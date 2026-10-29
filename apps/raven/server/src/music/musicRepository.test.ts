@@ -393,14 +393,18 @@ describe('MusicRepository', () => {
     ).not.toContain('Guest Singer')
   })
 
-  it('drops an album with its last file, and forgets a cover that was in a file now gone', () => {
+  it('drops an album with its last file, and a cover that was in a file now gone gives way to the archive', () => {
     const airbag = state.ids.get('/music/Radiohead/OK Computer/01 Airbag.flac') ?? 0
     new MediaIndex(database.get()).remove([airbag])
     repository().prune()
     const okComputer = repository()
       .listAlbums({ libraryId: state.library, ...LIST })
       .find(({ title }) => title === 'OK Computer')
-    expect(okComputer).toMatchObject({ trackCount: 1, coverVersion: null })
+    // The embedded cover went with the file; the album keeps its tags' release id, so the archive's stands in.
+    expect(okComputer).toMatchObject({ trackCount: 1 })
+    expect(
+      repository().cover({ id: okComputer?.id ?? 0, version: okComputer?.coverVersion ?? '' }),
+    ).toEqual({ source: COVER_SOURCES.coverArtArchive, ref: 'rel-ok' })
     const paranoid = state.ids.get('/music/Radiohead/OK Computer/02 Paranoid Android.flac') ?? 0
     new MediaIndex(database.get()).remove([paranoid])
     repository().prune()
@@ -409,7 +413,7 @@ describe('MusicRepository', () => {
         .listAlbums({ libraryId: state.library, ...LIST })
         .map(({ title }) => title),
     ).not.toContain('OK Computer')
-    expect(repository().albumIds().size).toBe(
+    expect(repository().keptCovers().albumIds.size).toBe(
       repository().listAlbums({ libraryId: state.library, ...LIST }).length +
         repository().listAlbums({ libraryId: state.other, ...LIST }).length,
     )

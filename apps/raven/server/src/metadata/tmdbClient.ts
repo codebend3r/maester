@@ -34,7 +34,7 @@ import {
   toShow,
   toTmdbImages,
 } from '@/metadata/tmdbShapes'
-import { type RateLimit, createRateLimit } from '@/scanner/concurrency'
+import { type RateLimit, createRateLimit, sleep } from '@/scanner/concurrency'
 
 type MetadataFetchProps = {
   url: string
@@ -120,8 +120,6 @@ export type TmdbState = {
   error: string | null
   lastOk: string | null
 }
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 /** Seconds from a `Retry-After` header, capped so a strange answer cannot stall a pass for long. */
 const retryAfterMs = (header: string | null): number => {

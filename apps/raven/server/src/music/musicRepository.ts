@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import {
   ALBUM_TYPES,
   type AlbumDetails,
+  MATCH_STATES,
   type AlbumSummary,
   type Artist,
   type ArtistCredit,
@@ -12,6 +13,7 @@ import {
   type Track,
   isAlbumType,
   isArtistCredit,
+  isMatchState,
   isStringArray,
   listOf,
   sortTitle,
@@ -23,11 +25,12 @@ import { likePattern } from '@/media/mediaSql'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import type { AudioFormat, AudioTags } from '@/music/audioReader'
 import { type Filing, type NamedArtist, albumTypeOf, filingOf, nameKeyOf } from '@/music/filing'
+import type { Release } from '@/music/musicBrainzClient'
 
-/** Where an album's cover comes from: a picture embedded in one of its files, or a file in its folder. */
-export const COVER_SOURCES = { embedded: 'embedded', file: 'file' } as const
+/** Where an album's cover comes from: a picture embedded in one of its files, a file in its folder, or the Cover Art Archive. */
+export const COVER_SOURCES = { embedded: 'embedded', file: 'file', coverArtArchive: 'caa' } as const
 
-/** An album's cover: the media id of the file that embeds it, or the path of the picture in its folder. */
+/** An album's cover: the media id of the file that embeds it, the path of the picture in its folder, or the release id the archive files it under. */
 export type AlbumCover = {
   source: (typeof COVER_SOURCES)[keyof typeof COVER_SOURCES]
   ref: string
@@ -48,10 +51,30 @@ type AlbumRow = {
   is_compilation: number
   cover_source: string | null
   cover_ref: string | null
+  mbid: string | null
+  match: string
   added_at: string
   artists: string
   track_count: number
   duration: number | null
+}
+
+/** An album as a MusicBrainz search reads it: what the tags and the files say of it. */
+export type AlbumToMatch = {
+  id: number
+  title: string
+  /** The first album artist's name; null for an album with none. */
+  artist: string | null
+  year: number | null
+  trackCount: number
+}
+
+type AlbumToMatchRow = {
+  id: number
+  title: string
+  artist: string | null
+  year: number | null
+  track_count: number
 }
 
 type AlbumDetailsRow = AlbumRow & {
@@ -107,7 +130,7 @@ const TRACK_ARTISTS = `(SELECT json_group_array(json_object('id', credited.id, '
 /** An album with its credits, track count and length; `more` adds columns the album's page reads. */
 const selectAlbums = (more = ''): string =>
   `SELECT a.id, a.library_id, a.title, a.sort_title, a.year, a.type, a.is_compilation,
-          a.cover_source, a.cover_ref, a.added_at, ${ALBUM_ARTISTS} AS artists,
+          a.cover_source, a.cover_ref, a.mbid, a.match, a.added_at, ${ALBUM_ARTISTS} AS artists,
           COUNT(t.media_id) AS track_count, SUM(m.duration) AS duration${more}
      FROM albums a
      LEFT JOIN tracks t ON t.album_id = a.id
@@ -126,6 +149,13 @@ const SELECT_TRACKS = `SELECT m.id AS media_id, m.library_id, t.album_id, t.titl
                          FROM tracks t
                          JOIN media m ON m.id = t.media_id
                          JOIN albums a ON a.id = t.album_id`
+
+/** An album as a search reads it: its title, first artist, year and how many tracks are on disk. */
+const SELECT_TO_MATCH = `SELECT a.id, a.title, a.year, COUNT(t.media_id) AS track_count,
+                                (SELECT ar.name FROM album_artists aa JOIN artists ar ON ar.id = aa.artist_id
+                                  WHERE aa.album_id = a.id ORDER BY aa.position LIMIT 1) AS artist
+                           FROM albums a
+                           LEFT JOIN tracks t ON t.album_id = a.id`
 
 /** The first album artist's sort name, for a listing by artist. */
 const FIRST_ARTIST = `(SELECT ar.sort_name FROM album_artists aa JOIN artists ar ON ar.id = aa.artist_id
@@ -167,10 +197,19 @@ const CREDITS = {
 const creditsOf = (json: string): ArtistCredit[] =>
   parseJsonAs({ json, guard: isArtistCredits }) ?? []
 
-type CoverOfProps = { source: string | null; ref: string | null }
+type CoverOfProps = { source: string | null; ref: string | null; mbid: string | null }
 
-const coverOf = ({ source, ref }: CoverOfProps): AlbumCover | null =>
-  isCoverSource(source) && ref != null ? { source, ref } : null
+/**
+ * An album's cover: the one its files or folder gave it, else the Cover
+ * Art Archive's by its release id, which is never stored as a cover so a
+ * picture that turns up beside the files later still wins.
+ */
+const coverOf = ({ source, ref, mbid }: CoverOfProps): AlbumCover | null =>
+  isCoverSource(source) && ref != null
+    ? { source, ref }
+    : mbid === null
+      ? null
+      : { source: COVER_SOURCES.coverArtArchive, ref: mbid }
 
 type MusicRepositoryRecordProps = {
   mediaId: number
@@ -222,6 +261,14 @@ type MusicRepositoryArtistProps = {
 
 type MusicRepositoryCoverProps = { id: number; version: string }
 
+type MusicRepositorySaveMatchProps = {
+  id: number
+  release: Release | null
+  match: typeof MATCH_STATES.matched | typeof MATCH_STATES.unmatched | typeof MATCH_STATES.manual
+  /** How sure the pass was, 0 to 100; null for a Fix match. */
+  confidence: number | null
+}
+
 /**
  * The music tables: what a scan writes of each audio file's tags, and the
  * artists, albums and tracks the clients list. Every album reads as an
@@ -253,8 +300,9 @@ export class MusicRepository {
       duration: row.duration ?? 0,
       coverVersion: this.pictureVersions.album({
         id: row.id,
-        cover: coverOf({ source: row.cover_source, ref: row.cover_ref }),
+        cover: coverOf({ source: row.cover_source, ref: row.cover_ref, mbid: row.mbid }),
       }),
+      match: isMatchState(row.match) ? row.match : MATCH_STATES.pending,
       addedAt: row.added_at,
     }
   }
@@ -340,10 +388,11 @@ export class MusicRepository {
       .prepare(
         `INSERT INTO albums (library_id, album_key, title, sort_title, year, original_year, mbid,
                              release_group_mbid, type, label, genres, is_compilation, credited_by_tags,
-                             cover_source, cover_ref, replaygain_gain, replaygain_peak, added_at)
+                             cover_source, cover_ref, replaygain_gain, replaygain_peak, added_at,
+                             match, matched_at)
          VALUES (@libraryId, @key, @title, @sortTitle, @year, @originalYear, @mbid,
                  @releaseGroupMbid, @type, @label, @genres, @isCompilation, @isCredited,
-                 @coverSource, @coverRef, @gain, @peak, @addedAt)`,
+                 @coverSource, @coverRef, @gain, @peak, @addedAt, @match, @matchedAt)`,
       )
       .run({
         libraryId,
@@ -364,6 +413,9 @@ export class MusicRepository {
         gain: tags.replayGain.albumGain,
         peak: tags.replayGain.albumPeak,
         addedAt: at.toISOString(),
+        // A release id in the tags is a match already; MusicBrainz is asked for the rest.
+        match: tags.releaseMbid === null ? MATCH_STATES.pending : MATCH_STATES.matched,
+        matchedAt: tags.releaseMbid === null ? null : at.toISOString(),
       })
     const id = Number(inserted.lastInsertRowid)
     this.credit({ credits: CREDITS.album, ownerId: id, artists: filing.albumArtists })
@@ -376,8 +428,13 @@ export class MusicRepository {
       .prepare(
         `UPDATE albums
             SET year = COALESCE(year, @year), original_year = COALESCE(original_year, @originalYear),
-                mbid = COALESCE(mbid, @mbid),
-                release_group_mbid = COALESCE(release_group_mbid, @releaseGroupMbid),
+                match = CASE WHEN mbid IS NULL AND @mbid IS NOT NULL AND match <> @manual
+                             THEN @matched ELSE match END,
+                matched_at = CASE WHEN mbid IS NULL AND @mbid IS NOT NULL AND match <> @manual
+                                  THEN @at ELSE matched_at END,
+                mbid = CASE WHEN match = @manual THEN mbid ELSE COALESCE(mbid, @mbid) END,
+                release_group_mbid = CASE WHEN match = @manual THEN release_group_mbid
+                                          ELSE COALESCE(release_group_mbid, @releaseGroupMbid) END,
                 label = COALESCE(label, @label),
                 genres = CASE WHEN genres = '[]' THEN @genres ELSE genres END,
                 cover_ref = CASE WHEN cover_source IS NULL THEN @coverRef ELSE cover_ref END,
@@ -398,6 +455,9 @@ export class MusicRepository {
         coverRef: cover?.ref ?? null,
         gain: tags.replayGain.albumGain,
         peak: tags.replayGain.albumPeak,
+        matched: MATCH_STATES.matched,
+        manual: MATCH_STATES.manual,
+        at: new Date().toISOString(),
       })
   }
 
@@ -490,6 +550,74 @@ export class MusicRepository {
     })()
   }
 
+  private toAlbumToMatch(row: AlbumToMatchRow): AlbumToMatch {
+    return {
+      id: row.id,
+      title: row.title,
+      artist: row.artist,
+      year: row.year,
+      trackCount: row.track_count,
+    }
+  }
+
+  /** The library's albums no pass has looked at yet, oldest first. */
+  albumsToMatch(libraryId: number): AlbumToMatch[] {
+    return this.db
+      .prepare<[string, number], AlbumToMatchRow>(
+        `${SELECT_TO_MATCH} WHERE a.match = ? AND a.library_id = ? GROUP BY a.id ORDER BY a.id`,
+      )
+      .all(MATCH_STATES.pending, libraryId)
+      .map((row) => this.toAlbumToMatch(row))
+  }
+
+  /** One album as a search reads it, or null when there is no such album. */
+  albumToMatch(id: number): AlbumToMatch | null {
+    const row = this.db
+      .prepare<[number], AlbumToMatchRow>(`${SELECT_TO_MATCH} WHERE a.id = ? GROUP BY a.id`)
+      .get(id)
+    return row === undefined ? null : this.toAlbumToMatch(row)
+  }
+
+  /**
+   * What a pass or a Fix match decided: the release the album is, with
+   * what MusicBrainz says of it filling in what the tags did not; or that
+   * it is none, which takes an earlier release away. The archive's cover
+   * follows the release id, so nothing of it is written here.
+   */
+  saveMatch({ id, release, match, confidence }: MusicRepositorySaveMatchProps): void {
+    this.db
+      .prepare(
+        `UPDATE albums
+            SET match = @match, match_confidence = @confidence, matched_at = @at,
+                mbid = @mbid,
+                release_group_mbid = CASE WHEN @mbid IS NULL THEN NULL
+                                          ELSE COALESCE(@releaseGroupMbid, release_group_mbid) END,
+                year = COALESCE(year, @year),
+                label = COALESCE(label, @label),
+                type = CASE WHEN type = @plain AND @type IS NOT NULL THEN @type ELSE type END
+          WHERE id = @id`,
+      )
+      .run({
+        id,
+        match,
+        confidence,
+        at: new Date().toISOString(),
+        mbid: release?.mbid ?? null,
+        releaseGroupMbid: release?.releaseGroupMbid ?? null,
+        year: release?.year ?? null,
+        label: release?.label ?? null,
+        type: release?.type ?? null,
+        plain: ALBUM_TYPES.album,
+      })
+  }
+
+  /** The library's albums no release was found for go back to pending; how many. */
+  resetUnmatched(libraryId: number): number {
+    return this.db
+      .prepare('UPDATE albums SET match = ? WHERE library_id = ? AND match = ?')
+      .run(MATCH_STATES.pending, libraryId, MATCH_STATES.unmatched).changes
+  }
+
   /** The library an album is in, or null when there is no such album. */
   libraryOfAlbum(id: number): number | null {
     return (
@@ -499,14 +627,15 @@ export class MusicRepository {
     )
   }
 
-  /** Every album's id, for the image cache's sweep. */
-  albumIds(): Set<number> {
-    return new Set(
-      this.db
-        .prepare<[], { id: number }>('SELECT id FROM albums')
-        .all()
-        .map((row) => row.id),
-    )
+  /** Every album's id, and every release id an album shows the archive's cover of, for the image cache's sweep. */
+  keptCovers(): { albumIds: Set<number>; coverArtIds: Set<string> } {
+    const rows = this.db
+      .prepare<[], { id: number; mbid: string | null }>('SELECT id, mbid FROM albums')
+      .all()
+    return {
+      albumIds: new Set(rows.map((row) => row.id)),
+      coverArtIds: new Set(rows.flatMap((row) => (row.mbid === null ? [] : [row.mbid]))),
+    }
   }
 
   /**
@@ -517,7 +646,7 @@ export class MusicRepository {
   cover({ id, version }: MusicRepositoryCoverProps): AlbumCover | null {
     const row = this.db
       .prepare<[number], CoverOfProps>(
-        'SELECT cover_source AS source, cover_ref AS ref FROM albums WHERE id = ?',
+        'SELECT cover_source AS source, cover_ref AS ref, mbid FROM albums WHERE id = ?',
       )
       .get(id)
     const cover = row === undefined ? null : coverOf(row)

@@ -1,19 +1,31 @@
 import type { Transport } from '@/apiClient/transport'
 import {
   type AlbumDetails,
+  type AlbumMatchCandidate,
+  type AlbumMatchChoice,
   type AlbumSummary,
   type Artist,
   type ArtistDetails,
   type TrackPage,
   isAlbumDetails,
   isAlbumList,
+  isAlbumMatchCandidateList,
   isArtistDetails,
   isArtistList,
   isTrackPage,
 } from '@/contract'
 import { type MusicListOptions, musicListQuery } from '@/musicListQuery'
+import { toQueryString } from '@/query'
 
 type ListMusicProps = { libraryId: number } & MusicListOptions
+
+type SearchAlbumMatchesProps = {
+  albumId: number
+  /** What to search MusicBrainz for; the album's own title and artist when left out. */
+  query?: string
+}
+
+type SetAlbumMatchProps = { albumId: number } & AlbumMatchChoice
 
 /** A music library's artists, albums and tracks, and the pages of one album or artist. */
 export const musicCalls = ({ send, expect }: Transport) => ({
@@ -51,4 +63,27 @@ export const musicCalls = ({ send, expect }: Transport) => ({
   /** An artist with their albums, and the albums of others they appear on. */
   getArtist: (id: number): Promise<ArtistDetails> =>
     expect({ request: send({ path: `/api/artists/${id}` }), guard: isArtistDetails }),
+
+  /** MusicBrainz's releases for an album's Fix match, each with how sure raven is of it, best first. */
+  searchAlbumMatches: ({
+    albumId,
+    query,
+  }: SearchAlbumMatchesProps): Promise<AlbumMatchCandidate[]> =>
+    expect({
+      request: send({
+        path: `/api/albums/${albumId}/match/search${query === undefined ? '' : `?${toQueryString({ query })}`}`,
+      }),
+      guard: isAlbumMatchCandidateList,
+    }),
+
+  /** Points an album at a MusicBrainz release, or at none, and answers with its page. */
+  setAlbumMatch: ({ albumId, mbid }: SetAlbumMatchProps): Promise<AlbumDetails> =>
+    expect({
+      request: send({
+        path: `/api/albums/${albumId}/match`,
+        method: 'PUT',
+        body: { mbid } satisfies AlbumMatchChoice,
+      }),
+      guard: isAlbumDetails,
+    }),
 })

@@ -112,6 +112,8 @@ export const ROUTES = {
   libraryAlbums: { method: GET, path: '/api/libraries/:id/albums', account: approved },
   libraryTracks: { method: GET, path: '/api/libraries/:id/tracks', account: approved },
   album: { method: GET, path: '/api/albums/:id', account: approved },
+  albumMatchSearch: { method: GET, path: '/api/albums/:id/match/search', account: owner },
+  setAlbumMatch: { method: PUT, path: '/api/albums/:id/match', account: owner },
   artist: { method: GET, path: '/api/artists/:id', account: approved },
   lockState: { method: GET, path: '/api/lock', account: approved },
   relock: { method: POST, path: '/api/lock/lock', account: approved },

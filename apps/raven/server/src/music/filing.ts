@@ -5,6 +5,12 @@ import type { AudioTags } from '@/music/audioReader'
 /** The names a file with no album artist is filed under. */
 export const FALLBACK_ARTISTS = { unknown: 'Unknown Artist', various: 'Various Artists' } as const
 
+type ArtistToMatchProps = { artist: string | null }
+
+/** The artist an album is searched by: its first, unless it has none or is Various Artists', which is no one. */
+export const artistToMatch = ({ artist }: ArtistToMatchProps): string | null =>
+  artist === null || artist === FALLBACK_ARTISTS.various ? null : artist
+
 /** A name as it is found again: lowercased, unaccented, one space between words. */
 export const nameKeyOf = (name: string): string =>
   name

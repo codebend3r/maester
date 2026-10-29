@@ -1,15 +1,53 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { type ApiClient, LIBRARY_KINDS, MUSIC_SORTS, THUMBNAIL_STATES } from '@raven/core'
+import {
+  type ApiClient,
+  LIBRARY_KINDS,
+  MATCH_STATES,
+  MUSIC_SORTS,
+  THUMBNAIL_STATES,
+} from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
+import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { NOT_WATCHING, adminCookie, testConfig } from '@/test/app'
 import { encodeImage, encodeTrack, jpegSize } from '@/test/clips'
+import { fakeMusicBrainz } from '@/test/fakeMusicBrainz'
 import { apiFor } from '@/test/server'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
+
+/** MusicBrainz release ids are UUIDs; these name the fake's releases. */
+const MBIDS = {
+  blur: '11111111-1111-4111-8111-000000000001',
+  tribute: '11111111-1111-4111-8111-000000000002',
+  okComputer: '11111111-1111-4111-8111-000000000003',
+  live: '11111111-1111-4111-8111-000000000004',
+  unknown: '11111111-1111-4111-8111-000000000009',
+} as const
+
+/** What the fake MusicBrainz knows: Blur's album with a cover in the archive, and a tribute to confuse it. */
+const RELEASES = [
+  {
+    mbid: MBIDS.blur,
+    title: 'Blur',
+    artist: 'Blur',
+    date: '1997-02-10',
+    trackCount: 14,
+    hasCover: true,
+  },
+  { mbid: MBIDS.tribute, title: 'Blur', artist: 'A Tribute Band', date: '2005' },
+  {
+    mbid: MBIDS.okComputer,
+    title: 'OK Computer',
+    artist: 'Radiohead',
+    date: '1997-05-21',
+    trackCount: 12,
+  },
+  { mbid: MBIDS.live, title: 'Live 1994', artist: 'Someone Else', date: '1994' },
+]
 
 /** A music library of two tagged albums and one untagged folder, scanned by the real tag reader. */
 describe('a music library', () => {
@@ -62,6 +100,7 @@ describe('a music library', () => {
     // A video in the music folder is not a track.
     state.app = await createApp({
       config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
+      metadataFetch: fakeMusicBrainz({ releases: RELEASES, cover: await readFile(cover) }).fetch,
       quiet: true,
       watch: NOT_WATCHING,
     })
@@ -75,6 +114,7 @@ describe('a music library', () => {
     state.library = library.id
     await app().get(ScannerService).whenIdle(library.id)
     await app().get(ThumbnailService).whenIdle()
+    await app().get(MetadataService).whenIdle()
   })
 
   afterAll(async () => {
@@ -127,10 +167,56 @@ describe('a music library', () => {
         hasCover: coverVersion !== null,
       })),
     ).toEqual([
-      { title: 'Blur', artists: ['Blur'], year: 1997, trackCount: 1, hasCover: false },
+      // Matched by a search, and given the archive's cover.
+      { title: 'Blur', artists: ['Blur'], year: 1997, trackCount: 1, hasCover: true },
       { title: 'Live 1994', artists: ['Bootlegs'], year: null, trackCount: 1, hasCover: true },
       { title: 'OK Computer', artists: ['Radiohead'], year: 1997, trackCount: 2, hasCover: true },
     ])
+  })
+
+  it('matches each album to MusicBrainz: by the id in its tags, by a sure search, or not at all', async () => {
+    const albums = await api().listAlbums({ libraryId: state.library })
+    expect(albums.map(({ title, match }) => `${title}: ${match}`)).toEqual([
+      'Blur: matched',
+      'Live 1994: unmatched',
+      'OK Computer: matched',
+    ])
+    const blur = await api().getAlbum(albums.find(({ title }) => title === 'Blur')?.id ?? 0)
+    expect(blur).toMatchObject({ mbid: MBIDS.blur })
+    const cover = api().albumCoverUrl({
+      albumId: blur.album.id,
+      coverVersion: blur.album.coverVersion,
+    })
+    const served = await app().inject({ method: 'GET', url: cover ?? '' })
+    expect(served.statusCode).toBe(200)
+    expect(jpegSize(served.rawPayload)).toEqual({ width: 300, height: 300 })
+  })
+
+  it('offers Fix match candidates scored against the album, and takes the pick or none', async () => {
+    const albums = await api().listAlbums({ libraryId: state.library })
+    const live = albums.find(({ title }) => title === 'Live 1994')
+    // Its folder named the artist, so a search by it finds nothing; words of one's own do.
+    await expect(api().searchAlbumMatches({ albumId: live?.id ?? 0 })).resolves.toEqual([])
+    const candidates = await api().searchAlbumMatches({
+      albumId: live?.id ?? 0,
+      query: 'Live 1994',
+    })
+    expect(candidates.map(({ mbid }) => mbid)).toEqual([MBIDS.live])
+    expect(candidates[0]?.confidence).toBeLessThan(80)
+    const fixed = await api().setAlbumMatch({ albumId: live?.id ?? 0, mbid: MBIDS.live })
+    expect(fixed).toMatchObject({
+      mbid: MBIDS.live,
+      album: { match: MATCH_STATES.manual, year: 1994 },
+    })
+    const cleared = await api().setAlbumMatch({ albumId: live?.id ?? 0, mbid: null })
+    expect(cleared).toMatchObject({ mbid: null, album: { match: MATCH_STATES.manual } })
+    await expect(
+      api().setAlbumMatch({ albumId: live?.id ?? 0, mbid: MBIDS.unknown }),
+    ).rejects.toMatchObject({
+      status: 404,
+    })
+    const retried = await api().matchLibrary(state.library)
+    expect(retried.id).toBe(state.library)
   })
 
   it("serves an album's cover by its capability address, square and scaled, to anyone, and no other version", async () => {

@@ -16,19 +16,25 @@ type PassGuardProps = {
   logger: Logger
   /** Logged before a task's own failure: `Could not match`. */
   failed: string
-  /** Logged once when TMDB stopped the pass: `Matching stopped for now`. */
+  /** Logged once when the source stopped the pass: `Matching stopped for now`. */
   stopped: string
+  /** Whether a failure means the source is away; TMDB's rule when left out. */
+  stops?: (error: unknown) => boolean
 }
 
 /**
- * Runs the tasks of one pass over TMDB, a matching pass or the sweep: a task
- * that fails is logged and the rest go on, while TMDB going away (down, or
- * the token refused) stops every task after it until the next pass.
+ * Runs the tasks of one pass over a metadata source, a matching pass or the
+ * sweep: a task that fails is logged and the rest go on, while the source
+ * going away (TMDB down or its token refused, MusicBrainz down) stops every
+ * task after it until the next pass.
  */
 export class PassGuard {
   private state: GuardState = { stopped: false }
+  private readonly stops: (error: unknown) => boolean
 
-  constructor(private readonly options: PassGuardProps) {}
+  constructor(private readonly options: PassGuardProps) {
+    this.stops = options.stops ?? stopsThePass
+  }
 
   get isStopped(): boolean {
     return this.state.stopped
@@ -39,7 +45,7 @@ export class PassGuard {
     try {
       await task()
     } catch (error) {
-      if (stopsThePass(error)) {
+      if (this.stops(error)) {
         this.state = { stopped: true, error }
         return
       }

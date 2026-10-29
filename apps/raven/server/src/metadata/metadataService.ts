@@ -2,17 +2,19 @@ import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs
 import {
   type AiMatch,
   isMatchItemType,
+  ITEM_TYPES,
   type ItemType,
   type LibraryKind,
+  MATCH_SOURCES,
+  MATCH_STATES,
   MATCHED_KINDS,
+  matcherFor,
   type MatchItemType,
+  matchTypeFor,
   type MediaItem,
   type MetadataHealth,
-  matchTypeFor,
   tiersFor,
   type UnmatchedFile,
-  ITEM_TYPES,
-  MATCH_STATES,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { MarkerDetection } from '@/markers/markerDetection'
@@ -38,6 +40,7 @@ import { createMatchers, type KindMatcher } from '@/metadata/matchers'
 import { MatchPass } from '@/metadata/matchPass'
 import { MdblistClient } from '@/metadata/mdblistClient'
 import { MetadataRepository } from '@/metadata/metadataRepository'
+import { AlbumMatching } from '@/music/albumMatching'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { PASS_CONCURRENCY } from '@/metadata/passGuard'
 import { filePlace, groupPlaceOf, showPlace } from '@/metadata/places'
@@ -178,6 +181,7 @@ export class MetadataService implements OnApplicationBootstrap {
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(StartupWork) private readonly startup: StartupWork,
     @Inject(MarkerDetection) private readonly markers: Pick<MarkerDetection, 'kick'>,
+    @Inject(AlbumMatching) private readonly albums: Pick<AlbumMatching, 'matchLibrary' | 'retry'>,
   ) {
     this.matchers = createMatchers({ files, metadata, pictures, decisions })
   }
@@ -207,9 +211,19 @@ export class MetadataService implements OnApplicationBootstrap {
       )
     }
     const { kind } = library.settings
-    if (matchTypeFor(kind) == null) return
-    this.files.retitle({ libraryId: library.id, kind })
-    this.enqueue(library.id)
+    const matcher = matcherFor(kind)
+    if (matcher === null) return
+    switch (matcher.by) {
+      case MATCH_SOURCES.tmdb:
+        this.files.retitle({ libraryId: library.id, kind })
+        return this.enqueue(library.id)
+      case MATCH_SOURCES.musicBrainz:
+        return this.enqueue(library.id)
+      default: {
+        const unknown: never = matcher
+        return unknown
+      }
+    }
   }
 
   /**
@@ -233,9 +247,14 @@ export class MetadataService implements OnApplicationBootstrap {
    * many files are queued.
    */
   retryUnmatched(libraryId: number): number {
+    const kind = this.libraries.get(libraryId)?.settings.kind
+    if (kind != null && matcherFor(kind)?.by === MATCH_SOURCES.musicBrainz) {
+      const albums = this.albums.retry(libraryId)
+      if (albums > 0) this.enqueue(libraryId)
+      return albums
+    }
     // The lookups that chose no id are asked again with the files.
     this.decisions.clearUndecided(libraryId)
-    const kind = this.libraries.get(libraryId)?.settings.kind
     const count = this.files.retryUnmatched(libraryId)
     if (count === 0 || kind == null) return count
     // Names are read again first, so a parser that now reads the name right gets its say.
@@ -476,6 +495,10 @@ export class MetadataService implements OnApplicationBootstrap {
     const library = this.libraries.get(libraryId)
     const kind = library?.settings.kind
     const type = kind == null ? null : matchTypeFor(kind)
+    // A music library's albums go to MusicBrainz; `type` is null for one, so TMDB is left alone.
+    if (kind != null && matcherFor(kind)?.by === MATCH_SOURCES.musicBrainz) {
+      await this.albums.matchLibrary(libraryId)
+    }
     if (library != null && kind != null && type != null && this.tmdb.enabled) {
       this.tmdb.newPass()
       const pass = this.newPass(kind)
