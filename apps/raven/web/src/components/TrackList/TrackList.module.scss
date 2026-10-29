@@ -1,0 +1,98 @@
+.list {
+  display: grid;
+  list-style: none;
+  padding: 0;
+}
+
+// Number, play, title, length, and the row's own controls: the title takes
+// the room, the rest sits at its width. Hovering swaps the number for play.
+.row {
+  display: grid;
+  grid-template-columns: 2rem var(--control-size) minmax(0, 1fr) auto auto;
+  grid-template-areas: 'number play title length trail';
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-size-tall);
+  padding: var(--space-0) var(--space-2);
+  border-radius: var(--radius-md);
+
+  &:hover,
+  &:focus-within {
+    background: var(--color-night-haze);
+  }
+}
+
+.current {
+  color: var(--color-leaf-bright);
+}
+
+.number {
+  grid-area: number;
+  display: grid;
+  place-content: center;
+  color: var(--color-lichen);
+  font-variant-numeric: tabular-nums;
+}
+
+.current .number {
+  color: inherit;
+}
+
+.play {
+  grid-area: play;
+}
+
+.title {
+  grid-area: title;
+  display: grid;
+  gap: var(--space-0);
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artists {
+  overflow: hidden;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+}
+
+.length {
+  grid-area: length;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.trail {
+  grid-area: trail;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-0);
+}
+
+@media (max-width: 40rem) {
+  .row {
+    grid-template-columns: var(--control-size) minmax(0, 1fr) auto auto;
+    grid-template-areas: 'play title length trail';
+  }
+
+  .number {
+    display: none;
+  }
+}

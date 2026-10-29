@@ -1,0 +1,85 @@
+// Along the foot of the page, glass over it, clear of a phone's tab bar:
+// the cover, the words, the controls, and a hairline of progress on top.
+.bar {
+  display: grid;
+  grid-template-columns: var(--control-size-tall) minmax(0, 1fr) auto;
+  grid-template-areas:
+    'progress progress progress'
+    'cover words controls';
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: 0 var(--space-3) var(--space-1);
+  border-top: 1px solid var(--color-line);
+  background: var(--color-night-haze);
+  backdrop-filter: var(--filter-glass);
+}
+
+.cover {
+  grid-area: cover;
+  display: block;
+  inline-size: var(--control-size-tall);
+  block-size: var(--control-size-tall);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  outline: none;
+
+  &:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.words {
+  grid-area: words;
+  display: grid;
+  gap: var(--space-0);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  outline: none;
+
+  &:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.title {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artists {
+  overflow: hidden;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controls {
+  grid-area: controls;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-0);
+}
+
+// A hairline across the top, filled as far as the track has played.
+.progress {
+  grid-area: progress;
+  block-size: 2px;
+  background: var(--color-line);
+}
+
+.played {
+  display: block;
+  block-size: 100%;
+  background: var(--color-leaf-bright);
+  transform-origin: left;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .played {
+    transition: transform 250ms linear;
+  }
+}

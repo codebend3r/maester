@@ -40,6 +40,7 @@ export { LISTING_GC_MS, createQueryClient, mutationKeys, queryKeys } from '@/que
 export {
   EDITED_PARTS,
   afterAiLookups,
+  afterAlbumMatch,
   afterFavourites,
   afterItemEdited,
   afterLibraryEvent,
@@ -86,3 +87,5 @@ export { usePageBackdrop } from '@/stores/pageBackdrop'
 export { createSelectionStore, releaseSelectionStore } from '@/stores/selection'
 export type { SelectionStore } from '@/stores/selection'
 export { useUnlockPrompt } from '@/stores/unlockPrompt'
+export { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
+export type { AudioState } from '@/stores/audioQueue'

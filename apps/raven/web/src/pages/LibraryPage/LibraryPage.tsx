@@ -15,24 +15,36 @@ import { LibraryHeader } from '@/pages/LibraryPage/LibraryHeader'
 import { LibraryTabs } from '@/pages/LibraryPage/LibraryTabs'
 import { SectionView } from '@/pages/LibraryPage/SectionViews'
 import {
-  type LibrarySection,
   SECTIONS,
   hasSection,
+  openingSection,
   sectionFrom,
   sectionPath,
 } from '@/pages/LibraryPage/librarySections'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
-type LibraryViewProps = { library: Library; section: LibrarySection }
+type LibraryViewProps = { library: Library; param: string | undefined }
 
 /** The page once its library is known, open at one of its tabs. */
-const LibraryView = ({ library, section }: LibraryViewProps) => {
+const LibraryView = ({ library, param }: LibraryViewProps) => {
   const titleId = useId()
+  const { kind } = library.settings
+  const section = sectionFrom({ param, kind })
   // A locked library's videos are not asked for until this browser has the PIN.
   const lock = useLibraryLock(library)
   const isShut = lock.state !== LIBRARY_LOCK_STATES.open
   const actions = useLibraryActions(library)
+
+  if (section == null) return <NotFoundPage />
+  if (!hasSection({ kind, section })) {
+    return (
+      <Navigate
+        to={sectionPath({ libraryId: library.id, section: openingSection(kind) })}
+        replace
+      />
+    )
+  }
 
   return (
     <section className={styles.page} aria-labelledby={titleId}>
@@ -79,7 +91,7 @@ const LibrarySkeleton = () => (
 export const LibraryPage = () => {
   const queryClient = useQueryClient()
   const libraryId = useRouteId()
-  const section = sectionFrom(useParams().section)
+  const param = useParams().section
   const library = useQuery({
     ...libraryQuery(libraryId),
     placeholderData: () =>
@@ -88,12 +100,8 @@ export const LibraryPage = () => {
       libraryPollDelay({ libraries: current.state.data ? [current.state.data] : [] }),
   })
   const page = routeState({ id: libraryId, query: library })
-  if (section == null) return <NotFoundPage />
   if (page.state !== ROUTE_STATES.ready) {
     return <RouteState state={page} noun="library" shape={<LibrarySkeleton />} />
   }
-  if (!hasSection({ kind: page.data.settings.kind, section })) {
-    return <Navigate to={sectionPath({ libraryId: page.data.id, section: 'all' })} replace />
-  }
-  return <LibraryView library={page.data} section={section} />
+  return <LibraryView library={page.data} param={param} />
 }

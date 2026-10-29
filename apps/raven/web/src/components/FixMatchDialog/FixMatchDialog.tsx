@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type AiMatch,
   CONFIDENCE_TIERS,
-  type ConfidenceTier,
   type MatchCandidate,
   type MatchItemType,
   type MatchSubject,
@@ -10,6 +9,7 @@ import {
 } from '@raven/core'
 import { type FormEvent, useId } from 'react'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
+import { MatchTier } from '@/components/MatchTier/MatchTier'
 import { Button, Icon } from '@raven/ui'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { api } from '@/lib/api'
@@ -23,12 +23,6 @@ const NOT_A: Record<MatchItemType, string> = { movie: 'Not a movie', show: 'Not 
 const yearFrom = (text: string): number | null => {
   const year = Number.parseInt(text.trim(), 10)
   return Number.isInteger(year) && year > 1800 && year < 2200 ? year : null
-}
-
-const TIER_WORDS: Record<ConfidenceTier, string> = {
-  strong: 'Strong match',
-  possible: 'Possible match',
-  weak: 'Weak match',
 }
 
 type CandidateProps = {
@@ -62,11 +56,7 @@ const Candidate = ({ candidate, isBest, disabled, onChoose }: CandidateProps) =>
       <span className={styles.details}>
         <span className={styles.name}>{candidate.title}</span>
         {candidate.year != null && <span className={styles.year}>{candidate.year}</span>}
-        <span id={tierId} className={`${styles.tier} ${styles[tier]}`}>
-          {isBest && <Icon name="check" size={14} />}
-          <span>{isBest ? 'Best match' : TIER_WORDS[tier]}</span>
-          <span className="visually-hidden">, confidence {candidate.confidence} out of 100</span>
-        </span>
+        <MatchTier id={tierId} confidence={candidate.confidence} isBest={isBest} />
         {candidate.overview != null && (
           <span className={styles.overview}>{candidate.overview}</span>
         )}

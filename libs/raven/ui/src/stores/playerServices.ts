@@ -1,6 +1,7 @@
 import { useId, useLayoutEffect } from 'react'
 import { create } from 'zustand'
 import { createJSONStorage, devtools, persist } from 'zustand/middleware'
+import { useAudioQueue } from '@/stores/audioQueue'
 import { STORE_KEYS, UNCONFIGURED_STORAGE } from '@/stores/storage'
 import type { PlayerServices } from '@/components/Player/PlayerServices'
 
@@ -48,6 +49,10 @@ export const useHostPlayer = (services: PlayerServices): boolean => {
   useLayoutEffect(() => {
     usePlayerServices.setState({ host, services })
   }, [host, services])
+  // Starting a video pauses the music; starting music closes nothing.
+  useLayoutEffect(() => {
+    useAudioQueue.getState().pause()
+  }, [])
   useLayoutEffect(
     () => () => {
       if (usePlayerServices.getState().host === host) usePlayerServices.setState(EMPTY)

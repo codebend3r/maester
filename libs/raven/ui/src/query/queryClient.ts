@@ -43,6 +43,12 @@ type QueryKeysMediaProps = {
   seed: number
 }
 
+type QueryKeysMusicListProps = { libraryId: number; search: string; sort: string }
+
+type QueryKeysArtistsProps = { libraryId: number; search: string }
+
+type QueryKeysAlbumMatchSearchProps = { albumId: number; query: string }
+
 type QueryKeysNextInSessionProps = { id: number; session: ViewingSession }
 
 type QueryKeysShowsProps = {
@@ -160,6 +166,30 @@ export const queryKeys = {
   displaySettings: ['settings', 'display'],
   nextEpisode: (showId: number) => ['items', showId, 'next'],
   person: (id: number | null) => ['people', id],
+  /** A music library's albums, artists and tracks, under the library so a library event reads them again. */
+  albums: ({ libraryId, search, sort }: QueryKeysMusicListProps) => [
+    'libraries',
+    libraryId,
+    'albums',
+    { search, sort },
+  ],
+  artists: ({ libraryId, search }: QueryKeysArtistsProps) => [
+    'libraries',
+    libraryId,
+    'artists',
+    { search },
+  ],
+  /** Every album's and artist's page: one prefix a match or a scan reads again. */
+  music: ['music'],
+  album: (id: number | null) => ['music', 'albums', id],
+  artist: (id: number | null) => ['music', 'artists', id],
+  albumMatchSearch: ({ albumId, query }: QueryKeysAlbumMatchSearchProps) => [
+    'music',
+    'albums',
+    albumId,
+    'match',
+    query,
+  ],
   matchSearch: ({ type, query, year, libraryId, subject }: QueryKeysMatchSearchProps) => [
     'match',
     type,

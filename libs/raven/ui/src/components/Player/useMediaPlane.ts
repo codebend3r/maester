@@ -18,13 +18,20 @@ type UseMediaPlaneProps = {
   api: ApiClient
   mediaId: number
   reprobe: () => void
+  /** Whether there is a video to play yet; false asks for no ticket. */
+  isEnabled?: boolean
 }
 
-export const useMediaPlane = ({ api, mediaId, reprobe }: UseMediaPlaneProps): MediaPlane => {
+export const useMediaPlane = ({
+  api,
+  mediaId,
+  reprobe,
+  isEnabled = true,
+}: UseMediaPlaneProps): MediaPlane => {
   const pick = useMediaOrigin((state) => state.pick)
   const ticket = useQuery({
     ...playerQueriesFor(api).mediaTicket(mediaId),
-    enabled: pick !== null,
+    enabled: pick !== null && isEnabled,
   })
   const kind = pick?.origin.kind ?? null
   const url = pick?.origin.url ?? null

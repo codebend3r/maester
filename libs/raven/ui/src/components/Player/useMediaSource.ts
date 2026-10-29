@@ -51,7 +51,8 @@ export const sourceFor = ({
         url: (start) => api.streamUrl({ id, mode, start, audio, quality, access: access() }),
       }
 
-const failureMessage = (error: MediaError | null): string => {
+/** What a media element's error means to the viewer. */
+export const failureMessage = (error: MediaError | null): string => {
   if (error?.code === MediaError.MEDIA_ERR_NETWORK) return 'The connection to the server dropped.'
   if (error?.code === MediaError.MEDIA_ERR_DECODE) return "The browser couldn't decode this file."
   if (error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {

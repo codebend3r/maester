@@ -26,6 +26,10 @@ import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { PendingPage } from '@/pages/PendingPage/PendingPage'
 import { PersonPage } from '@/pages/PersonPage/PersonPage'
+import { AlbumPage } from '@/pages/AlbumPage/AlbumPage'
+import { ArtistPage } from '@/pages/ArtistPage/ArtistPage'
+import { NowPlayingPage } from '@/pages/NowPlayingPage/NowPlayingPage'
+import { NOW_PLAYING_PATH } from '@/lib/music'
 import { GetPage } from '@/pages/GetPage/GetPage'
 import { CheckEmailPage } from '@/pages/CheckEmailPage/CheckEmailPage'
 import { ConfirmPage } from '@/pages/ConfirmPage/ConfirmPage'
@@ -59,6 +63,9 @@ export const AppRoutes = () => {
             <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
             <Route path="episodes/:id" element={<EpisodePage />} />
             <Route path="people/:id" element={<PersonPage />} />
+            <Route path="albums/:id" element={<AlbumPage />} />
+            <Route path="artists/:id" element={<ArtistPage />} />
+            <Route path={NOW_PLAYING_PATH} element={<NowPlayingPage />} />
             <Route path="favourites" element={<FavouritesPage />} />
             <Route path="streams" element={<StreamsPage />} />
             <Route path="reports" element={<BugReportsPage />} />

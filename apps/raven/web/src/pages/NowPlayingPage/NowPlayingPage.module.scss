@@ -1,0 +1,115 @@
+.page {
+  display: grid;
+  gap: var(--space-6);
+  align-content: start;
+}
+
+.back {
+  justify-self: start;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+}
+
+.empty {
+  color: var(--color-lichen);
+}
+
+// The cover large and centred, the words under it, then the scrubber and the controls.
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 24rem);
+  grid-template-areas:
+    'cover'
+    'words'
+    'scrubber'
+    'controls';
+  justify-content: center;
+  gap: var(--space-4);
+  text-align: center;
+}
+
+.cover {
+  grid-area: cover;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-hero);
+}
+
+.words {
+  grid-area: words;
+  display: grid;
+  gap: var(--space-0);
+  min-width: 0;
+}
+
+.trackTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-heading);
+  overflow-wrap: anywhere;
+}
+
+.artists,
+.album {
+  color: var(--color-lichen);
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+}
+
+.error {
+  color: var(--color-leaf-bright);
+}
+
+.scrubber {
+  grid-area: scrubber;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'played range left';
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.played {
+  grid-area: played;
+}
+
+.left {
+  grid-area: left;
+}
+
+.time {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.range {
+  grid-area: range;
+  inline-size: 100%;
+  accent-color: var(--color-leaf-bright);
+}
+
+.controls {
+  grid-area: controls;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.queue {
+  display: grid;
+  gap: var(--space-3);
+}

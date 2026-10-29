@@ -19,20 +19,25 @@ const MEDIA_EVENTS = [
 
 type MediaEventName = (typeof MEDIA_EVENTS)[number]
 
-type MediaListeners = Partial<Record<MediaEventName, (element: HTMLVideoElement) => void>>
+type MediaListeners<E extends HTMLMediaElement> = Partial<
+  Record<MediaEventName, (element: E) => void>
+>
 
-type UseVideoEventsProps = {
-  videoRef: RefObject<HTMLVideoElement | null>
-  on: MediaListeners
+type UseVideoEventsProps<E extends HTMLMediaElement> = {
+  videoRef: RefObject<E | null>
+  on: MediaListeners<E>
 }
 
 /**
- * Listens to the video element's own events for as long as the component
- * lives. Each call answers with the listeners of the latest render, so a
+ * Listens to the media element's own events, a video's or an audio's, for
+ * as long as the component lives. Each call answers with the listeners of the latest render, so a
  * hook can hand over closures over its current props without resubscribing.
  */
-export const useVideoEvents = ({ videoRef, on }: UseVideoEventsProps): void => {
-  type HandleProps = { name: MediaEventName; element: HTMLVideoElement }
+export const useVideoEvents = <E extends HTMLMediaElement>({
+  videoRef,
+  on,
+}: UseVideoEventsProps<E>): void => {
+  type HandleProps = { name: MediaEventName; element: E }
 
   const handle = useEffectEvent(({ name, element }: HandleProps) => on[name]?.(element))
   useEffect(() => {

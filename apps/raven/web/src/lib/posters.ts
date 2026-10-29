@@ -28,6 +28,12 @@ export const POSTER_SIZES = {
    * under 48rem and 208 px past it.
    */
   cover: 'auto, (max-width: 48rem) 10rem, 13rem',
+  /** An album page's cover: the screen's width on a phone, 16rem beside the words past it. */
+  album: '(max-width: 40rem) calc(100vw - 2rem), 16rem',
+  /** The now-playing bar's cover, a control tall. */
+  bar: '3rem',
+  /** Now Playing's cover: most of a phone's width, 24rem past it. */
+  nowPlaying: '(max-width: 40rem) calc(100vw - 4rem), 24rem',
   /**
    * Home's rows: two, four, then eight across the page, which stops growing
    * at 120rem.
@@ -66,6 +72,9 @@ const NARROWEST: Record<PosterSizes, number> = {
   [POSTER_SIZES.movieTile]: 56,
   [POSTER_SIZES.list]: 36,
   [POSTER_SIZES.duplicate]: 56,
+  [POSTER_SIZES.album]: 256,
+  [POSTER_SIZES.bar]: 48,
+  [POSTER_SIZES.nowPlaying]: 288,
 }
 
 /**
