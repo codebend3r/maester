@@ -38,6 +38,11 @@ export const APP_CLIENT_CALLS = {
   listSagas: { method: get, path: '/api/libraries/:id/sagas' },
   listInProgress: { method: get, path: '/api/libraries/:id/in-progress' },
   listLibraryFavourites: { method: get, path: '/api/libraries/:id/favourites' },
+  listArtists: { method: get, path: '/api/libraries/:id/artists' },
+  listAlbums: { method: get, path: '/api/libraries/:id/albums' },
+  listTracks: { method: get, path: '/api/libraries/:id/tracks' },
+  getAlbum: { method: get, path: '/api/albums/:id' },
+  getArtist: { method: get, path: '/api/artists/:id' },
 
   getItem: { method: get, path: '/api/items/:id' },
   nextEpisode: { method: get, path: '/api/items/:id/next' },
@@ -46,6 +51,7 @@ export const APP_CLIENT_CALLS = {
   personPhoto: { method: get, path: '/api/people/:id/photo' },
   itemPicture: { method: get, path: PICTURE_PATHS.item },
   personPicture: { method: get, path: PICTURE_PATHS.photo },
+  albumCover: { method: get, path: PICTURE_PATHS.album },
 
   getMedia: { method: get, path: '/api/media/:id' },
   getTracks: { method: get, path: '/api/media/:id/tracks' },

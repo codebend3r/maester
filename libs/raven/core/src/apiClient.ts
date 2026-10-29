@@ -5,6 +5,7 @@ import { libraryCalls } from '@/apiClient/libraries'
 import { lockCalls } from '@/apiClient/locks'
 import { matchingCalls } from '@/apiClient/matching'
 import { mediaCalls } from '@/apiClient/media'
+import { musicCalls } from '@/apiClient/music'
 import { pictureCalls } from '@/apiClient/pictures'
 import { playbackCalls } from '@/apiClient/playback'
 import { reportCalls } from '@/apiClient/reports'
@@ -66,6 +67,7 @@ export const createApiClient = ({
     ...itemCalls(transport),
     ...homeCalls(transport),
     ...matchingCalls(transport),
+    ...musicCalls(transport),
     ...pictureCalls({ transport, pictureCdn }),
     ...settingsCalls(transport),
     ...playbackCalls(transport),

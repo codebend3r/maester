@@ -3,9 +3,11 @@ import {
   FOLDER_LAYOUTS,
   ITEM_TYPES,
   LIBRARY_KINDS,
+  LIBRARY_LISTINGS,
   LIBRARY_VIEWS,
   type LibraryIconName,
   type LibraryKind,
+  type LibraryListing,
   type LibrarySettings,
   type LibraryView,
   MEDIA_GROUPINGS,
@@ -31,6 +33,8 @@ export type KindRules = {
   media: MediaType
   /** Whether a new library saves the spot each file was left at. */
   saveProgress: boolean
+  /** What its page lists: files, shows, or albums. */
+  listing: LibraryListing
   /** What its files are matched to on TMDB; null for a library that is never matched. */
   matches: MatchItemType | null
   /** The search results it prefers, tier by tier: a key of `TIER_SETS`. */
@@ -65,6 +69,7 @@ const without = <T>({ all, left }: WithoutProps<T>): T[] =>
 const MOVIE_RULES = {
   media: MEDIA_TYPES.video,
   saveProgress: true,
+  listing: LIBRARY_LISTINGS.media,
   matches: ITEM_TYPES.movie,
   prefer: TIER_SET_NAMES.any,
   fields: isSortFieldName.values,
@@ -82,6 +87,7 @@ const MOVIE_RULES = {
 const SHOW_RULES = {
   media: MEDIA_TYPES.video,
   saveProgress: true,
+  listing: LIBRARY_LISTINGS.shows,
   matches: ITEM_TYPES.show,
   prefer: TIER_SET_NAMES.any,
   fields: without({ all: isSortFieldName.values, left: FILE_FIELDS }),
@@ -95,6 +101,7 @@ const SHOW_RULES = {
 const UNMATCHED_RULES = {
   media: MEDIA_TYPES.video,
   saveProgress: true,
+  listing: LIBRARY_LISTINGS.media,
   matches: null,
   prefer: TIER_SET_NAMES.any,
   fields: without({ all: isSortFieldName.values, left: MATCHED_FIELDS }),
@@ -106,11 +113,13 @@ const UNMATCHED_RULES = {
 
 /**
  * A library of audio files is never matched yet, and has no frame to sort
- * or group by. It starts as a list grouped by the month each file came in.
+ * or group by. Its files list as before the albums page lands, as a list
+ * grouped by the month each file came in.
  */
 const AUDIO_RULES = {
   media: MEDIA_TYPES.audio,
   saveProgress: true,
+  listing: LIBRARY_LISTINGS.media,
   matches: null,
   prefer: TIER_SET_NAMES.any,
   fields: without({
@@ -142,7 +151,7 @@ export const KIND_RULES = {
   sports: MOVIE_RULES,
   youtube: UNMATCHED_RULES,
   other: UNMATCHED_RULES,
-  music: { ...AUDIO_RULES, saveProgress: false },
+  music: { ...AUDIO_RULES, saveProgress: false, listing: LIBRARY_LISTINGS.albums },
   audiobooks: AUDIO_RULES,
 } as const satisfies Record<LibraryKind, KindRules>
 
@@ -184,8 +193,12 @@ export const MATCHED_KINDS: readonly LibraryKind[] = isLibraryKind.values.filter
   (kind) => matchTypeFor(kind) != null,
 )
 
+/** What a library of `kind` lists on its page. */
+export const listingFor = (kind: LibraryKind): LibraryListing => KIND_RULES[kind].listing
+
 /** Whether the library's cards are its shows, with its files no show was found for listed apart. */
-export const listsShows = (kind: LibraryKind): boolean => matchTypeFor(kind) === ITEM_TYPES.show
+export const listsShows = (kind: LibraryKind): boolean =>
+  listingFor(kind) === LIBRARY_LISTINGS.shows
 
 /** The fields a library of `kind` can sort on, in the order a menu offers them. */
 export const sortFieldsFor = (kind: LibraryKind): readonly SortFieldName[] =>

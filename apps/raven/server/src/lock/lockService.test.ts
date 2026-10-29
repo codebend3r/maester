@@ -8,6 +8,7 @@ import { AUTH_TEST_CONFIG, AUTH_TEST_IDS } from '@/test/auth'
 
 const LOCKED_LIBRARY = 3
 const VIDEO = 7
+const ALBUM = 11
 
 const OWNER: Account = {
   id: AUTH_TEST_IDS.owner,
@@ -29,6 +30,7 @@ const lockFor = ({ caller, lockedIds = () => new Set([LOCKED_LIBRARY]) }: LockFo
     { librariesHolding: () => [LOCKED_LIBRARY] },
     new Management(AUTH_TEST_CONFIG, { isLocked: () => true }, sessions),
     sessions,
+    { libraryOfAlbum: (id) => (id === ALBUM ? LOCKED_LIBRARY : null) },
   )
 }
 

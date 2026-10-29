@@ -5,10 +5,12 @@ import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   type ApiClient,
+  LIBRARY_KINDS,
   type LibraryInput,
   groupingsFor,
   isLibraryKind,
   isRecord,
+  musicListQuery,
   sortsFor,
   viewsFor,
 } from '@raven/core'
@@ -37,7 +39,8 @@ import {
   isRouteMethod,
   testConfig,
 } from '@/test/app'
-import { encodeClip } from '@/test/clips'
+import { MusicRepository } from '@/music/musicRepository'
+import { encodeClip, encodeTrack } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
 import { apiFor } from '@/test/server'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -51,8 +54,20 @@ describe('a library locked behind the PIN', () => {
     private: number
     privateVideo: number
     privateItem: number
+    privateMusic: number
+    privateAlbum: number
     app: NestFastifyApplication | null
-  } = { root: '', admin: '', open: 0, private: 0, privateVideo: 0, privateItem: 0, app: null }
+  } = {
+    root: '',
+    admin: '',
+    open: 0,
+    private: 0,
+    privateVideo: 0,
+    privateItem: 0,
+    privateMusic: 0,
+    privateAlbum: 0,
+    app: null,
+  }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
     return state.app
@@ -88,6 +103,10 @@ describe('a library locked behind the PIN', () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-locked-'))
     await encodeClip({ path: at('Open', 'Heat (1995).mp4'), seconds: 2 })
     await encodeClip({ path: at('Private', 'Lesson One.mp4'), seconds: 2 })
+    await encodeTrack({
+      path: at('Private', 'Music', 'Lesson One (Audio).mp3'),
+      tags: { title: 'Lesson One', artist: 'Tutor', album: 'Lessons' },
+    })
     state.app = await createApp({
       config: {
         ...testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
@@ -106,6 +125,16 @@ describe('a library locked behind the PIN', () => {
     })
     const [video] = app().get(MediaIndex).idsForLibrary(state.private)
     state.privateVideo = video ?? 0
+    // A locked music library too, so the album routes have an album to hold back.
+    state.privateMusic = await createLibrary({
+      name: 'Lessons',
+      paths: [at('Private', 'Music')],
+      settings: { kind: LIBRARY_KINDS.music, locked: true },
+    })
+    state.privateAlbum =
+      app()
+        .get(MusicRepository)
+        .listAlbums({ libraryId: state.privateMusic, ...musicListQuery.decode({}) })[0]?.id ?? 0
     // A movie only the locked library holds, as if it had been matched.
     const metadata = app().get(MetadataRepository)
     state.privateItem = metadata.save({
@@ -122,6 +151,7 @@ describe('a library locked behind the PIN', () => {
   it('lists the library, saying it is locked', async () => {
     const libraries = await api().listLibraries()
     expect(libraries.map((library) => [library.name, library.settings.locked])).toEqual([
+      ['Lessons', true],
       ['Open', false],
       ['Tutorials', true],
     ])
@@ -137,6 +167,7 @@ describe('a library locked behind the PIN', () => {
         backdrop: library.backdrop?.type ?? null,
       }))
     expect(await shown()).toEqual([
+      { paths: [], layouts: [], backdrop: null },
       { paths: [at('Open')], layouts: expect.any(Array), backdrop: 'thumbnail' },
       { paths: [], layouts: [], backdrop: null },
     ])
@@ -147,6 +178,8 @@ describe('a library locked behind the PIN', () => {
     })
     const { cookie } = await unlock('3001')
     expect(await shown(cookie)).toEqual([
+      // A music library grabs no frames, so it has no picture yet.
+      { paths: [at('Private', 'Music')], layouts: expect.any(Array), backdrop: null },
       { paths: [at('Open')], layouts: expect.any(Array), backdrop: 'thumbnail' },
       { paths: [at('Private')], layouts: expect.any(Array), backdrop: 'thumbnail' },
     ])
@@ -222,6 +255,7 @@ describe('a library locked behind the PIN', () => {
       library: state.private,
       media: state.privateVideo,
       item: state.privateItem,
+      album: state.privateAlbum,
     }
     const held = routeMarks(CONTROLLERS).flatMap((route) =>
       route.lock == null || route.lock === LOCK_MARKS.public || !isRouteMethod(route.method)
@@ -281,7 +315,7 @@ describe('a library locked behind the PIN', () => {
     }
     expect(await home(cookie)).toEqual({
       inProgress: [state.privateVideo],
-      shelves: [state.open, state.private],
+      shelves: [state.privateMusic, state.open, state.private],
     })
     expect(await home()).toEqual({ inProgress: [], shelves: [state.open] })
   })
@@ -471,6 +505,10 @@ describe('the admin lock', () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-admin-'))
     await encodeClip({ path: at('Open', 'Heat (1995).mp4'), seconds: 2 })
     await encodeClip({ path: at('Private', 'Lesson One.mp4'), seconds: 2 })
+    await encodeTrack({
+      path: at('Private', 'Music', 'Lesson One (Audio).mp3'),
+      tags: { title: 'Lesson One', artist: 'Tutor', album: 'Lessons' },
+    })
     state.app = await createApp({
       config: {
         ...testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
@@ -593,7 +631,12 @@ describe('the admin lock', () => {
     // library holds is hidden while a library is locked, so an item's routes take the open
     // movie: sent no body, and with TMDB off, none of them changes it.
     const absent = 999999
-    const ids: Record<Privacy, number> = { library: absent, media: absent, item: state.openItem }
+    const ids: Record<Privacy, number> = {
+      library: absent,
+      media: absent,
+      item: state.openItem,
+      album: absent,
+    }
     const managing = routeMarks(CONTROLLERS).flatMap(({ method, path, lock, audience }) =>
       audience !== AUDIENCES.admin || !isRouteMethod(method)
         ? []

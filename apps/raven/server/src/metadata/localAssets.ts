@@ -15,7 +15,7 @@ const stemOf = (name: string): string => name.slice(0, name.lastIndexOf('.')).to
 type FirstImageProps = { names: readonly string[]; stems: readonly string[] }
 
 /** The first of `stems`, in order, that names an image in `names`. */
-const firstImage = ({ names, stems }: FirstImageProps) =>
+export const firstImage = ({ names, stems }: FirstImageProps) =>
   stems
     .map((stem) =>
       names.find((name) => IMAGE_EXTENSION.test(name) && stemOf(name) === stem.toLowerCase()),

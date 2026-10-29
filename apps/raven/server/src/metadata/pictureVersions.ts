@@ -17,6 +17,9 @@ type PictureVersionsPhotoProps = { id: number; photo: string | null }
 
 type PictureVersionsAvatarProps = { id: number; avatar: string | null }
 
+/** Where an album's cover comes from and what names it there: the file that embeds it, or a picture's path. */
+type PictureVersionsAlbumProps = { id: number; cover: { source: string; ref: string } | null }
+
 /**
  * A picture's version: its owner, its kind and its source hashed with this
  * server's own secret, so it changes exactly when the picture does and
@@ -44,6 +47,11 @@ export class PictureVersions {
   /** The version of item `id`'s picture of `kind`, shown from `source` at `ref`. */
   item({ id, kind, source, ref }: PictureVersionsItemProps): string {
     return this.of(`item:${id}:${kind}:${source}:${ref}`)
+  }
+
+  /** The version of album `id`'s cover, from `source` at `ref`; null for none. */
+  album({ id, cover }: PictureVersionsAlbumProps): string | null {
+    return cover == null ? null : this.of(`album:${id}:${cover.source}:${cover.ref}`)
   }
 
   /** The version of person `id`'s TMDB photo at `photo`; null for none. */

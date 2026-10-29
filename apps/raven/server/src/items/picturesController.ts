@@ -8,7 +8,7 @@ import {
   Query,
   Res,
 } from '@nestjs/common'
-import { PICTURE_PARAMS, PICTURE_PATHS, isItemImageKind } from '@raven/core'
+import { ITEM_IMAGE_KINDS, PICTURE_PARAMS, PICTURE_PATHS, isItemImageKind } from '@raven/core'
 import { sameSecret } from '@shared/server'
 import type { FastifyReply } from 'fastify'
 import { OpenToAnyone } from '@/auth/accountGuard'
@@ -19,6 +19,7 @@ import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { PictureVersions } from '@/metadata/pictureVersions'
+import { AlbumCovers } from '@/music/albumCovers'
 
 type IsCurrentProps = { given: string; current: string | null | undefined }
 
@@ -50,6 +51,7 @@ export class PicturesController {
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(ImageCache) private readonly images: ImageCache,
     @Inject(PictureVersions) private readonly versions: PictureVersions,
+    @Inject(AlbumCovers) private readonly covers: AlbumCovers,
   ) {}
 
   /** An item's poster, backdrop, logo or still; a poster comes narrower when `w` asks. */
@@ -70,6 +72,20 @@ export class PicturesController {
     if (!named) throw new NotFoundException('No picture')
     const width = pictureWidth({ kind, asked })
     const path = await this.pictureFiles.pathOf({ id, kind, width, image: named.image })
+    await sendImage({ reply, path, version, audience: IMAGE_AUDIENCES.everyone })
+  }
+
+  /** An album's cover, square, at a poster's widths: its own, or narrower when `w` asks. */
+  @OpenToAnyone()
+  @Get(PICTURE_PATHS.album)
+  async album(
+    @Param(PICTURE_PARAMS.id, ParseIntPipe) id: number,
+    @Param(PICTURE_PARAMS.version) version: string,
+    @Query('w') asked: unknown,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const width = pictureWidth({ kind: ITEM_IMAGE_KINDS.poster, asked })
+    const path = await this.covers.pathOf({ id, version, width })
     await sendImage({ reply, path, version, audience: IMAGE_AUDIENCES.everyone })
   }
 

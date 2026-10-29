@@ -18,9 +18,15 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { WrongTries } from '@/lock/wrongTries'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MetadataRepository } from '@/metadata/metadataRepository'
+import { MusicRepository } from '@/music/musicRepository'
 
-/** What a route's `:id` names, so its library can be found: a library, a video, or a movie or show. */
-export const PRIVACIES = { library: 'library', media: 'media', item: 'item' } as const
+/** What a route's `:id` names, so its library can be found: a library, a video, a movie or show, or an album. */
+export const PRIVACIES = {
+  library: 'library',
+  media: 'media',
+  item: 'item',
+  album: 'album',
+} as const
 
 export type Privacy = (typeof PRIVACIES)[keyof typeof PRIVACIES]
 
@@ -110,6 +116,7 @@ export class LockService {
     private readonly metadata: Pick<MetadataRepository, 'librariesHolding'>,
     @Inject(Management) private readonly management: Pick<Management, 'canManage' | 'isLegacy'>,
     @Inject(AuthSessions) private readonly sessions: Pick<AuthSessions, 'callerOf'>,
+    @Inject(MusicRepository) private readonly music: Pick<MusicRepository, 'libraryOfAlbum'>,
   ) {}
 
   get available(): boolean {
@@ -186,6 +193,10 @@ export class LockService {
         }
         case PRIVACIES.item:
           return seesItem(id)
+        case PRIVACIES.album: {
+          const libraryId = this.music.libraryOfAlbum(id)
+          return libraryId == null || seesLibrary(libraryId)
+        }
         default: {
           const unknown: never = privacy
           return unknown

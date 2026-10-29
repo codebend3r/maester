@@ -1,6 +1,6 @@
 # raven: audio libraries, and a standalone music player
 
-Date: 2026-10-27. Status: approved on 2026-10-27, building as ten PRs; PR 1 is built. Written as a spike, its four spikes ran on 2026-10-27 and their results are in section "Spikes".
+Date: 2026-10-27. Status: approved on 2026-10-27, building as ten PRs; PRs 1 and 2 are built. Written as a spike, its four spikes ran on 2026-10-27 and their results are in section "Spikes".
 
 ## Why
 
@@ -299,12 +299,15 @@ Ten stacked PRs, one commit each, thermo-reviewed. PRs 1 to 7 bring music to eve
 > Ten PRs, not 22, at the owner's request (2026-10-27). Each PR carries a whole layer or a whole client, so PRs 2, 4 and 7 may run to about 100 files each; the owner chose ten PRs over the usual 50-file limit.
 
 > [!TIP]
+> PR 2 built on 2026-10-29 as planned, with three changes. The tags come from `music-metadata` alone (the scan-time spike's answer), so `parseProbe` is untouched and an audio file never reaches ffprobe; its one audio track, codec and duration come from the same read. An album's cover is served lazily as a capability picture (`PICTURE_PATHS.album`), scaled by ffmpeg from the file that embeds it or the picture in its folder, so a scan copies no bytes; Cover Art Archive joins in PR 3. The `tracks` listing pages (`musicListQuery`: `limit` up to 500, `offset`), since a music library holds tens of thousands of rows. `KindRules` gained `listing` (`media`, `shows`, `albums`), which PR 4 reads for the library page. Playlists and the album and artist favourites wait for PR 7, with the rest of the viewing tables.
+
+> [!TIP]
 > PR 1 was built on the spec's own branch, `audio-library-support`, and ships with this spec in #310. The scanner's indexing by type moved into it from PR 2, so the new audio extensions had a user (the dead-code check) and a music library already scans and plays as a list of files on the web and the desktop. The audio bitrate steps moved to PR 4, beside the settings menu that offers them. `@raven/app` plays no audio file until PR 6: its play tables and HLS are video-only.
 
 | PR | Projects | What it carries |
 | -- | -------- | --------------- |
 | 1. Audio playback foundations (built, #310) | core, server, web | `0:V:0` for every video map, so an attached picture is never taken for video; audio extensions, containers and MIME types; `music` and `audiobooks` kinds with `KIND_RULES`, labels and kind-picker copy; a kind's extensions in the scanner; an audio file's `/stream` as its audio alone, and its plan with no transcode or sizes |
-| 2. Music library on the server | core, server | `AudioTags` from the probe; no frame grabs for audio; embedded and folder cover art; the migration for `artists`, `albums`, `tracks` and credits, filled from tags, grouped by folder when tags are missing; the music routes and pictures; `ROUTES` rows, `APP_CLIENT_CALLS` entries and an audio file in the enforced fixture |
+| 2. Music library on the server (built, `raven-audio`) | core, server | `AudioTags` read with `music-metadata`; no frame grabs for audio; embedded and folder cover art as capability pictures; the migration for `artists`, `albums`, `tracks` and credits, filled from tags, grouped by folder when tags are missing; the music routes; `ROUTES` rows, `APP_CLIENT_CALLS` entries and a locked music library in the lock suite |
 | 3. MusicBrainz matching | server, core, web | `MusicMatcher` behind a one-request-a-second gate; Cover Art Archive as an image source; Fix match for albums |
 | 4. Queue player and music on the web | core, ui, web | `queue.ts` and its tests; the `audioQueue` store and persistent audio host; the html audio engine with preloading and Media Session; audio bitrate steps in `STREAM_QUALITIES` and the player's settings; music listings, artist and album pages, the now-playing bar, Now Playing and the queue page |
 | 5. Music on Raven for macOS | mpv, desktop, web | The audio surface kind; mpv playlist, gapless and ReplayGain; "showing" apart from "playing" in main; `prevent-app-suspension`; Now Playing and remote commands in the addon; album and playlist downloads |

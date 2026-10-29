@@ -29,6 +29,31 @@ branch. After a bottom PR merges, the rest restack with `rebase-stack`.
 
 Each PR also costs one review (RTime). Stack total: about 27 h of work plus 9 × RTime.
 
+## The audio stack
+
+The music library and the standalone player, from `docs/superpowers/specs/2026-10-27-raven-audio-design.md`
+(its Plan section is the source of each row's scope). PR 1 merged as #310. PR 2 sits on `raven-audio`
+(the branch the owner opened for it), and each next branch is cut from the one below. Estimates
+are build time plus the thermo review and its fixes; the owner's review and the restack after each merge
+are on top.
+
+| #   | Branch                  | Base                    | Scope                                                                                                                  | Model     | Effort | Work estimate                                                        |
+| --- | ----------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------- | ------ | -------------------------------------------------------------------- |
+| 1   | `audio-library-support` | `main`                  | Audio playback foundations: audio kinds, extensions, `0:V:0`, an audio file's `/stream` (#310)                         | Opus 5.5  | medium | done                                                                 |
+| 2   | `raven-audio` (#336)    | `main`                  | Music library on the server: `music-metadata` tags, artists, albums, tracks, covers as capability pictures, routes     | Fable 5.1 | medium | 3 h spent: 65 min build, 35 min review and fixes, 80 min hook pushes |
+| 3   | `raven-music-matching`  | `raven-audio`           | MusicBrainz matching behind a one-a-second gate, Cover Art Archive, Fix match for albums                               | Fable 5.1 | medium | 3.5 to 5 h                                                           |
+| 4   | `raven-music-web`       | `raven-music-matching`  | `queue.ts`, the `audioQueue` store, the persistent audio host, Media Session, bitrate steps, music pages on the web    | Fable 5.1 | medium | 9 to 11.5 h                                                          |
+| 5   | `raven-music-desktop`   | `raven-music-web`       | mpv's audio surface, playlist, gapless, ReplayGain, Now Playing and media keys in the addon, album downloads           | Fable 5.1 | high   | 6 to 8 h                                                             |
+| 6   | `raven-music-device`    | `raven-music-desktop`   | `@raven/audio` (AVQueuePlayer, Media3), music screens in touch and focus layouts, lock screen, `canPlay.ts` audio rows | Fable 5.1 | high   | 11 to 16 h                                                           |
+| 7   | `raven-music-playlists` | `raven-music-device`    | Playlists, lyrics (tags, sidecars, LRCLIB), listens at 50% or four minutes, audiobook chapters, resume and speed       | Fable 5.1 | medium | 9 to 11.5 h                                                          |
+| 8   | `raven-music-app`       | `raven-music-playlists` | `@raven/music`: the standalone app on `@raven/audio`: sign-in, library, Now Playing, queue, lock screen                | Fable 5.1 | medium | 9 to 11.5 h                                                          |
+| 9   | `raven-music-offline`   | `raven-music-app`       | Offline downloads with a server transcode cache, CarPlay templates, Android Auto browse tree                           | Fable 5.1 | medium | 8 to 10 h                                                            |
+| 10  | `raven-music-discovery` | `raven-music-offline`   | EBU R128 loudness, crossfade, EQ, mixes, radio, scrobbling, the `/music` mode in `@raven/web`                          | Fable 5.1 | medium | 10 to 13.5 h                                                         |
+
+Caveats: rows 6, 8 and 9 need a real iPhone and Android phone for the lock screen and the seams, and
+CarPlay needs Apple's `com.apple.developer.carplay-audio` entitlement (ask when row 8 starts). The
+pre-push hook re-tests the whole stack below each branch, so pushes higher up may need retries.
+
 ## Gates and caveats
 
 - **The real-GPU check gates rows 4 to 7.** The spike (`raven-windows-spike`, never merged) proved on `windows-2025`, which renders with WARP, that mpv in the BrowserWindow's own HWND draws under a transparent Electron page and the page keeps the mouse. It has not run on a physical Windows GPU. If a real GPU reorders the stacking, the fallback is mpv's render API into a shared texture Chromium composites: a new row of 2 to 3 days.
