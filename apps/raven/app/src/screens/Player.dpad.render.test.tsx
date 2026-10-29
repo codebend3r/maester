@@ -303,22 +303,20 @@ describe('Player on Android TV', () => {
     expect(screen.queryByText(CUE_TEXT)).toBeNull()
   })
 
-  it("keeps its chips, Play, Back and the lists they open the player's dark glass under Patina", async () => {
+  it("keeps its icon buttons and the lists they open the player's dark glass under Patina", async () => {
     usePlayerPrefs.setState({ subtitles: { on: true, language: null } })
     useAppPrefs.setState({ theme: PATINA })
     const { palette, overPicture } = appThemeOf(PATINA)
     await playing({ id: BUSBOYS_MP4.id })
 
     const chip = screen.getByRole('button', { name: 'Subtitles: English' })
-    expect(styleOf(chip)?.backgroundColor ?? null).toBe(overPicture.quiet)
-    expect(styleOf(within(chip).getByText('English'))?.color ?? null).toBe(overPicture.text)
-    expect(styleOf(within(chip).getByText('Subtitles'))?.color ?? null).toBe(overPicture.muted)
     expect(overPicture.quiet).not.toBe(palette.quiet)
     expect(overPicture.text).not.toBe(palette.text)
-    ;['Pause', PLAYER_COPY.leave].forEach((name) => {
+    ;['Subtitles: English', 'Pause', PLAYER_COPY.leave].forEach((name) => {
       const plate = screen.getByRole('button', { name })
       expect(styleOf(plate)?.backgroundColor ?? null).toBe(overPicture.quiet)
-      expect(styleOf(within(plate).getByText(name))?.color ?? null).toBe(overPicture.text)
+      // An icon, not words: the label is said, never drawn.
+      expect(within(plate).queryByText(name)).toBeNull()
     })
     expect(styleOf(screen.getByText(formatDuration(BUSBOYS_MP4.duration)))?.color ?? null).toBe(
       overPicture.text,

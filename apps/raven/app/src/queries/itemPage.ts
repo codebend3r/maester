@@ -5,6 +5,7 @@ import {
   type MediaItem,
   type MediaTracks,
   allFileFacts,
+  type FileFact,
   castMembers,
   createdBy,
   directedBy,
@@ -78,8 +79,8 @@ export type EpisodeRow = ShelfCard & { summary: string | null; isWatched: boolea
 /** Everything an item's page shows but its actions, which are the screen's. */
 export type ItemPage = {
   hero: ItemHero
-  /** The file Play starts, as label and value; none for a show or season. */
-  file: Array<{ label: string; value: string }>
+  /** The file Play starts, as its facts; none for a show or season. */
+  file: FileFact[]
   /** A movie's files, once there are two or more. */
   versions: VersionRow[]
   seasons: ShelfCard[]

@@ -30,7 +30,7 @@ import type { ShelfCard } from '@/queries/cards'
 import { type Listing, librarySectionsOf } from '@/queries/libraryGrid'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
-import { Grid, Picker, SearchField, ToolButton } from '@/layouts'
+import { Grid, Loading, Picker, SearchField, ToolButton } from '@/layouts'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
 import { appViewsFor, useLibraryView } from '@/screens/useLibraryView'
 import type { LibraryChoice } from '@/stores/libraryViews'
@@ -230,6 +230,7 @@ type ServerLibraryProps = {
 }
 
 const ServerLibrary = ({ session, id, asked }: ServerLibraryProps) => {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const { queries } = session
   // The libraries Home read already hold this one, so the page opens on that while it is read.
@@ -247,7 +248,7 @@ const ServerLibrary = ({ session, id, asked }: ServerLibraryProps) => {
     case ROUTE_STATES.error:
       return <LibraryNotice notice={page.message} />
     case ROUTE_STATES.loading:
-      return <LibraryNotice notice={COPY.opening} />
+      return <Loading label={COPY.opening} onBack={() => router.back()} />
     case ROUTE_STATES.ready:
       return <LibraryGrid key={page.data.id} asked={asked} library={page.data} session={session} />
     default: {

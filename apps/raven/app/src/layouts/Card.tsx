@@ -43,6 +43,8 @@ export const CardPicture = ({ card, width, ring = 0, radius = SIZES.radius }: Ca
           <Image
             key={pictureKey}
             onError={() => setFailed(pictureKey)}
+            // Android decodes the picture at the size it is drawn, not the size it was sent at.
+            resizeMethod="resize"
             resizeMode="cover"
             source={picture}
             style={StyleSheet.absoluteFill}

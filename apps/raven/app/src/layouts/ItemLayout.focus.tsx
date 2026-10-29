@@ -144,9 +144,24 @@ const Hero = ({ hero, actions, file }: HeroProps) => {
           </View>
         )}
         {file.length > 0 && (
-          <Text style={styles.line}>
-            {dotted(file.map((fact) => `${fact.label} ${fact.value}`))}
-          </Text>
+          <View style={styles.file}>
+            {file.map((fact) => (
+              <View key={fact.label} style={styles.fileRow}>
+                <Text style={styles.fileLabel}>{fact.label}</Text>
+                <View style={styles.fileValues}>
+                  {fact.values.length === 1 ? (
+                    <Text style={styles.fileValue}>{fact.values[0]}</Text>
+                  ) : (
+                    fact.values.map((value) => (
+                      <View key={value} style={styles.fileChip}>
+                        <Text style={styles.fileChipText}>{value}</Text>
+                      </View>
+                    ))
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
         )}
       </View>
     </View>
@@ -343,6 +358,34 @@ const useStyles = themedStyles((colours) =>
     },
     byline: { color: colours.text, fontSize: TV_SIZES.textLg },
     line: { color: colours.muted, fontSize: TV_SIZES.text, lineHeight: TV_SIZES.text * LINE_RATIO },
+    // The file's facts as a two column list: a quiet label beside each value, values on their own.
+    file: { gap: TV_SIZES.space2, paddingTop: TV_SIZES.space2 },
+    fileRow: { flexDirection: 'row', alignItems: 'flex-start', gap: TV_SIZES.space3 },
+    fileLabel: {
+      width: TV_SIZES.space8 * 2,
+      color: colours.muted,
+      fontSize: TV_SIZES.textSm,
+      fontWeight: '600',
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      lineHeight: TV_SIZES.text * LINE_RATIO,
+    },
+    fileValues: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: TV_SIZES.space1 },
+    fileValue: {
+      color: colours.text,
+      fontSize: TV_SIZES.text,
+      lineHeight: TV_SIZES.text * LINE_RATIO,
+    },
+    fileChip: {
+      paddingHorizontal: TV_SIZES.space2,
+      borderRadius: TV_SIZES.radius,
+      backgroundColor: colours.quiet,
+    },
+    fileChipText: {
+      color: colours.text,
+      fontSize: TV_SIZES.textSm,
+      lineHeight: TV_SIZES.text * LINE_RATIO,
+    },
     progress: { gap: TV_SIZES.space1, maxWidth: TV_SIZES.measure },
     track: {
       height: TV_SIZES.space1,

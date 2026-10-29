@@ -49,11 +49,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const ground = launchGround()
   const app: ExpoConfig = {
     ...config,
-    name: 'raven',
+    // What the home screen and the TV launcher write under the icon.
+    name: 'Raven',
     slug: 'raven',
     scheme: 'raven',
     version: packageJson.version,
     orientation: 'default',
+    icon: './assets/images/icon.png',
     ios: {
       bundleIdentifier: APP_ID,
       buildNumber: String(buildNumber),
@@ -71,14 +73,20 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       package: APP_ID,
       versionCode: buildNumber,
+      // The mark sits inside the middle two thirds, which every launcher's mask leaves whole.
+      adaptiveIcon: {
+        foregroundImage: './assets/images/adaptive-icon.png',
+        backgroundColor: ground,
+      },
       // The window's own colour, under the app. iOS reads its counterpart only through
       // expo-system-ui; there the splash covers the window until raven draws.
       backgroundColor: ground,
     },
     plugins: [
       'expo-router',
-      // config-tv acts only when EXPO_TV=1, which the TV prebuild scripts set.
-      '@react-native-tvos/config-tv',
+      // config-tv acts only when EXPO_TV=1, which the TV prebuild scripts set. The banner is the
+      // tile the Android TV launcher shows in its apps row: 320 by 180, the mark and the wordmark.
+      ['@react-native-tvos/config-tv', { androidTVBanner: './assets/images/tv_banner.png' }],
       // Picture in Picture needs the audio background mode. The player still pauses when the
       // app leaves the screen without it (`playInBackground` off): this is video.
       ['react-native-video', { enableBackgroundAudio: true }],

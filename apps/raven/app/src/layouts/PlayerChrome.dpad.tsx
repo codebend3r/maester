@@ -2,6 +2,7 @@ import { formatDuration } from '@raven/core'
 import { type ComponentRef, type RefObject, useEffect, useRef, useState } from 'react'
 import {
   Animated,
+  Image,
   Pressable,
   StyleSheet,
   type TVRemoteEvent,
@@ -13,26 +14,28 @@ import Video from 'react-native-video'
 import { Text } from '@/layouts/Text'
 import { useFocusOnMount } from '@/layouts/focus'
 import { FocusBand } from '@/layouts/FocusBand'
-import { focusPicker } from '@/layouts/Picker.focus'
+import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import { CaptionText } from '@/layouts/PlayerCaption'
+import type { Picture } from '@/queries/cards'
 import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import {
   PLAYER_COPY,
   type PlayerChromeKit,
   type PlayerChromeProps,
   type Transport,
+  type TrackPicker,
   type VideoSurface,
   playedShareOf,
   scrubberAccessibilityOf,
 } from '@/layouts/playerKit'
-import { pressedKeyOf, remoteAnswerOf } from '@/layouts/remoteKeys'
+import { isSeekingWith, pressedKeyOf, remoteAnswerOf } from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
+import type { IconName } from '@raven/ui/iconDrawings'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
+import { useHeldSeek } from '@/layouts/useHeldSeek'
 import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { pictureStyles } from '@/theme/useTheme'
-
-const { Picker } = focusPicker
 
 /** How dark the ground is laid over the picture under the controls. */
 const SCRIM_OPACITY = 0.45
@@ -108,13 +111,105 @@ const Scrubber = ({ view, transport, onScrubbing }: ScrubberProps) => {
 
 type ControlsProps = Pick<
   PlayerChromeProps,
-  'title' | 'transport' | 'audio' | 'subtitles' | 'onBack'
+  'heading' | 'transport' | 'audio' | 'subtitles' | 'onBack'
 > & {
   /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
   isVisible: boolean
   onScrubbing: (isScrubbing: boolean) => void
   onPicking: (isPicking: boolean) => void
   onBottomHeight: (height: number) => void
+}
+
+type TrackButtonProps = {
+  icon: IconName
+  label: string
+  picker: TrackPicker
+  onPicking: (isPicking: boolean) => void
+}
+
+/** A track picker as an icon on the player's glass, said with its choice, opening its list over the video. */
+const TrackButton = ({ icon, label, picker, onPicking }: TrackButtonProps) => {
+  const {
+    open,
+    label: said,
+    list,
+  } = usePickerList({
+    ...picker,
+    label,
+    isOverPicture: true,
+    onOpenChange: onPicking,
+  })
+  return (
+    <>
+      <PlateButton icon={icon} isOverPicture label={said} onPress={open} />
+      <PickerList {...list} />
+    </>
+  )
+}
+
+/** How tall a show's title art stands over the video; its width follows the art's own shape. */
+const LOGO_HEIGHT = TV_SIZES.space8 * 1.5
+
+/** A logo's width for its height until the art says its own: title art runs wide. */
+const LOGO_RATIO = 3
+
+type ShowNameProps = { name: string; logo: Picture | null }
+
+/**
+ * The show: its title art where it has some, at the art's own width and flush left, said as its
+ * name; its name in type where it has none, or the art fails to load.
+ */
+const ShowName = ({ name, logo }: ShowNameProps) => {
+  const styles = useStyles()
+  const [ratio, setRatio] = useState<number>(LOGO_RATIO)
+  const [failed, setFailed] = useState<string | null>(null)
+  if (logo === null || failed === logo.uri) {
+    return (
+      <Text numberOfLines={1} style={styles.show}>
+        {name}
+      </Text>
+    )
+  }
+  return (
+    <Image
+      accessibilityLabel={name}
+      accessibilityRole="image"
+      accessible
+      onError={() => setFailed(logo.uri)}
+      onLoad={({ nativeEvent: { source } }) => {
+        if (source.width > 0 && source.height > 0) setRatio(source.width / source.height)
+      }}
+      resizeMode="contain"
+      source={logo}
+      style={{ height: LOGO_HEIGHT, width: LOGO_HEIGHT * ratio, maxWidth: TV_SIZES.measure }}
+    />
+  )
+}
+
+type HeadingProps = Pick<PlayerChromeProps, 'heading'>
+
+/**
+ * The title along the top as lines: the show, then its season and episode, quieter, then the
+ * episode's own name with its length in a chip beside it. A film is its name and chip alone.
+ */
+const Heading = ({ heading }: HeadingProps) => {
+  const styles = useStyles()
+  return (
+    <View accessibilityRole="header" style={styles.heading}>
+      {heading.show !== null && <ShowName logo={heading.logo} name={heading.show} />}
+      {heading.place !== null && <Text style={styles.place}>{heading.place}</Text>}
+      <View style={styles.titleRow}>
+        <Text numberOfLines={2} style={heading.show === null ? styles.show : styles.title}>
+          {heading.title}
+        </Text>
+        {heading.length !== null && (
+          <View style={styles.chip}>
+            <Text style={styles.chipText}>{heading.length}</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  )
 }
 
 /**
@@ -125,7 +220,7 @@ type ControlsProps = Pick<
  * from the line lands on the first of them rather than on the one under the thumb.
  */
 const Controls = ({
-  title,
+  heading,
   transport,
   audio,
   subtitles,
@@ -144,9 +239,7 @@ const Controls = ({
   }, [isVisible])
   return (
     <View style={styles.frame}>
-      <Text numberOfLines={2} style={styles.title}>
-        {title}
-      </Text>
+      <Heading heading={heading} />
       <View
         onLayout={({ nativeEvent }) => onBottomHeight(nativeEvent.layout.height)}
         style={styles.bottom}
@@ -164,31 +257,29 @@ const Controls = ({
           <View style={styles.buttons}>
             {transport !== null && (
               <PlateButton
-                accessibilityRole="button"
+                icon={transport.isPaused ? 'play' : 'pause'}
                 isOverPicture
                 label={transport.isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
                 onPress={transport.onTogglePlay}
-                text={transport.isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
               />
             )}
             {audio !== null && (
-              <Picker isOverPicture label={PLAYER_COPY.audio} onOpenChange={onPicking} {...audio} />
-            )}
-            {subtitles !== null && (
-              <Picker
-                isOverPicture
-                label={PLAYER_COPY.subtitles}
-                onOpenChange={onPicking}
-                {...subtitles}
+              <TrackButton
+                icon="volume"
+                label={PLAYER_COPY.audio}
+                onPicking={onPicking}
+                picker={audio}
               />
             )}
-            <PlateButton
-              accessibilityRole="button"
-              isOverPicture
-              label={PLAYER_COPY.leave}
-              onPress={onBack}
-              text={PLAYER_COPY.leave}
-            />
+            {subtitles !== null && (
+              <TrackButton
+                icon="captions"
+                label={PLAYER_COPY.subtitles}
+                onPicking={onPicking}
+                picker={subtitles}
+              />
+            )}
+            <PlateButton icon="back" isOverPicture label={PLAYER_COPY.leave} onPress={onBack} />
           </View>
         </FocusBand>
       </View>
@@ -223,7 +314,7 @@ type DpadPlayerProps = PlayerChromeProps & { surface: VideoSurface }
  * The subtitle cues are raven's, over the video whether or not the controls are.
  */
 const DpadPlayer = ({
-  title,
+  heading,
   surface,
   notice,
   caption,
@@ -248,7 +339,16 @@ const DpadPlayer = ({
     if (!isVisible) isScrubbing.current = false
   }, [isVisible])
 
+  const held = useHeldSeek({
+    transport,
+    isSeeking: () => isSeekingWith({ isShown: isVisible, isScrubbing: isScrubbing.current }),
+  })
+
   useRemote((event) => {
+    if (held.respond(event)) {
+      show()
+      return
+    }
     const key = pressedKeyOf(event)
     if (key === null) return
     show()
@@ -283,6 +383,7 @@ const DpadPlayer = ({
           <View pointerEvents="none" style={styles.scrim} />
           <Controls
             audio={audio}
+            heading={heading}
             onBack={onBack}
             onBottomHeight={setBottomHeight}
             onPicking={setPicking}
@@ -291,8 +392,7 @@ const DpadPlayer = ({
               isScrubbing.current = isOnLine
             }}
             subtitles={subtitles}
-            title={title}
-            transport={transport}
+            transport={held.transport}
           />
         </Animated.View>
       )}
@@ -329,7 +429,23 @@ const useStyles = pictureStyles((colours) =>
       opacity: SCRIM_OPACITY,
     },
     frame: { flex: 1, justifyContent: 'space-between', padding: TV_GUTTER },
-    title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    heading: { gap: TV_SIZES.space1, maxWidth: TV_SIZES.measure },
+    show: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
+    place: {
+      color: colours.muted,
+      fontSize: TV_SIZES.textLg,
+      fontWeight: '600',
+      fontVariant: ['tabular-nums'],
+    },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
+    title: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.textLg },
+    chip: {
+      paddingHorizontal: TV_SIZES.space2,
+      paddingVertical: TV_SIZES.space0,
+      borderRadius: TV_SIZES.radius,
+      backgroundColor: colours.quiet,
+    },
+    chipText: { color: colours.text, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },
     bottom: { gap: TV_SIZES.space3 },
     timeline: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
     time: { color: colours.text, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },

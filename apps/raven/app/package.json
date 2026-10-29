@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build:android-tv": "./android/gradlew -p android assembleRelease",
+    "build:android-tv:test-account": "bun --env-file=.env.test-account run build:android-tv",
     "build:ios": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/raven.xcworkspace -scheme raven -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
     "build:tvos": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/raven.xcworkspace -scheme raven -configuration Release -sdk appletvsimulator -destination 'generic/platform=tvOS Simulator' -derivedDataPath build/tvos ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
     "dev:ios": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-phone",
@@ -24,8 +25,8 @@
     "lint:ts": "oxlint",
     "lint:ts:fix": "oxlint --fix",
     "prebuild:android-tv": "EXPO_TV=1 expo prebuild --platform android --clean",
-    "prebuild:ios": "NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
-    "prebuild:tvos": "EXPO_TV=1 NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
+    "prebuild:ios": "NODE_PATH=$PWD/node_modules REACT_NATIVE_NODE_MODULES_DIR=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
+    "prebuild:tvos": "EXPO_TV=1 NODE_PATH=$PWD/node_modules REACT_NATIVE_NODE_MODULES_DIR=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
     "predev:ios": "APP_VARIANT=development bun run prebuild:ios",
     "predev:ipad": "APP_VARIANT=development bun run prebuild:ios",
     "predev:tvos": "APP_VARIANT=development bun run prebuild:tvos",
@@ -63,6 +64,7 @@
     "react-native-safe-area-context": "5.10.1",
     "react-native-screens": "4.30.0",
     "react-native-sse": "1.2.1",
+    "react-native-svg": "15.16.0",
     "react-native-video": "6.19.3",
     "zustand": "5.0.15"
   },

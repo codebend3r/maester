@@ -1,4 +1,4 @@
-import { type MediaAccess, type Transport } from '@/apiClient/transport'
+import { type MediaAccess, type TicketedOrigin, type Transport } from '@/apiClient/transport'
 import {
   HLS_PARAMS,
   HLS_PATHS,
@@ -31,7 +31,7 @@ type GetSubtitlesProps = {
   id: number
   trackId: string
   window?: number
-  access?: MediaAccess | null
+  access?: TicketedOrigin | null
 }
 
 type HlsUrlProps = {

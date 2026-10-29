@@ -26,7 +26,7 @@ export const FileFacts = ({ media, tracks, className }: FileFactsProps) => {
           <div key={fact.label} className={styles.fact}>
             <dt>{fact.label}</dt>
             <dd>
-              <FactText fact={fact.value} />
+              <FactText fact={fact.values.join(', ')} />
             </dd>
           </div>
         ))}

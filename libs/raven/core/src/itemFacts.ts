@@ -132,11 +132,19 @@ type FileFactsProps = {
   tracks: MediaTracks | undefined
 }
 
+/** A fact about a file: its label and its values, more than one where it is a list (the subtitle languages). */
+export type FileFact = { label: string; values: string[] }
+
+type FactOfProps = { label: string; values: ReadonlyArray<string | null> }
+
+/** A fact with its empty values left out, or nothing when none is left. */
+const factOf = ({ label, values }: FactOfProps): FileFact[] => {
+  const kept = values.filter((value): value is string => value != null && value !== '')
+  return kept.length === 0 ? [] : [{ label, values: kept }]
+}
+
 /** The file's video, audio and subtitles, as the tracks the scan stored describe them. */
-export const fileFacts = ({
-  media,
-  tracks,
-}: FileFactsProps): Array<{ label: string; value: string }> => {
+export const fileFacts = ({ media, tracks }: FileFactsProps): FileFact[] => {
   const resolution = resolutionLabel(media)
   const codec = media.videoCodec ? codecLabel(media.videoCodec) : null
   const video = [resolution, codec == null ? null : `(${codec})`, media.hdr ? 'HDR' : null]
@@ -159,12 +167,12 @@ export const fileFacts = ({
           .join(' ')
   const subtitles = unique(
     (tracks?.subtitles ?? []).flatMap((track) => languageName({ tag: track.language }) ?? []),
-  ).join(', ')
+  )
   return [
-    { label: 'Video', value: video },
-    { label: 'Audio', value: audio },
-    { label: 'Subtitles', value: subtitles },
-  ].filter((fact) => fact.value !== '')
+    ...factOf({ label: 'Video', values: [video] }),
+    ...factOf({ label: 'Audio', values: [audio] }),
+    ...factOf({ label: 'Subtitles', values: subtitles }),
+  ]
 }
 
 /** What sets one file of a movie apart from its other files: its resolution, HDR, codec and size. */
@@ -182,16 +190,12 @@ type AllFileFactsProps = {
 }
 
 /** The file's facts as label and value: its tracks, then its container, bitrate and size. */
-export const allFileFacts = ({
-  media,
-  tracks,
-}: AllFileFactsProps): Array<{ label: string; value: string }> =>
-  [
-    ...fileFacts({ media, tracks }),
-    { label: 'Container', value: media.container.toUpperCase() },
-    { label: 'Bitrate', value: formatBitrate(media.bitrate) ?? '' },
-    { label: 'Size', value: formatBytes(media.size) },
-  ].filter((fact) => fact.value !== '')
+export const allFileFacts = ({ media, tracks }: AllFileFactsProps): FileFact[] => [
+  ...fileFacts({ media, tracks }),
+  ...factOf({ label: 'Container', values: [media.container.toUpperCase()] }),
+  ...factOf({ label: 'Bitrate', values: [formatBitrate(media.bitrate)] }),
+  ...factOf({ label: 'Size', values: [formatBytes(media.size)] }),
+]
 
 /** A show's seasons on disk, in order. */
 export const seasonsOf = (details: ItemDetails): SeasonSummary[] =>

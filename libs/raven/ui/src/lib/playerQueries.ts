@@ -1,5 +1,10 @@
 import { type QueryStatus, queryOptions } from '@tanstack/react-query'
-import { ACCOUNT_TICKET_SECONDS, type ApiClient, MEDIA_TICKET_RENEW_MS } from '@raven/core'
+import {
+  ACCOUNT_TICKET_SECONDS,
+  type ApiClient,
+  MEDIA_TICKET_RENEW_MS,
+  type TicketedOrigin,
+} from '@raven/core'
 import { playerQueryKeys as queryKeys } from '@/lib/playerQueryKeys'
 
 /** Two fifths of an account ticket's life, two of its five minutes, so a renewal lands well inside it. */
@@ -15,7 +20,18 @@ const QUERY_STATUSES = { error: 'error' } as const satisfies Record<string, Quer
 /** Keeps a ticket that is already due from being refetched in a tight loop. */
 const MIN_REFRESH_WAIT_MS = 1000
 
-type PlayerQueriesForSubtitlesProps = { id: number; trackId: string; window: number }
+/**
+ * Reads the address and ticket a subtitle fetch takes, for a client with no cookie to send (the
+ * device app); read per fetch, so a ticket is never stale. Null leaves the fetch on the cookie.
+ */
+export type SubtitleAccessReader = () => Promise<TicketedOrigin | null>
+
+type PlayerQueriesForSubtitlesProps = {
+  id: number
+  trackId: string
+  window: number
+  readAccess?: SubtitleAccessReader
+}
 
 export const playerQueriesFor = (api: ApiClient) => ({
   tracks: (id: number) =>
@@ -58,7 +74,10 @@ export const playerQueriesFor = (api: ApiClient) => ({
   subtitles: (input: PlayerQueriesForSubtitlesProps) =>
     queryOptions({
       queryKey: queryKeys.subtitles(input),
-      queryFn: () => api.getSubtitles(input),
+      queryFn: async () => {
+        const { readAccess, ...asked } = input
+        return api.getSubtitles({ ...asked, access: (await readAccess?.()) ?? null })
+      },
       staleTime: Infinity,
       gcTime: 30 * 60 * 1000,
       retry: 1,

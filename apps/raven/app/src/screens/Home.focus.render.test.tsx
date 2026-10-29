@@ -167,7 +167,7 @@ describe('Home on a TV', () => {
     const { answer, release } = heldAnswer()
     mockHome.answer = answer
     await renderHome()
-    expect(await screen.findByText('Gathering your libraries')).toBeTruthy()
+    expect(await screen.findByLabelText('Gathering your libraries')).toBeTruthy()
     // Drawn alone, it would be all tvOS had to give the opening focus to.
     expect(screen.queryByRole('link', { name: 'Search' })).toBeNull()
 
@@ -185,7 +185,7 @@ describe('Home on a TV', () => {
     const { answer, release } = heldAnswer()
     mockHome.answer = answer
     await renderHome()
-    expect(await screen.findByText('Gathering your libraries')).toBeTruthy()
+    expect(await screen.findByLabelText('Gathering your libraries')).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull()
 
     release()

@@ -149,7 +149,7 @@ const FileFacts = ({ facts }: FileFactsProps) => {
       {facts.map((fact) => (
         <View key={fact.label} style={styles.fact}>
           <Text style={styles.factLabel}>{fact.label}</Text>
-          <Text style={styles.factValue}>{fact.value}</Text>
+          <Text style={styles.factValue}>{fact.values.join(', ')}</Text>
         </View>
       ))}
     </View>

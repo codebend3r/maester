@@ -1,4 +1,5 @@
-import { Icon, type IconName } from '@/components/Icon/Icon'
+import { Icon } from '@/components/Icon/Icon'
+import type { IconName } from '@/components/Icon/drawings'
 import styles from '@/components/Player/Bezel.module.scss'
 
 export type BezelState = { id: number; icon: IconName; text: string }

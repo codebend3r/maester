@@ -14,6 +14,7 @@ import {
   MEDIA_TICKET_PARAM,
   type MaxHeight,
   type MediaAccess,
+  type TicketedOrigin,
   type MediaItem,
   type MediaOrigin,
   type OriginProbe,
@@ -79,6 +80,12 @@ const awayQualityOf = (maxHeight: MaxHeight): StreamQuality | null =>
 
 export type MediaSources = {
   source: (request: SourceRequest) => Promise<SourceOutcome>
+  /**
+   * Where a video's subtitles are fetched from and the ticket they carry, as its picture is: a
+   * media route takes a ticket, never the account's Bearer. Null where the server hands out no
+   * ticket, or refuses one.
+   */
+  subtitleAccess: (mediaId: number) => Promise<TicketedOrigin | null>
   /** Stops watching the network. */
   close: () => void
 }
@@ -135,6 +142,20 @@ type TicketRead =
   | { kind: typeof TICKET_READS.off }
   | { kind: typeof TICKET_READS.refused; refusal: AccessRefusal }
 
+/** The ways one video is reached: `accessOf`'s answer, shared by its picture and its subtitles. */
+const ACCESS_WAYS = {
+  origin: 'origin',
+  ownAddress: 'ownAddress',
+  cookies: 'cookies',
+  refused: 'refused',
+} as const
+
+type Access =
+  | ({ kind: typeof ACCESS_WAYS.origin } & MediaAccess)
+  | { kind: typeof ACCESS_WAYS.ownAddress; ticket: string }
+  | { kind: typeof ACCESS_WAYS.cookies }
+  | { kind: typeof ACCESS_WAYS.refused; refusal: AccessRefusal }
+
 type AccessRefusalProps = {
   reason: AccessRefusalReason
   server: AppServer
@@ -184,6 +205,14 @@ const refusalOf = ({ error, server }: RefusalOfProps): TicketRead => {
   // A proxy in front of a restarting server answers 502 or 504.
   if (error.status >= SERVER_ERROR_STATUS) return refused(ACCESS_REFUSALS.unreachable)
   return refused(ACCESS_REFUSALS.unreadable)
+}
+
+type TicketedSourceProps = { uri: string }
+
+/** A source that carries its ticket in its address: no header, and only a call the app may make. */
+const ticketedSource = ({ uri }: TicketedSourceProps): SourceOutcome => {
+  checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
+  return { ok: true, source: { uri, headers: {} } }
 }
 
 type WithTicketProps = { uri: string; ticket: string }
@@ -356,38 +385,68 @@ export const mediaAccessFor = ({
     return { ok: true, source: { uri, headers } }
   }
 
-  type OwnAddressSourceProps = { request: SourceRequest; ticket: string }
-
   /**
-   * With no origin to play from, a signed-in account plays from the server's own address by its
-   * ticket, never by its Bearer: the native player sends that header as it was, and the token
-   * ends within the hour while a film runs longer. A server without accounts sends cookies.
+   * How one video is reached, decided once for its picture and its subtitles alike: from the
+   * origin picked, by ticket; with none to play from, a signed-in account from the server's own
+   * address by its ticket, never by its Bearer (the native player sends that header as it was, and
+   * the token ends within the hour while a film runs longer); a server that hands out no ticket,
+   * or has no account signed in there, by its cookie; or refused.
    */
-  const ownAddressSource = async ({
-    request,
-    ticket,
-  }: OwnAddressSourceProps): Promise<SourceOutcome> => {
-    if (readAccessToken() === null) return cookieSource(request)
-    const uri = withTicket({ uri: uriFor({ request, access: null }), ticket })
-    checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
-    return { ok: true, source: { uri, headers: {} } }
-  }
-
-  const sourceFor = async (request: SourceRequest): Promise<SourceOutcome> => {
-    const [origin, read] = await Promise.all([pickOf(), ticketFor(request.media.id)])
+  const accessOf = async (mediaId: number): Promise<Access> => {
+    const [origin, read] = await Promise.all([pickOf(), ticketFor(mediaId)])
     switch (read.kind) {
       case TICKET_READS.refused:
-        return read.refusal
+        return { kind: ACCESS_WAYS.refused, refusal: read.refusal }
       case TICKET_READS.off:
-        return cookieSource(request)
+        return { kind: ACCESS_WAYS.cookies }
       case TICKET_READS.issued: {
-        if (origin === null) return ownAddressSource({ request, ticket: read.ticket })
-        const uri = uriFor({ request, access: { origin, ticket: read.ticket } })
-        checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
-        return { ok: true, source: { uri, headers: {} } }
+        if (origin !== null) return { kind: ACCESS_WAYS.origin, origin, ticket: read.ticket }
+        return readAccessToken() === null
+          ? { kind: ACCESS_WAYS.cookies }
+          : { kind: ACCESS_WAYS.ownAddress, ticket: read.ticket }
       }
       default: {
         const unreachable: never = read
+        return unreachable
+      }
+    }
+  }
+
+  const sourceFor = async (request: SourceRequest): Promise<SourceOutcome> => {
+    const access = await accessOf(request.media.id)
+    switch (access.kind) {
+      case ACCESS_WAYS.refused:
+        return access.refusal
+      case ACCESS_WAYS.cookies:
+        return cookieSource(request)
+      case ACCESS_WAYS.ownAddress:
+        return ticketedSource({
+          uri: withTicket({ uri: uriFor({ request, access: null }), ticket: access.ticket }),
+        })
+      case ACCESS_WAYS.origin:
+        return ticketedSource({
+          uri: uriFor({ request, access: { origin: access.origin, ticket: access.ticket } }),
+        })
+      default: {
+        const unreachable: never = access
+        return unreachable
+      }
+    }
+  }
+
+  /** Where a video's subtitles are fetched from by ticket, as its picture is; null on the cookie. */
+  const subtitleAccess = async (mediaId: number): Promise<TicketedOrigin | null> => {
+    const access = await accessOf(mediaId)
+    switch (access.kind) {
+      case ACCESS_WAYS.origin:
+        return { origin: access.origin, ticket: access.ticket }
+      case ACCESS_WAYS.ownAddress:
+        return { origin: { url: server.origin }, ticket: access.ticket }
+      case ACCESS_WAYS.cookies:
+      case ACCESS_WAYS.refused:
+        return null
+      default: {
+        const unreachable: never = access
         return unreachable
       }
     }
@@ -400,6 +459,7 @@ export const mediaAccessFor = ({
       sourceFor(request).catch(() =>
         accessRefusal({ reason: ACCESS_REFUSALS.unreachable, server }),
       ),
+    subtitleAccess: (mediaId) => subtitleAccess(mediaId).catch(() => null),
     close: stopWatching,
   }
 }

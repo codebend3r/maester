@@ -281,6 +281,23 @@ describe('mediaAccessFor', () => {
     })
   })
 
+  it('hands subtitles the picked origin and the ticket, as the picture plays by', async () => {
+    const { media } = setUp()
+    expect(await media.subtitleAccess(BUSBOYS.id)).toEqual({ origin: LAN, ticket: TICKETS[0] })
+  })
+
+  it("hands subtitles the server's own address with no origin, and the cookie without a ticket or an account", async () => {
+    const own = setUp({ server: mediaServer({ origins: [] }), accessToken: ACCOUNT_TOKEN })
+    expect(await own.media.subtitleAccess(BUSBOYS.id)).toEqual({
+      origin: { url: NAS.origin },
+      ticket: TICKETS[0],
+    })
+    const signedOut = setUp({ server: mediaServer({ origins: [] }) })
+    expect(await signedOut.media.subtitleAccess(BUSBOYS.id)).toBeNull()
+    const off = setUp({ server: mediaServer({ tickets: [STATUSES.unavailable] }) })
+    expect(await off.media.subtitleAccess(BUSBOYS.id)).toBeNull()
+  })
+
   it('sends no cookie header when the jar holds none', async () => {
     const { media } = setUp({ server: mediaServer({ origins: [] }), cookies: {} })
     expect(sourceOf(await media.source(direct))).toEqual({

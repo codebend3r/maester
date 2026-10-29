@@ -52,6 +52,7 @@
     "format": "nx run-many -t format",
     "format:check": "nx run-many -t format:check",
     "graph": "nx graph",
+    "help": "python3 scripts/help.py",
     "lint": "nx run-many -t lint:py lint:ts lint:css",
     "lint:css": "nx run-many -t lint:css",
     "lint:fix": "nx run-many -t lint:py:fix lint:ts:fix lint:css:fix",

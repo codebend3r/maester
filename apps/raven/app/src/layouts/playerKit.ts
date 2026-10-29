@@ -4,12 +4,13 @@ import type { AccessibilityActionEvent, AccessibilityActionInfo } from 'react-na
 import type Video from 'react-native-video'
 
 import type { PickerProps } from '@/layouts/gridKit'
+import type { PlayerHeading } from '@/layouts/playerHeading'
 
 /** How far a skip button moves, in seconds, as the web's Back 10 and Forward 10 do. */
 export const SKIP_SECONDS = 10
 
 /** A track picker: what it offers, which is picked, and what to do with a pick; the chrome names it. */
-type TrackPicker = Omit<PickerProps<string>, 'label'>
+export type TrackPicker = Omit<PickerProps<string>, 'label'>
 
 /** The transport, once there is a video to drive. */
 export type Transport = {
@@ -30,6 +31,8 @@ export type VideoSurface = ComponentProps<typeof Video>
 
 export type PlayerChromeProps = {
   title: string
+  /** The title as lines, for a platform that sets it out so: show, season and episode, name, length. */
+  heading: PlayerHeading
   /** What the video is about, for a platform that shows it beside the player; null when unknown. */
   summary: string | null
   /** The video's poster, for a platform that shows it beside the player; null when it has none. */

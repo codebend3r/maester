@@ -48,6 +48,12 @@ const headerHeightOf = (fontScale: number): number =>
     linesHeightOf({ sizes: [TV_SIZES.textXl], fontScale }) + 2 * TV_SIZES.tvFocusRing,
   ) + TV_SIZES.space3
 
+/** Rows drawn at once: a screen's worth of posters, with one more coming into view. */
+const GRID_ROWS_AT_ONCE = 4
+
+/** Screens of rows kept drawn: the one in view and one above and below it. */
+const GRID_WINDOW = 3
+
 type RowCardProps = {
   card: ShelfCard
   hasPicture: boolean
@@ -194,7 +200,12 @@ const Grid = ({
       2 * GROWTH_ROOM
     )
   }
-  const { list, rows, toggle, jumpTo } = useGrid({ sections, columnsOf, heightOf, top: 0 })
+  const { list, rows, toggle, jumpTo, getItemLayout } = useGrid({
+    sections,
+    columnsOf,
+    heightOf,
+    top: 0,
+  })
   const [listHeight, setListHeight] = useState(0)
   // Each jump counts, the same card twice included. The count last handled is kept apart from
   // rendering, so the card jumped to asks for the focus once for its jump and never again as it
@@ -313,9 +324,13 @@ const Grid = ({
             contentContainerStyle={styles.content}
             data={rows}
             extraData={drawn}
+            getItemLayout={getItemLayout}
             keyExtractor={(row) => row.key}
+            initialNumToRender={GRID_ROWS_AT_ONCE}
+            maxToRenderPerBatch={GRID_ROWS_AT_ONCE}
             renderItem={renderRow}
             style={{ height: listHeight }}
+            windowSize={GRID_WINDOW}
           />
         )}
       </View>

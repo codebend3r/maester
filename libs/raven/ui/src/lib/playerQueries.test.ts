@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test'
+import type { TicketedOrigin } from '@raven/core'
 import { QueryClient } from '@tanstack/react-query'
 import { api } from '@/test/api'
 import { playerQueriesFor } from '@/lib/playerQueries'
@@ -28,11 +29,26 @@ describe('playerQueriesFor', () => {
     await cache.fetchQuery(queries.playbackSettings)
     expect(client.getTracks).toHaveBeenCalledWith(7)
     expect(client.getStreams).toHaveBeenCalledWith(7)
-    expect(client.getSubtitles).toHaveBeenCalledWith(input)
+    // A browser's cookie carries the access, so no ticket goes with the request.
+    expect(client.getSubtitles).toHaveBeenCalledWith({ ...input, access: null })
     expect(client.getPlaybackSettings).toHaveBeenCalledTimes(1)
     expect(cache.getQueryData<typeof tracks>(queryKeys.mediaTracks(7))).toEqual(tracks)
     await cache.invalidateQueries({ queryKey: queryKeys.mediaTracks(7) })
     expect(cache.getQueryState(queryKeys.mediaTracks(7))?.isInvalidated).toBe(true)
+    cache.clear()
+  })
+
+  it('reads the ticket for each subtitle window where the client hands one', async () => {
+    const access = {
+      origin: { url: 'https://raven.home.example' },
+      ticket: 'abc.def',
+    } as const satisfies TicketedOrigin
+    const client = { ...api, getSubtitles: mock(async () => []) }
+    const queries = playerQueriesFor(client)
+    const cache = new QueryClient()
+    const input = { id: 7, trackId: 'embedded-0', window: 0 }
+    await cache.fetchQuery(queries.subtitles({ ...input, readAccess: async () => access }))
+    expect(client.getSubtitles).toHaveBeenCalledWith({ ...input, access })
     cache.clear()
   })
 })

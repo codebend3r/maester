@@ -1,4 +1,4 @@
-import { MAX_HEIGHTS, type MaxHeight, THEMES, isMaxHeight } from '@raven/core'
+import { MAX_HEIGHTS, type MaxHeight, isMaxHeight } from '@raven/core'
 import { useRouter } from 'expo-router'
 
 import { useAccountSession } from '@/account/accountSession'
@@ -10,13 +10,13 @@ import {
   SettingsToggle,
 } from '@/layouts'
 import { useAppPrefs } from '@/stores/appPrefs'
+import { THEME_PICKER } from '@/theme/themeOptions'
 
 const COPY = {
   title: 'Settings',
   account: 'Account',
   signedInAs: (email: string) => `Signed in as ${email}.`,
   signOut: 'Sign out',
-  theme: 'Theme',
   themeNote: 'How raven looks on this device.',
   playback: 'Playback',
   preferDirect: 'Prefer direct play',
@@ -44,8 +44,6 @@ const AWAY_OPTIONS = Object.values(MAX_HEIGHTS).map((height) => ({
   label: AWAY_LABELS[height],
 }))
 
-const THEME_OPTIONS = THEMES.map((theme) => ({ key: theme.id, label: theme.name }))
-
 /**
  * `/settings`: the signed-in account, its theme and how it plays, all kept on the device; nothing
  * here asks a server anything. Signing out sends the viewer back to sign-in.
@@ -65,11 +63,11 @@ export const Settings = () => {
       <SettingsSection note={email === null ? null : COPY.signedInAs(email)} title={COPY.account}>
         <SettingsButton isDisabled={false} onPress={signOut} text={COPY.signOut} />
       </SettingsSection>
-      <SettingsSection note={COPY.themeNote} title={COPY.theme}>
+      <SettingsSection note={COPY.themeNote} title={THEME_PICKER.label}>
         <SettingsChoice
-          label={COPY.theme}
+          label={THEME_PICKER.label}
           onChoose={(picked) => change({ theme: picked })}
-          options={THEME_OPTIONS}
+          options={THEME_PICKER.options}
           value={theme}
         />
       </SettingsSection>

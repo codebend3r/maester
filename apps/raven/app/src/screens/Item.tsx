@@ -31,7 +31,7 @@ import type { Pictures } from '@/queries/cards'
 import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
-import { ItemLayout, ItemNotice } from '@/layouts'
+import { ItemLayout, ItemNotice, Loading } from '@/layouts'
 import { type CheckState, ITEM_ACTIONS, type ItemAction } from '@/layouts/itemKit'
 import { APP_ROUTE_PARAMS, ROUTE_TARGETS, type RouteTarget, hrefOf } from '@/routes'
 
@@ -353,11 +353,11 @@ const ServerItem = ({ session, id, library, file }: ServerItemProps) => {
     case ROUTE_STATES.error:
       return <ItemNotice notice={page.message} onBack={onBack} />
     case ROUTE_STATES.loading:
-      return <ItemNotice notice={COPY.opening} onBack={onBack} />
+      return <Loading label={COPY.opening} onBack={onBack} />
     case ROUTE_STATES.ready:
       // The pictures wait for the server's cookies, so none is asked for twice.
       return pictures === null ? (
-        <ItemNotice notice={COPY.opening} onBack={onBack} />
+        <Loading label={COPY.opening} onBack={onBack} />
       ) : (
         <ItemOf
           key={page.data.id}

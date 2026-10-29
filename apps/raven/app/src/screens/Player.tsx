@@ -31,7 +31,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { SelectedTrackType, type VideoRef } from 'react-native-video'
 
-import { PlayerChrome, shouldDrawCaptions } from '@/layouts'
+import { Loading, PlayerChrome, shouldDrawCaptions } from '@/layouts'
+import { NO_HEADING } from '@/layouts/playerHeading'
 import type { VideoSurface } from '@/layouts/playerKit'
 import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
 import { planFor } from '@/platform/playbackPlan'
@@ -62,6 +63,7 @@ import {
   usePlaybackSession,
 } from '@/player/usePlaybackSession'
 import { imageOf } from '@/queries/cards'
+import { usePlayerHeading } from '@/queries/usePlayerHeading'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTE_PARAMS, secondsOf } from '@/routes'
 import { useAppPrefs } from '@/stores/appPrefs'
@@ -136,6 +138,7 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
   const setAudioLanguage = usePlayerPrefs((prefs) => prefs.setAudioLanguage)
   const setSubtitles = usePlayerPrefs((prefs) => prefs.setSubtitles)
   const [resumeAt] = useState(() => resumeAtFor({ at, media }))
+  const heading = usePlayerHeading({ media, session })
   const [subtitle, setSubtitle] = useState(() =>
     preferredSubtitle({ tracks, subtitles: subtitlePrefs }),
   )
@@ -156,13 +159,15 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
   const [video, dispatchVideo] = useReducer(videoReducer, resumeAt, initialVideoState)
   const [isPaused, setPaused] = useState(false)
   const position = useRef(resumeAt)
+  // One per server, so the picture and its subtitles reach the video the same way.
+  const sources = mediaSourcesFor(session.server)
   const { state, dispatch } = usePlaybackSession({
     media,
     modes: plan.modes,
     at: resumeAt,
     audio: preferredAudio({ tracks, language: audioLanguage }),
     problems: plan.problems,
-    sources: mediaSourcesFor(session.server),
+    sources,
     // AVPlayer says it waits at the end of a file too, and the viewer's pause is no stall.
     isWaiting: video.waiting && !isPaused && !video.ended,
     clock: video.time,
@@ -194,7 +199,11 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
       : audioPlaceFor({ mode, tracks, audio: ladder?.audio ?? null })
   const captions = captionsFor({ mode, tracks, subtitle })
   const { cues } = useTrackCues({
-    video: { api: session.api, mediaId: media.id },
+    video: {
+      api: session.api,
+      mediaId: media.id,
+      readAccess: () => sources.subtitleAccess(media.id),
+    },
     track: captions.cueTrack,
     time: video.time,
     duration,
@@ -353,6 +362,7 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
         }
         summary={summary}
         surface={surface}
+        heading={heading}
         title={mediaLabel(media)}
         transport={
           source === null
@@ -378,9 +388,8 @@ const ReadyPlayer = ({ media, at, session, onBack }: ReadyPlayerProps) => {
   // Read before the source is handed over, which carries the synopsis on a TV: a source that
   // changes once playing reloads the video.
   const details = useQuery(session.queries.itemQuery(media.item?.id ?? null))
-  const title = mediaLabel(media)
   if (policy === null || tracks.isPending || details.isLoading) {
-    return <Waiting notice={COPY.opening} onBack={onBack} title={title} />
+    return <Loading label={COPY.opening} onBack={onBack} />
   }
   // A file whose tracks or page cannot be read still plays, with no pickers or synopsis.
   return (
@@ -397,13 +406,12 @@ const ReadyPlayer = ({ media, at, session, onBack }: ReadyPlayerProps) => {
 }
 
 type WaitingProps = {
-  title: string
   notice: string
   onBack: () => void
 }
 
 /** The player's chrome with only a line on it and Back. */
-const Waiting = ({ title, notice, onBack }: WaitingProps) => (
+const Waiting = ({ notice, onBack }: WaitingProps) => (
   <PlayerChrome
     artwork={null}
     audio={null}
@@ -411,10 +419,11 @@ const Waiting = ({ title, notice, onBack }: WaitingProps) => (
     notice={notice}
     onBack={onBack}
     onPictureInPicture={null}
+    heading={NO_HEADING}
     subtitles={null}
     summary={null}
     surface={null}
-    title={title}
+    title=""
     transport={null}
   />
 )
@@ -431,11 +440,11 @@ const ServerPlayer = ({ session, mediaId, at }: ServerPlayerProps) => {
   const page = routeState({ id: mediaId, query: useQuery(session.queries.mediaQuery(mediaId)) })
   switch (page.state) {
     case ROUTE_STATES.missing:
-      return <Waiting notice={COPY.missing} onBack={onBack} title="" />
+      return <Waiting notice={COPY.missing} onBack={onBack} />
     case ROUTE_STATES.error:
-      return <Waiting notice={page.message} onBack={onBack} title="" />
+      return <Waiting notice={page.message} onBack={onBack} />
     case ROUTE_STATES.loading:
-      return <Waiting notice={COPY.opening} onBack={onBack} title="" />
+      return <Loading label={COPY.opening} onBack={onBack} />
     case ROUTE_STATES.ready:
       return (
         <ReadyPlayer

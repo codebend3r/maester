@@ -10,7 +10,7 @@ describe('ticketRenewAt', () => {
 })
 
 describe('MEDIA_PROBE_TIMEOUT_MS', () => {
-  it('gives an origin two seconds to answer its ping, on every client', () => {
-    expect(MEDIA_PROBE_TIMEOUT_MS).toBe(2000)
+  it('gives an origin six seconds to answer its ping, on every client, so a busy home network still wins', () => {
+    expect(MEDIA_PROBE_TIMEOUT_MS).toBe(6000)
   })
 })

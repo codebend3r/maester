@@ -12,8 +12,12 @@ type TicketRenewAtProps = { readAt: number }
 export const ticketRenewAt = ({ readAt }: TicketRenewAtProps): number =>
   readAt + MEDIA_TICKET_RENEW_MS
 
-/** How long a client waits on one origin's ping before it counts the origin as not answering. */
-export const MEDIA_PROBE_TIMEOUT_MS = 2000
+/**
+ * How long a client waits on one origin's ping before it counts the origin as not answering.
+ * Long enough for a busy home network: a LAN origin that misses it is passed over for a
+ * public one, which carries the video out to the internet and back and makes the network busier.
+ */
+export const MEDIA_PROBE_TIMEOUT_MS = 6000
 
 /** Why a client cannot reach a video's media. */
 export const ACCESS_REFUSALS = {

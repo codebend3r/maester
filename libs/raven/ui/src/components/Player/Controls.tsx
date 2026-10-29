@@ -1,6 +1,7 @@
 import { formatDuration } from '@raven/core'
 import { type ComponentPropsWithRef, type ReactNode, type RefObject, useId, useState } from 'react'
-import { Icon, type IconName } from '@/components/Icon/Icon'
+import { Icon } from '@/components/Icon/Icon'
+import type { IconName } from '@/components/Icon/drawings'
 import { CountdownRing } from '@/components/Player/CountdownRing'
 import styles from '@/components/Player/Controls.module.scss'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
