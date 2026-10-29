@@ -1,33 +1,35 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { type Marker, isChapter, listOf } from '@raven/core'
+import {
+  ITEM_TYPES,
+  type Marker,
+  type MarkerKind,
+  type MarkerSource,
+  isChapter,
+  listOf,
+} from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
-import type { StoredHead } from '@/markers/introDetector'
-import { MARKER_STATES, offerMarkers } from '@/markers/markerRows'
+import type { KeptFingerprint } from '@/markers/fingerprintMatch'
+import { MARKER_STATES, offerMarkers, wouldTake } from '@/markers/markerRows'
+import type { Region, SeasonFile } from '@/markers/seasonListen'
+import type { RegionFingerprint } from '@/markers/seasonMarkers'
 
 /**
  * The detector's version. Raising it analyses every season again, as an
  * improved detector should; files analysed by an older one keep their
  * markers until then.
  */
-export const MARKER_DETECTOR_VERSION = 1
+export const MARKER_DETECTOR_VERSION = 2
 
 /** The fingerprint format's version; a kept fingerprint of another is made again. */
 const FINGERPRINT_VERSION = 1
 
-/** The region of a file a head fingerprint covers, from its start. */
-const REGIONS = { head: 'head' } as const
-
 const isChapters = listOf(isChapter)
 
 /** One file of a season's episodes, as detection reads it. */
-export type EpisodeFile = {
-  id: number
-  path: string
-  duration: number
+export type EpisodeFile = SeasonFile & {
   /** The episode's number in its season; a file of several counts as its first. */
   episode: number
-  chapterStarts: number[]
 }
 
 type EpisodeRow = {
@@ -38,11 +40,18 @@ type EpisodeRow = {
   chapters: string | null
 }
 
-type MarkerJobsSaveHeadProps = StoredHead & { id: number }
+/** A film waiting for detection. */
+export type FilmFile = { id: number; path: string; duration: number }
+
+type MarkerJobsStoredProps = { id: number; region: Region }
+
+type MarkerJobsSaveProps = RegionFingerprint
+
+type MarkerJobsWouldTakeProps = { id: number; kind: MarkerKind; source: MarkerSource }
 
 type MarkerJobsFinishProps = {
   ids: readonly number[]
-  intros: ReadonlyMap<number, Marker>
+  markers: ReadonlyMap<number, readonly Marker[]>
   failed: ReadonlySet<number>
 }
 
@@ -60,9 +69,9 @@ const unpack = (data: Buffer): number[] =>
   Array.from({ length: Math.floor(data.length / 4) }, (_, index) => data.readUInt32LE(index * 4))
 
 /**
- * What intro detection reads and writes: the seasons waiting for it, the
- * files of one season, the kept head fingerprints, and each file's state
- * once its season is analysed.
+ * What marker detection reads and writes: the seasons and films waiting
+ * for it, the files of one season, the kept fingerprints, and each file's
+ * state once it is analysed.
  */
 @Injectable()
 export class MarkerJobs {
@@ -93,6 +102,26 @@ export class MarkerJobs {
       .map(({ season_id }) => season_id)
   }
 
+  /** The films with a file waiting for detection, as `seasonsDue` reads episodes. */
+  filmsDue(): FilmFile[] {
+    return this.db
+      .prepare<[string, string, number], FilmFile>(
+        `SELECT DISTINCT m.id, m.path, m.duration
+           FROM media m
+           JOIN media_items mi ON mi.media_id = m.id
+           JOIN items f ON f.id = mi.item_id AND f.type = ?
+          WHERE m.probed = 1 AND m.probe_error IS NULL AND m.duration > 0
+            AND (m.markers = ? OR m.markers_version < ?)
+          ORDER BY m.id`,
+      )
+      .all(ITEM_TYPES.movie, MARKER_STATES.pending, MARKER_DETECTOR_VERSION)
+  }
+
+  /** Whether a marker from `source` would be stored over what the file holds, so is worth looking for. */
+  wouldTake({ id, kind, source }: MarkerJobsWouldTakeProps): boolean {
+    return wouldTake({ db: this.db, mediaId: id, kind, source })
+  }
+
   /** The files of a season's episodes, in episode order, the biggest picture first among an episode's versions. */
   episodesOf(seasonId: number): EpisodeFile[] {
     const rows = this.db
@@ -119,18 +148,18 @@ export class MarkerJobs {
     }))
   }
 
-  /** The kept head fingerprint of a file, or null when none of this format is kept. */
-  storedHead(id: number): StoredHead | null {
+  /** The kept fingerprint of a region of a file, or null when none of this format is kept. */
+  stored({ id, region }: MarkerJobsStoredProps): KeptFingerprint | null {
     const row = this.db
       .prepare<[number, string, number], { seconds: number; data: Buffer }>(
         `SELECT seconds, data FROM media_fingerprints
           WHERE media_id = ? AND region = ? AND version = ?`,
       )
-      .get(id, REGIONS.head, FINGERPRINT_VERSION)
+      .get(id, region, FINGERPRINT_VERSION)
     return row ? { seconds: row.seconds, points: unpack(row.data) } : null
   }
 
-  saveHead({ id, seconds, points }: MarkerJobsSaveHeadProps): void {
+  save({ id, region, seconds, points }: MarkerJobsSaveProps): void {
     this.db
       .prepare(
         `INSERT INTO media_fingerprints (media_id, region, version, seconds, data)
@@ -138,14 +167,14 @@ export class MarkerJobs {
          ON CONFLICT (media_id, region) DO UPDATE SET version = excluded.version,
            seconds = excluded.seconds, data = excluded.data`,
       )
-      .run(id, REGIONS.head, FINGERPRINT_VERSION, seconds, pack(points))
+      .run(id, region, FINGERPRINT_VERSION, seconds, pack(points))
   }
 
-  /** A season analysed: the intros found offered as markers, and every file marked done or failed by this detector. */
-  finish({ ids, intros, failed }: MarkerJobsFinishProps): void {
+  /** A season or film analysed: the markers found offered, and every file marked done or failed by this detector. */
+  finish({ ids, markers, failed }: MarkerJobsFinishProps): void {
     const mark = this.db.prepare('UPDATE media SET markers = ?, markers_version = ? WHERE id = ?')
     this.db.transaction(() => {
-      intros.forEach((marker, mediaId) => offerMarkers({ db: this.db, mediaId, markers: [marker] }))
+      markers.forEach((found, mediaId) => offerMarkers({ db: this.db, mediaId, markers: found }))
       ids.forEach((id) =>
         mark.run(
           failed.has(id) ? MARKER_STATES.failed : MARKER_STATES.done,

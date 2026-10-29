@@ -3,14 +3,17 @@ import {
   ITEM_TYPES,
   type ItemType,
   LIBRARY_KINDS,
+  MARKER_KINDS,
   MARKER_SOURCES,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { readServerConfig } from '@/config'
 import type { FfmpegService } from '@/ffmpeg/ffmpegService'
+import type { PictureStat } from '@/ffmpeg/pictureStats'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
-import { RUN_LEAD_S } from '@/markers/seasonIntros'
+import { RUN_LEAD_S } from '@/markers/seasonMatch'
 import { MARKER_DETECTOR_VERSION, MarkerJobs } from '@/markers/markerJobs'
+import { REGIONS } from '@/markers/seasonListen'
 import { MarkerDetection, YIELD_MS } from '@/markers/markerDetection'
 import { MARKER_STATES } from '@/markers/markerRows'
 import { noise, pointsFor, withTheme } from '@/test/fingerprints'
@@ -35,6 +38,27 @@ const TRACKS = { audio: [], subtitles: [], defaultAudio: null, frameRate: 24 }
 
 const THEME = noise({ seed: 4242, count: pointsFor(45) })
 
+const END_THEME = noise({ seed: 4343, count: pointsFor(60) })
+
+/** Where each episode's end theme starts; it runs to within 5 s of the file's end. */
+const END_THEME_AT = 2335
+
+/** The films: one the crawl score reads, one whose chapters name its credits. */
+const FILMS = {
+  crawled: 'Film (2020).mkv',
+  named: 'Named (2021).mkv',
+} as const
+
+const FILM_PROBE = { ...PROBE, duration: 7200 }
+
+/** The crawled film's last frames: picture, then the crawl from 6800 s, then a scene from 7110 s. */
+const filmFrames = (start: number): PictureStat[] =>
+  Array.from({ length: 7200 - start }, (_, index) => {
+    const at = start + index
+    const isCrawl = at >= 6800 && at < 7110
+    return { at, saturation: isCrawl ? 1 : 40, dark: isCrawl ? 85 : 20 }
+  })
+
 /** Where each made up episode's intro starts, by file name; null for one with none. */
 const INTRO_AT = new Map<string, number | null>([
   ['Show - S01E01.mkv', 50],
@@ -54,25 +78,32 @@ const fetched = ({ type, tmdbId, number = null }: FetchedProps): FetchedItem => 
   title: tmdbId,
 })
 
-/** ffmpeg as detection uses it: each file's fingerprint made up from `INTRO_AT`, and whether a viewer's conversion runs. */
+type DetectionFfmpeg = Pick<FfmpegService, 'fingerprint' | 'pictureStats' | 'isConverting'>
+
+/**
+ * ffmpeg as detection uses it: each file's head made up from `INTRO_AT`,
+ * each tail with the end theme, the crawled film's frames, and whether a
+ * viewer's conversion runs.
+ */
 const fakeFfmpeg = () => {
   const state = { isConverting: false }
-  const fingerprint = vi.fn<FfmpegService['fingerprint']>(async ({ path, seconds }) => {
+  const fingerprint = vi.fn<FfmpegService['fingerprint']>(async ({ path, start, seconds }) => {
     const name = path.split('/').at(-1) ?? ''
-    const at = INTRO_AT.get(name) ?? null
-    const seed = Array.from(name).reduce(
-      (hash, char) => (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0,
-      3,
-    )
+    const at = start === 0 ? (INTRO_AT.get(name) ?? null) : END_THEME_AT - start
+    const seed =
+      Array.from(name).reduce((hash, char) => (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0, 3) +
+      start
     return at === null
       ? noise({ seed, count: pointsFor(seconds) })
-      : withTheme({ seed, seconds, theme: THEME, at })
+      : withTheme({ seed, seconds, theme: start === 0 ? THEME : END_THEME, at })
   })
-  const ffmpeg: Pick<FfmpegService, 'fingerprint' | 'isConverting'> = {
+  const pictureStats = vi.fn<FfmpegService['pictureStats']>(async ({ start }) => filmFrames(start))
+  const ffmpeg: DetectionFfmpeg = {
     fingerprint,
+    pictureStats,
     isConverting: () => state.isConverting,
   }
-  return { ffmpeg, fingerprint, state }
+  return { ffmpeg, fingerprint, pictureStats, state }
 }
 
 describe('MarkerDetection', () => {
@@ -81,7 +112,7 @@ describe('MarkerDetection', () => {
   const index = () => new MediaIndex(database.get())
   const jobs = () => new MarkerJobs(database.get())
   type DetectionWithProps = {
-    ffmpeg: Pick<FfmpegService, 'fingerprint' | 'isConverting'>
+    ffmpeg: DetectionFfmpeg
     detectMarkers?: boolean
   }
 
@@ -134,16 +165,48 @@ describe('MarkerDetection', () => {
       metadata.link({ mediaIds: [id], itemIds: [episodeId] })
       ids.set(name, id)
     })
+    const filmsId = new LibrariesRepository(database.get()).create({
+      name: 'Films',
+      paths: ['/films'],
+      settings: { kind: LIBRARY_KINDS.movies },
+    }).id
+    Object.values(FILMS).forEach((name) => {
+      const filmId = metadata.save({ item: fetched({ type: ITEM_TYPES.movie, tmdbId: name }) })
+      const id = index().insert({
+        libraryId: filmsId,
+        kind: LIBRARY_KINDS.movies,
+        file: { path: `/films/${name}`, root: '/films', size: 100, mtimeMs: 1 },
+      })
+      index().saveProbe({
+        id,
+        probe: FILM_PROBE,
+        tracks: TRACKS,
+        chapters:
+          name === FILMS.named
+            ? [
+                { start: 0, end: 6600, title: 'Start' },
+                { start: 6600, end: 7200, title: 'End Credits' },
+              ]
+            : [],
+      })
+      metadata.link({ mediaIds: [id], itemIds: [filmId] })
+      ids.set(name, id)
+    })
   })
 
   afterAll(database.close)
 
-  it('lists the seasons waiting for detection', () => {
+  it('lists the seasons and films waiting for detection', () => {
     expect(jobs().seasonsDue()).toHaveLength(2)
+    expect(
+      jobs()
+        .filmsDue()
+        .map(({ path }) => path),
+    ).toEqual(Object.values(FILMS).map((name) => `/films/${name}`))
   })
 
-  it('finds each episode’s intro, every version of it, and keeps the fingerprints', async () => {
-    const { ffmpeg, fingerprint } = fakeFfmpeg()
+  it('finds each episode’s intro and credits, every version of it, and keeps the fingerprints', async () => {
+    const { ffmpeg, fingerprint, pictureStats } = fakeFfmpeg()
     const detection = detectionWith({ ffmpeg })
     detection.kick()
     await detection.whenIdle()
@@ -158,10 +221,38 @@ describe('MarkerDetection', () => {
       markers_version: MARKER_DETECTOR_VERSION,
     })
     expect(stateOf('Show - S02E01.mkv')?.markers ?? null).toBe(MARKER_STATES.done)
-    expect(jobs().storedHead(ids.get('Show - S01E01.mkv') ?? -1)?.seconds ?? 0).toBe(600)
+    const first = ids.get('Show - S01E01.mkv') ?? -1
+    expect(jobs().stored({ id: first, region: REGIONS.head })?.seconds ?? 0).toBe(600)
+    expect(jobs().stored({ id: first, region: REGIONS.tail })?.seconds ?? 0).toBe(360)
     expect(jobs().seasonsDue()).toEqual([])
-    // Each head was decoded once, the second version's included.
-    expect(fingerprint).toHaveBeenCalledTimes(5)
+    // Each head and tail was decoded once, the second version's included.
+    expect(fingerprint).toHaveBeenCalledTimes(10)
+    // Only the film with no credits chapter has its pictures read.
+    expect(pictureStats).toHaveBeenCalledExactlyOnceWith({
+      path: `/films/${FILMS.crawled}`,
+      start: 6300,
+    })
+  })
+
+  it('places an episode’s credits on its end theme, running to the file’s end', () => {
+    const credits = index().storedMarkers(ids.get('Show - S01E02.mkv') ?? -1).credits
+    expect(credits).toMatchObject({
+      kind: MARKER_KINDS.credits,
+      source: MARKER_SOURCES.fingerprint,
+      end: PROBE.duration,
+    })
+    expect(credits?.start ?? Number.NaN).toBeCloseTo(END_THEME_AT + RUN_LEAD_S, 0)
+  })
+
+  it('places a film’s credits on its crawl, and leaves a film with a credits chapter alone', () => {
+    const crawled = index().storedMarkers(ids.get(FILMS.crawled) ?? -1).credits
+    expect(crawled).toMatchObject({ source: MARKER_SOURCES.visual, start: 6800, end: 7110 })
+    expect(index().storedMarkers(ids.get(FILMS.named) ?? -1).credits).toMatchObject({
+      source: MARKER_SOURCES.chapter,
+      start: 6600,
+    })
+    expect(stateOf(FILMS.named)?.markers ?? null).toBe(MARKER_STATES.done)
+    expect(jobs().filmsDue()).toEqual([])
   })
 
   it('analyses a replaced file again, against its season mates’ kept fingerprints', async () => {
@@ -173,8 +264,9 @@ describe('MarkerDetection', () => {
     const detection = detectionWith({ ffmpeg })
     detection.kick()
     await detection.whenIdle()
-    expect(fingerprint).toHaveBeenCalledTimes(1)
+    expect(fingerprint).toHaveBeenCalledTimes(2)
     expect(index().storedMarkers(id).intro).not.toBeNull()
+    expect(index().storedMarkers(id).credits).not.toBeNull()
   })
 
   it('does nothing while the admin has detection off', async () => {

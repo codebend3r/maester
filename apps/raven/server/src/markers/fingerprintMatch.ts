@@ -17,6 +17,20 @@ const CANDIDATE_SHIFTS = 12
 /** A file's fingerprint over one stretch of it, `start` seconds in. */
 export type Fingerprint = { start: number; points: readonly number[] }
 
+/** A kept fingerprint of one region of a file: how many seconds it covers, and its points. */
+export type KeptFingerprint = { seconds: number; points: readonly number[] }
+
+/** A fingerprint just made, and whose it is. */
+export type MadeFingerprint = KeptFingerprint & { id: number }
+
+/** A stretch of a file to fingerprint, in seconds. */
+type Stretch = { path: string; start: number; seconds: number }
+
+/** What detection needs ffmpeg for: `FfmpegService`, or a stand-in in tests. */
+export type FingerprintTools = {
+  fingerprint: (stretch: Stretch) => Promise<number[]>
+}
+
 /** The stretch two files share, in seconds of each. */
 export type SharedRun = { start: number; end: number; theirStart: number; theirEnd: number }
 

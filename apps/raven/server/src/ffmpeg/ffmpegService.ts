@@ -19,6 +19,7 @@ import { parseChapters } from '@/ffmpeg/chapters'
 import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
 import { type HlsDialect, hlsDialectOf, toolMismatch } from '@/ffmpeg/ffmpegVersion'
 import { parseKeyframes } from '@/ffmpeg/keyframes'
+import { type PictureStat, parsePictureStats } from '@/ffmpeg/pictureStats'
 import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
 import { type FileTracks, parseTracks } from '@/ffmpeg/tracks'
 
@@ -65,6 +66,16 @@ const failureText = (error: unknown): string => {
 const LOWEST_PRIORITY = 19
 
 type FfmpegServiceFingerprintProps = { path: string; start: number; seconds: number }
+
+type FfmpegServicePictureStatsProps = { path: string; start: number }
+
+/**
+ * A picture pass: one frame a second, keyframes only, scaled small, with
+ * the mean saturation and the share of pixels darker than luma 32 printed
+ * for each.
+ */
+const PICTURE_FILTERS =
+  'fps=1,scale=320:-2,signalstats,blackframe=amount=0:threshold=32,metadata=mode=print:file=-'
 
 /** The signals raven sends an ffmpeg it started. */
 export const FFMPEG_SIGNALS = { kill: 'SIGKILL' } as const satisfies Record<string, NodeJS.Signals>
@@ -171,6 +182,36 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     return Array.from({ length: Math.floor(out.length / 4) }, (_, index) =>
       out.readUInt32LE(index * 4),
     )
+  }
+
+  /**
+   * Each second of the file's first video track from `start` to its end,
+   * read from keyframes only so a 4K film's last 15 minutes take a minute
+   * rather than ten: its saturation and how dark it is (`parsePictureStats`).
+   */
+  async pictureStats({ path, start }: FfmpegServicePictureStatsProps): Promise<PictureStat[]> {
+    const out = await this.analyse([
+      '-hide_banner',
+      '-nostdin',
+      '-v',
+      'error',
+      '-skip_frame',
+      'nokey',
+      '-ss',
+      String(start),
+      '-i',
+      path,
+      '-map',
+      '0:v:0',
+      '-an',
+      '-sn',
+      '-vf',
+      PICTURE_FILTERS,
+      '-f',
+      'null',
+      '-',
+    ])
+    return parsePictureStats({ text: out.toString(), start })
   }
 
   /** Whether ffmpeg is converting a file for someone watching, which background analysis gives way to. */

@@ -414,7 +414,7 @@ const ServerSettings = () => {
             </fieldset>
             <fieldset className={styles.setting}>
               <legend className={styles.legend}>
-                <Titled icon="skipNext">Intros</Titled>
+                <Titled icon="skipNext">Intros and credits</Titled>
               </legend>
               <label className={styles.choice}>
                 <input
@@ -422,11 +422,13 @@ const ServerSettings = () => {
                   checked={current.detectMarkers}
                   onChange={(event) => save.mutate({ detectMarkers: event.target.checked })}
                 />
-                <span className={styles.choiceLabel}>Find intros</span>
+                <span className={styles.choiceLabel}>Find intros and credits</span>
                 <span className={styles.choiceHint}>
-                  Listens to each season in the background for the intro its episodes share, so
-                  players offer Skip intro. It waits while a video is converted for someone
-                  watching. Chapters named Opening or the like count either way.
+                  Listens to each season in the background for the intro and end theme its episodes
+                  share, and looks for each film's credits crawl, so players offer Skip intro and
+                  count down to what is next from the credits. It waits while a video is converted
+                  for someone watching. Chapters named Opening, End Credits or the like count either
+                  way.
                 </span>
               </label>
             </fieldset>

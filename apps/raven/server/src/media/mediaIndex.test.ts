@@ -1,6 +1,6 @@
 import { MARKER_KINDS, MARKER_SOURCES, type Marker } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { offerMarkers } from '@/markers/markerRows'
+import { offerMarkers, strongest, wouldTake } from '@/markers/markerRows'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { testDatabase } from '@/test/database'
@@ -134,6 +134,24 @@ describe('the media index', () => {
       expect(introStart(id)).toBe(42)
       index().markChanged({ id, size: 300, mtimeMs: 3 })
       expect(index().storedMarkers(id).intro?.source ?? null).toBe(MARKER_SOURCES.manual)
+    })
+
+    it('tells a detector whether its marker would be kept, before it looks', () => {
+      const id = add('would take')
+      const wouldKeep = (source: Marker['source']) =>
+        wouldTake({ db: database.get().db, mediaId: id, kind: MARKER_KINDS.intro, source })
+      expect(wouldKeep(MARKER_SOURCES.visual)).toBe(true)
+      offer({ id, marker: intro({ source: MARKER_SOURCES.chapter, start: 30 }) })
+      expect(wouldKeep(MARKER_SOURCES.visual)).toBe(false)
+      expect(wouldKeep(MARKER_SOURCES.chapter)).toBe(true)
+    })
+
+    it('picks the marker offering them in turn would keep', () => {
+      const chapter = intro({ source: MARKER_SOURCES.chapter, start: 30 })
+      const visual = intro({ source: MARKER_SOURCES.visual, start: 10 })
+      expect(strongest([chapter, visual])).toBe(chapter)
+      expect(strongest([visual, chapter])).toBe(chapter)
+      expect(strongest([])).toBeNull()
     })
   })
 

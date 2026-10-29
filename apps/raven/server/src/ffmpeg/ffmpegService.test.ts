@@ -44,6 +44,12 @@ describe('FfmpegService', () => {
       '#!/bin/sh\necho "$@" > "$0.args"\nprintf "\\001\\000\\000\\000\\377\\377\\377\\377"\n',
     )
     await chmod(join(state.dir, 'chromaprint'), 0o755)
+    // Prints its arguments, then one frame's statistics as `metadata=mode=print` does.
+    await writeFile(
+      join(state.dir, 'pictures'),
+      '#!/bin/sh\necho "$@" > "$0.args"\nprintf "frame:0    pts:0       pts_time:0\\nlavfi.signalstats.SATAVG=1.5\\nlavfi.blackframe.pblack=88\\n"\n',
+    )
+    await chmod(join(state.dir, 'pictures'), 0o755)
     await chmod(join(state.dir, 'works'), 0o755)
     await chmod(join(state.dir, 'slow'), 0o755)
     await chmod(join(state.dir, 'broken'), 0o755)
@@ -123,6 +129,14 @@ describe('FfmpegService', () => {
     expect(args).toContain(
       '-ss 0 -t 600 -i /m/a.mkv -map 0:a:0 -ac 1 -f chromaprint -fp_format raw -',
     )
+  })
+
+  it("scores a film's tail a frame a second, from its keyframes", async () => {
+    expect(await service('pictures').pictureStats({ path: '/m/a.mkv', start: 6300 })).toEqual([
+      { at: 6300, saturation: 1.5, dark: 88 },
+    ])
+    const args = await readFile(join(state.dir, 'pictures.args'), 'utf8')
+    expect(args).toContain('-skip_frame nokey -ss 6300 -i /m/a.mkv -map 0:v:0 -an -sn -vf fps=1,')
   })
 
   it("reports a fingerprint run's failure and timeout as the other runs do", async () => {
