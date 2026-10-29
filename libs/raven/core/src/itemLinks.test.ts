@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { ITEM_TYPES } from '@/contract'
+import { ITEM_TYPES, SESSION_KINDS } from '@/contract'
 import {
   CARD_DESTINATIONS,
   cardDestination,
@@ -11,6 +11,7 @@ import {
   queryId,
   queueLink,
   readWatchState,
+  sessionOf,
   watchLink,
   PAGE_PATHS,
   watchPageOf,
@@ -48,56 +49,63 @@ describe('watchPageOf', () => {
   })
 })
 
+describe('sessionOf', () => {
+  it('rolls an episode on through its show, and plays anything else on its own', () => {
+    const episode = itemSummary({ type: ITEM_TYPES.episode })
+    expect(sessionOf(mediaItem({ item: episode }))).toEqual({ kind: SESSION_KINDS.show })
+    const movie = itemSummary({ type: ITEM_TYPES.movie })
+    expect(sessionOf(mediaItem({ item: movie }))).toEqual({ kind: SESSION_KINDS.single })
+    expect(sessionOf(mediaItem({ item: null }))).toEqual({ kind: SESSION_KINDS.single })
+  })
+})
+
 describe('watchLink', () => {
-  it('hands the video over in router state, with nothing to play after it', () => {
-    const media = mediaItem({ id: 9 })
+  it('hands the video over in router state, in its own session when the page names none', () => {
+    const media = mediaItem({ id: 9, item: itemSummary({ type: ITEM_TYPES.episode }) })
     expect(watchLink({ media })).toEqual({
       to: '/watch/9',
-      state: { media, upNext: [], isShuffled: false },
+      state: { media, session: { kind: SESSION_KINDS.show }, upNext: [] },
     })
   })
 
-  it('hands over the videos to play after it, in turn', () => {
+  it('hands over the session a page names', () => {
     const media = mediaItem({ id: 9 })
-    const upNext = [mediaItem({ id: 10 }), mediaItem({ id: 11 })]
-    expect(watchLink({ media, upNext })).toEqual({
-      to: '/watch/9',
-      state: { media, upNext, isShuffled: false },
-    })
-  })
-
-  it('marks videos a shuffle dealt', () => {
-    const media = mediaItem({ id: 9 })
-    expect(watchLink({ media, isShuffled: true }).state.isShuffled).toBe(true)
+    const session = { kind: SESSION_KINDS.saga, sagaId: '10' } as const
+    expect(watchLink({ media, session }).state.session).toEqual(session)
   })
 })
 
 describe('queueLink', () => {
-  it('plays the first of a queue, with the rest after it', () => {
+  it('plays the first of a shuffled queue, with the rest after it', () => {
     const first = mediaItem({ id: 9 })
     const rest = [mediaItem({ id: 10 }), mediaItem({ id: 11 })]
     expect(queueLink({ queue: [first, ...rest] })).toEqual({
       to: '/watch/9',
-      state: { media: first, upNext: rest, isShuffled: false },
+      state: { media: first, session: { kind: SESSION_KINDS.queue }, upNext: rest },
     })
   })
 
   it('has nothing to play from an empty queue', () => {
-    expect(queueLink({ queue: [], isShuffled: true })).toBeNull()
+    expect(queueLink({ queue: [] })).toBeNull()
   })
 })
 
 describe('readWatchState', () => {
   it("reads what a link handed over for the video it plays, and nothing for another's", () => {
-    const { state } = watchLink({ media: mediaItem({ id: 9 }), upNext: [mediaItem({ id: 10 })] })
-    expect(readWatchState({ state, id: 9 })).toEqual(state)
+    const { state } = queueLink({ queue: [mediaItem({ id: 9 }), mediaItem({ id: 10 })] }) ?? {}
+    expect(readWatchState({ state, id: 9 })).toEqual(state ?? null)
     expect(readWatchState({ state, id: 10 })).toBeNull()
   })
 
-  it('reads nothing from a direct visit, or state from before the queue or the shuffle', () => {
+  it('reads nothing from a direct visit, or state from before sessions', () => {
     expect(readWatchState({ state: null, id: 9 })).toBeNull()
     expect(readWatchState({ state: { media: mediaItem({ id: 9 }) }, id: 9 })).toBeNull()
-    expect(readWatchState({ state: { media: mediaItem({ id: 9 }), upNext: [] }, id: 9 })).toBeNull()
+    expect(
+      readWatchState({
+        state: { media: mediaItem({ id: 9 }), upNext: [], isShuffled: false },
+        id: 9,
+      }),
+    ).toBeNull()
   })
 })
 

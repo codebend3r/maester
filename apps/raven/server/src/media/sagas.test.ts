@@ -1,4 +1,4 @@
-import { DEFAULT_SAGA_BACKDROP, type SagaBackdrop } from '@raven/core'
+import { DEFAULT_SAGA_BACKDROP, SESSION_KINDS, type SagaBackdrop } from '@raven/core'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -83,6 +83,40 @@ describe("a library's sagas", () => {
   })
 
   afterEach(() => database.close())
+
+  it("plays a saga's films in its order, its best file each, and nothing after the last", () => {
+    addMovie({ title: 'The Two Towers', year: 2002, files: ['Two Towers.mkv'] })
+    addMovie({ title: 'The Fellowship of the Ring', year: 2001, files: ['Fellowship.mkv'] })
+    addMovie({
+      title: 'The Return of the King',
+      year: 2003,
+      files: ['Return 2160p.mkv', 'Return 1080p.mkv'],
+    })
+    const session = { kind: SESSION_KINDS.saga, sagaId: RINGS.tmdbId } as const
+    const next = (name: string) => {
+      const playing = media().get({ id: id(name), account: TEST_ACCOUNTS.a })
+      if (!playing) throw new Error(`no ${name}`)
+      return media().nextInSession({ media: playing, session, account: TEST_ACCOUNTS.a })?.fileName
+    }
+    expect(next('Fellowship.mkv')).toBe('Two Towers.mkv')
+    expect(next('Two Towers.mkv')).toBe('Return 2160p.mkv')
+    expect(next('Return 1080p.mkv')).toBeUndefined()
+    expect(next('Return 2160p.mkv')).toBeUndefined()
+  })
+
+  it('plays nothing next in a saga the film is not in', () => {
+    addMovie({ title: 'The Fellowship of the Ring', year: 2001, files: ['Fellowship.mkv'] })
+    addMovie({ title: 'The Two Towers', year: 2002, files: ['Two Towers.mkv'] })
+    const playing = media().get({ id: id('Fellowship.mkv'), account: TEST_ACCOUNTS.a })
+    if (!playing) throw new Error('no Fellowship')
+    expect(
+      media().nextInSession({
+        media: playing,
+        session: { kind: SESSION_KINDS.saga, sagaId: '1241' },
+        account: TEST_ACCOUNTS.a,
+      }),
+    ).toBeNull()
+  })
 
   it('makes no saga of one movie split onto two cards', () => {
     addMovie({

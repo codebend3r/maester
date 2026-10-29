@@ -1,6 +1,8 @@
 import {
   type MediaItem,
   type RatingSource,
+  SESSION_KINDS,
+  type ViewingSession,
   cardLink,
   cardTitle,
   formatRuntime,
@@ -61,7 +63,7 @@ const filmFacts = (media: MediaItem): ReactNode[] => {
 
 type SagaFilmProps = {
   media: MediaItem
-  later: MediaItem[]
+  session: ViewingSession
   place: number
   standing: Standing
   ratingsSource: RatingSource
@@ -71,10 +73,10 @@ type SagaFilmProps = {
  * One movie of the saga on a row: its place in the order in large serif
  * figures (dim once watched), its poster, title, facts and score, whether
  * it is watched or up next, and a round button that plays it and then the
- * saga's movies after it, `later`. The title opens its page; a right click
+ * saga's movies after it, in `session`. The title opens its page; a right click
  * opens its menu; in select mode a click anywhere on the row selects it.
  */
-const SagaFilm = ({ media, later, place, standing, ratingsSource }: SagaFilmProps) => {
+const SagaFilm = ({ media, session, place, standing, ratingsSource }: SagaFilmProps) => {
   const menu = useCardMenu({ media, matchType: 'movie', inline: true })
   const { title } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
@@ -135,7 +137,7 @@ const SagaFilm = ({ media, later, place, standing, ratingsSource }: SagaFilmProp
       <span className={styles.end}>
         {hasPage && !select.selecting && (
           <CardLink
-            {...watchLink({ media, upNext: later })}
+            {...watchLink({ media, session })}
             className={styles.play}
             aria-label={`Play ${title}`}
           >
@@ -150,6 +152,8 @@ const SagaFilm = ({ media, later, place, standing, ratingsSource }: SagaFilmProp
 
 type SagaFilmsProps = {
   media: readonly MediaItem[]
+  /** The saga's TMDB collection id, the session its films play in. */
+  sagaId: string
   ratingsSource: RatingSource
 }
 
@@ -157,15 +161,16 @@ type SagaFilmsProps = {
  * A saga's movies in release order, numbered, each on a row of its own with
  * the score its library goes by.
  */
-export const SagaFilms = ({ media, ratingsSource }: SagaFilmsProps) => {
+export const SagaFilms = ({ media, sagaId, ratingsSource }: SagaFilmsProps) => {
   const standing = standings(media)
+  const session = { kind: SESSION_KINDS.saga, sagaId }
   return (
     <ol className={styles.films}>
       {media.map((each, index) => (
         <SagaFilm
           key={each.id}
           media={each}
-          later={media.slice(index + 1)}
+          session={session}
           place={index + 1}
           standing={standing[index] ?? STANDINGS.later}
           ratingsSource={ratingsSource}

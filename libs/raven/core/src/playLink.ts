@@ -1,5 +1,6 @@
+import { isSagaId } from '@/contract/sessions'
 import { toQueryString } from '@/query'
-import { type Infer, isNumber, matching, object, oneOf, union } from '@/schema'
+import { type Infer, isNumber, object, oneOf, union } from '@/schema'
 
 export const PLAY_LINK_MAX_NEXT = 100
 
@@ -30,8 +31,6 @@ export const playLinkFor = ({ origin, mediaId, at, next }: PlayRequest): string 
 
 export const DOWNLOAD_TARGET_KINDS = { media: 'media', item: 'item', saga: 'saga' } as const
 
-const isCollectionId = matching(/^[1-9]\d{0,15}$/u)
-
 /** What a download link asks the desktop to keep: one file, one title, or one collection of a library. */
 export const isDownloadTarget = union(
   object({ kind: oneOf([DOWNLOAD_TARGET_KINDS.media]), mediaId: isMediaId }),
@@ -39,7 +38,7 @@ export const isDownloadTarget = union(
   object({
     kind: oneOf([DOWNLOAD_TARGET_KINDS.saga]),
     libraryId: isMediaId,
-    tmdbId: isCollectionId,
+    tmdbId: isSagaId,
   }),
 )
 
@@ -62,7 +61,7 @@ export const downloadLinkFor = ({ origin, target }: DownloadRequest): string => 
       if (!isMediaId(target.libraryId)) {
         throw new RangeError(`${target.libraryId} is not a library id`)
       }
-      if (!isCollectionId(target.tmdbId)) {
+      if (!isSagaId(target.tmdbId)) {
         throw new RangeError(`${target.tmdbId} is not a collection id`)
       }
       const saga = `${target.libraryId}:${target.tmdbId}`

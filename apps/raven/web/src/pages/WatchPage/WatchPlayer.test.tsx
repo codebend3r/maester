@@ -4,6 +4,8 @@ import {
   type MediaItem,
   type MediaTracks,
   PLAY_LINK_MAX_NEXT,
+  SESSION_KINDS,
+  type ViewingSession,
   playLinkFor,
   type SubtitleTrack,
 } from '@raven/core'
@@ -23,6 +25,9 @@ import { bugReport, mediaItem } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 import { ravenVersion } from '@/lib/version'
+
+const SINGLE: ViewingSession = { kind: SESSION_KINDS.single }
+const QUEUE: ViewingSession = { kind: SESSION_KINDS.queue }
 
 const subtitleTrack = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({
   id: 'embedded-0',
@@ -71,7 +76,9 @@ describe('Player escape feedback', () => {
   it('keeps successful clipboard feedback owned by the browser host', async () => {
     const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {})
     spies.push(clipboard)
-    renderWithProviders({ ui: <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" /> })
+    renderWithProviders({
+      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+    })
     await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
     expect(clipboard).toHaveBeenCalledWith(
       new URL('/api/media/7/file', window.location.origin).href,
@@ -86,7 +93,9 @@ describe('Player escape feedback', () => {
       throw new Error('Clipboard denied')
     })
     spies.push(clipboard)
-    renderWithProviders({ ui: <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" /> })
+    renderWithProviders({
+      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+    })
     await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
     expect(
       await screen.findByText(
@@ -112,7 +121,9 @@ describe('Player file link on the media plane', () => {
     )
     const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {})
     spies.push(clipboard)
-    renderWithProviders({ ui: <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" /> })
+    renderWithProviders({
+      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+    })
     // The link is built from the ticket, so the click waits until the page holds one.
     await waitFor(async () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
@@ -139,7 +150,7 @@ describe('Player file link on the media plane', () => {
     )
     spies.push(spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {}))
     renderWithProviders({
-      ui: <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />,
+      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
       account: fakeAccount(),
     })
     await waitFor(async () => {
@@ -159,7 +170,9 @@ describe('Player file link on the media plane', () => {
     spies.push(spyOn(api, 'getMediaOrigins').mockImplementation(async () => ({ origins: [] })))
     const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {})
     spies.push(clipboard)
-    renderWithProviders({ ui: <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" /> })
+    renderWithProviders({
+      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+    })
     await waitFor(() => expect(api.getMediaOrigins).toHaveBeenCalled())
     await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
     expect(clipboard).toHaveBeenCalledWith(
@@ -182,7 +195,7 @@ describe('WatchPlayer Report this error', () => {
     renderWithProviders({
       ui: (
         <>
-          <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" />
+          <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />
           <Toaster />
         </>
       ),
@@ -207,6 +220,7 @@ describe('Player progress', () => {
       ui: (
         <Player
           media={mediaItem({ container: 'mp4', position: 600 })}
+          session={SINGLE}
           upNext={[]}
           backTo="/libraries/2"
         />
@@ -230,7 +244,14 @@ describe('Player progress', () => {
     const client = new QueryClient()
     client.setQueryData(queryKeys.home, [])
     const { container, unmount } = renderWithProviders({
-      ui: <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={mediaItem({ container: 'mp4' })}
+          session={SINGLE}
+          upNext={[]}
+          backTo="/libraries/2"
+        />
+      ),
       client,
     })
     act(() => {
@@ -252,7 +273,14 @@ describe('Player history', () => {
     stubTracks()
     const played = spyOn(api, 'recordPlay').mockImplementation(async () => undefined)
     const { container } = renderWithProviders({
-      ui: <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={mediaItem({ container: 'mp4' })}
+          session={SINGLE}
+          upNext={[]}
+          backTo="/libraries/2"
+        />
+      ),
     })
     const video = container.querySelector('video')!
     expect(played).not.toHaveBeenCalled()
@@ -270,7 +298,14 @@ describe('shared player capability module', () => {
   it('uses the public canPlay module mock inside the built player', () => {
     setBrowserSupport(() => false)
     const { container } = renderWithProviders({
-      ui: <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={mediaItem({ container: 'mp4' })}
+          session={SINGLE}
+          upNext={[]}
+          backTo="/libraries/2"
+        />
+      ),
     })
     expect(container.querySelector('video')).toBeNull()
     expect(screen.getByText("This video can't play in this browser.")).toBeInTheDocument()
@@ -331,6 +366,7 @@ describe('WatchPlayer up next', () => {
             element={
               <Player
                 media={mediaItem({ container: 'mp4' })}
+                session={QUEUE}
                 upNext={upNext}
                 backTo="/libraries/2"
               />
@@ -348,6 +384,62 @@ describe('WatchPlayer up next', () => {
     if (!video) throw new Error('no video')
     fireEvent(video, new Event('ended'))
     expect(await screen.findByText('Playing 8, then 9')).toBeInTheDocument()
+  })
+})
+
+describe('WatchPlayer sessions', () => {
+  beforeEach(() => stubTracks())
+
+  it('plays the next of the session, as the server finds it, once this one ends', async () => {
+    const show: ViewingSession = { kind: SESSION_KINDS.show }
+    const asked = spyOn(api, 'nextInSession').mockImplementation(async () =>
+      mediaItem({ id: 8, title: 'Busboys 2 (2027)', container: 'mp4' }),
+    )
+    spies.push(asked)
+    const { container } = renderWithProviders({
+      ui: (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <Player
+                media={mediaItem({ container: 'mp4' })}
+                session={show}
+                upNext={[]}
+                backTo="/libraries/2"
+              />
+            }
+          />
+          <Route path="watch/:id" element={<WatchProbe />} />
+        </Routes>
+      ),
+    })
+    expect(await screen.findByRole('link', { name: /^Up next: Busboys 2/ })).toHaveAttribute(
+      'href',
+      '/watch/8',
+    )
+    expect(asked).toHaveBeenCalledWith({ id: 7, session: show })
+    const video = container.querySelector('video')
+    if (!video) throw new Error('no video')
+    fireEvent(video, new Event('ended'))
+    expect(await screen.findByText('Playing 8, then')).toBeInTheDocument()
+  })
+
+  it('asks the server nothing for a video played on its own', async () => {
+    const asked = spyOn(api, 'nextInSession')
+    spies.push(asked)
+    renderWithProviders({
+      ui: (
+        <Player
+          media={mediaItem({ container: 'mp4' })}
+          session={SINGLE}
+          upNext={[]}
+          backTo="/libraries/2"
+        />
+      ),
+    })
+    expect(await screen.findByRole('button', { name: 'Nothing up next' })).toBeDisabled()
+    expect(asked).not.toHaveBeenCalled()
   })
 })
 
@@ -382,14 +474,23 @@ describe('WatchPlayer Open in Raven', () => {
 
   it('offers nothing on Unplayable while this browser has not asked for it', async () => {
     setBrowserSupport(() => false)
-    renderWithProviders({ ui: <Player media={mediaItem()} upNext={[]} backTo="/libraries/2" /> })
+    renderWithProviders({
+      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+    })
     await screen.findByRole('button', { name: 'Copy file link' })
     expect(screen.queryByRole('button', { name: 'Open in Raven' })).toBeNull()
   })
 
   it('offers nothing in the playback menu while this browser has not asked for it', async () => {
     renderWithProviders({
-      ui: <Player media={mediaItem({ container: 'mp4' })} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={mediaItem({ container: 'mp4' })}
+          session={SINGLE}
+          upNext={[]}
+          backTo="/libraries/2"
+        />
+      ),
     })
     await userEvent.click(screen.getByRole('button', { name: /^Playback:/ }))
     const menu = await screen.findByRole('dialog', { name: 'Playback' })
@@ -404,6 +505,7 @@ describe('WatchPlayer Open in Raven', () => {
       ui: (
         <Player
           media={mediaItem()}
+          session={QUEUE}
           upNext={[mediaItem({ id: 8 }), mediaItem({ id: 9 })]}
           backTo="/libraries/2"
         />
@@ -436,6 +538,7 @@ describe('WatchPlayer Open in Raven', () => {
       ui: (
         <Player
           media={mediaItem({ position: 600, duration: 7200 })}
+          session={SINGLE}
           upNext={[]}
           backTo="/libraries/2"
         />
@@ -458,6 +561,7 @@ describe('WatchPlayer Open in Raven', () => {
       ui: (
         <Player
           media={mediaItem({ container: 'mp4' })}
+          session={QUEUE}
           upNext={[mediaItem({ id: 8 })]}
           backTo="/libraries/2"
         />
@@ -489,7 +593,7 @@ describe('WatchPlayer Open in Raven', () => {
     )
     const upNext = [mediaItem({ id: 0 }), mediaItem({ id: 1.5 }), ...playable]
     renderWithProviders({
-      ui: <Player media={mediaItem()} upNext={upNext} backTo="/libraries/2" />,
+      ui: <Player media={mediaItem()} session={QUEUE} upNext={upNext} backTo="/libraries/2" />,
     })
     await userEvent.click(await screen.findByRole('button', { name: 'Open in Raven' }))
     const next = playable.slice(0, PLAY_LINK_MAX_NEXT).map(({ id }) => id)

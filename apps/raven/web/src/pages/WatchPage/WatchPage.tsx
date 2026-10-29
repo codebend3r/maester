@@ -5,11 +5,14 @@ import {
   type MediaItem,
   ROUTE_STATES,
   type RouteQuery,
+  SESSION_KINDS,
+  type ViewingSession,
   mediaLabel,
   playLinkFor,
   readWatchState,
   resumeAtFor,
   routeState,
+  sessionOf,
   watchLink,
   PLAYER_SOURCE_KINDS,
 } from '@raven/core'
@@ -35,7 +38,7 @@ import { PlayerMessage } from '@/desktop/player/PlayerMessage'
 import { api } from '@/lib/api'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation } from 'react-router-dom'
-import { authConfigQuery, mediaQuery } from '@/lib/queries'
+import { authConfigQuery, mediaQuery, nextInSessionQuery } from '@/lib/queries'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { useRouteId } from '@/lib/routeQuery'
 import { useMediaMutations } from '@/lib/useMediaMutations'
@@ -93,7 +96,8 @@ const messageOf = (
  * The card that was clicked hands its item over in router state, so the
  * video element gets its src on the very first render and playback starts
  * without a round trip. A direct link or a refresh fetches it instead.
- * Play all hands over the videos to play after it too.
+ * The link names the session it plays in; without one the video's own
+ * says what follows, so a refreshed episode still rolls on.
  */
 export const WatchPage = () => {
   const id = useRouteId()
@@ -112,8 +116,8 @@ export const WatchPage = () => {
         // A play link Raven opens for the title on screen names where to start: a new player.
         key={isDesktop ? `${page.data.id}${search}` : page.data.id}
         media={page.data}
+        session={handed?.session ?? sessionOf(page.data)}
         upNext={handed?.upNext ?? []}
-        isShuffled={handed?.isShuffled ?? false}
         backTo={`/libraries/${page.data.libraryId}`}
       />
     )
@@ -125,9 +129,9 @@ export const WatchPage = () => {
 
 type WatchPlayerProps = {
   media: MediaItem
+  session: ViewingSession
+  /** A queue's videos after this one, as a shuffle dealt them; the server finds any other session's. */
   upNext: readonly MediaItem[]
-  /** The videos after this one were dealt by a shuffle. */
-  isShuffled?: boolean
   backTo: string
 }
 
@@ -136,7 +140,7 @@ type WatchPlayerProps = {
  * behavior. A favourite marked here patches the cached video WatchPage
  * reads, so `media` brings the heart its new state before the server answers.
  */
-export const WatchPlayer = ({ media, upNext, isShuffled = false, backTo }: WatchPlayerProps) => {
+export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps) => {
   const queryClient = useQueryClient()
   const { favourite } = useMediaMutations({ media })
   const [copied, setCopied] = useState<string | null>(null)
@@ -144,7 +148,11 @@ export const WatchPlayer = ({ media, upNext, isShuffled = false, backTo }: Watch
     createProgressSaver({ send: (report) => api.saveProgress({ id: media.id, ...report }) }),
   )
   const opensInRavenPlayer = usePlayerPrefs((prefs) => prefs.opensInRavenPlayer)
-  const [next, ...after] = upNext
+  const isShuffled = session.kind === SESSION_KINDS.queue
+  const queued = isShuffled ? upNext : []
+  const found = useQuery(nextInSessionQuery({ id: media.id, session })).data ?? null
+  const [first, ...after] = queued
+  const next = first ?? found
   const mediaPlane = useMediaPlane({ api, mediaId: media.id, reprobe: useReprobe() })
   useTicketFollowsSession({ mediaId: media.id })
   const hasAccounts = (useQuery(authConfigQuery).data?.state ?? null) === AUTH_CONFIG_STATES.ready
@@ -167,7 +175,7 @@ export const WatchPlayer = ({ media, upNext, isShuffled = false, backTo }: Watch
       backTo,
       next: next
         ? {
-            ...watchLink({ media: next, upNext: after, isShuffled }),
+            ...watchLink({ media: next, session, upNext: after }),
             label: mediaLabel(next),
             isShuffled,
           }
@@ -208,14 +216,14 @@ export const WatchPlayer = ({ media, upNext, isShuffled = false, backTo }: Watch
                 origin: window.location.origin,
                 mediaId: media.id,
                 at,
-                next: upNext.map(({ id }) => id),
+                next: next ? [next, ...after].map(({ id }) => id) : [],
               }),
             ),
         },
       }),
   }
   return isDesktop ? (
-    <DesktopWatch services={services} media={media} upNext={upNext} />
+    <DesktopWatch services={services} media={media} upNext={queued} />
   ) : (
     <BrowserWatch services={services} media={media} mediaPlane={mediaPlane} />
   )

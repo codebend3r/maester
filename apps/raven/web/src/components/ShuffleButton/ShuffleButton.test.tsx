@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { readWatchState } from '@raven/core'
+import { SESSION_KINDS, readWatchState } from '@raven/core'
 import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes, useLocation, useParams } from 'react-router-dom'
@@ -15,7 +15,7 @@ const Watching = () => {
   return (
     <p>
       Watching {handed ? handed.media.fileName : 'nothing handed over'}
-      {handed?.isShuffled && `, shuffled, then ${after}`}
+      {handed?.session.kind === SESSION_KINDS.queue && `, shuffled, then ${after}`}
     </p>
   )
 }

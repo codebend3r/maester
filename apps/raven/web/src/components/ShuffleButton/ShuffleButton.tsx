@@ -31,7 +31,7 @@ export const ShuffleButton = ({ itemId, children }: ShuffleButtonProps) => {
     api
       .shuffleEpisodes(itemId)
       .then((queue) => {
-        const link = queueLink({ queue, isShuffled: true })
+        const link = queueLink({ queue })
         if (!link) {
           setState(PICK_STATES.empty)
           return
