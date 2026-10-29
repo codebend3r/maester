@@ -43,13 +43,31 @@ import { SettingsMenu } from '@/components/Player/SettingsMenu'
 import { ShortcutsDialog } from '@/components/Player/ShortcutsDialog'
 import { OVERLAYS, type Overlay, usePlayerActions } from '@/components/Player/usePlayerActions'
 import { useBezel, useFullscreen, useIdle, useNow } from '@/components/Player/useStageChrome'
+import { SkipButton } from '@/components/Player/SkipButton'
 import { UpNextCard } from '@/components/Player/UpNextCard'
+import { useSkipIntro } from '@/components/Player/useSkipIntro'
 import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
 import { isInForeignDialog, isTypingTarget } from '@/lib/keyboard'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostServices } from '@/stores/playerServices'
+
+type SkipAction = { label: string; run: () => void }
+
+type SkipActionOfProps = {
+  undo: (() => void) | null
+  skipIntro: (() => void) | null
+  skipCredits: (() => void) | null
+}
+
+/** What the one skip button offers now, if anything: Undo first, then the intro, then the credits. */
+const skipActionOf = ({ undo, skipIntro, skipCredits }: SkipActionOfProps): SkipAction | null => {
+  if (undo) return { label: 'Undo skip', run: undo }
+  if (skipIntro) return { label: 'Skip intro', run: skipIntro }
+  if (skipCredits) return { label: 'Skip credits', run: skipCredits }
+  return null
+}
 
 const isControlTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && !!target.closest('button, a')
@@ -149,7 +167,20 @@ export const PlayerChrome = ({
     duration,
     audio: selection.audio ?? selection.tracks?.defaultAudio ?? null,
   })
-  const upNext = useUpNext({ ended: state.ended, time: state.time, duration })
+  const markers = title.markers ?? null
+  const upNext = useUpNext({
+    ended: state.ended,
+    time: state.time,
+    duration,
+    credits: markers?.credits ?? null,
+    seek,
+  })
+  const intro = useSkipIntro({ time: state.time, intro: markers?.intro ?? null, seek })
+  const skipAction = skipActionOf({
+    undo: intro.undo,
+    skipIntro: intro.isInside ? intro.skip : null,
+    skipCredits: upNext.skipCredits,
+  })
   const nextLink = upNext.next
   const setAutoplay = usePlayerPrefs((prefs) => prefs.setAutoplay)
   // "Ends at" names a minute, so a step of 15 seconds keeps it true.
@@ -289,9 +320,10 @@ export const PlayerChrome = ({
     })
   }
 
-  // The up next card keeps the controls up, so it and the ring it fills can be seen.
-  const chromeShown = idle.active || upNext.isCardShown
-  const chapterStarts = title.markers?.chapters.map(({ start }) => start) ?? []
+  // The up next card keeps the controls up, so it and the ring it fills can be
+  // seen, and so does an intro's first seconds, so Skip intro is.
+  const chromeShown = idle.active || upNext.isCardShown || intro.isPrompting
+  const chapterStarts = markers?.chapters.map(({ start }) => start) ?? []
   const about = aboutLine({ media, label, mode, context: title.context ?? null })
 
   // The scrubber and the clock keep what they showed while the controls are
@@ -410,18 +442,28 @@ export const PlayerChrome = ({
         upNext={nextLink?.label ?? null}
         countdown={upNext.countdown}
         card={
-          upNext.isCardShown &&
-          nextLink && (
+          upNext.isCardShown && nextLink ? (
             <UpNextCard
               next={nextLink}
               countdown={upNext.countdown}
               secondsLeft={upNext.secondsLeft}
+              hasSceneAfter={upNext.hasSceneAfter}
               onPlay={upNext.playNext}
               onDismiss={() => {
                 upNext.dismiss()
                 engine.focusSurface()
               }}
             />
+          ) : (
+            skipAction && (
+              <SkipButton
+                label={skipAction.label}
+                onClick={() => {
+                  skipAction.run()
+                  engine.focusSurface()
+                }}
+              />
+            )
           )
         }
         endsAt={endsAtLabel({ now, time: held.time, duration, rate: state.rate })}

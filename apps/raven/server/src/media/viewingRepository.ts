@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import type { HistoryEntry } from '@raven/core'
+import { type HistoryEntry, MARKER_KINDS } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { FAVOURITE_OUTCOMES, type FavouriteOutcome } from '@/media/favouriteOutcomes'
 import { MediaRepository } from '@/media/mediaRepository'
@@ -157,7 +157,8 @@ export class ViewingRepository {
    * The history is kept whatever the library's progress setting, which is
    * only about resuming. The library's watched percentage counts as
    * finished, the same point at which a play counts as watched, so the next
-   * play starts from the top; so do the first few seconds (5s, or 5% of a
+   * play starts from the top, and so does reaching the file's credits,
+   * which notes the play as reaching the end; so do the first few seconds (5s, or 5% of a
    * short clip), which are a misclick rather than a place to come back to. A
    * library with progress saving off records no spot, not even the clearing
    * of a finished video, so turning it back on resumes from the spots it had.
@@ -166,20 +167,30 @@ export class ViewingRepository {
     return this.db.transaction(() => {
       const target = this.db
         .prepare<
-          [number],
-          { duration: number | null; save_progress: number; watched_percent: number }
+          [string, number],
+          {
+            duration: number | null
+            save_progress: number
+            watched_percent: number
+            credits_start: number | null
+          }
         >(
-          `SELECT m.duration, l.save_progress, l.watched_percent
+          `SELECT m.duration, l.save_progress, l.watched_percent, mk.start_s AS credits_start
              FROM media m
              JOIN libraries l ON l.id = m.library_id
+             LEFT JOIN media_markers mk ON mk.media_id = m.id AND mk.kind = ?
             WHERE m.id = ?`,
         )
-        .get(id)
+        .get(MARKER_KINDS.credits, id)
       if (!target) return false
-      this.notePlay({ id, position, at, account })
-      if (target.save_progress !== 1) return true
       const duration = target.duration
-      const finished = duration != null && position >= (duration * target.watched_percent) / 100
+      // The credits are the end of the story: reaching them counts as the whole play.
+      const isAtCredits = target.credits_start != null && position >= target.credits_start
+      const furthest = isAtCredits && duration != null ? Math.max(position, duration) : position
+      this.notePlay({ id, position: furthest, at, account })
+      if (target.save_progress !== 1) return true
+      const finished =
+        isAtCredits || (duration != null && position >= (duration * target.watched_percent) / 100)
       const barelyStarted = position < Math.min(5, (duration ?? 100) * 0.05)
       if (finished || barelyStarted) {
         this.db

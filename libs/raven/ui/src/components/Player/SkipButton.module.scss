@@ -1,0 +1,28 @@
+// Dark glass over the picture, as the player's other buttons are, and big
+// enough to hit from the sofa.
+.skip {
+  min-height: var(--control-size-tall);
+  padding: var(--space-1) var(--space-4);
+  border: 1px solid var(--color-bark-faint);
+  border-radius: var(--radius-pill);
+  background: var(--color-picture-glass);
+  color: var(--color-on-picture);
+  font-size: var(--font-size-md);
+  backdrop-filter: var(--filter-glass);
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--space-0);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: rise 250ms var(--ease-out) backwards;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-1));
+  }
+}

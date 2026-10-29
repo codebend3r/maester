@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import {
+  MARKER_KINDS,
+  MARKER_SOURCES,
+  type Marker,
   type MediaItem,
   type MediaTracks,
   type PlaybackSettingsState,
@@ -572,6 +575,104 @@ describe('the player controls', () => {
       ),
     })
     expect(container.querySelector('.rail')?.getAttribute('style') ?? '').toContain('50%')
+  })
+
+  describe('with the markers of a file', () => {
+    const LENGTH = 5812.768
+    const INTRO: Marker = {
+      kind: MARKER_KINDS.intro,
+      start: 40,
+      end: 100,
+      source: MARKER_SOURCES.chapter,
+      confidence: 1,
+    }
+    const CREDITS: Marker = {
+      kind: MARKER_KINDS.credits,
+      start: 5500,
+      end: 5700,
+      source: MARKER_SOURCES.chapter,
+      confidence: 1,
+    }
+    const MARKERS = { intro: INTRO, credits: CREDITS, chapters: [] }
+    const NEXT = { to: '/watch/8', state: null, label: 'Busboys 2 (2027)' }
+
+    type PlayMarkedProps = { next?: PlayerTitle['next'] }
+
+    /** A video with an intro at 0:40 to 1:40 and credits from 5500 s to 5700 s, a scene after them. */
+    const playMarked = ({ next = null }: PlayMarkedProps = {}) => {
+      const { container } = renderWithProviders({
+        ui: (
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <TestPlayer
+                  media={mediaItem({ container: 'mp4' })}
+                  backTo="/libraries/2"
+                  next={next}
+                  markers={MARKERS}
+                />
+              }
+            />
+            <Route path="watch/:id" element={<p>Playing the next video</p>} />
+          </Routes>
+        ),
+      })
+      const video = container.querySelector('video')
+      if (!video) throw new Error('no video')
+      return video
+    }
+
+    it('offers Skip intro inside the intro only, which jumps to its end', async () => {
+      const video = playMarked()
+      timeTo({ video, time: 20 })
+      expect(screen.queryByRole('button', { name: 'Skip intro' })).toBeNull()
+      timeTo({ video, time: 45 })
+      await userEvent.click(screen.getByRole('button', { name: 'Skip intro' }))
+      expect(video.currentTime).toBe(100)
+      timeTo({ video, time: 100 })
+      expect(screen.queryByRole('button', { name: 'Skip intro' })).toBeNull()
+    })
+
+    it('skips the intro by itself once, with a moment to undo it', async () => {
+      usePlayerPrefs.setState({ autoSkipIntro: true })
+      const video = playMarked()
+      timeTo({ video, time: 41 })
+      expect(video.currentTime).toBe(100)
+      timeTo({ video, time: 100 })
+      await userEvent.click(screen.getByRole('button', { name: 'Undo skip' }))
+      expect(video.currentTime).toBe(41)
+      // Once per title: back in the intro, it waits for a click.
+      timeTo({ video, time: 41 })
+      expect(video.currentTime).toBe(41)
+      expect(screen.getByRole('button', { name: 'Skip intro' })).toBeInTheDocument()
+    })
+
+    it('counts down from the credits for as long as the viewer set, then plays what is next', async () => {
+      usePlayerPrefs.setState({ autoplay: true, autoplayCountdownSeconds: 20 })
+      const video = playMarked({ next: NEXT })
+      timeTo({ video, time: CREDITS.start - 1 })
+      expect(screen.queryByRole('region', { name: 'Busboys 2 (2027)' })).toBeNull()
+      timeTo({ video, time: CREDITS.start + 5 })
+      const card = screen.getByRole('region', { name: 'Busboys 2 (2027)' })
+      expect(within(card).getByText('Plays in 15 seconds')).toBeInTheDocument()
+      expect(within(card).getByText('A scene follows the credits')).toBeInTheDocument()
+      timeTo({ video, time: CREDITS.start + 20 })
+      expect(await screen.findByText('Playing the next video')).toBeInTheDocument()
+    })
+
+    it('stays for the credits after Watch credits, and offers Skip credits to the scene after them', async () => {
+      usePlayerPrefs.setState({ autoplay: true })
+      const video = playMarked({ next: NEXT })
+      timeTo({ video, time: CREDITS.start + 1 })
+      await userEvent.click(screen.getByRole('button', { name: 'Watch credits' }))
+      timeTo({ video, time: CREDITS.start + 30 })
+      expect(screen.queryByText('Playing the next video')).toBeNull()
+      await userEvent.click(screen.getByRole('button', { name: 'Skip credits' }))
+      expect(video.currentTime).toBe(CREDITS.end)
+      timeTo({ video, time: LENGTH - 1 })
+      expect(screen.queryByRole('button', { name: 'Skip credits' })).toBeNull()
+    })
   })
 
   it('offers no next video when none came with it, and Next has nothing to press', () => {

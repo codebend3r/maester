@@ -362,6 +362,14 @@ describe('Autoplay on SettingsPage', () => {
     expect(within(playback).getByText('30 seconds')).toBeInTheDocument()
   })
 
+  it('skips intros automatically only once this browser turns it on', async () => {
+    renderWithProviders({ ui: <SettingsPage />, playback: null })
+    const autoSkip = screen.getByRole('checkbox', { name: /^Skip intros automatically/ })
+    expect(autoSkip).not.toBeChecked()
+    await userEvent.click(autoSkip)
+    expect(usePlayerPrefs.getState().autoSkipIntro).toBe(true)
+  })
+
   it('keeps a countdown set out of range within its ends', () => {
     usePlayerPrefs.getState().setAutoplayCountdownSeconds(90)
     expect(usePlayerPrefs.getState().autoplayCountdownSeconds).toBe(60)

@@ -114,7 +114,8 @@ type BrowserPlaybackProps = { isDesktop: boolean }
 
 /**
  * Playback that this browser, or Raven, keeps for itself: autoplay and how
- * long its countdown runs, and in a browser Open videos in Raven. That is
+ * long its countdown runs, skipping intros, and in a browser Open videos in
+ * Raven. That is
  * off by default: a page cannot tell whether Raven is installed, and a
  * `raven://` link nothing handles does nothing in Chrome and shows an error
  * in Safari.
@@ -127,6 +128,8 @@ const BrowserPlayback = ({ isDesktop }: BrowserPlaybackProps) => {
   const setAutoplay = usePlayerPrefs((prefs) => prefs.setAutoplay)
   const countdownSeconds = usePlayerPrefs((prefs) => prefs.autoplayCountdownSeconds)
   const setCountdownSeconds = usePlayerPrefs((prefs) => prefs.setAutoplayCountdownSeconds)
+  const autoSkipIntro = usePlayerPrefs((prefs) => prefs.autoSkipIntro)
+  const setAutoSkipIntro = usePlayerPrefs((prefs) => prefs.setAutoSkipIntro)
   const countdownWords = `${countdownSeconds} seconds`
   // Headed rather than grouped: the section's groups are the server's settings.
   return (
@@ -170,6 +173,18 @@ const BrowserPlayback = ({ isDesktop }: BrowserPlaybackProps) => {
         How long before the end the up next card shows, and with autoplay on how long it counts
         down, from {AUTOPLAY_COUNTDOWN_SECONDS.min} to {AUTOPLAY_COUNTDOWN_SECONDS.max} seconds.
       </p>
+      <label className={styles.choice}>
+        <input
+          type="checkbox"
+          checked={autoSkipIntro}
+          onChange={(event) => setAutoSkipIntro(event.target.checked)}
+        />
+        <span className={styles.choiceLabel}>Skip intros automatically</span>
+        <span className={styles.choiceHint}>
+          Jumps past an intro the file's chapters mark, once per episode, with a moment to undo it.
+          Off, Skip intro waits for a click.
+        </span>
+      </label>
       {!isDesktop && (
         <label className={styles.choice}>
           <input

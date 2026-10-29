@@ -8,6 +8,7 @@
     'poster title'
     'poster detail'
     'poster countdown'
+    'poster scene'
     'poster actions';
   gap: var(--space-0) var(--space-3);
   align-content: start;
@@ -82,6 +83,13 @@
   height: 1.25rem;
 }
 
+.scene {
+  grid-area: scene;
+  color: var(--color-on-picture);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
 .actions {
   grid-area: actions;
   display: grid;
@@ -104,6 +112,7 @@
       'title'
       'detail'
       'countdown'
+      'scene'
       'actions';
   }
 
