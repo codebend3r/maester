@@ -5,6 +5,7 @@ import {
   type LibraryView,
   MEDIA_SORTS,
   coherentSettings,
+  openingSettings,
   viewsFor,
 } from '@raven/core'
 import { useState } from 'react'
@@ -33,6 +34,7 @@ type UseLibraryViewProps = {
 /**
  * How a library is looked at on this device: the server's settings under what was chosen
  * here (see `useLibraryViews`), made coherent with its type, and the way to choose again.
+ * It opens on its type's own view (`openingSettings`) until one is picked on this device.
  */
 export const useLibraryView = ({
   serverId,
@@ -48,7 +50,7 @@ export const useLibraryView = ({
   )
   const choose = useLibraryViews((state) => state.choose)
   const [seed] = useState(dealSeed)
-  const coherent = coherentSettings({ ...library.settings, ...choice })
+  const coherent = coherentSettings({ ...openingSettings(library.settings), ...choice })
   const settings = { ...coherent, view: shownView(coherent.view) }
   return {
     settings,

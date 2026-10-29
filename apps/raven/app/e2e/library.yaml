@@ -12,9 +12,8 @@ tags:
 - extendedWaitUntil:
     visible: 'Sort: Title'
     timeout: 30000
-# A movie library starts grouped by match, each bucket folded, as on the web.
-- assertVisible: 'View: Grouped'
-- tapOn: Matched, 1 video
+# A movie library opens on its grid, as on the web.
+- assertVisible: 'View: Grid'
 - assertVisible: Kestrel Point
 # The sort opens the system's action sheet with the sorts a movie library has.
 - tapOn: 'Sort: Title'

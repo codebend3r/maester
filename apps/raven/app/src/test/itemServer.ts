@@ -51,6 +51,7 @@ const detailsFor = ({ summary, overrides }: DetailsForProps): ItemDetails => ({
   reviews: [],
   versions: [],
   children: [],
+  libraryPictures: [],
   ...overrides,
 })
 

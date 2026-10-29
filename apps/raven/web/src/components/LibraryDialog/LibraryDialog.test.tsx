@@ -148,7 +148,7 @@ describe('LibraryDialog', () => {
           groupBy: 'resolution',
           watchedPercent: 95,
           kind: 'other',
-          ratingsSource: 'tmdb',
+          ratingsSource: 'metacritic',
           autoRefresh: true,
           locked: false,
           folderLayout: 'auto',
@@ -179,7 +179,7 @@ describe('LibraryDialog', () => {
         groupBy: 'resolution',
         watchedPercent: 95,
         kind: 'other',
-        ratingsSource: 'tmdb',
+        ratingsSource: 'metacritic',
         autoRefresh: false,
         locked: true,
         folderLayout: 'auto',
@@ -201,7 +201,7 @@ describe('LibraryDialog', () => {
     })
   })
 
-  it('starts a Movies library grouped into matched and not', async () => {
+  it('starts a Movies library in a grid, grouping by matched and not when grouped', async () => {
     renderWithProviders({ ui: <LibraryDialog onClose={() => undefined} /> })
     await userEvent.type(screen.getByLabelText('Name'), 'Films')
     await userEvent.type(screen.getByLabelText('Folder path'), '/media/Films')
@@ -209,7 +209,7 @@ describe('LibraryDialog', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Movies' }))
     await userEvent.click(screen.getByRole('button', { name: 'Add library' }))
     expect(created.at(-1)).toMatchObject({
-      settings: { kind: 'movies', view: 'grouped', groupBy: 'match' },
+      settings: { kind: 'movies', view: 'grid', groupBy: 'match' },
     })
   })
 

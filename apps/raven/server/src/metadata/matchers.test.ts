@@ -200,12 +200,18 @@ describe('matching by library type', () => {
 
     await matchers.movie.match({ files: [heat], pass: pass() })
     const itemId = metadata.find({ type: 'movie', tmdbId: '949' })?.id ?? -1
-    expect(images.image({ itemId, kind: 'poster' })).toEqual({ source: 'local', ref: poster })
+    expect(images.image({ itemId, kind: 'poster', libraryId: null })).toEqual({
+      source: 'local',
+      ref: poster,
+    })
 
     // The copy in the other library, matched in a later pass, has no poster of its own.
     await matchers.movie.match({ files: [uhd], pass: pass() })
     expect(metadata.mediaUnder(itemId).toSorted()).toEqual([heat.id, uhd.id].toSorted())
-    expect(images.image({ itemId, kind: 'poster' })).toEqual({ source: 'local', ref: poster })
+    expect(images.image({ itemId, kind: 'poster', libraryId: null })).toEqual({
+      source: 'local',
+      ref: poster,
+    })
   })
 
   it('places a show folder: extras off, and the still kept whichever version comes last', async () => {
@@ -230,7 +236,7 @@ describe('matching by library type', () => {
     const seasonId = metadata.child({ parentId: showId, number: 1 })?.id ?? -1
     const episodeId = metadata.child({ parentId: seasonId, number: 1 })?.id ?? -1
     expect(metadata.mediaUnder(episodeId).toSorted()).toEqual([thumbed.id, plain.id].toSorted())
-    expect(images.image({ itemId: episodeId, kind: 'still' })).toEqual({
+    expect(images.image({ itemId: episodeId, kind: 'still', libraryId: null })).toEqual({
       source: 'local',
       ref: still,
     })
@@ -238,7 +244,7 @@ describe('matching by library type', () => {
     // Matching the version without a still again keeps the other's.
     files.reset([plain.id])
     await matchers.show.match({ files: [plain], pass: pass() })
-    expect(images.image({ itemId: episodeId, kind: 'still' })).toEqual({
+    expect(images.image({ itemId: episodeId, kind: 'still', libraryId: null })).toEqual({
       source: 'local',
       ref: still,
     })

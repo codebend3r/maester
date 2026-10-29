@@ -1,7 +1,11 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common'
 import { ITEM_IMAGE_KINDS, type ItemImageKind, POSTER_WIDTHS, posterWidthFrom } from '@raven/core'
 import { IMAGE_WIDTHS, type ImageWidth, ImageCache } from '@/metadata/imageCache'
-import { ItemImagesRepository, STORED_IMAGE_SOURCES } from '@/metadata/itemImagesRepository'
+import {
+  type ImageRef,
+  ItemImagesRepository,
+  STORED_IMAGE_SOURCES,
+} from '@/metadata/itemImagesRepository'
 
 type PictureWidthProps = {
   kind: ItemImageKind
@@ -26,6 +30,8 @@ type ItemPictureFilesPathOfProps = {
   id: number
   kind: ItemImageKind
   width: ImageWidth
+  /** The picture to serve, as the item or a library's card shows it; null for none stored. */
+  image: ImageRef | null
 }
 
 /** Where on disk the picture an item shows is kept, at the width it is asked for. */
@@ -37,11 +43,10 @@ export class ItemPictureFiles {
   ) {}
 
   /**
-   * The chosen picture first, then one beside the media, then TMDB's; null
-   * when the item has none that can be had.
+   * `image` first, then one beside the media, then TMDB's; null when the
+   * item has none that can be had.
    */
-  async pathOf({ id, kind, width }: ItemPictureFilesPathOfProps): Promise<string | null> {
-    const image = this.stored.image({ itemId: id, kind })
+  async pathOf({ id, kind, width, image }: ItemPictureFilesPathOfProps): Promise<string | null> {
     const chosen =
       image?.source === STORED_IMAGE_SOURCES.chosen
         ? await this.images.tmdb({ path: image.ref, width })

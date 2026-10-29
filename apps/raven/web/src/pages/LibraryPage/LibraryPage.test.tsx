@@ -130,8 +130,15 @@ describe('LibraryPage', () => {
     await waitFor(() => expect(client.isFetching()).toBe(0))
   })
 
-  it('opens in the view and sort the library was left in', async () => {
+  it('opens on the grid whatever view it was left in, and in the sort it was left in', async () => {
     serve({ settings: { view: 'list', sort: 'largest' } })
+    expect(await screen.findByRole('link', { name: 'Wide' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Grid' })).toHaveAttribute('aria-pressed', 'true')
+    expect(state.listed.at(-1)?.sort).toBe('largest')
+  })
+
+  it('opens in the view the address asks for', async () => {
+    serve({ settings: { sort: 'largest' }, route: '/libraries/2?view=list' })
     expect(await screen.findByRole('table', { name: 'Videos' })).toBeInTheDocument()
     expect(screen.getByLabelText('Sort')).toHaveValue('size')
     expect(screen.getByRole('button', { name: 'Order: Largest first' })).toBeInTheDocument()
@@ -140,7 +147,7 @@ describe('LibraryPage', () => {
   })
 
   it('shows on each card the value the library is sorted by', async () => {
-    serve({ settings: { view: 'grid', sort: 'largest' } })
+    serve({ settings: { sort: 'largest' }, route: '/libraries/2?view=grid' })
     expect(await screen.findAllByText('1.6 GB')).toHaveLength(ITEMS.length)
   })
 
@@ -198,16 +205,16 @@ describe('LibraryPage', () => {
     expect(screen.queryByRole('button', { name: /^Order:/ })).toBeNull()
   })
 
-  it('switches the view straight away and saves it', async () => {
+  it('switches the view straight away for the visit, in the address, and saves none of it', async () => {
     serve()
     await screen.findByRole('link', { name: 'Wide' })
     await userEvent.click(screen.getByRole('button', { name: 'Tiles' }))
     expect(screen.getByRole('button', { name: 'Tiles' })).toHaveAttribute('aria-pressed', 'true')
-    expect(state.sent.at(-1)).toEqual({ view: 'tiles' })
+    expect(state.sent).toEqual([])
   })
 
   it('lays the videos out as bare covers, each opening where its card would', async () => {
-    serve({ settings: { view: 'covers' } })
+    serve({ route: '/libraries/2?view=covers' })
     const cover = await screen.findByRole('link', { name: 'Wide' })
     expect(cover).toHaveAttribute('href', '/watch/1')
     expect(cover).toHaveTextContent('')
@@ -215,7 +222,11 @@ describe('LibraryPage', () => {
   })
 
   it("lays a Movies library's covers out as posters that open each movie's page", async () => {
-    serve({ settings: { kind: 'movies', view: 'covers' }, items: [matchedMovie()] })
+    serve({
+      settings: { kind: 'movies' },
+      route: '/libraries/2?view=covers',
+      items: [matchedMovie()],
+    })
     const cover = await screen.findByRole('link', { name: 'Busboys' })
     expect(cover.getAttribute('href')).toStartWith('/movies/40')
     expect(cover.querySelector('img')).toHaveAttribute('sizes', POSTER_SIZES.cover)
@@ -234,7 +245,7 @@ describe('LibraryPage', () => {
   })
 
   it('folds every bucket to start, and opens one on a click', async () => {
-    serve({ settings: { view: 'grouped', groupBy: 'resolution' } })
+    serve({ settings: { groupBy: 'resolution' }, route: '/libraries/2?view=grouped' })
     await screen.findByRole('link', { name: 'Wide' })
     const heading = screen
       .getAllByRole('heading', { level: 2 })
@@ -248,9 +259,10 @@ describe('LibraryPage', () => {
     expect(screen.getByRole('link', { name: 'Wide' })).toBeInTheDocument()
   })
 
-  it('buckets a Movies library by matched and not matched, which is where a new one opens', async () => {
+  it('buckets a Movies library by matched and not matched, its grouping to start', async () => {
     serve({
-      settings: { view: 'grouped', groupBy: 'match', kind: 'movies' },
+      settings: { groupBy: 'match', kind: 'movies' },
+      route: '/libraries/2?view=grouped',
       items: [
         mediaItem({ id: 1, title: 'Found', match: 'matched' }),
         mediaItem({ id: 2, title: 'Lost', match: 'unmatched' }),
@@ -268,7 +280,10 @@ describe('LibraryPage', () => {
   })
 
   it('does not offer match buckets to a library of no particular type', async () => {
-    serve({ settings: { view: 'grouped', groupBy: 'resolution', kind: 'other' } })
+    serve({
+      settings: { groupBy: 'resolution', kind: 'other' },
+      route: '/libraries/2?view=grouped',
+    })
     await screen.findByRole('link', { name: 'Wide' })
     const groupings = within(screen.getByLabelText('Group by'))
       .getAllByRole('option')
@@ -295,7 +310,7 @@ describe('LibraryPage', () => {
   })
 
   it('plays the first video of the first bucket in the grouped view', async () => {
-    serve({ settings: { view: 'grouped' }, items: [FULL, WIDE] })
+    serve({ route: '/libraries/2?view=grouped', items: [FULL, WIDE] })
     await screen.findByRole('link', { name: 'Wide' })
     await userEvent.click(screen.getByRole('button', { name: 'Play' }))
     expect(await screen.findByText('Watching 1')).toBeInTheDocument()
@@ -312,7 +327,7 @@ describe('LibraryPage', () => {
   })
 
   it('offers the letters of its titles down the side', async () => {
-    serve({ settings: { sort: 'title', view: 'grid' } })
+    serve({ settings: { sort: 'title' }, route: '/libraries/2?view=grid' })
     const picker = await screen.findByRole('navigation', { name: 'Jump to a letter' })
     const enabled = within(picker)
       .getAllByRole('button')
@@ -322,7 +337,10 @@ describe('LibraryPage', () => {
   })
 
   it('steps through what the listing is sorted by, a movie library grouped included', async () => {
-    serve({ settings: { kind: 'movies', sort: 'resolution-high', view: 'grouped' } })
+    serve({
+      settings: { kind: 'movies', sort: 'resolution-high' },
+      route: '/libraries/2?view=grouped',
+    })
     const picker = await screen.findByRole('navigation', { name: 'Jump to a resolution' })
     const enabled = within(picker)
       .getAllByRole('button')
@@ -333,7 +351,7 @@ describe('LibraryPage', () => {
   })
 
   it('has no strip down the side in a random order, which has nothing to jump by', async () => {
-    serve({ settings: { sort: 'random', view: 'grid' } })
+    serve({ settings: { sort: 'random' }, route: '/libraries/2?view=grid' })
     await screen.findByRole('link', { name: 'Wide' })
     expect(screen.queryByRole('navigation', { name: /^Jump to/ })).toBeNull()
   })
@@ -426,11 +444,11 @@ describe('LibraryPage', () => {
     expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull()
   })
 
-  it('still saves how the library is shown while the admin lock is on', async () => {
+  it('still saves how the library is sorted while the admin lock is on', async () => {
     serve({ adminLock: { state: 'on', available: true } })
     await screen.findByRole('link', { name: 'Wide' })
-    await userEvent.click(screen.getByRole('button', { name: 'Tiles' }))
-    expect(state.sent).toEqual([{ view: 'tiles' }])
+    await userEvent.selectOptions(screen.getByLabelText('Sort'), 'size')
+    expect(state.sent.at(-1)).toMatchObject({ sort: expect.any(String) })
   })
 
   it('has nothing to play or shuffle in an empty library', async () => {
@@ -518,9 +536,10 @@ describe('LibraryPage for TV shows', () => {
     }))
   }
 
+  /** A library opens on its type's own view, so one asked for rides in the address. */
   const serve = (settings: Partial<LibrarySettings> = {}) => {
     answerTv(settings)
-    renderLibraryPage()
+    renderLibraryPage(settings.view == null ? {} : { route: `/libraries/2?view=${settings.view}` })
   }
 
   it("stands wide show cards in while a TV library's shows are read", async () => {

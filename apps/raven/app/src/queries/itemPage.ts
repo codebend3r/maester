@@ -17,6 +17,7 @@ import {
   episodesWatched,
   initialsOf,
   movieFacts,
+  picturesIn,
   plural,
   progressOf,
   seasonEntryKey,
@@ -223,9 +224,20 @@ export const playablePage = ({
 }: PlayablePageProps): ItemPage => {
   const isEpisode = kind === ITEM_TYPES.episode
   const shown = { ...details, versions }
+  // Each library holding the item can choose its own pictures.
+  const pictured = picturesIn({ details, libraryId: primary.libraryId })
+  const showPictured =
+    show === null ? null : picturesIn({ details: show, libraryId: primary.libraryId })
   const hero = isEpisode
-    ? episodeHero({ details, shown, primary, show, isShowPending, ...pictures })
-    : movieHero({ details, shown, primary, ...pictures })
+    ? episodeHero({
+        details: pictured,
+        shown,
+        primary,
+        show: showPictured,
+        isShowPending,
+        ...pictures,
+      })
+    : movieHero({ details: pictured, shown, primary, ...pictures })
   return pageOf({
     hero,
     details,

@@ -61,7 +61,7 @@ type WithoutProps<T> = { all: readonly T[]; left: readonly T[] }
 const without = <T>({ all, left }: WithoutProps<T>): T[] =>
   all.filter((item) => !left.includes(item))
 
-/** A library of movies starts grouped into matched and not. */
+/** A library of movies opens on its posters. */
 const MOVIE_RULES = {
   media: MEDIA_TYPES.video,
   saveProgress: true,
@@ -70,7 +70,7 @@ const MOVIE_RULES = {
   fields: isSortFieldName.values,
   views: isLibraryView.values,
   groupings: isMediaGroupBy.values,
-  view: LIBRARY_VIEWS.grouped,
+  view: LIBRARY_VIEWS.grid,
   groupBy: MEDIA_GROUPINGS.match,
 } as const satisfies KindRules
 
@@ -209,7 +209,7 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   groupBy: MEDIA_GROUPINGS.resolution,
   watchedPercent: 95,
   kind: LIBRARY_KINDS.other,
-  ratingsSource: RATING_SOURCES.tmdb,
+  ratingsSource: RATING_SOURCES.metacritic,
   autoRefresh: true,
   locked: false,
   folderLayout: FOLDER_LAYOUTS.auto,
@@ -233,6 +233,25 @@ export const coherentSettings = (settings: LibrarySettings): LibrarySettings => 
     view: rules.views.includes(settings.view) ? settings.view : rules.view,
     groupBy: rules.groupings.includes(settings.groupBy) ? settings.groupBy : rules.groupBy,
   }
+}
+
+/**
+ * A library as it opens, on every visit: on its type's own view, the grid
+ * for movies and shows, whatever view was last picked. A view picked while
+ * it is open holds until it is left.
+ */
+export const openingSettings = (settings: LibrarySettings): LibrarySettings => ({
+  ...settings,
+  view: KIND_RULES[settings.kind].view,
+})
+
+/**
+ * What of a choice of sort, view and grouping a library keeps: all but the
+ * view, which holds only while it is open (see `openingSettings`).
+ */
+export const withoutView = <T extends { view?: LibraryView }>(choice: T): Omit<T, 'view'> => {
+  const { view: _view, ...kept } = choice
+  return kept
 }
 
 /** What a new library of `kind` starts with. */

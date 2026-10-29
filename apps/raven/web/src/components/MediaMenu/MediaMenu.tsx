@@ -262,6 +262,7 @@ const MenuBody = ({
         <ImageEditorDialog
           itemId={artwork.id}
           itemKind={artwork.kind}
+          libraryId={media.libraryId}
           onClose={() => {
             setEditingImages(false)
             trigger.current?.focus()

@@ -198,6 +198,10 @@ describe('Library on a TV', () => {
 
   it('asks once per jump, not again when the card jumped to mounts afresh', async () => {
     mockServer.libraries = [GROUPED_FILMS]
+    // A library opens on its grid; the grouped view is picked here.
+    useLibraryViews.setState({
+      choices: { [`${NAS.id}/${FILMS.id}`]: { view: LIBRARY_VIEWS.grouped } },
+    })
     await renderLibrary({ id: FILMS.id })
     const bucket = await screen.findByRole('button', { name: 'Matched, 3 videos' })
     const row = within(screen.getByLabelText('Jump to a letter'))

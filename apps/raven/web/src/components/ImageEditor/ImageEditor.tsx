@@ -110,61 +110,84 @@ const Options = ({ itemId, kind, options, busy, onChoose }: OptionsProps) => (
 type ImageEditorProps = {
   details: ItemDetails
   libraries: readonly Library[]
+  /** The library the editor was opened from, whose pictures it starts on; null for none. */
+  libraryId: number | null
   /** A show's pictures are its own; there are no linked files to list. */
   itemKind?: MatchItemType
   onDone: () => void
 }
 
-/**
- * Edit images: every poster, backdrop and logo a movie or show could show,
- * the current one marked, and the files that are this movie,
- * since they share them. A choice takes at once, so the panel has no Save,
- * only Done at its top.
- */
-export const ImageEditor = ({
+type LibraryImagesProps = {
+  details: ItemDetails
+  itemKind: MatchItemType
+  /** The library whose cards' pictures are being chosen. */
+  libraryId: number
+  /** Every library holding the title that the viewer sees, to pick among. */
+  holders: readonly number[]
+  onPick: (libraryId: number) => void
+  libraryName: (libraryId: number) => string | null
+}
+
+/** Edit images for one library: which library, its files of this movie, and the pictures to choose from. */
+const LibraryImages = ({
   details,
-  libraries,
-  itemKind = 'movie',
-  onDone,
-}: ImageEditorProps) => {
-  const ids = { heading: useId(), versions: useId() }
+  itemKind,
+  libraryId,
+  holders,
+  onPick,
+  libraryName,
+}: LibraryImagesProps) => {
+  const ids = { versions: useId(), library: useId() }
   const [tab, setTab] = useState<ChoosableImageKind>('poster')
   const kinds = KINDS_OF[itemKind]
   const queryClient = useQueryClient()
-  const options = useQuery(itemImagesQuery(details.id))
+  const options = useQuery(itemImagesQuery({ id: details.id, libraryId }))
   type ChooseMutationFnProps = { kind: ChoosableImageKind; option: ImageOption }
 
   const choose = useMutation({
     mutationFn: ({ kind, option }: ChooseMutationFnProps) =>
-      api.chooseItemImage({ id: details.id, kind, choice: choiceOf(option) }),
+      api.chooseItemImage({ id: details.id, kind, libraryId, choice: choiceOf(option) }),
     onSuccess: (updated) => afterItemEdited({ queryClient, updated, part: EDITED_PARTS.images }),
   })
-  const libraryName = (libraryId: number) =>
-    libraries.find((library) => library.id === libraryId)?.name ?? ''
+  const shownVersions = details.versions.filter((version) => version.libraryId === libraryId)
 
   return (
-    <section className={styles.editor} aria-labelledby={ids.heading}>
-      <header className={styles.header}>
-        <h2 id={ids.heading} className={styles.heading}>
-          Edit images
-        </h2>
-        <Button icon="close" onClick={onDone}>
-          Done
-        </Button>
-      </header>
+    <>
+      {holders.length > 1 && (
+        <div className={styles.library}>
+          <label htmlFor={ids.library}>Pictures for</label>
+          <select
+            id={ids.library}
+            value={libraryId}
+            onChange={(event) => {
+              const chosen = holders.find((holder) => String(holder) === event.target.value)
+              if (chosen != null) onPick(chosen)
+            }}
+          >
+            {holders.map((holder) => (
+              <option key={holder} value={holder}>
+                {libraryName(holder) ?? `Library ${holder}`}
+              </option>
+            ))}
+          </select>
+          <p className={styles.hint}>
+            Each library chooses its own; the others keep the pictures they show.
+          </p>
+        </div>
+      )}
 
-      {itemKind === ITEM_TYPES.movie && (
+      {itemKind === ITEM_TYPES.movie && shownVersions.length > 0 && (
         <section className={styles.group} aria-labelledby={ids.versions}>
           <h3 id={ids.versions} className={styles.groupHeading}>
-            {details.versions.length === 1 ? 'This file' : 'Linked files'}
+            {shownVersions.length === 1 ? 'This file' : 'Linked files'}
           </h3>
           <p className={styles.hint}>
-            {details.versions.length === 1
-              ? 'The pictures below are the movie’s, so a second version of it would share them.'
-              : 'These files are the same movie and share the pictures below; each plays on its own.'}
+            {shownVersions.length === 1
+              ? 'The pictures below are this library’s, so a second version of it here would share them.'
+              : 'These files are the same movie in this library and share the pictures below; each plays on its own.'}
           </p>
           <ul className={styles.versions}>
-            {details.versions.map((version) => {
+            {shownVersions.map((version) => {
               const edition = version.edition ?? 'Standard'
               const library = libraryName(version.libraryId)
               return (
@@ -176,7 +199,7 @@ export const ImageEditor = ({
                         <WordFact fact={fact} />
                       </span>
                     ))}
-                    {library !== '' && <span>{library}</span>}
+                    {library != null && <span>{library}</span>}
                   </span>
                   <span className={styles.file}>{version.fileName}</span>
                 </li>
@@ -222,6 +245,56 @@ export const ImageEditor = ({
             />
           </Tabs>
         </section>
+      )}
+    </>
+  )
+}
+
+/**
+ * Edit images: every poster, backdrop and logo a movie or show could show,
+ * the one its library shows marked, and that library's files of this movie,
+ * since they share them. Each library holding the title chooses its own, so
+ * a title held by several asks which one, starting on the one it was opened
+ * from. A choice takes at once, so the panel has no Save, only Done at its top.
+ */
+export const ImageEditor = ({
+  details,
+  libraries,
+  libraryId,
+  itemKind = 'movie',
+  onDone,
+}: ImageEditorProps) => {
+  const headingId = useId()
+  const holders = (details.libraryPictures ?? []).map((pictures) => pictures.libraryId)
+  const [picked, setPicked] = useState<number | null>(null)
+  const opened = libraryId != null && holders.includes(libraryId) ? libraryId : null
+  const shownIn = picked ?? opened ?? holders[0] ?? null
+  const libraryName = (id: number) => libraries.find((library) => library.id === id)?.name ?? null
+
+  return (
+    <section className={styles.editor} aria-labelledby={headingId}>
+      <header className={styles.header}>
+        <h2 id={headingId} className={styles.heading}>
+          Edit images
+        </h2>
+        <Button icon="close" onClick={onDone}>
+          Done
+        </Button>
+      </header>
+
+      {shownIn == null ? (
+        <p className={styles.hint}>
+          No library you can see holds this title, so it has no pictures to choose.
+        </p>
+      ) : (
+        <LibraryImages
+          details={details}
+          itemKind={itemKind}
+          libraryId={shownIn}
+          holders={holders}
+          onPick={setPicked}
+          libraryName={libraryName}
+        />
       )}
     </section>
   )

@@ -63,10 +63,13 @@ export class PicturesController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isItemImageKind(kind)) throw new NotFoundException('No picture')
-    const current = this.stored.versions({ ids: [id], kind }).get(id)
-    if (!isCurrent({ given: version, current })) throw new NotFoundException('No picture')
+    // Each library can show its own choice, so the version says which picture it is.
+    const named = this.stored
+      .candidates({ itemId: id, kind })
+      .find((candidate) => isCurrent({ given: version, current: candidate.version }))
+    if (!named) throw new NotFoundException('No picture')
     const width = pictureWidth({ kind, asked })
-    const path = await this.pictureFiles.pathOf({ id, kind, width })
+    const path = await this.pictureFiles.pathOf({ id, kind, width, image: named.image })
     await sendImage({ reply, path, version, audience: IMAGE_AUDIENCES.everyone })
   }
 

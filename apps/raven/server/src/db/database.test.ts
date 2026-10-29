@@ -111,7 +111,7 @@ describe('migrations', () => {
     database.onModuleDestroy()
   })
 
-  it('gives a library made before ratings sources the TMDB one', () => {
+  it('gives a library made before ratings sources the Metacritic one, by way of TMDB', () => {
     const before = new Sqlite(join(state.dir, 'raven.db'))
     MIGRATIONS.slice(0, 8).forEach((sql) => before.exec(sql))
     before.pragma('user_version = 8')
@@ -121,7 +121,7 @@ describe('migrations', () => {
     before.close()
     const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
     expect(database.db.prepare('SELECT ratings_source FROM libraries').get()).toEqual({
-      ratings_source: 'tmdb',
+      ratings_source: 'metacritic',
     })
     expect(database.db.prepare('SELECT COUNT(*) AS reviews FROM reviews').get()).toEqual({
       reviews: 0,
@@ -506,6 +506,58 @@ describe('migrations', () => {
     const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
     expect(database.db.pragma('user_version', { simple: true })).toBe(MIGRATIONS.length)
     expect(database.db.prepare('SELECT keyframes FROM media').get()).toEqual({ keyframes: null })
+    database.onModuleDestroy()
+  })
+
+  it('moves the libraries still on TMDB scores to Metacritic, keeping any other choice', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, -2).forEach((sql) => before.exec(sql))
+    before.pragma(`user_version = ${MIGRATIONS.length - 2}`)
+    before.exec(
+      `INSERT INTO libraries (id, name, created_at, ratings_source) VALUES (1, 'Films', '2026-01-01', 'tmdb');
+       INSERT INTO libraries (id, name, created_at, ratings_source) VALUES (2, 'Shows', '2026-01-01', 'imdb');`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.prepare('SELECT ratings_source FROM libraries ORDER BY id').all()).toEqual([
+      { ratings_source: 'metacritic' },
+      { ratings_source: 'imdb' },
+    ])
+    database.onModuleDestroy()
+  })
+
+  it('gives a picture chosen for a title to each library holding it, and keeps none for the title', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, -1).forEach((sql) => before.exec(sql))
+    before.pragma(`user_version = ${MIGRATIONS.length - 1}`)
+    before.exec(
+      `INSERT INTO libraries (id, name, created_at) VALUES (1, '4K Movies', '2026-01-01'), (2, 'Movies', '2026-01-01'), (3, 'Other', '2026-01-01');
+       INSERT INTO items (id, type, tmdb_id, title, sort_title, fetched_at) VALUES (1, 'show', '9', 'Andor', 'Andor', '2026-01-01');
+       INSERT INTO items (id, type, tmdb_id, title, sort_title, fetched_at, parent_id, number) VALUES (2, 'season', '9:1', 'Season 1', 'Season 1', '2026-01-01', 1, 1);
+       INSERT INTO items (id, type, tmdb_id, title, sort_title, fetched_at, parent_id, number) VALUES (3, 'episode', '9:1:1', 'One', 'One', '2026-01-01', 2, 1);
+       INSERT INTO media (id, library_id, path, file_name, folder, title, container, size, mtime_ms, added_at)
+       VALUES (1, 1, '/a/one.mkv', 'one.mkv', '/a', 'one', 'mkv', 1, 1, '2026-01-01'),
+              (2, 2, '/b/one.mkv', 'one.mkv', '/b', 'one', 'mkv', 1, 1, '2026-01-01');
+       INSERT INTO media_items (media_id, item_id) VALUES (1, 3), (2, 3);
+       INSERT INTO item_images (item_id, kind, source, ref) VALUES (1, 'poster', 'chosen', '/picked.jpg'), (1, 'poster', 'tmdb', '/own.jpg');`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(
+      database.db
+        .prepare(
+          'SELECT library_id, item_id, kind, ref FROM library_item_images ORDER BY library_id',
+        )
+        .all(),
+    ).toEqual([
+      { library_id: 1, item_id: 1, kind: 'poster', ref: '/picked.jpg' },
+      { library_id: 2, item_id: 1, kind: 'poster', ref: '/picked.jpg' },
+    ])
+    expect(database.db.prepare('SELECT source FROM item_images').all()).toEqual([
+      { source: 'tmdb' },
+    ])
     database.onModuleDestroy()
   })
 })

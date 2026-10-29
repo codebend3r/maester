@@ -241,6 +241,16 @@ export const isAiMatch = object({ reason: isString })
 
 export type AiMatch = Infer<typeof isAiMatch>
 
+/** What an item's page shows of its pictures in one library. */
+export const isLibraryPictures = object({
+  libraryId: isNumber,
+  posterVersion: nullable(isString),
+  backdropVersion: nullable(isString),
+  logoVersion: nullable(isString),
+})
+
+export type LibraryPictures = Infer<typeof isLibraryPictures>
+
 /** Everything a movie, show, season or episode page shows. */
 export const isItemDetails = object({
   ...isItemSummary.shape,
@@ -278,6 +288,13 @@ export const isItemDetails = object({
   versions: isMediaList,
   /** A show's seasons, or a season's episodes, on disk, in order; none for a movie or episode. */
   children: listOf(isItemChild),
+  /**
+   * Its pictures as each library the caller sees that holds it shows them,
+   * as Edit images can choose them for one library alone; the page shows the
+   * library's it was reached from. Absent from a server older than this
+   * field, which a web app served apart from it can still meet.
+   */
+  libraryPictures: optional(listOf(isLibraryPictures)),
 })
 
 export type ItemDetails = Infer<typeof isItemDetails>

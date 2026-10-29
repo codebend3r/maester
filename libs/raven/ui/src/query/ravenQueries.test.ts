@@ -184,9 +184,9 @@ const QUERIES = [
   }),
   asking({
     name: 'itemImagesQuery',
-    key: queryKeys.itemImages(40),
-    pick: (queries) => queries.itemImagesQuery(40),
-    call: (api) => api.getItemImages(40),
+    key: queryKeys.itemImagesIn({ id: 40, libraryId: 3 }),
+    pick: (queries) => queries.itemImagesQuery({ id: 40, libraryId: 3 }),
+    call: (api) => api.getItemImages({ id: 40, libraryId: 3 }),
   }),
   asking({
     name: 'itemMetadataQuery',

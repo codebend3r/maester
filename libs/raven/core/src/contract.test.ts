@@ -25,6 +25,7 @@ import {
   isFavouriteChange,
   isHwAccel,
   isImageChoice,
+  isLibraryImageChoice,
   isItemImageKind,
   isItemMetadataChange,
   isItemMetadataState,
@@ -696,6 +697,12 @@ describe('the request bodies', () => {
     expect(isImageChoice({ source: 'local' })).toBe(true)
     expect(isImageChoice({ source: 'tmdb' })).toBe(false)
     expect(isImageChoice({ source: 'web', ref: '/poster.jpg' })).toBe(false)
+  })
+
+  it('takes a choice for one library alone', () => {
+    expect(isLibraryImageChoice({ libraryId: 2, choice: { source: 'local' } })).toBe(true)
+    expect(isLibraryImageChoice({ source: 'local' })).toBe(false)
+    expect(isLibraryImageChoice({ libraryId: '2', choice: { source: 'local' } })).toBe(false)
   })
 })
 

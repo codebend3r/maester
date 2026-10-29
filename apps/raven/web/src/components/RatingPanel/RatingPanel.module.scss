@@ -153,14 +153,17 @@
   white-space: nowrap;
 }
 
-.badgeBare {
+// Bare keeps the score alone; unnamed keeps its scale but no label.
+.badgeBare,
+.badgeUnnamed {
   grid-template-columns: auto;
   grid-template-areas:
     'score'
     'track';
 }
 
-.badgeBare .badgeScore {
+.badgeBare .badgeScore,
+.badgeUnnamed .badgeScore {
   padding-inline-end: var(--space-0);
 }
 

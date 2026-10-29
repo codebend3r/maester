@@ -14,6 +14,7 @@ import {
   listsShows,
   matchTypeFor,
   matchesAlike,
+  openingSettings,
   sortsFor,
   tiersFor,
   viewsFor,
@@ -21,10 +22,10 @@ import {
 } from '@/libraryKinds'
 
 describe('defaultLibrarySettings', () => {
-  it('groups a new Movies library by match, and lays the others out in a grid', () => {
+  it('lays a new Movies library out in a grid, grouping by match when grouped', () => {
     expect(defaultLibrarySettings('movies')).toMatchObject({
       kind: 'movies',
-      view: 'grouped',
+      view: 'grid',
       groupBy: 'match',
     })
     expect(defaultLibrarySettings('shows')).toMatchObject({
@@ -33,7 +34,7 @@ describe('defaultLibrarySettings', () => {
       groupBy: 'resolution',
     })
     expect(defaultLibrarySettings('animeMovies')).toMatchObject({
-      view: 'grouped',
+      view: 'grid',
       groupBy: 'match',
     })
     expect(defaultLibrarySettings('other')).toEqual(DEFAULT_LIBRARY_SETTINGS)
@@ -65,9 +66,22 @@ describe('defaultLibrarySettings', () => {
   })
 })
 
+describe('openingSettings', () => {
+  it("opens a library on its type's own view, whatever it was left on", () => {
+    const left: LibrarySettings = { ...defaultLibrarySettings('movies'), view: 'covers' }
+    expect(openingSettings(left)).toEqual({ ...left, view: 'grid' })
+    expect(openingSettings({ ...defaultLibrarySettings('shows'), view: 'list' }).view).toBe('grid')
+    expect(openingSettings({ ...defaultLibrarySettings('music'), view: 'grid' }).view).toBe('list')
+  })
+})
+
 describe('withLibraryKind', () => {
   it('swaps a view or grouping the new type cannot show for its own, and keeps the rest', () => {
-    const movies: LibrarySettings = { ...defaultLibrarySettings('movies'), sort: 'added' }
+    const movies: LibrarySettings = {
+      ...defaultLibrarySettings('movies'),
+      view: 'grouped',
+      sort: 'added',
+    }
     expect(withLibraryKind({ settings: movies, kind: 'other' })).toMatchObject({
       kind: 'other',
       view: 'grouped',

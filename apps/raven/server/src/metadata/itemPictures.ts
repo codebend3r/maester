@@ -149,7 +149,7 @@ export class ItemPictures {
    * whatever the screen.
    */
   warmPoster(itemId: number): void {
-    const image = this.stored.image({ itemId, kind: ITEM_IMAGE_KINDS.poster })
+    const image = this.stored.image({ itemId, kind: ITEM_IMAGE_KINDS.poster, libraryId: null })
     if (!image) return
     POSTER_WIDTHS.forEach((width) => {
       const made =

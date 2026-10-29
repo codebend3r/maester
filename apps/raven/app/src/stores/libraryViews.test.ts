@@ -85,4 +85,36 @@ describe('useLibraryViews', () => {
       version: 0,
     })
   })
+
+  it('keeps a picked view while the app is open, and neither saves nor reads one back', async () => {
+    const { storage, items } = memoryStorage([
+      [
+        LIBRARY_VIEWS_KEY,
+        JSON.stringify({
+          state: { choices: { [`${SERVER}/2`]: { view: LIBRARY_VIEWS.list } } },
+          version: 0,
+        }),
+      ],
+    ])
+    await configureLibraryViews({ storage })
+    expect(useLibraryViews.getState().choices).toEqual({ [`${SERVER}/2`]: {} })
+
+    useLibraryViews.getState().choose({
+      serverId: SERVER,
+      libraryId: 1,
+      change: { sort: MEDIA_SORTS.added, view: LIBRARY_VIEWS.tiles },
+    })
+    expect(
+      libraryChoiceOf({
+        choices: useLibraryViews.getState().choices,
+        serverId: SERVER,
+        libraryId: 1,
+      }),
+    ).toEqual({ sort: MEDIA_SORTS.added, view: LIBRARY_VIEWS.tiles })
+    const written: unknown = JSON.parse(items.get(LIBRARY_VIEWS_KEY) ?? 'null')
+    expect(written).toEqual({
+      state: { choices: { [`${SERVER}/2`]: {}, [`${SERVER}/1`]: { sort: MEDIA_SORTS.added } } },
+      version: 0,
+    })
+  })
 })

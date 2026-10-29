@@ -5,6 +5,8 @@ import {
   MEDIA_SORTS,
   coherentSettings,
   isLibraryView,
+  openingSettings,
+  withoutView,
   isMediaGroupBy,
   isMediaSort,
 } from '@raven/core'
@@ -25,7 +27,8 @@ const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
 /**
  * The view the address carries, `?q=&sort=&view=&group=`, so a refresh or a
  * shared link lands on the same search, order and layout; what the address
- * leaves out comes from the library's own settings.
+ * leaves out comes from the library's own settings, but the view, which
+ * opens on the type's own (`openingSettings`).
  */
 const viewFromUrl = (params: URLSearchParams): LibraryViewChange => {
   const sort = params.get('sort')
@@ -75,11 +78,12 @@ export const useLibraryView = ({ library }: UseLibraryViewProps) => {
   const asked = request?.against === address ? request.change : null
   // The address may ask for what the library's type cannot show; that is settled here, once.
   const settings = useMemo(
-    () => coherentSettings({ ...library.settings, ...viewFromUrl(address) }),
+    () => coherentSettings({ ...openingSettings(library.settings), ...viewFromUrl(address) }),
     [library.settings, address],
   )
   const shown = useMemo(
-    () => coherentSettings({ ...library.settings, ...viewFromUrl(address), ...asked }),
+    () =>
+      coherentSettings({ ...openingSettings(library.settings), ...viewFromUrl(address), ...asked }),
     [library.settings, address, asked],
   )
 
@@ -101,7 +105,9 @@ export const useLibraryView = ({ library }: UseLibraryViewProps) => {
     change: (change: LibraryViewChange) => {
       setRequest({ change: { ...asked, ...change }, against: address })
       setAddress(writeView({ params: address, change }), { replace: true })
-      save.mutate({ id: library.id, change })
+      // A view picked holds for the visit, in the address; the library opens on its own next time.
+      const saved = withoutView(change)
+      if (Object.keys(saved).length > 0) save.mutate({ id: library.id, change: saved })
     },
     saveError: save.failure,
   }

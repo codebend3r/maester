@@ -41,6 +41,7 @@ export const ravenQueriesFor = (api: ApiClient) => {
     limit: number
   }
   type RavenQueriesForNextInSessionQueryProps = { id: number; session: ViewingSession }
+  type RavenQueriesForItemImagesQueryProps = { id: number; libraryId: number }
 
   type RavenQueriesForMatchSearchQueryProps = {
     type: MatchItemType
@@ -202,10 +203,10 @@ export const ravenQueriesFor = (api: ApiClient) => {
         queryFn: id == null ? skipToken : () => api.getItem(id),
       }),
 
-    itemImagesQuery: (id: number) =>
+    itemImagesQuery: ({ id, libraryId }: RavenQueriesForItemImagesQueryProps) =>
       queryOptions({
-        queryKey: queryKeys.itemImages(id),
-        queryFn: () => api.getItemImages(id),
+        queryKey: queryKeys.itemImagesIn({ id, libraryId }),
+        queryFn: () => api.getItemImages({ id, libraryId }),
       }),
 
     itemMetadataQuery: (id: number) =>

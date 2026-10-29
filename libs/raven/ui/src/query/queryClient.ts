@@ -66,6 +66,8 @@ type QueryKeysMatchSearchProps = {
   subject: MatchSubject | null
 }
 
+type QueryKeysItemImagesInProps = { id: number; libraryId: number }
+
 /**
  * Every cache key, in one place. An id may be null for a query that waits on
  * it (`skipToken`); the key still names what it would hold.
@@ -136,8 +138,15 @@ export const queryKeys = {
   /** Every item page shares this prefix, so a match or refresh refetches them all. */
   items: ['items'],
   item: (id: number | null) => ['items', id],
-  /** Edit images: what an item could show. */
+  /** Edit images: what an item could show, in every library. */
   itemImages: (id: number) => ['items', id, 'images'],
+  /** Edit images: what an item could show in `libraryId`, the one shown there marked. */
+  itemImagesIn: ({ id, libraryId }: QueryKeysItemImagesInProps) => [
+    'items',
+    id,
+    'images',
+    libraryId,
+  ],
   /** Edit metadata: what the page shows against what TMDB says. */
   itemMetadata: (id: number) => ['items', id, 'metadata'],
   /** Whether locked libraries can be opened, and are, in this browser. */

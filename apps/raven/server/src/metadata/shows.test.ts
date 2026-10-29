@@ -373,7 +373,10 @@ describe('TV show metadata', () => {
     const version = (await item(id)).logoVersion
     expect(version).toEqual(expect.any(String))
     const options = shape({
-      response: await asAdmin({ method: 'GET', url: `/api/items/${id}/images` }),
+      response: await asAdmin({
+        method: 'GET',
+        url: `/api/items/${id}/images?library=${state.library}`,
+      }),
       guard: isItemImageOptions,
     })
     expect(options.logo.find((option) => option.current)?.ref).toBe('/logo95396.png')

@@ -173,7 +173,10 @@ describe('the pictures that stand for an item', () => {
   afterAll(database.close)
 
   it("is a movie's own, an episode's season's, else its show's, and none where no poster is", () => {
-    const posters = metadata().posterItems([ids.inPostered, ids.inBare, ids.movie, ids.plain])
+    const posters = metadata().posterItems({
+      ids: [ids.inPostered, ids.inBare, ids.movie, ids.plain],
+      libraryId: null,
+    })
     expect(posters.get(ids.inPostered)?.id).toBe(ids.postered)
     expect(posters.get(ids.inBare)?.id).toBe(ids.show)
     expect(posters.get(ids.movie)?.id).toBe(ids.movie)
@@ -199,16 +202,17 @@ describe('the pictures that stand for an item', () => {
     expect(stored.extrasUnchecked().map((movie) => movie.tmdbId)).toEqual(['800'])
     expect(stored.sagasOf([sagaMovie]).get(sagaMovie)).toEqual(saga)
     expect(images.imageFrom({ itemId: sagaMovie, kind: 'logo', source: 'tmdb' })).toBe('/rings.png')
-    expect(images.image({ itemId: ids.plain, kind: 'logo' })).toBeNull()
+    expect(images.image({ itemId: ids.plain, kind: 'logo', libraryId: null })).toBeNull()
   })
 
   it("is a movie's own backdrop, an episode's show's, and none where no backdrop is", () => {
     const { images } = repositories(database.get())
-    const backdropOf = (id: number) => images.backdropFor(id)?.id
+    const backdropOf = (id: number) =>
+      images.backdropFor({ itemId: id, libraryId: null })?.id ?? null
     expect(backdropOf(ids.inPostered)).toBe(ids.show)
     expect(backdropOf(ids.bare)).toBe(ids.show)
     expect(backdropOf(ids.movie)).toBe(ids.movie)
-    expect(images.backdropFor(ids.plain)).toBeNull()
+    expect(images.backdropFor({ itemId: ids.plain, libraryId: null })).toBeNull()
   })
 })
 

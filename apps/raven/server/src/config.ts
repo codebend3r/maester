@@ -50,7 +50,7 @@ export type ServerConfig = ListenConfig & {
   markerTimeoutSeconds: number
   /** Quick-scan every library on boot, picking up whatever changed while the server was down. */
   scanOnStart: boolean
-  /** Quick-scan every library that refreshes automatically this often; 0 turns the timer off. */
+  /** Check the libraries that refresh automatically but no watch hears of this often; 0 turns the timer off. */
   quickScanIntervalMinutes: number
   /** How many titles home's hero holds at most, picked by the admin or by release date; at least 1. */
   heroCount: number

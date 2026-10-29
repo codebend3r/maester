@@ -8,6 +8,8 @@ import styles from '@/components/ImageEditor/ImageEditor.module.scss'
 type ImageEditorDialogProps = {
   itemId: number
   itemKind: MatchItemType
+  /** The library of the card whose menu opened it, whose pictures it starts on. */
+  libraryId: number
   onClose: () => void
 }
 
@@ -15,7 +17,12 @@ type ImageEditorDialogProps = {
  * Edit images away from the item's page, from a card's menu: the same editor
  * in a dialog over the page, for a movie, or for an episode's show.
  */
-export const ImageEditorDialog = ({ itemId, itemKind, onClose }: ImageEditorDialogProps) => {
+export const ImageEditorDialog = ({
+  itemId,
+  itemKind,
+  libraryId,
+  onClose,
+}: ImageEditorDialogProps) => {
   const { dialog } = useModal()
   const details = useQuery(itemQuery(itemId))
   const libraries = useQuery(librariesQuery)
@@ -26,6 +33,7 @@ export const ImageEditorDialog = ({ itemId, itemKind, onClose }: ImageEditorDial
         <ImageEditor
           details={details.data}
           libraries={libraries.data ?? []}
+          libraryId={libraryId}
           itemKind={itemKind}
           onDone={onClose}
         />

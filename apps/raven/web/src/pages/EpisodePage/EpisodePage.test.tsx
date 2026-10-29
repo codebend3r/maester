@@ -106,7 +106,7 @@ describe('EpisodePage', () => {
   it("lies under its season's backdrop, which is its show's, and under its still for a show with none", async () => {
     const backdrop = () =>
       document.querySelector<HTMLImageElement>('img[alt=""][src*="/api/pictures/"]')?.src ?? ''
-    open({ show: { ...SEVERANCE, backdropVersion: 'b4' } })
+    open({ show: { ...SEVERANCE, backdropVersion: 'b4', libraryPictures: [] } })
     await waitFor(() => expect(backdrop()).toContain('/api/pictures/items/4/backdrop/b4'))
     cleanup()
     open({ show: { ...SEVERANCE, backdropVersion: null } })

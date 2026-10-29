@@ -1,4 +1,5 @@
 import { type FSWatcher, type WatchEventType, type WatchListener, statSync, watch } from 'node:fs'
+import { statfs } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isRecord } from '@raven/core'
 import { ERROR_CODES } from '@/errorMessage'
@@ -9,7 +10,10 @@ import { foldersUnder, isUnder } from '@/scanner/walk'
 const WATCH_EVENTS = { rename: 'rename' } as const satisfies Record<string, WatchEventType>
 
 /** The `process.platform` whose `fs.watch` cannot watch a whole tree at once. */
-const PLATFORMS = { linux: 'linux' } as const satisfies Record<string, NodeJS.Platform>
+const PLATFORMS = { linux: 'linux', darwin: 'darwin' } as const satisfies Record<
+  string,
+  NodeJS.Platform
+>
 
 /** A watch that has stopped once closed. */
 export type Watching = { close: () => void }
@@ -154,3 +158,32 @@ export const watchEachFolder = ({
 /** Watches a library path the cheapest way the platform has. */
 export const watchFolder: WatchFolder = (args) =>
   process.platform === PLATFORMS.linux ? watchEachFolder(args) : watchTree(args)
+
+/**
+ * Linux's `statfs` magic numbers of the file systems mounted from another
+ * machine: CIFS, SMB2 and 3, NFS and FUSE (sshfs, rclone).
+ */
+const NETWORK_FILE_SYSTEMS: ReadonlySet<number> = new Set([
+  0xff534d42, 0xfe534d42, 0x517b, 0x6969, 0x65735546,
+])
+
+/** macOS mounts its shares under here, and gives no stable number for their type. */
+const MAC_VOLUMES = '/Volumes/'
+
+/**
+ * Whether `root` is on a share mounted from another machine, whose watch
+ * never hears of a change made there (another NAS writing to its own disk).
+ * A root that cannot be read counts as one, so the quick scan still looks.
+ */
+export type IsNetworkShare = (root: string) => Promise<boolean>
+
+export const isNetworkShare: IsNetworkShare = async (root) => {
+  if (process.platform === PLATFORMS.darwin) return root.startsWith(MAC_VOLUMES)
+  if (process.platform !== PLATFORMS.linux) return true
+  try {
+    const { type } = await statfs(root)
+    return NETWORK_FILE_SYSTEMS.has(type)
+  } catch {
+    return true
+  }
+}

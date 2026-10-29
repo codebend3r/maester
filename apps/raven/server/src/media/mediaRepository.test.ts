@@ -781,3 +781,45 @@ describe('what is watched, card by card', () => {
     expect(media().watchedEpisodes({ ids: [], account: TEST_ACCOUNTS.a })).toEqual([])
   })
 })
+
+describe('sorting a library by release', () => {
+  const database = testDatabase('raven-release-')
+  const state = { libraryId: 0 }
+  type AddReleasedProps = { title: string; year: number; released: string | null }
+
+  const addReleased = ({ title, year, released }: AddReleasedProps): void => {
+    const { metadata } = repositories(database.get())
+    const itemId = metadata.save({
+      item: { ...fetched({ type: 'movie', tmdbId: title, title }), year, released },
+    })
+    const id = new MediaIndex(database.get()).insert({
+      libraryId: state.libraryId,
+      kind: 'other',
+      file: { path: `/r/${title}.mkv`, root: '/r', size: 100, mtimeMs: 1 },
+    })
+    metadata.link({ mediaIds: [id], itemIds: [itemId] })
+  }
+  const titles = (sort: MediaSort): string[] =>
+    repositories(database.get())
+      .media.list({ libraryId: state.libraryId, sort, account: TEST_ACCOUNTS.a })
+      .map((item) => item.item?.title ?? item.title)
+
+  beforeAll(async () => {
+    await database.open()
+    state.libraryId = new LibrariesRepository(database.get()).create({
+      name: 'Released',
+      paths: ['/r'],
+    }).id
+    addReleased({ title: 'Accused', year: 2026, released: '2026-02-27' })
+    addReleased({ title: 'Animals', year: 2026, released: '2026-10-09' })
+    addReleased({ title: 'Undated', year: 2026, released: null })
+    addReleased({ title: 'Matrix', year: 1999, released: '1999-03-31' })
+  })
+
+  afterAll(database.close)
+
+  it('puts the latest day first within a year, a title with only its year at the start of it', () => {
+    expect(titles(MEDIA_SORTS.yearNew)).toEqual(['Animals', 'Accused', 'Undated', 'Matrix'])
+    expect(titles(MEDIA_SORTS.yearOld)).toEqual(['Matrix', 'Undated', 'Accused', 'Animals'])
+  })
+})

@@ -16,6 +16,7 @@ import {
   inLibrary,
   itemPath,
   movieFacts,
+  picturesIn,
   progressOf,
   watchLink,
   ITEM_IMAGE_KINDS,
@@ -156,8 +157,7 @@ type PlayableItemViewProps = {
  * file's menu (its picture plays too), whether this browser cannot play
  * that version, then the summary beside the file's facts, its versions, an
  * episode's neighbours, the people, a movie's reviews and TMDB's credit.
- * Only Edit images lists every library's files, since the pictures are the
- * item's wherever its files are.
+ * The pictures are the library's, which Edit images chooses for it alone.
  */
 export const PlayableItemView = ({
   kind,
@@ -166,7 +166,8 @@ export const PlayableItemView = ({
   everyCard,
   primary,
 }: PlayableItemViewProps) => {
-  const details = { ...item, versions }
+  // Each library holding the item can choose its own pictures.
+  const details = { ...picturesIn({ details: item, libraryId: primary.libraryId }), versions }
   const config: PlayableConfig = PLAYABLE[kind]
   const titleId = useId()
   const navigate = useNavigate()
@@ -198,7 +199,7 @@ export const PlayableItemView = ({
     ? api.itemImageUrl({
         id: show.data.id,
         kind: ITEM_IMAGE_KINDS.backdrop,
-        version: show.data.backdropVersion,
+        version: picturesIn({ details: show.data, libraryId: primary.libraryId }).backdropVersion,
       })
     : null
   // The still stands in only for a show with no backdrop, not while the show is read.
@@ -313,7 +314,12 @@ export const PlayableItemView = ({
 
       <AdminOnly>
         {config.editable && editingImages && (
-          <ImageEditor details={item} libraries={known} onDone={() => setEditingImages(false)} />
+          <ImageEditor
+            details={item}
+            libraries={known}
+            libraryId={primary.libraryId}
+            onDone={() => setEditingImages(false)}
+          />
         )}
         {config.editable && editingMetadata && (
           <MetadataEditor
