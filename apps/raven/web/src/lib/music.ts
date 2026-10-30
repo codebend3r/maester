@@ -4,6 +4,7 @@ import {
   type AppPath,
   MUSIC_PAGE,
   type MusicSort,
+  type PlaylistSummary,
   type Track,
   formatDuration,
 } from '@raven/core'
@@ -15,6 +16,9 @@ export const albumPath = (albumId: number): AppPath => `/albums/${albumId}`
 /** An artist's page: `/artists/:id`. */
 export const artistPath = (artistId: number): AppPath => `/artists/${artistId}`
 
+/** A playlist's page: `/playlists/:id`. */
+export const playlistPath = (playlistId: number): AppPath => `/playlists/${playlistId}`
+
 /** Now Playing, the full page over the bar. */
 export const NOW_PLAYING_PATH: AppPath = '/now-playing'
 
@@ -22,18 +26,30 @@ export const NOW_PLAYING_PATH: AppPath = '/now-playing'
 export const trackLength = (seconds: number | null): string =>
   seconds === null ? '' : formatDuration(seconds)
 
-type AlbumFactsProps = { album: AlbumSummary }
+type LengthFactsProps = { trackCount: number; duration: number }
 
-/** The line under an album's title: "1997 · Album · 12 tracks · 53 min". */
-export const albumFacts = ({ album }: AlbumFactsProps): string[] => {
-  const minutes = Math.round(album.duration / 60)
+/** How many tracks and how long they run: "12 tracks · 53 min", the minutes left out under one. */
+const lengthFacts = ({ trackCount, duration }: LengthFactsProps): string[] => {
+  const minutes = Math.round(duration / 60)
   return [
-    ...(album.year === null ? [] : [String(album.year)]),
-    ALBUM_TYPE_LABELS[album.type],
-    `${album.trackCount} ${album.trackCount === 1 ? 'track' : 'tracks'}`,
+    `${trackCount} ${trackCount === 1 ? 'track' : 'tracks'}`,
     ...(minutes > 0 ? [`${minutes} min`] : []),
   ]
 }
+
+type AlbumFactsProps = { album: AlbumSummary }
+
+/** The line under an album's title: "1997 · Album · 12 tracks · 53 min". */
+export const albumFacts = ({ album }: AlbumFactsProps): string[] => [
+  ...(album.year === null ? [] : [String(album.year)]),
+  ALBUM_TYPE_LABELS[album.type],
+  ...lengthFacts(album),
+]
+
+type PlaylistFactsProps = { playlist: PlaylistSummary }
+
+/** The line under a playlist's name: "12 tracks · 53 min". */
+export const playlistFacts = ({ playlist }: PlaylistFactsProps): string[] => lengthFacts(playlist)
 
 type LibraryTracksProps = { libraryId: number; search: string; sort: MusicSort }
 

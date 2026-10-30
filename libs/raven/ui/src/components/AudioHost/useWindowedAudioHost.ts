@@ -1,6 +1,8 @@
 import { type ApiClient, REMOTE_COMMANDS, type RemoteCommand, type Track } from '@raven/core'
 import { useEffect, useEffectEvent, useRef } from 'react'
 import { useListenCounter } from '@/components/AudioHost/useListenCounter'
+import { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
+import type { WatchHide } from '@/components/Player/useProgressReport'
 import { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
@@ -11,7 +13,12 @@ export const COULD_NOT_PLAY = 'Raven could not play this track.'
 export const failureOf = (error: unknown): string =>
   error instanceof Error && error.message !== '' ? error.message : COULD_NOT_PLAY
 
-export type WindowedLoadProps = { playing: Track; next: Track | null }
+export type WindowedLoadProps = {
+  playing: Track
+  next: Track | null
+  /** Seconds into `playing` to start at: an audiobook's saved spot, else 0. */
+  start: number
+}
 
 type SetPlayingProps = { shouldPlay: boolean }
 
@@ -23,7 +30,7 @@ type SetVolumeProps = { volume: number; isMuted: boolean }
  * not play; the rest fail quietly, as the player's own events say what happened.
  */
 export type WindowedPlayer = {
-  /** Replaces the window and plays `playing` from its start, `next` ready behind it. */
+  /** Replaces the window and plays `playing` from `start`, `next` ready behind it from its top. */
   load: (props: WindowedLoadProps) => Promise<void>
   /** Replaces what follows the playing track. */
   queueNext: (next: Track | null) => Promise<void>
@@ -61,10 +68,18 @@ export const runRemoteCommand = (command: RemoteCommand): void => {
 /** What the player holds, as the host last told it: the playing track's id and the next's. */
 type Loaded = { id: number; next: number | null }
 
-/** The queue's playing track and the next, by id, as `follow` takes them; null for none. */
-type FollowProps = { id: number | null; next: number | null }
+/**
+ * The queue's playing track and the next, by id, as `follow` takes them; null for none. `start`
+ * is where the playing track starts, null while its spot is still being read.
+ */
+type FollowProps = { id: number | null; next: number | null; start: number | null }
 
-type UseWindowedAudioHostProps = { api: ApiClient; player: WindowedPlayer }
+type UseWindowedAudioHostProps = {
+  api: ApiClient
+  player: WindowedPlayer
+  /** Calls its save as the host is about to go away, so an audiobook's spot is kept: the desktop's page hide. */
+  watchHide: WatchHide
+}
 
 /** What the player's own events tell the host: it moved on to the next track, or ran out. */
 export type WindowedAudioHost = { advanced: () => void; ended: () => void }
@@ -72,11 +87,14 @@ export type WindowedAudioHost = { advanced: () => void; ended: () => void }
 /**
  * Drives a windowed player from the shared queue store: the playing track and the one after it,
  * play and pause, seeks and the volume. The player says when it moved on by itself (`advanced`)
- * or ran out (`ended`), and the queue steps with it.
+ * or ran out (`ended`), and the queue steps with it. An audiobook loads at its saved spot, read
+ * before the load, and saves its spot as it plays; music starts at its top and saves none. A
+ * track the player moved on to by itself plays from its top, as the seam allows nothing else.
  */
 export const useWindowedAudioHost = ({
   api,
   player,
+  watchHide,
 }: UseWindowedAudioHostProps): WindowedAudioHost => {
   const track = useAudioQueue(playingTrackOf)
   const state = useAudioQueue((store) => store.state)
@@ -89,10 +107,15 @@ export const useWindowedAudioHost = ({
   const trackId = track?.id ?? null
   const nextId = useAudioQueue((store) => nextTrackOf(store)?.id ?? null)
   useListenCounter({ api, track })
+  const start = startOf(useAudiobookSpot({ api, track, watchHide }))
 
-  const load = useEffectEvent(({ playing, next }: WindowedLoadProps) => {
+  const load = useEffectEvent(({ playing, next, start: from }: WindowedLoadProps) => {
     loaded.current = { id: playing.id, next: next?.id ?? null }
-    player.load({ playing, next }).catch((error: unknown) => engine.failed(failureOf(error)))
+    // The clock starts where the player will, so nothing reads the spot as 0 before it says so.
+    if (from > 0) engine.time({ position: from, duration: useAudioQueue.getState().duration })
+    player
+      .load({ playing, next, start: from })
+      .catch((error: unknown) => engine.failed(failureOf(error)))
   })
 
   // The playing track and the one after it, as the queue stands.
@@ -108,14 +131,14 @@ export const useWindowedAudioHost = ({
     }
     const current = loaded.current
     if (current === null || current.id !== playing.id) {
-      load({ playing, next: following })
+      if (ids.start !== null) load({ playing, next: following, start: ids.start })
       return
     }
     if (current.next === ids.next) return
     loaded.current = { id: playing.id, next: ids.next }
     player.queueNext(following).catch(() => undefined)
   })
-  useEffect(() => follow({ id: trackId, next: nextId }), [trackId, nextId])
+  useEffect(() => follow({ id: trackId, next: nextId, start }), [trackId, nextId, start])
 
   const setPlaying = useEffectEvent((isOn: boolean) => {
     player.setPlaying({ shouldPlay: isOn }).catch(() => undefined)
@@ -154,7 +177,7 @@ export const useWindowedAudioHost = ({
       // The same track once more (repeat one): the player has closed it, and the queue has not
       // moved for `follow` to see, so it is loaded again here.
       if (over === null || again === null || again.id !== over.id) return
-      load({ playing: again, next: nextTrackOf(store) })
+      load({ playing: again, next: nextTrackOf(store), start: 0 })
     },
   }
 }

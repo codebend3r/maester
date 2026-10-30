@@ -7,13 +7,14 @@ import {
   type Track,
   artistNames,
 } from '@raven/core'
-import { AudioHost } from '@raven/ui'
+import { AudioHost, watchPageHide } from '@raven/ui'
 import {
   AUDIO_STATES,
   type WindowedPlayer,
   playingTrackOf,
   runRemoteCommand,
   useAudioQueue,
+  useTrackRate,
   useWindowedAudioHost,
 } from '@raven/ui/headless'
 import { useEffect, useEffectEvent, useMemo } from 'react'
@@ -38,12 +39,12 @@ const artworkOf = async ({ api, track }: ArtworkOfProps) => {
 
 /** Main's music engine as the shared windowed host drives it: each call one command on the port. */
 const windowedPlayerOf = (player: NativeAudio): WindowedPlayer => ({
-  load: ({ playing, next }) =>
+  load: ({ playing, next, start }) =>
     player.send({
       type: AUDIO_COMMANDS.load,
       mediaId: playing.id,
       next: next?.id ?? null,
-      start: 0,
+      start,
     }),
   queueNext: (next) => player.send({ type: AUDIO_COMMANDS.queueNext, next: next?.id ?? null }),
   stop: () => player.send({ type: AUDIO_COMMANDS.stop }),
@@ -62,14 +63,21 @@ type NativeAudioHostProps = {
 /**
  * Raven's music engine, driven from the shared queue store through the windowed host: main
  * holds the playing track and the one after it, plays the two with no gap, and says when it
- * moved on. The system's transport controls arrive the same way and drive the store.
+ * moved on. The system's transport controls arrive the same way and drive the store. An
+ * audiobook plays at the speed the prefs hold, and music at 1; mpv keeps the pitch either way.
  */
 const NativeAudioHost = ({ api, player }: NativeAudioHostProps) => {
   const track = useAudioQueue(playingTrackOf)
   const engine = useAudioQueue((store) => store.engine)
   const windowed = useMemo(() => windowedPlayerOf(player), [player])
-  const host = useWindowedAudioHost({ api, player: windowed })
+  const host = useWindowedAudioHost({ api, player: windowed, watchHide: watchPageHide })
   const trackId = track?.id ?? null
+  const rate = useTrackRate({ api, track })
+
+  const setRate = useEffectEvent((speed: number) => {
+    player.send({ type: AUDIO_COMMANDS.speed, rate: speed }).catch(() => undefined)
+  })
+  useEffect(() => setRate(rate), [rate])
 
   const onEvent = useEffectEvent((event: AudioEvent) => {
     switch (event.type) {

@@ -92,7 +92,8 @@ void RavenNowPlaying::set(const RavenNowPlayingInfo &info) {
         values[MPMediaItemPropertyAlbumTitle] = text(copy.album);
         values[MPMediaItemPropertyPlaybackDuration] = @(copy.duration);
         values[MPNowPlayingInfoPropertyElapsedPlaybackTime] = @(copy.position);
-        values[MPNowPlayingInfoPropertyPlaybackRate] = @(copy.isPlaying ? 1.0 : 0.0);
+        values[MPNowPlayingInfoPropertyPlaybackRate] = @(copy.isPlaying ? copy.rate : 0.0);
+        values[MPNowPlayingInfoPropertyDefaultPlaybackRate] = @(copy.rate);
         values[MPNowPlayingInfoPropertyMediaType] = @(MPNowPlayingInfoMediaTypeAudio);
         if (!copy.artwork.empty()) {
             NSData *data = [NSData dataWithBytes:copy.artwork.data() length:copy.artwork.size()];

@@ -1,14 +1,27 @@
-import { REPEAT_MODES, formatDuration, orderedOf } from '@raven/core'
+import { type Chapter, REPEAT_MODES, formatDuration, orderedOf } from '@raven/core'
 import { Button } from '@raven/ui'
-import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
-import { useId } from 'react'
+import {
+  AUDIOBOOK_SPEEDS,
+  AUDIO_STATES,
+  nextChapterStart,
+  playingTrackOf,
+  previousChapterStart,
+  useAudioQueue,
+  useAudiobookChapters,
+  usePlayerPrefs,
+} from '@raven/ui/headless'
+import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AddToPlaylistDialog } from '@/components/AddToPlaylistDialog/AddToPlaylistDialog'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { TrackList, type TrailProps } from '@/components/TrackList/TrackList'
+import { api } from '@/lib/api'
 import { albumPath, artistPath } from '@/lib/music'
 import { POSTER_SIZES } from '@/lib/posters'
+import { ChaptersPanel } from '@/pages/NowPlayingPage/ChaptersPanel'
+import { LyricsPanel } from '@/pages/NowPlayingPage/LyricsPanel'
 import styles from '@/pages/NowPlayingPage/NowPlayingPage.module.scss'
 
 const REPEAT_LABELS = {
@@ -42,15 +55,71 @@ const QueueControls = ({ index }: QueueControlsProps) => {
   )
 }
 
+/** Where the track is as a skip is pressed, read then rather than on every tick. */
+const positionNow = (): number => useAudioQueue.getState().position
+
+type BookControlsProps = { chapters: readonly Chapter[] }
+
+/** An audiobook's own controls: the chapter before and after, and how fast it reads. */
+const BookControls = ({ chapters }: BookControlsProps) => {
+  const speedId = useId()
+  const seekTo = useAudioQueue((store) => store.seekTo)
+  const speed = usePlayerPrefs((prefs) => prefs.audiobookSpeed)
+  const setSpeed = usePlayerPrefs((prefs) => prefs.setAudiobookSpeed)
+  const hasChapters = chapters.length > 0
+  const next = () => {
+    const start = nextChapterStart({ chapters, at: positionNow() })
+    if (start !== null) seekTo(start)
+  }
+  return (
+    <div className={styles.book}>
+      <Button
+        tone="ghost"
+        icon="rewind"
+        aria-label="Previous chapter"
+        disabled={!hasChapters}
+        onClick={() => seekTo(previousChapterStart({ chapters, at: positionNow() }))}
+      />
+      <Button
+        tone="ghost"
+        icon="forward"
+        aria-label="Next chapter"
+        disabled={!hasChapters}
+        onClick={next}
+      />
+      <label className={styles.speed} htmlFor={speedId}>
+        <span>Speed</span>
+        <select
+          id={speedId}
+          value={speed}
+          onChange={(event) => setSpeed(Number(event.target.value))}
+        >
+          {AUDIOBOOK_SPEEDS.map((offered) => (
+            <option key={offered} value={offered}>
+              {offered}×
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  )
+}
+
 /**
  * `/now-playing`: the playing track large, with its cover, a scrubber,
- * previous, play or pause, next, shuffle and repeat, and the queue under
- * it, each track playable, removable or moved up. Empty when nothing plays.
+ * previous, play or pause, next, shuffle and repeat, then its lyrics, and
+ * the queue under them, each track playable, removable or moved up. An
+ * audiobook shows its chapters in place of lyrics, with chapter skips and
+ * a speed; never Skip intro, though a chapter may be named like one. Empty
+ * when nothing plays.
  */
 export const NowPlayingPage = () => {
   const titleId = useId()
   const queueId = useId()
+  const extrasId = useId()
   const track = useAudioQueue(playingTrackOf)
+  const { isAudiobook, chapters } = useAudiobookChapters({ api, track })
+  const [isAdding, setAdding] = useState(false)
   const queue = useAudioQueue((store) => store.queue)
   const tracks = useAudioQueue((store) => store.tracks)
   const state = useAudioQueue((store) => store.state)
@@ -168,8 +237,23 @@ export const NowPlayingPage = () => {
           >
             {queue.repeat === REPEAT_MODES.one ? '1' : undefined}
           </Button>
+          <Button
+            tone="ghost"
+            icon="list"
+            aria-label="Add to playlist"
+            onClick={() => setAdding(true)}
+          />
         </div>
+        {isAudiobook && <BookControls chapters={chapters} />}
       </div>
+      <section className={styles.extras} aria-labelledby={extrasId}>
+        <SectionHeading id={extrasId}>{isAudiobook ? 'Chapters' : 'Lyrics'}</SectionHeading>
+        {isAudiobook ? (
+          <ChaptersPanel chapters={chapters} />
+        ) : (
+          <LyricsPanel key={track.id} trackId={track.id} />
+        )}
+      </section>
       <section className={styles.queue} aria-labelledby={queueId}>
         <SectionHeading
           id={queueId}
@@ -190,6 +274,7 @@ export const NowPlayingPage = () => {
           label="Queue"
         />
       </section>
+      {isAdding && <AddToPlaylistDialog tracks={[track]} onClose={() => setAdding(false)} />}
     </section>
   )
 }

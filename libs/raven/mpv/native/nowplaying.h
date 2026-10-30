@@ -15,6 +15,8 @@ struct RavenNowPlayingInfo {
     double duration = 0;
     double position = 0;
     bool isPlaying = false;
+    // How fast the clock runs while playing; the shown rate is 0 while paused.
+    double rate = 1;
     // Encoded image bytes (JPEG, PNG); empty for no cover.
     std::vector<uint8_t> artwork;
 };

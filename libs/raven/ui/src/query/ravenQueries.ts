@@ -270,6 +270,51 @@ export const ravenQueriesFor = (api: ApiClient) => {
         queryFn: id == null ? skipToken : () => api.getArtist(id),
       }),
 
+    /** The account's favourite albums, across every library it may see. */
+    favouriteAlbumsQuery: queryOptions({
+      queryKey: queryKeys.favouriteAlbums,
+      queryFn: () => api.listFavouriteAlbums(),
+    }),
+
+    /** The account's favourite artists. */
+    favouriteArtistsQuery: queryOptions({
+      queryKey: queryKeys.favouriteArtists,
+      queryFn: () => api.listFavouriteArtists(),
+    }),
+
+    /** The account's own playlists, most recently changed first. */
+    playlistsQuery: queryOptions({
+      queryKey: queryKeys.playlistList,
+      queryFn: () => api.listPlaylists(),
+    }),
+
+    playlistQuery: (id: number | null) =>
+      queryOptions({
+        queryKey: queryKeys.playlist(id),
+        queryFn: id == null ? skipToken : () => api.getPlaylist(id),
+      }),
+
+    /** A track's lyrics change only when its file or LRCLIB does, so they are read once a session. */
+    lyricsQuery: (id: number | null) =>
+      queryOptions({
+        queryKey: queryKeys.lyrics(id),
+        queryFn: id == null ? skipToken : () => api.getLyrics(id),
+        staleTime: Infinity,
+      }),
+
+    /**
+     * An audiobook's chapters, from the file's markers as the player reads
+     * them; its intro is never asked for, since a chapter named like an
+     * opening is still a chapter of the book.
+     */
+    chaptersQuery: (id: number | null) =>
+      queryOptions({
+        queryKey: queryKeys.markers(id),
+        queryFn: id == null ? skipToken : () => api.getMarkers(id),
+        staleTime: Infinity,
+        select: (markers) => markers.chapters,
+      }),
+
     /** MusicBrainz's releases for an album's Fix match; `query` '' searches by the album's own name. */
     albumMatchSearchQuery: ({ albumId, query }: RavenQueriesForAlbumMatchSearchQueryProps) =>
       queryOptions({

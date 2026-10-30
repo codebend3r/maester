@@ -317,6 +317,7 @@ describe('now playing', () => {
       duration: 200,
       position: 12,
       isPlaying: true,
+      rate: 1,
       artwork: null,
     }
     player.nowPlaying(info)

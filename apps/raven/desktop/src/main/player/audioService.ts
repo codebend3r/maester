@@ -22,7 +22,7 @@ import {
   type MpvEvent,
   type MpvProperty,
 } from '@raven/mpv'
-import { clamp } from '@/main/player/commandNumbers'
+import { SPEED_RANGE, clamp } from '@/main/player/commandNumbers'
 import { HARDENED_OPTIONS } from '@/main/player/engine'
 import { guardedMpv, type MpvControl } from '@/main/player/guardedMpv'
 import {
@@ -96,6 +96,8 @@ const numbersOf = (command: AudioCommand): number[] => {
       return [command.time]
     case AUDIO_COMMANDS.volume:
       return [command.volume]
+    case AUDIO_COMMANDS.speed:
+      return [command.rate]
     case AUDIO_COMMANDS.queueNext:
     case AUDIO_COMMANDS.play:
     case AUDIO_COMMANDS.pause:
@@ -139,6 +141,8 @@ export const createAudioService = ({
   let lastTime = 0
   let duration: number | null = null
   let isPaused = false
+  // mpv's speed outlives each file, so it is kept across loads and stops too.
+  let rate = 1
   let isVolumeFixed = false
   let shown: Shown | null = null
   const listeners = new Set<(listener: AudioEvent) => void>()
@@ -180,6 +184,7 @@ export const createAudioService = ({
         duration: duration ?? 0,
         position: lastTime,
         isPlaying: !isPaused,
+        rate,
       })
     } catch (error) {
       warn(`now playing failed: ${messageOf(error)}`)
@@ -469,6 +474,14 @@ export const createAudioService = ({
         const volume = clamp({ value: command.volume, min: 0, max: 1 })
         await mpv.set({ name: MPV_OPTIONS.volume, value: Math.round(volume * 1000) / 10 })
         await mpv.set({ name: MPV_OPTIONS.mute, value: command.muted })
+        return OK
+      }
+      // mpv keeps the pitch at any speed, as its audio-pitch-correction is on by default.
+      case AUDIO_COMMANDS.speed: {
+        const value = clamp({ value: command.rate, min: SPEED_RANGE.min, max: SPEED_RANGE.max })
+        await mpv.set({ name: MPV_PROPERTIES.speed, value })
+        rate = value
+        showNowPlaying()
         return OK
       }
       case AUDIO_COMMANDS.nowPlaying:

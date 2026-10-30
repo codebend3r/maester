@@ -1,4 +1,9 @@
+import type { QueryKey } from '@tanstack/react-query'
 import {
+  type AlbumDetails,
+  type AlbumSummary,
+  type Artist,
+  type ArtistDetails,
   type Duplicate,
   type Duplicates,
   HOME_SHELF_TYPES,
@@ -11,9 +16,12 @@ import {
   type Library,
   type LibrarySettings,
   type MediaItem,
+  type PlaylistDetails,
+  type PlaylistSummary,
   type PosterEntry,
   type Saga,
   type ShowListing,
+  type Track,
 } from '@raven/core'
 import { type Edit, editAll, editKey } from '@/query/optimistic'
 import { queryKeys } from '@/query/queryClient'
@@ -44,6 +52,14 @@ type WithoutEntryProps = {
 export const withoutEntry = ({ entries, id }: WithoutEntryProps): PosterEntry[] =>
   entries.filter((entry) => entry.media.id !== id)
 
+type WithoutIdProps<T> = { items: T[]; id: number }
+
+/** `items` without the one whose `id` is `id`, or the very same list where none is. */
+const withoutId = <T extends { id: number }>({ items, id }: WithoutIdProps<T>): T[] => {
+  const kept = items.filter((item) => item.id !== id)
+  return kept.length === items.length ? items : kept
+}
+
 type ItemFavouriteEditsProps = {
   item: ItemDetails
   favourite: boolean
@@ -61,11 +77,7 @@ export const itemFavouriteEdits = ({ item, favourite }: ItemFavouriteEditsProps)
   }),
   editKey<ItemSummary[]>({
     queryKey: queryKeys.favouriteTitles,
-    update: (titles) => {
-      if (favourite) return titles
-      const kept = titles.filter((title) => title.id !== item.id)
-      return kept.length === titles.length ? titles : kept
-    },
+    update: (titles) => (favourite ? titles : withoutId({ items: titles, id: item.id })),
   }),
 ]
 
@@ -328,3 +340,107 @@ export const librarySettingsEdits = ({ libraryId, change }: LibrarySettingsEdits
       }),
   }),
 ]
+
+type MarkedEditsProps = {
+  /** The album's or artist's page. */
+  detailsKey: QueryKey
+  /** The favourite albums or artists. */
+  listKey: QueryKey
+  id: number
+  favourite: boolean
+}
+
+/**
+ * An album or artist marked or unmarked as a favourite: its page, and its
+ * favourites list, which an unmarked one leaves. A marked one joins it once
+ * read again, as the list's order is the server's.
+ */
+const markedEdits = <Details extends { isFavourite: boolean }, Listed extends { id: number }>({
+  detailsKey,
+  listKey,
+  id,
+  favourite,
+}: MarkedEditsProps): Edit[] => [
+  editKey<Details>({
+    queryKey: detailsKey,
+    update: (details) =>
+      details.isFavourite === favourite ? details : { ...details, isFavourite: favourite },
+  }),
+  editKey<Listed[]>({
+    queryKey: listKey,
+    update: (listed) => (favourite ? listed : withoutId({ items: listed, id })),
+  }),
+]
+
+type AlbumFavouriteEditsProps = { albumId: number; favourite: boolean }
+
+/** An album marked or unmarked as a favourite: its page, and the favourite albums. */
+export const albumFavouriteEdits = ({ albumId, favourite }: AlbumFavouriteEditsProps): Edit[] =>
+  markedEdits<AlbumDetails, AlbumSummary>({
+    detailsKey: queryKeys.album(albumId),
+    listKey: queryKeys.favouriteAlbums,
+    id: albumId,
+    favourite,
+  })
+
+type ArtistFavouriteEditsProps = { artistId: number; favourite: boolean }
+
+/** An artist marked or unmarked as a favourite: their page, and the favourite artists. */
+export const artistFavouriteEdits = ({ artistId, favourite }: ArtistFavouriteEditsProps): Edit[] =>
+  markedEdits<ArtistDetails, Artist>({
+    detailsKey: queryKeys.artist(artistId),
+    listKey: queryKeys.favouriteArtists,
+    id: artistId,
+    favourite,
+  })
+
+type PlaylistRenameEditsProps = { id: number; name: string }
+
+/** A playlist renamed: its page, and the list of the account's playlists. */
+export const playlistRenameEdits = ({ id, name }: PlaylistRenameEditsProps): Edit[] => {
+  const rename = (playlist: PlaylistSummary): PlaylistSummary =>
+    playlist.name === name ? playlist : { ...playlist, name }
+  return [
+    editKey<PlaylistDetails>({
+      queryKey: queryKeys.playlist(id),
+      update: (details) => {
+        const playlist = rename(details.playlist)
+        return playlist === details.playlist ? details : { ...details, playlist }
+      },
+    }),
+    editKey<PlaylistSummary[]>({
+      queryKey: queryKeys.playlistList,
+      update: (playlists) =>
+        mapWhere({ items: playlists, matches: (playlist) => playlist.id === id, change: rename }),
+    }),
+  ]
+}
+
+type PlaylistTracksEditsProps = { id: number; tracks: readonly Track[] }
+
+/**
+ * A playlist's tracks put in a new order, or with one taken out: its page,
+ * with its count and length, and its line in the list of playlists.
+ */
+export const playlistTracksEdits = ({ id, tracks }: PlaylistTracksEditsProps): Edit[] => {
+  const trackCount = tracks.length
+  const duration = tracks.reduce((total, track) => total + (track.duration ?? 0), 0)
+  const recount = (playlist: PlaylistSummary): PlaylistSummary =>
+    playlist.trackCount === trackCount && playlist.duration === duration
+      ? playlist
+      : { ...playlist, trackCount, duration }
+  return [
+    editKey<PlaylistDetails>({
+      queryKey: queryKeys.playlist(id),
+      update: (details) => ({
+        playlist: recount(details.playlist),
+        tracks: [...tracks],
+      }),
+    }),
+    editKey<PlaylistSummary[]>({
+      queryKey: queryKeys.playlistList,
+      update: (playlists) =>
+        mapWhere({ items: playlists, matches: (playlist) => playlist.id === id, change: recount }),
+    }),
+  ]
+}

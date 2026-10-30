@@ -403,6 +403,7 @@ test('an audio surface plays sound alone: no video track is picked, and nothing 
       duration: 12,
       position: 0,
       isPlaying: false,
+      rate: 1,
       artwork: null,
     })
     player.clearNowPlaying()

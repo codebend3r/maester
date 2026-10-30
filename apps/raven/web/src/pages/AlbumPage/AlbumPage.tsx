@@ -10,18 +10,39 @@ import { Button } from '@raven/ui'
 import { afterAlbumMatch, useAudioQueue } from '@raven/ui/headless'
 import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AddToPlaylistDialog } from '@/components/AddToPlaylistDialog/AddToPlaylistDialog'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { AlbumMatchDialog } from '@/components/AlbumMatchDialog/AlbumMatchDialog'
 import { BackButton } from '@/components/BackButton/BackButton'
+import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
-import { TrackList } from '@/components/TrackList/TrackList'
+import { TrackList, type TrailProps } from '@/components/TrackList/TrackList'
 import { albumFacts, artistPath } from '@/lib/music'
 import { POSTER_SIZES } from '@/lib/posters'
 import { albumQuery, libraryQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
+import { useAlbumFavourite } from '@/lib/useMusicFavourite'
 import styles from '@/pages/AlbumPage/AlbumPage.module.scss'
+
+type AlbumTrackControlsProps = TrailProps
+
+/** A track row's own control: Add to playlist, which asks which one. */
+const AlbumTrackControls = ({ track }: AlbumTrackControlsProps) => {
+  const [isAdding, setAdding] = useState(false)
+  return (
+    <>
+      <Button
+        tone="ghost"
+        icon="list"
+        aria-label={`Add ${track.title} to a playlist`}
+        onClick={() => setAdding(true)}
+      />
+      {isAdding && <AddToPlaylistDialog tracks={[track]} onClose={() => setAdding(false)} />}
+    </>
+  )
+}
 
 type AlbumViewProps = { details: AlbumDetails }
 
@@ -35,6 +56,8 @@ const AlbumView = ({ details }: AlbumViewProps) => {
   const playNext = useAudioQueue((store) => store.playNext)
   const addToQueue = useAudioQueue((store) => store.addToQueue)
   const [isFixing, setFixing] = useState(false)
+  const [isAdding, setAdding] = useState(false)
+  const favourite = useAlbumFavourite({ albumId: album.id })
   const { tracks } = details
   const source = { kind: QUEUE_SOURCE_KINDS.album, id: album.id }
   const isOneArtist =
@@ -97,6 +120,10 @@ const AlbumView = ({ details }: AlbumViewProps) => {
             <Button icon="plus" disabled={tracks.length === 0} onClick={() => addToQueue(tracks)}>
               Add to queue
             </Button>
+            <Button icon="list" disabled={tracks.length === 0} onClick={() => setAdding(true)}>
+              Add to playlist
+            </Button>
+            <FavouriteButton isFavourite={details.isFavourite} onToggle={favourite.mutate} />
             <AdminOnly>
               <Button icon="wand" onClick={() => setFixing(true)}>
                 {album.match === MATCH_STATES.unmatched ? 'Match' : 'Fix match'}
@@ -113,10 +140,13 @@ const AlbumView = ({ details }: AlbumViewProps) => {
             tracks={tracks.filter((track) => track.disc === disc)}
             onPlay={(index) => play(tracks.findIndex((track) => track.disc === disc) + index)}
             shouldShowArtists={!isOneArtist}
+            Trail={AlbumTrackControls}
             label={discs.length > 1 ? `Disc ${disc} tracks` : 'Tracks'}
           />
         </section>
       ))}
+
+      {isAdding && <AddToPlaylistDialog tracks={tracks} onClose={() => setAdding(false)} />}
 
       {isFixing && (
         <AlbumMatchDialog

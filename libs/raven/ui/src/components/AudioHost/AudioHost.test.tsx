@@ -1,4 +1,10 @@
-import { type ApiClient, type Track, createApiClient } from '@raven/core'
+import {
+  type ApiClient,
+  LIBRARY_KINDS,
+  type LibraryKind,
+  type Track,
+  createApiClient,
+} from '@raven/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
@@ -6,6 +12,9 @@ import { AudioHost } from '@/components/AudioHost/AudioHost'
 import { LISTEN_AFTER_S, listenPointOf } from '@/components/AudioHost/useListenCounter'
 import { AUDIO_STATES, useAudioQueue } from '@/stores/audioQueue'
 import { useMediaOrigin } from '@/stores/mediaOrigin'
+import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { queryKeys } from '@/query/queryClient'
+import { library, mediaItem } from '@/test/fixtures'
 
 const track = (id: number): Track => ({
   id,
@@ -38,9 +47,20 @@ const apiWith = (plays: number[]): ApiClient => {
   return api
 }
 
-const renderHost = (api: ApiClient) =>
+/** A cache that already holds the tracks' library, of `kind`, so a track need not wait to learn it. */
+const clientWith = (kind: LibraryKind): QueryClient => {
+  const client = new QueryClient()
+  client.setQueryData(queryKeys.libraries, [
+    library({ id: 1, settings: { ...library().settings, kind } }),
+  ])
+  return client
+}
+
+type RenderHostProps = { api: ApiClient; client?: QueryClient }
+
+const renderHost = ({ api, client = clientWith(LIBRARY_KINDS.music) }: RenderHostProps) =>
   render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={client}>
       <AudioHost api={api} reprobe={() => undefined} />
     </QueryClientProvider>,
   )
@@ -80,7 +100,7 @@ describe('AudioHost', () => {
   })
 
   it('plays the queued track from the server and preloads the next', () => {
-    renderHost(apiWith([]))
+    renderHost({ api: apiWith([]) })
     act(() => store().playTracks({ tracks: ALBUM }))
     const [current, preload] = audioElements()
     expect(current?.src).toContain('/api/media/1/file')
@@ -89,7 +109,7 @@ describe('AudioHost', () => {
   })
 
   it('follows the element: playing, pausing, time, the end, and a failure', () => {
-    renderHost(apiWith([]))
+    renderHost({ api: apiWith([]) })
     act(() => store().playTracks({ tracks: ALBUM }))
     const [current] = audioElements()
     if (!current) throw new Error('No audio element')
@@ -105,7 +125,7 @@ describe('AudioHost', () => {
   })
 
   it('pauses and plays the element as the store says, and seeks once per request', () => {
-    renderHost(apiWith([]))
+    renderHost({ api: apiWith([]) })
     act(() => store().playTracks({ tracks: ALBUM }))
     const [current] = audioElements()
     if (!current) throw new Error('No audio element')
@@ -121,7 +141,7 @@ describe('AudioHost', () => {
 
   it('counts a listen once a track is half played, once per track', () => {
     const plays: number[] = []
-    renderHost(apiWith(plays))
+    renderHost({ api: apiWith(plays) })
     act(() => store().playTracks({ tracks: ALBUM }))
     act(() => store().engine.time({ position: 50, duration: 200 }))
     expect(plays).toEqual([])
@@ -143,7 +163,7 @@ describe('AudioHost', () => {
     useMediaOrigin.setState({
       pick: { origin: { kind: 'lan', url: 'http://nas.local:8484' }, at: Date.now() },
     })
-    renderHost(api)
+    renderHost({ api })
     act(() => store().playTracks({ tracks: [track(3)] }))
     await waitFor(() => expect(audioElements()[0]?.src).toContain('t=first'))
     expect(played).toHaveLength(1)
@@ -158,7 +178,7 @@ describe('AudioHost', () => {
     useMediaOrigin.setState({
       pick: { origin: { kind: 'lan', url: 'http://nas.local:8484' }, at: Date.now() },
     })
-    renderHost(api)
+    renderHost({ api })
     act(() => store().playTracks({ tracks: [track(3)] }))
     await waitFor(() =>
       expect(audioElements()[0]?.src).toContain('http://nas.local:8484/api/media/3/file'),
@@ -166,8 +186,61 @@ describe('AudioHost', () => {
     expect(audioElements()[0]?.src).toContain('t=tkt')
   })
 
+  it("plays an audiobook at the prefs' speed and music at its own", async () => {
+    usePlayerPrefs.getState().setAudiobookSpeed(1.5)
+    const client = new QueryClient()
+    client.setQueryData(queryKeys.libraries, [
+      library({ id: 1, settings: { ...library().settings, kind: LIBRARY_KINDS.audiobooks } }),
+    ])
+    renderHost({ api: apiWith([]), client })
+    act(() => store().playTracks({ tracks: ALBUM }))
+    await waitFor(() => expect(audioElements()[0]?.playbackRate ?? null).toBe(1.5))
+    expect(audioElements()[0]?.defaultPlaybackRate ?? null).toBe(1.5)
+    act(() =>
+      client.setQueryData(queryKeys.libraries, [
+        library({ id: 1, settings: { ...library().settings, kind: LIBRARY_KINDS.music } }),
+      ]),
+    )
+    await waitFor(() => expect(audioElements()[0]?.playbackRate ?? null).toBe(1))
+    usePlayerPrefs.getState().setAudiobookSpeed(1)
+  })
+
+  it('starts an audiobook where it was left and saves its spot; music saves none', async () => {
+    const saves: number[] = []
+    const api = apiWith([])
+    spyOn(api, 'getMedia').mockResolvedValue(mediaItem({ id: 1, position: 120, duration: 200 }))
+    spyOn(api, 'saveProgress').mockImplementation(async ({ position }) => {
+      saves.push(position)
+    })
+    renderHost({ api, client: clientWith(LIBRARY_KINDS.audiobooks) })
+    act(() => store().playTracks({ tracks: ALBUM }))
+    expect(played).toEqual([])
+    await waitFor(() => expect(played).toHaveLength(1))
+    const [current] = audioElements()
+    if (!current) throw new Error('No audio element')
+    expect(current.currentTime).toBe(120)
+    expect(store().position).toBe(120)
+    fireEvent.playing(current)
+    current.currentTime = 135
+    fireEvent.timeUpdate(current)
+    fireEvent.pause(current)
+    await waitFor(() => expect(saves).toEqual([135, 135]))
+    cleanup()
+    saves.length = 0
+    renderHost({ api })
+    act(() => store().playTracks({ tracks: ALBUM }))
+    const [music] = audioElements()
+    if (!music) throw new Error('No audio element')
+    fireEvent.playing(music)
+    music.currentTime = 60
+    fireEvent.timeUpdate(music)
+    fireEvent.pause(music)
+    act(() => store().clear())
+    expect(saves).toEqual([])
+  })
+
   it('unloads the element once the queue is cleared', () => {
-    renderHost(apiWith([]))
+    renderHost({ api: apiWith([]) })
     act(() => store().playTracks({ tracks: ALBUM }))
     act(() => store().clear())
     const [current] = audioElements()

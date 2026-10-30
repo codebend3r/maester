@@ -1,0 +1,58 @@
+.chapters {
+  display: grid;
+  gap: var(--space-0);
+  max-block-size: 22rem;
+  overflow-y: auto;
+  list-style: none;
+  padding: 0;
+}
+
+// The chapter's name and where it starts, the whole row the button.
+.chapter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'title start';
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: 100%;
+  min-block-size: var(--control-size-tall);
+  padding: var(--space-0) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-night-haze);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+.current {
+  color: var(--color-leaf-bright);
+}
+
+.title {
+  grid-area: title;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.start {
+  grid-area: start;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.quiet {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}

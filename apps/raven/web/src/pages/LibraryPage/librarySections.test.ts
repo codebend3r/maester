@@ -42,6 +42,7 @@ describe('the tabs of a library', () => {
     expect(sectionFrom({ param: 'sagas', kind: 'movies' })).toBe('sagas')
     expect(sectionFrom({ param: 'duplicates', kind: 'movies' })).toBe('duplicates')
     expect(sectionFrom({ param: 'artists', kind: 'music' })).toBe('artists')
+    expect(sectionFrom({ param: 'playlists', kind: 'music' })).toBe('playlists')
     expect(sectionFrom({ param: 'all', kind: 'movies' })).toBeNull()
     expect(sectionFrom({ param: 'albums', kind: 'music' })).toBeNull()
     expect(sectionFrom({ param: 'history', kind: 'movies' })).toBeNull()
@@ -57,6 +58,7 @@ describe('the tabs of a library', () => {
     expect(sectionsFor('music')).toEqual([
       'albums',
       'artists',
+      'playlists',
       'in-progress',
       'favourites',
       'finished',
@@ -72,6 +74,7 @@ describe('the tabs of a library', () => {
       '1,204',
       null,
       null,
+      null,
       '2',
       '5',
       '3',
@@ -82,6 +85,7 @@ describe('the tabs of a library', () => {
     const waiting = (section: LibrarySection) => countText({ section, tallies: library })
     expect(Object.values(LIBRARY_SECTIONS).map(waiting)).toEqual([
       '1,204',
+      null,
       null,
       null,
       null,

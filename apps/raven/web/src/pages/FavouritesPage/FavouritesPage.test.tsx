@@ -7,16 +7,23 @@ import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
 import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
+import { album, artist } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_CARD } from '@/test/tv'
 
 describe('FavouritesPage', () => {
   const titles = spyOn(api, 'listFavouriteTitles')
+  const albums = spyOn(api, 'listFavouriteAlbums')
+  const artists = spyOn(api, 'listFavouriteArtists')
   beforeEach(() => {
     titles.mockImplementation(async () => [])
+    albums.mockImplementation(async () => [])
+    artists.mockImplementation(async () => [])
   })
   afterEach(() => {
     titles.mockReset()
+    albums.mockReset()
+    artists.mockReset()
   })
 
   it('lists every favourite as a card', async () => {
@@ -83,6 +90,39 @@ describe('FavouritesPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Shows' }))
     expect(screen.getByText('1 favourite')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Busboys' })).toBeNull()
+    spy.mockRestore()
+  })
+
+  it('lists favourite albums and artists after the videos, each under its heading', async () => {
+    albums.mockImplementation(async () => [album({ id: 11, title: 'OK Computer' })])
+    artists.mockImplementation(async () => [
+      artist({ id: 21, name: 'Radiohead', albumCount: 1, trackCount: 12 }),
+    ])
+    const spy = spyOn(api, 'listFavourites').mockImplementation(async () => [
+      { media: matchedMovie({ favourite: true }), poster: itemSummary() },
+    ])
+    renderWithProviders({ ui: <FavouritesPage /> })
+    const albumSection = await screen.findByRole('region', { name: 'Albums' })
+    expect(within(albumSection).getByRole('link', { name: 'OK Computer' })).toHaveAttribute(
+      'href',
+      '/albums/11',
+    )
+    const artistSection = screen.getByRole('region', { name: 'Artists' })
+    expect(within(artistSection).getByRole('link', { name: 'Radiohead' })).toHaveAttribute(
+      'href',
+      '/artists/21',
+    )
+    expect(within(artistSection).getByText('1 album · 12 tracks')).toBeInTheDocument()
+    expect(screen.getByText('3 favourites')).toBeInTheDocument()
+    const pills = within(screen.getByRole('group', { name: 'Show' }))
+      .getAllByRole('button')
+      .map((pill) => pill.textContent)
+    expect(pills).toEqual(['All', 'Movies', 'Albums', 'Artists'])
+    await userEvent.click(screen.getByRole('button', { name: 'Albums' }))
+    expect(screen.getByText('1 favourite')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Busboys' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Artists' })).toBeNull()
+    expect(screen.getByRole('region', { name: 'Albums' })).toBeInTheDocument()
     spy.mockRestore()
   })
 

@@ -323,3 +323,14 @@ export const afterAlbumMatch = ({
     queryClient,
     filters: [{ queryKey: queryKeys.music }, { queryKey: queryKeys.library(libraryId) }],
   })
+
+/** An album or artist was marked or unmarked as a favourite: the favourites, and the album and artist pages. */
+export const afterMusicFavourites = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [{ queryKey: queryKeys.favourites }, { queryKey: queryKeys.music }],
+  })
+
+/** A playlist was made, renamed, filled, put in a new order or deleted: the list and every playlist's page. */
+export const afterPlaylists = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({ queryClient, filters: [{ queryKey: queryKeys.playlists }] })

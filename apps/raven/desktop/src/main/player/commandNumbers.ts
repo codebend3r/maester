@@ -5,6 +5,9 @@ type ClampProps = { value: number; min: number; max: number }
 export const clamp = ({ value, min, max }: ClampProps): number =>
   Math.min(max, Math.max(min, value))
 
+/** How slow and how fast mpv may play, a video or a track. */
+export const SPEED_RANGE = { min: 0.25, max: 4 } as const
+
 /** The numbers a command carries, which must be finite before any of them is used. */
 export const numbersOf = (command: PlayerCommand): number[] => {
   switch (command.type) {

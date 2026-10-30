@@ -18,6 +18,7 @@ export const LIBRARY_SECTIONS = {
   all: 'all',
   albums: 'albums',
   artists: 'artists',
+  playlists: 'playlists',
   inProgress: 'in-progress',
   favourites: 'favourites',
   sagas: 'sagas',
@@ -60,6 +61,8 @@ export const SECTIONS = {
   all: { label: 'All', icon: 'grid', isFor: listsFiles, tally: 'itemCount', most: null },
   albums: { label: 'Albums', icon: 'disc', isFor: listsAlbums, tally: null, most: null },
   artists: { label: 'Artists', icon: 'music', isFor: listsAlbums, tally: null, most: null },
+  // The account's own playlists, which span every music library it may see.
+  playlists: { label: 'Playlists', icon: 'list', isFor: listsAlbums, tally: null, most: null },
   'in-progress': {
     label: 'In progress',
     icon: 'playback',

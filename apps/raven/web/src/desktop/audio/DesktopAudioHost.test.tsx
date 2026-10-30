@@ -3,18 +3,21 @@ import {
   AUDIO_EVENTS,
   type AudioCommand,
   type AudioEvent,
+  LIBRARY_KINDS,
+  type Library,
   PLAYER_CONNECTION_STATUSES,
   PLAYER_ERROR_REASONS,
   REMOTE_COMMANDS,
 } from '@raven/core'
-import { AUDIO_STATES, useAudioQueue } from '@raven/ui/headless'
-import { afterEach, describe, expect, it, mock } from 'bun:test'
-import { act, cleanup } from '@testing-library/react'
+import { AUDIO_STATES, useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
+import { act, cleanup, waitFor } from '@testing-library/react'
 import { DesktopAudioHost } from '@/desktop/audio/DesktopAudioHost'
 import type { NativeAudio } from '@/desktop/audioConnection'
 import { CONNECTION_STATUSES } from '@/desktop/portConnection'
 import { api } from '@/lib/api'
 import { asPlayingDesktop, audioConnectionsOf } from '@/test/desktop'
+import { library, mediaItem } from '@/test/fixtures'
 import { track } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 
@@ -43,6 +46,18 @@ const fakeAudio = () => {
 
 const TRACKS = [track({ id: 1 }), track({ id: 2 }), track({ id: 3 })]
 
+const MUSIC = library({
+  id: 3,
+  name: 'Music',
+  settings: { ...library().settings, kind: LIBRARY_KINDS.music },
+})
+const BOOKS = library({
+  id: 4,
+  name: 'Audiobooks',
+  settings: { ...library().settings, kind: LIBRARY_KINDS.audiobooks },
+})
+const BOOK = track({ id: 201, libraryId: BOOKS.id, title: 'The Hobbit', duration: 3000 })
+
 const store = () => useAudioQueue.getState()
 
 type OfTypeProps = { commands: readonly AudioCommand[]; type: AudioCommand['type'] }
@@ -50,12 +65,17 @@ type OfTypeProps = { commands: readonly AudioCommand[]; type: AudioCommand['type
 const ofType = ({ commands, type }: OfTypeProps) =>
   commands.filter((command) => command.type === type)
 
-const renderNative = () => {
+type RenderNativeProps = { libraries?: Library[] }
+
+const renderNative = ({ libraries = [MUSIC] }: RenderNativeProps = {}) => {
   const audio = fakeAudio()
   asPlayingDesktop({
     audio: audioConnectionsOf({ status: CONNECTION_STATUSES.native, player: audio.player }),
   })
-  renderWithProviders({ ui: <DesktopAudioHost api={api} reprobe={() => undefined} /> })
+  renderWithProviders({
+    ui: <DesktopAudioHost api={api} reprobe={() => undefined} />,
+    libraries,
+  })
   return audio
 }
 
@@ -63,6 +83,7 @@ afterEach(() => {
   cleanup()
   act(() => store().clear())
   mock.restore()
+  usePlayerPrefs.getState().setAudiobookSpeed(1)
 })
 
 describe('DesktopAudioHost', () => {
@@ -186,6 +207,41 @@ describe('DesktopAudioHost', () => {
     expect(store().state).toBe(AUDIO_STATES.empty)
   })
 
+  it("plays an audiobook at the prefs' speed and music at 1", async () => {
+    usePlayerPrefs.getState().setAudiobookSpeed(1.5)
+    spyOn(api, 'getMedia').mockResolvedValue(mediaItem({ id: BOOK.id, position: 0 }))
+    const audio = renderNative({ libraries: [MUSIC, BOOKS] })
+    const speeds = () => ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.speed })
+    await waitFor(() => expect(speeds()).toEqual([{ type: AUDIO_COMMANDS.speed, rate: 1 }]))
+    act(() => store().playTracks({ tracks: [BOOK] }))
+    await waitFor(() => expect(speeds().at(-1)).toEqual({ type: AUDIO_COMMANDS.speed, rate: 1.5 }))
+    act(() => usePlayerPrefs.getState().setAudiobookSpeed(2))
+    await waitFor(() => expect(speeds().at(-1)).toEqual({ type: AUDIO_COMMANDS.speed, rate: 2 }))
+    act(() => store().playTracks({ tracks: TRACKS }))
+    await waitFor(() => expect(speeds().at(-1)).toEqual({ type: AUDIO_COMMANDS.speed, rate: 1 }))
+  })
+
+  it('loads an audiobook at its saved spot, and saves the spot as it plays', async () => {
+    spyOn(api, 'getMedia').mockResolvedValue(
+      mediaItem({ id: BOOK.id, position: 600, duration: 3000 }),
+    )
+    const saves: number[] = []
+    spyOn(api, 'saveProgress').mockImplementation(async ({ position }) => {
+      saves.push(position)
+    })
+    const audio = renderNative({ libraries: [MUSIC, BOOKS] })
+    act(() => store().playTracks({ tracks: [BOOK] }))
+    await waitFor(() =>
+      expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })).toEqual([
+        { type: AUDIO_COMMANDS.load, mediaId: BOOK.id, next: null, start: 600 },
+      ]),
+    )
+    audio.emit({ type: AUDIO_EVENTS.paused, paused: false })
+    audio.emit({ type: AUDIO_EVENTS.time, time: 612 })
+    audio.emit({ type: AUDIO_EVENTS.paused, paused: true })
+    await waitFor(() => expect(saves).toEqual([612, 612]))
+  })
+
   it('fails the track when main refuses to load it', async () => {
     const audio = fakeAudio()
     audio.player.send = async () => {
@@ -194,7 +250,10 @@ describe('DesktopAudioHost', () => {
     asPlayingDesktop({
       audio: audioConnectionsOf({ status: CONNECTION_STATUSES.native, player: audio.player }),
     })
-    renderWithProviders({ ui: <DesktopAudioHost api={api} reprobe={() => undefined} /> })
+    renderWithProviders({
+      ui: <DesktopAudioHost api={api} reprobe={() => undefined} />,
+      libraries: [MUSIC],
+    })
     act(() => store().playTracks({ tracks: TRACKS }))
     await act(async () => {})
     expect(store()).toMatchObject({

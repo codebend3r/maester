@@ -17,6 +17,8 @@ import {
   type ItemSummary,
   type Library,
   type MediaItem,
+  type PlaylistDetails,
+  type Track,
 } from '@raven/core'
 
 export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
@@ -155,5 +157,39 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   versions: [matchedMovie()],
   children: [],
   libraryPictures: [],
+  ...overrides,
+})
+
+export const track = (overrides: Partial<Track> = {}): Track => ({
+  id: 101,
+  libraryId: 3,
+  albumId: 7,
+  title: 'Airbag',
+  disc: 1,
+  number: 1,
+  duration: 200,
+  artists: [{ id: 1, name: 'Radiohead' }],
+  container: 'flac',
+  codec: 'flac',
+  bitrate: 900000,
+  sampleRate: 44100,
+  bitDepth: 16,
+  isLossless: true,
+  mbid: null,
+  addedAt: '2026-01-01T00:00:00Z',
+  album: { title: 'OK Computer', coverVersion: 'v1' },
+  ...overrides,
+})
+
+export const playlistDetails = (overrides: Partial<PlaylistDetails> = {}): PlaylistDetails => ({
+  playlist: {
+    id: 5,
+    name: 'Evening',
+    trackCount: 2,
+    duration: 400,
+    createdAt: '2026-10-01T00:00:00Z',
+    updatedAt: '2026-10-01T00:00:00Z',
+  },
+  tracks: [track(), track({ id: 102, title: 'Paranoid Android', number: 2 })],
   ...overrides,
 })

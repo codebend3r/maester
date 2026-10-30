@@ -11,6 +11,18 @@ export const CONTROLS_LINGER_SECONDS = { min: 3, max: 10, initial: 5 } as const
 /** How many seconds the countdown to what is up next runs: the slider's ends and where it starts. */
 export const AUTOPLAY_COUNTDOWN_SECONDS = { min: 5, max: 60, initial: 15 } as const
 
+/** The speeds an audiobook plays at, slowest first; 1 is as it was read. */
+export const AUDIOBOOK_SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2] as const
+
+export type AudiobookSpeed = (typeof AUDIOBOOK_SPEEDS)[number]
+
+/** The offered speed nearest `speed`, so a stored value from elsewhere still plays at one of them. */
+const nearestSpeed = (speed: number): AudiobookSpeed =>
+  AUDIOBOOK_SPEEDS.reduce<AudiobookSpeed>(
+    (best, offered) => (Math.abs(offered - speed) < Math.abs(best - speed) ? offered : best),
+    1,
+  )
+
 type WithinProps = {
   seconds: number
   range: { min: number; max: number }
@@ -45,6 +57,8 @@ type PlayerPrefs = {
   autoSkipIntro: boolean
   /** Whether the first video's tip about the keyboard has shown; it shows once, ever. */
   hasSeenShortcutsTip: boolean
+  /** How fast audiobooks play; music always plays at 1. */
+  audiobookSpeed: AudiobookSpeed
   setVolume: ({ volume, muted }: SetVolumeProps) => void
   setCaptionScale: (captionScale: number) => void
   setSubtitles: (subtitles: SetSubtitlesProps) => void
@@ -55,12 +69,13 @@ type PlayerPrefs = {
   setAutoplayCountdownSeconds: (seconds: number) => void
   setAutoSkipIntro: (isOn: boolean) => void
   markShortcutsTipSeen: () => void
+  setAudiobookSpeed: (speed: number) => void
 }
 
 /**
  * Volume, subtitles, audio language, how long the controls linger,
- * autoplay and its countdown, skipping intros, and whether the keyboard tip
- * has shown carry over from one video to the next, and across visits.
+ * autoplay and its countdown, skipping intros, whether the keyboard tip
+ * has shown and how fast audiobooks play carry over from one video to the next, and across visits.
  */
 export const usePlayerPrefs = create<PlayerPrefs>()(
   devtools(
@@ -77,6 +92,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         autoplayCountdownSeconds: AUTOPLAY_COUNTDOWN_SECONDS.initial,
         autoSkipIntro: false,
         hasSeenShortcutsTip: false,
+        audiobookSpeed: 1,
         setVolume: ({ volume, muted }) => set({ volume, muted }),
         setCaptionScale: (captionScale) => set({ captionScale }),
         setSubtitles: (subtitles) => set({ subtitles }),
@@ -91,6 +107,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           }),
         setAutoSkipIntro: (isOn) => set({ autoSkipIntro: isOn }),
         markShortcutsTipSeen: () => set({ hasSeenShortcutsTip: true }),
+        setAudiobookSpeed: (speed) => set({ audiobookSpeed: nearestSpeed(speed) }),
       }),
       {
         name: PLAYER_PREFS_KEY,
@@ -108,6 +125,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           autoplayCountdownSeconds,
           autoSkipIntro,
           hasSeenShortcutsTip,
+          audiobookSpeed,
         }) => ({
           volume,
           muted,
@@ -120,6 +138,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           autoplayCountdownSeconds,
           autoSkipIntro,
           hasSeenShortcutsTip,
+          audiobookSpeed,
         }),
       },
     ),

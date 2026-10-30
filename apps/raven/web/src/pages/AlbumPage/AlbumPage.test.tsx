@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
-import { ApiError } from '@raven/core'
+import { type AlbumDetails, ApiError } from '@raven/core'
 import { AUDIO_STATES, useAudioQueue } from '@raven/ui/headless'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { AlbumPage } from '@/pages/AlbumPage/AlbumPage'
 import { library } from '@/test/fixtures'
-import { albumDetails, albumMatchCandidate, track } from '@/test/music'
+import {
+  albumDetails,
+  albumMatchCandidate,
+  playlistDetails,
+  playlistSummary,
+  track,
+} from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 
 const renderPage = () =>
@@ -95,6 +101,33 @@ describe('AlbumPage', () => {
         mbid: '11111111-1111-4111-8111-000000000002',
       }),
     )
+  })
+
+  it('marks the album a favourite before the server answers', async () => {
+    const answer = Promise.withResolvers<AlbumDetails>()
+    const mark = spyOn(api, 'setAlbumFavourite').mockImplementation(() => answer.promise)
+    renderPage()
+    await screen.findByRole('heading', { level: 1, name: 'OK Computer' })
+    const heart = screen.getByRole('button', { name: 'Favourite' })
+    expect(heart).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(heart)
+    await waitFor(() => expect(heart).toHaveAttribute('aria-pressed', 'true'))
+    expect(mark).toHaveBeenCalledWith({ albumId: 7, favourite: true })
+    answer.resolve(albumDetails({ isFavourite: true }))
+  })
+
+  it('adds a track, or the whole album, to a playlist', async () => {
+    spyOn(api, 'listPlaylists').mockResolvedValue([playlistSummary()])
+    const append = spyOn(api, 'appendPlaylistTracks').mockResolvedValue(playlistDetails())
+    renderPage()
+    await screen.findByRole('heading', { level: 1, name: 'OK Computer' })
+    fireEvent.click(screen.getByRole('button', { name: 'Add Paranoid Android to a playlist' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Evening/ }))
+    await waitFor(() => expect(append).toHaveBeenCalledWith({ id: 5, mediaIds: [102] }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: 'Add to playlist' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Evening/ }))
+    await waitFor(() => expect(append).toHaveBeenLastCalledWith({ id: 5, mediaIds: [101, 102] }))
   })
 
   it('says when there is no such album', async () => {

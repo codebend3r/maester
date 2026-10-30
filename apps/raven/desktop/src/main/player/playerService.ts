@@ -23,7 +23,7 @@ import {
   type MpvProperty,
   type MpvTrack,
 } from '@raven/mpv'
-import { clamp, numbersOf } from '@/main/player/commandNumbers'
+import { SPEED_RANGE, clamp, numbersOf } from '@/main/player/commandNumbers'
 import { displayOptions } from '@/main/player/displayOptions'
 import { HARDENED_OPTIONS } from '@/main/player/engine'
 import { guardedMpv, type MpvControl } from '@/main/player/guardedMpv'
@@ -893,7 +893,7 @@ export const createPlayerService = ({
       case PLAYER_COMMANDS.speed:
         await mpv.set({
           name: MPV_PROPERTIES.speed,
-          value: clamp({ value: command.rate, min: 0.25, max: 4 }),
+          value: clamp({ value: command.rate, min: SPEED_RANGE.min, max: SPEED_RANGE.max }),
         })
         return OK
       case PLAYER_COMMANDS.subtitleScale:

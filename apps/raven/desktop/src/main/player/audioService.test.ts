@@ -391,6 +391,39 @@ describe('commands', () => {
     expect(fake.log).toEqual([])
   })
 
+  test('a speed goes to mpv within a quarter and four times, and Now Playing runs at it', async () => {
+    const { service, fake, shown } = setup()
+    await service.handle(LOAD)
+    await service.handle({
+      type: AUDIO_COMMANDS.nowPlaying,
+      info: { title: 'Dune', artist: 'Frank Herbert', album: 'Dune', artwork: null },
+    })
+    fake.log.length = 0
+    expect(await service.handle({ type: AUDIO_COMMANDS.speed, rate: 1.5 })).toEqual({ ok: true })
+    expect(shown.at(-1)).toMatchObject({ rate: 1.5, isPlaying: true })
+    await service.handle({ type: AUDIO_COMMANDS.speed, rate: 9 })
+    await service.handle({ type: AUDIO_COMMANDS.speed, rate: 0.1 })
+    expect(fake.log).toEqual(['set speed 1.5', 'set speed 4', 'set speed 0.25'])
+    expect(await service.handle({ type: AUDIO_COMMANDS.speed, rate: Number.NaN })).toEqual({
+      ok: false,
+      reason: PLAYER_REFUSAL_REASONS.refused,
+      message: PLAYER_MESSAGES.failed,
+    })
+  })
+
+  test('a speed mpv refuses leaves Now Playing at the speed it had', async () => {
+    const { service, fake, shown } = setup()
+    await service.handle(LOAD)
+    await service.handle({
+      type: AUDIO_COMMANDS.nowPlaying,
+      info: { title: 'Dune', artist: 'Frank Herbert', album: 'Dune', artwork: null },
+    })
+    fake.failing.add('set speed')
+    await service.handle({ type: AUDIO_COMMANDS.speed, rate: 2 })
+    fake.emit({ type: MPV_EVENTS.property, name: MPV_PROPERTIES.pause, data: false })
+    expect(shown.at(-1)).toMatchObject({ rate: 1 })
+  })
+
   test('a seek while nothing plays, and a command with a number that is not one, do nothing', async () => {
     const { service, fake } = setup()
     await settle()
@@ -453,6 +486,7 @@ describe('now playing', () => {
         duration: 200,
         position: 12,
         isPlaying: true,
+        rate: 1,
         artwork: Buffer.from([1, 2, 3]),
       },
     ])

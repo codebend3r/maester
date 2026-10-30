@@ -1,83 +1,139 @@
 import { useQuery } from '@tanstack/react-query'
-import { ITEM_TYPES, type ItemSummary, type MediaItem, type PosterEntry, plural } from '@raven/core'
+import {
+  type AlbumSummary,
+  type Artist,
+  ITEM_TYPES,
+  type ItemSummary,
+  type MediaItem,
+  type PosterEntry,
+  plural,
+} from '@raven/core'
 import { useId } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { AlbumGrid } from '@/components/AlbumGrid/AlbumGrid'
+import { ArtistList } from '@/components/ArtistList/ArtistList'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
+import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { TitleCard } from '@/components/TitleCard/TitleCard'
 import { POSTER_SIZES } from '@/lib/posters'
-import { favouriteTitlesQuery, favouritesQuery } from '@/lib/queries'
+import {
+  favouriteAlbumsQuery,
+  favouriteArtistsQuery,
+  favouriteTitlesQuery,
+  favouritesQuery,
+} from '@/lib/queries'
 import styles from '@/pages/FavouritesPage/FavouritesPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 
 /** What a favourite can be, in the order the filter offers them. */
-const KINDS = ['shows', 'seasons', 'movies', 'episodes', 'other'] as const
+const KINDS = {
+  shows: 'shows',
+  seasons: 'seasons',
+  movies: 'movies',
+  episodes: 'episodes',
+  other: 'other',
+  albums: 'albums',
+  artists: 'artists',
+} as const
 
-type Kind = (typeof KINDS)[number]
+type Kind = (typeof KINDS)[keyof typeof KINDS]
+
+const KIND_ORDER: readonly Kind[] = Object.values(KINDS)
 
 const KIND_LABELS = {
-  shows: 'Shows',
-  seasons: 'Seasons',
-  movies: 'Movies',
-  episodes: 'Episodes',
-  other: 'Other videos',
+  [KINDS.shows]: 'Shows',
+  [KINDS.seasons]: 'Seasons',
+  [KINDS.movies]: 'Movies',
+  [KINDS.episodes]: 'Episodes',
+  [KINDS.other]: 'Other videos',
+  [KINDS.albums]: 'Albums',
+  [KINDS.artists]: 'Artists',
 } as const satisfies Record<Kind, string>
 
-const isKind = (value: string | null): value is Kind => KINDS.some((kind) => kind === value)
+const isKind = (value: string | null): value is Kind => KIND_ORDER.some((kind) => kind === value)
 
 /** A favourite title is a show or a season; anything else is a video's. */
 const titleKindOf = (item: ItemSummary): Kind =>
-  item.type === ITEM_TYPES.season ? 'seasons' : 'shows'
+  item.type === ITEM_TYPES.season ? KINDS.seasons : KINDS.shows
 
 /** A favourite video is a movie's, an episode's, or one matched to neither. */
 const kindOf = (media: MediaItem): Kind => {
-  switch (media.item?.type) {
+  switch (media.item?.type ?? null) {
     case ITEM_TYPES.movie:
-      return 'movies'
+      return KINDS.movies
     case ITEM_TYPES.episode:
-      return 'episodes'
+      return KINDS.episodes
     default:
-      return 'other'
+      return KINDS.other
   }
 }
 
 type KindsInProps = {
   titles: readonly ItemSummary[]
   entries: readonly PosterEntry[]
+  albums: readonly AlbumSummary[]
+  artists: readonly Artist[]
 }
 
-/** The kinds among `titles` and `entries`, in the filter's order. */
-const kindsIn = ({ titles, entries }: KindsInProps): Kind[] =>
-  KINDS.filter(
-    (kind) =>
-      titles.some((item) => titleKindOf(item) === kind) ||
-      entries.some(({ media }) => kindOf(media) === kind),
-  )
+/** The kinds among the favourites, in the filter's order. */
+const kindsIn = ({ titles, entries, albums, artists }: KindsInProps): Kind[] => {
+  const present = new Set<Kind>([
+    ...titles.map(titleKindOf),
+    ...entries.map(({ media }) => kindOf(media)),
+    ...(albums.length > 0 ? [KINDS.albums] : []),
+    ...(artists.length > 0 ? [KINDS.artists] : []),
+  ])
+  return KIND_ORDER.filter((kind) => present.has(kind))
+}
+
+type ShownOfProps<T> = { all: readonly T[]; own: Kind; kind: Kind | null }
+
+/** A list of one kind as the filter leaves it: whole for All or its own kind, else empty. */
+const shownOf = <T,>({ all, own, kind }: ShownOfProps<T>): readonly T[] =>
+  kind === null || kind === own ? all : []
 
 /**
- * Every favourite across every library but the locked ones, as posters:
- * the shows and seasons, then the videos, each most recently marked first;
- * a movie's own poster, an episode's season's. With more than one kind
+ * Every favourite across every library but the locked ones: the shows and
+ * seasons, then the videos, as posters, each most recently marked first; a
+ * movie's own poster, an episode's season's. The albums follow as covers,
+ * then the artists, each under its own heading. With more than one kind
  * among them, pills narrow them to one; the kind rides in the address as
  * `?kind=`, so coming back from a video lands on the same pills.
  */
 export const FavouritesPage = () => {
   const id = useId()
+  const albumsId = useId()
+  const artistsId = useId()
   const videos = useQuery(favouritesQuery)
   const titleQuery = useQuery(favouriteTitlesQuery)
+  const albumQuery = useQuery(favouriteAlbumsQuery)
+  const artistQuery = useQuery(favouriteArtistsQuery)
   const [searchParams, setSearchParams] = useSearchParams()
   const all = videos.data ?? []
   const allTitles = titleQuery.data ?? []
-  const kinds = kindsIn({ titles: allTitles, entries: all })
+  const allAlbums = albumQuery.data ?? []
+  const allArtists = artistQuery.data ?? []
+  const kinds = kindsIn({
+    titles: allTitles,
+    entries: all,
+    albums: allAlbums,
+    artists: allArtists,
+  })
   const asked = searchParams.get('kind')
   const kind = isKind(asked) && kinds.includes(asked) ? asked : null
   const items = kind ? all.filter(({ media }) => kindOf(media) === kind) : all
   const titles = kind ? allTitles.filter((item) => titleKindOf(item) === kind) : allTitles
-  const error = videos.error ?? titleQuery.error
-  const isPending = videos.isPending || titleQuery.isPending
-  const isSuccess = videos.isSuccess && titleQuery.isSuccess
-  const shown = titles.length + items.length
+  const albums = shownOf({ all: allAlbums, own: KINDS.albums, kind })
+  const artists = shownOf({ all: allArtists, own: KINDS.artists, kind })
+  const queries = [videos, titleQuery, albumQuery, artistQuery]
+  const error = queries.find((query) => query.error !== null)?.error ?? null
+  const isSuccess = queries.every((query) => query.isSuccess)
+  const posters = titles.length + items.length
+  const shown = posters + albums.length + artists.length
+  // Each list shows as it comes; the stand-in cards only while none has anything to show.
+  const isPending = queries.some((query) => query.isPending) && shown === 0
 
   return (
     <section className={styles.page} aria-labelledby={id}>
@@ -122,13 +178,13 @@ export const FavouritesPage = () => {
           </ul>
         </Loading>
       )}
-      {isSuccess && all.length + allTitles.length === 0 && (
+      {isSuccess && all.length + allTitles.length + allAlbums.length + allArtists.length === 0 && (
         <p className={styles.message}>
-          No favourites yet. Press the heart on a movie, show or season page, or open a video's
-          menu, from the button in its corner or a right click, and choose Favourite.
+          No favourites yet. Press the heart on a movie, show, season, album or artist page, or open
+          a video's menu, from the button in its corner or a right click, and choose Favourite.
         </p>
       )}
-      {shown > 0 && (
+      {posters > 0 && (
         <ul className={styles.grid}>
           {titles.map((item) => (
             <TitleCard key={`title-${item.id}`} item={item} />
@@ -137,6 +193,18 @@ export const FavouritesPage = () => {
             <PosterCard key={media.id} media={media} poster={poster} sizes={POSTER_SIZES.grid} />
           ))}
         </ul>
+      )}
+      {albums.length > 0 && (
+        <section className={styles.music} aria-labelledby={albumsId}>
+          <SectionHeading id={albumsId}>Albums</SectionHeading>
+          <AlbumGrid albums={albums} />
+        </section>
+      )}
+      {artists.length > 0 && (
+        <section className={styles.music} aria-labelledby={artistsId}>
+          <SectionHeading id={artistsId}>Artists</SectionHeading>
+          <ArtistList artists={artists} label="Favourite artists" />
+        </section>
       )}
     </section>
   )

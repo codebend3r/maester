@@ -4,6 +4,8 @@ import type {
   AlbumSummary,
   Artist,
   ArtistDetails,
+  PlaylistDetails,
+  PlaylistSummary,
   Track,
 } from '@raven/core'
 
@@ -87,5 +89,21 @@ export const albumMatchCandidate = (
   type: 'album',
   country: 'GB',
   confidence: 95,
+  ...overrides,
+})
+
+export const playlistSummary = (overrides: Partial<PlaylistSummary> = {}): PlaylistSummary => ({
+  id: 5,
+  name: 'Evening',
+  trackCount: 2,
+  duration: 400,
+  createdAt: '2026-10-01T00:00:00Z',
+  updatedAt: '2026-10-01T00:00:00Z',
+  ...overrides,
+})
+
+export const playlistDetails = (overrides: Partial<PlaylistDetails> = {}): PlaylistDetails => ({
+  playlist: playlistSummary(),
+  tracks: [track(), track({ id: 102, title: 'Paranoid Android', number: 2 })],
   ...overrides,
 })

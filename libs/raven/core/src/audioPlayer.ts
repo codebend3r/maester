@@ -14,6 +14,7 @@ export const AUDIO_COMMANDS = {
   pause: 'pause',
   seek: 'seek',
   volume: 'volume',
+  speed: 'speed',
   nowPlaying: 'nowPlaying',
   stop: 'stop',
 } as const
@@ -48,6 +49,8 @@ export const isAudioCommand = union(
   object({ type: oneOf([AUDIO_COMMANDS.pause]) }),
   object({ type: oneOf([AUDIO_COMMANDS.seek]), time: isNumber }),
   object({ type: oneOf([AUDIO_COMMANDS.volume]), volume: isNumber, muted: isBoolean }),
+  // How fast it plays: an audiobook's chosen speed, 1 for music; the pitch stays as it was.
+  object({ type: oneOf([AUDIO_COMMANDS.speed]), rate: isNumber }),
   object({ type: oneOf([AUDIO_COMMANDS.nowPlaying]), info: isNowPlayingInfo }),
   object({ type: oneOf([AUDIO_COMMANDS.stop]) }),
 )

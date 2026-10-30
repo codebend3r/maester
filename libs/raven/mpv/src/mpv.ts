@@ -141,6 +141,8 @@ export type NowPlaying = {
   duration: number
   position: number
   isPlaying: boolean
+  /** How fast the clock runs while it plays, so the system's elapsed time keeps pace: 1 at normal speed. */
+  rate: number
   artwork: Buffer | null
 }
 
