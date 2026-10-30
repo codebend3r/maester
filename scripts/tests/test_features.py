@@ -14,6 +14,7 @@ def pr(branch: str = "some-branch", body: str = "", title: str = "MAE: do a thin
         "state": "OPEN",
         "headRefName": branch,
         "mergedAt": None,
+        "projectItems": [],
     } | rest
 
 
@@ -51,41 +52,48 @@ class TestFeatureFor:
         assert not feature_for(pr("raven-windows-window")).get("own")
 
 
-def projects(titles: dict[str, list[str]]) -> Projects:
-    """A dry-run `Projects` already holding, under each title, the items at the given urls."""
+def projects(*titles: str) -> Projects:
+    """A dry-run `Projects` holding a project under each title."""
     made = Projects.__new__(Projects)
     made.dry_run = True
     made.by_title = {
         title: {"number": number, "id": f"id{number}", "title": title}
         for number, title in enumerate(titles, start=1)
     }
-    made.details = {
-        number: {"status": {"id": "status"}, "options": {}, "items": {url: {} for url in urls}}
-        for number, urls in enumerate(titles.values(), start=1)
-    }
+    made.details = {}
     return made
 
 
-class TestEnsure:
-    url = "https://github.com/codebend3r/maester/pull/1"
+def on(*titles: str) -> list[dict]:
+    """A PR's `projectItems`, one on each titled project."""
+    return [{"title": title} for title in titles]
 
+
+class TestEnsure:
     def test_a_retitled_pr_renames_its_project(self):
-        held = projects({"Old title": [self.url], "Other feature": []})
-        feature = feature_for(pr(title="MAE: new title"))
-        project = held.ensure(feature, self.url)
+        held = projects("Old title", "Other feature")
+        retitled = pr(title="MAE: new title", projectItems=on("Old title"))
+        project = held.ensure(feature_for(retitled), retitled)
         assert project is not None
         assert project["number"] == 1
         assert set(held.by_title) == {"New title", "Other feature"}
 
     def test_a_pr_held_nowhere_gets_a_new_project(self):
-        held = projects({"Other feature": []})
-        assert held.ensure(feature_for(pr(title="MAE: new title")), self.url) is None
+        held = projects("Other feature")
+        new = pr(title="MAE: new title")
+        assert held.ensure(feature_for(new), new) is None
+        assert held.by_title["New title"] == {"planned": True}
+
+    def test_a_pr_on_a_deleted_project_gets_a_new_project(self):
+        held = projects("Other feature")
+        orphan = pr(title="MAE: new title", projectItems=on("Deleted"))
+        assert held.ensure(feature_for(orphan), orphan) is None
         assert held.by_title["New title"] == {"planned": True}
 
     def test_a_listed_feature_never_renames(self):
-        held = projects({"Old title": [self.url]})
-        feature = feature_for(pr("raven-windows-window"))
-        assert held.ensure(feature, self.url) is None
+        held = projects("Old title")
+        listed = pr("raven-windows-window", projectItems=on("Old title"))
+        assert held.ensure(feature_for(listed), listed) is None
         assert "Old title" in held.by_title
 
 

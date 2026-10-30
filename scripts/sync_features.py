@@ -25,7 +25,7 @@ from features import FEATURES
 
 OWNER = "codebend3r"
 REPO = f"{OWNER}/maester"
-PR_FIELDS = "number,title,url,body,state,headRefName,mergedAt"
+PR_FIELDS = "number,title,url,body,state,headRefName,mergedAt,projectItems"
 FEATURE_LINE = re.compile(r"^Feature:\s*(.+?)\s*$", re.M | re.I)
 TITLE_PREFIX = re.compile(r"^MAE:\s*")
 OPEN = "In Progress"
@@ -92,13 +92,18 @@ class Projects:
         self.by_title = {p["title"]: p for p in listed["projects"]}
         self.details: dict[int, dict] = {}
 
-    def holder_of(self, url: str) -> dict | None:
-        """The project already holding the item at `url`: a PR's own project under an earlier title."""
+    def holder_of(self, pr: dict) -> dict | None:
+        """The project already holding `pr`: its own project under an earlier title.
+
+        Read from the PR's `projectItems`, never by listing every project's items, which costs
+        enough GraphQL points to spend the token owner's hourly limit in a few runs.
+        """
         return next(
             (
-                project
-                for project in self.by_title.values()
-                if not project.get("planned") and url in self.detail(project["number"])["items"]
+                self.by_title[item["title"]]
+                for item in pr["projectItems"]
+                if item["title"] in self.by_title
+                and not self.by_title[item["title"]].get("planned")
             ),
             None,
         )
@@ -111,15 +116,15 @@ class Projects:
         self.by_title[title] = project | {"title": title}
         return self.by_title[title]
 
-    def ensure(self, feature: dict, pr_url: str | None = None) -> dict | None:
+    def ensure(self, feature: dict, pr: dict | None = None) -> dict | None:
         """The feature's project, made or reopened if need be. None on a dry run that would make it.
 
         A pull request's own project is named after its title, so when the title changes the
         project already holding the pull request is renamed, never a second one made.
         """
         project = self.by_title.get(feature["name"])
-        if project is None and feature.get("own") and pr_url:
-            held = self.holder_of(pr_url)
+        if project is None and feature.get("own") and pr:
+            held = self.holder_of(pr)
             project = self.rename(held, feature["name"]) if held else None
         if project and project.get("planned"):
             return None
@@ -180,7 +185,7 @@ def sync_pr(projects: Projects, pr: dict) -> None:
     if status is None:
         return
     feature = feature_for(pr)
-    project = projects.ensure(feature, pr["url"])
+    project = projects.ensure(feature, pr)
     if project is None:
         print(f"+ {feature['name']}: #{pr['number']} → {status}")
         return
