@@ -105,6 +105,7 @@ export const SIZES = {
   measure: size('--measure'),
   fieldHeight: size('--field-size'),
   controlLarge: size('--control-size-large'),
+  cover: size('--cover-size'),
   // The web's `--focus-ring` is `2px solid var(--color-bark)`, which React Native takes in parts.
   focusRing: size('--border-thick'),
   // The web's ring is read from a desk; from the sofa it is drawn twice as thick.

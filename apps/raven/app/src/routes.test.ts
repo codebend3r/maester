@@ -40,6 +40,19 @@ describe('hrefOf', () => {
   })
 })
 
+describe('hrefOf for music', () => {
+  it('opens an album and an artist by id', () => {
+    expect(hrefOf({ kind: ROUTE_TARGETS.album, albumId: 7 })).toEqual({
+      pathname: APP_ROUTES.album,
+      params: { [APP_ROUTE_PARAMS.id]: '7' },
+    })
+    expect(hrefOf({ kind: ROUTE_TARGETS.artist, artistId: 3 })).toEqual({
+      pathname: APP_ROUTES.artist,
+      params: { [APP_ROUTE_PARAMS.id]: '3' },
+    })
+  })
+})
+
 describe('secondsOf', () => {
   it('reads a spot in seconds from a route param, and 0 for anything else', () => {
     expect(secondsOf('3000.5')).toBe(3000.5)

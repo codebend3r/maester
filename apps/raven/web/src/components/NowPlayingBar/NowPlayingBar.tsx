@@ -1,8 +1,9 @@
+import { artistNames } from '@raven/core'
 import { Button } from '@raven/ui'
 import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { Link, useLocation } from 'react-router-dom'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
-import { NOW_PLAYING_PATH, artistNames } from '@/lib/music'
+import { NOW_PLAYING_PATH } from '@/lib/music'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/NowPlayingBar/NowPlayingBar.module.scss'
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import type { AlbumMatchCandidate, AlbumSummary } from '@raven/core'
+import { type AlbumMatchCandidate, type AlbumSummary, artistNames } from '@raven/core'
 import { Button } from '@raven/ui'
 import { useSearch } from '@raven/ui/headless'
 import { useId } from 'react'
@@ -84,7 +84,7 @@ export const AlbumMatchDialog = ({ album, onClose, onMatched }: AlbumMatchDialog
             Fix match
           </h2>
           <p className={styles.album}>
-            {album.title} · {album.artists.map(({ name }) => name).join(', ')}
+            {album.title} · {artistNames(album)}
           </p>
         </header>
         <SearchField

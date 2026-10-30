@@ -59,6 +59,7 @@
         "@formatjs/intl-locale": "5.3.12",
         "@formatjs/intl-pluralrules": "6.3.15",
         "@formatjs/intl-relativetimeformat": "12.3.15",
+        "@raven/audio": "workspace:*",
         "@raven/core": "workspace:*",
         "@raven/ui": "workspace:*",
         "@react-native-async-storage/async-storage": "2.2.0",
@@ -266,6 +267,24 @@
         "sass": "1.104.1",
         "typescript": "7.0.2",
         "vite": "8.3.0",
+      },
+    },
+    "libs/raven/audio": {
+      "name": "@raven/audio",
+      "version": "0.7.7",
+      "dependencies": {
+        "@raven/core": "workspace:*",
+        "expo-modules-core": "58.0.23",
+      },
+      "devDependencies": {
+        "@types/bun": "1.4.2",
+        "@types/react": "19.3.0",
+        "@typescript/native-preview": "7.0.0-dev.20260707.2",
+        "oxfmt": "0.68.0",
+        "oxlint": "1.83.0",
+        "react-native": "npm:react-native-tvos@0.88.0-0",
+        "tsc-alias": "1.9.7",
+        "typescript": "6.0.3",
       },
     },
     "libs/raven/core": {
@@ -1156,6 +1175,8 @@
     "@radix-ui/react-use-layout-effect": ["@radix-ui/react-use-layout-effect@1.1.4", "", { "peerDependencies": { "@types/react": "*", "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc" }, "optionalPeers": ["@types/react"] }, "sha512-K20DkRkUwDnxEYMBPcg3Y6voLkEy5p5QQmszZgLngKKiC7dzBR/aEuK3w1qlx2JWDUNH6FluahYdgR3BP+QbYw=="],
 
     "@raven/app": ["@raven/app@workspace:apps/raven/app"],
+
+    "@raven/audio": ["@raven/audio@workspace:libs/raven/audio"],
 
     "@raven/core": ["@raven/core@workspace:libs/raven/core"],
 

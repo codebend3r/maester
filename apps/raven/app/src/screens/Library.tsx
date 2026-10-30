@@ -3,6 +3,7 @@ import {
   type LibrarySettings,
   type PosterEntry,
   KINDS,
+  LIBRARY_LISTINGS,
   LIBRARY_VIEWS,
   GROUPING_LABELS,
   LIBRARY_VIEW_LABELS,
@@ -15,6 +16,7 @@ import {
   isString,
   jumpScale,
   libraryIconOf,
+  listingFor,
   listsShows,
   plural,
   reversedSort,
@@ -29,6 +31,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type ReactNode, useState } from 'react'
 
+import { AlbumsGrid } from '@/music/AlbumsGrid'
 import type { ShelfCard } from '@/queries/cards'
 import { CONTINUE_WATCHING, continueArtIdsOf } from '@/queries/homeShelves'
 import { useArtLogos } from '@/queries/useArtLogos'
@@ -376,7 +379,11 @@ const ServerLibrary = ({ session, id, asked }: ServerLibraryProps) => {
     case ROUTE_STATES.loading:
       return <Loading label={COPY.opening} onBack={() => router.back()} />
     case ROUTE_STATES.ready:
-      return <LibraryPages key={page.data.id} asked={asked} library={page.data} session={session} />
+      return listingFor(page.data.settings.kind) === LIBRARY_LISTINGS.albums ? (
+        <AlbumsGrid key={page.data.id} asked={asked} library={page.data} session={session} />
+      ) : (
+        <LibraryPages key={page.data.id} asked={asked} library={page.data} session={session} />
+      )
     default: {
       const unknown: never = page
       return unknown

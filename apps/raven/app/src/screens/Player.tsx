@@ -25,6 +25,7 @@ import {
   preferredSubtitle,
   useProgressReport,
   useTrackCues,
+  useAudioQueue,
   usePlaybackPolicy,
   usePlayerPrefs,
   useUnlockPrompt,
@@ -567,6 +568,8 @@ const ServerPlayer = ({ session, mediaId, at, isFromStart }: ServerPlayerProps) 
  * where the server last saved, down the ladder of ways the server offers.
  */
 export const Player = () => {
+  // A film and a track never play at once: the music pauses as the player opens, as on the web.
+  useEffect(() => useAudioQueue.getState().pause(), [])
   const params = useLocalSearchParams()
   const mediaId = routeIdOf(params[APP_ROUTE_PARAMS.mediaId])
   const at = secondsOf(params[APP_ROUTE_PARAMS.at])

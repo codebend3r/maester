@@ -9,10 +9,6 @@ import {
 } from '@raven/core'
 import { api } from '@/lib/api'
 
-/** "Radiohead", or "A, B" for several. */
-export const artistNames = (track: Pick<Track, 'artists'>): string =>
-  track.artists.map(({ name }) => name).join(', ')
-
 /** An album's page: `/albums/:id`. */
 export const albumPath = (albumId: number): AppPath => `/albums/${albumId}`
 

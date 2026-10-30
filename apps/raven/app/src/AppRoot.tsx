@@ -5,11 +5,14 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { hideAsync, preventAutoHideAsync } from 'expo-splash-screen'
 import { useEffect, useState } from 'react'
-import { Appearance, StatusBar } from 'react-native'
+import { Appearance, StatusBar, StyleSheet, View } from 'react-native'
+import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAccountSession } from '@/account/accountSession'
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
+import { MusicHost } from '@/music/MusicHost'
+import { NowPlayingBar, useIsBarShown } from '@/music/NowPlayingBar'
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
 import { IS_SIGN_IN_BYPASSED, RAVEN_SERVER } from '@/servers/ravenServer'
@@ -97,6 +100,8 @@ export const AppRoot = () => {
   const expiresAt = useAccountSession((state) => state.session?.expiresAt ?? null)
   const ground = useTheme((theme) => theme.palette.ground)
   const tone = useTheme((theme) => theme.tone)
+  const insets = useSafeAreaInsets()
+  const isBarShown = useIsBarShown()
 
   useEffect(() => {
     const show = () => setLoaded(true)
@@ -128,29 +133,43 @@ export const AppRoot = () => {
       <StatusBar barStyle={tone === THEME_TONES.light ? 'dark-content' : 'light-content'} />
       {session !== null && <ServerEvents key={session.server.id} session={session} />}
       <UnlockRoute />
+      {/* Music plays above the routes, so leaving a screen stops nothing. */}
+      {session !== null && <MusicHost key={session.server.id} session={session} />}
       {/* A screen's opening focus comes back once the transition that reveals it has ended:
           on Android TV the transition takes the focus from anything asked for before then. */}
-      <Stack
-        screenListeners={{
-          transitionEnd: ({ target, data }) => {
-            if (target !== undefined && !data.closing) returnScreen({ screen: target })
-          },
-        }}
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ground } }}
-      >
-        <Stack.Protected
-          guard={session !== null && (isSignedIn || IS_SIGN_IN_BYPASSED)}
-          redirectTo={APP_ROUTES.signIn}
-        >
-          <Stack.Screen name={APP_SCREENS.home} />
-          <Stack.Screen name={APP_SCREENS.item} />
-          <Stack.Screen name={APP_SCREENS.library} />
-          <Stack.Screen name={APP_SCREENS.play} />
-          <Stack.Screen name={APP_SCREENS.search} />
-          <Stack.Screen name={APP_SCREENS.settings} />
-          <Stack.Screen name={APP_SCREENS.unlock} />
-        </Stack.Protected>
-      </Stack>
+      <View style={styles.frame}>
+        {/* The bar keeps the bottom inset for itself, so the screens above it pad none. */}
+        <SafeAreaInsetsContext.Provider value={isBarShown ? { ...insets, bottom: 0 } : insets}>
+          <Stack
+            screenListeners={{
+              transitionEnd: ({ target, data }) => {
+                if (target !== undefined && !data.closing) returnScreen({ screen: target })
+              },
+            }}
+            screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ground } }}
+          >
+            <Stack.Protected
+              guard={session !== null && (isSignedIn || IS_SIGN_IN_BYPASSED)}
+              redirectTo={APP_ROUTES.signIn}
+            >
+              <Stack.Screen name={APP_SCREENS.home} />
+              <Stack.Screen name={APP_SCREENS.item} />
+              <Stack.Screen name={APP_SCREENS.library} />
+              <Stack.Screen name={APP_SCREENS.play} />
+              <Stack.Screen name={APP_SCREENS.album} />
+              <Stack.Screen name={APP_SCREENS.artist} />
+              <Stack.Screen name={APP_SCREENS.nowPlaying} />
+              <Stack.Screen name={APP_SCREENS.search} />
+              <Stack.Screen name={APP_SCREENS.settings} />
+              <Stack.Screen name={APP_SCREENS.unlock} />
+            </Stack.Protected>
+          </Stack>
+        </SafeAreaInsetsContext.Provider>
+        {/* The bar under the screens while a track plays; Now Playing is a screen of its own. */}
+        {session !== null && <NowPlayingBar session={session} />}
+      </View>
     </QueryClientProvider>
   )
 }
+
+const styles = StyleSheet.create({ frame: { flex: 1 } })
