@@ -6,7 +6,14 @@ import { Icon } from '@/layouts/Icon'
 import { Text } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
-import type { EpisodeRow, ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemPage'
+import {
+  ART_PLACES,
+  type EpisodeRow,
+  type ItemHero,
+  type ItemPage,
+  type PersonCard,
+  type VersionRow,
+} from '@/queries/itemPage'
 import { CardPicture } from '@/layouts/Card'
 import { TouchBack } from '@/layouts/TouchBack'
 import { TouchCard } from '@/layouts/TouchCard'
@@ -130,19 +137,31 @@ const Hero = ({ hero, actions, links }: HeroProps) => {
       <View style={[styles.headRow, isWide && styles.headRowWide]}>
         <CardPicture card={heroPictureOf(hero)} width={widths[hero.poster.shape]} />
         <View style={styles.words}>
-          {hero.logo !== null && (
+          {hero.logo?.place === ART_PLACES.over && (
             <TitleArt
               height={LOGO_HEIGHT}
-              logo={hero.logo}
+              logo={hero.logo.picture}
               maxWidth={width}
               name={hero.eyebrow ?? hero.title}
               textStyle={styles.eyebrow}
             />
           )}
           {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
-          <Text accessibilityRole="header" style={styles.title}>
-            {hero.title}
-          </Text>
+          {hero.logo?.place === ART_PLACES.title ? (
+            <View accessibilityLabel={hero.title} accessibilityRole="header" accessible>
+              <TitleArt
+                height={LOGO_HEIGHT}
+                logo={hero.logo.picture}
+                maxWidth={width}
+                name={hero.title}
+                textStyle={styles.title}
+              />
+            </View>
+          ) : (
+            <Text accessibilityRole="header" style={styles.title}>
+              {hero.title}
+            </Text>
+          )}
           {hero.byline !== null && <Text style={styles.byline}>{hero.byline}</Text>}
           {facts !== '' && <Text style={styles.small}>{facts}</Text>}
           {hero.progress !== null && <ProgressLine progress={hero.progress} />}
@@ -160,8 +179,12 @@ const Hero = ({ hero, actions, links }: HeroProps) => {
           ))}
         </View>
       )}
-      {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
-      {hero.summary !== null && <Text style={styles.summary}>{hero.summary}</Text>}
+      {(hero.tagline !== null || hero.summary !== null) && (
+        <View style={styles.synopsis}>
+          {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
+          {hero.summary !== null && <Text style={styles.summary}>{hero.summary}</Text>}
+        </View>
+      )}
     </View>
   )
 }
@@ -444,6 +467,13 @@ const useStyles = themedStyles((colours) =>
     },
     actionLabel: { fontSize: SIZES.text, fontWeight: 'bold' },
     pressed: { opacity: OPACITIES.pressed },
+    // The raised surface under the words, so they read over the backdrop in every theme.
+    synopsis: {
+      gap: SIZES.space2,
+      padding: SIZES.space3,
+      borderRadius: SIZES.radius,
+      backgroundColor: colours.raised,
+    },
     tagline: { color: colours.text, fontSize: SIZES.text, fontStyle: 'italic' },
     summary: {
       color: colours.text,

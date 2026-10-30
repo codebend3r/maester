@@ -388,6 +388,7 @@ const Playing = ({
                 onChoose: pickAudio,
               }
         }
+        mode={mode}
         next={nextMedia === null ? null : { label: nextLabelOf(nextMedia), onPlay: playNext }}
         notice={noticeOf(state)}
         onBack={onBack}
@@ -463,6 +464,7 @@ const Waiting = ({ notice, onBack }: WaitingProps) => (
     onBack={onBack}
     onPictureInPicture={null}
     heading={NO_HEADING}
+    mode={null}
     next={null}
     subtitles={null}
     summary={null}

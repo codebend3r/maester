@@ -31,6 +31,7 @@ import { isSeekingWith, pressedKeyOf, remoteAnswerOf } from '@/layouts/remoteKey
 import { PlateButton } from '@/layouts/tvControls'
 import type { IconName } from '@raven/ui/iconDrawings'
 import { requestTVFocus } from '@/layouts/tvFocus'
+import { useClock } from '@/layouts/useClock'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
 import { useHeldSeek } from '@/layouts/useHeldSeek'
 import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
@@ -110,7 +111,7 @@ const Scrubber = ({ view, transport, onScrubbing }: ScrubberProps) => {
 
 type ControlsProps = Pick<
   PlayerChromeProps,
-  'heading' | 'transport' | 'audio' | 'subtitles' | 'next' | 'onBack'
+  'heading' | 'transport' | 'audio' | 'subtitles' | 'next' | 'mode' | 'onBack'
 > & {
   /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
   isVisible: boolean
@@ -148,6 +149,29 @@ const TrackButton = ({ icon, label, picker, onPicking }: TrackButtonProps) => {
 
 /** How tall a show's title art stands over the video; its width follows the art's own shape. */
 const LOGO_HEIGHT = TV_SIZES.space8 * 1.5
+
+type CornerProps = Pick<PlayerChromeProps, 'mode'>
+
+/** The top right corner: the time of day, and how the video plays, read out together. */
+const Corner = ({ mode }: CornerProps) => {
+  const styles = useStyles()
+  const clock = useClock()
+  const way = mode === null ? null : PLAYER_COPY.modes[mode]
+  return (
+    <View
+      accessibilityLabel={[clock, way].filter((part): part is string => part !== null).join(', ')}
+      accessible
+      style={styles.corner}
+    >
+      <Text style={styles.clock}>{clock}</Text>
+      {way !== null && (
+        <View style={styles.chip}>
+          <Text style={styles.chipText}>{way}</Text>
+        </View>
+      )}
+    </View>
+  )
+}
 
 type HeadingProps = Pick<PlayerChromeProps, 'heading'>
 
@@ -206,6 +230,7 @@ const Controls = ({
   audio,
   subtitles,
   next,
+  mode,
   onBack,
   onScrubbing,
   onPicking,
@@ -221,7 +246,10 @@ const Controls = ({
   }, [isVisible])
   return (
     <View style={styles.frame}>
-      <Heading heading={heading} />
+      <View style={styles.top}>
+        <Heading heading={heading} />
+        <Corner mode={mode} />
+      </View>
       <View
         onLayout={({ nativeEvent }) => onBottomHeight(nativeEvent.layout.height)}
         style={styles.bottom}
@@ -294,7 +322,8 @@ type DpadPlayerProps = PlayerChromeProps & { surface: VideoSurface }
 /**
  * raven's own controls over ExoPlayer, driven by the d-pad. They fade once the video has played
  * untouched for the viewer's linger, and any key brings them back; they stay up while it is
- * paused, opening or ended, and while a picker's list is open. Hidden, left and right still skip
+ * paused, opening or ended, while a picker's list is open, and while left or right is held,
+ * until the key comes up and the video plays on. Hidden, left and right still skip
  * ten seconds, and the remote's play, rewind and fast forward keys work wherever the focus is.
  * The subtitle cues are raven's, over the video whether or not the controls are.
  */
@@ -307,6 +336,7 @@ const DpadPlayer = ({
   audio,
   subtitles,
   next,
+  mode,
   onBack,
 }: DpadPlayerProps) => {
   // Only the remote's handler reads whether the line has the focus, so it is no render's concern.
@@ -315,20 +345,22 @@ const DpadPlayer = ({
   const [bottomHeight, setBottomHeight] = useState(0)
   const styles = useStyles()
   const isPlaying = transport !== null && !transport.isPaused
+  // Whether the controls are showing, as the remote's handler reads it when a key goes down.
+  const isShown = useRef(false)
+  const held = useHeldSeek({
+    transport,
+    isSeeking: () => isSeekingWith({ isShown: isShown.current, isScrubbing: isScrubbing.current }),
+  })
   const { isVisible, isDrawn, opacity, show } = useControlsLinger({
     isPlaying,
-    isHeld: isPicking,
+    isHeld: isPicking || held.isHolding,
   })
 
   // The line goes with the controls, and its blur may not be heard as it does.
   useEffect(() => {
+    isShown.current = isVisible
     if (!isVisible) isScrubbing.current = false
   }, [isVisible])
-
-  const held = useHeldSeek({
-    transport,
-    isSeeking: () => isSeekingWith({ isShown: isVisible, isScrubbing: isScrubbing.current }),
-  })
 
   useRemote((event) => {
     if (held.respond(event)) {
@@ -370,6 +402,7 @@ const DpadPlayer = ({
           <Controls
             audio={audio}
             heading={heading}
+            mode={mode}
             next={next}
             onBack={onBack}
             onBottomHeight={setBottomHeight}
@@ -416,7 +449,15 @@ const useStyles = pictureStyles((colours) =>
       opacity: SCRIM_OPACITY,
     },
     frame: { flex: 1, justifyContent: 'space-between', padding: TV_GUTTER },
+    top: { flexDirection: 'row', justifyContent: 'space-between', gap: TV_SIZES.space4 },
     heading: { gap: TV_SIZES.space1, maxWidth: TV_SIZES.measure },
+    corner: { alignItems: 'flex-end', gap: TV_SIZES.space1 },
+    clock: {
+      color: colours.text,
+      fontSize: TV_SIZES.textXl,
+      fontWeight: 'bold',
+      fontVariant: ['tabular-nums'],
+    },
     show: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     place: {
       color: colours.muted,
@@ -436,7 +477,9 @@ const useStyles = pictureStyles((colours) =>
     bottom: { gap: TV_SIZES.space3 },
     timeline: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
     time: { color: colours.text, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },
-    scrubberSlot: { flex: 1 },
+    // Room at each end for the focused thumb, which is centred on the line's end and would
+    // otherwise sit over the time beside it.
+    scrubberSlot: { flex: 1, paddingHorizontal: THUMB_FOCUSED / 2 },
     scrubber: { height: TV_SIZES.controlLarge, justifyContent: 'center' },
     line: {
       height: TV_SIZES.space1,

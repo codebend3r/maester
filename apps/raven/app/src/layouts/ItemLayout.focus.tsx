@@ -5,7 +5,13 @@ import { Icon } from '@/layouts/Icon'
 import { Text } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
-import type { ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemPage'
+import {
+  ART_PLACES,
+  type ItemHero,
+  type ItemPage,
+  type PersonCard,
+  type VersionRow,
+} from '@/queries/itemPage'
 import { CardPicture } from '@/layouts/Card'
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
@@ -30,6 +36,9 @@ import { themedStyles, useTheme } from '@/theme/useTheme'
 
 /** How tall a show's title art stands over an episode's name: larger than the player's. */
 const LOGO_HEIGHT = tvSize(150)
+
+/** The synopsis plate shows a little of the backdrop through it. */
+const SYNOPSIS_OPACITY = 0.92
 
 /** The heading's picture in points on a 1920 by 1080 point screen: a poster, or a still. */
 const HERO_WIDTHS = {
@@ -155,27 +164,43 @@ const Hero = ({ hero, actions, links, file }: HeroProps) => {
         width={HERO_WIDTHS[hero.poster.shape]}
       />
       <View style={styles.words}>
-        {hero.logo !== null && (
+        {hero.logo?.place === ART_PLACES.over && (
           <TitleArt
             height={LOGO_HEIGHT}
-            logo={hero.logo}
+            logo={hero.logo.picture}
             maxWidth={WORDS_WIDTH}
             name={hero.eyebrow ?? hero.title}
             textStyle={styles.eyebrow}
           />
         )}
         {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
-        <Text accessibilityRole="header" style={styles.title}>
-          {hero.title}
-        </Text>
+        {hero.logo?.place === ART_PLACES.title ? (
+          <View accessibilityLabel={hero.title} accessibilityRole="header" accessible>
+            <TitleArt
+              height={LOGO_HEIGHT}
+              logo={hero.logo.picture}
+              maxWidth={WORDS_WIDTH}
+              name={hero.title}
+              textStyle={styles.title}
+            />
+          </View>
+        ) : (
+          <Text accessibilityRole="header" style={styles.title}>
+            {hero.title}
+          </Text>
+        )}
         {hero.byline !== null && <Text style={styles.byline}>{hero.byline}</Text>}
         {facts !== '' && <Text style={styles.line}>{facts}</Text>}
         {hero.progress !== null && <ProgressLine progress={hero.progress} />}
-        {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
-        {hero.summary !== null && (
-          <Text numberOfLines={4} style={styles.summary}>
-            {hero.summary}
-          </Text>
+        {(hero.tagline !== null || hero.summary !== null) && (
+          <View style={styles.synopsis}>
+            {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
+            {hero.summary !== null && (
+              <Text numberOfLines={4} style={styles.summary}>
+                {hero.summary}
+              </Text>
+            )}
+          </View>
         )}
         {actions !== null && <ActionRow actions={actions} isFirstRow />}
         {actions !== null && links.length > 0 && <ActionRow actions={links} isFirstRow={false} />}
@@ -434,6 +459,14 @@ const useStyles = themedStyles((colours) =>
       backgroundColor: colours.track,
     },
     fill: { height: '100%', borderRadius: TV_SIZES.space0, backgroundColor: colours.accent },
+    // The raised surface under the words, so they read over the backdrop in every theme.
+    synopsis: {
+      gap: TV_SIZES.space2,
+      padding: TV_SIZES.space3,
+      borderRadius: TV_SIZES.radius,
+      backgroundColor: colours.raised,
+      opacity: SYNOPSIS_OPACITY,
+    },
     tagline: { color: colours.text, fontSize: TV_SIZES.textLg, fontStyle: 'italic' },
     summary: {
       color: colours.text,

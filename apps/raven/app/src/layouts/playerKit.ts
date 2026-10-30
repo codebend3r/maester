@@ -1,4 +1,4 @@
-import { formatDuration } from '@raven/core'
+import { PLAYBACK_MODES, type PlaybackMode, formatDuration } from '@raven/core'
 import type { ComponentProps, ReactNode } from 'react'
 import type { AccessibilityActionEvent, AccessibilityActionInfo } from 'react-native'
 import type Video from 'react-native-video'
@@ -52,6 +52,8 @@ export type PlayerChromeProps = {
   subtitles: TrackPicker | null
   /** The next episode, once the server has named one; null for a film or the show's last. */
   next: PlayerNext | null
+  /** How the video plays, for the corner that says so; null while no way has been picked. */
+  mode: PlaybackMode | null
   /** Hands the video to Picture in Picture; null where the player cannot. */
   onPictureInPicture: (() => void) | null
   onBack: () => void
@@ -74,6 +76,12 @@ export const PLAYER_COPY = {
   leave: 'Back',
   pause: 'Pause',
   next: 'Next episode',
+  /** How each way of playing reads in the corner. */
+  modes: {
+    [PLAYBACK_MODES.direct]: 'Direct play',
+    [PLAYBACK_MODES.remux]: 'Remux',
+    [PLAYBACK_MODES.transcode]: 'Transcode',
+  } satisfies Record<PlaybackMode, string>,
   back: (seconds: number) => `Back ${seconds} seconds`,
   forward: (seconds: number) => `Forward ${seconds} seconds`,
   seek: 'Position',

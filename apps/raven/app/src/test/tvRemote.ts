@@ -1,9 +1,9 @@
 import { act } from '@testing-library/react-native'
 
-import { KEY_ACTIONS, type RemoteKey } from '@/layouts/remoteKeys'
+import { KEY_ACTIONS, type LONG_PRESSES, type RemoteKey } from '@/layouts/remoteKeys'
 
 /** What Android TV's fork hands each listener for a key: its name and whether it went down or up. */
-type KeyEvent = { eventType: RemoteKey; eventKeyAction: number }
+type KeyEvent = { eventType: RemoteKey | keyof typeof LONG_PRESSES; eventKeyAction: number }
 
 type Listener = (event: KeyEvent) => void
 
@@ -43,5 +43,14 @@ export const pressRemote = async ({ key }: PressRemoteProps): Promise<void> => {
     actions.forEach((eventKeyAction) =>
       [...listening.listeners].forEach((listener) => listener({ eventType: key, eventKeyAction })),
     )
+  })
+}
+
+type HoldRemoteProps = { key: keyof typeof LONG_PRESSES; eventKeyAction: number }
+
+/** A key held past the fork's long press, going down or coming up, as its long name. */
+export const holdRemote = async ({ key, eventKeyAction }: HoldRemoteProps): Promise<void> => {
+  await act(async () => {
+    ;[...listening.listeners].forEach((listener) => listener({ eventType: key, eventKeyAction }))
   })
 }

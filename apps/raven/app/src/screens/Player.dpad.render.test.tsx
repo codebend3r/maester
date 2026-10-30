@@ -19,7 +19,7 @@ import { SelectedTrackType } from 'react-native-video'
 
 import { PLAYER_COPY } from '@/layouts/playerKit'
 import { APP_ROUTES } from '@/routes'
-import { REMOTE_KEYS } from '@/layouts/remoteKeys'
+import { KEY_ACTIONS, LONG_PRESS_NAMES, REMOTE_KEYS } from '@/layouts/remoteKeys'
 import type * as PlatformModule from '@/platform/platform'
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { Player } from '@/screens/Player'
@@ -46,7 +46,7 @@ import { appThemeOf } from '@/theme/appTheme'
 import type * as NavigationFocus from '@/test/navigationFocus'
 import { askedFor, resetTestScreen } from '@/test/navigationFocus'
 import type * as RemoteModule from '@/test/tvRemote'
-import { pressRemote } from '@/test/tvRemote'
+import { holdRemote, pressRemote } from '@/test/tvRemote'
 import type * as VideoMockModule from '@/test/videoMock'
 import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/videoMock'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
@@ -503,5 +503,28 @@ describe('Player on Android TV', () => {
         ),
       ),
     ).toBe(false)
+  })
+
+  it('keeps the controls up while right is held, and lets them linger once it comes up', async () => {
+    usePlayerPrefs.setState({ controlsLingerSeconds: BRIEF_LINGER_SECONDS })
+    const props = await playing({ id: BUSBOYS_UNSUBTITLED.id })
+    await moveVideoTo({ props, seconds: 100 })
+    // A hold seeks from the line, which has the focus as the controls appear.
+    await fireEvent(scrubber(), NATIVE_EVENTS.focus)
+    await holdRemote({ key: LONG_PRESS_NAMES.longRight, eventKeyAction: KEY_ACTIONS.down })
+    await new Promise<void>((resolve) =>
+      setTimeout(() => resolve(), BRIEF_LINGER_SECONDS * 1000 * 3),
+    )
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
+    await holdRemote({ key: LONG_PRESS_NAMES.longRight, eventKeyAction: KEY_ACTIONS.up })
+    expect(drawnVideo.seek).toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull())
+  })
+
+  it('says the time of day and how the video plays in the top right', async () => {
+    await playing({ id: BUSBOYS_UNSUBTITLED.id })
+    const corner = screen.getByLabelText(new RegExp(`, ${PLAYER_COPY.modes.direct}$`, 'u'))
+    expect(corner.props.accessibilityLabel).toMatch(/^\d{1,2}:\d{2}/u)
   })
 })

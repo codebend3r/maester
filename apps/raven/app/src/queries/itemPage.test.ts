@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { AUTH_HEADERS, ITEM_TYPES, movieFacts } from '@raven/core'
 
 import { CARD_SHAPES } from '@/queries/cards'
-import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
+import { ART_PLACES, playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { ROUTE_TARGETS } from '@/routes'
 import { NAS, SERIES } from '@/test/homeServer'
 import {
@@ -111,6 +111,10 @@ describe('playablePage', () => {
     const { hero, castTitle } = episode({ isShowPending: true })
     expect(hero.eyebrow).toBe('Severance · S01 · E01')
     expect(hero.logo).toBeNull()
+    expect(episode({ show: { ...SEVERANCE, logoVersion: 'l4' } }).hero).toMatchObject({
+      eyebrow: 'S01 · E01',
+      logo: { picture: at('/api/pictures/items/4/logo/l4'), place: ART_PLACES.over },
+    })
     expect(hero.poster).toEqual({
       shape: CARD_SHAPES.wide,
       picture: at('/api/pictures/items/6/still/s6'),
@@ -143,6 +147,10 @@ describe('showPage', () => {
   it('lists the seasons as posters, each opening its page', () => {
     const page = showPage({ details: SEVERANCE, ...pictures })
     expect(page.hero.eyebrow).toBe('Show')
+    expect(page.hero.logo).toBeNull()
+    expect(
+      showPage({ details: { ...SEVERANCE, logoVersion: 'l4' }, ...pictures }).hero.logo,
+    ).toEqual({ picture: at('/api/pictures/items/4/logo/l4'), place: ART_PLACES.title })
     expect(page.seasons).toEqual([
       {
         key: 'season:5',

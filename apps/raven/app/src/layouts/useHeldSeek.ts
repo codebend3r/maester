@@ -15,7 +15,7 @@ type UseHeldSeekProps = {
  * Holding left or right on the d-pad: while the key is down the playhead runs, faster the longer
  * it is held, and the video seeks there once as the key comes up. `respond` takes a remote event
  * and says whether it was a hold's; `transport` is the one to draw, its position the hold's while
- * one runs.
+ * one runs, and `isHolding` says one runs, so the controls stay up until the key comes up.
  */
 export const useHeldSeek = ({ transport, isSeeking }: UseHeldSeekProps) => {
   const [hold, dispatch] = useReducer(holdReducer, null)
@@ -52,5 +52,5 @@ export const useHeldSeek = ({ transport, isSeeking }: UseHeldSeekProps) => {
 
   const shown =
     transport === null || hold === null ? transport : { ...transport, position: hold.at }
-  return { respond, transport: shown }
+  return { respond, transport: shown, isHolding }
 }
