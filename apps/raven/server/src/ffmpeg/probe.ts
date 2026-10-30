@@ -117,6 +117,13 @@ export type MediaClock = {
   frameRate: number | null
 }
 
+type EndOfProps = { start: number; duration: number | null; isMatroska: boolean }
+
+const endOf = ({ start, duration, isMatroska }: EndOfProps): number | null => {
+  if (duration == null) return null
+  return isMatroska ? Math.max(duration, start) : start + duration
+}
+
 /**
  * Reads the clock from `ffprobe -show_format -show_streams -of json`
  * output. Matroska measures its duration from 0 on its own timeline, so
@@ -130,7 +137,7 @@ export const mediaClockOf = (output: unknown): MediaClock => {
   const start = secondsOf(format.start_time) ?? 0
   const duration = numeric(format.duration)
   const isMatroska = formatNamesOf(output).includes(FORMAT_NAMES.matroska)
-  const end = duration == null ? null : isMatroska ? Math.max(duration, start) : start + duration
+  const end = endOf({ start, duration, isMatroska })
   const video = videoStreamOf(streams)
   return {
     start,

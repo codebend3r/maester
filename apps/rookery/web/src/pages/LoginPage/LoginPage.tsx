@@ -5,6 +5,7 @@ import { AUTH_ERRORS, AuthError, type AuthErrorCode, isAuthErrorCode, startSignI
 import { browser } from '@/lib/browser'
 import { QUERY_PARAMS } from '@/lib/routes'
 import styles from '@/pages/LoginPage/LoginPage.module.scss'
+import { LOGIN_PAGE_COPY } from '@/pages/LoginPage/copy'
 
 /** What went wrong, keyed by the `error` the server puts on `/login`, or by `AuthError.code`. */
 export const ERROR_MESSAGES = {
@@ -49,17 +50,15 @@ export const LoginPage = () => {
 
   return (
     <Frame>
-      <h1 className={styles.title}>Sign in</h1>
-      <p className={styles.lede}>
-        One sign-in for luwin and the rest of maester, with your Plex account.
-      </p>
+      <h1 className={styles.title}>{LOGIN_PAGE_COPY.title}</h1>
+      <p className={styles.lede}>{LOGIN_PAGE_COPY.lede}</p>
       {!!message && (
         <p role="alert" className={styles.error}>
           {message}
         </p>
       )}
       <button type="button" className={styles.plex} onClick={begin} disabled={busy}>
-        {busy ? 'Opening Plex…' : 'Sign in with Plex'}
+        {busy ? LOGIN_PAGE_COPY.opening : LOGIN_PAGE_COPY.signIn}
       </button>
     </Frame>
   )

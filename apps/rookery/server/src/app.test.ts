@@ -87,7 +87,8 @@ const boot = async ({
 
 const setCookies = (response: Injected): string[] => {
   const header = response.headers[HEADERS.setCookie]
-  return header == null ? [] : Array.isArray(header) ? header : [String(header)]
+  if (header == null) return []
+  return Array.isArray(header) ? header : [String(header)]
 }
 
 type CookieNamedProps = { response: Injected; name: string }

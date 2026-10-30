@@ -210,12 +210,10 @@ type CoverOfProps = { source: string | null; ref: string | null; mbid: string | 
  * Art Archive's by its release id, which is never stored as a cover so a
  * picture that turns up beside the files later still wins.
  */
-const coverOf = ({ source, ref, mbid }: CoverOfProps): AlbumCover | null =>
-  isCoverSource(source) && ref != null
-    ? { source, ref }
-    : mbid === null
-      ? null
-      : { source: COVER_SOURCES.coverArtArchive, ref: mbid }
+const coverOf = ({ source, ref, mbid }: CoverOfProps): AlbumCover | null => {
+  if (isCoverSource(source) && ref != null) return { source, ref }
+  return mbid === null ? null : { source: COVER_SOURCES.coverArtArchive, ref: mbid }
+}
 
 type MusicRepositoryRecordProps = {
   mediaId: number
@@ -517,11 +515,11 @@ export class MusicRepository {
     at = new Date(),
   }: MusicRepositoryRecordProps): void {
     const filing = filingOf({ tags, path })
+    const folderAlbumCover: AlbumCover | null =
+      folderCover === null ? null : { source: COVER_SOURCES.file, ref: folderCover }
     const cover: AlbumCover | null = tags.hasCover
       ? { source: COVER_SOURCES.embedded, ref: String(mediaId) }
-      : folderCover === null
-        ? null
-        : { source: COVER_SOURCES.file, ref: folderCover }
+      : folderAlbumCover
     this.db.transaction(() => {
       const existing = this.db
         .prepare<[number, string], { id: number }>(

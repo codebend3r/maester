@@ -35,12 +35,10 @@ export const sendImage = async ({
 }: SendImageProps): Promise<void> => {
   const info = path == null ? null : await stat(path).catch(() => null)
   if (path == null || !info?.isFile()) throw new NotFoundException('No picture')
-  const policy =
-    audience === IMAGE_AUDIENCES.everyone
-      ? CACHE_POLICIES.immutable
-      : version
-        ? RAVEN_CACHE_POLICIES.privateImmutable
-        : RAVEN_CACHE_POLICIES.privateMinute
+  const privatePolicy = version
+    ? RAVEN_CACHE_POLICIES.privateImmutable
+    : RAVEN_CACHE_POLICIES.privateMinute
+  const policy = audience === IMAGE_AUDIENCES.everyone ? CACHE_POLICIES.immutable : privatePolicy
   await reply
     .header(HEADERS.contentType, contentTypeOf(path))
     .header(HEADERS.contentLength, info.size)

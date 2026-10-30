@@ -93,9 +93,10 @@ const fakeFfmpeg = () => {
     const seed =
       Array.from(name).reduce((hash, char) => (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0, 3) +
       start
+    const theme = start === 0 ? THEME : END_THEME
     return at === null
       ? noise({ seed, count: pointsFor(seconds) })
-      : withTheme({ seed, seconds, theme: start === 0 ? THEME : END_THEME, at })
+      : withTheme({ seed, seconds, theme, at })
   })
   const pictureStats = vi.fn<FfmpegService['pictureStats']>(async ({ start }) => filmFrames(start))
   const ffmpeg: DetectionFfmpeg = {

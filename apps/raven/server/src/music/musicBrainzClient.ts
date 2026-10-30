@@ -85,14 +85,18 @@ const MB_STATUSES = { official: 'Official' } as const
 
 type AtProps = { record: Record<string, unknown>; key: string }
 
+type ListAtProps = AtProps
+
 /** The list under `key`, or none: MusicBrainz leaves a field out as often as it sends an empty list. */
-const listAt = ({ record, key }: AtProps): unknown[] => {
+const listAt = ({ record, key }: ListAtProps): unknown[] => {
   const value = record[key]
   return Array.isArray(value) ? value : []
 }
 
+type RecordAtProps = AtProps
+
 /** The record under `key`, or an empty one. */
-const recordAt = ({ record, key }: AtProps): Record<string, unknown> => {
+const recordAt = ({ record, key }: RecordAtProps): Record<string, unknown> => {
   const value = record[key]
   return isRecord(value) ? value : {}
 }
@@ -124,7 +128,8 @@ const artistsOf = (
     const artist = recordAt({ record: part, key: MB_FIELDS.artist })
     const credited = part[MB_FIELDS.name]
     const own = artist[MB_FIELDS.name]
-    const name = isString(credited) ? credited : isString(own) ? own : null
+    const ownName = isString(own) ? own : null
+    const name = isString(credited) ? credited : ownName
     const mbid = artist[MB_FIELDS.id]
     return name === null || !isString(mbid) ? [] : [{ name, mbid }]
   })

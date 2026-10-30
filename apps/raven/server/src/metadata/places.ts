@@ -75,7 +75,6 @@ type GroupPlaceOfProps = {
  */
 export const groupPlaceOf = ({ type, file, folderFiles }: GroupPlaceOfProps): string => {
   if (type === ITEM_TYPES.show) return showPlace(file)
-  return holdsOneMovie({ folder: file.folder, files: file.folder === '' ? [] : folderFiles() })
-    ? file.folder
-    : filePlace(file)
+  const files = file.folder === '' ? [] : folderFiles()
+  return holdsOneMovie({ folder: file.folder, files }) ? file.folder : filePlace(file)
 }

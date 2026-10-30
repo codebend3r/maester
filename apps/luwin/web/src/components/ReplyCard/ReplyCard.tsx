@@ -4,23 +4,27 @@ import styles from '@/components/ReplyCard/ReplyCard.module.scss'
 import { RichText } from '@/components/RichText/RichText'
 import { TitleCards } from '@/components/TitleCards/TitleCards'
 import { ToolTrace } from '@/components/ToolTrace/ToolTrace'
+import { REPLY_CARD_COPY, VERDICT_COPY } from '@/components/ReplyCard/copy'
+import type { CaseTurn } from '@/lib/api'
 import { checkTurn } from '@/lib/expectations'
 import { REPLY_STATES, type Reply } from '@/lib/entries'
 import { useChat } from '@/stores/chat'
 
-type VerdictProps = { reply: Reply }
+type VerdictProps = { reply: Reply; expected: CaseTurn }
 
 /** How a finished reply measured up to its case message's expectations. */
-const Verdict = ({ reply }: VerdictProps) => {
-  if (!reply.expected || reply.state !== REPLY_STATES.done) return null
+const Verdict = ({ reply, expected }: VerdictProps) => {
   const verdict = checkTurn({
-    turn: reply.expected,
+    turn: expected,
     tools: reply.tools.map((tool) => tool.name),
     reply: reply.chunks.join('\n'),
   })
   return (
-    <section className={verdict.isPassed ? styles.passed : styles.failed} aria-label="Verdict">
-      <p>{verdict.isPassed ? 'Meets the case' : 'Misses the case'}</p>
+    <section
+      className={verdict.isPassed ? styles.passed : styles.failed}
+      aria-label={VERDICT_COPY.label}
+    >
+      <p>{verdict.isPassed ? VERDICT_COPY.passed : VERDICT_COPY.missed}</p>
       {verdict.failures.length > 0 && (
         <ul className={styles.failures}>
           {verdict.failures.map((failure) => (
@@ -43,7 +47,9 @@ export const ReplyCard = ({ reply }: ReplyCardProps) => {
   return (
     <article className={styles.reply} aria-busy={reply.state === REPLY_STATES.running}>
       {reply.tools.length > 0 && <ToolTrace tools={reply.tools} />}
-      {reply.state === REPLY_STATES.running && <p className={styles.thinking}>Thinking…</p>}
+      {reply.state === REPLY_STATES.running && (
+        <p className={styles.thinking}>{REPLY_CARD_COPY.thinking}</p>
+      )}
       {reply.chunks.length > 0 && (
         <p className={styles.text}>
           <RichText text={reply.chunks.join('\n')} />
@@ -51,7 +57,11 @@ export const ReplyCard = ({ reply }: ReplyCardProps) => {
       )}
       {reply.titles.length > 0 && <TitleCards cards={reply.titles} />}
       {reply.confirmations.map((confirmation) => (
-        <section key={confirmation.pendingId} className={styles.ask} aria-label="Confirmation">
+        <section
+          key={confirmation.pendingId}
+          className={styles.ask}
+          aria-label={REPLY_CARD_COPY.confirmation}
+        >
           <p>{confirmation.summary}</p>
           <div className={styles.actions}>
             {[true, false].map((approve) => (
@@ -61,14 +71,14 @@ export const ReplyCard = ({ reply }: ReplyCardProps) => {
                 disabled={isBusy || settled.includes(confirmation.pendingId)}
                 onClick={() => void press({ pendingId: confirmation.pendingId, approve })}
               >
-                {approve ? 'Confirm' : 'Cancel'}
+                {approve ? REPLY_CARD_COPY.confirm : REPLY_CARD_COPY.cancel}
               </Button>
             ))}
           </div>
         </section>
       ))}
       {reply.choices.length > 0 && (
-        <ul className={styles.choices} aria-label="Choices">
+        <ul className={styles.choices} aria-label={REPLY_CARD_COPY.choices}>
           {reply.choices.map((choice) => (
             <li key={choice.value}>
               <Button className={styles.choice} disabled={isBusy} onClick={() => void pick(choice)}>
@@ -81,8 +91,8 @@ export const ReplyCard = ({ reply }: ReplyCardProps) => {
       )}
       {reply.notices.length > 0 && <NoticeList notices={reply.notices} />}
       {reply.cause && (
-        <section className={styles.cause} aria-label="Why it broke">
-          <p>Why it broke</p>
+        <section className={styles.cause} aria-label={REPLY_CARD_COPY.whyItBroke}>
+          <p>{REPLY_CARD_COPY.whyItBroke}</p>
           <pre className={styles.trace}>{reply.cause}</pre>
         </section>
       )}
@@ -91,7 +101,9 @@ export const ReplyCard = ({ reply }: ReplyCardProps) => {
           {reply.failure}
         </p>
       )}
-      <Verdict reply={reply} />
+      {!!reply.expected && reply.state === REPLY_STATES.done && (
+        <Verdict reply={reply} expected={reply.expected} />
+      )}
     </article>
   )
 }

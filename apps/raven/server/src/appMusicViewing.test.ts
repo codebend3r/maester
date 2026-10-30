@@ -20,6 +20,7 @@ import { NOT_WATCHING, ROUTE_METHODS, adminCookie, testConfig } from '@/test/app
 import { addChapters, encodeTrack } from '@/test/clips'
 import { LRCLIB_HOST, fakeLrclib } from '@/test/fakeLrclib'
 import { fakeMusicBrainz } from '@/test/fakeMusicBrainz'
+import { ROUTES, pathOf } from '@/test/enforced'
 import { apiFor } from '@/test/server'
 
 const TITLES = {
@@ -163,21 +164,25 @@ describe('playlists, favourites, lyrics and chapters', () => {
     const { id } = (await api().createPlaylist({ name: 'Checks' })).playlist
     const refused = await Promise.all(
       [
-        { method: ROUTE_METHODS.post, url: '/api/playlists', payload: { name: '   ' } },
+        { method: ROUTE_METHODS.post, url: ROUTES.createPlaylist.path, payload: { name: '   ' } },
         {
           method: ROUTE_METHODS.post,
-          url: '/api/playlists',
+          url: ROUTES.createPlaylist.path,
           payload: { name: 'x'.repeat(PLAYLIST_LIMITS.name + 1) },
         },
-        { method: ROUTE_METHODS.put, url: `/api/playlists/${id}`, payload: {} },
+        {
+          method: ROUTE_METHODS.put,
+          url: pathOf({ route: ROUTES.renamePlaylist, params: { id } }),
+          payload: {},
+        },
         {
           method: ROUTE_METHODS.post,
-          url: `/api/playlists/${id}/tracks`,
+          url: pathOf({ route: ROUTES.appendPlaylistTracks, params: { id } }),
           payload: { mediaIds: [1.5] },
         },
         {
           method: ROUTE_METHODS.put,
-          url: `/api/playlists/${id}/tracks`,
+          url: pathOf({ route: ROUTES.replacePlaylistTracks, params: { id } }),
           payload: { mediaIds: Array.from({ length: PLAYLIST_LIMITS.tracks + 1 }, () => 1) },
         },
       ].map(

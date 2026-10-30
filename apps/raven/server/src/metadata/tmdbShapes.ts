@@ -193,8 +193,10 @@ const record = (value: unknown): Record<string, unknown> => (isRecord(value) ? v
 
 const records = (value: unknown): Array<Record<string, unknown>> => list(value).filter(isRecord)
 
-const idOf = (value: unknown): string | null =>
-  isNumber(value) ? String(value) : isString(value) && value !== '' ? value : null
+const idOf = (value: unknown): string | null => {
+  if (isNumber(value)) return String(value)
+  return isString(value) && value !== '' ? value : null
+}
 
 const imagePath = (value: unknown): string | null => {
   const path = text(value)

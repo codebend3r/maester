@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/Button/Button'
+import { SANDBOX_BAR_COPY } from '@/components/SandboxBar/copy'
 import styles from '@/components/SandboxBar/SandboxBar.module.scss'
 import {
   SANDBOX_TIERS,
@@ -35,13 +36,13 @@ export const SandboxBar = ({ state, tier }: SandboxBarProps) => {
   const isLocked = isBusy || caseChange.isPending || tierChange.isPending
 
   return (
-    <section className={styles.bar} aria-label="Sandbox">
+    <section className={styles.bar} aria-label={SANDBOX_BAR_COPY.label}>
       <div className={styles.controls}>
         <p className={styles.badge}>
-          Sandbox · {state.model} · raven {state.raven ?? 'fake'}
+          {SANDBOX_BAR_COPY.badge({ model: state.model, raven: state.raven })}
         </p>
         <label className={styles.caseField}>
-          <span className={styles.label}>Case</span>
+          <span className={styles.label}>{SANDBOX_BAR_COPY.case}</span>
           <select
             className={styles.select}
             value={state.case.id}
@@ -56,7 +57,7 @@ export const SandboxBar = ({ state, tier }: SandboxBarProps) => {
           </select>
         </label>
         <label className={styles.tierField}>
-          <span className={styles.label}>Tier</span>
+          <span className={styles.label}>{SANDBOX_BAR_COPY.tier}</span>
           <select
             className={styles.select}
             value={tier}
@@ -74,12 +75,12 @@ export const SandboxBar = ({ state, tier }: SandboxBarProps) => {
           </select>
         </label>
         <Button className={styles.reset} disabled={isLocked} onClick={() => void startOver()}>
-          Start over
+          {SANDBOX_BAR_COPY.startOver}
         </Button>
       </div>
       {(caseChange.isError || tierChange.isError) && (
         <p className={styles.error} role="alert">
-          The sandbox didn't take that; is it still running?
+          {SANDBOX_BAR_COPY.failed}
         </p>
       )}
     </section>

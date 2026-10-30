@@ -87,15 +87,11 @@ type Clip = keyof typeof FILES
 
 /** The playlist's URIs: every line that is not a tag, and every tag's `URI` attribute. */
 const urisIn = (playlist: string): string[] =>
-  playlist
-    .split('\n')
-    .flatMap((line) =>
-      line.startsWith('#')
-        ? [...line.matchAll(/URI="([^"]+)"/g)].flatMap((match) => match[1] ?? [])
-        : line.trim() === ''
-          ? []
-          : [line],
-    )
+  playlist.split('\n').flatMap((line) => {
+    if (line.startsWith('#'))
+      return [...line.matchAll(/URI="([^"]+)"/g)].flatMap((match) => match[1] ?? [])
+    return line.trim() === '' ? [] : [line]
+  })
 
 const extinfsIn = (playlist: string): number[] =>
   [...playlist.matchAll(/^#EXTINF:([\d.]+),$/gm)].map((match) => Number(match[1]))

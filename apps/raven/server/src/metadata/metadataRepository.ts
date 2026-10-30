@@ -58,6 +58,12 @@ type SummaryRow = {
   show_title: string | null
 }
 
+/** A season's own number, or an episode's season's; null for anything else. */
+const seasonOf = (row: SummaryRow): number | null => {
+  if (row.type === ITEM_TYPES.season) return row.number
+  return row.type === ITEM_TYPES.episode ? row.parent_number : null
+}
+
 /**
  * `under(root, id)`: each item `roots` selects (as `root, id` pairs of
  * itself), and every item beneath it. "A file somewhere under it" is then
@@ -491,12 +497,7 @@ export class MetadataRepository {
                 row.show_id != null && row.show_title != null
                   ? { id: row.show_id, title: row.show_title }
                   : null,
-              season:
-                row.type === ITEM_TYPES.season
-                  ? row.number
-                  : row.type === ITEM_TYPES.episode
-                    ? row.parent_number
-                    : null,
+              season: seasonOf(row),
               episode: row.type === ITEM_TYPES.episode ? row.number : null,
               posterVersion: posters.get(row.id) ?? null,
               backdropVersion: backdrops.get(row.id) ?? null,

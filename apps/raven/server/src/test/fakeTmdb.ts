@@ -680,24 +680,23 @@ export const fakeTmdb = ({
     const show = /^\/tv\/(\d+)$/.exec(path)
     if (show) {
       const found = state.shows.find((entry) => String(entry.id) === show[1])
-      return found
-        ? json({
-            body: {
-              ...showBody(found),
-              ...(appended.includes('alternative_titles')
-                ? {
-                    alternative_titles: {
-                      results: (found.alternativeTitles ?? []).map((title) => ({
-                        iso_3166_1: 'GB',
-                        title,
-                        type: '',
-                      })),
-                    },
-                  }
-                : {}),
-            },
-          })
-        : json({ body: { status_code: 34 }, status: 404 })
+      if (!found) return json({ body: { status_code: 34 }, status: 404 })
+      return json({
+        body: {
+          ...showBody(found),
+          ...(appended.includes('alternative_titles')
+            ? {
+                alternative_titles: {
+                  results: (found.alternativeTitles ?? []).map((title) => ({
+                    iso_3166_1: 'GB',
+                    title,
+                    type: '',
+                  })),
+                },
+              }
+            : {}),
+        },
+      })
     }
 
     const images = /^\/(movie|tv)\/(\d+)\/images$/.exec(path)
@@ -779,24 +778,23 @@ export const fakeTmdb = ({
     const movie = /^\/movie\/(\d+)$/.exec(path)
     if (movie) {
       const found = state.movies.find((entry) => String(entry.id) === movie[1])
-      return found
-        ? json({
-            body: {
-              ...movieBody(found),
-              ...(appended.includes('alternative_titles')
-                ? {
-                    alternative_titles: {
-                      titles: (found.alternativeTitles ?? []).map((title) => ({
-                        iso_3166_1: 'US',
-                        title,
-                        type: '',
-                      })),
-                    },
-                  }
-                : {}),
-            },
-          })
-        : json({ body: { status_code: 34 }, status: 404 })
+      if (!found) return json({ body: { status_code: 34 }, status: 404 })
+      return json({
+        body: {
+          ...movieBody(found),
+          ...(appended.includes('alternative_titles')
+            ? {
+                alternative_titles: {
+                  titles: (found.alternativeTitles ?? []).map((title) => ({
+                    iso_3166_1: 'US',
+                    title,
+                    type: '',
+                  })),
+                },
+              }
+            : {}),
+        },
+      })
     }
     return json({ body: { status_code: 34 }, status: 404 })
   }
