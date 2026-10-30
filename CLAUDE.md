@@ -37,7 +37,16 @@ These apply to every TypeScript project: everything but `@luwin/api` and the Pyt
   export type Role = (typeof ROLES)[RoleKey]
   ```
 
-  Code then writes `ROLES.admin`, never `'ADMIN_ROLE'`, so a misspelling is a compile error instead of a branch that never runs. The guard for the boundary checks against `Object.values(ROLES)`. Text a person reads (UI copy, error and log messages, test names), import paths, SCSS module class references (`styles.card`), the result of `typeof` and the literal inside the constant's own declaration are exempt: they are copy or already typed, not identifiers.
+  Code then writes `ROLES.admin`, never `'ADMIN_ROLE'`, so a misspelling is a compile error instead of a branch that never runs. The guard for the boundary checks against `Object.values(ROLES)`. UI copy follows the same rule: every label, heading, button text, placeholder, `aria-label` and on-screen message is a value of an `as const` object, declared once and imported wherever it renders, so JSX writes `{AUTH_COPY.signIn}`, never `Sign in`:
+
+  ```ts
+  export const AUTH_COPY = {
+    signIn: 'Sign in',
+    signOut: 'Sign out',
+  } as const
+  ```
+
+  Error and log messages, test names, import paths, SCSS module class references (`styles.card`), the result of `typeof` and the literal inside the constant's own declaration are exempt: they are developer-facing or already typed, not identifiers.
 
 - No dead code. Every export has an importer, every file is reachable from an entry point, every function, variable, parameter and type is read, and every dependency in `package.json` is imported. Delete what is unused instead of commenting it out or keeping it for later; git has it. oxlint's `no-unused-vars` catches the locals, and the `dead-code` target (knip, in `verify`, `affected` and the PR checks) catches unused exports, files and dependencies.
 - `type` aliases, never `interface`, except where declaration merging requires one (the `.d.ts` augmentation of bun:test's `Matchers`). oxlint's `consistent-type-definitions` enforces it.
@@ -52,6 +61,7 @@ These apply to every TypeScript project: everything but `@luwin/api` and the Pyt
 
 - Never use `for`, `for...of` or `for...in` loops; reach for the array methods (`map`, `filter`, `reduce`, `flatMap` and the rest). Prefer `reduce` to accumulate.
 - `!!value` for boolean conversion.
+- Never nest ternaries. One ternary is fine; a ternary inside another's condition or either branch is not. Reach for an `as const` lookup object, a named variable or a small function with guard clauses instead.
 - Prefer optional chaining (`?.`), and always pair it with nullish coalescing (`??`) to supply a fallback.
 - One object parameter instead of several positional ones, so argument order doesn't matter: `doSomething({ foo, bar, hello })`, never `doSomething(foo, bar, hello)`.
 - In JSX, `&&` rather than a ternary with a `null` branch.
@@ -72,6 +82,31 @@ These apply to every React project: `@raven/web`, `@rookery/web`, `@luwin/web`, 
 - Global state lives in zustand, never in a React context. State that more than one component reads or writes is a store in the project's `src/stores/`, made with `create` (`apps/raven/web/src/stores/theme.ts`, `libs/raven/ui/src/stores/playerPrefs.ts`). A component reads it through a selector, `useTheme((state) => state.theme)`, so it re-renders only when its slice changes. Never write a `createContext` and a `*Provider` to pass state, a setter or a callback down the tree: the component that needs the value imports the store.
 - State one component owns stays in `useState` or `useReducer`, and server data stays in TanStack Query. A store holds client state the tree shares, not a copy of an API response.
 - The one exception is a provider a library requires: TanStack Query's `QueryClientProvider`, React Router's `RouterProvider`.
+- A component that can render more than one thing picks what to render from an object map, never with early returns, a `switch` or an `if`/`else` chain. Key the map by the values of an `as const` object, type it with `as const satisfies Record<Union, ComponentType<Props>>` so a missing or misspelled key is a compile error (this replaces the `never` exhaustiveness check for rendering), and look the component up by key. Every static object involved, the keys and the map alike, ends in `as const`. Showing or hiding a single element stays `&&`.
+
+  ```tsx
+  export const LOAD_STATES = {
+    loading: 'loading',
+    failed: 'failed',
+    ready: 'ready',
+  } as const
+  export type LoadState = (typeof LOAD_STATES)[keyof typeof LOAD_STATES]
+
+  const LIBRARY_VIEWS = {
+    [LOAD_STATES.loading]: LibrarySpinner,
+    [LOAD_STATES.failed]: LibraryError,
+    [LOAD_STATES.ready]: LibraryGrid,
+  } as const satisfies Record<LoadState, ComponentType>
+
+  type LibraryViewProps = { state: LoadState }
+
+  export function LibraryView({ state }: LibraryViewProps) {
+    const View = LIBRARY_VIEWS[state]
+    return <View />
+  }
+  ```
+
+  Don't: `if (state === LOAD_STATES.loading) return <LibrarySpinner />`, `switch (state) { case LOAD_STATES.failed: return <LibraryError /> }`, or a ternary chain choosing between components.
 
 ## CSS
 

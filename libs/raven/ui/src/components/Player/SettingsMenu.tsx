@@ -1,6 +1,7 @@
 import { type PlaybackMode, SPEEDS, audioLabel, describeMode, subtitleLabel } from '@raven/core'
-import { type RefObject, useEffect, useId, useRef } from 'react'
+import { type ComponentType, type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
+import { SETTINGS_MENU_COPY } from '@/components/Player/copy'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { stepDownNote } from '@/components/Player/playbackFacts'
 import { playingAudio } from '@/components/Player/selection'
@@ -10,12 +11,12 @@ import styles from '@/components/Player/SettingsMenu.module.scss'
 import type { SubtitleStatus } from '@/lib/useTrackCues'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 
-const SUBTITLE_STATUS: Record<SubtitleStatus, string | null> = {
+const SUBTITLE_STATUS = {
   off: null,
-  loading: 'Loading subtitles',
+  loading: SETTINGS_MENU_COPY.loadingSubtitles,
   ready: null,
-  error: 'These subtitles could not be loaded.',
-}
+  error: SETTINGS_MENU_COPY.subtitlesFailed,
+} as const satisfies Record<SubtitleStatus, string | null>
 
 type OptionProps = {
   name: string
@@ -56,37 +57,61 @@ type GroupProps = {
 }
 
 const tracksNoteOf = ({ tracksFailed, tracksPending }: TrackSelection): string | null => {
-  if (tracksFailed) return 'Tracks unavailable.'
-  return tracksPending ? 'Reading tracks' : null
+  if (tracksFailed) return SETTINGS_MENU_COPY.tracksUnavailable
+  return tracksPending ? SETTINGS_MENU_COPY.readingTracks : null
 }
 
-const AudioGroup = ({ labelledBy, selection, mode }: GroupProps) => {
+/** Whether the audio group has tracks to list, or only a note. */
+const AUDIO_LISTS = { tracks: 'tracks', note: 'note' } as const
+
+type AudioList = (typeof AUDIO_LISTS)[keyof typeof AUDIO_LISTS]
+
+type AudioTracksProps = GroupProps
+
+const AudioTracks = ({ labelledBy, selection, mode }: AudioTracksProps) => {
   const { tracks, audio, playsPickedAudio, pickAudio } = selection
   const playing = playingAudio({ mode, tracks, audio, playsPickedAudio })
+  return (tracks?.audio ?? []).map((track) => {
+    const label = audioLabel(track)
+    return (
+      <Option
+        key={track.index}
+        name={`${labelledBy}-audio`}
+        checked={track.index === playing}
+        label={label.name}
+        details={label.details}
+        onSelect={() => pickAudio(track.index)}
+      />
+    )
+  })
+}
+
+type AudioNoteProps = GroupProps
+
+const AudioNote = ({ selection }: AudioNoteProps) => (
+  <p className={styles.note}>{tracksNoteOf(selection) ?? SETTINGS_MENU_COPY.noAudioTracks}</p>
+)
+
+const AUDIO_VIEWS = {
+  [AUDIO_LISTS.tracks]: AudioTracks,
+  [AUDIO_LISTS.note]: AudioNote,
+} as const satisfies Record<AudioList, ComponentType<GroupProps>>
+
+type AudioGroupProps = GroupProps
+
+const AudioGroup = (group: AudioGroupProps) => {
+  const hasTracks = (group.selection.tracks?.audio.length ?? 0) > 0
+  const List = AUDIO_VIEWS[hasTracks ? AUDIO_LISTS.tracks : AUDIO_LISTS.note]
   return (
-    <fieldset className={styles.group} aria-labelledby={labelledBy}>
-      {tracks != null && tracks.audio.length > 0 ? (
-        tracks.audio.map((track) => {
-          const label = audioLabel(track)
-          return (
-            <Option
-              key={track.index}
-              name={`${labelledBy}-audio`}
-              checked={track.index === playing}
-              label={label.name}
-              details={label.details}
-              onSelect={() => pickAudio(track.index)}
-            />
-          )
-        })
-      ) : (
-        <p className={styles.note}>{tracksNoteOf(selection) ?? 'No audio tracks.'}</p>
-      )}
+    <fieldset className={styles.group} aria-labelledby={group.labelledBy}>
+      <List {...group} />
     </fieldset>
   )
 }
 
-const SubtitleGroup = ({ labelledBy, selection, subtitleStatus }: GroupProps) => {
+type SubtitleGroupProps = GroupProps
+
+const SubtitleGroup = ({ labelledBy, selection, subtitleStatus }: SubtitleGroupProps) => {
   const { tracks, subtitle, pickSubtitle } = selection
   const subtitleId = subtitle?.id ?? null
   const tracksNote = tracksNoteOf(selection)
@@ -96,7 +121,7 @@ const SubtitleGroup = ({ labelledBy, selection, subtitleStatus }: GroupProps) =>
       <Option
         name={`${labelledBy}-subtitles`}
         checked={subtitleId == null}
-        label="Off"
+        label={SETTINGS_MENU_COPY.off}
         onSelect={() => pickSubtitle(null)}
       />
       {(tracks?.subtitles ?? []).map((track) => {
@@ -150,14 +175,14 @@ type SpeedGroupProps = {
 
 const SpeedGroup = ({ name, rate, onPickRate }: SpeedGroupProps) => (
   <fieldset className={styles.group}>
-    <legend className={styles.legend}>Speed</legend>
+    <legend className={styles.legend}>{SETTINGS_MENU_COPY.speed}</legend>
     <div className={styles.speeds}>
       {SPEEDS.map((speed) => (
         <Option
           key={speed}
           name={`${name}-speed`}
           checked={speed === rate}
-          label={speed === 1 ? 'Normal' : `${speed}×`}
+          label={speed === 1 ? SETTINGS_MENU_COPY.normalSpeed : SETTINGS_MENU_COPY.rate(speed)}
           onSelect={() => onPickRate(speed)}
         />
       ))}
@@ -174,23 +199,87 @@ type AutoplayGroupProps = {
 /** Whether what is up next starts by itself once the video ends. */
 const AutoplayGroup = ({ name, autoplay, onPickAutoplay }: AutoplayGroupProps) => (
   <fieldset className={styles.group}>
-    <legend className={styles.legend}>Autoplay</legend>
+    <legend className={styles.legend}>{SETTINGS_MENU_COPY.autoplay}</legend>
     <div className={styles.speeds}>
       <Option
         name={`${name}-autoplay`}
         checked={autoplay}
-        label="On"
+        label={SETTINGS_MENU_COPY.on}
         onSelect={() => onPickAutoplay(true)}
       />
       <Option
         name={`${name}-autoplay`}
         checked={!autoplay}
-        label="Off"
+        label={SETTINGS_MENU_COPY.off}
         onSelect={() => onPickAutoplay(false)}
       />
     </div>
   </fieldset>
 )
+
+type MenuBodyProps = GroupProps & {
+  /** Names the menu's own radio groups. */
+  name: string
+  rate: number
+  steppedDown: StepDown | null
+  choices: PlayChoices | null
+  onPickRate: (rate: number) => void
+  autoplay: boolean
+  onPickAutoplay: (isOn: boolean) => void
+  onShowInfo: () => void
+  onHandoff?: () => void
+  handoffLabel?: string
+}
+
+type PlaybackBodyProps = MenuBodyProps
+
+/** How the file is reaching the browser, Playback info, a host's handoff, then the speed and autoplay. */
+const PlaybackBody = ({
+  mode,
+  name,
+  rate,
+  steppedDown,
+  choices,
+  onPickRate,
+  autoplay,
+  onPickAutoplay,
+  onShowInfo,
+  onHandoff,
+  handoffLabel,
+}: PlaybackBodyProps) => (
+  <>
+    {choices?.groups.map((each, index) => (
+      <ChoiceGroup
+        key={each.legend}
+        name={`${name}-choice-${index}`}
+        group={each}
+        select={choices.select}
+      />
+    ))}
+    <div className={styles.playing}>
+      {(choices?.groups.length ?? 0) === 0 && <p className={styles.mode}>{describeMode(mode)}</p>}
+      {!!steppedDown && <p className={styles.note}>{stepDownNote(steppedDown)}</p>}
+      <button type="button" className={styles.info} onClick={onShowInfo}>
+        <span>{SETTINGS_MENU_COPY.playbackInfo}</span>
+        <Icon name="next" size={16} />
+      </button>
+      {!!onHandoff && !!handoffLabel && (
+        <button type="button" className={styles.handoff} onClick={onHandoff}>
+          <Icon name="play" size={18} />
+          <span>{handoffLabel}</span>
+        </button>
+      )}
+    </div>
+    <SpeedGroup name={name} rate={rate} onPickRate={onPickRate} />
+    <AutoplayGroup name={name} autoplay={autoplay} onPickAutoplay={onPickAutoplay} />
+  </>
+)
+
+const MENU_BODIES = {
+  [MENU_SECTIONS.audio]: AudioGroup,
+  [MENU_SECTIONS.subtitles]: SubtitleGroup,
+  [MENU_SECTIONS.playback]: PlaybackBody,
+} as const satisfies Record<MenuSection, ComponentType<MenuBodyProps>>
 
 type SettingsMenuProps = {
   section: MenuSection
@@ -237,7 +326,7 @@ export const SettingsMenu = ({
 }: SettingsMenuProps) => {
   const id = useId()
   const heading = `${id}-heading`
-  const group: GroupProps = { labelledBy: heading, selection, mode, subtitleStatus }
+  const Body = MENU_BODIES[section]
   const groups = useRef<HTMLDivElement>(null)
 
   // Opening a menu puts the keyboard on its chosen option.
@@ -246,50 +335,6 @@ export const SettingsMenu = ({
     if (checked !== null) checked.focus()
   }, [])
 
-  const body = (() => {
-    switch (section) {
-      case MENU_SECTIONS.audio:
-        return <AudioGroup {...group} />
-      case MENU_SECTIONS.subtitles:
-        return <SubtitleGroup {...group} />
-      case MENU_SECTIONS.playback:
-        return (
-          <>
-            {choices?.groups.map((each, index) => (
-              <ChoiceGroup
-                key={each.legend}
-                name={`${id}-choice-${index}`}
-                group={each}
-                select={choices.select}
-              />
-            ))}
-            <div className={styles.playing}>
-              {(choices?.groups.length ?? 0) === 0 && (
-                <p className={styles.mode}>{describeMode(mode)}</p>
-              )}
-              {!!steppedDown && <p className={styles.note}>{stepDownNote(steppedDown)}</p>}
-              <button type="button" className={styles.info} onClick={onShowInfo}>
-                <span>Playback info</span>
-                <Icon name="next" size={16} />
-              </button>
-              {!!onHandoff && !!handoffLabel && (
-                <button type="button" className={styles.handoff} onClick={onHandoff}>
-                  <Icon name="play" size={18} />
-                  <span>{handoffLabel}</span>
-                </button>
-              )}
-            </div>
-            <SpeedGroup name={id} rate={rate} onPickRate={onPickRate} />
-            <AutoplayGroup name={id} autoplay={autoplay} onPickAutoplay={onPickAutoplay} />
-          </>
-        )
-      default: {
-        const unknown: never = section
-        return unknown
-      }
-    }
-  })()
-
   return (
     <div className={styles.layer}>
       <dialog ref={menuRef} open className={styles.menu} aria-labelledby={heading}>
@@ -297,12 +342,32 @@ export const SettingsMenu = ({
           <h2 id={heading} className={styles.heading}>
             {MENU_TITLES[section]}
           </h2>
-          <button type="button" className={styles.close} aria-label="Close menu" onClick={onClose}>
+          <button
+            type="button"
+            className={styles.close}
+            aria-label={SETTINGS_MENU_COPY.closeMenu}
+            onClick={onClose}
+          >
             <Icon name="close" size={18} />
           </button>
         </header>
         <div ref={groups} className={styles.groups}>
-          {body}
+          <Body
+            labelledBy={heading}
+            selection={selection}
+            mode={mode}
+            subtitleStatus={subtitleStatus}
+            name={id}
+            rate={rate}
+            steppedDown={steppedDown}
+            choices={choices}
+            onPickRate={onPickRate}
+            autoplay={autoplay}
+            onPickAutoplay={onPickAutoplay}
+            onShowInfo={onShowInfo}
+            onHandoff={onHandoff}
+            handoffLabel={handoffLabel}
+          />
         </div>
       </dialog>
     </div>

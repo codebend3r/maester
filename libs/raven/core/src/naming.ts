@@ -533,12 +533,9 @@ export const parseEpisodeName = ({
   const showFromFile = fileShow !== '' && fileShow !== show ? fileShow : null
 
   const season = code ? Number(code[1] ?? code[4]) : seasonFolder
-  const episodes = code
-    ? episodeRun({
-        first: Number(code[2] ?? code[5]),
-        second: code[3] == null ? null : Number(code[3]),
-      })
-    : []
+  const secondEpisode = code?.[3]
+  const second = secondEpisode == null ? null : Number(secondEpisode)
+  const episodes = code ? episodeRun({ first: Number(code[2] ?? code[5]), second }) : []
   const title = code ? tidy(after.slice(0, firstTagAt(after))) || null : null
 
   return {

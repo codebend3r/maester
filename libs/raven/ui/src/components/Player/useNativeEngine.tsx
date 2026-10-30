@@ -1,5 +1,6 @@
 import { type MediaTracks, PLAYER_EVENTS, type PlayerEvent, type PlayerSource } from '@raven/core'
 import { useEffect, useEffectEvent, useReducer, useRef, useState } from 'react'
+import { NATIVE_ENGINE_COPY } from '@/components/Player/copy'
 import { type EngineHandle, type NativePlayer, sendQuietly } from '@/components/Player/engine'
 import { fromPlayerEvent, rangesFrom } from '@/components/Player/fromPlayerEvent'
 import styles from '@/components/Player/Player.module.scss'
@@ -10,7 +11,6 @@ import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 const ENGINE_NAME = 'mpv'
 const COULD_NOT_OPEN = 'Raven could not open this video.'
-const COULD_NOT_PLAY = 'Raven could not play this video.'
 
 const messageOf = (error: unknown): string =>
   error instanceof Error && error.message !== '' ? error.message : COULD_NOT_OPEN
@@ -74,7 +74,7 @@ export const useNativeEngine = ({
           return
         case PLAYER_EVENTS.error:
           // Unplayable first, so a host callback that throws cannot keep it away.
-          fail(event.message === '' ? COULD_NOT_PLAY : event.message)
+          fail(event.message === '' ? NATIVE_ENGINE_COPY.couldNotPlay : event.message)
           tellHost(event)
           return
         case PLAYER_EVENTS.time:

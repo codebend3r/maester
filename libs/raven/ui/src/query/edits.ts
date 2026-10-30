@@ -40,8 +40,10 @@ type MapWhereProps<T> = {
 }
 
 /** `items` with `change` made to each one `matches`, or the very same list where none does. */
-const mapWhere = <T>({ items, matches, change }: MapWhereProps<T>): T[] =>
-  items.some(matches) ? items.map((item) => (matches(item) ? change(item) : item)) : items
+const mapWhere = <T>({ items, matches, change }: MapWhereProps<T>): T[] => {
+  if (!items.some(matches)) return items
+  return items.map((item) => (matches(item) ? change(item) : item))
+}
 
 type WithoutEntryProps = {
   entries: PosterEntry[]
@@ -153,7 +155,8 @@ export const favouriteEdits = ({ media, favourite }: FavouriteEditsProps): Edit[
             queryKey: queryKeys.item(media.item.id),
             update: (details) => {
               const versions = markAll(details.versions)
-              return versions === details.versions ? details : { ...details, versions }
+              if (versions === details.versions) return details
+              return { ...details, versions }
             },
           }),
         ]
@@ -291,7 +294,8 @@ export const watchedEdits = ({ media, watched }: WatchedEditsProps): Edit[] => {
             queryKey: queryKeys.item(media.item.id),
             update: (details) => {
               const versions = markAll(details.versions)
-              return versions === details.versions ? details : { ...details, versions }
+              if (versions === details.versions) return details
+              return { ...details, versions }
             },
           }),
         ]

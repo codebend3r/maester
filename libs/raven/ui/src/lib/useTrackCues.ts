@@ -10,7 +10,7 @@ import {
 import { type SubtitleAccessReader, playerQueriesFor } from '@/lib/playerQueries'
 
 /** Where a track's cues stand: none asked for, on their way, read, or refused. */
-const SUBTITLE_STATUSES = {
+export const SUBTITLE_STATUSES = {
   off: 'off',
   loading: 'loading',
   ready: 'ready',

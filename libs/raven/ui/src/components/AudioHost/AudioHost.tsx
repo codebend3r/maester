@@ -24,13 +24,13 @@ const playQuietly = (element: HTMLMediaElement): void => {
 }
 
 /** What the browser's media session is told for each state; `none` while nothing is loaded. */
-const SESSION_STATES: Record<AudioState, MediaSessionPlaybackState> = {
+const SESSION_STATES = {
   empty: 'none',
   loading: 'playing',
   playing: 'playing',
   paused: 'paused',
   failed: 'none',
-}
+} as const satisfies Record<AudioState, MediaSessionPlaybackState>
 
 type UseTrackSourceProps = {
   api: ApiClient

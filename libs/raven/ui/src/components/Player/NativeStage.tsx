@@ -4,6 +4,7 @@ import { PlayerChrome } from '@/components/Player/Stage'
 import { useNativeEngine } from '@/components/Player/useNativeEngine'
 import { useNativeSurface } from '@/components/Player/useNativeSurface'
 import { useFullscreen } from '@/components/Player/useStageChrome'
+import { SUBTITLE_STATUSES } from '@/lib/useTrackCues'
 
 type NativeStageProps = {
   engine: Extract<Engine, { kind: 'native' }>
@@ -27,7 +28,7 @@ export const NativeStage = ({ engine, onBack, onFailure }: NativeStageProps) => 
       onBack={onBack}
       rendition={DIRECT_RENDITION}
       selection={native.selection}
-      subtitleStatus={native.selection.subtitle ? 'ready' : 'off'}
+      subtitleStatus={native.selection.subtitle ? SUBTITLE_STATUSES.ready : SUBTITLE_STATUSES.off}
       fullscreen={fullscreen}
     />
   )

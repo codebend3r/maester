@@ -1,11 +1,12 @@
 import { useId } from 'react'
 import { Button } from '@/components/Button/Button'
+import { UP_NEXT_CARD_COPY } from '@/components/Player/copy'
 import { CountdownRing } from '@/components/Player/CountdownRing'
 import type { UpNext } from '@/components/Player/PlayerServices'
 import styles from '@/components/Player/UpNextCard.module.scss'
 
 const secondsWords = (seconds: number): string =>
-  seconds === 1 ? '1 second' : `${seconds} seconds`
+  seconds === 1 ? UP_NEXT_CARD_COPY.oneSecond : UP_NEXT_CARD_COPY.seconds(seconds)
 
 type UpNextCardProps = {
   next: UpNext
@@ -38,7 +39,9 @@ export const UpNextCard = ({
   return (
     <section className={styles.card} aria-labelledby={heading}>
       {!!next.posterUrl && <img className={styles.poster} src={next.posterUrl} alt="" />}
-      <p className={styles.lead}>{isNextSeason ? 'Next season' : 'Up next'}</p>
+      <p className={styles.lead}>
+        {isNextSeason ? UP_NEXT_CARD_COPY.nextSeason : UP_NEXT_CARD_COPY.upNext}
+      </p>
       <h2 id={heading} className={styles.title}>
         {next.label}
       </h2>
@@ -48,16 +51,16 @@ export const UpNextCard = ({
           <span className={styles.ring}>
             <CountdownRing countdown={countdown} />
           </span>
-          Plays in {secondsWords(secondsLeft)}
+          {UP_NEXT_CARD_COPY.playsIn(secondsWords(secondsLeft))}
         </p>
       )}
-      {hasSceneAfter && <p className={styles.scene}>A scene follows the credits</p>}
+      {hasSceneAfter && <p className={styles.scene}>{UP_NEXT_CARD_COPY.sceneAfter}</p>}
       <p className={styles.actions}>
         <Button tone="primary" icon="play" onClick={onPlay}>
-          {isNextSeason ? 'Play next season' : 'Play now'}
+          {isNextSeason ? UP_NEXT_CARD_COPY.playNextSeason : UP_NEXT_CARD_COPY.playNow}
         </Button>
         <Button tone="ghost" className={styles.dismiss} onClick={onDismiss}>
-          Watch credits
+          {UP_NEXT_CARD_COPY.watchCredits}
         </Button>
       </p>
     </section>

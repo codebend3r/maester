@@ -1,6 +1,7 @@
 import { essentialShortcutRows } from '@raven/core'
 import { useId } from 'react'
 import { Button } from '@/components/Button/Button'
+import { SHORTCUTS_TIP_COPY } from '@/components/Player/copy'
 import { ShortcutList } from '@/components/Player/ShortcutList'
 import styles from '@/components/Player/ShortcutsTip.module.scss'
 
@@ -17,11 +18,11 @@ export const ShortcutsTip = ({ onDismiss }: ShortcutsTipProps) => {
     <div className={styles.layer}>
       <aside className={styles.tip} aria-labelledby={heading}>
         <h2 id={heading} className={styles.heading}>
-          Play with your keyboard
+          {SHORTCUTS_TIP_COPY.heading}
         </h2>
         <ShortcutList rows={essentialShortcutRows()} className={styles.list} />
         <Button tone="ghost" className={styles.dismiss} onClick={onDismiss}>
-          Got it
+          {SHORTCUTS_TIP_COPY.dismiss}
         </Button>
       </aside>
     </div>

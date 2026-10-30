@@ -108,8 +108,8 @@ export { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stor
 export type { AudioState } from '@/stores/audioQueue'
 export { useListenCounter } from '@/components/AudioHost/useListenCounter'
 export { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
+export { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
 export {
-  COULD_NOT_PLAY,
   failureOf,
   runRemoteCommand,
   useWindowedAudioHost,
@@ -119,3 +119,5 @@ export type {
   WindowedLoadProps,
   WindowedPlayer,
 } from '@/components/AudioHost/useWindowedAudioHost'
+export { KeyedView } from '@/components/KeyedView/KeyedView'
+export type { ViewOf, ViewsOf } from '@/components/KeyedView/KeyedView'

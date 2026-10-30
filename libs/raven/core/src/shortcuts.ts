@@ -140,7 +140,8 @@ export const stepSpeed = ({ current, direction }: StepSpeedProps): number => {
   const index = SPEEDS.findIndex((speed) => speed >= current - 0.001)
   const from = index < 0 ? SPEEDS.length - 1 : index
   const exact = SPEEDS[from] === current
-  const next = direction > 0 ? (exact ? from + 1 : from) : from - 1
+  const up = exact ? from + 1 : from
+  const next = direction > 0 ? up : from - 1
   return SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, next))] ?? current
 }
 

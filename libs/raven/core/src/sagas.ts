@@ -48,7 +48,8 @@ export const sagaFacts = (saga: Saga): string[] => {
   const years = saga.media.flatMap((media) => media.item?.year ?? [])
   const first = Math.min(...years)
   const last = Math.max(...years)
-  const span = years.length === 0 ? [] : [first === last ? String(first) : `${first} to ${last}`]
+  const range = first === last ? String(first) : `${first} to ${last}`
+  const span = years.length === 0 ? [] : [range]
   return [plural({ n: saga.media.length, one: 'movie', many: 'movies' }), ...span]
 }
 

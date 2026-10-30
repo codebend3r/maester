@@ -4,6 +4,7 @@ import { Icon } from '@/components/Icon/Icon'
 import type { IconName } from '@/components/Icon/drawings'
 import { CountdownRing } from '@/components/Player/CountdownRing'
 import styles from '@/components/Player/Controls.module.scss'
+import { CONTROLS_COPY } from '@/components/Player/copy'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { Scrubber } from '@/components/Player/Scrubber'
 import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
@@ -19,7 +20,7 @@ type MuteLabelProps = { isVolumeFixed: boolean; muted: boolean }
 
 const muteLabel = ({ isVolumeFixed, muted }: MuteLabelProps) => {
   if (isVolumeFixed) return FIXED_VOLUME_NOTE
-  return muted ? 'Unmute (m)' : 'Mute (m)'
+  return muted ? CONTROLS_COPY.unmute : CONTROLS_COPY.mute
 }
 
 /** What each pill wears; its words show in a tip on hover or focus. */
@@ -54,21 +55,18 @@ const ControlButton = ({ label, onClick, className, disabled, children }: Contro
   </button>
 )
 
-/**
- * A round glass button for the right of the bar. It wears only its icon at
- * every width, and its words show in a tip above it on hover or focus.
- */
-const Pill = ({
-  label,
-  icon,
-  tip,
-  ...button
-}: ComponentPropsWithRef<'button'> & {
+type PillProps = ComponentPropsWithRef<'button'> & {
   label: string
   icon: IconName
   /** The tip's words. */
   tip: ReactNode
-}) => (
+}
+
+/**
+ * A round glass button for the right of the bar. It wears only its icon at
+ * every width, and its words show in a tip above it on hover or focus.
+ */
+const Pill = ({ label, icon, tip, ...button }: PillProps) => (
   <button {...button} type="button" className={styles.pill} aria-label={label}>
     <Icon name={icon} size={20} />
     <span className={styles.tip} aria-hidden="true">
@@ -95,12 +93,14 @@ const MenuPill = ({ section, value, open, buttonRef, onToggle }: MenuPillProps) 
   return (
     <Pill
       ref={buttonRef}
-      label={value == null ? title : `${title}: ${value}`}
+      label={value == null ? title : CONTROLS_COPY.menuPillLabel({ title, value })}
       icon={MENU_ICONS[section]}
       tip={
         <>
           {showsTitle && title}
-          {showsTitle && value != null && <span className={styles.dot}> · </span>}
+          {showsTitle && value != null && (
+            <span className={styles.dot}>{CONTROLS_COPY.separator}</span>
+          )}
           {value}
         </>
       }
@@ -111,22 +111,21 @@ const MenuPill = ({ section, value, open, buttonRef, onToggle }: MenuPillProps) 
   )
 }
 
-type EndTimeProps = { duration: number | null; endsAt: string | null }
+type EndTimeProps = { duration: number; endsAt: string }
 
 /**
  * The video's length, or with a press the clock time it ends at; the
- * length comes first. Nothing shows while the length is unknown.
+ * length comes first. The bar leaves it out while the length is unknown.
  */
 const EndTime = ({ duration, endsAt }: EndTimeProps) => {
   const [showsEndTime, setShowsEndTime] = useState(false)
-  if (duration == null || endsAt == null) return null
   const length = formatDuration(duration)
   return (
     <button
       type="button"
       className={styles.ends}
       aria-label={
-        showsEndTime ? `${endsAt}, show the length` : `Length ${length}, show the end time`
+        showsEndTime ? CONTROLS_COPY.showLength(endsAt) : CONTROLS_COPY.showEndTime(length)
       }
       onClick={() => setShowsEndTime((current) => !current)}
     >
@@ -147,7 +146,7 @@ type NextButtonProps = {
  * a ring round it fills as the countdown to what is up next runs out.
  */
 const NextButton = ({ upNext, countdown, onNext }: NextButtonProps) => {
-  const label = upNext == null ? 'Nothing up next' : `Next: ${upNext}`
+  const label = upNext == null ? CONTROLS_COPY.nothingUpNext : CONTROLS_COPY.next(upNext)
   return (
     <button
       type="button"
@@ -244,11 +243,13 @@ export const Controls = ({
 }: ControlsProps) => {
   const fixedNote = useId()
   const values: Record<MenuSection, string | null> = {
-    subtitles: menuValues.subtitles ?? (subtitlesOn ? 'On' : 'Off'),
+    subtitles:
+      menuValues.subtitles ??
+      (subtitlesOn ? CONTROLS_COPY.subtitlesOn : CONTROLS_COPY.subtitlesOff),
     audio: menuValues.audio ?? null,
     playback: menuValues.playback ?? null,
   }
-  const fullscreenLabel = fullscreen ? 'Exit full screen' : 'Full screen'
+  const fullscreenLabel = fullscreen ? CONTROLS_COPY.exitFullScreen : CONTROLS_COPY.fullScreen
   return (
     <div className={classes(styles.controls, !!card && styles.withCard, !shown && styles.hidden)}>
       {!!card && <div className={styles.card}>{card}</div>}
@@ -262,32 +263,28 @@ export const Controls = ({
           onSeek={onSeek}
         />
       </div>
-      <ControlButton
-        label="Back to the start (Home)"
-        onClick={onRestart}
-        className={styles.restart}
-      >
+      <ControlButton label={CONTROLS_COPY.restart} onClick={onRestart} className={styles.restart}>
         <Icon name="skipPrevious" size={22} />
       </ControlButton>
-      <ControlButton label="Back 10 seconds (j)" onClick={() => onSkip(-1)} className={styles.back}>
+      <ControlButton label={CONTROLS_COPY.back} onClick={() => onSkip(-1)} className={styles.back}>
         <Icon name="rewind" size={24} />
       </ControlButton>
       <ControlButton
-        label={paused ? 'Play (k)' : 'Pause (k)'}
+        label={paused ? CONTROLS_COPY.play : CONTROLS_COPY.pause}
         onClick={onTogglePlay}
         className={styles.play}
       >
         <Icon name={paused ? 'play' : 'pause'} size={26} />
       </ControlButton>
       <ControlButton
-        label="Forward 10 seconds (l)"
+        label={CONTROLS_COPY.forward}
         onClick={() => onSkip(1)}
         className={styles.forward}
       >
         <Icon name="forward" size={24} />
       </ControlButton>
       <NextButton upNext={upNext} countdown={countdown} onNext={onNext} />
-      <EndTime duration={duration} endsAt={endsAt} />
+      {duration != null && endsAt != null && <EndTime duration={duration} endsAt={endsAt} />}
       <div className={styles.volume}>
         <ControlButton
           label={muteLabel({ isVolumeFixed, muted })}
@@ -303,7 +300,7 @@ export const Controls = ({
           max={100}
           step={1}
           value={Math.round((muted ? 0 : volume) * 100)}
-          aria-label="Volume"
+          aria-label={CONTROLS_COPY.volume}
           aria-describedby={isVolumeFixed ? fixedNote : undefined}
           disabled={isVolumeFixed}
           onChange={(event) => onVolume(Number(event.currentTarget.value) / 100)}
@@ -326,7 +323,7 @@ export const Controls = ({
           />
         ))}
         <Pill
-          label={`${fullscreenLabel} (f)`}
+          label={CONTROLS_COPY.fullScreenShortcut(fullscreenLabel)}
           icon={fullscreen ? 'fullscreenExit' : 'fullscreen'}
           tip={fullscreenLabel}
           onClick={onToggleFullscreen}

@@ -1,5 +1,6 @@
 import { formatDuration } from '@raven/core'
 import { type CSSProperties, type PointerEvent, useRef, useState } from 'react'
+import { SCRUBBER_COPY } from '@/components/Player/copy'
 import styles from '@/components/Player/Scrubber.module.scss'
 
 type ShareProps = { time: number; duration: number }
@@ -119,7 +120,10 @@ export const Scrubber = ({
     setDragging(null)
   }
 
-  const label = `${formatDuration(shown)} of ${formatDuration(duration)}`
+  const label = SCRUBBER_COPY.position({
+    shown: formatDuration(shown),
+    total: formatDuration(duration),
+  })
 
   return (
     // A range input cannot draw buffered stretches under its track or wait
@@ -133,7 +137,7 @@ export const Scrubber = ({
       // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
       role="slider"
       tabIndex={0}
-      aria-label="Seek"
+      aria-label={SCRUBBER_COPY.seek}
       aria-valuemin={0}
       aria-valuemax={Math.round(total)}
       aria-valuenow={Math.round(shown)}

@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import type { BezelState } from '@/components/Player/Bezel'
+import { PLAYER_ACTIONS_COPY } from '@/components/Player/copy'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import type { EngineHandle } from '@/components/Player/engine'
 import type { MenuSection } from '@/components/Player/menus'
@@ -83,7 +84,10 @@ export const usePlayerActions = ({
     const nextVolume = clamp({ value: next, min: 0, max: 1 })
     const nextMuted = nextVolume === 0
     actions.setVolume({ volume: nextVolume, muted: nextMuted })
-    flash({ icon: nextMuted ? 'muted' : 'volume', text: `${Math.round(nextVolume * 100)}%` })
+    flash({
+      icon: nextMuted ? 'muted' : 'volume',
+      text: PLAYER_ACTIONS_COPY.percent(Math.round(nextVolume * 100)),
+    })
   }
 
   const toggleMute = () => {
@@ -92,18 +96,24 @@ export const usePlayerActions = ({
       return
     }
     actions.setVolume({ volume, muted: !muted })
-    flash({ icon: !muted ? 'muted' : 'volume', text: !muted ? 'Muted' : 'Sound on' })
+    flash({
+      icon: !muted ? 'muted' : 'volume',
+      text: !muted ? PLAYER_ACTIONS_COPY.muted : PLAYER_ACTIONS_COPY.soundOn,
+    })
   }
 
   const changeRate = (next: number) => {
     actions.setRate(next)
-    flash({ icon: 'forward', text: next === 1 ? 'Normal speed' : `${next}×` })
+    flash({
+      icon: 'forward',
+      text: next === 1 ? PLAYER_ACTIONS_COPY.normalSpeed : PLAYER_ACTIONS_COPY.rate(next),
+    })
   }
 
   const toggleSubtitles = () => {
     const hasAny = selection.tracks?.subtitles.some((track) => track.supported) ?? false
     if (!hasAny && selection.subtitle == null) {
-      flash({ icon: 'captions', text: 'No subtitles' })
+      flash({ icon: 'captions', text: PLAYER_ACTIONS_COPY.noSubtitles })
       return
     }
     const id =
@@ -119,8 +129,10 @@ export const usePlayerActions = ({
     flash({
       icon: 'captions',
       text: landed
-        ? `Subtitles: ${languageName({ tag: landed.language }) ?? 'on'}`
-        : 'Subtitles off',
+        ? PLAYER_ACTIONS_COPY.subtitles(
+            languageName({ tag: landed.language }) ?? PLAYER_ACTIONS_COPY.subtitlesOn,
+          )
+        : PLAYER_ACTIONS_COPY.subtitlesOff,
     })
   }
 
@@ -128,7 +140,10 @@ export const usePlayerActions = ({
     const now = position.current
     switch (action.type) {
       case PLAYER_ACTIONS.togglePlay:
-        flash({ icon: state.paused ? 'play' : 'pause', text: state.paused ? 'Play' : 'Pause' })
+        flash({
+          icon: state.paused ? 'play' : 'pause',
+          text: state.paused ? PLAYER_ACTIONS_COPY.play : PLAYER_ACTIONS_COPY.pause,
+        })
         togglePlay()
         return
       case PLAYER_ACTIONS.skip: {
@@ -141,14 +156,17 @@ export const usePlayerActions = ({
         seek(now + step.seconds * step.direction)
         flash({
           icon: step.direction < 0 ? 'rewind' : 'forward',
-          text: `${step.direction < 0 ? 'Back' : 'Forward'} ${step.seconds}s`,
+          text: PLAYER_ACTIONS_COPY.skip({ isBack: step.direction < 0, seconds: step.seconds }),
         })
         return
       }
       case PLAYER_ACTIONS.seekToFraction:
         if (duration == null) return
         seek(duration * action.fraction)
-        flash({ icon: 'forward', text: `${Math.round(action.fraction * 100)}%` })
+        flash({
+          icon: 'forward',
+          text: PLAYER_ACTIONS_COPY.percent(Math.round(action.fraction * 100)),
+        })
         return
       case PLAYER_ACTIONS.seekToEdge:
         seek(action.edge === SEEK_EDGES.start ? 0 : (duration ?? now))
@@ -175,7 +193,7 @@ export const usePlayerActions = ({
       case PLAYER_ACTIONS.stepCaptionSize: {
         const next = stepCaptionScale({ current: captionScale, direction: action.direction })
         actions.setSubtitleScale(next)
-        flash({ icon: 'captions', text: `Subtitles ${Math.round(next * 100)}%` })
+        flash({ icon: 'captions', text: PLAYER_ACTIONS_COPY.subtitleSize(Math.round(next * 100)) })
         return
       }
       case PLAYER_ACTIONS.toggleStats:

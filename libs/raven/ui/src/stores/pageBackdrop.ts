@@ -42,14 +42,13 @@ export const usePageBackdrop = create<PageBackdrop>()(
         hide: (url) =>
           set((state) => (state.current === url ? { current: null, shown: null } : state)),
         markLoaded: (url) =>
-          set((state) =>
-            !state.recent.includes(url) || state.loaded.includes(url)
-              ? state
-              : {
-                  loaded: [...state.loaded, url],
-                  shown: state.current === url ? url : state.shown,
-                },
-          ),
+          set((state) => {
+            if (!state.recent.includes(url) || state.loaded.includes(url)) return state
+            return {
+              loaded: [...state.loaded, url],
+              shown: state.current === url ? url : state.shown,
+            }
+          }),
       }),
       {
         name: STORE_KEYS.pageBackdrop,

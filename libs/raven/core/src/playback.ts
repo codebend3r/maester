@@ -144,7 +144,8 @@ export const videoCodecString = ({ codec, bitDepth }: VideoCodecStringProps): st
     av1: ['av01.0.08M.08', 'av01.0.12M.10'],
   }
   const pair = strings[codec]
-  return pair ? pair[deep ? 1 : 0] : null
+  if (!pair) return null
+  return pair[deep ? 1 : 0]
 }
 
 export const audioCodecString = (codec: string): string | null => {

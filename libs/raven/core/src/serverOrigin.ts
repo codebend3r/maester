@@ -174,11 +174,19 @@ const adapt = ({ delta, points, isFirst }: AdaptProps) => {
   return settle({ value: scaled + Math.floor(scaled / points), k: 0 })
 }
 
+type ThresholdOfProps = { k: number; bias: number }
+
+/** RFC 3492's threshold `t` at position `k`, clamped to `T_MIN` and `T_MAX`. */
+const thresholdOf = ({ k, bias }: ThresholdOfProps): number => {
+  if (k <= bias) return T_MIN
+  return k >= bias + T_MAX ? T_MAX : k - bias
+}
+
 type VariableLengthProps = { q: number; bias: number; k?: number }
 
 /** `q` as RFC 3492's generalised variable-length integer. */
 const variableLength = ({ q, bias, k = BASE }: VariableLengthProps): string => {
-  const threshold = k <= bias ? T_MIN : k >= bias + T_MAX ? T_MAX : k - bias
+  const threshold = thresholdOf({ k, bias })
   if (q < threshold) return digitOf(q)
   const digit = digitOf(threshold + ((q - threshold) % (BASE - threshold)))
   const rest = Math.floor((q - threshold) / (BASE - threshold))
