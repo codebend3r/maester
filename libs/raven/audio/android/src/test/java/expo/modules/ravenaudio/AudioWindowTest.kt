@@ -25,7 +25,7 @@ class AudioWindowTest {
     val held = window.open(listOf(track(1), track(2)))
 
     assertEquals(listOf("1", "2"), held.map { it.mediaId })
-    assertEquals(listOf("1", "2"), window.mediaIds)
+    assertEquals(listOf("1", "2"), window.tracks.map { it.mediaId })
     assertEquals(1, window.current?.id)
   }
 
@@ -46,7 +46,7 @@ class AudioWindowTest {
     val added = window.replaceNext(listOf(track(3)))
 
     assertEquals(listOf("3"), added?.map { it.mediaId })
-    assertEquals(listOf("1", "3"), window.mediaIds)
+    assertEquals(listOf("1", "3"), window.tracks.map { it.mediaId })
   }
 
   @Test
@@ -56,7 +56,7 @@ class AudioWindowTest {
 
     window.replaceNext(emptyList())
 
-    assertEquals(listOf("1"), window.mediaIds)
+    assertEquals(listOf("1"), window.tracks.map { it.mediaId })
   }
 
   @Test
@@ -67,7 +67,7 @@ class AudioWindowTest {
 
     window.replaceNext(listOf(track(3)))
 
-    assertEquals(listOf("2", "3"), window.mediaIds)
+    assertEquals(listOf("2", "3"), window.tracks.map { it.mediaId })
   }
 
   @Test
@@ -75,7 +75,7 @@ class AudioWindowTest {
     val window = AudioWindow()
 
     assertNull(window.replaceNext(listOf(track(3))))
-    assertEquals(emptyList<String>(), window.mediaIds)
+    assertEquals(emptyList<String>(), window.tracks.map { it.mediaId })
   }
 
   @Test
@@ -88,7 +88,7 @@ class AudioWindowTest {
     assertEquals(listOf(AudioEventTypes.ADVANCED), step.events)
     assertTrue(step.shouldDropFinished)
     assertFalse(step.shouldPause)
-    assertEquals(listOf("2"), window.mediaIds)
+    assertEquals(listOf("2"), window.tracks.map { it.mediaId })
   }
 
   @Test
@@ -100,7 +100,7 @@ class AudioWindowTest {
 
     assertEquals(emptyList<String>(), step.events)
     assertFalse(step.shouldDropFinished)
-    assertEquals(listOf("1", "2"), window.mediaIds)
+    assertEquals(listOf("1", "2"), window.tracks.map { it.mediaId })
   }
 
   @Test

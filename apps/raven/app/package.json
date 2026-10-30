@@ -102,7 +102,15 @@
         "react-native-reanimated",
         "react-native-worklets",
         "react-native-gesture-handler"
-      ]
+      ],
+      "android": {
+        "exclude": [
+          "react-native-reanimated",
+          "react-native-worklets",
+          "react-native-gesture-handler",
+          "@raven/audio"
+        ]
+      }
     }
   },
   "nx": {

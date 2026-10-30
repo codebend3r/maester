@@ -6,8 +6,8 @@ plugins {
 group = 'expo.modules.ravenaudio'
 version = '1.0.0'
 
-// react-native-video 6.19.3's (`RNVideo_media3Version`): this module autolinks into the TV app's
-// Android build beside it, and one app takes one Media3, so a bump moves both together.
+// react-native-video 6.19.3's (`RNVideo_media3Version`), so the workspace builds against one
+// Media3; a bump of either moves both together.
 def media3Version = '1.8.0'
 
 android {

@@ -119,21 +119,22 @@ private object LibraryCallback : MediaLibraryService.MediaLibrarySession.Callbac
  */
 @OptIn(UnstableApi::class)
 class RavenAudioService : MediaLibraryService() {
+  /** Hears the service come and go: the module, which drives its player. */
+  class Observer(val onCreated: (RavenAudioService) -> Unit, val onDestroyed: (RavenAudioService) -> Unit)
+
   companion object {
     /** The service while it runs: the module and the service share one process. */
     var running: RavenAudioService? = null
       private set
 
-    private var waiting: List<(RavenAudioService) -> Unit> = emptyList()
+    private var observers: List<Observer> = emptyList()
 
-    /** Runs `action` on the service now, or as soon as it is created. */
-    fun whenRunning(action: (RavenAudioService) -> Unit) {
-      val service = running
-      if (service != null) {
-        action(service)
-        return
-      }
-      waiting = waiting + action
+    fun observe(observer: Observer) {
+      if (observers.none { it === observer }) observers = observers + observer
+    }
+
+    fun forget(observer: Observer) {
+      observers = observers.filter { it !== observer }
     }
   }
 
@@ -162,15 +163,14 @@ class RavenAudioService : MediaLibraryService() {
     session = MediaLibrarySession.Builder(this, RemotePlayer(made) { command -> onRemote?.invoke(command) }, LibraryCallback)
       .build()
     running = this
-    val ready = waiting
-    waiting = emptyList()
-    ready.forEach { it(this) }
+    observers.forEach { it.onCreated(this) }
   }
 
   override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
 
   override fun onDestroy() {
     running = null
+    observers.forEach { it.onDestroyed(this) }
     onRemote = null
     session?.release()
     session = null

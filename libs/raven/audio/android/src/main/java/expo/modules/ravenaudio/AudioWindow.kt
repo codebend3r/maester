@@ -47,9 +47,6 @@ class AudioWindow {
   val current: AudioTrack?
     get() = tracks.firstOrNull()
 
-  val mediaIds: List<String>
-    get() = tracks.map { it.mediaId }
-
   /** Takes a new window, in play order, and hands back the tracks the player can open. */
   fun open(window: List<AudioTrack>): List<AudioTrack> {
     tracks = window.filter(::canOpen)

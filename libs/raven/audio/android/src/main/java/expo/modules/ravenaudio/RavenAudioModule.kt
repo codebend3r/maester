@@ -11,6 +11,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.MoreExecutors
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.functions.Queues
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -48,6 +50,8 @@ private const val STATE_INTERVAL_MS = 250L
 
 private const val COULD_NOT_OPEN = "Raven could not open this track."
 private const val COULD_NOT_PLAY = "Raven could not play this track."
+private const val COULD_NOT_START = "Raven could not start its player."
+private const val PLAYER_UNAVAILABLE = "ERR_RAVEN_AUDIO_UNAVAILABLE"
 
 private fun secondsOf(ms: Long) = ms / 1000.0
 
@@ -65,6 +69,8 @@ class RavenAudioModule : Module() {
    * created on the first window and kept while the app runs. Commands go to the player directly.
    */
   private var controller: ListenableFuture<MediaController>? = null
+  private val gate = ServiceGate<RavenAudioService>()
+  private val observer = RavenAudioService.Observer(onCreated = ::connected, onDestroyed = ::serviceGone)
   private var attached: RavenAudioService? = null
   private var isStopped = true
 
@@ -127,64 +133,102 @@ class RavenAudioModule : Module() {
       letGo()
     }
 
-    AsyncFunction("setWindow") { items: List<AudioItem>, shouldPlay: Boolean, start: Double ->
-      withService { service -> replaceWindow(service, items.map { it.toTrack() }, shouldPlay, start) }
+    AsyncFunction("setWindow") { items: List<AudioItem>, shouldPlay: Boolean, start: Double, promise: Promise ->
+      val tracks = items.map { it.toTrack() }
+      withService(promise, shouldBind = true) { service -> replaceWindow(service, tracks, shouldPlay, start) }
     }.runOnQueue(Queues.MAIN)
 
-    AsyncFunction("setNext") { items: List<AudioItem> ->
-      replaceNext(items.map { it.toTrack() })
+    AsyncFunction("setNext") { items: List<AudioItem>, promise: Promise ->
+      val tracks = items.map { it.toTrack() }
+      withService(promise) { service -> replaceNext(service, tracks) }
     }.runOnQueue(Queues.MAIN)
 
-    AsyncFunction("play") {
-      resume()
+    AsyncFunction("play") { promise: Promise ->
+      withService(promise, action = ::resume)
     }.runOnQueue(Queues.MAIN)
 
-    AsyncFunction("pause") {
-      player?.pause()
+    AsyncFunction("pause") { promise: Promise ->
+      withService(promise) { service -> service.player.pause() }
     }.runOnQueue(Queues.MAIN)
 
-    AsyncFunction("seekTo") { seconds: Double ->
-      player?.seekTo((seconds * 1000).toLong())
+    AsyncFunction("seekTo") { seconds: Double, promise: Promise ->
+      withService(promise) { service -> service.player.seekTo((seconds * 1000).toLong()) }
     }.runOnQueue(Queues.MAIN)
 
-    AsyncFunction("setVolume") { level: Double ->
+    AsyncFunction("setVolume") { level: Double, promise: Promise ->
       volume = level.toFloat()
-      player?.volume = volume
+      withService(promise) { service -> service.player.volume = volume }
     }.runOnQueue(Queues.MAIN)
 
-    AsyncFunction("setRate") { rate: Double ->
+    AsyncFunction("setRate") { rate: Double, promise: Promise ->
       // ExoPlayer stretches time and keeps a voice's pitch, as an audiobook's speed needs.
       playbackRate = rate.toFloat()
-      player?.setPlaybackSpeed(playbackRate)
+      withService(promise) { service -> service.player.setPlaybackSpeed(playbackRate) }
     }.runOnQueue(Queues.MAIN)
 
-    AsyncFunction("stop") {
-      isStopped = true
-      window.close()
-      ticker.removeCallbacks(tick)
-      player?.stop()
-      player?.clearMediaItems()
+    AsyncFunction("stop") { promise: Promise ->
+      withService(promise) { service ->
+        isStopped = true
+        window.close()
+        ticker.removeCallbacks(tick)
+        service.player.stop()
+        service.player.clearMediaItems()
+      }
     }.runOnQueue(Queues.MAIN)
   }
 
   // The service
 
-  /** Runs `action` once the service is up, binding it on first use. */
-  private fun withService(action: (RavenAudioService) -> Unit) {
-    if (controller == null) bindService()
-    RavenAudioService.whenRunning { service ->
-      if (service !== attached) attach(service)
-      action(service)
-    }
+  /**
+   * Applies `action` on the service and only then settles `promise`, so the app's calls take
+   * effect in the order it made them even while the service is still starting. Only a window
+   * (`shouldBind`) starts the service; any other call before one has nothing to act on.
+   */
+  private fun withService(promise: Promise, shouldBind: Boolean = false, action: (RavenAudioService) -> Unit) {
+    val pending = Pending<RavenAudioService>(
+      run = { service ->
+        action(service)
+        promise.resolve(null)
+      },
+      drop = {
+        if (shouldBind) promise.reject(PLAYER_UNAVAILABLE, COULD_NOT_START, null) else promise.resolve(null)
+      },
+    )
+    if (gate.submit(pending, shouldBind)) bindService()
   }
 
   private fun bindService() {
-    val context = appContext.reactContext ?: return
+    RavenAudioService.observe(observer)
+    // A service another controller started (a car, later) is used as it is.
+    RavenAudioService.running?.let(::connected)
+    val context = appContext.reactContext
+    if (context == null) {
+      gate.fail()
+      return
+    }
     val token = SessionToken(context, ComponentName(context, RavenAudioService::class.java))
-    controller = MediaController.Builder(context, token).buildAsync()
+    val future = MediaController.Builder(context, token)
+      .setListener(object : MediaController.Listener {
+        override fun onDisconnected(controller: MediaController) {
+          attached?.let(::serviceGone)
+        }
+      })
+      .buildAsync()
+    controller = future
+    // The future completes on the main looper, so its listener runs there too.
+    future.addListener(
+      {
+        if (controller === future && runCatching { future.get() }.isFailure) {
+          controller = null
+          gate.fail()
+        }
+      },
+      MoreExecutors.directExecutor(),
+    )
   }
 
-  private fun attach(service: RavenAudioService) {
+  private fun connected(service: RavenAudioService) {
+    if (service === attached) return
     attached = service
     service.player.addListener(listener)
     service.player.volume = volume
@@ -192,6 +236,21 @@ class RavenAudioModule : Module() {
     service.onRemote = { command ->
       if (!isStopped) sendEvent(AUDIO_EVENT, mapOf("type" to AudioEventTypes.REMOTE, "command" to command))
     }
+    gate.attach(service)
+  }
+
+  /** The service was destroyed: its player is gone, so the next window binds a new one. */
+  private fun serviceGone(service: RavenAudioService) {
+    if (service !== attached) return
+    ticker.removeCallbacks(tick)
+    service.player.removeListener(listener)
+    service.onRemote = null
+    attached = null
+    isStopped = true
+    window.close()
+    gate.detach()
+    controller?.let(MediaController::releaseFuture)
+    controller = null
   }
 
   // The window
@@ -212,17 +271,16 @@ class RavenAudioModule : Module() {
   }
 
   /** Plays the window it holds; with none, there is nothing to play. */
-  private fun resume() {
-    val playing = player ?: return
+  private fun resume(service: RavenAudioService) {
     if (window.current == null) return
+    val playing = service.player
     isStopped = false
     // A failed item leaves the player idle, and only a prepare lets it try again.
     if (playing.playbackState == Player.STATE_IDLE) playing.prepare()
     playing.play()
   }
 
-  private fun replaceNext(next: List<AudioTrack>) {
-    val service = attached ?: return
+  private fun replaceNext(service: RavenAudioService, next: List<AudioTrack>) {
     val playing = service.player
     val added = window.replaceNext(next) ?: return
     val after = playing.currentMediaItemIndex + 1
@@ -264,14 +322,13 @@ class RavenAudioModule : Module() {
   }
 
   private fun letGo() {
-    ticker.removeCallbacks(tick)
+    RavenAudioService.forget(observer)
+    gate.fail()
     attached?.let { service ->
-      service.onRemote = null
-      service.player.removeListener(listener)
       service.player.stop()
       service.player.clearMediaItems()
+      serviceGone(service)
     }
-    attached = null
     controller?.let(MediaController::releaseFuture)
     controller = null
   }
