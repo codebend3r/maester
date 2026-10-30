@@ -15,8 +15,9 @@ import {
   useRef,
   useState,
 } from 'react'
+import { KeyedView, type ViewOf, type ViewsOf } from '@/components/KeyedView/KeyedView'
 import type { Engine, EngineHandle } from '@/components/Player/engine'
-import type { Handoff, PlayerFavourite } from '@/components/Player/PlayerServices'
+import type { Handoff, PlayerFavourite, UpNext } from '@/components/Player/PlayerServices'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
 import type { PlayChoices } from '@/components/Player/playChoices'
 import type { Rendition } from '@/components/Player/rendition'
@@ -26,6 +27,7 @@ import type { SubtitleStatus } from '@/lib/useTrackCues'
 import { Button, ButtonLink } from '@/components/Button/Button'
 import { Bezel } from '@/components/Player/Bezel'
 import { Controls } from '@/components/Player/Controls'
+import { STAGE_COPY } from '@/components/Player/copy'
 import { Icon } from '@/components/Icon/Icon'
 import { type MenuSection, isMenuSection } from '@/components/Player/menus'
 import {
@@ -65,11 +67,85 @@ type SkipActionOfProps = {
 
 /** What the one skip button offers now, if anything: Undo first, then the intro, then the credits. */
 const skipActionOf = ({ undo, skipIntro, skipCredits }: SkipActionOfProps): SkipAction | null => {
-  if (undo) return { label: 'Undo skip', run: undo }
-  if (skipIntro) return { label: 'Skip intro', run: skipIntro }
-  if (skipCredits) return { label: 'Skip credits', run: skipCredits }
+  if (undo) return { label: STAGE_COPY.undoSkip, run: undo }
+  if (skipIntro) return { label: STAGE_COPY.skipIntro, run: skipIntro }
+  if (skipCredits) return { label: STAGE_COPY.skipCredits, run: skipCredits }
   return null
 }
+
+/** What sits above the timeline at the right: the up next card, else the skip button. */
+const BAR_CARDS = { upNext: 'upNext', skip: 'skip' } as const
+
+type BarCard =
+  | { kind: typeof BAR_CARDS.upNext; next: UpNext }
+  | { kind: typeof BAR_CARDS.skip; action: SkipAction }
+
+type BarCardKind = BarCard['kind']
+
+type BarCardOfProps = {
+  isCardShown: boolean
+  next: UpNext | null
+  skipAction: SkipAction | null
+}
+
+/** The up next card while it shows, otherwise the skip on offer, if any. */
+const barCardOf = ({ isCardShown, next, skipAction }: BarCardOfProps): BarCard | null => {
+  if (isCardShown && next) return { kind: BAR_CARDS.upNext, next }
+  if (skipAction) return { kind: BAR_CARDS.skip, action: skipAction }
+  return null
+}
+
+type BarCardScreenProps<K extends BarCardKind> = {
+  card: Extract<BarCard, { kind: K }>
+  upNext: ReturnType<typeof useUpNext>
+  focusSurface: () => void
+}
+
+type UpNextViewProps = BarCardScreenProps<typeof BAR_CARDS.upNext>
+
+const UpNextView = ({ card, upNext, focusSurface }: UpNextViewProps) => (
+  <UpNextCard
+    next={card.next}
+    countdown={upNext.countdown}
+    secondsLeft={upNext.secondsLeft}
+    hasSceneAfter={upNext.hasSceneAfter}
+    onPlay={upNext.playNext}
+    onDismiss={() => {
+      upNext.dismiss()
+      focusSurface()
+    }}
+  />
+)
+
+type SkipViewProps = BarCardScreenProps<typeof BAR_CARDS.skip>
+
+const SkipView = ({ card, focusSurface }: SkipViewProps) => (
+  <SkipButton
+    label={card.action.label}
+    onClick={() => {
+      card.action.run()
+      focusSurface()
+    }}
+  />
+)
+
+/** Each card kind's view props, or only `Keys`' for a builder generic over the kind. */
+type BarCardViewsProps<Keys extends BarCardKind = BarCardKind> = {
+  [K in Keys]: BarCardScreenProps<K>
+}
+
+const BAR_CARD_VIEWS = {
+  [BAR_CARDS.upNext]: UpNextView,
+  [BAR_CARDS.skip]: SkipView,
+} as const satisfies ViewsOf<BarCardViewsProps>
+
+type BarCardViewOfProps<K extends BarCardKind> = BarCardScreenProps<K> & { kind: K }
+
+/** The view for the card's kind, so each view is handed its own kind of card. */
+const barCardViewOf = <K extends BarCardKind>({
+  kind,
+  ...props
+}: BarCardViewOfProps<K>): ViewOf<BarCardViewsProps<K>, K> => ({ key: kind, props })
 
 const isControlTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && !!target.closest('button, a')
@@ -184,6 +260,7 @@ export const PlayerChrome = ({
     skipCredits: upNext.skipCredits,
   })
   const nextLink = upNext.next
+  const barCard = barCardOf({ isCardShown: upNext.isCardShown, next: nextLink, skipAction })
   const setAutoplay = usePlayerPrefs((prefs) => prefs.setAutoplay)
   // "Ends at" names a minute, so a step of 15 seconds keeps it true.
   const now = useNow(15_000)
@@ -323,7 +400,7 @@ export const PlayerChrome = ({
     current.toggle()
     flash({
       icon: 'heart',
-      text: current.isFavourite ? 'Removed from favourites' : 'Added to favourites',
+      text: current.isFavourite ? STAGE_COPY.removedFromFavourites : STAGE_COPY.addedToFavourites,
     })
   }
 
@@ -380,7 +457,7 @@ export const PlayerChrome = ({
         <Button
           tone="ghost"
           icon="back"
-          aria-label="Back"
+          aria-label={STAGE_COPY.back}
           className={styles.back}
           onClick={onBack}
         />
@@ -390,7 +467,7 @@ export const PlayerChrome = ({
           <Button
             tone="ghost"
             icon="heart"
-            aria-label="Favourite"
+            aria-label={STAGE_COPY.favourite}
             aria-pressed={favourite.isFavourite}
             className={[styles.favourite, favourite.isFavourite ? styles.favourited : '']
               .filter(Boolean)
@@ -406,18 +483,18 @@ export const PlayerChrome = ({
             tone="ghost"
             icon={nextLink.isShuffled ? 'shuffle' : 'next'}
             className={styles.next}
-            aria-label={`Up next: ${nextLink.label}`}
+            aria-label={STAGE_COPY.upNextLabel(nextLink.label)}
             title={nextLink.label}
           >
-            <span className={styles.nextLead}>Up next</span>
+            <span className={styles.nextLead}>{STAGE_COPY.upNext}</span>
             <span className={styles.nextLabel}>{nextLink.label}</span>
           </ButtonLink>
         )}
         {resumedAt != null && (
           <p className={styles.resumed} aria-live="polite">
-            <span>Resumed at {formatDuration(resumedAt)}</span>
+            <span>{STAGE_COPY.resumedAt(formatDuration(resumedAt))}</span>
             <Button tone="ghost" className={styles.startOver} onClick={startOver}>
-              Start over
+              {STAGE_COPY.startOver}
             </Button>
           </p>
         )}
@@ -449,28 +526,16 @@ export const PlayerChrome = ({
         upNext={nextLink?.label ?? null}
         countdown={upNext.countdown}
         card={
-          upNext.isCardShown && nextLink ? (
-            <UpNextCard
-              next={nextLink}
-              countdown={upNext.countdown}
-              secondsLeft={upNext.secondsLeft}
-              hasSceneAfter={upNext.hasSceneAfter}
-              onPlay={upNext.playNext}
-              onDismiss={() => {
-                upNext.dismiss()
-                engine.focusSurface()
-              }}
+          barCard && (
+            <KeyedView<BarCardViewsProps>
+              views={BAR_CARD_VIEWS}
+              view={barCardViewOf({
+                kind: barCard.kind,
+                card: barCard,
+                upNext,
+                focusSurface: engine.focusSurface,
+              })}
             />
-          ) : (
-            skipAction && (
-              <SkipButton
-                label={skipAction.label}
-                onClick={() => {
-                  skipAction.run()
-                  engine.focusSurface()
-                }}
-              />
-            )
           )
         }
         endsAt={endsAtLabel({ now, time: held.time, duration, rate: state.rate })}

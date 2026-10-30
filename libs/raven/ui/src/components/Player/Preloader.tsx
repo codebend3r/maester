@@ -1,3 +1,4 @@
+import { PRELOADER_COPY } from '@/components/Player/copy'
 import styles from '@/components/Player/Preloader.module.scss'
 
 /** raven's mark, from `apps/raven/web/public/brand/raven-mark-mono.svg`, inline so every host draws it. */
@@ -9,7 +10,7 @@ const MARK =
  * player gets ready and while the video waits for data.
  */
 export const Preloader = () => (
-  <output className={styles.preloader} aria-label="Loading">
+  <output className={styles.preloader} aria-label={PRELOADER_COPY.loading}>
     <span className={styles.ring} aria-hidden="true" />
     <svg className={styles.mark} viewBox="0 0 646 705" aria-hidden="true" focusable="false">
       <path d={MARK} />

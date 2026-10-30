@@ -6,6 +6,7 @@ import {
   describeMode,
   formatBitrate,
 } from '@raven/core'
+import { PLAY_CHOICES_COPY } from '@/components/Player/copy'
 import type { Rendition } from '@/components/Player/rendition'
 
 export const PICK_KINDS = { mode: 'mode', size: 'size' } as const
@@ -68,7 +69,7 @@ export const choiceGroups = ({
     candidates.length > 1
       ? [
           {
-            legend: 'Play as',
+            legend: PLAY_CHOICES_COPY.playAs,
             isInline: false,
             options: candidates.map((mode) => modeOption({ mode, rendition })),
           },
@@ -79,13 +80,13 @@ export const choiceGroups = ({
   const isConverting = rendition.mode === PLAYBACK_MODES.transcode
   const [best] = modes
   const sizes: ChoiceGroup = {
-    legend: 'Quality',
+    legend: PLAY_CHOICES_COPY.quality,
     isInline: true,
     options: [
       ...(best != null && best !== PLAYBACK_MODES.transcode
         ? [
             {
-              label: 'Play original quality',
+              label: PLAY_CHOICES_COPY.original,
               details: original,
               isChecked: !isConverting,
               pick: { kind: PICK_KINDS.mode, mode: best },
@@ -96,7 +97,7 @@ export const choiceGroups = ({
       ...(isConverting && rendition.quality == null
         ? [
             {
-              label: "Converted at the server's size",
+              label: PLAY_CHOICES_COPY.serverSize,
               details: null,
               isChecked: true,
               pick: { kind: PICK_KINDS.mode, mode: PLAYBACK_MODES.transcode },
@@ -104,7 +105,7 @@ export const choiceGroups = ({
           ]
         : []),
       ...qualities.map((quality): ChoiceOption => ({
-        label: `Convert to ${STREAM_QUALITIES[quality].label}`,
+        label: PLAY_CHOICES_COPY.convertTo(STREAM_QUALITIES[quality].label),
         details: formatBitrate(STREAM_QUALITIES[quality].bitrate),
         isChecked: rendition.quality === quality,
         pick: { kind: PICK_KINDS.size, quality },

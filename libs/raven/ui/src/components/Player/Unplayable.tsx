@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
+import { UNPLAYABLE_COPY } from '@/components/Player/copy'
 import {
   NO_CONTEXT,
   REPORTED_MESSAGE,
@@ -87,12 +88,12 @@ export const Unplayable = ({
       {!!thumbnail && <img className={styles.backdrop} src={thumbnail} alt="" aria-hidden="true" />}
       <div className={styles.panel}>
         <Button tone="ghost" icon="back" className={styles.panelBack} onClick={onBack}>
-          Back
+          {UNPLAYABLE_COPY.back}
         </Button>
         <h1 id="unplayable-title" className={styles.panelTitle}>
           {title.label}
         </h1>
-        <p>{unplayableNote ?? "This video can't play in this browser."}</p>
+        <p>{unplayableNote ?? UNPLAYABLE_COPY.cannotPlay}</p>
         <ul className={styles.problems}>
           {problems.map((problem) => (
             <li key={problem}>{problem}</li>
@@ -107,7 +108,7 @@ export const Unplayable = ({
           )}
           {!!onTryAnyway && (
             <Button tone={handoff ? 'quiet' : 'primary'} onClick={onTryAnyway}>
-              Try playing anyway
+              {UNPLAYABLE_COPY.tryAnyway}
             </Button>
           )}
           {escape && (
@@ -126,7 +127,7 @@ export const Unplayable = ({
               sendReport(report).catch(() => setReportState(REPORT_STATES.failed))
             }}
           >
-            Report this error
+            {UNPLAYABLE_COPY.report}
           </Button>
         )}
         <p className={styles.hint} aria-live="polite">

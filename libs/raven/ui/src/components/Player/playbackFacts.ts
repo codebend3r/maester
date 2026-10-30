@@ -12,6 +12,7 @@ import {
   resolutionLabel,
   subtitleLabel,
 } from '@raven/core'
+import { PLAYBACK_FACTS_COPY } from '@/components/Player/copy'
 import { playingAudio } from '@/components/Player/selection'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
 
@@ -41,7 +42,7 @@ const joined = ({ parts, separator = ' · ' }: JoinedProps): string =>
 export const pictureLabel = (media: MediaItem): string | null => {
   const resolution = resolutionLabel(media)
   if (resolution == null) return null
-  return media.hdr ? `${resolution} HDR` : resolution
+  return media.hdr ? PLAYBACK_FACTS_COPY.hdr(resolution) : resolution
 }
 
 type AboutLineProps = {
@@ -76,7 +77,9 @@ type QualityLabelProps = {
  */
 export const qualityLabel = ({ media, mode, quality = null }: QualityLabelProps): string => {
   if (mode === PLAYBACK_MODES.transcode && quality != null) {
-    return joined({ parts: [`${STREAM_QUALITIES[quality].height}p`, MODE_NAMES[mode]] })
+    return joined({
+      parts: [PLAYBACK_FACTS_COPY.height(STREAM_QUALITIES[quality].height), MODE_NAMES[mode]],
+    })
   }
   const picture = media && mode !== PLAYBACK_MODES.transcode ? resolutionLabel(media) : null
   return joined({ parts: [picture, MODE_NAMES[mode]] })
@@ -113,15 +116,15 @@ export const audioPillLabel = ({
 
 /** The subtitles pill's language, or Off. */
 export const subtitlePillLabel = (subtitle: SubtitleTrack | null): string =>
-  subtitle ? subtitleLabel(subtitle).name : 'Off'
+  subtitle ? subtitleLabel(subtitle).name : PLAYBACK_FACTS_COPY.subtitlesOff
 
 /** Why the picture is a transcode when the connection could not carry the way above it. */
 export const stepDownNote = ({ from, delivery }: StepDown): string => {
   const carried = formatBitrate(delivery.delivered)
   const needed = formatBitrate(delivery.needed)
   return needed == null
-    ? `Switched to a transcode because the connection carried only ${carried}.`
-    : `Switched to a transcode because the connection carried ${carried} and ${MODE_NOUNS[from]} needs ${needed}.`
+    ? PLAYBACK_FACTS_COPY.stepDown(carried)
+    : PLAYBACK_FACTS_COPY.stepDownWithNeed({ carried, noun: MODE_NOUNS[from], needed })
 }
 
 type EndsAtLabelProps = {
@@ -147,5 +150,5 @@ export const endsAtLabel = ({
   if (duration == null || rate <= 0) return null
   const remaining = Math.max(0, duration - time) / rate
   const clock = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' })
-  return `Ends at ${clock.format(now + remaining * 1_000)}`
+  return PLAYBACK_FACTS_COPY.endsAt(clock.format(now + remaining * 1_000))
 }

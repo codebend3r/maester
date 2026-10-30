@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
+import { UNLOCK_DIALOG_COPY } from '@/components/UnlockDialog/copy'
 import styles from '@/components/UnlockDialog/UnlockDialog.module.scss'
 
 export const UNLOCK_SECRETS = { pin: 'pin', adminPassword: 'adminPassword' } as const
@@ -97,14 +98,14 @@ export const UnlockDialog = ({ secret, hint, unlock, onUnlocked, onClose }: Unlo
           </p>
         )}
         <div className={styles.actions}>
-          <Button onClick={() => dialog.current?.close()}>Cancel</Button>
+          <Button onClick={() => dialog.current?.close()}>{UNLOCK_DIALOG_COPY.cancel}</Button>
           <Button
             type="submit"
             tone="primary"
             icon="unlock"
             disabled={entered.trim() === '' || attempt.isPending}
           >
-            Unlock
+            {UNLOCK_DIALOG_COPY.unlock}
           </Button>
         </div>
       </form>

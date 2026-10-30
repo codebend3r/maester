@@ -11,8 +11,8 @@ import {
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { act, cleanup, waitFor } from '@testing-library/react'
+import { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
 import {
-  COULD_NOT_PLAY,
   type WindowedPlayer,
   runRemoteCommand,
   useWindowedAudioHost,
@@ -151,7 +151,7 @@ describe('useWindowedAudioHost', () => {
     renderHost({ player })
     await act(async () => store().playTracks({ tracks: ALBUM }))
     expect(store().state).toBe(AUDIO_STATES.failed)
-    expect(store().error).toBe(COULD_NOT_PLAY)
+    expect(store().error).toBe(AUDIO_HOST_COPY.couldNotPlay)
     act(() => store().clear())
     expect(calls.at(-1)).toBe('stop')
   })

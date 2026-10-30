@@ -53,6 +53,8 @@ type Shared = {
   children?: ReactNode
 }
 
+type ButtonProps = Shared & ComponentProps<'button'>
+
 /** A button with an optional leading icon. Icon-only buttons must pass an aria-label. */
 export const Button = ({
   tone = BUTTON_TONES.quiet,
@@ -62,7 +64,7 @@ export const Button = ({
   className,
   type = 'button',
   ...rest
-}: Shared & ComponentProps<'button'>) => (
+}: ButtonProps) => (
   <button
     type={type}
     className={classes({ tone, size, iconOnly: !children, extra: className })}
@@ -73,6 +75,8 @@ export const Button = ({
   </button>
 )
 
+type ButtonLinkProps = Shared & ComponentProps<typeof Link>
+
 /** A router link that looks like a button, for actions that are really navigation. */
 export const ButtonLink = ({
   tone = BUTTON_TONES.quiet,
@@ -81,7 +85,7 @@ export const ButtonLink = ({
   children,
   className,
   ...rest
-}: Shared & ComponentProps<typeof Link>) => (
+}: ButtonLinkProps) => (
   <Link className={classes({ tone, size, iconOnly: !children, extra: className })} {...rest}>
     {!!icon && <Icon name={icon} size={ICON_SIZES[size]} />}
     {children}

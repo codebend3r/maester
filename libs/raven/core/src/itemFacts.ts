@@ -151,11 +151,10 @@ const audioFact = ({ codec, channels, language }: AudioFactProps): string => {
     (part): part is string => part != null,
   )
   const name = languageName({ tag: language })
+  const bracketed = details.length > 0 ? `(${details.join(' ')})` : null
   return name == null
     ? details.join(' ')
-    : [name, details.length > 0 ? `(${details.join(' ')})` : null]
-        .filter((part): part is string => part != null)
-        .join(' ')
+    : [name, bracketed].filter((part): part is string => part != null).join(' ')
 }
 
 /** The file's video, audio and subtitles, as the tracks the scan stored describe them. */

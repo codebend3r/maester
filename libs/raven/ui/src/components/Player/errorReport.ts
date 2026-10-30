@@ -135,10 +135,9 @@ export const codecSupport = ({
       ? null
       : videoCodecString({ codec: media.videoCodec, bitDepth: media.videoBitDepth })
   const audio = media.audioCodec == null ? null : audioCodecString(media.audioCodec)
+  const codecs = [video, audio].flatMap((codec) => (codec ? [codec] : []))
   const playTypes =
-    mime == null
-      ? []
-      : [mime, ...[video, audio].flatMap((codec) => (codec ? [`${mime}; codecs="${codec}"`] : []))]
+    mime == null ? [] : [mime, ...codecs.map((codec) => `${mime}; codecs="${codec}"`)]
   return {
     play: playTypes.map((type) => asked({ type, canPlay })),
     stream: [PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode].map((mode) =>

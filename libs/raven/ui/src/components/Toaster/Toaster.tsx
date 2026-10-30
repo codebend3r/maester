@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
+import { TOASTER_COPY } from '@/components/Toaster/copy'
 import styles from '@/components/Toaster/Toaster.module.scss'
 import { TOAST_MS, type Toast, useToasts } from '@/stores/toasts'
 
@@ -21,7 +22,7 @@ const ToastNote = ({ toast }: ToastNoteProps) => {
         tone="ghost"
         icon="close"
         className={styles.dismiss}
-        aria-label="Dismiss"
+        aria-label={TOASTER_COPY.dismiss}
         onClick={() => dismiss(toast.id)}
       />
     </span>

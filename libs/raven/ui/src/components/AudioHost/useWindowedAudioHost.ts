@@ -1,5 +1,6 @@
 import { type ApiClient, REMOTE_COMMANDS, type RemoteCommand, type Track } from '@raven/core'
 import { useEffect, useEffectEvent, useRef } from 'react'
+import { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
 import { useListenCounter } from '@/components/AudioHost/useListenCounter'
 import { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
 import type { WatchHide } from '@/components/Player/useProgressReport'
@@ -7,11 +8,9 @@ import { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stor
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 /** What a host says when a player refused a track without saying why. */
-export const COULD_NOT_PLAY = 'Raven could not play this track.'
-
-/** Why a player refused a track: its own words, or `COULD_NOT_PLAY` when it gave none. */
+/** Why a player refused a track: its own words, or `AUDIO_HOST_COPY.couldNotPlay` when it gave none. */
 export const failureOf = (error: unknown): string =>
-  error instanceof Error && error.message !== '' ? error.message : COULD_NOT_PLAY
+  error instanceof Error && error.message !== '' ? error.message : AUDIO_HOST_COPY.couldNotPlay
 
 export type WindowedLoadProps = {
   playing: Track
