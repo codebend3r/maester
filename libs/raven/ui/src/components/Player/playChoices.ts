@@ -1,5 +1,6 @@
 import {
   PLAYBACK_MODES,
+  type PictureSubtitles,
   type PlaybackMode,
   STREAM_QUALITIES,
   type StreamQuality,
@@ -31,8 +32,8 @@ export type ChoiceGroup = { legend: string; isInline: boolean; options: ChoiceOp
 export type PlayChoices = {
   /** Empty when there is nothing to choose between. */
   groups: ChoiceGroup[]
-  /** Whether a picture subtitle can be shown: the server may convert, which burns it in. */
-  canBurn: boolean
+  /** How a picture subtitle can be shown: burned in where the server may convert, else hidden. */
+  pictures: PictureSubtitles
   select: (pick: PlayPick) => void
 }
 

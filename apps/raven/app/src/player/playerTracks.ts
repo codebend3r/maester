@@ -1,12 +1,14 @@
 import {
   type MediaTracks,
+  PICTURE_SUBTITLES,
   PLAYBACK_MODES,
+  type PictureSubtitles,
   SUBTITLE_SOURCES,
   type PlaybackMode,
   type SubtitleTrack,
   type TrackLabel,
   audioLabel,
-  isPictureSubtitle,
+  isShowableSubtitle,
   subtitleLabel,
 } from '@raven/core'
 
@@ -29,24 +31,34 @@ export const audioOptionsOf = (tracks: MediaTracks): TrackOption[] =>
 const showable = (tracks: MediaTracks): SubtitleTrack[] =>
   tracks.subtitles.filter((track) => track.supported)
 
+type PicturesForProps = {
+  /** Whether the player draws the file's picture tracks now: it can, and it plays the file as it is. */
+  canDraw: boolean
+  /** Whether the plan holds a transcode, which burns a picture track into the picture. */
+  canBurn: boolean
+}
+
+/** How the player shows a picture track now: drawing it beats burning it, which beats neither. */
+export const picturesFor = ({ canDraw, canBurn }: PicturesForProps): PictureSubtitles => {
+  if (canDraw) return PICTURE_SUBTITLES.drawn
+  return canBurn ? PICTURE_SUBTITLES.burned : PICTURE_SUBTITLES.hidden
+}
+
 type SubtitleOptionsOfProps = {
   tracks: MediaTracks
-  /** Whether the player draws the file's picture tracks now: it can, and it plays the file as it is. */
-  canShowPictures: boolean
+  /** How the player shows a picture track now. */
+  pictures: PictureSubtitles
 }
 
 /**
  * Subtitles off, then each track the player can show now, keyed by its id: the text tracks,
- * and the picture tracks too where the player draws them from the file it is playing.
+ * and the picture tracks too unless pictures are hidden, each saying how it is shown.
  */
-export const subtitleOptionsOf = ({
-  tracks,
-  canShowPictures,
-}: SubtitleOptionsOfProps): TrackOption[] => [
+export const subtitleOptionsOf = ({ tracks, pictures }: SubtitleOptionsOfProps): TrackOption[] => [
   { key: SUBTITLE_CHOICES.off, label: PLAYER_TRACKS_COPY.off },
   ...tracks.subtitles
-    .filter((track) => track.supported || (canShowPictures && isPictureSubtitle(track)))
-    .map((track) => ({ key: track.id, label: labelText(subtitleLabel({ track })) })),
+    .filter((track) => isShowableSubtitle({ track, pictures }))
+    .map((track) => ({ key: track.id, label: labelText(subtitleLabel({ track, pictures })) })),
 ]
 
 type FilePlaceForProps = { tracks: MediaTracks; subtitle: string }

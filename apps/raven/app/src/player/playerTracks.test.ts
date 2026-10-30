@@ -2,7 +2,9 @@ import { describe, expect, it } from 'bun:test'
 import {
   AUDIO_CODECS,
   type MediaTracks,
+  PICTURE_SUBTITLES,
   PLAYBACK_MODES,
+  type PictureSubtitles,
   SUBTITLE_SOURCES,
   type SubtitleTrack,
 } from '@raven/core'
@@ -12,6 +14,7 @@ import {
   audioOptionsOf,
   audioPlaceFor,
   filePlaceFor,
+  picturesFor,
   subtitleOptionsOf,
   subtitlePlaceFor,
 } from '@/player/playerTracks'
@@ -69,16 +72,35 @@ describe('the track pickers', () => {
     ])
   })
 
-  it('offers subtitles off, then every text track, and no picture track where the player cannot draw it', () => {
+  it('offers subtitles off, then every text track, and no picture track where pictures are hidden', () => {
     expect(
-      subtitleOptionsOf({ tracks: TRACKS, canShowPictures: false }).map(({ key }) => key),
+      subtitleOptionsOf({ tracks: TRACKS, pictures: PICTURE_SUBTITLES.hidden }).map(
+        ({ key }) => key,
+      ),
     ).toEqual([SUBTITLE_CHOICES.off, ENGLISH.id, FRENCH.id, SIDECAR.id, UNTAGGED.id])
   })
 
   it("adds the file's picture tracks, in the file's order, where the player draws them", () => {
     expect(
-      subtitleOptionsOf({ tracks: TRACKS, canShowPictures: true }).map(({ key }) => key),
+      subtitleOptionsOf({ tracks: TRACKS, pictures: PICTURE_SUBTITLES.drawn }).map(
+        ({ key }) => key,
+      ),
     ).toEqual([SUBTITLE_CHOICES.off, ENGLISH.id, PICTURES.id, FRENCH.id, SIDECAR.id, UNTAGGED.id])
+  })
+
+  it('says how a picture track it offers is shown, never that it cannot be', () => {
+    const labelOf = (pictures: PictureSubtitles) =>
+      subtitleOptionsOf({ tracks: TRACKS, pictures }).find(({ key }) => key === PICTURES.id)?.label
+    expect(labelOf(PICTURE_SUBTITLES.drawn)).toBe('English · Picture subtitles')
+    expect(labelOf(PICTURE_SUBTITLES.burned)).toBe('English · Picture subtitles, burned in')
+  })
+})
+
+describe('picturesFor', () => {
+  it('draws where the player can, burns where a transcode can, and hides otherwise', () => {
+    expect(picturesFor({ canDraw: true, canBurn: true })).toBe(PICTURE_SUBTITLES.drawn)
+    expect(picturesFor({ canDraw: false, canBurn: true })).toBe(PICTURE_SUBTITLES.burned)
+    expect(picturesFor({ canDraw: false, canBurn: false })).toBe(PICTURE_SUBTITLES.hidden)
   })
 })
 

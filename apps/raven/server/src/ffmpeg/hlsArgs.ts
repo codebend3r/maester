@@ -12,6 +12,7 @@ import {
   type BurnSubtitle,
   QUIET,
   type TranscodeQuality,
+  canvasArgs,
   copyVideo,
   secondsArg,
   transcodeVideo,
@@ -162,7 +163,9 @@ const runCut = ({ source, from, seekKeyframes, timeBase }: RunCutProps): RunCut 
   // and ffmpeg must agree on it (FfmpegService warns when they differ).
   const fromStart = (time: number): string[] =>
     time - startTime > 0 ? ['-ss', secondsArg(time - startTime)] : []
-  if (source.burn !== null) return burnCut({ source, from, seekKeyframes, timeBase, tolerance })
+  if (source.burn !== null) {
+    return burnCut({ source, burn: source.burn, from, seekKeyframes, timeBase, tolerance })
+  }
   const exact = fromStart(start - tolerance)
   const video = [
     '-fps_mode',
@@ -189,18 +192,19 @@ const runCut = ({ source, from, seekKeyframes, timeBase }: RunCutProps): RunCut 
   }
 }
 
-type BurnCutProps = RunCutProps & { tolerance: number }
+type BurnCutProps = RunCutProps & { burn: BurnSubtitle; tolerance: number }
 
 /** A burn's cut, on a clock from the point it sought to: see `runCut`. */
 const burnCut = ({
-  source: { input, plan, startTime, burn },
+  source: { input, plan, startTime },
+  burn,
   from,
   seekKeyframes,
   timeBase,
   tolerance,
 }: BurnCutProps): RunCut => {
   const start = plan.boundaries[from] ?? 0
-  const canvas = burn === null ? [] : ['-canvas_size', `${burn.canvas.width}x${burn.canvas.height}`]
+  const canvas = canvasArgs(burn)
   // The seek counts from the file's start time, and a point before it is the start itself.
   const seekTo = (time: number): { at: number; seek: string[] } =>
     time - startTime > 0

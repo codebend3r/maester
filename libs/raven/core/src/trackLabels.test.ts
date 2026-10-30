@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { type AudioTrack, SUBTITLE_SOURCES, type SubtitleTrack } from '@/contract'
+import { PICTURE_SUBTITLES } from '@/subtitles'
 import { audioLabel, subtitleLabel } from '@/trackLabels'
 
 const audio = (overrides: Partial<AudioTrack> = {}): AudioTrack => ({
@@ -54,5 +55,15 @@ describe('subtitleLabel', () => {
         }),
       }).details,
     ).toBe("SDH · Picture subtitles, can't be shown")
+  })
+
+  it('says how a picture track is shown where the player can show it', () => {
+    const picture = subtitle({ source: SUBTITLE_SOURCES.embedded, forced: false, supported: false })
+    expect(subtitleLabel({ track: picture, pictures: PICTURE_SUBTITLES.burned }).details).toBe(
+      'Picture subtitles, burned in',
+    )
+    expect(subtitleLabel({ track: picture, pictures: PICTURE_SUBTITLES.drawn }).details).toBe(
+      'Picture subtitles',
+    )
   })
 })

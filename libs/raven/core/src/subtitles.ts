@@ -8,6 +8,19 @@ export const isPictureSubtitle = (track: SubtitleTrack | null): track is Subtitl
   track !== null && !track.supported && track.source === SUBTITLE_SOURCES.embedded
 
 /**
+ * How a player shows a picture track now: not at all, drawn by the player from the file it plays,
+ * or burned into the picture by a transcode.
+ */
+export const PICTURE_SUBTITLES = { hidden: 'hidden', drawn: 'drawn', burned: 'burned' } as const
+export type PictureSubtitles = (typeof PICTURE_SUBTITLES)[keyof typeof PICTURE_SUBTITLES]
+
+type IsShowableSubtitleProps = { track: SubtitleTrack; pictures: PictureSubtitles }
+
+/** A track the player can show now: any text track, and a picture track unless pictures are hidden. */
+export const isShowableSubtitle = ({ track, pictures }: IsShowableSubtitleProps): boolean =>
+  track.supported || (pictures !== PICTURE_SUBTITLES.hidden && isPictureSubtitle(track))
+
+/**
  * Embedded subtitles are extracted a window at a time. They are interleaved
  * through the whole file, so a full track means reading every byte of it;
  * a window reads only its own stretch. Five minutes keeps the first one

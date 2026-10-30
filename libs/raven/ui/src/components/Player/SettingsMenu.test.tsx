@@ -1,5 +1,7 @@
 import { describe, expect, it, jest } from 'bun:test'
 import {
+  PICTURE_SUBTITLES,
+  type PictureSubtitles,
   PLAYBACK_MODES,
   type PlaybackMode,
   type StreamQuality,
@@ -41,7 +43,7 @@ const choicesFor = ({
   select = () => {},
 }: ChoicesForProps): PlayChoices => ({
   groups: choiceGroups({ modes, rendition, qualities, original: '24.2 Mb/s, 4K' }),
-  canBurn: false,
+  pictures: PICTURE_SUBTITLES.hidden,
   select,
 })
 
@@ -87,7 +89,10 @@ const remuxing = {
 describe('SettingsMenu playback section', () => {
   it('switches autoplay under the speed', async () => {
     const onPickAutoplay = jest.fn()
-    renderPlayback({ choices: { groups: [], canBurn: false, select: () => {} }, onPickAutoplay })
+    renderPlayback({
+      choices: { groups: [], pictures: PICTURE_SUBTITLES.hidden, select: () => {} },
+      onPickAutoplay,
+    })
     const autoplay = screen.getByRole('group', { name: 'Autoplay' })
     expect(within(autoplay).getByRole('radio', { name: 'On' })).toBeChecked()
     await userEvent.click(within(autoplay).getByRole('radio', { name: 'Off' }))
@@ -183,7 +188,7 @@ describe('SettingsMenu subtitles', () => {
     ...selection,
     tracks: { audio: [], subtitles: [picture], defaultAudio: null, frameRate: null },
   }
-  const renderSubtitles = (canBurn: boolean) =>
+  const renderSubtitles = (pictures: PictureSubtitles) =>
     render(
       <SettingsMenu
         section={MENU_SECTIONS.subtitles}
@@ -192,7 +197,7 @@ describe('SettingsMenu subtitles', () => {
         subtitleStatus="off"
         rate={1}
         mode={PLAYBACK_MODES.direct}
-        choices={{ groups: [], canBurn, select: () => {} }}
+        choices={{ groups: [], pictures, select: () => {} }}
         onPickRate={() => {}}
         autoplay
         onPickAutoplay={() => {}}
@@ -202,12 +207,12 @@ describe('SettingsMenu subtitles', () => {
     )
 
   it('lets a picture track be picked when the server can burn it in', () => {
-    renderSubtitles(true)
+    renderSubtitles(PICTURE_SUBTITLES.burned)
     expect(screen.getByRole('radio', { name: /English/ })).toBeEnabled()
   })
 
   it('keeps a picture track off when nothing can burn it in', () => {
-    renderSubtitles(false)
+    renderSubtitles(PICTURE_SUBTITLES.hidden)
     expect(screen.getByRole('radio', { name: /English/ })).toBeDisabled()
   })
 })

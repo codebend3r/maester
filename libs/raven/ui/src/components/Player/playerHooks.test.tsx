@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { PLAYBACK_MODES } from '@raven/core'
+import { PICTURE_SUBTITLES, PLAYBACK_MODES } from '@raven/core'
 import { act, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import {
@@ -216,7 +216,7 @@ describe('usePlaybackLadder', () => {
     )
     const burning = result.current
     if (burning.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
-    expect(burning.choices.canBurn).toBe(true)
+    expect(burning.choices.pictures).toBe(PICTURE_SUBTITLES.burned)
     expect(burning.rendition).toEqual({
       mode: PLAYBACK_MODES.transcode,
       quality: null,

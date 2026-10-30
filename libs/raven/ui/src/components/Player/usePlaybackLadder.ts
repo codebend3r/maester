@@ -5,6 +5,7 @@ import {
   type PlaybackDiagnostics,
   type PlaybackMode,
   DEFAULT_PLAYBACK_SETTINGS,
+  PICTURE_SUBTITLES,
   PLAYBACK_MODES,
   offeredQualities,
   planPlayback,
@@ -176,7 +177,8 @@ export const usePlaybackLadder = ({
   const rendition: Rendition = {
     mode,
     quality: isConverting && picked?.kind === PICK_KINDS.size ? picked.quality : null,
-    burn: isConverting && isBurning ? burn : null,
+    // A burn's ladder is the transcode alone, so a burning rendition is always converting.
+    burn: isBurning ? burn : null,
   }
   return {
     status: PLAYBACK_STATUSES.playing,
@@ -189,7 +191,7 @@ export const usePlaybackLadder = ({
     slow: lighter > step ? (delivery) => setSteppedDown({ from: mode, delivery }) : null,
     steppedDown: isConverting ? steppedDown : null,
     choices: {
-      canBurn,
+      pictures: canBurn ? PICTURE_SUBTITLES.burned : PICTURE_SUBTITLES.hidden,
       groups: choiceGroups({
         modes: ladder.modes,
         rendition,
