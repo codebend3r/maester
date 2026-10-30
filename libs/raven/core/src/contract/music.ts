@@ -34,6 +34,12 @@ export const isArtistCredit = object({
 
 export type ArtistCredit = Infer<typeof isArtistCredit>
 
+type ArtistNamesProps = { artists: readonly ArtistCredit[] }
+
+/** The credited artists as one line: "Radiohead", or "A, B" for several. */
+export const artistNames = ({ artists }: ArtistNamesProps): string =>
+  artists.map(({ name }) => name).join(', ')
+
 /** An artist among a library's, with how much of the library is theirs. */
 export const isArtist = object({
   id: isNumber,

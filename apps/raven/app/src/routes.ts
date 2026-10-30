@@ -5,6 +5,9 @@ export const APP_ROUTES = {
   item: '/item/[id]',
   library: '/library/[id]',
   play: '/play/[mediaId]',
+  album: '/album/[id]',
+  artist: '/artist/[id]',
+  nowPlaying: '/now-playing',
   search: '/search',
   settings: '/settings',
   unlock: '/unlock',
@@ -35,13 +38,22 @@ export const APP_SCREENS = {
   item: 'item/[id]',
   library: 'library/[id]',
   play: 'play/[mediaId]',
+  album: 'album/[id]',
+  artist: 'artist/[id]',
+  nowPlaying: 'now-playing',
   search: 'search',
   settings: 'settings',
   unlock: 'unlock',
 } as const
 
-/** Where a card or a link takes the viewer: an item's page, the player, or a library. */
-export const ROUTE_TARGETS = { item: 'item', play: 'play', library: 'library' } as const
+/** Where a card or a link takes the viewer: an item's page, the player, a library, an album or an artist. */
+export const ROUTE_TARGETS = {
+  item: 'item',
+  play: 'play',
+  library: 'library',
+  album: 'album',
+  artist: 'artist',
+} as const
 
 export type RouteTarget =
   | {
@@ -66,6 +78,8 @@ export type RouteTarget =
       /** The search the library opens on, as the web's `?q=`; empty for none. */
       query: string
     }
+  | { kind: typeof ROUTE_TARGETS.album; albumId: number }
+  | { kind: typeof ROUTE_TARGETS.artist; artistId: number }
 
 /** An item's page, with neither a library nor a file named. */
 export const itemTarget = (itemId: number): RouteTarget => ({
@@ -118,6 +132,16 @@ export const hrefOf = (target: RouteTarget): Href => {
           [APP_ROUTE_PARAMS.id]: String(target.libraryId),
           ...paramOf({ name: APP_ROUTE_PARAMS.query, value: target.query }),
         },
+      }
+    case ROUTE_TARGETS.album:
+      return {
+        pathname: APP_ROUTES.album,
+        params: { [APP_ROUTE_PARAMS.id]: String(target.albumId) },
+      }
+    case ROUTE_TARGETS.artist:
+      return {
+        pathname: APP_ROUTES.artist,
+        params: { [APP_ROUTE_PARAMS.id]: String(target.artistId) },
       }
     default: {
       const unknown: never = target

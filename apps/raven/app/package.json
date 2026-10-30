@@ -48,6 +48,7 @@
     "@formatjs/intl-locale": "5.3.12",
     "@formatjs/intl-pluralrules": "6.3.15",
     "@formatjs/intl-relativetimeformat": "12.3.15",
+    "@raven/audio": "workspace:*",
     "@raven/core": "workspace:*",
     "@raven/ui": "workspace:*",
     "@react-native-async-storage/async-storage": "2.2.0",

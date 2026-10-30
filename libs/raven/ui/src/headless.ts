@@ -90,3 +90,14 @@ export { useUnlockPrompt } from '@/stores/unlockPrompt'
 export { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
 export type { AudioState } from '@/stores/audioQueue'
 export { useListenCounter } from '@/components/AudioHost/useListenCounter'
+export {
+  COULD_NOT_PLAY,
+  failureOf,
+  runRemoteCommand,
+  useWindowedAudioHost,
+} from '@/components/AudioHost/useWindowedAudioHost'
+export type {
+  WindowedAudioHost,
+  WindowedLoadProps,
+  WindowedPlayer,
+} from '@/components/AudioHost/useWindowedAudioHost'

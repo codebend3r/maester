@@ -1,4 +1,4 @@
-import type { ApiClient, Track } from '@raven/core'
+import { type ApiClient, type Track, artistNames } from '@raven/core'
 import { type RefObject, useEffect, useRef } from 'react'
 import { failureMessage } from '@/components/Player/useMediaSource'
 import { useMediaPlane } from '@/components/Player/useMediaPlane'
@@ -81,7 +81,7 @@ const useMediaSession = ({ api, track }: UseMediaSessionProps) => {
     })
     session.metadata = new MediaMetadata({
       title: track.title,
-      artist: track.artists.map(({ name }) => name).join(', '),
+      artist: artistNames(track),
       album: track.album.title,
       artwork: cover === null ? [] : [{ src: cover }],
     })
