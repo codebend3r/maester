@@ -17,9 +17,10 @@ tags:
 - extendedWaitUntil:
     visible: Pause
     timeout: 60000
-# The controls fade five seconds into a play, and Maestro can take longer than that to settle on
-# a playing video, so a tap can land on the hidden controls' catcher. Each try brings the controls
-# back when they are gone and presses Pause when it is there, until Play shows.
+# The controls fade five seconds after a touch, and a playing video never settles, so a tap left
+# to wait for the screen to settle spends seconds before and after it and lands on the hidden
+# controls' catcher. The taps cap that wait. Each try brings the controls back when they are gone
+# and presses Pause when it is there, until Play shows.
 - retry:
     maxRetries: 4
     commands:
@@ -27,12 +28,16 @@ tags:
           when:
             visible: Show the controls
           commands:
-            - tapOn: Show the controls
+            - tapOn:
+                text: Show the controls
+                waitToSettleTimeoutMs: 500
       - runFlow:
           when:
             visible: Pause
           commands:
-            - tapOn: Pause
+            - tapOn:
+                text: Pause
+                waitToSettleTimeoutMs: 500
       - assertVisible: Play
 - assertVisible: Position
 - assertVisible: Back 10 seconds
