@@ -4,10 +4,17 @@ import {
   MATCH_STATES,
   QUEUE_SOURCE_KINDS,
   ROUTE_STATES,
+  type RouteQuery,
   routeState,
 } from '@raven/core'
 import { Button } from '@raven/ui'
-import { afterAlbumMatch, useAudioQueue } from '@raven/ui/headless'
+import {
+  afterAlbumMatch,
+  useAudioQueue,
+  KeyedView,
+  type ViewOf,
+  type ViewsOf,
+} from '@raven/ui/headless'
 import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AddToPlaylistDialog } from '@/components/AddToPlaylistDialog/AddToPlaylistDialog'
@@ -24,7 +31,9 @@ import { POSTER_SIZES } from '@/lib/posters'
 import { albumQuery, libraryQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
 import { useAlbumFavourite } from '@/lib/useMusicFavourite'
+import { ALBUM_COPY } from '@/pages/AlbumPage/copy'
 import styles from '@/pages/AlbumPage/AlbumPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type AlbumTrackControlsProps = TrailProps
 
@@ -36,7 +45,7 @@ const AlbumTrackControls = ({ track }: AlbumTrackControlsProps) => {
       <Button
         tone="ghost"
         icon="list"
-        aria-label={`Add ${track.title} to a playlist`}
+        aria-label={ALBUM_COPY.addTrackToPlaylist(track.title)}
         onClick={() => setAdding(true)}
       />
       {isAdding && <AddToPlaylistDialog tracks={[track]} onClose={() => setAdding(false)} />}
@@ -75,7 +84,7 @@ const AlbumView = ({ details }: AlbumViewProps) => {
       <BackButton
         fallback={{
           to: `/libraries/${album.libraryId}`,
-          label: library.data?.name ?? 'Library',
+          label: library.data?.name ?? COMMON_COPY.library,
         }}
         className={styles.back}
       />
@@ -84,19 +93,19 @@ const AlbumView = ({ details }: AlbumViewProps) => {
           <AlbumCover album={album} sizes={POSTER_SIZES.album} />
         </div>
         <div className={styles.heading}>
-          <p className={styles.eyebrow}>Album</p>
+          <p className={styles.eyebrow}>{ALBUM_COPY.eyebrow}</p>
           <h1 id={titleId} className={styles.title}>
             {album.title}
           </h1>
           <p className={styles.artists}>
             {album.artists.map((artist, index) => (
               <span key={artist.id}>
-                {index > 0 && ', '}
+                {index > 0 && COMMON_COPY.listSeparator}
                 <Link to={artistPath(artist.id)}>{artist.name}</Link>
               </span>
             ))}
           </p>
-          <p className={styles.facts}>{albumFacts({ album }).join(' · ')}</p>
+          <p className={styles.facts}>{albumFacts({ album }).join(COMMON_COPY.separator)}</p>
           {details.label !== null && <p className={styles.label}>{details.label}</p>}
           <div className={styles.actions}>
             <Button
@@ -105,28 +114,28 @@ const AlbumView = ({ details }: AlbumViewProps) => {
               disabled={tracks.length === 0}
               onClick={() => play(0)}
             >
-              Play
+              {COMMON_COPY.play}
             </Button>
             <Button
               icon="shuffle"
               disabled={tracks.length === 0}
               onClick={() => playTracks({ tracks, source, isShuffled: true })}
             >
-              Shuffle
+              {COMMON_COPY.shuffle}
             </Button>
             <Button icon="skipNext" disabled={tracks.length === 0} onClick={() => playNext(tracks)}>
-              Play next
+              {ALBUM_COPY.playNext}
             </Button>
             <Button icon="plus" disabled={tracks.length === 0} onClick={() => addToQueue(tracks)}>
-              Add to queue
+              {ALBUM_COPY.addToQueue}
             </Button>
             <Button icon="list" disabled={tracks.length === 0} onClick={() => setAdding(true)}>
-              Add to playlist
+              {COMMON_COPY.addToPlaylist}
             </Button>
             <FavouriteButton isFavourite={details.isFavourite} onToggle={favourite.mutate} />
             <AdminOnly>
               <Button icon="wand" onClick={() => setFixing(true)}>
-                {album.match === MATCH_STATES.unmatched ? 'Match' : 'Fix match'}
+                {album.match === MATCH_STATES.unmatched ? ALBUM_COPY.match : COMMON_COPY.fixMatch}
               </Button>
             </AdminOnly>
           </div>
@@ -134,14 +143,14 @@ const AlbumView = ({ details }: AlbumViewProps) => {
       </header>
 
       {discs.map((disc) => (
-        <section key={disc} className={styles.disc} aria-label={`Disc ${disc}`}>
-          {discs.length > 1 && <h2 className={styles.discTitle}>Disc {disc}</h2>}
+        <section key={disc} className={styles.disc} aria-label={ALBUM_COPY.disc(disc)}>
+          {discs.length > 1 && <h2 className={styles.discTitle}>{ALBUM_COPY.disc(disc)}</h2>}
           <TrackList
             tracks={tracks.filter((track) => track.disc === disc)}
             onPlay={(index) => play(tracks.findIndex((track) => track.disc === disc) + index)}
             shouldShowArtists={!isOneArtist}
             Trail={AlbumTrackControls}
-            label={discs.length > 1 ? `Disc ${disc} tracks` : 'Tracks'}
+            label={discs.length > 1 ? ALBUM_COPY.discTracks(disc) : ALBUM_COPY.tracks}
           />
         </section>
       ))}
@@ -173,13 +182,34 @@ const AlbumSkeleton = () => (
   </>
 )
 
+const ALBUM_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
+
+type AlbumPageViewProps = {
+  [ALBUM_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
+  [ALBUM_VIEW_KEYS.ready]: AlbumViewProps
+}
+
+const ALBUM_VIEWS = {
+  [ALBUM_VIEW_KEYS.pending]: RouteState,
+  [ALBUM_VIEW_KEYS.ready]: AlbumView,
+} as const satisfies ViewsOf<AlbumPageViewProps>
+
+type AlbumPageViewOfProps = { page: RouteQuery<AlbumDetails> }
+
+/** Which view the page shows: the album on its way, missing or failing, or the album. */
+const albumPageViewOf = ({ page }: AlbumPageViewOfProps): ViewOf<AlbumPageViewProps> => {
+  if (page.state !== ROUTE_STATES.ready)
+    return {
+      key: ALBUM_VIEW_KEYS.pending,
+      props: { state: page, noun: ALBUM_COPY.noun, shape: <AlbumSkeleton /> },
+    }
+  return { key: ALBUM_VIEW_KEYS.ready, props: { details: page.data } }
+}
+
 /** `/albums/:id`: an album's cover, artists, facts and tracks, which play into the queue. */
 export const AlbumPage = () => {
   const id = useRouteId()
   const album = useQuery(albumQuery(id))
   const page = routeState({ id, query: album })
-  if (page.state !== ROUTE_STATES.ready) {
-    return <RouteState state={page} noun="album" shape={<AlbumSkeleton />} />
-  }
-  return <AlbumView details={page.data} />
+  return <KeyedView<AlbumPageViewProps> views={ALBUM_VIEWS} view={albumPageViewOf({ page })} />
 }

@@ -1,5 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { type HistoryEntry, ROUTE_STATES, historyDays, historyNote, routeState } from '@raven/core'
+import {
+  type HistoryEntry,
+  type Library,
+  ROUTE_STATES,
+  type RouteQuery,
+  historyDays,
+  historyNote,
+  routeState,
+} from '@raven/core'
 import { useId, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Button } from '@raven/ui'
@@ -7,10 +15,18 @@ import { BackButton } from '@/components/BackButton/BackButton'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import { HISTORY_SHOWS, type HistoryShow } from '@raven/ui/headless'
+import {
+  HISTORY_SHOWS,
+  type HistoryShow,
+  KeyedView,
+  type ViewOf,
+  type ViewsOf,
+} from '@raven/ui/headless'
 import { historyQuery, libraryQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
+import { HISTORY_COPY } from '@/pages/HistoryPage/copy'
 import styles from '@/pages/HistoryPage/HistoryPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** How many entries a page of history adds. */
 const PAGE = 100
@@ -19,8 +35,8 @@ const PAGE = 100
 const SEARCH_PARAMS = { show: 'show' } as const
 
 const SHOWS: ReadonlyArray<{ show: HistoryShow; label: string }> = [
-  { show: HISTORY_SHOWS.watched, label: 'Watched' },
-  { show: HISTORY_SHOWS.all, label: 'All played' },
+  { show: HISTORY_SHOWS.watched, label: COMMON_COPY.watched },
+  { show: HISTORY_SHOWS.all, label: HISTORY_COPY.allPlayed },
 ]
 
 type HistoryDaySectionProps = {
@@ -57,13 +73,10 @@ const HistorySkeleton = () => (
   </>
 )
 
-/**
- * A library's history: what was watched by its own measure, or everything
- * that played, last played first and split into days. Which of the two is
- * in the URL, so coming back from the player lands on the same list.
- */
-export const HistoryPage = () => {
-  const libraryId = useRouteId()
+type HistoryViewProps = { library: Library }
+
+/** The history once its library is known: its switch, then the days, more on request. */
+const HistoryView = ({ library }: HistoryViewProps) => {
   const ids = { title: useId() }
   const [searchParams, setSearchParams] = useSearchParams()
   const show: HistoryShow =
@@ -71,18 +84,8 @@ export const HistoryPage = () => {
       ? HISTORY_SHOWS.all
       : HISTORY_SHOWS.watched
   const [limit, setLimit] = useState(PAGE)
-
-  const libraryResult = useQuery(libraryQuery(libraryId))
-  const history = useQuery({
-    ...historyQuery({ libraryId, show, limit }),
-    enabled: libraryResult.isSuccess,
-  })
-
-  const library = routeState({ id: libraryId, query: libraryResult })
-  if (library.state !== ROUTE_STATES.ready)
-    return <RouteState state={library} noun="history" shape={<HistorySkeleton />} />
-
-  const { id, name, settings } = library.data
+  const { id, name, settings } = library
+  const history = useQuery(historyQuery({ libraryId: id, show, limit }))
   const entries = history.data ?? []
 
   return (
@@ -90,16 +93,14 @@ export const HistoryPage = () => {
       <BackButton fallback={{ to: `/libraries/${id}`, label: name }} />
 
       <header className={styles.header}>
-        <h1 id={ids.title}>History</h1>
+        <h1 id={ids.title}>{COMMON_COPY.history}</h1>
         <p className={styles.intro}>
-          Videos played or marked in {name}, last played first. One counts as watched once playback
-          gets {settings.watchedPercent}% of the way through, or when it is marked, which the
-          library's settings can change.
+          {HISTORY_COPY.intro({ name, watchedPercent: settings.watchedPercent })}
         </p>
       </header>
 
       <fieldset className={styles.shows}>
-        <legend className="visually-hidden">Show</legend>
+        <legend className="visually-hidden">{HISTORY_COPY.show}</legend>
         {SHOWS.map((option) => (
           <button
             key={option.show}
@@ -127,15 +128,15 @@ export const HistoryPage = () => {
         </p>
       )}
       {history.isPending && (
-        <Loading label="Reading the history">
+        <Loading label={HISTORY_COPY.loading}>
           <MediaTilesSkeleton />
         </Loading>
       )}
       {history.isSuccess && entries.length === 0 && (
         <p className={styles.message}>
           {show === HISTORY_SHOWS.watched
-            ? `Nothing watched in ${name} yet.`
-            : `Nothing played in ${name} yet.`}
+            ? HISTORY_COPY.nothingWatched(name)
+            : HISTORY_COPY.nothingPlayed(name)}
         </p>
       )}
 
@@ -158,9 +159,46 @@ export const HistoryPage = () => {
           disabled={history.isFetching}
           onClick={() => setLimit((current) => current + PAGE)}
         >
-          Show more
+          {HISTORY_COPY.showMore}
         </Button>
       )}
     </section>
+  )
+}
+
+const HISTORY_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
+
+type HistoryPageViewProps = {
+  [HISTORY_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
+  [HISTORY_VIEW_KEYS.ready]: HistoryViewProps
+}
+
+const HISTORY_VIEWS = {
+  [HISTORY_VIEW_KEYS.pending]: RouteState,
+  [HISTORY_VIEW_KEYS.ready]: HistoryView,
+} as const satisfies ViewsOf<HistoryPageViewProps>
+
+type HistoryPageViewOfProps = { library: RouteQuery<Library> }
+
+/** Which view the page shows: its library on its way, missing or failing, or the history. */
+const historyPageViewOf = ({ library }: HistoryPageViewOfProps): ViewOf<HistoryPageViewProps> => {
+  if (library.state !== ROUTE_STATES.ready)
+    return {
+      key: HISTORY_VIEW_KEYS.pending,
+      props: { state: library, noun: HISTORY_COPY.noun, shape: <HistorySkeleton /> },
+    }
+  return { key: HISTORY_VIEW_KEYS.ready, props: { library: library.data } }
+}
+
+/**
+ * A library's history: what was watched by its own measure, or everything
+ * that played, last played first and split into days. Which of the two is
+ * in the URL, so coming back from the player lands on the same list.
+ */
+export const HistoryPage = () => {
+  const libraryId = useRouteId()
+  const library = routeState({ id: libraryId, query: useQuery(libraryQuery(libraryId)) })
+  return (
+    <KeyedView<HistoryPageViewProps> views={HISTORY_VIEWS} view={historyPageViewOf({ library })} />
   )
 }

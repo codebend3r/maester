@@ -1,9 +1,12 @@
-import { type PersonDetails, type PersonProfile, ageOn, plural } from '@raven/core'
+import { type PersonDetails, type PersonProfile, ageOn } from '@raven/core'
 import { Button, ButtonLink } from '@raven/ui'
 import { useId, useLayoutEffect, useRef, useState } from 'react'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { api } from '@/lib/api'
+import { PERSON_COPY } from '@/pages/PersonPage/copy'
 import styles from '@/pages/PersonPage/PersonPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** The first letters of a name's first two words, for a person with no photo: "Rebecca Ferguson" is RF. */
 export const initialsOf = (name: string): string =>
@@ -49,17 +52,16 @@ export const lifeLine = ({ profile, today }: LifeLineProps): string | null => {
   const birthday = profile?.birthday ?? null
   const born = birthday == null ? null : formatDay(birthday)
   if (profile == null || born == null) return null
-  const place = profile.placeOfBirth ? ` in ${profile.placeOfBirth}` : ''
-  const birth = `Born ${born}${place}`
+  const place = profile.placeOfBirth ? PERSON_COPY.bornIn(profile.placeOfBirth) : ''
+  const birth = `${PERSON_COPY.born(born)}${place}`
   const age = ageOn({ birthday, on: profile.deathday ?? today })
   if (profile.deathday == null) {
-    return age == null
-      ? birth
-      : `${birth} · ${plural({ n: age, one: 'year old', many: 'years old' })}`
+    return age == null ? birth : `${birth}${COMMON_COPY.separator}${PERSON_COPY.yearsOld(age)}`
   }
   const died = formatDay(profile.deathday)
   if (died == null) return birth
-  return age == null ? `${birth} · Died ${died}` : `${birth} · Died ${died}, aged ${age}`
+  const death = age == null ? PERSON_COPY.died(died) : PERSON_COPY.diedAged({ day: died, age })
+  return `${birth}${COMMON_COPY.separator}${death}`
 }
 
 /** A pixel the clamp can leave between the two heights with nothing hidden, as each rounds on its own. */
@@ -104,11 +106,39 @@ const Biography = ({ text }: BiographyProps) => {
           aria-controls={id}
           onClick={() => setIsExpanded((current) => !current)}
         >
-          {isExpanded ? 'Less' : 'More'}
+          {isExpanded ? PERSON_COPY.less : PERSON_COPY.more}
         </Button>
       )}
     </div>
   )
+}
+
+/** Whether a person shows their photo or, with none, their initials. */
+const PHOTO_KEYS = { photo: 'photo', initials: 'initials' } as const
+
+type PhotoProps = { src: string }
+
+const Photo = ({ src }: PhotoProps) => <img src={src} alt="" decoding="async" />
+
+type InitialsProps = { name: string }
+
+const Initials = ({ name }: InitialsProps) => <span aria-hidden="true">{initialsOf(name)}</span>
+
+type PortraitProps = {
+  [PHOTO_KEYS.photo]: PhotoProps
+  [PHOTO_KEYS.initials]: InitialsProps
+}
+
+const PORTRAITS = {
+  [PHOTO_KEYS.photo]: Photo,
+  [PHOTO_KEYS.initials]: Initials,
+} as const satisfies ViewsOf<PortraitProps>
+
+type PortraitOfProps = { photo: string | null; name: string }
+
+const portraitOf = ({ photo, name }: PortraitOfProps): ViewOf<PortraitProps> => {
+  if (photo) return { key: PHOTO_KEYS.photo, props: { src: photo } }
+  return { key: PHOTO_KEYS.initials, props: { name } }
 }
 
 type PersonHeaderProps = {
@@ -130,11 +160,10 @@ export const PersonHeader = ({ person, headingId, eyebrow }: PersonHeaderProps) 
     <header className={styles.header}>
       <BackButton fallback={HOME} className={styles.back} />
       <span className={photo ? styles.photo : `${styles.photo} ${styles.initials}`}>
-        {photo ? (
-          <img src={photo} alt="" decoding="async" />
-        ) : (
-          <span aria-hidden="true">{initialsOf(person.name)}</span>
-        )}
+        <KeyedView<PortraitProps>
+          views={PORTRAITS}
+          view={portraitOf({ photo, name: person.name })}
+        />
       </span>
       <div className={styles.about}>
         <hgroup className={styles.named}>
@@ -156,7 +185,7 @@ export const PersonHeader = ({ person, headingId, eyebrow }: PersonHeaderProps) 
                 target="_blank"
                 rel="noreferrer"
               >
-                IMDb
+                {COMMON_COPY.imdb}
               </ButtonLink>
             </li>
           )}
@@ -166,7 +195,7 @@ export const PersonHeader = ({ person, headingId, eyebrow }: PersonHeaderProps) 
               target="_blank"
               rel="noreferrer"
             >
-              TMDB
+              {COMMON_COPY.tmdb}
             </ButtonLink>
           </li>
         </ul>

@@ -3,7 +3,9 @@ import { Button } from '@raven/ui'
 import { useId } from 'react'
 import { useModal } from '@/lib/useModal'
 import { usePlaylistMutations } from '@/lib/usePlaylistMutations'
+import { DELETE_PLAYLIST_COPY } from '@/pages/PlaylistPage/copy'
 import styles from '@/pages/PlaylistPage/DeletePlaylistDialog.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type DeletePlaylistDialogProps = {
   playlist: PlaylistSummary
@@ -30,25 +32,23 @@ export const DeletePlaylistDialog = ({
     >
       <div className={styles.body}>
         <h2 id={titleId} className={styles.title}>
-          Delete {playlist.name}?
+          {DELETE_PLAYLIST_COPY.title(playlist.name)}
         </h2>
-        <p className={styles.hint}>
-          This removes the playlist for good. Its tracks stay in their libraries.
-        </p>
+        <p className={styles.hint}>{DELETE_PLAYLIST_COPY.hint}</p>
         {remove.isError && (
           <p role="alert" className={styles.error}>
             {remove.error.message}
           </p>
         )}
         <div className={styles.actions}>
-          <Button onClick={close}>Cancel</Button>
+          <Button onClick={close}>{COMMON_COPY.cancel}</Button>
           <Button
             tone="danger"
             icon="trash"
             disabled={remove.isPending}
             onClick={() => remove.mutate(playlist.id, { onSuccess: onDeleted })}
           >
-            Delete playlist
+            {DELETE_PLAYLIST_COPY.confirm}
           </Button>
         </div>
       </div>

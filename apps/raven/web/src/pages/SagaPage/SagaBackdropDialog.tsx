@@ -12,19 +12,16 @@ import { Button } from '@raven/ui'
 import { api } from '@/lib/api'
 import { useModal } from '@/lib/useModal'
 import { afterSagaBackdrop } from '@raven/ui/headless'
+import { SAGA_COPY } from '@/pages/SagaPage/copy'
 import styles from '@/pages/SagaPage/SagaBackdropDialog.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** A way for the slideshow to go, or `off` for the cover held still. */
 const CHOICES = { ...SLIDESHOW_MOTIONS, off: 'off' } as const
 
 type Choice = (typeof CHOICES)[keyof typeof CHOICES]
 
-const LABELS = {
-  fade: { label: 'Crossfade', hint: 'Each picture fades into the next.' },
-  kenBurns: { label: 'Ken Burns', hint: 'A slow zoom across each picture as it fades in.' },
-  slide: { label: 'Slide', hint: 'Each picture slides in and pushes the last one out.' },
-  off: { label: 'Off', hint: "One movie's backdrop, held still." },
-} as const satisfies Record<Choice, { label: string; hint: string }>
+const LABELS = SAGA_COPY.motions satisfies Record<Choice, { label: string; hint: string }>
 
 type SagaBackdropDialogProps = {
   libraryId: number
@@ -72,14 +69,12 @@ export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDia
     <dialog ref={dialog} className={styles.dialog} aria-labelledby={ids.title} onClose={onClose}>
       <form className={styles.form} onSubmit={submit}>
         <h2 id={ids.title} className={styles.title}>
-          Edit backdrop
+          {SAGA_COPY.editBackdrop}
         </h2>
 
         <fieldset className={styles.field}>
-          <legend>Slideshow</legend>
-          <p className={styles.hint}>
-            Behind the title, each movie's backdrop in turn, first to last and round again.
-          </p>
+          <legend>{SAGA_COPY.slideshow}</legend>
+          <p className={styles.hint}>{SAGA_COPY.slideshowHint}</p>
           {Object.values(CHOICES).map((each) => (
             <div key={each} className={styles.choice}>
               <input
@@ -101,7 +96,7 @@ export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDia
 
         {choice === CHOICES.off && (
           <fieldset className={styles.field}>
-            <legend>Picture</legend>
+            <legend>{SAGA_COPY.picture}</legend>
             <ul className={styles.pictures}>
               {sagaPictures(saga).map((picture) => (
                 <li key={picture.id} className={styles.picture}>
@@ -125,14 +120,14 @@ export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDia
 
         {save.isError && (
           <p className={styles.error} role="alert">
-            Could not save the backdrop: {save.error.message}
+            {SAGA_COPY.saveFailed(save.error.message)}
           </p>
         )}
 
         <div className={styles.actions}>
-          <Button onClick={() => dialog.current?.close()}>Cancel</Button>
+          <Button onClick={() => dialog.current?.close()}>{COMMON_COPY.cancel}</Button>
           <Button type="submit" tone="primary" disabled={save.isPending || !chosen()}>
-            Save
+            {SAGA_COPY.save}
           </Button>
         </div>
       </form>

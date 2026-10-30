@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { type ArtistDetails, ROUTE_STATES, routeState } from '@raven/core'
+import { type ArtistDetails, ROUTE_STATES, type RouteQuery, routeState } from '@raven/core'
 import { useId } from 'react'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
@@ -10,9 +11,9 @@ import { Bone } from '@/components/Skeleton/Skeleton'
 import { artistQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
 import { useArtistFavourite } from '@/lib/useMusicFavourite'
+import { ARTIST_COPY } from '@/pages/ArtistPage/copy'
 import styles from '@/pages/ArtistPage/ArtistPage.module.scss'
-
-const count = new Intl.NumberFormat()
+import { COMMON_COPY, MUSIC_COPY } from '@/lib/copy'
 
 type ArtistViewProps = { details: ArtistDetails }
 
@@ -27,32 +28,29 @@ const ArtistView = ({ details }: ArtistViewProps) => {
     <article className={styles.page} aria-labelledby={titleId}>
       <BackButton fallback={HOME} className={styles.back} />
       <header className={styles.header}>
-        <p className={styles.eyebrow}>Artist</p>
+        <p className={styles.eyebrow}>{ARTIST_COPY.eyebrow}</p>
         <div className={styles.titleRow}>
           <h1 id={titleId} className={styles.title}>
             {artist.name}
           </h1>
           <FavouriteButton isFavourite={details.isFavourite} onToggle={favourite.mutate} />
         </div>
-        <p className={styles.count}>
-          {count.format(artist.albumCount)} {artist.albumCount === 1 ? 'album' : 'albums'} ·{' '}
-          {count.format(artist.trackCount)} {artist.trackCount === 1 ? 'track' : 'tracks'}
-        </p>
+        <p className={styles.count}>{MUSIC_COPY.artistCounts(artist)}</p>
       </header>
       {albums.length > 0 && (
         <section className={styles.section} aria-labelledby={albumsId}>
-          <SectionHeading id={albumsId}>Albums</SectionHeading>
+          <SectionHeading id={albumsId}>{COMMON_COPY.albums}</SectionHeading>
           <AlbumGrid albums={albums} />
         </section>
       )}
       {appearsOn.length > 0 && (
         <section className={styles.section} aria-labelledby={appearsId}>
-          <SectionHeading id={appearsId}>Appears on</SectionHeading>
+          <SectionHeading id={appearsId}>{ARTIST_COPY.appearsOn}</SectionHeading>
           <AlbumGrid albums={appearsOn} />
         </section>
       )}
       {albums.length === 0 && appearsOn.length === 0 && (
-        <p className={styles.empty}>No albums of {artist.name}'s are in a library you can see.</p>
+        <p className={styles.empty}>{ARTIST_COPY.empty(artist.name)}</p>
       )}
     </article>
   )
@@ -67,13 +65,34 @@ const ArtistSkeleton = () => (
   </>
 )
 
+const ARTIST_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
+
+type ArtistPageViewProps = {
+  [ARTIST_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
+  [ARTIST_VIEW_KEYS.ready]: ArtistViewProps
+}
+
+const ARTIST_VIEWS = {
+  [ARTIST_VIEW_KEYS.pending]: RouteState,
+  [ARTIST_VIEW_KEYS.ready]: ArtistView,
+} as const satisfies ViewsOf<ArtistPageViewProps>
+
+type ArtistPageViewOfProps = { page: RouteQuery<ArtistDetails> }
+
+/** Which view the page shows: the artist on its way, missing or failing, or the artist. */
+const artistPageViewOf = ({ page }: ArtistPageViewOfProps): ViewOf<ArtistPageViewProps> => {
+  if (page.state !== ROUTE_STATES.ready)
+    return {
+      key: ARTIST_VIEW_KEYS.pending,
+      props: { state: page, noun: ARTIST_COPY.noun, shape: <ArtistSkeleton /> },
+    }
+  return { key: ARTIST_VIEW_KEYS.ready, props: { details: page.data } }
+}
+
 /** `/artists/:id`: an artist's albums, and the albums of others they appear on. */
 export const ArtistPage = () => {
   const id = useRouteId()
   const artist = useQuery(artistQuery(id))
   const page = routeState({ id, query: artist })
-  if (page.state !== ROUTE_STATES.ready) {
-    return <RouteState state={page} noun="artist" shape={<ArtistSkeleton />} />
-  }
-  return <ArtistView details={page.data} />
+  return <KeyedView<ArtistPageViewProps> views={ARTIST_VIEWS} view={artistPageViewOf({ page })} />
 }

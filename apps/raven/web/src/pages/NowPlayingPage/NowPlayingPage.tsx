@@ -1,4 +1,4 @@
-import { type Chapter, REPEAT_MODES, formatDuration, orderedOf } from '@raven/core'
+import { type Chapter, REPEAT_MODES, type Track, formatDuration, orderedOf } from '@raven/core'
 import { Button } from '@raven/ui'
 import {
   AUDIOBOOK_SPEEDS,
@@ -9,6 +9,9 @@ import {
   useAudioQueue,
   useAudiobookChapters,
   usePlayerPrefs,
+  KeyedView,
+  type ViewOf,
+  type ViewsOf,
 } from '@raven/ui/headless'
 import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -22,7 +25,9 @@ import { albumPath, artistPath } from '@/lib/music'
 import { POSTER_SIZES } from '@/lib/posters'
 import { ChaptersPanel } from '@/pages/NowPlayingPage/ChaptersPanel'
 import { LyricsPanel } from '@/pages/NowPlayingPage/LyricsPanel'
+import { NOW_PLAYING_COPY } from '@/pages/NowPlayingPage/copy'
 import styles from '@/pages/NowPlayingPage/NowPlayingPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 const REPEAT_LABELS = {
   [REPEAT_MODES.off]: 'Repeat off',
@@ -41,14 +46,14 @@ const QueueControls = ({ index }: QueueControlsProps) => {
       <Button
         tone="ghost"
         icon="up"
-        aria-label="Move up"
+        aria-label={NOW_PLAYING_COPY.moveUp}
         disabled={index === 0}
         onClick={() => move({ from: index, to: index - 1 })}
       />
       <Button
         tone="ghost"
         icon="close"
-        aria-label="Remove from queue"
+        aria-label={NOW_PLAYING_COPY.removeFromQueue}
         onClick={() => remove(index)}
       />
     </>
@@ -76,19 +81,19 @@ const BookControls = ({ chapters }: BookControlsProps) => {
       <Button
         tone="ghost"
         icon="rewind"
-        aria-label="Previous chapter"
+        aria-label={NOW_PLAYING_COPY.previousChapter}
         disabled={!hasChapters}
         onClick={() => seekTo(previousChapterStart({ chapters, at: positionNow() }))}
       />
       <Button
         tone="ghost"
         icon="forward"
-        aria-label="Next chapter"
+        aria-label={NOW_PLAYING_COPY.nextChapter}
         disabled={!hasChapters}
         onClick={next}
       />
       <label className={styles.speed} htmlFor={speedId}>
-        <span>Speed</span>
+        <span>{NOW_PLAYING_COPY.speed}</span>
         <select
           id={speedId}
           value={speed}
@@ -96,7 +101,7 @@ const BookControls = ({ chapters }: BookControlsProps) => {
         >
           {AUDIOBOOK_SPEEDS.map((offered) => (
             <option key={offered} value={offered}>
-              {offered}×
+              {NOW_PLAYING_COPY.speedOption(offered)}
             </option>
           ))}
         </select>
@@ -105,19 +110,59 @@ const BookControls = ({ chapters }: BookControlsProps) => {
   )
 }
 
+const EXTRAS_VIEW_KEYS = { chapters: 'chapters', lyrics: 'lyrics' } as const
+
+type ExtrasViewProps = {
+  [EXTRAS_VIEW_KEYS.chapters]: Parameters<typeof ChaptersPanel>[0]
+  [EXTRAS_VIEW_KEYS.lyrics]: Parameters<typeof LyricsPanel>[0]
+}
+
+const EXTRAS_VIEWS = {
+  [EXTRAS_VIEW_KEYS.chapters]: ChaptersPanel,
+  [EXTRAS_VIEW_KEYS.lyrics]: LyricsPanel,
+} as const satisfies ViewsOf<ExtrasViewProps>
+
+const EXTRAS_HEADINGS = {
+  [EXTRAS_VIEW_KEYS.chapters]: NOW_PLAYING_COPY.chapters,
+  [EXTRAS_VIEW_KEYS.lyrics]: NOW_PLAYING_COPY.lyrics,
+} as const satisfies Record<keyof ExtrasViewProps, string>
+
+type ExtrasViewOfProps = { track: Track; isAudiobook: boolean; chapters: readonly Chapter[] }
+
+/** What sits under the controls: an audiobook's chapters, or a song's lyrics. */
+const extrasViewOf = ({
+  track,
+  isAudiobook,
+  chapters,
+}: ExtrasViewOfProps): ViewOf<ExtrasViewProps> => {
+  if (isAudiobook) return { key: EXTRAS_VIEW_KEYS.chapters, props: { chapters } }
+  return { key: EXTRAS_VIEW_KEYS.lyrics, props: { trackId: track.id } }
+}
+
+/** The page when nothing plays: its title over a line on how to start something. */
+const NothingPlaying = () => {
+  const titleId = useId()
+  return (
+    <section className={styles.page} aria-labelledby={titleId}>
+      <BackButton fallback={HOME} className={styles.back} />
+      <h1 id={titleId} className={styles.title}>
+        {NOW_PLAYING_COPY.title}
+      </h1>
+      <p className={styles.empty}>{NOW_PLAYING_COPY.empty}</p>
+    </section>
+  )
+}
+
+type PlayingProps = { track: Track }
+
 /**
- * `/now-playing`: the playing track large, with its cover, a scrubber,
- * previous, play or pause, next, shuffle and repeat, then its lyrics, and
- * the queue under them, each track playable, removable or moved up. An
- * audiobook shows its chapters in place of lyrics, with chapter skips and
- * a speed; never Skip intro, though a chapter may be named like one. Empty
- * when nothing plays.
+ * The page while `track` plays: it large, its controls, its lyrics or an
+ * audiobook's chapters, and the queue under them.
  */
-export const NowPlayingPage = () => {
+const Playing = ({ track }: PlayingProps) => {
   const titleId = useId()
   const queueId = useId()
   const extrasId = useId()
-  const track = useAudioQueue(playingTrackOf)
   const { isAudiobook, chapters } = useAudiobookChapters({ api, track })
   const [isAdding, setAdding] = useState(false)
   const queue = useAudioQueue((store) => store.queue)
@@ -135,32 +180,19 @@ export const NowPlayingPage = () => {
   const cycleRepeat = useAudioQueue((store) => store.cycleRepeat)
   const clear = useAudioQueue((store) => store.clear)
 
-  if (track === null) {
-    return (
-      <section className={styles.page} aria-labelledby={titleId}>
-        <BackButton fallback={HOME} className={styles.back} />
-        <h1 id={titleId} className={styles.title}>
-          Now playing
-        </h1>
-        <p className={styles.empty}>
-          Nothing is playing. Open an album and press Play, or add tracks to the queue.
-        </p>
-      </section>
-    )
-  }
-
   const isPlaying = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
   const ordered = orderedOf(queue).flatMap(({ id }) => {
     const queued = tracks[id]
     return queued === undefined ? [] : [queued]
   })
   const length = duration ?? track.duration ?? 0
+  const extras = extrasViewOf({ track, isAudiobook, chapters })
 
   return (
     <section className={styles.page} aria-labelledby={titleId}>
       <BackButton fallback={HOME} className={styles.back} />
       <h1 id={titleId} className="visually-hidden">
-        Now playing
+        {NOW_PLAYING_COPY.title}
       </h1>
       <div className={styles.stage}>
         <div className={styles.cover}>
@@ -178,7 +210,7 @@ export const NowPlayingPage = () => {
           <p className={styles.artists}>
             {track.artists.map((artist, index) => (
               <span key={artist.id}>
-                {index > 0 && ', '}
+                {index > 0 && COMMON_COPY.listSeparator}
                 <Link to={artistPath(artist.id)}>{artist.name}</Link>
               </span>
             ))}
@@ -197,7 +229,7 @@ export const NowPlayingPage = () => {
           <input
             type="range"
             className={styles.range}
-            aria-label="Position"
+            aria-label={NOW_PLAYING_COPY.position}
             min={0}
             max={Math.max(length, 1)}
             step={1}
@@ -210,24 +242,29 @@ export const NowPlayingPage = () => {
           <Button
             tone="ghost"
             icon="shuffle"
-            aria-label={queue.isShuffled ? 'Shuffle on' : 'Shuffle off'}
+            aria-label={queue.isShuffled ? NOW_PLAYING_COPY.shuffleOn : NOW_PLAYING_COPY.shuffleOff}
             aria-pressed={queue.isShuffled}
             onClick={toggleShuffle}
           />
           <Button
             tone="ghost"
             icon="skipPrevious"
-            aria-label="Previous track"
+            aria-label={NOW_PLAYING_COPY.previousTrack}
             onClick={skipPrevious}
           />
           <Button
             tone="primary"
             size="large"
             icon={isPlaying ? 'pause' : 'play'}
-            aria-label={isPlaying ? 'Pause' : 'Play'}
+            aria-label={isPlaying ? COMMON_COPY.pause : COMMON_COPY.play}
             onClick={toggle}
           />
-          <Button tone="ghost" icon="skipNext" aria-label="Next track" onClick={skipNext} />
+          <Button
+            tone="ghost"
+            icon="skipNext"
+            aria-label={NOW_PLAYING_COPY.nextTrack}
+            onClick={skipNext}
+          />
           <Button
             tone="ghost"
             icon="reset"
@@ -235,35 +272,31 @@ export const NowPlayingPage = () => {
             aria-pressed={queue.repeat !== REPEAT_MODES.off}
             onClick={cycleRepeat}
           >
-            {queue.repeat === REPEAT_MODES.one ? '1' : undefined}
+            {queue.repeat === REPEAT_MODES.one ? NOW_PLAYING_COPY.repeatOne : undefined}
           </Button>
           <Button
             tone="ghost"
             icon="list"
-            aria-label="Add to playlist"
+            aria-label={COMMON_COPY.addToPlaylist}
             onClick={() => setAdding(true)}
           />
         </div>
         {isAudiobook && <BookControls chapters={chapters} />}
       </div>
       <section className={styles.extras} aria-labelledby={extrasId}>
-        <SectionHeading id={extrasId}>{isAudiobook ? 'Chapters' : 'Lyrics'}</SectionHeading>
-        {isAudiobook ? (
-          <ChaptersPanel chapters={chapters} />
-        ) : (
-          <LyricsPanel key={track.id} trackId={track.id} />
-        )}
+        <SectionHeading id={extrasId}>{EXTRAS_HEADINGS[extras.key]}</SectionHeading>
+        <KeyedView<ExtrasViewProps> key={track.id} views={EXTRAS_VIEWS} view={extras} />
       </section>
       <section className={styles.queue} aria-labelledby={queueId}>
         <SectionHeading
           id={queueId}
           aside={
             <Button tone="quiet" icon="close" onClick={clear}>
-              Clear
+              {NOW_PLAYING_COPY.clear}
             </Button>
           }
         >
-          Queue
+          {NOW_PLAYING_COPY.queue}
         </SectionHeading>
         <TrackList
           tracks={ordered}
@@ -271,10 +304,45 @@ export const NowPlayingPage = () => {
           currentPlace={queue.at}
           numberOf={({ index }) => index + 1}
           Trail={QueueControls}
-          label="Queue"
+          label={NOW_PLAYING_COPY.queue}
         />
       </section>
       {isAdding && <AddToPlaylistDialog tracks={[track]} onClose={() => setAdding(false)} />}
     </section>
+  )
+}
+
+const NOW_PLAYING_VIEW_KEYS = { empty: 'empty', playing: 'playing' } as const
+
+type NowPlayingViewProps = {
+  [NOW_PLAYING_VIEW_KEYS.empty]: Record<never, never>
+  [NOW_PLAYING_VIEW_KEYS.playing]: PlayingProps
+}
+
+const NOW_PLAYING_VIEWS = {
+  [NOW_PLAYING_VIEW_KEYS.empty]: NothingPlaying,
+  [NOW_PLAYING_VIEW_KEYS.playing]: Playing,
+} as const satisfies ViewsOf<NowPlayingViewProps>
+
+type NowPlayingViewOfProps = { track: Track | null }
+
+/** Which view the page shows: nothing playing, or the track that is. */
+const nowPlayingViewOf = ({ track }: NowPlayingViewOfProps): ViewOf<NowPlayingViewProps> => {
+  if (track === null) return { key: NOW_PLAYING_VIEW_KEYS.empty, props: {} }
+  return { key: NOW_PLAYING_VIEW_KEYS.playing, props: { track } }
+}
+
+/**
+ * `/now-playing`: the playing track large, with its cover, a scrubber,
+ * previous, play or pause, next, shuffle and repeat, then its lyrics, and
+ * the queue under them, each track playable, removable or moved up. An
+ * audiobook shows its chapters in place of lyrics, with chapter skips and
+ * a speed; never Skip intro, though a chapter may be named like one. Empty
+ * when nothing plays.
+ */
+export const NowPlayingPage = () => {
+  const track = useAudioQueue(playingTrackOf)
+  return (
+    <KeyedView<NowPlayingViewProps> views={NOW_PLAYING_VIEWS} view={nowPlayingViewOf({ track })} />
   )
 }

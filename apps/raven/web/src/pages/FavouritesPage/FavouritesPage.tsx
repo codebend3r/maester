@@ -24,8 +24,10 @@ import {
   favouriteTitlesQuery,
   favouritesQuery,
 } from '@/lib/queries'
+import { FAVOURITES_COPY } from '@/pages/FavouritesPage/copy'
 import styles from '@/pages/FavouritesPage/FavouritesPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** What a favourite can be, in the order the filter offers them. */
 const KINDS = {
@@ -140,18 +142,18 @@ export const FavouritesPage = () => {
       <BackButton fallback={HOME} />
       <header className={styles.header}>
         <PageTitle id={id} icon="heart">
-          Favourites
+          {COMMON_COPY.favourites}
         </PageTitle>
         {isSuccess && (
           <p className={styles.count}>
-            {plural({ n: shown, one: 'favourite', many: 'favourites' })}
+            {plural({ n: shown, one: FAVOURITES_COPY.favourite, many: FAVOURITES_COPY.favourites })}
           </p>
         )}
       </header>
 
       {kinds.length > 1 && (
         <fieldset className={styles.kinds}>
-          <legend className="visually-hidden">Show</legend>
+          <legend className="visually-hidden">{FAVOURITES_COPY.show}</legend>
           {[null, ...kinds].map((option) => (
             <button
               key={option ?? 'all'}
@@ -160,7 +162,7 @@ export const FavouritesPage = () => {
               aria-pressed={kind === option}
               onClick={() => setSearchParams(option ? { kind: option } : {}, { replace: true })}
             >
-              {option ? KIND_LABELS[option] : 'All'}
+              {option ? KIND_LABELS[option] : COMMON_COPY.all}
             </button>
           ))}
         </fieldset>
@@ -172,17 +174,14 @@ export const FavouritesPage = () => {
         </p>
       )}
       {isPending && !error && (
-        <Loading label="Gathering your favourites">
+        <Loading label={FAVOURITES_COPY.loading}>
           <ul className={styles.grid}>
             <SkeletonCards picture="poster" />
           </ul>
         </Loading>
       )}
       {isSuccess && all.length + allTitles.length + allAlbums.length + allArtists.length === 0 && (
-        <p className={styles.message}>
-          No favourites yet. Press the heart on a movie, show, season, album or artist page, or open
-          a video's menu, from the button in its corner or a right click, and choose Favourite.
-        </p>
+        <p className={styles.message}>{FAVOURITES_COPY.empty}</p>
       )}
       {posters > 0 && (
         <ul className={styles.grid}>
@@ -196,14 +195,14 @@ export const FavouritesPage = () => {
       )}
       {albums.length > 0 && (
         <section className={styles.music} aria-labelledby={albumsId}>
-          <SectionHeading id={albumsId}>Albums</SectionHeading>
+          <SectionHeading id={albumsId}>{COMMON_COPY.albums}</SectionHeading>
           <AlbumGrid albums={albums} />
         </section>
       )}
       {artists.length > 0 && (
         <section className={styles.music} aria-labelledby={artistsId}>
-          <SectionHeading id={artistsId}>Artists</SectionHeading>
-          <ArtistList artists={artists} label="Favourite artists" />
+          <SectionHeading id={artistsId}>{FAVOURITES_COPY.artists}</SectionHeading>
+          <ArtistList artists={artists} label={FAVOURITES_COPY.artistsLabel} />
         </section>
       )}
     </section>

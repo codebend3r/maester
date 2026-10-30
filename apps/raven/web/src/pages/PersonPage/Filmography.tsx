@@ -5,12 +5,13 @@ import {
   isFilmographyTab,
   tabCounts,
 } from '@raven/core'
-import { useMemo, useState } from 'react'
+import { type ComponentType, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { useAddressSearch } from '@/lib/useSearch'
 import { FilmographyBones, FilmographyTable, rolesOf } from '@/pages/PersonPage/FilmographyTable'
 import { FilmographyToolbar } from '@/pages/PersonPage/FilmographyToolbar'
+import { PERSON_COPY } from '@/pages/PersonPage/copy'
 import styles from '@/pages/PersonPage/PersonPage.module.scss'
 
 /** Text as a search compares it: no case, and no accents, so "amelie" finds Amélie. */
@@ -23,8 +24,6 @@ type MatchesProps = { entry: FilmographyEntry; query: string }
 const matches = ({ entry, query }: MatchesProps): boolean =>
   query === '' || fold(`${entry.title}\n${rolesOf(entry)}`).includes(query)
 
-const noTitles = (name: string): string => `TMDB lists no titles for ${name}.`
-
 type EmptyMessageProps = {
   rows: number
   query: string
@@ -34,8 +33,8 @@ type EmptyMessageProps = {
 /** What shows in place of a table with no rows, or null while it has some. */
 const emptyMessage = ({ rows, query, name }: EmptyMessageProps): string | null => {
   if (rows > 0) return null
-  if (query) return `No titles match "${query}".`
-  return noTitles(name)
+  if (query) return PERSON_COPY.noMatch(query)
+  return PERSON_COPY.noTitles(name)
 }
 
 /**
@@ -59,7 +58,7 @@ type FilmographySkeletonProps = { name: string }
 
 /** A person's whole filmography on its way: rows of stand-ins, which a screen reader hears as `name`'s. */
 export const FilmographySkeleton = ({ name }: FilmographySkeletonProps) => (
-  <Loading label={`Fetching ${name}'s filmography`}>
+  <Loading label={PERSON_COPY.fetchingFilmography(name)}>
     <FilmographyBones />
   </Loading>
 )
@@ -69,12 +68,20 @@ type FilmographyProps = {
   entries: readonly FilmographyEntry[]
 }
 
+type NoFilmographyProps = FilmographyProps
+
+/** A filmography TMDB lists nothing on. */
+const NoFilmography = ({ name }: NoFilmographyProps) => (
+  <p className={styles.message}>{PERSON_COPY.noTitles(name)}</p>
+)
+
+type ListedFilmographyProps = FilmographyProps
+
 /**
- * A person's whole filmography as TMDB lists it, raven's titles marked:
- * the search, the toggle and the tabs over the table. The tab rides in the
+ * The search, the toggle and the tabs over the table. The tab rides in the
  * address as `?credits=`, and one with nothing on it is All.
  */
-export const Filmography = ({ name, entries }: FilmographyProps) => {
+const ListedFilmography = ({ name, entries }: ListedFilmographyProps) => {
   const search = useAddressSearch()
   const [address] = useSearchParams()
   const [isSelfAsked, setIsSelfAsked] = useState(false)
@@ -92,7 +99,6 @@ export const Filmography = ({ name, entries }: FilmographyProps) => {
       matches({ entry, query: folded }),
     )
   }, [entries, tab, isSelfShown, query])
-  if (entries.length === 0) return <p className={styles.message}>{noTitles(name)}</p>
   const message = emptyMessage({ rows: rows.length, query, name })
   return (
     <>
@@ -108,4 +114,21 @@ export const Filmography = ({ name, entries }: FilmographyProps) => {
       {message != null && <p className={styles.message}>{message}</p>}
     </>
   )
+}
+
+/** Whether TMDB lists any titles for them. */
+const FILMOGRAPHY_KEYS = { empty: 'empty', listed: 'listed' } as const
+
+type FilmographyKey = (typeof FILMOGRAPHY_KEYS)[keyof typeof FILMOGRAPHY_KEYS]
+
+const FILMOGRAPHY_VIEWS = {
+  [FILMOGRAPHY_KEYS.empty]: NoFilmography,
+  [FILMOGRAPHY_KEYS.listed]: ListedFilmography,
+} as const satisfies Record<FilmographyKey, ComponentType<FilmographyProps>>
+
+/** A person's whole filmography as TMDB lists it, raven's titles marked. */
+export const Filmography = ({ name, entries }: FilmographyProps) => {
+  const View =
+    FILMOGRAPHY_VIEWS[entries.length === 0 ? FILMOGRAPHY_KEYS.empty : FILMOGRAPHY_KEYS.listed]
+  return <View name={name} entries={entries} />
 }

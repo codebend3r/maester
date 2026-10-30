@@ -1,9 +1,8 @@
 import {
-  ACCOUNT_TICKET_SECONDS,
   AUTH_CONFIG_STATES,
-  MEDIA_TICKET_SECONDS,
   type MediaItem,
   ROUTE_STATES,
+  type RoutePending,
   type RouteQuery,
   SESSION_KINDS,
   type ViewingSession,
@@ -17,7 +16,7 @@ import {
   watchLink,
   PLAYER_SOURCE_KINDS,
 } from '@raven/core'
-import { useState } from 'react'
+import { type ComponentType, useState } from 'react'
 import {
   ButtonLink,
   type MediaPlane,
@@ -32,6 +31,9 @@ import {
   useHostPlayer,
   usePlayerPrefs,
   ENGINE_KINDS,
+  KeyedView,
+  type ViewOf,
+  type ViewsOf,
 } from '@raven/ui/headless'
 import { useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { DesktopWatch } from '@/desktop/DesktopWatch/DesktopWatch'
@@ -46,13 +48,9 @@ import { useMediaMutations } from '@/lib/useMediaMutations'
 import { useTicketFollowsSession } from '@/lib/useTicketFollowsSession'
 import { ravenVersion } from '@/lib/version'
 import { useIsDesktop } from '@/stores/desktop'
+import { WATCH_PAGE_COPY } from '@/pages/WatchPage/copy'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
-
-/** How long a copied file link plays, as long as the ticket it carries: an account ticket can end sooner, with its token. */
-const LINK_LIFE = {
-  account: `up to ${ACCOUNT_TICKET_SECONDS / 60} minutes`,
-  legacy: `${MEDIA_TICKET_SECONDS / 3600} hours`,
-} as const
+import { COMMON_COPY } from '@/lib/copy'
 
 /** Where a season played on its own looks for the next season's first episode. */
 const SHOW_SESSION = { kind: SESSION_KINDS.show } as const satisfies ViewingSession
@@ -60,33 +58,54 @@ const SHOW_SESSION = { kind: SESSION_KINDS.show } as const satisfies ViewingSess
 /** Where a video that cannot play goes back to. */
 const LIBRARIES_PATH = '/libraries'
 
+const WaitingLine = () => <p aria-live="polite">{COMMON_COPY.loading}</p>
+
+type RefusedLineProps = { message: string }
+
+const RefusedLine = ({ message }: RefusedLineProps) => (
+  <>
+    <p role="alert">{message}</p>
+    <ButtonLink to={LIBRARIES_PATH} tone="pill" icon="back" className={styles.back}>
+      {WATCH_PAGE_COPY.backToLibraries}
+    </ButtonLink>
+  </>
+)
+
+const MESSAGE_LINE_KEYS = { waiting: 'waiting', refused: 'refused' } as const
+
+type MessageLineProps = {
+  [MESSAGE_LINE_KEYS.waiting]: Record<never, never>
+  [MESSAGE_LINE_KEYS.refused]: RefusedLineProps
+}
+
+const MESSAGE_LINES = {
+  [MESSAGE_LINE_KEYS.waiting]: WaitingLine,
+  [MESSAGE_LINE_KEYS.refused]: RefusedLine,
+} as const satisfies ViewsOf<MessageLineProps>
+
+type MessageLineOfProps = { message: string | null }
+
+const messageLineOf = ({ message }: MessageLineOfProps): ViewOf<MessageLineProps> => {
+  if (message === null) return { key: MESSAGE_LINE_KEYS.waiting, props: {} }
+  return { key: MESSAGE_LINE_KEYS.refused, props: { message } }
+}
+
 type WatchMessageProps = { message: string | null }
 
 /** The player's place while there is no video: waiting for one (a null message), or saying why. */
 const WatchMessage = ({ message }: WatchMessageProps) => (
   <main className={styles.page}>
-    {message === null ? (
-      <p aria-live="polite">Loading</p>
-    ) : (
-      <>
-        <p role="alert">{message}</p>
-        <ButtonLink to={LIBRARIES_PATH} tone="pill" icon="back" className={styles.back}>
-          Back to libraries
-        </ButtonLink>
-      </>
-    )}
+    <KeyedView<MessageLineProps> views={MESSAGE_LINES} view={messageLineOf({ message })} />
   </main>
 )
 
 /** What the player's place says while the video is not there: nothing yet, or why not. */
-const messageOf = (
-  page: Exclude<RouteQuery<MediaItem>, { state: typeof ROUTE_STATES.ready }>,
-): string | null => {
+const messageOf = (page: RoutePending): string | null => {
   switch (page.state) {
     case ROUTE_STATES.loading:
       return null
     case ROUTE_STATES.missing:
-      return 'This video is no longer in any library.'
+      return WATCH_PAGE_COPY.missing
     case ROUTE_STATES.error:
       return page.message
     default: {
@@ -113,22 +132,69 @@ export const WatchPage = () => {
     query: useQuery({ ...mediaQuery(id), initialData: handed?.media }),
   })
   useLeaveFullscreen()
+  return (
+    <KeyedView<WatchViewProps>
+      views={WATCH_VIEWS}
+      view={watchViewOf({ page, isDesktop, search, handed })}
+    />
+  )
+}
 
-  if (page.state === ROUTE_STATES.ready) {
-    return (
-      <WatchPlayer
-        // A play link Raven opens for the title on screen names where to start: a new player.
-        key={isDesktop ? `${page.data.id}${search}` : page.data.id}
-        media={page.data}
-        session={handed?.session ?? sessionOf(page.data)}
-        upNext={handed?.upNext ?? []}
-        backTo={`/libraries/${page.data.libraryId}`}
-      />
-    )
-  }
+type PlayingProps = { playKey: string | number; player: WatchPlayerProps }
+
+/** A play link Raven opens for the title on screen names where to start: a new player. */
+const Playing = ({ playKey, player }: PlayingProps) => <WatchPlayer key={playKey} {...player} />
+
+type DesktopMessageProps = Parameters<typeof PlayerMessage>[0]
+
+const WATCH_VIEW_KEYS = { playing: 'playing', desktop: 'desktop', browser: 'browser' } as const
+
+type WatchViewProps = {
+  [WATCH_VIEW_KEYS.playing]: PlayingProps
+  [WATCH_VIEW_KEYS.desktop]: DesktopMessageProps
+  [WATCH_VIEW_KEYS.browser]: WatchMessageProps
+}
+
+const WATCH_VIEWS = {
+  [WATCH_VIEW_KEYS.playing]: Playing,
+  [WATCH_VIEW_KEYS.desktop]: PlayerMessage,
+  [WATCH_VIEW_KEYS.browser]: WatchMessage,
+} as const satisfies ViewsOf<WatchViewProps>
+
+type WatchViewOfProps = {
+  page: RouteQuery<MediaItem>
+  isDesktop: boolean
+  search: string
+  handed: ReturnType<typeof readWatchState>
+}
+
+/** The video's player once it is in, else the player's place saying why not, Raven's or the browser's. */
+const watchViewOf = ({
+  page,
+  isDesktop,
+  search,
+  handed,
+}: WatchViewOfProps): ViewOf<WatchViewProps> => {
+  if (page.state === ROUTE_STATES.ready)
+    return {
+      key: WATCH_VIEW_KEYS.playing,
+      props: {
+        playKey: isDesktop ? `${page.data.id}${search}` : page.data.id,
+        player: {
+          media: page.data,
+          session: handed?.session ?? sessionOf(page.data),
+          upNext: handed?.upNext ?? [],
+          backTo: `/libraries/${page.data.libraryId}`,
+        },
+      },
+    }
   // Outside the side menu, Raven's window has no other way back while this waits.
-  if (isDesktop) return <PlayerMessage message={messageOf(page)} fallback={LIBRARIES_PATH} />
-  return <WatchMessage message={messageOf(page)} />
+  if (isDesktop)
+    return {
+      key: WATCH_VIEW_KEYS.desktop,
+      props: { message: messageOf(page), fallback: LIBRARIES_PATH },
+    }
+  return { key: WATCH_VIEW_KEYS.browser, props: { message: messageOf(page) } }
 }
 
 type WatchPlayerProps = {
@@ -174,11 +240,11 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
   const copyLink = () => {
     const href = api.fileUrl({ id: media.id, access: mediaPlane.access })
     const link = href.startsWith('/') ? new URL(href, window.location.origin).href : href
-    const life = hasAccounts ? LINK_LIFE.account : LINK_LIFE.legacy
-    const lasts = mediaPlane.access ? `; it works for ${life}` : ''
+    const life = hasAccounts ? WATCH_PAGE_COPY.linkLife.account : WATCH_PAGE_COPY.linkLife.legacy
+    const lasts = mediaPlane.access ? WATCH_PAGE_COPY.linkLasts(life) : ''
     navigator.clipboard.writeText(link).then(
-      () => setCopied(`Link copied. Paste it into VLC or IINA to play it there${lasts}.`),
-      () => setCopied(`Copy this link: ${link}`),
+      () => setCopied(WATCH_PAGE_COPY.linkCopied(lasts)),
+      () => setCopied(WATCH_PAGE_COPY.copyThisLink(link)),
     )
   }
   const isDesktop = useIsDesktop()
@@ -214,7 +280,7 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
       },
     },
     posterUrl: api.thumbnailUrl(media),
-    escape: { label: 'Copy file link', run: copyLink },
+    escape: { label: WATCH_PAGE_COPY.copyFileLink, run: copyLink },
     escapeFeedback: copied,
     favourite: {
       isFavourite: media.favourite,
@@ -228,7 +294,7 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
     ...(opensInRavenPlayer &&
       !isDesktop && {
         handoff: {
-          label: 'Open in Raven',
+          label: WATCH_PAGE_COPY.openInRaven,
           run: (at) =>
             ravenPlayer.open(
               playLinkFor({
@@ -241,11 +307,9 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
         },
       }),
   }
-  return isDesktop ? (
-    <DesktopWatch services={services} media={media} upNext={queued} />
-  ) : (
-    <BrowserWatch services={services} media={media} mediaPlane={mediaPlane} />
-  )
+  const host = isDesktop ? HOST_KEYS.desktop : HOST_KEYS.browser
+  const Host = HOSTS[host]
+  return <Host services={services} media={media} upNext={queued} mediaPlane={mediaPlane} />
 }
 
 type BrowserWatchProps = {
@@ -253,6 +317,8 @@ type BrowserWatchProps = {
   media: MediaItem
   mediaPlane: MediaPlane
 }
+
+type HostProps = BrowserWatchProps & { upNext: readonly MediaItem[] }
 
 /** The browser's own video, hosted for as long as it plays. */
 const BrowserWatch = ({ services, media, mediaPlane }: BrowserWatchProps) => {
@@ -268,3 +334,13 @@ const BrowserWatch = ({ services, media, mediaPlane }: BrowserWatchProps) => {
     )
   )
 }
+
+const HOST_KEYS = { desktop: 'desktop', browser: 'browser' } as const
+
+type HostKey = (typeof HOST_KEYS)[keyof typeof HOST_KEYS]
+
+/** Raven plays through its own player; the browser hosts its video element. */
+const HOSTS = {
+  [HOST_KEYS.desktop]: DesktopWatch,
+  [HOST_KEYS.browser]: BrowserWatch,
+} as const satisfies Record<HostKey, ComponentType<HostProps>>
