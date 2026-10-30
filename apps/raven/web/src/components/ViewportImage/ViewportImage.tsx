@@ -19,6 +19,11 @@ const stopWatching = (image: Element): void => {
   listeners.delete(image)
 }
 
+type ViewportImageProps = Omit<ComponentProps<'img'>, 'ref' | 'loading' | 'decoding' | 'alt'> & {
+  src: string
+  alt: string
+}
+
 /**
  * A listing's picture, asked for only once it nears the screen. One that
  * scrolls away before it arrives lets its request go, so a fast scroll
@@ -27,16 +32,7 @@ const stopWatching = (image: Element): void => {
  * arrived is no longer watched, so it stays. It is lazy as well, which
  * `sizes="auto"` needs.
  */
-export const ViewportImage = ({
-  src,
-  srcSet,
-  alt,
-  onLoad,
-  ...rest
-}: Omit<ComponentProps<'img'>, 'ref' | 'loading' | 'decoding' | 'alt'> & {
-  src: string
-  alt: string
-}) => {
+export const ViewportImage = ({ src, srcSet, alt, onLoad, ...rest }: ViewportImageProps) => {
   const [isNear, setNear] = useState(false)
   const ref = useCallback((image: HTMLImageElement | null) => {
     if (!image) return

@@ -1,11 +1,48 @@
 import { type ItemSummary, type MediaItem, cardTitle } from '@raven/core'
-import { useState } from 'react'
+import { type ComponentType, useState } from 'react'
 import { api } from '@/lib/api'
 import { type PosterSizes, posterSources } from '@/lib/posters'
 import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/PosterImage/PosterImage.module.scss'
 
 type Source = NonNullable<ReturnType<typeof posterSources>>
+
+/** Whether a source is left to load, or every one failed and the initial stands in. */
+const PICTURE_STATES = { image: 'image', initial: 'initial' } as const
+
+type PictureState = (typeof PICTURE_STATES)[keyof typeof PICTURE_STATES]
+
+type PictureViewProps = {
+  source: Source | undefined
+  initial: string
+  onFail: (src: string) => void
+}
+
+type PictureImageProps = PictureViewProps
+
+const PictureImage = ({ source, onFail }: PictureImageProps) =>
+  source !== undefined && (
+    <ViewportImage
+      key={source.src}
+      className={styles.image}
+      {...source}
+      alt=""
+      onError={() => onFail(source.src)}
+    />
+  )
+
+type PictureInitialProps = PictureViewProps
+
+const PictureInitial = ({ initial }: PictureInitialProps) => (
+  <span className={styles.placeholder} aria-hidden="true">
+    {initial}
+  </span>
+)
+
+const PICTURE_VIEWS = {
+  [PICTURE_STATES.image]: PictureImage,
+  [PICTURE_STATES.initial]: PictureInitial,
+} as const satisfies Record<PictureState, ComponentType<PictureViewProps>>
 
 type PictureProps = { sources: Source[]; initial: string }
 
@@ -17,20 +54,13 @@ type PictureProps = { sources: Source[]; initial: string }
 export const Picture = ({ sources, initial }: PictureProps) => {
   const [failed, setFailed] = useState<ReadonlyArray<string>>([])
   const source = sources.find(({ src }) => !failed.includes(src))
-  if (!source) {
-    return (
-      <span className={styles.placeholder} aria-hidden="true">
-        {initial}
-      </span>
-    )
-  }
+  const View: ComponentType<PictureViewProps> =
+    PICTURE_VIEWS[source === undefined ? PICTURE_STATES.initial : PICTURE_STATES.image]
   return (
-    <ViewportImage
-      key={source.src}
-      className={styles.image}
-      {...source}
-      alt=""
-      onError={() => setFailed((current) => [...current, source.src])}
+    <View
+      source={source}
+      initial={initial}
+      onFail={(src) => setFailed((current) => [...current, src])}
     />
   )
 }

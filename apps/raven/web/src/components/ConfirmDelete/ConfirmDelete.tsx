@@ -1,9 +1,11 @@
 import { type MediaItem, mediaLabel } from '@raven/core'
 import { useId } from 'react'
 import { Button } from '@raven/ui'
+import { CONFIRM_DELETE_COPY } from '@/components/ConfirmDelete/copy'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import { useModal } from '@/lib/useModal'
 import styles from '@/components/ConfirmDelete/ConfirmDelete.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type ConfirmDeleteProps = {
   media: MediaItem
@@ -25,17 +27,17 @@ export const ConfirmDelete = ({ media, onClose, onDeleted }: ConfirmDeleteProps)
     <dialog ref={dialog} className={styles.dialog} aria-labelledby={id} onClose={onClose}>
       <div className={styles.body}>
         <h2 id={id} className={styles.title}>
-          Delete {mediaLabel(media)}?
+          {CONFIRM_DELETE_COPY.title(mediaLabel(media))}
         </h2>
         <p className={styles.fileName}>{media.fileName}</p>
-        <p className={styles.hint}>This removes the file from disk. It cannot be undone.</p>
+        <p className={styles.hint}>{CONFIRM_DELETE_COPY.hint}</p>
         {remove.isError && (
           <p role="alert" className={styles.error}>
             {remove.error.message}
           </p>
         )}
         <div className={styles.actions}>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{COMMON_COPY.cancel}</Button>
           <Button
             tone="danger"
             icon="trash"
@@ -49,7 +51,7 @@ export const ConfirmDelete = ({ media, onClose, onDeleted }: ConfirmDeleteProps)
               })
             }
           >
-            Delete for good
+            {COMMON_COPY.deleteForGood}
           </Button>
         </div>
       </div>

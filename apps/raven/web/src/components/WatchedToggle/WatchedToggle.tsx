@@ -1,6 +1,7 @@
 import type { WatchedState } from '@raven/core'
 import { Button } from '@raven/ui'
 import styles from '@/components/WatchedToggle/WatchedToggle.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 const PRESSED = { unwatched: false, partly: 'mixed', watched: true } as const satisfies Record<
   WatchedState,
@@ -24,7 +25,7 @@ type WatchedToggleProps = {
 export const WatchedToggle = ({
   state,
   onToggle,
-  label = 'Watched',
+  label = COMMON_COPY.watched,
   isLabelShown = true,
   className,
 }: WatchedToggleProps) => (

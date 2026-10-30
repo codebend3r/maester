@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useId } from 'react'
 import { Icon } from '@raven/ui'
 import styles from '@/components/Bucket/Bucket.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type BucketProps = {
   /** Text, or text with a mark: a resolution's group wears its chip. */
@@ -23,7 +24,8 @@ export const Bucket = ({ label, count, children }: BucketProps) => {
       <summary className={styles.summary} aria-labelledby={id}>
         <h2 id={id} className={styles.heading}>
           {label}
-          <span className="visually-hidden">, </span>
+          {/* Read between the label and the count, so a screen reader pauses there. */}
+          <span className="visually-hidden">{COMMON_COPY.listSeparator}</span>
           <span className={styles.count}>{count}</span>
         </h2>
         <span className={styles.chevron} aria-hidden="true">

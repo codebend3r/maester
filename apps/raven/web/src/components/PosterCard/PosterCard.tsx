@@ -1,6 +1,7 @@
 import {
   type ItemSummary,
   MATCH_STATES,
+  RATING_SOURCES,
   type MatchItemType,
   type MediaItem,
   type MediaSort,
@@ -28,7 +29,9 @@ import { api } from '@/lib/api'
 import type { PosterSizes } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
+import { POSTER_CARD_COPY } from '@/components/PosterCard/copy'
 import styles from '@/components/PosterCard/PosterCard.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type PosterFrameProps = {
   media: MediaItem
@@ -95,7 +98,7 @@ type PosterCardProps = {
 export const PosterCard = ({
   media,
   matchType = null,
-  ratingsSource = 'tmdb',
+  ratingsSource = RATING_SOURCES.tmdb,
   sort,
   poster,
   sizes,
@@ -114,9 +117,9 @@ export const PosterCard = ({
   const { sorted, isYearSaid } = cardSortFact({ media, sort })
   const facts = [
     year == null || isYearSaid ? null : String(year),
-    media.versions > 1 ? `${media.versions} versions` : null,
+    media.versions > 1 ? POSTER_CARD_COPY.versions(media.versions) : null,
     year == null && media.versions === 1 ? formatRuntime(media.duration) : null,
-    media.match === MATCH_STATES.unmatched ? 'Not matched' : null,
+    media.match === MATCH_STATES.unmatched ? COMMON_COPY.notMatched : null,
   ].filter((fact): fact is string => fact != null && fact !== sorted)
 
   return (
@@ -142,7 +145,7 @@ export const PosterCard = ({
           media={media}
           play={
             hasPage && !select.selecting
-              ? { ...watchLink({ media }), label: `Play ${title}` }
+              ? { ...watchLink({ media }), label: POSTER_CARD_COPY.play(title) }
               : null
           }
         />

@@ -4,6 +4,7 @@ import {
   type RatingSource,
   type ShowEntry,
   type SortColumn,
+  TABLE_SORT_DIRECTIONS,
   WATCHED_STATES,
   episodeCode,
   showEntryKey,
@@ -23,24 +24,23 @@ import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { POSTER_SIZES } from '@/lib/posters'
 import { useTableSort } from '@/lib/useTableSort'
 import { useSelectable } from '@/lib/useSelectable'
+import { SHOW_CARD_COPY } from '@/components/ShowCard/copy'
 import styles from '@/components/ShowCard/ShowViews.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
-const episodesLabel = (entry: ShowEntry): string =>
-  `${entry.episodes} ${entry.episodes === 1 ? 'episode' : 'episodes'}`
+type NextPlayProps = { title: string; next: NonNullable<ShowEntry['next']> }
 
-type NextPlayProps = { entry: ShowEntry }
-
-/** The play button a show's row carries: its first episode not yet watched, when there is one. */
-const NextPlay = ({ entry }: NextPlayProps) => {
-  const { show, next } = entry
-  if (!next) return null
+/** The play button a show's row carries: its first episode not yet watched. */
+const NextPlay = ({ title, next }: NextPlayProps) => {
   const code = next.item ? episodeCode(next.item) : null
   return (
     <CardLink
       to={watchPageOf(next.id)}
       state={{ media: next }}
       className={styles.play}
-      aria-label={code ? `Play ${show.title} ${code}` : `Play ${show.title}`}
+      aria-label={
+        code ? SHOW_CARD_COPY.playEpisode({ title, code }) : SHOW_CARD_COPY.playShow(title)
+      }
     >
       <Icon name="play" size={16} />
     </CardLink>
@@ -65,13 +65,20 @@ const SmallPoster = ({ entry, inRow = false }: SmallPosterProps) => (
 )
 
 const RATING_COLUMNS: readonly { source: RatingSource; label: string }[] = [
-  { source: 'rottenTomatoes', label: 'RT' },
-  { source: 'imdb', label: 'IMDb' },
-  { source: 'metacritic', label: 'Metacritic' },
-  { source: 'tmdb', label: 'TMDB' },
+  { source: RATING_SOURCES.rottenTomatoes, label: SHOW_CARD_COPY.rottenTomatoes },
+  { source: RATING_SOURCES.imdb, label: COMMON_COPY.imdb },
+  { source: RATING_SOURCES.metacritic, label: SHOW_CARD_COPY.metacritic },
+  { source: RATING_SOURCES.tmdb, label: COMMON_COPY.tmdb },
 ]
 
-type Column = 'title' | 'years' | 'episodes' | RatingSource
+/** The columns besides the scores that the show table sorts by. */
+const FACT_COLUMNS = {
+  title: 'title',
+  years: 'years',
+  episodes: 'episodes',
+} as const
+
+type Column = (typeof FACT_COLUMNS)[keyof typeof FACT_COLUMNS] | RatingSource
 
 type ScoreProps = { entry: ShowEntry; source: RatingSource }
 
@@ -79,19 +86,28 @@ const score = ({ entry, source }: ScoreProps): number | null =>
   entry.show.ratings.find((rating) => rating.source === source)?.value ?? null
 
 const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
-  title: { value: (entry) => sortTitle(entry.show.title), first: 'asc' },
-  years: { value: (entry) => entry.show.year, first: 'desc' },
-  episodes: { value: (entry) => entry.episodes, first: 'desc' },
-  rottenTomatoes: {
+  [FACT_COLUMNS.title]: {
+    value: (entry) => sortTitle(entry.show.title),
+    first: TABLE_SORT_DIRECTIONS.asc,
+  },
+  [FACT_COLUMNS.years]: { value: (entry) => entry.show.year, first: TABLE_SORT_DIRECTIONS.desc },
+  [FACT_COLUMNS.episodes]: { value: (entry) => entry.episodes, first: TABLE_SORT_DIRECTIONS.desc },
+  [RATING_SOURCES.rottenTomatoes]: {
     value: (entry) => score({ entry, source: RATING_SOURCES.rottenTomatoes }),
-    first: 'desc',
+    first: TABLE_SORT_DIRECTIONS.desc,
   },
-  imdb: { value: (entry) => score({ entry, source: RATING_SOURCES.imdb }), first: 'desc' },
-  metacritic: {
+  [RATING_SOURCES.imdb]: {
+    value: (entry) => score({ entry, source: RATING_SOURCES.imdb }),
+    first: TABLE_SORT_DIRECTIONS.desc,
+  },
+  [RATING_SOURCES.metacritic]: {
     value: (entry) => score({ entry, source: RATING_SOURCES.metacritic }),
-    first: 'desc',
+    first: TABLE_SORT_DIRECTIONS.desc,
   },
-  tmdb: { value: (entry) => score({ entry, source: RATING_SOURCES.tmdb }), first: 'desc' },
+  [RATING_SOURCES.tmdb]: {
+    value: (entry) => score({ entry, source: RATING_SOURCES.tmdb }),
+    first: TABLE_SORT_DIRECTIONS.desc,
+  },
 }
 
 type ShowRowProps = { entry: ShowEntry }
@@ -127,7 +143,11 @@ const ShowRow = ({ entry }: ShowRowProps) => {
           </td>
         )
       })}
-      <td className={styles.playCell}>{!select.selecting && <NextPlay entry={entry} />}</td>
+      <td className={styles.playCell}>
+        {!select.selecting && !!entry.next && (
+          <NextPlay title={entry.show.title} next={entry.next} />
+        )}
+      </td>
     </tr>
   )
 }
@@ -150,18 +170,18 @@ export const ShowList = ({ shows }: ShowListProps) => {
   )
   return (
     <div className={styles.room}>
-      <table className={styles.table} aria-label="Shows">
+      <table className={styles.table} aria-label={SHOW_CARD_COPY.shows}>
         <thead>
           <tr>
-            {header({ key: 'title', label: 'Title' })}
+            {header({ key: FACT_COLUMNS.title, label: COMMON_COPY.title })}
             {header({
-              key: 'years',
-              label: 'Years',
+              key: FACT_COLUMNS.years,
+              label: SHOW_CARD_COPY.years,
               className: `${styles.number} ${styles.spare}`,
             })}
             {header({
-              key: 'episodes',
-              label: 'Episodes',
+              key: FACT_COLUMNS.episodes,
+              label: SHOW_CARD_COPY.episodes,
               className: `${styles.number} ${styles.spare}`,
             })}
             {RATING_COLUMNS.map((column) =>
@@ -172,7 +192,7 @@ export const ShowList = ({ shows }: ShowListProps) => {
               }),
             )}
             <th scope="col">
-              <span className="visually-hidden">Play</span>
+              <span className="visually-hidden">{COMMON_COPY.play}</span>
             </th>
           </tr>
         </thead>
@@ -194,7 +214,7 @@ const ShowTile = ({ entry, sort }: ShowTileProps) => {
   const sorted = sort ? showSortFact({ entry, sort }) : null
   const facts = [
     showYears({ year: entry.show.year, endedYear: entry.endedYear }),
-    episodesLabel(entry),
+    COMMON_COPY.episodes(entry.episodes),
   ].filter((fact): fact is string => fact != null)
   const isStarted =
     watchedStateOf({ watched: entry.watchedEpisodes, total: entry.episodes }) !==
@@ -226,7 +246,7 @@ const ShowTile = ({ entry, sort }: ShowTileProps) => {
         </span>
         {entry.show.ratings.length > 0 && <RatingChip ratings={entry.show.ratings} />}
       </div>
-      {!select.selecting && <NextPlay entry={entry} />}
+      {!select.selecting && !!entry.next && <NextPlay title={entry.show.title} next={entry.next} />}
     </li>
   )
 }
@@ -239,7 +259,7 @@ type ShowTilesProps = {
 
 /** Every show as a tile, as many side by side as fit, each a small poster beside its facts. */
 export const ShowTiles = ({ shows, sort }: ShowTilesProps) => (
-  <ul className={styles.tiles} aria-label="Shows">
+  <ul className={styles.tiles} aria-label={SHOW_CARD_COPY.shows}>
     {shows.map((entry) => (
       <ShowTile key={entry.show.id} entry={entry} sort={sort} />
     ))}

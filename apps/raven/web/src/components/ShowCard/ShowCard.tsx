@@ -1,5 +1,6 @@
 import {
   type MediaSort,
+  RATING_SOURCES,
   type RatingSource,
   type ShowEntry,
   WATCHED_STATES,
@@ -25,7 +26,9 @@ import { POSTER_SIZES, type PosterSizes, posterSources } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
 import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
+import { SHOW_CARD_COPY } from '@/components/ShowCard/copy'
 import styles from '@/components/ShowCard/ShowCard.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type UseShowCardProps = {
   entry: ShowEntry
@@ -57,9 +60,11 @@ const useShowCard = ({ entry, ratingsSource, sort }: UseShowCardProps) => {
     sorted: sort ? showSortFact({ entry, sort }) : null,
     facts: [
       showYears({ year: show.year, endedYear: entry.endedYear }),
-      `${entry.episodes} ${entry.episodes === 1 ? 'episode' : 'episodes'}`,
+      COMMON_COPY.episodes(entry.episodes),
     ].filter((fact): fact is string => fact != null),
-    playLabel: code ? `Play ${show.title} ${code}` : `Play ${show.title}`,
+    playLabel: code
+      ? SHOW_CARD_COPY.playEpisode({ title: show.title, code })
+      : SHOW_CARD_COPY.playShow(show.title),
   }
 }
 
@@ -103,7 +108,12 @@ type ShowCardProps = {
  * so the player starts at once. Sorted by when shows were added, it says
  * when the newest episode came.
  */
-export const ShowCard = ({ entry, ratingsSource = 'tmdb', sort, sizes }: ShowCardProps) => {
+export const ShowCard = ({
+  entry,
+  ratingsSource = RATING_SOURCES.tmdb,
+  sort,
+  sizes,
+}: ShowCardProps) => {
   const { show, next } = entry
   const card = useShowCard({ entry, ratingsSource, sort })
 
@@ -169,14 +179,14 @@ type WideShowCardProps = {
  * page and its play button starts that episode at once. The wash is the
  * poster again, blurred: the same file, so nothing more is fetched.
  */
-const WideShowCard = ({ entry, ratingsSource = 'tmdb', sort }: WideShowCardProps) => {
+const WideShowCard = ({ entry, ratingsSource = RATING_SOURCES.tmdb, sort }: WideShowCardProps) => {
   const { show, next } = entry
   const card = useShowCard({ entry, ratingsSource, sort })
   const wash = posterSources({ item: show, sizes: POSTER_SIZES.showCard })
   const isWatched =
     watchedStateOf({ watched: entry.watchedEpisodes, total: entry.episodes }) ===
     WATCHED_STATES.watched
-  const nextLabel = [card.code, next?.item?.title].filter(Boolean).join(' · ')
+  const nextLabel = [card.code, next?.item?.title].filter(Boolean).join(COMMON_COPY.separator)
 
   return (
     <li
@@ -224,13 +234,13 @@ const WideShowCard = ({ entry, ratingsSource = 'tmdb', sort }: WideShowCardProps
             aria-label={card.playLabel}
           >
             <Icon name="play" size={14} />
-            <span className={styles.nextLabel}>{nextLabel || 'Play'}</span>
+            <span className={styles.nextLabel}>{nextLabel || COMMON_COPY.play}</span>
           </CardLink>
         )}
         {!next && isWatched && (
           <span className={styles.done} aria-hidden="true">
             <Icon name="check" size={16} />
-            All watched
+            {SHOW_CARD_COPY.allWatched}
           </span>
         )}
       </div>
@@ -254,7 +264,7 @@ type ShowGridProps = {
 }
 
 /** The grid a TV library lays its shows out in, each a wide card. */
-export const ShowGrid = ({ shows, ratingsSource = 'tmdb', sort }: ShowGridProps) => (
+export const ShowGrid = ({ shows, ratingsSource = RATING_SOURCES.tmdb, sort }: ShowGridProps) => (
   <ul className={styles.grid}>
     {shows.map((entry) => (
       <WideShowCard key={entry.show.id} entry={entry} ratingsSource={ratingsSource} sort={sort} />

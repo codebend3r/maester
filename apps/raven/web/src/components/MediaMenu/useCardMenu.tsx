@@ -31,7 +31,7 @@ export const useCardMenu = ({
       event.preventDefault()
       setOpen(true)
     },
-    menu: selecting ? null : (
+    menu: !selecting && (
       <MediaMenu
         media={media}
         open={open}

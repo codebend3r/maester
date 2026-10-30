@@ -1,9 +1,44 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { HeroPickChange } from '@raven/core'
+import type { HeroPickChange, HeroPicks } from '@raven/core'
 import { Button, useToasts } from '@raven/ui'
 import { afterHeroPicked } from '@raven/ui/headless'
+import { HERO_TOGGLE_COPY } from '@/components/HeroToggle/copy'
 import { api } from '@/lib/api'
 import { heroPicksQuery } from '@/lib/queries'
+
+type HeroTitleProps = { isFull: boolean; isShown: boolean; limit: number }
+
+/** What the switch says it will do on a hover. */
+const heroTitle = ({ isFull, isShown, limit }: HeroTitleProps): string => {
+  if (isFull) return HERO_TOGGLE_COPY.heroFull(limit)
+  if (isShown) return HERO_TOGGLE_COPY.takeOut
+  return HERO_TOGGLE_COPY.putIn
+}
+
+type HeroSwitchProps = { itemId: number; picks: HeroPicks }
+
+const HeroSwitch = ({ itemId, picks }: HeroSwitchProps) => {
+  const queryClient = useQueryClient()
+  const showNotice = useToasts((state) => state.show)
+  const update = useMutation({
+    mutationFn: (pick: HeroPickChange) => api.setHeroPick(pick),
+    onSuccess: () => afterHeroPicked(queryClient),
+    onError: (error) => showNotice(error.message),
+  })
+  const isShown = picks.itemIds.includes(itemId)
+  const isFull = !isShown && picks.itemIds.length >= picks.limit
+  return (
+    <Button
+      icon="pin"
+      aria-pressed={isShown}
+      disabled={update.isPending || isFull}
+      title={heroTitle({ isFull, isShown, limit: picks.limit })}
+      onClick={() => update.mutate({ itemId, isShown: !isShown })}
+    >
+      {isShown ? HERO_TOGGLE_COPY.inHero : HERO_TOGGLE_COPY.addToHero}
+    </Button>
+  )
+}
 
 type HeroToggleProps = { itemId: number }
 
@@ -13,32 +48,6 @@ type HeroToggleProps = { itemId: number }
  * for the picks, and a title not yet in is held back while the hero is full.
  */
 export const HeroToggle = ({ itemId }: HeroToggleProps) => {
-  const queryClient = useQueryClient()
-  const showNotice = useToasts((state) => state.show)
   const picks = useQuery(heroPicksQuery)
-  const update = useMutation({
-    mutationFn: (pick: HeroPickChange) => api.setHeroPick(pick),
-    onSuccess: () => afterHeroPicked(queryClient),
-    onError: (error) => showNotice(error.message),
-  })
-  if (!picks.data) return null
-  const isShown = picks.data.itemIds.includes(itemId)
-  const isFull = !isShown && picks.data.itemIds.length >= picks.data.limit
-  return (
-    <Button
-      icon="pin"
-      aria-pressed={isShown}
-      disabled={update.isPending || isFull}
-      title={
-        isFull
-          ? `The hero holds at most ${picks.data.limit} titles; take one out first`
-          : isShown
-            ? "Take this title out of Home's hero"
-            : "Show this title in Home's hero"
-      }
-      onClick={() => update.mutate({ itemId, isShown: !isShown })}
-    >
-      {isShown ? 'In hero' : 'Add to hero'}
-    </Button>
-  )
+  return picks.data !== undefined && <HeroSwitch itemId={itemId} picks={picks.data} />
 }

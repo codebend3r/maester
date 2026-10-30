@@ -1,7 +1,32 @@
 import { type ItemSummary, itemPath } from '@raven/core'
+import type { ComponentType } from 'react'
 import { Link } from 'react-router-dom'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import styles from '@/components/TitleCard/TitleCard.module.scss'
+
+/** Whether the title has a poster to show, or stands in with its initial. */
+const POSTER_STATES = { picture: 'picture', initial: 'initial' } as const
+
+type PosterState = (typeof POSTER_STATES)[keyof typeof POSTER_STATES]
+
+type PosterViewProps = { item: ItemSummary; poster: ReturnType<typeof posterSources> }
+
+type PosterPictureProps = PosterViewProps
+
+const PosterPicture = ({ poster }: PosterPictureProps) => (
+  <img {...poster} alt="" loading="lazy" decoding="async" />
+)
+
+type PosterInitialProps = PosterViewProps
+
+const PosterInitial = ({ item }: PosterInitialProps) => (
+  <span aria-hidden="true">{item.title.slice(0, 1)}</span>
+)
+
+const POSTER_VIEWS = {
+  [POSTER_STATES.picture]: PosterPicture,
+  [POSTER_STATES.initial]: PosterInitial,
+} as const satisfies Record<PosterState, ComponentType<PosterViewProps>>
 
 type TitleCardProps = { item: ItemSummary }
 
@@ -11,6 +36,7 @@ type TitleCardProps = { item: ItemSummary }
  */
 export const TitleCard = ({ item }: TitleCardProps) => {
   const poster = posterSources({ item, sizes: POSTER_SIZES.grid })
+  const Poster = POSTER_VIEWS[poster ? POSTER_STATES.picture : POSTER_STATES.initial]
   const facts = [item.show?.title ?? null, item.year == null ? null : String(item.year)].filter(
     (fact): fact is string => fact != null,
   )
@@ -18,11 +44,7 @@ export const TitleCard = ({ item }: TitleCardProps) => {
     <li className={styles.card}>
       <Link to={itemPath(item) ?? '/'} className={styles.link}>
         <span className={styles.poster}>
-          {poster ? (
-            <img {...poster} alt="" loading="lazy" decoding="async" />
-          ) : (
-            <span aria-hidden="true">{item.title.slice(0, 1)}</span>
-          )}
+          <Poster item={item} poster={poster} />
         </span>
         <span className={styles.words}>
           <span className={styles.title}>{item.title}</span>

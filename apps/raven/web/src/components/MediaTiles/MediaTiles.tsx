@@ -13,6 +13,7 @@ import {
   resolutionLabel,
   cardSortFact,
 } from '@raven/core'
+import type { ComponentType } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
@@ -27,7 +28,50 @@ import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { useSelectable } from '@/lib/useSelectable'
 import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
+import { MEDIA_TILES_COPY } from '@/components/MediaTiles/copy'
 import styles from '@/components/MediaTiles/MediaTiles.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
+
+const PICTURE_KINDS = {
+  poster: 'poster',
+  thumbnail: 'thumbnail',
+  placeholder: 'placeholder',
+} as const
+type PictureKind = (typeof PICTURE_KINDS)[keyof typeof PICTURE_KINDS]
+
+type TilePictureProps = { media: MediaItem; thumbnail: string | null; withWatched: boolean }
+
+type TilePosterProps = TilePictureProps
+
+const TilePoster = ({ media, withWatched }: TilePosterProps) => (
+  <PosterFrame media={media} sizes={POSTER_SIZES.movieTile} withWatched={withWatched} />
+)
+
+type TileThumbnailProps = TilePictureProps
+
+const TileThumbnail = ({ thumbnail }: TileThumbnailProps) => (
+  <ViewportImage className={styles.thumbnail} src={thumbnail ?? ''} alt="" />
+)
+
+type TilePlaceholderProps = TilePictureProps
+
+const TilePlaceholder = ({ media }: TilePlaceholderProps) => (
+  <span className={styles.placeholder}>{media.title.slice(0, 1)}</span>
+)
+
+const TILE_PICTURES = {
+  [PICTURE_KINDS.poster]: TilePoster,
+  [PICTURE_KINDS.thumbnail]: TileThumbnail,
+  [PICTURE_KINDS.placeholder]: TilePlaceholder,
+} as const satisfies Record<PictureKind, ComponentType<TilePictureProps>>
+
+type PictureKindOfProps = { posters: boolean; thumbnail: string | null }
+
+const pictureKindOf = ({ posters, thumbnail }: PictureKindOfProps): PictureKind => {
+  if (posters) return PICTURE_KINDS.poster
+  if (thumbnail) return PICTURE_KINDS.thumbnail
+  return PICTURE_KINDS.placeholder
+}
 
 type MediaTileProps = {
   media: MediaItem
@@ -53,12 +97,13 @@ const MediaTile = ({ media, note, posters, withWatched, matchType, sort }: Media
   const label = posters ? cardTitle(media).title : mediaLabel(media)
   const select = useSelectable({ key: mediaEntryKey(media), title: label })
   const { sorted, isYearSaid } = cardSortFact({ media, sort })
+  const TilePicture = TILE_PICTURES[pictureKindOf({ posters, thumbnail })]
   const facts = [
     posters && year != null && !isYearSaid ? String(year) : null,
-    posters && media.versions > 1 ? `${media.versions} versions` : null,
+    posters && media.versions > 1 ? MEDIA_TILES_COPY.versions(media.versions) : null,
     formatRuntime(media.duration),
     resolutionLabel(media),
-    media.hdr ? 'HDR' : null,
+    media.hdr ? COMMON_COPY.hdr : null,
     media.videoCodec ? codecLabel(media.videoCodec) : null,
     formatBytes(media.size),
   ].filter((fact): fact is string => fact != null && fact !== sorted)
@@ -79,13 +124,7 @@ const MediaTile = ({ media, note, posters, withWatched, matchType, sort }: Media
         aria-hidden="true"
         onContextMenu={menu.onContextMenu}
       >
-        {posters ? (
-          <PosterFrame media={media} sizes={POSTER_SIZES.movieTile} withWatched={withWatched} />
-        ) : thumbnail ? (
-          <ViewportImage className={styles.thumbnail} src={thumbnail} alt="" />
-        ) : (
-          <span className={styles.placeholder}>{media.title.slice(0, 1)}</span>
-        )}
+        <TilePicture media={media} thumbnail={thumbnail} withWatched={withWatched} />
         {!posters && <ResumeBar media={media} className={styles.resume} />}
         {!posters && (
           <WatchedMark
@@ -125,7 +164,7 @@ const MediaTile = ({ media, note, posters, withWatched, matchType, sort }: Media
         </span>
         {media.folder !== '' && <span className={styles.folder}>{media.folder}</span>}
         {posters && media.match === MATCH_STATES.unmatched && (
-          <span className={styles.note}>Not matched</span>
+          <span className={styles.note}>{COMMON_COPY.notMatched}</span>
         )}
         {note !== null && <span className={styles.note}>{note}</span>}
         <PlaybackNote media={media} />

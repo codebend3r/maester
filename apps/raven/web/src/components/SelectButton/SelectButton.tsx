@@ -4,6 +4,7 @@ import {
   useSelection,
   useSelectionScope,
 } from '@/components/SelectionScope/SelectionScope'
+import { SELECT_BUTTON_COPY } from '@/components/SelectButton/copy'
 import styles from '@/components/SelectButton/SelectButton.module.scss'
 
 type SelectButtonProps = { className?: string }
@@ -18,17 +19,18 @@ export const SelectButton = ({ className }: SelectButtonProps) => {
   const scope = useSelectionScope()
   const selecting = useSelection((state) => state.selecting)
   const ref = useSelectButtonRef()
-  if (!scope) return null
   return (
-    <Button
-      ref={ref}
-      tone="ghost"
-      icon="check"
-      className={className ? `${styles.select} ${className}` : styles.select}
-      aria-pressed={selecting}
-      onClick={() => (selecting ? scope.store.getState().end() : scope.store.getState().start())}
-    >
-      Select
-    </Button>
+    scope !== null && (
+      <Button
+        ref={ref}
+        tone="ghost"
+        icon="check"
+        className={className ? `${styles.select} ${className}` : styles.select}
+        aria-pressed={selecting}
+        onClick={() => (selecting ? scope.store.getState().end() : scope.store.getState().start())}
+      >
+        {SELECT_BUTTON_COPY.select}
+      </Button>
+    )
   )
 }

@@ -47,6 +47,13 @@ export const CardLinks = ({ children }: CardLinksProps) => {
 const isPlainClick = (event: MouseEvent): boolean =>
   event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
 
+type CardLinkProps = Omit<ComponentProps<'a'>, 'href' | 'target' | 'download'> & {
+  to: AppPath
+  state?: unknown
+  /** The item whose page `to` opens, read ahead when the link is pointed at or focused. */
+  prefetchItem?: number | null
+}
+
 /**
  * A link on a card, row or tile, opening `to` in the app with `state`
  * handed over, as react-router's `Link` does, for a fraction of its cost. A
@@ -62,12 +69,7 @@ export const CardLink = ({
   prefetchItem,
   children,
   ...rest
-}: Omit<ComponentProps<'a'>, 'href' | 'target' | 'download'> & {
-  to: AppPath
-  state?: unknown
-  /** The item whose page `to` opens, read ahead when the link is pointed at or focused. */
-  prefetchItem?: number | null
-}) => {
+}: CardLinkProps) => {
   const follow = useCardLinks((links) => links.follow)
   if (!follow) throw new Error('CardLink needs CardLinks around it')
   return (
