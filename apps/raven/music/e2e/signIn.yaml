@@ -1,0 +1,9 @@
+appId: app.netlify.wren
+name: Wren signs in to the fixture server and lands on Home
+---
+- runFlow: steps/signIn.yaml
+# Home's shelf is the music library's newest albums, so the fixture's album is on it.
+- extendedWaitUntil:
+    visible: Recently added
+    timeout: 30000
+- assertVisible: Morning Chorus.*

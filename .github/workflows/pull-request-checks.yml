@@ -503,15 +503,17 @@ jobs:
           if-no-files-found: ignore
 
   # Whether this PR touches raven's device app, what it imports (core and ui, through
-  # Nx's graph), the server its flows sign in to, or this workflow. The app jobs below are
-  # cold React Native builds, so they run only then; the 🖥️ Desktop gate takes
-  # their skip as a pass.
+  # Nx's graph), the server its flows sign in to, or this workflow; and the same for Wren
+  # (`music`), whose own libraries are `@raven/native` and `@raven/audio`. The app and Wren
+  # jobs below are cold React Native builds, so they run only then; the 🖥️ Desktop gate
+  # takes their skip as a pass.
   app-affected:
     name: 🔍 App affected
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       affected: ${{ steps.affected.outputs.affected }}
+      music: ${{ steps.affected.outputs.music }}
     steps:
       # The PR's head with its whole history, so Nx can find the merge base with the base.
       - name: 📥 Checkout exact PR head
@@ -545,6 +547,11 @@ jobs:
             echo "affected=true" >> "$GITHUB_OUTPUT"
           else
             echo "affected=false" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$projects" | jq -e 'any(.[]; IN("@raven/music", "@raven/native", "@raven/audio", "@raven/server"))' > /dev/null || [ -n "$workflow" ]; then
+            echo "music=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "music=false" >> "$GITHUB_OUTPUT"
           fi
 
   # raven's device app on Apple TV: the simulator build and an XCUITest that drives it
@@ -911,9 +918,172 @@ jobs:
             ${{ runner.temp }}/fixture.log
           if-no-files-found: ignore
 
+  # Wren, raven's music app, on the iPhone: its simulator build and its Maestro flows against
+  # the fixture server's music library, on a simulator of its own, as app-ios runs the app's.
+  music-ios:
+    name: 🎵 Wren on iPhone
+    needs: app-affected
+    if: needs.app-affected.outputs.music == 'true'
+    runs-on: macos-26
+    # One Release build of React Native, its compile cached by ccache, and the flows.
+    timeout-minutes: 60
+    steps:
+      # The PR's head commit, so the artifact names below match the commit that was built.
+      - name: 📥 Checkout exact PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # The app's setup, iOS caches and all: Wren builds on the same React Native and pods.
+      - name: 🧰 Set up the app build
+        uses: ./.github/actions/raven-app-setup
+        with:
+          platform: ios
+          node-version: ${{ env.APP_NODE_VERSION }}
+
+      # In the background while Wren builds; it prints its ready line once its libraries,
+      # the music library among them, are scanned.
+      - name: 🗄️ Start the fixture server
+        run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
+
+      # Maestro's own release, pinned by version and checksum, as app-ios installs it.
+      - name: 🎭 Install Maestro
+        env:
+          MAESTRO_VERSION: 2.11.0
+          MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
+        run: |
+          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
+          {
+            if curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip" &&
+              echo "$MAESTRO_SHA256  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c - &&
+              unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"; then
+              touch "$RUNNER_TEMP/maestro.ok"
+            else
+              touch "$RUNNER_TEMP/maestro.failed"
+            fi
+          } > "$RUNNER_TEMP/maestro.log" 2>&1 &
+
+      # Runs `prebuild:ios` first, which regenerates ios/ and installs the pods.
+      - name: 🎵 Build Wren for the iPhone simulator
+        run: bunx nx run @raven/music:build:ios --excludeTaskDependencies
+
+      - name: 📊 ccache
+        run: ccache --show-stats
+
+      # `expo prebuild` exits 0 when `pod install` fails.
+      - name: 🔎 Check Wren's pods
+        working-directory: apps/raven/music/ios
+        run: cmp Podfile.lock Pods/Manifest.lock
+
+      # A fresh iPhone 16 named wren-phone, as `ci:wren` makes one, on the iOS runtime of the
+      # selected Xcode's SDK, booted after the build, with Wren on it.
+      - name: 📱 Boot the iPhone simulator
+        run: |
+          sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          runtime="$(xcrun simctl list -j runtimes iOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
+          device="$(xcrun simctl create wren-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" apps/raven/music/build/ios/Build/Products/Release-iphonesimulator/Wren.app
+
+      - name: 🗄️ Wait for the fixture server
+        run: |
+          for _ in $(seq 1 90); do
+            if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
+              grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/fixture.log"
+          exit 1
+
+      - name: 🎭 Wait for Maestro
+        run: |
+          for _ in $(seq 1 90); do
+            test -f "$RUNNER_TEMP/maestro.ok" && exit 0
+            if test -f "$RUNNER_TEMP/maestro.failed"; then
+              cat "$RUNNER_TEMP/maestro.log"
+              exit 1
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/maestro.log"
+          exit 1
+
+      # Every flow in `apps/raven/music/e2e`: sign in to Home, and play the fixture's album.
+      - name: 🎬 Wren end to end
+        env:
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
+        run: bunx nx run @raven/music:e2e
+
+      # What Wren and the system logged on the simulator, only when a step failed.
+      - name: 🪵 Simulator log
+        if: failure()
+        run: xcrun simctl spawn wren-phone log show --last 30m --style compact --predicate 'process == "Wren"' > "$RUNNER_TEMP/wren-simulator.log" || true
+
+      - name: 📤 End to end logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-music-e2e-logs-${{ github.event.pull_request.head.sha }}
+          path: |
+            ~/.maestro/tests
+            ${{ runner.temp }}/fixture.log
+            ${{ runner.temp }}/wren-simulator.log
+          if-no-files-found: ignore
+
+      # Zipped as Finder would, which keeps the execute bits an artifact drops.
+      - name: 📦 Pack the simulator app
+        run: ditto -c -k --keepParent apps/raven/music/build/ios/Build/Products/Release-iphonesimulator/Wren.app "$RUNNER_TEMP/wren-iphonesimulator.zip"
+
+      - name: 📤 Simulator app
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-music-ios-simulator-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/wren-iphonesimulator.zip
+          if-no-files-found: error
+
+  # Wren for Android phones, built on Linux beside the Android TV job; it has no flows yet.
+  music-android:
+    name: 🎵 Wren for Android
+    needs: app-affected
+    if: needs.app-affected.outputs.music == 'true'
+    runs-on: ubuntu-24.04
+    # A Release build of React Native, its compile cached by ccache and Gradle.
+    timeout-minutes: 60
+    steps:
+      - name: 📥 Checkout exact PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # The Android TV job's setup, its caches and its x86_64-only build among them.
+      - name: 🧰 Set up the app build
+        uses: ./.github/actions/raven-app-setup
+        with:
+          platform: android-tv
+          node-version: ${{ env.APP_NODE_VERSION }}
+
+      # Runs `prebuild:android` first, which regenerates android/, then Gradle's Release APK.
+      - name: 🎵 Build the Wren APK
+        run: bunx nx run @raven/music:build:android --excludeTaskDependencies
+
+      - name: 📊 ccache
+        run: ccache --show-stats
+
+      # The Release APK, signed with the debug key Expo's template sets up. It holds only
+      # x86_64 code, so it installs on an x86_64 emulator, not on a phone.
+      - name: 📤 Wren APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-music-android-${{ github.event.pull_request.head.sha }}
+          path: apps/raven/music/android/app/build/outputs/apk/release
+          if-no-files-found: error
+
   # The "Protect main" ruleset requires a check named 🖥️ Desktop, so this one stands
-  # for every desktop and device app job and passes only when all of them did. The
-  # app jobs may also be skipped, when the PR leaves the app alone (app-affected).
+  # for every desktop, device app and Wren job and passes only when all of them did. The
+  # app and Wren jobs may also be skipped, when the PR leaves them alone (app-affected).
   desktop:
     name: 🖥️ Desktop
     needs:
@@ -927,6 +1097,8 @@ jobs:
         app-tvos,
         app-ios,
         app-android-tv,
+        music-ios,
+        music-android,
       ]
     if: always()
     runs-on: ubuntu-24.04
@@ -941,7 +1113,9 @@ jobs:
             ${{ needs.desktop-native.result }} ${{ needs.windows-native.result }}
             ${{ needs.desktop-app.result }} ${{ needs.windows-app.result }}
             ${{ needs.desktop-playback.result }} ${{ needs.app-affected.result }}
-          APP_RESULTS: ${{ needs.app-tvos.result }} ${{ needs.app-ios.result }} ${{ needs.app-android-tv.result }}
+          APP_RESULTS: >-
+            ${{ needs.app-tvos.result }} ${{ needs.app-ios.result }} ${{ needs.app-android-tv.result }}
+            ${{ needs.music-ios.result }} ${{ needs.music-android.result }}
         run: |
           echo "$RESULTS"
           for result in $REQUIRED; do

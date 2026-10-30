@@ -30,6 +30,7 @@
     "ci:app:tvos": "bash scripts/ci_app_tvos.sh",
     "ci:desktop:e2e": "bash scripts/ci_desktop_e2e.sh",
     "ci:docker": "bash scripts/ci_docker.sh",
+    "ci:wren": "bash scripts/ci_wren.sh",
     "claude-audit": "bash scripts/audit_claude_md.sh",
     "build": "nx run-many -t build",
     "dead-code": "nx run maester:dead-code",
