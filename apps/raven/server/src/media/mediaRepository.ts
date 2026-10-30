@@ -393,6 +393,14 @@ type MediaRepositoryListSagasProps = { libraryId: number; account: AccountKey }
 
 type MediaRepositoryCountInProgressProps = { libraryId: number; account: AccountKey }
 
+type MediaRepositoryNextUpProps = { libraryId: number | null; account: AccountKey }
+
+type NextUpShowRow = { show_id: number; library_id: number; last_played_at: string }
+
+type ProgressTimeRow = { media_id: number; updated_at: string }
+
+type DatedVideo = { media: MediaItem; at: string }
+
 type MediaRepositoryCountFavouritesProps = { libraryId: number; account: AccountKey }
 
 type MediaRepositoryCountSagasProps = { libraryId: number; account: AccountKey }
@@ -823,12 +831,13 @@ export class MediaRepository {
 
   /**
    * Every video `account` has a saved spot in, across every library that
-   * saves progress or in `libraryId` alone, the most recently watched first.
+   * saves progress or in `libraryId` alone, then the next episode of each
+   * show it is partway through (`nextUp`), the most recently watched first.
    * A finished or barely started video has no spot, so it is not in
-   * progress.
+   * progress itself.
    */
   listInProgress({ libraryId = null, account }: MediaRepositoryListInProgressProps): MediaItem[] {
-    return this.items(
+    const started = this.items(
       this.db
         .prepare<{ libraryId: number | null; account: AccountKey }, MediaRow>(
           `${SELECT_MEDIA} WHERE ${IN_PROGRESS}
@@ -837,6 +846,76 @@ export class MediaRepository {
         )
         .all({ libraryId, account }),
     )
+    const upNext = this.nextUp({ libraryId, account })
+    if (upNext.length === 0) return started
+    const times = new Map(
+      this.db
+        .prepare<[ByAccount, string], ProgressTimeRow>(
+          `SELECT media_id, updated_at FROM playback_progress
+            WHERE account_id = @account AND media_id IN (SELECT value FROM json_each(?))`,
+        )
+        .all({ account }, JSON.stringify(started.map((media) => media.id)))
+        .map((row) => [row.media_id, row.updated_at]),
+    )
+    const dated: DatedVideo[] = started.map((media) => ({ media, at: times.get(media.id) ?? '' }))
+    return [...dated, ...upNext]
+      .toSorted((a, b) => b.at.localeCompare(a.at))
+      .map(({ media }) => media)
+  }
+
+  /**
+   * The first unwatched episode of each show `account` has watched an episode
+   * of, in a library that saves progress, unless an episode of the show is
+   * in progress already: it keeps a binge going from the start of the next
+   * episode. Each comes with when the show was last watched, and starts from
+   * the beginning.
+   */
+  private nextUp({ libraryId, account }: MediaRepositoryNextUpProps): DatedVideo[] {
+    const shows = this.db
+      .prepare<{ libraryId: number | null; account: AccountKey }, NextUpShowRow>(
+        `SELECT s.parent_id AS show_id, m.library_id,
+                MAX((SELECT MAX(pl.played_at) FROM plays pl
+                      WHERE pl.account_id = @account AND pl.media_id = m.id)) AS last_played_at
+           FROM media m
+           JOIN libraries l ON l.id = m.library_id
+           JOIN media_items mi ON mi.media_id = m.id
+           JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+           JOIN shown_items s ON s.id = e.parent_id
+          WHERE l.save_progress = 1
+            AND (@libraryId IS NULL OR m.library_id = @libraryId)
+            AND ${fileWatched('m')}
+            AND NOT EXISTS (
+              SELECT 1 FROM playback_progress pp
+                JOIN media_items pmi ON pmi.media_id = pp.media_id
+                JOIN shown_items pe ON pe.id = pmi.item_id AND pe.type = 'episode'
+                JOIN shown_items ps ON ps.id = pe.parent_id
+                JOIN media pm ON pm.id = pp.media_id
+                JOIN libraries pl2 ON pl2.id = pm.library_id
+               WHERE pp.account_id = @account AND pl2.save_progress = 1
+                 AND ps.parent_id = s.parent_id)
+          GROUP BY s.parent_id, m.library_id`,
+      )
+      .all({ libraryId, account })
+    if (shows.length === 0) return []
+    const lastWatched = shows.reduce(
+      (latest, row) =>
+        (latest.get(row.show_id) ?? '') >= row.last_played_at
+          ? latest
+          : latest.set(row.show_id, row.last_played_at),
+      new Map<number, string>(),
+    )
+    const next = this.nextUnwatched({
+      showIds: [...lastWatched.keys()],
+      libraryIds: [...new Set(shows.map((row) => row.library_id))],
+      account,
+    })
+    const episodes = new Map(
+      this.getMany({ ids: [...next.values()], account }).map((item) => [item.id, item]),
+    )
+    return [...next].flatMap(([showId, mediaId]): DatedVideo[] => {
+      const media = episodes.get(mediaId)
+      return media ? [{ media: { ...media, position: 0 }, at: lastWatched.get(showId) ?? '' }] : []
+    })
   }
 
   /**
@@ -913,7 +992,10 @@ export class MediaRepository {
 
   /** How many videos `listInProgress` lists for the library, without reading them. */
   countInProgress({ libraryId, account }: MediaRepositoryCountInProgressProps): number {
-    return this.countWhere({ where: IN_PROGRESS, libraryId, account })
+    return (
+      this.countWhere({ where: IN_PROGRESS, libraryId, account }) +
+      this.nextUp({ libraryId, account }).length
+    )
   }
 
   /** How many videos `listFavourites` lists for the library, without reading them. */

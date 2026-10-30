@@ -40,6 +40,29 @@ describe('useWatchedChange', () => {
     await waitFor(() => expect(client.getQueryState(queryKeys.item(40))!.isInvalidated).toBe(true))
   })
 
+  it('shows a whole show watched at once, before the server answers', async () => {
+    spy.mockImplementation(() => new Promise<void>(() => undefined))
+    const { result, client } = setUp()
+    const episode = { type: 'episode', id: 51, watched: false, primary: null }
+    client.setQueryData(queryKeys.item(40), {
+      type: 'show',
+      id: 40,
+      children: [{ type: 'season', id: 41, season: 1, episodeCount: 2, watchedCount: 0 }],
+    })
+    client.setQueryData(queryKeys.item(41), { type: 'season', id: 41, children: [episode] })
+    client.setQueryData(queryKeys.nextEpisode(40), { id: 99 })
+    act(() => result.current.mutate(change({ id: 40, watched: true })))
+    await waitFor(() =>
+      expect(client.getQueryData(queryKeys.item(40))).toMatchObject({
+        children: [{ id: 41, watchedCount: 2 }],
+      }),
+    )
+    expect(client.getQueryData(queryKeys.item(41))).toMatchObject({
+      children: [{ id: 51, watched: true }],
+    })
+    expect(client.getQueryData(queryKeys.nextEpisode(40))).toBeNull()
+  })
+
   it('keeps marks in the order they were made', async () => {
     const first = Promise.withResolvers<void>()
     const seen: number[] = []
