@@ -1,6 +1,8 @@
 import { themeOf } from '@raven/core'
 import { Logo } from '@/components/Logo/Logo'
 import { useTheme } from '@/stores/theme'
+import { SECTION_IDS } from '@/pages/DesignPage/contents'
+import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import styles from '@/pages/DesignPage/LogoSection.module.scss'
 
@@ -43,15 +45,14 @@ const INVERSE_MARKS = {
   light: '/brand/raven-mark-on-dark.svg',
 } as const
 
+const COPY = DESIGN_COPY.logo
+
 const FAVICON_SIZES = [16, 32, 48] as const
 
 export const LogoSection = () => {
   const tone = useTheme((state) => themeOf(state.theme).tone)
   return (
-    <DesignSection
-      id="logo"
-      intro="A raven with a play button for a wing. The files live in public/brand, with PNG copies of the two coloured marks and a 512 pixel tile for anywhere that takes no SVG."
-    >
+    <DesignSection id={SECTION_IDS.logo} intro={COPY.intro}>
       <ul className={styles.marks}>
         {MARKS.map((mark) => (
           <li key={mark.file} className={styles.mark}>
@@ -73,38 +74,27 @@ export const LogoSection = () => {
           </li>
         ))}
       </ul>
-      <Specimen
-        name="Favicon"
-        note="The mark on a night tile: favicon.svg where a browser takes it, favicon.ico at 16, 32 and 48 pixels where it doesn't, and a square apple-touch-icon.png for a home screen, which rounds its own corners."
-      >
+      <Specimen name={COPY.favicon} note={COPY.faviconNote}>
         <ul className={styles.favicons} data-theme="verdigris">
           {FAVICON_SIZES.map((size) => (
             <li key={size} className={styles.favicon}>
-              <img
-                src="/favicon.svg"
-                alt={`The favicon at ${size} pixels`}
-                width={size}
-                height={size}
-              />
+              <img src="/favicon.svg" alt={COPY.faviconAt(size)} width={size} height={size} />
               <span className={styles.size}>{size}</span>
             </li>
           ))}
           <li className={styles.favicon}>
             <img
               src="/apple-touch-icon.png"
-              alt="The home screen icon"
+              alt={COPY.homeIcon}
               width={60}
               height={60}
               className={styles.homeIcon}
             />
-            <span className={styles.size}>Home screen</span>
+            <span className={styles.size}>{COPY.homeScreen}</span>
           </li>
         </ul>
       </Specimen>
-      <Specimen
-        name="Lockup"
-        note="The mark beside the wordmark, as the side menu draws it, and turned over onto bark."
-      >
+      <Specimen name={COPY.lockup} note={COPY.lockupNote}>
         <div className={styles.lockups}>
           <div className={styles.lockup}>
             <Logo />
@@ -117,7 +107,7 @@ export const LogoSection = () => {
               height={705}
               className={styles.lockupMark}
             />
-            <span className={styles.lockupWord}>raven</span>
+            <span className={styles.lockupWord}>{COPY.wordmark}</span>
           </div>
         </div>
       </Specimen>

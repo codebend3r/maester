@@ -4,6 +4,7 @@ import type { IconName } from '@raven/ui'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { cannotManageNote, useManagement } from '@/lib/management'
 import { Titled } from '@/pages/SettingsPage/Titled'
+import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 
 /** Every value a setting takes, with its words; a value added in `@raven/core` cannot go unlabelled. */
@@ -107,7 +108,13 @@ export const SettingsSection = <T,>({
           {!canManage && (
             <>
               {' '}
-              <span>{cannotManageNote({ mode, action: 'change these', lockPlace: 'below' })}</span>
+              <span>
+                {cannotManageNote({
+                  mode,
+                  action: SETTINGS_COPY.section.changeThese,
+                  lockPlace: SETTINGS_COPY.section.below,
+                })}
+              </span>
             </>
           )}
         </p>
@@ -119,7 +126,8 @@ export const SettingsSection = <T,>({
       )}
       {saveError && (
         <p className={styles.error} role="alert">
-          Could not save: {saveError.message}
+          {SETTINGS_COPY.section.saveFailed}
+          {saveError.message}
         </p>
       )}
       {/* The section names these already, so the fieldset is no group of its own to a screen reader. */}
@@ -128,7 +136,7 @@ export const SettingsSection = <T,>({
           {children(query.data)}
         </fieldset>
       )}
-      {query.isPending && <Loading label="Reading the settings">{shape}</Loading>}
+      {query.isPending && <Loading label={SETTINGS_COPY.section.reading}>{shape}</Loading>}
       {browser}
     </section>
   )

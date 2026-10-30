@@ -1,100 +1,115 @@
+import { SECTION_IDS } from '@/pages/DesignPage/contents'
+import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
 
+const COPY = DESIGN_COPY.text
+
 export const TextSection = () => (
-  <DesignSection
-    id="text"
-    intro="The display serif sets the top three heading levels; the body face sets the rest and everything you read."
-  >
-    <Specimen name="Headings" note="h1 is a page's title; h6 labels a small group.">
+  <DesignSection id={SECTION_IDS.text} intro={COPY.intro}>
+    <Specimen name={COPY.headings} note={COPY.headingsNote}>
       <div className={styles.headings}>
         <div className={styles.headingRow}>
-          <code className={styles.tag}>h1</code>
-          <h1>Heading one</h1>
+          <code className={styles.tag}>{COPY.tags.h1}</code>
+          <h1>{COPY.headingOne}</h1>
         </div>
         <div className={styles.headingRow}>
-          <code className={styles.tag}>h2</code>
-          <h2>Heading two</h2>
+          <code className={styles.tag}>{COPY.tags.h2}</code>
+          <h2>{COPY.headingTwo}</h2>
         </div>
         <div className={styles.headingRow}>
-          <code className={styles.tag}>h3</code>
-          <h3>Heading three</h3>
+          <code className={styles.tag}>{COPY.tags.h3}</code>
+          <h3>{COPY.headingThree}</h3>
         </div>
         <div className={styles.headingRow}>
-          <code className={styles.tag}>h4</code>
-          <h4>Heading four</h4>
+          <code className={styles.tag}>{COPY.tags.h4}</code>
+          <h4>{COPY.headingFour}</h4>
         </div>
         <div className={styles.headingRow}>
-          <code className={styles.tag}>h5</code>
-          <h5>Heading five</h5>
+          <code className={styles.tag}>{COPY.tags.h5}</code>
+          <h5>{COPY.headingFive}</h5>
         </div>
         <div className={styles.headingRow}>
-          <code className={styles.tag}>h6</code>
-          <h6>Heading six</h6>
+          <code className={styles.tag}>{COPY.tags.h6}</code>
+          <h6>{COPY.headingSix}</h6>
         </div>
       </div>
     </Specimen>
 
-    <Specimen name="Paragraph and inline">
+    <Specimen name={COPY.paragraph}>
       <div className="prose">
         <p>
-          A library is a set of folders. Every video inside is indexed, given a thumbnail, and{' '}
-          <a href="#text">ready to play</a>. Some words are <strong>strong</strong>, some are{' '}
-          <em>emphasised</em>, and some are <small>small print</small>. Search results{' '}
-          <mark>highlight</mark> what matched.
+          {COPY.library.lead}
+          <a href={`#${SECTION_IDS.text}`}>{COPY.library.link}</a>
+          {COPY.library.beforeStrong}
+          <strong>{COPY.library.strong}</strong>
+          {COPY.library.beforeEm}
+          <em>{COPY.library.em}</em>
+          {COPY.library.beforeSmall}
+          <small>{COPY.library.small}</small>
+          {COPY.library.beforeMark}
+          <mark>{COPY.library.mark}</mark>
+          {COPY.library.end}
         </p>
         <p>
-          The player reads <code>ffprobe</code> output; press <kbd>k</kbd> to pause and <kbd>?</kbd>{' '}
-          for every shortcut. <abbr title="High dynamic range">HDR</abbr> is tone mapped. The price
-          was <del>12</del> <ins>9</ins>. Water is H<sub>2</sub>O and a square is x<sup>2</sup>.
+          {COPY.player.lead}
+          <code>{COPY.player.code}</code>
+          {COPY.player.beforeK}
+          <kbd>{COPY.player.k}</kbd>
+          {COPY.player.beforeQuestion}
+          <kbd>{COPY.player.question}</kbd>
+          {COPY.player.beforeAbbr}
+          <abbr title={COPY.player.abbrTitle}>{COPY.player.abbr}</abbr>
+          {COPY.player.beforeDel}
+          <del>{COPY.player.del}</del> <ins>{COPY.player.ins}</ins>
+          {COPY.player.beforeSub}
+          <sub>{COPY.player.sub}</sub>
+          {COPY.player.beforeSup}
+          <sup>{COPY.player.sup}</sup>
+          {COPY.player.end}
         </p>
       </div>
     </Specimen>
 
-    <Specimen name="Quote">
+    <Specimen name={COPY.quote}>
       <blockquote>
-        <p>
-          A reader lives a thousand lives before he dies. The man who never reads lives only one.
-        </p>
+        <p>{COPY.quoteText}</p>
       </blockquote>
     </Specimen>
 
-    <Specimen name="Preformatted">
+    <Specimen name={COPY.preformatted}>
       <pre>
         <code>
-          <span className={styles.prompt}>$ </span>
-          {'docker compose up -d --build\n'}
-          <span className={styles.prompt}>$ </span>
-          {'open http://localhost:8484'}
+          <span className={styles.prompt}>{COPY.prompt}</span>
+          {COPY.compose}
+          <span className={styles.prompt}>{COPY.prompt}</span>
+          {COPY.open}
         </code>
       </pre>
     </Specimen>
 
-    <Specimen
-      name="Lists"
-      note="Bare by default, since most lists are layout; .prose brings back markers."
-    >
+    <Specimen name={COPY.lists} note={COPY.listsNote}>
       <div className={`prose ${styles.columns}`}>
         <ul>
-          <li>Movies</li>
-          <li>Shows</li>
-          <li>Home videos</li>
+          {COPY.unordered.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ul>
         <ol>
-          <li>Add a library</li>
-          <li>Wait for the scan</li>
-          <li>Press play</li>
+          {COPY.ordered.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ol>
         <dl>
-          <dt>Direct play</dt>
-          <dd>The browser plays the file as it is.</dd>
-          <dt>Converted</dt>
-          <dd>The server remuxes or transcodes on the fly.</dd>
+          <dt>{COPY.directPlay}</dt>
+          <dd>{COPY.directPlayNote}</dd>
+          <dt>{COPY.converted}</dt>
+          <dd>{COPY.convertedNote}</dd>
         </dl>
       </div>
     </Specimen>
 
-    <Specimen name="Rule">
+    <Specimen name={COPY.rule}>
       <hr />
     </Specimen>
   </DesignSection>

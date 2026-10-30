@@ -10,12 +10,18 @@ import {
   PLAYER_SOURCE_KINDS,
 } from '@raven/core'
 import { Player, useToasts } from '@raven/ui'
-import { ENGINE_KINDS, type PlayerServices, useHostPlayer } from '@raven/ui/headless'
+import {
+  ENGINE_KINDS,
+  type NativePlayer,
+  type PlayerServices,
+  useHostPlayer,
+} from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { type ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { refusalText } from '@/desktop/client'
 import { useIsOutputFixed } from '@/desktop/output'
+import { PLAY_PAGE_COPY } from '@/desktop/PlayPage/copy'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { NativePlaying } from '@/desktop/player/NativePlaying'
 import { PlayerMessage } from '@/desktop/player/PlayerMessage'
@@ -32,8 +38,6 @@ import { useLeaveSignal } from '@/desktop/player/useLeaveSignal'
 import { useMenuNext } from '@/desktop/player/useMenuNext'
 import { CONNECTION_STATUSES } from '@/desktop/playerConnection'
 import { useDesktop } from '@/stores/desktop'
-
-const NOT_OPENABLE = 'Raven cannot open that video.'
 
 /**
  * Where a file that is not playing goes back to when no page of the app is behind it: Back
@@ -64,6 +68,39 @@ const HtmlPlaying = ({ services, fileId }: HtmlPlayingProps) => {
     )
   )
 }
+
+type EngineViewProps = {
+  services: PlayerServices
+  file: LocalFile
+  player: NativePlayer | null
+  onLost: (at: number) => void
+}
+
+type NativeFilePlayingProps = EngineViewProps
+
+const NativeFilePlaying = ({ services, file, player, onLost }: NativeFilePlayingProps) =>
+  player !== null && (
+    <NativePlaying
+      services={services}
+      player={player}
+      source={{ kind: PLAYER_SOURCE_KINDS.file, fileId: file.fileId }}
+      resumeAt={file.resumeAt}
+      onLost={onLost}
+    />
+  )
+
+type HtmlFilePlayingProps = EngineViewProps
+
+const HtmlFilePlaying = ({ services, file }: HtmlFilePlayingProps) => (
+  <HtmlPlaying services={services} fileId={file.fileId} />
+)
+
+/** mpv while it plays, and Chromium's own video when it never started or stopped. */
+const ENGINE_VIEWS = {
+  [ENGINE_USES.native]: NativeFilePlaying,
+  [ENGINE_USES.fallback]: HtmlFilePlaying,
+  [ENGINE_USES.stopped]: HtmlFilePlaying,
+} as const satisfies Record<EngineUse, ComponentType<EngineViewProps>>
 
 type PlayingProps = {
   file: LocalFile
@@ -117,18 +154,38 @@ const Playing = ({ file, chosen, isOutputFixed }: PlayingProps) => {
     if (lostAt !== null) showNotice(ENGINE_MOVED)
   }, [lostAt, showNotice])
 
-  return player === null ? (
-    <HtmlPlaying services={services} fileId={file.fileId} />
-  ) : (
-    <NativePlaying
-      services={services}
-      player={player}
-      source={{ kind: PLAYER_SOURCE_KINDS.file, fileId: file.fileId }}
-      resumeAt={file.resumeAt}
-      onLost={onLost}
-    />
-  )
+  const View = ENGINE_VIEWS[engine]
+  return <View services={services} file={file} player={player} onLost={onLost} />
 }
+
+/** Whether the file is ready to play, or the page has a line to show instead. */
+const PAGE_KINDS = { playing: 'playing', message: 'message' } as const
+
+type PageKind = (typeof PAGE_KINDS)[keyof typeof PAGE_KINDS]
+
+type PageViewProps = {
+  file: LocalFile | null
+  chosen: Chosen | null
+  isOutputFixed: boolean
+  message: string | null
+}
+
+type ReadyFileProps = PageViewProps
+
+const ReadyFile = ({ file, chosen, isOutputFixed }: ReadyFileProps) =>
+  file !== null &&
+  chosen !== null && <Playing file={file} chosen={chosen} isOutputFixed={isOutputFixed} />
+
+type FileMessageProps = PageViewProps
+
+const FileMessage = ({ message }: FileMessageProps) => (
+  <PlayerMessage message={message} fallback={OPENED_FROM} />
+)
+
+const PAGE_VIEWS = {
+  [PAGE_KINDS.playing]: ReadyFile,
+  [PAGE_KINDS.message]: FileMessage,
+} as const satisfies Record<PageKind, ComponentType<PageViewProps>>
 
 type PlayPageProps = { fileId: string; queue: string[] }
 
@@ -143,7 +200,7 @@ const PlayPage = ({ fileId, queue }: PlayPageProps) => {
     queryFn: async (): Promise<LocalFile> => {
       const reply = await client.request({ type: DESKTOP_REQUESTS.describeFile, fileId, queue })
       if (reply.type === DESKTOP_REPLIES.file) return reply.file
-      throw new Error(refusalText({ reply, fallback: NOT_OPENABLE }))
+      throw new Error(refusalText({ reply, fallback: PLAY_PAGE_COPY.notOpenable }))
     },
     // Opening a file also records it as recent and reads its resume point: asking again while it
     // plays (focus, remount, a page reading everything again after a PIN) would move both.
@@ -153,12 +210,38 @@ const PlayPage = ({ fileId, queue }: PlayPageProps) => {
     retry: false,
   })
 
-  if (file.isError) return <PlayerMessage message={file.error.message} fallback={OPENED_FROM} />
-  if (file.isPending || chosen === null) {
-    return <PlayerMessage message={null} fallback={OPENED_FROM} />
-  }
-  return <Playing file={file.data} chosen={chosen} isOutputFixed={isOutputFixed} />
+  const isReady = file.isSuccess && chosen !== null
+  const View = PAGE_VIEWS[isReady ? PAGE_KINDS.playing : PAGE_KINDS.message]
+  return (
+    <View
+      file={file.data ?? null}
+      chosen={chosen}
+      isOutputFixed={isOutputFixed}
+      message={file.isError ? file.error.message : null}
+    />
+  )
 }
+
+/** Whether main granted an id for the file, so it can be asked for. */
+const ROUTE_KINDS = { granted: 'granted', invalid: 'invalid' } as const
+
+type RouteKind = (typeof ROUTE_KINDS)[keyof typeof ROUTE_KINDS]
+
+type RouteViewProps = { fileId: string | undefined; queue: string[] }
+
+type GrantedFileProps = RouteViewProps
+
+const GrantedFile = ({ fileId, queue }: GrantedFileProps) =>
+  isOpaqueId(fileId) && <PlayPage key={fileId} fileId={fileId} queue={queue} />
+
+const InvalidFile = () => (
+  <PlayerMessage message={PLAY_PAGE_COPY.notOpenable} fallback={OPENED_FROM} />
+)
+
+const ROUTE_VIEWS = {
+  [ROUTE_KINDS.granted]: GrantedFile,
+  [ROUTE_KINDS.invalid]: InvalidFile,
+} as const satisfies Record<RouteKind, ComponentType<RouteViewProps>>
 
 /**
  * A local file or a download, by the id main granted for it. Keyed by file, so a new file
@@ -167,7 +250,7 @@ const PlayPage = ({ fileId, queue }: PlayPageProps) => {
 export const PlayRoute = () => {
   const { fileId } = useParams()
   const state: unknown = useLocation().state
-  if (!isOpaqueId(fileId)) return <PlayerMessage message={NOT_OPENABLE} fallback={OPENED_FROM} />
   const queue = isPlayState(state) ? state.queue : []
-  return <PlayPage key={fileId} fileId={fileId} queue={queue} />
+  const View = ROUTE_VIEWS[isOpaqueId(fileId) ? ROUTE_KINDS.granted : ROUTE_KINDS.invalid]
+  return <View fileId={fileId} queue={queue} />
 }

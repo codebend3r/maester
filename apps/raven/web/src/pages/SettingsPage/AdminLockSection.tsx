@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ADMIN_LOCK_STATES, type AdminLock, plural } from '@raven/core'
-import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
+import { type ComponentType, type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { Button } from '@raven/ui'
-import { queryKeys } from '@raven/ui/headless'
+import { queryKeys, KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
 import { adminLockQuery } from '@/lib/queries'
 import { SettingsSkeleton } from '@/pages/SettingsPage/Setting'
 import { Titled } from '@/pages/SettingsPage/Titled'
+import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type CountdownProps = { deadline: number }
 
@@ -20,31 +22,75 @@ const Countdown = ({ deadline }: CountdownProps) => {
     return () => window.clearInterval(timer)
   }, [])
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1_000))
-  return plural({ n: seconds, one: 'second', many: 'seconds' })
+  return plural({
+    n: seconds,
+    one: SETTINGS_COPY.adminLock.second,
+    many: SETTINGS_COPY.adminLock.seconds,
+  })
 }
+
+const LOCKED_HINT_KEYS = { available: 'available', unavailable: 'unavailable' } as const
+type LockedHintKey = (typeof LOCKED_HINT_KEYS)[keyof typeof LOCKED_HINT_KEYS]
+
+const AvailableHint = () => SETTINGS_COPY.adminLock.onHint
+
+const UnavailableHint = () => (
+  <>
+    {SETTINGS_COPY.adminLock.unavailableSet}{' '}
+    <code>{SETTINGS_COPY.adminLock.unavailableEnvVar}</code> {SETTINGS_COPY.adminLock.unavailableIn}{' '}
+    <code>{COMMON_COPY.envFile}</code> {SETTINGS_COPY.adminLock.unavailableTurnOff}
+  </>
+)
+
+const LOCKED_HINTS = {
+  [LOCKED_HINT_KEYS.available]: AvailableHint,
+  [LOCKED_HINT_KEYS.unavailable]: UnavailableHint,
+} as const satisfies Record<LockedHintKey, ComponentType>
+
+type LockedHintProps = { isAvailable: boolean }
+
+/** The lock is on: turning it off asks for the password, or needs one set first. */
+const LockedHint = ({ isAvailable }: LockedHintProps) => {
+  const Hint = LOCKED_HINTS[isAvailable ? LOCKED_HINT_KEYS.available : LOCKED_HINT_KEYS.unavailable]
+  return <Hint />
+}
+
+type TurningOnHintProps = { deadline: number }
+
+const TurningOnHint = ({ deadline }: TurningOnHintProps) => (
+  <>
+    {SETTINGS_COPY.adminLock.turnsOnIn} <Countdown deadline={deadline} />
+    {SETTINGS_COPY.adminLock.turnsOnUntil}
+  </>
+)
+
+const OffHint = () => SETTINGS_COPY.adminLock.offHint
+
+type LockHintViewProps = {
+  [ADMIN_LOCK_STATES.on]: LockedHintProps
+  [ADMIN_LOCK_STATES.turningOn]: TurningOnHintProps
+  [ADMIN_LOCK_STATES.off]: Record<never, never>
+}
+
+const LOCK_HINTS = {
+  [ADMIN_LOCK_STATES.on]: LockedHint,
+  [ADMIN_LOCK_STATES.turningOn]: TurningOnHint,
+  [ADMIN_LOCK_STATES.off]: OffHint,
+} as const satisfies ViewsOf<LockHintViewProps>
 
 type AdminLockHintProps = { lock: AdminLock; readAt: number }
 
-/** What the admin lock's toggle says under it; `readAt` is when the lock was read, its countdown's start. */
-const AdminLockHint = ({ lock, readAt }: AdminLockHintProps) => {
+/** Which hint the lock's state takes, with what it needs; `readAt` is when the lock was read, its countdown's start. */
+type LockHintViewOfProps = AdminLockHintProps
+
+const lockHintViewOf = ({ lock, readAt }: LockHintViewOfProps): ViewOf<LockHintViewProps> => {
   switch (lock.state) {
     case ADMIN_LOCK_STATES.on:
-      return lock.available ? (
-        'Turning it off asks for the admin password.'
-      ) : (
-        <>
-          Set <code>ADMIN_PASSWORD</code> in raven's <code>.env</code> to turn it off.
-        </>
-      )
+      return { key: lock.state, props: { isAvailable: lock.available } }
     case ADMIN_LOCK_STATES.turningOn:
-      return (
-        <>
-          Turns on in <Countdown deadline={readAt + lock.remainingMs} />. Until then, turning it off
-          needs no password.
-        </>
-      )
+      return { key: lock.state, props: { deadline: readAt + lock.remainingMs } }
     case ADMIN_LOCK_STATES.off:
-      return 'Off in this browser until it is turned back on, through refreshes, restarts and redeploys. Turned on, it waits a moment first, so a slip costs no password.'
+      return { key: lock.state, props: {} }
     default: {
       const unknown: never = lock
       return unknown
@@ -121,15 +167,9 @@ export const AdminLockSection = () => {
     <section className={styles.section} aria-labelledby={headingId}>
       <header className={styles.sectionHead}>
         <h2 id={headingId} className={styles.heading}>
-          <Titled icon="lock">Admin</Titled>
+          <Titled icon="lock">{SETTINGS_COPY.adminLock.heading}</Titled>
         </h2>
-        <p className={styles.help}>
-          On in every browser until the admin password is entered there. While it is on, raven can
-          be watched but not managed: no library is added, edited, scanned or matched, no match,
-          metadata or image is changed, the settings above stay as they are, and no video is deleted
-          or has its file's path shown. Locked libraries are hidden altogether, so nothing asks for
-          their PIN.
-        </p>
+        <p className={styles.help}>{SETTINGS_COPY.adminLock.help}</p>
       </header>
       {lock.isError && (
         <p className={styles.error} role="alert">
@@ -142,7 +182,7 @@ export const AdminLockSection = () => {
         </p>
       )}
       {lock.isPending && (
-        <Loading label="Reading the admin lock">
+        <Loading label={SETTINGS_COPY.adminLock.reading}>
           <SettingsSkeleton count={1} />
         </Loading>
       )}
@@ -155,16 +195,19 @@ export const AdminLockSection = () => {
             disabled={busy || (current.state === ADMIN_LOCK_STATES.on && !current.available)}
             onChange={(event) => toggle({ from: current, checked: event.target.checked })}
           />
-          <span className={styles.choiceLabel}>Admin lock</span>
+          <span className={styles.choiceLabel}>{SETTINGS_COPY.adminLock.label}</span>
           <span className={styles.choiceHint}>
-            <AdminLockHint lock={current} readAt={lock.dataUpdatedAt} />
+            <KeyedView<LockHintViewProps>
+              views={LOCK_HINTS}
+              view={lockHintViewOf({ lock: current, readAt: lock.dataUpdatedAt })}
+            />
           </span>
         </label>
       )}
       {isAskingNow && (
         <form className={styles.password} onSubmit={submit}>
           <label htmlFor={passwordId} className={styles.passwordLabel}>
-            Admin password
+            {SETTINGS_COPY.adminLock.password}
           </label>
           <input
             ref={passwordInput}
@@ -181,14 +224,14 @@ export const AdminLockSection = () => {
             </p>
           )}
           <div className={styles.actions}>
-            <Button onClick={() => setAsking(false)}>Cancel</Button>
+            <Button onClick={() => setAsking(false)}>{COMMON_COPY.cancel}</Button>
             <Button
               type="submit"
               tone="primary"
               icon="unlock"
               disabled={password === '' || unlock.isPending}
             >
-              Turn off
+              {SETTINGS_COPY.adminLock.turnOff}
             </Button>
           </div>
         </form>

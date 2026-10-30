@@ -2,12 +2,12 @@ import { DESKTOP_REPLIES, DESKTOP_REQUESTS, type DesktopReply } from '@raven/cor
 import { Button, Icon } from '@raven/ui'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { handled } from '@/desktop/handled'
+import { OPEN_LINK_COPY } from '@/desktop/OpenLinkDialog/copy'
 import { useOpenReply } from '@/desktop/openReply'
 import { useModal } from '@/lib/useModal'
 import { useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/DesktopDialog.module.scss'
-
-const UNOPENED = 'Raven could not open that link. Try again.'
+import { COMMON_COPY } from '@/lib/copy'
 
 const OUTCOME_KINDS = { open: 'open', stay: 'stay' } as const
 
@@ -34,7 +34,7 @@ const outcomeOf = (reply: DesktopReply): Outcome => {
     case DESKTOP_REPLIES.updates:
     case DESKTOP_REPLIES.downloads:
     case DESKTOP_REPLIES.space:
-      return { kind: OUTCOME_KINDS.stay, message: UNOPENED }
+      return { kind: OUTCOME_KINDS.stay, message: OPEN_LINK_COPY.unopened }
     default: {
       const unreachable: never = reply
       return unreachable
@@ -109,13 +109,13 @@ export const OpenLinkDialog = ({ onClose }: OpenLinkDialogProps) => {
     >
       <form className={styles.form} onSubmit={(event) => handled(submit(event))}>
         <h2 id={ids.title} className={styles.title}>
-          Open a link
+          {OPEN_LINK_COPY.title}
         </h2>
         <p id={ids.hint} className={styles.hint}>
-          Paste a Raven link or the address of a title on raven.
+          {OPEN_LINK_COPY.hint}
         </p>
         <label className={styles.field}>
-          Link
+          {OPEN_LINK_COPY.link}
           <input
             ref={field}
             type="url"
@@ -135,10 +135,10 @@ export const OpenLinkDialog = ({ onClose }: OpenLinkDialogProps) => {
           </p>
         )}
         <div className={styles.actions}>
-          <Button onClick={close}>Cancel</Button>
+          <Button onClick={close}>{COMMON_COPY.cancel}</Button>
           {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}
           <Button type="submit" tone="primary" aria-disabled={isPending}>
-            Open
+            {OPEN_LINK_COPY.open}
           </Button>
         </div>
       </form>

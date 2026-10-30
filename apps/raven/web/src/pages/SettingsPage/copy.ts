@@ -1,0 +1,93 @@
+type RangeHintProps = { min: number; max: number }
+
+export const SETTINGS_COPY = {
+  resetToDefaults: 'Reset to defaults',
+  resetConfirm: 'Every setting goes back to its default.',
+  resetAll: 'Reset all',
+  resetDone: 'Every setting is back to its default.',
+  resetFailed: 'Could not reset: ',
+  thisApp: 'This app',
+  thisBrowser: 'This browser',
+  secondsFor: (seconds: number) => `${seconds} seconds`,
+  autoplay: 'Autoplay',
+  autoplayHint:
+    "Plays the next episode, the saga's next film or the shuffle's next pick once the countdown at the end runs out. Off, the up next card waits for Play now.",
+  countdown: 'Count down to what is up next for',
+  countdownHint: ({ min, max }: RangeHintProps) =>
+    `How long before the end the up next card shows, and with autoplay on how long it counts down, from ${min} to ${max} seconds.`,
+  skipIntros: 'Skip intros automatically',
+  skipIntrosHint:
+    "Jumps past an episode's intro, once per episode, with a moment to undo it. Off, Skip intro waits for a click.",
+  openInRaven: 'Open videos in Raven',
+  openInRavenHint:
+    "Offers Raven for videos this browser cannot play, in the player's settings, and Download to Raven on a title's page. Turn it on only where Raven is installed.",
+  playback: 'Playback',
+  playbackHint:
+    'How the server plays video, for every viewer. A change takes effect on the next play.',
+  directPlay: 'Play the original file',
+  transcoding: 'Server conversion',
+  maxHeight: 'Transcode size',
+  quality: 'Transcode quality',
+  hwAccel: 'Hardware acceleration',
+  encodesWith: (encoder: string) => `Transcodes encode with ${encoder} right now.`,
+  tonemap: 'Tone map HDR to SDR on a transcode',
+  tonemapHint: 'Colours are mapped for an SDR screen; off, HDR goes out as it is and looks flat.',
+  tonemapUnavailable: 'This ffmpeg cannot tone map, so HDR goes out as it is whatever this says.',
+  markers: 'Intros and credits',
+  detectMarkers: 'Find intros and credits',
+  detectMarkersHint:
+    "Listens to each season in the background for the intro and end theme its episodes share, and looks for each film's credits crawl, so players offer Skip intro and count down to what is next from the credits. It waits while a video is converted for someone watching. Chapters named Opening, End Credits or the like count either way.",
+  display: 'Display',
+  displayHint: 'How pages look, for every viewer.',
+  movieTitles: 'Movie titles',
+  section: {
+    changeThese: 'change these',
+    below: 'below',
+    saveFailed: 'Could not save: ',
+    reading: 'Reading the settings',
+  },
+  account: {
+    help: 'The account this browser is signed in to.',
+    email: 'Email',
+    access: 'Access',
+    signOutFailed: 'Could not sign out: ',
+  },
+  advanced: {
+    heading: 'Advanced',
+    help: 'For this browser only.',
+    linger: "Hide the player's controls after",
+    lingerHint: ({ min, max }: RangeHintProps) =>
+      `How long the controls and the cursor stay over the video once the mouse, the keys and clicks go quiet, from ${min} to ${max} seconds.`,
+  },
+  adminLock: {
+    heading: 'Admin',
+    help: "On in every browser until the admin password is entered there. While it is on, raven can be watched but not managed: no library is added, edited, scanned or matched, no match, metadata or image is changed, the settings above stay as they are, and no video is deleted or has its file's path shown. Locked libraries are hidden altogether, so nothing asks for their PIN.",
+    reading: 'Reading the admin lock',
+    label: 'Admin lock',
+    password: 'Admin password',
+    turnOff: 'Turn off',
+    second: 'second',
+    seconds: 'seconds',
+    onHint: 'Turning it off asks for the admin password.',
+    unavailableSet: 'Set',
+    unavailableEnvVar: 'ADMIN_PASSWORD',
+    unavailableIn: "in raven's",
+    unavailableTurnOff: 'to turn it off.',
+    turnsOnIn: 'Turns on in',
+    turnsOnUntil: '. Until then, turning it off needs no password.',
+    offHint:
+      'Off in this browser until it is turned back on, through refreshes, restarts and redeploys. Turned on, it waits a moment first, so a slip costs no password.',
+  },
+  users: {
+    heading: 'Users',
+    help: 'Who may use this raven. Each new account waits here until you approve it.',
+    changeFailed: 'Could not change access: ',
+    reading: 'Reading the accounts',
+    tabs: 'Accounts',
+    owner: 'Owner',
+    confirmRemove: 'Remove access for this account?',
+    yesRemove: 'Yes, remove',
+    yesRemoveFor: (email: string) => `Yes, remove access for ${email}`,
+    cancelRemovingFor: (email: string) => `Cancel removing ${email}`,
+  },
+} as const

@@ -20,6 +20,8 @@ import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { useSearch } from '@raven/ui/headless'
+import { SECTION_IDS } from '@/pages/DesignPage/contents'
+import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import { IconSet } from '@/pages/DesignPage/IconSet'
 import {
@@ -36,6 +38,8 @@ import {
 } from '@/pages/DesignPage/samples'
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
 
+const COPY = DESIGN_COPY.components
+
 const noop = () => undefined
 
 /** The toolbar with its own state, since here it saves to nothing. */
@@ -47,7 +51,7 @@ const ToolbarDemo = () => {
   })
   return (
     <LibraryToolbar
-      name="Movies"
+      name={COPY.toolbarName}
       search={search}
       settings={settings}
       onChange={(change) => setSettings((current) => ({ ...current, ...change }))}
@@ -78,15 +82,15 @@ const ControlsDemo = () => {
           fullscreen={false}
           subtitlesOn
           menuValues={{
-            subtitles: 'English',
-            audio: 'English 5.1',
-            playback: '1080p · Direct play',
+            subtitles: COPY.menuSubtitles,
+            audio: COPY.menuAudio,
+            playback: COPY.menuPlayback,
           }}
           menuOpen={false}
           settingsButton={settingsButton}
-          upNext="Tears of Steel (2012)"
+          upNext={COPY.upNext}
           countdown={null}
-          endsAt="Ends at 2:20 AM"
+          endsAt={COPY.endsAt}
           onRestart={noop}
           onNext={noop}
           onTogglePlay={() => setPaused((current) => !current)}
@@ -103,49 +107,37 @@ const ControlsDemo = () => {
 }
 
 export const ComponentsSection = () => (
-  <DesignSection
-    id="components"
-    intro="Every shared component, with made-up videos. Nothing here saves; the library dialog and folder browser are left out because they change real libraries."
-  >
-    <Specimen
-      name="Button"
-      note="Quiet by default; primary for the one action a screen is for, and large where that action is the page's whole point. Danger is an outline; a way back is a pill."
-    >
+  <DesignSection id={SECTION_IDS.components} intro={COPY.intro}>
+    <Specimen name={COPY.button} note={COPY.buttonNote}>
       <div className={styles.row}>
         <Button tone="primary" size="large" icon="play">
-          Play all
+          {COPY.playAll}
         </Button>
         <Button tone="primary" icon="plus">
-          Add library
+          {COPY.addLibrary}
         </Button>
-        <Button icon="edit">Edit</Button>
+        <Button icon="edit">{COPY.edit}</Button>
         <Button tone="danger" icon="trash">
-          Delete for good
+          {COPY.deleteForGood}
         </Button>
         <Button tone="ghost" icon="history">
-          History
+          {COPY.history}
         </Button>
-        <Button icon="close" aria-label="Close" />
+        <Button icon="close" aria-label={COPY.close} />
         <Button disabled icon="rescan">
-          Full scan
+          {COPY.fullScan}
         </Button>
         <ButtonLink tone="pill" to="/" icon="back">
-          Libraries
+          {COPY.libraries}
         </ButtonLink>
       </div>
     </Specimen>
 
-    <Specimen
-      name="Icon"
-      note="Line icons on a 24 grid, drawn at 28 here, decorative unless their control is labelled. Point at one to see how it moves in a control; press it to copy its name."
-    >
+    <Specimen name={COPY.icon} note={COPY.iconNote}>
       <IconSet />
     </Specimen>
 
-    <Specimen
-      name="Watched"
-      note="A check on a watched video, the number left or a check on a show, season or saga, and the toggle on a page: unpressed, partly and pressed."
-    >
+    <Specimen name={COPY.watched} note={COPY.watchedNote}>
       <div className={styles.row}>
         <WatchedMark watched />
         <WatchedCount watched={3} total={9} />
@@ -156,7 +148,7 @@ export const ComponentsSection = () => (
       </div>
     </Specimen>
 
-    <Specimen name="ScanStatus">
+    <Specimen name={COPY.scanStatus}>
       <ul className={styles.cards}>
         {SAMPLE_SCANS.map(({ label, scan, expected }) => (
           <li key={label} className={styles.card}>
@@ -167,7 +159,7 @@ export const ComponentsSection = () => (
       </ul>
     </Specimen>
 
-    <Specimen name="PlaybackNote" note="Only for a video this browser cannot play.">
+    <Specimen name={COPY.playbackNote} note={COPY.playbackNoteNote}>
       <ul className={styles.ruledList}>
         {SAMPLE_MEDIA.slice(0, 4).map((media) => (
           <li key={media.id} className={styles.noteRow}>
@@ -178,70 +170,51 @@ export const ComponentsSection = () => (
       </ul>
     </Specimen>
 
-    <Specimen name="MediaCard" note="With its menu, a resume line, a favourite and HDR.">
+    <Specimen name={COPY.mediaCard} note={COPY.mediaCardNote}>
       <ul className={styles.cardSample}>
         <MediaCard media={FEATURED_SAMPLE} />
       </ul>
     </Specimen>
 
-    <Specimen
-      name="PosterCard"
-      note="A Movies library's cards: with no poster they fall back to the frame grab, then the letter."
-    >
+    <Specimen name={COPY.posterCard} note={COPY.posterCardNote}>
       <MediaGrid items={SAMPLE_MOVIES} posters matchType="movie" />
     </Specimen>
 
-    <Specimen
-      name="ShowCard"
-      note="A TV library's cards: the years, the episode count, and Play for the next episode."
-    >
+    <Specimen name={COPY.showCard} note={COPY.showCardNote}>
       <ShowGrid shows={SAMPLE_SHOWS} />
     </Specimen>
 
-    <Specimen
-      name="ItemHeader"
-      isWide
-      note="The top of a movie's page, with the way back to its library, without its backdrop here."
-    >
+    <Specimen name={COPY.itemHeader} isWide note={COPY.itemHeaderNote}>
       <ItemHeader
-        back={{ to: '/', label: 'Movies' }}
+        back={{ to: '/', label: COPY.itemHeaderBack }}
         titleId="design-item-header"
-        title="Weirwood at Night"
-        byline="Directed by Mark Kimball"
-        contentRating="PG-13"
-        facts={['2026', '1h 42m', 'Drama', 'Mystery']}
+        title={COPY.itemHeaderTitle}
+        byline={COPY.itemHeaderByline}
+        contentRating={COPY.itemHeaderRating}
+        facts={COPY.itemHeaderFacts}
         ratings={SAMPLE_RATINGS}
         picture={{ shape: 'poster', url: null }}
         backdrop={null}
       >
         <Button tone="primary" icon="play">
-          Resume from 40:00
+          {COPY.resume}
         </Button>
-        <Button icon="heart" aria-label="Favourite" aria-pressed />
+        <Button icon="heart" aria-label={COPY.favourite} aria-pressed />
       </ItemHeader>
     </Specimen>
 
-    <Specimen
-      name="SectionHeading"
-      note="A section's title in the serif, ruled off from what follows, with room at its right for a count or the section's own controls."
-    >
-      <SectionHeading aside="6 people">Cast &amp; Crew</SectionHeading>
+    <Specimen name={COPY.sectionHeading} note={COPY.sectionHeadingNote}>
+      <SectionHeading aside={COPY.sectionHeadingAside}>{COPY.sectionHeadingTitle}</SectionHeading>
     </Specimen>
 
-    <Specimen
-      name="RatingPanel"
-      note="A movie's scores in one frame: the score, a bar in the source's colour and its name. Hover or focus a score for the site and what the number means. A source with no score is left out."
-    >
+    <Specimen name={COPY.ratingPanel} note={COPY.ratingPanelNote}>
       <div className={styles.stack}>
         <RatingPanel ratings={SAMPLE_RATINGS} />
         <RatingPanel ratings={SAMPLE_RATINGS_LOW} />
       </div>
     </Specimen>
 
-    <Specimen
-      name="RatingBadge"
-      note="The panel in one line, where a card or a table row has room for one score: the score, its scale and the source's name, with the bar along the frame's foot."
-    >
+    <Specimen name={COPY.ratingBadge} note={COPY.ratingBadgeNote}>
       <div className={styles.row}>
         {[...SAMPLE_RATINGS, ...SAMPLE_RATINGS_LOW, ...SAMPLE_RATINGS_RED].map((rating) => (
           <RatingBadge key={`${rating.source}-${rating.value}`} rating={rating} />
@@ -249,10 +222,7 @@ export const ComponentsSection = () => (
       </div>
     </Specimen>
 
-    <Specimen
-      name="RatingChip"
-      note="Every score a title has in one chip, where a tile has no room for four badges: the lead score and how many more. Hover or focus it for each source's score in a popover."
-    >
+    <Specimen name={COPY.ratingChip} note={COPY.ratingChipNote}>
       <div className={styles.row}>
         <RatingChip ratings={SAMPLE_RATINGS} />
         <RatingChip ratings={SAMPLE_RATINGS_LOW} />
@@ -260,49 +230,42 @@ export const ComponentsSection = () => (
       </div>
     </Specimen>
 
-    <Specimen name="ReviewCards" note="Reviews by TMDB members; Read opens the whole review.">
+    <Specimen name={COPY.reviewCards} note={COPY.reviewCardsNote}>
       <ReviewCards reviews={SAMPLE_REVIEWS} />
     </Specimen>
 
-    <Specimen name="CastRow" note="Someone who acts and directs is one person with both roles.">
+    <Specimen name={COPY.castRow} note={COPY.castRowNote}>
       <CastRow credits={SAMPLE_CREDITS} />
     </Specimen>
 
-    <Specimen name="MediaGrid">
+    <Specimen name={COPY.mediaGrid}>
       <MediaGrid items={SAMPLE_MEDIA} />
     </Specimen>
 
-    <Specimen name="MediaList" isWide>
+    <Specimen name={COPY.mediaList} isWide>
       <MediaList items={SAMPLE_MEDIA} />
     </Specimen>
 
-    <Specimen name="MediaTiles">
+    <Specimen name={COPY.mediaTiles}>
       <MediaTiles items={SAMPLE_MEDIA} />
     </Specimen>
 
-    <Specimen name="MediaGroups" note="Grouped by resolution.">
+    <Specimen name={COPY.mediaGroups} note={COPY.mediaGroupsNote}>
       <MediaGroups items={SAMPLE_MEDIA} by="resolution" />
     </Specimen>
 
-    <Specimen
-      name="LibraryToolbar"
-      isWide
-      note="Its search, sort, views and Play all, saving to nothing here."
-    >
+    <Specimen name={COPY.libraryToolbar} isWide note={COPY.libraryToolbarNote}>
       <ToolbarDemo />
     </Specimen>
 
-    <Specimen
-      name="Skeleton"
-      note="What a page shows while it waits: the shape of what is coming, which a screen reader hears as one line."
-    >
-      <Loading label="Gathering the videos">
+    <Specimen name={COPY.skeleton} note={COPY.skeletonNote}>
+      <Loading label={COPY.skeletonLabel}>
         <MediaGridSkeleton posters count={4} />
         <MediaTilesSkeleton />
       </Loading>
     </Specimen>
 
-    <Specimen name="Controls" note="The player's bar; play and pause work here, nothing else does.">
+    <Specimen name={COPY.controls} note={COPY.controlsNote}>
       <ControlsDemo />
     </Specimen>
   </DesignSection>

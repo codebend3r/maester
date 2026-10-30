@@ -1,100 +1,163 @@
 import type { DesignToken } from '@raven/core'
+import type { ComponentType } from 'react'
+import { SECTION_IDS } from '@/pages/DesignPage/contents'
+import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import { SAMPLES, type Sample, groupTokens } from '@/pages/DesignPage/tokenGroups'
 import styles from '@/pages/DesignPage/TokensSection.module.scss'
 
-const SAMPLE_TEXT = 'The raven reads every folder'
+const COPY = DESIGN_COPY.tokens
+
+type SampleViewProps = { value: string }
+
+type BarSampleProps = SampleViewProps
+
+const BarSample = ({ value }: BarSampleProps) => (
+  <span className={styles.bar} style={{ width: value }} />
+)
+
+type WidthSampleProps = SampleViewProps
+
+const WidthSample = ({ value }: WidthSampleProps) => (
+  <span className={styles.bar} style={{ width: `min(${value}, 100%)` }} />
+)
+
+type RadiusSampleProps = SampleViewProps
+
+const RadiusSample = ({ value }: RadiusSampleProps) => (
+  <span className={styles.radius} style={{ borderRadius: value }} />
+)
+
+type FamilySampleProps = SampleViewProps
+
+const FamilySample = ({ value }: FamilySampleProps) => (
+  <span className={styles.family} style={{ fontFamily: value }}>
+    {COPY.sampleText}
+  </span>
+)
+
+type SizeSampleProps = SampleViewProps
+
+const SizeSample = ({ value }: SizeSampleProps) => (
+  <span className={styles.size} style={{ fontSize: value }}>
+    {COPY.sampleText}
+  </span>
+)
+
+type LineSampleProps = SampleViewProps
+
+const LineSample = ({ value }: LineSampleProps) => (
+  <span className={styles.line} style={{ lineHeight: value }}>
+    {COPY.lineText(COPY.sampleText)}
+  </span>
+)
+
+type TrackingSampleProps = SampleViewProps
+
+const TrackingSample = ({ value }: TrackingSampleProps) => (
+  <span className={styles.tracking} style={{ letterSpacing: value }}>
+    {COPY.tracking}
+  </span>
+)
+
+type EyebrowSampleProps = SampleViewProps
+
+const EyebrowSample = ({ value }: EyebrowSampleProps) => (
+  <span className={styles.eyebrow} style={{ letterSpacing: value }}>
+    {COPY.eyebrow}
+  </span>
+)
+
+type EaseSampleProps = SampleViewProps
+
+const EaseSample = ({ value }: EaseSampleProps) => (
+  <span className={styles.ease} style={{ transitionTimingFunction: value }} />
+)
+
+type ShadowSampleProps = SampleViewProps
+
+const ShadowSample = ({ value }: ShadowSampleProps) => (
+  <span className={styles.shadow} style={{ boxShadow: value }} />
+)
+
+type TextShadowSampleProps = SampleViewProps
+
+const TextShadowSample = ({ value }: TextShadowSampleProps) => (
+  <span className={styles.textShadow} style={{ textShadow: value }}>
+    {COPY.textShadow}
+  </span>
+)
+
+type FadeSampleProps = SampleViewProps
+
+const FadeSample = ({ value }: FadeSampleProps) => (
+  <span className={styles.fade}>
+    <span className={styles.fadeOver} style={{ backgroundImage: value }} />
+  </span>
+)
+
+type GlowSampleProps = SampleViewProps
+
+const GlowSample = ({ value }: GlowSampleProps) => (
+  <span className={styles.glowGround}>
+    <span className={styles.glow} style={{ opacity: value }} />
+  </span>
+)
+
+type HeightSampleProps = SampleViewProps
+
+const HeightSample = ({ value }: HeightSampleProps) => (
+  <span className={styles.height} style={{ height: value }} />
+)
+
+type BorderSampleProps = SampleViewProps
+
+const BorderSample = ({ value }: BorderSampleProps) => (
+  <span className={styles.border} style={{ borderTopWidth: value }} />
+)
+
+type FocusSampleProps = SampleViewProps
+
+const FocusSample = ({ value }: FocusSampleProps) => (
+  <span className={styles.focus} style={{ outline: value }}>
+    {COPY.focus}
+  </span>
+)
+
+const NoSample = () => null
+
+const SAMPLE_VIEWS = {
+  [SAMPLES.bar]: BarSample,
+  [SAMPLES.width]: WidthSample,
+  [SAMPLES.radius]: RadiusSample,
+  [SAMPLES.family]: FamilySample,
+  [SAMPLES.size]: SizeSample,
+  [SAMPLES.line]: LineSample,
+  [SAMPLES.tracking]: TrackingSample,
+  [SAMPLES.eyebrow]: EyebrowSample,
+  [SAMPLES.ease]: EaseSample,
+  [SAMPLES.shadow]: ShadowSample,
+  [SAMPLES.textShadow]: TextShadowSample,
+  [SAMPLES.fade]: FadeSample,
+  [SAMPLES.glow]: GlowSample,
+  [SAMPLES.height]: HeightSample,
+  [SAMPLES.border]: BorderSample,
+  [SAMPLES.focus]: FocusSample,
+  [SAMPLES.none]: NoSample,
+} as const satisfies Record<Sample, ComponentType<SampleViewProps>>
 
 type TokenSampleProps = { name: string; sample: Sample }
 
 /** A token drawn at its true size, read through var() so it is the live value. */
 const TokenSample = ({ name, sample }: TokenSampleProps) => {
-  const value = `var(${name})`
-  switch (sample) {
-    case SAMPLES.bar:
-      return <span className={styles.bar} style={{ width: value }} />
-    case SAMPLES.width:
-      return <span className={styles.bar} style={{ width: `min(${value}, 100%)` }} />
-    case SAMPLES.radius:
-      return <span className={styles.radius} style={{ borderRadius: value }} />
-    case SAMPLES.family:
-      return (
-        <span className={styles.family} style={{ fontFamily: value }}>
-          {SAMPLE_TEXT}
-        </span>
-      )
-    case SAMPLES.size:
-      return (
-        <span className={styles.size} style={{ fontSize: value }}>
-          {SAMPLE_TEXT}
-        </span>
-      )
-    case SAMPLES.line:
-      return (
-        <span className={styles.line} style={{ lineHeight: value }}>
-          {`${SAMPLE_TEXT}, then waits for the next one, and the next.`}
-        </span>
-      )
-    case SAMPLES.tracking:
-      return (
-        <span className={styles.tracking} style={{ letterSpacing: value }}>
-          Weirwood at Night
-        </span>
-      )
-    case SAMPLES.eyebrow:
-      return (
-        <span className={styles.eyebrow} style={{ letterSpacing: value }}>
-          Design system
-        </span>
-      )
-    case SAMPLES.ease:
-      return <span className={styles.ease} style={{ transitionTimingFunction: value }} />
-    case SAMPLES.shadow:
-      return <span className={styles.shadow} style={{ boxShadow: value }} />
-    case SAMPLES.textShadow:
-      return (
-        <span className={styles.textShadow} style={{ textShadow: value }}>
-          Subtitles
-        </span>
-      )
-    case SAMPLES.fade:
-      return (
-        <span className={styles.fade}>
-          <span className={styles.fadeOver} style={{ backgroundImage: value }} />
-        </span>
-      )
-    case SAMPLES.glow:
-      return (
-        <span className={styles.glowGround}>
-          <span className={styles.glow} style={{ opacity: value }} />
-        </span>
-      )
-    case SAMPLES.height:
-      return <span className={styles.height} style={{ height: value }} />
-    case SAMPLES.border:
-      return <span className={styles.border} style={{ borderTopWidth: value }} />
-    case SAMPLES.focus:
-      return (
-        <span className={styles.focus} style={{ outline: value }}>
-          Focused
-        </span>
-      )
-    case SAMPLES.none:
-      return null
-    default: {
-      const unknown: never = sample
-      return unknown
-    }
-  }
+  const View = SAMPLE_VIEWS[sample]
+  return <View value={`var(${name})`} />
 }
 
 type TokensSectionProps = { tokens: readonly DesignToken[] }
 
 export const TokensSection = ({ tokens }: TokensSectionProps) => (
-  <DesignSection
-    id="tokens"
-    intro="Read straight from globals.scss, so a token added there shows up here, drawn at its true size. Component styles use only these values. Point at an easing curve to see it move."
-  >
+  <DesignSection id={SECTION_IDS.tokens} intro={COPY.intro}>
     {groupTokens(tokens).map((group) => (
       <Specimen key={group.name} name={group.name}>
         <dl className={styles.rows}>

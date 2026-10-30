@@ -1,12 +1,101 @@
-import { DESKTOP_REQUESTS, formatBytes, KEYS } from '@raven/core'
+import { DESKTOP_REQUESTS, KEYS } from '@raven/core'
 import { Button } from '@raven/ui'
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
+import {
+  type ComponentType,
+  type KeyboardEvent,
+  type RefObject,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react'
 import { handled } from '@/desktop/handled'
 import { useChangeDownloads, useDownloads, useSpace } from '@/desktop/downloadsApi'
+import { DOWNLOADS_SECTION_COPY } from '@/desktop/settings/copy'
 import { Section } from '@/desktop/settings/Section'
 import { useComputerName } from '@/stores/desktop'
 import styles from '@/desktop/settings/DesktopSettings.module.scss'
 import settings from '@/pages/SettingsPage/SettingsPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
+
+/** Whether the section asks before deleting every download, or offers to. */
+const ASK_STATES = { idle: 'idle', asking: 'asking' } as const
+
+type AskState = (typeof ASK_STATES)[keyof typeof ASK_STATES]
+
+type ButtonRef = RefObject<HTMLButtonElement | null>
+
+type DeleteAllViewProps = {
+  question: string
+  questionId: string
+  isDeleting: boolean
+  hasDownloads: boolean
+  askButton: ButtonRef
+  showButton: ButtonRef
+  cancelButton: ButtonRef
+  onDeleteAll: () => void
+  onAsk: () => void
+  onBack: () => void
+  onBackKey: (event: KeyboardEvent) => void
+  onShow: () => void
+}
+
+type DeleteAllQuestionProps = DeleteAllViewProps
+
+const DeleteAllQuestion = ({
+  question,
+  questionId,
+  isDeleting,
+  cancelButton,
+  onDeleteAll,
+  onBack,
+  onBackKey,
+}: DeleteAllQuestionProps) => (
+  <div className={styles.confirm}>
+    <p id={questionId} className={styles.question}>
+      {question}
+    </p>
+    <div className={`${styles.buttons} ${styles.answers}`}>
+      {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}
+      <Button
+        tone="danger"
+        aria-describedby={questionId}
+        aria-disabled={isDeleting}
+        onClick={onDeleteAll}
+        onKeyDown={onBackKey}
+      >
+        {DOWNLOADS_SECTION_COPY.deleteAll}
+      </Button>
+      <Button ref={cancelButton} onClick={onBack} onKeyDown={onBackKey}>
+        {COMMON_COPY.cancel}
+      </Button>
+    </div>
+  </div>
+)
+
+type DownloadsButtonsProps = DeleteAllViewProps
+
+const DownloadsButtons = ({
+  hasDownloads,
+  askButton,
+  showButton,
+  onAsk,
+  onShow,
+}: DownloadsButtonsProps) => (
+  <div className={styles.buttons}>
+    <Button ref={showButton} icon="folder" onClick={onShow}>
+      {DOWNLOADS_SECTION_COPY.showInFinder}
+    </Button>
+    <Button ref={askButton} tone="danger" icon="trash" disabled={!hasDownloads} onClick={onAsk}>
+      {DOWNLOADS_SECTION_COPY.deleteAllDownloads}
+    </Button>
+  </div>
+)
+
+const DELETE_ALL_VIEWS = {
+  [ASK_STATES.idle]: DownloadsButtons,
+  [ASK_STATES.asking]: DeleteAllQuestion,
+} as const satisfies Record<AskState, ComponentType<DeleteAllViewProps>>
 
 /** What a new download starts with, the room downloads take, where they are, and deleting them all. */
 export const DownloadsSection = () => {
@@ -57,11 +146,16 @@ export const DownloadsSection = () => {
 
   const question =
     used === null
-      ? 'Delete all downloads?'
-      : `Delete all downloads? ${formatBytes(used)} will be freed.`
+      ? DOWNLOADS_SECTION_COPY.deleteAllQuestion
+      : DOWNLOADS_SECTION_COPY.deleteAllFreeing(used)
+  const DeleteAllView = DELETE_ALL_VIEWS[isAsking ? ASK_STATES.asking : ASK_STATES.idle]
 
   return (
-    <Section icon="download" title="Downloads" help={`What Raven keeps on this ${computer}.`}>
+    <Section
+      icon="download"
+      title={COMMON_COPY.downloads}
+      help={DOWNLOADS_SECTION_COPY.help(computer)}
+    >
       {downloads.isError && (
         <p className={settings.error} role="alert">
           {downloads.error.message}
@@ -81,59 +175,35 @@ export const DownloadsSection = () => {
               )
             }
           />
-          <span className={settings.choiceLabel}>Delete once watched</span>
+          <span className={settings.choiceLabel}>{COMMON_COPY.deleteOnceWatched}</span>
           <span className={settings.choiceHint}>
-            What a new download starts with. A download set so goes a while after its last minutes
-            play.
+            {DOWNLOADS_SECTION_COPY.deleteOnceWatchedHint}
           </span>
         </label>
       )}
       {space.data !== undefined && (
         <p className={settings.hint}>
-          {`${formatBytes(space.data.used)} of downloads, ${formatBytes(space.data.free)} free on this ${computer}.`}
+          {DOWNLOADS_SECTION_COPY.space({
+            used: space.data.used,
+            free: space.data.free,
+            computer,
+          })}
         </p>
       )}
-      {isAsking ? (
-        <div className={styles.confirm}>
-          <p id={questionId} className={styles.question}>
-            {question}
-          </p>
-          <div className={`${styles.buttons} ${styles.answers}`}>
-            {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}
-            <Button
-              tone="danger"
-              aria-describedby={questionId}
-              aria-disabled={isDeleting}
-              onClick={() => handled(deleteAll())}
-              onKeyDown={backOnEscape}
-            >
-              Delete all
-            </Button>
-            <Button ref={cancelButton} onClick={() => setIsAsking(false)} onKeyDown={backOnEscape}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className={styles.buttons}>
-          <Button
-            ref={showButton}
-            icon="folder"
-            onClick={() => handled(change({ type: DESKTOP_REQUESTS.showDownloadsFolder }))}
-          >
-            Show in Finder
-          </Button>
-          <Button
-            ref={askButton}
-            tone="danger"
-            icon="trash"
-            disabled={!hasDownloads}
-            onClick={() => setIsAsking(true)}
-          >
-            Delete all downloads
-          </Button>
-        </div>
-      )}
+      <DeleteAllView
+        question={question}
+        questionId={questionId}
+        isDeleting={isDeleting}
+        hasDownloads={hasDownloads}
+        askButton={askButton}
+        showButton={showButton}
+        cancelButton={cancelButton}
+        onDeleteAll={() => handled(deleteAll())}
+        onAsk={() => setIsAsking(true)}
+        onBack={() => setIsAsking(false)}
+        onBackKey={backOnEscape}
+        onShow={() => handled(change({ type: DESKTOP_REQUESTS.showDownloadsFolder }))}
+      />
     </Section>
   )
 }

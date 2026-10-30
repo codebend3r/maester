@@ -1,5 +1,7 @@
 import { type ReactNode, useId } from 'react'
 import { Button, Icon } from '@raven/ui'
+import { SECTION_IDS } from '@/pages/DesignPage/contents'
+import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
 
@@ -34,7 +36,11 @@ const Field = ({ label, error, aside, isDisabled = false, children, id }: FieldP
   </div>
 )
 
-const TEXT_INPUTS: Array<{ type: string; label: string; placeholder?: string; value?: string }> = [
+const COPY = DESIGN_COPY.forms
+
+type TextInput = { type: string; label: string; placeholder?: string; value?: string }
+
+const TEXT_INPUTS: readonly TextInput[] = [
   { type: 'text', label: 'Text', placeholder: 'Movies' },
   { type: 'search', label: 'Search', placeholder: 'Search Movies' },
   { type: 'email', label: 'Email', placeholder: 'you@example.com' },
@@ -48,12 +54,9 @@ const TEXT_INPUTS: Array<{ type: string; label: string; placeholder?: string; va
 export const FormsSection = () => {
   const id = useId()
   return (
-    <DesignSection
-      id="forms"
-      intro="One field look for everything you type into, a lichen ring that fills with bark for choices, and the browser's own sliders and gauges in bark."
-    >
+    <DesignSection id={SECTION_IDS.forms} intro={COPY.intro}>
       <form className={styles.form} onSubmit={(event) => event.preventDefault()}>
-        <Specimen name="Text fields">
+        <Specimen name={COPY.textFields}>
           <div className={styles.fields}>
             {TEXT_INPUTS.map((input) => (
               <Field key={input.type} id={`${id}-${input.type}`} label={input.label}>
@@ -66,7 +69,7 @@ export const FormsSection = () => {
                 />
               </Field>
             ))}
-            <Field id={`${id}-invalid`} label="Invalid" error="Give the library a name.">
+            <Field id={`${id}-invalid`} label={COPY.invalid} error={COPY.invalidError}>
               <input
                 id={`${id}-invalid`}
                 type="text"
@@ -74,55 +77,52 @@ export const FormsSection = () => {
                 aria-describedby={`${id}-invalid-error`}
               />
             </Field>
-            <Field id={`${id}-disabled`} label="Disabled" isDisabled>
-              <input id={`${id}-disabled`} type="text" defaultValue="Read only for now" disabled />
+            <Field id={`${id}-disabled`} label={COPY.disabled} isDisabled>
+              <input id={`${id}-disabled`} type="text" defaultValue={COPY.readOnly} disabled />
             </Field>
           </div>
         </Specimen>
 
-        <Specimen name="Textarea">
+        <Specimen name={COPY.textarea}>
           <div className={styles.measure}>
-            <Field id={`${id}-textarea`} label="Notes">
-              <textarea
-                id={`${id}-textarea`}
-                defaultValue="The first season is in 4K; the rest is 1080p."
-              />
+            <Field id={`${id}-textarea`} label={COPY.notes}>
+              <textarea id={`${id}-textarea`} defaultValue={COPY.notesValue} />
             </Field>
           </div>
         </Specimen>
 
-        <Specimen name="Select">
+        <Specimen name={COPY.select}>
           <div className={styles.fields}>
-            <Field id={`${id}-select`} label="Sort">
+            <Field id={`${id}-select`} label={COPY.sort}>
               <select id={`${id}-select`} defaultValue="added">
-                <option value="title">Title</option>
-                <option value="added">Date added</option>
-                <option value="largest">File size</option>
+                <option value="title">{COPY.sortTitle}</option>
+                <option value="added">{COPY.sortAdded}</option>
+                <option value="largest">{COPY.sortSize}</option>
               </select>
             </Field>
-            <Field id={`${id}-multiple`} label="Several at once">
+            <Field id={`${id}-multiple`} label={COPY.several}>
               <select id={`${id}-multiple`} multiple size={3} defaultValue={['hevc', 'av1']}>
-                <option value="h264">H.264</option>
-                <option value="hevc">HEVC</option>
-                <option value="av1">AV1</option>
+                <option value="h264">{COPY.h264}</option>
+                <option value="hevc">{COPY.hevc}</option>
+                <option value="av1">{COPY.av1}</option>
               </select>
             </Field>
-            <Field id={`${id}-select-disabled`} label="Disabled" isDisabled>
+            <Field id={`${id}-select-disabled`} label={COPY.disabled} isDisabled>
               <select id={`${id}-select-disabled`} disabled>
-                <option>Resolution</option>
+                <option>{COPY.resolution}</option>
               </select>
             </Field>
           </div>
         </Specimen>
 
-        <Specimen name="Checkboxes and radios">
+        <Specimen name={COPY.choices}>
           <div className={styles.choiceGroups}>
             <div className={styles.choices}>
               <label className={styles.choice}>
-                <input type="checkbox" defaultChecked /> Save where each video stopped
+                <input type="checkbox" defaultChecked /> {COPY.saveWhere}
               </label>
               <label className={styles.choice}>
-                <input type="checkbox" /> Pin to the side menu
+                <input type="checkbox" /> {COPY.pin}
               </label>
               <label className={styles.choice}>
                 <input
@@ -131,67 +131,64 @@ export const FormsSection = () => {
                     if (element) element.indeterminate = true
                   }}
                 />{' '}
-                Some of them
+                {COPY.someOfThem}
               </label>
               <label className={styles.choice}>
-                <input type="checkbox" disabled defaultChecked /> Disabled
+                <input type="checkbox" disabled defaultChecked /> {COPY.disabled}
               </label>
             </div>
             <fieldset className={styles.radios}>
-              <legend className={styles.legend}>Subtitles</legend>
+              <legend className={styles.legend}>{COPY.subtitles}</legend>
               <label className={styles.choice}>
-                <input type="radio" name={`${id}-subtitles`} defaultChecked /> Off
+                <input type="radio" name={`${id}-subtitles`} defaultChecked /> {COPY.off}
               </label>
               <label className={styles.choice}>
-                <input type="radio" name={`${id}-subtitles`} /> English
+                <input type="radio" name={`${id}-subtitles`} /> {COPY.english}
               </label>
               <label className={styles.choice}>
-                <input type="radio" name={`${id}-subtitles`} disabled /> Japanese (image based)
+                <input type="radio" name={`${id}-subtitles`} disabled /> {COPY.japanese}
               </label>
             </fieldset>
           </div>
         </Specimen>
 
-        <Specimen name="Range, colour and file">
+        <Specimen name={COPY.rangeColourFile}>
           <div className={styles.fields}>
-            <Field id={`${id}-range`} label="Volume">
+            <Field id={`${id}-range`} label={COPY.volume}>
               <input id={`${id}-range`} type="range" min={0} max={100} defaultValue={70} />
             </Field>
-            <Field id={`${id}-colour`} label="Colour">
+            <Field id={`${id}-colour`} label={COPY.colour}>
               <input id={`${id}-colour`} type="color" defaultValue="#a8262f" />
             </Field>
-            <Field id={`${id}-file`} label="File">
+            <Field id={`${id}-file`} label={COPY.file}>
               <input id={`${id}-file`} type="file" />
             </Field>
           </div>
         </Specimen>
 
-        <Specimen name="Progress and meter">
+        <Specimen name={COPY.gauges}>
           <div className={styles.fields}>
-            <Field id={`${id}-progress`} label="Scan progress" aside="60%">
+            <Field id={`${id}-progress`} label={COPY.scanProgress} aside={COPY.scanReading}>
               <progress id={`${id}-progress`} value={0.6} className={styles.gauge} />
             </Field>
-            <Field id={`${id}-meter`} label="Disk used" aside="4.0 of 10 TB">
+            <Field id={`${id}-meter`} label={COPY.diskUsed} aside={COPY.diskReading}>
               <meter id={`${id}-meter`} value={0.4} className={styles.gauge} />
             </Field>
           </div>
         </Specimen>
 
-        <Specimen
-          name="Buttons"
-          note="Use the Button component; plain input buttons match its quiet tone."
-        >
+        <Specimen name={COPY.buttons} note={COPY.buttonsNote}>
           <div className={styles.row}>
             <Button tone="primary" icon="plus" type="submit">
-              Add library
+              {COPY.addLibrary}
             </Button>
-            <Button icon="rescan">Full scan</Button>
+            <Button icon="rescan">{COPY.fullScan}</Button>
             <Button tone="danger" icon="trash">
-              Delete library
+              {COPY.deleteLibrary}
             </Button>
-            <Button disabled>Disabled</Button>
-            <input type="submit" value="Submit" />
-            <input type="reset" value="Reset" />
+            <Button disabled>{COPY.disabled}</Button>
+            <input type="submit" value={COPY.submit} />
+            <input type="reset" value={COPY.reset} />
           </div>
         </Specimen>
       </form>

@@ -4,13 +4,14 @@ import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { useIsDesktop } from '@/stores/desktop'
 import { SIDE_MENU_KEY } from '@/stores/sideMenu'
+import { SHORTCUTS_COPY } from '@/pages/ShortcutsPage/copy'
 import styles from '@/pages/ShortcutsPage/ShortcutsPage.module.scss'
 
 /** The keys raven's frame answers on any browsing page. */
 const FRAME_ROWS: readonly ShortcutRow[] = [
   {
     keys: [SIDE_MENU_KEY.toUpperCase()],
-    action: 'Collapse or expand the side menu, on a screen wide enough for it',
+    action: SHORTCUTS_COPY.sideMenu,
   },
 ]
 
@@ -55,15 +56,17 @@ export const ShortcutsPage = () => {
       <header className={styles.header}>
         <BackButton fallback={HOME} className={styles.back} />
         <PageTitle id={titleId} icon="keyboard">
-          Shortcuts
+          {SHORTCUTS_COPY.title}
         </PageTitle>
         <p className={styles.intro}>
-          Keys that work while a video plays, and around raven. Press <kbd>?</kbd> in the player for
-          the same list.
+          {SHORTCUTS_COPY.intro} <kbd>{SHORTCUTS_COPY.introKey}</kbd> {SHORTCUTS_COPY.introEnd}
         </p>
       </header>
-      <ShortcutList title="While a video plays" rows={shortcutRows({ canShowStats: isDesktop })} />
-      <ShortcutList title="Around raven" rows={FRAME_ROWS} />
+      <ShortcutList
+        title={SHORTCUTS_COPY.whilePlaying}
+        rows={shortcutRows({ canShowStats: isDesktop })}
+      />
+      <ShortcutList title={SHORTCUTS_COPY.aroundRaven} rows={FRAME_ROWS} />
     </section>
   )
 }
