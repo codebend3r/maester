@@ -14,6 +14,7 @@ import {
   type MatchSubject,
   type MediaSort,
   type MusicSort,
+  type TrackPage,
   type ViewingSession,
   asksServerForNext,
 } from '@raven/core'
@@ -71,6 +72,26 @@ export const ravenQueriesFor = (api: ApiClient) => {
     year: number | null
     libraryId: number | null
     subject: MatchSubject | null
+  }
+
+  type SongsFromProps = RavenQueriesForSongsQueryProps & { from: SongsPage }
+
+  /**
+   * A page of songs from `from` on, with where it was read. A library that has none there is
+   * passed over for the next one's first page, so a page is empty only at the end of the last
+   * library, and a list asking near its end always gets rows or the end.
+   */
+  const songsFrom = async ({
+    libraryIds,
+    search,
+    sort,
+    from: { at, offset },
+  }: SongsFromProps): Promise<TrackPage & SongsPage> => {
+    const libraryId = libraryIds[at]
+    if (libraryId === undefined) throw new Error(`No music library at ${at}`)
+    const page = await api.listTracks({ libraryId, search, sort, limit: MUSIC_PAGE.most, offset })
+    if (page.tracks.length > 0 || at + 1 >= libraryIds.length) return { ...page, at, offset }
+    return songsFrom({ libraryIds, search, sort, from: { at: at + 1, offset: 0 } })
   }
 
   return {
@@ -295,16 +316,12 @@ export const ravenQueriesFor = (api: ApiClient) => {
         queryFn:
           libraryIds.length === 0
             ? skipToken
-            : ({ pageParam: { at, offset } }) => {
-                const libraryId = libraryIds[at]
-                if (libraryId === undefined) throw new Error(`No music library at ${at}`)
-                return api.listTracks({ libraryId, search, sort, limit: MUSIC_PAGE.most, offset })
-              },
+            : ({ pageParam }) => songsFrom({ libraryIds, search, sort, from: pageParam }),
         initialPageParam: FIRST_SONGS_PAGE,
-        getNextPageParam: (last, _pages, { at, offset }): SongsPage | null => {
-          const next = offset + last.tracks.length
-          if (last.tracks.length > 0 && next < last.total) return { at, offset: next }
-          return at + 1 < libraryIds.length ? { at: at + 1, offset: 0 } : null
+        getNextPageParam: (last): SongsPage | null => {
+          const next = last.offset + last.tracks.length
+          if (last.tracks.length > 0 && next < last.total) return { at: last.at, offset: next }
+          return last.at + 1 < libraryIds.length ? { at: last.at + 1, offset: 0 } : null
         },
         gcTime: LISTING_GC_MS,
       }),

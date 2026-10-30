@@ -18,10 +18,20 @@ export function PageTitle({ title }: PageTitleProps) {
 /** How far down a page starts, clear of the notch. */
 export const usePageTop = (): number => useSafeAreaInsets().top + SIZES.space4
 
+/** A list page's padding, clear of the notch, its rows sitting together under its header. */
+export const useListContent = () => {
+  const top = usePageTop()
+  return [pageStyles.list, { paddingTop: top }]
+}
+
 /** A page's ground and its content's padding, shared by the pages that scroll a list. */
 export const pageStyles = StyleSheet.create({
   ground: { flex: 1, backgroundColor: PALETTE.ground },
   content: { gap: SIZES.space4, paddingHorizontal: SIZES.space4, paddingBottom: SIZES.space5 },
+  /** A list of rows: its header holds the page's spacing, so the rows sit together. */
+  list: { paddingHorizontal: SIZES.space4, paddingBottom: SIZES.space5 },
+  /** A list's header, spaced as a page is and clear of the rows below it. */
+  header: { gap: SIZES.space4, paddingBottom: SIZES.space4 },
   title: { color: PALETTE.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
 })
 

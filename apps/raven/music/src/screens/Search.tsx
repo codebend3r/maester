@@ -9,9 +9,10 @@ import { AlbumTile } from '@/components/AlbumTile'
 import { ListRow } from '@/components/ListRow'
 import { Notice } from '@/components/Notice'
 import { SongRow } from '@/components/SongList'
-import { PageTitle, pageStyles, usePageTop } from '@/components/TabPage'
+import { PageTitle, pageStyles, useListContent } from '@/components/TabPage'
 import { byName, byTitle, mergedOf } from '@/music/merged'
-import { useMusicLibraries } from '@/music/musicLibraries'
+import { LIBRARY_COPY, useMusicLibraries } from '@/music/musicLibraries'
+import { nextPageOf } from '@/music/nextPage'
 import { type CoverOf, useCovers } from '@/music/useCovers'
 import { WREN_PAGES, pageHref } from '@/routes'
 import { PALETTE, SIZES } from '@/theme/wrenTheme'
@@ -133,7 +134,7 @@ const sectionsOf = ({ albums, artists, songs }: SectionsOfProps): ResultSection[
 type ServerSearchProps = { session: WrenSession }
 
 function ServerSearch({ session }: ServerSearchProps) {
-  const top = usePageTop()
+  const listContent = useListContent()
   const search = useSearch()
   const { query } = search
   const isAsked = query !== ''
@@ -164,33 +165,30 @@ function ServerSearch({ session }: ServerSearchProps) {
       sort: MUSIC_SORTS.title,
     }),
   )
-  const albums = mergedOf({ listings: albumListings })
-  const artists = mergedOf({ listings: artistListings })
+  const albums = mergedOf({ listings: albumListings, order: byTitle })
+  const artists = mergedOf({ listings: artistListings, order: byName })
   const tracks = isAsked ? (songs.data?.pages.flatMap((page) => page.tracks) ?? []) : []
   const sections = isAsked
     ? sectionsOf({
-        albums: music.libraries.length > 1 ? byTitle(albums.entries) : albums.entries,
-        artists: music.libraries.length > 1 ? byName(artists.entries) : artists.entries,
+        albums: albums.entries,
+        artists: artists.entries,
         songs: tracks,
       })
     : []
   const notice = ((): string | null => {
+    if (music.failure !== null) return music.failure.message
+    if (music.isRead && music.libraries.length === 0) return LIBRARY_COPY.noMusic
     if (!isAsked) return COPY.hint
-    const failure = music.failure ?? albums.failure ?? artists.failure ?? songs.error
+    const failure = albums.failure ?? artists.failure ?? songs.error
     if (failure !== null) return failure.message
     if (sections.length > 0) return null
     const isRead = music.isRead && albums.isRead && artists.isRead && songs.isSuccess
     return isRead ? COPY.nothing(query) : COPY.searching
   })()
-  const onEnd = () => {
-    if (!songs.hasNextPage || songs.isFetchingNextPage) return
-    // A page that fails keeps its error on the query, which the page says.
-    songs.fetchNextPage().catch(() => undefined)
-  }
   return (
     <SectionList
       ListHeaderComponent={
-        <View style={styles.header}>
+        <View style={pageStyles.header}>
           <PageTitle title={COPY.title} />
           <TextInput
             accessibilityLabel={COPY.label}
@@ -208,10 +206,10 @@ function ServerSearch({ session }: ServerSearchProps) {
           {notice !== null && <Notice text={notice} />}
         </View>
       }
-      contentContainerStyle={[pageStyles.content, { paddingTop: top }]}
+      contentContainerStyle={listContent}
       keyExtractor={(result) => result.key}
       keyboardShouldPersistTaps="handled"
-      onEndReached={onEnd}
+      onEndReached={nextPageOf(songs)}
       renderItem={({ item }) => (
         <ResultRow coverOf={coverOf} playingId={playingId} result={item} songs={tracks} />
       )}
@@ -234,7 +232,6 @@ export function Search() {
 }
 
 const styles = StyleSheet.create({
-  header: { gap: SIZES.space3 },
   input: {
     backgroundColor: PALETTE.raised,
     borderColor: PALETTE.line,

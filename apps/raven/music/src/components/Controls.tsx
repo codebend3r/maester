@@ -13,7 +13,7 @@ type ActionButtonProps = {
 }
 
 /** A page's action under the thumb: Play, Shuffle. */
-export function ActionButton({ label, icon, onPress, isPrimary = false }: ActionButtonProps) {
+function ActionButton({ label, icon, onPress, isPrimary = false }: ActionButtonProps) {
   const colour = isPrimary ? PALETTE.onAccent : PALETTE.text
   return (
     <Pressable
@@ -46,6 +46,20 @@ export function IconButton({ label, icon, onPress }: IconButtonProps) {
     >
       <Icon colour={PALETTE.muted} name={icon} size={SIZES.textLg} />
     </Pressable>
+  )
+}
+
+const PLAY_COPY = { play: 'Play', shuffle: 'Shuffle' } as const
+
+type PlayButtonsProps = { onPlay: () => void; onShuffle: () => void }
+
+/** Play and Shuffle, side by side, for an album or a playlist. */
+export function PlayButtons({ onPlay, onShuffle }: PlayButtonsProps) {
+  return (
+    <>
+      <ActionButton icon={WREN_ICONS.play} isPrimary label={PLAY_COPY.play} onPress={onPlay} />
+      <ActionButton icon={WREN_ICONS.shuffle} label={PLAY_COPY.shuffle} onPress={onShuffle} />
+    </>
   )
 }
 

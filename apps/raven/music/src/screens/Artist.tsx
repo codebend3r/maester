@@ -1,4 +1,4 @@
-import { type ArtistDetails, ROUTE_STATES, plural, routeIdOf, routeState } from '@raven/core'
+import { type ArtistDetails, plural, routeIdOf } from '@raven/core'
 import { useServerArtistFavourite } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams } from 'expo-router'
@@ -6,7 +6,7 @@ import { StyleSheet, Text, View } from 'react-native'
 
 import { AlbumGrid } from '@/components/AlbumGrid'
 import { FavouriteToggle } from '@/components/Controls'
-import { DetailNotice, DetailPage } from '@/components/DetailPage'
+import { DetailPage, DetailRoute } from '@/components/DetailPage'
 import { Notice } from '@/components/Notice'
 import { useCovers } from '@/music/useCovers'
 import { WREN_ROUTE_PARAMS } from '@/routes'
@@ -66,21 +66,11 @@ type ServerArtistProps = { session: WrenSession; id: number | null }
 
 function ServerArtist({ session, id }: ServerArtistProps) {
   const artist = useQuery(session.queries.artistQuery(id))
-  const page = routeState({ id, query: artist })
-  switch (page.state) {
-    case ROUTE_STATES.missing:
-      return <DetailNotice text={COPY.missing} />
-    case ROUTE_STATES.error:
-      return <DetailNotice text={page.message} />
-    case ROUTE_STATES.loading:
-      return <DetailNotice text={COPY.opening} />
-    case ROUTE_STATES.ready:
-      return <ArtistPage details={page.data} session={session} />
-    default: {
-      const unknown: never = page
-      return unknown
-    }
-  }
+  return (
+    <DetailRoute copy={COPY} id={id} query={artist}>
+      {(details) => <ArtistPage details={details} session={session} />}
+    </DetailRoute>
+  )
 }
 
 /** `/artist/[id]`: an artist's albums, the albums of others they appear on, and Favourite. */

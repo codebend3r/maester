@@ -3,7 +3,7 @@ import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import type { ReactElement } from 'react'
 import { FlatList } from 'react-native'
 
-import { pageStyles, usePageTop } from '@/components/TabPage'
+import { pageStyles, useListContent } from '@/components/TabPage'
 import { TrackRow } from '@/components/TrackRow'
 
 type SongRowProps = { tracks: readonly Track[]; track: Track; index: number; isPlaying: boolean }
@@ -34,13 +34,13 @@ type SongListProps = {
 
 /** Songs a page at a time under a page's header, the next page asked for near the end. */
 export function SongList({ tracks, header, empty, onEnd }: SongListProps) {
-  const top = usePageTop()
+  const listContent = useListContent()
   const playingId = useAudioQueue((store) => playingTrackOf(store)?.id ?? null)
   return (
     <FlatList
       ListEmptyComponent={empty}
       ListHeaderComponent={header}
-      contentContainerStyle={[pageStyles.content, { paddingTop: top }]}
+      contentContainerStyle={listContent}
       data={tracks}
       keyExtractor={(track, index) => `${track.id}:${index}`}
       onEndReached={onEnd}

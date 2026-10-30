@@ -9,6 +9,7 @@ import {
   ALBUM_TYPES,
   type AlbumSummary,
   type ApiClient,
+  createApiClient,
   ITEM_TYPES,
   MATCH_STATES,
   MATCH_SUBJECT_KINDS,
@@ -475,6 +476,58 @@ describe('ravenQueriesFor', () => {
       ravenQueriesFor(api).songsQuery({ libraryIds: [], search: '', sort: MUSIC_SORTS.title })
         .queryFn,
     ).toBe(skipToken)
+    cache.clear()
+  })
+
+  it('passes over a library with no songs, so no page between two others is empty', async () => {
+    const asked: string[] = []
+    const api = createApiClient({
+      fetch: async (url) => {
+        asked.push(url)
+        const body = url.includes('/libraries/3/')
+          ? { tracks: [], total: 0 }
+          : { tracks: [track()], total: 1 }
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => body,
+          text: async () => JSON.stringify(body),
+        }
+      },
+    })
+    const query = ravenQueriesFor(api).songsQuery({
+      libraryIds: [2, 3, 4],
+      search: '',
+      sort: MUSIC_SORTS.title,
+    })
+    const cache = new QueryClient()
+    const songs = await cache.fetchInfiniteQuery({ ...query, pages: 3 })
+    expect(songs.pages.map(({ at, tracks }) => [at, tracks.length])).toEqual([
+      [0, 1],
+      [2, 1],
+    ])
+    expect(asked.map((url) => url.split('?')[0])).toEqual([
+      '/api/libraries/2/tracks',
+      '/api/libraries/3/tracks',
+      '/api/libraries/4/tracks',
+    ])
+    cache.clear()
+  })
+
+  it('ends with an empty page when the last libraries have no songs', async () => {
+    const { api } = recordingApi({ body: { tracks: [], total: 0 } })
+    const query = ravenQueriesFor(api).songsQuery({
+      libraryIds: [2, 3],
+      search: '',
+      sort: MUSIC_SORTS.title,
+    })
+    const cache = new QueryClient()
+    const songs = await cache.fetchInfiniteQuery(query)
+    expect(songs.pages).toEqual([{ tracks: [], total: 0, at: 1, offset: 0 }])
+    expect(query.getNextPageParam(songs.pages[0]!, songs.pages, { at: 0, offset: 0 }, [])).toBe(
+      null,
+    )
     cache.clear()
   })
 

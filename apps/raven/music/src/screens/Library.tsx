@@ -11,9 +11,10 @@ import { ListRow } from '@/components/ListRow'
 import { Notice } from '@/components/Notice'
 import { Segments } from '@/components/Segments'
 import { SongList } from '@/components/SongList'
-import { PageTitle, pageStyles, usePageTop } from '@/components/TabPage'
+import { PageTitle, pageStyles, useListContent } from '@/components/TabPage'
 import { byName, byTitle, mergedOf } from '@/music/merged'
 import { LIBRARY_COPY, useMusicLibraries } from '@/music/musicLibraries'
+import { nextPageOf } from '@/music/nextPage'
 import { useCovers } from '@/music/useCovers'
 import { WREN_PAGES, pageHref } from '@/routes'
 import { SIZES } from '@/theme/wrenTheme'
@@ -54,7 +55,7 @@ function ListNotice({ failure, isRead, empty }: ListNoticeProps) {
 type SegmentListProps = { session: WrenSession; header: ReactElement }
 
 function AlbumsList({ session, header }: SegmentListProps) {
-  const top = usePageTop()
+  const listContent = useListContent()
   const { columns, tileWidth } = useTileWidth()
   const coverOf = useCovers(session)
   const music = useMusicLibraries(session)
@@ -63,8 +64,7 @@ function AlbumsList({ session, header }: SegmentListProps) {
       session.queries.albumsQuery({ libraryId: library.id, search: '', sort: MUSIC_SORTS.title }),
     ),
   })
-  const { entries, failure, isRead } = mergedOf({ listings })
-  const albums = music.libraries.length > 1 ? byTitle(entries) : entries
+  const { entries: albums, failure, isRead } = mergedOf({ listings, order: byTitle })
   return (
     <FlatList
       ListEmptyComponent={
@@ -76,7 +76,7 @@ function AlbumsList({ session, header }: SegmentListProps) {
       }
       ListHeaderComponent={header}
       columnWrapperStyle={styles.columns}
-      contentContainerStyle={[pageStyles.content, { paddingTop: top }]}
+      contentContainerStyle={listContent}
       data={albums}
       key={columns}
       keyExtractor={(album) => String(album.id)}
@@ -95,15 +95,14 @@ function AlbumsList({ session, header }: SegmentListProps) {
 
 function ArtistsList({ session, header }: SegmentListProps) {
   const router = useRouter()
-  const top = usePageTop()
+  const listContent = useListContent()
   const music = useMusicLibraries(session)
   const listings = useQueries({
     queries: music.libraries.map((library) =>
       session.queries.artistsQuery({ libraryId: library.id, search: '' }),
     ),
   })
-  const { entries, failure, isRead } = mergedOf({ listings })
-  const artists = music.libraries.length > 1 ? byName(entries) : entries
+  const { entries: artists, failure, isRead } = mergedOf({ listings, order: byName })
   return (
     <FlatList
       ListEmptyComponent={
@@ -114,7 +113,7 @@ function ArtistsList({ session, header }: SegmentListProps) {
         />
       }
       ListHeaderComponent={header}
-      contentContainerStyle={[pageStyles.content, { paddingTop: top }]}
+      contentContainerStyle={listContent}
       data={artists}
       keyExtractor={(artist) => String(artist.id)}
       renderItem={({ item }) => (
@@ -142,11 +141,6 @@ function SongsList({ session, header }: SegmentListProps) {
     }),
   )
   const tracks = songs.data?.pages.flatMap((page) => page.tracks) ?? []
-  const onEnd = () => {
-    if (!songs.hasNextPage || songs.isFetchingNextPage) return
-    // A page that fails keeps its error on the query, which the list says.
-    songs.fetchNextPage().catch(() => undefined)
-  }
   return (
     <SongList
       empty={
@@ -157,7 +151,7 @@ function SongsList({ session, header }: SegmentListProps) {
         />
       }
       header={header}
-      onEnd={onEnd}
+      onEnd={nextPageOf(songs)}
       tracks={tracks}
     />
   )
@@ -165,7 +159,7 @@ function SongsList({ session, header }: SegmentListProps) {
 
 function PlaylistsList({ session, header }: SegmentListProps) {
   const router = useRouter()
-  const top = usePageTop()
+  const listContent = useListContent()
   const playlists = useQuery(session.queries.playlistsQuery)
   return (
     <FlatList
@@ -177,7 +171,7 @@ function PlaylistsList({ session, header }: SegmentListProps) {
         />
       }
       ListHeaderComponent={header}
-      contentContainerStyle={[pageStyles.content, { paddingTop: top }]}
+      contentContainerStyle={listContent}
       data={playlists.data}
       keyExtractor={(playlist) => String(playlist.id)}
       renderItem={({ item }) => (
@@ -197,7 +191,7 @@ type ServerLibraryProps = { session: WrenSession }
 function ServerLibrary({ session }: ServerLibraryProps) {
   const [segment, setSegment] = useState<Segment>(SEGMENTS.albums)
   const header = (
-    <View style={styles.header}>
+    <View style={pageStyles.header}>
       <PageTitle title={COPY.title} />
       <Segments onSelect={setSegment} segments={COPY.segments} selected={segment} />
     </View>
@@ -228,6 +222,5 @@ export function Library() {
 }
 
 const styles = StyleSheet.create({
-  header: { gap: SIZES.space4 },
-  columns: { gap: SIZES.space3 },
+  columns: { gap: SIZES.space3, paddingBottom: SIZES.space3 },
 })
