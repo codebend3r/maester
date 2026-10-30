@@ -148,7 +148,7 @@ Shared tool config lives at the root, so every project lints and compiles by the
 | `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check                                       |
 | `@raven/ui`       | `libs/raven/ui`       | Shared React player, engine/services contracts, primitives and styles                                          |
 | `@raven/mpv`      | `libs/raven/mpv`      | N-API addon over our pinned libmpv build: macOS video surface, typed async wrapper                             |
-| `@raven/audio`    | `libs/raven/audio`    | Local Expo module for music on iPhones and iPads: `AVQueuePlayer` with Now Playing and the lock screen         |
+| `@raven/audio`    | `libs/raven/audio`    | Local Expo module for music on phones and tablets: `AVQueuePlayer` on iOS, Media3 on Android                   |
 | `@raven/native`   | `libs/raven/native`   | Sign-in and media access on React Native, shared by the device app and Wren: session, cookies, tickets         |
 | `@raven/desktop`  | `apps/raven/desktop`  | Raven: Electron 44 and Forge, serving `@raven/web`, libmpv through `@raven/mpv`, Playwright e2e                |
 | `@raven/app`      | `apps/raven/app`      | raven on iPhone, iPad, Apple TV and Android TV: Expo 58 on react-native-tvos, expo-router, jest-expo           |

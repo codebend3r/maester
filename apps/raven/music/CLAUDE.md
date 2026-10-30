@@ -14,6 +14,7 @@
 - **The build number and the variant** come from `@raven/native/headless` (`buildNumberOf`, `isDevelopmentVariant`), as the app's do: `GITHUB_RUN_NUMBER`, else 1, and `APP_VARIANT=development` for plain http to a LAN server (`NSAllowsLocalNetworking`, and Android's cleartext through `plugins/withCleartextTraffic.ts`).
 - **No TV.** Wren has no `@react-native-tvos/config-tv`, no `EXPO_TV` and nothing from `@raven/app`'s layouts. Its colours come from `@raven/ui/designTokens`; the splash and Android's window are the default theme's `--color-night`.
 - **Background audio.** `UIBackgroundModes` holds `audio`, and Android asks for `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, for `@raven/audio`'s media service.
+- **Media3** is pinned to exactly 1.8.0 in `libs/raven/audio/android/build.gradle`: `react-native-video` 6.19.3's (`RNVideo_media3Version`). `@raven/audio` autolinks into `@raven/app`'s Android TV build beside it, and an app takes one Media3, so a bump of either moves both. `@raven/audio`'s README says how its Android side works.
 
 ## Running it
 

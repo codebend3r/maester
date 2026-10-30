@@ -2,7 +2,7 @@
   "name": "@raven/audio",
   "version": "0.7.9",
   "private": true,
-  "description": "raven's music player for iPhones and iPads: AVQueuePlayer with Now Playing and the remote commands",
+  "description": "raven's music player for iPhones, iPads and Android phones: AVQueuePlayer and Media3, with the lock screen and the remote commands",
   "type": "module",
   "exports": {
     ".": {
