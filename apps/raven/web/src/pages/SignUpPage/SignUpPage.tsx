@@ -16,13 +16,13 @@ import { checkEmailPath } from '@/lib/authRoutes'
 import { callAuth } from '@/lib/session'
 import { useConfirmUrl } from '@/lib/useConfirmUrl'
 import { useAuthSession } from '@/stores/authSession'
-
-const FAILED_COPY = 'Sign up failed. Try again.'
+import { SIGN_UP_COPY } from '@/pages/SignUpPage/copy'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** The server's own words for a weak password; the rest of what it says stays out of the page. */
 const failureCopy = (error: unknown): string => {
   if (isRateLimited(error)) return RATE_LIMITED_COPY
-  return weakPasswordMessage(error) ?? FAILED_COPY
+  return weakPasswordMessage(error) ?? SIGN_UP_COPY.failed
 }
 
 const SignUpForm = () => {
@@ -59,18 +59,15 @@ const SignUpForm = () => {
 
   return (
     <AuthForm
-      title="Create your account"
-      lead={<Lead>Sign up to watch on {window.location.hostname}</Lead>}
+      title={SIGN_UP_COPY.title}
+      lead={<Lead>{SIGN_UP_COPY.lead(window.location.hostname)}</Lead>}
       onSubmit={submit}
     >
-      <Note>
-        We will email you a link to confirm your address. The owner of this raven approves each new
-        account by hand, so you can start watching once they have.
-      </Note>
+      <Note>{SIGN_UP_COPY.approval}</Note>
       <Fields>
         <EmailField value={email} onChange={setEmail} />
         <PasswordFields
-          label="Password"
+          label={SIGN_UP_COPY.password}
           password={password}
           confirmation={confirmation}
           refusal={
@@ -84,10 +81,10 @@ const SignUpForm = () => {
         />
       </Fields>
       <SubmitButton isDisabled={signUp.isPending || !isReady}>
-        {signUp.isPending ? 'Creating account…' : 'Create account'}
+        {signUp.isPending ? SIGN_UP_COPY.creating : SIGN_UP_COPY.create}
       </SubmitButton>
       <Note>
-        Already have an account? <Link to={AUTH_ROUTES.signIn}>Sign in</Link>
+        {SIGN_UP_COPY.haveAccount} <Link to={AUTH_ROUTES.signIn}>{COMMON_COPY.signIn}</Link>
       </Note>
     </AuthForm>
   )

@@ -10,13 +10,15 @@ import { callAuth } from '@/lib/session'
 import { useConfirmUrl } from '@/lib/useConfirmUrl'
 import { useCooldown } from '@/lib/useCooldown'
 import { useAuthSession } from '@/stores/authSession'
+import { FORGOT_PASSWORD_COPY } from '@/pages/ForgotPasswordPage/copy'
 import styles from '@/pages/ForgotPasswordPage/ForgotPasswordPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 const OUTCOMES = { sent: 'sent', rateLimited: 'rateLimited' } as const
 type Outcome = (typeof OUTCOMES)[keyof typeof OUTCOMES]
 
 const MESSAGES = {
-  [OUTCOMES.sent]: 'If that address has an account, a link is on its way.',
+  [OUTCOMES.sent]: FORGOT_PASSWORD_COPY.sent,
   [OUTCOMES.rateLimited]: RATE_LIMITED_COPY,
 } as const satisfies Record<Outcome, string>
 
@@ -54,18 +56,16 @@ const ForgotPasswordForm = () => {
   }
 
   const label = () => {
-    if (request.isPending) return 'Sending…'
-    return cooldown.isCounting ? `Send again in ${cooldown.secondsLeft}s` : 'Send reset link'
+    if (request.isPending) return FORGOT_PASSWORD_COPY.sending
+    return cooldown.isCounting
+      ? FORGOT_PASSWORD_COPY.sendAgainIn(cooldown.secondsLeft)
+      : FORGOT_PASSWORD_COPY.sendLink
   }
 
   return (
     <AuthForm
-      title="Reset your password"
-      lead={
-        <Lead>
-          Enter the email you signed up with and we will send you a link to choose a new password.
-        </Lead>
-      }
+      title={FORGOT_PASSWORD_COPY.title}
+      lead={<Lead>{FORGOT_PASSWORD_COPY.lead}</Lead>}
       onSubmit={submit}
     >
       <Fields>
@@ -76,7 +76,7 @@ const ForgotPasswordForm = () => {
         {label()}
       </SubmitButton>
       <Note>
-        <Link to={AUTH_ROUTES.signIn}>Back to sign in</Link>
+        <Link to={AUTH_ROUTES.signIn}>{COMMON_COPY.backToSignIn}</Link>
       </Note>
     </AuthForm>
   )

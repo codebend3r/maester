@@ -7,7 +7,9 @@ import { AppPreview } from '@/pages/GetPage/AppPreview'
 import { Downloads } from '@/pages/GetPage/Downloads'
 import { LATEST_RELEASE, RELEASES, REPOSITORY } from '@/pages/GetPage/links'
 import { PLATFORMS, detectSystem } from '@/pages/GetPage/platforms'
+import { GET_COPY } from '@/pages/GetPage/copy'
 import styles from '@/pages/GetPage/GetPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** Where the downloads start, for the links that jump there. */
 const DOWNLOADS_ID = 'download'
@@ -53,12 +55,12 @@ export const GetPage = () => {
         <span className={styles.brand}>
           <Logo />
         </span>
-        <nav className={styles.nav} aria-label="Get raven">
+        <nav className={styles.nav} aria-label={GET_COPY.nav}>
           <a href={`#${DOWNLOADS_ID}`} className={styles.jump}>
-            Download
+            {COMMON_COPY.download}
           </a>
           <ButtonLink to="/" className={styles.openApp}>
-            Open web app
+            {GET_COPY.openWebApp}
           </ButtonLink>
         </nav>
         <ThemePicker className={styles.theme} />
@@ -67,24 +69,24 @@ export const GetPage = () => {
         <section className={styles.hero} aria-labelledby={titleId}>
           <div className={styles.intro}>
             <h1 id={titleId} className={styles.headline}>
-              Your films and shows, from your own server.
+              {GET_COPY.headline}
             </h1>
-            <p className={styles.pitch}>
-              raven plays the library you already keep. Install it on your computer, or open it in
-              any browser pointed at your server.
-            </p>
+            <p className={styles.pitch}>{GET_COPY.pitch}</p>
             <div className={styles.actions}>
               <ButtonLink to={LATEST_RELEASE} tone="primary" size="large">
                 <Icon name="download" size="1.15em" />
-                {platform ? `Download for ${platform.name}` : 'Download'}
+                {platform ? GET_COPY.downloadFor(platform.name) : COMMON_COPY.download}
               </ButtonLink>
               <ButtonLink to="/" size="large" icon="globe">
-                Open in your browser
+                {GET_COPY.openInBrowser}
               </ButtonLink>
             </div>
             <p className={styles.needs}>
-              {platform?.note ?? 'macOS, Windows and Linux'} ·{' '}
-              <a href={`#${DOWNLOADS_ID}`}>{platform ? 'Other platforms' : 'Choose yours'}</a>
+              {platform?.note ?? GET_COPY.everySystem}
+              {GET_COPY.needsSeparator}{' '}
+              <a href={`#${DOWNLOADS_ID}`}>
+                {platform ? GET_COPY.otherPlatforms : GET_COPY.chooseYours}
+              </a>
             </p>
           </div>
           <AppPreview />
@@ -103,16 +105,16 @@ export const GetPage = () => {
         <Downloads id={DOWNLOADS_ID} system={system} />
       </main>
       <footer className={styles.footer}>
-        <p className={styles.about}>raven · a self-hosted video library and player</p>
+        <p className={styles.about}>{GET_COPY.about}</p>
         <ul className={styles.links}>
           <li>
-            <a href={REPOSITORY}>Source on GitHub</a>
+            <a href={REPOSITORY}>{GET_COPY.source}</a>
           </li>
           <li>
-            <a href={RELEASES}>Release notes</a>
+            <a href={RELEASES}>{GET_COPY.releaseNotes}</a>
           </li>
           <li>
-            <Link to="/">Open web app</Link>
+            <Link to="/">{GET_COPY.openWebApp}</Link>
           </li>
         </ul>
       </footer>

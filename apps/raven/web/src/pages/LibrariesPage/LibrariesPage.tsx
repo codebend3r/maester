@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { KINDS, type Library, plural } from '@raven/core'
-import { useId, useState } from 'react'
+import { KINDS, type Library } from '@raven/core'
+import { type ComponentType, type ReactNode, useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
@@ -15,7 +15,12 @@ import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { RatingsStatus } from '@/components/RatingsStatus/RatingsStatus'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import { cannotManageNote, useCanManage, useManagement } from '@/lib/management'
+import {
+  type ManagementMode,
+  cannotManageNote,
+  useCanManage,
+  useManagement,
+} from '@/lib/management'
 import { api } from '@/lib/api'
 import {
   afterHeroLibraries,
@@ -23,28 +28,27 @@ import {
   librarySettingsEdits,
   mutationKeys,
   useOptimisticMutation,
+  KeyedView,
+  type ViewOf,
+  type ViewsOf,
 } from '@raven/ui/headless'
 import { foldersByParent } from '@/lib/folders'
 import { libraryPollDelay } from '@/lib/libraryPolling'
 import { LIBRARY_LOCK_STATES, lockState } from '@/lib/libraryLock'
 import { useLibraryOrdering } from '@/lib/useLibraryOrdering'
 import { librariesQuery, lockQuery } from '@/lib/queries'
+import { LIBRARIES_COPY } from '@/pages/LibrariesPage/copy'
 import { OrderedLibraries } from '@/pages/LibrariesPage/OrderedLibraries'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
-
-const count = new Intl.NumberFormat()
+import { COMMON_COPY } from '@/lib/copy'
 
 /** How many libraries there are and how many videos they hold between them. */
 const summaryOf = (libraries: readonly Library[]): string =>
   [
-    plural({ n: libraries.length, one: 'library', many: 'libraries' }),
-    plural({
-      n: libraries.reduce((sum, library) => sum + library.itemCount, 0),
-      one: 'video',
-      many: 'videos',
-    }),
-  ].join(' · ')
+    LIBRARIES_COPY.libraries(libraries.length),
+    COMMON_COPY.videos(libraries.reduce((sum, library) => sum + library.itemCount, 0)),
+  ].join(COMMON_COPY.separator)
 
 type PinButtonProps = { library: Library }
 
@@ -71,15 +75,11 @@ const PinButton = ({ library }: PinButtonProps) => {
       icon="pin"
       className={styles.pin}
       aria-pressed={pinned}
-      title={
-        pinned
-          ? 'Pinned: this library has its own link in the side menu and a row on Home. Press to unpin it.'
-          : 'Pin this library: give it its own link in the side menu and a row on Home.'
-      }
+      title={pinned ? LIBRARIES_COPY.pinnedTitle : LIBRARIES_COPY.pinTitle}
       onClick={() => pin.mutate(!pinned)}
     >
-      <span aria-hidden="true">{pinned ? 'Pinned' : 'Pin'}</span>
-      <span className="visually-hidden">Pin {library.name}</span>
+      <span aria-hidden="true">{pinned ? LIBRARIES_COPY.pinned : LIBRARIES_COPY.pin}</span>
+      <span className="visually-hidden">{LIBRARIES_COPY.pinName(library.name)}</span>
     </Button>
   )
 }
@@ -111,13 +111,10 @@ const HeroCheckbox = ({ library }: HeroCheckboxProps) => {
       />
       <label
         htmlFor={id}
-        title={
-          library.settings.locked
-            ? 'A locked library never shows in the hero'
-            : "Let Home's hero show this library's movies and shows"
-        }
+        title={library.settings.locked ? LIBRARIES_COPY.heroLockedTitle : LIBRARIES_COPY.heroTitle}
       >
-        Include in hero display<span className="visually-hidden"> for {library.name}</span>
+        {LIBRARIES_COPY.includeInHero}
+        <span className="visually-hidden">{LIBRARIES_COPY.heroFor(library.name)}</span>
       </label>
     </div>
   )
@@ -143,7 +140,7 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
   const detailsId = useId()
   const actions = useLibraryActions(library)
   const backdrop = !isShut && library.backdrop && api.libraryBackdropUrl(library.backdrop)
-  const lockNote = isShut ? ' · Locked' : ' · Unlocked'
+  const lockNote = isShut ? LIBRARIES_COPY.locked : LIBRARIES_COPY.unlocked
   // The server sends no folders to a browser with the admin lock on; this holds a list cached from before to the same.
   const canManage = useCanManage()
   const paths = isShut || !canManage ? [] : library.paths
@@ -162,9 +159,10 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
         </Link>
         <span className={styles.count}>
           {KINDS[library.settings.kind].label}
-          {library.settings.locked && lockNote} · {count.format(library.itemCount)}{' '}
-          {library.itemCount === 1 ? 'video' : 'videos'}
-          {library.unmatchedCount > 0 && ` · ${count.format(library.unmatchedCount)} not matched`}
+          {library.settings.locked && lockNote}
+          {COMMON_COPY.separator}
+          {COMMON_COPY.videos(library.itemCount)}
+          {library.unmatchedCount > 0 && LIBRARIES_COPY.notMatched(library.unmatchedCount)}
         </span>
         <Button
           icon="expand"
@@ -172,18 +170,20 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
           className={styles.toggle}
           aria-expanded={isOpen}
           aria-controls={detailsId}
-          aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${library.name}`}
-          title={isOpen ? 'Show less' : 'Show its folders, scan and actions'}
+          aria-label={
+            isOpen ? LIBRARIES_COPY.collapse(library.name) : LIBRARIES_COPY.expand(library.name)
+          }
+          title={isOpen ? LIBRARIES_COPY.showLess : LIBRARIES_COPY.showMore}
           onClick={onToggle}
         />
         {isOpen && (
           <div id={detailsId} className={styles.more}>
             {paths.length > 0 && (
-              <ul className={styles.paths} aria-label="Folders">
+              <ul className={styles.paths} aria-label={LIBRARIES_COPY.folders}>
                 {foldersByParent(paths).map(({ parent, names }) => (
                   <li key={parent} className={styles.path}>
                     <span className={styles.parent}>{parent}</span>
-                    <span className={styles.names}>{names.join(' · ')}</span>
+                    <span className={styles.names}>{names.join(COMMON_COPY.separator)}</span>
                   </li>
                 ))}
               </ul>
@@ -213,7 +213,7 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
 
 /** Three cards on their way, each a line for its name over one for its counts. */
 const RowsSkeleton = () => (
-  <Loading label="Gathering your libraries">
+  <Loading label={LIBRARIES_COPY.gathering}>
     <ul className={styles.list}>
       {['first', 'second', 'third'].map((row) => (
         <li key={row} className={styles.rowSkeleton}>
@@ -224,6 +224,170 @@ const RowsSkeleton = () => (
     </ul>
   </Loading>
 )
+
+type AddLibraryButtonProps = { onAdd: () => void }
+
+const AddLibraryButton = ({ onAdd }: AddLibraryButtonProps) => (
+  <Button tone="primary" icon="plus" title={LIBRARIES_COPY.addTitle} onClick={onAdd}>
+    {COMMON_COPY.addLibrary}
+  </Button>
+)
+
+type AddLibraryProps = AddLibraryButtonProps & { mode: ManagementMode }
+
+type CannotAddNoteProps = AddLibraryProps
+
+const CannotAddNote = ({ mode }: CannotAddNoteProps) => (
+  <p>{cannotManageNote({ mode, action: LIBRARIES_COPY.addAction })}</p>
+)
+
+const ADD_KEYS = { can: 'can', cannot: 'cannot' } as const
+
+type AddKey = (typeof ADD_KEYS)[keyof typeof ADD_KEYS]
+
+/** Add library for one who may manage, else why not. */
+const ADD_VIEWS = {
+  [ADD_KEYS.can]: AddLibraryButton,
+  [ADD_KEYS.cannot]: CannotAddNote,
+} as const satisfies Record<AddKey, ComponentType<AddLibraryProps>>
+
+type LibrariesFailedProps = { message: string; onRetry: () => void }
+
+const LibrariesFailed = ({ message, onRetry }: LibrariesFailedProps) => (
+  <section className={styles.empty}>
+    <BackButton fallback={HOME} className={styles.back} />
+    <div className={styles.emptyBody}>
+      <h1 className={styles.emptyTitle}>{LIBRARIES_COPY.noAnswer}</h1>
+      <p role="alert">{message}</p>
+      <Button icon="reset" title={LIBRARIES_COPY.askAgain} onClick={onRetry}>
+        {LIBRARIES_COPY.tryAgain}
+      </Button>
+    </div>
+  </section>
+)
+
+type LibrariesEmptyProps = AddLibraryProps & { canManage: boolean; dialog: ReactNode }
+
+const LibrariesEmpty = ({ canManage, mode, onAdd, dialog }: LibrariesEmptyProps) => {
+  const Add = ADD_VIEWS[canManage ? ADD_KEYS.can : ADD_KEYS.cannot]
+  return (
+    <section className={styles.empty}>
+      <BackButton fallback={HOME} className={styles.back} />
+      <div className={styles.emptyBody}>
+        <h1 className={styles.emptyTitle}>{LIBRARIES_COPY.emptyTitle}</h1>
+        <p>{LIBRARIES_COPY.emptyBody}</p>
+        <Add mode={mode} onAdd={onAdd} />
+        {dialog}
+      </div>
+    </section>
+  )
+}
+
+type Ordering = ReturnType<typeof useLibraryOrdering>
+
+type LibraryCardsProps = {
+  ordering: Ordering
+  openIds: ReadonlySet<number>
+  onToggle: (id: number) => void
+  isShut: (library: Library) => boolean
+}
+
+const LibraryCards = ({ ordering, openIds, onToggle, isShut }: LibraryCardsProps) => (
+  <ul className={styles.list}>
+    {ordering.ordered.map((library) => (
+      <LibraryRow
+        key={library.id}
+        library={library}
+        isOpen={openIds.has(library.id)}
+        onToggle={() => onToggle(library.id)}
+        isShut={isShut(library)}
+      />
+    ))}
+  </ul>
+)
+
+const LIST_KEYS = { pending: 'pending', ordering: 'ordering', cards: 'cards' } as const
+
+type ListProps = {
+  [LIST_KEYS.pending]: Record<never, never>
+  [LIST_KEYS.ordering]: Parameters<typeof OrderedLibraries>[0]
+  [LIST_KEYS.cards]: LibraryCardsProps
+}
+
+/** The cards on their way, thin while their order is edited, else in full. */
+const LIST_VIEWS = {
+  [LIST_KEYS.pending]: RowsSkeleton,
+  [LIST_KEYS.ordering]: OrderedLibraries,
+  [LIST_KEYS.cards]: LibraryCards,
+} as const satisfies ViewsOf<ListProps>
+
+type ListViewOfProps = LibraryCardsProps & { isPending: boolean }
+
+const listViewOf = ({ isPending, ...cards }: ListViewOfProps): ViewOf<ListProps> => {
+  if (isPending) return { key: LIST_KEYS.pending, props: {} }
+  if (cards.ordering.isEditing)
+    return { key: LIST_KEYS.ordering, props: { ordering: cards.ordering } }
+  return { key: LIST_KEYS.cards, props: cards }
+}
+
+type LibrariesListedProps = ListViewOfProps & {
+  libraries: readonly Library[] | undefined
+  onAdd: () => void
+  dialog: ReactNode
+}
+
+const LibrariesListed = ({ libraries, onAdd, dialog, ...list }: LibrariesListedProps) => {
+  const { ordering } = list
+  return (
+    <section className={styles.page}>
+      <header className={styles.header}>
+        <BackButton fallback={HOME} className={styles.back} />
+        <hgroup className={styles.heading}>
+          <PageTitle icon="libraries">{COMMON_COPY.libraries}</PageTitle>
+          {libraries && <p className={styles.summary}>{summaryOf(libraries)}</p>}
+        </hgroup>
+        <AdminOnly>
+          <span className={styles.headerActions}>
+            {(libraries?.length ?? 0) > 1 && (
+              <Button
+                tone={ordering.isEditing ? 'primary' : 'quiet'}
+                icon={ordering.isEditing ? 'check' : 'edit'}
+                title={
+                  ordering.isEditing ? LIBRARIES_COPY.saveOrderTitle : LIBRARIES_COPY.editOrderTitle
+                }
+                onClick={ordering.isEditing ? ordering.finish : ordering.start}
+              >
+                {ordering.isEditing ? LIBRARIES_COPY.finish : LIBRARIES_COPY.editOrder}
+              </Button>
+            )}
+            {!ordering.isEditing && <AddLibraryButton onAdd={onAdd} />}
+          </span>
+        </AdminOnly>
+      </header>
+      {ordering.failure && (
+        <p role="alert" className={styles.failure}>
+          {ordering.failure.message}
+        </p>
+      )}
+      <KeyedView<ListProps> views={LIST_VIEWS} view={listViewOf(list)} />
+      {dialog}
+    </section>
+  )
+}
+
+const LIBRARIES_VIEW_KEYS = { failed: 'failed', empty: 'empty', listed: 'listed' } as const
+
+type LibrariesViewProps = {
+  [LIBRARIES_VIEW_KEYS.failed]: LibrariesFailedProps
+  [LIBRARIES_VIEW_KEYS.empty]: LibrariesEmptyProps
+  [LIBRARIES_VIEW_KEYS.listed]: LibrariesListedProps
+}
+
+const LIBRARIES_VIEWS = {
+  [LIBRARIES_VIEW_KEYS.failed]: LibrariesFailed,
+  [LIBRARIES_VIEW_KEYS.empty]: LibrariesEmpty,
+  [LIBRARIES_VIEW_KEYS.listed]: LibrariesListed,
+} as const satisfies ViewsOf<LibrariesViewProps>
 
 /**
  * `/libraries`: every library as a card, in the order the server keeps
@@ -257,121 +421,36 @@ export const LibrariesPage = () => {
   const dialog = (
     <AdminOnly>{adding && <LibraryDialog onClose={() => setAdding(false)} />}</AdminOnly>
   )
+  const onAdd = () => setAdding(true)
+  const view = ((): ViewOf<LibrariesViewProps> => {
+    if (libraries.isError)
+      return {
+        key: LIBRARIES_VIEW_KEYS.failed,
+        props: { message: libraries.error.message, onRetry: () => libraries.refetch() },
+      }
+    if (libraries.data?.length === 0)
+      return { key: LIBRARIES_VIEW_KEYS.empty, props: { canManage, mode, onAdd, dialog } }
+    return {
+      key: LIBRARIES_VIEW_KEYS.listed,
+      props: {
+        libraries: libraries.data,
+        isPending: libraries.isPending,
+        ordering,
+        openIds,
+        onToggle: (id) =>
+          setOpenIds((current) =>
+            current.has(id)
+              ? new Set([...current].filter((open) => open !== id))
+              : new Set([...current, id]),
+          ),
+        isShut: (library) =>
+          lockState({ locked: library.settings.locked, lock: lock.data }).state !==
+          LIBRARY_LOCK_STATES.open,
+        onAdd,
+        dialog,
+      },
+    }
+  })()
 
-  if (libraries.isError) {
-    return (
-      <section className={styles.empty}>
-        <BackButton fallback={HOME} className={styles.back} />
-        <div className={styles.emptyBody}>
-          <h1 className={styles.emptyTitle}>The server did not answer</h1>
-          <p role="alert">{libraries.error.message}</p>
-          <Button
-            icon="reset"
-            title="Ask the server for the libraries again"
-            onClick={() => libraries.refetch()}
-          >
-            Try again
-          </Button>
-        </div>
-      </section>
-    )
-  }
-
-  if (libraries.data?.length === 0) {
-    return (
-      <section className={styles.empty}>
-        <BackButton fallback={HOME} className={styles.back} />
-        <div className={styles.emptyBody}>
-          <h1 className={styles.emptyTitle}>Point raven at your videos</h1>
-          <p>
-            A library is a set of folders. Pick the ones that hold your movies or shows, and every
-            video inside is indexed, given a thumbnail, and ready to play.
-          </p>
-          {canManage ? (
-            <Button
-              tone="primary"
-              icon="plus"
-              title="Add a library: a name, a type and the folders that hold its videos"
-              onClick={() => setAdding(true)}
-            >
-              Add library
-            </Button>
-          ) : (
-            <p>{cannotManageNote({ mode, action: 'add a library' })}</p>
-          )}
-          {dialog}
-        </div>
-      </section>
-    )
-  }
-
-  return (
-    <section className={styles.page}>
-      <header className={styles.header}>
-        <BackButton fallback={HOME} className={styles.back} />
-        <hgroup className={styles.heading}>
-          <PageTitle icon="libraries">Libraries</PageTitle>
-          {libraries.data && <p className={styles.summary}>{summaryOf(libraries.data)}</p>}
-        </hgroup>
-        <AdminOnly>
-          <span className={styles.headerActions}>
-            {(libraries.data?.length ?? 0) > 1 && (
-              <Button
-                tone={ordering.isEditing ? 'primary' : 'quiet'}
-                icon={ordering.isEditing ? 'check' : 'edit'}
-                title={
-                  ordering.isEditing
-                    ? 'Save the order and show the libraries in full again'
-                    : 'Drag the libraries into the order they list in'
-                }
-                onClick={ordering.isEditing ? ordering.finish : ordering.start}
-              >
-                {ordering.isEditing ? 'Finish' : 'Edit order'}
-              </Button>
-            )}
-            {!ordering.isEditing && (
-              <Button
-                tone="primary"
-                icon="plus"
-                title="Add a library: a name, a type and the folders that hold its videos"
-                onClick={() => setAdding(true)}
-              >
-                Add library
-              </Button>
-            )}
-          </span>
-        </AdminOnly>
-      </header>
-      {ordering.failure && (
-        <p role="alert" className={styles.failure}>
-          {ordering.failure.message}
-        </p>
-      )}
-      {libraries.isPending && <RowsSkeleton />}
-      {!libraries.isPending && ordering.isEditing && <OrderedLibraries ordering={ordering} />}
-      {!libraries.isPending && !ordering.isEditing && (
-        <ul className={styles.list}>
-          {ordering.ordered.map((library) => (
-            <LibraryRow
-              key={library.id}
-              library={library}
-              isOpen={openIds.has(library.id)}
-              onToggle={() =>
-                setOpenIds((current) =>
-                  current.has(library.id)
-                    ? new Set([...current].filter((id) => id !== library.id))
-                    : new Set([...current, library.id]),
-                )
-              }
-              isShut={
-                lockState({ locked: library.settings.locked, lock: lock.data }).state !==
-                LIBRARY_LOCK_STATES.open
-              }
-            />
-          ))}
-        </ul>
-      )}
-      {dialog}
-    </section>
-  )
+  return <KeyedView<LibrariesViewProps> views={LIBRARIES_VIEWS} view={view} />
 }

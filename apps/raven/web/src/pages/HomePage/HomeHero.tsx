@@ -2,7 +2,9 @@ import { Button, ButtonLink } from '@raven/ui'
 import { Fragment, type KeyboardEvent, useEffect, useState, useSyncExternalStore } from 'react'
 import type { Featured } from '@/pages/HomePage/featured'
 import { PictureFact } from '@/components/ResolutionChip/ResolutionChip'
+import { HOME_COPY } from '@/pages/HomePage/copy'
 import styles from '@/pages/HomePage/HomeHero.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** How long each arrival holds before the next takes its place. */
 export const HERO_MS = 7000
@@ -114,7 +116,7 @@ type SlideProps = {
 const Slide = ({ entry, place, isCurrent }: SlideProps) => (
   <article
     className={isCurrent ? `${styles.slide} ${styles.current}` : styles.slide}
-    aria-roledescription="slide"
+    aria-roledescription={HOME_COPY.slide}
     aria-label={place}
     aria-hidden={!isCurrent}
     inert={!isCurrent}
@@ -133,28 +135,28 @@ const Slide = ({ entry, place, isCurrent }: SlideProps) => (
             icon="play"
             to={entry.play.to}
             state={entry.play.state}
-            aria-label={`Play ${entry.title}`}
+            aria-label={HOME_COPY.playTitle(entry.title)}
           >
-            Play
+            {COMMON_COPY.play}
           </ButtonLink>
         )}
         <ButtonLink size="large" to={entry.details}>
-          Details
+          {HOME_COPY.details}
         </ButtonLink>
       </div>
       <p className={styles.facts}>
         {entry.facts.map((fact, index) => (
           <Fragment key={fact}>
-            {index > 0 && <span aria-hidden="true"> · </span>}
+            {index > 0 && <span aria-hidden="true">{COMMON_COPY.separator}</span>}
             {fact}
           </Fragment>
         ))}
         {entry.picture && (
           <>
-            {entry.facts.length > 0 && <span aria-hidden="true"> · </span>}
+            {entry.facts.length > 0 && <span aria-hidden="true">{COMMON_COPY.separator}</span>}
             <PictureFact
               resolution={entry.picture.resolution}
-              rest={entry.picture.isHdr ? 'HDR' : null}
+              rest={entry.picture.isHdr ? COMMON_COPY.hdr : null}
             />
           </>
         )}
@@ -192,7 +194,6 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
   }, [isHeld, at, count])
 
   const current = featured[at]
-  if (!current) return null
 
   const step = (by: number) => setTurn({ index: (at + by + count) % count, from: at })
   const onKeyDown = (event: KeyboardEvent) => {
@@ -206,24 +207,23 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
     <section
       ref={setNode}
       className={styles.hero}
-      aria-roledescription="carousel"
-      aria-label="Featured"
+      aria-roledescription={HOME_COPY.carousel}
+      aria-label={HOME_COPY.featured}
     >
       <div className={styles.wash} aria-hidden="true">
-        {featured.flatMap(({ key, backdrop }, index) =>
-          isInWash({ index, at, from: turn.from, count })
-            ? [
-                <img
-                  key={key}
-                  className={index === at ? `${styles.backdrop} ${styles.shown}` : styles.backdrop}
-                  src={backdrop}
-                  alt=""
-                  decoding="async"
-                  fetchPriority={index === at ? 'high' : 'auto'}
-                />,
-              ]
-            : [],
-        )}
+        {featured
+          .map((entry, index) => ({ entry, index }))
+          .filter(({ index }) => isInWash({ index, at, from: turn.from, count }))
+          .map(({ entry: { key, backdrop }, index }) => (
+            <img
+              key={key}
+              className={index === at ? `${styles.backdrop} ${styles.shown}` : styles.backdrop}
+              src={backdrop}
+              alt=""
+              decoding="async"
+              fetchPriority={index === at ? 'high' : 'auto'}
+            />
+          ))}
       </div>
 
       <div className={styles.slides}>
@@ -231,7 +231,7 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
           <Slide
             key={entry.key}
             entry={entry}
-            place={`${index + 1} of ${count}`}
+            place={HOME_COPY.place({ at: index + 1, count })}
             isCurrent={index === at}
           />
         ))}
@@ -242,31 +242,33 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
           <Button
             tone="pill"
             icon="back"
-            aria-label="Previous"
+            aria-label={HOME_COPY.previous}
             onClick={() => step(-1)}
             onKeyDown={onKeyDown}
           />
           <Button
             tone="pill"
             icon="next"
-            aria-label="Next"
+            aria-label={HOME_COPY.next}
             onClick={() => step(1)}
             onKeyDown={onKeyDown}
           />
-          <span className={styles.count} aria-hidden="true">{`${at + 1} / ${count}`}</span>
+          <span className={styles.count} aria-hidden="true">
+            {HOME_COPY.counter({ at: at + 1, count })}
+          </span>
         </div>
       )}
       <p className="visually-hidden" aria-live={isHeld ? 'polite' : 'off'}>
-        {`${current.title}, ${at + 1} of ${count}`}
+        {HOME_COPY.announcement({ title: current?.title ?? '', at: at + 1, count })}
       </p>
 
       <div className={styles.stack} aria-hidden="true">
         <div className={styles.fan}>
-          {featured.flatMap(({ key, poster }, index) => {
-            const offset = (index - at + count) % count
+          {featured
+            .map((entry, index) => ({ entry, offset: (index - at + count) % count }))
             // Only the posters in view, and the one the next turn brings in, are fetched.
-            if (offset > FAN_LOADED && offset !== count - 1) return []
-            return [
+            .filter(({ offset }) => offset <= FAN_LOADED || offset === count - 1)
+            .map(({ entry: { key, poster }, offset }) => (
               <img
                 key={key}
                 className={`${styles.poster} ${FAN[fanPlace({ offset, count })]}`}
@@ -274,9 +276,8 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
                 alt=""
                 decoding="async"
                 fetchPriority={offset === 0 ? 'high' : 'auto'}
-              />,
-            ]
-          })}
+              />
+            ))}
         </div>
       </div>
     </section>

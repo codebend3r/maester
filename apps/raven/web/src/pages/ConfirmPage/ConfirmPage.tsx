@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { AUTH_ROUTES } from '@raven/core'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { AuthCard, Lead, Status } from '@/components/AuthScreen/AuthCard'
 import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
 import { AUTH_QUERY, HOME_PATH } from '@/lib/authRoutes'
 import { useAuthSession } from '@/stores/authSession'
+import { CONFIRM_COPY } from '@/pages/ConfirmPage/copy'
 import styles from '@/pages/ConfirmPage/ConfirmPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 export const CONFIRM_TYPES = { email: 'email', recovery: 'recovery' } as const
 type ConfirmType = (typeof CONFIRM_TYPES)[keyof typeof CONFIRM_TYPES]
@@ -14,11 +17,11 @@ type ConfirmType = (typeof CONFIRM_TYPES)[keyof typeof CONFIRM_TYPES]
 const LINK_TYPES = {
   [CONFIRM_TYPES.email]: {
     destination: HOME_PATH,
-    resend: { to: AUTH_ROUTES.checkEmail, label: 'Send a new confirmation link' },
+    resend: { to: AUTH_ROUTES.checkEmail, label: CONFIRM_COPY.newConfirmationLink },
   },
   [CONFIRM_TYPES.recovery]: {
     destination: AUTH_ROUTES.reset,
-    resend: { to: AUTH_ROUTES.forgot, label: 'Send a new reset link' },
+    resend: { to: AUTH_ROUTES.forgot, label: CONFIRM_COPY.newResetLink },
   },
 } as const satisfies Record<
   ConfirmType,
@@ -46,7 +49,12 @@ const linkOf = (params: URLSearchParams): ConfirmLink => {
 const OUTCOMES = { verifying: 'verifying', verified: 'verified', failed: 'failed' } as const
 type Outcome = (typeof OUTCOMES)[keyof typeof OUTCOMES]
 
-const Verifying = () => <AuthCard title="Confirming your link" lead={<Status>One moment</Status>} />
+const Verifying = () => (
+  <AuthCard
+    title={CONFIRM_COPY.verifyingTitle}
+    lead={<Status>{CONFIRM_COPY.verifyingLead}</Status>}
+  />
+)
 
 type ExpiredProps = { type: ConfirmType | null }
 
@@ -55,21 +63,85 @@ const Expired = ({ type }: ExpiredProps) => {
 
   return (
     <AuthCard
-      title="This link has expired or was already used"
+      title={CONFIRM_COPY.expiredTitle}
       lead={
-        <Lead>
-          {again === null
-            ? 'Sign in, and ask for a new link from there if you need one.'
-            : 'Links work once, for a short time. Ask for a new one.'}
-        </Lead>
+        <Lead>{again === null ? CONFIRM_COPY.expiredSignIn : CONFIRM_COPY.expiredAskAgain}</Lead>
       }
     >
-      <nav className={styles.actions} aria-label="Next steps">
+      <nav className={styles.actions} aria-label={CONFIRM_COPY.nextSteps}>
         {again !== null && <Link to={again.to}>{again.label}</Link>}
-        <Link to={AUTH_ROUTES.signIn}>Back to sign in</Link>
+        <Link to={AUTH_ROUTES.signIn}>{COMMON_COPY.backToSignIn}</Link>
       </nav>
     </AuthCard>
   )
+}
+
+const CARD_KEYS = { verifying: 'verifying', expired: 'expired' } as const
+
+type CardProps = {
+  [CARD_KEYS.verifying]: Record<never, never>
+  [CARD_KEYS.expired]: ExpiredProps
+}
+
+const CARDS = {
+  [CARD_KEYS.verifying]: Verifying,
+  [CARD_KEYS.expired]: Expired,
+} as const satisfies ViewsOf<CardProps>
+
+type ConfirmScreenProps = { card: ViewOf<CardProps> }
+
+/** The screen stays mounted while the wait gives way to the dead end. */
+const ConfirmScreen = ({ card }: ConfirmScreenProps) => (
+  <AuthScreen audience={AUDIENCES.anyone}>
+    <KeyedView<CardProps> views={CARDS} view={card} />
+  </AuthScreen>
+)
+
+type LeaveProps = { to: string }
+
+const Leave = ({ to }: LeaveProps) => <Navigate replace to={to} />
+
+const CONFIRM_VIEW_KEYS = { clearing: 'clearing', leaving: 'leaving', screen: 'screen' } as const
+
+type ConfirmViewProps = {
+  [CONFIRM_VIEW_KEYS.clearing]: LeaveProps
+  [CONFIRM_VIEW_KEYS.leaving]: LeaveProps
+  [CONFIRM_VIEW_KEYS.screen]: ConfirmScreenProps
+}
+
+const CONFIRM_VIEWS = {
+  [CONFIRM_VIEW_KEYS.clearing]: Leave,
+  [CONFIRM_VIEW_KEYS.leaving]: Leave,
+  [CONFIRM_VIEW_KEYS.screen]: ConfirmScreen,
+} as const satisfies ViewsOf<ConfirmViewProps>
+
+type ConfirmViewOfProps = {
+  search: string
+  link: ConfirmLink
+  outcome: Outcome
+  hasSession: boolean
+}
+
+/** Which view the page shows: the URL being cleared, the way on, or the screen with the wait or the dead end. */
+const confirmViewOf = ({
+  search,
+  link,
+  outcome,
+  hasSession,
+}: ConfirmViewOfProps): ViewOf<ConfirmViewProps> => {
+  // The same route stays mounted, so the link read on mounting survives the move.
+  if (search !== '') return { key: CONFIRM_VIEW_KEYS.clearing, props: { to: AUTH_ROUTES.confirm } }
+  if (link.kind === LINK_KINDS.valid && outcome === OUTCOMES.verified && hasSession)
+    return { key: CONFIRM_VIEW_KEYS.leaving, props: { to: LINK_TYPES[link.type].destination } }
+  if (link.kind === LINK_KINDS.valid && outcome !== OUTCOMES.failed)
+    return {
+      key: CONFIRM_VIEW_KEYS.screen,
+      props: { card: { key: CARD_KEYS.verifying, props: {} } },
+    }
+  return {
+    key: CONFIRM_VIEW_KEYS.screen,
+    props: { card: { key: CARD_KEYS.expired, props: { type: link.type } } },
+  }
 }
 
 /**
@@ -100,20 +172,10 @@ export const ConfirmPage = () => {
     )
   }, [link, client, search])
 
-  // The same route stays mounted, so the link read above survives the move.
-  if (search !== '') return <Navigate replace to={AUTH_ROUTES.confirm} />
-
-  if (link.kind === LINK_KINDS.valid && outcome === OUTCOMES.verified && hasSession) {
-    return <Navigate replace to={LINK_TYPES[link.type].destination} />
-  }
-
   return (
-    <AuthScreen audience={AUDIENCES.anyone}>
-      {link.kind === LINK_KINDS.valid && outcome !== OUTCOMES.failed ? (
-        <Verifying />
-      ) : (
-        <Expired type={link.type} />
-      )}
-    </AuthScreen>
+    <KeyedView<ConfirmViewProps>
+      views={CONFIRM_VIEWS}
+      view={confirmViewOf({ search, link, outcome, hasSession })}
+    />
   )
 }

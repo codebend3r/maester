@@ -9,7 +9,8 @@ import {
   watchLink,
 } from '@raven/core'
 import { Button, Icon } from '@raven/ui'
-import { useId, useState } from 'react'
+import { type ComponentType, useId, useState } from 'react'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
@@ -18,40 +19,97 @@ import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
+import { HOME_COPY } from '@/pages/HomePage/copy'
 import styles from '@/pages/HomePage/ContinueWatching.module.scss'
 
 /** "23m left", "1h 12m left"; null until the video's length is known. */
 export const timeLeft = (media: MediaItem): string | null => {
   if (media.duration == null) return null
   const left = formatRuntime(media.duration - media.position)
-  return left == null ? null : `${left} left`
+  return left == null ? null : HOME_COPY.timeLeft(left)
 }
 
+const TINT_KINDS = { poster: 'poster', frame: 'frame', none: 'none' } as const
+
+type PosterTintProps = { srcSet: string }
+
+const PosterTint = ({ srcSet }: PosterTintProps) => (
+  <img className={styles.tint} srcSet={srcSet} sizes="1px" alt="" loading="lazy" decoding="async" />
+)
+
+type FrameTintProps = { thumbnail: string }
+
+const FrameTint = ({ thumbnail }: FrameTintProps) => (
+  <img className={styles.tint} src={thumbnail} alt="" loading="lazy" decoding="async" />
+)
+
+const NoTint = () => null
+
+type TintViewProps = {
+  [TINT_KINDS.poster]: PosterTintProps
+  [TINT_KINDS.frame]: FrameTintProps
+  [TINT_KINDS.none]: Record<never, never>
+}
+
+const TINTS = {
+  [TINT_KINDS.poster]: PosterTint,
+  [TINT_KINDS.frame]: FrameTint,
+  [TINT_KINDS.none]: NoTint,
+} as const satisfies ViewsOf<TintViewProps>
+
 type TintProps = { entry: PosterEntry }
+
+/** The poster's sources where it has one, else the frame grab, else nothing. */
+type TintViewOfProps = TintProps
+
+const tintViewOf = ({ entry: { media, poster } }: TintViewOfProps): ViewOf<TintViewProps> => {
+  const srcSet = poster ? api.posterSrcSet({ id: poster.id, version: poster.posterVersion }) : null
+  if (srcSet) return { key: TINT_KINDS.poster, props: { srcSet } }
+  const thumbnail = api.thumbnailUrl(media)
+  if (thumbnail) return { key: TINT_KINDS.frame, props: { thumbnail } }
+  return { key: TINT_KINDS.none, props: {} }
+}
 
 /**
  * The picture a tile is tinted with, blurred past knowing: the poster at its
  * narrowest width, which `sizes` asks the browser for, else the frame grab
  * the tile already shows.
  */
-const Tint = ({ entry: { media, poster } }: TintProps) => {
-  const srcSet = poster ? api.posterSrcSet({ id: poster.id, version: poster.posterVersion }) : null
-  const thumbnail = api.thumbnailUrl(media)
-  if (srcSet) {
-    return (
-      <img
-        className={styles.tint}
-        srcSet={srcSet}
-        sizes="1px"
-        alt=""
-        loading="lazy"
-        decoding="async"
-      />
-    )
-  }
-  if (!thumbnail) return null
-  return <img className={styles.tint} src={thumbnail} alt="" loading="lazy" decoding="async" />
+const Tint = ({ entry }: TintProps) => (
+  <KeyedView<TintViewProps> views={TINTS} view={tintViewOf({ entry })} />
+)
+
+const TITLE_KINDS = { linked: 'linked', plain: 'plain' } as const
+type TitleKind = (typeof TITLE_KINDS)[keyof typeof TITLE_KINDS]
+
+type TileTitleProps = {
+  page: ReturnType<typeof cardLink>
+  title: string
+  label: string
+  onContextMenu: ReturnType<typeof useCardMenu>['onContextMenu']
 }
+
+type LinkedTitleProps = TileTitleProps
+
+const LinkedTitle = ({ page, title, label, onContextMenu }: LinkedTitleProps) => (
+  <CardLink
+    {...page}
+    className={`${styles.title} ${styles.link}`}
+    aria-label={label}
+    onContextMenu={onContextMenu}
+  >
+    {title}
+  </CardLink>
+)
+
+type PlainTitleProps = TileTitleProps
+
+const PlainTitle = ({ title }: PlainTitleProps) => <span className={styles.title}>{title}</span>
+
+const TILE_TITLES = {
+  [TITLE_KINDS.linked]: LinkedTitle,
+  [TITLE_KINDS.plain]: PlainTitle,
+} as const satisfies Record<TitleKind, ComponentType<TileTitleProps>>
 
 type ContinueTileProps = { entry: PosterEntry }
 
@@ -68,7 +126,7 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
   const { title, line } = tileWords(media)
   const left = timeLeft(media)
   const page = cardLink({ media, hasPages: true })
-  const hasPage = page.state == null
+  const TileTitle = TILE_TITLES[page.state == null ? TITLE_KINDS.linked : TITLE_KINDS.plain]
   const hasPoster = poster?.posterVersion != null
   const resolution = resolutionLabel(media)
 
@@ -77,7 +135,7 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
       <CardLink
         {...watchLink({ media })}
         className={styles.play}
-        aria-label={`Play ${label}`}
+        aria-label={HOME_COPY.playTitle(label)}
         onContextMenu={menu.onContextMenu}
       >
         <span className={hasPoster ? `${styles.frame} ${styles.poster}` : styles.frame}>
@@ -90,18 +148,7 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
         </span>
       </CardLink>
       <span className={styles.copy}>
-        {hasPage ? (
-          <CardLink
-            {...page}
-            className={`${styles.title} ${styles.link}`}
-            aria-label={label}
-            onContextMenu={menu.onContextMenu}
-          >
-            {title}
-          </CardLink>
-        ) : (
-          <span className={styles.title}>{title}</span>
-        )}
+        <TileTitle page={page} title={title} label={label} onContextMenu={menu.onContextMenu} />
         {(line || resolution != null) && (
           <span className={styles.line}>
             {line && <span>{line}</span>}
@@ -149,12 +196,12 @@ export const ContinueWatching = ({ entries }: ContinueWatchingProps) => {
               aria-controls={`${id}-tiles`}
               onClick={() => setAll((now) => !now)}
             >
-              {isAll ? 'Show fewer' : `Show all ${entries.length}`}
+              {isAll ? HOME_COPY.showFewer : HOME_COPY.showAll(entries.length)}
             </Button>
           )
         }
       >
-        Continue watching
+        {HOME_COPY.continueWatching}
       </SectionHeading>
       <ul id={`${id}-tiles`} className={styles.tiles}>
         {shown.map((entry) => (

@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import {
   type LibrarySettings,
   MATCH_STATES,
+  type MediaItem,
+  type ShowListing,
   METADATA_SERVICE_STATES,
   THUMBNAIL_STATES,
   listsShows,
@@ -10,6 +12,14 @@ import {
 import { mediaListQuery, metadataHealthQuery, showListQuery } from '@/lib/queries'
 import { LISTING_STATES, type Listing, type ListingState } from '@/pages/LibraryPage/libraryShape'
 import { POLL_MS, anyPending, useMatchingPassDone } from '@/pages/LibraryPage/useMatchingPassDone'
+
+/** A TV library's listing: its shows, and the files no show was found for. */
+const showListing = (data: ShowListing | undefined): Listing | null =>
+  data ? { shows: data.shows, files: data.unmatched } : null
+
+/** Any other library's listing: its files. */
+const fileListing = (data: MediaItem[] | undefined): Listing | null =>
+  data ? { shows: [], files: data } : null
 
 type UseLibraryListingProps = {
   libraryId: number
@@ -61,13 +71,7 @@ export const useLibraryListing = ({
   })
 
   const query = isShowList ? shows : files
-  const listed: Listing | null = isShowList
-    ? shows.data
-      ? { shows: shows.data.shows, files: shows.data.unmatched }
-      : null
-    : files.data
-      ? { shows: [], files: files.data }
-      : null
+  const listed = isShowList ? showListing(shows.data) : fileListing(files.data)
 
   useMatchingPassDone({ libraryId, files: listed?.files ?? [] })
 

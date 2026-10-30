@@ -5,20 +5,9 @@ import { Address, AuthCard, Lead } from '@/components/AuthScreen/AuthCard'
 import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
 import { ACCESS_KINDS, useAccessState, useAccount } from '@/lib/accessState'
 import { useSignOut } from '@/lib/useSignOut'
+import { PENDING_COPY } from '@/pages/PendingPage/copy'
 import styles from '@/pages/PendingPage/PendingPage.module.scss'
-
-const COPY = {
-  [ACCESS_KINDS.pending]: {
-    title: 'Waiting for approval',
-    lead: 'The owner of this raven approves each new account by hand. You can start watching once they have.',
-  },
-  [ACCESS_KINDS.revoked]: {
-    title: 'Your access was removed',
-    lead: "The owner of this raven removed this account's access. Ask them if you think that is a mistake.",
-  },
-} as const
-
-const CHECK_FAILED_COPY = 'Could not check. Try again.'
+import { COMMON_COPY } from '@/lib/copy'
 
 const ANSWERS = [AUTH_REFUSALS.pending, AUTH_REFUSALS.revoked, AUTH_REFUSALS.signedOut]
 
@@ -51,13 +40,14 @@ export const PendingPage = () => {
     <AuthScreen audience={AUDIENCES.waiting}>
       {(access.kind === ACCESS_KINDS.pending || access.kind === ACCESS_KINDS.revoked) && (
         <AuthCard
-          title={COPY[access.kind].title}
+          title={PENDING_COPY[access.kind].title}
           lead={
             <>
-              <Lead>{COPY[access.kind].lead}</Lead>
+              <Lead>{PENDING_COPY[access.kind].lead}</Lead>
               {email !== undefined && (
                 <Lead>
-                  Signed in as <Address>{email}</Address>.
+                  {PENDING_COPY.signedInAs} <Address>{email}</Address>
+                  {PENDING_COPY.signedInAsEnd}
                 </Lead>
               )}
             </>
@@ -65,13 +55,13 @@ export const PendingPage = () => {
         >
           <div className={styles.actions}>
             <Button tone="primary" disabled={isBusy} onClick={() => check.mutate()}>
-              {check.isPending ? 'Checking' : 'Check again'}
+              {check.isPending ? PENDING_COPY.checking : PENDING_COPY.checkAgain}
             </Button>
             <Button disabled={isBusy} onClick={() => end.mutate()}>
-              {end.isPending ? 'Signing out' : 'Sign out'}
+              {end.isPending ? COMMON_COPY.signingOut : COMMON_COPY.signOut}
             </Button>
           </div>
-          {isFailed && <output className={styles.failed}>{CHECK_FAILED_COPY}</output>}
+          {isFailed && <output className={styles.failed}>{PENDING_COPY.checkFailed}</output>}
         </AuthCard>
       )}
     </AuthScreen>

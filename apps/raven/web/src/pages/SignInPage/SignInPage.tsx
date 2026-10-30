@@ -10,16 +10,18 @@ import { AUTH_ERRORS, errorCodeOf, resendFailureCopy } from '@/lib/authErrors'
 import { AUTH_QUERY, checkEmailPath, safeReturnPath } from '@/lib/authRoutes'
 import { callAuth, resendConfirmation } from '@/lib/session'
 import { useAuthSession } from '@/stores/authSession'
+import { SIGN_IN_COPY } from '@/pages/SignInPage/copy'
 import styles from '@/pages/SignInPage/SignInPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 const failureCopy = (error: unknown): string => {
   switch (errorCodeOf(error)) {
     case AUTH_ERRORS.invalidCredentials:
-      return 'Email or password is wrong.'
+      return SIGN_IN_COPY.wrongCredentials
     case AUTH_ERRORS.emailNotConfirmed:
-      return 'Confirm your email to sign in.'
+      return SIGN_IN_COPY.unconfirmed
     default:
-      return 'Sign in failed. Try again.'
+      return SIGN_IN_COPY.failed
   }
 }
 
@@ -50,14 +52,14 @@ const SignInForm = ({ returnPath }: SignInFormProps) => {
 
   return (
     <AuthForm
-      title="Welcome back"
-      lead={<Lead>Sign in to watch on {window.location.hostname}</Lead>}
+      title={SIGN_IN_COPY.title}
+      lead={<Lead>{SIGN_IN_COPY.lead(window.location.hostname)}</Lead>}
       onSubmit={submit}
     >
       <Fields>
         <EmailField value={email} onChange={setEmail} />
         <PasswordField
-          label="Password"
+          label={SIGN_IN_COPY.password}
           autoComplete="current-password"
           value={password}
           onChange={setPassword}
@@ -71,23 +73,23 @@ const SignInForm = ({ returnPath }: SignInFormProps) => {
                 disabled={resend.isPending}
                 onClick={() => resend.mutate({ email: attempted })}
               >
-                Resend confirmation email
+                {SIGN_IN_COPY.resendConfirmation}
               </Button>
-              <Link to={checkEmailPath({ email: attempted })}>Check your email</Link>
-              {resend.isSuccess && <output>Confirmation email sent.</output>}
+              <Link to={checkEmailPath({ email: attempted })}>{SIGN_IN_COPY.checkEmail}</Link>
+              {resend.isSuccess && <output>{SIGN_IN_COPY.confirmationSent}</output>}
               {resend.isError && <output>{resendFailureCopy(resend.error)}</output>}
             </div>
           )}
         </PasswordField>
         <Link className={styles.forgot} to={AUTH_ROUTES.forgot}>
-          Forgot password?
+          {SIGN_IN_COPY.forgot}
         </Link>
       </Fields>
       <SubmitButton isDisabled={signIn.isPending || !isReady}>
-        {signIn.isPending ? 'Signing in…' : 'Sign in'}
+        {signIn.isPending ? SIGN_IN_COPY.signingIn : COMMON_COPY.signIn}
       </SubmitButton>
       <Note>
-        New to raven? <Link to={AUTH_ROUTES.signUp}>Create an account</Link>
+        {SIGN_IN_COPY.newToRaven} <Link to={AUTH_ROUTES.signUp}>{SIGN_IN_COPY.createAccount}</Link>
       </Note>
     </AuthForm>
   )

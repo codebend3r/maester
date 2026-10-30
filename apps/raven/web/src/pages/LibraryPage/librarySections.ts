@@ -8,6 +8,7 @@ import {
   matchTypeFor,
 } from '@raven/core'
 import type { IconName } from '@raven/ui'
+import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 
 /**
  * The tabs of a library's page, in order. Each but All is its own address
@@ -58,42 +59,72 @@ export const FINISHED_LIMIT = 48
  * movies, and Not matched wherever files are matched at all.
  */
 export const SECTIONS = {
-  all: { label: 'All', icon: 'grid', isFor: listsFiles, tally: 'itemCount', most: null },
-  albums: { label: 'Albums', icon: 'disc', isFor: listsAlbums, tally: null, most: null },
-  artists: { label: 'Artists', icon: 'music', isFor: listsAlbums, tally: null, most: null },
+  all: {
+    label: LIBRARY_COPY.sectionLabels.all,
+    icon: 'grid',
+    isFor: listsFiles,
+    tally: 'itemCount',
+    most: null,
+  },
+  albums: {
+    label: LIBRARY_COPY.sectionLabels.albums,
+    icon: 'disc',
+    isFor: listsAlbums,
+    tally: null,
+    most: null,
+  },
+  artists: {
+    label: LIBRARY_COPY.sectionLabels.artists,
+    icon: 'music',
+    isFor: listsAlbums,
+    tally: null,
+    most: null,
+  },
   // The account's own playlists, which span every music library it may see.
-  playlists: { label: 'Playlists', icon: 'list', isFor: listsAlbums, tally: null, most: null },
+  playlists: {
+    label: LIBRARY_COPY.sectionLabels.playlists,
+    icon: 'list',
+    isFor: listsAlbums,
+    tally: null,
+    most: null,
+  },
   'in-progress': {
-    label: 'In progress',
+    label: LIBRARY_COPY.sectionLabels.inProgress,
     icon: 'playback',
     isFor: always,
     tally: 'inProgress',
     most: null,
   },
   favourites: {
-    label: 'Favourites',
+    label: LIBRARY_COPY.sectionLabels.favourites,
     icon: 'heart',
     isFor: always,
     tally: 'favourites',
     most: null,
   },
-  sagas: { label: 'Sagas', icon: 'covers', isFor: matchedToMovies, tally: 'sagas', most: null },
+  sagas: {
+    label: LIBRARY_COPY.sectionLabels.sagas,
+    icon: 'covers',
+    isFor: matchedToMovies,
+    tally: 'sagas',
+    most: null,
+  },
   'not-matched': {
-    label: 'Not matched',
+    label: LIBRARY_COPY.sectionLabels.notMatched,
     icon: 'alert',
     isFor: matched,
     tally: 'unmatchedCount',
     most: null,
   },
   duplicates: {
-    label: 'Duplicates',
+    label: LIBRARY_COPY.sectionLabels.duplicates,
     icon: 'copy',
     isFor: matchedToMovies,
     tally: 'duplicates',
     most: null,
   },
   finished: {
-    label: 'Recently finished',
+    label: LIBRARY_COPY.sectionLabels.finished,
     icon: 'check',
     isFor: always,
     tally: 'finished',

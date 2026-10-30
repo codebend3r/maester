@@ -20,10 +20,10 @@ import {
   WATCH_TARGET_KINDS,
   watchLink,
 } from '@raven/core'
-import { type ReactNode, useDeferredValue, useRef } from 'react'
+import { type ComponentType, type ReactNode, useDeferredValue, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ButtonLink } from '@raven/ui'
-import { HISTORY_SHOWS } from '@raven/ui/headless'
+import { HISTORY_SHOWS, KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { Duplicates } from '@/components/Duplicates/Duplicates'
 import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
@@ -51,6 +51,7 @@ import {
   sagasQuery,
   unmatchedQuery,
 } from '@/lib/queries'
+import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import { LibraryListing, LibraryListingSkeleton } from '@/pages/LibraryPage/LibraryViews'
 import { AlbumsSection, ArtistsSection, PlaylistsSection } from '@/pages/LibraryPage/MusicSections'
 import { SelectableCards } from '@/pages/LibraryPage/SelectableCards'
@@ -60,12 +61,17 @@ import {
   NOTHING_LISTED,
   playQueue,
 } from '@/pages/LibraryPage/libraryShape'
-import { FINISHED_LIMIT, type LibrarySection } from '@/pages/LibraryPage/librarySections'
+import {
+  FINISHED_LIMIT,
+  LIBRARY_SECTIONS,
+  type LibrarySection,
+} from '@/pages/LibraryPage/librarySections'
 import { useAiLookupsDone } from '@/pages/LibraryPage/useAiLookupsDone'
 import { useLibraryListing } from '@/pages/LibraryPage/useLibraryListing'
 import { useLibraryView } from '@/pages/LibraryPage/useLibraryView'
 import { POLL_MS, anyPending, useMatchingPassDone } from '@/pages/LibraryPage/useMatchingPassDone'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** A tab's `empty`: `message` when its list has nothing in it. */
 const whenEmpty =
@@ -80,23 +86,71 @@ type SectionBodyProps<T> = {
   children: (data: T) => ReactNode
 }
 
+const BODY_VIEW_KEYS = {
+  failed: 'failed',
+  pending: 'pending',
+  empty: 'empty',
+  ready: 'ready',
+} as const
+
+type FailedProps = { error: Error }
+
+/** Why what a tab lists could not be read. */
+const Failed = ({ error }: FailedProps) => (
+  <p className={styles.message} role="alert">
+    {error.message}
+  </p>
+)
+
+type ShapeProps = { shape: ReactNode }
+
+const Shape = ({ shape }: ShapeProps) => <Loading label={COMMON_COPY.loading}>{shape}</Loading>
+
+type EmptyProps = { message: string }
+
+const Empty = ({ message }: EmptyProps) => <p className={styles.message}>{message}</p>
+
+type ContentProps = { content: ReactNode }
+
+const Content = ({ content }: ContentProps) => content
+
+type BodyViewsProps = {
+  [BODY_VIEW_KEYS.failed]: FailedProps
+  [BODY_VIEW_KEYS.pending]: ShapeProps
+  [BODY_VIEW_KEYS.empty]: EmptyProps
+  [BODY_VIEW_KEYS.ready]: ContentProps
+}
+
+const BODY_VIEWS = {
+  [BODY_VIEW_KEYS.failed]: Failed,
+  [BODY_VIEW_KEYS.pending]: Shape,
+  [BODY_VIEW_KEYS.empty]: Empty,
+  [BODY_VIEW_KEYS.ready]: Content,
+} as const satisfies ViewsOf<BodyViewsProps>
+
+type SectionBodyViewProps<T> = SectionBodyProps<T>
+
+/** Which view a tab's body shows, as its query stands. */
+const sectionBodyView = <T,>({
+  query,
+  shape,
+  empty,
+  children,
+}: SectionBodyViewProps<T>): ViewOf<BodyViewsProps> => {
+  if (query.isError) return { key: BODY_VIEW_KEYS.failed, props: { error: query.error } }
+  if (query.isPending) return { key: BODY_VIEW_KEYS.pending, props: { shape } }
+  const message = empty(query.data)
+  if (message != null) return { key: BODY_VIEW_KEYS.empty, props: { message } }
+  return { key: BODY_VIEW_KEYS.ready, props: { content: children(query.data) } }
+}
+
 /**
  * A tab's body: its failure, `shape` while it loads, the line `empty` gives
  * for what came back, if any, else its content.
  */
-const SectionBody = <T,>({ query, shape, empty, children }: SectionBodyProps<T>) => {
-  if (query.isError) {
-    return (
-      <p className={styles.message} role="alert">
-        {query.error.message}
-      </p>
-    )
-  }
-  if (query.isPending) return <Loading label="Loading">{shape}</Loading>
-  const message = empty(query.data)
-  if (message != null) return <p className={styles.message}>{message}</p>
-  return children(query.data)
-}
+const SectionBody = <T,>(props: SectionBodyProps<T>) => (
+  <KeyedView<BodyViewsProps> views={BODY_VIEWS} view={sectionBodyView(props)} />
+)
 
 type EntryGridProps = { library: Library; entries: PosterEntry[] }
 
@@ -126,29 +180,46 @@ type ListingBodyProps = {
   empty: string | null
 }
 
-/** The listing as it stands: its shape on its way, why it could not be read, why it is empty, or itself. */
-const ListingBody = ({ listing, settings, empty }: ListingBodyProps) => {
-  switch (listing.state) {
-    case LISTING_STATES.pending:
-      return <LibraryListingSkeleton settings={settings} />
-    case LISTING_STATES.failed:
-      return (
-        <p className={styles.message} role="alert">
-          {listing.error.message}
-        </p>
-      )
-    case LISTING_STATES.listed:
-      return empty ? (
-        <p className={styles.message}>{empty}</p>
-      ) : (
-        <LibraryListing settings={settings} shows={listing.shows} files={listing.files} />
-      )
-    default: {
-      const unknown: never = listing
-      return unknown
-    }
+const LISTING_VIEW_KEYS = {
+  pending: 'pending',
+  failed: 'failed',
+  empty: 'empty',
+  listed: 'listed',
+} as const
+
+type ListingViewsProps = {
+  [LISTING_VIEW_KEYS.pending]: Parameters<typeof LibraryListingSkeleton>[0]
+  [LISTING_VIEW_KEYS.failed]: FailedProps
+  [LISTING_VIEW_KEYS.empty]: EmptyProps
+  [LISTING_VIEW_KEYS.listed]: Parameters<typeof LibraryListing>[0]
+}
+
+const LISTING_VIEWS = {
+  [LISTING_VIEW_KEYS.pending]: LibraryListingSkeleton,
+  [LISTING_VIEW_KEYS.failed]: Failed,
+  [LISTING_VIEW_KEYS.empty]: Empty,
+  [LISTING_VIEW_KEYS.listed]: LibraryListing,
+} as const satisfies ViewsOf<ListingViewsProps>
+
+type ListingViewProps = ListingBodyProps
+
+/** Which view the listing shows as it stands. */
+const listingView = ({ listing, settings, empty }: ListingViewProps): ViewOf<ListingViewsProps> => {
+  if (listing.state === LISTING_STATES.pending)
+    return { key: LISTING_VIEW_KEYS.pending, props: { settings } }
+  if (listing.state === LISTING_STATES.failed)
+    return { key: LISTING_VIEW_KEYS.failed, props: { error: listing.error } }
+  if (empty) return { key: LISTING_VIEW_KEYS.empty, props: { message: empty } }
+  return {
+    key: LISTING_VIEW_KEYS.listed,
+    props: { settings, shows: listing.shows, files: listing.files },
   }
 }
+
+/** The listing as it stands: its shape on its way, why it could not be read, why it is empty, or itself. */
+const ListingBody = (props: ListingBodyProps) => (
+  <KeyedView<ListingViewsProps> views={LISTING_VIEWS} view={listingView(props)} />
+)
 
 type SameLayoutProps = { a: LibrarySettings; b: LibrarySettings }
 
@@ -232,7 +303,7 @@ const AllSection = ({ library }: AllSectionProps) => {
 
         {view.saveError && (
           <p className={styles.message} role="alert">
-            Could not save how this library is shown: {view.saveError.message}
+            {LIBRARY_COPY.saveFailed(view.saveError.message)}
           </p>
         )}
 
@@ -247,7 +318,7 @@ const AllSection = ({ library }: AllSectionProps) => {
           {isChanging && (
             <output className={styles.switching}>
               <Spinner />
-              Changing the view
+              {LIBRARY_COPY.changingView}
             </output>
           )}
         </div>
@@ -269,8 +340,8 @@ const InProgressSection = ({ library }: InProgressSectionProps) => {
       shape={<MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />}
       empty={whenEmpty(
         library.settings.saveProgress
-          ? `Nothing in progress in ${library.name}. A video left partway through waits here.`
-          : `${library.name} does not save where videos stop, so nothing waits here. Edit can turn that on.`,
+          ? LIBRARY_COPY.inProgressEmpty(library.name)
+          : LIBRARY_COPY.inProgressUnsaved(library.name),
       )}
     >
       {(entries) => <EntryGrid library={library} entries={entries} />}
@@ -287,9 +358,7 @@ const FavouritesSection = ({ library }: FavouritesSectionProps) => {
     <SectionBody
       query={query}
       shape={<MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />}
-      empty={whenEmpty(
-        `No favourites in ${library.name} yet. Open a video's menu, from the button in its corner or a right click, and choose Favourite.`,
-      )}
+      empty={whenEmpty(LIBRARY_COPY.favouritesEmpty(library.name))}
     >
       {(entries) => <EntryGrid library={library} entries={entries} />}
     </SectionBody>
@@ -308,9 +377,7 @@ const SagasSection = ({ library }: SagasSectionProps) => {
     <SectionBody
       query={query}
       shape={<MediaGridSkeleton posters />}
-      empty={whenEmpty(
-        `No sagas in ${library.name} yet. One shows here once two movies or more from the same TMDB collection are in the library.`,
-      )}
+      empty={whenEmpty(LIBRARY_COPY.sagasEmpty(library.name))}
     >
       {(sagas) => (
         <SelectableCards
@@ -339,17 +406,83 @@ type NotMatchedHintProps = {
 
 /** What the Not matched tab says to do about its files: Fix match, once the viewer may manage. */
 const notMatchedHint = ({ matchType, management }: NotMatchedHintProps): string => {
-  const title = matchType ?? 'title'
+  const title = matchType ?? LIBRARY_COPY.title
   if (!management.canManage) {
     return cannotManageNote({
       mode: management.mode,
-      action: `point these at the right ${title}`,
+      action: LIBRARY_COPY.pointAt(title),
     })
   }
   if (matchType === ITEM_TYPES.show) {
-    return 'Choose Fix match beside a show to point its folder at the right show.'
+    return LIBRARY_COPY.fixShowMatch
   }
-  return `Open a file's menu and choose Fix match to point it at the right ${title}.`
+  return LIBRARY_COPY.fixFileMatch(title)
+}
+
+const NOT_MATCHED_LAYOUTS = { shows: 'shows', files: 'files' } as const
+
+type NotMatchedLayout = (typeof NOT_MATCHED_LAYOUTS)[keyof typeof NOT_MATCHED_LAYOUTS]
+
+/** A TV library's files not matched are gathered by the show their folder is for; any other's are cards. */
+const notMatchedLayout = (matchType: ReturnType<typeof matchTypeFor>): NotMatchedLayout =>
+  matchType === ITEM_TYPES.show ? NOT_MATCHED_LAYOUTS.shows : NOT_MATCHED_LAYOUTS.files
+
+const NOT_MATCHED_SHAPES = {
+  [NOT_MATCHED_LAYOUTS.shows]: MediaTilesSkeleton,
+  [NOT_MATCHED_LAYOUTS.files]: MediaGridSkeleton,
+} as const satisfies Record<NotMatchedLayout, ComponentType>
+
+type NotMatchedShapeProps = { matchType: ReturnType<typeof matchTypeFor> }
+
+const NotMatchedShape = ({ matchType }: NotMatchedShapeProps) => {
+  const Bones = NOT_MATCHED_SHAPES[notMatchedLayout(matchType)]
+  return <Bones />
+}
+
+type NotMatchedFilesProps = { library: Library; files: UnmatchedFile[] }
+
+type UnmatchedShowFilesProps = NotMatchedFilesProps
+
+/** A TV library's files not matched, by the show their folder is for. */
+const UnmatchedShowFiles = ({ library, files }: UnmatchedShowFilesProps) => {
+  const matchType = matchTypeFor(library.settings.kind)
+  return (
+    <UnmatchedShows
+      files={files}
+      suggestionOf={suggestionsIn(files)}
+      renderFiles={(group) => (
+        <MediaGrid
+          items={group}
+          matchType={matchType}
+          ratingsSource={library.settings.ratingsSource}
+        />
+      )}
+    />
+  )
+}
+
+type UnmatchedFileCardsProps = NotMatchedFilesProps
+
+/** Any other library's files not matched, with the movies the AI lookup suggests. */
+const UnmatchedFileCards = ({ library, files }: UnmatchedFileCardsProps) => (
+  <>
+    <SuggestedMovies files={files} libraryId={library.id} />
+    <MediaGrid
+      items={files}
+      matchType={matchTypeFor(library.settings.kind)}
+      ratingsSource={library.settings.ratingsSource}
+    />
+  </>
+)
+
+const NOT_MATCHED_FILES = {
+  [NOT_MATCHED_LAYOUTS.shows]: UnmatchedShowFiles,
+  [NOT_MATCHED_LAYOUTS.files]: UnmatchedFileCards,
+} as const satisfies Record<NotMatchedLayout, ComponentType<NotMatchedFilesProps>>
+
+const NotMatchedFiles = ({ library, files }: NotMatchedFilesProps) => {
+  const Files = NOT_MATCHED_FILES[notMatchedLayout(matchTypeFor(library.settings.kind))]
+  return <Files library={library} files={files} />
 }
 
 type NotMatchedSectionProps = { library: Library }
@@ -376,34 +509,13 @@ const NotMatchedSection = ({ library }: NotMatchedSectionProps) => {
   return (
     <SectionBody
       query={query}
-      shape={matchType === ITEM_TYPES.show ? <MediaTilesSkeleton /> : <MediaGridSkeleton />}
-      empty={whenEmpty(`Every file in ${library.name} is matched.`)}
+      shape={<NotMatchedShape matchType={matchType} />}
+      empty={whenEmpty(LIBRARY_COPY.allMatched(library.name))}
     >
       {(files) => (
         <>
           <p className={styles.message}>{notMatchedHint({ matchType, management })}</p>
-          {matchType === ITEM_TYPES.show ? (
-            <UnmatchedShows
-              files={files}
-              suggestionOf={suggestionsIn(files)}
-              renderFiles={(group) => (
-                <MediaGrid
-                  items={group}
-                  matchType={matchType}
-                  ratingsSource={library.settings.ratingsSource}
-                />
-              )}
-            />
-          ) : (
-            <>
-              <SuggestedMovies files={files} libraryId={library.id} />
-              <MediaGrid
-                items={files}
-                matchType={matchType}
-                ratingsSource={library.settings.ratingsSource}
-              />
-            </>
-          )}
+          <NotMatchedFiles files={files} library={library} />
         </>
       )}
     </SectionBody>
@@ -422,7 +534,7 @@ const DuplicatesSection = ({ library }: DuplicatesSectionProps) => {
     <SectionBody
       query={query}
       shape={<MediaGridSkeleton posters />}
-      empty={whenEmpty(`No movie in ${library.name} has more than one file.`)}
+      empty={whenEmpty(LIBRARY_COPY.duplicatesEmpty(library.name))}
     >
       {(listing) => <Duplicates library={library} listing={listing} />}
     </SectionBody>
@@ -442,7 +554,10 @@ const FinishedSection = ({ library }: FinishedSectionProps) => {
       query={query}
       shape={<MediaTilesSkeleton />}
       empty={whenEmpty(
-        `Nothing finished in ${library.name} yet. A video counts once playback gets ${library.settings.watchedPercent}% of the way through, or when you mark it watched.`,
+        LIBRARY_COPY.finishedEmpty({
+          name: library.name,
+          percent: library.settings.watchedPercent,
+        }),
       )}
     >
       {(entries) => {
@@ -460,7 +575,7 @@ const FinishedSection = ({ library }: FinishedSectionProps) => {
               icon="history"
               className={styles.more}
             >
-              Full history
+              {LIBRARY_COPY.fullHistory}
             </ButtonLink>
           </SelectableCards>
         )
@@ -473,17 +588,17 @@ type SectionProps = { library: Library }
 
 /** Each tab's content. */
 const SECTION_VIEWS = {
-  all: AllSection,
-  albums: AlbumsSection,
-  artists: ArtistsSection,
-  playlists: PlaylistsSection,
-  'in-progress': InProgressSection,
-  favourites: FavouritesSection,
-  sagas: SagasSection,
-  'not-matched': NotMatchedSection,
-  duplicates: DuplicatesSection,
-  finished: FinishedSection,
-} as const satisfies Record<LibrarySection, (props: SectionProps) => ReactNode>
+  [LIBRARY_SECTIONS.all]: AllSection,
+  [LIBRARY_SECTIONS.albums]: AlbumsSection,
+  [LIBRARY_SECTIONS.artists]: ArtistsSection,
+  [LIBRARY_SECTIONS.playlists]: PlaylistsSection,
+  [LIBRARY_SECTIONS.inProgress]: InProgressSection,
+  [LIBRARY_SECTIONS.favourites]: FavouritesSection,
+  [LIBRARY_SECTIONS.sagas]: SagasSection,
+  [LIBRARY_SECTIONS.notMatched]: NotMatchedSection,
+  [LIBRARY_SECTIONS.duplicates]: DuplicatesSection,
+  [LIBRARY_SECTIONS.finished]: FinishedSection,
+} as const satisfies Record<LibrarySection, ComponentType<SectionProps>>
 
 type SectionViewProps = {
   library: Library
