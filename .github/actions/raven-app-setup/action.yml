@@ -201,6 +201,28 @@ runs:
       shell: bash
       run: bun install --frozen-lockfile
 
+    # Gradle installs the NDK React Native's `libs.versions.toml` names by itself, from a
+    # download it checks only when it unpacks it, so a short read ("Archive is not a ZIP
+    # archive") failed a build. sdkmanager installs it here first, checks the download's
+    # digest, and a bad one is tried again.
+    - name: 🧱 Android NDK
+      if: inputs.platform == 'android-tv'
+      shell: bash
+      working-directory: apps/raven/app
+      run: |
+        toml="$(node -p "require('path').dirname(require.resolve('react-native/package.json'))")/gradle/libs.versions.toml"
+        ndk="$(awk -F'"' '/^ndkVersion = /{ print $2 }' "$toml")"
+        test -n "$ndk"
+        for attempt in 1 2 3; do
+          if "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$ndk" > /dev/null; then
+            exit 0
+          fi
+          rm -rf "$ANDROID_HOME/ndk/$ndk"
+          echo "attempt $attempt failed to install ndk;$ndk"
+          sleep 15
+        done
+        exit 1
+
     # The fixture server and the app build are two Nx processes that would each run the
     # libraries' `build` (it starts with `rm -rf dist`) at once, so the server could import
     # `dist` between `tsc` and `tsc-alias`, while it still holds `@/` paths. Built once here,

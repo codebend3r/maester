@@ -14,6 +14,8 @@ RUN npm install --global "$(node -p "require('./package.json').packageManager")"
 # Every workspace manifest, so the frozen install sees the same workspace the
 # lockfile describes; only rookery's sources are copied after this.
 COPY --parents apps/*/*/package.json libs/*/*/package.json scripts/package.json ./
+# The patches `patchedDependencies` names, which every install applies.
+COPY patches/ patches/
 
 FROM bun AS build
 RUN bun install --frozen-lockfile --ignore-scripts

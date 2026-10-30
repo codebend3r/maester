@@ -1,4 +1,4 @@
-import { type MediaAccess, type Transport } from '@/apiClient/transport'
+import { type MediaAccess, type TicketedOrigin, type Transport } from '@/apiClient/transport'
 import {
   HLS_PARAMS,
   HLS_PATHS,
@@ -31,7 +31,7 @@ type GetSubtitlesProps = {
   id: number
   trackId: string
   window?: number
-  access?: MediaAccess | null
+  access?: TicketedOrigin | null
 }
 
 type HlsUrlProps = {
@@ -40,6 +40,8 @@ type HlsUrlProps = {
   audio: number | null
   quality: StreamQuality | null
   access: MediaAccess | null
+  /** A transcode's picture subtitle to burn into the picture, by track id; null for none. */
+  burn?: string | null
 }
 
 type StreamUrlProps = {
@@ -105,13 +107,14 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
    * that holds `mode`, `audio` and `quality`, which are read as for
    * `streamUrl`.
    */
-  hlsUrl: ({ id, mode, audio, quality, access }: HlsUrlProps): string =>
+  hlsUrl: ({ id, mode, audio, quality, access, burn = null }: HlsUrlProps): string =>
     mediaUrl({
       path: HLS_PATHS.master.replace(`:${HLS_PARAMS.id}`, String(id)),
       query: {
         [HLS_PARAMS.mode]: mode,
         ...(audio == null ? {} : { [HLS_PARAMS.audio]: String(audio) }),
         ...(quality == null ? {} : { [HLS_PARAMS.quality]: quality }),
+        ...(burn == null ? {} : { [HLS_PARAMS.burn]: burn }),
       },
       access,
     }),

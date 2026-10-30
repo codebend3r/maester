@@ -21,6 +21,7 @@ const SOURCES: MediaSources = {
     ok: true,
     source: { uri: `http://nas:8080/${mode}`, headers: {} },
   }),
+  subtitleAccess: async () => null,
   close: () => undefined,
 }
 

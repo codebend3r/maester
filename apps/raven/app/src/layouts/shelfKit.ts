@@ -1,17 +1,16 @@
+import type { LibraryIconName } from '@raven/core'
 import type { ReactNode } from 'react'
 
 import type { ShelfCard } from '@/queries/cards'
 import type { ShelfView } from '@/queries/homeShelves'
 
-/** A pinned library as the side menu lists it. */
-export type MenuLibrary = { id: number; name: string }
+/** A pinned library as the side menu lists it, with the icon it wears there on the web. */
+export type MenuLibrary = { id: number; name: string; icon: LibraryIconName }
 
 export type ShelvesProps = {
   title: string
   /** A line in place of the shelves: while they load, when they fail, or when there are none. */
   notice: string | null
-  /** Whether the shelves are still being read. */
-  isLoading: boolean
   /** Opens the search through every library. */
   onSearch: () => void
   /** Opens Settings. */
@@ -50,6 +49,12 @@ export const SEARCH_EVERY_LIBRARY = { text: 'Search', label: 'Search every libra
 
 /** The side menu's heading over the pinned libraries, as the web's. */
 export const PINNED_HEADING = 'Pinned'
+
+/** The side menu's foot on a TV: the toggle that folds it to its icons, and back. */
+export const MENU_FOOT = {
+  collapse: 'Collapse menu',
+  expand: 'Expand menu',
+} as const
 
 /** The way into Settings: a gear under the thumb, a plate in the TV's top row. */
 export const SETTINGS_ENTRY = { label: 'Settings', gear: '\u2699\uFE0E' } as const

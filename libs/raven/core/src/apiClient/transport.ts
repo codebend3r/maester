@@ -33,6 +33,9 @@ export type FetchResponse = {
 /** A media origin and the ticket that opens a video on it, which stands in for the cookie. */
 export type MediaAccess = { origin: MediaOrigin; ticket: string }
 
+/** What a media address is built from: an origin's address and the ticket it takes, whatever its kind. */
+export type TicketedOrigin = { origin: Pick<MediaOrigin, 'url'>; ticket: string }
+
 export type FetchLike = (url: string, init?: FetchInit) => Promise<FetchResponse>
 
 type ApiErrorProps = {
@@ -102,7 +105,7 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
   type MediaUrlProps = {
     path: string
     query: Record<string, string>
-    access: MediaAccess | null
+    access: TicketedOrigin | null
   }
 
   /** A media path on the origin `access` names, with its ticket; on this server's own without. */

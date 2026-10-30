@@ -80,6 +80,7 @@ const FILES = {
   late: 'Late (2026).mkv',
   warm: 'Warm (2026).mp4',
   broadcast: 'Broadcast (2026).ts',
+  pictures: 'Pictures (2026).mkv',
 } as const
 
 type Clip = keyof typeof FILES
@@ -121,7 +122,7 @@ describe('the HLS route', () => {
     app: null,
     admin: '',
     unlocked: '',
-    ids: { rich: 0, gap: 0, late: 0, warm: 0, broadcast: 0 },
+    ids: { rich: 0, gap: 0, late: 0, warm: 0, broadcast: 0, pictures: 0 },
   }
 
   const app = (): NestFastifyApplication => {
@@ -164,11 +165,11 @@ describe('the HLS route', () => {
     return `${path}?${toQueryString(params)}`
   }
 
-  type MasterProps = { clip: Clip; mode: StreamMode }
+  type MasterProps = { clip: Clip; mode: StreamMode; query?: Record<string, string> }
 
   /** The master playlist and the URIs in it, asked for with a ticket. */
-  const master = async ({ clip, mode }: MasterProps) => {
-    const response = await get({ url: masterUrl({ clip, mode }) })
+  const master = async ({ clip, mode, query = {} }: MasterProps) => {
+    const response = await get({ url: masterUrl({ clip, mode, query }) })
     expect(response.statusCode).toBe(200)
     const playlist = decodedBody(response).toString()
     return { playlist, uris: urisIn(playlist) }
@@ -212,6 +213,13 @@ describe('the HLS route', () => {
       writeFile(join(media, 'Late (2026).en.srt'), LATE_SIDECAR),
       encodeClip({ path: join(media, FILES.warm), seconds: 2 }),
       encodeClip({ path: join(media, FILES.broadcast), seconds: 12, startAt: 10 }),
+      // The rich clip with its English cues as a picture track, which only a burn can show.
+      encodeRichClip({
+        path: join(media, FILES.pictures),
+        seconds: 12,
+        cues: CUES,
+        isPictureSubtitle: true,
+      }),
     ])
     state.app = await createApp({
       config: {
@@ -250,6 +258,7 @@ describe('the HLS route', () => {
       late: idOf('late'),
       warm: idOf('warm'),
       broadcast: idOf('broadcast'),
+      pictures: idOf('pictures'),
     }
     const unlock = await state.app.inject({
       method: ROUTES.unlock.method,
@@ -444,6 +453,42 @@ describe('the HLS route', () => {
       ].map((url) => get({ url })),
     )
     expect(asked.map(({ statusCode }) => statusCode)).toEqual([400, 400, 400, 400])
+  })
+
+  it('burns a picture subtitle into a transcode, whose segments still play', async () => {
+    const { playlist, uris } = await master({
+      clip: 'pictures',
+      mode: PLAYBACK_MODES.transcode,
+      query: { [HLS_PARAMS.burn]: 'embedded-0' },
+    })
+    expect(attributeOf({ playlist, name: 'CODECS' })).toBe('avc1.640028,ac-3')
+    const variant = await playlistAt(uris.find((uri) => uri.includes('/video.m3u8')) ?? '')
+    const segment = await get({ url: variant.uris[1] ?? '' })
+    expect(segment.statusCode).toBe(200)
+    expect(segment.rawPayload.subarray(4, 8).toString()).toBe('moof')
+  })
+
+  it('refuses a burn of a remux, of a text track or of a track that is not there with 400', async () => {
+    const asked = await Promise.all(
+      [
+        masterUrl({
+          clip: 'pictures',
+          mode: PLAYBACK_MODES.remux,
+          query: { [HLS_PARAMS.burn]: 'embedded-0' },
+        }),
+        masterUrl({
+          clip: 'rich',
+          mode: PLAYBACK_MODES.transcode,
+          query: { [HLS_PARAMS.burn]: 'embedded-0' },
+        }),
+        masterUrl({
+          clip: 'pictures',
+          mode: PLAYBACK_MODES.transcode,
+          query: { [HLS_PARAMS.burn]: 'embedded-4' },
+        }),
+      ].map((url) => get({ url })),
+    )
+    expect(asked.map(({ statusCode }) => statusCode)).toEqual([400, 400, 400])
   })
 
   it('refuses what the settings turn off with 403', async () => {

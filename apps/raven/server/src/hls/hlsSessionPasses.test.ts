@@ -119,6 +119,7 @@ describe("an account's HLS session", () => {
         quality: QUALITIES.medium,
         bitrate: null,
         tonemap: false,
+        burn: null,
       },
       keyframesFor: null,
       access,

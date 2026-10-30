@@ -64,13 +64,6 @@
       }
     },
     {
-      // Metro hands a bundled picture over as the module's default export.
-      "files": ["src/assets.d.ts"],
-      "rules": {
-        "import/no-default-export": "off"
-      }
-    },
-    {
       // The polyfill is `toSorted` itself, so it sorts a copy of its own in
       // place, which nothing else holds.
       "files": ["src/arrayToSorted.ts"],

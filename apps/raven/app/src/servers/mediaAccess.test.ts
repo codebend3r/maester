@@ -1,13 +1,14 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import {
   ACCESS_REFUSALS,
+  ACCOUNT_TICKET_SECONDS,
   APP_CLIENT_CALLS,
   AUTH_HEADERS,
   HLS_PARAMS,
   HLS_PATHS,
   MEDIA_ORIGIN_KINDS,
   MEDIA_TICKET_PARAM,
-  MEDIA_TICKET_RENEW_MS,
+  TICKET_RENEW_MS,
   MAX_HEIGHTS,
   type MaxHeight,
   PLAYBACK_MODES,
@@ -92,9 +93,19 @@ const filePath = pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS.id })
 const masterPath = pathFor({ path: HLS_PATHS.master, id: BUSBOYS.id })
 const ticketPath = pathFor({ path: APP_CLIENT_CALLS.getMediaTicket.path, id: BUSBOYS.id })
 
-const direct: SourceRequest = { media: BUSBOYS, mode: PLAYBACK_MODES.direct, audio: null }
-const remux: SourceRequest = { media: BUSBOYS, mode: PLAYBACK_MODES.remux, audio: 1 }
-const transcode: SourceRequest = { media: BUSBOYS, mode: PLAYBACK_MODES.transcode, audio: 0 }
+const direct: SourceRequest = {
+  media: BUSBOYS,
+  mode: PLAYBACK_MODES.direct,
+  audio: null,
+  burn: null,
+}
+const remux: SourceRequest = { media: BUSBOYS, mode: PLAYBACK_MODES.remux, audio: 1, burn: null }
+const transcode: SourceRequest = {
+  media: BUSBOYS,
+  mode: PLAYBACK_MODES.transcode,
+  audio: 0,
+  burn: null,
+}
 
 /** Only the public origin answers: the device is away from home. */
 const AWAY = { [PUBLIC.url]: 40 }
@@ -142,6 +153,19 @@ describe('mediaAccessFor', () => {
     })
   })
 
+  it("asks a transcode's master to burn the picture subtitle in, by its track id", async () => {
+    const { media } = setUp()
+    const query = toQueryString({
+      [HLS_PARAMS.mode]: PLAYBACK_MODES.transcode,
+      [HLS_PARAMS.audio]: '0',
+      [HLS_PARAMS.burn]: 'embedded-1',
+      [MEDIA_TICKET_PARAM]: TICKETS[0],
+    })
+    expect(sourceOf(await media.source({ ...transcode, burn: 'embedded-1' })).uri).toBe(
+      `${LAN.url}${masterPath}?${query}`,
+    )
+  })
+
   it('caps a transcode from the public origin at the height chosen for away from home', async () => {
     const { media, away } = setUp({ elapsedMs: AWAY })
     const query = toQueryString({
@@ -179,10 +203,10 @@ describe('mediaAccessFor', () => {
   it('keeps a ticket until its renewal comes, then renews it before building the source', async () => {
     const { media, clock, heard } = setUp()
     expect(sourceOf(await media.source(direct)).uri).toContain(TICKETS[0])
-    clock.now = READ_AT + MEDIA_TICKET_RENEW_MS - 1
+    clock.now = READ_AT + TICKET_RENEW_MS - 1
     expect(sourceOf(await media.source(remux)).uri).toContain(TICKETS[0])
     expect(heard.filter((path) => path === ticketPath)).toHaveLength(1)
-    clock.now = READ_AT + MEDIA_TICKET_RENEW_MS
+    clock.now = READ_AT + TICKET_RENEW_MS
     expect(sourceOf(await media.source(remux)).uri).toContain(TICKETS[1])
     expect(heard.filter((path) => path === ticketPath)).toHaveLength(2)
   })
@@ -281,6 +305,31 @@ describe('mediaAccessFor', () => {
     })
   })
 
+  it('hands subtitles the picked origin and the ticket, as the picture plays by', async () => {
+    const { media } = setUp()
+    expect(await media.subtitleAccess(BUSBOYS.id)).toEqual({ origin: LAN, ticket: TICKETS[0] })
+  })
+
+  it("hands subtitles a fresh ticket once an account ticket's five minutes are up, as subtitles turned on mid-film need", async () => {
+    const { media, clock } = setUp()
+    expect(await media.subtitleAccess(BUSBOYS.id)).toEqual({ origin: LAN, ticket: TICKETS[0] })
+    // An account ticket dies ACCOUNT_TICKET_SECONDS after it is read; one held past that is refused.
+    clock.now = READ_AT + ACCOUNT_TICKET_SECONDS * 1000
+    expect(await media.subtitleAccess(BUSBOYS.id)).toEqual({ origin: LAN, ticket: TICKETS[1] })
+  })
+
+  it("hands subtitles the server's own address with no origin, and the cookie without a ticket or an account", async () => {
+    const own = setUp({ server: mediaServer({ origins: [] }), accessToken: ACCOUNT_TOKEN })
+    expect(await own.media.subtitleAccess(BUSBOYS.id)).toEqual({
+      origin: { url: NAS.origin },
+      ticket: TICKETS[0],
+    })
+    const signedOut = setUp({ server: mediaServer({ origins: [] }) })
+    expect(await signedOut.media.subtitleAccess(BUSBOYS.id)).toBeNull()
+    const off = setUp({ server: mediaServer({ tickets: [STATUSES.unavailable] }) })
+    expect(await off.media.subtitleAccess(BUSBOYS.id)).toBeNull()
+  })
+
   it('sends no cookie header when the jar holds none', async () => {
     const { media } = setUp({ server: mediaServer({ origins: [] }), cookies: {} })
     expect(sourceOf(await media.source(direct))).toEqual({
@@ -370,7 +419,7 @@ describe('mediaAccessFor', () => {
     try {
       const issued = setUp()
       await issued.media.source(direct)
-      issued.clock.now = READ_AT + MEDIA_TICKET_RENEW_MS
+      issued.clock.now = READ_AT + TICKET_RENEW_MS
       await issued.media.source(transcode)
       issued.network.change()
       await issued.media.source(remux)

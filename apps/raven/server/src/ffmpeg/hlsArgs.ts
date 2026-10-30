@@ -8,14 +8,7 @@ import {
   STREAM_TIME_SHIFT,
   type StreamMode,
 } from '@raven/core'
-import {
-  QUIET,
-  type TranscodeQuality,
-  VIDEO_STREAM,
-  copyVideo,
-  secondsArg,
-  transcodeVideo,
-} from '@/ffmpeg/args'
+import { QUIET, type TranscodeQuality, copyVideo, secondsArg, transcodeVideo } from '@/ffmpeg/args'
 import type { VideoEncoder } from '@/ffmpeg/encoder'
 import { type HlsDialect, SEGMENT_CLOCKS } from '@/ffmpeg/ffmpegVersion'
 import { SEGMENT_FILE_PATTERN } from '@/hls/segmentFiles'
@@ -89,7 +82,15 @@ export type HlsSource = {
   /** A ceiling on the transcode's video bitrate, when the viewer asked for a size. */
   bitrate: number | null
   tonemap: boolean
+  /** The picture subtitle a transcode burns into the picture, or null for none. */
+  burn: HlsBurn | null
 }
+
+/**
+ * A picture subtitle to burn in: its `0:s:N` stream, and the canvas it is drawn on, the video's
+ * own size, which ffmpeg can not find for a track whose first cue lies past its probe.
+ */
+type HlsBurn = { stream: number; canvas: { width: number; height: number } }
 
 /** How a run reads its file: the inputs, which one the audio comes from, and how it cuts. */
 type RunCut = {
@@ -99,6 +100,11 @@ type RunCut = {
   trimFrom: number | null
   video: string[]
   tolerance: number
+  /**
+   * Where on the file's clock the run's own clock starts: 0 for a run on the file's clock
+   * (`-copyts`), the point it sought to for a burn, whose output is moved back onto the file's.
+   */
+  clockStart: number
 }
 
 type RunCutProps = {
@@ -128,13 +134,16 @@ type RunCutProps = {
  *   transcode reads the video from just before the keyframe at or before
  *   the boundary and trims it there exactly, and reads the audio from a
  *   second input of the same file with the exact seek.
+ * - A burn reads the file without `-copyts`: ffmpeg 5.1 lays a picture
+ *   subtitle over nothing after a seek on the file's clock (its blank frames
+ *   between cues never meet the video), while from a clock that starts at the
+ *   seek it lays every cue on time. So its times count from the point it
+ *   sought to (`clockStart`), the output is moved back onto the file's clock
+ *   with `-output_ts_offset`, and a transport stream's audio input is moved
+ *   onto the video's with `-itsoffset`.
  */
-const runCut = ({
-  source: { input, mode, plan, startTime, frameRate },
-  from,
-  seekKeyframes,
-  timeBase,
-}: RunCutProps): RunCut => {
+const runCut = ({ source, from, seekKeyframes, timeBase }: RunCutProps): RunCut => {
+  const { input, mode, plan, startTime, frameRate } = source
   const start = plan.boundaries[from] ?? 0
   const read = (seek: string[]): string[] => [...seek, '-copyts', '-i', input]
   if (mode === PLAYBACK_MODES.remux) {
@@ -144,6 +153,7 @@ const runCut = ({
       trimFrom: null,
       video: [],
       tolerance: REMUX_CUT_TOLERANCE,
+      clockStart: 0,
     }
   }
   const tolerance = frameRate == null ? REMUX_CUT_TOLERANCE : 0.5 / frameRate
@@ -151,6 +161,7 @@ const runCut = ({
   // and ffmpeg must agree on it (FfmpegService warns when they differ).
   const fromStart = (time: number): string[] =>
     time - startTime > 0 ? ['-ss', secondsArg(time - startTime)] : []
+  if (source.burn !== null) return burnCut({ source, from, seekKeyframes, timeBase, tolerance })
   const exact = fromStart(start - tolerance)
   const video = [
     '-fps_mode',
@@ -164,7 +175,7 @@ const runCut = ({
       .join(','),
   ]
   if (seekKeyframes == null || exact.length === 0) {
-    return { inputs: read(exact), audioInput: 0, trimFrom: null, video, tolerance }
+    return { inputs: read(exact), audioInput: 0, trimFrom: null, video, tolerance, clockStart: 0 }
   }
   const keyframe = seekKeyframes.findLast((time) => time <= start) ?? null
   return {
@@ -173,6 +184,71 @@ const runCut = ({
     trimFrom: start - tolerance,
     video,
     tolerance,
+    clockStart: 0,
+  }
+}
+
+type BurnCutProps = RunCutProps & { tolerance: number }
+
+/** A burn's cut, on a clock from the point it sought to: see `runCut`. */
+const burnCut = ({
+  source: { input, plan, startTime, burn },
+  from,
+  seekKeyframes,
+  timeBase,
+  tolerance,
+}: BurnCutProps): RunCut => {
+  const start = plan.boundaries[from] ?? 0
+  const canvas = burn === null ? [] : ['-canvas_size', `${burn.canvas.width}x${burn.canvas.height}`]
+  // The seek counts from the file's start time, and a point before it is the start itself.
+  const seekTo = (time: number): { at: number; seek: string[] } =>
+    time - startTime > 0
+      ? { at: time, seek: ['-ss', secondsArg(time - startTime)] }
+      : { at: startTime, seek: [] }
+  const exact = seekTo(start - tolerance)
+  const keyframe =
+    seekKeyframes == null || exact.seek.length === 0
+      ? null
+      : (seekKeyframes.findLast((time) => time <= start) ?? null)
+  const video = keyframe === null ? exact : seekTo(keyframe - tolerance)
+  const keyframes = [
+    '-fps_mode',
+    'passthrough',
+    '-enc_time_base',
+    timeBase,
+    '-force_key_frames',
+    plan.boundaries
+      .slice(from)
+      .map((boundary) => secondsArg(boundary - tolerance - video.at))
+      .join(','),
+  ]
+  if (keyframe === null) {
+    return {
+      inputs: [...exact.seek, ...canvas, '-i', input],
+      audioInput: 0,
+      trimFrom: null,
+      video: keyframes,
+      tolerance,
+      clockStart: exact.at,
+    }
+  }
+  return {
+    inputs: [
+      ...video.seek,
+      ...canvas,
+      '-i',
+      input,
+      ...exact.seek,
+      '-itsoffset',
+      secondsArg(exact.at - video.at),
+      '-i',
+      input,
+    ],
+    audioInput: 1,
+    trimFrom: exact.at - video.at,
+    video: keyframes,
+    tolerance,
+    clockStart: video.at,
   }
 }
 
@@ -232,6 +308,7 @@ export const hlsArgs = ({
           quality: source.quality,
           bitrate: source.bitrate,
           trimFrom: cut.trimFrom,
+          burn: source.burn?.stream ?? null,
         })
   return [
     ...QUIET,
@@ -240,7 +317,7 @@ export const hlsArgs = ({
     '-copypriorss',
     '0',
     '-map',
-    VIDEO_STREAM,
+    video.map,
     ...(audio == null ? [] : ['-map', `${cut.audioInput}:a:${audio.index}`]),
     ...video.output,
     ...cut.video,
@@ -252,7 +329,8 @@ export const hlsArgs = ({
     '-map_chapters',
     '-1',
     '-output_ts_offset',
-    String(STREAM_TIME_SHIFT),
+    // Seconds to the millisecond, as every other time here, without trailing zeros: `1`, `22.42`.
+    String(Number(secondsArg(cut.clockStart + STREAM_TIME_SHIFT))),
     '-avoid_negative_ts',
     'disabled',
     '-f',

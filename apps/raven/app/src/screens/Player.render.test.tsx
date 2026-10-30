@@ -13,9 +13,10 @@ import {
   toQueryString,
 } from '@raven/core'
 import { SAVE_EVERY_S, usePlayerPrefs, useUnlockPrompt } from '@raven/ui/headless'
-import { act, cleanup, fireEvent, screen, within } from '@testing-library/react-native'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 import type { ReactVideoProps } from 'react-native-video'
+import { SelectedTrackType } from 'react-native-video'
 
 import { useAccountSession } from '@/account/accountSession'
 import { APPLE_ERROR_DOMAINS, URL_ERROR_HTTP_CODES } from '@/player/playerErrors'
@@ -28,7 +29,13 @@ import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { type HeardRequest, STATUSES, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
-import { BUSBOYS_MP4, CUE_TEXT, playerApi } from '@/test/playerServer'
+import {
+  BUSBOYS_MP4,
+  BUSBOYS_PICTURES,
+  CUE_TEXT,
+  PICTURE_LANGUAGE,
+  playerApi,
+} from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 import { appThemeOf } from '@/theme/appTheme'
 import type * as VideoMock from '@/test/videoMock'
@@ -376,5 +383,24 @@ describe('Player on a phone or tablet', () => {
     expect(mockBack).toHaveBeenCalled()
     unmount()
     expect(savedSpots().at(-1)).toEqual({ position: 42, audio: AUDIO_PLAYED })
+  })
+
+  it('burns a picture subtitle into a transcode, the one way an iPhone shows one', async () => {
+    jest
+      .spyOn(ActionSheetIOS, 'showActionSheetWithOptions')
+      .mockImplementation((options, chosen) => {
+        chosen(options.options.findIndex((label) => label.startsWith(PICTURE_LANGUAGE)))
+      })
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_PICTURES.id) })
+    const props = await loadedVideo()
+    expect(props.source?.uri ?? '').toContain(APP_CLIENT_CALLS.file.path.split('/:id')[0] ?? '')
+    await fireEvent.press(screen.getByRole('button', { name: 'Subtitles: Off' }))
+    await waitFor(() =>
+      expect(String(videoProps().source?.uri ?? '')).toContain(`${HLS_PARAMS.burn}=embedded-1`),
+    )
+    expect(String(videoProps().source?.uri ?? '')).toContain(
+      `${HLS_PARAMS.mode}=${PLAYBACK_MODES.transcode}`,
+    )
+    expect(videoProps().selectedTextTrack).toEqual({ type: SelectedTrackType.DISABLED })
   })
 })

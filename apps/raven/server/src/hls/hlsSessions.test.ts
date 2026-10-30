@@ -241,6 +241,7 @@ describe('HlsSessions', () => {
         quality: QUALITIES.medium,
         bitrate: null,
         tonemap: false,
+        burn: null,
       },
       keyframesFor,
       access: null,

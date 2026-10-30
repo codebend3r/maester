@@ -20,16 +20,27 @@ export type RemoteKey = (typeof REMOTE_KEYS)[keyof typeof REMOTE_KEYS]
 
 const isRemoteKey = oneOf(Object.values(REMOTE_KEYS))
 
-/** A key held down, as the fork's Android helper names it (only the d-pad and select), and the key it is. */
-export const LONG_PRESSES = {
-  longLeft: REMOTE_KEYS.left,
-  longRight: REMOTE_KEYS.right,
-  longUp: REMOTE_KEYS.up,
-  longDown: REMOTE_KEYS.down,
-  longSelect: REMOTE_KEYS.select,
+/** The names the fork's Android helper gives a key held down (only the d-pad and select). */
+export const LONG_PRESS_NAMES = {
+  longLeft: 'longLeft',
+  longRight: 'longRight',
+  longUp: 'longUp',
+  longDown: 'longDown',
+  longSelect: 'longSelect',
 } as const
 
-const isLongPress = (name: string): name is keyof typeof LONG_PRESSES => name in LONG_PRESSES
+/** A key held down, by the fork's name for it, and the key it is. */
+export const LONG_PRESSES = {
+  [LONG_PRESS_NAMES.longLeft]: REMOTE_KEYS.left,
+  [LONG_PRESS_NAMES.longRight]: REMOTE_KEYS.right,
+  [LONG_PRESS_NAMES.longUp]: REMOTE_KEYS.up,
+  [LONG_PRESS_NAMES.longDown]: REMOTE_KEYS.down,
+  [LONG_PRESS_NAMES.longSelect]: REMOTE_KEYS.select,
+} as const
+
+// Its own keys only: `in` would also pass a name an object inherits, such as `toString`.
+const isLongPress = (name: string): name is keyof typeof LONG_PRESSES =>
+  Object.hasOwn(LONG_PRESSES, name)
 
 /** Android's `KeyEvent` actions, which the fork hands on with each key. */
 export const KEY_ACTIONS = { down: 0, up: 1 } as const
@@ -55,6 +66,26 @@ export const pressedKeyOf = ({
   return isRemoteKey(eventType) ? eventType : null
 }
 
+/** Which way a held key carries the playhead: left back, right on, the rest not at all. */
+const SEEK_DIRECTIONS: Partial<Record<RemoteKey, -1 | 1>> = {
+  [REMOTE_KEYS.left]: -1,
+  [REMOTE_KEYS.right]: 1,
+}
+
+/** A held left or right: which way it goes, and whether the key is going down or coming up. */
+export type HeldSeek = { direction: -1 | 1; isDown: boolean }
+
+/**
+ * A held left or right, going down or coming up; null for any other event. The fork names a held
+ * key once as it goes down and once as it comes up, so the player runs the playhead between.
+ */
+export const heldSeekOf = ({ eventType, eventKeyAction }: PressedKeyOfProps): HeldSeek | null => {
+  const direction = isLongPress(eventType) ? SEEK_DIRECTIONS[LONG_PRESSES[eventType]] : undefined
+  return direction === undefined
+    ? null
+    : { direction, isDown: Number(eventKeyAction) === KEY_ACTIONS.down }
+}
+
 /** What a press does beyond bringing the controls back: a seek, in seconds, and a play or pause. */
 type RemoteAnswer = { seekBy: number; shouldTogglePlay: boolean }
 
@@ -66,6 +97,12 @@ type RemoteAnswerOfProps = {
   isScrubbing: boolean
   isPaused: boolean
 }
+
+type IsSeekingWithProps = Pick<RemoteAnswerOfProps, 'isShown' | 'isScrubbing'>
+
+/** Whether left and right seek: from the scrubber, or while the controls are hidden. */
+export const isSeekingWith = ({ isShown, isScrubbing }: IsSeekingWithProps): boolean =>
+  isScrubbing || !isShown
 
 /**
  * What the d-pad player does with a press. Left and right skip ten seconds from the scrubber,
@@ -79,7 +116,7 @@ export const remoteAnswerOf = ({
   isScrubbing,
   isPaused,
 }: RemoteAnswerOfProps): RemoteAnswer => {
-  const isSeeking = isScrubbing || !isShown
+  const isSeeking = isSeekingWith({ isShown, isScrubbing })
   switch (key) {
     case REMOTE_KEYS.left:
       return isSeeking ? { ...NO_ANSWER, seekBy: -SKIP_SECONDS } : NO_ANSWER

@@ -5,10 +5,10 @@ import {
   type MediaItem,
   type MediaTracks,
   allFileFacts,
+  type FileFact,
   castMembers,
   createdBy,
   directedBy,
-  episodeByline,
   episodeEntryKey,
   episodeFacts,
   episodeRowFacts,
@@ -38,15 +38,26 @@ import {
   imageOf,
   pictureAt,
 } from '@/queries/cards'
+import { episodeMarkOf } from '@/queries/episodeMark'
 import { ROUTE_TARGETS, type RouteTarget, itemTarget } from '@/routes'
 
 /** How far through something the viewer is, and what that is in words. */
 type Progress = { fraction: number; label: string }
 
+/** Where a page's title art stands: over the eyebrow (an episode's or a season's show), or in the title's own place (a show's or a film's own). */
+export const ART_PLACES = { over: 'over', title: 'title' } as const
+
+type ArtPlace = (typeof ART_PLACES)[keyof typeof ART_PLACES]
+
+/** A page's title art and where it stands. */
+type TitleArtOf = { picture: Picture; place: ArtPlace }
+
 /** What heads an item's page: its pictures, its names and its facts. */
 export type ItemHero = {
-  /** The small line over the title: "Show", or an episode's show and number. */
+  /** The small line over the title: "Show", or an episode's show and place; its show's name is left to `logo` where there is art. */
   eyebrow: string | null
+  /** The title art: an episode's or a season's show's over the eyebrow, a show's or a film's own in the title's place. */
+  logo: TitleArtOf | null
   title: string
   byline: string | null
   /** The content rating, "R". */
@@ -78,8 +89,8 @@ export type EpisodeRow = ShelfCard & { summary: string | null; isWatched: boolea
 /** Everything an item's page shows but its actions, which are the screen's. */
 export type ItemPage = {
   hero: ItemHero
-  /** The file Play starts, as label and value; none for a show or season. */
-  file: Array<{ label: string; value: string }>
+  /** The file Play starts, as its facts; none for a show or season. */
+  file: FileFact[]
   /** A movie's files, once there are two or more. */
   versions: VersionRow[]
   seasons: ShelfCard[]
@@ -114,6 +125,19 @@ const posterOf = ({ details, api, headersFor }: PosterOfProps) => ({
   }),
 })
 
+type LogoOfProps = Pictures & { details: ItemDetails | null; place: ArtPlace }
+
+/** An item's title art, at `place`, or null while it has none or the item is unknown. */
+const logoOf = ({ details, place, api, headersFor }: LogoOfProps): TitleArtOf | null => {
+  const version = details?.logoVersion ?? null
+  if (details === null || version === null) return null
+  const picture = pictureAt({
+    uri: api.itemImageUrl({ id: details.id, kind: ITEM_IMAGE_KINDS.logo, version }),
+    headersFor,
+  })
+  return picture === null ? null : { picture, place }
+}
+
 type BackdropOfProps = Pictures & { details: ItemDetails | null }
 
 const backdropOf = ({ details, api, headersFor }: BackdropOfProps): Picture | null =>
@@ -145,13 +169,14 @@ type PlayableHeroProps = DetailsProps & { shown: ItemDetails; primary: MediaItem
 
 type MovieHeroProps = PlayableHeroProps
 
-/** A movie's heading: its poster and backdrop, director, rating and facts. */
+/** A movie's heading: its title art in its name's place, its poster and backdrop, director, rating and facts. */
 const movieHero = ({ details, shown, primary, ...pictures }: MovieHeroProps): ItemHero => ({
   eyebrow: null,
   title: details.title,
   byline: directedBy(details),
   rating: details.contentRating,
   facts: movieFacts({ details: shown, primary }),
+  logo: logoOf({ details, place: ART_PLACES.title, ...pictures }),
   progress: timeLeft(primary),
   poster: posterOf({ details, ...pictures }),
   backdrop: backdropOf({ details, ...pictures }),
@@ -167,9 +192,10 @@ type EpisodeHeroProps = PlayableHeroProps & {
 }
 
 /**
- * An episode's heading: its still, else a frame of its file, under its show's backdrop, and
- * its show and number. The still stands in for a show with no backdrop, or one that could not
- * be read, but not while the show is still being read.
+ * An episode's heading: its still, else a frame of its file, under its show's backdrop, its
+ * show's title art over its place in short ("S02 · E05"), or its show's name there while it
+ * has no art. The still stands in for a show with no backdrop, or one that could not be read,
+ * but not while the show is still being read.
  */
 const episodeHero = ({
   details,
@@ -188,8 +214,15 @@ const episodeHero = ({
       }) ?? pictures.api.thumbnailUrl(primary),
     headersFor: pictures.headersFor,
   })
+  const logo = logoOf({ details: show, place: ART_PLACES.over, ...pictures })
+  const mark = episodeMarkOf({ season: details.season, episode: details.episode })
   return {
-    eyebrow: lineOrNull(episodeByline(details)),
+    eyebrow: lineOrNull(
+      [logo === null ? (details.show?.title ?? null) : null, mark]
+        .filter((part): part is string => part !== null)
+        .join(' · '),
+    ),
+    logo,
     title: details.title,
     byline: null,
     rating: null,
@@ -205,17 +238,45 @@ const episodeHero = ({
 type PlayablePageProps = Omit<EpisodeHeroProps, 'shown'> & {
   kind: typeof ITEM_TYPES.movie | typeof ITEM_TYPES.episode
   versions: MediaItem[]
+  /** Every file of the item in every library the viewer sees, each a row to play it by. */
+  everyFile: MediaItem[]
+  /** The libraries' names by id, for rows that come from more than one. */
+  libraryNames: ReadonlyMap<number, string>
   tracks: MediaTracks | undefined
+}
+
+type VersionRowsOfProps = Pick<PlayablePageProps, 'everyFile' | 'libraryNames'>
+
+/**
+ * A row for each file of the item, in every library, once it has two or more: each plays its own
+ * file, and names its library when they come from more than one (a 4K copy beside a 1080p one).
+ */
+const versionRowsOf = ({ everyFile, libraryNames }: VersionRowsOfProps): VersionRow[] => {
+  if (everyFile.length < 2) return []
+  const isAcrossLibraries = new Set(everyFile.map(({ libraryId }) => libraryId)).size > 1
+  return everyFile.map((version) => ({
+    key: String(version.id),
+    fileName: version.fileName,
+    facts: [
+      ...versionFacts(version),
+      version.edition,
+      isAcrossLibraries ? (libraryNames.get(version.libraryId) ?? null) : null,
+    ].filter((fact): fact is string => fact !== null && fact !== ''),
+    target: { kind: ROUTE_TARGETS.play, mediaId: version.id, at: 0 },
+  }))
 }
 
 /**
  * A movie's or an episode's page, for the files of the one library and card it shows:
- * `versions`, and `primary`, the one Play starts. Either says how much of `primary` is left.
+ * `versions`, and `primary`, the one Play starts, with a row for every file it has anywhere.
+ * Either says how much of `primary` is left.
  */
 export const playablePage = ({
   kind,
   details,
   versions,
+  everyFile,
+  libraryNames,
   primary,
   show,
   isShowPending,
@@ -242,17 +303,7 @@ export const playablePage = ({
     hero,
     details,
     file: allFileFacts({ media: primary, tracks }),
-    versions:
-      versions.length < 2
-        ? []
-        : versions.map((version) => ({
-            key: String(version.id),
-            fileName: version.fileName,
-            facts: [...versionFacts(version), version.edition].filter(
-              (fact): fact is string => fact !== null && fact !== '',
-            ),
-            target: { kind: ROUTE_TARGETS.play, mediaId: version.id, at: 0 },
-          })),
+    versions: versionRowsOf({ everyFile, libraryNames }),
     castTitle: isEpisode ? CAST_TITLES.guests : CAST_TITLES.everyone,
     ...pictures,
   })
@@ -260,11 +311,12 @@ export const playablePage = ({
 
 type ShowPageProps = DetailsProps
 
-/** A show's page: its poster and backdrop, creator, years and network, then its seasons. */
+/** A show's page: its title art in its name's place, poster and backdrop, creator, years and network, then its seasons. */
 export const showPage = ({ details, ...pictures }: ShowPageProps): ItemPage =>
   pageOf({
     hero: {
       eyebrow: 'Show',
+      logo: logoOf({ details, place: ART_PLACES.title, ...pictures }),
       title: details.title,
       byline: createdBy(details),
       rating: details.contentRating,
@@ -304,6 +356,7 @@ export const seasonPage = ({ season, show, ...pictures }: SeasonPageProps): Item
   return pageOf({
     hero: {
       eyebrow: season.show?.title ?? null,
+      logo: logoOf({ details: show, place: ART_PLACES.over, ...pictures }),
       title: season.title,
       byline: null,
       rating: show?.contentRating ?? null,

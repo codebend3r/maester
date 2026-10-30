@@ -26,12 +26,12 @@ The flow is not Maestro (it cannot drive tvOS) but an XCUITest, `apps/raven/app/
 | Build                       | `@raven/app:build:tvos`, which runs `prebuild:tvos` (`EXPO_TV=1 expo prebuild`, `pod install`, the test target) and then `xcodebuild`'s Release build                                              | yes          |
 | Check the pods              | `ios/` is the TV project (`SDKROOT = appletvos`) and `Podfile.lock` matches `Pods/Manifest.lock`, since `expo prebuild` exits 0 when `pod install` fails                                           | no, instant  |
 | Wait for the fixture        | Its `raven fixture server ready` line, up to three minutes                                                                                                                                         | no           |
-| Boot the Apple TV simulator | Reuses the simulator `raven-tv` on the SDK's runtime, or makes one (CI's Apple TV 4K, 3rd generation), boots it and installs `raven.app`                                                           | no           |
+| Boot the Apple TV simulator | Reuses the simulator `raven-tv` on the SDK's runtime, or makes one (CI's Apple TV 4K, 3rd generation), boots it and installs `Raven.app`                                                           | no           |
 | Apple TV end to end         | `@raven/app:e2e:tvos`: `xcodebuild test` of `RavenRemoteTests` on `raven-tv`, then a screenshot of where it ended                                                                                  | yes          |
 
 It sets `APP_VARIANT=development`, `EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490`, `DEVELOPER_DIR` (`/Applications/Xcode.app/Contents/Developer` unless set) and `TVOS_SIMULATOR=raven-tv`. All four are Nx inputs, so the cache keys stay the same run to run. The fixture server stops when the script ends, pass or fail; the simulator stays booted.
 
-CI's last steps (zipping and uploading the simulator app and the screenshot) are left out: the build stays at `apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app`, and the script prints where the screenshot went.
+CI's last steps (zipping and uploading the simulator app and the screenshot) are left out: the build stays at `apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app`, and the script prints where the screenshot went.
 
 `ios/` is shared with the iPhone build. A cached `build:tvos` restores the TV project over an iPhone one, so `ci:app:ios` and `ci:app:tvos` can run one after the other, never at the same time.
 

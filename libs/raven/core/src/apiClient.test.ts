@@ -119,7 +119,7 @@ describe('account API client', () => {
       id: 7,
       trackId: 'external-0',
       access: {
-        origin: { kind: MEDIA_ORIGIN_KINDS.public, url: 'https://media.example.test' },
+        origin: { url: 'https://media.example.test' },
         ticket: 'opaque-ticket',
       },
     })

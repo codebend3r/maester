@@ -163,8 +163,13 @@ const episodeFor = ({ id, episode, title, fileId }: EpisodeForProps): EpisodeSum
 
 const SEASON_ONE = seasonFor({ id: 5, season: 1 })
 const SEASON_TWO = seasonFor({ id: 7, season: 2 })
-const GOOD_NEWS = episodeFor({ id: 6, episode: 1, title: 'Good News About Hell', fileId: 12 })
-const HALF_LOOP = episodeFor({ id: 8, episode: 2, title: 'Half Loop', fileId: 13 })
+export const GOOD_NEWS = episodeFor({
+  id: 6,
+  episode: 1,
+  title: 'Good News About Hell',
+  fileId: 12,
+})
+export const HALF_LOOP = episodeFor({ id: 8, episode: 2, title: 'Half Loop', fileId: 13 })
 
 export const SEVERANCE = detailsFor({
   summary: SEVERANCE_SUMMARY,
@@ -198,6 +203,7 @@ const {
   getItem,
   listLibraries,
   nextEpisode,
+  nextInSession,
   getTracks,
   setWatched,
   setFavourite,
@@ -211,6 +217,7 @@ const READS: Record<string, unknown> = {
   [pathFor({ path: getItem.path, id: SEVERANCE_ONE.id })]: SEVERANCE_ONE,
   [pathFor({ path: getItem.path, id: GOOD_NEWS_ABOUT_HELL.id })]: GOOD_NEWS_ABOUT_HELL,
   [pathFor({ path: nextEpisode.path, id: SEVERANCE.id })]: GOOD_NEWS.primary,
+  [pathFor({ path: nextInSession.path, id: 12 })]: HALF_LOOP.primary,
   [pathFor({ path: getTracks.path, id: BUSBOYS_FILE.id })]: TRACKS,
   [pathFor({ path: getTracks.path, id: 12 })]: TRACKS,
 }
@@ -248,6 +255,9 @@ const answerFor = ({ method, path, body }: AnswerForProps): Answer => {
 
 const bodyOf = (body: string | undefined): unknown => (body === undefined ? null : JSON.parse(body))
 
+/** The path a request names, without its query: the session a next is asked for. */
+const pathOnly = (path: string): string => path.split('?')[0] ?? path
+
 type ItemApiProps = {
   hear?: (request: HeardRequest) => void
   writes?: () => Promise<void>
@@ -269,7 +279,7 @@ export const itemApi = ({
     baseUrl: NAS.origin,
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
-        const path = url.slice(NAS.origin.length)
+        const path = pathOnly(url.slice(NAS.origin.length))
         const method = init.method ?? APP_CALL_METHODS.get
         const sent = bodyOf(init.body)
         hear({ method, path, body: sent })

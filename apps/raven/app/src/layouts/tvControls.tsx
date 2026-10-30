@@ -10,7 +10,10 @@ import {
   type ViewStyle,
 } from 'react-native'
 
+import type { IconName } from '@raven/ui/iconDrawings'
+
 import { BODY_FONT } from '@/theme/fonts'
+import { Icon } from '@/layouts/Icon'
 import { Text } from '@/layouts/Text'
 import { useFocusOnMount } from '@/layouts/focus'
 import { useTvFormStyles } from '@/layouts/formStyles'
@@ -138,10 +141,12 @@ export const usePlateStyles = themedStyles((colours) =>
   }),
 )
 
-type PlateButtonProps = {
-  text: string
+/** What a plate shows: words, or an icon, the web's, whose tint deepens while the remote is on it. */
+type PlateFace = { text: string } | { icon: IconName }
+
+type PlateButtonProps = PlateFace & {
   label: string
-  accessibilityRole: AccessibilityRole
+  accessibilityRole?: AccessibilityRole
   isPreferred?: boolean
   isOverPicture?: boolean
   onFocused?: () => void
@@ -149,20 +154,22 @@ type PlateButtonProps = {
 }
 
 /**
- * A plain button on a plate, the remote's to press: `text` is what it shows, `label` is said,
- * `isPreferred` asks the remote's focus for it as it appears, `onFocused` hears each time it
- * gets the focus, and `isOverPicture` gives it the player's dark glass in every theme.
+ * A button on a plate, the remote's to press: its face is its `text` or its `icon`, `label` is
+ * what it is called aloud, `isPreferred` asks the remote's focus for it as it appears, `onFocused`
+ * hears each time it gets the focus, and `isOverPicture` gives it the player's dark glass in every
+ * theme.
  */
 export const PlateButton = ({
-  text,
   label,
-  accessibilityRole,
+  accessibilityRole = 'button',
   isPreferred = false,
   isOverPicture = false,
   onFocused = NOTHING_ON_FOCUS,
   onPress,
+  ...face
 }: PlateButtonProps) => {
   const plateStyles = usePlateStyles({ isOverPicture })
+  const colour = useTheme((theme) => (isOverPicture ? theme.overPicture : theme.palette).text)
   return (
     <Pressable
       accessibilityLabel={label}
@@ -172,7 +179,13 @@ export const PlateButton = ({
       onPress={onPress}
       style={({ focused }) => [plateStyles.plate, focused && plateStyles.focused]}
     >
-      <Text style={plateStyles.label}>{text}</Text>
+      {({ focused }) =>
+        'icon' in face ? (
+          <Icon colour={colour} isFocused={focused} name={face.icon} size={TV_SIZES.textXl} />
+        ) : (
+          <Text style={plateStyles.label}>{face.text}</Text>
+        )
+      }
     </Pressable>
   )
 }

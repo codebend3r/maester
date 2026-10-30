@@ -12,6 +12,7 @@ import { BUILD_ENV, buildNumberOf } from './src/config/buildNumber.ts'
 import { isTvPrebuild } from './src/config/tvPrebuild.ts'
 import { PALETTE_TOKENS } from './src/theme/tokenNames.ts'
 import { withAndroidFonts } from './plugins/withAndroidFonts.ts'
+import { withTvBannerDensities } from './plugins/withTvBannerDensities.ts'
 import { withTvRemoteTests } from './plugins/withTvRemoteTests.ts'
 
 const APP_ID = 'io.github.codebend3r.raven.app'
@@ -49,11 +50,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const ground = launchGround()
   const app: ExpoConfig = {
     ...config,
-    name: 'raven',
+    // What the home screen and the TV launcher write under the icon.
+    name: 'Raven',
     slug: 'raven',
     scheme: 'raven',
     version: packageJson.version,
     orientation: 'default',
+    icon: './assets/images/icon.png',
     ios: {
       bundleIdentifier: APP_ID,
       buildNumber: String(buildNumber),
@@ -71,14 +74,21 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       package: APP_ID,
       versionCode: buildNumber,
+      // The mark sits inside the middle two thirds, which every launcher's mask leaves whole.
+      adaptiveIcon: {
+        foregroundImage: './assets/images/adaptive-icon.png',
+        backgroundColor: ground,
+      },
       // The window's own colour, under the app. iOS reads its counterpart only through
       // expo-system-ui; there the splash covers the window until raven draws.
       backgroundColor: ground,
     },
     plugins: [
       'expo-router',
-      // config-tv acts only when EXPO_TV=1, which the TV prebuild scripts set.
-      '@react-native-tvos/config-tv',
+      // config-tv acts only when EXPO_TV=1, which the TV prebuild scripts set. The banner is the
+      // tile the Android TV launcher shows in its apps row: 320 by 180 dp, the mark and the
+      // wordmark, drawn by `scripts/tv_banner.sh` at every density (`withTvBannerDensities`).
+      ['@react-native-tvos/config-tv', { androidTVBanner: './assets/images/tv_banner.png' }],
       // Picture in Picture needs the audio background mode. The player still pauses when the
       // app leaves the screen without it (`playInBackground` off): this is video.
       ['react-native-video', { enableBackgroundAudio: true }],
@@ -86,8 +96,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ['expo-splash-screen', { backgroundColor: ground }],
     ],
   }
-  // The Apple TV's remote-driven end to end test joins only the TV's native project.
-  const withTests = isTv ? withTvRemoteTests(app) : app
+  // The Apple TV's remote-driven end to end test joins only the TV's native project, and the
+  // Android TV's banner at each density only the TV's.
+  const withTests = isTv ? withTvRemoteTests(withTvBannerDensities(app)) : app
   const withFonts = withAndroidFonts(withTests)
   return isDevelopment ? withCleartextTraffic(withFonts) : withFonts
 }

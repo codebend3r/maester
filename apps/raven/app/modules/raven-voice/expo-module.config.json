@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["io.github.codebend3r.raven.voice.RavenVoiceModule"]
+  }
+}

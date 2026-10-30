@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Video from 'react-native-video'
 
+import { LoadingMark } from '@/layouts/LoadingMark'
 import { Text } from '@/layouts/Text'
 import { touchPicker } from '@/layouts/Picker.touch'
 import { CaptionText } from '@/layouts/PlayerCaption'
@@ -160,10 +161,12 @@ const PlayerChrome = ({
   title,
   surface,
   notice,
+  isOpening,
   caption,
   transport,
   audio,
   subtitles,
+  next,
   onPictureInPicture,
   onBack,
 }: PlayerChromeProps) => {
@@ -199,6 +202,16 @@ const PlayerChrome = ({
         onPress={toggle}
         style={StyleSheet.absoluteFill}
       />
+      {isOpening && (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <LoadingMark
+            gap={SIZES.space4}
+            isOverPicture
+            label={PLAYER_COPY.opening}
+            markWidth={SIZES.space6 * 2}
+          />
+        </View>
+      )}
       {notice !== null && (
         <View pointerEvents="none" style={[styles.noticeSlot, sides]}>
           <Text accessibilityLiveRegion="polite" style={styles.notice}>
@@ -227,6 +240,14 @@ const PlayerChrome = ({
               {subtitles !== null && (
                 <Picker isOverPicture label={PLAYER_COPY.subtitles} {...subtitles} />
               )}
+              {next !== null && (
+                <ToolButton
+                  accessibilityLabel={next.label}
+                  isOverPicture
+                  label={PLAYER_COPY.next}
+                  onPress={next.onPlay}
+                />
+              )}
               {onPictureInPicture !== null && (
                 <ToolButton
                   accessibilityLabel={PLAYER_COPY.pictureInPicture}
@@ -250,7 +271,11 @@ const PlayerChrome = ({
 }
 
 /** The player under the thumb, on iPhones and iPads. */
-export const touchPlayerChrome: PlayerChromeKit = { PlayerChrome, shouldDrawCaptions: true }
+export const touchPlayerChrome: PlayerChromeKit = {
+  PlayerChrome,
+  shouldDrawCaptions: true,
+  canDrawPictureSubtitles: false,
+}
 
 const useStyles = pictureStyles((colours) =>
   StyleSheet.create({

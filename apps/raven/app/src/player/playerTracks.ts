@@ -1,6 +1,7 @@
 import {
   type MediaTracks,
   PLAYBACK_MODES,
+  SUBTITLE_SOURCES,
   type PlaybackMode,
   type SubtitleTrack,
   type TrackLabel,
@@ -21,15 +22,46 @@ const labelText = ({ name, details }: TrackLabel): string =>
 export const audioOptionsOf = (tracks: MediaTracks): TrackOption[] =>
   tracks.audio.map((track) => ({ key: String(track.index), label: labelText(audioLabel(track)) }))
 
-/** The subtitle tracks a player can show: text ones, never pictures. */
+/** The subtitle tracks every player can show: text ones, which become WebVTT. */
 const showable = (tracks: MediaTracks): SubtitleTrack[] =>
   tracks.subtitles.filter((track) => track.supported)
 
-/** Subtitles off, then each track a player can show, keyed by its id. */
-export const subtitleOptionsOf = (tracks: MediaTracks): TrackOption[] => [
+/** A track that is a picture of text (Blu-ray PGS, VobSub) inside the file, which only the file carries. */
+export const isPictureSubtitle = (track: SubtitleTrack): boolean =>
+  !track.supported && track.source === SUBTITLE_SOURCES.embedded
+
+type SubtitleOptionsOfProps = {
+  tracks: MediaTracks
+  /** Whether the player draws the file's picture tracks now: it can, and it plays the file as it is. */
+  canShowPictures: boolean
+}
+
+/**
+ * Subtitles off, then each track the player can show now, keyed by its id: the text tracks,
+ * and the picture tracks too where the player draws them from the file it is playing.
+ */
+export const subtitleOptionsOf = ({
+  tracks,
+  canShowPictures,
+}: SubtitleOptionsOfProps): TrackOption[] => [
   { key: SUBTITLE_CHOICES.off, label: 'Off' },
-  ...showable(tracks).map((track) => ({ key: track.id, label: labelText(subtitleLabel(track)) })),
+  ...tracks.subtitles
+    .filter((track) => track.supported || (canShowPictures && isPictureSubtitle(track)))
+    .map((track) => ({ key: track.id, label: labelText(subtitleLabel(track)) })),
 ]
+
+type FilePlaceForProps = { tracks: MediaTracks; subtitle: string }
+
+/**
+ * Where a subtitle track sits among the file's own subtitle tracks, text and picture alike, as
+ * ExoPlayer lists them when it plays the file; null for a sidecar, which the file does not hold.
+ */
+export const filePlaceFor = ({ tracks, subtitle }: FilePlaceForProps): number | null => {
+  const place = tracks.subtitles
+    .filter((track) => track.source === SUBTITLE_SOURCES.embedded)
+    .findIndex((track) => track.id === subtitle)
+  return place < 0 ? null : place
+}
 
 type AudioPlaceForProps = {
   mode: PlaybackMode

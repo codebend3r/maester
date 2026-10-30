@@ -39,7 +39,7 @@ tags:
 # A row is read out with its line and watched state after its name.
 - tapOn: E1 · Low Tide.*
 - extendedWaitUntil:
-    visible: Lantern Bay · Season 1 · Episode 1
+    visible: S01 · E01
     timeout: 30000
 - assertVisible: Low Tide
 - assertVisible: Mark watched

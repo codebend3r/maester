@@ -4,7 +4,7 @@ import { Text } from '@/layouts/Text'
 import { FocusBand } from '@/layouts/FocusBand'
 import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
-import { chosenLabelOf, pickerLabelOf } from '@/layouts/gridKit'
+import { chosenLabelOf } from '@/layouts/gridKit'
 import type {
   SettingsButtonProps,
   SettingsChoiceProps,
@@ -113,13 +113,13 @@ const SettingsButton = ({ text, isDisabled, onPress }: SettingsButtonProps) => {
  */
 const SettingsChoice = <K extends string>(props: SettingsChoiceProps<K>) => {
   const { settle } = useOpeningFocus()
-  const { open, list } = usePickerList(props)
+  const { open, label, list } = usePickerList(props)
   const styles = useStyles()
   const plateStyles = usePlateStyles()
   return (
     <>
       <Pressable
-        accessibilityLabel={pickerLabelOf(props)}
+        accessibilityLabel={label}
         accessibilityRole="button"
         onFocus={settle}
         onPress={open}

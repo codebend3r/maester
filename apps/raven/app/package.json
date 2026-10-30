@@ -9,8 +9,10 @@
   },
   "scripts": {
     "build:android-tv": "./android/gradlew -p android assembleRelease",
-    "build:ios": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/raven.xcworkspace -scheme raven -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
-    "build:tvos": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/raven.xcworkspace -scheme raven -configuration Release -sdk appletvsimulator -destination 'generic/platform=tvOS Simulator' -derivedDataPath build/tvos ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
+    "banner:tv": "./scripts/tv_banner.sh",
+    "build:android-tv:test-account": "bun --env-file=.env.test-account run build:android-tv",
+    "build:ios": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
+    "build:tvos": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release -sdk appletvsimulator -destination 'generic/platform=tvOS Simulator' -derivedDataPath build/tvos ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
     "dev:ios": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-phone",
     "dev:ipad": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-pad",
     "dev:tvos": "EXPO_TV=1 APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-tv",
@@ -18,14 +20,14 @@
     "e2e:android-tv": "bun run --sequential e2e:android-tv:reverse e2e:android-tv:flows",
     "e2e:android-tv:flows": "maestro test --platform android --exclude-tags touch e2e",
     "e2e:android-tv:reverse": "${ANDROID_HOME:?set ANDROID_HOME to the Android SDK folder}/platform-tools/adb reverse tcp:8490 tcp:8490",
-    "e2e:tvos": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild test -project ios/raven.xcodeproj -scheme RavenRemoteTests -destination \"platform=tvOS Simulator,name=${TVOS_SIMULATOR:-Apple TV 4K (3rd generation)}\" -derivedDataPath build/tvos-e2e CODE_SIGNING_ALLOWED=NO",
+    "e2e:tvos": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild test -project ios/Raven.xcodeproj -scheme RavenRemoteTests -destination \"platform=tvOS Simulator,name=${TVOS_SIMULATOR:-Apple TV 4K (3rd generation)}\" -derivedDataPath build/tvos-e2e CODE_SIGNING_ALLOWED=NO",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint:ts": "oxlint",
     "lint:ts:fix": "oxlint --fix",
     "prebuild:android-tv": "EXPO_TV=1 expo prebuild --platform android --clean",
-    "prebuild:ios": "NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
-    "prebuild:tvos": "EXPO_TV=1 NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
+    "prebuild:ios": "NODE_PATH=$PWD/node_modules REACT_NATIVE_NODE_MODULES_DIR=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
+    "prebuild:tvos": "EXPO_TV=1 NODE_PATH=$PWD/node_modules REACT_NATIVE_NODE_MODULES_DIR=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
     "predev:ios": "APP_VARIANT=development bun run prebuild:ios",
     "predev:ipad": "APP_VARIANT=development bun run prebuild:ios",
     "predev:tvos": "APP_VARIANT=development bun run prebuild:tvos",
@@ -63,6 +65,7 @@
     "react-native-safe-area-context": "5.10.1",
     "react-native-screens": "4.30.0",
     "react-native-sse": "1.2.1",
+    "react-native-svg": "15.16.0",
     "react-native-video": "6.19.3",
     "zustand": "5.0.15"
   },
@@ -141,7 +144,7 @@
         "inputs": [
           "default",
           "^production",
-          "{workspaceRoot}/apps/raven/web/public/brand/raven-mark-on-*.png"
+          "{workspaceRoot}/apps/raven/web/public/brand/raven-mark-on-*.svg"
         ]
       },
       "start": {
@@ -168,6 +171,7 @@
         "inputs": [
           "default",
           "^production",
+          "{workspaceRoot}/patches/react-native-video@*.patch",
           {
             "env": "APP_VARIANT"
           },
@@ -185,7 +189,7 @@
         "outputs": [
           "{projectRoot}/ios/Podfile.lock",
           "{projectRoot}/ios/Pods/Manifest.lock",
-          "{projectRoot}/build/ios/Build/Products/Release-iphonesimulator/raven.app"
+          "{projectRoot}/build/ios/Build/Products/Release-iphonesimulator/Raven.app"
         ],
         "cache": true
       },
@@ -196,6 +200,7 @@
         "inputs": [
           "default",
           "^production",
+          "{workspaceRoot}/patches/react-native-video@*.patch",
           {
             "env": "APP_VARIANT"
           },
@@ -214,9 +219,9 @@
           "{projectRoot}/ios/Podfile.lock",
           "{projectRoot}/ios/Pods/Manifest.lock",
           "{projectRoot}/ios/Pods/Target Support Files/Pods-raven",
-          "{projectRoot}/ios/raven.xcodeproj",
+          "{projectRoot}/ios/Raven.xcodeproj",
           "{projectRoot}/ios/RavenRemoteTests",
-          "{projectRoot}/build/tvos/Build/Products/Release-appletvsimulator/raven.app"
+          "{projectRoot}/build/tvos/Build/Products/Release-appletvsimulator/Raven.app"
         ],
         "cache": true
       },
@@ -227,6 +232,7 @@
         "inputs": [
           "default",
           "^production",
+          "{workspaceRoot}/patches/react-native-video@*.patch",
           {
             "env": "APP_VARIANT"
           },
@@ -250,6 +256,7 @@
         "inputs": [
           "default",
           "^production",
+          "{workspaceRoot}/patches/react-native-video@*.patch",
           {
             "env": "APP_VARIANT"
           },
@@ -276,6 +283,7 @@
         "inputs": [
           "default",
           "^production",
+          "{workspaceRoot}/patches/react-native-video@*.patch",
           {
             "env": "APP_VARIANT"
           },
@@ -302,6 +310,7 @@
         "inputs": [
           "default",
           "^production",
+          "{workspaceRoot}/patches/react-native-video@*.patch",
           {
             "env": "APP_VARIANT"
           },

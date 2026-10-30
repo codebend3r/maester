@@ -1,13 +1,22 @@
 import { type ReactNode, useState } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 
+import { Icon } from '@/layouts/Icon'
 import { Text } from '@/layouts/Text'
+import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
-import type { ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemPage'
+import {
+  ART_PLACES,
+  type ItemHero,
+  type ItemPage,
+  type PersonCard,
+  type VersionRow,
+} from '@/queries/itemPage'
 import { CardPicture } from '@/layouts/Card'
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
+import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import {
   ITEM_HEADINGS,
@@ -23,7 +32,13 @@ import {
 } from '@/layouts/itemKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
-import { themedStyles } from '@/theme/useTheme'
+import { themedStyles, useTheme } from '@/theme/useTheme'
+
+/** How tall a show's title art stands over an episode's name: larger than the player's. */
+const LOGO_HEIGHT = tvSize(150)
+
+/** The synopsis plate shows a little of the backdrop through it. */
+const SYNOPSIS_OPACITY = 0.92
 
 /** The heading's picture in points on a 1920 by 1080 point screen: a poster, or a still. */
 const HERO_WIDTHS = {
@@ -59,15 +74,18 @@ const Heading = ({ title }: HeadingProps) => {
 type ActionButtonProps = { action: ItemAction; isFirst: boolean }
 
 /**
- * Play, filled as the one action the page is for, or a mark, ticked while it is on, ringed
- * while focused. The first takes the remote's focus as the page opens, and lets go once
- * anything on the page has had it, so a button that changes after a mark leaves the viewer put.
+ * Play, filled as the one action the page is for, a mark, filled while it is on, or a link up,
+ * each its icon with its few words, ringed while focused. The first takes the remote's focus
+ * as the page opens, and lets go once anything on the page has had it, so a button that
+ * changes after a mark leaves the viewer put.
  */
 const ActionButton = ({ action, isFirst }: ActionButtonProps) => {
   const { isOpening, settle } = useOpeningFocus()
   const styles = useStyles()
   const toneStyles = useToneStyles()
+  const palette = useTheme((theme) => theme.palette)
   const look = actionLookOf(action)
+  const colour = look.tone === BUTTON_TONES.primary ? palette.onAccent : palette.text
   return (
     <Pressable
       accessibilityLabel={action.label}
@@ -82,7 +100,14 @@ const ActionButton = ({ action, isFirst }: ActionButtonProps) => {
         focused && styles.focused,
       ]}
     >
-      <Text style={[styles.actionLabel, toneStyles[look.tone].label]}>{look.text}</Text>
+      {({ focused }) => (
+        <>
+          <Icon colour={colour} isFocused={focused} name={look.icon} size={TV_SIZES.textXl} />
+          {look.text !== null && (
+            <Text style={[styles.actionLabel, toneStyles[look.tone].label]}>{look.text}</Text>
+          )}
+        </>
+      )}
     </Pressable>
   )
 }
@@ -101,18 +126,34 @@ const ProgressLine = ({ progress }: ProgressLineProps) => {
   )
 }
 
+type ActionRowProps = { actions: ItemAction[]; isFirstRow: boolean }
+
+/** A row of actions; on the first row the first action takes the opening focus. */
+const ActionRow = ({ actions, isFirstRow }: ActionRowProps) => {
+  const styles = useStyles()
+  return (
+    <View style={styles.actions}>
+      {actions.map((action, index) => (
+        <ActionButton key={action.key} action={action} isFirst={isFirstRow && index === 0} />
+      ))}
+    </View>
+  )
+}
+
 type HeroProps = {
   hero: ItemHero
   /** The actions, or null while what Play starts is still being read. */
   actions: ItemAction[] | null
+  links: ItemAction[]
   file: ItemPage['file']
 }
 
 /**
- * The heading over the backdrop: the picture beside the names, facts and summary, then the
- * actions in a row, the first taking the remote's focus while the page opens.
+ * The heading over the backdrop: the picture beside the show's title art, the names, facts and
+ * summary, then the actions in a row, the first taking the remote's focus while the page opens,
+ * and the links up on a row of their own below, so neither row runs off the screen.
  */
-const Hero = ({ hero, actions, file }: HeroProps) => {
+const Hero = ({ hero, actions, links, file }: HeroProps) => {
   const styles = useStyles()
   const facts = heroFactsOf(hero)
   return (
@@ -123,30 +164,65 @@ const Hero = ({ hero, actions, file }: HeroProps) => {
         width={HERO_WIDTHS[hero.poster.shape]}
       />
       <View style={styles.words}>
+        {hero.logo?.place === ART_PLACES.over && (
+          <TitleArt
+            height={LOGO_HEIGHT}
+            logo={hero.logo.picture}
+            maxWidth={WORDS_WIDTH}
+            name={hero.eyebrow ?? hero.title}
+            textStyle={styles.eyebrow}
+          />
+        )}
         {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
-        <Text accessibilityRole="header" style={styles.title}>
-          {hero.title}
-        </Text>
+        {hero.logo?.place === ART_PLACES.title ? (
+          <View accessibilityLabel={hero.title} accessibilityRole="header" accessible>
+            <TitleArt
+              height={LOGO_HEIGHT}
+              logo={hero.logo.picture}
+              maxWidth={WORDS_WIDTH}
+              name={hero.title}
+              textStyle={styles.title}
+            />
+          </View>
+        ) : (
+          <Text accessibilityRole="header" style={styles.title}>
+            {hero.title}
+          </Text>
+        )}
         {hero.byline !== null && <Text style={styles.byline}>{hero.byline}</Text>}
         {facts !== '' && <Text style={styles.line}>{facts}</Text>}
         {hero.progress !== null && <ProgressLine progress={hero.progress} />}
-        {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
-        {hero.summary !== null && (
-          <Text numberOfLines={4} style={styles.summary}>
-            {hero.summary}
-          </Text>
-        )}
-        {actions !== null && (
-          <View style={styles.actions}>
-            {actions.map((action, index) => (
-              <ActionButton key={action.key} action={action} isFirst={index === 0} />
-            ))}
+        {(hero.tagline !== null || hero.summary !== null) && (
+          <View style={styles.synopsis}>
+            {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
+            {hero.summary !== null && (
+              <Text numberOfLines={4} style={styles.summary}>
+                {hero.summary}
+              </Text>
+            )}
           </View>
         )}
+        {actions !== null && <ActionRow actions={actions} isFirstRow />}
+        {actions !== null && links.length > 0 && <ActionRow actions={links} isFirstRow={false} />}
         {file.length > 0 && (
-          <Text style={styles.line}>
-            {dotted(file.map((fact) => `${fact.label} ${fact.value}`))}
-          </Text>
+          <View style={styles.file}>
+            {file.map((fact) => (
+              <View key={fact.label} style={styles.fileRow}>
+                <Text style={styles.fileLabel}>{fact.label}</Text>
+                <View style={styles.fileValues}>
+                  {fact.values.length === 1 ? (
+                    <Text style={styles.fileValue}>{fact.values[0]}</Text>
+                  ) : (
+                    fact.values.map((value) => (
+                      <View key={value} style={styles.fileChip}>
+                        <Text style={styles.fileChipText}>{value}</Text>
+                      </View>
+                    ))
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
         )}
       </View>
     </View>
@@ -267,7 +343,7 @@ const Person = ({ person }: PersonProps) => {
  * opens on, its first action holding the focus until the viewer moves it, then rows to move
  * along for the seasons or episodes, the versions and the cast.
  */
-const ItemLayout = ({ page, actions, isPlayPending, onOpen }: ItemLayoutProps) => {
+const ItemLayout = ({ page, actions, links, isPlayPending, onOpen }: ItemLayoutProps) => {
   const styles = useStyles()
   const screen = useWindowDimensions()
   // The page's hold on its screen's focus; each part below reads the opening focus itself.
@@ -284,7 +360,12 @@ const ItemLayout = ({ page, actions, isPlayPending, onOpen }: ItemLayoutProps) =
       <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
         <FocusBand>
           <View style={styles.padded}>
-            <Hero actions={isPlayPending ? null : actions} file={page.file} hero={page.hero} />
+            <Hero
+              actions={isPlayPending ? null : actions}
+              file={page.file}
+              hero={page.hero}
+              links={links}
+            />
           </View>
         </FocusBand>
         {/* The rows wait for the actions, so nothing below can take the opening focus from Play. */}
@@ -343,6 +424,34 @@ const useStyles = themedStyles((colours) =>
     },
     byline: { color: colours.text, fontSize: TV_SIZES.textLg },
     line: { color: colours.muted, fontSize: TV_SIZES.text, lineHeight: TV_SIZES.text * LINE_RATIO },
+    // The file's facts as a two column list: a quiet label beside each value, values on their own.
+    file: { gap: TV_SIZES.space2, paddingTop: TV_SIZES.space2 },
+    fileRow: { flexDirection: 'row', alignItems: 'flex-start', gap: TV_SIZES.space3 },
+    fileLabel: {
+      width: TV_SIZES.space8 * 2,
+      color: colours.muted,
+      fontSize: TV_SIZES.textSm,
+      fontWeight: '600',
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      lineHeight: TV_SIZES.text * LINE_RATIO,
+    },
+    fileValues: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: TV_SIZES.space1 },
+    fileValue: {
+      color: colours.text,
+      fontSize: TV_SIZES.text,
+      lineHeight: TV_SIZES.text * LINE_RATIO,
+    },
+    fileChip: {
+      paddingHorizontal: TV_SIZES.space2,
+      borderRadius: TV_SIZES.radius,
+      backgroundColor: colours.quiet,
+    },
+    fileChipText: {
+      color: colours.text,
+      fontSize: TV_SIZES.textSm,
+      lineHeight: TV_SIZES.text * LINE_RATIO,
+    },
     progress: { gap: TV_SIZES.space1, maxWidth: TV_SIZES.measure },
     track: {
       height: TV_SIZES.space1,
@@ -350,16 +459,32 @@ const useStyles = themedStyles((colours) =>
       backgroundColor: colours.track,
     },
     fill: { height: '100%', borderRadius: TV_SIZES.space0, backgroundColor: colours.accent },
+    // The raised surface under the words, so they read over the backdrop in every theme.
+    synopsis: {
+      gap: TV_SIZES.space2,
+      padding: TV_SIZES.space3,
+      borderRadius: TV_SIZES.radius,
+      backgroundColor: colours.raised,
+      opacity: SYNOPSIS_OPACITY,
+    },
     tagline: { color: colours.text, fontSize: TV_SIZES.textLg, fontStyle: 'italic' },
     summary: {
       color: colours.text,
       fontSize: TV_SIZES.textLg,
       lineHeight: TV_SIZES.textLg * LINE_RATIO,
     },
-    actions: { flexDirection: 'row', gap: TV_SIZES.space3, paddingVertical: TV_SIZES.space2 },
+    actions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: TV_SIZES.space3,
+      paddingVertical: TV_SIZES.space1,
+    },
     action: {
       minHeight: TV_SIZES.controlLarge,
+      flexDirection: 'row',
+      alignItems: 'center',
       justifyContent: 'center',
+      gap: TV_SIZES.space2,
       paddingHorizontal: TV_SIZES.space4,
       borderRadius: TV_SIZES.radius,
       borderWidth: TV_SIZES.tvFocusRing,

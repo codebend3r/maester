@@ -4,6 +4,7 @@ import {
   type AudioTrack,
   type MediaTracks,
   PLAYBACK_MODES,
+  SUBTITLE_SOURCES,
   type PlaybackSettings,
   STREAM_QUALITIES,
   type StreamMode,
@@ -83,6 +84,32 @@ export const audioTrackOf = ({ tracks, audio }: AudioTrackOfProps): AudioTrack |
   const track = tracks.audio.find((candidate) => candidate.index === chosen) ?? null
   if (audio != null && !track) throw new BadRequestException(`No audio track ${audio}`)
   return track
+}
+
+type BurnTrackOfProps = {
+  tracks: MediaTracks
+  burn: string | undefined
+  mode: StreamMode
+}
+
+/**
+ * The `0:s:N` picture subtitle a transcode burns into the picture, or null when none is asked
+ * for. Only a transcode re-encodes the picture, and only a picture track needs burning: a text
+ * track is a rendition of its own. Anything else is a 400.
+ */
+export const burnTrackOf = ({ tracks, burn, mode }: BurnTrackOfProps): number | null => {
+  if (burn == null) return null
+  if (mode !== PLAYBACK_MODES.transcode) {
+    throw new BadRequestException('burn applies to a transcode only')
+  }
+  const embedded = tracks.subtitles.filter((track) => track.source === SUBTITLE_SOURCES.embedded)
+  const place = embedded.findIndex((track) => track.id === burn)
+  const track = embedded[place]
+  if (track === undefined) throw new BadRequestException(`No subtitle track ${burn}`)
+  if (track.supported) {
+    throw new BadRequestException('Only a picture subtitle is burned in; a text one is a rendition')
+  }
+  return place
 }
 
 /** The file's size in bytes, or a 404 once it is no longer on disk. */

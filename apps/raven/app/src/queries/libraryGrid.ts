@@ -2,6 +2,7 @@ import {
   LIBRARY_VIEWS,
   type LibrarySettings,
   type MediaItem,
+  type PosterEntry,
   type ShowEntry,
   groupMedia,
   listsShows,
@@ -19,6 +20,7 @@ import {
   showCard,
   videoShapeFor,
 } from '@/queries/cards'
+import { type ArtLogos, continueCard } from '@/queries/homeShelves'
 
 /**
  * What a library lists, whatever its type: a TV library's shows and the files no show was found
@@ -42,7 +44,30 @@ export type GridSection = {
  * The keys of the sections a listing always has the one of: a plain grid's, or a TV library's
  * shows.
  */
-const SECTION_KEYS = { all: 'all', shows: 'shows' } as const
+const SECTION_KEYS = { all: 'all', shows: 'shows', continue: 'continue' } as const
+
+type ContinueSectionsOfProps = Pictures & { entries: readonly PosterEntry[]; logos: ArtLogos }
+
+/**
+ * A library's Continue watching page: its videos with a saved spot, the most recently watched
+ * first, as wide cards like Home's shelf, in one open run; none at all with nothing in progress.
+ */
+export const continueSectionsOf = ({
+  entries,
+  logos,
+  ...pictures
+}: ContinueSectionsOfProps): GridSection[] =>
+  entries.length === 0
+    ? []
+    : [
+        {
+          key: SECTION_KEYS.continue,
+          title: null,
+          count: null,
+          shape: CARD_SHAPES.wide,
+          cards: entries.map((entry) => continueCard({ entry, logos, ...pictures })),
+        },
+      ]
 
 type Cards = Pictures & { settings: LibrarySettings; now: Date }
 

@@ -40,6 +40,8 @@ export type ShelfCard = {
   picture: Picture | null
   /** How far in playback stopped, from 0 to 1. */
   progress: number
+  /** The show's or film's title art, drawn over the picture where a card wears it. */
+  logo?: Picture | null
   /** Where pressing it goes: its item's page, or the player for a file with no page. */
   target: RouteTarget
 }

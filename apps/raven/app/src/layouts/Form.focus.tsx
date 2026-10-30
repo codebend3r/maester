@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ComponentRef, useRef, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 
 import {
@@ -12,8 +12,10 @@ import { Text } from '@/layouts/Text'
 import { ShowSecretToggle } from '@/layouts/ShowSecretToggle'
 import { useToneStyles, useTvFormStyles } from '@/layouts/formStyles'
 import { Logo } from '@/layouts/Logo'
+import { useFocusOnMount } from '@/layouts/focus'
 import { TvTextField } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
+import { ListenButton } from '@/voice/ListenButton'
 
 /** How wide the mark stands over a form. */
 const LOGO_WIDTH = TV_SIZES.space6
@@ -36,7 +38,10 @@ const Form = ({ title, children }: FormProps) => {
 /** What the checkbox under a secret field says. */
 const SHOW_COPY = { password: 'Show password', pin: 'Show PIN' } as const
 
-/** A labelled field; the step's first takes the remote as it is drawn. */
+/**
+ * A labelled field; the step's first takes the remote as it is drawn, and where the device can
+ * hear (Android TV), a button under it fills it from speech.
+ */
 const Field = ({
   label,
   value,
@@ -64,6 +69,7 @@ const Field = ({
         secureTextEntry={isSecret && !isShown}
         value={value}
       />
+      <ListenButton isEmail={isEmail} label={label} onHeard={onChangeText} />
       {isSecret && (
         <ShowSecretToggle
           formStyles={formStyles}
@@ -76,14 +82,24 @@ const Field = ({
   )
 }
 
-const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProps) => {
+const FormButton = ({
+  label,
+  onPress,
+  tone,
+  isDisabled = false,
+  isFirst = false,
+}: FormButtonProps) => {
   const formStyles = useTvFormStyles()
   const toneStyles = useToneStyles()
+  const button = useRef<ComponentRef<typeof Pressable>>(null)
+  useFocusOnMount({ view: button, isAsked: isFirst })
   return (
     <Pressable
+      ref={button}
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled }}
       disabled={isDisabled}
+      hasTVPreferredFocus={isFirst}
       onPress={onPress}
       style={({ focused }) => [
         formStyles.button,

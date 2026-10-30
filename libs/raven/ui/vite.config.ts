@@ -24,6 +24,7 @@ export default defineConfig({
         headless: fileURLToPath(new URL('./src/headless.ts', import.meta.url)),
         canPlay: fileURLToPath(new URL('./src/lib/canPlay.ts', import.meta.url)),
         designTokens: fileURLToPath(new URL('./src/styles/designTokens.ts', import.meta.url)),
+        iconDrawings: fileURLToPath(new URL('./src/components/Icon/drawings.ts', import.meta.url)),
       },
       formats: ['es'],
       fileName: (_format, name) => `${name}.js`,

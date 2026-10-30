@@ -17,17 +17,46 @@ tags:
 - extendedWaitUntil:
     visible: Pause
     timeout: 60000
-- tapOn: Pause
-- extendedWaitUntil:
-    visible: Play
-    timeout: 10000
+# The controls fade five seconds after a touch, and a playing video never settles, so a tap left
+# to wait for the screen to settle spends seconds before and after it and lands on the hidden
+# controls' catcher. The taps cap that wait. Each try brings the controls back when they are gone
+# and presses Pause when it is there, until Play shows.
+- retry:
+    maxRetries: 4
+    commands:
+      - runFlow:
+          when:
+            visible: Show the controls
+          commands:
+            - tapOn:
+                text: Show the controls
+                waitToSettleTimeoutMs: 500
+      - runFlow:
+          when:
+            visible: Pause
+          commands:
+            - tapOn:
+                text: Pause
+                waitToSettleTimeoutMs: 500
+      - assertVisible: Play
 - assertVisible: Position
 - assertVisible: Back 10 seconds
 - assertVisible: Forward 10 seconds
 - tapOn: Back
+# The film is a minute long and a tap on a playing video can take several seconds to settle, so
+# the server may already count it watched by the pause. Either way the page is back, and a watched
+# film has its mark taken off first, so the marks below start from the same place.
 - extendedWaitUntil:
-    visible: Mark watched
+    visible: Mark watched|Watched
     timeout: 30000
+- runFlow:
+    when:
+      visible: Watched
+    commands:
+      - tapOn: Watched
+      - extendedWaitUntil:
+          visible: Mark watched
+          timeout: 10000
 # The spot saved on the pause is cleared by a mark, and taking the mark off again leaves the
 # film as the fixture had it, never started.
 - tapOn: Mark watched

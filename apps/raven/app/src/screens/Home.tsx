@@ -1,11 +1,13 @@
+import { libraryIconOf } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 
 import type { ShelfCard } from '@/queries/cards'
-import { homeShelvesOf } from '@/queries/homeShelves'
+import { continueArtIdsOf, homeShelvesOf } from '@/queries/homeShelves'
+import { useArtLogos } from '@/queries/useArtLogos'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
-import { Shelf, Shelves } from '@/layouts'
+import { Loading, Shelf, Shelves } from '@/layouts'
 import { APP_ROUTES, ROUTE_TARGETS, hrefOf } from '@/routes'
 
 const COPY = {
@@ -21,18 +23,23 @@ const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
   const home = useQuery(queries.homeQuery)
   const libraries = useQuery(queries.librariesQuery)
   const pictures = usePictures({ server, api })
+  const logos = useArtLogos({
+    queries,
+    ids: continueArtIdsOf(home.data?.inProgress ?? []),
+    pictures,
+  })
 
   const shelves =
     home.data === undefined || libraries.data === undefined || pictures === null
       ? []
-      : homeShelvesOf({ home: home.data, libraries: libraries.data, ...pictures })
+      : homeShelvesOf({ home: home.data, libraries: libraries.data, logos, ...pictures })
   const failure = home.error ?? libraries.error
   const isBare = home.isSuccess && libraries.isSuccess && pictures !== null && shelves.length === 0
   const isLoading = failure === null && !isBare && shelves.length === 0
+  if (isLoading) return <Loading label={COPY.loading} />
   const notice = ((): string | null => {
     if (failure !== null) return failure.message
-    if (isBare) return COPY.bare
-    return isLoading ? COPY.loading : null
+    return isBare ? COPY.bare : null
   })()
 
   // Focus starts on a card, so on the first shelf that has one.
@@ -40,7 +47,7 @@ const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
 
   const pinnedLibraries = (libraries.data ?? [])
     .filter((library) => library.settings.pinned)
-    .map(({ id, name }) => ({ id, name }))
+    .map(({ id, name, settings }) => ({ id, name, icon: libraryIconOf(settings) }))
 
   const open = ({ target }: ShelfCard) => router.push(hrefOf(target))
 
@@ -49,7 +56,6 @@ const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
 
   return (
     <Shelves
-      isLoading={isLoading}
       notice={notice}
       libraries={pinnedLibraries}
       onOpenLibrary={openLibrary}

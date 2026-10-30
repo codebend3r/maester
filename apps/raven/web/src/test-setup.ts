@@ -21,11 +21,14 @@ import { useServerReach } from '@/stores/serverReach'
 import { useSideMenu } from '@/stores/sideMenu'
 import { useTheme } from '@/stores/theme'
 import { useWindowChrome } from '@/stores/windowChrome'
+import { failOnActWarnings, listenForActWarnings, settleAsyncHelpers } from '@/test/act'
 import { resetBrowserSupport } from '@/test/canPlay'
 import { FakeEventSource } from '@/test/eventSource'
 import { pacePolls, resetPolls } from '@/test/polls'
 
 pacePolls()
+settleAsyncHelpers()
+listenForActWarnings()
 await configureStorage({ storage: window.localStorage })
 
 const initialAuthSession = useAuthSession.getInitialState()
@@ -73,4 +76,5 @@ afterEach(() => {
   resetBrowserSupport()
   FakeEventSource.opened = []
   resetPolls()
+  failOnActWarnings()
 })

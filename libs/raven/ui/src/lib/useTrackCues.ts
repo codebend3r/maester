@@ -7,7 +7,7 @@ import {
   mergeCues,
   subtitleWindows,
 } from '@raven/core'
-import { playerQueriesFor } from '@/lib/playerQueries'
+import { type SubtitleAccessReader, playerQueriesFor } from '@/lib/playerQueries'
 
 /** Where a track's cues stand: none asked for, on their way, read, or refused. */
 const SUBTITLE_STATUSES = {
@@ -20,7 +20,11 @@ const SUBTITLE_STATUSES = {
 export type SubtitleStatus = (typeof SUBTITLE_STATUSES)[keyof typeof SUBTITLE_STATUSES]
 
 type UseTrackCuesProps = {
-  video: { api: ApiClient; mediaId: number } | null
+  video: {
+    api: ApiClient
+    mediaId: number
+    readAccess?: SubtitleAccessReader
+  } | null
   track: SubtitleTrack | null
   time: number
   duration: number | null
@@ -43,7 +47,9 @@ export const useTrackCues = ({
     const windows =
       track.source === SUBTITLE_SOURCES.external ? [0] : subtitleWindows({ time, duration })
     const { subtitles } = playerQueriesFor(video.api)
-    return windows.map((window) => subtitles({ id: video.mediaId, trackId: track.id, window }))
+    return windows.map((window) =>
+      subtitles({ id: video.mediaId, trackId: track.id, window, readAccess: video.readAccess }),
+    )
   })()
   return useQueries({
     queries,

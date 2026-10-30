@@ -4,7 +4,9 @@ import { SKIP_SECONDS } from '@/layouts/playerKit'
 import {
   KEY_ACTIONS,
   LONG_PRESSES,
+  LONG_PRESS_NAMES,
   REMOTE_KEYS,
+  heldSeekOf,
   pressedKeyOf,
   remoteAnswerOf,
 } from '@/layouts/remoteKeys'
@@ -80,5 +82,27 @@ describe('remoteAnswerOf', () => {
     expect(others.map((key) => remoteAnswerOf({ key, ...PLAYING, isShown: false }))).toEqual(
       others.map(() => ({ seekBy: 0, shouldTogglePlay: false })),
     )
+  })
+})
+
+describe('heldSeekOf', () => {
+  it('reads a held left or right, going down and coming up, and nothing else', () => {
+    expect(
+      heldSeekOf({ eventType: LONG_PRESS_NAMES.longRight, eventKeyAction: KEY_ACTIONS.down }),
+    ).toEqual({
+      direction: 1,
+      isDown: true,
+    })
+    expect(
+      heldSeekOf({ eventType: LONG_PRESS_NAMES.longLeft, eventKeyAction: KEY_ACTIONS.up }),
+    ).toEqual({
+      direction: -1,
+      isDown: false,
+    })
+    expect(heldSeekOf({ eventType: REMOTE_KEYS.right, eventKeyAction: KEY_ACTIONS.up })).toBeNull()
+    expect(
+      heldSeekOf({ eventType: LONG_PRESS_NAMES.longSelect, eventKeyAction: KEY_ACTIONS.down }),
+    ).toBeNull()
+    expect(heldSeekOf({ eventType: 'toString', eventKeyAction: KEY_ACTIONS.down })).toBeNull()
   })
 })

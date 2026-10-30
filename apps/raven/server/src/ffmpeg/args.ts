@@ -115,16 +115,46 @@ const ceiling = (bitrate: number | null): string[] =>
   bitrate == null ? [] : ['-maxrate', String(bitrate), '-bufsize', String(bitrate * 2)]
 
 /** Video flags: those before `-i`, and the encoding after it. */
-type VideoArgs = { input: string[]; output: string[] }
+/** A video's flags before `-i` and after it, and the stream or filter output its `-map` takes. */
+type VideoArgs = { input: string[]; output: string[]; map: string }
+
+/** Where a burned picture subtitle's video comes out of the filter graph. */
+const BURNED_VIDEO = '[vout]'
 
 /** No video at all, for an audio file. */
-const NO_VIDEO: VideoArgs = { input: [], output: [] }
+const NO_VIDEO: VideoArgs = { input: [], output: [], map: VIDEO_STREAM }
 
 /** A remux's video, copied. Safari and AVPlayer only play HEVC in MP4 under the hvc1 tag. */
 export const copyVideo = (videoCodec: string | null): VideoArgs => ({
   input: [],
   output: ['-c:v', 'copy', ...(videoCodec === VIDEO_CODECS.hevc ? ['-tag:v', 'hvc1'] : [])],
+  map: VIDEO_STREAM,
 })
+
+type FiltersOfProps = {
+  /** Applied to the file's frames before anything is laid over them: the trim. */
+  before: readonly string[]
+  /** Applied once the subtitle is laid over: the scale, the tone map, the upload. */
+  after: readonly string[]
+  /** The `0:s:N` picture subtitle to burn in, or null for none. */
+  burn: number | null
+}
+
+/**
+ * A video's filters: a plain `-vf` chain, or with a picture subtitle to burn in, a filter graph
+ * that lays the subtitle over the frame before it is scaled, so the subtitle scales with it, and
+ * whose output `-map` takes. Only a graph can read a second stream.
+ */
+const filtersOf = ({ before, after, burn }: FiltersOfProps): { output: string[]; map: string } => {
+  if (burn === null) return { output: ['-vf', [...before, ...after].join(',')], map: VIDEO_STREAM }
+  const overlay = [`overlay=eof_action=pass`, ...after].join(',')
+  const subtitle = `[0:s:${burn}]`
+  const graph =
+    before.length === 0
+      ? `[${VIDEO_STREAM}]${subtitle}${overlay}${BURNED_VIDEO}`
+      : `[${VIDEO_STREAM}]${before.join(',')}[base];[base]${subtitle}${overlay}${BURNED_VIDEO}`
+  return { output: ['-filter_complex', graph], map: BURNED_VIDEO }
+}
 
 type TranscodeVideoProps = {
   encoder: VideoEncoder
@@ -135,6 +165,8 @@ type TranscodeVideoProps = {
   bitrate: number | null
   /** Drops the frames before this time, on the file's clock, before any other filter. */
   trimFrom?: number | null
+  /** The `0:s:N` picture subtitle to burn into the picture, or null for none. */
+  burn?: number | null
 }
 
 /**
@@ -157,11 +189,12 @@ export const transcodeVideo = ({
   quality,
   bitrate,
   trimFrom = null,
+  burn = null,
 }: TranscodeVideoProps): VideoArgs => {
   const scale = scaleTo(maxHeight)
   const squeeze = QUALITY[quality]
   const trim = trimFrom == null ? [] : [`trim=start=${secondsArg(trimFrom)}`]
-  const cpuFilters = [...trim, `scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
+  const cpuAfter = [`scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
   // A keyframe every two seconds keeps fragments small, so playback starts
   // and seeks quickly.
   const shared = ['-profile:v', 'high', '-g', '48']
@@ -178,21 +211,26 @@ export const transcodeVideo = ({
         ...shared,
         '-pix_fmt',
         'yuv420p',
-        '-vf',
-        cpuFilters.join(','),
+        ...filtersOf({ before: trim, after: cpuAfter, burn }).output,
       ],
+      map: filtersOf({ before: trim, after: cpuAfter, burn }).map,
     }
   }
 
   if (encoder.kind === ENCODER_KINDS.vaapi) {
     const device = ['-init_hw_device', `vaapi=va:${encoder.device}`, '-filter_hw_device', 'va']
-    const gpuDecode = videoCodec != null && GPU_DECODES.has(videoCodec)
+    // A subtitle is laid over frames in memory, so a burn decodes on the CPU and uploads after.
+    const gpuDecode = burn === null && videoCodec != null && GPU_DECODES.has(videoCodec)
     const toBt709 = tonemap
       ? ':out_color_matrix=bt709:out_color_primaries=bt709:out_color_transfer=bt709:out_range=tv'
       : ''
-    const filters = gpuDecode
-      ? [...trim, `scale_vaapi=${scale}:format=nv12${toBt709}`]
-      : [...cpuFilters, 'format=nv12', 'hwupload']
+    const filters = filtersOf({
+      before: trim,
+      after: gpuDecode
+        ? [`scale_vaapi=${scale}:format=nv12${toBt709}`]
+        : [...cpuAfter, 'format=nv12', 'hwupload'],
+      burn,
+    })
     return {
       input: [
         ...device,
@@ -205,9 +243,9 @@ export const transcodeVideo = ({
         'h264_vaapi',
         ...(bitrate == null ? ['-qp', squeeze.qp] : ['-b:v', String(bitrate), ...ceiling(bitrate)]),
         ...shared,
-        '-vf',
-        filters.join(','),
+        ...filters.output,
       ],
+      map: filters.map,
     }
   }
 
@@ -224,9 +262,9 @@ export const transcodeVideo = ({
       ...shared,
       '-pix_fmt',
       'yuv420p',
-      '-vf',
-      cpuFilters.join(','),
+      ...filtersOf({ before: trim, after: cpuAfter, burn }).output,
     ],
+    map: filtersOf({ before: trim, after: cpuAfter, burn }).map,
   }
 }
 

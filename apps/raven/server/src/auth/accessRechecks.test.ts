@@ -284,6 +284,7 @@ describe('an HLS session opened with an account ticket', () => {
     quality: QUALITIES.medium,
     bitrate: null,
     tonemap: false,
+    burn: null,
   }
   /** Each test's sessions and data folder, let go once it is done. */
   const made: { sessions: HlsSessions[]; dirs: string[] } = { sessions: [], dirs: [] }

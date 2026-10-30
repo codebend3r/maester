@@ -2,14 +2,22 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { APP_CLIENT_CALLS } from '@raven/core'
 import { fireEvent, screen, within } from '@testing-library/react-native'
 
-import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
+import { APP_ROUTES, APP_ROUTE_PARAMS, PLAY_FROM } from '@/routes'
 import { Item } from '@/screens/Item'
 import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { NAS } from '@/test/homeServer'
 import { pathFor } from '@/test/fixtureFetch'
-import { BUSBOYS, SEVERANCE, SEVERANCE_ONE, itemApi } from '@/test/itemServer'
+import {
+  BUSBOYS,
+  BUSBOYS_FILE,
+  GOOD_NEWS_ABOUT_HELL,
+  HALF_LOOP,
+  SEVERANCE,
+  SEVERANCE_ONE,
+  itemApi,
+} from '@/test/itemServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import type * as NavigationFocus from '@/test/navigationFocus'
 import {
@@ -196,5 +204,56 @@ describe('Item on a TV', () => {
     await returnToTestScreen()
     expect(askedFor()).toEqual(['Season 1'])
     expect(preferred()).toEqual([])
+  })
+
+  it('gives an episode its next, and the way up to its show and its season', async () => {
+    await renderItem(GOOD_NEWS_ABOUT_HELL.id)
+    await screen.findByRole('button', { name: 'Play' })
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Next S01E02' }))
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: APP_ROUTES.play,
+      params: { [APP_ROUTE_PARAMS.mediaId]: String(HALF_LOOP.primary?.id) },
+    })
+
+    await fireEvent.press(screen.getByRole('link', { name: 'Go to Severance' }))
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: APP_ROUTES.item,
+      params: { [APP_ROUTE_PARAMS.id]: String(SEVERANCE.id) },
+    })
+
+    await fireEvent.press(await screen.findByRole('link', { name: 'Go to Season 1' }))
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: APP_ROUTES.item,
+      params: { [APP_ROUTE_PARAMS.id]: String(SEVERANCE_ONE.id) },
+    })
+    expect(preferred()).toEqual(['Play'])
+  })
+
+  it('asks a film for no next and gives it no way up', async () => {
+    await renderItem(BUSBOYS.id)
+    await screen.findByRole('button', { name: 'Resume from 50:00' })
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Next/u })).toBeNull()
+  })
+
+  it('offers Play from the beginning beside Resume, which opens the player at the very start', async () => {
+    await renderItem(BUSBOYS.id)
+    await screen.findByRole('button', { name: 'Resume from 50:00' })
+    await fireEvent.press(screen.getByRole('button', { name: 'Play from the beginning' }))
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: APP_ROUTES.play,
+      params: {
+        [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_FILE.id),
+        [APP_ROUTE_PARAMS.from]: PLAY_FROM.start,
+      },
+    })
+    expect(preferred()).toEqual(['Resume from 50:00'])
+  })
+
+  it('offers no Play from the beginning for a video not started', async () => {
+    await renderItem(GOOD_NEWS_ABOUT_HELL.id)
+    await screen.findByRole('button', { name: 'Play' })
+    expect(screen.queryByRole('button', { name: 'Play from the beginning' })).toBeNull()
   })
 })
