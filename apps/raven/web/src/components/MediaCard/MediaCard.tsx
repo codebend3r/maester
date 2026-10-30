@@ -14,6 +14,7 @@ import {
   watchLink,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
+import type { ComponentType } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark, FavouriteWords } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
@@ -25,7 +26,36 @@ import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
 import { useSelectable } from '@/lib/useSelectable'
 import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
+import { MEDIA_CARD_COPY } from '@/components/MediaCard/copy'
 import styles from '@/components/MediaCard/MediaCard.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
+
+const FRAME_KINDS = {
+  thumbnail: 'thumbnail',
+  placeholder: 'placeholder',
+} as const
+type FrameKind = (typeof FRAME_KINDS)[keyof typeof FRAME_KINDS]
+
+type FramePictureProps = { thumbnail: string | null; label: string }
+
+type FrameThumbnailProps = FramePictureProps
+
+const FrameThumbnail = ({ thumbnail }: FrameThumbnailProps) => (
+  <ViewportImage className={styles.thumbnail} src={thumbnail ?? ''} alt="" />
+)
+
+type FramePlaceholderProps = FramePictureProps
+
+const FramePlaceholder = ({ label }: FramePlaceholderProps) => (
+  <span className={styles.placeholder} aria-hidden="true">
+    {label.slice(0, 1)}
+  </span>
+)
+
+const FRAME_PICTURES = {
+  [FRAME_KINDS.thumbnail]: FrameThumbnail,
+  [FRAME_KINDS.placeholder]: FramePlaceholder,
+} as const satisfies Record<FrameKind, ComponentType<FramePictureProps>>
 
 type MediaCardProps = {
   media: MediaItem
@@ -59,6 +89,7 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
   // A listing sorted by resolution says it under the title, so the corner leaves it out.
   const resolution = resolutionLabel(media)
   const cornerResolution = resolution === sorted ? null : resolution
+  const FramePicture = FRAME_PICTURES[thumbnail ? FRAME_KINDS.thumbnail : FRAME_KINDS.placeholder]
   const facts = [
     formatRuntime(media.duration),
     media.videoCodec ? codecLabel(media.videoCodec) : null,
@@ -77,17 +108,11 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
           className={styles.link}
           onContextMenu={menu.onContextMenu}
           {...(hasPage
-            ? { 'aria-label': `Play ${label}`, tabIndex: select.linkTabIndex }
+            ? { 'aria-label': MEDIA_CARD_COPY.play(label), tabIndex: select.linkTabIndex }
             : { 'aria-hidden': true, tabIndex: -1 })}
         >
           <span className={styles.frame}>
-            {thumbnail ? (
-              <ViewportImage className={styles.thumbnail} src={thumbnail} alt="" />
-            ) : (
-              <span className={styles.placeholder} aria-hidden="true">
-                {label.slice(0, 1)}
-              </span>
-            )}
+            <FramePicture thumbnail={thumbnail} label={label} />
             <span className={styles.scrim} />
             {timeLeft && (
               <span className={styles.left}>
@@ -105,7 +130,7 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
         {(cornerResolution != null || media.hdr) && (
           <span className={styles.badges}>
             <ResolutionChip resolution={cornerResolution} />
-            {media.hdr && <PictureChip label="HDR">HDR</PictureChip>}
+            {media.hdr && <PictureChip label={COMMON_COPY.hdr}>{COMMON_COPY.hdr}</PictureChip>}
           </span>
         )}
         <SelectCheckbox select={select} className={styles.select} />

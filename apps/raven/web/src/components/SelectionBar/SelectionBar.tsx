@@ -6,6 +6,7 @@ import {
   useSelection,
   useSelectionScope,
 } from '@/components/SelectionScope/SelectionScope'
+import { SELECTION_BAR_COPY } from '@/components/SelectionBar/copy'
 import { useReturnFocus } from '@/lib/useReturnFocus'
 import { useWatchedChange } from '@/lib/useWatchedChange'
 import type { SelectionScopeValue } from '@/stores/selectionScope'
@@ -61,46 +62,46 @@ const SelectingBar = ({ scope }: SelectingBarProps) => {
   const { selectAll, clear, end } = store.getState()
 
   return (
-    <section className={styles.bar} aria-label="Selection">
+    <section className={styles.bar} aria-label={SELECTION_BAR_COPY.label}>
       <div className={styles.status}>
         <output className={styles.count}>
-          <span>{keys.size} selected</span>
+          <span>{SELECTION_BAR_COPY.selected(keys.size)}</span>
           {outcome?.type === OUTCOME_TYPES.marked && (
             <span className={styles.outcome}>
-              <span className="visually-hidden">. </span>
-              Marked {outcome.count} {outcome.watched ? 'watched' : 'unwatched'}
+              <span className="visually-hidden">{SELECTION_BAR_COPY.pause}</span>
+              {SELECTION_BAR_COPY.marked(outcome)}
             </span>
           )}
         </output>
         {outcome?.type === OUTCOME_TYPES.failed && (
           <p className={styles.failure} role="alert">
-            Could not mark. Try again.
+            {SELECTION_BAR_COPY.failed}
           </p>
         )}
       </div>
       <div className={styles.actions}>
         <Button className={styles.button} onClick={() => selectAll(allKeys())}>
-          Select all
+          {SELECTION_BAR_COPY.selectAll}
         </Button>
         <Button
           className={styles.button}
           disabled={isEmpty || change.isPending}
           onClick={() => mark(true)}
         >
-          Mark watched
+          {SELECTION_BAR_COPY.markWatched}
         </Button>
         <Button
           className={styles.button}
           disabled={isEmpty || change.isPending}
           onClick={() => mark(false)}
         >
-          Mark unwatched
+          {SELECTION_BAR_COPY.markUnwatched}
         </Button>
         <Button className={styles.button} disabled={isEmpty} onClick={clear}>
-          Clear
+          {SELECTION_BAR_COPY.clear}
         </Button>
         <Button className={styles.button} tone="primary" onClick={end}>
-          Done
+          {SELECTION_BAR_COPY.done}
         </Button>
       </div>
     </section>
@@ -118,6 +119,5 @@ export const SelectionBar = () => {
   const unused = useRef<HTMLButtonElement>(null)
   const selectButton = useSelectButtonRef()
   useReturnFocus({ isOpen: selecting, target: selectButton ?? unused })
-  if (!scope || !selecting) return null
-  return <SelectingBar scope={scope} />
+  return scope !== null && selecting && <SelectingBar scope={scope} />
 }

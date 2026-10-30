@@ -14,6 +14,7 @@ import {
   resolutionLabel,
   sortTitle,
 } from '@raven/core'
+import type { ComponentType } from 'react'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
@@ -29,13 +30,40 @@ import { POSTER_SIZES } from '@/lib/posters'
 import { useTableSort } from '@/lib/useTableSort'
 import { useSelectable } from '@/lib/useSelectable'
 import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
+import { MEDIA_LIST_COPY } from '@/components/MediaList/copy'
 import styles from '@/components/MediaList/MediaList.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 const day = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
   month: 'short',
   year: 'numeric',
 })
+
+/** The picture before a row's title: a movie's poster, or a frame grab of any other video. */
+const ROW_PICTURES = { poster: 'poster', frame: 'frame' } as const
+
+type RowPicture = (typeof ROW_PICTURES)[keyof typeof ROW_PICTURES]
+
+type RowPictureProps = { media: MediaItem }
+
+type PosterPictureProps = RowPictureProps
+
+const PosterPicture = ({ media }: PosterPictureProps) => (
+  <PosterImage media={media} sizes={POSTER_SIZES.list} />
+)
+
+type FramePictureProps = RowPictureProps
+
+const FramePicture = ({ media }: FramePictureProps) => {
+  const thumbnail = api.thumbnailUrl(media)
+  return thumbnail && <ViewportImage className={styles.thumbnail} src={thumbnail} alt="" />
+}
+
+const ROW_PICTURE_VIEWS = {
+  [ROW_PICTURES.poster]: PosterPicture,
+  [ROW_PICTURES.frame]: FramePicture,
+} as const satisfies Record<RowPicture, ComponentType<RowPictureProps>>
 
 type MediaRowProps = {
   media: MediaItem
@@ -54,7 +82,7 @@ const MediaRow = ({ media, movies, matchType }: MediaRowProps) => {
   const { title, year } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
   const link = cardLink({ media, hasPages: movies })
-  const thumbnail = api.thumbnailUrl(media)
+  const RowPictureView = ROW_PICTURE_VIEWS[movies ? ROW_PICTURES.poster : ROW_PICTURES.frame]
   return (
     <tr className={menu.hostClass} data-entry={mediaEntryKey(media)} {...select.rootProps}>
       <th scope="row" className={styles.titleHeader}>
@@ -67,11 +95,7 @@ const MediaRow = ({ media, movies, matchType }: MediaRowProps) => {
             aria-hidden="true"
             onContextMenu={menu.onContextMenu}
           >
-            {movies ? (
-              <PosterImage media={media} sizes={POSTER_SIZES.list} />
-            ) : (
-              thumbnail && <ViewportImage className={styles.thumbnail} src={thumbnail} alt="" />
-            )}
+            <RowPictureView media={media} />
           </CardLink>
           <CardLink
             {...link}
@@ -118,10 +142,10 @@ const MediaRow = ({ media, movies, matchType }: MediaRowProps) => {
 }
 
 const RATING_COLUMNS: readonly { source: RatingSource; label: string }[] = [
-  { source: 'rottenTomatoes', label: 'RT' },
-  { source: 'imdb', label: 'IMDb' },
-  { source: 'metacritic', label: 'Metacritic' },
-  { source: 'tmdb', label: 'TMDB' },
+  { source: RATING_SOURCES.rottenTomatoes, label: MEDIA_LIST_COPY.rottenTomatoes },
+  { source: RATING_SOURCES.imdb, label: COMMON_COPY.imdb },
+  { source: RATING_SOURCES.metacritic, label: MEDIA_LIST_COPY.metacritic },
+  { source: RATING_SOURCES.tmdb, label: COMMON_COPY.tmdb },
 ]
 
 type Column =
@@ -206,11 +230,11 @@ export const MediaList = ({ items, movies = false, matchType = null }: MediaList
     <div className={styles.room}>
       <table
         className={movies ? `${styles.table} ${styles.movies}` : styles.table}
-        aria-label="Videos"
+        aria-label={MEDIA_LIST_COPY.table}
       >
         <thead>
           <tr>
-            {header({ key: 'title', label: 'Title' })}
+            {header({ key: 'title', label: COMMON_COPY.title })}
             {movies &&
               RATING_COLUMNS.map((column) =>
                 header({
@@ -221,28 +245,32 @@ export const MediaList = ({ items, movies = false, matchType = null }: MediaList
               )}
             {header({
               key: 'length',
-              label: 'Length',
+              label: MEDIA_LIST_COPY.length,
               className: movies ? `${styles.number} ${styles.spare}` : styles.number,
             })}
             {header({
               key: 'resolution',
-              label: 'Resolution',
+              label: MEDIA_LIST_COPY.resolution,
               className: movies ? styles.extra : styles.roomy,
             })}
-            {header({ key: 'size', label: 'Size', className: `${styles.number} ${styles.extra}` })}
             {header({
-              key: 'bitrate',
-              label: 'Bitrate',
+              key: 'size',
+              label: MEDIA_LIST_COPY.size,
               className: `${styles.number} ${styles.extra}`,
             })}
-            {header({ key: 'added', label: 'Added', className: styles.extra })}
+            {header({
+              key: 'bitrate',
+              label: MEDIA_LIST_COPY.bitrate,
+              className: `${styles.number} ${styles.extra}`,
+            })}
+            {header({ key: 'added', label: MEDIA_LIST_COPY.added, className: styles.extra })}
             {header({
               key: movies ? 'released' : 'changed',
-              label: movies ? 'Released' : 'Changed',
+              label: movies ? MEDIA_LIST_COPY.released : MEDIA_LIST_COPY.changed,
               className: movies ? undefined : styles.extra,
             })}
             <th scope="col">
-              <span className="visually-hidden">Actions</span>
+              <span className="visually-hidden">{MEDIA_LIST_COPY.actions}</span>
             </th>
           </tr>
         </thead>

@@ -1,12 +1,13 @@
 import type { MediaItem } from '@raven/core'
 import { Icon } from '@raven/ui'
 import styles from '@/components/FavouriteMark/FavouriteMark.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type FavouriteWordsProps = { media: MediaItem }
 
 /** The heart's word, for a screen reader; the heart itself is only a picture. */
 export const FavouriteWords = ({ media }: FavouriteWordsProps) =>
-  media.favourite && <span className="visually-hidden">Favourite</span>
+  media.favourite && <span className="visually-hidden">{COMMON_COPY.favourite}</span>
 
 const FAVOURITE_TONES = { inline: 'inline', overlay: 'overlay', scrim: 'scrim' } as const
 

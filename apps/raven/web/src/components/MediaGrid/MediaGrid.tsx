@@ -1,9 +1,65 @@
-import type { ItemSummary, MatchItemType, MediaItem, MediaSort, RatingSource } from '@raven/core'
+import {
+  type ItemSummary,
+  type MatchItemType,
+  type MediaItem,
+  type MediaSort,
+  RATING_SOURCES,
+  type RatingSource,
+} from '@raven/core'
+import type { ComponentType } from 'react'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/MediaGrid/MediaGrid.module.scss'
+
+/** How the grid draws each card: as a poster, or as a frame grab. */
+const CARD_KINDS = { poster: 'poster', frame: 'frame' } as const
+
+type CardKind = (typeof CARD_KINDS)[keyof typeof CARD_KINDS]
+
+type GridCardProps = {
+  media: MediaItem
+  matchType: MatchItemType | null
+  ratingsSource: RatingSource
+  sort?: MediaSort
+  posterOf?: (media: MediaItem) => ItemSummary | null
+}
+
+type GridPosterCardProps = GridCardProps
+
+const GridPosterCard = ({
+  media,
+  matchType,
+  ratingsSource,
+  sort,
+  posterOf,
+}: GridPosterCardProps) => (
+  <PosterCard
+    media={media}
+    poster={posterOf?.(media)}
+    matchType={matchType}
+    ratingsSource={ratingsSource}
+    sort={sort}
+    sizes={POSTER_SIZES.grid}
+  />
+)
+
+type GridFrameCardProps = GridCardProps
+
+const GridFrameCard = ({ media, matchType, sort }: GridFrameCardProps) => (
+  <MediaCard media={media} matchType={matchType} sort={sort} />
+)
+
+const GRID_CARDS = {
+  [CARD_KINDS.poster]: GridPosterCard,
+  [CARD_KINDS.frame]: GridFrameCard,
+} as const satisfies Record<CardKind, ComponentType<GridCardProps>>
+
+type CardKindOfProps = { hasPosters: boolean }
+
+const cardKindOf = ({ hasPosters }: CardKindOfProps): CardKind =>
+  hasPosters ? CARD_KINDS.poster : CARD_KINDS.frame
 
 type MediaGridProps = {
   items: MediaItem[]
@@ -24,28 +80,26 @@ export const MediaGrid = ({
   items,
   posters = false,
   matchType = null,
-  ratingsSource = 'tmdb',
+  ratingsSource = RATING_SOURCES.tmdb,
   sort,
   posterOf,
-}: MediaGridProps) => (
-  <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>
-    {items.map((item) =>
-      posters ? (
-        <PosterCard
+}: MediaGridProps) => {
+  const Card: ComponentType<GridCardProps> = GRID_CARDS[cardKindOf({ hasPosters: posters })]
+  return (
+    <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>
+      {items.map((item) => (
+        <Card
           key={item.id}
           media={item}
-          poster={posterOf?.(item)}
           matchType={matchType}
           ratingsSource={ratingsSource}
           sort={sort}
-          sizes={POSTER_SIZES.grid}
+          posterOf={posterOf}
         />
-      ) : (
-        <MediaCard key={item.id} media={item} matchType={matchType} sort={sort} />
-      ),
-    )}
-  </ul>
-)
+      ))}
+    </ul>
+  )
+}
 
 type MediaGridSkeletonProps = {
   posters?: boolean
@@ -55,6 +109,6 @@ type MediaGridSkeletonProps = {
 /** The grid while its cards are on their way: stand-ins shaped as its cards, posters or frame grabs. */
 export const MediaGridSkeleton = ({ posters = false, count }: MediaGridSkeletonProps) => (
   <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>
-    <SkeletonCards picture={posters ? 'poster' : 'frame'} count={count} />
+    <SkeletonCards picture={cardKindOf({ hasPosters: posters })} count={count} />
   </ul>
 )

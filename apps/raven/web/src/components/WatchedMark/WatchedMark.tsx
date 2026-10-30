@@ -1,11 +1,12 @@
 import { Icon } from '@raven/ui'
 import styles from '@/components/WatchedMark/WatchedMark.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type WatchedWordsProps = { watched: boolean }
 
 /** The words of the check, for a screen reader; the check itself is only a picture. */
 export const WatchedWords = ({ watched }: WatchedWordsProps) =>
-  watched && <span className="visually-hidden">Watched</span>
+  watched && <span className="visually-hidden">{COMMON_COPY.watched}</span>
 
 type WatchedMarkProps = {
   watched: boolean

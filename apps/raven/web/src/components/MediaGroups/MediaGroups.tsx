@@ -3,6 +3,7 @@ import {
   type MediaGroupBy,
   type MediaItem,
   type MediaSort,
+  RATING_SOURCES,
   type RatingSource,
   groupMedia,
 } from '@raven/core'
@@ -10,8 +11,7 @@ import { Bucket } from '@/components/Bucket/Bucket'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
 import { FactText } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/components/MediaGroups/MediaGroups.module.scss'
-
-const count = new Intl.NumberFormat()
+import { COMMON_COPY } from '@/lib/copy'
 
 type MediaGroupsProps = {
   items: MediaItem[]
@@ -28,7 +28,7 @@ export const MediaGroups = ({
   by,
   posters = false,
   matchType = null,
-  ratingsSource = 'tmdb',
+  ratingsSource = RATING_SOURCES.tmdb,
   sort,
 }: MediaGroupsProps) => (
   <div className={styles.groups}>
@@ -36,7 +36,7 @@ export const MediaGroups = ({
       <Bucket
         key={group.key}
         label={<FactText fact={group.label} />}
-        count={`${count.format(group.items.length)} ${group.items.length === 1 ? 'video' : 'videos'}`}
+        count={COMMON_COPY.videos(group.items.length)}
       >
         <MediaGrid
           items={group.items}

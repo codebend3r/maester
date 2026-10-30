@@ -21,7 +21,9 @@ import { itemQuery, mediaLocationQuery } from '@/lib/queries'
 import { useCanFavourite } from '@/lib/useCanFavourite'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import { useMenuList } from '@/lib/useMenu'
+import { MEDIA_MENU_COPY } from '@/components/MediaMenu/copy'
 import styles from '@/components/MediaMenu/MediaMenu.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /**
  * The class for a card, row or tile holding a menu: there the menu's button
@@ -82,7 +84,7 @@ const LocationItem = ({ media }: LocationItemProps) => {
   const [copied, setCopied] = useState(false)
   const location = useQuery(mediaLocationQuery(media.id))
   const path = location.data?.path ?? null
-  const waiting = location.isError ? location.error.message : 'Finding the file'
+  const waiting = location.isError ? location.error.message : MEDIA_MENU_COPY.findingFile
   return (
     <li role="none" className={styles.location}>
       <button
@@ -93,8 +95,13 @@ const LocationItem = ({ media }: LocationItemProps) => {
         onClick={async () => setCopied(path != null && (await copyText(path)))}
       >
         <Icon name="copy" size={16} />
-        <span className={styles.locationLabel}>{copied ? 'Copied' : 'Copy file path'}</span>
-        <span className={styles.path}>{path ? <WrappingPath path={path} /> : waiting}</span>
+        <span className={styles.locationLabel}>
+          {copied ? MEDIA_MENU_COPY.copied : MEDIA_MENU_COPY.copyPath}
+        </span>
+        <span className={styles.path}>
+          {path && <WrappingPath path={path} />}
+          {!path && waiting}
+        </span>
       </button>
     </li>
   )
@@ -120,6 +127,13 @@ type MenuProps = {
   onDeleted?: () => void
 }
 
+type MenuBodyProps = MenuProps & {
+  id: string
+  label: string
+  root: RefObject<HTMLDivElement | null>
+  trigger: RefObject<HTMLButtonElement | null>
+}
+
 /**
  * The menu's list and what it opens: the delete confirmation, Fix match,
  * and a failed refresh's message. It holds the video's mutations, so a grid
@@ -139,12 +153,7 @@ const MenuBody = ({
   label,
   root,
   trigger,
-}: MenuProps & {
-  id: string
-  label: string
-  root: RefObject<HTMLDivElement | null>
-  trigger: RefObject<HTMLButtonElement | null>
-}) => {
+}: MenuBodyProps) => {
   const [confirming, setConfirming] = useState(false)
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
@@ -180,7 +189,7 @@ const MenuBody = ({
           {withFavourite && canFavourite && (
             <MenuItem
               icon="heart"
-              label={media.favourite ? 'Remove favourite' : 'Favourite'}
+              label={media.favourite ? MEDIA_MENU_COPY.removeFavourite : COMMON_COPY.favourite}
               onClick={() => {
                 favourite.mutate(!media.favourite)
                 close({ refocus: true })
@@ -190,7 +199,7 @@ const MenuBody = ({
           {withWatched && (
             <MenuItem
               icon="check"
-              label={media.watched ? 'Mark as unwatched' : 'Mark as watched'}
+              label={media.watched ? MEDIA_MENU_COPY.markUnwatched : MEDIA_MENU_COPY.markWatched}
               onClick={() => {
                 watched.mutate(!media.watched)
                 close({ refocus: true })
@@ -201,7 +210,7 @@ const MenuBody = ({
             {matchable && (
               <MenuItem
                 icon="search"
-                label="Fix match"
+                label={COMMON_COPY.fixMatch}
                 onClick={() => {
                   close({ refocus: false })
                   setFixing(true)
@@ -211,7 +220,7 @@ const MenuBody = ({
             {matchable && item != null && (
               <MenuItem
                 icon="rescan"
-                label="Refresh details"
+                label={MEDIA_MENU_COPY.refreshDetails}
                 onClick={() => {
                   refresh.mutate(item.id)
                   close({ refocus: true })
@@ -221,7 +230,7 @@ const MenuBody = ({
             {artwork && (
               <MenuItem
                 icon="image"
-                label="Edit images"
+                label={COMMON_COPY.editImages}
                 onClick={() => {
                   close({ refocus: false })
                   setEditingImages(true)
@@ -230,7 +239,7 @@ const MenuBody = ({
             )}
             <MenuItem
               icon="trash"
-              label="Delete"
+              label={COMMON_COPY.delete}
               onClick={() => {
                 close({ refocus: false })
                 setConfirming(true)
@@ -243,7 +252,7 @@ const MenuBody = ({
 
       {refresh.isError && (
         <p role="alert" className={styles.failure}>
-          Could not refresh: {refresh.error.message}
+          {MEDIA_MENU_COPY.couldNotRefresh(refresh.error.message)}
         </p>
       )}
 
@@ -291,6 +300,8 @@ const MenuBody = ({
   )
 }
 
+type MediaMenuProps = MenuProps
+
 /**
  * A card's context menu: mark or unmark a favourite, mark it watched or
  * unwatched and, with the admin lock
@@ -301,14 +312,14 @@ const MenuBody = ({
  * discoverable way in for touch and keyboard. Until it first opens it is
  * only that button.
  */
-export const MediaMenu = (props: MenuProps) => {
+export const MediaMenu = (props: MediaMenuProps) => {
   const { media, open, onOpenChange, inline = false, beside = false } = props
   const id = useId()
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [woken, setWoken] = useState(open)
   if (open && !woken) setWoken(true)
-  const label = `Options for ${mediaLabel(media)}`
+  const label = MEDIA_MENU_COPY.options(mediaLabel(media))
 
   return (
     <div

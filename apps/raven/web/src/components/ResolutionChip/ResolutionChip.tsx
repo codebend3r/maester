@@ -1,5 +1,6 @@
 import { RESOLUTIONS, type Resolution, isResolution, splitResolution } from '@raven/core'
-import type { ReactNode } from 'react'
+import type { ComponentType, ReactNode } from 'react'
+import { RESOLUTION_CHIP_COPY } from '@/components/ResolutionChip/copy'
 import styles from '@/components/ResolutionChip/ResolutionChip.module.scss'
 
 type PictureChipProps = {
@@ -35,7 +36,10 @@ type ResolutionChipProps = { resolution: Resolution | null }
  */
 export const ResolutionChip = ({ resolution }: ResolutionChipProps) =>
   resolution != null && (
-    <PictureChip label={`Video resolution: ${resolution}`} className={TIERS[resolution]}>
+    <PictureChip
+      label={RESOLUTION_CHIP_COPY.videoResolution(resolution)}
+      className={TIERS[resolution]}
+    >
       {resolution}
     </PictureChip>
   )
@@ -54,6 +58,32 @@ export const PictureFact = ({ resolution, rest }: PictureFactProps) => (
   </span>
 )
 
+/** Whether a fact or word opens with a resolution, drawn as the chip, or is plain text. */
+const FACT_KINDS = { chip: 'chip', text: 'text' } as const
+type FactKind = (typeof FACT_KINDS)[keyof typeof FACT_KINDS]
+
+type FactKindOfProps = { resolution: Resolution | null }
+
+const factKindOf = ({ resolution }: FactKindOfProps): FactKind =>
+  resolution == null ? FACT_KINDS.text : FACT_KINDS.chip
+
+type SplitFactProps = { fact: string; resolution: Resolution | null; rest: string | null }
+
+type PlainFactProps = SplitFactProps
+
+const PlainFact = ({ fact }: PlainFactProps) => fact
+
+type ChipFactProps = SplitFactProps
+
+const ChipFact = ({ resolution, rest }: ChipFactProps) => (
+  <PictureFact resolution={resolution} rest={rest} />
+)
+
+const FACT_VIEWS = {
+  [FACT_KINDS.chip]: ChipFact,
+  [FACT_KINDS.text]: PlainFact,
+} as const satisfies Record<FactKind, ComponentType<SplitFactProps>>
+
 type FactTextProps = { fact: string }
 
 /**
@@ -65,9 +95,18 @@ type FactTextProps = { fact: string }
  */
 export const FactText = ({ fact }: FactTextProps) => {
   const { resolution, rest } = splitResolution(fact)
-  if (resolution == null) return fact
-  return <PictureFact resolution={resolution} rest={rest} />
+  const View = FACT_VIEWS[factKindOf({ resolution })]
+  return <View fact={fact} resolution={resolution} rest={rest} />
 }
+
+type ChipWordProps = SplitFactProps
+
+const ChipWord = ({ resolution }: ChipWordProps) => <ResolutionChip resolution={resolution} />
+
+const WORD_VIEWS = {
+  [FACT_KINDS.chip]: ChipWord,
+  [FACT_KINDS.text]: PlainFact,
+} as const satisfies Record<FactKind, ComponentType<SplitFactProps>>
 
 type WordFactProps = { fact: string }
 
@@ -76,5 +115,8 @@ type WordFactProps = { fact: string }
  * chip when the word is a resolution, else the word. Names someone chose
  * (an edition, a library) are not words of these lists, so they stay text.
  */
-export const WordFact = ({ fact }: WordFactProps) =>
-  isResolution(fact) ? <ResolutionChip resolution={fact} /> : fact
+export const WordFact = ({ fact }: WordFactProps) => {
+  const resolution = isResolution(fact) ? fact : null
+  const View = WORD_VIEWS[factKindOf({ resolution })]
+  return <View fact={fact} resolution={resolution} rest={null} />
+}

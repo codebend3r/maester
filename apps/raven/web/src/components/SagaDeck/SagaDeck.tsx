@@ -9,6 +9,7 @@ import { POSTER_SIZES } from '@/lib/posters'
 import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/SagaDeck/SagaDeck.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /**
  * How many posters show while a deck is stacked: the top one and the three
@@ -63,7 +64,7 @@ const SagaDeck = ({ saga, to }: SagaDeckProps) => {
         </span>
         <span className={styles.name}>{saga.name}</span>
         <span className={styles.facts}>
-          <span>{sagaFacts(saga).join(' · ')}</span>
+          <span>{sagaFacts(saga).join(COMMON_COPY.separator)}</span>
           <WatchedCount
             watched={saga.media.filter((media) => media.watched).length}
             total={saga.media.length}

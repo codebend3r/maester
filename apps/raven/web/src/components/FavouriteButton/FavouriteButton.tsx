@@ -1,5 +1,6 @@
 import { Button } from '@raven/ui'
 import styles from '@/components/FavouriteButton/FavouriteButton.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type FavouriteButtonProps = {
   isFavourite: boolean
@@ -10,7 +11,7 @@ type FavouriteButtonProps = {
 export const FavouriteButton = ({ isFavourite, onToggle }: FavouriteButtonProps) => (
   <Button
     icon="heart"
-    aria-label="Favourite"
+    aria-label={COMMON_COPY.favourite}
     aria-pressed={isFavourite}
     className={styles.favourite}
     onClick={() => onToggle(!isFavourite)}
