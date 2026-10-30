@@ -4,6 +4,8 @@ import {
   type EpisodeSummary,
   type ItemDetails,
   ROUTE_STATES,
+  type RoutePending,
+  type RouteQuery,
   SESSION_KINDS,
   type ViewingSession,
   episodeCode,
@@ -22,9 +24,10 @@ import {
   ITEM_IMAGE_KINDS,
   WATCHED_STATES,
 } from '@raven/core'
-import { useId } from 'react'
+import { type ReactNode, useId } from 'react'
 import { Link } from 'react-router-dom'
 import { ButtonLink, Icon } from '@raven/ui'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import {
@@ -52,11 +55,45 @@ import { useItemFavourite } from '@/lib/useItemFavourite'
 import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
+import { SEASON_COPY } from '@/pages/SeasonPage/copy'
 import { FactText } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
 
 /** A season's page plays the rest of that season, then stops. */
 const SEASON_SESSION: ViewingSession = { kind: SESSION_KINDS.season }
+
+const STILL_KEYS = { picture: 'picture', number: 'number' } as const
+
+type StillPictureProps = { picture: string }
+
+const StillPicture = ({ picture }: StillPictureProps) => (
+  <img src={picture} alt="" loading="lazy" decoding="async" />
+)
+
+type StillNumberProps = { number: ReactNode }
+
+const StillNumber = ({ number }: StillNumberProps) => (
+  <span className={styles.stillPlaceholder}>{number}</span>
+)
+
+type StillProps = {
+  [STILL_KEYS.picture]: StillPictureProps
+  [STILL_KEYS.number]: StillNumberProps
+}
+
+const STILLS = {
+  [STILL_KEYS.picture]: StillPicture,
+  [STILL_KEYS.number]: StillNumber,
+} as const satisfies ViewsOf<StillProps>
+
+type StillOfProps = { episode: EpisodeSummary }
+
+/** An episode's still where it has one, else its number in the still's place. */
+const stillOf = ({ episode }: StillOfProps): ViewOf<StillProps> => {
+  const picture = episodeStillUrl({ api, episode })
+  if (picture) return { key: STILL_KEYS.picture, props: { picture } }
+  return { key: STILL_KEYS.number, props: { number: episode.episode ?? '' } }
+}
 
 type EpisodeRowProps = { episode: EpisodeSummary }
 
@@ -72,7 +109,6 @@ const EpisodeRow = ({ episode }: EpisodeRowProps) => {
     targets: [{ kind: WATCH_TARGET_KINDS.item, id: episode.id, libraryId: null }],
   })
   const file = episode.primary ?? undefined
-  const picture = episodeStillUrl({ api, episode })
   const facts = episodeRowFacts(episode)
 
   return (
@@ -84,11 +120,7 @@ const EpisodeRow = ({ episode }: EpisodeRowProps) => {
         tabIndex={-1}
         aria-hidden="true"
       >
-        {picture ? (
-          <img src={picture} alt="" loading="lazy" decoding="async" />
-        ) : (
-          <span className={styles.stillPlaceholder}>{episode.episode ?? ''}</span>
-        )}
+        <KeyedView<StillProps> views={STILLS} view={stillOf({ episode })} />
         <span className={styles.overlay}>
           <WatchedMark decorative watched={episode.watched} className={styles.watched} />
           {file && <ResumeBar media={file} className={styles.resume} />}
@@ -96,7 +128,9 @@ const EpisodeRow = ({ episode }: EpisodeRowProps) => {
       </Link>
       <div className={styles.body}>
         <p className={styles.heading}>
-          {episode.episode != null && <span className={styles.code}>E{episode.episode}</span>}
+          {episode.episode != null && (
+            <span className={styles.code}>{SEASON_COPY.episodeNumber(episode.episode)}</span>
+          )}
           <Link
             to={`/episodes/${episode.id}`}
             className={styles.title}
@@ -119,12 +153,16 @@ const EpisodeRow = ({ episode }: EpisodeRowProps) => {
       </div>
       {!select.selecting && (
         <span className={styles.actions}>
-          <WatchedToggle {...toggle} label={`Watched ${episode.title}`} isLabelShown={false} />
+          <WatchedToggle
+            {...toggle}
+            label={SEASON_COPY.watched(episode.title)}
+            isLabelShown={false}
+          />
           {file && (
             <Link
               {...watchLink({ media: file, session: SEASON_SESSION })}
               className={styles.play}
-              aria-label={`Play ${episode.title}`}
+              aria-label={SEASON_COPY.playEpisode(episode.title)}
             >
               <Icon name="play" size={14} />
             </Link>
@@ -187,14 +225,16 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
               icon="play"
               {...watchLink({ media: nextFile, session: SEASON_SESSION })}
             >
-              {nextCode ? `Play ${nextCode}` : 'Play'}
+              {SEASON_COPY.play(nextCode)}
             </ButtonLink>
           )}
           {season.favourite != null && (
             <FavouriteButton isFavourite={season.favourite} onToggle={favourite.mutate} />
           )}
-          {hasFiles && <ShuffleButton itemId={season.id}>Shuffle season</ShuffleButton>}
-          {hasFiles && <ShuffleButton itemId={show.id}>Shuffle show</ShuffleButton>}
+          {hasFiles && (
+            <ShuffleButton itemId={season.id}>{SEASON_COPY.shuffleSeason}</ShuffleButton>
+          )}
+          {hasFiles && <ShuffleButton itemId={show.id}>{SEASON_COPY.shuffleShow}</ShuffleButton>}
           <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.item, itemId: season.id }} />
           <WatchedToggle {...toggle} />
           <SelectButton />
@@ -204,7 +244,7 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
 
         <section aria-labelledby={ids.episodes} className={styles.episodes}>
           <SectionHeading id={ids.episodes} aside={count > 0 && watchedWords}>
-            Episodes
+            {SEASON_COPY.episodes}
           </SectionHeading>
           <ol className={styles.list}>
             {episodes.map((episode) => (
@@ -221,6 +261,46 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
   )
 }
 
+const SEASON_VIEW_KEYS = { pending: 'pending', missing: 'missing', ready: 'ready' } as const
+
+type SeasonViewsProps = {
+  [SEASON_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
+  [SEASON_VIEW_KEYS.missing]: Record<never, never>
+  [SEASON_VIEW_KEYS.ready]: SeasonViewProps
+}
+
+const SEASON_VIEWS = {
+  [SEASON_VIEW_KEYS.pending]: RouteState,
+  [SEASON_VIEW_KEYS.missing]: NotFoundPage,
+  [SEASON_VIEW_KEYS.ready]: SeasonView,
+} as const satisfies ViewsOf<SeasonViewsProps>
+
+type PendingSeasonProps = { state: RoutePending }
+
+const pendingSeason = ({ state }: PendingSeasonProps): ViewOf<SeasonViewsProps> => ({
+  key: SEASON_VIEW_KEYS.pending,
+  props: { state, noun: SEASON_COPY.noun, shape: <ItemHeaderSkeleton picture="poster" /> },
+})
+
+type SeasonPageViewProps = {
+  show: RouteQuery<ItemDetails>
+  summaryId: number | null
+  seasonQuery: Parameters<typeof routeState<ItemDetails>>[0]['query']
+}
+
+/** The show then the season on their way or failing, a season the show lacks, else the season. */
+const seasonPageView = ({
+  show,
+  summaryId,
+  seasonQuery,
+}: SeasonPageViewProps): ViewOf<SeasonViewsProps> => {
+  if (show.state !== ROUTE_STATES.ready) return pendingSeason({ state: show })
+  if (summaryId == null) return { key: SEASON_VIEW_KEYS.missing, props: {} }
+  const season = routeState({ id: summaryId, query: seasonQuery })
+  if (season.state !== ROUTE_STATES.ready) return pendingSeason({ state: season })
+  return { key: SEASON_VIEW_KEYS.ready, props: { show: show.data, season: season.data } }
+}
+
 /**
  * `/shows/:id/seasons/:number`: a season's poster under its show's
  * backdrop, how much of it is watched, Play for the next episode and Shuffle
@@ -235,13 +315,10 @@ export const SeasonPage = () => {
   const seasonQuery = useQuery(itemQuery(summary?.id ?? null))
 
   const show = routeState({ id: number == null ? null : showId, query: showQuery })
-  if (show.state !== ROUTE_STATES.ready)
-    return <RouteState state={show} noun="season" shape={<ItemHeaderSkeleton picture="poster" />} />
-  if (!summary) return <NotFoundPage />
-  const season = routeState({ id: summary.id, query: seasonQuery })
-  if (season.state !== ROUTE_STATES.ready)
-    return (
-      <RouteState state={season} noun="season" shape={<ItemHeaderSkeleton picture="poster" />} />
-    )
-  return <SeasonView show={show.data} season={season.data} />
+  return (
+    <KeyedView<SeasonViewsProps>
+      views={SEASON_VIEWS}
+      view={seasonPageView({ show, summaryId: summary?.id ?? null, seasonQuery })}
+    />
+  )
 }

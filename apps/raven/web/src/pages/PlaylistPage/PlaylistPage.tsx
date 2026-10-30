@@ -3,12 +3,13 @@ import {
   type PlaylistDetails,
   QUEUE_SOURCE_KINDS,
   ROUTE_STATES,
+  type RouteQuery,
   type Track,
   routeState,
 } from '@raven/core'
 import { Button, useCanGoBack } from '@raven/ui'
 import { useAudioQueue } from '@raven/ui/headless'
-import { useId, useState } from 'react'
+import { type ComponentType, useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { PlaylistNameDialog } from '@/components/PlaylistNameDialog/PlaylistNameDialog'
@@ -19,8 +20,10 @@ import { playlistFacts } from '@/lib/music'
 import { playlistQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
 import { usePlaylistMutations } from '@/lib/usePlaylistMutations'
+import { PLAYLIST_PAGE_COPY } from '@/pages/PlaylistPage/copy'
 import { DeletePlaylistDialog } from '@/pages/PlaylistPage/DeletePlaylistDialog'
 import styles from '@/pages/PlaylistPage/PlaylistPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** What the page has open over it: nothing, the rename, or the delete. */
 const OPEN_DIALOGS = { none: 'none', rename: 'rename', remove: 'remove' } as const
@@ -45,27 +48,60 @@ const PlaylistTrackControls = ({ track, index }: PlaylistTrackControlsProps) => 
   const playlist = useQuery(playlistQuery(id))
   const { setTracks } = usePlaylistMutations()
   const tracks = playlist.data?.tracks ?? []
-  if (id === null) return null
   return (
-    <>
-      <Button
-        tone="ghost"
-        icon="up"
-        aria-label={`Move ${track.title} up`}
-        disabled={index === 0}
-        onClick={() => setTracks.mutate({ id, tracks: movedUp({ tracks, index }) })}
-      />
-      <Button
-        tone="ghost"
-        icon="close"
-        aria-label={`Remove ${track.title} from the playlist`}
-        onClick={() =>
-          setTracks.mutate({ id, tracks: tracks.filter((_track, place) => place !== index) })
-        }
-      />
-    </>
+    id !== null && (
+      <>
+        <Button
+          tone="ghost"
+          icon="up"
+          aria-label={PLAYLIST_PAGE_COPY.moveUp(track.title)}
+          disabled={index === 0}
+          onClick={() => setTracks.mutate({ id, tracks: movedUp({ tracks, index }) })}
+        />
+        <Button
+          tone="ghost"
+          icon="close"
+          aria-label={PLAYLIST_PAGE_COPY.takeOut(track.title)}
+          onClick={() =>
+            setTracks.mutate({ id, tracks: tracks.filter((_track, place) => place !== index) })
+          }
+        />
+      </>
+    )
   )
 }
+
+/** Whether the playlist has tracks to list, or is empty. */
+const TRACK_VIEW_KEYS = { empty: 'empty', listed: 'listed' } as const
+type TrackViewKey = (typeof TRACK_VIEW_KEYS)[keyof typeof TRACK_VIEW_KEYS]
+
+type PlaylistTracksProps = {
+  details: PlaylistDetails
+  onPlay: (index: number) => void
+}
+
+type EmptyTracksProps = PlaylistTracksProps
+
+const EmptyTracks = ({ details }: EmptyTracksProps) => (
+  <p className={styles.empty}>{PLAYLIST_PAGE_COPY.empty(details.playlist.name)}</p>
+)
+
+type ListedTracksProps = PlaylistTracksProps
+
+const ListedTracks = ({ details, onPlay }: ListedTracksProps) => (
+  <TrackList
+    tracks={details.tracks}
+    onPlay={onPlay}
+    numberOf={({ index }) => index + 1}
+    Trail={PlaylistTrackControls}
+    label={PLAYLIST_PAGE_COPY.tracks}
+  />
+)
+
+const TRACK_VIEWS = {
+  [TRACK_VIEW_KEYS.empty]: EmptyTracks,
+  [TRACK_VIEW_KEYS.listed]: ListedTracks,
+} as const satisfies Record<TrackViewKey, ComponentType<PlaylistTracksProps>>
 
 type PlaylistViewProps = { details: PlaylistDetails }
 
@@ -83,16 +119,18 @@ const PlaylistView = ({ details }: PlaylistViewProps) => {
   const failure = setTracks.failure ?? rename.failure
   // A deleted playlist's page has nothing to show, so the way back is taken for the listener.
   const leave = () => void (canGoBack ? navigate(-1) : navigate(HOME.to))
+  const Tracks: ComponentType<PlaylistTracksProps> =
+    TRACK_VIEWS[tracks.length === 0 ? TRACK_VIEW_KEYS.empty : TRACK_VIEW_KEYS.listed]
 
   return (
     <article className={styles.page} aria-labelledby={titleId}>
       <BackButton fallback={HOME} className={styles.back} />
       <header className={styles.header}>
-        <p className={styles.eyebrow}>Playlist</p>
+        <p className={styles.eyebrow}>{PLAYLIST_PAGE_COPY.eyebrow}</p>
         <h1 id={titleId} className={styles.title}>
           {playlist.name}
         </h1>
-        <p className={styles.facts}>{playlistFacts({ playlist }).join(' · ')}</p>
+        <p className={styles.facts}>{playlistFacts({ playlist }).join(COMMON_COPY.separator)}</p>
         <div className={styles.actions}>
           <Button
             tone="primary"
@@ -100,48 +138,39 @@ const PlaylistView = ({ details }: PlaylistViewProps) => {
             disabled={tracks.length === 0}
             onClick={() => playTracks({ tracks, source })}
           >
-            Play
+            {COMMON_COPY.play}
           </Button>
           <Button
             icon="shuffle"
             disabled={tracks.length === 0}
             onClick={() => playTracks({ tracks, source, isShuffled: true })}
           >
-            Shuffle
+            {COMMON_COPY.shuffle}
           </Button>
           <Button icon="edit" onClick={() => setDialog(OPEN_DIALOGS.rename)}>
-            Rename
+            {PLAYLIST_PAGE_COPY.rename}
           </Button>
           <Button icon="trash" onClick={() => setDialog(OPEN_DIALOGS.remove)}>
-            Delete
+            {COMMON_COPY.delete}
           </Button>
         </div>
         {failure !== null && (
           <p className={styles.error} role="alert">
-            Could not change the playlist: {failure.message}
+            {PLAYLIST_PAGE_COPY.changeFailed(failure.message)}
           </p>
         )}
       </header>
 
-      {tracks.length === 0 ? (
-        <p className={styles.empty}>
-          Nothing in {playlist.name} yet. Add tracks from an album, or from Now playing.
-        </p>
-      ) : (
-        <TrackList
-          tracks={tracks}
-          onPlay={(index) => playTracks({ tracks, startAt: index, source })}
-          numberOf={({ index }) => index + 1}
-          Trail={PlaylistTrackControls}
-          label="Tracks"
-        />
-      )}
+      <Tracks
+        details={details}
+        onPlay={(index) => playTracks({ tracks, startAt: index, source })}
+      />
 
       {dialog === OPEN_DIALOGS.rename && (
         <PlaylistNameDialog
-          title="Rename playlist"
+          title={PLAYLIST_PAGE_COPY.renameTitle}
           initialName={playlist.name}
-          submitLabel="Rename"
+          submitLabel={PLAYLIST_PAGE_COPY.rename}
           isPending={false}
           error={null}
           onSubmit={(name) => {
@@ -168,13 +197,36 @@ const PlaylistSkeleton = () => (
   </>
 )
 
+type PlaylistPageViewProps = { page: RouteQuery<PlaylistDetails> }
+
+type PlaylistPendingProps = PlaylistPageViewProps
+
+/** The playlist missing, failing or on its way. */
+const PlaylistPending = ({ page }: PlaylistPendingProps) =>
+  page.state !== ROUTE_STATES.ready && (
+    <RouteState state={page} noun={PLAYLIST_PAGE_COPY.noun} shape={<PlaylistSkeleton />} />
+  )
+
+type PlaylistReadyProps = PlaylistPageViewProps
+
+const PlaylistReady = ({ page }: PlaylistReadyProps) =>
+  page.state === ROUTE_STATES.ready && <PlaylistView details={page.data} />
+
+const PLAYLIST_PAGE_VIEWS = {
+  [ROUTE_STATES.missing]: PlaylistPending,
+  [ROUTE_STATES.error]: PlaylistPending,
+  [ROUTE_STATES.loading]: PlaylistPending,
+  [ROUTE_STATES.ready]: PlaylistReady,
+} as const satisfies Record<
+  RouteQuery<PlaylistDetails>['state'],
+  ComponentType<PlaylistPageViewProps>
+>
+
 /** `/playlists/:id`: one of the account's playlists, its tracks in order, played, reordered and renamed here. */
 export const PlaylistPage = () => {
   const id = useRouteId()
   const playlist = useQuery(playlistQuery(id))
   const page = routeState({ id, query: playlist })
-  if (page.state !== ROUTE_STATES.ready) {
-    return <RouteState state={page} noun="playlist" shape={<PlaylistSkeleton />} />
-  }
-  return <PlaylistView details={page.data} />
+  const View: ComponentType<PlaylistPageViewProps> = PLAYLIST_PAGE_VIEWS[page.state]
+  return <View page={page} />
 }

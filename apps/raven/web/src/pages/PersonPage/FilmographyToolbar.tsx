@@ -4,15 +4,10 @@ import { useId } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { SearchField } from '@/components/SearchField/SearchField'
 import type { Search } from '@raven/ui/headless'
+import { PERSON_COPY } from '@/pages/PersonPage/copy'
 import styles from '@/pages/PersonPage/FilmographyToolbar.module.scss'
 
-const TAB_LABELS: Record<FilmographyTab, string> = {
-  all: 'All',
-  acting: 'Acting',
-  directing: 'Directing',
-  writing: 'Writing',
-  producing: 'Producing',
-}
+const TAB_LABELS: Record<FilmographyTab, string> = PERSON_COPY.tabs
 
 const count = new Intl.NumberFormat()
 
@@ -58,7 +53,7 @@ export const FilmographyToolbar = ({
       <search className={styles.find}>
         <div className={styles.search}>
           <label htmlFor={id} className="visually-hidden">
-            Search titles
+            {PERSON_COPY.searchTitles}
           </label>
           <span className={styles.searchIcon}>
             <Icon name="search" size={18} />
@@ -67,7 +62,7 @@ export const FilmographyToolbar = ({
             id={id}
             search={search}
             className={styles.input}
-            placeholder="Search titles"
+            placeholder={PERSON_COPY.searchTitles}
           />
         </div>
         {hasSelfCredits && (
@@ -77,11 +72,11 @@ export const FilmographyToolbar = ({
               checked={isSelfShown}
               onChange={(event) => onSelfShownChange(event.target.checked)}
             />
-            Show appearances as themselves
+            {PERSON_COPY.showSelf}
           </label>
         )}
       </search>
-      <nav aria-label="Credits" className={styles.tabsNav}>
+      <nav aria-label={PERSON_COPY.credits} className={styles.tabsNav}>
         <ul className={styles.tabs}>
           {FILMOGRAPHY_TABS.filter((each) => each === 'all' || counts[each] > 0).map((each) => (
             <li key={each} className={styles.tabItem}>
@@ -90,7 +85,10 @@ export const FilmographyToolbar = ({
                 replace
                 className={styles.tab}
                 aria-current={each === tab ? 'page' : undefined}
-                aria-label={`${TAB_LABELS[each]}, ${count.format(counts[each])}`}
+                aria-label={PERSON_COPY.tabWithCount({
+                  label: TAB_LABELS[each],
+                  count: count.format(counts[each]),
+                })}
               >
                 {TAB_LABELS[each]}
                 <span className={styles.tabCount}>{count.format(counts[each])}</span>

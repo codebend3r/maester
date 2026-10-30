@@ -3,6 +3,7 @@ import {
   DOWNLOAD_TARGET_KINDS,
   type ItemDetails,
   ROUTE_STATES,
+  type RouteQuery,
   type SeasonSummary,
   TITLE_DISPLAYS,
   createdBy,
@@ -20,11 +21,12 @@ import {
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
 } from '@raven/core'
-import { useId, useState } from 'react'
+import { type ReactNode, useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button, ButtonLink } from '@raven/ui'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
@@ -52,13 +54,45 @@ import { useRouteItem } from '@/lib/routeQuery'
 import { useItemFavourite } from '@/lib/useItemFavourite'
 import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
+import { SHOW_COPY } from '@/pages/ShowPage/copy'
 import styles from '@/pages/ShowPage/ShowPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
+
+const SEASON_POSTER_KEYS = { picture: 'picture', number: 'number' } as const
+
+type SeasonPictureProps = { poster: NonNullable<ReturnType<typeof posterSources>> }
+
+const SeasonPicture = ({ poster }: SeasonPictureProps) => (
+  <img {...poster} alt="" loading="lazy" decoding="async" />
+)
+
+type SeasonNumberProps = { number: ReactNode }
+
+const SeasonNumber = ({ number }: SeasonNumberProps) => <span aria-hidden="true">{number}</span>
+
+type SeasonPosterProps = {
+  [SEASON_POSTER_KEYS.picture]: SeasonPictureProps
+  [SEASON_POSTER_KEYS.number]: SeasonNumberProps
+}
+
+const SEASON_POSTERS = {
+  [SEASON_POSTER_KEYS.picture]: SeasonPicture,
+  [SEASON_POSTER_KEYS.number]: SeasonNumber,
+} as const satisfies ViewsOf<SeasonPosterProps>
+
+type SeasonPosterOfProps = { season: SeasonSummary }
+
+/** A season's poster where it has one, else its number in the poster's place. */
+const seasonPosterOf = ({ season }: SeasonPosterOfProps): ViewOf<SeasonPosterProps> => {
+  const poster = posterSources({ item: season, sizes: POSTER_SIZES.season })
+  if (poster) return { key: SEASON_POSTER_KEYS.picture, props: { poster } }
+  return { key: SEASON_POSTER_KEYS.number, props: { number: season.season ?? '' } }
+}
 
 type SeasonCardProps = { season: SeasonSummary; show: ItemDetails }
 
 /** One season in the row: its poster, name and how many episodes are on disk. */
 const SeasonCard = ({ season, show }: SeasonCardProps) => {
-  const poster = posterSources({ item: season, sizes: POSTER_SIZES.season })
   const to = itemPath(season) ?? `/shows/${show.id}`
   const count = season.episodeCount
   const select = useSelectable({ key: seasonEntryKey(season), title: season.title })
@@ -67,11 +101,7 @@ const SeasonCard = ({ season, show }: SeasonCardProps) => {
       <SelectCheckbox select={select} className={styles.select} />
       <Link to={to} className={styles.seasonLink} tabIndex={select.linkTabIndex}>
         <span className={styles.seasonPoster}>
-          {poster ? (
-            <img {...poster} alt="" loading="lazy" decoding="async" />
-          ) : (
-            <span aria-hidden="true">{season.season ?? ''}</span>
-          )}
+          <KeyedView<SeasonPosterProps> views={SEASON_POSTERS} view={seasonPosterOf({ season })} />
           <WatchedCount
             watched={season.watchedCount}
             total={season.episodeCount}
@@ -80,9 +110,7 @@ const SeasonCard = ({ season, show }: SeasonCardProps) => {
         </span>
         <span className={styles.seasonText}>
           <span className={styles.seasonTitle}>{season.title}</span>
-          <span className={styles.seasonCount}>
-            {count} {count === 1 ? 'episode' : 'episodes'}
-          </span>
+          <span className={styles.seasonCount}>{COMMON_COPY.episodes(count)}</span>
         </span>
       </Link>
     </li>
@@ -103,7 +131,7 @@ const ShowView = ({ details }: ShowViewProps) => {
   const showsLogo = useQuery(displaySettingsQuery).data?.titles !== TITLE_DISPLAYS.text
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId ?? null
   const known = useQuery(librariesQuery).data ?? []
-  const libraryName = known.find((entry) => entry.id === libraryId)?.name ?? 'Library'
+  const libraryName = known.find((entry) => entry.id === libraryId)?.name ?? COMMON_COPY.library
   // Each library holding the show can choose its own pictures.
   const pictures = picturesIn({ details, libraryId })
   const library = {
@@ -132,7 +160,7 @@ const ShowView = ({ details }: ShowViewProps) => {
           back={library}
           library={library}
           titleId={ids.title}
-          eyebrow={['Show']}
+          eyebrow={[SHOW_COPY.eyebrow]}
           title={details.title}
           logo={
             showsLogo
@@ -163,17 +191,17 @@ const ShowView = ({ details }: ShowViewProps) => {
                 aria-pressed={editingImages}
                 onClick={() => setEditingImages((editing) => !editing)}
               >
-                Edit images
+                {COMMON_COPY.editImages}
               </Button>
               <Button
                 icon="edit"
                 aria-pressed={editingMetadata}
                 onClick={() => setEditingMetadata((editing) => !editing)}
               >
-                Edit metadata
+                {COMMON_COPY.editMetadata}
               </Button>
               <Button icon="search" onClick={() => setFixing(true)}>
-                Fix match
+                {COMMON_COPY.fixMatch}
               </Button>
               <HeroToggle itemId={details.id} />
             </AdminOnly>
@@ -181,13 +209,15 @@ const ShowView = ({ details }: ShowViewProps) => {
         >
           {next.data && (
             <ButtonLink tone="primary" icon="play" {...watchLink({ media: next.data })}>
-              {code ? `Play ${code}` : 'Play'}
+              {SHOW_COPY.play(code)}
             </ButtonLink>
           )}
           {details.favourite != null && (
             <FavouriteButton isFavourite={details.favourite} onToggle={favourite.mutate} />
           )}
-          {marks.total > 0 && <ShuffleButton itemId={details.id}>Shuffle</ShuffleButton>}
+          {marks.total > 0 && (
+            <ShuffleButton itemId={details.id}>{COMMON_COPY.shuffle}</ShuffleButton>
+          )}
           <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.item, itemId: details.id }} />
           <WatchedToggle {...toggle} />
           <SelectButton />
@@ -201,14 +231,14 @@ const ShowView = ({ details }: ShowViewProps) => {
               details={details}
               libraries={known}
               libraryId={libraryId}
-              itemKind="show"
+              itemKind={ITEM_TYPES.show}
               onDone={() => setEditingImages(false)}
             />
           )}
           {editingMetadata && (
             <MetadataEditor
               details={details}
-              itemKind="show"
+              itemKind={ITEM_TYPES.show}
               onDone={() => setEditingMetadata(false)}
             />
           )}
@@ -218,7 +248,7 @@ const ShowView = ({ details }: ShowViewProps) => {
 
         {seasons.length > 0 && (
           <section className={styles.seasons} aria-labelledby={ids.seasons}>
-            <SectionHeading id={ids.seasons}>Seasons</SectionHeading>
+            <SectionHeading id={ids.seasons}>{SHOW_COPY.seasons}</SectionHeading>
             <ul className={styles.seasonRow}>
               {seasons.map((season) => (
                 <SeasonCard key={season.id} season={season} show={details} />
@@ -258,14 +288,36 @@ const ShowView = ({ details }: ShowViewProps) => {
   )
 }
 
+const SHOW_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
+
+type ShowViewsProps = {
+  [SHOW_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
+  [SHOW_VIEW_KEYS.ready]: ShowViewProps
+}
+
+const SHOW_VIEWS = {
+  [SHOW_VIEW_KEYS.pending]: RouteState,
+  [SHOW_VIEW_KEYS.ready]: ShowView,
+} as const satisfies ViewsOf<ShowViewsProps>
+
+type ShowPageViewProps = { page: RouteQuery<ItemDetails> }
+
+/** The show on its way or failing, else the show. */
+const showPageView = ({ page }: ShowPageViewProps): ViewOf<ShowViewsProps> => {
+  if (page.state !== ROUTE_STATES.ready)
+    return {
+      key: SHOW_VIEW_KEYS.pending,
+      props: { state: page, noun: SHOW_COPY.noun, shape: <ItemHeaderSkeleton picture="poster" /> },
+    }
+  return { key: SHOW_VIEW_KEYS.ready, props: { details: page.data } }
+}
+
 /**
  * `/shows/:id`: a show's backdrop, poster, creator, years, network, scores,
  * Play for the next episode and Shuffle for a random one, then its summary,
  * its seasons as posters in a row, its people and its reviews.
  */
 export const ShowPage = () => {
-  const page = useRouteItem('show')
-  if (page.state !== ROUTE_STATES.ready)
-    return <RouteState state={page} noun="show" shape={<ItemHeaderSkeleton picture="poster" />} />
-  return <ShowView details={page.data} />
+  const page = useRouteItem(ITEM_TYPES.show)
+  return <KeyedView<ShowViewsProps> views={SHOW_VIEWS} view={showPageView({ page })} />
 }

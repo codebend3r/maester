@@ -3,6 +3,7 @@ import {
   DOWNLOAD_TARGET_KINDS,
   type Library,
   ROUTE_STATES,
+  type RouteQuery,
   SAGA_BACKDROP_TYPES,
   SESSION_KINDS,
   type Saga,
@@ -19,6 +20,7 @@ import { type ReactNode, useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink } from '@raven/ui'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import {
   type HeaderBackdrop,
   itemBackdrop,
@@ -35,15 +37,16 @@ import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
 import { SelectionScope, mediaEntryOf, sourceOf } from '@/components/SelectionScope/SelectionScope'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
-import { LIBRARY_LOCK_STATES, useLibraryLock } from '@/lib/libraryLock'
+import { LIBRARY_LOCK_STATES, type LibraryLock, useLibraryLock } from '@/lib/libraryLock'
 import { libraryQuery, sagasQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { useOwnBackdrop } from '@/lib/useHoverBackdrop'
-import { sectionPath } from '@/pages/LibraryPage/librarySections'
+import { LIBRARY_SECTIONS, sectionPath } from '@/pages/LibraryPage/librarySections'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { SagaBackdropDialog } from '@/pages/SagaPage/SagaBackdropDialog'
 import { SagaFilms } from '@/pages/SagaPage/SagaFilms'
+import { SAGA_COPY } from '@/pages/SagaPage/copy'
 import styles from '@/pages/SagaPage/SagaPage.module.scss'
 
 /** A saga on its way: its title and facts over stand-ins for its movies. */
@@ -98,25 +101,13 @@ const OwnBackdrop = ({ children }: OwnBackdropProps) => {
   return isOwn && children
 }
 
-type SagaViewProps = { library: Library; sagaId: string }
+type ShownSagaProps = { library: Library; saga: Saga }
 
-/** The saga once its library is known and open to this browser. */
-const SagaView = ({ library, sagaId }: SagaViewProps) => {
+/** The saga, found in its library. */
+const ShownSaga = ({ library, saga }: ShownSagaProps) => {
   const titleId = useId()
   const filmsId = useId()
   const [isEditing, setEditing] = useState(false)
-  const sagas = useQuery(sagasQuery(library.id))
-  const page = routeState({
-    id: library.id,
-    query: {
-      data: sagas.data && (sagas.data.find((saga) => saga.tmdbId === sagaId) ?? null),
-      error: sagas.error,
-    },
-  })
-  if (page.state !== ROUTE_STATES.ready)
-    return <RouteState state={page} noun="saga" shape={<SagaSkeleton />} />
-  if (page.data == null) return <NotFoundPage />
-  const saga = page.data
   const runtime = sagaRuntime(saga)
   const [count, ...span] = sagaFacts(saga)
   const watchedCount = saga.media.filter((media) => media.watched).length
@@ -128,9 +119,12 @@ const SagaView = ({ library, sagaId }: SagaViewProps) => {
       <SelectionScope {...sourceOf(saga.media.map(mediaEntryOf))}>
         <section className={styles.page} aria-labelledby={titleId}>
           <ItemHeader
-            back={{ to: sectionPath({ libraryId: library.id, section: 'sagas' }), label: 'Sagas' }}
+            back={{
+              to: sectionPath({ libraryId: library.id, section: LIBRARY_SECTIONS.sagas }),
+              label: SAGA_COPY.sagas,
+            }}
             titleId={titleId}
-            eyebrow={['Saga', count].filter((part): part is string => part != null)}
+            eyebrow={[SAGA_COPY.saga, count].filter((part): part is string => part != null)}
             title={saga.name}
             byline={library.name}
             contentRating={null}
@@ -140,7 +134,7 @@ const SagaView = ({ library, sagaId }: SagaViewProps) => {
               saga.media.length > 0
                 ? {
                     fraction: watchedCount / saga.media.length,
-                    label: `${watchedCount} of ${saga.media.length} watched`,
+                    label: SAGA_COPY.watchedOf({ watched: watchedCount, total: saga.media.length }),
                   }
                 : undefined
             }
@@ -149,7 +143,7 @@ const SagaView = ({ library, sagaId }: SagaViewProps) => {
               backdrop && (
                 <AdminOnly>
                   <Button icon="edit" onClick={() => setEditing(true)}>
-                    Edit backdrop
+                    {SAGA_COPY.editBackdrop}
                   </Button>
                 </AdminOnly>
               )
@@ -164,7 +158,7 @@ const SagaView = ({ library, sagaId }: SagaViewProps) => {
                   session: { kind: SESSION_KINDS.saga, sagaId: saga.tmdbId },
                 })}
               >
-                Play all
+                {SAGA_COPY.playAll}
               </ButtonLink>
             )}
             <DownloadButton
@@ -178,8 +172,8 @@ const SagaView = ({ library, sagaId }: SagaViewProps) => {
             <SelectButton />
           </ItemHeader>
           <section className={styles.films} aria-labelledby={filmsId}>
-            <SectionHeading id={filmsId} aside="Release order">
-              In order
+            <SectionHeading id={filmsId} aside={SAGA_COPY.releaseOrder}>
+              {SAGA_COPY.inOrder}
             </SectionHeading>
             <SagaFilms
               media={saga.media}
@@ -203,6 +197,98 @@ const SagaView = ({ library, sagaId }: SagaViewProps) => {
   )
 }
 
+const SAGA_VIEW_KEYS = { pending: 'pending', missing: 'missing', ready: 'ready' } as const
+
+type SagaViewViewProps = {
+  [SAGA_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
+  [SAGA_VIEW_KEYS.missing]: Record<never, never>
+  [SAGA_VIEW_KEYS.ready]: ShownSagaProps
+}
+
+const SAGA_VIEW_VIEWS = {
+  [SAGA_VIEW_KEYS.pending]: RouteState,
+  [SAGA_VIEW_KEYS.missing]: NotFoundPage,
+  [SAGA_VIEW_KEYS.ready]: ShownSaga,
+} as const satisfies ViewsOf<SagaViewViewProps>
+
+type SagaViewOfProps = { library: Library; page: RouteQuery<Saga | null> }
+
+/** The library's sagas on their way or failing, this one not among them, or it. */
+const sagaViewOf = ({ library, page }: SagaViewOfProps): ViewOf<SagaViewViewProps> => {
+  if (page.state !== ROUTE_STATES.ready)
+    return {
+      key: SAGA_VIEW_KEYS.pending,
+      props: { state: page, noun: SAGA_COPY.noun, shape: <SagaSkeleton /> },
+    }
+  if (page.data == null) return { key: SAGA_VIEW_KEYS.missing, props: {} }
+  return { key: SAGA_VIEW_KEYS.ready, props: { library, saga: page.data } }
+}
+
+type SagaViewProps = { library: Library; sagaId: string }
+
+/** The saga once its library is known and open to this browser. */
+const SagaView = ({ library, sagaId }: SagaViewProps) => {
+  const sagas = useQuery(sagasQuery(library.id))
+  const page = routeState({
+    id: library.id,
+    query: {
+      data: sagas.data && (sagas.data.find((saga) => saga.tmdbId === sagaId) ?? null),
+      error: sagas.error,
+    },
+  })
+  return (
+    <KeyedView<SagaViewViewProps> views={SAGA_VIEW_VIEWS} view={sagaViewOf({ library, page })} />
+  )
+}
+
+/** Nothing, while the browser checks whether the library is locked to it. */
+const CheckingLock = () => null
+
+const SAGA_PAGE_KEYS = {
+  pending: 'pending',
+  ...LIBRARY_LOCK_STATES,
+} as const
+
+type SagaPageViewProps = {
+  [SAGA_PAGE_KEYS.pending]: Parameters<typeof RouteState>[0]
+  [SAGA_PAGE_KEYS.checking]: Record<never, never>
+  [SAGA_PAGE_KEYS.shut]: Parameters<typeof LockedLibrary>[0]
+  [SAGA_PAGE_KEYS.open]: SagaViewProps
+}
+
+const SAGA_PAGE_VIEWS = {
+  [SAGA_PAGE_KEYS.pending]: RouteState,
+  [SAGA_PAGE_KEYS.checking]: CheckingLock,
+  [SAGA_PAGE_KEYS.shut]: LockedLibrary,
+  [SAGA_PAGE_KEYS.open]: SagaView,
+} as const satisfies ViewsOf<SagaPageViewProps>
+
+type SagaPageViewOfProps = { page: RouteQuery<Library>; lock: LibraryLock; sagaId: string }
+
+/** The library on its way or failing, waiting on its lock, locked, or the saga in it. */
+const sagaPageViewOf = ({ page, lock, sagaId }: SagaPageViewOfProps): ViewOf<SagaPageViewProps> => {
+  if (page.state !== ROUTE_STATES.ready)
+    return {
+      key: SAGA_PAGE_KEYS.pending,
+      props: { state: page, noun: SAGA_COPY.noun, shape: <SagaSkeleton /> },
+    }
+  switch (lock.state) {
+    case LIBRARY_LOCK_STATES.checking:
+      return { key: SAGA_PAGE_KEYS.checking, props: {} }
+    case LIBRARY_LOCK_STATES.shut:
+      return {
+        key: SAGA_PAGE_KEYS.shut,
+        props: { name: page.data.name, available: lock.available },
+      }
+    case LIBRARY_LOCK_STATES.open:
+      return { key: SAGA_PAGE_KEYS.open, props: { library: page.data, sagaId } }
+    default: {
+      const unknown: never = lock
+      return unknown
+    }
+  }
+}
+
 /**
  * `/libraries/:id/sagas/:sagaId`: one saga, under its movies' backdrops in
  * turn or the one it holds still, with how many of them are watched and
@@ -217,18 +303,10 @@ export const SagaPage = () => {
   const library = useQuery(libraryQuery(libraryId))
   const lock = useLibraryLock(library.data)
   const page = routeState({ id: libraryId, query: library })
-  if (page.state !== ROUTE_STATES.ready)
-    return <RouteState state={page} noun="saga" shape={<SagaSkeleton />} />
-  switch (lock.state) {
-    case LIBRARY_LOCK_STATES.checking:
-      return null
-    case LIBRARY_LOCK_STATES.shut:
-      return <LockedLibrary name={page.data.name} available={lock.available} />
-    case LIBRARY_LOCK_STATES.open:
-      return <SagaView library={page.data} sagaId={sagaId} />
-    default: {
-      const unknown: never = lock
-      return unknown
-    }
-  }
+  return (
+    <KeyedView<SagaPageViewProps>
+      views={SAGA_PAGE_VIEWS}
+      view={sagaPageViewOf({ page, lock, sagaId })}
+    />
+  )
 }

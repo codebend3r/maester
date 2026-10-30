@@ -22,7 +22,7 @@ import {
   resolutionLabel,
 } from '@raven/core'
 import { Button } from '@raven/ui'
-import { type ReactNode, useId, useState } from 'react'
+import { type ComponentType, type ReactNode, useId, useState } from 'react'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
 import {
@@ -33,11 +33,13 @@ import {
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useManagement } from '@/lib/management'
+import { STREAMS_COPY } from '@/pages/StreamsPage/copy'
 import { api } from '@/lib/api'
 import { liveStreamsQuery, mediaStreamsQuery, tracksQuery } from '@/lib/queries'
 import { queryKeys } from '@raven/ui/headless'
 import styles from '@/pages/StreamsPage/StreamsPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
+import { COMMON_COPY } from '@/lib/copy'
 
 const MODE_LABELS = {
   [PLAYBACK_MODES.direct]: 'Direct play',
@@ -50,16 +52,33 @@ const CONVERTED_AUDIO = 'AAC stereo'
 
 type Fact = { term: string; value: ReactNode }
 
+/** A fact worth a line: one with a value. */
+const hasValue = ({ value }: Fact): boolean => value != null && value !== false
+
+type PictureRangeProps = {
+  range: keyof typeof VIDEO_RANGE_LABELS | null
+  isHdr: boolean
+}
+
+/** The picture's range as the probe read it, else HDR where the scan saw it, else none. */
+const pictureRange = ({ range, isHdr }: PictureRangeProps): string | null => {
+  if (range != null) return VIDEO_RANGE_LABELS[range]
+  return isHdr ? COMMON_COPY.hdr : null
+}
+
 const joined = (parts: ReadonlyArray<string | null>): string =>
-  parts.filter((part): part is string => !!part).join(' · ')
+  parts.filter((part): part is string => !!part).join(COMMON_COPY.separator)
 
 type ProgressWordsProps = { stream: LiveStream }
 
 /** Where playback is, as "12:04 of 45:30"; "Starting" until the player first reports. */
 const progressWords = ({ stream }: ProgressWordsProps): string => {
-  if (stream.position == null) return 'Starting'
+  if (stream.position == null) return STREAMS_COPY.starting
   if (stream.media.duration == null) return formatDuration(stream.position)
-  return `${formatDuration(stream.position)} of ${formatDuration(stream.media.duration)}`
+  return STREAMS_COPY.progress({
+    position: formatDuration(stream.position),
+    duration: formatDuration(stream.media.duration),
+  })
 }
 
 type WatcherWordsProps = { stream: LiveStream }
@@ -67,8 +86,8 @@ type WatcherWordsProps = { stream: LiveStream }
 /** Who is watching on what: "sam@example.com on iPhone", or the client alone on a server without accounts. */
 const watcherWords = ({ stream }: WatcherWordsProps): string =>
   stream.viewer == null
-    ? `${stream.device}, ${stream.browser}`
-    : `${stream.viewer} on ${stream.device}`
+    ? STREAMS_COPY.client({ device: stream.device, browser: stream.browser })
+    : STREAMS_COPY.watcher({ viewer: stream.viewer, device: stream.device })
 
 type SentVideoProps = {
   mode: PlaybackMode
@@ -79,13 +98,13 @@ type SentVideoProps = {
 const sentVideo = ({ mode, quality }: SentVideoProps): string => {
   switch (mode) {
     case PLAYBACK_MODES.direct:
-      return 'The original file'
+      return STREAMS_COPY.originalFile
     case PLAYBACK_MODES.remux:
-      return 'Copied as it is'
+      return STREAMS_COPY.copiedAsItIs
     case PLAYBACK_MODES.transcode:
       return quality == null
-        ? 'Converted to H.264'
-        : `Converted to ${STREAM_QUALITIES[quality].label}`
+        ? STREAMS_COPY.convertedToH264
+        : STREAMS_COPY.convertedTo(STREAM_QUALITIES[quality].label)
     default: {
       const unreachable: never = mode
       throw new Error(`Unknown playback mode: ${String(unreachable)}`)
@@ -108,16 +127,12 @@ const Facts = ({ title, facts }: FactsProps) => (
   <section className={styles.panel}>
     <h4 className={styles.panelTitle}>{title}</h4>
     <dl className={styles.facts}>
-      {facts.flatMap(({ term, value }) =>
-        value == null
-          ? []
-          : [
-              <div key={term} className={styles.fact}>
-                <dt className={styles.factName}>{term}</dt>
-                <dd className={styles.factValue}>{value}</dd>
-              </div>,
-            ],
-      )}
+      {facts.filter(hasValue).map(({ term, value }) => (
+        <div key={term} className={styles.fact}>
+          <dt className={styles.factName}>{term}</dt>
+          <dd className={styles.factValue}>{value}</dd>
+        </div>
+      ))}
     </dl>
   </section>
 )
@@ -139,44 +154,46 @@ const StreamDetails = ({ id, stream, track }: StreamDetailsProps) => {
   const probe = useQuery(mediaStreamsQuery(media.id))
   const video = probe.data?.video ?? null
   const sound = probe.data?.audio.find(({ index }) => index === stream.audio) ?? null
-  const range = video == null ? (media.hdr ? 'HDR' : null) : VIDEO_RANGE_LABELS[video.range]
+  const range = pictureRange({ range: video?.range ?? null, isHdr: media.hdr })
   const resolution = resolutionLabel(media)
   return (
     <div id={id} className={styles.details}>
       <Facts
-        title="Viewer"
+        title={STREAMS_COPY.viewer}
         facts={[
-          { term: 'Account', value: stream.viewer },
-          { term: 'Device', value: `${stream.device} · ${stream.browser}` },
-          { term: 'Address', value: stream.address },
+          { term: COMMON_COPY.account, value: stream.viewer },
+          {
+            term: STREAMS_COPY.deviceTerm,
+            value: STREAMS_COPY.device({ device: stream.device, browser: stream.browser }),
+          },
+          { term: STREAMS_COPY.address, value: stream.address },
         ]}
       />
       <Facts
-        title="Video"
+        title={STREAMS_COPY.video}
         facts={[
           {
-            term: 'Picture',
-            value:
-              resolution == null && range == null ? null : (
-                <PictureFact resolution={resolution} rest={range} />
-              ),
+            term: STREAMS_COPY.picture,
+            value: (resolution != null || range != null) && (
+              <PictureFact resolution={resolution} rest={range} />
+            ),
           },
           {
-            term: 'Codec',
+            term: STREAMS_COPY.codec,
             value: codecWithProfile({
               codec: video?.codec ?? media.videoCodec,
               profile: video?.profile ?? null,
             }),
           },
-          { term: 'Sent as', value: sentVideo({ mode, quality: stream.quality }) },
+          { term: STREAMS_COPY.sentAs, value: sentVideo({ mode, quality: stream.quality }) },
         ]}
       />
       <Facts
-        title="Audio"
+        title={STREAMS_COPY.audio}
         facts={[
-          { term: 'Track', value: track == null ? null : audioLabel(track).name },
+          { term: STREAMS_COPY.track, value: track == null ? null : audioLabel(track).name },
           {
-            term: 'Format',
+            term: STREAMS_COPY.format,
             value:
               track == null
                 ? null
@@ -185,15 +202,21 @@ const StreamDetails = ({ id, stream, track }: StreamDetailsProps) => {
                     formatChannels(track.channels),
                   ]),
           },
-          { term: 'Sent as', value: track == null ? null : sentAudio({ mode, track }) },
+          {
+            term: STREAMS_COPY.sentAs,
+            value: track == null ? null : sentAudio({ mode, track }),
+          },
         ]}
       />
       <Facts
-        title="Bandwidth"
+        title={STREAMS_COPY.bandwidth}
         facts={[
-          { term: 'Sending now', value: formatBitrate(stream.sendRate) ?? 'Measuring' },
-          { term: 'File average', value: formatBitrate(media.bitrate) },
-          { term: 'Mode', value: MODE_LABELS[mode] },
+          {
+            term: STREAMS_COPY.sendingNow,
+            value: formatBitrate(stream.sendRate) ?? STREAMS_COPY.measuring,
+          },
+          { term: STREAMS_COPY.fileAverage, value: formatBitrate(media.bitrate) },
+          { term: STREAMS_COPY.mode, value: MODE_LABELS[mode] },
         ]}
       />
     </div>
@@ -240,7 +263,7 @@ const CardTop = ({ stream, title }: CardTopProps) => {
             </>
           )}
           <span>{watcherWords({ stream })}</span>
-          <span aria-hidden="true"> · </span>
+          <span aria-hidden="true">{COMMON_COPY.separator}</span>
           <span>{stream.libraryName}</span>
         </p>
       </hgroup>
@@ -253,7 +276,7 @@ type StopErrorProps = { error: Error | null }
 const StopError = ({ error }: StopErrorProps) =>
   error != null && (
     <p className={styles.error} role="alert">
-      Could not stop it: {error.message}
+      {STREAMS_COPY.couldNotStop(error.message)}
     </p>
   )
 
@@ -279,13 +302,13 @@ const StreamRow = ({ stream }: StreamRowProps) => {
     <li className={styles.row}>
       <div className={styles.overview}>
         <CardTop stream={stream} title={title} />
-        <ul className={styles.tags} aria-label="How it plays">
+        <ul className={styles.tags} aria-label={STREAMS_COPY.howItPlays}>
           <li className={styles.chip}>
             <ResolutionChip resolution={resolutionLabel(stream.media)} />
           </li>
           {stream.media.hdr && (
             <li className={styles.chip}>
-              <PictureChip>HDR</PictureChip>
+              <PictureChip>{COMMON_COPY.hdr}</PictureChip>
             </li>
           )}
           {track != null && (
@@ -311,9 +334,9 @@ const StreamRow = ({ stream }: StreamRowProps) => {
             disabled={stop.isPending}
             onClick={() => stop.mutate()}
           >
-            <span aria-hidden="true">Stop</span>
+            <span aria-hidden="true">{STREAMS_COPY.stop}</span>
             <span className="visually-hidden">
-              Stop {title} on {stream.device}, {stream.browser}
+              {STREAMS_COPY.stopStream({ title, device: stream.device, browser: stream.browser })}
             </span>
           </Button>
           <Button
@@ -321,7 +344,7 @@ const StreamRow = ({ stream }: StreamRowProps) => {
             className={styles.toggle}
             aria-expanded={isOpen}
             aria-controls={detailsId}
-            aria-label={`${isOpen ? 'Hide' : 'Show'} the details of ${title}`}
+            aria-label={STREAMS_COPY.detailsToggle({ isOpen, title })}
             onClick={() => setIsOpen((was) => !was)}
           />
         </div>
@@ -351,13 +374,13 @@ const DownloadRow = ({ stream }: DownloadRowProps) => {
     <li className={styles.row}>
       <div className={styles.overview}>
         <CardTop stream={stream} title={title} />
-        <ul className={styles.tags} aria-label="What it downloads">
+        <ul className={styles.tags} aria-label={STREAMS_COPY.whatItDownloads}>
           <li className={styles.chip}>
             <ResolutionChip resolution={resolutionLabel(stream.media)} />
           </li>
           {stream.media.hdr && (
             <li className={styles.chip}>
-              <PictureChip>HDR</PictureChip>
+              <PictureChip>{COMMON_COPY.hdr}</PictureChip>
             </li>
           )}
           <li className={styles.tag}>{formatBytes(size)}</li>
@@ -370,11 +393,11 @@ const DownloadRow = ({ stream }: DownloadRowProps) => {
             aria-labelledby={amountId}
           />
           <p id={amountId} className={styles.time}>
-            {`${formatBytes(received)} of ${formatBytes(size)}`}
+            {STREAMS_COPY.received({ received: formatBytes(received), size: formatBytes(size) })}
           </p>
           <p className={styles.rate}>
-            <span className="visually-hidden">Download rate </span>
-            {formatByteRate(stream.sendRate) ?? 'Measuring'}
+            <span className="visually-hidden">{STREAMS_COPY.downloadRate}</span>
+            {formatByteRate(stream.sendRate) ?? STREAMS_COPY.measuring}
           </p>
         </div>
         <div className={styles.actions}>
@@ -384,9 +407,9 @@ const DownloadRow = ({ stream }: DownloadRowProps) => {
             disabled={stop.isPending}
             onClick={() => stop.mutate()}
           >
-            <span aria-hidden="true">Stop</span>
+            <span aria-hidden="true">{STREAMS_COPY.stop}</span>
             <span className="visually-hidden">
-              Stop downloading {title} to {stream.device}
+              {STREAMS_COPY.stopDownload({ title, device: stream.device })}
             </span>
           </Button>
         </div>
@@ -436,12 +459,12 @@ const Sections = ({ streams }: SectionsProps) => {
   return (
     <>
       <Section
-        heading="Streaming"
+        heading={STREAMS_COPY.streaming}
         summary={counted({
           n: plays.length,
-          one: 'stream',
-          many: 'streams',
-          none: 'Nobody is streaming right now',
+          one: STREAMS_COPY.stream,
+          many: STREAMS_COPY.streams,
+          none: STREAMS_COPY.nobodyStreaming,
         })}
       >
         {plays.length > 0 && (
@@ -453,12 +476,12 @@ const Sections = ({ streams }: SectionsProps) => {
         )}
       </Section>
       <Section
-        heading="Downloading"
+        heading={STREAMS_COPY.downloading}
         summary={counted({
           n: downloads.length,
-          one: 'download',
-          many: 'downloads',
-          none: 'Nothing is downloading right now',
+          one: STREAMS_COPY.download,
+          many: STREAMS_COPY.downloads,
+          none: STREAMS_COPY.nothingDownloading,
         })}
       >
         {downloads.length > 0 && (
@@ -475,7 +498,7 @@ const Sections = ({ streams }: SectionsProps) => {
 
 /** Two cards on their way, each a line for its name over one for its facts. */
 const RowsSkeleton = () => (
-  <Loading label="Looking for streams">
+  <Loading label={STREAMS_COPY.lookingForStreams}>
     <ul className={styles.list}>
       {['first', 'second'].map((row) => (
         <li key={row} className={styles.rowSkeleton}>
@@ -486,6 +509,43 @@ const RowsSkeleton = () => (
     </ul>
   </Loading>
 )
+
+const ACCESS_STATES = { managersOnly: 'managersOnly', managing: 'managing' } as const
+type AccessState = (typeof ACCESS_STATES)[keyof typeof ACCESS_STATES]
+
+type StreamsViewProps = { mode: ReturnType<typeof useManagement>['mode'] }
+
+type StreamsManagersOnlyProps = StreamsViewProps
+
+const StreamsManagersOnly = ({ mode }: StreamsManagersOnlyProps) => (
+  <ManagersOnly
+    mode={mode}
+    name={STREAMS_COPY.managersOnlyName}
+    forAdmin={STREAMS_COPY.forAdmin}
+    forOwner={STREAMS_COPY.forOwner}
+  />
+)
+
+/** The streams themselves, asked for only while the viewer may manage. */
+const StreamsList = () => {
+  const streams = useQuery(liveStreamsQuery)
+  return (
+    <section className={styles.page}>
+      <header className={styles.header}>
+        <BackButton fallback={HOME} className={styles.back} />
+        <PageTitle icon="playback">{STREAMS_COPY.title}</PageTitle>
+      </header>
+      {streams.isError && <p role="alert">{STREAMS_COPY.noAnswer(streams.error.message)}</p>}
+      {streams.isPending && <RowsSkeleton />}
+      {streams.data && <Sections streams={streams.data} />}
+    </section>
+  )
+}
+
+const STREAMS_VIEWS = {
+  [ACCESS_STATES.managersOnly]: StreamsManagersOnly,
+  [ACCESS_STATES.managing]: StreamsList,
+} as const satisfies Record<AccessState, ComponentType<StreamsViewProps>>
 
 /**
  * `/streams`: what the server is sending right now, in two sections: the
@@ -498,28 +558,6 @@ const RowsSkeleton = () => (
  */
 export const StreamsPage = () => {
   const { mode, canManage } = useManagement()
-  const streams = useQuery({ ...liveStreamsQuery, enabled: canManage })
-
-  if (!canManage) {
-    return (
-      <ManagersOnly
-        mode={mode}
-        name="Streams"
-        forAdmin="see who is streaming and to stop a stream"
-        forOwner="see who is streaming and stop a stream"
-      />
-    )
-  }
-
-  return (
-    <section className={styles.page}>
-      <header className={styles.header}>
-        <BackButton fallback={HOME} className={styles.back} />
-        <PageTitle icon="playback">Streams</PageTitle>
-      </header>
-      {streams.isError && <p role="alert">The server did not answer: {streams.error.message}</p>}
-      {streams.isPending && <RowsSkeleton />}
-      {streams.data && <Sections streams={streams.data} />}
-    </section>
-  )
+  const View = STREAMS_VIEWS[canManage ? ACCESS_STATES.managing : ACCESS_STATES.managersOnly]
+  return <View mode={mode} />
 }

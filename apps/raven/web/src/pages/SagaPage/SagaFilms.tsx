@@ -25,7 +25,9 @@ import { PartlyWatched } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { POSTER_SIZES } from '@/lib/posters'
 import { useSelectable } from '@/lib/useSelectable'
+import { SAGA_COPY } from '@/pages/SagaPage/copy'
 import styles from '@/pages/SagaPage/SagaFilms.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** Where a movie stands in the saga: watched, the one to watch next, or neither. */
 const STANDINGS = { watched: 'watched', next: 'next', later: 'later' } as const
@@ -33,9 +35,9 @@ const STANDINGS = { watched: 'watched', next: 'next', later: 'later' } as const
 type Standing = (typeof STANDINGS)[keyof typeof STANDINGS]
 
 const TAGS = {
-  watched: { label: 'Watched', className: styles.watchedTag },
-  next: { label: 'Up next', className: styles.nextTag },
-  later: null,
+  [STANDINGS.watched]: { label: COMMON_COPY.watched, className: styles.watchedTag },
+  [STANDINGS.next]: { label: SAGA_COPY.upNext, className: styles.nextTag },
+  [STANDINGS.later]: null,
 } as const satisfies Record<Standing, { label: string; className: string | undefined } | null>
 
 /** Each movie's standing: the watched ones, then the first not watched is up next. */
@@ -55,9 +57,13 @@ const filmFacts = (media: MediaItem): ReactNode[] => {
     year == null ? null : String(year),
     formatRuntime(media.duration),
     resolution && (
-      <PictureFact key="picture" resolution={resolution} rest={media.hdr ? 'HDR' : null} />
+      <PictureFact
+        key="picture"
+        resolution={resolution}
+        rest={media.hdr ? COMMON_COPY.hdr : null}
+      />
     ),
-    media.versions > 1 ? `${media.versions} versions` : null,
+    media.versions > 1 ? SAGA_COPY.versions(media.versions) : null,
   ].filter((fact) => fact != null)
 }
 
@@ -139,7 +145,7 @@ const SagaFilm = ({ media, session, place, standing, ratingsSource }: SagaFilmPr
           <CardLink
             {...watchLink({ media, session })}
             className={styles.play}
-            aria-label={`Play ${title}`}
+            aria-label={SAGA_COPY.play(title)}
           >
             <Icon name="play" size={14} />
           </CardLink>
