@@ -1,4 +1,5 @@
 import { type MediaItem, progressOf } from '@raven/core'
+import { RESUME_BAR_COPY } from '@/components/ResumeBar/copy'
 import styles from '@/components/ResumeBar/ResumeBar.module.scss'
 
 type ResumeBarProps = {
@@ -14,14 +15,15 @@ type ResumeBarProps = {
  */
 export const ResumeBar = ({ media, tone = 'overlay', className }: ResumeBarProps) => {
   const progress = progressOf(media)
-  if (progress <= 0) return null
   return (
-    <span
-      className={[styles.bar, styles[tone], className ?? ''].filter(Boolean).join(' ')}
-      aria-hidden="true"
-    >
-      <span className={styles.fill} style={{ width: `${progress * 100}%` }} />
-    </span>
+    progress > 0 && (
+      <span
+        className={[styles.bar, styles[tone], className ?? ''].filter(Boolean).join(' ')}
+        aria-hidden="true"
+      >
+        <span className={styles.fill} style={{ width: `${progress * 100}%` }} />
+      </span>
+    )
   )
 }
 
@@ -29,4 +31,4 @@ type PartlyWatchedProps = { media: MediaItem }
 
 /** The resume line's words, for a screen reader; the line itself is hidden from it. */
 export const PartlyWatched = ({ media }: PartlyWatchedProps) =>
-  progressOf(media) > 0 && <span className="visually-hidden">Partly watched</span>
+  progressOf(media) > 0 && <span className="visually-hidden">{RESUME_BAR_COPY.partlyWatched}</span>

@@ -6,7 +6,9 @@ import {
   type Library,
   type MatchItemType,
   type MediaItem,
+  type MediaTracks,
   TITLE_DISPLAYS,
+  WATCHED_STATES,
   directedBy,
   episodeBackPath,
   episodeByline,
@@ -21,7 +23,7 @@ import {
   watchLink,
   ITEM_IMAGE_KINDS,
 } from '@raven/core'
-import { useId, useState } from 'react'
+import { type ComponentType, useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink } from '@raven/ui'
@@ -54,7 +56,9 @@ import { displaySettingsQuery, itemQuery, librariesQuery, tracksQuery } from '@/
 import { queryKeys } from '@raven/ui/headless'
 import { useCanFavourite } from '@/lib/useCanFavourite'
 import { useMediaMutations } from '@/lib/useMediaMutations'
+import { PLAYABLE_ITEM_VIEW_COPY } from '@/components/PlayableItemView/copy'
 import styles from '@/components/PlayableItemView/PlayableItemView.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type Facts = { details: ItemDetails; primary: MediaItem }
 
@@ -91,10 +95,10 @@ type PlayableConfig = {
 
 const PLAYABLE = {
   movie: {
-    matchType: 'movie',
+    matchType: ITEM_TYPES.movie,
     back: ({ primary, libraries }) => ({
       to: `/libraries/${primary.libraryId}`,
-      label: libraries.find((entry) => entry.id === primary.libraryId)?.name ?? 'Library',
+      label: libraries.find((entry) => entry.id === primary.libraryId)?.name ?? COMMON_COPY.library,
     }),
     eyebrow: () => [],
     byline: directedBy,
@@ -111,10 +115,10 @@ const PLAYABLE = {
     castTitle: undefined,
   },
   episode: {
-    matchType: 'show',
+    matchType: ITEM_TYPES.show,
     back: ({ details, primary }) => ({
       to: episodeBackPath({ item: details, libraryId: primary.libraryId }),
-      label: details.show?.title ?? 'Library',
+      label: details.show?.title ?? COMMON_COPY.library,
     }),
     eyebrow: (details) => [episodeByline(details)].filter(Boolean),
     byline: () => null,
@@ -128,7 +132,7 @@ const PLAYABLE = {
     linksLibrary: false,
     showsTimeLeft: true,
     showsNeighbours: true,
-    castTitle: 'Guest stars & crew',
+    castTitle: PLAYABLE_ITEM_VIEW_COPY.guestStars,
   },
 } as const satisfies Record<'movie' | 'episode', PlayableConfig>
 
@@ -136,8 +140,54 @@ const PLAYABLE = {
 const timeLeft = (media: MediaItem): HeaderProgress | undefined => {
   const fraction = progressOf(media)
   const left = formatRuntime((media.duration ?? 0) - media.position)
-  return fraction > 0 && left ? { fraction, label: `${left} left` } : undefined
+  return fraction > 0 && left
+    ? { fraction, label: PLAYABLE_ITEM_VIEW_COPY.timeLeft(left) }
+    : undefined
 }
+
+type AboutProps = {
+  details: ItemDetails
+  primary: MediaItem
+  tracks: MediaTracks | undefined
+  tagline: string | null
+  hasSummary: boolean
+}
+
+type AboutWithNeighboursProps = AboutProps
+
+/** An episode's summary over its file's facts beside the episodes either side. */
+const AboutWithNeighbours = ({ details, primary, tracks }: AboutWithNeighboursProps) => (
+  <>
+    <Summary tagline={null} summary={details.summary} />
+    <div className={`${styles.about} ${styles.besides}`}>
+      <FileFacts media={primary} tracks={tracks} className={styles.main} />
+      <EpisodeNeighbours episode={details} libraryId={primary.libraryId} className={styles.aside} />
+    </div>
+  </>
+)
+
+type AboutAloneProps = AboutProps
+
+/** A movie's tagline and summary beside its file's facts, or the facts alone. */
+const AboutAlone = ({ details, primary, tracks, tagline, hasSummary }: AboutAloneProps) => (
+  <div className={hasSummary ? `${styles.about} ${styles.besides}` : styles.about}>
+    <Summary tagline={tagline} summary={details.summary} className={styles.main} />
+    <FileFacts media={primary} tracks={tracks} className={hasSummary ? styles.aside : undefined} />
+  </div>
+)
+
+/** What follows the header: the file's facts with the episodes either side, or on their own. */
+const ABOUT_LAYOUTS = {
+  withNeighbours: 'withNeighbours',
+  alone: 'alone',
+} as const
+
+type AboutLayout = (typeof ABOUT_LAYOUTS)[keyof typeof ABOUT_LAYOUTS]
+
+const ABOUT_VIEWS = {
+  [ABOUT_LAYOUTS.withNeighbours]: AboutWithNeighbours,
+  [ABOUT_LAYOUTS.alone]: AboutAlone,
+} as const satisfies Record<AboutLayout, ComponentType<AboutProps>>
 
 type PlayableItemViewProps = {
   kind: keyof typeof PLAYABLE
@@ -188,7 +238,7 @@ export const PlayableItemView = ({
   const back = config.back({ details, primary, libraries: known })
   const tagline = config.showsTagline ? details.tagline : null
   const play = watchLink({ media: primary })
-  const playPicture = { ...play, label: `Play ${details.title}` }
+  const playPicture = { ...play, label: PLAYABLE_ITEM_VIEW_COPY.playTitle(details.title) }
   const still =
     api.itemImageUrl({
       id: details.id,
@@ -205,6 +255,8 @@ export const PlayableItemView = ({
   // The still stands in only for a show with no backdrop, not while the show is read.
   const episodeBackdrop = item.show && show.isPending ? null : (showBackdrop ?? still)
   const hasSummary = !!tagline || !!details.summary
+  const About =
+    ABOUT_VIEWS[config.showsNeighbours ? ABOUT_LAYOUTS.withNeighbours : ABOUT_LAYOUTS.alone]
 
   return (
     <article className={styles.page} aria-labelledby={titleId}>
@@ -254,14 +306,14 @@ export const PlayableItemView = ({
                   aria-pressed={editingImages}
                   onClick={() => setEditingImages((editing) => !editing)}
                 >
-                  Edit images
+                  {COMMON_COPY.editImages}
                 </Button>
                 <Button
                   icon="edit"
                   aria-pressed={editingMetadata}
                   onClick={() => setEditingMetadata((editing) => !editing)}
                 >
-                  Edit metadata
+                  {COMMON_COPY.editMetadata}
                 </Button>
               </>
             )}
@@ -294,14 +346,16 @@ export const PlayableItemView = ({
         }
       >
         <ButtonLink tone="primary" icon="play" to={play.to} state={play.state}>
-          {primary.position > 0 ? `Resume from ${formatDuration(primary.position)}` : 'Play'}
+          {primary.position > 0
+            ? PLAYABLE_ITEM_VIEW_COPY.resumeFrom(formatDuration(primary.position))
+            : COMMON_COPY.play}
         </ButtonLink>
         <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.media, mediaId: primary.id }} />
         {canFavourite && (
           <FavouriteButton isFavourite={primary.favourite} onToggle={favourite.mutate} />
         )}
         <WatchedToggle
-          state={primary.watched ? 'watched' : 'unwatched'}
+          state={primary.watched ? WATCHED_STATES.watched : WATCHED_STATES.unwatched}
           onToggle={() => watched.mutate(!primary.watched)}
         />
       </ItemHeader>
@@ -325,34 +379,19 @@ export const PlayableItemView = ({
           <MetadataEditor
             details={details}
             everyCard={everyCard}
-            itemKind="movie"
+            itemKind={ITEM_TYPES.movie}
             onDone={() => setEditingMetadata(false)}
           />
         )}
       </AdminOnly>
 
-      {config.showsNeighbours ? (
-        <>
-          <Summary tagline={null} summary={details.summary} />
-          <div className={`${styles.about} ${styles.besides}`}>
-            <FileFacts media={primary} tracks={tracks.data} className={styles.main} />
-            <EpisodeNeighbours
-              episode={details}
-              libraryId={primary.libraryId}
-              className={styles.aside}
-            />
-          </div>
-        </>
-      ) : (
-        <div className={hasSummary ? `${styles.about} ${styles.besides}` : styles.about}>
-          <Summary tagline={tagline} summary={details.summary} className={styles.main} />
-          <FileFacts
-            media={primary}
-            tracks={tracks.data}
-            className={hasSummary ? styles.aside : undefined}
-          />
-        </div>
-      )}
+      <About
+        details={details}
+        primary={primary}
+        tracks={tracks.data}
+        tagline={tagline}
+        hasSummary={hasSummary}
+      />
 
       <Versions versions={details.versions} libraries={known} />
       <CastRow credits={details.credits} title={config.castTitle} />

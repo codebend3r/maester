@@ -2,6 +2,7 @@ import { queueLink } from '@raven/core'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@raven/ui'
+import { SHUFFLE_BUTTON_COPY } from '@/components/ShuffleButton/copy'
 import { api } from '@/lib/api'
 
 const PICK_STATES = { idle: 'idle', picking: 'picking', empty: 'empty' } as const
@@ -9,9 +10,9 @@ const PICK_STATES = { idle: 'idle', picking: 'picking', empty: 'empty' } as cons
 type PickState = (typeof PICK_STATES)[keyof typeof PICK_STATES]
 
 const LABELS = {
-  idle: null,
-  picking: 'Picking',
-  empty: 'Nothing to play',
+  [PICK_STATES.idle]: null,
+  [PICK_STATES.picking]: SHUFFLE_BUTTON_COPY.picking,
+  [PICK_STATES.empty]: SHUFFLE_BUTTON_COPY.nothingToPlay,
 } as const satisfies Record<PickState, string | null>
 
 type ShuffleButtonProps = { itemId: number; children: string }

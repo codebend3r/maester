@@ -2,6 +2,7 @@ import { type MediaItem, type MediaTracks, allFileFacts } from '@raven/core'
 import { useId } from 'react'
 import { FactText } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/components/PlayableItemView/FileFacts.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type FileFactsProps = {
   media: MediaItem
@@ -19,7 +20,7 @@ export const FileFacts = ({ media, tracks, className }: FileFactsProps) => {
   return (
     <section className={className} aria-labelledby={id}>
       <h2 id={id} className="visually-hidden">
-        File
+        {COMMON_COPY.file}
       </h2>
       <dl className={styles.facts}>
         {allFileFacts({ media, tracks }).map((fact) => (

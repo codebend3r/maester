@@ -1,22 +1,24 @@
-import type { RatingsRefresh } from '@raven/core'
+import { RATINGS_REFRESH_STATES, type RatingsRefresh } from '@raven/core'
+import { RATINGS_STATUS_COPY } from '@/components/RatingsStatus/copy'
 import { useCanManage } from '@/lib/management'
 import styles from '@/components/RatingsStatus/RatingsStatus.module.scss'
 
-const count = new Intl.NumberFormat()
-
 const WAITING = {
-  budget: 'the rest after midnight UTC (daily limit)',
-  unavailable: 'waiting for the ratings service',
-} as const satisfies Record<Extract<RatingsRefresh, { state: 'waiting' }>['reason'], string>
+  budget: RATINGS_STATUS_COPY.budget,
+  unavailable: RATINGS_STATUS_COPY.unavailable,
+} as const satisfies Record<
+  Extract<RatingsRefresh, { state: typeof RATINGS_REFRESH_STATES.waiting }>['reason'],
+  string
+>
 
 const noteOf = (refresh: RatingsRefresh): string | null => {
   switch (refresh.state) {
-    case 'idle':
+    case RATINGS_REFRESH_STATES.idle:
       return null
-    case 'running':
-      return `Updating ratings · ${count.format(refresh.done)} of ${count.format(refresh.total)}`
-    case 'waiting':
-      return `Ratings: ${count.format(refresh.done)} of ${count.format(refresh.total)} · ${WAITING[refresh.reason]}`
+    case RATINGS_REFRESH_STATES.running:
+      return RATINGS_STATUS_COPY.updating(refresh)
+    case RATINGS_REFRESH_STATES.waiting:
+      return RATINGS_STATUS_COPY.waiting({ ...refresh, why: WAITING[refresh.reason] })
     default: {
       const unreachable: never = refresh
       return unreachable
@@ -35,12 +37,9 @@ type RatingsStatusProps = { refresh: RatingsRefresh }
  * as ScanStatus's does, so a screen reader hears the first line and
  * when it goes.
  */
-export const RatingsStatus = ({ refresh }: RatingsStatusProps) => {
-  const canManage = useCanManage()
-  if (!canManage) return null
-  return (
+export const RatingsStatus = ({ refresh }: RatingsStatusProps) =>
+  useCanManage() && (
     <p className={styles.status} aria-live="polite">
       {noteOf(refresh)}
     </p>
   )
-}

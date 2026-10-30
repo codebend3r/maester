@@ -9,6 +9,7 @@ import {
 import { useId, useRef, useState } from 'react'
 import { AiSuggestionCard } from '@/components/AiSuggestionCard/AiSuggestionCard'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
+import { SUGGESTED_MOVIES_COPY } from '@/components/SuggestedMovies/copy'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
 import { useReturnFocus } from '@/lib/useReturnFocus'
@@ -84,6 +85,34 @@ const SuggestedMovieEntry = ({ entry, libraryId }: SuggestedMovieEntryProps) => 
   )
 }
 
+type SuggestionListProps = {
+  suggested: readonly SuggestedMovie[]
+  libraryId: number
+}
+
+const SuggestionList = ({ suggested, libraryId }: SuggestionListProps) => {
+  const headingId = useId()
+  return (
+    <section className={styles.section} aria-labelledby={headingId}>
+      <SectionHeading
+        id={headingId}
+        aside={plural({
+          n: suggested.length,
+          one: SUGGESTED_MOVIES_COPY.suggestion,
+          many: SUGGESTED_MOVIES_COPY.suggestions,
+        })}
+      >
+        {SUGGESTED_MOVIES_COPY.heading}
+      </SectionHeading>
+      <ul className={styles.list}>
+        {suggested.map((entry) => (
+          <SuggestedMovieEntry key={entry.suggestion.place} entry={entry} libraryId={libraryId} />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 type SuggestedMoviesProps = {
   files: readonly UnmatchedFile[]
   libraryId: number
@@ -94,22 +123,6 @@ type SuggestedMoviesProps = {
  * ruled heading counting them, above its files; nothing when it has none.
  */
 export const SuggestedMovies = ({ files, libraryId }: SuggestedMoviesProps) => {
-  const headingId = useId()
   const suggested = suggestedMoviesOf(files)
-  if (suggested.length === 0) return null
-  return (
-    <section className={styles.section} aria-labelledby={headingId}>
-      <SectionHeading
-        id={headingId}
-        aside={plural({ n: suggested.length, one: 'suggestion', many: 'suggestions' })}
-      >
-        Suggested by AI
-      </SectionHeading>
-      <ul className={styles.list}>
-        {suggested.map((entry) => (
-          <SuggestedMovieEntry key={entry.suggestion.place} entry={entry} libraryId={libraryId} />
-        ))}
-      </ul>
-    </section>
-  )
+  return suggested.length > 0 && <SuggestionList suggested={suggested} libraryId={libraryId} />
 }

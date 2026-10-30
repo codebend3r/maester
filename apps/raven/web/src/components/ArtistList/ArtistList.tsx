@@ -1,6 +1,7 @@
 import type { Artist } from '@raven/core'
 import { Link } from 'react-router-dom'
 import { artistPath } from '@/lib/music'
+import { MUSIC_COPY } from '@/lib/copy'
 import styles from '@/components/ArtistList/ArtistList.module.scss'
 
 type ArtistListProps = {
@@ -17,10 +18,7 @@ export const ArtistList = ({ artists, label }: ArtistListProps) => (
         <Link to={artistPath(artist.id)} className={styles.name}>
           {artist.name}
         </Link>
-        <span className={styles.count}>
-          {artist.albumCount} {artist.albumCount === 1 ? 'album' : 'albums'} · {artist.trackCount}{' '}
-          {artist.trackCount === 1 ? 'track' : 'tracks'}
-        </span>
+        <span className={styles.count}>{MUSIC_COPY.artistCounts(artist)}</span>
       </li>
     ))}
   </ul>

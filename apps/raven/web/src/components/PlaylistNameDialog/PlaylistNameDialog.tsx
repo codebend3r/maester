@@ -3,6 +3,7 @@ import { Button } from '@raven/ui'
 import { type FormEvent, useId, useState } from 'react'
 import { useModal } from '@/lib/useModal'
 import styles from '@/components/PlaylistNameDialog/PlaylistNameDialog.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type PlaylistNameDialogProps = {
   /** The dialog's heading: "New playlist", "Rename playlist". */
@@ -50,7 +51,7 @@ export const PlaylistNameDialog = ({
           {title}
         </h2>
         <div className={styles.field}>
-          <label htmlFor={fieldId}>Name</label>
+          <label htmlFor={fieldId}>{COMMON_COPY.name}</label>
           <input
             id={fieldId}
             value={name}
@@ -65,7 +66,7 @@ export const PlaylistNameDialog = ({
           </p>
         )}
         <div className={styles.actions}>
-          <Button onClick={close}>Cancel</Button>
+          <Button onClick={close}>{COMMON_COPY.cancel}</Button>
           <Button tone="primary" type="submit" disabled={!isValid || isPending}>
             {submitLabel}
           </Button>

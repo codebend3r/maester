@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import { Button } from '@raven/ui'
+import { SUMMARY_COPY } from '@/components/Summary/copy'
 import styles from '@/components/Summary/Summary.module.scss'
 
 /** A summary longer than this gets clamped to three lines with More. */
@@ -21,29 +22,33 @@ export const Summary = ({ tagline, summary, className }: SummaryProps) => {
   const [expanded, setExpanded] = useState(false)
   const text = summary ?? ''
   const long = text.length > LONG_SUMMARY
-  if (!tagline && !text) return null
   return (
-    <section
-      className={className ? `${styles.summary} ${className}` : styles.summary}
-      aria-label="Summary"
-    >
-      {tagline && <p className={styles.tagline}>{tagline}</p>}
-      {text && (
-        <p id={id} className={long && !expanded ? `${styles.text} ${styles.clamped}` : styles.text}>
-          {text}
-        </p>
-      )}
-      {long && (
-        <Button
-          tone="ghost"
-          className={styles.more}
-          aria-expanded={expanded}
-          aria-controls={id}
-          onClick={() => setExpanded((current) => !current)}
-        >
-          {expanded ? 'Less' : 'More'}
-        </Button>
-      )}
-    </section>
+    (!!tagline || !!text) && (
+      <section
+        className={className ? `${styles.summary} ${className}` : styles.summary}
+        aria-label={SUMMARY_COPY.summary}
+      >
+        {tagline && <p className={styles.tagline}>{tagline}</p>}
+        {text && (
+          <p
+            id={id}
+            className={long && !expanded ? `${styles.text} ${styles.clamped}` : styles.text}
+          >
+            {text}
+          </p>
+        )}
+        {long && (
+          <Button
+            tone="ghost"
+            className={styles.more}
+            aria-expanded={expanded}
+            aria-controls={id}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            {expanded ? SUMMARY_COPY.less : SUMMARY_COPY.more}
+          </Button>
+        )}
+      </section>
+    )
   )
 }

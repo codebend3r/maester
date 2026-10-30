@@ -1,7 +1,8 @@
 import { type Rating, type SlideshowMotion, type watchLink, ITEM_IMAGE_KINDS } from '@raven/core'
-import { Fragment, type ReactNode, useState } from 'react'
+import { type ComponentType, Fragment, type ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@raven/ui'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { type BackFallback, BackButton } from '@/components/BackButton/BackButton'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { RatingPanel } from '@/components/RatingPanel/RatingPanel'
@@ -9,6 +10,7 @@ import { Bone } from '@/components/Skeleton/Skeleton'
 import { Slideshow } from '@/components/Slideshow/Slideshow'
 import { api } from '@/lib/api'
 import { FactText } from '@/components/ResolutionChip/ResolutionChip'
+import { ITEM_HEADER_COPY } from '@/components/ItemHeader/copy'
 import styles from '@/components/ItemHeader/ItemHeader.module.scss'
 
 /** What sits beside the title: a poster, an episode's still, or no picture at all. */
@@ -62,37 +64,54 @@ export const itemBackdrop = ({ id, version }: ItemBackdropProps): HeaderBackdrop
   }
 }
 
-type BackdropPictureProps = { backdrop: HeaderBackdrop }
+type BackdropType = HeaderBackdrop['type']
+
+type BackdropOf<Type extends BackdropType> = Extract<HeaderBackdrop, { type: Type }>
+
+type BackdropViewProps<Type extends BackdropType> = { backdrop: BackdropOf<Type> }
+
+type PictureBackdropProps = BackdropViewProps<typeof HEADER_BACKDROP_TYPES.picture>
 
 // The page's largest picture, so it is fetched ahead of what lazy lists ask for.
-const BackdropPicture = ({ backdrop }: BackdropPictureProps) => {
-  switch (backdrop.type) {
-    case HEADER_BACKDROP_TYPES.picture:
-      return (
-        <img
-          className={styles.backdropPicture}
-          src={backdrop.url}
-          srcSet={backdrop.srcSet ?? undefined}
-          sizes={backdrop.srcSet == null ? undefined : '100vw'}
-          alt=""
-          decoding="async"
-          fetchPriority="high"
-        />
-      )
-    case HEADER_BACKDROP_TYPES.slideshow:
-      return (
-        <Slideshow
-          className={styles.backdropPicture}
-          slides={backdrop.slides}
-          motion={backdrop.motion}
-        />
-      )
-    default: {
-      const unknown: never = backdrop
-      return unknown
-    }
-  }
+const PictureBackdrop = ({ backdrop }: PictureBackdropProps) => (
+  <img
+    className={styles.backdropPicture}
+    src={backdrop.url}
+    srcSet={backdrop.srcSet ?? undefined}
+    sizes={backdrop.srcSet == null ? undefined : '100vw'}
+    alt=""
+    decoding="async"
+    fetchPriority="high"
+  />
+)
+
+type SlideshowBackdropProps = BackdropViewProps<typeof HEADER_BACKDROP_TYPES.slideshow>
+
+const SlideshowBackdrop = ({ backdrop }: SlideshowBackdropProps) => (
+  <Slideshow className={styles.backdropPicture} slides={backdrop.slides} motion={backdrop.motion} />
+)
+
+/** Each backdrop type's view props, or only `Types`' for a builder generic over the type. */
+type BackdropViewsProps<Types extends BackdropType = BackdropType> = {
+  [Type in Types]: BackdropViewProps<Type>
 }
+
+const BACKDROP_VIEWS = {
+  [HEADER_BACKDROP_TYPES.picture]: PictureBackdrop,
+  [HEADER_BACKDROP_TYPES.slideshow]: SlideshowBackdrop,
+} as const satisfies ViewsOf<BackdropViewsProps>
+
+type BackdropViewOfProps<Type extends BackdropType> = {
+  backdrop: BackdropOf<Type> & { type: Type }
+}
+
+/** The view for the backdrop's type, so each view is handed its own type of backdrop. */
+const backdropViewOf = <Type extends BackdropType>({
+  backdrop,
+}: BackdropViewOfProps<Type>): ViewOf<BackdropViewsProps<Type>, Type> => ({
+  key: backdrop.type,
+  props: { backdrop },
+})
 
 type BackdropProps = { backdrop: HeaderBackdrop }
 
@@ -102,7 +121,7 @@ type BackdropProps = { backdrop: HeaderBackdrop }
  */
 const Backdrop = ({ backdrop }: BackdropProps) => (
   <div className={styles.backdrop} aria-hidden="true">
-    <BackdropPicture backdrop={backdrop} />
+    <KeyedView<BackdropViewsProps> views={BACKDROP_VIEWS} view={backdropViewOf({ backdrop })} />
   </div>
 )
 
@@ -119,30 +138,68 @@ const PICTURES = {
   still: `${styles.picture} ${styles.still}`,
 } as const satisfies Record<HeaderPicture['shape'], string | undefined>
 
+/** What fills a picture's frame: the picture itself, or the title's first letter while it has none. */
+const PICTURE_FILLS = { image: 'image', letter: 'letter' } as const
+
+type PictureFill = (typeof PICTURE_FILLS)[keyof typeof PICTURE_FILLS]
+
+type FillProps = { url: string | null; title: string }
+
+type ImageFillProps = FillProps
+
+const ImageFill = ({ url }: ImageFillProps) => (
+  <img src={url ?? undefined} alt="" decoding="async" fetchPriority="high" />
+)
+
+type LetterFillProps = FillProps
+
+const LetterFill = ({ title }: LetterFillProps) => (
+  <span className={styles.letter} aria-hidden="true">
+    {title.slice(0, 1)}
+  </span>
+)
+
+const FILL_VIEWS = {
+  [PICTURE_FILLS.image]: ImageFill,
+  [PICTURE_FILLS.letter]: LetterFill,
+} as const satisfies Record<PictureFill, ComponentType<FillProps>>
+
 type PictureProps = { picture: HeaderPicture; title: string }
 
 const Picture = ({ picture, title }: PictureProps) => {
   const className = PICTURES[picture.shape]
-  const content = picture.url ? (
-    <img src={picture.url} alt="" decoding="async" fetchPriority="high" />
-  ) : (
-    <span className={styles.letter} aria-hidden="true">
-      {title.slice(0, 1)}
-    </span>
-  )
-  if (!picture.play) return <div className={className}>{content}</div>
-  const { label, ...link } = picture.play
+  const Fill = FILL_VIEWS[picture.url ? PICTURE_FILLS.image : PICTURE_FILLS.letter]
+  const content = <Fill url={picture.url} title={title} />
+  const { play } = picture
   return (
-    <Link {...link} className={`${className} ${styles.playable}`} aria-label={label}>
-      {content}
-      <span className={styles.playCorner} aria-hidden="true">
-        <span className={styles.playMark}>
-          <Icon name="play" size={22} />
-        </span>
-      </span>
-    </Link>
+    <>
+      {!play && <div className={className}>{content}</div>}
+      {play && <PlayablePicture play={play} className={className} content={content} />}
+    </>
   )
 }
+
+type PlayablePictureProps = {
+  play: NonNullable<HeaderPicture['play']>
+  className: string | undefined
+  content: ReactNode
+}
+
+/** A picture that plays its video, a play mark in its corner. */
+const PlayablePicture = ({
+  play: { label, ...link },
+  className,
+  content,
+}: PlayablePictureProps) => (
+  <Link {...link} className={`${className} ${styles.playable}`} aria-label={label}>
+    {content}
+    <span className={styles.playCorner} aria-hidden="true">
+      <span className={styles.playMark}>
+        <Icon name="play" size={22} />
+      </span>
+    </span>
+  </Link>
+)
 
 type TitleArtProps = { title: string; logo: string | null }
 
@@ -153,16 +210,21 @@ type TitleArtProps = { title: string; logo: string | null }
  */
 const TitleArt = ({ title, logo }: TitleArtProps) => {
   const [hasFailed, setFailed] = useState(false)
-  if (!logo || hasFailed) return title
+  const art = hasFailed ? null : logo
   return (
-    <span className={styles.logo}>
-      <LogoImage
-        className={styles.logoImage}
-        src={logo}
-        alt={title}
-        onError={() => setFailed(true)}
-      />
-    </span>
+    <>
+      {!art && title}
+      {art && (
+        <span className={styles.logo}>
+          <LogoImage
+            className={styles.logoImage}
+            src={art}
+            alt={title}
+            onError={() => setFailed(true)}
+          />
+        </span>
+      )}
+    </>
   )
 }
 
@@ -196,7 +258,7 @@ export const Dotted = ({ parts }: DottedProps) =>
         {part}
         {index < parts.length - 1 && (
           <span className={styles.dot} aria-hidden="true">
-            ·
+            {ITEM_HEADER_COPY.dot}
           </span>
         )}
       </span>
@@ -294,7 +356,7 @@ export const ItemHeader = ({
               <>
                 <span className={`${styles.part} ${styles.ratedPart}`}>
                   <span className={styles.rated}>
-                    <span className="visually-hidden">Rated </span>
+                    <span className="visually-hidden">{ITEM_HEADER_COPY.rated}</span>
                     {contentRating}
                   </span>
                 </span>
