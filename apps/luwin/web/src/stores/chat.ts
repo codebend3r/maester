@@ -10,6 +10,7 @@ import {
   toSavedChat,
 } from '@/lib/entries'
 import { CHAT_EVENTS, type ChatEvent, type Choice } from '@/lib/events'
+import { CHAT_COPY } from '@/stores/copy'
 
 /** Where the conversation is kept between visits, in this browser only. */
 export const CHAT_STORAGE_KEY = 'luwin-chat'
@@ -66,7 +67,7 @@ const applyEvent = ({ reply, event }: ApplyEventProps): Reply => {
       return {
         ...reply,
         state: REPLY_STATES.failed,
-        failure: `Something broke on luwin's side (ref ${event.ref}).`,
+        failure: CHAT_COPY.broke(event.ref),
       }
     default: {
       const unknown: never = event
@@ -161,7 +162,7 @@ export const useChat = create<ChatState>()(
               id: reply.id,
               change: (r) =>
                 r.state === REPLY_STATES.running
-                  ? { ...r, state: REPLY_STATES.failed, failure: 'The reply was cut off.' }
+                  ? { ...r, state: REPLY_STATES.failed, failure: CHAT_COPY.cutOff }
                   : r,
             })
             set({ isBusy: false })

@@ -56,6 +56,35 @@ export type Filing = {
   trackTitle: string
 }
 
+type AlbumArtistsOfProps = {
+  taggedAlbumArtists: NamedArtist[]
+  trackArtists: NamedArtist[]
+  tags: AudioTags
+  folder: string
+}
+
+/** The album's tagged artists, else Various Artists' for a compilation, else the track's, else the folder above's. */
+const albumArtistsOf = ({
+  taggedAlbumArtists,
+  trackArtists,
+  tags,
+  folder,
+}: AlbumArtistsOfProps): NamedArtist[] => {
+  if (taggedAlbumArtists.length > 0) return taggedAlbumArtists
+  if (tags.isCompilation) return [{ name: FALLBACK_ARTISTS.various, mbid: null }]
+  if (trackArtists.length > 0) return trackArtists
+  return [{ name: basename(dirname(folder)) || FALLBACK_ARTISTS.unknown, mbid: null }]
+}
+
+type AlbumKeyOfProps = { tags: AudioTags; albumArtists: NamedArtist[]; folder: string }
+
+const albumKeyOf = ({ tags, albumArtists, folder }: AlbumKeyOfProps): string => {
+  if (tags.releaseMbid !== null) return `mbid:${tags.releaseMbid}`
+  if (tags.album !== null)
+    return `name:${nameKeyOf(albumArtists[0]?.name ?? '')}:${nameKeyOf(tags.album)}`
+  return `folder:${folder}`
+}
+
 type FilingOfProps = { tags: AudioTags; path: string }
 
 /**
@@ -71,21 +100,9 @@ export const filingOf = ({ tags, path }: FilingOfProps): Filing => {
     names: tags.albumArtists,
     mbids: tags.albumArtistMbids,
   })
-  const albumArtists =
-    taggedAlbumArtists.length > 0
-      ? taggedAlbumArtists
-      : tags.isCompilation
-        ? [{ name: FALLBACK_ARTISTS.various, mbid: null }]
-        : trackArtists.length > 0
-          ? trackArtists
-          : [{ name: basename(dirname(folder)) || FALLBACK_ARTISTS.unknown, mbid: null }]
+  const albumArtists = albumArtistsOf({ taggedAlbumArtists, trackArtists, tags, folder })
   const albumTitle = tags.album ?? (basename(folder) || FALLBACK_ARTISTS.unknown)
-  const albumKey =
-    tags.releaseMbid !== null
-      ? `mbid:${tags.releaseMbid}`
-      : tags.album !== null
-        ? `name:${nameKeyOf(albumArtists[0]?.name ?? '')}:${nameKeyOf(tags.album)}`
-        : `folder:${folder}`
+  const albumKey = albumKeyOf({ tags, albumArtists, folder })
   return {
     albumKey,
     albumTitle,

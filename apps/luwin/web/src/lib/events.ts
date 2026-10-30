@@ -78,19 +78,22 @@ const toConfirmation = (data: Record<string, unknown>): Confirmation | null =>
     ? { pendingId: data.pending_id, summary: data.summary, action: data.action }
     : null
 
-const toChoice = (value: unknown): Choice | null =>
-  isRecord(value) &&
-  typeof value.label === 'string' &&
-  typeof value.value === 'string' &&
-  typeof value.display === 'string'
-    ? {
-        label: value.label,
-        value: value.value,
-        year: typeof value.year === 'number' ? value.year : null,
-        display: value.display,
-        detail: typeof value.detail === 'string' ? value.detail : '',
-      }
-    : null
+const toChoice = (value: unknown): Choice | null => {
+  if (
+    !isRecord(value) ||
+    typeof value.label !== 'string' ||
+    typeof value.value !== 'string' ||
+    typeof value.display !== 'string'
+  )
+    return null
+  return {
+    label: value.label,
+    value: value.value,
+    year: typeof value.year === 'number' ? value.year : null,
+    display: value.display,
+    detail: typeof value.detail === 'string' ? value.detail : '',
+  }
+}
 
 /** Whether `value` is an address the page may load or open: http or https only. */
 export const isWebAddress = (value: unknown): value is string =>
@@ -101,30 +104,33 @@ const toTitleLink = (value: unknown): TitleLink | null =>
     ? { label: value.label, url: value.url }
     : null
 
-const toTitleCard = (value: unknown): TitleCard | null =>
-  isRecord(value) &&
-  typeof value.key === 'string' &&
-  typeof value.title === 'string' &&
-  Array.isArray(value.links)
-    ? {
-        key: value.key,
-        title: value.title,
-        year: typeof value.year === 'number' ? value.year : null,
-        logoUrl: isWebAddress(value.logo_url) ? value.logo_url : null,
-        links: value.links.map(toTitleLink).filter(isPresent),
-      }
-    : null
+const toTitleCard = (value: unknown): TitleCard | null => {
+  if (
+    !isRecord(value) ||
+    typeof value.key !== 'string' ||
+    typeof value.title !== 'string' ||
+    !Array.isArray(value.links)
+  )
+    return null
+  return {
+    key: value.key,
+    title: value.title,
+    year: typeof value.year === 'number' ? value.year : null,
+    logoUrl: isWebAddress(value.logo_url) ? value.logo_url : null,
+    links: value.links.map(toTitleLink).filter(isPresent),
+  }
+}
 
 /** A notice as the stream or the decide route sends it, or null when it isn't one. */
-export const toNotice = (value: unknown): Notice | null =>
-  isRecord(value) && isNoticeKind(value.kind) && typeof value.text === 'string'
-    ? {
-        kind: value.kind,
-        text: value.text,
-        pendingId: typeof value.pending_id === 'number' ? value.pending_id : null,
-        to: typeof value.to === 'string' ? value.to : null,
-      }
-    : null
+export const toNotice = (value: unknown): Notice | null => {
+  if (!isRecord(value) || !isNoticeKind(value.kind) || typeof value.text !== 'string') return null
+  return {
+    kind: value.kind,
+    text: value.text,
+    pendingId: typeof value.pending_id === 'number' ? value.pending_id : null,
+    to: typeof value.to === 'string' ? value.to : null,
+  }
+}
 
 const parse = (data: string): unknown => {
   try {

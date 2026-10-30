@@ -261,17 +261,17 @@ describe('a library locked behind the PIN', () => {
       item: state.privateItem,
       album: state.privateAlbum,
     }
-    const held = routeMarks(CONTROLLERS).flatMap((route) =>
-      route.lock == null || route.lock === LOCK_MARKS.public || !isRouteMethod(route.method)
-        ? []
-        : [
-            {
-              method: route.method,
-              url: route.path.replace(':id', String(ids[route.lock])).replace(/:\w+/g, 'poster'),
-              expectedStatus: route.path === AUTH_PATHS.ticket ? 503 : 423,
-            },
-          ],
-    )
+    const held = routeMarks(CONTROLLERS).flatMap((route) => {
+      if (route.lock == null || route.lock === LOCK_MARKS.public || !isRouteMethod(route.method))
+        return []
+      return [
+        {
+          method: route.method,
+          url: route.path.replace(':id', String(ids[route.lock])).replace(/:\w+/g, 'poster'),
+          expectedStatus: route.path === AUTH_PATHS.ticket ? 503 : 423,
+        },
+      ]
+    })
     expect(routeMarks(CONTROLLERS).every((route) => isRouteMethod(route.method))).toBe(true)
     expect(held.length).toBeGreaterThan(25)
     const answers = await Promise.all(
@@ -670,21 +670,11 @@ describe('the admin lock', () => {
       item: state.openItem,
       album: absent,
     }
-    const managing = routeMarks(CONTROLLERS).flatMap(({ method, path, lock, audience }) =>
-      audience !== AUDIENCES.admin || !isRouteMethod(method)
-        ? []
-        : [
-            {
-              method,
-              url: path
-                .replace(
-                  ':id',
-                  String(lock == null || lock === LOCK_MARKS.public ? absent : ids[lock]),
-                )
-                .replace(/:\w+/g, 'poster'),
-            },
-          ],
-    )
+    const managing = routeMarks(CONTROLLERS).flatMap(({ method, path, lock, audience }) => {
+      if (audience !== AUDIENCES.admin || !isRouteMethod(method)) return []
+      const id = lock == null || lock === LOCK_MARKS.public ? absent : ids[lock]
+      return [{ method, url: path.replace(':id', String(id)).replace(/:\w+/g, 'poster') }]
+    })
     expect(managing.length).toBeGreaterThanOrEqual(17)
     const answers = (cookie?: string) =>
       Promise.all(

@@ -293,7 +293,7 @@ const startApp = (): void => {
               kind: ENGINE_STATUSES.unavailable,
               reason: unavailableReason({
                 mode: engineMode(),
-                note: player === null ? null : player.engineNote(),
+                note: player?.engineNote() ?? null,
               }),
             }
           : await readEngineDiagnostics({ mpv: engine.mpv }),

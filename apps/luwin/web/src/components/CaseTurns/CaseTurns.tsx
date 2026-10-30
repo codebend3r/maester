@@ -1,4 +1,5 @@
 import { Button } from '@/components/Button/Button'
+import { CASE_TURNS_COPY } from '@/components/CaseTurns/copy'
 import styles from '@/components/CaseTurns/CaseTurns.module.scss'
 import type { CaseTurn } from '@/lib/api'
 import { useChat } from '@/stores/chat'
@@ -35,14 +36,14 @@ export const CaseTurns = ({ name, turns }: CaseTurnsProps) => {
               {turn.user}
             </Button>
             <dl className={styles.expects}>
-              <Expectation term="Calls" values={turn.expectTools} />
-              <Expectation term="Never calls" values={turn.forbidTools} />
+              <Expectation term={CASE_TURNS_COPY.calls} values={turn.expectTools} />
+              <Expectation term={CASE_TURNS_COPY.neverCalls} values={turn.forbidTools} />
               <Expectation
-                term="Says"
+                term={CASE_TURNS_COPY.says}
                 values={turn.replyMatches ? [`/${turn.replyMatches}/`] : []}
               />
               <Expectation
-                term="Never says"
+                term={CASE_TURNS_COPY.neverSays}
                 values={turn.replyNotMatches ? [`/${turn.replyNotMatches}/`] : []}
               />
             </dl>

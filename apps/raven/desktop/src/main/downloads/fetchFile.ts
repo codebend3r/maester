@@ -56,6 +56,14 @@ const UNSATISFIABLE_RANGE_STATUS = 416
 
 type FailureReason = Extract<FetchOutcome, { ok: false }>['reason']
 
+type CutReasonOfProps = { isAborted: boolean; isStalled: boolean; fallback: FailureReason }
+
+/** Why a fetch that failed stopped: aborted, else stalled, else `fallback`. */
+const cutReasonOf = ({ isAborted, isStalled, fallback }: CutReasonOfProps): FailureReason => {
+  if (isAborted) return FETCH_REASONS.aborted
+  return isStalled ? FETCH_REASONS.stalled : fallback
+}
+
 type FetchInput = {
   fetch: StreamFetch
   url: string
@@ -265,11 +273,11 @@ const streamToPart = async ({
     return failure({ reason: FETCH_REASONS.space, bytes: progress.bytes })
   if (end?.kind === STOP_KINDS.write) throw end.error
   if (piped.isFailed) {
-    const reason = signal.aborted
-      ? FETCH_REASONS.aborted
-      : stall.isStalled
-        ? FETCH_REASONS.stalled
-        : FETCH_REASONS.cut
+    const reason = cutReasonOf({
+      isAborted: signal.aborted,
+      isStalled: stall.isStalled,
+      fallback: FETCH_REASONS.cut,
+    })
     return failure({ reason, bytes: progress.bytes })
   }
   if (progress.bytes !== expectedSize) {
@@ -320,11 +328,11 @@ const download = async ({
     .finally(() => timers.clear(timer))
   if (answer.isFailed) {
     const isAborted = signal.aborted && isAbortError(answer.error)
-    const reason = isAborted
-      ? FETCH_REASONS.aborted
-      : wait.isStalled
-        ? FETCH_REASONS.stalled
-        : FETCH_REASONS.unreachable
+    const reason = cutReasonOf({
+      isAborted,
+      isStalled: wait.isStalled,
+      fallback: FETCH_REASONS.unreachable,
+    })
     return failure({ reason, bytes: from })
   }
   const { response } = answer

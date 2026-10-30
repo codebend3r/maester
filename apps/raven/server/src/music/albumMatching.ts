@@ -46,6 +46,12 @@ const creditsArtist = ({ album, release }: CreditsArtistProps): boolean => {
  */
 type ScoreReleaseProps = { album: AlbumToMatch; release: Release }
 
+/** The year's share for releases `apart` years from the album, nothing when either has no year. */
+const yearPoints = (apart: number | null): number => {
+  if (apart === 0) return WEIGHTS.year
+  return apart === 1 ? WEIGHTS.yearNear : 0
+}
+
 export const scoreRelease = ({ album, release }: ScoreReleaseProps): number => {
   const isSameTitle = foldTitle(release.title) === foldTitle(album.title)
   const isSameArtist =
@@ -55,7 +61,7 @@ export const scoreRelease = ({ album, release }: ScoreReleaseProps): number => {
   const score =
     (isSameTitle ? WEIGHTS.title : 0) +
     (isSameArtist ? WEIGHTS.artist : 0) +
-    (apart === 0 ? WEIGHTS.year : apart === 1 ? WEIGHTS.yearNear : 0) +
+    yearPoints(apart) +
     (release.trackCount !== null && release.trackCount === album.trackCount
       ? WEIGHTS.trackCount
       : 0) +

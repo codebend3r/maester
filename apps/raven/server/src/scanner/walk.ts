@@ -95,12 +95,10 @@ export type WalkResult = {
 
 type Listing = { dirs: string[]; files: string[]; error: string | null }
 
-const reason = (error: unknown): string =>
-  error instanceof Error && 'code' in error && typeof error.code === 'string'
-    ? error.code
-    : error instanceof Error
-      ? error.message
-      : String(error)
+const reason = (error: unknown): string => {
+  if (!(error instanceof Error)) return String(error)
+  return 'code' in error && typeof error.code === 'string' ? error.code : error.message
+}
 
 type ClassifyProps = {
   dir: string

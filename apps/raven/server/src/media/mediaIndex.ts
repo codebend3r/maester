@@ -137,20 +137,19 @@ export class MediaIndex {
            FROM media WHERE id = ?`,
       )
       .get(id)
-    return row
-      ? {
-          id: row.id,
-          libraryId: row.library_id,
-          path: row.path,
-          fileName: row.file_name,
-          container: row.container,
-          mtimeMs: row.mtime_ms,
-          duration: row.duration,
-          videoCodec: row.video_codec,
-          hdr: row.hdr === 1,
-          thumbnail: isThumbnailState(row.thumbnail) ? row.thumbnail : 'pending',
-        }
-      : null
+    if (!row) return null
+    return {
+      id: row.id,
+      libraryId: row.library_id,
+      path: row.path,
+      fileName: row.file_name,
+      container: row.container,
+      mtimeMs: row.mtime_ms,
+      duration: row.duration,
+      videoCodec: row.video_codec,
+      hdr: row.hdr === 1,
+      thumbnail: isThumbnailState(row.thumbnail) ? row.thumbnail : 'pending',
+    }
   }
 
   /** The library a video is in, or null when there is no such video. */
