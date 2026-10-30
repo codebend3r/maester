@@ -49,7 +49,7 @@ const uniqueNames = (labels: readonly string[]): string[] =>
   )
 
 const renditionName = (track: SubtitleTrack): string => {
-  const { name, details } = subtitleLabel(track)
+  const { name, details } = subtitleLabel({ track })
   return details ? `${name} (${details})` : name
 }
 

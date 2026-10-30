@@ -6,6 +6,7 @@ import {
   type SubtitleTrack,
   type TrackLabel,
   audioLabel,
+  isPictureSubtitle,
   subtitleLabel,
 } from '@raven/core'
 
@@ -28,10 +29,6 @@ export const audioOptionsOf = (tracks: MediaTracks): TrackOption[] =>
 const showable = (tracks: MediaTracks): SubtitleTrack[] =>
   tracks.subtitles.filter((track) => track.supported)
 
-/** A track that is a picture of text (Blu-ray PGS, VobSub) inside the file, which only the file carries. */
-export const isPictureSubtitle = (track: SubtitleTrack): boolean =>
-  !track.supported && track.source === SUBTITLE_SOURCES.embedded
-
 type SubtitleOptionsOfProps = {
   tracks: MediaTracks
   /** Whether the player draws the file's picture tracks now: it can, and it plays the file as it is. */
@@ -49,7 +46,7 @@ export const subtitleOptionsOf = ({
   { key: SUBTITLE_CHOICES.off, label: PLAYER_TRACKS_COPY.off },
   ...tracks.subtitles
     .filter((track) => track.supported || (canShowPictures && isPictureSubtitle(track)))
-    .map((track) => ({ key: track.id, label: labelText(subtitleLabel(track)) })),
+    .map((track) => ({ key: track.id, label: labelText(subtitleLabel({ track })) })),
 ]
 
 type FilePlaceForProps = { tracks: MediaTracks; subtitle: string }

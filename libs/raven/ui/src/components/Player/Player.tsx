@@ -1,5 +1,5 @@
 import { type ComponentType, useState } from 'react'
-import { PLAYER_SOURCE_KINDS } from '@raven/core'
+import { PLAYER_SOURCE_KINDS, isPictureSubtitle } from '@raven/core'
 import { ENGINE_KINDS, type Engine, type HtmlSource, sourceKey } from '@/components/Player/engine'
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
@@ -289,6 +289,7 @@ const ServerPlayer = ({ source, onBack }: ServerPlayerProps) => {
     api: source.api,
     audio: selection.audio,
     isDefaultAudio: selection.isDefaultAudio,
+    burn: isPictureSubtitle(selection.subtitle) ? selection.subtitle.id : null,
   })
   return (
     <KeyedView<PlaybackViewsProps>

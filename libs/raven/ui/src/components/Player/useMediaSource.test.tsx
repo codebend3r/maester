@@ -21,13 +21,22 @@ const planeWith = (granted: MediaAccess | null): MediaPlane => ({
 describe('sourceFor', () => {
   it('plays the file itself directly, and a stream of its type otherwise', () => {
     expect(
-      sourceFor({ api, id: 7, mode: 'direct', audio: null, mime: null, access: () => null }),
+      sourceFor({
+        api,
+        id: 7,
+        mode: 'direct',
+        audio: null,
+        burn: null,
+        mime: null,
+        access: () => null,
+      }),
     ).toEqual({ kind: 'file', url: '/api/media/7/file' })
     const stream = sourceFor({
       api,
       id: 7,
       mode: 'remux',
       audio: 1,
+      burn: null,
       mime: 'video/mp4',
       access: () => null,
     })
@@ -45,6 +54,7 @@ describe('sourceFor', () => {
       id: 7,
       mode: 'remux',
       audio: null,
+      burn: null,
       mime: 'video/mp4',
       access: () => access(tickets[asked++] ?? 'late'),
     })
@@ -56,9 +66,31 @@ describe('sourceFor', () => {
     expect(second).toContain('t=ghi.jkl')
   })
 
+  it('asks a transcode to burn a picture subtitle in', () => {
+    const stream = sourceFor({
+      api,
+      id: 7,
+      mode: 'transcode',
+      audio: null,
+      burn: 'embedded-2',
+      mime: 'video/mp4',
+      access: () => access('abc.def'),
+    })
+    if (stream.kind !== VIDEO_SOURCE_KINDS.stream) throw new Error('expected a stream')
+    expect(stream.url(0)).toContain('burn=embedded-2')
+  })
+
   it('reads the access once for the file', () => {
     const read = mock(() => access('abc.def'))
-    const file = sourceFor({ api, id: 7, mode: 'direct', audio: null, mime: null, access: read })
+    const file = sourceFor({
+      api,
+      id: 7,
+      mode: 'direct',
+      audio: null,
+      burn: null,
+      mime: null,
+      access: read,
+    })
     expect(file).toEqual({
       kind: 'file',
       url: 'https://raven.home.example/api/media/7/file?t=abc.def',
@@ -84,7 +116,7 @@ const Harness = ({ mode, mediaPlane, onCommit = ignore, onFailure = ignore }: Ha
   useMediaSource({
     videoRef,
     source: { kind: 'server', media, api, mediaPlane },
-    rendition: { mode, quality: null },
+    rendition: { mode, quality: null, burn: null },
     audio: null,
     position,
     playing,

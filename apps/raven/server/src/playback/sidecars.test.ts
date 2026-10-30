@@ -19,6 +19,16 @@ describe('parseSidecarName', () => {
     })
   })
 
+  it('matches a name written composed beside one written decomposed', () => {
+    const fileName = 'Pokémon.en.srt'.normalize('NFD')
+    expect(
+      parseSidecarName({ videoFileName: 'Pokémon.mkv'.normalize('NFC'), fileName }),
+    ).toMatchObject({
+      codec: 'srt',
+      language: 'en',
+    })
+  })
+
   it('takes a bare sidecar as having no language', () => {
     expect(parse('Movie (2020) 1080p.srt')).toEqual({
       codec: 'srt',

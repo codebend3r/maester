@@ -1,5 +1,11 @@
 import { describe, expect, it, jest } from 'bun:test'
-import { PLAYBACK_MODES, type PlaybackMode, type StreamQuality } from '@raven/core'
+import {
+  PLAYBACK_MODES,
+  type PlaybackMode,
+  type StreamQuality,
+  SUBTITLE_SOURCES,
+  type SubtitleTrack,
+} from '@raven/core'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createRef } from 'react'
@@ -35,6 +41,7 @@ const choicesFor = ({
   select = () => {},
 }: ChoicesForProps): PlayChoices => ({
   groups: choiceGroups({ modes, rendition, qualities, original: '24.2 Mb/s, 4K' }),
+  canBurn: false,
   select,
 })
 
@@ -66,13 +73,21 @@ const renderPlayback = ({
     />,
   )
 
-const converting = { mode: PLAYBACK_MODES.transcode, quality: null } as const satisfies Rendition
-const remuxing = { mode: PLAYBACK_MODES.remux, quality: null } as const satisfies Rendition
+const converting = {
+  mode: PLAYBACK_MODES.transcode,
+  quality: null,
+  burn: null,
+} as const satisfies Rendition
+const remuxing = {
+  mode: PLAYBACK_MODES.remux,
+  quality: null,
+  burn: null,
+} as const satisfies Rendition
 
 describe('SettingsMenu playback section', () => {
   it('switches autoplay under the speed', async () => {
     const onPickAutoplay = jest.fn()
-    renderPlayback({ choices: { groups: [], select: () => {} }, onPickAutoplay })
+    renderPlayback({ choices: { groups: [], canBurn: false, select: () => {} }, onPickAutoplay })
     const autoplay = screen.getByRole('group', { name: 'Autoplay' })
     expect(within(autoplay).getByRole('radio', { name: 'On' })).toBeChecked()
     await userEvent.click(within(autoplay).getByRole('radio', { name: 'Off' }))
@@ -124,7 +139,7 @@ describe('SettingsMenu playback section', () => {
   it('checks the size playing, and leaves the original out when only a conversion plays', () => {
     renderPlayback({
       choices: choicesFor({
-        rendition: { mode: PLAYBACK_MODES.transcode, quality: 'sd480' },
+        rendition: { mode: PLAYBACK_MODES.transcode, quality: 'sd480', burn: null },
         qualities: ['high1080', 'sd480'],
       }),
     })
@@ -149,5 +164,50 @@ describe('SettingsMenu playback section', () => {
     const modes = within(screen.getByRole('group', { name: 'Play as' }))
     expect(modes.queryByRole('radio', { name: /Video and audio converted/ })).toBeNull()
     expect(modes.getByRole('radio', { name: /Playing the original file/ })).not.toBeChecked()
+  })
+})
+
+describe('SettingsMenu subtitles', () => {
+  const picture = {
+    id: 'embedded-0',
+    source: SUBTITLE_SOURCES.embedded,
+    codec: 'dvd_subtitle',
+    language: 'en',
+    title: null,
+    default: false,
+    forced: false,
+    hearingImpaired: false,
+    supported: false,
+  } as const satisfies SubtitleTrack
+  const withPicture: TrackSelection = {
+    ...selection,
+    tracks: { audio: [], subtitles: [picture], defaultAudio: null, frameRate: null },
+  }
+  const renderSubtitles = (canBurn: boolean) =>
+    render(
+      <SettingsMenu
+        section={MENU_SECTIONS.subtitles}
+        menuRef={createRef<HTMLDialogElement>()}
+        selection={withPicture}
+        subtitleStatus="off"
+        rate={1}
+        mode={PLAYBACK_MODES.direct}
+        choices={{ groups: [], canBurn, select: () => {} }}
+        onPickRate={() => {}}
+        autoplay
+        onPickAutoplay={() => {}}
+        onShowInfo={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+  it('lets a picture track be picked when the server can burn it in', () => {
+    renderSubtitles(true)
+    expect(screen.getByRole('radio', { name: /English/ })).toBeEnabled()
+  })
+
+  it('keeps a picture track off when nothing can burn it in', () => {
+    renderSubtitles(false)
+    expect(screen.getByRole('radio', { name: /English/ })).toBeDisabled()
   })
 })

@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common'
 import {
   AUTH_CONFIG_STATES,
+  HLS_PARAMS,
   type AuthConfig,
   type MediaMarkers,
   type MediaStreams,
@@ -32,6 +33,7 @@ import { AuthSessions } from '@/auth/authSessions'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
 import { streamArgs } from '@/ffmpeg/args'
 import { FFMPEG_SIGNALS, FfmpegService } from '@/ffmpeg/ffmpegService'
+import { parseProbe } from '@/ffmpeg/probe'
 import { parseStreams } from '@/ffmpeg/streams'
 import { KeyframesService } from '@/hls/keyframesService'
 import { MarkersService } from '@/markers/markersService'
@@ -43,6 +45,7 @@ import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MediaTickets } from '@/media/mediaTickets'
 import {
   audioTrackOf,
+  burnSubtitleOf,
   capHeight,
   refuseWhatSettingsTurnOff,
   sizeOnDisk,
@@ -174,6 +177,7 @@ export class PlaybackController {
     @Query('start') start: string | undefined,
     @Query('audio') audio: string | undefined,
     @Query('quality') quality: string | undefined,
+    @Query(HLS_PARAMS.burn) burn: string | undefined,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
@@ -191,6 +195,12 @@ export class PlaybackController {
 
     const { tracks } = await this.tracks.tracksFor(file)
     const chosen = audioTrackOf({ tracks, audio })
+    const burnWith = await burnSubtitleOf({
+      tracks,
+      burn,
+      mode: streamMode,
+      probe: async () => parseProbe(await this.ffmpeg.probeJson(file.path)),
+    })
     const { tonemap, encoder } = await videoEncodingOf({
       ffmpeg: this.ffmpeg,
       file,
@@ -212,6 +222,7 @@ export class PlaybackController {
         maxHeight: capHeight({ size, maxHeight: playback.maxHeight }),
         quality: playback.quality,
         bitrate: size?.bitrate ?? null,
+        burn: burnWith,
       }),
     )
     // The response closes when it finishes or when the client goes away;

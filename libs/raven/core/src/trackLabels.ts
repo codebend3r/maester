@@ -18,13 +18,20 @@ export const audioLabel = (track: AudioTrack): TrackLabel => ({
   ]),
 })
 
-export const subtitleLabel = (track: SubtitleTrack): TrackLabel => ({
+type SubtitleLabelProps = {
+  track: SubtitleTrack
+  /** Whether a picture track can still be shown, by burning it into the picture. */
+  canBurn?: boolean
+}
+
+export const subtitleLabel = ({ track, canBurn = false }: SubtitleLabelProps): TrackLabel => ({
   name: languageName({ tag: track.language }) ?? 'Unknown language',
   details: joined([
     track.title,
     track.forced && 'Forced',
     track.hearingImpaired && 'SDH',
     track.source === SUBTITLE_SOURCES.external && 'File',
-    !track.supported && "Picture subtitles, can't be shown",
+    !track.supported &&
+      (canBurn ? 'Picture subtitles, burned in' : "Picture subtitles, can't be shown"),
   ]),
 })

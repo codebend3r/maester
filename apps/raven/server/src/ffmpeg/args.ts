@@ -296,6 +296,12 @@ export const encoderTestArgs = (encoder: VideoEncoder): string[] => {
   ]
 }
 
+/**
+ * A picture subtitle to burn in: its `0:s:N` stream, and the canvas it is drawn on, the video's
+ * own size, which ffmpeg can not find for a track whose first cue lies past its probe.
+ */
+export type BurnSubtitle = { stream: number; canvas: { width: number; height: number } }
+
 type StreamArgsProps = {
   input: string
   start: number
@@ -314,6 +320,8 @@ type StreamArgsProps = {
   quality?: TranscodeQuality
   /** A ceiling on the transcode's video bitrate in bits per second, when the viewer asked for a size. */
   bitrate?: number | null
+  /** The `0:s:N` picture subtitle a transcode burns into the picture, and the canvas it is drawn on. */
+  burn?: BurnSubtitle | null
 }
 
 /**
@@ -342,22 +350,36 @@ export const streamArgs = ({
   maxHeight = 1080,
   quality = 'medium',
   bitrate = null,
+  burn = null,
 }: StreamArgsProps): string[] => {
   const video = ((): VideoArgs => {
     if (audioOnly) return NO_VIDEO
     return mode === PLAYBACK_MODES.remux
       ? copyVideo(videoCodec)
-      : transcodeVideo({ encoder, videoCodec, tonemap, maxHeight, quality, bitrate })
+      : transcodeVideo({
+          encoder,
+          videoCodec,
+          tonemap,
+          maxHeight,
+          quality,
+          bitrate,
+          burn: burn?.stream ?? null,
+        })
   })()
+  // ffmpeg 5.1 lays a picture subtitle over nothing after a seek on the file's clock, so a burn
+  // reads on a clock that starts at the seek and moves its output back onto the file's.
+  const clock =
+    burn === null
+      ? ['-copyts', '-start_at_zero']
+      : ['-canvas_size', `${burn.canvas.width}x${burn.canvas.height}`]
   return [
     ...QUIET,
     ...video.input,
     ...(start > 0 ? ['-ss', String(start)] : []),
-    '-copyts',
-    '-start_at_zero',
+    ...clock,
     '-i',
     input,
-    ...(audioOnly ? [] : ['-map', VIDEO_STREAM]),
+    ...(audioOnly ? [] : ['-map', video.map]),
     ...(audio == null ? [] : ['-map', `0:a:${audio}`]),
     ...video.output,
     ...(audio == null ? [] : ['-c:a', 'aac', '-ac', '2', '-b:a', '192k']),
@@ -370,7 +392,7 @@ export const streamArgs = ({
     '-max_muxing_queue_size',
     '4096',
     '-output_ts_offset',
-    String(streamShift),
+    String(burn === null ? streamShift : streamShift + start),
     '-avoid_negative_ts',
     'disabled',
     '-use_editlist',

@@ -61,6 +61,7 @@ describe('playback', () => {
     admin: string
     app: NestFastifyApplication | null
     movie: MediaItem | null
+    pictures: MediaItem | null
   } = {
     root: '',
     /**
@@ -74,6 +75,7 @@ describe('playback', () => {
     admin: '',
     app: null,
     movie: null,
+    pictures: null,
   }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
@@ -81,6 +83,7 @@ describe('playback', () => {
   }
   const api = (): ApiClient => apiFor({ app: app(), cookie: state.admin })
   const movieId = (): number => state.movie?.id ?? -1
+  const picturesId = (): number => state.pictures?.id ?? -1
   type StreamUrlProps = {
     mode: StreamMode
     start?: number
@@ -95,6 +98,13 @@ describe('playback', () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-playback-'))
     const media = join(state.root, 'media')
     await encodeRichClip({ path: join(media, 'Rich (2026).mkv'), cues: CUES })
+    // The same clip with its English cues as a picture track (PGS), which only a burn can show.
+    await encodeRichClip({
+      path: join(media, 'Rich Pictures (2026).mkv'),
+      seconds: 12,
+      cues: CUES,
+      isPictureSubtitle: true,
+    })
     // Latin-1 rather than UTF-8, as plenty of old sidecars are.
     await writeFile(join(media, 'Rich (2026).en.forced.srt'), Buffer.from(SIDECAR, 'latin1'))
     state.app = await createApp({
@@ -106,9 +116,12 @@ describe('playback', () => {
     state.admin = await adminCookie(state.app)
     const library = await api().createLibrary({ name: 'Films', paths: [media] })
     await app().get(ScannerService).whenIdle(library.id)
-    const [movie] = await api().listMedia({ libraryId: library.id })
-    if (!movie) throw new Error('nothing indexed')
+    const listed = await api().listMedia({ libraryId: library.id })
+    const movie = listed.find((item) => item.fileName === 'Rich (2026).mkv')
+    const pictures = listed.find((item) => item.fileName === 'Rich Pictures (2026).mkv')
+    if (!movie || !pictures) throw new Error('nothing indexed')
     state.movie = movie
+    state.pictures = pictures
     const fromTop = await app().inject({ method: 'GET', url: streamUrl({ mode: 'remux' }) })
     const top = join(state.root, 'top.mp4')
     await writeFile(top, fromTop.rawPayload)
@@ -251,6 +264,77 @@ describe('playback', () => {
       const times = await firstPacketTimes(await fetchStream(streamUrl({ mode: 'transcode' })))
       expect(times.video).toBeCloseTo(STREAM_TIME_SHIFT + state.lead, 1)
       expect(times.audio).toBeGreaterThan(0)
+    })
+
+    describe('with a picture subtitle burned in', () => {
+      type BurnUrlProps = { start?: number }
+      const burnUrl = ({ start = 0 }: BurnUrlProps = {}) =>
+        api().streamUrl({
+          id: picturesId(),
+          mode: 'transcode',
+          start,
+          audio: null,
+          burn: 'embedded-0',
+        })
+      type PlainUrlProps = { start?: number }
+      const plainUrl = ({ start = 0 }: PlainUrlProps = {}) =>
+        api().streamUrl({ id: picturesId(), mode: 'transcode', start, audio: null })
+
+      /** How alike two streams' frames are `seconds` into the file (`-ss` counts from the stream's start): PSNR in dB, high for alike. */
+      type LikenessProps = { a: string; b: string; seconds: number }
+      const likeness = async ({ a, b, seconds }: LikenessProps) => {
+        const { stderr } = await run('ffmpeg', [
+          '-hide_banner',
+          '-ss',
+          String(seconds),
+          '-i',
+          a,
+          '-ss',
+          String(seconds),
+          '-i',
+          b,
+          '-frames:v',
+          '1',
+          '-lavfi',
+          '[0:v][1:v]psnr',
+          '-f',
+          'null',
+          '-',
+        ])
+        const found = /average:(\S+)/.exec(stderr)?.[1]
+        return found === 'inf' ? Infinity : Number(found)
+      }
+
+      it('draws the subtitle while it is up and not before or after', async () => {
+        const burned = await fetchStream(burnUrl())
+        const plain = await fetchStream(plainUrl())
+        // The first box is up from 1 s to 3 s; its white box at the foot is a visible change.
+        expect(await likeness({ a: burned, b: plain, seconds: 2 })).toBeLessThan(30)
+        // Between the two boxes only the encoder's own noise differs.
+        expect(await likeness({ a: burned, b: plain, seconds: 5 })).toBeGreaterThan(35)
+      })
+
+      it('keeps the file clock after a seek, as a stream without a burn does', async () => {
+        const burned = await firstPacketTimes(await fetchStream(burnUrl({ start: 4 })))
+        const plain = await firstPacketTimes(await fetchStream(plainUrl({ start: 4 })))
+        expect(burned.video).toBeCloseTo(plain.video, 1)
+        expect(burned.audio).toBeCloseTo(plain.audio, 1)
+      })
+
+      it('refuses a burn that is not a picture track of a transcode', async () => {
+        const statuses = await Promise.all(
+          [
+            `${picturesId()}/stream?mode=remux&burn=embedded-0`,
+            `${picturesId()}/stream?mode=transcode&burn=embedded-9`,
+            // The rich clip's own subtitle is text, a rendition of its own.
+            `${movieId()}/stream?mode=transcode&burn=embedded-0`,
+          ].map(
+            async (path) =>
+              (await app().inject({ method: 'GET', url: `/api/media/${path}` })).statusCode,
+          ),
+        )
+        expect(statuses).toEqual([400, 400, 400])
+      })
     })
 
     // Addresses the client would never build, so written by hand.

@@ -72,6 +72,26 @@ describe('streamArgs', () => {
     streamShift: 1,
   }
 
+  describe('with a picture subtitle to burn in', () => {
+    const burn = { stream: 1, canvas: { width: 1920, height: 1080 } }
+    const args = streamArgs({ ...base, mode: 'transcode', burn })
+
+    it('lays the subtitle over the picture and maps the result', () => {
+      expect(args).toContain('-filter_complex')
+      expect(args.join(' ')).toContain('[0:s:1]overlay')
+      expect(args[args.indexOf('-map') + 1]).toBe('[vout]')
+    })
+
+    it('reads on a clock from the seek and moves the output back onto the file`s', () => {
+      expect(args).not.toContain('-copyts')
+      expect(args.slice(args.indexOf('-canvas_size'), args.indexOf('-canvas_size') + 2)).toEqual([
+        '-canvas_size',
+        '1920x1080',
+      ])
+      expect(args[args.indexOf('-output_ts_offset') + 1]).toBe('62.5')
+    })
+  })
+
   describe('on a GPU', () => {
     const vaapi: VideoEncoder = { kind: 'vaapi', device: '/dev/dri/renderD128' }
     const beforeInput = (args: string[]) => args.slice(0, args.indexOf('-i'))

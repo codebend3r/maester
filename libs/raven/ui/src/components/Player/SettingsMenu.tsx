@@ -1,4 +1,11 @@
-import { type PlaybackMode, SPEEDS, audioLabel, describeMode, subtitleLabel } from '@raven/core'
+import {
+  type PlaybackMode,
+  SPEEDS,
+  audioLabel,
+  describeMode,
+  isPictureSubtitle,
+  subtitleLabel,
+} from '@raven/core'
 import { type ComponentType, type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import { SETTINGS_MENU_COPY } from '@/components/Player/copy'
@@ -54,6 +61,8 @@ type GroupProps = {
   selection: TrackSelection
   mode: PlaybackMode
   subtitleStatus: SubtitleStatus
+  /** Whether a picture subtitle can be picked: the server may burn it into the picture. */
+  canBurn: boolean
 }
 
 const tracksNoteOf = ({ tracksFailed, tracksPending }: TrackSelection): string | null => {
@@ -111,7 +120,7 @@ const AudioGroup = (group: AudioGroupProps) => {
 
 type SubtitleGroupProps = GroupProps
 
-const SubtitleGroup = ({ labelledBy, selection, subtitleStatus }: SubtitleGroupProps) => {
+const SubtitleGroup = ({ labelledBy, selection, subtitleStatus, canBurn }: SubtitleGroupProps) => {
   const { tracks, subtitle, pickSubtitle } = selection
   const subtitleId = subtitle?.id ?? null
   const tracksNote = tracksNoteOf(selection)
@@ -125,13 +134,13 @@ const SubtitleGroup = ({ labelledBy, selection, subtitleStatus }: SubtitleGroupP
         onSelect={() => pickSubtitle(null)}
       />
       {(tracks?.subtitles ?? []).map((track) => {
-        const label = subtitleLabel(track)
+        const label = subtitleLabel({ track, canBurn })
         return (
           <Option
             key={track.id}
             name={`${labelledBy}-subtitles`}
             checked={track.id === subtitleId}
-            disabled={!track.supported}
+            disabled={!track.supported && !(canBurn && isPictureSubtitle(track))}
             label={label.name}
             details={label.details}
             onSelect={() => pickSubtitle(track.id)}
@@ -357,6 +366,7 @@ export const SettingsMenu = ({
             selection={selection}
             mode={mode}
             subtitleStatus={subtitleStatus}
+            canBurn={choices?.canBurn ?? false}
             name={id}
             rate={rate}
             steppedDown={steppedDown}

@@ -37,19 +37,22 @@ describe('audioLabel', () => {
 
 describe('subtitleLabel', () => {
   it('names a forced sidecar track by language, marked Forced and File', () => {
-    expect(subtitleLabel(subtitle())).toEqual({ name: 'English', details: 'Forced · File' })
+    expect(subtitleLabel({ track: subtitle() })).toEqual({
+      name: 'English',
+      details: 'Forced · File',
+    })
   })
 
   it("says why a picture track can't be shown", () => {
     expect(
-      subtitleLabel(
-        subtitle({
+      subtitleLabel({
+        track: subtitle({
           source: SUBTITLE_SOURCES.embedded,
           forced: false,
           hearingImpaired: true,
           supported: false,
         }),
-      ).details,
+      }).details,
     ).toBe("SDH · Picture subtitles, can't be shown")
   })
 })

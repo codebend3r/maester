@@ -116,7 +116,7 @@ export const audioPillLabel = ({
 
 /** The subtitles pill's language, or Off. */
 export const subtitlePillLabel = (subtitle: SubtitleTrack | null): string =>
-  subtitle ? subtitleLabel(subtitle).name : PLAYBACK_FACTS_COPY.subtitlesOff
+  subtitle ? subtitleLabel({ track: subtitle }).name : PLAYBACK_FACTS_COPY.subtitlesOff
 
 /** Why the picture is a transcode when the connection could not carry the way above it. */
 export const stepDownNote = ({ from, delivery }: StepDown): string => {

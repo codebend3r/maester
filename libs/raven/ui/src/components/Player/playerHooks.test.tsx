@@ -64,6 +64,7 @@ describe('usePlaybackLadder', () => {
           media: mediaItem({ audioCodec: 'truehd' }),
           audio: null,
           isDefaultAudio: true,
+          burn: null,
         }),
       { wrapper: withSettings },
     )
@@ -96,6 +97,7 @@ describe('usePlaybackLadder', () => {
           media: mediaItem({ audioCodec: 'truehd' }),
           audio,
           isDefaultAudio: audio == null,
+          burn: null,
         }),
       { wrapper: withSettings, initialProps: defaultTrack },
     )
@@ -129,6 +131,7 @@ describe('usePlaybackLadder', () => {
           media: mediaItem({ audioCodec: 'truehd' }),
           audio: null,
           isDefaultAudio: true,
+          burn: null,
         }),
       { wrapper: withSettings },
     )
@@ -171,6 +174,7 @@ describe('usePlaybackLadder', () => {
           }),
           audio: null,
           isDefaultAudio: true,
+          burn: null,
         }),
       { wrapper: withSettings },
     )
@@ -196,6 +200,30 @@ describe('usePlaybackLadder', () => {
     expect(back.rendition.quality).toBeNull()
   })
 
+  it('plays a picture subtitle only as a transcode, which burns it in', () => {
+    setBrowserSupport(() => true)
+    setStreamSupport(() => true)
+    const { result } = renderHook(
+      () =>
+        usePlaybackLadder({
+          api,
+          media: mediaItem(),
+          audio: null,
+          isDefaultAudio: true,
+          burn: 'embedded-2',
+        }),
+      { wrapper: withSettings },
+    )
+    const burning = result.current
+    if (burning.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
+    expect(burning.choices.canBurn).toBe(true)
+    expect(burning.rendition).toEqual({
+      mode: PLAYBACK_MODES.transcode,
+      quality: null,
+      burn: 'embedded-2',
+    })
+  })
+
   it('offers no step down when nothing lighter is left', () => {
     setBrowserSupport((mime) => !mime.includes('mlpa'))
     setStreamSupport((mime) => !mime.includes('avc1'))
@@ -206,6 +234,7 @@ describe('usePlaybackLadder', () => {
           media: mediaItem({ audioCodec: 'truehd' }),
           audio: null,
           isDefaultAudio: true,
+          burn: null,
         }),
       { wrapper: withSettings },
     )
