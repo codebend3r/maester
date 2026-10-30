@@ -2,13 +2,16 @@ import { DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { type ReactNode, useId } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { Button, Icon, type IconName, useKeyShortcut } from '@raven/ui'
+import { AudioHost, Button, Icon, type IconName, useKeyShortcut } from '@raven/ui'
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { isAnyOf, libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
 import { NavTip } from '@/components/AppShell/NavTip'
 import { TabBar } from '@/components/AppShell/TabBar'
 import { useIsMediumScreen } from '@/components/AppShell/useIsMediumScreen'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
+import { NowPlayingBar } from '@/components/NowPlayingBar/NowPlayingBar'
+import { useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
+import { api } from '@/lib/api'
 import { Logo } from '@/components/Logo/Logo'
 import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
@@ -348,6 +351,11 @@ export const AppShell = () => {
           <TopCardNote pageKey={key}>
             <Outlet />
           </TopCardNote>
+        </div>
+        {/* Music plays above the routes: the engine once, and the bar while a track plays. */}
+        <div className={styles.player}>
+          <AudioHost api={api} reprobe={useReprobe()} />
+          <NowPlayingBar />
         </div>
       </main>
       <TabBar />

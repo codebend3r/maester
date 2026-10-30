@@ -170,29 +170,6 @@
   gap: 2px;
 }
 
-.tier {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  align-items: center;
-  gap: var(--space-0);
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-
-  &.strong {
-    color: var(--color-fern);
-  }
-
-  &.possible {
-    color: var(--color-amber);
-  }
-
-  &.weak {
-    color: var(--color-lichen);
-    font-weight: 400;
-  }
-}
-
 .choose {
   grid-area: choose;
 }

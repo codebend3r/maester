@@ -101,6 +101,10 @@ type TrackRow = {
   mbid: string | null
   added_at: string
   artists: string
+  album_title: string
+  album_cover_source: string | null
+  album_cover_ref: string | null
+  album_mbid: string | null
 }
 
 type ArtistRow = {
@@ -145,7 +149,9 @@ const SELECT_ALBUM_DETAILS = selectAlbums(
 const SELECT_TRACKS = `SELECT m.id AS media_id, m.library_id, t.album_id, t.title, t.disc, t.number,
                               m.duration, m.container, m.audio_codec, m.bitrate, t.sample_rate,
                               t.bit_depth, t.is_lossless, t.mbid, m.added_at,
-                              ${TRACK_ARTISTS} AS artists
+                              ${TRACK_ARTISTS} AS artists,
+                              a.title AS album_title, a.cover_source AS album_cover_source,
+                              a.cover_ref AS album_cover_ref, a.mbid AS album_mbid
                          FROM tracks t
                          JOIN media m ON m.id = t.media_id
                          JOIN albums a ON a.id = t.album_id`
@@ -238,6 +244,8 @@ type MusicRepositoryFillAlbumProps = {
 
 type MusicRepositoryRecreditAlbumProps = { id: number; filing: Filing }
 
+type MusicRepositoryArtistIdProps = NamedArtist
+
 type MusicRepositoryCreditProps = {
   credits: (typeof CREDITS)[keyof typeof CREDITS]
   ownerId: number
@@ -325,6 +333,17 @@ export class MusicRepository {
       isLossless: row.is_lossless === 1,
       mbid: row.mbid,
       addedAt: row.added_at,
+      album: {
+        title: row.album_title,
+        coverVersion: this.pictureVersions.album({
+          id: row.album_id,
+          cover: coverOf({
+            source: row.album_cover_source,
+            ref: row.album_cover_ref,
+            mbid: row.album_mbid,
+          }),
+        }),
+      },
     }
   }
 
@@ -340,7 +359,7 @@ export class MusicRepository {
   }
 
   /** The artist's row, found by id, else by name; made when there is none. An id learnt later is kept. */
-  private artistId({ name, mbid }: NamedArtist): number {
+  private artistId({ name, mbid }: MusicRepositoryArtistIdProps): number {
     const byMbid =
       mbid === null
         ? undefined

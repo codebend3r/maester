@@ -22,6 +22,7 @@ import {
   type TrackPage,
   isAlbumMatchChoice,
   isRecord,
+  isString,
   musicListQuery,
 } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
@@ -106,11 +107,11 @@ export class AlbumsController {
   @Get(':id/match/search')
   async searchMatches(
     @Param('id', ParseIntPipe) id: number,
-    @Query('query') query: string | undefined,
+    @Query('query') query: unknown,
   ): Promise<AlbumMatchCandidate[]> {
     const album = this.music.albumToMatch(id)
     if (!album) throw new NotFoundException(`No album ${id}`)
-    const typed = query?.trim() ?? ''
+    const typed = isString(query) ? query.trim() : ''
     return this.matching
       .search({ album, query: typed === '' ? undefined : typed })
       .catch(musicBrainzFailed)

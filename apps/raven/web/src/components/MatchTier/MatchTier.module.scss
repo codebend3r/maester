@@ -1,0 +1,23 @@
+// The check and the words in a run, in the tier's colour.
+.tier {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-0);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.strong {
+  color: var(--color-fern);
+}
+
+.possible {
+  color: var(--color-bark);
+}
+
+.weak {
+  color: var(--color-lichen);
+}

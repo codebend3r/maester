@@ -1,8 +1,10 @@
 import {
   ITEM_TYPES,
+  LIBRARY_LISTINGS,
   type Library,
   type LibraryCounts,
   type LibraryKind,
+  listingFor,
   matchTypeFor,
 } from '@raven/core'
 import type { IconName } from '@raven/ui'
@@ -14,6 +16,8 @@ import type { IconName } from '@raven/ui'
  */
 export const LIBRARY_SECTIONS = {
   all: 'all',
+  albums: 'albums',
+  artists: 'artists',
   inProgress: 'in-progress',
   favourites: 'favourites',
   sagas: 'sagas',
@@ -30,6 +34,11 @@ const always = (): boolean => true
 const matchedToMovies = (kind: LibraryKind): boolean => matchTypeFor(kind) === ITEM_TYPES.movie
 
 const matched = (kind: LibraryKind): boolean => matchTypeFor(kind) != null
+
+/** A music library lists albums, and has its artists on a tab of their own; every other lists its files or shows. */
+const listsAlbums = (kind: LibraryKind): boolean => listingFor(kind) === LIBRARY_LISTINGS.albums
+
+const listsFiles = (kind: LibraryKind): boolean => !listsAlbums(kind)
 
 /**
  * Every count a tab can show: those the library carries, and the account's
@@ -48,7 +57,9 @@ export const FINISHED_LIMIT = 48
  * movies, and Not matched wherever files are matched at all.
  */
 export const SECTIONS = {
-  all: { label: 'All', icon: 'grid', isFor: always, tally: 'itemCount', most: null },
+  all: { label: 'All', icon: 'grid', isFor: listsFiles, tally: 'itemCount', most: null },
+  albums: { label: 'Albums', icon: 'disc', isFor: listsAlbums, tally: null, most: null },
+  artists: { label: 'Artists', icon: 'music', isFor: listsAlbums, tally: null, most: null },
   'in-progress': {
     label: 'In progress',
     icon: 'playback',
@@ -91,7 +102,8 @@ export const SECTIONS = {
     label: string
     icon: IconName
     isFor: (kind: LibraryKind) => boolean
-    tally: keyof Tallies
+    /** The count beside the tab; null for a tab that shows none. */
+    tally: keyof Tallies | null
     most: number | null
   }
 >
@@ -106,7 +118,7 @@ type CountTextProps = {
 /** The count beside a tab, `48+` past the most it lists; null while its tally is on its way. */
 export const countText = ({ section, tallies }: CountTextProps): string | null => {
   const { tally, most } = SECTIONS[section]
-  const n = tallies[tally]
+  const n = tally === null ? null : tallies[tally]
   if (n == null) return null
   return most != null && n > most ? `${count.format(most)}+` : count.format(n)
 }
@@ -128,21 +140,29 @@ type SectionPathProps = {
   section: LibrarySection
 }
 
-/** A tab's address; All is the library's own. */
+/** The tab a library opens on: its albums, or All. */
+export const openingSection = (kind: LibraryKind): LibrarySection =>
+  listsAlbums(kind) ? LIBRARY_SECTIONS.albums : LIBRARY_SECTIONS.all
+
+/** Whether a tab is the one the library's own address opens: All, or a music library's Albums. */
+const isOpening = (section: LibrarySection): boolean =>
+  section === LIBRARY_SECTIONS.all || section === LIBRARY_SECTIONS.albums
+
+/** A tab's address; the opening tab is the library's own. */
 export const sectionPath = ({ libraryId, section }: SectionPathProps): string =>
-  section === LIBRARY_SECTIONS.all
-    ? `/libraries/${libraryId}`
-    : `/libraries/${libraryId}/${section}`
+  isOpening(section) ? `/libraries/${libraryId}` : `/libraries/${libraryId}/${section}`
+
+type SectionFromProps = { param: string | undefined; kind: LibraryKind }
 
 /**
- * The tab a `:section` route param names: All when there is none, and null
- * for one that names no tab, `all` included, as All has no address of its own.
+ * The tab a `:section` route param names: the library's opening tab when
+ * there is none, and null for one that names no tab, the opening tabs
+ * included, as those have no address of their own.
  */
-export const sectionFrom = (param: string | undefined): LibrarySection | null => {
-  if (param === undefined) return LIBRARY_SECTIONS.all
+export const sectionFrom = ({ param, kind }: SectionFromProps): LibrarySection | null => {
+  if (param === undefined) return openingSection(kind)
   return (
-    Object.values(LIBRARY_SECTIONS).find(
-      (section) => section !== LIBRARY_SECTIONS.all && section === param,
-    ) ?? null
+    Object.values(LIBRARY_SECTIONS).find((section) => !isOpening(section) && section === param) ??
+    null
   )
 }

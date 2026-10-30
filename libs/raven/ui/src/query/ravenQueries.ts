@@ -6,6 +6,7 @@ import {
   type MatchItemType,
   type MatchSubject,
   type MediaSort,
+  type MusicSort,
   type ViewingSession,
   asksServerForNext,
 } from '@raven/core'
@@ -42,6 +43,9 @@ export const ravenQueriesFor = (api: ApiClient) => {
   }
   type RavenQueriesForNextInSessionQueryProps = { id: number; session: ViewingSession }
   type RavenQueriesForItemImagesQueryProps = { id: number; libraryId: number }
+  type RavenQueriesForAlbumsQueryProps = { libraryId: number; search: string; sort: MusicSort }
+  type RavenQueriesForArtistsQueryProps = { libraryId: number; search: string }
+  type RavenQueriesForAlbumMatchSearchQueryProps = { albumId: number; query: string }
 
   type RavenQueriesForMatchSearchQueryProps = {
     type: MatchItemType
@@ -236,6 +240,43 @@ export const ravenQueriesFor = (api: ApiClient) => {
           (query.state.data?.filmography.state ?? null) === FILMOGRAPHY_STATES.pending
             ? FILMOGRAPHY_POLL_MS
             : false,
+      }),
+
+    albumsQuery: ({ libraryId, search, sort }: RavenQueriesForAlbumsQueryProps) =>
+      queryOptions({
+        queryKey: queryKeys.albums({ libraryId, search, sort }),
+        queryFn: () => api.listAlbums({ libraryId, search, sort }),
+        placeholderData: keepPreviousData,
+        gcTime: LISTING_GC_MS,
+      }),
+
+    artistsQuery: ({ libraryId, search }: RavenQueriesForArtistsQueryProps) =>
+      queryOptions({
+        queryKey: queryKeys.artists({ libraryId, search }),
+        queryFn: () => api.listArtists({ libraryId, search }),
+        placeholderData: keepPreviousData,
+        gcTime: LISTING_GC_MS,
+      }),
+
+    albumQuery: (id: number | null) =>
+      queryOptions({
+        queryKey: queryKeys.album(id),
+        queryFn: id == null ? skipToken : () => api.getAlbum(id),
+      }),
+
+    artistQuery: (id: number | null) =>
+      queryOptions({
+        queryKey: queryKeys.artist(id),
+        queryFn: id == null ? skipToken : () => api.getArtist(id),
+      }),
+
+    /** MusicBrainz's releases for an album's Fix match; `query` '' searches by the album's own name. */
+    albumMatchSearchQuery: ({ albumId, query }: RavenQueriesForAlbumMatchSearchQueryProps) =>
+      queryOptions({
+        queryKey: queryKeys.albumMatchSearch({ albumId, query }),
+        queryFn: () => api.searchAlbumMatches({ albumId, query: query === '' ? undefined : query }),
+        staleTime: Infinity,
+        retry: false,
       }),
 
     /** A search for Fix match, scored against `subject` and best first; an empty title asks for nothing. */

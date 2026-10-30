@@ -1,0 +1,100 @@
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { LIBRARY_KINDS } from '@raven/core'
+import { useAudioQueue } from '@raven/ui/headless'
+import { api } from '@/lib/api'
+import { AlbumsSection, ArtistsSection } from '@/pages/LibraryPage/MusicSections'
+import { library } from '@/test/fixtures'
+import { album, artist, track } from '@/test/music'
+import { renderWithProviders } from '@/test/render'
+
+const MUSIC = library({
+  id: 3,
+  name: 'Music',
+  settings: { ...library().settings, kind: LIBRARY_KINDS.music },
+})
+
+describe('AlbumsSection', () => {
+  beforeEach(() => {
+    useAudioQueue.getState().clear()
+    spyOn(api, 'listAlbums').mockResolvedValue([
+      album(),
+      album({ id: 8, title: 'Kid A', year: 2000, coverVersion: null }),
+    ])
+    spyOn(api, 'listTracks').mockResolvedValue({
+      tracks: [track(), track({ id: 102, title: 'Paranoid Android', number: 2 })],
+      total: 2,
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+    mock.restore()
+    useAudioQueue.getState().clear()
+  })
+
+  it('lists the albums as covers with their artists and years', async () => {
+    renderWithProviders({ ui: <AlbumsSection library={MUSIC} />, route: '/libraries/3' })
+    expect(await screen.findByRole('link', { name: 'OK Computer' })).toHaveAttribute(
+      'href',
+      '/albums/7',
+    )
+    expect(screen.getByRole('link', { name: 'Kid A' })).toBeTruthy()
+    expect(screen.getByText('· 2000')).toBeTruthy()
+    expect(api.listAlbums).toHaveBeenCalledWith({ libraryId: 3, search: '', sort: 'artist' })
+  })
+
+  it('sorts as asked, and plays the library’s tracks in that order', async () => {
+    renderWithProviders({ ui: <AlbumsSection library={MUSIC} />, route: '/libraries/3' })
+    await screen.findByRole('link', { name: 'OK Computer' })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), { target: { value: 'year' } })
+    await waitFor(() =>
+      expect(api.listAlbums).toHaveBeenCalledWith({ libraryId: 3, search: '', sort: 'year' }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    await waitFor(() => expect(useAudioQueue.getState().queue.items).toEqual([101, 102]))
+    expect(useAudioQueue.getState().queue.source).toEqual({ kind: 'library', id: 3 })
+    expect(api.listTracks).toHaveBeenCalledWith({
+      libraryId: 3,
+      search: '',
+      sort: 'year',
+      limit: 500,
+    })
+    expect(useAudioQueue.getState().queue.isShuffled).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Shuffle' }))
+    await waitFor(() => expect(useAudioQueue.getState().queue.isShuffled).toBe(true))
+  })
+
+  it('says when the library has no albums, and when nothing matches a search', async () => {
+    spyOn(api, 'listAlbums').mockResolvedValue([])
+    renderWithProviders({ ui: <AlbumsSection library={MUSIC} />, route: '/libraries/3' })
+    expect(await screen.findByText(/No albums in Music yet/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled()
+  })
+})
+
+describe('ArtistsSection', () => {
+  beforeEach(() => {
+    spyOn(api, 'listArtists').mockResolvedValue([
+      artist(),
+      artist({ id: 2, name: 'Blur', albumCount: 2, trackCount: 1 }),
+    ])
+  })
+
+  afterEach(() => {
+    cleanup()
+    mock.restore()
+    useAudioQueue.getState().clear()
+  })
+
+  it('lists the artists with their counts, each linking to their page', async () => {
+    renderWithProviders({ ui: <ArtistsSection library={MUSIC} />, route: '/libraries/3/artists' })
+    expect(await screen.findByRole('link', { name: 'Radiohead' })).toHaveAttribute(
+      'href',
+      '/artists/1',
+    )
+    const list = screen.getByRole('list', { name: 'Artists' })
+    expect(list).toHaveTextContent('1 album · 2 tracks')
+    expect(list).toHaveTextContent('2 albums · 1 track')
+  })
+})

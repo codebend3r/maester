@@ -1,6 +1,6 @@
 # raven: audio libraries, and a standalone music player
 
-Date: 2026-10-27. Status: approved on 2026-10-27, building as ten PRs; PRs 1 to 3 are built. Written as a spike, its four spikes ran on 2026-10-27 and their results are in section "Spikes".
+Date: 2026-10-27. Status: approved on 2026-10-27, building as ten PRs; PRs 1 to 4 are built. Written as a spike, its four spikes ran on 2026-10-27 and their results are in section "Spikes".
 
 ## Why
 
@@ -299,6 +299,9 @@ Ten stacked PRs, one commit each, thermo-reviewed. PRs 1 to 7 bring music to eve
 > Ten PRs, not 22, at the owner's request (2026-10-27). Each PR carries a whole layer or a whole client, so PRs 2, 4 and 7 may run to about 100 files each; the owner chose ten PRs over the usual 50-file limit.
 
 > [!TIP]
+> PR 4 built on 2026-10-29. The audio engine is not a second `Engine` kind of the shared `Player`, whose chrome is a full-screen stage: `AudioHost` is a sibling, an element with no chrome, driven by the `audioQueue` store, which the bar, Now Playing and the queue page read; it shares the player's media plane (tickets and origins), its media events and its failure messages, and attaches a track once, so a renewed ticket never restarts it. A `Track` carries its album's title and cover, so no client joins tracks to albums. The audio bitrate steps (128, 256, 320 kbps) wait for PR 10, with the server-side transcode cache they need; until then a track plays as its file, or as `/stream`'s AAC where the browser cannot decode it. The queue page moves a track up a place rather than by drag, which can follow.
+
+> [!TIP]
 > PR 3 built on 2026-10-29. Albums are matched by `AlbumMatching`, a service of its own that `MetadataService` dispatches to for an audio library, rather than a `KindMatcher`, whose file-and-item shape fits nothing about albums; the scanner queues an audio library's matching after the probe, since the albums come from the tags it reads, where a video library's is queued before. AcoustID fingerprinting stays out until a key is configured, as decided. The Fix match page for albums comes with the album page in PR 4; the routes and the client calls are here.
 
 > [!TIP]
@@ -312,7 +315,7 @@ Ten stacked PRs, one commit each, thermo-reviewed. PRs 1 to 7 bring music to eve
 | 1. Audio playback foundations (built, #310) | core, server, web | `0:V:0` for every video map, so an attached picture is never taken for video; audio extensions, containers and MIME types; `music` and `audiobooks` kinds with `KIND_RULES`, labels and kind-picker copy; a kind's extensions in the scanner; an audio file's `/stream` as its audio alone, and its plan with no transcode or sizes |
 | 2. Music library on the server (built, `raven-audio`) | core, server | `AudioTags` read with `music-metadata`; no frame grabs for audio; embedded and folder cover art as capability pictures; the migration for `artists`, `albums`, `tracks` and credits, filled from tags, grouped by folder when tags are missing; the music routes; `ROUTES` rows, `APP_CLIENT_CALLS` entries and a locked music library in the lock suite |
 | 3. MusicBrainz matching (built, `raven-music-matching`) | server, core | `MusicBrainzClient` behind a one-request-a-second gate with raven's `User-Agent`; `AlbumMatching` takes a sure search (`CONFIDENCE_STRONG`) and fills in what the tags lacked; the Cover Art Archive as a cover source for a matched album with none; `GET /api/albums/:id/match/search` and `PUT /api/albums/:id/match` for Fix match, whose page lands with the album page in PR 4; Retry unmatched covers music libraries |
-| 4. Queue player and music on the web | core, ui, web | `queue.ts` and its tests; the `audioQueue` store and persistent audio host; the html audio engine with preloading and Media Session; audio bitrate steps in `STREAM_QUALITIES` and the player's settings; music listings, artist and album pages, the now-playing bar, Now Playing and the queue page |
+| 4. Queue player and music on the web (built, `raven-music-web`) | core, ui, web | `queue.ts` and its tests; the `audioQueue` store and the `AudioHost` mounted once at the shell, an `<audio>` element with the next track preloading, Media Session and listens at half or four minutes; the albums and artists tabs of a music library, the album page with Fix match, the artist page, the now-playing bar and Now Playing with the queue; the audio bitrate steps wait for PR 10's transcode cache |
 | 5. Music on Raven for macOS | mpv, desktop, web | The audio surface kind; mpv playlist, gapless and ReplayGain; "showing" apart from "playing" in main; `prevent-app-suspension`; Now Playing and remote commands in the addon; album and playlist downloads |
 | 6. Music in the device app | audio, app, core | `@raven/audio`, the local Expo module over `AVQueuePlayer` and Media3; music screens in touch and focus layouts; the now-playing bar; background playback and the lock screen on phones through it, and through `react-native-video` on the TVs; the audio rows in `canPlay.ts` |
 | 7. Playlists, lyrics, listens and audiobooks | server, core, ui, web, app | Per-account playlists everywhere; lyrics from tags, sidecars and LRCLIB; listens at 50% or four minutes; audiobook chapters from `.m4b`, resume and speed |

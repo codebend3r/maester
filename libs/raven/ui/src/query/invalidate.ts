@@ -232,6 +232,7 @@ export const afterLibraryEvent = ({
       { queryKey: queryKeys.libraries, exact: true },
       { queryKey: queryKeys.favourites },
       { queryKey: queryKeys.items },
+      { queryKey: queryKeys.music },
       { queryKey: queryKeys.home },
     ],
   })
@@ -306,4 +307,19 @@ export const afterAiLookups = ({ queryClient, libraryId }: AfterAiLookupsProps):
       { queryKey: queryKeys.libraries, exact: true },
       { queryKey: queryKeys.home },
     ],
+  })
+
+type AfterAlbumMatchProps = {
+  queryClient: QueryClient
+  libraryId: number
+}
+
+/** An album was pointed at a release, or at none: its page, its library's albums and artists, and every artist's page read again. */
+export const afterAlbumMatch = ({
+  queryClient,
+  libraryId,
+}: AfterAlbumMatchProps): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [{ queryKey: queryKeys.music }, { queryKey: queryKeys.library(libraryId) }],
   })

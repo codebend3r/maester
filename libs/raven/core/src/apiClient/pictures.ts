@@ -62,6 +62,19 @@ type AlbumCoverUrlProps = {
   coverVersion: string | null
 }
 
+type AlbumCoverSrcSetProps = {
+  albumId: number
+  coverVersion: string | null
+}
+
+type AlbumCoverPathProps = { albumId: number; coverVersion: string }
+
+/** The capability address of an album's cover at `coverVersion`, which it changes with. */
+const albumCoverPath = ({ albumId, coverVersion }: AlbumCoverPathProps): string =>
+  PICTURE_PATHS.album
+    .replace(`:${PICTURE_PARAMS.id}`, String(albumId))
+    .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(coverVersion))
+
 type ImageOptionUrlProps = {
   id: number
   kind: ChoosableImageKind
@@ -196,14 +209,18 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
               .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(photoVersion)),
           }),
 
-    /** An album's cover; null while the album has none. Versioned, so cached for good. */
+    /** An album's cover at its own width; null while the album has none. Versioned, so cached for good. */
     albumCoverUrl: ({ albumId, coverVersion }: AlbumCoverUrlProps): string | null =>
+      coverVersion == null ? null : pictureAt({ path: albumCoverPath({ albumId, coverVersion }) }),
+
+    /** An album's cover at each width a poster comes in, for an `img`'s `srcset`; null while it has none. */
+    albumCoverSrcSet: ({ albumId, coverVersion }: AlbumCoverSrcSetProps): string | null =>
       coverVersion == null
         ? null
-        : pictureAt({
-            path: PICTURE_PATHS.album
-              .replace(`:${PICTURE_PARAMS.id}`, String(albumId))
-              .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(coverVersion)),
+        : pictureSrcSet({
+            path: albumCoverPath({ albumId, coverVersion }),
+            widths: posterWidths,
+            own: POSTER_OWN_WIDTH,
           }),
 
     /** A Fix match result's poster, through the server's image cache. */

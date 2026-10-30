@@ -1,24 +1,24 @@
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import {
   type AiSuggestion,
-  ITEM_TYPES,
-  type Library,
-  type LibrarySettings,
-  METADATA_SERVICE_STATES,
-  type MediaItem,
-  type PosterEntry,
-  type UnmatchedFile,
   emptyListingMessage,
   finishedNote,
   isScanning,
+  ITEM_TYPES,
   jumpScale,
+  type Library,
+  type LibrarySettings,
   matchTypeFor,
+  type MediaItem,
+  METADATA_SERVICE_STATES,
+  type PosterEntry,
   queueLink,
   sagaEntryKey,
   sagaTargets,
   showEntryKey,
-  watchLink,
+  type UnmatchedFile,
   WATCH_TARGET_KINDS,
+  watchLink,
 } from '@raven/core'
 import { type ReactNode, useDeferredValue, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -52,6 +52,7 @@ import {
   unmatchedQuery,
 } from '@/lib/queries'
 import { LibraryListing, LibraryListingSkeleton } from '@/pages/LibraryPage/LibraryViews'
+import { AlbumsSection, ArtistsSection } from '@/pages/LibraryPage/MusicSections'
 import { SelectableCards } from '@/pages/LibraryPage/SelectableCards'
 import {
   LISTING_STATES,
@@ -473,6 +474,8 @@ type SectionProps = { library: Library }
 /** Each tab's content. */
 const SECTION_VIEWS = {
   all: AllSection,
+  albums: AlbumsSection,
+  artists: ArtistsSection,
   'in-progress': InProgressSection,
   favourites: FavouritesSection,
   sagas: SagasSection,

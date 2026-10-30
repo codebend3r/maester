@@ -106,6 +106,8 @@ export const isTrack = object({
   /** The MusicBrainz recording id, when the tags carry one. */
   mbid: nullable(isString),
   addedAt: isString,
+  /** The album's name and cover, so a queue, the bar and the lock screen need no second fetch. */
+  album: object({ title: isString, coverVersion: nullable(isString) }),
 })
 
 export type Track = Infer<typeof isTrack>
@@ -168,3 +170,13 @@ export const isAlbumMatchCandidateList = listOf(isAlbumMatchCandidate)
 export const isAlbumMatchChoice = object({ mbid: nullable(isMbid) })
 
 export type AlbumMatchChoice = Infer<typeof isAlbumMatchChoice>
+
+/** What each release type is called. */
+export const ALBUM_TYPE_LABELS: Record<AlbumType, string> = {
+  album: 'Album',
+  ep: 'EP',
+  single: 'Single',
+  compilation: 'Compilation',
+  live: 'Live',
+  soundtrack: 'Soundtrack',
+}

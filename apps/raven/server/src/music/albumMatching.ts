@@ -22,10 +22,10 @@ const WEIGHTS = {
   official: 5,
 } as const
 
-type ScoreProps = { album: AlbumToMatch; release: Release }
+type CreditsArtistProps = { album: AlbumToMatch; release: Release }
 
 /** Whether the release credits the album's artist, alone or among others. */
-const creditsArtist = ({ album, release }: ScoreProps): boolean => {
+const creditsArtist = ({ album, release }: CreditsArtistProps): boolean => {
   const wanted = artistToMatch(album)
   if (wanted === null) return false
   const folded = foldTitle(wanted)
@@ -44,7 +44,9 @@ const creditsArtist = ({ album, release }: ScoreProps): boolean => {
  * one release scores alike; the pass takes MusicBrainz's first, since they
  * are the same album.
  */
-export const scoreRelease = ({ album, release }: ScoreProps): number => {
+type ScoreReleaseProps = { album: AlbumToMatch; release: Release }
+
+export const scoreRelease = ({ album, release }: ScoreReleaseProps): number => {
   const isSameTitle = foldTitle(release.title) === foldTitle(album.title)
   const isSameArtist =
     artistToMatch(album) === null ? isSameTitle : creditsArtist({ album, release })
@@ -84,19 +86,23 @@ const toCandidate = ({ release, confidence }: ToCandidateProps): AlbumMatchCandi
   confidence,
 })
 
+type CandidatesOfProps = ScoredOfProps
+
 /** Releases as Fix match offers them: scored against the album, best first. */
-export const candidatesOf = (props: ScoredOfProps): AlbumMatchCandidate[] =>
+export const candidatesOf = (props: CandidatesOfProps): AlbumMatchCandidate[] =>
   scoredOf(props).map(toCandidate)
 
 /** Whether a MusicBrainz failure means the rest of a pass should wait for the next one. */
 const isMusicBrainzAway = (error: unknown): boolean =>
   error instanceof MusicBrainzError && error.kind === MUSICBRAINZ_ERROR_KINDS.unavailable
 
-type AlbumMatchingSearchProps = {
+type AlbumMatchingSearchScoredProps = {
   album: AlbumToMatch
   /** What to search for instead of the album's own title and artist. */
   query?: string
 }
+
+type AlbumMatchingSearchProps = AlbumMatchingSearchScoredProps
 
 type AlbumMatchingFixProps = { id: number; mbid: string | null }
 
@@ -119,7 +125,7 @@ export class AlbumMatching {
   ) {}
 
   /** MusicBrainz's releases for an album, scored against it, best first. */
-  private async searchScored({ album, query }: AlbumMatchingSearchProps): Promise<Scored[]> {
+  private async searchScored({ album, query }: AlbumMatchingSearchScoredProps): Promise<Scored[]> {
     const releases = await this.musicBrainz.searchReleases(
       query === undefined
         ? { album: album.title, artist: artistToMatch(album) }

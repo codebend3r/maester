@@ -12,9 +12,9 @@ type PictureProps = { sources: Source[]; initial: string }
 /**
  * The first of `sources` that loads, else `initial`, dim in the middle. A
  * picture that fails to load gives way to the next. The frame is the
- * container's to give.
+ * container's to give: a poster's, a frame grab's or an album cover's.
  */
-const Picture = ({ sources, initial }: PictureProps) => {
+export const Picture = ({ sources, initial }: PictureProps) => {
   const [failed, setFailed] = useState<ReadonlyArray<string>>([])
   const source = sources.find(({ src }) => !failed.includes(src))
   if (!source) {
