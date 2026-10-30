@@ -1,11 +1,14 @@
+import type { ComponentType } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { touchForm } from '@/layouts/Form.touch'
+import { MUSIC_COPY } from '@/layouts/copy'
 import {
-  MUSIC_COPY,
   type NowPlayingLayoutProps,
-  REPEAT_LABELS,
+  PLAYING_STATES,
+  type PlayingState,
+  playingStateOf,
   shuffleLabelOf,
   toggleLabelOf,
 } from '@/layouts/musicKit'
@@ -33,90 +36,103 @@ const useStyles = themedStyles((colours) =>
   }),
 )
 
-/** Now Playing under the thumb: the cover large, the controls, then the queue to scroll. */
-export const NowPlayingLayout = ({
+type PlayingHeroProps = NowPlayingLayoutProps
+
+/** What plays: the cover large, its words, the controls and Add to playlist. */
+const PlayingHero = ({
   track,
   error,
   time,
   isPlaying,
   isShuffled,
   repeat,
-  queue,
   onToggle,
   onPrevious,
   onNext,
   onShuffle,
   onRepeat,
-  onClear,
-  onJump,
-  onRemove,
-  aside,
   playlists,
   onAddToPlaylist,
   note,
-  onBack,
-}: NowPlayingLayoutProps) => {
+}: PlayingHeroProps) => {
   const styles = useMusicStyles()
   const own = useStyles()
+  return (
+    track !== null && (
+      <View style={styles.stage}>
+        <Cover cover={track.cover} title={track.title} />
+        <Text numberOfLines={2} style={own.trackTitle}>
+          {track.title}
+        </Text>
+        <Text numberOfLines={1} style={styles.muted}>
+          {track.artists}
+        </Text>
+        <Text numberOfLines={1} style={styles.muted}>
+          {track.album}
+        </Text>
+        {error !== null && <Text style={styles.error}>{error}</Text>}
+        <Text style={own.time}>{time}</Text>
+        <View style={styles.controls}>
+          <FormButton label={MUSIC_COPY.previous} onPress={onPrevious} tone={BUTTON_TONES.quiet} />
+          <FormButton
+            label={toggleLabelOf(isPlaying)}
+            onPress={onToggle}
+            tone={BUTTON_TONES.primary}
+          />
+          <FormButton label={MUSIC_COPY.next} onPress={onNext} tone={BUTTON_TONES.quiet} />
+        </View>
+        <View style={styles.controls}>
+          <ToolButton
+            accessibilityLabel={shuffleLabelOf(isShuffled)}
+            label={shuffleLabelOf(isShuffled)}
+            onPress={onShuffle}
+          />
+          <ToolButton
+            accessibilityLabel={MUSIC_COPY.repeat[repeat]}
+            label={MUSIC_COPY.repeat[repeat]}
+            onPress={onRepeat}
+          />
+          <ToolButton
+            accessibilityLabel={MUSIC_COPY.addToPlaylist}
+            label={MUSIC_COPY.addToPlaylist}
+            onPress={() =>
+              openAddToPlaylistSheet({
+                title: MUSIC_COPY.addTrackToPlaylist(track.title),
+                playlists,
+                onPick: onAddToPlaylist,
+              })
+            }
+          />
+        </View>
+        {note !== null && <Text style={styles.muted}>{note}</Text>}
+      </View>
+    )
+  )
+}
+
+const NothingPlaying = () => {
+  const styles = useMusicStyles()
+  return <Text style={styles.muted}>{MUSIC_COPY.nothingPlaying}</Text>
+}
+
+/** What stands under the heading: what plays, or a word that nothing does. */
+const PLAYING_VIEWS = {
+  [PLAYING_STATES.idle]: NothingPlaying,
+  [PLAYING_STATES.playing]: PlayingHero,
+} as const satisfies Record<PlayingState, ComponentType<PlayingHeroProps>>
+
+/** Now Playing under the thumb: the cover large, the controls, then the queue to scroll. */
+export const NowPlayingLayout = (props: NowPlayingLayoutProps) => {
+  const { track, queue, onClear, onJump, onRemove, aside, onBack } = props
+  const styles = useMusicStyles()
+  const own = useStyles()
+  const Playing = PLAYING_VIEWS[playingStateOf(track)]
   return (
     <TouchPage onBack={onBack}>
       <Text accessibilityRole="header" style={styles.heading}>
         {MUSIC_COPY.nowPlaying}
       </Text>
-      {track === null && <Text style={styles.muted}>{MUSIC_COPY.nothingPlaying}</Text>}
-      {track !== null && (
-        <View style={styles.stage}>
-          <Cover cover={track.cover} title={track.title} />
-          <Text numberOfLines={2} style={own.trackTitle}>
-            {track.title}
-          </Text>
-          <Text numberOfLines={1} style={styles.muted}>
-            {track.artists}
-          </Text>
-          <Text numberOfLines={1} style={styles.muted}>
-            {track.album}
-          </Text>
-          {error !== null && <Text style={styles.error}>{error}</Text>}
-          <Text style={own.time}>{time}</Text>
-          <View style={styles.controls}>
-            <FormButton
-              label={MUSIC_COPY.previous}
-              onPress={onPrevious}
-              tone={BUTTON_TONES.quiet}
-            />
-            <FormButton
-              label={toggleLabelOf(isPlaying)}
-              onPress={onToggle}
-              tone={BUTTON_TONES.primary}
-            />
-            <FormButton label={MUSIC_COPY.next} onPress={onNext} tone={BUTTON_TONES.quiet} />
-          </View>
-          <View style={styles.controls}>
-            <ToolButton
-              accessibilityLabel={shuffleLabelOf(isShuffled)}
-              label={shuffleLabelOf(isShuffled)}
-              onPress={onShuffle}
-            />
-            <ToolButton
-              accessibilityLabel={REPEAT_LABELS[repeat]}
-              label={REPEAT_LABELS[repeat]}
-              onPress={onRepeat}
-            />
-            <ToolButton
-              accessibilityLabel={MUSIC_COPY.addToPlaylist}
-              label={MUSIC_COPY.addToPlaylist}
-              onPress={() =>
-                openAddToPlaylistSheet({
-                  title: MUSIC_COPY.addTrackToPlaylist(track.title),
-                  playlists,
-                  onPick: onAddToPlaylist,
-                })
-              }
-            />
-          </View>
-          {note !== null && <Text style={styles.muted}>{note}</Text>}
-        </View>
-      )}
+      <Playing {...props} />
       <NowPlayingAside aside={aside} />
       {queue.length > 0 && (
         <View style={styles.section}>

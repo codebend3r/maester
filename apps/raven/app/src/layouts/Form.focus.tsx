@@ -8,6 +8,7 @@ import {
   type FormProps,
   keyboardFor,
 } from '@/layouts/formKit'
+import { FIELD_COPY } from '@/layouts/copy'
 import { Text } from '@/layouts/Text'
 import { ShowSecretToggle } from '@/layouts/ShowSecretToggle'
 import { useToneStyles, useTvFormStyles } from '@/layouts/formStyles'
@@ -34,9 +35,6 @@ const Form = ({ title, children }: FormProps) => {
     </View>
   )
 }
-
-/** What the checkbox under a secret field says. */
-const SHOW_COPY = { password: 'Show password', pin: 'Show PIN' } as const
 
 /**
  * A labelled field; the step's first takes the remote as it is drawn, and where the device can
@@ -74,7 +72,7 @@ const Field = ({
         <ShowSecretToggle
           formStyles={formStyles}
           isShown={isShown}
-          label={isNumeric ? SHOW_COPY.pin : SHOW_COPY.password}
+          label={isNumeric ? FIELD_COPY.showPin : FIELD_COPY.showPassword}
           onToggle={() => setShown((shown) => !shown)}
         />
       )}

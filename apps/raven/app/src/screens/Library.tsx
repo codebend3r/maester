@@ -8,6 +8,7 @@ import {
   GROUPING_LABELS,
   LIBRARY_VIEW_LABELS,
   ROUTE_STATES,
+  type RouteQuery,
   SORT_DIRECTION_LABELS,
   SORT_FIELD_LABELS,
   emptyListingMessage,
@@ -26,7 +27,7 @@ import {
   sortParts,
   startingSort,
 } from '@raven/core'
-import { useSearch } from '@raven/ui/headless'
+import { useSearch, KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type ReactNode, useState } from 'react'
@@ -40,22 +41,10 @@ import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
 import { Grid, Loading, Picker, SearchField, ToolButton } from '@/layouts'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
+import { LIBRARY_COPY } from '@/screens/copy'
+import type { LoadingProps } from '@/layouts/loadingKit'
 import { appViewsFor, useLibraryView } from '@/screens/useLibraryView'
 import type { LibraryChoice } from '@/stores/libraryViews'
-
-const COPY = {
-  library: 'Library',
-  opening: 'Opening the library',
-  missing: 'This library is not on the server.',
-  nothingInProgress: 'Nothing in progress here yet.',
-  showPage: (page: string) => `Show ${page}`,
-  gathering: { shows: 'Gathering the shows', videos: 'Gathering the videos' },
-  sort: 'Sort',
-  order: 'Order',
-  view: 'View',
-  groupBy: 'Group by',
-  search: 'Search',
-} as const
 
 /**
  * The two pages a library opens on: what is being watched in it, for picking up where one left
@@ -67,7 +56,7 @@ type LibraryPage = (typeof LIBRARY_PAGES)[keyof typeof LIBRARY_PAGES]
 
 const PAGE_NAMES = {
   [LIBRARY_PAGES.continue]: CONTINUE_WATCHING,
-  [LIBRARY_PAGES.library]: COPY.library,
+  [LIBRARY_PAGES.library]: LIBRARY_COPY.library,
 } as const satisfies Record<LibraryPage, string>
 
 /** The page the other one's button leads to. */
@@ -81,7 +70,7 @@ const PageToggle = ({ page, onChange }: PageToggleProps) => {
   const other = otherPageOf(page)
   return (
     <ToolButton
-      accessibilityLabel={COPY.showPage(PAGE_NAMES[other])}
+      accessibilityLabel={LIBRARY_COPY.showPage(PAGE_NAMES[other])}
       label={PAGE_NAMES[other]}
       onPress={() => onChange(other)}
     />
@@ -102,7 +91,7 @@ const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
   return (
     <>
       <Picker
-        label={COPY.sort}
+        label={LIBRARY_COPY.sort}
         onChoose={(field) => onChange({ sort: startingSort(field) })}
         options={sortFieldsFor(settings.kind).map((field) => ({
           key: field,
@@ -112,13 +101,15 @@ const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
       />
       {parts.direction !== null && (
         <ToolButton
-          accessibilityLabel={`${COPY.order}: ${SORT_DIRECTION_LABELS[parts.field][parts.direction]}`}
+          accessibilityLabel={LIBRARY_COPY.order(
+            SORT_DIRECTION_LABELS[parts.field][parts.direction],
+          )}
           label={SORT_DIRECTION_LABELS[parts.field][parts.direction]}
           onPress={() => onChange({ sort: reversedSort(settings.sort) })}
         />
       )}
       <Picker
-        label={COPY.view}
+        label={LIBRARY_COPY.view}
         onChoose={(view) => onChange({ view })}
         options={appViewsFor(settings.kind).map((view) => ({
           key: view,
@@ -128,7 +119,7 @@ const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
       />
       {settings.view === LIBRARY_VIEWS.grouped && (
         <Picker
-          label={COPY.groupBy}
+          label={LIBRARY_COPY.groupBy}
           onChoose={(groupBy) => onChange({ groupBy })}
           options={groupingsFor(settings.kind).map((grouping) => ({
             key: grouping,
@@ -196,8 +187,11 @@ const ContinueGrid = ({
     <Grid
       icon={libraryIconOf(library.settings)}
       jump={null}
-      line={`${CONTINUE_WATCHING}, ${plural({ n: entries.length, one: 'video', many: 'videos' })}`}
-      notice={entries.length === 0 ? COPY.nothingInProgress : null}
+      line={LIBRARY_COPY.line({
+        kind: CONTINUE_WATCHING,
+        count: plural({ n: entries.length, ...LIBRARY_COPY.videos }),
+      })}
+      notice={entries.length === 0 ? LIBRARY_COPY.nothingInProgress : null}
       onBack={() => router.back()}
       onOpen={({ target }) => router.push(hrefOf(target))}
       search={null}
@@ -207,42 +201,6 @@ const ContinueGrid = ({
       view={LIBRARY_VIEWS.grid}
     />
   )
-}
-
-type LibraryPagesProps = {
-  session: AppQueries
-  library: LibraryRecord
-  asked: string
-}
-
-/**
- * A library's two pages, Continue watching and the library itself, with the one press between
- * them. It opens on Continue watching while anything in it is in progress, so a show is picked
- * up in one press, and on the library otherwise; a search handed over opens the library too.
- */
-const LibraryPages = ({ session, library, asked }: LibraryPagesProps) => {
-  const router = useRouter()
-  const inProgress = useQuery(session.queries.inProgressQuery(library.id))
-  const [chosen, setChosen] = useState<LibraryPage | null>(null)
-  const entries = inProgress.data ?? null
-  if (entries === null && inProgress.isPending && chosen === null) {
-    return <Loading label={COPY.opening} onBack={() => router.back()} />
-  }
-  const isContinuing = asked === '' && entries !== null && entries.length > 0
-  const page = chosen ?? (isContinuing ? LIBRARY_PAGES.continue : LIBRARY_PAGES.library)
-  const toggle = <PageToggle onChange={setChosen} page={page} />
-  switch (page) {
-    case LIBRARY_PAGES.continue:
-      return (
-        <ContinueGrid entries={entries ?? []} library={library} session={session} toggle={toggle} />
-      )
-    case LIBRARY_PAGES.library:
-      return <LibraryGrid asked={asked} library={library} session={session} toggle={toggle} />
-    default: {
-      const unknown: never = page
-      return unknown
-    }
-  }
 }
 
 type LibraryGridProps = {
@@ -293,7 +251,7 @@ const LibraryGrid = ({
     if (error !== null && listed === null) return error.message
     if (empty !== null) return empty
     if (sections.length > 0) return null
-    return listsShows(settings.kind) ? COPY.gathering.shows : COPY.gathering.videos
+    return listsShows(settings.kind) ? LIBRARY_COPY.gathering.shows : LIBRARY_COPY.gathering.videos
   })()
   // The strip follows the order: letters for titles, steps of the value sorted by for the rest.
   const jump =
@@ -312,11 +270,14 @@ const LibraryGrid = ({
     <Grid
       icon={libraryIconOf(library.settings)}
       jump={jump}
-      line={`${KINDS[settings.kind].label}, ${plural({ n: library.itemCount, one: 'video', many: 'videos' })}`}
+      line={LIBRARY_COPY.line({
+        kind: KINDS[settings.kind].label,
+        count: plural({ n: library.itemCount, ...LIBRARY_COPY.videos }),
+      })}
       notice={notice}
       onBack={() => router.back()}
       onOpen={open}
-      search={<SearchField label={`${COPY.search} ${library.name}`} search={search} />}
+      search={<SearchField label={LIBRARY_COPY.search(library.name)} search={search} />}
       sections={sections}
       title={library.name}
       toolbar={
@@ -328,6 +289,81 @@ const LibraryGrid = ({
       view={settings.view}
     />
   )
+}
+
+type LibraryPagesProps = {
+  session: AppQueries
+  library: LibraryRecord
+  asked: string
+}
+
+/** What a library's pages draw: the mark while its videos in progress are read, then a page. */
+const LIBRARY_PAGES_VIEW_KEYS = { loading: 'loading', ...LIBRARY_PAGES } as const
+
+type LibraryPagesViewProps = {
+  [LIBRARY_PAGES_VIEW_KEYS.loading]: LoadingProps
+  [LIBRARY_PAGES_VIEW_KEYS.continue]: ContinueGridProps
+  [LIBRARY_PAGES_VIEW_KEYS.library]: LibraryGridProps
+}
+
+const LIBRARY_PAGES_VIEWS = {
+  [LIBRARY_PAGES_VIEW_KEYS.loading]: Loading,
+  [LIBRARY_PAGES_VIEW_KEYS.continue]: ContinueGrid,
+  [LIBRARY_PAGES_VIEW_KEYS.library]: LibraryGrid,
+} as const satisfies ViewsOf<LibraryPagesViewProps>
+
+type LibraryPagesViewOfProps = LibraryPagesProps & {
+  page: LibraryPage
+  isWaiting: boolean
+  entries: readonly PosterEntry[]
+  toggle: ReactNode
+  onBack: () => void
+}
+
+const libraryPagesViewOf = ({
+  page,
+  isWaiting,
+  entries,
+  toggle,
+  onBack,
+  ...shown
+}: LibraryPagesViewOfProps): ViewOf<LibraryPagesViewProps> => {
+  if (isWaiting) {
+    return { key: LIBRARY_PAGES_VIEW_KEYS.loading, props: { label: LIBRARY_COPY.opening, onBack } }
+  }
+  switch (page) {
+    case LIBRARY_PAGES.continue:
+      return { key: LIBRARY_PAGES_VIEW_KEYS.continue, props: { ...shown, entries, toggle } }
+    case LIBRARY_PAGES.library:
+      return { key: LIBRARY_PAGES_VIEW_KEYS.library, props: { ...shown, toggle } }
+    default: {
+      const unknown: never = page
+      return unknown
+    }
+  }
+}
+
+/**
+ * A library's two pages, Continue watching and the library itself, with the one press between
+ * them. It opens on Continue watching while anything in it is in progress, so a show is picked
+ * up in one press, and on the library otherwise; a search handed over opens the library too.
+ */
+const LibraryPages = (props: LibraryPagesProps) => {
+  const router = useRouter()
+  const inProgress = useQuery(props.session.queries.inProgressQuery(props.library.id))
+  const [chosen, setChosen] = useState<LibraryPage | null>(null)
+  const entries = inProgress.data ?? null
+  const isContinuing = props.asked === '' && entries !== null && entries.length > 0
+  const page = chosen ?? (isContinuing ? LIBRARY_PAGES.continue : LIBRARY_PAGES.library)
+  const view = libraryPagesViewOf({
+    ...props,
+    page,
+    isWaiting: entries === null && inProgress.isPending && chosen === null,
+    entries: entries ?? [],
+    toggle: <PageToggle onChange={setChosen} page={page} />,
+    onBack: () => router.back(),
+  })
+  return <KeyedView<LibraryPagesViewProps> view={view} views={LIBRARY_PAGES_VIEWS} />
 }
 
 type LibraryNoticeProps = { notice: string }
@@ -345,7 +381,7 @@ const LibraryNotice = ({ notice }: LibraryNoticeProps) => {
       onOpen={() => undefined}
       search={null}
       sections={[]}
-      title={COPY.library}
+      title={LIBRARY_COPY.library}
       toolbar={null}
       view={LIBRARY_VIEWS.grid}
     />
@@ -356,6 +392,75 @@ type ServerLibraryProps = {
   session: AppQueries
   id: number | null
   asked: string
+}
+
+type ReadyLibraryProps = LibraryPagesProps
+
+/** A library of videos once it is known, drawn afresh for each library. */
+const ReadyLibrary = (props: ReadyLibraryProps) => (
+  <LibraryPages key={props.library.id} {...props} />
+)
+
+type ReadyMusicProps = LibraryPagesProps
+
+/** A music library once it is known, drawn afresh for each library. */
+const ReadyMusic = (props: ReadyMusicProps) => <MusicPages key={props.library.id} {...props} />
+
+const LIBRARY_VIEW_KEYS = {
+  notice: 'notice',
+  loading: 'loading',
+  ready: 'ready',
+  music: 'music',
+} as const
+
+type LibraryViewProps = {
+  [LIBRARY_VIEW_KEYS.notice]: LibraryNoticeProps
+  [LIBRARY_VIEW_KEYS.loading]: LoadingProps
+  [LIBRARY_VIEW_KEYS.ready]: ReadyLibraryProps
+  [LIBRARY_VIEW_KEYS.music]: ReadyMusicProps
+}
+
+const LIBRARY_PAGE_VIEWS = {
+  [LIBRARY_VIEW_KEYS.notice]: LibraryNotice,
+  [LIBRARY_VIEW_KEYS.loading]: Loading,
+  [LIBRARY_VIEW_KEYS.ready]: ReadyLibrary,
+  [LIBRARY_VIEW_KEYS.music]: ReadyMusic,
+} as const satisfies ViewsOf<LibraryViewProps>
+
+type LibraryViewOfProps = Omit<ServerLibraryProps, 'id'> & {
+  page: RouteQuery<LibraryRecord>
+  onBack: () => void
+}
+
+const noticeView = (notice: string): ViewOf<LibraryViewProps> => ({
+  key: LIBRARY_VIEW_KEYS.notice,
+  props: { notice },
+})
+
+const libraryViewOf = ({
+  page,
+  session,
+  asked,
+  onBack,
+}: LibraryViewOfProps): ViewOf<LibraryViewProps> => {
+  switch (page.state) {
+    case ROUTE_STATES.missing:
+      return noticeView(LIBRARY_COPY.missing)
+    case ROUTE_STATES.error:
+      return noticeView(page.message)
+    case ROUTE_STATES.loading:
+      return { key: LIBRARY_VIEW_KEYS.loading, props: { label: LIBRARY_COPY.opening, onBack } }
+    case ROUTE_STATES.ready: {
+      const props = { asked, library: page.data, session }
+      return listingFor(page.data.settings.kind) === LIBRARY_LISTINGS.albums
+        ? { key: LIBRARY_VIEW_KEYS.music, props }
+        : { key: LIBRARY_VIEW_KEYS.ready, props }
+    }
+    default: {
+      const unknown: never = page
+      return unknown
+    }
+  }
 }
 
 const ServerLibrary = ({ session, id, asked }: ServerLibraryProps) => {
@@ -370,25 +475,13 @@ const ServerLibrary = ({ session, id, asked }: ServerLibraryProps) => {
         (entry) => entry.id === id,
       ),
   })
-  const page = routeState({ id, query: library })
-  switch (page.state) {
-    case ROUTE_STATES.missing:
-      return <LibraryNotice notice={COPY.missing} />
-    case ROUTE_STATES.error:
-      return <LibraryNotice notice={page.message} />
-    case ROUTE_STATES.loading:
-      return <Loading label={COPY.opening} onBack={() => router.back()} />
-    case ROUTE_STATES.ready:
-      return listingFor(page.data.settings.kind) === LIBRARY_LISTINGS.albums ? (
-        <MusicPages key={page.data.id} asked={asked} library={page.data} session={session} />
-      ) : (
-        <LibraryPages key={page.data.id} asked={asked} library={page.data} session={session} />
-      )
-    default: {
-      const unknown: never = page
-      return unknown
-    }
-  }
+  const view = libraryViewOf({
+    page: routeState({ id, query: library }),
+    session,
+    asked,
+    onBack: () => router.back(),
+  })
+  return <KeyedView<LibraryViewProps> view={view} views={LIBRARY_PAGE_VIEWS} />
 }
 
 /**

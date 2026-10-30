@@ -3,6 +3,7 @@ import {
   type ItemDetails,
   type MediaItem,
   ROUTE_STATES,
+  type RouteQuery,
   SESSION_KINDS,
   type ViewingSession,
   WATCHED_STATES,
@@ -25,9 +26,13 @@ import {
   useServerItemFavourite,
   useServerMediaMutations,
   useServerWatchedToggle,
+  KeyedView,
+  type ViewOf,
+  type ViewsOf,
 } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import type { ComponentType } from 'react'
 
 import type { Pictures } from '@/queries/cards'
 import { episodeMarkOf } from '@/queries/episodeMark'
@@ -35,19 +40,15 @@ import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
 import { ItemLayout, ItemNotice, Loading } from '@/layouts'
-import { type CheckState, ITEM_ACTIONS, type ItemAction } from '@/layouts/itemKit'
+import {
+  type CheckState,
+  ITEM_ACTIONS,
+  type ItemAction,
+  type ItemNoticeProps,
+} from '@/layouts/itemKit'
+import type { LoadingProps } from '@/layouts/loadingKit'
 import { APP_ROUTE_PARAMS, ROUTE_TARGETS, type RouteTarget, hrefOf, itemTarget } from '@/routes'
-
-const COPY = {
-  opening: 'Opening the title',
-  missing: 'This title is not on the server.',
-  play: 'Play',
-  fromStart: 'Play from the beginning',
-  nextEpisode: 'Next episode',
-  markWatched: 'Mark watched',
-  watched: 'Watched',
-  favourite: 'Favourite',
-} as const
+import { ITEM_COPY } from '@/screens/copy'
 
 const ACTION_KEYS = {
   play: 'play',
@@ -87,7 +88,7 @@ const playOf = ({ media, label, context }: PlayOfProps): ItemAction => ({
   icon: 'play',
   label,
   // Play alone is its icon; Resume shows the spot, and a show's Play the episode's code.
-  text: label === COPY.play ? null : label.replace(`${COPY.play} `, ''),
+  text: label === ITEM_COPY.play ? null : label.replace(ITEM_COPY.playEpisode(''), ''),
   onPress: () =>
     context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id, at: media.position }),
 })
@@ -105,7 +106,7 @@ const fromStartOf = ({ media, context }: FromStartOfProps): ItemAction[] =>
           kind: ITEM_ACTIONS.option,
           key: ACTION_KEYS.fromStart,
           icon: 'reset',
-          label: COPY.fromStart,
+          label: ITEM_COPY.fromStart,
           text: null,
           onPress: () =>
             context.onOpen({
@@ -127,7 +128,7 @@ const favouriteOf = ({ isOn, onToggle }: FavouriteOfProps): ItemAction => ({
   kind: ITEM_ACTIONS.toggle,
   key: ACTION_KEYS.favourite,
   icon: 'heart',
-  label: COPY.favourite,
+  label: ITEM_COPY.favourite,
   text: null,
   isOn,
   onPress: () => onToggle(!isOn),
@@ -143,7 +144,7 @@ const watchedOf = ({ state, onToggle }: WatchedOfProps): ItemAction => ({
   kind: ITEM_ACTIONS.toggle,
   key: ACTION_KEYS.watched,
   icon: 'check',
-  label: state === WATCHED_STATES.watched ? COPY.watched : COPY.markWatched,
+  label: state === WATCHED_STATES.watched ? ITEM_COPY.watched : ITEM_COPY.markWatched,
   text: null,
   isOn: WATCHED_CHECKS[state],
   onPress: onToggle,
@@ -151,7 +152,7 @@ const watchedOf = ({ state, onToggle }: WatchedOfProps): ItemAction => ({
 
 /** "Play S01E02" for the episode a show or season plays next, or plain Play without a number. */
 const playNextLabel = (code: string | null): string =>
-  code === null ? COPY.play : `${COPY.play} ${code}`
+  code === null ? ITEM_COPY.play : ITEM_COPY.playEpisode(code)
 
 type NextOfProps = { media: MediaItem; context: ItemContext }
 
@@ -162,7 +163,7 @@ const nextOf = ({ media, context }: NextOfProps): ItemAction => {
     kind: ITEM_ACTIONS.play,
     key: ACTION_KEYS.next,
     icon: 'skipNext',
-    label: code === null ? COPY.nextEpisode : `Next ${code}`,
+    label: code === null ? ITEM_COPY.nextEpisode : ITEM_COPY.nextCode(code),
     text: code,
     onPress: () => context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id, at: 0 }),
   }
@@ -182,7 +183,7 @@ const linkOf = ({ key, title, text, itemId, context }: LinkOfProps): ItemAction 
   kind: ITEM_ACTIONS.link,
   key,
   icon: 'up',
-  label: `Go to ${title}`,
+  label: ITEM_COPY.goTo(title),
   text,
   onPress: () => context.onOpen(itemTarget(itemId)),
 })
@@ -297,7 +298,10 @@ const PlayableItem = ({
   const actions = [
     playOf({
       media: primary,
-      label: primary.position > 0 ? `Resume from ${formatDuration(primary.position)}` : COPY.play,
+      label:
+        primary.position > 0
+          ? ITEM_COPY.resumeFrom({ at: formatDuration(primary.position) })
+          : ITEM_COPY.play,
       context,
     }),
     ...fromStartOf({ media: primary, context }),
@@ -339,15 +343,13 @@ const ShowItem = ({ details, session, context }: ShowItemProps) => {
     targets: [{ kind: WATCH_TARGET_KINDS.item, id: details.id, libraryId: null }],
   })
   const nextFile = next.data ?? null
+  const nextItem = nextFile?.item ?? null
+  const nextCode = nextItem === null ? null : episodeCode(nextItem)
   const actions = [
     ...(nextFile === null
       ? []
       : [
-          playOf({
-            media: nextFile,
-            label: playNextLabel(nextFile.item === null ? null : episodeCode(nextFile.item)),
-            context,
-          }),
+          playOf({ media: nextFile, label: playNextLabel(nextCode), context }),
           ...fromStartOf({ media: nextFile, context }),
         ]),
     ...marksOf({ details, favourite, watched: toggle }),
@@ -418,25 +420,56 @@ type PlayableFilesProps = {
   context: ItemContext
 }
 
+const PLAYABLE_VIEW_KEYS = { missing: 'missing', ready: 'ready' } as const
+
+type PlayableViewProps = {
+  [PLAYABLE_VIEW_KEYS.missing]: ItemNoticeProps
+  [PLAYABLE_VIEW_KEYS.ready]: PlayableItemProps
+}
+
+const PLAYABLE_VIEWS = {
+  [PLAYABLE_VIEW_KEYS.missing]: ItemNotice,
+  [PLAYABLE_VIEW_KEYS.ready]: PlayableItem,
+} as const satisfies ViewsOf<PlayableViewProps>
+
+type PlayableViewOfProps = PlayableFilesProps
+
+const playableViewOf = ({
+  kind,
+  details,
+  library,
+  file,
+  session,
+  context,
+}: PlayableViewOfProps): ViewOf<PlayableViewProps> => {
+  const shown = libraryFiles({ versions: details.versions, library, file })
+  if (shown === null) {
+    return {
+      key: PLAYABLE_VIEW_KEYS.missing,
+      props: { notice: ITEM_COPY.missing, onBack: context.onBack },
+    }
+  }
+  return {
+    key: PLAYABLE_VIEW_KEYS.ready,
+    props: {
+      context,
+      session,
+      details,
+      kind,
+      primary: shown.primary,
+      versions: shown.versions,
+    },
+  }
+}
+
 /**
  * A movie's or an episode's files as one library shows them: the one the address names, else
  * the one holding the file Play would start, and within it the one card the address's file
  * sits on, as the web's pages keep to.
  */
-const PlayableFiles = ({ kind, details, library, file, session, context }: PlayableFilesProps) => {
-  const shown = libraryFiles({ versions: details.versions, library, file })
-  if (shown === null) return <ItemNotice notice={COPY.missing} onBack={context.onBack} />
-  return (
-    <PlayableItem
-      context={context}
-      session={session}
-      details={details}
-      kind={kind}
-      primary={shown.primary}
-      versions={shown.versions}
-    />
-  )
-}
+const PlayableFiles = (props: PlayableFilesProps) => (
+  <KeyedView<PlayableViewProps> view={playableViewOf(props)} views={PLAYABLE_VIEWS} />
+)
 
 type ItemOfProps = {
   details: ItemDetails
@@ -446,29 +479,26 @@ type ItemOfProps = {
   context: ItemContext
 }
 
-const ItemOf = ({ details, library, file, session, context }: ItemOfProps) => {
-  switch (details.type) {
-    case ITEM_TYPES.movie:
-    case ITEM_TYPES.episode:
-      return (
-        <PlayableFiles
-          context={context}
-          details={details}
-          file={file}
-          kind={details.type}
-          library={library}
-          session={session}
-        />
-      )
-    case ITEM_TYPES.show:
-      return <ShowItem context={context} details={details} session={session} />
-    case ITEM_TYPES.season:
-      return <SeasonItem context={context} details={details} session={session} />
-    default: {
-      const unknown: never = details.type
-      return unknown
-    }
-  }
+type MovieItemProps = ItemOfProps
+
+const MovieItem = (props: MovieItemProps) => <PlayableFiles kind={ITEM_TYPES.movie} {...props} />
+
+type EpisodeItemProps = ItemOfProps
+
+const EpisodeItem = (props: EpisodeItemProps) => (
+  <PlayableFiles kind={ITEM_TYPES.episode} {...props} />
+)
+
+const ITEM_VIEWS = {
+  [ITEM_TYPES.movie]: MovieItem,
+  [ITEM_TYPES.episode]: EpisodeItem,
+  [ITEM_TYPES.show]: ShowItem,
+  [ITEM_TYPES.season]: SeasonItem,
+} as const satisfies Record<ItemDetails['type'], ComponentType<ItemOfProps>>
+
+const ItemOf = (props: ItemOfProps) => {
+  const View = ITEM_VIEWS[props.details.type]
+  return <View {...props} />
 }
 
 type ServerItemProps = {
@@ -478,42 +508,92 @@ type ServerItemProps = {
   file: number | null
 }
 
-const ServerItem = ({ session, id, library, file }: ServerItemProps) => {
-  const router = useRouter()
-  const item = useQuery(session.queries.itemQuery(id))
-  const pictures = usePictures(session)
-  const onBack = () => router.back()
-  const page = routeState({ id, query: item })
+type ReadyItemProps = ItemOfProps
+
+/** A page once its item and pictures are known, drawn afresh for each item. */
+const ReadyItem = (props: ReadyItemProps) => <ItemOf key={props.details.id} {...props} />
+
+const SERVER_ITEM_VIEW_KEYS = { notice: 'notice', loading: 'loading', ready: 'ready' } as const
+
+type ServerItemViewProps = {
+  [SERVER_ITEM_VIEW_KEYS.notice]: ItemNoticeProps
+  [SERVER_ITEM_VIEW_KEYS.loading]: LoadingProps
+  [SERVER_ITEM_VIEW_KEYS.ready]: ItemOfProps
+}
+
+const SERVER_ITEM_VIEWS = {
+  [SERVER_ITEM_VIEW_KEYS.notice]: ItemNotice,
+  [SERVER_ITEM_VIEW_KEYS.loading]: Loading,
+  [SERVER_ITEM_VIEW_KEYS.ready]: ReadyItem,
+} as const satisfies ViewsOf<ServerItemViewProps>
+
+type ServerItemViewOfProps = Omit<ServerItemProps, 'id'> & {
+  page: RouteQuery<ItemDetails>
+  pictures: Pick<Pictures, 'headersFor'> | null
+  onOpen: (target: RouteTarget) => void
+  onBack: () => void
+}
+
+type NoticeViewProps = ItemNoticeProps
+
+const noticeView = ({ notice, onBack }: NoticeViewProps): ViewOf<ServerItemViewProps> => ({
+  key: SERVER_ITEM_VIEW_KEYS.notice,
+  props: { notice, onBack },
+})
+
+type LoadingViewProps = LoadingProps
+
+const loadingView = ({ label, onBack }: LoadingViewProps): ViewOf<ServerItemViewProps> => ({
+  key: SERVER_ITEM_VIEW_KEYS.loading,
+  props: { label, onBack },
+})
+
+const serverItemViewOf = ({
+  page,
+  pictures,
+  onOpen,
+  onBack,
+  ...item
+}: ServerItemViewOfProps): ViewOf<ServerItemViewProps> => {
   switch (page.state) {
     case ROUTE_STATES.missing:
-      return <ItemNotice notice={COPY.missing} onBack={onBack} />
+      return noticeView({ notice: ITEM_COPY.missing, onBack })
     case ROUTE_STATES.error:
-      return <ItemNotice notice={page.message} onBack={onBack} />
+      return noticeView({ notice: page.message, onBack })
     case ROUTE_STATES.loading:
-      return <Loading label={COPY.opening} onBack={onBack} />
+      return loadingView({ label: ITEM_COPY.opening, onBack })
     case ROUTE_STATES.ready:
       // The pictures wait for the server's cookies, so none is asked for twice.
-      return pictures === null ? (
-        <Loading label={COPY.opening} onBack={onBack} />
-      ) : (
-        <ItemOf
-          key={page.data.id}
-          context={{
-            headersFor: pictures.headersFor,
-            onOpen: (target) => router.push(hrefOf(target)),
-            onBack,
-          }}
-          details={page.data}
-          file={file}
-          library={library}
-          session={session}
-        />
-      )
+      if (pictures === null) return loadingView({ label: ITEM_COPY.opening, onBack })
+      return {
+        key: SERVER_ITEM_VIEW_KEYS.ready,
+        props: {
+          ...item,
+          details: page.data,
+          context: { headersFor: pictures.headersFor, onOpen, onBack },
+        },
+      }
     default: {
       const unknown: never = page
       return unknown
     }
   }
+}
+
+const ServerItem = ({ session, id, library, file }: ServerItemProps) => {
+  const router = useRouter()
+  const item = useQuery(session.queries.itemQuery(id))
+  const pictures = usePictures(session)
+  const view = serverItemViewOf({
+    page: routeState({ id, query: item }),
+    pictures,
+    onOpen: (target) => router.push(hrefOf(target)),
+    onBack: () => router.back(),
+    library,
+    file,
+    session,
+  })
+  return <KeyedView<ServerItemViewProps> view={view} views={SERVER_ITEM_VIEWS} />
 }
 
 /**

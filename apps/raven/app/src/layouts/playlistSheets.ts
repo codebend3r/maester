@@ -2,12 +2,8 @@ import { isPlaylistName } from '@raven/core'
 import { ActionSheetIOS, Alert } from 'react-native'
 
 import { CANCEL } from '@/layouts/gridKit'
-import {
-  MUSIC_COPY,
-  PLAYLIST_PICKS,
-  type PlaylistChoice,
-  type PlaylistPick,
-} from '@/layouts/musicKit'
+import { MUSIC_COPY } from '@/layouts/copy'
+import { PLAYLIST_PICKS, type PlaylistChoice, type PlaylistPick } from '@/layouts/musicKit'
 import { themeNow } from '@/theme/useTheme'
 
 type AskPlaylistNameProps = {

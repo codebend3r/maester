@@ -5,7 +5,7 @@ import type { AccessibilityRole, AccessibilityState } from 'react-native'
 import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
 
 import type { ShelfCard } from '@/queries/cards'
-import type { EpisodeRow, ItemHero, ItemPage } from '@/queries/itemPage'
+import { ART_PLACES, type EpisodeRow, type ItemHero, type ItemPage } from '@/queries/itemPage'
 import type { RouteTarget } from '@/routes'
 
 /** How far a mark is on, as React Native says it to a screen reader: on, off, or `mixed`. */
@@ -130,6 +130,15 @@ export const dotted = (parts: readonly string[]): string => parts.join(' · ')
 /** The heading's facts on one line, its content rating last. */
 export const heroFactsOf = (hero: ItemHero): string =>
   dotted([...hero.facts, ...(hero.rating === null ? [] : [hero.rating])])
+
+/** How the heading sets its title: as the item's own title art, or in type. */
+export const TITLE_LOOKS = { art: 'art', words: 'words' } as const
+
+export type TitleLook = (typeof TITLE_LOOKS)[keyof typeof TITLE_LOOKS]
+
+/** The title as art where the item's own title art stands in its place, else in type. */
+export const titleLookOf = (logo: ItemHero['logo']): TitleLook =>
+  logo !== null && logo.place === ART_PLACES.title ? TITLE_LOOKS.art : TITLE_LOOKS.words
 
 /** The heading's picture as a card draws it: its poster or still, with no progress along it. */
 export const heroPictureOf = (

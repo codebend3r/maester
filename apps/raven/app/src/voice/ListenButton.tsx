@@ -1,9 +1,7 @@
 import { PlateButton } from '@/layouts/tvControls'
 import { CAN_LISTEN, listen } from '@/voice/listen'
+import { LISTEN_COPY } from '@/voice/copy'
 import { typedFrom } from '@/voice/spokenText'
-
-/** What the button under a field says that fills it from speech. */
-const COPY = { byVoice: (label: string) => `${label} by voice` } as const
 
 type ListenButtonProps = {
   label: string
@@ -18,18 +16,19 @@ type ListenButtonProps = {
  * recognizer shows what it heard on screen.
  */
 export const ListenButton = ({ label, isEmail, onHeard }: ListenButtonProps) => {
-  if (!CAN_LISTEN) return null
   const hear = async () => {
     const heard = await listen({ prompt: label })
     if (heard !== null) onHeard(typedFrom({ heard, isEmail }))
   }
   return (
-    <PlateButton
-      label={COPY.byVoice(label)}
-      onPress={() => {
-        void hear()
-      }}
-      text={COPY.byVoice(label)}
-    />
+    CAN_LISTEN && (
+      <PlateButton
+        label={LISTEN_COPY.byVoice(label)}
+        onPress={() => {
+          void hear()
+        }}
+        text={LISTEN_COPY.byVoice(label)}
+      />
+    )
   )
 }

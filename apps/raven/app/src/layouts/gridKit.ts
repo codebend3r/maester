@@ -32,6 +32,14 @@ const ROW_VIEWS: ReadonlySet<LibraryView> = new Set([LIBRARY_VIEWS.list, LIBRARY
 
 export const isRowView = (view: LibraryView): boolean => ROW_VIEWS.has(view)
 
+/** How a grid draws each card: as a row of words, or as a card. */
+export const CARD_LAYOUTS = { rows: 'rows', cards: 'cards' } as const
+
+export type CardLayout = (typeof CARD_LAYOUTS)[keyof typeof CARD_LAYOUTS]
+
+export const cardLayoutOf = (view: LibraryView): CardLayout =>
+  isRowView(view) ? CARD_LAYOUTS.rows : CARD_LAYOUTS.cards
+
 /** A section's heading as it is read out: "Matched, 3 videos". */
 export const headingLabelOf = (section: GridSection): string =>
   section.count === null ? (section.title ?? '') : `${section.title ?? ''}, ${section.count}`
@@ -78,6 +86,8 @@ export const chosenLabelOf = <K extends string>({
   value,
 }: ChosenLabelOfProps<K>): string => options.find(({ key }) => key === value)?.label ?? ''
 
+type PickerLabelOfProps<K extends string> = PickerProps<K>
+
 /** A picker's button as it is read out: "Sort: Title". */
-export const pickerLabelOf = <K extends string>(props: PickerProps<K>): string =>
+export const pickerLabelOf = <K extends string>(props: PickerLabelOfProps<K>): string =>
   `${props.label}: ${chosenLabelOf(props)}`

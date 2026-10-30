@@ -1,7 +1,7 @@
 import { PLAYBACK_MODES, type Track } from '@raven/core'
 import {
+  AUDIO_HOST_COPY,
   AUDIO_STATES,
-  COULD_NOT_PLAY,
   playingTrackOf,
   startOf,
   useAudiobookSpot,
@@ -59,7 +59,7 @@ const VideoTrack = ({ session, track, rate, start }: VideoTrackProps) => {
   })
   useEffect(() => {
     if (source.data !== undefined && !source.data.ok) engine.failed(source.data.message)
-    if (source.error !== null) engine.failed(COULD_NOT_PLAY)
+    if (source.error !== null) engine.failed(AUDIO_HOST_COPY.couldNotPlay)
   }, [source.data, source.error, engine])
 
   useEffect(() => {
@@ -68,31 +68,35 @@ const VideoTrack = ({ session, track, rate, start }: VideoTrackProps) => {
     engine.sought()
   }, [seek, engine])
 
-  if (source.data === undefined || !source.data.ok) return null
+  const answer = source.data
   // The length is the server's, as on every client: a player rounds a FLAC's up to whole blocks.
   return (
-    <Video
-      ref={video}
-      muted={isMuted}
-      onEnd={() => engine.ended()}
-      onError={() => engine.failed(COULD_NOT_PLAY)}
-      onLoad={() => {
-        if (start > 0) video.current?.seek(start)
-        engine.time({ position: start, duration: track.duration })
-      }}
-      onPlaybackStateChanged={({ isPlaying }) =>
-        engine.state(isPlaying ? AUDIO_STATES.playing : AUDIO_STATES.paused)
-      }
-      onProgress={({ currentTime }) =>
-        engine.time({ position: currentTime, duration: track.duration })
-      }
-      paused={state !== AUDIO_STATES.playing && state !== AUDIO_STATES.loading}
-      playInBackground
-      rate={rate}
-      source={{ uri: source.data.source.uri, headers: source.data.source.headers }}
-      style={styles.hidden}
-      volume={volume}
-    />
+    answer !== undefined &&
+    answer.ok && (
+      <Video
+        ref={video}
+        muted={isMuted}
+        onEnd={() => engine.ended()}
+        onError={() => engine.failed(AUDIO_HOST_COPY.couldNotPlay)}
+        onLoad={() => {
+          const player = video.current
+          if (start > 0 && player !== null) player.seek(start)
+          engine.time({ position: start, duration: track.duration })
+        }}
+        onPlaybackStateChanged={({ isPlaying }) =>
+          engine.state(isPlaying ? AUDIO_STATES.playing : AUDIO_STATES.paused)
+        }
+        onProgress={({ currentTime }) =>
+          engine.time({ position: currentTime, duration: track.duration })
+        }
+        paused={state !== AUDIO_STATES.playing && state !== AUDIO_STATES.loading}
+        playInBackground
+        rate={rate}
+        source={{ uri: answer.source.uri, headers: answer.source.headers }}
+        style={styles.hidden}
+        volume={volume}
+      />
+    )
   )
 }
 
@@ -110,8 +114,12 @@ export const VideoAudioHost = ({ session }: VideoAudioHostProps) => {
   useListenCounter({ api: session.api, track })
   // A book waits for its spot, so it never starts from the top and saves that over it.
   const start = startOf(useAudiobookSpot({ api: session.api, track, watchHide: watchAppHide }))
-  if (track === null || start === null) return null
-  return <VideoTrack key={track.id} rate={rate} session={session} start={start} track={track} />
+  return (
+    track !== null &&
+    start !== null && (
+      <VideoTrack key={track.id} rate={rate} session={session} start={start} track={track} />
+    )
+  )
 }
 
 const styles = StyleSheet.create({ hidden: { width: 0, height: 0 } })

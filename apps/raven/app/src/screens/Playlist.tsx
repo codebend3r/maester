@@ -2,24 +2,22 @@ import {
   type PlaylistDetails,
   QUEUE_SOURCE_KINDS,
   ROUTE_STATES,
+  type RouteQuery,
   routeIdOf,
   routeState,
 } from '@raven/core'
 import { playingTrackOf, useAudioQueue, useServerPlaylistMutations } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import type { ComponentType } from 'react'
 
-import { ItemNotice, PlaylistLayout } from '@/layouts'
+import { PlaylistLayout } from '@/layouts'
 import { playlistFactsOf, playlistTracksOf } from '@/layouts/musicRows'
 import { movedUp, withoutPlace } from '@/music/playlistOrder'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTE_PARAMS } from '@/routes'
-
-const COPY = {
-  opening: 'Opening the playlist',
-  missing: 'This playlist is not on the server.',
-  failed: (why: string) => `Could not change the playlist: ${why}`,
-} as const
+import { PLAYLIST_COPY } from '@/screens/copy'
+import { RouteError, RouteLoading, RouteMissing, type RouteViewProps } from '@/screens/RouteNotices'
 
 type PlaylistPageProps = { session: AppQueries; details: PlaylistDetails }
 
@@ -35,7 +33,7 @@ const PlaylistPage = ({ session: { api }, details }: PlaylistPageProps) => {
     <PlaylistLayout
       facts={playlistFactsOf({ playlist })}
       name={playlist.name}
-      note={failure === null ? null : COPY.failed(failure.message)}
+      note={failure === null ? null : PLAYLIST_COPY.failed(failure.message)}
       onBack={() => router.back()}
       onDelete={() => remove.mutate(playlist.id, { onSuccess: () => router.back() })}
       onMoveUp={(index) =>
@@ -54,6 +52,24 @@ const PlaylistPage = ({ session: { api }, details }: PlaylistPageProps) => {
   )
 }
 
+type ServerPlaylistViewProps = RouteViewProps<PlaylistDetails> & { session: AppQueries }
+
+type PlaylistReadyProps = ServerPlaylistViewProps
+
+const PlaylistReady = ({ page, session }: PlaylistReadyProps) =>
+  page.state === ROUTE_STATES.ready && <PlaylistPage details={page.data} session={session} />
+
+/** What the page draws in each state its read is in. */
+const SERVER_PLAYLIST_VIEWS = {
+  [ROUTE_STATES.missing]: RouteMissing,
+  [ROUTE_STATES.error]: RouteError,
+  [ROUTE_STATES.loading]: RouteLoading,
+  [ROUTE_STATES.ready]: PlaylistReady,
+} as const satisfies Record<
+  RouteQuery<PlaylistDetails>['state'],
+  ComponentType<ServerPlaylistViewProps>
+>
+
 type ServerPlaylistProps = { session: AppQueries; id: number | null }
 
 const ServerPlaylist = ({ session, id }: ServerPlaylistProps) => {
@@ -61,20 +77,8 @@ const ServerPlaylist = ({ session, id }: ServerPlaylistProps) => {
   const playlist = useQuery(session.queries.playlistQuery(id))
   const page = routeState({ id, query: playlist })
   const back = () => router.back()
-  switch (page.state) {
-    case ROUTE_STATES.missing:
-      return <ItemNotice notice={COPY.missing} onBack={back} />
-    case ROUTE_STATES.error:
-      return <ItemNotice notice={page.message} onBack={back} />
-    case ROUTE_STATES.loading:
-      return <ItemNotice notice={COPY.opening} onBack={back} />
-    case ROUTE_STATES.ready:
-      return <PlaylistPage details={page.data} session={session} />
-    default: {
-      const unknown: never = page
-      return unknown
-    }
-  }
+  const PageView = SERVER_PLAYLIST_VIEWS[page.state]
+  return <PageView copy={PLAYLIST_COPY} onBack={back} page={page} session={session} />
 }
 
 /**
@@ -85,6 +89,5 @@ export const Playlist = () => {
   const session = useAppQueries()
   const params = useLocalSearchParams()
   const id = routeIdOf(params[APP_ROUTE_PARAMS.id])
-  if (session === null) return null
-  return <ServerPlaylist key={session.server.id} id={id} session={session} />
+  return session !== null && <ServerPlaylist key={session.server.id} id={id} session={session} />
 }

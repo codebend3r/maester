@@ -2,11 +2,8 @@ import { View } from 'react-native'
 
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { touchForm } from '@/layouts/Form.touch'
-import {
-  MUSIC_COPY,
-  type NewPlaylistButtonProps,
-  type PlaylistLayoutProps,
-} from '@/layouts/musicKit'
+import { MUSIC_COPY } from '@/layouts/copy'
+import { type NewPlaylistButtonProps, type PlaylistLayoutProps } from '@/layouts/musicKit'
 import { ListEntry, TouchPage, useMusicStyles } from '@/layouts/MusicParts.touch'
 import { touchPicker } from '@/layouts/Picker.touch'
 import { askPlaylistName, confirmDeletePlaylist } from '@/layouts/playlistSheets'
@@ -86,7 +83,7 @@ export const PlaylistLayout = ({
             key={track.key}
             isSelected={playingId === track.id}
             label={track.label}
-            line={`${track.line} · ${track.length}`}
+            line={MUSIC_COPY.facts([track.line, track.length])}
             onPress={() => onPlayFrom(track.index)}
             title={track.title}
           >

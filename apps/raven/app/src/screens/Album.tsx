@@ -2,25 +2,24 @@ import {
   type AlbumDetails,
   QUEUE_SOURCE_KINDS,
   ROUTE_STATES,
+  type RouteQuery,
   routeIdOf,
   routeState,
 } from '@raven/core'
 import { playingTrackOf, useAudioQueue, useServerAlbumFavourite } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import type { ComponentType } from 'react'
 
-import { AlbumLayout, ItemNotice } from '@/layouts'
+import { AlbumLayout } from '@/layouts'
 import { albumDiscsOf, albumFactsOf } from '@/layouts/musicRows'
 import { usePlaylistAdd } from '@/music/usePlaylistAdd'
 import { pictureAt } from '@/queries/cards'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
 import { APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf } from '@/routes'
-
-const COPY = {
-  opening: 'Opening the album',
-  missing: 'This album is not on the server.',
-} as const
+import { ALBUM_COPY } from '@/screens/copy'
+import { RouteError, RouteLoading, RouteMissing, type RouteViewProps } from '@/screens/RouteNotices'
 
 type AlbumPageProps = { session: AppQueries; details: AlbumDetails }
 
@@ -72,6 +71,21 @@ const AlbumPage = ({ session, details }: AlbumPageProps) => {
   )
 }
 
+type ServerAlbumViewProps = RouteViewProps<AlbumDetails> & { session: AppQueries }
+
+type AlbumReadyProps = ServerAlbumViewProps
+
+const AlbumReady = ({ page, session }: AlbumReadyProps) =>
+  page.state === ROUTE_STATES.ready && <AlbumPage details={page.data} session={session} />
+
+/** What the page draws in each state its read is in. */
+const SERVER_ALBUM_VIEWS = {
+  [ROUTE_STATES.missing]: RouteMissing,
+  [ROUTE_STATES.error]: RouteError,
+  [ROUTE_STATES.loading]: RouteLoading,
+  [ROUTE_STATES.ready]: AlbumReady,
+} as const satisfies Record<RouteQuery<AlbumDetails>['state'], ComponentType<ServerAlbumViewProps>>
+
 type ServerAlbumProps = { session: AppQueries; id: number | null }
 
 const ServerAlbum = ({ session, id }: ServerAlbumProps) => {
@@ -79,20 +93,8 @@ const ServerAlbum = ({ session, id }: ServerAlbumProps) => {
   const album = useQuery(session.queries.albumQuery(id))
   const page = routeState({ id, query: album })
   const back = () => router.back()
-  switch (page.state) {
-    case ROUTE_STATES.missing:
-      return <ItemNotice notice={COPY.missing} onBack={back} />
-    case ROUTE_STATES.error:
-      return <ItemNotice notice={page.message} onBack={back} />
-    case ROUTE_STATES.loading:
-      return <ItemNotice notice={COPY.opening} onBack={back} />
-    case ROUTE_STATES.ready:
-      return <AlbumPage details={page.data} session={session} />
-    default: {
-      const unknown: never = page
-      return unknown
-    }
-  }
+  const PageView = SERVER_ALBUM_VIEWS[page.state]
+  return <PageView copy={ALBUM_COPY} onBack={back} page={page} session={session} />
 }
 
 /** `/album/[id]`: the cover, the artists and the facts, Play and Shuffle, and the tracks by disc. */
@@ -100,6 +102,5 @@ export const Album = () => {
   const session = useAppQueries()
   const params = useLocalSearchParams()
   const id = routeIdOf(params[APP_ROUTE_PARAMS.id])
-  if (session === null) return null
-  return <ServerAlbum key={session.server.id} id={id} session={session} />
+  return session !== null && <ServerAlbum key={session.server.id} id={id} session={session} />
 }

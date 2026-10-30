@@ -32,6 +32,14 @@ export type Transport = {
  */
 export type VideoSurface = ComponentProps<typeof Video>
 
+/** Whether the chrome has a video to draw yet, or only the line in its place. */
+export const SURFACE_STATES = { waiting: 'waiting', ready: 'ready' } as const
+
+export type SurfaceState = (typeof SURFACE_STATES)[keyof typeof SURFACE_STATES]
+
+export const surfaceStateOf = (surface: VideoSurface | null): SurfaceState =>
+  surface === null ? SURFACE_STATES.waiting : SURFACE_STATES.ready
+
 export type PlayerChromeProps = {
   title: string
   /** The title as lines, for a platform that sets it out so: show, season and episode, name, length. */

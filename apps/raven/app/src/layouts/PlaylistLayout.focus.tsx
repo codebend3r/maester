@@ -1,9 +1,11 @@
+import type { ComponentType } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { useScreenFocusScope } from '@/layouts/focus'
 import { BUTTON_TONES } from '@/layouts/formKit'
-import { MUSIC_COPY, type PlaylistLayoutProps } from '@/layouts/musicKit'
+import { MUSIC_COPY } from '@/layouts/copy'
+import { type PlaylistLayoutProps } from '@/layouts/musicKit'
 import { ActionPlate, FocusPage, FocusRow, useMusicStyles } from '@/layouts/MusicParts.focus'
 import type { PlaylistTrack } from '@/layouts/musicRows'
 import { Text } from '@/layouts/Text'
@@ -35,6 +37,51 @@ const PlaylistEntry = ({ track, isPlaying, onPlayFrom }: PlaylistEntryProps) => 
   )
 }
 
+/** Whether a playlist holds any tracks to list. */
+const PLAYLIST_FILLS = { empty: 'empty', filled: 'filled' } as const
+
+type PlaylistFill = (typeof PLAYLIST_FILLS)[keyof typeof PLAYLIST_FILLS]
+
+const playlistFillOf = (tracks: readonly PlaylistTrack[]): PlaylistFill =>
+  tracks.length === 0 ? PLAYLIST_FILLS.empty : PLAYLIST_FILLS.filled
+
+type PlaylistTracksProps = Pick<PlaylistLayoutProps, 'name' | 'tracks' | 'playingId' | 'onPlayFrom'>
+
+type EmptyTracksProps = PlaylistTracksProps
+
+/** A word that the playlist holds nothing yet. */
+const EmptyTracks = ({ name }: EmptyTracksProps) => {
+  const music = useMusicStyles()
+  return <Text style={music.line}>{MUSIC_COPY.emptyPlaylist(name)}</Text>
+}
+
+type TrackBandProps = PlaylistTracksProps
+
+/** The playlist's tracks in a band of their own. */
+const TrackBand = ({ tracks, playingId, onPlayFrom }: TrackBandProps) => {
+  const music = useMusicStyles()
+  return (
+    <FocusBand>
+      <View style={music.section}>
+        {tracks.map((track) => (
+          <PlaylistEntry
+            key={track.key}
+            isPlaying={playingId === track.id}
+            onPlayFrom={onPlayFrom}
+            track={track}
+          />
+        ))}
+      </View>
+    </FocusBand>
+  )
+}
+
+/** What stands below the actions: the tracks, or a word that there are none. */
+const PLAYLIST_TRACKS = {
+  [PLAYLIST_FILLS.empty]: EmptyTracks,
+  [PLAYLIST_FILLS.filled]: TrackBand,
+} as const satisfies Record<PlaylistFill, ComponentType<PlaylistTracksProps>>
+
 /**
  * A playlist on a TV: its name and facts over Play and Shuffle, which the remote opens on, then
  * its tracks in a band of their own to play from. Its edits stay under the thumb. Menu goes back.
@@ -50,6 +97,7 @@ export const PlaylistLayout = ({
 }: PlaylistLayoutProps) => {
   const { isOpening } = useScreenFocusScope()
   const music = useMusicStyles()
+  const Tracks = PLAYLIST_TRACKS[playlistFillOf(tracks)]
   return (
     <FocusPage>
       <FocusBand>
@@ -79,21 +127,7 @@ export const PlaylistLayout = ({
           </View>
         </View>
       </FocusBand>
-      {tracks.length === 0 && <Text style={music.line}>{MUSIC_COPY.emptyPlaylist(name)}</Text>}
-      {tracks.length > 0 && (
-        <FocusBand>
-          <View style={music.section}>
-            {tracks.map((track) => (
-              <PlaylistEntry
-                key={track.key}
-                isPlaying={playingId === track.id}
-                onPlayFrom={onPlayFrom}
-                track={track}
-              />
-            ))}
-          </View>
-        </FocusBand>
-      )}
+      <Tracks name={name} onPlayFrom={onPlayFrom} playingId={playingId} tracks={tracks} />
     </FocusPage>
   )
 }

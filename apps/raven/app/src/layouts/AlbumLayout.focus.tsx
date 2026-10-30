@@ -5,7 +5,8 @@ import { FocusBand } from '@/layouts/FocusBand'
 import { useOpenerFocus, useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
-import { type AlbumLayoutProps, MUSIC_COPY } from '@/layouts/musicKit'
+import { MUSIC_COPY } from '@/layouts/copy'
+import { type AlbumLayoutProps } from '@/layouts/musicKit'
 import {
   ActionPlate,
   Cover,

@@ -10,31 +10,15 @@ import {
   SettingsToggle,
 } from '@/layouts'
 import { useAppPrefs } from '@/stores/appPrefs'
+import { SETTINGS_COPY } from '@/screens/copy'
 import { THEME_PICKER } from '@/theme/themeOptions'
 
-const COPY = {
-  title: 'Settings',
-  account: 'Account',
-  signedInAs: (email: string) => `Signed in as ${email}.`,
-  signOut: 'Sign out',
-  themeNote: 'How raven looks on this device.',
-  playback: 'Playback',
-  preferDirect: 'Prefer direct play',
-  preferDirectHint:
-    'Plays a file this device may refuse as it is first, and has the server convert it only if that fails.',
-  allowTranscode: 'Allow transcoding',
-  allowTranscodeHint:
-    "Lets the server re-encode what this device can't play. Off, such a file doesn't play here.",
-  away: 'Away from home',
-  awayNote: 'The largest picture a transcode is sent at when raven is reached over the internet.',
-} as const
-
 /** What the away cap is called, as the web's server settings name the same heights. */
-const AWAY_LABELS: Record<MaxHeight, string> = {
-  [MAX_HEIGHTS.uhd]: '4K',
-  [MAX_HEIGHTS.fullHd]: '1080p',
-  [MAX_HEIGHTS.hd]: '720p',
-}
+const AWAY_LABELS = {
+  [MAX_HEIGHTS.uhd]: SETTINGS_COPY.heights.uhd,
+  [MAX_HEIGHTS.fullHd]: SETTINGS_COPY.heights.fullHd,
+  [MAX_HEIGHTS.hd]: SETTINGS_COPY.heights.hd,
+} as const satisfies Record<MaxHeight, string>
 
 /** A height as the picker keys it, which takes only strings. */
 const awayKeyOf = (height: MaxHeight) => `${height}` as const
@@ -59,11 +43,14 @@ export const Settings = () => {
   const change = useAppPrefs((state) => state.change)
 
   return (
-    <SettingsPage onBack={() => router.back()} title={COPY.title}>
-      <SettingsSection note={email === null ? null : COPY.signedInAs(email)} title={COPY.account}>
-        <SettingsButton isDisabled={false} onPress={signOut} text={COPY.signOut} />
+    <SettingsPage onBack={() => router.back()} title={SETTINGS_COPY.title}>
+      <SettingsSection
+        note={email === null ? null : SETTINGS_COPY.signedInAs(email)}
+        title={SETTINGS_COPY.account}
+      >
+        <SettingsButton isDisabled={false} onPress={signOut} text={SETTINGS_COPY.signOut} />
       </SettingsSection>
-      <SettingsSection note={COPY.themeNote} title={THEME_PICKER.label}>
+      <SettingsSection note={SETTINGS_COPY.themeNote} title={THEME_PICKER.label}>
         <SettingsChoice
           label={THEME_PICKER.label}
           onChoose={(picked) => change({ theme: picked })}
@@ -71,21 +58,21 @@ export const Settings = () => {
           value={theme}
         />
       </SettingsSection>
-      <SettingsSection note={COPY.awayNote} title={COPY.playback}>
+      <SettingsSection note={SETTINGS_COPY.awayNote} title={SETTINGS_COPY.playback}>
         <SettingsToggle
-          hint={COPY.preferDirectHint}
+          hint={SETTINGS_COPY.preferDirectHint}
           isOn={shouldPreferDirectPlay}
-          label={COPY.preferDirect}
+          label={SETTINGS_COPY.preferDirect}
           onToggle={(isOn) => change({ shouldPreferDirectPlay: isOn })}
         />
         <SettingsToggle
-          hint={COPY.allowTranscodeHint}
+          hint={SETTINGS_COPY.allowTranscodeHint}
           isOn={isTranscodeAllowed}
-          label={COPY.allowTranscode}
+          label={SETTINGS_COPY.allowTranscode}
           onToggle={(isOn) => change({ isTranscodeAllowed: isOn })}
         />
         <SettingsChoice
-          label={COPY.away}
+          label={SETTINGS_COPY.away}
           onChoose={(key) => {
             const height = Number(key)
             if (isMaxHeight(height)) change({ awayMaxHeight: height })

@@ -1,5 +1,12 @@
 import { formatDuration } from '@raven/core'
-import { type ComponentRef, type RefObject, useEffect, useRef, useState } from 'react'
+import {
+  type ComponentRef,
+  type ComponentType,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import {
   Animated,
   Pressable,
@@ -14,6 +21,7 @@ import { Icon } from '@/layouts/Icon'
 import { LoadingMark } from '@/layouts/LoadingMark'
 import { Text } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
+import { TITLE_LOOKS, type TitleLook } from '@/layouts/itemKit'
 import {
   CENTRE_MARK_LOOKS,
   type CentreMark,
@@ -28,11 +36,13 @@ import { CaptionText } from '@/layouts/PlayerCaption'
 import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import {
   PLAYER_COPY,
+  SURFACE_STATES,
   type PlayerChromeKit,
   type PlayerChromeProps,
+  type SurfaceState,
   type Transport,
   type TrackPicker,
-  type VideoSurface,
+  surfaceStateOf,
   playedShareOf,
   scrubberAccessibilityOf,
 } from '@/layouts/playerKit'
@@ -220,24 +230,60 @@ const Centre = ({ mark, isFading }: CentreProps) => {
     })
     return () => fade.stop()
   }, [isFading, isReduced, opacity])
-  if (isGone) return null
   const look = CENTRE_MARK_LOOKS[mark]
   return (
-    <View pointerEvents="none" style={styles.centreSlot}>
-      <Animated.View
-        accessibilityLabel={look.label}
-        accessibilityLiveRegion="polite"
-        accessible
-        style={[styles.centre, { opacity }]}
-      >
-        <Icon colour={colour} name={look.icon} size={CENTRE_ICON} />
-        {look.text !== null && <Text style={styles.centreText}>{look.text}</Text>}
-      </Animated.View>
-    </View>
+    !isGone && (
+      <View pointerEvents="none" style={styles.centreSlot}>
+        <Animated.View
+          accessibilityLabel={look.label}
+          accessibilityLiveRegion="polite"
+          accessible
+          style={[styles.centre, { opacity }]}
+        >
+          <Icon colour={colour} name={look.icon} size={CENTRE_ICON} />
+          {look.text !== null && <Text style={styles.centreText}>{look.text}</Text>}
+        </Animated.View>
+      </View>
+    )
   )
 }
 
 type HeadingProps = Pick<PlayerChromeProps, 'heading'>
+
+type HeadingTitleProps = HeadingProps
+
+type HeadingTitleArtProps = HeadingTitleProps
+
+/** A film's name as its title art, where it has some. */
+const HeadingTitleArt = ({ heading }: HeadingTitleArtProps) => {
+  const styles = useStyles()
+  return (
+    <TitleArt
+      height={LOGO_HEIGHT}
+      logo={heading.logo}
+      maxWidth={TV_SIZES.measure}
+      name={heading.title}
+      textStyle={styles.show}
+    />
+  )
+}
+
+type HeadingTitleWordsProps = HeadingTitleProps
+
+/** An episode's own name, under its show's art. */
+const HeadingTitleWords = ({ heading }: HeadingTitleWordsProps) => {
+  const styles = useStyles()
+  return (
+    <Text numberOfLines={2} style={styles.title}>
+      {heading.title}
+    </Text>
+  )
+}
+
+const HEADING_TITLES = {
+  [TITLE_LOOKS.art]: HeadingTitleArt,
+  [TITLE_LOOKS.words]: HeadingTitleWords,
+} as const satisfies Record<TitleLook, ComponentType<HeadingTitleProps>>
 
 /**
  * The title along the top as lines: the show, then its season and episode, quieter, then the
@@ -245,6 +291,7 @@ type HeadingProps = Pick<PlayerChromeProps, 'heading'>
  */
 const Heading = ({ heading }: HeadingProps) => {
   const styles = useStyles()
+  const Title = HEADING_TITLES[heading.show === null ? TITLE_LOOKS.art : TITLE_LOOKS.words]
   return (
     <View accessibilityRole="header" style={styles.heading}>
       {heading.show !== null && (
@@ -258,19 +305,7 @@ const Heading = ({ heading }: HeadingProps) => {
       )}
       {heading.place !== null && <Text style={styles.place}>{heading.place}</Text>}
       <View style={styles.titleRow}>
-        {heading.show === null ? (
-          <TitleArt
-            height={LOGO_HEIGHT}
-            logo={heading.logo}
-            maxWidth={TV_SIZES.measure}
-            name={heading.title}
-            textStyle={styles.show}
-          />
-        ) : (
-          <Text numberOfLines={2} style={styles.title}>
-            {heading.title}
-          </Text>
-        )}
+        <Title heading={heading} />
         {heading.length !== null && (
           <View style={styles.chip}>
             <Text style={styles.chipText}>{heading.length}</Text>
@@ -381,7 +416,13 @@ const ControlsCatcher = ({ onPress }: ControlsCatcherProps) => {
   )
 }
 
-type DpadPlayerProps = PlayerChromeProps & { surface: VideoSurface }
+type ShownKeyOfProps = ShownMark & { count: number }
+
+/** What tells one showing of the middle mark from the next: a flash counts, so the same twice starts afresh. */
+const shownKeyOf = ({ mark, isFading, count }: ShownKeyOfProps): string =>
+  isFading ? `${mark}:${count}` : mark
+
+type DpadPlayerProps = PlayerChromeProps
 
 /**
  * raven's own controls over ExoPlayer, driven by the d-pad. They fade once the video has played
@@ -475,12 +516,13 @@ const DpadPlayer = ({
     held: held.direction,
     flash: flash?.mark ?? null,
   })
-  const shownKey =
-    shown === null ? null : shown.isFading ? `${shown.mark}:${flash?.count ?? 0}` : shown.mark
+  const shownKey = shown === null ? null : shownKeyOf({ ...shown, count: flash?.count ?? 0 })
 
   return (
     <View style={styles.root}>
-      <Video {...surface} controls={false} resizeMode="contain" style={StyleSheet.absoluteFill} />
+      {surface !== null && (
+        <Video {...surface} controls={false} resizeMode="contain" style={StyleSheet.absoluteFill} />
+      )}
       {isOpening && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           <LoadingMark
@@ -541,12 +583,15 @@ const DpadPlayer = ({
   )
 }
 
+const PLAYER_VIEWS = {
+  [SURFACE_STATES.waiting]: PlayerNotice,
+  [SURFACE_STATES.ready]: DpadPlayer,
+} as const satisfies Record<SurfaceState, ComponentType<PlayerChromeProps>>
+
+/** The TV's notice while there is nothing to play, then raven's controls over the video. */
 const PlayerChrome = (props: PlayerChromeProps) => {
-  const { heading, surface, notice, isOpening, onBack } = props
-  if (surface === null) {
-    return <PlayerNotice heading={heading} isOpening={isOpening} notice={notice} onBack={onBack} />
-  }
-  return <DpadPlayer {...props} surface={surface} />
+  const PlayerView = PLAYER_VIEWS[surfaceStateOf(props.surface)]
+  return <PlayerView {...props} />
 }
 
 /** The player on Android TV: raven's controls, which the d-pad drives, with raven's subtitles. */

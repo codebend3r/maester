@@ -8,6 +8,11 @@ export type GridRow =
   | { kind: typeof GRID_ROWS.header; key: string; section: GridSection; isOpen: boolean }
   | { kind: typeof GRID_ROWS.cards; key: string; shape: CardShape; cards: ShelfCard[] }
 
+export type GridRowKind = GridRow['kind']
+
+/** The row of one kind, as a grid's row component for that kind draws it. */
+export type GridRowOf<K extends GridRowKind> = Extract<GridRow, { kind: K }>
+
 type GridColumnsOfProps = {
   room: number
   gap: number

@@ -2,7 +2,8 @@ import { type AccessibilityActionEvent, Pressable, StyleSheet, View } from 'reac
 
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { touchForm } from '@/layouts/Form.touch'
-import { type AlbumLayoutProps, MUSIC_COPY, ROW_ACTIONS } from '@/layouts/musicKit'
+import { MUSIC_COPY } from '@/layouts/copy'
+import { type AlbumLayoutProps, ROW_ACTIONS } from '@/layouts/musicKit'
 import { Cover, FavouriteButton, TouchPage, useMusicStyles } from '@/layouts/MusicParts.touch'
 import type { AlbumTrack } from '@/layouts/musicRows'
 import { touchPicker } from '@/layouts/Picker.touch'

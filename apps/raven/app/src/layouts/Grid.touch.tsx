@@ -1,7 +1,8 @@
-import { JUMP_SCALE_LABELS, type JumpScale, LIBRARY_VIEWS } from '@raven/core'
-import { useState } from 'react'
+import { JUMP_SCALE_LABELS, type JumpScale, LIBRARY_VIEWS, type LibraryView } from '@raven/core'
+import { type ComponentType, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import { Icon } from '@/layouts/Icon'
 import { Text } from '@/layouts/Text'
@@ -13,13 +14,22 @@ import { fitJumpMarks } from '@/layouts/jumpMarks'
 import { BREAKPOINTS } from '@/layouts/screenSizes'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
+  CARD_LAYOUTS,
   CHEVRONS,
+  type CardLayout,
   type GridKit,
   type GridProps,
+  cardLayoutOf,
   headingLabelOf,
   isRowView,
 } from '@/layouts/gridKit'
-import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
+import {
+  GRID_ROWS,
+  type GridRow,
+  type GridRowKind,
+  type GridRowOf,
+  gridColumnsOf,
+} from '@/layouts/gridRows'
 import { useGrid } from '@/layouts/useGrid'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
@@ -126,6 +136,103 @@ const JumpStrip = ({ jump, room, fontScale, onJump }: JumpStripProps) => {
   )
 }
 
+/** What a grid's rows draw from beyond the row itself. */
+type GridRowContext = {
+  view: LibraryView
+  heightOf: (row: GridRow) => number
+  widthOf: (shape: CardShape) => number
+  toggle: ReturnType<typeof useGrid>['toggle']
+  onOpen: GridProps['onOpen']
+}
+
+type GridCellProps = { card: ShelfCard; width: number; grid: GridRowContext }
+
+type RowCellProps = GridCellProps
+
+/** A card of the list or tiles view, in its column. */
+const RowCell = ({ card, width, grid }: RowCellProps) => (
+  <View style={{ width }}>
+    <RowCard
+      card={card}
+      hasPicture={grid.view === LIBRARY_VIEWS.tiles}
+      onPress={() => grid.onOpen(card)}
+    />
+  </View>
+)
+
+type CardCellProps = GridCellProps
+
+const CardCell = ({ card, width, grid }: CardCellProps) => (
+  <TouchCard card={card} onPress={() => grid.onOpen(card)} width={width} />
+)
+
+const GRID_CELLS = {
+  [CARD_LAYOUTS.rows]: RowCell,
+  [CARD_LAYOUTS.cards]: CardCell,
+} as const satisfies Record<CardLayout, ComponentType<GridCellProps>>
+
+type GridRowPartProps<K extends GridRowKind> = { row: GridRowOf<K>; grid: GridRowContext }
+
+type BucketRowProps = GridRowPartProps<typeof GRID_ROWS.header>
+
+/** A bucket's heading, pressed to open or fold it. */
+const BucketRow = ({ row, grid }: BucketRowProps) => {
+  const styles = useStyles()
+  return (
+    <Pressable
+      accessibilityLabel={headingLabelOf(row.section)}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: row.isOpen }}
+      onPress={() => grid.toggle(row.key)}
+      style={({ pressed }) => [
+        styles.bucket,
+        { height: grid.heightOf(row) },
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={styles.chevron}>{row.isOpen ? CHEVRONS.open : CHEVRONS.shut}</Text>
+      <Text numberOfLines={1} style={styles.bucketTitle}>
+        {row.section.title}
+      </Text>
+      <Text style={styles.count}>{row.section.count}</Text>
+    </Pressable>
+  )
+}
+
+type CardsRowProps = GridRowPartProps<typeof GRID_ROWS.cards>
+
+/** A run of cards across the grid. */
+const CardsRow = ({ row, grid }: CardsRowProps) => {
+  const styles = useStyles()
+  const Cell = GRID_CELLS[cardLayoutOf(grid.view)]
+  return (
+    <View style={[styles.cards, { height: grid.heightOf(row) }]}>
+      {row.cards.map((card) => (
+        <Cell key={card.key} card={card} grid={grid} width={grid.widthOf(row.shape)} />
+      ))}
+    </View>
+  )
+}
+
+/** Each row kind's view props, or only `Keys`' for a builder generic over the kind. */
+type GridRowViewsProps<Keys extends GridRowKind = GridRowKind> = {
+  [K in Keys]: GridRowPartProps<K>
+}
+
+const GRID_ROW_VIEWS = {
+  [GRID_ROWS.header]: BucketRow,
+  [GRID_ROWS.cards]: CardsRow,
+} as const satisfies ViewsOf<GridRowViewsProps>
+
+type GridRowViewOfProps<K extends GridRowKind> = GridRowPartProps<K> & { kind: K }
+
+/** A row of the grid as its kind's view, so each view is handed its own kind of row. */
+const gridRowViewOf = <K extends GridRowKind>({
+  kind,
+  row,
+  grid,
+}: GridRowViewOfProps<K>): ViewOf<GridRowViewsProps<K>, K> => ({ key: kind, props: { row, grid } })
+
 /**
  * A library under the thumb: the way back, its name and what it holds, its search box and the
  * pickers, then its cards in as many columns as the screen's width fits, the buckets folded
@@ -182,57 +289,14 @@ const Grid = ({
 
   type RenderRowProps = { item: GridRow }
 
-  const renderRow = ({ item: row }: RenderRowProps) => {
-    switch (row.kind) {
-      case GRID_ROWS.header:
-        return (
-          <Pressable
-            accessibilityLabel={headingLabelOf(row.section)}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: row.isOpen }}
-            onPress={() => toggle(row.key)}
-            style={({ pressed }) => [
-              styles.bucket,
-              { height: heightOf(row) },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={styles.chevron}>{row.isOpen ? CHEVRONS.open : CHEVRONS.shut}</Text>
-            <Text numberOfLines={1} style={styles.bucketTitle}>
-              {row.section.title}
-            </Text>
-            <Text style={styles.count}>{row.section.count}</Text>
-          </Pressable>
-        )
-      case GRID_ROWS.cards:
-        return (
-          <View style={[styles.cards, { height: heightOf(row) }]}>
-            {row.cards.map((card) =>
-              isRows ? (
-                <View key={card.key} style={{ width: widthOf(row.shape) }}>
-                  <RowCard
-                    card={card}
-                    hasPicture={view === LIBRARY_VIEWS.tiles}
-                    onPress={() => onOpen(card)}
-                  />
-                </View>
-              ) : (
-                <TouchCard
-                  key={card.key}
-                  card={card}
-                  onPress={() => onOpen(card)}
-                  width={widthOf(row.shape)}
-                />
-              ),
-            )}
-          </View>
-        )
-      default: {
-        const unknown: never = row
-        return unknown
-      }
-    }
-  }
+  const grid: GridRowContext = { view, heightOf, widthOf, toggle, onOpen }
+
+  const renderRow = ({ item: row }: RenderRowProps) => (
+    <KeyedView<GridRowViewsProps>
+      view={gridRowViewOf({ grid, kind: row.kind, row })}
+      views={GRID_ROW_VIEWS}
+    />
+  )
 
   return (
     <View style={styles.ground}>

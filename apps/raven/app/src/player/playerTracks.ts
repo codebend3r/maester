@@ -9,6 +9,8 @@ import {
   subtitleLabel,
 } from '@raven/core'
 
+import { PLAYER_TRACKS_COPY } from '@/player/copy'
+
 /** The subtitle picker's own choices beside the tracks: off, which no track id takes. */
 export const SUBTITLE_CHOICES = { off: 'off' } as const
 
@@ -44,7 +46,7 @@ export const subtitleOptionsOf = ({
   tracks,
   canShowPictures,
 }: SubtitleOptionsOfProps): TrackOption[] => [
-  { key: SUBTITLE_CHOICES.off, label: 'Off' },
+  { key: SUBTITLE_CHOICES.off, label: PLAYER_TRACKS_COPY.off },
   ...tracks.subtitles
     .filter((track) => track.supported || (canShowPictures && isPictureSubtitle(track)))
     .map((track) => ({ key: track.id, label: labelText(subtitleLabel(track)) })),

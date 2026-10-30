@@ -5,15 +5,12 @@ import { useRouter } from 'expo-router'
 import type { ReactNode } from 'react'
 
 import { Grid, NewPlaylistButton } from '@/layouts'
+import { MUSIC_COPY } from '@/layouts/copy'
+import { PLAYLISTS_GRID_COPY } from '@/music/copy'
 import { playlistSectionsOf } from '@/music/musicCards'
 import type { ShelfCard } from '@/queries/cards'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { ROUTE_TARGETS, hrefOf } from '@/routes'
-
-const COPY = {
-  gathering: 'Gathering your playlists',
-  none: 'You have no playlists yet. Make one here, or add tracks to one from an album.',
-} as const
 
 type PlaylistsGridProps = {
   session: AppQueries
@@ -38,8 +35,8 @@ export const PlaylistsGrid = ({
   const { create } = useServerPlaylistMutations({ api })
   const notice = ((): string | null => {
     if (playlists.error !== null && playlists.data === undefined) return playlists.error.message
-    if (playlists.data === undefined) return COPY.gathering
-    return playlists.data.length > 0 ? null : COPY.none
+    if (playlists.data === undefined) return PLAYLISTS_GRID_COPY.gathering
+    return playlists.data.length > 0 ? null : PLAYLISTS_GRID_COPY.none
   })()
   const make = (name: string) =>
     create.mutate(name, {
@@ -50,7 +47,7 @@ export const PlaylistsGrid = ({
     <Grid
       icon={libraryIconOf(library.settings)}
       jump={null}
-      line={plural({ n: playlists.data?.length ?? 0, one: 'playlist', many: 'playlists' })}
+      line={plural({ n: playlists.data?.length ?? 0, ...MUSIC_COPY.playlists })}
       notice={notice}
       onBack={() => router.back()}
       onOpen={({ target }: ShelfCard) => router.push(hrefOf(target))}
