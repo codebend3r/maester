@@ -158,6 +158,7 @@ export const AppRoot = () => {
               <Stack.Screen name={APP_SCREENS.play} />
               <Stack.Screen name={APP_SCREENS.album} />
               <Stack.Screen name={APP_SCREENS.artist} />
+              <Stack.Screen name={APP_SCREENS.playlist} />
               <Stack.Screen name={APP_SCREENS.nowPlaying} />
               <Stack.Screen name={APP_SCREENS.search} />
               <Stack.Screen name={APP_SCREENS.settings} />

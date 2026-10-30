@@ -43,13 +43,13 @@ export const nativePlayerOf = ({ audio, itemOf }: NativePlayerOfProps): Windowed
     next === null ? Promise.resolve(null) : itemOf(next).catch(() => null)
 
   return {
-    load: ({ playing, next }) =>
+    load: ({ playing, next, start }) =>
       enqueue({
         isReplacing: true,
         step: async (isCurrent) => {
           const [item, nextItem] = await Promise.all([itemOf(playing), nextItemOf(next)])
           if (!isCurrent()) return
-          await audio.setWindow({ playing: item, next: nextItem, shouldPlay })
+          await audio.setWindow({ playing: item, next: nextItem, shouldPlay, start })
         },
       }),
     queueNext: (next) =>

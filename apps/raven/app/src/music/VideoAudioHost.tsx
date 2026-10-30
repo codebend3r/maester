@@ -3,9 +3,12 @@ import {
   AUDIO_STATES,
   COULD_NOT_PLAY,
   playingTrackOf,
+  startOf,
+  useAudiobookSpot,
   useAudioQueue,
   useListenCounter,
   usePlayerPrefs,
+  useTrackRate,
 } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
@@ -13,6 +16,7 @@ import { StyleSheet } from 'react-native'
 import Video, { type VideoRef } from 'react-native-video'
 
 import { mediaSourcesFor } from '@/player/mediaSources'
+import { watchAppHide } from '@/player/progressSink'
 import type { AppQueries } from '@/queries/useAppQueries'
 
 /** The cache key a track's ticketed address sits under, with the server and the track. */
@@ -21,10 +25,17 @@ const MUSIC_SOURCE_KEY = 'musicSource'
 /** What a music host reads of the active server. */
 type MusicSession = Pick<AppQueries, 'server' | 'api'>
 
-type VideoTrackProps = { session: MusicSession; track: Track }
+type VideoTrackProps = {
+  session: MusicSession
+  track: Track
+  /** How fast it plays: an audiobook's speed, or 1 for music. */
+  rate: number
+  /** Where it starts: an audiobook's saved spot, or 0. */
+  start: number
+}
 
 /** The playing track in `react-native-video`, out of sight, from its ticketed address. */
-const VideoTrack = ({ session, track }: VideoTrackProps) => {
+const VideoTrack = ({ session, track, rate, start }: VideoTrackProps) => {
   const state = useAudioQueue((store) => store.state)
   const seek = useAudioQueue((store) => store.seek)
   const engine = useAudioQueue((store) => store.engine)
@@ -65,7 +76,10 @@ const VideoTrack = ({ session, track }: VideoTrackProps) => {
       muted={isMuted}
       onEnd={() => engine.ended()}
       onError={() => engine.failed(COULD_NOT_PLAY)}
-      onLoad={() => engine.time({ position: 0, duration: track.duration })}
+      onLoad={() => {
+        if (start > 0) video.current?.seek(start)
+        engine.time({ position: start, duration: track.duration })
+      }}
       onPlaybackStateChanged={({ isPlaying }) =>
         engine.state(isPlaying ? AUDIO_STATES.playing : AUDIO_STATES.paused)
       }
@@ -74,6 +88,7 @@ const VideoTrack = ({ session, track }: VideoTrackProps) => {
       }
       paused={state !== AUDIO_STATES.playing && state !== AUDIO_STATES.loading}
       playInBackground
+      rate={rate}
       source={{ uri: source.data.source.uri, headers: source.data.source.headers }}
       style={styles.hidden}
       volume={volume}
@@ -85,14 +100,18 @@ type VideoAudioHostProps = { session: MusicSession }
 
 /**
  * Music on a TV: `react-native-video` out of sight, following the shared queue store one track
- * at a time. Background play and the lock screen matter little on a TV, so the TVs keep the
- * player they have for video.
+ * at a time, an audiobook at the prefs' speed from its saved spot and music at 1 from its top.
+ * Background play and the lock screen matter little on a TV, so the TVs keep the player they have
+ * for video.
  */
 export const VideoAudioHost = ({ session }: VideoAudioHostProps) => {
   const track = useAudioQueue(playingTrackOf)
+  const rate = useTrackRate({ api: session.api, track })
   useListenCounter({ api: session.api, track })
-  if (track === null) return null
-  return <VideoTrack key={track.id} session={session} track={track} />
+  // A book waits for its spot, so it never starts from the top and saves that over it.
+  const start = startOf(useAudiobookSpot({ api: session.api, track, watchHide: watchAppHide }))
+  if (track === null || start === null) return null
+  return <VideoTrack key={track.id} rate={rate} session={session} start={start} track={track} />
 }
 
 const styles = StyleSheet.create({ hidden: { width: 0, height: 0 } })

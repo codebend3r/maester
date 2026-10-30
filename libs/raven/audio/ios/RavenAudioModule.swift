@@ -32,6 +32,14 @@ public final class RavenAudioModule: Module {
   private var artworkAsked: Int?
   private var isStopped = true
   private var wasPlayingBeforeInterruption = false
+  /// How fast every item plays, 1 as recorded. `AVQueuePlayer` keeps a rate set while it plays
+  /// across the items it advances to, but `play()` alone would start again at 1, so every start
+  /// goes through `startPlaying()`.
+  private var playbackRate: Float = 1
+  /// Where a window opened at a saved spot starts, until its seek lands, so the state events
+  /// before it report that spot rather than 0. The seek waits for the item to be ready to play
+  /// (`watchCurrentItem`): a seek with a completion handler before then raises an exception.
+  private var pendingStart: Double?
 
   public func definition() -> ModuleDefinition {
     Name("RavenAudio")
@@ -48,10 +56,10 @@ public final class RavenAudioModule: Module {
       self.letGo()
     }
 
-    AsyncFunction("setWindow") { (items: [AudioItem], shouldPlay: Bool) in
+    AsyncFunction("setWindow") { (items: [AudioItem], shouldPlay: Bool, start: Double) in
       try self.activateSession()
       if self.remoteTargets.isEmpty { self.takeRemoteCommands() }
-      self.replaceWindow(with: items, shouldPlay: shouldPlay)
+      self.replaceWindow(with: items, shouldPlay: shouldPlay, start: start)
     }.runOnQueue(.main)
 
     AsyncFunction("setNext") { (items: [AudioItem]) in
@@ -61,7 +69,7 @@ public final class RavenAudioModule: Module {
     AsyncFunction("play") {
       try self.activateSession()
       self.isStopped = false
-      self.player.play()
+      self.startPlaying()
       self.showNowPlaying()
     }.runOnQueue(.main)
 
@@ -82,8 +90,19 @@ public final class RavenAudioModule: Module {
       self.player.volume = Float(volume)
     }.runOnQueue(.main)
 
+    AsyncFunction("setRate") { (rate: Double) in
+      self.playbackRate = Float(rate)
+      if #available(iOS 16.0, tvOS 16.0, *) {
+        self.player.defaultRate = self.playbackRate
+      }
+      // A rate set while paused would start the player, so a paused one takes it on its next play.
+      if self.player.rate > 0 { self.player.rate = self.playbackRate }
+      self.showNowPlaying()
+    }.runOnQueue(.main)
+
     AsyncFunction("stop") {
       self.isStopped = true
+      self.pendingStart = nil
       self.player.pause()
       self.player.removeAllItems()
       self.items = []
@@ -102,10 +121,24 @@ public final class RavenAudioModule: Module {
     guard let url = URL(string: item.uri) else { return nil }
     // An undocumented key AVFoundation applies to every request the asset makes.
     let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": item.headers])
-    return AVPlayerItem(asset: asset)
+    let made = AVPlayerItem(asset: asset)
+    // Keeps a voice's pitch at any rate, as an audiobook's speed needs; at 1 it changes nothing.
+    made.audioTimePitchAlgorithm = .timeDomain
+    return made
   }
 
-  private func replaceWindow(with window: [AudioItem], shouldPlay: Bool) {
+  /// Plays at the rate asked for: `defaultRate` where the system has it, else the rate itself,
+  /// which starts the player as `play()` does.
+  private func startPlaying() {
+    if #available(iOS 16.0, tvOS 16.0, *) {
+      player.defaultRate = playbackRate
+      player.play()
+    } else {
+      player.rate = playbackRate
+    }
+  }
+
+  private func replaceWindow(with window: [AudioItem], shouldPlay: Bool, start: Double) {
     player.pause()
     player.removeAllItems()
     items = window.compactMap { item in
@@ -117,9 +150,11 @@ public final class RavenAudioModule: Module {
       return
     }
     items.forEach { player.insert($0.player, after: nil) }
+    // An audiobook opens at its saved spot, sought once the item is ready to play.
+    pendingStart = start > 0 ? start : nil
     watchCurrentItem()
     isStopped = false
-    if shouldPlay { player.play() }
+    if shouldPlay { startPlaying() }
     showNowPlaying()
   }
 
@@ -178,17 +213,41 @@ public final class RavenAudioModule: Module {
       guard !isStopped, wasPlayingBeforeInterruption, options.contains(.shouldResume) else { return }
       wasPlayingBeforeInterruption = false
       try? activateSession()
-      player.play()
+      startPlaying()
     @unknown default:
       return
     }
   }
 
   private func watchCurrentItem() {
-    statusObservation = player.observe(\.currentItem?.status, options: [.new]) { [weak self] player, _ in
-      guard let self, let item = player.currentItem, item.status == .failed else { return }
-      let message = item.error?.localizedDescription ?? "Raven could not play this track."
-      self.sendError(message)
+    statusObservation = player.observe(\.currentItem?.status, options: [.initial, .new]) { [weak self] player, _ in
+      guard let self, let item = player.currentItem else { return }
+      switch item.status {
+      case .failed:
+        let message = item.error?.localizedDescription ?? "Raven could not play this track."
+        self.sendError(message)
+      case .readyToPlay:
+        self.seekToPendingStart(of: item)
+      default:
+        return
+      }
+    }
+  }
+
+  /// Takes a window opened at a saved spot there, once its first item can play. A seek a newer
+  /// window cut short leaves that window's spot alone.
+  private func seekToPendingStart(of item: AVPlayerItem) {
+    guard let start = pendingStart else { return }
+    item.seek(
+      to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero,
+      toleranceAfter: .zero
+    ) { [weak self] _ in
+      DispatchQueue.main.async {
+        guard let self, self.player.currentItem === item else { return }
+        self.pendingStart = nil
+        self.reportState()
+        self.showNowPlaying()
+      }
     }
   }
 
@@ -207,13 +266,18 @@ public final class RavenAudioModule: Module {
     showNowPlaying()
   }
 
+  /// Where the playing item is: the saved spot a window opened at until its seek lands.
+  private var position: Double {
+    pendingStart ?? max(0, player.currentTime().seconds)
+  }
+
   private func reportState() {
     guard !isStopped, let current = player.currentItem else { return }
     let duration = current.duration.isNumeric ? current.duration.seconds : nil
     let known = currentAudioItem?.duration ?? duration
     sendEvent(audioEvent, [
       "type": "state",
-      "position": max(0, player.currentTime().seconds),
+      "position": position,
       "duration": known as Any,
       "isPlaying": player.rate > 0,
       "isBuffering": player.timeControlStatus == .waitingToPlayAtSpecifiedRate,
@@ -238,8 +302,9 @@ public final class RavenAudioModule: Module {
       MPMediaItemPropertyTitle: item.title,
       MPMediaItemPropertyArtist: item.artist,
       MPMediaItemPropertyAlbumTitle: item.album,
-      MPNowPlayingInfoPropertyElapsedPlaybackTime: max(0, player.currentTime().seconds),
+      MPNowPlayingInfoPropertyElapsedPlaybackTime: position,
       MPNowPlayingInfoPropertyPlaybackRate: Double(player.rate),
+      MPNowPlayingInfoPropertyDefaultPlaybackRate: Double(playbackRate),
       MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
     ]
     if let duration = item.duration { info[MPMediaItemPropertyPlaybackDuration] = duration }
