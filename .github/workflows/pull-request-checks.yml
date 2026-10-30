@@ -12,7 +12,10 @@ permissions:
 
 env:
   # Nx Cloud's remote cache: a task any job or earlier run already did, on the same
-  # inputs, restores instead of running. Unset (a fork's PR), Nx caches locally only.
+  # inputs, restores instead of running. Nx Cloud also groups every job's runs in this
+  # workflow run under one CI pipeline execution, linked at the end of each nx command's
+  # output. Not `nx start-ci-run --no-distribution`: Nx Cloud rejects it outside its
+  # Enterprise plan. Unset (a fork's PR), Nx caches locally only and records nothing.
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
   # raven's device app loads babel.config.ts through Node's own type stripping, which
   # needs Node 22.18 or newer, wherever Metro or jest-expo runs.
