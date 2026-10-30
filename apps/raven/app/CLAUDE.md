@@ -143,7 +143,7 @@ The jest config in `package.json` also lets Babel through `node_modules/.bun`, a
 
 - Two tsconfigs, and `typecheck` runs both. `tsconfig.json` checks the app (`src/`, `app/`, `index.ts`) with React Native's types only, so a Node or Bun global in screen code fails the typecheck. `tsconfig.node.json` checks what runs under Node or Bun: the three configs and the bun tests (`src/**/*.test.ts`), with Bun's types. The render tests stay in `tsconfig.json`, since they import their globals from `@jest/globals`.
 - `app.config.ts`, `metro.config.ts` and `babel.config.ts` are the only configs; there is no JavaScript file. Expo loads `app.config.ts` and `metro.config.ts` with its own require hook, which transpiles them with `typescript`. Babel loads `babel.config.ts` through Node's own type stripping, so Metro and jest need Node 22.18 or newer.
-- Expo's hook reads no tsconfig `paths`, and Node adds no `.ts`, so `app.config.ts` imports `./src/config/buildNumber.ts` and `./src/config/appVariant.ts` by relative path and extension. That one file is exempt from the `@/` rule in `.oxlintrc.json`.
+- Expo's hook reads no tsconfig `paths`, and Node adds no `.ts`, so `app.config.ts` imports `./src/config/tvPrebuild.ts` and the other modules it shares with the app by relative path and extension. That one file is exempt from the `@/` rule in `.oxlintrc.json`. The build number and the variant come from `@raven/native/headless` (`buildNumberOf`, `isDevelopmentVariant`, `BUILD_ENV`), which Wren's config reads too.
 - `version` comes from `package.json`, which `scripts/bump_version.sh` bumps with the rest. `ios.buildNumber` and `android.versionCode` come from `GITHUB_RUN_NUMBER`, and are `1` on a local build.
 
 ## Toolchain

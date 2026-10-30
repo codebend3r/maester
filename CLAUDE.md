@@ -152,6 +152,7 @@ Shared tool config lives at the root, so every project lints and compiles by the
 | `@raven/native`   | `libs/raven/native`   | Sign-in and media access on React Native, shared by the device app and Wren: session, cookies, tickets         |
 | `@raven/desktop`  | `apps/raven/desktop`  | Raven: Electron 44 and Forge, serving `@raven/web`, libmpv through `@raven/mpv`, Playwright e2e                |
 | `@raven/app`      | `apps/raven/app`      | raven on iPhone, iPad, Apple TV and Android TV: Expo 58 on react-native-tvos, expo-router, jest-expo           |
+| `@raven/music`    | `apps/raven/music`    | Wren, raven's music app for iPhone, iPad and Android phones: Expo 58 on react-native-tvos, expo-router         |
 | `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest                                     |
 | `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom                                       |
 | `@luwin/web`      | `apps/luwin/web`      | luwin's chat page, and the sandbox for testing its answers: React 19, Vite 8, TanStack Query, zustand          |

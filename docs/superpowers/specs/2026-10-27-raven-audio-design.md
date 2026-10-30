@@ -278,7 +278,7 @@ A new raven client, `@raven/music` in `apps/raven/music`, with the same server, 
 
 #### What it needs from the server beyond section 5
 
-- Transcodes for offline and cellular (AAC 256 or Opus 160), cached per track and bitrate on the server so a second download is free.
+- Transcodes for offline and cellular (AAC at 128, 256 or 320 kbps), cached per track and bitrate on the server so a second download is free.
 - Loudness: compute EBU R128 track and album gain with ffmpeg's `ebur128` filter for files without ReplayGain tags, once, in the background.
 - History and mix routes: `GET /api/music/mixes`, `GET /api/music/radio?seed=...`, built from plays and ListenBrainz similarity at first.
 - Scrobble forwarding to ListenBrainz and Last.fm with per-account tokens (stored server-side, never logged, like every other secret).

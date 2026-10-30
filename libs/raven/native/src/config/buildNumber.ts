@@ -1,7 +1,7 @@
+/** What each app's `app.config.ts` reads from the environment at prebuild. */
 export const BUILD_ENV = {
   runNumber: 'GITHUB_RUN_NUMBER',
   appVariant: 'APP_VARIANT',
-  tv: 'EXPO_TV',
 } as const
 
 type BuildNumberOfProps = { runNumber: string | undefined }

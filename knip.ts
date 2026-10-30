@@ -20,6 +20,13 @@ export default {
       // off; the app ships no over-the-air updates and does not install it.
       ignoreDependencies: ['expo-updates'],
     },
+    'apps/raven/music': {
+      // Wren, read as the app is: its routes by path, the binaries the Mac installs, and no
+      // over-the-air updates.
+      entry: ['app/**/*.tsx'],
+      ignoreBinaries: ['watchman', 'maestro'],
+      ignoreDependencies: ['expo-updates'],
+    },
     'apps/raven/desktop': {
       // Electron's main and preload bundles and the Forge config are entry
       // points no import names.

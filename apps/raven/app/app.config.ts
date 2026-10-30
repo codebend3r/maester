@@ -1,4 +1,5 @@
 import { DEFAULT_THEME } from '@raven/core'
+import { BUILD_ENV, buildNumberOf, isDevelopmentVariant } from '@raven/native/headless'
 import { themeTokens } from '@raven/ui/designTokens'
 import type { ConfigContext, ExpoConfig } from 'expo/config'
 import { type ConfigPlugin, withAndroidManifest } from 'expo/config-plugins'
@@ -7,9 +8,7 @@ import packageJson from '#package'
 // Expo loads this file with its own require hook, which reads no tsconfig
 // `paths`, and Node's resolver adds no `.ts`, so the modules it shares with
 // the app come in by their relative path and extension.
-import { isDevelopmentVariant } from './src/config/appVariant.ts'
-import { BUILD_ENV, buildNumberOf } from './src/config/buildNumber.ts'
-import { isTvPrebuild } from './src/config/tvPrebuild.ts'
+import { TV_ENV, isTvPrebuild } from './src/config/tvPrebuild.ts'
 import { PALETTE_TOKENS } from './src/theme/tokenNames.ts'
 import { withAndroidFonts } from './plugins/withAndroidFonts.ts'
 import { withTvBannerDensities } from './plugins/withTvBannerDensities.ts'
@@ -19,7 +18,7 @@ const APP_ID = 'io.github.codebend3r.raven.app'
 
 const buildNumber = buildNumberOf({ runNumber: process.env[BUILD_ENV.runNumber] })
 const isDevelopment = isDevelopmentVariant({ variant: process.env[BUILD_ENV.appVariant] })
-const isTv = isTvPrebuild({ value: process.env[BUILD_ENV.tv] })
+const isTv = isTvPrebuild({ value: process.env[TV_ENV.tv] })
 
 const LOCAL_NETWORK_USE = 'raven reaches your raven server on your local network.'
 
