@@ -25,7 +25,8 @@
     'cover'
     'words'
     'scrubber'
-    'controls';
+    'controls'
+    'book';
   justify-content: center;
   gap: var(--space-4);
   text-align: center;
@@ -107,6 +108,30 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+}
+
+// An audiobook's chapter skips and speed, in a run under the transport.
+.book {
+  grid-area: book;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.speed {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.extras {
+  display: grid;
+  gap: var(--space-3);
 }
 
 .queue {

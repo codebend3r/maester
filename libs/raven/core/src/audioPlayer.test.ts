@@ -24,6 +24,7 @@ describe('isAudioCommand', () => {
       { type: AUDIO_COMMANDS.pause },
       { type: AUDIO_COMMANDS.seek, time: 3 },
       { type: AUDIO_COMMANDS.volume, volume: 0.5, muted: false },
+      { type: AUDIO_COMMANDS.speed, rate: 1.5 },
       { type: AUDIO_COMMANDS.nowPlaying, info: INFO },
       { type: AUDIO_COMMANDS.nowPlaying, info: { ...INFO, artwork: new ArrayBuffer(8) } },
       { type: AUDIO_COMMANDS.stop },
@@ -36,6 +37,7 @@ describe('isAudioCommand', () => {
       { type: AUDIO_COMMANDS.load, mediaId: 0, next: null, start: 0 },
       { type: AUDIO_COMMANDS.load, mediaId: '7', next: null, start: 0 },
       { type: AUDIO_COMMANDS.queueNext, next: -1 },
+      { type: AUDIO_COMMANDS.speed, rate: '1.5' },
       { type: AUDIO_COMMANDS.nowPlaying, info: { ...INFO, artwork: 'bytes' } },
       {
         type: AUDIO_COMMANDS.nowPlaying,

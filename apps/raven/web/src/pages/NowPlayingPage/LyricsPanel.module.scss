@@ -1,0 +1,53 @@
+// Lines in a box of their own, which scrolls; the box is where each line's offset is measured from.
+.synced {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  max-block-size: 22rem;
+  overflow-y: auto;
+  list-style: none;
+  padding: var(--space-4) var(--space-2);
+  color: var(--color-lichen);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-tight);
+  text-align: center;
+
+  @media (prefers-reduced-motion: no-preference) {
+    scroll-behavior: smooth;
+  }
+}
+
+.line {
+  overflow-wrap: anywhere;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: color 200ms var(--ease-out);
+  }
+}
+
+.active {
+  color: var(--color-bark);
+  font-weight: 600;
+}
+
+.plain {
+  max-block-size: 22rem;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--color-bark);
+  line-height: var(--line-body);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  text-align: center;
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+.quiet {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}

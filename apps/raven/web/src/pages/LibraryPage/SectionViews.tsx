@@ -52,7 +52,7 @@ import {
   unmatchedQuery,
 } from '@/lib/queries'
 import { LibraryListing, LibraryListingSkeleton } from '@/pages/LibraryPage/LibraryViews'
-import { AlbumsSection, ArtistsSection } from '@/pages/LibraryPage/MusicSections'
+import { AlbumsSection, ArtistsSection, PlaylistsSection } from '@/pages/LibraryPage/MusicSections'
 import { SelectableCards } from '@/pages/LibraryPage/SelectableCards'
 import {
   LISTING_STATES,
@@ -476,6 +476,7 @@ const SECTION_VIEWS = {
   all: AllSection,
   albums: AlbumsSection,
   artists: ArtistsSection,
+  playlists: PlaylistsSection,
   'in-progress': InProgressSection,
   favourites: FavouritesSection,
   sagas: SagasSection,

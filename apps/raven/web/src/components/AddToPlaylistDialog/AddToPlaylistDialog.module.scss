@@ -1,0 +1,141 @@
+.dialog {
+  width: min(var(--measure), calc(100vw - 2 * var(--space-3)));
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+  color: var(--color-bark);
+  box-shadow: var(--shadow-popover);
+
+  &::backdrop {
+    background: var(--color-scrim);
+  }
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.what {
+  overflow-wrap: anywhere;
+  color: var(--color-lichen);
+}
+
+.hint {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+// A playlist a row: its name and how much it holds, the whole row the button.
+.playlists {
+  display: grid;
+  gap: var(--space-0);
+  max-block-size: 18rem;
+  overflow-y: auto;
+  list-style: none;
+  padding: 0;
+}
+
+.playlist {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'name facts';
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--color-night-haze);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+
+  &:disabled {
+    cursor: progress;
+  }
+}
+
+.name {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.facts {
+  grid-area: facts;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+// The new playlist's name and its button in a row, the button under it on a narrow screen.
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'label label'
+    'input make';
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+@media (max-width: 30rem) {
+  .form {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'label'
+      'input'
+      'make';
+  }
+}
+
+.label {
+  grid-area: label;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.input {
+  grid-area: input;
+  inline-size: 100%;
+  background-color: var(--color-deep);
+}
+
+.make {
+  grid-area: make;
+}
+
+.error {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-leaf-bright);
+  background: var(--color-night);
+  font-size: var(--font-size-sm);
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: end;
+  gap: var(--space-1);
+}

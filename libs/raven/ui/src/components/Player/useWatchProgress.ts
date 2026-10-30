@@ -1,14 +1,8 @@
 import type { RefObject } from 'react'
 import { useHostServices } from '@/stores/playerServices'
-import { type WatchHide, useProgressReport } from '@/components/Player/useProgressReport'
+import { useProgressReport } from '@/components/Player/useProgressReport'
 import type { VideoState } from '@/components/Player/videoState'
-
-const PAGE_EVENTS = { hide: 'pagehide' } as const
-
-const watchPageHide: WatchHide = (save) => {
-  window.addEventListener(PAGE_EVENTS.hide, save)
-  return () => window.removeEventListener(PAGE_EVENTS.hide, save)
-}
+import { watchPageHide } from '@/components/Player/watchPageHide'
 
 type UseWatchProgressProps = {
   state: VideoState

@@ -486,6 +486,11 @@ public:
         auto playing = value.Get("isPlaying");
         if (!playing.IsBoolean()) throw Napi::TypeError::New(info.Env(), "Expected isPlaying");
         parsed.isPlaying = playing.As<Napi::Boolean>().Value();
+        // Optional, so a page from before the field still shows; 0 or less means normal speed.
+        if (value.Has("rate")) {
+            double rate = number("rate");
+            parsed.rate = rate > 0 ? rate : 1.0;
+        }
         auto artwork = value.Get("artwork");
         if (artwork.IsBuffer()) {
             auto buffer = artwork.As<Napi::Buffer<uint8_t>>();

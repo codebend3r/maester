@@ -9,11 +9,14 @@ import {
 import { Button } from '@raven/ui'
 import { type Search, useAudioQueue } from '@raven/ui/headless'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
+import { ArtistList } from '@/components/ArtistList/ArtistList'
+import { PlaylistNameDialog } from '@/components/PlaylistNameDialog/PlaylistNameDialog'
 import { SearchField } from '@/components/SearchField/SearchField'
-import { artistPath, libraryTracks } from '@/lib/music'
-import { albumsQuery, artistsQuery } from '@/lib/queries'
+import { libraryTracks, playlistFacts, playlistPath } from '@/lib/music'
+import { albumsQuery, artistsQuery, playlistsQuery } from '@/lib/queries'
+import { usePlaylistMutations } from '@/lib/usePlaylistMutations'
 import { useAddressSearch } from '@/lib/useSearch'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
@@ -155,19 +158,67 @@ export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
         <p className={styles.message}>No artists in {library.name} yet.</p>
       )}
       {artists.data && artists.data.length > 0 && (
-        <ul className={styles.artists} aria-label="Artists">
-          {artists.data.map((artist) => (
-            <li key={artist.id} className={styles.artist}>
-              <Link to={artistPath(artist.id)} className={styles.artistName}>
-                {artist.name}
+        <ArtistList artists={artists.data} label="Artists" />
+      )}
+    </div>
+  )
+}
+
+/**
+ * The account's own playlists, the same on every music library's tab as
+ * they span them all, most recently changed first, and New playlist, which
+ * opens the one it makes.
+ */
+export const PlaylistsSection = () => {
+  const navigate = useNavigate()
+  const playlists = useQuery(playlistsQuery)
+  const { create } = usePlaylistMutations()
+  const [isNaming, setNaming] = useState(false)
+  return (
+    <div className={styles.section}>
+      <div className={styles.playlistsToolbar}>
+        <Button tone="primary" icon="plus" onClick={() => setNaming(true)}>
+          New playlist
+        </Button>
+      </div>
+      {playlists.error && (
+        <p className={styles.message} role="alert">
+          {playlists.error.message}
+        </p>
+      )}
+      {playlists.data && playlists.data.length === 0 && (
+        <p className={styles.message}>
+          No playlists yet. Make one here, or add tracks to a new one from an album.
+        </p>
+      )}
+      {playlists.data && playlists.data.length > 0 && (
+        <ul className={styles.playlists} aria-label="Playlists">
+          {playlists.data.map((playlist) => (
+            <li key={playlist.id} className={styles.playlist}>
+              <Link to={playlistPath(playlist.id)} className={styles.playlistName}>
+                {playlist.name}
               </Link>
-              <span className={styles.artistCount}>
-                {artist.albumCount} {artist.albumCount === 1 ? 'album' : 'albums'} ·{' '}
-                {artist.trackCount} {artist.trackCount === 1 ? 'track' : 'tracks'}
+              <span className={styles.playlistFacts}>
+                {playlistFacts({ playlist }).join(' · ')}
               </span>
             </li>
           ))}
         </ul>
+      )}
+      {isNaming && (
+        <PlaylistNameDialog
+          title="New playlist"
+          initialName=""
+          submitLabel="Make playlist"
+          isPending={create.isPending}
+          error={create.error}
+          onSubmit={(name) =>
+            create.mutate(name, {
+              onSuccess: (details) => void navigate(playlistPath(details.playlist.id)),
+            })
+          }
+          onClose={() => setNaming(false)}
+        />
       )}
     </div>
   )

@@ -108,13 +108,16 @@ export const queryKeys = {
   allMedia: ['media'],
   mediaItem: (id: number | null) => ['media', id],
   /** A video's intro, credits and chapters, for the player. */
-  markers: (id: number) => ['media', id, 'markers'],
+  markers: (id: number | null) => ['media', id, 'markers'],
   /** Where a video's file lives, for its menu. */
   mediaLocation: (id: number) => ['media', id, 'location'],
   /** What plays after a video in a session, under the video's key so reading it again reads this again too. */
   nextInSession: ({ id, session }: QueryKeysNextInSessionProps) => ['media', id, 'next', session],
   favourites: ['favourites'],
   favouriteTitles: ['favourites', 'titles'],
+  /** The account's favourite albums and artists, under the favourites so whatever reads them again reads these too. */
+  favouriteAlbums: ['favourites', 'albums'],
+  favouriteArtists: ['favourites', 'artists'],
   /** What is in progress and each pinned library's newest arrivals. */
   home: ['home'],
   /** A search from home, under home's key so whatever reads home again reads it again too. */
@@ -183,6 +186,12 @@ export const queryKeys = {
   music: ['music'],
   album: (id: number | null) => ['music', 'albums', id],
   artist: (id: number | null) => ['music', 'artists', id],
+  /** A track's lyrics, under the music's prefix so a scan reads them again. */
+  lyrics: (id: number | null) => ['music', 'tracks', id, 'lyrics'],
+  /** The account's playlists, and each one's page under the same prefix. */
+  playlists: ['playlists'],
+  playlistList: ['playlists', 'list'],
+  playlist: (id: number | null) => ['playlists', id],
   albumMatchSearch: ({ albumId, query }: QueryKeysAlbumMatchSearchProps) => [
     'music',
     'albums',
@@ -212,6 +221,10 @@ export const mutationKeys = {
   favourite: ['favourite'],
   /** Any show's or season's favourite: they all show on Favourites. */
   itemFavourite: ['item-favourite'],
+  /** Any album's or artist's favourite: they all show in the same favourites. */
+  musicFavourite: ['music-favourite'],
+  /** Any rename or change of order of a playlist: the whole order is sent each time, so answers keep their order. */
+  playlist: ['playlist'],
   /** Any mark as watched or unwatched: marks and their answers keep their order. */
   watched: ['watched'],
   /** Any library's pin: they all show in the libraries list and on home. */

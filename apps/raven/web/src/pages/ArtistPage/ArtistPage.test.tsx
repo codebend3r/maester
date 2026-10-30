@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import type { ArtistDetails } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { ArtistPage } from '@/pages/ArtistPage/ArtistPage'
@@ -46,5 +47,19 @@ describe('ArtistPage', () => {
     spyOn(api, 'getArtist').mockResolvedValue(artistDetails({ albums: [], appearsOn: [] }))
     renderPage()
     expect(await screen.findByText(/No albums of Radiohead's/)).toBeTruthy()
+  })
+
+  it('unmarks a favourite artist before the server answers', async () => {
+    spyOn(api, 'getArtist').mockResolvedValue(artistDetails({ isFavourite: true }))
+    const answer = Promise.withResolvers<ArtistDetails>()
+    const mark = spyOn(api, 'setArtistFavourite').mockImplementation(() => answer.promise)
+    renderPage()
+    await screen.findByRole('heading', { level: 1, name: 'Radiohead' })
+    const heart = screen.getByRole('button', { name: 'Favourite' })
+    expect(heart).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(heart)
+    await waitFor(() => expect(heart).toHaveAttribute('aria-pressed', 'false'))
+    expect(mark).toHaveBeenCalledWith({ artistId: 1, favourite: false })
+    answer.resolve(artistDetails({ isFavourite: false }))
   })
 })

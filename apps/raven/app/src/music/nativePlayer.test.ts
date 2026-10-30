@@ -83,9 +83,9 @@ const harness = ({ held = [], refused = [] }: HarnessProps = {}) => {
 describe('nativePlayerOf', () => {
   it('drops a load the queue moved past while its ticket was on its way', async () => {
     const { calls, player, release } = harness({ held: [1] })
-    const first = player.load({ playing: track(1), next: track(2) })
+    const first = player.load({ playing: track(1), next: track(2), start: 0 })
     await tick()
-    const second = player.load({ playing: track(3), next: null })
+    const second = player.load({ playing: track(3), next: null, start: 0 })
     await release()
     await Promise.all([first, second])
     expect(calls).toEqual(['window 3 - playing'])
@@ -93,7 +93,7 @@ describe('nativePlayerOf', () => {
 
   it('changes the next track only after the window it follows is in place', async () => {
     const { calls, player, release } = harness({ held: [1] })
-    const load = player.load({ playing: track(1), next: track(2) })
+    const load = player.load({ playing: track(1), next: track(2), start: 0 })
     const next = player.queueNext(track(3))
     await release()
     await Promise.all([load, next])
@@ -103,16 +103,16 @@ describe('nativePlayerOf', () => {
   it('opens the window paused when the queue was paused, and says why a ticket was refused', async () => {
     const { calls, player } = harness({ refused: [5] })
     await player.setPlaying({ shouldPlay: false })
-    await player.load({ playing: track(1), next: track(5) })
+    await player.load({ playing: track(1), next: track(5), start: 0 })
     expect(calls).toEqual(['window 1 - paused'])
-    await expect(player.load({ playing: track(5), next: null })).rejects.toThrow(
+    await expect(player.load({ playing: track(5), next: null, start: 0 })).rejects.toThrow(
       'Sign in to the server again.',
     )
   })
 
   it('lets a stop overtake a load still waiting for its ticket', async () => {
     const { calls, player, release } = harness({ held: [1] })
-    const load = player.load({ playing: track(1), next: null })
+    const load = player.load({ playing: track(1), next: null, start: 0 })
     await tick()
     const stop = player.stop()
     await release()

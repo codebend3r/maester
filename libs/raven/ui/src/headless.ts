@@ -25,10 +25,12 @@ export type {
   TrackChoice,
 } from '@/components/Player/PlayerServices'
 export {
+  AUDIOBOOK_SPEEDS,
   AUTOPLAY_COUNTDOWN_SECONDS,
   CONTROLS_LINGER_SECONDS,
   usePlayerPrefs,
 } from '@/stores/playerPrefs'
+export type { AudiobookSpeed } from '@/stores/playerPrefs'
 export { configureStorage } from '@/stores/configureStorage'
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
@@ -51,7 +53,9 @@ export {
   afterLibraryView,
   afterMatch,
   afterMatchingPass,
+  afterMusicFavourites,
   afterPins,
+  afterPlaylists,
   afterReconnect,
   afterRematch,
   afterRescan,
@@ -63,10 +67,14 @@ export {
 export { edit, editAll, useOptimisticMutation } from '@/query/optimistic'
 export type { Edit } from '@/query/optimistic'
 export {
+  albumFavouriteEdits,
+  artistFavouriteEdits,
   favouriteEdits,
   itemFavouriteEdits,
   libraryOrderEdits,
   librarySettingsEdits,
+  playlistRenameEdits,
+  playlistTracksEdits,
   watchedEdits,
   withoutEntry,
 } from '@/query/edits'
@@ -74,6 +82,15 @@ export { HISTORY_SHOWS, ravenQueriesFor } from '@/query/ravenQueries'
 export type { HistoryShow, RavenQueries } from '@/query/ravenQueries'
 export { itemFavouriteFor, useServerItemFavourite } from '@/query/useItemFavourite'
 export { mediaMutationsFor, useServerMediaMutations } from '@/query/useMediaMutations'
+export {
+  musicFavouritesFor,
+  useServerAlbumFavourite,
+  useServerArtistFavourite,
+} from '@/query/useMusicFavourite'
+export { playlistMutationsFor, useServerPlaylistMutations } from '@/query/usePlaylistMutations'
+export { useAudiobookChapters, useIsAudiobook, useTrackRate } from '@/query/useAudiobook'
+export { activeLineAt } from '@/lib/lyrics'
+export { chapterAt, nextChapterStart, previousChapterStart } from '@/lib/chapters'
 export { usePlaybackPolicy } from '@/query/usePlaybackPolicy'
 export {
   EVENTS_RETRY_MS,
@@ -90,6 +107,7 @@ export { useUnlockPrompt } from '@/stores/unlockPrompt'
 export { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
 export type { AudioState } from '@/stores/audioQueue'
 export { useListenCounter } from '@/components/AudioHost/useListenCounter'
+export { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
 export {
   COULD_NOT_PLAY,
   failureOf,

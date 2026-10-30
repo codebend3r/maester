@@ -17,6 +17,7 @@ import { Platform } from 'react-native'
 import { VideoAudioHost } from '@/music/VideoAudioHost'
 import { nativePlayerOf } from '@/music/nativePlayer'
 import { mediaSourcesFor } from '@/player/mediaSources'
+import { watchAppHide } from '@/player/progressSink'
 import type { AppQueries } from '@/queries/useAppQueries'
 
 /** What a music host reads of the active server. */
@@ -65,7 +66,7 @@ const NativeAudioHost = ({ session: { server, api } }: NativeAudioHostProps) => 
       }),
     [server, api],
   )
-  const host = useWindowedAudioHost({ api, player })
+  const host = useWindowedAudioHost({ api, player, watchHide: watchAppHide })
 
   const onEvent = useEffectEvent((event: AudioPlayerEvent) => {
     switch (event.type) {

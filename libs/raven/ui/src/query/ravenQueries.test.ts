@@ -8,7 +8,10 @@ import {
 import { type ApiClient, ITEM_TYPES, MATCH_SUBJECT_KINDS, MEDIA_SORTS } from '@raven/core'
 import { queryKeys } from '@/query/queryClient'
 import { HISTORY_SHOWS, type RavenQueries, ravenQueriesFor } from '@/query/ravenQueries'
+import { useQuery } from '@tanstack/react-query'
+import { waitFor } from '@testing-library/react'
 import { itemDetails } from '@/test/fixtures'
+import { renderQueryHook } from '@/test/renderQueryHook'
 import { recordingApi } from '@/test/recordingApi'
 
 /** The addresses a run asks the server for, whether or not the answer passes its guard. */
@@ -151,6 +154,36 @@ const QUERIES = [
     key: queryKeys.favouriteTitles,
     pick: (queries) => queries.favouriteTitlesQuery,
     call: (api) => api.listFavouriteTitles(),
+  }),
+  asking({
+    name: 'favouriteAlbumsQuery',
+    key: queryKeys.favouriteAlbums,
+    pick: (queries) => queries.favouriteAlbumsQuery,
+    call: (api) => api.listFavouriteAlbums(),
+  }),
+  asking({
+    name: 'favouriteArtistsQuery',
+    key: queryKeys.favouriteArtists,
+    pick: (queries) => queries.favouriteArtistsQuery,
+    call: (api) => api.listFavouriteArtists(),
+  }),
+  asking({
+    name: 'playlistsQuery',
+    key: queryKeys.playlistList,
+    pick: (queries) => queries.playlistsQuery,
+    call: (api) => api.listPlaylists(),
+  }),
+  asking({
+    name: 'playlistQuery',
+    key: queryKeys.playlist(5),
+    pick: (queries) => queries.playlistQuery(5),
+    call: (api) => api.getPlaylist(5),
+  }),
+  asking({
+    name: 'lyricsQuery',
+    key: queryKeys.lyrics(101),
+    pick: (queries) => queries.lyricsQuery(101),
+    call: (api) => api.getLyrics(101),
   }),
   asking({
     name: 'homeQuery',
@@ -330,6 +363,16 @@ const WAITING = [
     pick: (queries) => queries.matchSearchQuery({ ...MATCH, query: '' }),
   }),
   waiting({
+    name: 'playlistQuery',
+    key: queryKeys.playlist(null),
+    pick: (queries) => queries.playlistQuery(null),
+  }),
+  waiting({
+    name: 'lyricsQuery',
+    key: queryKeys.lyrics(null),
+    pick: (queries) => queries.lyricsQuery(null),
+  }),
+  waiting({
     name: 'accountQuery',
     key: queryKeys.account(null),
     pick: (queries) => queries.accountQuery(null),
@@ -356,6 +399,19 @@ describe('ravenQueriesFor', () => {
       expect(asked).toEqual(await requested(call))
     }),
   )
+
+  it("reads an audiobook's chapters from its markers, under their key, and asks nothing for no track", async () => {
+    const chapters = [{ start: 0, end: 60, title: 'Opening' }]
+    const { api, calls } = recordingApi({ body: { intro: null, credits: null, chapters } })
+    const query = ravenQueriesFor(api).chaptersQuery(7)
+    expect(queryKeys.markers(7)).toEqual(query.queryKey)
+    const cache = new QueryClient()
+    const { result } = renderQueryHook({ client: cache, hook: () => useQuery(query) })
+    await waitFor(() => expect(result.current.data).toEqual(chapters))
+    expect(calls.map(({ url }) => url)).toEqual(['/api/media/7/markers'])
+    expect(ravenQueriesFor(api).chaptersQuery(null).queryFn).toBe(skipToken)
+    cache.clear()
+  })
 
   WAITING.forEach(({ name, key, keyOf, queryFnOf }) =>
     it(`${name} asks for nothing while it waits`, () => {
