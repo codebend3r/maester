@@ -1,6 +1,5 @@
-import { PLAYER_ERROR_REASONS, PLAYER_EVENTS } from '@raven/core'
-import { ENGINE_MESSAGES, ENGINE_STATUSES, type OpenedEngine } from '@/main/player/engine'
-import type { PlayerService } from '@/main/player/playerService'
+import { type AudioEvent, isEngineStopEvent, type PlayerEvent } from '@raven/core'
+import { ENGINE_STATUSES, type EngineWords, type OpenedEngine } from '@/main/player/engine'
 import { messageOf } from '@/shared/messageOf'
 
 /** An engine's status once it opened is the slot's state too. */
@@ -14,13 +13,14 @@ const SLOT_STATES = {
 } as const
 type SlotState = (typeof SLOT_STATES)[keyof typeof SLOT_STATES]
 
-const UNAVAILABLE = {
-  status: ENGINE_STATUSES.unavailable,
-  message: ENGINE_MESSAGES.unavailable,
-} as const satisfies OpenedEngine<never>
+/** What a watched service shows the slot: its events, and whether its mpv already stopped. */
+export type WatchedService<E extends PlayerEvent | AudioEvent> = {
+  subscribe: (listener: (event: E) => void) => () => void
+  isDead: () => boolean
+}
 
-type WatchServiceProps = {
-  engine: { service: Pick<PlayerService, 'subscribe' | 'isDead'> }
+type WatchServiceProps<E extends PlayerEvent | AudioEvent> = {
+  engine: { service: WatchedService<E> }
   onDied: () => void
 }
 
@@ -28,9 +28,12 @@ type WatchServiceProps = {
  * Tells `onDied` when the service's mpv stops for good, including a stop that came before
  * this was asked to watch.
  */
-export const watchService = ({ engine, onDied }: WatchServiceProps): void => {
+export const watchService = <E extends PlayerEvent | AudioEvent>({
+  engine,
+  onDied,
+}: WatchServiceProps<E>): void => {
   engine.service.subscribe((event) => {
-    if (event.type === PLAYER_EVENTS.error && event.reason === PLAYER_ERROR_REASONS.engine) onDied()
+    if (isEngineStopEvent(event)) onDied()
   })
   if (engine.service.isDead()) onDied()
 }
@@ -41,6 +44,7 @@ type CreateEngineSlotProps<T> = {
   open: () => Promise<OpenedEngine<T>>
   destroyOf: (engine: T) => Promise<void>
   watch: (input: WatchProps<T>) => void
+  words: EngineWords
   warn: (message: string) => void
 }
 
@@ -50,7 +54,17 @@ type CreateEngineSlotProps<T> = {
  * and until its destroy settles, so a close or quit in that time still waits for mpv to
  * stop. Once `watch` reports it died, a page that asks is told to use the html engine.
  */
-export const createEngineSlot = <T>({ open, destroyOf, watch, warn }: CreateEngineSlotProps<T>) => {
+export const createEngineSlot = <T>({
+  open,
+  destroyOf,
+  watch,
+  words,
+  warn,
+}: CreateEngineSlotProps<T>) => {
+  const UNAVAILABLE = {
+    status: ENGINE_STATUSES.unavailable,
+    message: words.unavailable,
+  } as const satisfies OpenedEngine<never>
   let state: SlotState = SLOT_STATES.idle
   let engine: T | null = null
   let opened: Promise<OpenedEngine<T>> | null = null
@@ -72,7 +86,7 @@ export const createEngineSlot = <T>({ open, destroyOf, watch, warn }: CreateEngi
     const raw = Promise.resolve()
       .then(() => (state === SLOT_STATES.opening ? open() : UNAVAILABLE))
       .catch((error: unknown): OpenedEngine<T> => {
-        warn(`Raven could not open its video engine: ${messageOf(error)}`)
+        warn(`Raven could not open its ${words.name}: ${messageOf(error)}`)
         return UNAVAILABLE
       })
     opened = raw
@@ -85,7 +99,7 @@ export const createEngineSlot = <T>({ open, destroyOf, watch, warn }: CreateEngi
       try {
         watch({ engine: result.engine, onDied: died })
       } catch (error) {
-        warn(`Raven could not watch its video engine: ${messageOf(error)}`)
+        warn(`Raven could not watch its ${words.name}: ${messageOf(error)}`)
       }
       return isDead() ? UNAVAILABLE : result
     })

@@ -19,7 +19,7 @@ import { parseJson } from '@/main/parseJson'
 import {
   type AccountRefusalReader,
   type FailureExplainer,
-  type ResolvedSource,
+  type ResolvedServerSource,
   type ServerTarget,
 } from '@/main/player/loadTarget'
 import { PLAYER_PHASES } from '@/main/player/phases'
@@ -134,11 +134,15 @@ export const startRefusalOf = ({
 const accountRefusalIn = (result: ServerCallResult): AuthRefusal['reason'] | null =>
   result.ok ? refusalAt({ ...result, statuses: ACCOUNT_REFUSAL_STATUSES }) : null
 
+/** What a source plays: a video, with the server's subtitle sidecars, or music, which has none. */
+export const SOURCE_KINDS = { video: 'video', music: 'music' } as const
+
 type CreateServerSourcesProps = {
   serverOf: (serverId: string) => ServerEntry | null
   calls: Pick<ServerCalls, 'call'>
   tickets: Pick<AccountTickets, 'ticketFor'>
   relay: Pick<MediaRelay, 'open' | 'refusalOf' | 'close'>
+  kind: (typeof SOURCE_KINDS)[keyof typeof SOURCE_KINDS]
   warn: (message: string) => void
 }
 
@@ -153,9 +157,10 @@ export const createServerSources = ({
   calls,
   tickets,
   relay,
+  kind,
   warn,
 }: CreateServerSourcesProps): {
-  resolve: (source: ServerSource) => Promise<ResolvedSource>
+  resolve: (source: ServerSource) => Promise<ResolvedServerSource>
   explain: FailureExplainer
   refusedAccount: AccountRefusalReader
 } => {
@@ -213,7 +218,7 @@ export const createServerSources = ({
     server,
     mediaId,
     trackList,
-  }: ResolveRelayedProps): Promise<ResolvedSource> => {
+  }: ResolveRelayedProps): Promise<ResolvedServerSource> => {
     // The first ticket before anything opens: a title the account may not play is refused here.
     const [tracks, first] = await Promise.all([
       trackList,
@@ -248,14 +253,16 @@ export const createServerSources = ({
     }
   }
 
-  const resolve = async ({ serverId, mediaId }: ServerSource): Promise<ResolvedSource> => {
+  const resolve = async ({ serverId, mediaId }: ServerSource): Promise<ResolvedServerSource> => {
     if (!isOpaqueId(serverId) || !isMediaId(mediaId)) {
       return { ok: false, message: SOURCE_MESSAGES.badTitle }
     }
     const server = serverOf(serverId)
     if (server === null) return { ok: false, message: SOURCE_MESSAGES.unknownServer }
-    // Read while the first ticket is minted: the title wants its sidecars either way.
-    return resolveRelayed({ server, mediaId, trackList: trackListOf({ server, mediaId }) })
+    // Read while the first ticket is minted: a video wants its sidecars either way.
+    const trackList =
+      kind === SOURCE_KINDS.music ? Promise.resolve([]) : trackListOf({ server, mediaId })
+    return resolveRelayed({ server, mediaId, trackList })
   }
 
   /**

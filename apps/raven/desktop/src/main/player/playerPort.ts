@@ -1,12 +1,12 @@
 import {
+  type Guard,
   type Infer,
   isNumber,
   isPlayerReply,
-  isPlayerRequest,
   PLAYER_REFUSAL_REASONS,
 } from '@raven/core'
+import type { PlayerOutcome } from '@/main/player/outcomes'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
-import type { PlayerService } from '@/main/player/playerService'
 import { messageOf } from '@/shared/messageOf'
 
 /** The few things the bridge needs of a `MessagePortMain`, so `bun test` can hand it a fake. */
@@ -24,8 +24,16 @@ const BUSY = 'Raven is busy. Try again.'
 /** Requests waiting or in flight before the port refuses more; the page never needs this many. */
 export const MAX_PENDING = 100
 
-type PlayerRequest = Infer<typeof isPlayerRequest>
+/** A request on a port: a command of the service's kind, under an id its reply carries back. */
+export type PortRequest<C> = { id: number; command: C }
 type PlayerReply = Infer<typeof isPlayerReply>
+
+/** What a port drives: the video player's service, or the music engine's. */
+export type PortService<C, E> = {
+  handle: (command: C) => Promise<PlayerOutcome>
+  subscribe: (listener: (event: E) => void) => () => void
+  reset: () => Promise<void>
+}
 
 type RefusalProps = { id: number; message: string }
 
@@ -41,17 +49,24 @@ const idOf = (data: unknown): number | null => {
   return isNumber(data.id) ? data.id : null
 }
 
-type ConnectPortProps = {
+type ConnectPortProps<C extends { type: string }, E> = {
   port: PortLike
-  service: PlayerService
+  service: PortService<C, E>
+  /** What a message must pass to reach the service: `isPlayerRequest`, or the music port's. */
+  isRequest: Guard<PortRequest<C>>
   warn: (message: string) => void
 }
 
 /**
- * One page's player port. Only a request that passes `isPlayerRequest` reaches the
+ * One page's port to a service. Only a request that passes `isRequest` reaches the
  * service, one at a time in arrival order, and only its narrowed command goes on.
  */
-export const connectPort = ({ port, service, warn }: ConnectPortProps): { close: () => void } => {
+export const connectPort = <C extends { type: string }, E>({
+  port,
+  service,
+  isRequest,
+  warn,
+}: ConnectPortProps<C, E>): { close: () => void } => {
   // `isRefusing` quiets the warnings for a run of messages it cannot use, as
   // `isOverflowing` does for a run of commands past `MAX_PENDING`: one warning per run.
   const state = { isOpen: true, pending: 0, isOverflowing: false, isRefusing: false }
@@ -68,7 +83,7 @@ export const connectPort = ({ port, service, warn }: ConnectPortProps): { close:
 
   const unsubscribe = service.subscribe(post)
 
-  const outcomeOf = async ({ id, command }: PlayerRequest): Promise<PlayerReply> => {
+  const outcomeOf = async ({ id, command }: PortRequest<C>): Promise<PlayerReply> => {
     try {
       const outcome = await service.handle(command)
       if (outcome.ok) return { id, ok: true }
@@ -79,7 +94,7 @@ export const connectPort = ({ port, service, warn }: ConnectPortProps): { close:
     }
   }
 
-  const answer = async (request: PlayerRequest) => {
+  const answer = async (request: PortRequest<C>) => {
     // Work queued before the port closed is dropped, not run against the next page's player.
     if (!state.isOpen) return
     const reply = await outcomeOf(request)
@@ -88,7 +103,7 @@ export const connectPort = ({ port, service, warn }: ConnectPortProps): { close:
     post(reply)
   }
 
-  const enqueue = (request: PlayerRequest) => {
+  const enqueue = (request: PortRequest<C>) => {
     if (state.pending >= MAX_PENDING) {
       if (!state.isOverflowing) warn(`Raven refused commands past ${MAX_PENDING} waiting.`)
       state.isOverflowing = true
@@ -116,7 +131,7 @@ export const connectPort = ({ port, service, warn }: ConnectPortProps): { close:
 
   port.onMessage((data) => {
     if (!state.isOpen) return
-    if (isPlayerRequest(data)) {
+    if (isRequest(data)) {
       state.isRefusing = false
       enqueue({ id: data.id, command: data.command })
       return

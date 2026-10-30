@@ -66,8 +66,10 @@ export const AlbumMatchDialog = ({ album, onClose, onMatched }: AlbumMatchDialog
     mutationFn: (mbid: string | null) => api.setAlbumMatch({ albumId: album.id, mbid }),
     onSuccess: () => onMatched(),
   })
-  const isBest = (candidate: AlbumMatchCandidate): boolean =>
-    candidate === candidates.data?.[0] && hasBestMatch({ candidates: candidates.data })
+  const isBest = (candidate: AlbumMatchCandidate): boolean => {
+    const found = candidates.data ?? []
+    return candidate === (found[0] ?? null) && hasBestMatch({ candidates: found })
+  }
   return (
     <dialog
       ref={dialog}

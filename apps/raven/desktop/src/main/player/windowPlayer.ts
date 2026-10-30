@@ -1,5 +1,10 @@
-import { setTimeout as sleep } from 'node:timers/promises'
-import { type DesktopPlatform, PLAYER_SOURCE_KINDS } from '@raven/core'
+import {
+  type DesktopPlatform,
+  isPlayerRequest,
+  PLAYER_SOURCE_KINDS,
+  type PlayerCommand,
+  type PlayerEvent,
+} from '@raven/core'
 import {
   MPV_PROPERTIES,
   MPV_SURFACE_KINDS,
@@ -8,14 +13,7 @@ import {
   type NativeTarget,
   openMpv,
 } from '@raven/mpv'
-import {
-  app,
-  BrowserWindow,
-  MessageChannelMain,
-  type MessagePortMain,
-  powerSaveBlocker,
-  screen,
-} from 'electron'
+import { app, BrowserWindow, powerSaveBlocker, screen } from 'electron'
 import { NIGHT, showWindowButtons } from '@/main/appWindow'
 import type { ConfigStore, ServerEntry } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
@@ -23,60 +21,33 @@ import type { Grants } from '@/main/grants'
 import { errorText } from '@/main/log/errorText'
 import { openLine } from '@/main/log/opens'
 import { CLEAR, createActivity } from '@/main/player/activity'
-import { createConnector } from '@/main/player/connector'
 import { displayReading } from '@/main/player/displayOptions'
 import {
   addonPathFor,
-  ENGINE_MESSAGES,
   ENGINE_MODES,
   ENGINE_STATUSES,
-  engineModeFrom,
+  ENGINE_WORDS,
   engineOptionsFor,
   openEngine,
 } from '@/main/player/engine'
-import { createEngineSlot, watchService } from '@/main/player/engineSlot'
 import { resolveSourceWith } from '@/main/player/loadTarget'
 import type { createMarks } from '@/main/player/marks'
 import { readDevices } from '@/main/player/outputOptions'
-import type { PortLike } from '@/main/player/playerPort'
 import {
   createPlayerService,
   type PlayerActivity,
   type PlayerService,
 } from '@/main/player/playerService'
 import { createSleepGuard } from '@/main/player/sleepGuard'
-import { createQuitGate } from '@/main/quitGate'
-import { isPageUrl } from '@/main/security'
+import { attachWindowEngine, engineMode } from '@/main/player/windowEngine'
 import type { MediaRelay } from '@/main/servers/mediaRelay'
 import type { createServerSources } from '@/main/servers/serverSources'
-import { CLOSE_TIMEOUTS, closeTimeoutFor, DESTROY_MS } from '@/main/shutdown'
 import type { Timers } from '@/main/stateStore'
 import type { createBudgets } from '@/main/budgets'
 import { IPC_CHANNELS } from '@/shared/hostNames'
 
 export type NativeEngine = { mpv: Mpv; service: PlayerService }
 export type WindowPlayer = ReturnType<typeof attachPlayer>
-
-// A test hook too: an unpackaged run reads `RAVEN_DESKTOP_MPV` (`headless` or `off`).
-export const engineMode = () => engineModeFrom({ isPackaged: app.isPackaged, env: process.env })
-
-/** Electron's port behind the bridge's `PortLike`, so the bridge never sees Electron. */
-const portLike = (port: MessagePortMain): PortLike => ({
-  onMessage: (listener) => {
-    port.on('message', (event) => listener(event.data))
-  },
-  onClose: (listener) => {
-    port.on('close', listener)
-  },
-  post: (message) => port.postMessage(message),
-  start: () => port.start(),
-  close: () => port.close(),
-})
-
-const isPageLive = (window: BrowserWindow): boolean =>
-  !window.isDestroyed() &&
-  !window.webContents.isDestroyed() &&
-  isPageUrl(window.webContents.getURL())
 
 type DisplayOfProps = { window: BrowserWindow; mpv: Mpv }
 
@@ -247,19 +218,24 @@ export const attachPlayer = ({
   // Why there is no engine, for Copy Diagnostics. The message the engine fell back with, not
   // the error behind it, which the log keeps: a failed dlopen names the addon's path.
   let engineNote: string | null = null
-  const engine = createEngineSlot<NativeEngine>({
+  const attached = attachWindowEngine<PlayerCommand, PlayerEvent, NativeEngine>({
+    window,
+    channel: IPC_CHANNELS.player,
+    isRequest: isPlayerRequest,
+    words: ENGINE_WORDS.video,
     open: async () => {
       try {
         const opened = await openEngine({
           mode,
           surfaceFor,
           open: openLogged,
+          words: ENGINE_WORDS.video,
           warn: (message) => warn(`Raven could not open its video engine: ${message}`),
         })
         if (opened.status === ENGINE_STATUSES.unavailable) engineNote = opened.message
         return opened
       } catch (error) {
-        engineNote = ENGINE_MESSAGES.unavailable
+        engineNote = ENGINE_WORDS.video.unavailable
         throw error
       }
     },
@@ -267,38 +243,13 @@ export const attachPlayer = ({
       service.dispose()
       return mpv.destroy()
     },
-    watch: ({ engine: opened, onDied }) =>
-      watchService({
-        engine: opened,
-        onDied: () => {
-          engineNote = ENGINE_MESSAGES.unavailable
-          onDied()
-        },
-      }),
-    warn,
-  })
-
-  const connector = createConnector({
-    engine: engine.get,
-    channel: () => {
-      const { port1, port2 } = new MessageChannelMain()
-      return { local: portLike(port1), remote: port2 }
+    onDied: () => {
+      engineNote = ENGINE_WORDS.video.unavailable
     },
-    post: ({ connection, ports }) => {
-      if (!isPageLive(window)) throw new Error('its page is gone.')
-      window.webContents.postMessage(IPC_CHANNELS.player, connection, ports)
-    },
-    warn,
     timers,
+    warn,
   })
-
-  const startEngine = () => {
-    engine.get().catch((error: unknown) => {
-      warn(`Raven could not open its video engine: ${errorText(error)}`)
-    })
-  }
-  // Whichever comes first of this and the page's `ready` (through the connector).
-  window.once('ready-to-show', startEngine)
+  const { engine } = attached
 
   const followDisplay = () => {
     const current = engine.current()
@@ -314,55 +265,17 @@ export const attachPlayer = ({
   screen.on('display-removed', followDisplay)
   screen.on('display-metrics-changed', followDisplay)
 
-  // A new page load drops the port the last page's `ready` is still waiting on the engine for.
-  // Handed over late, it would reach the new page, which keeps the first port it gets, and
-  // the new page's own `ready` would then close it under it.
-  window.webContents.on('did-navigate', () => {
-    connector.disconnect()
-  })
-
-  // A crashed page holds no port; stop what it was playing until its reload asks again, and put
-  // the window back for a page with no video even when the service had nothing left to stop.
-  window.webContents.on('render-process-gone', () => {
-    connector.disconnect()
-    activity.hide()
-  })
+  // A crashed page holds no port: put the window back for a page with no video even when the
+  // service had nothing left to stop.
+  window.webContents.on('render-process-gone', () => activity.hide())
 
   // Each page load starts with no video, whatever the last one left the window showing.
   const connect = () => {
     activity.hide()
-    return connector.connect()
+    return attached.connect()
   }
 
-  // The window goes only once mpv has stopped drawing into it.
-  window.on(
-    'close',
-    createQuitGate({
-      isDirty: engine.isAlive,
-      flush: engine.destroy,
-      timeoutMs: DESTROY_MS,
-      quit: () => window.close(),
-      exit: () => {
-        const ending = closeTimeoutFor({ isEngineAlive: engine.isAlive() })
-        switch (ending) {
-          case CLOSE_TIMEOUTS.quitApp:
-            // The app's gate flushes the stores, then ends the process however it must.
-            app.quit()
-            return
-          case CLOSE_TIMEOUTS.destroyWindow:
-            window.destroy()
-            return
-          default: {
-            const unreachable: never = ending
-            return unreachable
-          }
-        }
-      },
-      wait: (ms) => sleep(ms),
-    }),
-  )
   window.on('closed', () => {
-    connector.disconnect()
     sleepGuard.set(false)
     marks.playing(false)
     screen.off('display-added', followDisplay)

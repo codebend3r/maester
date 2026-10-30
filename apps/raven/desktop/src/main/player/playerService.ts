@@ -1,25 +1,24 @@
 import {
-  type AudioDevice,
   type DesktopPlatform,
   isNumber,
   isTrackIndex,
-  type OutputSettings,
   PLAYER_COMMANDS,
   PLAYER_ERROR_REASONS,
   PLAYER_EVENTS,
-  PLAYER_REFUSAL_REASONS,
   PLAYER_SOURCE_KINDS,
   type PlayerCommand,
   type PlayerErrorReason,
   type PlayerEvent,
-  type PlayerRefusalReason,
 } from '@raven/core'
 import {
   MPV_CHOICES,
   MPV_COMMANDS,
   MPV_END_FILE_REASONS,
   MPV_EVENTS,
+  MPV_LOADFILE_MODES,
+  MPV_PLAYLIST_END,
   MPV_PROPERTIES,
+  MPV_SEEK_MODES,
   type MpvEvent,
   type MpvProperty,
   type MpvTrack,
@@ -39,7 +38,13 @@ import {
   sidecarsOfTarget,
   withoutTarget,
 } from '@/main/player/loadTarget'
-import { isVolumeFixedFor, MPV_OPTIONS, outputOptions } from '@/main/player/outputOptions'
+import { ENGINE_GONE, OK, type PlayerOutcome, refuse } from '@/main/player/outcomes'
+import {
+  type ApplyOutputProps,
+  isVolumeFixedFor,
+  MPV_OPTIONS,
+  outputOptions,
+} from '@/main/player/outputOptions'
 import { type Phase, PLAYER_PHASES, type ShowingPhase } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import { createQuietMpv } from '@/main/player/quietMpv'
@@ -49,9 +54,6 @@ import { aidFor, sidFor, tracksFromMpv } from '@/main/player/tracksFromMpv'
 import type { Timers } from '@/main/stateStore'
 import { messageOf } from '@/shared/messageOf'
 
-export type PlayerOutcome =
-  | { ok: true }
-  | { ok: false; reason: PlayerRefusalReason; message: string }
 export type PlayerActivity = { isPlaying: boolean; isShowing: boolean }
 
 /**
@@ -81,8 +83,6 @@ const EOF_SHORT_S = 5
 /** How far a buffered range edge must move before the page hears of it. */
 const BUFFERED_STEP_S = 0.5
 
-type ApplyOutputProps = { output: OutputSettings; devices: readonly AudioDevice[] }
-
 type ApplyDisplayProps = { refreshRate: number; edrHeadroom: number }
 
 export type PlayerService = {
@@ -103,18 +103,6 @@ export type PlayerService = {
 
 type Range = { start: number; end: number }
 type Wanted = { audio: number | null; subtitle: string | null }
-
-const OK: PlayerOutcome = { ok: true }
-const refuse = (message: string): PlayerOutcome => ({
-  ok: false,
-  reason: PLAYER_REFUSAL_REASONS.refused,
-  message,
-})
-const ENGINE_GONE: PlayerOutcome = {
-  ok: false,
-  reason: PLAYER_REFUSAL_REASONS.engine,
-  message: PLAYER_MESSAGES.engineStopped,
-}
 
 type HasMovedProps = { shown: readonly Range[] | null; next: readonly Range[] }
 
@@ -404,7 +392,7 @@ export const createPlayerService = ({
     shownTime = null
     seeks += 1
     try {
-      await mpv.command({ args: [MPV_COMMANDS.seek, String(target), 'absolute'] })
+      await mpv.command({ args: [MPV_COMMANDS.seek, String(target), MPV_SEEK_MODES.absolute] })
     } catch (error) {
       if (token === epoch && lastTime === target) lastTime = previous
       throw error
@@ -741,6 +729,9 @@ export const createPlayerService = ({
       case MPV_EVENTS.log:
         warn(`mpv ${event.level} ${event.prefix}: ${event.text}`)
         return
+      // The system's transport controls belong to the music engine, never to a video.
+      case MPV_EVENTS.remote:
+        return
       case MPV_EVENTS.error:
         warn(`mpv error: ${event.message}`)
         onEngineStopped()
@@ -804,8 +795,8 @@ export const createPlayerService = ({
         args: [
           MPV_COMMANDS.loadfile,
           locationOf(resolved.target),
-          'replace',
-          '-1',
+          MPV_LOADFILE_MODES.replace,
+          MPV_PLAYLIST_END,
           loadfileOptionsFor({ target: resolved.target, start: loadStart }),
         ],
         onReply: ({ isOk }) => {

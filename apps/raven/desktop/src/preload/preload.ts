@@ -4,6 +4,7 @@ import {
   type InvokeEnvelope,
   PAGE_ORIGIN,
   type RavenDesktopBridge,
+  WINDOW_MESSAGE_TYPES,
 } from '@raven/core'
 import { contextBridge, type IpcRendererEvent, ipcRenderer, webUtils } from 'electron'
 import { dropPaths } from '@/preload/dropPaths'
@@ -50,6 +51,15 @@ if (window.location.origin === PAGE_ORIGIN) {
     forwardPlayerPort({
       payload,
       ports: event.ports,
+      type: WINDOW_MESSAGE_TYPES.playerPort,
+      post: ({ message, transfer }) => window.postMessage(message, PAGE_ORIGIN, transfer),
+    }),
+  )
+  ipcRenderer.on(IPC_CHANNELS.audio, (event, payload: unknown) =>
+    forwardPlayerPort({
+      payload,
+      ports: event.ports,
+      type: WINDOW_MESSAGE_TYPES.audioPort,
       post: ({ message, transfer }) => window.postMessage(message, PAGE_ORIGIN, transfer),
     }),
   )

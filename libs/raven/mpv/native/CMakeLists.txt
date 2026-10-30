@@ -16,7 +16,7 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
   if(NOT EXISTS "${RESOURCES}/lib/libmpv.2.dylib")
     message(FATAL_ERROR "Run the @raven/mpv fetch:libmpv target first. Host libmpv is never used.")
   endif()
-  add_library(raven_mpv SHARED addon.cpp surface_mac.mm ${CMAKE_JS_SRC})
+  add_library(raven_mpv SHARED addon.cpp surface_mac.mm nowplaying_mac.mm ${CMAKE_JS_SRC})
   set_target_properties(raven_mpv PROPERTIES PREFIX "" SUFFIX ".node"
     LIBRARY_OUTPUT_DIRECTORY "${RESOURCES}"
     BUILD_WITH_INSTALL_RPATH TRUE INSTALL_RPATH "@loader_path/lib"
@@ -26,7 +26,7 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
   target_compile_definitions(raven_mpv PRIVATE NAPI_VERSION=8 NAPI_CPP_EXCEPTIONS)
   target_compile_options(raven_mpv PRIVATE -fobjc-arc -fexceptions -Wall -Wextra -Wno-unused-parameter)
   target_link_libraries(raven_mpv PRIVATE ${CMAKE_JS_LIB} "${RESOURCES}/lib/libmpv.2.dylib"
-    "-framework Cocoa" "-framework QuartzCore" "-framework CoreGraphics")
+    "-framework Cocoa" "-framework QuartzCore" "-framework CoreGraphics" "-framework MediaPlayer")
 elseif(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
   # Windows x64: the pinned prebuilt libmpv-2.dll, the BrowserWindow's HWND as the surface.
   # The DLL came from MinGW, so its import library is made here from the export list
@@ -43,7 +43,7 @@ elseif(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     COMMAND "${CMAKE_AR}" /nologo "/def:${RAVEN_LIBMPV_DEF}" /machine:x64 "/out:${LIBMPV_IMPORT}"
     DEPENDS "${RAVEN_LIBMPV_DEF}" COMMENT "Import library for libmpv-2.dll")
   add_custom_target(libmpv_import DEPENDS "${LIBMPV_IMPORT}")
-  add_library(raven_mpv SHARED addon.cpp surface_win.cpp ${CMAKE_JS_SRC})
+  add_library(raven_mpv SHARED addon.cpp surface_win.cpp nowplaying_win.cpp ${CMAKE_JS_SRC})
   add_dependencies(raven_mpv libmpv_import)
   set_target_properties(raven_mpv PROPERTIES PREFIX "" SUFFIX ".node"
     RUNTIME_OUTPUT_DIRECTORY "${RESOURCES}" RUNTIME_OUTPUT_DIRECTORY_RELEASE "${RESOURCES}"

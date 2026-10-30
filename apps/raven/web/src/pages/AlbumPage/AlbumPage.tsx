@@ -40,7 +40,9 @@ const AlbumView = ({ details }: AlbumViewProps) => {
   const isOneArtist =
     album.artists.length === 1 &&
     tracks.every(
-      (track) => track.artists.length === 1 && track.artists[0]?.id === album.artists[0]?.id,
+      (track) =>
+        track.artists.length === 1 &&
+        (track.artists[0]?.id ?? null) === (album.artists[0]?.id ?? null),
     )
   const play = (startAt: number) => playTracks({ tracks, startAt, source })
   const discs = [...new Set(tracks.map((track) => track.disc))].toSorted((a, b) => a - b)

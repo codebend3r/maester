@@ -6,6 +6,7 @@ import {
   WINDOW_MESSAGE_TYPES,
 } from '@raven/core'
 import { afterEach, describe, expect, it } from 'bun:test'
+import { CONNECTION_STATUSES } from '@/desktop/portConnection'
 import { startDesktop } from '@/desktop/startDesktop'
 import { useDesktopBridge } from '@/stores/desktop'
 
@@ -60,6 +61,27 @@ describe('startDesktop', () => {
     expect(useDesktopBridge.getState().desktop?.player.read()).toEqual({
       status: PLAYER_CONNECTION_STATUSES.unavailable,
       message: 'No mpv.',
+    })
+  })
+
+  it("hears main's music engine hand-over too", () => {
+    started(bridgeWith(DESKTOP_PLATFORMS.mac))
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          type: WINDOW_MESSAGE_TYPES.audioPort,
+          connection: { status: PLAYER_CONNECTION_STATUSES.unavailable, message: 'No music.' },
+        },
+        origin: PAGE_ORIGIN,
+        source: window,
+      }),
+    )
+    expect(useDesktopBridge.getState().desktop?.audio.read()).toEqual({
+      status: PLAYER_CONNECTION_STATUSES.unavailable,
+      message: 'No music.',
+    })
+    expect(useDesktopBridge.getState().desktop?.player.read()).toEqual({
+      status: CONNECTION_STATUSES.waiting,
     })
   })
 })

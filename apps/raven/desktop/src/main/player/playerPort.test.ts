@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from 'bun:test'
-import { isPlayerReply, PLAYER_COMMANDS } from '@raven/core'
+import { isPlayerReply, isPlayerRequest, PLAYER_COMMANDS } from '@raven/core'
 import { connectPort, MAX_PENDING, UNKNOWN_COMMAND } from '@/main/player/playerPort'
 import { fakePort, fakeService } from '@/main/test/playerFakes'
 
@@ -10,7 +10,12 @@ type ConnectProps = { service?: ReturnType<typeof fakeService> }
 const connect = ({ service = fakeService() }: ConnectProps = {}) => {
   const port = fakePort()
   const warn = mock((_message: string) => {})
-  const connection = connectPort({ port: port.port, service: service.service, warn })
+  const connection = connectPort({
+    port: port.port,
+    service: service.service,
+    isRequest: isPlayerRequest,
+    warn,
+  })
   return { port, service, warn, connection }
 }
 

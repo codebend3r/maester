@@ -17,7 +17,9 @@ import { mock } from 'bun:test'
 import { act } from '@testing-library/react'
 import type { DesktopClient } from '@/desktop/client'
 import { createMenuHub } from '@/desktop/menuHub'
+import type { AudioConnection, AudioConnections } from '@/desktop/audioConnection'
 import type { PlayerConnection, PlayerConnections } from '@/desktop/playerConnection'
+import type { Connection, Connections } from '@/desktop/portConnection'
 import { useDesktopBridge } from '@/stores/desktop'
 
 export const GB = 1_000_000_000
@@ -78,8 +80,8 @@ export const fakeClient = ({
 
 export type FakeClient = ReturnType<typeof fakeClient>
 
-/** A player connection that changes only when the test says so. */
-export const connectionsOf = (initial: PlayerConnection) => {
+/** A connection to one of main's engines that changes only when the test says so. */
+const settableConnectionsOf = <C, E>(initial: Connection<C, E>) => {
   const listeners = new Set<() => void>()
   let connection = initial
   return {
@@ -90,13 +92,23 @@ export const connectionsOf = (initial: PlayerConnection) => {
         listeners.delete(listener)
       }
     },
-    set: (next: PlayerConnection) =>
+    set: (next: Connection<C, E>) =>
       act(() => {
         connection = next
         listeners.forEach((listener) => listener())
       }),
-  } satisfies PlayerConnections & { set: (next: PlayerConnection) => void }
+  } satisfies Connections<C, E> & { set: (next: Connection<C, E>) => void }
 }
+
+/** A player connection that changes only when the test says so. */
+export const connectionsOf = (
+  initial: PlayerConnection,
+): PlayerConnections & { set: (next: PlayerConnection) => void } => settableConnectionsOf(initial)
+
+/** A music engine connection that changes only when the test says so. */
+export const audioConnectionsOf = (
+  initial: AudioConnection,
+): AudioConnections & { set: (next: AudioConnection) => void } => settableConnectionsOf(initial)
 
 /** No video engine, as main says when mpv did not start. */
 const NO_ENGINE: PlayerConnection = {
@@ -104,19 +116,27 @@ const NO_ENGINE: PlayerConnection = {
   message: 'The video engine is off for this test.',
 }
 
+/** No music engine either, so music plays through the page's own host. */
+const NO_MUSIC_ENGINE: AudioConnection = {
+  status: PLAYER_CONNECTION_STATUSES.unavailable,
+  message: 'The music engine is off for this test.',
+}
+
 type AsPlayingDesktopProps = {
   client?: DesktopClient
   player?: PlayerConnections
+  audio?: AudioConnections
 }
 
-/** Runs the page as Raven's, as `startDesktop` sets it: its bridge is `client` and `player`. */
+/** Runs the page as Raven's, as `startDesktop` sets it: its bridge is `client`, `player` and `audio`. */
 export const asPlayingDesktop = ({
   client = fakeClient(),
   player = connectionsOf(NO_ENGINE),
+  audio = audioConnectionsOf(NO_MUSIC_ENGINE),
 }: AsPlayingDesktopProps) => {
   const menu = createMenuHub()
-  useDesktopBridge.setState({ desktop: { client, menu, player } })
-  return { client, menu, player }
+  useDesktopBridge.setState({ desktop: { client, menu, player, audio } })
+  return { client, menu, player, audio }
 }
 
 /** Runs the page as Raven's with no video engine: its bridge is `client`. */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  QUEUE_SOURCE_KINDS,
   EMPTY_QUEUE,
   REPEAT_MODES,
   afterEnd,
@@ -26,10 +27,14 @@ const stays = () => 0.999
 
 describe('startQueue', () => {
   it('queues the items in order from the start asked, clamped', () => {
-    const queue = startQueue({ items: ALBUM, startAt: 2, source: { kind: 'album', id: 7 } })
+    const queue = startQueue({
+      items: ALBUM,
+      startAt: 2,
+      source: { kind: QUEUE_SOURCE_KINDS.album, id: 7 },
+    })
     expect(currentOf(queue)).toBe(12)
     expect(orderedOf(queue).map(({ id }) => id)).toEqual(ALBUM)
-    expect(queue.source).toEqual({ kind: 'album', id: 7 })
+    expect(queue.source).toEqual({ kind: QUEUE_SOURCE_KINDS.album, id: 7 })
     expect(currentOf(startQueue({ items: ALBUM, startAt: 99 }))).toBe(13)
     expect(currentOf(startQueue({ items: ALBUM, startAt: -1 }))).toBe(10)
   })

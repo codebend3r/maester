@@ -207,7 +207,25 @@ export const useAudioQueue = create<AudioQueueState>()(
             if (get().state !== AUDIO_STATES.empty) set({ state })
           },
           time: ({ position, duration }) => set({ position, duration }),
-          ended: () => moveQueue(afterEnd),
+          ended: () => {
+            const before = get().queue
+            const after = afterEnd(before)
+            // The same track again (repeat one, or repeat all with one track): a restart,
+            // since nothing about the queue changes for an engine to see.
+            if (
+              currentOf(after) !== null &&
+              currentOf(after) === currentOf(before) &&
+              after.at === before.at
+            ) {
+              set({
+                seek: { seconds: 0, nonce: (get().seek?.nonce ?? 0) + 1 },
+                position: 0,
+                state: AUDIO_STATES.loading,
+              })
+              return
+            }
+            moveQueue(afterEnd)
+          },
           failed: (message) => set({ state: AUDIO_STATES.failed, error: message }),
           sought: () => set({ seek: null }),
         },

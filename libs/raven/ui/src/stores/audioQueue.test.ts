@@ -134,4 +134,19 @@ describe('useAudioQueue', () => {
     expect(store().queue.at).toBe(0)
     expect(store().state).toBe(AUDIO_STATES.loading)
   })
+
+  it('starts the same track over when it ends under repeat one, since the queue does not move', () => {
+    store().playTracks({ tracks: ALBUM })
+    // The repeat mode outlives a clear, so it is cycled from wherever the last test left it.
+    Object.values(REPEAT_MODES).forEach(() => {
+      if (store().queue.repeat !== REPEAT_MODES.one) store().cycleRepeat()
+    })
+    expect(store().queue.repeat).toBe(REPEAT_MODES.one)
+    store().engine.state(AUDIO_STATES.playing)
+    store().engine.time({ position: 199, duration: 200 })
+    store().engine.ended()
+    expect(playingTrackOf(store())?.id).toBe(1)
+    expect(store()).toMatchObject({ state: AUDIO_STATES.loading, position: 0 })
+    expect(store().seek?.seconds).toBe(0)
+  })
 })

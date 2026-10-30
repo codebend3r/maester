@@ -27,6 +27,9 @@ export const MPV_OPTIONS = {
 
 export type MpvOption = { name: string; value: string | number | boolean }
 
+/** What a service applies when the output settings change: the settings, and the devices mpv lists. */
+export type ApplyOutputProps = { output: OutputSettings; devices: readonly AudioDevice[] }
+
 const AUDIO_OUTPUTS = {
   coreaudio: 'coreaudio',
   avfoundation: 'avfoundation',

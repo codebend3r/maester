@@ -75,6 +75,7 @@ export const engineOptionsFor = ({ surface }: EngineOptionsForProps): readonly M
     case MPV_SURFACE_KINDS.headless:
       return HEADLESS_OPTIONS
     case MPV_SURFACE_KINDS.window:
+    case MPV_SURFACE_KINDS.audio:
       return []
     default: {
       const unreachable: never = surface
@@ -83,10 +84,28 @@ export const engineOptionsFor = ({ surface }: EngineOptionsForProps): readonly M
   }
 }
 
-export const ENGINE_MESSAGES = {
-  unavailable: 'Raven could not start its video engine, so it plays only the videos Chromium can.',
-  off: 'The video engine is off for this run.',
-} as const
+/** The surface music plays through in each mode: sound alone, or the silent test surface. */
+export const audioSurfaceFor = (mode: Exclude<EngineMode, typeof ENGINE_MODES.off>): MpvSurface =>
+  mode === MPV_SURFACE_KINDS.headless
+    ? { kind: MPV_SURFACE_KINDS.headless }
+    : { kind: MPV_SURFACE_KINDS.audio }
+
+/** What an engine is called in the log, and what the page is told when it cannot open or is off. */
+export type EngineWords = { name: string; unavailable: string; off: string }
+
+export const ENGINE_WORDS = {
+  video: {
+    name: 'video engine',
+    unavailable:
+      'Raven could not start its video engine, so it plays only the videos Chromium can.',
+    off: 'The video engine is off for this run.',
+  },
+  music: {
+    name: 'music engine',
+    unavailable: 'Raven could not start its music engine, so music plays through Chromium.',
+    off: 'The music engine is off for this run.',
+  },
+} as const satisfies Record<string, EngineWords>
 
 export const ENGINE_STATUSES = { native: 'native', unavailable: 'unavailable' } as const
 
@@ -98,6 +117,7 @@ type OpenEngineProps<T> = {
   mode: EngineMode
   surfaceFor: (mode: Exclude<EngineMode, typeof ENGINE_MODES.off>) => MpvSurface
   open: (surface: MpvSurface) => Promise<T>
+  words: EngineWords
   warn: (message: string) => void
 }
 
@@ -105,15 +125,16 @@ export const openEngine = async <T>({
   mode,
   surfaceFor,
   open,
+  words,
   warn,
 }: OpenEngineProps<T>): Promise<OpenedEngine<T>> => {
   if (mode === ENGINE_MODES.off) {
-    return { status: ENGINE_STATUSES.unavailable, message: ENGINE_MESSAGES.off }
+    return { status: ENGINE_STATUSES.unavailable, message: words.off }
   }
   try {
     return { status: ENGINE_STATUSES.native, engine: await open(surfaceFor(mode)) }
   } catch (error) {
     warn(messageOf(error))
-    return { status: ENGINE_STATUSES.unavailable, message: ENGINE_MESSAGES.unavailable }
+    return { status: ENGINE_STATUSES.unavailable, message: words.unavailable }
   }
 }

@@ -1,8 +1,12 @@
-import { PLAYER_CONNECTION_STATUSES, type PlayerConnectionStatus } from '@raven/core'
+import { type Guard, PLAYER_CONNECTION_STATUSES, type PlayerConnectionStatus } from '@raven/core'
 import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
-import { ENGINE_MESSAGES, ENGINE_STATUSES, type OpenedEngine } from '@/main/player/engine'
-import { connectPort, type PortLike } from '@/main/player/playerPort'
-import type { PlayerService } from '@/main/player/playerService'
+import { ENGINE_STATUSES, type OpenedEngine } from '@/main/player/engine'
+import {
+  connectPort,
+  type PortLike,
+  type PortRequest,
+  type PortService,
+} from '@/main/player/playerPort'
 import type { Timers } from '@/main/stateStore'
 import { messageOf } from '@/shared/messageOf'
 
@@ -12,17 +16,20 @@ import { messageOf } from '@/shared/messageOf'
  */
 export const OPEN_MS = 5000
 
-const UNAVAILABLE = {
-  status: ENGINE_STATUSES.unavailable,
-  message: ENGINE_MESSAGES.unavailable,
-} as const satisfies OpenedEngine<never>
-
 type PostProps<R> = { connection: PlayerConnectionStatus; ports: R[] }
 
-type CreateConnectorProps<T extends { service: PlayerService }, R> = {
+type CreateConnectorProps<
+  C extends { type: string },
+  E,
+  T extends { service: PortService<C, E> },
+  R,
+> = {
   engine: () => Promise<OpenedEngine<T>>
+  isRequest: Guard<PortRequest<C>>
   channel: () => { local: PortLike; remote: R }
   post: (input: PostProps<R>) => void
+  /** What a page is told when the engine could not open or did not open in time. */
+  unavailable: string
   warn: (message: string) => void
   timers: Timers
 }
@@ -32,13 +39,24 @@ type CreateConnectorProps<T extends { service: PlayerService }, R> = {
  * stops playback) before a new one is made, so two ports never drive one engine.
  * `R` is the far end's type (Electron's `MessagePortMain`), passed on untouched.
  */
-export const createConnector = <T extends { service: PlayerService }, R>({
+export const createConnector = <
+  C extends { type: string },
+  E,
+  T extends { service: PortService<C, E> },
+  R,
+>({
   engine,
+  isRequest,
   channel,
   post,
+  unavailable,
   warn,
   timers,
-}: CreateConnectorProps<T, R>): { connect: () => Promise<void>; disconnect: () => void } => {
+}: CreateConnectorProps<C, E, T, R>): { connect: () => Promise<void>; disconnect: () => void } => {
+  const UNAVAILABLE = {
+    status: ENGINE_STATUSES.unavailable,
+    message: unavailable,
+  } as const satisfies OpenedEngine<never>
   let current: { close: () => void } | null = null
   // Bumped by every connect and disconnect, so an engine that opens late hands over nothing.
   let generation = 0
@@ -89,7 +107,12 @@ export const createConnector = <T extends { service: PlayerService }, R>({
         return
       case ENGINE_STATUSES.native: {
         const { local, remote } = channel()
-        const connection = connectPort({ port: local, service: opened.engine.service, warn })
+        const connection = connectPort({
+          port: local,
+          service: opened.engine.service,
+          isRequest,
+          warn,
+        })
         current = connection
         try {
           post({ connection: { status: PLAYER_CONNECTION_STATUSES.native }, ports: [remote] })

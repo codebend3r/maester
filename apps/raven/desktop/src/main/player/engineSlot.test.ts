@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'bun:test'
 import type { PlayerEvent } from '@raven/core'
-import { ENGINE_MESSAGES, type OpenedEngine } from '@/main/player/engine'
+import { ENGINE_WORDS, type OpenedEngine } from '@/main/player/engine'
 import { createEngineSlot, watchService } from '@/main/player/engineSlot'
 
 type Engine = { name: string }
@@ -32,6 +32,7 @@ const setup = ({
       log.push(`watch ${engine.name}`)
       watched.onDied = onDied
     },
+    words: ENGINE_WORDS.video,
     warn,
   })
   return { slot, log, warn, die: () => watched.onDied() }
@@ -59,8 +60,8 @@ describe('createEngineSlot', () => {
   })
 
   test('an unavailable engine is not alive and holds nothing', async () => {
-    const { slot } = setup({ opened: { status: 'unavailable', message: ENGINE_MESSAGES.off } })
-    expect(await slot.get()).toEqual({ status: 'unavailable', message: ENGINE_MESSAGES.off })
+    const { slot } = setup({ opened: { status: 'unavailable', message: ENGINE_WORDS.video.off } })
+    expect(await slot.get()).toEqual({ status: 'unavailable', message: ENGINE_WORDS.video.off })
     expect(slot.isAlive()).toBe(false)
     expect(slot.current()).toBeNull()
   })
@@ -69,7 +70,7 @@ describe('createEngineSlot', () => {
     const { slot, warn } = setup({ opened: Promise.reject(new Error('no addon')) })
     expect(await slot.get()).toEqual({
       status: 'unavailable',
-      message: ENGINE_MESSAGES.unavailable,
+      message: ENGINE_WORDS.video.unavailable,
     })
     expect(warn).toHaveBeenCalledTimes(1)
     expect(slot.isAlive()).toBe(false)
@@ -91,7 +92,7 @@ describe('createEngineSlot', () => {
     // A page that asks after the engine is gone gets the html engine, never a dead one.
     expect(await slot.get()).toEqual({
       status: 'unavailable',
-      message: ENGINE_MESSAGES.unavailable,
+      message: ENGINE_WORDS.video.unavailable,
     })
   })
 
@@ -114,7 +115,7 @@ describe('createEngineSlot', () => {
     expect(log).toEqual(['open', 'destroy late'])
     expect(slot.isAlive()).toBe(false)
     expect(slot.current()).toBeNull()
-    expect(await got).toEqual({ status: 'unavailable', message: ENGINE_MESSAGES.unavailable })
+    expect(await got).toEqual({ status: 'unavailable', message: ENGINE_WORDS.video.unavailable })
   })
 
   test('destroy before any open opens nothing, and a later ask is unavailable', async () => {
@@ -122,7 +123,7 @@ describe('createEngineSlot', () => {
     await slot.destroy()
     expect(await slot.get()).toEqual({
       status: 'unavailable',
-      message: ENGINE_MESSAGES.unavailable,
+      message: ENGINE_WORDS.video.unavailable,
     })
     expect(log).toEqual([])
     expect(slot.isAlive()).toBe(false)
@@ -143,11 +144,12 @@ describe('createEngineSlot', () => {
         log.push(`destroy ${engine.name}`)
       },
       watch: () => {},
+      words: ENGINE_WORDS.video,
       warn: () => {},
     })
     holder.slot = slot
     const got = slot.get()
-    expect(await got).toEqual({ status: 'unavailable', message: ENGINE_MESSAGES.unavailable })
+    expect(await got).toEqual({ status: 'unavailable', message: ENGINE_WORDS.video.unavailable })
     expect(destroying).toHaveLength(1)
     await Promise.all(destroying)
     expect(log).toEqual(['open', 'destroy mpv'])
@@ -158,7 +160,7 @@ describe('createEngineSlot', () => {
     const { slot, log } = setup()
     const got = slot.get()
     await slot.destroy()
-    expect(await got).toEqual({ status: 'unavailable', message: ENGINE_MESSAGES.unavailable })
+    expect(await got).toEqual({ status: 'unavailable', message: ENGINE_WORDS.video.unavailable })
     expect(log).toEqual([])
   })
 
@@ -168,7 +170,7 @@ describe('createEngineSlot', () => {
     die()
     expect(await slot.get()).toEqual({
       status: 'unavailable',
-      message: ENGINE_MESSAGES.unavailable,
+      message: ENGINE_WORDS.video.unavailable,
     })
     expect(slot.current()).toBeNull()
     expect(slot.isAlive()).toBe(true)
@@ -185,11 +187,12 @@ describe('createEngineSlot', () => {
         log.push(`destroy ${engine.name}`)
       },
       watch: ({ onDied }) => onDied(),
+      words: ENGINE_WORDS.video,
       warn: () => {},
     })
     expect(await slot.get()).toEqual({
       status: 'unavailable',
-      message: ENGINE_MESSAGES.unavailable,
+      message: ENGINE_WORDS.video.unavailable,
     })
     await slot.destroy()
     expect(log).toEqual(['destroy mpv'])
@@ -213,6 +216,7 @@ describe('createEngineSlot', () => {
       watch: () => {
         throw new Error('no listeners')
       },
+      words: ENGINE_WORDS.video,
       warn,
     })
     expect(await slot.get()).toEqual({ status: 'native', engine: { name: 'mpv' } })

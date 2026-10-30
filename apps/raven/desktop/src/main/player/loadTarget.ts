@@ -36,6 +36,10 @@ type FileTarget = {
 }
 export type LoadTarget = FileTarget | ServerTarget
 export type ResolvedSource = { ok: true; target: LoadTarget } | { ok: false; message: string }
+/** What the server sources answer: always a relayed server target, which the player widens. */
+export type ResolvedServerSource =
+  | { ok: true; target: ServerTarget }
+  | { ok: false; message: string }
 /**
  * The account failure the relay saw for a server title, read synchronously, or null: a title
  * refused mid-play says access was removed, never that the connection was lost.
@@ -57,7 +61,7 @@ type ResolveSourceWithProps = {
   servers: {
     resolve: (
       source: Extract<PlayerSource, { kind: typeof PLAYER_SOURCE_KINDS.server }>,
-    ) => Promise<ResolvedSource>
+    ) => Promise<ResolvedServerSource>
   }
   /** The subtitle files that belong to a granted file, keyed by its `fileId`. */
   sidecarsOf: (fileId: string) => readonly LocalSidecar[]

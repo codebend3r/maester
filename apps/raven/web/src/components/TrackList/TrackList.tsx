@@ -102,7 +102,7 @@ export const TrackList = ({
     <ol className={styles.list} aria-label={label}>
       {tracks.map((track, index) => {
         const isCurrent =
-          currentPlace === undefined ? playing?.id === track.id : index === currentPlace
+          currentPlace === undefined ? (playing?.id ?? null) === track.id : index === currentPlace
         const isPlaying =
           isCurrent && (state === AUDIO_STATES.playing || state === AUDIO_STATES.loading)
         return (

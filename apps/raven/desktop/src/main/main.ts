@@ -78,13 +78,16 @@ import { exists, makeDir, openPart, removeTree, sizeOf, TEXT_FS } from '@/main/n
 import { createOpenBatch, eventForOpen, launchPaths, linksFromArgv } from '@/main/openBatch'
 import { ENGINE_STATUSES } from '@/main/player/engine'
 import { createMarks } from '@/main/player/marks'
-import { readDevices } from '@/main/player/outputOptions'
+import { attachMusicPlayer, type MusicPlayer } from '@/main/player/audioPlayer'
 import {
-  attachPlayer,
-  engineMode,
-  type NativeEngine,
-  type WindowPlayer,
-} from '@/main/player/windowPlayer'
+  type ClosableEngine,
+  closeWindowAfterEngines,
+  destroyEngines,
+  isAnyEngineAlive,
+} from '@/main/player/windowClose'
+import { readDevices } from '@/main/player/outputOptions'
+import { attachPlayer, type NativeEngine, type WindowPlayer } from '@/main/player/windowPlayer'
+import { engineMode } from '@/main/player/windowEngine'
 import { createQuitGate } from '@/main/quitGate'
 import { createQuitMark } from '@/main/quitMark'
 import { createAccountTickets } from '@/main/servers/accountTickets'
@@ -93,7 +96,7 @@ import { createMediaRelay, listenOnLoopback } from '@/main/servers/mediaRelay'
 import { createServerCalls, fetchThrough } from '@/main/servers/serverCalls'
 import { clearFormerPartitions, PARTITIONS_DIR } from '@/main/servers/formerSessions'
 import { createPageUnlock } from '@/main/servers/pageUnlock'
-import { createServerSources } from '@/main/servers/serverSources'
+import { createServerSources, SOURCE_KINDS } from '@/main/servers/serverSources'
 import { createServerTitles } from '@/main/servers/serverTitles'
 import {
   createShutdown,
@@ -166,6 +169,10 @@ app.setAppLogsPath(
 // A second instance hands its files to the first and quits.
 const isPrimary = isLaunch && app.requestSingleInstanceLock()
 
+// Music plays in mpv, not in the page, so Chromium must not answer the media keys or hold
+// Now Playing for a page's media: the addon owns both (the audio spec's Now Playing spike).
+app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling,MediaSessionService')
+
 const appLog = createAppLog({
   isPrimary,
   isPackaged: app.isPackaged,
@@ -226,6 +233,15 @@ const startApp = (): void => {
 
   const windows: { current: BrowserWindow | null } = { current: null }
   const players: { current: WindowPlayer | null } = { current: null }
+  const musics: { current: MusicPlayer | null } = { current: null }
+  /** The window's engines as they stand: the video player's and the music engine's. */
+  const engines = (): ClosableEngine[] => {
+    const attached: (ClosableEngine | null)[] = [
+      players.current?.engine ?? null,
+      musics.current?.engine ?? null,
+    ]
+    return attached.filter((engine): engine is ClosableEngine => engine !== null)
+  }
   const currentEngine = (): NativeEngine | null => {
     const player = players.current
     return player === null ? null : player.engine.current()
@@ -447,6 +463,8 @@ const startApp = (): void => {
       fetchUpstream: fetchRelayed,
       tickets: accountTickets,
       newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
+      // One load at a time: a new title retires the last one's secret.
+      capacity: 1,
       warn,
     })
     // A sign out: the title stops being relayed. A ticket is the account's that minted it, so
@@ -458,6 +476,26 @@ const startApp = (): void => {
       calls: serverCalls,
       tickets: accountTickets,
       relay,
+      kind: SOURCE_KINDS.video,
+      warn,
+    })
+    // Music has a relay of its own, so a video and a track never retire each other's
+    // secrets, and it keeps two loads: the track playing and the one mpv opens after it.
+    const musicRelay = createMediaRelay({
+      listen: listenOnLoopback({ createServer: (handler) => createServer(handler), warn }),
+      fetchUpstream: fetchRelayed,
+      tickets: accountTickets,
+      newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
+      capacity: 2,
+      warn,
+    })
+    accessEnds.listen(({ serverId }) => musicRelay.closeServer(serverId))
+    const musicSources = createServerSources({
+      serverOf: serverOfId,
+      calls: serverCalls,
+      tickets: accountTickets,
+      relay: musicRelay,
+      kind: SOURCE_KINDS.music,
       warn,
     })
     // Grants hold real paths, so the downloads are named from the real folder too: a profile
@@ -596,9 +634,15 @@ const startApp = (): void => {
         linkBatch.ready()
         checkAtLaunch()
         const player = players.current
-        if (player === null) return
-        player.connect().catch((error: unknown) => {
-          warn(`Raven could not hand the page its player: ${errorText(error)}`)
+        if (player !== null) {
+          player.connect().catch((error: unknown) => {
+            warn(`Raven could not hand the page its player: ${errorText(error)}`)
+          })
+        }
+        const music = musics.current
+        if (music === null) return
+        music.connect().catch((error: unknown) => {
+          warn(`Raven could not hand the page its music engine: ${errorText(error)}`)
         })
       },
       onError: (error) => {
@@ -618,8 +662,12 @@ const startApp = (): void => {
         write: async (output) => {
           config.update((current) => setOutput({ config: current, output }))
           const engine = currentEngine()
-          if (engine === null) return
-          await engine.service.applyOutput({ output, devices: await readDevices(engine.mpv) })
+          await Promise.all([
+            engine === null
+              ? Promise.resolve()
+              : engine.service.applyOutput({ output, devices: await readDevices(engine.mpv) }),
+            musics.current === null ? Promise.resolve() : musics.current.applyOutput(),
+          ])
         },
       },
       setWindowButtons: (isVisible) => {
@@ -662,9 +710,8 @@ const startApp = (): void => {
     // mpv stops before the stores flush and before Electron tears the window down.
     const shutdown = createShutdown({
       engine: {
-        isAlive: () => players.current !== null && players.current.engine.isAlive(),
-        destroy: () =>
-          players.current === null ? Promise.resolve() : players.current.engine.destroy(),
+        isAlive: () => isAnyEngineAlive(engines()),
+        destroy: () => destroyEngines(engines()),
       },
       stores: [store, config, downloadsStore],
       writes: { hasPending: serverCalls.hasPendingWrites, settle: serverCalls.settleWrites },
@@ -680,8 +727,7 @@ const startApp = (): void => {
       // Reached when the flush timed out or the stores are still dirty; see `hardExitFor`
       // for why a live mpv means killing the process, and what that costs.
       exit: () => {
-        const isEngineAlive = players.current !== null && players.current.engine.isAlive()
-        const ending = hardExitFor({ isEngineAlive })
+        const ending = hardExitFor({ isEngineAlive: isAnyEngineAlive(engines()) })
         const end = () => {
           switch (ending) {
             case HARD_EXITS.kill:
@@ -798,6 +844,19 @@ const startApp = (): void => {
       windowMs: budgetWindow ?? BUDGET_WINDOW_MS,
       sampleMs: budgetWindow ?? PLAYING_SAMPLE_MS,
     })
+    const music = attachMusicPlayer({
+      window,
+      config,
+      sources: musicSources,
+      relay: musicRelay,
+      serverId: () => theServer().id,
+      timers,
+      platform,
+      nativeTarget,
+      info: (message) => log.info(message),
+      warn,
+    })
+    musics.current = music
     players.current = attachPlayer({
       window,
       grants,
@@ -814,10 +873,12 @@ const startApp = (): void => {
       info: (message) => log.info(message),
       warn,
     })
+    closeWindowAfterEngines({ window, engines: [players.current.engine, music.engine] })
     // A quit holds the window open while it flushes, so no budget timer may fire meanwhile.
     app.once('before-quit', () => budgets.dispose())
     window.on('closed', () => {
       windows.current = null
+      musics.current = null
       budgets.dispose()
     })
     return service
