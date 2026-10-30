@@ -2,6 +2,7 @@ import { Album } from '@/screens/Album'
 import { Artist } from '@/screens/Artist'
 import { Home } from '@/screens/Home'
 import { Library } from '@/screens/Library'
+import { NowPlaying } from '@/screens/NowPlaying'
 import { Playlist } from '@/screens/Playlist'
 import { Search } from '@/screens/Search'
 import { Settings } from '@/screens/Settings'
@@ -20,5 +21,6 @@ export const WREN_TREE = {
   'album/[id]': Album,
   'artist/[id]': Artist,
   'playlist/[id]': Playlist,
+  'now-playing': NowPlaying,
   'sign-in': SignIn,
 }

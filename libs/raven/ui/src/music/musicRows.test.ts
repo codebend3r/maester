@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'bun:test'
-import { ALBUM_TYPES, type AlbumSummary, MATCH_STATES, type PlaylistSummary } from '@raven/core'
+import {
+  ALBUM_TYPES,
+  type AlbumSummary,
+  EMPTY_QUEUE,
+  MATCH_STATES,
+  type PlaylistSummary,
+  startQueue,
+} from '@raven/core'
 
-import { albumDiscsOf, albumFactsOf, playlistFactsOf, playlistTracksOf } from '@/music/musicRows'
+import {
+  albumDiscsOf,
+  albumFactsOf,
+  playTimeOf,
+  playlistFactsOf,
+  playlistTracksOf,
+  queueRowsOf,
+} from '@/music/musicRows'
 import { track } from '@/test/fixtures'
 
 const AIRBAG = track({ duration: 300 })
@@ -78,5 +92,36 @@ describe('playlists', () => {
       ['101:1', '2. Airbag'],
     ])
     expect(rows[0]).toMatchObject({ line: 'Radiohead', length: '5:00' })
+  })
+})
+
+describe('queueRowsOf', () => {
+  const tracks = { [AIRBAG.id]: AIRBAG, [PARANOID.id]: PARANOID }
+
+  it('lists the queue in play order, the playing track marked', () => {
+    const queue = startQueue({ items: [AIRBAG.id, PARANOID.id], startAt: 1 })
+    expect(queueRowsOf({ queue, tracks })).toEqual([
+      { key: `${AIRBAG.id}:0`, place: 0, title: 'Airbag', line: 'Radiohead', isCurrent: false },
+      {
+        key: `${PARANOID.id}:1`,
+        place: 1,
+        title: 'Paranoid Android',
+        line: 'Radiohead',
+        isCurrent: true,
+      },
+    ])
+  })
+
+  it('leaves out a track the store does not know, and is empty for an empty queue', () => {
+    const queue = startQueue({ items: [AIRBAG.id, LUCKY.id] })
+    expect(queueRowsOf({ queue, tracks }).map(({ title }) => title)).toEqual(['Airbag'])
+    expect(queueRowsOf({ queue: EMPTY_QUEUE, tracks })).toEqual([])
+  })
+})
+
+describe('playTimeOf', () => {
+  it('says how far the track has played and how long it is', () => {
+    expect(playTimeOf({ position: 62, duration: 284 })).toBe('1:02 / 4:44')
+    expect(playTimeOf({ position: 0, duration: null })).toBe('0:00 / 0:00')
   })
 })

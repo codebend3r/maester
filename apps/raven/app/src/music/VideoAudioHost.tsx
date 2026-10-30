@@ -1,4 +1,5 @@
 import { PLAYBACK_MODES, type Track } from '@raven/core'
+import { watchAppHide } from '@raven/native'
 import {
   AUDIO_HOST_COPY,
   AUDIO_STATES,
@@ -16,7 +17,6 @@ import { StyleSheet } from 'react-native'
 import Video, { type VideoRef } from 'react-native-video'
 
 import { mediaSourcesFor } from '@/player/mediaSources'
-import { watchAppHide } from '@/player/progressSink'
 import type { AppQueries } from '@/queries/useAppQueries'
 
 /** The cache key a track's ticketed address sits under, with the server and the track. */

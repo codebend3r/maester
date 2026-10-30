@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import type { AudioItem } from '@raven/audio'
 import type { Track } from '@raven/core'
+import { UnplayableTrackError } from '@raven/ui/headless'
 
 import { nativePlayerOf } from '@/music/nativePlayer'
 
@@ -43,10 +44,12 @@ type HarnessProps = {
   held?: readonly number[]
   /** The tracks the server refuses. */
   refused?: readonly number[]
+  /** The tracks the device cannot decode. */
+  unplayable?: readonly number[]
 }
 
 /** A player whose calls are written down, over tickets a test can hold back or refuse. */
-const harness = ({ held = [], refused = [] }: HarnessProps = {}) => {
+const harness = ({ held = [], refused = [], unplayable = [] }: HarnessProps = {}) => {
   const calls: string[] = []
   const waiting: (() => void)[] = []
   const nameOf = (item: AudioItem | null) => (item === null ? '-' : String(item.id))
@@ -72,6 +75,7 @@ const harness = ({ held = [], refused = [] }: HarnessProps = {}) => {
     itemOf: async (asked) => {
       if (held.includes(asked.id)) await new Promise<void>((resolve) => waiting.push(resolve))
       if (refused.includes(asked.id)) throw new Error('Sign in to the server again.')
+      if (unplayable.includes(asked.id)) return null
       return itemFor(asked)
     },
   })
@@ -127,5 +131,15 @@ describe('nativePlayerOf', () => {
     await release()
     await Promise.all([load, stop])
     expect(calls).toEqual(['stop'])
+  })
+
+  it('refuses a track the device cannot decode, and leaves one out as the next', async () => {
+    const { calls, player } = harness({ unplayable: [2] })
+    await player.load({ playing: track(1), next: track(2), start: 0 })
+    await player.queueNext(track(2))
+    expect(calls).toEqual(['window 1 - playing', 'next -'])
+    await expect(player.load({ playing: track(2), next: null, start: 0 })).rejects.toBeInstanceOf(
+      UnplayableTrackError,
+    )
   })
 })

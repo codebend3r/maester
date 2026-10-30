@@ -1,10 +1,9 @@
 import type { ApiClient } from '@raven/core'
 import { apiFor, openEventsFor } from '@raven/native'
-import type { AppServer } from '@raven/native/headless'
+import { type AppServer, lastPerServer } from '@raven/native/headless'
 import { type RavenQueries, ravenQueriesFor, serverEventsFor } from '@raven/ui/headless'
 
 import { useAccountSession } from '@/account/session'
-import { lastPerServer } from '@/queries/perServer'
 import { useActiveServer } from '@/stores/activeServer'
 
 /** Everything the screens ask one server through: its client, its queries and its events. */

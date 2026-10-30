@@ -7,7 +7,18 @@ import type { WatchHide } from '@/components/Player/useProgressReport'
 import { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
-/** What a host says when a player refused a track without saying why. */
+/**
+ * A track this device's player cannot decode, refused before anything is fetched: Wren on
+ * Android passes over ALAC. The host says `AUDIO_HOST_COPY.couldNotPlay` and moves on to the
+ * next track.
+ */
+export class UnplayableTrackError extends Error {
+  constructor() {
+    super(AUDIO_HOST_COPY.couldNotPlay)
+    this.name = 'UnplayableTrackError'
+  }
+}
+
 /** Why a player refused a track: its own words, or `AUDIO_HOST_COPY.couldNotPlay` when it gave none. */
 export const failureOf = (error: unknown): string =>
   error instanceof Error && error.message !== '' ? error.message : AUDIO_HOST_COPY.couldNotPlay
@@ -89,6 +100,7 @@ export type WindowedAudioHost = { advanced: () => void; ended: () => void }
  * or ran out (`ended`), and the queue steps with it. An audiobook loads at its saved spot, read
  * before the load, and saves its spot as it plays; music starts at its top and saves none. A
  * track the player moved on to by itself plays from its top, as the seam allows nothing else.
+ * A track the player cannot decode (`UnplayableTrackError`) is said and passed over.
  */
 export const useWindowedAudioHost = ({
   api,
@@ -103,18 +115,41 @@ export const useWindowedAudioHost = ({
   const isMuted = usePlayerPrefs((prefs) => prefs.muted)
   const shouldPlay = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
   const loaded = useRef<Loaded | null>(null)
+  // The tracks passed over since one last played, and the one the last pass moved to, so a
+  // queue that holds nothing playable (repeat all over an ALAC album) stops rather than circles.
+  const passed = useRef<ReadonlySet<number>>(new Set())
+  const passingTo = useRef<number | null>(null)
   const trackId = track?.id ?? null
   const nextId = useAudioQueue((store) => nextTrackOf(store)?.id ?? null)
   useListenCounter({ api, track })
   const start = startOf(useAudiobookSpot({ api, track, watchHide }))
 
+  const passOver = useEffectEvent((id: number) => {
+    const store = useAudioQueue.getState()
+    // The queue moved on while the track was being read: there is nothing left to pass.
+    if (playingTrackOf(store)?.id !== id) return
+    passed.current = new Set([...passed.current, id])
+    const following = nextTrackOf(store)
+    if (following === null || passed.current.has(following.id)) return
+    passingTo.current = following.id
+    store.next()
+  })
+
   const load = useEffectEvent(({ playing, next, start: from }: WindowedLoadProps) => {
     loaded.current = { id: playing.id, next: next?.id ?? null }
+    if (passingTo.current !== playing.id) passed.current = new Set()
+    passingTo.current = null
     // The clock starts where the player will, so nothing reads the spot as 0 before it says so.
     if (from > 0) engine.time({ position: from, duration: useAudioQueue.getState().duration })
-    player
-      .load({ playing, next, start: from })
-      .catch((error: unknown) => engine.failed(failureOf(error)))
+    player.load({ playing, next, start: from }).then(
+      () => {
+        passed.current = new Set()
+      },
+      (error: unknown) => {
+        engine.failed(failureOf(error))
+        if (error instanceof UnplayableTrackError) passOver(playing.id)
+      },
+    )
   })
 
   // The playing track and the one after it, as the queue stands.

@@ -1,9 +1,11 @@
 import {
   type AlbumSummary,
   type PlaylistSummary,
+  type Queue,
   type Track,
   artistNames,
   formatDuration,
+  orderedOf,
   plural,
 } from '@raven/core'
 
@@ -102,3 +104,30 @@ export const albumDiscsOf = ({ tracks, discCount }: AlbumDiscsOfProps): AlbumDis
         : [],
     ),
   }))
+
+/** One row of the queue on Now Playing, as every app draws it: a track in play order. */
+export type QueueRow = {
+  key: string
+  /** Where it sits in the play order, which a jump or a remove names. */
+  place: number
+  title: string
+  line: string
+  isCurrent: boolean
+}
+
+type QueueRowsOfProps = { queue: Queue; tracks: Readonly<Record<number, Track>> }
+
+/** The queue in play order, each track the store knows, keyed by its place so a repeat is its own row. */
+export const queueRowsOf = ({ queue, tracks }: QueueRowsOfProps): QueueRow[] =>
+  orderedOf(queue).flatMap(({ id, isCurrent }, place) => {
+    const track = tracks[id]
+    return track === undefined
+      ? []
+      : [{ key: `${id}:${place}`, place, title: track.title, line: artistNames(track), isCurrent }]
+  })
+
+type PlayTimeOfProps = { position: number; duration: number | null }
+
+/** How far the track has played and how long it is: "1:02 / 4:44". */
+export const playTimeOf = ({ position, duration }: PlayTimeOfProps): string =>
+  `${formatDuration(position)} / ${formatDuration(duration)}`

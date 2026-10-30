@@ -4,11 +4,12 @@ import {
   type AlbumDisc,
   type AudiobookSpeed,
   type PlaylistTrack,
+  type QueueRow,
 } from '@raven/ui/headless'
 import type { ReactNode } from 'react'
 
 import { MUSIC_COPY } from '@/layouts/copy'
-import type { ChapterRow, LyricsView, QueueRow } from '@/layouts/musicRows'
+import type { ChapterRow, LyricsView } from '@/layouts/musicRows'
 import type { Picture } from '@/queries/cards'
 
 /** What the remote and the screen reader call the actions a touch row offers beside a press. */

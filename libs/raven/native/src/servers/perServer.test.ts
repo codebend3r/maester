@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 
-import { lastPerServer } from '@/queries/perServer'
-import { NAS } from '@/test/homeServer'
+import { lastPerServer } from '@/servers/perServer'
+import { NAS } from '@/test/mediaServer'
 
 const OTHER = { ...NAS, id: '5d3c2b1a-0f9e-4d8c-b7a6-958473625140', origin: 'http://other:8484' }
 

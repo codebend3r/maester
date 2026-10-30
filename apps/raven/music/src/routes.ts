@@ -5,6 +5,7 @@ export const WREN_ROUTES = {
   search: '/search',
   settings: '/settings',
   signIn: '/sign-in',
+  nowPlaying: '/now-playing',
 } as const
 
 /** The pages a listing opens, each named by the id in its path. */
@@ -26,6 +27,7 @@ export const WREN_SCREENS = {
   album: 'album/[id]',
   artist: 'artist/[id]',
   playlist: 'playlist/[id]',
+  nowPlaying: 'now-playing',
 } as const
 
 /** The tabs' names as the tab navigator knows them, inside `app/(tabs)/`. */

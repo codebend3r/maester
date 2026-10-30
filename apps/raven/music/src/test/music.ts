@@ -8,10 +8,14 @@ import {
   FOLDER_LAYOUTS,
   LIBRARY_KINDS,
   LIBRARY_VIEWS,
+  LYRICS_KINDS,
+  LYRICS_SOURCES,
   type Library,
+  type Lyrics,
   MATCH_STATES,
   MEDIA_GROUPINGS,
   MEDIA_SORTS,
+  NO_LYRICS,
   type MusicListOptions,
   PATH_LAYOUTS,
   type PlaylistDetails,
@@ -22,6 +26,7 @@ import {
   SCAN_STATES,
   type Track,
   type TrackPage,
+  createApiClient,
 } from '@raven/core'
 
 /** The signed-in listener every screen test starts as. */
@@ -73,6 +78,12 @@ const libraryFor = ({ id, name, kind }: LibraryForProps): Library => ({
 })
 
 export const MUSIC = libraryFor({ id: 5, name: 'Music', kind: LIBRARY_KINDS.music })
+/** The music library as a library of audiobooks, so what it holds plays as a book. */
+export const AUDIOBOOKS = libraryFor({
+  id: MUSIC.id,
+  name: 'Books',
+  kind: LIBRARY_KINDS.audiobooks,
+})
 const FILMS = libraryFor({ id: 1, name: 'Films', kind: LIBRARY_KINDS.movies })
 
 export const RADIOHEAD: Artist = {
@@ -124,7 +135,7 @@ export const trackFor = ({ id, title, disc = 1, number = 1 }: TrackForProps): Tr
 })
 
 export const AIRBAG = trackFor({ id: 101, title: 'Airbag' })
-const PARANOID = trackFor({ id: 102, title: 'Paranoid Android', number: 2 })
+export const PARANOID = trackFor({ id: 102, title: 'Paranoid Android', number: 2 })
 const LUCKY = trackFor({ id: 103, title: 'Lucky', disc: 2 })
 
 export const OK_COMPUTER_PAGE: AlbumDetails = {
@@ -142,6 +153,17 @@ const RADIOHEAD_PAGE: ArtistDetails = {
   albums: [OK_COMPUTER],
   appearsOn: [],
   isFavourite: false,
+}
+
+/** Airbag's words, timed to the music, a bar with none at its end. */
+const AIRBAG_LYRICS: Lyrics = {
+  kind: LYRICS_KINDS.synced,
+  source: LYRICS_SOURCES.lrclib,
+  lines: [
+    { at: 0, text: 'In the next world war' },
+    { at: 12, text: 'In a jackknifed juggernaut' },
+    { at: 20, text: '' },
+  ],
 }
 
 export const MIXTAPE: PlaylistSummary = {
@@ -162,6 +184,12 @@ type AppendProps = { id: number; mediaIds: readonly number[] }
 type AlbumFavouriteProps = { albumId: number; favourite: boolean }
 
 type ArtistFavouriteProps = { artistId: number; favourite: boolean }
+
+/** raven's own address builders, which ask the network nothing. */
+const addresses = createApiClient({
+  baseUrl: 'https://raven.example',
+  fetch: () => new Promise(() => undefined),
+})
 
 /**
  * raven's music as Wren's screens ask for it, each call a mock a test can answer otherwise or
@@ -194,5 +222,13 @@ export const musicApi = () => ({
       isFavourite: favourite,
     }),
   ),
+  getLyrics: jest.fn(async (id: number): Promise<Lyrics> =>
+    id === AIRBAG.id ? AIRBAG_LYRICS : NO_LYRICS,
+  ),
+  getMarkers: jest.fn(async (_id: number) => ({ intro: null, credits: null, chapters: [] })),
+  getMediaOrigins: jest.fn(async () => ({ origins: [] })),
+  getMediaTicket: jest.fn(async () => ({ ticket: 'tkt.wren', expiresAt: 0 })),
+  fileUrl: addresses.fileUrl,
+  recordPlay: jest.fn(async (_id: number) => undefined),
   albumCoverUrl: (): string | null => null,
 })

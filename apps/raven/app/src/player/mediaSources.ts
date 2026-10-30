@@ -1,8 +1,7 @@
 import { accessTokenNow, apiFor, cookieJar, watchNetwork } from '@raven/native'
-import { mediaAccessFor, probeFetchOf } from '@raven/native/headless'
+import { lastPerServer, mediaAccessFor, probeFetchOf } from '@raven/native/headless'
 
 import { useAccountSession } from '@/account/session'
-import { lastPerServer } from '@/queries/perServer'
 import { useAppPrefs } from '@/stores/appPrefs'
 
 /**

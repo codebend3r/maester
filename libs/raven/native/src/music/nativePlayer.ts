@@ -1,14 +1,17 @@
 import type { AudioItem, AudioPlayer } from '@raven/audio'
 import type { Track } from '@raven/core'
-import type { WindowedPlayer } from '@raven/ui/headless'
+import { UnplayableTrackError, type WindowedPlayer } from '@raven/ui/headless'
 
 type NativePlayerOfProps = {
   audio: Pick<
     AudioPlayer,
     'setWindow' | 'setNext' | 'play' | 'pause' | 'seekTo' | 'setVolume' | 'stop'
   >
-  /** The track as the player takes it, with its ticketed address; rejects with why it cannot. */
-  itemOf: (track: Track) => Promise<AudioItem>
+  /**
+   * The track as the player takes it, with its ticketed address; null for one this device's
+   * player cannot decode, and a rejection with why it cannot be reached.
+   */
+  itemOf: (track: Track) => Promise<AudioItem | null>
 }
 
 type Step = (isCurrent: () => boolean) => Promise<void>
@@ -23,7 +26,9 @@ type EnqueueProps = {
  * `@raven/audio` as the shared windowed host drives it. Each track needs a ticket first, so the
  * window's changes run one after another in the order asked, and a newer load or stop makes the
  * older ones lapse, so a slow ticket never lands a track the queue has moved past. Play and pause
- * go straight to the player, and the next window takes whichever was asked last.
+ * go straight to the player, and the next window takes whichever was asked last. A playing
+ * track the device cannot decode rejects with `UnplayableTrackError`, and one such next is left
+ * out, so the player ends where it starts and the host passes over it.
  */
 export const nativePlayerOf = ({ audio, itemOf }: NativePlayerOfProps): WindowedPlayer => {
   let generation = 0
@@ -49,6 +54,7 @@ export const nativePlayerOf = ({ audio, itemOf }: NativePlayerOfProps): Windowed
         step: async (isCurrent) => {
           const [item, nextItem] = await Promise.all([itemOf(playing), nextItemOf(next)])
           if (!isCurrent()) return
+          if (item === null) throw new UnplayableTrackError()
           await audio.setWindow({ playing: item, next: nextItem, shouldPlay, start })
         },
       }),

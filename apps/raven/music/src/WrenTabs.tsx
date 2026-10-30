@@ -1,8 +1,9 @@
 import { Icon } from '@raven/native'
 import type { IconName } from '@raven/ui/iconDrawings'
-import { Tabs } from 'expo-router/js-tabs'
-import { StyleSheet } from 'react-native'
+import { BottomTabBar, type BottomTabBarProps, Tabs } from 'expo-router/js-tabs'
+import { StyleSheet, View } from 'react-native'
 
+import { BAR_PLACES, NowPlayingBar } from '@/components/NowPlayingBar'
 import { WREN_TABS } from '@/routes'
 import { WREN_ICONS } from '@/theme/icons'
 import { PALETTE, SIZES } from '@/theme/wrenTheme'
@@ -26,7 +27,15 @@ const TABS = {
   [WREN_TABS.settings]: { title: 'Settings', tabBarIcon: tabIconOf(WREN_ICONS.settings) },
 } as const satisfies Record<WrenTab, { title: string; tabBarIcon: ReturnType<typeof tabIconOf> }>
 
-/** Wren's four tabs along the bottom, each named and drawn with raven's line icons. */
+/** The tab bar with the now-playing bar sitting on it. */
+const tabBarOf = (props: BottomTabBarProps) => (
+  <View>
+    <NowPlayingBar place={BAR_PLACES.tabs} />
+    <BottomTabBar {...props} />
+  </View>
+)
+
+/** Wren's four tabs along the bottom, each named and drawn with raven's line icons, the bar above them. */
 export function WrenTabs() {
   return (
     <Tabs
@@ -38,6 +47,7 @@ export function WrenTabs() {
         tabBarLabelStyle: styles.label,
         tabBarStyle: styles.bar,
       }}
+      tabBar={tabBarOf}
     >
       {Object.entries(TABS).map(([name, options]) => (
         <Tabs.Screen key={name} name={name} options={options} />

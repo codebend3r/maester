@@ -21,6 +21,7 @@ import {
   routeIdOf,
   routeState,
 } from '@raven/core'
+import { watchAppHide } from '@raven/native'
 import {
   VIDEO_EVENTS,
   initialVideoState,
@@ -51,7 +52,7 @@ import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
 import { planFor } from '@/platform/playbackPlan'
 import { mediaSourcesFor } from '@/player/mediaSources'
 import { isServerDrop } from '@/player/playerErrors'
-import { progressSinkFor, watchAppHide } from '@/player/progressSink'
+import { progressSinkFor } from '@/player/progressSink'
 import {
   AUDIO_HEARINGS,
   type AudioHearing,
