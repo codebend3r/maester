@@ -48,7 +48,10 @@ const examples = {
   ],
   [MPV_PROPERTIES.containerFps]: 24,
   [MPV_PROPERTIES.audioDeviceList]: [{ name: AUDIO_DEVICES.auto, description: 'Default' }],
-  [MPV_PROPERTIES.demuxerCacheState]: { 'seekable-ranges': [{ start: 0, end: 12 }] },
+  [MPV_PROPERTIES.demuxerCacheState]: {
+    'seekable-ranges': [{ start: 0, end: 12 }],
+    'raw-input-rate': 44_000,
+  },
   [MPV_PROPERTIES.hwdecCurrent]: 'videotoolbox',
   [MPV_PROPERTIES.frameDropCount]: 0,
   [MPV_PROPERTIES.decoderFrameDropCount]: 0,
@@ -85,6 +88,12 @@ test('every named native property accepts its shape and rejects malformed values
   expect(
     propertyGuards[MPV_PROPERTIES.demuxerCacheState]({
       'seekable-ranges': [{ start: '0', end: 1 }],
+    }),
+  ).toBe(false)
+  expect(
+    propertyGuards[MPV_PROPERTIES.demuxerCacheState]({
+      'seekable-ranges': [],
+      'raw-input-rate': '44000',
     }),
   ).toBe(false)
   expect(propertyGuards[MPV_PROPERTIES.audioDeviceList]([{ name: AUDIO_DEVICES.auto }])).toBe(false)

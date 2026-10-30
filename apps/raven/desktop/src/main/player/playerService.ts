@@ -57,8 +57,8 @@ import { messageOf } from '@/shared/messageOf'
 export type PlayerActivity = { isPlaying: boolean; isShowing: boolean }
 
 /**
- * How long a server title may wait on its server without the clock moving before the
- * service gives up on it. lavf's own timeouts and reconnects let a server that accepts
+ * How long a server title may wait on its server without the clock moving or bytes arriving
+ * before the service gives up on it. lavf's own timeouts and reconnects let a server that accepts
  * and then sends nothing hold the page for about two minutes.
  */
 export const SERVER_STALL_MS = 30_000
@@ -696,6 +696,9 @@ export const createPlayerService = ({
         return
       case MPV_PROPERTIES.demuxerCacheState:
         buffered.push(event.data?.['seekable-ranges'] ?? [])
+        // A slow link fills the cache for longer than the budget while the clock stands still;
+        // bytes still arriving mean the server is there, so only a quiet one runs the budget out.
+        if (stallTimer !== null && (event.data?.['raw-input-rate'] ?? 0) > 0) restartStall()
         return
       default:
         return
