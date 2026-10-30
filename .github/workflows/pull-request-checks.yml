@@ -576,7 +576,10 @@ jobs:
         run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
 
       # Runs `prebuild:tvos` first (bun runs it before `build:tvos`), which regenerates
-      # ios/ and installs the pods, so the pods are checked right after.
+      # ios/ and installs the pods, so the pods are checked right after. Nx caches only what
+      # the steps below read: the app, the lockfiles, and the project with the remote test
+      # target. Pods/ and DerivedData ran Nx Cloud's upload out of open files (EMFILE), so no
+      # Apple build was ever stored and every PR compiled from scratch.
       - name: 📺 Build for the Apple TV simulator
         run: bunx nx run @raven/app:build:tvos --excludeTaskDependencies
 
@@ -675,23 +678,12 @@ jobs:
           platform: ios
           node-version: ${{ env.APP_NODE_VERSION }}
 
-      # The fixture server, the simulator's boot and Maestro's download do not depend on
-      # the build, so they start before it and finish while it compiles. Each runs in the
-      # background; the steps after the build wait for them. The fixture server prints its
-      # ready line once its libraries are scanned.
+      # The fixture server and Maestro's download do not depend on the build, so they start
+      # before it and finish while it compiles. Each runs in the background; the steps after
+      # the build wait for them. The fixture server prints its ready line once its libraries
+      # are scanned.
       - name: 🗄️ Start the fixture server
         run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
-
-      # A fresh iPhone 16 on the iOS runtime of the selected Xcode's SDK. `simctl boot`
-      # returns at once and CoreSimulator boots it in the background; a runner with no such
-      # runtime fails here rather than testing on another.
-      - name: 📱 Boot the iPhone simulator
-        run: |
-          sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)"
-          runtime="$(xcrun simctl list -j runtimes iOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
-          device="$(xcrun simctl create raven-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
-          xcrun simctl boot "$device"
-          echo "SIMULATOR=$device" >> "$GITHUB_ENV"
 
       # Maestro's own release, the zip its Homebrew formula installs, pinned by version and
       # checksum. It runs on the runner's Java. The download runs in the background and
@@ -713,7 +705,8 @@ jobs:
           } > "$RUNNER_TEMP/maestro.log" 2>&1 &
 
       # Runs `prebuild:ios` first (bun runs it before `build:ios`), which regenerates ios/
-      # and installs the pods, so the pods are checked right after.
+      # and installs the pods, so the pods are checked right after. Nx caches only the app
+      # and the two lockfiles, so a PR that leaves the app's inputs alone restores the build.
       - name: 📱 Build for the iPhone and iPad simulator
         run: bunx nx run @raven/app:build:ios --excludeTaskDependencies
 
@@ -725,11 +718,18 @@ jobs:
         working-directory: apps/raven/app/ios
         run: cmp Podfile.lock Pods/Manifest.lock
 
-      - name: ⏳ Wait for the iPhone simulator
-        run: xcrun simctl bootstatus "$SIMULATOR" -b
-
-      - name: 📲 Install the build on the iPhone simulator
-        run: xcrun simctl install "$SIMULATOR" apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
+      # A fresh iPhone 16 on the iOS runtime of the selected Xcode's SDK, booted, with the
+      # build on it. A runner with no such runtime fails here rather than testing on another.
+      # It boots after the build, as the Apple TV does: booted during the compile, it shared
+      # the runner's three cores and its memory, and the build took twice the Apple TV's.
+      - name: 📱 Boot the iPhone simulator
+        run: |
+          sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          runtime="$(xcrun simctl list -j runtimes iOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
+          device="$(xcrun simctl create raven-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
 
       # A real raven server with a locked film library and an open series library, started
       # above for the flows.

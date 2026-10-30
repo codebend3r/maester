@@ -476,7 +476,7 @@ const setup = ({ timers, sidecarsOf = () => [], refusedAccount = () => null }: S
     service.receive({
       type: 'property',
       name: 'demuxer-cache-state',
-      data: { 'seekable-ranges': list },
+      data: { 'seekable-ranges': list, 'raw-input-rate': undefined },
     })
   return {
     service,
@@ -2017,6 +2017,30 @@ describe('createPlayerService', () => {
       expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
       clock.advance(1)
       expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toHaveLength(1)
+    })
+
+    test('bytes still arriving start the budget over, and a quiet stream runs it out', async () => {
+      const clock = createTimedTimers()
+      const { service, events, loaded } = setup({ timers: clock.timers })
+      await loaded(SERVER_LOAD)
+      waiting({ service, data: true })
+      const cache = (rate: number) =>
+        service.receive({
+          type: 'property',
+          name: 'demuxer-cache-state',
+          data: { 'seekable-ranges': [], 'raw-input-rate': rate },
+        })
+      clock.advance(SERVER_STALL_MS - 1)
+      cache(44_000)
+      clock.advance(SERVER_STALL_MS - 1)
+      cache(44_000)
+      clock.advance(SERVER_STALL_MS - 1)
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([])
+      cache(0)
+      clock.advance(1)
+      expect(events.filter(({ type }) => type === PLAYER_EVENTS.error)).toEqual([
+        { type: 'error', reason: 'network', message: PLAYER_MESSAGES.lost },
+      ])
     })
 
     test('a local file is never stopped for waiting', async () => {

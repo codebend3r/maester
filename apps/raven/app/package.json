@@ -183,8 +183,9 @@
           "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
         ],
         "outputs": [
-          "{projectRoot}/ios",
-          "{projectRoot}/build/ios"
+          "{projectRoot}/ios/Podfile.lock",
+          "{projectRoot}/ios/Pods/Manifest.lock",
+          "{projectRoot}/build/ios/Build/Products/Release-iphonesimulator/raven.app"
         ],
         "cache": true
       },
@@ -210,8 +211,12 @@
           "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
         ],
         "outputs": [
-          "{projectRoot}/ios",
-          "{projectRoot}/build/tvos"
+          "{projectRoot}/ios/Podfile.lock",
+          "{projectRoot}/ios/Pods/Manifest.lock",
+          "{projectRoot}/ios/Pods/Target Support Files/Pods-raven",
+          "{projectRoot}/ios/raven.xcodeproj",
+          "{projectRoot}/ios/RavenRemoteTests",
+          "{projectRoot}/build/tvos/Build/Products/Release-appletvsimulator/raven.app"
         ],
         "cache": true
       },

@@ -99,6 +99,8 @@ export const propertyGuards = {
   [MPV_PROPERTIES.demuxerCacheState]: nullable(
     object({
       'seekable-ranges': listOf(object({ start: isNumber, end: isNumber })),
+      // Bytes a second the stream is reading, which tells a slow server from one that went quiet.
+      'raw-input-rate': optional(isNumber),
     }),
   ),
   [MPV_PROPERTIES.hwdecCurrent]: isString,

@@ -134,6 +134,9 @@ runs:
     # ffmpeg for the fixture server's clips, and ccache for the compile: Expo's Podfile reads
     # USE_CCACHE at `pod install` and points Xcode's compilers at React Native's wrappers.
     # DEVELOPER_DIR is the Xcode every Apple build, and so its ccache objects, are made with.
+    # React Native's compiler wrapper runs `$CCACHE_BINARY clang`, but Xcode passes build
+    # settings to no compiler's environment, so its CCACHE_BINARY setting never arrived and
+    # every compile ran plain clang with ccache's stats at zero; the environment sets it.
     #
     # CocoaPods fetches the Hermes tarball with plain curl, which without a ~/.curlrc waits
     # out a stalled mirror for as long as the job lasts; this one drops a transfer under
@@ -152,6 +155,7 @@ runs:
         {
           echo "DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer"
           echo "USE_CCACHE=1"
+          echo "CCACHE_BINARY=$(command -v ccache)"
           echo "CCACHE_DIR=$CCACHE_PATH"
           echo "CCACHE_MAXSIZE=1500M"
         } >> "$GITHUB_ENV"
