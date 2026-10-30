@@ -1,11 +1,13 @@
-import type { Account } from '@raven/core'
+import { type Account, PAGE_PATHS } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
+import { ACCOUNT_MENU_COPY } from '@/components/AccountMenu/copy'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { useMenu } from '@/lib/useMenu'
 import { useSignOut } from '@/lib/useSignOut'
 import styles from '@/components/AccountMenu/AccountMenu.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type MenuProps = { account: Account }
 
@@ -20,7 +22,7 @@ const Menu = ({ account }: MenuProps) => {
         ref={trigger}
         type="button"
         className={styles.trigger}
-        aria-label="Account"
+        aria-label={COMMON_COPY.account}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={id}
@@ -35,7 +37,9 @@ const Menu = ({ account }: MenuProps) => {
             <p id={`${id}-email`} className={styles.email}>
               {account.email}
             </p>
-            <p className={styles.role}>{account.isOwner ? 'Owner' : 'Member'}</p>
+            <p className={styles.role}>
+              {account.isOwner ? ACCOUNT_MENU_COPY.owner : ACCOUNT_MENU_COPY.member}
+            </p>
           </header>
           <ul
             ref={list}
@@ -47,13 +51,13 @@ const Menu = ({ account }: MenuProps) => {
           >
             <li role="none">
               <Link
-                to="/settings"
+                to={PAGE_PATHS.settings}
                 role="menuitem"
                 className={styles.item}
                 onClick={() => close({ refocus: false })}
               >
                 <Icon name="settings" size={18} />
-                Settings
+                {COMMON_COPY.settings}
               </Link>
             </li>
             <li role="none">
@@ -65,13 +69,13 @@ const Menu = ({ account }: MenuProps) => {
                 onClick={() => end.mutate()}
               >
                 <Icon name="signOut" size={18} />
-                {end.isPending ? 'Signing out' : 'Sign out'}
+                {end.isPending ? COMMON_COPY.signingOut : COMMON_COPY.signOut}
               </button>
             </li>
           </ul>
           {end.isError && (
             <p className={styles.error} role="alert">
-              Could not sign out: {end.error.message}
+              {ACCOUNT_MENU_COPY.signOutFailed(end.error.message)}
             </p>
           )}
         </section>

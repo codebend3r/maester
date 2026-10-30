@@ -1,7 +1,10 @@
+import type { ComponentType } from 'react'
 import { Link } from 'react-router-dom'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
+import { MANAGERS_ONLY_COPY } from '@/components/ManagersOnly/copy'
 import { MANAGEMENT_MODES, type ManagementMode } from '@/lib/management'
 import styles from '@/components/ManagersOnly/ManagersOnly.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type ManagersOnlyProps = {
   mode: ManagementMode
@@ -13,27 +16,48 @@ type ManagersOnlyProps = {
   forOwner: string
 }
 
+type NoteProps = Omit<ManagersOnlyProps, 'mode'>
+
+type AdminNoteProps = NoteProps
+
+const AdminNote = ({ name, forAdmin }: AdminNoteProps) => (
+  <>
+    <h1 className={styles.title}>{MANAGERS_ONLY_COPY.forTheAdmin(name)}</h1>
+    <p>
+      {MANAGERS_ONLY_COPY.turnOffBefore}
+      <Link to="/settings">{COMMON_COPY.settings}</Link>
+      {MANAGERS_ONLY_COPY.turnOffAfter(forAdmin)}
+    </p>
+  </>
+)
+
+type OwnerNoteProps = NoteProps
+
+const OwnerNote = ({ name, forOwner }: OwnerNoteProps) => (
+  <>
+    <h1 className={styles.title}>{MANAGERS_ONLY_COPY.forTheOwner(name)}</h1>
+    <p>{MANAGERS_ONLY_COPY.onlyTheOwner(forOwner)}</p>
+  </>
+)
+
+const NOTES = {
+  [MANAGEMENT_MODES.adminLock]: AdminNote,
+  [MANAGEMENT_MODES.owner]: OwnerNote,
+  [MANAGEMENT_MODES.none]: OwnerNote,
+} as const satisfies Record<ManagementMode, ComponentType<NoteProps>>
+
 /**
  * What a managing page shows, in place of itself, to a viewer who may not
  * manage: whom it is for, and with the admin lock, how to turn it off.
  */
-export const ManagersOnly = ({ mode, name, forAdmin, forOwner }: ManagersOnlyProps) => (
-  <section className={styles.page}>
-    <BackButton fallback={HOME} className={styles.back} />
-    <div className={styles.body}>
-      {mode === MANAGEMENT_MODES.adminLock ? (
-        <>
-          <h1 className={styles.title}>{name} are for the admin</h1>
-          <p>
-            Turn the admin lock off in <Link to="/settings">Settings</Link> to {forAdmin}.
-          </p>
-        </>
-      ) : (
-        <>
-          <h1 className={styles.title}>{name} are for the owner</h1>
-          <p>Only the owner can {forOwner}.</p>
-        </>
-      )}
-    </div>
-  </section>
-)
+export const ManagersOnly = ({ mode, ...note }: ManagersOnlyProps) => {
+  const Note = NOTES[mode]
+  return (
+    <section className={styles.page}>
+      <BackButton fallback={HOME} className={styles.back} />
+      <div className={styles.body}>
+        <Note {...note} />
+      </div>
+    </section>
+  )
+}

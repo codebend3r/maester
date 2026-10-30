@@ -2,7 +2,6 @@ import {
   type AiSuggestion,
   type MediaItem,
   type UnmatchedShow,
-  plural,
   unmatchedShowsOf,
   MATCH_SUBJECT_KINDS,
   ITEM_TYPES,
@@ -14,7 +13,9 @@ import { Button, Icon } from '@raven/ui'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { api } from '@/lib/api'
 import { useReturnFocus } from '@/lib/useReturnFocus'
+import { UNMATCHED_SHOWS_COPY } from '@/components/UnmatchedShows/copy'
 import styles from '@/components/UnmatchedShows/UnmatchedShows.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type UnmatchedShowEntryProps = {
   group: UnmatchedShow
@@ -55,9 +56,7 @@ const UnmatchedShowEntry = ({ group, renderFiles, suggestionOf }: UnmatchedShowE
           <Icon name="next" size={18} />
         </span>
         <span className={styles.title}>{group.title}</span>
-        <span className={styles.count}>
-          {plural({ n: group.files.length, one: 'episode', many: 'episodes' })}
-        </span>
+        <span className={styles.count}>{COMMON_COPY.episodes(group.files.length)}</span>
       </button>
       <AdminOnly>
         {!suggested && (
@@ -65,10 +64,10 @@ const UnmatchedShowEntry = ({ group, renderFiles, suggestionOf }: UnmatchedShowE
             ref={fixButton}
             className={styles.fix}
             icon="search"
-            aria-label={`Fix match for ${group.title}`}
+            aria-label={UNMATCHED_SHOWS_COPY.fixMatchFor(group.title)}
             onClick={() => setIsFixing(true)}
           >
-            Fix match
+            {UNMATCHED_SHOWS_COPY.fixMatch}
           </Button>
         )}
       </AdminOnly>

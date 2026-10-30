@@ -1,6 +1,7 @@
 import { LIBRARY_ICON_LABELS, type LibraryIconName, isLibraryIconName } from '@raven/core'
 import { useId } from 'react'
 import { Icon } from '@raven/ui'
+import { LIBRARY_DIALOG_COPY } from '@/components/LibraryDialog/copy'
 import styles from '@/components/LibraryDialog/IconPicker.module.scss'
 
 type IconPickerProps = {
@@ -29,7 +30,9 @@ export const IconPicker = ({ value, onChange }: IconPickerProps) => {
           />
           <label htmlFor={`${name}-${icon}`} title={LIBRARY_ICON_LABELS[icon]}>
             <Icon name={icon} size={24} />
-            <span className="visually-hidden">{`${LIBRARY_ICON_LABELS[icon]} icon`}</span>
+            <span className="visually-hidden">
+              {LIBRARY_DIALOG_COPY.iconLabel(LIBRARY_ICON_LABELS[icon])}
+            </span>
           </label>
         </div>
       ))}

@@ -1,5 +1,6 @@
 import type { AiMatch } from '@raven/core'
 import { Icon } from '@raven/ui'
+import { AI_MATCH_NOTE_COPY } from '@/components/AiMatchNote/copy'
 import styles from '@/components/AiMatchNote/AiMatchNote.module.scss'
 
 type AiMatchNoteProps = { aiMatch: AiMatch; id?: string }
@@ -12,7 +13,7 @@ export const AiMatchNote = ({ aiMatch, id }: AiMatchNoteProps) => (
   <p id={id} className={styles.note}>
     <Icon name="wand" size={16} />
     <span className={styles.text}>
-      <strong>Matched by AI.</strong> {aiMatch.reason}
+      <strong>{AI_MATCH_NOTE_COPY.matchedByAi}</strong> {aiMatch.reason}
     </span>
   </p>
 )

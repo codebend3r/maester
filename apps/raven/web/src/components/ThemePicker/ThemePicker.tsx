@@ -1,6 +1,7 @@
 import { THEMES, type ThemeId } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { useId } from 'react'
+import { THEME_PICKER_COPY } from '@/components/ThemePicker/copy'
 import { useMenu } from '@/lib/useMenu'
 import { useTheme } from '@/stores/theme'
 import styles from '@/components/ThemePicker/ThemePicker.module.scss'
@@ -40,11 +41,11 @@ export const ThemePicker = ({ className }: ThemePickerProps) => {
         ref={trigger}
         type="button"
         className={styles.trigger}
-        aria-label="Theme"
+        aria-label={THEME_PICKER_COPY.theme}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={id}
-        title="Theme"
+        title={THEME_PICKER_COPY.theme}
         onClick={toggle}
       >
         <span className={styles.swatch} />
@@ -53,9 +54,9 @@ export const ThemePicker = ({ className }: ThemePickerProps) => {
         <section className={styles.popover} aria-labelledby={`${id}-heading`}>
           <header className={styles.head}>
             <h2 id={`${id}-heading`} className={styles.heading}>
-              Theme
+              {THEME_PICKER_COPY.theme}
             </h2>
-            <p className={styles.saved}>Saved on this device</p>
+            <p className={styles.saved}>{THEME_PICKER_COPY.saved}</p>
           </header>
           <ul
             ref={list}

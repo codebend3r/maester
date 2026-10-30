@@ -23,42 +23,56 @@ import type { IconName } from '@raven/ui'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
 import type { Search } from '@raven/ui/headless'
+import { LIBRARY_TOOLBAR_COPY } from '@/components/LibraryToolbar/copy'
 import styles from '@/components/LibraryToolbar/LibraryToolbar.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type DirectionButtonProps = {
-  settings: LibrarySettings
+  sort: LibrarySettings['sort']
   onChange: (change: LibraryViewChange) => void
 }
+
+type DirectedSortParts = Exclude<ReturnType<typeof sortParts>, { direction: null }>
+
+type DirectionButtonShownProps = DirectionButtonProps & { parts: DirectedSortParts }
 
 /**
  * The button beside the sort that turns the order around, saying which way
  * it runs now; a field with no direction, as Random, has none.
  */
-const DirectionButton = ({ settings, onChange }: DirectionButtonProps) => {
-  const { field, direction } = sortParts(settings.sort)
-  if (direction === null) return null
+const DirectionButtonShown = ({ sort, parts, onChange }: DirectionButtonShownProps) => {
+  const { field, direction } = parts
   const labels = SORT_DIRECTION_LABELS[field]
   return (
     <Button
       tone="ghost"
       icon={direction}
       className={styles.direction}
-      title={`Sort ${labels[reversedDirection(direction)].toLowerCase()} instead`}
-      onClick={() => onChange({ sort: reversedSort(settings.sort) })}
+      title={LIBRARY_TOOLBAR_COPY.sortInstead(labels[reversedDirection(direction)])}
+      onClick={() => onChange({ sort: reversedSort(sort) })}
     >
-      <span className="visually-hidden">Order: </span>
+      <span className="visually-hidden">{LIBRARY_TOOLBAR_COPY.order}</span>
       {labels[direction]}
     </Button>
   )
 }
 
-const VIEW_ICONS: Record<LibraryView, IconName> = {
-  grid: 'grid',
-  covers: 'covers',
-  list: 'list',
-  tiles: 'tiles',
-  grouped: 'grouped',
+const DirectionButton = ({ sort, onChange }: DirectionButtonProps) => {
+  const parts = sortParts(sort)
+  return (
+    parts.direction !== null && (
+      <DirectionButtonShown sort={sort} parts={parts} onChange={onChange} />
+    )
+  )
 }
+
+const VIEW_ICONS = {
+  [LIBRARY_VIEWS.grid]: 'grid',
+  [LIBRARY_VIEWS.covers]: 'covers',
+  [LIBRARY_VIEWS.list]: 'list',
+  [LIBRARY_VIEWS.tiles]: 'tiles',
+  [LIBRARY_VIEWS.grouped]: 'grouped',
+} as const satisfies Record<LibraryView, IconName>
 
 type LibraryToolbarProps = {
   name: string
@@ -95,7 +109,7 @@ export const LibraryToolbar = ({
       <div className={styles.find}>
         <div className={styles.search}>
           <label htmlFor={ids.search} className="visually-hidden">
-            Search {name}
+            {LIBRARY_TOOLBAR_COPY.search(name)}
           </label>
           <span className={styles.searchIcon}>
             <Icon name="search" size={18} />
@@ -104,13 +118,13 @@ export const LibraryToolbar = ({
             id={ids.search}
             search={search}
             className={styles.input}
-            placeholder={`Search ${name}`}
+            placeholder={LIBRARY_TOOLBAR_COPY.search(name)}
           />
         </div>
 
         <div className={`${styles.picker} ${styles.sort}`}>
           <label htmlFor={ids.sort} className={styles.label}>
-            Sort
+            {COMMON_COPY.sort}
           </label>
           <select
             id={ids.sort}
@@ -128,12 +142,12 @@ export const LibraryToolbar = ({
             ))}
           </select>
         </div>
-        <DirectionButton settings={settings} onChange={onChange} />
+        <DirectionButton sort={settings.sort} onChange={onChange} />
 
         {settings.view === LIBRARY_VIEWS.grouped && (
           <div className={`${styles.picker} ${styles.group}`}>
             <label htmlFor={ids.group} className={styles.label}>
-              Group by
+              {LIBRARY_TOOLBAR_COPY.groupBy}
             </label>
             <select
               id={ids.group}
@@ -156,16 +170,16 @@ export const LibraryToolbar = ({
       <div className={styles.act}>
         <div className={styles.play}>
           <Button tone="primary" icon="play" disabled={!playable} onClick={onPlay}>
-            Play
+            {COMMON_COPY.play}
           </Button>
           <Button icon="shuffle" disabled={!playable} onClick={onShuffle}>
-            Shuffle
+            {COMMON_COPY.shuffle}
           </Button>
           <SelectButton />
         </div>
 
         <fieldset className={styles.views}>
-          <legend className="visually-hidden">View</legend>
+          <legend className="visually-hidden">{LIBRARY_TOOLBAR_COPY.view}</legend>
           {viewsFor(settings.kind).map((view) => (
             <Button
               key={view}

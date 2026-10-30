@@ -1,0 +1,60 @@
+type PathLayoutProps = { path: string; label: string }
+
+export const LIBRARY_DIALOG_COPY = {
+  notScanned: 'not scanned yet',
+  oneFolderPerTitle: 'one folder per title',
+  letterFolders: (groups: number) => `letter folders (${groups})`,
+  groupFolders: (groups: number) => `group folders (${groups})`,
+  pathLayout: ({ path, label }: PathLayoutProps) => `${path}: ${label}`,
+  iconLabel: (label: string) => `${label} icon`,
+  editTitle: 'Edit library',
+  addTitle: 'Add a library',
+  namePlaceholder: 'Movies',
+  type: 'Type',
+  set: 'Set',
+  inRavensEnv: "in raven's",
+  tmdbToken: 'TMDB_API_TOKEN',
+  tmdbOff: 'for posters and details.',
+  tmdbOn:
+    'Movies, TV shows, anime, family, documentaries and sporting events get posters and details from TMDB.',
+  audioKinds: 'Music and audiobooks take audio files instead of videos.',
+  anthropicKey: 'ANTHROPIC_API_KEY',
+  aiOff: 'to look up titles the matcher misses.',
+  icon: 'Icon',
+  iconHint:
+    "Shown in the side menu, on the library's page and on Libraries. Until one is picked, the library wears its type's.",
+  folders: 'Folders',
+  foldersHint: 'Every video in these folders and the folders inside them joins the library.',
+  removePath: (path: string) => `Remove ${path}`,
+  folderPath: 'Folder path',
+  pathPlaceholder: 'Or type a path, like /media/movies',
+  add: 'Add',
+  saveProgress: 'Save where each video stopped',
+  saveProgressHint:
+    'Leave a video and come back to pick up where you stopped. Turning this off keeps saved spots for later.',
+  pin: 'Pin to the side menu',
+  pinHint: 'Pinned libraries get their own link in the side menu.',
+  autoRefresh: 'Refresh automatically',
+  autoRefreshHint:
+    'Watch the folders and take in videos as they are added, removed, renamed or replaced, and, for a share mounted from another machine, which never reports the changes made there, check it for new videos every few minutes. A video replaced under its own name waits for a rescan.',
+  lock: 'Lock with the PIN',
+  lockHint: 'Keep its videos private: they stay hidden until the PIN is entered in this browser.',
+  libraryPin: 'LIBRARY_PIN',
+  lockOff: 'to lock a library.',
+  watchedAt: 'Watched at',
+  percent: '%',
+  watchedHint:
+    'A video counts as watched once playback gets this far through it, and its resume spot clears there too. Set low, a video gives up its spot early.',
+  readLayouts: 'Read letter and group folders',
+  readLayoutsHint:
+    'Shows and movies inside letter folders (A, B, #) and group folders such as Requests are read as titles of their own. Turn this off when those folder names are the titles.',
+  ratingsShown: 'Ratings shown',
+  ratingsHint:
+    "The score on cards, and the one the rating sorts use. Where that source has none, TMDB's stands in. IMDb, Rotten Tomatoes and Metacritic need",
+  mdblistKey: 'MDBLIST_API_KEY',
+  or: 'or',
+  omdbKey: 'OMDB_API_KEY',
+  ratingsHintEnd: '; shows get Rotten Tomatoes and Metacritic only from MDBList.',
+  deleteLibrary: 'Delete library',
+  saveChanges: 'Save changes',
+} as const

@@ -1,5 +1,6 @@
 import { Icon } from '@raven/ui'
 import { useId } from 'react'
+import { SITE_SEARCH_COPY } from '@/components/SiteSearch/copy'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { useAddressSearch } from '@/lib/useSearch'
 import styles from '@/components/SiteSearch/SiteSearch.module.scss'
@@ -17,13 +18,13 @@ export const SiteSearch = ({ className }: SiteSearchProps) => {
   return (
     <search className={[styles.search, className].filter(Boolean).join(' ')}>
       <label htmlFor={id} className="visually-hidden">
-        Search every library
+        {SITE_SEARCH_COPY.searchEveryLibrary}
       </label>
       <SearchField
         id={id}
         search={search}
         className={styles.input}
-        placeholder="Search every library"
+        placeholder={SITE_SEARCH_COPY.searchEveryLibrary}
       />
       <span className={styles.icon}>
         <Icon name="search" size={20} />

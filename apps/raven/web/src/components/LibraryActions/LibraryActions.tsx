@@ -13,10 +13,12 @@ import { Button, ButtonLink, type IconName } from '@raven/ui'
 import { useRatingsRefreshDone } from '@/components/LibraryActions/useRatingsRefreshDone'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import styles from '@/components/LibraryActions/LibraryActions.module.scss'
+import { LIBRARY_ACTIONS_COPY } from '@/components/LibraryActions/copy'
 import { Spinner } from '@/components/Spinner/Spinner'
 import { api } from '@/lib/api'
 import { afterRematch, afterRescan, queryKeys, useUnlockPrompt } from '@raven/ui/headless'
 import { metadataHealthQuery } from '@/lib/queries'
+import { COMMON_COPY } from '@/lib/copy'
 
 type UseLibraryCallProps = {
   library: Library
@@ -98,18 +100,18 @@ export const LibraryActionErrors = ({
   className,
 }: LibraryActionErrorsProps) =>
   [
-    { verb: 'quick scan', failure: quickScan.error },
-    { verb: 'cancel the quick scan', failure: cancelQuickScan.error },
-    { verb: 'run a full scan', failure: fullScan.error },
-    { verb: 'cancel the full scan', failure: cancelFullScan.error },
-    { verb: 'update ratings', failure: updateRatings.error },
-    { verb: 'cancel the ratings update', failure: cancelRatings.error },
-    { verb: 'match again', failure: rematch.error },
+    { verb: LIBRARY_ACTIONS_COPY.verbs.quickScan, failure: quickScan.error },
+    { verb: LIBRARY_ACTIONS_COPY.verbs.cancelQuickScan, failure: cancelQuickScan.error },
+    { verb: LIBRARY_ACTIONS_COPY.verbs.fullScan, failure: fullScan.error },
+    { verb: LIBRARY_ACTIONS_COPY.verbs.cancelFullScan, failure: cancelFullScan.error },
+    { verb: LIBRARY_ACTIONS_COPY.verbs.updateRatings, failure: updateRatings.error },
+    { verb: LIBRARY_ACTIONS_COPY.verbs.cancelRatings, failure: cancelRatings.error },
+    { verb: LIBRARY_ACTIONS_COPY.verbs.rematch, failure: rematch.error },
   ].map(
     ({ verb, failure }) =>
       failure && (
         <p key={verb} className={className} role="alert">
-          Could not {verb}: {failure.message}
+          {LIBRARY_ACTIONS_COPY.couldNot({ verb, message: failure.message })}
         </p>
       ),
   )
@@ -153,7 +155,7 @@ const LongAction = ({
     onClick={isRunning ? onCancel : onStart}
   >
     {isRunning && <Spinner />}
-    {isRunning ? `Cancel ${label.toLowerCase()}` : label}
+    {isRunning ? LIBRARY_ACTIONS_COPY.cancel(label) : label}
     {whose}
   </Button>
 )
@@ -166,10 +168,9 @@ type MatchAgainTitleProps = {
 
 /** What Match again says on hover: what it does, or why it cannot now. */
 const matchAgainTitle = ({ matchType, canMatch, unmatched }: MatchAgainTitleProps): string => {
-  if (!canMatch) return 'TMDB is not answering, so files cannot be matched right now'
-  if (unmatched === 0)
-    return `Every file in this library has its ${matchType}, so there is nothing to match again`
-  return `Search TMDB again for the files no ${matchType} was found for`
+  if (!canMatch) return LIBRARY_ACTIONS_COPY.tmdbDown
+  if (unmatched === 0) return LIBRARY_ACTIONS_COPY.nothingToMatch(matchType)
+  return LIBRARY_ACTIONS_COPY.matchAgainTitle(matchType)
 }
 
 type LibraryActionsProps = {
@@ -230,9 +231,10 @@ export const LibraryActions = ({
         <ButtonLink
           icon="history"
           to={`/libraries/${library.id}/history`}
-          title="See what has been played in this library, the most recent first"
+          title={LIBRARY_ACTIONS_COPY.historyTitle}
         >
-          History{whose}
+          {COMMON_COPY.history}
+          {whose}
         </ButtonLink>
         <AdminOnly>
           {matchType && (
@@ -242,15 +244,13 @@ export const LibraryActions = ({
               title={matchAgainTitle({ matchType, canMatch, unmatched: library.unmatchedCount })}
               onClick={() => rematch.mutate()}
             >
-              Match again{whose}
+              {LIBRARY_ACTIONS_COPY.matchAgain}
+              {whose}
             </Button>
           )}
-          <Button
-            icon="edit"
-            title="Change this library's name, folders and settings"
-            onClick={edit}
-          >
-            Edit{whose}
+          <Button icon="edit" title={LIBRARY_ACTIONS_COPY.editTitle} onClick={edit}>
+            {LIBRARY_ACTIONS_COPY.edit}
+            {whose}
           </Button>
           {isEditing && <LibraryDialog library={library} onClose={() => setEditing(false)} />}
         </AdminOnly>
@@ -259,11 +259,11 @@ export const LibraryActions = ({
       <AdminOnly>
         <div className={styles.row}>
           <LongAction
-            label="Quick scan"
+            label={LIBRARY_ACTIONS_COPY.quickScan}
             icon="forward"
             whose={whose}
-            title="Look only for videos added since the last scan and add them, then fetch their ratings once they are matched"
-            cancelTitle="Stop the quick scan, and the ratings that would follow it"
+            title={LIBRARY_ACTIONS_COPY.quickScanTitle}
+            cancelTitle={LIBRARY_ACTIONS_COPY.cancelQuickScanTitle}
             isRunning={isQuickScanning}
             isDisabled={isScanRunning || quickScan.isPending}
             isCancelling={cancelQuickScan.isPending}
@@ -271,11 +271,11 @@ export const LibraryActions = ({
             onCancel={() => cancelQuickScan.mutate()}
           />
           <LongAction
-            label="Full scan"
+            label={LIBRARY_ACTIONS_COPY.fullScan}
             icon="rescan"
             whose={whose}
-            title="Read every file in the library again, picking up new, renamed, moved and replaced videos"
-            cancelTitle="Stop the full scan at its next step; the library keeps what was indexed"
+            title={LIBRARY_ACTIONS_COPY.fullScanTitle}
+            cancelTitle={LIBRARY_ACTIONS_COPY.cancelFullScanTitle}
             isRunning={isFullScanning}
             isDisabled={isScanRunning || fullScan.isPending}
             isCancelling={cancelFullScan.isPending}
@@ -283,11 +283,11 @@ export const LibraryActions = ({
             onCancel={() => cancelFullScan.mutate()}
           />
           <LongAction
-            label="Update ratings"
+            label={LIBRARY_ACTIONS_COPY.updateRatings}
             icon="gauge"
             whose={whose}
-            title="Find the movies and shows with no rating and fetch their ratings; needs a ratings source (TMDB, OMDb or MDBList)"
-            cancelTitle="Stop updating ratings: the titles still waiting are not asked for, and the ratings already fetched stay"
+            title={LIBRARY_ACTIONS_COPY.updateRatingsTitle}
+            cancelTitle={LIBRARY_ACTIONS_COPY.cancelRatingsTitle}
             isRunning={isUpdatingRatings}
             isDisabled={updateRatings.isPending}
             isCancelling={cancelRatings.isPending}

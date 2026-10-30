@@ -18,7 +18,7 @@ import {
   validateLibraryInput,
   withLibraryKind,
 } from '@raven/core'
-import { type FormEvent, type ReactNode, useId, useState } from 'react'
+import { type ComponentType, type FormEvent, type ReactNode, useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Icon } from '@raven/ui'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
@@ -28,7 +28,9 @@ import { afterLibrarySaved } from '@raven/ui/headless'
 import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import { RATING_SOURCE_LABELS } from '@/lib/ratingSources'
 import { useModal } from '@/lib/useModal'
+import { LIBRARY_DIALOG_COPY } from '@/components/LibraryDialog/copy'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type PathLayoutLabelProps = {
   layout: PathLayout | null
@@ -37,12 +39,68 @@ type PathLayoutLabelProps = {
 
 /** What Edit library calls each way a path was read. */
 const pathLayoutLabel = ({ layout, groups }: PathLayoutLabelProps): string => {
-  if (layout == null) return 'not scanned yet'
-  if (layout === PATH_LAYOUTS.flat) return 'one folder per title'
+  if (layout == null) return LIBRARY_DIALOG_COPY.notScanned
+  if (layout === PATH_LAYOUTS.flat) return LIBRARY_DIALOG_COPY.oneFolderPerTitle
   return layout === PATH_LAYOUTS.lettered
-    ? `letter folders (${groups})`
-    : `group folders (${groups})`
+    ? LIBRARY_DIALOG_COPY.letterFolders(groups)
+    : LIBRARY_DIALOG_COPY.groupFolders(groups)
 }
+
+type EnvNoteProps = { name: string; children: string }
+
+/** A line asking for a variable in raven's `.env`: Set NAME in raven's .env, then what it does. */
+const EnvNote = ({ name, children }: EnvNoteProps) => (
+  <>
+    {LIBRARY_DIALOG_COPY.set} <code>{name}</code> {LIBRARY_DIALOG_COPY.inRavensEnv}{' '}
+    <code>{COMMON_COPY.envFile}</code> {children}
+  </>
+)
+
+/** Whether TMDB has a token, which decides what the Type hint says first. */
+const SERVICE_STATES = {
+  on: 'on',
+  off: 'off',
+} as const
+
+type ServiceState = (typeof SERVICE_STATES)[keyof typeof SERVICE_STATES]
+
+const TMDB_HINTS = {
+  [SERVICE_STATES.off]: () => (
+    <EnvNote name={LIBRARY_DIALOG_COPY.tmdbToken}>{LIBRARY_DIALOG_COPY.tmdbOff}</EnvNote>
+  ),
+  [SERVICE_STATES.on]: () => LIBRARY_DIALOG_COPY.tmdbOn,
+} as const satisfies Record<ServiceState, ComponentType>
+
+const LOCK_HINTS = {
+  [SERVICE_STATES.on]: () => LIBRARY_DIALOG_COPY.lockHint,
+  [SERVICE_STATES.off]: () => (
+    <EnvNote name={LIBRARY_DIALOG_COPY.libraryPin}>{LIBRARY_DIALOG_COPY.lockOff}</EnvNote>
+  ),
+} as const satisfies Record<ServiceState, ComponentType>
+
+/** Where a setting's hint sits: alone, or beside what follows it. */
+const HINT_LAYOUTS = {
+  alone: 'alone',
+  withExtra: 'withExtra',
+} as const
+
+type HintLayout = (typeof HINT_LAYOUTS)[keyof typeof HINT_LAYOUTS]
+
+type SettingHintProps = { id: string; hint: ReactNode; children?: ReactNode }
+
+const SETTING_HINTS = {
+  [HINT_LAYOUTS.alone]: ({ id, hint }: SettingHintProps) => (
+    <p id={`${id}-hint`} className={styles.settingHint}>
+      {hint}
+    </p>
+  ),
+  [HINT_LAYOUTS.withExtra]: ({ id, hint, children }: SettingHintProps) => (
+    <div className={styles.layoutHint}>
+      <p id={`${id}-hint`}>{hint}</p>
+      {children}
+    </div>
+  ),
+} as const satisfies Record<HintLayout, ComponentType<SettingHintProps>>
 
 type SettingToggleProps = {
   id: string
@@ -65,30 +123,26 @@ const SettingToggle = ({
   onChange,
   hint,
   children,
-}: SettingToggleProps) => (
-  <div className={styles.setting}>
-    <input
-      id={id}
-      type="checkbox"
-      className={styles.checkbox}
-      checked={checked}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.checked)}
-      aria-describedby={`${id}-hint`}
-    />
-    <label htmlFor={id}>{label}</label>
-    {children === undefined ? (
-      <p id={`${id}-hint`} className={styles.settingHint}>
-        {hint}
-      </p>
-    ) : (
-      <div className={styles.layoutHint}>
-        <p id={`${id}-hint`}>{hint}</p>
+}: SettingToggleProps) => {
+  const Hint = SETTING_HINTS[children === undefined ? HINT_LAYOUTS.alone : HINT_LAYOUTS.withExtra]
+  return (
+    <div className={styles.setting}>
+      <input
+        id={id}
+        type="checkbox"
+        className={styles.checkbox}
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+        aria-describedby={`${id}-hint`}
+      />
+      <label htmlFor={id}>{label}</label>
+      <Hint id={id} hint={hint}>
         {children}
-      </div>
-    )}
-  </div>
-)
+      </Hint>
+    </div>
+  )
+}
 
 type LibraryDialogProps = { library?: Library; onClose: () => void }
 
@@ -125,6 +179,11 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
   const lock = useQuery(lockQuery)
   const lockable = !!lock.data?.available
   const isMatched = matchTypeFor(settings.kind) != null
+  const TmdbHint =
+    TMDB_HINTS[
+      metadata.data?.tmdb === METADATA_SERVICE_STATES.off ? SERVICE_STATES.off : SERVICE_STATES.on
+    ]
+  const LockHint = LOCK_HINTS[lockable ? SERVICE_STATES.on : SERVICE_STATES.off]
 
   const refresh = () => afterLibrarySaved(queryClient)
 
@@ -182,18 +241,18 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
     >
       <form className={styles.form} onSubmit={submit} noValidate>
         <h2 id={`${ids.name}-title`} className={styles.title}>
-          {library ? 'Edit library' : 'Add a library'}
+          {library ? LIBRARY_DIALOG_COPY.editTitle : LIBRARY_DIALOG_COPY.addTitle}
         </h2>
 
         <div className={styles.body}>
           <div className={styles.field}>
-            <label htmlFor={ids.name}>Name</label>
+            <label htmlFor={ids.name}>{COMMON_COPY.name}</label>
             <input
               id={ids.name}
               className={styles.input}
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Movies"
+              placeholder={LIBRARY_DIALOG_COPY.namePlaceholder}
               autoComplete="off"
               aria-describedby={errors.length > 0 ? ids.errors : undefined}
             />
@@ -203,7 +262,7 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
             className={styles.group}
             aria-describedby={isAiOff ? `${ids.kind}-hint ${ids.kind}-ai-hint` : `${ids.kind}-hint`}
           >
-            <legend>Type</legend>
+            <legend>{LIBRARY_DIALOG_COPY.type}</legend>
             <div className={styles.kinds}>
               {isLibraryKind.values.map((kind) => (
                 <div key={kind} className={styles.kind}>
@@ -220,40 +279,32 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
               ))}
             </div>
             <p id={`${ids.kind}-hint`} className={styles.hint}>
-              {metadata.data?.tmdb === METADATA_SERVICE_STATES.off ? (
-                <>
-                  Set <code>TMDB_API_TOKEN</code> in raven's <code>.env</code> for posters and
-                  details.
-                </>
-              ) : (
-                'Movies, TV shows, anime, family, documentaries and sporting events get posters and details from TMDB.'
-              )}{' '}
-              Music and audiobooks take audio files instead of videos.
+              <TmdbHint /> {LIBRARY_DIALOG_COPY.audioKinds}
             </p>
             {isAiOff && (
               <p id={`${ids.kind}-ai-hint`} className={styles.hint}>
-                Set <code>ANTHROPIC_API_KEY</code> in raven's <code>.env</code> to look up titles
-                the matcher misses.
+                <EnvNote name={LIBRARY_DIALOG_COPY.anthropicKey}>
+                  {LIBRARY_DIALOG_COPY.aiOff}
+                </EnvNote>
               </p>
             )}
           </fieldset>
 
           <fieldset className={styles.group} aria-describedby={`${ids.icon}-hint`}>
-            <legend>Icon</legend>
+            <legend>{LIBRARY_DIALOG_COPY.icon}</legend>
             <IconPicker
               value={libraryIconOf(settings)}
               onChange={(icon) => setSettings((current) => ({ ...current, icon }))}
             />
             <p id={`${ids.icon}-hint`} className={styles.hint}>
-              Shown in the side menu, on the library's page and on Libraries. Until one is picked,
-              the library wears its type's.
+              {LIBRARY_DIALOG_COPY.iconHint}
             </p>
           </fieldset>
 
           <fieldset className={styles.group} aria-describedby={ids.folders}>
-            <legend>Folders</legend>
+            <legend>{LIBRARY_DIALOG_COPY.folders}</legend>
             <p id={ids.folders} className={styles.hint}>
-              Every video in these folders and the folders inside them joins the library.
+              {LIBRARY_DIALOG_COPY.foldersHint}
             </p>
             {paths.length > 0 && (
               <ul className={styles.paths}>
@@ -262,7 +313,7 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
                     <span className={styles.pathText}>{path}</span>
                     <Button
                       icon="close"
-                      aria-label={`Remove ${path}`}
+                      aria-label={LIBRARY_DIALOG_COPY.removePath(path)}
                       onClick={() => setPaths((current) => current.filter((item) => item !== path))}
                     />
                   </li>
@@ -272,14 +323,14 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
             <FolderBrowser onChoose={addPath} exclude={paths} />
             <div className={styles.typed}>
               <label htmlFor={`${ids.folders}-typed`} className="visually-hidden">
-                Folder path
+                {LIBRARY_DIALOG_COPY.folderPath}
               </label>
               <input
                 id={`${ids.folders}-typed`}
                 className={styles.input}
                 value={typedPath}
                 onChange={(event) => setTypedPath(event.target.value)}
-                placeholder="Or type a path, like /media/movies"
+                placeholder={LIBRARY_DIALOG_COPY.pathPlaceholder}
                 autoComplete="off"
               />
               <Button
@@ -290,52 +341,44 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
                   setTypedPath('')
                 }}
               >
-                Add
+                {LIBRARY_DIALOG_COPY.add}
               </Button>
             </div>
           </fieldset>
 
           <fieldset className={styles.group}>
-            <legend>Settings</legend>
+            <legend>{COMMON_COPY.settings}</legend>
             <SettingToggle
               id={`${ids.settings}-progress`}
-              label="Save where each video stopped"
+              label={LIBRARY_DIALOG_COPY.saveProgress}
               checked={settings.saveProgress}
               onChange={(saveProgress) => setSettings((current) => ({ ...current, saveProgress }))}
-              hint="Leave a video and come back to pick up where you stopped. Turning this off keeps saved spots for later."
+              hint={LIBRARY_DIALOG_COPY.saveProgressHint}
             />
             <SettingToggle
               id={`${ids.settings}-pinned`}
-              label="Pin to the side menu"
+              label={LIBRARY_DIALOG_COPY.pin}
               checked={settings.pinned}
               onChange={(pinned) => setSettings((current) => ({ ...current, pinned }))}
-              hint="Pinned libraries get their own link in the side menu."
+              hint={LIBRARY_DIALOG_COPY.pinHint}
             />
             <SettingToggle
               id={`${ids.settings}-refresh`}
-              label="Refresh automatically"
+              label={LIBRARY_DIALOG_COPY.autoRefresh}
               checked={settings.autoRefresh}
               onChange={(autoRefresh) => setSettings((current) => ({ ...current, autoRefresh }))}
-              hint="Watch the folders and take in videos as they are added, removed, renamed or replaced, and, for a share mounted from another machine, which never reports the changes made there, check it for new videos every few minutes. A video replaced under its own name waits for a rescan."
+              hint={LIBRARY_DIALOG_COPY.autoRefreshHint}
             />
             <SettingToggle
               id={`${ids.settings}-locked`}
-              label="Lock with the PIN"
+              label={LIBRARY_DIALOG_COPY.lock}
               checked={settings.locked}
               disabled={!lockable && !settings.locked}
               onChange={(locked) => setSettings((current) => ({ ...current, locked }))}
-              hint={
-                lockable ? (
-                  'Keep its videos private: they stay hidden until the PIN is entered in this browser.'
-                ) : (
-                  <>
-                    Set <code>LIBRARY_PIN</code> in raven's <code>.env</code> to lock a library.
-                  </>
-                )
-              }
+              hint={<LockHint />}
             />
             <div className={styles.watched}>
-              <label htmlFor={`${ids.settings}-watched`}>Watched at</label>
+              <label htmlFor={`${ids.settings}-watched`}>{LIBRARY_DIALOG_COPY.watchedAt}</label>
               <span className={styles.percent}>
                 <input
                   id={`${ids.settings}-watched`}
@@ -355,17 +398,16 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
                   }}
                   aria-describedby={`${ids.settings}-watched-hint`}
                 />
-                <span aria-hidden="true">%</span>
+                <span aria-hidden="true">{LIBRARY_DIALOG_COPY.percent}</span>
               </span>
               <p id={`${ids.settings}-watched-hint`} className={styles.settingHint}>
-                A video counts as watched once playback gets this far through it, and its resume
-                spot clears there too. Set low, a video gives up its spot early.
+                {LIBRARY_DIALOG_COPY.watchedHint}
               </p>
             </div>
             {isMatched && (
               <SettingToggle
                 id={`${ids.settings}-layout`}
-                label="Read letter and group folders"
+                label={LIBRARY_DIALOG_COPY.readLayouts}
                 checked={settings.folderLayout === FOLDER_LAYOUTS.auto}
                 onChange={(isAuto) =>
                   setSettings((current) => ({
@@ -373,12 +415,17 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
                     folderLayout: isAuto ? FOLDER_LAYOUTS.auto : FOLDER_LAYOUTS.flat,
                   }))
                 }
-                hint="Shows and movies inside letter folders (A, B, #) and group folders such as Requests are read as titles of their own. Turn this off when those folder names are the titles."
+                hint={LIBRARY_DIALOG_COPY.readLayoutsHint}
               >
                 {!!library && library.layouts.length > 0 && (
                   <ul className={styles.layouts}>
                     {library.layouts.map((entry) => (
-                      <li key={entry.path}>{`${entry.path}: ${pathLayoutLabel(entry)}`}</li>
+                      <li key={entry.path}>
+                        {LIBRARY_DIALOG_COPY.pathLayout({
+                          path: entry.path,
+                          label: pathLayoutLabel(entry),
+                        })}
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -386,7 +433,9 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
             )}
             {isMatched && (
               <div className={styles.watched}>
-                <label htmlFor={`${ids.settings}-ratings`}>Ratings shown</label>
+                <label htmlFor={`${ids.settings}-ratings`}>
+                  {LIBRARY_DIALOG_COPY.ratingsShown}
+                </label>
                 <select
                   id={`${ids.settings}-ratings`}
                   className={styles.input}
@@ -406,10 +455,9 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
                   ))}
                 </select>
                 <p id={`${ids.settings}-ratings-hint`} className={styles.settingHint}>
-                  The score on cards, and the one the rating sorts use. Where that source has none,
-                  TMDB's stands in. IMDb, Rotten Tomatoes and Metacritic need{' '}
-                  <code>MDBLIST_API_KEY</code> or <code>OMDB_API_KEY</code>; shows get Rotten
-                  Tomatoes and Metacritic only from MDBList.
+                  {LIBRARY_DIALOG_COPY.ratingsHint} <code>{LIBRARY_DIALOG_COPY.mdblistKey}</code>{' '}
+                  {LIBRARY_DIALOG_COPY.or} <code>{LIBRARY_DIALOG_COPY.omdbKey}</code>
+                  {LIBRARY_DIALOG_COPY.ratingsHintEnd}
                 </p>
               </div>
             )}
@@ -438,12 +486,12 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
                 confirmingDelete ? remove.mutate(library.id) : setConfirmingDelete(true)
               }
             >
-              {confirmingDelete ? 'Delete for good' : 'Delete library'}
+              {confirmingDelete ? COMMON_COPY.deleteForGood : LIBRARY_DIALOG_COPY.deleteLibrary}
             </Button>
           )}
-          <Button onClick={() => dialog.current?.close()}>Cancel</Button>
+          <Button onClick={() => dialog.current?.close()}>{COMMON_COPY.cancel}</Button>
           <Button type="submit" tone="primary" disabled={save.isPending}>
-            {library ? 'Save changes' : 'Add library'}
+            {library ? LIBRARY_DIALOG_COPY.saveChanges : COMMON_COPY.addLibrary}
           </Button>
         </div>
       </form>

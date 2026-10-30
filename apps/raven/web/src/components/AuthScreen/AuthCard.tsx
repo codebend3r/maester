@@ -51,7 +51,9 @@ export const SubmitButton = ({ isDisabled, children }: SubmitButtonProps) => (
 
 type CardProps = { title: string; lead: ReactNode; children?: ReactNode }
 
-const Intro = ({ title, lead }: Omit<CardProps, 'children'>) => (
+type IntroProps = Omit<CardProps, 'children'>
+
+const Intro = ({ title, lead }: IntroProps) => (
   <>
     <Brand />
     <header className={styles.welcome}>
@@ -61,21 +63,20 @@ const Intro = ({ title, lead }: Omit<CardProps, 'children'>) => (
   </>
 )
 
+type AuthCardProps = CardProps
+
 /** What an auth page shows beside the poster wall: the brand, its title and the lines under it, then the rest. */
-export const AuthCard = ({ title, lead, children }: CardProps) => (
+export const AuthCard = ({ title, lead, children }: AuthCardProps) => (
   <section className={styles.card}>
     <Intro title={title} lead={lead} />
     {children}
   </section>
 )
 
+type AuthFormProps = CardProps & { onSubmit: (event: FormEvent) => void }
+
 /** An `AuthCard` that is a form. */
-export const AuthForm = ({
-  title,
-  lead,
-  onSubmit,
-  children,
-}: CardProps & { onSubmit: (event: FormEvent) => void }) => (
+export const AuthForm = ({ title, lead, onSubmit, children }: AuthFormProps) => (
   <form className={styles.card} onSubmit={onSubmit}>
     <Intro title={title} lead={lead} />
     {children}

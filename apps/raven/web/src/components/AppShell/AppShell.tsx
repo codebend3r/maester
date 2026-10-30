@@ -1,9 +1,10 @@
 import { DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
-import { type ReactNode, useId } from 'react'
+import { type ComponentType, type ReactNode, useId } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { AudioHost, Button, Icon, type IconName, useKeyShortcut } from '@raven/ui'
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
+import { APP_SHELL_COPY } from '@/components/AppShell/copy'
 import { isAnyOf, libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
 import { NavTip } from '@/components/AppShell/NavTip'
 import { TabBar } from '@/components/AppShell/TabBar'
@@ -29,6 +30,7 @@ import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import { SIDE_MENU_KEY, useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type NavItemProps = {
   to: string
@@ -47,7 +49,7 @@ type NavItemProps = {
  */
 const NavItem = ({ to, patterns, icon, label, isIconsOnly, note }: NavItemProps) => {
   const isCurrent = useIsCurrent(patterns)
-  const suffix = note ? ` (${note})` : ''
+  const suffix = note ? APP_SHELL_COPY.noteSuffix(note) : ''
   return (
     <NavTip text={`${label}${suffix}`} isOn={isIconsOnly}>
       {(handlers) => (
@@ -94,16 +96,16 @@ const DesktopNavItems = ({ isIconsOnly }: DesktopNavItemsProps) => {
         to={DESKTOP_PATHS.local}
         patterns={[DESKTOP_PATHS.local]}
         icon={<Icon name="file-play" />}
-        label={`On this ${computer}`}
+        label={APP_SHELL_COPY.onThisComputer(computer)}
         isIconsOnly={isIconsOnly}
       />
       <NavItem
         to={DESKTOP_PATHS.downloads}
         patterns={[DESKTOP_PATHS.downloads]}
         icon={<CountedIcon icon="download" count={inProgress} />}
-        label="Downloads"
+        label={COMMON_COPY.downloads}
         isIconsOnly={isIconsOnly}
-        note={inProgress > 0 ? `${inProgress} in progress` : undefined}
+        note={inProgress > 0 ? APP_SHELL_COPY.inProgress(inProgress) : undefined}
       />
     </>
   )
@@ -122,18 +124,21 @@ const ManageGroup = ({ isIconsOnly, children }: ManageGroupProps) => {
   const toggleManage = useSideMenu((state) => state.toggleManage)
   return (
     <>
-      <NavTip text={`${isFolded ? 'Show' : 'Hide'} Manage`} isOn={isIconsOnly}>
+      <NavTip
+        text={isFolded ? APP_SHELL_COPY.showManage : APP_SHELL_COPY.hideManage}
+        isOn={isIconsOnly}
+      >
         {(handlers) => (
           <button
             type="button"
             className={styles.manageToggle}
             aria-expanded={!isFolded}
             aria-controls={groupId}
-            aria-label={isIconsOnly ? 'Manage' : undefined}
+            aria-label={isIconsOnly ? APP_SHELL_COPY.manage : undefined}
             onClick={toggleManage}
             {...handlers}
           >
-            {!isIconsOnly && <span className={styles.manageLabel}>Manage</span>}
+            {!isIconsOnly && <span className={styles.manageLabel}>{APP_SHELL_COPY.manage}</span>}
             <span className={styles.chevron}>
               <Icon name="expand" size={16} />
             </span>
@@ -165,13 +170,46 @@ type ShortcutTipProps = { onDismiss: () => void }
 
 /** Rises above the toggle until it is first used or put away. */
 const ShortcutTip = ({ onDismiss }: ShortcutTipProps) => (
-  <aside className={styles.tip} aria-label="Tip">
+  <aside className={styles.tip} aria-label={APP_SHELL_COPY.tip}>
     <p>
-      Press <kbd>B</kbd> to collapse or expand the side menu.
+      {APP_SHELL_COPY.tipPress} <kbd>{APP_SHELL_COPY.tipKey}</kbd> {APP_SHELL_COPY.tipAction}
     </p>
-    <Button onClick={onDismiss}>Got it</Button>
+    <Button onClick={onDismiss}>{APP_SHELL_COPY.gotIt}</Button>
   </aside>
 )
+
+/** How wide the side menu is: open, or down to its icons. */
+const MENU_WIDTHS = {
+  open: 'open',
+  icons: 'icons',
+} as const
+
+type MenuWidth = (typeof MENU_WIDTHS)[keyof typeof MENU_WIDTHS]
+
+/** What heads the pinned libraries: a rule for the icons alone, the word in the open menu. */
+const PINNED_MARKS = {
+  [MENU_WIDTHS.icons]: () => <span className={styles.rule} aria-hidden="true" />,
+  [MENU_WIDTHS.open]: () => (
+    <p className={styles.eyebrow} aria-hidden="true">
+      {APP_SHELL_COPY.pinned}
+    </p>
+  ),
+} as const satisfies Record<MenuWidth, ComponentType>
+
+/** Where the music plays: raven player's own engine, or the browser's. */
+const PLAYER_HOSTS = {
+  desktop: 'desktop',
+  browser: 'browser',
+} as const
+
+type PlayerHost = (typeof PLAYER_HOSTS)[keyof typeof PLAYER_HOSTS]
+
+type AudioHostProps = Parameters<typeof AudioHost>[0]
+
+const AUDIO_HOSTS = {
+  [PLAYER_HOSTS.desktop]: DesktopAudioHost,
+  [PLAYER_HOSTS.browser]: AudioHost,
+} as const satisfies Record<PlayerHost, ComponentType<AudioHostProps>>
 
 /**
  * The frame around every browsing page. Beside the page, the side menu
@@ -209,6 +247,8 @@ export const AppShell = () => {
   const pinned = isOffline
     ? []
     : (libraries.data ?? []).filter((library) => library.settings.pinned)
+  const PinnedMark = PINNED_MARKS[isIconsOnly ? MENU_WIDTHS.icons : MENU_WIDTHS.open]
+  const Audio = AUDIO_HOSTS[isDesktop ? PLAYER_HOSTS.desktop : PLAYER_HOSTS.browser]
   const isPinnedOpen = pinned.some((library) =>
     isAnyOf({ patterns: libraryPages(library.id), pathname }),
   )
@@ -225,7 +265,7 @@ export const AppShell = () => {
       <nav
         id={navId}
         className={isFrosted ? `${styles.side} ${styles.frosted}` : styles.side}
-        aria-label="Main"
+        aria-label={APP_SHELL_COPY.main}
       >
         <Link to="/" className={styles.home}>
           <Logo isMarkOnly={isIconsOnly} />
@@ -237,28 +277,22 @@ export const AppShell = () => {
                 to="/"
                 patterns={['/']}
                 icon={<Icon name="home" />}
-                label="Home"
+                label={COMMON_COPY.home}
                 isIconsOnly={isIconsOnly}
               />
               <NavItem
                 to="/favourites"
                 patterns={['/favourites']}
                 icon={<Icon name="heart" />}
-                label="Favourites"
+                label={COMMON_COPY.favourites}
                 isIconsOnly={isIconsOnly}
               />
             </>
           )}
           {pinned.length > 0 && (
             <>
-              {isIconsOnly ? (
-                <span className={styles.rule} aria-hidden="true" />
-              ) : (
-                <p className={styles.eyebrow} aria-hidden="true">
-                  Pinned
-                </p>
-              )}
-              <ul className={styles.pinned} aria-label="Pinned">
+              <PinnedMark />
+              <ul className={styles.pinned} aria-label={APP_SHELL_COPY.pinned}>
                 {pinned.map((library) => (
                   <li key={library.id} className={styles.pinnedItem}>
                     <NavItem
@@ -267,7 +301,7 @@ export const AppShell = () => {
                       icon={<LibraryIcon settings={library.settings} />}
                       label={library.name}
                       isIconsOnly={isIconsOnly}
-                      note={library.settings.locked ? 'locked' : undefined}
+                      note={library.settings.locked ? APP_SHELL_COPY.locked : undefined}
                     />
                   </li>
                 ))}
@@ -283,7 +317,7 @@ export const AppShell = () => {
                   to="/libraries"
                   patterns={isPinnedOpen ? ['/libraries'] : ['/libraries', ...libraryPages(':id')]}
                   icon={<Icon name="libraries" />}
-                  label="Libraries"
+                  label={COMMON_COPY.libraries}
                   isIconsOnly={isIconsOnly}
                 />
                 <AdminOnly>
@@ -291,14 +325,14 @@ export const AppShell = () => {
                     to="/streams"
                     patterns={['/streams']}
                     icon={<Icon name="playback" />}
-                    label="Streams"
+                    label={APP_SHELL_COPY.streams}
                     isIconsOnly={isIconsOnly}
                   />
                   <NavItem
                     to="/reports"
                     patterns={['/reports']}
                     icon={<Icon name="alert" />}
-                    label="Bug reports"
+                    label={APP_SHELL_COPY.bugReports}
                     isIconsOnly={isIconsOnly}
                   />
                 </AdminOnly>
@@ -309,7 +343,7 @@ export const AppShell = () => {
               to="/settings"
               patterns={['/settings']}
               icon={<Icon name="settings" />}
-              label="Settings"
+              label={COMMON_COPY.settings}
               isIconsOnly={isIconsOnly}
             />
           </ManageGroup>
@@ -317,7 +351,7 @@ export const AppShell = () => {
             to={PAGE_PATHS.shortcuts}
             patterns={[PAGE_PATHS.shortcuts]}
             icon={<Icon name="keyboard" />}
-            label="Shortcuts"
+            label={APP_SHELL_COPY.shortcuts}
             isIconsOnly={isIconsOnly}
           />
           {!isMediumScreen && (
@@ -327,16 +361,20 @@ export const AppShell = () => {
                   tone="ghost"
                   icon="sidebar"
                   className={styles.toggleButton}
-                  aria-label="Side menu"
+                  aria-label={APP_SHELL_COPY.sideMenu}
                   aria-expanded={!collapsed}
                   aria-controls={navId}
                   aria-keyshortcuts="B"
-                  title={`${collapsed ? 'Expand' : 'Collapse'} the side menu (B)`}
+                  title={
+                    collapsed ? APP_SHELL_COPY.expandSideMenu : APP_SHELL_COPY.collapseSideMenu
+                  }
                   onClick={toggle}
                 />
                 {!tipSeen && <ShortcutTip onDismiss={dismissTip} />}
               </div>
-              {!collapsed && <p className={styles.version}>v{ravenVersion}</p>}
+              {!collapsed && (
+                <p className={styles.version}>{APP_SHELL_COPY.version(ravenVersion)}</p>
+              )}
             </div>
           )}
         </div>
@@ -356,11 +394,7 @@ export const AppShell = () => {
         </div>
         {/* Music plays above the routes: the engine once, and the bar while a track plays. */}
         <div className={styles.player}>
-          {isDesktop ? (
-            <DesktopAudioHost api={api} reprobe={reprobe} />
-          ) : (
-            <AudioHost api={api} reprobe={reprobe} />
-          )}
+          <Audio api={api} reprobe={reprobe} />
           <NowPlayingBar />
         </div>
       </main>

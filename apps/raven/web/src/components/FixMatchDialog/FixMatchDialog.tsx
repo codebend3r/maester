@@ -7,7 +7,7 @@ import {
   type MatchSubject,
   confidenceTierOf,
 } from '@raven/core'
-import { type FormEvent, useId } from 'react'
+import { type ComponentType, type FormEvent, useId } from 'react'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { MatchTier } from '@/components/MatchTier/MatchTier'
 import { Button, Icon } from '@raven/ui'
@@ -16,9 +16,35 @@ import { api } from '@/lib/api'
 import { afterMatch, useSearch } from '@raven/ui/headless'
 import { matchSearchQuery } from '@/lib/queries'
 import { useModal } from '@/lib/useModal'
+import { FIX_MATCH_DIALOG_COPY } from '@/components/FixMatchDialog/copy'
 import styles from '@/components/FixMatchDialog/FixMatchDialog.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
-const NOT_A: Record<MatchItemType, string> = { movie: 'Not a movie', show: 'Not a show' }
+const NOT_A = FIX_MATCH_DIALOG_COPY.notA satisfies Record<MatchItemType, string>
+
+const POSTER_KINDS = { image: 'image', initial: 'initial' } as const
+type PosterKind = (typeof POSTER_KINDS)[keyof typeof POSTER_KINDS]
+
+type CandidatePosterProps = { poster: string | null; title: string }
+
+type PosterImageProps = CandidatePosterProps
+
+const PosterImage = ({ poster }: PosterImageProps) => (
+  <img src={poster ?? ''} alt="" loading="lazy" decoding="async" />
+)
+
+type PosterInitialProps = CandidatePosterProps
+
+const PosterInitial = ({ title }: PosterInitialProps) => (
+  <span className={styles.initial} aria-hidden="true">
+    {title.slice(0, 1)}
+  </span>
+)
+
+const CANDIDATE_POSTERS = {
+  [POSTER_KINDS.image]: PosterImage,
+  [POSTER_KINDS.initial]: PosterInitial,
+} as const satisfies Record<PosterKind, ComponentType<CandidatePosterProps>>
 
 const yearFrom = (text: string): number | null => {
   const year = Number.parseInt(text.trim(), 10)
@@ -36,18 +62,16 @@ type CandidateProps = {
 const Candidate = ({ candidate, isBest, disabled, onChoose }: CandidateProps) => {
   const tierId = useId()
   const poster = api.candidatePosterUrl(candidate.poster)
-  const name = candidate.year == null ? candidate.title : `${candidate.title} (${candidate.year})`
+  const name =
+    candidate.year == null
+      ? candidate.title
+      : FIX_MATCH_DIALOG_COPY.named({ title: candidate.title, year: candidate.year })
+  const CandidatePoster = CANDIDATE_POSTERS[poster ? POSTER_KINDS.image : POSTER_KINDS.initial]
   const tier = confidenceTierOf(candidate.confidence)
   return (
     <li className={isBest ? `${styles.candidate} ${styles.best}` : styles.candidate}>
       <span className={styles.poster}>
-        {poster ? (
-          <img src={poster} alt="" loading="lazy" decoding="async" />
-        ) : (
-          <span className={styles.initial} aria-hidden="true">
-            {candidate.title.slice(0, 1)}
-          </span>
-        )}
+        <CandidatePoster poster={poster} title={candidate.title} />
         <span className={`${styles.stamp} ${styles[tier]}`} aria-hidden="true">
           {tier === CONFIDENCE_TIERS.strong && <Icon name="check" size={12} />}
           {candidate.confidence}
@@ -65,10 +89,10 @@ const Candidate = ({ candidate, isBest, disabled, onChoose }: CandidateProps) =>
         className={styles.choose}
         disabled={disabled}
         onClick={onChoose}
-        aria-label={`Choose ${name}`}
+        aria-label={FIX_MATCH_DIALOG_COPY.chooseLabel(name)}
         aria-describedby={tierId}
       >
-        Choose
+        {FIX_MATCH_DIALOG_COPY.choose}
       </Button>
     </li>
   )
@@ -164,7 +188,7 @@ export const FixMatchDialog = <T,>({
       <div className={styles.body}>
         <header className={styles.header}>
           <h2 id={ids.title} className={styles.title}>
-            Fix match
+            {COMMON_COPY.fixMatch}
           </h2>
           {fileName && <p className={styles.file}>{fileName}</p>}
           {aiMatch && <AiMatchNote aiMatch={aiMatch} id={ids.note} />}
@@ -173,11 +197,11 @@ export const FixMatchDialog = <T,>({
         <search>
           <form className={styles.form} onSubmit={search}>
             <div className={`${styles.field} ${styles.titleField}`}>
-              <label htmlFor={ids.query}>Title</label>
+              <label htmlFor={ids.query}>{COMMON_COPY.title}</label>
               <SearchField id={ids.query} search={typed.title} autoComplete="off" />
             </div>
             <div className={`${styles.field} ${styles.yearField}`}>
-              <label htmlFor={ids.year}>Year</label>
+              <label htmlFor={ids.year}>{COMMON_COPY.year}</label>
               <input
                 id={ids.year}
                 inputMode="numeric"
@@ -187,7 +211,7 @@ export const FixMatchDialog = <T,>({
               />
             </div>
             <Button type="submit" icon="search" className={styles.submit}>
-              Search
+              {FIX_MATCH_DIALOG_COPY.search}
             </Button>
           </form>
         </search>
@@ -195,7 +219,7 @@ export const FixMatchDialog = <T,>({
         {(choose.isError || results.isError) && (
           <p role="alert" className={styles.error}>
             <Icon name="alert" size={16} />
-            {(choose.error ?? results.error)?.message ?? 'Something went wrong.'}
+            {(choose.error ?? results.error)?.message ?? FIX_MATCH_DIALOG_COPY.failed}
           </p>
         )}
 
@@ -205,14 +229,14 @@ export const FixMatchDialog = <T,>({
           className={styles.results}
         >
           <h3 id={ids.results} className="visually-hidden">
-            Results
+            {FIX_MATCH_DIALOG_COPY.results}
           </h3>
           {results.isSuccess && results.data.length === 0 && (
-            <p className={styles.hint}>
-              TMDB has nothing by that name. Try the original title, or no year.
-            </p>
+            <p className={styles.hint}>{FIX_MATCH_DIALOG_COPY.noResults}</p>
           )}
-          {results.isFetching && !results.data && <p className={styles.hint}>Searching TMDB</p>}
+          {results.isFetching && !results.data && (
+            <p className={styles.hint}>{FIX_MATCH_DIALOG_COPY.searching}</p>
+          )}
           {!!results.data?.length && (
             <ul className={styles.list}>
               {results.data.map((candidate, index) => (
@@ -243,7 +267,7 @@ export const FixMatchDialog = <T,>({
           </Button>
         )}
         <Button className={styles.cancel} onClick={onClose}>
-          Cancel
+          {COMMON_COPY.cancel}
         </Button>
       </footer>
     </dialog>
