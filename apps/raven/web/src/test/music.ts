@@ -54,6 +54,7 @@ export const albumDetails = (overrides: Partial<AlbumDetails> = {}): AlbumDetail
   mbid: '11111111-1111-4111-8111-000000000001',
   discCount: 1,
   tracks: [track(), track({ id: 102, title: 'Paranoid Android', number: 2 })],
+  isFavourite: false,
   ...overrides,
 })
 
@@ -71,6 +72,7 @@ export const artistDetails = (overrides: Partial<ArtistDetails> = {}): ArtistDet
   artist: artist(),
   albums: [album()],
   appearsOn: [],
+  isFavourite: false,
   ...overrides,
 })
 

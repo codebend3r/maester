@@ -1,8 +1,19 @@
 import { Injectable } from '@nestjs/common'
 import {
+  type Chapter,
+  LYRICS_KINDS,
+  LYRICS_SOURCES,
+  type Lyrics,
+  NO_LYRICS,
+  lyricsOfText,
+} from '@raven/core'
+import {
   type IAudioMetadata,
+  type IChapter,
   type ICommonTagsResult,
   type IFormat,
+  type ILyricsTag,
+  TimestampFormat,
   parseFile,
 } from 'music-metadata'
 import type { ProbeResult } from '@/ffmpeg/probe'
@@ -53,12 +64,13 @@ export type AudioFormat = {
   isLossless: boolean
 }
 
-/** An audio file as the scanner reads it: the index's facts, its one track, its tags and its sound. */
+/** An audio file as the scanner reads it: the index's facts, its one track, its tags, its sound and its chapters. */
 export type AudioFile = {
   probe: ProbeResult
   tracks: FileTracks
   tags: AudioTags
   format: AudioFormat
+  chapters: Chapter[]
 }
 
 /**
@@ -208,12 +220,65 @@ export const audioFormatOf = (format: IFormat): AudioFormat => {
   }
 }
 
+type AudioChaptersOfProps = {
+  chapters: readonly IChapter[] | undefined
+  /** The file's length in seconds, where the last chapter ends when it says no end. */
+  duration: number | null
+}
+
+/**
+ * The chapters an audiobook's file lists (an `.m4b`'s chapter track or Nero
+ * list, an MP3's ID3 chapters), in seconds: a chapter with no end of its
+ * own runs to the next one's start, the last to the file's end. One with
+ * no length is left out.
+ */
+export const audioChaptersOf = ({ chapters = [], duration }: AudioChaptersOfProps): Chapter[] => {
+  const starts = chapters
+    .map((chapter) => ({ chapter, start: chapter.start / (chapter.timeScale ?? 1) }))
+    .toSorted((a, b) => a.start - b.start)
+  return starts.flatMap(({ chapter, start }, at) => {
+    const end =
+      chapter.end === undefined
+        ? (starts[at + 1]?.start ?? duration)
+        : chapter.end / (chapter.timeScale ?? 1)
+    if (end === null || !Number.isFinite(start) || start < 0 || end <= start) return []
+    return [{ start, end, title: text(chapter.title) }]
+  })
+}
+
+/** Synced lines the tag times in milliseconds, as music-metadata reads an LRC tag or an ID3 SYLT frame. */
+const syncedOf = (tag: ILyricsTag): Lyrics | null => {
+  if (tag.timeStampFormat !== TimestampFormat.milliseconds) return null
+  const lines = tag.syncText.flatMap(({ text: words, timestamp }) =>
+    timestamp === undefined ? [] : [{ at: timestamp / 1000, text: words.trim() }],
+  )
+  return lines.length === 0
+    ? null
+    : { kind: LYRICS_KINDS.synced, source: LYRICS_SOURCES.tags, lines }
+}
+
+/** The lyrics a file's tags carry: the first synced set, else the first text, else none. */
+export const lyricsOfTags = (tags: readonly ILyricsTag[] | undefined): Lyrics => {
+  const read = (tags ?? []).map(
+    (tag) => syncedOf(tag) ?? lyricsOfText({ text: tag.text ?? '', source: LYRICS_SOURCES.tags }),
+  )
+  return (
+    read.find(({ kind }) => kind === LYRICS_KINDS.synced) ??
+    read.find(({ kind }) => kind !== LYRICS_KINDS.none) ??
+    NO_LYRICS
+  )
+}
+
 /** Everything the scanner keeps of an audio file, from one `music-metadata` read. */
 const audioFileOf = (metadata: IAudioMetadata): AudioFile => ({
   probe: audioProbeOf(metadata.format),
   tracks: audioTracksOf(metadata.format),
   tags: audioTagsOf(metadata.common),
   format: audioFormatOf(metadata.format),
+  chapters: audioChaptersOf({
+    chapters: metadata.format.chapters,
+    duration: positive(metadata.format.duration),
+  }),
 })
 
 /**
@@ -224,8 +289,18 @@ const audioFileOf = (metadata: IAudioMetadata): AudioFile => ({
 @Injectable()
 export class AudioReader {
   async read(path: string): Promise<AudioFile> {
-    const metadata = await parseFile(path, { skipPostHeaders: true })
+    const metadata = await parseFile(path, { skipPostHeaders: true, includeChapters: true })
     if (metadata.format.hasAudio === false) throw new Error('No audio stream')
     return audioFileOf(metadata)
+  }
+
+  /**
+   * The lyrics a file's tags carry, read when they are asked for rather
+   * than at scan time: few tracks are ever shown with their lyrics, and a
+   * scan would otherwise keep text for every one of them.
+   */
+  async lyrics(path: string): Promise<Lyrics> {
+    const metadata = await parseFile(path, { skipPostHeaders: true, skipCovers: true })
+    return lyricsOfTags(metadata.common.lyrics)
   }
 }

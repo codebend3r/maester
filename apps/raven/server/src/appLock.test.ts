@@ -10,6 +10,7 @@ import {
   groupingsFor,
   isLibraryKind,
   isRecord,
+  LYRICS_KINDS,
   musicListQuery,
   sortsFor,
   viewsFor,
@@ -41,6 +42,7 @@ import {
 } from '@/test/app'
 import { MusicRepository } from '@/music/musicRepository'
 import { encodeClip, encodeTrack } from '@/test/clips'
+import { fakeLrclib } from '@/test/fakeLrclib'
 import { fakeTmdb } from '@/test/fakeTmdb'
 import { apiFor } from '@/test/server'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -114,6 +116,8 @@ describe('a library locked behind the PIN', () => {
       },
       quiet: true,
       watch: NOT_WATCHING,
+      // LRCLIB, and MusicBrainz with it, knowing nothing, so the lyrics route asks no network.
+      metadataFetch: fakeLrclib({ records: [] }).fetch,
     })
     await state.app.init()
     state.admin = await adminCookie(state.app)
@@ -301,6 +305,35 @@ describe('a library locked behind the PIN', () => {
     await expect(
       api('raven_unlock=1.forged').listMedia({ libraryId: state.private }),
     ).rejects.toMatchObject({ status: 423 })
+  })
+
+  it("leaves a locked library's tracks out of a playlist, and its lyrics behind the PIN", async () => {
+    const [track] = app().get(MediaIndex).idsForLibrary(state.privateMusic)
+    const id = track ?? 0
+    const { playlist } = await api().createPlaylist({ name: 'Lessons' })
+    // The admin can enter the PIN, so the lock says so rather than hiding the track.
+    await expect(
+      api().appendPlaylistTracks({ id: playlist.id, mediaIds: [id] }),
+    ).rejects.toMatchObject({ status: 423 })
+    await expect(api().getLyrics(id)).rejects.toMatchObject({ status: 423 })
+    // A video is no track, locked or not.
+    await expect(
+      api().appendPlaylistTracks({ id: playlist.id, mediaIds: [state.privateVideo] }),
+    ).rejects.toMatchObject({ status: 404 })
+
+    const { cookie } = await unlock('3001')
+    const added = await api(cookie).appendPlaylistTracks({ id: playlist.id, mediaIds: [id] })
+    expect(added.tracks.map((each) => each.id)).toEqual([id])
+    expect((await api(cookie).getLyrics(id)).kind).toBe(LYRICS_KINDS.none)
+
+    // Without the PIN the playlist holds nothing to see, and a new order keeps what it hides.
+    const shut = await api().getPlaylist(playlist.id)
+    expect(shut.tracks).toEqual([])
+    expect(shut.playlist.trackCount).toBe(0)
+    expect((await api().listPlaylists())[0]?.trackCount ?? null).toBe(0)
+    await api().replacePlaylistTracks({ id: playlist.id, mediaIds: [] })
+    expect((await api(cookie).getPlaylist(playlist.id)).tracks.map((each) => each.id)).toEqual([id])
+    await api().deletePlaylist(playlist.id)
   })
 
   it('keeps a locked library off the home page until it is unlocked', async () => {

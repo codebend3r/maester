@@ -31,7 +31,7 @@ describe("the app's mark", () => {
       RAVEN_MARK.colours.onLight,
     )
     const eye = /<circle cx="([^"]+)" cy="([^"]+)" r="([^"]+)" fill="([^"]+)"/u.exec(dark)
-    expect(eye?.slice(1)).toEqual([
+    expect(eye?.slice(1) ?? []).toEqual([
       String(RAVEN_MARK.eye.cx),
       String(RAVEN_MARK.eye.cy),
       String(RAVEN_MARK.eye.r),

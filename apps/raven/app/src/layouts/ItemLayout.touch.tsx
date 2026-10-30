@@ -137,7 +137,7 @@ const Hero = ({ hero, actions, links }: HeroProps) => {
       <View style={[styles.headRow, isWide && styles.headRowWide]}>
         <CardPicture card={heroPictureOf(hero)} width={widths[hero.poster.shape]} />
         <View style={styles.words}>
-          {hero.logo?.place === ART_PLACES.over && (
+          {hero.logo !== null && hero.logo.place === ART_PLACES.over && (
             <TitleArt
               height={LOGO_HEIGHT}
               logo={hero.logo.picture}
@@ -147,7 +147,7 @@ const Hero = ({ hero, actions, links }: HeroProps) => {
             />
           )}
           {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
-          {hero.logo?.place === ART_PLACES.title ? (
+          {hero.logo !== null && hero.logo.place === ART_PLACES.title ? (
             <View accessibilityLabel={hero.title} accessibilityRole="header" accessible>
               <TitleArt
                 height={LOGO_HEIGHT}

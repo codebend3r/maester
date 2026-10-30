@@ -269,6 +269,18 @@ type MusicRepositoryArtistProps = {
 
 type MusicRepositoryCoverProps = { id: number; version: string }
 
+type MusicRepositoryArtistsProps = {
+  ids: readonly number[]
+  /** Libraries whose albums and tracks the counts leave out. */
+  hidden: readonly number[]
+}
+
+/** An album's page as the music tables alone know it; whether it is a favourite is the account's. */
+type AlbumPage = Omit<AlbumDetails, 'isFavourite'>
+
+/** An artist's page as the music tables alone know it; whether they are a favourite is the account's. */
+type ArtistPage = Omit<ArtistDetails, 'isFavourite'>
+
 type MusicRepositorySaveMatchProps = {
   id: number
   release: Release | null
@@ -732,8 +744,52 @@ export class MusicRepository {
     return { tracks, total }
   }
 
+  /** The tracks among `ids`, by id; an id that is no track is not in the map. */
+  tracks(ids: readonly number[]): Map<number, Track> {
+    const tracks = this.db
+      .prepare<[string], TrackRow>(
+        `${SELECT_TRACKS} WHERE t.media_id IN (SELECT value FROM json_each(?))`,
+      )
+      .all(JSON.stringify([...new Set(ids)]))
+      .map((row) => this.toTrack(row))
+    return new Map(tracks.map((track) => [track.id, track]))
+  }
+
+  /** The albums among `ids`, by id; an id that is no album is not in the map. */
+  albums(ids: readonly number[]): Map<number, AlbumSummary> {
+    const albums = this.db
+      .prepare<[string], AlbumRow>(
+        `${SELECT_ALBUMS} WHERE a.id IN (SELECT value FROM json_each(?)) GROUP BY a.id`,
+      )
+      .all(JSON.stringify([...new Set(ids)]))
+      .map((row) => this.toAlbum(row))
+    return new Map(albums.map((album) => [album.id, album]))
+  }
+
+  /**
+   * The artists among `ids`, by id, each counted over the albums and
+   * tracks outside `hidden`; one credited on nothing else counts 0 and 0.
+   */
+  artists({ ids, hidden }: MusicRepositoryArtistsProps): Map<number, Artist> {
+    const artists = this.db
+      .prepare<{ ids: string; hidden: string }, ArtistRow>(
+        `SELECT ar.id, ar.name, ar.sort_name, ar.mbid,
+                (SELECT COUNT(*) FROM album_artists aa JOIN albums a ON a.id = aa.album_id
+                  WHERE aa.artist_id = ar.id
+                    AND a.library_id NOT IN (SELECT value FROM json_each(@hidden))) AS album_count,
+                (SELECT COUNT(*) FROM track_artists ta JOIN media m ON m.id = ta.media_id
+                  WHERE ta.artist_id = ar.id
+                    AND m.library_id NOT IN (SELECT value FROM json_each(@hidden))) AS track_count
+           FROM artists ar
+          WHERE ar.id IN (SELECT value FROM json_each(@ids))`,
+      )
+      .all({ ids: JSON.stringify([...new Set(ids)]), hidden: JSON.stringify(hidden) })
+      .map((row) => this.toArtist(row))
+    return new Map(artists.map((artist) => [artist.id, artist]))
+  }
+
   /** An album with its tracks in disc and number order, or null when there is no such album. */
-  album(id: number): AlbumDetails | null {
+  album(id: number): AlbumPage | null {
     const row = this.db
       .prepare<[number], AlbumDetailsRow>(`${SELECT_ALBUM_DETAILS} WHERE a.id = ? GROUP BY a.id`)
       .get(id)
@@ -760,7 +816,7 @@ export class MusicRepository {
    * credited on a track of, each in the libraries the caller sees, and
    * their counts over those; null when there is no such artist.
    */
-  artist({ id, seesLibrary }: MusicRepositoryArtistProps): ArtistDetails | null {
+  artist({ id, seesLibrary }: MusicRepositoryArtistProps): ArtistPage | null {
     const row = this.db
       .prepare<[number], Omit<ArtistRow, 'album_count' | 'track_count'>>(
         'SELECT id, name, sort_name, mbid FROM artists WHERE id = ?',

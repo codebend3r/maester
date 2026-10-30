@@ -45,7 +45,7 @@ type ViewingCountsOfProps = {
   account: AccountKey
 }
 
-/** How many spots, plays, video favourites and title favourites `account` holds. */
+/** How many spots, plays, favourites of each kind and playlists `account` holds. */
 export const viewingCountsOf = ({
   database,
   account,
@@ -56,6 +56,9 @@ export const viewingCountsOf = ({
          (SELECT COUNT(*) FROM playback_progress WHERE account_id = @account) AS spots,
          (SELECT COUNT(*) FROM plays WHERE account_id = @account) AS plays,
          (SELECT COUNT(*) FROM favourites WHERE account_id = @account) AS favourites,
-         (SELECT COUNT(*) FROM item_favourites WHERE account_id = @account) AS titleFavourites`,
+         (SELECT COUNT(*) FROM item_favourites WHERE account_id = @account) AS titleFavourites,
+         (SELECT COUNT(*) FROM album_favourites WHERE account_id = @account) AS albumFavourites,
+         (SELECT COUNT(*) FROM artist_favourites WHERE account_id = @account) AS artistFavourites,
+         (SELECT COUNT(*) FROM playlists WHERE account_id = @account) AS playlists`,
     )
     .get({ account })

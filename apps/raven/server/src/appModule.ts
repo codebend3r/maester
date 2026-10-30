@@ -82,11 +82,17 @@ import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbC
 import { AlbumCovers } from '@/music/albumCovers'
 import { AlbumMatching } from '@/music/albumMatching'
 import { MusicBrainzClient } from '@/music/musicBrainzClient'
+import { LrclibClient } from '@/music/lrclibClient'
+import { MusicFavourites } from '@/music/musicFavourites'
+import { Playlists } from '@/music/playlists'
+import { PlaylistsController } from '@/music/playlistsController'
+import { TrackLyrics } from '@/music/trackLyrics'
 import { AudioReader } from '@/music/audioReader'
 import {
   AlbumsController,
   ArtistsController,
   LibraryMusicController,
+  TracksController,
 } from '@/music/musicController'
 import { MusicIndexer } from '@/music/musicIndexer'
 import { MusicRepository } from '@/music/musicRepository'
@@ -131,6 +137,8 @@ export const CONTROLLERS = [
   LibraryMusicController,
   AlbumsController,
   ArtistsController,
+  TracksController,
+  PlaylistsController,
   SettingsController,
   EventsController,
   LockController,
@@ -238,6 +246,10 @@ export class AppModule {
         AlbumCovers,
         MusicIndexer,
         MusicBrainzClient,
+        LrclibClient,
+        MusicFavourites,
+        Playlists,
+        TrackLyrics,
         AlbumMatching,
         MatchFiles,
         AiDecisions,

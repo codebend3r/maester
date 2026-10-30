@@ -24,11 +24,25 @@ const NOTHING = {
   plays: 0,
   favourites: 0,
   titleFavourites: 0,
+  albumFavourites: 0,
+  artistFavourites: 0,
+  playlists: 0,
+} as const satisfies AdoptedCounts
+
+/** One of every row `recordThePast` leaves, but two plays. */
+const THE_PAST = {
+  spots: 1,
+  plays: 2,
+  favourites: 1,
+  titleFavourites: 1,
+  albumFavourites: 1,
+  artistFavourites: 1,
+  playlists: 1,
 } as const satisfies AdoptedCounts
 
 describe('the owner adopting the viewing from before accounts', () => {
   const database = testDatabase('raven-viewing-adoption-')
-  const ids = { first: 0, second: 0, show: 0 }
+  const ids = { first: 0, second: 0, show: 0, album: 0, artist: 0 }
 
   const db = () => database.get().db
   const settings = () => new SettingsRepository(database.get())
@@ -70,6 +84,29 @@ describe('the owner adopting the viewing from before accounts', () => {
       .prepare('INSERT INTO item_favourites (account_id, item_id, added_at) VALUES (?, ?, ?)')
       .run(account, itemId, at)
 
+  type AlbumFavouriteProps = { account: AccountKey; albumId: number; at: string }
+
+  const albumFavourite = ({ account, albumId, at }: AlbumFavouriteProps) =>
+    db()
+      .prepare('INSERT INTO album_favourites (account_id, album_id, added_at) VALUES (?, ?, ?)')
+      .run(account, albumId, at)
+
+  type ArtistFavouriteProps = { account: AccountKey; artistId: number; at: string }
+
+  const artistFavourite = ({ account, artistId, at }: ArtistFavouriteProps) =>
+    db()
+      .prepare('INSERT INTO artist_favourites (account_id, artist_id, added_at) VALUES (?, ?, ?)')
+      .run(account, artistId, at)
+
+  type PlaylistProps = { account: AccountKey; name: string; at: string }
+
+  const playlist = ({ account, name, at }: PlaylistProps) =>
+    db()
+      .prepare(
+        'INSERT INTO playlists (account_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)',
+      )
+      .run(account, name, at, at)
+
   type PlayProps = {
     account: AccountKey
     mediaId: number
@@ -105,6 +142,17 @@ describe('the owner adopting the viewing from before accounts', () => {
         'SELECT account_id, item_id, added_at FROM item_favourites ORDER BY account_id, item_id',
       )
       .all(),
+    albumFavourites: db()
+      .prepare(
+        'SELECT account_id, album_id, added_at FROM album_favourites ORDER BY account_id, album_id',
+      )
+      .all(),
+    artistFavourites: db()
+      .prepare(
+        'SELECT account_id, artist_id, added_at FROM artist_favourites ORDER BY account_id, artist_id',
+      )
+      .all(),
+    playlists: db().prepare('SELECT account_id, name FROM playlists ORDER BY id').all(),
   })
 
   type CountsOfProps = { account: AccountKey }
@@ -126,6 +174,9 @@ describe('the owner adopting the viewing from before accounts', () => {
     play({ account: LOCAL, mediaId: ids.second, at: day(2), kind: PLAY_KINDS.marked })
     favourite({ account: LOCAL, mediaId: ids.first, at: day(1) })
     titleFavourite({ account: LOCAL, itemId: ids.show, at: day(2) })
+    albumFavourite({ account: LOCAL, albumId: ids.album, at: day(2) })
+    artistFavourite({ account: LOCAL, artistId: ids.artist, at: day(2) })
+    playlist({ account: LOCAL, name: 'Road trip', at: day(2) })
   }
 
   beforeEach(async () => {
@@ -153,6 +204,19 @@ describe('the owner adopting the viewing from before accounts', () => {
         title: 'Show',
       },
     })
+    ids.artist = Number(
+      db()
+        .prepare("INSERT INTO artists (name, sort_name, name_key) VALUES ('Blur', 'Blur', 'blur')")
+        .run().lastInsertRowid,
+    )
+    ids.album = Number(
+      db()
+        .prepare(
+          `INSERT INTO albums (library_id, album_key, title, sort_title, added_at)
+           VALUES (?, 'blur', 'Blur', 'Blur', ?)`,
+        )
+        .run(libraryId, day(1)).lastInsertRowid,
+    )
   })
 
   afterEach(database.close)
@@ -161,19 +225,9 @@ describe('the owner adopting the viewing from before accounts', () => {
     recordThePast()
     expect(adoption().hasLocalRows()).toBe(true)
 
-    expect(adoption().adopt({ ownerId: OWNER })).toEqual({
-      spots: 1,
-      plays: 2,
-      favourites: 1,
-      titleFavourites: 1,
-    })
+    expect(adoption().adopt({ ownerId: OWNER })).toEqual(THE_PAST)
     expect(countsOf({ account: LOCAL })).toEqual(NOTHING)
-    expect(countsOf({ account: OWNER })).toEqual({
-      spots: 1,
-      plays: 2,
-      favourites: 1,
-      titleFavourites: 1,
-    })
+    expect(countsOf({ account: OWNER })).toEqual(THE_PAST)
     expect(settings().viewingOwner()).toBe(OWNER)
     expect(adoption().hasLocalRows()).toBe(false)
 
@@ -195,6 +249,12 @@ describe('the owner adopting the viewing from before accounts', () => {
     favourite({ account: LOCAL, mediaId: ids.second, at: day(5) })
     titleFavourite({ account: OWNER, itemId: ids.show, at: day(5) })
     titleFavourite({ account: LOCAL, itemId: ids.show, at: day(1) })
+    albumFavourite({ account: OWNER, albumId: ids.album, at: day(5) })
+    albumFavourite({ account: LOCAL, albumId: ids.album, at: day(1) })
+    artistFavourite({ account: OWNER, artistId: ids.artist, at: day(1) })
+    artistFavourite({ account: LOCAL, artistId: ids.artist, at: day(5) })
+    playlist({ account: OWNER, name: 'Mine', at: day(5) })
+    playlist({ account: LOCAL, name: 'Mine', at: day(1) })
     play({ account: OWNER, mediaId: ids.first, at: day(5), kind: PLAY_KINDS.played })
     play({ account: LOCAL, mediaId: ids.first, at: day(1), kind: PLAY_KINDS.played })
 
@@ -214,6 +274,13 @@ describe('the owner adopting the viewing from before accounts', () => {
         { account_id: OWNER, media_id: ids.second, added_at: day(1) },
       ],
       titleFavourites: [{ account_id: OWNER, item_id: ids.show, added_at: day(1) }],
+      albumFavourites: [{ account_id: OWNER, album_id: ids.album, added_at: day(1) }],
+      artistFavourites: [{ account_id: OWNER, artist_id: ids.artist, added_at: day(1) }],
+      // Two playlists of one name are still two lists, so both are kept.
+      playlists: [
+        { account_id: OWNER, name: 'Mine' },
+        { account_id: OWNER, name: 'Mine' },
+      ],
     })
   })
 
@@ -251,6 +318,18 @@ describe('the owner adopting the viewing from before accounts', () => {
     {
       held: 'a title favourite',
       record: () => titleFavourite({ account: LOCAL, itemId: ids.show, at: day(1) }),
+    },
+    {
+      held: 'an album favourite',
+      record: () => albumFavourite({ account: LOCAL, albumId: ids.album, at: day(1) }),
+    },
+    {
+      held: 'an artist favourite',
+      record: () => artistFavourite({ account: LOCAL, artistId: ids.artist, at: day(1) }),
+    },
+    {
+      held: 'a playlist',
+      record: () => playlist({ account: LOCAL, name: 'Road trip', at: day(1) }),
     },
   ])('finds the past when all it holds is $held', ({ record }) => {
     spot({ account: OWNER, mediaId: ids.second, position: 5, at: day(1) })

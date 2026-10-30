@@ -85,12 +85,18 @@ export class ViewingAccounts {
     if (!this.isAdoptionPending || !isApprovedOwner(account)) return
     if (Date.now() < this.retryAt) return
     try {
-      const { spots, plays, favourites, titleFavourites } = this.adoption.adopt({
-        ownerId: account.id,
-      })
+      const {
+        spots,
+        plays,
+        favourites,
+        titleFavourites,
+        albumFavourites,
+        artistFavourites,
+        playlists,
+      } = this.adoption.adopt({ ownerId: account.id })
       this.isAdoptionPending = false
       this.logger.log(
-        `Gave the owner the viewing history from before accounts: ${plays} plays, ${spots} resume spots, ${favourites + titleFavourites} favourites`,
+        `Gave the owner the viewing history from before accounts: ${plays} plays, ${spots} resume spots, ${favourites + titleFavourites + albumFavourites + artistFavourites} favourites, ${playlists} playlists`,
       )
     } catch (error) {
       this.retryAt = Date.now() + ADOPTION_RETRY_MS

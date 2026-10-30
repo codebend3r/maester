@@ -193,7 +193,7 @@ const Playing = ({
   // Only an episode has a next; a film asks nothing.
   const next = useQuery({
     ...session.queries.nextInSessionQuery({ id: media.id, session: SHOW_SESSION }),
-    enabled: media.item?.type === ITEM_TYPES.episode,
+    enabled: (media.item?.type ?? null) === ITEM_TYPES.episode,
   })
   const nextMedia = next.data ?? null
   // The end and a press of Next can both ask in one tick; the player leaves once.

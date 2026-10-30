@@ -36,8 +36,8 @@ export const CardPicture = ({ card, width, ring = 0, radius = SIZES.radius }: Ca
   const [failed, setFailed] = useState<string | null>(null)
   const [failedLogo, setFailedLogo] = useState<string | null>(null)
   const styles = useStyles()
-  const logo =
-    (card.logo ?? null) === null || card.logo?.uri === failedLogo ? null : (card.logo ?? null)
+  const cardLogo = card.logo ?? null
+  const logo = cardLogo === null || cardLogo.uri === failedLogo ? null : cardLogo
   const height = pictureHeightOf({ shape: card.shape, width })
   const pictureKey = card.picture === null ? null : JSON.stringify(card.picture)
   const picture = pictureKey === failed ? null : card.picture

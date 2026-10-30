@@ -1,11 +1,19 @@
-import type { ICommonTagsResult, IFormat } from 'music-metadata'
+import { LYRICS_KINDS, LYRICS_SOURCES, NO_LYRICS } from '@raven/core'
+import {
+  type ICommonTagsResult,
+  type IFormat,
+  LyricsContentType,
+  TimestampFormat,
+} from 'music-metadata'
 import { describe, expect, it } from 'vitest'
 import {
+  audioChaptersOf,
   audioFormatOf,
   audioProbeOf,
   audioTagsOf,
   audioTracksOf,
   codecNameOf,
+  lyricsOfTags,
 } from '@/music/audioReader'
 
 /** What `music-metadata` folds a file with no tags to. */
@@ -200,5 +208,76 @@ describe('audioProbeOf and audioTracksOf', () => {
       duration: null,
       bitrate: null,
     })
+  })
+})
+
+describe('audioChaptersOf', () => {
+  it("reads an audiobook's chapters in seconds, each running to the next and the last to the end", () => {
+    expect(
+      audioChaptersOf({
+        chapters: [
+          { title: 'Two', start: 88_200, timeScale: 44_100 },
+          { title: 'One', start: 0, timeScale: 44_100 },
+        ],
+        duration: 6,
+      }),
+    ).toEqual([
+      { start: 0, end: 2, title: 'One' },
+      { start: 2, end: 6, title: 'Two' },
+    ])
+  })
+
+  it('takes a chapter’s own end, names an untitled one null, and drops one with no length', () => {
+    expect(
+      audioChaptersOf({
+        chapters: [
+          { title: '', start: 0, end: 30 },
+          { title: 'Empty', start: 30, end: 30 },
+          { title: 'Last', start: 40 },
+        ],
+        duration: null,
+      }),
+    ).toEqual([{ start: 0, end: 30, title: null }])
+    expect(audioChaptersOf({ chapters: undefined, duration: 10 })).toEqual([])
+  })
+})
+
+describe('lyricsOfTags', () => {
+  const tag = {
+    contentType: LyricsContentType.lyrics,
+    timeStampFormat: TimestampFormat.notSynchronized,
+    syncText: [],
+  }
+
+  it('takes the synced lines a tag times, in seconds', () => {
+    expect(
+      lyricsOfTags([
+        { ...tag, text: 'Plain first' },
+        {
+          ...tag,
+          timeStampFormat: TimestampFormat.milliseconds,
+          syncText: [{ text: ' Hello ', timestamp: 1_500 }, { text: 'untimed' }],
+        },
+      ]),
+    ).toEqual({
+      kind: LYRICS_KINDS.synced,
+      source: LYRICS_SOURCES.tags,
+      lines: [{ at: 1.5, text: 'Hello' }],
+    })
+  })
+
+  it('reads LRC stamps in an untimed tag’s text, else gives it as plain text, else none', () => {
+    expect(lyricsOfTags([{ ...tag, text: '[00:02.00]Stamped' }])).toEqual({
+      kind: LYRICS_KINDS.synced,
+      source: LYRICS_SOURCES.tags,
+      lines: [{ at: 2, text: 'Stamped' }],
+    })
+    expect(lyricsOfTags([{ ...tag, text: 'Words' }])).toEqual({
+      kind: LYRICS_KINDS.plain,
+      source: LYRICS_SOURCES.tags,
+      text: 'Words',
+    })
+    expect(lyricsOfTags([{ ...tag, text: ' ' }])).toEqual(NO_LYRICS)
+    expect(lyricsOfTags(undefined)).toEqual(NO_LYRICS)
   })
 })

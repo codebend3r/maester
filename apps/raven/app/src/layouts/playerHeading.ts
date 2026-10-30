@@ -23,7 +23,7 @@ type PlayerHeadingOfProps = { media: MediaItem; logo: Picture | null }
 export const playerHeadingOf = ({ media, logo }: PlayerHeadingOfProps): PlayerHeading => {
   const { item } = media
   const length = formatRuntime(media.duration)
-  if (item?.type === ITEM_TYPES.episode) {
+  if (item !== null && item.type === ITEM_TYPES.episode) {
     return {
       show: item.show?.title ?? null,
       logo,

@@ -30,6 +30,9 @@ const ADOPTED = {
   plays: 2,
   favourites: 3,
   titleFavourites: 4,
+  albumFavourites: 5,
+  artistFavourites: 6,
+  playlists: 7,
 } as const satisfies AdoptedCounts
 
 const SQLITE_CODES = { full: 'SQLITE_FULL' } as const
@@ -137,7 +140,7 @@ describe('the owner adopting the past', () => {
       })
       expect(logged.mock.calls).toEqual([
         [
-          'Gave the owner the viewing history from before accounts: 2 plays, 1 resume spots, 7 favourites',
+          'Gave the owner the viewing history from before accounts: 2 plays, 1 resume spots, 18 favourites, 7 playlists',
         ],
       ])
     } finally {

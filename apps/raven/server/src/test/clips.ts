@@ -372,7 +372,8 @@ type EncodeTrackProps = {
       | 'compilation'
       | 'MUSICBRAINZ_ALBUMID'
       | 'MUSICBRAINZ_TRACKID'
-      | 'MUSICBRAINZ_ARTISTID',
+      | 'MUSICBRAINZ_ARTISTID'
+      | 'lyrics',
       string
     >
   >

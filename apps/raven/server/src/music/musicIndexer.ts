@@ -35,9 +35,9 @@ export class MusicIndexer {
   ) {}
 
   async index({ id, libraryId, path }: MusicIndexerIndexProps): Promise<void> {
-    const { probe, tracks, tags, format } = await this.reader.read(path)
+    const { probe, tracks, tags, format, chapters } = await this.reader.read(path)
     const folderCover = tags.hasCover ? null : await this.folderCover(dirname(path))
-    this.mediaIndex.saveProbe({ id, probe, tracks, chapters: [] })
+    this.mediaIndex.saveProbe({ id, probe, tracks, chapters })
     this.music.record({ mediaId: id, libraryId, path, tags, format, folderCover })
     // No thumbnail will come, so nothing waits for one.
     this.mediaIndex.setThumbnail({ id, state: THUMBNAIL_STATES.failed })

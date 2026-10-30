@@ -12,6 +12,7 @@ export const QUEUE_SOURCE_KINDS = {
   album: 'album',
   artist: 'artist',
   library: 'library',
+  playlist: 'playlist',
 } as const
 
 export const isQueueSource = object({

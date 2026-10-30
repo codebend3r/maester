@@ -14,21 +14,23 @@ describe('holdReducer', () => {
 
   it('carries the playhead on each tick, faster the longer the key is held', () => {
     const first = holdReducer(held, { type: HOLD_ACTIONS.tick, now: DOWN_AT + 200, duration: 3000 })
-    expect(first?.at).toBe(100 + SKIP_SECONDS)
+    expect(first?.at ?? null).toBe(100 + SKIP_SECONDS)
     const later = holdReducer(first, {
       type: HOLD_ACTIONS.tick,
       now: DOWN_AT + 6000,
       duration: 3000,
     })
-    expect(later?.at).toBe(100 + SKIP_SECONDS + 60)
+    expect(later?.at ?? null).toBe(100 + SKIP_SECONDS + 60)
   })
 
   it('stops at the start and at the end', () => {
     const back = holdReducer(null, { type: HOLD_ACTIONS.down, direction: -1, at: 4, now: DOWN_AT })
-    expect(holdReducer(back, { type: HOLD_ACTIONS.tick, now: DOWN_AT, duration: 50 })?.at).toBe(0)
-    expect(holdReducer(held, { type: HOLD_ACTIONS.tick, now: DOWN_AT, duration: 105 })?.at).toBe(
-      105,
-    )
+    expect(
+      holdReducer(back, { type: HOLD_ACTIONS.tick, now: DOWN_AT, duration: 50 })?.at ?? null,
+    ).toBe(0)
+    expect(
+      holdReducer(held, { type: HOLD_ACTIONS.tick, now: DOWN_AT, duration: 105 })?.at ?? null,
+    ).toBe(105)
   })
 
   it('ends as the key comes up, and a tick with no hold changes nothing', () => {
