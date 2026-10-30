@@ -3,11 +3,13 @@ import {
   activeCues,
   cueRuns,
   formatWebVtt,
+  isPictureSubtitle,
   mergeCues,
   parseWebVtt,
   subtitleWindowRange,
   subtitleWindows,
 } from '@/subtitles'
+import { SUBTITLE_SOURCES, type SubtitleTrack } from '@/contract'
 
 describe('parseWebVtt', () => {
   it('reads cues with and without hours, identifiers and settings', () => {
@@ -158,5 +160,27 @@ describe('formatWebVtt', () => {
     expect(formatWebVtt({ cues: [], timestampMap: { mpegts: 0, local: 3661.5 } })).toContain(
       'LOCAL:01:01:01.500',
     )
+  })
+})
+
+describe('isPictureSubtitle', () => {
+  const track = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({
+    id: 'embedded-0',
+    source: SUBTITLE_SOURCES.embedded,
+    codec: 'hdmv_pgs_subtitle',
+    language: 'en',
+    title: null,
+    default: false,
+    forced: false,
+    hearingImpaired: false,
+    supported: false,
+    ...overrides,
+  })
+
+  it('is true for an embedded track that is not text, and for nothing else', () => {
+    expect(isPictureSubtitle(track({}))).toBe(true)
+    expect(isPictureSubtitle(track({ supported: true }))).toBe(false)
+    expect(isPictureSubtitle(track({ source: SUBTITLE_SOURCES.external }))).toBe(false)
+    expect(isPictureSubtitle(null)).toBe(false)
   })
 })

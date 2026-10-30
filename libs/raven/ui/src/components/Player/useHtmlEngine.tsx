@@ -1,4 +1,9 @@
-import { PLAYBACK_MODES, PLAYER_SOURCE_KINDS, STREAM_TIME_SHIFT } from '@raven/core'
+import {
+  PLAYBACK_MODES,
+  PLAYER_SOURCE_KINDS,
+  STREAM_TIME_SHIFT,
+  isPictureSubtitle,
+} from '@raven/core'
 import { useEffect, useRef } from 'react'
 import type { EngineHandle, EngineStats, HtmlSource } from '@/components/Player/engine'
 import type { Rendition } from '@/components/Player/rendition'
@@ -111,7 +116,8 @@ export const useHtmlEngine = ({
       source.kind === PLAYER_SOURCE_KINDS.server
         ? { api: source.api, mediaId: source.media.id }
         : null,
-    track: selection.subtitle,
+    // A picture track is burned into the picture: it has no cues.
+    track: isPictureSubtitle(selection.subtitle) ? null : selection.subtitle,
     time: playback.state.time,
     duration: playback.duration,
   })

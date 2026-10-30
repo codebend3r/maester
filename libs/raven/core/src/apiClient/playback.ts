@@ -51,6 +51,8 @@ type StreamUrlProps = {
   audio: number | null
   quality?: StreamQuality | null
   access?: MediaAccess | null
+  /** A transcode's picture subtitle to burn into the picture, by track id; null for none. */
+  burn?: string | null
 }
 
 /** What a player loads: the file, its tracks and streams, the origins and tickets that open them, and the admin's view of who is streaming. */
@@ -125,7 +127,15 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
    * picks the track by its `0:a:N` index; left out, the default plays.
    * `quality` sizes a transcode; left out, the server's settings do.
    */
-  streamUrl: ({ id, mode, start, audio, quality = null, access = null }: StreamUrlProps): string =>
+  streamUrl: ({
+    id,
+    mode,
+    start,
+    audio,
+    quality = null,
+    access = null,
+    burn = null,
+  }: StreamUrlProps): string =>
     mediaUrl({
       path: `/api/media/${id}/stream`,
       query: {
@@ -133,6 +143,7 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
         start: String(Math.max(0, Math.round(start * 1000) / 1000)),
         ...(audio == null ? {} : { audio: String(audio) }),
         ...(quality == null ? {} : { quality }),
+        ...(burn == null ? {} : { [HLS_PARAMS.burn]: burn }),
       },
       access,
     }),

@@ -28,6 +28,8 @@ type SourceForProps = {
   audio: number | null
   /** The size a transcode is asked for; null for the server's settings. */
   quality?: StreamQuality | null
+  /** A picture subtitle a transcode burns into the picture, by track id; null for none. */
+  burn: string | null
   /** The converted stream's type; null for direct play, which needs none. */
   mime: string | null
   /** Read for each URL built, so a stream's next request carries the newest ticket. */
@@ -40,6 +42,7 @@ export const sourceFor = ({
   mode,
   audio,
   quality = null,
+  burn,
   mime,
   access,
 }: SourceForProps): VideoSource =>
@@ -48,7 +51,7 @@ export const sourceFor = ({
     : {
         kind: VIDEO_SOURCE_KINDS.stream,
         mime,
-        url: (start) => api.streamUrl({ id, mode, start, audio, quality, access: access() }),
+        url: (start) => api.streamUrl({ id, mode, start, audio, quality, burn, access: access() }),
       }
 
 /** What a media element's error means to the viewer. */
@@ -92,7 +95,7 @@ export const useMediaSource = ({
   onFailure,
   onSlow,
 }: UseMediaSourceProps): void => {
-  const { mode, quality } = rendition
+  const { mode, quality, burn } = rendition
   const mime =
     mode === PLAYBACK_MODES.direct || htmlSource.kind === PLAYER_SOURCE_KINDS.file
       ? null
@@ -116,7 +119,7 @@ export const useMediaSource = ({
   // failure the browser queued for the old one can land in between; it
   // must not count against the new one. A file's ticket is part of the
   // key because a new ticket re-attaches it.
-  const wanted = JSON.stringify([id, mode, audio, quality, originUrl, fileTicket])
+  const wanted = JSON.stringify([id, mode, audio, quality, burn, originUrl, fileTicket])
   const attached = useRef<string | null>(null)
   const report = (message: string) => {
     if (attached.current === wanted) onFailure(message)
@@ -189,7 +192,16 @@ export const useMediaSource = ({
     attached.current = wanted
     const videoSource: VideoSource =
       api != null && typeof id === 'number'
-        ? sourceFor({ api, id, mode, audio, quality, mime, access: () => accessRef.current })
+        ? sourceFor({
+            api,
+            id,
+            mode,
+            audio,
+            quality,
+            burn,
+            mime,
+            access: () => accessRef.current,
+          })
         : { kind: 'file', url: String(id) }
     return attach({
       element,
@@ -197,5 +209,5 @@ export const useMediaSource = ({
       duration: knownDuration,
       isRemote: originUrl != null,
     })
-  }, [videoRef, id, knownDuration, api, mode, audio, quality, mime, wanted, originUrl])
+  }, [videoRef, id, knownDuration, api, mode, audio, quality, burn, mime, wanted, originUrl])
 }

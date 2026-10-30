@@ -1,7 +1,9 @@
+import subprocess
+
 import pytest
 
 from features import FEATURES
-from sync_features import MERGED, OPEN, Projects, feature_for, status_for
+from sync_features import MERGED, OPEN, Projects, RateLimited, feature_for, gh, main, status_for
 
 
 def pr(branch: str = "some-branch", body: str = "", title: str = "MAE: do a thing", **rest):
@@ -98,3 +100,29 @@ class TestStatusFor:
 
     def test_closed_unmerged_is_left_out(self):
         assert status_for(pr(state="CLOSED")) is None
+
+
+def refused(stderr: str):
+    def run(*_args, **_kwargs):
+        return subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr=stderr)
+
+    return run
+
+
+def test_gh_names_a_rate_limit_apart_from_other_failures(monkeypatch):
+    monkeypatch.setattr(
+        subprocess, "run", refused("GraphQL: API rate limit exceeded for user ID 1.")
+    )
+    with pytest.raises(RateLimited):
+        gh("project", "list")
+    monkeypatch.setattr(subprocess, "run", refused("GraphQL: Could not resolve to a Project."))
+    with pytest.raises(RuntimeError) as other:
+        gh("project", "list")
+    assert not isinstance(other.value, RateLimited)
+
+
+def test_a_rate_limit_warns_and_leaves_the_run_green(monkeypatch, capsys):
+    monkeypatch.setattr(subprocess, "run", refused("API rate limit exceeded"))
+    monkeypatch.setattr("sys.argv", ["sync_features.py", "--pr", "351"])
+    main()
+    assert "::warning::" in capsys.readouterr().out

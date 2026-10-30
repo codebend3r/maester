@@ -32,10 +32,15 @@ OPEN = "In Progress"
 MERGED = "Done"
 
 
+class RateLimited(RuntimeError):
+    """GitHub's API budget, shared by everything signed in as this user, is used up."""
+
+
 def gh(*args: str) -> str:
     r = subprocess.run(["gh", *args], capture_output=True, text=True)
     if r.returncode != 0:
-        raise RuntimeError(f"gh {' '.join(args)}\n{r.stderr}")
+        error = RateLimited if "rate limit" in r.stderr.lower() else RuntimeError
+        raise error(f"gh {' '.join(args)}\n{r.stderr}")
     return r.stdout.strip()
 
 
@@ -217,13 +222,20 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="print the changes, make none")
     args = parser.parse_args()
 
-    projects = Projects(args.dry_run)
-    if args.pr:
-        sync_pr(projects, gh_json("pr", "view", str(args.pr), "-R", REPO, "--json", PR_FIELDS))
+    try:
+        projects = Projects(args.dry_run)
+        if args.pr:
+            sync_pr(projects, gh_json("pr", "view", str(args.pr), "-R", REPO, "--json", PR_FIELDS))
+            return
+        for pr in recent_prs(args.days):
+            sync_pr(projects, pr)
+        sync_stories(projects)
+    except RateLimited as error:
+        # Not the pull request's fault, and every step is idempotent: the next run catches up.
+        print(
+            f"::warning::GitHub's API rate limit is used up, so the projects are not synced this run.\n{error}"
+        )
         return
-    for pr in recent_prs(args.days):
-        sync_pr(projects, pr)
-    sync_stories(projects)
     print("✓ feature projects match the pull requests")
 
 

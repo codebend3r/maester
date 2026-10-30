@@ -31,6 +31,8 @@ export type ChoiceGroup = { legend: string; isInline: boolean; options: ChoiceOp
 export type PlayChoices = {
   /** Empty when there is nothing to choose between. */
   groups: ChoiceGroup[]
+  /** Whether a picture subtitle can be shown: the server may convert, which burns it in. */
+  canBurn: boolean
   select: (pick: PlayPick) => void
 }
 

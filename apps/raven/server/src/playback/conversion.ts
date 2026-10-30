@@ -1,5 +1,10 @@
 import { stat } from 'node:fs/promises'
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common'
 import {
   type AudioTrack,
   type MediaTracks,
@@ -10,12 +15,15 @@ import {
   type StreamMode,
   type StreamQuality,
   TRANSCODINGS,
+  isPictureSubtitle,
   isStreamMode,
   isStreamQuality,
 } from '@raven/core'
 import { wholeNumber } from '@shared/server'
+import type { BurnSubtitle } from '@/ffmpeg/args'
 import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
 import type { FfmpegService } from '@/ffmpeg/ffmpegService'
+import type { ProbeResult } from '@/ffmpeg/probe'
 import type { MediaFile } from '@/media/mediaIndex'
 
 /** The mode a converted stream, MSE or HLS, was asked for, or a 400. */
@@ -97,7 +105,7 @@ type BurnTrackOfProps = {
  * for. Only a transcode re-encodes the picture, and only a picture track needs burning: a text
  * track is a rendition of its own. Anything else is a 400.
  */
-export const burnTrackOf = ({ tracks, burn, mode }: BurnTrackOfProps): number | null => {
+const burnTrackOf = ({ tracks, burn, mode }: BurnTrackOfProps): number | null => {
   if (burn == null) return null
   if (mode !== PLAYBACK_MODES.transcode) {
     throw new BadRequestException('burn applies to a transcode only')
@@ -106,10 +114,33 @@ export const burnTrackOf = ({ tracks, burn, mode }: BurnTrackOfProps): number | 
   const place = embedded.findIndex((track) => track.id === burn)
   const track = embedded[place]
   if (track === undefined) throw new BadRequestException(`No subtitle track ${burn}`)
-  if (track.supported) {
+  if (!isPictureSubtitle(track)) {
     throw new BadRequestException('Only a picture subtitle is burned in; a text one is a rendition')
   }
   return place
+}
+
+type BurnSubtitleOfProps = BurnTrackOfProps & {
+  /** Reads the file's probe for the canvas, only once a burn is asked for and valid. */
+  probe: () => Promise<ProbeResult | null>
+}
+
+/**
+ * The picture subtitle a transcode burns in with the canvas it is drawn on (the video's size,
+ * which ffmpeg cannot find for a track whose first cue lies past its probe), or null when none is
+ * asked for. Both converted routes, the stream and the HLS master, read it here.
+ */
+export const burnSubtitleOf = async ({
+  probe,
+  ...asked
+}: BurnSubtitleOfProps): Promise<BurnSubtitle | null> => {
+  const stream = burnTrackOf(asked)
+  if (stream === null) return null
+  const found = await probe()
+  if (found?.width == null || found.height == null) {
+    throw new UnprocessableEntityException('This file has no picture to burn a subtitle into')
+  }
+  return { stream, canvas: { width: found.width, height: found.height } }
 }
 
 /** The file's size in bytes, or a 404 once it is no longer on disk. */

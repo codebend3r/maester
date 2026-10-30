@@ -33,6 +33,20 @@ const sameLadder = ({ a, b }: SameLadderProps): boolean =>
   a.modes.length === b.modes.length &&
   a.modes.every((mode, index) => mode === b.modes[index])
 
+type WaysOfProps = {
+  modes: readonly PlaybackMode[]
+  /** The viewer chose to try the original though the plan has no way. */
+  isForced: boolean
+  /** A picture subtitle is burned in, which only a transcode does. */
+  isBurning: boolean
+}
+
+/** The ways to play, best first: the plan's, or the transcode alone for a burn, or the original when forced. */
+const waysOf = ({ modes, isForced, isBurning }: WaysOfProps): readonly PlaybackMode[] => {
+  if (isBurning) return [PLAYBACK_MODES.transcode]
+  return modes.length === 0 && isForced ? [PLAYBACK_MODES.direct] : modes
+}
+
 /** A way of playing the connection could not carry, and what it did carry. */
 export type StepDown = { from: PlaybackMode; delivery: Delivery }
 
@@ -77,6 +91,8 @@ type UsePlaybackLadderProps = {
   api: ApiClient
   audio: number | null
   isDefaultAudio: boolean
+  /** A picture subtitle's track id: only a transcode can burn it into the picture. */
+  burn: string | null
 }
 
 /**
@@ -94,6 +110,7 @@ export const usePlaybackLadder = ({
   api,
   audio,
   isDefaultAudio,
+  burn,
 }: UsePlaybackLadderProps): PlaybackStatus => {
   const settings = useQuery(playerQueriesFor(api).playbackSettings)
   const policy = settings.data?.settings ?? (settings.isError ? DEFAULT_PLAYBACK_SETTINGS : null)
@@ -120,8 +137,10 @@ export const usePlaybackLadder = ({
   // converts; a plan made without them starts a stream it may refuse.
   if (!plan) return { status: PLAYBACK_STATUSES.waiting }
 
+  const canBurn = plan.modes.includes(PLAYBACK_MODES.transcode)
+  const isBurning = burn !== null && canBurn
   const ladder: Ladder = {
-    modes: plan.modes.length === 0 && forced ? [PLAYBACK_MODES.direct] : plan.modes,
+    modes: waysOf({ modes: plan.modes, isForced: forced, isBurning }),
     audio,
   }
   const failedStep =
@@ -157,6 +176,7 @@ export const usePlaybackLadder = ({
   const rendition: Rendition = {
     mode,
     quality: isConverting && picked?.kind === PICK_KINDS.size ? picked.quality : null,
+    burn: isConverting && isBurning ? burn : null,
   }
   return {
     status: PLAYBACK_STATUSES.playing,
@@ -169,6 +189,7 @@ export const usePlaybackLadder = ({
     slow: lighter > step ? (delivery) => setSteppedDown({ from: mode, delivery }) : null,
     steppedDown: isConverting ? steppedDown : null,
     choices: {
+      canBurn,
       groups: choiceGroups({
         modes: ladder.modes,
         rendition,

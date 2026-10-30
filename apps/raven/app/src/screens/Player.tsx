@@ -15,6 +15,7 @@ import {
   type ViewingSession,
   activeCues,
   episodeCode,
+  isPictureSubtitle,
   mediaLabel,
   resumeAtFor,
   routeIdOf,
@@ -63,7 +64,6 @@ import {
   audioOptionsOf,
   audioPlaceFor,
   filePlaceFor,
-  isPictureSubtitle,
   subtitleOptionsOf,
   subtitlePlaceFor,
 } from '@/player/playerTracks'

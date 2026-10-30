@@ -34,12 +34,14 @@ export const parseSidecarName = ({
   videoFileName,
   fileName,
 }: ParseSidecarNameProps): Omit<Sidecar, 'path'> | null => {
-  const base = basename(videoFileName, extname(videoFileName))
-  const extension = extname(fileName).slice(1).toLowerCase()
-  const belongs = fileName.toLowerCase().startsWith(`${base.toLowerCase()}.`)
+  // macOS and SMB shares can write the same accented name composed or decomposed.
+  const name = fileName.normalize('NFC')
+  const base = basename(videoFileName, extname(videoFileName)).normalize('NFC')
+  const extension = extname(name).slice(1).toLowerCase()
+  const belongs = name.toLowerCase().startsWith(`${base.toLowerCase()}.`)
   if (!belongs || !SIDECAR_EXTENSIONS.has(extension)) return null
 
-  const middle = fileName.slice(base.length + 1, fileName.length - extension.length - 1)
+  const middle = name.slice(base.length + 1, name.length - extension.length - 1)
   const words = middle.split('.').filter((word) => word.trim() !== '')
   const lower = words.map((word) => word.toLowerCase())
   const language = words.find((word) => !FLAGS.has(word.toLowerCase()) && isKnownLanguage(word))

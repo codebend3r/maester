@@ -1,4 +1,11 @@
-import type { SubtitleCue } from '@/contract'
+import { SUBTITLE_SOURCES, type SubtitleCue, type SubtitleTrack } from '@/contract'
+
+/**
+ * A picture of text inside the file (Blu-ray PGS, VobSub, DVD): no text for a player to draw, so
+ * a stream burns it into the picture, and only the file's own player draws it as it is.
+ */
+export const isPictureSubtitle = (track: SubtitleTrack | null): track is SubtitleTrack =>
+  track !== null && !track.supported && track.source === SUBTITLE_SOURCES.embedded
 
 /**
  * Embedded subtitles are extracted a window at a time. They are interleaved

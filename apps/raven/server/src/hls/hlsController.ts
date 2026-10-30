@@ -51,7 +51,7 @@ import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import {
   audioTrackOf,
-  burnTrackOf,
+  burnSubtitleOf,
   capHeight,
   refuseWhatSettingsTurnOff,
   sizeOnDisk,
@@ -176,10 +176,14 @@ export class HlsController {
     const bytes = await sizeOnDisk(file)
     const { tracks } = await this.tracks.tracksFor(file)
     const audioTrack = audioTrackOf({ tracks, audio })
-    const burnTrack = burnTrackOf({ tracks, burn, mode: streamMode })
-
     const output = await this.ffmpeg.probeJson(file.path)
     const probe = parseProbe(output)
+    const burnWith = await burnSubtitleOf({
+      tracks,
+      burn,
+      mode: streamMode,
+      probe: async () => probe,
+    })
     const clock = mediaClockOf(output)
     const end = clock.end ?? (file.duration == null ? null : clock.start + file.duration)
     if (probe === null || probe.width == null || probe.height == null || end == null) {
@@ -223,10 +227,7 @@ export class HlsController {
         quality: playback.quality,
         bitrate,
         tonemap,
-        burn:
-          burnTrack === null
-            ? null
-            : { stream: burnTrack, canvas: { width: probe.width, height: probe.height } },
+        burn: burnWith,
       },
       keyframesFor,
       // Only an account ticket's session has a pass; any other caller's needs no capability.

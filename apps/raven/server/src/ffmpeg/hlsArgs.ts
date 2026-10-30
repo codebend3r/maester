@@ -8,7 +8,14 @@ import {
   STREAM_TIME_SHIFT,
   type StreamMode,
 } from '@raven/core'
-import { QUIET, type TranscodeQuality, copyVideo, secondsArg, transcodeVideo } from '@/ffmpeg/args'
+import {
+  type BurnSubtitle,
+  QUIET,
+  type TranscodeQuality,
+  copyVideo,
+  secondsArg,
+  transcodeVideo,
+} from '@/ffmpeg/args'
 import type { VideoEncoder } from '@/ffmpeg/encoder'
 import { type HlsDialect, SEGMENT_CLOCKS } from '@/ffmpeg/ffmpegVersion'
 import { SEGMENT_FILE_PATTERN } from '@/hls/segmentFiles'
@@ -83,14 +90,8 @@ export type HlsSource = {
   bitrate: number | null
   tonemap: boolean
   /** The picture subtitle a transcode burns into the picture, or null for none. */
-  burn: HlsBurn | null
+  burn: BurnSubtitle | null
 }
-
-/**
- * A picture subtitle to burn in: its `0:s:N` stream, and the canvas it is drawn on, the video's
- * own size, which ffmpeg can not find for a track whose first cue lies past its probe.
- */
-type HlsBurn = { stream: number; canvas: { width: number; height: number } }
 
 /** How a run reads its file: the inputs, which one the audio comes from, and how it cuts. */
 type RunCut = {
