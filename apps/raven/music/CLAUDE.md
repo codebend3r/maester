@@ -16,6 +16,13 @@
 - **Background audio.** `UIBackgroundModes` holds `audio`, and Android asks for `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, for `@raven/audio`'s media service.
 - **Media3** is pinned to exactly 1.8.0 in `libs/raven/audio/android/build.gradle`: `react-native-video` 6.19.3's (`RNVideo_media3Version`), so the workspace builds against one Media3; a bump of either moves both. `@raven/audio`'s README says how its Android side works.
 
+## Sign-in and the shell
+
+- **Sign-in is the app's, step for step.** `src/screens/SignIn.tsx` asks the raven account's email and password, then the PIN, then the admin password, over `@raven/native/headless`'s `stepAfterAccount`, `stepAfterSecret` and `finishSignIn`, which the device app's sign-in runs too; only the copy and the look are Wren's. The account is kept under `wren.account` (`src/session.ts`); the server list and cookies keep the shared `raven.` keys, which Wren's own keychain holds apart.
+- **`WrenRoot` reads the stores before any route,** pins `RAVEN_SERVER` (`pinRavenServer`), renews the access token a minute before it ends, and guards the `(tabs)` group with `Stack.Protected`, so a listener signed out lands on `/sign-in`. `useWren()` gives the active server's `api` and `ravenQueriesFor(api)`, null until a server is active.
+- **The tabs are Home, Library, Search and Settings** (`src/WrenTabs.tsx`, named in `WREN_TABS`), labelled in words with no icons yet. Settings shows the account, the server, Sign out and the version from `#package`.
+- **The look is raven's default theme** through `src/theme/wrenTheme.ts`, which reads `themeTokens[DEFAULT_THEME]` and `designTokens` with `nativeTokens`; there is no theme picker.
+
 ## Running it
 
 - `bunx nx run @raven/music:dev:ios` builds the development variant and runs it on the `raven-phone` simulator against Metro; `dev:android` runs it on the connected device or emulator.

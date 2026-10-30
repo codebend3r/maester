@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { THEME_TONES } from '@raven/core'
-import { IS_SIGN_IN_BYPASSED, RAVEN_SERVER } from '@raven/native/headless'
+import { IS_SIGN_IN_BYPASSED, pinRavenServer } from '@raven/native/headless'
 import { configureStorage, createQueryClient } from '@raven/ui/headless'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
@@ -34,22 +34,6 @@ const SPLASH_IGNORED = (): void => undefined
 // The splash stays up until the stores are read, so the theme picked is the first thing drawn.
 preventAutoHideAsync().catch(SPLASH_IGNORED)
 
-/**
- * The installed app talks to one server, raven on Vhagar, and never asks for another. An end
- * to end build leaves its fixture absent until the PIN and admin password have been accepted.
- */
-const pinRavenServer = (): void => {
-  if (IS_SIGN_IN_BYPASSED) return
-  const { servers, add, remove, activate } = useActiveServer.getState()
-  servers
-    .filter(({ id }) => id !== RAVEN_SERVER.id)
-    .forEach(({ id }) => {
-      remove(id).catch(() => undefined)
-    })
-  if (!servers.some(({ id }) => id === RAVEN_SERVER.id)) add(RAVEN_SERVER)
-  activate(RAVEN_SERVER.id)
-}
-
 /** How long before the access token ends the app asks for a new one. */
 const REFRESH_LEAD_MS = 60_000
 
@@ -64,7 +48,7 @@ const loadStores = async (): Promise<void> => {
     useActiveServer.persist.rehydrate(),
     useAccountSession.persist.rehydrate(),
   ])
-  pinRavenServer()
+  pinRavenServer({ servers: useActiveServer })
 }
 
 type ServerEventsProps = { session: AppQueries }

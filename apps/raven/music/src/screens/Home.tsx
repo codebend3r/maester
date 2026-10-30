@@ -1,14 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native'
+import { TabPage } from '@/components/TabPage'
 
-const styles = StyleSheet.create({
-  page: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-})
-
-/** Wren's first screen, until sign-in and the tabs arrive. */
+/** Wren's first tab: what to play next. */
 export function Home() {
-  return (
-    <View style={styles.page}>
-      <Text accessibilityRole="header">Wren</Text>
-    </View>
-  )
+  return <TabPage title="Home" />
 }

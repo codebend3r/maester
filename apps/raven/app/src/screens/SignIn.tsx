@@ -1,17 +1,21 @@
-import { ADMIN_LOCK_STATES, type ApiClient } from '@raven/core'
 import { apiFor } from '@raven/native'
 import {
-  ADD_OUTCOMES,
   AUTH_OUTCOMES,
   type AppServer,
+  FINISH_OUTCOMES,
   IS_SIGN_IN_BYPASSED,
   RAVEN_SERVER,
-  TICKET_SUPPORT,
-  ticketSupportOf,
+  SIGN_IN_STEPS,
+  type SecretStep,
+  type SignInStep,
+  finishSignIn,
+  stepAfterAccount,
+  stepAfterSecret,
+  useSubmit,
 } from '@raven/native/headless'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { useRouter } from 'expo-router'
 import { type Dispatch, type SetStateAction, useState } from 'react'
-import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import { Text } from '@/layouts/Text'
 import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
@@ -19,39 +23,17 @@ import { useAccountSession } from '@/account/session'
 import { TEST_ACCOUNT } from '@/account/testAccount'
 import { APP_ROUTES } from '@/routes'
 import { SIGN_IN_COPY } from '@/screens/copy'
-import { useSubmit } from '@/screens/useSubmit'
 import { useActiveServer } from '@/stores/activeServer'
 
-const STEPS = { account: 'account', pin: 'pin', admin: 'admin', ticketsOff: 'ticketsOff' } as const
-
-/** A step that asks for a secret the server unlocks with. */
-type SecretStep = { kind: typeof STEPS.pin | typeof STEPS.admin; server: AppServer }
-
-type Step = { kind: typeof STEPS.account } | SecretStep | { kind: typeof STEPS.ticketsOff }
-
-type UnlockProps = { api: ApiClient; secret: string }
-
-/** What the PIN step and the admin step each ask for, and the call that sends it. */
+/** What the PIN step and the admin step each ask for. */
 const SECRET_STEPS = {
-  [STEPS.pin]: {
-    prompt: SIGN_IN_COPY.pinPrompt,
-    label: SIGN_IN_COPY.pin,
-    isNumeric: true,
-    unlock: ({ api, secret }: UnlockProps) => api.unlock(secret),
-  },
-  [STEPS.admin]: {
+  [SIGN_IN_STEPS.pin]: { prompt: SIGN_IN_COPY.pinPrompt, label: SIGN_IN_COPY.pin, isNumeric: true },
+  [SIGN_IN_STEPS.admin]: {
     prompt: SIGN_IN_COPY.adminPrompt,
     label: SIGN_IN_COPY.adminPassword,
     isNumeric: false,
-    unlock: ({ api, secret }: UnlockProps) => api.unlockAdmin(secret),
   },
 } as const satisfies Record<SecretStep['kind'], unknown>
-
-/** While the admin lock holds, the PIN opens nothing: locked libraries stay hidden. */
-const isAdminLockHeld = async (api: ApiClient): Promise<boolean> => {
-  const adminLock = await api.getAdminLock()
-  return adminLock.state === ADMIN_LOCK_STATES.on && adminLock.available
-}
 
 type SubmitSecretProps = { step: SecretStep; text: string }
 
@@ -194,21 +176,21 @@ const TicketsOffForm = ({ onContinue }: TicketsOffFormProps) => {
 }
 
 type SignInViewProps = {
-  [STEPS.account]: AccountFormProps
-  [STEPS.pin]: SecretFormProps
-  [STEPS.admin]: SecretFormProps
-  [STEPS.ticketsOff]: TicketsOffFormProps
+  [SIGN_IN_STEPS.account]: AccountFormProps
+  [SIGN_IN_STEPS.pin]: SecretFormProps
+  [SIGN_IN_STEPS.admin]: SecretFormProps
+  [SIGN_IN_STEPS.ticketsOff]: TicketsOffFormProps
 }
 
 const SIGN_IN_VIEWS = {
-  [STEPS.account]: AccountForm,
-  [STEPS.pin]: SecretForm,
-  [STEPS.admin]: SecretForm,
-  [STEPS.ticketsOff]: TicketsOffForm,
+  [SIGN_IN_STEPS.account]: AccountForm,
+  [SIGN_IN_STEPS.pin]: SecretForm,
+  [SIGN_IN_STEPS.admin]: SecretForm,
+  [SIGN_IN_STEPS.ticketsOff]: TicketsOffForm,
 } as const satisfies ViewsOf<SignInViewProps>
 
 type SignInViewOfProps = {
-  step: Step
+  step: SignInStep
   account: AccountFormProps
   secret: Omit<SecretFormProps, 'step'>
   ticketsOff: TicketsOffFormProps
@@ -221,13 +203,13 @@ const signInViewOf = ({
   ticketsOff,
 }: SignInViewOfProps): ViewOf<SignInViewProps> => {
   switch (step.kind) {
-    case STEPS.account:
-      return { key: STEPS.account, props: account }
-    case STEPS.pin:
-    case STEPS.admin:
+    case SIGN_IN_STEPS.account:
+      return { key: SIGN_IN_STEPS.account, props: account }
+    case SIGN_IN_STEPS.pin:
+    case SIGN_IN_STEPS.admin:
       return { key: step.kind, props: { ...secret, step } }
-    case STEPS.ticketsOff:
-      return { key: STEPS.ticketsOff, props: ticketsOff }
+    case SIGN_IN_STEPS.ticketsOff:
+      return { key: SIGN_IN_STEPS.ticketsOff, props: ticketsOff }
     default: {
       const unreachable: never = step
       return unreachable
@@ -243,8 +225,8 @@ const signInViewOf = ({
  */
 export const SignIn = () => {
   const router = useRouter()
-  const [step, setStep] = useState<Step>(
-    IS_SIGN_IN_BYPASSED ? { kind: STEPS.pin, server: RAVEN_SERVER } : { kind: STEPS.account },
+  const [step, setStep] = useState<SignInStep>(
+    IS_SIGN_IN_BYPASSED ? { kind: SIGN_IN_STEPS.pin, server: RAVEN_SERVER } : { kind: SIGN_IN_STEPS.account },
   )
   const [email, setEmail] = useState(TEST_ACCOUNT?.email ?? '')
   const [password, setPassword] = useState(TEST_ACCOUNT?.password ?? '')
@@ -254,26 +236,35 @@ export const SignIn = () => {
   // From Settings, Home is under it in the stack: go back down to it rather than stack another.
   const goHome = () => router.dismissTo(APP_ROUTES.home)
 
-  const askFor = (next: Step) => {
+  const askFor = (next: SignInStep) => {
     setSecret('')
     setStep(next)
   }
 
   const finish = async (server: AppServer) => {
-    const { servers, add, activate } = useActiveServer.getState()
-    const isKnown = servers.some((known) => known.id === server.id)
-    const added = isKnown ? ADD_OUTCOMES.added : add(server).kind
-    if (added !== ADD_OUTCOMES.added) {
-      setError(added === ADD_OUTCOMES.full ? SIGN_IN_COPY.full : SIGN_IN_COPY.notAdded)
-      return
+    const outcome = await finishSignIn({
+      servers: useActiveServer,
+      server,
+      api: apiFor({ server, session: useAccountSession }),
+    })
+    switch (outcome) {
+      case FINISH_OUTCOMES.done:
+        goHome()
+        return
+      case FINISH_OUTCOMES.ticketsOff:
+        askFor({ kind: SIGN_IN_STEPS.ticketsOff })
+        return
+      case FINISH_OUTCOMES.full:
+        setError(SIGN_IN_COPY.full)
+        return
+      case FINISH_OUTCOMES.notAdded:
+        setError(SIGN_IN_COPY.notAdded)
+        return
+      default: {
+        const unknown: never = outcome
+        return unknown
+      }
     }
-    activate(server.id)
-    const support = await ticketSupportOf({ api: apiFor({ server, session: useAccountSession }) })
-    if (support === TICKET_SUPPORT.off) {
-      askFor({ kind: STEPS.ticketsOff })
-      return
-    }
-    goHome()
   }
 
   type SubmitAccountProps = { typedPassword?: string }
@@ -298,21 +289,25 @@ export const SignIn = () => {
         return
       }
       setPassword('')
-      const lock = await apiFor({ server: RAVEN_SERVER, session: useAccountSession }).getLock()
-      if (lock.available && !lock.unlocked) {
-        askFor({ kind: STEPS.pin, server: RAVEN_SERVER })
+      const next = await stepAfterAccount({
+        api: apiFor({ server: RAVEN_SERVER, session: useAccountSession }),
+        server: RAVEN_SERVER,
+      })
+      if (next !== null) {
+        askFor(next)
         return
       }
       await finish(RAVEN_SERVER)
     })
   }
 
-  const submitSecret = ({ step: { kind, server }, text }: SubmitSecretProps) =>
+  const submitSecret = ({ step: secretStep, text }: SubmitSecretProps) =>
     run(async () => {
+      const { server } = secretStep
       const api = apiFor({ server, session: useAccountSession })
-      await SECRET_STEPS[kind].unlock({ api, secret: text })
-      if (kind === STEPS.pin && (await isAdminLockHeld(api))) {
-        askFor({ kind: STEPS.admin, server })
+      const next = await stepAfterSecret({ api, step: secretStep, secret: text })
+      if (next !== null) {
+        askFor(next)
         return
       }
       await finish(server)
@@ -320,7 +315,7 @@ export const SignIn = () => {
 
   const signOut = () => {
     useAccountSession.getState().signOut()
-    askFor({ kind: STEPS.account })
+    askFor({ kind: SIGN_IN_STEPS.account })
     setError(null)
   }
 

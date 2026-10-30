@@ -1,6 +1,16 @@
 // What imports no React Native or Expo module, so bun's tests load it as the device does. What
 // reaches the device itself is in `index.ts`.
+export {
+  FINISH_OUTCOMES,
+  SIGN_IN_STEPS,
+  type SecretStep,
+  type SignInStep,
+  finishSignIn,
+  stepAfterAccount,
+  stepAfterSecret,
+} from '@/account/signInSteps'
 export { AUTH_OUTCOMES, type AccountSession, type AuthOutcome } from '@/account/supabaseAuth'
+export { useSubmit } from '@/account/useSubmit'
 export { isDevelopmentVariant } from '@/config/appVariant'
 export { BUILD_ENV, buildNumberOf } from '@/config/buildNumber'
 export { nativePlayerOf } from '@/music/nativePlayer'
@@ -17,8 +27,10 @@ export {
   mediaAccessFor,
 } from '@/servers/mediaAccess'
 export { probeFetchOf } from '@/servers/mediaProbe'
+export { pinRavenServer } from '@/servers/pinRavenServer'
 export { IS_SIGN_IN_BYPASSED, RAVEN_SERVER } from '@/servers/ravenServer'
 export { cookieHeadersFor } from '@/servers/serverHeaders'
 export { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
 export { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'
 export { bumpCookieVersion, useCookieVersion } from '@/stores/cookieVersion'
+export { nativeTokens } from '@/theme/nativeTokens'

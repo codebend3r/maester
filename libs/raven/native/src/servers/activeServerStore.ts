@@ -80,3 +80,6 @@ export const createActiveServerStore = ({ store, jar }: CreateActiveServerStoreP
       },
     ),
   )
+
+/** One app's server list, as `createActiveServerStore` makes it. */
+export type ActiveServerStore = ReturnType<typeof createActiveServerStore>
