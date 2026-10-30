@@ -2,7 +2,8 @@ import { expect, test } from 'bun:test'
 import { type MpvSurface, NATIVE_TARGETS } from '@raven/mpv'
 import {
   addonPathFor,
-  ENGINE_MESSAGES,
+  audioSurfaceFor,
+  ENGINE_WORDS,
   engineModeFrom,
   engineOptionsFor,
   HARDENED_OPTIONS,
@@ -33,9 +34,16 @@ test('HEADLESS_OPTIONS paces the null output like a 60 Hz display', () => {
   expect(HEADLESS_OPTIONS).toEqual([{ name: 'vo-null-fps', value: 60 }])
 })
 
-test('engineOptionsFor paces only the headless output; a window gets nothing', () => {
+test('engineOptionsFor paces only the headless output; a window and the audio surface get nothing', () => {
   expect(engineOptionsFor({ surface: { kind: 'headless' } })).toEqual(HEADLESS_OPTIONS)
   expect(engineOptionsFor({ surface: { kind: 'window', handle: Buffer.alloc(8) } })).toEqual([])
+  expect(engineOptionsFor({ surface: { kind: 'audio' } })).toEqual([])
+})
+
+test('audioSurfaceFor plays sound alone, or nothing at all under the headless hook', () => {
+  expect(audioSurfaceFor('window')).toEqual({ kind: 'audio' })
+  expect(audioSurfaceFor('audio')).toEqual({ kind: 'audio' })
+  expect(audioSurfaceFor('headless')).toEqual({ kind: 'headless' })
 })
 
 test('addonPathFor', () => {
@@ -99,9 +107,10 @@ test('off never opens', async () => {
       opened.push(surface)
       return 'engine'
     },
+    words: ENGINE_WORDS.video,
     warn: () => {},
   })
-  expect(result).toEqual({ status: 'unavailable', message: ENGINE_MESSAGES.off })
+  expect(result).toEqual({ status: 'unavailable', message: ENGINE_WORDS.video.off })
   expect(opened).toEqual([])
 })
 
@@ -111,9 +120,10 @@ test('a rejecting open is warned and unavailable', async () => {
     mode: 'window',
     surfaceFor: () => windowSurface,
     open: () => Promise.reject(new Error('addon missing')),
+    words: ENGINE_WORDS.video,
     warn: (message) => warnings.push(message),
   })
-  expect(result).toEqual({ status: 'unavailable', message: ENGINE_MESSAGES.unavailable })
+  expect(result).toEqual({ status: 'unavailable', message: ENGINE_WORDS.video.unavailable })
   expect(warnings).toEqual(['addon missing'])
 })
 
@@ -125,9 +135,10 @@ test('a throwing open is warned and unavailable', async () => {
     open: () => {
       throw new Error('sync boom')
     },
+    words: ENGINE_WORDS.video,
     warn: (message) => warnings.push(message),
   })
-  expect(result).toEqual({ status: 'unavailable', message: ENGINE_MESSAGES.unavailable })
+  expect(result).toEqual({ status: 'unavailable', message: ENGINE_WORDS.video.unavailable })
   expect(warnings).toEqual(['sync boom'])
 })
 
@@ -139,9 +150,10 @@ test('a throwing surfaceFor is warned and unavailable', async () => {
       throw new Error('no window')
     },
     open: async () => 'engine',
+    words: ENGINE_WORDS.video,
     warn: (message) => warnings.push(message),
   })
-  expect(result).toEqual({ status: 'unavailable', message: ENGINE_MESSAGES.unavailable })
+  expect(result).toEqual({ status: 'unavailable', message: ENGINE_WORDS.video.unavailable })
   expect(warnings).toEqual(['no window'])
 })
 
@@ -151,6 +163,7 @@ test('a non-Error rejection is warned as text', async () => {
     mode: 'window',
     surfaceFor: () => windowSurface,
     open: () => Promise.reject('plain'),
+    words: ENGINE_WORDS.video,
     warn: (message) => warnings.push(message),
   })
   expect(warnings).toEqual(['plain'])
@@ -165,6 +178,7 @@ test('a resolving open is native and headless asks for the headless surface', as
       return headlessSurface
     },
     open: async (surface) => ({ surface }),
+    words: ENGINE_WORDS.video,
     warn: () => {},
   })
   expect(result).toEqual({ status: 'native', engine: { surface: headlessSurface } })

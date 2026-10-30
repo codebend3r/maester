@@ -1,4 +1,5 @@
 import { PAGE_ORIGIN, windowChromeFor } from '@raven/core'
+import { listenForAudio } from '@/desktop/audioConnection'
 import { clientFor } from '@/desktop/client'
 import { createMenuHub } from '@/desktop/menuHub'
 import { listenForPlayer } from '@/desktop/playerConnection'
@@ -22,7 +23,11 @@ export const startDesktop = ({ bridge, root, target }: StartDesktopProps): (() =
   const client = clientFor(bridge)
   if (client === null) return () => {}
   const player = listenForPlayer({ target, origin: PAGE_ORIGIN })
-  useDesktopBridge.setState({ desktop: { client, menu: createMenuHub(), player } })
+  const audio = listenForAudio({ target, origin: PAGE_ORIGIN })
+  useDesktopBridge.setState({ desktop: { client, menu: createMenuHub(), player, audio } })
   root.dataset.desktop = windowChromeFor({ platform: client.platform })
-  return player.dispose
+  return () => {
+    player.dispose()
+    audio.dispose()
+  }
 }

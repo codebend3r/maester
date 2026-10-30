@@ -18,6 +18,10 @@ import { MPV_CHOICES, MPV_PROPERTIES, MPV_TRACK_TYPES, propertyGuards } from '@/
 import { isWindows, project } from '@/build/context'
 import { isCleanupMode } from '@/test/cleanupModes'
 
+/** Options this file sets that the wrapper does not name: the audio output, and mpv's silent one. */
+const TEST_OPTIONS = { ao: 'ao' } as const
+const TEST_AUDIO_OUTPUTS = { null: 'null' } as const
+
 const directory = await mkdtemp(resolve(tmpdir(), 'raven-mpv-native-'))
 const clip = resolve(directory, 'tracks.mkv')
 const sidecar = resolve(directory, 'sidecar.srt')
@@ -356,5 +360,53 @@ test('real file-open errors arrive as guarded end-file events', async () => {
     assert.deepEqual(value.errors, [])
   } finally {
     await value.player.destroy()
+  }
+})
+
+test('an audio surface plays sound alone: no video track is picked, and nothing is drawn', async () => {
+  const listeners = new Set<(event: MpvEvent) => void>()
+  const player = await openMpv({
+    surface: { kind: MPV_SURFACE_KINDS.audio },
+    onEvent: (event) => listeners.forEach((listener) => listener(event)),
+  })
+  try {
+    await player.set({ name: MPV_PROPERTIES.pause, value: true })
+    // CI runners have no sound card: with video off too, a failed device leaves nothing to play.
+    await player.set({ name: TEST_OPTIONS.ao, value: TEST_AUDIO_OUTPUTS.null })
+    const logs: string[] = []
+    const opened = new Promise<void>((resolveOpen, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`The audio surface never opened the clip: ${logs.join('; ')}`))
+      }, 10000)
+      listeners.add((event) => {
+        if (event.type === MPV_EVENTS.log) {
+          logs.push(`${event.prefix}: ${event.text.trim()}`)
+          return
+        }
+        if (event.type === MPV_EVENTS.fileLoaded) {
+          clearTimeout(timer)
+          resolveOpen()
+          return
+        }
+        if (event.type !== MPV_EVENTS.endFile) return
+        clearTimeout(timer)
+        reject(new Error(`The audio surface ended the clip unopened: ${logs.join('; ')}`))
+      })
+    })
+    await Promise.all([player.command({ args: [MPV_COMMANDS.loadfile, clip] }), opened])
+    assert.equal(await player.read({ name: MPV_PROPERTIES.vid }), false)
+    assert.notEqual(await player.read({ name: MPV_PROPERTIES.aid }), false)
+    player.nowPlaying({
+      title: 'Native fixture',
+      artist: 'raven',
+      album: 'Tests',
+      duration: 12,
+      position: 0,
+      isPlaying: false,
+      artwork: null,
+    })
+    player.clearNowPlaying()
+  } finally {
+    await player.destroy()
   }
 })

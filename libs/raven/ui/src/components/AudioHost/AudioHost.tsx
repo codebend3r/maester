@@ -3,6 +3,7 @@ import { type RefObject, useEffect, useRef } from 'react'
 import { failureMessage } from '@/components/Player/useMediaSource'
 import { useMediaPlane } from '@/components/Player/useMediaPlane'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
+import { useListenCounter } from '@/components/AudioHost/useListenCounter'
 import {
   AUDIO_STATES,
   type AudioState,
@@ -14,12 +15,10 @@ import { useMediaOrigin } from '@/stores/mediaOrigin'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import styles from '@/components/AudioHost/AudioHost.module.scss'
 
-/** A track counts as listened to this far in, or halfway, whichever comes first: the Last.fm rule. */
-export const LISTEN_AFTER_S = 240
-
-/** How far in counts as a listen, for a track of `duration` seconds; null while the length is unknown. */
-export const listenPointOf = (duration: number | null): number | null =>
-  duration === null ? null : Math.min(duration / 2, LISTEN_AFTER_S)
+/** Plays, and lets a refused play go: the browser says why in its own events. */
+const playQuietly = (element: HTMLMediaElement): void => {
+  ;(element.play() ?? Promise.resolve()).catch(() => undefined)
+}
 
 /** What the browser's media session is told for each state; `none` while nothing is loaded. */
 const SESSION_STATES: Record<AudioState, MediaSessionPlaybackState> = {
@@ -115,25 +114,6 @@ const useMediaSession = ({ api, track }: UseMediaSessionProps) => {
   }, [state, position, duration])
 }
 
-type UseListenCounterProps = {
-  api: ApiClient
-  track: Track | null
-}
-
-/** Records a listen once per track, at half its length or four minutes in, from what the engine reports. */
-const useListenCounter = ({ api, track }: UseListenCounterProps) => {
-  const position = useAudioQueue((store) => store.position)
-  const duration = useAudioQueue((store) => store.duration)
-  const listened = useRef<number | null>(null)
-  const id = track?.id ?? null
-  useEffect(() => {
-    const point = listenPointOf(duration)
-    if (id === null || point === null || position < point || listened.current === id) return
-    listened.current = id
-    api.recordPlay(id).catch(() => undefined)
-  }, [api, id, position, duration])
-}
-
 type UseAudioElementProps = {
   ref: RefObject<HTMLAudioElement | null>
   /** The playing track's id; null for none. */
@@ -153,7 +133,7 @@ const useAudioElement = ({ ref, id, src }: UseAudioElementProps) => {
   const seek = useAudioQueue((store) => store.seek)
   const engine = useAudioQueue((store) => store.engine)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
-  const muted = usePlayerPrefs((prefs) => prefs.muted)
+  const isMuted = usePlayerPrefs((prefs) => prefs.muted)
   const shouldPlay = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
   const loaded = useRef<number | null>(null)
 
@@ -173,7 +153,7 @@ const useAudioElement = ({ ref, id, src }: UseAudioElementProps) => {
       element.load()
     }
     if (shouldPlay) {
-      element.play()?.catch(() => undefined)
+      playQuietly(element)
       return
     }
     element.pause()
@@ -183,15 +163,17 @@ const useAudioElement = ({ ref, id, src }: UseAudioElementProps) => {
     const element = ref.current
     if (!element || seek === null) return
     element.currentTime = seek.seconds
+    // A track asked to start over after it ended plays again only when told to.
+    if (shouldPlay && element.ended) playQuietly(element)
     engine.sought()
-  }, [ref, seek, engine])
+  }, [ref, seek, engine, shouldPlay])
 
   useEffect(() => {
     const element = ref.current
     if (!element) return
     element.volume = volume
-    element.muted = muted
-  }, [ref, volume, muted])
+    element.muted = isMuted
+  }, [ref, volume, isMuted])
 
   const report = (element: HTMLMediaElement) =>
     engine.time({

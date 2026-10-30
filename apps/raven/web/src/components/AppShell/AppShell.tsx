@@ -22,6 +22,7 @@ import { librariesQuery } from '@/lib/queries'
 import { TopCardNote, useScrollReset } from '@/lib/useScrollReset'
 import { useServerEvents } from '@/lib/useServerEvents'
 import { ravenVersion } from '@/lib/version'
+import { DesktopAudioHost } from '@/desktop/audio/DesktopAudioHost'
 import { useInProgressCount } from '@/desktop/downloadsApi'
 import { usePageBackdrop } from '@raven/ui/headless'
 import { useComputerName, useIsDesktop } from '@/stores/desktop'
@@ -201,6 +202,7 @@ export const AppShell = () => {
   const isIconsOnly = collapsed || isMediumScreen
   const isFrosted = usePageBackdrop((state) => state.shown != null)
   const isDesktop = useIsDesktop()
+  const reprobe = useReprobe()
   const isOffline = useServerReach((state) => state.isOffline)
   const libraries = useQuery({ ...librariesQuery, enabled: !isOffline })
   // Kept from before the server went out of reach, they would open pages that need it.
@@ -354,7 +356,11 @@ export const AppShell = () => {
         </div>
         {/* Music plays above the routes: the engine once, and the bar while a track plays. */}
         <div className={styles.player}>
-          <AudioHost api={api} reprobe={useReprobe()} />
+          {isDesktop ? (
+            <DesktopAudioHost api={api} reprobe={reprobe} />
+          ) : (
+            <AudioHost api={api} reprobe={reprobe} />
+          )}
           <NowPlayingBar />
         </div>
       </main>

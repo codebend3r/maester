@@ -19,6 +19,7 @@ import {
   EXPLAIN_TIMEOUT_MS,
   SOURCE_MESSAGES,
   TRACKS_TIMEOUT_MS,
+  SOURCE_KINDS,
 } from '@/main/servers/serverSources'
 
 const SERVER: ServerEntry = {
@@ -133,6 +134,7 @@ const setup = ({
   const order: string[] = []
   const relayed = fakeRelay({ refusal, isOpenFailing })
   const sources = createServerSources({
+    kind: SOURCE_KINDS.video,
     serverOf: (serverId) => servers.find((server) => server.id === serverId) ?? null,
     calls,
     tickets: {
@@ -255,6 +257,7 @@ describe('resolve', () => {
     const warnings: string[] = []
     const { relay } = fakeRelay({})
     const sources = createServerSources({
+      kind: SOURCE_KINDS.video,
       serverOf: () => SERVER,
       calls: { call: () => Promise.reject(new Error('gone')) },
       tickets: { ticketFor: async () => ({ kind: TICKET_OUTCOMES.ticket, ticket: 't' }) },

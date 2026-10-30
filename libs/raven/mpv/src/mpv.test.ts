@@ -9,6 +9,7 @@ import {
   type MpvEvent,
 } from '@/mpv'
 import { MPV_CHOICES, MPV_PROPERTIES } from '@/properties'
+import { REMOTE_COMMANDS } from '@raven/core'
 
 /** Commands only this fake engine knows: each makes it answer, or not, in its own way. */
 const FAKE_COMMANDS = { throw: 'throw', pending: 'pending', fail: 'fail', ok: 'ok' } as const
@@ -45,6 +46,12 @@ const fixture = ({ version = 'mpv 0.41.0', apiVersion = 131077 } = {}) => {
       calls.push({ observe: name })
     },
     display: (): unknown => ({ refreshRate: 60, edrHeadroom: 1, sortRepairs: 2 }),
+    nowPlaying: (info: unknown) => {
+      calls.push({ nowPlaying: info })
+    },
+    clearNowPlaying: () => {
+      calls.push({ clearNowPlaying: true })
+    },
     destroy: async () => {
       destroys += 1
     },
@@ -65,7 +72,7 @@ const fixture = ({ version = 'mpv 0.41.0', apiVersion = 131077 } = {}) => {
       },
       loadAddon,
     })
-  return { open, emit, values, events, native, calls, destroyed: () => destroys }
+  return { open, emit, values, events, native, calls, loadAddon, destroyed: () => destroys }
 }
 
 describe('mpv wrapper native boundary (no libmpv loaded)', () => {
@@ -160,6 +167,8 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
         { type: MPV_EVENTS.playbackRestart },
         { type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 },
         { type: MPV_EVENTS.log, level: 'warn', prefix: 'demux', text: 'warning' },
+        { type: MPV_EVENTS.remote, command: REMOTE_COMMANDS.toggle },
+        { type: MPV_EVENTS.remote, command: REMOTE_COMMANDS.seek, time: 12.5 },
       ]
       events.forEach(value.emit)
       value.emit({ type: NATIVE_MESSAGES.reply, id: 999, error: 0, data: null })
@@ -174,8 +183,10 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
       value.emit({ type: MPV_EVENTS.property, name: 'unknown', data: 1 })
       value.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 'no' })
       value.emit({ type: MPV_EVENTS.endFile, reason: 'unplugged', error: 0 })
-      expect(value.events.slice(-4)).toEqual(
-        Array.from({ length: 4 }, () => ({
+      value.emit({ type: MPV_EVENTS.remote, command: 'rewind' })
+      value.emit({ type: MPV_EVENTS.remote, command: REMOTE_COMMANDS.seek })
+      expect(value.events.slice(-6)).toEqual(
+        Array.from({ length: 6 }, () => ({
           type: MPV_EVENTS.error,
           message: 'Invalid native mpv event',
         })),
@@ -292,5 +303,46 @@ describe('mpv wrapper native boundary (no libmpv loaded)', () => {
     const before = value.events.length
     value.emit({ type: MPV_EVENTS.fileLoaded })
     expect(value.events).toHaveLength(before)
+  })
+})
+
+describe('now playing', () => {
+  test('passes what the system shows to the addon, and clears it, while the engine lives', async () => {
+    const value = fixture()
+    const player = await value.open()
+    const info = {
+      title: 'Blue',
+      artist: 'Joni Mitchell',
+      album: 'Blue',
+      duration: 200,
+      position: 12,
+      isPlaying: true,
+      artwork: null,
+    }
+    player.nowPlaying(info)
+    player.clearNowPlaying()
+    expect(value.calls.slice(-2)).toEqual([{ nowPlaying: info }, { clearNowPlaying: true }])
+    await player.destroy()
+    expect(() => player.nowPlaying(info)).toThrow('mpv is destroyed')
+    player.clearNowPlaying()
+    expect(value.calls.slice(-2)).toEqual([{ nowPlaying: info }, { clearNowPlaying: true }])
+  })
+
+  test('an audio surface is handed to the addon as it is', async () => {
+    const surfaces: unknown[] = []
+    const value = fixture()
+    const player = await openMpv({
+      surface: { kind: MPV_SURFACE_KINDS.audio },
+      onEvent: () => {},
+      loadAddon: () => ({
+        apiVersion: 131077,
+        create: (surface: unknown, callback: (event: unknown) => void) => {
+          surfaces.push(surface)
+          return value.loadAddon().create(surface, callback)
+        },
+      }),
+    })
+    expect(surfaces).toEqual([{ kind: MPV_SURFACE_KINDS.audio }])
+    await player.destroy()
   })
 })

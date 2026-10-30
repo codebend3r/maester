@@ -4,10 +4,16 @@ import { createJSONStorage, devtools, persist } from 'zustand/middleware'
 import { STORE_KEYS } from '@/stores/storage'
 import type { DesktopClient } from '@/desktop/client'
 import type { MenuHub } from '@/desktop/menuHub'
+import type { AudioConnections } from '@/desktop/audioConnection'
 import type { PlayerConnections } from '@/desktop/playerConnection'
 
-/** Raven's ways to main: its client, the Playback menu's hub and the player connection. */
-export type Desktop = { client: DesktopClient; menu: MenuHub; player: PlayerConnections }
+/** Raven's ways to main: its client, the Playback menu's hub, the player connection and the music engine's. */
+export type Desktop = {
+  client: DesktopClient
+  menu: MenuHub
+  player: PlayerConnections
+  audio: AudioConnections
+}
 
 type DesktopBridge = {
   /** Set once before the first render inside Raven; null in a browser. */

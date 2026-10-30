@@ -122,7 +122,7 @@ type OpenProps = {
 }
 
 export type MediaRelay = {
-  /** Retires every earlier secret: the relay serves the newest load alone. */
+  /** Retires the oldest secrets past its capacity: the relay serves the newest loads alone. */
   open: (input: OpenProps) => Promise<RelayedLoad>
   close: (loadId: string) => void
   closeServer: (serverId: string) => void
@@ -227,14 +227,22 @@ type CreateMediaRelayProps = {
   tickets: Pick<AccountTickets, 'ticketFor'>
   /** `RELAY_SECRET_BYTES` random bytes in base64url. */
   newSecret: (bytes: number) => string
+  /**
+   * How many loads stay served at once, the oldest retiring as a newer one opens: one for a
+   * video, two for music, whose next track mpv opens while the playing one still streams.
+   */
+  capacity: number
   warn: (message: string) => void
 }
+
+/** How many refusals are remembered: a load's is read after it retires, so they outlive it a while. */
+const REFUSALS_KEPT = 8
 
 /**
  * The loopback media relay: mpv opens `http://127.0.0.1:<port>/<secret>/file` (and its sidecars),
  * and each request it makes, every seek and reconnect, goes to the server with an account ticket
  * main holds and renews. No ticket, token or server address ever enters an mpv URL, header or log.
- * Only the newest load's paths are served, only to `GET` and `HEAD`; anything else is a 404 that
+ * Only the newest loads' paths are served, only to `GET` and `HEAD`; anything else is a 404 that
  * sends nothing upstream.
  */
 export const createMediaRelay = ({
@@ -242,10 +250,12 @@ export const createMediaRelay = ({
   fetchUpstream,
   tickets,
   newSecret,
+  capacity,
   warn,
 }: CreateMediaRelayProps): MediaRelay => {
-  let current: Load | null = null
-  let refusal: { loadId: string; reason: AuthRefusal['reason'] } | null = null
+  // Oldest first, never more than `capacity`.
+  let loads: readonly Load[] = []
+  let refusals: readonly { loadId: string; reason: AuthRefusal['reason'] }[] = []
   let requests: readonly Request[] = []
   let listening: Promise<{ port: number }> | null = null
   let opened = 0
@@ -253,15 +263,27 @@ export const createMediaRelay = ({
   const safeWarn = quietly(warn)
 
   const retire = (isRetired: (load: Load) => boolean): void => {
-    if (current === null || !isRetired(current)) return
-    const { loadId } = current
-    current = null
-    const ending = requests.filter((request) => request.loadId === loadId)
-    requests = requests.filter((request) => request.loadId !== loadId)
+    const retiring = loads.filter(isRetired)
+    if (retiring.length === 0) return
+    loads = loads.filter((load) => !isRetired(load))
+    const gone = new Set(retiring.map((load) => load.loadId))
+    const ending = requests.filter((request) => gone.has(request.loadId))
+    requests = requests.filter((request) => !gone.has(request.loadId))
     ending.forEach((request) => request.controller.abort())
   }
 
-  const isCurrent = (load: Load): boolean => (current?.loadId ?? null) === load.loadId
+  const isCurrent = (load: Load): boolean => loads.some((live) => live.loadId === load.loadId)
+
+  type RememberProps = { loadId: string; reason: AuthRefusal['reason'] }
+
+  const remember = ({ loadId, reason }: RememberProps): void => {
+    refusals = [...refusals.filter((known) => known.loadId !== loadId), { loadId, reason }].slice(
+      -REFUSALS_KEPT,
+    )
+  }
+  const forget = (loadId: string): void => {
+    refusals = refusals.filter((known) => known.loadId !== loadId)
+  }
 
   type RecordProps = {
     load: Load
@@ -276,7 +298,7 @@ export const createMediaRelay = ({
   const record = ({ load, path, reason }: RecordProps): void => {
     // A request of a load already retired answers late; the newer load's record stands.
     if (!isCurrent(load)) return
-    if (path === MEDIA_FILE_PATH) refusal = { loadId: load.loadId, reason }
+    if (path === MEDIA_FILE_PATH) remember({ loadId: load.loadId, reason })
     safeWarn(`${loggable(load.name)} refused a relayed request: ${reason}`)
   }
 
@@ -359,7 +381,7 @@ export const createMediaRelay = ({
     // The file served again after a refusal (the owner let the account back in): it plays on,
     // so its end is a plain one.
     if (path === MEDIA_FILE_PATH && isSuccessStatus(upstream.status) && isCurrent(load)) {
-      refusal = null
+      forget(load.loadId)
     }
     response.writeHead(upstream.status, passedHeaders(upstream))
     if (method === RELAY_METHODS.head || upstream.body === null) {
@@ -380,8 +402,9 @@ export const createMediaRelay = ({
   }
 
   const serve = async ({ request, response }: ServeProps): Promise<void> => {
-    const load = current
-    const path = load?.routes.get(request.url ?? '') ?? null
+    const url = request.url ?? ''
+    const load = loads.find((live) => live.routes.has(url)) ?? null
+    const path = load?.routes.get(url) ?? null
     if (!isRelayMethod(request.method) || load === null || path === null) {
       answer({ response, status: HTTP_STATUSES.notFound })
       return
@@ -431,7 +454,11 @@ export const createMediaRelay = ({
       const { port } = await portOf()
       const secret = newSecret(RELAY_SECRET_BYTES)
       if (!SECRET_PATTERN.test(secret)) throw new Error('The relay needs a random secret.')
-      retire(() => true)
+      // Room for this load: the oldest go.
+      const retiring = new Set(loads.slice(0, Math.max(0, loads.length - capacity + 1)))
+      retire((load) => retiring.has(load))
+      // A retired load's refusal was read by now, or never will be.
+      refusals = refusals.filter((known) => loads.some((live) => live.loadId === known.loadId))
       opened += 1
       const loadId = String(opened)
       const sidecars = sidecarTrackIds.filter(isSidecarTrackId)
@@ -442,15 +469,10 @@ export const createMediaRelay = ({
           subtitlePathOf(id),
         ]),
       ])
-      current = {
-        loadId,
-        serverId: server.id,
-        origin: server.origin,
-        name: server.name,
-        mediaId,
-        routes,
-      }
-      refusal = null
+      loads = [
+        ...loads,
+        { loadId, serverId: server.id, origin: server.origin, name: server.name, mediaId, routes },
+      ]
       const base = `http://${RELAY_HOST}:${port}/${secret}`
       return {
         loadId,
@@ -463,13 +485,13 @@ export const createMediaRelay = ({
     // Access ends on a sign out, a removed server or a moved sign-in host: the title playing
     // stops at the end of what mpv holds, and that is read as an account to sign in to again.
     closeServer: (serverId) => {
-      const ended = current
-      if (ended === null || ended.serverId !== serverId) return
-      retire((load) => load.loadId === ended.loadId)
-      if ((refusal?.loadId ?? null) === ended.loadId) return
-      refusal = { loadId: ended.loadId, reason: AUTH_REFUSALS.signedOut }
+      const ended = loads.filter((load) => load.serverId === serverId)
+      retire((load) => load.serverId === serverId)
+      ended
+        .filter((load) => !refusals.some((known) => known.loadId === load.loadId))
+        .forEach((load) => remember({ loadId: load.loadId, reason: AUTH_REFUSALS.signedOut }))
     },
     closeAll: () => retire(() => true),
-    refusalOf: (loadId) => (refusal !== null && refusal.loadId === loadId ? refusal.reason : null),
+    refusalOf: (loadId) => refusals.find((known) => known.loadId === loadId)?.reason ?? null,
   }
 }

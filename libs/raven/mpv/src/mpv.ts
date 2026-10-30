@@ -7,6 +7,7 @@ import {
   isString,
   object,
   oneOf,
+  REMOTE_COMMANDS,
   union,
 } from '@raven/core'
 import {
@@ -25,6 +26,7 @@ export const MPV_EVENTS = {
   log: 'log',
   shutdown: 'shutdown',
   overflow: 'overflow',
+  remote: 'remote',
   error: 'error',
 } as const
 
@@ -48,7 +50,21 @@ export const MPV_COMMANDS = {
   stop: 'stop',
   scriptBinding: 'script-binding',
   aoReload: 'ao-reload',
+  playlistClear: 'playlist-clear',
 } as const
+
+/** Where a `loadfile` puts its file: in place of what plays, or after it; `append-play` also starts it when nothing plays. */
+export const MPV_LOADFILE_MODES = {
+  replace: 'replace',
+  append: 'append',
+  appendPlay: 'append-play',
+} as const
+
+/** `loadfile`'s index argument for the end of the playlist. */
+export const MPV_PLAYLIST_END = '-1'
+
+/** How a `seek` reads its time. */
+export const MPV_SEEK_MODES = { absolute: 'absolute' } as const
 
 const isUnknown = (_value: unknown): _value is unknown => true
 const isReply = object({
@@ -74,6 +90,23 @@ const isOtherEvent = union(
     error: isNumber,
   }),
   object({ type: oneOf([MPV_EVENTS.log]), level: isString, prefix: isString, text: isString }),
+  // The system's transport controls, which the addon takes for an audio surface.
+  object({
+    type: oneOf([MPV_EVENTS.remote]),
+    command: oneOf([
+      REMOTE_COMMANDS.play,
+      REMOTE_COMMANDS.pause,
+      REMOTE_COMMANDS.toggle,
+      REMOTE_COMMANDS.next,
+      REMOTE_COMMANDS.previous,
+      REMOTE_COMMANDS.stop,
+    ]),
+  }),
+  object({
+    type: oneOf([MPV_EVENTS.remote]),
+    command: oneOf([REMOTE_COMMANDS.seek]),
+    time: isNumber,
+  }),
 )
 const isDisplayInfo = object({
   refreshRate: isNumber,
@@ -89,11 +122,27 @@ export type MpvEvent =
   | MpvPropertyEvent
   | { type: typeof MPV_EVENTS.error; message: string }
 
-export const MPV_SURFACE_KINDS = { headless: 'headless', window: 'window' } as const
+/**
+ * `headless` plays to no output at all, for tests; `window` draws into the window; `audio`
+ * decodes no video and plays sound alone, owning the system's Now Playing and media keys.
+ */
+export const MPV_SURFACE_KINDS = { headless: 'headless', window: 'window', audio: 'audio' } as const
 
 export type MpvSurface =
   | { kind: typeof MPV_SURFACE_KINDS.headless }
   | { kind: typeof MPV_SURFACE_KINDS.window; handle: Buffer }
+  | { kind: typeof MPV_SURFACE_KINDS.audio }
+
+/** What the system shows for the playing track, with the cover as encoded image bytes. */
+export type NowPlaying = {
+  title: string
+  artist: string
+  album: string
+  duration: number
+  position: number
+  isPlaying: boolean
+  artwork: Buffer | null
+}
 
 type NativeHandle = {
   command: (id: number, args: string[]) => void
@@ -102,6 +151,8 @@ type NativeHandle = {
   observe: (name: string) => void
   destroy: () => Promise<void>
   display: () => unknown
+  nowPlaying: (info: NowPlaying) => void
+  clearNowPlaying: () => void
 }
 type NativeAddon = {
   apiVersion: number
@@ -113,7 +164,9 @@ const isNativeAddon = (value: unknown): value is NativeAddon =>
   isRecord(value) && isNumber(value.apiVersion) && isFunction(value.create)
 const isNativeHandle = (value: unknown): value is NativeHandle =>
   isRecord(value) &&
-  ['command', 'get', 'set', 'observe', 'destroy', 'display'].every((key) => isFunction(value[key]))
+  ['command', 'get', 'set', 'observe', 'destroy', 'display', 'nowPlaying', 'clearNowPlaying'].every(
+    (key) => isFunction(value[key]),
+  )
 
 const isPropertyName = (name: string): name is MpvProperty => Object.hasOwn(propertyGuards, name)
 const isMpvPropertyEvent = (value: unknown): value is MpvPropertyEvent =>
@@ -284,6 +337,15 @@ export const openMpv = async ({
         const info: unknown = native.display()
         if (!isDisplayInfo(info)) throw new Error('Invalid native display information')
         return info
+      },
+      /** Tells the system what plays; nothing shows for a surface that is not `audio`. */
+      nowPlaying: (info: NowPlaying) => {
+        if (isDestroyed) throw new Error('mpv is destroyed')
+        native.nowPlaying(info)
+      },
+      clearNowPlaying: () => {
+        if (isDestroyed) return
+        native.clearNowPlaying()
       },
       destroy,
     }

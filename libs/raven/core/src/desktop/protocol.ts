@@ -17,7 +17,11 @@ import {
 } from '@/schema'
 
 export const FILE_SCHEME = 'raven-file'
-export const WINDOW_MESSAGE_TYPES = { playerPort: 'raven:player-port' } as const
+/** The preload's hand-overs: the video player's port, and the music engine's. */
+export const WINDOW_MESSAGE_TYPES = {
+  playerPort: 'raven:player-port',
+  audioPort: 'raven:audio-port',
+} as const
 /** Main's words once mpv has gone. They ride with reason `engine`, which is what the page reads. */
 export const ENGINE_STOPPED = "Raven's video engine stopped. Open the video again."
 
@@ -567,5 +571,11 @@ export type PlayerConnectionStatus = Infer<typeof isPlayerConnection>
 /** What the preload forwards to the page on each `ready`; the port, when there is one, rides with it. */
 export const isPlayerPortMessage = object({
   type: oneOf([WINDOW_MESSAGE_TYPES.playerPort]),
+  connection: isPlayerConnection,
+})
+
+/** The music engine's hand-over, which rides the same way and carries the same kind of answer. */
+export const isAudioPortMessage = object({
+  type: oneOf([WINDOW_MESSAGE_TYPES.audioPort]),
   connection: isPlayerConnection,
 })

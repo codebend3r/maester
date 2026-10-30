@@ -1,11 +1,6 @@
 import { MPV_PROPERTIES } from '@raven/mpv'
 import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
-import {
-  ENGINE_MESSAGES,
-  ENGINE_MODES,
-  ENGINE_STATUSES,
-  type EngineMode,
-} from '@/main/player/engine'
+import { ENGINE_WORDS, ENGINE_MODES, ENGINE_STATUSES, type EngineMode } from '@/main/player/engine'
 
 type DisplayInfo = { refreshRate: number; edrHeadroom: number }
 
@@ -113,7 +108,7 @@ type UnavailableReasonProps = {
 
 /** Why there is no engine to read: off for this run, what the engine said as it fell back, or not yet open. */
 export const unavailableReason = ({ mode, note }: UnavailableReasonProps): string =>
-  mode === ENGINE_MODES.off ? ENGINE_MESSAGES.off : (note ?? STILL_OPENING)
+  mode === ENGINE_MODES.off ? ENGINE_WORDS.video.off : (note ?? STILL_OPENING)
 
 type EngineLinesProps = {
   engine: EngineDiagnostics

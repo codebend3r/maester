@@ -196,6 +196,8 @@
           "{projectRoot}/src/build/compileAddon.ts",
           "{projectRoot}/native/surface.h",
           "{projectRoot}/native/surface_win.cpp",
+          "{projectRoot}/native/nowplaying.h",
+          "{projectRoot}/native/nowplaying_win.cpp",
           "{projectRoot}/native/CMakeLists.txt",
           "{projectRoot}/src/build/buildWindowsAddon.ts",
           "{projectRoot}/src/build/nodeHeaders.ts",

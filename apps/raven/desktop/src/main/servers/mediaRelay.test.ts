@@ -54,6 +54,8 @@ type AnswerProps = { heard: Heard; count: number }
 type SetupProps = {
   answer?: (input: AnswerProps) => Answer
   outcomes?: TicketOutcome[]
+  /** One load at a time, as the video relay keeps, unless a test asks for the music relay's two. */
+  capacity?: number
 }
 
 /**
@@ -74,6 +76,7 @@ const setup = ({
     body: 'abcd',
   }),
   outcomes = [],
+  capacity = 1,
 }: SetupProps = {}) => {
   const heard: Heard[] = []
   const asked: { serverId: string; mediaId: number; isFresh: boolean }[] = []
@@ -113,6 +116,7 @@ const setup = ({
       secrets.push(bytes)
       return `${'s'.repeat(42)}${secrets.length}`
     },
+    capacity,
     warn: (message) => {
       warnings.push(message)
     },
@@ -142,6 +146,32 @@ describe('open', () => {
     expect(listens.count).toBe(1)
   })
 
+  test('a relay with room for two keeps the last two loads served and retires the oldest', async () => {
+    const { relay } = setup({ capacity: 2 })
+    const first = await relay.open(OPEN)
+    const second = await relay.open({ ...OPEN, mediaId: 8 })
+    expect((await rangeOf(first.fileUrl)).status).toBe(206)
+    expect((await rangeOf(second.fileUrl)).status).toBe(206)
+    const third = await relay.open({ ...OPEN, mediaId: 9 })
+    expect((await rangeOf(first.fileUrl)).status).toBe(404)
+    expect((await rangeOf(second.fileUrl)).status).toBe(206)
+    expect((await rangeOf(third.fileUrl)).status).toBe(206)
+  })
+
+  test('with two loads, closing the server retires both and remembers a refusal for each', async () => {
+    const { relay } = setup({ capacity: 2 })
+    const first = await relay.open(OPEN)
+    const second = await relay.open({ ...OPEN, mediaId: 8 })
+    relay.closeServer(SERVER.id)
+    expect((await rangeOf(first.fileUrl)).status).toBe(404)
+    expect((await rangeOf(second.fileUrl)).status).toBe(404)
+    expect(relay.refusalOf(first.loadId)).toBe(AUTH_REFUSALS.signedOut)
+    expect(relay.refusalOf(second.loadId)).toBe(AUTH_REFUSALS.signedOut)
+    const third = await relay.open(OPEN)
+    expect(relay.refusalOf(first.loadId)).toBeNull()
+    expect(relay.refusalOf(third.loadId)).toBeNull()
+  })
+
   test('a sidecar id that is not external-N is never served', async () => {
     const { relay } = setup()
     const opened = await relay.open({ ...OPEN, sidecarTrackIds: ['../file', 'external-1'] })
@@ -159,6 +189,7 @@ describe('open', () => {
       fetchUpstream: () => Promise.reject(new Error('unused')),
       tickets: { ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.unreachable }) },
       newSecret: () => 'x'.repeat(43),
+      capacity: 1,
       warn: () => undefined,
     })
     await expect(relay.open(OPEN)).rejects.toThrow('no socket')
@@ -171,6 +202,7 @@ describe('open', () => {
       fetchUpstream: () => Promise.reject(new Error('unused')),
       tickets: { ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.unreachable }) },
       newSecret: () => 'short/../',
+      capacity: 1,
       warn: () => undefined,
     })
     await expect(relay.open(OPEN)).rejects.toThrow()
@@ -434,6 +466,7 @@ describe('a relayed request', () => {
           }),
       },
       newSecret: () => 'r'.repeat(43),
+      capacity: 1,
       warn: () => undefined,
     })
     const old = await relay.open(OPEN)
@@ -524,6 +557,7 @@ describe('a relayed request', () => {
         ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.ticket, ticket: 'account.t1' }),
       },
       newSecret: () => 'w'.repeat(43),
+      capacity: 1,
       warn: (message) => {
         warnings.push(message)
       },
@@ -570,6 +604,7 @@ describe('a relayed request', () => {
         now: () => clock.now,
       }),
       newSecret: () => 'v'.repeat(43),
+      capacity: 1,
       warn: () => undefined,
     })
     const { fileUrl, loadId } = await relay.open(OPEN)
@@ -602,6 +637,7 @@ describe('a relayed request', () => {
         ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.ticket, ticket: 'account.t1' }),
       },
       newSecret: () => 'q'.repeat(43),
+      capacity: 1,
       warn: (message) => {
         warnings.push(message)
       },

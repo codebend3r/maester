@@ -69,7 +69,8 @@ import {
   type ServerTarget,
 } from '@/main/player/loadTarget'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
-import { createPlayerService, type PlayerOutcome } from '@/main/player/playerService'
+import type { PlayerOutcome } from '@/main/player/outcomes'
+import { createPlayerService } from '@/main/player/playerService'
 import { SIDECAR_BUDGET_MS } from '@/main/player/sidecars'
 import { tracksFromMpv } from '@/main/player/tracksFromMpv'
 import { createAccountTickets } from '@/main/servers/accountTickets'
@@ -84,6 +85,7 @@ import {
   createServerSources,
   SOURCE_MESSAGES,
   TRACKS_TIMEOUT_MS,
+  SOURCE_KINDS,
 } from '@/main/servers/serverSources'
 import { NO_SERVERS, noExplanation, noRefusedAccount } from '@/main/test/playerFakes'
 import { createNodeTimers } from '@/main/timers'
@@ -1777,6 +1779,7 @@ const accountPartsFor = async ({
       fetch(url, { method, headers, signal, redirect: 'error', cache: 'no-store' }),
     tickets,
     newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
+    capacity: 1,
     warn,
   })
   const sources = createServerSources({
@@ -1784,6 +1787,7 @@ const accountPartsFor = async ({
     calls,
     tickets,
     relay,
+    kind: SOURCE_KINDS.video,
     warn,
   })
   const page = await pageSessionFor({ fixture, account, now })

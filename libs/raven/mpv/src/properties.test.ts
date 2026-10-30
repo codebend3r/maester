@@ -30,6 +30,7 @@ const examples = {
   [MPV_PROPERTIES.speed]: 1,
   [MPV_PROPERTIES.aid]: 1,
   [MPV_PROPERTIES.sid]: false,
+  [MPV_PROPERTIES.vid]: false,
   [MPV_PROPERTIES.trackList]: [
     {
       id: 1,

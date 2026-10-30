@@ -3,18 +3,17 @@ import type { PortLike } from '@/main/player/playerPort'
 import type {
   AccountRefusalReader,
   FailureExplainer,
-  ResolvedSource,
+  ResolvedServerSource,
 } from '@/main/player/loadTarget'
-import type { PlayerOutcome, PlayerService } from '@/main/player/playerService'
+import { OK, type PlayerOutcome } from '@/main/player/outcomes'
+import type { PlayerService } from '@/main/player/playerService'
 import type { Timers } from '@/main/stateStore'
-
-const OK: PlayerOutcome = { ok: true }
 
 const NO_SERVERS_MESSAGE = 'This player knows no servers.'
 
 /** Server sources for a player that knows no servers: every server title is refused. */
 export const NO_SERVERS = {
-  resolve: async (): Promise<ResolvedSource> => ({ ok: false, message: NO_SERVERS_MESSAGE }),
+  resolve: async (): Promise<ResolvedServerSource> => ({ ok: false, message: NO_SERVERS_MESSAGE }),
 }
 
 /** A player whose server titles were never refused an account. */

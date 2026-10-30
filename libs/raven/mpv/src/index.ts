@@ -1,6 +1,9 @@
 export {
   MPV_COMMANDS,
   MPV_END_FILE_REASONS,
+  MPV_LOADFILE_MODES,
+  MPV_PLAYLIST_END,
+  MPV_SEEK_MODES,
   MPV_EVENTS,
   MPV_SURFACE_KINDS,
   openMpv,
@@ -8,6 +11,7 @@ export {
   type MpvEvent,
   type MpvReply,
   type MpvSurface,
+  type NowPlaying,
 } from '@/mpv'
 export {
   MPV_CHOICES,

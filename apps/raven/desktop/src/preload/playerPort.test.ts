@@ -11,6 +11,7 @@ const forward = ({ payload, ports }: ForwardProps) => {
   forwardPlayerPort({
     payload,
     ports,
+    type: WINDOW_MESSAGE_TYPES.playerPort,
     post: ({ message, transfer }) => {
       sent.push({ message, transfer })
     },
@@ -38,6 +39,27 @@ describe('forwardPlayerPort', () => {
     ['two ports', [port1, port2]],
   ])('drops a native connection with %s', (_name, ports) => {
     expect(forward({ payload: { status: PLAYER_CONNECTION_STATUSES.native }, ports })).toEqual([])
+  })
+
+  test("forwards the music engine's hand-over under its own message type", () => {
+    const sent: { message: unknown; transfer: MessagePort[] }[] = []
+    forwardPlayerPort({
+      payload: { status: PLAYER_CONNECTION_STATUSES.native },
+      ports: [port1],
+      type: WINDOW_MESSAGE_TYPES.audioPort,
+      post: (input) => {
+        sent.push(input)
+      },
+    })
+    expect(sent).toEqual([
+      {
+        message: {
+          type: WINDOW_MESSAGE_TYPES.audioPort,
+          connection: { status: PLAYER_CONNECTION_STATUSES.native },
+        },
+        transfer: [port1],
+      },
+    ])
   })
 
   test('forwards an unavailable connection with no port', () => {

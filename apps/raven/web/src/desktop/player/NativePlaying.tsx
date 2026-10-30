@@ -1,4 +1,4 @@
-import { PLAYER_COMMANDS, PLAYER_EVENTS, type PlayerSource } from '@raven/core'
+import { isEngineStopEvent, PLAYER_COMMANDS, PLAYER_EVENTS, type PlayerSource } from '@raven/core'
 import { Player } from '@raven/ui'
 import {
   ENGINE_KINDS,
@@ -7,7 +7,7 @@ import {
   useHostPlayer,
 } from '@raven/ui/headless'
 import { useEffect, useMemo, useRef } from 'react'
-import { isEngineGone, isEngineStop } from '@/desktop/playerConnection'
+import { isEngineGone } from '@/desktop/playerConnection'
 
 type NativePlayingProps = {
   services: PlayerServices
@@ -66,7 +66,7 @@ export const NativePlaying = ({
           if (load.current.isAnswered) position.current = event.time
           return
         }
-        if (isEngineStop(event)) onLost(position.current)
+        if (isEngineStopEvent(event)) onLost(position.current)
       }),
     [player, onLost],
   )

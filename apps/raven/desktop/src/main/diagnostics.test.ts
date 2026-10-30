@@ -7,7 +7,7 @@ import {
   unavailableReason,
 } from '@/main/diagnostics'
 import { MPV_PROPERTIES } from '@raven/mpv'
-import { ENGINE_MESSAGES } from '@/main/player/engine'
+import { ENGINE_WORDS } from '@/main/player/engine'
 
 const NATIVE = {
   app: { version: '0.5.4', isPackaged: true, arch: 'arm64' },
@@ -26,7 +26,7 @@ const NATIVE = {
 const UNAVAILABLE = {
   ...NATIVE,
   app: { version: '0.5.4', isPackaged: false, arch: 'arm64' },
-  engine: { kind: 'unavailable', reason: ENGINE_MESSAGES.unavailable },
+  engine: { kind: 'unavailable', reason: ENGINE_WORDS.video.unavailable },
   displayHz: 60,
 } as const satisfies DiagnosticsInput
 
@@ -187,14 +187,14 @@ describe('readEngineDiagnostics with a hung engine', () => {
 
 describe('unavailableReason', () => {
   it('is the off message in off mode, whatever was noted', () => {
-    expect(unavailableReason({ mode: 'off', note: ENGINE_MESSAGES.unavailable })).toBe(
-      ENGINE_MESSAGES.off,
+    expect(unavailableReason({ mode: 'off', note: ENGINE_WORDS.video.unavailable })).toBe(
+      ENGINE_WORDS.video.off,
     )
   })
 
   it('is what was noted, else that the engine is still opening', () => {
-    expect(unavailableReason({ mode: 'headless', note: ENGINE_MESSAGES.unavailable })).toBe(
-      ENGINE_MESSAGES.unavailable,
+    expect(unavailableReason({ mode: 'headless', note: ENGINE_WORDS.video.unavailable })).toBe(
+      ENGINE_WORDS.video.unavailable,
     )
     expect(unavailableReason({ mode: 'window', note: null })).toBe('still opening')
   })

@@ -25,7 +25,7 @@ import {
   type AccountRefusalReader,
   type FailureExplainer,
   type LocalSidecar,
-  type ResolvedSource,
+  type ResolvedServerSource,
   resolveSourceWith,
   type ServerTarget,
 } from '@/main/player/loadTarget'
@@ -155,7 +155,7 @@ const fakeServers = () => {
     mediaId: number
   }
 
-  const resolve = async (source: ResolveProps): Promise<ResolvedSource> => {
+  const resolve = async (source: ResolveProps): Promise<ResolvedServerSource> => {
     if (flags.shouldHold) {
       flags.shouldHold = false
       await new Promise<void>((resume) => {

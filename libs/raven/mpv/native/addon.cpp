@@ -2,6 +2,7 @@
 #include <uv.h>
 #include <mpv/client.h>
 #include "surface.h"
+#include "nowplaying.h"
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -35,6 +36,10 @@ struct Player {
     std::atomic<bool> isAlive{false};
     std::atomic<bool> isQueued{false};
     RavenSurface surface;
+    RavenNowPlaying nowPlaying;
+    // The system's transport commands, queued from the main thread until the next drain.
+    std::mutex remoteMutex;
+    std::vector<RavenRemoteCommand> remote;
     napi_async_cleanup_hook_handle cleanupHook = nullptr;
     std::shared_ptr<Player> *cleanupOwner = nullptr;
     uv_loop_t *loop = nullptr;
@@ -90,8 +95,34 @@ struct Player {
         delete static_cast<std::shared_ptr<Player> *>(data);
     }
 
+    void onRemote(const RavenRemoteCommand &command) {
+        {
+            std::lock_guard<std::mutex> lock(remoteMutex);
+            remote.push_back(command);
+        }
+        wake(this);
+    }
+    void drainRemote(Napi::Env env, Napi::Function receive) {
+        std::vector<RavenRemoteCommand> commands;
+        {
+            std::lock_guard<std::mutex> lock(remoteMutex);
+            commands.swap(remote);
+        }
+        for (auto &command : commands) {
+            if (!isAlive) return;
+            auto result = Napi::Object::New(env);
+            result.Set("type", "remote");
+            result.Set("command", command.name);
+            if (command.name == "seek") result.Set("time", command.time);
+            receive.Call({result});
+            if (env.IsExceptionPending()) return;
+        }
+    }
+
     void drain(Napi::Env env, Napi::Function receive) {
         isQueued = false;
+        drainRemote(env, receive);
+        if (env.IsExceptionPending()) return;
         // Bound a turn so a busy decoder cannot monopolize Electron's main loop.
         for (int i = 0; i < 256 && isAlive; ++i) {
             mpv_event *event = mpv_wait_event(handle, 0);
@@ -169,6 +200,8 @@ struct Player {
     }
     void terminate() {
         std::call_once(termination, [this] {
+            // Before mpv goes: a remote command landing after would wake nothing.
+            nowPlaying.stop();
             if (handle) {
                 // mpv unregistration takes its wakeup lock and joins any producer
                 // already inside wake(). Keep the TSFN reference until then.
@@ -282,7 +315,7 @@ public:
             if (!view) throw Napi::TypeError::New(env, "Empty native window handle");
             try { player->surface.attach(view); }
             catch (const std::exception &error) { throw Napi::Error::New(env, error.what()); }
-        } else if (kind != "headless") throw Napi::TypeError::New(env, "Unknown surface kind");
+        } else if (kind != "headless" && kind != "audio") throw Napi::TypeError::New(env, "Unknown surface kind");
         player->handle = mpv_create();
         if (!player->handle) {
             player->surface.detach();
@@ -310,6 +343,18 @@ public:
             if (kind == "headless") {
                 option("vo", "null");
                 option("ao", "null");
+            } else if (kind == "audio") {
+                // Sound alone: no window, no video decoding, the tracks run together and sit at
+                // the album's loudness. The host picks the audio output, as for a window.
+                option("vo", "null");
+                option("vid", "no");
+                option("force-window", "no");
+                option("audio-display", "no");
+                option("gapless-audio", "yes");
+                option("replaygain", "album");
+                // Raven owns the media keys through Now Playing; the option exists on macOS alone,
+                // so a build without it is left as it is.
+                mpv_set_option_string(player->handle, "input-media-keys", "no");
             } else {
                 option("vo", "gpu-next");
                 option("gpu-api", player->surface.gpuApi());
@@ -350,6 +395,11 @@ public:
             throw Napi::Error::New(env, "Cannot register async mpv cleanup");
         }
         mpv_set_wakeup_callback(player->handle, Player::wake, player.get());
+        if (kind == "audio") {
+            // The handlers keep the owner alive until stop(), which terminate() runs.
+            auto owner = player;
+            player->nowPlaying.listen([owner](const RavenRemoteCommand &command) { owner->onRemote(command); });
+        }
     }
     ~NativePlayer() {
         if (!player || !player->isAlive) return;
@@ -417,6 +467,36 @@ public:
         worker->Queue();
         return promise;
     }
+    void nowPlaying(const Napi::CallbackInfo &info) {
+        active(info.Env());
+        if (!info[0].IsObject()) throw Napi::TypeError::New(info.Env(), "Expected now playing info");
+        auto value = info[0].As<Napi::Object>();
+        RavenNowPlayingInfo parsed;
+        parsed.title = stringArg(value.Get("title"));
+        parsed.artist = stringArg(value.Get("artist"));
+        parsed.album = stringArg(value.Get("album"));
+        auto number = [&](const char *name) {
+            auto field = value.Get(name);
+            if (!field.IsNumber()) throw Napi::TypeError::New(info.Env(), "Expected a number");
+            double result = field.As<Napi::Number>().DoubleValue();
+            return std::isfinite(result) && result >= 0 ? result : 0.0;
+        };
+        parsed.duration = number("duration");
+        parsed.position = number("position");
+        auto playing = value.Get("isPlaying");
+        if (!playing.IsBoolean()) throw Napi::TypeError::New(info.Env(), "Expected isPlaying");
+        parsed.isPlaying = playing.As<Napi::Boolean>().Value();
+        auto artwork = value.Get("artwork");
+        if (artwork.IsBuffer()) {
+            auto buffer = artwork.As<Napi::Buffer<uint8_t>>();
+            parsed.artwork.assign(buffer.Data(), buffer.Data() + buffer.Length());
+        } else if (!artwork.IsNull()) throw Napi::TypeError::New(info.Env(), "Expected artwork bytes or null");
+        player->nowPlaying.set(parsed);
+    }
+    void clearNowPlaying(const Napi::CallbackInfo &) {
+        if (!player) return;
+        player->nowPlaying.clear();
+    }
     Napi::Value display(const Napi::CallbackInfo &info) {
         active(info.Env());
         auto result = Napi::Object::New(info.Env());
@@ -430,6 +510,8 @@ public:
             InstanceMethod("command", &NativePlayer::command), InstanceMethod("get", &NativePlayer::get),
             InstanceMethod("set", &NativePlayer::set), InstanceMethod("observe", &NativePlayer::observe),
             InstanceMethod("destroy", &NativePlayer::destroy), InstanceMethod("display", &NativePlayer::display),
+            InstanceMethod("nowPlaying", &NativePlayer::nowPlaying),
+            InstanceMethod("clearNowPlaying", &NativePlayer::clearNowPlaying),
         });
         auto reference = new Napi::FunctionReference(Napi::Persistent(constructor));
         env.AddCleanupHook([](Napi::FunctionReference *ref) { delete ref; }, reference);

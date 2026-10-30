@@ -1,7 +1,7 @@
-import type { PlayerConnectionStatus } from '@raven/core'
+import { isPlayerRequest, type PlayerConnectionStatus } from '@raven/core'
 import { describe, expect, mock, test } from 'bun:test'
 import { createConnector, OPEN_MS } from '@/main/player/connector'
-import { ENGINE_MESSAGES, type OpenedEngine } from '@/main/player/engine'
+import { ENGINE_WORDS, type OpenedEngine } from '@/main/player/engine'
 import type { PlayerService } from '@/main/player/playerService'
 import { fakePort, fakeService, fakeTimers } from '@/main/test/playerFakes'
 
@@ -27,6 +27,8 @@ const setup = ({ engine }: SetupProps = {}) => {
     engine:
       engine?.(service) ??
       (async () => ({ status: 'native', engine: { service: service.service } })),
+    isRequest: isPlayerRequest,
+    unavailable: ENGINE_WORDS.video.unavailable,
     channel: () => {
       const port = fakePort({ log })
       ports.push(port)
@@ -77,11 +79,11 @@ describe('createConnector', () => {
 
   test('an unavailable engine is posted with its message and no port', async () => {
     const { connector, ports, posted } = setup({
-      engine: () => async () => ({ status: 'unavailable', message: ENGINE_MESSAGES.off }),
+      engine: () => async () => ({ status: 'unavailable', message: ENGINE_WORDS.video.off }),
     })
     await connector.connect()
     expect(posted).toEqual([
-      { connection: { status: 'unavailable', message: ENGINE_MESSAGES.off }, ports: [] },
+      { connection: { status: 'unavailable', message: ENGINE_WORDS.video.off }, ports: [] },
     ])
     expect(ports).toEqual([])
   })
@@ -92,7 +94,7 @@ describe('createConnector', () => {
     })
     await connector.connect()
     expect(posted).toEqual([
-      { connection: { status: 'unavailable', message: ENGINE_MESSAGES.unavailable }, ports: [] },
+      { connection: { status: 'unavailable', message: ENGINE_WORDS.video.unavailable }, ports: [] },
     ])
     expect(warn).toHaveBeenCalledTimes(1)
   })
@@ -134,6 +136,8 @@ describe('createConnector', () => {
     const warn = mock((_message: string) => {})
     const connector = createConnector({
       engine: async () => ({ status: 'native', engine: { service: service.service } }),
+      isRequest: isPlayerRequest,
+      unavailable: ENGINE_WORDS.video.unavailable,
       channel: () => {
         const port = fakePort()
         ports.push(port)
@@ -161,7 +165,7 @@ describe('createConnector', () => {
     clock.fire()
     await connecting
     expect(posted).toEqual([
-      { connection: { status: 'unavailable', message: ENGINE_MESSAGES.unavailable }, ports: [] },
+      { connection: { status: 'unavailable', message: ENGINE_WORDS.video.unavailable }, ports: [] },
     ])
     expect(ports).toEqual([])
     expect(warn).toHaveBeenCalledTimes(1)
