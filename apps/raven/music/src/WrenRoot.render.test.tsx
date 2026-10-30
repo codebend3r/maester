@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { audioPlayer } from '@raven/audio'
 import type * as Native from '@raven/native'
-import { queryKeys } from '@raven/ui/headless'
-import { act, renderRouter, screen } from 'expo-router/testing-library'
+import { queryKeys, useAudioQueue } from '@raven/ui/headless'
+import { router } from 'expo-router'
+import { act, renderRouter, screen, waitFor } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
 import { WREN_ROUTES } from '@/routes'
 import { useWrenAccount } from '@/session'
-import { LISTENER, MIXTAPE, musicApi } from '@/test/music'
+import { AIRBAG, LISTENER, MIXTAPE, PARANOID, musicApi } from '@/test/music'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()
@@ -18,6 +20,7 @@ jest.mock('expo-splash-screen', () => ({
 jest.mock('@raven/native', () => ({
   ...jest.requireActual<typeof Native>('@raven/native'),
   apiFor: () => mockApi,
+  watchNetwork: () => () => undefined,
   cookieJar: { read: async () => ({}), forget: async () => {} },
   secretStore: {
     getItemAsync: async () => null,
@@ -31,6 +34,7 @@ describe('WrenRoot', () => {
     jest.clearAllMocks()
     queryClient.clear()
     useWrenAccount.setState({ session: LISTENER })
+    useAudioQueue.getState().clear()
   })
 
   it("forgets what one account read once another signs in, so it never shows the last one's playlists", async () => {
@@ -50,5 +54,22 @@ describe('WrenRoot', () => {
     await act(async () => useWrenAccount.setState({ session: null }))
     expect(queryClient.getQueryData(queryKeys.playlistList)).toBeUndefined()
     expect(mockApi.listPlaylists).not.toHaveBeenCalled()
+  })
+
+  it("stops the last account's music when it signs out, so nothing plays or counts for the next", async () => {
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await screen.findByRole('header', { name: 'Home' })
+    await act(async () => useAudioQueue.getState().playTracks({ tracks: [AIRBAG, PARANOID] }))
+    await waitFor(() => expect(audioPlayer.setWindow).toHaveBeenCalled())
+    expect(await screen.findByRole('button', { name: /^Now Playing: Airbag/ })).toBeTruthy()
+
+    await act(async () => useWrenAccount.setState({ session: null }))
+    expect(audioPlayer.stop).toHaveBeenCalled()
+
+    await act(async () => useWrenAccount.setState({ session: LISTENER }))
+    await act(async () => router.replace(WREN_ROUTES.home))
+    expect(await screen.findByRole('header', { name: 'Home' })).toBeTruthy()
+    expect(useAudioQueue.getState().queue.at).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Now Playing: Airbag/ })).toBeNull()
   })
 })

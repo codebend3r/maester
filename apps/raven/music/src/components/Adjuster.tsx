@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native'
 
+import { adjusterRangeOf } from '@/components/adjusterRange'
 import { PALETTE, SIZES } from '@/theme/wrenTheme'
 
 /** What a screen reader offers on an adjustable: a swipe up or down moves it a step. */
@@ -47,9 +48,7 @@ export function Adjuster({ label, value, max, step, valueText, onChange }: Adjus
       accessibilityLabel={label}
       accessibilityRole="adjustable"
       accessibilityValue={{
-        min: 0,
-        max: Math.round(max),
-        now: Math.round(shown),
+        ...adjusterRangeOf({ value: shown, max, step }),
         text: valueText(shown),
       }}
       accessible
@@ -65,6 +64,8 @@ export function Adjuster({ label, value, max, step, valueText, onChange }: Adjus
         onChange(valueAt(event))
       }}
       onResponderTerminate={() => setHeld(null)}
+      // A list scrolling under the finger would otherwise take the touch and drop the scrub.
+      onResponderTerminationRequest={() => false}
       onStartShouldSetResponder={() => true}
       style={styles.adjuster}
     >

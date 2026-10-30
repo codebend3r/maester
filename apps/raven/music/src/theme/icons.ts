@@ -14,7 +14,6 @@ export const WREN_ICONS = {
   close: 'down',
   moveUp: 'up',
   remove: 'close',
-  volume: 'volume',
   shuffle: 'shuffle',
   favourite: 'heart',
   more: 'more',
