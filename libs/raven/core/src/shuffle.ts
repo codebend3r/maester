@@ -1,3 +1,5 @@
+import type { MediaItem, ShowEntry } from '@/contract'
+
 /**
  * How many videos a shuffle lines up, the one it starts with among them, so
  * the queue riding along with each video stays small however big the library.
@@ -19,3 +21,11 @@ export const shuffled = <T>({ items, roll = Math.random }: ShuffledProps<T>): T[
     (dealt, item, index) => dealt.toSpliced(Math.floor(roll() * (index + 1)), 0, item),
     [],
   )
+
+type ShuffleChoicesProps = { shows: readonly ShowEntry[]; files: readonly MediaItem[] }
+
+/** What a library's Shuffle deals from: each show's next episode, then every file it lists. */
+export const shuffleChoices = ({ shows, files }: ShuffleChoicesProps): MediaItem[] => [
+  ...shows.flatMap((entry) => entry.next ?? []),
+  ...files,
+]

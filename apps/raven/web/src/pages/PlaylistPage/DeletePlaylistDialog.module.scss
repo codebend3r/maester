@@ -31,13 +31,6 @@
   color: var(--color-lichen);
 }
 
-.error {
-  padding: var(--space-2) var(--space-3);
-  border-left: 2px solid var(--color-leaf-bright);
-  background: var(--color-night);
-  font-size: var(--font-size-sm);
-}
-
 .actions {
   display: grid;
   grid-auto-flow: column;

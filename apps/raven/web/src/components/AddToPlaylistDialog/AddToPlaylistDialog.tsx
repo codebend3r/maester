@@ -94,20 +94,21 @@ export const AddToPlaylistDialog = ({ tracks, onClose }: AddToPlaylistDialogProp
   const { create, append } = usePlaylistMutations()
   const show = useToasts((state) => state.show)
   const [name, setName] = useState('')
-  const isPending = create.isPending || append.isPending
-  const failure = create.error ?? append.error ?? playlists.error
+  const isPending = create.isPending
+  const failure = create.error ?? playlists.error
   const what = whatOf({ tracks })
 
-  const addTo = (playlist: PlaylistSummary) =>
-    append.mutate(
-      { id: playlist.id, tracks },
-      {
-        onSuccess: () => {
-          show(ADD_TO_PLAYLIST_COPY.added({ what, name: playlist.name }))
-          close()
-        },
-      },
-    )
+  // The tracks show in the playlist at once, so the dialog closes before the
+  // server answers; a refusal takes them out again and says so in a toast.
+  const addTo = (playlist: PlaylistSummary) => {
+    show(ADD_TO_PLAYLIST_COPY.added({ what, name: playlist.name }))
+    close()
+    append.attempt({
+      variables: { id: playlist.id, tracks },
+      onRefused: (error) =>
+        show(ADD_TO_PLAYLIST_COPY.notAdded({ name: playlist.name, why: error.message })),
+    })
+  }
 
   const makeAndAdd = (event: FormEvent) => {
     event.preventDefault()

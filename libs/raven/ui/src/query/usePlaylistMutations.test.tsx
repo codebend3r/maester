@@ -83,30 +83,68 @@ describe('usePlaylistMutations', () => {
     expect(client.getQueryData<PlaylistDetails>(queryKeys.playlist(9))).toEqual(made)
   })
 
-  it('adds tracks at the end and keeps the page the server answers with', async () => {
-    const filled = playlistDetails({ tracks: [...PAGE.tracks, track({ id: 103 })] })
-    append.mockResolvedValue(filled)
-    list.mockResolvedValue([filled.playlist])
+  it('adds tracks at the end of the page and the count in the list before the server answers', async () => {
+    const answer = Promise.withResolvers<PlaylistDetails>()
+    append.mockImplementation(() => answer.promise)
+    list.mockResolvedValue([PAGE.playlist])
+    const client = holdingPlaylist()
+    const { result } = renderQueryHook({ client, hook: () => usePlaylistMutations() })
+    const added = track({ id: 103, duration: 200 })
+
+    act(() => result.current.append.mutate({ id: PAGE.playlist.id, tracks: [added] }))
+
+    await waitFor(() => expect(pageIn(client)?.tracks.at(-1)?.id ?? null).toBe(103))
+    const grown = {
+      trackCount: PAGE.playlist.trackCount + 1,
+      duration: PAGE.playlist.duration + 200,
+    }
+    expect(pageIn(client)?.playlist ?? null).toMatchObject(grown)
+    expect(listIn(client)?.[0] ?? null).toMatchObject(grown)
+    expect(append).toHaveBeenCalledWith({ id: PAGE.playlist.id, mediaIds: [103] })
+    answer.resolve(PAGE)
+  })
+
+  it('puts the page and the list back when the server refuses the tracks', async () => {
+    append.mockRejectedValue(new Error('refused'))
+    list.mockResolvedValue([PAGE.playlist])
     const client = holdingPlaylist()
     const { result } = renderQueryHook({ client, hook: () => usePlaylistMutations() })
 
     await act(() =>
-      result.current.append.mutateAsync({ id: PAGE.playlist.id, tracks: [track({ id: 103 })] }),
+      result.current.append
+        .mutateAsync({ id: PAGE.playlist.id, tracks: [track({ id: 103 })] })
+        .catch(() => undefined),
     )
 
-    expect(append).toHaveBeenCalledWith({ id: PAGE.playlist.id, mediaIds: [103] })
-    expect(pageIn(client)).toEqual(filled)
+    expect(pageIn(client)).toEqual(PAGE)
+    expect(listIn(client)).toEqual([PAGE.playlist])
+    expect(result.current.append.failure?.message ?? null).toBe('refused')
   })
 
-  it('deletes a playlist: its page goes, and so does its line in the list', async () => {
-    remove.mockResolvedValue(undefined)
+  it('takes a playlist out of the list before the server answers, and its page once it agrees', async () => {
+    const answer = Promise.withResolvers<undefined>()
+    remove.mockImplementation(() => answer.promise)
     list.mockResolvedValue([])
     const client = holdingPlaylist()
     const { result } = renderQueryHook({ client, hook: () => usePlaylistMutations() })
 
-    await act(() => result.current.remove.mutateAsync(PAGE.playlist.id))
+    act(() => result.current.remove.mutate(PAGE.playlist.id))
 
-    expect(pageIn(client)).toBeUndefined()
-    expect(listIn(client)).toEqual([])
+    await waitFor(() => expect(listIn(client)).toEqual([]))
+    expect(pageIn(client)).toEqual(PAGE)
+    answer.resolve(undefined)
+    await waitFor(() => expect(pageIn(client)).toBeUndefined())
+  })
+
+  it('puts a playlist back in the list when the server refuses to delete it', async () => {
+    remove.mockRejectedValue(new Error('refused'))
+    list.mockResolvedValue([PAGE.playlist])
+    const client = holdingPlaylist()
+    const { result } = renderQueryHook({ client, hook: () => usePlaylistMutations() })
+
+    await act(() => result.current.remove.mutateAsync(PAGE.playlist.id).catch(() => undefined))
+
+    expect(listIn(client)).toEqual([PAGE.playlist])
+    expect(pageIn(client)).toEqual(PAGE)
   })
 })

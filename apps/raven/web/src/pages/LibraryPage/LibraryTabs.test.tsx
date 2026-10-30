@@ -260,6 +260,25 @@ describe('LibraryPage tabs', () => {
     )
   })
 
+  it('plays what is in progress from Play, the most recent first, and shuffles it', async () => {
+    spies.inProgress.mockImplementation(async () => [
+      { media: movie({ id: 7, title: 'Heat', year: 1995 }), poster: null },
+      { media: movie({ id: 8, title: 'Ronin', year: 1998 }), poster: null },
+    ])
+    open({ route: '/libraries/2/in-progress' })
+    await screen.findByRole('link', { name: 'Play Heat' })
+    expect(screen.getByRole('button', { name: 'Shuffle' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Play' }))
+    expect(await screen.findByText('Watching 7')).toBeInTheDocument()
+  })
+
+  it('keeps Play and Shuffle at the top of In progress while it is empty, with nothing to play', async () => {
+    open({ route: '/libraries/2/in-progress' })
+    await screen.findByText(/Nothing in progress|in progress/i)
+    expect(screen.getByRole('button', { name: 'Shuffle' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled()
+  })
+
   it('lists the files not matched, with how to fix them', async () => {
     spies.unmatched.mockImplementation(async () => [
       unmatchedFile({ id: 9, title: 'Unknown Thing', match: 'unmatched' }),

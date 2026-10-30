@@ -61,7 +61,6 @@ const ROW_ACTIONS = {
 
 type MemberActionsProps = {
   member: Account
-  isBusy: boolean
   removeButton: RefObject<HTMLButtonElement | null>
   cancelButton: RefObject<HTMLButtonElement | null>
   onAct: (action: ActionKey) => void
@@ -73,12 +72,11 @@ const OwnerActions = () => <span className={usersStyles.aside}>{SETTINGS_COPY.us
 
 type AskingActionsProps = MemberActionsProps
 
-const AskingActions = ({ member, isBusy, cancelButton, onAct, onCancel }: AskingActionsProps) => (
+const AskingActions = ({ member, cancelButton, onAct, onCancel }: AskingActionsProps) => (
   <>
     <p className={usersStyles.aside}>{SETTINGS_COPY.users.confirmRemove}</p>
     <Button
       tone="danger"
-      disabled={isBusy}
       aria-label={SETTINGS_COPY.users.yesRemoveFor(member.email)}
       onClick={() => onAct(ACTION_KEYS.remove)}
     >
@@ -96,7 +94,7 @@ const AskingActions = ({ member, isBusy, cancelButton, onAct, onCancel }: Asking
 
 type StatusActionsProps = MemberActionsProps
 
-const StatusActions = ({ member, isBusy, removeButton, onAct, onAsk }: StatusActionsProps) =>
+const StatusActions = ({ member, removeButton, onAct, onAsk }: StatusActionsProps) =>
   ROW_ACTIONS[member.status].map((action) => {
     const isRemove = action === ACTION_KEYS.remove
     return (
@@ -104,7 +102,6 @@ const StatusActions = ({ member, isBusy, removeButton, onAct, onAsk }: StatusAct
         key={action}
         ref={isRemove ? removeButton : undefined}
         tone={ACTIONS[action].tone}
-        disabled={isBusy}
         aria-label={ACTIONS[action].nameFor(member.email)}
         onClick={() => (isRemove ? onAsk() : onAct(action))}
       >
@@ -132,7 +129,6 @@ const rowStateOf = ({ member, isAsking }: RowStateOfProps): RowState => {
 
 type MemberRowProps = {
   member: Account
-  isBusy: boolean
   isAsking: boolean
   onAct: (action: ActionKey) => void
   onAsk: () => void
@@ -144,7 +140,7 @@ type MemberRowProps = {
  * with focus on Cancel; cancelled, focus goes back to Remove access. The
  * owner's row has no actions: the owner cannot lose access from here.
  */
-const MemberRow = ({ member, isBusy, isAsking, onAct, onAsk, onCancel }: MemberRowProps) => {
+const MemberRow = ({ member, isAsking, onAct, onAsk, onCancel }: MemberRowProps) => {
   const removeButton = useRef<HTMLButtonElement>(null)
   const cancelButton = useRef<HTMLButtonElement>(null)
   useReturnFocus({ isOpen: isAsking, target: removeButton })
@@ -159,7 +155,6 @@ const MemberRow = ({ member, isBusy, isAsking, onAct, onAsk, onCancel }: MemberR
       <div className={usersStyles.actions}>
         <Actions
           member={member}
-          isBusy={isBusy}
           removeButton={removeButton}
           cancelButton={cancelButton}
           onAct={onAct}
@@ -213,10 +208,10 @@ export const UsersSection = ({ userId }: UsersSectionProps) => {
             {members.error.message}
           </p>
         )}
-        {setStatus.isError && (
+        {setStatus.failure && (
           <p className={styles.error} role="alert">
             {SETTINGS_COPY.users.changeFailed}
-            {setStatus.error.message}
+            {setStatus.failure.message}
           </p>
         )}
         {members.isPending && (
@@ -243,7 +238,6 @@ export const UsersSection = ({ userId }: UsersSectionProps) => {
                   <MemberRow
                     key={member.id}
                     member={member}
-                    isBusy={setStatus.isPending}
                     isAsking={asking === member.id}
                     onAct={(action) => act({ member, action })}
                     onAsk={() => setAsking(member.id)}

@@ -1,6 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { ApiClient, PlaylistDetails, PlaylistSummary, Track } from '@raven/core'
-import { playlistRenameEdits, playlistTracksEdits } from '@/query/edits'
+import type { ApiClient, Track } from '@raven/core'
+import {
+  playlistAppendEdits,
+  playlistDeleteEdits,
+  playlistRenameEdits,
+  playlistTracksEdits,
+} from '@/query/edits'
 import { afterPlaylists } from '@/query/invalidate'
 import { useOptimisticMutation } from '@/query/optimistic'
 import { mutationKeys, queryKeys } from '@/query/queryClient'
@@ -14,24 +19,22 @@ type AppendProps = { id: number; tracks: readonly Track[] }
 type UseServerPlaylistMutationsProps = { api: ApiClient }
 
 /**
- * Everything done to the account's playlists. A rename and a new order (a
- * track moved or taken out) show before the server answers and go to it one
- * at a time; making, deleting and adding tracks wait for the answer, which
- * fills the playlist's page. The list of playlists is read again after each.
+ * Everything done to the account's playlists. A rename, a new order (a track
+ * moved or taken out), tracks added and a playlist deleted show before the
+ * server answers and go to it one at a time; making one waits for the
+ * answer, which fills the playlist's page. The list of playlists is read
+ * again after each, without holding up the change.
  */
 export const useServerPlaylistMutations = ({ api }: UseServerPlaylistMutationsProps) => {
   const queryClient = useQueryClient()
-  // The answer is the playlist's page as it now stands, so only the list is read again.
-  const readList = (): Promise<unknown> =>
-    queryClient.invalidateQueries({ queryKey: queryKeys.playlistList })
-  const keep = (details: PlaylistDetails): Promise<unknown> => {
-    queryClient.setQueryData(queryKeys.playlist(details.playlist.id), details)
-    return readList()
-  }
-
+  // The answer is the new playlist's page, so only the list is read again, and
+  // not waited on: the caller goes on with the playlist as soon as it exists.
   const create = useMutation({
     mutationFn: (name: string) => api.createPlaylist({ name }),
-    onSuccess: keep,
+    onSuccess: (details) => {
+      queryClient.setQueryData(queryKeys.playlist(details.playlist.id), details)
+      queryClient.invalidateQueries({ queryKey: queryKeys.playlistList }).catch(() => undefined)
+    },
   })
 
   const rename = useOptimisticMutation({
@@ -49,21 +52,22 @@ export const useServerPlaylistMutations = ({ api }: UseServerPlaylistMutationsPr
     settle: () => afterPlaylists(queryClient),
   })
 
-  const append = useMutation({
+  const append = useOptimisticMutation({
+    mutationKey: mutationKeys.playlist,
     mutationFn: ({ id, tracks }: AppendProps) =>
       api.appendPlaylistTracks({ id, mediaIds: tracks.map((track) => track.id) }),
-    onSuccess: keep,
+    edits: ({ id, tracks }) => playlistAppendEdits({ id, tracks }),
+    settle: () => afterPlaylists(queryClient),
   })
 
-  const remove = useMutation({
-    mutationFn: (id: number) => api.deletePlaylist(id),
-    onSuccess: (_answer, id) => {
+  const remove = useOptimisticMutation({
+    mutationKey: mutationKeys.playlist,
+    mutationFn: async (id: number) => {
+      await api.deletePlaylist(id)
       queryClient.removeQueries({ queryKey: queryKeys.playlist(id), exact: true })
-      queryClient.setQueryData<PlaylistSummary[]>(queryKeys.playlistList, (playlists) =>
-        playlists === undefined ? undefined : playlists.filter((playlist) => playlist.id !== id),
-      )
-      return readList()
     },
+    edits: (id) => playlistDeleteEdits({ id }),
+    settle: () => afterPlaylists(queryClient),
   })
 
   return { create, rename, setTracks, append, remove }

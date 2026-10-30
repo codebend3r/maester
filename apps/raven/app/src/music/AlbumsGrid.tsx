@@ -1,10 +1,19 @@
-import { KINDS, LIBRARY_VIEWS, type Library, MUSIC_SORTS, libraryIconOf, plural } from '@raven/core'
-import { useSearch } from '@raven/ui/headless'
+import {
+  KINDS,
+  LIBRARY_VIEWS,
+  type Library,
+  MUSIC_PAGE,
+  MUSIC_SORTS,
+  QUEUE_SOURCE_KINDS,
+  libraryIconOf,
+  plural,
+} from '@raven/core'
+import { useAudioQueue, useSearch } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import type { ReactNode } from 'react'
 
-import { Grid, SearchField } from '@/layouts'
+import { Grid, SearchField, ToolButton } from '@/layouts'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { ALBUMS_GRID_COPY } from '@/music/copy'
 import { albumSectionsOf } from '@/music/musicCards'
@@ -21,7 +30,10 @@ type AlbumsGridProps = {
   toggle: ReactNode
 }
 
-/** A music library: its albums as covers, by artist, of those the search finds. */
+/**
+ * A music library: its albums as covers, by artist, of those the search finds, with Shuffle,
+ * which plays the tracks those albums hold, as many as one page of them, in a random order.
+ */
 export const AlbumsGrid = ({
   session: { server, api, queries },
   library,
@@ -45,6 +57,26 @@ export const AlbumsGrid = ({
     return search.query === '' ? ALBUMS_GRID_COPY.none : ALBUMS_GRID_COPY.noMatch(search.query)
   })()
   const open = ({ target }: ShelfCard) => router.push(hrefOf(target))
+  const playTracks = useAudioQueue((store) => store.playTracks)
+  // A read that fails leaves the queue as it was.
+  const shuffle = () =>
+    api
+      .listTracks({
+        libraryId: library.id,
+        search: search.query,
+        sort: MUSIC_SORTS.artist,
+        limit: MUSIC_PAGE.most,
+      })
+      .then(
+        ({ tracks }) =>
+          tracks.length > 0 &&
+          playTracks({
+            tracks,
+            source: { kind: QUEUE_SOURCE_KINDS.library, id: library.id },
+            isShuffled: true,
+          }),
+      )
+      .catch(() => undefined)
   return (
     <Grid
       icon={libraryIconOf(library.settings)}
@@ -59,7 +91,16 @@ export const AlbumsGrid = ({
       search={<SearchField label={ALBUMS_GRID_COPY.search(library.name)} search={search} />}
       sections={sections}
       title={library.name}
-      toolbar={toggle}
+      toolbar={
+        <>
+          {toggle}
+          <ToolButton
+            accessibilityLabel={ALBUMS_GRID_COPY.shuffle(library.name)}
+            label={MUSIC_COPY.shuffle}
+            onPress={() => void shuffle()}
+          />
+        </>
+      }
       view={LIBRARY_VIEWS.grid}
     />
   )

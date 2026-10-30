@@ -24,7 +24,7 @@ import { Button, Icon } from '@raven/ui'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { IconPicker } from '@/components/LibraryDialog/IconPicker'
 import { api } from '@/lib/api'
-import { afterLibrarySaved } from '@raven/ui/headless'
+import { afterLibraryDeleted, afterLibrarySaved } from '@raven/ui/headless'
 import { lockQuery, metadataHealthQuery } from '@/lib/queries'
 import { RATING_SOURCE_LABELS } from '@/lib/ratingSources'
 import { useModal } from '@/lib/useModal'
@@ -198,10 +198,11 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
     onError: (error) => setErrors([error.message]),
   })
 
+  // The list the page lands on already lacks it, so it goes there without waiting on the reading again.
   const remove = useMutation({
     mutationFn: (id: number) => api.deleteLibrary(id),
-    onSuccess: async () => {
-      await refresh()
+    onSuccess: (_answer, id) => {
+      afterLibraryDeleted({ queryClient, id }).catch(() => undefined)
       onClose()
       navigate('/libraries')
     },

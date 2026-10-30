@@ -229,6 +229,10 @@ export const mutationKeys = {
   watched: ['watched'],
   /** Any library's pin: they all show in the libraries list and on home. */
   pin: ['pin'],
+  /** Any title's place in the hero: they all show in the admin's picks. */
+  heroPick: ['hero-pick'],
+  /** Any account's access: they all show in the owner's list of members. */
+  members: ['members'],
   /** Any library's place in the hero: they all show in the libraries list and in the hero. */
   heroLibrary: ['hero-library'],
   /** Any change to the libraries' order: the whole list is sent each time. */

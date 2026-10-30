@@ -7,9 +7,13 @@ import {
   groupMedia,
   shuffled,
 } from '@raven/core'
+import { type SeasonEntry, seasonNext } from '@/pages/LibraryPage/seasons'
 
-/** A library's listing: its shows (none outside a TV library), then the files listed as files. */
-export type Listing = { shows: ShowEntry[]; files: MediaItem[] }
+/**
+ * A library's listing: its shows or its seasons (none outside a TV library),
+ * then the files listed as files.
+ */
+export type Listing = { shows: ShowEntry[]; seasons: SeasonEntry[]; files: MediaItem[] }
 
 export const LISTING_STATES = { pending: 'pending', failed: 'failed', listed: 'listed' } as const
 
@@ -20,7 +24,7 @@ export type ListingState =
   | ({ state: typeof LISTING_STATES.listed } & Listing)
 
 /** What Play, Shuffle and the jump strip see while nothing is listed yet. */
-export const NOTHING_LISTED: Listing = { shows: [], files: [] }
+export const NOTHING_LISTED: Listing = { shows: [], seasons: [], files: [] }
 
 type PlayQueueProps = {
   settings: LibrarySettings
@@ -28,9 +32,9 @@ type PlayQueueProps = {
 }
 
 /**
- * What Play and Shuffle start: a show's next episode first, then the files
- * in the order the page shows them. Shuffle deals every show's next episode
- * and every file, and lines up `SHUFFLE_LENGTH` of them to play one after
+ * What Play and Shuffle start: a show's or a season's next episode first,
+ * then the files in the order the page shows them. Shuffle deals every show's
+ * and season's next episode and every file, and lines up `SHUFFLE_LENGTH` of them to play one after
  * another. The settings are coherent with the library's type, so a grouped
  * view is one its type can show.
  */
@@ -42,7 +46,10 @@ export const playQueue = ({
   first: () => MediaItem | undefined
   shuffled: () => MediaItem[]
 } => {
-  const nextEpisodes = listing.shows.flatMap((entry) => entry.next ?? [])
+  const nextEpisodes = [
+    ...listing.shows.flatMap((entry) => entry.next ?? []),
+    ...listing.seasons.flatMap((entry) => seasonNext(entry) ?? []),
+  ]
   const shownFiles =
     settings.view === LIBRARY_VIEWS.grouped
       ? groupMedia({ items: listing.files, by: settings.groupBy }).flatMap((group) => group.items)

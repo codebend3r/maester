@@ -5,6 +5,7 @@ import {
   finishedNote,
   isScanning,
   ITEM_TYPES,
+  listsShows,
   jumpScale,
   type Library,
   type LibrarySettings,
@@ -15,20 +16,23 @@ import {
   queueLink,
   sagaEntryKey,
   sagaTargets,
+  SHUFFLE_LENGTH,
   showEntryKey,
+  shuffled,
   type UnmatchedFile,
   WATCH_TARGET_KINDS,
   watchLink,
 } from '@raven/core'
-import { type ComponentType, type ReactNode, useDeferredValue, useRef } from 'react'
+import { type ComponentType, type ReactNode, useDeferredValue, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ButtonLink } from '@raven/ui'
 import { HISTORY_SHOWS, KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { Duplicates } from '@/components/Duplicates/Duplicates'
 import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
-import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
+import { LibraryToolbar, ShowLevelPicker } from '@/components/LibraryToolbar/LibraryToolbar'
 import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
+import { PlayButtons } from '@/components/PlayButtons/PlayButtons'
 import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
 import {
@@ -72,6 +76,7 @@ import { useLibraryView } from '@/pages/LibraryPage/useLibraryView'
 import { POLL_MS, anyPending, useMatchingPassDone } from '@/pages/LibraryPage/useMatchingPassDone'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { SHOW_LEVELS, type ShowLevel } from '@/lib/showLevels'
 
 /** A tab's `empty`: `message` when its list has nothing in it. */
 const whenEmpty =
@@ -177,6 +182,7 @@ const EntryGrid = ({ library, entries }: EntryGridProps) => {
 type ListingBodyProps = {
   listing: ListingState
   settings: LibrarySettings
+  level: ShowLevel
   empty: string | null
 }
 
@@ -204,7 +210,12 @@ const LISTING_VIEWS = {
 type ListingViewProps = ListingBodyProps
 
 /** Which view the listing shows as it stands. */
-const listingView = ({ listing, settings, empty }: ListingViewProps): ViewOf<ListingViewsProps> => {
+const listingView = ({
+  listing,
+  settings,
+  level,
+  empty,
+}: ListingViewProps): ViewOf<ListingViewsProps> => {
   if (listing.state === LISTING_STATES.pending)
     return { key: LISTING_VIEW_KEYS.pending, props: { settings } }
   if (listing.state === LISTING_STATES.failed)
@@ -212,7 +223,13 @@ const listingView = ({ listing, settings, empty }: ListingViewProps): ViewOf<Lis
   if (empty) return { key: LISTING_VIEW_KEYS.empty, props: { message: empty } }
   return {
     key: LISTING_VIEW_KEYS.listed,
-    props: { settings, shows: listing.shows, files: listing.files },
+    props: {
+      settings,
+      level,
+      shows: listing.shows,
+      seasons: listing.seasons,
+      files: listing.files,
+    },
   }
 }
 
@@ -238,6 +255,7 @@ const AllSection = ({ library }: AllSectionProps) => {
   const cards = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const view = useLibraryView({ library })
+  const [level, setLevel] = useState<ShowLevel>(SHOW_LEVELS.shows)
   // The listing follows a change of view once it can lay itself out, the old one standing till then.
   const settings = useDeferredValue(view.settings)
   const isChanging = !sameLayout({ a: settings, b: view.settings })
@@ -245,6 +263,7 @@ const AllSection = ({ library }: AllSectionProps) => {
   const listing = useLibraryListing({
     libraryId: library.id,
     settings,
+    level,
     search: view.query,
     seed: view.seed,
     scanning,
@@ -262,7 +281,8 @@ const AllSection = ({ library }: AllSectionProps) => {
   const empty =
     listing.state === LISTING_STATES.listed
       ? emptyListingMessage({
-          isEmpty: listed.shows.length === 0 && listed.files.length === 0,
+          isEmpty:
+            listed.shows.length === 0 && listed.seasons.length === 0 && listed.files.length === 0,
           query: view.query,
           isScanning: scanning,
         })
@@ -299,7 +319,11 @@ const AllSection = ({ library }: AllSectionProps) => {
             const link = queueLink({ queue: queue.shuffled() })
             if (link) navigate(link.to, { state: link.state })
           }}
-        />
+        >
+          {listsShows(library.settings.kind) && (
+            <ShowLevelPicker level={level} onChange={setLevel} />
+          )}
+        </LibraryToolbar>
 
         {view.saveError && (
           <p className={styles.message} role="alert">
@@ -313,7 +337,7 @@ const AllSection = ({ library }: AllSectionProps) => {
           <div
             className={isChanging ? `${styles.listingBody} ${styles.changing}` : styles.listingBody}
           >
-            <ListingBody listing={listing} settings={settings} empty={empty} />
+            <ListingBody listing={listing} settings={settings} level={level} empty={empty} />
           </div>
           {isChanging && (
             <output className={styles.switching}>
@@ -331,21 +355,39 @@ const AllSection = ({ library }: AllSectionProps) => {
 
 type InProgressSectionProps = { library: Library }
 
-/** What was left partway through, the most recently watched first. */
+/**
+ * What was left partway through, the most recently watched first, under
+ * Play, which picks them up in that order, and Shuffle.
+ */
 const InProgressSection = ({ library }: InProgressSectionProps) => {
   const query = useQuery(inProgressQuery(library.id))
+  const navigate = useNavigate()
+  const media = query.data?.map((entry) => entry.media) ?? []
+  const play = (queue: MediaItem[]) => {
+    const link = queueLink({ queue: queue.slice(0, SHUFFLE_LENGTH) })
+    if (link) navigate(link.to, { state: link.state })
+  }
   return (
-    <SectionBody
-      query={query}
-      shape={<MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />}
-      empty={whenEmpty(
-        library.settings.saveProgress
-          ? LIBRARY_COPY.inProgressEmpty(library.name)
-          : LIBRARY_COPY.inProgressUnsaved(library.name),
-      )}
-    >
-      {(entries) => <EntryGrid library={library} entries={entries} />}
-    </SectionBody>
+    <div className={styles.section}>
+      <div className={styles.playRow}>
+        <PlayButtons
+          playable={media.length > 0}
+          onPlay={() => play(media)}
+          onShuffle={() => play(shuffled({ items: media }))}
+        />
+      </div>
+      <SectionBody
+        query={query}
+        shape={<MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />}
+        empty={whenEmpty(
+          library.settings.saveProgress
+            ? LIBRARY_COPY.inProgressEmpty(library.name)
+            : LIBRARY_COPY.inProgressUnsaved(library.name),
+        )}
+      >
+        {(entries) => <EntryGrid library={library} entries={entries} />}
+      </SectionBody>
+    </div>
   )
 }
 

@@ -65,7 +65,7 @@ export const openAddToPlaylistSheet = ({
     (index) => {
       const chosen = playlists[index]
       if (chosen !== undefined) {
-        onPick({ kind: PLAYLIST_PICKS.existing, playlistId: chosen.id })
+        onPick({ kind: PLAYLIST_PICKS.existing, playlistId: chosen.id, name: chosen.name })
         return
       }
       if (index !== playlists.length) return

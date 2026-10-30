@@ -1,5 +1,5 @@
 import type { PlaylistSummary } from '@raven/core'
-import { Button } from '@raven/ui'
+import { Button, useToasts } from '@raven/ui'
 import { useId } from 'react'
 import { useModal } from '@/lib/useModal'
 import { usePlaylistMutations } from '@/lib/usePlaylistMutations'
@@ -13,7 +13,11 @@ type DeletePlaylistDialogProps = {
   onDeleted: () => void
 }
 
-/** Asks before a playlist goes: it cannot be had back, though its tracks stay in their libraries. */
+/**
+ * Asks before a playlist goes: it cannot be had back, though its tracks stay
+ * in their libraries. Confirmed, it leaves the list and the page at once; a
+ * refusal puts it back in the list and says so in a toast.
+ */
 export const DeletePlaylistDialog = ({
   playlist,
   onClose,
@@ -21,6 +25,7 @@ export const DeletePlaylistDialog = ({
 }: DeletePlaylistDialogProps) => {
   const { dialog, close, keepKeys } = useModal()
   const { remove } = usePlaylistMutations()
+  const show = useToasts((state) => state.show)
   const titleId = useId()
   return (
     <dialog
@@ -35,18 +40,21 @@ export const DeletePlaylistDialog = ({
           {DELETE_PLAYLIST_COPY.title(playlist.name)}
         </h2>
         <p className={styles.hint}>{DELETE_PLAYLIST_COPY.hint}</p>
-        {remove.isError && (
-          <p role="alert" className={styles.error}>
-            {remove.error.message}
-          </p>
-        )}
         <div className={styles.actions}>
           <Button onClick={close}>{COMMON_COPY.cancel}</Button>
           <Button
             tone="danger"
             icon="trash"
-            disabled={remove.isPending}
-            onClick={() => remove.mutate(playlist.id, { onSuccess: onDeleted })}
+            onClick={() => {
+              remove.attempt({
+                variables: playlist.id,
+                onRefused: (error) =>
+                  show(
+                    DELETE_PLAYLIST_COPY.notDeleted({ name: playlist.name, why: error.message }),
+                  ),
+              })
+              onDeleted()
+            }}
           >
             {DELETE_PLAYLIST_COPY.confirm}
           </Button>

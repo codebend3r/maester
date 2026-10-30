@@ -1,6 +1,7 @@
 import {
   type Library as LibraryRecord,
   type LibrarySettings,
+  type MediaItem,
   type PosterEntry,
   KINDS,
   LIBRARY_LISTINGS,
@@ -23,6 +24,7 @@ import {
   reversedSort,
   routeIdOf,
   routeState,
+  shuffleChoices,
   sortFieldsFor,
   sortParts,
   startingSort,
@@ -42,6 +44,7 @@ import { usePictures } from '@/queries/usePictures'
 import { Grid, Loading, Picker, SearchField, ToolButton } from '@/layouts'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
 import { LIBRARY_COPY } from '@/screens/copy'
+import { shuffleTarget } from '@/screens/shuffleTarget'
 import type { LoadingProps } from '@/layouts/loadingKit'
 import { appViewsFor, useLibraryView } from '@/screens/useLibraryView'
 import type { LibraryChoice } from '@/stores/libraryViews'
@@ -73,6 +76,23 @@ const PageToggle = ({ page, onChange }: PageToggleProps) => {
       accessibilityLabel={LIBRARY_COPY.showPage(PAGE_NAMES[other])}
       label={PAGE_NAMES[other]}
       onPress={() => onChange(other)}
+    />
+  )
+}
+
+type ShuffleButtonProps = { library: LibraryRecord; choices: readonly MediaItem[] }
+
+/** Shuffle, first after the way to the other page: one of `choices` at random, from where it was left. */
+const ShuffleButton = ({ library, choices }: ShuffleButtonProps) => {
+  const router = useRouter()
+  return (
+    <ToolButton
+      accessibilityLabel={LIBRARY_COPY.shuffleLibrary(library.name)}
+      label={LIBRARY_COPY.shuffle}
+      onPress={() => {
+        const target = shuffleTarget({ choices })
+        if (target !== null) router.push(hrefOf(target))
+      }}
     />
   )
 }
@@ -197,7 +217,12 @@ const ContinueGrid = ({
       search={null}
       sections={sections}
       title={library.name}
-      toolbar={toggle}
+      toolbar={
+        <>
+          {toggle}
+          <ShuffleButton choices={entries.map((entry) => entry.media)} library={library} />
+        </>
+      }
       view={LIBRARY_VIEWS.grid}
     />
   )
@@ -283,6 +308,10 @@ const LibraryGrid = ({
       toolbar={
         <>
           {toggle}
+          <ShuffleButton
+            choices={listed === null ? [] : shuffleChoices(listed)}
+            library={library}
+          />
           <LibraryToolbar onChange={view.change} settings={settings} />
         </>
       }

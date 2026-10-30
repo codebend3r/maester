@@ -78,7 +78,8 @@
   grid-area: sort;
 }
 
-.group {
+.group,
+.level {
   grid-area: group;
 }
 
@@ -160,7 +161,7 @@
 // The grouping beside the rest leaves the search too little room on a
 // narrower page, so the search takes a row of its own above them.
 @container (max-width: 48rem) {
-  .find:has(.group) {
+  .find:has(.group, .level) {
     grid-template-columns: minmax(0, max-content) auto minmax(0, max-content) minmax(0, 1fr);
     grid-template-areas:
       'search search search search'
@@ -176,7 +177,7 @@
       'sort direction .';
   }
 
-  .find:has(.group) {
+  .find:has(.group, .level) {
     grid-template-columns: minmax(0, max-content) auto minmax(0, 1fr);
     grid-template-areas:
       'search search search'
@@ -184,7 +185,8 @@
       'group group group';
   }
 
-  .group {
+  .group,
+  .level {
     justify-self: start;
   }
 }

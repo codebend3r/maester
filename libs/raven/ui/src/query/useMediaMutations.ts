@@ -52,12 +52,13 @@ export const useServerMediaMutations = ({ api, media }: UseServerMediaMutationsP
         queryKeys.favourites,
         (entries) => entries && withoutEntry({ entries, id: media.id }),
       )
-      // Every library, the counts on the libraries list with them.
-      return Promise.all([
+      // Every library, the counts on the libraries list with them; not waited
+      // on, as the lists above already show the video gone.
+      Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.libraries }),
         queryClient.invalidateQueries({ queryKey: queryKeys.items }),
         queryClient.invalidateQueries({ queryKey: queryKeys.home }),
-      ])
+      ]).catch(() => undefined)
     },
   })
 

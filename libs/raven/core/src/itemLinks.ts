@@ -28,7 +28,7 @@ export const watchPageOf = (mediaId: number): AppPath => `${PAGE_PATHS.watch}/${
 type SeasonPathProps = { showId: number; season: number }
 
 /** A season's page, by its show and number. */
-const seasonPath = ({ showId, season }: SeasonPathProps): AppPath =>
+export const seasonPath = ({ showId, season }: SeasonPathProps): AppPath =>
   `/shows/${showId}/seasons/${season}`
 
 /** Where an item's page lives, or null for one that has no page of its own. */
