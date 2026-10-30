@@ -1,6 +1,7 @@
 export * from '@/apiClient'
 export * from '@/appClientCalls'
 export * from '@/bugReports'
+export * from '@/canPlayAudio'
 export * from '@/candidateTiers'
 export * from '@/cast'
 export * from '@/contract'
