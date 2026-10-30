@@ -1,7 +1,14 @@
-import { keepPreviousData, queryOptions, skipToken } from '@tanstack/react-query'
+import {
+  infiniteQueryOptions,
+  keepPreviousData,
+  queryOptions,
+  skipToken,
+} from '@tanstack/react-query'
 import {
   ADMIN_LOCK_STATES,
   FILMOGRAPHY_STATES,
+  MUSIC_PAGE,
+  MUSIC_SORTS,
   type ApiClient,
   type MatchItemType,
   type MatchSubject,
@@ -19,6 +26,11 @@ export const HISTORY_SHOWS = { watched: 'watched', all: 'all' } as const
 export type HistoryShow = (typeof HISTORY_SHOWS)[keyof typeof HISTORY_SHOWS]
 
 type Listing = { libraryId: number; search: string; sort: MediaSort; seed: number }
+
+/** Where the next page of songs starts: which of the libraries, and how far into it. */
+type SongsPage = { at: number; offset: number }
+
+const FIRST_SONGS_PAGE: SongsPage = { at: 0, offset: 0 }
 
 /** How long a person's page waits between asks while their filmography is on its way. */
 const FILMOGRAPHY_POLL_MS = 1_500
@@ -45,6 +57,12 @@ export const ravenQueriesFor = (api: ApiClient) => {
   type RavenQueriesForItemImagesQueryProps = { id: number; libraryId: number }
   type RavenQueriesForAlbumsQueryProps = { libraryId: number; search: string; sort: MusicSort }
   type RavenQueriesForArtistsQueryProps = { libraryId: number; search: string }
+  type RavenQueriesForRecentAlbumsQueryProps = { libraryId: number; limit: number }
+  type RavenQueriesForSongsQueryProps = {
+    libraryIds: readonly number[]
+    search: string
+    sort: MusicSort
+  }
   type RavenQueriesForAlbumMatchSearchQueryProps = { albumId: number; query: string }
 
   type RavenQueriesForMatchSearchQueryProps = {
@@ -255,6 +273,39 @@ export const ravenQueriesFor = (api: ApiClient) => {
         queryKey: queryKeys.artists({ libraryId, search }),
         queryFn: () => api.listArtists({ libraryId, search }),
         placeholderData: keepPreviousData,
+        gcTime: LISTING_GC_MS,
+      }),
+
+    /** A music library's newest albums, newest first. */
+    recentAlbumsQuery: ({ libraryId, limit }: RavenQueriesForRecentAlbumsQueryProps) =>
+      queryOptions({
+        queryKey: queryKeys.recentAlbums({ libraryId, limit }),
+        queryFn: () => api.listAlbums({ libraryId, sort: MUSIC_SORTS.added, limit }),
+        // The server lists a library's every album whatever the limit, so the newest are kept here.
+        select: (albums) => albums.slice(0, limit),
+      }),
+
+    /**
+     * The tracks of `libraryIds` as one list, `MUSIC_PAGE.most` a page: each library's to its
+     * end, then the next library's from its start. None asks for nothing.
+     */
+    songsQuery: ({ libraryIds, search, sort }: RavenQueriesForSongsQueryProps) =>
+      infiniteQueryOptions({
+        queryKey: queryKeys.songs({ libraryIds, search, sort }),
+        queryFn:
+          libraryIds.length === 0
+            ? skipToken
+            : ({ pageParam: { at, offset } }) => {
+                const libraryId = libraryIds[at]
+                if (libraryId === undefined) throw new Error(`No music library at ${at}`)
+                return api.listTracks({ libraryId, search, sort, limit: MUSIC_PAGE.most, offset })
+              },
+        initialPageParam: FIRST_SONGS_PAGE,
+        getNextPageParam: (last, _pages, { at, offset }): SongsPage | null => {
+          const next = offset + last.tracks.length
+          if (last.tracks.length > 0 && next < last.total) return { at, offset: next }
+          return at + 1 < libraryIds.length ? { at: at + 1, offset: 0 } : null
+        },
         gcTime: LISTING_GC_MS,
       }),
 

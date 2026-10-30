@@ -14,6 +14,11 @@ export const PALETTE_TOKENS = {
   notice: '--color-amber',
 } as const
 
+/** The colours globals.scss gives every theme alike, by what Wren paints with them. */
+export const SHADE_TOKENS = {
+  scrim: '--color-scrim',
+} as const
+
 /** The lengths globals.scss gives every theme alike, by what Wren sizes with them. */
 export const SIZE_TOKENS = {
   space1: '--space-1',
@@ -28,5 +33,4 @@ export const SIZE_TOKENS = {
   textXl: '--font-size-xl',
   measure: '--measure',
   fieldHeight: '--field-size',
-  ring: '--border-thick',
 } as const

@@ -20,8 +20,15 @@
 
 - **Sign-in is the app's, step for step.** `src/screens/SignIn.tsx` asks the raven account's email and password, then the PIN, then the admin password, over `@raven/native/headless`'s `stepAfterAccount`, `stepAfterSecret` and `finishSignIn`, which the device app's sign-in runs too; only the copy and the look are Wren's. The account is kept under `wren.account` (`src/session.ts`); the server list and cookies keep the shared `raven.` keys, which Wren's own keychain holds apart.
 - **`WrenRoot` reads the stores before any route,** pins `RAVEN_SERVER` (`pinRavenServer`), renews the access token a minute before it ends, and guards the `(tabs)` group with `Stack.Protected`, so a listener signed out lands on `/sign-in`. `useWren()` gives the active server's `api` and `ravenQueriesFor(api)`, null until a server is active.
-- **The tabs are Home, Library, Search and Settings** (`src/WrenTabs.tsx`, named in `WREN_TABS`), labelled in words with no icons yet. Settings shows the account, the server, Sign out and the version from `#package`.
+- **The tabs are Home, Library, Search and Settings** (`src/WrenTabs.tsx`, named in `WREN_TABS`), each labelled and drawn with raven's line icons through `@raven/native`'s `Icon` (the web's drawings from `@raven/ui/iconDrawings`, over react-native-svg, which Wren links through `@raven/native`). `src/theme/icons.ts` names the drawings Wren uses. Settings shows the account, the server, Sign out and the version from `#package`.
+- **The cache is per account.** `src/queryClient.ts` holds Wren's one query client, and `forgetOnAccountChange` empties it whenever the signed-in account's id changes, signing out included, so the next account never sees the last one's playlists or favourites; a renewed token keeps it.
 - **The look is raven's default theme** through `src/theme/wrenTheme.ts`, which reads `themeTokens[DEFAULT_THEME]` and `designTokens` with `nativeTokens`; there is no theme picker.
+
+## Browsing
+
+- **Every list holds every music library's.** A music library is one `listingFor` lists by album. Library's Albums and Artists merge each library's listing (by title or name when there are several, an artist once), Songs reads `songsQuery`, which pages each library's tracks at `MUSIC_PAGE.most` to its end and then the next library's, asking for the next page as the list nears its end, and Playlists lists the account's. Home has one Recently added shelf per music library, its twenty newest albums (`recentAlbumsQuery`), and Search asks each library for albums, artists and songs once typing pauses.
+- **`/album/[id]`, `/artist/[id]` and `/playlist/[id]`** sit in the guarded stack beside the tabs. The rows come from `@raven/ui/headless` (`albumDiscsOf`, `albumFactsOf`, `playlistTracksOf`, `playlistFactsOf`), as the device app's do. Play, Shuffle and a pressed row fill the shared `useAudioQueue`; holding a `TrackRow`, or its More, opens its menu: Play next, Add to queue, and Add to playlist, which appends it to one of the account's playlists.
+- **Covers carry the server's cookies and the account's token** (`src/music/useCovers.ts`, over `useServerCookies` and `cookieHeadersFor`), so a locked library's covers show once it is unlocked.
 
 ## Running it
 

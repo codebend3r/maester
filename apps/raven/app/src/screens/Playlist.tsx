@@ -9,6 +9,8 @@ import {
 import {
   movedUp,
   playingTrackOf,
+  playlistFactsOf,
+  playlistTracksOf,
   useAudioQueue,
   useServerPlaylistMutations,
   withoutPlace,
@@ -18,7 +20,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 
 import { PlaylistLayout } from '@/layouts'
-import { playlistFactsOf, playlistTracksOf } from '@/layouts/musicRows'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { PLAYLIST_COPY } from '@/screens/copy'

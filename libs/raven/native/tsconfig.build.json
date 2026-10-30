@@ -5,6 +5,8 @@
     "declaration": true,
     "rootDir": "./src",
     "outDir": "./dist",
+    // Plain JavaScript in dist, so Metro and jest read it as any package's.
+    "jsx": "react-jsx",
     "types": ["react-native"]
   },
   "include": ["src"],

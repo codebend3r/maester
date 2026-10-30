@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native'
 
 import { Text } from '@/layouts/Text'
 import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
-import { Icon } from '@/layouts/Icon'
+import { Icon } from '@raven/native'
 import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import {
   MENU_FOOT,

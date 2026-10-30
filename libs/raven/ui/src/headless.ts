@@ -92,6 +92,8 @@ export { useAudiobookChapters, useIsAudiobook, useTrackRate } from '@/query/useA
 export { activeLineAt } from '@/lib/lyrics'
 export { chapterAt, nextChapterStart, previousChapterStart } from '@/lib/chapters'
 export { movedUp, withoutPlace } from '@/music/playlistOrder'
+export { albumDiscsOf, albumFactsOf, playlistFactsOf, playlistTracksOf } from '@/music/musicRows'
+export type { AlbumDisc, AlbumTrack, PlaylistTrack } from '@/music/musicRows'
 export { usePlaybackPolicy } from '@/query/usePlaybackPolicy'
 export {
   EVENTS_RETRY_MS,

@@ -1,7 +1,7 @@
 import { type ComponentType, type ReactNode, useState } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 
-import { Icon } from '@/layouts/Icon'
+import { Icon } from '@raven/native'
 import { Text } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'

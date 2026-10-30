@@ -2,7 +2,7 @@ import { DEFAULT_THEME } from '@raven/core'
 import { nativeTokens } from '@raven/native/headless'
 import { designTokens, themeTokens } from '@raven/ui/designTokens'
 
-import { PALETTE_TOKENS, SIZE_TOKENS } from '@/theme/tokenNames'
+import { PALETTE_TOKENS, SHADE_TOKENS, SIZE_TOKENS } from '@/theme/tokenNames'
 
 type TokenOfProps<T> = { tokens: Readonly<Record<string, T>>; name: string }
 
@@ -17,7 +17,7 @@ const tokenOf = <T>({ tokens, name }: TokenOfProps<T>): T => {
 }
 
 const { colours } = nativeTokens(themeTokens[DEFAULT_THEME] ?? {})
-const { numbers } = nativeTokens(
+const { colours: shared, numbers } = nativeTokens(
   Object.fromEntries(designTokens.map(({ name, value }) => [name, value])),
 )
 
@@ -39,6 +39,11 @@ export const PALETTE = {
   notice: colour(PALETTE_TOKENS.notice),
 } as const satisfies Record<keyof typeof PALETTE_TOKENS, string>
 
+/** What Wren lays over a screen to hold a sheet above it, the same in every theme. */
+export const SHADES = {
+  scrim: tokenOf({ tokens: shared, name: SHADE_TOKENS.scrim }),
+} as const satisfies Record<keyof typeof SHADE_TOKENS, string>
+
 /** raven's scale in points, from globals.scss. */
 export const SIZES = {
   space1: size(SIZE_TOKENS.space1),
@@ -53,7 +58,6 @@ export const SIZES = {
   textXl: size(SIZE_TOKENS.textXl),
   measure: size(SIZE_TOKENS.measure),
   fieldHeight: size(SIZE_TOKENS.fieldHeight),
-  ring: size(SIZE_TOKENS.ring),
 } as const satisfies Record<keyof typeof SIZE_TOKENS, number>
 
 /** How faint a control is drawn while a finger holds it, and while it is turned off. */

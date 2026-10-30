@@ -7,9 +7,9 @@ import {
   artistNames,
   plural,
 } from '@raven/core'
+import { playlistFactsOf } from '@raven/ui/headless'
 
 import { MUSIC_COPY } from '@/layouts/copy'
-import { playlistFactsOf } from '@/layouts/musicRows'
 import {
   CARD_SHAPES,
   type Picture,

@@ -1,20 +1,17 @@
 import { DEFAULT_THEME, THEME_TONES, themeOf } from '@raven/core'
 import { IS_SIGN_IN_BYPASSED, pinRavenServer } from '@raven/native/headless'
-import { createQueryClient } from '@raven/ui/headless'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { hideAsync, preventAutoHideAsync } from 'expo-splash-screen'
 import { useEffect, useState } from 'react'
 import { StatusBar } from 'react-native'
 
+import { forgetOnAccountChange, queryClient } from '@/queryClient'
 import { WREN_ROUTES, WREN_SCREENS } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { useActiveServer } from '@/stores/activeServer'
 import { PALETTE } from '@/theme/wrenTheme'
 import { useWren } from '@/useWren'
-
-/** One cache for Wren's life: it talks to one server, so nothing ever empties it. */
-const queryClient = createQueryClient()
 
 /** A splash the system cannot hold or hide leaves Wren as it is: the next frame is Wren's. */
 const SPLASH_IGNORED = (): void => undefined
@@ -41,7 +38,8 @@ const loadStores = async (): Promise<void> => {
 /**
  * Reads what Wren keeps on the device before any route renders, then the routes. The tabs need
  * a signed-in account on raven, so without one they send the listener to sign in. The account's
- * access token is renewed a minute before it ends, so a call never meets an expired one.
+ * access token is renewed a minute before it ends, so a call never meets an expired one, and
+ * the cache is emptied when the account changes.
  */
 export function WrenRoot() {
   const [isLoaded, setLoaded] = useState(false)
@@ -49,6 +47,7 @@ export function WrenRoot() {
   const isSignedIn = useWrenAccount((state) => state.session !== null)
   const expiresAt = useWrenAccount((state) => state.session?.expiresAt ?? null)
 
+  useEffect(forgetOnAccountChange, [])
   useEffect(() => {
     const show = () => setLoaded(true)
     loadStores().then(show, show)
@@ -82,6 +81,9 @@ export function WrenRoot() {
           redirectTo={WREN_ROUTES.signIn}
         >
           <Stack.Screen name={WREN_SCREENS.tabs} />
+          <Stack.Screen name={WREN_SCREENS.album} />
+          <Stack.Screen name={WREN_SCREENS.artist} />
+          <Stack.Screen name={WREN_SCREENS.playlist} />
         </Stack.Protected>
         <Stack.Screen name={WREN_SCREENS.signIn} />
       </Stack>
