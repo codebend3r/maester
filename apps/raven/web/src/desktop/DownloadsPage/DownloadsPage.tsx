@@ -3,11 +3,10 @@ import {
   DOWNLOAD_STATUS_KINDS,
   type DownloadGroup,
   type DownloadView,
-  formatBytes,
   type SpaceView,
 } from '@raven/core'
 import { Button, type IconName } from '@raven/ui'
-import { useId, useRef } from 'react'
+import { type ComponentType, useId, useRef } from 'react'
 import {
   type DownloadsChange,
   isInProgress,
@@ -16,11 +15,11 @@ import {
   useSpace,
 } from '@/desktop/downloadsApi'
 import { handled } from '@/desktop/handled'
+import { DOWNLOADS_PAGE_COPY } from '@/desktop/DownloadsPage/copy'
 import { DownloadRow } from '@/desktop/DownloadsPage/DownloadRow'
 import styles from '@/desktop/DownloadsPage/DownloadsPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
-
-const EMPTY = 'Nothing downloaded yet. Choose Download on a movie, show or saga to keep it here.'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** The header's buttons for every download at once. */
 const BULKS = { pauseAll: 'pauseAll', resumeAll: 'resumeAll' } as const
@@ -29,12 +28,12 @@ type Bulk = (typeof BULKS)[keyof typeof BULKS]
 
 const BULK_BUTTONS = {
   pauseAll: {
-    label: 'Pause all',
+    label: DOWNLOADS_PAGE_COPY.pauseAll,
     icon: 'pause',
     request: { type: DESKTOP_REQUESTS.pauseAllDownloads },
   },
   resumeAll: {
-    label: 'Resume all',
+    label: DOWNLOADS_PAGE_COPY.resumeAll,
     icon: 'download',
     request: { type: DESKTOP_REQUESTS.resumeAllDownloads },
   },
@@ -47,9 +46,6 @@ const bulksOf = (downloads: DownloadView[]): Bulk[] => [
     ? [BULKS.resumeAll]
     : []),
 ]
-
-const spaceLine = ({ used, free, total }: SpaceView): string =>
-  `${formatBytes(used)} of downloads · ${formatBytes(free)} free of ${formatBytes(total)}`
 
 type Grouped = { group: DownloadGroup; views: DownloadView[] }
 
@@ -88,6 +84,83 @@ const Group = ({ grouped, onDeleted }: GroupProps) => {
   )
 }
 
+/** Where a query the page reads stands: on its way, refused, or answered (empty or not). */
+const READ_STATES = {
+  waiting: 'waiting',
+  failed: 'failed',
+  empty: 'empty',
+  listed: 'listed',
+} as const
+
+type ReadState = (typeof READ_STATES)[keyof typeof READ_STATES]
+
+type ReadStateOfProps = { isRead: boolean; isEmpty: boolean; isError: boolean }
+
+const readStateOf = ({ isRead, isEmpty, isError }: ReadStateOfProps): ReadState => {
+  if (!isRead) return isError ? READ_STATES.failed : READ_STATES.waiting
+  return isEmpty ? READ_STATES.empty : READ_STATES.listed
+}
+
+const Unread = () => null
+
+type ListViewProps = { list: DownloadView[]; error: string | null; onDeleted: () => void }
+
+type ListFailedProps = ListViewProps
+
+const ListFailed = ({ error }: ListFailedProps) => <p role="alert">{error}</p>
+
+const ListEmpty = () => <p className={styles.empty}>{DOWNLOADS_PAGE_COPY.empty}</p>
+
+type ListedProps = ListViewProps
+
+const Listed = ({ list, onDeleted }: ListedProps) => (
+  <ul className={styles.groups}>
+    {groupsOf(list).map((grouped) => (
+      <Group key={grouped.group.key} grouped={grouped} onDeleted={onDeleted} />
+    ))}
+  </ul>
+)
+
+const LIST_VIEWS = {
+  [READ_STATES.waiting]: Unread,
+  [READ_STATES.failed]: ListFailed,
+  [READ_STATES.empty]: ListEmpty,
+  [READ_STATES.listed]: Listed,
+} as const satisfies Record<ReadState, ComponentType<ListViewProps>>
+
+type DiskViewProps = { disk: SpaceView | null; error: string | null; lineId: string }
+
+type DiskFailedProps = DiskViewProps
+
+const DiskFailed = ({ error }: DiskFailedProps) => <p className={styles.line}>{error}</p>
+
+type DiskProps = DiskViewProps
+
+const Disk = ({ disk, lineId }: DiskProps) =>
+  disk !== null && (
+    <div className={styles.disk}>
+      <p id={lineId} className={styles.line}>
+        {DOWNLOADS_PAGE_COPY.space(disk)}
+      </p>
+      <meter
+        className={styles.meter}
+        min={0}
+        max={disk.total}
+        value={disk.used}
+        aria-label={DOWNLOADS_PAGE_COPY.disk}
+        aria-describedby={lineId}
+      />
+    </div>
+  )
+
+/** A disk is never empty: once read, it is shown. */
+const DISK_VIEWS = {
+  [READ_STATES.waiting]: Unread,
+  [READ_STATES.failed]: DiskFailed,
+  [READ_STATES.empty]: Disk,
+  [READ_STATES.listed]: Disk,
+} as const satisfies Record<ReadState, ComponentType<DiskViewProps>>
+
 /** Every title Raven has downloaded or is downloading, and the disk they are kept on. */
 export const DownloadsPage = () => {
   const downloads = useDownloads()
@@ -101,6 +174,16 @@ export const DownloadsPage = () => {
   const list = downloads.data?.downloads ?? null
   const bulks = bulksOf(list ?? [])
   const disk = space.data ?? null
+  const ListView =
+    LIST_VIEWS[
+      readStateOf({
+        isRead: list !== null,
+        isEmpty: list !== null && list.length === 0,
+        isError: downloads.isError,
+      })
+    ]
+  const DiskView =
+    DISK_VIEWS[readStateOf({ isRead: disk !== null, isEmpty: false, isError: space.isError })]
 
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
@@ -112,7 +195,7 @@ export const DownloadsPage = () => {
           icon="download"
           className={styles.title}
         >
-          Downloads
+          {COMMON_COPY.downloads}
         </PageTitle>
         <div className={styles.tools}>
           {bulks.map((bulk) => (
@@ -128,35 +211,12 @@ export const DownloadsPage = () => {
             icon="folder"
             onClick={() => handled(change({ type: DESKTOP_REQUESTS.showDownloadsFolder }))}
           >
-            Show in Finder
+            {DOWNLOADS_PAGE_COPY.showInFinder}
           </Button>
         </div>
-        {disk !== null && (
-          <div className={styles.disk}>
-            <p id={ids.line} className={styles.line}>
-              {spaceLine(disk)}
-            </p>
-            <meter
-              className={styles.meter}
-              min={0}
-              max={disk.total}
-              value={disk.used}
-              aria-label="Disk"
-              aria-describedby={ids.line}
-            />
-          </div>
-        )}
-        {disk === null && space.isError && <p className={styles.line}>{space.error.message}</p>}
+        <DiskView disk={disk} error={space.error?.message ?? null} lineId={ids.line} />
       </header>
-      {list === null && downloads.isError && <p role="alert">{downloads.error.message}</p>}
-      {list !== null && list.length === 0 && <p className={styles.empty}>{EMPTY}</p>}
-      {list !== null && list.length > 0 && (
-        <ul className={styles.groups}>
-          {groupsOf(list).map((grouped) => (
-            <Group key={grouped.group.key} grouped={grouped} onDeleted={focusTitle} />
-          ))}
-        </ul>
-      )}
+      <ListView list={list ?? []} error={downloads.error?.message ?? null} onDeleted={focusTitle} />
     </section>
   )
 }

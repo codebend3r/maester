@@ -11,15 +11,22 @@ import { useId, useRef, useState } from 'react'
 import { refusalText } from '@/desktop/client'
 import { handled } from '@/desktop/handled'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
+import { UPDATES_SECTION_COPY } from '@/desktop/settings/copy'
 import { Section } from '@/desktop/settings/Section'
 import { useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/settings/DesktopSettings.module.scss'
 import settings from '@/pages/SettingsPage/SettingsPage.module.scss'
 
-const UNREADABLE = 'Raven could not read its update settings.'
-const UNCHANGED = 'Raven could not change its update check. Try again.'
-const UNCHECKED = 'Raven could not check for updates. Try again.'
-const UNOPENED = 'Raven could not open the release page. Try again.'
+type CheckedLineProps = Pick<UpdateStatus, 'current' | 'checkedAt'>
+
+/** The running version, and when its release check last ran. */
+const checkedLine = ({ current, checkedAt }: CheckedLineProps): string => {
+  const checked =
+    checkedAt === null
+      ? UPDATES_SECTION_COPY.notChecked
+      : UPDATES_SECTION_COPY.lastChecked(new Date(checkedAt).toLocaleString())
+  return `${UPDATES_SECTION_COPY.version(current)} ${checked}`
+}
 
 type ResultsOfProps = {
   status: UpdateStatus
@@ -61,7 +68,7 @@ export const UpdatesSection = () => {
     queryFn: async (): Promise<UpdateStatus> => {
       const reply = await client.request({ type: DESKTOP_REQUESTS.readUpdates })
       if (reply.type === DESKTOP_REPLIES.updates) return reply.status
-      throw new Error(refusalText({ reply, fallback: UNREADABLE }))
+      throw new Error(refusalText({ reply, fallback: UPDATES_SECTION_COPY.unreadable }))
     },
     retry: false,
   })
@@ -89,7 +96,7 @@ export const UpdatesSection = () => {
     setPicked(isEnabled)
     await send({
       request: { type: DESKTOP_REQUESTS.setUpdateCheck, isEnabled },
-      fallback: UNCHANGED,
+      fallback: UPDATES_SECTION_COPY.unchanged,
     })
     if (pick === lastPick.current) setPicked(null)
   }
@@ -100,7 +107,7 @@ export const UpdatesSection = () => {
     setIsChecking(true)
     const isAnswered = await send({
       request: { type: DESKTOP_REQUESTS.checkForUpdates },
-      fallback: UNCHECKED,
+      fallback: UPDATES_SECTION_COPY.unchecked,
     })
     isCheckingNow.current = false
     setIsChecking(false)
@@ -113,18 +120,14 @@ export const UpdatesSection = () => {
     setRefusal('')
     const reply = await client.request({ type: DESKTOP_REQUESTS.openRelease })
     if (reply.type === DESKTOP_REPLIES.done) return
-    setRefusal(refusalText({ reply, fallback: UNOPENED }))
+    setRefusal(refusalText({ reply, fallback: UPDATES_SECTION_COPY.unopened }))
   }
 
   const status = read.data ?? null
   const results = status === null ? [] : resultsOf({ status, hasJustChecked })
 
   return (
-    <Section
-      icon="rescan"
-      title="Updates"
-      help="Raven asks GitHub for its newest release and sends nothing else. It never installs one by itself."
-    >
+    <Section icon="rescan" title={UPDATES_SECTION_COPY.title} help={UPDATES_SECTION_COPY.help}>
       {read.isError && (
         <p className={settings.error} role="alert">
           {read.error.message}
@@ -138,13 +141,9 @@ export const UpdatesSection = () => {
             aria-describedby={hintId}
             onChange={(event) => handled(setEnabled(event.target.checked))}
           />
-          <span className={settings.choiceLabel}>Check for updates once a day</span>
+          <span className={settings.choiceLabel}>{UPDATES_SECTION_COPY.checkDaily}</span>
           <span id={hintId} className={settings.choiceHint}>
-            {`This is Raven ${status.current}. ${
-              status.checkedAt === null
-                ? 'Not checked yet.'
-                : `Last checked ${new Date(status.checkedAt).toLocaleString()}.`
-            }`}
+            {checkedLine(status)}
           </span>
         </label>
       )}
@@ -162,11 +161,11 @@ export const UpdatesSection = () => {
         <div className={styles.buttons}>
           {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}
           <Button aria-disabled={isChecking} onClick={() => handled(checkNow())}>
-            Check now
+            {UPDATES_SECTION_COPY.checkNow}
           </Button>
           {status.latest !== null && (
             <Button tone="primary" onClick={() => handled(openRelease())}>
-              See what's new
+              {UPDATES_SECTION_COPY.whatsNew}
             </Button>
           )}
         </div>

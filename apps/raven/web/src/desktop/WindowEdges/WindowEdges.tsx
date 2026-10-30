@@ -1,8 +1,9 @@
-import type { PointerEvent } from 'react'
+import type { ComponentType, PointerEvent } from 'react'
 import {
   DESKTOP_REQUESTS,
   WINDOW_CHROMES,
   WINDOW_EDGES,
+  type WindowChrome,
   type WindowEdge,
   windowChromeFor,
 } from '@raven/core'
@@ -23,14 +24,9 @@ const EDGES = [
 
 const PRIMARY_BUTTON = 0
 
-/**
- * Resize handles along the edges and corners of a window with no frame, as on Windows,
- * where a transparent window has no native resize border. A drag captures the pointer, so
- * it keeps coming once the pointer leaves the window, and main resizes from screen points.
- */
-export const WindowEdges = () => {
+/** The page draws the resize border itself. */
+const DrawnEdges = () => {
   const { client } = useDesktop()
-  if (windowChromeFor({ platform: client.platform }) !== WINDOW_CHROMES.drawn) return null
 
   const startResize = (edge: WindowEdge) => (event: PointerEvent<HTMLSpanElement>) => {
     if (event.button !== PRIMARY_BUTTON) return
@@ -68,4 +64,23 @@ export const WindowEdges = () => {
       ))}
     </div>
   )
+}
+
+/** The system draws the window's frame, resize border included. */
+const SystemEdges = () => null
+
+const EDGES_BY_CHROME = {
+  [WINDOW_CHROMES.inset]: SystemEdges,
+  [WINDOW_CHROMES.drawn]: DrawnEdges,
+} as const satisfies Record<WindowChrome, ComponentType>
+
+/**
+ * Resize handles along the edges and corners of a window with no frame, as on Windows,
+ * where a transparent window has no native resize border. A drag captures the pointer, so
+ * it keeps coming once the pointer leaves the window, and main resizes from screen points.
+ */
+export const WindowEdges = () => {
+  const { client } = useDesktop()
+  const Edges = EDGES_BY_CHROME[windowChromeFor({ platform: client.platform })]
+  return <Edges />
 }

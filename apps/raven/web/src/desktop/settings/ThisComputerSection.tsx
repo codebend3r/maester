@@ -10,10 +10,11 @@ import {
   type OutputSettings,
 } from '@raven/core'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useId, useRef, useState } from 'react'
+import { type ComponentType, useId, useRef, useState } from 'react'
 import { refusalText } from '@/desktop/client'
 import { outputQuery } from '@/desktop/output'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
+import { THIS_COMPUTER_COPY } from '@/desktop/settings/copy'
 import { Section } from '@/desktop/settings/Section'
 import { useComputerName, useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/settings/DesktopSettings.module.scss'
@@ -24,15 +25,15 @@ type ProfilesForProps = { computer: string }
 const profilesFor = ({
   computer,
 }: ProfilesForProps): Record<AudioProfile, { label: string; hint: string }> => ({
-  pcm: {
-    label: 'Speakers or TV',
-    hint: `Sound decoded on this ${computer}, up to 7.1, for whatever is plugged in.`,
-  },
+  pcm: { label: THIS_COMPUTER_COPY.pcmLabel, hint: THIS_COMPUTER_COPY.pcmHint(computer) },
   passthrough: {
-    label: 'Receiver passthrough',
-    hint: 'Dolby Digital and DTS go to the receiver as they are, for it to decode.',
+    label: THIS_COMPUTER_COPY.passthroughLabel,
+    hint: THIS_COMPUTER_COPY.passthroughHint,
   },
-  headphones: { label: 'Headphones', hint: 'Mixed down to stereo, or spatial on AirPods.' },
+  headphones: {
+    label: THIS_COMPUTER_COPY.headphonesLabel,
+    hint: THIS_COMPUTER_COPY.headphonesHint,
+  },
 })
 
 const FORMAT_LABELS = {
@@ -40,8 +41,65 @@ const FORMAT_LABELS = {
   dts: 'DTS',
 } as const satisfies Record<(typeof CARRIED_FORMATS)[number], string>
 
-const SAVED = 'Sound output saved. It applies to the video you play next.'
-const UNSAVED = 'Raven could not save the sound output. Try again.'
+type ProfileViewProps = {
+  shown: OutputSettings
+  onToggleFormat: (props: ToggleFormatProps) => void
+  onSpatial: (isSpatial: boolean) => void
+}
+
+type ToggleFormatProps = {
+  format: (typeof CARRIED_FORMATS)[number]
+  isOn: boolean
+}
+
+/** Speakers or TV take no setting of their own. */
+const NoProfileSettings = () => null
+
+type PassthroughFormatsProps = ProfileViewProps
+
+const PassthroughFormats = ({ shown, onToggleFormat }: PassthroughFormatsProps) => (
+  <fieldset className={settings.setting}>
+    <legend className={settings.legend}>{THIS_COMPUTER_COPY.formats}</legend>
+    <div className={settings.choices}>
+      {CARRIED_FORMATS.map((format) => (
+        <label key={format} className={settings.choice}>
+          <input
+            type="checkbox"
+            checked={shown.passthrough.includes(format)}
+            onChange={(event) => onToggleFormat({ format, isOn: event.target.checked })}
+          />
+          <span className={settings.choiceLabel}>{FORMAT_LABELS[format]}</span>
+        </label>
+      ))}
+    </div>
+    <p className={settings.hint}>
+      {THIS_COMPUTER_COPY.passthroughNote}{' '}
+      {carriesPassthrough(shown)
+        ? THIS_COMPUTER_COPY.volumeOnReceiver
+        : THIS_COMPUTER_COPY.noFormats}
+    </p>
+  </fieldset>
+)
+
+type SpatialChoiceProps = ProfileViewProps
+
+const SpatialChoice = ({ shown, onSpatial }: SpatialChoiceProps) => (
+  <label className={settings.choice}>
+    <input
+      type="checkbox"
+      checked={shown.spatial}
+      onChange={(event) => onSpatial(event.target.checked)}
+    />
+    <span className={settings.choiceLabel}>{THIS_COMPUTER_COPY.spatial}</span>
+  </label>
+)
+
+/** What each sound output adds beneath the choice. */
+const PROFILE_SETTINGS = {
+  [AUDIO_PROFILES.pcm]: NoProfileSettings,
+  [AUDIO_PROFILES.passthrough]: PassthroughFormats,
+  [AUDIO_PROFILES.headphones]: SpatialChoice,
+} as const satisfies Record<AudioProfile, ComponentType<ProfileViewProps>>
 
 type OutputPick = { id: number; apply: (base: OutputSettings) => OutputSettings }
 
@@ -76,13 +134,13 @@ export const ThisComputerSection = () => {
     const reply = await client.request({ type: DESKTOP_REQUESTS.writeOutput, output: next })
     if (reply.type !== DESKTOP_REPLIES.done) {
       settle(pick.id)
-      setRefusal(refusalText({ reply, fallback: UNSAVED }))
+      setRefusal(refusalText({ reply, fallback: THIS_COMPUTER_COPY.unsaved }))
       return
     }
     confirmed.current = next
     await queryClient.invalidateQueries({ queryKey: DESKTOP_QUERY_KEYS.output })
     settle(pick.id)
-    setStatus(SAVED)
+    setStatus(THIS_COMPUTER_COPY.saved)
   }
 
   const change = (apply: OutputPick['apply']) => {
@@ -96,15 +154,10 @@ export const ThisComputerSection = () => {
     const base = stored
     writes.current = writes.current
       .then(() => write({ pick, base }))
-      .catch(() => setRefusal(UNSAVED))
+      .catch(() => setRefusal(THIS_COMPUTER_COPY.unsaved))
   }
 
   const choose = (changes: Partial<OutputSettings>) => change((base) => ({ ...base, ...changes }))
-
-  type ToggleFormatProps = {
-    format: (typeof CARRIED_FORMATS)[number]
-    isOn: boolean
-  }
 
   const toggleFormat = ({ format, isOn }: ToggleFormatProps) =>
     change((base) => {
@@ -120,12 +173,13 @@ export const ThisComputerSection = () => {
   const isListed = (name: string) => devices.some((device) => device.name === name)
   const isEngineReady = read.data?.isEngineReady ?? false
   const isDeviceListMissing = !isEngineReady || devices.length === 0
+  const ProfileSettings = PROFILE_SETTINGS[shown?.profile ?? AUDIO_PROFILES.pcm]
 
   return (
     <Section
       icon="volume"
-      title="This computer"
-      help={`How Raven sends sound from this ${computer}.`}
+      title={THIS_COMPUTER_COPY.title}
+      help={THIS_COMPUTER_COPY.help(computer)}
     >
       {read.isError && (
         <p className={settings.error} role="alert">
@@ -134,13 +188,9 @@ export const ThisComputerSection = () => {
       )}
       {shown !== null && (
         <>
-          {!isEngineReady && (
-            <p className={settings.hint}>
-              Raven's video engine is not running, so the sound settings wait until it is.
-            </p>
-          )}
+          {!isEngineReady && <p className={settings.hint}>{THIS_COMPUTER_COPY.engineNotRunning}</p>}
           <fieldset className={settings.setting}>
-            <legend className={settings.legend}>Sound output</legend>
+            <legend className={settings.legend}>{THIS_COMPUTER_COPY.soundOutput}</legend>
             <div className={settings.choices}>
               {Object.values(AUDIO_PROFILES).map((profile) => (
                 <label key={profile} className={settings.choice}>
@@ -156,42 +206,13 @@ export const ThisComputerSection = () => {
               ))}
             </div>
           </fieldset>
-          {shown.profile === AUDIO_PROFILES.passthrough && (
-            <fieldset className={settings.setting}>
-              <legend className={settings.legend}>Formats your receiver decodes</legend>
-              <div className={settings.choices}>
-                {CARRIED_FORMATS.map((format) => (
-                  <label key={format} className={settings.choice}>
-                    <input
-                      type="checkbox"
-                      checked={shown.passthrough.includes(format)}
-                      onChange={(event) => toggleFormat({ format, isOn: event.target.checked })}
-                    />
-                    <span className={settings.choiceLabel}>{FORMAT_LABELS[format]}</span>
-                  </label>
-                ))}
-              </div>
-              <p className={settings.hint}>
-                macOS passes Dolby Digital and DTS core to the receiver; TrueHD, DTS-HD MA and E-AC3
-                play as PCM.{' '}
-                {carriesPassthrough(shown)
-                  ? 'Volume is set on your receiver.'
-                  : 'No formats chosen, so sound plays as PCM.'}
-              </p>
-            </fieldset>
-          )}
-          {shown.profile === AUDIO_PROFILES.headphones && (
-            <label className={settings.choice}>
-              <input
-                type="checkbox"
-                checked={shown.spatial}
-                onChange={(event) => choose({ spatial: event.target.checked })}
-              />
-              <span className={settings.choiceLabel}>Spatial audio (AirPods)</span>
-            </label>
-          )}
+          <ProfileSettings
+            shown={shown}
+            onToggleFormat={toggleFormat}
+            onSpatial={(isSpatial) => choose({ spatial: isSpatial })}
+          />
           <div className={styles.device}>
-            <label htmlFor={ids.device}>Output device</label>
+            <label htmlFor={ids.device}>{THIS_COMPUTER_COPY.outputDevice}</label>
             <select
               id={ids.device}
               value={isListed(shown.device) ? shown.device : AUDIO_DEVICES.auto}
@@ -199,7 +220,7 @@ export const ThisComputerSection = () => {
               aria-describedby={isDeviceListMissing ? ids.note : undefined}
               onChange={(event) => choose({ device: event.target.value })}
             >
-              <option value={AUDIO_DEVICES.auto}>System default</option>
+              <option value={AUDIO_DEVICES.auto}>{THIS_COMPUTER_COPY.systemDefault}</option>
               {devices.map((device) => (
                 <option key={device.name} value={device.name}>
                   {device.description}
@@ -209,7 +230,7 @@ export const ThisComputerSection = () => {
           </div>
           {isDeviceListMissing && (
             <p id={ids.note} className={settings.hint}>
-              Device list unavailable.
+              {THIS_COMPUTER_COPY.noDeviceList}
             </p>
           )}
         </>

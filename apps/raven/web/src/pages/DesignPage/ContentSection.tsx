@@ -1,76 +1,78 @@
 import { useRef } from 'react'
 import { Button } from '@raven/ui'
+import { SECTION_IDS } from '@/pages/DesignPage/contents'
+import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
+
+const COPY = DESIGN_COPY.content
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
 
 export const ContentSection = () => {
   const dialog = useRef<HTMLDialogElement>(null)
   return (
-    <DesignSection id="content">
-      <Specimen name="Table">
+    <DesignSection id={SECTION_IDS.content}>
+      <Specimen name={COPY.table}>
         <table className={styles.table}>
-          <caption>Libraries on this server</caption>
+          <caption>{COPY.caption}</caption>
           <thead>
             <tr>
-              <th scope="col">Library</th>
+              <th scope="col">{COPY.library}</th>
               <th scope="col" className={styles.number}>
-                Videos
+                {COPY.videos}
               </th>
               <th scope="col" className={styles.number}>
-                Size
+                {COPY.size}
               </th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <th scope="row">Movies</th>
-              <td className={styles.number}>1,242</td>
-              <td className={styles.number}>8.1 TB</td>
+              <th scope="row">{COPY.movies}</th>
+              <td className={styles.number}>{COPY.moviesVideos}</td>
+              <td className={styles.number}>{COPY.moviesSize}</td>
             </tr>
             <tr>
-              <th scope="row">Shows</th>
-              <td className={styles.number}>2,772</td>
-              <td className={styles.number}>5.4 TB</td>
+              <th scope="row">{COPY.shows}</th>
+              <td className={styles.number}>{COPY.showsVideos}</td>
+              <td className={styles.number}>{COPY.showsSize}</td>
             </tr>
           </tbody>
         </table>
       </Specimen>
 
-      <Specimen name="Details">
+      <Specimen name={COPY.details}>
         <div className={styles.measure}>
           <details>
-            <summary>Why does this file convert?</summary>
-            <p>Firefox cannot decode HEVC, so the server transcodes it to H.264 as it plays.</p>
+            <summary>{COPY.whyConvert}</summary>
+            <p>{COPY.whyConvertAnswer}</p>
           </details>
           <details open>
-            <summary>What counts as finished?</summary>
-            <p>The last 5% of a video. The next play starts from the top.</p>
+            <summary>{COPY.finished}</summary>
+            <p>{COPY.finishedAnswer}</p>
           </details>
         </div>
       </Specimen>
 
-      <Specimen name="Figure">
+      <Specimen name={COPY.figure}>
         <figure className={styles.figure}>
-          <div className={styles.figureFrame}>raven</div>
-          <figcaption>
-            A thumbnail is one frame, 480 pixels wide, from 10% into the file.
-          </figcaption>
+          <div className={styles.figureFrame}>{COPY.figureFrame}</div>
+          <figcaption>{COPY.figcaption}</figcaption>
         </figure>
       </Specimen>
 
-      <Specimen name="Dialog" note="A native modal: focus stays inside and Escape closes it.">
+      <Specimen name={COPY.dialog} note={COPY.dialogNote}>
         <div className={styles.row}>
-          <Button onClick={() => dialog.current?.showModal()}>Open a dialog</Button>
+          <Button onClick={() => dialog.current?.showModal()}>{COPY.openDialog}</Button>
         </div>
         <dialog ref={dialog} className={styles.dialog} aria-labelledby="design-dialog-title">
           <div className={styles.dialogBody}>
             <h2 id="design-dialog-title" className={styles.dialogTitle}>
-              A dialog
+              {COPY.dialogTitle}
             </h2>
-            <p className={styles.dialogText}>It sits on the canopy colour over a scrim.</p>
+            <p className={styles.dialogText}>{COPY.dialogText}</p>
             <div className={styles.dialogActions}>
               <Button tone="primary" onClick={() => dialog.current?.close()}>
-                Close
+                {COPY.close}
               </Button>
             </div>
           </div>

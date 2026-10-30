@@ -1,9 +1,10 @@
-import { DESKTOP_EVENTS, DESKTOP_REQUESTS, type DesktopEvent, UPDATE_WORDS } from '@raven/core'
+import { DESKTOP_EVENTS, DESKTOP_REQUESTS, type DesktopEvent } from '@raven/core'
 import { useToasts } from '@raven/ui'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSendAccountToken } from '@/desktop/accountToken'
+import { DESKTOP_HOST_COPY } from '@/desktop/copy'
 import { DownloadDialog } from '@/desktop/DownloadDialog/DownloadDialog'
 import { applyDownloadsEvent } from '@/desktop/downloadsApi'
 import { OpenLinkDialog } from '@/desktop/OpenLinkDialog/OpenLinkDialog'
@@ -16,10 +17,6 @@ import { WindowEdges } from '@/desktop/WindowEdges/WindowEdges'
 import { useDesktop } from '@/stores/desktop'
 import { useDownloadAsk } from '@/stores/downloadAsk'
 import { handled } from '@/desktop/handled'
-
-/** The toast for a newer release; Settings' Updates section opens its page. */
-const updateWords = (version: string): string =>
-  `${UPDATE_WORDS.newer(version)} Settings has what's new.`
 
 /**
  * Raven's part of the page, mounted once over every route: it hears main's events and
@@ -56,7 +53,7 @@ export const DesktopHost = () => {
       case DESKTOP_EVENTS.openLink:
         return setIsOpenLinkShown(true)
       case DESKTOP_EVENTS.updateAvailable:
-        showToast(updateWords(event.version))
+        showToast(DESKTOP_HOST_COPY.newerRelease(event.version))
         // Settings reads main's status again, so an open Updates section shows the release too.
         return void queryClient
           .invalidateQueries({ queryKey: DESKTOP_QUERY_KEYS.updates })

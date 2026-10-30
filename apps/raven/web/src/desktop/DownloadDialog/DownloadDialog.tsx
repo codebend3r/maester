@@ -5,12 +5,12 @@ import {
   DOWNLOAD_KINDS,
   type DownloadAsk,
   type DownloadKind,
-  formatBytes,
 } from '@raven/core'
 import { Button, UNLOCK_SECRETS, UnlockDialog } from '@raven/ui'
 import { useQueryClient } from '@tanstack/react-query'
-import { type FormEvent, useId, useRef, useState } from 'react'
+import { type ComponentType, type FormEvent, useId, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { DOWNLOAD_DIALOG_COPY } from '@/desktop/DownloadDialog/copy'
 import { handled } from '@/desktop/handled'
 import { useOpenReply } from '@/desktop/openReply'
 import { useModal } from '@/lib/useModal'
@@ -19,28 +19,64 @@ import { signInPath } from '@/lib/authRoutes'
 import { useComputerName, useDesktop } from '@/stores/desktop'
 import { declineAsk } from '@/stores/downloadAsk'
 import styles from '@/desktop/DesktopDialog.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type ReadyStatus = Extract<DownloadAsk['status'], { kind: typeof DOWNLOAD_ASK_KINDS.ready }>
 
-const TITLE = 'Download to Raven'
+type FilesForProps = { kind: DownloadKind; files: number }
 
-type NounForProps = { kind: DownloadKind; files: number }
-
-const nounFor = ({ kind, files }: NounForProps): string => {
+const filesFor = ({ kind, files }: FilesForProps): string => {
   switch (kind) {
     case DOWNLOAD_KINDS.movie:
     case DOWNLOAD_KINDS.saga:
-      return files === 1 ? 'movie' : 'movies'
+      return DOWNLOAD_DIALOG_COPY.movies(files)
     case DOWNLOAD_KINDS.episode:
     case DOWNLOAD_KINDS.season:
     case DOWNLOAD_KINDS.show:
-      return files === 1 ? 'episode' : 'episodes'
+      return COMMON_COPY.episodes(files)
     default: {
       const unreachable: never = kind
       return unreachable
     }
   }
 }
+
+/** Whether the title has files left to fetch, or every one is already downloaded. */
+const CONTENTS = { files: 'files', empty: 'empty' } as const
+
+type Contents = (typeof CONTENTS)[keyof typeof CONTENTS]
+
+type QuestionViewProps = { status: ReadyStatus; questionId: string; computer: string }
+
+type FilesQuestionProps = QuestionViewProps
+
+const FilesQuestion = ({ status, questionId, computer }: FilesQuestionProps) => {
+  const question = DOWNLOAD_DIALOG_COPY.question({
+    title: status.title,
+    files: filesFor({ kind: status.downloadKind, files: status.files }),
+    bytes: status.bytes,
+  })
+  const room = status.canFit
+    ? DOWNLOAD_DIALOG_COPY.room({ free: status.free, computer })
+    : DOWNLOAD_DIALOG_COPY.short({ bytes: status.bytes, free: status.free })
+  return (
+    <>
+      <p id={questionId}>{question}</p>
+      <p className={styles.hint}>{room}</p>
+    </>
+  )
+}
+
+type EmptyQuestionProps = QuestionViewProps
+
+const EmptyQuestion = ({ status, questionId }: EmptyQuestionProps) => (
+  <p id={questionId}>{DOWNLOAD_DIALOG_COPY.alreadyDownloaded(status.title)}</p>
+)
+
+const QUESTIONS = {
+  [CONTENTS.files]: FilesQuestion,
+  [CONTENTS.empty]: EmptyQuestion,
+} as const satisfies Record<Contents, ComponentType<QuestionViewProps>>
 
 type ReadyDialogProps = {
   ask: DownloadAsk
@@ -80,11 +116,7 @@ const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
     )
   }
 
-  const noun = nounFor({ kind: status.downloadKind, files: status.files })
-  const question = `Download ${status.title} (${status.files} ${noun}, ${formatBytes(status.bytes)})?`
-  const room = status.canFit
-    ? `${formatBytes(status.free)} free on this ${computer}.`
-    : `Needs ${formatBytes(status.bytes)}; ${formatBytes(status.free)} free.`
+  const Question = QUESTIONS[isEmpty ? CONTENTS.empty : CONTENTS.files]
 
   return (
     <dialog
@@ -97,16 +129,9 @@ const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
     >
       <form className={styles.form} onSubmit={(event) => handled(confirm(event))}>
         <h2 id={ids.title} className={styles.title}>
-          {TITLE}
+          {DOWNLOAD_DIALOG_COPY.title}
         </h2>
-        {isEmpty ? (
-          <p id={ids.question}>{`${status.title} is already downloaded.`}</p>
-        ) : (
-          <>
-            <p id={ids.question}>{question}</p>
-            <p className={styles.hint}>{room}</p>
-          </>
-        )}
+        <Question status={status} questionId={ids.question} computer={computer} />
         {canDownload && (
           <label className={styles.check}>
             <input
@@ -114,14 +139,14 @@ const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
               checked={shouldAutoDelete}
               onChange={(event) => setShouldAutoDelete(event.target.checked)}
             />
-            Delete once watched
+            {COMMON_COPY.deleteOnceWatched}
           </label>
         )}
         <div className={styles.actions}>
-          <Button onClick={close}>Cancel</Button>
+          <Button onClick={close}>{COMMON_COPY.cancel}</Button>
           {canDownload && (
             <Button type="submit" tone="primary" icon="download">
-              Download
+              {COMMON_COPY.download}
             </Button>
           )}
         </div>
@@ -156,7 +181,7 @@ const LockedDialog = ({ ask, onClose }: LockedDialogProps) => {
   return (
     <UnlockDialog
       secret={UNLOCK_SECRETS.pin}
-      hint="This title is in a locked library. Enter the PIN to download it."
+      hint={DOWNLOAD_DIALOG_COPY.lockedHint}
       unlock={(entered) => api.unlock(entered)}
       onUnlocked={retry}
       onClose={() => {
@@ -196,13 +221,13 @@ const AccountDialog = ({ ask, onClose }: AccountDialogProps) => {
     >
       <div className={styles.form}>
         <h2 id={titleId} className={styles.title}>
-          {TITLE}
+          {DOWNLOAD_DIALOG_COPY.title}
         </h2>
-        <p>Sign in to raven to download from it, then download again.</p>
+        <p>{DOWNLOAD_DIALOG_COPY.signInFirst}</p>
         <div className={styles.actions}>
-          <Button onClick={close}>Cancel</Button>
+          <Button onClick={close}>{COMMON_COPY.cancel}</Button>
           <Button tone="primary" onClick={signIn}>
-            Sign in
+            {COMMON_COPY.signIn}
           </Button>
         </div>
       </div>
@@ -210,21 +235,26 @@ const AccountDialog = ({ ask, onClose }: AccountDialogProps) => {
   )
 }
 
+type DialogViewProps = { ask: DownloadAsk; onClose: () => void }
+
+type ReadyViewProps = DialogViewProps
+
+/** The ready dialog reads the files the status lists, which only a ready status holds. */
+const ReadyView = ({ ask, onClose }: ReadyViewProps) =>
+  ask.status.kind === DOWNLOAD_ASK_KINDS.ready && (
+    <ReadyDialog ask={ask} status={ask.status} onClose={onClose} />
+  )
+
+const DIALOGS = {
+  [DOWNLOAD_ASK_KINDS.ready]: ReadyView,
+  [DOWNLOAD_ASK_KINDS.locked]: LockedDialog,
+  [DOWNLOAD_ASK_KINDS.account]: AccountDialog,
+} as const satisfies Record<DownloadAsk['status']['kind'], ComponentType<DialogViewProps>>
+
 type DownloadDialogProps = { ask: DownloadAsk; onClose: () => void }
 
 /** What Raven asks before it downloads a title, from a Download button or a link. */
 export const DownloadDialog = ({ ask, onClose }: DownloadDialogProps) => {
-  const { status } = ask
-  switch (status.kind) {
-    case DOWNLOAD_ASK_KINDS.ready:
-      return <ReadyDialog ask={ask} status={status} onClose={onClose} />
-    case DOWNLOAD_ASK_KINDS.locked:
-      return <LockedDialog ask={ask} onClose={onClose} />
-    case DOWNLOAD_ASK_KINDS.account:
-      return <AccountDialog ask={ask} onClose={onClose} />
-    default: {
-      const unreachable: never = status
-      return unreachable
-    }
-  }
+  const Dialog = DIALOGS[ask.status.kind]
+  return <Dialog ask={ask} onClose={onClose} />
 }

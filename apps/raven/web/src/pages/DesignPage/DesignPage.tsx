@@ -5,6 +5,7 @@ import { ColourSection } from '@/pages/DesignPage/ColourSection'
 import { ComponentsSection } from '@/pages/DesignPage/ComponentsSection'
 import { ContentSection } from '@/pages/DesignPage/ContentSection'
 import { SECTIONS, sectionNumber } from '@/pages/DesignPage/contents'
+import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import { FormsSection } from '@/pages/DesignPage/FormsSection'
 import { LogoSection } from '@/pages/DesignPage/LogoSection'
 import { TextSection } from '@/pages/DesignPage/TextSection'
@@ -21,16 +22,13 @@ export const DesignPage = () => (
   <article className={styles.page} aria-labelledby="design-title">
     <BackButton fallback={HOME} />
     <header className={styles.header}>
-      <p className={styles.eyebrow}>Design system</p>
+      <p className={styles.eyebrow}>{DESIGN_COPY.page.eyebrow}</p>
       <h1 id="design-title" className={styles.title}>
-        Design
+        {DESIGN_COPY.page.title}
       </h1>
-      <p className={styles.lede}>
-        The logo, the palette, the tokens, every HTML element and every shared component, as the app
-        draws them.
-      </p>
+      <p className={styles.lede}>{DESIGN_COPY.page.lede}</p>
     </header>
-    <nav aria-label="On this page" className={styles.contents}>
+    <nav aria-label={DESIGN_COPY.page.contents} className={styles.contents}>
       <ol className={styles.contentsList}>
         {SECTIONS.map((section) => (
           <li key={section.id}>

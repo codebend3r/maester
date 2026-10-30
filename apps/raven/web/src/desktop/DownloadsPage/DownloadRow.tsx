@@ -7,14 +7,24 @@ import {
   KEYS,
 } from '@raven/core'
 import { Button, type IconName, UNLOCK_SECRETS, UnlockDialog } from '@raven/ui'
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
+import {
+  type ComponentType,
+  type KeyboardEvent,
+  type RefObject,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react'
 import { handled } from '@/desktop/handled'
 import { useChangeDownloads } from '@/desktop/downloadsApi'
+import { DOWNLOAD_ROW_COPY } from '@/desktop/DownloadsPage/copy'
 import { useOpenReply } from '@/desktop/openReply'
 import { watchedLabel } from '@/desktop/watched'
 import { api } from '@/lib/api'
 import { useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/DownloadsPage/DownloadsPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** What a row shows: the download, or the question before it is deleted. */
 const ROW_MODES = { view: 'view', delete: 'delete' } as const
@@ -28,10 +38,10 @@ type RowAction = (typeof ROW_ACTIONS)[keyof typeof ROW_ACTIONS]
 
 /** Each action's button: its words and its icon. */
 const ACTION_BUTTONS = {
-  play: { label: 'Play', icon: 'play' },
-  pause: { label: 'Pause', icon: 'pause' },
-  resume: { label: 'Resume', icon: 'download' },
-  retry: { label: 'Retry', icon: 'rescan' },
+  play: { label: COMMON_COPY.play, icon: 'play' },
+  pause: { label: COMMON_COPY.pause, icon: 'pause' },
+  resume: { label: DOWNLOAD_ROW_COPY.resume, icon: 'download' },
+  retry: { label: DOWNLOAD_ROW_COPY.retry, icon: 'rescan' },
 } as const satisfies Record<RowAction, { label: string; icon: IconName }>
 
 const actionOf = (status: DownloadStatus): RowAction => {
@@ -75,9 +85,6 @@ const MINUTE_MS = 60_000
 /** How often the line is read again: well inside a minute, so it is never a minute behind. */
 const DELETES_TICK_MS = 10_000
 
-const deletesInWords = (minutes: number): string =>
-  minutes === 1 ? 'Deletes in 1 minute' : `Deletes in ${minutes} minutes`
-
 type DeletesInProps = { at: number }
 
 /** How long until a download set to delete once watched goes, in whole minutes rounded up. */
@@ -90,51 +97,185 @@ const DeletesIn = ({ at }: DeletesInProps) => {
   }, [])
 
   const minutes = Math.ceil((at - now) / MINUTE_MS)
-  return minutes > 0 && <span>{deletesInWords(minutes)}</span>
+  return minutes > 0 && <span>{DOWNLOAD_ROW_COPY.deletesIn(minutes)}</span>
 }
 
 type StatusLineProps = { view: DownloadView; textId: string }
 
+type DownloadingLineProps = StatusLineProps
+
+const DownloadingLine = ({ view, textId }: DownloadingLineProps) =>
+  view.status.kind === DOWNLOAD_STATUS_KINDS.downloading && (
+    <>
+      <span id={textId}>
+        {DOWNLOAD_ROW_COPY.downloadedOf({ bytes: view.status.bytes, size: view.size })}
+      </span>
+      <progress
+        className={styles.gauge}
+        max={view.size}
+        value={view.status.bytes}
+        aria-labelledby={textId}
+      />
+    </>
+  )
+
+const QueuedLine = () => <span>{DOWNLOAD_ROW_COPY.waiting}</span>
+
+type PausedLineProps = StatusLineProps
+
+const PausedLine = ({ view }: PausedLineProps) =>
+  view.status.kind === DOWNLOAD_STATUS_KINDS.paused && (
+    <span>{view.status.message ?? DOWNLOAD_ROW_COPY.paused}</span>
+  )
+
+type FailedLineProps = StatusLineProps
+
+const FailedLine = ({ view }: FailedLineProps) =>
+  view.status.kind === DOWNLOAD_STATUS_KINDS.failed && (
+    <span>{DOWNLOAD_ROW_COPY.failed(view.status.message)}</span>
+  )
+
+type ReadyLineProps = StatusLineProps
+
+const ReadyLine = ({ view }: ReadyLineProps) => (
+  <>
+    <progress
+      className={styles.gauge}
+      max={1}
+      value={view.watched ?? 0}
+      aria-label={watchedLabel(view.watched)}
+    />
+    {view.deletesAt !== null && <DeletesIn at={view.deletesAt} />}
+  </>
+)
+
 /** Where a download stands: its progress, its wait, why it stopped, or how much of it was watched. */
+const STATUS_LINES = {
+  [DOWNLOAD_STATUS_KINDS.downloading]: DownloadingLine,
+  [DOWNLOAD_STATUS_KINDS.queued]: QueuedLine,
+  [DOWNLOAD_STATUS_KINDS.paused]: PausedLine,
+  [DOWNLOAD_STATUS_KINDS.failed]: FailedLine,
+  [DOWNLOAD_STATUS_KINDS.ready]: ReadyLine,
+} as const satisfies Record<DownloadStatus['kind'], ComponentType<StatusLineProps>>
+
+/** Where a download stands, by its status. */
 const StatusLine = ({ view, textId }: StatusLineProps) => {
-  const { status } = view
-  switch (status.kind) {
-    case DOWNLOAD_STATUS_KINDS.downloading:
-      return (
-        <>
-          <span id={textId}>{`${formatBytes(status.bytes)} of ${formatBytes(view.size)}`}</span>
-          <progress
-            className={styles.gauge}
-            max={view.size}
-            value={status.bytes}
-            aria-labelledby={textId}
-          />
-        </>
-      )
-    case DOWNLOAD_STATUS_KINDS.queued:
-      return <span>Waiting</span>
-    case DOWNLOAD_STATUS_KINDS.paused:
-      return <span>{status.message ?? 'Paused'}</span>
-    case DOWNLOAD_STATUS_KINDS.failed:
-      return <span>{`Failed: ${status.message}`}</span>
-    case DOWNLOAD_STATUS_KINDS.ready:
-      return (
-        <>
-          <progress
-            className={styles.gauge}
-            max={1}
-            value={view.watched ?? 0}
-            aria-label={watchedLabel(view.watched)}
-          />
-          {view.deletesAt !== null && <DeletesIn at={view.deletesAt} />}
-        </>
-      )
-    default: {
-      const unreachable: never = status
-      return unreachable
-    }
-  }
+  const Line = STATUS_LINES[view.status.kind]
+  return <Line view={view} textId={textId} />
 }
+
+type ButtonRef = RefObject<HTMLButtonElement | null>
+
+type RowViewProps = {
+  view: DownloadView
+  ids: { label: string; status: string; question: string }
+  action: RowAction
+  isDeleting: boolean
+  deleteButton: ButtonRef
+  cancelButton: ButtonRef
+  onAct: () => void
+  onRemove: () => void
+  onAsk: () => void
+  onBack: () => void
+  onBackKey: (event: KeyboardEvent) => void
+  onAutoDelete: (shouldAutoDelete: boolean) => void
+}
+
+type AskingRowProps = RowViewProps
+
+/** The question before the download is deleted. */
+const AskingRow = ({
+  view,
+  ids,
+  isDeleting,
+  cancelButton,
+  onRemove,
+  onBack,
+  onBackKey,
+}: AskingRowProps) => (
+  <div className={styles.asking}>
+    <p id={ids.question} className={styles.question}>
+      {DOWNLOAD_ROW_COPY.deleteQuestion({ label: view.label, bytes: bytesOnDisk(view) })}
+    </p>
+    <div className={styles.confirm}>
+      {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}
+      <Button
+        tone="danger"
+        aria-describedby={ids.question}
+        aria-disabled={isDeleting}
+        onClick={onRemove}
+        onKeyDown={onBackKey}
+      >
+        {COMMON_COPY.delete}
+      </Button>
+      <Button ref={cancelButton} onClick={onBack} onKeyDown={onBackKey}>
+        {COMMON_COPY.cancel}
+      </Button>
+    </div>
+  </div>
+)
+
+type ViewingRowProps = RowViewProps
+
+/** The download: what it is, where it stands, and what can be done with it. */
+const ViewingRow = ({
+  view,
+  ids,
+  action,
+  deleteButton,
+  onAct,
+  onAsk,
+  onAutoDelete,
+}: ViewingRowProps) => {
+  const { label } = view
+  const actionButton = ACTION_BUTTONS[action]
+  return (
+    <div className={styles.row}>
+      <span id={ids.label} className={styles.label}>
+        {label}
+      </span>
+      <span className={styles.size}>{formatBytes(view.size)}</span>
+      <p className={styles.status}>
+        <StatusLine view={view} textId={ids.status} />
+      </p>
+      <div className={styles.actions}>
+        <Button
+          className={styles.act}
+          tone={action === ROW_ACTIONS.play ? 'primary' : 'quiet'}
+          icon={actionButton.icon}
+          aria-label={DOWNLOAD_ROW_COPY.actionLabel({ action: actionButton.label, label })}
+          onClick={onAct}
+        >
+          {actionButton.label}
+        </Button>
+        <label className={styles.auto}>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={view.shouldAutoDelete}
+            aria-checked={view.shouldAutoDelete}
+            aria-describedby={ids.label}
+            onChange={(event) => onAutoDelete(event.target.checked)}
+          />
+          {COMMON_COPY.deleteOnceWatched}
+        </label>
+        <Button
+          ref={deleteButton}
+          className={styles.remove}
+          tone="ghost"
+          icon="trash"
+          aria-label={DOWNLOAD_ROW_COPY.deleteLabel(label)}
+          onClick={onAsk}
+        />
+      </div>
+    </div>
+  )
+}
+
+const ROW_VIEWS = {
+  [ROW_MODES.view]: ViewingRow,
+  [ROW_MODES.delete]: AskingRow,
+} as const satisfies Record<RowMode, ComponentType<RowViewProps>>
 
 type DownloadRowProps = {
   view: DownloadView
@@ -156,9 +297,9 @@ export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
   const cancelButton = useRef<HTMLButtonElement>(null)
   const previousMode = useRef<RowMode>(mode)
   const ids = { label: useId(), status: useId(), question: useId() }
-  const { downloadId, label } = view
+  const { downloadId } = view
   const action = actionOf(view.status)
-  const actionButton = ACTION_BUTTONS[action]
+  const RowView = ROW_VIEWS[mode]
 
   // Focus follows the swap: into the question, then back to Delete, unless the person moved on.
   useEffect(() => {
@@ -210,84 +351,32 @@ export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
 
   return (
     <li ref={row} className={styles.card}>
-      {mode === ROW_MODES.delete ? (
-        <div className={styles.asking}>
-          <p id={ids.question} className={styles.question}>
-            {`Delete ${label}? ${formatBytes(bytesOnDisk(view))} will be freed.`}
-          </p>
-          <div className={styles.confirm}>
-            {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}
-            <Button
-              tone="danger"
-              aria-describedby={ids.question}
-              aria-disabled={isDeleting}
-              onClick={() => handled(remove())}
-              onKeyDown={backOnEscape}
-            >
-              Delete
-            </Button>
-            <Button
-              ref={cancelButton}
-              onClick={() => setMode(ROW_MODES.view)}
-              onKeyDown={backOnEscape}
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className={styles.row}>
-          <span id={ids.label} className={styles.label}>
-            {label}
-          </span>
-          <span className={styles.size}>{formatBytes(view.size)}</span>
-          <p className={styles.status}>
-            <StatusLine view={view} textId={ids.status} />
-          </p>
-          <div className={styles.actions}>
-            <Button
-              className={styles.act}
-              tone={action === ROW_ACTIONS.play ? 'primary' : 'quiet'}
-              icon={actionButton.icon}
-              aria-label={`${actionButton.label} ${label}`}
-              onClick={() => handled(act())}
-            >
-              {actionButton.label}
-            </Button>
-            <label className={styles.auto}>
-              <input
-                type="checkbox"
-                role="switch"
-                checked={view.shouldAutoDelete}
-                aria-checked={view.shouldAutoDelete}
-                aria-describedby={ids.label}
-                onChange={(event) =>
-                  handled(
-                    change({
-                      type: DESKTOP_REQUESTS.setDownloadAutoDelete,
-                      downloadId,
-                      shouldAutoDelete: event.target.checked,
-                    }),
-                  )
-                }
-              />
-              Delete once watched
-            </label>
-            <Button
-              ref={deleteButton}
-              className={styles.remove}
-              tone="ghost"
-              icon="trash"
-              aria-label={`Delete ${label}`}
-              onClick={() => setMode(ROW_MODES.delete)}
-            />
-          </div>
-        </div>
-      )}
+      <RowView
+        view={view}
+        ids={ids}
+        action={action}
+        isDeleting={isDeleting}
+        deleteButton={deleteButton}
+        cancelButton={cancelButton}
+        onAct={() => handled(act())}
+        onRemove={() => handled(remove())}
+        onAsk={() => setMode(ROW_MODES.delete)}
+        onBack={() => setMode(ROW_MODES.view)}
+        onBackKey={backOnEscape}
+        onAutoDelete={(shouldAutoDelete) =>
+          handled(
+            change({
+              type: DESKTOP_REQUESTS.setDownloadAutoDelete,
+              downloadId,
+              shouldAutoDelete,
+            }),
+          )
+        }
+      />
       {isUnlocking && (
         <UnlockDialog
           secret={UNLOCK_SECRETS.pin}
-          hint="This download is in a locked library. Enter the PIN to go on downloading it."
+          hint={DOWNLOAD_ROW_COPY.lockedHint}
           unlock={(entered) => api.unlock(entered)}
           onUnlocked={() => {
             setIsUnlocking(false)

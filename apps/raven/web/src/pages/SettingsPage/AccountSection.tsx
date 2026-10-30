@@ -4,8 +4,10 @@ import { Button } from '@raven/ui'
 import { useSignOut } from '@/lib/useSignOut'
 import { STATUS_NAMES } from '@/pages/SettingsPage/memberStatus'
 import { Titled } from '@/pages/SettingsPage/Titled'
+import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import accountStyles from '@/pages/SettingsPage/AccountSection.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type AccountSectionProps = { account: Account }
 
@@ -18,15 +20,15 @@ export const AccountSection = ({ account }: AccountSectionProps) => {
     <section className={styles.section} aria-labelledby={headingId}>
       <header className={styles.sectionHead}>
         <h2 id={headingId} className={styles.heading}>
-          <Titled icon="check">Account</Titled>
+          <Titled icon="check">{COMMON_COPY.account}</Titled>
         </h2>
-        <p className={styles.help}>The account this browser is signed in to.</p>
+        <p className={styles.help}>{SETTINGS_COPY.account.help}</p>
       </header>
       <div className={accountStyles.account}>
         <dl className={accountStyles.facts}>
-          <dt>Email</dt>
+          <dt>{SETTINGS_COPY.account.email}</dt>
           <dd>{account.email}</dd>
-          <dt>Access</dt>
+          <dt>{SETTINGS_COPY.account.access}</dt>
           <dd>{STATUS_NAMES[account.status]}</dd>
         </dl>
         <Button
@@ -34,12 +36,13 @@ export const AccountSection = ({ account }: AccountSectionProps) => {
           disabled={end.isPending}
           onClick={() => end.mutate()}
         >
-          {end.isPending ? 'Signing out' : 'Sign out'}
+          {end.isPending ? COMMON_COPY.signingOut : COMMON_COPY.signOut}
         </Button>
       </div>
       {end.isError && (
         <p className={styles.error} role="alert">
-          Could not sign out: {end.error.message}
+          {SETTINGS_COPY.account.signOutFailed}
+          {end.error.message}
         </p>
       )}
     </section>

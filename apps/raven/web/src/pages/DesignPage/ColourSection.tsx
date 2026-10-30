@@ -8,6 +8,8 @@ import {
 } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { useTheme } from '@/stores/theme'
+import { SECTION_IDS } from '@/pages/DesignPage/contents'
+import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import { DesignSection } from '@/pages/DesignPage/DesignSection'
 import styles from '@/pages/DesignPage/ColourSection.module.scss'
 
@@ -36,6 +38,8 @@ const THEME_CHIPS = [
 
 /** Body text needs 4.5:1 (WCAG AA); a ratio under it is marked as falling short. */
 const BODY_TEXT_RATIO = 4.5
+
+const COPY = DESIGN_COPY.colour
 
 const ratio = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
 
@@ -79,9 +83,9 @@ type ContrastOfProps = { value: string; against: string }
 /** How a colour reads on a ground: its ratio, and whether that is enough for body text. */
 const contrastOf = ({ value, against }: ContrastOfProps) => {
   const measured = contrastRatio({ foreground: value, background: against })
-  if (measured == null) return { text: 'Varies', className: styles.varies }
+  if (measured == null) return { text: COPY.varies, className: styles.varies }
   return {
-    text: `${ratio.format(measured)}:1`,
+    text: COPY.ratio(ratio.format(measured)),
     className: measured >= BODY_TEXT_RATIO ? styles.passes : styles.falls,
   }
 }
@@ -92,13 +96,10 @@ type ThemeStripProps = { worn: ThemeId }
 const ThemeStrip = ({ worn }: ThemeStripProps) => (
   <div className={styles.themes}>
     <div className={styles.themesHeader}>
-      <h3 className={styles.themesTitle}>Themes</h3>
-      <p className={styles.note}>
-        The same names, seven sets of values. Each tile wears its own theme; the round button at the
-        top of every page picks one, and this device keeps it.
-      </p>
+      <h3 className={styles.themesTitle}>{COPY.themes}</h3>
+      <p className={styles.note}>{COPY.themesNote}</p>
     </div>
-    <ul className={styles.themeList} aria-label="Themes">
+    <ul className={styles.themeList} aria-label={COPY.themes}>
       {THEMES.map((option) => {
         const isWorn = option.id === worn
         return (
@@ -122,13 +123,13 @@ const ThemeStrip = ({ worn }: ThemeStripProps) => (
             <span className={styles.themeSample} aria-hidden="true">
               <span className={styles.themePlay}>
                 <Icon name="play" size={14} />
-                Play
+                {COPY.play}
               </span>
               <span className={styles.themeTrack}>
                 <span className={styles.themeProgress} />
               </span>
             </span>
-            {isWorn && <span className={styles.worn}>Worn now</span>}
+            {isWorn && <span className={styles.worn}>{COPY.wornNow}</span>}
           </li>
         )
       })}
@@ -156,13 +157,10 @@ export const ColourSection = ({ tokens }: ColourSectionProps) => {
   })
   const isDefault = theme === DEFAULT_THEME
   return (
-    <DesignSection
-      id="colour"
-      intro="A godswood at night for the ground, bone-white bark for text, and red leaves kept for where you stopped watching and the one action a screen is for. Contrast is the WCAG ratio against each ground. Every value and ratio is the theme worn now; the notes, written for Verdigris, show in it alone."
-    >
+    <DesignSection id={SECTION_IDS.colour} intro={COPY.intro}>
       <div className={styles.body}>
         {band.length > 0 && (
-          <ul className={styles.band} aria-label="Grounds">
+          <ul className={styles.band} aria-label={COPY.grounds}>
             {band.map((entry) => (
               <li
                 key={entry.name}
@@ -185,7 +183,7 @@ export const ColourSection = ({ tokens }: ColourSectionProps) => {
             ))}
           </ul>
         )}
-        <ul className={styles.swatches} aria-label="Every colour">
+        <ul className={styles.swatches} aria-label={COPY.everyColour}>
           {colours.map((token) => {
             const value = valueOf(token)
             return (
@@ -205,7 +203,7 @@ export const ColourSection = ({ tokens }: ColourSectionProps) => {
                       const contrast = contrastOf({ value, against: ground.value })
                       return (
                         <div key={ground.name} className={`${styles.ratio} ${contrast.className}`}>
-                          <dt>On {ground.on}</dt>
+                          <dt>{COPY.on(ground.on)}</dt>
                           <dd>{contrast.text}</dd>
                         </div>
                       )

@@ -30,7 +30,7 @@ import { AlbumPage } from '@/pages/AlbumPage/AlbumPage'
 import { ArtistPage } from '@/pages/ArtistPage/ArtistPage'
 import { NowPlayingPage } from '@/pages/NowPlayingPage/NowPlayingPage'
 import { PlaylistPage } from '@/pages/PlaylistPage/PlaylistPage'
-import { NOW_PLAYING_PATH } from '@/lib/music'
+import { NOW_PLAYING_PATH, PLAYLIST_ROUTE } from '@/lib/music'
 import { GetPage } from '@/pages/GetPage/GetPage'
 import { CheckEmailPage } from '@/pages/CheckEmailPage/CheckEmailPage'
 import { ConfirmPage } from '@/pages/ConfirmPage/ConfirmPage'
@@ -66,7 +66,7 @@ export const AppRoutes = () => {
             <Route path="people/:id" element={<PersonPage />} />
             <Route path="albums/:id" element={<AlbumPage />} />
             <Route path="artists/:id" element={<ArtistPage />} />
-            <Route path="playlists/:id" element={<PlaylistPage />} />
+            <Route path={PLAYLIST_ROUTE} element={<PlaylistPage />} />
             <Route path={NOW_PLAYING_PATH} element={<NowPlayingPage />} />
             <Route path="favourites" element={<FavouritesPage />} />
             <Route path="streams" element={<StreamsPage />} />

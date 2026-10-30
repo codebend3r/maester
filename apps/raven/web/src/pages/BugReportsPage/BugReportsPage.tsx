@@ -10,7 +10,7 @@ import {
   plural,
 } from '@raven/core'
 import { Button } from '@raven/ui'
-import { useId, useState } from 'react'
+import { type ComponentType, useId, useState } from 'react'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
@@ -18,8 +18,10 @@ import { copyText } from '@/lib/clipboard'
 import { useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
 import { bugReportsQuery } from '@/lib/queries'
+import { BUG_REPORTS_COPY } from '@/pages/BugReportsPage/copy'
 import styles from '@/pages/BugReportsPage/BugReportsPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
+import { COMMON_COPY } from '@/lib/copy'
 
 const STATUS_LABELS = {
   [BUG_REPORT_STATUSES.new]: 'New',
@@ -35,15 +37,18 @@ const reporterOf = (report: BugReport): string => report.reporter.email ?? repor
 /** Everything a report holds as plain text: a few lines to read, then the diagnostics as sent. */
 const debugText = (report: BugReport): string =>
   [
-    `raven bug report #${report.id}`,
-    `Status: ${STATUS_LABELS[report.status]}`,
-    `Reported: ${report.createdAt}`,
-    `Reported by: ${reporterOf(report)} (account ${report.reporter.accountId})`,
-    `Title: ${report.title}`,
-    `Problem: ${report.summary}`,
-    `Media id: ${report.mediaId ?? 'none'}`,
+    BUG_REPORTS_COPY.debug.heading(report.id),
+    BUG_REPORTS_COPY.debug.status(STATUS_LABELS[report.status]),
+    BUG_REPORTS_COPY.debug.reported(report.createdAt),
+    BUG_REPORTS_COPY.debug.reportedBy({
+      reporter: reporterOf(report),
+      accountId: report.reporter.accountId,
+    }),
+    BUG_REPORTS_COPY.debug.title(report.title),
+    BUG_REPORTS_COPY.debug.problem(report.summary),
+    BUG_REPORTS_COPY.debug.mediaId(report.mediaId),
     '',
-    'Diagnostics:',
+    BUG_REPORTS_COPY.debug.diagnostics,
     JSON.stringify(report.diagnostics, null, 2),
   ].join('\n')
 
@@ -55,7 +60,9 @@ const MODE_LABELS = {
 
 /** The ways that were tried and failed, in order; null when none got as far as starting. */
 const triedWords = (modes: readonly PlaybackMode[]): string | null =>
-  modes.length === 0 ? null : modes.map((mode) => MODE_LABELS[mode]).join(', then ')
+  modes.length === 0
+    ? null
+    : modes.map((mode) => MODE_LABELS[mode]).join(BUG_REPORTS_COPY.triedSeparator)
 
 /** The facts worth a glance before the full diagnostics; none from a report this page cannot read. */
 const glanceFacts = (report: BugReport): Array<{ name: string; value: string }> => {
@@ -63,15 +70,18 @@ const glanceFacts = (report: BugReport): Array<{ name: string; value: string }> 
   if (!isPlaybackDiagnostics(diagnostics)) return []
   const tried = triedWords(diagnostics.playback?.attempts.map(({ mode }) => mode) ?? [])
   return [
-    { name: 'File', value: diagnostics.media?.fileName ?? 'Not a library file' },
-    { name: 'Tried', value: tried ?? 'Nothing, it could not start' },
-    { name: 'Browser', value: diagnostics.device.userAgent },
+    {
+      name: COMMON_COPY.file,
+      value: diagnostics.media?.fileName ?? BUG_REPORTS_COPY.notALibraryFile,
+    },
+    { name: BUG_REPORTS_COPY.tried, value: tried ?? BUG_REPORTS_COPY.triedNothing },
+    { name: BUG_REPORTS_COPY.browser, value: diagnostics.device.userAgent },
   ]
 }
 
 const COPY_FEEDBACK = {
-  copied: 'Debug info copied.',
-  failed: 'Could not copy. Open Debug info and copy it from there.',
+  copied: BUG_REPORTS_COPY.copied,
+  failed: BUG_REPORTS_COPY.copyFailed,
 } as const
 
 type CopyFeedback = (typeof COPY_FEEDBACK)[keyof typeof COPY_FEEDBACK]
@@ -115,15 +125,16 @@ const ReportRow = ({ report }: ReportRowProps) => {
       <h2 className={styles.title}>{report.title}</h2>
       <p className={styles.meta}>
         <time dateTime={report.createdAt}>{when.format(new Date(report.createdAt))}</time>
-        {' by '}
+        {BUG_REPORTS_COPY.by}
         {reporterOf(report)}
       </p>
       <p className={styles.problem}>
-        {report.summary === '' ? 'No problem was listed.' : report.summary}
+        {report.summary === '' ? BUG_REPORTS_COPY.noProblem : report.summary}
       </p>
       <div className={styles.status}>
         <label htmlFor={statusId}>
-          Status<span className="visually-hidden"> of report {report.id}</span>
+          {BUG_REPORTS_COPY.status}
+          <span className="visually-hidden">{BUG_REPORTS_COPY.ofReport(report.id)}</span>
         </label>
         <select
           id={statusId}
@@ -157,7 +168,7 @@ const ReportRow = ({ report }: ReportRowProps) => {
             copy().catch(() => setCopied(COPY_FEEDBACK.failed))
           }}
         >
-          Copy debug info
+          {BUG_REPORTS_COPY.copyDebugInfo}
         </Button>
         <p className={styles.feedback} aria-live="polite">
           {copied}
@@ -165,11 +176,12 @@ const ReportRow = ({ report }: ReportRowProps) => {
       </div>
       {status.isError && (
         <p className={styles.error} role="alert">
-          Could not change its status: {status.error.message}
+          {BUG_REPORTS_COPY.statusFailed}
+          {status.error.message}
         </p>
       )}
       <details className={styles.details}>
-        <summary>Debug info</summary>
+        <summary>{BUG_REPORTS_COPY.debugInfo}</summary>
         <pre className={styles.json}>{JSON.stringify(report.diagnostics, null, 2)}</pre>
       </details>
     </li>
@@ -178,7 +190,7 @@ const ReportRow = ({ report }: ReportRowProps) => {
 
 /** Two cards on their way. */
 const RowsSkeleton = () => (
-  <Loading label="Looking for bug reports">
+  <Loading label={BUG_REPORTS_COPY.loading}>
     <ul className={styles.list}>
       {['first', 'second'].map((row) => (
         <li key={row} className={styles.rowSkeleton}>
@@ -191,42 +203,49 @@ const RowsSkeleton = () => (
 )
 
 const summaryOf = (reports: readonly BugReport[]): string => {
-  if (reports.length === 0) return 'Nothing has been reported'
+  if (reports.length === 0) return BUG_REPORTS_COPY.nothingReported
   const fresh = reports.filter(({ status }) => status === BUG_REPORT_STATUSES.new).length
-  return `${plural({ n: reports.length, one: 'report', many: 'reports' })}, ${fresh} new`
+  return BUG_REPORTS_COPY.summary({
+    reports: plural({
+      n: reports.length,
+      one: BUG_REPORTS_COPY.report,
+      many: BUG_REPORTS_COPY.reports,
+    }),
+    fresh,
+  })
 }
 
-/**
- * `/reports`: what viewers sent with Report this error when a video would
- * not play, newest first, for the admin to work through. It is for the
- * admin, or the owner once accounts are on, so it asks only while the
- * viewer may manage, and says so otherwise.
- */
-export const BugReportsPage = () => {
-  const { mode, canManage } = useManagement()
-  const reports = useQuery({ ...bugReportsQuery, enabled: canManage })
+type BugReportsViewProps = { mode: ReturnType<typeof useManagement>['mode'] }
 
-  if (!canManage) {
-    return (
-      <ManagersOnly
-        mode={mode}
-        name="Bug reports"
-        forAdmin="read what viewers reported"
-        forOwner="read what viewers reported"
-      />
-    )
-  }
+type NotManagingProps = BugReportsViewProps
 
+const NotManaging = ({ mode }: NotManagingProps) => (
+  <ManagersOnly
+    mode={mode}
+    name={BUG_REPORTS_COPY.title}
+    forAdmin={BUG_REPORTS_COPY.managersOnlyFor}
+    forOwner={BUG_REPORTS_COPY.managersOnlyFor}
+  />
+)
+
+/** The reports, newest first, with how many there are and how many are new. */
+const ReportsList = () => {
+  const reports = useQuery(bugReportsQuery)
   return (
     <section className={styles.page}>
       <header className={styles.header}>
         <BackButton fallback={HOME} className={styles.back} />
         <hgroup className={styles.heading}>
-          <PageTitle icon="alert">Bug reports</PageTitle>
+          <PageTitle icon="alert">{BUG_REPORTS_COPY.title}</PageTitle>
           {reports.data && <p className={styles.summary}>{summaryOf(reports.data)}</p>}
         </hgroup>
       </header>
-      {reports.isError && <p role="alert">The server did not answer: {reports.error.message}</p>}
+      {reports.isError && (
+        <p role="alert">
+          {BUG_REPORTS_COPY.serverDidNotAnswer}
+          {reports.error.message}
+        </p>
+      )}
       {reports.isPending && <RowsSkeleton />}
       {reports.data && reports.data.length > 0 && (
         <ul className={styles.list}>
@@ -237,4 +256,24 @@ export const BugReportsPage = () => {
       )}
     </section>
   )
+}
+
+const MANAGE_STATES = { managing: 'managing', refused: 'refused' } as const
+type ManageState = (typeof MANAGE_STATES)[keyof typeof MANAGE_STATES]
+
+const BUG_REPORTS_VIEWS = {
+  [MANAGE_STATES.managing]: ReportsList,
+  [MANAGE_STATES.refused]: NotManaging,
+} as const satisfies Record<ManageState, ComponentType<BugReportsViewProps>>
+
+/**
+ * `/reports`: what viewers sent with Report this error when a video would
+ * not play, newest first, for the admin to work through. It is for the
+ * admin, or the owner once accounts are on, so it asks only while the
+ * viewer may manage, and says so otherwise.
+ */
+export const BugReportsPage = () => {
+  const { mode, canManage } = useManagement()
+  const View = BUG_REPORTS_VIEWS[canManage ? MANAGE_STATES.managing : MANAGE_STATES.refused]
+  return <View mode={mode} />
 }

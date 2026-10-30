@@ -14,7 +14,7 @@ import {
 } from '@raven/core'
 import { type NativePlayer, type PlayerServices, useUnlockPrompt } from '@raven/ui/headless'
 import { type Query, useQuery } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { DesktopClient } from '@/desktop/client'
 import { handled } from '@/desktop/handled'
@@ -22,7 +22,7 @@ import { useIsOutputFixed } from '@/desktop/output'
 import { NativePlaying } from '@/desktop/player/NativePlaying'
 import { PlayerMessage } from '@/desktop/player/PlayerMessage'
 import { fileProgressFor, windowPartsFor } from '@/desktop/player/playerServices'
-import { useChosenEngine } from '@/desktop/player/useChosenEngine'
+import { type Chosen, useChosenEngine } from '@/desktop/player/useChosenEngine'
 import { useLeaveSignal } from '@/desktop/player/useLeaveSignal'
 import { useMenuNext } from '@/desktop/player/useMenuNext'
 import { CONNECTION_STATUSES } from '@/desktop/playerConnection'
@@ -123,6 +123,56 @@ const useLinkedNext = ({ next, handed }: UseLinkedNextProps): PlayerServices['ti
     label: mediaLabel(media),
   }
 }
+
+/** Whether the player has a title from main to play, or a line to show while it has none. */
+const VIEW_KINDS = { playing: 'playing', message: 'message' } as const
+
+type ViewKind = (typeof VIEW_KINDS)[keyof typeof VIEW_KINDS]
+
+type TitleMessageOfProps = { isError: boolean; isFetching: boolean; reply: DesktopReply | null }
+
+/** What the page says while it holds no title: null while main is still answering. */
+const titleMessageOf = ({ isError, isFetching, reply }: TitleMessageOfProps): string | null => {
+  if (isError) return WATCH_COPY.unreadable
+  if (reply === null || reply.type === DESKTOP_REPLIES.title || isFetching) return null
+  if (reply.type === DESKTOP_REPLIES.titleRefused || reply.type === DESKTOP_REPLIES.refused) {
+    return reply.message
+  }
+  return WATCH_COPY.unreadable
+}
+
+type TitleViewProps = {
+  held: Held | null
+  services: PlayerServices
+  player: NativePlayer
+  message: string | null
+  onLost: () => void
+}
+
+type HeldTitleProps = TitleViewProps
+
+const HeldTitle = ({ held, services, player, onLost }: HeldTitleProps) =>
+  held !== null && (
+    <NativePlaying
+      key={held.load}
+      services={services}
+      player={player}
+      source={held.source}
+      resumeAt={held.resumeAt}
+      onLost={onLost}
+    />
+  )
+
+type TitleMessageProps = TitleViewProps
+
+const TitleMessage = ({ services, message }: TitleMessageProps) => (
+  <PlayerMessage message={message} fallback={services.title.backTo} />
+)
+
+const TITLE_VIEWS = {
+  [VIEW_KINDS.playing]: HeldTitle,
+  [VIEW_KINDS.message]: TitleMessage,
+} as const satisfies Record<ViewKind, ComponentType<TitleViewProps>>
 
 type WatchTitleProps = {
   services: PlayerServices
@@ -261,28 +311,70 @@ const WatchTitle = ({
   }
   useMenuNext({ menu, next: nextTitle })
 
-  if (held !== null) {
-    return (
-      <NativePlaying
-        key={held.load}
-        services={played}
-        player={player}
-        source={held.source}
-        resumeAt={held.resumeAt}
-        onLost={onLost}
-      />
-    )
-  }
-  const { backTo } = services.title
-  if (title.isError) return <PlayerMessage message={WATCH_COPY.unreadable} fallback={backTo} />
-  if (reply === null || reply.type === DESKTOP_REPLIES.title || title.isFetching) {
-    return <PlayerMessage message={null} fallback={backTo} />
-  }
-  if (reply.type === DESKTOP_REPLIES.titleRefused || reply.type === DESKTOP_REPLIES.refused) {
-    return <PlayerMessage message={reply.message} fallback={backTo} />
-  }
-  return <PlayerMessage message={WATCH_COPY.unreadable} fallback={backTo} />
+  const View = TITLE_VIEWS[held === null ? VIEW_KINDS.message : VIEW_KINDS.playing]
+  return (
+    <View
+      held={held}
+      services={played}
+      player={player}
+      message={titleMessageOf({ isError: title.isError, isFetching: title.isFetching, reply })}
+      onLost={onLost}
+    />
+  )
 }
+
+type EngineMessageOfProps = { chosen: Chosen | null; isLost: boolean }
+
+/** Why mpv cannot play the title, or null while main is still choosing the engine. */
+const engineMessageOf = ({ chosen, isLost }: EngineMessageOfProps): string | null => {
+  if (chosen === null) return null
+  // mpv stopped under this title, or under one before it: either way it is gone until a relaunch.
+  if (isLost || chosen.status === CONNECTION_STATUSES.lost) return WATCH_COPY.engineStopped
+  if (chosen.status === CONNECTION_STATUSES.unavailable) return WATCH_COPY.noEngine
+  return null
+}
+
+type WatchViewProps = {
+  services: PlayerServices
+  media: MediaItem
+  upNext: readonly MediaItem[]
+  player: NativePlayer | null
+  isOutputFixed: boolean
+  message: string | null
+  onLost: () => void
+}
+
+type WatchingTitleProps = WatchViewProps
+
+const WatchingTitle = ({
+  services,
+  media,
+  upNext,
+  player,
+  isOutputFixed,
+  onLost,
+}: WatchingTitleProps) =>
+  player !== null && (
+    <WatchTitle
+      services={services}
+      media={media}
+      upNext={upNext}
+      player={player}
+      isOutputFixed={isOutputFixed}
+      onLost={onLost}
+    />
+  )
+
+type EngineMessageProps = WatchViewProps
+
+const EngineMessage = ({ services, message }: EngineMessageProps) => (
+  <PlayerMessage message={message} fallback={services.title.backTo} />
+)
+
+const WATCH_VIEWS = {
+  [VIEW_KINDS.playing]: WatchingTitle,
+  [VIEW_KINDS.message]: EngineMessage,
+} as const satisfies Record<ViewKind, ComponentType<WatchViewProps>>
 
 type DesktopWatchProps = {
   services: PlayerServices
@@ -301,22 +393,16 @@ export const DesktopWatch = ({ services, media, upNext }: DesktopWatchProps) => 
   const isOutputFixed = useIsOutputFixed()
   const [isLost, setIsLost] = useState(false)
   const onLost = useCallback(() => setIsLost(true), [])
-  const { backTo } = services.title
-  if (chosen === null) return <PlayerMessage message={null} fallback={backTo} />
-  // mpv stopped under this title, or under one before it: either way it is gone until a relaunch.
-  if (isLost || chosen.status === CONNECTION_STATUSES.lost) {
-    return <PlayerMessage message={WATCH_COPY.engineStopped} fallback={backTo} />
-  }
-  if (chosen.status === CONNECTION_STATUSES.unavailable) {
-    return <PlayerMessage message={WATCH_COPY.noEngine} fallback={backTo} />
-  }
+  const player = !isLost && chosen?.status === CONNECTION_STATUSES.native ? chosen.player : null
+  const View = WATCH_VIEWS[player === null ? VIEW_KINDS.message : VIEW_KINDS.playing]
   return (
-    <WatchTitle
+    <View
       services={services}
       media={media}
       upNext={upNext}
-      player={chosen.player}
+      player={player}
       isOutputFixed={isOutputFixed}
+      message={engineMessageOf({ chosen, isLost })}
       onLost={onLost}
     />
   )

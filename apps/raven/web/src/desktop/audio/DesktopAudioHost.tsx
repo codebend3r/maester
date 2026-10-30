@@ -17,9 +17,13 @@ import {
   useTrackRate,
   useWindowedAudioHost,
 } from '@raven/ui/headless'
-import { useEffect, useEffectEvent, useMemo } from 'react'
+import { type ComponentType, useEffect, useEffectEvent, useMemo } from 'react'
 import { CONNECTION_STATUSES } from '@/desktop/portConnection'
-import { type NativeAudio, useAudioConnection } from '@/desktop/audioConnection'
+import {
+  type AudioConnection,
+  type NativeAudio,
+  useAudioConnection,
+} from '@/desktop/audioConnection'
 
 type ArtworkOfProps = { api: ApiClient; track: Track }
 
@@ -137,6 +141,35 @@ const NativeAudioHost = ({ api, player }: NativeAudioHostProps) => {
   return null
 }
 
+type AudioViewProps = {
+  api: ApiClient
+  reprobe: () => void
+  connection: AudioConnection
+}
+
+/** Main's answer is on its way, so nothing plays yet and a track never changes engine mid-play. */
+const AwaitingAudio = () => null
+
+type NativeAudioViewProps = AudioViewProps
+
+const NativeAudioView = ({ api, connection }: NativeAudioViewProps) =>
+  connection.status === CONNECTION_STATUSES.native && (
+    <NativeAudioHost api={api} player={connection.player} />
+  )
+
+type HtmlAudioViewProps = AudioViewProps
+
+const HtmlAudioView = ({ api, reprobe }: HtmlAudioViewProps) => (
+  <AudioHost api={api} reprobe={reprobe} />
+)
+
+const AUDIO_VIEWS = {
+  [CONNECTION_STATUSES.waiting]: AwaitingAudio,
+  [CONNECTION_STATUSES.native]: NativeAudioView,
+  [CONNECTION_STATUSES.unavailable]: HtmlAudioView,
+  [CONNECTION_STATUSES.lost]: HtmlAudioView,
+} as const satisfies Record<AudioConnection['status'], ComponentType<AudioViewProps>>
+
 type DesktopAudioHostProps = {
   api: ApiClient
   /** Asks the media origins to be probed again when the picked one cannot be reached, for the html host. */
@@ -150,17 +183,6 @@ type DesktopAudioHostProps = {
  */
 export const DesktopAudioHost = ({ api, reprobe }: DesktopAudioHostProps) => {
   const connection = useAudioConnection()
-  switch (connection.status) {
-    case CONNECTION_STATUSES.waiting:
-      return null
-    case CONNECTION_STATUSES.native:
-      return <NativeAudioHost api={api} player={connection.player} />
-    case CONNECTION_STATUSES.unavailable:
-    case CONNECTION_STATUSES.lost:
-      return <AudioHost api={api} reprobe={reprobe} />
-    default: {
-      const unreachable: never = connection
-      return unreachable
-    }
-  }
+  const View = AUDIO_VIEWS[connection.status]
+  return <View api={api} reprobe={reprobe} connection={connection} />
 }
