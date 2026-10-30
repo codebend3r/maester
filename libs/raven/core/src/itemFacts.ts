@@ -219,6 +219,14 @@ export const episodesOf = (details: ItemDetails): EpisodeSummary[] =>
 export const nextEpisodeIn = (episodes: readonly EpisodeSummary[]): EpisodeSummary | undefined =>
   episodes.find((episode) => !episode.watched && episode.primary != null)
 
+/** The first episode on disk with a file to play: where a watched season starts again. */
+export const firstEpisodeIn = (episodes: readonly EpisodeSummary[]): EpisodeSummary | undefined =>
+  episodes.find((episode) => episode.primary != null)
+
+/** The season a show starts again from: its first, specials last. */
+export const firstSeasonIn = (seasons: readonly SeasonSummary[]): SeasonSummary | undefined =>
+  seasons.find((season) => season.season !== 0) ?? seasons[0]
+
 /** A season's year, and how many of its episodes are on disk. */
 export const seasonFacts = (season: ItemDetails): string[] =>
   present([

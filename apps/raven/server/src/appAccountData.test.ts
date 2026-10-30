@@ -259,7 +259,7 @@ describe('each account sees only its own viewing', () => {
       libraryFavourites: [video, duplicate, unmatched].toSorted(ascending),
       favourites: [video, duplicate, unmatched].toSorted(ascending),
       titles: [tv.show],
-      homeInProgress: [video, duplicate, unmatched].toSorted(ascending),
+      homeInProgress: [video, duplicate, unmatched, second].toSorted(ascending),
       unmatched: [{ id: unmatched, ...spot }],
       duplicates: [
         [
@@ -760,7 +760,7 @@ describe('the viewing from before accounts', () => {
 
   const allOf = (past: Past) => ({
     movie: { position: SPOT, favourite: true, watched: false },
-    homeInProgress: [past.ids.movie],
+    homeInProgress: [past.ids.movie, past.tv.episodes[1]].toSorted(ascending),
     favourites: [past.ids.movie],
     titles: [past.tv.show],
     history: [{ id: past.ids.movie, plays: 1, watched: false, marked: false }],
@@ -792,7 +792,9 @@ describe('the viewing from before accounts', () => {
     })
 
     const home = await owner.getHome()
-    expect(home.inProgress.map(({ media }) => media.id)).toEqual([past.ids.movie])
+    expect(home.inProgress.map(({ media }) => media.id).toSorted(ascending)).toEqual(
+      [past.ids.movie, past.tv.episodes[1]].toSorted(ascending),
+    )
     expect(await pastOf({ api: owner, past })).toEqual(allOf(past))
     expect(await pastOf({ api: member, past })).toEqual(NONE_OF_IT)
     expect(pastRows({ app })).toEqual(NO_PAST)
@@ -814,7 +816,7 @@ describe('the viewing from before accounts', () => {
     const owner = await clientOn({ app, id: AUTH_TEST_IDS.owner })
     const member = await clientOn({ app, id: AUTH_TEST_IDS.friend })
     expect((await pastOf({ api: owner, past })).homeInProgress).toEqual(
-      [past.ids.movie, past.ids.other].toSorted(ascending),
+      [past.ids.movie, past.ids.other, past.tv.episodes[1]].toSorted(ascending),
     )
     expect((await pastOf({ api: member, past })).homeInProgress).toEqual([])
   })
@@ -849,7 +851,7 @@ describe('the viewing from before accounts', () => {
     const owner = await clientOn({ app, id: AUTH_TEST_IDS.owner })
     const home = await owner.getHome()
     expect(home.inProgress.map(({ media }) => media.id).toSorted(ascending)).toEqual(
-      [past.ids.movie, past.ids.later].toSorted(ascending),
+      [past.ids.movie, past.ids.later, past.tv.episodes[1]].toSorted(ascending),
     )
     expect((await owner.getMedia(past.ids.movie)).position).toBe(SPOT)
     expect(spotOwners({ app, mediaId: past.ids.movie })).toEqual([AUTH_TEST_IDS.owner])

@@ -356,6 +356,32 @@ describe("listing a TV library's shows", () => {
     )
   })
 
+  it('lists the next episode of a show partway through as in progress, from the start', () => {
+    const viewing = new ViewingRepository(database.get(), media())
+    const listed = () =>
+      media()
+        .listInProgress({ account: TEST_ACCOUNTS.a })
+        .map((item) => [fileName(item.id), item.position])
+    expect(listed()).not.toContainEqual(['Binge - S01E02.mkv', 0])
+    viewing.report({
+      id: state.ids.get('Binge - S01E01.mkv') ?? -1,
+      position: 60,
+      account: TEST_ACCOUNTS.a,
+    })
+    expect(listed()).toContainEqual(['Binge - S01E02.mkv', 0])
+    expect(
+      media().countInProgress({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a }),
+    ).toBeGreaterThanOrEqual(1)
+    viewing.report({
+      id: state.ids.get('Binge - S01E02.mkv') ?? -1,
+      position: 20,
+      account: TEST_ACCOUNTS.a,
+    })
+    expect(listed().filter(([name]) => String(name).startsWith('Binge'))).toEqual([
+      ['Binge - S01E02.mkv', 20],
+    ])
+  })
+
   it('deals every episode of a show, watched or not, as the die falls', () => {
     const libraryIds = [state.libraryId]
     const deal = (roll: number) =>

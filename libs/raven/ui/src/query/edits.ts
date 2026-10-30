@@ -7,10 +7,12 @@ import {
   type Duplicate,
   type Duplicates,
   HOME_SHELF_TYPES,
+  ITEM_TYPES,
   type HistoryEntry,
   type Home,
   type HomeSearch,
   type HomeShelf,
+  type ItemChild,
   type ItemDetails,
   type ItemSummary,
   type Library,
@@ -22,6 +24,10 @@ import {
   type Saga,
   type ShowListing,
   type Track,
+  firstEpisodeIn,
+  firstSeasonIn,
+  episodesOf,
+  seasonsOf,
 } from '@raven/core'
 import { type Edit, editAll, editKey } from '@/query/optimistic'
 import { queryKeys } from '@/query/queryClient'
@@ -302,6 +308,157 @@ export const watchedEdits = ({ media, watched }: WatchedEditsProps): Edit[] => {
       : []),
   ]
 }
+
+type ItemWatchedEditsProps = {
+  itemId: number
+  watched: boolean
+}
+
+type MarkEpisodesProps = {
+  details: ItemDetails
+  watched: boolean
+}
+
+type MarkFileProps = {
+  file: MediaItem | null
+  watched: boolean
+}
+
+/** An episode's file marked as the episode was, and no longer holding a spot. */
+const markFile = ({ file, watched }: MarkFileProps): MediaItem | null =>
+  file === null ? null : { ...file, watched, position: 0 }
+
+type MarkEpisodeProps = {
+  child: ItemChild
+  watched: boolean
+}
+
+const markEpisode = ({ child, watched }: MarkEpisodeProps): ItemChild => {
+  if (child.type !== ITEM_TYPES.episode) return child
+  return { ...child, watched, primary: markFile({ file: child.primary, watched }) }
+}
+
+/** A season's episodes, and the file each plays, marked as the season was. */
+const markEpisodes = ({ details, watched }: MarkEpisodesProps): ItemDetails => {
+  const children = mapWhere<ItemChild>({
+    items: details.children,
+    matches: (child) =>
+      child.type === ITEM_TYPES.episode &&
+      (child.watched !== watched || (child.primary?.position ?? 0) !== 0),
+    change: (child) => markEpisode({ child, watched }),
+  })
+  return children === details.children ? details : { ...details, children }
+}
+
+type CountedProps = {
+  episodeCount: number
+  watched: boolean
+}
+
+/** How many of a season's episodes count as watched once it is marked. */
+const countedOf = ({ episodeCount, watched }: CountedProps): number => (watched ? episodeCount : 0)
+
+type MarkSeasonsProps = {
+  details: ItemDetails
+  watched: boolean
+  seasonId?: number
+}
+
+/**
+ * A show's seasons, each counted all watched or none; only the season
+ * `seasonId` names when one is given.
+ */
+const markSeasons = ({ details, watched, seasonId }: MarkSeasonsProps): ItemDetails => {
+  const isNamed = (child: ItemChild): boolean => seasonId === undefined || child.id === seasonId
+  const children = mapWhere<ItemChild>({
+    items: details.children,
+    matches: (child) =>
+      child.type === ITEM_TYPES.season &&
+      isNamed(child) &&
+      child.watchedCount !== countedOf({ episodeCount: child.episodeCount, watched }),
+    change: (child) =>
+      child.type === ITEM_TYPES.season
+        ? { ...child, watchedCount: countedOf({ episodeCount: child.episodeCount, watched }) }
+        : child,
+  })
+  return children === details.children ? details : { ...details, children }
+}
+
+type NextEditProps = { showId: number; first: ItemChild | undefined; watched: boolean }
+
+/** The episode a show plays next: none once all is watched, the first again once none is. */
+const nextEdit = ({ showId, first, watched }: NextEditProps): Edit =>
+  editKey<MediaItem | null>({
+    queryKey: queryKeys.nextEpisode(showId),
+    update: (next) => {
+      if (watched) return null
+      if (first?.type !== ITEM_TYPES.episode) return next
+      return first.primary ?? next
+    },
+  })
+
+/**
+ * A whole show or season marked watched or unwatched, from what its pages
+ * already hold: the season's episodes, the show's seasons and counts, and
+ * the episode a show plays next, which is none once all is watched and the
+ * first again once none is. A title whose page is not cached is left to be
+ * read again.
+ */
+export const itemWatchedEdits = ({ itemId, watched }: ItemWatchedEditsProps): Edit[] => [
+  {
+    plan: (queryClient) => {
+      const details = queryClient.getQueryData<ItemDetails>(queryKeys.item(itemId))
+      if (details === undefined) return []
+      const edits: Edit[] = (() => {
+        if (details.type === ITEM_TYPES.season) {
+          const showId = details.show?.id ?? null
+          return [
+            editKey<ItemDetails>({
+              queryKey: queryKeys.item(itemId),
+              update: (held) => markEpisodes({ details: held, watched }),
+            }),
+            ...(showId === null
+              ? []
+              : [
+                  editKey<ItemDetails>({
+                    queryKey: queryKeys.item(showId),
+                    update: (held) => markSeasons({ details: held, watched, seasonId: itemId }),
+                  }),
+                ]),
+          ]
+        }
+        if (details.type === ITEM_TYPES.show) {
+          const seasons = seasonsOf(details)
+          const firstSeason = firstSeasonIn(seasons)
+          const firstDetails =
+            firstSeason === undefined
+              ? undefined
+              : queryClient.getQueryData<ItemDetails>(queryKeys.item(firstSeason.id))
+          return [
+            editKey<ItemDetails>({
+              queryKey: queryKeys.item(itemId),
+              update: (held) => markSeasons({ details: held, watched }),
+            }),
+            ...seasons.map((season) =>
+              editKey<ItemDetails>({
+                queryKey: queryKeys.item(season.id),
+                update: (held) => markEpisodes({ details: held, watched }),
+              }),
+            ),
+            nextEdit({
+              showId: itemId,
+              first:
+                firstDetails === undefined ? undefined : firstEpisodeIn(episodesOf(firstDetails)),
+              watched,
+            }),
+          ]
+        }
+        return []
+      })()
+      return edits.flatMap((change) => change.plan(queryClient))
+    },
+  },
+]
 
 type LibraryOrderEditsProps = { ids: readonly number[] }
 

@@ -14,6 +14,7 @@ export const ITEM_COPY = {
   playEpisode: (code: string) => `Play ${code}`,
   resumeFrom: ({ at }: ResumeFromProps) => `Resume from ${at}`,
   fromStart: 'Play from the beginning',
+  rewatch: 'Rewatch',
   nextEpisode: 'Next episode',
   /** "Next S01E03": the episode after this one in its show. */
   nextCode: (code: string) => `Next ${code}`,

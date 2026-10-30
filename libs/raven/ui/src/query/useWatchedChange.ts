@@ -1,5 +1,12 @@
-import { type ApiClient, WATCHED_STATES, type WatchedChange, type WatchedState } from '@raven/core'
+import {
+  type ApiClient,
+  WATCHED_STATES,
+  WATCH_TARGET_KINDS,
+  type WatchedChange,
+  type WatchedState,
+} from '@raven/core'
 import { useQueryClient } from '@tanstack/react-query'
+import { itemWatchedEdits } from '@/query/edits'
 import { afterWatched } from '@/query/invalidate'
 import { useOptimisticMutation } from '@/query/optimistic'
 import { mutationKeys } from '@/query/queryClient'
@@ -7,18 +14,23 @@ import { mutationKeys } from '@/query/queryClient'
 type UseServerWatchedChangeProps = { api: ApiClient }
 
 /**
- * Marks whatever `targets` name watched or unwatched when the cache cannot
- * be patched ahead of the answer: a show, season or saga, whose counts and
- * next episode only the server knows. It shares a key, so a queue, with a
- * video's own optimistic mark, and everything marked is read again once the
- * last of them settles.
+ * Marks whatever `targets` name watched or unwatched. A show or season shows
+ * at once from the pages already cached (`itemWatchedEdits`); anything else
+ * waits for the server. It shares a key, so a queue, with a video's own
+ * optimistic mark, and everything marked is read again once the last of them
+ * settles.
  */
 const useServerWatchedChange = ({ api }: UseServerWatchedChangeProps) => {
   const queryClient = useQueryClient()
   return useOptimisticMutation({
     mutationKey: mutationKeys.watched,
     mutationFn: (change: WatchedChange) => api.setWatched(change),
-    edits: () => [],
+    edits: (change: WatchedChange) =>
+      change.targets.flatMap((target) =>
+        target.kind === WATCH_TARGET_KINDS.item
+          ? itemWatchedEdits({ itemId: target.id, watched: change.watched })
+          : [],
+      ),
     settle: () => afterWatched(queryClient),
   })
 }

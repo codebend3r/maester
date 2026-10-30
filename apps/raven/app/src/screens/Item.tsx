@@ -13,6 +13,8 @@ import {
   episodeCode,
   episodesOf,
   episodesWatched,
+  firstEpisodeIn,
+  firstSeasonIn,
   formatDuration,
   libraryFiles,
   nextEpisodeIn,
@@ -91,6 +93,15 @@ const playOf = ({ media, label, context }: PlayOfProps): ItemAction => ({
   text: label === ITEM_COPY.play ? null : label.replace(ITEM_COPY.playEpisode(''), ''),
   onPress: () =>
     context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id, at: media.position }),
+})
+
+type RewatchOfProps = { media: MediaItem; context: ItemContext }
+
+/** Rewatch, in Play's place once all of a show or season is watched: its first episode, from the start. */
+const rewatchOf = ({ media, context }: RewatchOfProps): ItemAction => ({
+  ...playOf({ media, label: ITEM_COPY.rewatch, context }),
+  onPress: () =>
+    context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id, at: 0, isFromStart: true }),
 })
 
 type FromStartOfProps = { media: MediaItem; context: ItemContext }
@@ -324,6 +335,35 @@ const PlayableItem = ({
   )
 }
 
+type PlayNextActionsOfProps = {
+  next: MediaItem | null
+  code: string | null
+  first: MediaItem | null | undefined
+  state: WatchedState
+  context: ItemContext
+}
+
+/**
+ * What a show or season plays: the episode that comes next, from where it was left, or, once
+ * all of it is watched, Rewatch from its first episode.
+ */
+const playNextActionsOf = ({
+  next,
+  code,
+  first,
+  state,
+  context,
+}: PlayNextActionsOfProps): ItemAction[] => {
+  if (next !== null)
+    return [
+      playOf({ media: next, label: playNextLabel(code), context }),
+      ...fromStartOf({ media: next, context }),
+    ]
+  if (state === WATCHED_STATES.watched && first != null)
+    return [rewatchOf({ media: first, context })]
+  return []
+}
+
 type ShowItemProps = {
   details: ItemDetails
   session: AppQueries
@@ -337,21 +377,22 @@ type ShowItemProps = {
 const ShowItem = ({ details, session, context }: ShowItemProps) => {
   const next = useQuery(session.queries.nextEpisodeQuery(details.id))
   const favourite = useServerItemFavourite({ api: session.api, item: details })
+  const seasons = seasonsOf(details)
+  const state = watchedStateOf(seasonsWatched(seasons))
   const toggle = useServerWatchedToggle({
     api: session.api,
-    state: watchedStateOf(seasonsWatched(seasonsOf(details))),
+    state,
     targets: [{ kind: WATCH_TARGET_KINDS.item, id: details.id, libraryId: null }],
   })
+  // Read for the first episode a fully watched show starts again from.
+  const first = useQuery(session.queries.itemQuery(firstSeasonIn(seasons)?.id ?? null))
+  const firstFile =
+    (first.data === undefined ? undefined : firstEpisodeIn(episodesOf(first.data)))?.primary ?? null
   const nextFile = next.data ?? null
   const nextItem = nextFile?.item ?? null
   const nextCode = nextItem === null ? null : episodeCode(nextItem)
   const actions = [
-    ...(nextFile === null
-      ? []
-      : [
-          playOf({ media: nextFile, label: playNextLabel(nextCode), context }),
-          ...fromStartOf({ media: nextFile, context }),
-        ]),
+    ...playNextActionsOf({ next: nextFile, code: nextCode, first: firstFile, state, context }),
     ...marksOf({ details, favourite, watched: toggle }),
   ]
   return (
@@ -385,13 +426,15 @@ const SeasonItem = ({ details, session, context }: SeasonItemProps) => {
   })
   const next = nextEpisodeIn(episodes)
   const nextFile = next?.primary ?? null
+  const firstFile = firstEpisodeIn(episodes)?.primary ?? null
   const actions = [
-    ...(next === undefined || nextFile === null
-      ? []
-      : [
-          playOf({ media: nextFile, label: playNextLabel(episodeCode(next)), context }),
-          ...fromStartOf({ media: nextFile, context }),
-        ]),
+    ...playNextActionsOf({
+      next: nextFile,
+      code: next === undefined ? null : episodeCode(next),
+      first: firstFile,
+      state: toggle.state,
+      context,
+    }),
     ...marksOf({ details, favourite, watched: toggle }),
   ]
   return (
