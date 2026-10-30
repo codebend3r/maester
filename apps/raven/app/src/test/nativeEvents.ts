@@ -8,4 +8,5 @@ export const NATIVE_EVENTS = {
   submitEditing: 'submitEditing',
   valueChange: 'valueChange',
   requestClose: 'requestClose',
+  longPress: 'longPress',
 } as const

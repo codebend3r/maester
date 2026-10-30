@@ -6,10 +6,11 @@ import {
   routeIdOf,
   routeState,
 } from '@raven/core'
+import { useServerArtistFavourite } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
-import { Grid, ItemNotice } from '@/layouts'
+import { FavouriteButton, Grid, ItemNotice } from '@/layouts'
 import { artistSectionsOf } from '@/music/musicCards'
 import type { ShelfCard } from '@/queries/cards'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
@@ -23,11 +24,12 @@ const COPY = {
 
 type ArtistGridProps = { session: AppQueries; details: ArtistDetails }
 
-/** The artist's albums as a grid, then the albums of others they appear on. */
+/** The artist's albums as a grid, then the albums of others they appear on, and their favourite mark. */
 const ArtistGrid = ({ session: { server, api }, details }: ArtistGridProps) => {
   const router = useRouter()
   const pictures = usePictures({ server, api })
-  const { artist, albums, appearsOn } = details
+  const { artist, albums, appearsOn, isFavourite } = details
+  const favourite = useServerArtistFavourite({ api, artistId: artist.id })
   const sections =
     pictures === null
       ? []
@@ -43,7 +45,12 @@ const ArtistGrid = ({ session: { server, api }, details }: ArtistGridProps) => {
       search={null}
       sections={sections}
       title={artist.name}
-      toolbar={null}
+      toolbar={
+        <FavouriteButton
+          isFavourite={isFavourite}
+          onToggle={() => favourite.mutate(!isFavourite)}
+        />
+      }
       view={LIBRARY_VIEWS.grid}
     />
   )

@@ -7,6 +7,7 @@ export const APP_ROUTES = {
   play: '/play/[mediaId]',
   album: '/album/[id]',
   artist: '/artist/[id]',
+  playlist: '/playlist/[id]',
   nowPlaying: '/now-playing',
   search: '/search',
   settings: '/settings',
@@ -40,19 +41,24 @@ export const APP_SCREENS = {
   play: 'play/[mediaId]',
   album: 'album/[id]',
   artist: 'artist/[id]',
+  playlist: 'playlist/[id]',
   nowPlaying: 'now-playing',
   search: 'search',
   settings: 'settings',
   unlock: 'unlock',
 } as const
 
-/** Where a card or a link takes the viewer: an item's page, the player, a library, an album or an artist. */
+/**
+ * Where a card or a link takes the viewer: an item's page, the player, a library, an album, an
+ * artist or one of the account's playlists.
+ */
 export const ROUTE_TARGETS = {
   item: 'item',
   play: 'play',
   library: 'library',
   album: 'album',
   artist: 'artist',
+  playlist: 'playlist',
 } as const
 
 export type RouteTarget =
@@ -80,6 +86,7 @@ export type RouteTarget =
     }
   | { kind: typeof ROUTE_TARGETS.album; albumId: number }
   | { kind: typeof ROUTE_TARGETS.artist; artistId: number }
+  | { kind: typeof ROUTE_TARGETS.playlist; playlistId: number }
 
 /** An item's page, with neither a library nor a file named. */
 export const itemTarget = (itemId: number): RouteTarget => ({
@@ -142,6 +149,11 @@ export const hrefOf = (target: RouteTarget): Href => {
       return {
         pathname: APP_ROUTES.artist,
         params: { [APP_ROUTE_PARAMS.id]: String(target.artistId) },
+      }
+    case ROUTE_TARGETS.playlist:
+      return {
+        pathname: APP_ROUTES.playlist,
+        params: { [APP_ROUTE_PARAMS.id]: String(target.playlistId) },
       }
     default: {
       const unknown: never = target

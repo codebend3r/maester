@@ -1,6 +1,21 @@
-import { type AlbumSummary, type ApiClient, artistNames } from '@raven/core'
+import {
+  type AlbumSummary,
+  type ApiClient,
+  type Artist,
+  type PlaylistSummary,
+  type Track,
+  artistNames,
+  plural,
+} from '@raven/core'
 
-import { CARD_SHAPES, type Pictures, type ShelfCard, pictureAt } from '@/queries/cards'
+import { playlistFactsOf } from '@/layouts/musicRows'
+import {
+  CARD_SHAPES,
+  type Picture,
+  type Pictures,
+  type ShelfCard,
+  pictureAt,
+} from '@/queries/cards'
 import type { GridSection } from '@/queries/libraryGrid'
 import { ROUTE_TARGETS } from '@/routes'
 
@@ -23,7 +38,12 @@ export const albumCard = ({ api, headersFor, album }: AlbumCardProps): ShelfCard
   target: { kind: ROUTE_TARGETS.album, albumId: album.id },
 })
 
-const SECTION_KEYS = { albums: 'albums', appearsOn: 'appearsOn' } as const
+const SECTION_KEYS = {
+  albums: 'albums',
+  appearsOn: 'appearsOn',
+  artists: 'artists',
+  playlists: 'playlists',
+} as const
 
 const APPEARS_ON = 'Appears on'
 
@@ -74,3 +94,63 @@ export const artistSectionsOf = ({
         },
       ]),
 ]
+
+type TrackCoverOfProps = Pick<AlbumCardProps, 'api' | 'headersFor'> & {
+  track: Pick<Track, 'albumId' | 'album'>
+}
+
+/** The cover of the album a track is on, as Now Playing and the bar draw it. */
+export const trackCoverOf = ({ api, headersFor, track }: TrackCoverOfProps): Picture | null =>
+  pictureAt({
+    uri: api.albumCoverUrl({ albumId: track.albumId, coverVersion: track.album.coverVersion }),
+    headersFor,
+  })
+
+type ArtistCardProps = { artist: Artist }
+
+/** An artist as a row of the Artists page: their name, and how many albums and tracks are theirs. */
+export const artistCard = ({ artist }: ArtistCardProps): ShelfCard => ({
+  key: `artist:${artist.id}`,
+  title: artist.name,
+  line: [
+    plural({ n: artist.albumCount, one: 'album', many: 'albums' }),
+    plural({ n: artist.trackCount, one: 'track', many: 'tracks' }),
+  ].join(' · '),
+  shape: CARD_SHAPES.poster,
+  picture: null,
+  progress: 0,
+  target: { kind: ROUTE_TARGETS.artist, artistId: artist.id },
+})
+
+type RowsSectionOfProps = { key: string; cards: ShelfCard[] }
+
+/** A list page's one untitled run of rows, or none for no cards. */
+const rowsSectionOf = ({ key, cards }: RowsSectionOfProps): GridSection[] =>
+  cards.length === 0 ? [] : [{ key, title: null, count: null, shape: CARD_SHAPES.poster, cards }]
+
+/** A music library's Artists page: one run of rows, by name as the server lists them. */
+export const artistListSectionsOf = (artists: readonly Artist[]): GridSection[] =>
+  rowsSectionOf({
+    key: SECTION_KEYS.artists,
+    cards: artists.map((artist) => artistCard({ artist })),
+  })
+
+type PlaylistCardProps = { playlist: PlaylistSummary }
+
+/** A playlist as a row of the Playlists page: its name, and its tracks and length. */
+export const playlistCard = ({ playlist }: PlaylistCardProps): ShelfCard => ({
+  key: `playlist:${playlist.id}`,
+  title: playlist.name,
+  line: playlistFactsOf({ playlist }),
+  shape: CARD_SHAPES.poster,
+  picture: null,
+  progress: 0,
+  target: { kind: ROUTE_TARGETS.playlist, playlistId: playlist.id },
+})
+
+/** The account's playlists as one run of rows, most recently changed first, as the server lists them. */
+export const playlistSectionsOf = (playlists: readonly PlaylistSummary[]): GridSection[] =>
+  rowsSectionOf({
+    key: SECTION_KEYS.playlists,
+    cards: playlists.map((playlist) => playlistCard({ playlist })),
+  })

@@ -31,7 +31,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type ReactNode, useState } from 'react'
 
-import { AlbumsGrid } from '@/music/AlbumsGrid'
+import { MusicPages } from '@/music/MusicPages'
 import type { ShelfCard } from '@/queries/cards'
 import { CONTINUE_WATCHING, continueArtIdsOf } from '@/queries/homeShelves'
 import { useArtLogos } from '@/queries/useArtLogos'
@@ -380,7 +380,7 @@ const ServerLibrary = ({ session, id, asked }: ServerLibraryProps) => {
       return <Loading label={COPY.opening} onBack={() => router.back()} />
     case ROUTE_STATES.ready:
       return listingFor(page.data.settings.kind) === LIBRARY_LISTINGS.albums ? (
-        <AlbumsGrid key={page.data.id} asked={asked} library={page.data} session={session} />
+        <MusicPages key={page.data.id} asked={asked} library={page.data} session={session} />
       ) : (
         <LibraryPages key={page.data.id} asked={asked} library={page.data} session={session} />
       )

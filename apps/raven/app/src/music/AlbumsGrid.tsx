@@ -2,6 +2,7 @@ import { KINDS, LIBRARY_VIEWS, type Library, MUSIC_SORTS, libraryIconOf, plural 
 import { useSearch } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
+import type { ReactNode } from 'react'
 
 import { Grid, SearchField } from '@/layouts'
 import { albumSectionsOf } from '@/music/musicCards'
@@ -21,6 +22,8 @@ type AlbumsGridProps = {
   session: AppQueries
   library: Library
   asked: string
+  /** The ways to the library's other pages, in the toolbar. */
+  toggle: ReactNode
 }
 
 /** A music library: its albums as covers, by artist, of those the search finds. */
@@ -28,6 +31,7 @@ export const AlbumsGrid = ({
   session: { server, api, queries },
   library,
   asked,
+  toggle,
 }: AlbumsGridProps) => {
   const router = useRouter()
   const search = useSearch({ initial: asked })
@@ -57,7 +61,7 @@ export const AlbumsGrid = ({
       search={<SearchField label={`${COPY.search} ${library.name}`} search={search} />}
       sections={sections}
       title={library.name}
-      toolbar={null}
+      toolbar={toggle}
       view={LIBRARY_VIEWS.grid}
     />
   )

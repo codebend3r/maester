@@ -41,6 +41,13 @@ describe('hrefOf', () => {
 })
 
 describe('hrefOf for music', () => {
+  it('opens a playlist by id', () => {
+    expect(hrefOf({ kind: ROUTE_TARGETS.playlist, playlistId: 4 })).toEqual({
+      pathname: APP_ROUTES.playlist,
+      params: { [APP_ROUTE_PARAMS.id]: '4' },
+    })
+  })
+
   it('opens an album and an artist by id', () => {
     expect(hrefOf({ kind: ROUTE_TARGETS.album, albumId: 7 })).toEqual({
       pathname: APP_ROUTES.album,

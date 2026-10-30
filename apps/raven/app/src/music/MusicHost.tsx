@@ -7,8 +7,10 @@ import {
 import { PLAYBACK_MODES, type Track, artistNames } from '@raven/core'
 import {
   AUDIO_STATES,
+  playingTrackOf,
   runRemoteCommand,
   useAudioQueue,
+  useTrackRate,
   useWindowedAudioHost,
 } from '@raven/ui/headless'
 import { useEffect, useEffectEvent, useMemo } from 'react'
@@ -54,7 +56,8 @@ type NativeAudioHostProps = { session: MusicSession }
 /**
  * Music on an iPhone or iPad: `@raven/audio` plays the shared queue store's track with the next
  * one ready behind it, as the desktop's engine does, so the seam plays in the background; the
- * lock screen's controls come back as remote commands and drive the store.
+ * lock screen's controls come back as remote commands and drive the store. An audiobook plays at
+ * the prefs' speed, music at 1.
  */
 const NativeAudioHost = ({ session: { server, api } }: NativeAudioHostProps) => {
   const engine = useAudioQueue((store) => store.engine)
@@ -66,7 +69,17 @@ const NativeAudioHost = ({ session: { server, api } }: NativeAudioHostProps) => 
       }),
     [server, api],
   )
+  // An audiobook's spot is saved as the app leaves the foreground, as the film player's is.
   const host = useWindowedAudioHost({ api, player, watchHide: watchAppHide })
+  const track = useAudioQueue(playingTrackOf)
+  const rate = useTrackRate({ api, track })
+
+  // The player keeps the rate across its items, so it is told only when it changes.
+  useEffect(() => {
+    audioPlayer
+      .setRate(rate)
+      .catch(() => console.warn('Raven could not set how fast the track plays.'))
+  }, [rate])
 
   const onEvent = useEffectEvent((event: AudioPlayerEvent) => {
     switch (event.type) {

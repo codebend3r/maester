@@ -52,8 +52,11 @@ const harness = ({ held = [], refused = [] }: HarnessProps = {}) => {
   const nameOf = (item: AudioItem | null) => (item === null ? '-' : String(item.id))
   const player = nativePlayerOf({
     audio: {
-      setWindow: async ({ playing, next, shouldPlay }) => {
-        calls.push(`window ${playing.id} ${nameOf(next)} ${shouldPlay ? 'playing' : 'paused'}`)
+      setWindow: async ({ playing, next, shouldPlay, start }) => {
+        const from = start > 0 ? ` from ${start}` : ''
+        calls.push(
+          `window ${playing.id} ${nameOf(next)} ${shouldPlay ? 'playing' : 'paused'}${from}`,
+        )
       },
       setNext: async (next) => {
         calls.push(`next ${nameOf(next)}`)
@@ -108,6 +111,12 @@ describe('nativePlayerOf', () => {
     await expect(player.load({ playing: track(5), next: null, start: 0 })).rejects.toThrow(
       'Sign in to the server again.',
     )
+  })
+
+  it("opens an audiobook's window at its saved spot", async () => {
+    const { calls, player } = harness()
+    await player.load({ playing: track(1), next: track(2), start: 754.5 })
+    expect(calls).toEqual(['window 1 2 playing from 754.5'])
   })
 
   it('lets a stop overtake a load still waiting for its ticket', async () => {

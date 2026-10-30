@@ -17,6 +17,8 @@ import { focusShelf } from '@/layouts/Shelf.focus'
 import { touchShelf } from '@/layouts/Shelf.touch'
 import { touchForm } from '@/layouts/Form.touch'
 import { focusLoading } from '@/layouts/Loading.focus'
+import { focusMusic } from '@/layouts/Music.focus'
+import { touchMusic } from '@/layouts/Music.touch'
 import { touchLoading } from '@/layouts/Loading.touch'
 import { touchPlayerChrome } from '@/layouts/PlayerChrome.touch'
 import type { PlayerChromeKit } from '@/layouts/playerKit'
@@ -62,6 +64,21 @@ export const { SearchField, SearchLayout } = Platform.isTV ? focusSearch : touch
  */
 export const { SettingsPage, SettingsSection, SettingsToggle, SettingsButton, SettingsChoice } =
   Platform.isTV ? focusSettings : touchSettings
+
+/**
+ * The music pages: an album's, a playlist's and Now Playing, rows and plates the remote moves
+ * through on a TV, one page scrolled under the thumb everywhere else; the strip under the screens
+ * while a track plays, which the remote reaches below a screen on a TV; New playlist, which only
+ * the touch screens offer, and the favourite mark a toolbar wears.
+ */
+export const {
+  AlbumLayout,
+  NowPlayingLayout,
+  NowPlayingStrip,
+  PlaylistLayout,
+  NewPlaylistButton,
+  FavouriteButton,
+} = Platform.isTV ? focusMusic : touchMusic
 
 /**
  * Each platform's player controls, the one layout that differs between the two TVs: Apple TV's
