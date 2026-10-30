@@ -137,6 +137,8 @@ export const isAlbumDetails = object({
   /** How many discs its tracks span. */
   discCount: isNumber,
   tracks: listOf(isTrack),
+  /** Whether the caller marked the album a favourite. */
+  isFavourite: isBoolean,
 })
 
 export type AlbumDetails = Infer<typeof isAlbumDetails>
@@ -146,6 +148,8 @@ export const isArtistDetails = object({
   artist: isArtist,
   albums: listOf(isAlbumSummary),
   appearsOn: listOf(isAlbumSummary),
+  /** Whether the caller marked the artist a favourite. */
+  isFavourite: isBoolean,
 })
 
 export type ArtistDetails = Infer<typeof isArtistDetails>

@@ -213,7 +213,7 @@ describe('Item on a TV', () => {
     await fireEvent.press(await screen.findByRole('button', { name: 'Next S01E02' }))
     expect(mockPush).toHaveBeenLastCalledWith({
       pathname: APP_ROUTES.play,
-      params: { [APP_ROUTE_PARAMS.mediaId]: String(HALF_LOOP.primary?.id) },
+      params: { [APP_ROUTE_PARAMS.mediaId]: String(HALF_LOOP.primary?.id ?? '') },
     })
 
     await fireEvent.press(screen.getByRole('link', { name: 'Go to Severance' }))

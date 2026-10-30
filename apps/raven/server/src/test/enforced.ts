@@ -33,7 +33,7 @@ import {
   authFixture,
   bearerHeaders,
 } from '@/test/auth'
-import { encodeClip } from '@/test/clips'
+import { encodeClip, encodeTrack } from '@/test/clips'
 import { type FakeShow, fakeTmdb } from '@/test/fakeTmdb'
 import { injectFetch } from '@/test/server'
 
@@ -57,6 +57,8 @@ export const ROUTES = {
   events: { method: GET, path: '/api/events', account: approved },
   favourites: { method: GET, path: '/api/favourites', account: approved },
   favouriteTitles: { method: GET, path: '/api/favourites/titles', account: approved },
+  favouriteAlbums: { method: GET, path: '/api/favourites/albums', account: approved },
+  favouriteArtists: { method: GET, path: '/api/favourites/artists', account: approved },
   browse: { method: GET, path: '/api/fs/browse', account: owner },
   health: { method: GET, path: '/api/health', account: anyone },
   home: { method: GET, path: '/api/home', account: approved },
@@ -114,7 +116,17 @@ export const ROUTES = {
   album: { method: GET, path: '/api/albums/:id', account: approved },
   albumMatchSearch: { method: GET, path: '/api/albums/:id/match/search', account: owner },
   setAlbumMatch: { method: PUT, path: '/api/albums/:id/match', account: owner },
+  albumFavourite: { method: PUT, path: '/api/albums/:id/favourite', account: approved },
   artist: { method: GET, path: '/api/artists/:id', account: approved },
+  artistFavourite: { method: PUT, path: '/api/artists/:id/favourite', account: approved },
+  lyrics: { method: GET, path: '/api/tracks/:id/lyrics', account: approved },
+  playlists: { method: GET, path: '/api/playlists', account: approved },
+  createPlaylist: { method: POST, path: '/api/playlists', account: approved },
+  playlist: { method: GET, path: '/api/playlists/:id', account: approved },
+  renamePlaylist: { method: PUT, path: '/api/playlists/:id', account: approved },
+  deletePlaylist: { method: DELETE, path: '/api/playlists/:id', account: approved },
+  replacePlaylistTracks: { method: PUT, path: '/api/playlists/:id/tracks', account: approved },
+  appendPlaylistTracks: { method: POST, path: '/api/playlists/:id/tracks', account: approved },
   lockState: { method: GET, path: '/api/lock', account: approved },
   relock: { method: POST, path: '/api/lock/lock', account: approved },
   unlock: { method: POST, path: '/api/lock/unlock', account: approved },
@@ -425,6 +437,58 @@ export const addShow = async ({ root, enforced }: AddShowProps): Promise<ShowIds
     throw new Error('The enforced shows library did not match Andor and its two episodes')
   }
   return { library: library.id, show: entry.show.id, season: firstSeason.id, episodes: [one, two] }
+}
+
+/** Where `addMusic` finds its one album, the album's artist and its two tracks. */
+export type MusicIds = {
+  library: number
+  album: number
+  artist: number
+  tracks: [number, number]
+}
+
+type AddMusicProps = {
+  root: string
+  enforced: Pick<Awaited<ReturnType<typeof createEnforcedApp>>, 'app' | 'ownerApi'>
+}
+
+/**
+ * Adds a music library holding one album of two tagged tracks to a server
+ * `createEnforcedApp` made, for the per-account playlists and favourites.
+ * A separate step for the same reason as `addShow`.
+ */
+export const addMusic = async ({ root, enforced }: AddMusicProps): Promise<MusicIds> => {
+  const { app, ownerApi } = enforced
+  const album = join(root, 'music', 'Radiohead', 'OK Computer')
+  const tags = { artist: 'Radiohead', album: 'OK Computer', album_artist: 'Radiohead' }
+  await encodeTrack({
+    path: join(album, '01 Airbag.mp3'),
+    tags: { ...tags, title: 'Airbag', track: '1' },
+  })
+  await encodeTrack({
+    path: join(album, '02 Paranoid Android.mp3'),
+    tags: { ...tags, title: 'Paranoid Android', track: '2' },
+  })
+  const library = await ownerApi.createLibrary({
+    name: 'Music',
+    paths: [join(root, 'music')],
+    settings: { kind: LIBRARY_KINDS.music },
+  })
+  await app.get(ScannerService).whenIdle(library.id)
+  await app.get(MetadataService).whenIdle()
+  const [summary] = await ownerApi.listAlbums({ libraryId: library.id })
+  const details = summary === undefined ? null : await ownerApi.getAlbum(summary.id)
+  const [first, second] = details?.tracks ?? []
+  const [artist] = summary?.artists ?? []
+  if (details === null || first === undefined || second === undefined || artist === undefined) {
+    throw new Error('The enforced music library did not file its album')
+  }
+  return {
+    library: library.id,
+    album: details.album.id,
+    artist: artist.id,
+    tracks: [first.id, second.id],
+  }
 }
 
 /** The movies library's two extras: a file no movie matches, and a second file of The Matrix. */

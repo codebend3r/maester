@@ -6,7 +6,9 @@ import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 const LOGO = { uri: 'https://nas.example/api/items/1/images/logo?v=1', headers: {} }
 
-const episode = ({ season }: { season: number }) =>
+type EpisodeProps = { season: number }
+
+const episode = ({ season }: EpisodeProps) =>
   mediaItemFor({
     duration: 2513,
     item: summaryFor({

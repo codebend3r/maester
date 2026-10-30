@@ -6,12 +6,15 @@ import {
   type AlbumSummary,
   type Artist,
   type ArtistDetails,
+  type FavouriteChange,
+  type Lyrics,
   type TrackPage,
   isAlbumDetails,
   isAlbumList,
   isAlbumMatchCandidateList,
   isArtistDetails,
   isArtistList,
+  isLyrics,
   isTrackPage,
 } from '@/contract'
 import { type MusicListOptions, musicListQuery } from '@/musicListQuery'
@@ -26,6 +29,10 @@ type SearchAlbumMatchesProps = {
 }
 
 type SetAlbumMatchProps = { albumId: number } & AlbumMatchChoice
+
+type SetAlbumFavouriteProps = { albumId: number } & FavouriteChange
+
+type SetArtistFavouriteProps = { artistId: number } & FavouriteChange
 
 /** A music library's artists, albums and tracks, and the pages of one album or artist. */
 export const musicCalls = ({ send, expect }: Transport) => ({
@@ -86,4 +93,38 @@ export const musicCalls = ({ send, expect }: Transport) => ({
       }),
       guard: isAlbumDetails,
     }),
+
+  /** Marks an album the account's favourite, or not, and answers with its page. */
+  setAlbumFavourite: ({ albumId, favourite }: SetAlbumFavouriteProps): Promise<AlbumDetails> =>
+    expect({
+      request: send({
+        path: `/api/albums/${albumId}/favourite`,
+        method: 'PUT',
+        body: { favourite } satisfies FavouriteChange,
+      }),
+      guard: isAlbumDetails,
+    }),
+
+  /** Marks an artist the account's favourite, or not, and answers with their page. */
+  setArtistFavourite: ({ artistId, favourite }: SetArtistFavouriteProps): Promise<ArtistDetails> =>
+    expect({
+      request: send({
+        path: `/api/artists/${artistId}/favourite`,
+        method: 'PUT',
+        body: { favourite } satisfies FavouriteChange,
+      }),
+      guard: isArtistDetails,
+    }),
+
+  /** The account's favourite albums across every library it may see, most recently marked first. */
+  listFavouriteAlbums: (): Promise<AlbumSummary[]> =>
+    expect({ request: send({ path: '/api/favourites/albums' }), guard: isAlbumList }),
+
+  /** The account's favourite artists, most recently marked first. */
+  listFavouriteArtists: (): Promise<Artist[]> =>
+    expect({ request: send({ path: '/api/favourites/artists' }), guard: isArtistList }),
+
+  /** A track's lyrics: synced lines, plain text, or none, from its tags, a sidecar `.lrc` or LRCLIB. */
+  getLyrics: (id: number): Promise<Lyrics> =>
+    expect({ request: send({ path: `/api/tracks/${id}/lyrics` }), guard: isLyrics }),
 })

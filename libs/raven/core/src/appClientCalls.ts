@@ -1,19 +1,19 @@
 import { HLS_PATHS, PICTURE_PATHS } from '@/contract'
 
 /** The methods raven's device app sends. */
-export const APP_CALL_METHODS = { get: 'GET', put: 'PUT', post: 'POST' } as const
+export const APP_CALL_METHODS = { get: 'GET', put: 'PUT', post: 'POST', delete: 'DELETE' } as const
 
 export type AppCallMethod = (typeof APP_CALL_METHODS)[keyof typeof APP_CALL_METHODS]
 
 /** One route the app may ask for: its method and its path, with the server's `:name` placeholders. */
 export type AppClientCall = { method: AppCallMethod; path: string }
 
-const { get, put, post } = APP_CALL_METHODS
+const { get, put, post, delete: remove } = APP_CALL_METHODS
 
 /**
  * Every route raven's device app may ask a server for, through PR 9's screens: the
  * `@Public()` and viewer reads, the writes the spec allows (progress, plays, watched, the
- * favourites, the PIN) and the admin lock's unlock, the media ticket and the media plane.
+ * favourites, the account's playlists, the PIN) and the admin lock's unlock, the media ticket and the media plane.
  * A call the `ApiClient` makes is named after its method; the rest are the URLs the native
  * players, pictures and the event stream fetch. Nothing here is `@AdminOnly()` or kept for the
  * owner by the account gate: the server's `appClients.test.ts` checks every entry against its
@@ -43,6 +43,11 @@ export const APP_CLIENT_CALLS = {
   listTracks: { method: get, path: '/api/libraries/:id/tracks' },
   getAlbum: { method: get, path: '/api/albums/:id' },
   getArtist: { method: get, path: '/api/artists/:id' },
+  getLyrics: { method: get, path: '/api/tracks/:id/lyrics' },
+  listFavouriteAlbums: { method: get, path: '/api/favourites/albums' },
+  listFavouriteArtists: { method: get, path: '/api/favourites/artists' },
+  listPlaylists: { method: get, path: '/api/playlists' },
+  getPlaylist: { method: get, path: '/api/playlists/:id' },
 
   getItem: { method: get, path: '/api/items/:id' },
   nextEpisode: { method: get, path: '/api/items/:id/next' },
@@ -56,6 +61,7 @@ export const APP_CLIENT_CALLS = {
   getMedia: { method: get, path: '/api/media/:id' },
   nextInSession: { method: get, path: '/api/media/:id/next' },
   getTracks: { method: get, path: '/api/media/:id/tracks' },
+  getMarkers: { method: get, path: '/api/media/:id/markers' },
   getStreams: { method: get, path: '/api/media/:id/streams' },
   getMediaTicket: { method: get, path: '/api/media/:id/ticket' },
   thumbnail: { method: get, path: '/api/media/:id/thumbnail' },
@@ -66,6 +72,13 @@ export const APP_CLIENT_CALLS = {
   setWatched: { method: put, path: '/api/watched' },
   setFavourite: { method: put, path: '/api/media/:id/favourite' },
   setItemFavourite: { method: put, path: '/api/items/:id/favourite' },
+  setAlbumFavourite: { method: put, path: '/api/albums/:id/favourite' },
+  setArtistFavourite: { method: put, path: '/api/artists/:id/favourite' },
+  createPlaylist: { method: post, path: '/api/playlists' },
+  renamePlaylist: { method: put, path: '/api/playlists/:id' },
+  deletePlaylist: { method: remove, path: '/api/playlists/:id' },
+  replacePlaylistTracks: { method: put, path: '/api/playlists/:id/tracks' },
+  appendPlaylistTracks: { method: post, path: '/api/playlists/:id/tracks' },
 
   ping: { method: get, path: '/api/media-origins/ping' },
   file: { method: get, path: '/api/media/:id/file' },

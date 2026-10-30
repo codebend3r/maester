@@ -167,9 +167,10 @@ export const fileFacts = ({ media, tracks }: FileFactsProps): FileFact[] => {
     .join(' ')
   // Every track, the default first; a file whose tracks are unknown is its own codec alone.
   const listed = tracks?.audio ?? []
+  const defaultAudio = tracks?.defaultAudio ?? null
   const audioTracks = [
-    ...listed.filter((track) => track.index === tracks?.defaultAudio),
-    ...listed.filter((track) => track.index !== tracks?.defaultAudio),
+    ...listed.filter((track) => track.index === defaultAudio),
+    ...listed.filter((track) => track.index !== defaultAudio),
   ]
   const audio =
     audioTracks.length === 0

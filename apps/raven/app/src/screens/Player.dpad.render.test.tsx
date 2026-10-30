@@ -575,7 +575,7 @@ describe('Player on Android TV', () => {
     })
     const props = await loadedVideo()
     expect(BUSBOYS_UNSUBTITLED.position).toBeGreaterThan(0)
-    expect(props.source?.startPosition).toBe(0)
+    expect(props.source?.startPosition ?? null).toBe(0)
   })
 
   it("offers the file's picture subtitles in direct play and hands the pick to ExoPlayer to draw", async () => {

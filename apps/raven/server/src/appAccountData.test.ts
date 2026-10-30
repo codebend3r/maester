@@ -38,10 +38,12 @@ import {
   ENFORCED_TITLES,
   ROUTES,
   type LeftoverIds,
+  type MusicIds,
   type Route,
   type ShowIds,
   TOKEN_CARRIERS,
   addLeftovers,
+  addMusic,
   addShow,
   createEnforcedApp,
   headersFor,
@@ -62,6 +64,10 @@ let fixture: Awaited<ReturnType<typeof authFixture>>
 let enforced: Awaited<ReturnType<typeof createEnforcedApp>>
 let tv: ShowIds
 let extra: LeftoverIds
+let music: MusicIds
+
+/** The member's playlist `recordMemberViewing` keeps, found again by its name. */
+const MEMBER_MIX = 'Member mix'
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'raven-account-data-'))
@@ -69,6 +75,7 @@ beforeAll(async () => {
   enforced = await createEnforcedApp({ root, fixture, movieSeconds: MOVIE_SECONDS })
   tv = await addShow({ root, enforced })
   extra = await addLeftovers({ enforced })
+  music = await addMusic({ root, enforced })
 })
 
 afterAll(async () => {
@@ -139,7 +146,25 @@ const viewingOf = async ({ api }: ViewingOfProps) => {
     api.listDuplicates(library),
     api.getLibraryCounts(library),
   ])
+  const [album, artist, favouriteAlbums, favouriteArtists, playlists] = await Promise.all([
+    api.getAlbum(music.album),
+    api.getArtist(music.artist),
+    api.listFavouriteAlbums(),
+    api.listFavouriteArtists(),
+    api.listPlaylists(),
+  ])
   return {
+    isAlbumFavourite: album.isFavourite,
+    isArtistFavourite: artist.isFavourite,
+    favouriteAlbums: favouriteAlbums.map(({ id }) => id),
+    favouriteArtists: favouriteArtists.map(({ id }) => id),
+    playlists: await Promise.all(
+      playlists.map(async ({ id, name, trackCount }) => ({
+        name,
+        trackCount,
+        tracks: (await api.getPlaylist(id)).tracks.map((track) => track.id),
+      })),
+    ),
     movie: viewOf(movie),
     movies: movies.map(cardOf),
     history: history.map(markOf).toSorted(byId),
@@ -177,11 +202,17 @@ type RecordMemberViewingProps = { api: Client }
 
 /**
  * The member's viewing, safe to record again: the movie half watched and a favourite, the extra
- * files with a spot and a favourite, the show a favourite, its first episode marked.
+ * files with a spot and a favourite, the show a favourite, its first episode marked, the album
+ * and its artist favourites, and a playlist of the album's tracks, second first.
  */
 const recordMemberViewing = async ({ api }: RecordMemberViewingProps) => {
   const { video } = enforced.ids
   const [first] = tv.episodes
+  const kept = (await api.listPlaylists()).find(({ name }) => name === MEMBER_MIX)
+  const mix = kept?.id ?? (await api.createPlaylist({ name: MEMBER_MIX })).playlist.id
+  await api.replacePlaylistTracks({ id: mix, mediaIds: [music.tracks[1], music.tracks[0]] })
+  await api.setAlbumFavourite({ albumId: music.album, favourite: true })
+  await api.setArtistFavourite({ artistId: music.artist, favourite: true })
   await Promise.all(
     [extra.unmatched, extra.duplicate].map(async (id) => {
       await api.saveProgress({ id, position: SPOT, audio: null })
@@ -208,6 +239,11 @@ describe('each account sees only its own viewing', () => {
     const spot = { position: SPOT, favourite: true, watched: false }
     const played = { plays: 1, watched: false, marked: false }
     expect(await viewingOf({ api: member })).toEqual({
+      isAlbumFavourite: true,
+      isArtistFavourite: true,
+      favouriteAlbums: [music.album],
+      favouriteArtists: [music.artist],
+      playlists: [{ name: MEMBER_MIX, trackCount: 2, tracks: [music.tracks[1], music.tracks[0]] }],
       movie: spot,
       movies: [
         { id: video, ...spot },
@@ -246,6 +282,11 @@ describe('each account sees only its own viewing', () => {
       ],
     })
     expect(await viewingOf({ api: guest })).toEqual({
+      isAlbumFavourite: false,
+      isArtistFavourite: false,
+      favouriteAlbums: [],
+      favouriteArtists: [],
+      playlists: [],
       movie: NOBODYS,
       movies: [
         { id: video, ...NOBODYS },
@@ -281,8 +322,34 @@ describe('each account sees only its own viewing', () => {
     })
   })
 
+  it("answers another account's playlist as none, read or written", async () => {
+    const member = await clientFor({ id: AUTH_TEST_IDS.friend })
+    const guest = await clientFor({ id: AUTH_TEST_IDS.guest })
+    await recordMemberViewing({ api: member })
+    const mix = (await member.listPlaylists()).find(({ name }) => name === MEMBER_MIX)?.id ?? 0
+    const before = await member.getPlaylist(mix)
+    const refused = await Promise.all(
+      [
+        guest.getPlaylist(mix),
+        guest.renamePlaylist({ id: mix, name: 'Taken' }),
+        guest.replacePlaylistTracks({ id: mix, mediaIds: [] }),
+        guest.appendPlaylistTracks({ id: mix, mediaIds: [music.tracks[0]] }),
+        guest.deletePlaylist(mix),
+      ].map((call) =>
+        call.then(
+          () => 'answered',
+          (error: unknown) => error,
+        ),
+      ),
+    )
+    expect(refused).toEqual(refused.map(() => expect.objectContaining({ status: 404 })))
+    expect(await member.getPlaylist(mix)).toEqual(before)
+  })
+
   it('answers per-account reads uncached', async () => {
     const { library, video } = enforced.ids
+    const member = await clientFor({ id: AUTH_TEST_IDS.friend })
+    const mix = (await member.createPlaylist({ name: 'Uncached' })).playlist.id
     const reads: { route: Route; params: Record<string, number> }[] = [
       { route: ROUTES.libraryMedia, params: { id: library } },
       { route: ROUTES.shows, params: { id: tv.library } },
@@ -301,12 +368,31 @@ describe('each account sees only its own viewing', () => {
       { route: ROUTES.homeSearch, params: {} },
       { route: ROUTES.favourites, params: {} },
       { route: ROUTES.favouriteTitles, params: {} },
+      { route: ROUTES.favouriteAlbums, params: {} },
+      { route: ROUTES.favouriteArtists, params: {} },
+      { route: ROUTES.album, params: { id: music.album } },
+      { route: ROUTES.artist, params: { id: music.artist } },
+      { route: ROUTES.playlists, params: {} },
+      { route: ROUTES.playlist, params: { id: mix } },
     ]
     const writes: { route: Route; params: Record<string, number>; payload?: object }[] = [
       { route: ROUTES.progress, params: { id: video }, payload: { position: SPOT } },
       { route: ROUTES.plays, params: { id: video } },
       { route: ROUTES.mediaFavourite, params: { id: video }, payload: { favourite: true } },
       { route: ROUTES.itemFavourite, params: { id: tv.show }, payload: { favourite: true } },
+      { route: ROUTES.albumFavourite, params: { id: music.album }, payload: { favourite: true } },
+      {
+        route: ROUTES.artistFavourite,
+        params: { id: music.artist },
+        payload: { favourite: true },
+      },
+      { route: ROUTES.createPlaylist, params: {}, payload: { name: 'Another' } },
+      {
+        route: ROUTES.appendPlaylistTracks,
+        params: { id: mix },
+        payload: { mediaIds: [music.tracks[0]] },
+      },
+      { route: ROUTES.renamePlaylist, params: { id: mix }, payload: { name: 'Renamed' } },
       {
         route: ROUTES.watched,
         params: {},
@@ -578,6 +664,9 @@ describe('the viewing from before accounts', () => {
     plays: 0,
     favourites: 0,
     titleFavourites: 0,
+    albumFavourites: 0,
+    artistFavourites: 0,
+    playlists: 0,
   } as const satisfies AdoptedCounts
 
   type SpotOwnersProps = { app: NestFastifyApplication; mediaId: number }
@@ -694,7 +783,13 @@ describe('the viewing from before accounts', () => {
     const owner = await clientOn({ app, id: AUTH_TEST_IDS.owner })
 
     expect(await pastOf({ api: member, past })).toEqual(NONE_OF_IT)
-    expect(pastRows({ app })).toEqual({ spots: 1, plays: 2, favourites: 1, titleFavourites: 1 })
+    expect(pastRows({ app })).toEqual({
+      ...NO_PAST,
+      spots: 1,
+      plays: 2,
+      favourites: 1,
+      titleFavourites: 1,
+    })
 
     const home = await owner.getHome()
     expect(home.inProgress.map(({ media }) => media.id)).toEqual([past.ids.movie])

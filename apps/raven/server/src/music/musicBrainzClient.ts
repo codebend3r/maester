@@ -1,19 +1,11 @@
-import { readFileSync } from 'node:fs'
 import { Inject, Injectable } from '@nestjs/common'
 import { ALBUM_TYPES, type AlbumType, isAlbumType, isNumber, isRecord, isString } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
+import { RAVEN_USER_AGENT } from '@/music/userAgent'
 import { type RateLimit, createRateLimit, sleep } from '@/scanner/concurrency'
 
 const API = 'https://musicbrainz.org/ws/2'
-
-/** The server's own version, for the `User-Agent` MusicBrainz asks every client to send. */
-const versionOf = (): string => {
-  const parsed: unknown = JSON.parse(
-    readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
-  )
-  return isRecord(parsed) && isString(parsed.version) ? parsed.version : '0.0.0'
-}
 
 /** One call may take this long before it counts as MusicBrainz being down. */
 const TIMEOUT_MS = 10_000
@@ -210,16 +202,12 @@ type MusicBrainzClientSearchReleasesProps = {
 @Injectable()
 export class MusicBrainzClient {
   private readonly limit: RateLimit = createRateLimit({ perSecond: 1, inFlight: 1 })
-  private readonly userAgent: string
-
-  constructor(@Inject(METADATA_FETCH) private readonly fetch: MetadataFetch) {
-    this.userAgent = `raven/${versionOf()} (https://github.com/codebend3r/maester)`
-  }
+  constructor(@Inject(METADATA_FETCH) private readonly fetch: MetadataFetch) {}
 
   private async get({ path, params }: MusicBrainzClientGetProps): Promise<unknown> {
     const query = new URLSearchParams({ ...params, fmt: 'json' })
     const url = `${API}${path}?${query.toString()}`
-    const headers = { [HEADERS.accept]: CONTENT_TYPES.json, [HEADERS.userAgent]: this.userAgent }
+    const headers = { [HEADERS.accept]: CONTENT_TYPES.json, [HEADERS.userAgent]: RAVEN_USER_AGENT }
     const attempt = async (retriesLeft: number): Promise<unknown> => {
       const response = await this.limit
         .run(() => this.fetch({ url, init: { headers, signal: AbortSignal.timeout(TIMEOUT_MS) } }))

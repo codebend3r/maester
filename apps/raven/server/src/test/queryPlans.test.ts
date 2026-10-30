@@ -6,7 +6,8 @@ import { PRODUCTION_STATISTICS } from '@/test/queryPlans'
  * Tables the copy has no statistics for, as `ANALYZE` gives an empty table
  * none: `ai_decisions` was empty on the real server, and `saga_backdrops`,
  * `person_credits`, `score_requests`, `bug_reports`, `media_markers`,
- * `media_fingerprints` and the music tables came after the copy was taken.
+ * `media_fingerprints`, the music tables, the playlists, the album and
+ * artist favourites and the lyrics cache came after the copy was taken.
  */
 const NOT_IN_THE_COPY: ReadonlySet<string> = new Set([
   'ai_decisions',
@@ -21,6 +22,11 @@ const NOT_IN_THE_COPY: ReadonlySet<string> = new Set([
   'album_artists',
   'tracks',
   'track_artists',
+  'playlists',
+  'playlist_tracks',
+  'album_favourites',
+  'artist_favourites',
+  'track_lyrics',
 ])
 
 type KeyOfProps = { table: string; index: string | null }

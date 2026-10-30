@@ -267,7 +267,7 @@ describe('hlsArgs', () => {
     expect(args[args.indexOf('-filter_complex') + 1]).toBe(
       "[0:V:0]trim=start=2.000[base];[base][0:s:0]overlay=eof_action=pass,scale=w=-2:h='min(1080,ih)'[vout]",
     )
-    expect(args[args.indexOf('-force_key_frames') + 1]?.split(',')[0]).toBe('2.000')
+    expect(args[args.indexOf('-force_key_frames') + 1]?.split(',')[0] ?? null).toBe('2.000')
     expect(args[args.indexOf('-output_ts_offset') + 1]).toBe('22.42')
     expect(args).toContain('1:a:1')
   })

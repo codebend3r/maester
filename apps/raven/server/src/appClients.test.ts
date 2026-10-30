@@ -20,13 +20,24 @@ const calls = Object.entries(APP_CLIENT_CALLS)
 const routeOf = ({ method, path }: AppClientCall) =>
   routes.find((route) => route.method === method && route.path === path)
 
-/** The spec's writes (progress, plays, watched, the favourites, the PIN), and the admin lock's unlock, ruled in by Task 17. */
+/**
+ * The spec's writes (progress, plays, watched, the favourites, the PIN), and the admin lock's
+ * unlock, ruled in by Task 17; and the account's playlists and its album and artist favourites,
+ * by the audio spec's PR 7.
+ */
 const WRITES = [
   APP_CLIENT_CALLS.saveProgress,
   APP_CLIENT_CALLS.recordPlay,
   APP_CLIENT_CALLS.setWatched,
   APP_CLIENT_CALLS.setFavourite,
   APP_CLIENT_CALLS.setItemFavourite,
+  APP_CLIENT_CALLS.setAlbumFavourite,
+  APP_CLIENT_CALLS.setArtistFavourite,
+  APP_CLIENT_CALLS.createPlaylist,
+  APP_CLIENT_CALLS.renamePlaylist,
+  APP_CLIENT_CALLS.deletePlaylist,
+  APP_CLIENT_CALLS.replacePlaylistTracks,
+  APP_CLIENT_CALLS.appendPlaylistTracks,
   APP_CLIENT_CALLS.unlock,
   APP_CLIENT_CALLS.unlockAdmin,
 ]
@@ -97,6 +108,13 @@ describe('the calls raven’s app may make', () => {
       api.setWatched({ watched: true, targets: [{ kind: WATCH_TARGET_KINDS.media, id: 7 }] }),
       api.setFavourite({ id: 7, favourite: true }),
       api.setItemFavourite({ id: 3, favourite: true }),
+      api.setAlbumFavourite({ albumId: 4, favourite: true }),
+      api.setArtistFavourite({ artistId: 5, favourite: true }),
+      api.createPlaylist({ name: 'Mix' }),
+      api.renamePlaylist({ id: 6, name: 'Mix' }),
+      api.deletePlaylist(6),
+      api.replacePlaylistTracks({ id: 6, mediaIds: [7] }),
+      api.appendPlaylistTracks({ id: 6, mediaIds: [7] }),
       api.unlock('1234'),
       api.unlockAdmin('password'),
     ])

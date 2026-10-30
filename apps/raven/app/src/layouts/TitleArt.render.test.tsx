@@ -19,6 +19,6 @@ describe('TitleArt', () => {
     expect(labelled.type).toBe('View')
     expect(labelled.children).toHaveLength(1)
     const [art] = labelled.children
-    expect(typeof art === 'string' ? null : art?.props.accessible).toBeUndefined()
+    expect(typeof art === 'string' ? null : (art?.props.accessible ?? null)).toBeNull()
   })
 })

@@ -116,7 +116,7 @@ describe('allFileFacts', () => {
         frameRate: null,
       },
     }).find((fact) => fact.label === 'Audio')
-    expect(audio?.values).toEqual(['Japanese (DTS 7 ch)', 'English (Dolby Digital 5.1)'])
+    expect(audio?.values ?? null).toEqual(['Japanese (DTS 7 ch)', 'English (Dolby Digital 5.1)'])
   })
 
   it('leaves out a bitrate the file has not been probed for', () => {

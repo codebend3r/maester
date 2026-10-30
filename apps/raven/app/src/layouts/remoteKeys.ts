@@ -75,11 +75,16 @@ const SEEK_DIRECTIONS: Partial<Record<RemoteKey, -1 | 1>> = {
 /** A held left or right: which way it goes, and whether the key is going down or coming up. */
 export type HeldSeek = { direction: -1 | 1; isDown: boolean }
 
+type HeldSeekOfProps = {
+  eventType: string
+  eventKeyAction?: unknown
+}
+
 /**
  * A held left or right, going down or coming up; null for any other event. The fork names a held
  * key once as it goes down and once as it comes up, so the player runs the playhead between.
  */
-export const heldSeekOf = ({ eventType, eventKeyAction }: PressedKeyOfProps): HeldSeek | null => {
+export const heldSeekOf = ({ eventType, eventKeyAction }: HeldSeekOfProps): HeldSeek | null => {
   const direction = isLongPress(eventType) ? SEEK_DIRECTIONS[LONG_PRESSES[eventType]] : undefined
   return direction === undefined
     ? null

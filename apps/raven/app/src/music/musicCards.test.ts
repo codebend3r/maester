@@ -37,7 +37,7 @@ describe('musicCards', () => {
       shape: CARD_SHAPES.poster,
       target: { kind: ROUTE_TARGETS.album, albumId: 7 },
     })
-    expect(card.picture?.headers).toEqual({ cookie: 'raven_unlock=1' })
+    expect(card.picture?.headers ?? null).toEqual({ cookie: 'raven_unlock=1' })
   })
 
   it('draws an album with no cover with no picture', () => {
@@ -48,8 +48,8 @@ describe('musicCards', () => {
 
   it('lays a library out as one open run of albums, and none when it has none', () => {
     const [section] = albumSectionsOf({ api, headersFor, albums: [ALBUM] })
-    expect(section?.title).toBeNull()
-    expect(section?.cards.map((card) => card.key)).toEqual(['album:7'])
+    expect(section?.title ?? null).toBeNull()
+    expect(section?.cards.map((card) => card.key) ?? null).toEqual(['album:7'])
     expect(albumSectionsOf({ api, headersFor, albums: [] })).toEqual([])
   })
 

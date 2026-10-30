@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { APP_CALL_METHODS, APP_CLIENT_CALLS, appClientCallOf } from '@/appClientCalls'
 
-const { get, put, post } = APP_CALL_METHODS
-
-/** A method the server takes that the app never sends. */
-const UNSENT_METHODS = { delete: 'DELETE' } as const
+const { get, put, post, delete: remove } = APP_CALL_METHODS
 
 type CallOfProps = { method: string; url: string }
 
@@ -64,7 +61,10 @@ describe('appClientCallOf', () => {
   })
 
   it('is no call for a route the app has no business with', () => {
-    expect(callOf({ method: UNSENT_METHODS.delete, url: '/api/media/4' })).toBeNull()
+    expect(callOf({ method: remove, url: '/api/media/4' })).toBeNull()
+    expect(callOf({ method: remove, url: '/api/playlists/4' })).toBe(
+      APP_CLIENT_CALLS.deletePlaylist,
+    )
     expect(callOf({ method: post, url: '/api/libraries/1/scan' })).toBeNull()
     expect(callOf({ method: get, url: '/api/fs/browse' })).toBeNull()
     expect(callOf({ method: get, url: '/api/lock/' })).toBeNull()
