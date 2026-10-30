@@ -9,14 +9,18 @@ type AlbumCoverProps = {
   sizes: PosterSizes
 }
 
-/** An album's cover at the width it shows, else the album's initial; the frame is the container's. */
-export const AlbumCover = ({ album, sizes }: AlbumCoverProps) => {
+type CoverSourcesProps = AlbumCoverProps
+
+/** The cover's one source, with its widths when the server scales it; none when it has no cover. */
+const coverSources = ({ album, sizes }: CoverSourcesProps) => {
   const src = api.albumCoverUrl({ albumId: album.id, coverVersion: album.coverVersion })
   const srcSet = api.albumCoverSrcSet({ albumId: album.id, coverVersion: album.coverVersion })
-  return (
-    <Picture
-      sources={src === null ? [] : [srcSet === null ? { src } : { src, srcSet, sizes }]}
-      initial={album.title.slice(0, 1)}
-    />
-  )
+  if (src === null) return []
+  if (srcSet === null) return [{ src }]
+  return [{ src, srcSet, sizes }]
 }
+
+/** An album's cover at the width it shows, else the album's initial; the frame is the container's. */
+export const AlbumCover = ({ album, sizes }: AlbumCoverProps) => (
+  <Picture sources={coverSources({ album, sizes })} initial={album.title.slice(0, 1)} />
+)

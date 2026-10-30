@@ -1,6 +1,8 @@
 import { RATING_SOURCES, type Rating, type RatingSource, pickScore } from '@raven/core'
 import { RATING_SOURCE_LABELS } from '@/lib/ratingSources'
+import { RATING_PANEL_COPY } from '@/components/RatingPanel/copy'
 import styles from '@/components/RatingPanel/RatingPanel.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** Every source, in the order the panel lists them. */
 const SOURCE_ORDER = [
@@ -22,43 +24,31 @@ const outOfTen = (rating: Rating): string => rating.value.toFixed(1)
  * whose it is.
  */
 const SOURCES = {
-  rottenTomatoes: {
+  [RATING_SOURCES.rottenTomatoes]: {
     site: RATING_SOURCE_LABELS.rottenTomatoes,
-    label: 'Tomatometer',
-    meaning: 'Critics who reviewed it positively',
+    ...RATING_PANEL_COPY.sources[RATING_SOURCES.rottenTomatoes],
     score: percent,
-    shown: '%',
-    spoken: '%',
     className: styles.rottenTomatoes,
     isNamedOnCards: true,
   },
-  imdb: {
+  [RATING_SOURCES.imdb]: {
     site: RATING_SOURCE_LABELS.imdb,
-    label: 'IMDb',
-    meaning: 'Average user rating',
+    ...RATING_PANEL_COPY.sources[RATING_SOURCES.imdb],
     score: outOfTen,
-    shown: '/10',
-    spoken: ' out of 10',
     className: styles.imdb,
     isNamedOnCards: true,
   },
-  metacritic: {
+  [RATING_SOURCES.metacritic]: {
     site: RATING_SOURCE_LABELS.metacritic,
-    label: 'Metascore',
-    meaning: 'Weighted critic score',
+    ...RATING_PANEL_COPY.sources[RATING_SOURCES.metacritic],
     score: percent,
-    shown: '/100',
-    spoken: ' out of 100',
     className: styles.metacritic,
     isNamedOnCards: false,
   },
-  tmdb: {
+  [RATING_SOURCES.tmdb]: {
     site: RATING_SOURCE_LABELS.tmdb,
-    label: 'TMDB',
-    meaning: 'Average user rating',
+    ...RATING_PANEL_COPY.sources[RATING_SOURCES.tmdb],
     score: outOfTen,
-    shown: '/10',
-    spoken: ' out of 10',
     className: styles.tmdb,
     isNamedOnCards: true,
   },
@@ -88,7 +78,12 @@ const RatingItem = ({ rating }: RatingItemProps) => {
       className={`${styles.item} ${source.className}`}
       // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focus is how the keyboard reaches the tooltip
       tabIndex={0}
-      aria-label={`${source.site}: ${score}${source.spoken}. ${source.meaning}.`}
+      aria-label={RATING_PANEL_COPY.itemLabel({
+        site: source.site,
+        score,
+        spoken: source.spoken,
+        meaning: source.meaning,
+      })}
     >
       <span className={styles.score} aria-hidden="true">
         <span className={styles.value}>{score}</span>
@@ -130,7 +125,9 @@ export const RatingBadge = ({ rating, isBare = false }: RatingBadgeProps) => {
   const shape = badgeShape({ isBare, isNamed: source.isNamedOnCards })
   return (
     <span className={`${styles.badge} ${shape} ${source.className}`}>
-      <span className="visually-hidden">{`${source.site}: ${score}${source.spoken}`}</span>
+      <span className="visually-hidden">
+        {RATING_PANEL_COPY.badgeLabel({ site: source.site, score, spoken: source.spoken })}
+      </span>
       <span className={styles.badgeScore} aria-hidden="true">
         <span className={styles.badgeValue}>{score}</span>
         {!isBare && <span className={styles.badgeScale}>{source.shown}</span>}
@@ -160,7 +157,7 @@ export const RatingPanel = ({ ratings }: RatingPanelProps) => {
   )
   return (
     scored.length > 0 && (
-      <ul className={styles.panel} aria-label="Ratings">
+      <ul className={styles.panel} aria-label={RATING_PANEL_COPY.ratings}>
         {scored.map((rating) => (
           <RatingItem key={rating.source} rating={rating} />
         ))}
@@ -187,14 +184,22 @@ type RatingChipProps = {
 export const RatingChip = ({ ratings, lead = RATING_SOURCES.tmdb }: RatingChipProps) => {
   const scored = inSourceOrder(ratings)
   const first = pickScore({ ratings: scored, source: lead }) ?? scored[0]
-  if (!first) return null
+  return first && <RatingChipFace scored={scored} first={first} />
+}
+
+type RatingChipFaceProps = { scored: readonly Rating[]; first: Rating }
+
+const RatingChipFace = ({ scored, first }: RatingChipFaceProps) => {
   const more = scored.length - 1
   const spoken = scored
-    .map(
-      (rating) =>
-        `${SOURCES[rating.source].site} ${SOURCES[rating.source].score(rating)}${SOURCES[rating.source].spoken}`,
+    .map((rating) =>
+      RATING_PANEL_COPY.chipEntry({
+        site: SOURCES[rating.source].site,
+        score: SOURCES[rating.source].score(rating),
+        spoken: SOURCES[rating.source].spoken,
+      }),
     )
-    .join(', ')
+    .join(COMMON_COPY.listSeparator)
   return (
     <span
       className={styles.chip}
@@ -202,11 +207,11 @@ export const RatingChip = ({ ratings, lead = RATING_SOURCES.tmdb }: RatingChipPr
       role="img"
       // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focus is how the keyboard reaches the popover
       tabIndex={more > 0 ? 0 : undefined}
-      aria-label={`Ratings: ${spoken}`}
+      aria-label={RATING_PANEL_COPY.chipLabel(spoken)}
     >
       <span className={styles.chipFace} aria-hidden="true">
         <RatingBadge rating={first} />
-        {more > 0 && <span className={styles.chipMore}>{`+${more}`}</span>}
+        {more > 0 && <span className={styles.chipMore}>{RATING_PANEL_COPY.more(more)}</span>}
       </span>
       {more > 0 && (
         <ul className={styles.popover} aria-hidden="true">

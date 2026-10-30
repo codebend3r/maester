@@ -3,9 +3,11 @@ import { type MediaItem, cardLink, plural } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@raven/ui'
+import { MOVIE_FILES_COPY } from '@/components/MovieFiles/copy'
 import { api } from '@/lib/api'
 import { afterSplit } from '@raven/ui/headless'
 import styles from '@/components/MovieFiles/MovieFiles.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type OtherCardsProps = {
   files: readonly MediaItem[]
@@ -63,7 +65,13 @@ export const MovieFiles = ({ files, everyCard, itemId }: MovieFilesProps) => {
   return (
     <section className={styles.files} aria-labelledby={ids.heading}>
       <h3 id={ids.heading} className={styles.heading}>
-        {isShared ? plural({ n: files.length, one: 'file', many: 'files' }) : 'File'}
+        {isShared
+          ? plural({
+              n: files.length,
+              one: MOVIE_FILES_COPY.fileUnit,
+              many: MOVIE_FILES_COPY.filesUnit,
+            })
+          : COMMON_COPY.file}
       </h3>
       <ul className={styles.list}>
         {files.map((file) => (
@@ -76,19 +84,16 @@ export const MovieFiles = ({ files, everyCard, itemId }: MovieFilesProps) => {
       {isShared && (
         <div className={styles.split}>
           <Button icon="split" disabled={busy} onClick={() => split.mutate()}>
-            Split apart
+            {MOVIE_FILES_COPY.splitApart}
           </Button>
-          <p className={styles.hint}>
-            Gives each file a card of its own in this library. One that is another movie can then be
-            fixed with Fix match on its own page.
-          </p>
+          <p className={styles.hint}>{MOVIE_FILES_COPY.splitHint}</p>
         </div>
       )}
 
       {others.length > 0 && (
         <section className={styles.others} aria-labelledby={ids.others}>
           <h4 id={ids.others} className={styles.heading}>
-            On cards of their own
+            {MOVIE_FILES_COPY.ownCards}
           </h4>
           <ul className={styles.list}>
             {others.map((card) => {
@@ -97,7 +102,7 @@ export const MovieFiles = ({ files, everyCard, itemId }: MovieFilesProps) => {
                 lead && (
                   <li key={lead.id} className={styles.file}>
                     <Link to={cardLink({ media: lead, hasPages: true }).to} className={styles.card}>
-                      {card.map((file) => file.fileName).join(', ')}
+                      {card.map((file) => file.fileName).join(COMMON_COPY.listSeparator)}
                     </Link>
                   </li>
                 )
@@ -106,7 +111,7 @@ export const MovieFiles = ({ files, everyCard, itemId }: MovieFilesProps) => {
           </ul>
           <div className={styles.split}>
             <Button icon="merge" disabled={busy} onClick={() => join.mutate()}>
-              Put back together
+              {MOVIE_FILES_COPY.putBack}
             </Button>
           </div>
         </section>
@@ -117,10 +122,8 @@ export const MovieFiles = ({ files, everyCard, itemId }: MovieFilesProps) => {
           {failure.message}
         </p>
       )}
-      {split.isSuccess && (
-        <output className={styles.note}>Each file has a card of its own now.</output>
-      )}
-      {join.isSuccess && <output className={styles.note}>Every file is back on one card.</output>}
+      {split.isSuccess && <output className={styles.note}>{MOVIE_FILES_COPY.splitDone}</output>}
+      {join.isSuccess && <output className={styles.note}>{MOVIE_FILES_COPY.joinDone}</output>}
     </section>
   )
 }

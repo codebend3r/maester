@@ -1,10 +1,29 @@
 import { Button, Icon } from '@raven/ui'
 import type { Track } from '@raven/core'
 import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
-import type { ReactNode } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { TRACK_LIST_COPY } from '@/components/TrackList/copy'
 import { artistPath, trackLength } from '@/lib/music'
 import styles from '@/components/TrackList/TrackList.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
+
+/** What a row's leading cell shows: a speaker while its track plays, else its number. */
+const LEAD_KINDS = { speaker: 'speaker', number: 'number' } as const
+type LeadKind = (typeof LEAD_KINDS)[keyof typeof LEAD_KINDS]
+
+type LeadProps = { number: number | null }
+
+const Speaker = () => <Icon name="volume" size="1em" />
+
+type TrackNumberProps = LeadProps
+
+const TrackNumber = ({ number }: TrackNumberProps) => number ?? ''
+
+const LEADS = {
+  [LEAD_KINDS.speaker]: Speaker,
+  [LEAD_KINDS.number]: TrackNumber,
+} as const satisfies Record<LeadKind, ComponentType<LeadProps>>
 
 type TrackRowProps = {
   track: Track
@@ -27,38 +46,43 @@ const TrackRow = ({
   onPlay,
   trail,
   shouldShowArtists,
-}: TrackRowProps) => (
-  <li
-    className={isPlaying || isPaused ? `${styles.row} ${styles.current}` : styles.row}
-    aria-current={isPlaying || isPaused ? 'true' : undefined}
-  >
-    <span className={styles.number} aria-hidden="true">
-      {isPlaying ? <Icon name="volume" size="1em" /> : (number ?? '')}
-    </span>
-    <Button
-      tone="ghost"
-      className={styles.play}
-      icon={isPlaying ? 'pause' : 'play'}
-      aria-label={isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
-      onClick={onPlay}
-    />
-    <span className={styles.title}>
-      <span className={styles.name}>{track.title}</span>
-      {shouldShowArtists && (
-        <span className={styles.artists}>
-          {track.artists.map((artist, index) => (
-            <span key={artist.id}>
-              {index > 0 && ', '}
-              <Link to={artistPath(artist.id)}>{artist.name}</Link>
-            </span>
-          ))}
-        </span>
-      )}
-    </span>
-    <span className={styles.length}>{trackLength(track.duration)}</span>
-    {trail && <span className={styles.trail}>{trail}</span>}
-  </li>
-)
+}: TrackRowProps) => {
+  const Lead = LEADS[isPlaying ? LEAD_KINDS.speaker : LEAD_KINDS.number]
+  return (
+    <li
+      className={isPlaying || isPaused ? `${styles.row} ${styles.current}` : styles.row}
+      aria-current={isPlaying || isPaused ? 'true' : undefined}
+    >
+      <span className={styles.number} aria-hidden="true">
+        <Lead number={number} />
+      </span>
+      <Button
+        tone="ghost"
+        className={styles.play}
+        icon={isPlaying ? 'pause' : 'play'}
+        aria-label={
+          isPlaying ? TRACK_LIST_COPY.pause(track.title) : TRACK_LIST_COPY.play(track.title)
+        }
+        onClick={onPlay}
+      />
+      <span className={styles.title}>
+        <span className={styles.name}>{track.title}</span>
+        {shouldShowArtists && (
+          <span className={styles.artists}>
+            {track.artists.map((artist, index) => (
+              <span key={artist.id}>
+                {index > 0 && COMMON_COPY.listSeparator}
+                <Link to={artistPath(artist.id)}>{artist.name}</Link>
+              </span>
+            ))}
+          </span>
+        )}
+      </span>
+      <span className={styles.length}>{trackLength(track.duration)}</span>
+      {trail && <span className={styles.trail}>{trail}</span>}
+    </li>
+  )
+}
 
 /** What a row's controls are told: the track and its place in the list. */
 export type TrailProps = { track: Track; index: number }
@@ -113,7 +137,7 @@ export const TrackList = ({
             isPlaying={isPlaying}
             isPaused={isCurrent && state === AUDIO_STATES.paused}
             onPlay={() => (isCurrent ? toggle() : onPlay(index))}
-            trail={Trail === undefined ? null : <Trail track={track} index={index} />}
+            trail={Trail !== undefined && <Trail track={track} index={index} />}
             shouldShowArtists={shouldShowArtists}
           />
         )

@@ -1,10 +1,12 @@
 import type { AlbumSummary } from '@raven/core'
 import { Link } from 'react-router-dom'
+import { ALBUM_GRID_COPY } from '@/components/AlbumGrid/copy'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { albumPath, artistPath } from '@/lib/music'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/AlbumGrid/AlbumGrid.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type AlbumCardProps = { album: AlbumSummary }
 
@@ -21,11 +23,13 @@ const AlbumCard = ({ album }: AlbumCardProps) => (
     <p className={styles.artists}>
       {album.artists.map((artist, index) => (
         <span key={artist.id}>
-          {index > 0 && ', '}
+          {index > 0 && COMMON_COPY.listSeparator}
           <Link to={artistPath(artist.id)}>{artist.name}</Link>
         </span>
       ))}
-      {album.year !== null && <span className={styles.year}> · {album.year}</span>}
+      {album.year !== null && (
+        <span className={styles.year}>{ALBUM_GRID_COPY.year(album.year)}</span>
+      )}
     </p>
   </li>
 )
