@@ -1,4 +1,5 @@
 import { Logo } from '@/components/Logo/Logo'
+import { GET_COPY } from '@/pages/GetPage/copy'
 import styles from '@/pages/GetPage/AppPreview.module.scss'
 
 /** The side menu's rows, as wide as their names would be; the first is the page it is on. */
@@ -45,7 +46,7 @@ export const AppPreview = () => (
           <span className={styles.swatch} />
         </span>
         <span className={styles.feature}>
-          <span className={styles.featureTitle}>Dune: Part Two</span>
+          <span className={styles.featureTitle}>{GET_COPY.previewFeature}</span>
           <span className={styles.play} />
         </span>
         <span className={styles.shelfHead} />

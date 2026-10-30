@@ -11,6 +11,7 @@ import {
   sectionPath,
   sectionsFor,
 } from '@/pages/LibraryPage/librarySections'
+import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
 type LibraryTabsProps = {
@@ -34,7 +35,7 @@ export const LibraryTabs = ({ library, current }: LibraryTabsProps) => {
     ...counts.data,
   }
   return (
-    <nav aria-label="Sections" className={styles.tabsNav}>
+    <nav aria-label={LIBRARY_COPY.sections} className={styles.tabsNav}>
       <ul className={styles.tabs}>
         {sectionsFor(library.settings.kind).map((section) => {
           const text = countText({ section, tallies })

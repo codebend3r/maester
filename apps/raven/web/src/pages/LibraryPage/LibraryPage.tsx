@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { type Library, ROUTE_STATES, routeState } from '@raven/core'
+import { type Library, ROUTE_STATES, type RouteQuery, routeState } from '@raven/core'
 import { useId } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { LibraryActionErrors, useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
@@ -11,10 +12,12 @@ import { libraryPollDelay } from '@/lib/libraryPolling'
 import { LIBRARY_LOCK_STATES, useLibraryLock } from '@/lib/libraryLock'
 import { librariesQuery, libraryQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
+import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import { LibraryHeader } from '@/pages/LibraryPage/LibraryHeader'
 import { LibraryTabs } from '@/pages/LibraryPage/LibraryTabs'
 import { SectionView } from '@/pages/LibraryPage/SectionViews'
 import {
+  type LibrarySection,
   SECTIONS,
   hasSection,
   openingSection,
@@ -24,28 +27,19 @@ import {
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 
-type LibraryViewProps = { library: Library; param: string | undefined }
+const LIBRARY_VIEW_KEYS = { missing: 'missing', elsewhere: 'elsewhere', open: 'open' } as const
 
-/** The page once its library is known, open at one of its tabs. */
-const LibraryView = ({ library, param }: LibraryViewProps) => {
-  const titleId = useId()
-  const { kind } = library.settings
-  const section = sectionFrom({ param, kind })
-  // A locked library's videos are not asked for until this browser has the PIN.
-  const lock = useLibraryLock(library)
+type OpenLibraryProps = {
+  library: Library
+  section: LibrarySection
+  titleId: string
+  lock: ReturnType<typeof useLibraryLock>
+  actions: ReturnType<typeof useLibraryActions>
+}
+
+/** The library open at one of its tabs. */
+const OpenLibrary = ({ library, section, titleId, lock, actions }: OpenLibraryProps) => {
   const isShut = lock.state !== LIBRARY_LOCK_STATES.open
-  const actions = useLibraryActions(library)
-
-  if (section == null) return <NotFoundPage />
-  if (!hasSection({ kind, section })) {
-    return (
-      <Navigate
-        to={sectionPath({ libraryId: library.id, section: openingSection(kind) })}
-        replace
-      />
-    )
-  }
-
   return (
     <section className={styles.page} aria-labelledby={titleId}>
       <LibraryHeader titleId={titleId} library={library} actions={actions} isShut={isShut} />
@@ -70,6 +64,58 @@ const LibraryView = ({ library, param }: LibraryViewProps) => {
   )
 }
 
+type ToSectionProps = { to: string }
+
+/** Away from a tab the library's type does not have. */
+const ToSection = ({ to }: ToSectionProps) => <Navigate to={to} replace />
+
+type LibraryViewsProps = {
+  [LIBRARY_VIEW_KEYS.missing]: Record<never, never>
+  [LIBRARY_VIEW_KEYS.elsewhere]: ToSectionProps
+  [LIBRARY_VIEW_KEYS.open]: OpenLibraryProps
+}
+
+const LIBRARY_VIEWS = {
+  [LIBRARY_VIEW_KEYS.missing]: NotFoundPage,
+  [LIBRARY_VIEW_KEYS.elsewhere]: ToSection,
+  [LIBRARY_VIEW_KEYS.open]: OpenLibrary,
+} as const satisfies ViewsOf<LibraryViewsProps>
+
+type LibraryViewOfProps = Omit<OpenLibraryProps, 'section'> & { section: LibrarySection | null }
+
+/** Which view the library shows: no such tab, a tab its type has not, or the tab. */
+const libraryViewOf = ({
+  library,
+  section,
+  ...rest
+}: LibraryViewOfProps): ViewOf<LibraryViewsProps> => {
+  if (section == null) return { key: LIBRARY_VIEW_KEYS.missing, props: {} }
+  const { kind } = library.settings
+  if (!hasSection({ kind, section }))
+    return {
+      key: LIBRARY_VIEW_KEYS.elsewhere,
+      props: { to: sectionPath({ libraryId: library.id, section: openingSection(kind) }) },
+    }
+  return { key: LIBRARY_VIEW_KEYS.open, props: { library, section, ...rest } }
+}
+
+type LibraryViewProps = { library: Library; param: string | undefined }
+
+/** The page once its library is known, open at one of its tabs. */
+const LibraryView = ({ library, param }: LibraryViewProps) => {
+  const titleId = useId()
+  const section = sectionFrom({ param, kind: library.settings.kind })
+  // A locked library's videos are not asked for until this browser has the PIN.
+  const lock = useLibraryLock(library)
+  const actions = useLibraryActions(library)
+  return (
+    <KeyedView<LibraryViewsProps>
+      views={LIBRARY_VIEWS}
+      view={libraryViewOf({ library, section, titleId, lock, actions })}
+    />
+  )
+}
+
 /** The page before anything of its library is known: the way back, its title and counts, its tabs, and a grid of cards. */
 const LibrarySkeleton = () => (
   <>
@@ -80,6 +126,30 @@ const LibrarySkeleton = () => (
     <MediaGridSkeleton />
   </>
 )
+
+const LIBRARY_PAGE_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
+
+type LibraryPageViewsProps = {
+  [LIBRARY_PAGE_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
+  [LIBRARY_PAGE_VIEW_KEYS.ready]: LibraryViewProps
+}
+
+const LIBRARY_PAGE_VIEWS = {
+  [LIBRARY_PAGE_VIEW_KEYS.pending]: RouteState,
+  [LIBRARY_PAGE_VIEW_KEYS.ready]: LibraryView,
+} as const satisfies ViewsOf<LibraryPageViewsProps>
+
+type LibraryPageViewProps = { page: RouteQuery<Library>; param: string | undefined }
+
+/** Which view the page shows: its library on its way or failing, or the library. */
+const libraryPageView = ({ page, param }: LibraryPageViewProps): ViewOf<LibraryPageViewsProps> => {
+  if (page.state !== ROUTE_STATES.ready)
+    return {
+      key: LIBRARY_PAGE_VIEW_KEYS.pending,
+      props: { state: page, noun: LIBRARY_COPY.noun, shape: <LibrarySkeleton /> },
+    }
+  return { key: LIBRARY_PAGE_VIEW_KEYS.ready, props: { library: page.data, param } }
+}
 
 /**
  * `/libraries/:id`: a library's videos or shows, searched, sorted and laid
@@ -100,8 +170,10 @@ export const LibraryPage = () => {
       libraryPollDelay({ libraries: current.state.data ? [current.state.data] : [] }),
   })
   const page = routeState({ id: libraryId, query: library })
-  if (page.state !== ROUTE_STATES.ready) {
-    return <RouteState state={page} noun="library" shape={<LibrarySkeleton />} />
-  }
-  return <LibraryView library={page.data} param={param} />
+  return (
+    <KeyedView<LibraryPageViewsProps>
+      views={LIBRARY_PAGE_VIEWS}
+      view={libraryPageView({ page, param })}
+    />
+  )
 }

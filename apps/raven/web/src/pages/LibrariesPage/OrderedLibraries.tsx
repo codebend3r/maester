@@ -3,6 +3,7 @@ import { type DragEvent, useState } from 'react'
 import { Button, Icon } from '@raven/ui'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import type { useLibraryOrdering } from '@/lib/useLibraryOrdering'
+import { LIBRARIES_COPY } from '@/pages/LibrariesPage/copy'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 
 /** Firefox starts no drag that sets no data. */
@@ -45,14 +46,14 @@ const ThinLibraryRow = ({ library, place, isDragging, drag }: ThinLibraryRowProp
       <Button
         icon="up"
         tone="ghost"
-        aria-label={`Move ${library.name} up`}
+        aria-label={LIBRARIES_COPY.moveUp(library.name)}
         disabled={place.isFirst}
         onClick={() => place.onMove(-1)}
       />
       <Button
         icon="down"
         tone="ghost"
-        aria-label={`Move ${library.name} down`}
+        aria-label={LIBRARIES_COPY.moveDown(library.name)}
         disabled={place.isLast}
         onClick={() => place.onMove(1)}
       />
@@ -70,7 +71,7 @@ type OrderedLibrariesProps = { ordering: ReturnType<typeof useLibraryOrdering> }
 export const OrderedLibraries = ({ ordering }: OrderedLibrariesProps) => {
   const [draggingId, setDraggingId] = useState<number | null>(null)
   return (
-    <ul className={styles.list} aria-label="Libraries, in order">
+    <ul className={styles.list} aria-label={LIBRARIES_COPY.inOrder}>
       {ordering.ordered.map((library, index) => (
         <ThinLibraryRow
           key={library.id}

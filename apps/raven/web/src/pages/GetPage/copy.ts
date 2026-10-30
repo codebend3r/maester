@@ -1,0 +1,25 @@
+export const GET_COPY = {
+  nav: 'Get raven',
+  openWebApp: 'Open web app',
+  headline: 'Your films and shows, from your own server.',
+  pitch:
+    'raven plays the library you already keep. Install it on your computer, or open it in any browser pointed at your server.',
+  downloadFor: (name: string) => `Download for ${name}`,
+  openInBrowser: 'Open in your browser',
+  everySystem: 'macOS, Windows and Linux',
+  needsSeparator: ' ·',
+  otherPlatforms: 'Other platforms',
+  chooseYours: 'Choose yours',
+  about: 'raven · a self-hosted video library and player',
+  source: 'Source on GitHub',
+  releaseNotes: 'Release notes',
+  previewFeature: 'Dune: Part Two',
+  yourSystem: 'Your system',
+  fileOf: (name: string) => `${name}, `,
+  inTheBrowser: 'In the browser',
+  nothingToInstall: 'Nothing to install',
+  yourServer: 'Your server',
+  downloadsTitle: 'Get raven',
+  downloadsLead:
+    'The desktop app and the web app are the same raven. Pick whichever suits the screen.',
+} as const

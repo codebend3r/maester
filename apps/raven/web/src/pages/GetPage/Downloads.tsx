@@ -2,6 +2,7 @@ import { type FormEvent, useId, useRef, useState } from 'react'
 import { ButtonLink, Icon } from '@raven/ui'
 import { LATEST_RELEASE, webAppAddress } from '@/pages/GetPage/links'
 import { type OperatingSystem, PLATFORMS } from '@/pages/GetPage/platforms'
+import { GET_COPY } from '@/pages/GetPage/copy'
 import styles from '@/pages/GetPage/Downloads.module.scss'
 
 type PlatformCardProps = {
@@ -26,7 +27,7 @@ const PlatformCard = ({ platform, isYours }: PlatformCardProps) => {
           {platform.name}
         </h3>
         <p className={styles.needs}>{platform.needs}</p>
-        {isYours && <p className={styles.badge}>Your system</p>}
+        {isYours && <p className={styles.badge}>{GET_COPY.yourSystem}</p>}
       </header>
       <ul className={styles.files}>
         {platform.files.map((file, index) => (
@@ -38,7 +39,7 @@ const PlatformCard = ({ platform, isYours }: PlatformCardProps) => {
             >
               <Icon name="download" size={18} />
               <span className={styles.fileLabel}>
-                <span className="visually-hidden">{platform.name}, </span>
+                <span className="visually-hidden">{GET_COPY.fileOf(platform.name)}</span>
                 {file.label}
               </span>
               <span className={styles.fileKind}>{file.kind}</span>
@@ -67,13 +68,13 @@ const WebCard = () => {
     <article className={`${styles.card} ${styles.web}`} aria-labelledby={ids.name}>
       <header className={styles.head}>
         <h3 id={ids.name} className={styles.name}>
-          In the browser
+          {GET_COPY.inTheBrowser}
         </h3>
-        <p className={styles.needs}>Nothing to install</p>
+        <p className={styles.needs}>{GET_COPY.nothingToInstall}</p>
       </header>
       <form className={styles.server} onSubmit={submit}>
         <label htmlFor={ids.server} className={styles.serverLabel}>
-          Your server
+          {GET_COPY.yourServer}
         </label>
         <input
           id={ids.server}
@@ -93,7 +94,7 @@ const WebCard = () => {
         tone="primary"
         className={styles.open}
       >
-        Open web app
+        {GET_COPY.openWebApp}
       </ButtonLink>
     </article>
   )
@@ -112,11 +113,9 @@ export const Downloads = ({ id, system }: DownloadsProps) => {
     <section id={id} className={styles.downloads} aria-labelledby={titleId}>
       <header className={styles.intro}>
         <h2 id={titleId} className={styles.title}>
-          Get raven
+          {GET_COPY.downloadsTitle}
         </h2>
-        <p className={styles.lead}>
-          The desktop app and the web app are the same raven. Pick whichever suits the screen.
-        </p>
+        <p className={styles.lead}>{GET_COPY.downloadsLead}</p>
       </header>
       <ul className={styles.cards}>
         {PLATFORMS.map((platform) => (

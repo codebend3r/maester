@@ -12,13 +12,14 @@ import {
   cardLink,
   cardTitle,
   formatRuntime,
-  plural,
   resolutionLabel,
   showYears,
   watchLink,
   ITEM_IMAGE_KINDS,
 } from '@raven/core'
 import { api } from '@/lib/api'
+import { HOME_COPY } from '@/pages/HomePage/copy'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** One of the titles home's hero shows: what it says, its pictures, and where its buttons go. */
 export type Featured = {
@@ -83,7 +84,7 @@ const fromMedia = ({ media, line, library }: FromMediaProps): Featured[] => {
     {
       key: `media:${media.id}`,
       ...artwork,
-      eyebrow: `Featured in ${library.name}`,
+      eyebrow: HOME_COPY.featuredIn(library.name),
       title,
       facts: [year == null ? null : String(year), formatRuntime(media.duration)].filter(isFact),
       picture: pictureOf(media),
@@ -108,11 +109,11 @@ const fromShow = ({ entry, line, library }: FromShowProps): Featured[] => {
     {
       key: `show:${show.id}`,
       ...artwork,
-      eyebrow: `Featured in ${library.name}`,
+      eyebrow: HOME_COPY.featuredIn(library.name),
       title: show.title,
       facts: [
         showYears({ year: show.year, endedYear: entry.endedYear }),
-        plural({ n: entry.episodes, one: 'episode', many: 'episodes' }),
+        COMMON_COPY.episodes(entry.episodes),
       ].filter(isFact),
       picture: null,
       line,

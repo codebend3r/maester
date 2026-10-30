@@ -1,0 +1,15 @@
+export const SIGN_IN_COPY = {
+  wrongCredentials: 'Email or password is wrong.',
+  unconfirmed: 'Confirm your email to sign in.',
+  failed: 'Sign in failed. Try again.',
+  title: 'Welcome back',
+  lead: (host: string) => `Sign in to watch on ${host}`,
+  password: 'Password',
+  resendConfirmation: 'Resend confirmation email',
+  checkEmail: 'Check your email',
+  confirmationSent: 'Confirmation email sent.',
+  forgot: 'Forgot password?',
+  signingIn: 'Signing in…',
+  newToRaven: 'New to raven?',
+  createAccount: 'Create an account',
+} as const

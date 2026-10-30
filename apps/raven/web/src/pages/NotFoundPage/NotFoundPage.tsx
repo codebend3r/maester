@@ -2,6 +2,7 @@ import { themeOf } from '@raven/core'
 import { ButtonLink } from '@raven/ui'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { useTheme } from '@/stores/theme'
+import { NOT_FOUND_COPY } from '@/pages/NotFoundPage/copy'
 import styles from '@/pages/NotFoundPage/NotFoundPage.module.scss'
 
 /** The mark drawn for each ground, as the side menu's logo picks it. */
@@ -9,6 +10,8 @@ const MARKS = {
   dark: '/brand/raven-mark-on-dark.svg',
   light: '/brand/raven-mark-on-light.svg',
 } as const
+
+const LIBRARIES_PATH = '/libraries'
 
 /**
  * What an address that names nothing shows: a 4, an empty poster holding
@@ -22,22 +25,20 @@ export const NotFoundPage = () => {
       <BackButton fallback={HOME} className={styles.back} />
       <div className={styles.body}>
         <p className={styles.figures} aria-hidden="true">
-          <span>4</span>
+          <span>{NOT_FOUND_COPY.figure}</span>
           <span className={styles.poster}>
             <img src={MARKS[tone]} alt="" width={646} height={705} className={styles.mark} />
           </span>
-          <span>4</span>
+          <span>{NOT_FOUND_COPY.figure}</span>
         </p>
-        <h1 className={styles.title}>Nothing lives at this address</h1>
-        <p className={styles.copy}>
-          The library or video may have been removed, or the link is incomplete.
-        </p>
-        <nav className={styles.actions} aria-label="Ways back">
-          <ButtonLink to="/libraries" tone="primary" size="large">
-            Back to libraries
+        <h1 className={styles.title}>{NOT_FOUND_COPY.title}</h1>
+        <p className={styles.copy}>{NOT_FOUND_COPY.body}</p>
+        <nav className={styles.actions} aria-label={NOT_FOUND_COPY.waysBack}>
+          <ButtonLink to={LIBRARIES_PATH} tone="primary" size="large">
+            {NOT_FOUND_COPY.backToLibraries}
           </ButtonLink>
-          <ButtonLink to="/" size="large">
-            Go home
+          <ButtonLink to={HOME.to} size="large">
+            {NOT_FOUND_COPY.goHome}
           </ButtonLink>
         </nav>
       </div>

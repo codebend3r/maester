@@ -7,7 +7,9 @@ import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { RatingsStatus } from '@/components/RatingsStatus/RatingsStatus'
 import { ScanStatus } from '@/components/ScanStatus/ScanStatus'
 import { api } from '@/lib/api'
+import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 const count = new Intl.NumberFormat()
 
@@ -34,16 +36,20 @@ export const LibraryHeader = ({ titleId, library, actions, isShut }: LibraryHead
 
   return (
     <header className={styles.header}>
-      <BackButton fallback={{ to: '/libraries', label: 'Libraries' }} className={styles.back} />
+      <BackButton
+        fallback={{ to: '/libraries', label: COMMON_COPY.libraries }}
+        className={styles.back}
+      />
       <div className={styles.heading}>
         <h1 id={titleId} className={styles.title}>
           <LibraryIcon settings={settings} size="0.6em" className={styles.titleIcon} />
           <span className={styles.name}>{library.name}</span>
         </h1>
         <p className={styles.count}>
-          {KINDS[settings.kind].label} · {count.format(library.itemCount)}{' '}
-          {library.itemCount === 1 ? 'video' : 'videos'}
-          {unmatched > 0 && ` · ${count.format(unmatched)} not matched`}
+          {KINDS[settings.kind].label}
+          {COMMON_COPY.separator}
+          {COMMON_COPY.videos(library.itemCount)}
+          {unmatched > 0 && LIBRARY_COPY.notMatchedCount(count.format(unmatched))}
         </p>
         <div className={styles.status}>
           <ScanStatus scan={library.scan} expected={library.itemCount} />
@@ -60,10 +66,10 @@ export const LibraryHeader = ({ titleId, library, actions, isShut }: LibraryHead
                 <Button
                   icon="lock"
                   disabled={relock.isPending}
-                  title="Lock this library again: the PIN is asked for it the next time"
+                  title={LIBRARY_COPY.lockTitle}
                   onClick={() => relock.mutate()}
                 >
-                  Lock
+                  {LIBRARY_COPY.lock}
                 </Button>
               )
             }

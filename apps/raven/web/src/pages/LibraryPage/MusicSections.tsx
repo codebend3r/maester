@@ -18,14 +18,9 @@ import { libraryTracks, playlistFacts, playlistPath } from '@/lib/music'
 import { albumsQuery, artistsQuery, playlistsQuery } from '@/lib/queries'
 import { usePlaylistMutations } from '@/lib/usePlaylistMutations'
 import { useAddressSearch } from '@/lib/useSearch'
+import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
-
-const SORT_LABELS: Record<MusicSort, string> = {
-  title: 'Title',
-  artist: 'Artist',
-  year: 'Year',
-  added: 'Recently added',
-}
+import { COMMON_COPY } from '@/lib/copy'
 
 type AlbumsToolbarProps = {
   library: Library
@@ -55,11 +50,11 @@ const AlbumsToolbar = ({ library, search, sort, onSort, isPlayable }: AlbumsTool
       <SearchField
         search={search}
         className={styles.musicSearch}
-        aria-label={`Search ${library.name}`}
-        placeholder="Search albums and artists"
+        aria-label={LIBRARY_COPY.searchLibrary(library.name)}
+        placeholder={LIBRARY_COPY.searchAlbums}
       />
       <label className={styles.musicSort}>
-        <span className="visually-hidden">Sort</span>
+        <span className="visually-hidden">{COMMON_COPY.sort}</span>
         <select
           value={sort}
           onChange={(event) => {
@@ -68,7 +63,7 @@ const AlbumsToolbar = ({ library, search, sort, onSort, isPlayable }: AlbumsTool
         >
           {Object.values(MUSIC_SORTS).map((key) => (
             <option key={key} value={key}>
-              {SORT_LABELS[key]}
+              {LIBRARY_COPY.sortLabels[key]}
             </option>
           ))}
         </select>
@@ -80,7 +75,7 @@ const AlbumsToolbar = ({ library, search, sort, onSort, isPlayable }: AlbumsTool
         disabled={play.isPending || !isPlayable}
         onClick={() => play.mutate(false)}
       >
-        Play
+        {COMMON_COPY.play}
       </Button>
       <Button
         icon="shuffle"
@@ -88,11 +83,11 @@ const AlbumsToolbar = ({ library, search, sort, onSort, isPlayable }: AlbumsTool
         disabled={play.isPending || !isPlayable}
         onClick={() => play.mutate(true)}
       >
-        Shuffle
+        {COMMON_COPY.shuffle}
       </Button>
       {play.error && (
         <p className={styles.message} role="alert">
-          Could not read the tracks: {play.error.message}
+          {LIBRARY_COPY.tracksFailed(play.error.message)}
         </p>
       )}
     </div>
@@ -124,8 +119,8 @@ export const AlbumsSection = ({ library }: AlbumsSectionProps) => {
       {albums.data && albums.data.length === 0 && (
         <p className={styles.message}>
           {search.query
-            ? `No album in ${library.name} matches "${search.query}".`
-            : `No albums in ${library.name} yet. A scan files each audio file under its album as it reads its tags.`}
+            ? LIBRARY_COPY.noAlbumMatches({ name: library.name, query: search.query })
+            : LIBRARY_COPY.noAlbums(library.name)}
         </p>
       )}
       {albums.data && albums.data.length > 0 && <AlbumGrid albums={albums.data} />}
@@ -145,8 +140,8 @@ export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
         <SearchField
           search={search}
           className={styles.musicSearch}
-          aria-label="Search artists"
-          placeholder="Search artists"
+          aria-label={LIBRARY_COPY.searchArtists}
+          placeholder={LIBRARY_COPY.searchArtists}
         />
       </div>
       {artists.error && (
@@ -155,10 +150,10 @@ export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
         </p>
       )}
       {artists.data && artists.data.length === 0 && (
-        <p className={styles.message}>No artists in {library.name} yet.</p>
+        <p className={styles.message}>{LIBRARY_COPY.noArtists(library.name)}</p>
       )}
       {artists.data && artists.data.length > 0 && (
-        <ArtistList artists={artists.data} label="Artists" />
+        <ArtistList artists={artists.data} label={LIBRARY_COPY.artists} />
       )}
     </div>
   )
@@ -178,7 +173,7 @@ export const PlaylistsSection = () => {
     <div className={styles.section}>
       <div className={styles.playlistsToolbar}>
         <Button tone="primary" icon="plus" onClick={() => setNaming(true)}>
-          New playlist
+          {LIBRARY_COPY.newPlaylist}
         </Button>
       </div>
       {playlists.error && (
@@ -187,19 +182,17 @@ export const PlaylistsSection = () => {
         </p>
       )}
       {playlists.data && playlists.data.length === 0 && (
-        <p className={styles.message}>
-          No playlists yet. Make one here, or add tracks to a new one from an album.
-        </p>
+        <p className={styles.message}>{LIBRARY_COPY.noPlaylists}</p>
       )}
       {playlists.data && playlists.data.length > 0 && (
-        <ul className={styles.playlists} aria-label="Playlists">
+        <ul className={styles.playlists} aria-label={LIBRARY_COPY.playlists}>
           {playlists.data.map((playlist) => (
             <li key={playlist.id} className={styles.playlist}>
               <Link to={playlistPath(playlist.id)} className={styles.playlistName}>
                 {playlist.name}
               </Link>
               <span className={styles.playlistFacts}>
-                {playlistFacts({ playlist }).join(' · ')}
+                {playlistFacts({ playlist }).join(COMMON_COPY.separator)}
               </span>
             </li>
           ))}
@@ -207,9 +200,9 @@ export const PlaylistsSection = () => {
       )}
       {isNaming && (
         <PlaylistNameDialog
-          title="New playlist"
+          title={LIBRARY_COPY.newPlaylist}
           initialName=""
-          submitLabel="Make playlist"
+          submitLabel={LIBRARY_COPY.makePlaylist}
           isPending={create.isPending}
           error={create.error}
           onSubmit={(name) =>
