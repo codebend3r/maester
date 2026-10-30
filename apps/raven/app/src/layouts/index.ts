@@ -86,11 +86,11 @@ export const {
  * raven's own under the d-pad on Android TV and under the thumb on iPhones and iPads, both with
  * the subtitle cues raven draws itself.
  */
-const PLAYER_CHROMES: Record<AppPlatform, PlayerChromeKit> = {
+const PLAYER_CHROMES = {
   [APP_PLATFORMS.ios]: touchPlayerChrome,
   [APP_PLATFORMS.tvos]: focusPlayerChrome,
   [APP_PLATFORMS.androidTv]: dpadPlayerChrome,
-}
+} as const satisfies Record<AppPlatform, PlayerChromeKit>
 
 /**
  * The player's controls, whether raven draws the subtitles under them, and whether the player

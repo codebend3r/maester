@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -14,7 +14,8 @@ import {
   type PersonCard,
   type VersionRow,
 } from '@/queries/itemPage'
-import { CardPicture } from '@/layouts/Card'
+import { CardPicture, PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
+import { ITEM_LAYOUT_COPY } from '@/layouts/copy'
 import { TouchBack } from '@/layouts/TouchBack'
 import { TouchCard } from '@/layouts/TouchCard'
 import { BUTTON_TONES } from '@/layouts/formKit'
@@ -32,6 +33,9 @@ import {
   heroFactsOf,
   heroPictureOf,
   playLabelOf,
+  TITLE_LOOKS,
+  type TitleLook,
+  titleLookOf,
 } from '@/layouts/itemKit'
 import { isTablet } from '@/layouts/screenSizes'
 import { LINE_RATIO } from '@/layouts/textHeights'
@@ -123,6 +127,43 @@ const ProgressLine = ({ progress }: ProgressLineProps) => {
   )
 }
 
+type HeroTitleProps = { hero: ItemHero; maxWidth: number }
+
+type HeroTitleArtProps = HeroTitleProps
+
+/** The title as the item's own title art, said as a header. */
+const HeroTitleArt = ({ hero, maxWidth }: HeroTitleArtProps) => {
+  const styles = useStyles()
+  return (
+    <View accessibilityLabel={hero.title} accessibilityRole="header" accessible>
+      <TitleArt
+        height={LOGO_HEIGHT}
+        logo={hero.logo?.picture ?? null}
+        maxWidth={maxWidth}
+        name={hero.title}
+        textStyle={styles.title}
+      />
+    </View>
+  )
+}
+
+type HeroTitleWordsProps = HeroTitleProps
+
+/** The title in type. */
+const HeroTitleWords = ({ hero }: HeroTitleWordsProps) => {
+  const styles = useStyles()
+  return (
+    <Text accessibilityRole="header" style={styles.title}>
+      {hero.title}
+    </Text>
+  )
+}
+
+const HERO_TITLES = {
+  [TITLE_LOOKS.art]: HeroTitleArt,
+  [TITLE_LOOKS.words]: HeroTitleWords,
+} as const satisfies Record<TitleLook, ComponentType<HeroTitleProps>>
+
 type HeroProps = { hero: ItemHero; actions: ItemAction[]; links: ItemAction[] }
 
 const Hero = ({ hero, actions, links }: HeroProps) => {
@@ -132,6 +173,7 @@ const Hero = ({ hero, actions, links }: HeroProps) => {
   // Held sideways the screen is short, so the title sits by the poster's top, not its foot.
   const isWide = width > height
   const facts = heroFactsOf(hero)
+  const Title = HERO_TITLES[titleLookOf(hero.logo)]
   return (
     <View style={styles.hero}>
       <View style={[styles.headRow, isWide && styles.headRowWide]}>
@@ -147,21 +189,7 @@ const Hero = ({ hero, actions, links }: HeroProps) => {
             />
           )}
           {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
-          {hero.logo !== null && hero.logo.place === ART_PLACES.title ? (
-            <View accessibilityLabel={hero.title} accessibilityRole="header" accessible>
-              <TitleArt
-                height={LOGO_HEIGHT}
-                logo={hero.logo.picture}
-                maxWidth={width}
-                name={hero.title}
-                textStyle={styles.title}
-              />
-            </View>
-          ) : (
-            <Text accessibilityRole="header" style={styles.title}>
-              {hero.title}
-            </Text>
-          )}
+          <Title hero={hero} maxWidth={width} />
           {hero.byline !== null && <Text style={styles.byline}>{hero.byline}</Text>}
           {facts !== '' && <Text style={styles.small}>{facts}</Text>}
           {hero.progress !== null && <ProgressLine progress={hero.progress} />}
@@ -199,7 +227,7 @@ const FileFacts = ({ facts }: FileFactsProps) => {
       {facts.map((fact) => (
         <View key={fact.label} style={styles.fact}>
           <Text style={styles.factLabel}>{fact.label}</Text>
-          <Text style={styles.factValue}>{fact.values.join(', ')}</Text>
+          <Text style={styles.factValue}>{ITEM_LAYOUT_COPY.values(fact.values)}</Text>
         </View>
       ))}
     </View>
@@ -227,7 +255,7 @@ const Versions = ({ versions, onOpen }: VersionsProps) => {
               {version.fileName}
             </Text>
           </View>
-          <Text style={styles.play}>{'▶'}</Text>
+          <Text style={styles.play}>{ITEM_LAYOUT_COPY.play}</Text>
         </Pressable>
       ))}
     </View>
@@ -311,16 +339,33 @@ const Episodes = ({ episodes, onOpen }: EpisodesProps) => {
 
 type PersonProps = { person: PersonCard }
 
+type PersonPictureProps = PersonProps
+
+const PersonPicture = ({ person }: PersonPictureProps) =>
+  person.picture !== null && (
+    <Image resizeMode="cover" source={person.picture} style={StyleSheet.absoluteFill} />
+  )
+
+type PersonInitialsProps = PersonProps
+
+const PersonInitials = ({ person }: PersonInitialsProps) => {
+  const styles = useStyles()
+  return <Text style={styles.initials}>{person.initials}</Text>
+}
+
+/** A person's photo, else their initials. */
+const PERSON_PHOTOS = {
+  [PICTURE_STATES.shown]: PersonPicture,
+  [PICTURE_STATES.missing]: PersonInitials,
+} as const satisfies Record<PictureState, ComponentType<PersonProps>>
+
 const Person = ({ person }: PersonProps) => {
   const styles = useStyles()
+  const Photo = PERSON_PHOTOS[pictureStateOf(person.picture)]
   return (
     <View style={styles.person}>
       <View style={styles.photo}>
-        {person.picture !== null ? (
-          <Image resizeMode="cover" source={person.picture} style={StyleSheet.absoluteFill} />
-        ) : (
-          <Text style={styles.initials}>{person.initials}</Text>
-        )}
+        <Photo person={person} />
       </View>
       <Text numberOfLines={2} style={styles.personName}>
         {person.name}
@@ -344,29 +389,48 @@ const Cast = ({ title, cast }: CastProps) => (
 
 type TopProps = Pick<ItemPage['hero'], 'backdrop'> & { onBack: () => void }
 
-/** The backdrop across the top, under the way back; without one, room for the way back. */
-const Top = ({ backdrop, onBack }: TopProps) => {
+type TopViewProps = TopProps & { room: { paddingTop: number; paddingLeft: number } }
+
+type BareTopProps = TopViewProps
+
+/** No backdrop: room for the way back. */
+const BareTop = ({ onBack, room }: BareTopProps) => (
+  <View style={room}>
+    <TouchBack onPress={onBack} />
+  </View>
+)
+
+type BackdropTopProps = TopViewProps
+
+/** The backdrop across the top, under the way back raised on it. */
+const BackdropTop = ({ backdrop, onBack, room }: BackdropTopProps) => {
   const styles = useStyles()
   const screen = useWindowDimensions()
-  const insets = useSafeAreaInsets()
-  const gutters = useGutters()
   const height = Math.min(screen.width * BACKDROP_RATIO, screen.height * BACKDROP_SHARE)
-  const room = { paddingTop: insets.top + SIZES.space1, paddingLeft: gutters.left }
-  if (backdrop === null) {
-    return (
-      <View style={room}>
-        <TouchBack onPress={onBack} />
-      </View>
-    )
-  }
   return (
     <View style={{ height }}>
-      <Image resizeMode="cover" source={backdrop} style={StyleSheet.absoluteFill} />
+      {backdrop !== null && (
+        <Image resizeMode="cover" source={backdrop} style={StyleSheet.absoluteFill} />
+      )}
       <View style={[styles.top, room]}>
         <TouchBack isRaised onPress={onBack} />
       </View>
     </View>
   )
+}
+
+const TOP_VIEWS = {
+  [PICTURE_STATES.shown]: BackdropTop,
+  [PICTURE_STATES.missing]: BareTop,
+} as const satisfies Record<PictureState, ComponentType<TopViewProps>>
+
+/** The backdrop across the top, under the way back; without one, room for the way back. */
+const Top = ({ backdrop, onBack }: TopProps) => {
+  const insets = useSafeAreaInsets()
+  const gutters = useGutters()
+  const room = { paddingTop: insets.top + SIZES.space1, paddingLeft: gutters.left }
+  const TopView = TOP_VIEWS[pictureStateOf(backdrop)]
+  return <TopView backdrop={backdrop} onBack={onBack} room={room} />
 }
 
 /**

@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react'
+import { type ComponentType, type ReactNode, useState } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 
 import { Icon } from '@/layouts/Icon'
@@ -12,7 +12,8 @@ import {
   type PersonCard,
   type VersionRow,
 } from '@/queries/itemPage'
-import { CardPicture } from '@/layouts/Card'
+import { CardPicture, PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
+import { ITEM_LAYOUT_COPY } from '@/layouts/copy'
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
@@ -29,6 +30,9 @@ import {
   heroFactsOf,
   heroPictureOf,
   playLabelOf,
+  TITLE_LOOKS,
+  type TitleLook,
+  titleLookOf,
 } from '@/layouts/itemKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
@@ -140,6 +144,78 @@ const ActionRow = ({ actions, isFirstRow }: ActionRowProps) => {
   )
 }
 
+type HeroTitleProps = { hero: ItemHero }
+
+type HeroTitleArtProps = HeroTitleProps
+
+/** The title as the item's own title art, said as a header. */
+const HeroTitleArt = ({ hero }: HeroTitleArtProps) => {
+  const styles = useStyles()
+  return (
+    <View accessibilityLabel={hero.title} accessibilityRole="header" accessible>
+      <TitleArt
+        height={LOGO_HEIGHT}
+        logo={hero.logo?.picture ?? null}
+        maxWidth={WORDS_WIDTH}
+        name={hero.title}
+        textStyle={styles.title}
+      />
+    </View>
+  )
+}
+
+type HeroTitleWordsProps = HeroTitleProps
+
+/** The title in type. */
+const HeroTitleWords = ({ hero }: HeroTitleWordsProps) => {
+  const styles = useStyles()
+  return (
+    <Text accessibilityRole="header" style={styles.title}>
+      {hero.title}
+    </Text>
+  )
+}
+
+const HERO_TITLES = {
+  [TITLE_LOOKS.art]: HeroTitleArt,
+  [TITLE_LOOKS.words]: HeroTitleWords,
+} as const satisfies Record<TitleLook, ComponentType<HeroTitleProps>>
+
+/** Whether a file's fact holds one value or several. */
+const FACT_COUNTS = { one: 'one', several: 'several' } as const
+
+type FactCount = (typeof FACT_COUNTS)[keyof typeof FACT_COUNTS]
+
+const factCountOf = (values: readonly string[]): FactCount =>
+  values.length === 1 ? FACT_COUNTS.one : FACT_COUNTS.several
+
+type FactValuesProps = { values: readonly string[] }
+
+type FactValueProps = FactValuesProps
+
+/** A fact's one value, set plainly. */
+const FactValue = ({ values }: FactValueProps) => {
+  const styles = useStyles()
+  return <Text style={styles.fileValue}>{values[0]}</Text>
+}
+
+type FactChipsProps = FactValuesProps
+
+/** A fact's several values, each a chip of its own. */
+const FactChips = ({ values }: FactChipsProps) => {
+  const styles = useStyles()
+  return values.map((value) => (
+    <View key={value} style={styles.fileChip}>
+      <Text style={styles.fileChipText}>{value}</Text>
+    </View>
+  ))
+}
+
+const FACT_VALUE_VIEWS = {
+  [FACT_COUNTS.one]: FactValue,
+  [FACT_COUNTS.several]: FactChips,
+} as const satisfies Record<FactCount, ComponentType<FactValuesProps>>
+
 type HeroProps = {
   hero: ItemHero
   /** The actions, or null while what Play starts is still being read. */
@@ -156,6 +232,7 @@ type HeroProps = {
 const Hero = ({ hero, actions, links, file }: HeroProps) => {
   const styles = useStyles()
   const facts = heroFactsOf(hero)
+  const Title = HERO_TITLES[titleLookOf(hero.logo)]
   return (
     <View style={styles.hero}>
       <CardPicture
@@ -174,21 +251,7 @@ const Hero = ({ hero, actions, links, file }: HeroProps) => {
           />
         )}
         {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
-        {hero.logo !== null && hero.logo.place === ART_PLACES.title ? (
-          <View accessibilityLabel={hero.title} accessibilityRole="header" accessible>
-            <TitleArt
-              height={LOGO_HEIGHT}
-              logo={hero.logo.picture}
-              maxWidth={WORDS_WIDTH}
-              name={hero.title}
-              textStyle={styles.title}
-            />
-          </View>
-        ) : (
-          <Text accessibilityRole="header" style={styles.title}>
-            {hero.title}
-          </Text>
-        )}
+        <Title hero={hero} />
         {hero.byline !== null && <Text style={styles.byline}>{hero.byline}</Text>}
         {facts !== '' && <Text style={styles.line}>{facts}</Text>}
         {hero.progress !== null && <ProgressLine progress={hero.progress} />}
@@ -206,22 +269,17 @@ const Hero = ({ hero, actions, links, file }: HeroProps) => {
         {actions !== null && links.length > 0 && <ActionRow actions={links} isFirstRow={false} />}
         {file.length > 0 && (
           <View style={styles.file}>
-            {file.map((fact) => (
-              <View key={fact.label} style={styles.fileRow}>
-                <Text style={styles.fileLabel}>{fact.label}</Text>
-                <View style={styles.fileValues}>
-                  {fact.values.length === 1 ? (
-                    <Text style={styles.fileValue}>{fact.values[0]}</Text>
-                  ) : (
-                    fact.values.map((value) => (
-                      <View key={value} style={styles.fileChip}>
-                        <Text style={styles.fileChipText}>{value}</Text>
-                      </View>
-                    ))
-                  )}
+            {file.map((fact) => {
+              const Values = FACT_VALUE_VIEWS[factCountOf(fact.values)]
+              return (
+                <View key={fact.label} style={styles.fileRow}>
+                  <Text style={styles.fileLabel}>{fact.label}</Text>
+                  <View style={styles.fileValues}>
+                    <Values values={fact.values} />
+                  </View>
                 </View>
-              </View>
-            ))}
+              )
+            })}
           </View>
         )}
       </View>
@@ -302,16 +360,37 @@ const Versions = ({ versions, onOpen }: VersionsProps) => {
 
 type PersonProps = { person: PersonCard }
 
+type PersonPictureProps = PersonProps
+
+const PersonPicture = ({ person }: PersonPictureProps) =>
+  person.picture !== null && (
+    <Image resizeMode="cover" source={person.picture} style={StyleSheet.absoluteFill} />
+  )
+
+type PersonInitialsProps = PersonProps
+
+const PersonInitials = ({ person }: PersonInitialsProps) => {
+  const styles = useStyles()
+  return <Text style={styles.initials}>{person.initials}</Text>
+}
+
+/** A person's photo, else their initials. */
+const PERSON_PHOTOS = {
+  [PICTURE_STATES.shown]: PersonPicture,
+  [PICTURE_STATES.missing]: PersonInitials,
+} as const satisfies Record<PictureState, ComponentType<PersonProps>>
+
 /** A person the remote can move to, so the row scrolls along with the focus. */
 const Person = ({ person }: PersonProps) => {
   const { settle } = useOpeningFocus()
   const styles = useStyles()
   const [isFocused, setFocused] = useState(false)
+  const Photo = PERSON_PHOTOS[pictureStateOf(person.picture)]
   return (
     // Deliberately inert until the app has a person page: it takes the focus only so the
     // remote can move along the row and scroll it.
     <Pressable
-      accessibilityLabel={`${person.name}, ${person.role}`}
+      accessibilityLabel={ITEM_LAYOUT_COPY.person(person)}
       accessibilityRole="text"
       focusable
       onBlur={() => setFocused(false)}
@@ -322,11 +401,7 @@ const Person = ({ person }: PersonProps) => {
       style={styles.person}
     >
       <View style={[styles.photo, isFocused && styles.focusedPhoto]}>
-        {person.picture !== null ? (
-          <Image resizeMode="cover" source={person.picture} style={StyleSheet.absoluteFill} />
-        ) : (
-          <Text style={styles.initials}>{person.initials}</Text>
-        )}
+        <Photo person={person} />
       </View>
       <Text numberOfLines={2} style={[styles.personName, isFocused && styles.focusedName]}>
         {person.name}

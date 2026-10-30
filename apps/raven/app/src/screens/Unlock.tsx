@@ -6,15 +6,8 @@ import { Text } from '@/layouts/Text'
 import { useAppQueries } from '@/queries/useAppQueries'
 import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
 import { APP_ROUTES } from '@/routes'
+import { UNLOCK_COPY } from '@/screens/copy'
 import { useSubmit } from '@/screens/useSubmit'
-
-const COPY = {
-  prompt: 'What you opened sits in a library this server keeps behind its PIN.',
-  pin: 'PIN',
-  unlock: 'Unlock',
-  notNow: 'Not now',
-  unreachable: "Couldn't reach the server. Check that raven is running.",
-} as const
 
 /**
  * `/unlock`: the PIN, asked for when a page is refused for sitting in a locked library. Once
@@ -27,7 +20,7 @@ export const Unlock = () => {
   const formStyles = useFormStyles()
   const session = useAppQueries()
   const [pin, setPin] = useState('')
-  const { isBusy, error, run } = useSubmit({ unreachable: COPY.unreachable })
+  const { isBusy, error, run } = useSubmit({ unreachable: UNLOCK_COPY.unreachable })
 
   const leave = () => {
     if (!router.canGoBack()) {
@@ -47,12 +40,12 @@ export const Unlock = () => {
 
   return (
     <Form title={session?.server.name ?? ''}>
-      <Text style={formStyles.note}>{COPY.prompt}</Text>
+      <Text style={formStyles.note}>{UNLOCK_COPY.prompt}</Text>
       <Field
         isFirst
         isNumeric
         isSecret
-        label={COPY.pin}
+        label={UNLOCK_COPY.pin}
         onChangeText={setPin}
         onSubmit={() => submit()}
         value={pin}
@@ -64,13 +57,13 @@ export const Unlock = () => {
       )}
       <FormButton
         isDisabled={isBusy}
-        label={COPY.unlock}
+        label={UNLOCK_COPY.unlock}
         onPress={() => submit()}
         tone={BUTTON_TONES.primary}
       />
       <FormButton
         isDisabled={isBusy}
-        label={COPY.notNow}
+        label={UNLOCK_COPY.notNow}
         onPress={leave}
         tone={BUTTON_TONES.quiet}
       />

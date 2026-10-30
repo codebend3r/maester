@@ -32,18 +32,20 @@ export const NowPlayingBar = ({ session: { server, api } }: NowPlayingBarProps) 
   const toggle = useAudioQueue((store) => store.toggle)
   const next = useAudioQueue((store) => store.next)
   const isShown = useIsBarShown()
-  if (track === null || !isShown) return null
   return (
-    <NowPlayingStrip
-      artists={artistNames(track)}
-      cover={
-        pictures === null ? null : trackCoverOf({ api, headersFor: pictures.headersFor, track })
-      }
-      isPlaying={state === AUDIO_STATES.playing || state === AUDIO_STATES.loading}
-      onNext={next}
-      onOpen={() => router.push(APP_ROUTES.nowPlaying)}
-      onToggle={toggle}
-      title={track.title}
-    />
+    track !== null &&
+    isShown && (
+      <NowPlayingStrip
+        artists={artistNames(track)}
+        cover={
+          pictures === null ? null : trackCoverOf({ api, headersFor: pictures.headersFor, track })
+        }
+        isPlaying={state === AUDIO_STATES.playing || state === AUDIO_STATES.loading}
+        onNext={next}
+        onOpen={() => router.push(APP_ROUTES.nowPlaying)}
+        onToggle={toggle}
+        title={track.title}
+      />
+    )
   )
 }

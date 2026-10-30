@@ -2,12 +2,14 @@ import {
   ACCESS_REFUSALS,
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
+  type ItemDetails,
   PLAYBACK_MODES,
   type MediaItem,
   type MediaTracks,
   type PlaybackMode,
   type PlaybackPolicy,
   ROUTE_STATES,
+  type RouteQuery,
   SESSION_KINDS,
   type SubtitleTrack,
   type ViewingSession,
@@ -30,14 +32,18 @@ import {
   usePlayerPrefs,
   useUnlockPrompt,
   videoReducer,
+  KeyedView,
+  type ViewOf,
+  type ViewsOf,
 } from '@raven/ui/headless'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { type UseQueryResult, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useKeepAwake } from 'expo-keep-awake'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { SelectedTrackType, type VideoRef } from 'react-native-video'
 
 import { Loading, PlayerChrome, canDrawPictureSubtitles, shouldDrawCaptions } from '@/layouts'
+import type { LoadingProps } from '@/layouts/loadingKit'
 import { NO_HEADING } from '@/layouts/playerHeading'
 import { PLAYER_COPY, type VideoSurface } from '@/layouts/playerKit'
 import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
@@ -75,12 +81,8 @@ import { imageOf } from '@/queries/cards'
 import { usePlayerHeading } from '@/queries/usePlayerHeading'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTE_PARAMS, PLAY_FROM, ROUTE_TARGETS, hrefOf, secondsOf } from '@/routes'
+import { PLAYER_SCREEN_COPY } from '@/screens/copy'
 import { useAppPrefs } from '@/stores/appPrefs'
-
-const COPY = {
-  opening: 'Opening the video',
-  missing: 'This video is not on the server.',
-} as const
 
 /** How often the player says where it is, in milliseconds: often enough for a smooth clock. */
 const PROGRESS_EVERY_MS = 250
@@ -149,6 +151,10 @@ const captionsFor = ({
     textTrack: place === null ? undefined : { type: SelectedTrackType.INDEX, value: place },
   }
 }
+
+/** What the player saying it buffers, or not, tells the video state. */
+const bufferEventOf = (isBuffering: boolean) =>
+  isBuffering ? VIDEO_EVENTS.waiting : VIDEO_EVENTS.flowing
 
 /** Keeps the screen on while it is drawn. */
 const StayAwake = () => {
@@ -368,13 +374,15 @@ const Playing = ({
           canShowPictures:
             canDrawPictures || (ladder?.modes.includes(PLAYBACK_MODES.transcode) ?? false),
         })
+  const audioValue = audioPlaying === null ? '' : String(audioPlaying)
+  const audioTrack: VideoSurface['selectedAudioTrack'] =
+    audioPlace === null ? undefined : { type: SelectedTrackType.INDEX, value: audioPlace }
   const surface: VideoSurface | null =
     source === null || attempt === null
       ? null
       : {
           ref: player,
-          onBuffer: ({ isBuffering }) =>
-            dispatchVideo({ type: isBuffering ? VIDEO_EVENTS.waiting : VIDEO_EVENTS.flowing }),
+          onBuffer: ({ isBuffering }) => dispatchVideo({ type: bufferEventOf(isBuffering) }),
           onEnd: () => {
             setPaused(true)
             dispatchVideo({ type: VIDEO_EVENTS.ended })
@@ -409,8 +417,7 @@ const Playing = ({
           },
           paused: isPaused,
           progressUpdateInterval: PROGRESS_EVERY_MS,
-          selectedAudioTrack:
-            audioPlace === null ? undefined : { type: SelectedTrackType.INDEX, value: audioPlace },
+          selectedAudioTrack: audioTrack,
           selectedTextTrack: captions.textTrack,
           source,
         }
@@ -429,7 +436,7 @@ const Playing = ({
             ? null
             : {
                 options: audioOptionsOf(tracks),
-                value: audioPlaying === null ? '' : String(audioPlaying),
+                value: audioValue,
                 onChoose: pickAudio,
               }
         }
@@ -471,32 +478,6 @@ type ReadyPlayerProps = {
   onPlayNext: (next: MediaItem) => void
 }
 
-/** A video once the server's playback settings and its tracks are known. */
-const ReadyPlayer = ({ media, at, isFromStart, session, onBack, onPlayNext }: ReadyPlayerProps) => {
-  const policy = usePlaybackPolicy({ queries: session.queries })
-  const tracks = useQuery(session.queries.tracksQuery(media.id))
-  // Read before the source is handed over, which carries the synopsis on a TV: a source that
-  // changes once playing reloads the video.
-  const details = useQuery(session.queries.itemQuery(media.item?.id ?? null))
-  if (policy === null || tracks.isPending || details.isLoading) {
-    return <Loading label={COPY.opening} onBack={onBack} />
-  }
-  // A file whose tracks or page cannot be read still plays, with no pickers or synopsis.
-  return (
-    <Playing
-      at={at}
-      isFromStart={isFromStart}
-      media={media}
-      onBack={onBack}
-      onPlayNext={onPlayNext}
-      policy={policy}
-      session={session}
-      summary={details.data?.summary ?? null}
-      tracks={tracks.data ?? null}
-    />
-  )
-}
-
 type WaitingProps = {
   notice: string
   onBack: () => void
@@ -523,11 +504,126 @@ const Waiting = ({ notice, onBack }: WaitingProps) => (
   />
 )
 
+const READY_PLAYER_VIEW_KEYS = { loading: 'loading', playing: 'playing' } as const
+
+type ReadyPlayerViewProps = {
+  [READY_PLAYER_VIEW_KEYS.loading]: LoadingProps
+  [READY_PLAYER_VIEW_KEYS.playing]: PlayingProps
+}
+
+const READY_PLAYER_VIEWS = {
+  [READY_PLAYER_VIEW_KEYS.loading]: Loading,
+  [READY_PLAYER_VIEW_KEYS.playing]: Playing,
+} as const satisfies ViewsOf<ReadyPlayerViewProps>
+
+type ReadyPlayerViewOfProps = ReadyPlayerProps & {
+  policy: ReturnType<typeof usePlaybackPolicy>
+  tracks: Pick<UseQueryResult<MediaTracks>, 'isPending' | 'data'>
+  details: Pick<UseQueryResult<ItemDetails>, 'isLoading' | 'data'>
+}
+
+const readyPlayerViewOf = ({
+  policy,
+  tracks,
+  details,
+  ...playing
+}: ReadyPlayerViewOfProps): ViewOf<ReadyPlayerViewProps> => {
+  if (policy === null || tracks.isPending || details.isLoading) {
+    return {
+      key: READY_PLAYER_VIEW_KEYS.loading,
+      props: { label: PLAYER_SCREEN_COPY.opening, onBack: playing.onBack },
+    }
+  }
+  // A file whose tracks or page cannot be read still plays, with no pickers or synopsis.
+  return {
+    key: READY_PLAYER_VIEW_KEYS.playing,
+    props: {
+      ...playing,
+      policy,
+      summary: details.data?.summary ?? null,
+      tracks: tracks.data ?? null,
+    },
+  }
+}
+
+/** A video once the server's playback settings and its tracks are known. */
+const ReadyPlayer = (props: ReadyPlayerProps) => {
+  const { session, media } = props
+  const policy = usePlaybackPolicy({ queries: session.queries })
+  const tracks = useQuery(session.queries.tracksQuery(media.id))
+  // Read before the source is handed over, which carries the synopsis on a TV: a source that
+  // changes once playing reloads the video.
+  const details = useQuery(session.queries.itemQuery(media.item?.id ?? null))
+  const view = readyPlayerViewOf({ ...props, policy, tracks, details })
+  return <KeyedView<ReadyPlayerViewProps> view={view} views={READY_PLAYER_VIEWS} />
+}
+
 type ServerPlayerProps = {
   session: AppQueries
   mediaId: number | null
   at: number
   isFromStart: boolean
+}
+
+type KeyedReadyPlayerProps = ReadyPlayerProps
+
+/** A video once it is known, drawn afresh for each video. */
+const KeyedReadyPlayer = (props: KeyedReadyPlayerProps) => (
+  <ReadyPlayer key={props.media.id} {...props} />
+)
+
+const SERVER_PLAYER_VIEW_KEYS = { waiting: 'waiting', loading: 'loading', ready: 'ready' } as const
+
+type ServerPlayerViewProps = {
+  [SERVER_PLAYER_VIEW_KEYS.waiting]: WaitingProps
+  [SERVER_PLAYER_VIEW_KEYS.loading]: LoadingProps
+  [SERVER_PLAYER_VIEW_KEYS.ready]: ReadyPlayerProps
+}
+
+const SERVER_PLAYER_VIEWS = {
+  [SERVER_PLAYER_VIEW_KEYS.waiting]: Waiting,
+  [SERVER_PLAYER_VIEW_KEYS.loading]: Loading,
+  [SERVER_PLAYER_VIEW_KEYS.ready]: KeyedReadyPlayer,
+} as const satisfies ViewsOf<ServerPlayerViewProps>
+
+type ServerPlayerViewOfProps = Omit<ServerPlayerProps, 'mediaId'> & {
+  page: RouteQuery<MediaItem>
+  onBack: () => void
+  onPlayNext: (next: MediaItem) => void
+}
+
+type WaitingViewProps = WaitingProps
+
+const waitingView = ({ notice, onBack }: WaitingViewProps): ViewOf<ServerPlayerViewProps> => ({
+  key: SERVER_PLAYER_VIEW_KEYS.waiting,
+  props: { notice, onBack },
+})
+
+const serverPlayerViewOf = ({
+  page,
+  onBack,
+  ...ready
+}: ServerPlayerViewOfProps): ViewOf<ServerPlayerViewProps> => {
+  switch (page.state) {
+    case ROUTE_STATES.missing:
+      return waitingView({ notice: PLAYER_SCREEN_COPY.missing, onBack })
+    case ROUTE_STATES.error:
+      return waitingView({ notice: page.message, onBack })
+    case ROUTE_STATES.loading:
+      return {
+        key: SERVER_PLAYER_VIEW_KEYS.loading,
+        props: { label: PLAYER_SCREEN_COPY.opening, onBack },
+      }
+    case ROUTE_STATES.ready:
+      return {
+        key: SERVER_PLAYER_VIEW_KEYS.ready,
+        props: { ...ready, media: page.data, onBack },
+      }
+    default: {
+      const unknown: never = page
+      return unknown
+    }
+  }
 }
 
 const ServerPlayer = ({ session, mediaId, at, isFromStart }: ServerPlayerProps) => {
@@ -537,30 +633,8 @@ const ServerPlayer = ({ session, mediaId, at, isFromStart }: ServerPlayerProps) 
   const onPlayNext = (next: MediaItem) =>
     router.replace(hrefOf({ kind: ROUTE_TARGETS.play, mediaId: next.id, at: 0 }))
   const page = routeState({ id: mediaId, query: useQuery(session.queries.mediaQuery(mediaId)) })
-  switch (page.state) {
-    case ROUTE_STATES.missing:
-      return <Waiting notice={COPY.missing} onBack={onBack} />
-    case ROUTE_STATES.error:
-      return <Waiting notice={page.message} onBack={onBack} />
-    case ROUTE_STATES.loading:
-      return <Loading label={COPY.opening} onBack={onBack} />
-    case ROUTE_STATES.ready:
-      return (
-        <ReadyPlayer
-          key={page.data.id}
-          at={at}
-          isFromStart={isFromStart}
-          media={page.data}
-          onBack={onBack}
-          onPlayNext={onPlayNext}
-          session={session}
-        />
-      )
-    default: {
-      const unknown: never = page
-      return unknown
-    }
-  }
+  const view = serverPlayerViewOf({ page, onBack, onPlayNext, at, isFromStart, session })
+  return <KeyedView<ServerPlayerViewProps> view={view} views={SERVER_PLAYER_VIEWS} />
 }
 
 /**

@@ -39,6 +39,14 @@ export type ShelfKit = {
 
 export const NOTHING_HERE = 'Nothing here yet.'
 
+/** Whether a shelf has cards to draw, or only its line saying it has none. */
+export const SHELF_STATES = { empty: 'empty', filled: 'filled' } as const
+
+export type ShelfState = (typeof SHELF_STATES)[keyof typeof SHELF_STATES]
+
+export const shelfStateOf = (shelf: ShelfView): ShelfState =>
+  shelf.cards.length === 0 ? SHELF_STATES.empty : SHELF_STATES.filled
+
 /** The way into a library from its shelf, and what it is called aloud: "See all in Films". */
 export const SEE_ALL = 'See all'
 

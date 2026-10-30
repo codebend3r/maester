@@ -8,6 +8,7 @@ import {
   plural,
 } from '@raven/core'
 
+import { MUSIC_COPY } from '@/layouts/copy'
 import { playlistFactsOf } from '@/layouts/musicRows'
 import {
   CARD_SHAPES,
@@ -44,8 +45,6 @@ const SECTION_KEYS = {
   artists: 'artists',
   playlists: 'playlists',
 } as const
-
-const APPEARS_ON = 'Appears on'
 
 type AlbumSectionsOfProps = Pick<AlbumCardProps, 'api' | 'headersFor'> & {
   albums: readonly AlbumSummary[]
@@ -87,7 +86,7 @@ export const artistSectionsOf = ({
     : [
         {
           key: SECTION_KEYS.appearsOn,
-          title: APPEARS_ON,
+          title: MUSIC_COPY.appearsOn,
           count: String(appearsOn.length),
           shape: CARD_SHAPES.poster,
           cards: appearsOn.map((album) => albumCard({ api, headersFor, album })),
@@ -112,10 +111,10 @@ type ArtistCardProps = { artist: Artist }
 export const artistCard = ({ artist }: ArtistCardProps): ShelfCard => ({
   key: `artist:${artist.id}`,
   title: artist.name,
-  line: [
-    plural({ n: artist.albumCount, one: 'album', many: 'albums' }),
-    plural({ n: artist.trackCount, one: 'track', many: 'tracks' }),
-  ].join(' · '),
+  line: MUSIC_COPY.facts([
+    plural({ n: artist.albumCount, ...MUSIC_COPY.albums }),
+    plural({ n: artist.trackCount, ...MUSIC_COPY.tracks }),
+  ]),
   shape: CARD_SHAPES.poster,
   picture: null,
   progress: 0,

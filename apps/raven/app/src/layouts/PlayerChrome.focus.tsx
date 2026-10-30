@@ -1,9 +1,15 @@
-import { useMemo } from 'react'
+import { type ComponentType, useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Video, { type VideoMetadata } from 'react-native-video'
 
 import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
-import { type PlayerChromeKit, type PlayerChromeProps } from '@/layouts/playerKit'
+import {
+  SURFACE_STATES,
+  type PlayerChromeKit,
+  type PlayerChromeProps,
+  type SurfaceState,
+  surfaceStateOf,
+} from '@/layouts/playerKit'
 import { pictureStyles } from '@/theme/useTheme'
 
 type InfoOfProps = Pick<PlayerChromeProps, 'title' | 'summary' | 'artwork'>
@@ -15,23 +21,10 @@ const infoOf = ({ title, summary, artwork }: InfoOfProps): VideoMetadata => ({
   ...(artwork === null ? {} : { imageUri: artwork }),
 })
 
-/**
- * The video under Apple TV's own transport (AVPlayerViewController): the remote's swipe scrubs,
- * a press plays and pauses, the info panel shows the title, synopsis and poster, and the audio
- * and subtitle panel lists the stream's renditions. raven draws nothing over it, so the
- * transport owns the remote's focus, and Menu leaves the player. While there is nothing to play
- * it is the TV's notice with Back.
- */
-const PlayerChrome = ({
-  title,
-  heading,
-  summary,
-  artwork,
-  surface,
-  notice,
-  isOpening,
-  onBack,
-}: PlayerChromeProps) => {
+type FocusVideoProps = PlayerChromeProps
+
+/** The video under Apple TV's own transport, with the info panel's metadata on its source. */
+const FocusVideo = ({ title, summary, artwork, surface }: FocusVideoProps) => {
   const source = surface?.source ?? null
   const styles = useStyles()
   // The source is the video: a new object of the same values must not reload it.
@@ -40,20 +33,36 @@ const PlayerChrome = ({
       source === null ? undefined : { ...source, metadata: infoOf({ title, summary, artwork }) },
     [source, title, summary, artwork],
   )
-  if (surface === null) {
-    return <PlayerNotice heading={heading} isOpening={isOpening} notice={notice} onBack={onBack} />
-  }
   return (
     <View style={styles.ground}>
-      <Video
-        {...surface}
-        controls
-        resizeMode="contain"
-        source={withInfo}
-        style={StyleSheet.absoluteFill}
-      />
+      {surface !== null && (
+        <Video
+          {...surface}
+          controls
+          resizeMode="contain"
+          source={withInfo}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
     </View>
   )
+}
+
+const PLAYER_VIEWS = {
+  [SURFACE_STATES.waiting]: PlayerNotice,
+  [SURFACE_STATES.ready]: FocusVideo,
+} as const satisfies Record<SurfaceState, ComponentType<PlayerChromeProps>>
+
+/**
+ * The video under Apple TV's own transport (AVPlayerViewController): the remote's swipe scrubs,
+ * a press plays and pauses, the info panel shows the title, synopsis and poster, and the audio
+ * and subtitle panel lists the stream's renditions. raven draws nothing over it, so the
+ * transport owns the remote's focus, and Menu leaves the player. While there is nothing to play
+ * it is the TV's notice with Back.
+ */
+const PlayerChrome = (props: PlayerChromeProps) => {
+  const PlayerView = PLAYER_VIEWS[surfaceStateOf(props.surface)]
+  return <PlayerView {...props} />
 }
 
 /** The player on Apple TV: the system's transport, which the remote drives and draws over. */

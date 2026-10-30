@@ -1,7 +1,8 @@
 import { Image, Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { MUSIC_COPY, type NowPlayingStripProps, toggleLabelOf } from '@/layouts/musicKit'
+import { MUSIC_COPY } from '@/layouts/copy'
+import { type NowPlayingStripProps, toggleLabelOf } from '@/layouts/musicKit'
 import { useMusicStyles } from '@/layouts/MusicParts.touch'
 import { Text } from '@/layouts/Text'
 import { SIZES } from '@/theme/appTheme'

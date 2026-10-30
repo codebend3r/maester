@@ -20,6 +20,7 @@ import {
   showCard,
   videoShapeFor,
 } from '@/queries/cards'
+import { LIBRARY_GRID_COPY } from '@/queries/copy'
 import { type ArtLogos, continueCard } from '@/queries/homeShelves'
 
 /**
@@ -86,12 +87,14 @@ const fileCards = ({ settings, now, files, ...pictures }: FileCardsProps) => ({
   ),
 })
 
-const videos = (n: number): string => plural({ n, one: 'video', many: 'videos' })
+const videos = (n: number): string => plural({ n, ...LIBRARY_GRID_COPY.videos })
+
+type FileSectionsProps = FileCardsProps
 
 /**
  * A library of files: one run, or the grouped view's buckets, as the web's `MediaGroups` cuts them.
  */
-const fileSections = ({ files, ...cards }: FileCardsProps): GridSection[] => {
+const fileSections = ({ files, ...cards }: FileSectionsProps): GridSection[] => {
   if (cards.settings.view !== LIBRARY_VIEWS.grouped) {
     return [{ key: SECTION_KEYS.all, title: null, count: null, ...fileCards({ files, ...cards }) }]
   }
@@ -122,23 +125,21 @@ const showSections = ({
   ...pictures
 }: ShowSectionsProps): GridSection[] => {
   const order = { sort: settings.sort, now }
-  const shown: GridSection[] =
-    shows.length === 0
-      ? []
-      : [
-          {
-            key: SECTION_KEYS.shows,
-            title: files.length === 0 ? null : 'Matched',
-            count:
-              files.length === 0 ? null : plural({ n: shows.length, one: 'show', many: 'shows' }),
-            shape: CARD_SHAPES.poster,
-            cards: shows.map((entry) => showCard({ entry, order, ...pictures })),
-          },
-        ]
+  const isBucketed = files.length > 0
+  const showRun: GridSection = {
+    key: SECTION_KEYS.shows,
+    title: isBucketed ? LIBRARY_GRID_COPY.matched : null,
+    count: isBucketed ? plural({ n: shows.length, ...LIBRARY_GRID_COPY.shows }) : null,
+    shape: CARD_SHAPES.poster,
+    cards: shows.map((entry) => showCard({ entry, order, ...pictures })),
+  }
+  const shown: GridSection[] = shows.length === 0 ? [] : [showRun]
   const folders = unmatchedShowsOf(files).map((folder) => ({
     key: `folder:${folder.key}`,
     title: folder.title,
-    count: `Not matched, ${plural({ n: folder.files.length, one: 'episode', many: 'episodes' })}`,
+    count: LIBRARY_GRID_COPY.notMatched(
+      plural({ n: folder.files.length, ...LIBRARY_GRID_COPY.episodes }),
+    ),
     shape: CARD_SHAPES.wide,
     cards: folder.files.map((media) => frameCard({ media, order, ...pictures })),
   }))

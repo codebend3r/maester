@@ -16,7 +16,8 @@ import { useAccountSession } from '@/account/accountSession'
 import { AUTH_OUTCOMES, type AuthOutcome } from '@/account/supabaseAuth'
 import { RAVEN_SERVER } from '@/servers/ravenServer'
 import { APP_ROUTES } from '@/routes'
-import { SignIn, TICKETS_OFF } from '@/screens/SignIn'
+import { SIGN_IN_COPY } from '@/screens/copy'
+import { SignIn } from '@/screens/SignIn'
 import { useActiveServer } from '@/stores/activeServer'
 import { appThemeOf } from '@/theme/appTheme'
 import { mediaItemFor } from '@/test/mediaItem'
@@ -253,8 +254,8 @@ describe('SignIn', () => {
     await render(<SignIn />)
     await signInAsViewer()
 
-    expect(await screen.findByText(TICKETS_OFF)).toBeTruthy()
-    expect(TICKETS_OFF).toBe(
+    expect(await screen.findByText(SIGN_IN_COPY.ticketsOff)).toBeTruthy()
+    expect(SIGN_IN_COPY.ticketsOff).toBe(
       "This server can't hand out media tickets. Set RAVEN_MEDIA_SECRET on it to play in the app",
     )
     expect(mockDismissTo).not.toHaveBeenCalled()

@@ -1,12 +1,14 @@
 import type { IconName } from '@raven/ui/iconDrawings'
-import { type ComponentRef, type ReactNode, useRef } from 'react'
+import { type ComponentRef, type ComponentType, type ReactNode, useRef } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
+import { PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
 import { useFocusOnMount, useOpeningFocus } from '@/layouts/focus'
 import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import { Icon } from '@/layouts/Icon'
-import { type FavouriteButtonProps, MUSIC_COPY } from '@/layouts/musicKit'
+import { MUSIC_COPY } from '@/layouts/copy'
+import { type FavouriteButtonProps } from '@/layouts/musicKit'
 import { Text } from '@/layouts/Text'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import type { Picture } from '@/queries/cards'
@@ -102,13 +104,31 @@ export const FocusPage = ({ children }: FocusPageProps) => {
 
 type CoverProps = { cover: Picture | null; title: string; size: number }
 
+type CoverPictureProps = CoverProps
+
+const CoverPicture = ({ cover, size }: CoverPictureProps) =>
+  cover !== null && <Image source={cover} style={{ width: size, height: size }} />
+
+type CoverInitialProps = CoverProps
+
+const CoverInitial = ({ title }: CoverInitialProps) => {
+  const styles = useMusicStyles()
+  return <Text style={styles.initial}>{title.slice(0, 1)}</Text>
+}
+
+/** A cover's face: its picture, else its title's first letter. */
+const COVER_FACES = {
+  [PICTURE_STATES.shown]: CoverPicture,
+  [PICTURE_STATES.missing]: CoverInitial,
+} as const satisfies Record<PictureState, ComponentType<CoverProps>>
+
 /** A square cover, or the title's first letter while there is none. */
 export const Cover = ({ cover, title, size }: CoverProps) => {
   const styles = useMusicStyles()
+  const Face = COVER_FACES[pictureStateOf(cover)]
   return (
     <View style={[styles.cover, { width: size, height: size }]}>
-      {cover !== null && <Image source={cover} style={{ width: size, height: size }} />}
-      {cover === null && <Text style={styles.initial}>{title.slice(0, 1)}</Text>}
+      <Face cover={cover} size={size} title={title} />
     </View>
   )
 }

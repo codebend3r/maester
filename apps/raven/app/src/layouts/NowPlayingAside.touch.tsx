@@ -1,11 +1,12 @@
 import { LYRICS_KINDS } from '@raven/core'
+import type { ComponentType } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { touchForm } from '@/layouts/Form.touch'
+import { MUSIC_COPY } from '@/layouts/copy'
 import {
   type BookControls,
-  MUSIC_COPY,
   NOW_PLAYING_ASIDES,
   type NowPlayingAside as Aside,
   SPEED_OPTIONS,
@@ -118,45 +119,70 @@ const SyncedLines = ({ lyrics }: SyncedLinesProps) => {
 
 type LyricsBodyProps = { lyrics: LyricsView }
 
+type SyncedBodyProps = LyricsBodyProps
+
+const SyncedBody = ({ lyrics }: SyncedBodyProps) =>
+  lyrics.kind === LYRICS_KINDS.synced && <SyncedLines lyrics={lyrics} />
+
+type PlainBodyProps = LyricsBodyProps
+
+const PlainBody = ({ lyrics }: PlainBodyProps) => {
+  const styles = useMusicStyles()
+  return lyrics.kind === LYRICS_KINDS.plain && <Text style={styles.rowTitle}>{lyrics.text}</Text>
+}
+
+const NoLyrics = () => {
+  const styles = useMusicStyles()
+  return <Text style={styles.muted}>{MUSIC_COPY.noLyrics}</Text>
+}
+
+/** The words in each shape they come in. */
+const LYRICS_BODIES = {
+  [LYRICS_KINDS.synced]: SyncedBody,
+  [LYRICS_KINDS.plain]: PlainBody,
+  [LYRICS_KINDS.none]: NoLyrics,
+} as const satisfies Record<LyricsView['kind'], ComponentType<LyricsBodyProps>>
+
 /** The words themselves: timed lines, plain text, or a quiet word that there are none. */
 const LyricsBody = ({ lyrics }: LyricsBodyProps) => {
-  const styles = useMusicStyles()
-  switch (lyrics.kind) {
-    case LYRICS_KINDS.synced:
-      return <SyncedLines lyrics={lyrics} />
-    case LYRICS_KINDS.plain:
-      return <Text style={styles.rowTitle}>{lyrics.text}</Text>
-    case LYRICS_KINDS.none:
-      return <Text style={styles.muted}>{MUSIC_COPY.noLyrics}</Text>
-    default: {
-      const unknown: never = lyrics
-      return unknown
-    }
-  }
+  const Body = LYRICS_BODIES[lyrics.kind]
+  return <Body lyrics={lyrics} />
 }
 
 type NowPlayingAsideProps = { aside: Aside }
 
+type BookAsideProps = NowPlayingAsideProps
+
+const BookAside = ({ aside }: BookAsideProps) =>
+  aside.kind === NOW_PLAYING_ASIDES.book && <Book book={aside.book} />
+
+type LyricsAsideProps = NowPlayingAsideProps
+
+const LyricsAside = ({ aside }: LyricsAsideProps) => {
+  const styles = useMusicStyles()
+  return (
+    aside.kind === NOW_PLAYING_ASIDES.lyrics && (
+      <View style={styles.section}>
+        <Text accessibilityRole="header" style={styles.heading}>
+          {MUSIC_COPY.lyrics}
+        </Text>
+        <LyricsBody lyrics={aside.lyrics} />
+      </View>
+    )
+  )
+}
+
+const NoAside = () => null
+
+/** What each kind of aside draws. */
+const ASIDES = {
+  [NOW_PLAYING_ASIDES.book]: BookAside,
+  [NOW_PLAYING_ASIDES.lyrics]: LyricsAside,
+  [NOW_PLAYING_ASIDES.none]: NoAside,
+} as const satisfies Record<Aside['kind'], ComponentType<NowPlayingAsideProps>>
+
 /** What sits below Now Playing's controls: a book's controls, or the lyrics under a heading. */
 export const NowPlayingAside = ({ aside }: NowPlayingAsideProps) => {
-  const styles = useMusicStyles()
-  switch (aside.kind) {
-    case NOW_PLAYING_ASIDES.book:
-      return <Book book={aside.book} />
-    case NOW_PLAYING_ASIDES.lyrics:
-      return (
-        <View style={styles.section}>
-          <Text accessibilityRole="header" style={styles.heading}>
-            {MUSIC_COPY.lyrics}
-          </Text>
-          <LyricsBody lyrics={aside.lyrics} />
-        </View>
-      )
-    case NOW_PLAYING_ASIDES.none:
-      return null
-    default: {
-      const unknown: never = aside
-      return unknown
-    }
-  }
+  const AsideView = ASIDES[aside.kind]
+  return <AsideView aside={aside} />
 }

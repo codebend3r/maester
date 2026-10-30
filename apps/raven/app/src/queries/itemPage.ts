@@ -38,6 +38,7 @@ import {
   imageOf,
   pictureAt,
 } from '@/queries/cards'
+import { ITEM_PAGE_COPY } from '@/queries/copy'
 import { episodeMarkOf } from '@/queries/episodeMark'
 import { ROUTE_TARGETS, type RouteTarget, itemTarget } from '@/routes'
 
@@ -315,7 +316,7 @@ type ShowPageProps = DetailsProps
 export const showPage = ({ details, ...pictures }: ShowPageProps): ItemPage =>
   pageOf({
     hero: {
-      eyebrow: 'Show',
+      eyebrow: ITEM_PAGE_COPY.show,
       logo: logoOf({ details, place: ART_PLACES.title, ...pictures }),
       title: details.title,
       byline: createdBy(details),
@@ -331,7 +332,7 @@ export const showPage = ({ details, ...pictures }: ShowPageProps): ItemPage =>
     seasons: seasonsOf(details).map((season): ShelfCard => ({
       key: seasonEntryKey(season),
       title: season.title,
-      line: plural({ n: season.episodeCount, one: 'episode', many: 'episodes' }),
+      line: plural({ n: season.episodeCount, ...ITEM_PAGE_COPY.episodes }),
       shape: CARD_SHAPES.poster,
       picture: pictureAt({
         uri: imageOf({ ...pictures, item: season, kind: ITEM_IMAGE_KINDS.poster }),
@@ -373,7 +374,10 @@ export const seasonPage = ({ season, show, ...pictures }: SeasonPageProps): Item
     details: season,
     episodes: episodes.map((episode): EpisodeRow => ({
       key: episodeEntryKey(episode),
-      title: [episode.episode === null ? null : `E${episode.episode}`, episode.title]
+      title: [
+        episode.episode === null ? null : ITEM_PAGE_COPY.episodeNumber(episode.episode),
+        episode.title,
+      ]
         .filter((part): part is string => part !== null)
         .join(' · '),
       line: lineOrNull(episodeRowFacts(episode).join(' · ')),

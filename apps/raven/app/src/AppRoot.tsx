@@ -86,48 +86,14 @@ const UnlockRoute = () => {
   return null
 }
 
-/**
- * Loads what the app keeps on the device before any route renders, then the routes. Every
- * route but sign-in needs a server, so without one they send the viewer to sign in. Until the
- * prefs are read the splash stays up and the app paints nothing, so the first frame of a theme
- * is the one picked, never the default's on its way to it; the splash goes once that frame is
- * drawn, and after that a theme picked in Settings repaints everything at once.
- */
-export const AppRoot = () => {
-  const [isLoaded, setLoaded] = useState(false)
+/** The routes, once the stores are read: every route but sign-in needs a server. */
+const AppRoutes = () => {
   const session = useAppQueries()
   const isSignedIn = useAccountSession((state) => state.session !== null)
-  const expiresAt = useAccountSession((state) => state.session?.expiresAt ?? null)
   const ground = useTheme((theme) => theme.palette.ground)
   const tone = useTheme((theme) => theme.tone)
   const insets = useSafeAreaInsets()
   const isBarShown = useIsBarShown()
-
-  useEffect(() => {
-    const show = () => setLoaded(true)
-    loadStores().then(show, show)
-  }, [])
-  useEffect(() => clearOnServerSwitch({ client: queryClient, store: useActiveServer }), [])
-  useEffect(() => followReduceMotion(), [])
-  useEffect(() => {
-    if (expiresAt === null) return undefined
-    const timer = setTimeout(
-      () => {
-        useAccountSession
-          .getState()
-          .refresh()
-          .catch(() => undefined)
-      },
-      Math.max(0, expiresAt - Date.now() - REFRESH_LEAD_MS),
-    )
-    return () => clearTimeout(timer)
-  }, [expiresAt])
-  useEffect(() => (isLoaded ? followTheme({ apply: wearSystemLook }) : undefined), [isLoaded])
-  useEffect(() => {
-    if (isLoaded) hideAsync().catch(SPLASH_IGNORED)
-  }, [isLoaded])
-
-  if (!isLoaded) return null
   return (
     <QueryClientProvider client={queryClient}>
       <StatusBar barStyle={tone === THEME_TONES.light ? 'dark-content' : 'light-content'} />
@@ -174,3 +140,41 @@ export const AppRoot = () => {
 }
 
 const styles = StyleSheet.create({ frame: { flex: 1 } })
+
+/**
+ * Loads what the app keeps on the device before any route renders, then the routes. Every
+ * route but sign-in needs a server, so without one they send the viewer to sign in. Until the
+ * prefs are read the splash stays up and the app paints nothing, so the first frame of a theme
+ * is the one picked, never the default's on its way to it; the splash goes once that frame is
+ * drawn, and after that a theme picked in Settings repaints everything at once.
+ */
+export const AppRoot = () => {
+  const [isLoaded, setLoaded] = useState(false)
+  const expiresAt = useAccountSession((state) => state.session?.expiresAt ?? null)
+
+  useEffect(() => {
+    const show = () => setLoaded(true)
+    loadStores().then(show, show)
+  }, [])
+  useEffect(() => clearOnServerSwitch({ client: queryClient, store: useActiveServer }), [])
+  useEffect(() => followReduceMotion(), [])
+  useEffect(() => {
+    if (expiresAt === null) return undefined
+    const timer = setTimeout(
+      () => {
+        useAccountSession
+          .getState()
+          .refresh()
+          .catch(() => undefined)
+      },
+      Math.max(0, expiresAt - Date.now() - REFRESH_LEAD_MS),
+    )
+    return () => clearTimeout(timer)
+  }, [expiresAt])
+  useEffect(() => (isLoaded ? followTheme({ apply: wearSystemLook }) : undefined), [isLoaded])
+  useEffect(() => {
+    if (isLoaded) hideAsync().catch(SPLASH_IGNORED)
+  }, [isLoaded])
+
+  return isLoaded && <AppRoutes />
+}

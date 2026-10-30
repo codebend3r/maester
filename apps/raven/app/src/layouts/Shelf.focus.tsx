@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { Text } from '@/layouts/Text'
@@ -10,10 +11,13 @@ import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import {
   NOTHING_HERE,
   SEE_ALL,
+  SHELF_STATES,
   type ShelfKit,
   type ShelfProps,
+  type ShelfState,
   type ShelvesProps,
   seeAllLabelOf,
+  shelfStateOf,
 } from '@/layouts/shelfKit'
 import { Logo } from '@/layouts/Logo'
 import { SideMenu } from '@/layouts/SideMenu.focus'
@@ -99,39 +103,57 @@ type PlaceOfProps = { shelf: ShelfView; card: ShelfCard }
 /** Where a card sits on its screen: one title can sit on two shelves, as Continue watching's do. */
 const placeOf = ({ shelf, card }: PlaceOfProps): string => `${shelf.key}/${card.key}`
 
+/** A shelf with no cards: its line in place of the row. */
+const EmptyRow = () => {
+  const styles = useStyles()
+  return <Text style={styles.notice}>{NOTHING_HERE}</Text>
+}
+
+type CardsRowProps = ShelfProps
+
+/** A shelf's row of cards, a band the remote comes into on a card. */
+const CardsRow = ({ shelf, onOpen, isFirst = false }: CardsRowProps) => {
+  const { isOpening } = useOpeningFocus()
+  const styles = useStyles()
+  return (
+    <FocusBand>
+      <ScrollView
+        contentContainerStyle={styles.row}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {shelf.cards.map((card, index) => (
+          <FocusCard
+            key={card.key}
+            card={card}
+            isPreferred={isOpening && isFirst && index === 0}
+            onPress={() => onOpen(card)}
+            place={placeOf({ shelf, card })}
+            width={focusCardWidthOf(card.shape)}
+          />
+        ))}
+      </ScrollView>
+    </FocusBand>
+  )
+}
+
+const SHELF_ROWS = {
+  [SHELF_STATES.empty]: EmptyRow,
+  [SHELF_STATES.filled]: CardsRow,
+} as const satisfies Record<ShelfState, ComponentType<ShelfProps>>
+
 /**
  * A shelf the remote moves along: its title, then one row, scrolled as focus moves. The row is a
  * band the width of the screen, so the remote coming down or up into it from anywhere lands on
  * a card: the first, or the one it last left there.
  */
-const Shelf = ({ shelf, onOpen, onOpenLibrary, isFirst = false }: ShelfProps) => {
-  const { isOpening } = useOpeningFocus()
+const Shelf = (props: ShelfProps) => {
   const styles = useStyles()
+  const Row = SHELF_ROWS[shelfStateOf(props.shelf)]
   return (
     <View style={styles.shelf}>
-      <ShelfTitle onOpenLibrary={onOpenLibrary} shelf={shelf} />
-      {shelf.cards.length === 0 ? (
-        <Text style={styles.notice}>{NOTHING_HERE}</Text>
-      ) : (
-        <FocusBand>
-          <ScrollView
-            contentContainerStyle={styles.row}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            {shelf.cards.map((card, index) => (
-              <FocusCard
-                key={card.key}
-                card={card}
-                isPreferred={isOpening && isFirst && index === 0}
-                onPress={() => onOpen(card)}
-                place={placeOf({ shelf, card })}
-                width={focusCardWidthOf(card.shape)}
-              />
-            ))}
-          </ScrollView>
-        </FocusBand>
-      )}
+      <ShelfTitle onOpenLibrary={props.onOpenLibrary} shelf={props.shelf} />
+      <Row {...props} />
     </View>
   )
 }

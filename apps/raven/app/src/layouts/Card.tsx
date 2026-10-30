@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { type ComponentType, useState } from 'react'
 import { Image, StyleSheet, View } from 'react-native'
 
 import { Text } from '@/layouts/Text'
-import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
+import { CARD_SHAPES, type CardShape, type Picture, type ShelfCard } from '@/queries/cards'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -17,6 +17,49 @@ type PictureHeightOfProps = { shape: CardShape; width: number }
 /** How tall a card's picture stands for its width: a poster at 2:3, a wide frame at 16:9. */
 export const pictureHeightOf = ({ shape, width }: PictureHeightOfProps): number =>
   width * (shape === CARD_SHAPES.poster ? POSTER_RATIO : WIDE_RATIO)
+
+/** Whether a picture is drawn, or a stand-in for it in its place. */
+export const PICTURE_STATES = { shown: 'shown', missing: 'missing' } as const
+
+export type PictureState = (typeof PICTURE_STATES)[keyof typeof PICTURE_STATES]
+
+/** Whether `picture` is there to draw. */
+export const pictureStateOf = (picture: Picture | null): PictureState =>
+  picture === null ? PICTURE_STATES.missing : PICTURE_STATES.shown
+
+type CardFaceProps = {
+  title: string
+  picture: Picture | null
+  height: number
+  onError: () => void
+}
+
+type CardImageProps = CardFaceProps
+
+const CardImage = ({ picture, onError }: CardImageProps) =>
+  picture !== null && (
+    <Image
+      onError={onError}
+      // Android decodes the picture at the size it is drawn, not the size it was sent at.
+      resizeMethod="resize"
+      resizeMode="cover"
+      source={picture}
+      style={StyleSheet.absoluteFill}
+    />
+  )
+
+type CardInitialProps = CardFaceProps
+
+const CardInitial = ({ title, height }: CardInitialProps) => {
+  const styles = useStyles()
+  return <Text style={[styles.initial, { fontSize: height / 3 }]}>{title.slice(0, 1)}</Text>
+}
+
+/** A card's face: its picture, else its title's first letter. */
+const CARD_FACES = {
+  [PICTURE_STATES.shown]: CardImage,
+  [PICTURE_STATES.missing]: CardInitial,
+} as const satisfies Record<PictureState, ComponentType<CardFaceProps>>
 
 type CardPictureProps = {
   card: Pick<ShelfCard, 'title' | 'shape' | 'picture' | 'progress' | 'logo'>
@@ -42,22 +85,17 @@ export const CardPicture = ({ card, width, ring = 0, radius = SIZES.radius }: Ca
   const pictureKey = card.picture === null ? null : JSON.stringify(card.picture)
   const picture = pictureKey === failed ? null : card.picture
   const outset = -2 * ring
+  const Face = CARD_FACES[pictureStateOf(picture)]
   return (
     <View style={{ width, height }}>
       <View style={[styles.frame, { borderRadius: radius }]}>
-        {picture !== null ? (
-          <Image
-            key={pictureKey}
-            onError={() => setFailed(pictureKey)}
-            // Android decodes the picture at the size it is drawn, not the size it was sent at.
-            resizeMethod="resize"
-            resizeMode="cover"
-            source={picture}
-            style={StyleSheet.absoluteFill}
-          />
-        ) : (
-          <Text style={[styles.initial, { fontSize: height / 3 }]}>{card.title.slice(0, 1)}</Text>
-        )}
+        <Face
+          key={pictureKey}
+          height={height}
+          onError={() => setFailed(pictureKey)}
+          picture={picture}
+          title={card.title}
+        />
         {logo !== null && (
           <View pointerEvents="none" style={styles.logoSlot}>
             <Image

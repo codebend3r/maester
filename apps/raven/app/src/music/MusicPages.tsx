@@ -1,13 +1,12 @@
 import type { Library } from '@raven/core'
-import { useState } from 'react'
+import { type ComponentType, type ReactNode, useState } from 'react'
 
 import { ToolButton } from '@/layouts'
+import { MUSIC_PAGES_COPY } from '@/music/copy'
 import { AlbumsGrid } from '@/music/AlbumsGrid'
 import { ArtistsGrid } from '@/music/ArtistsGrid'
 import { PlaylistsGrid } from '@/music/PlaylistsGrid'
 import type { AppQueries } from '@/queries/useAppQueries'
-
-const COPY = { show: (page: string) => `Show ${page}` } as const
 
 /**
  * The pages a music library opens on: its albums as covers, its artists by name, and the
@@ -26,9 +25,9 @@ const PAGE_ORDER: readonly MusicPage[] = [
 
 /** What each page is called, on the button that leads to it. */
 const PAGE_NAMES = {
-  [MUSIC_PAGES.albums]: 'Albums',
-  [MUSIC_PAGES.artists]: 'Artists',
-  [MUSIC_PAGES.playlists]: 'Playlists',
+  [MUSIC_PAGES.albums]: MUSIC_PAGES_COPY.albums,
+  [MUSIC_PAGES.artists]: MUSIC_PAGES_COPY.artists,
+  [MUSIC_PAGES.playlists]: MUSIC_PAGES_COPY.playlists,
 } as const satisfies Record<MusicPage, string>
 
 type MusicPageToggleProps = { page: MusicPage; onChange: (page: MusicPage) => void }
@@ -38,13 +37,22 @@ const MusicPageToggle = ({ page, onChange }: MusicPageToggleProps) =>
   PAGE_ORDER.filter((other) => other !== page).map((other) => (
     <ToolButton
       key={other}
-      accessibilityLabel={COPY.show(PAGE_NAMES[other])}
+      accessibilityLabel={MUSIC_PAGES_COPY.show(PAGE_NAMES[other])}
       label={PAGE_NAMES[other]}
       onPress={() => onChange(other)}
     />
   ))
 
 type MusicPagesProps = { session: AppQueries; library: Library; asked: string }
+
+type MusicPageViewProps = MusicPagesProps & { toggle: ReactNode }
+
+/** Each page as the toolbar's choice draws it. */
+const MUSIC_PAGE_VIEWS = {
+  [MUSIC_PAGES.albums]: AlbumsGrid,
+  [MUSIC_PAGES.artists]: ArtistsGrid,
+  [MUSIC_PAGES.playlists]: PlaylistsGrid,
+} as const satisfies Record<MusicPage, ComponentType<MusicPageViewProps>>
 
 /**
  * A music library's three pages, its albums, its artists and the account's playlists, with a
@@ -53,17 +61,13 @@ type MusicPagesProps = { session: AppQueries; library: Library; asked: string }
  */
 export const MusicPages = ({ session, library, asked }: MusicPagesProps) => {
   const [page, setPage] = useState<MusicPage>(MUSIC_PAGES.albums)
-  const toggle = <MusicPageToggle onChange={setPage} page={page} />
-  switch (page) {
-    case MUSIC_PAGES.albums:
-      return <AlbumsGrid asked={asked} library={library} session={session} toggle={toggle} />
-    case MUSIC_PAGES.artists:
-      return <ArtistsGrid library={library} session={session} toggle={toggle} />
-    case MUSIC_PAGES.playlists:
-      return <PlaylistsGrid library={library} session={session} toggle={toggle} />
-    default: {
-      const unknown: never = page
-      return unknown
-    }
-  }
+  const Page = MUSIC_PAGE_VIEWS[page]
+  return (
+    <Page
+      asked={asked}
+      library={library}
+      session={session}
+      toggle={<MusicPageToggle onChange={setPage} page={page} />}
+    />
+  )
 }

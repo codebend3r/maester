@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react'
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -10,10 +11,13 @@ import {
   SEARCH_EVERY_LIBRARY,
   SEE_ALL,
   SETTINGS_ENTRY,
+  SHELF_STATES,
   type ShelfKit,
   type ShelfProps,
+  type ShelfState,
   type ShelvesProps,
   seeAllLabelOf,
+  shelfStateOf,
 } from '@/layouts/shelfKit'
 import { Logo } from '@/layouts/Logo'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
@@ -110,11 +114,16 @@ const ShelfTitle = ({ shelf, onOpenLibrary }: ShelfTitleProps) => {
   )
 }
 
-/**
- * A shelf under the thumb: its title, then a row that scrolls sideways and comes to rest on a
- * card's edge, each card as wide as its own shape asks.
- */
-const Shelf = ({ shelf, onOpen, onOpenLibrary }: ShelfProps) => {
+/** A shelf with no cards: its line in place of the row. */
+const EmptyRow = () => {
+  const styles = useStyles()
+  return <Text style={styles.notice}>{NOTHING_HERE}</Text>
+}
+
+type CardsRowProps = ShelfProps
+
+/** A shelf's row, which scrolls sideways and comes to rest on a card's edge. */
+const CardsRow = ({ shelf, onOpen }: CardsRowProps) => {
   const widths = useCardWidths()
   const styles = useStyles()
   const snaps = shelf.cards.reduce<number[]>(
@@ -122,31 +131,44 @@ const Shelf = ({ shelf, onOpen, onOpenLibrary }: ShelfProps) => {
     [0],
   )
   return (
+    <ScrollView
+      contentContainerStyle={styles.row}
+      decelerationRate="fast"
+      horizontal
+      // Under a search box the keyboard may be up: a card's first tap opens it, not only
+      // puts the keyboard away.
+      keyboardShouldPersistTaps="handled"
+      showsHorizontalScrollIndicator={false}
+      snapToOffsets={snaps}
+    >
+      {shelf.cards.map((card) => (
+        <TouchCard
+          key={card.key}
+          card={card}
+          onPress={() => onOpen(card)}
+          width={widths[card.shape]}
+        />
+      ))}
+    </ScrollView>
+  )
+}
+
+const SHELF_ROWS = {
+  [SHELF_STATES.empty]: EmptyRow,
+  [SHELF_STATES.filled]: CardsRow,
+} as const satisfies Record<ShelfState, ComponentType<ShelfProps>>
+
+/**
+ * A shelf under the thumb: its title, then a row that scrolls sideways and comes to rest on a
+ * card's edge, each card as wide as its own shape asks.
+ */
+const Shelf = (props: ShelfProps) => {
+  const styles = useStyles()
+  const Row = SHELF_ROWS[shelfStateOf(props.shelf)]
+  return (
     <View style={styles.shelf}>
-      <ShelfTitle shelf={shelf} onOpenLibrary={onOpenLibrary} />
-      {shelf.cards.length === 0 ? (
-        <Text style={styles.notice}>{NOTHING_HERE}</Text>
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.row}
-          decelerationRate="fast"
-          horizontal
-          // Under a search box the keyboard may be up: a card's first tap opens it, not only
-          // puts the keyboard away.
-          keyboardShouldPersistTaps="handled"
-          showsHorizontalScrollIndicator={false}
-          snapToOffsets={snaps}
-        >
-          {shelf.cards.map((card) => (
-            <TouchCard
-              key={card.key}
-              card={card}
-              onPress={() => onOpen(card)}
-              width={widths[card.shape]}
-            />
-          ))}
-        </ScrollView>
-      )}
+      <ShelfTitle onOpenLibrary={props.onOpenLibrary} shelf={props.shelf} />
+      <Row {...props} />
     </View>
   )
 }

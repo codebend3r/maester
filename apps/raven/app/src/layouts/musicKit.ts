@@ -1,7 +1,8 @@
-import { type ArtistCredit, type PlaylistSummary, REPEAT_MODES, type RepeatMode } from '@raven/core'
+import type { ArtistCredit, PlaylistSummary, RepeatMode } from '@raven/core'
 import { AUDIOBOOK_SPEEDS, type AudiobookSpeed } from '@raven/ui/headless'
 import type { ReactNode } from 'react'
 
+import { MUSIC_COPY } from '@/layouts/copy'
 import type {
   AlbumDisc,
   ChapterRow,
@@ -10,52 +11,6 @@ import type {
   QueueRow,
 } from '@/layouts/musicRows'
 import type { Picture } from '@/queries/cards'
-
-/** The words both platforms' music pages say. */
-export const MUSIC_COPY = {
-  play: 'Play',
-  pause: 'Pause',
-  shuffle: 'Shuffle',
-  playNext: 'Play next',
-  addToQueue: 'Add to queue',
-  previous: 'Previous',
-  next: 'Next',
-  nowPlaying: 'Now Playing',
-  nothingPlaying: 'Nothing is playing.',
-  upNext: 'Up next',
-  clear: 'Clear',
-  remove: 'Remove',
-  removeTrack: (title: string) => `Remove ${title}`,
-  openNowPlaying: 'Open Now Playing',
-  goTo: (name: string) => `Go to ${name}`,
-  disc: (n: number) => `Disc ${n}`,
-  favourite: 'Favourite',
-  playlist: 'Playlist',
-  newPlaylist: 'New playlist',
-  create: 'Make',
-  rename: 'Rename',
-  renamePlaylist: 'Rename playlist',
-  delete: 'Delete',
-  deletePlaylist: (name: string) => `Delete ${name}?`,
-  deleteNote: 'Its tracks stay in the library.',
-  addToPlaylist: 'Add to playlist',
-  addTrackToPlaylist: (title: string) => `Add ${title} to a playlist`,
-  added: (playlist: string) => `Added to ${playlist}.`,
-  up: 'Up',
-  moveUp: (title: string) => `Move ${title} up`,
-  removeFrom: (title: string) => `Remove ${title} from the playlist`,
-  emptyPlaylist: (name: string) =>
-    `Nothing in ${name} yet. Add tracks from an album, or from Now Playing.`,
-  lyrics: 'Lyrics',
-  noLyrics: 'No lyrics for this track.',
-  instrumental: '\u266A',
-  chapters: 'Chapters',
-  noChapters: 'This book names no chapters.',
-  chapter: (n: number) => `Chapter ${n}`,
-  previousChapter: 'Previous chapter',
-  nextChapter: 'Next chapter',
-  speed: 'Speed',
-} as const
 
 /** What the remote and the screen reader call the actions a touch row offers beside a press. */
 export const ROW_ACTIONS = { addToPlaylist: 'addToPlaylist' } as const
@@ -70,13 +25,10 @@ export type PlaylistPick =
 /** One of the account's playlists, as Add to playlist offers it. */
 export type PlaylistChoice = Pick<PlaylistSummary, 'id' | 'name'>
 
-/** A speed as the picker names it: "1.25×". */
-const speedLabelOf = (speed: AudiobookSpeed): string => `${speed}\u00D7`
-
 /** The speeds the picker offers, each keyed by its number in words. */
 export const SPEED_OPTIONS = AUDIOBOOK_SPEEDS.map((speed) => ({
   key: String(speed),
-  label: speedLabelOf(speed),
+  label: MUSIC_COPY.speedLabel(speed),
 }))
 
 /** The speed a picker's key names, or null for a key no speed has. */
@@ -91,16 +43,9 @@ export const speedChooserOf =
     if (speed !== null) onSpeed(speed)
   }
 
-/** What the repeat button says in each mode. */
-export const REPEAT_LABELS: Record<RepeatMode, string> = {
-  [REPEAT_MODES.off]: 'Repeat off',
-  [REPEAT_MODES.all]: 'Repeat all',
-  [REPEAT_MODES.one]: 'Repeat one',
-}
-
 /** What the shuffle button says: "Shuffle on" or "Shuffle off". */
 export const shuffleLabelOf = (isShuffled: boolean): string =>
-  `${MUSIC_COPY.shuffle} ${isShuffled ? 'on' : 'off'}`
+  isShuffled ? MUSIC_COPY.shuffleOn : MUSIC_COPY.shuffleOff
 
 /** What Play or Pause says: what a press does now. */
 export const toggleLabelOf = (isPlaying: boolean): string =>
@@ -144,6 +89,15 @@ type PlayingTrack = {
   album: string
   cover: Picture | null
 }
+
+/** Whether Now Playing has a track to show. */
+export const PLAYING_STATES = { idle: 'idle', playing: 'playing' } as const
+
+export type PlayingState = (typeof PLAYING_STATES)[keyof typeof PLAYING_STATES]
+
+/** Whether `track` is there to show. */
+export const playingStateOf = (track: PlayingTrack | null): PlayingState =>
+  track === null ? PLAYING_STATES.idle : PLAYING_STATES.playing
 
 export type NowPlayingLayoutProps = {
   /** The track playing, or null when nothing is. */

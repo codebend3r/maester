@@ -3,7 +3,8 @@ import { useServerPlaylistMutations } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { MUSIC_COPY, PLAYLIST_PICKS, type PlaylistPick } from '@/layouts/musicKit'
+import { MUSIC_COPY } from '@/layouts/copy'
+import { PLAYLIST_PICKS, type PlaylistPick } from '@/layouts/musicKit'
 import type { AppQueries } from '@/queries/useAppQueries'
 
 /** What Add to playlist offers while the account's playlists are on their way. */

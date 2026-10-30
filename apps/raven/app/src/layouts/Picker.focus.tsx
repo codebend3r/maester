@@ -8,13 +8,11 @@ import {
   chosenLabelOf,
   pickerLabelOf,
 } from '@/layouts/gridKit'
+import { PICKER_LIST_COPY } from '@/layouts/copy'
 import { Text } from '@/layouts/Text'
 import { PlateButton, usePlateStyles } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
-
-/** Marks the option chosen now. */
-const CHOSEN = '\u2713'
 
 /** What a picker does as its list opens or closes unless told more: nothing. */
 const NOTHING_ON_OPEN = (): void => undefined
@@ -60,7 +58,7 @@ export const PickerList = <K extends string>({
                 style={({ focused }) => [styles.option, focused && styles.focused]}
               >
                 <Text style={[plateStyles.label, option.key === value && styles.chosen]}>
-                  {option.key === value ? `${CHOSEN} ${option.label}` : option.label}
+                  {option.key === value ? PICKER_LIST_COPY.chosen(option.label) : option.label}
                 </Text>
               </Pressable>
             ))}
@@ -70,6 +68,8 @@ export const PickerList = <K extends string>({
     </Modal>
   )
 }
+
+type UsePickerListProps<K extends string> = PickerProps<K>
 
 /**
  * What opens a TV picker's list, what the control that opens it is called aloud (`pickerLabelOf`),
@@ -83,7 +83,7 @@ export const usePickerList = <K extends string>({
   onChoose,
   onOpenChange = NOTHING_ON_OPEN,
   isOverPicture,
-}: PickerProps<K>): { open: () => void; label: string; list: PickerListProps<K> } => {
+}: UsePickerListProps<K>): { open: () => void; label: string; list: PickerListProps<K> } => {
   const [isOpen, setIsOpen] = useState(false)
   const setOpen = (isOpening: boolean) => {
     setIsOpen(isOpening)

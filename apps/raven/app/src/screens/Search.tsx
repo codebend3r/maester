@@ -8,15 +8,7 @@ import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
 import { SearchLayout, Shelf } from '@/layouts'
 import { ROUTE_TARGETS, hrefOf } from '@/routes'
-
-const COPY = {
-  title: 'Search',
-  label: 'Search every library',
-  searching: 'Searching every library',
-} as const
-
-/** What the screen says when a search finds nothing, as the web's Home says it. */
-const nothingMatches = (query: string): string => `Nothing in any library matches "${query}".`
+import { SEARCH_COPY } from '@/screens/copy'
 
 type ServerSearchProps = { session: AppQueries }
 
@@ -42,7 +34,7 @@ const ServerSearch = ({ session: { server, api, queries } }: ServerSearchProps) 
     // The last search's answer stands in while this one is read: it says nothing of this one.
     const isRead =
       results.isSuccess && !results.isPlaceholderData && libraries.isSuccess && pictures !== null
-    return isRead ? nothingMatches(query) : COPY.searching
+    return isRead ? SEARCH_COPY.nothingMatches(query) : SEARCH_COPY.searching
   })()
 
   const open = ({ target }: ShelfCard) => router.push(hrefOf(target))
@@ -53,11 +45,11 @@ const ServerSearch = ({ session: { server, api, queries } }: ServerSearchProps) 
 
   return (
     <SearchLayout
-      label={COPY.label}
+      label={SEARCH_COPY.label}
       notice={notice}
       onBack={() => router.back()}
       search={search}
-      title={COPY.title}
+      title={SEARCH_COPY.title}
     >
       {shelves.map((shelf) => (
         <Shelf key={shelf.key} onOpen={open} onOpenLibrary={openLibrary} shelf={shelf} />

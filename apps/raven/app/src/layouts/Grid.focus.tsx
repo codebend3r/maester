@@ -1,5 +1,5 @@
-import { JUMP_SCALE_LABELS, type JumpScale, LIBRARY_VIEWS } from '@raven/core'
-import { type ComponentRef, useMemo, useRef, useState } from 'react'
+import { JUMP_SCALE_LABELS, type JumpScale, LIBRARY_VIEWS, type LibraryView } from '@raven/core'
+import { type ComponentRef, type ComponentType, useMemo, useRef, useState } from 'react'
 import {
   FlatList,
   Pressable,
@@ -8,22 +8,32 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import { Icon } from '@/layouts/Icon'
 import { Text } from '@/layouts/Text'
-import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
+import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import { focusCardWidthOf, FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
 import { useOpenerFocus, useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
+  CARD_LAYOUTS,
   CHEVRONS,
+  type CardLayout,
   type GridKit,
   type GridProps,
+  cardLayoutOf,
   headingLabelOf,
   isRowView,
 } from '@/layouts/gridKit'
-import { GRID_ROWS, type GridRow, gridColumnsOf } from '@/layouts/gridRows'
+import {
+  GRID_ROWS,
+  type GridRow,
+  type GridRowKind,
+  type GridRowOf,
+  gridColumnsOf,
+} from '@/layouts/gridRows'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useGrid } from '@/layouts/useGrid'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
@@ -159,6 +169,120 @@ const firstKeyOf = (rows: readonly GridRow[]): string | null => {
   return first.kind === GRID_ROWS.header ? first.key : (first.cards[0]?.key ?? null)
 }
 
+/** What a grid's rows draw from beyond the row itself. */
+type GridRowContext = {
+  view: LibraryView
+  preferred: string | null
+  heightOf: (row: GridRow) => number
+  widthOf: (shape: CardShape) => number
+  jumpOf: (card: ShelfCard) => JumpFocus | null
+  toggle: ReturnType<typeof useGrid>['toggle']
+  settle: () => void
+  onOpen: GridProps['onOpen']
+}
+
+type GridCellProps = { card: ShelfCard; width: number; grid: GridRowContext }
+
+type RowCellProps = GridCellProps
+
+/** A card of the list or tiles view, in its column. */
+const RowCell = ({ card, width, grid }: RowCellProps) => (
+  <View style={{ width }}>
+    <RowCard
+      card={card}
+      hasPicture={grid.view === LIBRARY_VIEWS.tiles}
+      isPreferred={card.key === grid.preferred}
+      jump={grid.jumpOf(card)}
+      onPress={() => grid.onOpen(card)}
+    />
+  </View>
+)
+
+type CardCellProps = GridCellProps
+
+const CardCell = ({ card, width, grid }: CardCellProps) => (
+  <FocusCard
+    card={card}
+    isPreferred={card.key === grid.preferred}
+    jump={grid.jumpOf(card)}
+    onPress={() => grid.onOpen(card)}
+    width={width}
+  />
+)
+
+const GRID_CELLS = {
+  [CARD_LAYOUTS.rows]: RowCell,
+  [CARD_LAYOUTS.cards]: CardCell,
+} as const satisfies Record<CardLayout, ComponentType<GridCellProps>>
+
+type GridRowPartProps<K extends GridRowKind> = { row: GridRowOf<K>; grid: GridRowContext }
+
+type BucketRowProps = GridRowPartProps<typeof GRID_ROWS.header>
+
+/** A bucket's heading, which the remote presses to open or fold it. */
+const BucketRow = ({ row, grid }: BucketRowProps) => {
+  const styles = useStyles()
+  return (
+    <View style={[styles.bucketRow, { height: grid.heightOf(row) }]}>
+      <Pressable
+        accessibilityLabel={headingLabelOf(row.section)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: row.isOpen }}
+        hasTVPreferredFocus={row.key === grid.preferred}
+        onFocus={grid.settle}
+        onPress={() => grid.toggle(row.key)}
+        style={({ focused }) => [styles.bucket, focused && styles.focused]}
+      >
+        <Text style={styles.chevron}>{row.isOpen ? CHEVRONS.open : CHEVRONS.shut}</Text>
+        <Text numberOfLines={1} style={styles.bucketTitle}>
+          {row.section.title}
+        </Text>
+        <Text style={styles.count}>{row.section.count}</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+type CardsRowProps = GridRowPartProps<typeof GRID_ROWS.cards>
+
+/** A run of cards across the grid. */
+const CardsRow = ({ row, grid }: CardsRowProps) => {
+  const styles = useStyles()
+  const Cell = GRID_CELLS[cardLayoutOf(grid.view)]
+  return (
+    <View
+      style={[
+        styles.cards,
+        isRowView(grid.view) && styles.rowCards,
+        { height: grid.heightOf(row) },
+      ]}
+    >
+      {row.cards.map((card) => (
+        <Cell key={card.key} card={card} grid={grid} width={grid.widthOf(row.shape)} />
+      ))}
+    </View>
+  )
+}
+
+/** Each row kind's view props, or only `Keys`' for a builder generic over the kind. */
+type GridRowViewsProps<Keys extends GridRowKind = GridRowKind> = {
+  [K in Keys]: GridRowPartProps<K>
+}
+
+const GRID_ROW_VIEWS = {
+  [GRID_ROWS.header]: BucketRow,
+  [GRID_ROWS.cards]: CardsRow,
+} as const satisfies ViewsOf<GridRowViewsProps>
+
+type GridRowViewOfProps<K extends GridRowKind> = GridRowPartProps<K> & { kind: K }
+
+/** A row of the grid as its kind's view, so each view is handed its own kind of row. */
+const gridRowViewOf = <K extends GridRowKind>({
+  kind,
+  row,
+  grid,
+}: GridRowViewOfProps<K>): ViewOf<GridRowViewsProps<K>, K> => ({ key: kind, props: { row, grid } })
+
 /**
  * A library on a TV: its name, what it holds, its search box beside the pickers and the jump
  * row held at the top, and below them the cards in rows the remote moves through, never the
@@ -235,61 +359,23 @@ const Grid = ({
 
   type RenderRowProps = { item: GridRow }
 
-  const renderRow = ({ item: row }: RenderRowProps) => {
-    switch (row.kind) {
-      case GRID_ROWS.header:
-        return (
-          <View style={[styles.bucketRow, { height: heightOf(row) }]}>
-            <Pressable
-              accessibilityLabel={headingLabelOf(row.section)}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: row.isOpen }}
-              hasTVPreferredFocus={row.key === preferred}
-              onFocus={settle}
-              onPress={() => toggle(row.key)}
-              style={({ focused }) => [styles.bucket, focused && styles.focused]}
-            >
-              <Text style={styles.chevron}>{row.isOpen ? CHEVRONS.open : CHEVRONS.shut}</Text>
-              <Text numberOfLines={1} style={styles.bucketTitle}>
-                {row.section.title}
-              </Text>
-              <Text style={styles.count}>{row.section.count}</Text>
-            </Pressable>
-          </View>
-        )
-      case GRID_ROWS.cards:
-        return (
-          <View style={[styles.cards, isRows && styles.rowCards, { height: heightOf(row) }]}>
-            {row.cards.map((card) =>
-              isRows ? (
-                <View key={card.key} style={{ width: widthOf(row.shape) }}>
-                  <RowCard
-                    card={card}
-                    hasPicture={view === LIBRARY_VIEWS.tiles}
-                    isPreferred={card.key === preferred}
-                    jump={jumpOf(card)}
-                    onPress={() => onOpen(card)}
-                  />
-                </View>
-              ) : (
-                <FocusCard
-                  key={card.key}
-                  card={card}
-                  isPreferred={card.key === preferred}
-                  jump={jumpOf(card)}
-                  onPress={() => onOpen(card)}
-                  width={widthOf(row.shape)}
-                />
-              ),
-            )}
-          </View>
-        )
-      default: {
-        const unknown: never = row
-        return unknown
-      }
-    }
+  const grid: GridRowContext = {
+    view,
+    preferred,
+    heightOf,
+    widthOf,
+    jumpOf,
+    toggle,
+    settle,
+    onOpen,
   }
+
+  const renderRow = ({ item: row }: RenderRowProps) => (
+    <KeyedView<GridRowViewsProps>
+      view={gridRowViewOf({ grid, kind: row.kind, row })}
+      views={GRID_ROW_VIEWS}
+    />
+  )
 
   return (
     <View style={styles.ground}>

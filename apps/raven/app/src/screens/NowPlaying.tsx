@@ -48,26 +48,23 @@ const NowPlayingPage = ({ session }: NowPlayingPageProps) => {
   // A book has chapters in place of lyrics, so its words are never looked for.
   const lyrics = useQuery(queries.lyricsQuery(track === null || isAudiobook ? null : track.id))
   const { playlists, addToPlaylist, note } = usePlaylistAdd({ session })
+  const cover =
+    track === null || pictures === null
+      ? null
+      : trackCoverOf({ api, headersFor: pictures.headersFor, track })
   const playing =
     track === null
       ? null
-      : {
-          title: track.title,
-          artists: artistNames(track),
-          album: track.album.title,
-          cover:
-            pictures === null
-              ? null
-              : trackCoverOf({ api, headersFor: pictures.headersFor, track }),
-        }
+      : { title: track.title, artists: artistNames(track), album: track.album.title, cover }
   const nextStart = nextChapterStart({ chapters, at: position })
+  const onNextChapter = nextStart === null ? null : () => seekTo(nextStart)
   const book: BookControls | null = isAudiobook
     ? {
         chapters: chapterRowsOf({ chapters, current: chapterAt({ chapters, at: position }) }),
         speed,
         onChapter: seekTo,
         onPreviousChapter: () => seekTo(previousChapterStart({ chapters, at: position })),
-        onNextChapter: nextStart === null ? null : () => seekTo(nextStart),
+        onNextChapter,
         onSpeed: setSpeed,
       }
     : null
@@ -107,6 +104,5 @@ const NowPlayingPage = ({ session }: NowPlayingPageProps) => {
  */
 export const NowPlaying = () => {
   const session = useAppQueries()
-  if (session === null) return null
-  return <NowPlayingPage key={session.server.id} session={session} />
+  return session !== null && <NowPlayingPage key={session.server.id} session={session} />
 }

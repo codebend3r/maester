@@ -11,7 +11,8 @@ type FrontRouteKeyOfProps = { state: NavigationLike | undefined }
  * it on that screen: the focused route of the deepest navigator. Null before any route is known.
  */
 export const frontRouteKeyOf = ({ state }: FrontRouteKeyOfProps): string | null => {
-  const route = state?.routes[state.index ?? state.routes.length - 1]
+  const routes = state?.routes ?? []
+  const route = routes[state?.index ?? routes.length - 1]
   if (route === undefined) return null
   return route.state === undefined ? (route.key ?? null) : frontRouteKeyOf({ state: route.state })
 }

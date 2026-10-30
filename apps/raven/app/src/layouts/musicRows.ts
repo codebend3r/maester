@@ -13,22 +13,18 @@ import {
 } from '@raven/core'
 import { activeLineAt } from '@raven/ui/headless'
 
-import {
-  type BookControls,
-  MUSIC_COPY,
-  NOW_PLAYING_ASIDES,
-  type NowPlayingAside,
-} from '@/layouts/musicKit'
+import { MUSIC_COPY } from '@/layouts/copy'
+import { type BookControls, NOW_PLAYING_ASIDES, type NowPlayingAside } from '@/layouts/musicKit'
 
 type PlaylistFactsOfProps = { playlist: PlaylistSummary }
 
 /** A playlist's facts on one line: "12 tracks · 53 min", the minutes left out under one. */
 export const playlistFactsOf = ({ playlist }: PlaylistFactsOfProps): string => {
   const minutes = Math.round(playlist.duration / 60)
-  return [
-    plural({ n: playlist.trackCount, one: 'track', many: 'tracks' }),
-    ...(minutes > 0 ? [`${minutes} min`] : []),
-  ].join(' · ')
+  return MUSIC_COPY.facts([
+    plural({ n: playlist.trackCount, ...MUSIC_COPY.tracks }),
+    ...(minutes > 0 ? [MUSIC_COPY.minutes(minutes)] : []),
+  ])
 }
 
 /** One track of a playlist's page, as both layouts draw it. */
@@ -56,7 +52,7 @@ export const playlistTracksOf = ({ tracks }: PlaylistTracksOfProps): PlaylistTra
     title: track.title,
     line: artistNames(track),
     length: formatDuration(track.duration),
-    label: `${index + 1}. ${track.title}`,
+    label: MUSIC_COPY.numbered({ place: index + 1, title: track.title }),
   }))
 
 /** One line of synced lyrics as both layouts draw it, a line with no words as a note. */
@@ -153,7 +149,7 @@ export const chapterRowsOf = ({ chapters, current }: ChapterRowsOfProps): Chapte
       start: chapter.start,
       title,
       at,
-      label: `${title}, ${at}`,
+      label: MUSIC_COPY.chapterLabel({ title, at }),
       isCurrent: place === current,
     }
   })
@@ -162,13 +158,13 @@ type AlbumFactsOfProps = { album: AlbumSummary }
 
 /** An album's facts on one line: "1997 · 12 tracks · 53:21". */
 export const albumFactsOf = ({ album }: AlbumFactsOfProps): string =>
-  [
-    album.year === null ? null : String(album.year),
-    plural({ n: album.trackCount, one: 'track', many: 'tracks' }),
-    formatDuration(album.duration),
-  ]
-    .filter((fact): fact is string => fact !== null)
-    .join(' · ')
+  MUSIC_COPY.facts(
+    [
+      album.year === null ? null : String(album.year),
+      plural({ n: album.trackCount, ...MUSIC_COPY.tracks }),
+      formatDuration(album.duration),
+    ].filter((fact): fact is string => fact !== null),
+  )
 
 /** One track of an album's page, as both layouts draw it. */
 export type AlbumTrack = {
@@ -205,7 +201,7 @@ export const albumDiscsOf = ({ tracks, discCount }: AlbumDiscsOfProps): AlbumDis
               number: String(track.number ?? index + 1),
               title: track.title,
               length: formatDuration(track.duration),
-              label: `${index + 1}. ${track.title}`,
+              label: MUSIC_COPY.numbered({ place: index + 1, title: track.title }),
             },
           ]
         : [],
@@ -237,4 +233,4 @@ type PlayTimeOfProps = { position: number; duration: number | null }
 
 /** How far the track has played and how long it is: "1:02 / 4:44". */
 export const playTimeOf = ({ position, duration }: PlayTimeOfProps): string =>
-  `${formatDuration(position)} / ${formatDuration(duration)}`
+  MUSIC_COPY.playTime({ at: formatDuration(position), length: formatDuration(duration) })
