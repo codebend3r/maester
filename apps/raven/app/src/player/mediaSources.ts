@@ -1,9 +1,8 @@
+import { accessTokenNow, apiFor, cookieJar, watchNetwork } from '@raven/native'
+import { mediaAccessFor, probeFetchOf } from '@raven/native/headless'
+
+import { useAccountSession } from '@/account/session'
 import { lastPerServer } from '@/queries/perServer'
-import { mediaAccessFor } from '@/servers/mediaAccess'
-import { probeFetchOf } from '@/servers/mediaProbe'
-import { watchNetwork } from '@/servers/networkChanges'
-import { accessTokenNow } from '@/account/accountSession'
-import { apiFor, cookieJar } from '@/servers/serverClient'
 import { useAppPrefs } from '@/stores/appPrefs'
 
 /**
@@ -14,12 +13,12 @@ import { useAppPrefs } from '@/stores/appPrefs'
 export const mediaSourcesFor = lastPerServer({
   make: (server) =>
     mediaAccessFor({
-      api: apiFor(server),
+      api: apiFor({ server, session: useAccountSession }),
       server,
       now: Date.now,
       probe: probeFetchOf({ fetch, clock: Date.now }),
       readCookies: () => cookieJar.read(server.id),
-      readAccessToken: accessTokenNow,
+      readAccessToken: () => accessTokenNow({ session: useAccountSession }),
       watchNetwork,
       awayMaxHeight: () => useAppPrefs.getState().awayMaxHeight,
     }),

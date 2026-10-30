@@ -32,6 +32,11 @@ export default {
       paths: { '@/alert': ['functions/signup-alert/alert.ts'] },
       ignoreDependencies: ['nodemailer'],
     },
+    'libs/raven/native': {
+      // The package's three entries. Its exports name them in dist, and knip's default finds
+      // only src/index.ts.
+      entry: ['src/index.ts', 'src/headless.ts', 'src/polyfills.ts'],
+    },
     'libs/raven/mpv': {
       // The native build consumes both: node-addon-api is the addon's C++
       // header set, and buildAddon.ts spawns cmake-js by name.

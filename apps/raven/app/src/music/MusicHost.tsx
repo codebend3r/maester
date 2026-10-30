@@ -5,6 +5,7 @@ import {
   audioPlayer,
 } from '@raven/audio'
 import { PLAYBACK_MODES, type Track, artistNames } from '@raven/core'
+import { nativePlayerOf } from '@raven/native/headless'
 import {
   AUDIO_STATES,
   playingTrackOf,
@@ -17,7 +18,6 @@ import { type ComponentType, useEffect, useEffectEvent, useMemo } from 'react'
 import { Platform } from 'react-native'
 
 import { VideoAudioHost } from '@/music/VideoAudioHost'
-import { nativePlayerOf } from '@/music/nativePlayer'
 import { mediaSourcesFor } from '@/player/mediaSources'
 import { watchAppHide } from '@/player/progressSink'
 import type { AppQueries } from '@/queries/useAppQueries'

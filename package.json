@@ -125,7 +125,8 @@
           {
             "projects": [
               "@raven/core",
-              "@raven/ui"
+              "@raven/ui",
+              "@raven/native"
             ],
             "target": "build"
           }

@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MAX_HEIGHTS, THEMES, themeOf } from '@raven/core'
+import type { ApiForProps } from '@raven/native'
+import type * as Native from '@raven/native'
 import { fireEvent, screen, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import { Settings } from '@/screens/Settings'
-import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { NAS, OTHER, homeApi } from '@/test/homeServer'
@@ -34,8 +35,9 @@ jest.mock(
   '@/layouts/tvFocus',
   () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
 )
-jest.mock('@/servers/serverClient', () => ({
-  apiFor: (server: AppServer) => mockApi(server),
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
+  apiFor: ({ server }: ApiForProps) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },
   secretStore: {

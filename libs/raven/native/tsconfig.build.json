@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "types": ["react-native"]
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/test"],
+  "tsc-alias": {
+    "resolveFullPaths": true
+  }
+}

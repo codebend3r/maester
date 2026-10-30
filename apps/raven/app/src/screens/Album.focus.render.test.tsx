@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { QUEUE_SOURCE_KINDS } from '@raven/core'
+import type * as Native from '@raven/native'
 import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { fireEvent, screen } from '@testing-library/react-native'
 
@@ -41,7 +42,8 @@ jest.mock(
   '@/layouts/tvFocus',
   () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
 )
-jest.mock('@/servers/serverClient', () => ({
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
   apiFor: () => mockApi(),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },

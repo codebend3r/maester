@@ -91,6 +91,7 @@ export { playlistMutationsFor, useServerPlaylistMutations } from '@/query/usePla
 export { useAudiobookChapters, useIsAudiobook, useTrackRate } from '@/query/useAudiobook'
 export { activeLineAt } from '@/lib/lyrics'
 export { chapterAt, nextChapterStart, previousChapterStart } from '@/lib/chapters'
+export { movedUp, withoutPlace } from '@/music/playlistOrder'
 export { usePlaybackPolicy } from '@/query/usePlaybackPolicy'
 export {
   EVENTS_RETRY_MS,

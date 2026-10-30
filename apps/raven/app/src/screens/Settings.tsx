@@ -1,7 +1,7 @@
 import { MAX_HEIGHTS, type MaxHeight, isMaxHeight } from '@raven/core'
 import { useRouter } from 'expo-router'
 
-import { useAccountSession } from '@/account/accountSession'
+import { useAccountSession } from '@/account/session'
 import {
   SettingsButton,
   SettingsChoice,

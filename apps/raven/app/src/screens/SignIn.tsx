@@ -1,20 +1,25 @@
 import { ADMIN_LOCK_STATES, type ApiClient } from '@raven/core'
+import { apiFor } from '@raven/native'
+import {
+  ADD_OUTCOMES,
+  AUTH_OUTCOMES,
+  type AppServer,
+  IS_SIGN_IN_BYPASSED,
+  RAVEN_SERVER,
+  TICKET_SUPPORT,
+  ticketSupportOf,
+} from '@raven/native/headless'
 import { useRouter } from 'expo-router'
 import { type Dispatch, type SetStateAction, useState } from 'react'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import { Text } from '@/layouts/Text'
 import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
-import { useAccountSession } from '@/account/accountSession'
+import { useAccountSession } from '@/account/session'
 import { TEST_ACCOUNT } from '@/account/testAccount'
-import { AUTH_OUTCOMES } from '@/account/supabaseAuth'
 import { APP_ROUTES } from '@/routes'
 import { SIGN_IN_COPY } from '@/screens/copy'
 import { useSubmit } from '@/screens/useSubmit'
-import { IS_SIGN_IN_BYPASSED, RAVEN_SERVER } from '@/servers/ravenServer'
-import { apiFor } from '@/servers/serverClient'
-import { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
-import { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'
 import { useActiveServer } from '@/stores/activeServer'
 
 const STEPS = { account: 'account', pin: 'pin', admin: 'admin', ticketsOff: 'ticketsOff' } as const
@@ -263,7 +268,7 @@ export const SignIn = () => {
       return
     }
     activate(server.id)
-    const support = await ticketSupportOf({ api: apiFor(server) })
+    const support = await ticketSupportOf({ api: apiFor({ server, session: useAccountSession }) })
     if (support === TICKET_SUPPORT.off) {
       askFor({ kind: STEPS.ticketsOff })
       return
@@ -293,7 +298,7 @@ export const SignIn = () => {
         return
       }
       setPassword('')
-      const lock = await apiFor(RAVEN_SERVER).getLock()
+      const lock = await apiFor({ server: RAVEN_SERVER, session: useAccountSession }).getLock()
       if (lock.available && !lock.unlocked) {
         askFor({ kind: STEPS.pin, server: RAVEN_SERVER })
         return
@@ -304,7 +309,7 @@ export const SignIn = () => {
 
   const submitSecret = ({ step: { kind, server }, text }: SubmitSecretProps) =>
     run(async () => {
-      const api = apiFor(server)
+      const api = apiFor({ server, session: useAccountSession })
       await SECRET_STEPS[kind].unlock({ api, secret: text })
       if (kind === STEPS.pin && (await isAdminLockHeld(api))) {
         askFor({ kind: STEPS.admin, server })

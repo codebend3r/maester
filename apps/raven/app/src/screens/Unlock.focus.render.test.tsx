@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import type { ApiForProps } from '@raven/native'
+import type * as Native from '@raven/native'
 import { screen } from '@testing-library/react-native'
 
 import { Unlock } from '@/screens/Unlock'
-import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { NAS, homeApi } from '@/test/homeServer'
 import type * as NavigationFocus from '@/test/navigationFocus'
@@ -24,8 +25,9 @@ jest.mock(
   '@/layouts/tvFocus',
   () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
 )
-jest.mock('@/servers/serverClient', () => ({
-  apiFor: (server: AppServer) => mockApi(server),
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
+  apiFor: ({ server }: ApiForProps) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },
   secretStore: {

@@ -26,9 +26,9 @@ import {
   type SourceRequest,
 } from '@/servers/mediaAccess'
 import { STATUSES, pathFor } from '@/test/fixtureFetch'
-import { NAS } from '@/test/homeServer'
 import {
   LAN,
+  NAS,
   NAS_COOKIES,
   PUBLIC,
   TICKETS,

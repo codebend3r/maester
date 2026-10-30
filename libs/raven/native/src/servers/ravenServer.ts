@@ -10,7 +10,7 @@ const BYPASS_ORIGIN = process.env.EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN ?? ''
 export const IS_SIGN_IN_BYPASSED = BYPASS_ORIGIN !== ''
 
 /**
- * The one server the device app talks to: raven on Vhagar, reached through the same public
+ * The one server raven's apps talk to: raven on Vhagar, reached through the same public
  * address as the web app, which proxies `/api` to it. The id is fixed so the PIN's cookie,
  * kept under it, survives a relaunch.
  */

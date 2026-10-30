@@ -1,9 +1,6 @@
+import { cookieJar } from '@raven/native'
+import { type AppServer, type ServerCookies, useCookieVersion } from '@raven/native/headless'
 import { useEffect, useState } from 'react'
-
-import type { ServerCookies } from '@/servers/cookieJar'
-import { cookieJar } from '@/servers/serverClient'
-import type { AppServer } from '@/servers/serverList'
-import { useCookieVersion } from '@/stores/cookieVersion'
 
 /**
  * The server's cookies, for what the app sends outside `fetch`; null until the jar first

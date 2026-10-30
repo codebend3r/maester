@@ -2,7 +2,7 @@ import { type ApiClient, createApiClient } from '@raven/core'
 import { AppState } from 'react-native'
 import EventSource from 'react-native-sse'
 
-import { accessTokenNow, useAccountSession } from '@/account/accountSession'
+import { type AccountSessionStore, accessTokenNow } from '@/account/accountSession'
 import { refreshingFetch } from '@/account/refreshingFetch'
 import { allowlistedFetch } from '@/servers/allowlist'
 import { createCookieJar } from '@/servers/cookieJar'
@@ -18,41 +18,48 @@ import { cookieHeadersFor } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
 import { bumpCookieVersion } from '@/stores/cookieVersion'
 
-export { secretStore }
-
 /** Every server's cookies. */
 export const cookieJar = createCookieJar({ store: secretStore, onChange: bumpCookieVersion })
 
+export type ApiForProps = {
+  server: AppServer
+  /** The account whose token the calls carry, refreshed once when the server answers 401. */
+  session: AccountSessionStore
+}
+
 /** The client for one server, in its own session: its cookies and no other, and only the app's calls. */
-export const apiFor = (server: AppServer): ApiClient =>
+export const apiFor = ({ server, session }: ApiForProps): ApiClient =>
   createApiClient({
     baseUrl: server.origin,
-    accessToken: accessTokenNow,
+    accessToken: () => accessTokenNow({ session }),
     fetch: allowlistedFetch({
       fetch: refreshingFetch({
         fetch: serverFetchFor({ server, jar: cookieJar, fetch }),
-        refresh: () => useAccountSession.getState().refresh(),
+        refresh: () => session.getState().refresh(),
       }),
     }),
   })
 
-type HeadersForProps = {
-  server: AppServer
-  url: string
-}
+type HeadersForProps = ApiForProps & { url: string }
 
 /** What a request made outside `fetch` (a picture, the event stream) sends to `url` on `server`. */
-const headersFor = async ({ server, url }: HeadersForProps): Promise<Record<string, string>> =>
+const headersFor = async ({
+  server,
+  session,
+  url,
+}: HeadersForProps): Promise<Record<string, string>> =>
   cookieHeadersFor({
     server,
     cookies: await cookieJar.read(server.id),
-    accessToken: accessTokenNow(),
+    accessToken: accessTokenNow({ session }),
   })(url)
 
+type OpenEventsForProps = ApiForProps
+
 /** The server's event stream, over `react-native-sse`, with its cookies, kept open while the app is. */
-export const openEventsFor = (server: AppServer) =>
+export const openEventsFor = ({ server, session }: OpenEventsForProps) =>
   eventSourceFor({
-    headersFor: (url) => headersFor({ server, url }),
+    headersFor: (url) => headersFor({ server, session, url }),
     createSource: ({ url, headers }) => new EventSource(url, { headers }),
     schedule: ({ run, ms }) => {
       const timer = setTimeout(run, ms)

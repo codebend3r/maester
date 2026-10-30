@@ -9,12 +9,14 @@ import {
   SORT_FIELD_LABELS,
   sortFieldsFor,
 } from '@raven/core'
+import type { ApiForProps } from '@raven/native'
+import type * as Native from '@raven/native'
+import type { AppServer } from '@raven/native/headless'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { Library } from '@/screens/Library'
-import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
 import { useReduceMotion } from '@/stores/reduceMotion'
@@ -72,8 +74,9 @@ jest.mock(
   '@/layouts/tvFocus',
   () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
 )
-jest.mock('@/servers/serverClient', () => ({
-  apiFor: (server: AppServer) => mockApi(server),
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
+  apiFor: ({ server }: ApiForProps) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },
   secretStore: {

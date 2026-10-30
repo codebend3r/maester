@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { AUTH_HEADERS, SERVER_COOKIES } from '@raven/core'
 
 import { cookieHeadersFor } from '@/servers/serverHeaders'
-import { NAS } from '@/test/homeServer'
+import { NAS } from '@/test/mediaServer'
 
 describe('cookieHeadersFor', () => {
   it("sends the server's cookies to its own API, both of them", () => {

@@ -12,10 +12,18 @@ import {
 } from '@raven/core'
 
 import { allowlistedFetch } from '@/servers/allowlist'
-import type { ProbeFetch, WatchNetwork } from '@/servers/mediaAccess'
 import type { ServerCookies } from '@/servers/cookieJar'
+import type { ProbeFetch, WatchNetwork } from '@/servers/mediaAccess'
+import type { AppServer } from '@/servers/serverList'
 import { type Answer, NOT_FOUND, STATUSES, responseOf } from '@/test/fixtureFetch'
-import { NAS } from '@/test/homeServer'
+
+/** A server on the home network, as the app lists it. */
+export const NAS: AppServer = {
+  id: '0f8fad5b-d9cb-469f-a165-70867728950e',
+  name: 'nas:8080',
+  origin: 'http://nas:8080',
+  addedAt: 1,
+}
 
 /** The NAS's address on the home network, and its public one. */
 export const LAN: MediaOrigin = { kind: MEDIA_ORIGIN_KINDS.lan, url: 'http://192.168.1.20:8080' }

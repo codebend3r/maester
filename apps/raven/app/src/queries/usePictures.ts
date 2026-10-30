@@ -1,8 +1,9 @@
-import { useAccessToken } from '@/account/accountSession'
+import { cookieHeadersFor } from '@raven/native/headless'
+
+import { useAccountSession } from '@/account/session'
 import type { Pictures } from '@/queries/cards'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { useServerCookies } from '@/queries/useServerCookies'
-import { cookieHeadersFor } from '@/servers/serverHeaders'
 
 type UsePicturesProps = Pick<AppQueries, 'server' | 'api'>
 
@@ -14,7 +15,7 @@ type UsePicturesProps = Pick<AppQueries, 'server' | 'api'>
  */
 export const usePictures = ({ server, api }: UsePicturesProps): Pictures | null => {
   const cookies = useServerCookies(server)
-  const accessToken = useAccessToken()
+  const accessToken = useAccountSession((state) => state.session?.accessToken ?? null)
   if (cookies === null) return null
   return { api, headersFor: cookieHeadersFor({ server, cookies, accessToken }) }
 }

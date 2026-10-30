@@ -1,4 +1,4 @@
-import type { AppServer } from '@/servers/serverList'
+import type { AppServer } from '@raven/native/headless'
 
 type LastPerServerProps<T extends object> = {
   make: (server: AppServer) => T

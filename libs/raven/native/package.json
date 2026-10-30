@@ -1,0 +1,99 @@
+{
+  "name": "@raven/native",
+  "version": "0.7.8",
+  "private": true,
+  "description": "raven's sign-in and media access on React Native, shared by the device app and Wren",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./headless": {
+      "types": "./dist/headless.d.ts",
+      "default": "./dist/headless.js"
+    },
+    "./polyfills": {
+      "types": "./dist/polyfills.d.ts",
+      "default": "./dist/polyfills.js"
+    }
+  },
+  "scripts": {
+    "build": "bun run --sequential build:clean build:compile build:aliases",
+    "build:aliases": "tsc-alias -p tsconfig.build.json",
+    "build:clean": "rm -rf dist",
+    "build:compile": "tsc -p tsconfig.build.json",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint:ts": "oxlint",
+    "lint:ts:fix": "oxlint --fix",
+    "test": "bun test --dots src",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@formatjs/intl-displaynames": "7.3.15",
+    "@formatjs/intl-getcanonicallocales": "3.2.12",
+    "@formatjs/intl-locale": "5.3.12",
+    "@formatjs/intl-pluralrules": "6.3.15",
+    "@formatjs/intl-relativetimeformat": "12.3.15",
+    "@raven/audio": "workspace:*",
+    "@raven/core": "workspace:*",
+    "@raven/ui": "workspace:*",
+    "@react-native-community/netinfo": "12.0.1",
+    "expo-secure-store": "58.0.2",
+    "react-native-sse": "1.2.1"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "@types/react": "19.3.0",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "react-native": "npm:react-native-tvos@0.88.0-0",
+    "tsc-alias": "1.9.7",
+    "typescript": "6.0.3"
+  },
+  "peerDependencies": {
+    "react": "19.3.0",
+    "zustand": "5.0.15"
+  },
+  "nx": {
+    "projectType": "library",
+    "tags": [
+      "scope:raven",
+      "lang:ts"
+    ],
+    "includedScripts": [
+      "build",
+      "typecheck",
+      "lint:ts",
+      "lint:ts:fix",
+      "format",
+      "format:check",
+      "test"
+    ],
+    "targets": {
+      "test": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "typecheck": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "build": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ],
+        "outputs": [
+          "{projectRoot}/dist"
+        ]
+      }
+    }
+  }
+}

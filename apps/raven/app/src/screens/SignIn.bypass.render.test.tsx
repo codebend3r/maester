@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals'
+import type * as NativeHeadless from '@raven/native/headless'
 import { render, screen } from '@testing-library/react-native'
 
 import { SignIn } from '@/screens/SignIn'
@@ -6,12 +7,13 @@ import { SignIn } from '@/screens/SignIn'
 jest.mock('expo-router', () => ({
   useRouter: () => ({ dismissTo: jest.fn() }),
 }))
-jest.mock('@/account/accountSession', () => ({
+jest.mock('@/account/session', () => ({
   useAccountSession: {
     getState: () => ({ signIn: jest.fn(), signOut: jest.fn() }),
   },
 }))
-jest.mock('@/servers/ravenServer', () => ({
+jest.mock('@raven/native/headless', () => ({
+  ...jest.requireActual<typeof NativeHeadless>('@raven/native/headless'),
   IS_SIGN_IN_BYPASSED: true,
   RAVEN_SERVER: {
     id: '7c1f4e2a-3b5d-4a6e-8f90-1a2b3c4d5e6f',
@@ -20,7 +22,7 @@ jest.mock('@/servers/ravenServer', () => ({
     addedAt: 0,
   },
 }))
-jest.mock('@/servers/serverClient', () => ({ apiFor: jest.fn() }))
+jest.mock('@raven/native', () => ({ apiFor: jest.fn() }))
 jest.mock('@/stores/activeServer', () => ({
   useActiveServer: { getState: jest.fn() },
 }))

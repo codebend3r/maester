@@ -6,14 +6,19 @@ import {
   routeIdOf,
   routeState,
 } from '@raven/core'
-import { playingTrackOf, useAudioQueue, useServerPlaylistMutations } from '@raven/ui/headless'
+import {
+  movedUp,
+  playingTrackOf,
+  useAudioQueue,
+  useServerPlaylistMutations,
+  withoutPlace,
+} from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 
 import { PlaylistLayout } from '@/layouts'
 import { playlistFactsOf, playlistTracksOf } from '@/layouts/musicRows'
-import { movedUp, withoutPlace } from '@/music/playlistOrder'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { PLAYLIST_COPY } from '@/screens/copy'

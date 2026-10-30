@@ -229,4 +229,4 @@ runs:
     # so both skip their own dependency builds.
     - name: 🧱 Build the libraries
       shell: bash
-      run: bunx nx run-many -t build -p @raven/core @raven/ui @raven/audio @shared/server
+      run: bunx nx run-many -t build -p @raven/core @raven/ui @raven/audio @raven/native @shared/server

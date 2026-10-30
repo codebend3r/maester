@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 
 import { movedUp, withoutPlace } from '@/music/playlistOrder'
-import { AIRBAG, LUCKY, PARANOID } from '@/test/musicServer'
+import { track } from '@/test/fixtures'
+
+const AIRBAG = track()
+const PARANOID = track({ id: 102, title: 'Paranoid Android', number: 2 })
+const LUCKY = track({ id: 103, title: 'Lucky', disc: 2, number: 1 })
 
 describe('playlist order', () => {
   it('moves a track up a place, and leaves the first where it is', () => {

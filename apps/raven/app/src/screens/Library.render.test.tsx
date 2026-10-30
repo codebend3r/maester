@@ -9,12 +9,14 @@ import {
   SORT_FIELD_LABELS,
   sortFieldsFor,
 } from '@raven/core'
+import type { ApiForProps } from '@raven/native'
+import type * as Native from '@raven/native'
+import type { AppServer } from '@raven/native/headless'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import { APP_ROUTE_PARAMS, APP_ROUTES } from '@/routes'
 import { Library } from '@/screens/Library'
-import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
@@ -61,8 +63,9 @@ jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
   default: () => ({ width: 390, height: 844, scale: 3, fontScale: mockFontScale() }),
 }))
-jest.mock('@/servers/serverClient', () => ({
-  apiFor: (server: AppServer) => mockApi(server),
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
+  apiFor: ({ server }: ApiForProps) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },
   secretStore: {

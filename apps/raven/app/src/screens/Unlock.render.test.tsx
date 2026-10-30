@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import type { ApiForProps } from '@raven/native'
+import type * as Native from '@raven/native'
 import { useUnlockPrompt } from '@raven/ui/headless'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES } from '@/routes'
 import { Unlock } from '@/screens/Unlock'
-import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { NAS, homeApi } from '@/test/homeServer'
 import { createScreenClient, renderScreen } from '@/test/renderScreen'
@@ -19,8 +20,9 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, push: mockPush, canGoBack: () => true }),
   usePathname: () => mockPathname(),
 }))
-jest.mock('@/servers/serverClient', () => ({
-  apiFor: (server: AppServer) => mockApi(server),
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
+  apiFor: ({ server }: ApiForProps) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },
   secretStore: {

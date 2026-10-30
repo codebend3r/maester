@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { APP_CALL_METHODS, APP_CLIENT_CALLS } from '@raven/core'
+import type * as Native from '@raven/native'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 
 import { APP_ROUTE_PARAMS } from '@/routes'
@@ -24,7 +25,8 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => mockParams(),
 }))
-jest.mock('@/servers/serverClient', () => ({
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
   apiFor: () => mockApi(),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },
