@@ -1,4 +1,5 @@
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
+import type { ComponentType } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { AUTH_ROUTES, DESKTOP_PATHS } from '@raven/core'
@@ -6,6 +7,7 @@ import { isFilePlaying, isOfflinePage, offlineReturnOf } from '@/desktop/paths'
 import { ACCESS_KINDS, type AccessState, useAccessState } from '@/lib/accessState'
 import { signInPath } from '@/lib/authRoutes'
 import { queryKeys } from '@raven/ui/headless'
+import { AUTH_GATE_COPY } from '@/components/AuthGate/copy'
 import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/components/AuthGate/AuthGate.module.scss'
@@ -27,7 +29,7 @@ const Retry = ({ title, message }: RetryProps) => {
           disabled={isRetrying}
           onClick={() => queryClient.refetchQueries({ queryKey: queryKeys.auth })}
         >
-          Try again
+          {AUTH_GATE_COPY.tryAgain}
         </Button>
       </section>
     </main>
@@ -44,6 +46,75 @@ const UNSETTLED: ReadonlySet<AccessState['kind']> = new Set([
   ACCESS_KINDS.unavailable,
 ])
 
+/** What the gate puts on screen in place of, or as, the page asked for. */
+const GATE_VIEWS = {
+  page: 'page',
+  offline: 'offline',
+  loading: 'loading',
+  failed: 'failed',
+  unavailable: 'unavailable',
+  signIn: 'signIn',
+  pending: 'pending',
+} as const
+type GateView = (typeof GATE_VIEWS)[keyof typeof GATE_VIEWS]
+
+/** The view each account state shows, once the server is in reach and no file is playing. */
+const ACCESS_VIEWS = {
+  [ACCESS_KINDS.disabled]: GATE_VIEWS.page,
+  [ACCESS_KINDS.approved]: GATE_VIEWS.page,
+  [ACCESS_KINDS.loading]: GATE_VIEWS.loading,
+  [ACCESS_KINDS.failed]: GATE_VIEWS.failed,
+  [ACCESS_KINDS.unavailable]: GATE_VIEWS.unavailable,
+  [ACCESS_KINDS.signedOut]: GATE_VIEWS.signIn,
+  [ACCESS_KINDS.pending]: GATE_VIEWS.pending,
+  [ACCESS_KINDS.revoked]: GATE_VIEWS.pending,
+} as const satisfies Record<AccessState['kind'], GateView>
+
+type GateViewOfProps = { access: AccessState; isOffline: boolean; pathname: string }
+
+const gateViewOf = ({ access, isOffline, pathname }: GateViewOfProps): GateView => {
+  if (isOffline) return isOfflinePage(pathname) ? GATE_VIEWS.page : GATE_VIEWS.offline
+  if (UNSETTLED.has(access.kind) && isFilePlaying(pathname)) return GATE_VIEWS.page
+  return ACCESS_VIEWS[access.kind]
+}
+
+/** The address asked for, which a redirect hands on to come back to. */
+type GateViewProps = { returnTo: string }
+
+const Page = () => <Outlet />
+
+type OfflineRedirectProps = GateViewProps
+
+const OfflineRedirect = ({ returnTo }: OfflineRedirectProps) => (
+  <Navigate replace to={DESKTOP_PATHS.downloads} state={offlineReturnOf(returnTo)} />
+)
+
+const FailedRetry = () => (
+  <Retry title={AUTH_GATE_COPY.failedTitle} message={AUTH_GATE_COPY.failedMessage} />
+)
+
+const UnavailableRetry = () => (
+  <Retry title={AUTH_GATE_COPY.unavailableTitle} message={AUTH_GATE_COPY.unavailableMessage} />
+)
+
+type SignInRedirectProps = GateViewProps
+
+const SignInRedirect = ({ returnTo }: SignInRedirectProps) => (
+  <Navigate replace to={signInPath({ returnTo })} />
+)
+
+const PendingRedirect = () => <Navigate replace to={AUTH_ROUTES.pending} />
+
+const GATE_SCREENS = {
+  [GATE_VIEWS.page]: Page,
+  [GATE_VIEWS.offline]: OfflineRedirect,
+  [GATE_VIEWS.loading]: Loading,
+  [GATE_VIEWS.failed]: FailedRetry,
+  [GATE_VIEWS.unavailable]: UnavailableRetry,
+  [GATE_VIEWS.signIn]: SignInRedirect,
+  [GATE_VIEWS.pending]: PendingRedirect,
+} as const satisfies Record<GateView, ComponentType<GateViewProps>>
+
 /**
  * The route element in front of every page that needs a signed-in, approved
  * account. With accounts off it lets everything through as raven always
@@ -58,45 +129,6 @@ export const AuthGate = () => {
   const access = useAccessState()
   const isOffline = useServerReach((state) => state.isOffline)
   const { pathname, search } = useLocation()
-  if (isOffline) {
-    if (isOfflinePage(pathname)) return <Outlet />
-    return (
-      <Navigate
-        replace
-        to={DESKTOP_PATHS.downloads}
-        state={offlineReturnOf(`${pathname}${search}`)}
-      />
-    )
-  }
-  if (UNSETTLED.has(access.kind) && isFilePlaying(pathname)) return <Outlet />
-  switch (access.kind) {
-    case ACCESS_KINDS.disabled:
-    case ACCESS_KINDS.approved:
-      return <Outlet />
-    case ACCESS_KINDS.loading:
-      return <Loading />
-    case ACCESS_KINDS.failed:
-      return (
-        <Retry
-          title="Account access is temporarily unavailable"
-          message="raven could not check your account. Your session is kept."
-        />
-      )
-    case ACCESS_KINDS.unavailable:
-      return (
-        <Retry
-          title="raven is temporarily unavailable"
-          message="raven could not reach its accounts. Try again in a moment."
-        />
-      )
-    case ACCESS_KINDS.signedOut:
-      return <Navigate replace to={signInPath({ returnTo: `${pathname}${search}` })} />
-    case ACCESS_KINDS.pending:
-    case ACCESS_KINDS.revoked:
-      return <Navigate replace to={AUTH_ROUTES.pending} />
-    default: {
-      const unreachable: never = access
-      return unreachable
-    }
-  }
+  const Screen = GATE_SCREENS[gateViewOf({ access, isOffline, pathname })]
+  return <Screen returnTo={`${pathname}${search}`} />
 }

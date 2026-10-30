@@ -14,7 +14,7 @@ import {
   plural,
   versionFacts,
 } from '@raven/core'
-import { useId, useState } from 'react'
+import { type ComponentType, useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { ConfirmDelete } from '@/components/ConfirmDelete/ConfirmDelete'
@@ -24,7 +24,9 @@ import { api } from '@/lib/api'
 import { afterSplit, queryKeys } from '@raven/ui/headless'
 import { POSTER_SIZES } from '@/lib/posters'
 import { WordFact } from '@/components/ResolutionChip/ResolutionChip'
+import { DUPLICATES_COPY } from '@/components/Duplicates/copy'
 import styles from '@/components/Duplicates/Duplicates.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type PosterProps = { entry: PosterEntry }
 
@@ -48,7 +50,9 @@ const FileRow = ({ file: { media, cut } }: FileRowProps) => {
   return (
     <li className={styles.file}>
       <span className={styles.facts}>
-        <span className={cut == null ? undefined : styles.cut}>{cut?.label ?? 'Standard'}</span>
+        <span className={cut == null ? undefined : styles.cut}>
+          {cut?.label ?? DUPLICATES_COPY.standardCut}
+        </span>
         {versionFacts(media).map((fact) => (
           <span key={fact}>
             <WordFact fact={fact} />
@@ -60,7 +64,7 @@ const FileRow = ({ file: { media, cut } }: FileRowProps) => {
         <Button
           icon="trash"
           className={styles.remove}
-          aria-label={`Delete ${media.fileName}`}
+          aria-label={DUPLICATES_COPY.deleteFile(media.fileName)}
           onClick={() => setConfirming(true)}
         />
         {confirming && <ConfirmDelete media={media} onClose={() => setConfirming(false)} />}
@@ -73,7 +77,7 @@ type FilesProps = { card: DuplicateCard }
 
 /** A card's files, best first. */
 const Files = ({ card }: FilesProps) => (
-  <ul className={styles.files} aria-label="Files">
+  <ul className={styles.files} aria-label={DUPLICATES_COPY.files}>
     {card.files.map((file) => (
       <FileRow key={file.media.id} file={file} />
     ))}
@@ -93,16 +97,14 @@ const Splits = ({ card, busy, onSplit }: SplitsProps) => {
     <>
       <div className={styles.actions}>
         <Button icon="split" disabled={busy} onClick={() => onSplit('apart')}>
-          Split apart
+          {DUPLICATES_COPY.splitApart}
         </Button>
         <Button icon="wand" disabled={busy || !canTellApart} onClick={() => onSplit('smart')}>
-          Smart split apart
+          {DUPLICATES_COPY.smartSplit}
         </Button>
       </div>
       <p className={styles.hint}>
-        {canTellApart
-          ? 'Smart split apart gives each cut its own card and keeps copies of one cut together.'
-          : 'Every file reads as the same cut, so Smart split apart has nothing to tell apart.'}
+        {canTellApart ? DUPLICATES_COPY.smartSplitHint : DUPLICATES_COPY.sameCutHint}
       </p>
     </>
   )
@@ -112,10 +114,67 @@ type OnSplitProps = { mediaId: number; how: SplitHow }
 
 type MovieDuplicateProps = {
   movie: Duplicate
+  /** The movie's first card: its own while it is not split. */
+  own: DuplicateCard
   busy: boolean
   onSplit: (split: OnSplitProps) => void
   onJoin: () => void
 }
+
+/** A movie's cards once split, or the one card its files share. */
+const CARD_LAYOUTS = { split: 'split', shared: 'shared' } as const
+
+type CardLayout = (typeof CARD_LAYOUTS)[keyof typeof CARD_LAYOUTS]
+
+type CardsProps = Omit<MovieDuplicateProps, 'onJoin'>
+
+type SplitCardsProps = CardsProps
+
+/** Each card under its own title, any that still holds several files splittable again. */
+const SplitCards = ({ movie, busy, onSplit }: SplitCardsProps) => (
+  <ul className={styles.cards} aria-label={DUPLICATES_COPY.cards}>
+    {movie.cards.map((card) => (
+      <li key={card.entry.media.id} className={styles.card}>
+        <h4 className={styles.cardTitle}>
+          <Link {...cardLink({ media: card.entry.media, hasPages: true })}>
+            {cardTitle(card.entry.media).title}
+          </Link>
+        </h4>
+        <Files card={card} />
+        <AdminOnly>
+          {card.files.length > 1 && (
+            <Splits
+              card={card}
+              busy={busy}
+              onSplit={(how) => onSplit({ mediaId: card.entry.media.id, how })}
+            />
+          )}
+        </AdminOnly>
+      </li>
+    ))}
+  </ul>
+)
+
+type SharedCardProps = CardsProps
+
+/** The one card's files, and the ways to split it. */
+const SharedCard = ({ own, busy, onSplit }: SharedCardProps) => (
+  <div className={styles.cards}>
+    <Files card={own} />
+    <AdminOnly>
+      <Splits
+        card={own}
+        busy={busy}
+        onSplit={(how) => onSplit({ mediaId: own.entry.media.id, how })}
+      />
+    </AdminOnly>
+  </div>
+)
+
+const CARD_VIEWS = {
+  [CARD_LAYOUTS.split]: SplitCards,
+  [CARD_LAYOUTS.shared]: SharedCard,
+} as const satisfies Record<CardLayout, ComponentType<CardsProps>>
 
 /**
  * A movie with more than one file: its poster and title, then its cards.
@@ -124,19 +183,18 @@ type MovieDuplicateProps = {
  * several files splittable again, and Put back together for them all.
  * Splitting, putting back and deleting a file wait for the admin lock to be off.
  */
-const MovieDuplicate = ({ movie, busy, onSplit, onJoin }: MovieDuplicateProps) => {
+const MovieDuplicate = ({ movie, own, busy, onSplit, onJoin }: MovieDuplicateProps) => {
   const headingId = useId()
-  const [own] = movie.cards
-  if (!own) return null
   const item = own.entry.media.item
   const files = movie.cards.reduce((sum, card) => sum + card.files.length, 0)
   const isSplit = movie.cards.length > 1
   const year = item?.year ?? own.entry.media.year
   const meta = [
     year == null ? null : String(year),
-    plural({ n: files, one: 'file', many: 'files' }),
-    isSplit ? plural({ n: movie.cards.length, one: 'card', many: 'cards' }) : null,
+    plural({ n: files, ...DUPLICATES_COPY.fileWords }),
+    isSplit ? plural({ n: movie.cards.length, ...DUPLICATES_COPY.cardWords }) : null,
   ].filter((part): part is string => part != null)
+  const Cards = CARD_VIEWS[isSplit ? CARD_LAYOUTS.split : CARD_LAYOUTS.shared]
 
   return (
     <li>
@@ -153,49 +211,16 @@ const MovieDuplicate = ({ movie, busy, onSplit, onJoin }: MovieDuplicateProps) =
               {item?.title ?? own.entry.media.title}
             </Link>
           </h3>
-          <p className={styles.meta}>{meta.join(' · ')}</p>
+          <p className={styles.meta}>{meta.join(COMMON_COPY.separator)}</p>
         </header>
-        {isSplit ? (
-          <ul className={styles.cards} aria-label="Cards">
-            {movie.cards.map((card) => (
-              <li key={card.entry.media.id} className={styles.card}>
-                <h4 className={styles.cardTitle}>
-                  <Link {...cardLink({ media: card.entry.media, hasPages: true })}>
-                    {cardTitle(card.entry.media).title}
-                  </Link>
-                </h4>
-                <Files card={card} />
-                <AdminOnly>
-                  {card.files.length > 1 && (
-                    <Splits
-                      card={card}
-                      busy={busy}
-                      onSplit={(how) => onSplit({ mediaId: card.entry.media.id, how })}
-                    />
-                  )}
-                </AdminOnly>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className={styles.cards}>
-            <Files card={own} />
-            <AdminOnly>
-              <Splits
-                card={own}
-                busy={busy}
-                onSplit={(how) => onSplit({ mediaId: own.entry.media.id, how })}
-              />
-            </AdminOnly>
-          </div>
-        )}
+        <Cards movie={movie} own={own} busy={busy} onSplit={onSplit} />
         <AdminOnly>
           {isSplit && (
             <footer className={styles.join}>
               <Button icon="merge" disabled={busy} onClick={onJoin}>
-                Put back together
+                {DUPLICATES_COPY.putBack}
               </Button>
-              <p className={styles.hint}>Its files go back on one card.</p>
+              <p className={styles.hint}>{DUPLICATES_COPY.putBackHint}</p>
             </footer>
           )}
         </AdminOnly>
@@ -243,16 +268,22 @@ export const Duplicates = ({ library, listing }: DuplicatesProps) => {
           {failure.message}
         </p>
       )}
-      <ul className={styles.list} aria-label="Movies with more than one file">
-        {listing.map((movie) => (
-          <MovieDuplicate
-            key={movie.itemId}
-            movie={movie}
-            busy={busy}
-            onSplit={(request) => split.mutate(request)}
-            onJoin={() => join.mutate(movie.itemId)}
-          />
-        ))}
+      <ul className={styles.list} aria-label={DUPLICATES_COPY.movies}>
+        {listing.map((movie) => {
+          const [own] = movie.cards
+          return (
+            own && (
+              <MovieDuplicate
+                key={movie.itemId}
+                movie={movie}
+                own={own}
+                busy={busy}
+                onSplit={(request) => split.mutate(request)}
+                onJoin={() => join.mutate(movie.itemId)}
+              />
+            )
+          )
+        })}
       </ul>
     </div>
   )

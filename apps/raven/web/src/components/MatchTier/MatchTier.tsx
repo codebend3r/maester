@@ -1,13 +1,14 @@
 import { CONFIDENCE_TIERS, type ConfidenceTier, confidenceTierOf } from '@raven/core'
 import { Icon } from '@raven/ui'
+import { MATCH_TIER_COPY } from '@/components/MatchTier/copy'
 import styles from '@/components/MatchTier/MatchTier.module.scss'
 
 /** What each tier is called beside a Fix match result. */
-const TIER_WORDS: Record<ConfidenceTier, string> = {
-  strong: 'Strong match',
-  possible: 'Possible match',
-  weak: 'Weak match',
-}
+const TIER_WORDS = {
+  [CONFIDENCE_TIERS.strong]: MATCH_TIER_COPY.strong,
+  [CONFIDENCE_TIERS.possible]: MATCH_TIER_COPY.possible,
+  [CONFIDENCE_TIERS.weak]: MATCH_TIER_COPY.weak,
+} as const satisfies Record<ConfidenceTier, string>
 
 type MatchTierProps = {
   /** For the Choose button's `aria-describedby`. */
@@ -29,8 +30,8 @@ export const MatchTier = ({ id, confidence, isBest }: MatchTierProps) => {
   return (
     <span id={id} className={`${styles.tier} ${styles[tier]}`}>
       {(isBest || tier === CONFIDENCE_TIERS.strong) && <Icon name="check" size={14} />}
-      <span>{isBest ? 'Best match' : TIER_WORDS[tier]}</span>
-      <span className="visually-hidden">, confidence {confidence} out of 100</span>
+      <span>{isBest ? MATCH_TIER_COPY.best : TIER_WORDS[tier]}</span>
+      <span className="visually-hidden">{MATCH_TIER_COPY.confidence(confidence)}</span>
     </span>
   )
 }

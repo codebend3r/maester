@@ -1,3 +1,4 @@
+import { AUTH_SCREEN_COPY } from '@/components/AuthScreen/copy'
 import styles from '@/components/AuthScreen/AuthScreen.module.scss'
 
 type Tile = { hue: number; lightness: number; opacity: number }
@@ -30,6 +31,6 @@ export const PosterWall = () => (
         <span key={tile.hue} ref={paint(tile)} className={styles.tile} />
       ))}
     </div>
-    <p className={styles.promise}>Your films and shows, from your own server.</p>
+    <p className={styles.promise}>{AUTH_SCREEN_COPY.promise}</p>
   </div>
 )

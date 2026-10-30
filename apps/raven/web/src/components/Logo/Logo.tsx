@@ -1,5 +1,6 @@
 import { themeOf } from '@raven/core'
 import { useTheme } from '@/stores/theme'
+import { LOGO_COPY } from '@/components/Logo/copy'
 import styles from '@/components/Logo/Logo.module.scss'
 
 /** Each mark is drawn for its ground: bark on a dark one, the original ink and red on a light one. */
@@ -20,7 +21,7 @@ export const Logo = ({ isMarkOnly = false }: LogoProps) => {
   return (
     <span className={isMarkOnly ? `${styles.logo} ${styles.markOnly}` : styles.logo}>
       <img src={MARKS[tone]} alt="" width={646} height={705} className={styles.mark} />
-      <span className={isMarkOnly ? 'visually-hidden' : styles.word}>raven</span>
+      <span className={isMarkOnly ? 'visually-hidden' : styles.word}>{LOGO_COPY.word}</span>
     </span>
   )
 }

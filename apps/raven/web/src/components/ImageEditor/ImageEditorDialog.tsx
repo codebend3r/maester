@@ -3,7 +3,9 @@ import type { MatchItemType } from '@raven/core'
 import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { itemQuery, librariesQuery } from '@/lib/queries'
 import { useModal } from '@/lib/useModal'
+import { IMAGE_EDITOR_COPY } from '@/components/ImageEditor/copy'
 import styles from '@/components/ImageEditor/ImageEditor.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type ImageEditorDialogProps = {
   itemId: number
@@ -28,8 +30,13 @@ export const ImageEditorDialog = ({
   const libraries = useQuery(librariesQuery)
 
   return (
-    <dialog ref={dialog} className={styles.dialog} aria-label="Edit images" onClose={onClose}>
-      {details.data ? (
+    <dialog
+      ref={dialog}
+      className={styles.dialog}
+      aria-label={COMMON_COPY.editImages}
+      onClose={onClose}
+    >
+      {details.data && (
         <ImageEditor
           details={details.data}
           libraries={libraries.data ?? []}
@@ -37,9 +44,10 @@ export const ImageEditorDialog = ({
           itemKind={itemKind}
           onDone={onClose}
         />
-      ) : (
+      )}
+      {!details.data && (
         <p className={styles.waiting} role={details.isError ? 'alert' : undefined}>
-          {details.isError ? details.error.message : 'Gathering the pictures'}
+          {details.isError ? details.error.message : IMAGE_EDITOR_COPY.gathering}
         </p>
       )}
     </dialog>

@@ -7,13 +7,15 @@ import {
   type MatchItemType,
   type MediaItem,
 } from '@raven/core'
-import { type FormEvent, useId, useState } from 'react'
+import { type ComponentType, type FormEvent, useId, useState } from 'react'
 import { Button, Icon } from '@raven/ui'
 import { MovieFiles } from '@/components/MovieFiles/MovieFiles'
 import { api } from '@/lib/api'
 import { EDITED_PARTS, afterItemEdited } from '@raven/ui/headless'
 import { itemMetadataQuery } from '@/lib/queries'
+import { METADATA_EDITOR_COPY } from '@/components/MetadataEditor/copy'
 import styles from '@/components/MetadataEditor/MetadataEditor.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type Field = keyof ItemMetadata
 
@@ -28,18 +30,55 @@ const FIELD_KEYS = {
 
 /** The box a field is typed in: a line, a number, or several lines. */
 const FIELD_KINDS = { text: 'text', number: 'number', long: 'long' } as const
+type FieldKind = (typeof FIELD_KINDS)[keyof typeof FIELD_KINDS]
 
 const FIELDS: readonly {
   key: Field
   label: string
-  kind: (typeof FIELD_KINDS)[keyof typeof FIELD_KINDS]
+  kind: FieldKind
 }[] = [
-  { key: FIELD_KEYS.title, label: 'Title', kind: FIELD_KINDS.text },
-  { key: FIELD_KEYS.year, label: 'Year', kind: FIELD_KINDS.number },
-  { key: FIELD_KEYS.contentRating, label: 'Content rating', kind: FIELD_KINDS.text },
-  { key: FIELD_KEYS.tagline, label: 'Tagline', kind: FIELD_KINDS.text },
-  { key: FIELD_KEYS.summary, label: 'Summary', kind: FIELD_KINDS.long },
+  { key: FIELD_KEYS.title, label: COMMON_COPY.title, kind: FIELD_KINDS.text },
+  { key: FIELD_KEYS.year, label: COMMON_COPY.year, kind: FIELD_KINDS.number },
+  {
+    key: FIELD_KEYS.contentRating,
+    label: METADATA_EDITOR_COPY.fields.contentRating,
+    kind: FIELD_KINDS.text,
+  },
+  { key: FIELD_KEYS.tagline, label: METADATA_EDITOR_COPY.fields.tagline, kind: FIELD_KINDS.text },
+  { key: FIELD_KEYS.summary, label: METADATA_EDITOR_COPY.fields.summary, kind: FIELD_KINDS.long },
 ]
+
+type FieldBoxProps = { id: string; value: string; onChange: (value: string) => void }
+
+type TextBoxProps = FieldBoxProps
+
+const TextBox = ({ id, value, onChange }: TextBoxProps) => (
+  <input id={id} type="text" value={value} onChange={(event) => onChange(event.target.value)} />
+)
+
+type NumberBoxProps = FieldBoxProps
+
+const NumberBox = ({ id, value, onChange }: NumberBoxProps) => (
+  <input
+    id={id}
+    type="number"
+    inputMode="numeric"
+    value={value}
+    onChange={(event) => onChange(event.target.value)}
+  />
+)
+
+type LongBoxProps = FieldBoxProps
+
+const LongBox = ({ id, value, onChange }: LongBoxProps) => (
+  <textarea id={id} rows={4} value={value} onChange={(event) => onChange(event.target.value)} />
+)
+
+const FIELD_BOXES = {
+  [FIELD_KINDS.text]: TextBox,
+  [FIELD_KINDS.number]: NumberBox,
+  [FIELD_KINDS.long]: LongBox,
+} as const satisfies Record<FieldKind, ComponentType<FieldBoxProps>>
 
 /** What the form holds: every field as text, so an empty box means "nothing". */
 type Draft = Record<Field, string>
@@ -129,19 +168,16 @@ export const MetadataEditor = ({
     <section className={styles.editor} aria-labelledby={ids.heading}>
       <header className={styles.header}>
         <h2 id={ids.heading} className={styles.heading}>
-          Edit metadata
+          {COMMON_COPY.editMetadata}
         </h2>
         <Button icon="close" onClick={onDone}>
-          Cancel
+          {COMMON_COPY.cancel}
         </Button>
       </header>
       {itemKind === ITEM_TYPES.movie && first && (
         <MovieFiles files={[first, ...rest]} everyCard={everyCard} itemId={details.id} />
       )}
-      <p className={styles.hint}>
-        What is written here shows instead of TMDB’s words, and an emptied box shows nothing; TMDB’s
-        stay underneath and come back with Use TMDB’s. A refresh never touches an edit.
-      </p>
+      <p className={styles.hint}>{METADATA_EDITOR_COPY.hint}</p>
       {state.isError && (
         <p className={styles.error} role="alert">
           <Icon name="alert" size={16} />
@@ -151,7 +187,7 @@ export const MetadataEditor = ({
       {save.isError && (
         <p className={styles.error} role="alert">
           <Icon name="alert" size={16} />
-          <span>Could not save: {save.error.message}</span>
+          <span>{METADATA_EDITOR_COPY.couldNotSave(save.error.message)}</span>
         </p>
       )}
       {draft && original && (
@@ -160,6 +196,7 @@ export const MetadataEditor = ({
             const id = `${ids.form}-${field.key}`
             const originalText = toDraft(original)[field.key]
             const differs = draft[field.key].trim() !== originalText.trim()
+            const FieldBox = FIELD_BOXES[field.kind]
             return (
               <div key={field.key} className={styles.field}>
                 <label htmlFor={id}>{field.label}</label>
@@ -168,42 +205,43 @@ export const MetadataEditor = ({
                     field.key === FIELD_KEYS.title && edition ? styles.withWand : styles.control
                   }
                 >
-                  {field.kind === FIELD_KINDS.long ? (
-                    <textarea
-                      id={id}
-                      rows={4}
-                      value={draft[field.key]}
-                      onChange={(event) => setDraft({ ...draft, [field.key]: event.target.value })}
-                    />
-                  ) : (
-                    <input
-                      id={id}
-                      type={field.kind === FIELD_KINDS.number ? 'number' : 'text'}
-                      inputMode={field.kind === FIELD_KINDS.number ? 'numeric' : undefined}
-                      value={draft[field.key]}
-                      onChange={(event) => setDraft({ ...draft, [field.key]: event.target.value })}
-                    />
-                  )}
+                  <FieldBox
+                    id={id}
+                    value={draft[field.key]}
+                    onChange={(value) => setDraft({ ...draft, [field.key]: value })}
+                  />
                   {field.key === FIELD_KEYS.title && edition && (
                     <Button
                       icon="wand"
-                      aria-label={`Add the edition from the file name: ${edition}`}
-                      title={`Title it “${original.title} (${edition})”, as the file name says`}
+                      aria-label={METADATA_EDITOR_COPY.addEdition(edition)}
+                      title={METADATA_EDITOR_COPY.titleItAs(
+                        METADATA_EDITOR_COPY.editionTitle({ title: original.title, edition }),
+                      )}
                       onClick={() =>
-                        setDraft({ ...draft, title: `${original.title} (${edition})` })
+                        setDraft({
+                          ...draft,
+                          title: METADATA_EDITOR_COPY.editionTitle({
+                            title: original.title,
+                            edition,
+                          }),
+                        })
                       }
                     />
                   )}
                 </div>
                 <p className={styles.original}>
-                  <span>TMDB: {originalText === '' ? 'nothing' : originalText}</span>
+                  <span>
+                    {METADATA_EDITOR_COPY.tmdb(
+                      originalText === '' ? METADATA_EDITOR_COPY.nothing : originalText,
+                    )}
+                  </span>
                   {differs && (
                     <button
                       type="button"
                       className={styles.reset}
                       onClick={() => setDraft({ ...draft, [field.key]: originalText })}
                     >
-                      Use TMDB’s
+                      {METADATA_EDITOR_COPY.useTmdbs}
                     </button>
                   )}
                 </p>
@@ -212,12 +250,14 @@ export const MetadataEditor = ({
           })}
           <div className={styles.actions}>
             <Button tone="primary" type="submit" disabled={save.isPending}>
-              Save
+              {METADATA_EDITOR_COPY.save}
             </Button>
           </div>
         </form>
       )}
-      {state.isPending && !state.isError && <p className={styles.hint}>Reading what TMDB says</p>}
+      {state.isPending && !state.isError && (
+        <p className={styles.hint}>{METADATA_EDITOR_COPY.reading}</p>
+      )}
     </section>
   )
 }

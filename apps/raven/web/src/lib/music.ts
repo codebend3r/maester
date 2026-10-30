@@ -9,6 +9,7 @@ import {
   formatDuration,
 } from '@raven/core'
 import { api } from '@/lib/api'
+import { COMMON_COPY, MUSIC_COPY } from '@/lib/copy'
 
 /** An album's page: `/albums/:id`. */
 export const albumPath = (albumId: number): AppPath => `/albums/${albumId}`
@@ -22,6 +23,9 @@ export const playlistPath = (playlistId: number): AppPath => `/playlists/${playl
 /** Now Playing, the full page over the bar. */
 export const NOW_PLAYING_PATH: AppPath = '/now-playing'
 
+/** The route a playlist's page answers on; `playlistPath` names one playlist's. */
+export const PLAYLIST_ROUTE: AppPath = '/playlists/:id'
+
 /** "4:03", or "1:02:03" past an hour; "" for an unknown length. */
 export const trackLength = (seconds: number | null): string =>
   seconds === null ? '' : formatDuration(seconds)
@@ -31,10 +35,7 @@ type LengthFactsProps = { trackCount: number; duration: number }
 /** How many tracks and how long they run: "12 tracks · 53 min", the minutes left out under one. */
 const lengthFacts = ({ trackCount, duration }: LengthFactsProps): string[] => {
   const minutes = Math.round(duration / 60)
-  return [
-    `${trackCount} ${trackCount === 1 ? 'track' : 'tracks'}`,
-    ...(minutes > 0 ? [`${minutes} min`] : []),
-  ]
+  return [COMMON_COPY.tracks(trackCount), ...(minutes > 0 ? [MUSIC_COPY.minutes(minutes)] : [])]
 }
 
 type AlbumFactsProps = { album: AlbumSummary }

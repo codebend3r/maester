@@ -3,20 +3,18 @@ import type { ComponentProps } from 'react'
 import type { Search } from '@raven/ui/headless'
 import styles from '@/components/SearchField/SearchField.module.scss'
 
+type SearchFieldProps = { search: Search } & Omit<
+  ComponentProps<'input'>,
+  'type' | 'value' | 'defaultValue' | 'onChange' | 'onKeyDown'
+>
+
 /**
  * A search box. Every one in raven is this, held by `useSearch`, so none
  * searches on each keystroke: what it asks for follows the typing once it
  * pauses, or at once on Enter. The label, the size and the place are the
  * caller's; it draws only its clear button, in the theme's lichen.
  */
-export const SearchField = ({
-  search,
-  className,
-  ...input
-}: { search: Search } & Omit<
-  ComponentProps<'input'>,
-  'type' | 'value' | 'defaultValue' | 'onChange' | 'onKeyDown'
->) => (
+export const SearchField = ({ search, className, ...input }: SearchFieldProps) => (
   <input
     {...input}
     type="search"

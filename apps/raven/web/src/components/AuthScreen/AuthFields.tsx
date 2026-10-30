@@ -1,8 +1,7 @@
 import { type ReactNode, useId, useState } from 'react'
 import { Button, Icon } from '@raven/ui'
+import { AUTH_SCREEN_COPY } from '@/components/AuthScreen/copy'
 import styles from '@/components/AuthScreen/AuthScreen.module.scss'
-
-const MISMATCH_COPY = 'The passwords do not match.'
 
 type FieldAlertProps = { id: string; children: string }
 
@@ -25,7 +24,7 @@ export const EmailField = ({ value, onChange }: EmailFieldProps) => {
   return (
     <div className={styles.field}>
       <label htmlFor={id} className={styles.label}>
-        Email
+        {AUTH_SCREEN_COPY.email}
       </label>
       <input
         id={id}
@@ -100,8 +99,8 @@ export const PasswordField = ({
           aria-controls={alsoReveals === undefined ? ids.input : `${ids.input} ${alsoReveals}`}
           onClick={onToggleShown}
         >
-          {isShown ? 'Hide' : 'Show'}
-          <span className="visually-hidden"> password</span>
+          {isShown ? AUTH_SCREEN_COPY.hide : AUTH_SCREEN_COPY.show}
+          <span className="visually-hidden">{AUTH_SCREEN_COPY.revealSuffix}</span>
         </Button>
       </div>
       {isInvalid && <FieldAlert id={ids.error}>{error}</FieldAlert>}
@@ -153,7 +152,7 @@ export const PasswordFields = ({
       />
       <div className={styles.field}>
         <label htmlFor={ids.confirm} className={styles.label}>
-          Confirm password
+          {AUTH_SCREEN_COPY.confirmPassword}
         </label>
         <input
           id={ids.confirm}
@@ -169,7 +168,7 @@ export const PasswordFields = ({
           value={confirmation}
           onChange={(event) => onConfirmationChange(event.target.value)}
         />
-        {isMismatched && <FieldAlert id={ids.mismatch}>{MISMATCH_COPY}</FieldAlert>}
+        {isMismatched && <FieldAlert id={ids.mismatch}>{AUTH_SCREEN_COPY.mismatch}</FieldAlert>}
       </div>
     </>
   )

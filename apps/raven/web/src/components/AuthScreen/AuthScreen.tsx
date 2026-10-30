@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { AUTH_ROUTES } from '@raven/core'
 import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
@@ -6,6 +6,7 @@ import { AuthCard, Brand, Lead } from '@/components/AuthScreen/AuthCard'
 import { PosterWall } from '@/components/AuthScreen/PosterWall'
 import { type AccessKind, ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { HOME_PATH, signInPath } from '@/lib/authRoutes'
+import { AUTH_SCREEN_COPY } from '@/components/AuthScreen/copy'
 import styles from '@/components/AuthScreen/AuthScreen.module.scss'
 
 /** Who an auth page is for. Anyone else is sent where they belong. */
@@ -40,24 +41,13 @@ const ADMITTED: Record<Audience, readonly Answered[]> = {
   [AUDIENCES.waiting]: [ACCESS_KINDS.pending, ACCESS_KINDS.revoked],
 }
 
-type DestinationOfProps = { kind: Answered; approvedTo: string }
-
-/** Where a visitor a page does not admit belongs. */
-const destinationOf = ({ kind, approvedTo }: DestinationOfProps): string => {
-  switch (kind) {
-    case ACCESS_KINDS.signedOut:
-      return signInPath({ returnTo: HOME_PATH })
-    case ACCESS_KINDS.pending:
-    case ACCESS_KINDS.revoked:
-      return AUTH_ROUTES.pending
-    case ACCESS_KINDS.approved:
-      return approvedTo
-    default: {
-      const unreachable: never = kind
-      return unreachable
-    }
-  }
-}
+/** Where a visitor a page does not admit belongs, by where the server says they stand. */
+const DESTINATIONS = {
+  [ACCESS_KINDS.signedOut]: () => signInPath({ returnTo: HOME_PATH }),
+  [ACCESS_KINDS.pending]: () => AUTH_ROUTES.pending,
+  [ACCESS_KINDS.revoked]: () => AUTH_ROUTES.pending,
+  [ACCESS_KINDS.approved]: (approvedTo: string) => approvedTo,
+} as const satisfies Record<Answered, (approvedTo: string) => string>
 
 type FrameProps = { children: ReactNode }
 
@@ -77,8 +67,8 @@ const Waiting = () => (
 
 const Unavailable = () => (
   <AuthCard
-    title="Sign in is temporarily unavailable"
-    lead={<Lead>raven could not reach its accounts. Try again in a moment.</Lead>}
+    title={AUTH_SCREEN_COPY.unavailableTitle}
+    lead={<Lead>{AUTH_SCREEN_COPY.unavailableLead}</Lead>}
   />
 )
 
@@ -87,6 +77,57 @@ type AuthScreenProps = {
   approvedTo?: string
   children: ReactNode
 }
+
+type ScreenViewProps = Required<AuthScreenProps>
+
+const ToHome = () => <Navigate replace to={HOME_PATH} />
+
+const Loading = () => (
+  <Frame>
+    <Waiting />
+  </Frame>
+)
+
+const Unreachable = () => (
+  <Frame>
+    <Unavailable />
+  </Frame>
+)
+
+/** Whether a page lets in the visitor the server has answered about. */
+const ADMISSIONS = {
+  admitted: 'admitted',
+  sent: 'sent',
+} as const
+
+type Admission = (typeof ADMISSIONS)[keyof typeof ADMISSIONS]
+
+type AdmissionViewProps = { to: string; children: ReactNode }
+
+const ADMISSION_VIEWS = {
+  [ADMISSIONS.admitted]: ({ children }: AdmissionViewProps) => <Frame>{children}</Frame>,
+  [ADMISSIONS.sent]: ({ to }: AdmissionViewProps) => <Navigate replace to={to} />,
+} as const satisfies Record<Admission, ComponentType<AdmissionViewProps>>
+
+/** The page for a visitor the server has answered about: its own, or a way on to where they belong. */
+const answeredView =
+  (kind: Answered) =>
+  ({ audience, approvedTo, children }: ScreenViewProps) => {
+    const isAdmitted = ADMITTED[audience].some((admitted) => admitted === kind)
+    const View = ADMISSION_VIEWS[isAdmitted ? ADMISSIONS.admitted : ADMISSIONS.sent]
+    return <View to={DESTINATIONS[kind](approvedTo)}>{children}</View>
+  }
+
+const SCREEN_VIEWS = {
+  [ACCESS_KINDS.disabled]: ToHome,
+  [ACCESS_KINDS.loading]: Loading,
+  [ACCESS_KINDS.unavailable]: Unreachable,
+  [ACCESS_KINDS.failed]: Unreachable,
+  [ACCESS_KINDS.signedOut]: answeredView(ACCESS_KINDS.signedOut),
+  [ACCESS_KINDS.pending]: answeredView(ACCESS_KINDS.pending),
+  [ACCESS_KINDS.revoked]: answeredView(ACCESS_KINDS.revoked),
+  [ACCESS_KINDS.approved]: answeredView(ACCESS_KINDS.approved),
+} as const satisfies Record<AccessKind, ComponentType<ScreenViewProps>>
 
 /**
  * The screen every page of the auth flow sits in, beside the poster wall.
@@ -97,35 +138,10 @@ type AuthScreenProps = {
  */
 export const AuthScreen = ({ audience, approvedTo = HOME_PATH, children }: AuthScreenProps) => {
   const access = useAccessState()
-
-  switch (access.kind) {
-    case ACCESS_KINDS.disabled:
-      return <Navigate replace to={HOME_PATH} />
-    case ACCESS_KINDS.loading:
-      return (
-        <Frame>
-          <Waiting />
-        </Frame>
-      )
-    case ACCESS_KINDS.unavailable:
-    case ACCESS_KINDS.failed:
-      return (
-        <Frame>
-          <Unavailable />
-        </Frame>
-      )
-    case ACCESS_KINDS.signedOut:
-    case ACCESS_KINDS.pending:
-    case ACCESS_KINDS.revoked:
-    case ACCESS_KINDS.approved:
-      return ADMITTED[audience].some((kind) => kind === access.kind) ? (
-        <Frame>{children}</Frame>
-      ) : (
-        <Navigate replace to={destinationOf({ kind: access.kind, approvedTo })} />
-      )
-    default: {
-      const unreachable: never = access
-      return unreachable
-    }
-  }
+  const View = SCREEN_VIEWS[access.kind]
+  return (
+    <View audience={audience} approvedTo={approvedTo}>
+      {children}
+    </View>
+  )
 }

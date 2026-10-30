@@ -8,7 +8,9 @@ import { SearchField } from '@/components/SearchField/SearchField'
 import { api } from '@/lib/api'
 import { albumMatchSearchQuery } from '@/lib/queries'
 import { useModal } from '@/lib/useModal'
+import { ALBUM_MATCH_DIALOG_COPY } from '@/components/AlbumMatchDialog/copy'
 import styles from '@/components/AlbumMatchDialog/AlbumMatchDialog.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 type CandidateProps = {
   candidate: AlbumMatchCandidate
@@ -23,24 +25,27 @@ const Candidate = ({ candidate, isBest, disabled, onChoose }: CandidateProps) =>
     candidate.artist,
     ...(candidate.year === null ? [] : [String(candidate.year)]),
     candidate.type,
-    ...(candidate.trackCount === null ? [] : [`${candidate.trackCount} tracks`]),
+    ...(candidate.trackCount === null ? [] : [COMMON_COPY.tracks(candidate.trackCount)]),
     ...(candidate.country === null ? [] : [candidate.country]),
   ]
   return (
     <li className={isBest ? `${styles.candidate} ${styles.best}` : styles.candidate}>
       <span className={styles.details}>
         <span className={styles.name}>{candidate.title}</span>
-        <span className={styles.facts}>{facts.join(' · ')}</span>
+        <span className={styles.facts}>{facts.join(COMMON_COPY.separator)}</span>
         <MatchTier id={tierId} confidence={candidate.confidence} isBest={isBest} />
       </span>
       <Button
         className={styles.choose}
         disabled={disabled}
         onClick={onChoose}
-        aria-label={`Choose ${candidate.title} by ${candidate.artist}`}
+        aria-label={ALBUM_MATCH_DIALOG_COPY.chooseLabel({
+          title: candidate.title,
+          artist: candidate.artist,
+        })}
         aria-describedby={tierId}
       >
-        Choose
+        {ALBUM_MATCH_DIALOG_COPY.choose}
       </Button>
     </li>
   )
@@ -81,28 +86,30 @@ export const AlbumMatchDialog = ({ album, onClose, onMatched }: AlbumMatchDialog
       <div className={styles.body}>
         <header className={styles.header}>
           <h2 id={titleId} className={styles.title}>
-            Fix match
+            {COMMON_COPY.fixMatch}
           </h2>
           <p className={styles.album}>
-            {album.title} · {artistNames(album)}
+            {album.title}
+            {COMMON_COPY.separator}
+            {artistNames(album)}
           </p>
         </header>
         <SearchField
           search={search}
-          aria-label="Search MusicBrainz"
-          placeholder="Search MusicBrainz for other words"
+          aria-label={ALBUM_MATCH_DIALOG_COPY.searchLabel}
+          placeholder={ALBUM_MATCH_DIALOG_COPY.searchPlaceholder}
         />
-        {candidates.isPending && <p className={styles.note}>Searching MusicBrainz</p>}
+        {candidates.isPending && <p className={styles.note}>{ALBUM_MATCH_DIALOG_COPY.searching}</p>}
         {candidates.error && (
           <p className={styles.note} role="alert">
             {candidates.error.message}
           </p>
         )}
         {candidates.data && candidates.data.length === 0 && (
-          <p className={styles.note}>MusicBrainz lists nothing by that name.</p>
+          <p className={styles.note}>{ALBUM_MATCH_DIALOG_COPY.noResults}</p>
         )}
         {candidates.data && candidates.data.length > 0 && (
-          <ol className={styles.candidates} aria-label="Releases">
+          <ol className={styles.candidates} aria-label={ALBUM_MATCH_DIALOG_COPY.releases}>
             {candidates.data.map((candidate) => (
               <Candidate
                 key={candidate.mbid}
@@ -121,10 +128,10 @@ export const AlbumMatchDialog = ({ album, onClose, onMatched }: AlbumMatchDialog
         )}
         <footer className={styles.footer}>
           <Button disabled={choose.isPending} onClick={() => choose.mutate(null)}>
-            Not on MusicBrainz
+            {ALBUM_MATCH_DIALOG_COPY.notOnMusicBrainz}
           </Button>
           <Button tone="quiet" onClick={close}>
-            Cancel
+            {COMMON_COPY.cancel}
           </Button>
         </footer>
       </div>

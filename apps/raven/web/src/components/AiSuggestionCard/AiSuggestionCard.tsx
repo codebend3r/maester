@@ -1,15 +1,38 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AiSuggestion } from '@raven/core'
-import { type Ref, useId } from 'react'
+import { type ComponentType, type Ref, useId } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
+import { AI_SUGGESTION_CARD_COPY } from '@/components/AiSuggestionCard/copy'
 import { Button, Icon } from '@raven/ui'
 import { api } from '@/lib/api'
 import { afterMatch } from '@raven/ui/headless'
 import styles from '@/components/AiSuggestionCard/AiSuggestionCard.module.scss'
+import { COMMON_COPY } from '@/lib/copy'
 
 /** A suggestion's title as a person reads it, with its year when TMDB gives one. */
 const suggestedName = (suggestion: AiSuggestion): string =>
   suggestion.year == null ? suggestion.title : `${suggestion.title} (${suggestion.year})`
+
+/** Whether the card shows the suggestion's poster, or its first letter where TMDB has none. */
+const POSTER_KINDS = { poster: 'poster', letter: 'letter' } as const
+type PosterKind = (typeof POSTER_KINDS)[keyof typeof POSTER_KINDS]
+
+type SuggestionPosterProps = { poster: string | null; title: string }
+
+type PosterProps = SuggestionPosterProps
+
+const Poster = ({ poster }: PosterProps) => (
+  <img src={poster ?? undefined} alt="" loading="lazy" decoding="async" />
+)
+
+type LetterProps = SuggestionPosterProps
+
+const Letter = ({ title }: LetterProps) => <span aria-hidden="true">{title.slice(0, 1)}</span>
+
+const SUGGESTION_POSTERS = {
+  [POSTER_KINDS.poster]: Poster,
+  [POSTER_KINDS.letter]: Letter,
+} as const satisfies Record<PosterKind, ComponentType<SuggestionPosterProps>>
 
 type AiSuggestionCardProps = {
   suggestion: AiSuggestion
@@ -44,18 +67,15 @@ export const AiSuggestionCard = ({
   })
   const poster = api.candidatePosterUrl(suggestion.poster)
   const name = suggestedName(suggestion)
+  const SuggestionPoster = SUGGESTION_POSTERS[poster ? POSTER_KINDS.poster : POSTER_KINDS.letter]
   return (
     <article className={styles.card} aria-labelledby={titleId}>
       <span className={styles.poster}>
-        {poster ? (
-          <img src={poster} alt="" loading="lazy" decoding="async" />
-        ) : (
-          <span aria-hidden="true">{suggestion.title.slice(0, 1)}</span>
-        )}
+        <SuggestionPoster poster={poster} title={suggestion.title} />
       </span>
       <div className={styles.text}>
         <p id={titleId} className={styles.title}>
-          Suggested: {name}
+          {AI_SUGGESTION_CARD_COPY.suggested(name)}
         </p>
         <p className={styles.reason}>{suggestion.reason}</p>
         {accepting.isError && (
@@ -70,18 +90,18 @@ export const AiSuggestionCard = ({
           <Button
             ref={fixRef}
             icon="search"
-            aria-label={`Fix match for ${subject}`}
+            aria-label={AI_SUGGESTION_CARD_COPY.fixMatchFor(subject)}
             onClick={onFix}
           >
-            Fix match
+            {COMMON_COPY.fixMatch}
           </Button>
           <Button
             tone="primary"
             disabled={accepting.isPending}
-            aria-label={`Accept ${name} for ${subject}`}
+            aria-label={AI_SUGGESTION_CARD_COPY.acceptFor({ name, subject })}
             onClick={() => accepting.mutate()}
           >
-            Accept
+            {AI_SUGGESTION_CARD_COPY.accept}
           </Button>
         </footer>
       </AdminOnly>
