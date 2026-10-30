@@ -21,6 +21,7 @@ export {
   isLockedError,
   LOCKED_STATUS,
   type MediaAccess,
+  type TicketedOrigin,
 } from '@/apiClient/transport'
 
 /** One message off the server's event stream, or null for anything this client does not know. */

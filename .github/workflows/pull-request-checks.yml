@@ -592,7 +592,7 @@ jobs:
       - name: 🔎 Check the Apple TV pods
         working-directory: apps/raven/app/ios
         run: |
-          grep -q 'SDKROOT = appletvos' raven.xcodeproj/project.pbxproj
+          grep -q 'SDKROOT = appletvos' Raven.xcodeproj/project.pbxproj
           cmp Podfile.lock Pods/Manifest.lock
 
       - name: 🗄️ Wait for the fixture server
@@ -616,7 +616,7 @@ jobs:
           device="$(xcrun simctl create raven-tv com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K "$runtime")"
           xcrun simctl boot "$device"
           xcrun simctl bootstatus "$device" -b
-          xcrun simctl install "$device" apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app
+          xcrun simctl install "$device" apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app
 
       # The XCUITest the tvOS prebuild added (`tvos-e2e/`) signs in, plays the film from
       # Home and returns with the Siri Remote. The screen it ends on goes up with the app.
@@ -641,7 +641,7 @@ jobs:
       # The build zipped as Finder would, which keeps the execute bits an artifact drops,
       # so the unzipped app still launches.
       - name: 📦 Pack the simulator app
-        run: ditto -c -k --keepParent apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app "$RUNNER_TEMP/raven-appletvsimulator.zip"
+        run: ditto -c -k --keepParent apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app "$RUNNER_TEMP/raven-appletvsimulator.zip"
 
       # The build, for trying the PR's app by hand on a simulator, and the flow's screenshot.
       - name: 📤 Simulator app
@@ -729,7 +729,7 @@ jobs:
           device="$(xcrun simctl create raven-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
           xcrun simctl boot "$device"
           xcrun simctl bootstatus "$device" -b
-          xcrun simctl install "$device" apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
+          xcrun simctl install "$device" apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app
 
       # A real raven server with a locked film library and an open series library, started
       # above for the flows.
@@ -780,7 +780,7 @@ jobs:
       # The build zipped as Finder would, which keeps the execute bits an artifact drops,
       # so the unzipped app still launches.
       - name: 📦 Pack the simulator app
-        run: ditto -c -k --keepParent apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app "$RUNNER_TEMP/raven-iphonesimulator.zip"
+        run: ditto -c -k --keepParent apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app "$RUNNER_TEMP/raven-iphonesimulator.zip"
 
       # The build, for trying the PR's app by hand on a simulator.
       - name: 📤 Simulator app

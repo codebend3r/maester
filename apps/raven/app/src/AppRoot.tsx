@@ -16,6 +16,7 @@ import { IS_SIGN_IN_BYPASSED, RAVEN_SERVER } from '@/servers/ravenServer'
 import { useActiveServer } from '@/stores/activeServer'
 import { configureAppPrefs } from '@/stores/appPrefs'
 import { configureLibraryViews } from '@/stores/libraryViews'
+import { configureSideMenu } from '@/stores/sideMenu'
 import { followReduceMotion } from '@/stores/reduceMotion'
 import { returnScreen } from '@/stores/screenFocus'
 import type { AppTheme } from '@/theme/appTheme'
@@ -56,6 +57,7 @@ const loadStores = async (): Promise<void> => {
     configureStorage({ storage: AsyncStorage }),
     configureLibraryViews({ storage: AsyncStorage }),
     configureAppPrefs({ storage: AsyncStorage }),
+    configureSideMenu({ storage: AsyncStorage }),
     useActiveServer.persist.rehydrate(),
     useAccountSession.persist.rehydrate(),
   ])

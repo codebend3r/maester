@@ -38,14 +38,14 @@ What happens: the app's `predev:*` script regenerates `ios/` with `APP_VARIANT=d
 - `ios/` is shared by iOS and tvOS, and `prebuild --clean` rewrites it, so switching devices re-runs the prebuild (a few minutes for `pod install`). Never edit `ios/`; change the Expo config or a plugin.
 - A local server needs `apps/raven/.env` and a library: pull Vhagar's `raven.db`, or use the fixture server (`bunx nx run @raven/server:serve:fixture`, `http://127.0.0.1:8490`, PIN `1357`).
 - If Vhagar refuses connections, check its container with the `synology-nas-ssh` skill: after an auto-update the `raven` container can sit in `Created` when Docker cannot make the `/volume1/Vhagar/Caraxes` bind mount; `docker start raven` brings it up.
-- A debugger and native logs: after `bun run app:prebuild:ios`, open `apps/raven/app/ios/raven.xcworkspace` (the workspace, not the project) in Xcode, pick the `raven` scheme and a simulator, run it, and keep Metro going with `bun run app:start`. Xcode does not start Metro; a red "no bundle URL" screen means Metro is not running.
+- A debugger and native logs: after `bun run app:prebuild:ios`, open `apps/raven/app/ios/Raven.xcworkspace` (the workspace, not the project) in Xcode, pick the `Raven` scheme and a simulator, run it, and keep Metro going with `bun run app:start`. Xcode does not start Metro; a red "no bundle URL" screen means Metro is not running.
 
 ## 3. Release build (no hot reload)
 
 ```bash
 APP_VARIANT=development bun run app:build:ios     # or app:build:tvos
 xcrun simctl boot raven-phone && open -a Simulator
-xcrun simctl install booted apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
+xcrun simctl install booted apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app
 xcrun simctl launch booted io.github.codebend3r.raven.app
 ```
 
@@ -58,7 +58,7 @@ Needs the development-variant Release build installed on a booted iPhone simulat
 ```bash
 APP_VARIANT=development bun run app:build:ios
 bunx nx run @raven/server:serve:fixture            # second terminal; wait for "raven fixture server ready"
-xcrun simctl install booted apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
+xcrun simctl install booted apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app
 JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home MAESTRO_DRIVER_STARTUP_TIMEOUT=300000 bun run app:e2e
 ```
 

@@ -69,11 +69,11 @@ For each simulator, by its UDID:
 ```bash
 xcrun simctl boot <udid>                 # "Unable to boot device in current state: Booted" is fine
 xcrun simctl bootstatus <udid> -b
-xcrun simctl install <udid> apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
+xcrun simctl install <udid> apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app
 xcrun simctl launch --terminate-running-process <udid> io.github.codebend3r.raven.app
 ```
 
-The Apple TV installs `apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app` instead. Wait about five seconds past the splash, then `xcrun simctl io <udid> screenshot <file>.png` and look at it: raven shows either its PIN screen or Home.
+The Apple TV installs `apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app` instead. Wait about five seconds past the splash, then `xcrun simctl io <udid> screenshot <file>.png` and look at it: raven shows either its PIN screen or Home.
 
 Then show the screens: Xcode 27 and later have no Simulator.app, so `open /Applications/Xcode.app/Contents/Applications/DeviceHub.app`; an older Xcode uses `open -a Simulator`.
 
@@ -98,5 +98,5 @@ The Apple silicon only build. The prebuild puts back the iPhone's `ios/` in case
 
 ```bash
 APP_VARIANT=development EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490 bunx nx run @raven/app:prebuild:ios
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -workspace apps/raven/app/ios/raven.xcworkspace -scheme raven -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath apps/raven/app/build/ios CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO ARCHS=arm64 build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -workspace apps/raven/app/ios/Raven.xcworkspace -scheme Raven -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath apps/raven/app/build/ios CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO ARCHS=arm64 build
 ```

@@ -33,13 +33,13 @@ Run every script through Nx from the repo root, as `bunx nx run @raven/app:<scri
 To try a simulator build, install it on a booted simulator:
 
 ```sh
-xcrun simctl install booted apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app
+xcrun simctl install booted apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app
 xcrun simctl launch booted io.github.codebend3r.raven.app
 ```
 
 ## Dev loop
 
-- **Metro and a debug build.** Generate the development variant's project, start Metro, and run the debug build from Xcode (`ios/raven.xcworkspace`) or Android Studio (`android/`) on a simulator, the emulator or a device. A change to the app reloads from Metro; a change to `app.config.ts`, a config plugin or a native dependency needs a prebuild again.
+- **Metro and a debug build.** Generate the development variant's project, start Metro, and run the debug build from Xcode (`ios/Raven.xcworkspace`) or Android Studio (`android/`) on a simulator, the emulator or a device. A change to the app reloads from Metro; a change to `app.config.ts`, a config plugin or a native dependency needs a prebuild again.
 
   ```sh
   APP_VARIANT=development bunx nx run @raven/app:prebuild:ios
@@ -99,7 +99,7 @@ Maestro cannot drive an Apple TV, so the TV's flow is an XCUITest, `tvos-e2e/Rem
 
 ```sh
 APP_VARIANT=development EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490 bunx nx run @raven/app:build:tvos
-xcrun simctl install booted apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/raven.app
+xcrun simctl install booted apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app
 bun run app:e2e:tvos
 ```
 

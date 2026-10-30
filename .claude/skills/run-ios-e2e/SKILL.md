@@ -24,13 +24,13 @@ It is `scripts/ci_app_ios.sh`. Run it yourself in the background (it takes up to
 | Boot the iPhone simulator | Reuses the simulator `raven-phone` on the SDK's runtime, or makes one (CI's iPhone 16, else the runtime's newest iPhone)                                                                                   | no           |
 | Build                     | `@raven/app:build:ios`, which runs `prebuild:ios` (`expo prebuild`, `pod install`) and then `xcodebuild`'s Release build                                                                                   | yes          |
 | Check the pods            | `cmp Podfile.lock Pods/Manifest.lock`, since `expo prebuild` exits 0 when `pod install` fails                                                                                                              | no, instant  |
-| Install the build         | `xcrun simctl install` of `raven.app`                                                                                                                                                                      | no, instant  |
+| Install the build         | `xcrun simctl install` of `Raven.app`                                                                                                                                                                      | no, instant  |
 | Wait for the fixture      | Its `raven fixture server ready` line, up to three minutes                                                                                                                                                 | no           |
 | App end to end            | `@raven/app:e2e`: every flow in `apps/raven/app/e2e` but the `dpad` ones                                                                                                                                   | yes          |
 
 It sets `APP_VARIANT=development`, `EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490` and `DEVELOPER_DIR` (`/Applications/Xcode.app/Contents/Developer` unless set) for every step. They are Nx inputs of the build and the flows, so the cache keys stay the same run to run. The fixture server is stopped when the script ends, pass or fail.
 
-CI's last two steps (zipping and uploading the simulator app) are left out: the build stays at `apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app`.
+CI's last two steps (zipping and uploading the simulator app) are left out: the build stays at `apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app`.
 
 ## Caching
 

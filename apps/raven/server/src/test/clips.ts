@@ -107,11 +107,131 @@ export const addChapters = async ({ path, chapters }: AddChaptersProps): Promise
   await rm(metadata)
 }
 
+/** A PGS segment's type, as a Blu-ray's subtitle stream names it. */
+const PGS_SEGMENTS = {
+  palette: 0x14,
+  object: 0x15,
+  presentation: 0x16,
+  window: 0x17,
+  end: 0x80,
+} as const
+
+/** The 90 kHz clock PGS stamps its segments with. */
+const PGS_CLOCK = 90_000
+
+type PgsSegmentProps = { pts: number; type: number; data: readonly number[] }
+
+/** One segment: the "PG" magic, its time (and a decode time of 0), its type, size and data. */
+const pgsSegment = ({ pts, type, data }: PgsSegmentProps): number[] => {
+  const stamp = Math.round(pts * PGS_CLOCK)
+  return [
+    0x50,
+    0x47,
+    (stamp >>> 24) & 0xff,
+    (stamp >>> 16) & 0xff,
+    (stamp >>> 8) & 0xff,
+    stamp & 0xff,
+    0,
+    0,
+    0,
+    0,
+    type,
+    (data.length >> 8) & 0xff,
+    data.length & 0xff,
+    ...data,
+  ]
+}
+
+const be16 = (value: number): number[] => [(value >> 8) & 0xff, value & 0xff]
+
+type PgsCue = { start: number; end: number }
+
+type WritePgsProps = { path: string; width: number; height: number; cues: readonly PgsCue[] }
+
+/**
+ * A Blu-ray PGS subtitle stream (`.sup`) holding, for each cue, a white box at the foot of the
+ * frame from its start, and a clear screen at its end: a real picture track, which ffmpeg can not
+ * make from text, for the tests that need one.
+ */
+const writePgs = async ({ path, width, height, cues }: WritePgsProps): Promise<void> => {
+  const box = { width: 96, height: 16 }
+  const at = { x: (width - box.width) >> 1, y: height - box.height - 8 }
+  // Each line: one run of the palette's white across the box, then the end of the line.
+  const line = [0x00, 0xc0 | (box.width >> 8), box.width & 0xff, 0x01, 0x00, 0x00]
+  const rle = Array.from({ length: box.height }, () => line).flat()
+  type ShowProps = { start: number; number: number }
+  const show = ({ start, number }: ShowProps): number[] => [
+    ...pgsSegment({
+      pts: start,
+      type: PGS_SEGMENTS.presentation,
+      data: [
+        ...be16(width),
+        ...be16(height),
+        0x10,
+        ...be16(number),
+        0x80,
+        0,
+        0,
+        1,
+        ...be16(0),
+        0,
+        0,
+        ...be16(at.x),
+        ...be16(at.y),
+      ],
+    }),
+    ...pgsSegment({
+      pts: start,
+      type: PGS_SEGMENTS.window,
+      data: [1, 0, ...be16(at.x), ...be16(at.y), ...be16(box.width), ...be16(box.height)],
+    }),
+    ...pgsSegment({ pts: start, type: PGS_SEGMENTS.palette, data: [0, 0, 1, 235, 128, 128, 255] }),
+    ...pgsSegment({
+      pts: start,
+      type: PGS_SEGMENTS.object,
+      data: [
+        ...be16(0),
+        0,
+        0xc0,
+        // The object's length in three bytes: its size and its run-length data.
+        (rle.length + 4) >> 16,
+        ((rle.length + 4) >> 8) & 0xff,
+        (rle.length + 4) & 0xff,
+        ...be16(box.width),
+        ...be16(box.height),
+        ...rle,
+      ],
+    }),
+    ...pgsSegment({ pts: start, type: PGS_SEGMENTS.end, data: [] }),
+  ]
+  type ClearProps = { end: number; number: number }
+  const clear = ({ end, number }: ClearProps): number[] => [
+    ...pgsSegment({
+      pts: end,
+      type: PGS_SEGMENTS.presentation,
+      data: [...be16(width), ...be16(height), 0x10, ...be16(number), 0x00, 0, 0, 0],
+    }),
+    ...pgsSegment({
+      pts: end,
+      type: PGS_SEGMENTS.window,
+      data: [1, 0, ...be16(at.x), ...be16(at.y), ...be16(box.width), ...be16(box.height)],
+    }),
+    ...pgsSegment({ pts: end, type: PGS_SEGMENTS.end, data: [] }),
+  ]
+  const bytes = cues.flatMap(({ start, end }, index) => [
+    ...show({ start, number: index * 2 }),
+    ...clear({ end, number: index * 2 + 1 }),
+  ])
+  await writeFile(path, Uint8Array.from(bytes))
+}
+
 type EncodeRichClipProps = {
   path: string
   seconds?: number
   cues: string
   bFrames?: number
+  /** Writes a picture track (Blu-ray PGS) in place of the text cues, which only a burn can show. */
+  isPictureSubtitle?: boolean
 }
 
 /**
@@ -125,10 +245,22 @@ export const encodeRichClip = async ({
   seconds = 30,
   cues,
   bFrames,
+  isPictureSubtitle = false,
 }: EncodeRichClipProps): Promise<void> => {
   await mkdir(dirname(path), { recursive: true })
-  const srt = `${path}.source.srt`
-  await writeFile(srt, cues)
+  // A picture track is written as PGS, two boxes a few seconds apart; text keeps `cues`.
+  const subtitles = isPictureSubtitle ? `${path}.source.sup` : `${path}.source.srt`
+  await (isPictureSubtitle
+    ? writePgs({
+        path: subtitles,
+        width: 320,
+        height: 240,
+        cues: [
+          { start: 1, end: 3 },
+          { start: 7, end: 9 },
+        ],
+      })
+    : writeFile(subtitles, cues))
   await run('ffmpeg', [
     '-hide_banner',
     '-loglevel',
@@ -147,7 +279,7 @@ export const encodeRichClip = async ({
     '-i',
     `sine=frequency=880:duration=${seconds}`,
     '-i',
-    srt,
+    subtitles,
     '-map',
     '0',
     '-map',
@@ -168,7 +300,7 @@ export const encodeRichClip = async ({
     '-c:a:1',
     'aac',
     '-c:s',
-    'srt',
+    isPictureSubtitle ? 'copy' : 'srt',
     '-metadata:s:a:0',
     'language=eng',
     '-metadata:s:a:1',
@@ -183,7 +315,7 @@ export const encodeRichClip = async ({
     '0',
     path,
   ])
-  await rm(srt)
+  await rm(subtitles)
 }
 
 type EncodeImageProps = {

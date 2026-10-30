@@ -1,4 +1,4 @@
-import { type JumpScale, LIBRARY_VIEWS, type LibraryView } from '@raven/core'
+import { type JumpScale, LIBRARY_VIEWS, type LibraryIconName, type LibraryView } from '@raven/core'
 import type { ReactNode } from 'react'
 
 import type { ShelfCard } from '@/queries/cards'
@@ -6,6 +6,8 @@ import type { GridSection } from '@/queries/libraryGrid'
 
 export type GridProps = {
   title: string
+  /** The library's icon, the one the side menu's pinned row wears; null while no library is known. */
+  icon: LibraryIconName | null
   /** What the library is and holds: "Movies, 1,204 videos". */
   line: string | null
   /** A line in place of the cards: while they load, when they fail, or when there are none. */

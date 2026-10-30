@@ -9,6 +9,7 @@ import {
   hasWayBelow,
   initialSession,
   modeOf,
+  isOpeningOf,
   noticeOf,
   sessionReducer,
   sourcedOf,
@@ -177,11 +178,43 @@ describe('the playback ladder', () => {
     ).toMatchObject({ phase: SESSION_PHASES.playing, audio: 1, attempt: 0 })
   })
 
+  it('moves to the transcode to burn a picture subtitle in, and back to where it played once cleared', () => {
+    const remuxing = loaded(
+      sourced(sessionReducer(opened(), { type: SESSION_EVENTS.failed, attempt: 0, at: 30 })),
+    )
+    expect(modeOf(remuxing)).toBe(remux)
+    const burning = sessionReducer(remuxing, {
+      type: SESSION_EVENTS.burnPicked,
+      burn: 'embedded-1',
+      at: 640,
+    })
+    expect(burning).toMatchObject({ phase: SESSION_PHASES.sourcing, burn: 'embedded-1', at: 640 })
+    expect(modeOf(burning)).toBe(transcode)
+    const cleared = sessionReducer(loaded(sourced(burning)), {
+      type: SESSION_EVENTS.burnPicked,
+      burn: null,
+      at: 700,
+    })
+    expect(cleared).toMatchObject({ phase: SESSION_PHASES.sourcing, burn: null, at: 700 })
+    expect(modeOf(cleared)).toBe(remux)
+  })
+
+  it('burns nothing where the plan holds no transcode, as when transcoding is off', () => {
+    const remuxOnly = loaded(sourced(opened({ modes: [direct, remux] })))
+    expect(
+      sessionReducer(remuxOnly, { type: SESSION_EVENTS.burnPicked, burn: 'embedded-1', at: 640 }),
+    ).toBe(remuxOnly)
+  })
+
   it('says what stands in for the video until frames flow, and hands the source over meanwhile', () => {
     const asking = opened()
-    expect([noticeOf(asking), sourcedOf(asking)]).toEqual([SESSION_COPY.starting, null])
+    expect([noticeOf(asking), isOpeningOf(asking), sourcedOf(asking)]).toEqual([null, true, null])
     const loading = sourced(asking)
-    expect([noticeOf(loading), sourcedOf(loading)]).toEqual([SESSION_COPY.starting, SOURCED])
+    expect([noticeOf(loading), isOpeningOf(loading), sourcedOf(loading)]).toEqual([
+      null,
+      true,
+      SOURCED,
+    ])
     const playing = loaded(loading)
     expect([noticeOf(playing), sourcedOf(playing)]).toEqual([null, SOURCED])
     const refused = sessionReducer(asking, {

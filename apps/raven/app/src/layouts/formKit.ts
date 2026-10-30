@@ -34,6 +34,8 @@ export type FormButtonProps = {
   onPress: () => void
   tone: ButtonTone
   isDisabled?: boolean
+  /** The button a step opens on, in place of its first field: on a TV, focused first by the remote. */
+  isFirst?: boolean
 }
 
 /**

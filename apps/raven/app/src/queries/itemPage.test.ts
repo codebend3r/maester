@@ -2,9 +2,9 @@ import { describe, expect, it } from 'bun:test'
 import { AUTH_HEADERS, ITEM_TYPES, movieFacts } from '@raven/core'
 
 import { CARD_SHAPES } from '@/queries/cards'
-import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
+import { ART_PLACES, playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { ROUTE_TARGETS } from '@/routes'
-import { NAS, SERIES } from '@/test/homeServer'
+import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import {
   BUSBOYS,
   BUSBOYS_FILE,
@@ -17,6 +17,12 @@ import { mediaItemFor } from '@/test/mediaItem'
 
 const COOKIE = { [AUTH_HEADERS.cookie]: 'raven_unlock=u.1' }
 const pictures = { api: itemApi(), headersFor: () => COOKIE }
+/** The libraries' names, as the page reads them. */
+const LIBRARY_NAMES = new Map([
+  [FILMS.id, FILMS.name],
+  [SERIES.id, SERIES.name],
+])
+
 const at = (path: string) => ({ uri: `${NAS.origin}${path}`, headers: COOKIE })
 
 type MovieProps = { versions?: typeof BUSBOYS.versions }
@@ -26,6 +32,8 @@ const movie = ({ versions = [BUSBOYS_FILE] }: MovieProps = {}) =>
     kind: ITEM_TYPES.movie,
     details: { ...BUSBOYS, versions },
     versions,
+    everyFile: versions,
+    libraryNames: LIBRARY_NAMES,
     primary: versions[0] ?? BUSBOYS_FILE,
     show: null,
     isShowPending: false,
@@ -38,6 +46,7 @@ describe('playablePage', () => {
     const { hero } = movie()
     expect(hero).toEqual({
       eyebrow: null,
+      logo: null,
       title: 'Busboys',
       byline: 'Directed by Mark Kimball',
       rating: 'R',
@@ -88,6 +97,34 @@ describe('playablePage', () => {
     expect(rows[1]!.facts).toEqual(['4K', 'HEVC', '40.0 GB'])
   })
 
+  it('lists every file of the item, in every library, each naming its library', () => {
+    const uhd = mediaItemFor({
+      ...BUSBOYS_FILE,
+      id: 22,
+      libraryId: SERIES.id,
+      width: 3840,
+      height: 2160,
+      size: 4e10,
+    })
+    const rows = playablePage({
+      kind: ITEM_TYPES.movie,
+      details: { ...BUSBOYS, versions: [BUSBOYS_FILE, uhd] },
+      versions: [BUSBOYS_FILE],
+      everyFile: [BUSBOYS_FILE, uhd],
+      libraryNames: LIBRARY_NAMES,
+      primary: BUSBOYS_FILE,
+      show: null,
+      isShowPending: false,
+      tracks: undefined,
+      ...pictures,
+    }).versions
+    expect(rows.map(({ target }) => target)).toEqual([
+      { kind: ROUTE_TARGETS.play, mediaId: BUSBOYS_FILE.id, at: 0 },
+      { kind: ROUTE_TARGETS.play, mediaId: 22, at: 0 },
+    ])
+    expect(rows.map(({ facts }) => facts.at(-1))).toEqual([FILMS.name, SERIES.name])
+  })
+
   it("heads an episode with its show and number, its still, and the show's backdrop once read", () => {
     const [primary] = GOOD_NEWS_ABOUT_HELL.versions
     if (primary === undefined) throw new Error('the episode has a file')
@@ -101,6 +138,8 @@ describe('playablePage', () => {
         kind: ITEM_TYPES.episode,
         details: GOOD_NEWS_ABOUT_HELL,
         versions: [primary],
+        everyFile: [primary],
+        libraryNames: LIBRARY_NAMES,
         primary,
         show,
         isShowPending,
@@ -108,7 +147,12 @@ describe('playablePage', () => {
         ...pictures,
       })
     const { hero, castTitle } = episode({ isShowPending: true })
-    expect(hero.eyebrow).toBe('Severance · Season 1 · Episode 1')
+    expect(hero.eyebrow).toBe('Severance · S01 · E01')
+    expect(hero.logo).toBeNull()
+    expect(episode({ show: { ...SEVERANCE, logoVersion: 'l4' } }).hero).toMatchObject({
+      eyebrow: 'S01 · E01',
+      logo: { picture: at('/api/pictures/items/4/logo/l4'), place: ART_PLACES.over },
+    })
     expect(hero.poster).toEqual({
       shape: CARD_SHAPES.wide,
       picture: at('/api/pictures/items/6/still/s6'),
@@ -127,6 +171,8 @@ describe('playablePage', () => {
       kind: ITEM_TYPES.episode,
       details: GOOD_NEWS_ABOUT_HELL,
       versions: [primary],
+      everyFile: [primary],
+      libraryNames: LIBRARY_NAMES,
       primary,
       show: null,
       isShowPending: false,
@@ -141,6 +187,10 @@ describe('showPage', () => {
   it('lists the seasons as posters, each opening its page', () => {
     const page = showPage({ details: SEVERANCE, ...pictures })
     expect(page.hero.eyebrow).toBe('Show')
+    expect(page.hero.logo).toBeNull()
+    expect(
+      showPage({ details: { ...SEVERANCE, logoVersion: 'l4' }, ...pictures }).hero.logo,
+    ).toEqual({ picture: at('/api/pictures/items/4/logo/l4'), place: ART_PLACES.title })
     expect(page.seasons).toEqual([
       {
         key: 'season:5',

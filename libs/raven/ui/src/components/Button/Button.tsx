@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Icon, type IconName, type IconSize } from '@/components/Icon/Icon'
+import { Icon, type IconSize } from '@/components/Icon/Icon'
+import type { IconName } from '@/components/Icon/drawings'
 import styles from '@/components/Button/Button.module.scss'
 
 /**

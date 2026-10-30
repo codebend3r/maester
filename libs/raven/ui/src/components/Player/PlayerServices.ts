@@ -5,7 +5,7 @@ import type {
   PlayerErrorReason,
   ProgressReport,
 } from '@raven/core'
-import type { IconName } from '@/components/Icon/Icon'
+import type { IconName } from '@/components/Icon/drawings'
 
 export type ProgressSink = {
   started: () => void

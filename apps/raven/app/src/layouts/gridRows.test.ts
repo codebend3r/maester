@@ -3,7 +3,13 @@ import { describe, expect, it } from 'bun:test'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import type { GridSection } from '@/queries/libraryGrid'
 import { ROUTE_TARGETS } from '@/routes'
-import { GRID_ROWS, gridColumnsOf, gridRowsOf, jumpTargetOf, offsetOfRow } from '@/layouts/gridRows'
+import {
+  GRID_ROWS,
+  gridColumnsOf,
+  gridRowsOf,
+  jumpTargetOf,
+  rowOffsetsOf,
+} from '@/layouts/gridRows'
 
 const card = (key: string): ShelfCard => ({
   key,
@@ -111,14 +117,14 @@ describe('jumpTargetOf', () => {
   })
 })
 
-describe('offsetOfRow', () => {
-  it('adds up the heights of the rows before it', () => {
+describe('rowOffsetsOf', () => {
+  it('starts each row after the heights of the rows before it, and ends with the whole', () => {
     const rows = gridRowsOf({
       sections: [section({ key: 'one', title: 'One', cards: ['a', 'b', 'c'] })],
       open: new Set(['one']),
       columnsOf: () => 2,
     })
     const heightOf = (row: (typeof rows)[number]) => (row.kind === GRID_ROWS.header ? 50 : 300)
-    expect([0, 1, 2].map((index) => offsetOfRow({ rows, index, heightOf }))).toEqual([0, 50, 350])
+    expect(rowOffsetsOf({ rows, heightOf })).toEqual([0, 50, 350, 650])
   })
 })

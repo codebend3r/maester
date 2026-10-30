@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Text } from '@/layouts/Text'
 import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
 import { useAccountSession } from '@/account/accountSession'
+import { TEST_ACCOUNT } from '@/account/testAccount'
 import { AUTH_OUTCOMES } from '@/account/supabaseAuth'
 import { APP_ROUTES } from '@/routes'
 import { useSubmit } from '@/screens/useSubmit'
@@ -31,6 +32,7 @@ const COPY = {
     "Locked libraries stay hidden on this device until the server's admin password is entered.",
   notAdded: "This server couldn't be added. Try its address again.",
   full: 'This device already keeps as many servers as it can.',
+  signIn: 'Sign in',
   continue: 'Continue',
   unlock: 'Unlock',
   notNow: 'Not now',
@@ -80,8 +82,8 @@ export const SignIn = () => {
   const [step, setStep] = useState<Step>(
     IS_SIGN_IN_BYPASSED ? { kind: STEPS.pin, server: RAVEN_SERVER } : { kind: STEPS.account },
   )
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState(TEST_ACCOUNT?.email ?? '')
+  const [password, setPassword] = useState(TEST_ACCOUNT?.password ?? '')
   const [secret, setSecret] = useState('')
   const { isBusy, error, setError, run } = useSubmit({ unreachable: COPY.unreachable })
 
@@ -172,7 +174,7 @@ export const SignIn = () => {
         <Form title={COPY.title}>
           <Field
             isEmail
-            isFirst
+            isFirst={TEST_ACCOUNT === null}
             label={COPY.email}
             onChangeText={setEmail}
             onSubmit={({ text }) => setEmail(text)}
@@ -191,7 +193,8 @@ export const SignIn = () => {
           {errorLine}
           <FormButton
             isDisabled={isBusy}
-            label={COPY.continue}
+            isFirst={TEST_ACCOUNT !== null}
+            label={COPY.signIn}
             onPress={() => submitAccount()}
             tone={BUTTON_TONES.primary}
           />

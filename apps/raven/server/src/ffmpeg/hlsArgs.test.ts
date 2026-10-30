@@ -1,4 +1,5 @@
 import {
+  ENCODER_KINDS,
   HLS_COPY_AUDIO_CODECS,
   PLAYBACK_MODES,
   QUALITIES,
@@ -37,7 +38,11 @@ describe('hlsArgs', () => {
     tonemap: false,
     startTime: 0,
     frameRate: 24,
+    burn: null,
   } as const
+  /** A picture subtitle to burn, on a 1080p canvas. */
+  const burnOf = (stream: number) => ({ stream, canvas: { width: 1920, height: 1080 } })
+
   const DIALECT = { segmentClock: SEGMENT_CLOCKS.run, timeBase: DEMUX_TIME_BASES.named } as const
 
   /** The run from `from` of the spike's clip, with what the test sets apart. */
@@ -229,6 +234,57 @@ describe('hlsArgs', () => {
       frameRate: 25,
     })
     expect(args).not.toContain('-ss')
+  })
+
+  it('burns a picture subtitle into a transcode: overlaid on the frame, then scaled with it', () => {
+    const args = argsFor({ from: 0, mode: PLAYBACK_MODES.transcode, burn: burnOf(2) })
+    expect(args).not.toContain('-vf')
+    expect(args).not.toContain('-copyts')
+    expect(args[args.indexOf('-canvas_size') + 1]).toBe('1920x1080')
+    expect(args[args.indexOf('-filter_complex') + 1]).toBe(
+      "[0:V:0][0:s:2]overlay=eof_action=pass,scale=w=-2:h='min(1080,ih)'[vout]",
+    )
+    expect(args[args.indexOf('-map') + 1]).toBe('[vout]')
+    expect(args).not.toContain('0:V:0')
+  })
+
+  it('trims a transport stream before the overlay, so the subtitles keep the file’s clock', () => {
+    const args = argsFor({
+      plan: transcodePlan({ start: 11.44, duration: 51.44, frameRate: 25 }),
+      from: 2,
+      mode: PLAYBACK_MODES.transcode,
+      startTime: 11.377,
+      frameRate: 25,
+      seekKeyframes: [11.44, 21.44, 31.44, 41.44],
+      burn: burnOf(0),
+    })
+    // On a clock from the keyframe it sought to, 21.42: the boundary is 2 s on, and so is the audio.
+    expect(
+      args.slice(0, args.lastIndexOf('-i') + 2).filter((arg) => arg !== '-hide_banner'),
+    ).toEqual(
+      expect.arrayContaining(['-ss', '10.043', '-canvas_size', '1920x1080', '-itsoffset', '2.000']),
+    )
+    expect(args[args.indexOf('-filter_complex') + 1]).toBe(
+      "[0:V:0]trim=start=2.000[base];[base][0:s:0]overlay=eof_action=pass,scale=w=-2:h='min(1080,ih)'[vout]",
+    )
+    expect(args[args.indexOf('-force_key_frames') + 1]?.split(',')[0]).toBe('2.000')
+    expect(args[args.indexOf('-output_ts_offset') + 1]).toBe('22.42')
+    expect(args).toContain('1:a:1')
+  })
+
+  it('decodes on the CPU to burn under VAAPI, since the overlay works on frames in memory', () => {
+    const args = argsFor({
+      from: 0,
+      mode: PLAYBACK_MODES.transcode,
+      videoCodec: VIDEO_CODECS.h264,
+      encoder: { kind: ENCODER_KINDS.vaapi, device: '/dev/dri/renderD128' },
+      burn: burnOf(1),
+    })
+    expect(args).not.toContain('-hwaccel')
+    expect(args[args.indexOf('-filter_complex') + 1]).toBe(
+      "[0:V:0][0:s:1]overlay=eof_action=pass,scale=w=-2:h='min(1080,ih)',format=nv12,hwupload[vout]",
+    )
+    expect(args[args.indexOf('-c:v') + 1]).toBe('h264_vaapi')
   })
 
   it('maps no audio for a silent file', () => {

@@ -84,7 +84,7 @@ describe('SignIn on a TV', () => {
     await fireEvent(field, NATIVE_EVENTS.endEditing, { nativeEvent: { text: '' } })
     expect(screen.getByLabelText('Email').props.value).toBe('')
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }))
     expect(await screen.findByText('Enter your email and password.')).toBeTruthy()
     expect(mockSignIn).not.toHaveBeenCalled()
   })

@@ -108,6 +108,8 @@ export const HLS_PARAMS = {
   mode: 'mode',
   audio: 'audio',
   quality: 'quality',
+  /** A transcode's picture subtitle (Blu-ray PGS, VobSub) to burn into the picture, by track id. */
+  burn: 'burn',
 } as const
 
 /** How long a segment lasts, in seconds; a remux stretches it to the next keyframe. */

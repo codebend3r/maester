@@ -11,6 +11,7 @@ import {
   SUBTITLE_CHOICES,
   audioOptionsOf,
   audioPlaceFor,
+  filePlaceFor,
   subtitleOptionsOf,
   subtitlePlaceFor,
 } from '@/player/playerTracks'
@@ -68,14 +69,27 @@ describe('the track pickers', () => {
     ])
   })
 
-  it('offers subtitles off, then every track a player can show', () => {
-    expect(subtitleOptionsOf(TRACKS).map(({ key }) => key)).toEqual([
-      SUBTITLE_CHOICES.off,
-      ENGLISH.id,
-      FRENCH.id,
-      SIDECAR.id,
-      UNTAGGED.id,
-    ])
+  it('offers subtitles off, then every text track, and no picture track where the player cannot draw it', () => {
+    expect(
+      subtitleOptionsOf({ tracks: TRACKS, canShowPictures: false }).map(({ key }) => key),
+    ).toEqual([SUBTITLE_CHOICES.off, ENGLISH.id, FRENCH.id, SIDECAR.id, UNTAGGED.id])
+  })
+
+  it("adds the file's picture tracks, in the file's order, where the player draws them", () => {
+    expect(
+      subtitleOptionsOf({ tracks: TRACKS, canShowPictures: true }).map(({ key }) => key),
+    ).toEqual([SUBTITLE_CHOICES.off, ENGLISH.id, PICTURES.id, FRENCH.id, SIDECAR.id, UNTAGGED.id])
+  })
+})
+
+describe('filePlaceFor', () => {
+  it("places a track among the file's own subtitle tracks, text and pictures alike", () => {
+    expect(filePlaceFor({ tracks: TRACKS, subtitle: PICTURES.id })).toBe(1)
+    expect(filePlaceFor({ tracks: TRACKS, subtitle: FRENCH.id })).toBe(2)
+  })
+
+  it('places no sidecar, which the file does not hold', () => {
+    expect(filePlaceFor({ tracks: TRACKS, subtitle: SIDECAR.id })).toBeNull()
   })
 })
 

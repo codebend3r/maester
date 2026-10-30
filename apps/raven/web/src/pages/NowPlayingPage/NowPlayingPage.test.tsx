@@ -74,7 +74,7 @@ describe('NowPlayingBar', () => {
   it('is gone while nothing plays, and on Now Playing itself', () => {
     const { container } = renderWithProviders({ ui: <NowPlayingBar />, route: '/' })
     expect(container).toBeEmptyDOMElement()
-    store().playTracks({ tracks: TRACKS })
+    act(() => store().playTracks({ tracks: TRACKS }))
     cleanup()
     const onPage = renderWithProviders({ ui: <NowPlayingBar />, route: '/now-playing' })
     expect(onPage.container).toBeEmptyDOMElement()

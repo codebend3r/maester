@@ -95,12 +95,28 @@ describe('versionFacts', () => {
 describe('allFileFacts', () => {
   it("lists the file's tracks, then its container, bitrate and size", () => {
     expect(allFileFacts({ media: mediaItem({ size: 2_500_000_000 }), tracks: undefined })).toEqual([
-      { label: 'Video', value: '1080p (H.264)' },
-      { label: 'Audio', value: 'AAC Stereo' },
-      { label: 'Container', value: 'MP4' },
-      { label: 'Bitrate', value: '5.0 Mb/s' },
-      { label: 'Size', value: '2.5 GB' },
+      { label: 'Video', values: ['1080p (H.264)'] },
+      { label: 'Audio', values: ['AAC Stereo'] },
+      { label: 'Container', values: ['MP4'] },
+      { label: 'Bitrate', values: ['5.0 Mb/s'] },
+      { label: 'Size', values: ['2.5 GB'] },
     ])
+  })
+
+  it('lists every audio track, the default first, each by its language and sound', () => {
+    const audio = allFileFacts({
+      media: mediaItem({}),
+      tracks: {
+        audio: [
+          { index: 0, codec: 'ac3', channels: 6, language: 'en', title: null, default: false },
+          { index: 1, codec: 'dts', channels: 7, language: 'ja', title: null, default: true },
+        ],
+        subtitles: [],
+        defaultAudio: 1,
+        frameRate: null,
+      },
+    }).find((fact) => fact.label === 'Audio')
+    expect(audio?.values).toEqual(['Japanese (DTS 7 ch)', 'English (Dolby Digital 5.1)'])
   })
 
   it('leaves out a bitrate the file has not been probed for', () => {

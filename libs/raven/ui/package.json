@@ -23,6 +23,10 @@
       "types": "./dist/styles/designTokens.d.ts",
       "default": "./dist/designTokens.js"
     },
+    "./iconDrawings": {
+      "types": "./dist/components/Icon/drawings.d.ts",
+      "default": "./dist/iconDrawings.js"
+    },
     "./styles.css": "./dist/styles.css"
   },
   "scripts": {
@@ -80,6 +84,17 @@
           "^build",
           "build"
         ]
+      },
+      "test:headless": {
+        "dependsOn": [
+          "^build",
+          "build"
+        ],
+        "inputs": [
+          "default",
+          "^production"
+        ],
+        "cache": true
       }
     },
     "projectType": "library",

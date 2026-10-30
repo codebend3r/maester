@@ -51,6 +51,7 @@ import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import {
   audioTrackOf,
+  burnTrackOf,
   capHeight,
   refuseWhatSettingsTurnOff,
   sizeOnDisk,
@@ -150,6 +151,8 @@ export class HlsController {
    * and a rendition for each text subtitle track. Nothing is converted
    * until a segment is asked for. A remux whose keyframes lie too far
    * apart, or whose video HLS cannot carry, is a 409: transcode it instead.
+   * A transcode may burn a picture subtitle into the picture (`burn`), the
+   * one way a player shows Blu-ray PGS or VobSub over a stream.
    */
   @MediaPlane()
   @Get(routeOf(HLS_PATHS.master))
@@ -158,6 +161,7 @@ export class HlsController {
     @Query(HLS_PARAMS.mode) mode: string | undefined,
     @Query(HLS_PARAMS.audio) audio: string | undefined,
     @Query(HLS_PARAMS.quality) quality: string | undefined,
+    @Query(HLS_PARAMS.burn) burn: string | undefined,
     @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
@@ -172,6 +176,7 @@ export class HlsController {
     const bytes = await sizeOnDisk(file)
     const { tracks } = await this.tracks.tracksFor(file)
     const audioTrack = audioTrackOf({ tracks, audio })
+    const burnTrack = burnTrackOf({ tracks, burn, mode: streamMode })
 
     const output = await this.ffmpeg.probeJson(file.path)
     const probe = parseProbe(output)
@@ -218,6 +223,10 @@ export class HlsController {
         quality: playback.quality,
         bitrate,
         tonemap,
+        burn:
+          burnTrack === null
+            ? null
+            : { stream: burnTrack, canvas: { width: probe.width, height: probe.height } },
       },
       keyframesFor,
       // Only an account ticket's session has a pass; any other caller's needs no capability.

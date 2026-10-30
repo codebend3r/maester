@@ -1,0 +1,15 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'io.github.codebend3r.raven'
+version = '1.0.0'
+
+android {
+  namespace "io.github.codebend3r.raven.voice"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}

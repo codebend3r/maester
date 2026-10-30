@@ -132,7 +132,7 @@ The CI-built runtime resources alone are sufficient for ordinary desktop setup, 
    runtime="$(xcrun simctl list -j runtimes iOS | jq -r '[.runtimes[] | select(.isAvailable)] | last | .identifier')"
    device="$(xcrun simctl create raven-phone com.apple.CoreSimulator.SimDeviceType.iPhone-17 "$runtime")"
    xcrun simctl boot "$device" && xcrun simctl bootstatus "$device" -b
-   xcrun simctl install "$device" apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
+   xcrun simctl install "$device" apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app
    ```
 
 Then `bun run app:e2e`. A cold Maestro driver can start slowly; set `MAESTRO_DRIVER_STARTUP_TIMEOUT=300000` if it times out. Maestro cannot drive tvOS; `app:e2e:tvos` instead uses XCUITest and the Siri Remote. Android TV uses `app:e2e:android-tv` with Maestro and adb. Stop the fixture server when done.

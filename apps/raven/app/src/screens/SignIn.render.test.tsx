@@ -68,7 +68,7 @@ type SignInWithProps = { email: string; password: string }
 const signInWith = async ({ email, password }: SignInWithProps) => {
   await fireEvent.changeText(screen.getByLabelText('Email'), email)
   await fireEvent.changeText(screen.getByLabelText('Password'), password)
-  await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
+  await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }))
 }
 
 const signInAsViewer = () => signInWith({ email: SESSION.email, password: 'hunter2' })
@@ -135,7 +135,7 @@ describe('SignIn', () => {
     mockSignIn.mockReturnValue(new Promise(() => {}))
     await render(<SignIn />)
     await signInAsViewer()
-    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }))
     expect(mockSignIn).toHaveBeenCalledTimes(1)
   })
 

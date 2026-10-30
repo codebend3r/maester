@@ -73,12 +73,21 @@ export const jumpTargetOf = ({
     .flatMap((section) => section.cards.map((card) => ({ section: section.key, card: card.key })))
     .find(({ card }) => keys.has(card)) ?? null
 
-type OffsetOfRowProps = {
+type RowOffsetsOfProps = {
   rows: readonly GridRow[]
-  index: number
   heightOf: (row: GridRow) => number
 }
 
-/** How far down the list row `index` starts, its rows being of fixed heights. */
-export const offsetOfRow = ({ rows, index, heightOf }: OffsetOfRowProps): number =>
-  rows.slice(0, index).reduce((offset, row) => offset + heightOf(row), 0)
+/**
+ * How far down the list each row starts, its rows being of fixed heights, and after the last
+ * the list's whole height: one more entry than rows, so row `i` runs from entry `i` to `i + 1`.
+ */
+export const rowOffsetsOf = ({ rows, heightOf }: RowOffsetsOfProps): number[] =>
+  rows.reduce(
+    (offsets, row) => {
+      // The array is this call's own, so growing it in place keeps the sum linear.
+      offsets.push((offsets.at(-1) ?? 0) + heightOf(row))
+      return offsets
+    },
+    [0],
+  )

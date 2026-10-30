@@ -17,7 +17,6 @@ export const LOAD_TIMEOUT_MS = 15_000
 export const STALL_REOPEN_MS = 10_000
 
 export const SESSION_COPY = {
-  starting: 'Starting',
   exhausted: "This video didn't start in any of the ways the server offers.",
   noWay: "The server offers no way to play this video here, and won't convert it.",
 } as const
@@ -37,6 +36,7 @@ export const SESSION_EVENTS = {
   dropped: 'dropped',
   timedOut: 'timedOut',
   audioPicked: 'audioPicked',
+  burnPicked: 'burnPicked',
   retried: 'retried',
 } as const
 
@@ -56,6 +56,10 @@ type Ladder = {
   problems: readonly string[]
   /** The spot this way was last opened again from, after the server let go of it; null before. */
   reopenedAt: number | null
+  /** The picture subtitle a transcode burns into the picture, by track id; null for none. */
+  burn: string | null
+  /** The way played before a burn moved to the transcode, which clearing it goes back to. */
+  stepBeforeBurn: number | null
 }
 
 export type SessionState =
@@ -72,6 +76,7 @@ type SessionEvent =
   | { type: typeof SESSION_EVENTS.dropped; attempt: number; at: number }
   | { type: typeof SESSION_EVENTS.timedOut; attempt: number }
   | { type: typeof SESSION_EVENTS.audioPicked; audio: number | null; at: number }
+  | { type: typeof SESSION_EVENTS.burnPicked; burn: string | null; at: number }
   | { type: typeof SESSION_EVENTS.retried }
 
 type FailedWithProps = {
@@ -110,6 +115,8 @@ export const initialSession = ({
         attempt: 0,
         problems,
         reopenedAt: null,
+        burn: null,
+        stepBeforeBurn: null,
       }
 
 /** The way being tried, or null once every way has failed. */
@@ -135,7 +142,37 @@ const sourcing = ({ ladder, step, at }: SourcingProps): SessionState => ({
   attempt: ladder.attempt + 1,
   problems: ladder.problems,
   reopenedAt: step === ladder.step ? ladder.reopenedAt : null,
+  burn: ladder.burn,
+  stepBeforeBurn: ladder.stepBeforeBurn,
 })
+
+type BurnPickedProps = { ladder: Ladder; burn: string | null; at: number }
+
+/**
+ * A picture subtitle picked to burn in, or a burn cleared, from `at`. Only a transcode re-encodes
+ * the picture, so a burn moves to the plan's transcode, remembering the way it played before;
+ * clearing it goes back to that way. A plan with no transcode (transcoding off) burns nothing.
+ */
+const burnPicked = ({ ladder, burn, at }: BurnPickedProps): Ladder | null => {
+  if (burn === ladder.burn) return null
+  if (burn === null) {
+    return {
+      ...ladder,
+      burn: null,
+      step: ladder.stepBeforeBurn ?? ladder.step,
+      stepBeforeBurn: null,
+    }
+  }
+  const transcode = ladder.modes.indexOf(PLAYBACK_MODES.transcode)
+  if (transcode < 0) return null
+  return {
+    ...ladder,
+    burn,
+    step: transcode,
+    stepBeforeBurn: ladder.burn === null ? ladder.step : ladder.stepBeforeBurn,
+    at,
+  }
+}
 
 type StepDownProps = { ladder: Ladder; at: number }
 
@@ -215,6 +252,11 @@ export const sessionReducer = (state: SessionState, event: SessionEvent): Sessio
       if (!isStream(modeOf(state))) return picked
       return sourcing({ ladder: picked, step: state.step, at: event.at })
     }
+    case SESSION_EVENTS.burnPicked: {
+      const moved = burnPicked({ ladder: state, burn: event.burn, at: event.at })
+      if (moved === null) return state
+      return sourcing({ ladder: { ...moved, step: state.step }, step: moved.step, at: event.at })
+    }
     case SESSION_EVENTS.retried:
       if (state.phase !== SESSION_PHASES.refused) return state
       return sourcing({ ladder: state, step: state.step, at: state.at })
@@ -232,7 +274,8 @@ export const sourcedOf = (state: SessionState): Sourced | null =>
     : null
 
 /**
- * The line shown in place of the video: why nothing plays, the refusal, or that it is starting;
+ * The line shown in place of the video: why nothing plays, or the refusal; none while it opens,
+ * which the chrome shows as raven's mark and a spinner (`isOpeningOf`), never in words;
  * null once frames flow.
  */
 export const noticeOf = (state: SessionState): string | null => {
@@ -243,7 +286,6 @@ export const noticeOf = (state: SessionState): string | null => {
       return state.refusal.message
     case SESSION_PHASES.sourcing:
     case SESSION_PHASES.loading:
-      return SESSION_COPY.starting
     case SESSION_PHASES.playing:
       return null
     default: {
@@ -252,6 +294,10 @@ export const noticeOf = (state: SessionState): string | null => {
     }
   }
 }
+
+/** Whether the video is still opening: its source asked for, or handed over and not yet loaded. */
+export const isOpeningOf = (state: SessionState): boolean =>
+  state.phase === SESSION_PHASES.sourcing || state.phase === SESSION_PHASES.loading
 
 type UsePlaybackSessionProps = {
   media: Pick<MediaItem, 'id'>
@@ -299,15 +345,22 @@ export const usePlaybackSession = ({
     const mode = modeOf(state)
     if (state.phase !== SESSION_PHASES.sourcing || mode === null) return () => undefined
     const { at: from } = state
-    sources.source({ media, mode, audio: state.audio }).then(
-      (outcome) => {
-        if (status.isCurrent) dispatch({ type: SESSION_EVENTS.sourced, attempt: asked, outcome })
-      },
-      // `source` answers every request with an outcome; should one still reject, the next way is tried.
-      () => {
-        if (status.isCurrent) dispatch({ type: SESSION_EVENTS.failed, attempt: asked, at: from })
-      },
-    )
+    sources
+      .source({
+        media,
+        mode,
+        audio: state.audio,
+        burn: mode === PLAYBACK_MODES.transcode ? state.burn : null,
+      })
+      .then(
+        (outcome) => {
+          if (status.isCurrent) dispatch({ type: SESSION_EVENTS.sourced, attempt: asked, outcome })
+        },
+        // `source` answers every request with an outcome; should one still reject, the next way is tried.
+        () => {
+          if (status.isCurrent) dispatch({ type: SESSION_EVENTS.failed, attempt: asked, at: from })
+        },
+      )
     return () => {
       status.isCurrent = false
     }

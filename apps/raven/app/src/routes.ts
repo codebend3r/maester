@@ -23,7 +23,11 @@ export const APP_ROUTE_PARAMS = {
   mediaId: 'mediaId',
   query: 'q',
   at: 'at',
+  from: 'from',
 } as const
+
+/** Where `?from=` starts the player: from the very beginning, whatever spot was saved. */
+export const PLAY_FROM = { start: 'start' } as const
 
 /** Each route's name as its navigator knows it: its file under `app/`, without the extension. */
 export const APP_SCREENS = {
@@ -53,6 +57,8 @@ export type RouteTarget =
       mediaId: number
       /** Where to start, in seconds, as Resume says; 0 starts where the server last saved. */
       at: number
+      /** Starts at the very beginning, past any spot the server saved: Play from the beginning. */
+      isFromStart?: boolean
     }
   | {
       kind: typeof ROUTE_TARGETS.library
@@ -99,6 +105,10 @@ export const hrefOf = (target: RouteTarget): Href => {
         params: {
           [APP_ROUTE_PARAMS.mediaId]: String(target.mediaId),
           ...paramOf({ name: APP_ROUTE_PARAMS.at, value: target.at > 0 ? target.at : null }),
+          ...paramOf({
+            name: APP_ROUTE_PARAMS.from,
+            value: target.isFromStart === true ? PLAY_FROM.start : null,
+          }),
         },
       }
     case ROUTE_TARGETS.library:

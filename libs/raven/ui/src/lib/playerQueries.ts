@@ -1,13 +1,8 @@
 import { type QueryStatus, queryOptions } from '@tanstack/react-query'
-import { ACCOUNT_TICKET_SECONDS, type ApiClient, MEDIA_TICKET_RENEW_MS } from '@raven/core'
+import { type ApiClient, TICKET_RENEW_MS, type TicketedOrigin } from '@raven/core'
 import { playerQueryKeys as queryKeys } from '@/lib/playerQueryKeys'
 
-/** Two fifths of an account ticket's life, two of its five minutes, so a renewal lands well inside it. */
-const ACCOUNT_TICKET_RENEW_MS = (ACCOUNT_TICKET_SECONDS * 1000 * 2) / 5
-
-// Legacy tickets last far longer and are renewed as often as account tickets, at no cost.
-const TICKET_REFRESH_MS = Math.min(MEDIA_TICKET_RENEW_MS, ACCOUNT_TICKET_RENEW_MS)
-
+/** How long a refused ticket waits before it is asked for again. */
 const REFUSED_RETRY_MS = 60_000
 
 const QUERY_STATUSES = { error: 'error' } as const satisfies Record<string, QueryStatus>
@@ -15,7 +10,18 @@ const QUERY_STATUSES = { error: 'error' } as const satisfies Record<string, Quer
 /** Keeps a ticket that is already due from being refetched in a tight loop. */
 const MIN_REFRESH_WAIT_MS = 1000
 
-type PlayerQueriesForSubtitlesProps = { id: number; trackId: string; window: number }
+/**
+ * Reads the address and ticket a subtitle fetch takes, for a client with no cookie to send (the
+ * device app); read per fetch, so a ticket is never stale. Null leaves the fetch on the cookie.
+ */
+export type SubtitleAccessReader = () => Promise<TicketedOrigin | null>
+
+type PlayerQueriesForSubtitlesProps = {
+  id: number
+  trackId: string
+  window: number
+  readAccess?: SubtitleAccessReader
+}
 
 export const playerQueriesFor = (api: ApiClient) => ({
   tracks: (id: number) =>
@@ -47,10 +53,10 @@ export const playerQueriesFor = (api: ApiClient) => ({
       refetchInterval: (query) => {
         // A refused fetch, the first included, is retried gently: a relocked library answers 423.
         if (query.state.status === QUERY_STATUSES.error) return REFUSED_RETRY_MS
-        if (query.state.dataUpdatedAt === 0) return TICKET_REFRESH_MS
+        if (query.state.dataUpdatedAt === 0) return TICKET_RENEW_MS
         return Math.max(
           MIN_REFRESH_WAIT_MS,
-          query.state.dataUpdatedAt + TICKET_REFRESH_MS - Date.now(),
+          query.state.dataUpdatedAt + TICKET_RENEW_MS - Date.now(),
         )
       },
       refetchIntervalInBackground: true,
@@ -58,7 +64,10 @@ export const playerQueriesFor = (api: ApiClient) => ({
   subtitles: (input: PlayerQueriesForSubtitlesProps) =>
     queryOptions({
       queryKey: queryKeys.subtitles(input),
-      queryFn: () => api.getSubtitles(input),
+      queryFn: async () => {
+        const { readAccess, ...asked } = input
+        return api.getSubtitles({ ...asked, access: (await readAccess?.()) ?? null })
+      },
       staleTime: Infinity,
       gcTime: 30 * 60 * 1000,
       retry: 1,

@@ -72,8 +72,9 @@ export const PickerList = <K extends string>({
 }
 
 /**
- * What opens a TV picker's list, and the props that draw it: choosing closes the list, and
- * `onOpenChange` hears each open and close.
+ * What opens a TV picker's list, what the control that opens it is called aloud (`pickerLabelOf`),
+ * and the props that draw the list: choosing closes the list, and `onOpenChange` hears each open
+ * and close.
  */
 export const usePickerList = <K extends string>({
   label,
@@ -82,7 +83,7 @@ export const usePickerList = <K extends string>({
   onChoose,
   onOpenChange = NOTHING_ON_OPEN,
   isOverPicture,
-}: PickerProps<K>): { open: () => void; list: PickerListProps<K> } => {
+}: PickerProps<K>): { open: () => void; label: string; list: PickerListProps<K> } => {
   const [isOpen, setIsOpen] = useState(false)
   const setOpen = (isOpening: boolean) => {
     setIsOpen(isOpening)
@@ -90,6 +91,7 @@ export const usePickerList = <K extends string>({
   }
   return {
     open: () => setOpen(true),
+    label: pickerLabelOf({ label, options, value, onChoose }),
     list: {
       label,
       options,
@@ -110,14 +112,14 @@ export const usePickerList = <K extends string>({
  * glass over the video.
  */
 const Picker = <K extends string>(props: PickerProps<K>) => {
-  const { open, list } = usePickerList(props)
+  const { open, label, list } = usePickerList(props)
   const ground = { isOverPicture: props.isOverPicture }
   const styles = useStyles(ground)
   const plateStyles = usePlateStyles(ground)
   return (
     <>
       <Pressable
-        accessibilityLabel={pickerLabelOf(props)}
+        accessibilityLabel={label}
         accessibilityRole="button"
         onPress={open}
         style={({ focused }) => [plateStyles.plate, styles.chip, focused && plateStyles.focused]}

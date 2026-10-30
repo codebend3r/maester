@@ -17,8 +17,9 @@ import { StyleSheet } from 'react-native'
 import type { ReactVideoProps } from 'react-native-video'
 import { SelectedTrackType } from 'react-native-video'
 
-import { PLAYER_COPY } from '@/layouts/playerKit'
-import { REMOTE_KEYS } from '@/layouts/remoteKeys'
+import { PLAYER_COPY, SKIP_SECONDS } from '@/layouts/playerKit'
+import { APP_ROUTES, PLAY_FROM } from '@/routes'
+import { KEY_ACTIONS, LONG_PRESS_NAMES, REMOTE_KEYS } from '@/layouts/remoteKeys'
 import type * as PlatformModule from '@/platform/platform'
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { Player } from '@/screens/Player'
@@ -33,9 +34,13 @@ import { NAS } from '@/test/homeServer'
 import {
   BUSBOYS_DUAL,
   BUSBOYS_MP4,
+  BUSBOYS_PICTURES,
   BUSBOYS_UNSUBTITLED,
   CUE_TEXT,
   DUAL_COMMENTARY,
+  GOOD_NEWS_MP4,
+  HALF_LOOP_MP4,
+  PICTURE_LANGUAGE,
   playerApi,
 } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
@@ -43,12 +48,13 @@ import { appThemeOf } from '@/theme/appTheme'
 import type * as NavigationFocus from '@/test/navigationFocus'
 import { askedFor, resetTestScreen } from '@/test/navigationFocus'
 import type * as RemoteModule from '@/test/tvRemote'
-import { pressRemote } from '@/test/tvRemote'
+import { holdRemote, pressRemote } from '@/test/tvRemote'
 import type * as VideoMockModule from '@/test/videoMock'
 import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/videoMock'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockBack = jest.fn()
+const mockReplace = jest.fn()
 const mockParams = jest.fn((): Record<string, string> => ({
   [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_UNSUBTITLED.id),
 }))
@@ -82,7 +88,7 @@ jest.mock('react-native-video', () =>
   jest.requireActual<typeof VideoMockModule>('@/test/videoMock').videoModuleMock(),
 )
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), back: mockBack }),
+  useRouter: () => ({ push: jest.fn(), back: mockBack, replace: mockReplace }),
   useLocalSearchParams: () => mockParams(),
 }))
 const mockApi = jest.fn((_server: AppServer) =>
@@ -205,6 +211,7 @@ describe('Player on Android TV', () => {
     usePlayerPrefs.setState({
       subtitles: { on: false, language: null },
       controlsLingerSeconds: CONTROLS_LINGER_SECONDS.initial,
+      autoplay: true,
     })
     const server = { ...NAS, id: `5b2d1f0e-8c3a-4f6b-9d7e-${String(++servers).padStart(12, '0')}` }
     useActiveServer.setState({ servers: [server], activeId: server.id })
@@ -303,22 +310,20 @@ describe('Player on Android TV', () => {
     expect(screen.queryByText(CUE_TEXT)).toBeNull()
   })
 
-  it("keeps its chips, Play, Back and the lists they open the player's dark glass under Patina", async () => {
+  it("keeps its icon buttons and the lists they open the player's dark glass under Patina", async () => {
     usePlayerPrefs.setState({ subtitles: { on: true, language: null } })
     useAppPrefs.setState({ theme: PATINA })
     const { palette, overPicture } = appThemeOf(PATINA)
     await playing({ id: BUSBOYS_MP4.id })
 
     const chip = screen.getByRole('button', { name: 'Subtitles: English' })
-    expect(styleOf(chip)?.backgroundColor ?? null).toBe(overPicture.quiet)
-    expect(styleOf(within(chip).getByText('English'))?.color ?? null).toBe(overPicture.text)
-    expect(styleOf(within(chip).getByText('Subtitles'))?.color ?? null).toBe(overPicture.muted)
     expect(overPicture.quiet).not.toBe(palette.quiet)
     expect(overPicture.text).not.toBe(palette.text)
-    ;['Pause', PLAYER_COPY.leave].forEach((name) => {
+    ;['Subtitles: English', 'Pause', PLAYER_COPY.leave].forEach((name) => {
       const plate = screen.getByRole('button', { name })
       expect(styleOf(plate)?.backgroundColor ?? null).toBe(overPicture.quiet)
-      expect(styleOf(within(plate).getByText(name))?.color ?? null).toBe(overPicture.text)
+      // An icon, not words: the label is said, never drawn.
+      expect(within(plate).queryByText(name)).toBeNull()
     })
     expect(styleOf(screen.getByText(formatDuration(BUSBOYS_MP4.duration)))?.color ?? null).toBe(
       overPicture.text,
@@ -441,5 +446,148 @@ describe('Player on Android TV', () => {
     expect(mockBack).toHaveBeenCalled()
     unmount()
     await waitFor(() => expect(savedSpots().at(-1)).toEqual({ position: 42, audio: AUDIO_PLAYED }))
+  })
+
+  /** Where the next episode's play goes, in the current one's place. */
+  const nextHref = {
+    pathname: APP_ROUTES.play,
+    params: { [APP_ROUTE_PARAMS.mediaId]: String(HALF_LOOP_MP4.id) },
+  }
+
+  it("offers an episode's next on Next, which plays it in this one's place", async () => {
+    await playing({ id: GOOD_NEWS_MP4.id })
+    const next = await screen.findByRole('button', {
+      name: `${PLAYER_COPY.next} S01E02 Half Loop`,
+    })
+    await fireEvent.press(next)
+    expect(mockReplace).toHaveBeenCalledWith(nextHref)
+    expect(mockBack).not.toHaveBeenCalled()
+  })
+
+  it('plays the next episode by itself once this one ends, while autoplay is on', async () => {
+    const props = await playing({ id: GOOD_NEWS_MP4.id })
+    await screen.findByRole('button', { name: `${PLAYER_COPY.next} S01E02 Half Loop` })
+    if (props.onEnd === undefined) throw new Error('The player hears no end')
+    await act(async () => props.onEnd?.())
+    expect(mockReplace).toHaveBeenCalledTimes(1)
+    expect(mockReplace).toHaveBeenCalledWith(nextHref)
+  })
+
+  it('waits on Next at the end with autoplay off', async () => {
+    usePlayerPrefs.setState({ autoplay: false })
+    const props = await playing({ id: GOOD_NEWS_MP4.id })
+    await screen.findByRole('button', { name: `${PLAYER_COPY.next} S01E02 Half Loop` })
+    await act(async () => props.onEnd?.())
+    expect(mockReplace).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: PLAYER_COPY.play })).toBeTruthy()
+  })
+
+  it("offers nothing after a show's last episode, nor after a film", async () => {
+    await playing({ id: HALF_LOOP_MP4.id })
+    await untilIdle(shown.client)
+    expect(screen.queryByRole('button', { name: /^Next episode/u })).toBeNull()
+    expect(
+      mockServer.heard.some(({ path }) =>
+        path.startsWith(
+          pathFor({ path: APP_CLIENT_CALLS.nextInSession.path, id: HALF_LOOP_MP4.id }),
+        ),
+      ),
+    ).toBe(true)
+    await cleanup()
+    mockServer.heard = []
+    await playing({ id: BUSBOYS_UNSUBTITLED.id })
+    await untilIdle(shown.client)
+    expect(screen.queryByRole('button', { name: /^Next episode/u })).toBeNull()
+    expect(
+      mockServer.heard.some(({ path }) =>
+        path.startsWith(
+          pathFor({ path: APP_CLIENT_CALLS.nextInSession.path, id: BUSBOYS_UNSUBTITLED.id }),
+        ),
+      ),
+    ).toBe(false)
+  })
+
+  it('keeps the controls up while right is held, and lets them linger once it comes up', async () => {
+    const props = await playing({ id: BUSBOYS_UNSUBTITLED.id })
+    await moveVideoTo({ props, seconds: 100 })
+    // A hold seeks from the line, which has the focus as the controls appear.
+    await fireEvent(scrubber(), NATIVE_EVENTS.focus)
+    await holdRemote({ key: LONG_PRESS_NAMES.longRight, eventKeyAction: KEY_ACTIONS.down })
+    // The linger goes short only once the key is down, so nothing can fade before the hold.
+    await act(async () => usePlayerPrefs.setState({ controlsLingerSeconds: BRIEF_LINGER_SECONDS }))
+    await new Promise<void>((resolve) =>
+      setTimeout(() => resolve(), BRIEF_LINGER_SECONDS * 1000 * 3),
+    )
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
+    await holdRemote({ key: LONG_PRESS_NAMES.longRight, eventKeyAction: KEY_ACTIONS.up })
+    expect(drawnVideo.seek).toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull())
+  })
+
+  it('says the time of day and how the video plays in the top right', async () => {
+    await playing({ id: BUSBOYS_UNSUBTITLED.id })
+    const corner = screen.getByLabelText(new RegExp(`, ${PLAYER_COPY.modes.direct}$`, 'u'))
+    expect(corner.props.accessibilityLabel).toMatch(/^\d{1,2}:\d{2}/u)
+  })
+
+  /** What the middle of the picture says now, as it is read out. */
+  const centre = (label: string) =>
+    screen
+      .queryAllByLabelText(label)
+      .filter((node) => node.props.accessibilityLiveRegion === 'polite')
+
+  it('says in the middle what each press did: a skip that fades, the pause while paused, then play', async () => {
+    const props = await playing({ id: BUSBOYS_UNSUBTITLED.id })
+    await moveVideoTo({ props, seconds: 100 })
+    await fireEvent(scrubber(), NATIVE_EVENTS.focus)
+    await pressRemote({ key: REMOTE_KEYS.right })
+    expect(centre(PLAYER_COPY.forward(SKIP_SECONDS))).toHaveLength(1)
+    await waitFor(() => expect(centre(PLAYER_COPY.forward(SKIP_SECONDS))).toHaveLength(0), {
+      timeout: 3000,
+    })
+
+    await pressRemote({ key: REMOTE_KEYS.playPause })
+    expect(centre(PLAYER_COPY.paused)).toHaveLength(1)
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 1200))
+    expect(centre(PLAYER_COPY.paused)).toHaveLength(1)
+
+    await pressRemote({ key: REMOTE_KEYS.playPause })
+    expect(centre(PLAYER_COPY.paused)).toHaveLength(0)
+    expect(centre(PLAYER_COPY.play)).toHaveLength(1)
+    await pressRemote({ key: REMOTE_KEYS.rewind })
+    expect(centre(PLAYER_COPY.back(SKIP_SECONDS))).toHaveLength(1)
+  })
+
+  it("opens under raven's mark and a spinner, with no words on screen, until the video loads", async () => {
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_UNSUBTITLED.id) })
+    const props = await loadedVideo()
+    expect(screen.getByRole('progressbar', { name: PLAYER_COPY.opening })).toBeTruthy()
+    expect(screen.queryByText('Starting')).toBeNull()
+    await startVideo({ props, duration: BUSBOYS_MP4.duration ?? 0 })
+    expect(screen.queryByRole('progressbar', { name: PLAYER_COPY.opening })).toBeNull()
+  })
+
+  it('starts at the very beginning when asked to, past the spot the server saved', async () => {
+    await renderPlayer({
+      [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_UNSUBTITLED.id),
+      [APP_ROUTE_PARAMS.from]: PLAY_FROM.start,
+    })
+    const props = await loadedVideo()
+    expect(BUSBOYS_UNSUBTITLED.position).toBeGreaterThan(0)
+    expect(props.source?.startPosition).toBe(0)
+  })
+
+  it("offers the file's picture subtitles in direct play and hands the pick to ExoPlayer to draw", async () => {
+    const props = await playing({ id: BUSBOYS_PICTURES.id })
+    expect(props.selectedTextTrack).toEqual({ type: SelectedTrackType.DISABLED })
+    await fireEvent.press(screen.getByRole('button', { name: 'Subtitles: Off' }))
+    const list = screen.getByLabelText(PLAYER_COPY.subtitles)
+    const picture = within(list)
+      .getAllByRole('button')
+      .find((option) => String(option.props.accessibilityLabel).startsWith(PICTURE_LANGUAGE))
+    if (picture === undefined) throw new Error('The picture track is not offered')
+    await fireEvent.press(picture)
+    expect(videoProps().selectedTextTrack).toEqual({ type: SelectedTrackType.INDEX, value: 1 })
   })
 })

@@ -16,12 +16,17 @@ import { touchPicker } from '@/layouts/Picker.touch'
 import { focusShelf } from '@/layouts/Shelf.focus'
 import { touchShelf } from '@/layouts/Shelf.touch'
 import { touchForm } from '@/layouts/Form.touch'
+import { focusLoading } from '@/layouts/Loading.focus'
+import { touchLoading } from '@/layouts/Loading.touch'
 import { touchPlayerChrome } from '@/layouts/PlayerChrome.touch'
 import type { PlayerChromeKit } from '@/layouts/playerKit'
 import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
 import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 
 export { BUTTON_TONES } from '@/layouts/formKit'
+
+/** What a page shows while it loads: the mark and a spinner, with the way back under the thumb. */
+export const { Loading } = Platform.isTV ? focusLoading : touchLoading
 
 /** The form a screen asks for: driven by focus on a TV, by touch everywhere else. */
 export const { Form, Field, FormButton, useFormStyles } = Platform.isTV ? focusForm : touchForm
@@ -70,5 +75,9 @@ const PLAYER_CHROMES: Record<AppPlatform, PlayerChromeKit> = {
   [APP_PLATFORMS.androidTv]: dpadPlayerChrome,
 }
 
-/** The player's controls, and whether raven draws the subtitles under them, for this device. */
-export const { PlayerChrome, shouldDrawCaptions } = PLAYER_CHROMES[DEVICE_PLATFORM]
+/**
+ * The player's controls, whether raven draws the subtitles under them, and whether the player
+ * draws a file's picture subtitles itself, for this device.
+ */
+export const { PlayerChrome, shouldDrawCaptions, canDrawPictureSubtitles } =
+  PLAYER_CHROMES[DEVICE_PLATFORM]

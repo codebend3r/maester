@@ -58,7 +58,14 @@ def feature_for(pr: dict) -> dict:
     if match:
         return match
     title = TITLE_PREFIX.sub("", pr["title"])
-    return {"name": title[:1].upper() + title[1:], "summary": "", "branches": (), "stories": []}
+    return {
+        "name": title[:1].upper() + title[1:],
+        "summary": "",
+        "branches": (),
+        "stories": [],
+        # Named after the pull request, so its project follows the title when that changes.
+        "own": True,
+    }
 
 
 def status_for(pr: dict) -> str | None:
@@ -85,9 +92,35 @@ class Projects:
         self.by_title = {p["title"]: p for p in listed["projects"]}
         self.details: dict[int, dict] = {}
 
-    def ensure(self, feature: dict) -> dict | None:
-        """The feature's project, made or reopened if need be. None on a dry run that would make it."""
+    def holder_of(self, url: str) -> dict | None:
+        """The project already holding the item at `url`: a PR's own project under an earlier title."""
+        return next(
+            (
+                project
+                for project in self.by_title.values()
+                if not project.get("planned") and url in self.detail(project["number"])["items"]
+            ),
+            None,
+        )
+
+    def rename(self, project: dict, title: str) -> dict:
+        print(f"~ project {project['title']!r} → {title!r}")
+        if not self.dry_run:
+            gh("project", "edit", str(project["number"]), "--owner", OWNER, "--title", title)
+        del self.by_title[project["title"]]
+        self.by_title[title] = project | {"title": title}
+        return self.by_title[title]
+
+    def ensure(self, feature: dict, pr_url: str | None = None) -> dict | None:
+        """The feature's project, made or reopened if need be. None on a dry run that would make it.
+
+        A pull request's own project is named after its title, so when the title changes the
+        project already holding the pull request is renamed, never a second one made.
+        """
         project = self.by_title.get(feature["name"])
+        if project is None and feature.get("own") and pr_url:
+            held = self.holder_of(pr_url)
+            project = self.rename(held, feature["name"]) if held else None
         if project and project.get("planned"):
             return None
         if project is None:
@@ -147,7 +180,7 @@ def sync_pr(projects: Projects, pr: dict) -> None:
     if status is None:
         return
     feature = feature_for(pr)
-    project = projects.ensure(feature)
+    project = projects.ensure(feature, pr["url"])
     if project is None:
         print(f"+ {feature['name']}: #{pr['number']} → {status}")
         return

@@ -2,12 +2,22 @@ import type { ReactNode } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { Icon } from '@/layouts/Icon'
 import { Text } from '@/layouts/Text'
+import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
-import type { EpisodeRow, ItemHero, ItemPage, PersonCard, VersionRow } from '@/queries/itemPage'
+import {
+  ART_PLACES,
+  type EpisodeRow,
+  type ItemHero,
+  type ItemPage,
+  type PersonCard,
+  type VersionRow,
+} from '@/queries/itemPage'
 import { CardPicture } from '@/layouts/Card'
 import { TouchBack } from '@/layouts/TouchBack'
 import { TouchCard } from '@/layouts/TouchCard'
+import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import {
   ITEM_HEADINGS,
@@ -26,7 +36,10 @@ import {
 import { isTablet } from '@/layouts/screenSizes'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
-import { themedStyles } from '@/theme/useTheme'
+import { themedStyles, useTheme } from '@/theme/useTheme'
+
+/** How tall a show's title art stands over an episode's name. */
+const LOGO_HEIGHT = 56
 
 /** How wide the heading's picture stands: a poster, or an episode's wider still. */
 const HERO_WIDTHS = {
@@ -68,11 +81,13 @@ const Heading = ({ title }: HeadingProps) => {
 
 type ActionButtonProps = { action: ItemAction }
 
-/** Play, filled as the one action the page is for, or a mark, ticked while it is on. */
+/** Play, filled as the one action the page is for, a mark, filled while it is on, or a link up: its icon with its few words. */
 const ActionButton = ({ action }: ActionButtonProps) => {
   const styles = useStyles()
   const toneStyles = useToneStyles()
+  const palette = useTheme((theme) => theme.palette)
   const look = actionLookOf(action)
+  const colour = look.tone === BUTTON_TONES.primary ? palette.onAccent : palette.text
   return (
     <Pressable
       accessibilityLabel={action.label}
@@ -85,7 +100,10 @@ const ActionButton = ({ action }: ActionButtonProps) => {
         pressed && styles.pressed,
       ]}
     >
-      <Text style={[styles.actionLabel, toneStyles[look.tone].label]}>{look.text}</Text>
+      <Icon colour={colour} name={look.icon} size={SIZES.textLg} />
+      {look.text !== null && (
+        <Text style={[styles.actionLabel, toneStyles[look.tone].label]}>{look.text}</Text>
+      )}
     </Pressable>
   )
 }
@@ -105,9 +123,9 @@ const ProgressLine = ({ progress }: ProgressLineProps) => {
   )
 }
 
-type HeroProps = { hero: ItemHero; actions: ItemAction[] }
+type HeroProps = { hero: ItemHero; actions: ItemAction[]; links: ItemAction[] }
 
-const Hero = ({ hero, actions }: HeroProps) => {
+const Hero = ({ hero, actions, links }: HeroProps) => {
   const styles = useStyles()
   const { width, height } = useWindowDimensions()
   const widths = isTablet({ width, height }) ? HERO_WIDTHS.tablet : HERO_WIDTHS.phone
@@ -119,10 +137,31 @@ const Hero = ({ hero, actions }: HeroProps) => {
       <View style={[styles.headRow, isWide && styles.headRowWide]}>
         <CardPicture card={heroPictureOf(hero)} width={widths[hero.poster.shape]} />
         <View style={styles.words}>
+          {hero.logo?.place === ART_PLACES.over && (
+            <TitleArt
+              height={LOGO_HEIGHT}
+              logo={hero.logo.picture}
+              maxWidth={width}
+              name={hero.eyebrow ?? hero.title}
+              textStyle={styles.eyebrow}
+            />
+          )}
           {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
-          <Text accessibilityRole="header" style={styles.title}>
-            {hero.title}
-          </Text>
+          {hero.logo?.place === ART_PLACES.title ? (
+            <View accessibilityLabel={hero.title} accessibilityRole="header" accessible>
+              <TitleArt
+                height={LOGO_HEIGHT}
+                logo={hero.logo.picture}
+                maxWidth={width}
+                name={hero.title}
+                textStyle={styles.title}
+              />
+            </View>
+          ) : (
+            <Text accessibilityRole="header" style={styles.title}>
+              {hero.title}
+            </Text>
+          )}
           {hero.byline !== null && <Text style={styles.byline}>{hero.byline}</Text>}
           {facts !== '' && <Text style={styles.small}>{facts}</Text>}
           {hero.progress !== null && <ProgressLine progress={hero.progress} />}
@@ -133,8 +172,19 @@ const Hero = ({ hero, actions }: HeroProps) => {
           <ActionButton key={action.key} action={action} />
         ))}
       </View>
-      {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
-      {hero.summary !== null && <Text style={styles.summary}>{hero.summary}</Text>}
+      {links.length > 0 && (
+        <View style={styles.actions}>
+          {links.map((action) => (
+            <ActionButton key={action.key} action={action} />
+          ))}
+        </View>
+      )}
+      {(hero.tagline !== null || hero.summary !== null) && (
+        <View style={styles.synopsis}>
+          {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
+          {hero.summary !== null && <Text style={styles.summary}>{hero.summary}</Text>}
+        </View>
+      )}
     </View>
   )
 }
@@ -149,7 +199,7 @@ const FileFacts = ({ facts }: FileFactsProps) => {
       {facts.map((fact) => (
         <View key={fact.label} style={styles.fact}>
           <Text style={styles.factLabel}>{fact.label}</Text>
-          <Text style={styles.factValue}>{fact.value}</Text>
+          <Text style={styles.factValue}>{fact.values.join(', ')}</Text>
         </View>
       ))}
     </View>
@@ -325,7 +375,7 @@ const Top = ({ backdrop, onBack }: TopProps) => {
  * episodes, and the cast. It scrolls as one page, clear of the side insets held sideways. The
  * marks are drawn at once and Play once it is known, as on the web.
  */
-const ItemLayout = ({ page, actions, onOpen, onBack }: ItemLayoutProps) => {
+const ItemLayout = ({ page, actions, links, onOpen, onBack }: ItemLayoutProps) => {
   const styles = useStyles()
   const insets = useSafeAreaInsets()
   const gutters = useGutters()
@@ -337,7 +387,7 @@ const ItemLayout = ({ page, actions, onOpen, onBack }: ItemLayoutProps) => {
     >
       <Top backdrop={page.hero.backdrop} onBack={onBack} />
       <View style={padded}>
-        <Hero actions={actions} hero={page.hero} />
+        <Hero actions={actions} hero={page.hero} links={links} />
       </View>
       {page.file.length > 0 && (
         <View style={padded}>
@@ -407,13 +457,23 @@ const useStyles = themedStyles((colours) =>
     actions: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space1 },
     action: {
       minHeight: SIZES.fieldHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
       justifyContent: 'center',
+      gap: SIZES.space1,
       paddingHorizontal: SIZES.space3,
       borderRadius: SIZES.radius,
       borderWidth: SIZES.focusRing,
     },
     actionLabel: { fontSize: SIZES.text, fontWeight: 'bold' },
     pressed: { opacity: OPACITIES.pressed },
+    // The raised surface under the words, so they read over the backdrop in every theme.
+    synopsis: {
+      gap: SIZES.space2,
+      padding: SIZES.space3,
+      borderRadius: SIZES.radius,
+      backgroundColor: colours.raised,
+    },
     tagline: { color: colours.text, fontSize: SIZES.text, fontStyle: 'italic' },
     summary: {
       color: colours.text,

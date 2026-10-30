@@ -5,3 +5,9 @@
 /.expo/
 /node_modules/
 /expo-env.d.ts
+
+# A local module's Gradle output
+/modules/*/android/build/
+
+# The test account a local build may open its sign-in with (see build:android-tv:test-account)
+/.env.test-account

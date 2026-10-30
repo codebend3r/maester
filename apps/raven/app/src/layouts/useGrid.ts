@@ -9,7 +9,7 @@ import {
   gridRowsOf,
   isBucket,
   jumpTargetOf,
-  offsetOfRow,
+  rowOffsetsOf,
 } from '@/layouts/gridRows'
 import { useReduceMotion } from '@/stores/reduceMotion'
 
@@ -33,25 +33,28 @@ export const useGrid = ({ sections, columnsOf, heightOf, top }: UseGridProps) =>
   const pending = useRef<string | null>(null)
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set())
   const rows = gridRowsOf({ sections, open, columnsOf })
+  // Where each row sits, so a jump scrolls straight to a row the list has not drawn yet.
+  const offsets = rowOffsetsOf({ rows, heightOf })
 
-  type ScrollToProps = { card: string; shown: readonly GridRow[] }
-
-  const scrollTo = ({ card, shown }: ScrollToProps): boolean => {
-    const index = shown.findIndex(
+  const scrollTo = (card: string): boolean => {
+    const index = rows.findIndex(
       (row) => row.kind === GRID_ROWS.cards && row.cards.some(({ key }) => key === card),
     )
     const shownList = list.current
     if (index === -1 || shownList === null) return false
-    shownList.scrollToOffset({
-      offset: top + offsetOfRow({ rows: shown, index, heightOf }),
-      animated: !isReduced,
-    })
+    shownList.scrollToOffset({ offset: top + (offsets[index] ?? 0), animated: !isReduced })
     return true
+  }
+
+  /** Each row's place, for a list that draws only the rows near the screen. */
+  const getItemLayout = (_: unknown, index: number) => {
+    const offset = offsets[index] ?? 0
+    return { index, offset: top + offset, length: (offsets[index + 1] ?? offset) - offset }
   }
 
   useEffect(() => {
     const card = pending.current
-    if (card !== null && scrollTo({ card, shown: rows })) pending.current = null
+    if (card !== null && scrollTo(card)) pending.current = null
   })
 
   const toggle = (key: string) =>
@@ -65,7 +68,7 @@ export const useGrid = ({ sections, columnsOf, heightOf, top }: UseGridProps) =>
   const jumpTo = (keys: ReadonlySet<string>): string | null => {
     const target = jumpTargetOf({ sections, keys })
     if (target === null) return null
-    if (scrollTo({ card: target.card, shown: rows })) return target.card
+    if (scrollTo(target.card)) return target.card
     const section = sections.find(({ key }) => key === target.section)
     if (section !== undefined && isBucket(section)) {
       pending.current = target.card
@@ -74,5 +77,5 @@ export const useGrid = ({ sections, columnsOf, heightOf, top }: UseGridProps) =>
     return target.card
   }
 
-  return { list, rows, toggle, jumpTo }
+  return { list, rows, toggle, jumpTo, getItemLayout }
 }

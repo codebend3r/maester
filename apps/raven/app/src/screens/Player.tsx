@@ -1,13 +1,18 @@
 import {
   ACCESS_REFUSALS,
   ITEM_IMAGE_KINDS,
+  ITEM_TYPES,
+  PLAYBACK_MODES,
   type MediaItem,
   type MediaTracks,
   type PlaybackMode,
   type PlaybackPolicy,
   ROUTE_STATES,
+  SESSION_KINDS,
   type SubtitleTrack,
+  type ViewingSession,
   activeCues,
+  episodeCode,
   mediaLabel,
   resumeAtFor,
   routeIdOf,
@@ -31,8 +36,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { SelectedTrackType, type VideoRef } from 'react-native-video'
 
-import { PlayerChrome, shouldDrawCaptions } from '@/layouts'
-import type { VideoSurface } from '@/layouts/playerKit'
+import { Loading, PlayerChrome, canDrawPictureSubtitles, shouldDrawCaptions } from '@/layouts'
+import { NO_HEADING } from '@/layouts/playerHeading'
+import { PLAYER_COPY, type VideoSurface } from '@/layouts/playerKit'
 import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
 import { planFor } from '@/platform/playbackPlan'
 import { mediaSourcesFor } from '@/player/mediaSources'
@@ -49,6 +55,8 @@ import {
   SUBTITLE_CHOICES,
   audioOptionsOf,
   audioPlaceFor,
+  filePlaceFor,
+  isPictureSubtitle,
   subtitleOptionsOf,
   subtitlePlaceFor,
 } from '@/player/playerTracks'
@@ -56,14 +64,16 @@ import {
   SESSION_EVENTS,
   SESSION_PHASES,
   hasWayBelow,
+  isOpeningOf,
   modeOf,
   noticeOf,
   sourcedOf,
   usePlaybackSession,
 } from '@/player/usePlaybackSession'
 import { imageOf } from '@/queries/cards'
+import { usePlayerHeading } from '@/queries/usePlayerHeading'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
-import { APP_ROUTE_PARAMS, secondsOf } from '@/routes'
+import { APP_ROUTE_PARAMS, PLAY_FROM, ROUTE_TARGETS, hrefOf, secondsOf } from '@/routes'
 import { useAppPrefs } from '@/stores/appPrefs'
 
 const COPY = {
@@ -74,10 +84,21 @@ const COPY = {
 /** How often the player says where it is, in milliseconds: often enough for a smooth clock. */
 const PROGRESS_EVERY_MS = 250
 
+/** An episode rolls on through its show, so its next is the show's next in turn. */
+const SHOW_SESSION = { kind: SESSION_KINDS.show } as const satisfies ViewingSession
+
+/** "Next episode, S01E03 Half Loop": what the Next button is called aloud. */
+const nextLabelOf = (next: MediaItem): string =>
+  [PLAYER_COPY.next, next.item === null ? null : episodeCode(next.item), next.title]
+    .filter((part): part is string => part !== null)
+    .join(' ')
+
 type CaptionsForProps = {
   mode: PlaybackMode | null
   tracks: MediaTracks | null
   subtitle: string | null
+  /** Whether the server burns the picked picture subtitle into the picture, which then draws it. */
+  isBurning: boolean
 }
 
 /**
@@ -90,13 +111,33 @@ const captionsFor = ({
   mode,
   tracks,
   subtitle,
+  isBurning,
 }: CaptionsForProps): {
   cueTrack: SubtitleTrack | null
   textTrack: VideoSurface['selectedTextTrack']
 } => {
+  if (isBurning) return { cueTrack: null, textTrack: { type: SelectedTrackType.DISABLED } }
+  const picked = tracks?.subtitles.find((track) => track.id === subtitle) ?? null
+  // A picture track is the player's to draw, from the file it plays: raven has no text to draw.
+  if (
+    canDrawPictureSubtitles &&
+    mode === PLAYBACK_MODES.direct &&
+    tracks !== null &&
+    picked !== null &&
+    isPictureSubtitle(picked)
+  ) {
+    const place = filePlaceFor({ tracks, subtitle: picked.id })
+    return {
+      cueTrack: null,
+      textTrack:
+        place === null
+          ? { type: SelectedTrackType.DISABLED }
+          : { type: SelectedTrackType.INDEX, value: place },
+    }
+  }
   if (shouldDrawCaptions) {
     return {
-      cueTrack: tracks?.subtitles.find((track) => track.supported && track.id === subtitle) ?? null,
+      cueTrack: picked !== null && picked.supported ? picked : null,
       textTrack: { type: SelectedTrackType.DISABLED },
     }
   }
@@ -120,22 +161,52 @@ type PlayingProps = {
   summary: string | null
   policy: PlaybackPolicy
   at: number
+  /** Starts at the very beginning, past any spot the server saved. */
+  isFromStart: boolean
   session: AppQueries
   onBack: () => void
+  /** Plays another video in this one's place. */
+  onPlayNext: (next: MediaItem) => void
 }
 
 /**
  * One video down its plan's ladder, under the platform's chrome: the session asks for each way's
  * source and steps down from the spot when one fails, the player's events drive the shared
- * video state, and that state drives the progress the server hears.
+ * video state, and that state drives the progress the server hears. An episode's next in its
+ * show is on the chrome's Next, and plays by itself once this one ends while autoplay is on.
  */
-const Playing = ({ media, tracks, summary, policy, at, session, onBack }: PlayingProps) => {
+const Playing = ({
+  media,
+  tracks,
+  summary,
+  policy,
+  at,
+  isFromStart,
+  session,
+  onBack,
+  onPlayNext,
+}: PlayingProps) => {
   const queryClient = useQueryClient()
   const audioLanguage = usePlayerPrefs((prefs) => prefs.audioLanguage)
+  const shouldAutoplay = usePlayerPrefs((prefs) => prefs.autoplay)
+  // Only an episode has a next; a film asks nothing.
+  const next = useQuery({
+    ...session.queries.nextInSessionQuery({ id: media.id, session: SHOW_SESSION }),
+    enabled: media.item?.type === ITEM_TYPES.episode,
+  })
+  const nextMedia = next.data ?? null
+  // The end and a press of Next can both ask in one tick; the player leaves once.
+  const hasLeft = useRef(false)
+  const playNext = () => {
+    if (nextMedia === null || hasLeft.current) return
+    hasLeft.current = true
+    onPlayNext(nextMedia)
+  }
   const subtitlePrefs = usePlayerPrefs((prefs) => prefs.subtitles)
   const setAudioLanguage = usePlayerPrefs((prefs) => prefs.setAudioLanguage)
   const setSubtitles = usePlayerPrefs((prefs) => prefs.setSubtitles)
-  const [resumeAt] = useState(() => resumeAtFor({ at, media }))
+  const [resumeAt] = useState(() => (isFromStart ? 0 : resumeAtFor({ at, media })))
+  const heading = usePlayerHeading({ media, session })
   const [subtitle, setSubtitle] = useState(() =>
     preferredSubtitle({ tracks, subtitles: subtitlePrefs }),
   )
@@ -156,13 +227,15 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
   const [video, dispatchVideo] = useReducer(videoReducer, resumeAt, initialVideoState)
   const [isPaused, setPaused] = useState(false)
   const position = useRef(resumeAt)
+  // One per server, so the picture and its subtitles reach the video the same way.
+  const sources = mediaSourcesFor(session.server)
   const { state, dispatch } = usePlaybackSession({
     media,
     modes: plan.modes,
     at: resumeAt,
     audio: preferredAudio({ tracks, language: audioLanguage }),
     problems: plan.problems,
-    sources: mediaSourcesFor(session.server),
+    sources,
     // AVPlayer says it waits at the end of a file too, and the viewer's pause is no stall.
     isWaiting: video.waiting && !isPaused && !video.ended,
     clock: video.time,
@@ -192,9 +265,14 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
     tracks === null || mode === null
       ? null
       : audioPlaceFor({ mode, tracks, audio: ladder?.audio ?? null })
-  const captions = captionsFor({ mode, tracks, subtitle })
+  const burning = ladder?.burn ?? null
+  const captions = captionsFor({ mode, tracks, subtitle, isBurning: burning !== null })
   const { cues } = useTrackCues({
-    video: { api: session.api, mediaId: media.id },
+    video: {
+      api: session.api,
+      mediaId: media.id,
+      readAccess: () => sources.subtitleAccess(media.id),
+    },
     track: captions.cueTrack,
     time: video.time,
     duration,
@@ -267,14 +345,28 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
     dispatch({ type: SESSION_EVENTS.audioPicked, audio: track.index, at: position.current })
   }
 
+  // The player draws a picture track itself only from the file it plays; anywhere else the
+  // server burns it into a transcode.
+  const canDrawPictures = canDrawPictureSubtitles && mode === PLAYBACK_MODES.direct
   const pickSubtitle = (key: string) => {
     const id = key === SUBTITLE_CHOICES.off ? null : key
     const track = tracks?.subtitles.find((each) => each.id === id) ?? null
     setSubtitles({ on: id !== null, language: track?.language ?? subtitlePrefs.language })
     setSubtitle(id)
+    const burn = track !== null && isPictureSubtitle(track) && !canDrawPictures ? track.id : null
+    if (burn !== burning) {
+      dispatch({ type: SESSION_EVENTS.burnPicked, burn, at: position.current })
+    }
   }
 
-  const subtitleOptions = tracks === null ? [] : subtitleOptionsOf(tracks)
+  const subtitleOptions =
+    tracks === null
+      ? []
+      : subtitleOptionsOf({
+          tracks,
+          canShowPictures:
+            canDrawPictures || (ladder?.modes.includes(PLAYBACK_MODES.transcode) ?? false),
+        })
   const surface: VideoSurface | null =
     source === null || attempt === null
       ? null
@@ -285,6 +377,7 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
           onEnd: () => {
             setPaused(true)
             dispatchVideo({ type: VIDEO_EVENTS.ended })
+            if (shouldAutoplay) playNext()
           },
           // The server letting go of the source (a ticket past its life, an HLS session it ended)
           // opens the same way again from the spot; any other failure steps down the ladder.
@@ -339,6 +432,9 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
                 onChoose: pickAudio,
               }
         }
+        mode={mode}
+        next={nextMedia === null ? null : { label: nextLabelOf(nextMedia), onPlay: playNext }}
+        isOpening={isOpeningOf(state)}
         notice={noticeOf(state)}
         onBack={onBack}
         onPictureInPicture={source === null ? null : enterPictureInPicture}
@@ -353,6 +449,7 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
         }
         summary={summary}
         surface={surface}
+        heading={heading}
         title={mediaLabel(media)}
         transport={
           source === null
@@ -367,27 +464,30 @@ const Playing = ({ media, tracks, summary, policy, at, session, onBack }: Playin
 type ReadyPlayerProps = {
   media: MediaItem
   at: number
+  isFromStart: boolean
   session: AppQueries
   onBack: () => void
+  onPlayNext: (next: MediaItem) => void
 }
 
 /** A video once the server's playback settings and its tracks are known. */
-const ReadyPlayer = ({ media, at, session, onBack }: ReadyPlayerProps) => {
+const ReadyPlayer = ({ media, at, isFromStart, session, onBack, onPlayNext }: ReadyPlayerProps) => {
   const policy = usePlaybackPolicy({ queries: session.queries })
   const tracks = useQuery(session.queries.tracksQuery(media.id))
   // Read before the source is handed over, which carries the synopsis on a TV: a source that
   // changes once playing reloads the video.
   const details = useQuery(session.queries.itemQuery(media.item?.id ?? null))
-  const title = mediaLabel(media)
   if (policy === null || tracks.isPending || details.isLoading) {
-    return <Waiting notice={COPY.opening} onBack={onBack} title={title} />
+    return <Loading label={COPY.opening} onBack={onBack} />
   }
   // A file whose tracks or page cannot be read still plays, with no pickers or synopsis.
   return (
     <Playing
       at={at}
+      isFromStart={isFromStart}
       media={media}
       onBack={onBack}
+      onPlayNext={onPlayNext}
       policy={policy}
       session={session}
       summary={details.data?.summary ?? null}
@@ -397,13 +497,12 @@ const ReadyPlayer = ({ media, at, session, onBack }: ReadyPlayerProps) => {
 }
 
 type WaitingProps = {
-  title: string
   notice: string
   onBack: () => void
 }
 
 /** The player's chrome with only a line on it and Back. */
-const Waiting = ({ title, notice, onBack }: WaitingProps) => (
+const Waiting = ({ notice, onBack }: WaitingProps) => (
   <PlayerChrome
     artwork={null}
     audio={null}
@@ -411,10 +510,14 @@ const Waiting = ({ title, notice, onBack }: WaitingProps) => (
     notice={notice}
     onBack={onBack}
     onPictureInPicture={null}
+    heading={NO_HEADING}
+    isOpening={false}
+    mode={null}
+    next={null}
     subtitles={null}
     summary={null}
     surface={null}
-    title={title}
+    title=""
     transport={null}
   />
 )
@@ -423,26 +526,32 @@ type ServerPlayerProps = {
   session: AppQueries
   mediaId: number | null
   at: number
+  isFromStart: boolean
 }
 
-const ServerPlayer = ({ session, mediaId, at }: ServerPlayerProps) => {
+const ServerPlayer = ({ session, mediaId, at, isFromStart }: ServerPlayerProps) => {
   const router = useRouter()
   const onBack = () => router.back()
+  // The next takes this video's place, so Back from it still goes to the page that pressed Play.
+  const onPlayNext = (next: MediaItem) =>
+    router.replace(hrefOf({ kind: ROUTE_TARGETS.play, mediaId: next.id, at: 0 }))
   const page = routeState({ id: mediaId, query: useQuery(session.queries.mediaQuery(mediaId)) })
   switch (page.state) {
     case ROUTE_STATES.missing:
-      return <Waiting notice={COPY.missing} onBack={onBack} title="" />
+      return <Waiting notice={COPY.missing} onBack={onBack} />
     case ROUTE_STATES.error:
-      return <Waiting notice={page.message} onBack={onBack} title="" />
+      return <Waiting notice={page.message} onBack={onBack} />
     case ROUTE_STATES.loading:
-      return <Waiting notice={COPY.opening} onBack={onBack} title="" />
+      return <Loading label={COPY.opening} onBack={onBack} />
     case ROUTE_STATES.ready:
       return (
         <ReadyPlayer
           key={page.data.id}
           at={at}
+          isFromStart={isFromStart}
           media={page.data}
           onBack={onBack}
+          onPlayNext={onPlayNext}
           session={session}
         />
       )
@@ -461,10 +570,17 @@ export const Player = () => {
   const params = useLocalSearchParams()
   const mediaId = routeIdOf(params[APP_ROUTE_PARAMS.mediaId])
   const at = secondsOf(params[APP_ROUTE_PARAMS.at])
+  const isFromStart = params[APP_ROUTE_PARAMS.from] === PLAY_FROM.start
   const session = useAppQueries()
   return (
     session !== null && (
-      <ServerPlayer key={session.server.id} at={at} mediaId={mediaId} session={session} />
+      <ServerPlayer
+        key={session.server.id}
+        at={at}
+        isFromStart={isFromStart}
+        mediaId={mediaId}
+        session={session}
+      />
     )
   )
 }

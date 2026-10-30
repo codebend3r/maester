@@ -1,7 +1,7 @@
 import pytest
 
 from features import FEATURES
-from sync_features import MERGED, OPEN, feature_for, status_for
+from sync_features import MERGED, OPEN, Projects, feature_for, status_for
 
 
 def pr(branch: str = "some-branch", body: str = "", title: str = "MAE: do a thing", **rest):
@@ -43,9 +43,50 @@ class TestFeatureFor:
         assert feature_for(pr(body="Feature: Subtitles"))["name"] == "Subtitles"
 
     def test_unmatched_pr_is_its_own_feature(self):
-        assert (
-            feature_for(pr(title="MAE: auto-approve sign-ups"))["name"] == "Auto-approve sign-ups"
-        )
+        feature = feature_for(pr(title="MAE: auto-approve sign-ups"))
+        assert feature["name"] == "Auto-approve sign-ups"
+        assert feature["own"] is True
+
+    def test_listed_feature_is_not_a_prs_own(self):
+        assert not feature_for(pr("raven-windows-window")).get("own")
+
+
+def projects(titles: dict[str, list[str]]) -> Projects:
+    """A dry-run `Projects` already holding, under each title, the items at the given urls."""
+    made = Projects.__new__(Projects)
+    made.dry_run = True
+    made.by_title = {
+        title: {"number": number, "id": f"id{number}", "title": title}
+        for number, title in enumerate(titles, start=1)
+    }
+    made.details = {
+        number: {"status": {"id": "status"}, "options": {}, "items": {url: {} for url in urls}}
+        for number, urls in enumerate(titles.values(), start=1)
+    }
+    return made
+
+
+class TestEnsure:
+    url = "https://github.com/codebend3r/maester/pull/1"
+
+    def test_a_retitled_pr_renames_its_project(self):
+        held = projects({"Old title": [self.url], "Other feature": []})
+        feature = feature_for(pr(title="MAE: new title"))
+        project = held.ensure(feature, self.url)
+        assert project is not None
+        assert project["number"] == 1
+        assert set(held.by_title) == {"New title", "Other feature"}
+
+    def test_a_pr_held_nowhere_gets_a_new_project(self):
+        held = projects({"Other feature": []})
+        assert held.ensure(feature_for(pr(title="MAE: new title")), self.url) is None
+        assert held.by_title["New title"] == {"planned": True}
+
+    def test_a_listed_feature_never_renames(self):
+        held = projects({"Old title": [self.url]})
+        feature = feature_for(pr("raven-windows-window"))
+        assert held.ensure(feature, self.url) is None
+        assert "Old title" in held.by_title
 
 
 class TestStatusFor:
