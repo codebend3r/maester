@@ -8,6 +8,8 @@ import {
   type Saga,
 } from '@raven/core'
 import {
+  BUSY_TRIES,
+  BUSY_WAIT_MS,
   DOWNLOAD_MAX_FILES,
   EXPAND_MESSAGES,
   episodeLabel,
@@ -31,6 +33,7 @@ import {
   type Reply,
 } from '@/main/test/serverFakes'
 import { CALL_NAMES } from '@/main/servers/allowlist'
+import { CALL_MESSAGES, type ServerCalls } from '@/main/servers/serverCalls'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
@@ -639,6 +642,58 @@ describe('expandTarget', () => {
       target: { kind: 'album', albumId: 7 },
     })
     expect(failed(await expansion).reason).toBe('locked')
+  })
+
+  it('asks again while the server is busy, then reads the track', async () => {
+    const tracks = [track({ id: 101 })]
+    const { calls: answering, log } = fakeCalls({
+      ...library1,
+      [albumCall]: ok(albumDetails(tracks)),
+      ...trackFiles([101]),
+    })
+    const busy = { left: 2 }
+    const calls: Pick<ServerCalls, 'call'> = {
+      call: async (input) => {
+        if (input.call.name !== CALL_NAMES.getMedia || busy.left === 0) return answering.call(input)
+        busy.left -= 1
+        return { ok: false, message: CALL_MESSAGES.busy(SERVER_NAME), isBusy: true }
+      },
+    }
+    const started = Date.now()
+    const result = succeeded(
+      await expandTarget({
+        calls,
+        serverId: SERVER_ID,
+        serverName: SERVER_NAME,
+        target: { kind: 'album', albumId: 7 },
+        skip: () => false,
+      }),
+    )
+    expect(result.files.map(({ media }) => media.id)).toEqual([101])
+    expect(log.filter((key) => key === mediaCall(101))).toHaveLength(1)
+    expect(Date.now() - started).toBeGreaterThanOrEqual(2 * BUSY_WAIT_MS - 20)
+  })
+
+  it('gives up as unreachable once the server stays busy through every try', async () => {
+    const tries = { count: 0 }
+    const calls: Pick<ServerCalls, 'call'> = {
+      call: async () => {
+        tries.count += 1
+        return { ok: false, message: CALL_MESSAGES.busy(SERVER_NAME), isBusy: true }
+      },
+    }
+    const result = failed(
+      await expandTarget({
+        calls,
+        serverId: SERVER_ID,
+        serverName: SERVER_NAME,
+        target: { kind: 'album', albumId: 7 },
+        skip: () => false,
+      }),
+    )
+    expect(result.reason).toBe('unreachable')
+    expect(result.message).toBe('Raven is still waiting on Vhagar.')
+    expect(tries.count).toBe(BUSY_TRIES)
   })
 
   it('answers gone for an album or playlist the server does not have', async () => {

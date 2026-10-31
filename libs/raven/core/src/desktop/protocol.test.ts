@@ -24,6 +24,7 @@ import {
   isDownloadAsk,
   isDownloadAskStatus,
   isDownloadGroup,
+  isMusicGroup,
   isDownloadKind,
   isDownloadStatus,
   isDownloadView,
@@ -841,6 +842,8 @@ describe('the download guards', () => {
     ).toBe(true)
     expect(isDownloadGroup({ ...album, cover: { albumId: 12, coverVersion: null } })).toBe(true)
     expect(isDownloadGroup({ kind: 'album', key: 'album:12', title: 'Ok', order: 1 })).toBe(false)
+    expect(isMusicGroup(album)).toBe(true)
+    expect(isMusicGroup({ ...group, cover: null })).toBe(false)
     expect(isDownloadGroup({ ...album, cover: { albumId: '12', coverVersion: null } })).toBe(false)
     expect(isDownloadGroup({ ...group, kind: 'track' })).toBe(false)
     expect(isDownloadGroup({ kind: 'season', title: 'Severance', order: 20004 })).toBe(false)

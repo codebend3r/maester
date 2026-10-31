@@ -162,7 +162,7 @@ const setup = ({
   const table: Record<string, Reply> = Object.fromEntries(
     entries.map(({ mediaId }) => [keyOf({ name: CALL_NAMES.getTracks, mediaId }), ok(tracks)]),
   )
-  const { calls } = fakeCalls(table)
+  const { calls, log: callLog } = fakeCalls(table)
   const finished: DownloadEntry[] = []
   const failed: DownloadEntry[] = []
   const dropped: (readonly DownloadEntry[])[] = []
@@ -205,6 +205,7 @@ const setup = ({
     network,
     media,
     table,
+    callLog,
     finished,
     failed,
     dropped,
@@ -1203,6 +1204,20 @@ describe('a finished file', () => {
     expect(world.warnings).toHaveLength(1)
     expect(world.warnings[0]).toContain('Episode 1')
     expect(world.warnings[0]).not.toContain(DOWNLOADS)
+  })
+
+  it('asks for no track list for a track, and keeps it as media.<container>', async () => {
+    const world = setup({
+      entries: [entryFor(1, { container: 'flac' })],
+      tracks: tracksWith([subtitleTrack({ id: 'external-0' })]),
+    })
+    world.network.answers.file = serving({ size: 8 })
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(world.drive.sizeOf(`${dirOf(1)}/media.flac`)).toBe(8)
+    expect(world.callLog).not.toContain(keyOf({ name: CALL_NAMES.getTracks, mediaId: 1 }))
+    expect(world.network.sidecarRequests()).toEqual([])
+    expect(world.warnings).toEqual([])
   })
 
   it('finishes with no subtitles when the track list cannot be read', async () => {

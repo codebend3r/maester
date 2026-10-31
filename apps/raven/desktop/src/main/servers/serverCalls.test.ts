@@ -14,6 +14,7 @@ import {
   WRITE_RESERVE,
   createServerCalls,
   fetchThrough,
+  isBusyRefusal,
   replyCapFor,
   type ServerCallResult,
   type ServerFetch,
@@ -579,7 +580,13 @@ describe('createServerCalls.call', () => {
       serverId: SERVER.id,
       call: { name: CALL_NAMES.getMediaOrigins },
     })
-    expect(seventh).toEqual({ ok: false, message: CALL_MESSAGES.busy('raven.example') })
+    expect(seventh).toEqual({
+      ok: false,
+      message: CALL_MESSAGES.busy('raven.example'),
+      isBusy: true,
+    })
+    expect(isBusyRefusal(seventh)).toBe(true)
+    expect(isBusyRefusal({ ok: false, message: 'gone' })).toBe(false)
     await flush()
     expect(sent).toHaveLength(MAX_IN_FLIGHT)
     releaseAll()
@@ -610,7 +617,7 @@ describe('createServerCalls.call', () => {
     ])
     expect(
       await calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.recordPlay, mediaId: 1 } }),
-    ).toEqual({ ok: false, message: CALL_MESSAGES.busy('raven.example') })
+    ).toEqual({ ok: false, message: CALL_MESSAGES.busy('raven.example'), isBusy: true })
     await flush()
     expect(sent).toHaveLength(MAX_IN_FLIGHT + WRITE_RESERVE)
     releaseAll()
@@ -630,6 +637,7 @@ describe('createServerCalls.call', () => {
     ).toEqual({
       ok: false,
       message: CALL_MESSAGES.busy('raven.example'),
+      isBusy: true,
     })
     const save = calls.call({
       serverId: SERVER.id,

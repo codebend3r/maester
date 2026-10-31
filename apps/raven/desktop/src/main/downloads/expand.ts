@@ -22,10 +22,11 @@ import {
   mediaLabel,
   type Track,
 } from '@raven/core'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import { ACCOUNT_REFUSAL_STATUSES, refusalAt } from '@/main/servers/authRefusals'
-import { CALL_MESSAGES, type ServerCalls } from '@/main/servers/serverCalls'
+import { CALL_MESSAGES, isBusyRefusal, type ServerCalls } from '@/main/servers/serverCalls'
 import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
 
 export const DOWNLOAD_MAX_FILES = 500
@@ -106,6 +107,10 @@ type SagaGroupKeyProps = { libraryId: number; tmdbId: string }
 const sagaGroupKey = ({ libraryId, tmdbId }: SagaGroupKeyProps): string =>
   `saga:${libraryId}:${tmdbId}`
 
+const albumGroupKey = (albumId: number): string => `album:${albumId}`
+
+const playlistGroupKey = (playlistId: number): string => `playlist:${playlistId}`
+
 /** Both episodes of a two-episode file name that one file as their `primary`: it is fetched once, as the first. */
 const oncePerFile = (entries: readonly Entry[]): Entry[] => [
   ...entries
@@ -130,6 +135,33 @@ const isAccountRefused = (result: IsAccountRefusedProps): boolean => {
   return reason !== null && reason !== AUTH_REFUSALS.unavailable
 }
 
+/** How often a call the server is too busy for is asked again, and how long apart. */
+export const BUSY_TRIES = 4
+export const BUSY_WAIT_MS = 250
+
+type CallUnlessBusyProps = {
+  calls: Calls
+  serverId: string
+  call: AllowedCall
+  triesLeft: number
+}
+
+/**
+ * The call's answer, asked again after a short wait while every slot to the server is taken: a
+ * download running, or a second ask, takes slots of its own while a long album is listed.
+ */
+const callUnlessBusy = async ({
+  calls,
+  serverId,
+  call,
+  triesLeft,
+}: CallUnlessBusyProps): ReturnType<Calls['call']> => {
+  const result = await calls.call({ serverId, call })
+  if (!isBusyRefusal(result) || triesLeft <= 1) return result
+  await sleep(BUSY_WAIT_MS)
+  return callUnlessBusy({ calls, serverId, call, triesLeft: triesLeft - 1 })
+}
+
 const read = async <T>({
   calls,
   serverId,
@@ -137,7 +169,7 @@ const read = async <T>({
   call,
   guard,
 }: Server & { call: AllowedCall; guard: Guard<T> }): Promise<Read<T>> => {
-  const result = await calls.call({ serverId, call })
+  const result = await callUnlessBusy({ calls, serverId, call, triesLeft: BUSY_TRIES })
   if (!result.ok) return fail({ reason: EXPAND_REASONS.unreachable, message: result.message })
   if (result.status === LOCKED_STATUS) {
     return fail({ reason: EXPAND_REASONS.locked, message: LOCKED_MESSAGE(serverName) })
@@ -286,8 +318,8 @@ const draftOfItem = async ({ server, details }: DraftOfItemProps): Promise<Read<
   }
 }
 
-/** How many of a music group's files main reads at once, under `serverCalls`' six reads in flight. */
-const MEDIA_READS_AT_ONCE = 4
+/** How many of a music group's files main reads at once, well under `serverCalls`' six reads in flight. */
+const MEDIA_READS_AT_ONCE = 2
 
 type ReadMediaProps = { server: Server; mediaIds: readonly number[] }
 
@@ -417,7 +449,7 @@ const draftOf = async ({ server, target, skip }: DraftOfProps): Promise<Read<Dra
         tracks: inDiscOrder(tracks),
         group: {
           kind: DOWNLOAD_KINDS.album,
-          key: `album:${album.id}`,
+          key: albumGroupKey(album.id),
           title: album.title,
           cover: { albumId: album.id, coverVersion: album.coverVersion },
         },
@@ -439,7 +471,7 @@ const draftOf = async ({ server, target, skip }: DraftOfProps): Promise<Read<Dra
         tracks,
         group: {
           kind: DOWNLOAD_KINDS.playlist,
-          key: `playlist:${playlist.id}`,
+          key: playlistGroupKey(playlist.id),
           title: playlist.name,
           cover:
             first === undefined

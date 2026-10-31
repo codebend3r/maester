@@ -51,9 +51,16 @@ export type ServerFetch = (
   input: ServerFetchProps,
 ) => Promise<{ status: number; text: (input: TextProps) => Promise<string> }>
 
+/** A call refused because the server already has every slot in flight; it is worth asking again. */
+type BusyRefusal = { ok: false; message: string; isBusy: true }
+
 export type ServerCallResult =
   | { ok: true; status: number; body: string }
   | { ok: false; message: string }
+  | BusyRefusal
+
+export const isBusyRefusal = (result: ServerCallResult): result is BusyRefusal =>
+  !result.ok && 'isBusy' in result && result.isBusy
 
 type CallProps = {
   serverId: string
@@ -222,7 +229,9 @@ export const createServerCalls = ({
 
   /** One request to the server, in one of its slots. */
   const attempt = async ({ server, call, token }: AttemptProps): Promise<ServerCallResult> => {
-    if (isBusy({ server, call })) return { ok: false, message: CALL_MESSAGES.busy(server.name) }
+    if (isBusy({ server, call })) {
+      return { ok: false, message: CALL_MESSAGES.busy(server.name), isBusy: true }
+    }
     adjust({ serverId: server.id, by: 1 })
     try {
       return await request({ server, call, token })

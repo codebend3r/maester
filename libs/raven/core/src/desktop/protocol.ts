@@ -117,6 +117,13 @@ const GROUP_FIELDS = { key: isString, title: isString, order: isNumber }
 /** The album cover a music group shows: an album's own, or a playlist's first track's album's. */
 const isDownloadCover = object({ albumId: isNumber, coverVersion: nullable(isString) })
 
+/** An album's or a playlist's group, which carries the cover Downloads heads it with. */
+export const isMusicGroup = object({
+  kind: oneOf([DOWNLOAD_KINDS.album, DOWNLOAD_KINDS.playlist]),
+  ...GROUP_FIELDS,
+  cover: nullable(isDownloadCover),
+})
+
 /**
  * Where a download sits in its group. `key` names the group on its server: `show:<itemId>` for an
  * episode, season or show, `saga:<libraryId>:<tmdbId>`, `movie:<mediaId>`, `album:<albumId>` or
@@ -136,11 +143,7 @@ export const isDownloadGroup = union(
     ]),
     ...GROUP_FIELDS,
   }),
-  object({
-    kind: oneOf([DOWNLOAD_KINDS.album, DOWNLOAD_KINDS.playlist]),
-    ...GROUP_FIELDS,
-    cover: nullable(isDownloadCover),
-  }),
+  isMusicGroup,
 )
 
 export type DownloadGroup = Infer<typeof isDownloadGroup>

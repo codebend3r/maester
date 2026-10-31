@@ -5,6 +5,7 @@ import {
   type DownloadGroup,
   type DownloadKind,
   type DownloadView,
+  isMusicGroup,
   type SpaceView,
 } from '@raven/core'
 import { Button, type IconName } from '@raven/ui'
@@ -65,16 +66,20 @@ const groupsOf = (downloads: DownloadView[]): Grouped[] =>
 
 type GroupHeadProps = { grouped: Grouped; headingId: string }
 
-const TitleHead = ({ grouped, headingId }: GroupHeadProps) => (
+type TitleHeadProps = GroupHeadProps
+
+const TitleHead = ({ grouped, headingId }: TitleHeadProps) => (
   <h2 id={headingId} className={styles.groupTitle}>
     {grouped.group.title}
   </h2>
 )
 
+type MusicHeadProps = GroupHeadProps
+
 /** An album or playlist: the album cover beside its name and how many of its tracks are here. */
-const MusicHead = ({ grouped, headingId }: GroupHeadProps) => {
+const MusicHead = ({ grouped, headingId }: MusicHeadProps) => {
   const { group, views } = grouped
-  const cover = 'cover' in group ? group.cover : null
+  const cover = isMusicGroup(group) ? group.cover : null
   return (
     <header className={styles.musicHead}>
       <div className={styles.cover}>
