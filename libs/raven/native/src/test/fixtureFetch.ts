@@ -29,8 +29,10 @@ export const pathFor = ({ path, id }: PathForProps): string => path.replace(ID_P
 
 const isSuccess = (status: number): boolean => status >= 200 && status < 300
 
+type ResponseOfProps = Answer
+
 /** `answer` as `fetch` hands it back: `ok` for any 2xx, as the platform's is. */
-export const responseOf = ({ status, body }: Answer): FetchResponse => ({
+export const responseOf = ({ status, body }: ResponseOfProps): FetchResponse => ({
   ok: isSuccess(status),
   status,
   statusText: isSuccess(status) ? 'OK' : 'Refused',

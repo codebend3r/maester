@@ -61,7 +61,9 @@ function ListNotice(props: ListNoticeProps) {
 
 type SegmentListProps = { session: WrenSession; header: ReactElement }
 
-function AlbumsList({ session, header }: SegmentListProps) {
+type AlbumsListProps = SegmentListProps
+
+function AlbumsList({ session, header }: AlbumsListProps) {
   const listContent = useListContent()
   const { columns, tileWidth } = useTileWidth()
   const coverOf = useCovers(session)
@@ -94,7 +96,9 @@ function AlbumsList({ session, header }: SegmentListProps) {
   )
 }
 
-function ArtistsList({ session, header }: SegmentListProps) {
+type ArtistsListProps = SegmentListProps
+
+function ArtistsList({ session, header }: ArtistsListProps) {
   const router = useRouter()
   const listContent = useListContent()
   const music = useMusicLibraries(session)
@@ -123,7 +127,9 @@ function ArtistsList({ session, header }: SegmentListProps) {
   )
 }
 
-function SongsList({ session, header }: SegmentListProps) {
+type SongsListProps = SegmentListProps
+
+function SongsList({ session, header }: SongsListProps) {
   const music = useMusicLibraries(session)
   const songs = useInfiniteQuery(
     session.queries.songsQuery({
@@ -148,7 +154,9 @@ function SongsList({ session, header }: SegmentListProps) {
   )
 }
 
-function PlaylistsList({ session, header }: SegmentListProps) {
+type PlaylistsListProps = SegmentListProps
+
+function PlaylistsList({ session, header }: PlaylistsListProps) {
   const router = useRouter()
   const listContent = useListContent()
   const playlists = useQuery(session.queries.playlistsQuery)

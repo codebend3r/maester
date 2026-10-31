@@ -21,7 +21,9 @@ type Made = SourceRequest & { heard: Heard[]; isClosed: boolean }
 /** Event sources that record how each was made and what listens, and can be made to speak. */
 const fakeSources = () => {
   const made: Made[] = []
-  const createSource = ({ url, headers }: SourceRequest): NativeEventSource => {
+  type CreateSourceProps = SourceRequest
+
+  const createSource = ({ url, headers }: CreateSourceProps): NativeEventSource => {
     const heard: Heard[] = []
     const source: Made = { url, headers, heard, isClosed: false }
     made.push(source)

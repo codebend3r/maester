@@ -10,8 +10,10 @@ type NetworkState = { type: string; isConnected: boolean | null; details: unknow
 // business there, and only a move to another network matters to it.
 configure({ reachabilityShouldRun: () => false })
 
+type NetworkKeyOfProps = NetworkState
+
 /** One network apart from another: its kind, whether it is up, and the device's address on it. */
-const networkKeyOf = ({ type, isConnected, details }: NetworkState): string => {
+const networkKeyOf = ({ type, isConnected, details }: NetworkKeyOfProps): string => {
   const address = isRecord(details) && isString(details.ipAddress) ? details.ipAddress : ''
   return [type, String(isConnected), address].join(' ')
 }

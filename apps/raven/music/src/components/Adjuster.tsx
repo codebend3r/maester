@@ -38,7 +38,9 @@ export function Adjuster({ label, value, max, step, valueText, onChange }: Adjus
   // Where the finger holds it, shown in place of `value` until it lifts.
   const [held, setHeld] = useState<number | null>(null)
   const within = (at: number): number => Math.min(max, Math.max(0, at))
-  const valueAt = ({ nativeEvent }: GestureResponderEvent): number =>
+  type ValueAtProps = GestureResponderEvent
+
+  const valueAt = ({ nativeEvent }: ValueAtProps): number =>
     width > 0 ? within((nativeEvent.locationX / width) * max) : value
   const shown = held ?? value
   const share = max > 0 ? within(shown) / max : 0

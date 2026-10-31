@@ -81,8 +81,10 @@ function RecentShelf({ session, library, title, coverOf }: RecentShelfProps) {
 
 type MusicLibraries = ReturnType<typeof useMusicLibraries>
 
+type HomeNoticeOfProps = MusicLibraries
+
 /** What Home says in place of its shelves: why the libraries could not be read, that they are, or that there is no music. */
-const homeNoticeOf = ({ libraries, isRead, failure }: MusicLibraries): string | null => {
+const homeNoticeOf = ({ libraries, isRead, failure }: HomeNoticeOfProps): string | null => {
   if (failure !== null) return failure.message
   if (!isRead) return LIBRARY_COPY.loading
   return libraries.length === 0 ? LIBRARY_COPY.noMusic : null

@@ -25,7 +25,9 @@ const track = (id: number): Track => ({
   album: { title: 'OK Computer', coverVersion: 'v1' },
 })
 
-const itemFor = ({ id, title }: Track): AudioItem => ({
+type ItemForProps = Track
+
+const itemFor = ({ id, title }: ItemForProps): AudioItem => ({
   id,
   uri: `https://raven.example/api/media/${id}/file`,
   headers: {},
