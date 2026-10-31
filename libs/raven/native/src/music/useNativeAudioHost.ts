@@ -77,6 +77,10 @@ export const useNativeAudioHost = ({ api, server, sourcesFor }: UseNativeAudioHo
         return engine.failed(event.message)
       case AUDIO_PLAYER_EVENTS.remote:
         return runRemoteCommand(event.command)
+      // The car's browse requests are the browse tree's to answer, not the player's.
+      case AUDIO_PLAYER_EVENTS.browse:
+      case AUDIO_PLAYER_EVENTS.playFromBrowse:
+        return
       default: {
         const unreachable: never = event
         return unreachable

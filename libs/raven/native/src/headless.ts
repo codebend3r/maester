@@ -7,6 +7,17 @@ export { tokenRenewalFor } from '@/account/tokenRenewal'
 export { useSubmit } from '@/account/useSubmit'
 export { isDevelopmentVariant } from '@/config/appVariant'
 export { BUILD_ENV, buildNumberOf } from '@/config/buildNumber'
+export {
+  BROWSE_KINDS,
+  type BrowseApi,
+  type BrowseTarget,
+  type DownloadedLibrary,
+  browseChildrenOf,
+  browseIdOf,
+  parseBrowseId,
+  tracksForBrowse,
+} from '@/music/browseTree'
+export { musicLibrariesOf } from '@/music/musicLibraries'
 export { nativePlayerOf } from '@/music/nativePlayer'
 export { createActiveServerStore } from '@/servers/activeServerStore'
 export { allowlistedFetch } from '@/servers/allowlist'

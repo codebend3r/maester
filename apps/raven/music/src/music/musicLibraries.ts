@@ -1,4 +1,5 @@
-import { LIBRARY_LISTINGS, type Library, listingFor } from '@raven/core'
+import type { Library } from '@raven/core'
+import { musicLibrariesOf } from '@raven/native/headless'
 import { useQuery } from '@tanstack/react-query'
 
 import type { WrenSession } from '@/useWren'
@@ -19,8 +20,6 @@ type UseMusicLibrariesProps = Pick<WrenSession, 'queries'>
  */
 export const useMusicLibraries = ({ queries }: UseMusicLibrariesProps) => {
   const libraries = useQuery(queries.librariesQuery)
-  const music = (libraries.data ?? NO_LIBRARIES).filter(
-    (library) => listingFor(library.settings.kind) === LIBRARY_LISTINGS.albums,
-  )
+  const music = musicLibrariesOf(libraries.data ?? NO_LIBRARIES)
   return { libraries: music, isRead: libraries.isSuccess, failure: libraries.error }
 }
