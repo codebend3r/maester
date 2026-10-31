@@ -9,13 +9,14 @@ import packageJson from '#package'
 // the app come in by their relative path and extension.
 import { PALETTE_TOKENS } from './src/theme/tokenNames.ts'
 import { withAndroidAuto } from './plugins/withAndroidAuto.ts'
-import { withCarPlay } from './plugins/withCarPlay.ts'
+import { CARPLAY_FLAG, withCarPlay } from './plugins/withCarPlay.ts'
 import { withCleartextTraffic } from './plugins/withCleartextTraffic.ts'
 
 const APP_ID = 'app.netlify.wren'
 
 const buildNumber = buildNumberOf({ runNumber: process.env[BUILD_ENV.runNumber] })
 const isDevelopment = isDevelopmentVariant({ variant: process.env[BUILD_ENV.appVariant] })
+const isCarPlay = process.env[CARPLAY_FLAG.name] === CARPLAY_FLAG.on
 
 const LOCAL_NETWORK_USE = 'Wren reaches your raven server on your local network.'
 
@@ -67,7 +68,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: ['expo-router', ['expo-splash-screen', { backgroundColor: ground }]],
   }
-  // CarPlay and Android Auto browse and play through `@raven/audio`'s browse bridge.
-  const app = withAndroidAuto(withCarPlay(base))
+  // CarPlay and Android Auto browse and play through `@raven/audio`'s browse bridge. CarPlay's
+  // entitlement waits for Apple's grant, so a build declares it only when asked to.
+  const app = withAndroidAuto(isCarPlay ? withCarPlay(base) : base)
   return isDevelopment ? withCleartextTraffic(app) : app
 }

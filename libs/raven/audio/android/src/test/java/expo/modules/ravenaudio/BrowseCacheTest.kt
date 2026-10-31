@@ -13,6 +13,10 @@ private class MemoryStore : BrowseStore {
   override fun write(key: String, value: String) {
     values = values + (key to value)
   }
+
+  override fun clear() {
+    values = emptyMap()
+  }
 }
 
 /** A clock the test moves by hand: what is due runs as `advance` passes its time. */
@@ -168,5 +172,31 @@ class BrowseCacheTest {
 
     assertEquals(ALBUM, car.bridge.nodeOf("album:3"))
     assertNull(car.bridge.nodeOf("album:4"))
+  }
+
+  @Test
+  fun clearingForgetsEveryListAndNode() {
+    val car = Car()
+    car.browse("albums")
+    car.bridge.answer(car.asked.single().first, BrowseAnswer(listOf(ALBUM), emptyMap()))
+
+    car.bridge.clear()
+    car.browse("albums")
+    car.timer.advance(BROWSE_WAIT_MS)
+
+    assertNull(car.bridge.nodeOf("album:3"))
+    assertEquals(listOf(OPEN_APP_NODE), car.delivered.last().nodes)
+  }
+
+  @Test
+  fun theNodesShownAreBounded() {
+    val car = Car()
+    val many = (1..SHOWN_KEPT + 10).map { ALBUM.copy(id = "album:$it") }
+    car.browse("albums")
+
+    car.bridge.answer(car.asked.single().first, BrowseAnswer(many, emptyMap()))
+
+    assertNull(car.bridge.nodeOf("album:1"))
+    assertEquals(many.last(), car.bridge.nodeOf("album:${SHOWN_KEPT + 10}"))
   }
 }

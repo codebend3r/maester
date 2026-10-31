@@ -9,10 +9,10 @@ import { StatusBar, StyleSheet, View } from 'react-native'
 
 import { BAR_PLACES, NowPlayingBar } from '@/components/NowPlayingBar'
 import { downloadSources } from '@/downloads/downloadDevice'
-import { configureDownloads, useDownloads } from '@/downloads/downloadStore'
+import { configureDownloads } from '@/downloads/downloadStore'
 import { deviceDisk } from '@/downloads/downloader'
 import { WrenAudioHost } from '@/music/WrenAudioHost'
-import { forgetOnAccountChange, queryClient } from '@/queryClient'
+import { forgetOnAccountChange, keepDownloadsFor, queryClient } from '@/queryClient'
 import { WREN_ROUTES, WREN_SCREENS } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { useActiveServer } from '@/stores/activeServer'
@@ -43,9 +43,7 @@ const loadStores = async (): Promise<void> => {
   ])
   pinRavenServer({ servers: useActiveServer })
   // The account read back may not be the downloads' owner, whatever order the stores loaded in.
-  await useDownloads
-    .getState()
-    .keepFor({ accountId: useWrenAccount.getState().session?.userId ?? null })
+  await keepDownloadsFor({ accountId: useWrenAccount.getState().session?.userId ?? null })
 }
 
 /**

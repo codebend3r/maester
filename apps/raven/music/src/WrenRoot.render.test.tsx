@@ -133,6 +133,7 @@ describe('WrenRoot', () => {
     await act(async () => useWrenAccount.setState({ session: LISTENER }))
     expect(Object.keys(useDownloads.getState().entries)).toHaveLength(1)
     expect(files.size).toBe(2)
+    expect(audioPlayer.clearBrowseCache).not.toHaveBeenCalled()
   })
 
   it("removes the last account's downloads, files and all, once another account signs in", async () => {
@@ -144,5 +145,7 @@ describe('WrenRoot', () => {
     await act(async () => useWrenAccount.setState({ session: { ...LISTENER, userId: 'u2' } }))
     expect(useDownloads.getState().entries).toEqual({})
     expect(files.size).toBe(0)
+    // The car's kept lists held the last account's titles too.
+    await waitFor(() => expect(audioPlayer.clearBrowseCache).toHaveBeenCalledTimes(1))
   })
 })

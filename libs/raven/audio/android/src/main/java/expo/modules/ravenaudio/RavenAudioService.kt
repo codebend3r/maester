@@ -1,6 +1,7 @@
 package expo.modules.ravenaudio
 
 import android.net.Uri
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -45,8 +46,11 @@ typealias RemoteCommand = Map<String, Any>
  * command to JS too. The app answers by calling the module, which drives the player itself.
  */
 @OptIn(UnstableApi::class)
-private class RemotePlayer(player: Player, private val forward: (RemoteCommand) -> Unit) :
-  ForwardingSimpleBasePlayer(player) {
+private class RemotePlayer(
+  player: Player,
+  private val shouldSwallowPlay: () -> Boolean,
+  private val forward: (RemoteCommand) -> Unit,
+) : ForwardingSimpleBasePlayer(player) {
 
   /** Next and previous stay on with one item held, since the app's queue may go on past it. */
   override fun getState(): State {
@@ -63,6 +67,7 @@ private class RemotePlayer(player: Player, private val forward: (RemoteCommand) 
   }
 
   override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
+    if (playWhenReady && shouldSwallowPlay()) return Futures.immediateVoidFuture()
     forward(mapOf("kind" to if (playWhenReady) RemoteCommands.PLAY else RemoteCommands.PAUSE))
     return Futures.immediateVoidFuture()
   }
@@ -116,7 +121,10 @@ private class LibraryCallback(private val service: RavenAudioService) :
     session: MediaLibraryService.MediaLibrarySession,
     browser: MediaSession.ControllerInfo,
     params: MediaLibraryService.LibraryParams?,
-  ): ListenableFuture<LibraryResult<MediaItem>> = Futures.immediateFuture(LibraryResult.ofItem(rootItem, params))
+  ): ListenableFuture<LibraryResult<MediaItem>> {
+    if (!mayBrowse(browser)) return refused()
+    return Futures.immediateFuture(LibraryResult.ofItem(rootItem, params))
+  }
 
   override fun onGetChildren(
     session: MediaLibraryService.MediaLibrarySession,
@@ -126,6 +134,7 @@ private class LibraryCallback(private val service: RavenAudioService) :
     pageSize: Int,
     params: MediaLibraryService.LibraryParams?,
   ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+    if (!mayBrowse(browser)) return refused()
     val future = SettableFuture.create<LibraryResult<ImmutableList<MediaItem>>>()
     RavenBrowse.bridge(service).children(parentId) { answer ->
       val onPage = if (pageSize > 0) answer.nodes.drop(page * pageSize).take(pageSize) else answer.nodes
@@ -140,10 +149,12 @@ private class LibraryCallback(private val service: RavenAudioService) :
     browser: MediaSession.ControllerInfo,
     mediaId: String,
   ): ListenableFuture<LibraryResult<MediaItem>> {
+    if (!mayBrowse(browser)) return refused()
     if (mediaId == BROWSE_ROOT) return Futures.immediateFuture(LibraryResult.ofItem(rootItem, null))
     val node = RavenBrowse.bridge(service).nodeOf(mediaId)
       ?: return Futures.immediateFuture(LibraryResult.ofError(SessionError.ERROR_BAD_VALUE))
-    return Futures.immediateFuture(LibraryResult.ofItem(service.browseItemOf(node, emptyMap()), null))
+    // Its cover keeps the headers the answer that listed it gave.
+    return Futures.immediateFuture(LibraryResult.ofItem(service.browseItemOf(node, null), null))
   }
 
   /**
@@ -155,11 +166,18 @@ private class LibraryCallback(private val service: RavenAudioService) :
     controller: MediaSession.ControllerInfo,
     mediaItems: MutableList<MediaItem>,
   ): ListenableFuture<MutableList<MediaItem>> {
-    mediaItems
-      .filter { it.localConfiguration == null }
-      .forEach { item -> RavenBrowse.play?.invoke(item.mediaId) }
+    if (!mayBrowse(controller)) return Futures.immediateFuture(mediaItems)
+    val chosen = mediaItems.filter { it.localConfiguration == null }
+    val play = RavenBrowse.play
+    if (chosen.isNotEmpty() && play != null) service.playAfterBrowse.chosen()
+    chosen.forEach { item -> play?.invoke(item.mediaId) }
     return Futures.immediateFuture(mediaItems)
   }
+
+  private fun mayBrowse(caller: MediaSession.ControllerInfo) = canBrowse(caller.packageName, service.packageName)
+
+  private fun <T : Any> refused(): ListenableFuture<LibraryResult<T>> =
+    Futures.immediateFuture(LibraryResult.ofError<T>(SessionError.ERROR_PERMISSION_DENIED))
 }
 
 /**
@@ -193,6 +211,9 @@ class RavenAudioService : MediaLibraryService() {
 
   private var session: MediaLibrarySession? = null
 
+  /** The Play Android Auto sends after a chosen node, which the app's own window answers. */
+  val playAfterBrowse = PlayAfterBrowse(clock = SystemClock::elapsedRealtime)
+
   /** Hears the remote commands; the module sets it while it lives. */
   var onRemote: ((RemoteCommand) -> Unit)? = null
 
@@ -210,7 +231,8 @@ class RavenAudioService : MediaLibraryService() {
       .setWakeMode(C.WAKE_MODE_NETWORK)
       .build()
     player = made
-    val built = MediaLibrarySession.Builder(this, RemotePlayer(made) { command -> onRemote?.invoke(command) }, LibraryCallback(this))
+    val remote = RemotePlayer(made, playAfterBrowse::shouldSwallowPlay) { command -> onRemote?.invoke(command) }
+    val built = MediaLibrarySession.Builder(this, remote, LibraryCallback(this))
       .build()
     session = built
     RavenBrowse.onLateAnswer = { parentId, count -> built.notifyChildrenChanged(parentId, count, null) }
@@ -232,7 +254,7 @@ class RavenAudioService : MediaLibraryService() {
   }
 
   /** A node as Android Auto lists it: a folder to open, a node to play, or the app's own note. */
-  fun browseItemOf(node: BrowseNode, artworkHeaders: Map<String, String>): MediaItem {
+  fun browseItemOf(node: BrowseNode, artworkHeaders: Map<String, String>?): MediaItem {
     val metadata = MediaMetadata.Builder()
       .setTitle(node.title)
       .setSubtitle(node.subtitle)

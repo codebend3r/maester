@@ -1,3 +1,4 @@
+import { audioPlayer } from '@raven/audio'
 import { createQueryClient, useAudioQueue } from '@raven/ui/headless'
 
 import { useDownloads } from '@/downloads/downloadStore'
@@ -7,6 +8,18 @@ import { useWrenAccount } from '@/session'
 export const queryClient = createQueryClient()
 
 const IGNORED = (): void => undefined
+
+type KeepDownloadsForProps = { accountId: string | null }
+
+/**
+ * Keeps the downloads for `accountId`, or removes them when it is not their owner, and then
+ * also forgets the lists native keeps for CarPlay and Android Auto, which hold their owner's
+ * titles.
+ */
+export const keepDownloadsFor = async ({ accountId }: KeepDownloadsForProps): Promise<void> => {
+  const isRemoved = await useDownloads.getState().keepFor({ accountId })
+  if (isRemoved) await audioPlayer.clearBrowseCache()
+}
 
 /**
  * Empties the cache and the queue whenever the signed-in account changes, signing out
@@ -24,5 +37,5 @@ export const forgetOnAccountChange = (): (() => void) =>
     if (accountId === (before.session?.userId ?? null)) return
     queryClient.clear()
     useAudioQueue.getState().clear()
-    useDownloads.getState().keepFor({ accountId }).catch(IGNORED)
+    keepDownloadsFor({ accountId }).catch(IGNORED)
   })

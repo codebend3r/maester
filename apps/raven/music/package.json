@@ -148,6 +148,9 @@
             "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
           },
           {
+            "env": "WREN_CARPLAY"
+          },
+          {
             "env": "DEVELOPER_DIR"
           },
           {
@@ -195,6 +198,9 @@
           },
           {
             "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+          },
+          {
+            "env": "WREN_CARPLAY"
           },
           {
             "env": "DEVELOPER_DIR"

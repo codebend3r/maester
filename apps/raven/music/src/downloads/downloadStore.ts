@@ -166,8 +166,11 @@ type Downloads = DownloadsValues & {
   downloadTracks: (props: DownloadTracksProps) => Promise<string | null>
   remove: (props: RemoveProps) => Promise<void>
   removeAll: () => Promise<void>
-  /** Removes every download when `accountId`, signed in, is not their owner; keeps them otherwise. */
-  keepFor: (props: KeepForProps) => Promise<void>
+  /**
+   * Removes every download when `accountId`, signed in, is not their owner, and answers true;
+   * keeps them otherwise.
+   */
+  keepFor: (props: KeepForProps) => Promise<boolean>
 }
 
 type DownloadKeyOfProps = { serverId: string; id: number }
@@ -447,8 +450,9 @@ export const useDownloads = create<Downloads>()(
         },
         keepFor: async ({ accountId }) => {
           const { ownerId, removeAll } = get()
-          if (accountId === null || ownerId === null || ownerId === accountId) return
+          if (accountId === null || ownerId === null || ownerId === accountId) return false
           await removeAll()
+          return true
         },
       }
     },

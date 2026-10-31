@@ -15,8 +15,13 @@ struct BrowseAnswer {
   let artworkHeaders: [String: String]
 }
 
-/// The browse tree's root, `BROWSE_ROOTS.home` on the JS side.
-let browseRoot = "root"
+/// The browse tree's top, as `BROWSE_ROOTS` names it on the JS side.
+enum BrowseRoots {
+  static let home = "root"
+  static let albums = "albums"
+  static let playlists = "playlists"
+  static let downloads = "downloads"
+}
 
 /// How long the app has to answer before the car is answered from the cache.
 private let browseWait: TimeInterval = 3
@@ -76,6 +81,13 @@ final class RavenBrowse {
     let parentId = late.remove(at: place).parentId
     keep(answer.nodes, for: parentId)
     onLateAnswer?(parentId)
+  }
+
+  /// Forgets every list kept: another account's titles must never show in the car.
+  func clear() {
+    defaults.dictionaryRepresentation().keys
+      .filter { $0.hasPrefix(cachePrefix) }
+      .forEach(defaults.removeObject(forKey:))
   }
 
   private func timedOut(_ requestId: String) {

@@ -12,7 +12,6 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
-import java.util.UUID
 
 /** Where a cover is: its address, and the headers its request carries. */
 private class ArtworkSource(val uri: String, val headers: Map<String, String>)
@@ -20,27 +19,42 @@ private class ArtworkSource(val uri: String, val headers: Map<String, String>)
 private const val AUTHORITY_SUFFIX = ".ravenaudio.artwork"
 private const val CACHE_FOLDER = "raven-artwork"
 private const val FILE_SCHEME = "file"
+private const val PART_SUFFIX = ".part"
 private const val TIMEOUT_MS = 10_000
 
 /** How many covers the provider knows at once: a few lists' worth. */
 private const val SOURCES_KEPT = 512
 
+/** The cache folder's bounds; past either, the covers read longest ago go first. */
+private const val CACHE_FILES_KEPT = 200
+private const val CACHE_BYTES_KEPT = 50L * 1024 * 1024
+
+/** A cover's key: a stable hash of its address, so a list shown again names the same keys. */
+private fun keyOf(artworkUri: String): String =
+  MessageDigest.getInstance("SHA-256").digest(artworkUri.toByteArray()).joinToString("") { "%02x".format(it) }
+
 /**
  * Hands Android Auto the browse tree's covers as `content://` addresses, the kind it loads:
  * a downloaded cover from its file, a server's fetched with the server's headers on the first
- * read and kept in the cache folder. Exported, since Auto reads it from its own process, but it
- * answers only the random keys `uriFor` gave out for covers the car was shown.
+ * read and kept in the cache folder, trimmed to its bounds by last read. Exported, since Auto
+ * reads it from its own process, but it answers only the keys `uriFor` gave out for covers the
+ * car was shown.
  */
 class RavenArtworkProvider : ContentProvider() {
   companion object {
     private val lock = Any()
-    private var sources: List<Pair<String, ArtworkSource>> = emptyList()
+    private var sources: Map<String, ArtworkSource> = emptyMap()
 
-    /** The `content://` address Auto reads `artworkUri` from. */
-    fun uriFor(context: Context, artworkUri: String, headers: Map<String, String>): Uri {
-      val key = UUID.randomUUID().toString()
+    /**
+     * The `content://` address Auto reads `artworkUri` from. Null `headers` keep those the
+     * cover was last shown with: a node named alone carries none of its own.
+     */
+    fun uriFor(context: Context, artworkUri: String, headers: Map<String, String>?): Uri {
+      val key = keyOf(artworkUri)
       synchronized(lock) {
-        sources = (sources + (key to ArtworkSource(artworkUri, headers))).takeLast(SOURCES_KEPT)
+        val kept = sources[key]?.headers ?: emptyMap()
+        val source = ArtworkSource(artworkUri, headers ?: kept)
+        sources = (sources - key + (key to source)).entries.toList().takeLast(SOURCES_KEPT).associate { it.toPair() }
       }
       return Uri.Builder()
         .scheme("content")
@@ -49,22 +63,22 @@ class RavenArtworkProvider : ContentProvider() {
         .build()
     }
 
-    private fun sourceOf(key: String): ArtworkSource? =
-      synchronized(lock) { sources.lastOrNull { it.first == key }?.second }
+    private fun sourceOf(key: String): ArtworkSource? = synchronized(lock) { sources[key] }
   }
 
   override fun onCreate() = true
 
   // Auto asks on one of the provider's binder threads, so the fetch blocks that alone, never a list.
   override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
-    val source = uri.lastPathSegment?.let(::sourceOf) ?: throw FileNotFoundException(uri.toString())
+    val key = uri.lastPathSegment ?: throw FileNotFoundException(uri.toString())
+    val source = sourceOf(key) ?: throw FileNotFoundException(uri.toString())
     val address = Uri.parse(source.uri)
     val file = if (address.scheme == FILE_SCHEME) {
       File(address.path ?: "")
     } else {
       // A provider may throw only this to its caller; a cover that cannot be fetched is missing.
       try {
-        fetched(source)
+        fetched(key, source)
       } catch (error: IOException) {
         throw FileNotFoundException(error.message)
       }
@@ -72,25 +86,39 @@ class RavenArtworkProvider : ContentProvider() {
     return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
   }
 
-  private fun fetched(source: ArtworkSource): File {
+  private fun fetched(key: String, source: ArtworkSource): File {
     val context = context ?: throw FileNotFoundException(source.uri)
     val folder = File(context.cacheDir, CACHE_FOLDER).apply { mkdirs() }
-    val digest = MessageDigest.getInstance("SHA-256").digest(source.uri.toByteArray())
-    val file = File(folder, digest.joinToString("") { "%02x".format(it) })
-    if (file.exists()) return file
-    val connection = URL(source.uri).openConnection() as HttpURLConnection
+    val file = File(folder, key)
+    if (file.exists()) {
+      file.setLastModified(System.currentTimeMillis())
+      return file
+    }
+    val connection = URL(source.uri).openConnection() as? HttpURLConnection
+      ?: throw FileNotFoundException(source.uri)
+    // Each fetch writes a part of its own and moves it into place once whole, so a cut fetch is
+    // never served and two fetches of one cover never write into one file.
+    val part = File.createTempFile(key, PART_SUFFIX, folder)
     try {
       connection.connectTimeout = TIMEOUT_MS
       connection.readTimeout = TIMEOUT_MS
       source.headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
       if (connection.responseCode != HttpURLConnection.HTTP_OK) throw FileNotFoundException(source.uri)
-      // Written beside its place and moved there once whole, so a cut fetch is never served.
-      val part = File(folder, "${file.name}.part")
       connection.inputStream.use { input -> part.outputStream().use { input.copyTo(it) } }
-      part.renameTo(file)
-      return file
+      if (!part.renameTo(file) && !file.exists()) throw FileNotFoundException(source.uri)
     } finally {
+      part.delete()
       connection.disconnect()
+    }
+    trim(folder)
+    return file
+  }
+
+  private fun trim(folder: File) {
+    val covers = folder.listFiles { each -> !each.name.endsWith(PART_SUFFIX) }.orEmpty().sortedByDescending { it.lastModified() }
+    val kept = covers.runningFold(0L) { total, each -> total + each.length() }.drop(1)
+    covers.zip(kept).forEachIndexed { place, (cover, bytes) ->
+      if (place >= CACHE_FILES_KEPT || bytes > CACHE_BYTES_KEPT) cover.delete()
     }
   }
 

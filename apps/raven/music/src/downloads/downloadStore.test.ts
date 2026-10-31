@@ -212,11 +212,11 @@ describe('useDownloads', () => {
     expect(useDownloads.getState().ownerId).toBe('u1')
 
     const { keepFor } = useDownloads.getState()
-    await keepFor({ accountId: null })
-    await keepFor({ accountId: 'u1' })
+    expect(await keepFor({ accountId: null })).toBe(false)
+    expect(await keepFor({ accountId: 'u1' })).toBe(false)
     expect(Object.keys(useDownloads.getState().entries)).toEqual([keyOf(FIRST.id)])
 
-    await keepFor({ accountId: 'u2' })
+    expect(await keepFor({ accountId: 'u2' })).toBe(true)
     expect(useDownloads.getState().entries).toEqual({})
     expect(useDownloads.getState().ownerId).toBeNull()
     expect(files.size).toBe(0)

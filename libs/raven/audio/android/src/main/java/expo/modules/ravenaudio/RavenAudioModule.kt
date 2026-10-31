@@ -191,6 +191,10 @@ class RavenAudioModule : Module() {
       RavenBrowse.answer(requestId, BrowseAnswer(nodes.map { it.toNode() }, artworkHeaders))
     }.runOnQueue(Queues.MAIN)
 
+    AsyncFunction("clearBrowseCache") {
+      appContext.reactContext?.let(RavenBrowse::clear)
+    }.runOnQueue(Queues.MAIN)
+
     AsyncFunction("stop") { promise: Promise ->
       withService(promise) { service ->
         isStopped = true

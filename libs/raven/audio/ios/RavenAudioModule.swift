@@ -72,6 +72,10 @@ public final class RavenAudioModule: Module {
       self.letGo()
     }
 
+    AsyncFunction("clearBrowseCache") {
+      RavenBrowse.shared.clear()
+    }.runOnQueue(.main)
+
     AsyncFunction("answerBrowse") { (requestId: String, nodes: [BrowseNodeRecord], artworkHeaders: [String: String]) in
       RavenBrowse.shared.answer(
         requestId: requestId, answer: BrowseAnswer(nodes: nodes.map(\.node), artworkHeaders: artworkHeaders)

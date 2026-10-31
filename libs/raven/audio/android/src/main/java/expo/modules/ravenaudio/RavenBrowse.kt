@@ -14,6 +14,10 @@ private class PreferencesStore(private val preferences: SharedPreferences) : Bro
   override fun write(key: String, value: String) {
     preferences.edit().putString(key, value).apply()
   }
+
+  override fun clear() {
+    preferences.edit().clear().apply()
+  }
 }
 
 /** The session's requests and the module's answers both arrive on the main thread. */
@@ -46,6 +50,8 @@ object RavenBrowse {
     asker = { ask },
     onLateAnswer = { parentId, count -> onLateAnswer?.invoke(parentId, count) },
   ).also { made = it }
+
+  fun clear(context: Context) = bridge(context).clear()
 
   /** An answer with no bridge made has no request waiting on it. */
   fun answer(requestId: String, answer: BrowseAnswer) {

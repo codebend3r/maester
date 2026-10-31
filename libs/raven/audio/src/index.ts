@@ -43,6 +43,8 @@ type NativeAudioModule = {
     nodes: BrowseNode[],
     artworkHeaders: Record<string, string>,
   ) => Promise<void>
+  /** Forgets every list kept for the car while the app was away. */
+  clearBrowseCache: () => Promise<void>
   addListener: (name: typeof NATIVE_EVENT, listener: (event: unknown) => void) => EventSubscription
 }
 
@@ -102,6 +104,8 @@ export const audioPlayer = {
   /** Gives CarPlay or Android Auto the list a `browse` event asked for. */
   answerBrowse: ({ requestId, nodes, artworkHeaders }: AnswerBrowseProps): Promise<void> =>
     native().answerBrowse(requestId, nodes, artworkHeaders),
+  /** Forgets the lists native keeps for the car, so another account's titles never show there. */
+  clearBrowseCache: (): Promise<void> => native().clearBrowseCache(),
   /** Hears the player; the subscription's `remove` stops it. */
   onEvent: ({ listener, onUnknown }: OnEventProps): EventSubscription =>
     native().addListener(NATIVE_EVENT, (event) => {

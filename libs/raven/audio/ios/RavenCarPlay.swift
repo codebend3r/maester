@@ -4,9 +4,9 @@ import UIKit
 
 /// The SF Symbol each of the root's folders wears as its tab.
 private let tabSymbols = [
-  "albums": "square.stack",
-  "playlists": "music.note.list",
-  "downloads": "arrow.down.circle",
+  BrowseRoots.albums: "square.stack",
+  BrowseRoots.playlists: "music.note.list",
+  BrowseRoots.downloads: "arrow.down.circle",
 ]
 private let defaultTabSymbol = "music.note"
 
@@ -14,7 +14,7 @@ private let defaultTabSymbol = "music.note"
 /// each a list the browse bridge fills. A playable node plays through the app's queue and shows
 /// Now Playing; a folder opens as a list of its own. Declared as the CarPlay scene's delegate by
 /// Wren's `withCarPlay` plugin, so the device app, which declares no such scene, never makes one.
-public final class RavenCarPlay: UIResponder, CPTemplateApplicationSceneDelegate {
+public final class RavenCarPlay: UIResponder, CPTemplateApplicationSceneDelegate, CPInterfaceControllerDelegate {
   private var interfaceController: CPInterfaceController?
   private var tabs: CPTabBarTemplate?
   private var lists: [(parentId: String, template: CPListTemplate)] = []
@@ -24,6 +24,7 @@ public final class RavenCarPlay: UIResponder, CPTemplateApplicationSceneDelegate
     didConnect interfaceController: CPInterfaceController
   ) {
     self.interfaceController = interfaceController
+    interfaceController.delegate = self
     RavenBrowse.shared.onLateAnswer = { [weak self] parentId in self?.reload(parentId) }
     loadRoot()
   }
@@ -41,7 +42,7 @@ public final class RavenCarPlay: UIResponder, CPTemplateApplicationSceneDelegate
   // MARK: The lists
 
   private func loadRoot() {
-    RavenBrowse.shared.children(of: browseRoot) { [weak self] answer in self?.showRoot(answer) }
+    RavenBrowse.shared.children(of: BrowseRoots.home) { [weak self] answer in self?.showRoot(answer) }
   }
 
   /// One tab per folder; with none (the app has never answered), the root's own nodes in one.
@@ -81,7 +82,7 @@ public final class RavenCarPlay: UIResponder, CPTemplateApplicationSceneDelegate
   }
 
   private func reload(_ parentId: String) {
-    if parentId == browseRoot {
+    if parentId == BrowseRoots.home {
       loadRoot()
       return
     }
@@ -110,7 +111,9 @@ public final class RavenCarPlay: UIResponder, CPTemplateApplicationSceneDelegate
 
   private func chose(_ node: BrowseNode) {
     if node.isPlayable {
-      RavenBrowse.shared.play?(node.id)
+      // With no app to play it, Now Playing would show the last queue, not the choice.
+      guard let play = RavenBrowse.shared.play else { return }
+      play(node.id)
       interfaceController?.pushTemplate(CPNowPlayingTemplate.shared, animated: true, completion: nil)
       return
     }
@@ -119,6 +122,12 @@ public final class RavenCarPlay: UIResponder, CPTemplateApplicationSceneDelegate
     lists.append((node.id, template))
     load(node.id, into: template)
     interfaceController?.pushTemplate(template, animated: true, completion: nil)
+  }
+
+  /// A list popped off the stack is no longer reloaded; the tabs' stay.
+  public func templateDidDisappear(_ aTemplate: CPTemplate, animated: Bool) {
+    let showing = (interfaceController?.templates ?? []) + (tabs?.templates ?? [])
+    lists = lists.filter { list in showing.contains { $0 === list.template } }
   }
 
   // MARK: Covers

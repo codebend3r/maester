@@ -29,6 +29,9 @@ interface BrowseStore {
   fun read(key: String): String?
 
   fun write(key: String, value: String)
+
+  /** Forgets every key: the store holds the cache alone. */
+  fun clear()
 }
 
 /** Runs `run` after `ms`, on the thread the car's requests come on; the answer cancels it. */
@@ -60,6 +63,8 @@ class BrowseCache(private val store: BrowseStore) {
       null
     }
   }
+
+  fun clear() = store.clear()
 
   fun write(parentId: String, nodes: List<BrowseNode>) {
     val array = JSONArray()
@@ -93,6 +98,9 @@ typealias BrowseAsker = (requestId: String, parentId: String) -> Unit
 
 /** How many timed out requests a late answer may still land on. */
 private const val LATE_KEPT = 32
+
+/** How many nodes the car was shown are kept for `nodeOf`: a few long lists' worth. */
+const val SHOWN_KEPT = 1_000
 
 /**
  * Ruling 10's bridge, apart from Android so its rules run on the JVM: the car's request goes to
@@ -144,6 +152,12 @@ class BrowseBridge(
   /** A node the car has been shown, for a request that names it alone. */
   fun nodeOf(id: String): BrowseNode? = shown[id]
 
+  /** Forgets every list and node: another account's titles must never show in the car. */
+  fun clear() {
+    cache.clear()
+    shown = emptyMap()
+  }
+
   private fun timedOut(requestId: String) {
     val asked = waiting[requestId] ?: return
     waiting = waiting - requestId
@@ -153,12 +167,18 @@ class BrowseBridge(
 
   private fun remember(parentId: String, nodes: List<BrowseNode>) {
     cache.write(parentId, nodes)
-    shown = shown + nodes.associateBy { it.id }
+    show(nodes)
+  }
+
+  /** Newest last, so the oldest go first once past `SHOWN_KEPT`. */
+  private fun show(nodes: List<BrowseNode>) {
+    val ids = nodes.map { it.id }.toSet()
+    shown = (shown - ids + nodes.associateBy { it.id }).entries.toList().takeLast(SHOWN_KEPT).associate { it.toPair() }
   }
 
   private fun fallback(parentId: String): BrowseAnswer {
     val cached = cache.read(parentId)
-    cached?.let { nodes -> shown = shown + nodes.associateBy { it.id } }
+    cached?.let(::show)
     return BrowseAnswer(cached ?: listOf(OPEN_APP_NODE), emptyMap())
   }
 }
