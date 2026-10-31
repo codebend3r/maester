@@ -1,4 +1,4 @@
-import { HTTP_METHODS, isSeconds, isTrackIndex } from '@/contract'
+import { HTTP_METHODS, isSeconds, isTrack, isTrackIndex } from '@/contract'
 import { watchPageOf } from '@/itemLinks'
 import { isDownloadTarget, isMediaId, PLAY_LINK_MAX_NEXT } from '@/playLink'
 import { isOutputSettings, isPlayerSource } from '@/player'
@@ -92,7 +92,7 @@ export const SERVER_METHODS = {
   post: HTTP_METHODS.post,
 } as const
 
-/** A container becomes `video.<container>` on disk, so only a short lowercase name passes. */
+/** A container becomes `video.<container>` or `media.<container>` on disk, so only a short lowercase name passes. */
 export const isContainerName = matching(/^[a-z0-9]{1,8}$/u)
 
 /** A sidecar's track id becomes `subtitles/<trackId>.vtt` on disk, so only the server's `external-<n>` passes. */
@@ -104,23 +104,53 @@ export const DOWNLOAD_KINDS = {
   season: 'season',
   show: 'show',
   saga: 'saga',
+  album: 'album',
+  playlist: 'playlist',
 } as const
 
 export const isDownloadKind = oneOf(Object.values(DOWNLOAD_KINDS))
 
 export type DownloadKind = Infer<typeof isDownloadKind>
 
+const GROUP_FIELDS = { key: isString, title: isString, order: isNumber }
+
+/** The album cover a music group shows: an album's own, or a playlist's first track's album's. */
+const isDownloadCover = object({ albumId: isNumber, coverVersion: nullable(isString) })
+
+export type DownloadCover = Infer<typeof isDownloadCover>
+
+/**
+ * An album's or a playlist's group, which carries the cover Downloads heads it with, and the
+ * album's or playlist's own id, which a queue played from it names.
+ */
+export const isMusicGroup = object({
+  kind: oneOf([DOWNLOAD_KINDS.album, DOWNLOAD_KINDS.playlist]),
+  ...GROUP_FIELDS,
+  cover: nullable(isDownloadCover),
+  sourceId: isNumber,
+})
+
 /**
  * Where a download sits in its group. `key` names the group on its server: `show:<itemId>` for an
- * episode, season or show, `saga:<libraryId>:<tmdbId>` or `movie:<mediaId>`. `order` is the play
- * order, a season times 10000 plus the episode, or a saga's index.
+ * episode, season or show, `saga:<libraryId>:<tmdbId>`, `movie:<mediaId>`, `album:<albumId>` or
+ * `playlist:<playlistId>`. `order` is the play order, a season times 10000 plus the episode, a
+ * saga's index, or a track's place on its album or playlist. A music group carries its `cover`,
+ * null for a playlist with no tracks; a video group has none, so a `downloads.json` written before
+ * music reads as it is.
  */
-export const isDownloadGroup = object({
-  kind: isDownloadKind,
-  key: isString,
-  title: isString,
-  order: isNumber,
-})
+export const isDownloadGroup = union(
+  object({
+    kind: oneOf([
+      DOWNLOAD_KINDS.movie,
+      DOWNLOAD_KINDS.episode,
+      DOWNLOAD_KINDS.season,
+      DOWNLOAD_KINDS.show,
+      DOWNLOAD_KINDS.saga,
+    ]),
+    ...GROUP_FIELDS,
+  }),
+  isMusicGroup,
+)
 
 export type DownloadGroup = Infer<typeof isDownloadGroup>
 
@@ -184,7 +214,11 @@ export const isDownloadAsk = object({
 
 export type DownloadAsk = Infer<typeof isDownloadAsk>
 
-/** A download as the page shows it: it and its server by opaque ids, with no media id, origin or path. */
+/**
+ * A download as the page shows it: it and its server by opaque ids, with no origin or path. A
+ * track's download carries its `Track`, so Downloads queues it with no server; null for a video,
+ * and for a track of a server Raven no longer holds, which the music engine cannot play.
+ */
 export const isDownloadView = object({
   downloadId: isOpaqueId,
   serverId: isOpaqueId,
@@ -197,6 +231,7 @@ export const isDownloadView = object({
   watched: nullable(isNumber),
   deletesAt: nullable(isNumber),
   isLocked: isBoolean,
+  track: nullable(isTrack),
 })
 
 export type DownloadView = Infer<typeof isDownloadView>

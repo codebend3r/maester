@@ -8,12 +8,15 @@ import packageJson from '#package'
 // `paths`, and Node's resolver adds no `.ts`, so the modules it shares with
 // the app come in by their relative path and extension.
 import { PALETTE_TOKENS } from './src/theme/tokenNames.ts'
+import { withAndroidAuto } from './plugins/withAndroidAuto.ts'
+import { CARPLAY_FLAG, withCarPlay } from './plugins/withCarPlay.ts'
 import { withCleartextTraffic } from './plugins/withCleartextTraffic.ts'
 
 const APP_ID = 'app.netlify.wren'
 
 const buildNumber = buildNumberOf({ runNumber: process.env[BUILD_ENV.runNumber] })
 const isDevelopment = isDevelopmentVariant({ variant: process.env[BUILD_ENV.appVariant] })
+const isCarPlay = process.env[CARPLAY_FLAG.name] === CARPLAY_FLAG.on
 
 const LOCAL_NETWORK_USE = 'Wren reaches your raven server on your local network.'
 
@@ -30,7 +33,7 @@ const launchGround = (): string => {
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   const ground = launchGround()
-  const app: ExpoConfig = {
+  const base: ExpoConfig = {
     ...config,
     // What the home screen writes under the icon, and the name of the Xcode project.
     name: 'Wren',
@@ -65,5 +68,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: ['expo-router', ['expo-splash-screen', { backgroundColor: ground }]],
   }
+  // CarPlay and Android Auto browse and play through `@raven/audio`'s browse bridge. CarPlay's
+  // entitlement waits for Apple's grant, so a build declares it only when asked to.
+  const app = withAndroidAuto(isCarPlay ? withCarPlay(base) : base)
   return isDevelopment ? withCleartextTraffic(app) : app
 }

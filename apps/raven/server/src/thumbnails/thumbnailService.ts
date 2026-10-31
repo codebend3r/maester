@@ -5,6 +5,7 @@ import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs
 import { THUMBNAIL_STATES } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
+import { temporary } from '@/fileNames'
 import { thumbnailArgs, thumbnailSeek } from '@/ffmpeg/args'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -77,14 +78,17 @@ export class ThumbnailService implements OnApplicationBootstrap {
 
   private async render({ input, seek, tonemap }: ThumbnailServiceRenderProps): Promise<string> {
     // ffmpeg picks the image muxer from the extension, so the temp file keeps .jpg.
-    const temp = join(
-      this.dir,
-      `.${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`,
-    )
+    const temp = temporary({ dir: this.dir, extension: 'jpg' })
     try {
-      await this.ffmpeg.exec(
-        thumbnailArgs({ input, output: temp, seek, width: this.config.thumbnailWidth, tonemap }),
-      )
+      await this.ffmpeg.exec({
+        args: thumbnailArgs({
+          input,
+          output: temp,
+          seek,
+          width: this.config.thumbnailWidth,
+          tonemap,
+        }),
+      })
       if (!(await exists(temp))) throw new Error('ffmpeg wrote no frame')
       return temp
     } catch (error) {

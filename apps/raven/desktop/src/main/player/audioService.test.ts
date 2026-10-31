@@ -22,7 +22,7 @@ import {
 } from '@raven/mpv'
 import { AUDIO_OBSERVED, type AudioMpv, createAudioService } from '@/main/player/audioService'
 import { HARDENED_OPTIONS } from '@/main/player/engine'
-import type { FailureExplainer, ResolvedServerSource, ServerTarget } from '@/main/player/loadTarget'
+import type { FailureExplainer, ResolvedSource, ServerTarget } from '@/main/player/loadTarget'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 
 const SERVER_ID = '00000000-0000-4000-8000-000000000001'
@@ -37,8 +37,9 @@ const targetOf = (mediaId: number): ServerTarget => ({
   relay: { loadId: String(mediaId), base: `${BASE}/secret-${mediaId}` },
 })
 
-/** Track 404 is on no server; every other id resolves through the fake relay. */
+/** Track 404 is on no server; a downloaded one plays its file; every other id resolves through the fake relay. */
 const GONE = 404
+const fileOf = (mediaId: number) => `/Users/me/raven/downloads/${mediaId}/media.flac`
 const GONE_MESSAGE = 'This title is not on Vhagar any more.'
 const LOCKED = { reason: PLAYER_ERROR_REASONS.locked, message: 'Vhagar locked this library again.' }
 const PCM: OutputSettings = { profile: 'pcm', device: 'auto', passthrough: [], spatial: false }
@@ -89,9 +90,9 @@ const fakeMpv = () => {
   }
 }
 
-type SetupProps = { explain?: FailureExplainer }
+type SetupProps = { explain?: FailureExplainer; downloaded?: readonly number[] }
 
-const setup = ({ explain = async () => LOCKED }: SetupProps = {}) => {
+const setup = ({ explain = async () => LOCKED, downloaded = [] }: SetupProps = {}) => {
   const fake = fakeMpv()
   const resolved: number[] = []
   const closed: string[] = []
@@ -100,9 +101,15 @@ const setup = ({ explain = async () => LOCKED }: SetupProps = {}) => {
   const events: AudioEvent[] = []
   const service = createAudioService({
     mpv: fake.mpv,
-    resolve: async (mediaId): Promise<ResolvedServerSource> => {
+    resolve: async (mediaId): Promise<ResolvedSource> => {
       resolved.push(mediaId)
       if (mediaId === GONE) return { ok: false, message: GONE_MESSAGE }
+      if (downloaded.includes(mediaId)) {
+        return {
+          ok: true,
+          target: { kind: PLAYER_SOURCE_KINDS.file, path: fileOf(mediaId), sidecars: [] },
+        }
+      }
       return { ok: true, target: targetOf(mediaId) }
     },
     explain,
@@ -332,7 +339,47 @@ describe('what mpv reports', () => {
       {
         type: AUDIO_EVENTS.error,
         reason: PLAYER_ERROR_REASONS.decode,
-        message: PLAYER_MESSAGES.stopped,
+        message: PLAYER_MESSAGES.trackStopped,
+      },
+    ])
+  })
+
+  test('a downloaded track plays its file, queued after a server one, and its end retires no load', async () => {
+    const { service, fake, closed, events } = setup({ downloaded: [8] })
+    await service.handle(LOAD)
+    expect(fake.log).toContain(`loadfile ${fileOf(8)} append-play -1 start=0`)
+    fake.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
+    fake.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
+    expect(closed).toEqual(['7'])
+    expect(events).toEqual([{ type: AUDIO_EVENTS.advanced }, { type: AUDIO_EVENTS.ended }])
+  })
+
+  test('a downloaded track queued again is kept, not resolved twice', async () => {
+    const { service, resolved } = setup({ downloaded: [7, 8] })
+    await service.handle(LOAD)
+    await service.handle({ type: AUDIO_COMMANDS.queueNext, next: 8 })
+    expect(resolved).toEqual([7, 8])
+  })
+
+  test('a downloaded track that fails ends with its own words, asking the server nothing', async () => {
+    const asked: Parameters<FailureExplainer>[0][] = []
+    const { service, fake, events, closed } = setup({
+      downloaded: [7],
+      explain: async (input) => {
+        asked.push(input)
+        return LOCKED
+      },
+    })
+    await service.handle({ ...LOAD, next: null })
+    fake.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.error, error: -2 })
+    await settle()
+    expect(asked).toEqual([])
+    expect(closed).toEqual([])
+    expect(events).toEqual([
+      {
+        type: AUDIO_EVENTS.error,
+        reason: PLAYER_ERROR_REASONS.decode,
+        message: PLAYER_MESSAGES.trackStopped,
       },
     ])
   })

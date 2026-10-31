@@ -23,6 +23,8 @@ object AudioEventTypes {
   const val ENDED = "ended"
   const val ERROR = "error"
   const val REMOTE = "remote"
+  const val BROWSE = "browse"
+  const val PLAY_FROM_BROWSE = "playFromBrowse"
 }
 
 /** What the player does after the window moved: the events to send, and what to change. */

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type AlbumDetails,
+  DOWNLOAD_TARGET_KINDS,
   MATCH_STATES,
   QUEUE_SOURCE_KINDS,
   ROUTE_STATES,
@@ -22,6 +23,7 @@ import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { AlbumMatchDialog } from '@/components/AlbumMatchDialog/AlbumMatchDialog'
 import { BackButton } from '@/components/BackButton/BackButton'
+import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
@@ -133,6 +135,9 @@ const AlbumView = ({ details }: AlbumViewProps) => {
               {COMMON_COPY.addToPlaylist}
             </Button>
             <FavouriteButton isFavourite={details.isFavourite} onToggle={favourite.mutate} />
+            {tracks.length > 0 && (
+              <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.album, albumId: album.id }} />
+            )}
             <AdminOnly>
               <Button icon="wand" onClick={() => setFixing(true)}>
                 {album.match === MATCH_STATES.unmatched ? ALBUM_COPY.match : COMMON_COPY.fixMatch}

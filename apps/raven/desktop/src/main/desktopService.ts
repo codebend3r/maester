@@ -128,7 +128,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
 
   type TitleOfProps = { path: string; name: string }
 
-  // A download's video is `video.<container>` in a folder named by its media id, so its title
+  // A download is `video.<container>` or `media.<container>` in a folder named by its media id, so its title
   // and its server come from the download service, and any other file names itself.
   const titleOf = ({ path, name }: TitleOfProps): string =>
     deps.downloads.labelOf({ path }) ?? titleFromFileName(name)
@@ -204,7 +204,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     // and must not rejoin On this Mac's recents before its load fails.
     if (deps.downloads.isStaleDownload({ path: file.path })) return refused(MESSAGES.missing)
     store.update((state) => addRecent({ state, path: file.path, at: now() }))
-    // A download's file is video.<container> in a folder named by its media id, and stays listed
+    // A download's file is `mediaPathFor`'s, in a folder named by its media id, and stays listed
     // after a delete, so File > Open Recent leaves it to On this Mac's recents.
     if (deps.downloads.labelOf({ path: file.path }) === null) deps.addRecentDocument(file.path)
     // The page describes a file each time it opens one, so this is where a play begins.

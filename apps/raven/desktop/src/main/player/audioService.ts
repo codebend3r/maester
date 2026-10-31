@@ -7,6 +7,7 @@ import {
   isNumber,
   type NowPlayingInfo,
   PLAYER_ERROR_REASONS,
+  PLAYER_SOURCE_KINDS,
   REMOTE_COMMANDS,
   type RemoteCommand,
 } from '@raven/core'
@@ -27,9 +28,10 @@ import { HARDENED_OPTIONS } from '@/main/player/engine'
 import { guardedMpv, type MpvControl } from '@/main/player/guardedMpv'
 import {
   type FailureExplainer,
+  type LoadTarget,
   loadfileOptionsFor,
   locationOf,
-  type ResolvedServerSource,
+  type ResolvedSource,
   type ServerTarget,
   withoutTarget,
 } from '@/main/player/loadTarget'
@@ -70,16 +72,26 @@ export type AudioMpv = MpvControl & Pick<Mpv, 'nowPlaying' | 'clearNowPlaying'>
 
 type CreateAudioServiceProps = {
   mpv: AudioMpv
-  /** A track on the one server, through the music relay. */
-  resolve: (mediaId: number) => Promise<ResolvedServerSource>
+  /** A track: its downloaded file, else the one server's, through the music relay. */
+  resolve: (mediaId: number) => Promise<ResolvedSource>
+  /** Why a server track failed; a downloaded file's failure needs no server to say. */
   explain: FailureExplainer
-  /** Retires a track's relay load once it is over. */
+  /** Retires a server track's relay load once it is over. */
   closeLoad: (target: ServerTarget) => void
   canChooseAo: boolean
   platform: DesktopPlatform
   onPlaying: (isPlaying: boolean) => void
   warn: (message: string) => void
 }
+
+/** How a track ends that the server cannot explain, or that played from a downloaded file. */
+const DECODE_FAILURE = {
+  reason: PLAYER_ERROR_REASONS.decode,
+  message: PLAYER_MESSAGES.trackStopped,
+} as const
+
+/** A track mpv holds: the page's id for it, and what it plays from. */
+type Held = { mediaId: number; target: LoadTarget }
 
 type MpvEndFileReason = (typeof MPV_END_FILE_REASONS)[keyof typeof MPV_END_FILE_REASONS]
 type LoadfileMode = (typeof MPV_LOADFILE_MODES)[keyof typeof MPV_LOADFILE_MODES]
@@ -132,8 +144,8 @@ export const createAudioService = ({
   onPlaying: reportPlaying,
   warn: reportWarning,
 }: CreateAudioServiceProps): AudioService => {
-  let playing: ServerTarget | null = null
-  let queued: ServerTarget | null = null
+  let playing: Held | null = null
+  let queued: Held | null = null
   let phase: Phase = PLAYER_PHASES.idle
   // Bumped by every load, stop and engine stop, so a step started for one of them notices it
   // was overtaken.
@@ -150,7 +162,7 @@ export const createAudioService = ({
   // These run inside the wrapper's event drain, so nothing they throw may escape.
   const warn = (message: string) => {
     try {
-      reportWarning(withoutTarget({ target: playing, message }))
+      reportWarning(withoutTarget({ target: playing?.target ?? null, message }))
     } catch {
       // A warning that cannot be written has nowhere left to go.
     }
@@ -200,10 +212,10 @@ export const createAudioService = ({
     }
   }
 
-  const retire = (target: ServerTarget | null) => {
-    if (target === null) return
+  const retire = (held: Held | null) => {
+    if (held === null || held.target.kind !== PLAYER_SOURCE_KINDS.server) return
     try {
-      closeLoad(target)
+      closeLoad(held.target)
     } catch (error) {
       warn(`music relay close failed: ${messageOf(error)}`)
     }
@@ -266,15 +278,19 @@ export const createAudioService = ({
     if (phase === PLAYER_PHASES.loading) phase = PLAYER_PHASES.loaded
   }
 
-  const onEndedEarly = async (target: ServerTarget) => {
-    const token = epoch
-    let failure
+  const failureOf = async (target: LoadTarget) => {
+    if (target.kind === PLAYER_SOURCE_KINDS.file) return DECODE_FAILURE
     try {
-      failure = await explain({ target, phase: PLAYER_PHASES.loaded })
+      return await explain({ target, phase: PLAYER_PHASES.loaded })
     } catch (error) {
       warn(`music failure could not be explained: ${messageOf(error)}`)
-      failure = { reason: PLAYER_ERROR_REASONS.decode, message: PLAYER_MESSAGES.stopped }
+      return DECODE_FAILURE
     }
+  }
+
+  const onEndedEarly = async (target: LoadTarget) => {
+    const token = epoch
+    const failure = await failureOf(target)
     if (token !== epoch) return
     emit({ type: AUDIO_EVENTS.error, ...failure })
   }
@@ -305,7 +321,7 @@ export const createAudioService = ({
         settle(PLAYER_PHASES.idle)
         hideNowPlaying()
         if (ended === null) return
-        onEndedEarly(ended).catch((error: unknown) => {
+        onEndedEarly(ended.target).catch((error: unknown) => {
           warn(`music ending failed: ${messageOf(error)}`)
         })
         return
@@ -359,7 +375,7 @@ export const createAudioService = ({
   }
 
   type LoadfileProps = {
-    target: ServerTarget
+    target: LoadTarget
     mode: LoadfileMode
     start: number
   }
@@ -394,22 +410,23 @@ export const createAudioService = ({
     if (next === null) return OK
     const resolved = await resolve(next)
     if (token !== epoch) {
-      if (resolved.ok) retire(resolved.target)
+      if (resolved.ok) retire({ mediaId: next, target: resolved.target })
       return overtaken()
     }
     // A track that cannot be reached is left out: the playing one ends on its own.
     if (!resolved.ok) return refuse(resolved.message)
+    const held = { mediaId: next, target: resolved.target }
     try {
       await loadfile({ target: resolved.target, mode: MPV_LOADFILE_MODES.appendPlay, start: 0 })
     } catch (error) {
-      retire(resolved.target)
+      retire(held)
       throw error
     }
     if (token !== epoch) {
-      retire(resolved.target)
+      retire(held)
       return overtaken()
     }
-    queued = resolved.target
+    queued = held
     return OK
   }
 
@@ -426,7 +443,7 @@ export const createAudioService = ({
     if (token !== epoch) return overtaken()
     retire(playing)
     retire(queued)
-    playing = resolved.target
+    playing = { mediaId: command.mediaId, target: resolved.target }
     queued = null
     phase = PLAYER_PHASES.loading
     lastTime = Math.max(0, command.start)

@@ -1,6 +1,7 @@
 import {
   ACCESS_REFUSALS,
   APP_CALL_METHODS,
+  type AudioBitrate,
   AUTH_REFUSALS,
   type AuthRefusal,
   type AccessRefusal,
@@ -80,8 +81,13 @@ const awayQualityOf = (maxHeight: MaxHeight): StreamQuality | null =>
     .filter((key) => STREAM_QUALITIES[key].height === maxHeight)
     .toSorted((a, b) => STREAM_QUALITIES[a].bitrate - STREAM_QUALITIES[b].bitrate)[0] ?? null
 
+/** A track to play: the file itself (`kbps` null), or the server's AAC transcode of it at `kbps`. */
+type TrackRequest = { mediaId: number; kbps: AudioBitrate | null }
+
 export type MediaSources = {
   source: (request: SourceRequest) => Promise<SourceOutcome>
+  /** Where a track plays or downloads from, by the same origin, ticket and cookie as a video. */
+  trackSource: (request: TrackRequest) => Promise<SourceOutcome>
   /**
    * Where a video's subtitles are fetched from and the ticket they carry, as its picture is: a
    * media route takes a ticket, never the account's Bearer. Null where the server hands out no
@@ -351,6 +357,9 @@ export const mediaAccessFor = ({
       ? awayQualityOf(awayMaxHeight())
       : null
 
+  /** The address one piece of media is at, on the origin `access` names or on the server's own. */
+  type UriOf = (access: MediaAccess | null) => string
+
   type UriForProps = {
     request: SourceRequest
     access: MediaAccess | null
@@ -378,8 +387,15 @@ export const mediaAccessFor = ({
     }
   }
 
-  const cookieSource = async (request: SourceRequest): Promise<SourceOutcome> => {
-    const uri = uriFor({ request, access: null })
+  const trackUriOf =
+    ({ mediaId, kbps }: TrackRequest): UriOf =>
+    (access) =>
+      kbps === null
+        ? api.fileUrl({ id: mediaId, access })
+        : api.transcodeUrl({ mediaId, kbps, access })
+
+  const cookieSource = async (uriOf: UriOf): Promise<SourceOutcome> => {
+    const uri = uriOf(null)
     const headers = cookieHeadersFor({
       server,
       cookies: await readCookies(),
@@ -415,21 +431,19 @@ export const mediaAccessFor = ({
     }
   }
 
-  const sourceFor = async (request: SourceRequest): Promise<SourceOutcome> => {
-    const access = await accessOf(request.media.id)
+  type SourceForProps = { mediaId: number; uriOf: UriOf }
+
+  const sourceFor = async ({ mediaId, uriOf }: SourceForProps): Promise<SourceOutcome> => {
+    const access = await accessOf(mediaId)
     switch (access.kind) {
       case ACCESS_WAYS.refused:
         return access.refusal
       case ACCESS_WAYS.cookies:
-        return cookieSource(request)
+        return cookieSource(uriOf)
       case ACCESS_WAYS.ownAddress:
-        return ticketedSource({
-          uri: withTicket({ uri: uriFor({ request, access: null }), ticket: access.ticket }),
-        })
+        return ticketedSource({ uri: withTicket({ uri: uriOf(null), ticket: access.ticket }) })
       case ACCESS_WAYS.origin:
-        return ticketedSource({
-          uri: uriFor({ request, access: { origin: access.origin, ticket: access.ticket } }),
-        })
+        return ticketedSource({ uri: uriOf({ origin: access.origin, ticket: access.ticket }) })
       default: {
         const unreachable: never = access
         return unreachable
@@ -455,13 +469,18 @@ export const mediaAccessFor = ({
     }
   }
 
+  // A jar that cannot be read, or an address the allowlist refuses, is an outcome like any
+  // other refusal, so the player always hears back.
+  const outcomeOf = (props: SourceForProps): Promise<SourceOutcome> =>
+    sourceFor(props).catch(() => accessRefusal({ reason: ACCESS_REFUSALS.unreachable, server }))
+
   return {
-    // A jar that cannot be read, or an address the allowlist refuses, is an outcome like any
-    // other refusal, so the player always hears back.
     source: (request) =>
-      sourceFor(request).catch(() =>
-        accessRefusal({ reason: ACCESS_REFUSALS.unreachable, server }),
-      ),
+      outcomeOf({
+        mediaId: request.media.id,
+        uriOf: (access) => uriFor({ request, access }),
+      }),
+    trackSource: (request) => outcomeOf({ mediaId: request.mediaId, uriOf: trackUriOf(request) }),
     subtitleAccess: (mediaId) => subtitleAccess(mediaId).catch(() => null),
     close: stopWatching,
   }

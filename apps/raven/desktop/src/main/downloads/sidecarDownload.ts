@@ -1,4 +1,4 @@
-import { isMediaTracks, type SubtitleTrack } from '@raven/core'
+import { isAudioContainer, isMediaTracks, type SubtitleTrack } from '@raven/core'
 import { unlessStopped } from '@/main/bounded'
 import type { ServerEntry } from '@/main/desktopConfig'
 import type { QueueFs } from '@/main/downloads/downloadQueue'
@@ -159,6 +159,8 @@ export const createSidecarDownload = ({
   }
 
   return async ({ job, access }) => {
+    // A track has no subtitles, so its download asks the server for no track list.
+    if (isAudioContainer(job.entry.container)) return []
     const tracks = await tracksOf(job)
     if (tracks.length === 0 || job.signal.aborted) return []
     const isMade = await fs.mkdir(subtitlesDirFor(partsOf(job.entry))).then(

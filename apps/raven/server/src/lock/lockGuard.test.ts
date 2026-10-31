@@ -144,6 +144,7 @@ describe('the lock marks on routes', () => {
       'GET /api/media/:id/hls/master.m3u8',
       'GET /api/media/:id/stream',
       'GET /api/media/:id/subtitles/:trackId',
+      'GET /api/media/:id/transcode',
     ])
   })
 

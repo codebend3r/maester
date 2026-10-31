@@ -49,6 +49,7 @@ export const viewOf = (overrides: Partial<DownloadView> = {}): DownloadView => (
   watched: null,
   deletesAt: null,
   isLocked: false,
+  track: null,
   ...overrides,
 })
 

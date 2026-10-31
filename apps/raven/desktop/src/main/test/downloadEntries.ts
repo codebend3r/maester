@@ -27,6 +27,7 @@ export const entry = (overrides: Partial<DownloadEntry> = {}): DownloadEntry => 
   serverPosition: 0,
   pending: NO_PENDING,
   createdAt: 100,
+  track: undefined,
   ...overrides,
 })
 

@@ -6,6 +6,7 @@ import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@/session'
 import { AIRBAG, AUDIOBOOKS, LISTENER, PARANOID, musicApi } from '@/test/music'
+import { WREN_ROUTES } from '@/routes'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()
@@ -19,6 +20,8 @@ jest.mock('expo-splash-screen', () => ({
 }))
 jest.mock('@raven/native', () => ({
   ...jest.requireActual<typeof Native>('@raven/native'),
+  // jest has no NetInfo native module to ask; the device is on Wi-Fi.
+  isOnCellular: async () => false,
   apiFor: () => mockApi,
   watchNetwork: () => () => undefined,
   cookieJar: { read: async () => ({}), forget: async () => {} },
@@ -29,7 +32,7 @@ jest.mock('@raven/native', () => ({
   },
 }))
 
-const openNowPlaying = () => renderRouter(WREN_TREE, { initialUrl: '/now-playing' })
+const openNowPlaying = () => renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.nowPlaying })
 
 describe('Now Playing', () => {
   beforeEach(() => {

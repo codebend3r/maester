@@ -123,7 +123,7 @@ export class SubtitlesService {
           done.then((finished) =>
             finished
               ? true
-              : this.ffmpeg.exec(attempt).then(
+              : this.ffmpeg.exec({ args: attempt }).then(
                   () => true,
                   (error: unknown) =>
                     index === attempts.length - 1 ? Promise.reject(error) : false,

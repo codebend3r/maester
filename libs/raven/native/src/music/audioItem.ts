@@ -1,8 +1,9 @@
 import type { AudioItem } from '@raven/audio'
 import {
+  AUDIO_BITRATES,
   type ApiClient,
+  type AudioBitrate,
   type AudioPlatform,
-  PLAYBACK_MODES,
   type Track,
   artistNames,
   canPlayAudio,
@@ -13,39 +14,48 @@ import type { MediaSources } from '@/servers/mediaAccess'
 /** What a track is played through: the server's client, for its cover, and where its media plays from. */
 type AudioServer = {
   api: Pick<ApiClient, 'albumCoverUrl'>
-  sources: Pick<MediaSources, 'source'>
+  sources: Pick<MediaSources, 'trackSource'>
 }
 
-type AudioItemOfProps = { server: AudioServer; track: Track; platform: AudioPlatform }
+/** A track on this device: its file, and the album cover saved beside it (null for none), as `file://` addresses. */
+type DownloadedTrack = { uri: string; artworkUri: string | null }
+
+/** What this device would play a track from before the server's file: a download, or a smaller stream. */
+export type TrackPlan = {
+  /** The track's download, or null when it is not on this device. */
+  downloadedOf: (track: Track) => DownloadedTrack | null
+  /** The bitrate the network calls for (a transcode on cellular), or null for the file itself. */
+  streamKbps: () => Promise<AudioBitrate | null>
+}
+
+/** A device that downloads nothing and always streams the file itself: the device app. */
+export const SERVER_FILE_PLAN: TrackPlan = {
+  downloadedOf: () => null,
+  streamKbps: async () => null,
+}
+
+type AudioItemOfProps = {
+  server: AudioServer
+  track: Track
+  platform: AudioPlatform
+  plan: TrackPlan
+}
 
 /**
- * A track as `@raven/audio` takes it: the file itself by its ticket, and what the lock screen
- * shows. Null for a track this device's player cannot decode (ALAC on Android, which plays
- * silent), asked of the server not at all; a rejection says why the server would not play it.
+ * A track as `@raven/audio` takes it, and what the lock screen shows. It plays, in order: the
+ * downloaded file and the cover saved with it, with no headers and nothing asked of the server; the AAC transcode at the
+ * bitrate the network calls for; else the file itself by its ticket. A file this device's player
+ * cannot decode (ALAC on Android, which plays silent) plays from the transcode at 256 kbps
+ * instead. A rejection says why the server would not play it.
  */
 export const audioItemOf = async ({
   server,
   track,
   platform,
-}: AudioItemOfProps): Promise<AudioItem | null> => {
-  // A track the server has not probed yet names no codec; the player is left to try it.
-  if (
-    track.codec !== null &&
-    !canPlayAudio({ platform, codec: track.codec, container: track.container })
-  ) {
-    return null
-  }
-  const outcome = await server.sources.source({
-    media: { id: track.id },
-    mode: PLAYBACK_MODES.direct,
-    audio: null,
-    burn: null,
-  })
-  if (!outcome.ok) throw new Error(outcome.message)
-  return {
+  plan,
+}: AudioItemOfProps): Promise<AudioItem> => {
+  const details = {
     id: track.id,
-    uri: outcome.source.uri,
-    headers: outcome.source.headers,
     title: track.title,
     artist: artistNames(track),
     album: track.album.title,
@@ -55,4 +65,21 @@ export const audioItemOf = async ({
     }),
     duration: track.duration,
   }
+  const downloaded = plan.downloadedOf(track)
+  if (downloaded !== null) {
+    return {
+      ...details,
+      uri: downloaded.uri,
+      headers: {},
+      artworkUri: downloaded.artworkUri ?? details.artworkUri,
+    }
+  }
+  // A track the server has not probed yet names no codec; the player is left to try it.
+  const canDecode =
+    track.codec === null ||
+    canPlayAudio({ platform, codec: track.codec, container: track.container })
+  const kbps = (await plan.streamKbps()) ?? (canDecode ? null : AUDIO_BITRATES.standard)
+  const outcome = await server.sources.trackSource({ mediaId: track.id, kbps })
+  if (!outcome.ok) throw new Error(outcome.message)
+  return { ...details, uri: outcome.source.uri, headers: outcome.source.headers }
 }

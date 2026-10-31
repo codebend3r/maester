@@ -1,12 +1,14 @@
-import { describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import {
   DESKTOP_PATHS,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   DOWNLOAD_KINDS,
   DOWNLOAD_STATUS_KINDS,
+  QUEUE_SOURCE_KINDS,
 } from '@raven/core'
 import { Toaster } from '@raven/ui'
+import { useAudioQueue } from '@raven/ui/headless'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
@@ -25,6 +27,7 @@ import {
   sentOfType,
   viewOf,
 } from '@/test/desktop'
+import { track } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 import { playPathOf } from '@/desktop/paths'
 
@@ -42,6 +45,31 @@ const DUNE = viewOf({
   status: { kind: DOWNLOAD_STATUS_KINDS.ready },
   watched: 0.5,
 })
+
+const OK_COMPUTER = {
+  kind: DOWNLOAD_KINDS.album,
+  key: 'album:7',
+  sourceId: 7,
+  title: 'OK Computer',
+  cover: { albumId: 7, coverVersion: 'cover-v1' },
+} as const
+
+const ALBUM_TRACKS = [
+  track({ id: 101, title: 'Airbag', number: 1 }),
+  track({ id: 102, title: 'Paranoid Android', number: 2 }),
+  track({ id: 103, title: 'Subterranean Homesick Alien', number: 3 }),
+]
+
+/** An album's tracks downloaded and ready, each keeping its `Track`. */
+const albumRows = ALBUM_TRACKS.map((each, order) =>
+  viewOf({
+    downloadId: `0b000000-0000-4000-8000-00000000000${order + 1}`,
+    label: each.title,
+    group: { ...OK_COMPUTER, order },
+    status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+    track: each,
+  }),
+)
 
 const renderPage = (client: FakeClient) => {
   asDesktop(client)
@@ -67,6 +95,10 @@ const rowOf = (label: string) => {
 }
 
 describe('DownloadsPage', () => {
+  afterEach(() => {
+    useAudioQueue.getState().clear()
+  })
+
   it('says there is nothing yet', async () => {
     renderPage(downloadsMain())
     expect(await screen.findByText(/Nothing downloaded yet/)).toBeInTheDocument()
@@ -90,6 +122,94 @@ describe('DownloadsPage', () => {
     expect(
       within(rowOf('Dune (2021)')).getByRole('progressbar', { name: '50% watched' }),
     ).toBeInTheDocument()
+  })
+
+  it('heads an album with its cover, its title and how many of its tracks are here', async () => {
+    const tracks = Array.from({ length: 12 }, (_, index) =>
+      viewOf({
+        downloadId: `0a000000-0000-4000-8000-0000000001${String(index).padStart(2, '0')}`,
+        label: `Track ${index + 1}`,
+        group: {
+          kind: DOWNLOAD_KINDS.album,
+          key: 'album:7',
+          sourceId: 7,
+          title: 'OK Computer',
+          order: index,
+          cover: { albumId: 7, coverVersion: 'cover-v1' },
+        },
+        status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+      }),
+    )
+    renderPage(downloadsMain({ downloads: tracks.toReversed() }))
+    const album = await screen.findByRole('region', { name: 'OK Computer' })
+    expect(within(album).getByRole('heading', { name: 'OK Computer' })).toBeInTheDocument()
+    expect(within(album).getByText('12 tracks')).toBeInTheDocument()
+    expect(album.querySelector('img')?.getAttribute('src')).toBe(
+      api.albumCoverUrl({ albumId: 7, coverVersion: 'cover-v1' }),
+    )
+    expect(
+      within(album)
+        .getAllByRole('listitem')
+        .map((row) => row.querySelector('span')?.textContent),
+    ).toEqual(tracks.map(({ label }) => label))
+  })
+
+  it("heads a playlist of one track with its first track's album cover", async () => {
+    renderPage(
+      downloadsMain({
+        downloads: [
+          viewOf({
+            label: 'Late night',
+            group: {
+              kind: DOWNLOAD_KINDS.playlist,
+              key: 'playlist:5',
+              sourceId: 5,
+              title: 'Late night',
+              order: 0,
+              cover: { albumId: 9, coverVersion: 'm1' },
+            },
+          }),
+        ],
+      }),
+    )
+    const playlist = await screen.findByRole('region', { name: 'Late night' })
+    expect(within(playlist).getByText('1 track')).toBeInTheDocument()
+    expect(playlist.querySelector('img')?.getAttribute('src')).toBe(
+      api.albumCoverUrl({ albumId: 9, coverVersion: 'm1' }),
+    )
+  })
+
+  it('shows a ready track neither watched nor set to delete once watched, as a video is', async () => {
+    renderPage(
+      downloadsMain({
+        downloads: [
+          DUNE,
+          viewOf({
+            downloadId: DL_1,
+            label: 'Airbag',
+            track: track({ id: 101, title: 'Airbag' }),
+            group: {
+              kind: DOWNLOAD_KINDS.album,
+              key: 'album:7',
+              sourceId: 7,
+              title: 'OK Computer',
+              order: 1,
+              cover: { albumId: 7, coverVersion: 'cover-v1' },
+            },
+            status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+            watched: 0.5,
+          }),
+        ],
+      }),
+    )
+    await screen.findByRole('region', { name: 'OK Computer' })
+    const airbag = rowOf('Airbag')
+    expect(within(airbag).queryByRole('progressbar')).toBeNull()
+    expect(within(airbag).queryByRole('switch')).toBeNull()
+    expect(within(airbag).getByRole('button', { name: 'Play Airbag' })).toBeInTheDocument()
+    const movie = rowOf('Dune (2021)')
+    expect(within(movie).getByRole('progressbar', { name: '50% watched' })).toBeInTheDocument()
+    expect(within(movie).getByRole('switch')).toBeInTheDocument()
   })
 
   it('pauses, resumes and retries a download, and sets it to delete once watched', async () => {
@@ -157,6 +277,67 @@ describe('DownloadsPage', () => {
     renderPage(client)
     await userEvent.click(await screen.findByRole('button', { name: 'Play Dune (2021)' }))
     await waitFor(() => expect(where()).toBe(playPathOf(FILE_ID)))
+  })
+
+  it("plays a downloaded track with its album's downloaded tracks from it, in no player", async () => {
+    const client = downloadsMain({ downloads: albumRows.toReversed() })
+    renderPage(client)
+    await userEvent.click(await screen.findByRole('button', { name: 'Play Paranoid Android' }))
+    const { queue } = useAudioQueue.getState()
+    expect(queue.items).toEqual([101, 102, 103])
+    expect(queue.at).toBe(1)
+    expect(queue.source).toEqual({ kind: QUEUE_SOURCE_KINDS.album, id: 7 })
+    expect(sentOfType({ client, type: DESKTOP_REQUESTS.openDownload })).toEqual([])
+  })
+
+  it("plays an album's downloaded tracks from the top from its head", async () => {
+    renderPage(downloadsMain({ downloads: albumRows }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Play OK Computer' }))
+    const { queue } = useAudioQueue.getState()
+    expect(queue.items).toEqual([101, 102, 103])
+    expect(queue.at).toBe(0)
+  })
+
+  it('plays a playlist as itself, and leaves out a track still downloading', async () => {
+    const group = {
+      kind: DOWNLOAD_KINDS.playlist,
+      key: 'playlist:5',
+      sourceId: 5,
+      title: 'Late night',
+      cover: { albumId: 9, coverVersion: 'm1' },
+    } as const
+    const [first, second, third] = albumRows
+    if (first === undefined || second === undefined || third === undefined) {
+      throw new Error('expected three rows')
+    }
+    renderPage(
+      downloadsMain({
+        downloads: [
+          { ...third, group: { ...group, order: 0 } },
+          {
+            ...first,
+            group: { ...group, order: 1 },
+            status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: GB },
+          },
+          { ...second, group: { ...group, order: 2 } },
+        ],
+      }),
+    )
+    await userEvent.click(await screen.findByRole('button', { name: 'Play Paranoid Android' }))
+    const { queue } = useAudioQueue.getState()
+    expect(queue.items).toEqual([103, 102])
+    expect(queue.at).toBe(1)
+    expect(queue.source).toEqual({ kind: QUEUE_SOURCE_KINDS.playlist, id: 5 })
+  })
+
+  it('shows no Play on a track of a server Raven no longer holds', async () => {
+    const [, second] = albumRows
+    if (second === undefined) throw new Error('expected a row')
+    renderPage(downloadsMain({ downloads: [{ ...second, track: null }] }))
+    await screen.findByRole('region', { name: 'OK Computer' })
+    expect(screen.queryByRole('button', { name: 'Play Paranoid Android' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Play OK Computer' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Delete Paranoid Android' })).toBeInTheDocument()
   })
 
   it('asks before deleting, frees the room it says, and can be talked out of it', async () => {

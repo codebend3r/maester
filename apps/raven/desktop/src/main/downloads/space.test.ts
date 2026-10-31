@@ -10,7 +10,7 @@ import {
   sidecarPathFor,
   SPACE_RESERVE_BYTES,
   subtitlesDirFor,
-  videoPathFor,
+  mediaPathFor,
   type SpaceFs,
 } from '@/main/downloads/space'
 
@@ -60,7 +60,7 @@ describe('path builders', () => {
     )
     expect(entryDirFor(part)).toBe(`/data/downloads/${SERVER_ID}/42`)
     expect(subtitlesDirFor(part)).toBe(`/data/downloads/${SERVER_ID}/42/subtitles`)
-    expect(videoPathFor({ ...part, container: 'mkv' })).toBe(
+    expect(mediaPathFor({ ...part, container: 'mkv' })).toBe(
       `/data/downloads/${SERVER_ID}/42/video.mkv`,
     )
     expect(partPathFor({ ...part, container: 'mkv' })).toBe(
@@ -71,10 +71,22 @@ describe('path builders', () => {
     )
   })
 
+  it('names a track media.<container> and anything else video.<container>', () => {
+    expect(mediaPathFor({ ...part, container: 'flac' })).toBe(
+      `/data/downloads/${SERVER_ID}/42/media.flac`,
+    )
+    expect(partPathFor({ ...part, container: 'm4a' })).toBe(
+      `/data/downloads/${SERVER_ID}/42/media.m4a.part`,
+    )
+    expect(mediaPathFor({ ...part, container: 'mkv' })).toBe(
+      `/data/downloads/${SERVER_ID}/42/video.mkv`,
+    )
+  })
+
   it('refuses a container that is not a short lowercase name', () => {
-    expect(() => videoPathFor({ ...part, container: '../x' })).toThrow(RangeError)
+    expect(() => mediaPathFor({ ...part, container: '../x' })).toThrow(RangeError)
     expect(() => partPathFor({ ...part, container: 'MKV' })).toThrow(RangeError)
-    expect(() => videoPathFor({ ...part, container: 'abcdefghi' })).toThrow(RangeError)
+    expect(() => mediaPathFor({ ...part, container: 'abcdefghi' })).toThrow(RangeError)
   })
 
   it('refuses a track id that is not external-<n>', () => {
@@ -86,7 +98,7 @@ describe('path builders', () => {
     const bad = { ...part, serverId: '../etc' }
     expect(() => serverDirFor({ userData: USER_DATA, serverId: '..' })).toThrow(RangeError)
     expect(() => entryDirFor(bad)).toThrow(RangeError)
-    expect(() => videoPathFor({ ...bad, container: 'mkv' })).toThrow(RangeError)
+    expect(() => mediaPathFor({ ...bad, container: 'mkv' })).toThrow(RangeError)
     expect(() => partPathFor({ ...bad, container: 'mkv' })).toThrow(RangeError)
     expect(() => sidecarPathFor({ ...bad, trackId: 'external-1' })).toThrow(RangeError)
   })

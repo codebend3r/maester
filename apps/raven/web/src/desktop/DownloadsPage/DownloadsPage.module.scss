@@ -92,6 +92,41 @@
   font-size: var(--font-size-lg);
 }
 
+// An album or playlist: its cover a control tall, beside its name over its track count, then Play.
+.musicHead {
+  display: grid;
+  grid-template-columns: var(--control-size-tall) minmax(0, 1fr) auto;
+  grid-template-areas:
+    'cover title play'
+    'cover count play';
+  gap: 0 var(--space-3);
+  align-items: center;
+}
+
+.cover {
+  grid-area: cover;
+  inline-size: var(--control-size-tall);
+  block-size: var(--control-size-tall);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.musicTitle {
+  grid-area: title;
+  font-size: var(--font-size-lg);
+  overflow-wrap: anywhere;
+}
+
+.trackCount {
+  grid-area: count;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.headPlay {
+  grid-area: play;
+}
+
 .rows {
   display: grid;
   gap: var(--space-2);
@@ -155,6 +190,12 @@
   justify-content: end;
 }
 
+// A track has no switch, so its actions leave the switch's place out.
+.musicActions {
+  grid-template-columns: auto auto;
+  grid-template-areas: 'act remove';
+}
+
 .act {
   grid-area: act;
 }
@@ -209,7 +250,7 @@
   }
 }
 
-// A phone's card: the switch over the two buttons, and the question over its answers.
+// A phone's card: the switch over the two buttons (a track has none), and the question over its answers.
 @container (max-width: 30rem) {
   .row {
     padding: var(--space-3);
@@ -221,6 +262,10 @@
       'auto auto'
       'act remove';
     justify-content: space-between;
+  }
+
+  .musicActions {
+    grid-template-areas: 'act remove';
   }
 
   .asking {

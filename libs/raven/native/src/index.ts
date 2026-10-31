@@ -6,7 +6,7 @@ export {
   createAccountSession,
 } from '@/account/accountSession'
 export { secretStore } from '@/servers/deviceSecretStore'
-export { watchNetwork } from '@/servers/networkChanges'
+export { isOnCellular, watchNetwork } from '@/servers/networkChanges'
 export { type ApiForProps, apiFor, cookieJar, openEventsFor } from '@/servers/serverClient'
 export { Icon } from '@/icons/Icon'
 export { useNativeAudioHost } from '@/music/useNativeAudioHost'

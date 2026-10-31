@@ -1,0 +1,31 @@
+appId: app.netlify.wren
+name: An album downloads from its page and is listed under Library's Downloads
+---
+- runFlow: steps/signIn.yaml
+- extendedWaitUntil:
+    visible: Recently added
+    timeout: 30000
+- tapOn: Library.*
+- tapOn: Albums
+- extendedWaitUntil:
+    visible: Morning Chorus.*
+    timeout: 30000
+- tapOn: Morning Chorus.*
+- extendedWaitUntil:
+    visible: Download
+    timeout: 30000
+- tapOn: Download
+# The server transcodes each track on first ask, two at a time.
+- extendedWaitUntil:
+    visible: Remove download
+    timeout: 120000
+- tapOn: Back
+# Library's segments scroll sideways on a phone, so Downloads waits past the right edge.
+- swipe:
+    start: 85%, 20%
+    end: 15%, 20%
+- tapOn: Downloads
+- extendedWaitUntil:
+    visible: Morning Chorus
+    timeout: 30000
+# Each flow signs in with `clearState`, which empties the downloads with the rest.

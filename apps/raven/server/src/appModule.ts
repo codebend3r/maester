@@ -87,6 +87,7 @@ import { MusicFavourites } from '@/music/musicFavourites'
 import { Playlists } from '@/music/playlists'
 import { PlaylistsController } from '@/music/playlistsController'
 import { TrackLyrics } from '@/music/trackLyrics'
+import { TranscodeCache } from '@/music/transcodeCache'
 import { AudioReader } from '@/music/audioReader'
 import {
   AlbumsController,
@@ -250,6 +251,7 @@ export class AppModule {
         MusicFavourites,
         Playlists,
         TrackLyrics,
+        TranscodeCache,
         AlbumMatching,
         MatchFiles,
         AiDecisions,

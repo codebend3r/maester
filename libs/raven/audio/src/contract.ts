@@ -32,9 +32,45 @@ export const AUDIO_PLAYER_EVENTS = {
   ended: 'ended',
   error: 'error',
   remote: 'remote',
+  browse: 'browse',
+  playFromBrowse: 'playFromBrowse',
 } as const
 
-/** What the native player reports: where it is, that it moved on by itself, ran out, or failed. */
+/** The ids of the browse tree's top: what CarPlay and Android Auto ask for first, and its tabs. */
+export const BROWSE_ROOTS = {
+  home: 'root',
+  albums: 'albums',
+  playlists: 'playlists',
+  downloads: 'downloads',
+} as const
+
+/** One entry of CarPlay's and Android Auto's lists: a folder to open, or something to play. */
+export const isBrowseNode = object({
+  id: isString,
+  title: isString,
+  subtitle: nullable(isString),
+  artworkUri: nullable(isString),
+  isPlayable: isBoolean,
+})
+
+export type BrowseNode = Infer<typeof isBrowseNode>
+
+/** Wren's answer to one `browse` request, which native matches to it by `requestId`. */
+export type BrowseAnswer = {
+  /** The `browse` event's own id. */
+  requestId: string
+  nodes: BrowseNode[]
+  /**
+   * What the server's covers need on their request (its cookies, the account's token), sent by
+   * native with every http cover of this answer; a downloaded `file://` cover needs none.
+   */
+  artworkHeaders: Record<string, string>
+}
+
+/**
+ * What the native player reports: where it is, that it moved on by itself, ran out, or failed;
+ * and what the car asks: a list to browse, or a node to play.
+ */
 export const isAudioPlayerEvent = union(
   object({
     type: oneOf([AUDIO_PLAYER_EVENTS.state]),
@@ -49,6 +85,10 @@ export const isAudioPlayerEvent = union(
   object({ type: oneOf([AUDIO_PLAYER_EVENTS.ended]) }),
   object({ type: oneOf([AUDIO_PLAYER_EVENTS.error]), message: isString }),
   object({ type: oneOf([AUDIO_PLAYER_EVENTS.remote]), command: isRemoteCommand }),
+  // CarPlay or Android Auto asks for the children of `parentId`, answered by `answerBrowse`.
+  object({ type: oneOf([AUDIO_PLAYER_EVENTS.browse]), requestId: isString, parentId: isString }),
+  // A playable node was chosen in the car.
+  object({ type: oneOf([AUDIO_PLAYER_EVENTS.playFromBrowse]), id: isString }),
 )
 
 export type AudioPlayerEvent = Infer<typeof isAudioPlayerEvent>

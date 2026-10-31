@@ -19,6 +19,31 @@ jest.mock('@raven/audio', () => ({
     setVolume: jest.fn(async () => undefined),
     setRate: jest.fn(async () => undefined),
     stop: jest.fn(async () => undefined),
+    answerBrowse: jest.fn(async () => undefined),
+    clearBrowseCache: jest.fn(async () => undefined),
     onEvent: jest.fn(() => ({ remove: () => undefined })),
+  },
+}))
+
+// jest has no AsyncStorage native module: Wren's prefs and downloads read nothing back and
+// keep what they write for the test alone.
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: {
+    getItem: async () => null,
+    setItem: async () => undefined,
+    removeItem: async () => undefined,
+  },
+}))
+
+// jest has no file system: every download a test holds is on disk, and no folder is stray.
+jest.mock('@/downloads/downloader', () => ({
+  deviceDisk: {
+    fetch: async () => 0,
+    uriOf: (path: string) => `file:///documents/${path}`,
+    exists: () => true,
+    folders: () => [],
+    remove: async () => undefined,
+    removeAll: async () => undefined,
   },
 }))

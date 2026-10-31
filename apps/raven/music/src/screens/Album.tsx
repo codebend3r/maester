@@ -9,14 +9,17 @@ import {
 } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useState } from 'react'
 import { Pressable, SectionList, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 
 import { AlbumArt } from '@/components/AlbumTile'
 import { FavouriteToggle, PlayButtons } from '@/components/Controls'
 import { BackButton, DetailRoute } from '@/components/DetailPage'
+import { DownloadButton } from '@/components/DownloadButton'
 import { Notice } from '@/components/Notice'
 import { pageStyles, useListContent } from '@/components/TabPage'
 import { TrackRow } from '@/components/TrackRow'
+import { DOWNLOAD_SOURCES } from '@/downloads/downloadStore'
 import { useCovers } from '@/music/useCovers'
 import { ALBUM_COPY } from '@/screens/copy'
 import { WREN_PAGES, WREN_ROUTE_PARAMS, pageHref } from '@/routes'
@@ -36,6 +39,7 @@ function AlbumPage({ session, details }: AlbumPageProps) {
   const playTracks = useAudioQueue((store) => store.playTracks)
   const { album, tracks, discCount, isFavourite } = details
   const favourite = useServerAlbumFavourite({ api: session.api, albumId: album.id })
+  const [refusal, setRefusal] = useState<string | null>(null)
   const source = { kind: QUEUE_SOURCE_KINDS.album, id: album.id } as const
   const coverSize = Math.min(width - 2 * SIZES.space4, SIZES.measure / 2)
   const discs = albumDiscsOf({ tracks, discCount }).map((disc) => ({ ...disc, data: disc.tracks }))
@@ -90,7 +94,16 @@ function AlbumPage({ session, details }: AlbumPageProps) {
             />
             <FavouriteToggle isOn={isFavourite} onToggle={() => favourite.mutate(!isFavourite)} />
           </View>
+          <View style={styles.actions}>
+            <DownloadButton
+              collection={{ kind: DOWNLOAD_SOURCES.album, album }}
+              onRefusal={setRefusal}
+              serverId={session.server.id}
+              tracks={tracks}
+            />
+          </View>
           {favourite.failure !== null && <Notice text={favourite.failure.message} />}
+          {refusal !== null && <Notice text={refusal} />}
         </View>
       }
       contentContainerStyle={content}

@@ -379,6 +379,8 @@ type EncodeTrackProps = {
   >
   /** A JPEG to embed as the cover, as `encodeImage` writes one. */
   cover?: string | null
+  /** Stereo white noise in place of the tone, which leaves a lossy encoder too little to spend its bitrate on. */
+  isNoise?: boolean
 }
 
 /**
@@ -391,6 +393,7 @@ export const encodeTrack = async ({
   seconds = 2,
   tags = {},
   cover = null,
+  isNoise = false,
 }: EncodeTrackProps): Promise<void> => {
   const codecs: Record<string, string> = {
     mp3: 'libmp3lame',
@@ -408,7 +411,9 @@ export const encodeTrack = async ({
     '-f',
     'lavfi',
     '-i',
-    `sine=frequency=440:sample_rate=44100:duration=${seconds}`,
+    isNoise
+      ? `anoisesrc=sample_rate=44100:duration=${seconds}`
+      : `sine=frequency=440:sample_rate=44100:duration=${seconds}`,
     ...(cover == null
       ? []
       : [
@@ -423,6 +428,7 @@ export const encodeTrack = async ({
           '-disposition:v:0',
           'attached_pic',
         ]),
+    ...(isNoise ? ['-ac', '2'] : []),
     '-c:a',
     codec,
     ...Object.entries(tags).flatMap(([key, value]) => ['-metadata', `${key}=${value}`]),

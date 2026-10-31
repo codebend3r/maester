@@ -1,5 +1,11 @@
 import { join } from 'node:path'
-import { isContainerName, isMediaId, isOpaqueId, isSidecarTrackId } from '@raven/core'
+import {
+  isAudioContainer,
+  isContainerName,
+  isMediaId,
+  isOpaqueId,
+  isSidecarTrackId,
+} from '@raven/core'
 
 /** What a download leaves free on the disk, so the system and Raven keep room to work. */
 export const SPACE_RESERVE_BYTES = 2 * 1024 ** 3
@@ -50,17 +56,20 @@ export const entryDirFor = ({ userData, serverId, mediaId }: EntryParts): string
   return join(serverDirFor({ userData, serverId }), String(mediaId))
 }
 
-export const videoPathFor = ({
-  container,
-  ...entry
-}: EntryParts & { container: string }): string => {
+type MediaPathForProps = EntryParts & { container: string }
+
+/**
+ * The downloaded file: `media.<container>` for a track, `video.<container>` for anything else,
+ * the name every video downloaded before music kept, so none moves.
+ */
+export const mediaPathFor = ({ container, ...entry }: MediaPathForProps): string => {
   if (!isContainerName(container)) throw new RangeError('A download needs a container name')
-  return join(entryDirFor(entry), `video.${container}`)
+  const name = isAudioContainer(container) ? 'media' : 'video'
+  return join(entryDirFor(entry), `${name}.${container}`)
 }
 
-/** Where the video lands while it downloads, before it is renamed to `video.<container>`. */
-export const partPathFor = (parts: EntryParts & { container: string }): string =>
-  `${videoPathFor(parts)}.part`
+/** Where the file lands while it downloads, before it is renamed to its `mediaPathFor`. */
+export const partPathFor = (parts: MediaPathForProps): string => `${mediaPathFor(parts)}.part`
 
 export const subtitlesDirFor = (parts: EntryParts): string => join(entryDirFor(parts), 'subtitles')
 

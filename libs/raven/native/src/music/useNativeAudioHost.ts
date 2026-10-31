@@ -11,7 +11,8 @@ import {
 import { useEffect, useEffectEvent, useMemo } from 'react'
 import { Platform } from 'react-native'
 
-import { audioItemOf } from '@/music/audioItem'
+import { SERVER_FILE_PLAN, type TrackPlan, audioItemOf } from '@/music/audioItem'
+import { type CarBrowse, NO_CAR_BROWSE } from '@/music/carBrowse'
 import { nativePlayerOf } from '@/music/nativePlayer'
 import { watchAppHide } from '@/player/watchAppHide'
 import type { MediaSources } from '@/servers/mediaAccess'
@@ -30,26 +31,41 @@ type UseNativeAudioHostProps = {
    * Where a server's tracks play from, made once per server (`lastPerServer`) and asked for only
    * as a track is, so nothing watches the network before music plays.
    */
-  sourcesFor: (server: AppServer) => Pick<MediaSources, 'source'>
+  sourcesFor: (server: AppServer) => Pick<MediaSources, 'trackSource'>
+  /** What a track plays from before the server's file; the file alone when the app downloads nothing. */
+  plan?: TrackPlan
+  /** Answers CarPlay and Android Auto; the device app, with no car, answers nothing. */
+  car?: CarBrowse
 }
 
 /**
  * Music on a phone or a tablet: `@raven/audio` plays the shared queue store's track with the
  * next one ready behind it, as the desktop's engine does, so the seam plays in the background;
  * the lock screen's controls come back as remote commands and drive the store. A track this
- * device cannot decode is said and passed over. An audiobook plays at the prefs' speed, music
+ * device cannot decode plays from the server's AAC transcode. An audiobook plays at the prefs' speed, music
  * at 1.
  */
-export const useNativeAudioHost = ({ api, server, sourcesFor }: UseNativeAudioHostProps): void => {
+export const useNativeAudioHost = ({
+  api,
+  server,
+  sourcesFor,
+  plan = SERVER_FILE_PLAN,
+  car = NO_CAR_BROWSE,
+}: UseNativeAudioHostProps): void => {
   const engine = useAudioQueue((store) => store.engine)
   const player = useMemo(
     () =>
       nativePlayerOf({
         audio: audioPlayer,
         itemOf: (track: Track) =>
-          audioItemOf({ server: { api, sources: sourcesFor(server) }, track, platform: PLATFORM }),
+          audioItemOf({
+            server: { api, sources: sourcesFor(server) },
+            track,
+            platform: PLATFORM,
+            plan,
+          }),
       }),
-    [api, server, sourcesFor],
+    [api, server, sourcesFor, plan],
   )
   // An audiobook's spot is saved as the app leaves the foreground, as the film player's is.
   const host = useWindowedAudioHost({ api, player, watchHide: watchAppHide })
@@ -77,6 +93,10 @@ export const useNativeAudioHost = ({ api, server, sourcesFor }: UseNativeAudioHo
         return engine.failed(event.message)
       case AUDIO_PLAYER_EVENTS.remote:
         return runRemoteCommand(event.command)
+      case AUDIO_PLAYER_EVENTS.browse:
+        return car.browse(event)
+      case AUDIO_PLAYER_EVENTS.playFromBrowse:
+        return car.play(event)
       default: {
         const unreachable: never = event
         return unreachable

@@ -7,6 +7,8 @@ import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@/session'
 import { LISTENER, MIXTAPE, MIXTAPE_PAGE, musicApi } from '@/test/music'
+import { WREN_PAGES } from '@/routes'
+import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()
@@ -36,7 +38,9 @@ describe('Playlist', () => {
   })
 
   it("lists the playlist's tracks in its order, and plays it from the top or a track", async () => {
-    await renderRouter(WREN_TREE, { initialUrl: `/playlist/${MIXTAPE.id}` })
+    await renderRouter(WREN_TREE, {
+      initialUrl: pagePathOf({ page: WREN_PAGES.playlist, id: MIXTAPE.id }),
+    })
     expect(await screen.findByRole('header', { name: MIXTAPE.name })).toBeTruthy()
     expect(screen.getByText('2 tracks · 10 min')).toBeTruthy()
     expect(
@@ -52,7 +56,9 @@ describe('Playlist', () => {
 
   it('says when the playlist is empty', async () => {
     mockApi.getPlaylist.mockResolvedValue({ playlist: { ...MIXTAPE, trackCount: 0 }, tracks: [] })
-    await renderRouter(WREN_TREE, { initialUrl: `/playlist/${MIXTAPE.id}` })
+    await renderRouter(WREN_TREE, {
+      initialUrl: pagePathOf({ page: WREN_PAGES.playlist, id: MIXTAPE.id }),
+    })
     expect(
       await screen.findByText("Nothing in Mixtape yet. Add songs from any track's menu."),
     ).toBeTruthy()
