@@ -849,6 +849,7 @@ const startApp = (): void => {
       config,
       sources: musicSources,
       relay: musicRelay,
+      downloads,
       serverId: () => theServer().id,
       timers,
       platform,

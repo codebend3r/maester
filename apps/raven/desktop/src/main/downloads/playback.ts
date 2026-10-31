@@ -105,6 +105,12 @@ export type DownloadPlayback = {
    */
   openTitle: (input: OpenTitleProps) => Promise<string | null>
   /**
+   * The file of a track's ready download, which the music engine in main plays in place of
+   * the server's: a path, since no page holds it, and so no grant, which takes only videos.
+   * Null when there is none, it is still downloading, or its file has gone.
+   */
+  trackPathOf: (input: OpenTitleProps) => Promise<string | null>
+  /**
    * The next ready download of a granted download's group, granted, for a play whose queue has
    * run out (opened from On this Mac's recents, or past `MAX_QUEUE`); null after the last, and for any
    * other file.
@@ -328,6 +334,14 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     return fileId
   }
 
+  const trackPathOf: DownloadPlayback['trackPathOf'] = async ({ serverId, mediaId }) => {
+    const entry = entryByMedia(store.read(), { serverId, mediaId })
+    if (entry === null || entry.status.kind !== DOWNLOAD_STATUS_KINDS.ready) return null
+    const facts = await readFileFacts({ stat: deps.stat, path: mediaPathOf(entry) })
+    if (facts === null) deps.warn(`Raven could not open the file of ${loggable(entry.label)}`)
+    return facts?.path ?? null
+  }
+
   const nextOf: DownloadPlayback['nextOf'] = async ({ fileId }) => {
     const entry = entryOfFile(fileId)
     return entry === null ? null : firstGranted(laterReady(entry))
@@ -472,6 +486,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   return {
     open,
     openTitle,
+    trackPathOf,
     nextOf,
     sidecarsOf,
     fromLabelOf,

@@ -4,6 +4,7 @@ import {
   type DownloadStatus,
   type DownloadView,
   formatBytes,
+  isMusicGroup,
   KEYS,
 } from '@raven/core'
 import { Button, type IconName, UNLOCK_SECRETS, UnlockDialog } from '@raven/ui'
@@ -135,19 +136,23 @@ const FailedLine = ({ view }: FailedLineProps) =>
     <span>{DOWNLOAD_ROW_COPY.failed(view.status.message)}</span>
   )
 
+/** Whether a download is watched, and so may delete itself once it is: a track never is. */
+const isWatchable = ({ group }: DownloadView): boolean => !isMusicGroup(group)
+
 type ReadyLineProps = StatusLineProps
 
-const ReadyLine = ({ view }: ReadyLineProps) => (
-  <>
-    <progress
-      className={styles.gauge}
-      max={1}
-      value={view.watched ?? 0}
-      aria-label={watchedLabel(view.watched)}
-    />
-    {view.deletesAt !== null && <DeletesIn at={view.deletesAt} />}
-  </>
-)
+const ReadyLine = ({ view }: ReadyLineProps) =>
+  isWatchable(view) && (
+    <>
+      <progress
+        className={styles.gauge}
+        max={1}
+        value={view.watched ?? 0}
+        aria-label={watchedLabel(view.watched)}
+      />
+      {view.deletesAt !== null && <DeletesIn at={view.deletesAt} />}
+    </>
+  )
 
 /** Where a download stands: its progress, its wait, why it stopped, or how much of it was watched. */
 const STATUS_LINES = {
@@ -248,17 +253,19 @@ const ViewingRow = ({
         >
           {actionButton.label}
         </Button>
-        <label className={styles.auto}>
-          <input
-            type="checkbox"
-            role="switch"
-            checked={view.shouldAutoDelete}
-            aria-checked={view.shouldAutoDelete}
-            aria-describedby={ids.label}
-            onChange={(event) => onAutoDelete(event.target.checked)}
-          />
-          {COMMON_COPY.deleteOnceWatched}
-        </label>
+        {isWatchable(view) && (
+          <label className={styles.auto}>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={view.shouldAutoDelete}
+              aria-checked={view.shouldAutoDelete}
+              aria-describedby={ids.label}
+              onChange={(event) => onAutoDelete(event.target.checked)}
+            />
+            {COMMON_COPY.deleteOnceWatched}
+          </label>
+        )}
         <Button
           ref={deleteButton}
           className={styles.remove}

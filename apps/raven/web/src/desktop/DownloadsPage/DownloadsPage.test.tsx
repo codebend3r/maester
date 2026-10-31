@@ -145,6 +145,37 @@ describe('DownloadsPage', () => {
     )
   })
 
+  it('shows a ready track neither watched nor set to delete once watched, as a video is', async () => {
+    renderPage(
+      downloadsMain({
+        downloads: [
+          DUNE,
+          viewOf({
+            downloadId: DL_1,
+            label: 'Airbag',
+            group: {
+              kind: DOWNLOAD_KINDS.album,
+              key: 'album:7',
+              title: 'OK Computer',
+              order: 1,
+              cover: { albumId: 7, coverVersion: 'cover-v1' },
+            },
+            status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+            watched: 0.5,
+          }),
+        ],
+      }),
+    )
+    await screen.findByRole('region', { name: 'OK Computer' })
+    const track = rowOf('Airbag')
+    expect(within(track).queryByRole('progressbar')).toBeNull()
+    expect(within(track).queryByRole('switch')).toBeNull()
+    expect(within(track).getByRole('button', { name: 'Play Airbag' })).toBeInTheDocument()
+    const movie = rowOf('Dune (2021)')
+    expect(within(movie).getByRole('progressbar', { name: '50% watched' })).toBeInTheDocument()
+    expect(within(movie).getByRole('switch')).toBeInTheDocument()
+  })
+
   it('pauses, resumes and retries a download, and sets it to delete once watched', async () => {
     const client = downloadsMain({
       downloads: [

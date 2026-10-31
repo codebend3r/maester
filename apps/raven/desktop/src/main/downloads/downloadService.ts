@@ -83,6 +83,7 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     DownloadPlayback,
     | 'open'
     | 'openTitle'
+    | 'trackPathOf'
     | 'nextOf'
     | 'sidecarsOf'
     | 'fromLabelOf'
@@ -528,6 +529,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     showFolder,
     open: playback.open,
     openTitle: playback.openTitle,
+    trackPathOf: playback.trackPathOf,
     nextOf: playback.nextOf,
     sidecarsOf: playback.sidecarsOf,
     fromLabelOf: playback.fromLabelOf,
