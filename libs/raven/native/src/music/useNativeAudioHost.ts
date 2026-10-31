@@ -11,7 +11,7 @@ import {
 import { useEffect, useEffectEvent, useMemo } from 'react'
 import { Platform } from 'react-native'
 
-import { audioItemOf } from '@/music/audioItem'
+import { SERVER_FILE_PLAN, type TrackPlan, audioItemOf } from '@/music/audioItem'
 import { nativePlayerOf } from '@/music/nativePlayer'
 import { watchAppHide } from '@/player/watchAppHide'
 import type { MediaSources } from '@/servers/mediaAccess'
@@ -30,7 +30,9 @@ type UseNativeAudioHostProps = {
    * Where a server's tracks play from, made once per server (`lastPerServer`) and asked for only
    * as a track is, so nothing watches the network before music plays.
    */
-  sourcesFor: (server: AppServer) => Pick<MediaSources, 'source'>
+  sourcesFor: (server: AppServer) => Pick<MediaSources, 'trackSource'>
+  /** What a track plays from before the server's file; the file alone when the app downloads nothing. */
+  plan?: TrackPlan
 }
 
 /**
@@ -40,16 +42,26 @@ type UseNativeAudioHostProps = {
  * device cannot decode is said and passed over. An audiobook plays at the prefs' speed, music
  * at 1.
  */
-export const useNativeAudioHost = ({ api, server, sourcesFor }: UseNativeAudioHostProps): void => {
+export const useNativeAudioHost = ({
+  api,
+  server,
+  sourcesFor,
+  plan = SERVER_FILE_PLAN,
+}: UseNativeAudioHostProps): void => {
   const engine = useAudioQueue((store) => store.engine)
   const player = useMemo(
     () =>
       nativePlayerOf({
         audio: audioPlayer,
         itemOf: (track: Track) =>
-          audioItemOf({ server: { api, sources: sourcesFor(server) }, track, platform: PLATFORM }),
+          audioItemOf({
+            server: { api, sources: sourcesFor(server) },
+            track,
+            platform: PLATFORM,
+            plan,
+          }),
       }),
-    [api, server, sourcesFor],
+    [api, server, sourcesFor, plan],
   )
   // An audiobook's spot is saved as the app leaves the foreground, as the film player's is.
   const host = useWindowedAudioHost({ api, player, watchHide: watchAppHide })

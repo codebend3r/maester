@@ -31,6 +31,16 @@ export const SETTINGS_COPY = {
   server: 'Server',
   about: 'About',
   version: (version: string) => `Wren ${version}`,
+  downloads: 'Downloads',
+  downloadQuality: 'Download quality',
+  cellularQuality: 'Cellular quality',
+  storageLimit: 'Storage limit',
+  original: 'Original',
+  kbps: (kbps: number) => `${kbps} kbps`,
+  noLimit: 'Off',
+  gigabytes: (gigabytes: number) => `${gigabytes} GB`,
+  used: (size: string) => `${size} used by downloads`,
+  removeAll: 'Remove all downloads',
 } as const
 
 export const HOME_COPY = {
@@ -50,6 +60,18 @@ export const LIBRARY_PAGE_COPY = {
   noArtists: 'No artists yet.',
   noSongs: 'No songs yet.',
   noPlaylists: 'No playlists yet. Add a track to one from its menu.',
+  downloads: 'Downloads',
+  noDownloads: 'Nothing downloaded yet. Download an album or a playlist from its page.',
+} as const
+
+type DownloadingProps = { done: number; total: number }
+
+/** What an album's or a playlist's download button says in each state. */
+export const DOWNLOAD_BUTTON_COPY = {
+  download: 'Download',
+  downloading: ({ done, total }: DownloadingProps) => `Downloading ${done} of ${total}`,
+  remove: 'Remove download',
+  retry: 'Retry download',
 } as const
 
 /** How an artist's albums and tracks are counted: "3 albums · 41 tracks". */

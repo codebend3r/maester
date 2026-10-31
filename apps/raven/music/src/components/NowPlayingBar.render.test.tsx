@@ -18,6 +18,8 @@ jest.mock('expo-splash-screen', () => ({
 }))
 jest.mock('@raven/native', () => ({
   ...jest.requireActual<typeof Native>('@raven/native'),
+  // jest has no NetInfo native module to ask; the device is on Wi-Fi.
+  isOnCellular: async () => false,
   apiFor: () => mockApi,
   watchNetwork: () => () => undefined,
   cookieJar: { read: async () => ({}), forget: async () => {} },

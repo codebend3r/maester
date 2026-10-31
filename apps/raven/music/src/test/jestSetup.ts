@@ -22,3 +22,14 @@ jest.mock('@raven/audio', () => ({
     onEvent: jest.fn(() => ({ remove: () => undefined })),
   },
 }))
+
+// jest has no AsyncStorage native module: Wren's prefs and downloads read nothing back and
+// keep what they write for the test alone.
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: {
+    getItem: async () => null,
+    setItem: async () => undefined,
+    removeItem: async () => undefined,
+  },
+}))

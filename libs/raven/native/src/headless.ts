@@ -17,6 +17,7 @@ export {
   parseBrowseId,
   tracksForBrowse,
 } from '@/music/browseTree'
+export type { TrackPlan } from '@/music/audioItem'
 export { musicLibrariesOf } from '@/music/musicLibraries'
 export { nativePlayerOf } from '@/music/nativePlayer'
 export { createActiveServerStore } from '@/servers/activeServerStore'

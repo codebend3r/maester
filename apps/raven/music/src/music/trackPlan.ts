@@ -1,0 +1,32 @@
+import type { TrackPlan } from '@raven/native/headless'
+
+import { downloadedOf, useDownloads } from '@/downloads/downloadStore'
+import { useWrenPrefs } from '@/stores/wrenPrefs'
+
+type TrackPlanForProps = {
+  serverId: string
+  /** Whether the device is on a mobile network now. */
+  isOnCellular: () => Promise<boolean>
+  /** The `file://` address a download's path is at now. */
+  uriOf: (path: string) => string
+}
+
+/**
+ * What Wren plays a track from before the server's file: its download from this server, then
+ * on a mobile network the transcode at "Cellular quality". A network that cannot be read is
+ * taken for Wi-Fi.
+ */
+export const trackPlanFor = ({ serverId, isOnCellular, uriOf }: TrackPlanForProps): TrackPlan => ({
+  downloadedUriOf: (track) => {
+    const entry = downloadedOf({
+      entries: useDownloads.getState().entries,
+      serverId,
+      mediaId: track.id,
+    })
+    return entry === undefined ? null : uriOf(entry.path)
+  },
+  streamKbps: async () => {
+    const isCellular = await isOnCellular().catch(() => false)
+    return isCellular ? useWrenPrefs.getState().cellularKbps : null
+  },
+})

@@ -185,9 +185,12 @@ const DOWNLOADED_ALBUMS = [
   albumFor({ id: 4, libraryId: MUSIC.id, addedAt: dayOf(2) }),
 ]
 
-/** Two downloaded albums, and album 3's tracks and one of album 4's on the device. */
+const DOWNLOADED_PLAYLIST = { ...PLAYLIST, id: 12, name: 'Offline mix' }
+
+/** Two downloaded albums and a playlist, and album 3's tracks and one of album 4's on the device. */
 const downloads: DownloadedLibrary = {
   albums: () => DOWNLOADED_ALBUMS,
+  playlists: () => [DOWNLOADED_PLAYLIST],
   tracksOf: (target: BrowseTarget) => {
     switch (target.kind) {
       case BROWSE_KINDS.album:
@@ -288,14 +291,14 @@ describe('the browse tree', () => {
     ])
   })
 
-  it('gives the downloaded albums under Downloads', async () => {
+  it('gives the downloaded albums, then the downloaded playlists, under Downloads', async () => {
     const { api } = fakeApi()
     const nodes = await browseChildrenOf({ api, downloads, parentId: BROWSE_ROOTS.downloads })
-    expect(nodes.map(({ id }) => id)).toEqual(['album:3', 'album:4'])
+    expect(nodes.map(({ id }) => id)).toEqual(['album:3', 'album:4', 'playlist:12'])
     expect(nodes[1]?.artworkUri).toBe('https://raven.example/api/pictures/albums/4/v4')
   })
 
-  it('offline, gives the downloaded albums only, with no covers and no playlists', async () => {
+  it('offline, gives what is downloaded only, the albums with no covers', async () => {
     const albums = await browseChildrenOf({ api: null, downloads, parentId: BROWSE_ROOTS.albums })
     expect(albums.map(({ id }) => id)).toEqual(['album:3', 'album:4'])
     expect(albums.map(({ artworkUri }) => artworkUri)).toEqual([null, null])
@@ -304,10 +307,18 @@ describe('the browse tree', () => {
       downloads,
       parentId: BROWSE_ROOTS.downloads,
     })
-    expect(offline).toEqual(albums)
+    expect(offline.map(({ id }) => id)).toEqual(['album:3', 'album:4', 'playlist:12'])
     expect(
       await browseChildrenOf({ api: null, downloads, parentId: BROWSE_ROOTS.playlists }),
-    ).toEqual([])
+    ).toEqual([
+      {
+        id: 'playlist:12',
+        title: 'Offline mix',
+        subtitle: null,
+        artworkUri: null,
+        isPlayable: true,
+      },
+    ])
   })
 
   it('gives nothing under a playable node or an id it does not know', async () => {

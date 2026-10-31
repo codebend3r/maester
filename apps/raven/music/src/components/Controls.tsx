@@ -13,8 +13,8 @@ type ActionButtonProps = {
   isPrimary?: boolean
 }
 
-/** A page's action under the thumb: Play, Shuffle. */
-function ActionButton({ label, icon, onPress, isPrimary = false }: ActionButtonProps) {
+/** A page's action under the thumb: Play, Shuffle, Download. */
+export function ActionButton({ label, icon, onPress, isPrimary = false }: ActionButtonProps) {
   const colour = isPrimary ? PALETTE.onAccent : PALETTE.text
   return (
     <Pressable

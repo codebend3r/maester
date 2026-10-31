@@ -2,16 +2,22 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
 
-type Segment<K extends string> = { key: K; label: string }
+/** How far a label may shrink to fit its segment before it is cut short, on a narrow phone. */
+const MINIMUM_FONT_SCALE = 0.7
 
-type SegmentsProps<K extends string> = {
+/** What a segment stands for: a list's name, or a setting's value. */
+export type SegmentKey = string | number | null
+
+type Segment<K extends SegmentKey> = { key: K; label: string }
+
+type SegmentsProps<K extends SegmentKey> = {
   segments: readonly Segment<K>[]
   selected: K
   onSelect: (key: K) => void
 }
 
-/** A row of tabs picking which list a page shows. */
-export function Segments<K extends string>({ segments, selected, onSelect }: SegmentsProps<K>) {
+/** A row of tabs picking which list a page shows, or which value a setting takes. */
+export function Segments<K extends SegmentKey>({ segments, selected, onSelect }: SegmentsProps<K>) {
   return (
     <View accessibilityRole="tablist" style={styles.segments}>
       {segments.map(({ key, label }) => {
@@ -21,7 +27,7 @@ export function Segments<K extends string>({ segments, selected, onSelect }: Seg
             accessibilityLabel={label}
             accessibilityRole="tab"
             accessibilityState={{ selected: isSelected }}
-            key={key}
+            key={String(key)}
             onPress={() => onSelect(key)}
             style={({ pressed }) => [
               styles.segment,
@@ -29,7 +35,12 @@ export function Segments<K extends string>({ segments, selected, onSelect }: Seg
               pressed && styles.pressed,
             ]}
           >
-            <Text numberOfLines={1} style={[styles.label, isSelected && styles.selectedLabel]}>
+            <Text
+              adjustsFontSizeToFit
+              minimumFontScale={MINIMUM_FONT_SCALE}
+              numberOfLines={1}
+              style={[styles.label, isSelected && styles.selectedLabel]}
+            >
               {label}
             </Text>
           </Pressable>

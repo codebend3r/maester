@@ -18,6 +18,7 @@ import { LIBRARY_COPY, useMusicLibraries } from '@/music/musicLibraries'
 import { nextPageOf } from '@/music/nextPage'
 import { useCovers } from '@/music/useCovers'
 import { LIBRARY_PAGE_COPY } from '@/screens/copy'
+import { DownloadsList } from '@/screens/Downloads'
 import { WREN_PAGES, pageHref } from '@/routes'
 import { SIZES } from '@/theme/wrenTheme'
 import { type WrenSession, useWren } from '@/useWren'
@@ -28,6 +29,7 @@ const SEGMENTS = {
   artists: 'artists',
   songs: 'songs',
   playlists: 'playlists',
+  downloads: 'downloads',
 } as const
 
 type Segment = (typeof SEGMENTS)[keyof typeof SEGMENTS]
@@ -38,6 +40,7 @@ const LIBRARY_SEGMENTS = [
   { key: SEGMENTS.artists, label: LIBRARY_PAGE_COPY.artists },
   { key: SEGMENTS.songs, label: LIBRARY_PAGE_COPY.songs },
   { key: SEGMENTS.playlists, label: LIBRARY_PAGE_COPY.playlists },
+  { key: SEGMENTS.downloads, label: LIBRARY_PAGE_COPY.downloads },
 ] as const
 
 type ListNoticeOfProps = { listing: ListState; empty: string }
@@ -184,12 +187,20 @@ function PlaylistsList({ session, header }: PlaylistsListProps) {
   )
 }
 
+type DownloadsSegmentProps = SegmentListProps
+
+/** What is on the device, which plays with the server out of reach. */
+function DownloadsSegment({ session, header }: DownloadsSegmentProps) {
+  return <DownloadsList header={header} serverId={session.server.id} />
+}
+
 /** The list each of the Library tab's segments shows. */
 const SEGMENT_LISTS = {
   [SEGMENTS.albums]: AlbumsList,
   [SEGMENTS.artists]: ArtistsList,
   [SEGMENTS.songs]: SongsList,
   [SEGMENTS.playlists]: PlaylistsList,
+  [SEGMENTS.downloads]: DownloadsSegment,
 } as const satisfies Record<Segment, ComponentType<SegmentListProps>>
 
 type ServerLibraryProps = { session: WrenSession }
@@ -208,7 +219,7 @@ function ServerLibrary({ session }: ServerLibraryProps) {
 
 /**
  * The albums, artists, songs and playlists raven holds, one list at a time: each list holds
- * every music library's, the songs a page at a time.
+ * every music library's, the songs a page at a time. Downloads lists what is on the device.
  */
 export function Library() {
   const session = useWren()

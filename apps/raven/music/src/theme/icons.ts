@@ -18,4 +18,6 @@ export const WREN_ICONS = {
   favourite: 'heart',
   more: 'more',
   cover: 'disc',
+  download: 'download',
+  downloaded: 'check',
 } as const satisfies Record<string, IconName>

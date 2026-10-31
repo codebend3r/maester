@@ -46,9 +46,10 @@ export type BrowseApi = Pick<
   'listLibraries' | 'listAlbums' | 'listPlaylists' | 'getAlbum' | 'getPlaylist' | 'albumCoverUrl'
 >
 
-/** What is on the device: the downloaded albums, and the tracks of a target that are downloaded. */
+/** What is on the device: the downloaded albums and playlists, and the tracks of a target that are downloaded. */
 export type DownloadedLibrary = {
   albums(): AlbumSummary[]
+  playlists(): PlaylistSummary[]
   /** An album's tracks in disc order, a playlist's in order, or the one track; empty for none. */
   tracksOf(target: BrowseTarget): Track[]
 }
@@ -164,26 +165,28 @@ type BrowseChildrenOfProps = {
 
 /**
  * The children CarPlay or Android Auto asked for under `parentId`: the root's folders, the
- * recently added albums, the playlists, or the downloaded albums. Offline, Albums lists the
- * downloaded albums and Playlists nothing. A playable node and an unknown id have none.
+ * recently added albums, the playlists, or the downloaded albums and playlists. Offline, Albums
+ * lists the downloaded albums and Playlists the downloaded playlists. A playable node and an
+ * unknown id have none.
  */
 export const browseChildrenOf = async ({
   api,
   downloads,
   parentId,
 }: BrowseChildrenOfProps): Promise<BrowseNode[]> => {
-  const downloadedNodes = () => downloads.albums().map((album) => albumNodeOf({ api, album }))
+  const downloadedAlbums = () => downloads.albums().map((album) => albumNodeOf({ api, album }))
+  const downloadedPlaylists = () => downloads.playlists().map(playlistNodeOf)
   switch (parentId) {
     case BROWSE_ROOTS.home:
       return [...ROOT_NODES]
     case BROWSE_ROOTS.albums:
-      if (api === null) return downloadedNodes()
+      if (api === null) return downloadedAlbums()
       return (await recentAlbumsOf(api)).map((album) => albumNodeOf({ api, album }))
     case BROWSE_ROOTS.playlists:
-      if (api === null) return []
+      if (api === null) return downloadedPlaylists()
       return (await api.listPlaylists()).map(playlistNodeOf)
     case BROWSE_ROOTS.downloads:
-      return downloadedNodes()
+      return [...downloadedAlbums(), ...downloadedPlaylists()]
     default:
       return []
   }
