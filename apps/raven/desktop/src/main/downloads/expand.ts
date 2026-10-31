@@ -323,6 +323,11 @@ const draftOf = async ({ server, target }: DraftOfProps): Promise<Read<Draft>> =
         },
       }
     }
+    // Task 12 expands these. The link parser (`shared/playLink.ts`) yields no album or playlist
+    // target yet, so no request reaches this branch.
+    case DOWNLOAD_TARGET_KINDS.album:
+    case DOWNLOAD_TARGET_KINDS.playlist:
+      return goneFor(server)
     default: {
       const unreachable: never = target
       return unreachable

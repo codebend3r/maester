@@ -824,16 +824,20 @@ describe('the download guards', () => {
   })
 
   it('accepts every kind and refuses an unknown one', () => {
-    ;['movie', 'episode', 'season', 'show', 'saga'].forEach((kind) => {
+    ;['movie', 'episode', 'season', 'show', 'saga', 'album', 'playlist'].forEach((kind) => {
       expect(isDownloadKind(kind)).toBe(true)
     })
-    expect(isDownloadKind('album')).toBe(false)
+    expect(isDownloadKind('track')).toBe(false)
   })
 
   it('accepts a group and refuses one of an unknown kind or with no key', () => {
     const group = { kind: 'season', key: 'show:4', title: 'Severance', order: 20004 }
     expect(isDownloadGroup(group)).toBe(true)
-    expect(isDownloadGroup({ ...group, kind: 'album' })).toBe(false)
+    expect(isDownloadGroup({ kind: 'album', key: 'album:12', title: 'Ok', order: 1 })).toBe(true)
+    expect(isDownloadGroup({ kind: 'playlist', key: 'playlist:3', title: 'Mix', order: 0 })).toBe(
+      true,
+    )
+    expect(isDownloadGroup({ ...group, kind: 'track' })).toBe(false)
     expect(isDownloadGroup({ kind: 'season', title: 'Severance', order: 20004 })).toBe(false)
     expect(isDownloadGroup({ ...group, key: 4 })).toBe(false)
     expect(isDownloadGroup({ kind: 'season', key: 'show:4', title: 'Severance' })).toBe(false)
@@ -860,7 +864,8 @@ describe('the download ask and views', () => {
     expect(isDownloadAskStatus({ kind: 'locked' })).toBe(true)
     expect(isDownloadAskStatus({ kind: DOWNLOAD_ASK_KINDS.account })).toBe(true)
     expect(isDownloadAskStatus({ kind: 'hidden' })).toBe(false)
-    expect(isDownloadAskStatus({ ...READY, downloadKind: 'album' })).toBe(false)
+    expect(isDownloadAskStatus({ ...READY, downloadKind: 'album' })).toBe(true)
+    expect(isDownloadAskStatus({ ...READY, downloadKind: 'track' })).toBe(false)
     expect(isDownloadAskStatus({ ...READY, files: '3' })).toBe(false)
   })
 
