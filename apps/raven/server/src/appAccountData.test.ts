@@ -11,6 +11,7 @@ import {
   ITEM_TYPES,
   LIBRARY_KINDS,
   MEMBER_STATUSES,
+  SCROBBLE_SERVICES,
   type MediaItem,
   WATCH_TARGET_KINDS,
   createApiClient,
@@ -18,7 +19,7 @@ import {
   isMediaTicket,
 } from '@raven/core'
 import { CACHE_POLICIES, ENCODINGS, HEADERS } from '@shared/server'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import type { ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
@@ -27,10 +28,13 @@ import { VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
 import type { AdoptedCounts } from '@/media/viewingAdoption'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
+import { ScrobbleQueue } from '@/scrobbling/scrobbleQueue'
+import { ScrobbleSender } from '@/scrobbling/scrobbleSender'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 import { NOT_WATCHING, ROUTE_METHODS, adminCookie, testConfig } from '@/test/app'
 import { AUTH_TEST_CONFIG, AUTH_TEST_IDS, authFixture, bearerHeaders } from '@/test/auth'
 import { encodeClip } from '@/test/clips'
+import { fakeListenBrainz } from '@/test/fakeListenBrainz'
 import { fakeTmdb } from '@/test/fakeTmdb'
 import {
   CALLER_KINDS,
@@ -66,13 +70,23 @@ let tv: ShowIds
 let extra: LeftoverIds
 let music: MusicIds
 
+/** ListenBrainz, knowing the member's user token and no other. */
+const MEMBER_LB_TOKEN = 'member-listenbrainz-token'
+
+const listenBrainz = fakeListenBrainz({ users: { [MEMBER_LB_TOKEN]: 'member-lb' } })
+
 /** The member's playlist `recordMemberViewing` keeps, found again by its name. */
 const MEMBER_MIX = 'Member mix'
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'raven-account-data-'))
   fixture = await authFixture()
-  enforced = await createEnforcedApp({ root, fixture, movieSeconds: MOVIE_SECONDS })
+  enforced = await createEnforcedApp({
+    root,
+    fixture,
+    movieSeconds: MOVIE_SECONDS,
+    scrobbling: { fetch: listenBrainz.fetch, lastFm: null },
+  })
   tv = await addShow({ root, enforced })
   extra = await addLeftovers({ enforced })
   music = await addMusic({ root, enforced })
@@ -346,6 +360,35 @@ describe('each account sees only its own viewing', () => {
     expect(await member.getPlaylist(mix)).toEqual(before)
   })
 
+  it("keeps each account's scrobbling links and waiting listens to itself", async () => {
+    const member = await clientFor({ id: AUTH_TEST_IDS.friend })
+    const guest = await clientFor({ id: AUTH_TEST_IDS.guest })
+    await member.linkListenBrainz({ token: MEMBER_LB_TOKEN })
+    const usernames = async (api: Client) =>
+      (await api.getScrobbling()).map(({ service, username }) => ({ service, username }))
+    expect(await usernames(guest)).toEqual([
+      { service: SCROBBLE_SERVICES.listenBrainz, username: null },
+      { service: SCROBBLE_SERVICES.lastFm, username: null },
+    ])
+    await guest.unlinkScrobbling({ service: SCROBBLE_SERVICES.listenBrainz })
+    expect(await usernames(member)).toContainEqual({
+      service: SCROBBLE_SERVICES.listenBrainz,
+      username: 'member-lb',
+    })
+
+    const queued = vi.spyOn(enforced.app.get(ScrobbleQueue), 'noteListen')
+    await guest.recordPlay(music.tracks[0])
+    await member.recordPlay(music.tracks[0])
+    expect(queued.mock.results.map((result) => result.value)).toEqual([0, 1])
+    expect(queued.mock.calls.map(([{ account }]) => account)).toEqual([
+      AUTH_TEST_IDS.guest,
+      AUTH_TEST_IDS.friend,
+    ])
+    queued.mockRestore()
+    await enforced.app.get(ScrobbleSender).whenIdle()
+    expect(listenBrainz.submissions.map(({ token }) => token)).toEqual([MEMBER_LB_TOKEN])
+  })
+
   it('answers per-account reads uncached', async () => {
     const { library, video } = enforced.ids
     const member = await clientFor({ id: AUTH_TEST_IDS.friend })
@@ -374,6 +417,7 @@ describe('each account sees only its own viewing', () => {
       { route: ROUTES.artist, params: { id: music.artist } },
       { route: ROUTES.playlists, params: {} },
       { route: ROUTES.playlist, params: { id: mix } },
+      { route: ROUTES.scrobbling, params: {} },
     ]
     const writes: { route: Route; params: Record<string, number>; payload?: object }[] = [
       { route: ROUTES.progress, params: { id: video }, payload: { position: SPOT } },

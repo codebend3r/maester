@@ -14,6 +14,7 @@ import {
   LYRICS_KINDS,
   MIX_KINDS,
   RADIO_SEED_KINDS,
+  SCROBBLE_SERVICES,
   musicListQuery,
   sortsFor,
   viewsFor,
@@ -27,6 +28,10 @@ import { HIDDEN_SCAN_ERROR, LOCKED_SCAN_ERROR } from '@/libraries/librariesContr
 import { LOCK_MARKS } from '@/lock/lockGuard'
 import type { Privacy } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
+import { VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
+import { ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
+import { ScrobbleQueue } from '@/scrobbling/scrobbleQueue'
+import { ScrobbleSender } from '@/scrobbling/scrobbleSender'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { BLANK_ITEM } from '@/metadata/tmdbShapes'
@@ -376,6 +381,34 @@ describe('a library locked behind the PIN', () => {
     expect((await api(cookie).getRecentAlbums()).added.map((album) => album.title)).toEqual([
       'Lessons',
     ])
+  })
+
+  it("scrobbles no play of a locked library's track until the PIN is entered, and hides nothing behind it", async () => {
+    const [track] = app().get(MediaIndex).idsForLibrary(state.privateMusic)
+    const id = track ?? 0
+    app().get(ScrobbleLinks).save({
+      account: VIEWING_ACCOUNTS.local,
+      service: SCROBBLE_SERVICES.listenBrainz,
+      username: 'rj',
+      secret: 'lb-token',
+      at: new Date(),
+    })
+    const queued = vi.spyOn(app().get(ScrobbleQueue), 'noteListen')
+    await expect(api().recordPlay(id)).rejects.toMatchObject({ status: 423 })
+    expect(queued).not.toHaveBeenCalled()
+    await expect(api().getScrobbling()).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ username: 'rj' })]),
+    )
+
+    const { cookie } = await unlock('3001')
+    await api(cookie).recordPlay(id)
+    expect(queued.mock.results.map((result) => result.value)).toEqual([1])
+    queued.mockRestore()
+    await app().get(ScrobbleSender).whenIdle()
+    app().get(ScrobbleLinks).remove({
+      account: VIEWING_ACCOUNTS.local,
+      service: SCROBBLE_SERVICES.listenBrainz,
+    })
   })
 
   it('keeps a locked library off the home page until it is unlocked', async () => {

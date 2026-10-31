@@ -612,8 +612,7 @@ describe('migrations', () => {
     before.close()
 
     const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
-    expect(database.db.pragma('user_version', { simple: true })).toBe(46)
-    expect(MIGRATIONS).toHaveLength(46)
+    expect(database.db.pragma('user_version', { simple: true })).toBe(MIGRATIONS.length)
     database.db
       .prepare(
         `INSERT INTO similar_artists (artist_id, similar_id, score, fetched_at)
@@ -630,6 +629,34 @@ describe('migrations', () => {
         .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'albums_added'")
         .all(),
     ).toEqual([{ name: 'albums_added' }])
+    database.onModuleDestroy()
+  })
+
+  it('gives a version-46 database empty scrobbling tables, whose waiting listens go with their file', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 46).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 46')
+    before.exec(
+      `INSERT INTO libraries (id, name, created_at, kind) VALUES (1, 'Music', '2026-01-01', 'music');
+       INSERT INTO media (id, library_id, path, file_name, folder, title, container, size, mtime_ms, added_at)
+       VALUES (1, 1, '/m/a.flac', 'a.flac', '/m', 'a', 'flac', 1, 1, '2026-01-01');`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.pragma('user_version', { simple: true })).toBe(47)
+    expect(MIGRATIONS).toHaveLength(47)
+    database.db.exec(
+      `INSERT INTO scrobble_links (account_id, service, username, secret_cipher, created_at)
+       VALUES ('local', 'listenBrainz', 'rj', 'iv.tag.cipher', '2026-10-31');
+       INSERT INTO scrobble_queue (account_id, service, id, media_id, listened_at, attempts, next_at)
+       VALUES ('local', 'listenBrainz', 1, 1, 1793000000, 0, 0);
+       DELETE FROM media WHERE id = 1;`,
+    )
+    expect(database.db.prepare('SELECT * FROM scrobble_queue').all()).toEqual([])
+    expect(database.db.prepare('SELECT username FROM scrobble_links').all()).toEqual([
+      { username: 'rj' },
+    ])
     database.onModuleDestroy()
   })
 })

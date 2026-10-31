@@ -9,6 +9,9 @@ import { type RateLimit, createRateLimit, sleep } from '@/scanner/concurrency'
 /** ListenBrainz's labs API, where its similarity datasets are served. */
 export const LISTENBRAINZ_LABS = 'https://labs.api.listenbrainz.org'
 
+/** ListenBrainz's core API, where listens are submitted and user tokens checked. */
+export const LISTENBRAINZ_API = 'https://api.listenbrainz.org'
+
 /**
  * The dataset similar artists are read from: listening sessions over about
  * twenty years, the one ListenBrainz's own artist pages use.

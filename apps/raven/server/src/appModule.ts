@@ -124,6 +124,14 @@ import { assertRoutesMarked } from '@/routeMarks'
 import { isNetworkShare, watchFolder } from '@/scanner/folderWatch'
 import { LibraryWatcher, WATCH_OPTIONS, type WatchOptions } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
+import { LastFmScrobbler } from '@/scrobbling/lastFmScrobbler'
+import { LastFmSignIns } from '@/scrobbling/lastFmSignIns'
+import { ListenBrainzScrobbler } from '@/scrobbling/listenBrainzScrobbler'
+import { ScrobbleCipher } from '@/scrobbling/scrobbleCipher'
+import { ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
+import { ScrobbleQueue } from '@/scrobbling/scrobbleQueue'
+import { ScrobbleSender } from '@/scrobbling/scrobbleSender'
+import { ScrobblingController } from '@/scrobbling/scrobblingController'
 import { SettingsController } from '@/settings/settingsController'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { STARTUP_HELD, StartupWork } from '@/startupWork'
@@ -152,6 +160,7 @@ export const CONTROLLERS = [
   TracksController,
   PlaylistsController,
   MixesController,
+  ScrobblingController,
   SettingsController,
   EventsController,
   LockController,
@@ -267,6 +276,13 @@ export class AppModule {
         SimilarArtists,
         Mixes,
         Radio,
+        ScrobbleCipher,
+        ScrobbleLinks,
+        ScrobbleQueue,
+        ListenBrainzScrobbler,
+        LastFmScrobbler,
+        LastFmSignIns,
+        ScrobbleSender,
         TrackLyrics,
         TranscodeCache,
         LoudnessJobs,

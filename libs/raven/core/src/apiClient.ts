@@ -11,6 +11,7 @@ import { pictureCalls } from '@/apiClient/pictures'
 import { playlistCalls } from '@/apiClient/playlists'
 import { playbackCalls } from '@/apiClient/playback'
 import { reportCalls } from '@/apiClient/reports'
+import { scrobblingCalls } from '@/apiClient/scrobbling'
 import { settingsCalls } from '@/apiClient/settings'
 import { createTransport, type FetchLike } from '@/apiClient/transport'
 import { isServerEvent, type ServerEvent } from '@/contract'
@@ -73,6 +74,7 @@ export const createApiClient = ({
     ...musicCalls(transport),
     ...playlistCalls(transport),
     ...mixCalls(transport),
+    ...scrobblingCalls(transport),
     ...pictureCalls({ transport, pictureCdn }),
     ...settingsCalls(transport),
     ...playbackCalls(transport),

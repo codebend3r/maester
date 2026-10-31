@@ -14,7 +14,19 @@ const AI_MATCH_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const sati
 export const MUSIC_ENV = {
   transcodeCacheGb: 'TRANSCODE_CACHE_GB',
   loudnessScan: 'LOUDNESS_SCAN',
+  lastFmApiKey: 'LASTFM_API_KEY',
+  lastFmApiSecret: 'LASTFM_API_SECRET',
 } as const
+
+/** raven's Last.fm API account, which signs every call it makes for an account. */
+export type LastFmKeys = { apiKey: string; apiSecret: string }
+
+/** Both Last.fm keys, or null while either is missing, which leaves Last.fm off. */
+const lastFmKeysFrom = (env: NodeJS.ProcessEnv): LastFmKeys | null => {
+  const apiKey = env[MUSIC_ENV.lastFmApiKey]?.trim() ?? ''
+  const apiSecret = env[MUSIC_ENV.lastFmApiSecret]?.trim() ?? ''
+  return apiKey === '' || apiSecret === '' ? null : { apiKey, apiSecret }
+}
 
 const GIB = 1024 ** 3
 
@@ -92,6 +104,8 @@ export type ServerConfig = ListenConfig & {
   transcodeCacheBytes: number
   /** Whether the tracks whose tags carry no ReplayGain are measured in the background for their loudness. */
   loudnessScan: boolean
+  /** Last.fm's API key and shared secret, for scrobbling; null keeps Last.fm off. Never logged or sent to a client. */
+  lastFm: LastFmKeys | null
   /** The PIN that opens locked libraries; null leaves them shut and none can be locked. Never logged or sent to a client. */
   libraryPin: string | null
   /** The password that turns the admin lock off; null, or too weak, keeps it on. Never logged or sent to a client. */
@@ -150,6 +164,7 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   aiDailyLimit: Math.max(1, wholeNumber(env.AI_DAILY_LIMIT) ?? 200),
   transcodeCacheBytes: (wholeNumber(env[MUSIC_ENV.transcodeCacheGb]) ?? 20) * GIB,
   loudnessScan: flag({ value: env[MUSIC_ENV.loudnessScan], fallback: true }),
+  lastFm: lastFmKeysFrom(env),
   libraryPin: env.LIBRARY_PIN?.trim() || null,
   adminPassword: env.ADMIN_PASSWORD?.trim() || null,
   mediaPlane: readMediaPlaneConfig(env),
