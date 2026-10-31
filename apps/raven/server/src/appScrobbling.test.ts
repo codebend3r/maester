@@ -5,6 +5,7 @@ import { Logger, type LoggerService } from '@nestjs/common'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   type ApiClient,
+  MEMBER_STATUSES,
   SCROBBLE_RETURNS,
   SCROBBLE_SERVICES,
   SCROBBLING_PATHS,
@@ -15,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
 import { LISTENBRAINZ_API } from '@/music/listenBrainzClient'
+import { ScrobbleQueue } from '@/scrobbling/scrobbleQueue'
 import { ScrobbleSender } from '@/scrobbling/scrobbleSender'
 import { DatabaseService } from '@/db/database'
 import { NOT_WATCHING, ROUTE_METHODS, testConfig } from '@/test/app'
@@ -292,5 +294,39 @@ describe('scrobbling on a server with accounts', () => {
       isAvailable: true,
       username: null,
     })
+  })
+
+  it('keeps a play when scrobbling fails, logging nothing of whose it was', async () => {
+    const member = await clientFor({ id: AUTH_TEST_IDS.friend })
+    const failing = vi
+      .spyOn(enforced().app.get(ScrobbleQueue), 'noteListen')
+      .mockImplementation(() => {
+        throw new Error(`queue broke for ${AUTH_TEST_IDS.friend}`)
+      })
+    await expect(member.recordPlay(enforced().music.tracks[0])).resolves.toBeUndefined()
+    failing.mockRestore()
+    expect(logged).toContainEqual(
+      expect.stringContaining('A play could not be queued for scrobbling.'),
+    )
+    expect(logged.filter((line) => line.includes(AUTH_TEST_IDS.friend))).toEqual([])
+  })
+
+  it('refuses a callback whose account was revoked since its sign-in began', async () => {
+    const guest = await clientFor({ id: AUTH_TEST_IDS.guest })
+    const signed = await started({ api: guest, returnTo: SCROBBLE_RETURNS.wren })
+    const { ownerApi } = enforced()
+    await ownerApi.setMemberStatus({
+      id: AUTH_TEST_IDS.guest,
+      change: { status: MEMBER_STATUSES.revoked },
+    })
+    try {
+      expect((await callback({ token: FM_TOKENS.member, state: signed })).statusCode).toBe(400)
+    } finally {
+      await ownerApi.setMemberStatus({
+        id: AUTH_TEST_IDS.guest,
+        change: { status: MEMBER_STATUSES.approved },
+      })
+    }
+    expect((await guest.getScrobbling()).map(({ username }) => username)).toEqual([null, null])
   })
 })

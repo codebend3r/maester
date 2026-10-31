@@ -19,6 +19,7 @@ import {
 import {
   AUTH_CONFIG_STATES,
   type AuthConfig,
+  MEMBER_STATUSES,
   type LastFmAuthPage,
   MEDIA_ORIGIN_KINDS,
   SCROBBLE_OUTCOMES,
@@ -36,6 +37,8 @@ import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { OpenToAnyone } from '@/auth/accountGuard'
+import { AuthSessions, CALLERS } from '@/auth/authSessions'
+import { MembershipLookups } from '@/auth/membershipLookups'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
 import { CLOCK, type Clock } from '@/clock'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
@@ -65,6 +68,8 @@ const publicOriginOf = ({ auth, config }: PublicOriginOfProps): string | null =>
 
 type ScrobblingControllerStatusOfProps = { account: AccountKey }
 
+type ScrobblingControllerIsStillViewerProps = { account: AccountKey; token: string | null }
+
 type ReturnAddressProps = { returnTo: string; outcome: string }
 
 /** The return address with how the sign-in ended in `?scrobbling=`. */
@@ -81,6 +86,7 @@ const returnAddress = ({ returnTo, outcome }: ReturnAddressProps): string =>
 @Public()
 export class ScrobblingController {
   private readonly publicOrigin: string | null
+  private readonly isAccountsReady: boolean
 
   constructor(
     @Inject(ScrobbleLinks) private readonly links: ScrobbleLinks,
@@ -89,10 +95,28 @@ export class ScrobblingController {
     @Inject(LastFmSignIns) private readonly signIns: LastFmSignIns,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(AuthSessions) private readonly sessions: Pick<AuthSessions, 'callerOf'>,
+    @Inject(MembershipLookups) private readonly lookups: Pick<MembershipLookups, 'current'>,
     @Inject(AUTH_STATE) auth: AuthConfig,
     @Inject(SERVER_CONFIG) config: ServerConfig,
   ) {
     this.publicOrigin = publicOriginOf({ auth, config })
+    this.isAccountsReady = auth.state === AUTH_CONFIG_STATES.ready
+  }
+
+  /**
+   * Whether the account a sign-in names may still link: always without
+   * accounts; with them, only while the session that started it still finds
+   * that account approved, asked again now through the shared lookups.
+   */
+  private async isStillViewer({
+    account,
+    token,
+  }: ScrobblingControllerIsStillViewerProps): Promise<boolean> {
+    if (!this.isAccountsReady) return true
+    if (token === null) return false
+    const current = await this.lookups.current({ token }).catch(() => null)
+    return current?.id === account && current.status === MEMBER_STATUSES.approved
   }
 
   /** The exact addresses Last.fm's sign-in may go back to. */
@@ -159,9 +183,11 @@ export class ScrobblingController {
     if (!isLastFmStart(body) || !this.returns().includes(body.returnTo)) {
       throw new BadRequestException('returnTo must be Settings or Wren')
     }
+    const caller = this.sessions.callerOf({ request })
     const state = this.signIns.start({
       account: this.accounts.keyOf({ request }),
       returnTo: body.returnTo,
+      token: caller.kind === CALLERS.session ? caller.session.token : null,
     })
     const callback = `${this.publicOrigin}${SCROBBLING_PATHS.lastFmCallback}?${new URLSearchParams({ [SCROBBLE_PARAMS.state]: state }).toString()}`
     return { url: this.lastFm.authPage({ callback }) }
@@ -170,8 +196,9 @@ export class ScrobblingController {
   /**
    * Where Last.fm's page comes back to, with a one-use token, and the
    * state `start` signed, which names the account: open to anyone, since
-   * no session rides along. A state that is not live answers 400; anything
-   * else goes back to its return address, saying how it went.
+   * no session rides along. A state that is not live, or whose account is
+   * no longer approved, answers 400; anything else goes back to its return
+   * address, saying how it went.
    */
   @OpenToAnyone()
   @Get('lastfm/callback')
@@ -186,6 +213,9 @@ export class ScrobblingController {
     const signIn = this.signIns.finish(state)
     if (signIn === null || !this.returns().includes(signIn.returnTo)) {
       throw new BadRequestException('This sign-in has expired or was already used.')
+    }
+    if (!(await this.isStillViewer(signIn))) {
+      throw new BadRequestException('This account can no longer link Last.fm.')
     }
     const linked = this.lastFm.isAvailable()
       ? await this.lastFm.validate({ token }).catch(() => null)

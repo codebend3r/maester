@@ -214,7 +214,12 @@ export class MediaController {
   recordPlay(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): void {
     const account = this.accounts.keyOf({ request })
     if (!this.viewing.recordPlay({ id, account })) throw new NotFoundException(`No media ${id}`)
-    this.scrobbles.noteListen({ mediaId: id, account })
+    try {
+      this.scrobbles.noteListen({ mediaId: id, account })
+    } catch {
+      // The play is kept whatever scrobbling does; the error could name an account.
+      this.logger.error('A play could not be queued for scrobbling.')
+    }
   }
 
   @ForViewers()

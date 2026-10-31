@@ -6,7 +6,7 @@ import { manualClock } from '@/test/clock'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS } from '@/test/repositories'
 
-const SIGN_IN = { account: TEST_ACCOUNTS.b, returnTo: 'wren://scrobbling' }
+const SIGN_IN = { account: TEST_ACCOUNTS.b, returnTo: 'wren://scrobbling', token: null }
 
 describe('LastFmSignIns', () => {
   const database = testDatabase('raven-lastfm-sign-ins-')
@@ -45,5 +45,16 @@ describe('LastFmSignIns', () => {
     expect(store.finish(`${forged}.${signature ?? ''}`)).toBeNull()
     expect(signIns().signIns.finish(state)).toBeNull()
     expect(store.finish(state)).toEqual(SIGN_IN)
+  })
+
+  it("keeps one sign-in per account, so starting again never pushes out another account's", () => {
+    const { signIns: store } = signIns()
+    const others = store.start({ ...SIGN_IN, account: TEST_ACCOUNTS.a })
+    const first = store.start(SIGN_IN)
+    Array.from({ length: 300 }).forEach(() => store.start(SIGN_IN))
+    const last = store.start(SIGN_IN)
+    expect(store.finish(first)).toBeNull()
+    expect(store.finish(last)).toEqual(SIGN_IN)
+    expect(store.finish(others)).toEqual({ ...SIGN_IN, account: TEST_ACCOUNTS.a })
   })
 })

@@ -87,7 +87,11 @@ export class ScrobbleSender implements OnApplicationBootstrap, OnModuleDestroy {
     this.limits = { listenBrainz: limitOf(), lastFm: limitOf() }
   }
 
+  /** Sweeps what grew too old while the server was down, a service's left behind while it was off included, then sends. */
   onApplicationBootstrap(): void {
+    this.queue.dropBefore({
+      seconds: Math.floor((this.clock.now() - SCROBBLE_KEEP_MS) / 1000),
+    })
     this.kick()
   }
 
@@ -158,9 +162,17 @@ export class ScrobbleSender implements OnApplicationBootstrap, OnModuleDestroy {
       return
     }
     const secret = this.links.secretOf({ account, service })
+    if (secret === null) {
+      // A link whose secret no longer opens (the server's key changed) can send nothing again.
+      this.links.remove({ account, service })
+      this.logger.warn(
+        `An account's ${SERVICE_NAMES[service]} link no longer opens, so it was removed.`,
+      )
+      return
+    }
     const track = this.music.tracks([listen.mediaId]).get(listen.mediaId)
     const artist = track?.artists[0]?.name ?? null
-    if (secret === null || track === undefined || artist === null) {
+    if (track === undefined || artist === null) {
       this.queue.remove(listen)
       return
     }

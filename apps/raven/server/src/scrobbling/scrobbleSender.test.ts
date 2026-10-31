@@ -272,4 +272,37 @@ describe('ScrobbleSender', () => {
     keyless.queue.noteListen({ mediaId: ids.track, account, services: keyless.sender.available() })
     expect(queued()).toEqual([expect.objectContaining({ service: SCROBBLE_SERVICES.listenBrainz })])
   })
+
+  it('unlinks a service whose stored secret no longer opens, with what was waiting for it', async () => {
+    const parts = wired()
+    await linkBoth(parts)
+    database
+      .get()
+      .db.prepare("UPDATE scrobble_links SET secret_cipher = 'AAAA.AAAA.AAAA' WHERE service = ?")
+      .run(SCROBBLE_SERVICES.listenBrainz)
+    parts.sender.noteListen({ mediaId: ids.track, account })
+    await parts.sender.whenIdle()
+    expect(parts.links.list({ account }).map(({ service }) => service)).toEqual([
+      SCROBBLE_SERVICES.lastFm,
+    ])
+    expect(setup.listenBrainz.submissions).toEqual([])
+    expect(queued()).toEqual([])
+  })
+
+  it('sweeps listens past seven days on boot, those left for a service that went off included', async () => {
+    const parts = wired()
+    await linkBoth(parts)
+    parts.queue.noteListen({ mediaId: ids.track, account, services: [SCROBBLE_SERVICES.lastFm] })
+    setup.clock.advance(SCROBBLE_KEEP_MS)
+    parts.queue.noteListen({ mediaId: ids.track, account, services: [SCROBBLE_SERVICES.lastFm] })
+    const keyless = wired({ lastFmKeys: null })
+    keyless.sender.onApplicationBootstrap()
+    await keyless.sender.whenIdle()
+    expect(queued()).toEqual([
+      expect.objectContaining({
+        service: SCROBBLE_SERVICES.lastFm,
+        next_at: NOW + SCROBBLE_KEEP_MS,
+      }),
+    ])
+  })
 })

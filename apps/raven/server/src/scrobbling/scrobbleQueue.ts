@@ -34,6 +34,8 @@ type ScrobbleQueueNextDueProps = { service: ScrobbleService }
 
 type ScrobbleQueueNextAtProps = { service: ScrobbleService }
 
+type ScrobbleQueueDropBeforeProps = { seconds: number }
+
 type ScrobbleQueueRemoveProps = QueueKey
 
 type ScrobbleQueueRetryProps = QueueKey & { attempts: number; nextAt: number }
@@ -113,6 +115,11 @@ export class ScrobbleQueue {
         )
         .get(service)?.at ?? null
     )
+  }
+
+  /** Drops every listen begun before `seconds` (Unix), whatever service it waits for; how many went. */
+  dropBefore({ seconds }: ScrobbleQueueDropBeforeProps): number {
+    return this.db.prepare('DELETE FROM scrobble_queue WHERE listened_at < ?').run(seconds).changes
   }
 
   /** A listen sent, or given up on. */

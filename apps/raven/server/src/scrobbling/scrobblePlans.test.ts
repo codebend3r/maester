@@ -38,6 +38,7 @@ const STATEMENTS = {
     stores({ database }).queue.retry({ account, service, id: 1, attempts: 1, nextAt: 0 }),
   'a listen sent': ({ database }) => stores({ database }).queue.remove({ account, service, id: 1 }),
   'an unlink': ({ database }) => stores({ database }).links.remove({ account, service }),
+  'old listens swept': ({ database }) => stores({ database }).queue.dropBefore({ seconds: 0 }),
 } as const satisfies Record<string, Read>
 
 /** A step over a scrobbling table, by name or alias. */
@@ -45,7 +46,7 @@ const SCROBBLE_STEP = /^[A-Z-]+ (l|q|scrobble_links|scrobble_queue)\b/
 
 /** A link or a waiting listen found by its key or an index kept for the read, never every row. */
 const BY_KEY =
-  /^SEARCH (l|q|scrobble_links|scrobble_queue) USING (PRIMARY KEY|(COVERING )?INDEX (scrobble_queue_due|scrobble_queue_media)) \((account_id=\?|service=\?|media_id=\?)/
+  /^SEARCH (l|q|scrobble_links|scrobble_queue) USING (PRIMARY KEY|(COVERING )?INDEX (scrobble_queue_due|scrobble_queue_media|scrobble_queue_listened)) \((account_id=\?|service=\?|media_id=\?|listened_at<\?)/
 
 describe.each([
   { statistics: 'no statistics', prepare: (): void => undefined },

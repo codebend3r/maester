@@ -47,17 +47,17 @@ export const LASTFM_ERRORS = {
   rateLimited: 29,
 } as const
 
-const REFUSED_TOKENS: readonly number[] = new Set([
+const REFUSED_TOKENS: ReadonlySet<number> = new Set([
   LASTFM_ERRORS.invalidToken,
   LASTFM_ERRORS.unauthorizedToken,
   LASTFM_ERRORS.expiredToken,
 ])
 
-const PASSING: readonly number[] = [
+const PASSING: ReadonlySet<number> = new Set([
   LASTFM_ERRORS.offline,
   LASTFM_ERRORS.temporary,
   LASTFM_ERRORS.rateLimited,
-]
+])
 
 type SignedProps = { params: Record<string, string>; keys: LastFmKeys }
 
@@ -177,7 +177,7 @@ export class LastFmScrobbler implements Scrobbler {
     if (response === null) return SEND_OUTCOMES.retry
     const error = errorOf(await response.json().catch(() => null))
     if (error === LASTFM_ERRORS.invalidSession) return SEND_OUTCOMES.unlinked
-    if (error !== null && PASSING.includes(error)) return SEND_OUTCOMES.retry
+    if (error !== null && PASSING.has(error)) return SEND_OUTCOMES.retry
     if (error !== null) return SEND_OUTCOMES.rejected
     return outcomeOfStatus(response.status)
   }
