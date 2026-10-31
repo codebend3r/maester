@@ -1,7 +1,10 @@
 package expo.modules.ravenaudio
 
-/** One call the app made: what it does on the service, and how it settles if it never reaches one. */
-class Pending<S : Any>(val run: (S) -> Unit, val drop: () -> Unit)
+/**
+ * One call the app made: what it does on the service, how it settles if it never reaches one,
+ * and how it settles when what it does throws.
+ */
+class Pending<S : Any>(val run: (S) -> Unit, val drop: () -> Unit, val fail: (Throwable) -> Unit)
 
 /**
  * Holds the app's calls while the service the player lives in starts, and runs them on it in
@@ -21,7 +24,7 @@ class ServiceGate<S : Any> {
   fun submit(pending: Pending<S>, shouldBind: Boolean): Boolean {
     val running = service
     if (running != null) {
-      pending.run(running)
+      runOn(pending, running)
       return false
     }
     if (!isBinding && !shouldBind) {
@@ -40,7 +43,15 @@ class ServiceGate<S : Any> {
     isBinding = false
     val ready = queued
     queued = emptyList()
-    ready.forEach { it.run(running) }
+    ready.forEach { runOn(it, running) }
+  }
+
+  /**
+   * A call that throws fails alone: `attach` runs from the service's `onCreate`, which an
+   * exception would take down with every call queued behind it.
+   */
+  private fun runOn(pending: Pending<S>, running: S) {
+    runCatching { pending.run(running) }.onFailure(pending.fail)
   }
 
   /** The service went away; the next window binds a new one. */

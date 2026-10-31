@@ -1,21 +1,16 @@
 import { apiFor } from '@raven/native'
 import {
-  AUTH_OUTCOMES,
-  type AppServer,
-  FINISH_OUTCOMES,
   IS_SIGN_IN_BYPASSED,
   RAVEN_SERVER,
   SIGN_IN_STEPS,
+  type SecretPrompt,
   type SecretStep,
   type SignInStep,
-  finishSignIn,
-  stepAfterAccount,
-  stepAfterSecret,
-  useSubmit,
+  signInFlowFor,
 } from '@raven/native/headless'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { useRouter } from 'expo-router'
-import { type Dispatch, type SetStateAction, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 
 import { Text } from '@/layouts/Text'
 import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
@@ -24,16 +19,6 @@ import { TEST_ACCOUNT } from '@/account/testAccount'
 import { APP_ROUTES } from '@/routes'
 import { SIGN_IN_COPY } from '@/screens/copy'
 import { useActiveServer } from '@/stores/activeServer'
-
-/** What the PIN step and the admin step each ask for. */
-const SECRET_STEPS = {
-  [SIGN_IN_STEPS.pin]: { prompt: SIGN_IN_COPY.pinPrompt, label: SIGN_IN_COPY.pin, isNumeric: true },
-  [SIGN_IN_STEPS.admin]: {
-    prompt: SIGN_IN_COPY.adminPrompt,
-    label: SIGN_IN_COPY.adminPassword,
-    isNumeric: false,
-  },
-} as const satisfies Record<SecretStep['kind'], unknown>
 
 type SubmitSecretProps = { step: SecretStep; text: string }
 
@@ -107,8 +92,9 @@ type SecretFormProps = {
   setSecret: Dispatch<SetStateAction<string>>
   error: string | null
   isBusy: boolean
+  prompt: SecretPrompt
   onSubmit: (submitted: SubmitSecretProps) => void
-  onNotNow: (server: AppServer) => void
+  onNotNow: (step: SecretStep) => void
   onSignOut: () => void
 }
 
@@ -119,12 +105,12 @@ const SecretForm = ({
   setSecret,
   error,
   isBusy,
+  prompt: { prompt, label, isNumeric },
   onSubmit,
   onNotNow,
   onSignOut,
 }: SecretFormProps) => {
   const formStyles = useFormStyles()
-  const { prompt, label, isNumeric } = SECRET_STEPS[step.kind]
   return (
     <Form key={step.kind} title={step.server.name}>
       <Text style={formStyles.note}>{prompt}</Text>
@@ -147,7 +133,7 @@ const SecretForm = ({
       <FormButton
         isDisabled={isBusy}
         label={SIGN_IN_COPY.notNow}
-        onPress={() => onNotNow(step.server)}
+        onPress={() => onNotNow(step)}
         tone={BUTTON_TONES.quiet}
       />
       <FormButton
@@ -192,7 +178,8 @@ const SIGN_IN_VIEWS = {
 type SignInViewOfProps = {
   step: SignInStep
   account: AccountFormProps
-  secret: Omit<SecretFormProps, 'step'>
+  secret: Omit<SecretFormProps, 'step' | 'prompt'>
+  secretSteps: Record<SecretStep['kind'], SecretPrompt>
   ticketsOff: TicketsOffFormProps
 }
 
@@ -200,6 +187,7 @@ const signInViewOf = ({
   step,
   account,
   secret,
+  secretSteps,
   ticketsOff,
 }: SignInViewOfProps): ViewOf<SignInViewProps> => {
   switch (step.kind) {
@@ -207,7 +195,7 @@ const signInViewOf = ({
       return { key: SIGN_IN_STEPS.account, props: account }
     case SIGN_IN_STEPS.pin:
     case SIGN_IN_STEPS.admin:
-      return { key: step.kind, props: { ...secret, step } }
+      return { key: step.kind, props: { ...secret, step, prompt: secretSteps[step.kind] } }
     case SIGN_IN_STEPS.ticketsOff:
       return { key: SIGN_IN_STEPS.ticketsOff, props: ticketsOff }
     default: {
@@ -217,107 +205,44 @@ const signInViewOf = ({
   }
 }
 
+const useSignInFlow = signInFlowFor({
+  account: useAccountSession,
+  servers: useActiveServer,
+  apiOf: (server) => apiFor({ server, session: useAccountSession }),
+  server: RAVEN_SERVER,
+  isBypassed: IS_SIGN_IN_BYPASSED,
+})
+
 /**
  * The first launch: the account's email and password (the web's Supabase sign-in, against the
  * one server the app talks to), then the PIN when the account may see locked libraries, then
- * the admin password when the admin lock would still hide them. An end to end build names an
- * accountless fixture in its bundle, so it begins at the PIN.
+ * the admin password when the admin lock would still hide them, over `@raven/native`'s
+ * `signInFlowFor`.
  */
 export const SignIn = () => {
   const router = useRouter()
-  const [step, setStep] = useState<SignInStep>(
-    IS_SIGN_IN_BYPASSED ? { kind: SIGN_IN_STEPS.pin, server: RAVEN_SERVER } : { kind: SIGN_IN_STEPS.account },
-  )
-  const [email, setEmail] = useState(TEST_ACCOUNT?.email ?? '')
-  const [password, setPassword] = useState(TEST_ACCOUNT?.password ?? '')
-  const [secret, setSecret] = useState('')
-  const { isBusy, error, setError, run } = useSubmit({ unreachable: SIGN_IN_COPY.unreachable })
-
   // From Settings, Home is under it in the stack: go back down to it rather than stack another.
   const goHome = () => router.dismissTo(APP_ROUTES.home)
-
-  const askFor = (next: SignInStep) => {
-    setSecret('')
-    setStep(next)
-  }
-
-  const finish = async (server: AppServer) => {
-    const outcome = await finishSignIn({
-      servers: useActiveServer,
-      server,
-      api: apiFor({ server, session: useAccountSession }),
-    })
-    switch (outcome) {
-      case FINISH_OUTCOMES.done:
-        goHome()
-        return
-      case FINISH_OUTCOMES.ticketsOff:
-        askFor({ kind: SIGN_IN_STEPS.ticketsOff })
-        return
-      case FINISH_OUTCOMES.full:
-        setError(SIGN_IN_COPY.full)
-        return
-      case FINISH_OUTCOMES.notAdded:
-        setError(SIGN_IN_COPY.notAdded)
-        return
-      default: {
-        const unknown: never = outcome
-        return unknown
-      }
-    }
-  }
-
-  type SubmitAccountProps = { typedPassword?: string }
-
-  const submitAccount = ({ typedPassword = password }: SubmitAccountProps = {}) => {
-    const trimmed = email.trim()
-    if (trimmed === '' || typedPassword === '') {
-      setError(SIGN_IN_COPY.badAccount)
-      return
-    }
-    run(async () => {
-      const outcome = await useAccountSession.getState().signIn({
-        email: trimmed,
-        password: typedPassword,
-      })
-      if (outcome.kind === AUTH_OUTCOMES.unreachable) {
-        setError(SIGN_IN_COPY.unreachable)
-        return
-      }
-      if (outcome.kind === AUTH_OUTCOMES.refused) {
-        setError(outcome.message)
-        return
-      }
-      setPassword('')
-      const next = await stepAfterAccount({
-        api: apiFor({ server: RAVEN_SERVER, session: useAccountSession }),
-        server: RAVEN_SERVER,
-      })
-      if (next !== null) {
-        askFor(next)
-        return
-      }
-      await finish(RAVEN_SERVER)
-    })
-  }
-
-  const submitSecret = ({ step: secretStep, text }: SubmitSecretProps) =>
-    run(async () => {
-      const { server } = secretStep
-      const api = apiFor({ server, session: useAccountSession })
-      const next = await stepAfterSecret({ api, step: secretStep, secret: text })
-      if (next !== null) {
-        askFor(next)
-        return
-      }
-      await finish(server)
-    })
-
-  const signOut = () => {
-    useAccountSession.getState().signOut()
-    askFor({ kind: SIGN_IN_STEPS.account })
-    setError(null)
-  }
+  const {
+    step,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    secret,
+    setSecret,
+    isBusy,
+    error,
+    secretSteps,
+    submitAccount,
+    submitSecret,
+    notNow,
+    signOut,
+  } = useSignInFlow({
+    copy: SIGN_IN_COPY,
+    initial: { email: TEST_ACCOUNT?.email ?? '', password: TEST_ACCOUNT?.password ?? '' },
+    onDone: goHome,
+  })
 
   const view = signInViewOf({
     step,
@@ -328,7 +253,7 @@ export const SignIn = () => {
       setPassword,
       error,
       isBusy,
-      onSubmit: (typedPassword) => submitAccount({ typedPassword }),
+      onSubmit: (typedPassword) => submitAccount({ password: typedPassword }),
     },
     secret: {
       secret,
@@ -336,9 +261,10 @@ export const SignIn = () => {
       error,
       isBusy,
       onSubmit: submitSecret,
-      onNotNow: (server) => run(() => finish(server)),
+      onNotNow: notNow,
       onSignOut: signOut,
     },
+    secretSteps,
     ticketsOff: { onContinue: goHome },
   })
   return <KeyedView<SignInViewProps> view={view} views={SIGN_IN_VIEWS} />

@@ -165,8 +165,8 @@ function ServerSearch({ session }: ServerSearchProps) {
       sort: MUSIC_SORTS.title,
     }),
   )
-  const albums = mergedOf({ listings: albumListings, order: byTitle })
-  const artists = mergedOf({ listings: artistListings, order: byName })
+  const albums = mergedOf({ music, listings: albumListings, order: byTitle })
+  const artists = mergedOf({ music, listings: artistListings, order: byName })
   const tracks = isAsked ? (songs.data?.pages.flatMap((page) => page.tracks) ?? []) : []
   const sections = isAsked
     ? sectionsOf({
@@ -176,13 +176,13 @@ function ServerSearch({ session }: ServerSearchProps) {
       })
     : []
   const notice = ((): string | null => {
-    if (music.failure !== null) return music.failure.message
-    if (music.isRead && music.libraries.length === 0) return LIBRARY_COPY.noMusic
-    if (!isAsked) return COPY.hint
+    if (albums.hasNoMusic) return LIBRARY_COPY.noMusic
+    // Before a search only the libraries' own failure counts: a blank one's listings ask nothing.
+    if (!isAsked) return music.failure?.message ?? COPY.hint
     const failure = albums.failure ?? artists.failure ?? songs.error
     if (failure !== null) return failure.message
     if (sections.length > 0) return null
-    const isRead = music.isRead && albums.isRead && artists.isRead && songs.isSuccess
+    const isRead = albums.isRead && artists.isRead && songs.isSuccess
     return isRead ? COPY.nothing(query) : COPY.searching
   })()
   return (

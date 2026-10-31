@@ -10,9 +10,9 @@ import {
   appClientCallOf,
   createApiClient,
 } from '@raven/core'
-import { mediaAccessFor } from '@raven/native/headless'
 
-import { itemOf } from '@/music/itemOf'
+import { audioItemOf } from '@/music/audioItem'
+import { mediaAccessFor } from '@/servers/mediaAccess'
 
 const ORIGIN = 'https://raven.example'
 const TICKET = 'tkt.wren'
@@ -75,18 +75,18 @@ const ravenServer = () => {
   return { server: { api, sources }, heard }
 }
 
-describe('itemOf', () => {
+describe('audioItemOf', () => {
   it('gives no item for an ALAC track on Android, whose player plays it silent', async () => {
     const { server, heard } = ravenServer()
     expect(
-      await itemOf({ server, track: ALAC_AIRBAG, platform: AUDIO_PLATFORMS.android }),
+      await audioItemOf({ server, track: ALAC_AIRBAG, platform: AUDIO_PLATFORMS.android }),
     ).toBeNull()
     expect(heard).toEqual([])
   })
 
   it("plays a FLAC track on an iPhone from the file itself, by its ticket, with the lock screen's details", async () => {
     const { server } = ravenServer()
-    const item = await itemOf({ server, track: AIRBAG, platform: AUDIO_PLATFORMS.apple })
+    const item = await audioItemOf({ server, track: AIRBAG, platform: AUDIO_PLATFORMS.apple })
     expect(item).toEqual({
       id: AIRBAG.id,
       uri: `${ORIGIN}/api/media/${AIRBAG.id}/file?${MEDIA_TICKET_PARAM}=${TICKET}`,
@@ -101,7 +101,7 @@ describe('itemOf', () => {
 
   it('plays ALAC on an iPhone, which decodes it', async () => {
     const { server } = ravenServer()
-    const item = await itemOf({ server, track: ALAC_AIRBAG, platform: AUDIO_PLATFORMS.apple })
+    const item = await audioItemOf({ server, track: ALAC_AIRBAG, platform: AUDIO_PLATFORMS.apple })
     expect(item?.id).toBe(AIRBAG.id)
   })
 })

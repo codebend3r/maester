@@ -193,6 +193,7 @@ class RavenAudioModule : Module() {
       drop = {
         if (shouldBind) promise.reject(PLAYER_UNAVAILABLE, COULD_NOT_START, null) else promise.resolve(null)
       },
+      fail = { error -> promise.reject(PLAYER_UNAVAILABLE, error.message ?: COULD_NOT_PLAY, error) },
     )
     if (gate.submit(pending, shouldBind)) bindService()
   }

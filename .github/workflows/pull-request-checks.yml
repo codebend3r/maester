@@ -504,9 +504,8 @@ jobs:
 
   # Whether this PR touches raven's device app, what it imports (core and ui, through
   # Nx's graph), the server its flows sign in to, or this workflow; and the same for Wren
-  # (`music`), whose own libraries are `@raven/native` and `@raven/audio`. The app and Wren
-  # jobs below are cold React Native builds, so they run only then; the 🖥️ Desktop gate
-  # takes their skip as a pass.
+  # (`music`). The app and Wren jobs below are cold React Native builds, so they run only
+  # then; the 🖥️ Desktop gate takes their skip as a pass.
   app-affected:
     name: 🔍 App affected
     runs-on: ubuntu-24.04
@@ -548,7 +547,7 @@ jobs:
           else
             echo "affected=false" >> "$GITHUB_OUTPUT"
           fi
-          if echo "$projects" | jq -e 'any(.[]; IN("@raven/music", "@raven/native", "@raven/audio", "@raven/server"))' > /dev/null || [ -n "$workflow" ]; then
+          if echo "$projects" | jq -e 'index("@raven/music") != null or index("@raven/server") != null' > /dev/null || [ -n "$workflow" ]; then
             echo "music=true" >> "$GITHUB_OUTPUT"
           else
             echo "music=false" >> "$GITHUB_OUTPUT"

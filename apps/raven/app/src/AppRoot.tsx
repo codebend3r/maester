@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { THEME_TONES } from '@raven/core'
-import { IS_SIGN_IN_BYPASSED, pinRavenServer } from '@raven/native/headless'
+import { IS_SIGN_IN_BYPASSED, pinRavenServer, tokenRenewalFor } from '@raven/native/headless'
 import { configureStorage, createQueryClient } from '@raven/ui/headless'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
@@ -34,8 +34,7 @@ const SPLASH_IGNORED = (): void => undefined
 // The splash stays up until the stores are read, so the theme picked is the first thing drawn.
 preventAutoHideAsync().catch(SPLASH_IGNORED)
 
-/** How long before the access token ends the app asks for a new one. */
-const REFRESH_LEAD_MS = 60_000
+const useTokenRenewal = tokenRenewalFor({ session: useAccountSession })
 
 const loadStores = async (): Promise<void> => {
   // A store whose storage cannot be read starts from its defaults rather than holding
@@ -134,7 +133,7 @@ const styles = StyleSheet.create({ frame: { flex: 1 } })
  */
 export const AppRoot = () => {
   const [isLoaded, setLoaded] = useState(false)
-  const expiresAt = useAccountSession((state) => state.session?.expiresAt ?? null)
+  useTokenRenewal()
 
   useEffect(() => {
     const show = () => setLoaded(true)
@@ -142,19 +141,6 @@ export const AppRoot = () => {
   }, [])
   useEffect(() => clearOnServerSwitch({ client: queryClient, store: useActiveServer }), [])
   useEffect(() => followReduceMotion(), [])
-  useEffect(() => {
-    if (expiresAt === null) return undefined
-    const timer = setTimeout(
-      () => {
-        useAccountSession
-          .getState()
-          .refresh()
-          .catch(() => undefined)
-      },
-      Math.max(0, expiresAt - Date.now() - REFRESH_LEAD_MS),
-    )
-    return () => clearTimeout(timer)
-  }, [expiresAt])
   useEffect(() => (isLoaded ? followTheme({ apply: wearSystemLook }) : undefined), [isLoaded])
   useEffect(() => {
     if (isLoaded) hideAsync().catch(SPLASH_IGNORED)

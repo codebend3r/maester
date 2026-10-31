@@ -56,12 +56,20 @@ describe('WrenRoot', () => {
     expect(mockApi.listPlaylists).not.toHaveBeenCalled()
   })
 
-  it("stops the last account's music when it signs out, so nothing plays or counts for the next", async () => {
+  it("keeps the music through a renewed token and stops the last account's when it signs out, so nothing plays or counts for the next", async () => {
     await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
     await screen.findByRole('header', { name: 'Home' })
     await act(async () => useAudioQueue.getState().playTracks({ tracks: [AIRBAG, PARANOID] }))
     await waitFor(() => expect(audioPlayer.setWindow).toHaveBeenCalled())
     expect(await screen.findByRole('button', { name: /^Now Playing: Airbag/ })).toBeTruthy()
+
+    // A renewed token is the same account: the music plays on.
+    await act(async () =>
+      useWrenAccount.setState({ session: { ...LISTENER, accessToken: 'renewed' } }),
+    )
+    expect(audioPlayer.stop).not.toHaveBeenCalled()
+    expect(useAudioQueue.getState().queue.at).not.toBeNull()
+    expect(screen.getByRole('button', { name: /^Now Playing: Airbag/ })).toBeTruthy()
 
     await act(async () => useWrenAccount.setState({ session: null }))
     expect(audioPlayer.stop).toHaveBeenCalled()

@@ -31,10 +31,12 @@ export type MenuView = (typeof MENU_VIEWS)[keyof typeof MENU_VIEWS]
 
 const NO_PLAYLISTS: readonly PlaylistSummary[] = []
 
-type PlaylistPickerProps = { session: WrenSession; track: Track; onDone: () => void }
+type PlaylistPickerProps = { track: Track; onDone: () => void }
+
+type PlaylistChoicesProps = PlaylistPickerProps & { session: WrenSession }
 
 /** The listener's playlists, one press adding the track to the end of one. */
-function PlaylistPicker({ session: { api, queries }, track, onDone }: PlaylistPickerProps) {
+function PlaylistChoices({ session: { api, queries }, track, onDone }: PlaylistChoicesProps) {
   const playlists = useQuery(queries.playlistsQuery)
   const { append } = useServerPlaylistMutations({ api })
   const [note, setNote] = useState<string | null>(null)
@@ -80,6 +82,12 @@ function PlaylistPicker({ session: { api, queries }, track, onDone }: PlaylistPi
   )
 }
 
+/** The active server's playlists to add the track to; none without a server, which the guarded stack never shows. */
+function PlaylistPicker({ track, onDone }: PlaylistPickerProps) {
+  const session = useWren()
+  return session !== null && <PlaylistChoices onDone={onDone} session={session} track={track} />
+}
+
 type TrackMenuProps = {
   track: Track
   view: MenuView
@@ -92,7 +100,6 @@ type TrackMenuProps = {
  * the queue, or add it to one of the listener's playlists.
  */
 export function TrackMenu({ track, view, onView }: TrackMenuProps) {
-  const session = useWren()
   const playNext = useAudioQueue((store) => store.playNext)
   const addToQueue = useAudioQueue((store) => store.addToQueue)
   const { bottom } = useSafeAreaInsets()
@@ -111,8 +118,8 @@ export function TrackMenu({ track, view, onView }: TrackMenuProps) {
           style={styles.away}
         />
         <View style={[styles.sheet, { paddingBottom: bottom + SIZES.space4 }]}>
-          {view === MENU_VIEWS.playlists && session !== null ? (
-            <PlaylistPicker onDone={close} session={session} track={track} />
+          {view === MENU_VIEWS.playlists ? (
+            <PlaylistPicker onDone={close} track={track} />
           ) : (
             <View style={styles.view}>
               <Text accessibilityRole="header" numberOfLines={1} style={styles.heading}>

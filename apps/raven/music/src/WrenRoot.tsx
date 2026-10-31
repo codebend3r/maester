@@ -1,5 +1,5 @@
 import { DEFAULT_THEME, THEME_TONES, themeOf } from '@raven/core'
-import { IS_SIGN_IN_BYPASSED, pinRavenServer } from '@raven/native/headless'
+import { IS_SIGN_IN_BYPASSED, pinRavenServer, tokenRenewalFor } from '@raven/native/headless'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { hideAsync, preventAutoHideAsync } from 'expo-splash-screen'
@@ -25,8 +25,7 @@ preventAutoHideAsync().catch(SPLASH_IGNORED)
 const BAR_STYLE =
   themeOf(DEFAULT_THEME).tone === THEME_TONES.light ? 'dark-content' : 'light-content'
 
-/** How long before the access token ends Wren asks for a new one. */
-const REFRESH_LEAD_MS = 60_000
+const useTokenRenewal = tokenRenewalFor({ session: useWrenAccount })
 
 const loadStores = async (): Promise<void> => {
   // A store whose keychain cannot be read starts empty rather than holding Wren on the splash.
@@ -48,26 +47,13 @@ export function WrenRoot() {
   const [isLoaded, setLoaded] = useState(false)
   const session = useWren()
   const isSignedIn = useWrenAccount((state) => state.session !== null)
-  const expiresAt = useWrenAccount((state) => state.session?.expiresAt ?? null)
 
+  useTokenRenewal()
   useEffect(forgetOnAccountChange, [])
   useEffect(() => {
     const show = () => setLoaded(true)
     loadStores().then(show, show)
   }, [])
-  useEffect(() => {
-    if (expiresAt === null) return undefined
-    const timer = setTimeout(
-      () => {
-        useWrenAccount
-          .getState()
-          .refresh()
-          .catch(() => undefined)
-      },
-      Math.max(0, expiresAt - Date.now() - REFRESH_LEAD_MS),
-    )
-    return () => clearTimeout(timer)
-  }, [expiresAt])
   useEffect(() => {
     if (isLoaded) hideAsync().catch(SPLASH_IGNORED)
   }, [isLoaded])

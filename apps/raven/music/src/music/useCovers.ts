@@ -1,6 +1,6 @@
 import type { AlbumSummary } from '@raven/core'
 import { cookieJar } from '@raven/native'
-import { cookieHeadersFor, useServerCookies } from '@raven/native/headless'
+import { serverHeadersFor } from '@raven/native/headless'
 
 import { useWrenAccount } from '@/session'
 import type { WrenSession } from '@/useWren'
@@ -10,6 +10,8 @@ export type Cover = { uri: string; headers: Record<string, string> }
 
 type CoverOfProps = Pick<AlbumSummary, 'coverVersion'> & { albumId: number }
 
+const useServerHeaders = serverHeadersFor({ session: useWrenAccount, jar: cookieJar })
+
 type UseCoversProps = Pick<WrenSession, 'server' | 'api'>
 
 /**
@@ -18,9 +20,7 @@ type UseCoversProps = Pick<WrenSession, 'server' | 'api'>
  * asked for twice.
  */
 export const useCovers = ({ server, api }: UseCoversProps) => {
-  const cookies = useServerCookies({ server, jar: cookieJar })
-  const accessToken = useWrenAccount((state) => state.session?.accessToken ?? null)
-  const headersFor = cookies === null ? null : cookieHeadersFor({ server, cookies, accessToken })
+  const headersFor = useServerHeaders({ server })
   return ({ albumId, coverVersion }: CoverOfProps): Cover | null => {
     const uri = api.albumCoverUrl({ albumId, coverVersion })
     return uri === null || headersFor === null ? null : { uri, headers: headersFor(uri) }

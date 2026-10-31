@@ -1,9 +1,11 @@
 import { cookieJar } from '@raven/native'
-import { cookieHeadersFor, useServerCookies } from '@raven/native/headless'
+import { serverHeadersFor } from '@raven/native/headless'
 
 import { useAccountSession } from '@/account/session'
 import type { Pictures } from '@/queries/cards'
 import type { AppQueries } from '@/queries/useAppQueries'
+
+const useServerHeaders = serverHeadersFor({ session: useAccountSession, jar: cookieJar })
 
 type UsePicturesProps = Pick<AppQueries, 'server' | 'api'>
 
@@ -14,8 +16,6 @@ type UsePicturesProps = Pick<AppQueries, 'server' | 'api'>
  * jar's changes (an unlock) and the token's refresh.
  */
 export const usePictures = ({ server, api }: UsePicturesProps): Pictures | null => {
-  const cookies = useServerCookies({ server, jar: cookieJar })
-  const accessToken = useAccountSession((state) => state.session?.accessToken ?? null)
-  if (cookies === null) return null
-  return { api, headersFor: cookieHeadersFor({ server, cookies, accessToken }) }
+  const headersFor = useServerHeaders({ server })
+  return headersFor === null ? null : { api, headersFor }
 }

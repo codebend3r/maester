@@ -13,6 +13,13 @@ private class Calls {
   fun pending(name: String) = Pending<String>(
     run = { service -> log = log + "$name on $service" },
     drop = { log = log + "$name dropped" },
+    fail = { error -> log = log + "$name failed: ${error.message}" },
+  )
+
+  fun throwing(name: String) = Pending<String>(
+    run = { throw IllegalStateException("$name threw") },
+    drop = { log = log + "$name dropped" },
+    fail = { error -> log = log + "$name failed: ${error.message}" },
   )
 }
 
@@ -115,5 +122,29 @@ class ServiceGateTest {
     gate.submit(calls.pending("setWindow"), shouldBind = true)
 
     assertEquals(listOf("setWindow on service"), calls.log)
+  }
+
+  @Test
+  fun aHeldCallThatThrowsFailsAloneAndTheRestStillRun() {
+    val calls = Calls()
+    val gate = ServiceGate<String>()
+    gate.submit(calls.throwing("setWindow"), shouldBind = true)
+    gate.submit(calls.pending("setNext"), shouldBind = false)
+
+    gate.attach("service")
+
+    assertEquals(listOf("setWindow failed: setWindow threw", "setNext on service"), calls.log)
+  }
+
+  @Test
+  fun aCallThatThrowsOnARunningServiceFails() {
+    val calls = Calls()
+    val gate = ServiceGate<String>()
+    gate.attach("service")
+
+    gate.submit(calls.throwing("seek"), shouldBind = false)
+    gate.submit(calls.pending("pause"), shouldBind = false)
+
+    assertEquals(listOf("seek failed: seek threw", "pause on service"), calls.log)
   }
 }

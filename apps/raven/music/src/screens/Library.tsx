@@ -12,7 +12,7 @@ import { Notice } from '@/components/Notice'
 import { Segments } from '@/components/Segments'
 import { SongList } from '@/components/SongList'
 import { PageTitle, pageStyles, useListContent } from '@/components/TabPage'
-import { byName, byTitle, mergedOf } from '@/music/merged'
+import { type ListState, byName, byTitle, listStateOf, mergedOf } from '@/music/merged'
 import { LIBRARY_COPY, useMusicLibraries } from '@/music/musicLibraries'
 import { nextPageOf } from '@/music/nextPage'
 import { useCovers } from '@/music/useCovers'
@@ -44,12 +44,16 @@ const COPY = {
   noPlaylists: 'No playlists yet. Add a track to one from its menu.',
 } as const
 
-type ListNoticeProps = { failure: Error | null; isRead: boolean; empty: string }
+type ListNoticeProps = { listing: ListState; empty: string }
 
-/** What a list says in place of its entries: why it could not be read, that it is, or that it is empty. */
-function ListNotice({ failure, isRead, empty }: ListNoticeProps) {
+/**
+ * What a list says in place of its entries: why it could not be read, that it is, that raven
+ * holds no music, or that it is empty.
+ */
+function ListNotice({ listing: { failure, isRead, hasNoMusic }, empty }: ListNoticeProps) {
   if (failure !== null) return <Notice text={failure.message} />
-  return <Notice text={isRead ? empty : LIBRARY_COPY.loading} />
+  if (!isRead) return <Notice text={LIBRARY_COPY.loading} />
+  return <Notice text={hasNoMusic ? LIBRARY_COPY.noMusic : empty} />
 }
 
 type SegmentListProps = { session: WrenSession; header: ReactElement }
@@ -64,16 +68,10 @@ function AlbumsList({ session, header }: SegmentListProps) {
       session.queries.albumsQuery({ libraryId: library.id, search: '', sort: MUSIC_SORTS.title }),
     ),
   })
-  const { entries: albums, failure, isRead } = mergedOf({ listings, order: byTitle })
+  const { entries: albums, ...listing } = mergedOf({ music, listings, order: byTitle })
   return (
     <FlatList
-      ListEmptyComponent={
-        <ListNotice
-          empty={music.libraries.length === 0 ? LIBRARY_COPY.noMusic : COPY.noAlbums}
-          failure={music.failure ?? failure}
-          isRead={music.isRead && isRead}
-        />
-      }
+      ListEmptyComponent={<ListNotice empty={COPY.noAlbums} listing={listing} />}
       ListHeaderComponent={header}
       columnWrapperStyle={styles.columns}
       contentContainerStyle={listContent}
@@ -102,16 +100,10 @@ function ArtistsList({ session, header }: SegmentListProps) {
       session.queries.artistsQuery({ libraryId: library.id, search: '' }),
     ),
   })
-  const { entries: artists, failure, isRead } = mergedOf({ listings, order: byName })
+  const { entries: artists, ...listing } = mergedOf({ music, listings, order: byName })
   return (
     <FlatList
-      ListEmptyComponent={
-        <ListNotice
-          empty={music.libraries.length === 0 ? LIBRARY_COPY.noMusic : COPY.noArtists}
-          failure={music.failure ?? failure}
-          isRead={music.isRead && isRead}
-        />
-      }
+      ListEmptyComponent={<ListNotice empty={COPY.noArtists} listing={listing} />}
       ListHeaderComponent={header}
       contentContainerStyle={listContent}
       data={artists}
@@ -145,9 +137,8 @@ function SongsList({ session, header }: SegmentListProps) {
     <SongList
       empty={
         <ListNotice
-          empty={music.libraries.length === 0 ? LIBRARY_COPY.noMusic : COPY.noSongs}
-          failure={music.failure ?? songs.error}
-          isRead={music.isRead && (music.libraries.length === 0 || songs.isSuccess)}
+          empty={COPY.noSongs}
+          listing={listStateOf({ music, failure: songs.error, isRead: songs.isSuccess })}
         />
       }
       header={header}
@@ -166,8 +157,7 @@ function PlaylistsList({ session, header }: SegmentListProps) {
       ListEmptyComponent={
         <ListNotice
           empty={COPY.noPlaylists}
-          failure={playlists.error}
-          isRead={playlists.isSuccess}
+          listing={{ failure: playlists.error, isRead: playlists.isSuccess, hasNoMusic: false }}
         />
       }
       ListHeaderComponent={header}

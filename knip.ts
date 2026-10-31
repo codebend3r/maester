@@ -18,7 +18,9 @@ export default {
       ignoreBinaries: ['watchman', 'maestro'],
       // knip's Expo plugin expects expo-updates unless the config turns updates
       // off; the app ships no over-the-air updates and does not install it.
-      ignoreDependencies: ['expo-updates'],
+      // `@raven/audio` is imported only through `@raven/native`'s host, but Expo
+      // autolinks a native module only from the app's own dependencies.
+      ignoreDependencies: ['expo-updates', '@raven/audio'],
     },
     'apps/raven/music': {
       // Wren, read as the app is: its routes by path, the binaries the Mac installs, and no
