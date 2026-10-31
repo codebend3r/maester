@@ -146,7 +146,9 @@ const ROW_KINDS = {
   music: { isWatchable: false, actions: `${styles.actions} ${styles.musicActions}` },
 } as const satisfies Record<string, { isWatchable: boolean; actions: string | undefined }>
 
-const rowKindOf = ({ group }: DownloadView) =>
+type RowKindOfProps = DownloadView
+
+const rowKindOf = ({ group }: RowKindOfProps) =>
   isMusicGroup(group) ? ROW_KINDS.music : ROW_KINDS.video
 
 /** What Play does on a ready row: opens a video in the player, or queues a track with its group. */

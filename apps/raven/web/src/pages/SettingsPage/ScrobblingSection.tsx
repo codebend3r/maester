@@ -195,7 +195,9 @@ const Unlinked = ({ standing: { service } }: UnlinkedProps) => {
   )
 }
 
-const standingOf = ({ service, isAvailable, username }: ScrobbleStatus): ServiceStanding => {
+type StandingOfProps = ScrobbleStatus
+
+const standingOf = ({ service, isAvailable, username }: StandingOfProps): ServiceStanding => {
   if (!isAvailable) return { state: SERVICE_STATES.notSetUp, service }
   if (username === null) return { state: SERVICE_STATES.unlinked, service }
   return { state: SERVICE_STATES.linked, service, username }

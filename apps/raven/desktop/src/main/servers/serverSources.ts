@@ -272,7 +272,9 @@ export const createServerSources = ({
     return { ok: true, server }
   }
 
-  const resolve = async ({ serverId, mediaId }: ServerSource): Promise<ResolvedServerSource> => {
+  type ResolveProps = ServerSource
+
+  const resolve = async ({ serverId, mediaId }: ResolveProps): Promise<ResolvedServerSource> => {
     const found = serverOfSource({ serverId, mediaId })
     if (!found.ok) return found
     // Read while the first ticket is minted: a video wants its sidecars either way.

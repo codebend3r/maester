@@ -14,6 +14,8 @@ import { type LoudTrack, LoudnessJobs } from '@/music/loudnessJobs'
 import { transcodeTimeoutSeconds } from '@/music/transcodeCache'
 import { createTaskQueue } from '@/scanner/concurrency'
 
+type LoudnessScanScanTrackProps = LoudTrack
+
 /**
  * Measures the loudness of the music tracks whose tags carry no ReplayGain,
  * an album at a time, with ffmpeg's EBU R128 meter, and gives each its
@@ -78,7 +80,7 @@ export class LoudnessScan implements OnApplicationBootstrap, OnModuleDestroy {
    * prints no summary. A run out of time is left waiting, as the share is
    * the likelier cause, and tried again by the next kick.
    */
-  private async scanTrack({ mediaId, path, duration }: LoudTrack): Promise<void> {
+  private async scanTrack({ mediaId, path, duration }: LoudnessScanScanTrackProps): Promise<void> {
     await givePlaybackWay({ ffmpeg: this.ffmpeg, isStopping: () => this.isStopping })
     if (this.isStopping) return
     try {
