@@ -787,6 +787,20 @@ export const MIGRATIONS: readonly string[] = [
   UPDATE tracks SET replaygain_source = 'tags' WHERE replaygain_gain IS NOT NULL;
   UPDATE albums SET replaygain_source = 'tags' WHERE replaygain_gain IS NOT NULL;
   `,
+  // The artists ListenBrainz finds similar to each of ours, shared by every
+  // account and asked again after 30 days. A similar artist is kept by its
+  // MusicBrainz id, held in a library or not, so one added later is found
+  // without asking again. Home lists the albums added last.
+  `
+  CREATE TABLE similar_artists (
+    artist_id INTEGER NOT NULL REFERENCES artists (id) ON DELETE CASCADE,
+    similar_id TEXT NOT NULL,
+    score REAL NOT NULL,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY (artist_id, similar_id)
+  ) WITHOUT ROWID;
+  CREATE INDEX albums_added ON albums (added_at);
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

@@ -83,9 +83,14 @@ import { AlbumCovers } from '@/music/albumCovers'
 import { AlbumMatching } from '@/music/albumMatching'
 import { MusicBrainzClient } from '@/music/musicBrainzClient'
 import { LrclibClient } from '@/music/lrclibClient'
+import { ListenBrainzClient } from '@/music/listenBrainzClient'
+import { Mixes } from '@/music/mixes'
+import { MixesController } from '@/music/mixesController'
 import { MusicFavourites } from '@/music/musicFavourites'
 import { Playlists } from '@/music/playlists'
 import { PlaylistsController } from '@/music/playlistsController'
+import { Radio } from '@/music/radio'
+import { SimilarArtists } from '@/music/similarArtists'
 import { TrackLyrics } from '@/music/trackLyrics'
 import { TranscodeCache } from '@/music/transcodeCache'
 import { LoudnessJobs } from '@/music/loudnessJobs'
@@ -142,6 +147,7 @@ export const CONTROLLERS = [
   ArtistsController,
   TracksController,
   PlaylistsController,
+  MixesController,
   SettingsController,
   EventsController,
   LockController,
@@ -252,6 +258,10 @@ export class AppModule {
         LrclibClient,
         MusicFavourites,
         Playlists,
+        ListenBrainzClient,
+        SimilarArtists,
+        Mixes,
+        Radio,
         TrackLyrics,
         TranscodeCache,
         LoudnessJobs,

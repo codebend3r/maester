@@ -578,8 +578,7 @@ describe('migrations', () => {
     before.close()
 
     const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
-    expect(database.db.pragma('user_version', { simple: true })).toBe(45)
-    expect(MIGRATIONS).toHaveLength(45)
+    expect(database.db.pragma('user_version', { simple: true })).toBe(MIGRATIONS.length)
     expect(
       database.db
         .prepare(
@@ -598,6 +597,34 @@ describe('migrations', () => {
       { replaygain_source: REPLAYGAIN_SOURCES.tags },
       { replaygain_source: null },
     ])
+    database.onModuleDestroy()
+  })
+
+  it('gives a version-45 database an empty similar artists cache and an index of when albums came', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 45).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 45')
+    before.exec(
+      `INSERT INTO artists (id, name, sort_name, name_key, mbid) VALUES (1, 'Band', 'Band', 'band', NULL);`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.pragma('user_version', { simple: true })).toBe(46)
+    expect(MIGRATIONS).toHaveLength(46)
+    database.db
+      .prepare(
+        `INSERT INTO similar_artists (artist_id, similar_id, score, fetched_at)
+         VALUES (1, '9c9f1380-2516-4fc9-a3e6-f9f61941d090', 10, '2026-10-31')`,
+      )
+      .run()
+    database.db.prepare('DELETE FROM artists WHERE id = 1').run()
+    expect(database.db.prepare('SELECT * FROM similar_artists').all()).toEqual([])
+    expect(
+      database.db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'albums_added'")
+        .all(),
+    ).toEqual([{ name: 'albums_added' }])
     database.onModuleDestroy()
   })
 })

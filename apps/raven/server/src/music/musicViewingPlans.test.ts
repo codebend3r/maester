@@ -1,14 +1,21 @@
-import { LIBRARY_KINDS } from '@raven/core'
+import { LIBRARY_KINDS, MIX_KINDS, RADIO_SEED_KINDS } from '@raven/core'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DatabaseService } from '@/db/database'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
+import { ViewingRepository } from '@/media/viewingRepository'
+import { ListenBrainzClient } from '@/music/listenBrainzClient'
+import { Mixes } from '@/music/mixes'
 import { MusicFavourites } from '@/music/musicFavourites'
 import { MusicRepository } from '@/music/musicRepository'
 import { Playlists } from '@/music/playlists'
+import { Radio } from '@/music/radio'
+import { SimilarArtists } from '@/music/similarArtists'
+import { STILL_CLOCK } from '@/test/clock'
 import { testDatabase } from '@/test/database'
 import { planLikeProduction, tracedDatabase } from '@/test/queryPlans'
-import { TEST_ACCOUNTS, pictureVersionsOf } from '@/test/repositories'
+import { fakeListenBrainz } from '@/test/fakeListenBrainz'
+import { TEST_ACCOUNTS, pictureVersionsOf, repositories } from '@/test/repositories'
 
 const account = TEST_ACCOUNTS.b
 
@@ -17,9 +24,16 @@ type StoresProps = { database: DatabaseService }
 /** The per-account music stores over `database`, wired as the app wires them. */
 const stores = ({ database }: StoresProps) => {
   const music = new MusicRepository(database, pictureVersionsOf(database))
+  const similar = new SimilarArtists(
+    database,
+    new ListenBrainzClient(fakeListenBrainz({ similar: {} }).fetch),
+    STILL_CLOCK,
+  )
   return {
     playlists: new Playlists(database, music),
     favourites: new MusicFavourites(database, music, new LibrariesRepository(database)),
+    mixes: new Mixes(database, music, STILL_CLOCK),
+    radio: new Radio(database, music, similar, STILL_CLOCK),
   }
 }
 
@@ -59,14 +73,30 @@ const ACCOUNT_STATEMENTS = {
     stores({ database }).favourites.setArtist({ artistId: ids.artist, favourite: false, account }),
   'its favourite albums': ({ database }) => stores({ database }).favourites.albums({ account }),
   'its favourite artists': ({ database }) => stores({ database }).favourites.artists({ account }),
+  // Recently added reads no plays, so it has no account's key to search by.
+  ...Object.fromEntries(
+    Object.values(MIX_KINDS)
+      .filter((kind) => kind !== MIX_KINDS.recentlyAdded)
+      .map((kind) => [
+        `its ${kind} mix`,
+        ({ database }: ReadProps) => stores({ database }).mixes.get({ kind, account, hidden: [] }),
+      ]),
+  ),
+  'its recent albums': ({ database }) => stores({ database }).mixes.recent({ account, hidden: [] }),
+  'a radio from a track': ({ database, ids }) =>
+    stores({ database }).radio.play({
+      seed: { kind: RADIO_SEED_KINDS.track, id: ids.track },
+      account,
+      hidden: [],
+    }),
 } as const satisfies Record<string, Read>
 
 /** A step over the per-account music tables, by name or the playlists' alias. */
-const ACCOUNT_STEP = /^[A-Z-]+ (p|playlists|album_favourites|artist_favourites)\b/
+const ACCOUNT_STEP = /^[A-Z-]+ (p|playlists|album_favourites|artist_favourites|pl|plays)\b/
 
 /** A playlist or a favourite found by the account's own key, never by reading every row. */
 const BY_ACCOUNT =
-  /^SEARCH (p|playlists|album_favourites|artist_favourites) USING (PRIMARY KEY|(COVERING )?INDEX \w+|INTEGER PRIMARY KEY) \((account_id=\?|rowid=\?)/
+  /^SEARCH (p|playlists|album_favourites|artist_favourites) USING (PRIMARY KEY|(COVERING )?INDEX \w+|INTEGER PRIMARY KEY) \((account_id=\?|rowid=\?)|^SEARCH pl USING (COVERING )?INDEX plays_account \(account_id=\?/
 
 /** A step over a playlist's tracks, which are read by their playlist's key alone. */
 const ORDER_STEP = /^[A-Z-]+ (pt|playlist_tracks)\b/
@@ -124,16 +154,20 @@ describe.each([
     const { playlists } = stores({ database: database.get() })
     ids.playlist = playlists.create({ name: 'Mix', account })
     playlists.append({ id: ids.playlist, mediaIds: [ids.track], account })
+    new ViewingRepository(database.get(), repositories(database.get()).media).recordPlay({
+      id: ids.track,
+      account,
+    })
     prepare(database.get())
   })
 
   afterEach(() => database.close())
 
   /** Every step SQLite took for `read`. */
-  const stepsOf = (read: Read) => {
+  const stepsOf = async (read: Read) => {
     const traced = tracedDatabase(database.get())
     try {
-      read({ database: traced.database, ids })
+      await read({ database: traced.database, ids })
       return traced.steps().map((step) => step.detail)
     } finally {
       traced.database.onModuleDestroy()
@@ -142,8 +176,8 @@ describe.each([
 
   it.each(Object.entries(ACCOUNT_STATEMENTS))(
     'reads %s by the account’s key, and a playlist’s tracks by its own',
-    (_name, read) => {
-      const details = stepsOf(read)
+    async (_name, read) => {
+      const details = await stepsOf(read)
       const byAccount = details.filter((detail) => ACCOUNT_STEP.test(detail))
       const orders = details.filter((detail) => ORDER_STEP.test(detail))
 

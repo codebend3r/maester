@@ -1,0 +1,89 @@
+import { Inject, Injectable } from '@nestjs/common'
+import { CLOCK, type Clock } from '@/clock'
+import { DatabaseService } from '@/db/database'
+import { ListenBrainzClient, type SimilarArtist } from '@/music/listenBrainzClient'
+import { createOnce } from '@/once'
+
+/** How long what ListenBrainz said of an artist is kept before it is asked again. */
+const KEEP_MS = 30 * 24 * 60 * 60 * 1000
+
+type SimilarArtistsOfProps = { artistId: number }
+
+type SimilarArtistsSaveProps = { artistId: number; similar: readonly SimilarArtist[] }
+
+/**
+ * The artists the library holds that ListenBrainz finds similar to one of
+ * ours, closest first, through the `similar_artists` cache. An artist with
+ * no MusicBrainz id has none. ListenBrainz failing leaves what was kept, or
+ * nothing; a radio goes on without them either way.
+ */
+@Injectable()
+export class SimilarArtists {
+  private readonly asking = createOnce<void>()
+  /** Artists ListenBrainz knew nothing similar to, and when it said so, since no row records that. */
+  private readonly foundNone = new Map<number, number>()
+
+  constructor(
+    @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(ListenBrainzClient) private readonly listenBrainz: ListenBrainzClient,
+    @Inject(CLOCK) private readonly clock: Clock,
+  ) {}
+
+  private get db() {
+    return this.database.db
+  }
+
+  /** The library's artists similar to `artistId`, closest first. */
+  async of({ artistId }: SimilarArtistsOfProps): Promise<number[]> {
+    const mbid =
+      this.db
+        .prepare<[number], { mbid: string | null }>('SELECT mbid FROM artists WHERE id = ?')
+        .get(artistId)?.mbid ?? null
+    if (mbid === null) return []
+    if (!this.isFresh({ artistId })) {
+      await this.asking.run({
+        key: String(artistId),
+        make: () =>
+          this.listenBrainz.similarArtists(mbid).then(
+            (similar) => this.save({ artistId, similar }),
+            () => undefined,
+          ),
+      })
+    }
+    return this.db
+      .prepare<[number], { id: number }>(
+        `SELECT ar.id FROM similar_artists s
+           JOIN artists ar ON ar.mbid = s.similar_id
+          WHERE s.artist_id = ?
+          ORDER BY s.score DESC, ar.id`,
+      )
+      .all(artistId)
+      .map((row) => row.id)
+  }
+
+  private isFresh({ artistId }: SimilarArtistsOfProps): boolean {
+    const since = this.clock.now() - KEEP_MS
+    if ((this.foundNone.get(artistId) ?? -Infinity) >= since) return true
+    const fetchedAt = this.db
+      .prepare<[number], { fetched_at: string | null }>(
+        'SELECT MAX(fetched_at) AS fetched_at FROM similar_artists WHERE artist_id = ?',
+      )
+      .get(artistId)?.fetched_at
+    return !!fetchedAt && Date.parse(fetchedAt) >= since
+  }
+
+  private save({ artistId, similar }: SimilarArtistsSaveProps): void {
+    const at = this.clock.now()
+    if (similar.length === 0) this.foundNone.set(artistId, at)
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM similar_artists WHERE artist_id = ?').run(artistId)
+      const insert = this.db.prepare(
+        `INSERT OR IGNORE INTO similar_artists (artist_id, similar_id, score, fetched_at)
+         VALUES (?, ?, ?, ?)`,
+      )
+      similar.forEach(({ mbid, score }) =>
+        insert.run(artistId, mbid, score, new Date(at).toISOString()),
+      )
+    })()
+  }
+}

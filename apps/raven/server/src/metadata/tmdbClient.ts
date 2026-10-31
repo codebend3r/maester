@@ -38,7 +38,13 @@ import { type RateLimit, createRateLimit, sleep } from '@/scanner/concurrency'
 
 type MetadataFetchProps = {
   url: string
-  init: { headers: Record<string, string>; signal: AbortSignal }
+  init: {
+    headers: Record<string, string>
+    signal: AbortSignal
+    /** GET when left out; the scrobblers POST. */
+    method?: string
+    body?: string
+  }
 }
 
 /**

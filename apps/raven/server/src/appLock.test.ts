@@ -12,6 +12,8 @@ import {
   isLibraryKind,
   isRecord,
   LYRICS_KINDS,
+  MIX_KINDS,
+  RADIO_SEED_KINDS,
   musicListQuery,
   sortsFor,
   viewsFor,
@@ -340,6 +342,40 @@ describe('a library locked behind the PIN', () => {
     await api().replacePlaylistTracks({ id: playlist.id, mediaIds: [] })
     expect((await api(cookie).getPlaylist(playlist.id)).tracks.map((each) => each.id)).toEqual([id])
     await api().deletePlaylist(playlist.id)
+  })
+
+  it("leaves a locked library's albums out of Home, and a radio seeded there behind the PIN", async () => {
+    const [track] = app().get(MediaIndex).idsForLibrary(state.privateMusic)
+    const id = track ?? 0
+    const seeds = [
+      { kind: RADIO_SEED_KINDS.track, id },
+      { kind: RADIO_SEED_KINDS.album, id: state.privateAlbum },
+    ]
+    const refused = await Promise.all(
+      seeds.map((seed) =>
+        api()
+          .getRadio({ seed })
+          .catch((error: unknown) => error),
+      ),
+    )
+    expect(refused).toEqual(seeds.map(() => expect.objectContaining({ status: 423 })))
+    expect((await api().getRecentAlbums()).added).toEqual([])
+    await expect(api().listMixes()).resolves.toEqual([])
+    await expect(api().getMix({ id: MIX_KINDS.heavyRotation })).rejects.toMatchObject({
+      status: 404,
+    })
+    const unread = ['/api/music/radio?seed=genre:1', '/api/music/radio', '/api/music/mixes/weekly']
+    const statuses = await Promise.all(
+      unread.map(async (url) => (await inject({ method: 'GET', url })).statusCode),
+    )
+    expect(statuses).toEqual([400, 400, 404])
+
+    const { cookie } = await unlock('3001')
+    const radio = await api(cookie).getRadio({ seed: { kind: RADIO_SEED_KINDS.track, id } })
+    expect(radio.map((each) => each.id)).toEqual([id])
+    expect((await api(cookie).getRecentAlbums()).added.map((album) => album.title)).toEqual([
+      'Lessons',
+    ])
   })
 
   it('keeps a locked library off the home page until it is unlocked', async () => {
