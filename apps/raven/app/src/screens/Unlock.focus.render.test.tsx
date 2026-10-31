@@ -3,6 +3,7 @@ import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import { screen } from '@testing-library/react-native'
 
+import { FORM_COPY } from '@/layouts/copy'
 import { Unlock } from '@/screens/Unlock'
 import { useActiveServer } from '@/stores/activeServer'
 import { NAS, homeApi } from '@/test/homeServer'
@@ -48,7 +49,8 @@ describe('Unlock on a TV', () => {
   // on Android TV left the PIN screen with nothing focused.
   it('asks for the remote on the PIN field once it is drawn, and on nothing else', async () => {
     await renderScreen({ ui: <Unlock /> })
-    expect(screen.getByRole('header', { name: NAS.name })).toBeTruthy()
+    expect(screen.getByRole('header', { name: FORM_COPY.wordmark })).toBeTruthy()
+    expect(screen.getByText(NAS.name)).toBeTruthy()
     expect(askedFor()).toEqual(['PIN'])
   })
 })

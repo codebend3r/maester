@@ -1,18 +1,10 @@
 import { describe, expect, it } from 'bun:test'
-import {
-  ADMIN_LOCK_STATES,
-  type AdminLock,
-  ApiError,
-  type Home,
-  type LockState,
-  SERVERS_CAP,
-} from '@raven/core'
+import { ADMIN_LOCK_STATES, type AdminLock, ApiError, type Home, SERVERS_CAP } from '@raven/core'
 
 import {
   FINISH_OUTCOMES,
   SIGN_IN_STEPS,
   finishSignIn,
-  stepAfterAccount,
   stepAfterSecret,
 } from '@/account/signInSteps'
 import { createActiveServerStore } from '@/servers/activeServerStore'
@@ -30,14 +22,12 @@ const SERVER: AppServer = {
 const HOME: Home = { inProgress: [{ media: mediaItemFor({ id: 7 }), poster: null }], shelves: [] }
 
 type ApiOfProps = {
-  lock?: LockState
   adminLock?: AdminLock
   ticket?: () => Promise<{ ticket: string; expiresAt: number }>
 }
 
 /** A fake server that records the secrets it was sent. */
 const apiOf = ({
-  lock = { available: false, unlocked: false },
   adminLock = { state: ADMIN_LOCK_STATES.off },
   ticket = async () => ({ ticket: 't', expiresAt: 1 }),
 }: ApiOfProps = {}) => {
@@ -45,7 +35,6 @@ const apiOf = ({
   return {
     sent,
     api: {
-      getLock: async () => lock,
       unlock: async (pin: string) => {
         sent.push(`pin:${pin}`)
         return { available: true, unlocked: true }
@@ -63,23 +52,6 @@ const apiOf = ({
 
 const serversOf = () =>
   createActiveServerStore({ store: memoryStore().store, jar: { forget: async () => {} } })
-
-describe('stepAfterAccount', () => {
-  it('asks for the PIN when the server has one the account has not given', async () => {
-    const { api } = apiOf({ lock: { available: true, unlocked: false } })
-    expect(await stepAfterAccount({ api, server: SERVER })).toEqual({
-      kind: SIGN_IN_STEPS.pin,
-      server: SERVER,
-    })
-  })
-
-  it.each([
-    ['has no PIN', { available: false, unlocked: false }],
-    ['is unlocked already', { available: true, unlocked: true }],
-  ])('asks nothing more when the server %s', async (_name, lock: LockState) => {
-    expect(await stepAfterAccount({ api: apiOf({ lock }).api, server: SERVER })).toBeNull()
-  })
-})
 
 describe('stepAfterSecret', () => {
   it('sends the PIN, then asks for the admin password while the admin lock holds', async () => {
