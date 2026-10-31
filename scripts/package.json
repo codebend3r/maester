@@ -1,13 +1,13 @@
 {
   "name": "scripts",
   "private": true,
-  "description": "Repo tooling: the tracker catalog and its issue and board sync, NAS deploy, version bump. Linted and tested with luwin's pinned ruff, pytest and config",
+  "description": "Repo tooling: the tracker catalog and its issue and board sync, NAS deploy, version bump. Linted and tested with sparrow's pinned ruff, pytest and config",
   "scripts": {
-    "format": "uv run --project ../apps/luwin/api ruff format --config ../apps/luwin/api/pyproject.toml .",
-    "format:check": "uv run --project ../apps/luwin/api ruff format --config ../apps/luwin/api/pyproject.toml --check .",
-    "lint:py": "uv run --project ../apps/luwin/api ruff check --config ../apps/luwin/api/pyproject.toml .",
-    "lint:py:fix": "uv run --project ../apps/luwin/api ruff check --config ../apps/luwin/api/pyproject.toml --fix .",
-    "test": "uv run --project ../apps/luwin/api pytest -q -o console_output_style=classic tests"
+    "format": "uv run --project ../apps/sparrow/api ruff format --config ../apps/sparrow/api/pyproject.toml .",
+    "format:check": "uv run --project ../apps/sparrow/api ruff format --config ../apps/sparrow/api/pyproject.toml --check .",
+    "lint:py": "uv run --project ../apps/sparrow/api ruff check --config ../apps/sparrow/api/pyproject.toml .",
+    "lint:py:fix": "uv run --project ../apps/sparrow/api ruff check --config ../apps/sparrow/api/pyproject.toml --fix .",
+    "test": "uv run --project ../apps/sparrow/api pytest -q -o console_output_style=classic tests"
   },
   "nx": {
     "projectType": "library",

@@ -53,13 +53,13 @@
     },
     "eval": {
       "inputs": [
-        "{projectRoot}/luwin/**/*.py",
+        "{projectRoot}/sparrow/**/*.py",
         "{projectRoot}/evals/**/*",
         "{projectRoot}/pyproject.toml",
         "{projectRoot}/uv.lock",
-        { "env": "LUWIN_MODEL" }
+        { "env": "SPARROW_MODEL" }
       ],
-      "outputs": ["{workspaceRoot}/apps/luwin/docs/evals.md"],
+      "outputs": ["{workspaceRoot}/apps/sparrow/docs/evals.md"],
       "cache": true
     },
     "dev": {

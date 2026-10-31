@@ -15,13 +15,13 @@ A fresh clone that fails `verify` almost always has an environment problem, not 
 
 Install by tier. A full setup includes every tier below; a scoped setup includes the tiers its commands need. The repo is macOS on Apple silicon first: the device app, desktop and their e2e need it. Installing prerequisites is not permission to deploy, publish, sign in as the user, overwrite credentials, migrate personal app data or leave services running. Ask before privileged changes, changing `xcode-select`, or large Xcode/runtime downloads unless the user already approved them.
 
-**Core** (`verify`, lint, typecheck, format, unit tests, `dev:*`, `sandbox:luwin`)
+**Core** (`verify`, lint, typecheck, format, unit tests, `dev:*`, `sandbox:sparrow`)
 
 | Tool               | Why                                                                                                   | Check                                 | Install                                                      |
 | ------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------ |
 | Bun                | Runs everything; must match `packageManager` in `package.json`                                        | `bun --version`                       | `curl -fsSL https://bun.sh/install \| bash -s bun-v<pinned>` |
 | uv / uvx           | Python lint, format and tests; `uvx typos` spellcheck                                                 | `uv --version`                        | `brew install uv`                                            |
-| Python 3.12        | `apps/luwin/api` pins `>=3.12,<3.13`; `scripts` uses its env                                          | `uv python find 3.12`                 | `uv python install 3.12`                                     |
+| Python 3.12        | `apps/sparrow/api` pins `>=3.12,<3.13`; `scripts` uses its env                                        | `uv python find 3.12`                 | `uv python install 3.12`                                     |
 | ffmpeg and ffprobe | `@raven/server` and `@raven/core` tests make real clips, and the dev server probes with them          | `ffmpeg -version && ffprobe -version` | `brew install ffmpeg`                                        |
 | Nx CLI (optional)  | `nx login`, which signs this machine in to the Nx Cloud workspace that `nxCloudId` in `nx.json` names | `nx --version`                        | `brew install nx`                                            |
 
@@ -43,7 +43,7 @@ Install by tier. A full setup includes every tier below; a scoped setup includes
 
 **Docker images** (`ci:docker`, `docker build -f apps/<product>/Dockerfile .`): Docker as above. Check `docker info`, not just `docker --version`: the daemon must be running. `ci:docker` builds the disposable Linux checks image; it cannot run the macOS native or simulator jobs.
 
-**Git and authenticated tooling** (`affected`, `affected:tasks`, `lint-staged`, `claude-audit`, `dev:luwin`, `sandbox:luwin`): Apple's Git and command-line tools, `jq` for the simulator recipes, and a signed-in Claude Code CLI with network access. Install missing `jq` with `brew install jq` and Claude Code with `brew install --cask claude-code`; check `git --version`, `jq --version`, `claude --version` and `claude auth status`. Let the user complete any sign-in, never collect their credentials. Read `scripts/audit_claude_md.sh` for its current model/access requirements; the root command is `bun run claude-audit`, not `bun run audit`. Fetch `origin` so affected checks and audits have their base ref. `lint-staged` operates on the user's index: do not stage files just to exercise it. `graph` needs no extra global package; Nx comes with the workspace install. A browser is only needed to view its interactive output.
+**Git and authenticated tooling** (`affected`, `affected:tasks`, `lint-staged`, `claude-audit`, `dev:sparrow`, `sandbox:sparrow`): Apple's Git and command-line tools, `jq` for the simulator recipes, and a signed-in Claude Code CLI with network access. Install missing `jq` with `brew install jq` and Claude Code with `brew install --cask claude-code`; check `git --version`, `jq --version`, `claude --version` and `claude auth status`. Let the user complete any sign-in, never collect their credentials. Read `scripts/audit_claude_md.sh` for its current model/access requirements; the root command is `bun run claude-audit`, not `bun run audit`. Fetch `origin` so affected checks and audits have their base ref. `lint-staged` operates on the user's index: do not stage files just to exercise it. `graph` needs no extra global package; Nx comes with the workspace install. A browser is only needed to view its interactive output.
 
 One shot for a Mac that needs everything but the GUI apps:
 
@@ -58,7 +58,7 @@ Run `uv python install 3.12` even when some Python is on the PATH. uv only accep
 
 `verify` and every task run through `bunx nx`, so the global Nx CLI is only for `nx login`. That command opens a browser, so run it yourself rather than through an agent (in Claude Code, `! nx login`). Homebrew's `nx` can be newer than the `nx` pinned in `package.json`; inside the repo it hands off to the pinned one, so `nx --version` printing a newer `Global` than `Local` is expected.
 
-Env files: copy `apps/raven/.env.example`, `apps/luwin/.env.example` and `apps/rookery/.env.example` to `.env` beside them when you run that product's dev server. Never put a `.env` at the repo root. Keep luwin's `ANTHROPIC_API_KEY` empty locally; its local runs go through `claude -p` on your own sign-in.
+Env files: copy `apps/raven/.env.example`, `apps/sparrow/.env.example` and `apps/rookery/.env.example` to `.env` beside them when you run that product's dev server. Never put a `.env` at the repo root. Keep sparrow's `ANTHROPIC_API_KEY` empty locally; its local runs go through `claude -p` on your own sign-in.
 
 ## 2. Install and verify
 
@@ -75,7 +75,7 @@ Everything goes through Nx from the repo root; `bun run <script>` is a wrapper.
 
 | Kind              | Command                                                                                                | Needs                                  |
 | ----------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------- |
-| Dev servers       | `bun run dev:raven`, `dev:luwin`, `dev:rookery`, `sandbox:luwin`, `app:start`, `desktop:dev`           | core; each product's `.env`            |
+| Dev servers       | `bun run dev:raven`, `dev:sparrow`, `dev:rookery`, `sandbox:sparrow`, `app:start`, `desktop:dev`       | core; each product's `.env`            |
 | Prebuild          | `bun run app:prebuild:ios`, `app:prebuild:tvos`, `app:prebuild:android-tv`                             | device app tier (Android for the last) |
 | Build             | `bun run build`, `app:build:ios`, `app:build:tvos`, `app:build:android-tv`, `desktop:build`            | as above                               |
 | Unit tests        | `bun run test`, `test:screens` (device app render tests)                                               | core, Node and Xcode for screens       |
@@ -167,15 +167,15 @@ After preparing native resources, install Electron with `bunx nx run @raven/desk
 
 Ask before `desktop:smoke:packaged`: it launches the real app, checks GitHub for updates, writes `updates.checkedAt`, and can migrate the user's `~/Library/Application Support/raven/desktop-config.json` to version 5; its logs go to `~/Library/Logs/raven`. This is not a throwaway test profile. Report it as untested if permission is withheld.
 
-For `dev:raven`, `dev:rookery`, `dev:luwin` and `sandbox:luwin`, use product-local env examples, check port availability and required backend sign-ins, and verify startup without disclosing secrets. Do not overwrite existing env files. For `ci:docker`, verify Docker is running and allow space/time for a cold image build; use `PLATFORM=linux/amd64` only when explicitly reproducing CI's architecture on this arm64 Mac. Maintenance commands (`lint:fix`, `format`, `lint-staged`) may modify files; inspect the diff and preserve the user's work. `affected` needs the chosen Git base/head, and `graph` is a long-running viewer rather than a pass/fail check.
+For `dev:raven`, `dev:rookery`, `dev:sparrow` and `sandbox:sparrow`, use product-local env examples, check port availability and required backend sign-ins, and verify startup without disclosing secrets. Do not overwrite existing env files. For `ci:docker`, verify Docker is running and allow space/time for a cold image build; use `PLATFORM=linux/amd64` only when explicitly reproducing CI's architecture on this arm64 Mac. Maintenance commands (`lint:fix`, `format`, `lint-staged`) may modify files; inspect the diff and preserve the user's work. `affected` needs the chosen Git base/head, and `graph` is a long-running viewer rather than a pass/fail check.
 
 ## 4. Read the failure
 
-Nx ends with a `Failed tasks:` list. Rerun just one to see its output: `bunx nx run <project>:<target> --skip-nx-cache` (for example `bunx nx run @luwin/api:lint:py --skip-nx-cache`).
+Nx ends with a `Failed tasks:` list. Rerun just one to see its output: `bunx nx run <project>:<target> --skip-nx-cache` (for example `bunx nx run @sparrow/api:lint:py --skip-nx-cache`).
 
 | Symptom                                                                                              | Cause                                                                                         | Fix                                                                                                                                                                   |
 | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@luwin/api` and `scripts` fail `lint:py`, `format:check` and `test` together                        | uv has no usable Python 3.12                                                                  | `uv python install 3.12`                                                                                                                                              |
+| `@sparrow/api` and `scripts` fail `lint:py`, `format:check` and `test` together                      | uv has no usable Python 3.12                                                                  | `uv python install 3.12`                                                                                                                                              |
 | `Failed to inspect Python interpreter ... /usr/local/bin/python3` / `Bad CPU type in executable`     | A leftover Intel Homebrew in `/usr/local` on Apple silicon without Rosetta                    | `uv python install 3.12`; optionally remove the stale `/usr/local` Homebrew                                                                                           |
 | `Executable not found in $PATH: "ffmpeg"`, `spawn ffmpeg ENOENT` in `@raven/server` or `@raven/core` | ffmpeg not installed                                                                          | `brew install ffmpeg`                                                                                                                                                 |
 | `xcrun metal --version` reports `missing Metal Toolchain`                                            | Full Xcode is installed but its optional Metal component is absent                            | With approval, export `DEVELOPER_DIR`, run `xcodebuild -downloadComponent MetalToolchain`, then recheck Metal as above                                                |

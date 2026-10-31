@@ -80,7 +80,7 @@ GROUPS: tuple[Group, ...] = (
         "cyan",
         (
             Command("lint", "Lints Python (ruff), TypeScript (oxlint) and SCSS (gale)."),
-            Command("lint:py", "Lints the Python with luwin's pinned ruff."),
+            Command("lint:py", "Lints the Python with sparrow's pinned ruff."),
             Command("lint:ts", "Lints the TypeScript with oxlint."),
             Command("lint:css", "Lints the SCSS with gale."),
             Command("lint:fix", "Fixes what the three linters can fix on their own."),
@@ -133,8 +133,8 @@ GROUPS: tuple[Group, ...] = (
                 "dev:raven:splash", "raven's splash page (maester.netlify.app) with hot reload."
             ),
             Command("build:raven:splash", "Builds raven's splash page."),
-            Command("dev:luwin", "luwin's API and chat page."),
-            Command("sandbox:luwin", "luwin's sandbox for testing its answers."),
+            Command("dev:sparrow", "sparrow's API and chat page."),
+            Command("sandbox:sparrow", "sparrow's sandbox for testing its answers."),
             Command("dev:rookery", "rookery's sign-in server and its login pages."),
         ),
     ),

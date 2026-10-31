@@ -1,0 +1,202 @@
+import os
+from dataclasses import fields, is_dataclass
+from datetime import time, timedelta
+from zoneinfo import ZoneInfo
+
+import pytest
+
+from sparrow.config import (
+    REQUIRED,
+    FleetMonitorAccess,
+    Jobs,
+    MissingConfig,
+    RenamedConfig,
+    Settings,
+    load_settings,
+    refuse_renamed,
+    require,
+)
+
+
+def test_defaults_when_env_is_empty():
+    s = load_settings({})
+    assert s == Settings()
+    assert s.model == "claude-sonnet-5-5"
+    assert s.guardrails.replace_daily_cap == 3
+    assert s.db_path == "/data/luwin.db"
+
+
+def test_values_are_parsed_and_urls_stripped():
+    s = load_settings(
+        {
+            "SPARROW_MODEL": "claude-sonnet-5",
+            "SEERR_URL": "http://seerr:5055/ ",
+            "REPLACE_DAILY_CAP": "5",
+            "USER_TOKENS_PER_DAY": "",
+            "DUB_PROFILE": " Dual Audio ",
+        }
+    )
+    assert (s.dub_tag, s.dub_profile) == ("dub", "Dual Audio")
+    assert s.model == "claude-sonnet-5"
+    assert s.seerr_url == "http://seerr:5055"
+    assert s.guardrails.replace_daily_cap == 5
+    assert s.guardrails.user_tokens_per_day == 200_000
+
+
+def test_media_roots_and_path_map_are_lists():
+    s = load_settings(
+        {
+            "MEDIA_ROOTS": " /Vermithor, /Meleys ,,",
+            "MEDIA_PATH_MAP": "/data/media=/Meleys, broken, =/x, /tv = /Syrax/TV",
+            "PROBE_TIMEOUT_SECONDS": "45",
+        }
+    )
+    assert s.media_roots == ("/Vermithor", "/Meleys")
+    assert s.media_path_map == (("/data/media", "/Meleys"), ("/tv", "/Syrax/TV"))
+    assert s.probe_timeout_seconds == 45 and Settings().media_roots == ()
+
+
+@pytest.mark.parametrize("roots", ["/", "/Meleys, Movies"])
+def test_media_roots_must_be_absolute_and_not_the_whole_filesystem(roots):
+    with pytest.raises(ValueError, match="MEDIA_ROOTS"):
+        load_settings({"MEDIA_ROOTS": roots})
+
+
+def test_require_names_every_missing_variable_at_once():
+    with pytest.raises(MissingConfig) as exc:
+        require({"A": "1", "B": ""}, "A", "B", "C")
+    assert exc.value.names == ["B", "C"]
+    assert "B, C" in str(exc.value)
+
+
+def test_require_passes_when_all_present():
+    require({"A": "1"}, "A")
+
+
+def test_the_fleet_monitor_is_optional_but_needs_its_token_once_named():
+    assert load_settings({}).fleet_monitor is None
+    named = {"FLEET_MONITOR_URL": "http://192.168.50.2:8010/", "FLEET_MONITOR_TOKEN": " tok "}
+    assert load_settings(named).fleet_monitor == FleetMonitorAccess(
+        "http://192.168.50.2:8010", "tok"
+    )
+    with pytest.raises(MissingConfig) as exc:
+        load_settings({**named, "FLEET_MONITOR_TOKEN": ""})
+    assert exc.value.names == ["FLEET_MONITOR_TOKEN"]
+    assert load_settings({"FLEET_MONITOR_TOKEN": "tok"}).fleet_monitor is None
+
+
+def test_the_speed_test_runs_on_the_host_named():
+    assert load_settings({}).speedtest_host == ""
+    assert load_settings({"SPEEDTEST_HOST": " Meleys "}).speedtest_host == "meleys"
+
+
+def test_jobs_run_in_the_named_time_zone_at_the_named_times():
+    cfg = load_settings(
+        {
+            "TZ": "America/Toronto",
+            "DIGEST_TIME": "07:30",
+            "NAS_REPORT_DAY": "Sunday",
+            "SWEEP_MINUTES": "10",
+            "STALLED_HOURS": "3",
+        }
+    )
+    jobs = cfg.jobs
+    assert jobs.zone == ZoneInfo("America/Toronto") and jobs.digest_at == time(7, 30)
+    assert jobs.nas_report_day == 6
+    assert (jobs.sweep_every, jobs.stalled_after) == (timedelta(minutes=10), timedelta(hours=3))
+    assert load_settings({}).jobs == Jobs()
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [("TZ", "Mars/Olympus"), ("DIGEST_TIME", "8am"), ("NAS_REPORT_DAY", "someday")],
+)
+def test_a_bad_schedule_fails_on_boot_naming_the_variable(name, value):
+    with pytest.raises(ValueError, match=name):
+        load_settings({name: value})
+
+
+def test_load_env_file_reads_dotenv_from_the_working_directory(tmp_path, monkeypatch):
+    from sparrow.config import load_env_file
+
+    (tmp_path / ".env").write_text("SEERR_API_KEY=from-file\nWEB_PORT=42\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("WEB_PORT", "7")
+    monkeypatch.delenv("SEERR_API_KEY", raising=False)
+    assert load_env_file() is True
+    assert os.environ["SEERR_API_KEY"] == "from-file"
+    assert os.environ["WEB_PORT"] == "7"  # what the process already had wins
+
+
+def test_load_env_file_is_a_no_op_without_a_file(tmp_path, monkeypatch):
+    from sparrow.config import load_env_file
+
+    monkeypatch.chdir(tmp_path)
+    assert load_env_file() is False
+
+
+def test_old_variable_names_are_refused_with_their_new_names():
+    with pytest.raises(RenamedConfig) as exc:
+        refuse_renamed(
+            {"MAESTER_DB_PATH": "", "MAESTER_MODEL": "claude-sonnet-5", "SPARROW_EFFORT": "low"}
+        )
+    assert exc.value.names == ["MAESTER_MODEL", "MAESTER_DB_PATH"]
+    assert "MAESTER_MODEL is now SPARROW_MODEL, MAESTER_DB_PATH is now SPARROW_DB_PATH" in str(
+        exc.value
+    )
+
+
+@pytest.mark.parametrize("name", ["LUWIN_MODEL", "LUWIN_EFFORT", "LUWIN_DB_PATH"])
+def test_previous_brand_variables_are_refused_even_when_new_names_are_set(name):
+    with pytest.raises(RenamedConfig, match=f"{name} is now {name.replace('LUWIN', 'SPARROW')}"):
+        refuse_renamed({name: "old", name.replace("LUWIN", "SPARROW"): "new"})
+
+
+def test_new_variable_names_pass_and_are_read():
+    env = {
+        "SPARROW_MODEL": "claude-sonnet-5",
+        "SPARROW_EFFORT": "low",
+        "SPARROW_DB_PATH": "/data/x.db",
+    }
+    refuse_renamed(env)
+    s = load_settings(env)
+    assert (s.model, s.effort, s.db_path) == ("claude-sonnet-5", "low", "/data/x.db")
+
+
+def test_sparrow_needs_the_model_key_seerr_and_rookery_to_boot():
+    assert REQUIRED == (
+        "ANTHROPIC_API_KEY",
+        "SEERR_URL",
+        "SEERR_API_KEY",
+        "ROOKERY_URL",
+        "ROOKERY_PUBLIC_URL",
+        "ROOKERY_SERVICE_TOKEN",
+    )
+
+
+def test_rookery_is_read_with_its_urls_stripped():
+    s = load_settings(
+        {
+            "ROOKERY_URL": "http://192.168.50.2:8030/",
+            "ROOKERY_PUBLIC_URL": " https://rookery.maester.example.com/ ",
+            "ROOKERY_SERVICE_TOKEN": " tok ",
+        }
+    )
+    assert s.rookery_url == "http://192.168.50.2:8030"
+    assert s.rookery_public_url == "https://rookery.maester.example.com"
+    assert s.rookery_service_token == "tok"
+
+
+def test_every_setting_is_read_from_one_variable_of_its_own():
+    def names(cls):
+        for f in fields(cls):
+            if "env" in f.metadata:
+                yield f.metadata["env"]
+            elif is_dataclass(f.default_factory):
+                yield from names(f.default_factory)
+            else:
+                raise AssertionError(f"{cls.__name__}.{f.name} is read from nowhere")
+
+    read = list(names(Settings))
+    assert len(read) == len(set(read))
+    assert set(REQUIRED) <= set(read)
