@@ -1,9 +1,10 @@
 import {
+  PICTURE_SUBTITLES,
   type PlaybackMode,
   SPEEDS,
   audioLabel,
   describeMode,
-  isPictureSubtitle,
+  isShowableSubtitle,
   subtitleLabel,
 } from '@raven/core'
 import { type ComponentType, type RefObject, useEffect, useId, useRef } from 'react'
@@ -61,8 +62,8 @@ type GroupProps = {
   selection: TrackSelection
   mode: PlaybackMode
   subtitleStatus: SubtitleStatus
-  /** Whether a picture subtitle can be picked: the server may burn it into the picture. */
-  canBurn: boolean
+  /** The ways the server offers; its `pictures` says whether a picture subtitle can be picked. */
+  choices: PlayChoices | null
 }
 
 const tracksNoteOf = ({ tracksFailed, tracksPending }: TrackSelection): string | null => {
@@ -120,8 +121,9 @@ const AudioGroup = (group: AudioGroupProps) => {
 
 type SubtitleGroupProps = GroupProps
 
-const SubtitleGroup = ({ labelledBy, selection, subtitleStatus, canBurn }: SubtitleGroupProps) => {
+const SubtitleGroup = ({ labelledBy, selection, subtitleStatus, choices }: SubtitleGroupProps) => {
   const { tracks, subtitle, pickSubtitle } = selection
+  const pictures = choices?.pictures ?? PICTURE_SUBTITLES.hidden
   const subtitleId = subtitle?.id ?? null
   const tracksNote = tracksNoteOf(selection)
   const subtitleNote = SUBTITLE_STATUS[subtitleStatus]
@@ -134,13 +136,13 @@ const SubtitleGroup = ({ labelledBy, selection, subtitleStatus, canBurn }: Subti
         onSelect={() => pickSubtitle(null)}
       />
       {(tracks?.subtitles ?? []).map((track) => {
-        const label = subtitleLabel({ track, canBurn })
+        const label = subtitleLabel({ track, pictures })
         return (
           <Option
             key={track.id}
             name={`${labelledBy}-subtitles`}
             checked={track.id === subtitleId}
-            disabled={!track.supported && !(canBurn && isPictureSubtitle(track))}
+            disabled={!isShowableSubtitle({ track, pictures })}
             label={label.name}
             details={label.details}
             onSelect={() => pickSubtitle(track.id)}
@@ -231,7 +233,6 @@ type MenuBodyProps = GroupProps & {
   name: string
   rate: number
   steppedDown: StepDown | null
-  choices: PlayChoices | null
   onPickRate: (rate: number) => void
   autoplay: boolean
   onPickAutoplay: (isOn: boolean) => void
@@ -366,7 +367,6 @@ export const SettingsMenu = ({
             selection={selection}
             mode={mode}
             subtitleStatus={subtitleStatus}
-            canBurn={choices?.canBurn ?? false}
             name={id}
             rate={rate}
             steppedDown={steppedDown}

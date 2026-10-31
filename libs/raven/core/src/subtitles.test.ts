@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  PICTURE_SUBTITLES,
   activeCues,
   cueRuns,
   formatWebVtt,
   isPictureSubtitle,
+  isShowableSubtitle,
   mergeCues,
   parseWebVtt,
   subtitleWindowRange,
@@ -182,5 +184,13 @@ describe('isPictureSubtitle', () => {
     expect(isPictureSubtitle(track({ supported: true }))).toBe(false)
     expect(isPictureSubtitle(track({ source: SUBTITLE_SOURCES.external }))).toBe(false)
     expect(isPictureSubtitle(null)).toBe(false)
+  })
+
+  it('is showable when it is text, or a picture unless pictures are hidden', () => {
+    const text = track({ supported: true })
+    expect(isShowableSubtitle({ track: text, pictures: PICTURE_SUBTITLES.hidden })).toBe(true)
+    expect(isShowableSubtitle({ track: track({}), pictures: PICTURE_SUBTITLES.hidden })).toBe(false)
+    expect(isShowableSubtitle({ track: track({}), pictures: PICTURE_SUBTITLES.drawn })).toBe(true)
+    expect(isShowableSubtitle({ track: track({}), pictures: PICTURE_SUBTITLES.burned })).toBe(true)
   })
 })

@@ -302,6 +302,12 @@ export const encoderTestArgs = (encoder: VideoEncoder): string[] => {
  */
 export type BurnSubtitle = { stream: number; canvas: { width: number; height: number } }
 
+/** The flag before `-i` that gives a burn its canvas. */
+export const canvasArgs = ({ canvas }: BurnSubtitle): string[] => [
+  '-canvas_size',
+  `${canvas.width}x${canvas.height}`,
+]
+
 type StreamArgsProps = {
   input: string
   start: number
@@ -370,13 +376,13 @@ export const streamArgs = ({
   // reads on a clock that starts at the seek and moves its output back onto the file's.
   const clock =
     burn === null
-      ? ['-copyts', '-start_at_zero']
-      : ['-canvas_size', `${burn.canvas.width}x${burn.canvas.height}`]
+      ? { input: ['-copyts', '-start_at_zero'], shift: streamShift }
+      : { input: canvasArgs(burn), shift: streamShift + start }
   return [
     ...QUIET,
     ...video.input,
     ...(start > 0 ? ['-ss', String(start)] : []),
-    ...clock,
+    ...clock.input,
     '-i',
     input,
     ...(audioOnly ? [] : ['-map', video.map]),
@@ -392,7 +398,7 @@ export const streamArgs = ({
     '-max_muxing_queue_size',
     '4096',
     '-output_ts_offset',
-    String(burn === null ? streamShift : streamShift + start),
+    String(clock.shift),
     '-avoid_negative_ts',
     'disabled',
     '-use_editlist',

@@ -64,6 +64,7 @@ import {
   audioOptionsOf,
   audioPlaceFor,
   filePlaceFor,
+  picturesFor,
   subtitleOptionsOf,
   subtitlePlaceFor,
 } from '@/player/playerTracks'
@@ -371,8 +372,10 @@ const Playing = ({
       ? []
       : subtitleOptionsOf({
           tracks,
-          canShowPictures:
-            canDrawPictures || (ladder?.modes.includes(PLAYBACK_MODES.transcode) ?? false),
+          pictures: picturesFor({
+            canDraw: canDrawPictures,
+            canBurn: ladder?.modes.includes(PLAYBACK_MODES.transcode) ?? false,
+          }),
         })
   const audioValue = audioPlaying === null ? '' : String(audioPlaying)
   const audioTrack: VideoSurface['selectedAudioTrack'] =
