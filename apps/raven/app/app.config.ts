@@ -93,6 +93,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ['react-native-video', { enableBackgroundAudio: true }],
       // Held up by `AppRoot` until the stores are read, so the theme picked is the first frame.
       ['expo-splash-screen', { backgroundColor: ground }],
+      // Apple's display font: the family is the one inside the file, "Young Serif". Android's
+      // fonts are copied by `withAndroidFonts`, which names a family by its file instead.
+      ['expo-font', { ios: { fonts: ['./assets/fonts/YoungSerif.ttf'] } }],
     ],
   }
   // The Apple TV's remote-driven end to end test joins only the TV's native project, and the

@@ -78,7 +78,7 @@ export const SETTINGS_COPY = {
 } as const
 
 export const SIGN_IN_COPY = {
-  title: 'Sign in to raven',
+  title: 'Sign in to continue',
   email: 'Email',
   password: 'Password',
   badAccount: 'Enter your email and password.',

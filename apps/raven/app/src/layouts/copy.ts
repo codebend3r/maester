@@ -2,6 +2,9 @@ import { REPEAT_MODES, type RepeatMode } from '@raven/core'
 
 import type { PersonCard } from '@/queries/itemPage'
 
+/** The name every form wears above its own title, always in the display font. */
+export const FORM_COPY = { wordmark: 'Raven' } as const
+
 /** What the checkbox under a secret field says. */
 export const FIELD_COPY = { showPassword: 'Show password', showPin: 'Show PIN' } as const
 

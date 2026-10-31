@@ -14,13 +14,20 @@ name: An album plays from its page, and the bar follows Next to the second track
 - extendedWaitUntil:
     visible: Shuffle
     timeout: 30000
-- tapOn: Play
-# The bar is named for the track it shows. Each track lasts twenty seconds, so the first is
-# still playing when the bar is read.
+- tapOn:
+    text: Play
+    waitToSettleTimeoutMs: 500
+# Each track lasts twenty seconds. Cap settling around playback controls so Maestro reads
+# the next track before it ends, then pause it to keep the final assertion stable.
 - extendedWaitUntil:
     visible: 'Now Playing: First Light.*'
     timeout: 30000
-- tapOn: Next
+- tapOn:
+    text: Next
+    waitToSettleTimeoutMs: 500
+- tapOn:
+    text: Pause
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible: 'Now Playing: Dawn Song.*'
     timeout: 30000

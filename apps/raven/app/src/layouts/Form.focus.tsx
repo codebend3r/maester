@@ -12,7 +12,7 @@ import { FIELD_COPY } from '@/layouts/copy'
 import { Text } from '@/layouts/Text'
 import { ShowSecretToggle } from '@/layouts/ShowSecretToggle'
 import { useToneStyles, useTvFormStyles } from '@/layouts/formStyles'
-import { Logo } from '@/layouts/Logo'
+import { FormMasthead } from '@/layouts/FormMasthead'
 import { useFocusOnMount } from '@/layouts/focus'
 import { TvTextField } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
@@ -26,10 +26,7 @@ const Form = ({ title, children }: FormProps) => {
   return (
     <View style={[formStyles.ground, styles.ground]}>
       <View style={styles.content}>
-        <Logo width={LOGO_WIDTH} />
-        <Text accessibilityRole="header" style={formStyles.title}>
-          {title}
-        </Text>
+        <FormMasthead formStyles={formStyles} logoWidth={LOGO_WIDTH} title={title} />
         {children}
       </View>
     </View>
