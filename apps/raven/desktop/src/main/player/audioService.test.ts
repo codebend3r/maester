@@ -5,6 +5,8 @@ import {
   type AudioEvent,
   DESKTOP_PLATFORMS,
   ENGINE_STOPPED,
+  EQ_BANDS,
+  EQ_PRESETS,
   type OutputSettings,
   PLAYER_ERROR_REASONS,
   PLAYER_REFUSAL_REASONS,
@@ -20,7 +22,12 @@ import {
   type MpvProperty,
   type NowPlaying,
 } from '@raven/mpv'
-import { AUDIO_OBSERVED, type AudioMpv, createAudioService } from '@/main/player/audioService'
+import {
+  AUDIO_OBSERVED,
+  type AudioMpv,
+  createAudioService,
+  soundFilterOf,
+} from '@/main/player/audioService'
 import { HARDENED_OPTIONS } from '@/main/player/engine'
 import type { FailureExplainer, ResolvedSource, ServerTarget } from '@/main/player/loadTarget'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
@@ -95,14 +102,16 @@ type SetupProps = { explain?: FailureExplainer; downloaded?: readonly number[] }
 const setup = ({ explain = async () => LOCKED, downloaded = [] }: SetupProps = {}) => {
   const fake = fakeMpv()
   const resolved: number[] = []
+  const bitrates: (number | null)[] = []
   const closed: string[] = []
   const playing: boolean[] = []
   const warnings: string[] = []
   const events: AudioEvent[] = []
   const service = createAudioService({
     mpv: fake.mpv,
-    resolve: async (mediaId): Promise<ResolvedSource> => {
+    resolve: async ({ mediaId, kbps }): Promise<ResolvedSource> => {
       resolved.push(mediaId)
+      bitrates.push(kbps)
       if (mediaId === GONE) return { ok: false, message: GONE_MESSAGE }
       if (downloaded.includes(mediaId)) {
         return {
@@ -129,10 +138,20 @@ const setup = ({ explain = async () => LOCKED, downloaded = [] }: SetupProps = {
   service.subscribe((event) => {
     events.push(event)
   })
-  return { service, fake, shown: fake.shown, resolved, closed, playing, warnings, events }
+  return {
+    service,
+    fake,
+    shown: fake.shown,
+    resolved,
+    bitrates,
+    closed,
+    playing,
+    warnings,
+    events,
+  }
 }
 
-const LOAD = { type: AUDIO_COMMANDS.load, mediaId: 7, next: 8, start: 0 } as const
+const LOAD = { type: AUDIO_COMMANDS.load, mediaId: 7, next: 8, start: 0, kbps: null } as const
 
 type LoadfileOfProps = { mediaId: number; mode: string; start: number }
 
@@ -163,6 +182,16 @@ describe('loading', () => {
     ])
   })
 
+  test('a load at a bitrate fetches the track and the one queued after it at that bitrate', async () => {
+    const { service, resolved, bitrates } = setup()
+    await settle()
+    await service.handle({ ...LOAD, kbps: 256 })
+    await service.handle({ type: AUDIO_COMMANDS.queueNext, next: 9 })
+    await service.handle(LOAD)
+    expect(resolved).toEqual([7, 8, 9, 7, 8])
+    expect(bitrates).toEqual([256, 256, 256, null, null])
+  })
+
   test('a track the server refuses is refused with its words, and nothing is sent', async () => {
     const { service, fake } = setup()
     await settle()
@@ -180,7 +209,7 @@ describe('loading', () => {
     fake.failing.add(`set ${HARDENED_OPTIONS[0].name}`)
     const service = createAudioService({
       mpv: fake.mpv,
-      resolve: async (mediaId) => ({ ok: true, target: targetOf(mediaId) }),
+      resolve: async ({ mediaId }) => ({ ok: true, target: targetOf(mediaId) }),
       explain: async () => LOCKED,
       closeLoad: () => {},
       canChooseAo: true,
@@ -510,6 +539,51 @@ describe('commands', () => {
     expect(shown.at(-1)).toBeNull()
     expect(fake.log.at(-1)).toBe(MPV_COMMANDS.stop)
     expect(playing.at(-1)).toBe(false)
+  })
+})
+
+describe('the sound', () => {
+  const BASS = EQ_PRESETS.bassBoost
+
+  test('a level is a gain in dB first in the chain, and nothing at all for level 1 and a flat EQ', () => {
+    expect(soundFilterOf({ level: 0.5, eq: EQ_PRESETS.flat })).toBe('lavfi=[volume=-6.02dB]')
+    expect(soundFilterOf({ level: 1, eq: EQ_PRESETS.flat })).toBe('')
+  })
+
+  test('an EQ that is not flat appends its ten bands, an octave wide each', () => {
+    const bands = EQ_BANDS.map(
+      (frequency, index) => `equalizer=f=${frequency}:t=o:w=1:g=${BASS[index]}`,
+    )
+    expect(soundFilterOf({ level: 0.5, eq: BASS })).toBe(
+      `lavfi=[volume=-6.02dB,${bands.join(',')}]`,
+    )
+    expect(soundFilterOf({ level: 1, eq: BASS })).toBe(`lavfi=[${bands.join(',')}]`)
+  })
+
+  test('a sound command turns replaygain off and sets af once, with no ao-reload', async () => {
+    const { service, fake } = setup()
+    await settle()
+    await service.handle(LOAD)
+    fake.emit({ type: MPV_EVENTS.fileLoaded })
+    fake.log.length = 0
+    const sound = { type: AUDIO_COMMANDS.sound, level: 0.5, eq: EQ_PRESETS.flat } as const
+    expect(await service.handle(sound)).toEqual({ ok: true })
+    await service.handle(sound)
+    expect(fake.log).toEqual(['set replaygain no', 'set af lavfi=[volume=-6.02dB]'])
+    fake.log.length = 0
+    await service.handle({ ...sound, level: 1 })
+    expect(fake.log).toEqual(['set af '])
+    expect(fake.log.some((entry) => entry.startsWith(MPV_COMMANDS.aoReload))).toBe(false)
+  })
+
+  test('a level that is not a number is refused before mpv hears it', async () => {
+    const { service, fake } = setup()
+    await settle()
+    fake.log.length = 0
+    expect(
+      await service.handle({ type: AUDIO_COMMANDS.sound, level: Number.NaN, eq: BASS }),
+    ).toMatchObject({ ok: false })
+    expect(fake.log).toEqual([])
   })
 })
 

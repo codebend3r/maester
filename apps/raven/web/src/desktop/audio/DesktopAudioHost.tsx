@@ -3,17 +3,23 @@ import {
   ARTWORK_MAX_BYTES,
   AUDIO_COMMANDS,
   AUDIO_EVENTS,
+  type AudioBitrate,
+  type AudioCommand,
   type AudioEvent,
   type Track,
   artistNames,
+  levelOf,
 } from '@raven/core'
 import { AudioHost, watchPageHide } from '@raven/ui'
 import {
   AUDIO_STATES,
+  MUSIC_QUALITIES,
   type WindowedPlayer,
   playingTrackOf,
   runRemoteCommand,
   useAudioQueue,
+  useIsAudiobook,
+  usePlayerPrefs,
   useTrackRate,
   useWindowedAudioHost,
 } from '@raven/ui/headless'
@@ -41,14 +47,21 @@ const artworkOf = async ({ api, track }: ArtworkOfProps) => {
   }
 }
 
+type WindowedPlayerOfProps = {
+  player: NativeAudio
+  /** The transcode's bitrate a load asks for; null for the file itself. */
+  kbps: AudioBitrate | null
+}
+
 /** Main's music engine as the shared windowed host drives it: each call one command on the port. */
-const windowedPlayerOf = (player: NativeAudio): WindowedPlayer => ({
+const windowedPlayerOf = ({ player, kbps }: WindowedPlayerOfProps): WindowedPlayer => ({
   load: ({ playing, next, start }) =>
     player.send({
       type: AUDIO_COMMANDS.load,
       mediaId: playing.id,
       next: next?.id ?? null,
       start,
+      kbps,
     }),
   queueNext: (next) => player.send({ type: AUDIO_COMMANDS.queueNext, next: next?.id ?? null }),
   stop: () => player.send({ type: AUDIO_COMMANDS.stop }),
@@ -58,6 +71,8 @@ const windowedPlayerOf = (player: NativeAudio): WindowedPlayer => ({
   setVolume: ({ volume, isMuted }) =>
     player.send({ type: AUDIO_COMMANDS.volume, volume, muted: isMuted }),
 })
+
+type SetSoundProps = Omit<Extract<AudioCommand, { type: typeof AUDIO_COMMANDS.sound }>, 'type'>
 
 type NativeAudioHostProps = {
   api: ApiClient
@@ -69,19 +84,34 @@ type NativeAudioHostProps = {
  * holds the playing track and the one after it, plays the two with no gap, and says when it
  * moved on. The system's transport controls arrive the same way and drive the store. An
  * audiobook plays at the speed the prefs hold, and music at 1; mpv keeps the pitch either way.
+ * Music plays from its file or the transcode at the bitrate the prefs pick, an audiobook always
+ * from its file, and mpv levels and equalises it as the prefs say. Raven's mpv does not
+ * crossfade: one mpv cannot overlap two files.
  */
 const NativeAudioHost = ({ api, player }: NativeAudioHostProps) => {
   const track = useAudioQueue(playingTrackOf)
   const engine = useAudioQueue((store) => store.engine)
-  const windowed = useMemo(() => windowedPlayerOf(player), [player])
+  const quality = usePlayerPrefs((prefs) => prefs.musicQuality)
+  const isAudiobook = useIsAudiobook({ api, track })
+  const kbps = quality === MUSIC_QUALITIES.original || isAudiobook ? null : quality
+  const windowed = useMemo(() => windowedPlayerOf({ player, kbps }), [player, kbps])
   const host = useWindowedAudioHost({ api, player: windowed, watchHide: watchPageHide })
   const trackId = track?.id ?? null
   const rate = useTrackRate({ api, track })
+  const levelling = usePlayerPrefs((prefs) => prefs.levelling)
+  const eq = usePlayerPrefs((prefs) => prefs.equalizer.gains)
+  const level = track === null ? 1 : levelOf({ track, mode: levelling })
 
   const setRate = useEffectEvent((speed: number) => {
     player.send({ type: AUDIO_COMMANDS.speed, rate: speed }).catch(() => undefined)
   })
   useEffect(() => setRate(rate), [rate])
+
+  // The level is the playing track's, so it goes again as each track starts.
+  const setSound = useEffectEvent((sound: SetSoundProps) => {
+    player.send({ type: AUDIO_COMMANDS.sound, ...sound }).catch(() => undefined)
+  })
+  useEffect(() => setSound({ level, eq }), [level, eq])
 
   const onEvent = useEffectEvent((event: AudioEvent) => {
     switch (event.type) {

@@ -31,7 +31,8 @@ export const EQ_PRESETS = {
   loudness: [5, 4, 2, 0, -1, -1, 0, 2, 4, 5],
 } as const satisfies Record<EqPreset, EqGains>
 
-const isEqGains: Guard<EqGains> = (value): value is EqGains =>
+/** Ten gains in dB, one per band, each within `EQ_GAIN_DB`. */
+export const isEqGains: Guard<EqGains> = (value): value is EqGains =>
   Array.isArray(value) &&
   value.length === EQ_BANDS.length &&
   value.every((gain) => isNumber(gain) && gain >= EQ_GAIN_DB.min && gain <= EQ_GAIN_DB.max)

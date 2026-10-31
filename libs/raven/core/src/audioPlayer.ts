@@ -1,3 +1,5 @@
+import { isAudioBitrate } from '@/contract/streaming'
+import { isEqGains } from '@/equalizer'
 import { isMediaId } from '@/playLink'
 import { isPlayerErrorReason, PLAYER_ERROR_REASONS, type PlayerEvent } from '@/player'
 import { type Infer, isBoolean, isNumber, isString, nullable, object, oneOf, union } from '@/schema'
@@ -16,8 +18,12 @@ export const AUDIO_COMMANDS = {
   volume: 'volume',
   speed: 'speed',
   nowPlaying: 'nowPlaying',
+  sound: 'sound',
   stop: 'stop',
 } as const
+
+/** A levelling factor, as `levelOf` gives it: above 0, and never above 1, as levelling only turns down. */
+const isLevel = (value: unknown): value is number => isNumber(value) && value > 0 && value <= 1
 
 /** A cover rides along as its bytes, which the page already holds; main asks no picture route. */
 export const ARTWORK_MAX_BYTES = 4 * 1024 * 1024
@@ -36,12 +42,14 @@ export const isNowPlayingInfo = object({
 export type NowPlayingInfo = Infer<typeof isNowPlayingInfo>
 
 export const isAudioCommand = union(
-  // Plays `mediaId` from `start`, with `next` ready to follow it.
+  // Plays `mediaId` from `start`, with `next` ready to follow it, from the file itself, or both
+  // from the server's AAC transcode at `kbps`.
   object({
     type: oneOf([AUDIO_COMMANDS.load]),
     mediaId: isMediaId,
     next: nullable(isMediaId),
     start: isNumber,
+    kbps: nullable(isAudioBitrate),
   }),
   // Changes only what follows the playing track.
   object({ type: oneOf([AUDIO_COMMANDS.queueNext]), next: nullable(isMediaId) }),
@@ -52,6 +60,8 @@ export const isAudioCommand = union(
   // How fast it plays: an audiobook's chosen speed, 1 for music; the pitch stays as it was.
   object({ type: oneOf([AUDIO_COMMANDS.speed]), rate: isNumber }),
   object({ type: oneOf([AUDIO_COMMANDS.nowPlaying]), info: isNowPlayingInfo }),
+  // How the playing track sounds: its levelling factor and the equalizer's gains, from 32 Hz up.
+  object({ type: oneOf([AUDIO_COMMANDS.sound]), level: isLevel, eq: isEqGains }),
   object({ type: oneOf([AUDIO_COMMANDS.stop]) }),
 )
 

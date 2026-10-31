@@ -1,6 +1,8 @@
 import type { AddressInfo } from 'node:net'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
+  AUDIO_BITRATE_PARAM,
+  type AudioBitrate,
   AUTH_REFUSALS,
   type AuthRefusal,
   HTTP_METHODS,
@@ -17,7 +19,12 @@ import {
   TICKET_OUTCOMES,
   type TicketOutcome,
 } from '@/main/servers/accountTickets'
-import { API_PATHS, MEDIA_FILE_PATH, subtitlePathOf } from '@/main/servers/allowlist'
+import {
+  API_PATHS,
+  MEDIA_FILE_PATH,
+  MEDIA_TRANSCODE_PATH,
+  subtitlePathOf,
+} from '@/main/servers/allowlist'
 import { accountRefusalOf, readShort } from '@/main/servers/authRefusals'
 import { loggable } from '@/main/servers/serverCalls'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
@@ -119,6 +126,8 @@ type OpenProps = {
   server: Pick<ServerEntry, 'id' | 'origin' | 'name'>
   mediaId: number
   sidecarTrackIds: readonly string[]
+  /** A track's AAC transcode at this bitrate in place of its file; null for the file. */
+  kbps: AudioBitrate | null
 }
 
 export type MediaRelay = {
@@ -135,15 +144,28 @@ export type MediaRelay = {
   refusalOf: (loadId: string) => AuthRefusal['reason'] | null
 }
 
+/**
+ * What a path mpv asks for stands for: a path under `/api/media/<id>/` and the query it carries
+ * beside the ticket. `isMedia` marks the title's own bytes, the file or its transcode, whose
+ * refusal ends the title; a sidecar's does not.
+ */
+type Route = { path: string; query: Readonly<Record<string, string>>; isMedia: boolean }
+
 type Load = {
   loadId: string
   serverId: string
   origin: string
   name: string
   mediaId: number
-  /** Each path mpv may ask for, to the path under `/api/media/<id>/` it stands for. */
-  routes: ReadonlyMap<string, string>
+  /** Each path mpv may ask for, to what it stands for. */
+  routes: ReadonlyMap<string, Route>
 }
+
+/** The title's own bytes: its file, or a track's transcode at `kbps`. */
+const mediaRouteOf = (kbps: AudioBitrate | null): Route =>
+  kbps === null
+    ? { path: MEDIA_FILE_PATH, query: {}, isMedia: true }
+    : { path: MEDIA_TRANSCODE_PATH, query: { [AUDIO_BITRATE_PARAM]: String(kbps) }, isMedia: true }
 
 type Request = { loadId: string; controller: AbortController }
 
@@ -287,7 +309,7 @@ export const createMediaRelay = ({
 
   type RecordProps = {
     load: Load
-    path: string
+    route: Route
     reason: AuthRefusal['reason']
   }
 
@@ -295,16 +317,16 @@ export const createMediaRelay = ({
    * Every refusal is logged, but only the file's own is why the title ends: mpv plays on past a
    * sidecar it could not read, so a refused sidecar must not turn the end into an error.
    */
-  const record = ({ load, path, reason }: RecordProps): void => {
+  const record = ({ load, route, reason }: RecordProps): void => {
     // A request of a load already retired answers late; the newer load's record stands.
     if (!isCurrent(load)) return
-    if (path === MEDIA_FILE_PATH) remember({ loadId: load.loadId, reason })
+    if (route.isMedia) remember({ loadId: load.loadId, reason })
     safeWarn(`${loggable(load.name)} refused a relayed request: ${reason}`)
   }
 
   type TicketedProps = {
     load: Load
-    path: string
+    route: Route
     method: RelayMethod
     headers: Record<string, string>
     signal: AbortSignal
@@ -313,7 +335,7 @@ export const createMediaRelay = ({
 
   const ticketed = async ({
     load,
-    path,
+    route,
     method,
     headers,
     signal,
@@ -328,9 +350,9 @@ export const createMediaRelay = ({
       isFresh,
     })
     if (outcome.kind !== TICKET_OUTCOMES.ticket) return outcome
-    const query = toQueryString({ [MEDIA_TICKET_PARAM]: outcome.ticket })
+    const query = toQueryString({ ...route.query, [MEDIA_TICKET_PARAM]: outcome.ticket })
     const upstream = await fetchUpstream({
-      url: `${load.origin}${API_PATHS.media}/${load.mediaId}/${path}?${query}`,
+      url: `${load.origin}${API_PATHS.media}/${load.mediaId}/${route.path}?${query}`,
       method,
       headers,
       signal,
@@ -340,7 +362,7 @@ export const createMediaRelay = ({
 
   type RelayProps = {
     load: Load
-    path: string
+    route: Route
     method: RelayMethod
     range: string | null
     response: ServerResponse
@@ -349,14 +371,14 @@ export const createMediaRelay = ({
 
   const relay = async ({
     load,
-    path,
+    route,
     method,
     range,
     response,
     signal,
   }: RelayProps): Promise<void> => {
     const headers: Record<string, string> = range === null ? {} : { [HTTP_HEADERS.range]: range }
-    const request = { load, path, method, headers, signal }
+    const request = { load, route, method, headers, signal }
     const first = await ticketed({ ...request, isFresh: false })
     // A ticket the server no longer takes (it restarted, or the clocks disagree) is minted once more.
     const outcome =
@@ -364,7 +386,7 @@ export const createMediaRelay = ({
         ? await discard(first.upstream).then(() => ticketed({ ...request, isFresh: true }))
         : first
     if (outcome.kind !== TICKET_OUTCOMES.ticket) {
-      if (outcome.kind === TICKET_OUTCOMES.refused) record({ load, path, reason: outcome.reason })
+      if (outcome.kind === TICKET_OUTCOMES.refused) record({ load, route, reason: outcome.reason })
       answer({ response, status: statusForOutcome(outcome) })
       return
     }
@@ -374,13 +396,13 @@ export const createMediaRelay = ({
       upstream.status === HTTP_STATUSES.forbidden
     ) {
       const body = await readShort(upstream.body)
-      record({ load, path, reason: accountRefusalOf({ status: upstream.status, body }) })
+      record({ load, route, reason: accountRefusalOf({ status: upstream.status, body }) })
       answer({ response, status: upstream.status })
       return
     }
     // The file served again after a refusal (the owner let the account back in): it plays on,
     // so its end is a plain one.
-    if (path === MEDIA_FILE_PATH && isSuccessStatus(upstream.status) && isCurrent(load)) {
+    if (route.isMedia && isSuccessStatus(upstream.status) && isCurrent(load)) {
       forget(load.loadId)
     }
     response.writeHead(upstream.status, passedHeaders(upstream))
@@ -404,8 +426,8 @@ export const createMediaRelay = ({
   const serve = async ({ request, response }: ServeProps): Promise<void> => {
     const url = request.url ?? ''
     const load = loads.find((live) => live.routes.has(url)) ?? null
-    const path = load?.routes.get(url) ?? null
-    if (!isRelayMethod(request.method) || load === null || path === null) {
+    const route = load?.routes.get(url) ?? null
+    if (!isRelayMethod(request.method) || load === null || route === null) {
       answer({ response, status: HTTP_STATUSES.notFound })
       return
     }
@@ -418,7 +440,7 @@ export const createMediaRelay = ({
     try {
       await relay({
         load,
-        path,
+        route,
         method: request.method,
         range: request.headers.range ?? null,
         response,
@@ -449,7 +471,7 @@ export const createMediaRelay = ({
   }
 
   return {
-    open: async ({ server, mediaId, sidecarTrackIds }) => {
+    open: async ({ server, mediaId, sidecarTrackIds, kbps }) => {
       if (!isMediaId(mediaId)) throw new RangeError('The relay needs a media id.')
       const { port } = await portOf()
       const secret = newSecret(RELAY_SECRET_BYTES)
@@ -462,11 +484,12 @@ export const createMediaRelay = ({
       opened += 1
       const loadId = String(opened)
       const sidecars = sidecarTrackIds.filter(isSidecarTrackId)
-      const routes = new Map([
-        [`/${secret}/${MEDIA_FILE_PATH}`, MEDIA_FILE_PATH],
-        ...sidecars.map((id): [string, string] => [
+      // mpv asks for `/file` either way; the relay knows which bytes it stands for.
+      const routes = new Map<string, Route>([
+        [`/${secret}/${MEDIA_FILE_PATH}`, mediaRouteOf(kbps)],
+        ...sidecars.map((id): [string, Route] => [
           `/${secret}/${subtitlePathOf(id)}`,
-          subtitlePathOf(id),
+          { path: subtitlePathOf(id), query: {}, isMedia: false },
         ]),
       ])
       loads = [

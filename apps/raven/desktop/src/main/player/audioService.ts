@@ -1,9 +1,12 @@
 import {
   AUDIO_COMMANDS,
   AUDIO_EVENTS,
+  type AudioBitrate,
   type AudioCommand,
   type AudioEvent,
   type DesktopPlatform,
+  EQ_BANDS,
+  isFlatEq,
   isNumber,
   type NowPlayingInfo,
   PLAYER_ERROR_REASONS,
@@ -44,6 +47,7 @@ import {
 } from '@/main/player/outputOptions'
 import { type Phase, PLAYER_PHASES } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
+import type { MusicResolveProps } from '@/main/player/musicSource'
 import { createQuietMpv } from '@/main/player/quietMpv'
 import { messageOf } from '@/shared/messageOf'
 
@@ -73,7 +77,7 @@ export type AudioMpv = MpvControl & Pick<Mpv, 'nowPlaying' | 'clearNowPlaying'>
 type CreateAudioServiceProps = {
   mpv: AudioMpv
   /** A track: its downloaded file, else the one server's, through the music relay. */
-  resolve: (mediaId: number) => Promise<ResolvedSource>
+  resolve: (props: MusicResolveProps) => Promise<ResolvedSource>
   /** Why a server track failed; a downloaded file's failure needs no server to say. */
   explain: FailureExplainer
   /** Retires a server track's relay load once it is over. */
@@ -110,6 +114,8 @@ const numbersOf = (command: AudioCommand): number[] => {
       return [command.volume]
     case AUDIO_COMMANDS.speed:
       return [command.rate]
+    case AUDIO_COMMANDS.sound:
+      return [command.level, ...command.eq]
     case AUDIO_COMMANDS.queueNext:
     case AUDIO_COMMANDS.play:
     case AUDIO_COMMANDS.pause:
@@ -121,6 +127,28 @@ const numbersOf = (command: AudioCommand): number[] => {
       return unreachable
     }
   }
+}
+
+/** mpv's replaygain off: the page's levelling factor stands in its place. */
+const REPLAYGAIN_OFF = 'no'
+
+type SoundFilterOfProps = Pick<
+  Extract<AudioCommand, { type: typeof AUDIO_COMMANDS.sound }>,
+  'level' | 'eq'
+>
+
+/**
+ * mpv's `af` for how a track sounds: its levelling factor as a gain in dB first, then the
+ * equalizer's ten bands, each an octave wide. A track left as it is (level 1, a flat
+ * equalizer) has no filter at all.
+ */
+export const soundFilterOf = ({ level, eq }: SoundFilterOfProps): string => {
+  const volume = level === 1 ? [] : [`volume=${(20 * Math.log10(level)).toFixed(2)}dB`]
+  const bands = isFlatEq(eq)
+    ? []
+    : EQ_BANDS.map((frequency, index) => `equalizer=f=${frequency}:t=o:w=1:g=${eq[index] ?? 0}`)
+  const filters = [...volume, ...bands]
+  return filters.length === 0 ? '' : `lavfi=[${filters.join(',')}]`
 }
 
 const remoteOf = (event: Extract<MpvEvent, { type: typeof MPV_EVENTS.remote }>): RemoteCommand =>
@@ -157,6 +185,11 @@ export const createAudioService = ({
   let rate = 1
   let isVolumeFixed = false
   let shown: Shown | null = null
+  // The bitrate the last load asked for, which the track queued after it is fetched at too.
+  let kbps: AudioBitrate | null = null
+  // The `af` mpv holds, null until the page first says how music sounds. Like the speed, it
+  // outlives each file and is set again only when it changes.
+  let soundFilter: string | null = null
   const listeners = new Set<(listener: AudioEvent) => void>()
 
   // These run inside the wrapper's event drain, so nothing they throw may escape.
@@ -408,7 +441,7 @@ export const createAudioService = ({
     await mpv.command({ args: [MPV_COMMANDS.playlistClear] })
     if (token !== epoch) return overtaken()
     if (next === null) return OK
-    const resolved = await resolve(next)
+    const resolved = await resolve({ mediaId: next, kbps })
     if (token !== epoch) {
       if (resolved.ok) retire({ mediaId: next, target: resolved.target })
       return overtaken()
@@ -435,7 +468,8 @@ export const createAudioService = ({
   ): Promise<PlayerOutcome> => {
     epoch += 1
     const token = epoch
-    const resolved = await resolve(command.mediaId)
+    kbps = command.kbps
+    const resolved = await resolve({ mediaId: command.mediaId, kbps })
     if (token !== epoch) return overtaken()
     if (!resolved.ok) return refuse(resolved.message)
     const isHardened = await hardening
@@ -453,6 +487,23 @@ export const createAudioService = ({
     await loadfile({ target: resolved.target, mode: MPV_LOADFILE_MODES.replace, start: lastTime })
     if (token !== epoch) return overtaken()
     return queueNext(command.next)
+  }
+
+  /**
+   * Levelling and the equalizer, as one `af` chain mpv applies to whatever plays, with its own
+   * replaygain off so a track is never levelled twice. The level is the playing track's, so the
+   * page sends it again as each track starts; at a gapless seam mpv is already on the next track
+   * by then, which plays its first moments at the last one's level.
+   */
+  const setSound = async (props: SoundFilterOfProps): Promise<PlayerOutcome> => {
+    const filter = soundFilterOf(props)
+    if (soundFilter === null) {
+      await mpv.set({ name: MPV_OPTIONS.replaygain, value: REPLAYGAIN_OFF })
+    }
+    if (filter === soundFilter) return OK
+    await mpv.set({ name: MPV_OPTIONS.af, value: filter })
+    soundFilter = filter
+    return OK
   }
 
   const stop = async (): Promise<PlayerOutcome> => {
@@ -508,6 +559,8 @@ export const createAudioService = ({
         }
         showNowPlaying()
         return OK
+      case AUDIO_COMMANDS.sound:
+        return setSound(command)
       case AUDIO_COMMANDS.stop:
         return stop()
       default: {

@@ -85,7 +85,6 @@ import {
   createServerSources,
   SOURCE_MESSAGES,
   TRACKS_TIMEOUT_MS,
-  SOURCE_KINDS,
 } from '@/main/servers/serverSources'
 import { NO_SERVERS, noExplanation, noRefusedAccount } from '@/main/test/playerFakes'
 import { createNodeTimers } from '@/main/timers'
@@ -1787,7 +1786,6 @@ const accountPartsFor = async ({
     calls,
     tickets,
     relay,
-    kind: SOURCE_KINDS.video,
     warn,
   })
   const page = await pageSessionFor({ fixture, account, now })

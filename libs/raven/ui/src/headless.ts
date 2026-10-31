@@ -28,6 +28,7 @@ export {
   AUDIOBOOK_SPEEDS,
   AUTOPLAY_COUNTDOWN_SECONDS,
   CONTROLS_LINGER_SECONDS,
+  MUSIC_QUALITIES,
   usePlayerPrefs,
 } from '@/stores/playerPrefs'
 export type { AudiobookSpeed } from '@/stores/playerPrefs'

@@ -52,6 +52,8 @@ export const API_PATHS = {
 
 /** A title's bytes under `${API_PATHS.media}/<id>/`, read with a ticket or a cookie. */
 export const MEDIA_FILE_PATH = 'file'
+/** A track as the server's AAC transcode, at the bitrate its query names. */
+export const MEDIA_TRANSCODE_PATH = 'transcode'
 const MEDIA_SUBTITLES_PATH = 'subtitles'
 
 export const subtitlePathOf = (trackId: string): string => `${MEDIA_SUBTITLES_PATH}/${trackId}`
