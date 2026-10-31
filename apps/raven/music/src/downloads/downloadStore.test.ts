@@ -143,6 +143,8 @@ type SetUpProps = {
   storage?: StateStorage
   /** Files already on the disk before the downloads are read back. */
   onDisk?: readonly string[]
+  /** What each fetch of a track waits on before it writes; resolved at once by default. */
+  writeHold?: (path: string) => Promise<void>
 }
 
 const setUp = async ({
@@ -150,8 +152,17 @@ const setUp = async ({
   hold = Promise.resolve(),
   storage = memoryStorage(),
   onDisk = [],
+  writeHold = async () => undefined,
 }: SetUpProps = {}) => {
-  const { disk, files } = memoryDisk(failing)
+  const memory = memoryDisk(failing)
+  const { files } = memory
+  const disk: DownloadDisk = {
+    ...memory.disk,
+    fetch: async (props) => {
+      await writeHold(props.path)
+      return memory.disk.fetch(props)
+    },
+  }
   onDisk.forEach((file) => files.add(file))
   const asked: number[] = []
   await configureDownloads({
@@ -174,9 +185,13 @@ const setUp = async ({
       uri: `https://raven.example/covers/${track.albumId}`,
       headers: {},
     }),
+    accountId: () => ACCOUNT.id,
   })
   return { files, asked }
 }
+
+/** The account signed in; a test switches it by setting `id`. */
+const ACCOUNT: { id: string | null } = { id: 'u1' }
 
 const albumOf = { kind: DOWNLOAD_SOURCES.album, album: ALBUM } as const
 
@@ -184,8 +199,50 @@ const trackFolder = (id: number) => `${DOWNLOADS_FOLDER}/${SERVER_ID}/${id}`
 
 describe('useDownloads', () => {
   beforeEach(() => {
+    ACCOUNT.id = 'u1'
     useWrenPrefs.setState(DEFAULT_WREN_PREFS)
-    useDownloads.setState({ entries: {}, playlists: {}, running: 0 })
+    useDownloads.setState({ ownerId: null, entries: {}, playlists: {}, running: 0 })
+  })
+
+  it('belongs to the account it was made under, and goes only when another account signs in', async () => {
+    const { files } = await setUp()
+    await useDownloads
+      .getState()
+      .downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: albumOf })
+    expect(useDownloads.getState().ownerId).toBe('u1')
+
+    const { keepFor } = useDownloads.getState()
+    await keepFor({ accountId: null })
+    await keepFor({ accountId: 'u1' })
+    expect(Object.keys(useDownloads.getState().entries)).toEqual([keyOf(FIRST.id)])
+
+    await keepFor({ accountId: 'u2' })
+    expect(useDownloads.getState().entries).toEqual({})
+    expect(useDownloads.getState().ownerId).toBeNull()
+    expect(files.size).toBe(0)
+  })
+
+  it('lands a fetch only on the entry it was started for, not on one queued again since', async () => {
+    const firstWrite = Promise.withResolvers<void>()
+    const writes: string[] = []
+    const { files } = await setUp({
+      writeHold: async (path) => {
+        writes.push(path)
+        if (writes.length === 1) await firstWrite.promise
+      },
+    })
+    const { downloadTracks, remove } = useDownloads.getState()
+    const older = downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: albumOf })
+    await Promise.resolve()
+    await remove({ serverId: SERVER_ID, mediaIds: [FIRST.id] })
+    await downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: albumOf })
+    const newer = useDownloads.getState().entries[keyOf(FIRST.id)]
+    expect(newer?.status).toBe(DOWNLOAD_STATUSES.done)
+
+    firstWrite.resolve()
+    await older
+    expect(useDownloads.getState().entries[keyOf(FIRST.id)]).toEqual(newer)
+    expect(files.has(`${trackFolder(31)}/media.m4a`)).toBe(true)
   })
 
   it("downloads an album's tracks as 256 kbps transcodes, each with its cover, under the server's folder", async () => {
@@ -299,6 +356,7 @@ describe('useDownloads', () => {
     track: FIRST,
     album: ALBUM,
     status: DOWNLOAD_STATUSES.done,
+    queueStamp: 1,
   }
 
   type SavedOfProps = { entries: Record<string, unknown> }

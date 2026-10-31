@@ -65,6 +65,7 @@ const entryFor = ({ track, album }: EntryForProps): DownloadEntry => ({
   track,
   album,
   status: DOWNLOAD_STATUSES.done,
+  queueStamp: 1,
 })
 
 /** OK Computer's first two tracks downloaded from its page, and Airbag again in the Mixtape. */

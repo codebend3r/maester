@@ -14,9 +14,10 @@ const serverOf = (serverId: string) =>
 /**
  * Where downloads come from: a track through the server's media access, its album cover with
  * the server's cookies and the account's token, as `useCovers` asks for it, while Wren holds
- * that server.
+ * that server; and the account signed in, which owns them.
  */
 export const downloadSources: DownloadDevice = {
+  accountId: () => useWrenAccount.getState().session?.userId ?? null,
   sourcesOf: (serverId) => {
     const server = serverOf(serverId)
     return server === undefined ? null : mediaSourcesFor(server)

@@ -90,9 +90,8 @@ describe('WrenRoot', () => {
     expect(screen.queryByRole('button', { name: /^Now Playing: Airbag/ })).toBeNull()
   })
 
-  it("takes the last account's downloads, files and all, once it signs out, and keeps them through a renewed token", async () => {
-    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
-    await screen.findByRole('header', { name: 'Home' })
+  /** Airbag downloaded under the listener's account, on a disk a test can look at. */
+  const downloaded = () => {
     const folder = 'downloads/raven/101'
     const files = new Set([`${folder}/media.m4a`, `${folder}/cover.jpg`])
     const disk: DownloadDisk = {
@@ -113,16 +112,33 @@ describe('WrenRoot', () => {
       track: AIRBAG,
       album: null,
       status: DOWNLOAD_STATUSES.done,
+      queueStamp: 1,
     }
     useDownloads.setState({
       device: { ...useDownloads.getState().device, disk },
+      ownerId: LISTENER.userId,
       entries: { [downloadKeyOf({ serverId: 'raven', id: AIRBAG.id })]: entry },
     })
+    return { files }
+  }
 
-    await act(async () =>
-      useWrenAccount.setState({ session: { ...LISTENER, accessToken: 'renewed' } }),
-    )
+  it('keeps the downloads as Wren opens, and through a refused refresh until the same account signs in again', async () => {
+    const { files } = downloaded()
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await screen.findByRole('header', { name: 'Home' })
     expect(Object.keys(useDownloads.getState().entries)).toHaveLength(1)
+
+    // A refresh the server refused signs the account out.
+    await act(async () => useWrenAccount.setState({ session: null }))
+    await act(async () => useWrenAccount.setState({ session: LISTENER }))
+    expect(Object.keys(useDownloads.getState().entries)).toHaveLength(1)
+    expect(files.size).toBe(2)
+  })
+
+  it("removes the last account's downloads, files and all, once another account signs in", async () => {
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await screen.findByRole('header', { name: 'Home' })
+    const { files } = downloaded()
 
     await act(async () => useWrenAccount.setState({ session: null }))
     await act(async () => useWrenAccount.setState({ session: { ...LISTENER, userId: 'u2' } }))

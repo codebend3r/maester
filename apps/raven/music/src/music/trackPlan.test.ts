@@ -42,6 +42,7 @@ const ENTRY: DownloadEntry = {
   track: FIRST_LIGHT,
   album: null,
   status: DOWNLOAD_STATUSES.done,
+  queueStamp: 1,
 }
 
 const KEY = downloadKeyOf({ serverId: SERVER_ID, id: FIRST_LIGHT.id })
