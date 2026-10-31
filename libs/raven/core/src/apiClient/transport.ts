@@ -99,7 +99,7 @@ type CreateTransportProps = {
  * the guard a response must pass before a caller sees it.
  */
 export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransportProps) => {
-  const root = baseUrl.replace(/\/+$/, '')
+  const root = baseUrl.replace(/(?<!\/)\/+$/, '')
   const url = (path: string): string => `${root}${path}`
 
   type MediaUrlProps = {

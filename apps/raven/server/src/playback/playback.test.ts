@@ -9,6 +9,8 @@ import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { RAVEN_CONTENT_TYPES } from '@/http'
+import { MediaIndex } from '@/media/mediaIndex'
+import { SubtitlesService } from '@/playback/subtitlesService'
 import { ScannerService } from '@/scanner/scannerService'
 import { BROWSER_ENCODINGS, adminCookie, testConfig } from '@/test/app'
 import { encodeRichClip } from '@/test/clips'
@@ -204,6 +206,22 @@ describe('playback', () => {
     expect(await api().getSubtitles({ id: movieId(), trackId: 'external-0' })).toEqual([
       { start: 5, end: 6, text: 'Café forced' },
     ])
+  })
+
+  it('refuses unsafe subtitle cache names before looking up tracks', async () => {
+    const file = app().get(MediaIndex).fileOf(movieId())
+    if (!file) throw new Error('nothing indexed')
+    const service = app().get(SubtitlesService)
+    await Promise.all(
+      ['../../outside', 'external-0/../../../outside', 'embedded-0\\..\\outside'].map((trackId) =>
+        expect(service.vtt({ file, trackId, window: 0 })).rejects.toThrow(),
+      ),
+    )
+    await Promise.all(
+      [-1, NaN, Infinity, 0.5].map((window) =>
+        expect(service.vtt({ file, trackId: 'embedded-0', window })).rejects.toThrow(),
+      ),
+    )
   })
 
   it('refuses unknown tracks and bad windows', async () => {

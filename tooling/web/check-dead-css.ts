@@ -59,7 +59,7 @@ const resolveStylesheet = ({
     if (!pattern.endsWith('*') || !specifier.startsWith(prefix) || target === undefined) {
       return []
     }
-    return [resolve(configDir, target.replace('*', specifier.slice(prefix.length)))]
+    return [resolve(configDir, target.replaceAll('*', specifier.slice(prefix.length)))]
   })
   return mapped[0]
 }

@@ -1,13 +1,20 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
-
-const digest = (text: string): Buffer => createHash('sha256').update(text).digest()
+import { timingSafeEqual } from 'node:crypto'
 
 type SameSecretProps = { given: string; expected: string }
 
 /**
  * Whether `given` matches `expected`, in time that does not depend on where
- * they differ. Hashing both sides first gives equal lengths, which
- * `timingSafeEqual` needs, so the length leaks nothing either.
+ * they differ. Padding gives `timingSafeEqual` equal-length buffers without
+ * hashing passwords; the byte lengths distinguish trailing NUL characters.
  */
-export const sameSecret = ({ given, expected }: SameSecretProps): boolean =>
-  timingSafeEqual(digest(given), digest(expected))
+export const sameSecret = ({ given, expected }: SameSecretProps): boolean => {
+  const givenBytes = Buffer.from(given)
+  const expectedBytes = Buffer.from(expected)
+  const size = Math.max(givenBytes.length, expectedBytes.length)
+  const paddedGiven = Buffer.alloc(size)
+  const paddedExpected = Buffer.alloc(size)
+  givenBytes.copy(paddedGiven)
+  expectedBytes.copy(paddedExpected)
+  const matches = timingSafeEqual(paddedGiven, paddedExpected)
+  return matches && givenBytes.length === expectedBytes.length
+}

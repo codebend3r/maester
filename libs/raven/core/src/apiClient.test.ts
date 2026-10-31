@@ -154,6 +154,13 @@ describe('account API client', () => {
 })
 
 describe('createApiClient', () => {
+  it('strips long runs of trailing slashes from the server URL', () => {
+    const client = createApiClient({
+      baseUrl: `http://nas:8484${'/'.repeat(50_000)}`,
+      fetch: async () => respond({ body: [] }),
+    })
+    expect(client.fileUrl({ id: 5 })).toBe('http://nas:8484/api/media/5/file')
+  })
   it('returns media that passes the guard', async () => {
     const item = mediaItem()
     const { client, calls } = clientReturning(respond({ body: [item] }))

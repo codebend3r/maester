@@ -180,6 +180,9 @@ describe('contentSecurityPolicy', () => {
 })
 
 describe('inlineScriptHashes', () => {
+  it('recognises script tags in any case without changing the body being hashed', () => {
+    expect(inlineScriptHashes(`<SCRIPT>${THEME_SCRIPT}</sCrIpT>`)).toEqual([THEME_HASH])
+  })
   it('hashes each inline script and skips the ones loaded from a file', () => {
     expect(inlineScriptHashes(INDEX)).toEqual([THEME_HASH])
     expect(inlineScriptHashes('<script>a</script><p></p><script>b</script>')).toEqual([
@@ -619,6 +622,28 @@ describe('the web host: /api', () => {
     expect(armed).toEqual([10_000])
     expect(reply.status).toBe(502)
     expect(JSON.parse(reply.body)).toEqual({ error: WEB_HOST_ERRORS.serverUnreachable })
+  })
+
+  it('forwards to a configured IPv6 upstream', async () => {
+    const server = createServer((_request, response) => response.end('IPv6'))
+    servers.push(server)
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(0, '::1', resolve)
+    })
+    const { port } = await host({ serverOrigin: `http://[::1]:${portOf(server)}` })
+    const reply = await ask({ port, path: AUTH_PATHS.me })
+    expect(reply.status).toBe(200)
+    expect(reply.body).toBe('IPv6')
+  })
+
+  it('keeps URL-like API paths on the configured upstream', async () => {
+    const server = await upstream()
+    const { port } = await host({ serverOrigin: server.origin })
+    const path = '/api//evil.example/file?next=http://evil.example/'
+    expect((await ask({ port, path })).status).toBe(200)
+    expect(server.heard.map((entry) => entry.url)).toEqual([path])
+    expect(server.heard[0]?.headers.host).toBe(new URL(server.origin).host)
   })
 
   it('never lets a request name another host', async () => {

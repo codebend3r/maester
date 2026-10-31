@@ -13,6 +13,14 @@ describe('validateLibraryInput', () => {
     })
   })
 
+  it('removes long runs of trailing slashes in linear time', () => {
+    const slashes = '/'.repeat(50_000)
+    expect(validateLibraryInput({ name: 'Movies', paths: [slashes, `/media${slashes}`] })).toEqual({
+      ok: true,
+      value: { name: 'Movies', paths: ['/', '/media'] },
+    })
+  })
+
   it('keeps the filesystem root as a path', () => {
     const result = validateLibraryInput({ name: 'Everything', paths: ['/'] })
     expect(result).toEqual({ ok: true, value: { name: 'Everything', paths: ['/'] } })

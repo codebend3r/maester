@@ -39,9 +39,9 @@ type NameReading = Omit<ParsedMovieName, 'alternatives'> & {
 
 const NO_IDS: NameIds = { tmdb: null, imdb: null, tvdb: null }
 
-const ID_PATTERN = /\{(tmdb|imdb|tvdb)-([^}\s]+)\}|\[(tmdb|imdb|tvdb)id[-=]([^\]\s]+)\]/gi
+const ID_PATTERN = /\{(tmdb|imdb|tvdb)-([^{}\s]+)\}|\[(tmdb|imdb|tvdb)id[-=]([^[\]\s]+)\]/gi
 
-const EDITION_PATTERN = /\{edition-([^}]+)\}/i
+const EDITION_PATTERN = /\{edition-([^{}]+)\}/i
 
 /**
  * An edition named in the title itself, as Radarr's `{Edition Tags}` or a
@@ -120,7 +120,7 @@ const spaced = (text: string): string =>
 const tidy = (text: string): string =>
   spaced(text)
     .replace(/^[\s\-_.([]+/, '')
-    .replace(/[\s\-_.([]+$/, '')
+    .replace(/(?<![\s\-_.([])[\s\-_.([]+$/, '')
     .trim()
 
 /** Where the year sits: the last `(YYYY)`, else the last bare year that release tags follow. */
@@ -155,7 +155,7 @@ const unsortTitle = (title: string): string => {
 }
 
 /** A DVD region code left in a title: `Alien Resurrection R2`. */
-const REGION_TAG = /\s+R[1-6]$/i
+const REGION_TAG = /(?<!\s)\s+R[1-6]$/i
 
 type BeforeOwnYearProps = { title: string; year: number | null }
 
@@ -453,7 +453,7 @@ export const seasonFolderNumber = (name: string): number | null => {
 
 /** Sonarr's country suffix telling two shows of a name apart: `Euphoria (US)`, `The Office (UK)`. */
 const COUNTRY_SUFFIX =
-  /\s*\((US|UK|AU|CA|NZ|IE|JP|KR|FR|DE|IT|ES|BR|MX|IN|CN|SE|NO|DK|NL|BE|PL|RU|TR|ZA)\)$/i
+  /\((US|UK|AU|CA|NZ|IE|JP|KR|FR|DE|IT|ES|BR|MX|IN|CN|SE|NO|DK|NL|BE|PL|RU|TR|ZA)\)$/i
 
 /** Sonarr's country codes that TMDB, keeping to ISO 3166-1, writes another way. */
 const TMDB_COUNTRIES: Readonly<Record<string, string>> = { UK: 'GB' }
@@ -466,7 +466,7 @@ const TMDB_COUNTRIES: Readonly<Record<string, string>> = { UK: 'GB' }
 export const splitCountry = (name: string): { title: string; country: string | null } => {
   const code = COUNTRY_SUFFIX.exec(name)?.[1]?.toUpperCase() ?? null
   return {
-    title: name.replace(COUNTRY_SUFFIX, ''),
+    title: code === null ? name : name.replace(COUNTRY_SUFFIX, '').trimEnd(),
     country: code == null ? null : (TMDB_COUNTRIES[code] ?? code),
   }
 }

@@ -19,6 +19,20 @@ const movie = (path: string) => {
 }
 
 describe('parseMovieName', () => {
+  it('handles long unterminated tags and trailing separators', () => {
+    const repeats = 20_000
+    const ids = '{tmdb-'.repeat(repeats)
+    const editions = '{edition-'.repeat(repeats)
+    expect(movie(`Title ${ids}.mkv`).ids.tmdb).toBeNull()
+    expect(movie(`Title ${editions}.mkv`).edition).toBeNull()
+    expect(movie(`Title ${'-'.repeat(repeats)}.mkv`).title).toBe('Title')
+    expect(readCut({ fileName: `${editions}.mkv`, titles: [] })).toBeNull()
+    expect(splitCountry(`Title${'\t'.repeat(repeats)}!`).country).toBeNull()
+    expect(splitCountry(`Title${'\t'.repeat(repeats)}(UK)`)).toEqual({
+      title: 'Title',
+      country: 'GB',
+    })
+  })
   it.each([
     ['The Matrix (1999)/The Matrix (1999) Bluray-1080p.mkv', 'The Matrix', 1999],
     ['The.Matrix.1999.1080p.BluRay.x264-GROUP.mkv', 'The Matrix', 1999],

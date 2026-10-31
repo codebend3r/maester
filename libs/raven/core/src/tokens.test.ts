@@ -77,6 +77,14 @@ const THEMES_SCSS = `
 `
 
 describe('parseThemes', () => {
+  it('skips whitespace-only and unterminated declarations without backtracking', () => {
+    const tabs = '\t'.repeat(50_000)
+    expect(
+      parseThemes(`[data-theme='test'] {\n  ---:${tabs}\n  --bad:${tabs}!\n  --ok: red;\n}`),
+    ).toEqual({
+      test: { '--ok': 'red' },
+    })
+  })
   it("reads each theme's custom properties by its id, in the order they are declared", () => {
     expect(parseThemes(THEMES_SCSS)).toEqual({
       verdigris: { '--color-night': '#15201e', '--glow': '0.6' },

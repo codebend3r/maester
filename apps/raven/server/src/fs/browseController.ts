@@ -15,11 +15,6 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { ERROR_CODES } from '@/errorMessage'
 import { SKIPPED_FOLDERS } from '@/scanner/walk'
 
-type IsInsideProps = { root: string; path: string }
-
-const isInside = ({ root, path }: IsInsideProps): boolean =>
-  path === root || path.startsWith(root.endsWith(sep) ? root : `${root}${sep}`)
-
 const errorCode = (error: unknown): string | null =>
   error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : null
 
@@ -35,13 +30,26 @@ export class BrowseController {
   @AdminOnly()
   @Get('browse')
   async browse(@Query('path') requested?: string): Promise<DirectoryListing> {
-    const root = await realpath(this.config.browseRoot).catch(() => this.config.browseRoot)
-    const target = await realpath(resolve(requested?.trim() || root)).catch((error: unknown) => {
+    const configuredRoot = resolve(this.config.browseRoot)
+    const root = await realpath(configuredRoot).catch(() => configuredRoot)
+    const resolved = resolve(requested?.trim() || root)
+    const prefix = root.endsWith(sep) ? root : `${root}${sep}`
+    const configuredPrefix = configuredRoot.endsWith(sep)
+      ? configuredRoot
+      : `${configuredRoot}${sep}`
+    // Accept the configured alias too, such as macOS's /var pointing at /private/var,
+    // by rebasing it onto the real root so one prefix check guards the path.
+    const isAliased = resolved === configuredRoot || resolved.startsWith(configuredPrefix)
+    const requestedPath = isAliased ? join(root, resolved.slice(configuredRoot.length)) : resolved
+    if (requestedPath !== root && !requestedPath.startsWith(prefix)) {
+      throw new BadRequestException(`Only folders under ${root} can be browsed`)
+    }
+    const target = await realpath(requestedPath).catch((error: unknown) => {
       throw errorCode(error) === ERROR_CODES.enoent
         ? new NotFoundException('That folder does not exist')
         : new BadRequestException('That folder cannot be opened')
     })
-    if (!isInside({ root, path: target })) {
+    if (target !== root && !target.startsWith(prefix)) {
       throw new BadRequestException(`Only folders under ${root} can be browsed`)
     }
 

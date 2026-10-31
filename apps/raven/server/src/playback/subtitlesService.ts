@@ -53,6 +53,9 @@ export class SubtitlesService {
 
   /** One track's WebVTT; for an embedded track, only window `window`. */
   async vtt({ file, trackId, window }: SubtitlesServiceVttProps): Promise<string> {
+    if (!/^(embedded|external)-\d+$/.test(trackId) || !Number.isSafeInteger(window) || window < 0) {
+      throw new NotFoundException('Invalid subtitle track or window')
+    }
     const { tracks, sidecars } = await this.tracks.tracksFor(file)
     const track = tracks.subtitles.find((candidate) => candidate.id === trackId)
     if (!track) throw new NotFoundException(`No subtitle track ${trackId}`)

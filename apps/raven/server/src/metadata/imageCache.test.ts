@@ -73,6 +73,21 @@ describe('the image cache', () => {
     await rm(state.root, { recursive: true, force: true })
   })
 
+  it('rejects cover-art path traversal before fetching or touching a cache file', async () => {
+    const calls = state.calls.length
+    const ids = ['../../outside', '..\\outside', '/absolute', 'not-a-release-id']
+    expect(await Promise.all(ids.map((id) => cache().coverArt(id)))).toEqual(ids.map(() => null))
+    expect(state.calls).toHaveLength(calls)
+  })
+
+  it('fetches cover art for a valid MusicBrainz release id', async () => {
+    const mbid = '12345678-1234-1234-1234-123456789abc'
+    expect(await cache().coverArt(mbid)).toBe(
+      join(state.root, 'data', 'images', 'cover-art', `${mbid}.jpg`),
+    )
+    expect(state.calls).toContain(`https://coverartarchive.org/release/${mbid}/front-500`)
+  })
+
   it('fetches a TMDB poster at the width asked for, once for each width', async () => {
     const first = await Promise.all(
       POSTER_WIDTHS.map((width) => cache().tmdb({ path: '/heat.jpg', width })),
