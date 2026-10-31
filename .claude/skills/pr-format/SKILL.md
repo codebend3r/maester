@@ -76,8 +76,8 @@ Closes #<n>
 - [x] Any new arr call names its host
 ```
 
-- **Sections** are named by package name in backticks (`@luwin/api`, `@raven/server`, `@raven/web`, `@raven/core`, `scripts`); the root `CLAUDE.md` table maps paths to projects
-- Order: the app a user sees (`@raven/web`), then other apps (`@raven/server`, `@luwin/api`), then libs (`@raven/core`), then `apps/<product>`, then `Workspace`. Leave out a section with no changes. A one-project PR still gets its heading
+- **Sections** are named by package name in backticks (`@sparrow/api`, `@raven/server`, `@raven/web`, `@raven/core`, `scripts`); the root `CLAUDE.md` table maps paths to projects
+- Order: the app a user sees (`@raven/web`), then other apps (`@raven/server`, `@sparrow/api`), then libs (`@raven/core`), then `apps/<product>`, then `Workspace`. Leave out a section with no changes. A one-project PR still gets its heading
 - `apps/<product>` takes product files outside a project (`Dockerfile`, compose, README) and root files that serve only that product (its spec and plan in `docs/superpowers/`, its workflow job). `Workspace` takes the rest of the root
 - **What** says what changed, one change per bullet, not how the code works
 - **Why** gives the reason, not a restatement of What. "Friends could see tools they can't call" is a reason; "Filter tools by tier" is not

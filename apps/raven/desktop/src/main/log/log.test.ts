@@ -516,7 +516,7 @@ describe('redact', () => {
       const samples = [
         "import { x } from '@raven/core'",
         'resolved @raven/core@1.2.3 and react@19.2.0 and @types/node@22.0.0',
-        'bun add @luwin/web @shared/server',
+        'bun add @sparrow/web @shared/server',
         'Loaded /Users/cj/node_modules/@raven/ui/dist/index.js',
         'asset icon@2x.png and icon@3x.webp',
         '@ alone, a@b, @home, user@localhost, 1 @ 2',

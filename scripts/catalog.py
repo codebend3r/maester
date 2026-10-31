@@ -9,16 +9,16 @@ MILESTONES = [
     (
         "M1",
         "Walking skeleton",
-        "A friend can chat with luwin and it answers using a read-only tool.",
+        "A friend can chat with sparrow and it answers using a read-only tool.",
     ),
-    ("M2", "Requests", "Friends request movies and shows in 1080p and 4K through luwin."),
+    ("M2", "Requests", "Friends request movies and shows in 1080p and 4K through sparrow."),
     (
         "M3",
         "Troubleshooting",
         "Playback problems are diagnosed before anything is replaced; lag is explained with live data.",
     ),
     ("M4", "Admin and onboarding", "Approvals, digests and Wizarr invites run from chat."),
-    ("M5", "Engagement", "luwin gives friends reasons to come back."),
+    ("M5", "Engagement", "sparrow gives friends reasons to come back."),
 ]
 
 # Each epic: key, title, milestone, area label, summary, stories.
@@ -203,14 +203,14 @@ EPICS = [
         "title": "Chat and identity",
         "milestone": "M1",
         "area": "chat",
-        "summary": "luwin's first chat surface, account linking to Plex/Seerr users, tiers, and interactive buttons. The surface has since been removed so luwin can become its own app.",
+        "summary": "sparrow's first chat surface, account linking to Plex/Seerr users, tiers, and interactive buttons. The surface has since been removed so sparrow can become its own app.",
         "stories": [
             {
                 "key": "E2.1",
                 "title": "First chat surface with DMs and a requests channel",
                 "size": "M",
                 "priority": "P0",
-                "story": "As a friend, I want to message luwin directly or mention it in the requests channel and get an answer, so that I can use it where the group already talks.",
+                "story": "As a friend, I want to message sparrow directly or mention it in the requests channel and get an answer, so that I can use it where the group already talks.",
                 "criteria": [
                     "A chat client that answers direct messages and mentions in configured channels",
                     "Typing indicator while the agent works",
@@ -223,7 +223,7 @@ EPICS = [
                 "title": "Account linking",
                 "size": "M",
                 "priority": "P0",
-                "story": "As a friend, I want to link my chat account to my Plex user once so that requests are made as me and luwin knows what I have watched.",
+                "story": "As a friend, I want to link my chat account to my Plex user once so that requests are made as me and sparrow knows what I have watched.",
                 "criteria": [
                     "Linking asks for the Plex email or username, matches against Seerr users, and stores the pair pending admin confirmation",
                     "Admin gets an approve/deny button; on approve the link becomes active",
@@ -912,7 +912,7 @@ PRIORITIES = {
 
 AREA_LABELS = {
     "agent": "The Claude tool-use loop, registry and guardrails",
-    "chat": "luwin's chat surface and identity",
+    "chat": "sparrow's chat surface and identity",
     "requests": "Requesting and finding media",
     "playback": "Playback issue reports and file replacement",
     "perf": "Lag and network diagnostics",

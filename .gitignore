@@ -3,7 +3,7 @@
 .env.local
 *.pem
 
-# runtime data: luwin's SQLite file, raven's index and thumbnail cache
+# runtime data: sparrow's SQLite file, raven's index and thumbnail cache
 luwin-data/
 data/
 *.db

@@ -35,7 +35,7 @@ describe('LoginPage', () => {
       json({ body: { auth_url: 'https://app.plex.tv/auth#?code=abc' } }),
     )
     const goTo = spyOn(browser, 'goTo').mockImplementation(() => {})
-    renderAt({ ui: <LoginPage />, route: '/?return_to=https%3A%2F%2Fluwin.example.com%2F' })
+    renderAt({ ui: <LoginPage />, route: '/?return_to=https%3A%2F%2Fsparrow.example.com%2F' })
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign in with Plex' }))
 
@@ -44,7 +44,7 @@ describe('LoginPage', () => {
     expect(url).toBe(API_ROUTES.start)
     expect(init.method).toBe(HTTP_METHODS.post)
     expect(new Headers(init.headers).get(HEADERS.contentType)).toBe(CONTENT_TYPES.json)
-    expect(init.body).toBe(JSON.stringify({ return_to: 'https://luwin.example.com/' }))
+    expect(init.body).toBe(JSON.stringify({ return_to: 'https://sparrow.example.com/' }))
   })
 
   it('says so when Plex is down, and lets the friend try again', async () => {

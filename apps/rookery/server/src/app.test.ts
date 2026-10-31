@@ -19,7 +19,7 @@ import { SESSION_KINDS, hashToken } from '@/sessions/sessionsRepository'
 import { FakePlexTv } from '@/test/fakePlexTv'
 
 const ROOKERY = 'https://rookery.maester.example.com'
-const LUWIN = 'https://luwin.maester.example.com'
+const SPARROW = 'https://sparrow.maester.example.com'
 const SERVICE_TOKEN = 'service-s3cret'
 const START = new Date('2026-10-09T12:00:00.000Z')
 const MINUTE = 60 * 1000
@@ -72,7 +72,7 @@ const boot = async ({
     dataDir: join(root, 'data'),
     webDir,
     cookieDomain,
-    appOrigins: [LUWIN],
+    appOrigins: [SPARROW],
     pinCheckDelayMs: 0,
   }
   const plex = new FakePlexTv()
@@ -130,7 +130,7 @@ type SignInProps = {
 }
 
 /** A full sign-in as `account`; returns the callback's response and the session token. */
-const signIn = async ({ harness, account = alice, returnTo = `${LUWIN}/` }: SignInProps) => {
+const signIn = async ({ harness, account = alice, returnTo = `${SPARROW}/` }: SignInProps) => {
   const started = await start({ harness, returnTo })
   const pin: PlexPin | undefined = started.pin
   if (!pin) throw new Error('no PIN created')
@@ -176,7 +176,7 @@ const count = ({ harness, table }: CountProps): number =>
 describe('starting a sign-in', () => {
   it('opens a PIN, remembers the sign-in, and sends the browser to Plex', async () => {
     const harness = await boot()
-    const { response, pin } = await start({ harness, returnTo: `${LUWIN}/chat` })
+    const { response, pin } = await start({ harness, returnTo: `${SPARROW}/chat` })
 
     expect(response.statusCode).toBe(200)
     const body = response.json<{ auth_url: string }>()
@@ -218,10 +218,10 @@ describe('starting a sign-in', () => {
 describe('the Plex callback', () => {
   it('signs in, sets the session cookie, and returns to the app', async () => {
     const harness = await boot()
-    const { response, token } = await signIn({ harness, returnTo: `${LUWIN}/chat` })
+    const { response, token } = await signIn({ harness, returnTo: `${SPARROW}/chat` })
 
     expect(response.statusCode).toBe(303)
-    expect(response.headers.location).toBe(`${LUWIN}/chat`)
+    expect(response.headers.location).toBe(`${SPARROW}/chat`)
     const cookie = cookieNamed({ response, name: SESSION_COOKIE })
     expect(cookie).toContain('Path=/')
     expect(cookie).toContain(`Max-Age=${30 * 24 * 60 * 60}`)
@@ -289,14 +289,14 @@ describe('the Plex callback', () => {
 
   it('sends a sign-in Plex never approved back to /login', async () => {
     const harness = await boot()
-    const { response, pin } = await start({ harness, returnTo: `${LUWIN}/chat` })
+    const { response, pin } = await start({ harness, returnTo: `${SPARROW}/chat` })
     const done = await callback({
       harness,
       pinCookie: valueOf(cookieNamed({ response, name: PIN_COOKIE })),
     })
     expect(done.statusCode).toBe(303)
     expect(done.headers.location).toBe(
-      `${PAGE_PATHS.login}?error=${SIGN_IN_ERRORS.notApproved}&return_to=${encodeURIComponent(`${LUWIN}/chat`)}`,
+      `${PAGE_PATHS.login}?error=${SIGN_IN_ERRORS.notApproved}&return_to=${encodeURIComponent(`${SPARROW}/chat`)}`,
     )
     expect(pin && harness.plex.checksOf(pin)).toBe(5)
     expect(setCookies(done).some((cookie) => cookie.startsWith(`${SESSION_COOKIE}=`))).toBe(false)
@@ -347,10 +347,10 @@ describe('signing out', () => {
       method: 'POST',
       url: ROUTES.logout,
       headers: { cookie: `${SESSION_COOKIE}=${token}` },
-      payload: { return_to: `${LUWIN}/` },
+      payload: { return_to: `${SPARROW}/` },
     })
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toEqual({ next: `${LUWIN}/` })
+    expect(response.json()).toEqual({ next: `${SPARROW}/` })
     const cleared = cookieNamed({ response, name: SESSION_COOKIE })
     expect(cleared).toContain('Max-Age=0')
     expect(cleared).toContain('Domain=maester.example.com')

@@ -9,7 +9,7 @@ Board: https://github.com/users/codebend3r/projects ("maester roadmap")
 
 ### M1 Walking skeleton
 
-A friend can chat with luwin and it answers using a read-only tool.
+A friend can chat with sparrow and it answers using a read-only tool.
 
 - [x] E0 Foundation [#1](https://github.com/codebend3r/maester/issues/1)
 - [x] E1 Agent core [#9](https://github.com/codebend3r/maester/issues/9)
@@ -17,7 +17,7 @@ A friend can chat with luwin and it answers using a read-only tool.
 
 ### M2 Requests
 
-Friends request movies and shows in 1080p and 4K through luwin.
+Friends request movies and shows in 1080p and 4K through sparrow.
 
 - [x] E3 Requests [#21](https://github.com/codebend3r/maester/issues/21)
 
@@ -37,7 +37,7 @@ Approvals, digests and Wizarr invites run from chat.
 
 ### M5 Engagement
 
-luwin gives friends reasons to come back.
+sparrow gives friends reasons to come back.
 
 - [ ] E8 Engagement [#64](https://github.com/codebend3r/maester/issues/64)
 
@@ -67,7 +67,7 @@ The Claude tool-use loop, the tool registry with permission tiers, memory, guard
 
 ### E2 Chat and identity (M1) [#15](https://github.com/codebend3r/maester/issues/15)
 
-luwin's first chat surface, account linking to Plex/Seerr users, tiers, and interactive buttons. The surface has since been removed so luwin can become its own app.
+sparrow's first chat surface, account linking to Plex/Seerr users, tiers, and interactive buttons. The surface has since been removed so sparrow can become its own app.
 
 - [x] E2.1 First chat surface with DMs and a requests channel · M · P0 · [#16](https://github.com/codebend3r/maester/issues/16)
 - [x] E2.2 Account linking · M · P0 · [#17](https://github.com/codebend3r/maester/issues/17)

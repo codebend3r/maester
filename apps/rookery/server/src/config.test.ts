@@ -27,14 +27,14 @@ describe('readServerConfig', () => {
     const config = readServerConfig({
       ...required,
       [ENV_VARS.appOrigins]:
-        'https://luwin.maester.example.com/, https://raven.maester.example.com',
+        'https://sparrow.maester.example.com/, https://raven.maester.example.com',
       [ENV_VARS.cookieDomain]: '.maester.example.com',
     })
     expect(config).toMatchObject({
       port: 8030,
       publicUrl: 'https://rookery.maester.example.com',
       serviceToken: 's3cret',
-      appOrigins: ['https://luwin.maester.example.com', 'https://raven.maester.example.com'],
+      appOrigins: ['https://sparrow.maester.example.com', 'https://raven.maester.example.com'],
       cookieDomain: 'maester.example.com',
       secureCookies: true,
       webDir: null,
