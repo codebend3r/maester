@@ -229,8 +229,6 @@ export const AppShell = () => {
   return (
     <div className={collapsed ? `${styles.shell} ${styles.collapsed}` : styles.shell}>
       {!isOffline && <FollowServer />}
-      {/* The window has no title bar of its own: this strip is what it is dragged by. */}
-      {isDesktop && <div className={styles.titlebar} aria-hidden="true" />}
       <PageBackdrop />
       <nav
         id={navId}

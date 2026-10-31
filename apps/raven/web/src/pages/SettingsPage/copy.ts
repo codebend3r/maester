@@ -73,6 +73,8 @@ export const SETTINGS_COPY = {
     connect: 'Connect',
     connecting: 'Connecting',
     connectFailed: 'Could not connect: ',
+    finishInBrowser:
+      'Finish signing in to Last.fm in your browser. This page updates when you come back.',
     notSetUp: (service: string) => `${service} isn't set up on this server`,
     linked: 'Last.fm is linked.',
     failed: 'Last.fm could not be linked. Try again.',

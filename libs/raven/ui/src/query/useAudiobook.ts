@@ -41,8 +41,9 @@ type UseTrackBitrateProps = { api: ApiClient; track: Track | null }
 /**
  * The AAC transcode's bitrate `track` plays at: the one the prefs pick for music, null for its
  * file. An audiobook always plays its file, which a transcode would have to convert whole before
- * the first second plays, so while the libraries that tell a book from music are unknown (on
- * their way, or failed) the file is asked for too.
+ * the first second plays, so while the libraries that tell a book from music are unknown the
+ * file is asked for too: once they have failed, and while they are on their way, which the
+ * browser's host waits out before it sets a source.
  */
 export const useTrackBitrate = ({ api, track }: UseTrackBitrateProps): AudioBitrate | null => {
   const queries = useMemo(() => ravenQueriesFor(api), [api])

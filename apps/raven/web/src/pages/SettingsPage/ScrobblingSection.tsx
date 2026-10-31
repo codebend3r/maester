@@ -15,6 +15,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
 import { scrobblingQuery } from '@/lib/queries'
+import { useIsDesktop } from '@/stores/desktop'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
@@ -97,9 +98,12 @@ const ListenBrainzLink = () => {
 /**
  * Last.fm's Connect, which leaves for Last.fm's sign-in page; it comes back
  * to Settings on the web address the server knows, which a page inside
- * Raven or on a LAN address cannot name for itself.
+ * Raven or on a LAN address cannot name for itself. Raven hands Last.fm's page
+ * to the system browser, so it says where to finish; the statuses read again
+ * as the window comes back into focus.
  */
 const LastFmLink = () => {
+  const isDesktop = useIsDesktop()
   const start = useMutation({
     mutationFn: () => api.startLastFm({ returnTo: SCROBBLE_RETURNS.web }),
     onSuccess: ({ url }) => window.location.assign(url),
@@ -109,6 +113,9 @@ const LastFmLink = () => {
       <Button disabled={start.isPending} onClick={() => start.mutate()}>
         {start.isPending ? COPY.connecting : COPY.connect}
       </Button>
+      {isDesktop && start.isSuccess && (
+        <output className={styles.status}>{COPY.finishInBrowser}</output>
+      )}
       {start.isError && (
         <p className={styles.error} role="alert">
           {COPY.connectFailed}

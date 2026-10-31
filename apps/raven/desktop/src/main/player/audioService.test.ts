@@ -55,15 +55,29 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 type FakeReadProps<K extends MpvProperty> = { name: K }
 
-/** A scripted mpv: every call is logged and answers at once, unless its prefix is set to fail. */
+/**
+ * A scripted mpv: every call is logged and answers at once, unless its prefix is set to fail,
+ * or held until `hold`'s release.
+ */
 const fakeMpv = () => {
   const log: string[] = []
   const shown: (NowPlaying | null)[] = []
   const observed: string[] = []
   const failing = new Set<string>()
+  const holds = new Map<string, Promise<void>>()
   const sink: { receive: (event: MpvEvent) => void } = { receive: () => {} }
+  const hold = (prefix: string) => {
+    const { promise, resolve } = Promise.withResolvers<void>()
+    holds.set(prefix, promise)
+    return () => {
+      holds.delete(prefix)
+      resolve()
+    }
+  }
   const reply = async (entry: string) => {
     log.push(entry)
+    const held = [...holds].find(([prefix]) => entry.startsWith(prefix))
+    if (held !== undefined) await held[1]
     if ([...failing].some((prefix) => entry.startsWith(prefix))) {
       throw new Error('mpv request failed (-12)')
     }
@@ -90,6 +104,7 @@ const fakeMpv = () => {
     shown,
     observed,
     failing,
+    hold,
     connect: (receive: (event: MpvEvent) => void) => {
       sink.receive = receive
     },
@@ -322,6 +337,22 @@ describe('what follows', () => {
       MPV_COMMANDS.playlistClear,
       loadfileOf({ mediaId: 9, mode: 'append-play', start: 0 }),
     ])
+  })
+
+  test('an end while the queue clears is an advance onto what was queued, which stays open', async () => {
+    const { service, fake, events, closed } = setup()
+    await service.handle(LOAD)
+    fake.emit({ type: MPV_EVENTS.fileLoaded })
+    const release = fake.hold(MPV_COMMANDS.playlistClear)
+    fake.log.length = 0
+    const queuing = service.handle(queueOf(9))
+    await settle()
+    fake.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
+    release()
+    expect(await queuing).toEqual({ ok: true })
+    expect(events).toEqual([{ type: AUDIO_EVENTS.advanced }])
+    expect(closed).toEqual(['7'])
+    expect(fake.log).toEqual([MPV_COMMANDS.playlistClear])
   })
 
   test('when the track ends with nothing queued, the page hears ended and the relay load goes', async () => {
@@ -642,10 +673,23 @@ describe('the sound', () => {
     expect(fake.log.some((entry) => entry.startsWith(MPV_COMMANDS.aoReload))).toBe(false)
   })
 
+  test('a sound heard while a file loads is set once it has loaded', async () => {
+    const { service, fake } = setup()
+    await settle()
+    await service.handle({ ...LOAD, next: null })
+    fake.log.length = 0
+    await service.handle({ type: AUDIO_COMMANDS.sound, level: 1, nextLevel: null, eq: BASS })
+    expect(fake.log).toEqual([])
+    fake.emit({ type: MPV_EVENTS.fileLoaded })
+    await settle()
+    expect(fake.log).toEqual([`set af ${soundFilterOf({ level: 1, eq: BASS })}`])
+  })
+
   test('an EQ or a level change queues the next track again with its new af', async () => {
     const { service, fake, resolved } = setup()
     await settle()
     await service.handle(LOAD)
+    fake.emit({ type: MPV_EVENTS.fileLoaded })
     fake.log.length = 0
     const sound = { type: AUDIO_COMMANDS.sound, level: 1, nextLevel: 1, eq: BASS } as const
     await service.handle(sound)

@@ -34,7 +34,11 @@ const FILE: LocalFile = {
 
 type SetupProps = { file?: LocalFile; engine?: EngineUse; downloadsPage?: DownloadsPage }
 
-const setup = ({ file = FILE, engine = ENGINE_USES.native, downloadsPage }: SetupProps = {}) => {
+const setup = ({
+  file = FILE,
+  engine = ENGINE_USES.native,
+  downloadsPage = DESKTOP_PATHS.downloads,
+}: SetupProps = {}) => {
   const client = fakeClient()
   const menu = createMenuHub()
   return {

@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { ApiError, SCROBBLE_RETURNS, SCROBBLE_SERVICES, type ScrobbleStatus } from '@raven/core'
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { useDesktopBridge } from '@/stores/desktop'
+import { asDesktop } from '@/test/desktop'
 import { ScrobblingSection } from '@/pages/SettingsPage/ScrobblingSection'
 import { readyConfig } from '@/test/authClient'
 import { renderWithProviders } from '@/test/render'
@@ -51,6 +53,7 @@ describe('ScrobblingSection', () => {
   afterEach(() => {
     cleanup()
     mock.restore()
+    useDesktopBridge.setState({ desktop: null })
   })
 
   it("says Last.fm isn't set up when the server has no Last.fm keys", async () => {
@@ -111,6 +114,19 @@ describe('ScrobblingSection', () => {
     expect(start).toHaveBeenCalledWith({ returnTo: SCROBBLE_RETURNS.web })
     await waitFor(() =>
       expect(assign).toHaveBeenCalledWith('https://www.last.fm/api/auth?api_key=k'),
+    )
+  })
+
+  it('says inside Raven to finish the Last.fm sign-in in the browser', async () => {
+    asDesktop()
+    spyOn(api, 'getScrobbling').mockResolvedValue(statuses())
+    spyOn(api, 'startLastFm').mockResolvedValue({ url: 'https://www.last.fm/api/auth?api_key=k' })
+    spyOn(window.location, 'assign').mockImplementation(() => undefined)
+    renderSection()
+    expect(screen.queryByRole('status')).toBeNull()
+    await userEvent.click(await screen.findByRole('button', { name: 'Connect' }))
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Finish signing in to Last.fm in your browser.',
     )
   })
 

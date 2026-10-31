@@ -86,8 +86,15 @@ export const useAllArtists = ({ search }: UseAllArtistsProps): MusicListing<Arti
 
 type UseAllSongsProps = UseMusicSearchProps
 
+/** The songs read so far, and how to read the next page. */
+type SongsListing = MusicListing<Track> & {
+  hasMore: boolean
+  isLoadingMore: boolean
+  loadMore: () => void
+}
+
 /** Every music library's tracks matching `search` ('' for all), by title, a page at a time. */
-export const useAllSongs = ({ search }: UseAllSongsProps) => {
+export const useAllSongs = ({ search }: UseAllSongsProps): SongsListing => {
   const music = useMusicLibraries()
   const songs = useInfiniteQuery(
     songsQuery({
@@ -96,9 +103,8 @@ export const useAllSongs = ({ search }: UseAllSongsProps) => {
       sort: MUSIC_SORTS.title,
     }),
   )
-  const tracks: readonly Track[] = songs.data?.pages.flatMap((page) => page.tracks) ?? []
   return {
-    tracks,
+    entries: songs.data?.pages.flatMap((page) => page.tracks) ?? [],
     isRead: songs.isSuccess || (music.isRead && music.libraries.length === 0),
     error: music.error ?? songs.error,
     hasNoMusic: music.isRead && music.libraries.length === 0,

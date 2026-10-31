@@ -6,6 +6,7 @@ import { useIsCurrent } from '@/components/AppShell/currentPage'
 import { HOME } from '@/components/BackButton/BackButton'
 import { Logo } from '@/components/Logo/Logo'
 import { MUSIC_SHELL_COPY } from '@/components/MusicShell/copy'
+import { Tab, TabStrip } from '@/components/TabStrip/TabStrip'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
 import { MUSIC_PATHS } from '@/lib/music'
 import { TopCardNote, useScrollReset } from '@/lib/useScrollReset'
@@ -66,13 +67,13 @@ const placesFor = ({ isOffline, isDesktop }: PlacesForProps): readonly MusicPlac
   ...(isDesktop ? [DOWNLOADS_PLACE] : []),
 ]
 
-type PlaceLinkProps = { place: MusicPlace; className: string }
+type PlaceLinkProps = { place: MusicPlace }
 
-/** A place's link: its icon and name, marked as current on any of its pages. */
-const PlaceLink = ({ place, className }: PlaceLinkProps) => {
+/** A place's link in the side menu: its icon and name, marked as current on any of its pages. */
+const PlaceLink = ({ place }: PlaceLinkProps) => {
   const isCurrent = useIsCurrent(place.patterns)
   return (
-    <Link to={place.to} className={className} aria-current={isCurrent ? 'page' : undefined}>
+    <Link to={place.to} className={styles.navLink} aria-current={isCurrent ? 'page' : undefined}>
       <Icon name={place.icon} />
       <span className={styles.label}>{place.label}</span>
     </Link>
@@ -96,8 +97,6 @@ export const MusicShell = () => {
   return (
     <div className={styles.shell}>
       {!isOffline && <FollowServer />}
-      {/* The window has no title bar of its own: this strip is what it is dragged by. */}
-      {isDesktop && <div className={styles.titlebar} aria-hidden="true" />}
       <nav className={styles.side} aria-label={MUSIC_SHELL_COPY.music}>
         <Link
           to={MUSIC_PATHS.root}
@@ -112,7 +111,7 @@ export const MusicShell = () => {
         <ul className={styles.links}>
           {places.map((place) => (
             <li key={place.to} className={styles.item}>
-              <PlaceLink place={place} className={styles.navLink} />
+              <PlaceLink place={place} />
             </li>
           ))}
         </ul>
@@ -132,15 +131,24 @@ export const MusicShell = () => {
           </TopCardNote>
         </div>
       </main>
-      <nav className={styles.tabs} aria-label={MUSIC_SHELL_COPY.tabs}>
+      <TabStrip label={MUSIC_SHELL_COPY.tabs}>
         {places.map((place) => (
-          <PlaceLink key={place.to} place={place} className={styles.tab} />
+          <Tab
+            key={place.to}
+            to={place.to}
+            patterns={place.patterns}
+            icon={place.icon}
+            label={place.label}
+          />
         ))}
-        <Link to={HOME.to} className={styles.tab} aria-label={MUSIC_SHELL_COPY.backToRaven}>
-          <Icon name="back" />
-          <span className={styles.label}>{MUSIC_SHELL_COPY.raven}</span>
-        </Link>
-      </nav>
+        <Tab
+          to={HOME.to}
+          patterns={[]}
+          icon="back"
+          label={MUSIC_SHELL_COPY.raven}
+          accessibleName={MUSIC_SHELL_COPY.backToRaven}
+        />
+      </TabStrip>
     </div>
   )
 }

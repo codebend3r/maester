@@ -39,7 +39,7 @@ const nearestSpeed = (speed: number): AudiobookSpeed =>
 /** What music plays from: the file as it is, or an AAC transcode at one of its bitrates. */
 export const MUSIC_QUALITIES = { original: 'original', ...AUDIO_BITRATES } as const
 
-type MusicQuality = (typeof MUSIC_QUALITIES)[keyof typeof MUSIC_QUALITIES]
+export type MusicQuality = (typeof MUSIC_QUALITIES)[keyof typeof MUSIC_QUALITIES]
 
 const isMusicQuality = oneOf(Object.values(MUSIC_QUALITIES))
 

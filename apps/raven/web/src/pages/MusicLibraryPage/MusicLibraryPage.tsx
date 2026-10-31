@@ -8,7 +8,7 @@ import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { MUSIC_COPY } from '@/lib/copy'
 import { MUSIC_PATHS } from '@/lib/music'
 import { type MusicListing, useAllAlbums, useAllArtists, useAllSongs } from '@/lib/useMusicListings'
-import { PlaylistsSection } from '@/pages/LibraryPage/MusicSections'
+import { PlaylistsSection } from '@/components/PlaylistsSection/PlaylistsSection'
 import { SongList } from '@/pages/MusicLibraryPage/SongList'
 import { MUSIC_LIBRARY_COPY } from '@/pages/MusicLibraryPage/copy'
 import styles from '@/pages/MusicLibraryPage/MusicLibraryPage.module.scss'
@@ -93,9 +93,9 @@ const SongsList = () => {
   const songs = useAllSongs({ search: '' })
   return (
     <ListState
-      entries={songs.isRead ? songs.tracks : undefined}
+      entries={songs.isRead ? songs.entries : undefined}
       error={songs.error}
-      empty={songs.hasNoMusic ? MUSIC_COPY.noMusic : MUSIC_LIBRARY_COPY.noSongs}
+      empty={emptyOf({ listing: songs, empty: MUSIC_LIBRARY_COPY.noSongs })}
     >
       {(tracks) => (
         <SongList

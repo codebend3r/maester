@@ -213,17 +213,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-// Raven's window has no title bar: this strip along its top is what
-// drags it, over the page as it scrolls. --titlebar-inset is 0 in a browser,
-// where the strip is never drawn anyway.
-.titlebar {
-  position: fixed;
-  inset: 0 0 auto;
-  z-index: 6;
-  height: var(--titlebar-inset);
-  -webkit-app-region: drag;
-}
-
 // An icon with its count over the top corner, both in one cell.
 .counted {
   display: grid;

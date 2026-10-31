@@ -132,7 +132,7 @@ type FileServicesForProps = {
   menu: MenuHub
   engine: EngineUse
   /** The Downloads a download goes back to: raven's, or the music mode's it was opened from. */
-  downloadsPage?: DownloadsPage
+  downloadsPage: DownloadsPage
 }
 
 /** A local file's or a download's services, as main described the file. */
@@ -141,7 +141,7 @@ export const fileServicesFor = ({
   client,
   menu,
   engine,
-  downloadsPage = DESKTOP_PATHS.downloads,
+  downloadsPage,
 }: FileServicesForProps): PlayerServices => ({
   title: {
     label: file.label,

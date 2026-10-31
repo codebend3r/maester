@@ -374,6 +374,23 @@ describe('AudioHost sound', () => {
     expect(fakeContexts()).toHaveLength(1)
   })
 
+  it('resumes a context left suspended on the next gesture', () => {
+    installAudioContext()
+    usePlayerPrefs
+      .getState()
+      .setEqualizer({ preset: EQ_PRESET_NAMES.bassBoost, gains: EQ_PRESETS.bassBoost })
+    renderHost({ api: apiWith([]) })
+    act(() => store().playTracks({ tracks: ALBUM }))
+    const [context] = fakeContexts()
+    if (!context) throw new Error('No audio context')
+    context.state = 'suspended'
+    const resumes = context.resumes
+    fireEvent.pointerDown(document)
+    expect(context.resumes).toBe(resumes + 1)
+    fireEvent.pointerDown(document)
+    expect(context.resumes).toBe(resumes + 1)
+  })
+
   it('swaps tracks on the one element at the end with crossfade off', () => {
     installAudioContext()
     usePlayerPrefs
@@ -446,6 +463,37 @@ describe('AudioHost sound', () => {
     act(() => store().seekTo(20))
     expect(paused).toContain(second)
     expect(first.currentTime).toBe(20)
+  })
+
+  it('never fades into an audiobook, which starts at its own spot', () => {
+    installAudioContext()
+    usePlayerPrefs.getState().setCrossfade(6)
+    const client = new QueryClient()
+    client.setQueryData(queryKeys.libraries, [
+      library({ id: 1, settings: { ...library().settings, kind: LIBRARY_KINDS.music } }),
+      library({ id: 2, settings: { ...library().settings, kind: LIBRARY_KINDS.audiobooks } }),
+    ])
+    renderHost({ api: apiWith([]), client })
+    act(() => store().playTracks({ tracks: [track(1), { ...track(2), libraryId: 2 }] }))
+    const [first, second] = bothElements()
+    act(() => fireEvent.playing(first))
+    playAt({ element: first, seconds: 197 })
+    expect(played).not.toContain(second)
+  })
+
+  it('sets no source until the libraries say whether the track is music', async () => {
+    usePlayerPrefs.getState().setMusicQuality(MUSIC_QUALITIES.standard)
+    const client = new QueryClient()
+    renderHost({ api: apiWith([]), client })
+    act(() => store().playTracks({ tracks: ALBUM }))
+    const [current] = bothElements()
+    expect(current.getAttribute('src')).toBeNull()
+    act(() =>
+      client.setQueryData(queryKeys.libraries, [
+        library({ id: 1, settings: { ...library().settings, kind: LIBRARY_KINDS.music } }),
+      ]),
+    )
+    await waitFor(() => expect(current.src).toContain('/api/media/1/transcode?kbps=256'))
   })
 
   it('fades into nothing neither on the last track nor on repeat one', () => {

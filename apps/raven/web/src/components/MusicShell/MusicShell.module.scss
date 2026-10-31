@@ -110,8 +110,7 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .navLink,
-  .tab {
+  .navLink {
     transition:
       background-color 150ms ease,
       color 150ms ease;
@@ -122,15 +121,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-// Raven's window has no title bar: this strip along its top drags it.
-.titlebar {
-  position: fixed;
-  inset: 0 0 auto;
-  z-index: 6;
-  height: var(--titlebar-inset);
-  -webkit-app-region: drag;
 }
 
 // The theme and account buttons over the page, then the page.
@@ -175,55 +165,6 @@
   align-content: start;
 }
 
-// A phone's way round, in the side menu's place, as raven's own tab bar is.
-.tabs {
-  position: fixed;
-  inset: auto 0 0;
-  z-index: 5;
-  display: none;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-rows: var(--control-size-large);
-  gap: var(--space-0);
-  padding: var(--space-0) var(--space-1) calc(var(--space-0) + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--color-line);
-  background: var(--color-night-haze);
-  backdrop-filter: blur(20px);
-}
-
-.tab {
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: var(--space-0);
-  min-width: 0;
-  border-radius: var(--radius-md);
-  color: var(--color-lichen);
-  font-size: var(--font-size-2xs);
-  font-weight: 600;
-  line-height: var(--line-tight);
-  text-decoration: none;
-
-  &:hover {
-    color: var(--color-bark);
-  }
-
-  &:focus-visible {
-    outline: var(--focus-ring);
-  }
-
-  &[aria-current='page'] {
-    --icon-tint: 0.4;
-
-    background: var(--color-moss);
-    color: var(--color-bark);
-  }
-
-  .label {
-    max-width: 100%;
-  }
-}
-
 @media (max-width: 64rem) {
   .side {
     width: 11rem;
@@ -238,9 +179,5 @@
 
   .side {
     display: none;
-  }
-
-  .tabs {
-    display: grid;
   }
 }

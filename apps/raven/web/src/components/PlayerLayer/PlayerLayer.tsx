@@ -26,7 +26,7 @@ const AUDIO_HOSTS = {
 /**
  * Music under both shells, raven's and the music mode's: the engine once,
  * and the now-playing bar along the foot of the screen while a track
- * plays. The shell is the outlet, so going from one mode to the other
+ * plays; in Raven, the strip the window is dragged by. The shell is the outlet, so going from one mode to the other
  * swaps the shell and leaves the engine, and what it plays, where it is.
  */
 export const PlayerLayer = () => {
@@ -36,6 +36,8 @@ export const PlayerLayer = () => {
   const Audio = AUDIO_HOSTS[isDesktop ? PLAYER_HOSTS.desktop : PLAYER_HOSTS.browser]
   return (
     <div className={isBarShown ? `${styles.layer} ${styles.withBar}` : styles.layer}>
+      {/* The window has no title bar of its own: this strip is what it is dragged by. */}
+      {isDesktop && <div className={styles.titlebar} aria-hidden="true" />}
       <div className={styles.shell}>
         <Outlet />
       </div>

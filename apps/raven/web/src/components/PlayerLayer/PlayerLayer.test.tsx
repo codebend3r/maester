@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { AUDIO_STATES, useAudioQueue } from '@raven/ui/headless'
+import { Route, Routes } from 'react-router-dom'
 import { AppRoutes } from '@/AppRoutes'
+import { PlayerLayer } from '@/components/PlayerLayer/PlayerLayer'
 import { api } from '@/lib/api'
+import { useDesktopBridge } from '@/stores/desktop'
+import { asDesktop } from '@/test/desktop'
 import { albumDetails, mixSummary, musicLibrary } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 
@@ -22,6 +26,29 @@ describe('PlayerLayer', () => {
     cleanup()
     mock.restore()
     useAudioQueue.getState().clear()
+    useDesktopBridge.setState({ desktop: null })
+  })
+
+  it("draws the strip Raven's window is dragged by once, over either shell, and none in a browser", () => {
+    const renderLayer = () =>
+      renderWithProviders({
+        ui: (
+          <Routes>
+            <Route element={<PlayerLayer />}>
+              <Route index element={<p>The shell</p>} />
+            </Route>
+          </Routes>
+        ),
+        route: '/',
+      })
+    asDesktop()
+    renderLayer()
+    expect(screen.getByText('The shell')).toBeInTheDocument()
+    expect(document.querySelectorAll('[aria-hidden="true"].titlebar')).toHaveLength(1)
+    cleanup()
+    useDesktopBridge.setState({ desktop: null })
+    renderLayer()
+    expect(document.querySelector('.titlebar')).toBeNull()
   })
 
   it('keeps the same audio element playing from an album in raven to the music mode and back', async () => {

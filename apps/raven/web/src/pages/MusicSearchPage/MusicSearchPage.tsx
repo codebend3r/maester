@@ -52,7 +52,7 @@ const Matches = ({ query }: MatchesProps) => {
       </Results>
       <Results title={MUSIC_SEARCH_COPY.songs}>
         <ListState
-          entries={songs.isRead ? songs.tracks : undefined}
+          entries={songs.isRead ? songs.entries : undefined}
           error={songs.error}
           empty={MUSIC_SEARCH_COPY.noSongs(query)}
         >

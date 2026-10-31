@@ -1,5 +1,5 @@
 // The shell over the player, and under them the room that clears a phone's
-// tab bar. The tab bar's rows, padding and hairline (TabBar.module.scss)
+// tab bar. The tab bar's rows, padding and hairline (TabStrip.module.scss)
 // make --tab-bar-height; --tab-bar-room is the room it takes, and
 // --player-room the now-playing bar's, which the shells' side menus stop short of.
 .layer {
@@ -38,4 +38,15 @@
   .layer {
     --tab-bar-room: calc(var(--tab-bar-height) + env(safe-area-inset-bottom));
   }
+}
+
+// Raven's window has no title bar: this strip along its top is what
+// drags it, over either shell as the page scrolls. --titlebar-inset is 0 in a
+// browser, where the strip is never drawn anyway.
+.titlebar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 6;
+  height: var(--titlebar-inset);
+  -webkit-app-region: drag;
 }

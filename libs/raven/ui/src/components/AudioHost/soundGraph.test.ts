@@ -27,11 +27,13 @@ describe('soundGraph', () => {
     })
   })
 
-  it("sets each band to a preset's gain", () => {
+  it("glides each band to a preset's gain", () => {
     const context = new FakeAudioContext()
     const graph = soundGraph({ context, elements: twoElements() })
     graph.setEq(EQ_PRESETS.bassBoost)
-    expect(context.filters.map((filter) => filter.gain.value)).toEqual([...EQ_PRESETS.bassBoost])
+    expect(context.filters.map((filter) => filter.gain.targets)).toEqual(
+      EQ_PRESETS.bassBoost.map((value) => [{ value, time: 10, timeConstant: 0.02 }]),
+    )
   })
 
   it('ramps one element down and the other up over the fade, and snaps them over none', () => {

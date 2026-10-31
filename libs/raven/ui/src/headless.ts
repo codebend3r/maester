@@ -31,7 +31,7 @@ export {
   MUSIC_QUALITIES,
   usePlayerPrefs,
 } from '@/stores/playerPrefs'
-export type { AudiobookSpeed } from '@/stores/playerPrefs'
+export type { AudiobookSpeed, MusicQuality } from '@/stores/playerPrefs'
 export { configureStorage } from '@/stores/configureStorage'
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'

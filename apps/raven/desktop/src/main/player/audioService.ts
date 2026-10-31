@@ -204,6 +204,8 @@ export const createAudioService = ({
   let eq: EqGains = EQ_PRESETS.flat
   // The `af` the playing track runs, so a `sound` that changes nothing sets nothing.
   let soundFilter = ''
+  // The `af` a `sound` asked for while a file loaded, set once it has.
+  let pendingFilter: string | null = null
   const listeners = new Set<(listener: AudioEvent) => void>()
 
   // These run inside the wrapper's event drain, so nothing they throw may escape.
@@ -276,6 +278,7 @@ export const createAudioService = ({
     retire(queued)
     playing = null
     queued = null
+    pendingFilter = null
     lastTime = 0
     duration = null
     onPlaying(false)
@@ -322,7 +325,15 @@ export const createAudioService = ({
   }
 
   const onFileLoaded = () => {
-    if (phase === PLAYER_PHASES.loading) phase = PLAYER_PHASES.loaded
+    if (phase !== PLAYER_PHASES.loading) return
+    phase = PLAYER_PHASES.loaded
+    const filter = pendingFilter
+    pendingFilter = null
+    if (filter === null || filter === soundFilter) return
+    soundFilter = filter
+    mpv.set({ name: MPV_OPTIONS.af, value: filter }).catch((error: unknown) => {
+      warn(`mpv af failed: ${messageOf(error)}`)
+    })
   }
 
   const failureOf = async (target: LoadTarget) => {
@@ -354,6 +365,7 @@ export const createAudioService = ({
           retire(playing)
           playing = queued
           soundFilter = queued.filter
+          pendingFilter = null
           queued = null
           lastTime = 0
           duration = null
@@ -474,10 +486,13 @@ export const createAudioService = ({
       return OK
     }
     const token = epoch
-    retire(queued)
-    queued = null
+    const previous = queued
     await mpv.command({ args: [MPV_COMMANDS.playlistClear] })
     if (token !== epoch) return overtaken()
+    // mpv moved on to `previous` while it cleared: the page's `advanced` brings a fresh queueNext.
+    if (queued !== previous) return OK
+    retire(previous)
+    queued = null
     if (next === null) return OK
     const resolved = await resolve({ mediaId: next.mediaId, kbps: next.kbps })
     if (token !== epoch) {
@@ -525,6 +540,7 @@ export const createAudioService = ({
     lastTime = Math.max(0, command.start)
     duration = null
     soundFilter = soundFilterOf({ level: command.level, eq })
+    pendingFilter = null
     await mpv.set({ name: MPV_PROPERTIES.pause, value: false })
     if (token !== epoch) return overtaken()
     await loadfile({
@@ -546,7 +562,10 @@ export const createAudioService = ({
     eq = command.eq
     if (phase === PLAYER_PHASES.idle) return OK
     const filter = soundFilterOf({ level: command.level, eq })
-    if (filter !== soundFilter) {
+    // A file still loading takes it once loaded, or its own `af` would undo it.
+    if (phase === PLAYER_PHASES.loading) {
+      pendingFilter = filter
+    } else if (filter !== soundFilter) {
       await mpv.set({ name: MPV_OPTIONS.af, value: filter })
       soundFilter = filter
     }

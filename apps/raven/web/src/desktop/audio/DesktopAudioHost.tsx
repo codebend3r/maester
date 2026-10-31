@@ -48,6 +48,18 @@ const artworkOf = async ({ api, track }: ArtworkOfProps) => {
   }
 }
 
+type QueuedOfProps = {
+  next: Track | null
+  levelling: LevellingMode
+  kbps: AudioBitrate | null
+}
+
+/** The next track as main queues it: with its level, so mpv opens it at that level from its first note. */
+const queuedOf = ({ next, levelling, kbps }: QueuedOfProps) =>
+  next === null
+    ? null
+    : { mediaId: next.id, level: levelOf({ track: next, mode: levelling }), kbps }
+
 type WindowedPlayerOfProps = {
   player: NativeAudio
   levelling: LevellingMode
@@ -63,22 +75,21 @@ const windowedPlayerOf = ({
   kbps,
   nextKbps,
 }: WindowedPlayerOfProps): WindowedPlayer => {
-  // The next track goes with its level, so mpv opens it at that level from its first note.
-  const queuedOf = (next: Track | null) =>
-    next === null
-      ? null
-      : { mediaId: next.id, level: levelOf({ track: next, mode: levelling }), kbps: nextKbps }
   return {
     load: ({ playing, next, start }) =>
       player.send({
         type: AUDIO_COMMANDS.load,
         mediaId: playing.id,
         level: levelOf({ track: playing, mode: levelling }),
-        next: queuedOf(next),
+        next: queuedOf({ next, levelling, kbps: nextKbps }),
         start,
         kbps,
       }),
-    queueNext: (next) => player.send({ type: AUDIO_COMMANDS.queueNext, next: queuedOf(next) }),
+    queueNext: (next) =>
+      player.send({
+        type: AUDIO_COMMANDS.queueNext,
+        next: queuedOf({ next, levelling, kbps: nextKbps }),
+      }),
     stop: () => player.send({ type: AUDIO_COMMANDS.stop }),
     setPlaying: ({ shouldPlay }) =>
       player.send({ type: shouldPlay ? AUDIO_COMMANDS.play : AUDIO_COMMANDS.pause }),
@@ -87,6 +98,9 @@ const windowedPlayerOf = ({
       player.send({ type: AUDIO_COMMANDS.volume, volume, muted: isMuted }),
   }
 }
+
+/** How long the sound must hold still before mpv rebuilds its filters for it. */
+const SOUND_SETTLE_MS = 150
 
 type SetSoundProps = Omit<Extract<AudioCommand, { type: typeof AUDIO_COMMANDS.sound }>, 'type'>
 
@@ -128,21 +142,21 @@ const NativeAudioHost = ({ api, player }: NativeAudioHostProps) => {
   useEffect(() => setRate(rate), [rate])
 
   // Main queues the next track again when its level or the EQ changes; a sound that only names
-  // what main already holds, as after mpv moved on, sets nothing there.
+  // what main already holds, as after mpv moved on, sets nothing there. It waits for a dragged
+  // slider to settle: a load carries its own level, so the wait costs nothing at a seam.
   const setSound = useEffectEvent((sound: SetSoundProps) => {
     player.send({ type: AUDIO_COMMANDS.sound, ...sound }).catch(() => undefined)
   })
-  useEffect(() => setSound({ level, nextLevel, eq }), [level, nextLevel, eq])
+  useEffect(() => {
+    const timer = setTimeout(() => setSound({ level, nextLevel, eq }), SOUND_SETTLE_MS)
+    return () => clearTimeout(timer)
+  }, [level, nextLevel, eq])
 
   // A bitrate that changes while a track is queued (the libraries came, or the quality moved)
   // queues it again at the new one.
   const requeue = useEffectEvent((bitrate: AudioBitrate | null) => {
     if (trackId === null || next === null) return
-    const queued = {
-      mediaId: next.id,
-      level: levelOf({ track: next, mode: levelling }),
-      kbps: bitrate,
-    }
+    const queued = queuedOf({ next, levelling, kbps: bitrate })
     player.send({ type: AUDIO_COMMANDS.queueNext, next: queued }).catch(() => undefined)
   })
   useEffect(() => requeue(nextKbps), [nextKbps])

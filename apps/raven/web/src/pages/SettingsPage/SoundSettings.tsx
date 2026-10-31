@@ -7,7 +7,7 @@ import {
   LEVELLING_MODES,
   type LevellingMode,
 } from '@raven/core'
-import { MUSIC_QUALITIES, usePlayerPrefs } from '@raven/ui/headless'
+import { MUSIC_QUALITIES, type MusicQuality, usePlayerPrefs } from '@raven/ui/headless'
 import { type ComponentType, useId } from 'react'
 import { type AudioConnection, useAudioConnection } from '@/desktop/audioConnection'
 import { CONNECTION_STATUSES } from '@/desktop/portConnection'
@@ -18,8 +18,6 @@ import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import soundStyles from '@/pages/SettingsPage/SoundSettings.module.scss'
 
 const COPY = SETTINGS_COPY.sound
-
-type MusicQuality = (typeof MUSIC_QUALITIES)[keyof typeof MUSIC_QUALITIES]
 
 const QUALITIES: Choices<MusicQuality> = {
   [MUSIC_QUALITIES.original]: {

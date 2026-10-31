@@ -1,32 +1,12 @@
 import { DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
-import { Icon, type IconName } from '@raven/ui'
-import { Link } from 'react-router-dom'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
+import { libraryPages } from '@/components/AppShell/currentPage'
+import { Tab, TabStrip } from '@/components/TabStrip/TabStrip'
 import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
-import styles from '@/components/AppShell/TabBar.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { MUSIC_PATHS } from '@/lib/music'
-
-type TabProps = {
-  to: string
-  patterns: readonly string[]
-  icon: IconName
-  label: string
-}
-
-/** A tab: its icon over its name, marked as current when the location matches any of its patterns. */
-const Tab = ({ to, patterns, icon, label }: TabProps) => {
-  const isCurrent = useIsCurrent(patterns)
-  return (
-    <Link to={to} className={styles.tab} aria-current={isCurrent ? 'page' : undefined}>
-      <Icon name={icon} size={22} />
-      <span className={styles.label}>{label}</span>
-    </Link>
-  )
-}
 
 type TabBarProps = {
   /** Whether a music library exists, so the tabs offer the music mode. */
@@ -47,7 +27,7 @@ export const TabBar = ({ hasMusic }: TabBarProps) => {
   const computer = useComputerName()
   const isOffline = useServerReach((state) => state.isOffline)
   return (
-    <nav className={styles.tabs} aria-label={APP_SHELL_COPY.tabs}>
+    <TabStrip label={APP_SHELL_COPY.tabs}>
       {!isOffline && (
         <>
           <Tab to="/" patterns={['/']} icon="home" label={COMMON_COPY.home} />
@@ -109,6 +89,6 @@ export const TabBar = ({ hasMusic }: TabBarProps) => {
         icon="settings"
         label={COMMON_COPY.settings}
       />
-    </nav>
+    </TabStrip>
   )
 }

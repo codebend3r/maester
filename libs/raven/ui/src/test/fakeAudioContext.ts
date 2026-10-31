@@ -1,12 +1,16 @@
 /** A value an `AudioParam` was set or ramped to, and when. */
 type Scheduled = { value: number; time: number }
 
+/** A value an `AudioParam` was told to glide to, from when, and how fast. */
+type Target = Scheduled & { timeConstant: number }
+
 /** An `AudioParam` that records what it was told. */
 class FakeParam {
   value: number
   readonly sets: Scheduled[] = []
   readonly ramps: Scheduled[] = []
   readonly cancels: number[] = []
+  readonly targets: Target[] = []
 
   constructor(value: number) {
     this.value = value
@@ -20,6 +24,12 @@ class FakeParam {
 
   linearRampToValueAtTime(value: number, time: number): FakeParam {
     this.ramps.push({ value, time })
+    this.value = value
+    return this
+  }
+
+  setTargetAtTime(value: number, time: number, timeConstant: number): FakeParam {
+    this.targets.push({ value, time, timeConstant })
     this.value = value
     return this
   }

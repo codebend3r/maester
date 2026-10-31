@@ -5,6 +5,9 @@ import { type SoundGraph, soundGraph } from '@/components/AudioHost/soundGraph'
 /** The `AudioContext` state a browser holds a context in until a gesture lets it run. */
 const SUSPENDED: AudioContextState = 'suspended'
 
+/** The gestures a browser lets a suspended context resume on. */
+const GESTURE_EVENTS = ['pointerdown', 'keydown'] as const
+
 /** Whether this browser has Web Audio at all. */
 export const hasWebAudio = (): boolean => typeof AudioContext !== 'undefined'
 
@@ -46,6 +49,21 @@ export const useSoundGraph = ({ elements, isRouted, gains }: UseSoundGraphProps)
     },
     [],
   )
+
+  // A graph a play built with no gesture behind it (a media key, an advance, a fade) stays
+  // suspended, its elements playing into silence, until the next gesture resumes it.
+  useEffect(() => {
+    if (!isRouted) return
+    const resume = () => {
+      const context = routed.current?.context
+      if (context?.state === SUSPENDED) context.resume().catch(() => undefined)
+    }
+    GESTURE_EVENTS.forEach((name) => document.addEventListener(name, resume, { capture: true }))
+    return () =>
+      GESTURE_EVENTS.forEach((name) =>
+        document.removeEventListener(name, resume, { capture: true }),
+      )
+  }, [isRouted])
 
   const graph = useCallback(() => routed.current?.graph ?? null, [])
 

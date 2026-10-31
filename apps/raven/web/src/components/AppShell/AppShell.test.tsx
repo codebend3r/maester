@@ -599,10 +599,9 @@ describe('AppShell', () => {
       'Downloads',
       'Settings',
     ])
-    expect(document.querySelector('[aria-hidden="true"].titlebar')).not.toBeNull()
   })
 
-  it('has no badge, and no title bar strip, with nothing under way or in a browser', async () => {
+  it('has no badge with nothing under way, and no Downloads in a browser', async () => {
     spies.list.mockImplementation(async () => [])
     asDesktop(
       downloadsMain({ downloads: [viewOf({ status: { kind: DOWNLOAD_STATUS_KINDS.ready } })] }),
@@ -613,7 +612,6 @@ describe('AppShell', () => {
     useDesktopBridge.setState({ desktop: null })
     renderShell({ route: '/' })
     expect(within(nav()).queryByRole('link', { name: 'Downloads' })).toBeNull()
-    expect(document.querySelector('.titlebar')).toBeNull()
   })
 
   it('names the files on this PC on Windows', () => {

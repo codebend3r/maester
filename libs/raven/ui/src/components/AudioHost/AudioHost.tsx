@@ -1,4 +1,5 @@
 import { type ApiClient, type Track, artistNames, isFlatEq, levelOf } from '@raven/core'
+import { useQuery } from '@tanstack/react-query'
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { failureMessage } from '@/components/Player/useMediaSource'
 import { useMediaPlane } from '@/components/Player/useMediaPlane'
@@ -13,6 +14,7 @@ import {
 import { hasWebAudio, useSoundGraph } from '@/components/AudioHost/useSoundGraph'
 import { watchPageHide } from '@/components/Player/watchPageHide'
 import { useIsAudiobook, useTrackBitrate, useTrackRate } from '@/query/useAudiobook'
+import { ravenQueriesFor } from '@/query/ravenQueries'
 import {
   AUDIO_STATES,
   type AudioState,
@@ -53,10 +55,14 @@ type UseTrackSourceProps = {
  * The address a track plays from, as a video's: through the web host's own
  * address, or from the picked media origin once a ticket for the track has
  * come. It plays from its file, or from the transcode at `useTrackBitrate`'s
- * bitrate. Null while there is no track, or the ticket is on its way.
+ * bitrate. Null while there is no track, while the ticket is on its way,
+ * and while the libraries that pick between the two are, as the element never
+ * reloads mid-track; once they have failed it plays from its file.
  */
 const useTrackSource = ({ api, track, reprobe }: UseTrackSourceProps): string | null => {
   const pick = useMediaOrigin((state) => state.pick)
+  const queries = useMemo(() => ravenQueriesFor(api), [api])
+  const libraries = useQuery({ ...queries.librariesQuery, enabled: track !== null })
   const kbps = useTrackBitrate({ api, track })
   const plane = useMediaPlane({
     api,
@@ -64,7 +70,7 @@ const useTrackSource = ({ api, track, reprobe }: UseTrackSourceProps): string | 
     reprobe,
     isEnabled: track !== null,
   })
-  if (track === null) return null
+  if (track === null || libraries.isPending) return null
   if (pick !== null && plane.access === null) return null
   if (kbps === null) return api.fileUrl({ id: track.id, access: plane.access })
   return api.transcodeUrl({ mediaId: track.id, kbps, access: plane.access })
@@ -328,8 +334,9 @@ const useIsRouted = (): boolean => {
 
 /**
  * The web's audio engine: two `<audio>` elements, one playing the queue's
- * track and the other preloading the next, mounted once at the app shell,
- * outside the router, so playback carries on from page to page. Tracks play
+ * track and the other preloading the next, mounted once by the page's player
+ * layer, over every shell, so playback carries on from page to page and from
+ * mode to mode. Tracks play
  * through the web host or the picked media origin, as videos do. Each
  * element's volume is levelled by its track's gain. With the equalizer on or
  * a crossfade set, both play through one Web Audio graph, and a crossfade
@@ -338,7 +345,7 @@ const useIsRouted = (): boolean => {
  * at the end. It tells the media session what plays and counts a listen at
  * half the track or four minutes. An audiobook plays at the speed the prefs
  * hold, starts where it was left and saves its spot as it plays, and never
- * crossfades; music saves none. The chrome (the bar, Now Playing, the queue
+ * crossfades, in or out; music saves none. The chrome (the bar, Now Playing, the queue
  * page) reads and drives the store, never this.
  */
 export const AudioHost = ({ api, reprobe }: AudioHostProps) => {
@@ -352,6 +359,7 @@ export const AudioHost = ({ api, reprobe }: AudioHostProps) => {
   const preload = useTrackSource({ api, track: upNext, reprobe })
   const rate = useTrackRate({ api, track })
   const isAudiobook = useIsAudiobook({ api, track })
+  const isNextAudiobook = useIsAudiobook({ api, track: upNext })
   const start = startOf(useAudiobookSpot({ api, track, watchHide: watchPageHide }))
   const isRouted = useIsRouted()
   const gains = usePlayerPrefs((prefs) => prefs.equalizer.gains)
@@ -369,7 +377,7 @@ export const AudioHost = ({ api, reprobe }: AudioHostProps) => {
     elements,
     trackId: track?.id ?? null,
     nextId: upNext?.id ?? null,
-    seconds: isAudiobook ? 0 : seconds,
+    seconds: isAudiobook || isNextAudiobook ? 0 : seconds,
     graph: route.graph,
     loads,
     play,

@@ -12,7 +12,11 @@ type SoundParam = {
   setValueAtTime(value: number, startTime: number): unknown
   linearRampToValueAtTime(value: number, endTime: number): unknown
   cancelScheduledValues(cancelTime: number): unknown
+  setTargetAtTime(target: number, startTime: number, timeConstant: number): unknown
 }
+
+/** How fast a band glides to a new gain, so a slider dragged across it does not click. */
+const EQ_SMOOTHING_SECONDS = 0.02
 
 type SoundNode = { connect(destination: SoundNode): unknown }
 
@@ -99,7 +103,7 @@ export const soundGraph = ({ context, elements }: SoundGraphProps): SoundGraph =
   return {
     setEq: (gains) =>
       filters.forEach((filter, band) => {
-        filter.gain.value = gains[band] ?? 0
+        filter.gain.setTargetAtTime(gains[band] ?? 0, context.currentTime, EQ_SMOOTHING_SECONDS)
       }),
     crossfade: ({ from, to, seconds }) => {
       ramp({ element: from, level: 0, seconds })

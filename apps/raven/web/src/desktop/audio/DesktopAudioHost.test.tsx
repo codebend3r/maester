@@ -350,7 +350,22 @@ describe('DesktopAudioHost', () => {
     act(() => usePlayerPrefs.getState().setLevelling(LEVELLING_MODES.off))
     act(() => store().previous())
     await waitFor(() => expect(playingTrackOf(store())?.id).toBe(1))
-    expect(sounds().at(-1)).toMatchObject({ level: 1 })
+    await waitFor(() => expect(sounds().at(-1)).toMatchObject({ level: 1 }))
+  })
+
+  it('sends the sound once a run of equalizer changes settles, with the last gains', async () => {
+    const audio = renderNative()
+    const sounds = () => ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.sound })
+    act(() => store().playTracks({ tracks: TRACKS }))
+    await waitFor(() => expect(sounds()).toHaveLength(1))
+    const steps = [EQ_PRESETS.bassBoost, EQ_PRESETS.trebleBoost, EQ_PRESETS.vocal]
+    steps.forEach((gains) =>
+      act(() => usePlayerPrefs.getState().setEqualizer({ preset: EQ_PRESET_NAMES.vocal, gains })),
+    )
+    await waitFor(() => expect(sounds()).toHaveLength(2))
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(sounds()).toHaveLength(2)
+    expect(sounds().at(-1)).toMatchObject({ eq: EQ_PRESETS.vocal })
   })
 
   it('fails the track when main refuses to load it', async () => {
