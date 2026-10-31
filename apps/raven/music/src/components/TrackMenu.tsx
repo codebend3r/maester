@@ -35,14 +35,11 @@ function PlaylistChoices({ session: { api, queries }, track, onDone }: PlaylistC
     return list.length === 0 ? TRACK_MENU_COPY.noPlaylists : null
   })()
   const add = (playlist: PlaylistSummary) => {
-    setNote(null)
-    append.mutate(
-      { id: playlist.id, tracks: [track] },
-      {
-        onSuccess: (details) => setNote(TRACK_MENU_COPY.added(details.playlist.name)),
-        onError: (error) => setNote(error.message),
-      },
-    )
+    setNote(TRACK_MENU_COPY.added(playlist.name))
+    append.attempt({
+      variables: { id: playlist.id, tracks: [track] },
+      onRefused: (error) => setNote(error.message),
+    })
   }
   return (
     <View accessibilityLabel={TRACK_MENU_COPY.pickPlaylist(track.title)} style={styles.view}>
