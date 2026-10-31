@@ -282,11 +282,13 @@ export const createServerSources = ({
     return resolveRelayed({ server: found.server, mediaId, trackList, kbps: null })
   }
 
+  type ResolveTrackProps = TrackSource
+
   const resolveTrack = async ({
     serverId,
     mediaId,
     kbps,
-  }: TrackSource): Promise<ResolvedServerSource> => {
+  }: ResolveTrackProps): Promise<ResolvedServerSource> => {
     const found = serverOfSource({ serverId, mediaId })
     if (!found.ok) return found
     return resolveRelayed({ server: found.server, mediaId, trackList: Promise.resolve([]), kbps })
