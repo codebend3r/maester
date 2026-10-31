@@ -20,6 +20,10 @@ name: An album downloads from its page and is listed under Library's Downloads
     visible: Remove download
     timeout: 120000
 - tapOn: Back
+# Library's segments scroll sideways on a phone, so Downloads waits past the right edge.
+- swipe:
+    start: 85%, 20%
+    end: 15%, 20%
 - tapOn: Downloads
 - extendedWaitUntil:
     visible: Morning Chorus
