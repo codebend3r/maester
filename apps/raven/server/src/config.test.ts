@@ -14,6 +14,13 @@ describe('readServerConfig', () => {
     })
   })
 
+  it('measures loudness unless LOUDNESS_SCAN turns it off', () => {
+    expect(readServerConfig({})).toMatchObject({ loudnessScan: true })
+    expect(readServerConfig({ [MUSIC_ENV.loudnessScan]: 'off' })).toMatchObject({
+      loudnessScan: false,
+    })
+  })
+
   it('quick-scans on boot and every 10 minutes unless told otherwise', () => {
     expect(readServerConfig({})).toMatchObject({ scanOnStart: true, quickScanIntervalMinutes: 10 })
     expect(

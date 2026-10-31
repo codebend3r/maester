@@ -24,6 +24,7 @@ import { parseJsonAs } from '@/db/json'
 import { likePattern } from '@/media/mediaSql'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import type { AudioFormat, AudioTags } from '@/music/audioReader'
+import { REPLAYGAIN_SOURCES } from '@/music/loudness'
 import { type Filing, type NamedArtist, albumTypeOf, filingOf, nameKeyOf } from '@/music/filing'
 import type { Release } from '@/music/musicBrainzClient'
 
@@ -417,11 +418,11 @@ export class MusicRepository {
       .prepare(
         `INSERT INTO albums (library_id, album_key, title, sort_title, year, original_year, mbid,
                              release_group_mbid, type, label, genres, is_compilation, credited_by_tags,
-                             cover_source, cover_ref, replaygain_gain, replaygain_peak, added_at,
-                             match, matched_at)
+                             cover_source, cover_ref, replaygain_gain, replaygain_peak,
+                             replaygain_source, added_at, match, matched_at)
          VALUES (@libraryId, @key, @title, @sortTitle, @year, @originalYear, @mbid,
                  @releaseGroupMbid, @type, @label, @genres, @isCompilation, @isCredited,
-                 @coverSource, @coverRef, @gain, @peak, @addedAt, @match, @matchedAt)`,
+                 @coverSource, @coverRef, @gain, @peak, @source, @addedAt, @match, @matchedAt)`,
       )
       .run({
         libraryId,
@@ -441,6 +442,7 @@ export class MusicRepository {
         coverRef: cover?.ref ?? null,
         gain: tags.replayGain.albumGain,
         peak: tags.replayGain.albumPeak,
+        source: tags.replayGain.albumGain === null ? null : REPLAYGAIN_SOURCES.tags,
         addedAt: at.toISOString(),
         // A release id in the tags is a match already; MusicBrainz is asked for the rest.
         match: tags.releaseMbid === null ? MATCH_STATES.pending : MATCH_STATES.matched,
@@ -468,8 +470,12 @@ export class MusicRepository {
                 genres = CASE WHEN genres = '[]' THEN @genres ELSE genres END,
                 cover_ref = CASE WHEN cover_source IS NULL THEN @coverRef ELSE cover_ref END,
                 cover_source = COALESCE(cover_source, @coverSource),
-                replaygain_gain = COALESCE(replaygain_gain, @gain),
-                replaygain_peak = COALESCE(replaygain_peak, @peak)
+                replaygain_gain = CASE WHEN replaygain_source IS NOT @tags AND @gain IS NOT NULL
+                                       THEN @gain ELSE replaygain_gain END,
+                replaygain_peak = CASE WHEN replaygain_source IS NOT @tags AND @gain IS NOT NULL
+                                       THEN @peak ELSE COALESCE(replaygain_peak, @peak) END,
+                replaygain_source = CASE WHEN @gain IS NOT NULL THEN @tags
+                                         ELSE replaygain_source END
           WHERE id = @id`,
       )
       .run({
@@ -484,6 +490,7 @@ export class MusicRepository {
         coverRef: cover?.ref ?? null,
         gain: tags.replayGain.albumGain,
         peak: tags.replayGain.albumPeak,
+        tags: REPLAYGAIN_SOURCES.tags,
         matched: MATCH_STATES.matched,
         manual: MATCH_STATES.manual,
         at: new Date().toISOString(),
@@ -534,9 +541,10 @@ export class MusicRepository {
       this.db
         .prepare(
           `INSERT OR REPLACE INTO tracks (media_id, album_id, disc, number, title, mbid, isrc, sample_rate,
-                                          bit_depth, is_lossless, replaygain_gain, replaygain_peak)
+                                          bit_depth, is_lossless, replaygain_gain, replaygain_peak,
+                                          replaygain_source)
            VALUES (@mediaId, @albumId, @disc, @number, @title, @mbid, @isrc, @sampleRate,
-                   @bitDepth, @isLossless, @gain, @peak)`,
+                   @bitDepth, @isLossless, @gain, @peak, @source)`,
         )
         .run({
           mediaId,
@@ -551,6 +559,7 @@ export class MusicRepository {
           isLossless: format.isLossless ? 1 : 0,
           gain: tags.replayGain.trackGain,
           peak: tags.replayGain.trackPeak,
+          source: tags.replayGain.trackGain === null ? null : REPLAYGAIN_SOURCES.tags,
         })
       this.credit({ credits: CREDITS.track, ownerId: mediaId, artists: filing.trackArtists })
       this.prune()

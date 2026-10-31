@@ -88,6 +88,8 @@ import { Playlists } from '@/music/playlists'
 import { PlaylistsController } from '@/music/playlistsController'
 import { TrackLyrics } from '@/music/trackLyrics'
 import { TranscodeCache } from '@/music/transcodeCache'
+import { LoudnessJobs } from '@/music/loudnessJobs'
+import { LoudnessScan } from '@/music/loudnessScan'
 import { AudioReader } from '@/music/audioReader'
 import {
   AlbumsController,
@@ -252,6 +254,8 @@ export class AppModule {
         Playlists,
         TrackLyrics,
         TranscodeCache,
+        LoudnessJobs,
+        LoudnessScan,
         AlbumMatching,
         MatchFiles,
         AiDecisions,

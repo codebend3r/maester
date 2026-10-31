@@ -9,6 +9,7 @@ import { readServerConfig } from '@/config'
 import { adoptLegacyDatabase, DatabaseService, MIGRATIONS } from '@/db/database'
 import { VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
 import { PLAY_KINDS } from '@/media/watchedRepository'
+import { LOUDNESS_STATES, REPLAYGAIN_SOURCES } from '@/music/loudness'
 
 /** A kind of play the `plays.kind` CHECK refuses. */
 const UNKNOWN_PLAY_KIND = 'bogus'
@@ -557,6 +558,45 @@ describe('migrations', () => {
     ])
     expect(database.db.prepare('SELECT source FROM item_images').all()).toEqual([
       { source: 'tmdb' },
+    ])
+    database.onModuleDestroy()
+  })
+
+  it('waits a version-44 database’s tracks for the loudness scan, naming the gains their tags gave', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 44).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 44')
+    before.exec(
+      `INSERT INTO libraries (id, name, created_at, kind) VALUES (1, 'Music', '2026-01-01', 'music');
+       INSERT INTO media (id, library_id, path, file_name, folder, title, container, size, mtime_ms, added_at)
+       VALUES (1, 1, '/m/a.flac', 'a.flac', '/m', 'a', 'flac', 1, 1, '2026-01-01'),
+              (2, 1, '/m/b.flac', 'b.flac', '/m', 'b', 'flac', 1, 1, '2026-01-01');
+       INSERT INTO albums (id, library_id, album_key, title, sort_title, replaygain_gain, added_at)
+       VALUES (1, 1, 'a', 'A', 'A', -7.5, '2026-01-01'), (2, 1, 'b', 'B', 'B', NULL, '2026-01-01');
+       INSERT INTO tracks (media_id, album_id, title, replaygain_gain) VALUES (1, 1, 'a', -6.5), (2, 2, 'b', NULL);`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.pragma('user_version', { simple: true })).toBe(45)
+    expect(MIGRATIONS).toHaveLength(45)
+    expect(
+      database.db
+        .prepare(
+          'SELECT loudness_state, loudness_version, replaygain_source FROM tracks ORDER BY media_id',
+        )
+        .all(),
+    ).toEqual([
+      {
+        loudness_state: LOUDNESS_STATES.pending,
+        loudness_version: 0,
+        replaygain_source: REPLAYGAIN_SOURCES.tags,
+      },
+      { loudness_state: LOUDNESS_STATES.pending, loudness_version: 0, replaygain_source: null },
+    ])
+    expect(database.db.prepare('SELECT replaygain_source FROM albums ORDER BY id').all()).toEqual([
+      { replaygain_source: REPLAYGAIN_SOURCES.tags },
+      { replaygain_source: null },
     ])
     database.onModuleDestroy()
   })

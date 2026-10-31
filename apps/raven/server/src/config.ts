@@ -11,7 +11,10 @@ const AI_MATCH_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const sati
 >
 
 /** The environment the music features read. */
-export const MUSIC_ENV = { transcodeCacheGb: 'TRANSCODE_CACHE_GB' } as const
+export const MUSIC_ENV = {
+  transcodeCacheGb: 'TRANSCODE_CACHE_GB',
+  loudnessScan: 'LOUDNESS_SCAN',
+} as const
 
 const GIB = 1024 ** 3
 
@@ -87,6 +90,8 @@ export type ServerConfig = ListenConfig & {
   aiDailyLimit: number
   /** How many bytes of AAC transcodes of tracks are kept; the least recently served go first past it. */
   transcodeCacheBytes: number
+  /** Whether the tracks whose tags carry no ReplayGain are measured in the background for their loudness. */
+  loudnessScan: boolean
   /** The PIN that opens locked libraries; null leaves them shut and none can be locked. Never logged or sent to a client. */
   libraryPin: string | null
   /** The password that turns the admin lock off; null, or too weak, keeps it on. Never logged or sent to a client. */
@@ -144,6 +149,7 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   aiMatchEffort: aiEffortFrom(env.AI_MATCH_EFFORT),
   aiDailyLimit: Math.max(1, wholeNumber(env.AI_DAILY_LIMIT) ?? 200),
   transcodeCacheBytes: (wholeNumber(env[MUSIC_ENV.transcodeCacheGb]) ?? 20) * GIB,
+  loudnessScan: flag({ value: env[MUSIC_ENV.loudnessScan], fallback: true }),
   libraryPin: env.LIBRARY_PIN?.trim() || null,
   adminPassword: env.ADMIN_PASSWORD?.trim() || null,
   mediaPlane: readMediaPlaneConfig(env),
