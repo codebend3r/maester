@@ -10,7 +10,7 @@ import {
   CALL_TIMEOUT_MS,
   MAX_IN_FLIGHT,
   MAX_REPLY_CHARS,
-  MAX_SAGAS_REPLY_CHARS,
+  MAX_LONG_REPLY_CHARS,
   WRITE_RESERVE,
   createServerCalls,
   fetchThrough,
@@ -147,7 +147,7 @@ describe('the call values', () => {
   it('has the timeout, the reply cap, the in-flight cap and the messages', () => {
     expect(CALL_TIMEOUT_MS).toBe(10_000)
     expect(MAX_REPLY_CHARS).toBe(1_048_576)
-    expect(MAX_SAGAS_REPLY_CHARS).toBe(8 * 1_048_576)
+    expect(MAX_LONG_REPLY_CHARS).toBe(8 * 1_048_576)
     expect(MAX_IN_FLIGHT).toBe(6)
     expect(WRITE_RESERVE).toBe(2)
     expect(CALL_MESSAGES.offList).toBe('Raven does not make that call.')
@@ -232,7 +232,7 @@ describe('fetchThrough', () => {
       body: null,
       timeoutMs: 1000,
     })
-    expect(await answer.text({ maxChars: MAX_SAGAS_REPLY_CHARS })).toHaveLength(MAX_REPLY_CHARS * 2)
+    expect(await answer.text({ maxChars: MAX_LONG_REPLY_CHARS })).toHaveLength(MAX_REPLY_CHARS * 2)
   })
 
   it('reads a reply with no body as empty text', async () => {
@@ -500,8 +500,12 @@ describe('createServerCalls.call', () => {
         warn: () => undefined,
       })
 
-    it('reads getSagas up to MAX_SAGAS_REPLY_CHARS and every other call up to MAX_REPLY_CHARS', () => {
-      expect(replyCapFor({ name: CALL_NAMES.getSagas, libraryId: 3 })).toBe(MAX_SAGAS_REPLY_CHARS)
+    it('reads getSagas and getPlaylist up to MAX_LONG_REPLY_CHARS and every other call up to MAX_REPLY_CHARS', () => {
+      expect(replyCapFor({ name: CALL_NAMES.getSagas, libraryId: 3 })).toBe(MAX_LONG_REPLY_CHARS)
+      expect(replyCapFor({ name: CALL_NAMES.getPlaylist, playlistId: 3 })).toBe(
+        MAX_LONG_REPLY_CHARS,
+      )
+      expect(replyCapFor({ name: CALL_NAMES.getAlbum, albumId: 3 })).toBe(MAX_REPLY_CHARS)
       expect(replyCapFor({ name: CALL_NAMES.getLibrary, libraryId: 3 })).toBe(MAX_REPLY_CHARS)
       expect(replyCapFor({ name: CALL_NAMES.getItem, itemId: 3 })).toBe(MAX_REPLY_CHARS)
       expect(replyCapFor({ name: CALL_NAMES.getMediaOrigins })).toBe(MAX_REPLY_CHARS)
@@ -527,9 +531,9 @@ describe('createServerCalls.call', () => {
       ).toEqual({ ok: false, message: CALL_MESSAGES.tooBig('raven.example') })
     })
 
-    it('answers tooBig for a getSagas reply past MAX_SAGAS_REPLY_CHARS', async () => {
+    it('answers tooBig for a getSagas reply past MAX_LONG_REPLY_CHARS', async () => {
       const { calls } = setup({
-        answer: () => reply({ text: 'x'.repeat(MAX_SAGAS_REPLY_CHARS + 1) }),
+        answer: () => reply({ text: 'x'.repeat(MAX_LONG_REPLY_CHARS + 1) }),
       })
       expect(
         await calls.call({

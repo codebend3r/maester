@@ -5,7 +5,8 @@ type DeleteQuestionProps = { label: string; bytes: number }
 type ActionLabelProps = { action: string; label: string }
 
 export const DOWNLOADS_PAGE_COPY = {
-  empty: 'Nothing downloaded yet. Choose Download on a movie, show or saga to keep it here.',
+  empty:
+    'Nothing downloaded yet. Choose Download on a movie, show, saga, album or playlist to keep it here.',
   pauseAll: 'Pause all',
   resumeAll: 'Resume all',
   showInFinder: 'Show in Finder',

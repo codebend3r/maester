@@ -833,10 +833,15 @@ describe('the download guards', () => {
   it('accepts a group and refuses one of an unknown kind or with no key', () => {
     const group = { kind: 'season', key: 'show:4', title: 'Severance', order: 20004 }
     expect(isDownloadGroup(group)).toBe(true)
-    expect(isDownloadGroup({ kind: 'album', key: 'album:12', title: 'Ok', order: 1 })).toBe(true)
-    expect(isDownloadGroup({ kind: 'playlist', key: 'playlist:3', title: 'Mix', order: 0 })).toBe(
-      true,
-    )
+    const cover = { albumId: 12, coverVersion: 'c1' }
+    const album = { kind: 'album', key: 'album:12', title: 'Ok', order: 1, cover }
+    expect(isDownloadGroup(album)).toBe(true)
+    expect(
+      isDownloadGroup({ kind: 'playlist', key: 'playlist:3', title: 'Mix', order: 0, cover: null }),
+    ).toBe(true)
+    expect(isDownloadGroup({ ...album, cover: { albumId: 12, coverVersion: null } })).toBe(true)
+    expect(isDownloadGroup({ kind: 'album', key: 'album:12', title: 'Ok', order: 1 })).toBe(false)
+    expect(isDownloadGroup({ ...album, cover: { albumId: '12', coverVersion: null } })).toBe(false)
     expect(isDownloadGroup({ ...group, kind: 'track' })).toBe(false)
     expect(isDownloadGroup({ kind: 'season', title: 'Severance', order: 20004 })).toBe(false)
     expect(isDownloadGroup({ ...group, key: 4 })).toBe(false)

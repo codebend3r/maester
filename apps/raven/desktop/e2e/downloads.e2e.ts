@@ -47,7 +47,7 @@ import {
   type DownloadsState,
   isDownloadsState,
 } from '@/main/downloads/downloadState'
-import { entryDirFor, partPathFor, videoPathFor } from '@/main/downloads/space'
+import { entryDirFor, partPathFor, mediaPathFor } from '@/main/downloads/space'
 
 // Past the file's first chunk, so a pause finds bytes on disk to resume from.
 const THROTTLE_BYTE = 262_144
@@ -327,7 +327,7 @@ test.describe.serial('downloading from the web pages, and playing offline', () =
         size,
       },
     ])
-    const video = videoPathFor({
+    const video = mediaPathFor({
       userData,
       serverId,
       mediaId: FIXTURE_MEDIA.first,
@@ -559,7 +559,7 @@ test('deletes at launch a download watched eleven minutes ago, and says so', asy
     await mkdir(folder, { recursive: true })
     await copyFile(
       fixtureClips.tracks,
-      videoPathFor({ userData, serverId, mediaId: FIXTURE_MEDIA.first, container }),
+      mediaPathFor({ userData, serverId, mediaId: FIXTURE_MEDIA.first, container }),
     )
     await Promise.all([
       writeFile(join(userData, CONFIG_FILE), JSON.stringify(config)),

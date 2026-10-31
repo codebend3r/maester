@@ -14,7 +14,7 @@ import {
   type DownloadsState,
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
-import { downloadsDirFor, sidecarPathFor, videoPathFor } from '@/main/downloads/space'
+import { downloadsDirFor, sidecarPathFor, mediaPathFor } from '@/main/downloads/space'
 import type { GrantedFile, Grants } from '@/main/grants'
 import { errorText } from '@/main/log/errorText'
 import type { LocalSidecar } from '@/main/player/loadTarget'
@@ -216,13 +216,13 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
    */
   const playing: { page: Slot; engine: Slot } = { page: NO_SLOT, engine: NO_SLOT }
 
-  const videoPathOf = ({ serverId, mediaId, container }: DownloadEntry): string =>
-    videoPathFor({ userData: deps.userData, serverId, mediaId, container })
+  const mediaPathOf = ({ serverId, mediaId, container }: DownloadEntry): string =>
+    mediaPathFor({ userData: deps.userData, serverId, mediaId, container })
 
   const entryAt = (path: string): DownloadEntry | null =>
-    store.read().entries.find((entry) => videoPathOf(entry) === path) ?? null
+    store.read().entries.find((entry) => mediaPathOf(entry) === path) ?? null
 
-  /** The download a granted file is the video of; one granted outside `open` is found by its path. */
+  /** The download behind a granted file; one granted outside `open` is found by its path. */
   const entryOfFile = (fileId: string): DownloadEntry | null => {
     const known = downloadIdByFile.get(fileId)
     if (known !== undefined) {
@@ -242,7 +242,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
 
   /** Grants a download's video and remembers whose it is; null when the file has gone. */
   const grantVideo = async (entry: DownloadEntry): Promise<string | null> => {
-    const result = await grants.grant(videoPathOf(entry))
+    const result = await grants.grant(mediaPathOf(entry))
     if (!result.ok) return null
     downloadIdByFile.set(result.file.fileId, entry.downloadId)
     return result.file.fileId
@@ -421,7 +421,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     const entry = entryById(store.read(), { downloadId })
     if (entry === null) return false
     const state = deps.state.read()
-    const path = videoPathOf(entry)
+    const path = mediaPathOf(entry)
     // The spot's own facts stand in until the file is read, so a launch need not wait for it.
     const file = factsById.get(downloadId) ?? state.resume.find((spot) => spot.path === path)
     if (file === undefined || resumeFor({ state, file }) === 0) return false
@@ -436,7 +436,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
 
   /** Reads a ready download's file for its share watched; a file that cannot be read shows none. */
   const readFacts = async (entry: DownloadEntry): Promise<boolean> => {
-    const path = videoPathOf(entry)
+    const path = mediaPathOf(entry)
     const facts = await readFileFacts({ stat: deps.stat, path })
     // A download removed while its file was read keeps nothing.
     if (facts === null || entryById(store.read(), { downloadId: entry.downloadId }) === null) {
@@ -459,7 +459,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
 
   const forget: DownloadPlayback['forget'] = (entries) => {
     const removed = new Set(entries.map(({ downloadId }) => downloadId))
-    deps.state.update((state) => forgetVideos(state, { paths: entries.map(videoPathOf) }))
+    deps.state.update((state) => forgetVideos(state, { paths: entries.map(mediaPathOf) }))
     removed.forEach((downloadId) => factsById.delete(downloadId))
     const files = [...downloadIdByFile].filter(([, downloadId]) => removed.has(downloadId))
     files.forEach(([fileId]) => {

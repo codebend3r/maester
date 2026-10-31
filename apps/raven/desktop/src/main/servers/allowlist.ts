@@ -20,6 +20,8 @@ export const CALL_NAMES = {
   getItem: 'getItem',
   getLibrary: 'getLibrary',
   getSagas: 'getSagas',
+  getAlbum: 'getAlbum',
+  getPlaylist: 'getPlaylist',
   getMediaOrigins: 'getMediaOrigins',
   getAccountTicket: 'getAccountTicket',
 } as const
@@ -37,6 +39,8 @@ export type AllowedCall =
   | { name: typeof CALL_NAMES.getItem; itemId: number }
   | { name: typeof CALL_NAMES.getLibrary; libraryId: number }
   | { name: typeof CALL_NAMES.getSagas; libraryId: number }
+  | { name: typeof CALL_NAMES.getAlbum; albumId: number }
+  | { name: typeof CALL_NAMES.getPlaylist; playlistId: number }
   | { name: typeof CALL_NAMES.getMediaOrigins }
   | { name: typeof CALL_NAMES.getAccountTicket; mediaId: number }
 
@@ -155,6 +159,18 @@ const ROUTES: readonly Route[] = [
   },
   {
     kind: ROUTE_KINDS.numbered,
+    method: SERVER_METHODS.get,
+    pattern: /^\/api\/albums\/([1-9]\d{0,15})$/u,
+    read: ({ id, body }) => bare({ name: CALL_NAMES.getAlbum, albumId: id })({ body }),
+  },
+  {
+    kind: ROUTE_KINDS.numbered,
+    method: SERVER_METHODS.get,
+    pattern: /^\/api\/playlists\/([1-9]\d{0,15})$/u,
+    read: ({ id, body }) => bare({ name: CALL_NAMES.getPlaylist, playlistId: id })({ body }),
+  },
+  {
+    kind: ROUTE_KINDS.numbered,
     method: SERVER_METHODS.post,
     pattern: new RegExp(`^${withId({ path: AUTH_PATHS.ticket, id: '([1-9]\\d{0,15})' })}$`, 'u'),
     read: ({ id, body }) => bare({ name: CALL_NAMES.getAccountTicket, mediaId: id })({ body }),
@@ -245,6 +261,10 @@ export const requestFor = (
         path: `/api/libraries/${call.libraryId}/sagas`,
         body: null,
       }
+    case CALL_NAMES.getAlbum:
+      return { method: SERVER_METHODS.get, path: `/api/albums/${call.albumId}`, body: null }
+    case CALL_NAMES.getPlaylist:
+      return { method: SERVER_METHODS.get, path: `/api/playlists/${call.playlistId}`, body: null }
     case CALL_NAMES.getMediaOrigins:
       return { method: SERVER_METHODS.get, path: API_PATHS.mediaOrigins, body: null }
     case CALL_NAMES.getAccountTicket:
@@ -271,6 +291,8 @@ export const isWrite = (call: AllowedCall): boolean => {
     case CALL_NAMES.getItem:
     case CALL_NAMES.getLibrary:
     case CALL_NAMES.getSagas:
+    case CALL_NAMES.getAlbum:
+    case CALL_NAMES.getPlaylist:
     case CALL_NAMES.getMediaOrigins:
     case CALL_NAMES.getAccountTicket:
       return false

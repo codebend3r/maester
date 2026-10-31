@@ -92,6 +92,59 @@ describe('DownloadsPage', () => {
     ).toBeInTheDocument()
   })
 
+  it('heads an album with its cover, its title and how many of its tracks are here', async () => {
+    const tracks = Array.from({ length: 12 }, (_, index) =>
+      viewOf({
+        downloadId: `0a000000-0000-4000-8000-0000000001${String(index).padStart(2, '0')}`,
+        label: `Track ${index + 1}`,
+        group: {
+          kind: DOWNLOAD_KINDS.album,
+          key: 'album:7',
+          title: 'OK Computer',
+          order: index,
+          cover: { albumId: 7, coverVersion: 'cover-v1' },
+        },
+        status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+      }),
+    )
+    renderPage(downloadsMain({ downloads: tracks.toReversed() }))
+    const album = await screen.findByRole('region', { name: 'OK Computer' })
+    expect(within(album).getByRole('heading', { name: 'OK Computer' })).toBeInTheDocument()
+    expect(within(album).getByText('12 tracks')).toBeInTheDocument()
+    expect(album.querySelector('img')?.getAttribute('src')).toBe(
+      api.albumCoverUrl({ albumId: 7, coverVersion: 'cover-v1' }),
+    )
+    expect(
+      within(album)
+        .getAllByRole('listitem')
+        .map((row) => row.querySelector('span')?.textContent),
+    ).toEqual(tracks.map(({ label }) => label))
+  })
+
+  it("heads a playlist of one track with its first track's album cover", async () => {
+    renderPage(
+      downloadsMain({
+        downloads: [
+          viewOf({
+            label: 'Late night',
+            group: {
+              kind: DOWNLOAD_KINDS.playlist,
+              key: 'playlist:5',
+              title: 'Late night',
+              order: 0,
+              cover: { albumId: 9, coverVersion: 'm1' },
+            },
+          }),
+        ],
+      }),
+    )
+    const playlist = await screen.findByRole('region', { name: 'Late night' })
+    expect(within(playlist).getByText('1 track')).toBeInTheDocument()
+    expect(playlist.querySelector('img')?.getAttribute('src')).toBe(
+      api.albumCoverUrl({ albumId: 9, coverVersion: 'm1' }),
+    )
+  })
+
   it('pauses, resumes and retries a download, and sets it to delete once watched', async () => {
     const client = downloadsMain({
       downloads: [

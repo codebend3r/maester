@@ -92,7 +92,7 @@ export const SERVER_METHODS = {
   post: HTTP_METHODS.post,
 } as const
 
-/** A container becomes `video.<container>` on disk, so only a short lowercase name passes. */
+/** A container becomes `video.<container>` or `media.<container>` on disk, so only a short lowercase name passes. */
 export const isContainerName = matching(/^[a-z0-9]{1,8}$/u)
 
 /** A sidecar's track id becomes `subtitles/<trackId>.vtt` on disk, so only the server's `external-<n>` passes. */
@@ -112,18 +112,36 @@ export const isDownloadKind = oneOf(Object.values(DOWNLOAD_KINDS))
 
 export type DownloadKind = Infer<typeof isDownloadKind>
 
+const GROUP_FIELDS = { key: isString, title: isString, order: isNumber }
+
+/** The album cover a music group shows: an album's own, or a playlist's first track's album's. */
+const isDownloadCover = object({ albumId: isNumber, coverVersion: nullable(isString) })
+
 /**
  * Where a download sits in its group. `key` names the group on its server: `show:<itemId>` for an
  * episode, season or show, `saga:<libraryId>:<tmdbId>`, `movie:<mediaId>`, `album:<albumId>` or
- * `playlist:<playlistId>`. `order` is the play order, a season times 10000 plus the episode, or a
- * saga's index.
+ * `playlist:<playlistId>`. `order` is the play order, a season times 10000 plus the episode, a
+ * saga's index, or a track's place on its album or playlist. A music group carries its `cover`,
+ * null for a playlist with no tracks; a video group has none, so a `downloads.json` written before
+ * music reads as it is.
  */
-export const isDownloadGroup = object({
-  kind: isDownloadKind,
-  key: isString,
-  title: isString,
-  order: isNumber,
-})
+export const isDownloadGroup = union(
+  object({
+    kind: oneOf([
+      DOWNLOAD_KINDS.movie,
+      DOWNLOAD_KINDS.episode,
+      DOWNLOAD_KINDS.season,
+      DOWNLOAD_KINDS.show,
+      DOWNLOAD_KINDS.saga,
+    ]),
+    ...GROUP_FIELDS,
+  }),
+  object({
+    kind: oneOf([DOWNLOAD_KINDS.album, DOWNLOAD_KINDS.playlist]),
+    ...GROUP_FIELDS,
+    cover: nullable(isDownloadCover),
+  }),
+)
 
 export type DownloadGroup = Infer<typeof isDownloadGroup>
 

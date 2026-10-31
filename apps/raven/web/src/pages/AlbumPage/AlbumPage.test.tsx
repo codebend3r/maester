@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { type AlbumDetails, ApiError } from '@raven/core'
-import { AUDIO_STATES, useAudioQueue } from '@raven/ui/headless'
+import { AUDIO_STATES, useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { ravenPlayer } from '@/lib/ravenPlayer'
 import { AlbumPage } from '@/pages/AlbumPage/AlbumPage'
 import { library } from '@/test/fixtures'
 import {
@@ -134,5 +135,20 @@ describe('AlbumPage', () => {
     spyOn(api, 'getAlbum').mockRejectedValue(new ApiError({ status: 404, message: 'No album 7' }))
     renderPage()
     expect(await screen.findByText(/album/i)).toBeTruthy()
+  })
+
+  it('hands the album to Raven to download', async () => {
+    const handoff = spyOn(ravenPlayer, 'open').mockImplementation(() => {})
+    usePlayerPrefs.setState({ opensInRavenPlayer: true })
+    try {
+      renderPage()
+      fireEvent.click(await screen.findByRole('button', { name: 'Download to Raven' }))
+      expect(handoff).toHaveBeenCalledWith(
+        `raven://download?server=${encodeURIComponent(window.location.origin)}&album=7`,
+      )
+    } finally {
+      cleanup()
+      usePlayerPrefs.setState({ opensInRavenPlayer: false })
+    }
   })
 })

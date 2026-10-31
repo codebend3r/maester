@@ -7,9 +7,11 @@ import {
   type DownloadTarget,
   episodeCode,
   type Guard,
+  isAlbumDetails,
   isItemDetails,
   isLibrary,
   isMediaItem,
+  isPlaylistDetails,
   isSagaList,
   ITEM_TYPES,
   type ItemDetails,
@@ -18,6 +20,7 @@ import {
   LOCKED_STATUS,
   type MediaItem,
   mediaLabel,
+  type Track,
 } from '@raven/core'
 import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
@@ -63,13 +66,10 @@ const LOCKED_MESSAGE = (name: string): string => `${name} keeps that behind its 
 type Failure = Extract<Expansion, { ok: false }>
 type Read<T> = { ok: true; value: T } | { ok: false; failure: Failure }
 type Entry = { media: MediaItem; label: string; order: number }
-type Draft = {
-  kind: DownloadKind
-  title: string
-  groupTitle: string
-  groupKey: string
-  entries: Entry[]
-}
+/** A group before each file takes its place in it. */
+type UnorderedGroup<G = DownloadGroup> = G extends DownloadGroup ? Omit<G, 'order'> : never
+type Draft = { title: string; group: UnorderedGroup; entries: Entry[] }
+type MusicGroup = Extract<UnorderedGroup, { cover: unknown }>
 type Calls = Pick<ServerCalls, 'call'>
 type Server = { calls: Calls; serverId: string; serverName: string }
 
@@ -176,18 +176,18 @@ const draftOfMedia = (media: MediaItem): Draft => {
   if (item?.type !== ITEM_TYPES.episode) {
     const title = mediaLabel(media)
     return {
-      kind: DOWNLOAD_KINDS.movie,
       title,
-      groupTitle: title,
-      groupKey: movieGroupKey(media),
+      group: { kind: DOWNLOAD_KINDS.movie, key: movieGroupKey(media), title },
       entries: [{ media, label: title, order: 0 }],
     }
   }
   return {
-    kind: DOWNLOAD_KINDS.episode,
     title: mediaLabel(media),
-    groupTitle: item.show?.title ?? item.title,
-    groupKey: showGroupKey(item),
+    group: {
+      kind: DOWNLOAD_KINDS.episode,
+      key: showGroupKey(item),
+      title: item.show?.title ?? item.title,
+    },
     entries: [{ media, label: episodeLabel(item), order: episodeOrder(item) }],
   }
 }
@@ -219,10 +219,8 @@ const draftOfShow = async ({ server, details }: DraftOfShowProps): Promise<Read<
   return {
     ok: true,
     value: {
-      kind: DOWNLOAD_KINDS.show,
       title: details.title,
-      groupTitle: details.title,
-      groupKey: showGroupKey(details),
+      group: { kind: DOWNLOAD_KINDS.show, key: showGroupKey(details), title: details.title },
       entries: entries.value,
     },
   }
@@ -238,12 +236,16 @@ const draftOfItem = async ({ server, details }: DraftOfItemProps): Promise<Read<
   switch (details.type) {
     case ITEM_TYPES.movie: {
       if (first === undefined) return goneFor(server)
+      const draft = draftOfMedia(first)
       return {
         ok: true,
         value: {
-          ...draftOfMedia(first),
-          kind: DOWNLOAD_KINDS.movie,
-          groupKey: movieGroupKey(first),
+          ...draft,
+          group: {
+            kind: DOWNLOAD_KINDS.movie,
+            key: movieGroupKey(first),
+            title: draft.group.title,
+          },
         },
       }
     }
@@ -252,10 +254,12 @@ const draftOfItem = async ({ server, details }: DraftOfItemProps): Promise<Read<
       return {
         ok: true,
         value: {
-          kind: DOWNLOAD_KINDS.episode,
           title: itemLabel(details),
-          groupTitle: details.show?.title ?? details.title,
-          groupKey: showGroupKey(details),
+          group: {
+            kind: DOWNLOAD_KINDS.episode,
+            key: showGroupKey(details),
+            title: details.show?.title ?? details.title,
+          },
           entries: [{ media: first, label: episodeLabel(details), order: episodeOrder(details) }],
         },
       }
@@ -264,10 +268,12 @@ const draftOfItem = async ({ server, details }: DraftOfItemProps): Promise<Read<
       return {
         ok: true,
         value: {
-          kind: DOWNLOAD_KINDS.season,
           title: itemLabel(details),
-          groupTitle: details.show?.title ?? details.title,
-          groupKey: showGroupKey(details),
+          group: {
+            kind: DOWNLOAD_KINDS.season,
+            key: showGroupKey(details),
+            title: details.show?.title ?? details.title,
+          },
           entries: episodesOf(details),
         },
       }
@@ -280,12 +286,88 @@ const draftOfItem = async ({ server, details }: DraftOfItemProps): Promise<Read<
   }
 }
 
+/** How many of a music group's files main reads at once, under `serverCalls`' six reads in flight. */
+const MEDIA_READS_AT_ONCE = 4
+
+type ReadMediaProps = { server: Server; mediaIds: readonly number[] }
+
+/** Each file a track is, in the order asked, a few at a time; the first refusal answers for all. */
+const readMedia = ({ server, mediaIds }: ReadMediaProps): Promise<Read<MediaItem[]>> =>
+  Array.from({ length: Math.ceil(mediaIds.length / MEDIA_READS_AT_ONCE) }, (_, index) =>
+    mediaIds.slice(index * MEDIA_READS_AT_ONCE, (index + 1) * MEDIA_READS_AT_ONCE),
+  ).reduce<Promise<Read<MediaItem[]>>>(
+    async (previous, batch) => {
+      const soFar = await previous
+      if (!soFar.ok) return soFar
+      const reads = await Promise.all(
+        batch.map((mediaId) =>
+          read({ ...server, call: { name: CALL_NAMES.getMedia, mediaId }, guard: isMediaItem }),
+        ),
+      )
+      return reads.reduce<Read<MediaItem[]>>((all, one) => {
+        if (!all.ok) return all
+        return one.ok ? { ok: true, value: [...all.value, one.value] } : one
+      }, soFar)
+    },
+    Promise.resolve({ ok: true, value: [] }),
+  )
+
+/** A playlist may hold a track twice; it is fetched once, in its first place. */
+const oncePerTrack = (tracks: readonly Track[]): Track[] =>
+  tracks.filter((track, index) => tracks.findIndex(({ id }) => id === track.id) === index)
+
+type DraftOfTracksProps = {
+  server: Server
+  group: MusicGroup
+  tracks: readonly Track[]
+  skip: (mediaId: number) => boolean
+}
+
+/**
+ * A track's `Track` names no size or position, so each one not already downloaded is read as a
+ * file. The cap counts every track, skipped or not, before any is read.
+ */
+const draftOfTracks = async ({
+  server,
+  group,
+  tracks,
+  skip,
+}: DraftOfTracksProps): Promise<Read<Draft>> => {
+  const unique = oncePerTrack(tracks)
+  if (unique.length > DOWNLOAD_MAX_FILES) {
+    return fail({ reason: EXPAND_REASONS.tooMany, message: EXPAND_MESSAGES.tooMany })
+  }
+  const wanted = unique.flatMap((track, order) => (skip(track.id) ? [] : [{ track, order }]))
+  const media = await readMedia({ server, mediaIds: wanted.map(({ track }) => track.id) })
+  if (!media.ok) return media
+  return {
+    ok: true,
+    value: {
+      title: group.title,
+      group,
+      entries: wanted.flatMap(({ track, order }, index) => {
+        const file = media.value[index]
+        return file === undefined ? [] : [{ media: file, label: track.title, order }]
+      }),
+    },
+  }
+}
+
+/** An album's tracks by disc, then by number, as its page lists them. */
+const inDiscOrder = (tracks: readonly Track[]): Track[] =>
+  tracks.toSorted(
+    (left, right) =>
+      left.disc - right.disc ||
+      (left.number ?? Number.MAX_SAFE_INTEGER) - (right.number ?? Number.MAX_SAFE_INTEGER),
+  )
+
 type DraftOfProps = {
   server: Server
   target: DownloadTarget
+  skip: (mediaId: number) => boolean
 }
 
-const draftOf = async ({ server, target }: DraftOfProps): Promise<Read<Draft>> => {
+const draftOf = async ({ server, target, skip }: DraftOfProps): Promise<Read<Draft>> => {
   switch (target.kind) {
     case DOWNLOAD_TARGET_KINDS.media: {
       const media = await read({
@@ -315,19 +397,57 @@ const draftOf = async ({ server, target }: DraftOfProps): Promise<Read<Draft>> =
       return {
         ok: true,
         value: {
-          kind: DOWNLOAD_KINDS.saga,
           title: saga.name,
-          groupTitle: saga.name,
-          groupKey: sagaGroupKey(target),
+          group: { kind: DOWNLOAD_KINDS.saga, key: sagaGroupKey(target), title: saga.name },
           entries: saga.media.map((media, order) => ({ media, label: mediaLabel(media), order })),
         },
       }
     }
-    // Task 12 expands these. The link parser (`shared/playLink.ts`) yields no album or playlist
-    // target yet, so no request reaches this branch.
-    case DOWNLOAD_TARGET_KINDS.album:
-    case DOWNLOAD_TARGET_KINDS.playlist:
-      return goneFor(server)
+    case DOWNLOAD_TARGET_KINDS.album: {
+      const details = await read({
+        ...server,
+        call: { name: CALL_NAMES.getAlbum, albumId: target.albumId },
+        guard: isAlbumDetails,
+      })
+      if (!details.ok) return details
+      const { album, tracks } = details.value
+      return draftOfTracks({
+        server,
+        skip,
+        tracks: inDiscOrder(tracks),
+        group: {
+          kind: DOWNLOAD_KINDS.album,
+          key: `album:${album.id}`,
+          title: album.title,
+          cover: { albumId: album.id, coverVersion: album.coverVersion },
+        },
+      })
+    }
+    case DOWNLOAD_TARGET_KINDS.playlist: {
+      // A locked library's tracks are left out of the playlist by the server, so none is asked for.
+      const details = await read({
+        ...server,
+        call: { name: CALL_NAMES.getPlaylist, playlistId: target.playlistId },
+        guard: isPlaylistDetails,
+      })
+      if (!details.ok) return details
+      const { playlist, tracks } = details.value
+      const [first] = tracks
+      return draftOfTracks({
+        server,
+        skip,
+        tracks,
+        group: {
+          kind: DOWNLOAD_KINDS.playlist,
+          key: `playlist:${playlist.id}`,
+          title: playlist.name,
+          cover:
+            first === undefined
+              ? null
+              : { albumId: first.albumId, coverVersion: first.album.coverVersion },
+        },
+      })
+    }
     default: {
       const unreachable: never = target
       return unreachable
@@ -375,9 +495,9 @@ export const expandTarget = async ({
   skip: (mediaId: number) => boolean
 }): Promise<Expansion> => {
   const server = { calls, serverId, serverName }
-  const draft = await draftOf({ server, target })
+  const draft = await draftOf({ server, target, skip })
   if (!draft.ok) return draft.failure
-  const { kind, title, groupTitle, groupKey } = draft.value
+  const { title, group } = draft.value
   const entries = oncePerFile(draft.value.entries)
   if (entries.length > DOWNLOAD_MAX_FILES) {
     return { ok: false, reason: EXPAND_REASONS.tooMany, message: EXPAND_MESSAGES.tooMany }
@@ -388,12 +508,12 @@ export const expandTarget = async ({
   if (!percents.ok) return percents.failure
   return {
     ok: true,
-    kind,
+    kind: group.kind,
     title,
     files: kept.map(({ media, label, order }) => ({
       media,
       label,
-      group: { kind, key: groupKey, title: groupTitle, order },
+      group: { ...group, order },
       watchedPercent: percents.value[media.libraryId],
     })),
   }

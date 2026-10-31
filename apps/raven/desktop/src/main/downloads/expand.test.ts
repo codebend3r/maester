@@ -16,15 +16,18 @@ import {
   EXPAND_REASONS,
 } from '@/main/downloads/expand'
 import {
+  albumDetails,
   details,
   episode,
   fakeCalls,
   keyOf,
   library,
   ok,
+  playlistDetails,
   season,
   show,
   summary,
+  track,
   type Reply,
 } from '@/main/test/serverFakes'
 import { CALL_NAMES } from '@/main/servers/allowlist'
@@ -57,6 +60,19 @@ const library1 = {
 const itemCall = (itemId: number): string => keyOf({ name: CALL_NAMES.getItem, itemId })
 const mediaCall = (mediaId: number): string => keyOf({ name: CALL_NAMES.getMedia, mediaId })
 const sagasCall = keyOf({ name: CALL_NAMES.getSagas, libraryId: 1 })
+const albumCall = keyOf({ name: CALL_NAMES.getAlbum, albumId: 7 })
+const playlistCall = keyOf({ name: CALL_NAMES.getPlaylist, playlistId: 5 })
+const library3 = keyOf({ name: CALL_NAMES.getLibrary, libraryId: 3 })
+
+/** Each track's file in music library 3, as `getMedia` answers it. */
+const trackFiles = (ids: number[]): Record<string, Reply> =>
+  Object.fromEntries([
+    [library3, ok(library({ id: 3, watchedPercent: 90 }))],
+    ...ids.map((id) => [
+      mediaCall(id),
+      ok(mediaItemFor({ id, libraryId: 3, title: `Track ${id}`, container: 'flac' })),
+    ]),
+  ])
 
 type RunProps = {
   replies: Record<string, Reply>
@@ -493,6 +509,143 @@ describe('expandTarget', () => {
     const result = failed(await expansion)
     expect(result.reason).toBe('tooMany')
     expect(result.message).toBe(EXPAND_MESSAGES.tooMany)
+  })
+
+  it('expands an album to one file per track in disc order, grouped under the album', async () => {
+    const tracks = [
+      track({ id: 203, title: 'Lucky', disc: 2, number: 1 }),
+      track({ id: 102, title: 'Paranoid Android', disc: 1, number: 2 }),
+      track({ id: 101, title: 'Airbag', disc: 1, number: 1 }),
+    ]
+    const { expansion, log } = run({
+      replies: { [albumCall]: ok(albumDetails(tracks)), ...trackFiles([101, 102, 203]) },
+      target: { kind: 'album', albumId: 7 },
+    })
+    const result = succeeded(await expansion)
+    expect(result.kind).toBe('album')
+    expect(result.title).toBe('OK Computer')
+    expect(result.files.map(({ media, label, group }) => ({ id: media.id, label, group }))).toEqual(
+      [
+        { id: 101, label: 'Airbag', order: 0 },
+        { id: 102, label: 'Paranoid Android', order: 1 },
+        { id: 203, label: 'Lucky', order: 2 },
+      ].map(({ id, label, order }) => ({
+        id,
+        label,
+        group: {
+          kind: 'album',
+          key: 'album:7',
+          title: 'OK Computer',
+          order,
+          cover: { albumId: 7, coverVersion: 'cover-v1' },
+        },
+      })),
+    )
+    expect(result.files.every(({ watchedPercent }) => watchedPercent === 90)).toBe(true)
+    expect(log[0]).toBe(albumCall)
+  })
+
+  it('expands a playlist in its order, with no file for a track it leaves out and one for a track it holds twice', async () => {
+    // Track 102 is in a locked library, so the server's playlist leaves it out.
+    const tracks = [
+      track({
+        id: 301,
+        albumId: 9,
+        title: 'Teardrop',
+        album: { title: 'Mezzanine', coverVersion: 'm1' },
+      }),
+      track({ id: 101, title: 'Airbag' }),
+      track({
+        id: 301,
+        albumId: 9,
+        title: 'Teardrop',
+        album: { title: 'Mezzanine', coverVersion: 'm1' },
+      }),
+    ]
+    const { expansion, log } = run({
+      replies: { [playlistCall]: ok(playlistDetails(tracks)), ...trackFiles([101, 301]) },
+      target: { kind: 'playlist', playlistId: 5 },
+    })
+    const result = succeeded(await expansion)
+    expect(result.kind).toBe('playlist')
+    expect(result.title).toBe('Late night')
+    expect(result.files.map(({ media, group }) => [media.id, group])).toEqual([
+      [
+        301,
+        {
+          kind: 'playlist',
+          key: 'playlist:5',
+          title: 'Late night',
+          order: 0,
+          cover: { albumId: 9, coverVersion: 'm1' },
+        },
+      ],
+      [
+        101,
+        {
+          kind: 'playlist',
+          key: 'playlist:5',
+          title: 'Late night',
+          order: 1,
+          cover: { albumId: 9, coverVersion: 'm1' },
+        },
+      ],
+    ])
+    expect(log).not.toContain(mediaCall(102))
+    expect(log.filter((key) => key === mediaCall(301))).toHaveLength(1)
+  })
+
+  it('reads no file for a track already downloaded', async () => {
+    const tracks = [track({ id: 101 }), track({ id: 102, number: 2 })]
+    const { expansion, log } = run({
+      replies: { [albumCall]: ok(albumDetails(tracks)), ...trackFiles([101, 102]) },
+      target: { kind: 'album', albumId: 7 },
+      skip: (mediaId) => mediaId === 101,
+    })
+    const result = succeeded(await expansion)
+    expect(result.files.map(({ media, group }) => [media.id, group.order])).toEqual([[102, 1]])
+    expect(log).not.toContain(mediaCall(101))
+  })
+
+  it('gives an empty playlist no cover and no files', async () => {
+    const { expansion } = run({
+      replies: { [playlistCall]: ok(playlistDetails([])) },
+      target: { kind: 'playlist', playlistId: 5 },
+    })
+    expect(succeeded(await expansion).files).toEqual([])
+  })
+
+  it('answers tooMany for a playlist past the cap before reading any file', async () => {
+    const tracks = Array.from({ length: DOWNLOAD_MAX_FILES + 1 }, (_, index) =>
+      track({ id: index + 1 }),
+    )
+    const { expansion, log } = run({
+      replies: { [playlistCall]: ok(playlistDetails(tracks)) },
+      target: { kind: 'playlist', playlistId: 5 },
+      skip: (mediaId) => mediaId > 1,
+    })
+    expect(failed(await expansion).reason).toBe('tooMany')
+    expect(log).toEqual([playlistCall])
+  })
+
+  it('answers with the refusal of a track file it cannot read', async () => {
+    const tracks = [track({ id: 101 }), track({ id: 102, number: 2 })]
+    const { expansion } = run({
+      replies: {
+        [albumCall]: ok(albumDetails(tracks)),
+        ...trackFiles([101]),
+        [mediaCall(102)]: { status: LOCKED_STATUS, body: '' },
+      },
+      target: { kind: 'album', albumId: 7 },
+    })
+    expect(failed(await expansion).reason).toBe('locked')
+  })
+
+  it('answers gone for an album or playlist the server does not have', async () => {
+    const album = run({ replies: {}, target: { kind: 'album', albumId: 7 } })
+    expect(failed(await album.expansion).reason).toBe('gone')
+    const playlist = run({ replies: {}, target: { kind: 'playlist', playlistId: 5 } })
+    expect(failed(await playlist.expansion).reason).toBe('gone')
   })
 
   it('answers tooMany for 501 episodes and allows 500', async () => {
