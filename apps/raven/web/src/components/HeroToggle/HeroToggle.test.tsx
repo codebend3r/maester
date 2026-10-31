@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { act, cleanup, screen, waitFor } from '@testing-library/react'
+import { QueryClient } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import type { HeroPicks } from '@raven/core'
 import { HeroToggle } from '@/components/HeroToggle/HeroToggle'
@@ -10,13 +11,20 @@ import { renderWithProviders } from '@/test/render'
 describe('HeroToggle', () => {
   const spies = { picks: spyOn(api, 'getHeroPicks'), set: spyOn(api, 'setHeroPick') }
 
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
   const open = (picks: HeroPicks) => {
     spies.picks.mockImplementation(async () => picks)
-    renderWithProviders({ ui: <HeroToggle itemId={7} /> })
+    renderWithProviders({ ui: <HeroToggle itemId={7} />, client })
   }
+
+  // The settle step refetches after the server answers; a test that ends first
+  // lets that refetch redraw the switch outside act().
+  const untilRefetched = () => waitFor(() => expect(client.isFetching()).toBe(0))
 
   afterEach(() => {
     cleanup()
+    client.clear()
     spies.picks.mockReset()
     spies.set.mockReset()
   })
@@ -58,6 +66,7 @@ describe('HeroToggle', () => {
       'true',
     )
     await act(async () => answer.answer({ itemIds: [7], limit: 10 }))
+    await untilRefetched()
   })
 
   it('puts the switch back when the server refuses', async () => {
@@ -71,6 +80,7 @@ describe('HeroToggle', () => {
       'aria-pressed',
       'false',
     )
+    await untilRefetched()
   })
 
   it('holds a title back while the hero is full, but still lets one in it come out', async () => {

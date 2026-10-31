@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto'
+import { createHmac, scryptSync } from 'node:crypto'
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common'
 import { type AdminLock, SERVER_COOKIES } from '@raven/core'
 import { readCookie, sameSecret } from '@shared/server'
@@ -71,9 +71,7 @@ export class AdminService implements OnModuleInit {
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(SettingsRepository) settings: SettingsRepository,
   ) {
-    this.key = createHmac('sha256', settings.adminSecret())
-      .update(config.adminPassword ?? '')
-      .digest()
+    this.key = scryptSync(config.adminPassword ?? '', settings.adminSecret(), 32)
   }
 
   onModuleInit(): void {

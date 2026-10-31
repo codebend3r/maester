@@ -122,7 +122,7 @@ export const contentSecurityPolicy = ({
     "frame-ancestors 'none'",
   ].join('; ')
 
-const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/g
+const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/gi
 
 /** Each inline script of a page, hashed as `script-src` names it. */
 export const inlineScriptHashes = (html: string): string[] =>
@@ -233,6 +233,7 @@ export const createWebHostHandler = ({
 }: CreateWebHostHandlerProps): Handler => {
   const base = resolve(root)
   const indexPath = join(base, INDEX)
+  const destination = new URL(serverOrigin)
   // Told once each time it changes, since the page asks again and again while it is down.
   const reach = { isReachable: true }
 
@@ -328,9 +329,15 @@ export const createWebHostHandler = ({
   }
 
   const forward = ({ request, response, url }: ForwardProps): void => {
-    const target = new URL(`${url.pathname}${url.search}`, serverOrigin)
-    const send = target.protocol === URL_PROTOCOLS.https ? requestHttps : requestHttp
-    const outgoing = send(target, { method: request.method, headers: passed(request.headers) })
+    const send = destination.protocol === URL_PROTOCOLS.https ? requestHttps : requestHttp
+    const outgoing = send({
+      protocol: destination.protocol,
+      hostname: destination.hostname.replace(/^\[|\]$/g, ''),
+      port: destination.port,
+      path: `${url.pathname}${url.search}`,
+      method: request.method,
+      headers: passed(request.headers),
+    })
     const page = { hasLeft: false }
 
     outgoing.on(HTTP_EVENTS.socket, (socket) => {

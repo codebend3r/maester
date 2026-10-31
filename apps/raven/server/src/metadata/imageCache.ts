@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import {
   BACKDROP_OWN_WIDTH,
+  isMbid,
   type ItemImageKind,
   POSTER_OWN_WIDTH,
   POSTER_WIDTHS,
@@ -182,6 +183,7 @@ export class ImageCache {
    * album's narrower covers are scaled from it.
    */
   coverArt(mbid: string): Promise<string | null> {
+    if (!isMbid(mbid)) return Promise.resolve(null)
     return this.downloaded({
       target: join(this.root, COVER_ART_DIR, `${mbid}.jpg`),
       url: `https://coverartarchive.org/release/${encodeURIComponent(mbid)}/front-500`,

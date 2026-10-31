@@ -114,6 +114,13 @@ describe('cueRuns', () => {
     ])
   })
 
+  it('handles long runs of unterminated ASS overrides and markup', () => {
+    const overrides = '{\\'.repeat(20_000)
+    expect(cueRuns(overrides)).toEqual([{ ...plain, text: overrides }])
+    const markup = '<'.repeat(20_000)
+    expect(cueRuns(`Hello${markup}`)).toEqual([{ ...plain, text: `Hello${markup}` }])
+  })
+
   it('survives an unbalanced closing tag', () => {
     expect(cueRuns('</i>fine')).toEqual([{ ...plain, text: 'fine' }])
   })

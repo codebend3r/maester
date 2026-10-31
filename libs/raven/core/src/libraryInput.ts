@@ -13,7 +13,7 @@ export type LibraryInputResult = { ok: true; value: LibraryInput } | { ok: false
 /** Trailing slashes off, but never the root itself down to ''. */
 const normalisePath = (path: string): string => {
   const trimmed = path.trim()
-  const stripped = trimmed.replace(/\/+$/, '')
+  const stripped = trimmed.replace(/(?<!\/)\/+$/, '')
   return stripped === '' && trimmed.startsWith('/') ? '/' : stripped
 }
 

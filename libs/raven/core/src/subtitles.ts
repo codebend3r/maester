@@ -192,7 +192,7 @@ const tagName = (tag: string): string => /^<\/?([a-z]+)/i.exec(tag)?.[1]?.toLowe
  * override block that slipped through conversion is dropped.
  */
 export const cueRuns = (text: string): CueRun[] => {
-  const tokens = text.replace(/\{\\[^}]*\}/g, '').split(/(<[^>]*>)/)
+  const tokens = text.replace(/\{\\[^{}]*\}/g, '').split(/(<[^<>]*>)/)
   const { runs } = tokens.reduce<{ runs: CueRun[]; styles: Styles }>(
     ({ runs: done, styles }, token) => {
       if (token.startsWith('<')) {

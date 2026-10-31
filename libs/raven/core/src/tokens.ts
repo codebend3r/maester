@@ -67,7 +67,7 @@ export const parseTokens = (scss: string): DesignToken[] => {
 }
 
 const THEME_BLOCK = /^\[data-theme=(['"])([\w-]+)\1\] \{$([\s\S]*?)^\}/gm
-const PROPERTY = /^\s*(--[\w-]+):\s*(.+);$/gm
+const PROPERTY = /^[\t ]*(--[\w-]+):[\t ]*([^\s][^\r\n]*);$/gm
 
 /**
  * Reads each `[data-theme='<id>'] { ... }` block of a stylesheet: the custom

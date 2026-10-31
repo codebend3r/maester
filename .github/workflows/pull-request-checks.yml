@@ -774,7 +774,19 @@ jobs:
       - name: 🎬 App end to end
         env:
           MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
-        run: bun run app:e2e
+        run: |
+          if bun run app:e2e; then
+            exit 0
+          fi
+          # Maestro's XCTest server dies on a screenshot timeout (upstream #3538).
+          if ! grep -R -F -q 'Failed to get screenshot: Timed out while requesting screenshot.' "$HOME/.maestro/tests"; then
+            exit 1
+          fi
+          echo '::warning::Maestro screenshot service timed out; rebooting the simulator and retrying once'
+          xcrun simctl shutdown raven-phone
+          xcrun simctl boot raven-phone
+          xcrun simctl bootstatus raven-phone -b
+          bun run app:e2e
 
       # Maestro's screenshots and logs and the fixture server's log, only when a step failed.
       - name: 📤 End to end logs
