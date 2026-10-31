@@ -49,6 +49,9 @@ const probed = async (path: string): Promise<{ codec: string; bitRate: number }>
     : { codec: '', bitRate: 0 }
 }
 
+/** A ticket on the injected app's own address, which has no origin of its own: its paths are relative. */
+const ownAddress = (ticket: string) => ({ origin: { url: '' }, ticket })
+
 const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 /** A FLAC track and a video, on a server that keeps at most one byte of transcodes. */
@@ -190,7 +193,7 @@ describe('the transcode cache', () => {
     const url = apiFor({ app: app() }).transcodeUrl({
       mediaId: state.track,
       kbps: standard,
-      ticket,
+      access: ownAddress(ticket),
     })
     const whole = await app().inject({ method: 'GET', url })
     expect(whole.statusCode).toBe(200)
@@ -227,7 +230,7 @@ describe('the transcode cache', () => {
     const url = apiFor({ app: app() }).transcodeUrl({
       mediaId: state.track,
       kbps: standard,
-      ticket,
+      access: ownAddress(ticket),
     })
     const before = await app().inject({ method: 'GET', url })
     await encodeTrack({ path, seconds: 6, isNoise: true, tags: { title: 'Beetlebum' } })

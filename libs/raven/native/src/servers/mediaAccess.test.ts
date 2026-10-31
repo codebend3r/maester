@@ -3,6 +3,8 @@ import {
   ACCESS_REFUSALS,
   ACCOUNT_TICKET_SECONDS,
   APP_CLIENT_CALLS,
+  AUDIO_BITRATES,
+  AUDIO_BITRATE_PARAM,
   AUTH_HEADERS,
   HLS_PARAMS,
   HLS_PATHS,
@@ -90,6 +92,7 @@ const ticketed = ({ origin, path, ticket }: TicketedProps) =>
   `${origin}${path}?${toQueryString({ [MEDIA_TICKET_PARAM]: ticket })}`
 
 const filePath = pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS.id })
+const transcodePath = pathFor({ path: APP_CLIENT_CALLS.transcode.path, id: BUSBOYS.id })
 const masterPath = pathFor({ path: HLS_PATHS.master, id: BUSBOYS.id })
 const ticketPath = pathFor({ path: APP_CLIENT_CALLS.getMediaTicket.path, id: BUSBOYS.id })
 
@@ -138,6 +141,39 @@ describe('mediaAccessFor', () => {
     expect(sourceOf(await slow.media.source(direct)).uri.startsWith(`${PUBLIC.url}/`)).toBe(true)
     const away = setUp({ elapsedMs: { [PUBLIC.url]: 40 } })
     expect(sourceOf(await away.media.source(direct)).uri.startsWith(`${PUBLIC.url}/`)).toBe(true)
+  })
+
+  it("plays a track's file, or the AAC transcode at a bitrate, from the picked origin by ticket", async () => {
+    const { media } = setUp()
+    expect(sourceOf(await media.trackSource({ mediaId: BUSBOYS.id, kbps: null }))).toEqual({
+      uri: ticketed({ origin: LAN.url, path: filePath, ticket: TICKETS[0] }),
+      headers: {},
+    })
+    const query = toQueryString({
+      [AUDIO_BITRATE_PARAM]: String(AUDIO_BITRATES.standard),
+      [MEDIA_TICKET_PARAM]: TICKETS[0],
+    })
+    expect(
+      sourceOf(await media.trackSource({ mediaId: BUSBOYS.id, kbps: AUDIO_BITRATES.standard })),
+    ).toEqual({ uri: `${LAN.url}${transcodePath}?${query}`, headers: {} })
+  })
+
+  it("plays a track's transcode from the server's own address by ticket, or by its cookie", async () => {
+    const signedIn = setUp({ elapsedMs: {}, accessToken: ACCOUNT_TOKEN })
+    const query = toQueryString({
+      [AUDIO_BITRATE_PARAM]: String(AUDIO_BITRATES.low),
+      [MEDIA_TICKET_PARAM]: TICKETS[0],
+    })
+    expect(
+      sourceOf(await signedIn.media.trackSource({ mediaId: BUSBOYS.id, kbps: AUDIO_BITRATES.low })),
+    ).toEqual({ uri: `${NAS.origin}${transcodePath}?${query}`, headers: {} })
+    const cookie = setUp({ server: mediaServer({ tickets: [STATUSES.unavailable] }) })
+    expect(
+      sourceOf(await cookie.media.trackSource({ mediaId: BUSBOYS.id, kbps: AUDIO_BITRATES.low })),
+    ).toEqual({
+      uri: `${NAS.origin}${transcodePath}?${toQueryString({ [AUDIO_BITRATE_PARAM]: String(AUDIO_BITRATES.low) })}`,
+      headers: cookieHeader,
+    })
   })
 
   it('builds the HLS master playlist with its mode and audio, by ticket', async () => {

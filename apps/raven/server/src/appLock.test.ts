@@ -320,7 +320,6 @@ describe('a library locked behind the PIN', () => {
     const transcode = api().transcodeUrl({
       mediaId: id,
       kbps: AUDIO_BITRATES.standard,
-      ticket: null,
     })
     expect((await inject({ method: 'GET', url: transcode })).statusCode).toBe(423)
     // A video is no track, locked or not.
