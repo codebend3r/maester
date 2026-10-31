@@ -1,3 +1,16 @@
+import {
+  AUDIO_BITRATES,
+  type CrossfadeSeconds,
+  DEFAULT_LEVELLING_MODE,
+  type Equalizer,
+  FLAT_EQUALIZER,
+  LEVELLING_MODES,
+  type LevellingMode,
+  isCrossfadeSeconds,
+  isEqualizer,
+  isRecord,
+  oneOf,
+} from '@raven/core'
 import { create } from 'zustand'
 import { createJSONStorage, devtools, persist } from 'zustand/middleware'
 import { UNCONFIGURED_STORAGE } from '@/stores/storage'
@@ -22,6 +35,15 @@ const nearestSpeed = (speed: number): AudiobookSpeed =>
     (best, offered) => (Math.abs(offered - speed) < Math.abs(best - speed) ? offered : best),
     1,
   )
+
+/** What music plays from: the file as it is, or an AAC transcode at one of its bitrates. */
+export const MUSIC_QUALITIES = { original: 'original', ...AUDIO_BITRATES } as const
+
+type MusicQuality = (typeof MUSIC_QUALITIES)[keyof typeof MUSIC_QUALITIES]
+
+const isMusicQuality = oneOf(Object.values(MUSIC_QUALITIES))
+
+const isLevellingMode = oneOf(Object.values(LEVELLING_MODES))
 
 type WithinProps = {
   seconds: number
@@ -59,6 +81,13 @@ type PlayerPrefs = {
   hasSeenShortcutsTip: boolean
   /** How fast audiobooks play; music always plays at 1. */
   audiobookSpeed: AudiobookSpeed
+  /** Whether music plays from its file or a transcode at a bitrate. */
+  musicQuality: MusicQuality
+  /** How loudness is levelled from track to track. */
+  levelling: LevellingMode
+  /** How many seconds one track fades into the next; 0 for none. */
+  crossfade: CrossfadeSeconds
+  equalizer: Equalizer
   setVolume: ({ volume, muted }: SetVolumeProps) => void
   setCaptionScale: (captionScale: number) => void
   setSubtitles: (subtitles: SetSubtitlesProps) => void
@@ -70,12 +99,28 @@ type PlayerPrefs = {
   setAutoSkipIntro: (isOn: boolean) => void
   markShortcutsTipSeen: () => void
   setAudiobookSpeed: (speed: number) => void
+  setMusicQuality: (musicQuality: MusicQuality) => void
+  setLevelling: (levelling: LevellingMode) => void
+  setCrossfade: (crossfade: CrossfadeSeconds) => void
+  setEqualizer: (equalizer: Equalizer) => void
 }
+
+type SoundPrefs = Pick<PlayerPrefs, 'musicQuality' | 'levelling' | 'crossfade' | 'equalizer'>
+
+type StoredSoundOfProps = { stored: Record<string, unknown>; current: SoundPrefs }
+
+/** The sound prefs a stored copy holds, each kept only when it is one this build knows. */
+const storedSoundOf = ({ stored, current }: StoredSoundOfProps): SoundPrefs => ({
+  musicQuality: isMusicQuality(stored.musicQuality) ? stored.musicQuality : current.musicQuality,
+  levelling: isLevellingMode(stored.levelling) ? stored.levelling : current.levelling,
+  crossfade: isCrossfadeSeconds(stored.crossfade) ? stored.crossfade : current.crossfade,
+  equalizer: isEqualizer(stored.equalizer) ? stored.equalizer : current.equalizer,
+})
 
 /**
  * Volume, subtitles, audio language, how long the controls linger,
  * autoplay and its countdown, skipping intros, whether the keyboard tip
- * has shown and how fast audiobooks play carry over from one video to the next, and across visits.
+ * has shown, how fast audiobooks play and how music sounds carry over from one video to the next, and across visits.
  */
 export const usePlayerPrefs = create<PlayerPrefs>()(
   devtools(
@@ -93,6 +138,10 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         autoSkipIntro: false,
         hasSeenShortcutsTip: false,
         audiobookSpeed: 1,
+        musicQuality: MUSIC_QUALITIES.original,
+        levelling: DEFAULT_LEVELLING_MODE,
+        crossfade: 0,
+        equalizer: FLAT_EQUALIZER,
         setVolume: ({ volume, muted }) => set({ volume, muted }),
         setCaptionScale: (captionScale) => set({ captionScale }),
         setSubtitles: (subtitles) => set({ subtitles }),
@@ -108,6 +157,10 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         setAutoSkipIntro: (isOn) => set({ autoSkipIntro: isOn }),
         markShortcutsTipSeen: () => set({ hasSeenShortcutsTip: true }),
         setAudiobookSpeed: (speed) => set({ audiobookSpeed: nearestSpeed(speed) }),
+        setMusicQuality: (musicQuality) => set({ musicQuality }),
+        setLevelling: (levelling) => set({ levelling }),
+        setCrossfade: (crossfade) => set({ crossfade }),
+        setEqualizer: (equalizer) => set({ equalizer }),
       }),
       {
         name: PLAYER_PREFS_KEY,
@@ -126,6 +179,10 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           autoSkipIntro,
           hasSeenShortcutsTip,
           audiobookSpeed,
+          musicQuality,
+          levelling,
+          crossfade,
+          equalizer,
         }) => ({
           volume,
           muted,
@@ -139,7 +196,16 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           autoSkipIntro,
           hasSeenShortcutsTip,
           audiobookSpeed,
+          musicQuality,
+          levelling,
+          crossfade,
+          equalizer,
         }),
+        // The sound prefs feed the audio graph, so a stored one this build does not know is dropped.
+        merge: (stored, current) =>
+          isRecord(stored)
+            ? { ...current, ...stored, ...storedSoundOf({ stored, current }) }
+            : current,
       },
     ),
     { name: 'raven/playerPrefs' },

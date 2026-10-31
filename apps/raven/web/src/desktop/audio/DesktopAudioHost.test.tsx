@@ -95,7 +95,7 @@ describe('DesktopAudioHost', () => {
       }),
     })
     renderWithProviders({ ui: <DesktopAudioHost api={api} reprobe={() => undefined} /> })
-    expect(document.querySelectorAll('audio')).toHaveLength(1)
+    expect(document.querySelectorAll('audio')).toHaveLength(2)
   })
 
   it("plays through the page's own audio host once main's engine is lost", () => {
@@ -103,7 +103,7 @@ describe('DesktopAudioHost', () => {
       audio: audioConnectionsOf({ status: CONNECTION_STATUSES.lost, message: 'Gone.' }),
     })
     renderWithProviders({ ui: <DesktopAudioHost api={api} reprobe={() => undefined} /> })
-    expect(document.querySelectorAll('audio')).toHaveLength(1)
+    expect(document.querySelectorAll('audio')).toHaveLength(2)
   })
 
   it("renders nothing while main's answer is on its way", () => {
