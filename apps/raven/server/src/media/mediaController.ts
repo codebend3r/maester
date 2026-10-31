@@ -72,6 +72,7 @@ import { ScrobbleSender } from '@/scrobbling/scrobbleSender'
 import { clientOf, trackStream } from '@/streams/trackStream'
 import { StreamSessions } from '@/streams/streamSessions'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
+import { ROUTE_PARAMS } from '@/requestParts'
 
 const errorCode = (error: unknown): string =>
   isRecord(error) && isString(error.code) ? error.code : ''
@@ -146,7 +147,7 @@ export class MediaController {
   }
 
   @Get(':id')
-  get(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): MediaItem {
+  get(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number, @Req() request: FastifyRequest): MediaItem {
     return this.find({ id, account: this.accounts.keyOf({ request }) })
   }
 
@@ -156,7 +157,7 @@ export class MediaController {
    */
   @Get(':id/next')
   next(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Query(SESSION_PARAMS.session) session: unknown,
     @Query(SESSION_PARAMS.scope) scope: unknown,
     @Req() request: FastifyRequest,
@@ -174,7 +175,7 @@ export class MediaController {
   /** Where the file lives, for the card's menu: the one call that hands a client a path. */
   @AdminOnly()
   @Get(':id/location')
-  location(@Param('id', ParseIntPipe) id: number): MediaLocation {
+  location(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number): MediaLocation {
     return { path: this.fileOf(id).path }
   }
 
@@ -182,7 +183,7 @@ export class MediaController {
   @Put(':id/progress')
   @HttpCode(204)
   saveProgress(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
   ): void {
@@ -211,7 +212,10 @@ export class MediaController {
   @ForViewers()
   @Post(':id/plays')
   @HttpCode(204)
-  recordPlay(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): void {
+  recordPlay(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): void {
     const account = this.accounts.keyOf({ request })
     if (!this.viewing.recordPlay({ id, account })) throw new NotFoundException(`No media ${id}`)
     try {
@@ -225,7 +229,7 @@ export class MediaController {
   @ForViewers()
   @Put(':id/favourite')
   setFavourite(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
   ): MediaItem {
@@ -260,7 +264,7 @@ export class MediaController {
   @AdminOnly()
   @Delete(':id')
   @HttpCode(204)
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+  async remove(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number): Promise<void> {
     const file = this.fileOf(id)
     await this.scanner.whenIdle(file.libraryId)
     try {
@@ -277,7 +281,7 @@ export class MediaController {
 
   @Get(':id/thumbnail')
   async thumbnail(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Query('v') version: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
@@ -301,7 +305,7 @@ export class MediaController {
   @OpenedByPass(PASS_KINDS.ticket)
   @Get(':id/file')
   async file(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Query(MEDIA_TICKET_PARAM) ticket: unknown,
     @Query(MEDIA_PURPOSE_PARAM) purpose: unknown,
     @Req() request: FastifyRequest,
@@ -330,7 +334,7 @@ export class MediaController {
   @OpenedByPass(PASS_KINDS.ticket)
   @Get(':id/transcode')
   async transcode(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Query(AUDIO_BITRATE_PARAM) kbps: unknown,
     @Query(MEDIA_TICKET_PARAM) ticket: unknown,
     @Query(MEDIA_PURPOSE_PARAM) purpose: unknown,

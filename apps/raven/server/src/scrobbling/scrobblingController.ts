@@ -52,6 +52,7 @@ import { LastFmScrobbler } from '@/scrobbling/lastFmScrobbler'
 import { LastFmSignIns } from '@/scrobbling/lastFmSignIns'
 import { ListenBrainzScrobbler } from '@/scrobbling/listenBrainzScrobbler'
 import { ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
+import { ROUTE_PARAMS } from '@/requestParts'
 
 type PublicOriginOfProps = { auth: AuthConfig; config: ServerConfig }
 
@@ -267,7 +268,10 @@ export class ScrobblingController {
   /** Stops forwarding to the service, forgetting its token and the listens waiting for it. */
   @ForViewers()
   @Delete(SCROBBLING_PATHS.service)
-  unlink(@Param('service') service: string, @Req() request: FastifyRequest): ScrobbleStatus[] {
+  unlink(
+    @Param(ROUTE_PARAMS.service) service: string,
+    @Req() request: FastifyRequest,
+  ): ScrobbleStatus[] {
     if (!isScrobbleService(service)) throw new NotFoundException(`No service ${service}`)
     const account = this.accounts.keyOf({ request })
     this.links.remove({ account, service })
