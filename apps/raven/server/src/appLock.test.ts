@@ -49,6 +49,8 @@ import {
   testConfig,
 } from '@/test/app'
 import { MusicRepository } from '@/music/musicRepository'
+import { Playlists } from '@/music/playlists'
+import { AUTH_TEST_IDS } from '@/test/auth'
 import { encodeClip, encodeTrack } from '@/test/clips'
 import { fakeLrclib } from '@/test/fakeLrclib'
 import { fakeTmdb } from '@/test/fakeTmdb'
@@ -347,6 +349,31 @@ describe('a library locked behind the PIN', () => {
     await api().replacePlaylistTracks({ id: playlist.id, mediaIds: [] })
     expect((await api(cookie).getPlaylist(playlist.id)).tracks.map((each) => each.id)).toEqual([id])
     await api().deletePlaylist(playlist.id)
+  })
+
+  it("leaves a locked library's tracks out of another account's shared playlist, and out of a copy", async () => {
+    const [track] = app().get(MediaIndex).idsForLibrary(state.privateMusic)
+    const id = track ?? 0
+    const playlists = app().get(Playlists)
+    const owner = AUTH_TEST_IDS.friend
+    const theirs = playlists.create({ name: 'Their lessons', account: owner })
+    playlists.append({ id: theirs, mediaIds: [id], account: owner })
+    expect(playlists.share({ id: theirs, isShared: true, account: owner })).toBe(true)
+
+    const shut = await api().getPlaylist(theirs)
+    expect(shut.playlist).toMatchObject({ trackCount: 0, isShared: true, isOwn: false })
+    expect(shut.tracks).toEqual([])
+    const listed = (await api().listPlaylists()).find((each) => each.id === theirs)
+    expect(listed?.trackCount ?? null).toBe(0)
+    const copy = await api().copyPlaylist({ id: theirs })
+    expect(copy.playlist).toMatchObject({ name: 'Their lessons', trackCount: 0, isOwn: true })
+    // The copy holds what its maker could see, so the PIN finds nothing more in it.
+    const { cookie } = await unlock('3001')
+    expect((await api(cookie).getPlaylist(copy.playlist.id)).tracks).toEqual([])
+    expect((await api(cookie).getPlaylist(theirs)).tracks.map((each) => each.id)).toEqual([id])
+
+    await api().deletePlaylist(copy.playlist.id)
+    expect(playlists.remove({ id: theirs, account: owner })).toBe(true)
   })
 
   it("leaves a locked library's albums out of Home, and a radio seeded there behind the PIN", async () => {

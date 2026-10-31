@@ -835,6 +835,13 @@ export const MIGRATIONS: readonly string[] = [
   CREATE INDEX scrobble_queue_media ON scrobble_queue (media_id);
   CREATE INDEX scrobble_queue_listened ON scrobble_queue (listened_at);
   `,
+  // A playlist its owner shares, which every account on the server may
+  // read, play and copy; every playlist kept so far stays its owner's. The
+  // shared ones are few, so a partial index finds them without the rest.
+  `
+  ALTER TABLE playlists ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0;
+  CREATE INDEX playlists_shared ON playlists (is_shared) WHERE is_shared = 1;
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

@@ -360,6 +360,59 @@ describe('each account sees only its own viewing', () => {
     expect(await member.getPlaylist(mix)).toEqual(before)
   })
 
+  it('lets every account read, play and copy a shared playlist, and change only its own', async () => {
+    const member = await clientFor({ id: AUTH_TEST_IDS.friend })
+    const guest = await clientFor({ id: AUTH_TEST_IDS.guest })
+    await recordMemberViewing({ api: member })
+    const mix = (await member.listPlaylists()).find(({ name }) => name === MEMBER_MIX)?.id ?? 0
+    const order = [music.tracks[1], music.tracks[0]]
+    const shared = await member.setPlaylistSharing({ id: mix, isShared: true })
+    expect(shared.playlist).toMatchObject({ id: mix, isShared: true, isOwn: true })
+
+    const listed = (await guest.listPlaylists()).find(({ id }) => id === mix)
+    expect(listed).toMatchObject({ name: MEMBER_MIX, trackCount: 2, isShared: true, isOwn: false })
+    const read = await guest.getPlaylist(mix)
+    expect(read.playlist.isOwn).toBe(false)
+    expect(read.tracks.map(({ id }) => id)).toEqual(order)
+
+    const before = await member.getPlaylist(mix)
+    const refused = await Promise.all(
+      [
+        guest.renamePlaylist({ id: mix, name: 'Taken' }),
+        guest.replacePlaylistTracks({ id: mix, mediaIds: [] }),
+        guest.appendPlaylistTracks({ id: mix, mediaIds: [music.tracks[0]] }),
+        guest.setPlaylistSharing({ id: mix, isShared: false }),
+        guest.deletePlaylist(mix),
+      ].map((call) =>
+        call.then(
+          () => 'answered',
+          (error: unknown) => error,
+        ),
+      ),
+    )
+    expect(refused).toEqual(refused.map(() => expect.objectContaining({ status: 404 })))
+    expect(await member.getPlaylist(mix)).toEqual(before)
+
+    const copy = await guest.copyPlaylist({ id: mix })
+    expect(copy.playlist).toMatchObject({
+      name: MEMBER_MIX,
+      trackCount: 2,
+      isShared: false,
+      isOwn: true,
+    })
+    expect(copy.playlist.id).not.toBe(mix)
+    expect(copy.tracks.map(({ id }) => id)).toEqual(order)
+    const renamed = await guest.renamePlaylist({ id: copy.playlist.id, name: 'Guest mix' })
+    expect(renamed.playlist.name).toBe('Guest mix')
+    expect((await member.getPlaylist(mix)).playlist.name).toBe(MEMBER_MIX)
+
+    await member.setPlaylistSharing({ id: mix, isShared: false })
+    expect((await guest.listPlaylists()).map(({ id }) => id)).toEqual([copy.playlist.id])
+    await expect(guest.getPlaylist(mix)).rejects.toMatchObject({ status: 404 })
+    await expect(guest.copyPlaylist({ id: mix })).rejects.toMatchObject({ status: 404 })
+    await guest.deletePlaylist(copy.playlist.id)
+  })
+
   it("keeps each account's scrobbling links and waiting listens to itself", async () => {
     const member = await clientFor({ id: AUTH_TEST_IDS.friend })
     const guest = await clientFor({ id: AUTH_TEST_IDS.guest })
@@ -437,6 +490,8 @@ describe('each account sees only its own viewing', () => {
         payload: { mediaIds: [music.tracks[0]] },
       },
       { route: ROUTES.renamePlaylist, params: { id: mix }, payload: { name: 'Renamed' } },
+      { route: ROUTES.playlistSharing, params: { id: mix }, payload: { isShared: false } },
+      { route: ROUTES.copyPlaylist, params: { id: mix } },
       {
         route: ROUTES.watched,
         params: {},

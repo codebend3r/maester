@@ -100,6 +100,8 @@ export const playlistSummary = (overrides: Partial<PlaylistSummary> = {}): Playl
   duration: 400,
   createdAt: '2026-10-01T00:00:00Z',
   updatedAt: '2026-10-01T00:00:00Z',
+  isShared: false,
+  isOwn: true,
   ...overrides,
 })
 

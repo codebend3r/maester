@@ -174,6 +174,8 @@ export const MIXTAPE: PlaylistSummary = {
   duration: 600,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-02T00:00:00Z',
+  isShared: false,
+  isOwn: true,
 }
 
 export const MIXTAPE_PAGE: PlaylistDetails = { playlist: MIXTAPE, tracks: [LUCKY, AIRBAG] }

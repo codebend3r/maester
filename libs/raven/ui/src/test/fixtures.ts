@@ -190,6 +190,8 @@ export const playlistDetails = (overrides: Partial<PlaylistDetails> = {}): Playl
     duration: 400,
     createdAt: '2026-10-01T00:00:00Z',
     updatedAt: '2026-10-01T00:00:00Z',
+    isShared: false,
+    isOwn: true,
   },
   tracks: [track(), track({ id: 102, title: 'Paranoid Android', number: 2 })],
   ...overrides,

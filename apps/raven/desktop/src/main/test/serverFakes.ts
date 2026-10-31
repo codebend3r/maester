@@ -207,6 +207,8 @@ export const playlistDetails = (tracks: Track[]): PlaylistDetails => ({
     duration: 0,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
+    isShared: false,
+    isOwn: true,
   },
   tracks,
 })

@@ -11,26 +11,37 @@ type PlaylistRow = {
   updated_at: string
   track_count: number
   duration: number
+  is_shared: number
+  is_own: number
 }
 
-/** A playlist with its tracks counted and timed, those in a hidden library left out. */
-const SELECT_PLAYLISTS = `SELECT p.id, p.name, p.created_at, p.updated_at,
+/**
+ * The playlists a read may reach: the account's own and every account's
+ * shared ones, each found by its own index. Written as an `OR`, SQLite reads
+ * every playlist once it holds a real server's statistics.
+ */
+const VISIBLE = `p.id IN (SELECT id FROM playlists WHERE account_id = @account
+                          UNION ALL SELECT id FROM playlists WHERE is_shared = 1)`
+
+/** A playlist the account may read, its tracks counted and timed, those in a hidden library left out. */
+const SELECT_PLAYLISTS = `SELECT p.id, p.name, p.created_at, p.updated_at, p.is_shared,
+                                 p.account_id = @account AS is_own,
                                  COUNT(m.id) AS track_count, COALESCE(SUM(m.duration), 0) AS duration
                             FROM playlists p
                             LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
                             LEFT JOIN media m ON m.id = pt.media_id
                                  AND m.library_id NOT IN (SELECT value FROM json_each(@hidden))
-                           WHERE p.account_id = @account`
+                           WHERE ${VISIBLE}`
 
 /** Which of a playlist's tracks a read takes: those the caller sees, or those in its hidden libraries. */
 const ENTRY_SCOPES = { shown: 'NOT IN', hidden: 'IN' } as const
 
 type EntryScope = (typeof ENTRY_SCOPES)[keyof typeof ENTRY_SCOPES]
 
-/** A playlist's tracks in order, in or out of `@hidden`'s libraries as `scope` says. */
+/** A readable playlist's tracks in order, in or out of `@hidden`'s libraries as `scope` says. */
 const selectEntries = (scope: EntryScope): string =>
   `SELECT pt.media_id FROM playlist_tracks pt
-     JOIN playlists p ON p.id = pt.playlist_id AND p.account_id = @account
+     JOIN playlists p ON p.id = pt.playlist_id AND ${VISIBLE}
      JOIN media m ON m.id = pt.media_id
     WHERE pt.playlist_id = @id AND m.library_id ${scope} (SELECT value FROM json_each(@hidden))
     ORDER BY pt.position`
@@ -42,6 +53,8 @@ const toSummary = (row: PlaylistRow): PlaylistSummary => ({
   duration: row.duration,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  isShared: row.is_shared === 1,
+  isOwn: row.is_own === 1,
 })
 
 type PlaylistsListProps = {
@@ -57,6 +70,10 @@ type PlaylistsCreateProps = { name: string; account: AccountKey }
 type PlaylistsRenameProps = { id: number; name: string; account: AccountKey }
 
 type PlaylistsRemoveProps = { id: number; account: AccountKey }
+
+type PlaylistsShareProps = { id: number; isShared: boolean; account: AccountKey }
+
+type PlaylistsCopyProps = { id: number; account: AccountKey; hidden: readonly number[] }
 
 type PlaylistsReplaceProps = {
   id: number
@@ -85,11 +102,12 @@ type PlaylistsEntriesProps = {
 
 /**
  * Each account's playlists: a name and an order of tracks, by position, so
- * a track may come twice. Every statement names the account, so one
- * account's playlist is no other's to read or change; a playlist's tracks
- * are reached only through a playlist of the account's. A track in a
- * library the caller may not see is left out of what it reads and is kept
- * where it was when it changes the order.
+ * a track may come twice. Every statement names the account: a playlist is
+ * its owner's alone to change, and no other account's to read unless its
+ * owner shares it, when every account may read and copy it; a playlist's
+ * tracks are reached only through one the account may read. A track in a
+ * library the caller may not see is left out of what it reads and copies,
+ * and is kept where it was when it changes the order.
  */
 @Injectable()
 export class Playlists {
@@ -102,7 +120,7 @@ export class Playlists {
     return this.database.db
   }
 
-  /** The account's playlists, most recently changed first. */
+  /** The account's playlists and every account's shared ones, most recently changed first. */
   list({ account, hidden }: PlaylistsListProps): PlaylistSummary[] {
     return this.db
       .prepare<{ account: AccountKey; hidden: string }, PlaylistRow>(
@@ -121,7 +139,7 @@ export class Playlists {
       .map((row) => row.media_id)
   }
 
-  /** The account's playlist with its tracks in order, or null when it has no such playlist. */
+  /** A playlist the account may read, with its tracks in order, or null when it may read no such playlist. */
   get({ id, account, hidden }: PlaylistsGetProps): PlaylistDetails | null {
     const row = this.db
       .prepare<{ id: number; account: AccountKey; hidden: string }, PlaylistRow>(
@@ -167,6 +185,37 @@ export class Playlists {
         .prepare('DELETE FROM playlists WHERE id = @id AND account_id = @account')
         .run({ id, account }).changes > 0
     )
+  }
+
+  /** Shares the account's playlist with every account, or stops; false when it has no such playlist. */
+  share({ id, isShared, account }: PlaylistsShareProps): boolean {
+    return (
+      this.db
+        .prepare(
+          'UPDATE playlists SET is_shared = @shared WHERE id = @id AND account_id = @account',
+        )
+        .run({ id, shared: isShared ? 1 : 0, account }).changes > 0
+    )
+  }
+
+  /**
+   * Makes the account a playlist of its own with the name and the tracks of
+   * one it may read, those it may not see left out; its id, or null when it
+   * may read no such playlist.
+   */
+  copy({ id, account, hidden }: PlaylistsCopyProps): number | null {
+    return this.db.transaction(() => {
+      const source = this.db
+        .prepare<{ id: number; account: AccountKey }, { name: string }>(
+          `SELECT p.name FROM playlists p WHERE p.id = @id AND ${VISIBLE}`,
+        )
+        .get({ id, account })
+      if (!source) return null
+      const mediaIds = this.entries({ id, account, hidden, scope: ENTRY_SCOPES.shown })
+      const copy = this.create({ name: source.name, account })
+      this.insert({ id: copy, mediaIds, from: 0, account })
+      return copy
+    })()
   }
 
   /** Marks the account's playlist changed now; false when it has no such playlist. */

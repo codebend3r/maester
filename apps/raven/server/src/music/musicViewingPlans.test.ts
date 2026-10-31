@@ -67,6 +67,10 @@ const ACCOUNT_STATEMENTS = {
     stores({ database }).playlists.append({ id: ids.playlist, mediaIds: [ids.track], account }),
   'a rename': ({ database, ids }) =>
     stores({ database }).playlists.rename({ id: ids.playlist, name: 'Again', account }),
+  'a share': ({ database, ids }) =>
+    stores({ database }).playlists.share({ id: ids.playlist, isShared: true, account }),
+  'a copy': ({ database, ids }) =>
+    stores({ database }).playlists.copy({ id: ids.playlist, account, hidden: [] }),
   'its album mark': ({ database, ids }) =>
     stores({ database }).favourites.isAlbum({ albumId: ids.album, account }),
   'its artist mark': ({ database, ids }) =>
@@ -98,9 +102,12 @@ const ACCOUNT_STATEMENTS = {
 /** A step over the per-account music tables, by name or the playlists' alias. */
 const ACCOUNT_STEP = /^[A-Z-]+ (p|playlists|album_favourites|artist_favourites|pl|plays)\b/
 
-/** A playlist or a favourite found by the account's own key, never by reading every row. */
+/**
+ * A playlist or a favourite found by the account's own key, never by reading
+ * every row; or a shared playlist, found by the index that holds those alone.
+ */
 const BY_ACCOUNT =
-  /^SEARCH (p|playlists|album_favourites|artist_favourites) USING (PRIMARY KEY|(COVERING )?INDEX \w+|INTEGER PRIMARY KEY) \((account_id=\?|rowid=\?)|^SEARCH pl USING (COVERING )?INDEX plays_account \(account_id=\?/
+  /^SEARCH (p|playlists|album_favourites|artist_favourites) USING (PRIMARY KEY|(COVERING )?INDEX \w+|INTEGER PRIMARY KEY) \((account_id=\?|rowid=\?)|^SEARCH pl USING (COVERING )?INDEX plays_account \(account_id=\?|^SEARCH playlists USING COVERING INDEX playlists_shared \(is_shared=\?\)$/
 
 /** A step over a playlist's tracks, which are read by their playlist's key alone. */
 const ORDER_STEP = /^[A-Z-]+ (pt|playlist_tracks)\b/

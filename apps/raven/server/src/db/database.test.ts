@@ -644,8 +644,7 @@ describe('migrations', () => {
     before.close()
 
     const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
-    expect(database.db.pragma('user_version', { simple: true })).toBe(47)
-    expect(MIGRATIONS).toHaveLength(47)
+    expect(database.db.pragma('user_version', { simple: true })).toBe(MIGRATIONS.length)
     database.db.exec(
       `INSERT INTO scrobble_links (account_id, service, username, secret_cipher, created_at)
        VALUES ('local', 'listenBrainz', 'rj', 'iv.tag.cipher', '2026-10-31');
@@ -656,6 +655,25 @@ describe('migrations', () => {
     expect(database.db.prepare('SELECT * FROM scrobble_queue').all()).toEqual([])
     expect(database.db.prepare('SELECT username FROM scrobble_links').all()).toEqual([
       { username: 'rj' },
+    ])
+    database.onModuleDestroy()
+  })
+
+  it("keeps a version-47 database's playlists to their owners until one is shared", () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 47).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 47')
+    before.exec(
+      `INSERT INTO playlists (id, account_id, name, created_at, updated_at)
+       VALUES (1, 'local', 'Road trip', '2026-10-01', '2026-10-01');`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.pragma('user_version', { simple: true })).toBe(48)
+    expect(MIGRATIONS).toHaveLength(48)
+    expect(database.db.prepare('SELECT id, is_shared FROM playlists').all()).toEqual([
+      { id: 1, is_shared: 0 },
     ])
     database.onModuleDestroy()
   })

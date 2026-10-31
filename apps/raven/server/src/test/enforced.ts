@@ -132,6 +132,8 @@ export const ROUTES = {
   deletePlaylist: { method: DELETE, path: '/api/playlists/:id', account: approved },
   replacePlaylistTracks: { method: PUT, path: '/api/playlists/:id/tracks', account: approved },
   appendPlaylistTracks: { method: POST, path: '/api/playlists/:id/tracks', account: approved },
+  playlistSharing: { method: PUT, path: '/api/playlists/:id/sharing', account: approved },
+  copyPlaylist: { method: POST, path: '/api/playlists/:id/copy', account: approved },
   mixes: { method: GET, path: '/api/music/mixes', account: approved },
   mix: { method: GET, path: '/api/music/mixes/:id', account: approved },
   radio: { method: GET, path: '/api/music/radio', account: approved },
