@@ -1,21 +1,46 @@
 // Design tokens and the few true primitives. Component styles live next to
 // their component as *.module.scss and use only these values.
 
-// The palette is a maester's study at night: slate for the ground, vellum for
-// text, and the brass of the chain for what sparrow itself says and does.
+// The colours are raven's Verdigris theme (libs/raven/ui/src/styles/themes.scss),
+// under the same names, so sparrow sits beside raven as one family: a
+// godswood at night for the ground, bone-white bark for text, red leaves
+// for the one action a screen is for and for sparrow's own mark, and amber
+// for the gold the design gives links and the sandbox line.
 :root {
-  --color-ground: #14181a;
-  --color-panel: #1d2326;
-  --color-line: #323b3f;
-  --color-vellum: #e8e4d8;
-  // 7.9:1 on --color-ground, 7.0:1 on --color-panel.
-  --color-ash: #a3aca9;
-  // Fills behind ground-coloured text: 7.6:1.
-  --color-brass: #d39b4a;
-  --color-brass-hover: #e2b06a;
-  // Verdicts on --color-panel: 8.4:1 and 7.3:1.
-  --color-pass: #8fcf9a;
+  --color-night: #15201e;
+  // The icon rail, below the ground.
+  --color-deep: #0f1816;
+  // Fields, cards and the composer.
+  --color-canopy: #1c2b28;
+  // A quiet button, and a row under the pointer.
+  --color-canopy-hi: #223430;
+  // The user's avatar, and a quiet button under the pointer.
+  --color-moss: #2c3e3a;
+  --color-bark: #e6e1d6;
+  // A cooler bark for secondary text: 10:1 on --color-canopy.
+  --color-birch: #cfdcd2;
+  // Muted text: 7:1 on --color-night, 6:1 on --color-canopy.
+  --color-lichen: #9db0a8;
+  // Placeholders and what is disabled, never body text.
+  --color-moss-line: #5d736c;
+  // Fills behind --color-on-leaf text.
+  --color-leaf: #a8262f;
+  --color-leaf-hi: #b8303a;
+  --color-on-leaf: #ffffff;
+  // Thin marks on the ground: the budget bar running out.
+  --color-leaf-bright: #d8414a;
+  // Gold text: links and the sandbox line, 8.7:1 on --color-night.
+  --color-amber: #e3b45f;
+  --color-amber-hi: #edc57f;
+  // What passed: a verdict, a tool that answered, the budget left.
+  --color-fern: #8fcf9f;
+  // What failed, as text: 7.3:1 on --color-canopy.
   --color-alert: #f1a7a0;
+  // Hairlines: bark mixed into the ground, so they follow the theme.
+  --color-line: color-mix(in srgb, var(--color-bark) 10%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-bark) 16%, transparent);
+  // A track behind the budget bar.
+  --color-track: color-mix(in srgb, var(--color-bark) 14%, transparent);
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -23,29 +48,76 @@
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3rem;
 
-  --radius-sm: 4px;
+  --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 14px;
+  --radius-lg: 10px;
+  --radius-round: 50%;
 
   --font-display: 'Young Serif', georgia, serif;
   --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', menlo, monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', menlo, monospace;
 
-  --font-size-xs: 0.8rem;
-  --font-size-sm: 0.9rem;
-  --font-size-md: 1rem;
-  --font-size-lg: 1.25rem;
+  --font-size-2xs: 0.6875rem;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-md: 0.875rem;
+  --font-size-body: 0.9375rem;
+  --font-size-lg: 1rem;
+  // sparrow's own voice, a size up from the user's.
+  --font-size-voice: 1.0625rem;
+  --font-size-icon: 1.125rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 1.625rem;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-strong: 700;
+  --font-weight-bold: 600;
 
   --tracking-caps: 0.04em;
 
   --line-tight: 1.2;
+  --line-list: 1.4;
   --line-body: 1.5;
+  --line-voice: 1.55;
+  --line-relaxed: 1.6;
 
-  --measure: 46rem;
-  --sidebar: 20rem;
-  --logo-height: 4.5rem;
-  --focus-ring: 2px solid var(--color-vellum);
+  // The three columns: the icon rail, the sidebar, and the conversation's width.
+  --rail: 4rem;
+  --sidebar: 17rem;
+  --measure: 47.5rem;
+  // The empty state's line under its heading.
+  --measure-narrow: 21.25rem;
+  --avatar: 1.875rem;
+  --logo-badge: 2.375rem;
+  --rail-button: 2.25rem;
+  --glyph-sm: 1.125rem;
+  --glyph-md: 1.375rem;
+  --glyph-lg: 3.25rem;
+  --composer-max: 8.75rem;
+  // A tool call's arguments or answer, opened.
+  --trace-max: 16rem;
+  --card-min: 12.5rem;
+  --budget-bar: 4rem;
+  --budget-bar-height: 0.25rem;
+  --divider-height: 0.75rem;
+  --dot: 0.375rem;
+  --hairline: 1px;
+  --underline-offset: 0.15em;
+  // The coloured edge of a notice.
+  --rule: 3px;
+  --focus-ring: 2px solid var(--color-bark);
+  --focus-offset: 2px;
+  --opacity-disabled: 0.5;
+  --opacity-faint: 0.25;
+  --duration-fast: 120ms;
+  --ease: ease;
+  // The typing dots: one pulse, and how far behind each dot runs.
+  --duration-pulse: 1.2s;
+  --stagger: 0.15s;
 
   color-scheme: dark;
 }
@@ -61,10 +133,10 @@ body {
 }
 
 body {
-  background: var(--color-ground);
-  color: var(--color-vellum);
+  background: var(--color-night);
+  color: var(--color-bark);
   font-family: var(--font-body);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-body);
   line-height: var(--line-body);
   -webkit-font-smoothing: antialiased;
 }
@@ -95,7 +167,17 @@ textarea {
 
 :focus-visible {
   outline: var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: var(--focus-offset);
+}
+
+// Read by screen readers, never shown: a label the design gives no room to.
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {

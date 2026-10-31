@@ -189,11 +189,11 @@ class ChatApi:
             yield item
 
     def router(self) -> APIRouter:
-        router = APIRouter(prefix="/api/chat", dependencies=[Depends(require_json)])
+        router = APIRouter(prefix="/api/chat")
         auth = self.auth
         Linked = Annotated[Viewer, Depends(auth.linked)]
 
-        @router.post("")
+        @router.post("", dependencies=[Depends(require_json)])
         async def send(message: Message, viewer: Linked) -> StreamingResponse:
             user = viewer.chat_user
             return StreamingResponse(
@@ -203,7 +203,7 @@ class ChatApi:
                 media_type=EVENT_STREAM,
             )
 
-        @router.post("/pick")
+        @router.post("/pick", dependencies=[Depends(require_json)])
         async def pick(chosen: Pick, viewer: Linked) -> StreamingResponse:
             user = viewer.chat_user
             choice = Choice(label=chosen.label, value=chosen.value, year=chosen.year)
@@ -212,7 +212,7 @@ class ChatApi:
                 media_type=EVENT_STREAM,
             )
 
-        @router.post("/decide")
+        @router.post("/decide", dependencies=[Depends(require_json)])
         async def decide(press: Press, viewer: Linked) -> dict[str, Any]:
             decision = await self.chat.decide(press.pending_id, viewer.chat_user, press.approve)
             return {
@@ -221,8 +221,13 @@ class ChatApi:
                 "notices": await self._deliver(decision.notices),
             }
 
-        @router.post("/forget")
+        @router.post("/forget", dependencies=[Depends(require_json)])
         async def forget(viewer: Linked) -> dict[str, str]:
             return {"text": self.chat.forget(viewer.chat_user)}
+
+        @router.get("/usage")
+        async def usage(viewer: Linked) -> dict[str, str | int | None]:
+            """The model, and today's tokens against the daily budget, for the page's footer."""
+            return self.chat.usage(viewer.chat_user.id)
 
         return router

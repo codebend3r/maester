@@ -1,83 +1,87 @@
-.page,
-.withTurns {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: var(--space-4);
-  height: 100dvh;
-  padding: var(--space-4);
-}
-
+// One full-viewport screen with no page scroll: only the conversation scrolls.
 .page {
-  grid-template-columns: minmax(0, var(--measure));
-  grid-template-areas:
-    'header'
-    'chat';
-  justify-content: center;
-}
-
-.withTurns {
-  grid-template-columns: var(--sidebar) minmax(0, var(--measure));
-  grid-template-areas:
-    'header header'
-    'turns chat';
-  justify-content: center;
-}
-
-.header {
-  grid-area: header;
   display: grid;
-  gap: var(--space-3);
+  grid-template-columns: var(--rail) var(--sidebar) minmax(0, 1fr);
+  grid-template-areas: 'rail sidebar chat';
+  block-size: 100dvh;
 }
 
-.wordmark {
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  font-weight: 400;
-  color: var(--color-ash);
+.rail {
+  grid-area: rail;
+  display: grid;
+  min-block-size: 0;
 }
 
-.turns {
-  grid-area: turns;
-  overflow-y: auto;
-  padding: var(--space-3);
-  background: var(--color-panel);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-lg);
+.sidebar {
+  grid-area: sidebar;
+  display: grid;
+  min-block-size: 0;
 }
 
 .chat {
   grid-area: chat;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: var(--space-3);
+  grid-template-areas:
+    'conversation'
+    'composer';
+  min-block-size: 0;
 }
 
-// A grid itself, so the transcript's empty-state message can centre in the scrolling row.
 .conversation {
+  grid-area: conversation;
   display: grid;
+  justify-items: center;
   overflow-y: auto;
+  padding: var(--space-7) var(--space-8) var(--space-5);
+}
+
+.composer {
+  grid-area: composer;
+  display: grid;
+  justify-items: center;
+  padding: 0 var(--space-8) var(--space-6);
 }
 
 .notice {
   display: grid;
   place-items: center;
-  min-height: 100dvh;
-  padding: var(--space-4);
-  color: var(--color-ash);
+  min-block-size: 100dvh;
+  padding: var(--space-5);
+  color: var(--color-lichen);
   text-align: center;
 }
 
 @media (max-width: 64rem) {
-  .withTurns {
-    grid-template-rows: auto auto minmax(0, 1fr);
-    grid-template-columns: minmax(0, var(--measure));
+  .page {
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
-      'header'
-      'turns'
-      'chat';
+      'rail sidebar'
+      'rail chat';
   }
 
-  .turns {
-    max-height: 30dvh;
+  .sidebar {
+    max-block-size: 40dvh;
+    overflow-y: auto;
+  }
+
+  .conversation {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .composer {
+    padding: 0 var(--space-4) var(--space-4);
+  }
+}
+
+@media (max-width: 30rem) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'rail'
+      'sidebar'
+      'chat';
   }
 }

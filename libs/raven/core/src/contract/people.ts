@@ -100,3 +100,15 @@ export const isPersonDetails = object({
 })
 
 export type PersonDetails = Infer<typeof isPersonDetails>
+
+/** A person whose name a search matched, and how many movies and shows in raven the caller may see they are credited on. */
+export const isPersonMatch = object({
+  id: isNumber,
+  name: isString,
+  photoVersion: nullable(isString),
+  titles: isNumber,
+})
+
+export type PersonMatch = Infer<typeof isPersonMatch>
+
+export const isPersonMatches = listOf(isPersonMatch)

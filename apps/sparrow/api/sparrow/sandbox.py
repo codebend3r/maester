@@ -1,11 +1,12 @@
 """A local playground for sparrow's chat: the real agent against an eval case's fakes.
 
 `uv run sparrow-sandbox` serves the chat routes the web app talks to, but every
-service is a fake seeded from one eval case (or none, a blank world) except
+service is a fake seeded from one eval case (or none, a blank world, where the
+eval user starts as an admin) except
 raven, which is the real library at `RAVEN_URL` (from the environment or
 `.env`, http://localhost:5174 when unset), so "is it on the server?" is
 answered from real titles. The deployed server reads the same variable. The store is in memory, and there is no sign-in: every request is the eval user,
-at the tier the page picks. The model is Claude Haiku 5.5 unless `--model`
+at the tier the page picks. The model is Claude Sonnet 5.5 at medium effort unless `--model`
 names another, reached through headless Claude Code on the developer's own
 sign-in (`sparrow/agent/claude_code.py`), never an API key: only the deployed
 server uses one. `--model fake` answers every turn with a scripted line, for
@@ -34,15 +35,24 @@ from fastapi import APIRouter, Depends, FastAPI, Request
 from pydantic import BaseModel
 
 from sparrow.agent.claude_code import BINARY, ClaudeCodeModel
+from sparrow.agent.limits import RateLimiter
 from sparrow.agent.tools import Tier
 from sparrow.chat.identity import IdentityService
 from sparrow.chat.service import ChatService
 from sparrow.clients import RavenClient
+from sparrow.clients.arr_library import (
+    LIBRARY_TIMEOUT,
+    SHAPES,
+    ArrLibrary,
+    ArrService,
+    arr_libraries,
+)
 from sparrow.clients.curl import CurlTransport
-from sparrow.config import load_env_file, load_settings
+from sparrow.config import Settings, load_env_file, load_settings
 from sparrow.evals import CASES_DIR, Case, build_agent
 from sparrow.evals.world import EVAL_USER, build_world
 from sparrow.notify import LogNotifier
+from sparrow.registry import instances_from_env
 from sparrow.store import Store
 from sparrow.web import create_app
 from sparrow.web.auth import Auth, Refused, Viewer, require_json
@@ -58,12 +68,12 @@ CHOICES = {
     "case": "SPARROW_SANDBOX_CASE",
     "raven": "SPARROW_SANDBOX_RAVEN",
 }
-MODEL = "claude-haiku-5-5"
+MODEL = "claude-sonnet-5-5"
 # raven's web dev server on this machine, which proxies its API: where the sandbox looks
 # when `RAVEN_URL` is unset.
 LOCAL_RAVEN = "http://localhost:5174"
 FAKE_MODEL = "fake"
-SANDBOX_NAME = "Sandbox friend"
+SANDBOX_NAME = "Sandbox user"
 HOST = "127.0.0.1"
 
 
@@ -108,24 +118,40 @@ class SandboxAuth(Auth):
 
 
 class Sandbox:
-    def __init__(self, model: str, cases_dir: Path = CASES_DIR, raven_url: str = ""):
+    def __init__(
+        self,
+        model: str,
+        cases_dir: Path = CASES_DIR,
+        raven_url: str = "",
+        arrs: dict[ArrService, dict[str, ArrLibrary]] | None = None,
+    ):
         self.model = model
         # One Claude Code client and one raven client for every world.
         self.client = None if model == FAKE_MODEL else ClaudeCodeModel()
         # On a Mac, Local Network privacy can keep this Python off a raven on the LAN; curl gets through.
         transport = CurlTransport() if sys.platform == "darwin" else None
         self.raven = RavenClient(raven_url, transport=transport) if raven_url else None
+        # The real Radarr, Sonarr and Lidarr from `.env`, like raven, stand in for every case's.
+        self.arrs = {service: hosts for service, hosts in (arrs or {}).items() if hosts}
+        # One meter for every world, counting tokens against the deployed daily budget
+        # without refusing anything, so the page's footer reads true while testing.
+        guardrails = Settings().guardrails
+        self.limiter = RateLimiter(
+            guardrails.user_messages_per_hour, guardrails.user_tokens_per_day, enforce=False
+        )
         self.cases = {p.stem: Case.load(p) for p in sorted(cases_dir.glob("*.yaml"))}
         self.world = self._open(BLANK)
         self.auth = SandboxAuth(self)
         self.chat = ChatApi(self.auth, self.world.chat, LogNotifier(), trace=True)
 
     def _open(self, case_id: str) -> World:
-        case = self.cases.get(case_id) or Case(name="Blank world", tier=Tier.FRIEND, turns=[])
+        case = self.cases.get(case_id) or Case(name="Blank world", tier=Tier.ADMIN, turns=[])
         registry, services, store = build_world(case.services)
         if self.raven is not None:
             services.raven = self.raven
+        services.arr_libraries = {**services.arr_libraries, **self.arrs}
         agent = build_agent(self.model, registry, services, store, model_client=self.client)
+        agent.limiter = self.limiter
         identity = IdentityService(store, services)
         identity.set_tier_override(EVAL_USER, case.tier.name.lower())
         return World(case_id, case, store, ChatService(agent=agent, identity=identity, store=store))
@@ -190,7 +216,15 @@ class Sandbox:
 
 def app() -> FastAPI:
     """The sandbox `main` chose, opened fresh: uvicorn's factory, called again on each reload."""
-    sandbox = Sandbox(os.environ[CHOICES["model"]], raven_url=os.environ[CHOICES["raven"]])
+    mac = sys.platform == "darwin"
+    sandbox = Sandbox(
+        os.environ[CHOICES["model"]],
+        raven_url=os.environ[CHOICES["raven"]],
+        arrs=arr_libraries(
+            instances_from_env(os.environ),
+            transport=CurlTransport(timeout=LIBRARY_TIMEOUT) if mac else None,
+        ),
+    )
     sandbox.open(os.environ[CHOICES["case"]])
     return sandbox.app()
 
@@ -229,6 +263,8 @@ def main(argv: list[str] | None = None) -> int:
         HOST,
         cfg.web_port,
     )
+    arrs = [f"{i.service} {i.host}" for i in instances_from_env(os.environ) if i.service in SHAPES]
+    log.info("real arrs for the admin's arr tools: %s", ", ".join(arrs) or "none (cases' fakes)")
     # Reloads on every change to sparrow's code, so the page never talks to a stale sandbox.
     uvicorn.run(
         f"{__name__}:{app.__name__}",

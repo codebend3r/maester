@@ -118,6 +118,7 @@ async def test_run_case_and_close_closes_the_client_inside_the_loop():
         ("request_status", ("request_status", {})),
         ("collection_request", ("find_collection", {"tmdb_id": 954})),
         ("anime_english_dub", ("check_availability", {"tmdb_id": 209867, "media_type": "tv"})),
+        ("person_latest_movies", ("search_people", {"name": "Bob Odenkirk", "kind": "movie"})),
     ],
 )  # fmt: skip
 async def test_case_worlds_answer_the_tools_their_cases_expect(case_file, call):

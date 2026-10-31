@@ -27,6 +27,15 @@ def test_token_budget_resets_each_day():
     assert lim.add_tokens("u", 1) == 1
 
 
+def test_a_meter_that_does_not_enforce_counts_but_never_refuses():
+    lim = RateLimiter(messages_per_hour=1, tokens_per_day=10, enforce=False)
+    lim.add_tokens("u", 25)
+    lim.check_tokens("u")
+    lim.check_message("u")
+    lim.check_message("u")
+    assert lim.used_today("u") == 25 and lim.used_today("other") == 0
+
+
 def test_kill_switch():
     k = KillSwitch()
     assert not k.enabled

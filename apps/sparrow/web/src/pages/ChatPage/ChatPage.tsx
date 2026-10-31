@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useEffect } from 'react'
-import { CaseTurns } from '@/components/CaseTurns/CaseTurns'
 import { Composer } from '@/components/Composer/Composer'
-import { SandboxBar } from '@/components/SandboxBar/SandboxBar'
+import { Rail } from '@/components/Rail/Rail'
+import { Sidebar } from '@/components/Sidebar/Sidebar'
 import { Transcript } from '@/components/Transcript/Transcript'
 import { type Me, SIGN_IN_STATES, TIERS, fetchMe, fetchSandbox } from '@/lib/api'
 import { browser } from '@/lib/browser'
@@ -58,28 +58,25 @@ const Unlinked = () => <Notice>{CHAT_PAGE_COPY.unlinked}</Notice>
 
 type ChatRoomProps = { signedIn: SignedIn; world: World }
 
-const ChatRoom = ({ signedIn, world }: ChatRoomProps) => {
-  const turns = world?.case.turns ?? []
-  return (
-    <div className={turns.length > 0 ? styles.withTurns : styles.page}>
-      <header className={styles.header}>
-        <h1 className={styles.wordmark}>{CHAT_PAGE_COPY.wordmark}</h1>
-        {world && <SandboxBar state={world} tier={signedIn.tier} />}
-      </header>
-      {world && turns.length > 0 && (
-        <aside className={styles.turns}>
-          <CaseTurns name={world.case.name} turns={turns} />
-        </aside>
-      )}
-      <main className={styles.chat}>
-        <section className={styles.conversation} aria-label={CHAT_PAGE_COPY.transcript}>
-          <Transcript />
-        </section>
-        <Composer />
-      </main>
+/** The app: the icon rail, the sidebar, and the conversation with the composer under it. */
+const ChatRoom = ({ signedIn, world }: ChatRoomProps) => (
+  <div className={styles.page}>
+    <div className={styles.rail}>
+      <Rail />
     </div>
-  )
-}
+    <div className={styles.sidebar}>
+      <Sidebar world={world ?? null} tier={signedIn.tier} />
+    </div>
+    <main className={styles.chat}>
+      <section className={styles.conversation} aria-label={CHAT_PAGE_COPY.transcript}>
+        <Transcript tier={signedIn.tier} />
+      </section>
+      <div className={styles.composer}>
+        <Composer />
+      </div>
+    </main>
+  </div>
+)
 
 type ReadyProps = ChatViewProps
 

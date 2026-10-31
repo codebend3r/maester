@@ -1,15 +1,15 @@
 .link {
-  color: var(--color-brass);
+  color: var(--color-amber);
   text-decoration: underline;
-  text-underline-offset: 0.15em;
+  text-underline-offset: var(--underline-offset);
 
   &:hover {
-    color: var(--color-brass-hover);
+    color: var(--color-amber-hi);
   }
 }
 
 .strong {
-  font-weight: 700;
+  font-weight: var(--font-weight-strong);
 }
 
 .emphasis {

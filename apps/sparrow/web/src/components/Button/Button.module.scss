@@ -1,24 +1,26 @@
 .button {
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
+  border: var(--hairline) solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
   line-height: var(--line-tight);
   cursor: pointer;
 
   &:disabled {
     cursor: not-allowed;
-    opacity: 0.5;
+    opacity: var(--opacity-disabled);
   }
 }
 
 .primary {
-  background: var(--color-brass);
-  border-color: var(--color-brass);
-  color: var(--color-ground);
+  background: var(--color-leaf);
+  border-color: var(--color-leaf);
+  color: var(--color-on-leaf);
+  font-weight: var(--font-weight-bold);
 
   &:hover:not(:disabled) {
-    background: var(--color-brass-hover);
+    background: var(--color-leaf-hi);
+    border-color: var(--color-leaf-hi);
   }
 }
 
@@ -26,6 +28,6 @@
   background: transparent;
 
   &:hover:not(:disabled) {
-    border-color: var(--color-ash);
+    background: var(--color-canopy);
   }
 }

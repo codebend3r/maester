@@ -125,6 +125,16 @@ class ChatService:
         self.identity = identity
         self.store = store
 
+    def usage(self, user_id: str) -> dict[str, str | int | None]:
+        """The model answering, and `user_id`'s tokens today against the daily budget
+        (None for both without a limiter)."""
+        limiter = self.agent.limiter
+        return {
+            "model": self.agent.model,
+            "tokens_used": limiter.used_today(user_id) if limiter else None,
+            "token_budget": limiter.tokens_per_day if limiter else None,
+        }
+
     # -- messages ---------------------------------------------------------
 
     async def handle_message(

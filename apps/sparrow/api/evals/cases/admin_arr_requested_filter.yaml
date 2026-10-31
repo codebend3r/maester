@@ -1,0 +1,22 @@
+name: the admin asks Radarr about a saved filter, then moves it to the letter folders
+tier: admin
+services:
+  arr_libraries:
+    radarr:
+      vermithor:
+        roots: ["/Meleys/Movies/#", "/Meleys/Movies/L", "/Meleys/Movies/D", "/Meleys/Movies/Requests"]
+        filters:
+          - label: "Movies (Requested)"
+            type: movieIndex
+            filters: [{key: path, value: ["/Meleys/Movies/Requests/"], type: contains}]
+        records:
+          - {id: 1, title: "Love Liza", year: 2002, path: "/Meleys/Movies/Requests/Love Liza (2002)", hasFile: true, sizeOnDisk: 1500000000, monitored: false, status: released}
+          - {id: 2, title: "25th Hour", year: 2002, path: "/Meleys/Movies/Requests/25th Hour (2002)", hasFile: true, sizeOnDisk: 36000000000, monitored: false, status: released}
+          - {id: 3, title: "Digger", year: 2026, path: "/Meleys/Movies/Requests/Digger (2026)", hasFile: false, sizeOnDisk: 0, monitored: true, status: inCinemas}
+turns:
+  - user: "look at radarr on vermithor, list every movie in the Movies (Requested) filter"
+    expect_tools: [arr_titles]
+    forbid_tools: [arr_move]
+    reply_matches: "Digger"
+  - user: "move them all into their letter bucket folders under /Meleys/Movies"
+    expect_tools: [arr_move]

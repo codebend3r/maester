@@ -182,3 +182,60 @@ describe("the people store's filmographies", () => {
     )
   })
 })
+
+type MovieProps = {
+  tmdbId: string
+  cast: readonly (readonly [string, string])[]
+}
+
+describe("the people store's name search", () => {
+  const database = testDatabase('raven-people-named-')
+  const people = () => peopleRepositoryOf(database.get())
+
+  beforeAll(async () => {
+    await database.open()
+    const { metadata } = repositories(database.get())
+    const movie = ({ tmdbId, cast }: MovieProps) =>
+      metadata.save({
+        item: {
+          ...BLANK_ITEM,
+          type: 'movie',
+          tmdbId,
+          number: null,
+          title: `Movie ${tmdbId}`,
+          credits: cast.map(([personTmdbId, name]) => ({
+            tmdbId: personTmdbId,
+            name,
+            photo: null,
+            job: 'cast',
+            role: null,
+          })),
+        },
+      })
+    movie({
+      tmdbId: '1',
+      cast: [
+        ['10', 'Bob Odenkirk'],
+        ['11', 'Bob'],
+        ['12', '50% Bob'],
+      ],
+    })
+    movie({ tmdbId: '2', cast: [['10', 'Bob Odenkirk']] })
+  })
+
+  afterAll(database.close)
+
+  it('puts the exact name first, then the most credited, and reads % as itself', () => {
+    expect(
+      people()
+        .named({ search: 'BOB', limit: 10 })
+        .map(({ name }) => name),
+    ).toEqual(['Bob', 'Bob Odenkirk', '50% Bob'])
+    expect(
+      people()
+        .named({ search: '%', limit: 10 })
+        .map(({ name }) => name),
+    ).toEqual(['50% Bob'])
+    expect(people().named({ search: 'bob', limit: 1 })).toHaveLength(1)
+  })
+})

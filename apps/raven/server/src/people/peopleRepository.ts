@@ -3,6 +3,7 @@ import { isMatchItemType, isNumber, listOf, type PersonProfile } from '@raven/co
 import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
+import { likePattern } from '@/media/mediaSql'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import type { FetchedPerson, FetchedPersonCredit } from '@/metadata/tmdbShapes'
 
@@ -61,6 +62,14 @@ type CreditRow = {
 
 const isGenreIds = listOf(isNumber)
 
+/** A person whose name a search matched. */
+export type NamedPerson = { id: number; name: string; photoVersion: string | null }
+
+type PeopleRepositoryNamedProps = {
+  search: string
+  limit: number
+}
+
 type PeopleRepositorySaveFilmographyProps = {
   personId: number
   tmdbId: string
@@ -107,6 +116,32 @@ export class PeopleRepository {
               knownFor: row.known_for,
             },
     }
+  }
+
+  /**
+   * People whose name holds `search`, ignoring case: one named exactly that
+   * first, then whoever is credited on the most of raven's titles.
+   */
+  named({ search, limit }: PeopleRepositoryNamedProps): NamedPerson[] {
+    return this.db
+      .prepare<
+        { search: string; pattern: string; limit: number },
+        { id: number; name: string; photo: string | null }
+      >(
+        `SELECT p.id, p.name, p.photo
+           FROM people p
+          WHERE p.name LIKE @pattern ESCAPE '\\'
+          ORDER BY lower(p.name) = lower(@search) DESC,
+                   (SELECT COUNT(*) FROM credits c WHERE c.person_id = p.id) DESC,
+                   p.name
+          LIMIT @limit`,
+      )
+      .all({ search, pattern: likePattern(search), limit })
+      .map((row) => ({
+        id: row.id,
+        name: row.name,
+        photoVersion: this.pictureVersions.photo({ id: row.id, photo: row.photo }),
+      }))
   }
 
   /**

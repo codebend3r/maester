@@ -1,8 +1,8 @@
-type TitleWithYearProps = { title: string; year: number }
+type OpenProps = { title: string; copy: string }
 
 export const TITLE_CARD_COPY = {
-  titleWithYear: ({ title, year }: TitleWithYearProps) => `${title} (${year})`,
-  open: (name: string) => `Open ${name}`,
+  open: ({ title, copy }: OpenProps) => `Open ${title}: ${copy}`,
+  separator: ' · ',
 } as const
 
 export const TITLE_CARDS_COPY = {

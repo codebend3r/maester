@@ -109,21 +109,19 @@ describe('ChatPage', () => {
     )
     renderWithQueries(<ChatPage />)
 
-    expect(
-      await screen.findByText('Sandbox · fake · raven http://localhost:5174'),
-    ).toBeInTheDocument()
+    expect(await screen.findByText('raven · localhost:5174')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'can you get Dune (2021) in 1080p?' }))
 
     const link = await screen.findByRole('link', { name: 'Watch it in raven' })
     expect(link).toHaveAttribute('href', 'http://localhost:5174/movies/277?library=6')
     expect(link).toHaveAttribute('target', '_blank')
     expect(screen.queryByText(/localhost:5174\/movies/)).not.toBeInTheDocument()
-    expect(screen.getByText('2 tool calls: search_media, request_media')).toBeInTheDocument()
+    const tools = screen.getByRole('list', { name: 'Tool calls' })
+    expect(within(tools).getByText('✓ search_media("Dune")')).toBeInTheDocument()
+    expect(within(tools).getByText('✓ request_media(438631)')).toBeInTheDocument()
     const titles = screen.getByRole('list', { name: 'Titles' })
-    expect(within(titles).getByRole('img', { name: 'Dune (2021)' })).toHaveAttribute(
-      'src',
-      'http://localhost:5174/api/items/277/images/logo',
-    )
+    expect(within(titles).getByText('Dune')).toBeInTheDocument()
+    expect(within(titles).getByText('2021')).toBeInTheDocument()
     expect(
       within(titles)
         .getAllByRole('link')
@@ -133,6 +131,39 @@ describe('ChatPage', () => {
     expect(sent).toEqual([
       { url: '/api/chat', body: { text: 'can you get Dune (2021) in 1080p?' } },
     ])
+  })
+
+  it('shows the model and the tokens left, read again after each turn, and ＋ starts over', async () => {
+    const used = [15_750]
+    const sent = serve(
+      sandboxRoutes({
+        '/api/chat/usage': () =>
+          json({ model: 'claude-sonnet-5-5', tokens_used: used[0], token_budget: 200_000 }),
+        '/api/chat': () => {
+          used[0] = 190_000
+          return new Response(
+            eventStream([
+              ['text', { text: 'Hello.' }],
+              ['done', {}],
+            ]),
+          )
+        },
+        '/api/chat/forget': () => json({ text: 'Forgotten.' }),
+      }),
+    )
+    renderWithQueries(<ChatPage />)
+
+    expect(await screen.findByText('claude-sonnet-5-5')).toBeInTheDocument()
+    expect(await screen.findByText('184,250')).toBeInTheDocument()
+    expect(screen.getByText('/ 200,000 tokens left')).toBeInTheDocument()
+
+    await userEvent.type(await screen.findByLabelText('Message sparrow'), 'hi{Enter}')
+    expect(await screen.findByText('Hello.')).toBeInTheDocument()
+    expect(await screen.findByText('10,000')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(await screen.findByText('How can I help?')).toBeInTheDocument()
+    expect(sent.at(-1)).toEqual({ url: '/api/chat/forget', body: {} })
   })
 
   it('presses a confirmation once and picks a choice as the next message', async () => {
@@ -275,7 +306,7 @@ describe('ChatPage', () => {
     await useChat.persist.rehydrate()
     serve(sandboxRoutes())
     renderWithQueries(<ChatPage />)
-    expect(await screen.findByText(/Ask sparrow something/)).toBeInTheDocument()
+    expect(await screen.findByText('How can I help?')).toBeInTheDocument()
     expect(screen.queryByText('from before')).not.toBeInTheDocument()
   })
 

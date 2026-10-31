@@ -42,6 +42,7 @@ from sparrow.clients import (
     TautulliClient,
     WizarrClient,
 )
+from sparrow.clients.arr_library import arr_libraries
 from sparrow.clients.fleet import FleetMonitorClient
 from sparrow.clients.media import MediaPaths
 from sparrow.config import REQUIRED, Settings, load_env_file, refuse_renamed, require, settings
@@ -85,6 +86,7 @@ def build_services(cfg: Settings, instances: list[Instance]) -> Services:
         speedtest=OoklaSpeedTest(cfg.speedtest_host) if cfg.speedtest_host else None,
         plextv=PlexTvClient(cfg.plex_tv_url, cfg.plex_token) if cfg.plex_token else None,
         raven=RavenClient(cfg.raven_url) if cfg.raven_url else None,
+        arr_libraries=arr_libraries(instances),
     )
 
 

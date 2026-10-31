@@ -10,27 +10,39 @@ const pretty = (text: string): string => {
   }
 }
 
+/** A call's arguments as the chip shows them, their values in order: ("movie", 10). */
+const shownArgument = (input: Record<string, unknown>): string =>
+  Object.values(input)
+    .map((value) => JSON.stringify(value))
+    .join(', ')
+
 type ToolTraceProps = { tools: ToolCall[] }
 
-/** Each tool call a turn made, its arguments and what it answered, folded until opened. */
+/** Each tool call a turn made as a chip, opening to its arguments and what it answered. */
 export const ToolTrace = ({ tools }: ToolTraceProps) => (
-  <details className={styles.trace}>
-    <summary className={styles.summary}>
-      {TOOL_TRACE_COPY.calls(tools.length)} {tools.map((tool) => tool.name).join(', ')}
-    </summary>
-    <ol className={styles.calls}>
-      {tools.map((tool, index) => (
-        <li key={`${tool.name}-${index}`} className={styles.call}>
-          <p className={styles.name}>
-            {tool.name}{' '}
-            <span className={tool.ok ? styles.ok : styles.failed}>
-              {tool.ok ? TOOL_TRACE_COPY.ok : TOOL_TRACE_COPY.error}
-            </span>
-          </p>
-          <pre className={styles.code}>{JSON.stringify(tool.input, null, 2)}</pre>
-          <pre className={styles.code}>{pretty(tool.result)}</pre>
-        </li>
-      ))}
-    </ol>
-  </details>
+  <ul className={styles.chips} aria-label={TOOL_TRACE_COPY.label}>
+    {tools.map((tool, index) => (
+      <li key={`${tool.name}-${index}`} className={styles.call}>
+        <details className={styles.details}>
+          <summary className={tool.ok ? styles.chip : styles.failedChip}>
+            {TOOL_TRACE_COPY.chip({
+              name: tool.name,
+              argument: shownArgument(tool.input),
+              isOk: tool.ok,
+            })}
+          </summary>
+          <dl className={styles.trace}>
+            <dt className={styles.term}>{TOOL_TRACE_COPY.input}</dt>
+            <dd>
+              <pre className={styles.code}>{JSON.stringify(tool.input, null, 2)}</pre>
+            </dd>
+            <dt className={styles.term}>{TOOL_TRACE_COPY.result}</dt>
+            <dd>
+              <pre className={styles.code}>{pretty(tool.result)}</pre>
+            </dd>
+          </dl>
+        </details>
+      </li>
+    ))}
+  </ul>
 )

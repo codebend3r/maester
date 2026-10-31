@@ -98,7 +98,6 @@ const isTitleCard = (value: unknown): value is TitleCard =>
   typeof value.key === 'string' &&
   typeof value.title === 'string' &&
   (value.year === null || typeof value.year === 'number') &&
-  (value.logoUrl === null || isWebAddress(value.logoUrl)) &&
   Array.isArray(value.links) &&
   value.links.every(
     (link) => isRecord(link) && typeof link.label === 'string' && isWebAddress(link.url),

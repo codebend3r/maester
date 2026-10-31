@@ -1,64 +1,33 @@
-import { type ComponentType, useState } from 'react'
+import { Fragment } from 'react'
 import styles from '@/components/TitleCards/TitleCards.module.scss'
 import { TITLE_CARD_COPY, TITLE_CARDS_COPY } from '@/components/TitleCards/copy'
 import type { TitleCard } from '@/lib/events'
 
-const named = (card: TitleCard) =>
-  card.year == null
-    ? card.title
-    : TITLE_CARD_COPY.titleWithYear({ title: card.title, year: card.year })
-
-const TITLE_FACES = { logo: 'logo', name: 'name' } as const
-
-type TitleFace = (typeof TITLE_FACES)[keyof typeof TITLE_FACES]
-
-type TitleFaceProps = { card: TitleCard; onLogoBroken: () => void }
-
-type TitleLogoProps = TitleFaceProps
-
-const TitleLogo = ({ card, onLogoBroken }: TitleLogoProps) => (
-  <img
-    className={styles.logo}
-    src={card.logoUrl ?? undefined}
-    alt={named(card)}
-    loading="lazy"
-    onError={onLogoBroken}
-  />
-)
-
-type TitleNameProps = TitleFaceProps
-
-const TitleName = ({ card }: TitleNameProps) => <p className={styles.name}>{named(card)}</p>
-
-const TITLE_FACE_VIEWS = {
-  [TITLE_FACES.logo]: TitleLogo,
-  [TITLE_FACES.name]: TitleName,
-} as const satisfies Record<TitleFace, ComponentType<TitleFaceProps>>
-
 type CardProps = { card: TitleCard }
 
-/** One title: its logo, or its name when it has none, and a link to each copy. */
-const Card = ({ card }: CardProps) => {
-  const [isLogoBroken, setLogoBroken] = useState(false)
-  const Face =
-    TITLE_FACE_VIEWS[card.logoUrl != null && !isLogoBroken ? TITLE_FACES.logo : TITLE_FACES.name]
-  return (
-    <li className={styles.card}>
-      <Face card={card} onLogoBroken={() => setLogoBroken(true)} />
-      {card.links.length > 0 && (
-        <ul className={styles.links} aria-label={TITLE_CARD_COPY.open(named(card))}>
-          {card.links.map((link) => (
-            <li key={link.url}>
-              <a className={styles.link} href={link.url} target="_blank" rel="noopener noreferrer">
-                {link.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
-  )
-}
+/** One title: its name, then its year and a link to each copy. */
+const Card = ({ card }: CardProps) => (
+  <li className={styles.card}>
+    <p className={styles.name}>{card.title}</p>
+    <p className={styles.meta}>
+      {card.year != null && <span>{card.year}</span>}
+      {card.links.map((link, index) => (
+        <Fragment key={link.url}>
+          {(card.year != null || index > 0) && TITLE_CARD_COPY.separator}
+          <a
+            className={styles.link}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={TITLE_CARD_COPY.open({ title: card.title, copy: link.label })}
+          >
+            {link.label}
+          </a>
+        </Fragment>
+      ))}
+    </p>
+  </li>
+)
 
 type TitleCardsProps = { cards: TitleCard[] }
 

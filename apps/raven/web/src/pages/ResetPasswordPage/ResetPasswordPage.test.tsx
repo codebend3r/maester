@@ -6,7 +6,7 @@ import { AUTH_CONFIG_STATES, ApiError, MEMBER_STATUSES, AUTH_ROUTES } from '@rav
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
 import { type AuthClient } from '@/lib/authClient'
-import { AUTH_ERRORS } from '@/lib/authErrors'
+import { AUTH_ERRORS, PASSWORD_COPY } from '@/lib/authErrors'
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage/ResetPasswordPage'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { fakeAccount, fakeSession } from '@/test/authClient'
@@ -18,6 +18,10 @@ type UpdateResult = Awaited<ReturnType<AuthClient['updateUser']>>
 const updated = (): UpdateResult => ({ data: { user: fakeSession().user }, error: null })
 
 type RefusedProps = { code: string; message: string }
+
+/** What Supabase says for a weak password under raven's rules. */
+const SUPABASE_WEAK_PASSWORD =
+  'Password should be at least 10 characters. Password should contain at least one character of each: abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 0123456789.'
 
 const refused = ({ code, message }: RefusedProps): UpdateResult => ({
   data: { user: null },
@@ -120,14 +124,14 @@ describe('ResetPasswordPage', () => {
       expect(useAuthSession.getState().isRecovery).toBe(false)
     })
 
-    it('shows the server’s words for a weak password, marking the password as the field to fix', async () => {
+    it('states the password rules plainly for a weak password, marking the password as the field to fix', async () => {
       const user = userEvent.setup()
       renderReset({
         calls: {
           updateUser: async () =>
             refused({
               code: AUTH_ERRORS.weakPassword,
-              message: 'Password should be at least 12 characters.',
+              message: SUPABASE_WEAK_PASSWORD,
             }),
         },
       })
@@ -136,11 +140,9 @@ describe('ResetPasswordPage', () => {
 
       await user.click(submit())
 
-      expect(await screen.findByRole('alert')).toHaveTextContent(
-        'Password should be at least 12 characters.',
-      )
+      expect(await screen.findByRole('alert')).toHaveTextContent(PASSWORD_COPY.rules)
       expect(password()).toHaveAttribute('aria-invalid', 'true')
-      expect(password()).toHaveAccessibleDescription('Password should be at least 12 characters.')
+      expect(password()).toHaveAccessibleDescription(PASSWORD_COPY.rules)
       expect(submit()).toBeEnabled()
       expect(useAuthSession.getState().isRecovery).toBe(true)
     })
@@ -152,7 +154,7 @@ describe('ResetPasswordPage', () => {
           updateUser: async () =>
             refused({
               code: AUTH_ERRORS.weakPassword,
-              message: 'Password should be at least 12 characters.',
+              message: SUPABASE_WEAK_PASSWORD,
             }),
         },
       })
@@ -163,7 +165,7 @@ describe('ResetPasswordPage', () => {
 
       await user.type(password(), '-staple')
 
-      expect(screen.queryByText('Password should be at least 12 characters.')).toBeNull()
+      expect(screen.queryByText(PASSWORD_COPY.rules)).toBeNull()
       expect(password()).toHaveAttribute('aria-invalid', 'false')
     })
 

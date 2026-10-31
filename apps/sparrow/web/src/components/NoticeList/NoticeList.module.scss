@@ -7,13 +7,13 @@
   display: grid;
   gap: var(--space-1);
   padding: var(--space-2) var(--space-3);
-  border-left: 3px solid var(--color-brass);
-  background: var(--color-ground);
+  border-inline-start: var(--rule) solid var(--color-amber);
+  background: var(--color-night);
   border-radius: var(--radius-sm);
 }
 
 .heading {
-  color: var(--color-ash);
+  color: var(--color-lichen);
   font-size: var(--font-size-xs);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
