@@ -30,6 +30,7 @@ const FIRST_LIGHT: Track = {
   mbid: null,
   addedAt: '2026-10-01T00:00:00Z',
   album: { title: 'Morning Chorus', coverVersion: null },
+  gain: { track: null, album: null, trackPeak: null, albumPeak: null },
 }
 
 const ENTRY: DownloadEntry = {

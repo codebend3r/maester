@@ -98,6 +98,7 @@ const trackFor = ({ id, title, disc, number }: TrackForProps): Track => ({
   mbid: null,
   addedAt: '2026-01-01T00:00:00Z',
   album: { title: OK_COMPUTER.title, coverVersion: null },
+  gain: { track: null, album: null, trackPeak: null, albumPeak: null },
 })
 
 export const AIRBAG = trackFor({ id: 101, title: 'Airbag', disc: 1, number: 1 })

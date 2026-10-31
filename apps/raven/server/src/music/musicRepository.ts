@@ -106,6 +106,10 @@ type TrackRow = {
   album_cover_source: string | null
   album_cover_ref: string | null
   album_mbid: string | null
+  track_gain: number | null
+  track_peak: number | null
+  album_gain: number | null
+  album_peak: number | null
 }
 
 type ArtistRow = {
@@ -152,7 +156,9 @@ const SELECT_TRACKS = `SELECT m.id AS media_id, m.library_id, t.album_id, t.titl
                               t.bit_depth, t.is_lossless, t.mbid, m.added_at,
                               ${TRACK_ARTISTS} AS artists,
                               a.title AS album_title, a.cover_source AS album_cover_source,
-                              a.cover_ref AS album_cover_ref, a.mbid AS album_mbid
+                              a.cover_ref AS album_cover_ref, a.mbid AS album_mbid,
+                              t.replaygain_gain AS track_gain, t.replaygain_peak AS track_peak,
+                              a.replaygain_gain AS album_gain, a.replaygain_peak AS album_peak
                          FROM tracks t
                          JOIN media m ON m.id = t.media_id
                          JOIN albums a ON a.id = t.album_id`
@@ -354,6 +360,12 @@ export class MusicRepository {
             mbid: row.album_mbid,
           }),
         }),
+      },
+      gain: {
+        track: row.track_gain,
+        album: row.album_gain,
+        trackPeak: row.track_peak,
+        albumPeak: row.album_peak,
       },
     }
   }

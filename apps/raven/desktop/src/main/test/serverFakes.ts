@@ -171,6 +171,7 @@ export const track = (overrides: Partial<Track>): Track => ({
   mbid: null,
   addedAt: '2026-01-01T00:00:00Z',
   album: { title: 'OK Computer', coverVersion: 'cover-v1' },
+  gain: { track: null, album: null, trackPeak: null, albumPeak: null },
   ...overrides,
 })
 
