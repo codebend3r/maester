@@ -19,7 +19,7 @@ import { useAuthSession } from '@/stores/authSession'
 import { SIGN_UP_COPY } from '@/pages/SignUpPage/copy'
 import { COMMON_COPY } from '@/lib/copy'
 
-/** The server's own words for a weak password; the rest of what it says stays out of the page. */
+/** A weak password in plain words; the rest of what the server says stays out of the page. */
 const failureCopy = (error: unknown): string => {
   if (isRateLimited(error)) return RATE_LIMITED_COPY
   return weakPasswordMessage(error) ?? SIGN_UP_COPY.failed

@@ -4,6 +4,5 @@ export const CHAT_PAGE_COPY = {
   signingIn: 'Sending you to sign in…',
   unlinked:
     "Your Plex account doesn't have access to this server yet. Ask the admin or the friend who invited you for an invite.",
-  wordmark: 'sparrow',
   transcript: 'Transcript',
 } as const

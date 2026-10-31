@@ -9,13 +9,16 @@ the same methods over in-memory data, so tools and evals run without a stack.
 `speedtest` measures the internet connection from the container's own host.
 `plextv` reads and changes friends' library shares as the server owner.
 `raven` is the suite's own library, searched the way friends browse it.
+`arr_libraries` is each Radarr, Sonarr and Lidarr as a whole, by service and host,
+for the admin's questions about them and the moves they ask for.
 The fleet monitor, the speed test, plex.tv and raven are optional: None where not set up.
 `rookery` (who a session cookie belongs to) is the web app's, not the tools',
 so it sits outside `Services`.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from sparrow.clients.arr_library import ArrLibrary, ArrService
 from sparrow.clients.base import ClientError, HttpClient
 from sparrow.clients.fleet import FakeFleetMonitor, FleetMonitor, FleetMonitorClient
 from sparrow.clients.media import FakeFileProbe, FileProbe, MediaProbe
@@ -48,6 +51,8 @@ class Services:
     speedtest: SpeedTester | None  # None when SPEEDTEST_HOST isn't set
     plextv: PlexTv | None = None  # None without the owner's PLEX_TOKEN
     raven: Raven | None = None  # None without RAVEN_URL
+    # Every Radarr, Sonarr and Lidarr, by service, then host.
+    arr_libraries: dict[ArrService, dict[str, ArrLibrary]] = field(default_factory=dict)
 
 
 __all__ = [

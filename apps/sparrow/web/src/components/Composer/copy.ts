@@ -1,5 +1,6 @@
 export const COMPOSER_COPY = {
   label: 'Message sparrow',
-  placeholder: 'is Dune on the server?',
+  placeholder: 'Message sparrow',
   send: 'Send',
+  hint: 'Enter to send · Shift+Enter for a new line',
 } as const

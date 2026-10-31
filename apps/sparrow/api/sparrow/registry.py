@@ -1,6 +1,6 @@
 """Named service instances, so nothing ever talks to "Sonarr" without a host.
 
-Two NAS hosts each run their own Sonarr, Radarr, SABnzbd and Tautulli on the
+Two NAS hosts each run their own Sonarr, Radarr, Lidarr, SABnzbd and Tautulli on the
 same ports. Every tool that touches one takes a host name, and this registry
 is the only place that turns (service, host) into a URL and key. Which host
 owns a title is `sparrow/library.py`'s question, answered through Seerr and
@@ -17,7 +17,7 @@ import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
-PER_HOST_SERVICES = ("sonarr", "radarr", "sabnzbd", "tautulli")
+PER_HOST_SERVICES = ("sonarr", "radarr", "lidarr", "sabnzbd", "tautulli")
 
 _URL_VAR = re.compile(r"^(?P<service>[A-Z]+)_(?P<host>[A-Z0-9]+)_URL$")
 

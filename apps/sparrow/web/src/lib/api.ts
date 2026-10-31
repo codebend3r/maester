@@ -22,6 +22,7 @@ export const ROUTES = {
   pick: '/api/chat/pick',
   decide: '/api/chat/decide',
   forget: '/api/chat/forget',
+  usage: '/api/chat/usage',
 } as const
 
 export type ChatRoute = typeof ROUTES.chat | typeof ROUTES.pick
@@ -74,6 +75,12 @@ export type SandboxState = {
 }
 
 export type Decision = { text: string; isSettled: boolean; notices: Notice[] }
+
+/** Today's tokens against the daily budget, null where the server keeps no budget. */
+type Budget = { used: number; total: number }
+
+/** The model answering, and how much of today's budget is left. */
+export type Usage = { model: string; budget: Budget | null }
 
 class ApiError extends Error {
   constructor(readonly status: number) {
@@ -219,6 +226,23 @@ export const decide = async ({ pendingId, approve }: DecideProps): Promise<Decis
   }
   const notices = Array.isArray(body.notices) ? body.notices.map(toNotice) : []
   return { text: body.text, isSettled: body.settled, notices: notices.filter(isPresent) }
+}
+
+const isCount = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0
+
+/** The model, and the signed-in user's tokens today against the daily budget. */
+export const fetchUsage = async (): Promise<Usage> => {
+  const response = await fetch(ROUTES.usage)
+  const body = await readJson(response)
+  if (!response.ok || !isRecord(body) || typeof body.model !== 'string') {
+    throw new ApiError(response.status)
+  }
+  const budget =
+    isCount(body.tokens_used) && isCount(body.token_budget) && body.token_budget > 0
+      ? { used: body.tokens_used, total: body.token_budget }
+      : null
+  return { model: body.model, budget }
 }
 
 export const forget = async (): Promise<void> => {

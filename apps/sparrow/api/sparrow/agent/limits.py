@@ -26,11 +26,15 @@ class LimitExceeded(Exception):
 class RateLimiter:
     messages_per_hour: int
     tokens_per_day: int
+    # Off in the sandbox: usage is still counted and shown, but nothing is refused.
+    enforce: bool = True
     clock: callable = time.time  # type: ignore[assignment]
     _messages: dict[str, deque[float]] = field(default_factory=lambda: defaultdict(deque))
     _tokens: dict[str, tuple[int, float]] = field(default_factory=dict)  # (count, day_start)
 
     def check_message(self, user_id: str) -> None:
+        if not self.enforce:
+            return
         now = self.clock()
         window = self._messages[user_id]
         while window and window[0] < now - 3600:
@@ -40,9 +44,12 @@ class RateLimiter:
         window.append(now)
 
     def check_tokens(self, user_id: str) -> None:
-        count, _ = self._today(user_id)
-        if count >= self.tokens_per_day:
+        if self.enforce and self.used_today(user_id) >= self.tokens_per_day:
             raise LimitExceeded("daily usage", "try again tomorrow")
+
+    def used_today(self, user_id: str) -> int:
+        """The tokens `user_id` has used since midnight UTC."""
+        return self._today(user_id)[0]
 
     def add_tokens(self, user_id: str, tokens: int) -> int:
         count, day = self._today(user_id)

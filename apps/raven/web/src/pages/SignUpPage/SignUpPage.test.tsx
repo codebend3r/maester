@@ -6,7 +6,7 @@ import { AUTH_CONFIG_STATES, ApiError, MEMBER_STATUSES, AUTH_ROUTES } from '@rav
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
 import { type AuthClient } from '@/lib/authClient'
-import { AUTH_ERRORS } from '@/lib/authErrors'
+import { AUTH_ERRORS, PASSWORD_COPY } from '@/lib/authErrors'
 import { checkEmailPath } from '@/lib/authRoutes'
 import { SignUpPage } from '@/pages/SignUpPage/SignUpPage'
 import { AUTH_SESSION_STATUSES } from '@/stores/authSession'
@@ -29,6 +29,10 @@ const alreadyRegistered = (): SignUpResult => ({
 })
 
 type RefusedSignUpProps = { code: string; message: string }
+
+/** What Supabase says for a weak password under raven's rules. */
+const SUPABASE_WEAK_PASSWORD =
+  'Password should be at least 10 characters. Password should contain at least one character of each: abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 0123456789.'
 
 const refusedSignUp = ({ code, message }: RefusedSignUpProps): SignUpResult => ({
   data: { user: null, session: null },
@@ -178,25 +182,23 @@ describe('SignUpPage', () => {
     await waitFor(() => expect(where()).toBe(checkEmailPath({ email: 'jordan@example.com' })))
   })
 
-  it('shows the server’s words for a weak password, marking the password as the field to fix', async () => {
+  it('states the password rules plainly for a weak password, marking the password as the field to fix', async () => {
     const user = userEvent.setup()
     renderSignUp({
       calls: {
         signUp: async () =>
           refusedSignUp({
             code: AUTH_ERRORS.weakPassword,
-            message: 'Password should be at least 12 characters.',
+            message: SUPABASE_WEAK_PASSWORD,
           }),
       },
     })
     await fillIn({ user })
     await user.click(submit())
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Password should be at least 12 characters.',
-    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(PASSWORD_COPY.rules)
     expect(password()).toHaveAttribute('aria-invalid', 'true')
-    expect(password()).toHaveAccessibleDescription('Password should be at least 12 characters.')
+    expect(password()).toHaveAccessibleDescription(PASSWORD_COPY.rules)
     expect(submit()).toBeEnabled()
   })
 
@@ -207,7 +209,7 @@ describe('SignUpPage', () => {
         signUp: async () =>
           refusedSignUp({
             code: AUTH_ERRORS.weakPassword,
-            message: 'Password should be at least 12 characters.',
+            message: SUPABASE_WEAK_PASSWORD,
           }),
       },
     })
@@ -217,7 +219,7 @@ describe('SignUpPage', () => {
 
     await user.type(password(), '-battery')
 
-    expect(screen.queryByText('Password should be at least 12 characters.')).toBeNull()
+    expect(screen.queryByText(PASSWORD_COPY.rules)).toBeNull()
     expect(password()).toHaveAttribute('aria-invalid', 'false')
   })
 

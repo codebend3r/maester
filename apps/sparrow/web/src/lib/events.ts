@@ -36,12 +36,11 @@ export type Choice = {
   detail: string
 }
 type TitleLink = { label: string; url: string }
-/** A title a tool found, shown beside the reply: its logo, and a link per copy. */
+/** A title a tool found, shown beside the reply: its name and year, and a link per copy. */
 export type TitleCard = {
   key: string
   title: string
   year: number | null
-  logoUrl: string | null
   links: TitleLink[]
 }
 export type Notice = { kind: NoticeKind; text: string; pendingId: number | null; to: string | null }
@@ -116,7 +115,6 @@ const toTitleCard = (value: unknown): TitleCard | null => {
     key: value.key,
     title: value.title,
     year: typeof value.year === 'number' ? value.year : null,
-    logoUrl: isWebAddress(value.logo_url) ? value.logo_url : null,
     links: value.links.map(toTitleLink).filter(isPresent),
   }
 }

@@ -1,0 +1,158 @@
+.sidebar {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'wordmark'
+    'pickers'
+    'turns'
+    'footer';
+  gap: var(--space-5);
+  min-block-size: 0;
+  padding: var(--space-5) var(--space-4);
+  border-inline-end: var(--hairline) solid var(--color-line);
+}
+
+.wordmark {
+  grid-area: wordmark;
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-tight);
+}
+
+.pickers {
+  grid-area: pickers;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    'case tier'
+    'error error';
+  gap: var(--space-2);
+}
+
+.caseField,
+.tierField {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.caseField {
+  grid-area: case;
+}
+
+.tierField {
+  grid-area: tier;
+}
+
+.label {
+  color: var(--color-lichen);
+  font-size: var(--font-size-2xs);
+}
+
+.select {
+  inline-size: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: var(--hairline) solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-canopy);
+  font-size: var(--font-size-sm);
+  appearance: none;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: var(--opacity-disabled);
+  }
+}
+
+.error {
+  grid-area: error;
+  color: var(--color-alert);
+  font-size: var(--font-size-sm);
+}
+
+.turns {
+  grid-area: turns;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  min-block-size: 0;
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+}
+
+.list {
+  display: grid;
+  align-content: start;
+  overflow-y: auto;
+}
+
+.turn {
+  inline-size: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-list);
+  text-align: start;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--color-canopy-hi);
+    color: var(--color-bark);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: var(--opacity-disabled);
+  }
+}
+
+.footer {
+  grid-area: footer;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.environment {
+  display: grid;
+  color: var(--color-lichen);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-relaxed);
+}
+
+.sandbox {
+  color: var(--color-amber);
+}
+
+.startOver {
+  inline-size: 100%;
+}
+
+// Stacked above the conversation, the sidebar is as tall as what it holds.
+@media (max-width: 64rem) {
+  .sidebar,
+  .turns {
+    grid-template-rows: auto;
+  }
+
+  // The capped sidebar scrolls as a whole, so the list keeps its full height.
+  .list {
+    overflow-y: visible;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .turn {
+    transition:
+      background var(--duration-fast) var(--ease),
+      color var(--duration-fast) var(--ease);
+  }
+}

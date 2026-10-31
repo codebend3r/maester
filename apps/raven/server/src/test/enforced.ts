@@ -156,6 +156,7 @@ export const ROUTES = {
   nextInSession: { method: GET, path: '/api/media/:id/next', account: approved },
   markers: { method: GET, path: '/api/media/:id/markers', account: approved },
   tracks: { method: GET, path: '/api/media/:id/tracks', account: approved },
+  people: { method: GET, path: '/api/people', account: approved },
   person: { method: GET, path: '/api/people/:id', account: approved },
   itemPicture: { method: GET, path: PICTURE_PATHS.item, account: anyone },
   photoPicture: { method: GET, path: PICTURE_PATHS.photo, account: anyone },

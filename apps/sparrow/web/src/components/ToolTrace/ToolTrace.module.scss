@@ -1,44 +1,63 @@
-.trace {
+.chips {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-}
-
-.summary {
-  color: var(--color-ash);
-  cursor: pointer;
-}
-
-.calls {
-  display: grid;
-  gap: var(--space-3);
 }
 
 .call {
   display: grid;
-  gap: var(--space-1);
+  max-inline-size: 100%;
 }
 
-.name {
+.details {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.chip,
+.failedChip {
+  max-inline-size: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: var(--hairline) solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-lichen);
   font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  list-style: none;
+  cursor: pointer;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  &:hover {
+    color: var(--color-bark);
+  }
 }
 
-.ok {
-  color: var(--color-pass);
-}
-
-.failed {
+.failedChip {
   color: var(--color-alert);
+}
+
+.trace {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+}
+
+.term {
+  color: var(--color-lichen);
 }
 
 .code {
   overflow: auto;
-  max-height: 16rem;
+  max-block-size: var(--trace-max);
   padding: var(--space-2);
-  background: var(--color-ground);
+  background: var(--color-deep);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);

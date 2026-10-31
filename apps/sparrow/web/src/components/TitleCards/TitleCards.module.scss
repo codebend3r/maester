@@ -1,48 +1,35 @@
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--card-min)), 1fr));
   gap: var(--space-3);
 }
 
 .card {
   display: grid;
-  grid-template-rows: var(--logo-height) auto;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  background: var(--color-ground);
-  border: 1px solid var(--color-line);
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-canopy);
+  border: var(--hairline) solid var(--color-line-strong);
   border-radius: var(--radius-md);
 }
 
-.logo {
-  justify-self: center;
-  max-width: 100%;
-  max-height: var(--logo-height);
-  object-fit: contain;
-}
-
 .name {
-  justify-self: center;
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
   line-height: var(--line-tight);
-  text-align: center;
 }
 
-.links {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: center;
-  gap: var(--space-2);
+.meta {
+  color: var(--color-lichen);
   font-size: var(--font-size-xs);
 }
 
 .link {
-  color: var(--color-brass);
-  text-underline-offset: 0.15em;
+  color: var(--color-amber);
+  text-underline-offset: var(--underline-offset);
 
   &:hover {
-    color: var(--color-brass-hover);
+    color: var(--color-amber-hi);
   }
 }

@@ -1,0 +1,17 @@
+name: the newest movies come from raven by release date
+tier: friend
+services:
+  raven:
+    titles:
+      - {title: "Arrival", year: 2016, released: "2016-11-11", quality: "1080p"}
+      - {title: "Dune", year: 2021, released: "2021-10-22", quality: "1080p"}
+      - {title: "Dune", year: 2021, released: "2021-10-22", quality: "4K", hdr: true, library: "4K Movies", library_id: 4, item_id: 2}
+      - {title: "Severance", year: 2022, released: "2022-02-18", kind: show, library: "TV Shows", library_id: 7}
+turns:
+  - user: "what are the newest movies out right now?"
+    expect_tools: [newest_in_library]
+    forbid_tools: [search_library]
+    reply_matches: "Dune"
+  - user: "and the newest tv shows?"
+    expect_tools: [newest_in_library]
+    reply_matches: "Severance"

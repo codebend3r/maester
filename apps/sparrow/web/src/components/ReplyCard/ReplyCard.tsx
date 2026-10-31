@@ -38,7 +38,7 @@ const Verdict = ({ reply, expected }: VerdictProps) => {
 
 type ReplyCardProps = { reply: Reply }
 
-/** One of sparrow's answers: its text, the work behind it, and whatever it asks of you. */
+/** One of sparrow's answers: the work behind it, its text, and whatever it asks of you. */
 export const ReplyCard = ({ reply }: ReplyCardProps) => {
   const pick = useChat((state) => state.pick)
   const press = useChat((state) => state.press)
@@ -47,8 +47,12 @@ export const ReplyCard = ({ reply }: ReplyCardProps) => {
   return (
     <article className={styles.reply} aria-busy={reply.state === REPLY_STATES.running}>
       {reply.tools.length > 0 && <ToolTrace tools={reply.tools} />}
-      {reply.state === REPLY_STATES.running && (
-        <p className={styles.thinking}>{REPLY_CARD_COPY.thinking}</p>
+      {reply.state === REPLY_STATES.running && reply.chunks.length === 0 && (
+        <output className={styles.typing} aria-label={REPLY_CARD_COPY.thinking}>
+          <span className={styles.dot} />
+          <span className={styles.dot} />
+          <span className={styles.dot} />
+        </output>
       )}
       {reply.chunks.length > 0 && (
         <p className={styles.text}>

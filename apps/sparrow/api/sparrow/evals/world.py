@@ -31,13 +31,14 @@ from sparrow.clients import (
     FakeWizarrClient,
     Services,
 )
-from sparrow.clients.arr import HistoryEvent, MediaFile, QueueItem
+from sparrow.clients.arr import HistoryEvent, MediaFile, QueueItem, RootFolder
+from sparrow.clients.arr_library import CustomFilter, FakeArrLibrary
 from sparrow.clients.fleet import Vitals
 from sparrow.clients.media import Inspection, Track
 from sparrow.clients.plex import PlexItem, PlexSeason, Version
 from sparrow.clients.plextv import FakePlexTv, OwnedServer, Section, Share
 from sparrow.clients.radarr import Movie
-from sparrow.clients.raven import RavenTitle
+from sparrow.clients.raven import Part, RavenPerson, RavenTitle, Work
 from sparrow.clients.sabnzbd import Download
 from sparrow.clients.seerr import (
     ArrRef,
@@ -466,23 +467,71 @@ def _speedtest(seed: dict[str, Any]) -> FakeSpeedTest:
 
 
 def _raven(seed: dict[str, Any]) -> FakeRavenClient:
-    """raven's libraries as a case lists them: each entry one library's copy of a title."""
-    return FakeRavenClient(
-        titles=[
-            RavenTitle(
-                library_id=int(t.get("library_id", 1)),
-                library=t.get("library", "Movies"),
-                kind=t.get("kind", "movie"),
-                title=t["title"],
-                year=t.get("year"),
-                item_id=int(t.get("item_id", n + 1)),
-                quality=t.get("quality"),
-                hdr=bool(t.get("hdr", False)),
-                episodes=t.get("episodes"),
+    """raven's libraries as a case lists them: each entry one library's copy of a title.
+    Its people each list their filmography; a work named like a title in raven is that item."""
+    titles = [
+        RavenTitle(
+            library_id=int(t.get("library_id", 1)),
+            library=t.get("library", "Movies"),
+            kind=t.get("kind", "movie"),
+            title=t["title"],
+            year=t.get("year"),
+            item_id=int(t.get("item_id", n + 1)),
+            quality=t.get("quality"),
+            hdr=bool(t.get("hdr", False)),
+            episodes=t.get("episodes"),
+            released=t.get("released"),
+        )
+        for n, t in enumerate(seed.get("titles", []))
+    ]
+    items = {(t.kind, t.title): t.item_id for t in titles}
+    persons = [
+        RavenPerson(
+            id=n + 1,
+            name=p["name"],
+            known_for=p.get("known_for"),
+            works=tuple(
+                Work(
+                    kind=w.get("kind", "movie"),
+                    title=w["title"],
+                    year=int(w["released"][:4]) if w.get("released") else None,
+                    released=w.get("released"),
+                    parts=(Part(w.get("department", "acting"), w.get("role")),),
+                    item_id=items.get((w.get("kind", "movie"), w["title"])),
+                )
+                for w in sorted(
+                    p.get("works", []), key=lambda w: w.get("released") or "9999", reverse=True
+                )
+            ),
+            complete=True,
+        )
+        for n, p in enumerate(seed.get("people", []))
+    ]
+    return FakeRavenClient(titles=titles, persons=persons)
+
+
+def _arr_libraries(seed: dict[str, Any]) -> dict[Any, dict[str, FakeArrLibrary]]:
+    """Each arr as a case lists it, by service and host: its records as the arr's API
+    gives them, its saved custom filters and its root folders."""
+    return {
+        service: {
+            host: FakeArrLibrary(
+                service=service,
+                host=host,
+                records=[dict(r) for r in arr.get("records", [])],
+                filters=[
+                    CustomFilter(f["label"], f.get("type", ""), tuple(f["filters"]))
+                    for f in arr.get("filters", [])
+                ],
+                roots=[
+                    RootFolder(p, 8_000_000_000_000, 16_000_000_000_000)
+                    for p in arr.get("roots", [])
+                ],
             )
-            for n, t in enumerate(seed.get("titles", []))
-        ]
-    )
+            for host, arr in hosts.items()
+        }
+        for service, hosts in seed.items()
+    }
 
 
 def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
@@ -504,6 +553,7 @@ def build_services(seed: dict[str, Any], seerr_user_id: int = 4) -> Services:
         speedtest=_speedtest(seed["speedtest"]) if "speedtest" in seed else None,
         plextv=_plextv(seed.get("plextv", {})),
         raven=_raven(seed.get("raven", {})),
+        arr_libraries=_arr_libraries(seed.get("arr_libraries", {})),
     )
     # Services that answer like unreachable ones: "plex", or "radarr:vermithor" per host.
     for name in seed.get("down", []):

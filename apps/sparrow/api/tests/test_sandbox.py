@@ -15,11 +15,11 @@ def client():
     return TestClient(sandbox.app()), sandbox
 
 
-def test_it_opens_a_blank_world_as_a_friend_with_no_sign_in(client):
+def test_it_opens_a_blank_world_as_an_admin_with_no_sign_in(client):
     web, _ = client
     assert web.get("/api/me").json() == {
-        "user": {"id": "eval-user", "display_name": "Sandbox friend"},
-        "tier": "friend",
+        "user": {"id": "eval-user", "display_name": "Sandbox user"},
+        "tier": "admin",
     }
     state = web.get("/api/sandbox").json()
     assert state["model"] == "fake" and state["raven"] is None
@@ -46,8 +46,8 @@ def test_a_case_brings_its_tier_and_turns(client):
 
 def test_the_tier_can_change_mid_conversation(client):
     web, _ = client
-    assert web.post("/api/sandbox/tier", json={"tier": "admin"}).json() == {"tier": "admin"}
-    assert web.get("/api/me").json()["tier"] == "admin"
+    assert web.post("/api/sandbox/tier", json={"tier": "friend"}).json() == {"tier": "friend"}
+    assert web.get("/api/me").json()["tier"] == "friend"
     assert web.post("/api/sandbox/tier", json={"tier": "unlinked"}).status_code == 422
 
 
@@ -80,7 +80,7 @@ def test_it_listens_on_localhost_only_and_reloads_on_changes(monkeypatch, tmp_pa
         sandbox_module.main(["--model", "fake", "--case", "nope"])
 
 
-def test_it_runs_haiku_through_claude_code_and_needs_it_installed(monkeypatch, capsys, tmp_path):
+def test_it_runs_sonnet_through_claude_code_and_needs_it_installed(monkeypatch, capsys, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(sandbox_module.shutil, "which", lambda name: None)
     with pytest.raises(SystemExit):
@@ -93,9 +93,9 @@ def test_it_runs_haiku_through_claude_code_and_needs_it_installed(monkeypatch, c
         monkeypatch.delenv(name, raising=False)
     monkeypatch.delenv("RAVEN_URL", raising=False)
     assert sandbox_module.main([]) == 0
-    assert os.environ[sandbox_module.CHOICES["model"]] == "claude-haiku-5-5"
+    assert os.environ[sandbox_module.CHOICES["model"]] == "claude-sonnet-5-5"
     assert os.environ[sandbox_module.CHOICES["raven"]] == "http://localhost:5174"
-    sandbox = Sandbox("claude-haiku-5-5")
+    sandbox = Sandbox("claude-sonnet-5-5")
     assert isinstance(sandbox.client, ClaudeCodeModel)
     assert sandbox.world.chat.agent.client is sandbox.client
     assert Sandbox("fake").client is None
@@ -106,3 +106,16 @@ def test_the_real_raven_stands_in_for_every_case_fake():
     assert sandbox.state()["raven"] == "http://localhost:5174"
     sandbox.open("simple_request")
     assert sandbox.world.chat.agent.services.raven is sandbox.raven
+
+
+def test_usage_counts_the_turns_against_the_daily_budget(client):
+    web, sandbox = client
+    before = web.get("/api/chat/usage").json()
+    assert before == {
+        "model": "fake",
+        "tokens_used": 0,
+        "token_budget": sandbox.limiter.tokens_per_day,
+    }
+    sandbox.limiter.add_tokens("eval-user", 1234)
+    sandbox.open("simple_request")  # a new world keeps the same meter
+    assert web.get("/api/chat/usage").json()["tokens_used"] == 1234
