@@ -257,6 +257,18 @@ Home opens on a hero that takes turns with up to `HERO_COUNT` titles (10 by defa
 
 Every search box, on Home, a library's page and in Fix match, searches once typing pauses for a fifth of a second rather than on each keystroke; Enter, or Fix match's **Search**, searches at once.
 
+## Music albums
+
+Music libraries use the album folder as their identity, not individual tracks' album titles or MusicBrainz IDs. Explicit disc subfolders such as `CD1`, `CD 02` and `Disc 3` belong to the parent album. Keep separate editions in separate folders. Tracks retain their individual artist credits and disc ordering.
+
+On upgrade, Raven reconciles existing album records in a transaction. Track/media IDs, playlists and listening history stay intact. Album favourites transfer per account; splitting an album previously shared by separate folders copies its favourite to both. Conflicting manual matches are not silently merged: the server logs the affected album IDs, and their scan reports the conflict. Use **Fix match** to resolve those choices, then restart Raven to repeat the reconciliation. Back up the server's data directory with Raven stopped before upgrading; the repair never edits music files.
+
+Run **Full scan** after upgrading to re-read tags and discover local artwork. Full scans re-read music even when file sizes and timestamps have not changed; quick scans remain incremental. Artwork uses named files such as `cover.jpg`, `folder.jpg` and `front.jpg` in the album or disc folder, embedded pictures, then the Cover Art Archive. A failed selected image falls through to another candidate. A full scan discovers new or replaced artwork without a server restart.
+
+Release dates retain their actual precision: a full date when tags or MusicBrainz provide one, otherwise a month, year or no date. An edition's release date is distinct from its original-release year. Already-matched albums with incomplete dates are enriched in the background, at MusicBrainz's rate limit; unavailable metadata is not invented.
+
+The album grid shows a count and sorts by title, album artist, year, release date, date added, date played, plays or a stable random order. Unknown dates stay last in either direction. Listening-based sorts use only the signed-in account's history. The address retains sort choices, and **Play** queues all matching tracks in the displayed album order, including libraries larger than one track page. Critic and personal rating sorts are not provided.
+
 ## Library settings and views
 
 Each library keeps its own settings on the server, so every browser opens it the same way.

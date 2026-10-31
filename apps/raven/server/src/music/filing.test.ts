@@ -12,6 +12,7 @@ const NO_TAGS: AudioTags = {
   disc: null,
   year: null,
   originalYear: null,
+  releaseDate: null,
   genres: [],
   isCompilation: false,
   label: null,
@@ -51,7 +52,7 @@ describe('albumTypeOf', () => {
 describe('filingOf', () => {
   const path = '/music/Radiohead/Radiohead - OK Computer (1997)/02 - Paranoid Android.flac'
 
-  it('files a tagged file by its release id, under its album artist', () => {
+  it('files a tagged file by its folder, under its album artist', () => {
     const filing = filingOf({
       tags: {
         ...NO_TAGS,
@@ -65,7 +66,7 @@ describe('filingOf', () => {
       path,
     })
     expect(filing).toEqual({
-      albumKey: 'mbid:rel-1',
+      albumKey: 'folder:/music/Radiohead/Radiohead - OK Computer (1997)',
       albumTitle: 'OK Computer',
       albumArtists: [{ name: 'Radiohead', mbid: null }],
       isAlbumCredited: true,
@@ -79,7 +80,7 @@ describe('filingOf', () => {
       tags: { ...NO_TAGS, album: 'OK Computer', albumArtists: ['Radiohead'] },
       path,
     })
-    expect(filing.albumKey).toBe('name:radiohead:ok computer')
+    expect(filing.albumKey).toBe('folder:/music/Radiohead/Radiohead - OK Computer (1997)')
     expect(filing.trackArtists).toEqual([{ name: 'Radiohead', mbid: null }])
     expect(filing.trackTitle).toBe('02 - Paranoid Android')
   })
@@ -103,7 +104,30 @@ describe('filingOf', () => {
     })
     expect(filing.albumArtists).toEqual([{ name: FALLBACK_ARTISTS.various, mbid: null }])
     expect(filing.trackArtists).toEqual([{ name: 'Blur', mbid: null }])
-    expect(filing.albumKey).toBe('name:various artists:now 40')
+    expect(filing.albumKey).toBe('folder:/music/Now 40')
+  })
+
+  it('keeps three discs together despite conflicting titles, credits and release ids', () => {
+    const files = [1, 2, 3].map((disc) =>
+      filingOf({
+        path: `/music/Band/Album/CD${disc}/01.flac`,
+        tags: {
+          ...NO_TAGS,
+          album: `Album (CD${disc})`,
+          releaseMbid: `release-${disc}`,
+          albumArtists: [`Credit ${disc}`],
+        },
+      }),
+    )
+    expect(new Set(files.map(({ albumKey }) => albumKey))).toEqual(
+      new Set(['folder:/music/Band/Album']),
+    )
+    expect(files.map(({ albumTitle }) => albumTitle)).toEqual(['Album', 'Album', 'Album'])
+    const deluxe = filingOf({
+      path: '/music/Band/Album Deluxe/01.flac',
+      tags: { ...NO_TAGS, album: 'Album', releaseMbid: 'release-1' },
+    })
+    expect(deluxe.albumKey).not.toBe(files[0]?.albumKey)
   })
 
   it('pairs ids with names only when the tags list as many of each', () => {

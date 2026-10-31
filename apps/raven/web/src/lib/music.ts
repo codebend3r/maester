@@ -7,6 +7,8 @@ import {
   type PlaylistSummary,
   type Track,
   formatDuration,
+  albumDateLabel,
+  type MusicListOptions,
 } from '@raven/core'
 import { api } from '@/lib/api'
 import { COMMON_COPY, MUSIC_COPY } from '@/lib/copy'
@@ -42,7 +44,7 @@ type AlbumFactsProps = { album: AlbumSummary }
 
 /** The line under an album's title: "1997 · Album · 12 tracks · 53 min". */
 export const albumFacts = ({ album }: AlbumFactsProps): string[] => [
-  ...(album.year === null ? [] : [String(album.year)]),
+  ...[albumDateLabel(album)].filter((date) => date !== null),
   ALBUM_TYPE_LABELS[album.type],
   ...lengthFacts(album),
 ]
@@ -52,12 +54,22 @@ type PlaylistFactsProps = { playlist: PlaylistSummary }
 /** The line under a playlist's name: "12 tracks · 53 min". */
 export const playlistFacts = ({ playlist }: PlaylistFactsProps): string[] => lengthFacts(playlist)
 
-type LibraryTracksProps = { libraryId: number; search: string; sort: MusicSort }
+type LibraryTracksProps = { libraryId: number; search: string; sort: MusicSort } & Pick<
+  MusicListOptions,
+  'order' | 'seed'
+>
 
 /** A library's tracks as its page lists them, as many as one page holds, for Play and Shuffle on the library. */
-export const libraryTracks = async ({
-  libraryId,
-  search,
-  sort,
-}: LibraryTracksProps): Promise<Track[]> =>
-  (await api.listTracks({ libraryId, search, sort, limit: MUSIC_PAGE.most })).tracks
+export const libraryTracks = async (options: LibraryTracksProps): Promise<Track[]> => {
+  const listing = { ...options, byAlbum: true, limit: MUSIC_PAGE.most }
+  const page = await api.listTracks(listing)
+  const pages = Math.ceil(page.total / MUSIC_PAGE.most)
+  return Array.from({ length: Math.max(0, pages - 1) }, (_, index) => index + 1).reduce(
+    async (previous, next) => {
+      const tracks = await previous
+      const more = await api.listTracks({ ...listing, offset: next * MUSIC_PAGE.most })
+      return [...tracks, ...more.tracks]
+    },
+    Promise.resolve(page.tracks),
+  )
+}

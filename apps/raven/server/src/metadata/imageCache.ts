@@ -1,4 +1,5 @@
 import { HEADERS } from '@shared/server'
+import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -241,7 +242,7 @@ export class ImageCache {
   }
 
   /**
-   * A picture scaled from `source` into `dir` as `<prefix><mtime>-<width>.jpg`,
+   * A picture scaled from `source` into `dir` as `<prefix><source hash>-<mtime>-<width>.jpg`,
    * made once; scales of the file before it changed go when a new one is made.
    */
   private scaled({
@@ -251,14 +252,25 @@ export class ImageCache {
     width,
   }: ImageCacheScaledProps): Promise<string | null> {
     return this.once({
-      key: `${name}/${prefix}${width}`,
+      key: `${name}/${prefix}${source}/${width}`,
       make: async () => {
         const info = await stat(source).catch(() => null)
         if (!info?.isFile()) return null
         const dir = join(this.root, name)
-        const current = `${prefix}${Math.round(info.mtimeMs)}-`
+        const identity = createHash('sha256').update(source).digest('hex').slice(0, 12)
+        const current = `${prefix}${identity}-${Math.round(info.mtimeMs)}-`
         const target = join(dir, `${current}${width}.jpg`)
         if (await exists(target)) return target
+        // A scale made before the name carried the source's identity is the same picture
+        // (it names the same mtime), so it moves to its new name instead of being made again.
+        const legacy = join(dir, `${prefix}${Math.round(info.mtimeMs)}-${width}.jpg`)
+        if (
+          await rename(legacy, target).then(
+            () => true,
+            () => false,
+          )
+        )
+          return target
         const temp = temporary({ dir, extension: 'jpg' })
         try {
           await this.scales.run(() =>

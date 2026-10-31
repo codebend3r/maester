@@ -1,6 +1,5 @@
-import type { AlbumSummary } from '@raven/core'
+import { type AlbumSummary, albumDateLabel } from '@raven/core'
 import { Link } from 'react-router-dom'
-import { ALBUM_GRID_COPY } from '@/components/AlbumGrid/copy'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { albumPath, artistPath } from '@/lib/music'
@@ -27,10 +26,8 @@ const AlbumCard = ({ album }: AlbumCardProps) => (
           <Link to={artistPath(artist.id)}>{artist.name}</Link>
         </span>
       ))}
-      {album.year !== null && (
-        <span className={styles.year}>{ALBUM_GRID_COPY.year(album.year)}</span>
-      )}
     </p>
+    {albumDateLabel(album) !== null && <p className={styles.year}>{albumDateLabel(album)}</p>}
   </li>
 )
 

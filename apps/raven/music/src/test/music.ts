@@ -100,6 +100,7 @@ export const OK_COMPUTER: AlbumSummary = {
   libraryId: MUSIC.id,
   title: 'OK Computer',
   sortTitle: 'OK Computer',
+  releaseDate: null,
   year: 1997,
   type: ALBUM_TYPES.album,
   artists: [{ id: RADIOHEAD.id, name: RADIOHEAD.name }],

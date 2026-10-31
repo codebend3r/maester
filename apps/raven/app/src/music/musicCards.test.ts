@@ -23,6 +23,7 @@ const ALBUM: AlbumSummary = {
   libraryId: 1,
   title: 'OK Computer',
   sortTitle: 'OK Computer',
+  releaseDate: null,
   year: 1997,
   type: 'album',
   artists: [

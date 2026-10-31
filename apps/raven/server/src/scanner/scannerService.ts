@@ -384,6 +384,7 @@ export class ScannerService implements OnApplicationBootstrap {
   /** A full scan: everything under the library's paths, its progress and outcome in the status. */
   private async scanLibrary({ library, signal }: ScannerServiceScanLibraryProps): Promise<void> {
     const before = this.status(library.id)
+    this.music.resetFolderCovers()
     this.update({
       libraryId: library.id,
       patch: {
@@ -650,7 +651,16 @@ export class ScannerService implements OnApplicationBootstrap {
     if (changesAnything(changes)) this.database.refreshStatistics()
     await this.artifacts.discard(changes.gone)
     if (changesAnything(changes)) this.events.libraryChanged(library.id)
-    return { walk, changes, toProbe, media: KIND_RULES[kind].media }
+    const media = KIND_RULES[kind].media
+    if (scope.kind === SCOPE_KINDS.library && media === MEDIA_TYPES.audio) {
+      const current = this.index.forLibrary(library.id)
+      const audioFiles = walk.files.flatMap(({ path }) => {
+        const file = current.get(path)
+        return file === undefined ? [] : [{ id: file.id, path }]
+      })
+      return { walk, changes, toProbe: audioFiles, media }
+    }
+    return { walk, changes, toProbe, media }
   }
 
   /** A video goes to ffprobe and the thumbnail queue; an audio file to the music indexer, which grabs no frame. */

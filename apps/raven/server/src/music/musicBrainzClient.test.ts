@@ -36,6 +36,7 @@ describe('toRelease', () => {
         { name: 'Guest', mbid: 'art-2' },
       ],
       year: 1997,
+      releaseDate: '1997-05-21',
       trackCount: 14,
       type: ALBUM_TYPES.live,
       country: 'GB',

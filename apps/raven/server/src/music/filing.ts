@@ -76,33 +76,37 @@ const albumArtistsOf = ({
   return [{ name: basename(dirname(folder)) || FALLBACK_ARTISTS.unknown, mbid: null }]
 }
 
-type AlbumKeyOfProps = { tags: AudioTags; albumArtists: NamedArtist[]; folder: string }
+/** Only explicit disc folder names collapse into their parent, never arbitrary numbered albums. */
+const DISC_FOLDER = /^(?:cd|disc|disk)[\s._-]*0*(\d+)(?:\s*[-:]\s*.+)?$/i
 
-const albumKeyOf = ({ tags, albumArtists, folder }: AlbumKeyOfProps): string => {
-  if (tags.releaseMbid !== null) return `mbid:${tags.releaseMbid}`
-  if (tags.album !== null)
-    return `name:${nameKeyOf(albumArtists[0]?.name ?? '')}:${nameKeyOf(tags.album)}`
-  return `folder:${folder}`
+export const albumFolderOf = (path: string): string => {
+  const folder = dirname(path)
+  return DISC_FOLDER.test(basename(folder)) ? dirname(folder) : folder
+}
+
+export const discOfPath = (path: string): number => {
+  const match = DISC_FOLDER.exec(basename(dirname(path)))
+  return Math.max(1, Number(match?.[1] ?? 1))
 }
 
 type FilingOfProps = { tags: AudioTags; path: string }
 
 /**
- * A file with tags is filed by them: by its release id, else by its album
- * artist and album. One without is filed by its folder, the `Artist/Album`
- * layout most libraries use: the folder is the album, the folder above the
- * artist. A compilation with no album artist is Various Artists'.
+ * Folders define album identity; tags describe the album, never split it.
+ * Explicit disc subfolders share their parent's album.
  */
 export const filingOf = ({ tags, path }: FilingOfProps): Filing => {
-  const folder = dirname(path)
+  const folder = albumFolderOf(path)
   const trackArtists = namedArtists({ names: tags.artists, mbids: tags.artistMbids })
   const taggedAlbumArtists = namedArtists({
     names: tags.albumArtists,
     mbids: tags.albumArtistMbids,
   })
   const albumArtists = albumArtistsOf({ taggedAlbumArtists, trackArtists, tags, folder })
-  const albumTitle = tags.album ?? (basename(folder) || FALLBACK_ARTISTS.unknown)
-  const albumKey = albumKeyOf({ tags, albumArtists, folder })
+  const albumTitle =
+    tags.album?.replace(/\s*[([](?:cd|disc|disk)\s*\d+[)\]]\s*$/i, '').trim() ??
+    (basename(folder) || FALLBACK_ARTISTS.unknown)
+  const albumKey = `folder:${folder}`
   return {
     albumKey,
     albumTitle,

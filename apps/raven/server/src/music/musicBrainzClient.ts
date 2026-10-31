@@ -1,5 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { ALBUM_TYPES, type AlbumType, isAlbumType, isNumber, isRecord, isString } from '@raven/core'
+import {
+  ALBUM_TYPES,
+  type AlbumType,
+  isAlbumType,
+  isNumber,
+  isRecord,
+  isString,
+  releaseDateOf,
+} from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 import { RAVEN_USER_AGENT } from '@/music/userAgent'
@@ -49,6 +57,7 @@ export type Release = {
   /** The credited artists' names and ids, in order. */
   artists: { name: string; mbid: string }[]
   year: number | null
+  releaseDate: string | null
   trackCount: number | null
   type: AlbumType
   country: string | null
@@ -177,6 +186,7 @@ export const toRelease = (value: unknown): Release | null => {
     artist: names,
     artists: list,
     year: yearOf(value[MB_FIELDS.date]),
+    releaseDate: releaseDateOf(value[MB_FIELDS.date]),
     trackCount: trackCountOf(value),
     type: typeOf(group),
     country: isString(country) ? country : null,
