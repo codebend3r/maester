@@ -1,0 +1,21 @@
+name: an actor's latest movies come from raven's people, marked on the server or not
+tier: friend
+services:
+  raven:
+    titles:
+      - {title: "Nobody", year: 2021, released: "2021-03-26", quality: "1080p"}
+      - {title: "Better Call Saul", year: 2015, released: "2015-02-08", kind: show, library: "TV Shows", library_id: 7}
+    people:
+      - name: "Bob Odenkirk"
+        known_for: "Acting"
+        works:
+          - {title: "Nobody 2", released: "2025-08-15", role: "Hutch Mansell"}
+          - {title: "Nobody", released: "2021-03-26", role: "Hutch Mansell"}
+          - {title: "Little Women", released: "2019-12-25", role: "Father March"}
+          - {title: "Better Call Saul", kind: show, released: "2015-02-08", role: "Saul Goodman"}
+turns:
+  - user: "What are the latest movies starring Bob Odenkirk?"
+    expect_tools: [search_people]
+    reply_matches: "Nobody 2"
+  - user: "which of his movies can I watch here?"
+    reply_matches: "Nobody"

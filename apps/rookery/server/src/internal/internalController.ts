@@ -31,7 +31,7 @@ export type SessionInfo = {
 }
 
 /**
- * For the suite's other apps, never for browsers: luwin posts the cookie's
+ * For the suite's other apps, never for browsers: sparrow posts the cookie's
  * value here to learn who it belongs to. The token travels in the body so it
  * stays out of access logs. The proxy should not expose `/internal/*`; the
  * service token guards it either way.

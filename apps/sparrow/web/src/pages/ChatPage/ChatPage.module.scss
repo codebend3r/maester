@@ -1,0 +1,87 @@
+// One full-viewport screen with no page scroll: only the conversation scrolls.
+.page {
+  display: grid;
+  grid-template-columns: var(--rail) var(--sidebar) minmax(0, 1fr);
+  grid-template-areas: 'rail sidebar chat';
+  block-size: 100dvh;
+}
+
+.rail {
+  grid-area: rail;
+  display: grid;
+  min-block-size: 0;
+}
+
+.sidebar {
+  grid-area: sidebar;
+  display: grid;
+  min-block-size: 0;
+}
+
+.chat {
+  grid-area: chat;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'conversation'
+    'composer';
+  min-block-size: 0;
+}
+
+.conversation {
+  grid-area: conversation;
+  display: grid;
+  justify-items: center;
+  overflow-y: auto;
+  padding: var(--space-7) var(--space-8) var(--space-5);
+}
+
+.composer {
+  grid-area: composer;
+  display: grid;
+  justify-items: center;
+  padding: 0 var(--space-8) var(--space-6);
+}
+
+.notice {
+  display: grid;
+  place-items: center;
+  min-block-size: 100dvh;
+  padding: var(--space-5);
+  color: var(--color-lichen);
+  text-align: center;
+}
+
+@media (max-width: 64rem) {
+  .page {
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'rail sidebar'
+      'rail chat';
+  }
+
+  .sidebar {
+    max-block-size: 40dvh;
+    overflow-y: auto;
+  }
+
+  .conversation {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .composer {
+    padding: 0 var(--space-4) var(--space-4);
+  }
+}
+
+@media (max-width: 30rem) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'rail'
+      'sidebar'
+      'chat';
+  }
+}

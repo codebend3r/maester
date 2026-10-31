@@ -1,0 +1,17 @@
+.link {
+  color: var(--color-amber);
+  text-decoration: underline;
+  text-underline-offset: var(--underline-offset);
+
+  &:hover {
+    color: var(--color-amber-hi);
+  }
+}
+
+.strong {
+  font-weight: var(--font-weight-strong);
+}
+
+.emphasis {
+  font-style: italic;
+}

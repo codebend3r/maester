@@ -1,0 +1,132 @@
+.reply {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.typing {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-1);
+  block-size: var(--avatar);
+}
+
+.dot {
+  inline-size: var(--dot);
+  block-size: var(--dot);
+  border-radius: var(--radius-round);
+  background: var(--color-lichen);
+  opacity: var(--opacity-faint);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dot {
+    animation: typing var(--duration-pulse) var(--ease) infinite;
+
+    &:nth-child(2) {
+      animation-delay: var(--stagger);
+    }
+
+    &:nth-child(3) {
+      animation-delay: calc(var(--stagger) * 2);
+    }
+  }
+}
+
+@keyframes typing {
+  0%,
+  100% {
+    opacity: var(--opacity-faint);
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.text {
+  font-family: var(--font-display);
+  font-size: var(--font-size-voice);
+  line-height: var(--line-voice);
+  text-wrap: pretty;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ask {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-canopy);
+  border: var(--hairline) solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-2);
+}
+
+.choices {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.choice {
+  display: grid;
+  gap: var(--space-1);
+  inline-size: 100%;
+  text-align: start;
+}
+
+.detail {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+.failure {
+  color: var(--color-alert);
+}
+
+.cause {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-alert);
+  font-size: var(--font-size-sm);
+}
+
+.trace {
+  padding: var(--space-2);
+  background: var(--color-deep);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.passed,
+.failed {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-canopy);
+  font-size: var(--font-size-sm);
+}
+
+.passed {
+  color: var(--color-fern);
+}
+
+.failed {
+  color: var(--color-alert);
+}
+
+.failures {
+  display: grid;
+  gap: var(--space-1);
+}

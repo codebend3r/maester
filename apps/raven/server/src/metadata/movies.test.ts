@@ -15,6 +15,7 @@ import {
   isMediaList,
   isMetadataHealth,
   isPersonDetails,
+  isPersonMatches,
   isRecord,
   isSagaList,
   sagaCover,
@@ -545,6 +546,28 @@ describe('movie metadata', () => {
     expect(titles.indexOf('Heat')).toBeGreaterThan(titles.indexOf('The Matrix'))
     expect(titles.indexOf('Heat')).toBeLessThan(titles.indexOf('The Late Show'))
     expect((await app().inject({ method: 'GET', url: '/api/people/99999' })).statusCode).toBe(404)
+  })
+
+  it("finds people by part of their name, with how many of raven's titles they are on", async () => {
+    const found = async (q: string) =>
+      shape({
+        response: await app().inject({
+          method: 'GET',
+          url: `/api/people?q=${encodeURIComponent(q)}`,
+        }),
+        guard: isPersonMatches,
+      })
+    // Lilly Wachowski directs and writes each title, and counts each once.
+    expect((await found('wachowski')).map(({ name, titles }) => [name, titles])).toEqual([
+      ['Lilly Wachowski', 5],
+      ['Lana Wachowski', 5],
+    ])
+    expect(await found('KEANU reeves')).toEqual([
+      expect.objectContaining({ name: 'Keanu Reeves', titles: 5 }),
+    ])
+    expect(await found('  ')).toEqual([])
+    expect(await found('%')).toEqual([])
+    expect(await found('Nobody Here')).toEqual([])
   })
 
   it("serves a filmography's TMDB posters at the width a thumbnail asks for", async () => {

@@ -1,6 +1,6 @@
 # raven authentication database
 
-Supabase Auth and membership approval, owned by raven. This project holds the database; raven's server enforces it. Once raven runs with accounts `ready` (see `apps/raven/README.md`, "Accounts"), every protected route needs an approved account and management is the owner's. rookery and luwin keep their current sign-in.
+Supabase Auth and membership approval, owned by raven. This project holds the database; raven's server enforces it. Once raven runs with accounts `ready` (see `apps/raven/README.md`, "Accounts"), every protected route needs an approved account and management is the owner's. rookery and sparrow keep their current sign-in.
 
 ## Local development
 

@@ -1,7 +1,7 @@
 {
   "name": "maester",
   "private": true,
-  "description": "Nx workspace for maester, a self-hosted media suite: raven, a media library and direct-play player, luwin, an AI assistant for the friends who share the server, rookery, the suite's sign-in, and the apps and libraries around them",
+  "description": "Nx workspace for maester, a self-hosted media suite: raven, a media library and direct-play player, sparrow, an AI assistant for the friends who share the server, rookery, the suite's sign-in, and the apps and libraries around them",
   "workspaces": [
     "apps/*/*",
     "libs/*/*",
@@ -43,7 +43,7 @@
     "desktop:release:assets": "nx run @raven/desktop:release:assets",
     "desktop:smoke:packaged": "nx run @raven/desktop:smoke:packaged",
     "desktop:test:native": "nx run @raven/desktop:test:native",
-    "dev:luwin": "nx run-many -t dev -p @luwin/api @luwin/web",
+    "dev:sparrow": "nx run-many -t dev -p @sparrow/api @sparrow/web",
     "dev:raven": "nx run-many -t dev -p @raven/server @raven/ui @raven/web",
     "dev:raven:prod": "RAVEN_DEV_API_ORIGIN=https://raven.tail5586d4.ts.net nx run-many -t dev -p @raven/ui @raven/web",
     "dev:raven:db": "scripts/pull_raven_db.sh",
@@ -63,7 +63,7 @@
     "mpv:native": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} nx run-many -p @raven/mpv -t audit:native test:native",
     "mpv:native:windows": "nx run-many -p @raven/mpv -t audit:native:windows test:native:windows",
     "one-command-per-script": "nx run maester:one-command-per-script",
-    "sandbox:luwin": "nx run-many -t sandbox -p @luwin/api @luwin/web",
+    "sandbox:sparrow": "nx run-many -t sandbox -p @sparrow/api @sparrow/web",
     "spellcheck": "nx run maester:spellcheck",
     "test": "nx run-many -t test",
     "test:screens": "nx run-many -t test:screens",

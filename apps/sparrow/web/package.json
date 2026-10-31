@@ -1,0 +1,69 @@
+{
+  "name": "@sparrow/web",
+  "version": "0.7.9",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint:css": "gale \"src/**/*.scss\"",
+    "lint:css:fix": "gale --fix \"src/**/*.scss\"",
+    "lint:ts": "oxlint",
+    "lint:ts:fix": "oxlint --fix",
+    "preview": "vite preview",
+    "sandbox": "vite",
+    "test": "bun test --dots",
+    "test:watch": "bun test --dots --watch",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@fontsource-variable/instrument-sans": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/young-serif": "5.3.0",
+    "@tanstack/react-query": "5.103.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@codebend3r/gale": "0.3.1",
+    "@happy-dom/global-registrator": "20.14.5",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
+    "@types/bun": "1.4.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@vitejs/plugin-react": "6.1.1",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "sass": "1.104.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  },
+  "nx": {
+    "projectType": "application",
+    "tags": [
+      "scope:web",
+      "lang:ts"
+    ],
+    "includedScripts": [
+      "dev",
+      "build",
+      "preview",
+      "sandbox",
+      "typecheck",
+      "lint:ts",
+      "lint:ts:fix",
+      "lint:css",
+      "lint:css:fix",
+      "format",
+      "format:check",
+      "test",
+      "test:watch"
+    ]
+  }
+}

@@ -3,10 +3,10 @@
 ## Rules
 
 - The root holds only workspace files. Anything that belongs to a product (its image, compose, env, docs, version) goes under `apps/<product>/`.
-- Run tasks through Nx from the repo root: `bunx nx run @luwin/api:test`, `bunx nx run-many -t test`, `bun run verify`, `bun run affected`.
+- Run tasks through Nx from the repo root: `bunx nx run @sparrow/api:test`, `bunx nx run-many -t test`, `bun run verify`, `bun run affected`.
 - Never put a `.env` at the repo root; Nx loads it into every task. Each product reads its own beside its compose file.
 - Commits and PRs follow the `commit-format` and `pr-format` skills (`MAE:` prefix).
-- lefthook's git hooks (`lefthook.yml`) run on every commit and push: pre-commit runs lint-staged (`lint-staged.config.ts`) to lint and format the staged files, and pre-push runs the checks `verify` runs but `dead-code` and `dead-css`, which only the PR checks run, in parallel. The repository-rule audit is manual only (`bun run claude-audit`); it does not block pushes.
+- lefthook's git hooks (`lefthook.yml`) run on every commit and push: pre-commit runs lint-staged (`lint-staged.config.ts`) to lint and format the staged files, and pre-push runs the checks `verify` runs but `dead-code` and `dead-css`, which only the PR checks run, in parallel. The repository-rule audit is manual only (`bun run claude-audit`); it does not block pushes. Never skip the hooks with `--no-verify` or `LEFTHOOK=0`; fix what they report.
 - TypeScript only: no `.js`, `.jsx`, `.mjs` or `.cjs` files anywhere, config files included. The pre-push hook and the `typescript-only` target (in `verify`, `affected` and the PR checks) reject them.
 - A `package.json` script runs one command. Steps become scripts of their own, chained with `bun run --sequential build:clean build:compile` (or `--parallel`), never with `&&`, `||` or `;`. The pre-push hook and the `one-command-per-script` target (in `verify`, `affected` and the PR checks) reject a chained script.
 - Every import of a project's own modules goes through its `@/` alias and names no extension: `@/lib/api`, never `./api`, `../lib/api` or `@/lib/api.js`. oxlint's `no-restricted-imports` fails on anything else. Non-TypeScript assets keep their extension (`@/components/Player/Player.module.scss`). Node needs relative `.js` paths at runtime, so the server and core builds run `tsc-alias` after `tsc` to rewrite the alias in `dist` only.
@@ -17,7 +17,7 @@
 
 ## TypeScript
 
-These apply to every TypeScript project: everything but `@luwin/api` and the Python in `scripts`.
+These apply to every TypeScript project: everything but `@sparrow/api` and the Python in `scripts`.
 
 - Use type guards wherever possible.
 - Never use `any`; narrow the type or write a type guard. oxlint's `no-explicit-any` fails on it.
@@ -77,7 +77,7 @@ These apply to every TypeScript project: everything but `@luwin/api` and the Pyt
 
 ## React
 
-These apply to every React project: `@raven/web`, `@rookery/web`, `@luwin/web`, `@raven/ui` and the device app `@raven/app`. Raven's UI is `@raven/web`'s `src/desktop`.
+These apply to every React project: `@raven/web`, `@rookery/web`, `@sparrow/web`, `@raven/ui` and the device app `@raven/app`. Raven's UI is `@raven/web`'s `src/desktop`.
 
 - Global state lives in zustand, never in a React context. State that more than one component reads or writes is a store in the project's `src/stores/`, made with `create` (`apps/raven/web/src/stores/theme.ts`, `libs/raven/ui/src/stores/playerPrefs.ts`). A component reads it through a selector, `useTheme((state) => state.theme)`, so it re-renders only when its slice changes. Never write a `createContext` and a `*Provider` to pass state, a setter or a callback down the tree: the component that needs the value imports the store.
 - State one component owns stays in `useState` or `useReducer`, and server data stays in TanStack Query. A store holds client state the tree shares, not a copy of an API response.
@@ -110,17 +110,17 @@ These apply to every React project: `@raven/web`, `@rookery/web`, `@luwin/web`, 
 
 ## CSS
 
-These apply to the web apps, `@raven/web`, `@rookery/web` and `@luwin/web`, and to `@raven/ui`, whose styles both raven clients import. Each app has its own tokens, so "the app's `globals.scss`" means `libs/raven/ui/src/styles/globals.scss` for raven, `apps/rookery/web/src/styles/globals.scss` for rookery and `apps/luwin/web/src/styles/globals.scss` for luwin.
+These apply to the web apps, `@raven/web`, `@rookery/web` and `@sparrow/web`, and to `@raven/ui`, whose styles both raven clients import. Each app has its own tokens, so "the app's `globals.scss`" means `libs/raven/ui/src/styles/globals.scss` for raven, `apps/rookery/web/src/styles/globals.scss` for rookery and `apps/sparrow/web/src/styles/globals.scss` for sparrow.
 
 - No dead selectors. Every class in a `*.module.scss` is referenced from the component that imports it, and every rule in `globals.scss` and `elements.scss` matches an element some component renders. Delete a selector when its last use goes; a stale class in a module is dead code. The `dead-css` target (in `verify`, `affected` and the PR checks) fails on a module class no TSX reads.
 - Component styles are SCSS modules (`*.module.scss`), imported through the `@/` alias, never a relative path. The `react-ts-css` editor extension flags aliased imports as unresolved; that is a tooling bug to fix in tooling, not a reason to relativize the import.
-- Raven's shared styles live in `libs/raven/ui/src/styles/`; rookery's and luwin's remain in their web apps. The app's `globals.scss` holds the design tokens, resets and typographic primitives. raven also has `libs/raven/ui/src/styles/elements.scss`, the default look of each element, inside `:where()` so any class beats it. Everything else belongs in a component module.
+- Raven's shared styles live in `libs/raven/ui/src/styles/`; rookery's and sparrow's remain in their web apps. The app's `globals.scss` holds the design tokens, resets and typographic primitives. raven also has `libs/raven/ui/src/styles/elements.scss`, the default look of each element, inside `:where()` so any class beats it. Everything else belongs in a component module.
 - Containers drive layout: the container defines the child's available width and height, its padding, and the spacing between children; the children only care about their content. Moving a child to a different container may lay it out differently, because the container specifies the layout.
 - Layout is CSS grid, with `gap` between items and padding on the container. Avoid margins for spacing at all cost. That includes prose: a rendered-markdown container is a grid too, its element margins stay zeroed, and `gap` sets the rhythm between blocks.
 - No flex layouts, toolbars and inline rows included: they are grids too (`grid-auto-flow: column` for a run of items).
 - In fixed regional layouts, place grid children with named `grid-template-areas` and `grid-area: <name>`, never positional line spans like `grid-area: 1 / -1`. Auto-placed collections (`repeat(auto-fill, ...)`, `grid-auto-flow`) are exempt, since dynamic children can't be named. For overlays, give several children the same named area.
 - Reach for a semantic element (`nav`, `section`, `ul`, `button`) before a `div`. A `div` is a styling hook of last resort: give it a class, and style by class, never by `id`.
-- Colors, fonts, font sizes, line heights, spacing, radii and the focus ring come from the tokens in the app's `globals.scss`: `--color-*`, `--font-*`, `--font-size-*`, `--line-*`, `--space-*`, `--radius-*`, `--focus-ring`. The names are unprefixed and the values differ per app (raven's text is `--color-bark`, rookery's is `--color-parchment`), so check the app's own file. Never hardcode a literal where a token exists; if none fits, extend the scale in that app's `globals.scss` instead of inlining a value. raven also has `--tracking-*` for letter spacing and `--ease-*` for motion curves; luwin has `--tracking-*` too, and rookery has neither yet.
+- Colors, fonts, font sizes, line heights, spacing, radii and the focus ring come from the tokens in the app's `globals.scss`: `--color-*`, `--font-*`, `--font-size-*`, `--line-*`, `--space-*`, `--radius-*`, `--focus-ring`. The names are unprefixed and the values differ per app (raven's text is `--color-bark`, rookery's is `--color-parchment`), so check the app's own file. Never hardcode a literal where a token exists; if none fits, extend the scale in that app's `globals.scss` instead of inlining a value. raven also has `--tracking-*` for letter spacing and `--ease-*` for motion curves; sparrow has `--tracking-*` too, and rookery has neither yet.
 - Responsive styles are desktop-first: `@media (max-width: ...)`. There is no shared breakpoints partial yet, so reuse the thresholds already in use (`30rem`, `40rem`, `48rem`, `64rem`) rather than inventing one. Every page works at 320px wide.
 - Guard every animation, transition and `scroll-behavior: smooth` with `prefers-reduced-motion`: a component adds motion inside `@media (prefers-reduced-motion: no-preference)`. The `@media (prefers-reduced-motion: reduce)` block in each app's `globals.scss`, which cuts every transition and animation to 0.01ms, is a backstop, not the guard.
 - `:global()` is an escape hatch, not a tool. Avoid it, and comment the why on the rare occasion it is unavoidable.
@@ -140,7 +140,7 @@ Shared tool config lives at the root, so every project lints and compiles by the
 
 | Project           | Path                  | What                                                                                                           |
 | ----------------- | --------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `@luwin/api`      | `apps/luwin/api`      | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite                                        |
+| `@sparrow/api`    | `apps/sparrow/api`    | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite                                        |
 | `@raven/supabase` | `apps/raven/supabase` | Supabase Auth configuration, membership approval, migrations, local seed and database tests                    |
 | `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest                                          |
 | `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom                                  |
@@ -155,9 +155,9 @@ Shared tool config lives at the root, so every project lints and compiles by the
 | `@raven/music`    | `apps/raven/music`    | Wren, raven's music app for iPhone, iPad and Android phones: Expo 58 on react-native-tvos, expo-router         |
 | `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest                                     |
 | `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom                                       |
-| `@luwin/web`      | `apps/luwin/web`      | luwin's chat page, and the sandbox for testing its answers: React 19, Vite 8, TanStack Query, zustand          |
+| `@sparrow/web`    | `apps/sparrow/web`    | sparrow's chat page, and the sandbox for testing its answers: React 19, Vite 8, TanStack Query, zustand        |
 | `@shared/server`  | `libs/shared/server`  | The servers' shared scaffolding: web app serving, SQLite migrations, env                                       |
-| `scripts`         | `scripts`             | Repo tooling; its Python is linted with luwin's pinned ruff and config                                         |
+| `scripts`         | `scripts`             | Repo tooling; its Python is linted with sparrow's pinned ruff and config                                       |
 
 Python projects declare `package.json` scripts that call uv (`uv run pytest -q`, `uv run ruff check .`); Nx runs them in the project's folder. There is no Python Nx plugin and no uv workspace.
 

@@ -33,12 +33,12 @@ jobs:
         include:
           # The default CMD does not serve HTTP yet, so the web app is started
           # explicitly. /health is ungated, so no .env is needed.
-          - product: luwin
+          - product: sparrow
             port: 8020
             health: /health
             expect: .status == "ok" and .version == $version
-            version-file: apps/luwin/VERSION
-            command: uvicorn luwin.web:create_app --factory --host 0.0.0.0 --port 8020
+            version-file: apps/sparrow/VERSION
+            command: uvicorn sparrow.web:create_app --factory --host 0.0.0.0 --port 8020
           # The image's Debian ffmpeg has zscale, so HDR thumbnails are tone mapped.
           - product: raven
             port: 8484
@@ -84,10 +84,10 @@ jobs:
             --label "org.opencontainers.image.revision=$GITHUB_SHA" "${release[@]}" .
 
       - name: 🏷️ Entrypoint reports the release version
-        if: matrix.product == 'luwin'
+        if: matrix.product == 'sparrow'
         run: |
-          expected="luwin $(cat "$VERSION_FILE")"
-          actual="$(docker run --rm "$IMAGE" luwin --version)"
+          expected="sparrow $(cat "$VERSION_FILE")"
+          actual="$(docker run --rm "$IMAGE" sparrow --version)"
           echo "expected: $expected"
           echo "actual:   $actual"
           test "$actual" = "$expected"

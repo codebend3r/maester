@@ -8,7 +8,7 @@ export type ServerConfig = ListenConfig & {
   publicUrl: string
   /** The bearer token apps present to `/internal/session`. */
   serviceToken: string
-  /** Origins `return_to` may point at besides rookery itself, e.g. luwin's. */
+  /** Origins `return_to` may point at besides rookery itself, e.g. sparrow's. */
   appOrigins: readonly string[]
   /** The parent domain the session cookie is shared across, or null to keep it on this host. */
   cookieDomain: string | null

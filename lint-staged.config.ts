@@ -13,13 +13,13 @@ export default {
   'apps/raven/web/**/*.scss': ['bun --cwd apps/raven/web gale --fix', oxfmt],
   'apps/rookery/web/**/*.scss': ['bun --cwd apps/rookery/web gale --fix', oxfmt],
   'libs/raven/ui/**/*.scss': ['bun --cwd libs/raven/ui gale --fix', oxfmt],
-  'apps/luwin/api/**/*.{py,pyi}': [
-    'uv run --directory apps/luwin/api ruff check --fix',
-    'uv run --directory apps/luwin/api ruff format',
+  'apps/sparrow/api/**/*.{py,pyi}': [
+    'uv run --directory apps/sparrow/api ruff check --fix',
+    'uv run --directory apps/sparrow/api ruff format',
   ],
-  // As in scripts/package.json: luwin's ruff and config, run from scripts.
+  // As in scripts/package.json: sparrow's ruff and config, run from scripts.
   'scripts/**/*.py': [
-    'uv run --directory scripts --project ../apps/luwin/api ruff check --config ../apps/luwin/api/pyproject.toml --fix',
-    'uv run --directory scripts --project ../apps/luwin/api ruff format --config ../apps/luwin/api/pyproject.toml',
+    'uv run --directory scripts --project ../apps/sparrow/api ruff check --config ../apps/sparrow/api/pyproject.toml --fix',
+    'uv run --directory scripts --project ../apps/sparrow/api ruff format --config ../apps/sparrow/api/pyproject.toml',
   ],
 } satisfies Configuration

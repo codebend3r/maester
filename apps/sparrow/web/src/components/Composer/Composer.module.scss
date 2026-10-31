@@ -1,0 +1,76 @@
+.composer {
+  display: grid;
+  gap: var(--space-3);
+  inline-size: 100%;
+  max-inline-size: var(--measure);
+}
+
+.box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'input send';
+  align-items: end;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  background: var(--color-canopy);
+  border: var(--hairline) solid var(--color-line-strong);
+  border-radius: var(--radius-lg);
+
+  &:has(:focus-visible) {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
+  }
+}
+
+.input {
+  grid-area: input;
+  max-block-size: var(--composer-max);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--font-size-body);
+  line-height: var(--line-body);
+  resize: none;
+
+  &::placeholder {
+    color: var(--color-moss-line);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+.send {
+  grid-area: send;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-md);
+}
+
+.footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'hint meter';
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.meter {
+  grid-area: meter;
+}
+
+.hint {
+  grid-area: hint;
+  color: var(--color-moss-line);
+  font-size: var(--font-size-2xs);
+}
+
+@media (max-width: 40rem) {
+  .footer {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'hint'
+      'meter';
+    justify-items: end;
+  }
+}

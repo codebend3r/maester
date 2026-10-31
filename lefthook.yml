@@ -5,7 +5,7 @@ pre-commit:
     - name: 🧹 lint-staged
       run: bun run lint-staged
 
-# The checks `bun run verify` runs, one at a time, stopping at the first that fails.
+# The checks `bun run verify` runs, in parallel.
 # All but dead-code and dead-css, which the PR checks run instead.
 pre-push:
   parallel: true

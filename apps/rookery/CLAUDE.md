@@ -4,7 +4,7 @@
 
 The suite's sign-in: Sign in with Plex, the shared `maester_session` cookie, sign-out, and `/internal/session`, which tells the other apps who a session belongs to. See README.md for the flow and hosting, and `docs/superpowers/specs/2026-10-09-shared-sign-in-design.md` for the design.
 
-rookery authenticates; it never decides what someone may do in an app. Tiers, owner detection and Seerr matching stay in luwin.
+rookery authenticates; it never decides what someone may do in an app. Tiers, owner detection and Seerr matching stay in sparrow.
 
 ## Structure
 

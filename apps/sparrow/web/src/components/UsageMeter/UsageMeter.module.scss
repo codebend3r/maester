@@ -1,0 +1,72 @@
+.meter {
+  display: grid;
+  grid-template-areas: 'model divider track count';
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-lichen);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  white-space: nowrap;
+}
+
+.model,
+.strong {
+  color: var(--color-bark);
+}
+
+.model {
+  grid-area: model;
+}
+
+.count {
+  grid-area: count;
+}
+
+.divider {
+  grid-area: divider;
+  inline-size: var(--hairline);
+  block-size: var(--divider-height);
+  background: var(--color-line-strong);
+}
+
+.track {
+  grid-area: track;
+  display: grid;
+  inline-size: var(--budget-bar);
+  block-size: var(--budget-bar-height);
+  border-radius: var(--budget-bar-height);
+  background: var(--color-track);
+  overflow: hidden;
+}
+
+.fill,
+.low {
+  block-size: 100%;
+  border-radius: var(--budget-bar-height);
+}
+
+.fill {
+  background: var(--color-fern);
+}
+
+.low {
+  background: var(--color-leaf-bright);
+}
+
+@media (max-width: 30rem) {
+  .meter {
+    grid-template-areas:
+      'model model'
+      'track count';
+    justify-content: end;
+    row-gap: var(--space-1);
+  }
+
+  .model {
+    justify-self: end;
+  }
+
+  .divider {
+    display: none;
+  }
+}

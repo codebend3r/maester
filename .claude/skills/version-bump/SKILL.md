@@ -5,7 +5,7 @@ description: Use when cutting a release or bumping the version in this workspace
 
 # Version bump
 
-The workspace follows [semver 2.0.0](https://semver.org) with one version for everything: every app, lib and API (luwin, raven, rookery, `@raven/core`, and any project added later) carries the same number. Every release is one commit, `Release vX.Y.Z`, carrying an annotated tag that is exactly `vX.Y.Z`. A tag never names a product: no `luwin-v0.4.0`, no `raven-v1.0.0`.
+The workspace follows [semver 2.0.0](https://semver.org) with one version for everything: every app, lib and API (sparrow, raven, rookery, `@raven/core`, and any project added later) carries the same number. Every release is one commit, `Release vX.Y.Z`, carrying an annotated tag that is exactly `vX.Y.Z`. A tag never names a product: no `sparrow-v0.4.0`, no `raven-v1.0.0`.
 
 `scripts/bump_version.sh` does the whole thing. `npm version` does not work here (the root `package.json` has no version and does not know about the Python projects), so when asked for `npm version <bump>`, run this script instead. Never edit versions or create release tags by hand.
 
@@ -39,8 +39,8 @@ While the version is `0.y.z`, breaking changes may go in a `minor`. A literal re
 
 - The current version is the latest `vX.Y.Z` tag reachable from HEAD, less any build number (`v0.5.3.4` is `0.5.3`); it refuses to run when there is none.
 - Every tracked `apps/*/*/package.json` and `libs/*/*/package.json` gets the new top-level `version`, and its workspace entry in `bun.lock` follows, so `bun install --frozen-lockfile` still passes. A project whose version had drifted (rookery was `0.1.0` before `v0.4.0`) is pulled onto the shared version.
-- Every `apps/<product>/VERSION` gets the new version (the luwin smoke test reads it).
-- Every `pyproject.toml` under `apps/` and `libs/` gets its first `version = "..."` line (the `[project]` table) updated, and the project's own entry in the `uv.lock` beside it. The luwin image reads its version from that metadata, so `--version` and `/health` follow.
+- Every `apps/<product>/VERSION` gets the new version (the sparrow smoke test reads it).
+- Every `pyproject.toml` under `apps/` and `libs/` gets its first `version = "..."` line (the `[project]` table) updated, and the project's own entry in the `uv.lock` beside it. The sparrow image reads its version from that metadata, so `--version` and `/health` follow.
 - `patch` on a prerelease (`1.2.0-rc.1`) releases it (`1.2.0`) rather than skipping to `1.2.1`.
 - It refuses a dirty tree, an invalid version, a version that does not move forward by semver precedence, and a tag that already exists. Nothing is written when it refuses.
 - `build` refuses a commit that already has a version tag, and a prerelease, which gets no builds.

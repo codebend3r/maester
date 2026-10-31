@@ -1,0 +1,272 @@
+from datetime import date
+from pathlib import Path
+
+import pytest
+
+from sparrow.agent.loop import Agent
+from sparrow.agent.runner import ToolRunner
+from sparrow.agent.tools import ToolContext, ToolRegistry
+from sparrow.config import Settings
+from sparrow.evals import (
+    CASES_DIR,
+    Case,
+    CaseResult,
+    Turn,
+    TurnResult,
+    load_cases,
+    markdown_report,
+    progress_line,
+    publish_report,
+    report,
+    run_case,
+    run_case_and_close,
+    summary_bar,
+)
+from sparrow.evals.world import EVAL_USER, build_services, build_world
+from sparrow.memo import Memo
+from sparrow.store import Store
+from tests.fake_model import FakeModel, text_message, tool_message
+
+
+def test_all_case_files_load():
+    cases = load_cases()
+    assert {c.name for c in cases} >= {
+        "simple movie request",
+        "ambiguous title asks before requesting",
+    }
+    assert all(c.turns for c in cases)
+
+
+def test_world_seeds_fake_seerr():
+    services = build_services(
+        {"seerr": {"results": [{"tmdb_id": 1, "title": "Dune", "year": 2021}]}}
+    )
+    assert services.seerr.results[0].title == "Dune"
+    assert set(services.sonarr) == {"meleys", "vermithor"}
+
+
+async def test_run_case_checks_tools_and_reply(tmp_path: Path):
+    reg = ToolRegistry()
+
+    @reg.tool("search_media", "search")
+    async def search(ctx, query: str = ""):
+        return [{"title": "Dune"}]
+
+    case = Case.load(CASES_DIR / "ambiguous_title.yaml")
+    store = Store(":memory:")
+
+    def agent_with(*script):
+        return Agent(
+            model_client=FakeModel.scripted(*script),
+            model="fake",
+            runner=ToolRunner(reg),
+            store=store,
+            services=None,
+            settings=Settings(),
+        )
+
+    good = await run_case(
+        case,
+        agent_with(
+            tool_message([("search_media", {"query": "dune"})]),
+            text_message("Which one, 2021 or 1984?"),
+        ),
+    )
+    assert good.passed
+
+    bad = await run_case(case, agent_with(text_message("Requested Dune.")))
+    assert not bad.passed
+    failures = bad.turns[0].failures
+    assert any("expected tool 'search_media'" in f for f in failures)
+    assert any("did not match" in f for f in failures)
+    assert "FAIL  ambiguous title" in report([bad]) and "0/1 cases passed" in report([bad])
+    store.close()
+
+
+async def test_run_case_and_close_closes_the_client_inside_the_loop():
+    class ClosingModel(FakeModel):
+        is_closed = False
+
+        async def close(self):
+            self.is_closed = True
+
+    case = Case.load(CASES_DIR / "setup_roku.yaml")
+    store = Store(":memory:")
+    closing = ClosingModel.scripted(text_message("Go to plex.tv/link."))
+    agent = Agent(
+        model_client=closing,
+        model="fake",
+        runner=ToolRunner(ToolRegistry()),
+        store=store,
+        services=None,
+        settings=Settings(),
+    )
+    await run_case_and_close(case, agent)
+    assert closing.is_closed
+
+    agent.client = FakeModel.scripted(text_message("Go to plex.tv/link."))
+    await run_case_and_close(case, agent)
+    store.close()
+
+
+@pytest.mark.parametrize(
+    ("case_file", "call"),
+    [
+        ("trusted_4k_goes_to_admin", ("request_media_4k", {"tmdb_id": 438631, "media_type": "movie"})),
+        ("tv_request_by_season", ("request_media", {"tmdb_id": 136315, "media_type": "tv", "seasons": [2, 3]})),
+        ("availability_with_plex_link", ("check_availability", {"tmdb_id": 438631, "media_type": "movie"})),
+        ("request_status", ("request_status", {})),
+        ("collection_request", ("find_collection", {"tmdb_id": 954})),
+        ("anime_english_dub", ("check_availability", {"tmdb_id": 209867, "media_type": "tv"})),
+        ("person_latest_movies", ("search_people", {"name": "Bob Odenkirk", "kind": "movie"})),
+    ],
+)  # fmt: skip
+async def test_case_worlds_answer_the_tools_their_cases_expect(case_file, call):
+    case = Case.load(CASES_DIR / f"{case_file}.yaml")
+    registry, services, store = build_world(case.services)
+    agent = Agent(
+        model_client=FakeModel.scripted(tool_message([call]), text_message("done")),
+        model="fake",
+        runner=ToolRunner(registry),
+        store=store,
+        services=services,
+        settings=Settings(),
+    )
+    reply = await agent.respond(EVAL_USER, case.tier, case.turns[0].user)
+    assert reply.tool_calls == [{"name": call[0], "input": call[1], "ok": True}]
+    store.close()
+
+
+DUNE_1080P = {"tmdb_id": 438631, "media_type": "movie", "version": "1080p"}
+FORKS = {"tmdb_id": 136315, "media_type": "tv", "version": "1080p", "season": 2, "episode": 7}
+
+
+@pytest.mark.parametrize(
+    ("case_file", "call", "expect"),
+    [
+        ("playback_identify_recent", ("recent_sessions", {}), "movie:438631:1080p"),
+        ("playback_client_fix", ("report_problem", {**DUNE_1080P, "kind": "wont_play", "description": "stalls"}), '"decision": "advised"'),
+        ("playback_broken_file", ("report_problem", {**FORKS, "kind": "wont_play", "description": "freezes", "at": "20:00"}), '"decision": "replaceable"'),
+        ("wrong_file_report", ("report_problem", {**DUNE_1080P, "kind": "cam", "description": "a cam"}), '"decision": "recorded"'),
+        ("subtitle_question", ("list_tracks", DUNE_1080P), '"language": "spa"'),
+        ("missing_episode", ("find_gaps", {"tmdb_id": 136315, "host": "meleys"}), '"searched": ["S02E07"]'),
+    ],
+)  # fmt: skip
+async def test_playback_case_worlds_reach_what_their_cases_expect(case_file, call, expect):
+    """The tool each playback case expects, run on its world, reaches the case's decision."""
+    case = Case.load(CASES_DIR / f"{case_file}.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    outcome = await ToolRunner(registry).run(ctx, *call)
+    assert not outcome.is_error and expect in outcome.text
+    store.close()
+
+
+@pytest.mark.parametrize(
+    ("case_file", "call", "expect"),
+    [
+        ("lag_relayed", ("session_report", {}), '"fix": "avoid_relay"'),
+        ("lag_remote_quality", ("session_report", {}), '"fix": "original_quality"'),
+        ("lag_subtitle_burn_in", ("session_report", {}), '"fix": "subtitles_off"'),
+        ("lag_busy_server", ("session_report", {}), '"fix": "wait"'),
+        ("lag_heavy_remux", ("session_report", {}), '"what_to_do": "Play the 1080p version instead'),
+        ("lag_details_on_request", ("session_report", {"details": True}), '"findings": [{"fix": "original_quality"'),
+        ("server_load", ("server_status", {}), '"load_is_a_plausible_cause": true'),
+    ],
+)  # fmt: skip
+async def test_lag_case_worlds_reach_the_advice_their_cases_expect(case_file, call, expect):
+    """The advice each lag case's reply is held to is what its world's stream calls for."""
+    case = Case.load(CASES_DIR / f"{case_file}.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    outcome = await ToolRunner(registry).run(ctx, *call)
+    assert not outcome.is_error and expect in outcome.text
+    store.close()
+
+
+async def test_the_slow_uplink_world_is_found_by_a_speed_test():
+    case = Case.load(CASES_DIR / "lag_slow_uplink.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    runner = ToolRunner(registry)
+    before = await runner.run(ctx, "session_report", {})
+    assert '"fix": null' in before.text and "speed_test(host=meleys)" in before.text
+    tested = await runner.run(ctx, "speed_test", {"host": "meleys"})
+    assert (
+        "The upload is nearly full" in tested.text and '"remote_streams_mbps": 20.0' in tested.text
+    )
+    after = await runner.run(ctx, "session_report", {})
+    assert '"fix": "lower_quality"' in after.text and "4 Mbps 720p" in after.text
+    store.close()
+
+
+async def test_the_health_world_has_what_its_case_says_is_down():
+    case = Case.load(CASES_DIR / "service_health_down.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    outcome = await ToolRunner(registry).run(ctx, "service_health", {})
+    assert [d["service"] for d in outcome.content["down"]] == ["Plex", "Radarr on vermithor"]
+    store.close()
+
+
+async def test_the_version_world_recommends_what_its_case_expects():
+    case = Case.load(CASES_DIR / "version_for_slow_connection.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    call = {"tmdb_id": 438631, "connection_mbps": 20}
+    outcome = await ToolRunner(registry).run(ctx, "pick_version", call)
+    assert '"recommended": {"version": "1080p", "fits": true' in outcome.text
+    assert outcome.notices == ()
+    store.close()
+
+
+async def test_the_heavy_remux_world_flags_the_remux_to_the_admin():
+    case = Case.load(CASES_DIR / "lag_heavy_remux.yaml")
+    registry, services, store = build_world(case.services)
+    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
+    outcome = await ToolRunner(registry).run(ctx, "session_report", {})
+    (notice,) = outcome.notices
+    assert "watched away from home 3 times" in notice.text
+    store.close()
+
+
+def _result(name: str, failures: list[str]) -> CaseResult:
+    case = Case(name=name, tier="friend", turns=[Turn(user="hi")])
+    return CaseResult(case, [TurnResult(case.turns[0], "reply", [], failures)])
+
+
+def test_markdown_report_is_sorted_and_stable():
+    results = [_result("b case", ["got | a\npipe"]), _result("a case", [])]
+    markdown = markdown_report(results, model="m-1", day=date(2026, 10, 16))
+    assert "- Passed: **1/2**" in markdown and "- Model: `m-1`" in markdown
+    assert markdown.index("a case") < markdown.index("b case")
+    assert "| ❌ | b case | got \\| a pipe |" in markdown
+    assert markdown == markdown_report(results[::-1], model="m-1", day=date(2026, 10, 16))
+
+
+def test_publish_report_writes_only_full_real_runs(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    target = tmp_path / "evals.md"
+    results = [_result("a case", [])]
+    publish_report(results, model="m-1", is_full_run=False, report_path=target)
+    publish_report(results, model="fake", is_full_run=True, report_path=target)
+    assert not target.exists()
+    assert publish_report(results, model="m-1", is_full_run=True, report_path=target)
+    assert "a case" in target.read_text()
+
+
+def test_publish_report_appends_to_the_github_step_summary(tmp_path: Path, monkeypatch):
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    publish_report(
+        [_result("a case", [])], model="fake", is_full_run=False, report_path=tmp_path / "x.md"
+    )
+    assert "a case" in summary.read_text()
+
+
+def test_terminal_output_shows_progress_and_a_pass_bar():
+    results = [_result("a case", []), _result("b case", ["nope"])]
+    assert progress_line(results[1], index=2, total=10, is_color=False) == "[ 2/10] ❌ b case"
+    bar = summary_bar(results, is_color=False)
+    assert bar.endswith("1/2 passed") and bar.count("█") == 15 and bar.count("░") == 15
+    assert "\033[" in summary_bar(results, is_color=True)
