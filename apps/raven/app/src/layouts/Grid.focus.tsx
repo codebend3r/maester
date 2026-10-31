@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
-import { Icon } from '@/layouts/Icon'
+import { Icon } from '@raven/native'
 import { Text } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'

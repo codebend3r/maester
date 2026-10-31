@@ -13,8 +13,8 @@ import {
   createApiClient,
   isRecord,
 } from '@raven/core'
+import { allowlistedFetch } from '@raven/native/headless'
 
-import { allowlistedFetch } from '@/servers/allowlist'
 import {
   type Answer,
   type HeardRequest,

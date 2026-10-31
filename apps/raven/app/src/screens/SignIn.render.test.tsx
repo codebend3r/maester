@@ -9,12 +9,12 @@ import {
   type MediaTicket,
   SERVERS_CAP,
 } from '@raven/core'
+import type * as Native from '@raven/native'
+import { AUTH_OUTCOMES, type AuthOutcome, RAVEN_SERVER } from '@raven/native/headless'
 import { fireEvent, render, screen } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
-import { useAccountSession } from '@/account/accountSession'
-import { AUTH_OUTCOMES, type AuthOutcome } from '@/account/supabaseAuth'
-import { RAVEN_SERVER } from '@/servers/ravenServer'
+import { useAccountSession } from '@/account/session'
 import { APP_ROUTES } from '@/routes'
 import { SIGN_IN_COPY } from '@/screens/copy'
 import { SignIn } from '@/screens/SignIn'
@@ -54,7 +54,8 @@ const mockApiFor = jest.fn((_server: unknown) => ({
 jest.mock('expo-router', () => ({
   useRouter: () => ({ dismissTo: mockDismissTo }),
 }))
-jest.mock('@/servers/serverClient', () => ({
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
   apiFor: (server: unknown) => mockApiFor(server),
   cookieJar: { forget: async () => {} },
   secretStore: {

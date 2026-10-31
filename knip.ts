@@ -18,6 +18,15 @@ export default {
       ignoreBinaries: ['watchman', 'maestro'],
       // knip's Expo plugin expects expo-updates unless the config turns updates
       // off; the app ships no over-the-air updates and does not install it.
+      // `@raven/audio` is imported only through `@raven/native`'s host, but Expo
+      // autolinks a native module only from the app's own dependencies.
+      ignoreDependencies: ['expo-updates', '@raven/audio'],
+    },
+    'apps/raven/music': {
+      // Wren, read as the app is: its routes by path, the binaries the Mac installs, and no
+      // over-the-air updates.
+      entry: ['app/**/*.tsx'],
+      ignoreBinaries: ['watchman', 'maestro'],
       ignoreDependencies: ['expo-updates'],
     },
     'apps/raven/desktop': {
@@ -31,6 +40,11 @@ export default {
       entry: ['functions/*/index.ts', 'functions/*/*.test.ts'],
       paths: { '@/alert': ['functions/signup-alert/alert.ts'] },
       ignoreDependencies: ['nodemailer'],
+    },
+    'libs/raven/native': {
+      // The package's three entries. Its exports name them in dist, and knip's default finds
+      // only src/index.ts.
+      entry: ['src/index.ts', 'src/headless.ts', 'src/polyfills.ts'],
     },
     'libs/raven/mpv': {
       // The native build consumes both: node-addon-api is the addon's C++

@@ -18,8 +18,8 @@ import {
   type LibraryKind,
   createApiClient,
 } from '@raven/core'
+import type { AppServer } from '@raven/native/headless'
 
-import type { AppServer } from '@/servers/serverList'
 import { NOT_FOUND, STATUSES, responseOf } from '@/test/fixtureFetch'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 

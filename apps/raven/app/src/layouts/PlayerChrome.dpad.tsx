@@ -17,7 +17,7 @@ import {
 } from 'react-native'
 import Video from 'react-native-video'
 
-import { Icon } from '@/layouts/Icon'
+import { Icon } from '@raven/native'
 import { LoadingMark } from '@/layouts/LoadingMark'
 import { Text } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'

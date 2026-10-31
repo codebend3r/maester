@@ -6,13 +6,18 @@ import {
   routeIdOf,
   routeState,
 } from '@raven/core'
-import { playingTrackOf, useAudioQueue, useServerAlbumFavourite } from '@raven/ui/headless'
+import {
+  albumDiscsOf,
+  albumFactsOf,
+  playingTrackOf,
+  useAudioQueue,
+  useServerAlbumFavourite,
+} from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 
 import { AlbumLayout } from '@/layouts'
-import { albumDiscsOf, albumFactsOf } from '@/layouts/musicRows'
 import { usePlaylistAdd } from '@/music/usePlaylistAdd'
 import { pictureAt } from '@/queries/cards'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { AUTH_HEADERS, SERVER_COOKIES, isRecord, isString } from '@raven/core'
+import type { ApiForProps } from '@raven/native'
+import type * as Native from '@raven/native'
+import { bumpCookieVersion } from '@raven/native/headless'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
@@ -7,9 +10,7 @@ import type { Picture } from '@/queries/cards'
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Home } from '@/screens/Home'
-import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
-import { bumpCookieVersion } from '@/stores/cookieVersion'
 import { NAS, OTHER, homeApi } from '@/test/homeServer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { createScreenClient, renderScreen } from '@/test/renderScreen'
@@ -25,8 +26,9 @@ jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
   default: () => ({ width: mockWindowWidth(), height: 844, scale: 3, fontScale: 1 }),
 }))
-jest.mock('@/servers/serverClient', () => ({
-  apiFor: (server: AppServer) => mockApi(server),
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
+  apiFor: ({ server }: ApiForProps) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => mockCookies(), forget: async () => {} },
   secretStore: {

@@ -94,6 +94,16 @@ export { playlistMutationsFor, useServerPlaylistMutations } from '@/query/usePla
 export { useAudiobookChapters, useIsAudiobook, useTrackRate } from '@/query/useAudiobook'
 export { activeLineAt } from '@/lib/lyrics'
 export { chapterAt, nextChapterStart, previousChapterStart } from '@/lib/chapters'
+export { movedUp, withoutPlace } from '@/music/playlistOrder'
+export {
+  albumDiscsOf,
+  albumFactsOf,
+  playTimeOf,
+  playlistFactsOf,
+  playlistTracksOf,
+  queueRowsOf,
+} from '@/music/musicRows'
+export type { AlbumDisc, AlbumTrack, PlaylistTrack, QueueRow } from '@/music/musicRows'
 export { usePlaybackPolicy } from '@/query/usePlaybackPolicy'
 export {
   EVENTS_RETRY_MS,
@@ -113,6 +123,7 @@ export { useListenCounter } from '@/components/AudioHost/useListenCounter'
 export { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
 export { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
 export {
+  UnplayableTrackError,
   failureOf,
   runRemoteCommand,
   useWindowedAudioHost,

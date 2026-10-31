@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:te
 import { act, cleanup, waitFor } from '@testing-library/react'
 import { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
 import {
+  UnplayableTrackError,
   type WindowedPlayer,
   runRemoteCommand,
   useWindowedAudioHost,
@@ -67,15 +68,20 @@ const reset = () => {
   useAudioQueue.setState({ queue: EMPTY_QUEUE })
 }
 
-type FakePlayerProps = { loadFails?: Error | null }
+type FakePlayerProps = {
+  loadFails?: Error | null
+  /** The tracks this player cannot decode. */
+  unplayable?: readonly number[]
+}
 
 /** A player that writes down each call as a line, so a test reads what the host asked of it. */
-const fakePlayer = ({ loadFails = null }: FakePlayerProps = {}) => {
+const fakePlayer = ({ loadFails = null, unplayable = [] }: FakePlayerProps = {}) => {
   const calls: string[] = []
   const player: WindowedPlayer = {
     load: async ({ playing, next, start }) => {
       calls.push(`load ${playing.id} ${next?.id ?? '-'}${start > 0 ? ` at ${start}` : ''}`)
       if (loadFails !== null) throw loadFails
+      if (unplayable.includes(playing.id)) throw new UnplayableTrackError()
     },
     queueNext: async (next) => {
       calls.push(`next ${next?.id ?? '-'}`)
@@ -165,6 +171,38 @@ describe('useWindowedAudioHost', () => {
     act(() => store().seekTo(42))
     expect(calls.slice(-2)).toEqual(['pause', 'seek 42'])
     expect(store().seek).toBeNull()
+  })
+
+  it('says a track the player cannot decode, and passes on to the next', async () => {
+    const { calls, player } = fakePlayer({ unplayable: [2] })
+    renderHost({ player })
+    await act(async () => store().playTracks({ tracks: ALBUM, startAt: 1 }))
+    await waitFor(() => expect(store().queue.at).toBe(2))
+    expect(calls.filter((call) => call.startsWith('load'))).toEqual(['load 2 3', 'load 3 -'])
+    expect(store().state).not.toBe(AUDIO_STATES.failed)
+  })
+
+  it('stops on a queue it cannot play at all, rather than going round it for ever', async () => {
+    const { calls, player } = fakePlayer({ unplayable: [1, 2, 3] })
+    renderHost({ player })
+    act(() => store().cycleRepeat())
+    expect(store().queue.repeat).toBe(REPEAT_MODES.all)
+    await act(async () => store().playTracks({ tracks: ALBUM }))
+    await waitFor(() => expect(store().state).toBe(AUDIO_STATES.failed))
+    expect(store().error).toBe(AUDIO_HOST_COPY.couldNotPlay)
+    expect(calls.filter((call) => call.startsWith('load'))).toEqual([
+      'load 1 2',
+      'load 2 3',
+      'load 3 1',
+    ])
+  })
+
+  it('leaves a track that failed for any other reason where it is', async () => {
+    const { player } = fakePlayer({ loadFails: new Error('Sign in to raven again.') })
+    renderHost({ player })
+    await act(async () => store().playTracks({ tracks: ALBUM }))
+    expect(store().queue.at).toBe(0)
+    expect(store().error).toBe('Sign in to raven again.')
   })
 })
 

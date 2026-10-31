@@ -12,19 +12,20 @@ import {
   mediaLabel,
   toQueryString,
 } from '@raven/core'
+import type { ApiForProps } from '@raven/native'
+import type * as Native from '@raven/native'
+import { ACCOUNT_ACCESS_MESSAGES, type AppServer } from '@raven/native/headless'
 import { SAVE_EVERY_S, usePlayerPrefs, useUnlockPrompt } from '@raven/ui/headless'
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 import type { ReactVideoProps } from 'react-native-video'
 import { SelectedTrackType } from 'react-native-video'
 
-import { useAccountSession } from '@/account/accountSession'
+import { useAccountSession } from '@/account/session'
 import { APPLE_ERROR_DOMAINS, URL_ERROR_HTTP_CODES } from '@/player/playerErrors'
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Player } from '@/screens/Player'
-import { ACCOUNT_ACCESS_MESSAGES } from '@/servers/mediaAccess'
-import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { type HeardRequest, STATUSES, pathFor } from '@/test/fixtureFetch'
@@ -67,9 +68,11 @@ const mockApi = jest.fn((_server: AppServer) =>
   }),
 )
 
-jest.mock('@/servers/serverClient', () => ({
-  apiFor: (server: AppServer) => mockApi(server),
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
+  apiFor: ({ server }: ApiForProps) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
+  watchNetwork: () => () => {},
   cookieJar: { read: async () => ({}), forget: async () => {} },
   secretStore: {
     getItemAsync: async () => null,
@@ -77,9 +80,6 @@ jest.mock('@/servers/serverClient', () => ({
     deleteItemAsync: async () => {},
   },
 }))
-jest.mock('@react-native-community/netinfo', () =>
-  jest.requireActual('@react-native-community/netinfo/jest/netinfo-mock'),
-)
 jest.mock('react-native-video', () =>
   jest.requireActual<typeof VideoMock>('@/test/videoMock').videoModuleMock(),
 )

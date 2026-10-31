@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { ACCESS_REFUSALS, type AccessRefusal, PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
+import type { SourceOutcome } from '@raven/native/headless'
 
 import {
   SESSION_COPY,
@@ -14,7 +15,6 @@ import {
   sessionReducer,
   sourcedOf,
 } from '@/player/usePlaybackSession'
-import type { SourceOutcome } from '@/servers/mediaAccess'
 
 const { direct, remux, transcode } = PLAYBACK_MODES
 const LADDER: readonly PlaybackMode[] = [direct, remux, transcode]

@@ -1,3 +1,4 @@
+import { useSubmit } from '@raven/native/headless'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
@@ -7,7 +8,6 @@ import { useAppQueries } from '@/queries/useAppQueries'
 import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
 import { APP_ROUTES } from '@/routes'
 import { UNLOCK_COPY } from '@/screens/copy'
-import { useSubmit } from '@/screens/useSubmit'
 
 /**
  * `/unlock`: the PIN, asked for when a page is refused for sitting in a locked library. Once

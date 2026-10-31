@@ -271,14 +271,14 @@ Audio features for "radio" and mixes (tempo, key, energy) can come from Essentia
 
 A new raven client, `@raven/music` in `apps/raven/music`, with the same server, accounts, PIN, tickets and viewing data. It is not a new product with its own server: the server, matching and library are raven's, and splitting them would duplicate the hardest parts. Its look is its own, music-first, under raven's tokens and themes.
 
-- **Phone and tablet first (iOS, iPadOS, Android).** An Expo app like `@raven/app`, but upstream React Native rather than the TV fork, so its native audio choices are not limited by tvOS.
+- **Phone and tablet first (iOS, iPadOS, Android).** An Expo app like `@raven/app`, on the same tvOS fork, `react-native-tvos@0.88.0-0`. The root `overrides` swaps `react-native` for the fork across the whole workspace (see "Pins" in `apps/raven/app/CLAUDE.md`), so upstream React Native would break `@raven/app`, and the fork builds iPhone, iPad and Android phone apps unchanged. Its native audio is still not limited by tvOS: the app has no TV target.
 - **Its audio engine is `@raven/audio`,** the module PR 6 builds for the device app's phones: on Apple, `AVQueuePlayer` (gapless, preloading), `MPNowPlayingInfoCenter`, `MPRemoteCommandCenter`, and CarPlay's `CPTemplate`s added in PR 9; on Android, Media3's `ExoPlayer` with the whole queue (gapless from the files' own metadata, ReplayGain through an `AudioProcessor`) inside a `MediaLibraryService`, which is also what Android Auto browses. The engine prototype ruled out `react-native-track-player`: 190 to 500 ms gaps at every seam on iOS, no CarPlay, and no Android Auto browse tree. Track lengths come from the server's tags, since AVFoundation rounds a FLAC's length up to whole blocks.
 - **Mac and web.** The music UI is a mode of `@raven/web` (its own route tree under `/music`, with the shared queue player), so the browser and Raven on macOS get it with no second desktop app. A separate Mac app can follow if the mode proves itself.
 - **Watch, CarPlay, Android Auto and widgets** follow the phone app, since they are extensions of it.
 
 #### What it needs from the server beyond section 5
 
-- Transcodes for offline and cellular (AAC 256 or Opus 160), cached per track and bitrate on the server so a second download is free.
+- Transcodes for offline and cellular (AAC at 128, 256 or 320 kbps), cached per track and bitrate on the server so a second download is free.
 - Loudness: compute EBU R128 track and album gain with ffmpeg's `ebur128` filter for files without ReplayGain tags, once, in the background.
 - History and mix routes: `GET /api/music/mixes`, `GET /api/music/radio?seed=...`, built from plays and ListenBrainz similarity at first.
 - Scrobble forwarding to ListenBrainz and Last.fm with per-account tokens (stored server-side, never logged, like every other secret).
@@ -297,6 +297,9 @@ Ten stacked PRs, one commit each, thermo-reviewed. PRs 1 to 7 bring music to eve
 
 > [!TIP]
 > Ten PRs, not 22, at the owner's request (2026-10-27). Each PR carries a whole layer or a whole client, so PRs 2, 4 and 7 may run to about 100 files each; the owner chose ten PRs over the usual 50-file limit.
+
+> [!TIP]
+> PR 8 started on 2026-10-30. The app is Wren: `@raven/music` in `apps/raven/music`, with `app.netlify.wren` as both its iOS bundle id and its Android package, and `wren` as its scheme. Sign-in and media access are shared rather than copied: the device app's account session, Supabase sign-in, server fetch, cookie jar, tickets and media access move into `@raven/native` (`libs/raven/native`), which both apps import, each keeping its account under a secure-store key of its own. Shared playlists can be read by every account and edited only by their owner. Transcodes are AAC only, at 128, 256 or 320 kbps; there is no Opus. Two Wren jobs join the PR checks: `🎵 Wren on iPhone` (build and Maestro flows) and `🎵 Wren for Android` (a Release APK build).
 
 > [!TIP]
 > PR 7 built on 2026-10-30, and split by layer into three stacked PRs, since it came to 171 files: 7a, server and core (`raven-music-playlists`); 7b, the shared player, the web and Raven (`raven-music-web-playlists`); 7c, the device app (`raven-music-app-playlists`). Album and artist favourites are two small per-account tables rather than a kind on `item_favourites`. Lyrics from a tag or an `.lrc` sidecar are read when asked for, and only LRCLIB's answers are cached, misses included. An audiobook's chapters come through the markers route, which the music indexer now fills; its spot is kept by `useAudiobookSpot`, shared by every audio host, and its speed is a player pref, mpv's `speed` on Raven and `setRate` in `@raven/audio`. Listens were already counted everywhere since PR 4. A TV plays a playlist but does not edit one, and a book's next file played gaplessly on Raven starts from its top.
@@ -462,7 +465,7 @@ Build a throwaway Expo app that plays a ten-track album from raven on an iPhone 
 > Gapless on the web is not true gapless with two `<audio>` elements. Live albums and classical music will show the seam until a Web Audio path exists.
 
 > [!WARNING]
-> `@raven/audio` must build in `@raven/app` on the tvOS fork as well as in `@raven/music` on upstream React Native. A local Expo module in Swift and Kotlin has no tie to either, but PR 6 builds it in both before the music screens land.
+> `@raven/audio` must build in both `@raven/app` and `@raven/music`, which share the tvOS fork. A local Expo module in Swift and Kotlin has no tie to the fork, and PR 6 builds it in the device app before the music screens land.
 
 > [!WARNING]
 > Docker image size. `fpcalc`, and later Essentia, add native binaries; both stay optional.

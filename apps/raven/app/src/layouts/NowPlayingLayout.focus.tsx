@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import { StyleSheet, View } from 'react-native'
+import type { QueueRow } from '@raven/ui/headless'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { useScreenFocusScope } from '@/layouts/focus'
@@ -15,7 +16,6 @@ import {
 } from '@/layouts/musicKit'
 import { NowPlayingAside } from '@/layouts/NowPlayingAside.focus'
 import { ActionPlate, Cover, FocusPage, FocusRow, useMusicStyles } from '@/layouts/MusicParts.focus'
-import type { QueueRow } from '@/layouts/musicRows'
 import { Text } from '@/layouts/Text'
 import { TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'

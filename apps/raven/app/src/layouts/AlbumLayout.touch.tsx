@@ -1,3 +1,4 @@
+import type { AlbumTrack } from '@raven/ui/headless'
 import { type AccessibilityActionEvent, Pressable, StyleSheet, View } from 'react-native'
 
 import { BUTTON_TONES } from '@/layouts/formKit'
@@ -5,7 +6,6 @@ import { touchForm } from '@/layouts/Form.touch'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type AlbumLayoutProps, ROW_ACTIONS } from '@/layouts/musicKit'
 import { Cover, FavouriteButton, TouchPage, useMusicStyles } from '@/layouts/MusicParts.touch'
-import type { AlbumTrack } from '@/layouts/musicRows'
 import { touchPicker } from '@/layouts/Picker.touch'
 import { openAddToPlaylistSheet } from '@/layouts/playlistSheets'
 import { Text } from '@/layouts/Text'

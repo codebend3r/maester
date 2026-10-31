@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type { LockState } from '@raven/core'
+import type * as Native from '@raven/native'
+import { AUTH_OUTCOMES, type AuthOutcome } from '@raven/native/headless'
 import { fireEvent, render, screen } from '@testing-library/react-native'
 
-import { useAccountSession } from '@/account/accountSession'
-import { AUTH_OUTCOMES, type AuthOutcome } from '@/account/supabaseAuth'
+import { useAccountSession } from '@/account/session'
 import { SignIn } from '@/screens/SignIn'
 import { useActiveServer } from '@/stores/activeServer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
@@ -30,7 +31,8 @@ jest.mock(
   '@/layouts/tvFocus',
   () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
 )
-jest.mock('@/servers/serverClient', () => ({
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
   apiFor: () => ({ getLock: mockGetLock }),
   cookieJar: { forget: async () => {} },
   secretStore: {

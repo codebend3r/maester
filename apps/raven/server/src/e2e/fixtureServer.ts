@@ -9,18 +9,21 @@ import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 import { ADMIN_PASSWORD, NOT_WATCHING, adminCookie, testConfig } from '@/test/app'
-import { encodeClip, encodeRichClip } from '@/test/clips'
+import { encodeClip, encodeRichClip, encodeTrack } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
 import { apiFor } from '@/test/server'
 
 /**
- * A real raven server for the device app's Maestro flows (`apps/raven/app/e2e`): one locked
- * film library holding a movie and one open series library holding two episodes, behind a PIN
- * and the admin password, with media tickets on. The movie and the first episode are MKVs, which
- * an Apple device plays through the server's HLS remux; the second episode is an MP4 with an
- * English sidecar, which it plays as it is. Both are matched against a fake TMDB, so no
- * request leaves the Mac. It listens on a fixed port on the loopback, which the iOS and tvOS
- * simulators share with the Mac, and lives until it is stopped.
+ * A real raven server for the device app's and Wren's Maestro flows (`apps/raven/app/e2e`,
+ * `apps/raven/music/e2e`): a locked film library holding a movie, an open series library holding
+ * two episodes and an open music library holding a three track FLAC album, behind a PIN and the
+ * admin password, with media tickets on. The movie and the first episode are MKVs, which an Apple
+ * device plays through the server's HLS remux; the second episode is an MP4 with an English
+ * sidecar, which it plays as it is. Both are matched against a fake TMDB, which knows no
+ * MusicBrainz release, so the album keeps its tags and no request leaves the Mac. The music
+ * library is neither pinned nor in the hero, so the device app's Home is as it was without it.
+ * It listens on a fixed port on the loopback, which the iOS and tvOS simulators share with the
+ * Mac, and lives until it is stopped.
  */
 const FIXTURE = {
   host: '127.0.0.1',
@@ -33,6 +36,19 @@ const FIXTURE = {
     file: 'Lantern Bay - S01E01 - Low Tide.mkv',
     direct: 'Lantern Bay - S01E02 - High Water.mp4',
     sidecar: 'Lantern Bay - S01E02 - High Water.en.srt',
+  },
+  album: {
+    library: 'Music',
+    folder: join('The Fixture Birds', 'Morning Chorus'),
+    tags: {
+      album: 'Morning Chorus',
+      album_artist: 'The Fixture Birds',
+      artist: 'The Fixture Birds',
+      date: '2024',
+    },
+    // Long enough that a flow reads the bar before the track ends and the next one starts.
+    seconds: 20,
+    tracks: ['First Light', 'Dawn Song', 'Open Sky'],
   },
 } as const
 
@@ -78,7 +94,16 @@ const serve = async (): Promise<string> => {
   const media = join(root, 'media')
   const movies = join(media, 'movies')
   const shows = join(media, 'shows')
+  const music = join(media, 'music')
+  const { album } = FIXTURE
   await Promise.all([
+    ...album.tracks.map((title, index) =>
+      encodeTrack({
+        path: join(music, album.folder, `0${index + 1} ${title}.flac`),
+        seconds: album.seconds,
+        tags: { ...album.tags, title, track: String(index + 1) },
+      }),
+    ),
     encodeRichClip({
       path: join(movies, FIXTURE.movie.folder, FIXTURE.movie.file),
       seconds: 60,
@@ -121,6 +146,11 @@ const serve = async (): Promise<string> => {
       name: FIXTURE.show.library,
       paths: [shows],
       settings: { kind: LIBRARY_KINDS.shows },
+    }),
+    api.createLibrary({
+      name: album.library,
+      paths: [music],
+      settings: { kind: LIBRARY_KINDS.music, pinned: false, inHero: false },
     }),
   ])
   await Promise.all(libraries.map((library) => app.get(ScannerService).whenIdle(library.id)))

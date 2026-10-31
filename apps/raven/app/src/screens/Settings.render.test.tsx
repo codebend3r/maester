@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { APP_CLIENT_CALLS, MAX_HEIGHTS, THEMES, themeOf } from '@raven/core'
+import type { ApiForProps } from '@raven/native'
+import type * as Native from '@raven/native'
+import type { AppServer } from '@raven/native/headless'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet, processColor } from 'react-native'
 
 import { LAUNCH_LOOK, LOGO_TEST_IDS, logoColoursOf } from '@/layouts/Logo'
 import { Home } from '@/screens/Home'
 import { Settings } from '@/screens/Settings'
-import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { NAS, OTHER, homeApi } from '@/test/homeServer'
@@ -29,8 +31,9 @@ const mockApi = jest.fn((server: AppServer) => {
 })
 
 jest.mock('expo-router', () => ({ useRouter: () => ({ back: mockBack }) }))
-jest.mock('@/servers/serverClient', () => ({
-  apiFor: (server: AppServer) => mockApi(server),
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
+  apiFor: ({ server }: ApiForProps) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },
   secretStore: {

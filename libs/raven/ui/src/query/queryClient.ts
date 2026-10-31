@@ -47,6 +47,10 @@ type QueryKeysMusicListProps = { libraryId: number; search: string; sort: string
 
 type QueryKeysArtistsProps = { libraryId: number; search: string }
 
+type QueryKeysRecentAlbumsProps = { libraryId: number; limit: number }
+
+type QueryKeysSongsProps = { libraryIds: readonly number[]; search: string; sort: string }
+
 type QueryKeysAlbumMatchSearchProps = { albumId: number; query: string }
 
 type QueryKeysNextInSessionProps = { id: number; session: ViewingSession }
@@ -182,8 +186,22 @@ export const queryKeys = {
     'artists',
     { search },
   ],
+  /** A music library's newest albums, `limit` of them. */
+  recentAlbums: ({ libraryId, limit }: QueryKeysRecentAlbumsProps) => [
+    'libraries',
+    libraryId,
+    'albums',
+    'recent',
+    limit,
+  ],
   /** Every album's and artist's page: one prefix a match or a scan reads again. */
   music: ['music'],
+  /** The tracks of several music libraries, one after another: under the music, since a scan of any of them reads it again. */
+  songs: ({ libraryIds, search, sort }: QueryKeysSongsProps) => [
+    'music',
+    'songs',
+    { libraryIds, search, sort },
+  ],
   album: (id: number | null) => ['music', 'albums', id],
   artist: (id: number | null) => ['music', 'artists', id],
   /** A track's lyrics, under the music's prefix so a scan reads them again. */

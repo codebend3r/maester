@@ -1,8 +1,6 @@
 import { type AccessRefusal, type MediaItem, PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
+import { type MediaSources, type SourceOutcome, useCookieVersion } from '@raven/native/headless'
 import { useEffect, useEffectEvent, useReducer } from 'react'
-
-import type { MediaSources, SourceOutcome } from '@/servers/mediaAccess'
-import { useCookieVersion } from '@/stores/cookieVersion'
 
 /** How long a source may take to load before the ladder steps down from it. */
 export const LOAD_TIMEOUT_MS = 15_000

@@ -6,7 +6,7 @@ import { PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Car
 import { useFocusOnMount, useOpeningFocus } from '@/layouts/focus'
 import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
-import { Icon } from '@/layouts/Icon'
+import { Icon } from '@raven/native'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type FavouriteButtonProps } from '@/layouts/musicKit'
 import { Text } from '@/layouts/Text'

@@ -1,7 +1,7 @@
 import { DEFAULT_THEME, THEMES, type ThemeId, type ThemeTone, themeOf } from '@raven/core'
+import { nativeTokens } from '@raven/native/headless'
 import { designTokens, themeTokens } from '@raven/ui/designTokens'
 
-import { nativeTokens } from '@/theme/nativeTokens'
 import { OVER_PICTURE_TOKENS, PALETTE_TOKENS } from '@/theme/tokenNames'
 
 const { numbers, colours: rootColours } = nativeTokens(

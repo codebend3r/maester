@@ -1,0 +1,9 @@
+{
+  // React Native code the device app and Wren bundle through Metro, from dist.
+  "extends": "../../../tooling/tsconfig/react-native.json",
+  "compilerOptions": {
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["react-native", "bun"]
+  },
+  "include": ["src"]
+}

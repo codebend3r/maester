@@ -13,7 +13,7 @@ import {
 import type { IconName } from '@raven/ui/iconDrawings'
 
 import { BODY_FONT } from '@/theme/fonts'
-import { Icon } from '@/layouts/Icon'
+import { Icon } from '@raven/native'
 import { Text } from '@/layouts/Text'
 import { useFocusOnMount } from '@/layouts/focus'
 import { useTvFormStyles } from '@/layouts/formStyles'

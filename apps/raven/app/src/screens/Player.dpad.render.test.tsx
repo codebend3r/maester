@@ -11,6 +11,9 @@ import {
   type PlaybackSettings,
   formatDuration,
 } from '@raven/core'
+import type { ApiForProps } from '@raven/native'
+import type * as Native from '@raven/native'
+import type { AppServer } from '@raven/native/headless'
 import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@raven/ui/headless'
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
@@ -23,7 +26,6 @@ import { KEY_ACTIONS, LONG_PRESS_NAMES, REMOTE_KEYS } from '@/layouts/remoteKeys
 import type * as PlatformModule from '@/platform/platform'
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { Player } from '@/screens/Player'
-import type { AppServer } from '@/servers/serverList'
 import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { useReduceMotion } from '@/stores/reduceMotion'
@@ -99,9 +101,11 @@ const mockApi = jest.fn((_server: AppServer) =>
     directPlay: mockServer.directPlay,
   }),
 )
-jest.mock('@/servers/serverClient', () => ({
-  apiFor: (server: AppServer) => mockApi(server),
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
+  apiFor: ({ server }: ApiForProps) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
+  watchNetwork: () => () => {},
   cookieJar: { read: async () => ({}), forget: async () => {} },
   secretStore: {
     getItemAsync: async () => null,
@@ -109,9 +113,6 @@ jest.mock('@/servers/serverClient', () => ({
     deleteItemAsync: async () => {},
   },
 }))
-jest.mock('@react-native-community/netinfo', () =>
-  jest.requireActual('@react-native-community/netinfo/jest/netinfo-mock'),
-)
 
 const shown = { client: createScreenClient() }
 

@@ -1,3 +1,4 @@
+import type { AlbumTrack } from '@raven/ui/headless'
 import { type ComponentRef, useRef } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 
@@ -15,7 +16,6 @@ import {
   FocusRow,
   useMusicStyles,
 } from '@/layouts/MusicParts.focus'
-import type { AlbumTrack } from '@/layouts/musicRows'
 import { Text } from '@/layouts/Text'
 import { tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'

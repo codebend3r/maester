@@ -1,12 +1,20 @@
-import { keepPreviousData, queryOptions, skipToken } from '@tanstack/react-query'
+import {
+  infiniteQueryOptions,
+  keepPreviousData,
+  queryOptions,
+  skipToken,
+} from '@tanstack/react-query'
 import {
   ADMIN_LOCK_STATES,
   FILMOGRAPHY_STATES,
+  MUSIC_PAGE,
+  MUSIC_SORTS,
   type ApiClient,
   type MatchItemType,
   type MatchSubject,
   type MediaSort,
   type MusicSort,
+  type TrackPage,
   type ViewingSession,
   asksServerForNext,
 } from '@raven/core'
@@ -19,6 +27,11 @@ export const HISTORY_SHOWS = { watched: 'watched', all: 'all' } as const
 export type HistoryShow = (typeof HISTORY_SHOWS)[keyof typeof HISTORY_SHOWS]
 
 type Listing = { libraryId: number; search: string; sort: MediaSort; seed: number }
+
+/** Where the next page of songs starts: which of the libraries, and how far into it. */
+type SongsPage = { at: number; offset: number }
+
+const FIRST_SONGS_PAGE: SongsPage = { at: 0, offset: 0 }
 
 /** How long a person's page waits between asks while their filmography is on its way. */
 const FILMOGRAPHY_POLL_MS = 1_500
@@ -45,6 +58,12 @@ export const ravenQueriesFor = (api: ApiClient) => {
   type RavenQueriesForItemImagesQueryProps = { id: number; libraryId: number }
   type RavenQueriesForAlbumsQueryProps = { libraryId: number; search: string; sort: MusicSort }
   type RavenQueriesForArtistsQueryProps = { libraryId: number; search: string }
+  type RavenQueriesForRecentAlbumsQueryProps = { libraryId: number; limit: number }
+  type RavenQueriesForSongsQueryProps = {
+    libraryIds: readonly number[]
+    search: string
+    sort: MusicSort
+  }
   type RavenQueriesForAlbumMatchSearchQueryProps = { albumId: number; query: string }
 
   type RavenQueriesForMatchSearchQueryProps = {
@@ -53,6 +72,26 @@ export const ravenQueriesFor = (api: ApiClient) => {
     year: number | null
     libraryId: number | null
     subject: MatchSubject | null
+  }
+
+  type SongsFromProps = RavenQueriesForSongsQueryProps & { from: SongsPage }
+
+  /**
+   * A page of songs from `from` on, with where it was read. A library that has none there is
+   * passed over for the next one's first page, so a page is empty only at the end of the last
+   * library, and a list asking near its end always gets rows or the end.
+   */
+  const songsFrom = async ({
+    libraryIds,
+    search,
+    sort,
+    from: { at, offset },
+  }: SongsFromProps): Promise<TrackPage & SongsPage> => {
+    const libraryId = libraryIds[at]
+    if (libraryId === undefined) throw new Error(`No music library at ${at}`)
+    const page = await api.listTracks({ libraryId, search, sort, limit: MUSIC_PAGE.most, offset })
+    if (page.tracks.length > 0 || at + 1 >= libraryIds.length) return { ...page, at, offset }
+    return songsFrom({ libraryIds, search, sort, from: { at: at + 1, offset: 0 } })
   }
 
   return {
@@ -255,6 +294,35 @@ export const ravenQueriesFor = (api: ApiClient) => {
         queryKey: queryKeys.artists({ libraryId, search }),
         queryFn: () => api.listArtists({ libraryId, search }),
         placeholderData: keepPreviousData,
+        gcTime: LISTING_GC_MS,
+      }),
+
+    /** A music library's newest albums, newest first. */
+    recentAlbumsQuery: ({ libraryId, limit }: RavenQueriesForRecentAlbumsQueryProps) =>
+      queryOptions({
+        queryKey: queryKeys.recentAlbums({ libraryId, limit }),
+        queryFn: () => api.listAlbums({ libraryId, sort: MUSIC_SORTS.added, limit }),
+        // The server lists a library's every album whatever the limit, so the newest are kept here.
+        select: (albums) => albums.slice(0, limit),
+      }),
+
+    /**
+     * The tracks of `libraryIds` as one list, `MUSIC_PAGE.most` a page: each library's to its
+     * end, then the next library's from its start. None asks for nothing.
+     */
+    songsQuery: ({ libraryIds, search, sort }: RavenQueriesForSongsQueryProps) =>
+      infiniteQueryOptions({
+        queryKey: queryKeys.songs({ libraryIds, search, sort }),
+        queryFn:
+          libraryIds.length === 0
+            ? skipToken
+            : ({ pageParam }) => songsFrom({ libraryIds, search, sort, from: pageParam }),
+        initialPageParam: FIRST_SONGS_PAGE,
+        getNextPageParam: (last): SongsPage | null => {
+          const next = last.offset + last.tracks.length
+          if (last.tracks.length > 0 && next < last.total) return { at: last.at, offset: next }
+          return last.at + 1 < libraryIds.length ? { at: last.at + 1, offset: 0 } : null
+        },
         gcTime: LISTING_GC_MS,
       }),
 

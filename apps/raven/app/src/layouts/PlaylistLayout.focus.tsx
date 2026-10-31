@@ -1,3 +1,4 @@
+import type { PlaylistTrack } from '@raven/ui/headless'
 import type { ComponentType } from 'react'
 import { StyleSheet, View } from 'react-native'
 
@@ -7,7 +8,6 @@ import { BUTTON_TONES } from '@/layouts/formKit'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type PlaylistLayoutProps } from '@/layouts/musicKit'
 import { ActionPlate, FocusPage, FocusRow, useMusicStyles } from '@/layouts/MusicParts.focus'
-import type { PlaylistTrack } from '@/layouts/musicRows'
 import { Text } from '@/layouts/Text'
 
 const styles = StyleSheet.create({ entryWords: { flex: 1 } })

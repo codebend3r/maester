@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { THEME_TONES } from '@raven/core'
+import { IS_SIGN_IN_BYPASSED, pinRavenServer, tokenRenewalFor } from '@raven/native/headless'
 import { configureStorage, createQueryClient } from '@raven/ui/headless'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
@@ -8,14 +9,13 @@ import { useEffect, useState } from 'react'
 import { Appearance, StatusBar, StyleSheet, View } from 'react-native'
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { useAccountSession } from '@/account/accountSession'
+import { useAccountSession } from '@/account/session'
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { MusicHost } from '@/music/MusicHost'
 import { NowPlayingBar, useIsBarShown } from '@/music/NowPlayingBar'
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
-import { IS_SIGN_IN_BYPASSED, RAVEN_SERVER } from '@/servers/ravenServer'
 import { useActiveServer } from '@/stores/activeServer'
 import { configureAppPrefs } from '@/stores/appPrefs'
 import { configureLibraryViews } from '@/stores/libraryViews'
@@ -34,24 +34,7 @@ const SPLASH_IGNORED = (): void => undefined
 // The splash stays up until the stores are read, so the theme picked is the first thing drawn.
 preventAutoHideAsync().catch(SPLASH_IGNORED)
 
-/**
- * The installed app talks to one server, raven on Vhagar, and never asks for another. An end
- * to end build leaves its fixture absent until the PIN and admin password have been accepted.
- */
-const pinRavenServer = (): void => {
-  if (IS_SIGN_IN_BYPASSED) return
-  const { servers, add, remove, activate } = useActiveServer.getState()
-  servers
-    .filter(({ id }) => id !== RAVEN_SERVER.id)
-    .forEach(({ id }) => {
-      remove(id).catch(() => undefined)
-    })
-  if (!servers.some(({ id }) => id === RAVEN_SERVER.id)) add(RAVEN_SERVER)
-  activate(RAVEN_SERVER.id)
-}
-
-/** How long before the access token ends the app asks for a new one. */
-const REFRESH_LEAD_MS = 60_000
+const useTokenRenewal = tokenRenewalFor({ session: useAccountSession })
 
 const loadStores = async (): Promise<void> => {
   // A store whose storage cannot be read starts from its defaults rather than holding
@@ -64,7 +47,7 @@ const loadStores = async (): Promise<void> => {
     useActiveServer.persist.rehydrate(),
     useAccountSession.persist.rehydrate(),
   ])
-  pinRavenServer()
+  pinRavenServer({ servers: useActiveServer })
 }
 
 type ServerEventsProps = { session: AppQueries }
@@ -150,7 +133,7 @@ const styles = StyleSheet.create({ frame: { flex: 1 } })
  */
 export const AppRoot = () => {
   const [isLoaded, setLoaded] = useState(false)
-  const expiresAt = useAccountSession((state) => state.session?.expiresAt ?? null)
+  useTokenRenewal()
 
   useEffect(() => {
     const show = () => setLoaded(true)
@@ -158,19 +141,6 @@ export const AppRoot = () => {
   }, [])
   useEffect(() => clearOnServerSwitch({ client: queryClient, store: useActiveServer }), [])
   useEffect(() => followReduceMotion(), [])
-  useEffect(() => {
-    if (expiresAt === null) return undefined
-    const timer = setTimeout(
-      () => {
-        useAccountSession
-          .getState()
-          .refresh()
-          .catch(() => undefined)
-      },
-      Math.max(0, expiresAt - Date.now() - REFRESH_LEAD_MS),
-    )
-    return () => clearTimeout(timer)
-  }, [expiresAt])
   useEffect(() => (isLoaded ? followTheme({ apply: wearSystemLook }) : undefined), [isLoaded])
   useEffect(() => {
     if (isLoaded) hideAsync().catch(SPLASH_IGNORED)

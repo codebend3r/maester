@@ -56,22 +56,6 @@
       }
     },
     {
-      // formatjs's package exports list each polyfill and locale file only
-      // with its `.js`; without it Metro warns and falls back to the files.
-      "files": ["src/polyfills.ts"],
-      "rules": {
-        "no-restricted-imports": "off"
-      }
-    },
-    {
-      // The polyfill is `toSorted` itself, so it sorts a copy of its own in
-      // place, which nothing else holds.
-      "files": ["src/arrayToSorted.ts"],
-      "rules": {
-        "unicorn/no-array-sort": "off"
-      }
-    },
-    {
       "files": ["src/**/*.test.ts", "src/**/*.test.tsx"],
       "rules": {
         "typescript/no-non-null-assertion": "off",

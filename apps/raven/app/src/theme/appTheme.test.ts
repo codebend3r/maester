@@ -2,9 +2,9 @@ import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DEFAULT_THEME, THEMES, THEME_TONES, parseThemes, parseTokens } from '@raven/core'
+import { nativeTokens } from '@raven/native/headless'
 
 import { appThemeOf } from '@/theme/appTheme'
-import { nativeTokens } from '@/theme/nativeTokens'
 import { OVER_PICTURE_TOKENS, PALETTE_TOKENS } from '@/theme/tokenNames'
 
 // The stylesheets themselves, not the built `@raven/ui/designTokens` the app reads, so a

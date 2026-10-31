@@ -5,6 +5,9 @@
  */
 const TV_ON = ['1', 'true'] as const
 
+/** The variable the TV prebuild scripts set. */
+export const TV_ENV = { tv: 'EXPO_TV' } as const
+
 type IsTvPrebuildProps = { value: string | undefined }
 
 /** Whether `EXPO_TV` asks for the Apple TV's or Android TV's native project. */

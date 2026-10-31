@@ -1,0 +1,26 @@
+appId: app.netlify.wren
+name: An album plays from its page, and the bar follows Next to the second track
+---
+- runFlow: steps/signIn.yaml
+- extendedWaitUntil:
+    visible: Recently added
+    timeout: 30000
+- tapOn: Library.*
+- tapOn: Albums
+- extendedWaitUntil:
+    visible: Morning Chorus.*
+    timeout: 30000
+- tapOn: Morning Chorus.*
+- extendedWaitUntil:
+    visible: Shuffle
+    timeout: 30000
+- tapOn: Play
+# The bar is named for the track it shows. Each track lasts twenty seconds, so the first is
+# still playing when the bar is read.
+- extendedWaitUntil:
+    visible: 'Now Playing: First Light.*'
+    timeout: 30000
+- tapOn: Next
+- extendedWaitUntil:
+    visible: 'Now Playing: Dawn Song.*'
+    timeout: 30000

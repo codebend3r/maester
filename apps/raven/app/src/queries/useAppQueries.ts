@@ -1,9 +1,9 @@
 import type { ApiClient } from '@raven/core'
+import { apiFor, openEventsFor } from '@raven/native'
+import { type AppServer, lastPerServer } from '@raven/native/headless'
 import { type RavenQueries, ravenQueriesFor, serverEventsFor } from '@raven/ui/headless'
 
-import { lastPerServer } from '@/queries/perServer'
-import type { AppServer } from '@/servers/serverList'
-import { apiFor, openEventsFor } from '@/servers/serverClient'
+import { useAccountSession } from '@/account/session'
 import { useActiveServer } from '@/stores/activeServer'
 
 /** Everything the screens ask one server through: its client, its queries and its events. */
@@ -16,8 +16,11 @@ export type AppQueries = {
 
 const appQueriesFor = lastPerServer({
   make: (server): AppQueries => {
-    const api = apiFor(server)
-    const { useServerEvents } = serverEventsFor({ api, openEvents: openEventsFor(server) })
+    const api = apiFor({ server, session: useAccountSession })
+    const { useServerEvents } = serverEventsFor({
+      api,
+      openEvents: openEventsFor({ server, session: useAccountSession }),
+    })
     return { server, api, queries: ravenQueriesFor(api), useServerEvents }
   },
 })

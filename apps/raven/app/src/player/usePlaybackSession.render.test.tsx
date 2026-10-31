@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
+import type { MediaSources, SourceRequest } from '@raven/native/headless'
 import { act, renderHook } from '@testing-library/react-native'
 
 import {
@@ -11,7 +12,6 @@ import {
   modeOf,
   usePlaybackSession,
 } from '@/player/usePlaybackSession'
-import type { MediaSources, SourceRequest } from '@/servers/mediaAccess'
 
 const { direct, remux, transcode } = PLAYBACK_MODES
 

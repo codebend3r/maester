@@ -1,6 +1,9 @@
 {
-  "platforms": ["apple"],
+  "platforms": ["apple", "android"],
   "apple": {
     "modules": ["RavenAudioModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.ravenaudio.RavenAudioModule"]
   }
 }

@@ -15,8 +15,8 @@ import {
   createApiClient,
   mediaListQuery,
 } from '@raven/core'
+import { allowlistedFetch } from '@raven/native/headless'
 
-import { allowlistedFetch } from '@/servers/allowlist'
 import { NOT_FOUND, STATUSES, pathFor, responseOf } from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'

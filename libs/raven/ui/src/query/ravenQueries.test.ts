@@ -5,12 +5,23 @@ import {
   type QueryKey,
   skipToken,
 } from '@tanstack/react-query'
-import { type ApiClient, ITEM_TYPES, MATCH_SUBJECT_KINDS, MEDIA_SORTS } from '@raven/core'
+import {
+  ALBUM_TYPES,
+  type AlbumSummary,
+  type ApiClient,
+  createApiClient,
+  ITEM_TYPES,
+  MATCH_STATES,
+  MATCH_SUBJECT_KINDS,
+  MEDIA_SORTS,
+  MUSIC_PAGE,
+  MUSIC_SORTS,
+} from '@raven/core'
 import { queryKeys } from '@/query/queryClient'
 import { HISTORY_SHOWS, type RavenQueries, ravenQueriesFor } from '@/query/ravenQueries'
 import { useQuery } from '@tanstack/react-query'
 import { waitFor } from '@testing-library/react'
-import { itemDetails } from '@/test/fixtures'
+import { itemDetails, track } from '@/test/fixtures'
 import { renderQueryHook } from '@/test/renderQueryHook'
 import { recordingApi } from '@/test/recordingApi'
 
@@ -64,6 +75,22 @@ const waiting = <TData, TKey extends QueryKey>({ name, key, pick }: WaitingProps
   keyOf: (queries: RavenQueries): QueryKey => pick(queries).queryKey,
   queryFnOf: (queries: RavenQueries): unknown => pick(queries).queryFn,
 })
+
+const ALBUM: AlbumSummary = {
+  id: 1,
+  libraryId: 2,
+  title: 'OK Computer',
+  sortTitle: 'OK Computer',
+  year: 1997,
+  type: ALBUM_TYPES.album,
+  artists: [{ id: 1, name: 'Radiohead' }],
+  isCompilation: false,
+  trackCount: 12,
+  duration: 3200,
+  coverVersion: null,
+  match: MATCH_STATES.matched,
+  addedAt: '2026-01-01T00:00:00Z',
+}
 
 const LISTING = { libraryId: 2, search: 'bus', sort: MEDIA_SORTS.title, seed: 4 } as const
 const MATCH = {
@@ -410,6 +437,97 @@ describe('ravenQueriesFor', () => {
     await waitFor(() => expect(result.current.data).toEqual(chapters))
     expect(calls.map(({ url }) => url)).toEqual(['/api/media/7/markers'])
     expect(ravenQueriesFor(api).chaptersQuery(null).queryFn).toBe(skipToken)
+    cache.clear()
+  })
+
+  it("keeps a library's newest albums, asking for them newest first", async () => {
+    const albums = [1, 2, 3].map((id) => ({ ...ALBUM, id }))
+    const { api, calls } = recordingApi({ body: albums })
+    const query = ravenQueriesFor(api).recentAlbumsQuery({ libraryId: 2, limit: 2 })
+    expect(queryKeys.recentAlbums({ libraryId: 2, limit: 2 })).toEqual(query.queryKey)
+    const cache = new QueryClient()
+    const { result } = renderQueryHook({ client: cache, hook: () => useQuery(query) })
+    await waitFor(() => expect(result.current.data?.map(({ id }) => id)).toEqual([1, 2]))
+    expect(calls.map(({ url }) => url)).toEqual(['/api/libraries/2/albums?sort=added&limit=2'])
+    cache.clear()
+  })
+
+  it("pages through each library's songs to its end, then the next library's", async () => {
+    const { api, calls } = recordingApi({ body: { tracks: [track()], total: 2 } })
+    const query = ravenQueriesFor(api).songsQuery({
+      libraryIds: [2, 3],
+      search: '',
+      sort: MUSIC_SORTS.title,
+    })
+    const cache = new QueryClient()
+    const songs = await cache.fetchInfiniteQuery({ ...query, pages: 4 })
+    const page = `limit=${MUSIC_PAGE.most}`
+    expect(calls.map(({ url }) => url)).toEqual([
+      `/api/libraries/2/tracks?sort=title&${page}`,
+      `/api/libraries/2/tracks?sort=title&${page}&offset=1`,
+      `/api/libraries/3/tracks?sort=title&${page}`,
+      `/api/libraries/3/tracks?sort=title&${page}&offset=1`,
+    ])
+    expect(songs.pages).toHaveLength(4)
+    expect(query.getNextPageParam(songs.pages[3]!, songs.pages, { at: 1, offset: 1 }, [])).toBe(
+      null,
+    )
+    expect(
+      ravenQueriesFor(api).songsQuery({ libraryIds: [], search: '', sort: MUSIC_SORTS.title })
+        .queryFn,
+    ).toBe(skipToken)
+    cache.clear()
+  })
+
+  it('passes over a library with no songs, so no page between two others is empty', async () => {
+    const asked: string[] = []
+    const api = createApiClient({
+      fetch: async (url) => {
+        asked.push(url)
+        const body = url.includes('/libraries/3/')
+          ? { tracks: [], total: 0 }
+          : { tracks: [track()], total: 1 }
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => body,
+          text: async () => JSON.stringify(body),
+        }
+      },
+    })
+    const query = ravenQueriesFor(api).songsQuery({
+      libraryIds: [2, 3, 4],
+      search: '',
+      sort: MUSIC_SORTS.title,
+    })
+    const cache = new QueryClient()
+    const songs = await cache.fetchInfiniteQuery({ ...query, pages: 3 })
+    expect(songs.pages.map(({ at, tracks }) => [at, tracks.length])).toEqual([
+      [0, 1],
+      [2, 1],
+    ])
+    expect(asked.map((url) => url.split('?')[0])).toEqual([
+      '/api/libraries/2/tracks',
+      '/api/libraries/3/tracks',
+      '/api/libraries/4/tracks',
+    ])
+    cache.clear()
+  })
+
+  it('ends with an empty page when the last libraries have no songs', async () => {
+    const { api } = recordingApi({ body: { tracks: [], total: 0 } })
+    const query = ravenQueriesFor(api).songsQuery({
+      libraryIds: [2, 3],
+      search: '',
+      sort: MUSIC_SORTS.title,
+    })
+    const cache = new QueryClient()
+    const songs = await cache.fetchInfiniteQuery(query)
+    expect(songs.pages).toEqual([{ tracks: [], total: 0, at: 1, offset: 0 }])
+    expect(query.getNextPageParam(songs.pages[0]!, songs.pages, { at: 0, offset: 0 }, [])).toBe(
+      null,
+    )
     cache.clear()
   })
 

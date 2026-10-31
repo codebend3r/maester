@@ -3,8 +3,10 @@ import {
   AUDIO_STATES,
   chapterAt,
   nextChapterStart,
+  playTimeOf,
   playingTrackOf,
   previousChapterStart,
+  queueRowsOf,
   useAudioQueue,
   useAudiobookChapters,
   usePlayerPrefs,
@@ -14,7 +16,7 @@ import { useRouter } from 'expo-router'
 
 import { NowPlayingLayout } from '@/layouts'
 import type { BookControls } from '@/layouts/musicKit'
-import { chapterRowsOf, nowPlayingAsideOf, playTimeOf, queueRowsOf } from '@/layouts/musicRows'
+import { chapterRowsOf, nowPlayingAsideOf } from '@/layouts/musicRows'
 import { trackCoverOf } from '@/music/musicCards'
 import { usePlaylistAdd } from '@/music/usePlaylistAdd'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'

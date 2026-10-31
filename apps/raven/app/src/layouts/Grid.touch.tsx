@@ -4,7 +4,7 @@ import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from 'reac
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
-import { Icon } from '@/layouts/Icon'
+import { Icon } from '@raven/native'
 import { Text } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'

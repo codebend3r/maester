@@ -43,29 +43,22 @@
   "dependencies": {
     "@babel/runtime": "7.29.7",
     "@expo/metro-runtime": "58.0.14",
-    "@formatjs/intl-displaynames": "7.3.15",
-    "@formatjs/intl-getcanonicallocales": "3.2.12",
-    "@formatjs/intl-locale": "5.3.12",
-    "@formatjs/intl-pluralrules": "6.3.15",
-    "@formatjs/intl-relativetimeformat": "12.3.15",
     "@raven/audio": "workspace:*",
     "@raven/core": "workspace:*",
+    "@raven/native": "workspace:*",
     "@raven/ui": "workspace:*",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-native-community/netinfo": "12.0.1",
     "@tanstack/react-query": "5.103.1",
     "expo": "58.0.14",
     "expo-constants": "58.0.12",
     "expo-keep-awake": "58.0.3",
     "expo-linking": "58.0.13",
     "expo-router": "58.0.23",
-    "expo-secure-store": "58.0.2",
     "expo-splash-screen": "58.0.10",
     "react": "19.3.0",
     "react-native": "npm:react-native-tvos@0.88.0-0",
     "react-native-safe-area-context": "5.10.1",
     "react-native-screens": "4.30.0",
-    "react-native-sse": "1.2.1",
     "react-native-svg": "15.16.0",
     "react-native-video": "6.19.3",
     "zustand": "5.0.15"
@@ -109,7 +102,15 @@
         "react-native-reanimated",
         "react-native-worklets",
         "react-native-gesture-handler"
-      ]
+      ],
+      "android": {
+        "exclude": [
+          "react-native-reanimated",
+          "react-native-worklets",
+          "react-native-gesture-handler",
+          "@raven/audio"
+        ]
+      }
     }
   },
   "nx": {
