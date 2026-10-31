@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
 import { waitFor } from '@testing-library/react'
-import { LIBRARY_KINDS } from '@raven/core'
+import { AUDIO_BITRATES, LIBRARY_KINDS } from '@raven/core'
 import { queryKeys } from '@/query/queryClient'
-import { useAudiobookChapters } from '@/query/useAudiobook'
+import { useAudiobookChapters, useTrackBitrate } from '@/query/useAudiobook'
+import { MUSIC_QUALITIES, usePlayerPrefs } from '@/stores/playerPrefs'
 import { library, track } from '@/test/fixtures'
 import { recordingApi } from '@/test/recordingApi'
 import { renderQueryHook } from '@/test/renderQueryHook'
@@ -58,5 +59,41 @@ describe('useAudiobookChapters', () => {
     expect(song.result.current).toEqual({ isAudiobook: false, chapters: [] })
     expect(none.result.current).toEqual({ isAudiobook: false, chapters: [] })
     expect(markers).not.toHaveBeenCalled()
+  })
+})
+
+describe('useTrackBitrate', () => {
+  afterEach(() => usePlayerPrefs.getState().setMusicQuality(MUSIC_QUALITIES.original))
+
+  it("is the prefs' bitrate for a song, and null for a book, the original, or no track", () => {
+    const client = holdingLibraries()
+    const bitrateOf = (libraryId: number | null) =>
+      renderQueryHook({
+        client,
+        hook: () =>
+          useTrackBitrate({ api, track: libraryId === null ? null : track({ libraryId }) }),
+      }).result.current
+    expect(bitrateOf(4)).toBeNull()
+    usePlayerPrefs.getState().setMusicQuality(AUDIO_BITRATES.high)
+    expect(bitrateOf(4)).toBe(AUDIO_BITRATES.high)
+    expect(bitrateOf(3)).toBeNull()
+    expect(bitrateOf(null)).toBeNull()
+  })
+
+  it('asks for the file while the libraries are unknown, so a book is never a transcode', async () => {
+    usePlayerPrefs.getState().setMusicQuality(AUDIO_BITRATES.standard)
+    const libraries = spyOn(api, 'listLibraries').mockRejectedValue(new Error('offline'))
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { result } = renderQueryHook({
+      client,
+      hook: () => useTrackBitrate({ api, track: track({ libraryId: 4 }) }),
+    })
+    expect(result.current).toBeNull()
+    await waitFor(() => expect(libraries).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(client.getQueryState(queryKeys.libraries)?.error).toBeInstanceOf(Error),
+    )
+    expect(result.current).toBeNull()
+    libraries.mockRestore()
   })
 })

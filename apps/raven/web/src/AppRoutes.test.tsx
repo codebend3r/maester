@@ -1,12 +1,22 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen } from '@testing-library/react'
-import { AUTH_PATHS, AUTH_ROUTES, DESKTOP_PATHS, DESKTOP_REQUESTS } from '@raven/core'
+import { act, cleanup, screen, within } from '@testing-library/react'
+import {
+  ApiError,
+  AUTH_CONFIG_STATES,
+  AUTH_PATHS,
+  AUTH_ROUTES,
+  DESKTOP_PATHS,
+  DESKTOP_REQUESTS,
+} from '@raven/core'
+import { queryKeys } from '@raven/ui/headless'
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { fakeAuthClient, readyConfig } from '@/test/authClient'
 import { asDesktop, downloadsMain, sentOfType } from '@/test/desktop'
+import { albumDetails, musicLibrary } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
+import { useServerReach } from '@/stores/serverReach'
 
 describe('AppRoutes signed out', () => {
   const fetch = spyOn(window, 'fetch')
@@ -49,6 +59,40 @@ describe('AppRoutes inside Raven', () => {
     renderWithProviders({ ui: <AppRoutes />, route: DESKTOP_PATHS.downloads })
     expect(await screen.findByRole('heading', { level: 1, name: 'Downloads' })).toBeInTheDocument()
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.ready })).toHaveLength(1)
+  })
+
+  it('keeps the music mode while the server is out of reach, and goes back once it answers', async () => {
+    list.mockImplementation(async () => [musicLibrary()])
+    const getAlbum = spyOn(api, 'getAlbum').mockResolvedValue(albumDetails())
+    const getAuthConfig = spyOn(api, 'getAuthConfig').mockRejectedValue(
+      new ApiError({ status: 502, message: 'Bad Gateway', isServerUnreachable: true }),
+    )
+    try {
+      asDesktop(downloadsMain())
+      const { client } = renderWithProviders({
+        ui: <AppRoutes />,
+        route: '/music/albums/7',
+        authConfig: null,
+      })
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'Downloads' }),
+      ).toBeInTheDocument()
+      const music = screen.getByRole('navigation', { name: 'Music' })
+      expect(within(music).getByRole('link', { name: 'Downloads' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+      act(() => client.setQueryData(queryKeys.authConfig, { state: AUTH_CONFIG_STATES.off }))
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'OK Computer' }),
+      ).toBeInTheDocument()
+      expect(screen.getByRole('navigation', { name: 'Music' })).toBeInTheDocument()
+    } finally {
+      cleanup()
+      getAuthConfig.mockRestore()
+      getAlbum.mockRestore()
+      useServerReach.setState({ isOffline: false })
+    }
   })
 
   it('has no Downloads page in a browser', async () => {

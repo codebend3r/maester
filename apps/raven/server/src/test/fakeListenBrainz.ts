@@ -1,7 +1,7 @@
 import { AUTH_HEADERS } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
-import { LISTENBRAINZ_API } from '@/music/listenBrainzClient'
+import { LB_FIELDS, LB_PARAMS, LISTENBRAINZ_API } from '@/music/listenBrainzClient'
 import { LISTENBRAINZ_ROUTES } from '@/scrobbling/listenBrainzScrobbler'
 
 type FakeSimilar = { mbid: string; name: string; score: number }
@@ -83,14 +83,14 @@ export const fakeListenBrainz = ({
       })
     }
     if (answer === FAKE_ANSWERS.tooMany) return new Response('slow down', { status: 429 })
-    const asked = new URL(url).searchParams.get('artist_mbids') ?? ''
+    const asked = new URL(url).searchParams.get(LB_PARAMS.artists) ?? ''
     const body = (similar[asked] ?? []).map((artist) => ({
-      artist_mbid: artist.mbid,
+      [LB_FIELDS.mbid]: artist.mbid,
       name: artist.name,
       comment: '',
       type: 'Group',
       gender: null,
-      score: artist.score,
+      [LB_FIELDS.score]: artist.score,
       reference_mbid: asked,
     }))
     return json({ body })

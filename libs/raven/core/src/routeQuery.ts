@@ -22,7 +22,8 @@ export type RoutePending = Exclude<RouteQuery<never>, { state: typeof ROUTE_STAT
 type QueryView<T> = { data: T | undefined; error: Error | null }
 
 type RouteStateProps<T> = {
-  id: number | null
+  /** What the address names: a whole-number id, or a key such as a mix's kind; null for nothing it reads as one. */
+  id: number | string | null
   query: QueryView<T>
 }
 

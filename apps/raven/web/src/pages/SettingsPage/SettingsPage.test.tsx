@@ -104,6 +104,9 @@ describe('SettingsPage', () => {
       'chip',
       'sun',
       'skipNext',
+      'headphones',
+      'volume',
+      'split',
       'film',
     ])
   })
@@ -206,12 +209,16 @@ describe('SettingsPage', () => {
       adminLock: { state: 'on', available: true },
     })
     await screen.findByRole('group', { name: 'Movie titles' })
+    const music = screen.getByRole('region', { name: 'Music' })
     const controls = [
-      ...screen.getAllByRole('radio'),
+      ...screen.getAllByRole('radio').filter((radio) => !music.contains(radio)),
       screen.getByRole('checkbox', { name: /HDR/ }),
     ]
     expect(controls).toHaveLength(18)
     controls.forEach((control) => expect(control).toBeDisabled())
+    within(music)
+      .getAllByRole('radio')
+      .forEach((control) => expect(control).toBeEnabled())
     expect(screen.getByRole('radio', { name: /Remux only/ })).toBeChecked()
     expect(screen.getAllByText('Turn the admin lock off below to change these.')).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Reset to defaults' })).toBeNull()
@@ -370,7 +377,9 @@ describe('Autoplay on SettingsPage', () => {
   it('sets how long the countdown runs, from 5 to 60 seconds, 15 at first', () => {
     renderWithProviders({ ui: <SettingsPage />, playback: null })
     const playback = screen.getByRole('region', { name: 'Playback' })
-    expect(within(playback).getByRole('slider')).toBe(slider())
+    expect(
+      within(playback).getByRole('slider', { name: 'Count down to what is up next for' }),
+    ).toBe(slider())
     expect(slider()).toHaveValue('15')
     expect(slider()).toHaveAttribute('min', '5')
     expect(slider()).toHaveAttribute('max', '60')
@@ -424,7 +433,7 @@ describe('Advanced on SettingsPage', () => {
     })
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(['Playback', 'Display', 'Advanced', 'Admin'])
+    ).toEqual(['Playback', 'Display', 'Scrobbling', 'Advanced', 'Admin'])
     expect(slider()).toBeEnabled()
   })
 })
@@ -459,7 +468,7 @@ describe('accounts on SettingsPage', () => {
 
   it('shows neither Account nor Users while accounts are off', () => {
     renderWithProviders({ ui: <SettingsPage /> })
-    expect(headings()).toEqual(['Playback', 'Display', 'Advanced', 'Admin'])
+    expect(headings()).toEqual(['Playback', 'Display', 'Scrobbling', 'Advanced', 'Admin'])
     expect(spies.me).not.toHaveBeenCalled()
     expect(spies.members).not.toHaveBeenCalled()
   })
@@ -483,14 +492,21 @@ describe('accounts on SettingsPage', () => {
   it('shows Account but not Users to a member', async () => {
     renderSignedIn(fakeAccount())
     await screen.findByRole('heading', { name: 'Account' })
-    expect(headings()).toEqual(['Playback', 'Display', 'Account', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Display', 'Account', 'Scrobbling', 'Advanced'])
     expect(spies.members).not.toHaveBeenCalled()
   })
 
   it('shows Account and Users, after Display, to the owner', async () => {
     renderSignedIn(fakeAccount({ isOwner: true }))
     await screen.findByRole('heading', { name: 'Users' })
-    expect(headings()).toEqual(['Playback', 'Display', 'Account', 'Users', 'Advanced'])
+    expect(headings()).toEqual([
+      'Playback',
+      'Display',
+      'Account',
+      'Scrobbling',
+      'Users',
+      'Advanced',
+    ])
   })
 
   describe('who may change the server settings', () => {

@@ -1,46 +1,33 @@
 import { DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
-import { Icon, type IconName } from '@raven/ui'
-import { Link } from 'react-router-dom'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
+import { libraryPages } from '@/components/AppShell/currentPage'
+import { Tab, TabStrip } from '@/components/TabStrip/TabStrip'
 import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
-import styles from '@/components/AppShell/TabBar.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { MUSIC_PATHS } from '@/lib/music'
 
-type TabProps = {
-  to: string
-  patterns: readonly string[]
-  icon: IconName
-  label: string
-}
-
-/** A tab: its icon over its name, marked as current when the location matches any of its patterns. */
-const Tab = ({ to, patterns, icon, label }: TabProps) => {
-  const isCurrent = useIsCurrent(patterns)
-  return (
-    <Link to={to} className={styles.tab} aria-current={isCurrent ? 'page' : undefined}>
-      <Icon name={icon} size={22} />
-      <span className={styles.label}>{label}</span>
-    </Link>
-  )
+type TabBarProps = {
+  /** Whether a music library exists, so the tabs offer the music mode. */
+  hasMusic: boolean
 }
 
 /**
  * A phone's way round, in place of the side menu: Home, Libraries,
- * Favourites and Settings along the foot of the screen, with Streams and
+ * Favourites, Music while a music library exists, and Settings along the
+ * foot of the screen, with Streams and
  * Reports between them for whoever may manage. The pinned
  * libraries are reached from Libraries, so any library's pages mark it.
  * A narrow Raven window adds On this Mac and Downloads before
  * Settings, and keeps only those three while it cannot reach its server.
  */
-export const TabBar = () => {
+export const TabBar = ({ hasMusic }: TabBarProps) => {
   const isDesktop = useIsDesktop()
   const computer = useComputerName()
   const isOffline = useServerReach((state) => state.isOffline)
   return (
-    <nav className={styles.tabs} aria-label={APP_SHELL_COPY.tabs}>
+    <TabStrip label={APP_SHELL_COPY.tabs}>
       {!isOffline && (
         <>
           <Tab to="/" patterns={['/']} icon="home" label={COMMON_COPY.home} />
@@ -56,6 +43,14 @@ export const TabBar = () => {
             icon="heart"
             label={COMMON_COPY.favourites}
           />
+          {hasMusic && (
+            <Tab
+              to={MUSIC_PATHS.root}
+              patterns={[MUSIC_PATHS.root]}
+              icon="music"
+              label={APP_SHELL_COPY.music}
+            />
+          )}
           <AdminOnly>
             <Tab
               to="/streams"
@@ -94,6 +89,6 @@ export const TabBar = () => {
         icon="settings"
         label={COMMON_COPY.settings}
       />
-    </nav>
+    </TabStrip>
   )
 }

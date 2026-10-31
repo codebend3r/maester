@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ALBUM_GRID_COPY } from '@/components/AlbumGrid/copy'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { Bone } from '@/components/Skeleton/Skeleton'
-import { albumPath, artistPath } from '@/lib/music'
+import { useMusicLinks } from '@/lib/useMusicLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/AlbumGrid/AlbumGrid.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
@@ -11,28 +11,31 @@ import { COMMON_COPY } from '@/lib/copy'
 type AlbumCardProps = { album: AlbumSummary }
 
 /** One album: its cover, linking to its page, with its title and artists under. */
-const AlbumCard = ({ album }: AlbumCardProps) => (
-  <li className={styles.card}>
-    {/* The title under it is the link read aloud; the cover is the same link for the pointer. */}
-    <Link to={albumPath(album.id)} className={styles.cover} aria-hidden="true" tabIndex={-1}>
-      <AlbumCover album={album} sizes={POSTER_SIZES.grid} />
-    </Link>
-    <p className={styles.title}>
-      <Link to={albumPath(album.id)}>{album.title}</Link>
-    </p>
-    <p className={styles.artists}>
-      {album.artists.map((artist, index) => (
-        <span key={artist.id}>
-          {index > 0 && COMMON_COPY.listSeparator}
-          <Link to={artistPath(artist.id)}>{artist.name}</Link>
-        </span>
-      ))}
-      {album.year !== null && (
-        <span className={styles.year}>{ALBUM_GRID_COPY.year(album.year)}</span>
-      )}
-    </p>
-  </li>
-)
+const AlbumCard = ({ album }: AlbumCardProps) => {
+  const links = useMusicLinks()
+  return (
+    <li className={styles.card}>
+      {/* The title under it is the link read aloud; the cover is the same link for the pointer. */}
+      <Link to={links.album(album.id)} className={styles.cover} aria-hidden="true" tabIndex={-1}>
+        <AlbumCover album={album} sizes={POSTER_SIZES.grid} />
+      </Link>
+      <p className={styles.title}>
+        <Link to={links.album(album.id)}>{album.title}</Link>
+      </p>
+      <p className={styles.artists}>
+        {album.artists.map((artist, index) => (
+          <span key={artist.id}>
+            {index > 0 && COMMON_COPY.listSeparator}
+            <Link to={links.artist(artist.id)}>{artist.name}</Link>
+          </span>
+        ))}
+        {album.year !== null && (
+          <span className={styles.year}>{ALBUM_GRID_COPY.year(album.year)}</span>
+        )}
+      </p>
+    </li>
+  )
+}
 
 type AlbumGridProps = { albums: readonly AlbumSummary[] }
 

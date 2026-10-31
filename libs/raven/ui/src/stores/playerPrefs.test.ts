@@ -1,7 +1,13 @@
+import { EQ_PRESETS, EQ_PRESET_NAMES, FLAT_EQUALIZER, LEVELLING_MODES } from '@raven/core'
 import { afterAll, describe, expect, test } from 'bun:test'
 import type { StateStorage } from 'zustand/middleware'
 import { configureStorage } from '@/stores/configureStorage'
-import { AUDIOBOOK_SPEEDS, PLAYER_PREFS_KEY, usePlayerPrefs } from '@/stores/playerPrefs'
+import {
+  AUDIOBOOK_SPEEDS,
+  MUSIC_QUALITIES,
+  PLAYER_PREFS_KEY,
+  usePlayerPrefs,
+} from '@/stores/playerPrefs'
 
 const mapStorage = (entries: Map<string, string>): StateStorage => ({
   getItem: (name) => entries.get(name) ?? null,
@@ -26,6 +32,48 @@ describe('configureStorage', () => {
     await configureStorage({ storage: mapStorage(entries) })
 
     expect(usePlayerPrefs.getState().volume).toBe(0.4)
+  })
+
+  test('keeps the stored sound prefs this build knows, and drops the rest', async () => {
+    const version = usePlayerPrefs.persist.getOptions().version ?? 0
+    const stored = (state: Record<string, unknown>) =>
+      new Map([[PLAYER_PREFS_KEY, JSON.stringify({ state, version })]])
+    const vocal = { preset: EQ_PRESET_NAMES.vocal, gains: EQ_PRESETS.vocal }
+
+    await configureStorage({
+      storage: mapStorage(
+        stored({
+          musicQuality: 320,
+          levelling: LEVELLING_MODES.track,
+          crossfade: 6,
+          equalizer: vocal,
+        }),
+      ),
+    })
+    expect(usePlayerPrefs.getState()).toMatchObject({
+      musicQuality: MUSIC_QUALITIES.high,
+      levelling: LEVELLING_MODES.track,
+      crossfade: 6,
+      equalizer: vocal,
+    })
+
+    usePlayerPrefs.setState({
+      musicQuality: MUSIC_QUALITIES.original,
+      levelling: LEVELLING_MODES.album,
+      crossfade: 0,
+      equalizer: FLAT_EQUALIZER,
+    })
+    await configureStorage({
+      storage: mapStorage(
+        stored({ musicQuality: 192, levelling: 'loud', crossfade: 5, equalizer: { gains: [1] } }),
+      ),
+    })
+    expect(usePlayerPrefs.getState()).toMatchObject({
+      musicQuality: MUSIC_QUALITIES.original,
+      levelling: LEVELLING_MODES.album,
+      crossfade: 0,
+      equalizer: FLAT_EQUALIZER,
+    })
   })
 
   test('writes later changes into that storage', async () => {

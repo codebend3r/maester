@@ -124,7 +124,12 @@ const setup = ({
   return { relay, heard, asked, warnings, secrets, listens }
 }
 
-const OPEN = { server: SERVER, mediaId: 7, sidecarTrackIds: ['external-0', 'external-3'] }
+const OPEN = {
+  server: SERVER,
+  mediaId: 7,
+  sidecarTrackIds: ['external-0', 'external-3'],
+  kbps: null,
+}
 
 const rangeOf = (url: string) => fetch(url, { headers: { [HTTP_HEADERS.range]: 'bytes=0-3' } })
 
@@ -294,6 +299,21 @@ describe('a relayed request', () => {
       },
     ])
     expect(asked).toEqual([{ serverId: SERVER.id, mediaId: 7, isFresh: false }])
+  })
+
+  test('a track opened at a bitrate is its transcode, behind the same /file path', async () => {
+    const { relay, heard } = setup({
+      outcomes: [{ kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.revoked }],
+    })
+    const { fileUrl, loadId } = await relay.open({ ...OPEN, sidecarTrackIds: [], kbps: 256 })
+    expect(fileUrl.endsWith('/file')).toBe(true)
+    expect((await rangeOf(fileUrl)).status).toBe(403)
+    expect(relay.refusalOf(loadId)).toBe(AUTH_REFUSALS.revoked)
+    expect((await rangeOf(fileUrl)).status).toBe(206)
+    expect(heard.map(({ url }) => url)).toEqual([
+      'https://raven.example/api/media/7/transcode?kbps=256&t=account.t2',
+    ])
+    expect(relay.refusalOf(loadId)).toBeNull()
   })
 
   test('a sidecar goes to its subtitles path, and HEAD stays HEAD', async () => {

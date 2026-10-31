@@ -12,6 +12,9 @@ export const LISTENBRAINZ_LABS = 'https://labs.api.listenbrainz.org'
 /** ListenBrainz's core API, where listens are submitted and user tokens checked. */
 export const LISTENBRAINZ_API = 'https://api.listenbrainz.org'
 
+/** The labs API's routes this client asks. */
+export const LISTENBRAINZ_LABS_ROUTES = { similarArtists: '/similar-artists/json' } as const
+
 /**
  * The dataset similar artists are read from: listening sessions over about
  * twenty years, the one ListenBrainz's own artist pages use.
@@ -31,7 +34,11 @@ export const LISTENBRAINZ_AWAY_MS = 15 * 60 * 1000
 /** How often a 503 is asked again before ListenBrainz counts as away. */
 const RETRIES = 1
 
-const LB_FIELDS = { mbid: 'artist_mbid', score: 'score' } as const
+/** The fields of a similar artist ListenBrainz answers that the client reads. */
+export const LB_FIELDS = { mbid: 'artist_mbid', score: 'score' } as const
+
+/** The similar-artists query's parameters. */
+export const LB_PARAMS = { artists: 'artist_mbids', algorithm: 'algorithm' } as const
 
 /** An artist ListenBrainz finds similar: its MusicBrainz id, and how strongly, higher being closer. */
 export type SimilarArtist = { mbid: string; score: number }
@@ -75,8 +82,11 @@ export class ListenBrainzClient {
 
   /** The artists similar to the one MusicBrainz knows as `mbid`, closest first. */
   async similarArtists(mbid: string): Promise<SimilarArtist[]> {
-    const query = new URLSearchParams({ artist_mbids: mbid, algorithm: ALGORITHM })
-    const url = `${LISTENBRAINZ_LABS}/similar-artists/json?${query.toString()}`
+    const query = new URLSearchParams({
+      [LB_PARAMS.artists]: mbid,
+      [LB_PARAMS.algorithm]: ALGORITHM,
+    })
+    const url = `${LISTENBRAINZ_LABS}${LISTENBRAINZ_LABS_ROUTES.similarArtists}?${query.toString()}`
     const headers = { [HEADERS.accept]: CONTENT_TYPES.json, [HEADERS.userAgent]: RAVEN_USER_AGENT }
     const ask = (): Promise<Response> =>
       this.limit.run(() => {

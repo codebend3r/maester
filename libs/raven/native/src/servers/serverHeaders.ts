@@ -1,4 +1,4 @@
-import { APP_CALL_METHODS, AUTH_HEADERS, AUTH_SCHEME } from '@raven/core'
+import { APP_CALL_METHODS, AUTH_API_PREFIX, AUTH_HEADERS, AUTH_SCHEME } from '@raven/core'
 
 import { checkAppCall } from '@/servers/allowlist'
 import { type ServerCookies, cookieHeaderOf } from '@/servers/cookieJar'
@@ -8,7 +8,7 @@ type IsServerApiProps = { server: AppServer; address: string }
 
 /** Whether `address` is on the server's own API, the only place its cookies, `Path=/api`, go. */
 export const isServerApi = ({ server, address }: IsServerApiProps): boolean =>
-  address.startsWith(`${server.origin}/api/`)
+  address.startsWith(`${server.origin}${AUTH_API_PREFIX}`)
 
 type CookieHeadersForProps = {
   server: AppServer

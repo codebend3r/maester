@@ -1,8 +1,8 @@
 import type { ExecutionContext } from '@nestjs/common'
 import { isRecord } from '@raven/core'
 
-/** The route parameters the guards read, named once for the routes that declare them. */
-export const ROUTE_PARAMS = { id: 'id' } as const
+/** The route parameters the guards and the controllers read, named once for the routes that declare them. */
+export const ROUTE_PARAMS = { id: 'id', service: 'service' } as const
 
 /** The request a guard is asked about, as far as a guard reads it: its params and its query. */
 export const requestParts = (

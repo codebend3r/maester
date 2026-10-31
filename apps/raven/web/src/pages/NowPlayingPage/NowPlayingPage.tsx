@@ -17,11 +17,11 @@ import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AddToPlaylistDialog } from '@/components/AddToPlaylistDialog/AddToPlaylistDialog'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
-import { BackButton, HOME } from '@/components/BackButton/BackButton'
+import { BackButton } from '@/components/BackButton/BackButton'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { TrackList, type TrailProps } from '@/components/TrackList/TrackList'
 import { api } from '@/lib/api'
-import { albumPath, artistPath } from '@/lib/music'
+import { useMusicLinks } from '@/lib/useMusicLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import { ChaptersPanel } from '@/pages/NowPlayingPage/ChaptersPanel'
 import { LyricsPanel } from '@/pages/NowPlayingPage/LyricsPanel'
@@ -142,9 +142,10 @@ const extrasViewOf = ({
 /** The page when nothing plays: its title over a line on how to start something. */
 const NothingPlaying = () => {
   const titleId = useId()
+  const links = useMusicLinks()
   return (
     <section className={styles.page} aria-labelledby={titleId}>
-      <BackButton fallback={HOME} className={styles.back} />
+      <BackButton fallback={links.home} className={styles.back} />
       <h1 id={titleId} className={styles.title}>
         {NOW_PLAYING_COPY.title}
       </h1>
@@ -163,6 +164,7 @@ const Playing = ({ track }: PlayingProps) => {
   const titleId = useId()
   const queueId = useId()
   const extrasId = useId()
+  const links = useMusicLinks()
   const { isAudiobook, chapters } = useAudiobookChapters({ api, track })
   const [isAdding, setAdding] = useState(false)
   const queue = useAudioQueue((store) => store.queue)
@@ -190,7 +192,7 @@ const Playing = ({ track }: PlayingProps) => {
 
   return (
     <section className={styles.page} aria-labelledby={titleId}>
-      <BackButton fallback={HOME} className={styles.back} />
+      <BackButton fallback={links.home} className={styles.back} />
       <h1 id={titleId} className="visually-hidden">
         {NOW_PLAYING_COPY.title}
       </h1>
@@ -211,12 +213,12 @@ const Playing = ({ track }: PlayingProps) => {
             {track.artists.map((artist, index) => (
               <span key={artist.id}>
                 {index > 0 && COMMON_COPY.listSeparator}
-                <Link to={artistPath(artist.id)}>{artist.name}</Link>
+                <Link to={links.artist(artist.id)}>{artist.name}</Link>
               </span>
             ))}
           </p>
           <p className={styles.album}>
-            <Link to={albumPath(track.albumId)}>{track.album.title}</Link>
+            <Link to={links.album(track.albumId)}>{track.album.title}</Link>
           </p>
           {error !== null && (
             <p className={styles.error} role="alert">

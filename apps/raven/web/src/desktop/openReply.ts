@@ -1,7 +1,7 @@
 import { DESKTOP_REPLIES, type DesktopReply } from '@raven/core'
 import { useToasts } from '@raven/ui'
 import { type NavigateFunction, useLocation, useNavigate } from 'react-router-dom'
-import { isPlaying, playPathOf } from '@/desktop/paths'
+import { isPlaying, playOriginFor, playPathOf } from '@/desktop/paths'
 import { useDownloadAsk } from '@/stores/downloadAsk'
 import { handled } from '@/desktop/handled'
 
@@ -9,6 +9,8 @@ type ApplyReplyProps = {
   reply: DesktopReply
   navigate: NavigateFunction
   pathname: string
+  /** The opening page's route state, which carries a playing file's way back on to the next. */
+  state: unknown
   showNotice: (message: string) => void
 }
 
@@ -16,13 +18,13 @@ type ApplyReplyProps = {
  * What to do with main's answer to opening something: play a file (replacing a video already
  * on screen, so Back leaves the player), show a page, ask about a download, or say why not.
  */
-const applyReply = ({ reply, navigate, pathname, showNotice }: ApplyReplyProps): void => {
+const applyReply = ({ reply, navigate, pathname, state, showNotice }: ApplyReplyProps): void => {
   switch (reply.type) {
     case DESKTOP_REPLIES.play:
       return handled(
         Promise.resolve(
           navigate(playPathOf(reply.target.fileId), {
-            state: { queue: reply.target.queue },
+            state: { queue: reply.target.queue, from: playOriginFor({ state, pathname }) },
             replace: isPlaying(pathname),
           }),
         ),
@@ -53,7 +55,7 @@ const applyReply = ({ reply, navigate, pathname, showNotice }: ApplyReplyProps):
 /** `applyReply` bound to this page's router and toasts. */
 export const useOpenReply = (): ((reply: DesktopReply) => void) => {
   const navigate = useNavigate()
-  const { pathname } = useLocation()
-  const showNotice = useToasts((state) => state.show)
-  return (reply) => applyReply({ reply, navigate, pathname, showNotice })
+  const { pathname, state } = useLocation()
+  const showNotice = useToasts((toasts) => toasts.show)
+  return (reply) => applyReply({ reply, navigate, pathname, state, showNotice })
 }

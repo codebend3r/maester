@@ -1,0 +1,63 @@
+// The music's settings under their heading, spaced as the server's settings above.
+.sound {
+  display: grid;
+  gap: var(--space-5);
+}
+
+// The equalizer's ten bands side by side, low to high, as on a mixing desk.
+.bands {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  max-width: 36rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+  list-style: none;
+}
+
+// One band: its gain over its slider, standing upright, over its name.
+.band {
+  display: grid;
+  grid-template-areas:
+    'gain'
+    'range'
+    'name';
+  justify-items: center;
+  gap: var(--space-1);
+}
+
+.gain {
+  grid-area: gain;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+// Upright, the top end the loudest.
+.range {
+  grid-area: range;
+  height: 8rem;
+  writing-mode: vertical-lr;
+  direction: rtl;
+}
+
+.name {
+  grid-area: name;
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+// On a phone a band's words wrap under each other, smaller.
+@media (max-width: 30rem) {
+  .bands {
+    padding: var(--space-2);
+  }
+
+  .gain,
+  .name {
+    font-size: var(--font-size-2xs);
+  }
+}

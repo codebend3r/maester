@@ -26,7 +26,9 @@ import {
   SCROBBLE_PARAMS,
   SCROBBLE_RETURNS,
   SCROBBLE_SERVICES,
+  SCROBBLE_WEB_PATH,
   SCROBBLING_PATHS,
+  type ScrobbleReturn,
   type ScrobbleStatus,
   isLastFmStart,
   isListenBrainzLink,
@@ -50,6 +52,7 @@ import { LastFmScrobbler } from '@/scrobbling/lastFmScrobbler'
 import { LastFmSignIns } from '@/scrobbling/lastFmSignIns'
 import { ListenBrainzScrobbler } from '@/scrobbling/listenBrainzScrobbler'
 import { ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
+import { ROUTE_PARAMS } from '@/requestParts'
 
 type PublicOriginOfProps = { auth: AuthConfig; config: ServerConfig }
 
@@ -141,12 +144,22 @@ export class ScrobblingController {
     }
   }
 
-  /** The exact addresses Last.fm's sign-in may go back to. */
-  private returns(): string[] {
-    return [
-      ...(this.publicOrigin === null ? [] : [`${this.publicOrigin}${SCROBBLE_RETURNS.web}`]),
-      SCROBBLE_RETURNS.wren,
-    ]
+  /**
+   * Where a named return sends the browser: the web's Settings on the web
+   * address this server knows, or null while it knows none, and Wren's
+   * screen as it is.
+   */
+  private addressOf(returnTo: ScrobbleReturn): string | null {
+    switch (returnTo) {
+      case SCROBBLE_RETURNS.web:
+        return this.publicOrigin === null ? null : `${this.publicOrigin}${SCROBBLE_WEB_PATH}`
+      case SCROBBLE_RETURNS.wren:
+        return SCROBBLE_RETURNS.wren
+      default: {
+        const unreachable: never = returnTo
+        return unreachable
+      }
+    }
   }
 
   /** Where Last.fm's sign-in comes back to while Last.fm is on, else null. */
@@ -202,7 +215,7 @@ export class ScrobblingController {
   startLastFm(@Body() body: unknown, @Req() request: FastifyRequest): LastFmAuthPage {
     const origin = this.lastFmOrigin()
     if (origin === null) throw new ConflictException(SCROBBLING_COPY.lastFmOff)
-    if (!isLastFmStart(body) || !this.returns().includes(body.returnTo)) {
+    if (!isLastFmStart(body) || this.addressOf(body.returnTo) === null) {
       throw new BadRequestException(SCROBBLING_COPY.badReturn)
     }
     const state = this.signIns.start({
@@ -231,7 +244,8 @@ export class ScrobblingController {
       throw new BadRequestException(SCROBBLING_COPY.callbackParts)
     }
     const signIn = this.signIns.finish(state)
-    if (signIn === null || !this.returns().includes(signIn.returnTo)) {
+    const address = signIn === null ? null : this.addressOf(signIn.returnTo)
+    if (signIn === null || address === null) {
       throw new BadRequestException(SCROBBLING_COPY.staleSignIn)
     }
     await this.checkStillViewer({ account: signIn.account })
@@ -248,13 +262,16 @@ export class ScrobblingController {
     const outcome = linked === null ? SCROBBLE_OUTCOMES.failed : SCROBBLE_OUTCOMES.linked
     await reply
       .header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
-      .redirect(returnAddress({ returnTo: signIn.returnTo, outcome }), 302)
+      .redirect(returnAddress({ returnTo: address, outcome }), 302)
   }
 
   /** Stops forwarding to the service, forgetting its token and the listens waiting for it. */
   @ForViewers()
   @Delete(SCROBBLING_PATHS.service)
-  unlink(@Param('service') service: string, @Req() request: FastifyRequest): ScrobbleStatus[] {
+  unlink(
+    @Param(ROUTE_PARAMS.service) service: string,
+    @Req() request: FastifyRequest,
+  ): ScrobbleStatus[] {
     if (!isScrobbleService(service)) throw new NotFoundException(`No service ${service}`)
     const account = this.accounts.keyOf({ request })
     this.links.remove({ account, service })

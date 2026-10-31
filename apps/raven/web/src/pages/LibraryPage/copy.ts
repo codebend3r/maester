@@ -54,10 +54,6 @@ export const LIBRARY_COPY = {
   searchArtists: 'Search artists',
   noArtists: (name: string) => `No artists in ${name} yet.`,
   artists: 'Artists',
-  newPlaylist: 'New playlist',
-  noPlaylists: 'No playlists yet. Make one here, or add tracks to a new one from an album.',
-  playlists: 'Playlists',
-  makePlaylist: 'Make playlist',
   sortLabels: SORT_LABELS,
   sectionLabels: {
     all: COMMON_COPY.all,

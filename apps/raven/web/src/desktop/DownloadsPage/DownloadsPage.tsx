@@ -154,8 +154,10 @@ const Group = ({ grouped, onDeleted }: GroupProps) => {
   const cover = isMusicGroup(group) ? group.cover : null
   const playFrom = ({ queue: { source, playable }, startAt }: PlayFromProps) =>
     playTracks({ tracks: playable.map(({ track }) => track), startAt, source })
+  type PlayOfProps = DownloadView
+
   // A video opens in the player; a track queues its group's downloaded tracks from it.
-  const playOf = ({ downloadId }: DownloadView): RowPlay => {
+  const playOf = ({ downloadId }: PlayOfProps): RowPlay => {
     if (!isMusicGroup(group)) return PLAYS_IN_PLAYER
     const startAt = queue?.playable.findIndex((each) => each.downloadId === downloadId) ?? -1
     if (queue === null || startAt < 0) return PLAYS_NOTHING

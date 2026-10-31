@@ -1,9 +1,9 @@
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import type { ComponentType } from 'react'
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, parsePath, useLocation } from 'react-router-dom'
 import { Button } from '@raven/ui'
-import { AUTH_ROUTES, DESKTOP_PATHS } from '@raven/core'
-import { isFilePlaying, isOfflinePage, offlineReturnOf } from '@/desktop/paths'
+import { AUTH_ROUTES } from '@raven/core'
+import { downloadsPageFor, isFilePlaying, isOfflinePage, offlineReturnOf } from '@/desktop/paths'
 import { ACCESS_KINDS, type AccessState, useAccessState } from '@/lib/accessState'
 import { signInPath } from '@/lib/authRoutes'
 import { queryKeys } from '@raven/ui/headless'
@@ -85,8 +85,13 @@ const Page = () => <Outlet />
 
 type OfflineRedirectProps = GateViewProps
 
+/** To the Downloads of the mode the page asked for was in, which comes back to it once the server answers. */
 const OfflineRedirect = ({ returnTo }: OfflineRedirectProps) => (
-  <Navigate replace to={DESKTOP_PATHS.downloads} state={offlineReturnOf(returnTo)} />
+  <Navigate
+    replace
+    to={downloadsPageFor(parsePath(returnTo).pathname ?? '')}
+    state={offlineReturnOf(returnTo)}
+  />
 )
 
 const FailedRetry = () => (

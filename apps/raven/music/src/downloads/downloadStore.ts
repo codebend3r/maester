@@ -191,7 +191,9 @@ const inFolder = ({ folder, file }: InFolderProps): string => [folder, file].joi
 
 export const isDone = (entry: DownloadEntry): boolean => entry.status === DOWNLOAD_STATUSES.done
 
-export const isUnderway = ({ status }: DownloadEntry): boolean =>
+type IsUnderwayProps = DownloadEntry
+
+export const isUnderway = ({ status }: IsUnderwayProps): boolean =>
   status === DOWNLOAD_STATUSES.queued || status === DOWNLOAD_STATUSES.downloading
 
 /** The bytes the finished downloads take. */

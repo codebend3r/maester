@@ -1,0 +1,81 @@
+.page {
+  display: grid;
+  grid-template-areas:
+    'back'
+    'header'
+    'tracks';
+  gap: var(--space-5);
+  align-content: start;
+}
+
+.back {
+  grid-area: back;
+  justify-self: start;
+}
+
+// The covers beside the words, on a narrow screen above them.
+.header {
+  grid-area: header;
+  display: grid;
+  grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
+  grid-template-areas: 'cover heading';
+  gap: var(--space-5);
+  align-items: end;
+}
+
+@media (max-width: 40rem) {
+  .header {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'cover'
+      'heading';
+  }
+}
+
+.cover {
+  grid-area: cover;
+  display: grid;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-poster);
+}
+
+.heading {
+  grid-area: heading;
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.eyebrow {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-heading);
+  letter-spacing: var(--tracking-display);
+  overflow-wrap: anywhere;
+}
+
+.facts {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  gap: var(--space-2);
+  justify-content: start;
+  padding-top: var(--space-2);
+}
+
+.tracks {
+  grid-area: tracks;
+  display: grid;
+}

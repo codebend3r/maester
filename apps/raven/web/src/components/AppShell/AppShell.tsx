@@ -2,28 +2,24 @@ import { DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, type ReactNode, useId } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { AudioHost, Button, Icon, type IconName, useKeyShortcut } from '@raven/ui'
+import { Button, Icon, type IconName, useKeyShortcut } from '@raven/ui'
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
 import { isAnyOf, libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
+import { FollowServer } from '@/components/AppShell/FollowServer'
 import { NavTip } from '@/components/AppShell/NavTip'
 import { TabBar } from '@/components/AppShell/TabBar'
 import { useIsMediumScreen } from '@/components/AppShell/useIsMediumScreen'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
-import { NowPlayingBar } from '@/components/NowPlayingBar/NowPlayingBar'
-import { useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
-import { api } from '@/lib/api'
 import { Logo } from '@/components/Logo/Logo'
 import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
-import { useFollowAdminLock } from '@/lib/adminLock'
+import { MUSIC_PATHS, musicLibrariesOf } from '@/lib/music'
 import { librariesQuery } from '@/lib/queries'
 import { TopCardNote, useScrollReset } from '@/lib/useScrollReset'
-import { useServerEvents } from '@/lib/useServerEvents'
 import { ravenVersion } from '@/lib/version'
-import { DesktopAudioHost } from '@/desktop/audio/DesktopAudioHost'
 import { useInProgressCount } from '@/desktop/downloadsApi'
 import { usePageBackdrop } from '@raven/ui/headless'
 import { useComputerName, useIsDesktop } from '@/stores/desktop'
@@ -152,17 +148,6 @@ const ManageGroup = ({ isIconsOnly, children }: ManageGroupProps) => {
   )
 }
 
-/**
- * What keeps the pages in step with the server while the frame is open: its
- * changes, and the admin lock coming on or going off. Left out while raven
- * player cannot reach its server.
- */
-const FollowServer = () => {
-  useServerEvents()
-  useFollowAdminLock()
-  return null
-}
-
 /** What B does on a medium screen, where the menu keeps to its icons. */
 const ignore = () => undefined
 
@@ -196,25 +181,11 @@ const PINNED_MARKS = {
   ),
 } as const satisfies Record<MenuWidth, ComponentType>
 
-/** Where the music plays: raven player's own engine, or the browser's. */
-const PLAYER_HOSTS = {
-  desktop: 'desktop',
-  browser: 'browser',
-} as const
-
-type PlayerHost = (typeof PLAYER_HOSTS)[keyof typeof PLAYER_HOSTS]
-
-type AudioHostProps = Parameters<typeof AudioHost>[0]
-
-const AUDIO_HOSTS = {
-  [PLAYER_HOSTS.desktop]: DesktopAudioHost,
-  [PLAYER_HOSTS.browser]: AudioHost,
-} as const satisfies Record<PlayerHost, ComponentType<AudioHostProps>>
-
 /**
  * The frame around every browsing page. Beside the page, the side menu
- * holds still as the page scrolls: the logo, Home and Favourites, then
- * under a Pinned heading the pinned libraries, each with its type's icon
+ * holds still as the page scrolls: the logo, Home and Favourites, Music
+ * (the music mode at `/music`) while a music library exists, then under a
+ * Pinned heading the pinned libraries, each with its type's icon
  * (with a lock on it for a locked one, whatever its type), an open one
  * marked instead of Libraries. Libraries and Settings sit at its foot, under
  * a rule and a Manage button that folds them away, open menu or icons alone,
@@ -240,15 +211,14 @@ export const AppShell = () => {
   const isIconsOnly = collapsed || isMediumScreen
   const isFrosted = usePageBackdrop((state) => state.shown != null)
   const isDesktop = useIsDesktop()
-  const reprobe = useReprobe()
   const isOffline = useServerReach((state) => state.isOffline)
   const libraries = useQuery({ ...librariesQuery, enabled: !isOffline })
   // Kept from before the server went out of reach, they would open pages that need it.
   const pinned = isOffline
     ? []
     : (libraries.data ?? []).filter((library) => library.settings.pinned)
+  const hasMusic = !isOffline && musicLibrariesOf(libraries.data ?? []).length > 0
   const PinnedMark = PINNED_MARKS[isIconsOnly ? MENU_WIDTHS.icons : MENU_WIDTHS.open]
-  const Audio = AUDIO_HOSTS[isDesktop ? PLAYER_HOSTS.desktop : PLAYER_HOSTS.browser]
   const isPinnedOpen = pinned.some((library) =>
     isAnyOf({ patterns: libraryPages(library.id), pathname }),
   )
@@ -259,8 +229,6 @@ export const AppShell = () => {
   return (
     <div className={collapsed ? `${styles.shell} ${styles.collapsed}` : styles.shell}>
       {!isOffline && <FollowServer />}
-      {/* The window has no title bar of its own: this strip is what it is dragged by. */}
-      {isDesktop && <div className={styles.titlebar} aria-hidden="true" />}
       <PageBackdrop />
       <nav
         id={navId}
@@ -288,6 +256,15 @@ export const AppShell = () => {
                 isIconsOnly={isIconsOnly}
               />
             </>
+          )}
+          {hasMusic && (
+            <NavItem
+              to={MUSIC_PATHS.root}
+              patterns={[MUSIC_PATHS.root]}
+              icon={<Icon name="music" />}
+              label={APP_SHELL_COPY.music}
+              isIconsOnly={isIconsOnly}
+            />
           )}
           {pinned.length > 0 && (
             <>
@@ -392,13 +369,8 @@ export const AppShell = () => {
             <Outlet />
           </TopCardNote>
         </div>
-        {/* Music plays above the routes: the engine once, and the bar while a track plays. */}
-        <div className={styles.player}>
-          <Audio api={api} reprobe={reprobe} />
-          <NowPlayingBar />
-        </div>
       </main>
-      <TabBar />
+      <TabBar hasMusic={hasMusic} />
     </div>
   )
 }

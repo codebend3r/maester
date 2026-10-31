@@ -28,9 +28,10 @@ export {
   AUDIOBOOK_SPEEDS,
   AUTOPLAY_COUNTDOWN_SECONDS,
   CONTROLS_LINGER_SECONDS,
+  MUSIC_QUALITIES,
   usePlayerPrefs,
 } from '@/stores/playerPrefs'
-export type { AudiobookSpeed } from '@/stores/playerPrefs'
+export type { AudiobookSpeed, MusicQuality } from '@/stores/playerPrefs'
 export { configureStorage } from '@/stores/configureStorage'
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
@@ -88,7 +89,12 @@ export {
   useServerArtistFavourite,
 } from '@/query/useMusicFavourite'
 export { playlistMutationsFor, useServerPlaylistMutations } from '@/query/usePlaylistMutations'
-export { useAudiobookChapters, useIsAudiobook, useTrackRate } from '@/query/useAudiobook'
+export {
+  useAudiobookChapters,
+  useIsAudiobook,
+  useTrackBitrate,
+  useTrackRate,
+} from '@/query/useAudiobook'
 export { activeLineAt } from '@/lib/lyrics'
 export { chapterAt, nextChapterStart, previousChapterStart } from '@/lib/chapters'
 export { movedUp, withoutPlace } from '@/music/playlistOrder'

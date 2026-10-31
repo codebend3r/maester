@@ -4,6 +4,7 @@ import {
   DOWNLOAD_TARGET_KINDS,
   MATCH_STATES,
   QUEUE_SOURCE_KINDS,
+  RADIO_SEED_KINDS,
   ROUTE_STATES,
   type RouteQuery,
   routeState,
@@ -27,8 +28,10 @@ import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
+import { START_RADIO_LOOKS, StartRadio } from '@/components/StartRadio/StartRadio'
 import { TrackList, type TrailProps } from '@/components/TrackList/TrackList'
-import { albumFacts, artistPath } from '@/lib/music'
+import { albumFacts } from '@/lib/music'
+import { useMusicLinks } from '@/lib/useMusicLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import { albumQuery, libraryQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
@@ -39,11 +42,16 @@ import { COMMON_COPY } from '@/lib/copy'
 
 type AlbumTrackControlsProps = TrailProps
 
-/** A track row's own control: Add to playlist, which asks which one. */
+/** A track row's own controls: Start radio from it, and Add to playlist, which asks which one. */
 const AlbumTrackControls = ({ track }: AlbumTrackControlsProps) => {
   const [isAdding, setAdding] = useState(false)
   return (
     <>
+      <StartRadio
+        seed={{ kind: RADIO_SEED_KINDS.track, id: track.id }}
+        title={track.title}
+        look={START_RADIO_LOOKS.icon}
+      />
       <Button
         tone="ghost"
         icon="list"
@@ -63,6 +71,7 @@ const AlbumView = ({ details }: AlbumViewProps) => {
   const queryClient = useQueryClient()
   const { album } = details
   const library = useQuery(libraryQuery(album.libraryId))
+  const links = useMusicLinks()
   const playTracks = useAudioQueue((store) => store.playTracks)
   const playNext = useAudioQueue((store) => store.playNext)
   const addToQueue = useAudioQueue((store) => store.addToQueue)
@@ -84,10 +93,10 @@ const AlbumView = ({ details }: AlbumViewProps) => {
   return (
     <article className={styles.page} aria-labelledby={titleId}>
       <BackButton
-        fallback={{
-          to: `/libraries/${album.libraryId}`,
-          label: library.data?.name ?? COMMON_COPY.library,
-        }}
+        fallback={links.library({
+          libraryId: album.libraryId,
+          name: library.data?.name ?? COMMON_COPY.library,
+        })}
         className={styles.back}
       />
       <header className={styles.header}>
@@ -103,7 +112,7 @@ const AlbumView = ({ details }: AlbumViewProps) => {
             {album.artists.map((artist, index) => (
               <span key={artist.id}>
                 {index > 0 && COMMON_COPY.listSeparator}
-                <Link to={artistPath(artist.id)}>{artist.name}</Link>
+                <Link to={links.artist(artist.id)}>{artist.name}</Link>
               </span>
             ))}
           </p>
@@ -134,6 +143,7 @@ const AlbumView = ({ details }: AlbumViewProps) => {
             <Button icon="list" disabled={tracks.length === 0} onClick={() => setAdding(true)}>
               {COMMON_COPY.addToPlaylist}
             </Button>
+            <StartRadio seed={{ kind: RADIO_SEED_KINDS.album, id: album.id }} title={album.title} />
             <FavouriteButton isFavourite={details.isFavourite} onToggle={favourite.mutate} />
             {tracks.length > 0 && (
               <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.album, albumId: album.id }} />
