@@ -538,6 +538,7 @@ describe('expandTarget', () => {
         group: {
           kind: 'album',
           key: 'album:7',
+          sourceId: 7,
           title: 'OK Computer',
           order,
           cover: { albumId: 7, coverVersion: 'cover-v1' },
@@ -579,6 +580,7 @@ describe('expandTarget', () => {
         {
           kind: 'playlist',
           key: 'playlist:5',
+          sourceId: 5,
           title: 'Late night',
           order: 0,
           cover: { albumId: 9, coverVersion: 'm1' },
@@ -589,6 +591,7 @@ describe('expandTarget', () => {
         {
           kind: 'playlist',
           key: 'playlist:5',
+          sourceId: 5,
           title: 'Late night',
           order: 1,
           cover: { albumId: 9, coverVersion: 'm1' },

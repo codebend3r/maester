@@ -216,7 +216,12 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         isLocked:
           entry.status.kind === DOWNLOAD_STATUS_KINDS.paused &&
           entry.status.reason === PAUSE_REASONS.relocked,
-        track: entry.track ?? null,
+        // The music engine plays the current server's downloads alone, so another server's
+        // tracks have nothing to queue them by.
+        track:
+          serverById({ config: config.read(), serverId: entry.serverId }) === null
+            ? null
+            : (entry.track ?? null),
       }
     })
 

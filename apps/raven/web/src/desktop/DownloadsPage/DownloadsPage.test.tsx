@@ -48,6 +48,7 @@ const DUNE = viewOf({
 const OK_COMPUTER = {
   kind: DOWNLOAD_KINDS.album,
   key: 'album:7',
+  sourceId: 7,
   title: 'OK Computer',
   cover: { albumId: 7, coverVersion: 'cover-v1' },
 } as const
@@ -130,6 +131,7 @@ describe('DownloadsPage', () => {
         group: {
           kind: DOWNLOAD_KINDS.album,
           key: 'album:7',
+          sourceId: 7,
           title: 'OK Computer',
           order: index,
           cover: { albumId: 7, coverVersion: 'cover-v1' },
@@ -160,6 +162,7 @@ describe('DownloadsPage', () => {
             group: {
               kind: DOWNLOAD_KINDS.playlist,
               key: 'playlist:5',
+              sourceId: 5,
               title: 'Late night',
               order: 0,
               cover: { albumId: 9, coverVersion: 'm1' },
@@ -187,6 +190,7 @@ describe('DownloadsPage', () => {
             group: {
               kind: DOWNLOAD_KINDS.album,
               key: 'album:7',
+              sourceId: 7,
               title: 'OK Computer',
               order: 1,
               cover: { albumId: 7, coverVersion: 'cover-v1' },
@@ -297,6 +301,7 @@ describe('DownloadsPage', () => {
     const group = {
       kind: DOWNLOAD_KINDS.playlist,
       key: 'playlist:5',
+      sourceId: 5,
       title: 'Late night',
       cover: { albumId: 9, coverVersion: 'm1' },
     } as const
@@ -332,6 +337,20 @@ describe('DownloadsPage', () => {
     expect(screen.queryByRole('button', { name: 'Play Paranoid Android' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Play OK Computer' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Delete Paranoid Android' })).toBeInTheDocument()
+  })
+
+  it('shows no Play on an album kept before its id was', async () => {
+    renderPage(
+      downloadsMain({
+        downloads: albumRows.map((row) => ({
+          ...row,
+          group: { ...OK_COMPUTER, order: row.group.order, sourceId: undefined },
+        })),
+      }),
+    )
+    await screen.findByRole('region', { name: 'OK Computer' })
+    expect(screen.queryByRole('button', { name: 'Play OK Computer' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Play Airbag' })).toBeNull()
   })
 
   it('asks before deleting, frees the room it says, and can be talked out of it', async () => {

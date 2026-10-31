@@ -362,6 +362,7 @@ describe('trackPathOf', () => {
       group: {
         kind: 'album',
         key: 'album:7',
+        sourceId: 7,
         title: 'OK Computer',
         order: 1,
         cover: { albumId: 7, coverVersion: 'cover-v1' },

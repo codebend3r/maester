@@ -88,7 +88,7 @@ describe('loadDownloads', () => {
     expect(await load(fs)).toEqual({ state: written, wasSetAside: false })
   })
 
-  it('loads a file written before tracks were kept, and one that keeps a track', async () => {
+  it("loads a file written before tracks and their group's id were kept, beside one that keeps both", async () => {
     const before = {
       downloadId: '00000000-0000-4000-8000-000000000001',
       serverId: '11111111-1111-4111-8111-111111111111',
@@ -113,11 +113,22 @@ describe('loadDownloads', () => {
       pending: NO_PENDING,
       createdAt: 1,
     }
-    const kept = { ...before, downloadId: '00000000-0000-4000-8000-000000000002', track: TRACK }
+    const kept = {
+      ...before,
+      downloadId: '00000000-0000-4000-8000-000000000002',
+      group: { ...before.group, sourceId: 7 },
+      track: TRACK,
+    }
     const written = { ...EMPTY_DOWNLOADS, entries: [before, kept] }
     const { fs } = createFakeFs({ [FILE]: JSON.stringify(written) })
     expect(await load(fs)).toEqual({
-      state: { ...EMPTY_DOWNLOADS, entries: [{ ...before, track: undefined }, kept] },
+      state: {
+        ...EMPTY_DOWNLOADS,
+        entries: [
+          { ...before, group: { ...before.group, sourceId: undefined }, track: undefined },
+          kept,
+        ],
+      },
       wasSetAside: false,
     })
   })

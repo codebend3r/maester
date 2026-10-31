@@ -844,6 +844,8 @@ describe('the download guards', () => {
     expect(isDownloadGroup({ ...album, cover: { albumId: 12, coverVersion: null } })).toBe(true)
     expect(isDownloadGroup({ kind: 'album', key: 'album:12', title: 'Ok', order: 1 })).toBe(false)
     expect(isMusicGroup(album)).toBe(true)
+    expect(isMusicGroup({ ...album, sourceId: 12 })).toBe(true)
+    expect(isMusicGroup({ ...album, sourceId: '12' })).toBe(false)
     expect(isMusicGroup({ ...group, cover: null })).toBe(false)
     expect(isDownloadGroup({ ...album, cover: { albumId: '12', coverVersion: null } })).toBe(false)
     expect(isDownloadGroup({ ...group, kind: 'track' })).toBe(false)

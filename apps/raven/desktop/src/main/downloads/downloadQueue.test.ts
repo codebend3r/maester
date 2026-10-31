@@ -1323,6 +1323,30 @@ describe('remove', () => {
     ])
   })
 
+  it('drops a track whose folder is still busy, says so, and sweeps the folder next launch', async () => {
+    const track = `${dirOf(5)}/media.flac`
+    const world = setup({
+      entries: [
+        entryFor(5, {
+          label: 'Airbag',
+          container: 'flac',
+          status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+        }),
+      ],
+      disk: { [track]: 8 },
+    })
+    world.drive.unremovable.add(dirOf(5))
+    await world.queue.remove({ downloadId: idOf(5) })
+    expect(world.store.read().entries).toEqual([])
+    expect(world.drive.files.has(track)).toBe(true)
+    expect(world.warnings).toEqual([
+      expect.stringContaining('Raven could not remove the files of Airbag'),
+    ])
+    world.drive.unremovable.delete(dirOf(5))
+    await world.queue.sweep({ wasSetAside: false })
+    expect(world.drive.files.has(track)).toBe(false)
+  })
+
   it('removes every download and the whole downloads folder', async () => {
     const world = setup({
       entries: [entryFor(1), entryFor(2), entryFor(3)],

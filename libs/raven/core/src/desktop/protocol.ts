@@ -13,6 +13,7 @@ import {
   nullable,
   object,
   oneOf,
+  optional,
   union,
 } from '@/schema'
 
@@ -117,11 +118,16 @@ const GROUP_FIELDS = { key: isString, title: isString, order: isNumber }
 /** The album cover a music group shows: an album's own, or a playlist's first track's album's. */
 const isDownloadCover = object({ albumId: isNumber, coverVersion: nullable(isString) })
 
-/** An album's or a playlist's group, which carries the cover Downloads heads it with. */
+/**
+ * An album's or a playlist's group, which carries the cover Downloads heads it with, and the
+ * album's or playlist's own id, which a queue played from it names. A group kept before the id
+ * was has none, and so nothing to queue its tracks by.
+ */
 export const isMusicGroup = object({
   kind: oneOf([DOWNLOAD_KINDS.album, DOWNLOAD_KINDS.playlist]),
   ...GROUP_FIELDS,
   cover: nullable(isDownloadCover),
+  sourceId: optional(isNumber),
 })
 
 /**

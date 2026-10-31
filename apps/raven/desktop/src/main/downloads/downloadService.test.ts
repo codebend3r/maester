@@ -820,6 +820,20 @@ describe('confirm', () => {
     expect(reply.downloads.map((view) => view.track)).toEqual([airbag])
   })
 
+  it("carries no track for another server's download, which the music engine cannot play", () => {
+    const airbag = track({ id: 101 })
+    const kept = entryFor({ mediaId: 101, track: airbag })
+    const elsewhere = entryFor({
+      downloadId: '00000000-0000-4000-8000-0000000000a1',
+      serverId: OTHER_SERVER_ID,
+      track: airbag,
+    })
+    const world = setup({ initial: { ...EMPTY_DOWNLOADS, entries: [kept, elsewhere] } })
+    const tracksById = new Map(world.service.views().map((view) => [view.downloadId, view.track]))
+    expect(tracksById.get(kept.downloadId) ?? null).toEqual(airbag)
+    expect(tracksById.get(elsewhere.downloadId)).toBeNull()
+  })
+
   it("keeps the dialog's choice as the default the next ask starts from", async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE), [itemCall(5)]: ok(SEASON) } })
     const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })

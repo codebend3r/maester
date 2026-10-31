@@ -454,6 +454,7 @@ const draftOf = async ({ server, target, skip }: DraftOfProps): Promise<Read<Dra
           key: albumGroupKey(album.id),
           title: album.title,
           cover: { albumId: album.id, coverVersion: album.coverVersion },
+          sourceId: album.id,
         },
       })
     }
@@ -479,6 +480,7 @@ const draftOf = async ({ server, target, skip }: DraftOfProps): Promise<Read<Dra
             first === undefined
               ? null
               : { albumId: first.albumId, coverVersion: first.album.coverVersion },
+          sourceId: playlist.id,
         },
       })
     }
