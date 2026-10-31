@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test'
-import { AUDIO_PLAYER_EVENTS, BROWSE_ROOTS, type BrowseNode } from '@raven/audio/contract'
+import {
+  AUDIO_PLAYER_EVENTS,
+  BROWSE_ROOTS,
+  type BrowseAnswer,
+  type BrowseNode,
+} from '@raven/audio/contract'
 import {
   ALBUM_TYPES,
   AUDIO_BITRATES,
@@ -14,7 +19,7 @@ import type { BrowseApi } from '@raven/native/headless'
 import { useAudioQueue } from '@raven/ui/headless'
 
 import { DOWNLOAD_STATUSES, downloadKeyOf, useDownloads } from '@/downloads/downloadStore'
-import { type CarAnswer, carBrowseFor } from '@/music/carBrowse'
+import { carBrowseFor } from '@/music/carBrowse'
 
 const SERVER_ID = 'raven'
 
@@ -95,7 +100,7 @@ const unreachableApi: BrowseApi = {
 type CarOverProps = { api: BrowseApi }
 
 const carOver = ({ api }: CarOverProps) => {
-  const answers: CarAnswer[] = []
+  const answers: BrowseAnswer[] = []
   const car = carBrowseFor({
     api,
     serverId: SERVER_ID,

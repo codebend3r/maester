@@ -153,8 +153,8 @@ const rowKindOf = ({ group }: DownloadView) =>
 export const ROW_PLAYS = { player: 'player', queue: 'queue', none: 'none' } as const
 
 /**
- * `none` is a track downloaded before its `Track` was kept, which has nothing to queue it with,
- * so its row shows no Play.
+ * `none` is a ready track of a server Raven no longer holds, which the music engine has nothing
+ * to queue it by, so its row shows no Play.
  */
 export type RowPlay =
   | { kind: typeof ROW_PLAYS.player }
@@ -197,7 +197,7 @@ type RowViewProps = {
   view: DownloadView
   ids: { label: string; status: string; question: string }
   action: RowAction
-  /** Whether the row shows its action: a ready track with nothing to queue it by has none. */
+  /** Whether the row shows its action: a ready track of a server Raven no longer holds has none. */
   hasAction: boolean
   isDeleting: boolean
   deleteButton: ButtonRef

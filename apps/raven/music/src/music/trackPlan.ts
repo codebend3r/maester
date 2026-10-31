@@ -1,6 +1,7 @@
 import type { TrackPlan } from '@raven/native/headless'
 
-import { downloadedOf, useDownloads } from '@/downloads/downloadStore'
+import { useDownloads } from '@/downloads/downloadStore'
+import { downloadedOf } from '@/downloads/downloadViews'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 
 type TrackPlanForProps = {

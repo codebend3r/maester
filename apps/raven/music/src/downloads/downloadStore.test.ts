@@ -8,7 +8,6 @@ import {
   type PlaylistSummary,
   type Track,
 } from '@raven/core'
-import { BROWSE_KINDS } from '@raven/native/headless'
 import type { StateStorage } from 'zustand/middleware'
 
 import {
@@ -16,13 +15,10 @@ import {
   DOWNLOADS_KEY,
   downloadKeyOf,
   DOWNLOAD_COPY,
-  DOWNLOAD_PROGRESS,
   DOWNLOAD_SOURCES,
   DOWNLOAD_STATUSES,
   type DownloadDisk,
   configureDownloads,
-  downloadProgressOf,
-  downloadedLibraryOf,
   useDownloads,
 } from '@/downloads/downloadStore'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
@@ -185,41 +181,49 @@ const setUp = async ({
       uri: `https://raven.example/covers/${track.albumId}`,
       headers: {},
     }),
-    accountId: () => ACCOUNT.id,
   })
   return { files, asked }
 }
 
-/** The account signed in; a test switches it by setting `id`. */
-const ACCOUNT: { id: string | null } = { id: 'u1' }
-
 const albumOf = { kind: DOWNLOAD_SOURCES.album, album: ALBUM } as const
+
+const playlistOf = { kind: DOWNLOAD_SOURCES.playlist, playlist: PLAYLIST } as const
 
 const trackFolder = (id: number) => `${DOWNLOADS_FOLDER}/${SERVER_ID}/${id}`
 
 describe('useDownloads', () => {
   beforeEach(() => {
-    ACCOUNT.id = 'u1'
     useWrenPrefs.setState(DEFAULT_WREN_PREFS)
     useDownloads.setState({ ownerId: null, entries: {}, playlists: {}, running: 0 })
   })
 
-  it('belongs to the account it was made under, and goes only when another account signs in', async () => {
+  it('belongs to the account that signed in first, and goes only when another account signs in', async () => {
     const { files } = await setUp()
+    const { keepFor } = useDownloads.getState()
+    expect(await keepFor({ accountId: null })).toBe(false)
+    expect(useDownloads.getState().ownerId).toBeNull()
+    expect(await keepFor({ accountId: 'u1' })).toBe(false)
+    expect(useDownloads.getState().ownerId).toBe('u1')
     await useDownloads
       .getState()
       .downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: albumOf })
-    expect(useDownloads.getState().ownerId).toBe('u1')
 
-    const { keepFor } = useDownloads.getState()
     expect(await keepFor({ accountId: null })).toBe(false)
     expect(await keepFor({ accountId: 'u1' })).toBe(false)
     expect(Object.keys(useDownloads.getState().entries)).toEqual([keyOf(FIRST.id)])
 
     expect(await keepFor({ accountId: 'u2' })).toBe(true)
     expect(useDownloads.getState().entries).toEqual({})
-    expect(useDownloads.getState().ownerId).toBeNull()
+    expect(useDownloads.getState().ownerId).toBe('u2')
     expect(files.size).toBe(0)
+  })
+
+  it('answers that another account came even when nothing was downloaded, so the car forgets its lists', async () => {
+    await setUp()
+    const { keepFor } = useDownloads.getState()
+    expect(await keepFor({ accountId: 'u1' })).toBe(false)
+    expect(await keepFor({ accountId: 'u2' })).toBe(true)
+    expect(await keepFor({ accountId: 'u2' })).toBe(false)
   })
 
   it('lands a fetch only on the entry it was started for, not on one queued again since', async () => {
@@ -234,7 +238,7 @@ describe('useDownloads', () => {
     const { downloadTracks, remove } = useDownloads.getState()
     const older = downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: albumOf })
     await Promise.resolve()
-    await remove({ serverId: SERVER_ID, mediaIds: [FIRST.id] })
+    await remove({ serverId: SERVER_ID, collection: albumOf })
     await downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: albumOf })
     const newer = useDownloads.getState().entries[keyOf(FIRST.id)]
     expect(newer?.status).toBe(DOWNLOAD_STATUSES.done)
@@ -243,6 +247,32 @@ describe('useDownloads', () => {
     await older
     expect(useDownloads.getState().entries[keyOf(FIRST.id)]).toEqual(newer)
     expect(files.has(`${trackFolder(31)}/media.m4a`)).toBe(true)
+  })
+
+  it("lets a stale fetch's failure land nowhere, keeping the newer download's file", async () => {
+    const firstWrite = Promise.withResolvers<void>()
+    const writes: string[] = []
+    const { files } = await setUp({
+      writeHold: async (path) => {
+        writes.push(path)
+        if (writes.length > 1) return
+        await firstWrite.promise
+        throw new Error('cut off')
+      },
+    })
+    const { downloadTracks, remove } = useDownloads.getState()
+    const older = downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: albumOf })
+    await Promise.resolve()
+    await remove({ serverId: SERVER_ID, collection: albumOf })
+    await downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: albumOf })
+    const newer = useDownloads.getState().entries[keyOf(FIRST.id)]
+    expect(newer?.status).toBe(DOWNLOAD_STATUSES.done)
+
+    firstWrite.resolve()
+    await older
+    expect(useDownloads.getState().entries[keyOf(FIRST.id)]).toEqual(newer)
+    expect(files.has(`${trackFolder(31)}/media.m4a`)).toBe(true)
+    expect(files.has(`${trackFolder(31)}/cover.jpg`)).toBe(true)
   })
 
   it("downloads an album's tracks as 256 kbps transcodes, each with its cover, under the server's folder", async () => {
@@ -303,9 +333,6 @@ describe('useDownloads', () => {
     expect(entries[keyOf(SECOND.id)]?.status).toBe(DOWNLOAD_STATUSES.failed)
     expect(entries[keyOf(FIRST.id)]?.status).toBe(DOWNLOAD_STATUSES.done)
     expect([...files].filter((file) => file.startsWith(trackFolder(32)))).toEqual([])
-    expect(
-      downloadProgressOf({ entries, serverId: SERVER_ID, mediaIds: [FIRST.id, SECOND.id] }),
-    ).toEqual({ kind: DOWNLOAD_PROGRESS.failed, done: 1, total: 2 })
   })
 
   it("keeps one server's track apart from another's with the same media id", async () => {
@@ -323,27 +350,61 @@ describe('useDownloads', () => {
     )
   })
 
-  it('removes every download and the folder they are in', async () => {
+  it('removes every download and the folder they are in, keeping their owner', async () => {
     const { files } = await setUp()
+    await useDownloads.getState().keepFor({ accountId: 'u1' })
     await useDownloads
       .getState()
       .downloadTracks({ serverId: SERVER_ID, tracks: [FIRST, SECOND], collection: albumOf })
     await useDownloads.getState().removeAll()
     expect(useDownloads.getState().entries).toEqual({})
+    expect(useDownloads.getState().ownerId).toBe('u1')
     expect(files.size).toBe(0)
   })
 
-  it('removes the tracks asked for, and a playlist once none of its tracks is left', async () => {
+  it('removes a playlist and its tracks', async () => {
     const { files } = await setUp()
-    await useDownloads.getState().downloadTracks({
-      serverId: SERVER_ID,
-      tracks: [SECOND],
-      collection: { kind: DOWNLOAD_SOURCES.playlist, playlist: PLAYLIST },
-    })
+    await useDownloads
+      .getState()
+      .downloadTracks({ serverId: SERVER_ID, tracks: [SECOND], collection: playlistOf })
     expect(Object.keys(useDownloads.getState().playlists)).toEqual([keyOf(PLAYLIST.id)])
-    await useDownloads.getState().remove({ serverId: SERVER_ID, mediaIds: [SECOND.id] })
+    await useDownloads.getState().remove({ serverId: SERVER_ID, collection: playlistOf })
     expect(useDownloads.getState().playlists).toEqual({})
+    expect(useDownloads.getState().entries).toEqual({})
     expect(files.size).toBe(0)
+  })
+
+  it("keeps an album's track when a playlist that shares it is removed", async () => {
+    const { files } = await setUp()
+    const { downloadTracks } = useDownloads.getState()
+    await downloadTracks({ serverId: SERVER_ID, tracks: [FIRST, SECOND], collection: albumOf })
+    await downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: playlistOf })
+    await useDownloads.getState().remove({ serverId: SERVER_ID, collection: playlistOf })
+    expect(useDownloads.getState().entries[keyOf(FIRST.id)]?.album).toEqual(ALBUM)
+    expect(files.has(`${trackFolder(31)}/media.m4a`)).toBe(true)
+  })
+
+  it("keeps a playlist's track when an album that shares it is removed", async () => {
+    const { files } = await setUp()
+    const { downloadTracks } = useDownloads.getState()
+    await downloadTracks({ serverId: SERVER_ID, tracks: [FIRST, SECOND], collection: albumOf })
+    await downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: playlistOf })
+    await useDownloads.getState().remove({ serverId: SERVER_ID, collection: albumOf })
+    const { entries, playlists } = useDownloads.getState()
+    expect(Object.keys(entries)).toEqual([keyOf(FIRST.id)])
+    expect(entries[keyOf(FIRST.id)]?.album).toBeNull()
+    expect(playlists[keyOf(PLAYLIST.id)]?.mediaIds).toEqual([FIRST.id])
+    expect(files.has(`${trackFolder(31)}/media.m4a`)).toBe(true)
+    expect([...files].filter((file) => file.startsWith(trackFolder(32)))).toEqual([])
+  })
+
+  it('lets go of a track that left a playlist downloaded again', async () => {
+    const { files } = await setUp()
+    const { downloadTracks } = useDownloads.getState()
+    await downloadTracks({ serverId: SERVER_ID, tracks: [FIRST, SECOND], collection: playlistOf })
+    await downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: playlistOf })
+    expect(Object.keys(useDownloads.getState().entries)).toEqual([keyOf(FIRST.id)])
+    expect([...files].filter((file) => file.startsWith(trackFolder(32)))).toEqual([])
   })
 
   const savedEntry = {
@@ -390,45 +451,5 @@ describe('useDownloads', () => {
     const { files } = await setUp({ storage, onDisk: [savedEntry.path] })
     expect(useDownloads.getState().entries[keyOf(31)]?.status).toBe(DOWNLOAD_STATUSES.done)
     expect(files.has(savedEntry.path)).toBe(true)
-  })
-})
-
-describe('downloadedLibraryOf', () => {
-  beforeEach(() => {
-    useWrenPrefs.setState(DEFAULT_WREN_PREFS)
-    useDownloads.setState({ entries: {}, playlists: {}, running: 0 })
-  })
-
-  it("lists the server's downloaded albums and playlists, their tracks in order and their saved cover", async () => {
-    await setUp()
-    const { downloadTracks } = useDownloads.getState()
-    await downloadTracks({ serverId: SERVER_ID, tracks: [SECOND, FIRST], collection: albumOf })
-    await downloadTracks({
-      serverId: SERVER_ID,
-      tracks: [SECOND, FIRST],
-      collection: { kind: DOWNLOAD_SOURCES.playlist, playlist: PLAYLIST },
-    })
-    const uriOf = (path: string) => `file:///documents/${path}`
-    const library = downloadedLibraryOf({ ...useDownloads.getState(), serverId: SERVER_ID, uriOf })
-    expect(library.albums()).toEqual([ALBUM])
-    expect(library.playlists()).toEqual([PLAYLIST])
-    expect(library.tracksOf({ kind: BROWSE_KINDS.album, albumId: ALBUM.id })).toEqual([
-      FIRST,
-      SECOND,
-    ])
-    expect(library.tracksOf({ kind: BROWSE_KINDS.playlist, playlistId: PLAYLIST.id })).toEqual([
-      SECOND,
-      FIRST,
-    ])
-    expect(library.tracksOf({ kind: BROWSE_KINDS.track, mediaId: FIRST.id })).toEqual([FIRST])
-    expect(library.artworkOf({ kind: BROWSE_KINDS.album, albumId: ALBUM.id })).toBe(
-      uriOf(`${trackFolder(31)}/cover.jpg`),
-    )
-    const other = downloadedLibraryOf({
-      ...useDownloads.getState(),
-      serverId: 'elsewhere',
-      uriOf,
-    })
-    expect(other.albums()).toEqual([])
   })
 })

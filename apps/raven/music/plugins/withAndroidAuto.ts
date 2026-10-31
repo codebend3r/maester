@@ -1,10 +1,21 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { type ConfigPlugin, withAndroidManifest, withDangerousMod } from 'expo/config-plugins'
+import {
+  type AndroidConfig,
+  type ConfigPlugin,
+  withAndroidManifest,
+  withDangerousMod,
+} from 'expo/config-plugins'
 
 /** The meta-data Android Auto looks for, naming what the app does in the car. */
 const CAR_APPLICATION = 'com.google.android.gms.car.application'
+
+const MANIFEST_KEYS = {
+  metaData: 'meta-data',
+  name: 'android:name',
+  resource: 'android:resource',
+} as const
 
 const AUTOMOTIVE_DESCRIPTION = 'automotive_app_desc'
 
@@ -26,18 +37,28 @@ const withAutomotiveXml: ConfigPlugin = (config) =>
     },
   ])
 
+type ManifestApplication = AndroidConfig.Manifest.ManifestApplication
+
+/** The application with the car's meta-data, held once, whatever it already had. */
+export const withCarMetaData = (application: ManifestApplication): ManifestApplication => {
+  const carMetaData = {
+    $: {
+      [MANIFEST_KEYS.name]: CAR_APPLICATION,
+      [MANIFEST_KEYS.resource]: `@xml/${AUTOMOTIVE_DESCRIPTION}`,
+    },
+  }
+  const metaData = (application[MANIFEST_KEYS.metaData] ?? []).filter(
+    ({ $ }) => $[MANIFEST_KEYS.name] !== CAR_APPLICATION,
+  )
+  return { ...application, [MANIFEST_KEYS.metaData]: [...metaData, carMetaData] }
+}
+
 /** Wren in Android Auto: the description, and the meta-data that points Auto at it. */
 export const withAndroidAuto: ConfigPlugin = (config) =>
   withAndroidManifest(withAutomotiveXml(config), (mod) => {
     const { manifest } = mod.modResults
     const [main, ...rest] = manifest.application ?? []
     if (main === undefined) return mod
-    const carMetaData = {
-      $: { 'android:name': CAR_APPLICATION, 'android:resource': `@xml/${AUTOMOTIVE_DESCRIPTION}` },
-    }
-    const metaData = (main['meta-data'] ?? []).filter(
-      ({ $ }) => $['android:name'] !== CAR_APPLICATION,
-    )
-    const application = [{ ...main, 'meta-data': [...metaData, carMetaData] }, ...rest]
+    const application = [withCarMetaData(main), ...rest]
     return { ...mod, modResults: { ...mod.modResults, manifest: { ...manifest, application } } }
   })

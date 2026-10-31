@@ -1,5 +1,5 @@
-import { QUEUE_SOURCE_KINDS, type QueueSource, artistNames } from '@raven/core'
-import { BROWSE_KINDS, type BrowseTarget, browseIdOf } from '@raven/native/headless'
+import { artistNames } from '@raven/core'
+import { BROWSE_KINDS, type BrowseTarget, browseIdOf, queueSourceOf } from '@raven/native/headless'
 import { playlistFactsOf, useAudioQueue } from '@raven/ui/headless'
 import type { ReactElement } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
@@ -7,7 +7,8 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { AlbumArt } from '@/components/AlbumTile'
 import { Notice } from '@/components/Notice'
 import { pageStyles, useListContent } from '@/components/TabPage'
-import { downloadedLibraryOf, useDownloads } from '@/downloads/downloadStore'
+import { useDownloads } from '@/downloads/downloadStore'
+import { downloadedLibraryOf } from '@/downloads/downloadViews'
 import { deviceDisk } from '@/downloads/downloader'
 import { LIBRARY_PAGE_COPY } from '@/screens/copy'
 import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
@@ -17,7 +18,6 @@ type DownloadedRow = {
   title: string
   line: string
   target: BrowseTarget
-  source: QueueSource
 }
 
 type DownloadRowProps = { row: DownloadedRow; artworkUri: string | null; onPress: () => void }
@@ -65,13 +65,11 @@ export function DownloadsList({ serverId, header }: DownloadsListProps) {
       title: album.title,
       line: artistNames(album),
       target: { kind: BROWSE_KINDS.album, albumId: album.id } as const,
-      source: { kind: QUEUE_SOURCE_KINDS.album, id: album.id } as const,
     })),
     ...library.playlists().map((playlist) => ({
       title: playlist.name,
       line: playlistFactsOf({ playlist }),
       target: { kind: BROWSE_KINDS.playlist, playlistId: playlist.id } as const,
-      source: { kind: QUEUE_SOURCE_KINDS.playlist, id: playlist.id } as const,
     })),
   ]
   return (
@@ -84,7 +82,12 @@ export function DownloadsList({ serverId, header }: DownloadsListProps) {
       renderItem={({ item }) => (
         <DownloadRow
           artworkUri={library.artworkOf(item.target)}
-          onPress={() => playTracks({ tracks: library.tracksOf(item.target), source: item.source })}
+          onPress={() =>
+            playTracks({
+              tracks: library.tracksOf(item.target),
+              source: queueSourceOf(item.target),
+            })
+          }
           row={item}
         />
       )}

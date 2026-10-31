@@ -19,6 +19,8 @@ const SCENE_KEYS = {
   manifest: 'UIApplicationSceneManifest',
   configurations: 'UISceneConfigurations',
   carPlayRole: 'CPTemplateApplicationSceneSessionRoleApplication',
+  windowRole: 'UIWindowSceneSessionRoleApplication',
+  multipleScenes: 'UIApplicationSupportsMultipleScenes',
 } as const
 
 /** CarPlay's scene: its delegate is `@raven/audio`'s `RavenCarPlay`, named with its pod's module. */
@@ -46,6 +48,26 @@ type PlistValue = IOSConfig.InfoPlist[string]
 const isPlistDictionary = (value: PlistValue): value is Record<string, PlistValue> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
+type InfoPlist = IOSConfig.InfoPlist
+
+/** The Info.plist with CarPlay's scene added to the manifest's, the window's scene kept. */
+export const carPlayInfoPlist = (plist: InfoPlist): InfoPlist => {
+  const manifest = plist[SCENE_KEYS.manifest]
+  const declared = isPlistDictionary(manifest) ? manifest : null
+  const configurations = declared?.[SCENE_KEYS.configurations] ?? null
+  const scenes = isPlistDictionary(configurations)
+    ? configurations
+    : { [SCENE_KEYS.windowRole]: windowScenes() }
+  return {
+    ...plist,
+    [SCENE_KEYS.manifest]: {
+      [SCENE_KEYS.multipleScenes]: false,
+      ...declared,
+      [SCENE_KEYS.configurations]: { ...scenes, [SCENE_KEYS.carPlayRole]: carPlayScenes() },
+    },
+  }
+}
+
 /** Wren in CarPlay: the audio entitlement, and CarPlay's scene added to the manifest's. */
 export const withCarPlay: ConfigPlugin = (config) =>
   withInfoPlist(
@@ -53,23 +75,5 @@ export const withCarPlay: ConfigPlugin = (config) =>
       ...mod,
       modResults: { ...mod.modResults, [CARPLAY_ENTITLEMENT]: true },
     })),
-    (mod) => {
-      const manifest = mod.modResults[SCENE_KEYS.manifest]
-      const declared = isPlistDictionary(manifest) ? manifest : null
-      const configurations = declared?.[SCENE_KEYS.configurations] ?? null
-      const scenes = isPlistDictionary(configurations)
-        ? configurations
-        : { UIWindowSceneSessionRoleApplication: windowScenes() }
-      return {
-        ...mod,
-        modResults: {
-          ...mod.modResults,
-          [SCENE_KEYS.manifest]: {
-            UIApplicationSupportsMultipleScenes: false,
-            ...declared,
-            [SCENE_KEYS.configurations]: { ...scenes, [SCENE_KEYS.carPlayRole]: carPlayScenes() },
-          },
-        },
-      }
-    },
+    (mod) => ({ ...mod, modResults: carPlayInfoPlist(mod.modResults) }),
   )

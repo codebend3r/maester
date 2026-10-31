@@ -11,7 +11,7 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
+import java.security.SecureRandom
 
 /** Where a cover is: its address, and the headers its request carries. */
 private class ArtworkSource(val uri: String, val headers: Map<String, String>)
@@ -19,19 +19,26 @@ private class ArtworkSource(val uri: String, val headers: Map<String, String>)
 private const val AUTHORITY_SUFFIX = ".ravenaudio.artwork"
 private const val CACHE_FOLDER = "raven-artwork"
 private const val FILE_SCHEME = "file"
-private const val PART_SUFFIX = ".part"
 private const val TIMEOUT_MS = 10_000
 
 /** How many covers the provider knows at once: a few lists' worth. */
 private const val SOURCES_KEPT = 512
 
-/** The cache folder's bounds; past either, the covers read longest ago go first. */
-private const val CACHE_FILES_KEPT = 200
-private const val CACHE_BYTES_KEPT = 50L * 1024 * 1024
+private const val KEY_BYTES = 16
 
-/** A cover's key: a stable hash of its address, so a list shown again names the same keys. */
-private fun keyOf(artworkUri: String): String =
-  MessageDigest.getInstance("SHA-256").digest(artworkUri.toByteArray()).joinToString("") { "%02x".format(it) }
+private val random = SecureRandom()
+
+/**
+ * A cover's key: random, so no other app can work one out from a cover's address and read it,
+ * fetched with the account's token, through this exported provider.
+ */
+private fun newKey(): String {
+  val bytes = ByteArray(KEY_BYTES).also { random.nextBytes(it) }
+  return bytes.joinToString("") { "%02x".format(it) }
+}
+
+private fun <K, V> Map<K, V>.withLast(key: K, value: V): Map<K, V> =
+  (this - key + (key to value)).entries.toList().takeLast(SOURCES_KEPT).associate { it.toPair() }
 
 /**
  * Hands Android Auto the browse tree's covers as `content://` addresses, the kind it loads:
@@ -45,16 +52,20 @@ class RavenArtworkProvider : ContentProvider() {
     private val lock = Any()
     private var sources: Map<String, ArtworkSource> = emptyMap()
 
+    /** Each address's key, so a list shown again names the same keys; bounded with `sources`. */
+    private var keys: Map<String, String> = emptyMap()
+
     /**
      * The `content://` address Auto reads `artworkUri` from. Null `headers` keep those the
      * cover was last shown with: a node named alone carries none of its own.
      */
     fun uriFor(context: Context, artworkUri: String, headers: Map<String, String>?): Uri {
-      val key = keyOf(artworkUri)
-      synchronized(lock) {
+      val key = synchronized(lock) {
+        val key = keys[artworkUri] ?: newKey()
         val kept = sources[key]?.headers ?: emptyMap()
-        val source = ArtworkSource(artworkUri, headers ?: kept)
-        sources = (sources - key + (key to source)).entries.toList().takeLast(SOURCES_KEPT).associate { it.toPair() }
+        keys = keys.withLast(artworkUri, key)
+        sources = sources.withLast(key, ArtworkSource(artworkUri, headers ?: kept))
+        key
       }
       return Uri.Builder()
         .scheme("content")
@@ -115,11 +126,10 @@ class RavenArtworkProvider : ContentProvider() {
   }
 
   private fun trim(folder: File) {
-    val covers = folder.listFiles { each -> !each.name.endsWith(PART_SUFFIX) }.orEmpty().sortedByDescending { it.lastModified() }
-    val kept = covers.runningFold(0L) { total, each -> total + each.length() }.drop(1)
-    covers.zip(kept).forEachIndexed { place, (cover, bytes) ->
-      if (place >= CACHE_FILES_KEPT || bytes > CACHE_BYTES_KEPT) cover.delete()
-    }
+    val files = folder.listFiles().orEmpty()
+    val covers = files.map { CoverFile(it.name, it.length(), it.lastModified()) }
+    val gone = trimmed(covers, System.currentTimeMillis()).map { it.name }.toSet()
+    files.filter { it.name in gone }.forEach { it.delete() }
   }
 
   override fun getType(uri: Uri): String = "image/*"

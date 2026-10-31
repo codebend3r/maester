@@ -836,15 +836,22 @@ describe('the download guards', () => {
     const group = { kind: 'season', key: 'show:4', title: 'Severance', order: 20004 }
     expect(isDownloadGroup(group)).toBe(true)
     const cover = { albumId: 12, coverVersion: 'c1' }
-    const album = { kind: 'album', key: 'album:12', title: 'Ok', order: 1, cover }
+    const album = { kind: 'album', key: 'album:12', title: 'Ok', order: 1, cover, sourceId: 12 }
     expect(isDownloadGroup(album)).toBe(true)
     expect(
-      isDownloadGroup({ kind: 'playlist', key: 'playlist:3', title: 'Mix', order: 0, cover: null }),
+      isDownloadGroup({
+        kind: 'playlist',
+        key: 'playlist:3',
+        title: 'Mix',
+        order: 0,
+        cover: null,
+        sourceId: 3,
+      }),
     ).toBe(true)
     expect(isDownloadGroup({ ...album, cover: { albumId: 12, coverVersion: null } })).toBe(true)
     expect(isDownloadGroup({ kind: 'album', key: 'album:12', title: 'Ok', order: 1 })).toBe(false)
     expect(isMusicGroup(album)).toBe(true)
-    expect(isMusicGroup({ ...album, sourceId: 12 })).toBe(true)
+    expect(isMusicGroup({ ...album, sourceId: undefined })).toBe(false)
     expect(isMusicGroup({ ...album, sourceId: '12' })).toBe(false)
     expect(isMusicGroup({ ...group, cover: null })).toBe(false)
     expect(isDownloadGroup({ ...album, cover: { albumId: '12', coverVersion: null } })).toBe(false)

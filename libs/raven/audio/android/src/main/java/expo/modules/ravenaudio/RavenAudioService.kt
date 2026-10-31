@@ -1,6 +1,7 @@
 package expo.modules.ravenaudio
 
 import android.net.Uri
+import android.os.Build
 import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
@@ -166,7 +167,7 @@ private class LibraryCallback(private val service: RavenAudioService) :
     controller: MediaSession.ControllerInfo,
     mediaItems: MutableList<MediaItem>,
   ): ListenableFuture<MutableList<MediaItem>> {
-    if (!mayBrowse(controller)) return Futures.immediateFuture(mediaItems)
+    if (!mayChoose(controller)) return Futures.immediateFuture(mediaItems)
     val chosen = mediaItems.filter { it.localConfiguration == null }
     val play = RavenBrowse.play
     if (chosen.isNotEmpty() && play != null) service.playAfterBrowse.chosen()
@@ -175,6 +176,9 @@ private class LibraryCallback(private val service: RavenAudioService) :
   }
 
   private fun mayBrowse(caller: MediaSession.ControllerInfo) = canBrowse(caller.packageName, service.packageName)
+
+  private fun mayChoose(caller: MediaSession.ControllerInfo) =
+    canChoose(caller.packageName, service.packageName, Build.VERSION.SDK_INT)
 
   private fun <T : Any> refused(): ListenableFuture<LibraryResult<T>> =
     Futures.immediateFuture(LibraryResult.ofError<T>(SessionError.ERROR_PERMISSION_DENIED))

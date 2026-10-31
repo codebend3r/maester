@@ -4,6 +4,8 @@ import {
   type ApiClient,
   MUSIC_SORTS,
   type PlaylistSummary,
+  QUEUE_SOURCE_KINDS,
+  type QueueSource,
   type Track,
   artistNames,
   isLockedError,
@@ -65,6 +67,22 @@ export const browseIdOf = (target: BrowseTarget): string => {
       return [target.kind, target.playlistId].join(ID_SEPARATOR)
     case BROWSE_KINDS.track:
       return [target.kind, target.mediaId].join(ID_SEPARATOR)
+    default: {
+      const unknown: never = target
+      return unknown
+    }
+  }
+}
+
+/** What the queue says a target plays from: its album or its playlist; null for one track. */
+export const queueSourceOf = (target: BrowseTarget): QueueSource | null => {
+  switch (target.kind) {
+    case BROWSE_KINDS.album:
+      return { kind: QUEUE_SOURCE_KINDS.album, id: target.albumId }
+    case BROWSE_KINDS.playlist:
+      return { kind: QUEUE_SOURCE_KINDS.playlist, id: target.playlistId }
+    case BROWSE_KINDS.track:
+      return null
     default: {
       const unknown: never = target
       return unknown

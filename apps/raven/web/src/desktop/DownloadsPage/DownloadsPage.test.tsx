@@ -330,7 +330,7 @@ describe('DownloadsPage', () => {
     expect(queue.source).toEqual({ kind: QUEUE_SOURCE_KINDS.playlist, id: 5 })
   })
 
-  it('shows no Play on a track downloaded before its track was kept', async () => {
+  it('shows no Play on a track of a server Raven no longer holds', async () => {
     const [, second] = albumRows
     if (second === undefined) throw new Error('expected a row')
     renderPage(downloadsMain({ downloads: [{ ...second, track: null }] }))
@@ -338,20 +338,6 @@ describe('DownloadsPage', () => {
     expect(screen.queryByRole('button', { name: 'Play Paranoid Android' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Play OK Computer' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Delete Paranoid Android' })).toBeInTheDocument()
-  })
-
-  it('shows no Play on an album kept before its id was', async () => {
-    renderPage(
-      downloadsMain({
-        downloads: albumRows.map((row) => ({
-          ...row,
-          group: { ...OK_COMPUTER, order: row.group.order, sourceId: undefined },
-        })),
-      }),
-    )
-    await screen.findByRole('region', { name: 'OK Computer' })
-    expect(screen.queryByRole('button', { name: 'Play OK Computer' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Play Airbag' })).toBeNull()
   })
 
   it('asks before deleting, frees the room it says, and can be talked out of it', async () => {

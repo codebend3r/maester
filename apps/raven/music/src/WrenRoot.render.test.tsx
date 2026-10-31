@@ -44,6 +44,7 @@ describe('WrenRoot', () => {
     queryClient.clear()
     useWrenAccount.setState({ session: LISTENER })
     useAudioQueue.getState().clear()
+    useDownloads.setState({ ownerId: null, entries: {}, playlists: {} })
   })
 
   it("forgets what one account read once another signs in, so it never shows the last one's playlists", async () => {
@@ -90,6 +91,17 @@ describe('WrenRoot', () => {
     expect(screen.queryByRole('button', { name: /^Now Playing: Airbag/ })).toBeNull()
   })
 
+  it("forgets the car's lists once another account signs in, though the first downloaded nothing", async () => {
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await screen.findByRole('header', { name: 'Home' })
+    expect(useDownloads.getState().ownerId).toBe(LISTENER.userId)
+
+    await act(async () => useWrenAccount.setState({ session: null }))
+    await act(async () => useWrenAccount.setState({ session: { ...LISTENER, userId: 'u2' } }))
+    await waitFor(() => expect(audioPlayer.clearBrowseCache).toHaveBeenCalledTimes(1))
+    expect(useDownloads.getState().ownerId).toBe('u2')
+  })
+
   /** Airbag downloaded under the listener's account, on a disk a test can look at. */
   const downloaded = () => {
     const folder = 'downloads/raven/101'
@@ -99,7 +111,10 @@ describe('WrenRoot', () => {
       uriOf: (path) => path,
       exists: (path) => files.has(path),
       folders: () => [folder],
-      remove: async () => undefined,
+      remove: async (removed) =>
+        [...files]
+          .filter((path) => path.startsWith(`${removed}/`))
+          .forEach((path) => files.delete(path)),
       removeAll: async () => files.clear(),
     }
     const entry = {

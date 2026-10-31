@@ -2,6 +2,7 @@ import { type EventSubscription, requireNativeModule } from 'expo-modules-core'
 import {
   type AudioItem,
   type AudioPlayerEvent,
+  type BrowseAnswer,
   type BrowseNode,
   isAudioPlayerEvent,
 } from '@/contract'
@@ -70,16 +71,7 @@ type SetWindowProps = {
   start: number
 }
 
-type AnswerBrowseProps = {
-  /** The `browse` event's own id, so native matches the answer to its request. */
-  requestId: string
-  nodes: BrowseNode[]
-  /**
-   * What the server's covers need on their request (its cookies, the account's token), sent by
-   * native with every http cover of this answer; a downloaded `file://` cover needs none.
-   */
-  artworkHeaders: Record<string, string>
-}
+type AnswerBrowseProps = BrowseAnswer
 
 type OnEventProps = {
   listener: (event: AudioPlayerEvent) => void

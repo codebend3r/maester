@@ -24,6 +24,19 @@ class BrowseCallersTest {
   }
 
   @Test
+  fun aLegacyControllerMayChooseOnlyBelowAndroid9() {
+    assertTrue(canChoose(LEGACY_CONTROLLER, OWN, sdk = 27))
+    assertFalse(canChoose(LEGACY_CONTROLLER, OWN, sdk = 28))
+    assertFalse(canBrowse(LEGACY_CONTROLLER, OWN))
+  }
+
+  @Test
+  fun theCarsMayChooseAndAnUnknownAppMayNot() {
+    assertTrue(canChoose("com.google.android.projection.gearhead", OWN, sdk = 34))
+    assertFalse(canChoose("com.example.snoop", OWN, sdk = 27))
+  }
+
+  @Test
   fun aPlayThatFollowsAChosenNodeIsSwallowedOnce() {
     var now = 0L
     val gate = PlayAfterBrowse(clock = { now })

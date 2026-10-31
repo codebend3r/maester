@@ -55,6 +55,18 @@ export const isBrowseNode = object({
 
 export type BrowseNode = Infer<typeof isBrowseNode>
 
+/** Wren's answer to one `browse` request, which native matches to it by `requestId`. */
+export type BrowseAnswer = {
+  /** The `browse` event's own id. */
+  requestId: string
+  nodes: BrowseNode[]
+  /**
+   * What the server's covers need on their request (its cookies, the account's token), sent by
+   * native with every http cover of this answer; a downloaded `file://` cover needs none.
+   */
+  artworkHeaders: Record<string, string>
+}
+
 /**
  * What the native player reports: where it is, that it moved on by itself, ran out, or failed;
  * and what the car asks: a list to browse, or a node to play.

@@ -3,14 +3,10 @@ import { describe, expect, it } from 'bun:test'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   clearPending,
-  EMPTY_DOWNLOADS,
   NO_PENDING,
   remove,
   type DownloadEntry,
-  type DownloadsState,
 } from '@/main/downloads/downloadState'
-import { createDownloadPlayback } from '@/main/downloads/playback'
-import { createGrants } from '@/main/grants'
 import {
   addRecent,
   EMPTY_STATE,
@@ -18,54 +14,34 @@ import {
   type PlayerState,
   savePosition,
 } from '@/main/playerState'
-import type { JsonStore } from '@/main/stateStore'
 import { ticks, until } from '@/main/test/downloadFakes'
+import {
+  ACCOUNT_A,
+  DOWNLOADS,
+  FILE,
+  GIB,
+  ID,
+  MTIME,
+  NOW,
+  OTHER_SERVER_ID,
+  SERVER_ID,
+  USER_DATA,
+  type Video,
+  type World,
+  entryFor,
+  setup,
+} from '@/main/test/playbackWorld'
 import { MAX_QUEUE } from '@/shared/hostNames'
 
-const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
-const OTHER_SERVER_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
-const USER_DATA = '/data'
-const DOWNLOADS = `${USER_DATA}/downloads`
-const NOW = 1_700_000_000_000
-/** When every file on the fake disk was last changed. */
-const MTIME = 1_600_000_000_000
-const GIB = 1024 ** 3
-const ID = '0f8fad5b-d9cb-469f-a165-70867728950e'
 const OTHER_ID = '00000000-0000-4000-8000-0000000000a1'
 const UNKNOWN_ID = '00000000-0000-4000-8000-0000000000ff'
 const MOVIE_PATH = '/Movies/x.mkv'
-const ACCOUNT_A = '30000000-0000-4000-8000-00000000000a'
 const ACCOUNT_B = '30000000-0000-4000-8000-00000000000b'
-
-type Video = { size: number; mtimeMs: number }
-
-const FILE: Video = { size: 2 * GIB, mtimeMs: MTIME }
 
 const videoOf = (mediaId: number, serverId = SERVER_ID): string =>
   `${DOWNLOADS}/${serverId}/${mediaId}/video.mkv`
 
 const VIDEO = videoOf(11)
-
-const entryFor = (overrides: Partial<DownloadEntry>): DownloadEntry => ({
-  downloadId: ID,
-  serverId: SERVER_ID,
-  mediaId: 11,
-  label: 'S01E01 Good News',
-  group: { kind: 'season', key: 'show:4', title: 'Severance', order: 10_001 },
-  container: 'mkv',
-  size: 2 * GIB,
-  duration: 3000,
-  watchedPercent: 90,
-  sidecars: [],
-  status: { kind: 'ready' },
-  autoDelete: false,
-  watchedAt: null,
-  serverPosition: 0,
-  pending: NO_PENDING,
-  createdAt: NOW - 1000,
-  track: undefined,
-  ...overrides,
-})
 
 const episodeOf = (n: number, overrides: Partial<DownloadEntry> = {}): DownloadEntry =>
   entryFor({
@@ -105,122 +81,6 @@ const pathsIn = (state: PlayerState) => ({
   recents: state.recents.flatMap((recent) => (recent.kind === 'file' ? [recent.path] : [])),
   resume: state.resume.map(({ path }) => path),
 })
-
-/** A store held in memory that never writes a file. */
-const memoryStore = <T>(initial: T): JsonStore<T> => {
-  const held = { value: initial }
-  return {
-    read: () => held.value,
-    update: (apply) => {
-      held.value = apply(held.value)
-    },
-    flush: async () => undefined,
-    isDirty: () => false,
-  }
-}
-
-const missing = (): Error => Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
-
-const fileIds = (): (() => string) => {
-  const counter = { n: 0 }
-  return () => {
-    counter.n += 1
-    return `20000000-0000-4000-8000-${String(counter.n).padStart(12, '0')}`
-  }
-}
-
-type SetupProps = {
-  entries?: DownloadEntry[]
-  /** Finished videos by path. */
-  videos?: Record<string, Video>
-  player?: PlayerState
-  /** The account signed in to the server, as the page's session names it. */
-  accountId?: string | null
-  /** The last account signed in to the server, as the config keeps it. */
-  lastAccountId?: string | null
-}
-
-const setup = ({
-  entries = [],
-  videos = {},
-  player = EMPTY_STATE,
-  accountId = ACCOUNT_A,
-  lastAccountId = null,
-}: SetupProps = {}) => {
-  const signedIn = { accountId, lastAccountId }
-  const store = memoryStore<DownloadsState>({ ...EMPTY_DOWNLOADS, entries })
-  const state = memoryStore(player)
-  const shelf = new Map(Object.entries(videos))
-  const videoAt = (path: string): Video => {
-    const video = shelf.get(path)
-    if (video === undefined) throw missing()
-    return video
-  }
-  /** What every grant and every read of a file waits on, so a test can hold one. */
-  const granting: { hold: Promise<void> } = { hold: Promise.resolve() }
-  const reading: { hold: Promise<void> } = { hold: Promise.resolve() }
-  const grants = createGrants({
-    fs: {
-      realpath: async (path) => {
-        await granting.hold
-        videoAt(path)
-        return path
-      },
-      stat: async (path) => ({ isFile: () => true, ...videoAt(path) }),
-    },
-    newId: fileIds(),
-  })
-  const clock = { now: NOW }
-  const warnings: string[] = []
-  const names = new Map([[SERVER_ID, 'Vhagar']])
-  const statted: string[] = []
-  const told = { lists: 0 }
-  const noted: string[] = []
-  const left = { count: 0 }
-  const playback = createDownloadPlayback({
-    store,
-    userData: USER_DATA,
-    grants,
-    state,
-    stat: async (path) => {
-      statted.push(path)
-      await reading.hold
-      return videoAt(path)
-    },
-    now: () => clock.now,
-    warn: (message) => warnings.push(message),
-    serverNameOf: (serverId) => names.get(serverId) ?? '',
-    change: (apply) => store.update(apply),
-    announce: () => {
-      told.lists += 1
-    },
-    onNoted: ({ downloadId }) => noted.push(downloadId),
-    onLeft: () => {
-      left.count += 1
-    },
-    accountIdOf: () => signedIn.accountId,
-    lastAccountIdOf: () => signedIn.lastAccountId,
-  })
-  return {
-    playback,
-    signedIn,
-    store,
-    state,
-    grants,
-    granting,
-    reading,
-    shelf,
-    clock,
-    warnings,
-    names,
-    statted,
-    told,
-    noted,
-    left,
-  }
-}
-
-type World = ReturnType<typeof setup>
 
 const pathOf = (world: World, fileId: string): string | null =>
   world.grants.fileOf(fileId)?.path ?? null
@@ -349,52 +209,6 @@ describe('openTitle', () => {
     const world = setup({ entries: [entryFor({})] })
     expect(await world.playback.openTitle({ serverId: SERVER_ID, mediaId: 11 })).toBeNull()
     expect(world.warnings).toEqual(['Raven could not open the file of S01E01 Good News'])
-  })
-})
-
-describe('trackPathOf', () => {
-  const TRACK = `${DOWNLOADS}/${SERVER_ID}/31/media.flac`
-  const trackFor = (overrides: Partial<DownloadEntry> = {}): DownloadEntry =>
-    entryFor({
-      mediaId: 31,
-      label: 'Airbag',
-      container: 'flac',
-      group: {
-        kind: 'album',
-        key: 'album:7',
-        sourceId: 7,
-        title: 'OK Computer',
-        order: 1,
-        cover: { albumId: 7, coverVersion: 'cover-v1' },
-      },
-      ...overrides,
-    })
-
-  it("finds a track's ready download, granting nothing and leaving the page where it was", async () => {
-    const world = setup({ entries: [trackFor()], videos: { [TRACK]: FILE } })
-    expect(await world.playback.trackPathOf({ serverId: SERVER_ID, mediaId: 31 })).toBe(TRACK)
-    expect(world.playback.isPlaying(ID)).toBe(false)
-  })
-
-  it('never offers the part of a track still downloading', async () => {
-    const world = setup({
-      entries: [trackFor({ status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 10 } })],
-      videos: { [`${TRACK}.part`]: FILE },
-    })
-    expect(await world.playback.trackPathOf({ serverId: SERVER_ID, mediaId: 31 })).toBeNull()
-    expect(world.statted).toEqual([])
-  })
-
-  it('offers nothing for a track with no download, or on another server', async () => {
-    const world = setup({ entries: [trackFor()], videos: { [TRACK]: FILE } })
-    expect(await world.playback.trackPathOf({ serverId: SERVER_ID, mediaId: 99 })).toBeNull()
-    expect(await world.playback.trackPathOf({ serverId: OTHER_SERVER_ID, mediaId: 31 })).toBeNull()
-  })
-
-  it('offers nothing, with a warning, for a download whose file has gone', async () => {
-    const world = setup({ entries: [trackFor()] })
-    expect(await world.playback.trackPathOf({ serverId: SERVER_ID, mediaId: 31 })).toBeNull()
-    expect(world.warnings).toEqual(['Raven could not open the file of Airbag'])
   })
 })
 

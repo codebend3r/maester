@@ -13,7 +13,6 @@ import {
   nullable,
   object,
   oneOf,
-  optional,
   union,
 } from '@/schema'
 
@@ -118,16 +117,17 @@ const GROUP_FIELDS = { key: isString, title: isString, order: isNumber }
 /** The album cover a music group shows: an album's own, or a playlist's first track's album's. */
 const isDownloadCover = object({ albumId: isNumber, coverVersion: nullable(isString) })
 
+export type DownloadCover = Infer<typeof isDownloadCover>
+
 /**
  * An album's or a playlist's group, which carries the cover Downloads heads it with, and the
- * album's or playlist's own id, which a queue played from it names. A group kept before the id
- * was has none, and so nothing to queue its tracks by.
+ * album's or playlist's own id, which a queue played from it names.
  */
 export const isMusicGroup = object({
   kind: oneOf([DOWNLOAD_KINDS.album, DOWNLOAD_KINDS.playlist]),
   ...GROUP_FIELDS,
   cover: nullable(isDownloadCover),
-  sourceId: optional(isNumber),
+  sourceId: isNumber,
 })
 
 /**
@@ -217,7 +217,7 @@ export type DownloadAsk = Infer<typeof isDownloadAsk>
 /**
  * A download as the page shows it: it and its server by opaque ids, with no origin or path. A
  * track's download carries its `Track`, so Downloads queues it with no server; null for a video,
- * and for a track downloaded before tracks were kept.
+ * and for a track of a server Raven no longer holds, which the music engine cannot play.
  */
 export const isDownloadView = object({
   downloadId: isOpaqueId,

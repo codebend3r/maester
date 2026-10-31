@@ -11,9 +11,11 @@ import {
 import type { AudioBitrate } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
+import { temporary } from '@/fileNames'
 import { audioTranscodeArgs } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { MediaIndex } from '@/media/mediaIndex'
+import { createOnce } from '@/once'
 import { type Gate, createGate } from '@/scanner/concurrency'
 
 const SWEEP_MS = 6 * 60 * 60 * 1000
@@ -58,8 +60,6 @@ type TranscodeCacheFileForProps = {
   kbps: AudioBitrate
 }
 
-type TranscodeCacheOnceProps = { key: string; make: () => Promise<string> }
-
 type TranscodeCacheMakeProps = {
   source: string
   dir: string
@@ -84,7 +84,7 @@ export class TranscodeCache implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly root: string
   private readonly cap: number
   private readonly baseTimeoutSeconds: number
-  private readonly working = new Map<string, Promise<string>>()
+  private readonly working = createOnce<string>()
   // Encoding takes CPU the server shares with video transcodes, and a download asks for an album at once.
   private readonly encodes: Gate = createGate({ limit: 2 })
   private timer: NodeJS.Timeout | null = null
@@ -112,16 +112,7 @@ export class TranscodeCache implements OnApplicationBootstrap, OnModuleDestroy {
 
   async onModuleDestroy(): Promise<void> {
     if (this.timer) clearInterval(this.timer)
-    await Promise.allSettled(this.working.values())
-  }
-
-  /** Runs `make` once per key at a time; later callers wait on the same promise. */
-  private once({ key, make }: TranscodeCacheOnceProps): Promise<string> {
-    const running = this.working.get(key)
-    if (running) return running
-    const started = make().finally(() => this.working.delete(key))
-    this.working.set(key, started)
-    return started
+    await this.working.settled()
   }
 
   /**
@@ -138,7 +129,7 @@ export class TranscodeCache implements OnApplicationBootstrap, OnModuleDestroy {
     const dir = join(this.root, String(mediaId))
     const version = `${Math.round(mtimeMs)}-`
     const target = join(dir, `${version}${kbps}.${EXTENSION}`)
-    const made = await this.once({
+    const made = await this.working.run({
       key: target,
       make: async () => {
         const existing = await stat(target).catch(() => null)
@@ -176,10 +167,7 @@ export class TranscodeCache implements OnApplicationBootstrap, OnModuleDestroy {
     timeoutSeconds,
   }: TranscodeCacheMakeProps): Promise<void> {
     await mkdir(dir, { recursive: true })
-    const temp = join(
-      dir,
-      `.${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.${EXTENSION}`,
-    )
+    const temp = temporary({ dir, extension: EXTENSION })
     try {
       await this.encodes.run(() =>
         this.ffmpeg.exec({

@@ -106,10 +106,7 @@ const ENTRY_FIELDS = {
    */
   serverPosition: isNumber,
   createdAt: isNumber,
-  /**
-   * A track's `Track`, kept so Downloads queues it with no server. None for a video, and for a
-   * track downloaded before tracks were kept, so an older `downloads.json` reads as it is.
-   */
+  /** A track's `Track`, kept so Downloads queues it with no server; none for a video. */
   track: optional(isTrack),
 }
 

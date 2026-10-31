@@ -42,7 +42,7 @@ type UseNativeAudioHostProps = {
  * Music on a phone or a tablet: `@raven/audio` plays the shared queue store's track with the
  * next one ready behind it, as the desktop's engine does, so the seam plays in the background;
  * the lock screen's controls come back as remote commands and drive the store. A track this
- * device cannot decode is said and passed over. An audiobook plays at the prefs' speed, music
+ * device cannot decode plays from the server's AAC transcode. An audiobook plays at the prefs' speed, music
  * at 1.
  */
 export const useNativeAudioHost = ({

@@ -16,6 +16,7 @@ import {
   type MusicListOptions,
   type PlaylistDetails,
   type PlaylistSummary,
+  QUEUE_SOURCE_KINDS,
   RATINGS_REFRESH_STATES,
   RATING_SOURCES,
   SCAN_KINDS,
@@ -32,6 +33,7 @@ import {
   browseChildrenOf,
   browseIdOf,
   parseBrowseId,
+  queueSourceOf,
   tracksForBrowse,
 } from '@/music/browseTree'
 
@@ -382,5 +384,19 @@ describe('the tracks a browse node plays', () => {
   it('plays nothing for an id it cannot read', async () => {
     const { api } = fakeApi()
     expect(await tracksForBrowse({ api, downloads, id: 'album:x' })).toEqual([])
+  })
+})
+
+describe('queueSourceOf', () => {
+  it('plays an album or a playlist as its own source, and one track as none', () => {
+    expect(queueSourceOf({ kind: BROWSE_KINDS.album, albumId: 3 })).toEqual({
+      kind: QUEUE_SOURCE_KINDS.album,
+      id: 3,
+    })
+    expect(queueSourceOf({ kind: BROWSE_KINDS.playlist, playlistId: 9 })).toEqual({
+      kind: QUEUE_SOURCE_KINDS.playlist,
+      id: 9,
+    })
+    expect(queueSourceOf({ kind: BROWSE_KINDS.track, mediaId: 31 })).toBeNull()
   })
 })

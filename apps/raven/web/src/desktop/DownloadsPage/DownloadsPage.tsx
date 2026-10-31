@@ -2,6 +2,7 @@ import {
   DESKTOP_REQUESTS,
   DOWNLOAD_KINDS,
   DOWNLOAD_STATUS_KINDS,
+  type DownloadCover,
   type DownloadGroup,
   type DownloadKind,
   type DownloadView,
@@ -69,6 +70,8 @@ const groupsOf = (downloads: DownloadView[]): Grouped[] =>
 type GroupHeadProps = {
   grouped: Grouped
   headingId: string
+  /** The album cover a music group heads with; null for a video group, or a music one with none. */
+  cover: DownloadCover | null
   /** Plays the group's downloaded tracks from the first; null for a group with none. */
   onPlay: (() => void) | null
 }
@@ -84,9 +87,8 @@ const TitleHead = ({ grouped, headingId }: TitleHeadProps) => (
 type MusicHeadProps = GroupHeadProps
 
 /** An album or playlist: the album cover beside its name and how many of its tracks are here. */
-const MusicHead = ({ grouped, headingId, onPlay }: MusicHeadProps) => {
+const MusicHead = ({ grouped, headingId, cover, onPlay }: MusicHeadProps) => {
   const { group, views } = grouped
-  const cover = isMusicGroup(group) ? group.cover : null
   return (
     <header className={styles.musicHead}>
       <div className={styles.cover}>
@@ -149,6 +151,7 @@ const Group = ({ grouped, onDeleted }: GroupProps) => {
   const { Head, isAlwaysHeaded } = GROUP_HEADS[group.kind]
   const playTracks = useAudioQueue((store) => store.playTracks)
   const queue = musicQueueOf(grouped)
+  const cover = isMusicGroup(group) ? group.cover : null
   const playFrom = ({ queue: { source, playable }, startAt }: PlayFromProps) =>
     playTracks({ tracks: playable.map(({ track }) => track), startAt, source })
   // A video opens in the player; a track queues its group's downloaded tracks from it.
@@ -167,6 +170,7 @@ const Group = ({ grouped, onDeleted }: GroupProps) => {
           <Head
             grouped={grouped}
             headingId={headingId}
+            cover={cover}
             onPlay={queue === null ? null : () => playFrom({ queue, startAt: 0 })}
           />
         )}

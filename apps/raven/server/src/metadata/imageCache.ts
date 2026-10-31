@@ -11,11 +11,13 @@ import {
   type PosterWidth,
 } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { temporary } from '@/fileNames'
 import { imageScaleArgs } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { RAVEN_CONTENT_TYPES } from '@/http'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 import { TMDB_IMAGE_PATH } from '@/metadata/tmdbShapes'
+import { createOnce } from '@/once'
 import { type Gate, createGate } from '@/scanner/concurrency'
 
 /** What a picture is for: an item's, or a person's photo. */
@@ -49,18 +51,8 @@ const exists = async (path: string): Promise<boolean> =>
     () => false,
   )
 
-type TemporaryProps = { dir: string; extension: string }
-
-const temporary = ({ dir, extension }: TemporaryProps): string =>
-  join(dir, `.${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`)
-
 export const contentTypeOf = (path: string): string =>
   path.toLowerCase().endsWith('.png') ? RAVEN_CONTENT_TYPES.png : RAVEN_CONTENT_TYPES.jpeg
-
-type ImageCacheOnceProps = {
-  key: string
-  make: () => Promise<string | null>
-}
 
 type ImageCacheWarnOnceProps = { key: string; message: string }
 
@@ -125,7 +117,7 @@ const COVER_ART_DIR = 'cover-art'
 export class ImageCache {
   private readonly logger = new Logger(ImageCache.name)
   private readonly root: string
-  private readonly working = new Map<string, Promise<string | null>>()
+  private readonly working = createOnce<string | null>()
   private readonly downloads: Gate = createGate({ limit: 4 })
   // Scaling takes CPU the server shares with transcodes, and matching a
   // library of pictures beside its media asks for three widths of each.
@@ -147,16 +139,7 @@ export class ImageCache {
 
   /** Poster warming outlives a match, so shutdown must wait for its queued writes too. */
   async onModuleDestroy(): Promise<void> {
-    await Promise.allSettled(this.working.values())
-  }
-
-  /** Runs `make` once per key at a time; later callers wait on the same promise. */
-  private once({ key, make }: ImageCacheOnceProps): Promise<string | null> {
-    const running = this.working.get(key)
-    if (running) return running
-    const started = make().finally(() => this.working.delete(key))
-    this.working.set(key, started)
-    return started
+    await this.working.settled()
   }
 
   private warnOnce({ key, message }: ImageCacheWarnOnceProps): void {
@@ -191,7 +174,7 @@ export class ImageCache {
 
   /** A picture fetched from `url` into `target` once; null when it cannot be had, warned of once. */
   private downloaded({ target, url, what }: ImageCacheDownloadedProps): Promise<string | null> {
-    return this.once({
+    return this.working.run({
       key: target,
       make: async () => {
         if (await exists(target)) return target
@@ -248,7 +231,7 @@ export class ImageCache {
     source,
     width,
   }: ImageCacheScaledProps): Promise<string | null> {
-    return this.once({
+    return this.working.run({
       key: `${name}/${prefix}${width}`,
       make: async () => {
         const info = await stat(source).catch(() => null)

@@ -2,12 +2,8 @@ import type { Track } from '@raven/core'
 import type { IconName } from '@raven/ui/iconDrawings'
 
 import { ActionButton } from '@/components/Controls'
-import {
-  DOWNLOAD_PROGRESS,
-  type DownloadCollection,
-  downloadProgressOf,
-  useDownloads,
-} from '@/downloads/downloadStore'
+import { type DownloadCollection, useDownloads } from '@/downloads/downloadStore'
+import { DOWNLOAD_PROGRESS, downloadProgressOf } from '@/downloads/downloadViews'
 import { DOWNLOAD_BUTTON_COPY } from '@/screens/copy'
 import { WREN_ICONS } from '@/theme/icons'
 
@@ -29,10 +25,11 @@ type DownloadButtonProps = {
  */
 export function DownloadButton({ serverId, tracks, collection, onRefusal }: DownloadButtonProps) {
   const entries = useDownloads((state) => state.entries)
+  const playlists = useDownloads((state) => state.playlists)
   const downloadTracks = useDownloads((state) => state.downloadTracks)
   const remove = useDownloads((state) => state.remove)
   const mediaIds = tracks.map(({ id }) => id)
-  const progress = downloadProgressOf({ entries, serverId, mediaIds })
+  const progress = downloadProgressOf({ entries, playlists, serverId, mediaIds, collection })
   const download = () => {
     onRefusal(null)
     downloadTracks({ serverId, tracks, collection }).then(onRefusal, IGNORED)
@@ -55,7 +52,7 @@ export function DownloadButton({ serverId, tracks, collection, onRefusal }: Down
       label: DOWNLOAD_BUTTON_COPY.remove,
       icon: WREN_ICONS.downloaded,
       onPress: () => {
-        remove({ serverId, mediaIds }).catch(IGNORED)
+        remove({ serverId, collection }).catch(IGNORED)
       },
       isDisabled: false,
     },

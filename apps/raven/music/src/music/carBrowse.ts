@@ -1,23 +1,16 @@
-import type { BrowseNode } from '@raven/audio/contract'
-import { QUEUE_SOURCE_KINDS, type QueueSource } from '@raven/core'
+import type { BrowseAnswer, BrowseNode } from '@raven/audio/contract'
 import {
-  BROWSE_KINDS,
   type BrowseApi,
   type CarBrowse,
   browseChildrenOf,
   parseBrowseId,
+  queueSourceOf,
   tracksForBrowse,
 } from '@raven/native/headless'
 import { useAudioQueue } from '@raven/ui/headless'
 
-import { downloadedLibraryOf, useDownloads } from '@/downloads/downloadStore'
-
-/** What `audioPlayer.answerBrowse` takes. */
-export type CarAnswer = {
-  requestId: string
-  nodes: BrowseNode[]
-  artworkHeaders: Record<string, string>
-}
+import { useDownloads } from '@/downloads/downloadStore'
+import { downloadedLibraryOf } from '@/downloads/downloadViews'
 
 /** A saved cover's address, which native reads from disk with no headers. */
 const FILE_SCHEME = 'file://'
@@ -29,24 +22,7 @@ type CarBrowseForProps = {
   uriOf: (path: string) => string
   /** The headers a request to `uri` on the server carries: its cookies and the account's token. */
   headersFor: (uri: string) => Promise<Record<string, string>>
-  answer: (answer: CarAnswer) => Promise<void>
-}
-
-const sourceOf = (id: string): QueueSource | null => {
-  const target = parseBrowseId(id)
-  if (target === null) return null
-  switch (target.kind) {
-    case BROWSE_KINDS.album:
-      return { kind: QUEUE_SOURCE_KINDS.album, id: target.albumId }
-    case BROWSE_KINDS.playlist:
-      return { kind: QUEUE_SOURCE_KINDS.playlist, id: target.playlistId }
-    case BROWSE_KINDS.track:
-      return null
-    default: {
-      const unknown: never = target
-      return unknown
-    }
-  }
+  answer: (answer: BrowseAnswer) => Promise<void>
 }
 
 /**
@@ -92,8 +68,9 @@ export const carBrowseFor = ({
     play: ({ id }) => {
       tracksOf(id)
         .then((tracks) => {
-          if (tracks.length === 0) return
-          useAudioQueue.getState().playTracks({ tracks, source: sourceOf(id) })
+          const target = parseBrowseId(id)
+          if (tracks.length === 0 || target === null) return
+          useAudioQueue.getState().playTracks({ tracks, source: queueSourceOf(target) })
         })
         .catch(() => console.warn('Wren could not play what the car chose.'))
     },

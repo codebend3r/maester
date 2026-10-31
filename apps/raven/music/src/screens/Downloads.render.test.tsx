@@ -137,7 +137,7 @@ describe('Downloads', () => {
     await fireEvent.press(await screen.findByRole('button', { name: 'Remove download' }))
     expect(remove).toHaveBeenCalledWith({
       serverId: RAVEN_SERVER.id,
-      mediaIds: OK_COMPUTER_PAGE.tracks.map(({ id }) => id),
+      collection: { kind: DOWNLOAD_SOURCES.album, album: OK_COMPUTER },
     })
   })
 
@@ -200,8 +200,10 @@ describe('Downloads', () => {
     expect(removeAll).not.toHaveBeenCalled()
     const [title, , buttons] = alert.mock.calls[0] ?? []
     expect(title).toBe('Remove all downloads?')
-    expect(buttons?.map(({ text }) => text)).toEqual(['Cancel', 'Remove'])
-    await act(async () => buttons?.[1]?.onPress?.())
+    const choices = buttons ?? []
+    expect(choices.map(({ text }) => text)).toEqual(['Cancel', 'Remove'])
+    const confirm = choices[1]?.onPress ?? (() => undefined)
+    await act(async () => confirm())
     expect(removeAll).toHaveBeenCalled()
   })
 })

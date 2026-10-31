@@ -6,7 +6,8 @@
   "main": "index.ts",
   "imports": {
     "#package": "./package.json",
-    "#app-config": "./app.config.ts"
+    "#app-config": "./app.config.ts",
+    "#plugins/*": "./plugins/*.ts"
   },
   "scripts": {
     "build:android": "./android/gradlew -p android assembleRelease",
