@@ -81,6 +81,7 @@ const ALBUM: AlbumSummary = {
   libraryId: 2,
   title: 'OK Computer',
   sortTitle: 'OK Computer',
+  releaseDate: null,
   year: 1997,
   type: ALBUM_TYPES.album,
   artists: [{ id: 1, name: 'Radiohead' }],

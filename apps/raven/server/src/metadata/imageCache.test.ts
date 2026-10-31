@@ -15,8 +15,10 @@ import { FAKE_JPEG } from '@/test/fakeTmdb'
 class CountingFfmpeg extends FfmpegService {
   running = 0
   most = 0
+  ran = 0
 
   override async exec(args: string[]): Promise<void> {
+    this.ran += 1
     this.running += 1
     this.most = Math.max(this.most, this.running)
     try {
@@ -165,6 +167,27 @@ describe('the image cache', () => {
       await widthOf(await cache().local({ itemId: 9, kind: 'poster', source, width: 500 })),
     ).toBe(400)
     expect(await exists(old)).toBe(false)
+  })
+
+  it('keeps the scales a raven made before names carried the source, without scaling again', async () => {
+    const images = join(state.root, 'data', 'images')
+    const source = join(state.root, 'Sicario (2015)', 'poster.jpg')
+    await encodeImage({ path: source, size: '400x600' })
+    const old = join(
+      images,
+      'local',
+      `10-poster-${Math.round((await stat(source)).mtimeMs)}-185.jpg`,
+    )
+    await writeFile(old, FAKE_JPEG)
+    const ffmpeg = state.ffmpeg
+    if (!ffmpeg) throw new Error('ffmpeg not made')
+    const ran = ffmpeg.ran
+    const made = await cache().local({ itemId: 10, kind: 'poster', source, width: 185 })
+    expect(made).not.toBe(old)
+    expect(await readFile(made ?? '')).toEqual(FAKE_JPEG)
+    expect(await exists(old)).toBe(false)
+    expect(ffmpeg.ran).toBe(ran)
+    expect(await cache().local({ itemId: 10, kind: 'poster', source, width: 185 })).toBe(made)
   })
 
   it('waits for running and queued picture work before shutdown', async () => {

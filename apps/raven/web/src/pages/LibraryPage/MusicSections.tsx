@@ -5,11 +5,16 @@ import {
   type MusicSort,
   QUEUE_SOURCE_KINDS,
   isMusicSort,
+  MUSIC_LIST_PARAMS,
+  MUSIC_DEFAULT_ORDERS,
+  SORT_DIRECTIONS,
+  type SortDirection,
+  musicListQuery,
 } from '@raven/core'
 import { Button } from '@raven/ui'
 import { type Search, useAudioQueue } from '@raven/ui/headless'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
 import { ArtistList } from '@/components/ArtistList/ArtistList'
 import { PlaylistNameDialog } from '@/components/PlaylistNameDialog/PlaylistNameDialog'
@@ -26,17 +31,35 @@ type AlbumsToolbarProps = {
   library: Library
   search: Search
   sort: MusicSort
+  order: SortDirection
+  seed: number
   onSort: (sort: MusicSort) => void
+  onOrder: () => void
   /** Whether there is anything to play. */
   isPlayable: boolean
 }
 
 /** Search, the sort, and Play and Shuffle, which queue the library's tracks in the order shown. */
-const AlbumsToolbar = ({ library, search, sort, onSort, isPlayable }: AlbumsToolbarProps) => {
+const AlbumsToolbar = ({
+  library,
+  search,
+  sort,
+  order,
+  seed,
+  onSort,
+  onOrder,
+  isPlayable,
+}: AlbumsToolbarProps) => {
   const playTracks = useAudioQueue((store) => store.playTracks)
   const play = useMutation({
     mutationFn: async (isShuffled: boolean) => {
-      const tracks = await libraryTracks({ libraryId: library.id, search: search.query, sort })
+      const tracks = await libraryTracks({
+        libraryId: library.id,
+        search: search.query,
+        sort,
+        order,
+        seed,
+      })
       if (tracks.length === 0) return
       playTracks({
         tracks,
@@ -69,6 +92,14 @@ const AlbumsToolbar = ({ library, search, sort, onSort, isPlayable }: AlbumsTool
         </select>
       </label>
       <Button
+        className={styles.musicOrder}
+        onClick={onOrder}
+        disabled={sort === MUSIC_SORTS.random}
+        aria-label={LIBRARY_COPY.reverseOrder}
+      >
+        {LIBRARY_COPY.directions[order]}
+      </Button>
+      <Button
         tone="primary"
         icon="play"
         className={styles.musicPlay}
@@ -99,18 +130,48 @@ type AlbumsSectionProps = { library: Library }
 /** A music library's albums: searched and sorted, with Play and Shuffle. */
 export const AlbumsSection = ({ library }: AlbumsSectionProps) => {
   const search = useAddressSearch()
-  const [sort, setSort] = useState<MusicSort>(MUSIC_SORTS.artist)
-  const albums = useQuery(albumsQuery({ libraryId: library.id, search: search.query, sort }))
+  const [address, setAddress] = useSearchParams()
+  const decoded = musicListQuery.decode(address.toString())
+  const sort = address.has(MUSIC_LIST_PARAMS.sort) ? decoded.sort : MUSIC_SORTS.artist
+  const order = decoded.order ?? MUSIC_DEFAULT_ORDERS[sort]
+  const seed = decoded.seed ?? 0
+  const setSort = (next: MusicSort) =>
+    setAddress((previous) => {
+      const params = new URLSearchParams(previous)
+      params.set(MUSIC_LIST_PARAMS.sort, next)
+      params.set(MUSIC_LIST_PARAMS.order, MUSIC_DEFAULT_ORDERS[next])
+      if (next === MUSIC_SORTS.random)
+        params.set(MUSIC_LIST_PARAMS.seed, String(Date.now() % 1_000_000))
+      return params
+    })
+  const reverse = () =>
+    setAddress((previous) => {
+      const params = new URLSearchParams(previous)
+      params.set(
+        MUSIC_LIST_PARAMS.order,
+        order === SORT_DIRECTIONS.ascending
+          ? SORT_DIRECTIONS.descending
+          : SORT_DIRECTIONS.ascending,
+      )
+      return params
+    })
+  const albums = useQuery(
+    albumsQuery({ libraryId: library.id, search: search.query, sort, order, seed }),
+  )
   return (
     <div className={styles.section}>
       <AlbumsToolbar
         library={library}
         search={search}
         sort={sort}
+        order={order}
+        seed={seed}
         onSort={setSort}
+        onOrder={reverse}
         isPlayable={(albums.data?.length ?? 0) > 0}
       />
       {albums.isPending && <AlbumGridSkeleton />}
+      {albums.data && <output>{LIBRARY_COPY.albumCount(albums.data.length)}</output>}
       {albums.error && (
         <p className={styles.message} role="alert">
           {albums.error.message}
@@ -144,6 +205,7 @@ export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
           placeholder={LIBRARY_COPY.searchArtists}
         />
       </div>
+      {artists.isPending && <output>{LIBRARY_COPY.loadingArtists}</output>}
       {artists.error && (
         <p className={styles.message} role="alert">
           {artists.error.message}

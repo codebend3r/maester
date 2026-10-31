@@ -78,6 +78,7 @@ describe('audioTagsOf', () => {
       disc: 1,
       year: 1997,
       originalYear: 1997,
+      releaseDate: '1997-05-21',
       genres: ['Alternative Rock', 'Art Rock'],
       isCompilation: false,
       label: 'Parlophone',

@@ -251,8 +251,8 @@
 // A music library's toolbar: the search, then the sort, Play and Shuffle in a run.
 .musicToolbar {
   display: grid;
-  grid-template-columns: minmax(0, 26.25rem) auto auto auto;
-  grid-template-areas: 'search sort play shuffle';
+  grid-template-columns: minmax(0, 26.25rem) auto auto auto auto;
+  grid-template-areas: 'search sort order play shuffle';
   align-items: center;
   gap: var(--space-2);
 }
@@ -262,7 +262,7 @@
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       'search search'
-      'sort sort'
+      'sort order'
       'play shuffle';
   }
 }
@@ -274,6 +274,10 @@
 .musicSort {
   grid-area: sort;
   display: grid;
+}
+
+.musicOrder {
+  grid-area: order;
 }
 
 .musicPlay {

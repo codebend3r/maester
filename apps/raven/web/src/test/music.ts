@@ -16,6 +16,7 @@ export const album = (overrides: Partial<AlbumSummary> = {}): AlbumSummary => ({
   libraryId: 3,
   title: 'OK Computer',
   sortTitle: 'OK Computer',
+  releaseDate: null,
   year: 1997,
   type: 'album',
   artists: [RADIOHEAD],

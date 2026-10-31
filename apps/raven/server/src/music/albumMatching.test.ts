@@ -23,6 +23,7 @@ const release = (over: Partial<Release> = {}): Release => ({
   type: ALBUM_TYPES.album,
   country: 'GB',
   releaseGroupMbid: 'rg-1',
+  releaseDate: null,
   label: 'Parlophone',
   isOfficial: true,
   score: 100,

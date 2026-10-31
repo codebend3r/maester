@@ -66,6 +66,8 @@ export const isAlbumSummary = object({
   sortTitle: isString,
   /** The release's year, from the tags; null when they say none. */
   year: nullable(isNumber),
+  /** ISO calendar date with year, month or day precision; no invented components. */
+  releaseDate: nullable(isString),
   type: isAlbumType,
   /** The album's artists, in credit order; one entry, "Various Artists", for a compilation. */
   artists: listOf(isArtistCredit),

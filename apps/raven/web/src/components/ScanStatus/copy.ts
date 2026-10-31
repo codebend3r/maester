@@ -11,6 +11,7 @@ export const SCAN_STATUS_COPY = {
   walkingOf: ({ found, expected }: WalkingOfProps) =>
     `Looking through the folders, ${found} of about ${expected} found`,
   matching: 'Matching the new videos',
+  matchingAlbums: 'Matching the albums',
   indexing: ({ processed, found }: IndexingProps) => `Indexing ${processed} of ${found}`,
   fullScan: (when: string) => `Full scan ${when}`,
   noFullScan: 'No full scan yet',

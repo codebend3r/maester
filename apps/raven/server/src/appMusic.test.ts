@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
@@ -79,7 +79,7 @@ describe('a music library', () => {
       album_artist: 'Radiohead',
       date: '1997',
       genre: 'Alternative Rock',
-      MUSICBRAINZ_ALBUMID: 'rel-ok',
+      MUSICBRAINZ_ALBUMID: MBIDS.okComputer,
     }
     await encodeTrack({
       path: at('Radiohead', 'OK Computer', '01 Airbag.flac'),
@@ -251,7 +251,12 @@ describe('a music library', () => {
     const albums = await api().listAlbums({ libraryId: state.library })
     const okComputer = albums.find(({ title }) => title === 'OK Computer')
     const details = await api().getAlbum(okComputer?.id ?? 0)
-    expect(details).toMatchObject({ mbid: 'rel-ok', genres: ['Alternative Rock'], discCount: 1 })
+    expect(details).toMatchObject({
+      mbid: MBIDS.okComputer,
+      genres: ['Alternative Rock'],
+      discCount: 1,
+      album: { releaseDate: '1997-05-21' },
+    })
     expect(
       details.tracks.map(({ number, title, codec, isLossless }) => ({
         number,
@@ -292,6 +297,23 @@ describe('a music library', () => {
       offset: 2,
     })
     expect(rest.tracks.map(({ title }) => title)).toEqual(['Song 2', 'take 1'])
+  })
+
+  it('falls back from a broken selected cover to another local image and changes its version', async () => {
+    const before = (await api().listAlbums({ libraryId: state.library })).find(
+      ({ title }) => title === 'Live 1994',
+    )
+    if (!before) throw new Error('Missing live album')
+    await writeFile(at('Bootlegs', 'Live 1994', 'folder.jpg'), 'not an image')
+    await encodeImage({ path: at('Bootlegs', 'Live 1994', 'front.jpg'), size: '160x160' })
+    const url = api().albumCoverUrl({ albumId: before.id, coverVersion: before.coverVersion })
+    const response = await app().inject({ method: 'GET', url: url ?? '' })
+    expect(response.statusCode).toBe(200)
+    expect(jpegSize(response.rawPayload).width).toBe(160)
+    const after = await api().getAlbum(before.id)
+    expect(after.album.coverVersion).not.toBe(before.coverVersion)
+    const stale = await app().inject({ method: 'GET', url: url ?? '' })
+    expect(stale.statusCode).toBe(404)
   })
 
   it('drops an album and its artist once its last file goes, on the next scan', async () => {

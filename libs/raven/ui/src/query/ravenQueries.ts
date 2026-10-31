@@ -9,6 +9,7 @@ import {
   FILMOGRAPHY_STATES,
   MUSIC_PAGE,
   MUSIC_SORTS,
+  type MusicListOptions,
   type ApiClient,
   type MatchItemType,
   type MatchSubject,
@@ -56,7 +57,11 @@ export const ravenQueriesFor = (api: ApiClient) => {
   }
   type RavenQueriesForNextInSessionQueryProps = { id: number; session: ViewingSession }
   type RavenQueriesForItemImagesQueryProps = { id: number; libraryId: number }
-  type RavenQueriesForAlbumsQueryProps = { libraryId: number; search: string; sort: MusicSort }
+  type RavenQueriesForAlbumsQueryProps = {
+    libraryId: number
+    search: string
+    sort: MusicSort
+  } & Pick<MusicListOptions, 'order' | 'seed'>
   type RavenQueriesForArtistsQueryProps = { libraryId: number; search: string }
   type RavenQueriesForRecentAlbumsQueryProps = { libraryId: number; limit: number }
   type RavenQueriesForSongsQueryProps = {
@@ -281,10 +286,10 @@ export const ravenQueriesFor = (api: ApiClient) => {
             : false,
       }),
 
-    albumsQuery: ({ libraryId, search, sort }: RavenQueriesForAlbumsQueryProps) =>
+    albumsQuery: (options: RavenQueriesForAlbumsQueryProps) =>
       queryOptions({
-        queryKey: queryKeys.albums({ libraryId, search, sort }),
-        queryFn: () => api.listAlbums({ libraryId, search, sort }),
+        queryKey: queryKeys.albums(options),
+        queryFn: () => api.listAlbums(options),
         placeholderData: keepPreviousData,
         gcTime: LISTING_GC_MS,
       }),

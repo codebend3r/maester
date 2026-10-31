@@ -170,7 +170,8 @@ export class AlbumMatching {
    */
   async matchLibrary(libraryId: number): Promise<void> {
     const pending = this.music.albumsToMatch(libraryId)
-    if (pending.length === 0) return
+    const enrichment = this.music.albumsToEnrich(libraryId)
+    if (pending.length === 0 && enrichment.length === 0) return
     const guard = new PassGuard({
       logger: this.logger,
       failed: 'Could not match an album',
@@ -187,6 +188,15 @@ export class AlbumMatching {
         })
         return done.isMatched
       },
+    })
+    await mapWithConcurrency({
+      items: enrichment,
+      limit: 1,
+      fn: async ({ id, mbid }) =>
+        guard.run(async () => {
+          const release = await this.musicBrainz.release(mbid)
+          this.music.enrich({ id, release })
+        }),
     })
     guard.reportStop()
     const matched = outcomes.filter(Boolean).length

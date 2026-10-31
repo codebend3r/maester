@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { KINDS, type Library } from '@raven/core'
+import { KINDS, LIBRARY_KINDS, type Library } from '@raven/core'
 import { Button } from '@raven/ui'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { LibraryActions, type useLibraryActions } from '@/components/LibraryActions/LibraryActions'
@@ -33,6 +33,8 @@ export const LibraryHeader = ({ titleId, library, actions, isShut }: LibraryHead
   })
   const { settings } = library
   const unmatched = library.unmatchedCount
+  const isMusic = settings.kind === LIBRARY_KINDS.music
+  const files = isMusic ? COMMON_COPY.tracks : COMMON_COPY.videos
 
   return (
     <header className={styles.header}>
@@ -48,11 +50,11 @@ export const LibraryHeader = ({ titleId, library, actions, isShut }: LibraryHead
         <p className={styles.count}>
           {KINDS[settings.kind].label}
           {COMMON_COPY.separator}
-          {COMMON_COPY.videos(library.itemCount)}
+          {files(library.itemCount)}
           {unmatched > 0 && LIBRARY_COPY.notMatchedCount(count.format(unmatched))}
         </p>
         <div className={styles.status}>
-          <ScanStatus scan={library.scan} expected={library.itemCount} />
+          <ScanStatus scan={library.scan} expected={library.itemCount} isMusic={isMusic} />
           <RatingsStatus refresh={library.ratingsRefresh} />
         </div>
         <div className={styles.actions}>

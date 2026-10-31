@@ -5,7 +5,7 @@ import { MediaIndex } from '@/media/mediaIndex'
 import type { AudioFormat, AudioTags } from '@/music/audioReader'
 import { COVER_SOURCES, MusicRepository } from '@/music/musicRepository'
 import { testDatabase } from '@/test/database'
-import { pictureVersionsOf } from '@/test/repositories'
+import { TEST_ACCOUNTS, pictureVersionsOf } from '@/test/repositories'
 
 const NO_TAGS: AudioTags = {
   title: null,
@@ -16,6 +16,7 @@ const NO_TAGS: AudioTags = {
   disc: null,
   year: null,
   originalYear: null,
+  releaseDate: null,
   genres: [],
   isCompilation: false,
   label: null,
@@ -32,7 +33,7 @@ const NO_TAGS: AudioTags = {
 
 const FLAC: AudioFormat = { sampleRate: 44100, bitDepth: 16, isLossless: true }
 
-const LIST = musicListQuery.decode({})
+const LIST = { ...musicListQuery.decode({}), account: TEST_ACCOUNTS.a }
 
 describe('MusicRepository', () => {
   const database = testDatabase('raven-music-')
@@ -371,7 +372,7 @@ describe('MusicRepository', () => {
     ])
   })
 
-  it('moves a file read again to the album its tags now name, and prunes what is left empty', () => {
+  it('keeps a file in its folder album when its tags change, and refreshes track credits', () => {
     const path = '/music/Radiohead/Kid A/CD 02/01 Guest.flac'
     const id = state.ids.get(path) ?? 0
     repository().record({
@@ -385,12 +386,97 @@ describe('MusicRepository', () => {
     const titles = repository()
       .listAlbums({ libraryId: state.library, ...LIST })
       .map(({ title }) => title)
-    expect(titles).toContain('Kid B')
+    expect(titles).not.toContain('Kid B')
+    expect(titles).toContain('Kid A')
     expect(
       repository()
         .listArtists({ libraryId: state.library, ...LIST })
         .map(({ name }) => name),
     ).not.toContain('Guest Singer')
+  })
+
+  it('sorts precise dates, keeps unknown dates last in either direction, and queues whole albums in grid order', () => {
+    const { db } = database.get()
+    const dated = repository()
+      .listAlbums({ libraryId: state.library, ...LIST })
+      .filter(({ year }) => year !== null)
+    dated.forEach((album, at) =>
+      db
+        .prepare('UPDATE albums SET release_date = ? WHERE id = ?')
+        .run(`1997-05-${at === 0 ? '22' : '21'}`, album.id),
+    )
+    const newest = repository().listAlbums({
+      libraryId: state.library,
+      ...LIST,
+      sort: MUSIC_SORTS.release,
+    })
+    expect(
+      newest
+        .filter(({ releaseDate }) => releaseDate !== null)
+        .map(({ releaseDate }) => releaseDate),
+    ).toEqual(['1997-05-22', '1997-05-21'])
+    const oldest = repository().listAlbums({
+      libraryId: state.library,
+      ...LIST,
+      sort: MUSIC_SORTS.release,
+      order: 'ascending',
+    })
+    expect(oldest.at(-1)?.releaseDate).toBeNull()
+    const queued = repository().listTracks({
+      libraryId: state.library,
+      ...LIST,
+      sort: MUSIC_SORTS.release,
+      byAlbum: true,
+    })
+    expect([...new Set(queued.tracks.map(({ albumId }) => albumId))]).toEqual(
+      newest.map(({ id }) => id),
+    )
+  })
+
+  it('sorts listening history only for the requesting account, and keeps seeded random order stable across pages', () => {
+    const airbag = state.ids.get('/music/Radiohead/OK Computer/01 Airbag.flac') ?? 0
+    const kid = state.ids.get('/music/Radiohead/Kid A/CD 01/01 Everything.flac') ?? 0
+    const { db } = database.get()
+    db.prepare('INSERT INTO plays (account_id, media_id, played_at) VALUES (?, ?, ?)').run(
+      TEST_ACCOUNTS.a,
+      airbag,
+      '2026-10-01',
+    )
+    db.prepare('INSERT INTO plays (account_id, media_id, played_at) VALUES (?, ?, ?)').run(
+      TEST_ACCOUNTS.b,
+      kid,
+      '2026-10-02',
+    )
+    expect(
+      repository().listAlbums({ libraryId: state.library, ...LIST, sort: MUSIC_SORTS.played })[0]
+        ?.title,
+    ).toBe('OK Computer')
+    expect(
+      repository().listAlbums({
+        libraryId: state.library,
+        ...LIST,
+        account: TEST_ACCOUNTS.b,
+        sort: MUSIC_SORTS.plays,
+      })[0]?.title,
+    ).toBe('Kid A')
+    const options = {
+      libraryId: state.library,
+      ...LIST,
+      sort: MUSIC_SORTS.random,
+      seed: 345,
+      byAlbum: true,
+    }
+    const all = repository().listTracks(options)
+    const pages = Array.from(
+      { length: all.total },
+      (_, offset) => repository().listTracks({ ...options, limit: 1, offset }).tracks[0]?.id,
+    )
+    expect(pages).toEqual(all.tracks.map(({ id }) => id))
+    expect([...new Set(all.tracks.map(({ albumId }) => albumId))]).toEqual(
+      repository()
+        .listAlbums(options)
+        .map(({ id }) => id),
+    )
   })
 
   it('drops an album with its last file, and a cover that was in a file now gone gives way to the archive', () => {

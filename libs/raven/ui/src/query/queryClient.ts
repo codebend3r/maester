@@ -3,6 +3,7 @@ import {
   type MatchItemType,
   type MatchSubject,
   type MediaSort,
+  type MusicListOptions,
   type ViewingSession,
   ApiError,
   isLockedError,
@@ -43,7 +44,10 @@ type QueryKeysMediaProps = {
   seed: number
 }
 
-type QueryKeysMusicListProps = { libraryId: number; search: string; sort: string }
+type QueryKeysMusicListProps = { libraryId: number; search: string; sort: string } & Pick<
+  MusicListOptions,
+  'order' | 'seed'
+>
 
 type QueryKeysArtistsProps = { libraryId: number; search: string }
 
@@ -174,11 +178,11 @@ export const queryKeys = {
   nextEpisode: (showId: number) => ['items', showId, 'next'],
   person: (id: number | null) => ['people', id],
   /** A music library's albums, artists and tracks, under the library so a library event reads them again. */
-  albums: ({ libraryId, search, sort }: QueryKeysMusicListProps) => [
+  albums: ({ libraryId, ...options }: QueryKeysMusicListProps) => [
     'libraries',
     libraryId,
     'albums',
-    { search, sort },
+    options,
   ],
   artists: ({ libraryId, search }: QueryKeysArtistsProps) => [
     'libraries',

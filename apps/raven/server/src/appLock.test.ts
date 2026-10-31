@@ -40,6 +40,7 @@ import {
   isRouteMethod,
   testConfig,
 } from '@/test/app'
+import { VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
 import { MusicRepository } from '@/music/musicRepository'
 import { encodeClip, encodeTrack } from '@/test/clips'
 import { fakeLrclib } from '@/test/fakeLrclib'
@@ -138,7 +139,11 @@ describe('a library locked behind the PIN', () => {
     state.privateAlbum =
       app()
         .get(MusicRepository)
-        .listAlbums({ libraryId: state.privateMusic, ...musicListQuery.decode({}) })[0]?.id ?? 0
+        .listAlbums({
+          libraryId: state.privateMusic,
+          ...musicListQuery.decode({}),
+          account: VIEWING_ACCOUNTS.local,
+        })[0]?.id ?? 0
     // A movie only the locked library holds, as if it had been matched.
     const metadata = app().get(MetadataRepository)
     state.privateItem = metadata.save({

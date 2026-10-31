@@ -6,6 +6,7 @@ import {
   type Lyrics,
   NO_LYRICS,
   lyricsOfText,
+  releaseDateOf,
 } from '@raven/core'
 import {
   type IAudioMetadata,
@@ -35,6 +36,7 @@ export type AudioTags = {
   disc: number | null
   year: number | null
   originalYear: number | null
+  releaseDate: string | null
   genres: string[]
   isCompilation: boolean
   label: string | null
@@ -159,6 +161,7 @@ export const audioTagsOf = (common: ICommonTagsResult): AudioTags => ({
   disc: whole(common.disk.no),
   year: whole(common.year) ?? yearOf(common.date) ?? yearOf(common.releasedate),
   originalYear: whole(common.originalyear) ?? yearOf(common.originaldate),
+  releaseDate: releaseDateOf(common.releasedate) ?? releaseDateOf(common.date),
   genres: texts(common.genre),
   isCompilation: common.compilation === true,
   label: text(common.label?.[0]),

@@ -15,6 +15,19 @@ describe('musicListQuery', () => {
     })
   })
 
+  it('round-trips direction, album grouping and a stable random seed, rejecting invalid directions', () => {
+    const options = {
+      sort: MUSIC_SORTS.random,
+      order: 'descending',
+      seed: 42,
+      byAlbum: true,
+    } as const
+    expect(musicListQuery.decode(musicListQuery.encode(options))).toMatchObject(options)
+    expect(musicListQuery.decode('order=sideways&seed=-1')).not.toHaveProperty('order')
+    expect(musicListQuery.decode('seed=9000000').seed).toBe(1000000)
+    expect(musicListQuery.decode('seed=nope')).not.toHaveProperty('seed')
+  })
+
   it('falls back on a page and an order it knows for anything else', () => {
     expect(musicListQuery.decode({ sort: 'loudness', limit: '-3', offset: 'x' })).toEqual({
       search: '',

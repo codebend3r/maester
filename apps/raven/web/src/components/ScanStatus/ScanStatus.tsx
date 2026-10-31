@@ -22,7 +22,7 @@ type Progress = { note: string; bar: Bar }
 
 const SWEEP: Bar = { max: 1, value: undefined }
 
-type ProgressOfProps = { scan: Status; expected: number }
+type ProgressOfProps = { scan: Status; expected: number; isMusic: boolean }
 
 /**
  * What the running scan is doing, in words and as a bar. The walk counts
@@ -30,7 +30,8 @@ type ProgressOfProps = { scan: Status; expected: number }
  * has one, and sweeps for a new library; the indexing counts against what the
  * walk found; the matching, which has no count, sweeps.
  */
-const progressOf = ({ scan, expected }: ProgressOfProps): Progress => {
+const progressOf = ({ scan, expected, isMusic }: ProgressOfProps): Progress => {
+  const files = isMusic ? COMMON_COPY.tracks : COMMON_COPY.videos
   switch (scan.state) {
     case SCAN_STATES.walking: {
       if (scan.found === 0) {
@@ -41,20 +42,23 @@ const progressOf = ({ scan, expected }: ProgressOfProps): Progress => {
       }
       if (expected === 0) {
         return {
-          note: SCAN_STATUS_COPY.walkingSoFar(COMMON_COPY.videos(scan.found)),
+          note: SCAN_STATUS_COPY.walkingSoFar(files(scan.found)),
           bar: SWEEP,
         }
       }
       return {
         note: SCAN_STATUS_COPY.walkingOf({
           found: count.format(scan.found),
-          expected: COMMON_COPY.videos(expected),
+          expected: files(expected),
         }),
         bar: { max: Math.max(expected, scan.found), value: scan.found },
       }
     }
     case SCAN_STATES.matching:
-      return { note: SCAN_STATUS_COPY.matching, bar: SWEEP }
+      return {
+        note: isMusic ? SCAN_STATUS_COPY.matchingAlbums : SCAN_STATUS_COPY.matching,
+        bar: SWEEP,
+      }
     case SCAN_STATES.idle:
     case SCAN_STATES.indexing:
       return {
@@ -117,15 +121,16 @@ type ScanStatusProps = {
   scan: Status
   /** The library's video count before the scan, which a full scan's walk is measured against; 0 for none. */
   expected: number
+  isMusic?: boolean
 }
 
 /**
  * Live scan progress, a bar with what the scan is doing beside it, or when
  * the library was last brought up to date.
  */
-export const ScanStatus = ({ scan, expected }: ScanStatusProps) => {
+export const ScanStatus = ({ scan, expected, isMusic = false }: ScanStatusProps) => {
   const scanned = scannedNote(scan)
-  const { note, bar } = progressOf({ scan, expected })
+  const { note, bar } = progressOf({ scan, expected, isMusic })
   const View = SCAN_STATUS_VIEWS[isScanning(scan) ? SCAN_VIEWS.scanning : SCAN_VIEWS.scanned]
   return (
     <div className={styles.status} aria-live="polite">

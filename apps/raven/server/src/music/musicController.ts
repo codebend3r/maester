@@ -79,6 +79,7 @@ export class LibraryMusicController {
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MusicRepository) private readonly music: MusicRepository,
+    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
   private find(id: number): void {
@@ -94,16 +95,32 @@ export class LibraryMusicController {
 
   /** The library's albums in the order asked; search matches titles and artists. */
   @Get(':id/albums')
-  listAlbums(@Param('id', ParseIntPipe) id: number, @Query() query: unknown): AlbumSummary[] {
+  listAlbums(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: unknown,
+    @Req() request: FastifyRequest,
+  ): AlbumSummary[] {
     this.find(id)
-    return this.music.listAlbums({ libraryId: id, ...listParams(query) })
+    return this.music.listAlbums({
+      libraryId: id,
+      ...listParams(query),
+      account: this.accounts.keyOf({ request }),
+    })
   }
 
   /** One page of the library's tracks, since a music library holds tens of thousands. */
   @Get(':id/tracks')
-  listTracks(@Param('id', ParseIntPipe) id: number, @Query() query: unknown): TrackPage {
+  listTracks(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: unknown,
+    @Req() request: FastifyRequest,
+  ): TrackPage {
     this.find(id)
-    return this.music.listTracks({ libraryId: id, ...listParams(query) })
+    return this.music.listTracks({
+      libraryId: id,
+      ...listParams(query),
+      account: this.accounts.keyOf({ request }),
+    })
   }
 }
 
