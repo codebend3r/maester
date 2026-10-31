@@ -233,6 +233,7 @@ GROUPS: tuple[Group, ...] = (
             Command("ci:app:ios", "The 📱 App on iPhone and iPad job.", "macOS + Xcode"),
             Command("ci:app:tvos", "The 📺 App on Apple TV job.", "macOS + Xcode"),
             Command("ci:app:android-tv", "The 📺 App on Android TV job.", "Android SDK"),
+            Command("ci:wren", "The 🎵 Wren on iPhone job.", "macOS + Xcode"),
             Command("ci:desktop:e2e", "The 🎬 Desktop end to end job.", "macOS"),
         ),
     ),

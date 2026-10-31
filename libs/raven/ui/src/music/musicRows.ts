@@ -9,18 +9,17 @@ import {
   plural,
 } from '@raven/core'
 
-/** A disc's heading on an album of several. */
-const discTitle = (n: number): string => `Disc ${n}`
+import { MUSIC_ROWS_COPY } from '@/music/copy'
 
 type PlaylistFactsOfProps = { playlist: PlaylistSummary }
 
 /** A playlist's facts on one line: "12 tracks · 53 min", the minutes left out under one. */
 export const playlistFactsOf = ({ playlist }: PlaylistFactsOfProps): string => {
   const minutes = Math.round(playlist.duration / 60)
-  return [
-    plural({ n: playlist.trackCount, one: 'track', many: 'tracks' }),
-    ...(minutes > 0 ? [`${minutes} min`] : []),
-  ].join(' · ')
+  return MUSIC_ROWS_COPY.facts([
+    plural({ n: playlist.trackCount, ...MUSIC_ROWS_COPY.tracks }),
+    ...(minutes > 0 ? [MUSIC_ROWS_COPY.minutes(minutes)] : []),
+  ])
 }
 
 /** One track of a playlist's page, as every app draws it. */
@@ -48,20 +47,20 @@ export const playlistTracksOf = ({ tracks }: PlaylistTracksOfProps): PlaylistTra
     title: track.title,
     line: artistNames(track),
     length: formatDuration(track.duration),
-    label: `${index + 1}. ${track.title}`,
+    label: MUSIC_ROWS_COPY.numbered({ place: index + 1, title: track.title }),
   }))
 
 type AlbumFactsOfProps = { album: AlbumSummary }
 
 /** An album's facts on one line: "1997 · 12 tracks · 53:21". */
 export const albumFactsOf = ({ album }: AlbumFactsOfProps): string =>
-  [
-    album.year === null ? null : String(album.year),
-    plural({ n: album.trackCount, one: 'track', many: 'tracks' }),
-    formatDuration(album.duration),
-  ]
-    .filter((fact): fact is string => fact !== null)
-    .join(' · ')
+  MUSIC_ROWS_COPY.facts(
+    [
+      album.year === null ? null : String(album.year),
+      plural({ n: album.trackCount, ...MUSIC_ROWS_COPY.tracks }),
+      formatDuration(album.duration),
+    ].filter((fact): fact is string => fact !== null),
+  )
 
 /** One track of an album's page, as every app draws it. */
 export type AlbumTrack = {
@@ -87,7 +86,7 @@ type AlbumDiscsOfProps = { tracks: readonly Track[]; discCount: number }
 export const albumDiscsOf = ({ tracks, discCount }: AlbumDiscsOfProps): AlbumDisc[] =>
   Array.from({ length: Math.max(1, discCount) }, (_, at) => at + 1).map((disc) => ({
     key: String(disc),
-    title: discCount > 1 ? discTitle(disc) : null,
+    title: discCount > 1 ? MUSIC_ROWS_COPY.disc(disc) : null,
     tracks: tracks.flatMap((track, index) =>
       track.disc === disc
         ? [
@@ -98,7 +97,7 @@ export const albumDiscsOf = ({ tracks, discCount }: AlbumDiscsOfProps): AlbumDis
               number: String(track.number ?? index + 1),
               title: track.title,
               length: formatDuration(track.duration),
-              label: `${index + 1}. ${track.title}`,
+              label: MUSIC_ROWS_COPY.numbered({ place: index + 1, title: track.title }),
             },
           ]
         : [],
@@ -130,4 +129,4 @@ type PlayTimeOfProps = { position: number; duration: number | null }
 
 /** How far the track has played and how long it is: "1:02 / 4:44". */
 export const playTimeOf = ({ position, duration }: PlayTimeOfProps): string =>
-  `${formatDuration(position)} / ${formatDuration(duration)}`
+  MUSIC_ROWS_COPY.playTime({ at: formatDuration(position), length: formatDuration(duration) })

@@ -19,11 +19,7 @@ export const ITEM_LAYOUT_COPY = {
   values: (values: readonly string[]) => values.join(', '),
 } as const
 
-type NumberedProps = { place: number; title: string }
-
 type ChapterLabelProps = { title: string; at: string }
-
-type PlayTimeProps = { at: string; length: string }
 
 /** The words both platforms' music pages say. */
 export const MUSIC_COPY = {
@@ -49,7 +45,6 @@ export const MUSIC_COPY = {
   removeTrack: (title: string) => `Remove ${title}`,
   openNowPlaying: 'Open Now Playing',
   goTo: (name: string) => `Go to ${name}`,
-  disc: (n: number) => `Disc ${n}`,
   favourite: 'Favourite',
   playlist: 'Playlist',
   newPlaylist: 'New playlist',
@@ -82,15 +77,9 @@ export const MUSIC_COPY = {
   albums: { one: 'album', many: 'albums' },
   artists: { one: 'artist', many: 'artists' },
   playlists: { one: 'playlist', many: 'playlists' },
-  /** A playlist's length in whole minutes: "53 min". */
-  minutes: (minutes: number) => `${minutes} min`,
   /** Facts on one line: "1997 · 12 tracks · 53:21". */
   facts: (facts: readonly string[]) => facts.join(' · '),
-  /** A track as it is read out: "1. Airbag". */
-  numbered: ({ place, title }: NumberedProps) => `${place}. ${title}`,
   /** A chapter as it is read out: "Opening, 0:00". */
   chapterLabel: ({ title, at }: ChapterLabelProps) => `${title}, ${at}`,
-  /** How far the track has played and how long it is: "1:02 / 4:44". */
-  playTime: ({ at, length }: PlayTimeProps) => `${at} / ${length}`,
   appearsOn: 'Appears on',
 } as const
