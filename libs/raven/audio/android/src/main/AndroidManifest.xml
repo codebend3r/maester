@@ -6,7 +6,7 @@
   <uses-permission android:name="android.permission.WAKE_LOCK" />
 
   <application>
-    <!-- Exported so the notification, Bluetooth buttons and, later, Android Auto can reach the session. -->
+    <!-- Exported so the notification, Bluetooth buttons and Android Auto can reach the session. -->
     <service
       android:name="expo.modules.ravenaudio.RavenAudioService"
       android:exported="true"
@@ -16,5 +16,10 @@
         <action android:name="android.media.browse.MediaBrowserService" />
       </intent-filter>
     </service>
+    <!-- Android Auto loads the browse tree's covers from its own process, by the keys the service gave out. -->
+    <provider
+      android:name="expo.modules.ravenaudio.RavenArtworkProvider"
+      android:authorities="${applicationId}.ravenaudio.artwork"
+      android:exported="true" />
   </application>
 </manifest>

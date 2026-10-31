@@ -8,6 +8,8 @@ import packageJson from '#package'
 // `paths`, and Node's resolver adds no `.ts`, so the modules it shares with
 // the app come in by their relative path and extension.
 import { PALETTE_TOKENS } from './src/theme/tokenNames.ts'
+import { withAndroidAuto } from './plugins/withAndroidAuto.ts'
+import { withCarPlay } from './plugins/withCarPlay.ts'
 import { withCleartextTraffic } from './plugins/withCleartextTraffic.ts'
 
 const APP_ID = 'app.netlify.wren'
@@ -30,7 +32,7 @@ const launchGround = (): string => {
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   const ground = launchGround()
-  const app: ExpoConfig = {
+  const base: ExpoConfig = {
     ...config,
     // What the home screen writes under the icon, and the name of the Xcode project.
     name: 'Wren',
@@ -65,5 +67,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: ['expo-router', ['expo-splash-screen', { backgroundColor: ground }]],
   }
+  // CarPlay and Android Auto browse and play through `@raven/audio`'s browse bridge.
+  const app = withAndroidAuto(withCarPlay(base))
   return isDevelopment ? withCleartextTraffic(app) : app
 }

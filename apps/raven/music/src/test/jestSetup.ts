@@ -19,6 +19,7 @@ jest.mock('@raven/audio', () => ({
     setVolume: jest.fn(async () => undefined),
     setRate: jest.fn(async () => undefined),
     stop: jest.fn(async () => undefined),
+    answerBrowse: jest.fn(async () => undefined),
     onEvent: jest.fn(() => ({ remove: () => undefined })),
   },
 }))

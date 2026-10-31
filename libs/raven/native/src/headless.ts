@@ -18,6 +18,7 @@ export {
   tracksForBrowse,
 } from '@/music/browseTree'
 export type { TrackPlan } from '@/music/audioItem'
+export type { BrowseRequest, CarBrowse, PlayRequest } from '@/music/carBrowse'
 export { musicLibrariesOf } from '@/music/musicLibraries'
 export { nativePlayerOf } from '@/music/nativePlayer'
 export { createActiveServerStore } from '@/servers/activeServerStore'

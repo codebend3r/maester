@@ -14,6 +14,19 @@ struct AudioItem: Record {
   @Field var duration: Double? = nil
 }
 
+/// One entry of the car's lists as the app answers it: see `BrowseNode` in `src/contract.ts`.
+struct BrowseNodeRecord: Record {
+  @Field var id: String = ""
+  @Field var title: String = ""
+  @Field var subtitle: String? = nil
+  @Field var artworkUri: String? = nil
+  @Field var isPlayable: Bool = false
+
+  var node: BrowseNode {
+    BrowseNode(id: id, title: title, subtitle: subtitle, artworkUri: artworkUri, isPlayable: isPlayable)
+  }
+}
+
 /// The one event the module emits; its `type` says which player event it carries.
 private let audioEvent = "onAudioEvent"
 
@@ -50,11 +63,20 @@ public final class RavenAudioModule: Module {
     OnCreate {
       self.player.actionAtItemEnd = .advance
       self.observePlayer()
+      self.answerTheCar()
     }
 
     OnDestroy {
+      RavenBrowse.shared.ask = nil
+      RavenBrowse.shared.play = nil
       self.letGo()
     }
+
+    AsyncFunction("answerBrowse") { (requestId: String, nodes: [BrowseNodeRecord], artworkHeaders: [String: String]) in
+      RavenBrowse.shared.answer(
+        requestId: requestId, answer: BrowseAnswer(nodes: nodes.map(\.node), artworkHeaders: artworkHeaders)
+      )
+    }.runOnQueue(.main)
 
     AsyncFunction("setWindow") { (items: [AudioItem], shouldPlay: Bool, start: Double) in
       try self.activateSession()
@@ -113,6 +135,20 @@ public final class RavenAudioModule: Module {
       MPNowPlayingInfoCenter.default().playbackState = .stopped
       try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }.runOnQueue(.main)
+  }
+
+  // MARK: The car
+
+  /// While the module lives, CarPlay's requests reach JS through it, on the main thread.
+  private func answerTheCar() {
+    DispatchQueue.main.async {
+      RavenBrowse.shared.ask = { [weak self] requestId, parentId in
+        self?.sendEvent(audioEvent, ["type": "browse", "requestId": requestId, "parentId": parentId])
+      }
+      RavenBrowse.shared.play = { [weak self] id in
+        self?.sendEvent(audioEvent, ["type": "playFromBrowse", "id": id])
+      }
+    }
   }
 
   // MARK: The window

@@ -34,8 +34,15 @@ type NativeAudioModule = {
   /** How fast every item plays, kept across items and windows until it is set again. */
   setRate: (rate: number) => Promise<void>
   stop: () => Promise<void>
-  /** Answers the `browse` event of `requestId` with the children it asked for. */
-  answerBrowse: (requestId: string, nodes: BrowseNode[]) => Promise<void>
+  /**
+   * Answers the `browse` event of `requestId` with the children it asked for, and the headers
+   * native sends with each cover it fetches over http.
+   */
+  answerBrowse: (
+    requestId: string,
+    nodes: BrowseNode[],
+    artworkHeaders: Record<string, string>,
+  ) => Promise<void>
   addListener: (name: typeof NATIVE_EVENT, listener: (event: unknown) => void) => EventSubscription
 }
 
@@ -65,6 +72,11 @@ type AnswerBrowseProps = {
   /** The `browse` event's own id, so native matches the answer to its request. */
   requestId: string
   nodes: BrowseNode[]
+  /**
+   * What the server's covers need on their request (its cookies, the account's token), sent by
+   * native with every http cover of this answer; a downloaded `file://` cover needs none.
+   */
+  artworkHeaders: Record<string, string>
 }
 
 type OnEventProps = {
@@ -88,8 +100,8 @@ export const audioPlayer = {
     native().setRate(Math.min(RATE_RANGE.max, Math.max(RATE_RANGE.min, rate))),
   stop: (): Promise<void> => native().stop(),
   /** Gives CarPlay or Android Auto the list a `browse` event asked for. */
-  answerBrowse: ({ requestId, nodes }: AnswerBrowseProps): Promise<void> =>
-    native().answerBrowse(requestId, nodes),
+  answerBrowse: ({ requestId, nodes, artworkHeaders }: AnswerBrowseProps): Promise<void> =>
+    native().answerBrowse(requestId, nodes, artworkHeaders),
   /** Hears the player; the subscription's `remove` stops it. */
   onEvent: ({ listener, onUnknown }: OnEventProps): EventSubscription =>
     native().addListener(NATIVE_EVENT, (event) => {

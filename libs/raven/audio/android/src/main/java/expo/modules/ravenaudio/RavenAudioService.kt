@@ -17,9 +17,11 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionError
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 
 /** The system's transport controls, as `REMOTE_COMMANDS` in `@raven/core` names them. */
 object RemoteCommands {
@@ -85,21 +87,36 @@ private class RemotePlayer(player: Player, private val forward: (RemoteCommand) 
     forward(mapOf("kind" to RemoteCommands.STOP))
     return Futures.immediateVoidFuture()
   }
+
+  // A car's chosen node reaches the app as `playFromBrowse`, which opens the window itself.
+  override fun handleSetMediaItems(
+    mediaItems: MutableList<MediaItem>,
+    startIndex: Int,
+    startPositionMs: Long,
+  ): ListenableFuture<*> = Futures.immediateVoidFuture()
+
+  override fun handleAddMediaItems(index: Int, mediaItems: MutableList<MediaItem>): ListenableFuture<*> =
+    Futures.immediateVoidFuture()
 }
 
-/** A root with no children until the browse tree is filled (CarPlay and Android Auto). */
-private object LibraryCallback : MediaLibraryService.MediaLibrarySession.Callback {
+private val rootItem: MediaItem = MediaItem.Builder()
+  .setMediaId(BROWSE_ROOT)
+  .setMediaMetadata(MediaMetadata.Builder().setIsBrowsable(true).setIsPlayable(false).build())
+  .build()
+
+/**
+ * The browse tree Android Auto reads: the root, then each parent's children through the bridge,
+ * asked of the app and answered from the cache when it is not there to answer. A chosen node
+ * goes to the app as `playFromBrowse`, which fills its queue and drives the player itself.
+ */
+@OptIn(UnstableApi::class)
+private class LibraryCallback(private val service: RavenAudioService) :
+  MediaLibraryService.MediaLibrarySession.Callback {
   override fun onGetLibraryRoot(
     session: MediaLibraryService.MediaLibrarySession,
     browser: MediaSession.ControllerInfo,
     params: MediaLibraryService.LibraryParams?,
-  ): ListenableFuture<LibraryResult<MediaItem>> {
-    val root = MediaItem.Builder()
-      .setMediaId(BROWSE_ROOT)
-      .setMediaMetadata(MediaMetadata.Builder().setIsBrowsable(true).setIsPlayable(false).build())
-      .build()
-    return Futures.immediateFuture(LibraryResult.ofItem(root, params))
-  }
+  ): ListenableFuture<LibraryResult<MediaItem>> = Futures.immediateFuture(LibraryResult.ofItem(rootItem, params))
 
   override fun onGetChildren(
     session: MediaLibraryService.MediaLibrarySession,
@@ -108,8 +125,41 @@ private object LibraryCallback : MediaLibraryService.MediaLibrarySession.Callbac
     page: Int,
     pageSize: Int,
     params: MediaLibraryService.LibraryParams?,
-  ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> =
-    Futures.immediateFuture(LibraryResult.ofItemList(ImmutableList.of(), params))
+  ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+    val future = SettableFuture.create<LibraryResult<ImmutableList<MediaItem>>>()
+    RavenBrowse.bridge(service).children(parentId) { answer ->
+      val onPage = if (pageSize > 0) answer.nodes.drop(page * pageSize).take(pageSize) else answer.nodes
+      val items = onPage.map { node -> service.browseItemOf(node, answer.artworkHeaders) }
+      future.set(LibraryResult.ofItemList(ImmutableList.copyOf(items), params))
+    }
+    return future
+  }
+
+  override fun onGetItem(
+    session: MediaLibraryService.MediaLibrarySession,
+    browser: MediaSession.ControllerInfo,
+    mediaId: String,
+  ): ListenableFuture<LibraryResult<MediaItem>> {
+    if (mediaId == BROWSE_ROOT) return Futures.immediateFuture(LibraryResult.ofItem(rootItem, null))
+    val node = RavenBrowse.bridge(service).nodeOf(mediaId)
+      ?: return Futures.immediateFuture(LibraryResult.ofError(SessionError.ERROR_BAD_VALUE))
+    return Futures.immediateFuture(LibraryResult.ofItem(service.browseItemOf(node, emptyMap()), null))
+  }
+
+  /**
+   * A node chosen in the car carries only its id, so the app is told which, and the items are
+   * handed back as they came: `RemotePlayer` takes no queue from a controller.
+   */
+  override fun onAddMediaItems(
+    mediaSession: MediaSession,
+    controller: MediaSession.ControllerInfo,
+    mediaItems: MutableList<MediaItem>,
+  ): ListenableFuture<MutableList<MediaItem>> {
+    mediaItems
+      .filter { it.localConfiguration == null }
+      .forEach { item -> RavenBrowse.play?.invoke(item.mediaId) }
+    return Futures.immediateFuture(mediaItems)
+  }
 }
 
 /**
@@ -160,8 +210,10 @@ class RavenAudioService : MediaLibraryService() {
       .setWakeMode(C.WAKE_MODE_NETWORK)
       .build()
     player = made
-    session = MediaLibrarySession.Builder(this, RemotePlayer(made) { command -> onRemote?.invoke(command) }, LibraryCallback)
+    val built = MediaLibrarySession.Builder(this, RemotePlayer(made) { command -> onRemote?.invoke(command) }, LibraryCallback(this))
       .build()
+    session = built
+    RavenBrowse.onLateAnswer = { parentId, count -> built.notifyChildrenChanged(parentId, count, null) }
     running = this
     observers.forEach { it.onCreated(this) }
   }
@@ -170,12 +222,26 @@ class RavenAudioService : MediaLibraryService() {
 
   override fun onDestroy() {
     running = null
+    RavenBrowse.onLateAnswer = null
     observers.forEach { it.onDestroyed(this) }
     onRemote = null
     session?.release()
     session = null
     player.release()
     super.onDestroy()
+  }
+
+  /** A node as Android Auto lists it: a folder to open, a node to play, or the app's own note. */
+  fun browseItemOf(node: BrowseNode, artworkHeaders: Map<String, String>): MediaItem {
+    val metadata = MediaMetadata.Builder()
+      .setTitle(node.title)
+      .setSubtitle(node.subtitle)
+      .setArtist(node.subtitle)
+      .setArtworkUri(node.artworkUri?.let { RavenArtworkProvider.uriFor(this, it, artworkHeaders) })
+      .setIsBrowsable(!node.isPlayable && node.id != OPEN_APP_NODE.id)
+      .setIsPlayable(node.isPlayable)
+      .build()
+    return MediaItem.Builder().setMediaId(node.id).setMediaMetadata(metadata).build()
   }
 
   /**

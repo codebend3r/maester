@@ -1,7 +1,7 @@
-import { accessTokenNow, apiFor, cookieJar } from '@raven/native'
-import { cookieHeadersFor } from '@raven/native/headless'
+import { apiFor } from '@raven/native'
 
 import type { configureDownloads } from '@/downloads/downloadStore'
+import { coverHeadersOf } from '@/music/coverHeaders'
 import { mediaSourcesFor } from '@/music/mediaSources'
 import { useWrenAccount } from '@/session'
 import { useActiveServer } from '@/stores/activeServer'
@@ -30,11 +30,6 @@ export const downloadSources: DownloadDevice = {
       coverVersion: track.album.coverVersion,
     })
     if (uri === null) return null
-    const headers = cookieHeadersFor({
-      server,
-      cookies: await cookieJar.read(server.id),
-      accessToken: accessTokenNow({ session: useWrenAccount }),
-    })(uri)
-    return { uri, headers }
+    return { uri, headers: await coverHeadersOf({ server, uri }) }
   },
 }
