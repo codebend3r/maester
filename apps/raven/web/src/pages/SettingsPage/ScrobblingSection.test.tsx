@@ -74,7 +74,7 @@ describe('ScrobblingSection', () => {
   it('links ListenBrainz with a token it never shows, clearing the field after', async () => {
     spyOn(api, 'getScrobbling').mockResolvedValue(statuses())
     const link = spyOn(api, 'linkListenBrainz').mockResolvedValue(statuses({ listenBrainz: 'rob' }))
-    renderSection()
+    const { client } = renderSection()
     const token = await screen.findByLabelText('User token')
     expect(token).toHaveAttribute('type', 'password')
     await userEvent.type(token, 'abc-123')
@@ -82,6 +82,7 @@ describe('ScrobblingSection', () => {
     expect(link).toHaveBeenCalledWith({ token: 'abc-123' })
     expect(await screen.findByText('Linked as rob')).toBeInTheDocument()
     expect(screen.queryByDisplayValue('abc-123')).toBeNull()
+    await waitFor(() => expect(client.getMutationCache().getAll()).toEqual([]))
   })
 
   it("shows the server's reason when a token is refused, and clears the field", async () => {
@@ -99,7 +100,7 @@ describe('ScrobblingSection', () => {
     expect(token).toHaveValue('')
   })
 
-  it("starts Last.fm's sign-in, coming back to the web's Settings", async () => {
+  it("starts Last.fm's sign-in, coming back to the web's Settings the server knows", async () => {
     spyOn(api, 'getScrobbling').mockResolvedValue(statuses())
     const start = spyOn(api, 'startLastFm').mockResolvedValue({
       url: 'https://www.last.fm/api/auth?api_key=k',
@@ -107,9 +108,7 @@ describe('ScrobblingSection', () => {
     const assign = spyOn(window.location, 'assign').mockImplementation(() => undefined)
     renderSection()
     await userEvent.click(await screen.findByRole('button', { name: 'Connect' }))
-    expect(start).toHaveBeenCalledWith({
-      returnTo: `${readyConfig.webUrl}${SCROBBLE_RETURNS.web}`,
-    })
+    expect(start).toHaveBeenCalledWith({ returnTo: SCROBBLE_RETURNS.web })
     await waitFor(() =>
       expect(assign).toHaveBeenCalledWith('https://www.last.fm/api/auth?api_key=k'),
     )

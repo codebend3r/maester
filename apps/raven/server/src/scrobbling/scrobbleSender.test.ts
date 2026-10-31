@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type LastFmKeys, readServerConfig } from '@/config'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
-import { LastFmScrobbler } from '@/scrobbling/lastFmScrobbler'
+import { LASTFM_ERRORS, LASTFM_METHODS, LastFmScrobbler } from '@/scrobbling/lastFmScrobbler'
 import { ListenBrainzScrobbler } from '@/scrobbling/listenBrainzScrobbler'
 import { ScrobbleCipher } from '@/scrobbling/scrobbleCipher'
 import { ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
@@ -172,7 +172,7 @@ describe('ScrobbleSender', () => {
     ])
     expect(setup.lastFm.scrobbles).toEqual([
       expect.objectContaining({
-        method: 'track.scrobble',
+        method: LASTFM_METHODS.scrobble,
         artist: 'Radiohead',
         track: 'Paranoid Android',
         album: 'OK Computer',
@@ -258,7 +258,7 @@ describe('ScrobbleSender', () => {
     const parts = wired()
     await linkBoth(parts)
     setup.listenBrainz.setSubmitStatus({ status: 401 })
-    setup.lastFm.setScrobbleError({ error: 9 })
+    setup.lastFm.setScrobbleError({ error: LASTFM_ERRORS.invalidSession })
     parts.sender.noteListen({ mediaId: ids.track, account })
     await parts.sender.whenIdle()
     expect(parts.links.list({ account })).toEqual([])

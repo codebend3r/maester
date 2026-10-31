@@ -132,6 +132,7 @@ const OwnActions = ({ details, mutations }: OwnActionsProps) => {
   // A deleted playlist's page has nothing to show, so the way back is taken for the listener.
   const leave = () => void (canGoBack ? navigate(-1) : navigate(links.home.to))
   const isShared = share.isPending ? share.variables.isShared : playlist.isShared
+  const sharedHintId = useId()
   return (
     <>
       <Button icon="edit" onClick={() => setDialog(OPEN_DIALOGS.rename)}>
@@ -140,17 +141,21 @@ const OwnActions = ({ details, mutations }: OwnActionsProps) => {
       <Button icon="trash" onClick={() => setDialog(OPEN_DIALOGS.remove)}>
         {COMMON_COPY.delete}
       </Button>
-      <label className={styles.shared} title={PLAYLIST_PAGE_COPY.sharedHint}>
+      <label className={styles.shared}>
         <input
           type="checkbox"
           role="switch"
           checked={isShared}
           aria-checked={isShared}
+          aria-describedby={sharedHintId}
           disabled={share.isPending}
           onChange={(event) => share.mutate({ id: playlist.id, isShared: event.target.checked })}
         />
         {PLAYLIST_PAGE_COPY.shared}
       </label>
+      <span id={sharedHintId} className="visually-hidden">
+        {PLAYLIST_PAGE_COPY.sharedHint}
+      </span>
       {dialog === OPEN_DIALOGS.rename && (
         <PlaylistNameDialog
           title={PLAYLIST_PAGE_COPY.renameTitle}
@@ -195,6 +200,15 @@ const SharedActions = ({ details, mutations }: SharedActionsProps) => {
   )
 }
 
+type FailureWordsProps = { change: Error | null; copy: Error | null }
+
+/** Why the last change or copy failed, in words; null while none has. */
+const failureWords = ({ change, copy }: FailureWordsProps): string | null => {
+  if (copy !== null) return PLAYLIST_PAGE_COPY.copyFailed(copy.message)
+  if (change !== null) return PLAYLIST_PAGE_COPY.changeFailed(change.message)
+  return null
+}
+
 /** Whose the playlist is: the account's own, to change, or another's shared one, to read. */
 const OWNERSHIPS = { own: 'own', shared: 'shared' } as const
 type Ownership = (typeof OWNERSHIPS)[keyof typeof OWNERSHIPS]
@@ -231,7 +245,10 @@ const PlaylistView = ({ details }: PlaylistViewProps) => {
   const mutations = usePlaylistMutations()
   const { rename, setTracks, share, copy } = mutations
   const source = { kind: QUEUE_SOURCE_KINDS.playlist, id: playlist.id }
-  const failure = setTracks.failure ?? rename.failure ?? share.error ?? copy.error
+  const failure = failureWords({
+    change: setTracks.failure ?? rename.failure ?? share.error,
+    copy: copy.error,
+  })
   const { eyebrow, Actions, Trail } = OWNED_BY[playlist.isOwn ? OWNERSHIPS.own : OWNERSHIPS.shared]
   const Tracks: ComponentType<PlaylistTracksProps> =
     TRACK_VIEWS[tracks.length === 0 ? TRACK_VIEW_KEYS.empty : TRACK_VIEW_KEYS.listed]
@@ -271,7 +288,7 @@ const PlaylistView = ({ details }: PlaylistViewProps) => {
         </div>
         {failure !== null && (
           <p className={styles.error} role="alert">
-            {PLAYLIST_PAGE_COPY.changeFailed(failure.message)}
+            {failure}
           </p>
         )}
       </header>

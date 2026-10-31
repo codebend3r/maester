@@ -180,6 +180,7 @@ describe('PlaylistPage', () => {
     })
     renderPage()
     const shared = await screen.findByRole('switch', { name: 'Shared' })
+    expect(shared).toHaveAccessibleDescription('Every account on this server can play and copy it.')
     expect(shared).not.toBeChecked()
     fireEvent.click(shared)
     await waitFor(() => expect(share).toHaveBeenCalledWith({ id: 5, isShared: true }))
@@ -217,7 +218,7 @@ describe('PlaylistPage', () => {
     renderTheirs()
     fireEvent.click(await screen.findByRole('button', { name: 'Copy to my playlists' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Could not change the playlist: No playlist 8',
+      'Could not copy the playlist: No playlist 8',
     )
   })
 })

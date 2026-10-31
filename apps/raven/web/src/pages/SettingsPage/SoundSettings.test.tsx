@@ -3,10 +3,10 @@ import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EQ_PRESET_NAMES, EQ_PRESETS, LEVELLING_MODES } from '@raven/core'
 import { MUSIC_QUALITIES, usePlayerPrefs } from '@raven/ui/headless'
-import type { NativeAudio } from '@/desktop/audioConnection'
+import type { AudioConnection, NativeAudio } from '@/desktop/audioConnection'
 import { CONNECTION_STATUSES } from '@/desktop/portConnection'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
-import { asDesktop, asPlayingDesktop, audioConnectionsOf } from '@/test/desktop'
+import { asPlayingDesktop, audioConnectionsOf } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
 
 const BAND_NAMES = [
@@ -94,8 +94,12 @@ describe('music on SettingsPage', () => {
     expect(screen.getByRole('slider', { name: '32 Hz' })).toBeInTheDocument()
   })
 
-  it('offers crossfade inside Raven when its music plays through Chromium', () => {
-    asDesktop()
+  it.each<[string, AudioConnection]>([
+    ['is on its way', { status: CONNECTION_STATUSES.waiting }],
+    ['is not there', { status: CONNECTION_STATUSES.unavailable, message: 'No engine.' }],
+    ['was lost', { status: CONNECTION_STATUSES.lost, message: 'Gone.' }],
+  ])('offers crossfade inside Raven while its music engine %s', (_when, connection) => {
+    asPlayingDesktop({ audio: audioConnectionsOf(connection) })
     renderWithProviders({ ui: <SettingsPage /> })
     expect(screen.getByRole('slider', { name: 'Crossfade' })).toBeInTheDocument()
     expect(screen.queryByText(LATER)).toBeNull()

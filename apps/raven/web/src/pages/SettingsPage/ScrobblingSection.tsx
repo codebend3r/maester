@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  AUTH_CONFIG_STATES,
   SCROBBLE_OUTCOMES,
   SCROBBLE_PARAMS,
   SCROBBLE_RETURNS,
@@ -15,7 +14,7 @@ import { type ComponentType, type FormEvent, useEffect, useId, useState } from '
 import { useSearchParams } from 'react-router-dom'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
-import { authConfigQuery, scrobblingQuery } from '@/lib/queries'
+import { scrobblingQuery } from '@/lib/queries'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
@@ -48,16 +47,6 @@ const useKeepStatuses = () => {
   return (statuses: ScrobbleStatus[]) => queryClient.setQueryData(queryKeys.scrobbling, statuses)
 }
 
-/**
- * Where Last.fm's sign-in comes back to: Settings on the web address the
- * server names for raven, which is the one it accepts, else on this page's.
- */
-const useLastFmReturn = (): string => {
-  const config = useQuery(authConfigQuery).data
-  const webUrl = config?.state === AUTH_CONFIG_STATES.ready ? config.webUrl : window.location.origin
-  return `${webUrl}${SCROBBLE_RETURNS.web}`
-}
-
 /** ListenBrainz's user token, sent once and never shown: the field empties as it is sent. */
 const ListenBrainzLink = () => {
   const tokenId = useId()
@@ -66,6 +55,8 @@ const ListenBrainzLink = () => {
   const link = useMutation({
     mutationFn: (sent: string) => api.linkListenBrainz({ token: sent }),
     onSuccess: keep,
+    // The token rides in the mutation's variables, so the cache lets it go as soon as it settles.
+    gcTime: 0,
   })
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -103,11 +94,14 @@ const ListenBrainzLink = () => {
   )
 }
 
-/** Last.fm's Connect, which leaves for Last.fm's sign-in page; it comes back to Settings. */
+/**
+ * Last.fm's Connect, which leaves for Last.fm's sign-in page; it comes back
+ * to Settings on the web address the server knows, which a page inside
+ * Raven or on a LAN address cannot name for itself.
+ */
 const LastFmLink = () => {
-  const returnTo = useLastFmReturn()
   const start = useMutation({
-    mutationFn: () => api.startLastFm({ returnTo }),
+    mutationFn: () => api.startLastFm({ returnTo: SCROBBLE_RETURNS.web }),
     onSuccess: ({ url }) => window.location.assign(url),
   })
   return (
@@ -130,26 +124,43 @@ const LINKERS = {
   [SCROBBLE_SERVICES.lastFm]: LastFmLink,
 } as const satisfies Record<ScrobbleService, ComponentType>
 
-type ServiceViewProps = { status: ScrobbleStatus }
+const SERVICE_STATES = { notSetUp: 'notSetUp', linked: 'linked', unlinked: 'unlinked' } as const
+
+/** Where the account stands with a service, its name there read only once it is linked. */
+type ServiceStanding =
+  | { state: typeof SERVICE_STATES.notSetUp; service: ScrobbleService }
+  | { state: typeof SERVICE_STATES.linked; service: ScrobbleService; username: string }
+  | { state: typeof SERVICE_STATES.unlinked; service: ScrobbleService }
+
+type ServiceState = (typeof SERVICE_STATES)[keyof typeof SERVICE_STATES]
+
+/** Each state's standing, by its state. */
+type StandingIn = { [State in ServiceState]: Extract<ServiceStanding, { state: State }> }
+
+type StandingViewProps<State extends ServiceState> = { standing: StandingIn[State] }
+
+type NotSetUpProps = StandingViewProps<typeof SERVICE_STATES.notSetUp>
 
 /** A service the server has no keys for. */
-const NotSetUp = ({ status }: ServiceViewProps) => (
-  <p className={styles.hint}>{COPY.notSetUp(SERVICE_NAMES[status.service])}</p>
+const NotSetUp = ({ standing }: NotSetUpProps) => (
+  <p className={styles.hint}>{COPY.notSetUp(SERVICE_NAMES[standing.service])}</p>
 )
 
+type LinkedProps = StandingViewProps<typeof SERVICE_STATES.linked>
+
 /** A linked service: the account's name there, and Unlink. */
-const Linked = ({ status }: ServiceViewProps) => {
+const Linked = ({ standing: { service, username } }: LinkedProps) => {
   const keep = useKeepStatuses()
   const unlink = useMutation({
-    mutationFn: () => api.unlinkScrobbling({ service: status.service }),
+    mutationFn: () => api.unlinkScrobbling({ service }),
     onSuccess: keep,
   })
   return (
     <div className={scrobblingStyles.connect}>
-      <p>{COPY.linkedAs(status.username ?? '')}</p>
+      <p>{COPY.linkedAs(username)}</p>
       <Button
         disabled={unlink.isPending}
-        aria-label={COPY.unlinkService(SERVICE_NAMES[status.service])}
+        aria-label={COPY.unlinkService(SERVICE_NAMES[service])}
         onClick={() => unlink.mutate()}
       >
         {COPY.unlink}
@@ -164,42 +175,53 @@ const Linked = ({ status }: ServiceViewProps) => {
   )
 }
 
+type UnlinkedProps = StandingViewProps<typeof SERVICE_STATES.unlinked>
+
 /** A service the account may link: its hint, and the way to link it. */
-const Unlinked = ({ status }: ServiceViewProps) => {
-  const Linker = LINKERS[status.service]
+const Unlinked = ({ standing: { service } }: UnlinkedProps) => {
+  const Linker = LINKERS[service]
   return (
     <>
-      <p className={styles.hint}>{SERVICE_HINTS[status.service]}</p>
+      <p className={styles.hint}>{SERVICE_HINTS[service]}</p>
       <Linker />
     </>
   )
 }
 
-const SERVICE_STATES = { notSetUp: 'notSetUp', linked: 'linked', unlinked: 'unlinked' } as const
+const standingOf = ({ service, isAvailable, username }: ScrobbleStatus): ServiceStanding => {
+  if (!isAvailable) return { state: SERVICE_STATES.notSetUp, service }
+  if (username === null) return { state: SERVICE_STATES.unlinked, service }
+  return { state: SERVICE_STATES.linked, service, username }
+}
 
-type ServiceState = (typeof SERVICE_STATES)[keyof typeof SERVICE_STATES]
+/** Each state's view, which takes that state's standing, so a linked one reads its username as text. */
+type StandingViews = { [State in ServiceState]: ComponentType<StandingViewProps<State>> }
 
-const SERVICE_VIEWS = {
+const STANDING_VIEWS = {
   [SERVICE_STATES.notSetUp]: NotSetUp,
   [SERVICE_STATES.linked]: Linked,
   [SERVICE_STATES.unlinked]: Unlinked,
-} as const satisfies Record<ServiceState, ComponentType<ServiceViewProps>>
+} as const satisfies StandingViews
 
-const stateOf = (status: ScrobbleStatus): ServiceState => {
-  if (!status.isAvailable) return SERVICE_STATES.notSetUp
-  return status.username === null ? SERVICE_STATES.unlinked : SERVICE_STATES.linked
+type StandingProps<State extends ServiceState> = { standing: StandingIn[State] & { state: State } }
+
+/** Where the account stands with a service, by the view its state keys. */
+const Standing = <State extends ServiceState>({ standing }: StandingProps<State>) => {
+  // Read through the mapped type, which ties each state to its own view's props.
+  const views: StandingViews = STANDING_VIEWS
+  const View: ComponentType<StandingViewProps<State>> = views[standing.state]
+  return <View standing={standing} />
 }
+
+type ServiceProps = { status: ScrobbleStatus }
 
 /** One service on a card of its own: its name, then where the account stands with it. */
-const Service = ({ status }: ServiceViewProps) => {
-  const View = SERVICE_VIEWS[stateOf(status)]
-  return (
-    <li className={scrobblingStyles.service}>
-      <h3 className={styles.subheading}>{SERVICE_NAMES[status.service]}</h3>
-      <View status={status} />
-    </li>
-  )
-}
+const Service = ({ status }: ServiceProps) => (
+  <li className={scrobblingStyles.service}>
+    <h3 className={styles.subheading}>{SERVICE_NAMES[status.service]}</h3>
+    <Standing standing={standingOf(status)} />
+  </li>
+)
 
 /**
  * How Last.fm's sign-in went, read once from `?scrobbling=` as it comes

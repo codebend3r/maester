@@ -8,7 +8,9 @@ import {
   MEMBER_STATUSES,
   SCROBBLE_RETURNS,
   SCROBBLE_SERVICES,
+  SCROBBLE_WEB_PATH,
   SCROBBLING_PATHS,
+  type ScrobbleReturn,
   createApiClient,
 } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
@@ -37,7 +39,8 @@ const LB_TOKENS = { member: 'lb-member-token-0001', local: 'lb-local-token-0001'
 
 const FM_TOKENS = { member: 'fm-member-token-0001', unknown: 'fm-unknown-token-0001' } as const
 
-const WEB_RETURN = `${AUTH_TEST_CONFIG.webUrl}${SCROBBLE_RETURNS.web}`
+/** Where the web's named return lands: Settings on the web address the server knows. */
+const WEB_SETTINGS = `${AUTH_TEST_CONFIG.webUrl}${SCROBBLE_WEB_PATH}`
 
 /** Every line any logger or the console was handed while this file ran. */
 const logged: string[] = []
@@ -178,7 +181,21 @@ describe('scrobbling on a server with accounts', () => {
       url: `${SCROBBLING_PATHS.lastFmCallback}?${new URLSearchParams({ token, state: signed }).toString()}`,
     })
 
-  type StartedProps = { api: ApiClient; returnTo: string }
+  type StartedProps = { api: ApiClient; returnTo: ScrobbleReturn }
+
+  type StartRawProps = { id: string; returnTo: string }
+
+  /** `start` with any return at all, as a client that is not this one could send it. */
+  const startRaw = async ({ id, returnTo }: StartRawProps) => {
+    const { app, fixture } = enforced()
+    const token = await fixture.mint({ id })
+    return app.inject({
+      method: ROUTE_METHODS.post,
+      url: SCROBBLING_PATHS.lastFmStart,
+      headers: bearerHeaders({ token }),
+      payload: { returnTo },
+    })
+  }
 
   /** The state Last.fm's page would hand back, read off the callback `start` named. */
   const started = async ({ api, returnTo }: StartedProps): Promise<string> => {
@@ -208,25 +225,32 @@ describe('scrobbling on a server with accounts', () => {
 
   afterAll(() => state.enforced?.app.close())
 
-  it('starts Last.fm only for a return address it knows exactly', async () => {
+  it('starts Last.fm only for a return it names, the web or Wren', async () => {
     const member = await clientFor({ id: AUTH_TEST_IDS.friend })
     const refused = await Promise.all(
-      ['https://evil.example.test/settings', `${WEB_RETURN}/`, 'wren://scrobbling/x', ''].map(
-        (returnTo) => member.startLastFm({ returnTo }).catch((error: unknown) => error),
-      ),
+      [
+        'https://evil.example.test/settings',
+        WEB_SETTINGS,
+        SCROBBLE_WEB_PATH,
+        'wren://scrobbling/x',
+        '',
+      ].map((returnTo) => startRaw({ id: AUTH_TEST_IDS.friend, returnTo })),
     )
-    expect(refused).toEqual(refused.map(() => expect.objectContaining({ status: 400 })))
+    expect(refused.map(({ statusCode }) => statusCode)).toEqual(refused.map(() => 400))
     await expect(started({ api: member, returnTo: SCROBBLE_RETURNS.wren })).resolves.toMatch(
+      /^[\w-]+\.[\w-]+$/u,
+    )
+    await expect(started({ api: member, returnTo: SCROBBLE_RETURNS.web })).resolves.toMatch(
       /^[\w-]+\.[\w-]+$/u,
     )
   })
 
   it('links Last.fm through its callback once, going back to where it started, and refuses a replay', async () => {
     const member = await clientFor({ id: AUTH_TEST_IDS.friend })
-    const signed = await started({ api: member, returnTo: WEB_RETURN })
+    const signed = await started({ api: member, returnTo: SCROBBLE_RETURNS.web })
     const answer = await callback({ token: FM_TOKENS.member, state: signed })
     expect(answer.statusCode).toBe(302)
-    expect(answer.headers.location).toBe(`${WEB_RETURN}?scrobbling=linked`)
+    expect(answer.headers.location).toBe(`${WEB_SETTINGS}?scrobbling=linked`)
     expect(answer.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
     expect(await member.getScrobbling()).toContainEqual({
       service: SCROBBLE_SERVICES.lastFm,

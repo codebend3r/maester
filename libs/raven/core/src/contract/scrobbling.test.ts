@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  SCROBBLE_RETURNS,
   SCROBBLE_SERVICES,
   isLastFmStart,
   isListenBrainzLink,
@@ -28,8 +29,11 @@ describe('scrobbling', () => {
     expect(isListenBrainzLink({ token: 'a'.repeat(129) })).toBe(false)
   })
 
-  it('takes a return address as text, which the server matches exactly', () => {
-    expect(isLastFmStart({ returnTo: 'wren://scrobbling' })).toBe(true)
+  it('takes a return by name: the web, or Wren, and nothing else', () => {
+    expect(isLastFmStart({ returnTo: SCROBBLE_RETURNS.web })).toBe(true)
+    expect(isLastFmStart({ returnTo: SCROBBLE_RETURNS.wren })).toBe(true)
+    expect(isLastFmStart({ returnTo: 'https://raven.example/settings' })).toBe(false)
+    expect(isLastFmStart({ returnTo: '/settings' })).toBe(false)
     expect(isLastFmStart({})).toBe(false)
   })
 })

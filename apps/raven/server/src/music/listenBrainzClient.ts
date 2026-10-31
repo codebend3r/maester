@@ -33,6 +33,9 @@ const RETRIES = 1
 
 const LB_FIELDS = { mbid: 'artist_mbid', score: 'score' } as const
 
+/** The similar-artists query's parameters. */
+export const LB_PARAMS = { artists: 'artist_mbids', algorithm: 'algorithm' } as const
+
 /** An artist ListenBrainz finds similar: its MusicBrainz id, and how strongly, higher being closer. */
 export type SimilarArtist = { mbid: string; score: number }
 
@@ -75,7 +78,10 @@ export class ListenBrainzClient {
 
   /** The artists similar to the one MusicBrainz knows as `mbid`, closest first. */
   async similarArtists(mbid: string): Promise<SimilarArtist[]> {
-    const query = new URLSearchParams({ artist_mbids: mbid, algorithm: ALGORITHM })
+    const query = new URLSearchParams({
+      [LB_PARAMS.artists]: mbid,
+      [LB_PARAMS.algorithm]: ALGORITHM,
+    })
     const url = `${LISTENBRAINZ_LABS}/similar-artists/json?${query.toString()}`
     const headers = { [HEADERS.accept]: CONTENT_TYPES.json, [HEADERS.userAgent]: RAVEN_USER_AGENT }
     const ask = (): Promise<Response> =>
