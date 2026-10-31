@@ -1,7 +1,9 @@
 import {
+  APP_CALL_METHODS,
   AUTH_CONFIG_STATES,
   AUTH_HEADERS,
   AUTH_PATHS,
+  type Infer,
   isAuthConfig,
   isNumber,
   isString,
@@ -29,15 +31,6 @@ const isTokenAnswer = object({
 
 const isErrorAnswer = object({ msg: isString })
 
-/** What the app keeps of a Supabase session: the two tokens, when the access one ends, and who. */
-export type AccountSession = {
-  accessToken: string
-  refreshToken: string
-  expiresAt: number
-  userId: string
-  email: string
-}
-
 export const isAccountSession = object({
   accessToken: isString,
   refreshToken: isString,
@@ -45,6 +38,9 @@ export const isAccountSession = object({
   userId: isString,
   email: isString,
 })
+
+/** What the app keeps of a Supabase session: the two tokens, when the access one ends, and who. */
+export type AccountSession = Infer<typeof isAccountSession>
 
 export const AUTH_OUTCOMES = {
   ok: 'ok',
@@ -92,7 +88,7 @@ const requestToken = async ({
     const config = await readSupabaseConfig({ origin })
     if (config === null) return { kind: AUTH_OUTCOMES.unreachable }
     const response = await fetch(`${config.supabaseUrl}${TOKEN_PATH}?${GRANT_PARAM}=${grant}`, {
-      method: 'POST',
+      method: APP_CALL_METHODS.post,
       headers: {
         [HEADERS.accept]: JSON_TYPE,
         [HEADERS.contentType]: JSON_TYPE,

@@ -4,10 +4,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { IconButton } from '@/components/Controls'
 import { MENU_VIEWS, type MenuView, TrackMenu } from '@/components/TrackMenu'
+import { TRACK_ROW_COPY } from '@/components/copy'
 import { WREN_ICONS } from '@/theme/icons'
 import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
-
-const moreFor = (title: string): string => `More for ${title}`
 
 type TrackRowProps = {
   track: Track
@@ -53,7 +52,7 @@ export function TrackRow({ track, lead, line, length, label, isPlaying, onPress 
       </Pressable>
       <IconButton
         icon={WREN_ICONS.more}
-        label={moreFor(track.title)}
+        label={TRACK_ROW_COPY.more(track.title)}
         onPress={() => setMenu(MENU_VIEWS.actions)}
       />
       {menu !== null && <TrackMenu onView={setMenu} track={track} view={menu} />}

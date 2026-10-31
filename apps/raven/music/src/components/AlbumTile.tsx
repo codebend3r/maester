@@ -1,25 +1,53 @@
 import { type AlbumSummary, artistNames } from '@raven/core'
 import { Icon } from '@raven/native'
 import { useRouter } from 'expo-router'
+import type { ComponentType } from 'react'
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 
+import { ALBUM_TILE_COPY } from '@/components/copy'
 import type { Cover } from '@/music/useCovers'
 import { WREN_PAGES, pageHref } from '@/routes'
 import { WREN_ICONS } from '@/theme/icons'
 import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
 
+/** Whether a cover is drawn, or a disc in its place. */
+const COVER_STATES = { shown: 'shown', missing: 'missing' } as const
+
+type CoverState = (typeof COVER_STATES)[keyof typeof COVER_STATES]
+
 type AlbumArtProps = { cover: Cover | null; size: number }
+
+type CoverImageProps = AlbumArtProps
+
+function CoverImage({ cover, size }: CoverImageProps) {
+  return (
+    cover !== null && (
+      <Image
+        accessibilityIgnoresInvertColors
+        source={cover}
+        style={{ width: size, height: size }}
+      />
+    )
+  )
+}
+
+type CoverDiscProps = AlbumArtProps
+
+function CoverDisc({ size }: CoverDiscProps) {
+  return <Icon colour={PALETTE.muted} name={WREN_ICONS.cover} size={size / 3} />
+}
+
+const COVER_FACES = {
+  [COVER_STATES.shown]: CoverImage,
+  [COVER_STATES.missing]: CoverDisc,
+} as const satisfies Record<CoverState, ComponentType<AlbumArtProps>>
 
 /** An album's cover, square at `size`, or a disc drawn in its place while it has none. */
 export function AlbumArt({ cover, size }: AlbumArtProps) {
-  const square = { width: size, height: size }
+  const Face = COVER_FACES[cover === null ? COVER_STATES.missing : COVER_STATES.shown]
   return (
-    <View style={[styles.art, square]}>
-      {cover === null ? (
-        <Icon colour={PALETTE.muted} name={WREN_ICONS.cover} size={size / 3} />
-      ) : (
-        <Image accessibilityIgnoresInvertColors source={cover} style={square} />
-      )}
+    <View style={[styles.art, { width: size, height: size }]}>
+      <Face cover={cover} size={size} />
     </View>
   )
 }
@@ -32,7 +60,7 @@ export function AlbumTile({ album, cover, width }: AlbumTileProps) {
   const artists = artistNames(album)
   return (
     <Pressable
-      accessibilityLabel={`${album.title}, ${artists}`}
+      accessibilityLabel={ALBUM_TILE_COPY.label({ title: album.title, artists })}
       accessibilityRole="button"
       onPress={() => router.push(pageHref({ page: WREN_PAGES.album, id: album.id }))}
       style={({ pressed }) => [styles.tile, { width }, pressed && styles.pressed]}

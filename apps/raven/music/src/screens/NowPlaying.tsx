@@ -4,7 +4,7 @@ import {
   type Lyrics,
   NO_LYRICS,
   REPEAT_MODES,
-  type RepeatMode,
+  type Track,
   artistNames,
   formatDuration,
 } from '@raven/core'
@@ -22,7 +22,7 @@ import {
 } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { type ComponentType, type ReactElement, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 
 import { Adjuster } from '@/components/Adjuster'
@@ -32,35 +32,10 @@ import { Notice } from '@/components/Notice'
 import { Segments } from '@/components/Segments'
 import { pageStyles, useListContent } from '@/components/TabPage'
 import { useCovers } from '@/music/useCovers'
+import { NOW_PLAYING_COPY } from '@/screens/copy'
 import { WREN_ICONS } from '@/theme/icons'
 import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
 import { type WrenSession, useWren } from '@/useWren'
-
-const NOW_PLAYING_COPY = {
-  close: 'Close Now Playing',
-  nothing: 'Nothing is playing.',
-  position: 'Position',
-  volume: 'Volume',
-  previous: 'Previous',
-  play: 'Play',
-  pause: 'Pause',
-  next: 'Next',
-  shuffle: 'Shuffle',
-  speed: 'Speed',
-  lyrics: 'Lyrics',
-  queue: 'Queue',
-  noLyrics: 'No lyrics for this track.',
-  instrumental: '♪',
-  moveUp: (title: string) => `Move ${title} up`,
-  remove: (title: string) => `Remove ${title}`,
-} as const
-
-/** What the repeat button says in each mode, which a press moves on from. */
-const REPEAT_LABELS = {
-  [REPEAT_MODES.off]: 'Repeat off',
-  [REPEAT_MODES.all]: 'Repeat all',
-  [REPEAT_MODES.one]: 'Repeat one',
-} as const satisfies Record<RepeatMode, string>
 
 /** The panes under the controls. */
 const PANES = { lyrics: 'lyrics', queue: 'queue' } as const
@@ -75,7 +50,7 @@ const PANE_SEGMENTS = [
 /** The speeds a book plays at, each keyed by its number: "1.25×". */
 const SPEED_SEGMENTS = AUDIOBOOK_SPEEDS.map((speed) => ({
   key: String(speed),
-  label: `${speed}×`,
+  label: NOW_PLAYING_COPY.speedOf(speed),
 }))
 
 /** How far a screen reader's swipe moves the scrubber, in seconds, and the volume. */
@@ -84,9 +59,15 @@ const STEPS = { seconds: 15, volume: 0.1 } as const
 type ScrubTextOfProps = { at: number; length: number }
 
 const scrubTextOf = ({ at, length }: ScrubTextOfProps): string =>
-  `${formatDuration(at)} of ${formatDuration(length)}`
+  NOW_PLAYING_COPY.scrubText({ at: formatDuration(at), length: formatDuration(length) })
 
-const percentOf = (volume: number): string => `${Math.round(volume * 100)}%`
+/** Whether a track is queued for the sheet to show. */
+const SHEET_STATES = { idle: 'idle', playing: 'playing' } as const
+
+type SheetState = (typeof SHEET_STATES)[keyof typeof SHEET_STATES]
+
+const sheetStateOf = (track: Track | null): SheetState =>
+  track === null ? SHEET_STATES.idle : SHEET_STATES.playing
 
 type HeadProps = {
   session: Pick<WrenSession, 'server' | 'api'>
@@ -94,12 +75,26 @@ type HeadProps = {
   onPane: (pane: Pane) => void
 }
 
+type HeadViewProps = HeadProps & { track: Track | null; close: ReactElement }
+
+type IdleHeadProps = HeadViewProps
+
+/** The sheet with nothing queued: the way out, and that nothing plays. */
+function IdleHead({ close }: IdleHeadProps) {
+  return (
+    <View style={pageStyles.header}>
+      {close}
+      <Notice text={NOW_PLAYING_COPY.nothing} />
+    </View>
+  )
+}
+
+type TrackHeadProps = HeadViewProps & { track: Track }
+
 /** The sheet above its pane: the cover, the track, the scrubber, the controls and the volume. */
-function Head({ session, pane, onPane }: HeadProps) {
-  const router = useRouter()
+function TrackHead({ session, pane, onPane, track, close }: TrackHeadProps) {
   const coverOf = useCovers(session)
   const { width } = useWindowDimensions()
-  const track = useAudioQueue(playingTrackOf)
   const queue = useAudioQueue((store) => store.queue)
   const state = useAudioQueue((store) => store.state)
   const position = useAudioQueue((store) => store.position)
@@ -116,21 +111,6 @@ function Head({ session, pane, onPane }: HeadProps) {
   const speed = usePlayerPrefs((prefs) => prefs.audiobookSpeed)
   const setSpeed = usePlayerPrefs((prefs) => prefs.setAudiobookSpeed)
   const isAudiobook = useIsAudiobook({ api: session.api, track })
-  const close = (
-    <IconButton
-      icon={WREN_ICONS.close}
-      label={NOW_PLAYING_COPY.close}
-      onPress={() => router.back()}
-    />
-  )
-  if (track === null) {
-    return (
-      <View style={pageStyles.header}>
-        {close}
-        <Notice text={NOW_PLAYING_COPY.nothing} />
-      </View>
-    )
-  }
   const length = duration ?? track.duration ?? 0
   const isPlaying = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
   return (
@@ -191,7 +171,7 @@ function Head({ session, pane, onPane }: HeadProps) {
           style={({ pressed }) => [styles.repeat, pressed && styles.pressed]}
         >
           <Text style={[styles.repeatLabel, queue.repeat !== REPEAT_MODES.off && styles.on]}>
-            {REPEAT_LABELS[queue.repeat]}
+            {NOW_PLAYING_COPY.repeat[queue.repeat]}
           </Text>
         </Pressable>
       </View>
@@ -201,7 +181,7 @@ function Head({ session, pane, onPane }: HeadProps) {
         onChange={(level) => setVolume({ volume: level, muted: false })}
         step={STEPS.volume}
         value={volume}
-        valueText={percentOf}
+        valueText={NOW_PLAYING_COPY.percent}
       />
       {isAudiobook && (
         <View style={styles.speed}>
@@ -219,6 +199,33 @@ function Head({ session, pane, onPane }: HeadProps) {
       <Segments onSelect={onPane} segments={PANE_SEGMENTS} selected={pane} />
     </View>
   )
+}
+
+type PlayingHeadProps = HeadViewProps
+
+function PlayingHead({ track, ...props }: PlayingHeadProps) {
+  return track !== null && <TrackHead {...props} track={track} />
+}
+
+/** What the sheet's head shows, with a track queued or none. */
+const HEADS = {
+  [SHEET_STATES.idle]: IdleHead,
+  [SHEET_STATES.playing]: PlayingHead,
+} as const satisfies Record<SheetState, ComponentType<HeadViewProps>>
+
+/** The sheet's head: the way out, and the playing track with its controls, or that none plays. */
+function Head(props: HeadProps) {
+  const router = useRouter()
+  const track = useAudioQueue(playingTrackOf)
+  const close = (
+    <IconButton
+      icon={WREN_ICONS.close}
+      label={NOW_PLAYING_COPY.close}
+      onPress={() => router.back()}
+    />
+  )
+  const HeadView = HEADS[sheetStateOf(track)]
+  return <HeadView {...props} close={close} track={track} />
 }
 
 type LyricRowProps = { line: LyricLine; isCurrent: boolean; onSeek: (at: number) => void }
@@ -241,21 +248,41 @@ function LyricRow({ line, isCurrent, onSeek }: LyricRowProps) {
 
 type LyricsNoteProps = { lyrics: Lyrics | null }
 
+type NoteOfProps = { lyrics: Lyrics }
+
+/** Synced lyrics are their lines, with nothing to note under them. */
+function NoNote() {
+  return null
+}
+
+type PlainNoteProps = NoteOfProps
+
+/** The words as they are, with no times to follow. */
+function PlainNote({ lyrics }: PlainNoteProps) {
+  return lyrics.kind === LYRICS_KINDS.plain && <Text style={styles.plain}>{lyrics.text}</Text>
+}
+
+function NoLyricsNote() {
+  return <Notice text={NOW_PLAYING_COPY.noLyrics} />
+}
+
+/** What the lyrics pane notes for each kind of lyrics. */
+const LYRICS_NOTES = {
+  [LYRICS_KINDS.synced]: NoNote,
+  [LYRICS_KINDS.plain]: PlainNote,
+  [LYRICS_KINDS.none]: NoLyricsNote,
+} as const satisfies Record<Lyrics['kind'], ComponentType<NoteOfProps>>
+
+type NoteProps = NoteOfProps
+
+function Note({ lyrics }: NoteProps) {
+  const NoteOf = LYRICS_NOTES[lyrics.kind]
+  return <NoteOf lyrics={lyrics} />
+}
+
 /** What the lyrics pane says when it has no lines to time: the words as they are, or that there are none. */
 function LyricsNote({ lyrics }: LyricsNoteProps) {
-  if (lyrics === null) return null
-  switch (lyrics.kind) {
-    case LYRICS_KINDS.synced:
-      return null
-    case LYRICS_KINDS.plain:
-      return <Text style={styles.plain}>{lyrics.text}</Text>
-    case LYRICS_KINDS.none:
-      return <Notice text={NOW_PLAYING_COPY.noLyrics} />
-    default: {
-      const unknown: never = lyrics
-      return unknown
-    }
-  }
+  return lyrics !== null && <Note lyrics={lyrics} />
 }
 
 type QueueEntryProps = {
@@ -270,7 +297,7 @@ function QueueEntry({ row, onJump, onMoveUp, onRemove }: QueueEntryProps) {
   return (
     <View style={styles.entry}>
       <Pressable
-        accessibilityLabel={`${row.title}, ${row.line}`}
+        accessibilityLabel={NOW_PLAYING_COPY.entry({ title: row.title, line: row.line })}
         accessibilityRole="button"
         accessibilityState={{ selected: row.isCurrent }}
         onPress={() => onJump(row.place)}
@@ -302,65 +329,114 @@ function QueueEntry({ row, onJump, onMoveUp, onRemove }: QueueEntryProps) {
 /** A line of synced lyrics, keyed by its place and time, since a song repeats lines. */
 type LyricItem = { key: string; place: number; line: LyricLine }
 
+type SheetViewProps = {
+  head: ReactElement
+  content: ReturnType<typeof useListContent>
+  /** The lyrics to show, read or not yet. */
+  lyrics: Lyrics | null
+}
+
+type IdleSheetProps = SheetViewProps
+
+/** Nothing queued: the head alone. */
+function IdleSheet({ head, content }: IdleSheetProps) {
+  return <View style={[pageStyles.ground, ...content]}>{head}</View>
+}
+
+type QueueSheetProps = SheetViewProps
+
+/** The queue under the head, each track playable, movable up and removable. */
+function QueueSheet({ head, content }: QueueSheetProps) {
+  const queue = useAudioQueue((store) => store.queue)
+  const tracks = useAudioQueue((store) => store.tracks)
+  const jump = useAudioQueue((store) => store.jump)
+  const move = useAudioQueue((store) => store.move)
+  const remove = useAudioQueue((store) => store.remove)
+  return (
+    <FlatList
+      contentContainerStyle={content}
+      data={queueRowsOf({ queue, tracks })}
+      keyExtractor={(row) => row.key}
+      ListHeaderComponent={head}
+      renderItem={({ item }) => (
+        <QueueEntry
+          onJump={jump}
+          onMoveUp={(place) => move({ from: place, to: place - 1 })}
+          onRemove={remove}
+          row={item}
+        />
+      )}
+      style={pageStyles.ground}
+    />
+  )
+}
+
+type LyricsSheetProps = SheetViewProps
+
+/** The lyrics under the head, a synced line bright while it is sung. */
+function LyricsSheet({ head, content, lyrics }: LyricsSheetProps) {
+  const position = useAudioQueue((store) => store.position)
+  const seekTo = useAudioQueue((store) => store.seekTo)
+  const lines: LyricItem[] =
+    lyrics?.kind === LYRICS_KINDS.synced
+      ? lyrics.lines.map((line, place) => ({ key: `${place}:${line.at}`, place, line }))
+      : []
+  const current =
+    lyrics?.kind === LYRICS_KINDS.synced
+      ? activeLineAt({ lines: lyrics.lines, at: position })
+      : null
+  return (
+    <FlatList
+      contentContainerStyle={content}
+      data={lines}
+      keyExtractor={(item) => item.key}
+      ListFooterComponent={<LyricsNote lyrics={lyrics} />}
+      ListHeaderComponent={head}
+      renderItem={({ item }) => (
+        <LyricRow isCurrent={item.place === current} line={item.line} onSeek={seekTo} />
+      )}
+      style={pageStyles.ground}
+    />
+  )
+}
+
+/** What the sheet draws: the head alone with nothing queued, else the pane picked under it. */
+const SHEET_VIEWS = {
+  [SHEET_STATES.idle]: IdleSheet,
+  [PANES.lyrics]: LyricsSheet,
+  [PANES.queue]: QueueSheet,
+} as const satisfies Record<typeof SHEET_STATES.idle | Pane, ComponentType<SheetViewProps>>
+
+type ShownLyricsOfProps = {
+  isAudiobook: boolean
+  lyrics: { data: Lyrics | undefined; isError: boolean }
+}
+
+/** The lyrics the pane shows: none for a book, and none, quietly, for a failed read. */
+const shownLyricsOf = ({ isAudiobook, lyrics }: ShownLyricsOfProps): Lyrics | null => {
+  if (isAudiobook) return NO_LYRICS
+  if (lyrics.data !== undefined) return lyrics.data
+  return lyrics.isError ? NO_LYRICS : null
+}
+
 type NowPlayingSheetProps = { session: WrenSession }
 
 function NowPlayingSheet({ session }: NowPlayingSheetProps) {
   const [pane, setPane] = useState<Pane>(PANES.lyrics)
   const content = useListContent()
   const track = useAudioQueue(playingTrackOf)
-  const queue = useAudioQueue((store) => store.queue)
-  const tracks = useAudioQueue((store) => store.tracks)
-  const position = useAudioQueue((store) => store.position)
-  const seekTo = useAudioQueue((store) => store.seekTo)
-  const jump = useAudioQueue((store) => store.jump)
-  const move = useAudioQueue((store) => store.move)
-  const remove = useAudioQueue((store) => store.remove)
   const isAudiobook = useIsAudiobook({ api: session.api, track })
   // A book has no words to look for.
   const lyrics = useQuery(
     session.queries.lyricsQuery(track === null || isAudiobook ? null : track.id),
   )
-  const head = <Head onPane={setPane} pane={pane} session={session} />
-  if (track === null) return <View style={[pageStyles.ground, ...content]}>{head}</View>
-
-  if (pane === PANES.queue) {
-    return (
-      <FlatList
-        contentContainerStyle={content}
-        data={queueRowsOf({ queue, tracks })}
-        keyExtractor={(row) => row.key}
-        ListHeaderComponent={head}
-        renderItem={({ item }) => (
-          <QueueEntry
-            onJump={jump}
-            onMoveUp={(place) => move({ from: place, to: place - 1 })}
-            onRemove={remove}
-            row={item}
-          />
-        )}
-        style={pageStyles.ground}
-      />
-    )
-  }
-  // A failed read is said as no lyrics, quietly.
-  const shown = isAudiobook ? NO_LYRICS : (lyrics.data ?? (lyrics.isError ? NO_LYRICS : null))
-  const lines: LyricItem[] =
-    shown?.kind === LYRICS_KINDS.synced
-      ? shown.lines.map((line, place) => ({ key: `${place}:${line.at}`, place, line }))
-      : []
-  const current =
-    shown?.kind === LYRICS_KINDS.synced ? activeLineAt({ lines: shown.lines, at: position }) : null
+  const shown = shownLyricsOf({ isAudiobook, lyrics })
+  const Sheet = SHEET_VIEWS[track === null ? SHEET_STATES.idle : pane]
   return (
-    <FlatList
-      contentContainerStyle={content}
-      data={lines}
-      keyExtractor={(item) => item.key}
-      ListFooterComponent={<LyricsNote lyrics={shown} />}
-      ListHeaderComponent={head}
-      renderItem={({ item }) => (
-        <LyricRow isCurrent={item.place === current} line={item.line} onSeek={seekTo} />
-      )}
-      style={pageStyles.ground}
+    <Sheet
+      content={content}
+      head={<Head onPane={setPane} pane={pane} session={session} />}
+      lyrics={shown}
     />
   )
 }
@@ -372,8 +448,7 @@ function NowPlayingSheet({ session }: NowPlayingSheetProps) {
  */
 export function NowPlaying() {
   const session = useWren()
-  if (session === null) return null
-  return <NowPlayingSheet key={session.server.id} session={session} />
+  return session !== null && <NowPlayingSheet key={session.server.id} session={session} />
 }
 
 const styles = StyleSheet.create({

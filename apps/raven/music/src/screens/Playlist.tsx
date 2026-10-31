@@ -14,15 +14,10 @@ import { BackButton, DetailRoute } from '@/components/DetailPage'
 import { Notice } from '@/components/Notice'
 import { pageStyles, useListContent } from '@/components/TabPage'
 import { TrackRow } from '@/components/TrackRow'
+import { PLAYLIST_COPY } from '@/screens/copy'
 import { WREN_ROUTE_PARAMS } from '@/routes'
 import { PALETTE, SIZES } from '@/theme/wrenTheme'
 import { type WrenSession, useWren } from '@/useWren'
-
-const COPY = {
-  opening: 'Opening the playlist',
-  missing: 'This playlist is not on the server.',
-  empty: (name: string) => `Nothing in ${name} yet. Add songs from any track's menu.`,
-} as const
 
 type PlaylistPageProps = { details: PlaylistDetails }
 
@@ -34,7 +29,7 @@ function PlaylistPage({ details }: PlaylistPageProps) {
   const source = { kind: QUEUE_SOURCE_KINDS.playlist, id: playlist.id } as const
   return (
     <FlatList
-      ListEmptyComponent={<Notice text={COPY.empty(playlist.name)} />}
+      ListEmptyComponent={<Notice text={PLAYLIST_COPY.empty(playlist.name)} />}
       ListHeaderComponent={
         <View style={pageStyles.header}>
           <BackButton />
@@ -83,7 +78,7 @@ type ServerPlaylistProps = { session: WrenSession; id: number | null }
 function ServerPlaylist({ session, id }: ServerPlaylistProps) {
   const playlist = useQuery(session.queries.playlistQuery(id))
   return (
-    <DetailRoute copy={COPY} id={id} query={playlist}>
+    <DetailRoute copy={PLAYLIST_COPY} id={id} query={playlist}>
       {(details) => <PlaylistPage details={details} />}
     </DetailRoute>
   )

@@ -1,4 +1,4 @@
-import { type ArtistDetails, plural, routeIdOf } from '@raven/core'
+import { type ArtistDetails, routeIdOf } from '@raven/core'
 import { useServerArtistFavourite } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams } from 'expo-router'
@@ -8,17 +8,12 @@ import { AlbumGrid } from '@/components/AlbumGrid'
 import { FavouriteToggle } from '@/components/Controls'
 import { DetailPage, DetailRoute } from '@/components/DetailPage'
 import { Notice } from '@/components/Notice'
+import { artistFactsOf } from '@/music/artistFacts'
 import { useCovers } from '@/music/useCovers'
+import { ARTIST_COPY } from '@/screens/copy'
 import { WREN_ROUTE_PARAMS } from '@/routes'
 import { PALETTE, SIZES } from '@/theme/wrenTheme'
 import { type WrenSession, useWren } from '@/useWren'
-
-const COPY = {
-  opening: 'Opening the artist',
-  missing: 'This artist is not on the server.',
-  albums: 'Albums',
-  appearsOn: 'Appears on',
-} as const
 
 type ArtistPageProps = { session: WrenSession; details: ArtistDetails }
 
@@ -26,10 +21,6 @@ function ArtistPage({ session, details }: ArtistPageProps) {
   const coverOf = useCovers(session)
   const { artist, albums, appearsOn, isFavourite } = details
   const favourite = useServerArtistFavourite({ api: session.api, artistId: artist.id })
-  const facts = [
-    plural({ n: artist.albumCount, one: 'album', many: 'albums' }),
-    plural({ n: artist.trackCount, one: 'track', many: 'tracks' }),
-  ].join(' · ')
   return (
     <DetailPage>
       <View style={styles.head}>
@@ -37,7 +28,7 @@ function ArtistPage({ session, details }: ArtistPageProps) {
           <Text accessibilityRole="header" style={styles.title}>
             {artist.name}
           </Text>
-          <Text style={styles.facts}>{facts}</Text>
+          <Text style={styles.facts}>{artistFactsOf({ artist })}</Text>
         </View>
         <FavouriteToggle isOn={isFavourite} onToggle={() => favourite.mutate(!isFavourite)} />
       </View>
@@ -45,7 +36,7 @@ function ArtistPage({ session, details }: ArtistPageProps) {
       {albums.length > 0 && (
         <View style={styles.section}>
           <Text accessibilityRole="header" style={styles.heading}>
-            {COPY.albums}
+            {ARTIST_COPY.albums}
           </Text>
           <AlbumGrid albums={albums} coverOf={coverOf} />
         </View>
@@ -53,7 +44,7 @@ function ArtistPage({ session, details }: ArtistPageProps) {
       {appearsOn.length > 0 && (
         <View style={styles.section}>
           <Text accessibilityRole="header" style={styles.heading}>
-            {COPY.appearsOn}
+            {ARTIST_COPY.appearsOn}
           </Text>
           <AlbumGrid albums={appearsOn} coverOf={coverOf} />
         </View>
@@ -67,7 +58,7 @@ type ServerArtistProps = { session: WrenSession; id: number | null }
 function ServerArtist({ session, id }: ServerArtistProps) {
   const artist = useQuery(session.queries.artistQuery(id))
   return (
-    <DetailRoute copy={COPY} id={id} query={artist}>
+    <DetailRoute copy={ARTIST_COPY} id={id} query={artist}>
       {(details) => <ArtistPage details={details} session={session} />}
     </DetailRoute>
   )

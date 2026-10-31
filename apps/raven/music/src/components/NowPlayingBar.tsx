@@ -1,4 +1,4 @@
-import { artistNames } from '@raven/core'
+import { type Track, artistNames } from '@raven/core'
 import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { useRouter, useSegments } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AlbumArt } from '@/components/AlbumTile'
 import { IconButton } from '@/components/Controls'
+import { BAR_COPY } from '@/components/copy'
 import { useCovers } from '@/music/useCovers'
 import { WREN_ROUTES, WREN_SCREENS } from '@/routes'
 import { WREN_ICONS } from '@/theme/icons'
@@ -28,36 +29,26 @@ const useIsBarShown = (place: BarPlace): boolean => {
   return hasTrack && here === place && !BARLESS_SCREENS.has(screen)
 }
 
-type OpenLabelOfProps = { title: string; artists: string }
+type BarSession = Pick<WrenSession, 'server' | 'api'>
 
-/** What the bar is called aloud: what it opens, and the track it shows. */
-const openLabelOf = ({ title, artists }: OpenLabelOfProps): string =>
-  `Now Playing: ${title}, ${artists}`
+type BarProps = { session: BarSession; place: BarPlace }
 
-const BAR_COPY = {
-  play: 'Play',
-  pause: 'Pause',
-  next: 'Next',
-} as const
+type TrackBarProps = BarProps & { track: Track }
 
-type BarProps = { session: Pick<WrenSession, 'server' | 'api'>; place: BarPlace }
-
-function Bar({ session, place }: BarProps) {
+function TrackBar({ session, place, track }: TrackBarProps) {
   const router = useRouter()
   const coverOf = useCovers(session)
   const bottom = useSafeAreaInsets().bottom
-  const track = useAudioQueue(playingTrackOf)
   const state = useAudioQueue((store) => store.state)
   const error = useAudioQueue((store) => store.error)
   const toggle = useAudioQueue((store) => store.toggle)
   const next = useAudioQueue((store) => store.next)
-  if (track === null) return null
   const artists = artistNames(track)
   const isPlaying = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
   return (
     <View style={[styles.bar, place === BAR_PLACES.page && { paddingBottom: bottom }]}>
       <Pressable
-        accessibilityLabel={openLabelOf({ title: track.title, artists })}
+        accessibilityLabel={BAR_COPY.open({ title: track.title, artists })}
         accessibilityRole="button"
         onPress={() => router.push(WREN_ROUTES.nowPlaying)}
         style={({ pressed }) => [styles.open, pressed && styles.pressed]}
@@ -85,6 +76,11 @@ function Bar({ session, place }: BarProps) {
   )
 }
 
+function Bar({ session, place }: BarProps) {
+  const track = useAudioQueue(playingTrackOf)
+  return track !== null && <TrackBar place={place} session={session} track={track} />
+}
+
 type NowPlayingBarProps = { place: BarPlace }
 
 /**
@@ -95,8 +91,7 @@ type NowPlayingBarProps = { place: BarPlace }
 export function NowPlayingBar({ place }: NowPlayingBarProps) {
   const session = useWren()
   const isShown = useIsBarShown(place)
-  if (session === null || !isShown) return null
-  return <Bar place={place} session={session} />
+  return session !== null && isShown && <Bar place={place} session={session} />
 }
 
 const styles = StyleSheet.create({

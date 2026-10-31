@@ -58,30 +58,34 @@ export function WrenRoot() {
     if (isLoaded) hideAsync().catch(SPLASH_IGNORED)
   }, [isLoaded])
 
-  if (!isLoaded) return null
   return (
-    <QueryClientProvider client={queryClient}>
-      <StatusBar barStyle={BAR_STYLE} />
-      {session !== null && <WrenAudioHost key={session.server.id} session={session} />}
-      <View style={styles.screen}>
-        <Stack
-          screenOptions={{ headerShown: false, contentStyle: { backgroundColor: PALETTE.ground } }}
-        >
-          <Stack.Protected
-            guard={session !== null && (isSignedIn || IS_SIGN_IN_BYPASSED)}
-            redirectTo={WREN_ROUTES.signIn}
+    isLoaded && (
+      <QueryClientProvider client={queryClient}>
+        <StatusBar barStyle={BAR_STYLE} />
+        {session !== null && <WrenAudioHost key={session.server.id} session={session} />}
+        <View style={styles.screen}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: PALETTE.ground },
+            }}
           >
-            <Stack.Screen name={WREN_SCREENS.tabs} />
-            <Stack.Screen name={WREN_SCREENS.album} />
-            <Stack.Screen name={WREN_SCREENS.artist} />
-            <Stack.Screen name={WREN_SCREENS.playlist} />
-            <Stack.Screen name={WREN_SCREENS.nowPlaying} options={{ presentation: 'modal' }} />
-          </Stack.Protected>
-          <Stack.Screen name={WREN_SCREENS.signIn} />
-        </Stack>
-        <NowPlayingBar place={BAR_PLACES.page} />
-      </View>
-    </QueryClientProvider>
+            <Stack.Protected
+              guard={session !== null && (isSignedIn || IS_SIGN_IN_BYPASSED)}
+              redirectTo={WREN_ROUTES.signIn}
+            >
+              <Stack.Screen name={WREN_SCREENS.tabs} />
+              <Stack.Screen name={WREN_SCREENS.album} />
+              <Stack.Screen name={WREN_SCREENS.artist} />
+              <Stack.Screen name={WREN_SCREENS.playlist} />
+              <Stack.Screen name={WREN_SCREENS.nowPlaying} options={{ presentation: 'modal' }} />
+            </Stack.Protected>
+            <Stack.Screen name={WREN_SCREENS.signIn} />
+          </Stack>
+          <NowPlayingBar place={BAR_PLACES.page} />
+        </View>
+      </QueryClientProvider>
+    )
   )
 }
 

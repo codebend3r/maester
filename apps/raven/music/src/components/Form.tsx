@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import {
   KeyboardAvoidingView,
+  type KeyboardTypeOptions,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,6 +34,24 @@ export function Form({ title, note, children }: FormProps) {
   )
 }
 
+type FieldKindProps = { isSecret: boolean; isNumeric: boolean; isEmail: boolean }
+
+type AutoCompleteForProps = FieldKindProps
+
+/** What the system offers to fill a field with: the email, a saved password, or nothing. */
+const autoCompleteFor = ({ isSecret, isNumeric, isEmail }: AutoCompleteForProps) => {
+  if (isEmail) return 'email'
+  return isSecret && !isNumeric ? 'password' : 'off'
+}
+
+type KeyboardForProps = FieldKindProps
+
+/** The keyboard a field brings up: digits for a PIN, the email one, else the default. */
+const keyboardFor = ({ isNumeric, isEmail }: KeyboardForProps): KeyboardTypeOptions => {
+  if (isNumeric) return 'number-pad'
+  return isEmail ? 'email-address' : 'default'
+}
+
 type FieldProps = {
   label: string
   value: string
@@ -58,9 +77,9 @@ export function Field({
       <TextInput
         accessibilityLabel={label}
         autoCapitalize="none"
-        autoComplete={isEmail ? 'email' : isSecret && !isNumeric ? 'password' : 'off'}
+        autoComplete={autoCompleteFor({ isSecret, isNumeric, isEmail })}
         autoCorrect={false}
-        keyboardType={isNumeric ? 'number-pad' : isEmail ? 'email-address' : 'default'}
+        keyboardType={keyboardFor({ isSecret, isNumeric, isEmail })}
         onChangeText={onChangeText}
         onSubmitEditing={onSubmit}
         returnKeyType="go"

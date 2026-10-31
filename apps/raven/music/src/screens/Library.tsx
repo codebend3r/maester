@@ -1,8 +1,8 @@
-import { MUSIC_SORTS, plural } from '@raven/core'
+import { MUSIC_SORTS } from '@raven/core'
 import { playlistFactsOf } from '@raven/ui/headless'
 import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
-import { type ReactElement, useState } from 'react'
+import { type ComponentType, type ReactElement, useState } from 'react'
 import { FlatList, StyleSheet, View } from 'react-native'
 
 import { useTileWidth } from '@/components/AlbumGrid'
@@ -12,10 +12,12 @@ import { Notice } from '@/components/Notice'
 import { Segments } from '@/components/Segments'
 import { SongList } from '@/components/SongList'
 import { PageTitle, pageStyles, useListContent } from '@/components/TabPage'
+import { artistFactsOf } from '@/music/artistFacts'
 import { type ListState, byName, byTitle, listStateOf, mergedOf } from '@/music/merged'
 import { LIBRARY_COPY, useMusicLibraries } from '@/music/musicLibraries'
 import { nextPageOf } from '@/music/nextPage'
 import { useCovers } from '@/music/useCovers'
+import { LIBRARY_PAGE_COPY } from '@/screens/copy'
 import { WREN_PAGES, pageHref } from '@/routes'
 import { SIZES } from '@/theme/wrenTheme'
 import { type WrenSession, useWren } from '@/useWren'
@@ -30,30 +32,31 @@ const SEGMENTS = {
 
 type Segment = (typeof SEGMENTS)[keyof typeof SEGMENTS]
 
-const COPY = {
-  title: 'Library',
-  segments: [
-    { key: SEGMENTS.albums, label: 'Albums' },
-    { key: SEGMENTS.artists, label: 'Artists' },
-    { key: SEGMENTS.songs, label: 'Songs' },
-    { key: SEGMENTS.playlists, label: 'Playlists' },
-  ],
-  noAlbums: 'No albums yet.',
-  noArtists: 'No artists yet.',
-  noSongs: 'No songs yet.',
-  noPlaylists: 'No playlists yet. Add a track to one from its menu.',
-} as const
+/** The Library tab's lists, each named on its tab. */
+const LIBRARY_SEGMENTS = [
+  { key: SEGMENTS.albums, label: LIBRARY_PAGE_COPY.albums },
+  { key: SEGMENTS.artists, label: LIBRARY_PAGE_COPY.artists },
+  { key: SEGMENTS.songs, label: LIBRARY_PAGE_COPY.songs },
+  { key: SEGMENTS.playlists, label: LIBRARY_PAGE_COPY.playlists },
+] as const
 
-type ListNoticeProps = { listing: ListState; empty: string }
+type ListNoticeOfProps = { listing: ListState; empty: string }
 
 /**
  * What a list says in place of its entries: why it could not be read, that it is, that raven
  * holds no music, or that it is empty.
  */
-function ListNotice({ listing: { failure, isRead, hasNoMusic }, empty }: ListNoticeProps) {
-  if (failure !== null) return <Notice text={failure.message} />
-  if (!isRead) return <Notice text={LIBRARY_COPY.loading} />
-  return <Notice text={hasNoMusic ? LIBRARY_COPY.noMusic : empty} />
+const listNoticeOf = ({ listing: { failure, isRead, hasNoMusic }, empty }: ListNoticeOfProps) => {
+  if (failure !== null) return failure.message
+  if (!isRead) return LIBRARY_COPY.loading
+  return hasNoMusic ? LIBRARY_COPY.noMusic : empty
+}
+
+type ListNoticeProps = ListNoticeOfProps
+
+/** A list's notice, standing where its entries would. */
+function ListNotice(props: ListNoticeProps) {
+  return <Notice text={listNoticeOf(props)} />
 }
 
 type SegmentListProps = { session: WrenSession; header: ReactElement }
@@ -71,7 +74,7 @@ function AlbumsList({ session, header }: SegmentListProps) {
   const { entries: albums, ...listing } = mergedOf({ music, listings, order: byTitle })
   return (
     <FlatList
-      ListEmptyComponent={<ListNotice empty={COPY.noAlbums} listing={listing} />}
+      ListEmptyComponent={<ListNotice empty={LIBRARY_PAGE_COPY.noAlbums} listing={listing} />}
       ListHeaderComponent={header}
       columnWrapperStyle={styles.columns}
       contentContainerStyle={listContent}
@@ -103,17 +106,14 @@ function ArtistsList({ session, header }: SegmentListProps) {
   const { entries: artists, ...listing } = mergedOf({ music, listings, order: byName })
   return (
     <FlatList
-      ListEmptyComponent={<ListNotice empty={COPY.noArtists} listing={listing} />}
+      ListEmptyComponent={<ListNotice empty={LIBRARY_PAGE_COPY.noArtists} listing={listing} />}
       ListHeaderComponent={header}
       contentContainerStyle={listContent}
       data={artists}
       keyExtractor={(artist) => String(artist.id)}
       renderItem={({ item }) => (
         <ListRow
-          line={[
-            plural({ n: item.albumCount, one: 'album', many: 'albums' }),
-            plural({ n: item.trackCount, one: 'track', many: 'tracks' }),
-          ].join(' · ')}
+          line={artistFactsOf({ artist: item })}
           onPress={() => router.push(pageHref({ page: WREN_PAGES.artist, id: item.id }))}
           title={item.name}
         />
@@ -137,7 +137,7 @@ function SongsList({ session, header }: SegmentListProps) {
     <SongList
       empty={
         <ListNotice
-          empty={COPY.noSongs}
+          empty={LIBRARY_PAGE_COPY.noSongs}
           listing={listStateOf({ music, failure: songs.error, isRead: songs.isSuccess })}
         />
       }
@@ -156,7 +156,7 @@ function PlaylistsList({ session, header }: SegmentListProps) {
     <FlatList
       ListEmptyComponent={
         <ListNotice
-          empty={COPY.noPlaylists}
+          empty={LIBRARY_PAGE_COPY.noPlaylists}
           listing={{ failure: playlists.error, isRead: playlists.isSuccess, hasNoMusic: false }}
         />
       }
@@ -176,30 +176,26 @@ function PlaylistsList({ session, header }: SegmentListProps) {
   )
 }
 
+/** The list each of the Library tab's segments shows. */
+const SEGMENT_LISTS = {
+  [SEGMENTS.albums]: AlbumsList,
+  [SEGMENTS.artists]: ArtistsList,
+  [SEGMENTS.songs]: SongsList,
+  [SEGMENTS.playlists]: PlaylistsList,
+} as const satisfies Record<Segment, ComponentType<SegmentListProps>>
+
 type ServerLibraryProps = { session: WrenSession }
 
 function ServerLibrary({ session }: ServerLibraryProps) {
   const [segment, setSegment] = useState<Segment>(SEGMENTS.albums)
   const header = (
     <View style={pageStyles.header}>
-      <PageTitle title={COPY.title} />
-      <Segments onSelect={setSegment} segments={COPY.segments} selected={segment} />
+      <PageTitle title={LIBRARY_PAGE_COPY.title} />
+      <Segments onSelect={setSegment} segments={LIBRARY_SEGMENTS} selected={segment} />
     </View>
   )
-  switch (segment) {
-    case SEGMENTS.albums:
-      return <AlbumsList header={header} session={session} />
-    case SEGMENTS.artists:
-      return <ArtistsList header={header} session={session} />
-    case SEGMENTS.songs:
-      return <SongsList header={header} session={session} />
-    case SEGMENTS.playlists:
-      return <PlaylistsList header={header} session={session} />
-    default: {
-      const unknown: never = segment
-      return unknown
-    }
-  }
+  const List = SEGMENT_LISTS[segment]
+  return <List header={header} session={session} />
 }
 
 /**

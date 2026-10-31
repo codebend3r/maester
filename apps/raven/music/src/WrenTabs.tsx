@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native'
 
 import { BAR_PLACES, NowPlayingBar } from '@/components/NowPlayingBar'
 import { WREN_TABS } from '@/routes'
+import { HOME_COPY, LIBRARY_PAGE_COPY, SEARCH_COPY, SETTINGS_COPY } from '@/screens/copy'
 import { WREN_ICONS } from '@/theme/icons'
 import { PALETTE, SIZES } from '@/theme/wrenTheme'
 
@@ -21,10 +22,13 @@ const tabIconOf =
 
 /** Each tab's name and drawing on the bar, in the bar's order. */
 const TABS = {
-  [WREN_TABS.home]: { title: 'Home', tabBarIcon: tabIconOf(WREN_ICONS.home) },
-  [WREN_TABS.library]: { title: 'Library', tabBarIcon: tabIconOf(WREN_ICONS.library) },
-  [WREN_TABS.search]: { title: 'Search', tabBarIcon: tabIconOf(WREN_ICONS.search) },
-  [WREN_TABS.settings]: { title: 'Settings', tabBarIcon: tabIconOf(WREN_ICONS.settings) },
+  [WREN_TABS.home]: { title: HOME_COPY.title, tabBarIcon: tabIconOf(WREN_ICONS.home) },
+  [WREN_TABS.library]: {
+    title: LIBRARY_PAGE_COPY.title,
+    tabBarIcon: tabIconOf(WREN_ICONS.library),
+  },
+  [WREN_TABS.search]: { title: SEARCH_COPY.title, tabBarIcon: tabIconOf(WREN_ICONS.search) },
+  [WREN_TABS.settings]: { title: SETTINGS_COPY.title, tabBarIcon: tabIconOf(WREN_ICONS.settings) },
 } as const satisfies Record<WrenTab, { title: string; tabBarIcon: ReturnType<typeof tabIconOf> }>
 
 /** The tab bar with the now-playing bar sitting on it. */

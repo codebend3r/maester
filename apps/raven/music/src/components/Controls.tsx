@@ -2,6 +2,7 @@ import { Icon } from '@raven/native'
 import type { IconName } from '@raven/ui/iconDrawings'
 import { Pressable, StyleSheet, Text } from 'react-native'
 
+import { CONTROLS_COPY } from '@/components/copy'
 import { WREN_ICONS } from '@/theme/icons'
 import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
 
@@ -59,16 +60,14 @@ export function IconButton({ label, icon, onPress, isProminent = false }: IconBu
   )
 }
 
-const PLAY_COPY = { play: 'Play', shuffle: 'Shuffle' } as const
-
 type PlayButtonsProps = { onPlay: () => void; onShuffle: () => void }
 
 /** Play and Shuffle, side by side, for an album or a playlist. */
 export function PlayButtons({ onPlay, onShuffle }: PlayButtonsProps) {
   return (
     <>
-      <ActionButton icon={WREN_ICONS.play} isPrimary label={PLAY_COPY.play} onPress={onPlay} />
-      <ActionButton icon={WREN_ICONS.shuffle} label={PLAY_COPY.shuffle} onPress={onShuffle} />
+      <ActionButton icon={WREN_ICONS.play} isPrimary label={CONTROLS_COPY.play} onPress={onPlay} />
+      <ActionButton icon={WREN_ICONS.shuffle} label={CONTROLS_COPY.shuffle} onPress={onShuffle} />
     </>
   )
 }
@@ -96,14 +95,17 @@ export function ToggleButton({ label, icon, isOn, onToggle }: ToggleButtonProps)
   )
 }
 
-const FAVOURITE = 'Favourite'
-
 type FavouriteToggleProps = { isOn: boolean; onToggle: () => void }
 
 /** Whether the album or artist is one of the listener's favourites, and the switch to change it. */
 export function FavouriteToggle({ isOn, onToggle }: FavouriteToggleProps) {
   return (
-    <ToggleButton icon={WREN_ICONS.favourite} isOn={isOn} label={FAVOURITE} onToggle={onToggle} />
+    <ToggleButton
+      icon={WREN_ICONS.favourite}
+      isOn={isOn}
+      label={CONTROLS_COPY.favourite}
+      onToggle={onToggle}
+    />
   )
 }
 

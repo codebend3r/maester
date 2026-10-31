@@ -2,6 +2,7 @@ import { type AlbumSummary, type Artist, MUSIC_SORTS, type Track, plural } from 
 import { playingTrackOf, useAudioQueue, useSearch } from '@raven/ui/headless'
 import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
+import type { ComponentType } from 'react'
 import { FlatList, SectionList, StyleSheet, Text, TextInput, View } from 'react-native'
 
 import { useTileWidth } from '@/components/AlbumGrid'
@@ -14,20 +15,10 @@ import { byName, byTitle, mergedOf } from '@/music/merged'
 import { LIBRARY_COPY, useMusicLibraries } from '@/music/musicLibraries'
 import { nextPageOf } from '@/music/nextPage'
 import { type CoverOf, useCovers } from '@/music/useCovers'
+import { COUNT_COPY, SEARCH_COPY } from '@/screens/copy'
 import { WREN_PAGES, pageHref } from '@/routes'
 import { PALETTE, SIZES } from '@/theme/wrenTheme'
 import { type WrenSession, useWren } from '@/useWren'
-
-const COPY = {
-  title: 'Search',
-  label: 'Search your music',
-  hint: 'Find albums, artists and songs in every music library.',
-  searching: 'Searching',
-  nothing: (query: string) => `Nothing in your music matches "${query}".`,
-  albums: 'Albums',
-  artists: 'Artists',
-  songs: 'Songs',
-} as const
 
 /** What a row of the results is: the run of albums, an artist, or a song. */
 const RESULT_KINDS = { albums: 'albums', artist: 'artist', song: 'song' } as const
@@ -46,49 +37,73 @@ type ResultRowProps = {
   coverOf: CoverOf
 }
 
-function ResultRow({ result, songs, playingId, coverOf }: ResultRowProps) {
-  const router = useRouter()
+type AlbumsResultProps = ResultRowProps
+
+/** The run of albums that match, in a row that scrolls sideways. */
+function AlbumsResult({ result, coverOf }: AlbumsResultProps) {
   const { tileWidth } = useTileWidth()
-  switch (result.kind) {
-    case RESULT_KINDS.albums:
-      return (
-        <FlatList
-          contentContainerStyle={styles.albums}
-          data={result.albums}
-          horizontal
-          keyExtractor={(album) => String(album.id)}
-          renderItem={({ item }) => (
-            <AlbumTile
-              album={item}
-              cover={coverOf({ albumId: item.id, coverVersion: item.coverVersion })}
-              width={tileWidth}
-            />
-          )}
-          showsHorizontalScrollIndicator={false}
-        />
-      )
-    case RESULT_KINDS.artist:
-      return (
-        <ListRow
-          line={plural({ n: result.artist.albumCount, one: 'album', many: 'albums' })}
-          onPress={() => router.push(pageHref({ page: WREN_PAGES.artist, id: result.artist.id }))}
-          title={result.artist.name}
-        />
-      )
-    case RESULT_KINDS.song:
-      return (
-        <SongRow
-          index={result.index}
-          isPlaying={result.track.id === playingId}
-          track={result.track}
-          tracks={songs}
-        />
-      )
-    default: {
-      const unknown: never = result
-      return unknown
-    }
-  }
+  return (
+    result.kind === RESULT_KINDS.albums && (
+      <FlatList
+        contentContainerStyle={styles.albums}
+        data={result.albums}
+        horizontal
+        keyExtractor={(album) => String(album.id)}
+        renderItem={({ item }) => (
+          <AlbumTile
+            album={item}
+            cover={coverOf({ albumId: item.id, coverVersion: item.coverVersion })}
+            width={tileWidth}
+          />
+        )}
+        showsHorizontalScrollIndicator={false}
+      />
+    )
+  )
+}
+
+type ArtistResultProps = ResultRowProps
+
+/** An artist that matches, a press opening their page. */
+function ArtistResult({ result }: ArtistResultProps) {
+  const router = useRouter()
+  return (
+    result.kind === RESULT_KINDS.artist && (
+      <ListRow
+        line={plural({ n: result.artist.albumCount, ...COUNT_COPY.albums })}
+        onPress={() => router.push(pageHref({ page: WREN_PAGES.artist, id: result.artist.id }))}
+        title={result.artist.name}
+      />
+    )
+  )
+}
+
+type SongResultProps = ResultRowProps
+
+/** A song that matches, a press playing the songs found from it. */
+function SongResult({ result, songs, playingId }: SongResultProps) {
+  return (
+    result.kind === RESULT_KINDS.song && (
+      <SongRow
+        index={result.index}
+        isPlaying={result.track.id === playingId}
+        track={result.track}
+        tracks={songs}
+      />
+    )
+  )
+}
+
+/** How each kind of result is drawn. */
+const RESULT_ROWS = {
+  [RESULT_KINDS.albums]: AlbumsResult,
+  [RESULT_KINDS.artist]: ArtistResult,
+  [RESULT_KINDS.song]: SongResult,
+} as const satisfies Record<Result['kind'], ComponentType<ResultRowProps>>
+
+function ResultRow(props: ResultRowProps) {
+  const Row = RESULT_ROWS[props.result.kind]
+  return <Row {...props} />
 }
 
 type SectionsOfProps = {
@@ -103,7 +118,7 @@ const sectionsOf = ({ albums, artists, songs }: SectionsOfProps): ResultSection[
     [
       {
         key: RESULT_KINDS.albums,
-        title: COPY.albums,
+        title: SEARCH_COPY.albums,
         data:
           albums.length === 0
             ? []
@@ -111,7 +126,7 @@ const sectionsOf = ({ albums, artists, songs }: SectionsOfProps): ResultSection[
       },
       {
         key: RESULT_KINDS.artist,
-        title: COPY.artists,
+        title: SEARCH_COPY.artists,
         data: artists.map((artist) => ({
           kind: RESULT_KINDS.artist,
           key: String(artist.id),
@@ -120,7 +135,7 @@ const sectionsOf = ({ albums, artists, songs }: SectionsOfProps): ResultSection[
       },
       {
         key: RESULT_KINDS.song,
-        title: COPY.songs,
+        title: SEARCH_COPY.songs,
         data: songs.map((track, index) => ({
           kind: RESULT_KINDS.song,
           key: `${track.id}:${index}`,
@@ -178,26 +193,26 @@ function ServerSearch({ session }: ServerSearchProps) {
   const notice = ((): string | null => {
     if (albums.hasNoMusic) return LIBRARY_COPY.noMusic
     // Before a search only the libraries' own failure counts: a blank one's listings ask nothing.
-    if (!isAsked) return music.failure?.message ?? COPY.hint
+    if (!isAsked) return music.failure?.message ?? SEARCH_COPY.hint
     const failure = albums.failure ?? artists.failure ?? songs.error
     if (failure !== null) return failure.message
     if (sections.length > 0) return null
     const isRead = albums.isRead && artists.isRead && songs.isSuccess
-    return isRead ? COPY.nothing(query) : COPY.searching
+    return isRead ? SEARCH_COPY.nothing(query) : SEARCH_COPY.searching
   })()
   return (
     <SectionList
       ListHeaderComponent={
         <View style={pageStyles.header}>
-          <PageTitle title={COPY.title} />
+          <PageTitle title={SEARCH_COPY.title} />
           <TextInput
-            accessibilityLabel={COPY.label}
+            accessibilityLabel={SEARCH_COPY.label}
             autoCapitalize="none"
             autoCorrect={false}
             clearButtonMode="while-editing"
             onChangeText={search.setText}
             onSubmitEditing={search.searchNow}
-            placeholder={COPY.label}
+            placeholder={SEARCH_COPY.label}
             placeholderTextColor={PALETTE.muted}
             returnKeyType="search"
             style={styles.input}

@@ -18,15 +18,10 @@ import { Notice } from '@/components/Notice'
 import { pageStyles, useListContent } from '@/components/TabPage'
 import { TrackRow } from '@/components/TrackRow'
 import { useCovers } from '@/music/useCovers'
+import { ALBUM_COPY } from '@/screens/copy'
 import { WREN_PAGES, WREN_ROUTE_PARAMS, pageHref } from '@/routes'
 import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
 import { type WrenSession, useWren } from '@/useWren'
-
-const COPY = {
-  opening: 'Opening the album',
-  missing: 'This album is not on the server.',
-  openArtist: (name: string) => `Go to ${name}`,
-} as const
 
 type AlbumPageProps = { session: WrenSession; details: AlbumDetails }
 
@@ -76,7 +71,7 @@ function AlbumPage({ session, details }: AlbumPageProps) {
             <View style={styles.artists}>
               {album.artists.map((artist) => (
                 <Pressable
-                  accessibilityLabel={COPY.openArtist(artist.name)}
+                  accessibilityLabel={ALBUM_COPY.openArtist(artist.name)}
                   accessibilityRole="link"
                   key={artist.id}
                   onPress={() => router.push(pageHref({ page: WREN_PAGES.artist, id: artist.id }))}
@@ -120,7 +115,7 @@ type ServerAlbumProps = { session: WrenSession; id: number | null }
 function ServerAlbum({ session, id }: ServerAlbumProps) {
   const album = useQuery(session.queries.albumQuery(id))
   return (
-    <DetailRoute copy={COPY} id={id} query={album}>
+    <DetailRoute copy={ALBUM_COPY} id={id} query={album}>
       {(details) => <AlbumPage details={details} session={session} />}
     </DetailRoute>
   )
