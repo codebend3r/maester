@@ -1,12 +1,12 @@
 import { RADIO_SEED_KINDS, type RadioSeed, type Track } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ViewingRepository } from '@/media/viewingRepository'
-import { ListenBrainzClient } from '@/music/listenBrainzClient'
+import { DEFAULT_LISTENBRAINZ_TIMEOUT_MS, ListenBrainzClient } from '@/music/listenBrainzClient'
 import { RADIO_OUTCOMES, Radio } from '@/music/radio'
 import { SimilarArtists } from '@/music/similarArtists'
 import { manualClock } from '@/test/clock'
 import { testDatabase } from '@/test/database'
-import { fakeListenBrainz } from '@/test/fakeListenBrainz'
+import { FAKE_ANSWERS, fakeListenBrainz } from '@/test/fakeListenBrainz'
 import { musicLibrary } from '@/test/musicLibrary'
 import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
@@ -24,6 +24,21 @@ const MBIDS = {
 } as const
 
 const ARTISTS = { seed: 'Radiohead', similar: 'Muse', genre: 'Rocker', other: 'Jazzer' } as const
+
+type ManyProps = {
+  add: ReturnType<typeof musicLibrary>['addTrack']
+  libraryId: number
+  artist: string
+  count: number
+  artistMbid?: string
+  genres?: string[]
+}
+
+/** `count` tracks by `artist`, on one album of theirs. */
+const many = ({ add, libraryId, artist, count, artistMbid, genres }: ManyProps): number[] =>
+  Array.from({ length: count }, (_, at) =>
+    add({ libraryId, title: `${artist} ${at}`, artist, album: `${artist} LP`, artistMbid, genres }),
+  )
 
 const namesOf = (tracks: readonly Track[]): (string | undefined)[] =>
   tracks.map((track) => track.artists[0]?.name)
@@ -52,7 +67,7 @@ describe('Radio', () => {
     const { music } = musicLibrary(database.get())
     const similar = new SimilarArtists(
       database.get(),
-      new ListenBrainzClient(listenBrainz.fetch),
+      new ListenBrainzClient(listenBrainz.fetch, clock.clock, DEFAULT_LISTENBRAINZ_TIMEOUT_MS),
       clock.clock,
     )
     return new Radio(database.get(), music, similar, clock.clock)
@@ -190,4 +205,113 @@ describe('Radio', () => {
     expect(await outcomeOf({ kind: artist, id: 9999 })).toBe(RADIO_OUTCOMES.missing)
     expect(await outcomeOf({ kind: track, id: state.rested })).toBe(RADIO_OUTCOMES.found)
   })
+})
+
+describe('a radio over a larger library', () => {
+  const database = testDatabase('raven-radio-blend-')
+  const SIMILAR = ['Muse', 'Placebo'] as const
+  const GENRE = ['Rock 1', 'Rock 2', 'Rock 3', 'Rock 4', 'Rock 5'] as const
+  const MBID_OF = {
+    Muse: MBIDS.similar,
+    Placebo: '847e8284-8582-4b0e-9c26-b042a4f49e57',
+  } as const
+  const state = { main: 0, solo: 0, seedArtist: 0, soloArtist: 0, soloTracks: [0] }
+
+  type RadioOverProps = { answer?: (typeof FAKE_ANSWERS)[keyof typeof FAKE_ANSWERS] }
+
+  /** A radio whose ListenBrainz answers as `answer` says, with a 50 ms timeout. */
+  const radioOver = ({ answer }: RadioOverProps = {}) => {
+    const clock = manualClock()
+    clock.advance(NOW)
+    const listenBrainz = fakeListenBrainz({
+      similar: {
+        [MBIDS.seed]: SIMILAR.map((name, at) => ({ mbid: MBID_OF[name], name, score: 10 - at })),
+      },
+      answer,
+    })
+    const { music } = musicLibrary(database.get())
+    const similar = new SimilarArtists(
+      database.get(),
+      new ListenBrainzClient(listenBrainz.fetch, clock.clock, 50),
+      clock.clock,
+    )
+    return { radio: new Radio(database.get(), music, similar, clock.clock), listenBrainz }
+  }
+
+  beforeAll(async () => {
+    await database.open()
+    const { addLibrary, addTrack, music } = musicLibrary(database.get())
+    state.main = addLibrary({ name: 'Music' })
+    state.solo = addLibrary({ name: 'Solo' })
+    const [seedTrack] = many({
+      add: addTrack,
+      libraryId: state.main,
+      artist: ARTISTS.seed,
+      count: 60,
+      artistMbid: MBIDS.seed,
+      genres: ['Rock'],
+    })
+    SIMILAR.forEach((artist) =>
+      many({ add: addTrack, libraryId: state.main, artist, count: 6, artistMbid: MBID_OF[artist] }),
+    )
+    GENRE.forEach((artist) =>
+      many({ add: addTrack, libraryId: state.main, artist, count: 5, genres: ['Rock'] }),
+    )
+    many({ add: addTrack, libraryId: state.main, artist: 'Lounge', count: 10, genres: ['Jazz'] })
+    state.soloTracks = many({ add: addTrack, libraryId: state.solo, artist: 'Solo', count: 20 })
+    state.seedArtist = music.tracks([seedTrack ?? 0]).get(seedTrack ?? 0)?.artists[0]?.id ?? 0
+    const [soloTrack = 0] = state.soloTracks
+    state.soloArtist = music.tracks([soloTrack]).get(soloTrack)?.artists[0]?.id ?? 0
+  })
+
+  afterAll(() => database.close())
+
+  it('takes a third of the seed artist, a few of each similar one, then the genre before the library', async () => {
+    const answer = await radioOver().radio.play({
+      seed: { kind: RADIO_SEED_KINDS.artist, id: state.seedArtist },
+      account,
+      hidden: [state.solo],
+    })
+    const names = namesOf(answer.outcome === RADIO_OUTCOMES.found ? answer.tracks : [])
+    const countOf = (name: string) => names.filter((each) => each === name).length
+
+    expect(names).toHaveLength(50)
+    expect(countOf(ARTISTS.seed)).toBe(17)
+    expect(SIMILAR.map(countOf)).toEqual([4, 4])
+    expect(GENRE.map(countOf)).toEqual([5, 5, 5, 5, 5])
+    expect(countOf('Lounge')).toBe(0)
+    expect(names.filter((name, at) => at > 0 && name === names[at - 1])).toEqual([])
+  })
+
+  it('fills a library too small for the caps from the seed artist', async () => {
+    const answer = await radioOver().radio.play({
+      seed: { kind: RADIO_SEED_KINDS.artist, id: state.soloArtist },
+      account,
+      hidden: [state.main],
+    })
+    const ids = answer.outcome === RADIO_OUTCOMES.found ? answer.tracks.map(({ id }) => id) : []
+    expect(ids.toSorted((a, b) => a - b)).toEqual(state.soloTracks)
+  })
+
+  it.each([FAKE_ANSWERS.hang, FAKE_ANSWERS.tooMany])(
+    'answers from the other tiers when ListenBrainz is away (%s), and asks it nothing again meanwhile',
+    async (away) => {
+      // What the tests before kept would answer without asking.
+      database.get().db.prepare('DELETE FROM similar_artists').run()
+      const { radio, listenBrainz } = radioOver({ answer: away })
+      const play = () =>
+        radio.play({
+          seed: { kind: RADIO_SEED_KINDS.artist, id: state.seedArtist },
+          account,
+          hidden: [state.solo],
+        })
+      const started = performance.now()
+      const first = await play()
+      expect(performance.now() - started).toBeLessThan(1000)
+      await play()
+
+      expect(first.outcome === RADIO_OUTCOMES.found ? first.tracks : []).toHaveLength(50)
+      expect(listenBrainz.requests).toHaveLength(1)
+    },
+  )
 })

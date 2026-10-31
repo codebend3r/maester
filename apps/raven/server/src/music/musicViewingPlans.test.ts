@@ -4,7 +4,7 @@ import type { DatabaseService } from '@/db/database'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import { ViewingRepository } from '@/media/viewingRepository'
-import { ListenBrainzClient } from '@/music/listenBrainzClient'
+import { DEFAULT_LISTENBRAINZ_TIMEOUT_MS, ListenBrainzClient } from '@/music/listenBrainzClient'
 import { Mixes } from '@/music/mixes'
 import { MusicFavourites } from '@/music/musicFavourites'
 import { MusicRepository } from '@/music/musicRepository'
@@ -26,7 +26,11 @@ const stores = ({ database }: StoresProps) => {
   const music = new MusicRepository(database, pictureVersionsOf(database))
   const similar = new SimilarArtists(
     database,
-    new ListenBrainzClient(fakeListenBrainz({ similar: {} }).fetch),
+    new ListenBrainzClient(
+      fakeListenBrainz({ similar: {} }).fetch,
+      STILL_CLOCK,
+      DEFAULT_LISTENBRAINZ_TIMEOUT_MS,
+    ),
     STILL_CLOCK,
   )
   return {

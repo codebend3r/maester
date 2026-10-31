@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { isMbid, isNumber, isRecord } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
+import { CLOCK, type Clock } from '@/clock'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 import { RAVEN_USER_AGENT } from '@/music/userAgent'
 import { type RateLimit, createRateLimit, sleep } from '@/scanner/concurrency'
@@ -15,10 +16,17 @@ export const LISTENBRAINZ_LABS = 'https://labs.api.listenbrainz.org'
 const ALGORITHM =
   'session_based_days_7500_session_300_contribution_5_threshold_10_limit_100_filter_True_skip_30'
 
-const TIMEOUT_MS = 10_000
+/** How long one call may take before ListenBrainz counts as away; a test gives less. */
+export const DEFAULT_LISTENBRAINZ_TIMEOUT_MS = 5_000
 
-/** How often a 503 or a 429 is waited out before the call gives up. */
-const RETRIES = 3
+/** The DI token the call's timeout is provided under. */
+export const LISTENBRAINZ_TIMEOUT_MS = Symbol('LISTENBRAINZ_TIMEOUT_MS')
+
+/** How long ListenBrainz is left alone after it timed out, refused with a 429 or failed with a 5xx. */
+export const LISTENBRAINZ_AWAY_MS = 15 * 60 * 1000
+
+/** How often a 503 is asked again before ListenBrainz counts as away. */
+const RETRIES = 1
 
 const LB_FIELDS = { mbid: 'artist_mbid', score: 'score' } as const
 
@@ -35,28 +43,54 @@ const toSimilar = (value: unknown): SimilarArtist[] => {
 /**
  * ListenBrainz, which needs no key for its similarity data but asks for a
  * `User-Agent` that names the client. One request a second for the whole
- * server, a 503 or a 429 waited out and the rate halved after one, and ten
- * seconds per call; any other failure throws, and the caller goes on
- * without similar artists.
+ * server and five seconds per call. A timeout, a 429 or a 5xx (after one
+ * more try for a 503) leaves ListenBrainz away for `LISTENBRAINZ_AWAY_MS`:
+ * every call meanwhile, those already waiting their turn included, fails at
+ * once without asking, so an outage never holds a radio up. Any failure
+ * throws, and the caller goes on without similar artists.
  */
 @Injectable()
 export class ListenBrainzClient {
   private readonly limit: RateLimit = createRateLimit({ perSecond: 1, inFlight: 1 })
-  constructor(@Inject(METADATA_FETCH) private readonly fetch: MetadataFetch) {}
+  private readonly state = { awayUntil: -Infinity }
+
+  constructor(
+    @Inject(METADATA_FETCH) private readonly fetch: MetadataFetch,
+    @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(LISTENBRAINZ_TIMEOUT_MS) private readonly timeoutMs: number,
+  ) {}
+
+  /** Whether ListenBrainz failed lately enough to be left alone. */
+  get isAway(): boolean {
+    return this.clock.now() < this.state.awayUntil
+  }
+
+  private away(reason: string): Error {
+    this.state.awayUntil = this.clock.now() + LISTENBRAINZ_AWAY_MS
+    return new Error(`ListenBrainz is away: ${reason}`)
+  }
 
   /** The artists similar to the one MusicBrainz knows as `mbid`, closest first. */
   async similarArtists(mbid: string): Promise<SimilarArtist[]> {
     const query = new URLSearchParams({ artist_mbids: mbid, algorithm: ALGORITHM })
     const url = `${LISTENBRAINZ_LABS}/similar-artists/json?${query.toString()}`
     const headers = { [HEADERS.accept]: CONTENT_TYPES.json, [HEADERS.userAgent]: RAVEN_USER_AGENT }
+    const ask = (): Promise<Response> =>
+      this.limit.run(() => {
+        if (this.isAway) throw new Error('ListenBrainz is away.')
+        return this.fetch({ url, init: { headers, signal: AbortSignal.timeout(this.timeoutMs) } })
+      })
     const attempt = async (retriesLeft: number): Promise<unknown> => {
-      const response = await this.limit.run(() =>
-        this.fetch({ url, init: { headers, signal: AbortSignal.timeout(TIMEOUT_MS) } }),
-      )
-      if ((response.status === 503 || response.status === 429) && retriesLeft > 0) {
-        this.limit.slowDown()
+      const response = await ask().catch((error: unknown) => {
+        if (this.isAway) throw error
+        throw this.away(error instanceof Error ? error.message : String(error))
+      })
+      if (response.status === 503 && retriesLeft > 0) {
         await sleep(1000)
         return attempt(retriesLeft - 1)
+      }
+      if (response.status === 429 || response.status >= 500) {
+        throw this.away(`it answered ${response.status}`)
       }
       if (!response.ok) throw new Error(`ListenBrainz answered ${response.status}.`)
       return response.json()

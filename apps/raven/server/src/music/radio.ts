@@ -73,7 +73,18 @@ type RadioIdsProps = {
 /** The tiers a radio fills from, each dealt by a key of its own. */
 const TIERS = { artist: 'artist', similar: 'similar', genre: 'genre', library: 'library' } as const
 
+/**
+ * How many tracks a radio takes of the seed's artists (a third) and of each
+ * similar artist before the genre and the library, so it blends rather than
+ * playing one artist's catalogue; more of them only fill what is left.
+ */
+const RADIO_CAPS = { seed: Math.ceil(MIX_LIMITS.tracks / 3), similar: 4 } as const
+
 type DealProps = { ids: readonly number[]; tier: string }
+
+type ByArtistsProps = { artists: readonly number[]; tier: string }
+
+type OthersProps = { sql: string; tier: string; params?: Record<string, string> }
 
 type RoundRobinProps = { groups: readonly (readonly number[])[] }
 
@@ -86,10 +97,12 @@ const roundRobin = ({ groups }: RoundRobinProps): number[] =>
 /**
  * A radio around a track, an artist or an album: up to 50 tracks, first the
  * seed's artists', then those of the artists ListenBrainz finds similar
- * that the library holds, then the seed's genres, then anything, leaving out
- * what the account played in the last day and the libraries it may not
- * see, and spaced so no artist plays twice in a row where that can be
- * helped. Each tier is dealt by the day, so a radio is the same all day.
+ * that the library holds, then the seed's genres, then anything, each tier
+ * capped by `RADIO_CAPS`, leaving out what the account played in the last
+ * day and the libraries it may not see, and spaced so no artist plays twice
+ * in a row where that can be helped. Each tier is dealt by the day, so a
+ * radio is the same all day, though a track played meanwhile drops out
+ * and the rest move up.
  */
 @Injectable()
 export class Radio {
@@ -181,42 +194,38 @@ export class Radio {
     )
       .flat()
       .filter((id, at, all) => !found.artists.includes(id) && all.indexOf(id) === at)
+    const byArtists = ({ artists, tier }: ByArtistsProps): number[] =>
+      deal({
+        ids: this.ids({
+          sql: BY_ARTISTS,
+          scope,
+          now,
+          params: { artists: JSON.stringify(artists) },
+        }),
+        tier,
+      })
+    const seeds = byArtists({ artists: found.artists, tier: TIERS.artist })
+    const similars = similarArtists.map((artistId) =>
+      byArtists({ artists: [artistId], tier: `${TIERS.similar}:${artistId}` }),
+    )
+    // The genre and the library leave the seed's and the similar artists' tracks to their own tiers and caps.
+    const kept = new Set([...seeds, ...similars.flat()])
+    const others =
+      ({ sql, tier, params }: OthersProps): (() => number[]) =>
+      () =>
+        deal({ ids: this.ids({ sql, scope, now, params }), tier }).filter((id) => !kept.has(id))
     const tiers: (() => number[])[] = [
-      () =>
-        deal({
-          ids: this.ids({
-            sql: BY_ARTISTS,
-            scope,
-            now,
-            params: { artists: JSON.stringify(found.artists) },
-          }),
-          tier: TIERS.artist,
-        }),
-      () =>
-        roundRobin({
-          groups: similarArtists.map((artistId) =>
-            deal({
-              ids: this.ids({
-                sql: BY_ARTISTS,
-                scope,
-                now,
-                params: { artists: JSON.stringify([artistId]) },
-              }),
-              tier: `${TIERS.similar}:${artistId}`,
-            }),
-          ),
-        }),
-      () =>
-        deal({
-          ids: this.ids({
-            sql: BY_GENRE,
-            scope,
-            now,
-            params: { albums: JSON.stringify(found.albums) },
-          }),
-          tier: TIERS.genre,
-        }),
-      () => deal({ ids: this.ids({ sql: ANY_TRACK, scope, now }), tier: TIERS.library }),
+      () => seeds.slice(0, RADIO_CAPS.seed),
+      () => roundRobin({ groups: similars.map((group) => group.slice(0, RADIO_CAPS.similar)) }),
+      others({
+        sql: BY_GENRE,
+        tier: TIERS.genre,
+        params: { albums: JSON.stringify(found.albums) },
+      }),
+      others({ sql: ANY_TRACK, tier: TIERS.library }),
+      // A library too small to fill the radio otherwise takes more of the seed's and the similar artists'.
+      () => seeds.slice(RADIO_CAPS.seed),
+      () => roundRobin({ groups: similars.map((group) => group.slice(RADIO_CAPS.similar)) }),
     ]
     const ids = tiers.reduce<number[]>((picked, tier) => {
       if (picked.length >= MIX_LIMITS.tracks) return picked

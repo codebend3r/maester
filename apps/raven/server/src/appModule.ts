@@ -83,7 +83,11 @@ import { AlbumCovers } from '@/music/albumCovers'
 import { AlbumMatching } from '@/music/albumMatching'
 import { MusicBrainzClient } from '@/music/musicBrainzClient'
 import { LrclibClient } from '@/music/lrclibClient'
-import { ListenBrainzClient } from '@/music/listenBrainzClient'
+import {
+  DEFAULT_LISTENBRAINZ_TIMEOUT_MS,
+  LISTENBRAINZ_TIMEOUT_MS,
+  ListenBrainzClient,
+} from '@/music/listenBrainzClient'
 import { Mixes } from '@/music/mixes'
 import { MixesController } from '@/music/mixesController'
 import { MusicFavourites } from '@/music/musicFavourites'
@@ -258,6 +262,7 @@ export class AppModule {
         LrclibClient,
         MusicFavourites,
         Playlists,
+        { provide: LISTENBRAINZ_TIMEOUT_MS, useValue: DEFAULT_LISTENBRAINZ_TIMEOUT_MS },
         ListenBrainzClient,
         SimilarArtists,
         Mixes,

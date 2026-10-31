@@ -167,4 +167,40 @@ describe('Mixes', () => {
     const mix = mixes().get({ kind: MIX_KINDS.recentlyAdded, ...scope() })
     expect(mix?.tracks.map(({ id }) => id).toSorted((a, b) => a - b)).toEqual(fresh)
   })
+
+  it('makes on this day from what was played on this date in an earlier year', () => {
+    const viewing = new ViewingRepository(database.get(), repositories(database.get()).media)
+    const { addTrack } = musicLibrary(database.get())
+    const tracks = Array.from({ length: 12 }, (_, at) =>
+      addTrack({ libraryId: state.open, title: `Year ${at}`, artist: 'Then', album: 'Then' }),
+    )
+    const [today = 0, dayBefore = 0, ...lastYear] = tracks
+    lastYear.forEach((id, at) =>
+      viewing.recordPlay({
+        id,
+        account,
+        at: new Date(`${2015 + at}-10-31T${String(at).padStart(2, '0')}:30:00Z`),
+      }),
+    )
+    viewing.recordPlay({ id: today, account, at: new Date(NOW - HOUR_MS) })
+    viewing.recordPlay({ id: dayBefore, account, at: new Date('2025-10-30T23:59:00Z') })
+
+    const ids = mixes()
+      .get({ kind: MIX_KINDS.onThisDay, ...scope() })
+      ?.tracks.map(({ id }) => id)
+    expect(ids?.toSorted((a, b) => a - b)).toEqual(lastYear)
+  })
+
+  it('keeps the three most played in heavy rotation when there are more tracks than it holds', () => {
+    const { addTrack } = musicLibrary(database.get())
+    Array.from({ length: 60 }, (_, at) =>
+      addTrack({ libraryId: state.open, title: `B-side ${at}`, artist: 'Hot', album: 'B-sides' }),
+    )
+    const ids = mixes()
+      .get({ kind: MIX_KINDS.heavyRotation, ...scope() })
+      ?.tracks.map(({ id }) => id)
+
+    expect(ids).toHaveLength(50)
+    expect(ids).toEqual(expect.arrayContaining(state.spins.slice(0, 3)))
+  })
 })

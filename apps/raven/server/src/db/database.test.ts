@@ -600,12 +600,14 @@ describe('migrations', () => {
     database.onModuleDestroy()
   })
 
-  it('gives a version-45 database an empty similar artists cache and an index of when albums came', () => {
+  it('gives a version-45 database an empty similar artists cache, lowercase artist ids and an index of when albums came', () => {
     const before = new Sqlite(join(state.dir, 'raven.db'))
     MIGRATIONS.slice(0, 45).forEach((sql) => before.exec(sql))
     before.pragma('user_version = 45')
     before.exec(
-      `INSERT INTO artists (id, name, sort_name, name_key, mbid) VALUES (1, 'Band', 'Band', 'band', NULL);`,
+      `INSERT INTO artists (id, name, sort_name, name_key, mbid)
+       VALUES (1, 'Band', 'Band', 'band', NULL),
+              (2, 'Muse', 'Muse', 'muse', '9C9F1380-2516-4FC9-A3E6-F9F61941D090');`,
     )
     before.close()
 
@@ -620,6 +622,9 @@ describe('migrations', () => {
       .run()
     database.db.prepare('DELETE FROM artists WHERE id = 1').run()
     expect(database.db.prepare('SELECT * FROM similar_artists').all()).toEqual([])
+    expect(database.db.prepare('SELECT mbid FROM artists WHERE id = 2').get()).toEqual({
+      mbid: '9c9f1380-2516-4fc9-a3e6-f9f61941d090',
+    })
     expect(
       database.db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'albums_added'")
