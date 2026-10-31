@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import {
   ACCOUNT_TICKET_SECONDS,
+  AUDIO_BITRATES,
+  isAudioBitrate,
   BUG_REPORT_STATUSES,
   isBugReport,
   isBugReportList,
@@ -769,6 +771,13 @@ describe('the AI lookup', () => {
 })
 
 describe('the media plane guards', () => {
+  it('takes only the three audio bitrates', () => {
+    expect(AUDIO_BITRATES).toEqual({ low: 128, standard: 256, high: 320 })
+    expect(isAudioBitrate(256)).toBe(true)
+    expect(isAudioBitrate(192)).toBe(false)
+    expect(isAudioBitrate('256')).toBe(false)
+  })
+
   it('takes an origin of a known kind with a url', () => {
     expect(isMediaOrigin({ kind: 'lan', url: 'https://raven.home.example.com' })).toBe(true)
     expect(isMediaOrigin({ kind: 'vpn', url: 'https://raven.home.example.com' })).toBe(false)

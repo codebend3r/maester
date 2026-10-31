@@ -663,6 +663,16 @@ describe('playback calls', () => {
     ).toBe('http://nas:8484/api/media/7/hls/master.m3u8?mode=transcode&quality=low720')
   })
 
+  it('builds a transcode URL with the bitrate and the ticket', () => {
+    const { client } = clientReturning(respond({}))
+    expect(client.transcodeUrl({ mediaId: 7, kbps: 256, ticket: 'abc.def' })).toBe(
+      'http://nas:8484/api/media/7/transcode?kbps=256&t=abc.def',
+    )
+    expect(client.transcodeUrl({ mediaId: 7, kbps: 128, ticket: null })).toBe(
+      'http://nas:8484/api/media/7/transcode?kbps=128',
+    )
+  })
+
   it('builds stream URLs', () => {
     const { client } = clientReturning(respond({}))
     expect(client.streamUrl({ id: 7, mode: 'remux', start: 61.23456, audio: 2 })).toBe(

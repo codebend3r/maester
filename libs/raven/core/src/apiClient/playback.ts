@@ -1,5 +1,7 @@
 import { type MediaAccess, type TicketedOrigin, type Transport } from '@/apiClient/transport'
 import {
+  AUDIO_BITRATE_PARAM,
+  type AudioBitrate,
   HLS_PARAMS,
   HLS_PATHS,
   isLiveStreamList,
@@ -9,6 +11,7 @@ import {
   isMediaTracks,
   type LiveStream,
   MEDIA_PROBE_BYTES,
+  MEDIA_TICKET_PARAM,
   type MediaOrigin,
   type MediaOrigins,
   type MediaStreams,
@@ -21,6 +24,13 @@ import {
 import { parseWebVtt } from '@/subtitles'
 
 type FileUrlProps = { id: number; access?: MediaAccess | null }
+
+type TranscodeUrlProps = {
+  mediaId: number
+  kbps: AudioBitrate
+  /** The media ticket that opens it; null on a session that sends the cookie. */
+  ticket: string | null
+}
 
 type PingUrlProps = {
   origin: MediaOrigin
@@ -60,6 +70,17 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
   /** The original file, served with byte ranges: what a player loads for direct play. */
   fileUrl: ({ id, access = null }: FileUrlProps): string =>
     mediaUrl({ path: `/api/media/${id}/file`, query: {}, access }),
+
+  /** A track converted to AAC at `kbps`, served with byte ranges like the original; `ticket` stands in for the cookie. */
+  transcodeUrl: ({ mediaId, kbps, ticket }: TranscodeUrlProps): string =>
+    mediaUrl({
+      path: `/api/media/${mediaId}/transcode`,
+      query: {
+        [AUDIO_BITRATE_PARAM]: String(kbps),
+        ...(ticket === null ? {} : { [MEDIA_TICKET_PARAM]: ticket }),
+      },
+      access: null,
+    }),
 
   /** The server's event stream: `ServerEvent`s, read with `parseServerEvent`. */
   eventsUrl: (): string => url('/api/events'),
