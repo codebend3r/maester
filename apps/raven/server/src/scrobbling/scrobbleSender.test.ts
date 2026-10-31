@@ -1,5 +1,6 @@
 import { LIBRARY_KINDS, SCROBBLE_SERVICES } from '@raven/core'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { Logger } from '@nestjs/common'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type LastFmKeys, readServerConfig } from '@/config'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -273,19 +274,47 @@ describe('ScrobbleSender', () => {
     expect(queued()).toEqual([expect.objectContaining({ service: SCROBBLE_SERVICES.listenBrainz })])
   })
 
-  it('unlinks a service whose stored secret no longer opens, with what was waiting for it', async () => {
+  it('unlinks a service whose stored secret no longer opens, warning, with what was waiting for it', async () => {
     const parts = wired()
     await linkBoth(parts)
-    database
-      .get()
-      .db.prepare("UPDATE scrobble_links SET secret_cipher = 'AAAA.AAAA.AAAA' WHERE service = ?")
-      .run(SCROBBLE_SERVICES.listenBrainz)
-    parts.sender.noteListen({ mediaId: ids.track, account })
-    await parts.sender.whenIdle()
+    const warned = vi.spyOn(Logger.prototype, 'warn')
+    try {
+      database
+        .get()
+        .db.prepare("UPDATE scrobble_links SET secret_cipher = 'AAAA.AAAA.AAAA' WHERE service = ?")
+        .run(SCROBBLE_SERVICES.listenBrainz)
+      parts.sender.noteListen({ mediaId: ids.track, account })
+      await parts.sender.whenIdle()
+      expect(warned).toHaveBeenCalledWith(
+        "An account's ListenBrainz link no longer opens, so it was removed.",
+      )
+    } finally {
+      warned.mockRestore()
+    }
     expect(parts.links.list({ account }).map(({ service }) => service)).toEqual([
       SCROBBLE_SERVICES.lastFm,
     ])
     expect(setup.listenBrainz.submissions).toEqual([])
+    expect(queued()).toEqual([])
+  })
+
+  it('drops a listen whose link is gone without a warning', async () => {
+    const parts = wired()
+    const warned = vi.spyOn(Logger.prototype, 'warn')
+    try {
+      database
+        .get()
+        .db.prepare(
+          `INSERT INTO scrobble_queue (account_id, service, id, media_id, listened_at, attempts, next_at)
+           VALUES (?, ?, 1, ?, ?, 0, ?)`,
+        )
+        .run(account, SCROBBLE_SERVICES.listenBrainz, ids.track, NOW / 1000, NOW)
+      parts.sender.kick()
+      await parts.sender.whenIdle()
+      expect(warned).not.toHaveBeenCalled()
+    } finally {
+      warned.mockRestore()
+    }
     expect(queued()).toEqual([])
   })
 

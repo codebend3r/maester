@@ -1,7 +1,7 @@
 import { SCROBBLE_SERVICES } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ScrobbleCipher } from '@/scrobbling/scrobbleCipher'
-import { ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
+import { SECRET_READS, ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS } from '@/test/repositories'
@@ -39,13 +39,13 @@ describe('ScrobbleLinks', () => {
 
     expect(
       store.secretOf({ account: TEST_ACCOUNTS.b, service: SCROBBLE_SERVICES.listenBrainz }),
-    ).toBe(TOKEN)
+    ).toEqual({ kind: SECRET_READS.opened, secret: TOKEN })
     expect(
       links().secretOf({ account: TEST_ACCOUNTS.b, service: SCROBBLE_SERVICES.listenBrainz }),
-    ).toBe(TOKEN)
+    ).toEqual({ kind: SECRET_READS.opened, secret: TOKEN })
     expect(
       store.secretOf({ account: TEST_ACCOUNTS.a, service: SCROBBLE_SERVICES.listenBrainz }),
-    ).toBeNull()
+    ).toEqual({ kind: SECRET_READS.missing })
     expect(store.list({ account: TEST_ACCOUNTS.a })).toEqual([])
     expect(store.list({ account: TEST_ACCOUNTS.b })).toEqual([
       { service: SCROBBLE_SERVICES.listenBrainz, username: 'member' },
@@ -64,7 +64,7 @@ describe('ScrobbleLinks', () => {
       .run({ other: TEST_ACCOUNTS.a, account: TEST_ACCOUNTS.b })
     expect(
       store.secretOf({ account: TEST_ACCOUNTS.a, service: SCROBBLE_SERVICES.listenBrainz }),
-    ).toBeNull()
+    ).toEqual({ kind: SECRET_READS.unopenable })
     store.remove({ account: TEST_ACCOUNTS.a, service: SCROBBLE_SERVICES.listenBrainz })
     expect(store.list({ account: TEST_ACCOUNTS.a })).toEqual([])
   })

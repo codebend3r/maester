@@ -352,6 +352,8 @@ type CreateEnforcedAppProps = {
   movieSeconds?: number
   /** Answers for ListenBrainz and Last.fm, and the Last.fm keys the server holds, for the scrobbling tests. */
   scrobbling?: { fetch: MetadataFetch; lastFm: LastFmKeys | null }
+  /** How long a membership answer is reused; 5 s when left out. */
+  membershipTtlMs?: number
 }
 
 type ScrobblingOrTmdbProps = { scrobbling: MetadataFetch; tmdb: MetadataFetch }
@@ -378,6 +380,7 @@ export const createEnforcedApp = async ({
   accessRecheckMs,
   movieSeconds = 1,
   scrobbling,
+  membershipTtlMs,
 }: CreateEnforcedAppProps): Promise<{
   app: NestFastifyApplication
   mediaDir: string
@@ -404,6 +407,7 @@ export const createEnforcedApp = async ({
     quiet: true,
     watch: NOT_WATCHING,
     accessRecheckMs,
+    membershipTtlMs,
   })
   await app.init()
   await app.getHttpAdapter().getInstance().ready()

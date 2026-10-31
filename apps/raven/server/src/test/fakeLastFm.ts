@@ -1,7 +1,13 @@
 import { CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@shared/server'
 import type { LastFmKeys } from '@/config'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
-import { LASTFM_API, LASTFM_ERRORS, LASTFM_METHODS, signed } from '@/scrobbling/lastFmScrobbler'
+import {
+  LASTFM_API,
+  LASTFM_ERRORS,
+  LASTFM_METHODS,
+  LASTFM_PARAMS,
+  signed,
+} from '@/scrobbling/lastFmScrobbler'
 
 /** raven's Last.fm keys in the tests. */
 export const FAKE_LASTFM_KEYS: LastFmKeys = { apiKey: 'fm-key-0001', apiSecret: 'fm-secret-0001' }
@@ -21,7 +27,7 @@ const json = ({ body, status = 200 }: JsonProps): Response =>
 
 /** The form fields of a call, without the signature, as Last.fm signs them. */
 const fieldsOf = (form: URLSearchParams): Record<string, string> =>
-  Object.fromEntries([...form.entries()].filter(([name]) => name !== 'api_sig'))
+  Object.fromEntries([...form.entries()].filter(([name]) => name !== LASTFM_PARAMS.apiSig))
 
 /**
  * Last.fm's API as a test's fetch, on `FAKE_LASTFM_KEYS`. Every call must
@@ -42,8 +48,11 @@ export const fakeLastFm = ({ tokens = {} }: FakeLastFmProps = {}) => {
     }
     const form = new URLSearchParams(init.body ?? '')
     const fields = fieldsOf(form)
-    const expected = signed({ params: fields, keys: FAKE_LASTFM_KEYS }).api_sig
-    if (fields.api_key !== FAKE_LASTFM_KEYS.apiKey || form.get('api_sig') !== expected) {
+    const expected = signed({ params: fields, keys: FAKE_LASTFM_KEYS })[LASTFM_PARAMS.apiSig]
+    if (
+      fields[LASTFM_PARAMS.apiKey] !== FAKE_LASTFM_KEYS.apiKey ||
+      form.get(LASTFM_PARAMS.apiSig) !== expected
+    ) {
       return json({ body: { error: 13, message: 'Invalid method signature' }, status: 403 })
     }
     if (fields.method === LASTFM_METHODS.getSession) {

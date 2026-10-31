@@ -18,7 +18,7 @@ import {
   type SendOutcome,
   SEND_OUTCOMES,
 } from '@/scrobbling/scrobbler'
-import { ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
+import { SECRET_READS, ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
 import { type QueuedListen, ScrobbleQueue } from '@/scrobbling/scrobbleQueue'
 
 /** A failed listen waits this long before its first retry, doubling each time after. */
@@ -37,6 +37,8 @@ const SERVICE_NAMES = {
 } as const satisfies Record<ScrobbleService, string>
 
 type ScrobbleSenderNoteListenProps = { mediaId: number; account: AccountKey }
+
+type ScrobbleSenderSendOpenedProps = { listen: QueuedListen; secret: string }
 
 type ScrobbleSenderSettleProps = { listen: QueuedListen; outcome: SendOutcome }
 
@@ -161,15 +163,29 @@ export class ScrobbleSender implements OnApplicationBootstrap, OnModuleDestroy {
       this.queue.remove(listen)
       return
     }
-    const secret = this.links.secretOf({ account, service })
-    if (secret === null) {
-      // A link whose secret no longer opens (the server's key changed) can send nothing again.
-      this.links.remove({ account, service })
-      this.logger.warn(
-        `An account's ${SERVICE_NAMES[service]} link no longer opens, so it was removed.`,
-      )
-      return
+    const read = this.links.secretOf({ account, service })
+    switch (read.kind) {
+      case SECRET_READS.missing:
+        this.queue.remove(listen)
+        return
+      case SECRET_READS.unopenable:
+        // A link whose secret no longer opens (the server's key changed) can send nothing again.
+        this.links.remove({ account, service })
+        this.logger.warn(
+          `An account's ${SERVICE_NAMES[service]} link no longer opens, so it was removed.`,
+        )
+        return
+      case SECRET_READS.opened:
+        return this.sendOpened({ listen, secret: read.secret })
+      default: {
+        const unknown: never = read
+        throw new Error(`Unknown secret read ${String(unknown)}`)
+      }
     }
+  }
+
+  private async sendOpened({ listen, secret }: ScrobbleSenderSendOpenedProps): Promise<void> {
+    const { service } = listen
     const track = this.music.tracks([listen.mediaId]).get(listen.mediaId)
     const artist = track?.artists[0]?.name ?? null
     if (track === undefined || artist === null) {

@@ -22,17 +22,10 @@ const isSignInState = object({
 /** A sign-in the callback finished: whose it was, and where it goes back to. */
 type SignIn = { account: AccountKey; returnTo: string }
 
-/**
- * A finished sign-in, with the access token of the session that started it
- * (null without accounts), so the callback can ask whether the account is
- * still approved. The token stays in memory only, never logged or written.
- */
-type FinishedSignIn = SignIn & { token: string | null }
-
-type LastFmSignInsStartProps = FinishedSignIn
+type LastFmSignInsStartProps = SignIn
 
 /** A sign-in waiting for its callback, under its nonce. */
-type Waiting = { account: AccountKey; token: string | null; expires: number }
+type Waiting = { account: AccountKey; expires: number }
 
 /**
  * Last.fm's sign-ins under way. `start` gives one a `state` for the
@@ -65,14 +58,14 @@ export class LastFmSignIns {
     })
   }
 
-  start({ account, returnTo, token }: LastFmSignInsStartProps): string {
+  start({ account, returnTo }: LastFmSignInsStartProps): string {
     ;[...this.waiting].forEach(([held, waiting]) => {
       if (waiting.account === account) this.waiting.delete(held)
     })
     this.prune()
     const nonce = randomBytes(16).toString('base64url')
     const expires = this.clock.now() + LASTFM_SIGN_IN_MS
-    this.waiting.set(nonce, { account, token, expires })
+    this.waiting.set(nonce, { account, expires })
     const text = Buffer.from(JSON.stringify({ account, returnTo, nonce, expires })).toString(
       'base64url',
     )
@@ -80,7 +73,7 @@ export class LastFmSignIns {
   }
 
   /** The sign-in `state` names, used up, or null for one that is not a live state of this server's. */
-  finish(state: string): FinishedSignIn | null {
+  finish(state: string): SignIn | null {
     this.prune()
     const [text, signature, ...rest] = state.split('.')
     if (text === undefined || signature === undefined || rest.length > 0) return null
@@ -93,6 +86,6 @@ export class LastFmSignIns {
     if (parsed === null || waiting === undefined || waiting.account !== parsed.account) return null
     this.waiting.delete(parsed.nonce)
     if (parsed.expires <= this.clock.now()) return null
-    return { account: parsed.account, returnTo: parsed.returnTo, token: waiting.token }
+    return { account: parsed.account, returnTo: parsed.returnTo }
   }
 }

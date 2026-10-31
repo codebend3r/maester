@@ -20,7 +20,13 @@ import { ScrobbleQueue } from '@/scrobbling/scrobbleQueue'
 import { ScrobbleSender } from '@/scrobbling/scrobbleSender'
 import { DatabaseService } from '@/db/database'
 import { NOT_WATCHING, ROUTE_METHODS, testConfig } from '@/test/app'
-import { AUTH_TEST_CONFIG, AUTH_TEST_IDS, authFixture, bearerHeaders } from '@/test/auth'
+import {
+  AUTH_TEST_CONFIG,
+  AUTH_TEST_FAILURES,
+  AUTH_TEST_IDS,
+  authFixture,
+  bearerHeaders,
+} from '@/test/auth'
 import { type MusicIds, addMusic, createEnforcedApp } from '@/test/enforced'
 import { FAKE_LASTFM_KEYS, fakeLastFm } from '@/test/fakeLastFm'
 import { fakeListenBrainz } from '@/test/fakeListenBrainz'
@@ -193,6 +199,7 @@ describe('scrobbling on a server with accounts', () => {
       root: join(root, 'enforced'),
       fixture: state.fixture,
       scrobbling: { fetch: scrobbleFetch, lastFm: FAKE_LASTFM_KEYS },
+      membershipTtlMs: 0,
     })
     state.music = await addMusic({ root: join(root, 'enforced'), enforced: state.enforced })
     Logger.overrideLogger(SPY_LOGGER)
@@ -303,15 +310,18 @@ describe('scrobbling on a server with accounts', () => {
       .mockImplementation(() => {
         throw new Error(`queue broke for ${AUTH_TEST_IDS.friend}`)
       })
-    await expect(member.recordPlay(enforced().music.tracks[0])).resolves.toBeUndefined()
-    failing.mockRestore()
+    try {
+      await expect(member.recordPlay(enforced().music.tracks[0])).resolves.toBeUndefined()
+    } finally {
+      failing.mockRestore()
+    }
     expect(logged).toContainEqual(
       expect.stringContaining('A play could not be queued for scrobbling.'),
     )
     expect(logged.filter((line) => line.includes(AUTH_TEST_IDS.friend))).toEqual([])
   })
 
-  it('refuses a callback whose account was revoked since its sign-in began', async () => {
+  it('asks a sign-in to start over when its account has no live session, as once revoked', async () => {
     const guest = await clientFor({ id: AUTH_TEST_IDS.guest })
     const signed = await started({ api: guest, returnTo: SCROBBLE_RETURNS.wren })
     const { ownerApi } = enforced()
@@ -320,13 +330,40 @@ describe('scrobbling on a server with accounts', () => {
       change: { status: MEMBER_STATUSES.revoked },
     })
     try {
-      expect((await callback({ token: FM_TOKENS.member, state: signed })).statusCode).toBe(400)
+      const answer = await callback({ token: FM_TOKENS.member, state: signed })
+      expect(answer.statusCode).toBe(400)
+      expect(answer.json()).toMatchObject({
+        message: 'Sign in to raven again, then link Last.fm again.',
+      })
     } finally {
       await ownerApi.setMemberStatus({
         id: AUTH_TEST_IDS.guest,
         change: { status: MEMBER_STATUSES.approved },
       })
     }
+    expect((await guest.getScrobbling()).map(({ username }) => username)).toEqual([null, null])
+  })
+
+  it('refuses a sign-in whose account the account service refuses now, and answers an outage 503', async () => {
+    const guest = await clientFor({ id: AUTH_TEST_IDS.guest })
+    const { fixture } = enforced()
+    const outcomes = await [AUTH_TEST_FAILURES.denied, AUTH_TEST_FAILURES.network].reduce<
+      Promise<{ status: number; message: unknown }[]>
+    >(async (before, failure) => {
+      const seen = await before
+      const signed = await started({ api: guest, returnTo: SCROBBLE_RETURNS.wren })
+      fixture.state.failure = failure
+      try {
+        const answer = await callback({ token: FM_TOKENS.member, state: signed })
+        return [...seen, { status: answer.statusCode, message: answer.json().message }]
+      } finally {
+        fixture.state.failure = AUTH_TEST_FAILURES.none
+      }
+    }, Promise.resolve([]))
+    expect(outcomes).toEqual([
+      { status: 400, message: 'This account can no longer link Last.fm.' },
+      { status: 503, message: 'Account access is temporarily unavailable.' },
+    ])
     expect((await guest.getScrobbling()).map(({ username }) => username)).toEqual([null, null])
   })
 })

@@ -9,6 +9,18 @@ export type ScrobbleLink = { service: ScrobbleService; username: string }
 
 type AccountService = { account: AccountKey; service: ScrobbleService }
 
+/** What reading a link's secret found: no link, a secret this server's key cannot open, or the secret. */
+export const SECRET_READS = {
+  missing: 'missing',
+  unopenable: 'unopenable',
+  opened: 'opened',
+} as const
+
+type SecretRead =
+  | { kind: typeof SECRET_READS.missing }
+  | { kind: typeof SECRET_READS.unopenable }
+  | { kind: typeof SECRET_READS.opened; secret: string }
+
 type ScrobbleLinksListProps = { account: AccountKey }
 
 type ScrobbleLinksSaveProps = AccountService & { username: string; secret: string; at: Date }
@@ -50,17 +62,22 @@ export class ScrobbleLinks {
       )
   }
 
-  /** The account's token or session key for `service`, opened, or null with no link that opens. */
-  secretOf({ account, service }: ScrobbleLinksSecretOfProps): string | null {
+  /** The account's token or session key for `service`, opened, or why there is none. */
+  secretOf({ account, service }: ScrobbleLinksSecretOfProps): SecretRead {
     const row = this.db
       .prepare<AccountService, { sealed: string }>(
         `SELECT secret_cipher AS sealed FROM scrobble_links
           WHERE account_id = @account AND service = @service`,
       )
       .get({ account, service })
-    return row === undefined
-      ? null
-      : this.cipher.open({ sealed: row.sealed, context: contextOf({ account, service }) })
+    if (row === undefined) return { kind: SECRET_READS.missing }
+    const secret = this.cipher.open({
+      sealed: row.sealed,
+      context: contextOf({ account, service }),
+    })
+    return secret === null
+      ? { kind: SECRET_READS.unopenable }
+      : { kind: SECRET_READS.opened, secret }
   }
 
   /** Links `service`, in place of a link the account had to it before. */

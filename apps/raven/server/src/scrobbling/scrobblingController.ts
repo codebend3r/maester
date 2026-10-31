@@ -18,8 +18,8 @@ import {
 } from '@nestjs/common'
 import {
   AUTH_CONFIG_STATES,
+  AUTH_REFUSALS,
   type AuthConfig,
-  MEMBER_STATUSES,
   type LastFmAuthPage,
   MEDIA_ORIGIN_KINDS,
   SCROBBLE_OUTCOMES,
@@ -37,8 +37,9 @@ import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { OpenToAnyone } from '@/auth/accountGuard'
-import { AuthSessions, CALLERS } from '@/auth/authSessions'
-import { MembershipLookups } from '@/auth/membershipLookups'
+import { isAccountOutage } from '@/auth/accessRechecks'
+import { authFailure } from '@/auth/authFailure'
+import { AuthSessions, requireApproved } from '@/auth/authSessions'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
 import { CLOCK, type Clock } from '@/clock'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
@@ -66,9 +67,22 @@ const publicOriginOf = ({ auth, config }: PublicOriginOfProps): string | null =>
   )
 }
 
+/** What the scrobbling routes tell a person when they refuse. */
+const SCROBBLING_COPY = {
+  badToken: 'token must be a user token',
+  unknownToken: 'ListenBrainz does not know this token.',
+  listenBrainzAway: 'ListenBrainz could not be reached.',
+  lastFmOff: 'Last.fm is not set up on this server.',
+  badReturn: 'returnTo must be Settings or Wren',
+  callbackParts: 'token and state are both needed',
+  staleSignIn: 'This sign-in has expired or was already used.',
+  signInAgain: 'Sign in to raven again, then link Last.fm again.',
+  noLongerViewer: 'This account can no longer link Last.fm.',
+} as const
+
 type ScrobblingControllerStatusOfProps = { account: AccountKey }
 
-type ScrobblingControllerIsStillViewerProps = { account: AccountKey; token: string | null }
+type ScrobblingControllerCheckStillViewerProps = { account: AccountKey }
 
 type ReturnAddressProps = { returnTo: string; outcome: string }
 
@@ -95,8 +109,8 @@ export class ScrobblingController {
     @Inject(LastFmSignIns) private readonly signIns: LastFmSignIns,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(CLOCK) private readonly clock: Clock,
-    @Inject(AuthSessions) private readonly sessions: Pick<AuthSessions, 'callerOf'>,
-    @Inject(MembershipLookups) private readonly lookups: Pick<MembershipLookups, 'current'>,
+    @Inject(AuthSessions)
+    private readonly sessions: Pick<AuthSessions, 'freshestFor' | 'authenticate'>,
     @Inject(AUTH_STATE) auth: AuthConfig,
     @Inject(SERVER_CONFIG) config: ServerConfig,
   ) {
@@ -105,18 +119,26 @@ export class ScrobblingController {
   }
 
   /**
-   * Whether the account a sign-in names may still link: always without
-   * accounts; with them, only while the session that started it still finds
-   * that account approved, asked again now through the shared lookups.
+   * Refuses a sign-in whose account may no longer link. Without accounts
+   * every account may. With them, the account's freshest live token in the
+   * session store (as the access rechecks read it) is asked again now: no
+   * live token is a 400 to sign in again, a refused or unapproved account a
+   * 400, and an outage of the account service a 503, as everywhere else.
    */
-  private async isStillViewer({
+  private async checkStillViewer({
     account,
-    token,
-  }: ScrobblingControllerIsStillViewerProps): Promise<boolean> {
-    if (!this.isAccountsReady) return true
-    if (token === null) return false
-    const current = await this.lookups.current({ token }).catch(() => null)
-    return current?.id === account && current.status === MEMBER_STATUSES.approved
+  }: ScrobblingControllerCheckStillViewerProps): Promise<void> {
+    if (!this.isAccountsReady) return
+    const freshest = this.sessions.freshestFor({ accountId: account })
+    if (freshest === null) throw new BadRequestException(SCROBBLING_COPY.signInAgain)
+    try {
+      const session = await this.sessions.authenticate({ token: freshest.token })
+      requireApproved(session.account)
+      if (session.account.id !== account) throw new Error('The token names another account.')
+    } catch (error) {
+      if (isAccountOutage(error)) throw authFailure(AUTH_REFUSALS.unavailable)
+      throw new BadRequestException(SCROBBLING_COPY.noLongerViewer)
+    }
   }
 
   /** The exact addresses Last.fm's sign-in may go back to. */
@@ -156,12 +178,12 @@ export class ScrobblingController {
     @Body() body: unknown,
     @Req() request: FastifyRequest,
   ): Promise<ScrobbleStatus[]> {
-    if (!isListenBrainzLink(body)) throw new BadRequestException('token must be a user token')
+    if (!isListenBrainzLink(body)) throw new BadRequestException(SCROBBLING_COPY.badToken)
     const account = this.accounts.keyOf({ request })
     const linked = await this.listenBrainz.validate({ token: body.token }).catch(() => {
-      throw new BadGatewayException('ListenBrainz could not be reached.')
+      throw new BadGatewayException(SCROBBLING_COPY.listenBrainzAway)
     })
-    if (linked === null) throw new BadRequestException('ListenBrainz does not know this token.')
+    if (linked === null) throw new BadRequestException(SCROBBLING_COPY.unknownToken)
     this.links.save({
       account,
       service: SCROBBLE_SERVICES.listenBrainz,
@@ -178,16 +200,14 @@ export class ScrobblingController {
   @HttpCode(200)
   startLastFm(@Body() body: unknown, @Req() request: FastifyRequest): LastFmAuthPage {
     if (!this.isLastFmOpen() || this.publicOrigin === null) {
-      throw new ConflictException('Last.fm is not set up on this server.')
+      throw new ConflictException(SCROBBLING_COPY.lastFmOff)
     }
     if (!isLastFmStart(body) || !this.returns().includes(body.returnTo)) {
-      throw new BadRequestException('returnTo must be Settings or Wren')
+      throw new BadRequestException(SCROBBLING_COPY.badReturn)
     }
-    const caller = this.sessions.callerOf({ request })
     const state = this.signIns.start({
       account: this.accounts.keyOf({ request }),
       returnTo: body.returnTo,
-      token: caller.kind === CALLERS.session ? caller.session.token : null,
     })
     const callback = `${this.publicOrigin}${SCROBBLING_PATHS.lastFmCallback}?${new URLSearchParams({ [SCROBBLE_PARAMS.state]: state }).toString()}`
     return { url: this.lastFm.authPage({ callback }) }
@@ -208,15 +228,13 @@ export class ScrobblingController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isString(token) || token === '' || !isString(state)) {
-      throw new BadRequestException('token and state are both needed')
+      throw new BadRequestException(SCROBBLING_COPY.callbackParts)
     }
     const signIn = this.signIns.finish(state)
     if (signIn === null || !this.returns().includes(signIn.returnTo)) {
-      throw new BadRequestException('This sign-in has expired or was already used.')
+      throw new BadRequestException(SCROBBLING_COPY.staleSignIn)
     }
-    if (!(await this.isStillViewer(signIn))) {
-      throw new BadRequestException('This account can no longer link Last.fm.')
-    }
+    await this.checkStillViewer({ account: signIn.account })
     const linked = this.lastFm.isAvailable()
       ? await this.lastFm.validate({ token }).catch(() => null)
       : null

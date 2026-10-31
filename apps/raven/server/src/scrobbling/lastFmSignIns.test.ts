@@ -6,7 +6,7 @@ import { manualClock } from '@/test/clock'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS } from '@/test/repositories'
 
-const SIGN_IN = { account: TEST_ACCOUNTS.b, returnTo: 'wren://scrobbling', token: null }
+const SIGN_IN = { account: TEST_ACCOUNTS.b, returnTo: 'wren://scrobbling' }
 
 describe('LastFmSignIns', () => {
   const database = testDatabase('raven-lastfm-sign-ins-')

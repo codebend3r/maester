@@ -26,6 +26,9 @@ export const LASTFM_METHODS = {
   scrobble: 'track.scrobble',
 } as const
 
+/** The parameters every call carries: raven's key and the call's signature. */
+export const LASTFM_PARAMS = { apiKey: 'api_key', apiSig: 'api_sig' } as const
+
 /** Parameters that are sent but never signed, as Last.fm's signing leaves them out. */
 const UNSIGNED = { format: 'format', callback: 'callback' } as const
 
@@ -75,7 +78,9 @@ export const signed = ({ params, keys }: SignedProps): Record<string, string> =>
     .join('')
   return {
     ...params,
-    api_sig: createHash('md5').update(`${text}${keys.apiSecret}`, 'utf8').digest('hex'),
+    [LASTFM_PARAMS.apiSig]: createHash('md5')
+      .update(`${text}${keys.apiSecret}`, 'utf8')
+      .digest('hex'),
   }
 }
 
@@ -117,13 +122,13 @@ export class LastFmScrobbler implements Scrobbler {
 
   /** Last.fm's page that asks the account to allow raven, then goes to `callback`. */
   authPage({ callback }: LastFmScrobblerAuthPageProps): string {
-    const query = new URLSearchParams({ api_key: this.keys().apiKey, cb: callback })
+    const query = new URLSearchParams({ [LASTFM_PARAMS.apiKey]: this.keys().apiKey, cb: callback })
     return `${LASTFM_AUTH_PAGE}?${query.toString()}`
   }
 
   private call({ keys, params }: LastFmScrobblerCallProps): Promise<Response> {
     const body = new URLSearchParams({
-      ...signed({ params: { ...params, api_key: keys.apiKey }, keys }),
+      ...signed({ params: { ...params, [LASTFM_PARAMS.apiKey]: keys.apiKey }, keys }),
       [UNSIGNED.format]: 'json',
     })
     return this.fetch({

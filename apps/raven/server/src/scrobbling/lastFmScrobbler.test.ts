@@ -1,7 +1,12 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
-import { LASTFM_AUTH_PAGE, LastFmScrobbler, signed } from '@/scrobbling/lastFmScrobbler'
+import {
+  LASTFM_AUTH_PAGE,
+  LASTFM_PARAMS,
+  LastFmScrobbler,
+  signed,
+} from '@/scrobbling/lastFmScrobbler'
 import { SEND_OUTCOMES } from '@/scrobbling/scrobbler'
 import { FAKE_LASTFM_KEYS, fakeLastFm } from '@/test/fakeLastFm'
 
@@ -18,9 +23,9 @@ const LISTEN = {
 describe('LastFmScrobbler', () => {
   it("signs a call as Last.fm's docs spell it: names sorted, name then value, the secret, md5", () => {
     const params = { token: 'tok', method: 'auth.getSession', api_key: 'key', format: 'json' }
-    expect(signed({ params, keys: { apiKey: 'key', apiSecret: 'secret' } }).api_sig).toBe(
-      createHash('md5').update('api_keykeymethodauth.getSessiontokentoksecret').digest('hex'),
-    )
+    expect(
+      signed({ params, keys: { apiKey: 'key', apiSecret: 'secret' } })[LASTFM_PARAMS.apiSig],
+    ).toBe(createHash('md5').update('api_keykeymethodauth.getSessiontokentoksecret').digest('hex'))
   })
 
   it("sends the account to Last.fm's page with raven's key and the callback", () => {
