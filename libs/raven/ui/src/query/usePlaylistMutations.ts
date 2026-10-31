@@ -11,13 +11,16 @@ type SetTracksProps = { id: number; tracks: readonly Track[] }
 
 type AppendProps = { id: number; tracks: readonly Track[] }
 
+type ShareProps = { id: number; isShared: boolean }
+
 type UseServerPlaylistMutationsProps = { api: ApiClient }
 
 /**
  * Everything done to the account's playlists. A rename and a new order (a
  * track moved or taken out) show before the server answers and go to it one
- * at a time; making, deleting and adding tracks wait for the answer, which
- * fills the playlist's page. The list of playlists is read again after each.
+ * at a time; making, deleting, adding tracks, sharing and copying wait for
+ * the answer, which fills the playlist's page (the copy's, for a copy). The
+ * list of playlists is read again after each.
  */
 export const useServerPlaylistMutations = ({ api }: UseServerPlaylistMutationsProps) => {
   const queryClient = useQueryClient()
@@ -66,7 +69,17 @@ export const useServerPlaylistMutations = ({ api }: UseServerPlaylistMutationsPr
     },
   })
 
-  return { create, rename, setTracks, append, remove }
+  const share = useMutation({
+    mutationFn: ({ id, isShared }: ShareProps) => api.setPlaylistSharing({ id, isShared }),
+    onSuccess: keep,
+  })
+
+  const copy = useMutation({
+    mutationFn: (id: number) => api.copyPlaylist({ id }),
+    onSuccess: keep,
+  })
+
+  return { create, rename, setTracks, append, remove, share, copy }
 }
 
 type PlaylistMutationsForProps = { api: ApiClient }

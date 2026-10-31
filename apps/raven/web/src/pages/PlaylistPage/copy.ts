@@ -1,6 +1,11 @@
 export const PLAYLIST_PAGE_COPY = {
   noun: 'playlist',
   eyebrow: 'Playlist',
+  sharedEyebrow: 'Shared playlist',
+  shared: 'Shared',
+  sharedHint: 'Every account on this server can play and copy it.',
+  copy: 'Copy to my playlists',
+  copying: 'Copying',
   rename: 'Rename',
   changeFailed: (message: string) => `Could not change the playlist: ${message}`,
   empty: (name: string) => `Nothing in ${name} yet. Add tracks from an album, or from Now playing.`,

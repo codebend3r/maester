@@ -3,12 +3,13 @@ import {
   type Library,
   MUSIC_SORTS,
   type MusicSort,
+  type PlaylistSummary,
   QUEUE_SOURCE_KINDS,
   isMusicSort,
 } from '@raven/core'
 import { Button } from '@raven/ui'
 import { type Search, useAudioQueue } from '@raven/ui/headless'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
 import { ArtistList } from '@/components/ArtistList/ArtistList'
@@ -160,17 +161,42 @@ export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
   )
 }
 
+type PlaylistLinksProps = { playlists: readonly PlaylistSummary[]; label: string }
+
+/** Playlists as cards, each its name linking to its page over its length. */
+const PlaylistLinks = ({ playlists, label }: PlaylistLinksProps) => {
+  const links = useMusicLinks()
+  return (
+    <ul className={styles.playlists} aria-label={label}>
+      {playlists.map((playlist) => (
+        <li key={playlist.id} className={styles.playlist}>
+          <Link to={links.playlist(playlist.id)} className={styles.playlistName}>
+            {playlist.name}
+          </Link>
+          <span className={styles.playlistFacts}>
+            {playlistFacts({ playlist }).join(COMMON_COPY.separator)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 /**
  * The account's own playlists, the same on every music library's tab as
  * they span them all, most recently changed first, and New playlist, which
- * opens the one it makes.
+ * opens the one it makes; then, under Shared with you, the ones other
+ * accounts share.
  */
 export const PlaylistsSection = () => {
   const navigate = useNavigate()
   const links = useMusicLinks()
   const playlists = useQuery(playlistsQuery)
   const { create } = usePlaylistMutations()
+  const sharedId = useId()
   const [isNaming, setNaming] = useState(false)
+  const own = playlists.data?.filter(({ isOwn }) => isOwn) ?? []
+  const shared = playlists.data?.filter(({ isOwn }) => !isOwn) ?? []
   return (
     <div className={styles.section}>
       <div className={styles.playlistsToolbar}>
@@ -183,22 +209,17 @@ export const PlaylistsSection = () => {
           {playlists.error.message}
         </p>
       )}
-      {playlists.data && playlists.data.length === 0 && (
+      {playlists.data && own.length === 0 && (
         <p className={styles.message}>{LIBRARY_COPY.noPlaylists}</p>
       )}
-      {playlists.data && playlists.data.length > 0 && (
-        <ul className={styles.playlists} aria-label={LIBRARY_COPY.playlists}>
-          {playlists.data.map((playlist) => (
-            <li key={playlist.id} className={styles.playlist}>
-              <Link to={links.playlist(playlist.id)} className={styles.playlistName}>
-                {playlist.name}
-              </Link>
-              <span className={styles.playlistFacts}>
-                {playlistFacts({ playlist }).join(COMMON_COPY.separator)}
-              </span>
-            </li>
-          ))}
-        </ul>
+      {own.length > 0 && <PlaylistLinks playlists={own} label={LIBRARY_COPY.playlists} />}
+      {shared.length > 0 && (
+        <section className={styles.section} aria-labelledby={sharedId}>
+          <h2 id={sharedId} className={styles.playlistsHeading}>
+            {LIBRARY_COPY.sharedWithYou}
+          </h2>
+          <PlaylistLinks playlists={shared} label={LIBRARY_COPY.sharedWithYou} />
+        </section>
       )}
       {isNaming && (
         <PlaylistNameDialog

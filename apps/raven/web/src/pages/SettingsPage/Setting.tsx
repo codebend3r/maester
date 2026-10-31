@@ -17,6 +17,8 @@ type SettingProps<V extends string | number> = {
   choices: Choices<V>
   value: V
   onChange: (value: V) => void
+  /** What follows the cards inside the setting's group. */
+  children?: ReactNode
 }
 
 /** One setting as a group of radio cards, each with a line saying what it means; the chosen one is filled. */
@@ -27,6 +29,7 @@ export const Setting = <V extends string | number>({
   choices,
   value,
   onChange,
+  children,
 }: SettingProps<V>) => {
   const name = useId()
   return (
@@ -48,6 +51,7 @@ export const Setting = <V extends string | number>({
           </label>
         ))}
       </div>
+      {children}
     </fieldset>
   )
 }

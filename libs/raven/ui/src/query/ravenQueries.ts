@@ -391,6 +391,12 @@ export const ravenQueriesFor = (api: ApiClient) => {
         queryFn: id == null ? skipToken : () => api.getPlaylist(id),
       }),
 
+    /** Each scrobbling service, whether this server offers it, and the account's name there once linked. */
+    scrobblingQuery: queryOptions({
+      queryKey: queryKeys.scrobbling,
+      queryFn: () => api.getScrobbling(),
+    }),
+
     /** A track's lyrics change only when its file or LRCLIB does, so they are read once a session. */
     lyricsQuery: (id: number | null) =>
       queryOptions({

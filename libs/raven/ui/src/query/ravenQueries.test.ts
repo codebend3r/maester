@@ -208,6 +208,12 @@ const QUERIES = [
     call: (api) => api.getPlaylist(5),
   }),
   asking({
+    name: 'scrobblingQuery',
+    key: queryKeys.scrobbling,
+    pick: (queries) => queries.scrobblingQuery,
+    call: (api) => api.getScrobbling(),
+  }),
+  asking({
     name: 'mixesQuery',
     key: queryKeys.mixes,
     pick: (queries) => queries.mixesQuery,

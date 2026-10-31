@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { Route, Routes } from 'react-router-dom'
 import { LIBRARY_KINDS } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
@@ -114,6 +114,29 @@ describe('PlaylistsSection', () => {
       '/playlists/5',
     )
     expect(screen.getByText('2 tracks · 7 min')).toBeTruthy()
+  })
+
+  it("groups other accounts' shared playlists under Shared with you", async () => {
+    spyOn(api, 'listPlaylists').mockResolvedValue([
+      playlistSummary(),
+      playlistSummary({ id: 8, name: 'Their mix', isOwn: false, isShared: true }),
+    ])
+    renderWithProviders({ ui: <PlaylistsSection />, route: '/libraries/3/playlists' })
+    const shared = await screen.findByRole('list', { name: 'Shared with you' })
+    expect(within(shared).getByRole('link', { name: 'Their mix' })).toHaveAttribute(
+      'href',
+      '/playlists/8',
+    )
+    expect(within(shared).queryByRole('link', { name: 'Evening' })).toBeNull()
+    const own = screen.getByRole('list', { name: 'Playlists' })
+    expect(within(own).queryByRole('link', { name: 'Their mix' })).toBeNull()
+  })
+
+  it('leaves Shared with you out while nobody shares one', async () => {
+    spyOn(api, 'listPlaylists').mockResolvedValue([playlistSummary()])
+    renderWithProviders({ ui: <PlaylistsSection />, route: '/libraries/3/playlists' })
+    await screen.findByRole('link', { name: 'Evening' })
+    expect(screen.queryByRole('list', { name: 'Shared with you' })).toBeNull()
   })
 
   it('makes a playlist by name and opens it', async () => {

@@ -57,6 +57,7 @@ export const LIBRARY_COPY = {
   newPlaylist: 'New playlist',
   noPlaylists: 'No playlists yet. Make one here, or add tracks to a new one from an album.',
   playlists: 'Playlists',
+  sharedWithYou: 'Shared with you',
   makePlaylist: 'Make playlist',
   sortLabels: SORT_LABELS,
   sectionLabels: {

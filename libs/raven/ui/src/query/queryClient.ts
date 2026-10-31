@@ -216,6 +216,8 @@ export const queryKeys = {
   playlists: ['playlists'],
   playlistList: ['playlists', 'list'],
   playlist: (id: number | null) => ['playlists', id],
+  /** The services the account forwards its listens to. */
+  scrobbling: ['scrobbling'],
   albumMatchSearch: ({ albumId, query }: QueryKeysAlbumMatchSearchProps) => [
     'music',
     'albums',

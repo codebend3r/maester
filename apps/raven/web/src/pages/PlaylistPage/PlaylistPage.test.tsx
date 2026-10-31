@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
-import { ApiError, QUEUE_SOURCE_KINDS } from '@raven/core'
+import { ApiError, type PlaylistDetails, QUEUE_SOURCE_KINDS } from '@raven/core'
 import { useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
@@ -18,6 +18,11 @@ const PAGE = playlistDetails({
   ],
 })
 
+const THEIRS = playlistDetails({
+  playlist: playlistSummary({ id: 8, name: 'Their mix', isOwn: false, isShared: true }),
+  tracks: PAGE.tracks,
+})
+
 const renderPage = () =>
   renderWithProviders({
     ui: (
@@ -28,6 +33,23 @@ const renderPage = () =>
     ),
     route: '/playlists/5',
   })
+
+type RenderTheirsProps = { copied?: PlaylistDetails }
+
+/** Another account's shared playlist, open on its page, and `copied`, its copy, once made. */
+const renderTheirs = ({ copied }: RenderTheirsProps = {}) => {
+  spyOn(api, 'getPlaylist').mockImplementation(async (id) =>
+    id === copied?.playlist.id ? copied : THEIRS,
+  )
+  return renderWithProviders({
+    ui: (
+      <Routes>
+        <Route path="/playlists/:id" element={<PlaylistPage />} />
+      </Routes>
+    ),
+    route: '/playlists/8',
+  })
+}
 
 describe('PlaylistPage', () => {
   beforeEach(() => {
@@ -149,5 +171,53 @@ describe('PlaylistPage', () => {
       cleanup()
       usePlayerPrefs.setState({ opensInRavenPlayer: false })
     }
+  })
+
+  it('shares the playlist with every account from its Shared switch', async () => {
+    const share = spyOn(api, 'setPlaylistSharing').mockResolvedValue({
+      ...PAGE,
+      playlist: { ...PAGE.playlist, isShared: true },
+    })
+    renderPage()
+    const shared = await screen.findByRole('switch', { name: 'Shared' })
+    expect(shared).not.toBeChecked()
+    fireEvent.click(shared)
+    await waitFor(() => expect(share).toHaveBeenCalledWith({ id: 5, isShared: true }))
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Shared' })).toBeChecked())
+  })
+
+  it("shows another's playlist with no rename, delete, reorder or remove", async () => {
+    renderTheirs()
+    await screen.findByRole('heading', { level: 1, name: 'Their mix' })
+    expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Move Lucky up' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove Airbag from the playlist' })).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'Shared' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Play' })).toBeEnabled()
+  })
+
+  it("copies another's playlist into the account's own and opens the copy", async () => {
+    const copied = playlistDetails({
+      playlist: playlistSummary({ id: 12, name: 'Their mix' }),
+      tracks: PAGE.tracks,
+    })
+    const copy = spyOn(api, 'copyPlaylist').mockResolvedValue(copied)
+    renderTheirs({ copied })
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy to my playlists' }))
+    await waitFor(() => expect(copy).toHaveBeenCalledWith({ id: 8 }))
+    expect(await screen.findByRole('button', { name: 'Rename' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Copy to my playlists' })).toBeNull()
+  })
+
+  it("says why another's playlist could not be copied", async () => {
+    spyOn(api, 'copyPlaylist').mockRejectedValue(
+      new ApiError({ status: 404, message: 'No playlist 8' }),
+    )
+    renderTheirs()
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy to my playlists' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not change the playlist: No playlist 8',
+    )
   })
 })

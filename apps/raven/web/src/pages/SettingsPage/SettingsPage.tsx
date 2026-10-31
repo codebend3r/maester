@@ -27,12 +27,14 @@ import { DesktopSettings } from '@/desktop/settings/DesktopSettings'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
 import { AdminLockSection } from '@/pages/SettingsPage/AdminLockSection'
 import { AdvancedSection } from '@/pages/SettingsPage/AdvancedSection'
+import { ScrobblingSection } from '@/pages/SettingsPage/ScrobblingSection'
 import {
   type Choices,
   Setting,
   SettingsSection,
   SettingsSkeleton,
 } from '@/pages/SettingsPage/Setting'
+import { SoundSettings } from '@/pages/SettingsPage/SoundSettings'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import { UsersSection } from '@/pages/SettingsPage/UsersSection'
@@ -117,8 +119,8 @@ type BrowserPlaybackProps = { isDesktop: boolean }
 
 /**
  * Playback that this browser, or Raven, keeps for itself: autoplay and how
- * long its countdown runs, skipping intros, and in a browser Open videos in
- * Raven. That is
+ * long its countdown runs, skipping intros, in a browser Open videos in
+ * Raven, and how music sounds. Open videos in Raven is
  * off by default: a page cannot tell whether Raven is installed, and a
  * `raven://` link nothing handles does nothing in Chrome and shows an error
  * in Safari.
@@ -197,6 +199,7 @@ const BrowserPlayback = ({ isDesktop }: BrowserPlaybackProps) => {
           <span className={styles.choiceHint}>{SETTINGS_COPY.openInRavenHint}</span>
         </label>
       )}
+      <SoundSettings isDesktop={isDesktop} />
     </section>
   )
 }
@@ -486,11 +489,13 @@ const ServerSettings = () => {
       {access.kind === ACCESS_KINDS.approved && (
         <>
           <AccountSection account={access.account} />
+          <ScrobblingSection />
           {access.account.isOwner && (
             <UsersSection key={access.account.id} userId={access.account.id} />
           )}
         </>
       )}
+      {access.kind === ACCESS_KINDS.disabled && <ScrobblingSection />}
       {isDesktop && <DesktopSettings />}
       <AdvancedSection />
       {mode === MANAGEMENT_MODES.adminLock && <AdminLockSection />}

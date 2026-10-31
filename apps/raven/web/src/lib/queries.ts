@@ -43,6 +43,7 @@ export const {
   playlistsQuery,
   ownPlaylistsQuery,
   playlistQuery,
+  scrobblingQuery,
   lyricsQuery,
   albumMatchSearchQuery,
   matchSearchQuery,
