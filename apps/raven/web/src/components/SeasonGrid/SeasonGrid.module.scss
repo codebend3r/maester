@@ -1,0 +1,6 @@
+// As many posters to a row as fit, as a library's grid lays its cards out.
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
+  gap: var(--space-5) var(--space-3);
+}

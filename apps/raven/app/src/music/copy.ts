@@ -9,6 +9,7 @@ export const ALBUMS_GRID_COPY = {
   none: 'No albums here yet. A scan files each audio file under its album as it reads its tags.',
   noMatch: (query: string) => `No album matches "${query}".`,
   line: libraryLine,
+  shuffle: (library: string) => `Shuffle ${library}`,
 } as const
 
 export const ARTISTS_GRID_COPY = {

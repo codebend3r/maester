@@ -1,5 +1,6 @@
 import type { QueryKey } from '@tanstack/react-query'
 import {
+  type Account,
   type AlbumDetails,
   type AlbumSummary,
   type Artist,
@@ -7,6 +8,8 @@ import {
   type Duplicate,
   type Duplicates,
   HOME_SHELF_TYPES,
+  type HeroPickChange,
+  type HeroPicks,
   ITEM_TYPES,
   type HistoryEntry,
   type Home,
@@ -18,6 +21,7 @@ import {
   type Library,
   type LibrarySettings,
   type MediaItem,
+  type MemberStatusChange,
   type PlaylistDetails,
   type PlaylistSummary,
   type PosterEntry,
@@ -605,3 +609,72 @@ export const playlistTracksEdits = ({ id, tracks }: PlaylistTracksEditsProps): E
     }),
   ]
 }
+
+type PlaylistAppendEditsProps = { id: number; tracks: readonly Track[] }
+
+/**
+ * Tracks added to the end of a playlist: its page, with its count and length,
+ * and its line in the list of playlists.
+ */
+export const playlistAppendEdits = ({ id, tracks }: PlaylistAppendEditsProps): Edit[] => {
+  if (tracks.length === 0) return []
+  const added = tracks.reduce((total, track) => total + (track.duration ?? 0), 0)
+  const grow = (playlist: PlaylistSummary): PlaylistSummary => ({
+    ...playlist,
+    trackCount: playlist.trackCount + tracks.length,
+    duration: playlist.duration + added,
+  })
+  return [
+    editKey<PlaylistDetails>({
+      queryKey: queryKeys.playlist(id),
+      update: (details) => ({
+        playlist: grow(details.playlist),
+        tracks: [...details.tracks, ...tracks],
+      }),
+    }),
+    editKey<PlaylistSummary[]>({
+      queryKey: queryKeys.playlistList,
+      update: (playlists) =>
+        mapWhere({ items: playlists, matches: (playlist) => playlist.id === id, change: grow }),
+    }),
+  ]
+}
+
+type PlaylistDeleteEditsProps = { id: number }
+
+/** A playlist deleted: the list of playlists, which it leaves. Its page goes once the server agrees. */
+export const playlistDeleteEdits = ({ id }: PlaylistDeleteEditsProps): Edit[] => [
+  editKey<PlaylistSummary[]>({
+    queryKey: queryKeys.playlistList,
+    update: (playlists) => withoutId({ items: playlists, id }),
+  }),
+]
+
+/** A title put in home's hero or taken out: the admin's picks. The hero itself follows once read again. */
+export const heroPickEdits = ({ itemId, isShown }: HeroPickChange): Edit[] => [
+  editKey<HeroPicks>({
+    queryKey: queryKeys.heroPicks,
+    update: (picks) => {
+      if (picks.itemIds.includes(itemId) === isShown) return picks
+      const itemIds = isShown
+        ? [...picks.itemIds, itemId]
+        : picks.itemIds.filter((id) => id !== itemId)
+      return { ...picks, itemIds }
+    },
+  }),
+]
+
+type MemberStatusEditsProps = { userId: string; id: string; change: MemberStatusChange }
+
+/** An account approved or revoked by the owner `userId`: its row moves to its new tab. */
+export const memberStatusEdits = ({ userId, id, change }: MemberStatusEditsProps): Edit[] => [
+  editKey<Account[]>({
+    queryKey: queryKeys.members(userId),
+    update: (members) =>
+      mapWhere({
+        items: members,
+        matches: (member) => member.id === id && member.status !== change.status,
+        change: (member) => ({ ...member, status: change.status }),
+      }),
+  }),
+]

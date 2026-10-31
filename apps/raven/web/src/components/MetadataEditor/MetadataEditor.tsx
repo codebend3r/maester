@@ -139,8 +139,9 @@ export const MetadataEditor = ({
 
   const save = useMutation({
     mutationFn: (change: ItemMetadataChange) => api.setItemMetadata({ id: details.id, change }),
-    onSuccess: async (updated) => {
-      await afterItemEdited({ queryClient, updated, part: EDITED_PARTS.metadata })
+    // The page takes the answer at once; the listings are read again without holding the editor open.
+    onSuccess: (updated) => {
+      afterItemEdited({ queryClient, updated, part: EDITED_PARTS.metadata }).catch(() => undefined)
       onDone()
     },
   })

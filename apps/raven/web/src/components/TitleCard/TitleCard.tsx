@@ -1,4 +1,4 @@
-import { type ItemSummary, itemPath } from '@raven/core'
+import { type AppPath, type ItemSummary, itemPath } from '@raven/core'
 import type { ComponentType } from 'react'
 import { Link } from 'react-router-dom'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
@@ -28,26 +28,26 @@ const POSTER_VIEWS = {
   [POSTER_STATES.initial]: PosterInitial,
 } as const satisfies Record<PosterState, ComponentType<PosterViewProps>>
 
-type TitleCardProps = { item: ItemSummary }
+type PosterTitleCardProps = {
+  /** The item whose poster the card wears. */
+  poster: ItemSummary
+  to: AppPath
+  title: string
+  facts: readonly string[]
+}
 
-/**
- * A favourite show or season as a poster that opens its page, its title
- * and facts beneath: a season names its show.
- */
-export const TitleCard = ({ item }: TitleCardProps) => {
+/** A poster that opens a page, its title and facts beneath, a dot apart. */
+export const PosterTitleCard = ({ poster: item, to, title, facts }: PosterTitleCardProps) => {
   const poster = posterSources({ item, sizes: POSTER_SIZES.grid })
   const Poster = POSTER_VIEWS[poster ? POSTER_STATES.picture : POSTER_STATES.initial]
-  const facts = [item.show?.title ?? null, item.year == null ? null : String(item.year)].filter(
-    (fact): fact is string => fact != null,
-  )
   return (
     <li className={styles.card}>
-      <Link to={itemPath(item) ?? '/'} className={styles.link}>
+      <Link to={to} className={styles.link}>
         <span className={styles.poster}>
           <Poster item={item} poster={poster} />
         </span>
         <span className={styles.words}>
-          <span className={styles.title}>{item.title}</span>
+          <span className={styles.title}>{title}</span>
           <span className={styles.facts}>
             {facts.map((fact) => (
               <span key={fact}>{fact}</span>
@@ -58,3 +58,20 @@ export const TitleCard = ({ item }: TitleCardProps) => {
     </li>
   )
 }
+
+type TitleCardProps = { item: ItemSummary }
+
+/**
+ * A favourite show or season as a poster that opens its page, its title
+ * and facts beneath: a season names its show.
+ */
+export const TitleCard = ({ item }: TitleCardProps) => (
+  <PosterTitleCard
+    poster={item}
+    to={itemPath(item) ?? '/'}
+    title={item.title}
+    facts={[item.show?.title ?? null, item.year == null ? null : String(item.year)].filter(
+      (fact): fact is string => fact != null,
+    )}
+  />
+)

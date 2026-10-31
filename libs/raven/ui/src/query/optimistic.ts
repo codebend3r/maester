@@ -93,6 +93,11 @@ const applyEdits = async ({ queryClient, edits }: ApplyEditsProps): Promise<Snap
   return snapshot
 }
 
+type AttemptProps<TVariables> = {
+  variables: TVariables
+  onRefused: (error: Error) => void
+}
+
 type UseOptimisticMutationProps<TVariables> = {
   mutationKey: MutationKey
   mutationFn: (variables: TVariables) => Promise<unknown>
@@ -137,6 +142,16 @@ export const useOptimisticMutation = <TVariables>({
     mutate: (variables: TVariables) => {
       setFailure(null)
       mutation.mutate(variables)
+    },
+    /**
+     * As `mutate`, for a caller that may be gone by the time the server
+     * answers (a dialog that closes at once): `onRefused` still hears why.
+     */
+    attempt: ({ variables, onRefused }: AttemptProps<TVariables>) => {
+      setFailure(null)
+      mutation
+        .mutateAsync(variables)
+        .catch((error: unknown) => error instanceof Error && onRefused(error))
     },
     /** As `mutate`, for a caller that waits on the answer: it rejects with why the server refused. */
     mutateAsync: (variables: TVariables) => {

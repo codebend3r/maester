@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { ApiError, QUEUE_SOURCE_KINDS } from '@raven/core'
+import { useToasts } from '@raven/ui'
 import { useAudioQueue } from '@raven/ui/headless'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
@@ -116,6 +117,24 @@ describe('PlaylistPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete playlist' }))
     await waitFor(() => expect(remove).toHaveBeenCalledWith(5))
     expect(await screen.findByText('Home page')).toBeTruthy()
+  })
+
+  it('leaves before the server answers, and says so in a toast when it refuses', async () => {
+    const answer = Promise.withResolvers<undefined>()
+    spyOn(api, 'deletePlaylist').mockImplementation(() => answer.promise)
+    useToasts.setState({ toasts: [] })
+    renderPage()
+    await screen.findByRole('heading', { level: 1, name: 'Evening' })
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await screen.findByRole('dialog', { name: 'Delete Evening?' })
+    fireEvent.click(screen.getByRole('button', { name: 'Delete playlist' }))
+    expect(await screen.findByText('Home page')).toBeTruthy()
+    await act(async () => answer.reject(new Error('Server is down')))
+    await waitFor(() =>
+      expect(useToasts.getState().toasts.map(({ message }) => message)).toEqual([
+        'Could not delete Evening: Server is down',
+      ]),
+    )
   })
 
   it('says so when the playlist is empty', async () => {

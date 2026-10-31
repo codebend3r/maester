@@ -19,7 +19,7 @@ export const ROW_ACTIONS = { addToPlaylist: 'addToPlaylist' } as const
 export const PLAYLIST_PICKS = { existing: 'existing', fresh: 'fresh' } as const
 
 export type PlaylistPick =
-  | { kind: typeof PLAYLIST_PICKS.existing; playlistId: number }
+  | { kind: typeof PLAYLIST_PICKS.existing; playlistId: number; name: string }
   | { kind: typeof PLAYLIST_PICKS.fresh; name: string }
 
 /** One of the account's playlists, as Add to playlist offers it. */

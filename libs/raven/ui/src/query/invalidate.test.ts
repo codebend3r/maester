@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'bun:test'
 import { QueryClient, type QueryKey, hashKey } from '@tanstack/react-query'
-import { MEDIA_SORTS } from '@raven/core'
+import {
+  type Library,
+  MEDIA_SORTS,
+  SAGA_BACKDROP_TYPES,
+  SLIDESHOW_MOTIONS,
+  type Saga,
+} from '@raven/core'
 import {
   EDITED_PARTS,
   afterAiLookups,
   afterFavourites,
   afterHeroPicked,
   afterItemEdited,
+  afterLibraryDeleted,
   afterLibraryEvent,
   afterLibrarySaved,
   afterLibraryView,
@@ -22,7 +29,7 @@ import {
   afterWatching,
 } from '@/query/invalidate'
 import { queryKeys } from '@/query/queryClient'
-import { itemDetails } from '@/test/fixtures'
+import { itemDetails, library, mediaItem } from '@/test/fixtures'
 
 /** A client holding one query under each key, none of them stale. */
 const holding = (keys: readonly QueryKey[]): QueryClient => {
@@ -49,6 +56,17 @@ const HELD = {
   lock: queryKeys.lock,
   browse: queryKeys.browse(null),
 } as const
+
+const STILL = { type: SAGA_BACKDROP_TYPES.still, itemId: 40 } as const
+
+type SagaProps = { tmdbId: string }
+
+const saga = ({ tmdbId }: SagaProps): Saga => ({
+  tmdbId,
+  name: `Saga ${tmdbId}`,
+  backdrop: { type: SAGA_BACKDROP_TYPES.slideshow, motion: SLIDESHOW_MOTIONS.fade },
+  media: [mediaItem()],
+})
 
 const HELD_KEYS: QueryKey[] = Object.values(HELD)
 
@@ -95,6 +113,11 @@ const CHANGES: ReadonlyArray<{
     stale: [...EVERY_LIBRARY, HELD.favourites, HELD.home, HELD.media],
   },
   {
+    name: 'afterLibraryDeleted',
+    change: (queryClient) => afterLibraryDeleted({ queryClient, id: 2 }),
+    stale: [...EVERY_LIBRARY, HELD.favourites, HELD.home, HELD.media],
+  },
+  {
     name: 'afterFavourites',
     change: afterFavourites,
     stale: [...EVERY_LIBRARY, ...ITEMS, HELD.favourites, HELD.home, HELD.media],
@@ -123,7 +146,8 @@ const CHANGES: ReadonlyArray<{
   },
   {
     name: 'afterSagaBackdrop',
-    change: (queryClient) => afterSagaBackdrop({ queryClient, libraryId: 2 }),
+    change: (queryClient) =>
+      afterSagaBackdrop({ queryClient, libraryId: 2, sagaId: '119', backdrop: STILL }),
     stale: [HELD.sagas],
   },
   {
@@ -188,6 +212,31 @@ describe('afterItemEdited', () => {
     await afterItemEdited({ queryClient: client, updated, part: EDITED_PARTS.images })
     expect(client.getQueryData<typeof updated>(queryKeys.item(40))).toEqual(updated)
     expect(client.getQueryState(queryKeys.item(40))!.isInvalidated).toBe(false)
+  })
+})
+
+describe('afterSagaBackdrop', () => {
+  it('hands the saga the answer, leaving the others as they were', async () => {
+    const client = new QueryClient()
+    const lotr = saga({ tmdbId: '119' })
+    const matrix = saga({ tmdbId: '2344' })
+    client.setQueryData(queryKeys.sagas(2), [lotr, matrix])
+    await afterSagaBackdrop({ queryClient: client, libraryId: 2, sagaId: '119', backdrop: STILL })
+    expect(client.getQueryData<Saga[]>(queryKeys.sagas(2))).toEqual([
+      { ...lotr, backdrop: STILL },
+      matrix,
+    ])
+  })
+})
+
+describe('afterLibraryDeleted', () => {
+  it('drops the library from the list before it is read again', async () => {
+    const client = new QueryClient()
+    client.setQueryData(queryKeys.libraries, [library({ id: 2 }), library({ id: 3 })])
+    await afterLibraryDeleted({ queryClient: client, id: 2 })
+    expect(
+      client.getQueryData<Library[]>(queryKeys.libraries)?.map(({ id }) => id) ?? null,
+    ).toEqual([3])
   })
 })
 

@@ -53,8 +53,11 @@ export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDia
   const save = useMutation({
     mutationFn: (backdrop: SagaBackdrop) =>
       api.setSagaBackdrop({ libraryId, sagaId: saga.tmdbId, backdrop }),
-    onSuccess: async () => {
-      await afterSagaBackdrop({ queryClient, libraryId })
+    // The saga takes the answer at once, so the dialog closes on it, not on the reading again.
+    onSuccess: (backdrop) => {
+      afterSagaBackdrop({ queryClient, libraryId, sagaId: saga.tmdbId, backdrop }).catch(
+        () => undefined,
+      )
       dialog.current?.close()
     },
   })

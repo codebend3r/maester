@@ -17,15 +17,17 @@ import {
   startingSort,
   viewsFor,
 } from '@raven/core'
-import { useId } from 'react'
+import { type ReactNode, useId } from 'react'
 import { Button, Icon } from '@raven/ui'
 import type { IconName } from '@raven/ui'
+import { PlayButtons } from '@/components/PlayButtons/PlayButtons'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
 import type { Search } from '@raven/ui/headless'
 import { LIBRARY_TOOLBAR_COPY } from '@/components/LibraryToolbar/copy'
 import styles from '@/components/LibraryToolbar/LibraryToolbar.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { SHOW_LEVELS, type ShowLevel, isShowLevel } from '@/lib/showLevels'
 
 type DirectionButtonProps = {
   sort: LibrarySettings['sort']
@@ -74,6 +76,35 @@ const VIEW_ICONS = {
   [LIBRARY_VIEWS.grouped]: 'grouped',
 } as const satisfies Record<LibraryView, IconName>
 
+type ShowLevelPickerProps = { level: ShowLevel; onChange: (level: ShowLevel) => void }
+
+/**
+ * A TV library's choice of what its page lists: its shows, their seasons or
+ * their episodes. It stands where the grouping would, which a TV library never has.
+ */
+export const ShowLevelPicker = ({ level, onChange }: ShowLevelPickerProps) => {
+  const id = useId()
+  return (
+    <div className={`${styles.picker} ${styles.level}`}>
+      <label htmlFor={id} className={styles.label}>
+        {LIBRARY_TOOLBAR_COPY.showBy}
+      </label>
+      <select
+        id={id}
+        className={styles.select}
+        value={level}
+        onChange={(event) => isShowLevel(event.target.value) && onChange(event.target.value)}
+      >
+        {Object.values(SHOW_LEVELS).map((each) => (
+          <option key={each} value={each}>
+            {LIBRARY_TOOLBAR_COPY.levels[each]}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 type LibraryToolbarProps = {
   name: string
   search: Search
@@ -82,6 +113,8 @@ type LibraryToolbarProps = {
   playable: boolean
   onPlay: () => void
   onShuffle: () => void
+  /** More pickers after the sort, as a TV library's `ShowLevelPicker`. */
+  children?: ReactNode
 }
 
 /**
@@ -102,6 +135,7 @@ export const LibraryToolbar = ({
   playable,
   onPlay,
   onShuffle,
+  children,
 }: LibraryToolbarProps) => {
   const ids = { search: useId(), sort: useId(), group: useId() }
   return (
@@ -143,6 +177,7 @@ export const LibraryToolbar = ({
           </select>
         </div>
         <DirectionButton sort={settings.sort} onChange={onChange} />
+        {children}
 
         {settings.view === LIBRARY_VIEWS.grouped && (
           <div className={`${styles.picker} ${styles.group}`}>
@@ -169,12 +204,7 @@ export const LibraryToolbar = ({
 
       <div className={styles.act}>
         <div className={styles.play}>
-          <Button tone="primary" icon="play" disabled={!playable} onClick={onPlay}>
-            {COMMON_COPY.play}
-          </Button>
-          <Button icon="shuffle" disabled={!playable} onClick={onShuffle}>
-            {COMMON_COPY.shuffle}
-          </Button>
+          <PlayButtons playable={playable} onPlay={onPlay} onShuffle={onShuffle} />
           <SelectButton />
         </div>
 

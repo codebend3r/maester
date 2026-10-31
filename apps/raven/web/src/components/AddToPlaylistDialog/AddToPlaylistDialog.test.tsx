@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { useToasts } from '@raven/ui'
 import { AddToPlaylistDialog } from '@/components/AddToPlaylistDialog/AddToPlaylistDialog'
 import { api } from '@/lib/api'
@@ -37,6 +37,24 @@ describe('AddToPlaylistDialog', () => {
     expect(useToasts.getState().toasts.map(({ message }) => message)).toEqual([
       'Added Airbag to Morning',
     ])
+  })
+
+  it('closes before the server answers, and says so in a toast when it refuses', async () => {
+    const answer = Promise.withResolvers<ReturnType<typeof playlistDetails>>()
+    spyOn(api, 'appendPlaylistTracks').mockImplementation(() => answer.promise)
+    const closed: string[] = []
+    renderWithProviders({
+      ui: <AddToPlaylistDialog tracks={[AIRBAG]} onClose={() => closed.push('closed')} />,
+    })
+    fireEvent.click(await screen.findByRole('button', { name: /Morning/ }))
+    await waitFor(() => expect(closed).toEqual(['closed']))
+    await act(async () => answer.reject(new Error('Playlist is gone')))
+    await waitFor(() =>
+      expect(useToasts.getState().toasts.map(({ message }) => message)).toEqual([
+        'Added Airbag to Morning',
+        'Could not add to Morning: Playlist is gone',
+      ]),
+    )
   })
 
   it('makes a new playlist by name and adds the tracks to it', async () => {

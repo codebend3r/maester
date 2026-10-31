@@ -13,6 +13,7 @@ import { api } from '@/lib/api'
 import { useUnlockPrompt } from '@raven/ui/headless'
 import { POSTER_SIZES } from '@/lib/posters'
 import {
+  itemSummary,
   library,
   libraryCounts,
   matchedMovie,
@@ -645,6 +646,54 @@ describe('LibraryPage for TV shows', () => {
       '/shows/4',
     )
     expect(within(tiles).getByText('9 episodes')).toBeInTheDocument()
+  })
+
+  it('opens on its shows, and lists every season or every episode when asked', async () => {
+    const severance = { id: 4, title: 'Severance' }
+    const episode = (id: number, season: number, number: number) =>
+      mediaItem({
+        id,
+        title: `Severance - S0${season}E0${number}`,
+        match: 'matched',
+        item: itemSummary({
+          id: id * 10,
+          type: 'episode',
+          show: severance,
+          season,
+          episode: number,
+        }),
+      })
+    spies.list.mockImplementation(async () => [
+      episode(11, 1, 1),
+      episode(12, 1, 2),
+      episode(13, 2, 1),
+    ])
+    serve()
+    await screen.findByRole('link', { name: 'Severance' })
+    const level = screen.getByLabelText('Show')
+    expect(level).toHaveValue('shows')
+    expect(spies.list).not.toHaveBeenCalled()
+
+    await userEvent.selectOptions(level, 'seasons')
+    expect(await screen.findByRole('link', { name: /Season 1/ })).toHaveAttribute(
+      'href',
+      '/shows/4/seasons/1',
+    )
+    expect(screen.getByRole('link', { name: /Season 2/ })).toHaveAttribute(
+      'href',
+      '/shows/4/seasons/2',
+    )
+    expect(screen.getByText('2 episodes')).toBeInTheDocument()
+
+    await userEvent.selectOptions(level, 'episodes')
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByRole('link')
+          .some((link) => link.getAttribute('href') === '/episodes/130?library=2'),
+      ).toBe(true),
+    )
+    expect(screen.queryByRole('link', { name: /Season 1/ })).toBeNull()
   })
 
   it('offers no file sorts and no grouped view, and plays the next episode', async () => {

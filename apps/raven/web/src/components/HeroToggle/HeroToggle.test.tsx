@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { HeroPicks } from '@raven/core'
 import { HeroToggle } from '@/components/HeroToggle/HeroToggle'
@@ -46,6 +46,31 @@ describe('HeroToggle', () => {
     open({ itemIds: [3, 7], limit: 10 })
     await userEvent.click(await screen.findByRole('button', { name: 'In hero' }))
     await waitFor(() => expect(spies.set).toHaveBeenCalledWith({ itemId: 7, isShown: false }))
+  })
+
+  it('shows the title in the hero before the server answers', async () => {
+    const answer = held<HeroPicks>()
+    spies.set.mockImplementation(() => answer.promise)
+    open({ itemIds: [], limit: 10 })
+    await userEvent.click(await screen.findByRole('button', { name: 'Add to hero' }))
+    expect(await screen.findByRole('button', { name: 'In hero' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await act(async () => answer.answer({ itemIds: [7], limit: 10 }))
+  })
+
+  it('puts the switch back when the server refuses', async () => {
+    const answer = held<HeroPicks>()
+    spies.set.mockImplementation(() => answer.promise)
+    open({ itemIds: [], limit: 10 })
+    await userEvent.click(await screen.findByRole('button', { name: 'Add to hero' }))
+    await screen.findByRole('button', { name: 'In hero' })
+    await act(async () => answer.refuse(new Error('Hero is full')))
+    expect(await screen.findByRole('button', { name: 'Add to hero' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
   })
 
   it('holds a title back while the hero is full, but still lets one in it come out', async () => {

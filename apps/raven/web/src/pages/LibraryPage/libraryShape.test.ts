@@ -13,7 +13,10 @@ describe('playQueue', () => {
   const full = mediaItem({ id: 2, title: 'Full', width: 1920, height: 1080 })
 
   it('has nothing to play in an empty listing', () => {
-    const queue = playQueue({ settings: settings({}), listing: { shows: [], files: [] } })
+    const queue = playQueue({
+      settings: settings({}),
+      listing: { shows: [], seasons: [], files: [] },
+    })
     expect(queue.playable).toBe(false)
     expect(queue.first()).toBeUndefined()
     expect(queue.shuffled()).toEqual([])
@@ -23,7 +26,7 @@ describe('playQueue', () => {
     const next = mediaItem({ id: 9 })
     const queue = playQueue({
       settings: settings({ kind: 'shows' }),
-      listing: { shows: [showEntry({ next })], files: [full] },
+      listing: { shows: [showEntry({ next })], seasons: [], files: [full] },
     })
     expect(queue.playable).toBe(true)
     expect(queue.first()).toBe(next)
@@ -33,7 +36,7 @@ describe('playQueue', () => {
     const next = mediaItem({ id: 9 })
     const queue = playQueue({
       settings: settings({ kind: 'shows' }),
-      listing: { shows: [showEntry({ next })], files: [full, wide] },
+      listing: { shows: [showEntry({ next })], seasons: [], files: [full, wide] },
     })
     const random = spyOn(Math, 'random').mockReturnValue(0)
     const dealt = queue.shuffled()
@@ -45,14 +48,14 @@ describe('playQueue', () => {
     const files = Array.from({ length: SHUFFLE_LENGTH + 5 }, (_, index) =>
       mediaItem({ id: index + 1 }),
     )
-    const queue = playQueue({ settings: settings({}), listing: { shows: [], files } })
+    const queue = playQueue({ settings: settings({}), listing: { shows: [], seasons: [], files } })
     expect(queue.shuffled()).toHaveLength(SHUFFLE_LENGTH)
   })
 
   it('starts the top of the first bucket in the grouped view', () => {
     const queue = playQueue({
       settings: settings({ kind: 'other', view: 'grouped', groupBy: 'resolution' }),
-      listing: { shows: [], files: [full, wide] },
+      listing: { shows: [], seasons: [], files: [full, wide] },
     })
     expect(queue.first()).toBe(wide)
   })

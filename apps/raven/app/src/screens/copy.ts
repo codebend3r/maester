@@ -41,6 +41,8 @@ export const LIBRARY_COPY = {
   search: (library: string) => `Search ${library}`,
   line: ({ kind, count }: LibraryLineProps) => `${kind}, ${count}`,
   videos: { one: 'video', many: 'videos' },
+  shuffle: 'Shuffle',
+  shuffleLibrary: (library: string) => `Shuffle ${library}`,
 } as const
 
 export const PLAYER_SCREEN_COPY = {

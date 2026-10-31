@@ -1,5 +1,5 @@
 import type { InvalidateQueryFilters, QueryClient } from '@tanstack/react-query'
-import type { ItemDetails } from '@raven/core'
+import type { ItemDetails, Library, Saga, SagaBackdrop } from '@raven/core'
 import { queryKeys } from '@/query/queryClient'
 
 /**
@@ -27,6 +27,19 @@ export const afterMatch = (queryClient: QueryClient): Promise<unknown> =>
       { queryKey: queryKeys.home },
     ],
   })
+
+type AfterLibraryDeletedProps = { queryClient: QueryClient; id: number }
+
+/** A library was deleted: the libraries list drops it at once, then reads again as after a save. */
+export const afterLibraryDeleted = ({
+  queryClient,
+  id,
+}: AfterLibraryDeletedProps): Promise<unknown> => {
+  queryClient.setQueryData<Library[]>(queryKeys.libraries, (libraries) =>
+    libraries === undefined ? libraries : libraries.filter((library) => library.id !== id),
+  )
+  return afterLibrarySaved(queryClient)
+}
 
 /**
  * A library was created or its settings saved. Saved spots show or hide with
@@ -154,14 +167,23 @@ export const afterLibraryView = ({
 type AfterSagaBackdropProps = {
   queryClient: QueryClient
   libraryId: number
+  sagaId: string
+  backdrop: SagaBackdrop
 }
 
-/** A saga's backdrop was picked: the library's sagas, which its page and its deck read. */
+/** A saga's backdrop was picked: the saga takes the answer, and the library's sagas, which its page and its deck read, are read again. */
 export const afterSagaBackdrop = ({
   queryClient,
   libraryId,
-}: AfterSagaBackdropProps): Promise<unknown> =>
-  refetch({ queryClient, filters: [{ queryKey: queryKeys.sagas(libraryId) }] })
+  sagaId,
+  backdrop,
+}: AfterSagaBackdropProps): Promise<unknown> => {
+  const withBackdrop = (saga: Saga): Saga => (saga.tmdbId === sagaId ? { ...saga, backdrop } : saga)
+  queryClient.setQueryData<Saga[]>(queryKeys.sagas(libraryId), (sagas) =>
+    sagas === undefined ? sagas : sagas.map(withBackdrop),
+  )
+  return refetch({ queryClient, filters: [{ queryKey: queryKeys.sagas(libraryId) }] })
+}
 
 type AfterWatchingProps = {
   queryClient: QueryClient

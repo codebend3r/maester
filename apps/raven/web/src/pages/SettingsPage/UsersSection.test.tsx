@@ -264,7 +264,7 @@ describe('UsersSection', () => {
       })
     })
 
-    it('keeps the buttons off while the change is on its way', async () => {
+    it('moves the row before the server answers, leaving the other rows usable', async () => {
       const user = userEvent.setup()
       const change = held<Account>()
       setMemberStatus.mockImplementation(() => change.promise)
@@ -272,19 +272,10 @@ describe('UsersSection', () => {
 
       await user.click(await screen.findByRole('button', { name: 'Approve pat@example.com' }))
 
-      expect(screen.getByRole('button', { name: 'Approve sam@example.com' })).toBeDisabled()
-      expect(
-        screen.getByRole('button', { name: 'Remove access for pat@example.com' }),
-      ).toBeDisabled()
+      await waitFor(() => expect(emailsShown()).toEqual(['sam@example.com']))
+      expect(screen.getByRole('button', { name: 'Approve sam@example.com' })).toBeEnabled()
 
       await act(async () => change.answer({ ...WAITING_PAT, status: MEMBER_STATUSES.approved }))
-      // A failed toBeEnabled prints the whole element, which takes seconds; a boolean prints at once.
-      await waitFor(() =>
-        expect(
-          screen.getByRole('button', { name: 'Approve sam@example.com' }).hasAttribute('disabled'),
-        ).toBe(false),
-      )
-      expect(screen.getByRole('button', { name: 'Approve sam@example.com' })).toBeEnabled()
     })
 
     it('says what went wrong, and keeps the row where it was', async () => {
@@ -299,7 +290,6 @@ describe('UsersSection', () => {
       )
       expect(emailsShown()).toEqual(['pat@example.com', 'sam@example.com'])
       expect(screen.getByRole('button', { name: 'Approve pat@example.com' })).toBeEnabled()
-      expect(listMembers).toHaveBeenCalledTimes(1)
     })
 
     it('drops the message once a later change works', async () => {

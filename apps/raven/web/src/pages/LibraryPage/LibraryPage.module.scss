@@ -185,6 +185,14 @@
   gap: var(--space-4);
 }
 
+// Play and Shuffle in a run, above a tab's cards.
+.playRow {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+}
+
 // The listing and, over its top edge while a change of view lays itself out,
 // the note saying so. The old view stays, dimmed, until the new one is ready.
 .listing {

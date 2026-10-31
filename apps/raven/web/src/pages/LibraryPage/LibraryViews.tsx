@@ -21,6 +21,9 @@ import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import type { ComponentType } from 'react'
+import { SeasonGrid } from '@/components/SeasonGrid/SeasonGrid'
+import { SHOW_LEVELS, type ShowLevel } from '@/lib/showLevels'
+import type { Listing } from '@/pages/LibraryPage/libraryShape'
 import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
@@ -107,13 +110,18 @@ const MediaView = ({ settings, items }: MediaViewProps) => {
   return <View settings={settings} items={items} />
 }
 
-type LibraryListingProps = {
+type LibraryListingProps = Listing & {
   settings: LibrarySettings
-  shows: ShowEntry[]
-  files: MediaItem[]
+  /** What a TV library lists; any other lists its files. */
+  level: ShowLevel
 }
 
-const LISTING_LAYOUTS = { files: 'files', shows: 'shows', buckets: 'buckets' } as const
+const LISTING_LAYOUTS = {
+  files: 'files',
+  shows: 'shows',
+  buckets: 'buckets',
+  seasons: 'seasons',
+} as const
 
 type ListingLayout = (typeof LISTING_LAYOUTS)[keyof typeof LISTING_LAYOUTS]
 
@@ -154,24 +162,34 @@ const LISTING_VIEWS = {
     <ShowsView settings={settings} shows={shows} />
   ),
   [LISTING_LAYOUTS.buckets]: ListingBuckets,
+  [LISTING_LAYOUTS.seasons]: ({ seasons }: LibraryListingProps) => <SeasonGrid seasons={seasons} />,
 } as const satisfies Record<ListingLayout, ComponentType<LibraryListingProps>>
 
-type ListingLayoutOfProps = { settings: LibrarySettings; files: MediaItem[] }
+type ListingLayoutOfProps = { settings: LibrarySettings; level: ShowLevel; files: MediaItem[] }
 
-/** Files alone outside a TV library, its shows alone when every file is matched, else both. */
-const listingLayoutOf = ({ settings, files }: ListingLayoutOfProps): ListingLayout => {
-  if (!listsShows(settings.kind)) return LISTING_LAYOUTS.files
-  if (files.length === 0) return LISTING_LAYOUTS.shows
-  return LISTING_LAYOUTS.buckets
-}
+/** A TV library's shows when every file is matched, else them and the files no show was found for. */
+const showsLayoutOf = (files: MediaItem[]): ListingLayout =>
+  files.length === 0 ? LISTING_LAYOUTS.shows : LISTING_LAYOUTS.buckets
+
+/** How each of a TV library's levels lays its listing out. */
+const LEVEL_LAYOUTS = {
+  [SHOW_LEVELS.shows]: showsLayoutOf,
+  [SHOW_LEVELS.seasons]: () => LISTING_LAYOUTS.seasons,
+  [SHOW_LEVELS.episodes]: () => LISTING_LAYOUTS.files,
+} as const satisfies Record<ShowLevel, (files: MediaItem[]) => ListingLayout>
+
+/** Files alone outside a TV library; a TV library's as its level lays it out. */
+const listingLayoutOf = ({ settings, level, files }: ListingLayoutOfProps): ListingLayout =>
+  listsShows(settings.kind) ? LEVEL_LAYOUTS[level](files) : LISTING_LAYOUTS.files
 
 /**
  * A library's listing laid out: its files, or a TV library's shows, with the
- * files no show was found for in a bucket of their own after them.
+ * files no show was found for in a bucket of their own after them, its
+ * seasons, or its episodes.
  */
-export const LibraryListing = ({ settings, shows, files }: LibraryListingProps) => {
-  const View = LISTING_VIEWS[listingLayoutOf({ settings, files })]
-  return <View settings={settings} shows={shows} files={files} />
+export const LibraryListing = (props: LibraryListingProps) => {
+  const View = LISTING_VIEWS[listingLayoutOf(props)]
+  return <View {...props} />
 }
 
 type ListingBonesProps = { settings: LibrarySettings }

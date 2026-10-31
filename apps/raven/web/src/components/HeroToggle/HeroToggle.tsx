@@ -1,7 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { HeroPickChange, HeroPicks } from '@raven/core'
 import { Button, useToasts } from '@raven/ui'
-import { afterHeroPicked } from '@raven/ui/headless'
+import {
+  afterHeroPicked,
+  heroPickEdits,
+  mutationKeys,
+  useOptimisticMutation,
+} from '@raven/ui/headless'
 import { HERO_TOGGLE_COPY } from '@/components/HeroToggle/copy'
 import { api } from '@/lib/api'
 import { heroPicksQuery } from '@/lib/queries'
@@ -20,10 +25,12 @@ type HeroSwitchProps = { itemId: number; picks: HeroPicks }
 const HeroSwitch = ({ itemId, picks }: HeroSwitchProps) => {
   const queryClient = useQueryClient()
   const showNotice = useToasts((state) => state.show)
-  const update = useMutation({
+  // It shows at once and goes back if the server refuses, which a toast says.
+  const update = useOptimisticMutation({
+    mutationKey: mutationKeys.heroPick,
     mutationFn: (pick: HeroPickChange) => api.setHeroPick(pick),
-    onSuccess: () => afterHeroPicked(queryClient),
-    onError: (error) => showNotice(error.message),
+    edits: heroPickEdits,
+    settle: () => afterHeroPicked(queryClient),
   })
   const isShown = picks.itemIds.includes(itemId)
   const isFull = !isShown && picks.itemIds.length >= picks.limit
@@ -31,9 +38,14 @@ const HeroSwitch = ({ itemId, picks }: HeroSwitchProps) => {
     <Button
       icon="pin"
       aria-pressed={isShown}
-      disabled={update.isPending || isFull}
+      disabled={isFull}
       title={heroTitle({ isFull, isShown, limit: picks.limit })}
-      onClick={() => update.mutate({ itemId, isShown: !isShown })}
+      onClick={() =>
+        update.attempt({
+          variables: { itemId, isShown: !isShown },
+          onRefused: (error) => showNotice(error.message),
+        })
+      }
     >
       {isShown ? HERO_TOGGLE_COPY.inHero : HERO_TOGGLE_COPY.addToHero}
     </Button>

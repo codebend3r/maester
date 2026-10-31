@@ -28,14 +28,20 @@ const PlaylistPage = ({ session: { api }, details }: PlaylistPageProps) => {
   const { rename, setTracks, remove } = useServerPlaylistMutations({ api })
   const { playlist, tracks } = details
   const source = { kind: QUEUE_SOURCE_KINDS.playlist, id: playlist.id } as const
-  const failure = setTracks.failure ?? rename.failure ?? remove.error
+  const failure = setTracks.failure ?? rename.failure ?? remove.failure
   return (
     <PlaylistLayout
       facts={playlistFactsOf({ playlist })}
       name={playlist.name}
       note={failure === null ? null : PLAYLIST_COPY.failed(failure.message)}
       onBack={() => router.back()}
-      onDelete={() => remove.mutate(playlist.id, { onSuccess: () => router.back() })}
+      // It leaves the list at once; the page waits for the server, to say why if it refuses.
+      onDelete={() =>
+        remove
+          .mutateAsync(playlist.id)
+          .then(() => router.back())
+          .catch(() => undefined)
+      }
       onMoveUp={(index) =>
         setTracks.mutate({ id: playlist.id, tracks: movedUp({ tracks, index }) })
       }
