@@ -36,6 +36,8 @@ export type ExpandedFile = {
   label: string
   group: DownloadGroup
   watchedPercent: number
+  /** The track a music file is, which its download keeps; none for a video. */
+  track?: Track
 }
 
 export const EXPAND_REASONS = {
@@ -66,7 +68,7 @@ const LOCKED_MESSAGE = (name: string): string => `${name} keeps that behind its 
 
 type Failure = Extract<Expansion, { ok: false }>
 type Read<T> = { ok: true; value: T } | { ok: false; failure: Failure }
-type Entry = { media: MediaItem; label: string; order: number }
+type Entry = { media: MediaItem; label: string; order: number; track?: Track }
 /** A group before each file takes its place in it. */
 type UnorderedGroup<G = DownloadGroup> = G extends DownloadGroup ? Omit<G, 'order'> : never
 type Draft = { title: string; group: UnorderedGroup; entries: Entry[] }
@@ -379,7 +381,7 @@ const draftOfTracks = async ({
       group,
       entries: wanted.flatMap(({ track, order }, index) => {
         const file = media.value[index]
-        return file === undefined ? [] : [{ media: file, label: track.title, order }]
+        return file === undefined ? [] : [{ media: file, label: track.title, order, track }]
       }),
     },
   }
@@ -542,11 +544,12 @@ export const expandTarget = async ({
     ok: true,
     kind: group.kind,
     title,
-    files: kept.map(({ media, label, order }) => ({
+    files: kept.map(({ media, label, order, track }) => ({
       media,
       label,
       group: { ...group, order },
       watchedPercent: percents.value[media.libraryId],
+      track,
     })),
   }
 }

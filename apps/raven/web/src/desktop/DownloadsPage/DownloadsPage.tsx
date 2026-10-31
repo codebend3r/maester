@@ -9,6 +9,7 @@ import {
   type SpaceView,
 } from '@raven/core'
 import { Button, type IconName } from '@raven/ui'
+import { useAudioQueue } from '@raven/ui/headless'
 import { type ComponentType, useId, useRef } from 'react'
 import {
   type DownloadsChange,
@@ -18,8 +19,9 @@ import {
   useSpace,
 } from '@/desktop/downloadsApi'
 import { handled } from '@/desktop/handled'
-import { DOWNLOADS_PAGE_COPY } from '@/desktop/DownloadsPage/copy'
-import { DownloadRow } from '@/desktop/DownloadsPage/DownloadRow'
+import { DOWNLOAD_ROW_COPY, DOWNLOADS_PAGE_COPY } from '@/desktop/DownloadsPage/copy'
+import { DownloadRow, ROW_PLAYS, type RowPlay } from '@/desktop/DownloadsPage/DownloadRow'
+import { type MusicQueue, musicQueueOf } from '@/desktop/DownloadsPage/musicQueue'
 import styles from '@/desktop/DownloadsPage/DownloadsPage.module.scss'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
@@ -64,7 +66,12 @@ const groupsOf = (downloads: DownloadView[]): Grouped[] =>
     return first === undefined ? [] : [{ group: first.group, views }]
   })
 
-type GroupHeadProps = { grouped: Grouped; headingId: string }
+type GroupHeadProps = {
+  grouped: Grouped
+  headingId: string
+  /** Plays the group's downloaded tracks from the first; null for a group with none. */
+  onPlay: (() => void) | null
+}
 
 type TitleHeadProps = GroupHeadProps
 
@@ -77,7 +84,7 @@ const TitleHead = ({ grouped, headingId }: TitleHeadProps) => (
 type MusicHeadProps = GroupHeadProps
 
 /** An album or playlist: the album cover beside its name and how many of its tracks are here. */
-const MusicHead = ({ grouped, headingId }: MusicHeadProps) => {
+const MusicHead = ({ grouped, headingId, onPlay }: MusicHeadProps) => {
   const { group, views } = grouped
   const cover = isMusicGroup(group) ? group.cover : null
   return (
@@ -94,6 +101,20 @@ const MusicHead = ({ grouped, headingId }: MusicHeadProps) => {
         {group.title}
       </h2>
       <p className={styles.trackCount}>{COMMON_COPY.tracks(views.length)}</p>
+      {onPlay !== null && (
+        <Button
+          className={styles.headPlay}
+          tone="primary"
+          icon="play"
+          aria-label={DOWNLOAD_ROW_COPY.actionLabel({
+            action: COMMON_COPY.play,
+            label: group.title,
+          })}
+          onClick={onPlay}
+        >
+          {COMMON_COPY.play}
+        </Button>
+      )}
     </header>
   )
 }
@@ -116,20 +137,47 @@ const GROUP_HEADS = {
 
 type GroupProps = { grouped: Grouped; onDeleted: () => void }
 
+type PlayFromProps = { queue: MusicQueue; startAt: number }
+
+const PLAYS_IN_PLAYER = { kind: ROW_PLAYS.player } as const satisfies RowPlay
+const PLAYS_NOTHING = { kind: ROW_PLAYS.none } as const satisfies RowPlay
+
 /** A title's downloads under its name; a movie on its own is its own heading. */
 const Group = ({ grouped, onDeleted }: GroupProps) => {
   const headingId = useId()
   const { group, views } = grouped
   const { Head, isAlwaysHeaded } = GROUP_HEADS[group.kind]
+  const playTracks = useAudioQueue((store) => store.playTracks)
+  const queue = musicQueueOf(grouped)
+  const playFrom = ({ queue: { source, playable }, startAt }: PlayFromProps) =>
+    playTracks({ tracks: playable.map(({ track }) => track), startAt, source })
+  // A video opens in the player; a track queues its group's downloaded tracks from it.
+  const playOf = ({ downloadId }: DownloadView): RowPlay => {
+    if (!isMusicGroup(group)) return PLAYS_IN_PLAYER
+    const startAt = queue?.playable.findIndex((each) => each.downloadId === downloadId) ?? -1
+    if (queue === null || startAt < 0) return PLAYS_NOTHING
+    return { kind: ROW_PLAYS.queue, play: () => playFrom({ queue, startAt }) }
+  }
   const isOwnTitle = views.length === 1 && (views[0]?.label ?? null) === group.title
   const isHeaded = isAlwaysHeaded || !isOwnTitle
   return (
     <li className={styles.group}>
       <section aria-labelledby={isHeaded ? headingId : undefined} className={styles.groupBody}>
-        {isHeaded && <Head grouped={grouped} headingId={headingId} />}
+        {isHeaded && (
+          <Head
+            grouped={grouped}
+            headingId={headingId}
+            onPlay={queue === null ? null : () => playFrom({ queue, startAt: 0 })}
+          />
+        )}
         <ul className={styles.rows}>
           {views.map((view) => (
-            <DownloadRow key={view.downloadId} view={view} onDeleted={onDeleted} />
+            <DownloadRow
+              key={view.downloadId}
+              view={view}
+              play={playOf(view)}
+              onDeleted={onDeleted}
+            />
           ))}
         </ul>
       </section>

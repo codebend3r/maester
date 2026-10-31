@@ -9,11 +9,13 @@ import {
   isOpaqueId,
   isSidecarTrackId,
   isString,
+  isTrack,
   isWatchedPercent,
   listOf,
   nullable,
   object,
   oneOf,
+  optional,
   union,
 } from '@raven/core'
 
@@ -104,6 +106,11 @@ const ENTRY_FIELDS = {
    */
   serverPosition: isNumber,
   createdAt: isNumber,
+  /**
+   * A track's `Track`, kept so Downloads queues it with no server. None for a video, and for a
+   * track downloaded before tracks were kept, so an older `downloads.json` reads as it is.
+   */
+  track: optional(isTrack),
 }
 
 export const isDownloadEntry = object({ ...ENTRY_FIELDS, pending: isPending })

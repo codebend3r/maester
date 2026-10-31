@@ -1,4 +1,4 @@
-import { HTTP_METHODS, isSeconds, isTrackIndex } from '@/contract'
+import { HTTP_METHODS, isSeconds, isTrack, isTrackIndex } from '@/contract'
 import { watchPageOf } from '@/itemLinks'
 import { isDownloadTarget, isMediaId, PLAY_LINK_MAX_NEXT } from '@/playLink'
 import { isOutputSettings, isPlayerSource } from '@/player'
@@ -208,7 +208,11 @@ export const isDownloadAsk = object({
 
 export type DownloadAsk = Infer<typeof isDownloadAsk>
 
-/** A download as the page shows it: it and its server by opaque ids, with no media id, origin or path. */
+/**
+ * A download as the page shows it: it and its server by opaque ids, with no origin or path. A
+ * track's download carries its `Track`, so Downloads queues it with no server; null for a video,
+ * and for a track downloaded before tracks were kept.
+ */
 export const isDownloadView = object({
   downloadId: isOpaqueId,
   serverId: isOpaqueId,
@@ -221,6 +225,7 @@ export const isDownloadView = object({
   watched: nullable(isNumber),
   deletesAt: nullable(isNumber),
   isLocked: isBoolean,
+  track: nullable(isTrack),
 })
 
 export type DownloadView = Infer<typeof isDownloadView>

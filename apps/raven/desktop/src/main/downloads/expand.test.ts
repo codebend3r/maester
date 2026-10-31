@@ -545,6 +545,7 @@ describe('expandTarget', () => {
       })),
     )
     expect(result.files.every(({ watchedPercent }) => watchedPercent === 90)).toBe(true)
+    expect(result.files.map((each) => each.track)).toEqual([tracks[2], tracks[1], tracks[0]])
     expect(log[0]).toBe(albumCall)
   })
 
@@ -594,6 +595,7 @@ describe('expandTarget', () => {
         },
       ],
     ])
+    expect(result.files.map((each) => each.track)).toEqual([tracks[0], tracks[1]])
     expect(log).not.toContain(mediaCall(102))
     expect(log.filter((key) => key === mediaCall(301))).toHaveLength(1)
   })

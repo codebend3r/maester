@@ -216,6 +216,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         isLocked:
           entry.status.kind === DOWNLOAD_STATUS_KINDS.paused &&
           entry.status.reason === PAUSE_REASONS.relocked,
+        track: entry.track ?? null,
       }
     })
 

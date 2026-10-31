@@ -88,6 +88,7 @@ const VIEW = {
   watched: null,
   deletesAt: null,
   isLocked: false,
+  track: null,
 } as const
 
 const SESSION = { accessToken: 'eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJhZGEifQ.c2ln', userId: id }
@@ -888,6 +889,31 @@ describe('the download ask and views', () => {
     expect(isDownloadView({ ...VIEW, watched: 0.4, deletesAt: 1_700_000_600_000 })).toBe(true)
     expect(isDownloadView({ ...VIEW, isLocked: 'no' })).toBe(false)
     expect(isDownloadView({ ...VIEW, status: { kind: 'stalled' } })).toBe(false)
+  })
+
+  it("carries a track's `Track`, and refuses one that is not a track", () => {
+    const track = {
+      id: 101,
+      libraryId: 3,
+      albumId: 7,
+      title: 'Airbag',
+      disc: 1,
+      number: 1,
+      duration: 284,
+      artists: [{ id: 1, name: 'Radiohead' }],
+      container: 'flac',
+      codec: 'flac',
+      bitrate: 900_000,
+      sampleRate: 44_100,
+      bitDepth: 16,
+      isLossless: true,
+      mbid: null,
+      addedAt: '2026-01-01T00:00:00Z',
+      album: { title: 'OK Computer', coverVersion: null },
+    }
+    expect(isDownloadView({ ...VIEW, track })).toBe(true)
+    expect(isDownloadView({ ...VIEW, track: { ...track, disc: 'one' } })).toBe(false)
+    expect(isDownloadView({ ...VIEW, track: undefined })).toBe(false)
   })
 
   it('names its server by an opaque id, never an origin', () => {

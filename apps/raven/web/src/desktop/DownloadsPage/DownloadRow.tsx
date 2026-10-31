@@ -136,13 +136,35 @@ const FailedLine = ({ view }: FailedLineProps) =>
     <span>{DOWNLOAD_ROW_COPY.failed(view.status.message)}</span>
   )
 
-/** Whether a download is watched, and so may delete itself once it is: a track never is. */
-const isWatchable = ({ group }: DownloadView): boolean => !isMusicGroup(group)
+/**
+ * How a row lays out by what it holds: a video is watched and may delete itself once it is, so
+ * it shows its share watched and the switch; a track neither, so its actions leave the switch's
+ * place out.
+ */
+const ROW_KINDS = {
+  video: { isWatchable: true, actions: styles.actions },
+  music: { isWatchable: false, actions: `${styles.actions} ${styles.musicActions}` },
+} as const satisfies Record<string, { isWatchable: boolean; actions: string | undefined }>
+
+const rowKindOf = ({ group }: DownloadView) =>
+  isMusicGroup(group) ? ROW_KINDS.music : ROW_KINDS.video
+
+/** What Play does on a ready row: opens a video in the player, or queues a track with its group. */
+export const ROW_PLAYS = { player: 'player', queue: 'queue', none: 'none' } as const
+
+/**
+ * `none` is a track downloaded before its `Track` was kept, which has nothing to queue it with,
+ * so its row shows no Play.
+ */
+export type RowPlay =
+  | { kind: typeof ROW_PLAYS.player }
+  | { kind: typeof ROW_PLAYS.queue; play: () => void }
+  | { kind: typeof ROW_PLAYS.none }
 
 type ReadyLineProps = StatusLineProps
 
 const ReadyLine = ({ view }: ReadyLineProps) =>
-  isWatchable(view) && (
+  rowKindOf(view).isWatchable && (
     <>
       <progress
         className={styles.gauge}
@@ -175,6 +197,8 @@ type RowViewProps = {
   view: DownloadView
   ids: { label: string; status: string; question: string }
   action: RowAction
+  /** Whether the row shows its action: a ready track with nothing to queue it by has none. */
+  hasAction: boolean
   isDeleting: boolean
   deleteButton: ButtonRef
   cancelButton: ButtonRef
@@ -227,6 +251,7 @@ const ViewingRow = ({
   view,
   ids,
   action,
+  hasAction,
   deleteButton,
   onAct,
   onAsk,
@@ -234,6 +259,7 @@ const ViewingRow = ({
 }: ViewingRowProps) => {
   const { label } = view
   const actionButton = ACTION_BUTTONS[action]
+  const kind = rowKindOf(view)
   return (
     <div className={styles.row}>
       <span id={ids.label} className={styles.label}>
@@ -243,17 +269,19 @@ const ViewingRow = ({
       <p className={styles.status}>
         <StatusLine view={view} textId={ids.status} />
       </p>
-      <div className={styles.actions}>
-        <Button
-          className={styles.act}
-          tone={action === ROW_ACTIONS.play ? 'primary' : 'quiet'}
-          icon={actionButton.icon}
-          aria-label={DOWNLOAD_ROW_COPY.actionLabel({ action: actionButton.label, label })}
-          onClick={onAct}
-        >
-          {actionButton.label}
-        </Button>
-        {isWatchable(view) && (
+      <div className={kind.actions}>
+        {hasAction && (
+          <Button
+            className={styles.act}
+            tone={action === ROW_ACTIONS.play ? 'primary' : 'quiet'}
+            icon={actionButton.icon}
+            aria-label={DOWNLOAD_ROW_COPY.actionLabel({ action: actionButton.label, label })}
+            onClick={onAct}
+          >
+            {actionButton.label}
+          </Button>
+        )}
+        {kind.isWatchable && (
           <label className={styles.auto}>
             <input
               type="checkbox"
@@ -286,12 +314,14 @@ const ROW_VIEWS = {
 
 type DownloadRowProps = {
   view: DownloadView
+  /** What Play does once the row is ready. */
+  play: RowPlay
   /** The row is gone with its buttons, so the page takes the focus. */
   onDeleted: () => void
 }
 
 /** One downloaded file: what it is, where it stands, and what can be done with it. */
-export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
+export const DownloadRow = ({ view, play, onDeleted }: DownloadRowProps) => {
   const { client } = useDesktop()
   const change = useChangeDownloads()
   const openReply = useOpenReply()
@@ -306,6 +336,7 @@ export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
   const ids = { label: useId(), status: useId(), question: useId() }
   const { downloadId } = view
   const action = actionOf(view.status)
+  const hasAction = action !== ROW_ACTIONS.play || play.kind !== ROW_PLAYS.none
   const RowView = ROW_VIEWS[mode]
 
   // Focus follows the swap: into the question, then back to Delete, unless the person moved on.
@@ -320,10 +351,26 @@ export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
     deleteButton.current?.focus()
   }, [mode])
 
+  // A track plays in the music engine, which finds its file, so it needs no grant and no server.
+  const playRow = async (): Promise<unknown> => {
+    switch (play.kind) {
+      case ROW_PLAYS.player:
+        return openReply(await client.request({ type: DESKTOP_REQUESTS.openDownload, downloadId }))
+      case ROW_PLAYS.queue:
+        return play.play()
+      case ROW_PLAYS.none:
+        return undefined
+      default: {
+        const unreachable: never = play
+        return unreachable
+      }
+    }
+  }
+
   const act = async (): Promise<unknown> => {
     switch (action) {
       case ROW_ACTIONS.play:
-        return openReply(await client.request({ type: DESKTOP_REQUESTS.openDownload, downloadId }))
+        return playRow()
       case ROW_ACTIONS.pause:
         return change({ type: DESKTOP_REQUESTS.pauseDownload, downloadId })
       case ROW_ACTIONS.resume:
@@ -362,6 +409,7 @@ export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
         view={view}
         ids={ids}
         action={action}
+        hasAction={hasAction}
         isDeleting={isDeleting}
         deleteButton={deleteButton}
         cancelButton={cancelButton}

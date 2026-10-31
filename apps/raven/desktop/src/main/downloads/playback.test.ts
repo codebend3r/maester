@@ -63,6 +63,7 @@ const entryFor = (overrides: Partial<DownloadEntry>): DownloadEntry => ({
   serverPosition: 0,
   pending: NO_PENDING,
   createdAt: NOW - 1000,
+  track: undefined,
   ...overrides,
 })
 

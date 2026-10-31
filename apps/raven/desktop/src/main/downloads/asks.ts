@@ -117,6 +117,7 @@ const entryOf = ({
   serverPosition: file.media.position,
   pending: NO_PENDING,
   createdAt,
+  track: file.track,
 })
 
 /** The asks a download link raises: expanded, held for the page's answer, then queued or dropped. */

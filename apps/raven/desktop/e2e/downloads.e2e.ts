@@ -548,6 +548,7 @@ test('deletes at launch a download watched eleven minutes ago, and says so', asy
         serverPosition: 0,
         pending: { play: false, position: null, furthest: null, at: 0, accountId: null },
         createdAt: at - 60 * MINUTE_MS,
+        track: undefined,
       },
     ],
     autoDeleteDefault: false,
