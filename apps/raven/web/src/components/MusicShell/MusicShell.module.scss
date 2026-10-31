@@ -112,8 +112,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .navLink {
     transition:
-      background-color 150ms ease,
-      color 150ms ease;
+      background-color 150ms var(--ease-out),
+      color 150ms var(--ease-out);
   }
 }
 

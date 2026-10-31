@@ -56,8 +56,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .sectionLink {
     transition:
-      background-color 150ms ease,
-      color 150ms ease;
+      background-color 150ms var(--ease-out),
+      color 150ms var(--ease-out);
   }
 }
 
