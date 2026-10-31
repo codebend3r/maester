@@ -2,12 +2,14 @@ import { describe, expect, it } from 'bun:test'
 import { BROWSE_ROOTS } from '@raven/audio/contract'
 import {
   ALBUM_TYPES,
+  ApiError,
   type AlbumDetails,
   type AlbumSummary,
   FOLDER_LAYOUTS,
   LIBRARY_KINDS,
   LIBRARY_VIEWS,
   type Library,
+  LOCKED_STATUS,
   MATCH_STATES,
   MEDIA_GROUPINGS,
   MEDIA_SORTS,
@@ -251,6 +253,31 @@ describe('the browse tree', () => {
     expect(nodes[2]?.artworkUri).toBe('https://raven.example/api/pictures/albums/2078/v2078')
     // The 100th is day 61's album, so day 60's and older are left out.
     expect(nodes.at(-1)?.id).toBe('album:1030')
+  })
+
+  it('leaves out a PIN-locked library and still lists the others', async () => {
+    const { api } = fakeApi()
+    const locked: BrowseApi = {
+      ...api,
+      listAlbums: (props: ListAlbumsProps) =>
+        props.libraryId === MUSIC.id
+          ? Promise.reject(new ApiError({ status: LOCKED_STATUS, message: 'Locked' }))
+          : api.listAlbums(props),
+    }
+    const nodes = await browseChildrenOf({ api: locked, downloads, parentId: BROWSE_ROOTS.albums })
+    expect(nodes).toHaveLength(80)
+    expect(nodes.every(({ id }) => id.startsWith('album:2'))).toBe(true)
+  })
+
+  it('fails the listing when a library fails for any other reason', async () => {
+    const { api } = fakeApi()
+    const failing: BrowseApi = {
+      ...api,
+      listAlbums: () => Promise.reject(new ApiError({ status: 500, message: 'Broken' })),
+    }
+    await expect(
+      browseChildrenOf({ api: failing, downloads, parentId: BROWSE_ROOTS.albums }),
+    ).rejects.toThrow('Broken')
   })
 
   it("gives the account's playlists, playable", async () => {

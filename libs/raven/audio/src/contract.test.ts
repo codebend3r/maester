@@ -46,5 +46,6 @@ describe('the audio contract', () => {
     expect(isBrowseNode(album)).toBe(true)
     expect(isBrowseNode({ ...album, isPlayable: undefined })).toBe(false)
     expect(isBrowseNode({ ...album, subtitle: 3 })).toBe(false)
+    expect(isBrowseNode({ ...album, artworkUri: 3 })).toBe(false)
   })
 })

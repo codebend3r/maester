@@ -6,6 +6,7 @@ import {
   type PlaylistSummary,
   type Track,
   artistNames,
+  isLockedError,
   isMediaId,
 } from '@raven/core'
 
@@ -104,7 +105,7 @@ const folderOf = ({ id, title }: FolderOfProps): BrowseNode => ({
   isPlayable: false,
 })
 
-const ROOT_NODES: BrowseNode[] = [
+const ROOT_NODES: readonly BrowseNode[] = [
   folderOf({ id: BROWSE_ROOTS.albums, title: BROWSE_TITLES.albums }),
   folderOf({ id: BROWSE_ROOTS.playlists, title: BROWSE_TITLES.playlists }),
   folderOf({ id: BROWSE_ROOTS.downloads, title: BROWSE_TITLES.downloads }),
@@ -135,13 +136,20 @@ const newestFirst = (a: AlbumSummary, b: AlbumSummary): number => {
 
 /**
  * The most recently added albums across every music library. The server orders each library's
- * by `added` but lists them whole, ignoring `limit`, so the merge is trimmed here.
+ * by `added` but lists them whole, ignoring `limit`, so the merge is trimmed here. A locked
+ * library is left out rather than hiding the rest.
  */
 const recentAlbumsOf = async (api: BrowseApi): Promise<AlbumSummary[]> => {
   const libraries = musicLibrariesOf(await api.listLibraries())
   const listed = await Promise.all(
     libraries.map((library) =>
-      api.listAlbums({ libraryId: library.id, sort: MUSIC_SORTS.added, limit: RECENT_ALBUMS }),
+      api
+        .listAlbums({ libraryId: library.id, sort: MUSIC_SORTS.added, limit: RECENT_ALBUMS })
+        .catch((error: unknown) => {
+          // A PIN-locked library is listed but answers 423; the car cannot unlock it.
+          if (isLockedError(error)) return []
+          throw error
+        }),
     ),
   )
   return listed.flat().toSorted(newestFirst).slice(0, RECENT_ALBUMS)
@@ -167,7 +175,7 @@ export const browseChildrenOf = async ({
   const downloadedNodes = () => downloads.albums().map((album) => albumNodeOf({ api, album }))
   switch (parentId) {
     case BROWSE_ROOTS.home:
-      return ROOT_NODES
+      return [...ROOT_NODES]
     case BROWSE_ROOTS.albums:
       if (api === null) return downloadedNodes()
       return (await recentAlbumsOf(api)).map((album) => albumNodeOf({ api, album }))
