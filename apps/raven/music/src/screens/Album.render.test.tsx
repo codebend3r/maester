@@ -99,6 +99,19 @@ describe('Album', () => {
     })
   })
 
+  it('shows why adding a track to a playlist was refused', async () => {
+    mockApi.appendPlaylistTracks.mockRejectedValueOnce(new Error('Playlist is full.'))
+    await renderRouter(WREN_TREE, { initialUrl: ALBUM_URL })
+    await screen.findByRole('button', { name: '1. Airbag' })
+    await fireEvent.press(screen.getByRole('button', { name: 'More for Airbag' }))
+    await fireEvent.press(await screen.findByRole('button', { name: 'Add to playlist' }))
+    const sheet = await screen.findByLabelText('Add Airbag to a playlist')
+    await fireEvent.press(await within(sheet).findByRole('button', { name: MIXTAPE.name }))
+
+    expect(await screen.findByText('Playlist is full.')).toBeTruthy()
+    expect(screen.queryByText(`Added to ${MIXTAPE.name}.`)).toBeNull()
+  })
+
   it('marks the album a favourite', async () => {
     await renderRouter(WREN_TREE, { initialUrl: ALBUM_URL })
     await fireEvent.press(await screen.findByRole('switch', { name: 'Favourite' }))
