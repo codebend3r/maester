@@ -89,7 +89,12 @@ export {
   useServerArtistFavourite,
 } from '@/query/useMusicFavourite'
 export { playlistMutationsFor, useServerPlaylistMutations } from '@/query/usePlaylistMutations'
-export { useAudiobookChapters, useIsAudiobook, useTrackRate } from '@/query/useAudiobook'
+export {
+  useAudiobookChapters,
+  useIsAudiobook,
+  useTrackBitrate,
+  useTrackRate,
+} from '@/query/useAudiobook'
 export { activeLineAt } from '@/lib/lyrics'
 export { chapterAt, nextChapterStart, previousChapterStart } from '@/lib/chapters'
 export { movedUp, withoutPlace } from '@/music/playlistOrder'

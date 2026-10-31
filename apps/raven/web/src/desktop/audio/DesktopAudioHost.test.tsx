@@ -132,7 +132,14 @@ describe('DesktopAudioHost', () => {
     act(() => store().playTracks({ tracks: TRACKS }))
     await act(async () => {})
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })).toEqual([
-      { type: AUDIO_COMMANDS.load, mediaId: 1, next: 2, start: 0, kbps: null },
+      {
+        type: AUDIO_COMMANDS.load,
+        mediaId: 1,
+        level: 1,
+        next: { mediaId: 2, level: 1, kbps: null },
+        start: 0,
+        kbps: null,
+      },
     ])
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.nowPlaying })).toMatchObject([
       { info: { title: TRACKS[0].title, album: TRACKS[0].album.title, artwork: null } },
@@ -140,7 +147,7 @@ describe('DesktopAudioHost', () => {
     act(() => store().playNext([track({ id: 9 })]))
     await act(async () => {})
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.queueNext })).toEqual([
-      { type: AUDIO_COMMANDS.queueNext, next: 9 },
+      { type: AUDIO_COMMANDS.queueNext, next: { mediaId: 9, level: 1, kbps: null } },
     ])
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })).toHaveLength(1)
   })
@@ -169,7 +176,7 @@ describe('DesktopAudioHost', () => {
     expect(store().queue.at).toBe(1)
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })).toHaveLength(1)
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.queueNext })).toEqual([
-      { type: AUDIO_COMMANDS.queueNext, next: 3 },
+      { type: AUDIO_COMMANDS.queueNext, next: { mediaId: 3, level: 1, kbps: null } },
     ])
   })
 
@@ -248,7 +255,14 @@ describe('DesktopAudioHost', () => {
     act(() => store().playTracks({ tracks: [BOOK] }))
     await waitFor(() =>
       expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })).toEqual([
-        { type: AUDIO_COMMANDS.load, mediaId: BOOK.id, next: null, start: 600, kbps: null },
+        {
+          type: AUDIO_COMMANDS.load,
+          mediaId: BOOK.id,
+          level: 1,
+          next: null,
+          start: 600,
+          kbps: null,
+        },
       ]),
     )
     audio.emit({ type: AUDIO_EVENTS.paused, paused: false })
@@ -257,7 +271,7 @@ describe('DesktopAudioHost', () => {
     await waitFor(() => expect(saves).toEqual([612, 612]))
   })
 
-  it('asks main for the transcode at the bitrate the prefs pick, and an audiobook for its file', async () => {
+  it('asks main for the transcode at the bitrate the prefs pick, the queued track again as it changes, and an audiobook for its file', async () => {
     usePlayerPrefs.getState().setMusicQuality(AUDIO_BITRATES.standard)
     spyOn(api, 'getMedia').mockResolvedValue(mediaItem({ id: BOOK.id, position: 0 }))
     const audio = renderNative({ libraries: [MUSIC, BOOKS] })
@@ -265,14 +279,30 @@ describe('DesktopAudioHost', () => {
     act(() => store().playTracks({ tracks: TRACKS }))
     await waitFor(() =>
       expect(loads()).toEqual([
-        { type: AUDIO_COMMANDS.load, mediaId: 1, next: 2, start: 0, kbps: 256 },
+        {
+          type: AUDIO_COMMANDS.load,
+          mediaId: 1,
+          level: 1,
+          next: { mediaId: 2, level: 1, kbps: 256 },
+          start: 0,
+          kbps: 256,
+        },
       ]),
+    )
+    const queues = () => ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.queueNext })
+    act(() => usePlayerPrefs.getState().setMusicQuality(AUDIO_BITRATES.high))
+    await waitFor(() =>
+      expect(queues().at(-1)).toEqual({
+        type: AUDIO_COMMANDS.queueNext,
+        next: { mediaId: 2, level: 1, kbps: 320 },
+      }),
     )
     act(() => store().playTracks({ tracks: [BOOK] }))
     await waitFor(() =>
       expect(loads().at(-1)).toEqual({
         type: AUDIO_COMMANDS.load,
         mediaId: BOOK.id,
+        level: 1,
         next: null,
         start: 0,
         kbps: null,
@@ -290,11 +320,18 @@ describe('DesktopAudioHost', () => {
     const sounds = () => ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.sound })
     await waitFor(() =>
       expect(sounds()).toEqual([
-        { type: AUDIO_COMMANDS.sound, level: 1, eq: FLAT_EQUALIZER.gains },
+        { type: AUDIO_COMMANDS.sound, level: 1, nextLevel: null, eq: FLAT_EQUALIZER.gains },
       ]),
     )
     act(() => store().playTracks({ tracks: [quiet, loud] }))
-    await waitFor(() => expect(sounds().at(-1)).toMatchObject({ level: expect.closeTo(0.5, 4) }))
+    await waitFor(() =>
+      expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })).toMatchObject([
+        { mediaId: 1, level: expect.closeTo(0.5, 4), next: { mediaId: 2, level: 1 } },
+      ]),
+    )
+    await waitFor(() =>
+      expect(sounds().at(-1)).toMatchObject({ level: expect.closeTo(0.5, 4), nextLevel: 1 }),
+    )
     act(() =>
       usePlayerPrefs
         .getState()
@@ -306,6 +343,7 @@ describe('DesktopAudioHost', () => {
       expect(sounds().at(-1)).toEqual({
         type: AUDIO_COMMANDS.sound,
         level: 1,
+        nextLevel: null,
         eq: EQ_PRESETS.vocal,
       }),
     )

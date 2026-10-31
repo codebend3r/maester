@@ -12,7 +12,7 @@ import {
 } from '@/components/AudioHost/useCrossfade'
 import { hasWebAudio, useSoundGraph } from '@/components/AudioHost/useSoundGraph'
 import { watchPageHide } from '@/components/Player/watchPageHide'
-import { useIsAudiobook, useTrackRate } from '@/query/useAudiobook'
+import { useIsAudiobook, useTrackBitrate, useTrackRate } from '@/query/useAudiobook'
 import {
   AUDIO_STATES,
   type AudioState,
@@ -21,7 +21,7 @@ import {
   useAudioQueue,
 } from '@/stores/audioQueue'
 import { useMediaOrigin } from '@/stores/mediaOrigin'
-import { MUSIC_QUALITIES, usePlayerPrefs } from '@/stores/playerPrefs'
+import { usePlayerPrefs } from '@/stores/playerPrefs'
 import styles from '@/components/AudioHost/AudioHost.module.scss'
 
 /** What the elements ask for when their sound goes through Web Audio, which reads only CORS media. */
@@ -52,15 +52,12 @@ type UseTrackSourceProps = {
 /**
  * The address a track plays from, as a video's: through the web host's own
  * address, or from the picked media origin once a ticket for the track has
- * come. Music plays from its file, or from a transcode at the bitrate the
- * prefs pick; an audiobook always from its file, which a transcode would
- * have to convert whole before the first second plays. Null while there is
- * no track, or the ticket is on its way.
+ * come. It plays from its file, or from the transcode at `useTrackBitrate`'s
+ * bitrate. Null while there is no track, or the ticket is on its way.
  */
 const useTrackSource = ({ api, track, reprobe }: UseTrackSourceProps): string | null => {
   const pick = useMediaOrigin((state) => state.pick)
-  const quality = usePlayerPrefs((prefs) => prefs.musicQuality)
-  const isAudiobook = useIsAudiobook({ api, track })
+  const kbps = useTrackBitrate({ api, track })
   const plane = useMediaPlane({
     api,
     mediaId: track?.id ?? 0,
@@ -69,10 +66,8 @@ const useTrackSource = ({ api, track, reprobe }: UseTrackSourceProps): string | 
   })
   if (track === null) return null
   if (pick !== null && plane.access === null) return null
-  if (quality === MUSIC_QUALITIES.original || isAudiobook) {
-    return api.fileUrl({ id: track.id, access: plane.access })
-  }
-  return api.transcodeUrl({ mediaId: track.id, kbps: quality, access: plane.access })
+  if (kbps === null) return api.fileUrl({ id: track.id, access: plane.access })
+  return api.transcodeUrl({ mediaId: track.id, kbps, access: plane.access })
 }
 
 type UseLevelledVolumeProps = {

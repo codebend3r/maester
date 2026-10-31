@@ -41,18 +41,29 @@ export const isNowPlayingInfo = object({
 
 export type NowPlayingInfo = Infer<typeof isNowPlayingInfo>
 
+/**
+ * A track to queue: its id, its levelling factor, which mpv applies from its first note, and
+ * the bitrate of the AAC transcode it plays from, null for its file.
+ */
+const isQueuedTrack = object({
+  mediaId: isMediaId,
+  level: isLevel,
+  kbps: nullable(isAudioBitrate),
+})
+
 export const isAudioCommand = union(
-  // Plays `mediaId` from `start`, with `next` ready to follow it, from the file itself, or both
-  // from the server's AAC transcode at `kbps`.
+  // Plays `mediaId` from `start` at `level`, from its file or its AAC transcode at `kbps`, with
+  // `next` ready to follow it.
   object({
     type: oneOf([AUDIO_COMMANDS.load]),
     mediaId: isMediaId,
-    next: nullable(isMediaId),
+    level: isLevel,
+    next: nullable(isQueuedTrack),
     start: isNumber,
     kbps: nullable(isAudioBitrate),
   }),
-  // Changes only what follows the playing track.
-  object({ type: oneOf([AUDIO_COMMANDS.queueNext]), next: nullable(isMediaId) }),
+  // Changes only what follows the playing track, or the level or bitrate it is queued at.
+  object({ type: oneOf([AUDIO_COMMANDS.queueNext]), next: nullable(isQueuedTrack) }),
   object({ type: oneOf([AUDIO_COMMANDS.play]) }),
   object({ type: oneOf([AUDIO_COMMANDS.pause]) }),
   object({ type: oneOf([AUDIO_COMMANDS.seek]), time: isNumber }),
@@ -60,8 +71,14 @@ export const isAudioCommand = union(
   // How fast it plays: an audiobook's chosen speed, 1 for music; the pitch stays as it was.
   object({ type: oneOf([AUDIO_COMMANDS.speed]), rate: isNumber }),
   object({ type: oneOf([AUDIO_COMMANDS.nowPlaying]), info: isNowPlayingInfo }),
-  // How the playing track sounds: its levelling factor and the equalizer's gains, from 32 Hz up.
-  object({ type: oneOf([AUDIO_COMMANDS.sound]), level: isLevel, eq: isEqGains }),
+  // How music sounds: the playing track's levelling factor, the queued one's (null for none),
+  // and the equalizer's gains, from 32 Hz up.
+  object({
+    type: oneOf([AUDIO_COMMANDS.sound]),
+    level: isLevel,
+    nextLevel: nullable(isLevel),
+    eq: isEqGains,
+  }),
   object({ type: oneOf([AUDIO_COMMANDS.stop]) }),
 )
 

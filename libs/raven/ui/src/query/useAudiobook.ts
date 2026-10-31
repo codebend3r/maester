@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ApiClient, Chapter, Track } from '@raven/core'
+import type { ApiClient, AudioBitrate, Chapter, Track } from '@raven/core'
 import { useMemo } from 'react'
 import { isAudiobookTrack } from '@/lib/chapters'
 import { ravenQueriesFor } from '@/query/ravenQueries'
-import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { MUSIC_QUALITIES, usePlayerPrefs } from '@/stores/playerPrefs'
 
 /** What a track that is no audiobook's has of chapters. */
 const NO_CHAPTERS: readonly Chapter[] = []
@@ -34,6 +34,24 @@ export const useTrackRate = ({ api, track }: UseTrackRateProps): number => {
   const isAudiobook = useIsAudiobook({ api, track })
   const speed = usePlayerPrefs((prefs) => prefs.audiobookSpeed)
   return isAudiobook ? speed : MUSIC_RATE
+}
+
+type UseTrackBitrateProps = { api: ApiClient; track: Track | null }
+
+/**
+ * The AAC transcode's bitrate `track` plays at: the one the prefs pick for music, null for its
+ * file. An audiobook always plays its file, which a transcode would have to convert whole before
+ * the first second plays, so while the libraries that tell a book from music are unknown (on
+ * their way, or failed) the file is asked for too.
+ */
+export const useTrackBitrate = ({ api, track }: UseTrackBitrateProps): AudioBitrate | null => {
+  const queries = useMemo(() => ravenQueriesFor(api), [api])
+  const quality = usePlayerPrefs((prefs) => prefs.musicQuality)
+  const libraries = useQuery({ ...queries.librariesQuery, enabled: track !== null }).data
+  if (track === null || libraries === undefined || quality === MUSIC_QUALITIES.original) {
+    return null
+  }
+  return isAudiobookTrack({ track, libraries }) ? null : quality
 }
 
 type UseAudiobookChaptersProps = { api: ApiClient; track: Track | null }

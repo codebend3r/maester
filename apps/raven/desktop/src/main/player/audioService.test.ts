@@ -151,12 +151,27 @@ const setup = ({ explain = async () => LOCKED, downloaded = [] }: SetupProps = {
   }
 }
 
-const LOAD = { type: AUDIO_COMMANDS.load, mediaId: 7, next: 8, start: 0, kbps: null } as const
+const LOAD = {
+  type: AUDIO_COMMANDS.load,
+  mediaId: 7,
+  level: 1,
+  next: { mediaId: 8, level: 1, kbps: null },
+  start: 0,
+  kbps: null,
+} as const
 
-type LoadfileOfProps = { mediaId: number; mode: string; start: number }
+/** Queues `mediaId` at level 1 from its file, or clears what is queued for null. */
+const queueOf = (mediaId: number | null) =>
+  ({
+    type: AUDIO_COMMANDS.queueNext,
+    next: mediaId === null ? null : { mediaId, level: 1, kbps: null },
+  }) as const
 
-const loadfileOf = ({ mediaId, mode, start }: LoadfileOfProps) =>
-  `loadfile ${BASE}/secret-${mediaId}/file ${mode} -1 start=${start},stream-lavf-o=%37%max_redirects=0,reconnect_delay_max=3,network-timeout=15`
+type LoadfileOfProps = { mediaId: number; mode: string; start: number; filter?: string }
+
+/** A `loadfile` as the fake logs it, its `af` quoted with mpv's byte count. */
+const loadfileOf = ({ mediaId, mode, start, filter = '' }: LoadfileOfProps) =>
+  `loadfile ${BASE}/secret-${mediaId}/file ${mode} -1 start=${start},stream-lavf-o=%37%max_redirects=0,reconnect_delay_max=3,network-timeout=15,replaygain=no,af=%${filter.length}%${filter}`
 
 describe('loading', () => {
   test('hardens mpv first and follows the four properties', async () => {
@@ -182,14 +197,20 @@ describe('loading', () => {
     ])
   })
 
-  test('a load at a bitrate fetches the track and the one queued after it at that bitrate', async () => {
+  test('a load fetches at its bitrate, and a queued track at its own, queued again only when it changes', async () => {
     const { service, resolved, bitrates } = setup()
     await settle()
-    await service.handle({ ...LOAD, kbps: 256 })
-    await service.handle({ type: AUDIO_COMMANDS.queueNext, next: 9 })
+    await service.handle({ ...LOAD, kbps: 256, next: { ...LOAD.next, kbps: 256 } })
+    const at320 = {
+      type: AUDIO_COMMANDS.queueNext,
+      next: { mediaId: 9, level: 1, kbps: 320 },
+    } as const
+    await service.handle(at320)
+    await service.handle(at320)
+    await service.handle({ ...at320, next: { ...at320.next, kbps: 128 } })
     await service.handle(LOAD)
-    expect(resolved).toEqual([7, 8, 9, 7, 8])
-    expect(bitrates).toEqual([256, 256, 256, null, null])
+    expect(resolved).toEqual([7, 8, 9, 9, 7, 8])
+    expect(bitrates).toEqual([256, 256, 320, 128, null, null])
   })
 
   test('a track the server refuses is refused with its words, and nothing is sent', async () => {
@@ -238,16 +259,16 @@ describe('what follows', () => {
     const { service, fake, closed, resolved } = setup()
     await service.handle(LOAD)
     fake.log.length = 0
-    expect(await service.handle({ type: AUDIO_COMMANDS.queueNext, next: 8 })).toEqual({ ok: true })
+    expect(await service.handle(queueOf(8))).toEqual({ ok: true })
     expect(fake.log).toEqual([])
-    expect(await service.handle({ type: AUDIO_COMMANDS.queueNext, next: 9 })).toEqual({ ok: true })
+    expect(await service.handle(queueOf(9))).toEqual({ ok: true })
     expect(closed).toEqual(['8'])
     expect(fake.log).toEqual([
       MPV_COMMANDS.playlistClear,
       loadfileOf({ mediaId: 9, mode: 'append-play', start: 0 }),
     ])
     fake.log.length = 0
-    expect(await service.handle({ type: AUDIO_COMMANDS.queueNext, next: null })).toEqual({
+    expect(await service.handle(queueOf(null))).toEqual({
       ok: true,
     })
     expect(closed).toEqual(['8', '9'])
@@ -259,7 +280,7 @@ describe('what follows', () => {
     const { service, fake, events, closed } = setup()
     await service.handle({ ...LOAD, next: null })
     fake.failing.add(`loadfile ${BASE}/secret-8/file append-play`)
-    expect(await service.handle({ type: AUDIO_COMMANDS.queueNext, next: 8 })).toEqual({
+    expect(await service.handle(queueOf(8))).toEqual({
       ok: false,
       reason: PLAYER_REFUSAL_REASONS.refused,
       message: PLAYER_MESSAGES.failed,
@@ -272,7 +293,7 @@ describe('what follows', () => {
   test('a next track the server refuses is refused with its words', async () => {
     const { service } = setup()
     await service.handle({ ...LOAD, next: null })
-    expect(await service.handle({ type: AUDIO_COMMANDS.queueNext, next: GONE })).toEqual({
+    expect(await service.handle(queueOf(GONE))).toEqual({
       ok: false,
       reason: PLAYER_REFUSAL_REASONS.refused,
       message: GONE_MESSAGE,
@@ -283,7 +304,7 @@ describe('what follows', () => {
     const { service, fake } = setup()
     await settle()
     fake.log.length = 0
-    expect(await service.handle({ type: AUDIO_COMMANDS.queueNext, next: 8 })).toEqual({ ok: true })
+    expect(await service.handle(queueOf(8))).toEqual({ ok: true })
     expect(fake.log).toEqual([])
   })
 
@@ -296,7 +317,7 @@ describe('what follows', () => {
     expect(closed).toEqual(['7'])
     // The page now names what follows the new track; the old next is what plays.
     fake.log.length = 0
-    await service.handle({ type: AUDIO_COMMANDS.queueNext, next: 9 })
+    await service.handle(queueOf(9))
     expect(fake.log).toEqual([
       MPV_COMMANDS.playlistClear,
       loadfileOf({ mediaId: 9, mode: 'append-play', start: 0 }),
@@ -376,7 +397,7 @@ describe('what mpv reports', () => {
   test('a downloaded track plays its file, queued after a server one, and its end retires no load', async () => {
     const { service, fake, closed, events } = setup({ downloaded: [8] })
     await service.handle(LOAD)
-    expect(fake.log).toContain(`loadfile ${fileOf(8)} append-play -1 start=0`)
+    expect(fake.log).toContain(`loadfile ${fileOf(8)} append-play -1 start=0,replaygain=no,af=%0%`)
     fake.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
     fake.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
     expect(closed).toEqual(['7'])
@@ -386,7 +407,7 @@ describe('what mpv reports', () => {
   test('a downloaded track queued again is kept, not resolved twice', async () => {
     const { service, resolved } = setup({ downloaded: [7, 8] })
     await service.handle(LOAD)
-    await service.handle({ type: AUDIO_COMMANDS.queueNext, next: 8 })
+    await service.handle(queueOf(8))
     expect(resolved).toEqual([7, 8])
   })
 
@@ -560,20 +581,93 @@ describe('the sound', () => {
     expect(soundFilterOf({ level: 1, eq: BASS })).toBe(`lavfi=[${bands.join(',')}]`)
   })
 
-  test('a sound command turns replaygain off and sets af once, with no ao-reload', async () => {
+  test('each track opens with replaygain off and its own af, the queued one at its level', async () => {
     const { service, fake } = setup()
     await settle()
-    await service.handle(LOAD)
+    await service.handle({ type: AUDIO_COMMANDS.sound, level: 1, nextLevel: null, eq: BASS })
+    fake.log.length = 0
+    await service.handle({ ...LOAD, level: 0.5, next: { mediaId: 8, level: 0.25, kbps: null } })
+    expect(fake.log).toEqual([
+      'set pause false',
+      loadfileOf({
+        mediaId: 7,
+        mode: 'replace',
+        start: 0,
+        filter: soundFilterOf({ level: 0.5, eq: BASS }),
+      }),
+      MPV_COMMANDS.playlistClear,
+      loadfileOf({
+        mediaId: 8,
+        mode: 'append-play',
+        start: 0,
+        filter: soundFilterOf({ level: 0.25, eq: BASS }),
+      }),
+    ])
+  })
+
+  test("mpv going on to the queued track keeps its af, so the page's sound for it sets nothing", async () => {
+    const { service, fake } = setup()
+    await settle()
+    await service.handle({ ...LOAD, next: { mediaId: 8, level: 0.5, kbps: null } })
+    fake.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
+    fake.log.length = 0
+    const sound = {
+      type: AUDIO_COMMANDS.sound,
+      level: 0.5,
+      nextLevel: null,
+      eq: EQ_PRESETS.flat,
+    } as const
+    expect(await service.handle(sound)).toEqual({ ok: true })
+    expect(fake.log).toEqual([])
+  })
+
+  test('a sound command sets the playing af once, with no ao-reload', async () => {
+    const { service, fake } = setup()
+    await settle()
+    await service.handle({ ...LOAD, next: null })
     fake.emit({ type: MPV_EVENTS.fileLoaded })
     fake.log.length = 0
-    const sound = { type: AUDIO_COMMANDS.sound, level: 0.5, eq: EQ_PRESETS.flat } as const
+    const sound = {
+      type: AUDIO_COMMANDS.sound,
+      level: 0.5,
+      nextLevel: null,
+      eq: EQ_PRESETS.flat,
+    } as const
     expect(await service.handle(sound)).toEqual({ ok: true })
     await service.handle(sound)
-    expect(fake.log).toEqual(['set replaygain no', 'set af lavfi=[volume=-6.02dB]'])
+    expect(fake.log).toEqual(['set af lavfi=[volume=-6.02dB]'])
     fake.log.length = 0
     await service.handle({ ...sound, level: 1 })
     expect(fake.log).toEqual(['set af '])
     expect(fake.log.some((entry) => entry.startsWith(MPV_COMMANDS.aoReload))).toBe(false)
+  })
+
+  test('an EQ or a level change queues the next track again with its new af', async () => {
+    const { service, fake, resolved } = setup()
+    await settle()
+    await service.handle(LOAD)
+    fake.log.length = 0
+    const sound = { type: AUDIO_COMMANDS.sound, level: 1, nextLevel: 1, eq: BASS } as const
+    await service.handle(sound)
+    const bass = soundFilterOf({ level: 1, eq: BASS })
+    expect(fake.log).toEqual([
+      `set af ${bass}`,
+      MPV_COMMANDS.playlistClear,
+      loadfileOf({ mediaId: 8, mode: 'append-play', start: 0, filter: bass }),
+    ])
+    fake.log.length = 0
+    await service.handle(sound)
+    expect(fake.log).toEqual([])
+    await service.handle({ ...sound, nextLevel: 0.5 })
+    expect(fake.log.at(-1)).toBe(
+      loadfileOf({
+        mediaId: 8,
+        mode: 'append-play',
+        start: 0,
+        filter: soundFilterOf({ level: 0.5, eq: BASS }),
+      }),
+    )
+    expect(resolved).toEqual([7, 8, 8, 8])
   })
 
   test('a level that is not a number is refused before mpv hears it', async () => {
@@ -581,7 +675,12 @@ describe('the sound', () => {
     await settle()
     fake.log.length = 0
     expect(
-      await service.handle({ type: AUDIO_COMMANDS.sound, level: Number.NaN, eq: BASS }),
+      await service.handle({
+        type: AUDIO_COMMANDS.sound,
+        level: Number.NaN,
+        nextLevel: null,
+        eq: BASS,
+      }),
     ).toMatchObject({ ok: false })
     expect(fake.log).toEqual([])
   })
