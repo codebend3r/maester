@@ -11,7 +11,7 @@ import {
 import { DOWNLOAD_BUTTON_COPY } from '@/screens/copy'
 import { WREN_ICONS } from '@/theme/icons'
 
-type DownloadAction = { label: string; icon: IconName; onPress: () => void }
+type DownloadAction = { label: string; icon: IconName; onPress: () => void; isDisabled: boolean }
 
 const IGNORED = (): void => undefined
 
@@ -42,25 +42,30 @@ export function DownloadButton({ serverId, tracks, collection, onRefusal }: Down
       label: DOWNLOAD_BUTTON_COPY.download,
       icon: WREN_ICONS.download,
       onPress: download,
+      isDisabled: false,
     },
+    // On its way, it is shown and said as dimmed rather than pressed to no end.
     [DOWNLOAD_PROGRESS.downloading]: {
       label: DOWNLOAD_BUTTON_COPY.downloading(progress),
       icon: WREN_ICONS.download,
       onPress: IGNORED,
+      isDisabled: true,
     },
     [DOWNLOAD_PROGRESS.done]: {
       label: DOWNLOAD_BUTTON_COPY.remove,
       icon: WREN_ICONS.downloaded,
       onPress: () => {
-        remove({ mediaIds }).catch(IGNORED)
+        remove({ serverId, mediaIds }).catch(IGNORED)
       },
+      isDisabled: false,
     },
     [DOWNLOAD_PROGRESS.failed]: {
       label: DOWNLOAD_BUTTON_COPY.retry,
       icon: WREN_ICONS.download,
       onPress: download,
+      isDisabled: false,
     },
   } as const satisfies Record<typeof progress.kind, DownloadAction>
-  const { label, icon, onPress } = actions[progress.kind]
-  return <ActionButton icon={icon} label={label} onPress={onPress} />
+  const { label, icon, onPress, isDisabled } = actions[progress.kind]
+  return <ActionButton icon={icon} isDisabled={isDisabled} label={label} onPress={onPress} />
 }

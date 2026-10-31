@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { AUDIO_BITRATES, AUDIO_CODECS, type Track } from '@raven/core'
 
-import { DOWNLOAD_STATUSES, type DownloadEntry, useDownloads } from '@/downloads/downloadStore'
+import {
+  DOWNLOAD_STATUSES,
+  type DownloadEntry,
+  downloadKeyOf,
+  useDownloads,
+} from '@/downloads/downloadStore'
 import { trackPlanFor } from '@/music/trackPlan'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 
@@ -33,10 +38,13 @@ const ENTRY: DownloadEntry = {
   kbps: AUDIO_BITRATES.standard,
   bytes: 640_000,
   path: `downloads/${SERVER_ID}/${FIRST_LIGHT.id}/media.m4a`,
+  coverPath: `downloads/${SERVER_ID}/${FIRST_LIGHT.id}/cover.jpg`,
   track: FIRST_LIGHT,
   album: null,
   status: DOWNLOAD_STATUSES.done,
 }
+
+const KEY = downloadKeyOf({ serverId: SERVER_ID, id: FIRST_LIGHT.id })
 
 type PlanOnProps = { isCellular: boolean }
 
@@ -54,19 +62,23 @@ describe('trackPlanFor', () => {
   })
 
   it("plays a finished download of this server's from its file", () => {
-    useDownloads.setState({ entries: { [ENTRY.mediaId]: ENTRY } })
-    expect(planOn({ isCellular: false }).downloadedUriOf(FIRST_LIGHT)).toBe(
-      `file:///documents/downloads/${SERVER_ID}/${FIRST_LIGHT.id}/media.m4a`,
-    )
+    useDownloads.setState({ entries: { [KEY]: ENTRY } })
+    expect(planOn({ isCellular: false }).downloadedOf(FIRST_LIGHT)).toEqual({
+      uri: `file:///documents/downloads/${SERVER_ID}/${FIRST_LIGHT.id}/media.m4a`,
+      artworkUri: `file:///documents/downloads/${SERVER_ID}/${FIRST_LIGHT.id}/cover.jpg`,
+    })
   })
 
   it("plays no download still on its way, or another server's", () => {
     useDownloads.setState({
-      entries: { [ENTRY.mediaId]: { ...ENTRY, status: DOWNLOAD_STATUSES.downloading } },
+      entries: { [KEY]: { ...ENTRY, status: DOWNLOAD_STATUSES.downloading } },
     })
-    expect(planOn({ isCellular: false }).downloadedUriOf(FIRST_LIGHT)).toBeNull()
-    useDownloads.setState({ entries: { [ENTRY.mediaId]: { ...ENTRY, serverId: 'elsewhere' } } })
-    expect(planOn({ isCellular: false }).downloadedUriOf(FIRST_LIGHT)).toBeNull()
+    expect(planOn({ isCellular: false }).downloadedOf(FIRST_LIGHT)).toBeNull()
+    const elsewhere = { ...ENTRY, serverId: 'elsewhere' }
+    useDownloads.setState({
+      entries: { [downloadKeyOf({ serverId: 'elsewhere', id: FIRST_LIGHT.id })]: elsewhere },
+    })
+    expect(planOn({ isCellular: false }).downloadedOf(FIRST_LIGHT)).toBeNull()
   })
 
   it('streams at the cellular quality on a mobile network, and the file on Wi-Fi', async () => {

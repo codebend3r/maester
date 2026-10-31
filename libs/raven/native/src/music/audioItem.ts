@@ -17,17 +17,20 @@ type AudioServer = {
   sources: Pick<MediaSources, 'trackSource'>
 }
 
+/** A track on this device: its file, and the album cover saved beside it (null for none), as `file://` addresses. */
+type DownloadedTrack = { uri: string; artworkUri: string | null }
+
 /** What this device would play a track from before the server's file: a download, or a smaller stream. */
 export type TrackPlan = {
-  /** The downloaded file's `file://` address, or null when the track is not on this device. */
-  downloadedUriOf: (track: Track) => string | null
+  /** The track's download, or null when it is not on this device. */
+  downloadedOf: (track: Track) => DownloadedTrack | null
   /** The bitrate the network calls for (a transcode on cellular), or null for the file itself. */
   streamKbps: () => Promise<AudioBitrate | null>
 }
 
 /** A device that downloads nothing and always streams the file itself: the device app. */
 export const SERVER_FILE_PLAN: TrackPlan = {
-  downloadedUriOf: () => null,
+  downloadedOf: () => null,
   streamKbps: async () => null,
 }
 
@@ -40,7 +43,7 @@ type AudioItemOfProps = {
 
 /**
  * A track as `@raven/audio` takes it, and what the lock screen shows. It plays, in order: the
- * downloaded file, with no headers and nothing asked of the server; the AAC transcode at the
+ * downloaded file and the cover saved with it, with no headers and nothing asked of the server; the AAC transcode at the
  * bitrate the network calls for; else the file itself by its ticket. A file this device's player
  * cannot decode (ALAC on Android, which plays silent) plays from the transcode at 256 kbps
  * instead. A rejection says why the server would not play it.
@@ -62,8 +65,15 @@ export const audioItemOf = async ({
     }),
     duration: track.duration,
   }
-  const downloaded = plan.downloadedUriOf(track)
-  if (downloaded !== null) return { ...details, uri: downloaded, headers: {} }
+  const downloaded = plan.downloadedOf(track)
+  if (downloaded !== null) {
+    return {
+      ...details,
+      uri: downloaded.uri,
+      headers: {},
+      artworkUri: downloaded.artworkUri ?? details.artworkUri,
+    }
+  }
   // A track the server has not probed yet names no codec; the player is left to try it.
   const canDecode =
     track.codec === null ||

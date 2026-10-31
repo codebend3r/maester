@@ -37,6 +37,13 @@ export const DOWNLOADS_FOLDER = 'downloads'
 /** The one file a downloaded track is: the server's AAC transcode, in an `.m4a`. */
 const MEDIA_FILE = 'media.m4a'
 
+/** Its album's cover, beside it, for the Downloads list, the lock screen and the car offline. */
+const COVER_FILE = 'cover.jpg'
+
+const PATH_SEPARATOR = '/'
+
+const KEY_SEPARATOR = ':'
+
 export const DOWNLOAD_STATUSES = {
   queued: 'queued',
   downloading: 'downloading',
@@ -68,6 +75,8 @@ const isDownloadEntry = object({
   bytes: isNumber,
   /** Under the app's documents, since the documents folder's own address moves on an update. */
   path: isString,
+  /** The album cover's path beside it; null when the album has none or it could not be fetched. */
+  coverPath: nullable(isString),
   track: isTrack,
   /** The album's summary when it was downloaded from its page; null for a playlist's track. */
   album: nullable(isAlbumSummary),
@@ -96,8 +105,12 @@ export type DownloadDisk = {
   fetch: (props: DiskFetchProps) => Promise<number>
   /** The `file://` address `path` is at now. */
   uriOf: (path: string) => string
-  /** Deletes a track's folder. */
-  remove: (path: string) => Promise<void>
+  /** Whether a file is at `path`. */
+  exists: (path: string) => boolean
+  /** Every track's folder on disk, `downloads/<serverId>/<mediaId>`. */
+  folders: () => string[]
+  /** Deletes a track's folder and all in it. */
+  remove: (folder: string) => Promise<void>
   /** Deletes every download. */
   removeAll: () => Promise<void>
 }
@@ -105,7 +118,12 @@ export type DownloadDisk = {
 /** Where a server's tracks download from; null for a server this device no longer holds. */
 type SourcesOf = (serverId: string) => Pick<MediaSources, 'trackSource'> | null
 
-type DownloadDevice = { disk: DownloadDisk; sourcesOf: SourcesOf }
+type CoverOfProps = { serverId: string; track: Track }
+
+/** Where a track's album cover is fetched from, with its headers; null when it has none. */
+type CoverOf = (props: CoverOfProps) => Promise<TrackSource | null>
+
+type DownloadDevice = { disk: DownloadDisk; sourcesOf: SourcesOf; coverOf: CoverOf }
 
 export type DownloadCollection =
   | { kind: typeof DOWNLOAD_SOURCES.album; album: AlbumSummary }
@@ -117,11 +135,13 @@ type DownloadTracksProps = {
   collection: DownloadCollection
 }
 
-type RemoveProps = { mediaIds: readonly number[] }
+type RemoveProps = { serverId: string; mediaIds: readonly number[] }
 
 type DownloadsValues = {
-  entries: Record<number, DownloadEntry>
-  playlists: Record<number, DownloadedPlaylist>
+  /** Each track by `downloadKeyOf`, so one server's media id never stands for another's. */
+  entries: Record<string, DownloadEntry>
+  /** Each playlist by `downloadKeyOf` of its server and its id. */
+  playlists: Record<string, DownloadedPlaylist>
 }
 
 type Downloads = DownloadsValues & {
@@ -134,12 +154,32 @@ type Downloads = DownloadsValues & {
   removeAll: () => Promise<void>
 }
 
-type DownloadPathOfProps = { serverId: string; mediaId: number }
+type DownloadKeyOfProps = { serverId: string; id: number }
 
-const downloadPathOf = ({ serverId, mediaId }: DownloadPathOfProps): string =>
-  [DOWNLOADS_FOLDER, serverId, String(mediaId), MEDIA_FILE].join('/')
+/** A download's key: its server and its id, `<serverId>:<id>`. */
+export const downloadKeyOf = ({ serverId, id }: DownloadKeyOfProps): string =>
+  [serverId, id].join(KEY_SEPARATOR)
+
+const keyOfEntry = (entry: DownloadEntry): string =>
+  downloadKeyOf({ serverId: entry.serverId, id: entry.mediaId })
+
+type FolderOfProps = { serverId: string; mediaId: number }
+
+const folderOf = ({ serverId, mediaId }: FolderOfProps): string =>
+  [DOWNLOADS_FOLDER, serverId, String(mediaId)].join(PATH_SEPARATOR)
+
+/** The folder a track's files sit in: its path without the file's name. */
+const folderOfPath = (path: string): string =>
+  path.split(PATH_SEPARATOR).slice(0, -1).join(PATH_SEPARATOR)
+
+type InFolderProps = { folder: string; file: string }
+
+const inFolder = ({ folder, file }: InFolderProps): string => [folder, file].join(PATH_SEPARATOR)
 
 const isDone = (entry: DownloadEntry): boolean => entry.status === DOWNLOAD_STATUSES.done
+
+const isUnderway = ({ status }: DownloadEntry): boolean =>
+  status === DOWNLOAD_STATUSES.queued || status === DOWNLOAD_STATUSES.downloading
 
 /** The bytes the finished downloads take. */
 export const usedBytesOf = (entries: DownloadsValues['entries']): number =>
@@ -153,6 +193,13 @@ type EstimateOfProps = { tracks: readonly Track[]; kbps: AudioBitrate }
 const estimateOf = ({ tracks, kbps }: EstimateOfProps): number =>
   tracks.reduce((sum, track) => sum + (track.duration ?? 0) * kbps * BYTES_PER_KBPS_SECOND, 0)
 
+/** What the downloads take once those on their way are done: the finished bytes, and an estimate of the rest. */
+const committedBytesOf = (entries: DownloadsValues['entries']): number =>
+  usedBytesOf(entries) +
+  Object.values(entries)
+    .filter(isUnderway)
+    .reduce((sum, entry) => sum + estimateOf({ tracks: [entry.track], kbps: entry.kbps }), 0)
+
 const IGNORED = (): void => undefined
 
 /** Holds the place of the device until `configureDownloads`: every fetch fails, and nothing is on disk. */
@@ -162,10 +209,13 @@ const UNCONFIGURED_DEVICE: DownloadDevice = {
       throw new Error('Downloads are not configured.')
     },
     uriOf: (path) => path,
+    exists: () => false,
+    folders: () => [],
     remove: async () => undefined,
     removeAll: async () => undefined,
   },
   sourcesOf: () => null,
+  coverOf: async () => null,
 }
 
 const UNCONFIGURED_STORAGE: StateStorage = {
@@ -187,20 +237,23 @@ const downloadsOf = (saved: unknown): DownloadsValues => {
       entries
         .filter(isDownloadEntry)
         .map((entry) => [
-          entry.mediaId,
+          keyOfEntry(entry),
           { ...entry, status: isDone(entry) ? entry.status : DOWNLOAD_STATUSES.failed },
         ]),
     ),
     playlists: Object.fromEntries(
-      playlists.filter(isDownloadedPlaylist).map((each) => [each.playlist.id, each]),
+      playlists
+        .filter(isDownloadedPlaylist)
+        .map((each) => [downloadKeyOf({ serverId: each.serverId, id: each.playlist.id }), each]),
     ),
   }
 }
 
 /**
  * Wren's downloads: each track the server's AAC transcode at "Download quality", under
- * `downloads/<serverId>/<mediaId>/media.m4a`, with its `Track` and its album's summary so the
- * Downloads list plays with no server. Two download at once. Past "Storage limit" a download is
+ * `downloads/<serverId>/<mediaId>/media.m4a` with its album's cover beside it, with its `Track`
+ * and its album's summary so the Downloads list plays with no server. Two download at once. A
+ * download that would take the downloads, those on their way included, past "Storage limit" is
  * refused. Persisted to AsyncStorage and guarded when read.
  */
 export const useDownloads = create<Downloads>()(
@@ -209,7 +262,21 @@ export const useDownloads = create<Downloads>()(
       type PutProps = { entry: DownloadEntry }
 
       const put = ({ entry }: PutProps) =>
-        set((state) => ({ entries: { ...state.entries, [entry.mediaId]: entry } }))
+        set((state) => ({ entries: { ...state.entries, [keyOfEntry(entry)]: entry } }))
+
+      /** The cover's path once fetched beside the track, or null; a cover that fails costs the track nothing. */
+      const fetchCover = async (entry: DownloadEntry): Promise<string | null> => {
+        const { disk, coverOf } = get().device
+        const source = await coverOf({ serverId: entry.serverId, track: entry.track }).catch(
+          () => null,
+        )
+        if (source === null) return null
+        const path = inFolder({ folder: folderOfPath(entry.path), file: COVER_FILE })
+        return disk.fetch({ source, path }).then(
+          () => path,
+          () => null,
+        )
+      }
 
       const fetchOne = async (entry: DownloadEntry): Promise<DownloadEntry> => {
         const { disk, sourcesOf } = get().device
@@ -219,10 +286,11 @@ export const useDownloads = create<Downloads>()(
           const outcome = await sources.trackSource({ mediaId: entry.mediaId, kbps: entry.kbps })
           if (!outcome.ok) throw new Error(outcome.message)
           const bytes = await disk.fetch({ source: outcome.source, path: entry.path })
-          return { ...entry, bytes, status: DOWNLOAD_STATUSES.done }
+          const coverPath = await fetchCover(entry)
+          return { ...entry, bytes, coverPath, status: DOWNLOAD_STATUSES.done }
         } catch {
-          await disk.remove(entry.path).catch(IGNORED)
-          return { ...entry, bytes: 0, status: DOWNLOAD_STATUSES.failed }
+          await disk.remove(folderOfPath(entry.path)).catch(IGNORED)
+          return { ...entry, bytes: 0, coverPath: null, status: DOWNLOAD_STATUSES.failed }
         }
       }
 
@@ -234,9 +302,9 @@ export const useDownloads = create<Downloads>()(
         if (next === undefined) return
         put({ entry: { ...next, status: DOWNLOAD_STATUSES.downloading } })
         const fetched = await fetchOne(next)
-        const isRemoved = get().entries[next.mediaId] === undefined
+        const isRemoved = get().entries[keyOfEntry(next)] === undefined
         // Removed while it downloaded: what it wrote goes too.
-        if (isRemoved) await get().device.disk.remove(next.path).catch(IGNORED)
+        if (isRemoved) await get().device.disk.remove(folderOfPath(next.path)).catch(IGNORED)
         if (!isRemoved) put({ entry: fetched })
         return runQueue()
       }
@@ -258,7 +326,8 @@ export const useDownloads = create<Downloads>()(
         downloadTracks: async ({ serverId, tracks, collection }) => {
           const { downloadKbps, storageLimitGb } = useWrenPrefs.getState()
           const { entries } = get()
-          const kept = (track: Track) => entries[track.id]
+          const kept = (track: Track): DownloadEntry | undefined =>
+            entries[downloadKeyOf({ serverId, id: track.id })]
           const wanted = tracks.filter((track) => {
             const entry = kept(track)
             return entry === undefined || entry.status === DOWNLOAD_STATUSES.failed
@@ -266,7 +335,7 @@ export const useDownloads = create<Downloads>()(
           const needed = estimateOf({ tracks: wanted, kbps: downloadKbps })
           if (
             storageLimitGb !== null &&
-            usedBytesOf(entries) + needed > storageLimitGb * BYTES_PER_GB
+            committedBytesOf(entries) + needed > storageLimitGb * BYTES_PER_GB
           ) {
             return DOWNLOAD_COPY.full(storageLimitGb)
           }
@@ -281,7 +350,11 @@ export const useDownloads = create<Downloads>()(
               serverId,
               kbps: downloadKbps,
               bytes: 0,
-              path: downloadPathOf({ serverId, mediaId: track.id }),
+              path: inFolder({
+                folder: folderOf({ serverId, mediaId: track.id }),
+                file: MEDIA_FILE,
+              }),
+              coverPath: null,
               track,
               album: entry?.album ?? album,
               status: DOWNLOAD_STATUSES.queued,
@@ -290,13 +363,13 @@ export const useDownloads = create<Downloads>()(
           set((state) => ({
             entries: {
               ...state.entries,
-              ...Object.fromEntries(queued.map((entry) => [entry.mediaId, entry])),
+              ...Object.fromEntries(queued.map((entry) => [keyOfEntry(entry), entry])),
             },
             playlists:
               collection.kind === DOWNLOAD_SOURCES.playlist
                 ? {
                     ...state.playlists,
-                    [collection.playlist.id]: {
+                    [downloadKeyOf({ serverId, id: collection.playlist.id })]: {
                       serverId,
                       playlist: collection.playlist,
                       mediaIds: tracks.map(({ id }) => id),
@@ -308,28 +381,33 @@ export const useDownloads = create<Downloads>()(
           await Promise.all(Array.from({ length: idle }, worker))
           return null
         },
-        remove: async ({ mediaIds }) => {
+        remove: async ({ serverId, mediaIds }) => {
           const { entries, device } = get()
-          const gone = new Set(mediaIds)
-          const paths = mediaIds.flatMap((id) => {
-            const entry = entries[id]
-            return entry === undefined ? [] : [entry.path]
+          const gone = new Set(mediaIds.map((id) => downloadKeyOf({ serverId, id })))
+          const folders = [...gone].flatMap((key) => {
+            const entry = entries[key]
+            return entry === undefined ? [] : [folderOfPath(entry.path)]
           })
           set((state) => ({
             entries: Object.fromEntries(
-              Object.values(state.entries)
-                .filter(({ mediaId }) => !gone.has(mediaId))
-                .map((entry) => [entry.mediaId, entry]),
+              Object.entries(state.entries).filter(([key]) => !gone.has(key)),
             ),
             // A playlist goes once none of its tracks is downloaded.
             playlists: Object.fromEntries(
-              Object.values(state.playlists)
-                .map((each) => ({ ...each, mediaIds: each.mediaIds.filter((id) => !gone.has(id)) }))
-                .filter(({ mediaIds: left }) => left.length > 0)
-                .map((each) => [each.playlist.id, each]),
+              Object.entries(state.playlists)
+                .map(([key, each]): [string, DownloadedPlaylist] => [
+                  key,
+                  {
+                    ...each,
+                    mediaIds: each.mediaIds.filter(
+                      (id) => !gone.has(downloadKeyOf({ serverId: each.serverId, id })),
+                    ),
+                  },
+                ])
+                .filter(([, each]) => each.mediaIds.length > 0),
             ),
           }))
-          await Promise.allSettled(paths.map((path) => device.disk.remove(path)))
+          await Promise.allSettled(folders.map((folder) => device.disk.remove(folder)))
         },
         removeAll: async () => {
           set({ entries: {}, playlists: {} })
@@ -349,13 +427,44 @@ export const useDownloads = create<Downloads>()(
   ),
 )
 
+/**
+ * Brings what was read back and what is on disk into line: a finished download whose file has
+ * gone (the system cleared space, or the app was restored) is failed, to be fetched again, and
+ * every folder no finished download holds, a stopped one's `.part` among them, is deleted.
+ */
+const reconcileDisk = async (): Promise<void> => {
+  const { entries, device } = useDownloads.getState()
+  const checked = Object.fromEntries(
+    Object.entries(entries).map(([key, entry]): [string, DownloadEntry] => [
+      key,
+      isDone(entry) && !device.disk.exists(entry.path)
+        ? { ...entry, bytes: 0, coverPath: null, status: DOWNLOAD_STATUSES.failed }
+        : entry,
+    ]),
+  )
+  useDownloads.setState({ entries: checked })
+  const held = new Set(
+    Object.values(checked)
+      .filter(isDone)
+      .map((entry) => folderOfPath(entry.path)),
+  )
+  const strays = device.disk.folders().filter((folder) => !held.has(folder))
+  await Promise.allSettled(strays.map((folder) => device.disk.remove(folder)))
+}
+
 type ConfigureDownloadsProps = { storage: StateStorage } & DownloadDevice
 
-/** Gives the downloads their storage, disk and servers, and reads them back. */
-export const configureDownloads = async ({ storage, disk, sourcesOf }: ConfigureDownloadsProps) => {
-  useDownloads.setState({ device: { disk, sourcesOf } })
+/** Gives the downloads their storage, disk and servers, reads them back, and squares them with the disk. */
+export const configureDownloads = async ({
+  storage,
+  disk,
+  sourcesOf,
+  coverOf,
+}: ConfigureDownloadsProps) => {
+  useDownloads.setState({ device: { disk, sourcesOf, coverOf } })
   useDownloads.persist.setOptions({ storage: createJSONStorage(() => storage) })
   await useDownloads.persist.rehydrate()
+  await reconcileDisk()
 }
 
 type DownloadedOfProps = Pick<DownloadsValues, 'entries'> & { serverId: string; mediaId: number }
@@ -366,42 +475,48 @@ export const downloadedOf = ({
   serverId,
   mediaId,
 }: DownloadedOfProps): DownloadEntry | undefined => {
-  const entry = entries[mediaId]
-  return entry !== undefined && entry.serverId === serverId && isDone(entry) ? entry : undefined
+  const entry = entries[downloadKeyOf({ serverId, id: mediaId })]
+  return entry !== undefined && isDone(entry) ? entry : undefined
 }
 
 const byDiscAndNumber = (a: Track, b: Track): number =>
   a.disc === b.disc ? (a.number ?? 0) - (b.number ?? 0) : a.disc - b.disc
 
+type DownloadedLibraryOfProps = DownloadsValues & {
+  serverId: string
+  /** The `file://` address a download's path is at now. */
+  uriOf: (path: string) => string
+}
+
 /**
  * What is downloaded from `serverId`, as CarPlay, Android Auto and the Downloads list read it:
- * the albums by title, the playlists by name, and a target's finished tracks in order.
+ * the albums by title, the playlists by name, a target's finished tracks in order, and the
+ * cover saved with them.
  */
-type DownloadedLibraryOfProps = DownloadsValues & { serverId: string }
-
 export const downloadedLibraryOf = ({
   entries,
   playlists,
   serverId,
+  uriOf,
 }: DownloadedLibraryOfProps): DownloadedLibrary => {
   const done = Object.values(entries).filter(
     (entry) => entry.serverId === serverId && isDone(entry),
   )
-  const tracksOf = (target: BrowseTarget): Track[] => {
+  const playlistOf = (playlistId: number) => playlists[downloadKeyOf({ serverId, id: playlistId })]
+  const entriesOf = (target: BrowseTarget): DownloadEntry[] => {
     switch (target.kind) {
       case BROWSE_KINDS.album:
         return done
           .filter(({ album }) => album?.id === target.albumId)
-          .map(({ track }) => track)
-          .toSorted(byDiscAndNumber)
+          .toSorted((a, b) => byDiscAndNumber(a.track, b.track))
       case BROWSE_KINDS.playlist:
-        return (playlists[target.playlistId]?.mediaIds ?? []).flatMap((mediaId) => {
+        return (playlistOf(target.playlistId)?.mediaIds ?? []).flatMap((mediaId) => {
           const entry = downloadedOf({ entries, serverId, mediaId })
-          return entry === undefined ? [] : [entry.track]
+          return entry === undefined ? [] : [entry]
         })
       case BROWSE_KINDS.track: {
         const entry = downloadedOf({ entries, serverId, mediaId: target.mediaId })
-        return entry === undefined ? [] : [entry.track]
+        return entry === undefined ? [] : [entry]
       }
       default: {
         const unknown: never = target
@@ -409,6 +524,7 @@ export const downloadedLibraryOf = ({
       }
     }
   }
+  const tracksOf = (target: BrowseTarget): Track[] => entriesOf(target).map(({ track }) => track)
   return {
     albums: () =>
       [
@@ -426,6 +542,11 @@ export const downloadedLibraryOf = ({
         .map(({ playlist }) => playlist)
         .toSorted((a, b) => a.name.localeCompare(b.name)),
     tracksOf,
+    artworkOf: (target) => {
+      const coverPath =
+        entriesOf(target).find((entry) => entry.coverPath !== null)?.coverPath ?? null
+      return coverPath === null ? null : uriOf(coverPath)
+    },
   }
 }
 
@@ -455,15 +576,12 @@ export const downloadProgressOf = ({
   mediaIds,
 }: DownloadProgressOfProps): DownloadProgress => {
   const held = mediaIds.flatMap((id) => {
-    const entry = entries[id]
-    return entry !== undefined && entry.serverId === serverId ? [entry] : []
+    const entry = entries[downloadKeyOf({ serverId, id })]
+    return entry === undefined ? [] : [entry]
   })
   const done = held.filter(isDone).length
   const total = mediaIds.length
-  const isActive = held.some(
-    ({ status }) => status === DOWNLOAD_STATUSES.queued || status === DOWNLOAD_STATUSES.downloading,
-  )
-  if (isActive) return { kind: DOWNLOAD_PROGRESS.downloading, done, total }
+  if (held.some(isUnderway)) return { kind: DOWNLOAD_PROGRESS.downloading, done, total }
   if (held.some(({ status }) => status === DOWNLOAD_STATUSES.failed)) {
     return { kind: DOWNLOAD_PROGRESS.failed, done, total }
   }

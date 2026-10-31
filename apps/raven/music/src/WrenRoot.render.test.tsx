@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { audioPlayer } from '@raven/audio'
+import { AUDIO_BITRATES } from '@raven/core'
 import type * as Native from '@raven/native'
 import { queryKeys, useAudioQueue } from '@raven/ui/headless'
 import { router } from 'expo-router'
 import { act, renderRouter, screen, waitFor } from 'expo-router/testing-library'
 
+import {
+  DOWNLOAD_STATUSES,
+  type DownloadDisk,
+  downloadKeyOf,
+  useDownloads,
+} from '@/downloads/downloadStore'
 import { queryClient } from '@/queryClient'
 import { WREN_ROUTES } from '@/routes'
 import { useWrenAccount } from '@/session'
@@ -81,5 +88,45 @@ describe('WrenRoot', () => {
     expect(await screen.findByRole('header', { name: 'Home' })).toBeTruthy()
     expect(useAudioQueue.getState().queue.at).toBeNull()
     expect(screen.queryByRole('button', { name: /^Now Playing: Airbag/ })).toBeNull()
+  })
+
+  it("takes the last account's downloads, files and all, once it signs out, and keeps them through a renewed token", async () => {
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await screen.findByRole('header', { name: 'Home' })
+    const folder = 'downloads/raven/101'
+    const files = new Set([`${folder}/media.m4a`, `${folder}/cover.jpg`])
+    const disk: DownloadDisk = {
+      fetch: async () => 0,
+      uriOf: (path) => path,
+      exists: (path) => files.has(path),
+      folders: () => [folder],
+      remove: async () => undefined,
+      removeAll: async () => files.clear(),
+    }
+    const entry = {
+      mediaId: AIRBAG.id,
+      serverId: 'raven',
+      kbps: AUDIO_BITRATES.standard,
+      bytes: 4_000_000,
+      path: `${folder}/media.m4a`,
+      coverPath: `${folder}/cover.jpg`,
+      track: AIRBAG,
+      album: null,
+      status: DOWNLOAD_STATUSES.done,
+    }
+    useDownloads.setState({
+      device: { ...useDownloads.getState().device, disk },
+      entries: { [downloadKeyOf({ serverId: 'raven', id: AIRBAG.id })]: entry },
+    })
+
+    await act(async () =>
+      useWrenAccount.setState({ session: { ...LISTENER, accessToken: 'renewed' } }),
+    )
+    expect(Object.keys(useDownloads.getState().entries)).toHaveLength(1)
+
+    await act(async () => useWrenAccount.setState({ session: null }))
+    await act(async () => useWrenAccount.setState({ session: { ...LISTENER, userId: 'u2' } }))
+    expect(useDownloads.getState().entries).toEqual({})
+    expect(files.size).toBe(0)
   })
 })

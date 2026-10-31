@@ -33,3 +33,15 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
     removeItem: async () => undefined,
   },
 }))
+
+// jest has no file system: every download a test holds is on disk, and no folder is stray.
+jest.mock('@/downloads/downloader', () => ({
+  deviceDisk: {
+    fetch: async () => 0,
+    uriOf: (path: string) => `file:///documents/${path}`,
+    exists: () => true,
+    folders: () => [],
+    remove: async () => undefined,
+    removeAll: async () => undefined,
+  },
+}))

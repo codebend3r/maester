@@ -79,11 +79,12 @@ const ravenServer = () => {
 }
 
 /** Wren's plan with nothing downloaded and the device on Wi-Fi: the file itself plays. */
-const ON_WIFI: TrackPlan = { downloadedUriOf: () => null, streamKbps: async () => null }
+const ON_WIFI: TrackPlan = { downloadedOf: () => null, streamKbps: async () => null }
 
 const ON_CELLULAR: TrackPlan = { ...ON_WIFI, streamKbps: async () => AUDIO_BITRATES.standard }
 
 const DOWNLOADED_URI = 'file:///data/Documents/downloads/raven/101/media.m4a'
+const SAVED_COVER = 'file:///data/Documents/downloads/raven/101/cover.jpg'
 
 const transcodeUri = (kbps: number) =>
   `${ORIGIN}/api/media/${AIRBAG.id}/transcode?${toQueryString({
@@ -112,16 +113,20 @@ describe('audioItemOf', () => {
     })
   })
 
-  it('plays a downloaded track from its file with no headers, asking the server nothing', async () => {
+  it('plays a downloaded track from its file with no headers and its saved cover, asking the server nothing', async () => {
     const { server, heard } = ravenServer()
     const item = await audioItemOf({
       server,
       track: AIRBAG,
       platform: AUDIO_PLATFORMS.android,
-      plan: { ...ON_CELLULAR, downloadedUriOf: () => DOWNLOADED_URI },
+      plan: {
+        ...ON_CELLULAR,
+        downloadedOf: () => ({ uri: DOWNLOADED_URI, artworkUri: SAVED_COVER }),
+      },
     })
     expect(item.uri).toBe(DOWNLOADED_URI)
     expect(item.headers).toEqual({})
+    expect(item.artworkUri).toBe(SAVED_COVER)
     expect(heard).toEqual([])
   })
 

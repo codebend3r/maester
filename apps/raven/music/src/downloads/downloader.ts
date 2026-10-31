@@ -2,19 +2,30 @@ import { Directory, File, Paths } from 'expo-file-system'
 
 import { DOWNLOADS_FOLDER, type DownloadDisk } from '@/downloads/downloadStore'
 
-/** What a track's file is called while its bytes come in. */
+/** What a file is called while its bytes come in. */
 const PART_SUFFIX = '.part'
 
 const fileOf = (path: string): File => new File(Paths.document, path)
+
+const folderAt = (path: string): Directory => new Directory(Paths.document, path)
 
 /** Deletes a file or folder that may not be there. */
 const deleteIfThere = (entry: File | Directory): void => {
   if (entry.exists) entry.delete()
 }
 
+/** The folders directly inside `folder`, by their paths under the documents. */
+const subfoldersOf = (folder: string): string[] => {
+  const directory = folderAt(folder)
+  if (!directory.exists) return []
+  return directory
+    .list()
+    .flatMap((child) => (child instanceof Directory ? [`${folder}/${child.name}`] : []))
+}
+
 /**
  * The downloads' disk, through `expo-file-system`'s `File` and `Directory` (its current API, not
- * `expo-file-system/legacy`'s `createDownloadResumable`). A track downloads into a `.part` file
+ * `expo-file-system/legacy`'s `createDownloadResumable`). A file downloads into a `.part`
  * beside its place and is moved there only once it is whole, so a cut download never passes for
  * a finished one; on failure the part is deleted.
  */
@@ -34,6 +45,8 @@ export const deviceDisk: DownloadDisk = {
     }
   },
   uriOf: (path) => fileOf(path).uri,
-  remove: async (path) => deleteIfThere(fileOf(path).parentDirectory),
-  removeAll: async () => deleteIfThere(new Directory(Paths.document, DOWNLOADS_FOLDER)),
+  exists: (path) => fileOf(path).exists,
+  folders: () => subfoldersOf(DOWNLOADS_FOLDER).flatMap(subfoldersOf),
+  remove: async (folder) => deleteIfThere(folderAt(folder)),
+  removeAll: async () => deleteIfThere(folderAt(DOWNLOADS_FOLDER)),
 }

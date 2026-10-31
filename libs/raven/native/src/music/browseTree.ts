@@ -52,6 +52,8 @@ export type DownloadedLibrary = {
   playlists(): PlaylistSummary[]
   /** An album's tracks in disc order, a playlist's in order, or the one track; empty for none. */
   tracksOf(target: BrowseTarget): Track[]
+  /** The cover saved with a target's tracks, as a `file://` address; null for none. */
+  artworkOf(target: BrowseTarget): string | null
 }
 
 /** The id a target goes by in the browse tree: `album:3`, `playlist:9` or `track:31`. */
@@ -130,6 +132,15 @@ const playlistNodeOf = (playlist: PlaylistSummary): BrowseNode => ({
   isPlayable: true,
 })
 
+type DownloadedNodeOfProps = { downloads: DownloadedLibrary; node: BrowseNode }
+
+/** A downloaded album or playlist wears the cover saved with it, which shows offline too. */
+const downloadedNodeOf = ({ downloads, node }: DownloadedNodeOfProps): BrowseNode => {
+  const target = parseBrowseId(node.id)
+  const artworkUri = target === null ? null : downloads.artworkOf(target)
+  return artworkUri === null ? node : { ...node, artworkUri }
+}
+
 const newestFirst = (a: AlbumSummary, b: AlbumSummary): number => {
   if (a.addedAt === b.addedAt) return b.id - a.id
   return a.addedAt < b.addedAt ? 1 : -1
@@ -174,8 +185,14 @@ export const browseChildrenOf = async ({
   downloads,
   parentId,
 }: BrowseChildrenOfProps): Promise<BrowseNode[]> => {
-  const downloadedAlbums = () => downloads.albums().map((album) => albumNodeOf({ api, album }))
-  const downloadedPlaylists = () => downloads.playlists().map(playlistNodeOf)
+  const downloadedAlbums = () =>
+    downloads
+      .albums()
+      .map((album) => downloadedNodeOf({ downloads, node: albumNodeOf({ api, album }) }))
+  const downloadedPlaylists = () =>
+    downloads
+      .playlists()
+      .map((playlist) => downloadedNodeOf({ downloads, node: playlistNodeOf(playlist) }))
   switch (parentId) {
     case BROWSE_ROOTS.home:
       return [...ROOT_NODES]

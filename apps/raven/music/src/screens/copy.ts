@@ -41,6 +41,10 @@ export const SETTINGS_COPY = {
   gigabytes: (gigabytes: number) => `${gigabytes} GB`,
   used: (size: string) => `${size} used by downloads`,
   removeAll: 'Remove all downloads',
+  removeAllTitle: 'Remove all downloads?',
+  removeAllMessage: 'The music on this device goes, and plays again only with the server in reach.',
+  cancel: 'Cancel',
+  remove: 'Remove',
 } as const
 
 export const HOME_COPY = {
@@ -62,6 +66,11 @@ export const LIBRARY_PAGE_COPY = {
   noPlaylists: 'No playlists yet. Add a track to one from its menu.',
   downloads: 'Downloads',
   noDownloads: 'Nothing downloaded yet. Download an album or a playlist from its page.',
+} as const
+
+export const OFFLINE_COPY = {
+  /** The way from Home's notice, when the server is out of reach, to what plays without it. */
+  playDownloads: 'Play your downloads',
 } as const
 
 type DownloadingProps = { done: number; total: number }

@@ -3,17 +3,19 @@ import { AUDIO_BITRATES, QUEUE_SOURCE_KINDS } from '@raven/core'
 import type * as Native from '@raven/native'
 import { RAVEN_SERVER } from '@raven/native/headless'
 import { useAudioQueue } from '@raven/ui/headless'
-import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
+import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
+import { Alert } from 'react-native'
 
 import {
   DOWNLOAD_COPY,
   DOWNLOAD_SOURCES,
   DOWNLOAD_STATUSES,
   type DownloadEntry,
+  downloadKeyOf,
   useDownloads,
 } from '@/downloads/downloadStore'
 import { queryClient } from '@/queryClient'
-import { WREN_ROUTES } from '@/routes'
+import { WREN_PAGES, WREN_ROUTES } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 import {
@@ -25,6 +27,7 @@ import {
   PARANOID,
   musicApi,
 } from '@/test/music'
+import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()
@@ -50,12 +53,15 @@ jest.mock('@raven/native', () => ({
 
 type EntryForProps = { track: typeof AIRBAG; album: typeof OK_COMPUTER | null }
 
+const keyOf = (id: number) => downloadKeyOf({ serverId: RAVEN_SERVER.id, id })
+
 const entryFor = ({ track, album }: EntryForProps): DownloadEntry => ({
   mediaId: track.id,
   serverId: RAVEN_SERVER.id,
   kbps: AUDIO_BITRATES.standard,
   bytes: 4_200_000,
   path: `downloads/${RAVEN_SERVER.id}/${track.id}/media.m4a`,
+  coverPath: `downloads/${RAVEN_SERVER.id}/${track.id}/cover.jpg`,
   track,
   album,
   status: DOWNLOAD_STATUSES.done,
@@ -64,11 +70,11 @@ const entryFor = ({ track, album }: EntryForProps): DownloadEntry => ({
 /** OK Computer's first two tracks downloaded from its page, and Airbag again in the Mixtape. */
 const DOWNLOADED = {
   entries: {
-    [AIRBAG.id]: entryFor({ track: AIRBAG, album: OK_COMPUTER }),
-    [PARANOID.id]: entryFor({ track: PARANOID, album: OK_COMPUTER }),
+    [keyOf(AIRBAG.id)]: entryFor({ track: AIRBAG, album: OK_COMPUTER }),
+    [keyOf(PARANOID.id)]: entryFor({ track: PARANOID, album: OK_COMPUTER }),
   },
   playlists: {
-    [MIXTAPE.id]: { serverId: RAVEN_SERVER.id, playlist: MIXTAPE, mediaIds: [AIRBAG.id] },
+    [keyOf(MIXTAPE.id)]: { serverId: RAVEN_SERVER.id, playlist: MIXTAPE, mediaIds: [AIRBAG.id] },
   },
 }
 
@@ -86,7 +92,9 @@ describe('Downloads', () => {
   })
 
   it("downloads an album from its page, and says the storage limit's refusal", async () => {
-    await renderRouter(WREN_TREE, { initialUrl: `/album/${OK_COMPUTER.id}` })
+    await renderRouter(WREN_TREE, {
+      initialUrl: pagePathOf({ page: WREN_PAGES.album, id: OK_COMPUTER.id }),
+    })
     await fireEvent.press(await screen.findByRole('button', { name: 'Download' }))
     expect(downloadTracks).toHaveBeenCalledWith({
       serverId: RAVEN_SERVER.id,
@@ -103,22 +111,33 @@ describe('Downloads', () => {
     useDownloads.setState({
       entries: {
         ...DOWNLOADED.entries,
-        [OK_COMPUTER_PAGE.tracks[2]?.id ?? 0]: {
+        [keyOf(OK_COMPUTER_PAGE.tracks[2]?.id ?? 0)]: {
           ...entryFor({ track: OK_COMPUTER_PAGE.tracks[2] ?? AIRBAG, album: OK_COMPUTER }),
           status: DOWNLOAD_STATUSES.downloading,
         },
       },
     })
-    await renderRouter(WREN_TREE, { initialUrl: `/album/${OK_COMPUTER.id}` })
-    expect(await screen.findByRole('button', { name: 'Downloading 2 of 3' })).toBeTruthy()
+    await renderRouter(WREN_TREE, {
+      initialUrl: pagePathOf({ page: WREN_PAGES.album, id: OK_COMPUTER.id }),
+    })
+    const downloading = await screen.findByRole('button', { name: 'Downloading 2 of 3' })
+    expect(downloading.props.accessibilityState).toEqual({ disabled: true })
+    await fireEvent.press(downloading)
+    expect(downloadTracks).not.toHaveBeenCalled()
 
     useDownloads.setState({
       entries: Object.fromEntries(
-        OK_COMPUTER_PAGE.tracks.map((track) => [track.id, entryFor({ track, album: OK_COMPUTER })]),
+        OK_COMPUTER_PAGE.tracks.map((track) => [
+          keyOf(track.id),
+          entryFor({ track, album: OK_COMPUTER }),
+        ]),
       ),
     })
     await fireEvent.press(await screen.findByRole('button', { name: 'Remove download' }))
-    expect(remove).toHaveBeenCalledWith({ mediaIds: OK_COMPUTER_PAGE.tracks.map(({ id }) => id) })
+    expect(remove).toHaveBeenCalledWith({
+      serverId: RAVEN_SERVER.id,
+      mediaIds: OK_COMPUTER_PAGE.tracks.map(({ id }) => id),
+    })
   })
 
   it("lists what is downloaded under Library's Downloads and plays it, with the server out of reach", async () => {
@@ -136,6 +155,17 @@ describe('Downloads', () => {
     expect(playTracks).toHaveBeenLastCalledWith({
       tracks: [AIRBAG],
       source: { kind: QUEUE_SOURCE_KINDS.playlist, id: MIXTAPE.id },
+    })
+  })
+
+  it("offers the downloads from Home when the server can't be reached, and opens on them", async () => {
+    mockApi.listLibraries.mockRejectedValue(new Error("raven can't be reached."))
+    useDownloads.setState(DOWNLOADED)
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await fireEvent.press(await screen.findByRole('button', { name: 'Play your downloads' }))
+    expect(await screen.findByRole('button', { name: OK_COMPUTER.title })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Downloads' }).props.accessibilityState).toEqual({
+      selected: true,
     })
   })
 
@@ -164,7 +194,13 @@ describe('Downloads', () => {
     await fireEvent.press(screen.getByRole('tab', { name: '5 GB' }))
     expect(useWrenPrefs.getState().storageLimitGb).toBe(5)
 
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined)
     await fireEvent.press(screen.getByRole('button', { name: 'Remove all downloads' }))
+    expect(removeAll).not.toHaveBeenCalled()
+    const [title, , buttons] = alert.mock.calls[0] ?? []
+    expect(title).toBe('Remove all downloads?')
+    expect(buttons?.map(({ text }) => text)).toEqual(['Cancel', 'Remove'])
+    await act(async () => buttons?.[1]?.onPress?.())
     expect(removeAll).toHaveBeenCalled()
   })
 })

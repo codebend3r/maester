@@ -12,18 +12,22 @@ type TrackPlanForProps = {
 }
 
 /**
- * What Wren plays a track from before the server's file: its download from this server, then
- * on a mobile network the transcode at "Cellular quality". A network that cannot be read is
- * taken for Wi-Fi.
+ * What Wren plays a track from before the server's file: its download from this server, with
+ * the cover saved beside it, then on a mobile network the transcode at "Cellular quality". A
+ * network that cannot be read is taken for Wi-Fi.
  */
 export const trackPlanFor = ({ serverId, isOnCellular, uriOf }: TrackPlanForProps): TrackPlan => ({
-  downloadedUriOf: (track) => {
+  downloadedOf: (track) => {
     const entry = downloadedOf({
       entries: useDownloads.getState().entries,
       serverId,
       mediaId: track.id,
     })
-    return entry === undefined ? null : uriOf(entry.path)
+    if (entry === undefined) return null
+    return {
+      uri: uriOf(entry.path),
+      artworkUri: entry.coverPath === null ? null : uriOf(entry.coverPath),
+    }
   },
   streamKbps: async () => {
     const isCellular = await isOnCellular().catch(() => false)

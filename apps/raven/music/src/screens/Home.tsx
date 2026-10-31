@@ -1,15 +1,18 @@
 import type { AlbumSummary, Library } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import type { ComponentType } from 'react'
+import { useRouter } from 'expo-router'
 import { FlatList, StyleSheet, Text, View } from 'react-native'
 
 import { useTileWidth } from '@/components/AlbumGrid'
 import { AlbumTile } from '@/components/AlbumTile'
 import { MaybeNotice, NOTICE_STATES, type NoticeState, noticeStateOf } from '@/components/Notice'
+import { BUTTON_TONES, FormButton } from '@/components/Form'
 import { TabPage } from '@/components/TabPage'
 import { LIBRARY_COPY, useMusicLibraries } from '@/music/musicLibraries'
 import { type CoverOf, useCovers } from '@/music/useCovers'
-import { HOME_COPY } from '@/screens/copy'
+import { HOME_COPY, OFFLINE_COPY } from '@/screens/copy'
+import { LIBRARY_SEGMENTS, libraryHref } from '@/routes'
 import { PALETTE, SIZES } from '@/theme/wrenTheme'
 import { type WrenSession, useWren } from '@/useWren'
 
@@ -94,6 +97,27 @@ type HomeViewProps = {
   session: WrenSession
   libraries: readonly Library[]
   notice: string | null
+  /** Whether the server could not be read, when the downloads are what plays. */
+  hasFailed: boolean
+}
+
+type HomeNoticeProps = HomeViewProps
+
+/** Why Home has no shelves, and, with the server out of reach, the way to what plays without it. */
+function HomeNotice({ notice, hasFailed }: HomeNoticeProps) {
+  const router = useRouter()
+  return (
+    <>
+      <MaybeNotice notice={notice} />
+      {hasFailed && (
+        <FormButton
+          label={OFFLINE_COPY.playDownloads}
+          onPress={() => router.push(libraryHref(LIBRARY_SEGMENTS.downloads))}
+          tone={BUTTON_TONES.quiet}
+        />
+      )}
+    </>
+  )
 }
 
 type ShelvesProps = HomeViewProps
@@ -114,7 +138,7 @@ function Shelves({ session, libraries }: ShelvesProps) {
 
 /** What Home holds: a shelf per music library, or why it has none. */
 const HOME_VIEWS = {
-  [NOTICE_STATES.notice]: MaybeNotice,
+  [NOTICE_STATES.notice]: HomeNotice,
   [NOTICE_STATES.ready]: Shelves,
 } as const satisfies Record<NoticeState, ComponentType<HomeViewProps>>
 
@@ -124,7 +148,14 @@ function ServerHome({ session }: ServerHomeProps) {
   const music = useMusicLibraries(session)
   const notice = homeNoticeOf(music)
   const HomeView = HOME_VIEWS[noticeStateOf(notice)]
-  return <HomeView libraries={music.libraries} notice={notice} session={session} />
+  return (
+    <HomeView
+      hasFailed={music.failure !== null}
+      libraries={music.libraries}
+      notice={notice}
+      session={session}
+    />
+  )
 }
 
 /** Wren's first tab: what each music library gained lately, to play next. */

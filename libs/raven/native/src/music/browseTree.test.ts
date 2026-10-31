@@ -185,12 +185,17 @@ const DOWNLOADED_ALBUMS = [
   albumFor({ id: 4, libraryId: MUSIC.id, addedAt: dayOf(2) }),
 ]
 
+/** The cover saved beside album 3's tracks. */
+const SAVED_COVER = 'file:///documents/downloads/raven/31/cover.jpg'
+
 const DOWNLOADED_PLAYLIST = { ...PLAYLIST, id: 12, name: 'Offline mix' }
 
 /** Two downloaded albums and a playlist, and album 3's tracks and one of album 4's on the device. */
 const downloads: DownloadedLibrary = {
   albums: () => DOWNLOADED_ALBUMS,
   playlists: () => [DOWNLOADED_PLAYLIST],
+  artworkOf: (target: BrowseTarget) =>
+    target.kind === BROWSE_KINDS.album && target.albumId === 3 ? SAVED_COVER : null,
   tracksOf: (target: BrowseTarget) => {
     switch (target.kind) {
       case BROWSE_KINDS.album:
@@ -295,13 +300,14 @@ describe('the browse tree', () => {
     const { api } = fakeApi()
     const nodes = await browseChildrenOf({ api, downloads, parentId: BROWSE_ROOTS.downloads })
     expect(nodes.map(({ id }) => id)).toEqual(['album:3', 'album:4', 'playlist:12'])
+    expect(nodes[0]?.artworkUri).toBe(SAVED_COVER)
     expect(nodes[1]?.artworkUri).toBe('https://raven.example/api/pictures/albums/4/v4')
   })
 
-  it('offline, gives what is downloaded only, the albums with no covers', async () => {
+  it('offline, gives what is downloaded only, with the covers saved beside them', async () => {
     const albums = await browseChildrenOf({ api: null, downloads, parentId: BROWSE_ROOTS.albums })
     expect(albums.map(({ id }) => id)).toEqual(['album:3', 'album:4'])
-    expect(albums.map(({ artworkUri }) => artworkUri)).toEqual([null, null])
+    expect(albums.map(({ artworkUri }) => artworkUri)).toEqual([SAVED_COVER, null])
     const offline = await browseChildrenOf({
       api: null,
       downloads,

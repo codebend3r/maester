@@ -1,6 +1,6 @@
 import { AUDIO_BITRATES, formatBytes } from '@raven/core'
 import type { ReactNode } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Alert, StyleSheet, Text, View } from 'react-native'
 
 import packageJson from '#package'
 import { BUTTON_TONES, FormButton } from '@/components/Form'
@@ -63,6 +63,15 @@ function ChoiceRow<K extends SegmentKey>({
 
 const IGNORED = (): void => undefined
 
+type ConfirmRemoveAllProps = { onRemove: () => void }
+
+/** Asks before every download goes, with Cancel first and Remove as the destructive choice. */
+const confirmRemoveAll = ({ onRemove }: ConfirmRemoveAllProps) =>
+  Alert.alert(SETTINGS_COPY.removeAllTitle, SETTINGS_COPY.removeAllMessage, [
+    { text: SETTINGS_COPY.cancel, style: 'cancel' },
+    { text: SETTINGS_COPY.remove, style: 'destructive', onPress: onRemove },
+  ])
+
 /** The quality downloads and the cellular stream take, how much downloads may use and do, and a way to remove them all. */
 function DownloadSettings() {
   const downloadKbps = useWrenPrefs((state) => state.downloadKbps)
@@ -96,9 +105,13 @@ function DownloadSettings() {
       <FormButton
         isDisabled={!hasDownloads}
         label={SETTINGS_COPY.removeAll}
-        onPress={() => {
-          removeAll().catch(IGNORED)
-        }}
+        onPress={() =>
+          confirmRemoveAll({
+            onRemove: () => {
+              removeAll().catch(IGNORED)
+            },
+          })
+        }
         tone={BUTTON_TONES.quiet}
       />
     </Section>
