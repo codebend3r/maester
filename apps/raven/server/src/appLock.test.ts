@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
+  AUDIO_BITRATES,
   type ApiClient,
   LIBRARY_KINDS,
   type LibraryInput,
@@ -316,6 +317,12 @@ describe('a library locked behind the PIN', () => {
       api().appendPlaylistTracks({ id: playlist.id, mediaIds: [id] }),
     ).rejects.toMatchObject({ status: 423 })
     await expect(api().getLyrics(id)).rejects.toMatchObject({ status: 423 })
+    const transcode = api().transcodeUrl({
+      mediaId: id,
+      kbps: AUDIO_BITRATES.standard,
+      ticket: null,
+    })
+    expect((await inject({ method: 'GET', url: transcode })).statusCode).toBe(423)
     // A video is no track, locked or not.
     await expect(
       api().appendPlaylistTracks({ id: playlist.id, mediaIds: [state.privateVideo] }),

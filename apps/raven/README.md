@@ -643,6 +643,7 @@ raven app imports `@raven/core` and `@raven/ui/headless` and answers the direct-
 | `AI_MATCH_MODEL`              | `claude-haiku-5-5`             | The model the AI lookup asks                 |
 | `AI_MATCH_EFFORT`             | `low`                          | How hard it thinks: `low`, `medium`, `high`, `xhigh` or `max` |
 | `AI_DAILY_LIMIT`              | `200`                          | AI lookups a day                             |
+| `TRANSCODE_CACHE_GB`          | `20`                           | GiB of tracks converted to AAC (`/api/media/:id/transcode`) kept under `DATA_DIR/transcodes`; past it the least recently served go first, swept at start and every 6 hours |
 | `LIBRARY_PIN`                 | unset                          | The PIN that opens locked libraries          |
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `RAVEN_WEB_URL` | unset | All three valid turn [accounts](#accounts) on (`ready`). Origins; HTTPS except on loopback; the key is a publishable one, never a service-role key. None set is `off`; some set is `unavailable` |
 | `RAVEN_ACCOUNTS`              | unset                          | Exactly `off`, with the three above unset, reopens a server that once enforced accounts to anonymous viewers. A security rollback; it logs a warning on every start |

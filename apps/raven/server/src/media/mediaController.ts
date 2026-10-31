@@ -3,6 +3,7 @@ import { stat, unlink } from 'node:fs/promises'
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Delete,
   ForbiddenException,
@@ -21,10 +22,15 @@ import {
   Res,
 } from '@nestjs/common'
 import {
+  AUDIO_BITRATE_PARAM,
+  AUDIO_BITRATES,
   type MediaItem,
   type MediaLocation,
+  type PlaybackMode,
   THUMBNAIL_STATES,
   containerMimeType,
+  isAudioBitrate,
+  isAudioContainer,
   isFavouriteChange,
   isProgressChange,
   isProgressReport,
@@ -46,7 +52,7 @@ import { AccessRechecks } from '@/auth/accessRechecks'
 import { OpenedByPass, PASS_KINDS } from '@/auth/accountPasses'
 import { AuthSessions } from '@/auth/authSessions'
 import { ERROR_CODES, errorMessage } from '@/errorMessage'
-import { RAVEN_CACHE_POLICIES, RAVEN_HEADERS } from '@/http'
+import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES, RAVEN_HEADERS } from '@/http'
 import { sendImage } from '@/items/sendImage'
 import { PrivateBy } from '@/lock/lockGuard'
 import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
@@ -59,6 +65,7 @@ import { RANGE_OUTCOMES, RANGE_UNITS, parseRange } from '@/media/range'
 import { ViewingAccounts } from '@/media/viewingAccounts'
 import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ViewingRepository } from '@/media/viewingRepository'
+import { TranscodeCache } from '@/music/transcodeCache'
 import { parseBody } from '@/parseBody'
 import { ScannerService } from '@/scanner/scannerService'
 import { clientOf, trackStream } from '@/streams/trackStream'
@@ -93,6 +100,17 @@ const deleteFailure = (error: unknown): string => {
 
 type MediaControllerFindProps = { id: number; account: AccountKey }
 
+type MediaControllerSendRangesProps = {
+  id: number
+  path: string
+  contentType: string
+  mode: PlaybackMode
+  ticket: unknown
+  purpose: unknown
+  request: FastifyRequest
+  reply: FastifyReply
+}
+
 @Controller('api/media')
 @PrivateBy('media')
 export class MediaController {
@@ -110,6 +128,7 @@ export class MediaController {
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
     @Inject(FilePasses) private readonly passes: Pick<FilePasses, 'hold'>,
+    @Inject(TranscodeCache) private readonly transcodes: Pick<TranscodeCache, 'fileFor'>,
   ) {}
 
   private find({ id, account }: MediaControllerFindProps): MediaItem {
@@ -279,7 +298,80 @@ export class MediaController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const file = this.fileOf(id)
-    const info = await stat(file.path).catch(() => null)
+    await this.sendRanges({
+      id,
+      path: file.path,
+      contentType: containerMimeType(file.container) ?? CONTENT_TYPES.octetStream,
+      mode: PLAYBACK_MODES.direct,
+      ticket,
+      purpose,
+      request,
+      reply,
+    })
+  }
+
+  /**
+   * A track converted to AAC at `?kbps=`, for offline downloads and cellular
+   * streaming: made on the first ask, which waits for it, and served from the
+   * transcode cache with byte ranges, tickets and passes as `file` serves the
+   * original. A bitrate core does not offer is a 400, and a video a 409.
+   */
+  @MediaPlane()
+  @OpenedByPass(PASS_KINDS.ticket)
+  @Get(':id/transcode')
+  async transcode(
+    @Param('id', ParseIntPipe) id: number,
+    @Query(AUDIO_BITRATE_PARAM) kbps: unknown,
+    @Query(MEDIA_TICKET_PARAM) ticket: unknown,
+    @Query(MEDIA_PURPOSE_PARAM) purpose: unknown,
+    @Req() request: FastifyRequest,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const bitrate = isString(kbps) && /^\d+$/.test(kbps) ? Number(kbps) : null
+    if (!isAudioBitrate(bitrate)) {
+      throw new BadRequestException(
+        `${AUDIO_BITRATE_PARAM} must be one of ${Object.values(AUDIO_BITRATES).join(', ')}`,
+      )
+    }
+    const file = this.fileOf(id)
+    if (!isAudioContainer(file.container)) {
+      throw new ConflictException('Only a track can be converted to AAC.')
+    }
+    const source = await stat(file.path).catch(() => null)
+    if (!source?.isFile()) throw new NotFoundException('The file is no longer on disk')
+    const path = await this.transcodes
+      .fileFor({ mediaId: id, path: file.path, mtimeMs: file.mtimeMs, kbps: bitrate })
+      .catch((error: unknown) => {
+        this.logger.warn(`Could not convert media ${id} to AAC: ${errorMessage(error)}`)
+        throw new InternalServerErrorException('Could not convert the track.')
+      })
+    await this.sendRanges({
+      id,
+      path,
+      contentType: RAVEN_CONTENT_TYPES.audioMp4,
+      mode: PLAYBACK_MODES.transcode,
+      ticket,
+      purpose,
+      request,
+      reply,
+    })
+  }
+
+  /**
+   * Sends the file at `path` with byte ranges as one tracked stream, which
+   * ends when a recheck says so or when the pass the ticket earns ends.
+   */
+  private async sendRanges({
+    id,
+    path,
+    contentType,
+    mode,
+    ticket,
+    purpose,
+    request,
+    reply,
+  }: MediaControllerSendRangesProps): Promise<void> {
+    const info = await stat(path).catch(() => null)
     if (!info?.isFile()) throw new NotFoundException('The file is no longer on disk')
     const passEnded = this.passes.hold({ request, ticket, mediaId: id })
     const size = info.size
@@ -291,7 +383,7 @@ export class MediaController {
       auth: this.callers,
       purpose: isStreamPurpose(purpose) ? purpose : STREAM_PURPOSES.play,
       mediaId: id,
-      mode: PLAYBACK_MODES.direct,
+      mode,
       quality: null,
       audio: null,
       from: range == null || range === RANGE_OUTCOMES.unsatisfiable ? 0 : range.start,
@@ -300,7 +392,7 @@ export class MediaController {
     })
     reply
       .header(RAVEN_HEADERS.acceptRanges, RANGE_UNITS.bytes)
-      .header(HEADERS.contentType, containerMimeType(file.container) ?? CONTENT_TYPES.octetStream)
+      .header(HEADERS.contentType, contentType)
       .header(HEADERS.cacheControl, RAVEN_CACHE_POLICIES.privateRevalidate)
 
     if (range === RANGE_OUTCOMES.unsatisfiable) {
@@ -308,13 +400,13 @@ export class MediaController {
       return
     }
     if (range == null) {
-      await reply.header(HEADERS.contentLength, size).send(readFile({ path: file.path }))
+      await reply.header(HEADERS.contentLength, size).send(readFile({ path }))
       return
     }
     await reply
       .code(206)
       .header(HEADERS.contentRange, `${RANGE_UNITS.bytes} ${range.start}-${range.end}/${size}`)
       .header(HEADERS.contentLength, range.end - range.start + 1)
-      .send(readFile({ path: file.path, start: range.start, end: range.end }))
+      .send(readFile({ path, start: range.start, end: range.end }))
   }
 }
