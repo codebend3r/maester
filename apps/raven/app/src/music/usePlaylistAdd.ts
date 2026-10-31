@@ -20,7 +20,7 @@ type AddToPlaylistProps = { pick: PlaylistPick; tracks: readonly Track[] }
  * went once they are in, or why they are not.
  */
 export const usePlaylistAdd = ({ session: { api, queries } }: UsePlaylistAddProps) => {
-  const playlists = useQuery(queries.playlistsQuery)
+  const playlists = useQuery(queries.ownPlaylistsQuery)
   const { create, append } = useServerPlaylistMutations({ api })
   const [note, setNote] = useState<string | null>(null)
   const told = {

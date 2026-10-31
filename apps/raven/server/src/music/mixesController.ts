@@ -10,6 +10,7 @@ import {
   Req,
 } from '@nestjs/common'
 import {
+  DISCOVERY_PATHS,
   LOCKED_STATUS,
   type MixDetails,
   type MixSummary,
@@ -21,14 +22,10 @@ import {
 } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
 import { Management } from '@/auth/management'
-import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { Public } from '@/lock/lockGuard'
-import { LockService } from '@/lock/lockService'
-import { ViewingAccounts } from '@/media/viewingAccounts'
+import { ListenerScopes } from '@/music/listenerScope'
 import { Mixes } from '@/music/mixes'
 import { RADIO_OUTCOMES, Radio } from '@/music/radio'
-
-type MixesControllerScopeProps = { request: FastifyRequest }
 
 /**
  * The calling account's mixes, radio and Home's recent albums. None is in a
@@ -37,43 +34,32 @@ type MixesControllerScopeProps = { request: FastifyRequest }
  * them out, and a radio seeded in one is refused as the lock refuses a
  * route by its id: 423 to one who could enter the PIN, else 404.
  */
-@Controller('api/music')
+@Controller()
 @Public()
 export class MixesController {
   constructor(
     @Inject(Mixes) private readonly mixes: Mixes,
     @Inject(Radio) private readonly radio: Radio,
-    @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
-    @Inject(LockService) private readonly lock: LockService,
     @Inject(Management) private readonly management: Management,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
+    @Inject(ListenerScopes) private readonly scopes: ListenerScopes,
   ) {}
 
-  /** Whose plays a request reads, and the libraries whose tracks it may not see. */
-  private scope({ request }: MixesControllerScopeProps) {
-    const viewer = this.lock.viewer({ request })
-    return {
-      account: this.accounts.keyOf({ request }),
-      hidden: [...this.libraries.lockedIds()].filter((id) => !viewer.seesLibrary(id)),
-    }
-  }
-
   /** Today's mixes; one with too few tracks is left out. */
-  @Get('mixes')
+  @Get(DISCOVERY_PATHS.mixes)
   list(@Req() request: FastifyRequest): MixSummary[] {
-    return this.mixes.list(this.scope({ request }))
+    return this.mixes.list(this.scopes.of({ request }))
   }
 
   /** One mix by its kind, with its tracks in today's order. */
-  @Get('mixes/:id')
+  @Get(DISCOVERY_PATHS.mix)
   get(@Param('id') id: string, @Req() request: FastifyRequest): MixDetails {
-    const mix = isMixKind(id) ? this.mixes.get({ kind: id, ...this.scope({ request }) }) : null
+    const mix = isMixKind(id) ? this.mixes.get({ kind: id, ...this.scopes.of({ request }) }) : null
     if (mix === null) throw new NotFoundException(`No mix ${id}`)
     return mix
   }
 
   /** Up to 50 tracks around `?seed=`: `track:<mediaId>`, `artist:<id>` or `album:<id>`. */
-  @Get('radio')
+  @Get(DISCOVERY_PATHS.radio)
   async getRadio(
     @Query(RADIO_PARAMS.seed) seedText: unknown,
     @Req() request: FastifyRequest,
@@ -82,7 +68,7 @@ export class MixesController {
     if (seed === null) {
       throw new BadRequestException('seed must be track:<id>, artist:<id> or album:<id>')
     }
-    const answer = await this.radio.play({ seed, ...this.scope({ request }) })
+    const answer = await this.radio.play({ seed, ...this.scopes.of({ request }) })
     switch (answer.outcome) {
       case RADIO_OUTCOMES.found:
         return answer.tracks
@@ -101,8 +87,8 @@ export class MixesController {
   }
 
   /** The albums the account played last and those added last, 20 of each. */
-  @Get('recent')
+  @Get(DISCOVERY_PATHS.recent)
   recent(@Req() request: FastifyRequest): RecentAlbums {
-    return this.mixes.recent(this.scope({ request }))
+    return this.mixes.recent(this.scopes.of({ request }))
   }
 }

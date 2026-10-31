@@ -36,6 +36,15 @@ describe('levelOf', () => {
     expect(levelOf({ track, mode: LEVELLING_MODES.album })).toBeCloseTo(10 ** (-9 / 20), 6)
   })
 
+  it('limits an album gain by the track’s own peak when the album has none', () => {
+    expect(
+      levelOf({
+        track: gained({ album: 3, trackPeak: 1.6, albumPeak: null }),
+        mode: LEVELLING_MODES.album,
+      }),
+    ).toBeCloseTo(0.625, 6)
+  })
+
   it('falls back to the track gain without an album gain, and gives 1 with no gain at all', () => {
     expect(
       levelOf({ track: gained({ track: -6, trackPeak: 0.5 }), mode: LEVELLING_MODES.album }),

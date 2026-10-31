@@ -137,7 +137,8 @@ export class ScrobbleSender implements OnApplicationBootstrap, OnModuleDestroy {
       return
     }
     await this.limits[service].run(() => this.sendOne(listen))
-    return this.drain(service)
+    // Queued again rather than awaited, so a long backlog builds no chain of promises.
+    this.tasks.again({ key: service, task: () => this.drain(service) })
   }
 
   /** Wakes the service's queue when its next listen falls due, in place of an earlier wake. */

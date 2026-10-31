@@ -108,7 +108,7 @@ describe('Album', () => {
     await untilIdle(client)
   })
 
-  it('adds the album to a playlist picked from the sheet, and says where it went', async () => {
+  it('adds the album to one of its own playlists picked from the sheet, and says where it went', async () => {
     const offered = answerSheet({ answer: MIXTAPE.name })
     const client = createScreenClient()
     await renderScreen({ ui: <Album />, client })

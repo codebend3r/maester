@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import type { PlaylistDetails, PlaylistSummary } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import type { AccountKey } from '@/media/viewingAccountKeys'
+import type { ListenerScope } from '@/music/listenerScope'
 import { MusicRepository } from '@/music/musicRepository'
 
 type PlaylistRow = {
@@ -57,13 +58,9 @@ const toSummary = (row: PlaylistRow): PlaylistSummary => ({
   isOwn: row.is_own === 1,
 })
 
-type PlaylistsListProps = {
-  account: AccountKey
-  /** Libraries the caller may not see, whose tracks are left out. */
-  hidden: readonly number[]
-}
+type PlaylistsListProps = ListenerScope
 
-type PlaylistsGetProps = { id: number; account: AccountKey; hidden: readonly number[] }
+type PlaylistsGetProps = { id: number } & ListenerScope
 
 type PlaylistsCreateProps = { name: string; account: AccountKey }
 
@@ -73,14 +70,9 @@ type PlaylistsRemoveProps = { id: number; account: AccountKey }
 
 type PlaylistsShareProps = { id: number; isShared: boolean; account: AccountKey }
 
-type PlaylistsCopyProps = { id: number; account: AccountKey; hidden: readonly number[] }
+type PlaylistsCopyProps = { id: number } & ListenerScope
 
-type PlaylistsReplaceProps = {
-  id: number
-  mediaIds: readonly number[]
-  account: AccountKey
-  hidden: readonly number[]
-}
+type PlaylistsReplaceProps = { id: number; mediaIds: readonly number[] } & ListenerScope
 
 type PlaylistsAppendProps = { id: number; mediaIds: readonly number[]; account: AccountKey }
 
@@ -93,12 +85,7 @@ type PlaylistsInsertProps = {
   account: AccountKey
 }
 
-type PlaylistsEntriesProps = {
-  id: number
-  account: AccountKey
-  hidden: readonly number[]
-  scope: EntryScope
-}
+type PlaylistsEntriesProps = { id: number; scope: EntryScope } & ListenerScope
 
 /**
  * Each account's playlists: a name and an order of tracks, by position, so

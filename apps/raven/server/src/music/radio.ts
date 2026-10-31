@@ -1,9 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { RADIO_SEED_KINDS, type RadioSeed, type Track, radioSeedText } from '@raven/core'
+import {
+  LIBRARY_KINDS,
+  RADIO_SEED_KINDS,
+  type RadioSeed,
+  type Track,
+  radioSeedText,
+} from '@raven/core'
 import { CLOCK, type Clock } from '@/clock'
 import { DatabaseService } from '@/db/database'
-import type { AccountKey } from '@/media/viewingAccountKeys'
-import { PLAY_KINDS } from '@/media/watchedRepository'
+import { LISTENABLE, type ListenerScope, listenerParams } from '@/music/listenerScope'
 import { MIX_LIMITS } from '@/music/mixes'
 import { dayShuffle, interleaved } from '@/music/mixOrder'
 import { MusicRepository } from '@/music/musicRepository'
@@ -25,8 +30,8 @@ type SeedLookup =
   | { outcome: typeof RADIO_OUTCOMES.missing }
   | { outcome: typeof RADIO_OUTCOMES.locked }
 
-/** A track the caller sees, by `m`, that the account has not played in the last day. */
-const CANDIDATE = `m.library_id NOT IN (SELECT value FROM json_each(@hidden))
+/** A track the caller may hear, by `m`, that the account has not played in the last day. */
+const CANDIDATE = `${LISTENABLE}
                    AND NOT EXISTS (SELECT 1 FROM plays pl
                                     WHERE pl.account_id = @account AND pl.media_id = m.id
                                       AND pl.kind = @played AND pl.played_at >= @since)`
@@ -53,19 +58,13 @@ const BY_GENRE = `SELECT t.media_id AS id
 const ANY_TRACK = `SELECT t.media_id AS id FROM tracks t JOIN media m ON m.id = t.media_id
                     WHERE ${CANDIDATE} ORDER BY t.media_id`
 
-type RadioScope = {
-  account: AccountKey
-  /** Libraries the caller may not see: their tracks are left out, and a seed in one is locked. */
-  hidden: readonly number[]
-}
+type RadioPlayProps = { seed: RadioSeed } & ListenerScope
 
-type RadioPlayProps = { seed: RadioSeed } & RadioScope
-
-type RadioLookupProps = { seed: RadioSeed; hidden: readonly number[] }
+type RadioLookupProps = { seed: RadioSeed } & Pick<ListenerScope, 'hidden'>
 
 type RadioIdsProps = {
   sql: string
-  scope: RadioScope
+  scope: ListenerScope
   now: number
   params?: Record<string, string>
 }
@@ -117,13 +116,24 @@ export class Radio {
     return this.database.db
   }
 
+  /** Whether `libraryId` is a music library: a seed in any other names no radio. */
+  private isMusic(libraryId: number): boolean {
+    return !!this.db
+      .prepare<[number, string], { id: number }>(
+        'SELECT id FROM libraries WHERE id = ? AND kind = ?',
+      )
+      .get(libraryId, LIBRARY_KINDS.music)
+  }
+
   /** The seed's artists and albums, or why there is no radio from it. */
   private lookup({ seed, hidden }: RadioLookupProps): SeedLookup {
     const isHidden = (libraryId: number): boolean => hidden.includes(libraryId)
     switch (seed.kind) {
       case RADIO_SEED_KINDS.track: {
         const track = this.music.tracks([seed.id]).get(seed.id)
-        if (track === undefined) return { outcome: RADIO_OUTCOMES.missing }
+        if (track === undefined || !this.isMusic(track.libraryId)) {
+          return { outcome: RADIO_OUTCOMES.missing }
+        }
         if (isHidden(track.libraryId)) return { outcome: RADIO_OUTCOMES.locked }
         return {
           outcome: RADIO_OUTCOMES.found,
@@ -133,7 +143,8 @@ export class Radio {
       }
       case RADIO_SEED_KINDS.album: {
         const libraryId = this.music.libraryOfAlbum(seed.id)
-        if (libraryId === null) return { outcome: RADIO_OUTCOMES.missing }
+        if (libraryId === null || !this.isMusic(libraryId))
+          return { outcome: RADIO_OUTCOMES.missing }
         if (isHidden(libraryId)) return { outcome: RADIO_OUTCOMES.locked }
         const artists = this.db
           .prepare<[number], { id: number }>(
@@ -145,14 +156,15 @@ export class Radio {
       }
       case RADIO_SEED_KINDS.artist: {
         const libraries = this.db
-          .prepare<[number], { album_id: number; library_id: number }>(
+          .prepare<{ id: number; music: string }, { album_id: number; library_id: number }>(
             `SELECT DISTINCT t.album_id, m.library_id
                FROM track_artists ta
                JOIN tracks t ON t.media_id = ta.media_id
                JOIN media m ON m.id = ta.media_id
-              WHERE ta.artist_id = ?`,
+               JOIN libraries l ON l.id = m.library_id AND l.kind = @music
+              WHERE ta.artist_id = @id`,
           )
-          .all(seed.id)
+          .all({ id: seed.id, music: LIBRARY_KINDS.music })
         if (libraries.length === 0) return { outcome: RADIO_OUTCOMES.missing }
         const seen = libraries.filter((row) => !isHidden(row.library_id))
         if (seen.length === 0) return { outcome: RADIO_OUTCOMES.locked }
@@ -173,9 +185,7 @@ export class Radio {
     return this.db
       .prepare<Record<string, string>, { id: number }>(sql)
       .all({
-        account: scope.account,
-        hidden: JSON.stringify(scope.hidden),
-        played: PLAY_KINDS.played,
+        ...listenerParams(scope),
         since: new Date(now - RESTING_MS).toISOString(),
         ...params,
       })
@@ -235,10 +245,9 @@ export class Radio {
         MIX_LIMITS.tracks,
       )
     }, [])
-    const byId = this.music.tracks(ids)
     return {
       outcome: RADIO_OUTCOMES.found,
-      tracks: interleaved({ tracks: ids.flatMap((id) => byId.get(id) ?? []) }),
+      tracks: interleaved({ tracks: this.music.tracksInOrder(ids) }),
     }
   }
 }

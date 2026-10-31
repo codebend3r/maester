@@ -182,6 +182,19 @@ export const MIXTAPE: PlaylistSummary = {
 
 const MIXTAPE_PAGE: PlaylistDetails = { playlist: MIXTAPE, tracks: [AIRBAG, PARANOID, LUCKY] }
 
+/** Another account's playlist, shared: the account may play and copy it, never change it. */
+export const THEIR_MIX: PlaylistSummary = {
+  ...MIXTAPE,
+  id: 5,
+  name: 'Their mix',
+  trackCount: 2,
+  duration: 600,
+  isShared: true,
+  isOwn: false,
+}
+
+const THEIR_MIX_PAGE: PlaylistDetails = { playlist: THEIR_MIX, tracks: [LUCKY, AIRBAG] }
+
 /** The id the test server gives a playlist it makes. */
 export const NEW_PLAYLIST_ID = 9
 
@@ -189,8 +202,9 @@ const TRACKS: readonly Track[] = [AIRBAG, PARANOID, LUCKY, DUNE_BOOK]
 
 const ANSWERS: Record<string, unknown> = {
   [APP_CLIENT_CALLS.listLibraries.path]: [MUSIC, BOOKS],
-  [APP_CLIENT_CALLS.listPlaylists.path]: [MIXTAPE],
+  [APP_CLIENT_CALLS.listPlaylists.path]: [MIXTAPE, THEIR_MIX],
   [pathFor({ path: APP_CLIENT_CALLS.getPlaylist.path, id: MIXTAPE.id })]: MIXTAPE_PAGE,
+  [pathFor({ path: APP_CLIENT_CALLS.getPlaylist.path, id: THEIR_MIX.id })]: THEIR_MIX_PAGE,
   [pathFor({ path: APP_CLIENT_CALLS.getLyrics.path, id: AIRBAG.id })]: AIRBAG_LYRICS,
   [pathFor({ path: APP_CLIENT_CALLS.getLyrics.path, id: PARANOID.id })]: PARANOID_LYRICS,
   [pathFor({ path: APP_CLIENT_CALLS.getLyrics.path, id: LUCKY.id })]: NO_LYRICS,
@@ -307,8 +321,8 @@ type MusicApiProps = {
 /**
  * The test server's music, behind the app's allowlist so an unlisted call fails the test: the
  * music and books libraries, the albums and artists whatever the search, OK Computer's page and
- * Radiohead's, each favourite mark, the account's Mixtape and its edits, the tracks' lyrics and
- * a book's chapters. Each path is answered by itself, its query aside, and keeps no edit.
+ * Radiohead's, each favourite mark, the account's Mixtape and its edits, another account's shared
+ * mix, the tracks' lyrics and a book's chapters. Each path is answered by itself, its query aside, and keeps no edit.
  */
 export const musicApi = ({
   hear = () => undefined,

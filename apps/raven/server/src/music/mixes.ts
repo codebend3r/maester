@@ -9,8 +9,7 @@ import {
 } from '@raven/core'
 import { CLOCK, type Clock } from '@/clock'
 import { DatabaseService } from '@/db/database'
-import type { AccountKey } from '@/media/viewingAccountKeys'
-import { PLAY_KINDS } from '@/media/watchedRepository'
+import { LISTENABLE, type ListenerScope, listenerParams } from '@/music/listenerScope'
 import { dayShuffle, interleaved, utcDayOf } from '@/music/mixOrder'
 import { MusicRepository } from '@/music/musicRepository'
 
@@ -28,9 +27,6 @@ const ROTATION_CORE = 25
 /** Rediscover takes a track played at least this often. */
 const REDISCOVER_PLAYS = 3
 
-/** A track in a library the caller sees, the only kind a mix or Home holds. */
-const SEEN = 'm.library_id NOT IN (SELECT value FROM json_each(@hidden))'
-
 /**
  * The account's listens of tracks it sees: its own `played` rows, by its
  * key. On a server with one account its key picks out every play, and the
@@ -40,7 +36,7 @@ const SEEN = 'm.library_id NOT IN (SELECT value FROM json_each(@hidden))'
 const LISTENS = `FROM plays pl INDEXED BY plays_account
                  JOIN tracks t ON t.media_id = pl.media_id
                  JOIN media m ON m.id = pl.media_id
-                WHERE pl.account_id = @account AND pl.kind = @played AND ${SEEN}`
+                WHERE pl.account_id = @account AND pl.kind = @played AND ${LISTENABLE}`
 
 /** Heavy rotation's most played in its window, most first. */
 const MOST_PLAYED = `SELECT pl.media_id AS id ${LISTENS} AND pl.played_at >= @since
@@ -54,7 +50,7 @@ const UNPLAYED_BY = `SELECT DISTINCT ta.media_id AS id
                        JOIN media m ON m.id = ta.media_id
                       WHERE ta.artist_id IN (SELECT artist_id FROM track_artists
                                               WHERE media_id IN (SELECT value FROM json_each(@ids)))
-                        AND ${SEEN}
+                        AND ${LISTENABLE}
                         AND NOT EXISTS (SELECT 1 FROM plays pl
                                          WHERE pl.account_id = @account AND pl.media_id = ta.media_id
                                            AND pl.kind = @played)
@@ -74,7 +70,7 @@ const RECENTLY_ADDED = `SELECT t.media_id AS id
                           FROM albums a
                           JOIN tracks t ON t.album_id = a.id
                           JOIN media m ON m.id = t.media_id
-                         WHERE a.added_at >= @since AND ${SEEN}
+                         WHERE a.added_at >= @since AND ${LISTENABLE}
                          ORDER BY t.media_id`
 
 const PLAYED_ALBUMS = `SELECT t.album_id AS id ${LISTENS}
@@ -83,21 +79,16 @@ const PLAYED_ALBUMS = `SELECT t.album_id AS id ${LISTENS}
                         LIMIT ${MIX_LIMITS.recent}`
 
 const ADDED_ALBUMS = `SELECT a.id FROM albums a
-                       WHERE a.library_id NOT IN (SELECT value FROM json_each(@hidden))
+                       WHERE a.library_id IN (SELECT id FROM libraries WHERE kind = @music)
+                         AND a.library_id NOT IN (SELECT value FROM json_each(@hidden))
                        ORDER BY a.added_at DESC, a.id DESC
                        LIMIT ${MIX_LIMITS.recent}`
 
-type MixesScope = {
-  account: AccountKey
-  /** Libraries the caller may not see, whose tracks no mix holds. */
-  hidden: readonly number[]
-}
+type MixesGetProps = { kind: MixKind } & ListenerScope
 
-type MixesGetProps = { kind: MixKind } & MixesScope
+type MixesIdsProps = { sql: string; scope: ListenerScope; params?: Record<string, string | number> }
 
-type MixesIdsProps = { sql: string; scope: MixesScope; params?: Record<string, string | number> }
-
-type MixesPicksProps = { kind: MixKind; scope: MixesScope; now: number }
+type MixesPicksProps = { kind: MixKind; scope: ListenerScope; now: number }
 
 type SummaryOfProps = { kind: MixKind; tracks: readonly Track[] }
 
@@ -130,12 +121,7 @@ export class Mixes {
   private ids({ sql, scope, params = {} }: MixesIdsProps): number[] {
     return this.database.db
       .prepare<Record<string, string | number>, { id: number }>(sql)
-      .all({
-        account: scope.account,
-        hidden: JSON.stringify(scope.hidden),
-        played: PLAY_KINDS.played,
-        ...params,
-      })
+      .all({ ...listenerParams(scope), ...params })
       .map((row) => row.id)
   }
 
@@ -191,27 +177,22 @@ export class Mixes {
     const now = this.clock.now()
     const ids = this.picks({ kind, scope, now })
     if (ids.length < MIX_LIMITS.fewest) return null
-    const byId = this.music.tracks(ids)
     const tracks = interleaved({
-      tracks: dayShuffle({ items: ids.flatMap((id) => byId.get(id) ?? []), now, key: kind }),
+      tracks: dayShuffle({ items: this.music.tracksInOrder(ids), now, key: kind }),
     })
     return { mix: summaryOf({ kind, tracks }), tracks }
   }
 
   /** Today's mixes in `MIX_KINDS` order, those with too few tracks left out. */
-  list(scope: MixesScope): MixSummary[] {
+  list(scope: ListenerScope): MixSummary[] {
     return Object.values(MIX_KINDS).flatMap((kind) => this.get({ kind, ...scope })?.mix ?? [])
   }
 
   /** The albums the account played last, and those added last, each in a library it sees. */
-  recent(scope: MixesScope): RecentAlbums {
-    const albumsOf = (ids: readonly number[]) => {
-      const albums = this.music.albums(ids)
-      return ids.flatMap((id) => albums.get(id) ?? [])
-    }
+  recent(scope: ListenerScope): RecentAlbums {
     return {
-      played: albumsOf(this.ids({ sql: PLAYED_ALBUMS, scope })),
-      added: albumsOf(this.ids({ sql: ADDED_ALBUMS, scope })),
+      played: this.music.albumsInOrder(this.ids({ sql: PLAYED_ALBUMS, scope })),
+      added: this.music.albumsInOrder(this.ids({ sql: ADDED_ALBUMS, scope })),
     }
   }
 }

@@ -1,4 +1,4 @@
-import { RADIO_SEED_KINDS, type RadioSeed, type Track } from '@raven/core'
+import { LIBRARY_KINDS, RADIO_SEED_KINDS, type RadioSeed, type Track } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { DEFAULT_LISTENBRAINZ_TIMEOUT_MS, ListenBrainzClient } from '@/music/listenBrainzClient'
@@ -62,7 +62,19 @@ describe('Radio', () => {
     hidden: number
     hiddenAlbum: number
     ghost: number
-  } = { open: 0, locked: 0, seedArtist: 0, rested: 0, hidden: 0, hiddenAlbum: 0, ghost: 0 }
+    chapter: number
+    narrator: number
+  } = {
+    open: 0,
+    locked: 0,
+    seedArtist: 0,
+    rested: 0,
+    hidden: 0,
+    hiddenAlbum: 0,
+    ghost: 0,
+    chapter: 0,
+    narrator: 0,
+  }
   const radio = () => {
     const { music } = musicLibrary(database.get())
     const similar = new SimilarArtists(
@@ -134,6 +146,23 @@ describe('Radio', () => {
     })
     const ghost = addTrack({ libraryId: state.locked, title: 'Boo', artist: 'Ghost', album: 'Boo' })
     state.ghost = music.tracks([ghost]).get(ghost)?.artists[0]?.id ?? 0
+    // An audiobook's chapters are filed as tracks: one by the seed artist in its genre, one by another.
+    const books = addLibrary({ name: 'Books', kind: LIBRARY_KINDS.audiobooks })
+    state.chapter = addTrack({
+      libraryId: books,
+      title: 'Chapter 1',
+      artist: ARTISTS.seed,
+      artistMbid: MBIDS.seed,
+      album: 'Read Aloud',
+      genres: ['Rock'],
+    })
+    const narrated = addTrack({
+      libraryId: books,
+      title: 'Chapter 2',
+      artist: 'Narrator',
+      album: 'Read Again',
+    })
+    state.narrator = music.tracks([narrated]).get(narrated)?.artists[0]?.id ?? 0
     const [firstTrack] = music.tracks([state.rested]).values()
     state.seedArtist = firstTrack?.artists[0]?.id ?? 0
     state.hiddenAlbum = music.tracks([state.hidden]).get(state.hidden)?.albumId ?? 0
@@ -204,6 +233,19 @@ describe('Radio', () => {
     expect(await outcomeOf({ kind: album, id: 9999 })).toBe(RADIO_OUTCOMES.missing)
     expect(await outcomeOf({ kind: artist, id: 9999 })).toBe(RADIO_OUTCOMES.missing)
     expect(await outcomeOf({ kind: track, id: state.rested })).toBe(RADIO_OUTCOMES.found)
+  })
+
+  it('plays no audiobook chapter, and finds no radio seeded on one', async () => {
+    const outcomeOf = async (seed: RadioSeed) =>
+      (await radio().play({ seed, account, hidden: [] })).outcome
+    const { music } = musicLibrary(database.get())
+    const albumId = music.tracks([state.chapter]).get(state.chapter)?.albumId ?? 0
+    const { album, artist, track } = RADIO_SEED_KINDS
+
+    expect((await fromSeedArtist()).map(({ id }) => id)).not.toContain(state.chapter)
+    expect(await outcomeOf({ kind: track, id: state.chapter })).toBe(RADIO_OUTCOMES.missing)
+    expect(await outcomeOf({ kind: album, id: albumId })).toBe(RADIO_OUTCOMES.missing)
+    expect(await outcomeOf({ kind: artist, id: state.narrator })).toBe(RADIO_OUTCOMES.missing)
   })
 })
 

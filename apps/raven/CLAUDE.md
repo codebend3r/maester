@@ -55,6 +55,7 @@ The shared player has no web app imports. Hosts give it an `Engine` and their `P
   - The approved owner's first request under `ready` runs `ViewingAdoption.adopt`: one transaction that merges every `'local'` row into the owner's (newer spot, earlier favourite time), then records `{ ownerId, adoptedAt }` under `SETTINGS_KEYS.viewing`. A failure rolls back, is retried at most once per request and after `ADOPTION_RETRY_MS`, and logs only the SQLite code and counts, never an id.
   - Under `off` the shared viewer is the recorded owner, else `'local'`; under `ready` or `unavailable` an unbound request stays on `'local'`.
   - Library view settings stay shared.
+- **Playlists are per account, and may be shared.** A shared one (`playlists.is_shared`) is read, played and copied by every account through `Playlists`' `VISIBLE`, and written only by its owner: a write on another's answers 404 (`findOwn`), as if missing. A locked library's tracks stay out of a shared playlist and its copies.
 
 ## Desktop
 

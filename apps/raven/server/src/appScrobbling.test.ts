@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
 import { LISTENBRAINZ_API } from '@/music/listenBrainzClient'
+import { LASTFM_PARAMS } from '@/scrobbling/lastFmScrobbler'
 import { ScrobbleQueue } from '@/scrobbling/scrobbleQueue'
 import { ScrobbleSender } from '@/scrobbling/scrobbleSender'
 import { DatabaseService } from '@/db/database'
@@ -183,7 +184,7 @@ describe('scrobbling on a server with accounts', () => {
   const started = async ({ api, returnTo }: StartedProps): Promise<string> => {
     const { url } = await api.startLastFm({ returnTo })
     const page = new URL(url)
-    const cb = new URL(page.searchParams.get('cb') ?? '')
+    const cb = new URL(page.searchParams.get(LASTFM_PARAMS.callback) ?? '')
     expect(`${cb.origin}${cb.pathname}`).toBe(
       `${AUTH_TEST_CONFIG.webUrl}${SCROBBLING_PATHS.lastFmCallback}`,
     )

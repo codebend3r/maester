@@ -366,6 +366,14 @@ describe('each account sees only its own viewing', () => {
     await recordMemberViewing({ api: member })
     const mix = (await member.listPlaylists()).find(({ name }) => name === MEMBER_MIX)?.id ?? 0
     const order = [music.tracks[1], music.tracks[0]]
+    const original = await member.getPlaylist(mix)
+    const own = await member.copyPlaylist({ id: mix })
+    expect(own.playlist).toMatchObject({ name: MEMBER_MIX, isOwn: true, isShared: false })
+    expect(own.playlist.id).not.toBe(mix)
+    expect(own.tracks.map(({ id }) => id)).toEqual(order)
+    expect(await member.getPlaylist(mix)).toEqual(original)
+    await member.deletePlaylist(own.playlist.id)
+
     const shared = await member.setPlaylistSharing({ id: mix, isShared: true })
     expect(shared.playlist).toMatchObject({ id: mix, isShared: true, isOwn: true })
 

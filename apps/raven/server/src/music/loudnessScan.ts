@@ -45,7 +45,8 @@ export class LoudnessScan implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /**
-   * Queues every album with a track waiting for the scan. One already queued
+   * Queues every album with a track waiting for the scan, and every one
+   * missing the gain its tracks' would give it. One already queued
    * is left as it is, and one running is queued again after it, for a track
    * filed under it meanwhile.
    */

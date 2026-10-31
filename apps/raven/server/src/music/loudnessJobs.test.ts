@@ -49,10 +49,18 @@ describe('LoudnessJobs', () => {
     kind: LibraryKind
     path: string
     duration: number
+    album?: string
     replayGain?: AudioTags['replayGain']
   }
 
-  const add = ({ libraryId, kind, path, duration, replayGain = NO_GAIN }: AddProps): number => {
+  const add = ({
+    libraryId,
+    kind,
+    path,
+    duration,
+    album = 'Parklife',
+    replayGain = NO_GAIN,
+  }: AddProps): number => {
     const index = new MediaIndex(database.get())
     const id = index.insert({
       libraryId,
@@ -79,7 +87,7 @@ describe('LoudnessJobs', () => {
       mediaId: id,
       libraryId,
       path,
-      tags: { ...TAGS, replayGain },
+      tags: { ...TAGS, album, replayGain },
       format: { sampleRate: 44100, bitDepth: 16, isLossless: true },
       folderCover: null,
     })
@@ -91,6 +99,29 @@ describe('LoudnessJobs', () => {
       .get()
       .db.prepare<[number], { album_id: number }>('SELECT album_id FROM tracks WHERE media_id = ?')
       .get(mediaId)?.album_id ?? -1
+
+  const albumSourceOf = (albumId: number): string | null =>
+    database
+      .get()
+      .db.prepare<[number], { replaygain_source: string | null }>(
+        'SELECT replaygain_source FROM albums WHERE id = ?',
+      )
+      .get(albumId)?.replaygain_source ?? null
+
+  type AddToAlbumProps = { album: string; replayGain?: AudioTags['replayGain'] }
+
+  /** Two tracks of `album` in the music library. */
+  const addToAlbum = ({ album, replayGain }: AddToAlbumProps): number[] =>
+    [1, 2].map((at) =>
+      add({
+        libraryId: state.music,
+        kind: LIBRARY_KINDS.music,
+        path: `/music/Blur/${album}/0${at}.flac`,
+        duration: 120,
+        album,
+        replayGain,
+      }),
+    )
 
   beforeAll(async () => {
     await database.open()
@@ -162,5 +193,38 @@ describe('LoudnessJobs', () => {
       ]),
       9,
     )
+  })
+
+  it('lists an album whose tracks all carry tag gains but which has no album tag, until it has a gain', () => {
+    const [first = -1] = addToAlbum({
+      album: 'Modern Life',
+      replayGain: { ...NO_GAIN, trackGain: -6, trackPeak: 0.8 },
+    })
+    const albumId = albumIdOf(first)
+
+    expect(jobs().albumsDue()).toContain(albumId)
+    expect(jobs().tracksDue(albumId)).toEqual([])
+    jobs().finishAlbum(albumId)
+    expect(albumSourceOf(albumId)).toBe(REPLAYGAIN_SOURCES.scan)
+    expect(jobs().albumsDue()).not.toContain(albumId)
+  })
+
+  it('lists an album whose tracks were all measured but whose scan stopped before its gain', () => {
+    const tracks = addToAlbum({ album: 'Leisure' })
+    const albumId = albumIdOf(tracks[0] ?? -1)
+    tracks.forEach((mediaId) => jobs().measured({ mediaId, measured: { gain: -7, peak: 0.6 } }))
+
+    expect(jobs().tracksDue(albumId)).toEqual([])
+    expect(jobs().albumsDue()).toContain(albumId)
+    jobs().finishAlbum(albumId)
+    expect(jobs().albumsDue()).not.toContain(albumId)
+  })
+
+  it('leaves out an album none of whose tracks has a gain', () => {
+    const tracks = addToAlbum({ album: 'The Great Escape' })
+    const albumId = albumIdOf(tracks[0] ?? -1)
+    tracks.forEach((mediaId) => jobs().failed(mediaId))
+
+    expect(jobs().albumsDue()).not.toContain(albumId)
   })
 })

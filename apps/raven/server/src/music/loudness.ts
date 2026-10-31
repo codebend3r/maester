@@ -36,7 +36,7 @@ export const ebur128Args = (path: string): string[] => [
   '-map',
   '0:a:0',
   '-filter:a',
-  'ebur128=peak=true',
+  'ebur128=peak=true:framelog=verbose',
   '-f',
   'null',
   '-',
@@ -66,7 +66,11 @@ export const trackGainOf = ({ integrated, truePeak }: Measured): TrackGain => ({
   peak: 10 ** (truePeak / 20),
 })
 
-/** A track's integrated loudness from its gain, as `trackGainOf` made it or a ReplayGain 2.0 tag says. */
+/**
+ * A track's integrated loudness from its gain, as `trackGainOf` made it or a
+ * ReplayGain 2.0 tag says. A ReplayGain 1 tag (89 dB reference) is read as
+ * RG2 too, so an album mixing the two is about 4 dB off.
+ */
 export const integratedOf = (gain: number): number => REFERENCE_LUFS - gain
 
 /** The album's gain: its tracks' energy averaged by duration, brought to the reference. */

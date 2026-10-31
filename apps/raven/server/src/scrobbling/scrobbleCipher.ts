@@ -49,9 +49,8 @@ export class ScrobbleCipher {
   /** The plain value, or null for one this key did not seal for `context`. */
   open({ sealed, context }: ScrobbleCipherOpenProps): string | null {
     const [iv, tag, body, ...rest] = sealed.split('.').map((part) => Buffer.from(part, 'base64url'))
-    if (iv?.length !== IV_BYTES || tag?.length !== TAG_BYTES || !body || rest.length > 0) {
-      return null
-    }
+    if (iv === undefined || tag === undefined || body === undefined || rest.length > 0) return null
+    if (iv.length !== IV_BYTES || tag.length !== TAG_BYTES) return null
     try {
       const decipher = createDecipheriv(ALGORITHM, this.keys[KEY_USES.seal], iv)
       decipher.setAAD(Buffer.from(context))

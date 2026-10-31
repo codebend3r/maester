@@ -75,7 +75,7 @@ describe('ebur128Args', () => {
       '-map',
       '0:a:0',
       '-filter:a',
-      'ebur128=peak=true',
+      'ebur128=peak=true:framelog=verbose',
       '-f',
       'null',
       '-',

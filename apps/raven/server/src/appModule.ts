@@ -88,6 +88,7 @@ import {
   LISTENBRAINZ_TIMEOUT_MS,
   ListenBrainzClient,
 } from '@/music/listenBrainzClient'
+import { ListenerScopes } from '@/music/listenerScope'
 import { Mixes } from '@/music/mixes'
 import { MixesController } from '@/music/mixesController'
 import { MusicFavourites } from '@/music/musicFavourites'
@@ -274,6 +275,7 @@ export class AppModule {
         { provide: LISTENBRAINZ_TIMEOUT_MS, useValue: DEFAULT_LISTENBRAINZ_TIMEOUT_MS },
         ListenBrainzClient,
         SimilarArtists,
+        ListenerScopes,
         Mixes,
         Radio,
         ScrobbleCipher,

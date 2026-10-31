@@ -29,6 +29,19 @@ const DUE = `FROM tracks t
                 AND t.replaygain_source IS NOT @tags
                 AND (t.loudness_state = @pending OR t.loudness_version < @version)`
 
+/**
+ * A music library's album with no gain though a track of it has one: its
+ * tracks' gains all came from tags with no album tag, or its scan stopped
+ * before `finishAlbum`. The `EXISTS` reads the rows `finishAlbum` does, so
+ * the album leaves the list once it has run.
+ */
+const GAINLESS_ALBUMS = `SELECT a.id AS album_id FROM albums a
+                          WHERE a.replaygain_gain IS NULL
+                            AND a.library_id IN (SELECT id FROM libraries WHERE kind = @music)
+                            AND EXISTS (SELECT 1 FROM tracks t JOIN media m ON m.id = t.media_id
+                                         WHERE t.album_id = a.id AND t.replaygain_gain IS NOT NULL
+                                           AND m.duration > 0)`
+
 const DUE_PARAMS = {
   music: LIBRARY_KINDS.music,
   tags: REPLAYGAIN_SOURCES.tags,
@@ -49,11 +62,11 @@ export class LoudnessJobs {
     return this.database.db
   }
 
-  /** The albums with a track waiting for the scan. */
+  /** The albums with a track waiting for the scan, and those missing a gain their tracks' would give. */
   albumsDue(): number[] {
     return this.db
       .prepare<typeof DUE_PARAMS, { album_id: number }>(
-        `SELECT DISTINCT t.album_id ${DUE} ORDER BY t.album_id`,
+        `SELECT t.album_id ${DUE} UNION ${GAINLESS_ALBUMS} ORDER BY album_id`,
       )
       .all(DUE_PARAMS)
       .map(({ album_id }) => album_id)

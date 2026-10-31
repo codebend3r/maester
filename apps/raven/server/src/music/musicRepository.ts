@@ -774,6 +774,18 @@ export class MusicRepository {
     return new Map(tracks.map((track) => [track.id, track]))
   }
 
+  /** The tracks among `ids` in the order `ids` lists them; an id that is no track is left out. */
+  tracksInOrder(ids: readonly number[]): Track[] {
+    const byId = this.tracks(ids)
+    return ids.flatMap((id) => byId.get(id) ?? [])
+  }
+
+  /** The albums among `ids` in the order `ids` lists them; an id that is no album is left out. */
+  albumsInOrder(ids: readonly number[]): AlbumSummary[] {
+    const byId = this.albums(ids)
+    return ids.flatMap((id) => byId.get(id) ?? [])
+  }
+
   /** The albums among `ids`, by id; an id that is no album is not in the map. */
   albums(ids: readonly number[]): Map<number, AlbumSummary> {
     const albums = this.db

@@ -101,6 +101,24 @@ describe('Album', () => {
     })
   })
 
+  it("offers only the listener's own playlists, not another account's shared one", async () => {
+    const theirs = {
+      ...MIXTAPE,
+      id: MIXTAPE.id + 1,
+      name: 'Their mix',
+      isShared: true,
+      isOwn: false,
+    }
+    mockApi.listPlaylists.mockResolvedValueOnce([MIXTAPE, theirs])
+    await renderRouter(WREN_TREE, { initialUrl: ALBUM_URL })
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'More for Airbag' }))
+    await fireEvent.press(await screen.findByRole('button', { name: 'Add to playlist' }))
+    const sheet = await screen.findByLabelText('Add Airbag to a playlist')
+    expect(await within(sheet).findByRole('button', { name: MIXTAPE.name })).toBeTruthy()
+    expect(within(sheet).queryByRole('button', { name: theirs.name })).toBeNull()
+  })
+
   it('marks the album a favourite', async () => {
     await renderRouter(WREN_TREE, { initialUrl: ALBUM_URL })
     await fireEvent.press(await screen.findByRole('switch', { name: 'Favourite' }))

@@ -36,7 +36,9 @@ describe('LastFmScrobbler', () => {
     const page = new URL(lastFm.authPage({ callback: 'https://raven.example.test/cb?state=s' }))
     expect(`${page.origin}${page.pathname}`).toBe(LASTFM_AUTH_PAGE)
     expect(page.searchParams.get('api_key')).toBe(FAKE_LASTFM_KEYS.apiKey)
-    expect(page.searchParams.get('cb')).toBe('https://raven.example.test/cb?state=s')
+    expect(page.searchParams.get(LASTFM_PARAMS.callback)).toBe(
+      'https://raven.example.test/cb?state=s',
+    )
   })
 
   it('trades a sign-in token once for a session, and sends with it', async () => {

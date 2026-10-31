@@ -1,4 +1,4 @@
-import { LIBRARY_KINDS } from '@raven/core'
+import { LIBRARY_KINDS, type LibraryKind } from '@raven/core'
 import type { DatabaseService } from '@/db/database'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -29,7 +29,7 @@ const NO_TAGS: AudioTags = {
   hasCover: false,
 }
 
-type AddLibraryProps = { name: string; isLocked?: boolean }
+type AddLibraryProps = { name: string; isLocked?: boolean; kind?: LibraryKind }
 
 type AddTrackProps = {
   libraryId: number
@@ -42,17 +42,19 @@ type AddTrackProps = {
 }
 
 /**
- * Music libraries filled by hand over `database`, as a scan files them: each
+ * Music libraries (or an audiobooks one, whose chapters a scan files as
+ * tracks too) filled by hand over `database`, as a scan files them: each
  * track a file in the index with a probe, filed under its artist and album.
  */
 export const musicLibrary = (database: DatabaseService) => {
   const music = new MusicRepository(database, pictureVersionsOf(database))
-  const addLibrary = ({ name, isLocked = false }: AddLibraryProps): number =>
-    new LibrariesRepository(database).create({
-      name,
-      paths: [`/${name}`],
-      settings: { kind: LIBRARY_KINDS.music, locked: isLocked },
-    }).id
+  const libraries = new LibrariesRepository(database)
+  const addLibrary = ({
+    name,
+    isLocked = false,
+    kind = LIBRARY_KINDS.music,
+  }: AddLibraryProps): number =>
+    libraries.create({ name, paths: [`/${name}`], settings: { kind, locked: isLocked } }).id
   const addTrack = ({
     libraryId,
     title,
@@ -66,7 +68,7 @@ export const musicLibrary = (database: DatabaseService) => {
     const path = `/${libraryId}/${artist}/${album}/${title}.flac`
     const id = index.insert({
       libraryId,
-      kind: LIBRARY_KINDS.music,
+      kind: libraries.get(libraryId)?.settings.kind ?? LIBRARY_KINDS.music,
       file: { path, root: `/${libraryId}`, size: 1, mtimeMs: 1 },
       at,
     })

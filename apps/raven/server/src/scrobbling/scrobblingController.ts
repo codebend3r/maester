@@ -96,7 +96,7 @@ const returnAddress = ({ returnTo, outcome }: ReturnAddressProps): string =>
  * accounts too. Nothing here names a library, so the lock holds nothing
  * back; a token or session key never leaves the server.
  */
-@Controller('api/me/scrobbling')
+@Controller()
 @Public()
 export class ScrobblingController {
   private readonly publicOrigin: string | null
@@ -149,15 +149,16 @@ export class ScrobblingController {
     ]
   }
 
-  private isLastFmOpen(): boolean {
-    return this.lastFm.isAvailable() && this.publicOrigin !== null
+  /** Where Last.fm's sign-in comes back to while Last.fm is on, else null. */
+  private lastFmOrigin(): string | null {
+    return this.lastFm.isAvailable() ? this.publicOrigin : null
   }
 
   private statusOf({ account }: ScrobblingControllerStatusOfProps): ScrobbleStatus[] {
     const linked = this.links.list({ account })
     const available = {
       [SCROBBLE_SERVICES.listenBrainz]: this.listenBrainz.isAvailable(),
-      [SCROBBLE_SERVICES.lastFm]: this.isLastFmOpen(),
+      [SCROBBLE_SERVICES.lastFm]: this.lastFmOrigin() !== null,
     }
     return Object.values(SCROBBLE_SERVICES).map((service) => ({
       service,
@@ -166,14 +167,14 @@ export class ScrobblingController {
     }))
   }
 
-  @Get()
+  @Get(SCROBBLING_PATHS.root)
   status(@Req() request: FastifyRequest): ScrobbleStatus[] {
     return this.statusOf({ account: this.accounts.keyOf({ request }) })
   }
 
   /** Links ListenBrainz with the account's user token, once ListenBrainz says it is good. */
   @ForViewers()
-  @Put('listenbrainz')
+  @Put(SCROBBLING_PATHS.listenBrainz)
   async linkListenBrainz(
     @Body() body: unknown,
     @Req() request: FastifyRequest,
@@ -196,12 +197,11 @@ export class ScrobblingController {
 
   /** Last.fm's sign-in page for the account, which comes back to `returnTo` once allowed. */
   @ForViewers()
-  @Post('lastfm/start')
+  @Post(SCROBBLING_PATHS.lastFmStart)
   @HttpCode(200)
   startLastFm(@Body() body: unknown, @Req() request: FastifyRequest): LastFmAuthPage {
-    if (!this.isLastFmOpen() || this.publicOrigin === null) {
-      throw new ConflictException(SCROBBLING_COPY.lastFmOff)
-    }
+    const origin = this.lastFmOrigin()
+    if (origin === null) throw new ConflictException(SCROBBLING_COPY.lastFmOff)
     if (!isLastFmStart(body) || !this.returns().includes(body.returnTo)) {
       throw new BadRequestException(SCROBBLING_COPY.badReturn)
     }
@@ -209,7 +209,7 @@ export class ScrobblingController {
       account: this.accounts.keyOf({ request }),
       returnTo: body.returnTo,
     })
-    const callback = `${this.publicOrigin}${SCROBBLING_PATHS.lastFmCallback}?${new URLSearchParams({ [SCROBBLE_PARAMS.state]: state }).toString()}`
+    const callback = `${origin}${SCROBBLING_PATHS.lastFmCallback}?${new URLSearchParams({ [SCROBBLE_PARAMS.state]: state }).toString()}`
     return { url: this.lastFm.authPage({ callback }) }
   }
 
@@ -221,7 +221,7 @@ export class ScrobblingController {
    * address, saying how it went.
    */
   @OpenToAnyone()
-  @Get('lastfm/callback')
+  @Get(SCROBBLING_PATHS.lastFmCallback)
   async lastFmCallback(
     @Query(SCROBBLE_PARAMS.token) token: unknown,
     @Query(SCROBBLE_PARAMS.state) state: unknown,
@@ -235,9 +235,7 @@ export class ScrobblingController {
       throw new BadRequestException(SCROBBLING_COPY.staleSignIn)
     }
     await this.checkStillViewer({ account: signIn.account })
-    const linked = this.lastFm.isAvailable()
-      ? await this.lastFm.validate({ token }).catch(() => null)
-      : null
+    const linked = await this.lastFm.validate({ token }).catch(() => null)
     if (linked !== null) {
       this.links.save({
         account: signIn.account,
@@ -255,7 +253,7 @@ export class ScrobblingController {
 
   /** Stops forwarding to the service, forgetting its token and the listens waiting for it. */
   @ForViewers()
-  @Delete(':service')
+  @Delete(SCROBBLING_PATHS.service)
   unlink(@Param('service') service: string, @Req() request: FastifyRequest): ScrobbleStatus[] {
     if (!isScrobbleService(service)) throw new NotFoundException(`No service ${service}`)
     const account = this.accounts.keyOf({ request })

@@ -6,6 +6,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   AUDIO_BITRATES,
   type ApiClient,
+  DISCOVERY_PATHS,
   LIBRARY_KINDS,
   type LibraryInput,
   groupingsFor,
@@ -13,6 +14,7 @@ import {
   isRecord,
   LYRICS_KINDS,
   MIX_KINDS,
+  RADIO_PARAMS,
   RADIO_SEED_KINDS,
   SCROBBLE_SERVICES,
   musicListQuery,
@@ -396,9 +398,13 @@ describe('a library locked behind the PIN', () => {
     await expect(api().getMix({ id: MIX_KINDS.heavyRotation })).rejects.toMatchObject({
       status: 404,
     })
-    const unread = ['/api/music/radio?seed=genre:1', '/api/music/radio', '/api/music/mixes/weekly']
+    const unread = [
+      `${DISCOVERY_PATHS.radio}?${RADIO_PARAMS.seed}=genre:1`,
+      DISCOVERY_PATHS.radio,
+      DISCOVERY_PATHS.mix.replace(':id', 'weekly'),
+    ]
     const statuses = await Promise.all(
-      unread.map(async (url) => (await inject({ method: 'GET', url })).statusCode),
+      unread.map(async (url) => (await inject({ method: ROUTE_METHODS.get, url })).statusCode),
     )
     expect(statuses).toEqual([400, 400, 404])
 

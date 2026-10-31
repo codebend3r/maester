@@ -55,7 +55,7 @@ export const fakeLastFm = ({ tokens = {} }: FakeLastFmProps = {}) => {
     ) {
       return json({ body: { error: 13, message: 'Invalid method signature' }, status: 403 })
     }
-    if (fields.method === LASTFM_METHODS.getSession) {
+    if (fields[LASTFM_PARAMS.method] === LASTFM_METHODS.getSession) {
       const token = fields.token ?? ''
       const user = tokens[token]
       if (user === undefined || used.has(token)) {
@@ -69,7 +69,7 @@ export const fakeLastFm = ({ tokens = {} }: FakeLastFmProps = {}) => {
       sessions.set(key, user)
       return json({ body: { session: { name: user, key, subscriber: 0 } } })
     }
-    if (fields.method === LASTFM_METHODS.scrobble) {
+    if (fields[LASTFM_PARAMS.method] === LASTFM_METHODS.scrobble) {
       if (state.scrobbleError !== null) {
         return json({ body: { error: state.scrobbleError, message: 'No' }, status: 503 })
       }

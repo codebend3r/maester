@@ -26,8 +26,13 @@ export const LASTFM_METHODS = {
   scrobble: 'track.scrobble',
 } as const
 
-/** The parameters every call carries: raven's key and the call's signature. */
-export const LASTFM_PARAMS = { apiKey: 'api_key', apiSig: 'api_sig' } as const
+/** The parameters raven sends: its key, the call's signature and method, and the sign-in page's callback. */
+export const LASTFM_PARAMS = {
+  apiKey: 'api_key',
+  apiSig: 'api_sig',
+  method: 'method',
+  callback: 'cb',
+} as const
 
 /** Parameters that are sent but never signed, as Last.fm's signing leaves them out. */
 const UNSIGNED = { format: 'format', callback: 'callback' } as const
@@ -122,7 +127,10 @@ export class LastFmScrobbler implements Scrobbler {
 
   /** Last.fm's page that asks the account to allow raven, then goes to `callback`. */
   authPage({ callback }: LastFmScrobblerAuthPageProps): string {
-    const query = new URLSearchParams({ [LASTFM_PARAMS.apiKey]: this.keys().apiKey, cb: callback })
+    const query = new URLSearchParams({
+      [LASTFM_PARAMS.apiKey]: this.keys().apiKey,
+      [LASTFM_PARAMS.callback]: callback,
+    })
     return `${LASTFM_AUTH_PAGE}?${query.toString()}`
   }
 
@@ -149,7 +157,7 @@ export class LastFmScrobbler implements Scrobbler {
   async validate({ token }: LastFmScrobblerValidateProps): Promise<LinkedAccount | null> {
     const response = await this.call({
       keys: this.keys(),
-      params: { method: LASTFM_METHODS.getSession, token },
+      params: { [LASTFM_PARAMS.method]: LASTFM_METHODS.getSession, token },
     })
     const body: unknown = await response.json().catch(() => null)
     const error = errorOf(body)
@@ -167,7 +175,7 @@ export class LastFmScrobbler implements Scrobbler {
     const keys = this.config.lastFm
     if (keys === null) return SEND_OUTCOMES.retry
     const params = {
-      method: LASTFM_METHODS.scrobble,
+      [LASTFM_PARAMS.method]: LASTFM_METHODS.scrobble,
       sk: secret,
       artist: listen.artist,
       track: listen.track,

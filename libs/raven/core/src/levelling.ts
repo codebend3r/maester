@@ -21,7 +21,7 @@ const chosenOf = ({ track: { gain }, mode }: LevelOfProps): Chosen => {
     case LEVELLING_MODES.album:
       return gain.album === null
         ? { gain: gain.track, peak: gain.trackPeak }
-        : { gain: gain.album, peak: gain.albumPeak }
+        : { gain: gain.album, peak: gain.albumPeak ?? gain.trackPeak }
     default: {
       const unknown: never = mode
       return unknown

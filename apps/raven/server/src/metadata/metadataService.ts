@@ -4,7 +4,6 @@ import {
   isMatchItemType,
   ITEM_TYPES,
   type ItemType,
-  LIBRARY_KINDS,
   type LibraryKind,
   MATCH_SOURCES,
   MATCH_STATES,
@@ -492,7 +491,7 @@ export class MetadataService implements OnApplicationBootstrap {
     this.scoreSweep.kick()
     // Detection needs the episodes in their seasons, which the pass just placed.
     this.markers.kick()
-    if (this.libraries.get(libraryId)?.settings.kind === LIBRARY_KINDS.music) this.loudness.kick()
+    this.loudness.kick()
   }
 
   private async matchAndClearUp(libraryId: number): Promise<void> {

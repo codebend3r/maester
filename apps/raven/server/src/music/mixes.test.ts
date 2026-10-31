@@ -1,4 +1,4 @@
-import { MIX_KINDS } from '@raven/core'
+import { LIBRARY_KINDS, MIX_KINDS } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { Mixes } from '@/music/mixes'
@@ -18,13 +18,14 @@ type PlayProps = { id: number; times: number; from: number }
 
 describe('Mixes', () => {
   const database = testDatabase('raven-mixes-')
-  const state: { open: number; locked: number; spins: number[]; old: number[]; hidden: number } = {
-    open: 0,
-    locked: 0,
-    spins: [],
-    old: [],
-    hidden: 0,
-  }
+  const state: {
+    open: number
+    locked: number
+    spins: number[]
+    old: number[]
+    hidden: number
+    chapters: number[]
+  } = { open: 0, locked: 0, spins: [], old: [], hidden: 0, chapters: [] }
   const clock = manualClock()
   const mixes = () => {
     const { music } = musicLibrary(database.get())
@@ -65,6 +66,17 @@ describe('Mixes', () => {
       album: 'Hidden',
       at: longAgo,
     })
+    // An audiobook's chapters are filed as tracks, played and added lately, by a mix's artist.
+    const books = addLibrary({ name: 'Books', kind: LIBRARY_KINDS.audiobooks })
+    state.chapters = ['Hot', 'Old', 'Hot'].map((artist, at) =>
+      addTrack({
+        libraryId: books,
+        title: `Chapter ${at}`,
+        artist,
+        album: 'A Book',
+        at: new Date(NOW - 2 * DAY_MS),
+      }),
+    )
     /** Plays an hour apart from `from` on, so each is a sitting of its own. */
     const play = ({ id, times, from }: PlayProps) =>
       Array.from({ length: times }, (_, at) =>
@@ -76,6 +88,9 @@ describe('Mixes', () => {
     play({ id: third, times: 3, from: NOW - DAY_MS })
     play({ id: state.hidden, times: 9, from: NOW - 20 * HOUR_MS })
     state.old.forEach((id) => play({ id, times: 3, from: NOW - 120 * DAY_MS }))
+    const [heard = 0, heardLongAgo = 0] = state.chapters
+    play({ id: heard, times: 9, from: NOW - 20 * HOUR_MS })
+    play({ id: heardLongAgo, times: 3, from: Date.parse('2019-10-31T01:00:00Z') })
     // Another account's plays make none of this account's mixes.
     viewing.recordPlay({ id: state.old[0] ?? 0, account: TEST_ACCOUNTS.a, at: new Date(NOW) })
   })
@@ -202,5 +217,18 @@ describe('Mixes', () => {
 
     expect(ids).toHaveLength(50)
     expect(ids).toEqual(expect.arrayContaining(state.spins.slice(0, 3)))
+  })
+
+  it('never holds an audiobook’s chapters, nor shows its album on Home', () => {
+    const held = Object.values(MIX_KINDS).flatMap(
+      (kind) =>
+        mixes()
+          .get({ kind, ...scope() })
+          ?.tracks.map(({ id }) => id) ?? [],
+    )
+    const recent = mixes().recent({ account, hidden: [] })
+
+    expect(held.filter((id) => state.chapters.includes(id))).toEqual([])
+    expect([...recent.played, ...recent.added].map(({ title }) => title)).not.toContain('A Book')
   })
 })

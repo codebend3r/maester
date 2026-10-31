@@ -157,6 +157,8 @@ export type PlaylistLayoutProps = {
   playingId: number | null
   /** Why the last change failed; null for none. */
   note: string | null
+  /** Whether it is the account's, and so offers its edits; another account's shared one is read only. */
+  isOwn: boolean
   onPlay: () => void
   onShuffle: () => void
   onPlayFrom: (index: number) => void
