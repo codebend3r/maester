@@ -340,7 +340,14 @@ export class MediaController {
     const source = await stat(file.path).catch(() => null)
     if (!source?.isFile()) throw new NotFoundException('The file is no longer on disk')
     const path = await this.transcodes
-      .fileFor({ mediaId: id, path: file.path, mtimeMs: file.mtimeMs, kbps: bitrate })
+      .fileFor({
+        mediaId: id,
+        path: file.path,
+        // The file on disk, which may have changed since the last scan, names what is cached of it.
+        mtimeMs: source.mtimeMs,
+        durationSeconds: file.duration,
+        kbps: bitrate,
+      })
       .catch((error: unknown) => {
         this.logger.warn(`Could not convert media ${id} to AAC: ${errorMessage(error)}`)
         throw new InternalServerErrorException('Could not convert the track.')

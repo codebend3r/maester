@@ -1,18 +1,25 @@
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { AUDIO_BITRATES, type ApiClient, LIBRARY_KINDS, isRecord } from '@raven/core'
+import {
+  AUDIO_BITRATES,
+  type ApiClient,
+  type AudioBitrate,
+  LIBRARY_KINDS,
+  isRecord,
+} from '@raven/core'
 import { HEADERS } from '@shared/server'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { RAVEN_CONTENT_TYPES } from '@/http'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
-import { TranscodeCache } from '@/music/transcodeCache'
+import { TranscodeCache, transcodeTimeoutSeconds } from '@/music/transcodeCache'
 import { ScannerService } from '@/scanner/scannerService'
 import { NOT_WATCHING, adminCookie, testConfig } from '@/test/app'
 import { encodeClip, encodeTrack } from '@/test/clips'
@@ -104,11 +111,24 @@ describe('the transcode cache', () => {
     await rm(state.root, { recursive: true, force: true, maxRetries: 5 })
   })
 
+  type AskProps = { kbps: AudioBitrate; mtimeMs?: number; durationSeconds?: number | null }
+
+  /** The track at `kbps`, as the index has it unless the ask says otherwise. */
+  const ask = ({
+    kbps,
+    mtimeMs = track().mtimeMs,
+    durationSeconds = track().duration,
+  }: AskProps): Promise<string> =>
+    cache().fileFor({ mediaId: state.track, path: track().path, mtimeMs, durationSeconds, kbps })
+
+  beforeEach(async () => {
+    await rm(join(transcodes(), String(state.track)), { recursive: true, force: true })
+  })
+
   it('makes `<mtimeMs>-<kbps>.m4a` in the track’s folder, AAC at about the bitrate asked', async () => {
-    const { path, mtimeMs } = track()
-    const made = await cache().fileFor({ mediaId: state.track, path, mtimeMs, kbps: standard })
+    const made = await ask({ kbps: standard })
     expect(dirname(made)).toBe(join(transcodes(), String(state.track)))
-    expect(basename(made)).toBe(`${Math.round(mtimeMs)}-${standard}.m4a`)
+    expect(basename(made)).toBe(`${Math.round(track().mtimeMs)}-${standard}.m4a`)
     const { codec, bitRate } = await probed(made)
     expect(codec).toBe('aac')
     expect(bitRate).toBeGreaterThan(standard * 1000 * 0.75)
@@ -116,13 +136,9 @@ describe('the transcode cache', () => {
   })
 
   it('runs ffmpeg once for two asks at once', async () => {
-    const { path, mtimeMs } = track()
     const exec = vi.spyOn(app().get(FfmpegService), 'exec')
     try {
-      const [first, second] = await Promise.all([
-        cache().fileFor({ mediaId: state.track, path, mtimeMs, kbps: low }),
-        cache().fileFor({ mediaId: state.track, path, mtimeMs, kbps: low }),
-      ])
+      const [first, second] = await Promise.all([ask({ kbps: low }), ask({ kbps: low })])
       expect(first).toBe(second)
       expect(exec).toHaveBeenCalledTimes(1)
     } finally {
@@ -130,26 +146,35 @@ describe('the transcode cache', () => {
     }
   })
 
+  it('gives a long track, or one of unknown length, longer than ffmpeg’s usual limit', async () => {
+    const baseSeconds = app().get<ServerConfig>(SERVER_CONFIG).ffmpegTimeoutSeconds
+    expect(transcodeTimeoutSeconds({ durationSeconds: 180, baseSeconds })).toBe(baseSeconds)
+    expect(transcodeTimeoutSeconds({ durationSeconds: 3 * 60 * 60, baseSeconds })).toBe(2700)
+    expect(transcodeTimeoutSeconds({ durationSeconds: null, baseSeconds })).toBe(4 * 60 * 60)
+    const exec = vi.spyOn(app().get(FfmpegService), 'exec')
+    try {
+      await ask({ kbps: low, durationSeconds: 60 * 60 })
+      expect(exec).toHaveBeenCalledWith(expect.objectContaining({ timeoutSeconds: 900 }))
+    } finally {
+      exec.mockRestore()
+    }
+  })
+
   it('makes a new file once the track changes, and removes what it made of the old one', async () => {
-    const { path, mtimeMs } = track()
-    const older = await cache().fileFor({ mediaId: state.track, path, mtimeMs, kbps: high })
-    const newer = await cache().fileFor({
-      mediaId: state.track,
-      path,
-      mtimeMs: mtimeMs + 1000,
-      kbps: high,
-    })
+    const { mtimeMs } = track()
+    const older = await ask({ kbps: high, mtimeMs })
+    await ask({ kbps: low, mtimeMs })
+    const newer = await ask({ kbps: high, mtimeMs: mtimeMs + 1000 })
     expect(newer).not.toBe(older)
     expect(await readdir(dirname(newer))).toEqual([basename(newer)])
   })
 
   it('evicts to the cap, keeping the most recently served file, and removes orphans', async () => {
-    const { path, mtimeMs } = track()
-    const served = await cache().fileFor({ mediaId: state.track, path, mtimeMs, kbps: low })
+    const served = await ask({ kbps: low })
     await pause(20)
-    await cache().fileFor({ mediaId: state.track, path, mtimeMs, kbps: standard })
+    await ask({ kbps: standard })
     await pause(20)
-    await cache().fileFor({ mediaId: state.track, path, mtimeMs, kbps: low })
+    await ask({ kbps: low })
     const orphan = join(transcodes(), '987654')
     await mkdir(orphan, { recursive: true })
     await writeFile(join(orphan, `1-${standard}.m4a`), 'gone')
@@ -194,5 +219,27 @@ describe('the transcode cache', () => {
     expect((await at({ query: '?kbps=192', id: state.track })).statusCode).toBe(400)
     expect((await at({ query: '', id: state.track })).statusCode).toBe(400)
     expect((await at({ query: `?kbps=${standard}`, id: state.video })).statusCode).toBe(409)
+  })
+
+  it('converts the file on disk again once it changes, before any rescan', async () => {
+    const { path } = track()
+    const { ticket } = await api().getMediaTicket(state.track)
+    const url = apiFor({ app: app() }).transcodeUrl({
+      mediaId: state.track,
+      kbps: standard,
+      ticket,
+    })
+    const before = await app().inject({ method: 'GET', url })
+    await encodeTrack({ path, seconds: 6, isNoise: true, tags: { title: 'Beetlebum' } })
+    const changedAt = new Date(Date.now() + 60_000)
+    await utimes(path, changedAt, changedAt)
+
+    const after = await app().inject({ method: 'GET', url })
+
+    expect(after.statusCode).toBe(200)
+    expect(after.rawPayload.length).toBeGreaterThan(before.rawPayload.length)
+    expect(await readdir(join(transcodes(), String(state.track)))).toEqual([
+      `${Math.round((await stat(path)).mtimeMs)}-${standard}.m4a`,
+    ])
   })
 })

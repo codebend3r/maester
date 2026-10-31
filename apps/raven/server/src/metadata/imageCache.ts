@@ -260,7 +260,7 @@ export class ImageCache {
         const temp = temporary({ dir, extension: 'jpg' })
         try {
           await this.scales.run(() =>
-            this.ffmpeg.exec(imageScaleArgs({ input: source, output: temp, width })),
+            this.ffmpeg.exec({ args: imageScaleArgs({ input: source, output: temp, width }) }),
           )
           if (!(await exists(temp))) throw new Error('ffmpeg wrote nothing')
           await rename(temp, target)

@@ -16,11 +16,11 @@ class CountingFfmpeg extends FfmpegService {
   running = 0
   most = 0
 
-  override async exec(args: string[]): Promise<void> {
+  override async exec(run: Parameters<FfmpegService['exec']>[0]): Promise<void> {
     this.running += 1
     this.most = Math.max(this.most, this.running)
     try {
-      await super.exec(args)
+      await super.exec(run)
     } finally {
       this.running -= 1
     }

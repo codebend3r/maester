@@ -23,6 +23,26 @@ const ABANDONED_MS = 24 * 60 * 60 * 1000
 
 const EXTENSION = 'm4a'
 
+/** How much faster than it plays a track must encode before its run is given up. */
+const ENCODE_SPEED = 4
+
+/** The time a track of unknown length may take: long enough for an audiobook of many hours. */
+const UNKNOWN_LENGTH_SECONDS = 4 * 60 * 60
+
+type TranscodeTimeoutSecondsProps = { durationSeconds: number | null; baseSeconds: number }
+
+/**
+ * How long one transcode may run: ffmpeg's usual limit, or longer for a track
+ * that would not encode inside it at a quarter of its length.
+ */
+export const transcodeTimeoutSeconds = ({
+  durationSeconds,
+  baseSeconds,
+}: TranscodeTimeoutSecondsProps): number =>
+  durationSeconds === null
+    ? Math.max(baseSeconds, UNKNOWN_LENGTH_SECONDS)
+    : Math.max(baseSeconds, Math.ceil(durationSeconds / ENCODE_SPEED))
+
 const MEDIA_FOLDER = /^\d+$/
 
 type Cached = { path: string; size: number; servedAt: number }
@@ -31,14 +51,22 @@ type TranscodeCacheFileForProps = {
   mediaId: number
   /** The track's file, read only. */
   path: string
-  /** The track's mtime as the index holds it, which names the version made of it. */
+  /** The track's mtime as it is on disk, which names the version made of it. */
   mtimeMs: number
+  /** How long the track plays, from the index; null when unknown. */
+  durationSeconds: number | null
   kbps: AudioBitrate
 }
 
 type TranscodeCacheOnceProps = { key: string; make: () => Promise<string> }
 
-type TranscodeCacheMakeProps = { source: string; dir: string; target: string; kbps: AudioBitrate }
+type TranscodeCacheMakeProps = {
+  source: string
+  dir: string
+  target: string
+  kbps: AudioBitrate
+  timeoutSeconds: number
+}
 
 type TranscodeCacheKeptProps = { dir: string; now: number }
 
@@ -55,6 +83,7 @@ export class TranscodeCache implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(TranscodeCache.name)
   private readonly root: string
   private readonly cap: number
+  private readonly baseTimeoutSeconds: number
   private readonly working = new Map<string, Promise<string>>()
   // Encoding takes CPU the server shares with video transcodes, and a download asks for an album at once.
   private readonly encodes: Gate = createGate({ limit: 2 })
@@ -67,6 +96,7 @@ export class TranscodeCache implements OnApplicationBootstrap, OnModuleDestroy {
   ) {
     this.root = join(config.dataDir, 'transcodes')
     this.cap = config.transcodeCacheBytes
+    this.baseTimeoutSeconds = config.ffmpegTimeoutSeconds
     mkdirSync(this.root, { recursive: true })
   }
 
@@ -98,7 +128,13 @@ export class TranscodeCache implements OnApplicationBootstrap, OnModuleDestroy {
    * The track at `kbps`, made once and marked as served now, so the sweep
    * keeps it over files served longer ago. Rejects when ffmpeg cannot read it.
    */
-  async fileFor({ mediaId, path, mtimeMs, kbps }: TranscodeCacheFileForProps): Promise<string> {
+  async fileFor({
+    mediaId,
+    path,
+    mtimeMs,
+    durationSeconds,
+    kbps,
+  }: TranscodeCacheFileForProps): Promise<string> {
     const dir = join(this.root, String(mediaId))
     const version = `${Math.round(mtimeMs)}-`
     const target = join(dir, `${version}${kbps}.${EXTENSION}`)
@@ -107,7 +143,16 @@ export class TranscodeCache implements OnApplicationBootstrap, OnModuleDestroy {
       make: async () => {
         const existing = await stat(target).catch(() => null)
         if (existing?.isFile()) return target
-        await this.make({ source: path, dir, target, kbps })
+        await this.make({
+          source: path,
+          dir,
+          target,
+          kbps,
+          timeoutSeconds: transcodeTimeoutSeconds({
+            durationSeconds,
+            baseSeconds: this.baseTimeoutSeconds,
+          }),
+        })
         const files = await readdir(dir).catch((): string[] => [])
         await Promise.all(
           files
@@ -123,7 +168,13 @@ export class TranscodeCache implements OnApplicationBootstrap, OnModuleDestroy {
     return made
   }
 
-  private async make({ source, dir, target, kbps }: TranscodeCacheMakeProps): Promise<void> {
+  private async make({
+    source,
+    dir,
+    target,
+    kbps,
+    timeoutSeconds,
+  }: TranscodeCacheMakeProps): Promise<void> {
     await mkdir(dir, { recursive: true })
     const temp = join(
       dir,
@@ -131,7 +182,10 @@ export class TranscodeCache implements OnApplicationBootstrap, OnModuleDestroy {
     )
     try {
       await this.encodes.run(() =>
-        this.ffmpeg.exec(audioTranscodeArgs({ input: source, output: temp, kbps })),
+        this.ffmpeg.exec({
+          args: audioTranscodeArgs({ input: source, output: temp, kbps }),
+          timeoutSeconds,
+        }),
       )
       await rename(temp, target)
     } catch (error) {

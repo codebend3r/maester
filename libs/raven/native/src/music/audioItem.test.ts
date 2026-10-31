@@ -102,6 +102,6 @@ describe('audioItemOf', () => {
   it('plays ALAC on an iPhone, which decodes it', async () => {
     const { server } = ravenServer()
     const item = await audioItemOf({ server, track: ALAC_AIRBAG, platform: AUDIO_PLATFORMS.apple })
-    expect(item?.id).toBe(AIRBAG.id)
+    expect(item?.id ?? null).toBe(AIRBAG.id)
   })
 })

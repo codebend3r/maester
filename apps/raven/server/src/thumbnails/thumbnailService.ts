@@ -82,9 +82,15 @@ export class ThumbnailService implements OnApplicationBootstrap {
       `.${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`,
     )
     try {
-      await this.ffmpeg.exec(
-        thumbnailArgs({ input, output: temp, seek, width: this.config.thumbnailWidth, tonemap }),
-      )
+      await this.ffmpeg.exec({
+        args: thumbnailArgs({
+          input,
+          output: temp,
+          seek,
+          width: this.config.thumbnailWidth,
+          tonemap,
+        }),
+      })
       if (!(await exists(temp))) throw new Error('ffmpeg wrote no frame')
       return temp
     } catch (error) {
