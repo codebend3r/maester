@@ -68,7 +68,7 @@ describe('ArtistPage', () => {
     useAudioQueue.getState().clear()
     renderPage()
     await screen.findByRole('heading', { level: 1, name: 'Radiohead' })
-    fireEvent.click(screen.getByRole('button', { name: 'Start radio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start radio from Radiohead' }))
     await waitFor(() =>
       expect(useAudioQueue.getState().queue.source).toEqual({
         kind: 'radio',

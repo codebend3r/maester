@@ -20,11 +20,6 @@
 .cover {
   display: grid;
   border-radius: var(--radius-md);
-  outline: none;
-
-  &:focus-visible {
-    box-shadow: var(--focus-ring);
-  }
 }
 
 // Four covers in a square, two by two; fewer leave their cells to the ground.

@@ -1,9 +1,9 @@
-import { ApiError, DESKTOP_PATHS } from '@raven/core'
+import { ApiError } from '@raven/core'
 import { queryKeys } from '@raven/ui/headless'
 import { hashKey, type Query, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { offlineReturnIn } from '@/desktop/paths'
+import { isDownloadsPage, offlineReturnIn } from '@/desktop/paths'
 import { useServerReach } from '@/stores/serverReach'
 import { handled } from '@/desktop/handled'
 
@@ -66,7 +66,7 @@ export const useFollowServerReach = (): void => {
 
 /**
  * Once the server answers again, goes back to the page the offline redirect left, if the person
- * is still on the Downloads page it sent them to.
+ * is still on the Downloads page it sent them to, raven's or the music mode's.
  */
 export const useReturnWhenReached = (): void => {
   const isOffline = useServerReach((state) => state.isOffline)
@@ -75,7 +75,7 @@ export const useReturnWhenReached = (): void => {
   const wasOffline = useRef(isOffline)
 
   const goBack = useEffectEvent(() => {
-    const returnTo = pathname === DESKTOP_PATHS.downloads ? offlineReturnIn(state) : null
+    const returnTo = isDownloadsPage(pathname) ? offlineReturnIn(state) : null
     if (returnTo !== null) handled(Promise.resolve(navigate(returnTo, { replace: true })))
   })
 

@@ -9,7 +9,8 @@ import {
 } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { createMenuHub } from '@/desktop/menuHub'
-import { playPathOf } from '@/desktop/paths'
+import { type DownloadsPage, playPathOf } from '@/desktop/paths'
+import { MUSIC_PATHS } from '@/lib/music'
 import {
   ENGINE_NOTES,
   ENGINE_USES,
@@ -31,12 +32,16 @@ const FILE: LocalFile = {
   tracks: null,
 }
 
-type SetupProps = { file?: LocalFile; engine?: EngineUse }
+type SetupProps = { file?: LocalFile; engine?: EngineUse; downloadsPage?: DownloadsPage }
 
-const setup = ({ file = FILE, engine = ENGINE_USES.native }: SetupProps = {}) => {
+const setup = ({ file = FILE, engine = ENGINE_USES.native, downloadsPage }: SetupProps = {}) => {
   const client = fakeClient()
   const menu = createMenuHub()
-  return { client, menu, services: fileServicesFor({ file, client, menu, engine }) }
+  return {
+    client,
+    menu,
+    services: fileServicesFor({ file, client, menu, engine, downloadsPage }),
+  }
 }
 
 describe('playerActionFor', () => {
@@ -71,9 +76,18 @@ describe('fileServicesFor', () => {
     })
     expect(services.title.next).toEqual({
       to: playPathOf(DL_1),
-      state: { queue: [DL_2] },
+      state: { queue: [DL_2], from: DESKTOP_PATHS.downloads },
       label: 'Clip 02',
     })
+  })
+
+  it('takes a download opened from the music mode back to its Downloads, and the next file too', () => {
+    const { services } = setup({
+      file: { ...FILE, isDownload: true, next: { fileId: DL_1, label: 'Clip 02', queue: [] } },
+      downloadsPage: MUSIC_PATHS.downloads,
+    })
+    expect(services.title.backTo).toBe('/music/downloads')
+    expect(services.title.next?.state).toEqual({ queue: [], from: '/music/downloads' })
   })
 
   it('saves the position with the length the engine learned, and none before playback began', async () => {

@@ -28,6 +28,11 @@ const Tab = ({ to, patterns, icon, label }: TabProps) => {
   )
 }
 
+type TabBarProps = {
+  /** Whether a music library exists, so the tabs offer the music mode. */
+  hasMusic: boolean
+}
+
 /**
  * A phone's way round, in place of the side menu: Home, Libraries,
  * Favourites, Music while a music library exists, and Settings along the
@@ -37,11 +42,6 @@ const Tab = ({ to, patterns, icon, label }: TabProps) => {
  * A narrow Raven window adds On this Mac and Downloads before
  * Settings, and keeps only those three while it cannot reach its server.
  */
-type TabBarProps = {
-  /** Whether a music library exists, so the tabs offer the music mode. */
-  hasMusic: boolean
-}
-
 export const TabBar = ({ hasMusic }: TabBarProps) => {
   const isDesktop = useIsDesktop()
   const computer = useComputerName()

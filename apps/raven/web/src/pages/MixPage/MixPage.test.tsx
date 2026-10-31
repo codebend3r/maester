@@ -60,12 +60,13 @@ describe('MixPage', () => {
     expect(getRadio).toHaveBeenCalledWith({ seed: { kind: 'track', id: 101 } })
   })
 
-  it('finds nothing at an address that names no mix, and asks for none', () => {
+  it('finds nothing at an address that names no mix, asks for none, and goes home to the music', () => {
     const getMix = spyOn(api, 'getMix')
     renderPage('/music/mixes/everything')
     expect(
       screen.getByRole('heading', { name: 'Nothing lives at this address' }),
     ).toBeInTheDocument()
     expect(getMix).not.toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: 'Go home' })).toHaveAttribute('href', '/music')
   })
 })

@@ -14,7 +14,7 @@ import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { Bone } from '@/components/Skeleton/Skeleton'
-import { StartRadio } from '@/components/StartRadio/StartRadio'
+import { START_RADIO_LOOKS, StartRadio } from '@/components/StartRadio/StartRadio'
 import { useMusicLinks } from '@/lib/useMusicLinks'
 import { artistQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
@@ -43,7 +43,11 @@ const ArtistView = ({ details }: ArtistViewProps) => {
             {artist.name}
           </h1>
           <FavouriteButton isFavourite={details.isFavourite} onToggle={favourite.mutate} />
-          <StartRadio seed={{ kind: RADIO_SEED_KINDS.artist, id: artist.id }} title={artist.name} />
+          <StartRadio
+            seed={{ kind: RADIO_SEED_KINDS.artist, id: artist.id }}
+            title={artist.name}
+            look={START_RADIO_LOOKS.icon}
+          />
         </div>
         <p className={styles.count}>{MUSIC_COPY.artistCounts(artist)}</p>
       </header>

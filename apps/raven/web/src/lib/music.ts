@@ -13,6 +13,7 @@ import {
   formatDuration,
   listingFor,
 } from '@raven/core'
+import { generatePath, matchPath } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { COMMON_COPY, MUSIC_COPY } from '@/lib/copy'
 
@@ -52,7 +53,11 @@ export const MUSIC_PATHS = {
 } as const satisfies Record<string, AppPath>
 
 /** A mix's page: `/music/mixes/:id`, its kind the id. */
-export const mixPath = (kind: MixKind): AppPath => `/music/mixes/${kind}`
+export const mixPath = (kind: MixKind): string => generatePath(MUSIC_PATHS.mix, { id: kind })
+
+/** Whether `pathname` is one of the music mode's pages, under `/music`. */
+export const isMusicPath = (pathname: string): boolean =>
+  matchPath({ path: MUSIC_PATHS.root, end: false }, pathname) !== null
 
 /** The server's music libraries, the ones it lists by album, in its order. */
 export const musicLibrariesOf = (libraries: readonly Library[]): Library[] =>
