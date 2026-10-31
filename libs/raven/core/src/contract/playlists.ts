@@ -1,10 +1,13 @@
 import { isTrack } from '@/contract/music'
-import { type Infer, isNumber, isString, listOf, matching, object } from '@/schema'
+import { type Infer, isBoolean, isNumber, isString, listOf, matching, object } from '@/schema'
 
 /** How long a playlist's name may be, and how many tracks one request may name. */
 export const PLAYLIST_LIMITS = { name: 200, tracks: 5000 } as const
 
-/** One account's playlist as a list shows it: its tracks and length count only those the caller may see. */
+/**
+ * A playlist as a list shows it, the caller's own or another account's
+ * shared one: its tracks and length count only those the caller may see.
+ */
 export const isPlaylistSummary = object({
   id: isNumber,
   name: isString,
@@ -13,6 +16,10 @@ export const isPlaylistSummary = object({
   duration: isNumber,
   createdAt: isString,
   updatedAt: isString,
+  /** Whether every account on the server may read it, play it and copy it. */
+  isShared: isBoolean,
+  /** Whether it is the caller's, and so the caller's to change; another's is read only. */
+  isOwn: isBoolean,
 })
 
 export type PlaylistSummary = Infer<typeof isPlaylistSummary>
@@ -52,3 +59,8 @@ const isMediaIds = (value: unknown): value is number[] =>
 export const isPlaylistTracksChange = object({ mediaIds: isMediaIds })
 
 export type PlaylistTracksChange = Infer<typeof isPlaylistTracksChange>
+
+/** `PUT /api/playlists/:id/sharing`: whether the owner's playlist is shared with every account. */
+export const isPlaylistSharing = object({ isShared: isBoolean })
+
+export type PlaylistSharing = Infer<typeof isPlaylistSharing>

@@ -116,4 +116,18 @@ describe('filingOf', () => {
       { name: 'B', mbid: null },
     ])
   })
+
+  it('keeps an artist id lowercase, as MusicBrainz and ListenBrainz send it', () => {
+    const filing = filingOf({
+      tags: {
+        ...NO_TAGS,
+        artists: ['Muse'],
+        artistMbids: ['9C9F1380-2516-4FC9-A3E6-F9F61941D090'],
+      },
+      path: '/music/x.mp3',
+    })
+    expect(filing.trackArtists).toEqual([
+      { name: 'Muse', mbid: '9c9f1380-2516-4fc9-a3e6-f9f61941d090' },
+    ])
+  })
 })

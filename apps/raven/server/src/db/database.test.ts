@@ -9,6 +9,7 @@ import { readServerConfig } from '@/config'
 import { adoptLegacyDatabase, DatabaseService, MIGRATIONS } from '@/db/database'
 import { VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
 import { PLAY_KINDS } from '@/media/watchedRepository'
+import { LOUDNESS_STATES, REPLAYGAIN_SOURCES } from '@/music/loudness'
 
 /** A kind of play the `plays.kind` CHECK refuses. */
 const UNKNOWN_PLAY_KIND = 'bogus'
@@ -557,6 +558,122 @@ describe('migrations', () => {
     ])
     expect(database.db.prepare('SELECT source FROM item_images').all()).toEqual([
       { source: 'tmdb' },
+    ])
+    database.onModuleDestroy()
+  })
+
+  it('waits a version-44 database’s tracks for the loudness scan, naming the gains their tags gave', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 44).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 44')
+    before.exec(
+      `INSERT INTO libraries (id, name, created_at, kind) VALUES (1, 'Music', '2026-01-01', 'music');
+       INSERT INTO media (id, library_id, path, file_name, folder, title, container, size, mtime_ms, added_at)
+       VALUES (1, 1, '/m/a.flac', 'a.flac', '/m', 'a', 'flac', 1, 1, '2026-01-01'),
+              (2, 1, '/m/b.flac', 'b.flac', '/m', 'b', 'flac', 1, 1, '2026-01-01');
+       INSERT INTO albums (id, library_id, album_key, title, sort_title, replaygain_gain, added_at)
+       VALUES (1, 1, 'a', 'A', 'A', -7.5, '2026-01-01'), (2, 1, 'b', 'B', 'B', NULL, '2026-01-01');
+       INSERT INTO tracks (media_id, album_id, title, replaygain_gain) VALUES (1, 1, 'a', -6.5), (2, 2, 'b', NULL);`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.pragma('user_version', { simple: true })).toBe(MIGRATIONS.length)
+    expect(
+      database.db
+        .prepare(
+          'SELECT loudness_state, loudness_version, replaygain_source FROM tracks ORDER BY media_id',
+        )
+        .all(),
+    ).toEqual([
+      {
+        loudness_state: LOUDNESS_STATES.pending,
+        loudness_version: 0,
+        replaygain_source: REPLAYGAIN_SOURCES.tags,
+      },
+      { loudness_state: LOUDNESS_STATES.pending, loudness_version: 0, replaygain_source: null },
+    ])
+    expect(database.db.prepare('SELECT replaygain_source FROM albums ORDER BY id').all()).toEqual([
+      { replaygain_source: REPLAYGAIN_SOURCES.tags },
+      { replaygain_source: null },
+    ])
+    database.onModuleDestroy()
+  })
+
+  it('gives a version-45 database an empty similar artists cache, lowercase artist ids and an index of when albums came', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 45).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 45')
+    before.exec(
+      `INSERT INTO artists (id, name, sort_name, name_key, mbid)
+       VALUES (1, 'Band', 'Band', 'band', NULL),
+              (2, 'Muse', 'Muse', 'muse', '9C9F1380-2516-4FC9-A3E6-F9F61941D090');`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.pragma('user_version', { simple: true })).toBe(MIGRATIONS.length)
+    database.db
+      .prepare(
+        `INSERT INTO similar_artists (artist_id, similar_id, score, fetched_at)
+         VALUES (1, '9c9f1380-2516-4fc9-a3e6-f9f61941d090', 10, '2026-10-31')`,
+      )
+      .run()
+    database.db.prepare('DELETE FROM artists WHERE id = 1').run()
+    expect(database.db.prepare('SELECT * FROM similar_artists').all()).toEqual([])
+    expect(database.db.prepare('SELECT mbid FROM artists WHERE id = 2').get()).toEqual({
+      mbid: '9c9f1380-2516-4fc9-a3e6-f9f61941d090',
+    })
+    expect(
+      database.db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'albums_added'")
+        .all(),
+    ).toEqual([{ name: 'albums_added' }])
+    database.onModuleDestroy()
+  })
+
+  it('gives a version-46 database empty scrobbling tables, whose waiting listens go with their file', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 46).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 46')
+    before.exec(
+      `INSERT INTO libraries (id, name, created_at, kind) VALUES (1, 'Music', '2026-01-01', 'music');
+       INSERT INTO media (id, library_id, path, file_name, folder, title, container, size, mtime_ms, added_at)
+       VALUES (1, 1, '/m/a.flac', 'a.flac', '/m', 'a', 'flac', 1, 1, '2026-01-01');`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.pragma('user_version', { simple: true })).toBe(MIGRATIONS.length)
+    database.db.exec(
+      `INSERT INTO scrobble_links (account_id, service, username, secret_cipher, created_at)
+       VALUES ('local', 'listenBrainz', 'rj', 'iv.tag.cipher', '2026-10-31');
+       INSERT INTO scrobble_queue (account_id, service, id, media_id, listened_at, attempts, next_at)
+       VALUES ('local', 'listenBrainz', 1, 1, 1793000000, 0, 0);
+       DELETE FROM media WHERE id = 1;`,
+    )
+    expect(database.db.prepare('SELECT * FROM scrobble_queue').all()).toEqual([])
+    expect(database.db.prepare('SELECT username FROM scrobble_links').all()).toEqual([
+      { username: 'rj' },
+    ])
+    database.onModuleDestroy()
+  })
+
+  it("keeps a version-47 database's playlists to their owners until one is shared", () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 47).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 47')
+    before.exec(
+      `INSERT INTO playlists (id, account_id, name, created_at, updated_at)
+       VALUES (1, 'local', 'Road trip', '2026-10-01', '2026-10-01');`,
+    )
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(database.db.pragma('user_version', { simple: true })).toBe(48)
+    expect(MIGRATIONS).toHaveLength(48)
+    expect(database.db.prepare('SELECT id, is_shared FROM playlists').all()).toEqual([
+      { id: 1, is_shared: 0 },
     ])
     database.onModuleDestroy()
   })

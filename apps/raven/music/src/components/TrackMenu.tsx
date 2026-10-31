@@ -25,7 +25,7 @@ type PlaylistChoicesProps = PlaylistPickerProps & { session: WrenSession }
 
 /** The listener's playlists, one press adding the track to the end of one. */
 function PlaylistChoices({ session: { api, queries }, track, onDone }: PlaylistChoicesProps) {
-  const playlists = useQuery(queries.playlistsQuery)
+  const playlists = useQuery(queries.ownPlaylistsQuery)
   const { append } = useServerPlaylistMutations({ api })
   const [note, setNote] = useState<string | null>(null)
   const list = playlists.data ?? NO_PLAYLISTS

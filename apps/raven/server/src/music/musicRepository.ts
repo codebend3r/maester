@@ -24,6 +24,7 @@ import { parseJsonAs } from '@/db/json'
 import { likePattern } from '@/media/mediaSql'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import type { AudioFormat, AudioTags } from '@/music/audioReader'
+import { REPLAYGAIN_SOURCES } from '@/music/loudness'
 import { type Filing, type NamedArtist, albumTypeOf, filingOf, nameKeyOf } from '@/music/filing'
 import type { Release } from '@/music/musicBrainzClient'
 
@@ -105,6 +106,10 @@ type TrackRow = {
   album_cover_source: string | null
   album_cover_ref: string | null
   album_mbid: string | null
+  track_gain: number | null
+  track_peak: number | null
+  album_gain: number | null
+  album_peak: number | null
 }
 
 type ArtistRow = {
@@ -151,7 +156,9 @@ const SELECT_TRACKS = `SELECT m.id AS media_id, m.library_id, t.album_id, t.titl
                               t.bit_depth, t.is_lossless, t.mbid, m.added_at,
                               ${TRACK_ARTISTS} AS artists,
                               a.title AS album_title, a.cover_source AS album_cover_source,
-                              a.cover_ref AS album_cover_ref, a.mbid AS album_mbid
+                              a.cover_ref AS album_cover_ref, a.mbid AS album_mbid,
+                              t.replaygain_gain AS track_gain, t.replaygain_peak AS track_peak,
+                              a.replaygain_gain AS album_gain, a.replaygain_peak AS album_peak
                          FROM tracks t
                          JOIN media m ON m.id = t.media_id
                          JOIN albums a ON a.id = t.album_id`
@@ -354,6 +361,12 @@ export class MusicRepository {
           }),
         }),
       },
+      gain: {
+        track: row.track_gain,
+        album: row.album_gain,
+        trackPeak: row.track_peak,
+        albumPeak: row.album_peak,
+      },
     }
   }
 
@@ -417,11 +430,11 @@ export class MusicRepository {
       .prepare(
         `INSERT INTO albums (library_id, album_key, title, sort_title, year, original_year, mbid,
                              release_group_mbid, type, label, genres, is_compilation, credited_by_tags,
-                             cover_source, cover_ref, replaygain_gain, replaygain_peak, added_at,
-                             match, matched_at)
+                             cover_source, cover_ref, replaygain_gain, replaygain_peak,
+                             replaygain_source, added_at, match, matched_at)
          VALUES (@libraryId, @key, @title, @sortTitle, @year, @originalYear, @mbid,
                  @releaseGroupMbid, @type, @label, @genres, @isCompilation, @isCredited,
-                 @coverSource, @coverRef, @gain, @peak, @addedAt, @match, @matchedAt)`,
+                 @coverSource, @coverRef, @gain, @peak, @source, @addedAt, @match, @matchedAt)`,
       )
       .run({
         libraryId,
@@ -441,6 +454,7 @@ export class MusicRepository {
         coverRef: cover?.ref ?? null,
         gain: tags.replayGain.albumGain,
         peak: tags.replayGain.albumPeak,
+        source: tags.replayGain.albumGain === null ? null : REPLAYGAIN_SOURCES.tags,
         addedAt: at.toISOString(),
         // A release id in the tags is a match already; MusicBrainz is asked for the rest.
         match: tags.releaseMbid === null ? MATCH_STATES.pending : MATCH_STATES.matched,
@@ -468,8 +482,12 @@ export class MusicRepository {
                 genres = CASE WHEN genres = '[]' THEN @genres ELSE genres END,
                 cover_ref = CASE WHEN cover_source IS NULL THEN @coverRef ELSE cover_ref END,
                 cover_source = COALESCE(cover_source, @coverSource),
-                replaygain_gain = COALESCE(replaygain_gain, @gain),
-                replaygain_peak = COALESCE(replaygain_peak, @peak)
+                replaygain_gain = CASE WHEN replaygain_source IS NOT @tags AND @gain IS NOT NULL
+                                       THEN @gain ELSE replaygain_gain END,
+                replaygain_peak = CASE WHEN replaygain_source IS NOT @tags AND @gain IS NOT NULL
+                                       THEN @peak ELSE COALESCE(replaygain_peak, @peak) END,
+                replaygain_source = CASE WHEN @gain IS NOT NULL THEN @tags
+                                         ELSE replaygain_source END
           WHERE id = @id`,
       )
       .run({
@@ -484,6 +502,7 @@ export class MusicRepository {
         coverRef: cover?.ref ?? null,
         gain: tags.replayGain.albumGain,
         peak: tags.replayGain.albumPeak,
+        tags: REPLAYGAIN_SOURCES.tags,
         matched: MATCH_STATES.matched,
         manual: MATCH_STATES.manual,
         at: new Date().toISOString(),
@@ -534,9 +553,10 @@ export class MusicRepository {
       this.db
         .prepare(
           `INSERT OR REPLACE INTO tracks (media_id, album_id, disc, number, title, mbid, isrc, sample_rate,
-                                          bit_depth, is_lossless, replaygain_gain, replaygain_peak)
+                                          bit_depth, is_lossless, replaygain_gain, replaygain_peak,
+                                          replaygain_source)
            VALUES (@mediaId, @albumId, @disc, @number, @title, @mbid, @isrc, @sampleRate,
-                   @bitDepth, @isLossless, @gain, @peak)`,
+                   @bitDepth, @isLossless, @gain, @peak, @source)`,
         )
         .run({
           mediaId,
@@ -551,6 +571,7 @@ export class MusicRepository {
           isLossless: format.isLossless ? 1 : 0,
           gain: tags.replayGain.trackGain,
           peak: tags.replayGain.trackPeak,
+          source: tags.replayGain.trackGain === null ? null : REPLAYGAIN_SOURCES.tags,
         })
       this.credit({ credits: CREDITS.track, ownerId: mediaId, artists: filing.trackArtists })
       this.prune()
@@ -751,6 +772,18 @@ export class MusicRepository {
       .all(JSON.stringify([...new Set(ids)]))
       .map((row) => this.toTrack(row))
     return new Map(tracks.map((track) => [track.id, track]))
+  }
+
+  /** The tracks among `ids` in the order `ids` lists them; an id that is no track is left out. */
+  tracksInOrder(ids: readonly number[]): Track[] {
+    const byId = this.tracks(ids)
+    return ids.flatMap((id) => byId.get(id) ?? [])
+  }
+
+  /** The albums among `ids` in the order `ids` lists them; an id that is no album is left out. */
+  albumsInOrder(ids: readonly number[]): AlbumSummary[] {
+    const byId = this.albums(ids)
+    return ids.flatMap((id) => byId.get(id) ?? [])
   }
 
   /** The albums among `ids`, by id; an id that is no album is not in the map. */

@@ -1,4 +1,5 @@
-import { type Infer, isNumber, listOf, nullable, object, oneOf } from '@/schema'
+import { isMixKind, isRadioSeedKind } from '@/contract/mixes'
+import { type Infer, isNumber, listOf, nullable, object, oneOf, union } from '@/schema'
 
 /** What happens at the end of the queue: it stops, starts over, or the track plays again. */
 export const REPEAT_MODES = { off: 'off', all: 'all', one: 'one' } as const
@@ -13,12 +14,27 @@ export const QUEUE_SOURCE_KINDS = {
   artist: 'artist',
   library: 'library',
   playlist: 'playlist',
+  mix: 'mix',
+  radio: 'radio',
 } as const
 
-export const isQueueSource = object({
-  kind: oneOf(Object.values(QUEUE_SOURCE_KINDS)),
-  id: isNumber,
-})
+/**
+ * A queue's source: what it was started from by id, a mix by its kind, or a
+ * radio by its seed's id with the seed's kind beside it.
+ */
+export const isQueueSource = union(
+  object({
+    kind: oneOf([
+      QUEUE_SOURCE_KINDS.album,
+      QUEUE_SOURCE_KINDS.artist,
+      QUEUE_SOURCE_KINDS.library,
+      QUEUE_SOURCE_KINDS.playlist,
+    ]),
+    id: isNumber,
+  }),
+  object({ kind: oneOf([QUEUE_SOURCE_KINDS.mix]), id: isMixKind }),
+  object({ kind: oneOf([QUEUE_SOURCE_KINDS.radio]), id: isNumber, seed: isRadioSeedKind }),
+)
 
 export type QueueSource = Infer<typeof isQueueSource>
 

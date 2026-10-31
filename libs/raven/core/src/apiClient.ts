@@ -5,11 +5,13 @@ import { libraryCalls } from '@/apiClient/libraries'
 import { lockCalls } from '@/apiClient/locks'
 import { matchingCalls } from '@/apiClient/matching'
 import { mediaCalls } from '@/apiClient/media'
+import { mixCalls } from '@/apiClient/mixes'
 import { musicCalls } from '@/apiClient/music'
 import { pictureCalls } from '@/apiClient/pictures'
 import { playlistCalls } from '@/apiClient/playlists'
 import { playbackCalls } from '@/apiClient/playback'
 import { reportCalls } from '@/apiClient/reports'
+import { scrobblingCalls } from '@/apiClient/scrobbling'
 import { settingsCalls } from '@/apiClient/settings'
 import { createTransport, type FetchLike } from '@/apiClient/transport'
 import { isServerEvent, type ServerEvent } from '@/contract'
@@ -71,6 +73,8 @@ export const createApiClient = ({
     ...matchingCalls(transport),
     ...musicCalls(transport),
     ...playlistCalls(transport),
+    ...mixCalls(transport),
+    ...scrobblingCalls(transport),
     ...pictureCalls({ transport, pictureCdn }),
     ...settingsCalls(transport),
     ...playbackCalls(transport),

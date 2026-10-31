@@ -23,6 +23,7 @@ export const SETTINGS_KEYS = {
   pictures: 'pictures',
   accounts: 'accounts',
   viewing: 'viewing',
+  scrobble: 'scrobble',
 } as const
 
 /** The owner who took over the viewing recorded before accounts, and when. */
@@ -125,6 +126,14 @@ export class SettingsRepository {
    */
   pictureSecret(): string {
     return this.secretAt({ key: SETTINGS_KEYS.pictures })
+  }
+
+  /**
+   * The secret scrobble tokens are sealed and Last.fm's sign-in state is
+   * signed with, kept the same way, so a link outlives a restart.
+   */
+  scrobbleSecret(): string {
+    return this.secretAt({ key: SETTINGS_KEYS.scrobble })
   }
 
   private secretAt({ key }: SettingsRepositorySecretAtProps): string {

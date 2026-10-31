@@ -3,6 +3,8 @@ import {
   APP_CLIENT_CALLS,
   type AppClientCall,
   type FetchLike,
+  SCROBBLE_RETURNS,
+  SCROBBLE_SERVICES,
   WATCH_TARGET_KINDS,
   appClientCallOf,
   createApiClient,
@@ -23,7 +25,8 @@ const routeOf = ({ method, path }: AppClientCall) =>
 /**
  * The spec's writes (progress, plays, watched, the favourites, the PIN), and the admin lock's
  * unlock, ruled in by Task 17; and the account's playlists and its album and artist favourites,
- * by the audio spec's PR 7.
+ * by the audio spec's PR 7; and the account's scrobbling links, a playlist's sharing and its
+ * copies, by the music spec's PR 10.
  */
 const WRITES = [
   APP_CLIENT_CALLS.saveProgress,
@@ -38,6 +41,11 @@ const WRITES = [
   APP_CLIENT_CALLS.deletePlaylist,
   APP_CLIENT_CALLS.replacePlaylistTracks,
   APP_CLIENT_CALLS.appendPlaylistTracks,
+  APP_CLIENT_CALLS.setPlaylistSharing,
+  APP_CLIENT_CALLS.copyPlaylist,
+  APP_CLIENT_CALLS.linkListenBrainz,
+  APP_CLIENT_CALLS.startLastFm,
+  APP_CLIENT_CALLS.unlinkScrobbling,
   APP_CLIENT_CALLS.unlock,
   APP_CLIENT_CALLS.unlockAdmin,
 ]
@@ -115,6 +123,11 @@ describe('the calls raven’s app may make', () => {
       api.deletePlaylist(6),
       api.replacePlaylistTracks({ id: 6, mediaIds: [7] }),
       api.appendPlaylistTracks({ id: 6, mediaIds: [7] }),
+      api.setPlaylistSharing({ id: 6, isShared: true }),
+      api.copyPlaylist({ id: 6 }),
+      api.linkListenBrainz({ token: 'token' }),
+      api.startLastFm({ returnTo: SCROBBLE_RETURNS.wren }),
+      api.unlinkScrobbling({ service: SCROBBLE_SERVICES.lastFm }),
       api.unlock('1234'),
       api.unlockAdmin('password'),
     ])

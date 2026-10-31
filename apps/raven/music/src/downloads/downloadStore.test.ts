@@ -48,6 +48,8 @@ const PLAYLIST: PlaylistSummary = {
   duration: 20,
   createdAt: '2026-10-01T00:00:00Z',
   updatedAt: '2026-10-01T00:00:00Z',
+  isShared: false,
+  isOwn: true,
 }
 
 type TrackForProps = { id: number; number: number; duration: number }
@@ -70,6 +72,7 @@ const trackFor = ({ id, number, duration }: TrackForProps): Track => ({
   mbid: null,
   addedAt: ALBUM.addedAt,
   album: { title: ALBUM.title, coverVersion: ALBUM.coverVersion },
+  gain: { track: null, album: null, trackPeak: null, albumPeak: null },
 })
 
 const FIRST = trackFor({ id: 31, number: 1, duration: 20 })

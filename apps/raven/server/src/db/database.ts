@@ -776,6 +776,72 @@ export const MIGRATIONS: readonly string[] = [
    WHERE chapters = '[]'
      AND library_id IN (SELECT id FROM libraries WHERE kind = 'audiobooks');
   `,
+  // The loudness scan: where each track stands in it, by which scan, and
+  // whether a track's or an album's gain came from its tags or the scan. A
+  // gain already kept was read from the tags.
+  `
+  ALTER TABLE tracks ADD COLUMN loudness_state TEXT NOT NULL DEFAULT 'pending';
+  ALTER TABLE tracks ADD COLUMN loudness_version INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE tracks ADD COLUMN replaygain_source TEXT;
+  ALTER TABLE albums ADD COLUMN replaygain_source TEXT;
+  UPDATE tracks SET replaygain_source = 'tags' WHERE replaygain_gain IS NOT NULL;
+  UPDATE albums SET replaygain_source = 'tags' WHERE replaygain_gain IS NOT NULL;
+  `,
+  // The artists ListenBrainz finds similar to each of ours, shared by every
+  // account and asked again after 30 days. A similar artist is kept by its
+  // MusicBrainz id, held in a library or not, so one added later is found
+  // without asking again, the ids lowercase on both sides so they join on
+  // `artists.mbid`'s index; one id already held in another case keeps its own.
+  // Home lists the albums added last.
+  `
+  UPDATE OR IGNORE artists SET mbid = lower(mbid) WHERE mbid <> lower(mbid);
+  CREATE TABLE similar_artists (
+    artist_id INTEGER NOT NULL REFERENCES artists (id) ON DELETE CASCADE,
+    similar_id TEXT NOT NULL,
+    score REAL NOT NULL,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY (artist_id, similar_id)
+  ) WITHOUT ROWID;
+  CREATE INDEX albums_added ON albums (added_at);
+  `,
+  // Scrobbling: each account's link to ListenBrainz or Last.fm, its token
+  // or session key sealed with the server's key, and the listens waiting to
+  // go out, numbered per account and service. `listened_at` is in Unix
+  // seconds, as both services take it, and `next_at` in the server's
+  // milliseconds; the sender finds what is due by service and time, sweeps
+  // what is too old by when it began, and a removed file takes its waiting
+  // listens with it.
+  `
+  CREATE TABLE scrobble_links (
+    account_id TEXT NOT NULL,
+    service TEXT NOT NULL,
+    username TEXT NOT NULL,
+    secret_cipher TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (account_id, service)
+  ) WITHOUT ROWID;
+
+  CREATE TABLE scrobble_queue (
+    account_id TEXT NOT NULL,
+    service TEXT NOT NULL,
+    id INTEGER NOT NULL,
+    media_id INTEGER NOT NULL REFERENCES media (id) ON DELETE CASCADE,
+    listened_at INTEGER NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_at INTEGER NOT NULL,
+    PRIMARY KEY (account_id, service, id)
+  ) WITHOUT ROWID;
+  CREATE INDEX scrobble_queue_due ON scrobble_queue (service, next_at);
+  CREATE INDEX scrobble_queue_media ON scrobble_queue (media_id);
+  CREATE INDEX scrobble_queue_listened ON scrobble_queue (listened_at);
+  `,
+  // A playlist its owner shares, which every account on the server may
+  // read, play and copy; every playlist kept so far stays its owner's. The
+  // shared ones are few, so a partial index finds them without the rest.
+  `
+  ALTER TABLE playlists ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0;
+  CREATE INDEX playlists_shared ON playlists (is_shared) WHERE is_shared = 1;
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

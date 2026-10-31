@@ -3,7 +3,7 @@ import { PLAYLIST_LIMITS, type PlaylistSummary, type Track, isPlaylistName } fro
 import { Button, useToasts } from '@raven/ui'
 import { type ComponentType, type FormEvent, useId, useState } from 'react'
 import { playlistFacts } from '@/lib/music'
-import { playlistsQuery } from '@/lib/queries'
+import { ownPlaylistsQuery } from '@/lib/queries'
 import { useModal } from '@/lib/useModal'
 import { usePlaylistMutations } from '@/lib/usePlaylistMutations'
 import { ADD_TO_PLAYLIST_COPY } from '@/components/AddToPlaylistDialog/copy'
@@ -90,7 +90,7 @@ export const AddToPlaylistDialog = ({ tracks, onClose }: AddToPlaylistDialogProp
   const { dialog, close, keepKeys } = useModal()
   const titleId = useId()
   const fieldId = useId()
-  const playlists = useQuery(playlistsQuery)
+  const playlists = useQuery(ownPlaylistsQuery)
   const { create, append } = usePlaylistMutations()
   const show = useToasts((state) => state.show)
   const [name, setName] = useState('')

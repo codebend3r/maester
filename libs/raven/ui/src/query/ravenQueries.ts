@@ -350,10 +350,20 @@ export const ravenQueriesFor = (api: ApiClient) => {
       queryFn: () => api.listFavouriteArtists(),
     }),
 
-    /** The account's own playlists, most recently changed first. */
+    /** The account's playlists and every account's shared ones, most recently changed first. */
     playlistsQuery: queryOptions({
       queryKey: queryKeys.playlistList,
       queryFn: () => api.listPlaylists(),
+    }),
+
+    /**
+     * Only the account's own playlists, the ones it may add to; under the
+     * same key as `playlistsQuery`, so they share the cache and its invalidations.
+     */
+    ownPlaylistsQuery: queryOptions({
+      queryKey: queryKeys.playlistList,
+      queryFn: () => api.listPlaylists(),
+      select: (list) => list.filter(({ isOwn }) => isOwn),
     }),
 
     playlistQuery: (id: number | null) =>

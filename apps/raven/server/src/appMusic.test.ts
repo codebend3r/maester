@@ -83,7 +83,15 @@ describe('a music library', () => {
     }
     await encodeTrack({
       path: at('Radiohead', 'OK Computer', '01 Airbag.flac'),
-      tags: { ...okComputer, title: 'Airbag', track: '1' },
+      tags: {
+        ...okComputer,
+        title: 'Airbag',
+        track: '1',
+        REPLAYGAIN_TRACK_GAIN: '-6.50 dB',
+        REPLAYGAIN_TRACK_PEAK: '0.900000',
+        REPLAYGAIN_ALBUM_GAIN: '-7.00 dB',
+        REPLAYGAIN_ALBUM_PEAK: '0.950000',
+      },
       cover,
     })
     await encodeTrack({
@@ -247,7 +255,7 @@ describe('a music library', () => {
     expect(stale.statusCode).toBe(404)
   })
 
-  it("gives an album's page its tracks in order, each playable as the file it is", async () => {
+  it("gives an album's page its tracks in order with their gains, each playable as the file it is", async () => {
     const albums = await api().listAlbums({ libraryId: state.library })
     const okComputer = albums.find(({ title }) => title === 'OK Computer')
     const details = await api().getAlbum(okComputer?.id ?? 0)
@@ -262,6 +270,10 @@ describe('a music library', () => {
     ).toEqual([
       { number: 1, title: 'Airbag', codec: 'flac', isLossless: true },
       { number: 2, title: 'Paranoid Android', codec: 'flac', isLossless: true },
+    ])
+    expect(details.tracks.map(({ gain }) => gain)).toEqual([
+      { track: -6.5, album: -7, trackPeak: 0.9, albumPeak: 0.95 },
+      { track: null, album: -7, trackPeak: null, albumPeak: 0.95 },
     ])
     const [airbag] = details.tracks
     const media = await api().getMedia(airbag?.id ?? 0)

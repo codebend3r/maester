@@ -2,6 +2,7 @@ import type { Transport } from '@/apiClient/transport'
 import {
   type PlaylistDetails,
   type PlaylistInput,
+  type PlaylistSharing,
   type PlaylistSummary,
   type PlaylistTracksChange,
   isPlaylistDetails,
@@ -16,9 +17,13 @@ type ReplacePlaylistTracksProps = { id: number } & PlaylistTracksChange
 
 type AppendPlaylistTracksProps = { id: number } & PlaylistTracksChange
 
-/** The signed-in account's own playlists: listing, making, renaming and filling them. */
+type SetPlaylistSharingProps = { id: number } & PlaylistSharing
+
+type CopyPlaylistProps = { id: number }
+
+/** The signed-in account's playlists and everyone's shared ones: listing, making, renaming, filling, sharing and copying them. */
 export const playlistCalls = ({ send, expect }: Transport) => ({
-  /** The account's playlists, most recently changed first. */
+  /** The account's playlists and every account's shared ones, most recently changed first. */
   listPlaylists: (): Promise<PlaylistSummary[]> =>
     expect({ request: send({ path: '/api/playlists' }), guard: isPlaylistList }),
 
@@ -70,6 +75,24 @@ export const playlistCalls = ({ send, expect }: Transport) => ({
         method: 'POST',
         body: { mediaIds } satisfies PlaylistTracksChange,
       }),
+      guard: isPlaylistDetails,
+    }),
+
+  /** Shares the account's own playlist with every account, or stops sharing it. */
+  setPlaylistSharing: ({ id, isShared }: SetPlaylistSharingProps): Promise<PlaylistDetails> =>
+    expect({
+      request: send({
+        path: `/api/playlists/${id}/sharing`,
+        method: 'PUT',
+        body: { isShared } satisfies PlaylistSharing,
+      }),
+      guard: isPlaylistDetails,
+    }),
+
+  /** Copies a playlist the account can see, its own or a shared one, into a new one of its own. */
+  copyPlaylist: ({ id }: CopyPlaylistProps): Promise<PlaylistDetails> =>
+    expect({
+      request: send({ path: `/api/playlists/${id}/copy`, method: 'POST' }),
       guard: isPlaylistDetails,
     }),
 })

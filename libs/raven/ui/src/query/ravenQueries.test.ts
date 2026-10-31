@@ -452,6 +452,29 @@ describe('ravenQueriesFor', () => {
     cache.clear()
   })
 
+  it('keeps only the account’s own playlists, under the playlists’ key', async () => {
+    const playlist = {
+      name: 'Mix',
+      trackCount: 1,
+      duration: 200,
+      createdAt: '2026-10-01T00:00:00Z',
+      updatedAt: '2026-10-01T00:00:00Z',
+      isShared: true,
+    }
+    const { api } = recordingApi({
+      body: [
+        { ...playlist, id: 1, isOwn: true },
+        { ...playlist, id: 2, isOwn: false },
+      ],
+    })
+    const query = ravenQueriesFor(api).ownPlaylistsQuery
+    expect(queryKeys.playlistList).toEqual(query.queryKey)
+    const cache = new QueryClient()
+    const { result } = renderQueryHook({ client: cache, hook: () => useQuery(query) })
+    await waitFor(() => expect((result.current.data ?? []).map(({ id }) => id)).toEqual([1]))
+    cache.clear()
+  })
+
   it("pages through each library's songs to its end, then the next library's", async () => {
     const { api, calls } = recordingApi({ body: { tracks: [track()], total: 2 } })
     const query = ravenQueriesFor(api).songsQuery({

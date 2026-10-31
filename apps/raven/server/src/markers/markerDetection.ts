@@ -9,6 +9,7 @@ import { MARKER_KINDS, MARKER_SOURCES } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { givePlaybackWay } from '@/ffmpeg/playbackYield'
 import { detectFilmCredits } from '@/markers/creditsDetector'
 import type { KeptFingerprint } from '@/markers/fingerprintMatch'
 import { type EpisodeFile, type FilmFile, MarkerJobs } from '@/markers/markerJobs'
@@ -16,9 +17,6 @@ import { REGIONS, type Region } from '@/markers/seasonListen'
 import { type FoundMarkers, detectSeasonMarkers } from '@/markers/seasonMarkers'
 import { createTaskQueue } from '@/scanner/concurrency'
 import { SettingsRepository } from '@/settings/settingsRepository'
-
-/** How long a job waits, each time, while ffmpeg converts a file for someone watching. */
-export const YIELD_MS = 30_000
 
 type Grouped = { primaries: EpisodeFile[]; extras: { at: number; file: EpisodeFile }[] }
 
@@ -113,19 +111,13 @@ export class MarkerDetection implements OnApplicationBootstrap, OnModuleDestroy 
     return this.config.markerDetection && this.settings.playback().detectMarkers
   }
 
-  private async givePlaybackWay(): Promise<void> {
-    if (this.isStopping || !this.ffmpeg.isConverting()) return
-    await new Promise((resolve) => setTimeout(resolve, YIELD_MS).unref())
-    await this.givePlaybackWay()
-  }
-
   /** One job: wait for playback, detect, and mark every file done or failed; a job that throws fails all its files. */
   private async runJob<File extends { id: number }>({
     label,
     load,
     detect,
   }: RunJobProps<File>): Promise<void> {
-    await this.givePlaybackWay()
+    await givePlaybackWay({ ffmpeg: this.ffmpeg, isStopping: () => this.isStopping })
     if (this.isStopping || !this.isOn()) return
     const files = load()
     const ids = files.map(({ id }) => id)

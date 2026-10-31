@@ -6,12 +6,17 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   AUDIO_BITRATES,
   type ApiClient,
+  DISCOVERY_PATHS,
   LIBRARY_KINDS,
   type LibraryInput,
   groupingsFor,
   isLibraryKind,
   isRecord,
   LYRICS_KINDS,
+  MIX_KINDS,
+  RADIO_PARAMS,
+  RADIO_SEED_KINDS,
+  SCROBBLE_SERVICES,
   musicListQuery,
   sortsFor,
   viewsFor,
@@ -25,6 +30,10 @@ import { HIDDEN_SCAN_ERROR, LOCKED_SCAN_ERROR } from '@/libraries/librariesContr
 import { LOCK_MARKS } from '@/lock/lockGuard'
 import type { Privacy } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
+import { VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
+import { ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
+import { ScrobbleQueue } from '@/scrobbling/scrobbleQueue'
+import { ScrobbleSender } from '@/scrobbling/scrobbleSender'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { BLANK_ITEM } from '@/metadata/tmdbShapes'
@@ -42,6 +51,8 @@ import {
   testConfig,
 } from '@/test/app'
 import { MusicRepository } from '@/music/musicRepository'
+import { Playlists } from '@/music/playlists'
+import { AUTH_TEST_IDS } from '@/test/auth'
 import { encodeClip, encodeTrack } from '@/test/clips'
 import { fakeLrclib } from '@/test/fakeLrclib'
 import { fakeTmdb } from '@/test/fakeTmdb'
@@ -340,6 +351,97 @@ describe('a library locked behind the PIN', () => {
     await api().replacePlaylistTracks({ id: playlist.id, mediaIds: [] })
     expect((await api(cookie).getPlaylist(playlist.id)).tracks.map((each) => each.id)).toEqual([id])
     await api().deletePlaylist(playlist.id)
+  })
+
+  it("leaves a locked library's tracks out of another account's shared playlist, and out of a copy", async () => {
+    const [track] = app().get(MediaIndex).idsForLibrary(state.privateMusic)
+    const id = track ?? 0
+    const playlists = app().get(Playlists)
+    const owner = AUTH_TEST_IDS.friend
+    const theirs = playlists.create({ name: 'Their lessons', account: owner })
+    playlists.append({ id: theirs, mediaIds: [id], account: owner })
+    expect(playlists.share({ id: theirs, isShared: true, account: owner })).toBe(true)
+
+    const shut = await api().getPlaylist(theirs)
+    expect(shut.playlist).toMatchObject({ trackCount: 0, isShared: true, isOwn: false })
+    expect(shut.tracks).toEqual([])
+    const listed = (await api().listPlaylists()).find((each) => each.id === theirs)
+    expect(listed?.trackCount ?? null).toBe(0)
+    const copy = await api().copyPlaylist({ id: theirs })
+    expect(copy.playlist).toMatchObject({ name: 'Their lessons', trackCount: 0, isOwn: true })
+    // The copy holds what its maker could see, so the PIN finds nothing more in it.
+    const { cookie } = await unlock('3001')
+    expect((await api(cookie).getPlaylist(copy.playlist.id)).tracks).toEqual([])
+    expect((await api(cookie).getPlaylist(theirs)).tracks.map((each) => each.id)).toEqual([id])
+
+    await api().deletePlaylist(copy.playlist.id)
+    expect(playlists.remove({ id: theirs, account: owner })).toBe(true)
+  })
+
+  it("leaves a locked library's albums out of Home, and a radio seeded there behind the PIN", async () => {
+    const [track] = app().get(MediaIndex).idsForLibrary(state.privateMusic)
+    const id = track ?? 0
+    const seeds = [
+      { kind: RADIO_SEED_KINDS.track, id },
+      { kind: RADIO_SEED_KINDS.album, id: state.privateAlbum },
+    ]
+    const refused = await Promise.all(
+      seeds.map((seed) =>
+        api()
+          .getRadio({ seed })
+          .catch((error: unknown) => error),
+      ),
+    )
+    expect(refused).toEqual(seeds.map(() => expect.objectContaining({ status: 423 })))
+    expect((await api().getRecentAlbums()).added).toEqual([])
+    await expect(api().listMixes()).resolves.toEqual([])
+    await expect(api().getMix({ id: MIX_KINDS.heavyRotation })).rejects.toMatchObject({
+      status: 404,
+    })
+    const unread = [
+      `${DISCOVERY_PATHS.radio}?${RADIO_PARAMS.seed}=genre:1`,
+      DISCOVERY_PATHS.radio,
+      DISCOVERY_PATHS.mix.replace(':id', 'weekly'),
+    ]
+    const statuses = await Promise.all(
+      unread.map(async (url) => (await inject({ method: ROUTE_METHODS.get, url })).statusCode),
+    )
+    expect(statuses).toEqual([400, 400, 404])
+
+    const { cookie } = await unlock('3001')
+    const radio = await api(cookie).getRadio({ seed: { kind: RADIO_SEED_KINDS.track, id } })
+    expect(radio.map((each) => each.id)).toEqual([id])
+    expect((await api(cookie).getRecentAlbums()).added.map((album) => album.title)).toEqual([
+      'Lessons',
+    ])
+  })
+
+  it("scrobbles no play of a locked library's track until the PIN is entered, and hides nothing behind it", async () => {
+    const [track] = app().get(MediaIndex).idsForLibrary(state.privateMusic)
+    const id = track ?? 0
+    app().get(ScrobbleLinks).save({
+      account: VIEWING_ACCOUNTS.local,
+      service: SCROBBLE_SERVICES.listenBrainz,
+      username: 'rj',
+      secret: 'lb-token',
+      at: new Date(),
+    })
+    const queued = vi.spyOn(app().get(ScrobbleQueue), 'noteListen')
+    await expect(api().recordPlay(id)).rejects.toMatchObject({ status: 423 })
+    expect(queued).not.toHaveBeenCalled()
+    await expect(api().getScrobbling()).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ username: 'rj' })]),
+    )
+
+    const { cookie } = await unlock('3001')
+    await api(cookie).recordPlay(id)
+    expect(queued.mock.results.map((result) => result.value)).toEqual([1])
+    queued.mockRestore()
+    await app().get(ScrobbleSender).whenIdle()
+    app().get(ScrobbleLinks).remove({
+      account: VIEWING_ACCOUNTS.local,
+      service: SCROBBLE_SERVICES.listenBrainz,
+    })
   })
 
   it('keeps a locked library off the home page until it is unlocked', async () => {

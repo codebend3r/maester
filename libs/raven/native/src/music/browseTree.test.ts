@@ -114,6 +114,7 @@ const trackFor = ({ id, albumId, disc }: TrackForProps): Track => ({
   mbid: null,
   addedAt: '2026-01-01T00:00:00Z',
   album: { title: `Album ${albumId}`, coverVersion: null },
+  gain: { track: null, album: null, trackPeak: null, albumPeak: null },
 })
 
 const MUSIC = libraryFor({ id: 5, kind: LIBRARY_KINDS.music })
@@ -140,6 +141,8 @@ const PLAYLIST: PlaylistSummary = {
   duration: 400,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-02T00:00:00Z',
+  isShared: false,
+  isOwn: true,
 }
 
 const ALBUM_TRACKS = [

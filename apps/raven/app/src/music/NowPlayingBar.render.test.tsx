@@ -34,6 +34,7 @@ const TRACK: Track = {
   mbid: null,
   addedAt: '2026-01-01T00:00:00Z',
   album: { title: 'OK Computer', coverVersion: null },
+  gain: { track: null, album: null, trackPeak: null, albumPeak: null },
 }
 
 const renderBar = () =>

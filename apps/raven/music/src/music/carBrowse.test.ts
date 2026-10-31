@@ -61,6 +61,7 @@ const trackFor = ({ id, albumId, number }: TrackForProps): Track => ({
   mbid: null,
   addedAt: '2026-10-01T00:00:00Z',
   album: { title: `Album ${albumId}`, coverVersion: 'v1' },
+  gain: { track: null, album: null, trackPeak: null, albumPeak: null },
 })
 
 const ALBUM_3_TRACKS = [

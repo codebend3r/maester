@@ -61,6 +61,16 @@ describe('AddToPlaylistDialog', () => {
     await waitFor(() => expect(append).toHaveBeenCalledWith({ id: 9, mediaIds: [101, 102] }))
   })
 
+  it('offers only the account’s own playlists, not another account’s shared one', async () => {
+    spyOn(api, 'listPlaylists').mockResolvedValue([
+      playlistSummary({ id: 6, name: 'Morning' }),
+      playlistSummary({ id: 7, name: 'Theirs', isShared: true, isOwn: false }),
+    ])
+    renderWithProviders({ ui: <AddToPlaylistDialog tracks={[AIRBAG]} onClose={() => undefined} /> })
+    expect(await screen.findByRole('button', { name: /Morning/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Theirs/ })).toBeNull()
+  })
+
   it('says so when there are no playlists yet', async () => {
     spyOn(api, 'listPlaylists').mockResolvedValue([])
     renderWithProviders({ ui: <AddToPlaylistDialog tracks={[AIRBAG]} onClose={() => undefined} /> })
