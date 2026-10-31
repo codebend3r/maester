@@ -9,7 +9,12 @@ import { MUSIC_LIBRARY_SECTIONS, MusicLibraryPage } from '@/pages/MusicLibraryPa
 import { album, artist, musicLibrary, playlistSummary, track } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 
-const renderPage = (route: string, libraries = [musicLibrary(), musicLibrary({ id: 4 })]) =>
+type RenderPageProps = { route: string; libraries?: ReturnType<typeof musicLibrary>[] }
+
+const renderPage = ({
+  route,
+  libraries = [musicLibrary(), musicLibrary({ id: 4 })],
+}: RenderPageProps) =>
   renderWithProviders({
     ui: (
       <Routes>
@@ -43,7 +48,7 @@ describe('MusicLibraryPage', () => {
         ? [album({ id: 7, title: 'OK Computer', sortTitle: 'OK Computer' })]
         : [album({ id: 8, title: 'Amnesiac', sortTitle: 'Amnesiac', libraryId: 4 })],
     )
-    renderPage(MUSIC_PATHS.albums)
+    renderPage({ route: MUSIC_PATHS.albums })
     await screen.findByRole('link', { name: 'OK Computer' })
     const titles = screen.getAllByRole('paragraph').map((p) => p.textContent)
     expect(titles.filter((text) => text === 'Amnesiac' || text === 'OK Computer')).toEqual([
@@ -66,7 +71,7 @@ describe('MusicLibraryPage', () => {
         ? [artist(), artist({ id: 2, name: 'Bjork', sortName: 'Bjork' })]
         : [artist()],
     )
-    renderPage(MUSIC_PATHS.artists)
+    renderPage({ route: MUSIC_PATHS.artists })
     const list = await screen.findByRole('list', { name: 'Artists' })
     await waitFor(() =>
       expect(
@@ -84,7 +89,7 @@ describe('MusicLibraryPage', () => {
         : { tracks: [track({ id: 103, title: 'Subterranean' })], total: 3 },
     )
     const getRadio = spyOn(api, 'getRadio').mockResolvedValue([track({ id: 401 })])
-    renderPage(MUSIC_PATHS.songs, [musicLibrary()])
+    renderPage({ route: MUSIC_PATHS.songs, libraries: [musicLibrary()] })
     fireEvent.click(await screen.findByRole('button', { name: 'Play Paranoid Android' }))
     expect(useAudioQueue.getState().queue.items).toEqual([101, 102])
     expect(useAudioQueue.getState().queue.at).toBe(1)
@@ -98,21 +103,21 @@ describe('MusicLibraryPage', () => {
 
   it('lists the playlists, and says when raven has no music', async () => {
     spyOn(api, 'listPlaylists').mockResolvedValue([playlistSummary()])
-    renderPage(MUSIC_PATHS.playlists)
+    renderPage({ route: MUSIC_PATHS.playlists })
     expect(await screen.findByRole('list', { name: 'Playlists' })).toHaveTextContent(
       playlistSummary().name,
     )
     cleanup()
-    renderPage(MUSIC_PATHS.albums, [])
+    renderPage({ route: MUSIC_PATHS.albums, libraries: [] })
     expect(await screen.findByText('raven has no music library yet.')).toBeInTheDocument()
     cleanup()
-    renderPage(MUSIC_PATHS.songs, [])
+    renderPage({ route: MUSIC_PATHS.songs, libraries: [] })
     expect(await screen.findByText('raven has no music library yet.')).toBeInTheDocument()
   })
 
   it('says why a list could not be read', async () => {
     spyOn(api, 'listArtists').mockRejectedValue(new ApiError({ status: 500, message: 'Down' }))
-    renderPage(MUSIC_PATHS.artists, [musicLibrary()])
+    renderPage({ route: MUSIC_PATHS.artists, libraries: [musicLibrary()] })
     expect(await screen.findByRole('alert')).toHaveTextContent('Down')
   })
 })

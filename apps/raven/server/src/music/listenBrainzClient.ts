@@ -12,6 +12,9 @@ export const LISTENBRAINZ_LABS = 'https://labs.api.listenbrainz.org'
 /** ListenBrainz's core API, where listens are submitted and user tokens checked. */
 export const LISTENBRAINZ_API = 'https://api.listenbrainz.org'
 
+/** The labs API's routes this client asks. */
+export const LISTENBRAINZ_LABS_ROUTES = { similarArtists: '/similar-artists/json' } as const
+
 /**
  * The dataset similar artists are read from: listening sessions over about
  * twenty years, the one ListenBrainz's own artist pages use.
@@ -82,7 +85,7 @@ export class ListenBrainzClient {
       [LB_PARAMS.artists]: mbid,
       [LB_PARAMS.algorithm]: ALGORITHM,
     })
-    const url = `${LISTENBRAINZ_LABS}/similar-artists/json?${query.toString()}`
+    const url = `${LISTENBRAINZ_LABS}${LISTENBRAINZ_LABS_ROUTES.similarArtists}?${query.toString()}`
     const headers = { [HEADERS.accept]: CONTENT_TYPES.json, [HEADERS.userAgent]: RAVEN_USER_AGENT }
     const ask = (): Promise<Response> =>
       this.limit.run(() => {
