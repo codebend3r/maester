@@ -5,6 +5,7 @@ import {
   DESKTOP_REQUESTS,
   DOWNLOAD_KINDS,
   DOWNLOAD_STATUS_KINDS,
+  QUEUE_SOURCE_KINDS,
 } from '@raven/core'
 import { Toaster } from '@raven/ui'
 import { useAudioQueue } from '@raven/ui/headless'
@@ -285,7 +286,7 @@ describe('DownloadsPage', () => {
     const { queue } = useAudioQueue.getState()
     expect(queue.items).toEqual([101, 102, 103])
     expect(queue.at).toBe(1)
-    expect(queue.source).toEqual({ kind: 'album', id: 7 })
+    expect(queue.source).toEqual({ kind: QUEUE_SOURCE_KINDS.album, id: 7 })
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.openDownload })).toEqual([])
   })
 
@@ -326,7 +327,7 @@ describe('DownloadsPage', () => {
     const { queue } = useAudioQueue.getState()
     expect(queue.items).toEqual([103, 102])
     expect(queue.at).toBe(1)
-    expect(queue.source).toEqual({ kind: 'playlist', id: 5 })
+    expect(queue.source).toEqual({ kind: QUEUE_SOURCE_KINDS.playlist, id: 5 })
   })
 
   it('shows no Play on a track downloaded before its track was kept', async () => {
