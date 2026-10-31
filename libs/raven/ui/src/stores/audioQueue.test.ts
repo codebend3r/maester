@@ -158,9 +158,9 @@ describe('useAudioQueue', () => {
   })
 
   it('shuffles and repeats a radio queue as it does an album', () => {
-    type StepsProps = { source: QueueSource }
+    type StepsOfProps = { source: QueueSource }
     // What a listener sees: the shuffle keeps the playing track, repeat all wraps, repeat one stays.
-    const stepsOf = ({ source }: StepsProps) => {
+    const stepsOf = ({ source }: StepsOfProps) => {
       store().clear()
       store().playTracks({ tracks: ALBUM, startAt: 1, source })
       store().toggleShuffle()

@@ -34,7 +34,8 @@ export const LISTENBRAINZ_AWAY_MS = 15 * 60 * 1000
 /** How often a 503 is asked again before ListenBrainz counts as away. */
 const RETRIES = 1
 
-const LB_FIELDS = { mbid: 'artist_mbid', score: 'score' } as const
+/** The fields of a similar artist ListenBrainz answers that the client reads. */
+export const LB_FIELDS = { mbid: 'artist_mbid', score: 'score' } as const
 
 /** The similar-artists query's parameters. */
 export const LB_PARAMS = { artists: 'artist_mbids', algorithm: 'algorithm' } as const
