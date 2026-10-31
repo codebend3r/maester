@@ -12,13 +12,14 @@ import { Button, useCanGoBack } from '@raven/ui'
 import { useAudioQueue } from '@raven/ui/headless'
 import { type ComponentType, useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BackButton, HOME } from '@/components/BackButton/BackButton'
+import { BackButton } from '@/components/BackButton/BackButton'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { PlaylistNameDialog } from '@/components/PlaylistNameDialog/PlaylistNameDialog'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { TrackList, type TrailProps } from '@/components/TrackList/TrackList'
 import { playlistFacts } from '@/lib/music'
+import { useMusicLinks } from '@/lib/useMusicLinks'
 import { playlistQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
 import { usePlaylistMutations } from '@/lib/usePlaylistMutations'
@@ -112,6 +113,7 @@ const PlaylistView = ({ details }: PlaylistViewProps) => {
   const titleId = useId()
   const navigate = useNavigate()
   const canGoBack = useCanGoBack()
+  const links = useMusicLinks()
   const { playlist, tracks } = details
   const playTracks = useAudioQueue((store) => store.playTracks)
   const { rename, setTracks } = usePlaylistMutations()
@@ -120,13 +122,13 @@ const PlaylistView = ({ details }: PlaylistViewProps) => {
   const closeDialog = () => setDialog(OPEN_DIALOGS.none)
   const failure = setTracks.failure ?? rename.failure
   // A deleted playlist's page has nothing to show, so the way back is taken for the listener.
-  const leave = () => void (canGoBack ? navigate(-1) : navigate(HOME.to))
+  const leave = () => void (canGoBack ? navigate(-1) : navigate(links.home.to))
   const Tracks: ComponentType<PlaylistTracksProps> =
     TRACK_VIEWS[tracks.length === 0 ? TRACK_VIEW_KEYS.empty : TRACK_VIEW_KEYS.listed]
 
   return (
     <article className={styles.page} aria-labelledby={titleId}>
-      <BackButton fallback={HOME} className={styles.back} />
+      <BackButton fallback={links.home} className={styles.back} />
       <header className={styles.header}>
         <p className={styles.eyebrow}>{PLAYLIST_PAGE_COPY.eyebrow}</p>
         <h1 id={titleId} className={styles.title}>

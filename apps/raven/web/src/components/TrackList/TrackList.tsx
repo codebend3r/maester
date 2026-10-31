@@ -4,7 +4,8 @@ import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import type { ComponentType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { TRACK_LIST_COPY } from '@/components/TrackList/copy'
-import { artistPath, trackLength } from '@/lib/music'
+import { trackLength } from '@/lib/music'
+import { useMusicLinks } from '@/lib/useMusicLinks'
 import styles from '@/components/TrackList/TrackList.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 
@@ -47,6 +48,7 @@ const TrackRow = ({
   trail,
   shouldShowArtists,
 }: TrackRowProps) => {
+  const links = useMusicLinks()
   const Lead = LEADS[isPlaying ? LEAD_KINDS.speaker : LEAD_KINDS.number]
   return (
     <li
@@ -72,7 +74,7 @@ const TrackRow = ({
             {track.artists.map((artist, index) => (
               <span key={artist.id}>
                 {index > 0 && COMMON_COPY.listSeparator}
-                <Link to={artistPath(artist.id)}>{artist.name}</Link>
+                <Link to={links.artist(artist.id)}>{artist.name}</Link>
               </span>
             ))}
           </span>

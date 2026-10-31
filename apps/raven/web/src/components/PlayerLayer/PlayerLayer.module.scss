@@ -1,0 +1,41 @@
+// The shell over the player, and under them the room that clears a phone's
+// tab bar. The tab bar's rows, padding and hairline (TabBar.module.scss)
+// make --tab-bar-height; --tab-bar-room is the room it takes, and
+// --player-room the now-playing bar's, which the shells' side menus stop short of.
+.layer {
+  --tab-bar-height: calc(var(--control-size-large) + 2 * var(--space-0) + 1px);
+  --tab-bar-room: 0px;
+  --player-room: 0px;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'shell'
+    'player';
+  padding-bottom: var(--tab-bar-room);
+}
+
+// The bar's hairline, progress line, cover row and padding (NowPlayingBar.module.scss).
+.withBar {
+  --player-room: calc(1px + 2px + 2 * var(--space-1) + var(--control-size-tall));
+}
+
+.shell {
+  grid-area: shell;
+  min-width: 0;
+}
+
+// The engine and the bar, stuck to the foot of the screen over the shell.
+.player {
+  grid-area: player;
+  position: sticky;
+  bottom: var(--tab-bar-room);
+  z-index: 4;
+  min-width: 0;
+}
+
+@media (max-width: 48rem) {
+  .layer {
+    --tab-bar-room: calc(var(--tab-bar-height) + env(safe-area-inset-bottom));
+  }
+}

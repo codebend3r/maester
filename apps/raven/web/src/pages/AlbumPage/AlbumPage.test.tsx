@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:te
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { type AlbumDetails, ApiError } from '@raven/core'
 import { AUDIO_STATES, useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
+import { useToasts } from '@raven/ui'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { ravenPlayer } from '@/lib/ravenPlayer'
@@ -150,5 +151,63 @@ describe('AlbumPage', () => {
       cleanup()
       usePlayerPrefs.setState({ opensInRavenPlayer: false })
     }
+  })
+  it('keeps its links in the music mode under /music', async () => {
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="/music/albums/:id" element={<AlbumPage />} />
+        </Routes>
+      ),
+      route: '/music/albums/7',
+      libraries: [library({ id: 3, name: 'Music' })],
+    })
+    await screen.findByRole('heading', { level: 1, name: 'OK Computer' })
+    expect(screen.getByRole('link', { name: 'Radiohead' })).toHaveAttribute(
+      'href',
+      '/music/artists/1',
+    )
+    expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('href', '/music/albums')
+  })
+
+  it('starts a radio from the album, and from one of its tracks', async () => {
+    const radio = [track({ id: 201, title: 'Lucky' }), track({ id: 202, title: 'Let Down' })]
+    const getRadio = spyOn(api, 'getRadio').mockResolvedValue(radio)
+    renderPage()
+    await screen.findByRole('heading', { level: 1, name: 'OK Computer' })
+    fireEvent.click(screen.getByRole('button', { name: 'Start radio' }))
+    await waitFor(() => expect(useAudioQueue.getState().queue.items).toEqual([201, 202]))
+    expect(getRadio).toHaveBeenCalledWith({ seed: { kind: 'album', id: 7 } })
+    expect(useAudioQueue.getState().queue.source).toEqual({ kind: 'radio', id: 7, seed: 'album' })
+    fireEvent.click(screen.getByRole('button', { name: 'Start radio from Paranoid Android' }))
+    await waitFor(() =>
+      expect(useAudioQueue.getState().queue.source).toEqual({
+        kind: 'radio',
+        id: 102,
+        seed: 'track',
+      }),
+    )
+    expect(getRadio).toHaveBeenLastCalledWith({ seed: { kind: 'track', id: 102 } })
+  })
+
+  it('says when a radio finds nothing, or cannot start', async () => {
+    const getRadio = spyOn(api, 'getRadio').mockResolvedValue([])
+    renderPage()
+    await screen.findByRole('heading', { level: 1, name: 'OK Computer' })
+    fireEvent.click(screen.getByRole('button', { name: 'Start radio' }))
+    await waitFor(() =>
+      expect(useToasts.getState().toasts.map((toast) => toast.message)).toContain(
+        'The radio found nothing to play.',
+      ),
+    )
+    getRadio.mockRejectedValue(new ApiError({ status: 503, message: 'Server busy' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start radio' }))
+    await waitFor(() =>
+      expect(useToasts.getState().toasts.map((toast) => toast.message)).toContain(
+        'The radio could not start: Server busy',
+      ),
+    )
+    expect(useAudioQueue.getState().queue.items).toEqual([])
+    useToasts.setState({ toasts: [] })
   })
 })

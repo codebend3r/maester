@@ -1,7 +1,4 @@
 .shell {
-  // The tab bar's rows, padding and hairline (TabBar.module.scss), which a
-  // phone's page leaves room for under itself.
-  --tab-bar-height: calc(var(--control-size-large) + 2 * var(--space-0) + 1px);
   // How far the logo and the bar sit under the top: Raven's window
   // runs its traffic lights over it, so there they clear those too.
   --side-top: max(var(--space-5), calc(var(--titlebar-inset) + var(--space-3)));
@@ -35,7 +32,7 @@
     'dock';
   row-gap: var(--space-3);
   width: 15.5rem;
-  height: 100dvh;
+  height: calc(100dvh - var(--player-room, 0px));
   padding: var(--side-top) var(--space-1) var(--space-4);
   border-right: 1px solid var(--color-line-faint);
 }
@@ -382,28 +379,26 @@
   }
 }
 
-// The bar over the page, then the page, and under it the room that clears
-// the tab bar on a phone. --page-start is how far the page sits under
+// The bar over the page, then the page; PlayerLayer leaves the room that
+// clears the tab bar on a phone. --page-start is how far the page sits under
 // main's top, which an item's backdrop reaches up through to cover the bar.
 .main {
   --page-top: var(--side-top);
   --bar-gap: var(--space-5);
   --page-start: calc(var(--page-top) + var(--field-size) + var(--bar-gap));
-  --tab-bar-room: 0px;
 
   grid-area: main;
   display: grid;
   grid-template-columns: minmax(0, var(--max-width));
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
     'bar'
-    'page'
-    'player';
+    'page';
   align-content: start;
   justify-content: center;
   row-gap: var(--bar-gap);
   min-width: 0;
-  padding: var(--page-top) var(--gutter) calc(var(--section-gap) + var(--tab-bar-room));
+  padding: var(--page-top) var(--gutter) var(--section-gap);
 }
 
 // The search at the start, as wide as reads well, the corner's buttons at the end.
@@ -420,14 +415,6 @@
 
 .search {
   grid-area: search;
-}
-
-// The audio engine and the now-playing bar, under the page, stuck to the foot of the screen.
-.player {
-  grid-area: player;
-  position: sticky;
-  bottom: var(--tab-bar-room);
-  z-index: 4;
 }
 
 .page {
@@ -461,10 +448,6 @@
 
   .side {
     display: none;
-  }
-
-  .main {
-    --tab-bar-room: calc(var(--tab-bar-height) + env(safe-area-inset-bottom));
   }
 }
 

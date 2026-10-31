@@ -2,11 +2,16 @@ import {
   ALBUM_TYPE_LABELS,
   type AlbumSummary,
   type AppPath,
+  LIBRARY_LISTINGS,
+  type Library,
   MUSIC_PAGE,
+  type MixKind,
+  type MixSummary,
   type MusicSort,
   type PlaylistSummary,
   type Track,
   formatDuration,
+  listingFor,
 } from '@raven/core'
 import { api } from '@/lib/api'
 import { COMMON_COPY, MUSIC_COPY } from '@/lib/copy'
@@ -25,6 +30,33 @@ export const NOW_PLAYING_PATH: AppPath = '/now-playing'
 
 /** The route a playlist's page answers on; `playlistPath` names one playlist's. */
 export const PLAYLIST_ROUTE: AppPath = '/playlists/:id'
+
+/**
+ * The music mode's pages, under `/music`: Home, the library's four lists,
+ * the album, artist and playlist pages raven's own mode shows too, a mix,
+ * Now Playing, the music search and, in Raven, the downloads.
+ */
+export const MUSIC_PATHS = {
+  root: '/music',
+  albums: '/music/albums',
+  artists: '/music/artists',
+  songs: '/music/songs',
+  playlists: '/music/playlists',
+  album: '/music/albums/:id',
+  artist: '/music/artists/:id',
+  playlist: '/music/playlists/:id',
+  mix: '/music/mixes/:id',
+  nowPlaying: '/music/now-playing',
+  search: '/music/search',
+  downloads: '/music/downloads',
+} as const satisfies Record<string, AppPath>
+
+/** A mix's page: `/music/mixes/:id`, its kind the id. */
+export const mixPath = (kind: MixKind): AppPath => `/music/mixes/${kind}`
+
+/** The server's music libraries, the ones it lists by album, in its order. */
+export const musicLibrariesOf = (libraries: readonly Library[]): Library[] =>
+  libraries.filter((library) => listingFor(library.settings.kind) === LIBRARY_LISTINGS.albums)
 
 /** "4:03", or "1:02:03" past an hour; "" for an unknown length. */
 export const trackLength = (seconds: number | null): string =>
@@ -46,6 +78,11 @@ export const albumFacts = ({ album }: AlbumFactsProps): string[] => [
   ALBUM_TYPE_LABELS[album.type],
   ...lengthFacts(album),
 ]
+
+type MixFactsProps = { mix: MixSummary }
+
+/** The line under a mix's name: "50 tracks · 200 min". */
+export const mixFacts = ({ mix }: MixFactsProps): string[] => lengthFacts(mix)
 
 type PlaylistFactsProps = { playlist: PlaylistSummary }
 

@@ -51,7 +51,7 @@ export class LoudnessScan implements OnApplicationBootstrap, OnModuleDestroy {
    * filed under it meanwhile.
    */
   kick(): void {
-    if (!this.config.loudnessScan) return
+    if (!this.config.shouldScanLoudness) return
     this.jobs
       .albumsDue()
       .forEach((albumId) =>

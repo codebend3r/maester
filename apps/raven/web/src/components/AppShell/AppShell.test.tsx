@@ -25,6 +25,7 @@ import { fakeAccount } from '@/test/authClient'
 import { FakeEventSource } from '@/test/eventSource'
 import { asDesktop, DL_2, downloadsMain, viewOf } from '@/test/desktop'
 import { library } from '@/test/fixtures'
+import { musicLibrary } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 import { MEDIUM_SCREEN } from '@/components/AppShell/useIsMediumScreen'
 
@@ -92,6 +93,23 @@ describe('AppShell', () => {
 
   afterAll(() => {
     spies.media.mockRestore()
+  })
+
+  it('offers the music mode in the menu and the tabs once a music library exists', async () => {
+    spies.list.mockImplementation(async () => [musicLibrary()])
+    renderShell({ route: '/' })
+    const music = await within(nav()).findByRole('link', { name: 'Music' })
+    expect(music).toHaveAttribute('href', '/music')
+    expect(iconOf(music)).toBe('music')
+    expect(within(tabs()).getByRole('link', { name: 'Music' })).toHaveAttribute('href', '/music')
+  })
+
+  it('has no music mode without a music library', async () => {
+    spies.list.mockImplementation(async () => [library()])
+    renderShell({ route: '/' })
+    expect(await within(nav()).findByRole('link', { name: 'Movies' })).toBeInTheDocument()
+    expect(within(nav()).queryByRole('link', { name: 'Music' })).toBeNull()
+    expect(within(tabs()).queryByRole('link', { name: 'Music' })).toBeNull()
   })
 
   it('links home from the logo, named by its word alone', () => {

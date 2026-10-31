@@ -13,6 +13,7 @@ import {
   type MatchItemType,
   type MatchSubject,
   type MediaSort,
+  type MixKind,
   type MusicSort,
   type TrackPage,
   type ViewingSession,
@@ -325,6 +326,24 @@ export const ravenQueriesFor = (api: ApiClient) => {
         },
         gcTime: LISTING_GC_MS,
       }),
+
+    /** The account's mixes for today; each holds the same tracks all day. */
+    mixesQuery: queryOptions({
+      queryKey: queryKeys.mixes,
+      queryFn: () => api.listMixes(),
+    }),
+
+    mixQuery: (id: MixKind | null) =>
+      queryOptions({
+        queryKey: queryKeys.mix(id),
+        queryFn: id == null ? skipToken : () => api.getMix({ id }),
+      }),
+
+    /** The albums the account played last, and the albums added last. */
+    recentMusicQuery: queryOptions({
+      queryKey: queryKeys.recentMusic,
+      queryFn: () => api.getRecentAlbums(),
+    }),
 
     albumQuery: (id: number | null) =>
       queryOptions({

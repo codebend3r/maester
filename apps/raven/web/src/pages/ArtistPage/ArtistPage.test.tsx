@@ -4,7 +4,8 @@ import type { ArtistDetails } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { ArtistPage } from '@/pages/ArtistPage/ArtistPage'
-import { album, artist, artistDetails } from '@/test/music'
+import { useAudioQueue } from '@raven/ui/headless'
+import { album, artist, artistDetails, track } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 
 const renderPage = () =>
@@ -61,5 +62,38 @@ describe('ArtistPage', () => {
     await waitFor(() => expect(heart).toHaveAttribute('aria-pressed', 'false'))
     expect(mark).toHaveBeenCalledWith({ artistId: 1, favourite: false })
     answer.resolve(artistDetails({ isFavourite: false }))
+  })
+  it('starts a radio from the artist', async () => {
+    const getRadio = spyOn(api, 'getRadio').mockResolvedValue([track({ id: 201 })])
+    useAudioQueue.getState().clear()
+    renderPage()
+    await screen.findByRole('heading', { level: 1, name: 'Radiohead' })
+    fireEvent.click(screen.getByRole('button', { name: 'Start radio' }))
+    await waitFor(() =>
+      expect(useAudioQueue.getState().queue.source).toEqual({
+        kind: 'radio',
+        id: 1,
+        seed: 'artist',
+      }),
+    )
+    expect(getRadio).toHaveBeenCalledWith({ seed: { kind: 'artist', id: 1 } })
+    useAudioQueue.getState().clear()
+  })
+
+  it("goes back to the music mode's Home there", async () => {
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="/music/artists/:id" element={<ArtistPage />} />
+        </Routes>
+      ),
+      route: '/music/artists/1',
+    })
+    await screen.findByRole('heading', { level: 1, name: 'Radiohead' })
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/music')
+    expect(screen.getByRole('link', { name: 'OK Computer' })).toHaveAttribute(
+      'href',
+      '/music/albums/7',
+    )
   })
 })

@@ -14,7 +14,8 @@ import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
 import { ArtistList } from '@/components/ArtistList/ArtistList'
 import { PlaylistNameDialog } from '@/components/PlaylistNameDialog/PlaylistNameDialog'
 import { SearchField } from '@/components/SearchField/SearchField'
-import { libraryTracks, playlistFacts, playlistPath } from '@/lib/music'
+import { libraryTracks, playlistFacts } from '@/lib/music'
+import { useMusicLinks } from '@/lib/useMusicLinks'
 import { albumsQuery, artistsQuery, playlistsQuery } from '@/lib/queries'
 import { usePlaylistMutations } from '@/lib/usePlaylistMutations'
 import { useAddressSearch } from '@/lib/useSearch'
@@ -166,6 +167,7 @@ export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
  */
 export const PlaylistsSection = () => {
   const navigate = useNavigate()
+  const links = useMusicLinks()
   const playlists = useQuery(playlistsQuery)
   const { create } = usePlaylistMutations()
   const [isNaming, setNaming] = useState(false)
@@ -188,7 +190,7 @@ export const PlaylistsSection = () => {
         <ul className={styles.playlists} aria-label={LIBRARY_COPY.playlists}>
           {playlists.data.map((playlist) => (
             <li key={playlist.id} className={styles.playlist}>
-              <Link to={playlistPath(playlist.id)} className={styles.playlistName}>
+              <Link to={links.playlist(playlist.id)} className={styles.playlistName}>
                 {playlist.name}
               </Link>
               <span className={styles.playlistFacts}>
@@ -207,7 +209,7 @@ export const PlaylistsSection = () => {
           error={create.error}
           onSubmit={(name) =>
             create.mutate(name, {
-              onSuccess: (details) => void navigate(playlistPath(details.playlist.id)),
+              onSuccess: (details) => void navigate(links.playlist(details.playlist.id)),
             })
           }
           onClose={() => setNaming(false)}

@@ -1,0 +1,77 @@
+.page {
+  display: grid;
+  grid-template-areas:
+    'title'
+    'sections'
+    'list';
+  gap: var(--space-4);
+  align-content: start;
+}
+
+.title {
+  grid-area: title;
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-heading);
+  letter-spacing: var(--tracking-display);
+}
+
+// The four lists as a run of pills, scrolling sideways when a phone is too narrow for them.
+.sections {
+  grid-area: sections;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.sectionLink {
+  display: grid;
+  align-items: center;
+  min-height: var(--control-size);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-pill);
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    background: var(--color-hover);
+    color: var(--color-bark);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+
+  &[aria-current='page'] {
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sectionLink {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+}
+
+.list {
+  grid-area: list;
+  display: grid;
+  min-width: 0;
+}
+
+.songs {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.more {
+  justify-self: center;
+}

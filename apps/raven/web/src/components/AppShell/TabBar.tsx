@@ -8,6 +8,7 @@ import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/components/AppShell/TabBar.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { MUSIC_PATHS } from '@/lib/music'
 
 type TabProps = {
   to: string
@@ -29,13 +30,19 @@ const Tab = ({ to, patterns, icon, label }: TabProps) => {
 
 /**
  * A phone's way round, in place of the side menu: Home, Libraries,
- * Favourites and Settings along the foot of the screen, with Streams and
+ * Favourites, Music while a music library exists, and Settings along the
+ * foot of the screen, with Streams and
  * Reports between them for whoever may manage. The pinned
  * libraries are reached from Libraries, so any library's pages mark it.
  * A narrow Raven window adds On this Mac and Downloads before
  * Settings, and keeps only those three while it cannot reach its server.
  */
-export const TabBar = () => {
+type TabBarProps = {
+  /** Whether a music library exists, so the tabs offer the music mode. */
+  hasMusic: boolean
+}
+
+export const TabBar = ({ hasMusic }: TabBarProps) => {
   const isDesktop = useIsDesktop()
   const computer = useComputerName()
   const isOffline = useServerReach((state) => state.isOffline)
@@ -56,6 +63,14 @@ export const TabBar = () => {
             icon="heart"
             label={COMMON_COPY.favourites}
           />
+          {hasMusic && (
+            <Tab
+              to={MUSIC_PATHS.root}
+              patterns={[MUSIC_PATHS.root]}
+              icon="music"
+              label={APP_SHELL_COPY.music}
+            />
+          )}
           <AdminOnly>
             <Tab
               to="/streams"
