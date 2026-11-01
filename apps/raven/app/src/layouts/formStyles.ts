@@ -6,6 +6,10 @@ import { OPACITIES, type Palette, SIZES, type Sizes } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
+/** How many times the largest heading size the form's "Raven" stands, and its line's share of it. */
+const WORDMARK_SCALE = 2.5
+const WORDMARK_LINE = 1.1
+
 type FormStylesForProps = { sizes: Sizes; colours: Palette }
 
 /**
@@ -17,7 +21,14 @@ type FormStylesForProps = { sizes: Sizes; colours: Palette }
 const formStylesFor = ({ sizes, colours }: FormStylesForProps) =>
   StyleSheet.create({
     ground: { flex: 1, backgroundColor: colours.ground },
-    title: { color: colours.text, fontSize: sizes.textXl, fontWeight: 'bold' },
+    masthead: { alignItems: 'center', gap: sizes.space2 },
+    wordmark: {
+      color: colours.text,
+      fontSize: sizes.textXl * WORDMARK_SCALE,
+      lineHeight: sizes.textXl * WORDMARK_SCALE * WORDMARK_LINE,
+      textAlign: 'center',
+    },
+    subtitle: { color: colours.muted, fontSize: sizes.text, textAlign: 'center' },
     label: { color: colours.muted, fontSize: sizes.textSm },
     input: {
       color: colours.text,

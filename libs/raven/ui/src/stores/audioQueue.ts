@@ -53,6 +53,8 @@ export type AudioQueueState = {
   /** Every queued track by its id, so the queue page and the bar need no fetch. */
   tracks: Record<number, Track>
   state: AudioState
+  /** Playback intent, kept apart from asynchronous engine state reports. */
+  shouldPlay: boolean
   /** Seconds into the playing track, as the engine last said. */
   position: number
   duration: number | null
@@ -107,9 +109,17 @@ type AfterMoveProps = {
 const stateAfter = ({ before, after }: AfterMoveProps): Partial<AudioQueueState> => {
   const was = currentOf(before)
   const now = currentOf(after)
-  if (now === null) return { state: AUDIO_STATES.empty, position: 0, duration: null, seek: null }
+  if (now === null)
+    return { state: AUDIO_STATES.empty, shouldPlay: false, position: 0, duration: null, seek: null }
   if (now === was && after.at === before.at) return {}
-  return { state: AUDIO_STATES.loading, position: 0, duration: null, error: null, seek: null }
+  return {
+    state: AUDIO_STATES.loading,
+    shouldPlay: true,
+    position: 0,
+    duration: null,
+    error: null,
+    seek: null,
+  }
 }
 
 /**
@@ -131,6 +141,7 @@ export const useAudioQueue = create<AudioQueueState>()(
         queue: EMPTY_QUEUE,
         tracks: {},
         state: AUDIO_STATES.empty,
+        shouldPlay: false,
         position: 0,
         duration: null,
         error: null,
@@ -147,6 +158,7 @@ export const useAudioQueue = create<AudioQueueState>()(
             queue,
             tracks: tracksById({ known: {}, tracks }),
             state: queue.at === null ? AUDIO_STATES.empty : AUDIO_STATES.loading,
+            shouldPlay: queue.at !== null,
             position: 0,
             duration: null,
             error: null,
@@ -162,15 +174,16 @@ export const useAudioQueue = create<AudioQueueState>()(
           moveQueue((queue) => append({ queue, ids: tracks.map((track) => track.id) }))
         },
         play: () => {
-          if (get().state === AUDIO_STATES.paused) set({ state: AUDIO_STATES.playing })
+          const { state, shouldPlay } = get()
+          if (!shouldPlay && state !== AUDIO_STATES.empty && state !== AUDIO_STATES.failed)
+            set({ state: AUDIO_STATES.playing, shouldPlay: true })
         },
         pause: () => {
-          if (get().state === AUDIO_STATES.playing) set({ state: AUDIO_STATES.paused })
+          if (get().shouldPlay) set({ state: AUDIO_STATES.paused, shouldPlay: false })
         },
         toggle: () => {
-          const { state } = get()
-          if (state === AUDIO_STATES.playing) set({ state: AUDIO_STATES.paused })
-          if (state === AUDIO_STATES.paused) set({ state: AUDIO_STATES.playing })
+          if (get().shouldPlay) return get().pause()
+          get().play()
         },
         next: () => moveQueue(next),
         previous: () => {
@@ -197,6 +210,7 @@ export const useAudioQueue = create<AudioQueueState>()(
             queue: { ...EMPTY_QUEUE, repeat: get().queue.repeat },
             tracks: {},
             state: AUDIO_STATES.empty,
+            shouldPlay: false,
             position: 0,
             duration: null,
             error: null,
@@ -221,12 +235,14 @@ export const useAudioQueue = create<AudioQueueState>()(
                 seek: { seconds: 0, nonce: (get().seek?.nonce ?? 0) + 1 },
                 position: 0,
                 state: AUDIO_STATES.loading,
+                shouldPlay: true,
               })
               return
             }
             moveQueue(afterEnd)
           },
-          failed: (message) => set({ state: AUDIO_STATES.failed, error: message }),
+          failed: (message) =>
+            set({ state: AUDIO_STATES.failed, shouldPlay: false, error: message }),
           sought: () => set({ seek: null }),
         },
       }

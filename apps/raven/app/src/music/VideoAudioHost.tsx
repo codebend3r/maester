@@ -36,7 +36,7 @@ type VideoTrackProps = {
 
 /** The playing track in `react-native-video`, out of sight, from its ticketed address. */
 const VideoTrack = ({ session, track, rate, start }: VideoTrackProps) => {
-  const state = useAudioQueue((store) => store.state)
+  const shouldPlay = useAudioQueue((store) => store.shouldPlay)
   const seek = useAudioQueue((store) => store.seek)
   const engine = useAudioQueue((store) => store.engine)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
@@ -89,7 +89,7 @@ const VideoTrack = ({ session, track, rate, start }: VideoTrackProps) => {
         onProgress={({ currentTime }) =>
           engine.time({ position: currentTime, duration: track.duration })
         }
-        paused={state !== AUDIO_STATES.playing && state !== AUDIO_STATES.loading}
+        paused={!shouldPlay}
         playInBackground
         rate={rate}
         source={{ uri: answer.source.uri, headers: answer.source.headers }}

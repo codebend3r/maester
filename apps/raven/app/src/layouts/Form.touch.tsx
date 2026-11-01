@@ -19,7 +19,7 @@ import { FIELD_COPY } from '@/layouts/copy'
 import { Text } from '@/layouts/Text'
 import { ShowSecretToggle } from '@/layouts/ShowSecretToggle'
 import { useToneStyles, useTouchFormStyles } from '@/layouts/formStyles'
-import { Logo } from '@/layouts/Logo'
+import { FormMasthead } from '@/layouts/FormMasthead'
 import { SIZES } from '@/theme/appTheme'
 import { useTheme } from '@/theme/useTheme'
 
@@ -31,10 +31,7 @@ const Form = ({ title, children }: FormProps) => {
   return (
     <KeyboardAvoidingView behavior="padding" style={formStyles.ground}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Logo width={LOGO_WIDTH} />
-        <Text accessibilityRole="header" style={formStyles.title}>
-          {title}
-        </Text>
+        <FormMasthead formStyles={formStyles} logoWidth={LOGO_WIDTH} title={title} />
         {children}
       </ScrollView>
     </KeyboardAvoidingView>

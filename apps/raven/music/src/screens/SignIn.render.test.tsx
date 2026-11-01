@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { ADMIN_LOCK_STATES, type AdminLock, ApiError, type Home, type LockState } from '@raven/core'
+import { ADMIN_LOCK_STATES, type AdminLock, type Home, type LockState } from '@raven/core'
 import type * as Native from '@raven/native'
 import { AUTH_OUTCOMES, type AuthOutcome, RAVEN_SERVER } from '@raven/native/headless'
 import { fireEvent, render, screen } from '@testing-library/react-native'
@@ -53,13 +53,6 @@ const signInWith = async ({ email, password }: SignInWithProps) => {
 
 const signInAsListener = () => signInWith({ email: SESSION.email, password: 'hunter2' })
 
-const reachPin = async () => {
-  getLock.mockResolvedValue({ available: true, unlocked: false })
-  await render(<SignIn />)
-  await signInAsListener()
-  return screen.findByLabelText('PIN')
-}
-
 describe('SignIn', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -107,50 +100,14 @@ describe('SignIn', () => {
     expect(mockReplace).not.toHaveBeenCalled()
   })
 
-  it('asks a locked server for its PIN, then opens the tabs', async () => {
-    unlock.mockResolvedValue({ available: true, unlocked: true })
-    await fireEvent.changeText(await reachPin(), '1357')
-    expect(mockReplace).not.toHaveBeenCalled()
-    await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
+  it('never asks for the PIN, even when the server keeps libraries behind one', async () => {
+    getLock.mockResolvedValue({ available: true, unlocked: false })
+    await render(<SignIn />)
+    await signInAsListener()
 
-    expect(unlock).toHaveBeenCalledWith('1357')
     expect(mockReplace).toHaveBeenCalledWith(WREN_ROUTES.home)
-  })
-
-  it("shows the server's words for a wrong PIN", async () => {
-    unlock.mockRejectedValue(new ApiError({ status: 401, message: 'That PIN is not right.' }))
-    await fireEvent.changeText(await reachPin(), '0000')
-    await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
-    expect(await screen.findByText('That PIN is not right.')).toBeTruthy()
-    expect(mockReplace).not.toHaveBeenCalled()
-  })
-
-  it('asks for the admin password after the PIN while the admin lock holds', async () => {
-    unlock.mockResolvedValue({ available: true, unlocked: true })
-    getAdminLock.mockResolvedValue({ state: ADMIN_LOCK_STATES.on, available: true })
-    unlockAdmin.mockResolvedValue({ state: ADMIN_LOCK_STATES.off })
-    await fireEvent.changeText(await reachPin(), '1357')
-    await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
-
-    await fireEvent.changeText(await screen.findByLabelText('Admin password'), 'Pass#word2026')
-    await fireEvent.press(screen.getByRole('button', { name: 'Unlock' }))
-
-    expect(unlockAdmin).toHaveBeenCalledWith('Pass#word2026')
-    expect(mockReplace).toHaveBeenCalledWith(WREN_ROUTES.home)
-  })
-
-  it('goes on without the PIN on Not now', async () => {
-    await reachPin()
-    await fireEvent.press(screen.getByRole('button', { name: 'Not now' }))
+    expect(screen.queryByLabelText('PIN')).toBeNull()
     expect(unlock).not.toHaveBeenCalled()
-    expect(mockReplace).toHaveBeenCalledWith(WREN_ROUTES.home)
-  })
-
-  it('signs the account out from the PIN step and starts over', async () => {
-    await reachPin()
-    useWrenAccount.setState({ session: SESSION })
-    await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }))
-    expect(useWrenAccount.getState().session).toBeNull()
-    expect(await screen.findByLabelText('Email')).toBeTruthy()
+    expect(getAdminLock).not.toHaveBeenCalled()
   })
 })

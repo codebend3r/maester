@@ -5,9 +5,10 @@ import { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
 import { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'
 
 /**
- * What signing in asks, in order: the account's email and password, then the PIN when the
- * account may see locked libraries, then the admin password while the legacy admin lock would
- * still hide them, and last a word when the server hands out no media tickets.
+ * What signing in asks: the account's email and password, and last a word when the server hands
+ * out no media tickets. The PIN and the admin password are never asked after an account signs
+ * in, since the PIN is meant to stay a secret; only an end to end build, which has no account,
+ * begins at them. `/unlock` is the one other way to the PIN.
  */
 export const SIGN_IN_STEPS = {
   account: 'account',
@@ -26,17 +27,6 @@ export type SignInStep =
   | { kind: typeof SIGN_IN_STEPS.account }
   | SecretStep
   | { kind: typeof SIGN_IN_STEPS.ticketsOff }
-
-type StepAfterAccountProps = { api: Pick<ApiClient, 'getLock'>; server: AppServer }
-
-/** Once the account is accepted: the PIN when the server keeps one unopened, else null for done. */
-export const stepAfterAccount = async ({
-  api,
-  server,
-}: StepAfterAccountProps): Promise<SecretStep | null> => {
-  const lock = await api.getLock()
-  return lock.available && !lock.unlocked ? { kind: SIGN_IN_STEPS.pin, server } : null
-}
 
 type SecretApi = Pick<ApiClient, 'unlock' | 'getAdminLock' | 'unlockAdmin'>
 

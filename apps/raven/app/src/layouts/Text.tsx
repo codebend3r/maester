@@ -14,7 +14,7 @@ export const Text = ({ style, accessibilityRole, ...props }: TextProps) => {
       style={[
         { fontFamily: isHeading ? DISPLAY_FONT : BODY_FONT },
         style,
-        isHeading && DISPLAY_FONT !== undefined && { fontWeight: 'normal' },
+        isHeading && { fontWeight: 'normal' },
       ]}
       {...props}
     />

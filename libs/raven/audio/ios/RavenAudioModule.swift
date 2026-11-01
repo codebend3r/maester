@@ -139,6 +139,8 @@ public final class RavenAudioModule: Module {
   }
 
   private func replaceWindow(with window: [AudioItem], shouldPlay: Bool, start: Double) {
+    // Do not feed the replacement's temporary pause back into the host's play/pause commands.
+    isStopped = true
     player.pause()
     player.removeAllItems()
     items = window.compactMap { item in

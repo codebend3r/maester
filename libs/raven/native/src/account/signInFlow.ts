@@ -8,7 +8,6 @@ import {
   type SecretStep,
   type SignInStep,
   finishSignIn,
-  stepAfterAccount,
   stepAfterSecret,
 } from '@/account/signInSteps'
 import { AUTH_OUTCOMES } from '@/account/supabaseAuth'
@@ -53,11 +52,12 @@ type SubmitAccountProps = { password?: string }
 type SubmitSecretProps = { step: SecretStep; text: string }
 
 /**
- * The hook that runs sign-in's steps, as both apps do: the account's email and password, then
- * the PIN when the account may see locked libraries, then the admin password while the admin
- * lock would still hide them. Each screen keeps its fields, its layout and its copy. Made per
- * app at module scope, since a store handed to a hook at render reads to the hooks rule as a
- * hook used as a value.
+ * The hook that runs sign-in's steps, as both apps do: the account's email and password, and
+ * nothing more, since the PIN stays a secret that sign-in never asks for. A bypassed (end to
+ * end) build has no account, so it begins at the PIN and then the admin password while the
+ * admin lock would still hide them. Each screen keeps its fields, its layout and its copy.
+ * Made per app at module scope, since a store handed to a hook at render reads to the hooks
+ * rule as a hook used as a value.
  */
 export const signInFlowFor = ({
   account,
@@ -131,11 +131,6 @@ export const signInFlowFor = ({
           return
         }
         setPassword('')
-        const next = await stepAfterAccount({ api: apiOf(ravenServer), server: ravenServer })
-        if (next !== null) {
-          askFor(next)
-          return
-        }
         await finish(ravenServer)
       })
     }
