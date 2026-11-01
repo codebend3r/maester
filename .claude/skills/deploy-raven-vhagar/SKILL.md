@@ -1,6 +1,7 @@
 ---
 name: deploy-raven-vhagar
-description: Use when deploying raven to Vhagar, the NAS it runs on: "deploy to vhagar", "deploy raven", "put this build on the NAS", "is vhagar on the latest", "roll vhagar back", "make raven public", "turn on the funnel", "take raven off the internet", or after a merge to main that changed raven. Covers the GHCR path that update.sh follows, the hand-built image when GHCR is not an option, the Tailscale Funnel sidecar that makes raven public, how to run the root steps without a root shell, and how to check what is running.
+description: >-
+  Use when deploying raven to Vhagar, the NAS it runs on: "deploy to vhagar", "deploy raven", "put this build on the NAS", "is vhagar on the latest", "roll vhagar back", "make raven public", "turn on the funnel", "take raven off the internet", or after a merge to main that changed raven. Covers the GHCR path that update.sh follows, the hand-built image when GHCR is not an option, the Tailscale Funnel sidecar that makes raven public, how to run the root steps without a root shell, and how to check what is running.
 ---
 
 # Deploy raven to Vhagar

@@ -1,6 +1,7 @@
 ---
 name: run-android-tv-app
-description: Use when running raven's device app (`@raven/app`) on Android TV, a real Google TV Streamer or other Android TV over adb, or the `raven_tv` emulator: "run the app on my Google TV", "install raven on the Streamer", "sideload the APK", "run the Android TV e2e", "adb device offline", "failed to connect to 127.0.0.1", Maestro saying "0 devices connected" or "Device emulator-5554 was requested, but it is not connected", or the e2e flows stuck on "Sign in to raven" instead of the PIN screen.
+description: >-
+  Use when running raven's device app (`@raven/app`) on Android TV, a real Google TV Streamer or other Android TV over adb, or the `raven_tv` emulator: "run the app on my Google TV", "install raven on the Streamer", "sideload the APK", "run the Android TV e2e", "adb device offline", "failed to connect to 127.0.0.1", Maestro saying "0 devices connected" or "Device emulator-5554 was requested, but it is not connected", or the e2e flows stuck on "Sign in to raven" instead of the PIN screen.
 ---
 
 # Run the Android TV app
