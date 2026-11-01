@@ -589,7 +589,7 @@ export const toMovie = ({ body, country, language }: ToMovieProps): FetchedItem 
     title,
     originalTitle: text(movie.original_title),
     year: yearOf(primary),
-    released: certification.released ?? primary,
+    released: primary ?? certification.released,
     ended: null,
     summary: text(movie.overview),
     tagline: text(movie.tagline),
