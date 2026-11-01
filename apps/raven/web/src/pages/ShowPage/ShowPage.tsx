@@ -57,6 +57,8 @@ import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { SHOW_COPY } from '@/pages/ShowPage/copy'
 import styles from '@/pages/ShowPage/ShowPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { BingeButton } from '@/components/BingeButton/BingeButton'
+import { useIsDesktop } from '@/stores/desktop'
 
 const SEASON_POSTER_KEYS = { picture: 'picture', number: 'number' } as const
 
@@ -122,6 +124,7 @@ type ShowViewProps = { details: ItemDetails }
 const ShowView = ({ details }: ShowViewProps) => {
   const ids = { title: useId(), seasons: useId() }
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
   const [editingMetadata, setEditingMetadata] = useState(false)
@@ -212,6 +215,7 @@ const ShowView = ({ details }: ShowViewProps) => {
               {SHOW_COPY.play(code)}
             </ButtonLink>
           )}
+          {!isDesktop && <BingeButton item={details} />}
           {details.favourite != null && (
             <FavouriteButton isFavourite={details.favourite} onToggle={favourite.mutate} />
           )}

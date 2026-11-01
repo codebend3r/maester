@@ -11,6 +11,8 @@ import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { itemDetails, library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_ONE, EPISODE_TWO, SEASON_ONE_SUMMARY, SEVERANCE } from '@/test/tv'
+import { asDesktop, downloadsMain } from '@/test/desktop'
+import { BINGE_COPY } from '@/lib/binge'
 
 const Watching = () => <p>Watching {useParams().id}</p>
 const Elsewhere = () => <p>Show {useParams().id}</p>
@@ -51,6 +53,16 @@ describe('ShowPage', () => {
     spies.random.mockReset()
     spies.search.mockReset()
     spies.setItemMatch.mockReset()
+  })
+
+  it('offers binge mode on the web only', async () => {
+    open()
+    expect(await screen.findByRole('button', { name: BINGE_COPY.add })).toBeInTheDocument()
+    cleanup()
+    asDesktop(downloadsMain())
+    open()
+    await screen.findByRole('heading', { name: 'Severance', level: 1 })
+    expect(screen.queryByRole('button', { name: BINGE_COPY.add })).toBeNull()
   })
 
   it('shows the creator, years, network, genres and a Play for the next episode', async () => {

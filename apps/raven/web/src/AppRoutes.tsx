@@ -40,6 +40,8 @@ import { SignInPage } from '@/pages/SignInPage/SignInPage'
 import { SignUpPage } from '@/pages/SignUpPage/SignUpPage'
 import { WatchPage } from '@/pages/WatchPage/WatchPage'
 import { useIsDesktop } from '@/stores/desktop'
+import { BingePage } from '@/pages/BingePage/BingePage'
+import { BINGE_PATH } from '@/lib/binge'
 
 /**
  * Every page, behind the sign-in gate but the account pages and Get. Inside
@@ -68,6 +70,7 @@ export const AppRoutes = () => {
             <Route path="artists/:id" element={<ArtistPage />} />
             <Route path={PLAYLIST_ROUTE} element={<PlaylistPage />} />
             <Route path={NOW_PLAYING_PATH} element={<NowPlayingPage />} />
+            {!isDesktop && <Route path={BINGE_PATH} element={<BingePage />} />}
             <Route path="favourites" element={<FavouritesPage />} />
             <Route path="streams" element={<StreamsPage />} />
             <Route path="reports" element={<BugReportsPage />} />

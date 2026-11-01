@@ -10,7 +10,9 @@ import { HomePage } from '@/pages/HomePage/HomePage'
 import { itemSummary, library, matchedMovie, mediaItem, showEntry } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
-import { EPISODE_TWO, SEASON_ONE_CARD } from '@/test/tv'
+import { EPISODE_TWO, SEASON_ONE_CARD, SEVERANCE } from '@/test/tv'
+import { useBinge } from '@/stores/binge'
+import { asDesktop, downloadsMain } from '@/test/desktop'
 
 const LIBRARIES = [
   library({ id: 2, name: 'Films', settings: { ...library().settings, kind: 'movies' } }),
@@ -31,6 +33,7 @@ describe('HomePage', () => {
     hero: spyOn(api, 'getHero'),
     libraries: spyOn(api, 'listLibraries'),
     search: spyOn(api, 'searchHome'),
+    item: spyOn(api, 'getItem'),
   }
 
   beforeEach(() => {
@@ -49,6 +52,7 @@ describe('HomePage', () => {
     spies.libraries.mockReset()
     spies.search.mockReset()
     spies.hero.mockReset()
+    spies.item.mockReset()
   })
 
   it('stands in for its shelves while home is read, hiding the stand-ins from a screen reader', async () => {
@@ -132,6 +136,34 @@ describe('HomePage', () => {
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
     ).toEqual(['Busboys', 'Continue watching', 'Films', 'Series'])
+  })
+
+  it('puts binge shows above the hero, but not in the desktop app', async () => {
+    useBinge.getState().toggle({ account: 'local', item: SEVERANCE })
+    spies.item.mockImplementation(async () => SEVERANCE)
+    spies.hero.mockImplementation(async () => [
+      {
+        libraryId: 2,
+        type: 'media',
+        media: matchedMovie({ item: itemSummary({ backdropVersion: 'b1' }) }),
+        line: 'Featured film.',
+      },
+    ])
+    open({ inProgress: [], shelves: [] })
+    const binge = await screen.findByRole('region', { name: 'Binge' })
+    await screen.findByRole('region', { name: 'Featured' })
+    expect(
+      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
+    ).toEqual(['Binge', 'Busboys'])
+    expect(within(binge).getByRole('link', { name: /Severance/ })).toHaveAttribute(
+      'href',
+      '/shows/4',
+    )
+    cleanup()
+    asDesktop(downloadsMain())
+    open({ inProgress: [], shelves: [] })
+    await screen.findByRole('region', { name: 'Featured' })
+    expect(screen.queryByRole('region', { name: 'Binge' })).toBeNull()
   })
 
   it('leaves the hero out when the server chose nothing', async () => {

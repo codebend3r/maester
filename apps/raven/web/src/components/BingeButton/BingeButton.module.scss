@@ -1,0 +1,35 @@
+.control {
+  display: inline-grid;
+  align-content: start;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+
+.highlight {
+  outline: var(--focus-ring);
+}
+
+.tip {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 28rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-moss-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+  color: var(--color-bark);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-body);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .highlight {
+    animation: invite 1.8s ease-in-out 3;
+  }
+}
+
+@keyframes invite {
+  50% {
+    box-shadow: 0 0 0 var(--space-1) var(--color-track);
+  }
+}

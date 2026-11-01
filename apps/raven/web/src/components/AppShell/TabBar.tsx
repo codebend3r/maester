@@ -8,6 +8,7 @@ import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/components/AppShell/TabBar.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
 
 type TabProps = {
   to: string
@@ -50,6 +51,9 @@ export const TabBar = () => {
             icon="libraries"
             label={COMMON_COPY.libraries}
           />
+          {!isDesktop && (
+            <Tab to={BINGE_PATH} patterns={[BINGE_PATH]} icon="playback" label={BINGE_COPY.title} />
+          )}
           <Tab
             to="/favourites"
             patterns={['/favourites']}

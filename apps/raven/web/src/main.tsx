@@ -16,8 +16,10 @@ import { queryClient } from '@/lib/queryClient'
 import { PrefetchPlaybackSettings } from '@/lib/prefetchPlaybackSettings'
 import { StartAuthSession } from '@/lib/startAuthSession'
 import { followTheme } from '@/stores/theme'
+import { followBinge } from '@/stores/binge'
 
 followTheme()
+followBinge()
 startDesktop({ bridge: window.ravenDesktop, root: document.documentElement, target: window })
 await configureStorage({ storage: window.localStorage })
 const rootElement = document.getElementById('root')
