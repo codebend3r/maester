@@ -226,7 +226,11 @@ describe("a library's ratings", () => {
     }
 
     it('asks for the ratings of the titles it added, and of no title that was already there', async () => {
-      const { id } = library('Quick')
+      const { id, itemIds } = library('Quick')
+      database
+        .get()
+        .db.prepare("UPDATE items SET fetched_at = '2000-01-01T00:00:00.000Z' WHERE id IN (?, ?)")
+        .run(...itemIds)
       const { scanning, gate } = scanEndingLater()
       const sweep = { kick: vi.fn(), canSettle: () => true, requestsPause: () => null }
       const refresh = new RatingsRefresh(libraries(), scores(), scanning, sweep)

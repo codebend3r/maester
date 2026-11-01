@@ -17,6 +17,8 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
   s.frameworks = 'AVFoundation', 'MediaPlayer'
+  # Wren's CarPlay scene; tvOS has no CarPlay, and `RavenCarPlay.swift` builds for iOS alone.
+  s.ios.frameworks = 'CarPlay'
 
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',

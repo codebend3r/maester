@@ -70,6 +70,20 @@ const ACCEPTED: readonly Accepted[] = [
   },
   {
     method: HTTP_METHODS.get,
+    path: '/api/albums/12',
+    body: null,
+    call: { name: CALL_NAMES.getAlbum, albumId: 12 },
+    sentBody: null,
+  },
+  {
+    method: HTTP_METHODS.get,
+    path: '/api/playlists/5',
+    body: null,
+    call: { name: CALL_NAMES.getPlaylist, playlistId: 5 },
+    sentBody: null,
+  },
+  {
+    method: HTTP_METHODS.get,
     path: '/api/media-origins',
     body: null,
     call: { name: CALL_NAMES.getMediaOrigins },
@@ -259,6 +273,20 @@ describe('matchCall refuses the new reads when they are not exact', () => {
   it('refuses an id past the safe integers', () => {
     refuse({ method: HTTP_METHODS.get, path: '/api/items/9007199254740992' })
     refuse({ method: HTTP_METHODS.get, path: '/api/libraries/9007199254740992' })
+  })
+})
+
+describe('matchCall refuses the album and playlist reads when they are not exact', () => {
+  it('refuses a trailing slash, a leading zero, a query, a write and a body', () => {
+    refuse({ method: HTTP_METHODS.get, path: '/api/albums/12/' })
+    refuse({ method: HTTP_METHODS.get, path: '/api/albums/012' })
+    refuse({ method: HTTP_METHODS.get, path: '/api/playlists/5?x=1' })
+    refuse({ method: HTTP_METHODS.get, path: '/api/playlists/5/tracks' })
+    refuse({ method: HTTP_METHODS.get, path: '/api/albums' })
+    refuse({ method: HTTP_METHODS.put, path: '/api/playlists/5' })
+    refuse({ method: HTTP_METHODS.delete, path: '/api/playlists/5' })
+    refuse({ method: HTTP_METHODS.get, path: '/api/albums/12', body: '{}' })
+    refuse({ method: HTTP_METHODS.get, path: '/api/playlists/9007199254740992' })
   })
 })
 

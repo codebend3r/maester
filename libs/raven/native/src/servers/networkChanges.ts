@@ -1,4 +1,9 @@
-import { addEventListener, configure } from '@react-native-community/netinfo'
+import {
+  NetInfoStateType,
+  addEventListener,
+  configure,
+  fetch,
+} from '@react-native-community/netinfo'
 import { isRecord, isString } from '@raven/core'
 
 import type { WatchNetwork } from '@/servers/mediaAccess'
@@ -31,3 +36,7 @@ export const watchNetwork: WatchNetwork = ({ onChange }) => {
     if (isMove) onChange()
   })
 }
+
+/** Whether the device is on a mobile network now, where a track streams smaller to save data. */
+export const isOnCellular = async (): Promise<boolean> =>
+  (await fetch()).type === NetInfoStateType.cellular

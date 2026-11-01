@@ -502,3 +502,36 @@ export const imageScaleArgs = ({ input, output, width }: ImageScaleArgsProps): s
   '3',
   output,
 ]
+
+type AudioTranscodeArgsProps = {
+  input: string
+  output: string
+  kbps: number
+}
+
+/**
+ * A track's first audio stream as AAC at `kbps` in an `.m4a`, its tags kept
+ * and its index first so a player starts before the rest arrives. The ipod
+ * muxer is mp4's with the M4A brand: it writes the encoder's priming as an
+ * edit list, which AVPlayer and ExoPlayer honour, so album seams stay gapless.
+ */
+export const audioTranscodeArgs = ({ input, output, kbps }: AudioTranscodeArgsProps): string[] => [
+  ...QUIET,
+  '-y',
+  '-i',
+  input,
+  '-map',
+  '0:a:0',
+  '-vn',
+  '-c:a',
+  'aac',
+  '-b:a',
+  `${kbps}k`,
+  '-map_metadata',
+  '0',
+  '-movflags',
+  '+faststart',
+  '-f',
+  'ipod',
+  output,
+]

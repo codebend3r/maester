@@ -4,9 +4,10 @@ import type * as Native from '@raven/native'
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
-import { WREN_ROUTES } from '@/routes'
+import { WREN_PAGES, WREN_ROUTES } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { LISTENER, MUSIC, OK_COMPUTER, musicApi } from '@/test/music'
+import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()
@@ -46,7 +47,7 @@ describe('Home', () => {
 
     await fireEvent.press(tile)
     expect(await screen.findByRole('header', { name: OK_COMPUTER.title })).toBeTruthy()
-    expect(router.getPathname()).toBe(`/album/${OK_COMPUTER.id}`)
+    expect(router.getPathname()).toBe(pagePathOf({ page: WREN_PAGES.album, id: OK_COMPUTER.id }))
   })
 
   it('says so when raven holds no music', async () => {

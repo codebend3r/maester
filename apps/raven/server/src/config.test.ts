@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { ACCOUNTS_OPT_OUT, AUTH_ENV } from '@/auth/authConfig'
-import { readServerConfig } from '@/config'
+import { MUSIC_ENV, readServerConfig } from '@/config'
 
 describe('readServerConfig', () => {
+  it('keeps 20 GiB of track transcodes unless TRANSCODE_CACHE_GB says otherwise', () => {
+    const gib = 1024 ** 3
+    expect(readServerConfig({})).toMatchObject({ transcodeCacheBytes: 20 * gib })
+    expect(readServerConfig({ [MUSIC_ENV.transcodeCacheGb]: '5' })).toMatchObject({
+      transcodeCacheBytes: 5 * gib,
+    })
+    expect(readServerConfig({ [MUSIC_ENV.transcodeCacheGb]: 'lots' })).toMatchObject({
+      transcodeCacheBytes: 20 * gib,
+    })
+  })
+
   it('quick-scans on boot and every 10 minutes unless told otherwise', () => {
     expect(readServerConfig({})).toMatchObject({ scanOnStart: true, quickScanIntervalMinutes: 10 })
     expect(

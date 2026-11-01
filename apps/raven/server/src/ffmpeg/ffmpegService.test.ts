@@ -21,6 +21,9 @@ describe('FfmpegService', () => {
       '#!/bin/sh\necho "Invalid data found when processing input" >&2\nexit 1\n',
     )
     await writeFile(join(state.dir, 'works'), '#!/bin/sh\nexit 0\n')
+    // Stands in for a long encode: past the default second, inside a longer timeout.
+    await writeFile(join(state.dir, 'pause'), '#!/bin/sh\nsleep 2\n')
+    await chmod(join(state.dir, 'pause'), 0o755)
     // Prints its arguments, then three packets in decode order.
     await writeFile(
       join(state.dir, 'packets'),
@@ -99,8 +102,16 @@ describe('FfmpegService', () => {
   it('reports a timeout as a timeout, so the scan can retry later', async () => {
     await Promise.all([
       expect(service('slow').probeFile('/media/a.mkv')).rejects.toBeInstanceOf(FfmpegTimeoutError),
-      expect(service('slow').exec(['-version'])).rejects.toThrow('ffmpeg gave up after 1s'),
+      expect(service('slow').exec({ args: ['-version'] })).rejects.toThrow(
+        'ffmpeg gave up after 1s',
+      ),
     ])
+  })
+
+  it('waits out a run given more time than the default', async () => {
+    await expect(
+      service('pause').exec({ args: ['-version'], timeoutSeconds: 5 }),
+    ).resolves.toBeUndefined()
   })
 
   it('kills a segment run still going when the server stops', async () => {

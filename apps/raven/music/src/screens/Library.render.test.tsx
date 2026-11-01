@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MUSIC_PAGE, MUSIC_SORTS } from '@raven/core'
 import type * as Native from '@raven/native'
-import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
+import { fireEvent, renderRouter, screen, within } from 'expo-router/testing-library'
+import { StyleSheet } from 'react-native'
 
 import { queryClient } from '@/queryClient'
-import { WREN_ROUTES } from '@/routes'
+import { WREN_PAGES, WREN_ROUTES } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { LISTENER, MIXTAPE, MUSIC, OK_COMPUTER, RADIOHEAD, musicApi, trackFor } from '@/test/music'
+import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()
@@ -88,6 +90,19 @@ describe('Library', () => {
     await fireEvent.press(await screen.findByRole('tab', { name: 'Playlists' }))
     await fireEvent.press(await screen.findByRole('button', { name: MIXTAPE.name }))
     expect(await screen.findByRole('header', { name: MIXTAPE.name })).toBeTruthy()
-    expect(router.getPathname()).toBe(`/playlist/${MIXTAPE.id}`)
+    expect(router.getPathname()).toBe(pagePathOf({ page: WREN_PAGES.playlist, id: MIXTAPE.id }))
+  })
+
+  it('draws every segment label at the one size', async () => {
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.library })
+    const tabs = await screen.findAllByRole('tab')
+    expect(tabs).toHaveLength(5)
+    const sizes = tabs.map(
+      (tab) =>
+        StyleSheet.flatten(within(tab).getByText(tab.props.accessibilityLabel).props.style)
+          .fontSize,
+    )
+    expect(new Set(sizes).size).toBe(1)
+    expect(sizes[0]).toBeGreaterThan(0)
   })
 })

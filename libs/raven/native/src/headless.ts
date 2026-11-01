@@ -7,6 +7,20 @@ export { tokenRenewalFor } from '@/account/tokenRenewal'
 export { useSubmit } from '@/account/useSubmit'
 export { isDevelopmentVariant } from '@/config/appVariant'
 export { BUILD_ENV, buildNumberOf } from '@/config/buildNumber'
+export {
+  BROWSE_KINDS,
+  type BrowseApi,
+  type BrowseTarget,
+  type DownloadedLibrary,
+  browseChildrenOf,
+  browseIdOf,
+  parseBrowseId,
+  queueSourceOf,
+  tracksForBrowse,
+} from '@/music/browseTree'
+export type { TrackPlan } from '@/music/audioItem'
+export type { BrowseRequest, CarBrowse, PlayRequest } from '@/music/carBrowse'
+export { musicLibrariesOf } from '@/music/musicLibraries'
 export { nativePlayerOf } from '@/music/nativePlayer'
 export { createActiveServerStore } from '@/servers/activeServerStore'
 export { allowlistedFetch } from '@/servers/allowlist'
@@ -24,6 +38,7 @@ export { probeFetchOf } from '@/servers/mediaProbe'
 export { lastPerServer } from '@/servers/perServer'
 export { pinRavenServer } from '@/servers/pinRavenServer'
 export { IS_SIGN_IN_BYPASSED, RAVEN_SERVER } from '@/servers/ravenServer'
+export { cookieHeadersFor } from '@/servers/serverHeaders'
 export { serverHeadersFor } from '@/servers/serverHeadersHook'
 export { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
 export { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'

@@ -26,7 +26,7 @@ const SECONDS = /^\d+(\.\d+)?$/
 const WATCH_PATH = /^\/watch\/([1-9]\d{0,15})\/?$/
 const SAGA = /^([1-9]\d{0,15}):([1-9]\d{0,15})$/
 const LINK_KEYS = new Set(['server', 'media', 'at', 'next'])
-const DOWNLOAD_KEYS = new Set(['server', 'media', 'item', 'saga'])
+const DOWNLOAD_KEYS = new Set(['server', 'media', 'item', 'saga', 'album', 'playlist'])
 
 const parse = (raw: string): URL | null => (URL.canParse(raw) ? new URL(raw) : null)
 
@@ -101,7 +101,9 @@ const targetOf = ({ params }: TargetOfProps): DownloadRequest['target'] | null =
   const media = params.get('media')
   const item = params.get('item')
   const saga = params.get('saga')
-  const named = [media, item, saga].filter((value) => value !== undefined)
+  const album = params.get('album')
+  const playlist = params.get('playlist')
+  const named = [media, item, saga, album, playlist].filter((value) => value !== undefined)
   if (named.length !== 1) return null
   if (media !== undefined) {
     const mediaId = mediaIdOf(media)
@@ -110,6 +112,14 @@ const targetOf = ({ params }: TargetOfProps): DownloadRequest['target'] | null =
   if (item !== undefined) {
     const itemId = mediaIdOf(item)
     return itemId === null ? null : { kind: DOWNLOAD_TARGET_KINDS.item, itemId }
+  }
+  if (album !== undefined) {
+    const albumId = mediaIdOf(album)
+    return albumId === null ? null : { kind: DOWNLOAD_TARGET_KINDS.album, albumId }
+  }
+  if (playlist !== undefined) {
+    const playlistId = mediaIdOf(playlist)
+    return playlistId === null ? null : { kind: DOWNLOAD_TARGET_KINDS.playlist, playlistId }
   }
   const match = SAGA.exec(saga ?? '')
   const libraryId = mediaIdOf(match?.[1] ?? '')

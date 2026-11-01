@@ -17,6 +17,14 @@ export const posterOf = ({
     ? { kind: DOWNLOAD_ARTWORK_KINDS.none }
     : { kind: DOWNLOAD_ARTWORK_KINDS.poster, itemId: id, version: posterVersion }
 
+type CoverOfProps = { cover: { albumId: number; coverVersion: string | null } | null }
+
+/** The album cover a music group shows, or nothing when the server has none. */
+export const coverOf = ({ cover }: CoverOfProps): DownloadArtwork =>
+  cover === null || cover.coverVersion === null
+    ? { kind: DOWNLOAD_ARTWORK_KINDS.none }
+    : { kind: DOWNLOAD_ARTWORK_KINDS.cover, albumId: cover.albumId, version: cover.coverVersion }
+
 /** A file's own picture: its movie's or episode's poster. */
 export const artworkOfMedia = ({ item }: MediaItem): DownloadArtwork =>
   item === null ? { kind: DOWNLOAD_ARTWORK_KINDS.none } : posterOf(item)

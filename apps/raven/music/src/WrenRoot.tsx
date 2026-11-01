@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { DEFAULT_THEME, THEME_TONES, themeOf } from '@raven/core'
 import { IS_SIGN_IN_BYPASSED, pinRavenServer, tokenRenewalFor } from '@raven/native/headless'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -7,11 +8,15 @@ import { useEffect, useState } from 'react'
 import { StatusBar, StyleSheet, View } from 'react-native'
 
 import { BAR_PLACES, NowPlayingBar } from '@/components/NowPlayingBar'
+import { downloadSources } from '@/downloads/downloadDevice'
+import { configureDownloads } from '@/downloads/downloadStore'
+import { deviceDisk } from '@/downloads/downloader'
 import { WrenAudioHost } from '@/music/WrenAudioHost'
-import { forgetOnAccountChange, queryClient } from '@/queryClient'
+import { forgetOnAccountChange, keepDownloadsFor, queryClient } from '@/queryClient'
 import { WREN_ROUTES, WREN_SCREENS } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { useActiveServer } from '@/stores/activeServer'
+import { configureWrenPrefs } from '@/stores/wrenPrefs'
 import { PALETTE } from '@/theme/wrenTheme'
 import { useWren } from '@/useWren'
 
@@ -28,12 +33,17 @@ const BAR_STYLE =
 const useTokenRenewal = tokenRenewalFor({ session: useWrenAccount })
 
 const loadStores = async (): Promise<void> => {
-  // A store whose keychain cannot be read starts empty rather than holding Wren on the splash.
+  // A store whose keychain or AsyncStorage cannot be read starts empty rather than holding
+  // Wren on the splash.
   await Promise.allSettled([
     useActiveServer.persist.rehydrate(),
     useWrenAccount.persist.rehydrate(),
+    configureWrenPrefs({ storage: AsyncStorage }),
+    configureDownloads({ storage: AsyncStorage, disk: deviceDisk, ...downloadSources }),
   ])
   pinRavenServer({ servers: useActiveServer })
+  // The account read back may not be the downloads' owner, whatever order the stores loaded in.
+  await keepDownloadsFor({ accountId: useWrenAccount.getState().session?.userId ?? null })
 }
 
 /**

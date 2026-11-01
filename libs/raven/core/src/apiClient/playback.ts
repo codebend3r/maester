@@ -1,5 +1,7 @@
 import { type MediaAccess, type TicketedOrigin, type Transport } from '@/apiClient/transport'
 import {
+  AUDIO_BITRATE_PARAM,
+  type AudioBitrate,
   HLS_PARAMS,
   HLS_PATHS,
   isLiveStreamList,
@@ -21,6 +23,13 @@ import {
 import { parseWebVtt } from '@/subtitles'
 
 type FileUrlProps = { id: number; access?: MediaAccess | null }
+
+type TranscodeUrlProps = {
+  mediaId: number
+  kbps: AudioBitrate
+  /** The origin it plays from and the ticket that opens it; null on this server's own, by its cookie. */
+  access?: TicketedOrigin | null
+}
 
 type PingUrlProps = {
   origin: MediaOrigin
@@ -60,6 +69,14 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
   /** The original file, served with byte ranges: what a player loads for direct play. */
   fileUrl: ({ id, access = null }: FileUrlProps): string =>
     mediaUrl({ path: `/api/media/${id}/file`, query: {}, access }),
+
+  /** A track converted to AAC at `kbps`, served with byte ranges like the original, from `access`'s origin as `fileUrl` is. */
+  transcodeUrl: ({ mediaId, kbps, access = null }: TranscodeUrlProps): string =>
+    mediaUrl({
+      path: `/api/media/${mediaId}/transcode`,
+      query: { [AUDIO_BITRATE_PARAM]: String(kbps) },
+      access,
+    }),
 
   /** The server's event stream: `ServerEvent`s, read with `parseServerEvent`. */
   eventsUrl: (): string => url('/api/events'),

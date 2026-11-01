@@ -1,11 +1,20 @@
 import { type EventSubscription, requireNativeModule } from 'expo-modules-core'
-import { type AudioItem, type AudioPlayerEvent, isAudioPlayerEvent } from '@/contract'
+import {
+  type AudioItem,
+  type AudioPlayerEvent,
+  type BrowseAnswer,
+  type BrowseNode,
+  isAudioPlayerEvent,
+} from '@/contract'
 
 export {
   AUDIO_PLAYER_EVENTS,
   type AudioItem,
   type AudioPlayerEvent,
+  BROWSE_ROOTS,
+  type BrowseNode,
   isAudioPlayerEvent,
+  isBrowseNode,
 } from '@/contract'
 
 /** The one event the native side emits, carrying every player event as its payload. */
@@ -26,6 +35,17 @@ type NativeAudioModule = {
   /** How fast every item plays, kept across items and windows until it is set again. */
   setRate: (rate: number) => Promise<void>
   stop: () => Promise<void>
+  /**
+   * Answers the `browse` event of `requestId` with the children it asked for, and the headers
+   * native sends with each cover it fetches over http.
+   */
+  answerBrowse: (
+    requestId: string,
+    nodes: BrowseNode[],
+    artworkHeaders: Record<string, string>,
+  ) => Promise<void>
+  /** Forgets every list kept for the car while the app was away. */
+  clearBrowseCache: () => Promise<void>
   addListener: (name: typeof NATIVE_EVENT, listener: (event: unknown) => void) => EventSubscription
 }
 
@@ -51,6 +71,8 @@ type SetWindowProps = {
   start: number
 }
 
+type AnswerBrowseProps = BrowseAnswer
+
 type OnEventProps = {
   listener: (event: AudioPlayerEvent) => void
   /** Hears an event the native side sent in a shape this contract does not know. */
@@ -71,6 +93,11 @@ export const audioPlayer = {
   setRate: (rate: number): Promise<void> =>
     native().setRate(Math.min(RATE_RANGE.max, Math.max(RATE_RANGE.min, rate))),
   stop: (): Promise<void> => native().stop(),
+  /** Gives CarPlay or Android Auto the list a `browse` event asked for. */
+  answerBrowse: ({ requestId, nodes, artworkHeaders }: AnswerBrowseProps): Promise<void> =>
+    native().answerBrowse(requestId, nodes, artworkHeaders),
+  /** Forgets the lists native keeps for the car, so another account's titles never show there. */
+  clearBrowseCache: (): Promise<void> => native().clearBrowseCache(),
   /** Hears the player; the subscription's `remove` stops it. */
   onEvent: ({ listener, onUnknown }: OnEventProps): EventSubscription =>
     native().addListener(NATIVE_EVENT, (event) => {

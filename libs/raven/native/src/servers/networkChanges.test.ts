@@ -5,11 +5,15 @@ type Listener = (state: ReportedState) => void
 
 const configured: { reachabilityShouldRun?: () => boolean }[] = []
 let listeners: Listener[] = []
+/** The network NetInfo says the device is on now. */
+const current: { type: string } = { type: 'wifi' }
 
 type ConfigureProps = { reachabilityShouldRun?: () => boolean }
 
 // NetInfo's own module reaches React Native's native modules, which bun cannot load.
 mock.module('@react-native-community/netinfo', () => ({
+  NetInfoStateType: { wifi: 'wifi', cellular: 'cellular' },
+  fetch: async () => ({ type: current.type, isConnected: true, details: null }),
   configure: (configuration: ConfigureProps) => {
     configured.push(configuration)
   },
@@ -21,7 +25,7 @@ mock.module('@react-native-community/netinfo', () => ({
   },
 }))
 
-const { watchNetwork } = await import('@/servers/networkChanges')
+const { isOnCellular, watchNetwork } = await import('@/servers/networkChanges')
 
 /** NetInfo's names for two kinds of network. */
 const NETWORK_TYPES = { wifi: 'wifi', cellular: 'cellular' } as const
@@ -64,5 +68,14 @@ describe('watchNetwork', () => {
     expect(moves).toBe(3)
     stop()
     expect(listeners).toEqual([])
+  })
+})
+
+describe('isOnCellular', () => {
+  it('says whether NetInfo puts the device on a mobile network now', async () => {
+    current.type = NETWORK_TYPES.cellular
+    expect(await isOnCellular()).toBe(true)
+    current.type = NETWORK_TYPES.wifi
+    expect(await isOnCellular()).toBe(false)
   })
 })

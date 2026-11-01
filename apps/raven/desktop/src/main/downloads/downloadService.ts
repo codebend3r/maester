@@ -85,6 +85,7 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     DownloadPlayback,
     | 'open'
     | 'openTitle'
+    | 'trackPathOf'
     | 'nextOf'
     | 'sidecarsOf'
     | 'fromLabelOf'
@@ -220,6 +221,12 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         artwork: entry.artwork ?? { kind: DOWNLOAD_ARTWORK_KINDS.none },
         facts: entry.facts ?? factsBefore(entry),
         createdAt: entry.createdAt,
+        // The music engine plays the current server's downloads alone, so another server's
+        // tracks have nothing to queue them by.
+        track:
+          serverById({ config: config.read(), serverId: entry.serverId }) === null
+            ? null
+            : (entry.track ?? null),
       }
     })
 
@@ -533,6 +540,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     showFolder,
     open: playback.open,
     openTitle: playback.openTitle,
+    trackPathOf: playback.trackPathOf,
     nextOf: playback.nextOf,
     sidecarsOf: playback.sidecarsOf,
     fromLabelOf: playback.fromLabelOf,

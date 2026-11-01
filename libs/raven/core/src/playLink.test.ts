@@ -98,6 +98,24 @@ describe('downloadLinkFor', () => {
     )
   })
 
+  it('names an album or a playlist by its id', () => {
+    expect(downloadLinkFor({ origin, target: { kind: 'album', albumId: 12 } })).toBe(
+      'raven://download?server=https%3A%2F%2Fraven.example&album=12',
+    )
+    expect(downloadLinkFor({ origin, target: { kind: 'playlist', playlistId: 3 } })).toBe(
+      'raven://download?server=https%3A%2F%2Fraven.example&playlist=3',
+    )
+  })
+
+  it.each([0, -1, 1.5, Number.NaN, 2 ** 53])('refuses an album or a playlist id of %p', (id) => {
+    expect(() => downloadLinkFor({ origin, target: { kind: 'album', albumId: id } })).toThrow(
+      RangeError,
+    )
+    expect(() => downloadLinkFor({ origin, target: { kind: 'playlist', playlistId: id } })).toThrow(
+      RangeError,
+    )
+  })
+
   it.each([0, -1, 1.5, Number.NaN, 2 ** 53])('refuses a file id of %p', (mediaId) => {
     expect(() => downloadLinkFor({ origin, target: { kind: 'media', mediaId } })).toThrow(
       RangeError,
@@ -138,6 +156,8 @@ describe('isDownloadTarget', () => {
     [{ kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 7 }],
     [{ kind: DOWNLOAD_TARGET_KINDS.item, itemId: 4 }],
     [{ kind: DOWNLOAD_TARGET_KINDS.saga, libraryId: 1, tmdbId: '119' }],
+    [{ kind: DOWNLOAD_TARGET_KINDS.album, albumId: 12 }],
+    [{ kind: DOWNLOAD_TARGET_KINDS.playlist, playlistId: 3 }],
   ])('accepts %j', (target) => {
     expect(isDownloadTarget(target)).toBe(true)
   })
@@ -153,6 +173,8 @@ describe('isDownloadTarget', () => {
       'a saga whose collection is a path',
       { kind: DOWNLOAD_TARGET_KINDS.saga, libraryId: 1, tmdbId: '../119' },
     ],
+    ['an album id of zero', { kind: DOWNLOAD_TARGET_KINDS.album, albumId: 0 }],
+    ['a playlist named by a string', { kind: DOWNLOAD_TARGET_KINDS.playlist, playlistId: '3' }],
     ['a kind it does not know', { kind: 'library', libraryId: 1 }],
   ])('rejects %s', (_name, target) => {
     expect(isDownloadTarget(target)).toBe(false)

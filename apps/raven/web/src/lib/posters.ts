@@ -32,6 +32,8 @@ export const POSTER_SIZES = {
   album: '(max-width: 40rem) calc(100vw - 2rem), 16rem',
   /** The now-playing bar's cover, a control tall. */
   bar: '3rem',
+  /** An album or playlist's cover on Downloads, a control tall. */
+  download: '3rem',
   /** Now Playing's cover: most of a phone's width, 24rem past it. */
   nowPlaying: '(max-width: 40rem) calc(100vw - 4rem), 24rem',
   /**

@@ -7,26 +7,30 @@ import {
 } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams } from 'expo-router'
+import { useState } from 'react'
 import { FlatList, StyleSheet, Text, View } from 'react-native'
 
 import { PlayButtons } from '@/components/Controls'
 import { BackButton, DetailRoute } from '@/components/DetailPage'
+import { DownloadButton } from '@/components/DownloadButton'
 import { Notice } from '@/components/Notice'
 import { pageStyles, useListContent } from '@/components/TabPage'
 import { TrackRow } from '@/components/TrackRow'
+import { DOWNLOAD_SOURCES } from '@/downloads/downloadStore'
 import { PLAYLIST_COPY } from '@/screens/copy'
 import { WREN_ROUTE_PARAMS } from '@/routes'
 import { PALETTE, SIZES } from '@/theme/wrenTheme'
 import { type WrenSession, useWren } from '@/useWren'
 
-type PlaylistPageProps = { details: PlaylistDetails }
+type PlaylistPageProps = { session: WrenSession; details: PlaylistDetails }
 
-function PlaylistPage({ details }: PlaylistPageProps) {
+function PlaylistPage({ session, details }: PlaylistPageProps) {
   const content = useListContent()
   const playingId = useAudioQueue((store) => playingTrackOf(store)?.id ?? null)
   const playTracks = useAudioQueue((store) => store.playTracks)
   const { playlist, tracks } = details
   const source = { kind: QUEUE_SOURCE_KINDS.playlist, id: playlist.id } as const
+  const [refusal, setRefusal] = useState<string | null>(null)
   return (
     <FlatList
       ListEmptyComponent={<Notice text={PLAYLIST_COPY.empty(playlist.name)} />}
@@ -45,8 +49,15 @@ function PlaylistPage({ details }: PlaylistPageProps) {
                 onPlay={() => playTracks({ tracks, source })}
                 onShuffle={() => playTracks({ tracks, source, isShuffled: true })}
               />
+              <DownloadButton
+                collection={{ kind: DOWNLOAD_SOURCES.playlist, playlist }}
+                onRefusal={setRefusal}
+                serverId={session.server.id}
+                tracks={tracks}
+              />
             </View>
           )}
+          {refusal !== null && <Notice text={refusal} />}
         </View>
       }
       contentContainerStyle={content}
@@ -79,7 +90,7 @@ function ServerPlaylist({ session, id }: ServerPlaylistProps) {
   const playlist = useQuery(session.queries.playlistQuery(id))
   return (
     <DetailRoute copy={PLAYLIST_COPY} id={id} query={playlist}>
-      {(details) => <PlaylistPage details={details} />}
+      {(details) => <PlaylistPage details={details} session={session} />}
     </DetailRoute>
   )
 }
@@ -96,5 +107,5 @@ const styles = StyleSheet.create({
   head: { gap: SIZES.space1 },
   title: { color: PALETTE.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
   facts: { color: PALETTE.muted, fontSize: SIZES.textSm },
-  actions: { flexDirection: 'row', gap: SIZES.space2 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space2 },
 })

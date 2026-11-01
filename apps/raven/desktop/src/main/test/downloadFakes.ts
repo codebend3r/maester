@@ -54,6 +54,8 @@ export const fakeDisk = (seed: Record<string, number> = {}) => {
   const appendError: { value: unknown } = { value: undefined }
   /** Folders whose making fails. */
   const unmakeable = new Set<string>()
+  /** Folders whose removal fails, as Windows fails one holding a file still open. */
+  const unremovable = new Set<string>()
   /** What a listing waits on before it answers, so a test can hold one. */
   const listing: { hold: Promise<void> } = { hold: Promise.resolve() }
 
@@ -88,6 +90,7 @@ export const fakeDisk = (seed: Record<string, number> = {}) => {
       files.set(to, chunks)
     },
     rm: async (path) => {
+      if (unremovable.has(path)) throw fsError({ code: 'EBUSY', syscall: 'rm' })
       removed.push(path)
       const isGone = (key: string): boolean => isUnder({ path: key, dir: path })
       const goneFiles = [...files.keys()].filter(isGone)
@@ -118,7 +121,18 @@ export const fakeDisk = (seed: Record<string, number> = {}) => {
     size: async (path) => sizeOf(path),
   }
 
-  return { fs, files, texts, dirs, removed, appendError, unmakeable, listing, sizeOf }
+  return {
+    fs,
+    files,
+    texts,
+    dirs,
+    removed,
+    appendError,
+    unmakeable,
+    unremovable,
+    listing,
+    sizeOf,
+  }
 }
 
 export type Answer = {

@@ -5,6 +5,8 @@ import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@/session'
 import { LISTENER, OK_COMPUTER, RADIOHEAD, musicApi } from '@/test/music'
+import { WREN_PAGES } from '@/routes'
+import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()
@@ -32,7 +34,9 @@ describe('Artist', () => {
   })
 
   it("shows the artist's albums, opens one, and marks the artist a favourite", async () => {
-    const router = await renderRouter(WREN_TREE, { initialUrl: `/artist/${RADIOHEAD.id}` })
+    const router = await renderRouter(WREN_TREE, {
+      initialUrl: pagePathOf({ page: WREN_PAGES.artist, id: RADIOHEAD.id }),
+    })
     expect(await screen.findByRole('header', { name: RADIOHEAD.name })).toBeTruthy()
 
     await fireEvent.press(screen.getByRole('switch', { name: 'Favourite' }))
@@ -43,6 +47,6 @@ describe('Artist', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: `${OK_COMPUTER.title}, Radiohead` }))
     expect(await screen.findByRole('header', { name: OK_COMPUTER.title })).toBeTruthy()
-    expect(router.getPathname()).toBe(`/album/${OK_COMPUTER.id}`)
+    expect(router.getPathname()).toBe(pagePathOf({ page: WREN_PAGES.album, id: OK_COMPUTER.id }))
   })
 })

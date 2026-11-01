@@ -149,7 +149,7 @@ const CAPABILITY_ROUTES: ReadonlySet<Route> = new Set([
   ROUTES.albumCover,
 ])
 
-it("opens only an HLS session's own routes to its capability, and only `file` to a ticket's pass", () => {
+it("opens only an HLS session's own routes to its capability, and only `file` and `transcode` to a ticket's pass", () => {
   const marks = routeMarks(CONTROLLERS)
   const kinds = Object.values(PASS_KINDS)
   const opened = kinds.map((kind) =>

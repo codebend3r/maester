@@ -1,8 +1,8 @@
 import { MUSIC_SORTS } from '@raven/core'
 import { playlistFactsOf } from '@raven/ui/headless'
 import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query'
-import { useRouter } from 'expo-router'
-import { type ComponentType, type ReactElement, useState } from 'react'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import type { ComponentType, ReactElement } from 'react'
 import { FlatList, StyleSheet, View } from 'react-native'
 
 import { useTileWidth } from '@/components/AlbumGrid'
@@ -18,26 +18,25 @@ import { LIBRARY_COPY, useMusicLibraries } from '@/music/musicLibraries'
 import { nextPageOf } from '@/music/nextPage'
 import { useCovers } from '@/music/useCovers'
 import { LIBRARY_PAGE_COPY } from '@/screens/copy'
-import { WREN_PAGES, pageHref } from '@/routes'
+import { DownloadsList } from '@/screens/Downloads'
+import {
+  LIBRARY_SEGMENTS,
+  type LibrarySegment,
+  WREN_PAGES,
+  WREN_ROUTE_PARAMS,
+  librarySegmentOf,
+  pageHref,
+} from '@/routes'
 import { SIZES } from '@/theme/wrenTheme'
 import { type WrenSession, useWren } from '@/useWren'
 
-/** The lists the Library tab shows, one at a time. */
-const SEGMENTS = {
-  albums: 'albums',
-  artists: 'artists',
-  songs: 'songs',
-  playlists: 'playlists',
-} as const
-
-type Segment = (typeof SEGMENTS)[keyof typeof SEGMENTS]
-
 /** The Library tab's lists, each named on its tab. */
-const LIBRARY_SEGMENTS = [
-  { key: SEGMENTS.albums, label: LIBRARY_PAGE_COPY.albums },
-  { key: SEGMENTS.artists, label: LIBRARY_PAGE_COPY.artists },
-  { key: SEGMENTS.songs, label: LIBRARY_PAGE_COPY.songs },
-  { key: SEGMENTS.playlists, label: LIBRARY_PAGE_COPY.playlists },
+const SEGMENT_TABS = [
+  { key: LIBRARY_SEGMENTS.albums, label: LIBRARY_PAGE_COPY.albums },
+  { key: LIBRARY_SEGMENTS.artists, label: LIBRARY_PAGE_COPY.artists },
+  { key: LIBRARY_SEGMENTS.songs, label: LIBRARY_PAGE_COPY.songs },
+  { key: LIBRARY_SEGMENTS.playlists, label: LIBRARY_PAGE_COPY.playlists },
+  { key: LIBRARY_SEGMENTS.downloads, label: LIBRARY_PAGE_COPY.downloads },
 ] as const
 
 type ListNoticeOfProps = { listing: ListState; empty: string }
@@ -184,22 +183,37 @@ function PlaylistsList({ session, header }: PlaylistsListProps) {
   )
 }
 
+type DownloadsSegmentProps = SegmentListProps
+
+/** What is on the device, which plays with the server out of reach. */
+function DownloadsSegment({ session, header }: DownloadsSegmentProps) {
+  return <DownloadsList header={header} serverId={session.server.id} />
+}
+
 /** The list each of the Library tab's segments shows. */
 const SEGMENT_LISTS = {
-  [SEGMENTS.albums]: AlbumsList,
-  [SEGMENTS.artists]: ArtistsList,
-  [SEGMENTS.songs]: SongsList,
-  [SEGMENTS.playlists]: PlaylistsList,
-} as const satisfies Record<Segment, ComponentType<SegmentListProps>>
+  [LIBRARY_SEGMENTS.albums]: AlbumsList,
+  [LIBRARY_SEGMENTS.artists]: ArtistsList,
+  [LIBRARY_SEGMENTS.songs]: SongsList,
+  [LIBRARY_SEGMENTS.playlists]: PlaylistsList,
+  [LIBRARY_SEGMENTS.downloads]: DownloadsSegment,
+} as const satisfies Record<LibrarySegment, ComponentType<SegmentListProps>>
 
 type ServerLibraryProps = { session: WrenSession }
 
 function ServerLibrary({ session }: ServerLibraryProps) {
-  const [segment, setSegment] = useState<Segment>(SEGMENTS.albums)
+  const router = useRouter()
+  const params = useLocalSearchParams()
+  // The list rides in the address, so Home's way to the downloads opens on them.
+  const segment = librarySegmentOf(params[WREN_ROUTE_PARAMS.segment])
   const header = (
     <View style={pageStyles.header}>
       <PageTitle title={LIBRARY_PAGE_COPY.title} />
-      <Segments onSelect={setSegment} segments={LIBRARY_SEGMENTS} selected={segment} />
+      <Segments
+        onSelect={(key) => router.setParams({ [WREN_ROUTE_PARAMS.segment]: key })}
+        segments={SEGMENT_TABS}
+        selected={segment}
+      />
     </View>
   )
   const List = SEGMENT_LISTS[segment]
@@ -208,7 +222,7 @@ function ServerLibrary({ session }: ServerLibraryProps) {
 
 /**
  * The albums, artists, songs and playlists raven holds, one list at a time: each list holds
- * every music library's, the songs a page at a time.
+ * every music library's, the songs a page at a time. Downloads lists what is on the device.
  */
 export function Library() {
   const session = useWren()

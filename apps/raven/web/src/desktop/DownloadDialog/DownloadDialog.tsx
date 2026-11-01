@@ -31,6 +31,9 @@ const filesFor = ({ kind, files }: FilesForProps): string => {
     case DOWNLOAD_KINDS.season:
     case DOWNLOAD_KINDS.show:
       return COMMON_COPY.episodes(files)
+    case DOWNLOAD_KINDS.album:
+    case DOWNLOAD_KINDS.playlist:
+      return COMMON_COPY.tracks(files)
     default: {
       const unreachable: never = kind
       return unreachable

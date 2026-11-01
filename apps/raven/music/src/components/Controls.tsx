@@ -11,20 +11,31 @@ type ActionButtonProps = {
   icon: IconName
   onPress: () => void
   isPrimary?: boolean
+  /** Shown but not pressable, and said as dimmed: a download on its way. */
+  isDisabled?: boolean
 }
 
-/** A page's action under the thumb: Play, Shuffle. */
-function ActionButton({ label, icon, onPress, isPrimary = false }: ActionButtonProps) {
+/** A page's action under the thumb: Play, Shuffle, Download. */
+export function ActionButton({
+  label,
+  icon,
+  onPress,
+  isPrimary = false,
+  isDisabled = false,
+}: ActionButtonProps) {
   const colour = isPrimary ? PALETTE.onAccent : PALETTE.text
   return (
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled }}
+      disabled={isDisabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.action,
         isPrimary ? styles.primary : styles.quiet,
         pressed && styles.pressed,
+        isDisabled && styles.disabled,
       ]}
     >
       <Icon colour={colour} name={icon} size={SIZES.text} />
@@ -129,4 +140,5 @@ const styles = StyleSheet.create({
     minWidth: SIZES.fieldHeight,
   },
   pressed: { opacity: OPACITIES.pressed },
+  disabled: { opacity: OPACITIES.disabled },
 })

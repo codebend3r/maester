@@ -126,7 +126,7 @@ export const useWindowedAudioHost = ({
   const passOver = useEffectEvent((id: number) => {
     const store = useAudioQueue.getState()
     // The queue moved on while the track was being read: there is nothing left to pass.
-    if (playingTrackOf(store)?.id !== id) return
+    if ((playingTrackOf(store)?.id ?? null) !== id) return
     passed.current = new Set([...passed.current, id])
     const following = nextTrackOf(store)
     if (following === null || passed.current.has(following.id)) return

@@ -378,14 +378,10 @@ type LyricsSheetProps = SheetViewProps
 function LyricsSheet({ head, content, lyrics }: LyricsSheetProps) {
   const position = useAudioQueue((store) => store.position)
   const seekTo = useAudioQueue((store) => store.seekTo)
+  const synced = lyrics != null && lyrics.kind === LYRICS_KINDS.synced ? lyrics.lines : null
   const lines: LyricItem[] =
-    lyrics?.kind === LYRICS_KINDS.synced
-      ? lyrics.lines.map((line, place) => ({ key: `${place}:${line.at}`, place, line }))
-      : []
-  const current =
-    lyrics?.kind === LYRICS_KINDS.synced
-      ? activeLineAt({ lines: lyrics.lines, at: position })
-      : null
+    synced?.map((line, place) => ({ key: `${place}:${line.at}`, place, line })) ?? []
+  const current = synced === null ? null : activeLineAt({ lines: synced, at: position })
   return (
     <FlatList
       contentContainerStyle={content}
