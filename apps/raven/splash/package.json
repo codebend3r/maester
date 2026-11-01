@@ -1,6 +1,6 @@
 {
   "name": "@raven/splash",
-  "version": "0.7.9",
+  "version": "0.7.10",
   "private": true,
   "description": "raven's front door: download Raven for the desktop or open the web app",
   "type": "module",
