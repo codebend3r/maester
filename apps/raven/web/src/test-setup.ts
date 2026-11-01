@@ -10,6 +10,7 @@ import {
 import { useToasts } from '@raven/ui'
 import { queryClient } from '@/lib/queryClient'
 import { useAuthSession } from '@/stores/authSession'
+import { useBinge } from '@/stores/binge'
 import { useCardLinks } from '@/stores/cardLinks'
 import { useDesktopBridge } from '@/stores/desktop'
 import { useDownloadAsk } from '@/stores/downloadAsk'
@@ -57,6 +58,7 @@ afterEach(() => {
   cleanup()
   queryClient.clear()
   useAuthSession.setState(initialAuthSession, true)
+  useBinge.setState({ profiles: [] })
   usePlayerPrefs.setState(initialPrefs, true)
   usePageBackdrop.setState(initialPageBackdrop, true)
   useSideMenu.setState(initialSideMenu, true)

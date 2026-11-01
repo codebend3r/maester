@@ -152,6 +152,7 @@ describe('AppShell', () => {
     ).toEqual([
       'raven',
       'Home',
+      'Binge',
       'Favourites',
       'Movies',
       'Libraries',
@@ -478,6 +479,7 @@ describe('AppShell', () => {
     expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
       ['Home', '/'],
       ['Libraries', '/libraries'],
+      ['Binge', '/binge'],
       ['Favourites', '/favourites'],
       ['Streams', '/streams'],
       ['Reports', '/reports'],
@@ -486,6 +488,7 @@ describe('AppShell', () => {
     expect(links.map(iconOf)).toEqual([
       'home',
       'libraries',
+      'playback',
       'heart',
       'playback',
       'alert',

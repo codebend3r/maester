@@ -31,6 +31,7 @@ import { useServerReach } from '@/stores/serverReach'
 import { SIDE_MENU_KEY, useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
 
 type NavItemProps = {
   to: string
@@ -280,6 +281,15 @@ export const AppShell = () => {
                 label={COMMON_COPY.home}
                 isIconsOnly={isIconsOnly}
               />
+              {!isDesktop && (
+                <NavItem
+                  to={BINGE_PATH}
+                  patterns={[BINGE_PATH]}
+                  icon={<Icon name="playback" />}
+                  label={BINGE_COPY.title}
+                  isIconsOnly={isIconsOnly}
+                />
+              )}
               <NavItem
                 to="/favourites"
                 patterns={['/favourites']}
