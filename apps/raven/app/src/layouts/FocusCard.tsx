@@ -14,7 +14,11 @@ import { TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
 /** A card's width in points on a 1920 by 1080 point screen, read from across the room. */
-export const FOCUS_CARD_WIDTHS = { [CARD_SHAPES.poster]: 232, [CARD_SHAPES.wide]: 400 } as const
+export const FOCUS_CARD_WIDTHS = {
+  [CARD_SHAPES.poster]: 232,
+  [CARD_SHAPES.wide]: 400,
+  [CARD_SHAPES.square]: 232,
+} as const
 
 /** A card's width on this TV: its width on a 1920 point screen, sized to this one. */
 export const focusCardWidthOf = (shape: CardShape): number => tvSize(FOCUS_CARD_WIDTHS[shape])

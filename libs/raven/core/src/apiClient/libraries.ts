@@ -1,8 +1,10 @@
 import type { Transport } from '@/apiClient/transport'
 import {
+  type AlbumMerge,
   type DirectoryListing,
   type Duplicates,
   type HistoryEntry,
+  isAlbumMerge,
   isDirectoryListing,
   isDuplicates,
   isHistory,
@@ -164,6 +166,13 @@ export const libraryCalls = ({ send, expect, libraryGet }: Transport) => ({
     expect({
       request: send({ path: `/api/libraries/${id}/match`, method: 'POST' }),
       guard: isLibrary,
+    }),
+
+  /** Looks through a music library and folds albums that are the same release into one; how many went. */
+  mergeLibraryAlbums: (id: number): Promise<AlbumMerge> =>
+    expect({
+      request: send({ path: `/api/libraries/${id}/albums/merge`, method: 'POST' }),
+      guard: isAlbumMerge,
     }),
 
   /** `seed` only counts with a random sort: the same seed deals the same order. */

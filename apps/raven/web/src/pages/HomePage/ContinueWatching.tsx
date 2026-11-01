@@ -1,4 +1,5 @@
 import {
+  ITEM_IMAGE_KINDS,
   type MediaItem,
   type PosterEntry,
   cardLink,
@@ -9,16 +10,15 @@ import {
   watchLink,
 } from '@raven/core'
 import { Button, Icon } from '@raven/ui'
+import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useId, useState } from 'react'
-import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
-import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
-import { POSTER_SIZES } from '@/lib/posters'
+import { itemQuery } from '@/lib/queries'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import styles from '@/pages/HomePage/ContinueWatching.module.scss'
 
@@ -29,55 +29,35 @@ export const timeLeft = (media: MediaItem): string | null => {
   return left == null ? null : HOME_COPY.timeLeft(left)
 }
 
-const TINT_KINDS = { poster: 'poster', frame: 'frame', none: 'none' } as const
-
-type PosterTintProps = { srcSet: string }
-
-const PosterTint = ({ srcSet }: PosterTintProps) => (
-  <img className={styles.tint} srcSet={srcSet} sizes="1px" alt="" loading="lazy" decoding="async" />
-)
-
-type FrameTintProps = { thumbnail: string }
-
-const FrameTint = ({ thumbnail }: FrameTintProps) => (
-  <img className={styles.tint} src={thumbnail} alt="" loading="lazy" decoding="async" />
-)
-
-const NoTint = () => null
-
-type TintViewProps = {
-  [TINT_KINDS.poster]: PosterTintProps
-  [TINT_KINDS.frame]: FrameTintProps
-  [TINT_KINDS.none]: Record<never, never>
-}
-
-const TINTS = {
-  [TINT_KINDS.poster]: PosterTint,
-  [TINT_KINDS.frame]: FrameTint,
-  [TINT_KINDS.none]: NoTint,
-} as const satisfies ViewsOf<TintViewProps>
-
-type TintProps = { entry: PosterEntry }
-
-/** The poster's sources where it has one, else the frame grab, else nothing. */
-type TintViewOfProps = TintProps
-
-const tintViewOf = ({ entry: { media, poster } }: TintViewOfProps): ViewOf<TintViewProps> => {
-  const srcSet = poster ? api.posterSrcSet({ id: poster.id, version: poster.posterVersion }) : null
-  if (srcSet) return { key: TINT_KINDS.poster, props: { srcSet } }
-  const thumbnail = api.thumbnailUrl(media)
-  if (thumbnail) return { key: TINT_KINDS.frame, props: { thumbnail } }
-  return { key: TINT_KINDS.none, props: {} }
-}
+type TileArtProps = { entry: PosterEntry }
 
 /**
- * The picture a tile is tinted with, blurred past knowing: the poster at its
- * narrowest width, which `sizes` asks the browser for, else the frame grab
- * the tile already shows.
+ * The art a tile wears: the backdrop of the show or film it belongs to, else
+ * the frame grab the video already has, and the title's logo for the corner.
+ * An episode's summary carries neither version, so the show's page is read
+ * once through the query cache every page shares.
  */
-const Tint = ({ entry }: TintProps) => (
-  <KeyedView<TintViewProps> views={TINTS} view={tintViewOf({ entry })} />
-)
+const useTileArt = ({ entry: { media } }: TileArtProps) => {
+  const artId = media.item?.show?.id ?? media.item?.id ?? null
+  const { data } = useQuery({ ...itemQuery(artId ?? 0), enabled: artId !== null })
+  const backdrop =
+    data?.backdropVersion == null
+      ? api.thumbnailUrl(media)
+      : api.itemImageUrl({
+          id: data.id,
+          kind: ITEM_IMAGE_KINDS.backdrop,
+          version: data.backdropVersion,
+        })
+  const logo =
+    data?.logoVersion == null
+      ? null
+      : api.itemImageUrl({
+          id: data.id,
+          kind: ITEM_IMAGE_KINDS.logo,
+          version: data.logoVersion,
+        })
+  return { backdrop, logo }
+}
 
 const TITLE_KINDS = { linked: 'linked', plain: 'plain' } as const
 type TitleKind = (typeof TITLE_KINDS)[keyof typeof TITLE_KINDS]
@@ -114,21 +94,22 @@ const TILE_TITLES = {
 type ContinueTileProps = { entry: PosterEntry }
 
 /**
- * A video in progress as a wide tile tinted from its artwork: its poster, or
- * a frame grab where it has none, its name, the episode or year, how far in
- * it is and how long is left. The tile resumes it; its name opens its page,
- * where it has one. A right click opens the card's menu.
+ * A video in progress as a wide tile on its show's or film's backdrop, the
+ * title's logo in the top left corner, and along the foot its name, the
+ * episode or year, how far in it is and how long is left. The tile resumes
+ * it; its name opens its page, where it has one. A right click opens the
+ * card's menu.
  */
 const ContinueTile = ({ entry }: ContinueTileProps) => {
-  const { media, poster } = entry
+  const { media } = entry
   const menu = useCardMenu({ media, matchType: null, beside: true })
   const label = mediaLabel(media)
   const { title, line } = tileWords(media)
   const left = timeLeft(media)
   const page = cardLink({ media, hasPages: true })
   const TileTitle = TILE_TITLES[page.state == null ? TITLE_KINDS.linked : TITLE_KINDS.plain]
-  const hasPoster = poster?.posterVersion != null
   const resolution = resolutionLabel(media)
+  const art = useTileArt({ entry })
 
   return (
     <li className={`${styles.tile} ${menu.hostClass}`}>
@@ -138,15 +119,11 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
         aria-label={HOME_COPY.playTitle(label)}
         onContextMenu={menu.onContextMenu}
       >
-        <span className={hasPoster ? `${styles.frame} ${styles.poster}` : styles.frame}>
-          <span className={styles.picture}>
-            <PosterImage media={media} poster={poster} sizes={POSTER_SIZES.showTile} />
-          </span>
-          <span className={styles.mark}>
-            <Icon name="play" size={20} />
-          </span>
+        <span className={styles.mark}>
+          <Icon name="play" size={20} />
         </span>
       </CardLink>
+      {art.logo && <img className={styles.logo} src={art.logo} alt="" decoding="async" />}
       <span className={styles.copy}>
         <TileTitle page={page} title={title} label={label} onContextMenu={menu.onContextMenu} />
         {(line || resolution != null) && (
@@ -163,7 +140,15 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
         )}
       </span>
       <span className={styles.backdrop}>
-        <Tint entry={entry} />
+        {art.backdrop && (
+          <img
+            className={styles.picture}
+            src={art.backdrop}
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
+        )}
       </span>
       {menu.menu}
     </li>

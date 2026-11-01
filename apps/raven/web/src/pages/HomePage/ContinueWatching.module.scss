@@ -10,17 +10,20 @@
   gap: var(--space-4);
 }
 
-// The picture at the left, the words along the foot beside it. The tile is
-// a picture in every theme, its own artwork blurred to a colour under a
-// scrim, so its words keep the fixed light ink of words on a picture.
+// The backdrop fills the tile, the logo sits in its top left corner and the
+// words along its foot. The tile is a picture in every theme, so its words
+// keep the fixed light ink of words on a picture.
 .tile {
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas: 'play copy';
-  align-items: end;
-  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'logo'
+    '.'
+    'copy';
+  gap: var(--space-3);
   min-height: 12.5rem;
   padding: var(--space-4);
   border-radius: var(--radius-lg);
@@ -39,7 +42,7 @@
   }
 }
 
-// Darkest under the words at the left, so they read on any picture.
+// Darkest along the foot, under the words, so they read on any picture.
 .backdrop {
   position: absolute;
   inset: 0;
@@ -52,68 +55,37 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(110deg, var(--color-picture-scrim) 30%, var(--color-shade));
+    background: linear-gradient(0deg, var(--color-shade) 0%, transparent 65%);
   }
-}
-
-// Scaled past the tile's edges, which the blur would otherwise leave pale.
-.tint {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  scale: 1.3;
-  filter: blur(var(--space-5)) brightness(0.85);
-}
-
-.tile:hover .tint {
-  filter: blur(var(--space-5)) brightness(1);
-}
-
-// The picture is the link that resumes the video, and it reaches across
-// the whole tile, under its name's own link and its menu.
-.play {
-  grid-area: play;
-  display: grid;
-  border-radius: var(--radius-md);
-
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-  }
-
-  &:focus-visible {
-    outline: none;
-  }
-}
-
-// A frame grab's shape, or a poster's.
-.frame {
-  display: grid;
-  grid-template-areas: 'frame';
-  width: 10rem;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  background: var(--color-shade);
-  box-shadow: var(--shadow-panel);
-}
-
-.poster {
-  width: 6rem;
-  aspect-ratio: 2 / 3;
 }
 
 .picture {
-  grid-area: frame;
-  display: grid;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-// Play, in the middle of the picture, while the tile is pointed at or focused.
+.logo {
+  grid-area: logo;
+  justify-self: start;
+  max-width: 55%;
+  max-height: 3.5rem;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 4px var(--color-shade));
+}
+
+// The link that resumes the video reaches across the whole tile, under its
+// name's own link and its menu.
+.play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  border-radius: inherit;
+  outline: none;
+}
+
+// Play, in the middle of the tile, while it is pointed at or focused.
 .mark {
-  grid-area: frame;
   place-self: center;
   display: grid;
   place-items: center;
@@ -201,10 +173,6 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .tint {
-    transition: filter 200ms ease-out;
-  }
-
   .mark {
     transition: opacity 150ms ease-out;
   }
@@ -220,14 +188,6 @@
     gap: var(--space-3);
     min-height: 9.5rem;
     padding: var(--space-3);
-  }
-
-  .frame {
-    width: 7.5rem;
-  }
-
-  .poster {
-    width: 5rem;
   }
 
   .title {

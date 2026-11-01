@@ -55,6 +55,7 @@
 }
 
 .title {
+  color: var(--color-bark);
   font-family: var(--font-display);
   font-size: var(--font-size-2xl);
   line-height: var(--line-heading);
@@ -63,7 +64,9 @@
 }
 
 .artists {
+  color: var(--color-birch);
   font-size: var(--font-size-lg);
+  font-weight: 700;
 
   a {
     color: inherit;

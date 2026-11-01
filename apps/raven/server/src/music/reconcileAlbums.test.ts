@@ -48,8 +48,8 @@ describe('repairing existing album folders', () => {
     db.prepare('INSERT INTO album_artists (album_id, artist_id, position) VALUES (?, 1, 0)').run(id)
     return id
   }
-  type AddTrackProps = { album: number; path: string }
-  const addTrack = ({ album, path }: AddTrackProps) => {
+  type AddTrackProps = { album: number; path: string; title?: string; number?: number }
+  const addTrack = ({ album, path, title = 'Song', number = 1 }: AddTrackProps) => {
     const id = new MediaIndex(database.get()).insert({
       libraryId: state.library,
       kind: LIBRARY_KINDS.music,
@@ -57,8 +57,8 @@ describe('repairing existing album folders', () => {
     })
     database
       .get()
-      .db.prepare("INSERT INTO tracks (media_id, album_id, title) VALUES (?, ?, 'Song')")
-      .run(id, album)
+      .db.prepare('INSERT INTO tracks (media_id, album_id, title, number) VALUES (?, ?, ?, ?)')
+      .run(id, album, title, number)
     return id
   }
   type FavouriteProps = { album: number; viewer?: string; at?: string }
@@ -136,6 +136,66 @@ describe('repairing existing album folders', () => {
     ).toHaveLength(2)
     reconcileAlbums({ db: database.get().db })
     expect(albums()).toEqual(repaired)
+  })
+
+  it('merges folders that hold the same release into one album, each folder a disc', () => {
+    const first = addAlbum({ key: 'folder:/music/Band/Album/Digital Media 01', mbid: 'one' })
+    const second = addAlbum({ key: 'folder:/music/Band/Album/Digital Media 02', mbid: 'one' })
+    const other = addAlbum({ key: 'folder:/music/Band/Other', mbid: 'two' })
+    const tracks = [first, second].map((album, at) =>
+      addTrack({
+        album,
+        path: `/music/Band/Album/Digital Media 0${at + 1}/01.flac`,
+        title: `Song ${at + 1}`,
+      }),
+    )
+    addTrack({ album: other, path: '/music/Band/Other/01.flac' })
+    favourite({ album: second })
+    reconcileAlbums({ db: database.get().db })
+    const repaired = albums()
+    expect(repaired).toHaveLength(2)
+    expect(
+      music()
+        .album(first)
+        ?.tracks.map(({ id, disc }) => ({ id, disc })),
+    ).toEqual(tracks.map((id, at) => ({ id, disc: at + 1 })))
+    expect(
+      database
+        .get()
+        .db.prepare('SELECT album_id FROM album_favourites WHERE account_id = ?')
+        .all(account),
+    ).toEqual([{ album_id: first }])
+    reconcileAlbums({ db: database.get().db })
+    expect(albums()).toEqual(repaired)
+  })
+
+  it('merges copies of one release filed under different artist folders, showing each track once', () => {
+    const solo = addAlbum({ key: 'folder:/music/Band/Album', mbid: 'one' })
+    const duet = addAlbum({ key: 'folder:/music/Band & Friend/Album', mbid: 'two' })
+    const { db } = database.get()
+    db.prepare('UPDATE albums SET year = 2023, mbid = NULL WHERE id IN (?, ?)').run(solo, duet)
+    db.prepare("UPDATE albums SET mbid = 'one', title = 'Welcome' WHERE id = ?").run(solo)
+    db.prepare("UPDATE albums SET title = 'welcome' WHERE id = ?").run(duet)
+    db.prepare(
+      "INSERT INTO artists (id, name, sort_name, name_key) VALUES (2, 'Band & Friend', 'Band & Friend', 'band & friend')",
+    ).run()
+    db.prepare('UPDATE album_artists SET artist_id = 2 WHERE album_id = ?').run(duet)
+    ;['one', 'two'].forEach((title, at) => {
+      addTrack({ album: solo, path: `/music/Band/Album/0${at + 1}.flac`, title, number: at + 1 })
+      addTrack({
+        album: duet,
+        path: `/music/Band & Friend/Album/0${at + 1}.flac`,
+        title,
+        number: at + 1,
+      })
+    })
+    expect(music().mergeAlbums(state.library)).toBe(1)
+    const merged = albums()
+    expect(merged).toHaveLength(1)
+    expect(merged[0]).toMatchObject({ id: solo, trackCount: 2 })
+    expect(music().album(solo)?.tracks).toHaveLength(2)
+    expect(music().mergeAlbums(state.library)).toBe(0)
+    expect(albums()).toEqual(merged)
   })
 
   it('preserves conflicting manual choices instead of silently discarding one', () => {

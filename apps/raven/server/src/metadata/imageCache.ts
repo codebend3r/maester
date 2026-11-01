@@ -192,6 +192,20 @@ export class ImageCache {
     })
   }
 
+  /**
+   * The Cover Art Archive's front cover of a release group, the cover any of
+   * its releases is known by, for a release the archive has no art for.
+   * Fetched like a release's, and kept beside it under the group's id.
+   */
+  releaseGroupCoverArt(mbid: string): Promise<string | null> {
+    if (!isMbid(mbid)) return Promise.resolve(null)
+    return this.downloaded({
+      target: join(this.root, COVER_ART_DIR, `${mbid}.jpg`),
+      url: `https://coverartarchive.org/release-group/${encodeURIComponent(mbid)}/front-500`,
+      what: `the cover of release group ${mbid}`,
+    })
+  }
+
   /** A picture fetched from `url` into `target` once; null when it cannot be had, warned of once. */
   private downloaded({ target, url, what }: ImageCacheDownloadedProps): Promise<string | null> {
     return this.once({

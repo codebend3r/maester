@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { mediaLabel } from '@raven/core'
-import { POSTER_SIZES } from '@/lib/posters'
+import { QueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@raven/ui/headless'
 import { ContinueWatching, timeLeft } from '@/pages/HomePage/ContinueWatching'
-import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
+import { itemDetails, itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_CARD } from '@/test/tv'
 import { reported } from '@/test/viewport'
@@ -67,19 +68,30 @@ describe('ContinueWatching', () => {
     )
   })
 
-  it("wears its season's poster, as wide as the tile shows it, and is tinted with the narrowest", async () => {
+  it("wears its show's backdrop, with the show's logo in the corner, once the show's page is read", async () => {
+    const client = new QueryClient()
+    client.setQueryData(
+      queryKeys.item(4),
+      itemDetails({ id: 4, backdropVersion: 'b9', logoVersion: 'l9' }),
+    )
+    const episode = {
+      ...EPISODE_TWO,
+      item: { ...EPISODE_TWO.item!, show: { id: 4, title: 'Severance' } },
+    }
     renderWithProviders({
-      ui: <ContinueWatching entries={[{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }]} />,
+      ui: <ContinueWatching entries={[{ media: episode, poster: SEASON_ONE_CARD }]} />,
+      client,
     })
     await reported()
-    const [poster, tint] = [...section().querySelectorAll('img')]
-    expect(poster?.getAttribute('src')).toContain('/api/pictures/items/5/poster')
-    expect(poster?.getAttribute('sizes')).toBe(POSTER_SIZES.showTile)
-    expect(tint?.getAttribute('srcset')).toContain('/api/pictures/items/5/poster')
-    expect(tint?.getAttribute('sizes')).toBe('1px')
+    const sources = [...section().querySelectorAll('img')].map((img) => img.getAttribute('src'))
+    expect(sources).toEqual([
+      expect.stringContaining('/api/pictures/items/4/logo'),
+      expect.stringContaining('/api/pictures/items/4/backdrop'),
+    ])
+    expect(section().querySelector('img[src*="/logo"]')?.getAttribute('alt')).toBe('')
   })
 
-  it('shows and is tinted with a frame grab where there is no poster', async () => {
+  it('shows a frame grab as its backdrop where the show has no art to read', async () => {
     const clip = mediaItem({
       id: 8,
       title: 'Clip',
@@ -90,7 +102,7 @@ describe('ContinueWatching', () => {
     renderWithProviders({ ui: <ContinueWatching entries={[{ media: clip, poster: null }]} /> })
     await reported()
     const sources = [...section().querySelectorAll('img')].map((img) => img.getAttribute('src'))
-    expect(sources).toEqual(['/api/media/8/thumbnail?v=3', '/api/media/8/thumbnail?v=3'])
+    expect(sources).toEqual(['/api/media/8/thumbnail?v=3'])
   })
 
   it('has only the link that plays a file with no page, its name as plain words', () => {
@@ -104,11 +116,11 @@ describe('ContinueWatching', () => {
     expect(within(section()).getByText('Clip')).toBeInTheDocument()
   })
 
-  it('stands a letter in for a video with no picture at all, untinted', () => {
+  it('draws no picture for a video with no art at all, only its words', () => {
     const blank = mediaItem({ id: 9, title: 'Blank', thumbnail: 'pending', position: 30 })
     renderWithProviders({ ui: <ContinueWatching entries={[{ media: blank, poster: null }]} /> })
     expect(section().querySelectorAll('img')).toHaveLength(0)
-    expect(within(section()).getByText('B')).toBeInTheDocument()
+    expect(within(section()).getByText('Blank')).toBeInTheDocument()
   })
 
   it('marks its resolution beside the year, and leaves it out of a file not yet probed', () => {

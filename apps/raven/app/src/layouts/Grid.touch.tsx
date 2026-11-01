@@ -56,7 +56,11 @@ const leastWidthOf = ({ shape, screen }: LeastWidthOfProps): number => {
 const LEAST_ROW_WIDTH = 320
 
 /** A tile's picture, by its card's shape. */
-const TILE_WIDTHS = { [CARD_SHAPES.poster]: 48, [CARD_SHAPES.wide]: 96 } as const
+const TILE_WIDTHS = {
+  [CARD_SHAPES.poster]: 48,
+  [CARD_SHAPES.wide]: 96,
+  [CARD_SHAPES.square]: 48,
+} as const
 
 /** How tall a bucket's heading row stands: a finger's reach, or its title at the viewer's size. */
 const headerHeightOf = (fontScale: number): number =>

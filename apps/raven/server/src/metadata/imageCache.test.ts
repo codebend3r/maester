@@ -95,6 +95,15 @@ describe('the image cache', () => {
     expect(state.calls).toContain(`https://coverartarchive.org/release/${mbid}/front-500`)
   })
 
+  it('fetches the cover of a release group when asked for one', async () => {
+    const mbid = '87654321-4321-4321-4321-cba987654321'
+    expect(await cache().releaseGroupCoverArt(mbid)).toBe(
+      join(state.root, 'data', 'images', 'cover-art', `${mbid}.jpg`),
+    )
+    expect(state.calls).toContain(`https://coverartarchive.org/release-group/${mbid}/front-500`)
+    expect(await cache().releaseGroupCoverArt('../../outside')).toBeNull()
+  })
+
   it('fetches a TMDB poster at the width asked for, once for each width', async () => {
     const first = await Promise.all(
       POSTER_WIDTHS.map((width) => cache().tmdb({ path: '/heat.jpg', width })),

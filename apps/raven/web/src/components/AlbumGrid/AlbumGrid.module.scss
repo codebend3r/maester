@@ -42,12 +42,13 @@
   }
 }
 
+// Three shades tell the lines apart: bark for the title, birch for the artist, lichen for the date.
 .title {
-  overflow: hidden;
-  font-weight: 600;
+  color: var(--color-bark);
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
   line-height: var(--line-tight);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 
   a {
     color: inherit;
@@ -60,12 +61,11 @@
 }
 
 .artists {
-  overflow: hidden;
-  color: var(--color-lichen);
-  font-size: var(--font-size-sm);
+  color: var(--color-birch);
+  font-size: var(--font-size-md);
+  font-weight: 700;
   line-height: var(--line-tight);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 
   a {
     color: inherit;

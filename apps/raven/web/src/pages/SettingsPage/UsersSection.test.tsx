@@ -54,7 +54,15 @@ describe('UsersSection', () => {
   const setMemberStatus = spyOn(api, 'setMemberStatus')
   const server: { members: Account[] } = { members: EVERYONE }
 
-  const renderUsers = () => renderWithProviders({ ui: <UsersSection userId={OWNER.id} /> })
+  const rendered: { client: ReturnType<typeof renderWithProviders>['client'] | null } = {
+    client: null,
+  }
+
+  const renderUsers = () => {
+    const view = renderWithProviders({ ui: <UsersSection userId={OWNER.id} /> })
+    rendered.client = view.client
+    return view
+  }
 
   beforeEach(() => {
     server.members = EVERYONE
@@ -67,7 +75,11 @@ describe('UsersSection', () => {
     })
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    const client = rendered.client
+    rendered.client = null
+    // A change ends with a refetch of the list; let it land inside act() instead of after the test.
+    await waitFor(() => expect((client?.isFetching() ?? 0) + (client?.isMutating() ?? 0)).toBe(0))
     cleanup()
     listMembers.mockReset()
     setMemberStatus.mockReset()

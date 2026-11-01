@@ -91,6 +91,11 @@ button.tile {
   background: var(--color-canopy);
 }
 
+// An album's cover is square, never cropped to a poster's shape.
+.square {
+  aspect-ratio: 1;
+}
+
 .title {
   grid-area: title;
   font-weight: 600;

@@ -12,6 +12,7 @@ import {
   sortParts,
   startingSort,
   formatBytes,
+  DOWNLOAD_ARTWORK_KINDS,
 } from '@raven/core'
 import { Button } from '@raven/ui'
 import { type ComponentType, useId, useState } from 'react'
@@ -38,7 +39,14 @@ const TileFace = ({ view }: TileFaceProps) => {
   const subtitle = subtitleOf(view)
   return (
     <>
-      <span className={styles.poster} aria-hidden="true">
+      <span
+        className={
+          view.artwork.kind === DOWNLOAD_ARTWORK_KINDS.cover
+            ? `${styles.poster} ${styles.square}`
+            : styles.poster
+        }
+        aria-hidden="true"
+      >
         <DownloadArtwork
           artwork={view.artwork}
           initial={view.group.title.slice(0, 1)}

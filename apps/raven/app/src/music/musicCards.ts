@@ -30,7 +30,7 @@ export const albumCard = ({ api, headersFor, album }: AlbumCardProps): ShelfCard
   key: `album:${album.id}`,
   title: album.title,
   line: artistNames(album),
-  shape: CARD_SHAPES.poster,
+  shape: CARD_SHAPES.square,
   picture: pictureAt({
     uri: api.albumCoverUrl({ albumId: album.id, coverVersion: album.coverVersion }),
     headersFor,
@@ -63,7 +63,7 @@ export const albumSectionsOf = ({
           key: SECTION_KEYS.albums,
           title: null,
           count: null,
-          shape: CARD_SHAPES.poster,
+          shape: CARD_SHAPES.square,
           cards: albums.map((album) => albumCard({ api, headersFor, album })),
         },
       ]
@@ -88,7 +88,7 @@ export const artistSectionsOf = ({
           key: SECTION_KEYS.appearsOn,
           title: MUSIC_COPY.appearsOn,
           count: String(appearsOn.length),
-          shape: CARD_SHAPES.poster,
+          shape: CARD_SHAPES.square,
           cards: appearsOn.map((album) => albumCard({ api, headersFor, album })),
         },
       ]),

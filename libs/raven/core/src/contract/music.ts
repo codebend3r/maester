@@ -192,3 +192,8 @@ export const ALBUM_TYPE_LABELS: Record<AlbumType, string> = {
   live: 'Live',
   soundtrack: 'Soundtrack',
 }
+
+/** What folding a music library's duplicate albums did: how many albums went into another. */
+export const isAlbumMerge = object({ merged: isNumber })
+
+export type AlbumMerge = Infer<typeof isAlbumMerge>

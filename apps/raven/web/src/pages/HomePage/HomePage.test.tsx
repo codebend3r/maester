@@ -104,7 +104,7 @@ describe('HomePage', () => {
       }),
     ).toHaveAttribute('href', '/watch/13')
     expect(shelf('Continue watching').querySelector('img')?.getAttribute('src')).toContain(
-      '/api/pictures/items/5/poster',
+      '/api/media/13/thumbnail',
     )
     expect(
       within(shelf('Continue watching')).getByRole('link', { name: mediaLabel(EPISODE_TWO) }),
@@ -205,16 +205,13 @@ describe('HomePage', () => {
       ],
     })
     await screen.findByRole('heading', { name: 'Films' })
-    const posters = ['Continue watching', 'Films', 'Series'].map((name) =>
-      shelf(name).querySelector('img'),
-    )
+    const posters = ['Films', 'Series'].map((name) => shelf(name).querySelector('img'))
     expect(posters.map((poster) => poster?.getAttribute('sizes'))).toEqual([
-      POSTER_SIZES.showTile,
       POSTER_SIZES.row,
       POSTER_SIZES.row,
     ])
     expect(posters.map((poster) => poster?.getAttribute('srcset')?.split(', ').length)).toEqual([
-      3, 3, 3,
+      3, 3,
     ])
   })
 

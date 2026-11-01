@@ -120,6 +120,7 @@ function TrackHead({ session, pane, onPane, track, close }: TrackHeadProps) {
         <AlbumArt
           cover={coverOf({ albumId: track.albumId, coverVersion: track.album.coverVersion })}
           size={Math.min(width - 2 * SIZES.space4, SIZES.measure / 2)}
+          initial={track.album.title.slice(0, 1)}
         />
       </View>
       <View>
