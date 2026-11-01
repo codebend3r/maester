@@ -8,16 +8,15 @@ import { createApp } from '@/app'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
-import { ADMIN_PASSWORD, NOT_WATCHING, adminCookie, testConfig } from '@/test/app'
+import { NOT_WATCHING, adminCookie, testConfig } from '@/test/app'
 import { encodeClip, encodeRichClip, encodeTrack } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
 import { apiFor } from '@/test/server'
 
 /**
  * A real raven server for the device app's and Wren's Maestro flows (`apps/raven/app/e2e`,
- * `apps/raven/music/e2e`): a locked film library holding a movie, an open series library holding
- * two episodes and an open music library holding a three track FLAC album, behind a PIN and the
- * admin password, with media tickets on. The movie and the first episode are MKVs, which an Apple
+ * `apps/raven/music/e2e`): an open film library holding a movie, an open series library holding
+ * two episodes and an open music library holding a three track FLAC album, with media tickets on. The movie and the first episode are MKVs, which an Apple
  * device plays through the server's HLS remux; the second episode is an MP4 with an English
  * sidecar, which it plays as it is. Both are matched against a fake TMDB, which knows no
  * MusicBrainz release, so the album keeps its tags and no request leaves the Mac. The music
@@ -28,7 +27,6 @@ import { apiFor } from '@/test/server'
 const FIXTURE = {
   host: '127.0.0.1',
   port: 8490,
-  pin: '1357',
   movie: { library: 'Films', folder: 'Kestrel Point (2024)', file: 'Kestrel Point (2024).mkv' },
   show: {
     library: 'Series',
@@ -119,7 +117,6 @@ const serve = async (): Promise<string> => {
       ...testConfig({ dataDir: join(root, 'data'), mediaDir: media }),
       host: FIXTURE.host,
       port: FIXTURE.port,
-      libraryPin: FIXTURE.pin,
       tmdbApiToken: 'fixture-token',
       mediaPlane: {
         origins: [],
@@ -140,7 +137,7 @@ const serve = async (): Promise<string> => {
     api.createLibrary({
       name: FIXTURE.movie.library,
       paths: [movies],
-      settings: { kind: LIBRARY_KINDS.movies, locked: true },
+      settings: { kind: LIBRARY_KINDS.movies },
     }),
     api.createLibrary({
       name: FIXTURE.show.library,
@@ -162,9 +159,7 @@ const serve = async (): Promise<string> => {
 // A failed start (an encode, the port taken, a library refused) leaves no folder behind.
 try {
   const address = await serve()
-  console.log(
-    `raven fixture server ready at ${address} (PIN ${FIXTURE.pin}, admin password ${ADMIN_PASSWORD})`,
-  )
+  console.log(`raven fixture server ready at ${address}`)
 } catch (error) {
   removeRoot()
   console.error('raven fixture server could not start:', error)

@@ -17,7 +17,7 @@ import styles from '@/components/LibraryActions/LibraryActions.module.scss'
 import { LIBRARY_ACTIONS_COPY } from '@/components/LibraryActions/copy'
 import { Spinner } from '@/components/Spinner/Spinner'
 import { api } from '@/lib/api'
-import { afterRematch, afterRescan, queryKeys, useUnlockPrompt } from '@raven/ui/headless'
+import { afterRematch, afterRescan, queryKeys } from '@raven/ui/headless'
 import { metadataHealthQuery } from '@/lib/queries'
 import { COMMON_COPY } from '@/lib/copy'
 
@@ -232,13 +232,6 @@ export const LibraryActions = ({
   const isFullScanning = fullScan.isPending || (isScanRunning && scan.kind === SCAN_KINDS.full)
   const isUpdatingRatings = updateRatings.isPending || isRefreshingRatings(library)
 
-  // A locked library's folders stay on the server until the PIN is entered,
-  // so Edit asks for it rather than open with none.
-  const edit = () => {
-    if (isShut) return useUnlockPrompt.getState().ask()
-    setEditing(true)
-  }
-
   return (
     <>
       <div className={styles.row}>
@@ -263,7 +256,12 @@ export const LibraryActions = ({
               {whose}
             </Button>
           )}
-          <Button icon="edit" title={LIBRARY_ACTIONS_COPY.editTitle} onClick={edit}>
+          <Button
+            icon="edit"
+            title={LIBRARY_ACTIONS_COPY.editTitle}
+            disabled={isShut}
+            onClick={() => setEditing(true)}
+          >
             {LIBRARY_ACTIONS_COPY.edit}
             {whose}
           </Button>

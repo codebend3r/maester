@@ -288,6 +288,7 @@ describe('UsersSection', () => {
       expect(screen.getByRole('button', { name: 'Approve sam@example.com' })).toBeEnabled()
 
       await act(async () => change.answer({ ...WAITING_PAT, status: MEMBER_STATUSES.approved }))
+      await waitFor(() => expect(listMembers).toHaveBeenCalledTimes(2))
     })
 
     it('says what went wrong, and keeps the row where it was', async () => {

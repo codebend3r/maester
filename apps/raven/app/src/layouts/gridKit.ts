@@ -1,4 +1,5 @@
 import { type JumpScale, LIBRARY_VIEWS, type LibraryIconName, type LibraryView } from '@raven/core'
+import type { IconName } from '@raven/ui/iconDrawings'
 import type { ReactNode } from 'react'
 
 import type { ShelfCard } from '@/queries/cards'
@@ -52,6 +53,8 @@ type PickerOption<K extends string> = { key: K; label: string }
 export type PickerProps<K extends string> = {
   /** What is being picked: "Sort". */
   label: string
+  /** Drawn beside the text, the web's icon for the same control; decorative. */
+  icon: IconName
   options: readonly PickerOption<K>[]
   value: K
   onChoose: (key: K) => void
@@ -63,6 +66,8 @@ export type PickerProps<K extends string> = {
 
 export type ToolButtonProps = {
   label: string
+  /** Drawn beside the text, the web's icon for the same control; decorative. */
+  icon: IconName
   accessibilityLabel: string
   onPress: () => void
   /** Drawn over the video: dark in every theme. */
@@ -86,7 +91,7 @@ export const chosenLabelOf = <K extends string>({
   value,
 }: ChosenLabelOfProps<K>): string => options.find(({ key }) => key === value)?.label ?? ''
 
-type PickerLabelOfProps<K extends string> = PickerProps<K>
+type PickerLabelOfProps<K extends string> = Pick<PickerProps<K>, 'label' | 'options' | 'value'>
 
 /** A picker's button as it is read out: "Sort: Title". */
 export const pickerLabelOf = <K extends string>(props: PickerLabelOfProps<K>): string =>

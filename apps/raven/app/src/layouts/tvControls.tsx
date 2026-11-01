@@ -126,6 +126,8 @@ export const TvTextField = ({
 export const usePlateStyles = themedStyles((colours) =>
   StyleSheet.create({
     plate: {
+      flexDirection: 'row',
+      gap: TV_SIZES.space2,
       minWidth: TV_SIZES.controlLarge,
       minHeight: TV_SIZES.controlLarge,
       alignItems: 'center',
@@ -141,8 +143,11 @@ export const usePlateStyles = themedStyles((colours) =>
   }),
 )
 
-/** What a plate shows: words, or an icon, the web's, whose tint deepens while the remote is on it. */
-type PlateFace = { text: string } | { icon: IconName }
+/**
+ * What a plate shows: words, or an icon, the web's, whose tint deepens while the remote is on it,
+ * or both, the icon first.
+ */
+type PlateFace = { text: string } | { icon: IconName } | { text: string; icon: IconName }
 
 type PlateButtonProps = PlateFace & {
   label: string
@@ -154,7 +159,7 @@ type PlateButtonProps = PlateFace & {
 }
 
 /**
- * A button on a plate, the remote's to press: its face is its `text` or its `icon`, `label` is
+ * A button on a plate, the remote's to press: its face is its `text`, its `icon` or both, `label` is
  * what it is called aloud, `isPreferred` asks the remote's focus for it as it appears, `onFocused`
  * hears each time it gets the focus, and `isOverPicture` gives it the player's dark glass in every
  * theme.
@@ -179,13 +184,19 @@ export const PlateButton = ({
       onPress={onPress}
       style={({ focused }) => [plateStyles.plate, focused && plateStyles.focused]}
     >
-      {({ focused }) =>
-        'icon' in face ? (
-          <Icon colour={colour} isFocused={focused} name={face.icon} size={TV_SIZES.textXl} />
-        ) : (
-          <Text style={plateStyles.label}>{face.text}</Text>
-        )
-      }
+      {({ focused }) => (
+        <>
+          {'icon' in face && (
+            <Icon
+              colour={colour}
+              isFocused={focused}
+              name={face.icon}
+              size={'text' in face ? TV_SIZES.textLg : TV_SIZES.textXl}
+            />
+          )}
+          {'text' in face && <Text style={plateStyles.label}>{face.text}</Text>}
+        </>
+      )}
     </Pressable>
   )
 }

@@ -1,7 +1,7 @@
 import { type ComponentType, useState } from 'react'
 import { Image, StyleSheet, View } from 'react-native'
 
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type Picture, type ShelfCard } from '@/queries/cards'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
@@ -42,7 +42,11 @@ type CardInitialProps = CardFaceProps
 
 const CardInitial = ({ title, height }: CardInitialProps) => {
   const styles = useStyles()
-  return <Text style={[styles.initial, { fontSize: height / 3 }]}>{title.slice(0, 1)}</Text>
+  return (
+    <Text variant={TEXT_VARIANTS.display} style={[styles.initial, { fontSize: height / 3 }]}>
+      {title.slice(0, 1)}
+    </Text>
+  )
 }
 
 type CardImageProps = CardFaceProps
@@ -74,6 +78,8 @@ type CardPictureProps = {
   width: number
   ring?: number
   radius?: number
+  /** Hears the title art fail to load, so the card can put its title's words back. */
+  onLogoError?: () => void
 }
 
 /**
@@ -82,7 +88,13 @@ type CardPictureProps = {
  * the web's `:focus-visible` outline does, in the theme's focus colour. `radius` rounds its
  * corners: the web's `--radius-md`, which a TV sizes to its screen.
  */
-export const CardPicture = ({ card, width, ring = 0, radius = SIZES.radius }: CardPictureProps) => {
+export const CardPicture = ({
+  card,
+  width,
+  ring = 0,
+  radius = SIZES.radius,
+  onLogoError,
+}: CardPictureProps) => {
   // What failed is the picture with those headers: with new cookies it is asked for again.
   const [failed, setFailed] = useState<string | null>(null)
   const [failedLogo, setFailedLogo] = useState<string | null>(null)
@@ -107,7 +119,10 @@ export const CardPicture = ({ card, width, ring = 0, radius = SIZES.radius }: Ca
         {logo !== null && (
           <View pointerEvents="none" style={styles.logoSlot}>
             <Image
-              onError={() => setFailedLogo(logo.uri)}
+              onError={() => {
+                setFailedLogo(logo.uri)
+                onLogoError?.()
+              }}
               resizeMethod="resize"
               resizeMode="contain"
               source={logo}

@@ -27,6 +27,18 @@ import { linesHeightOf } from '@/layouts/textHeights'
 import { SIZES } from '@/theme/appTheme'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
+type RenderedNode = { type?: unknown; children?: readonly unknown[] }
+
+const isRenderedNode = (value: unknown): value is RenderedNode =>
+  typeof value === 'object' && value !== null
+
+/** How many drawings (react-native-svg's views) sit in `node`'s rendered tree. */
+const drawingsIn = (node: unknown): number =>
+  !isRenderedNode(node)
+    ? 0
+    : (node.type === 'RNSVGSvgView' ? 1 : 0) +
+      (node.children ?? []).reduce<number>((sum, child) => sum + drawingsIn(child), 0)
+
 const mockPush = jest.fn()
 const mockFontScale = jest.fn(() => 1)
 const mockParams = jest.fn((): Record<string, string> => ({
@@ -170,6 +182,20 @@ describe('Library on a phone or tablet', () => {
     )
     expect(screen.getByRole('button', { name: 'Sort: Title' })).toBeTruthy()
     expect(screen.getByRole('button', { name: `View: ${LIBRARY_VIEW_LABELS.grid}` })).toBeTruthy()
+  })
+
+  it('draws an icon beside the text of every toolbar chip', async () => {
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+
+    const chips = [
+      screen.getByRole('button', { name: 'Sort: Title' }),
+      screen.getByRole('button', { name: `View: ${LIBRARY_VIEW_LABELS.grid}` }),
+      screen.getByRole('button', { name: 'Shuffle Films' }),
+    ]
+    chips.forEach((chip) => {
+      expect(drawingsIn(chip)).toBe(1)
+    })
   })
 
   it("opens a card on its item's page, as this library shows it", async () => {

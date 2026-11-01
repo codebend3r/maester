@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event'
 import type { Library, LibraryViewChange } from '@raven/core'
 import { api } from '@/lib/api'
 import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
-import { useUnlockPrompt } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { fakeAccount } from '@/test/authClient'
 import { library, mediaItem, metadataHealth } from '@/test/fixtures'
@@ -112,17 +111,15 @@ describe('LibrariesPage', () => {
     expect(within(dialog).getByLabelText('Name')).toHaveValue('Clips')
   })
 
-  it('asks for the PIN on Edit while the library is locked, as its folders are held back', async () => {
+  it('holds Edit back while the library is locked, as its folders are, with no prompt', async () => {
     spies.list.mockImplementation(async () => [
       library({ id: 3, name: 'Tutorials', settings: { ...library().settings, locked: true } }),
     ])
     spies.lock.mockImplementation(async () => ({ available: true, unlocked: false }))
     renderWithProviders({ ui: <LibrariesPage /> })
     await openAll()
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit Tutorials' }))
-    expect(useUnlockPrompt.getState().open).toBe(true)
+    expect(await screen.findByRole('button', { name: 'Edit Tutorials' })).toBeDisabled()
     expect(screen.queryByRole('dialog')).toBeNull()
-    useUnlockPrompt.setState({ open: false })
   })
 
   it('unpins a pinned library, changing nothing else', async () => {

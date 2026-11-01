@@ -41,6 +41,7 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
 jest.mock('expo-router', () => ({
   ...jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').navigationFocusMocks,
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+  useLocalSearchParams: () => ({}),
 }))
 jest.mock(
   '@/layouts/tvFocus',

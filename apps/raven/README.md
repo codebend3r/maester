@@ -124,7 +124,7 @@ To take raven off the internet, delete `funnel/` and, as root in `/volume1/docke
 
 ### On Netlify
 
-The web app can also be served from Netlify, with `/api` proxied to the Funnel address, so a page there works as it does on Vhagar, the PIN and the admin lock included: the browser only ever talks to Netlify, so their cookies stay first party.
+The web app can also be served from Netlify, with `/api` proxied to the Funnel address, so a page there works as it does on Vhagar, the admin lock included: the browser only ever talks to Netlify, so their cookies stay first party.
 
 1. Create a site from the GitHub repo. Leave the base directory empty, the repo root, and set the package directory to `apps/raven/web`. Its `netlify.toml` holds the build command, the publish folder, Bun's version and the single-page app's fallback.
 2. In the site's environment variables, set `RAVEN_API_ORIGIN` to the Funnel address, `https://raven.<tailnet>.ts.net`. The build writes it into a `_redirects` file, and fails on Netlify without it.
@@ -445,7 +445,7 @@ The app keeps its settings, recents, resume points and downloads in `~/Library/A
 
 - **It is raven.** Browse, search, sign in and play as you do on the web. The app loads raven web from a page of its own on this Mac, `http://localhost:47484`, and passes `/api` on to one raven server, the one the app was built for. There is no server to add, and no Servers screen. Another app holding port 47484 stops Raven starting, and it says so.
 - **Sign in** with the web app's own sign-in, which asks Supabase directly. The page hands its session to the app, which keeps it in memory only, so playback and downloads act as your account. After a relaunch the page signs in again by itself while its session lasts.
-- **Locked libraries** ask for the PIN in the page, as in the browser. The app uses that same unlock for playback and downloads, so one entry covers them.
+- **Locked libraries** stay unavailable. No client asks for the PIN: the page says a library is locked and offers nothing to open it, and Raven's own server calls carry whatever unlock cookie the page already holds.
 - **Every title plays in mpv.** Play on a movie or an episode opens the native player, and prefers a finished download over the server. The player shows why a title will not play (signed out, waiting for approval, a locked library, gone from the server, server out of reach) instead of a blank window.
 - **Without the server** the app shows Downloads, On this Mac, anything already playing and Settings, and goes back to the page you were on when the server answers again.
 
@@ -473,7 +473,7 @@ The app keeps its settings, recents, resume points and downloads in `~/Library/A
 
 ### Downloads
 
-- **Download:** inside the app every movie, episode, season, show and saga page offers it beside Play. Raven asks first: what you are downloading, how many files and how big, and how much the disk has free. A locked library asks for the PIN first, as a title does. Raven leaves at least 2 GB of the disk free, and says so instead of offering Download when the files will not fit. Nothing is queued before you choose **Download**, and a file already on the Downloads page is skipped.
+- **Download:** inside the app every movie, episode, season, show and saga page offers it beside Play. Raven asks first: what you are downloading, how many files and how big, and how much the disk has free. A title in a locked library says so and is not downloaded. Raven leaves at least 2 GB of the disk free, and says so instead of offering Download when the files will not fit. Nothing is queued before you choose **Download**, and a file already on the Downloads page is skipped.
 - **What is kept:** the server's original file, the same bytes Raven streams, and its subtitle files. They live in `~/Library/Application Support/raven/downloads`, a folder per title, and the list of them in `downloads.json` beside it. Settings, Downloads, **Show in Finder** opens the folder; you cannot pick another one yet.
 - **The Downloads page**, from the side menu (its badge counts what is queued or downloading), lists every file, newest first, with a show's or saga's files together in play order, and the disk's free space. Each row offers **Play** once the file is whole, **Pause** or **Resume**, **Retry** after a failure, a **Delete once watched** switch and **Delete**; the header has **Pause all** and **Resume all**. Two files download at a time. A download picks up where it stopped after a quit, a sleep or a dropped connection: when the server cannot be reached, its files wait, and Raven tries again every five minutes, at launch and after a sleep.
 - **Playing a download** works as for a file of your own: the native engine, resume, track picks, and Next for the rest of its show or saga. The player and the recents say "Downloaded from raven". A title you streamed partway opens where the server had it when you downloaded it.
@@ -544,7 +544,7 @@ raven app is raven on iPhone, iPad, Apple TV and Android TV: browse the librarie
 
 ### Which server
 
-The app talks to raven at `https://raven-player.netlify.app`, the same public web address, and signs in with the same Supabase account as the web. It then asks for the PIN when that account may open locked libraries. The server address is fixed in the build, so there is no server picker.
+The app talks to raven at `https://raven-player.netlify.app`, the same public web address, and signs in with the same Supabase account as the web. It never asks for the PIN, and a locked library stays unavailable. The server address is fixed in the build, so there is no server picker.
 
 A release build reaches that HTTPS address only. Development builds may use plain HTTP for Metro and for the end to end fixture. The fixture build sets `APP_VARIANT=development` and `EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490`, which skips account sign-in on that accountless server and starts at its PIN.
 
@@ -583,7 +583,7 @@ The Maestro flows in `apps/raven/app/e2e` sign in to a real raven server, then b
 bunx nx run @raven/server:serve:fixture
 ```
 
-It encodes two short clips with ffmpeg into a temporary folder, a film in a locked library and an episode in an open one, matches both against a fake TMDB, and listens on `http://127.0.0.1:8490` until you stop it, when it deletes the folder. Once its libraries are scanned it prints `raven fixture server ready at http://127.0.0.1:8490 (PIN 1357, admin password Raven-Admin-2026)`.
+It encodes two short clips with ffmpeg into a temporary folder, a film and an episode, both in open libraries, matches both against a fake TMDB, and listens on `http://127.0.0.1:8490` until you stop it, when it deletes the folder. Once its libraries are scanned it prints `raven fixture server ready at http://127.0.0.1:8490`.
 
 With it running, build the development variant (plain http to the loopback needs it), install it on a booted iPhone simulator and run the flows, which need [Maestro](https://maestro.mobile.dev) (`brew tap mobile-dev-inc/tap`, then `brew install mobile-dev-inc/tap/maestro`):
 

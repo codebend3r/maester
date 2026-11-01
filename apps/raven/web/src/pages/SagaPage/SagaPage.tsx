@@ -278,7 +278,7 @@ const sagaPageViewOf = ({ page, lock, sagaId }: SagaPageViewOfProps): ViewOf<Sag
     case LIBRARY_LOCK_STATES.shut:
       return {
         key: SAGA_PAGE_KEYS.shut,
-        props: { name: page.data.name, available: lock.available },
+        props: { name: page.data.name },
       }
     case LIBRARY_LOCK_STATES.open:
       return { key: SAGA_PAGE_KEYS.open, props: { library: page.data, sagaId } }

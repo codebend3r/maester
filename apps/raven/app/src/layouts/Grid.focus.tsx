@@ -11,7 +11,7 @@ import {
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import { Icon } from '@raven/native'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import { focusCardWidthOf, FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
@@ -235,7 +235,7 @@ const BucketRow = ({ row, grid }: BucketRowProps) => {
         style={({ focused }) => [styles.bucket, focused && styles.focused]}
       >
         <Text style={styles.chevron}>{row.isOpen ? CHEVRONS.open : CHEVRONS.shut}</Text>
-        <Text numberOfLines={1} style={styles.bucketTitle}>
+        <Text variant={TEXT_VARIANTS.display} numberOfLines={1} style={styles.bucketTitle}>
           {row.section.title}
         </Text>
         <Text style={styles.count}>{row.section.count}</Text>
@@ -383,7 +383,7 @@ const Grid = ({
       <View onFocus={settle} style={styles.header}>
         <View style={styles.titleRow}>
           {icon !== null && <Icon colour={text} name={icon} size={TITLE_ICON} />}
-          <Text accessibilityRole="header" style={styles.title}>
+          <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
             {title}
           </Text>
         </View>

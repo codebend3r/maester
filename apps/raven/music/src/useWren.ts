@@ -18,8 +18,7 @@ const wrenSessionFor = lastPerServer({
 
 /**
  * The active server's client and queries, made once while it stays active; null until a
- * server is. Wren talks to raven alone, so there is one, but an end to end build adds its
- * fixture only once sign-in has passed its PIN.
+ * server is. Wren talks to raven alone, so there is one.
  */
 export const useWren = (): WrenSession | null => {
   const server = useActiveServer(

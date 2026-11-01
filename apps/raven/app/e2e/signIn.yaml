@@ -1,24 +1,11 @@
 appId: io.github.codebend3r.raven.app
-name: Unlock the fixture server with its PIN and admin password
-# The fixture server's secrets, as `serve:fixture` prints them. The build names the fixture
-# through EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN, so this accountless test starts at the PIN.
-env:
-  PIN: '1357'
-  ADMIN_PASSWORD: Raven-Admin-2026
+name: Open the fixture server on a clean install
+# The build names the fixture through EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN, so this accountless test
+# goes straight to Home on it: the app never asks for a PIN.
 ---
 - launchApp:
     clearState: true
     clearKeychain: true
 - extendedWaitUntil:
-    visible: This server keeps some libraries behind a PIN.
+    visible: Kestrel Point
     timeout: 60000
-# Maestro drives the iPhone simulator and the Android TV emulator: the thumb on one, the
-# remote on the other.
-- runFlow:
-    when:
-      platform: iOS
-    file: steps/signIn.touch.yaml
-- runFlow:
-    when:
-      platform: Android
-    file: steps/signIn.dpad.yaml

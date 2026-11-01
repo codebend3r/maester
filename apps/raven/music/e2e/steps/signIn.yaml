@@ -1,41 +1,8 @@
 appId: app.netlify.wren
-name: Unlock the fixture server with its PIN and admin password
-# The fixture server's secrets, as `serve:fixture` prints them. The build names the fixture
-# through EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN, so this accountless test starts at the PIN.
-env:
-  PIN: '1357'
-  ADMIN_PASSWORD: Raven-Admin-2026
+name: Open the fixture server on a clean install
+# The build names the fixture through EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN, so this accountless test
+# goes straight to the tabs on it: Wren never asks for a PIN.
 ---
 - launchApp:
     clearState: true
     clearKeychain: true
-- extendedWaitUntil:
-    visible: This server keeps some libraries behind a PIN.
-    timeout: 60000
-# Each field's label is announced as the field's own label too, and Maestro picks the label
-# first, so a field is tapped as the element below its label.
-#
-# The first keyboard a fresh simulator shows can swallow all but the first key, so each secret
-# is typed inside a `retry` that clears it first and checks the step reached after it.
-- retry:
-    maxRetries: 2
-    commands:
-      - tapOn:
-          below: PIN
-      - eraseText
-      - inputText: ${PIN}
-      - tapOn: Unlock
-      - extendedWaitUntil:
-          visible: Locked libraries stay hidden on this device until the server's admin password is entered.
-          timeout: 30000
-- retry:
-    maxRetries: 2
-    commands:
-      - tapOn:
-          below: Admin password
-      - eraseText
-      - inputText: ${ADMIN_PASSWORD}
-      - tapOn: Unlock
-      - extendedWaitUntil:
-          notVisible: Admin password
-          timeout: 30000

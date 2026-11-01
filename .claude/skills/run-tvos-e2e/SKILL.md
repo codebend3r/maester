@@ -50,7 +50,7 @@ The arguments go to the test's `nx run`, so the build stays cached.
 
 - **Simulator** (on Xcode 27, **DeviceHub**, which replaced it) opens with the Apple TV (`raven-tv`) and boots it to the tvOS home screen. It stays open afterwards.
 - During the build, nothing new: Expo, CocoaPods and `xcodebuild` print to the terminal.
-- The XCUITest launches raven and drives it with the Siri Remote: the PIN and admin password typed on tvOS's keyboard, Home with the film focused, the film's page, Play, about twenty seconds of the film, Menu to the page (now offering Resume), Menu to Home with the film under Continue watching, then Watched and back to clear the spot, and Menu on Home sends raven to the background.
+- The XCUITest launches raven and drives it with the Siri Remote: Home with the film focused, the film's page, Play, about twenty seconds of the film, Menu to the page (now offering Resume), Menu to Home with the film under Continue watching, then Watched and back to clear the spot, and Menu on Home sends raven to the background.
 - Xcode's test runner may briefly show **RavenRemoteTests-Runner** on the Apple TV as it starts; that is the test, not a second app to dismiss.
 - Ask the user not to click in Simulator or press keys while it runs; a stray press moves the focus and fails the test.
 - The terminal prints `xcodebuild`'s test output, ending in `** TEST SUCCEEDED **` or `** TEST FAILED **`.

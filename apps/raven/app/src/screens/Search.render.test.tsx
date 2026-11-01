@@ -24,6 +24,7 @@ import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockPush = jest.fn()
 const mockBack = jest.fn()
+let mockParams: Record<string, string> = {}
 /** What the server heard, and what its answers wait on, per test. */
 const mockServer: { heard: HeardRequest[]; reads: (path: string) => Promise<void> } = {
   heard: [],
@@ -38,7 +39,10 @@ const mockApi = jest.fn((_server: AppServer) =>
   }),
 )
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush, back: mockBack }) }))
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush, back: mockBack }),
+  useLocalSearchParams: () => mockParams,
+}))
 jest.mock('@raven/native', () => ({
   ...jest.requireActual<typeof Native>('@raven/native'),
   apiFor: ({ server }: ApiForProps) => mockApi(server),
@@ -76,6 +80,7 @@ describe('Search on a phone or tablet', () => {
   beforeEach(() => {
     jest.useFakeTimers()
     jest.clearAllMocks()
+    mockParams = {}
     mockServer.heard = []
     mockServer.reads = async () => undefined
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
@@ -98,6 +103,14 @@ describe('Search on a phone or tablet', () => {
     expect(screen.getByRole('button', { name: 'Dune' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Dune: Prophecy' })).toBeTruthy()
     await pause(SEARCH_DELAY_MS * 5)
+    expect(searches()).toEqual([searchPathFor(DUNE_QUERY)])
+  })
+
+  it('opens on the search a header ran, asking for it at once', async () => {
+    mockParams = { [APP_ROUTE_PARAMS.query]: DUNE_QUERY }
+    await renderScreen({ ui: <Search /> })
+    expect(screen.getByLabelText(FIELD).props.value).toBe(DUNE_QUERY)
+    expect(await screen.findByRole('header', { name: 'Films' })).toBeTruthy()
     expect(searches()).toEqual([searchPathFor(DUNE_QUERY)])
   })
 
@@ -205,6 +218,14 @@ describe('Search on a phone or tablet', () => {
   it('opens with the keyboard up on its field', async () => {
     await renderScreen({ ui: <Search /> })
     expect(screen.getByLabelText(FIELD).props.autoFocus).toBe(true)
+  })
+
+  it("wears Home's header: the touch navigation, the large field and the page's name", async () => {
+    await renderScreen({ ui: <Search /> })
+    expect(screen.getByRole('button', { name: 'Home' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Open menu' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Search' })).toBeTruthy()
+    expect(screen.getByRole('header', { name: 'Search' })).toBeTruthy()
   })
 
   it('goes back the way it came', async () => {

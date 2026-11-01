@@ -2,7 +2,6 @@ import type { QueryClient } from '@tanstack/react-query'
 import { listingStore } from '@/lib/listingStore'
 import { stopKeepingListings } from '@/lib/savedListings'
 import { useSelectionScopes } from '@/stores/selectionScope'
-import { useUnlockPrompt } from '@raven/ui/headless'
 
 type ClearAccountStateProps = {
   queryClient: QueryClient
@@ -18,7 +17,6 @@ type ClearAccountStateProps = {
  * go too.
  */
 export const clearAccountState = async ({ queryClient }: ClearAccountStateProps): Promise<void> => {
-  useUnlockPrompt.getState().close()
   useSelectionScopes.getState().scopes.forEach((scope) => scope.store.getState().end())
   stopKeepingListings()
   await queryClient.resetQueries()

@@ -116,7 +116,6 @@ export { useServerWatchedToggle, watchedChangeFor } from '@/query/useWatchedChan
 export { usePageBackdrop } from '@/stores/pageBackdrop'
 export { createSelectionStore, releaseSelectionStore } from '@/stores/selection'
 export type { SelectionStore } from '@/stores/selection'
-export { useUnlockPrompt } from '@/stores/unlockPrompt'
 export { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
 export type { AudioState } from '@/stores/audioQueue'
 export { useListenCounter } from '@/components/AudioHost/useListenCounter'

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { ADMIN_LOCK_STATES, type AdminLock, type Home, type LockState } from '@raven/core'
+import type { Home } from '@raven/core'
 import type * as Native from '@raven/native'
 import { AUTH_OUTCOMES, type AuthOutcome, RAVEN_SERVER } from '@raven/native/headless'
 import { fireEvent, render, screen } from '@testing-library/react-native'
@@ -22,12 +22,8 @@ type MockSignInProps = { email: string; password: string }
 
 const mockReplace = jest.fn<(href: string) => void>()
 const mockSignIn = jest.fn<(input: MockSignInProps) => Promise<AuthOutcome>>()
-const getLock = jest.fn<() => Promise<LockState>>()
-const unlock = jest.fn<(pin: string) => Promise<LockState>>()
-const getAdminLock = jest.fn<() => Promise<AdminLock>>()
-const unlockAdmin = jest.fn<(password: string) => Promise<AdminLock>>()
 const getHome = jest.fn<() => Promise<Home>>()
-const mockApi = { getLock, unlock, getAdminLock, unlockAdmin, getHome }
+const mockApi = { getHome }
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
@@ -59,8 +55,6 @@ describe('SignIn', () => {
     useActiveServer.setState({ servers: [], activeId: null })
     useWrenAccount.setState({ session: null, signIn: mockSignIn })
     mockSignIn.mockResolvedValue({ kind: AUTH_OUTCOMES.ok, session: SESSION })
-    getLock.mockResolvedValue({ available: false, unlocked: false })
-    getAdminLock.mockResolvedValue({ state: ADMIN_LOCK_STATES.off })
     getHome.mockResolvedValue(HOME)
   })
 
@@ -69,7 +63,6 @@ describe('SignIn', () => {
     await signInWith({ email: ' listener@example.com ', password: 'hunter2' })
 
     expect(mockSignIn).toHaveBeenCalledWith({ email: SESSION.email, password: 'hunter2' })
-    expect(unlock).not.toHaveBeenCalled()
     expect(mockReplace).toHaveBeenCalledWith(WREN_ROUTES.home)
     expect(useActiveServer.getState()).toMatchObject({
       servers: [{ id: RAVEN_SERVER.id }],
@@ -98,16 +91,5 @@ describe('SignIn', () => {
     await signInAsListener()
     expect(await screen.findByText(/Couldn't reach raven/)).toBeTruthy()
     expect(mockReplace).not.toHaveBeenCalled()
-  })
-
-  it('never asks for the PIN, even when the server keeps libraries behind one', async () => {
-    getLock.mockResolvedValue({ available: true, unlocked: false })
-    await render(<SignIn />)
-    await signInAsListener()
-
-    expect(mockReplace).toHaveBeenCalledWith(WREN_ROUTES.home)
-    expect(screen.queryByLabelText('PIN')).toBeNull()
-    expect(unlock).not.toHaveBeenCalled()
-    expect(getAdminLock).not.toHaveBeenCalled()
   })
 })

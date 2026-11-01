@@ -44,7 +44,6 @@ const Field = ({
   onSubmit,
   placeholder,
   isSecret = false,
-  isNumeric = false,
   isEmail = false,
   isFirst = false,
 }: FieldProps) => {
@@ -55,7 +54,7 @@ const Field = ({
       <Text style={[formStyles.label, styles.label]}>{label}</Text>
       <TvTextField
         isPreferred={isFirst}
-        keyboardType={keyboardFor({ isNumeric, isSecret, isEmail })}
+        keyboardType={keyboardFor({ isSecret, isEmail })}
         label={label}
         onChangeText={onChangeText}
         onSubmit={(text) => onSubmit({ text })}
@@ -69,7 +68,7 @@ const Field = ({
         <ShowSecretToggle
           formStyles={formStyles}
           isShown={isShown}
-          label={isNumeric ? FIELD_COPY.showPin : FIELD_COPY.showPassword}
+          label={FIELD_COPY.showPassword}
           onToggle={() => setShown((shown) => !shown)}
         />
       )}

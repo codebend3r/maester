@@ -11,14 +11,17 @@ import {
 
 import {
   CARD_SHAPES,
-  type Picture,
   type Pictures,
   type ShelfCard,
   imageOf,
   libraryVideoCard,
+  pictureAt,
   showCard,
   videoCard,
 } from '@/queries/cards'
+import { episodeWordsOf } from '@/queries/episodeMark'
+import { type ShowArts, logoOf, showArtOf } from '@/queries/showArt'
+import { timeLeftOf } from '@/queries/timeLeft'
 
 /** A shelf of cards; a library's names the library its title opens, Continue watching none. */
 export type ShelfView = { key: string; title: string; libraryId: number | null; cards: ShelfCard[] }
@@ -27,43 +30,38 @@ export const CONTINUE_WATCHING = 'Continue watching'
 
 const IN_PROGRESS_KEY = 'in-progress'
 
-/** The title art a card in progress wears, by the show's or film's item id. */
-export type ArtLogos = ReadonlyMap<number, Picture>
-
-/** The show or film a video in progress belongs to: an episode's show, else the film itself. */
-const continueArtOf = (entry: PosterEntry) => entry.poster ?? entry.media.item
-
-/** The shows and films the videos in progress belong to, whose title art their cards wear. */
-export const continueArtIdsOf = (entries: readonly PosterEntry[]): number[] =>
-  entries.flatMap((entry) => {
-    const art = continueArtOf(entry)
-    return art === null ? [] : [art.id]
-  })
+type ContinueCardProps = Pictures & { entry: PosterEntry; arts: ShowArts }
 
 /**
- * A video in progress, wide, on its show's or film's cover art, its backdrop, with its title
- * art over it: never an episode's own frame grab, which says less than the show's art does,
- * unless the show or film has no backdrop at all.
+ * A video in progress, wide, on its show's or film's backdrop with its title art over it:
+ * never an episode's own frame grab, which says less than the show's art does, unless the
+ * show's backdrop is not read yet or there is none. An episode says its own name and place
+ * under the art, a film its year.
  */
-type ContinueCardProps = Pictures & { entry: PosterEntry; logos: ArtLogos }
-
-export const continueCard = ({ entry, logos, api, headersFor }: ContinueCardProps): ShelfCard => {
+export const continueCard = ({ entry, arts, api, headersFor }: ContinueCardProps): ShelfCard => {
   const { media } = entry
-  const art = continueArtOf(entry)
-  const uri =
-    imageOf({ api, item: art, kind: ITEM_IMAGE_KINDS.backdrop }) ??
-    imageOf({ api, item: media.item, kind: ITEM_IMAGE_KINDS.backdrop }) ??
-    api.thumbnailUrl(media)
+  const { item } = media
+  const filmBackdrop =
+    item === null || item.backdropVersion === null
+      ? null
+      : pictureAt({ uri: imageOf({ api, item, kind: ITEM_IMAGE_KINDS.backdrop }), headersFor })
+  const episode = episodeWordsOf(media)
+  const words = tileWords(media)
+  const card = videoCard({
+    media,
+    ...words,
+    shape: CARD_SHAPES.wide,
+    uri: api.thumbnailUrl(media),
+    hasPages: true,
+    headersFor,
+  })
   return {
-    ...videoCard({
-      media,
-      ...tileWords(media),
-      shape: CARD_SHAPES.wide,
-      uri,
-      hasPages: true,
-      headersFor,
-    }),
-    logo: art === null ? null : (logos.get(art.id) ?? null),
+    ...card,
+    picture: filmBackdrop ?? showArtOf({ entry, arts })?.backdrop ?? card.picture,
+    line: episode === null ? words.line : null,
+    episode,
+    logo: logoOf({ entry, arts }),
+    resume: { timeLeft: media.position > 0 ? timeLeftOf(media) : null },
   }
 }
 
@@ -108,8 +106,8 @@ export const libraryShelvesOf = ({
 type HomeShelvesOfProps = Pictures & {
   home: Home
   libraries: readonly Library[]
-  /** The title art of the shows and films in progress, as `useArtLogos` reads it. */
-  logos: ArtLogos
+  /** The art of the shows and films in progress, as `useShowArts` reads it. */
+  arts: ShowArts
 }
 
 /**
@@ -119,7 +117,7 @@ type HomeShelvesOfProps = Pictures & {
 export const homeShelvesOf = ({
   home,
   libraries,
-  logos,
+  arts,
   ...pictures
 }: HomeShelvesOfProps): ShelfView[] => {
   const continuing: ShelfView[] =
@@ -130,7 +128,7 @@ export const homeShelvesOf = ({
             key: IN_PROGRESS_KEY,
             title: CONTINUE_WATCHING,
             libraryId: null,
-            cards: home.inProgress.map((entry) => continueCard({ entry, logos, ...pictures })),
+            cards: home.inProgress.map((entry) => continueCard({ entry, arts, ...pictures })),
           },
         ]
   return [...continuing, ...libraryShelvesOf({ shelves: home.shelves, libraries, ...pictures })]

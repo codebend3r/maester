@@ -12,6 +12,6 @@ export const DOWNLOAD_DIALOG_COPY = {
   room: ({ free, computer }: RoomProps) => `${formatBytes(free)} free on this ${computer}.`,
   short: ({ bytes, free }: ShortProps) => `Needs ${formatBytes(bytes)}; ${formatBytes(free)} free.`,
   alreadyDownloaded: (title: string) => `${title} is already downloaded.`,
-  lockedHint: 'This title is in a locked library. Enter the PIN to download it.',
+  locked: "This title is in a locked library, so it can't be downloaded.",
   signInFirst: 'Sign in to raven to download from it, then download again.',
 } as const

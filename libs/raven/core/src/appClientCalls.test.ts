@@ -30,7 +30,7 @@ describe('appClientCallOf', () => {
   })
 
   it('reads a listed call from a bare path', () => {
-    expect(callOf({ method: post, url: '/api/lock/unlock' })).toBe(APP_CLIENT_CALLS.unlock)
+    expect(callOf({ method: post, url: '/api/admin/unlock' })).toBe(APP_CLIENT_CALLS.unlockAdmin)
     expect(callOf({ method: get, url: '/api/media/9/subtitles/embedded-0' })).toBe(
       APP_CLIENT_CALLS.subtitles,
     )
@@ -57,7 +57,7 @@ describe('appClientCallOf', () => {
 
   it('is no call when the method differs', () => {
     expect(callOf({ method: post, url: '/api/home' })).toBeNull()
-    expect(callOf({ method: get, url: '/api/lock/unlock' })).toBeNull()
+    expect(callOf({ method: get, url: '/api/admin/unlock' })).toBeNull()
   })
 
   it('is no call for a route the app has no business with', () => {

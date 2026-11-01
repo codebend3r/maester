@@ -21,6 +21,7 @@ import {
   sortFact,
 } from '@raven/core'
 
+import type { EpisodeWords } from '@/queries/episodeMark'
 import { ROUTE_TARGETS, type RouteTarget, itemTarget } from '@/routes'
 
 /** How a card is drawn: a poster stood upright, or a wide frame. */
@@ -42,9 +43,21 @@ export type ShelfCard = {
   progress: number
   /** The show's or film's title art, drawn over the picture where a card wears it. */
   logo?: Picture | null
+  /** An episode's own name and place, set under the picture in place of `line`. */
+  episode?: EpisodeWords | null
+  /** Set on a card that resumes a video: it is drawn as a resume card, with what is left to watch. */
+  resume?: { timeLeft: string | null } | null
   /** Where pressing it goes: its item's page, or the player for a file with no page. */
   target: RouteTarget
 }
+
+type CardLabelOfProps = { card: Pick<ShelfCard, 'title' | 'episode'> }
+
+/** What a screen reader says of a card: its title, and for an episode its place and name. */
+export const cardLabelOf = ({ card }: CardLabelOfProps): string =>
+  [card.title, card.episode?.mark ?? null, card.episode?.name ?? null]
+    .filter((part): part is string => part !== null)
+    .join(', ')
 
 /** Where a card's picture comes from and what goes with the request for it. */
 export type Pictures = {

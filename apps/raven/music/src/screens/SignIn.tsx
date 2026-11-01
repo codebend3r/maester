@@ -1,12 +1,5 @@
 import { apiFor } from '@raven/native'
-import {
-  IS_SIGN_IN_BYPASSED,
-  RAVEN_SERVER,
-  SIGN_IN_STEPS,
-  type SecretStep,
-  type SignInStep,
-  signInFlowFor,
-} from '@raven/native/headless'
+import { RAVEN_SERVER, SIGN_IN_STEPS, type SignInStep, signInFlowFor } from '@raven/native/headless'
 import { useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 
@@ -21,12 +14,7 @@ const useSignInFlow = signInFlowFor({
   servers: useActiveServer,
   apiOf: (server) => apiFor({ server, session: useWrenAccount }),
   server: RAVEN_SERVER,
-  isBypassed: IS_SIGN_IN_BYPASSED,
 })
-
-/** Whether the step asks for the PIN or the admin password. */
-const isSecretStep = (step: SignInStep): step is SecretStep =>
-  step.kind === SIGN_IN_STEPS.pin || step.kind === SIGN_IN_STEPS.admin
 
 /** What each step's form is handed: the step, the flow that runs it, and where a finished one goes. */
 type StepFormProps = {
@@ -74,46 +62,6 @@ function AccountForm({ flow }: AccountFormProps) {
   )
 }
 
-type SecretFormProps = StepFormProps
-
-/** The PIN or the admin password, each its own form so the field starts empty. */
-function SecretForm({ step, flow }: SecretFormProps) {
-  const { secret, setSecret, isBusy, error, secretSteps, submitSecret, notNow, signOut } = flow
-  return (
-    isSecretStep(step) && (
-      <Form key={step.kind} note={secretSteps[step.kind].prompt} title={step.server.name}>
-        <Field
-          isNumeric={secretSteps[step.kind].isNumeric}
-          isSecret
-          label={secretSteps[step.kind].label}
-          onChangeText={setSecret}
-          onSubmit={() => submitSecret({ step, text: secret })}
-          value={secret}
-        />
-        <ErrorLine error={error} />
-        <FormButton
-          isDisabled={isBusy}
-          label={SIGN_IN_COPY.unlock}
-          onPress={() => submitSecret({ step, text: secret })}
-          tone={BUTTON_TONES.primary}
-        />
-        <FormButton
-          isDisabled={isBusy}
-          label={SIGN_IN_COPY.notNow}
-          onPress={() => notNow(step)}
-          tone={BUTTON_TONES.quiet}
-        />
-        <FormButton
-          isDisabled={isBusy}
-          label={SIGN_IN_COPY.signOut}
-          onPress={signOut}
-          tone={BUTTON_TONES.ghost}
-        />
-      </Form>
-    )
-  )
-}
-
 type TicketsOffFormProps = StepFormProps
 
 /** A server without media tickets, said before the tabs. */
@@ -129,15 +77,12 @@ function TicketsOffForm({ onDone }: TicketsOffFormProps) {
 /** The form each step of sign-in draws. */
 const SIGN_IN_VIEWS = {
   [SIGN_IN_STEPS.account]: AccountForm,
-  [SIGN_IN_STEPS.pin]: SecretForm,
-  [SIGN_IN_STEPS.admin]: SecretForm,
   [SIGN_IN_STEPS.ticketsOff]: TicketsOffForm,
 } as const satisfies Record<SignInStep['kind'], ComponentType<StepFormProps>>
 
 /**
- * The first launch: the raven account's email and password, then the PIN when the account may
- * see locked libraries, then the admin password while the admin lock would still hide them, over
- * `@raven/native`'s `signInFlowFor`.
+ * The first launch: the raven account's email and password, over `@raven/native`'s
+ * `signInFlowFor`. It never asks for a PIN.
  */
 export function SignIn() {
   const router = useRouter()

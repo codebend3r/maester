@@ -57,7 +57,7 @@ type StartVideoProps = {
 
 /** Fires what the player says as it opens its source, `duration` seconds long, and starts. */
 export const startVideo = async ({
-  props: { onLoad, onPlaybackStateChanged, onBuffer },
+  props: { onLoad, onPlaybackStateChanged, onBuffer, onSeek },
   duration,
 }: StartVideoProps): Promise<void> => {
   if (onLoad === undefined || onPlaybackStateChanged === undefined || onBuffer === undefined) {
@@ -72,6 +72,8 @@ export const startVideo = async ({
       textTracks: [],
       videoTracks: [],
     })
+    // Where the player resumes by a seek of the app's, it says so as the seek lands.
+    onSeek?.({ currentTime: 0, seekTime: 0 })
     onPlaybackStateChanged({ isPlaying: true, isSeeking: false })
     onBuffer({ isBuffering: false })
   })

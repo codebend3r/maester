@@ -10,8 +10,8 @@ export const APP_ROUTES = {
   playlist: '/playlist/[id]',
   nowPlaying: '/now-playing',
   search: '/search',
+  favourites: '/favourites',
   settings: '/settings',
-  unlock: '/unlock',
 } as const
 
 /**
@@ -44,8 +44,8 @@ export const APP_SCREENS = {
   playlist: 'playlist/[id]',
   nowPlaying: 'now-playing',
   search: 'search',
+  favourites: 'favourites',
   settings: 'settings',
-  unlock: 'unlock',
 } as const
 
 /**
@@ -103,7 +103,7 @@ const paramOf = ({ name, value }: ParamOfProps) =>
   value === null || value === '' ? {} : { [name]: String(value) }
 
 /** A route and its params, as the router takes them. */
-type Href = {
+export type Href = {
   pathname: (typeof APP_ROUTES)[keyof typeof APP_ROUTES]
   params: Record<string, string>
 }
@@ -167,3 +167,9 @@ export const secondsOf = (param: unknown): number => {
   const seconds = typeof param === 'string' ? Number(param) : Number.NaN
   return Number.isFinite(seconds) && seconds > 0 ? seconds : 0
 }
+
+/** The search through every library, opened on `query`: what the viewer typed in a header's field. */
+export const searchHrefOf = (query: string): Href => ({
+  pathname: APP_ROUTES.search,
+  params: paramOf({ name: APP_ROUTE_PARAMS.query, value: query }),
+})

@@ -14,7 +14,7 @@ import {
 import { ActionPlate, FocusRow, useMusicStyles } from '@/layouts/MusicParts.focus'
 import type { LyricsView, SyncedLyrics } from '@/layouts/musicRows'
 import { focusPicker } from '@/layouts/Picker.focus'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { useLineInView } from '@/layouts/useLineInView'
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { TV_SIZES, tvSize } from '@/theme/tvSizes'
@@ -66,6 +66,7 @@ const Book = ({ book }: BookProps) => {
             />
           )}
           <Picker
+            icon="gauge"
             label={MUSIC_COPY.speed}
             onChoose={speedChooserOf(book.onSpeed)}
             options={SPEED_OPTIONS}
@@ -75,7 +76,7 @@ const Book = ({ book }: BookProps) => {
       </FocusBand>
       <FocusBand>
         <View style={styles.section}>
-          <Text accessibilityRole="header" style={styles.heading}>
+          <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
             {MUSIC_COPY.chapters}
           </Text>
           {book.chapters.length === 0 && <Text style={styles.muted}>{MUSIC_COPY.noChapters}</Text>}
@@ -176,7 +177,7 @@ const LyricsAside = ({ aside }: LyricsAsideProps) => {
   return (
     aside.kind === NOW_PLAYING_ASIDES.lyrics && (
       <View style={styles.section}>
-        <Text accessibilityRole="header" style={styles.heading}>
+        <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
           {MUSIC_COPY.lyrics}
         </Text>
         <LyricsBody lyrics={aside.lyrics} />

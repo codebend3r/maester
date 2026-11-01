@@ -10,7 +10,6 @@ import type {
   MediaSort,
 } from '@raven/core'
 import { api } from '@/lib/api'
-import { useUnlockPrompt } from '@raven/ui/headless'
 import { POSTER_SIZES } from '@/lib/posters'
 import {
   itemSummary,
@@ -477,25 +476,22 @@ describe('LibraryPage', () => {
     expect(screen.getByRole('button', { name: 'Shuffle' })).toBeDisabled()
   })
 
-  it('keeps a locked library shut, asking for nothing, until the PIN is entered', async () => {
+  it('keeps a locked library shut, asking for nothing', async () => {
     spies.lockState.mockImplementation(async () => ({ available: true, unlocked: false }))
     serve({ settings: { locked: true } })
     const locked = await screen.findByRole('region', { name: 'Locked' })
     expect(locked).toHaveTextContent('Movies is locked.')
     expect(screen.queryByRole('search')).toBeNull()
     expect(state.listed).toEqual([])
-    await userEvent.click(within(locked).getByRole('button', { name: 'Unlock' }))
-    expect(useUnlockPrompt.getState().open).toBe(true)
+    expect(within(locked).queryByRole('button')).toBeNull()
   })
 
-  it('asks for the PIN on Edit while the library is locked, as its folders are held back', async () => {
+  it('holds Edit back while the library is locked, as its folders are, with no prompt', async () => {
     spies.lockState.mockImplementation(async () => ({ available: true, unlocked: false }))
     serve({ settings: { locked: true } })
     await screen.findByRole('region', { name: 'Locked' })
-    await userEvent.click(screen.getByRole('button', { name: 'Edit Movies' }))
-    expect(useUnlockPrompt.getState().open).toBe(true)
+    expect(screen.getByRole('button', { name: 'Edit Movies' })).toBeDisabled()
     expect(screen.queryByRole('dialog')).toBeNull()
-    useUnlockPrompt.setState({ open: false })
   })
 
   it('shows an unlocked library, with a way to lock it again', async () => {

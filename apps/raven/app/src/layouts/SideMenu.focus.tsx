@@ -2,7 +2,7 @@ import type { IconName } from '@raven/ui/iconDrawings'
 import { type ComponentRef, type Ref, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
 
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import { Icon } from '@raven/native'
 import { PickerList, usePickerList } from '@/layouts/Picker.focus'
@@ -127,7 +127,7 @@ export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: Sid
     >
       <MenuRow icon="search" label={SEARCH_EVERY_LIBRARY.text} onPress={onSearch} />
       {libraries.length > 0 && !isCollapsed && (
-        <Text accessibilityRole="header" style={styles.heading}>
+        <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
           {PINNED_HEADING}
         </Text>
       )}

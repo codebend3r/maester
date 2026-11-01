@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ApiError, ITEM_TYPES, type ItemDetails } from '@raven/core'
-import { createQueryClient, useUnlockPrompt } from '@raven/ui/headless'
+import { createQueryClient } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 import { BINGE_COPY } from '@/lib/binge'
 import { BingePage, BingeSection } from '@/pages/BingePage/BingePage'
@@ -73,7 +73,7 @@ describe('BingePage', () => {
     expect(screen.queryByRole('region')).toBeNull()
   })
 
-  it('hides locked selections on home without opening the PIN prompt', async () => {
+  it('hides locked selections on home', async () => {
     mark(1)
     const client = createQueryClient()
     client.setDefaultOptions({ queries: { retry: false } })
@@ -81,7 +81,6 @@ describe('BingePage', () => {
     const view = renderWithProviders({ ui: <BingeSection isHome />, client })
     await waitFor(() => expect(client.isFetching()).toBe(0))
     expect(screen.queryByRole('region')).toBeNull()
-    expect(useUnlockPrompt.getState().open).toBe(false)
     view.unmount()
     renderWithProviders({ ui: <BingePage />, client })
     expect(await screen.findByRole('alert')).toHaveTextContent(BINGE_COPY.unavailable)

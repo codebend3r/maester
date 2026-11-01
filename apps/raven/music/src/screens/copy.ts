@@ -7,20 +7,12 @@ export const SIGN_IN_COPY = {
   password: 'Password',
   badAccount: 'Enter your email and password.',
   unreachable: "Couldn't reach raven. Check your connection and try again.",
-  pin: 'PIN',
-  pinPrompt: 'This server keeps some libraries behind a PIN.',
-  adminPassword: 'Admin password',
-  adminPrompt:
-    "Locked libraries stay hidden on this device until the server's admin password is entered.",
   ticketsOff:
     "This server can't hand out media tickets. Set RAVEN_MEDIA_SECRET on it to play in Wren.",
   notAdded: "raven couldn't be added. Try again.",
   full: 'This device already keeps as many servers as it can.',
   signIn: 'Sign in',
   continue: 'Continue',
-  unlock: 'Unlock',
-  notNow: 'Not now',
-  signOut: 'Sign out',
 } as const
 
 export const SETTINGS_COPY = {

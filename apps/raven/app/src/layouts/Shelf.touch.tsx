@@ -1,16 +1,14 @@
+import { useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES } from '@/queries/cards'
 import { TouchCard } from '@/layouts/TouchCard'
 import { BREAKPOINTS } from '@/layouts/screenSizes'
 import {
   NOTHING_HERE,
-  SEARCH_EVERY_LIBRARY,
   SEE_ALL,
-  SETTINGS_ENTRY,
   SHELF_STATES,
   type ShelfKit,
   type ShelfProps,
@@ -19,14 +17,16 @@ import {
   seeAllLabelOf,
   shelfStateOf,
 } from '@/layouts/shelfKit'
-import { Logo } from '@/layouts/Logo'
+import { TouchNotice, TouchShelfPage } from '@/layouts/TouchShelfPage'
+import { SearchEveryLibrary } from '@/layouts/TouchSearchBar'
+import { searchHrefOf } from '@/routes'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 
 /** Card widths in points: about two and a half posters across a phone, more on a tablet. */
 const CARD_WIDTHS = {
-  phone: { [CARD_SHAPES.poster]: 128, [CARD_SHAPES.wide]: 248, [CARD_SHAPES.square]: 128 },
-  tablet: { [CARD_SHAPES.poster]: 168, [CARD_SHAPES.wide]: 320, [CARD_SHAPES.square]: 168 },
+  phone: { [CARD_SHAPES.poster]: 128, [CARD_SHAPES.wide]: 288, [CARD_SHAPES.square]: 128 },
+  tablet: { [CARD_SHAPES.poster]: 168, [CARD_SHAPES.wide]: 400, [CARD_SHAPES.square]: 168 },
 } as const
 
 const useCardWidths = () => {
@@ -34,54 +34,17 @@ const useCardWidths = () => {
   return width >= BREAKPOINTS.tablet ? CARD_WIDTHS.tablet : CARD_WIDTHS.phone
 }
 
-const Shelves = ({ title, notice, onSearch, onSettings, children }: ShelvesProps) => {
-  const insets = useSafeAreaInsets()
-  const styles = useStyles()
+const Shelves = ({ title, notice, children }: ShelvesProps) => {
+  const router = useRouter()
   return (
-    <ScrollView
-      contentContainerStyle={[
-        styles.shelves,
-        {
-          paddingTop: insets.top + SIZES.space3,
-          paddingBottom: insets.bottom + SIZES.space5,
-          // Clear of the Dynamic Island and the corners of a phone held sideways.
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
-        },
-      ]}
-      style={styles.ground}
+    <TouchShelfPage
+      isHome
+      notice={notice}
+      search={<SearchEveryLibrary onSearch={(query) => router.push(searchHrefOf(query))} />}
+      title={title}
     >
-      <View style={styles.pageRow}>
-        <View style={styles.brand}>
-          <Logo width={SIZES.textXl} />
-          <Text accessibilityRole="header" style={styles.pageTitle}>
-            {title}
-          </Text>
-        </View>
-        <View style={styles.tools}>
-          <Pressable
-            accessibilityLabel={SEARCH_EVERY_LIBRARY.label}
-            accessibilityRole="link"
-            hitSlop={SIZES.space2}
-            onPress={onSearch}
-            style={({ pressed }) => [styles.search, pressed && styles.pressed]}
-          >
-            <Text style={styles.searchLabel}>{SEARCH_EVERY_LIBRARY.text}</Text>
-          </Pressable>
-          <Pressable
-            accessibilityLabel={SETTINGS_ENTRY.label}
-            accessibilityRole="link"
-            hitSlop={SIZES.space2}
-            onPress={onSettings}
-            style={({ pressed }) => [styles.search, styles.gear, pressed && styles.pressed]}
-          >
-            <Text style={styles.gearLabel}>{SETTINGS_ENTRY.gear}</Text>
-          </Pressable>
-        </View>
-      </View>
-      {notice !== null && <Text style={styles.notice}>{notice}</Text>}
       {children}
-    </ScrollView>
+    </TouchShelfPage>
   )
 }
 
@@ -96,7 +59,12 @@ const ShelfTitle = ({ shelf, onOpenLibrary }: ShelfTitleProps) => {
   const styles = useStyles()
   return (
     <View style={styles.titleRow}>
-      <Text accessibilityRole="header" numberOfLines={1} style={styles.shelfTitle}>
+      <Text
+        variant={TEXT_VARIANTS.display}
+        accessibilityRole="header"
+        numberOfLines={1}
+        style={styles.shelfTitle}
+      >
         {shelf.title}
       </Text>
       {libraryId !== null && (
@@ -115,10 +83,7 @@ const ShelfTitle = ({ shelf, onOpenLibrary }: ShelfTitleProps) => {
 }
 
 /** A shelf with no cards: its line in place of the row. */
-const EmptyRow = () => {
-  const styles = useStyles()
-  return <Text style={styles.notice}>{NOTHING_HERE}</Text>
-}
+const EmptyRow = () => <TouchNotice>{NOTHING_HERE}</TouchNotice>
 
 type CardsRowProps = ShelfProps
 
@@ -178,29 +143,6 @@ export const touchShelf: ShelfKit = { Shelves, Shelf }
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
-    ground: { flex: 1, backgroundColor: colours.ground },
-    shelves: { gap: SIZES.space4 },
-    pageRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: SIZES.space2,
-      paddingHorizontal: SIZES.space3,
-    },
-    brand: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: SIZES.space2 },
-    pageTitle: { flexShrink: 1, color: colours.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
-    search: {
-      minHeight: SIZES.fieldHeight,
-      justifyContent: 'center',
-      paddingHorizontal: SIZES.space3,
-      borderRadius: SIZES.radius,
-      backgroundColor: colours.quiet,
-    },
-    searchLabel: { color: colours.text, fontSize: SIZES.text, fontWeight: '600' },
-    tools: { flexDirection: 'row', gap: SIZES.space2 },
-    gear: { minWidth: SIZES.fieldHeight, alignItems: 'center' },
-    gearLabel: { color: colours.text, fontSize: SIZES.textLg },
-    notice: { color: colours.muted, fontSize: SIZES.text, paddingHorizontal: SIZES.space3 },
     shelf: { gap: SIZES.space2 },
     titleRow: {
       flexDirection: 'row',
@@ -212,6 +154,7 @@ const useStyles = themedStyles((colours) =>
     shelfTitle: { flexShrink: 1, color: colours.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
     seeAll: { color: colours.muted, fontSize: SIZES.textSm, fontWeight: '600' },
     pressed: { opacity: OPACITIES.pressed },
-    row: { gap: SIZES.space3, paddingHorizontal: SIZES.space3 },
+    // The bottom room keeps a resume card's shadow from being cut off by the row.
+    row: { gap: SIZES.space3, paddingHorizontal: SIZES.space3, paddingBottom: SIZES.space2 },
   }),
 )

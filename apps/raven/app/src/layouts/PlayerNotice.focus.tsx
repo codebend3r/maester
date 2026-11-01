@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { LoadingMark } from '@/layouts/LoadingMark'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { PLAYER_COPY, type PlayerChromeProps } from '@/layouts/playerKit'
 import { PlateButton } from '@/layouts/tvControls'
@@ -47,7 +47,11 @@ export const PlayerNotice = ({ heading, notice, isOpening, onBack }: PlayerNotic
             textStyle={styles.title}
           />
           {heading.place !== null && <Text style={styles.place}>{heading.place}</Text>}
-          {heading.show !== null && <Text style={styles.title}>{heading.title}</Text>}
+          {heading.show !== null && (
+            <Text variant={TEXT_VARIANTS.display} style={styles.title}>
+              {heading.title}
+            </Text>
+          )}
         </View>
       )}
       {notice !== null && (

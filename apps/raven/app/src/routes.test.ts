@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test'
 
-import { APP_ROUTES, APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf, secondsOf } from '@/routes'
+import {
+  APP_ROUTES,
+  APP_ROUTE_PARAMS,
+  ROUTE_TARGETS,
+  hrefOf,
+  searchHrefOf,
+  secondsOf,
+} from '@/routes'
 
 describe('hrefOf', () => {
   it("opens an item's page, naming its library and file only when it has them", () => {
@@ -68,5 +75,15 @@ describe('secondsOf', () => {
     expect(secondsOf('-4')).toBe(0)
     expect(secondsOf('Infinity')).toBe(0)
     expect(secondsOf('soon')).toBe(0)
+  })
+})
+
+describe('searchHrefOf', () => {
+  it('opens the search on what was typed, and on nothing for an empty field', () => {
+    expect(searchHrefOf('dune')).toEqual({
+      pathname: APP_ROUTES.search,
+      params: { [APP_ROUTE_PARAMS.query]: 'dune' },
+    })
+    expect(searchHrefOf('')).toEqual({ pathname: APP_ROUTES.search, params: {} })
   })
 })

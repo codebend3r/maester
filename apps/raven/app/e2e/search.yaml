@@ -7,15 +7,14 @@ tags:
 - extendedWaitUntil:
     visible: Lantern Bay
     timeout: 30000
-# Home's header opens the search through every library.
+# Home's header holds the search through every library; Search hands what was typed to its page.
 - tapOn: Search every library
-# The search opens with the keyboard up on its field, so typing goes straight into it.
+- inputText: lantern
+- tapOn: Search
 - extendedWaitUntil:
     visible: Back
     timeout: 10000
-- inputText: lantern
-# The search runs once typing pauses, under the library holding the match. The server leaves
-# locked libraries out of it, the films' among them.
+# The search runs under the library holding the match.
 - extendedWaitUntil:
     visible: See all in Series
     timeout: 30000
@@ -28,11 +27,12 @@ tags:
 - tapOn: Clear search
 - tapOn: Search every library
 - inputText: nowhere
+- tapOn: Search
 - extendedWaitUntil:
     visible: Nothing in any library matches "nowhere".
     timeout: 30000
 - tapOn: Back
-# A library's own box searches it, a locked one once unlocked included.
+# A library's own box searches it.
 - extendedWaitUntil:
     visible: See all in Films
     timeout: 30000
@@ -42,6 +42,7 @@ tags:
     timeout: 30000
 - tapOn: Search Films
 - inputText: nowhere
+- tapOn: Search
 - extendedWaitUntil:
     visible: Nothing here matches "nowhere".
     timeout: 30000

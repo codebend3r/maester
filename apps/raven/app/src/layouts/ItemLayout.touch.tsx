@@ -3,7 +3,7 @@ import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } f
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Icon } from '@raven/native'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import {
@@ -16,12 +16,13 @@ import {
 } from '@/queries/itemPage'
 import { CardPicture, PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
 import { ITEM_LAYOUT_COPY } from '@/layouts/copy'
-import { TouchBack } from '@/layouts/TouchBack'
+import { TouchNav } from '@/layouts/TouchNav'
 import { TouchCard } from '@/layouts/TouchCard'
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import {
   ITEM_HEADINGS,
+  ITEM_TEST_IDS,
   WATCHED_MARK,
   type ItemAction,
   type ItemKit,
@@ -40,6 +41,7 @@ import {
 import { isTablet } from '@/layouts/screenSizes'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
+import { translucent } from '@/theme/translucent'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 
 /** How tall a show's title art stands over an episode's name. */
@@ -61,11 +63,15 @@ const PHOTO_SIZE = 72
 const PERSON_WIDTH = 96
 
 /**
- * The backdrop is 16:9, and never more than a third of the screen's height, so a phone held
- * sideways or a tablet still opens on the title.
+ * The backdrop is the page's ground, as the web's `PageBackdrop` is: fixed behind the content
+ * while it scrolls, faded well back over the theme's ground so the text keeps its contrast. The
+ * ground is the text's opposite in every theme (light ground and dark text, or the reverse), so
+ * one opacity dims the picture towards the contrast the text needs on light and dark alike.
  */
-const BACKDROP_RATIO = 9 / 16
-const BACKDROP_SHARE = 1 / 3
+const BACKDROP_OPACITY = 0.28
+
+/** How much of the theme's raised colour the synopsis plate keeps, so the backdrop shows faintly through. */
+const PLATE_ALPHA = 0.75
 
 const useGutters = () => {
   const insets = useSafeAreaInsets()
@@ -77,7 +83,7 @@ type HeadingProps = { title: string }
 const Heading = ({ title }: HeadingProps) => {
   const styles = useStyles()
   return (
-    <Text accessibilityRole="header" style={styles.heading}>
+    <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
       {title}
     </Text>
   )
@@ -153,7 +159,7 @@ type HeroTitleWordsProps = HeroTitleProps
 const HeroTitleWords = ({ hero }: HeroTitleWordsProps) => {
   const styles = useStyles()
   return (
-    <Text accessibilityRole="header" style={styles.title}>
+    <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
       {hero.title}
     </Text>
   )
@@ -170,13 +176,11 @@ const Hero = ({ hero, actions, links }: HeroProps) => {
   const styles = useStyles()
   const { width, height } = useWindowDimensions()
   const widths = isTablet({ width, height }) ? HERO_WIDTHS.tablet : HERO_WIDTHS.phone
-  // Held sideways the screen is short, so the title sits by the poster's top, not its foot.
-  const isWide = width > height
   const facts = heroFactsOf(hero)
   const Title = HERO_TITLES[titleLookOf(hero.logo)]
   return (
     <View style={styles.hero}>
-      <View style={[styles.headRow, isWide && styles.headRowWide]}>
+      <View style={styles.headRow}>
         <CardPicture card={heroPictureOf(hero)} width={widths[hero.poster.shape]} />
         <View style={styles.words}>
           {hero.logo !== null && hero.logo.place === ART_PLACES.over && (
@@ -350,7 +354,11 @@ type PersonInitialsProps = PersonProps
 
 const PersonInitials = ({ person }: PersonInitialsProps) => {
   const styles = useStyles()
-  return <Text style={styles.initials}>{person.initials}</Text>
+  return (
+    <Text variant={TEXT_VARIANTS.display} style={styles.initials}>
+      {person.initials}
+    </Text>
+  )
 }
 
 /** A person's photo, else their initials. */
@@ -387,54 +395,36 @@ const Cast = ({ title, cast }: CastProps) => (
   </Rail>
 )
 
-type TopProps = Pick<ItemPage['hero'], 'backdrop'> & { onBack: () => void }
+type TopProps = { onBack: () => void }
 
-type TopViewProps = TopProps & { room: { paddingTop: number; paddingLeft: number } }
-
-type BareTopProps = TopViewProps
-
-/** No backdrop: room for the way back. */
-const BareTop = ({ onBack, room }: BareTopProps) => (
-  <View style={room}>
-    <TouchBack onPress={onBack} />
-  </View>
-)
-
-type BackdropTopProps = TopViewProps
-
-/** The backdrop across the top, under the way back raised on it. */
-const BackdropTop = ({ backdrop, onBack, room }: BackdropTopProps) => {
-  const styles = useStyles()
-  const screen = useWindowDimensions()
-  const height = Math.min(screen.width * BACKDROP_RATIO, screen.height * BACKDROP_SHARE)
+/** Room for the way back, clear of the status bar; the poster sits right under it. */
+const Top = ({ onBack }: TopProps) => {
+  const insets = useSafeAreaInsets()
   return (
-    <View style={{ height }}>
-      {backdrop !== null && (
-        <Image resizeMode="cover" source={backdrop} style={StyleSheet.absoluteFill} />
-      )}
-      <View style={[styles.top, room]}>
-        <TouchBack isRaised onPress={onBack} />
-      </View>
+    <View style={{ paddingTop: insets.top + SIZES.space1 }}>
+      <TouchNav onBack={onBack} />
     </View>
   )
 }
 
-const TOP_VIEWS = {
-  [PICTURE_STATES.shown]: BackdropTop,
-  [PICTURE_STATES.missing]: BareTop,
-} as const satisfies Record<PictureState, ComponentType<TopViewProps>>
+type BackdropProps = { backdrop: NonNullable<ItemPage['hero']['backdrop']> }
 
-/** The backdrop across the top, under the way back; without one, room for the way back. */
-const Top = ({ backdrop, onBack }: TopProps) => {
-  const insets = useSafeAreaInsets()
-  const gutters = useGutters()
-  const room = { paddingTop: insets.top + SIZES.space1, paddingLeft: gutters.left }
-  const TopView = TOP_VIEWS[pictureStateOf(backdrop)]
-  return <TopView backdrop={backdrop} onBack={onBack} room={room} />
+const Backdrop = ({ backdrop }: BackdropProps) => {
+  const styles = useStyles()
+  return (
+    <Image
+      accessibilityElementsHidden
+      resizeMode="cover"
+      source={backdrop}
+      style={[StyleSheet.absoluteFill, styles.backdrop]}
+      testID={ITEM_TEST_IDS.backdrop}
+    />
+  )
 }
 
 /**
- * An item on a phone or tablet: the backdrop, then the poster beside the names and facts, the
+ * An item on a phone or tablet: the backdrop behind the whole page, fixed while it scrolls, and
+ * over it the way back, then the poster at the top left beside the names and facts, the
  * actions, the summary and the file, then a movie's versions, a show's seasons or a season's
  * episodes, and the cast. It scrolls as one page, clear of the side insets held sideways. The
  * marks are drawn at once and Play once it is known, as on the web.
@@ -445,32 +435,35 @@ const ItemLayout = ({ page, actions, links, onOpen, onBack }: ItemLayoutProps) =
   const gutters = useGutters()
   const padded = { paddingLeft: gutters.left, paddingRight: gutters.right }
   return (
-    <ScrollView
-      contentContainerStyle={[styles.page, { paddingBottom: insets.bottom + SIZES.space5 }]}
-      style={styles.ground}
-    >
-      <Top backdrop={page.hero.backdrop} onBack={onBack} />
-      <View style={padded}>
-        <Hero actions={actions} hero={page.hero} links={links} />
-      </View>
-      {page.file.length > 0 && (
-        <View style={padded}>
-          <FileFacts facts={page.file} />
+    <View style={styles.ground}>
+      {page.hero.backdrop !== null && <Backdrop backdrop={page.hero.backdrop} />}
+      <ScrollView
+        contentContainerStyle={[styles.page, { paddingBottom: insets.bottom + SIZES.space5 }]}
+        style={styles.scroll}
+      >
+        <View style={[styles.head, padded]}>
+          <Top onBack={onBack} />
+          <Hero actions={actions} hero={page.hero} links={links} />
         </View>
-      )}
-      {page.versions.length > 0 && (
-        <View style={padded}>
-          <Versions onOpen={onOpen} versions={page.versions} />
-        </View>
-      )}
-      {page.seasons.length > 0 && <Seasons onOpen={onOpen} seasons={page.seasons} />}
-      {page.episodes.length > 0 && (
-        <View style={padded}>
-          <Episodes episodes={page.episodes} onOpen={onOpen} />
-        </View>
-      )}
-      {page.cast.length > 0 && <Cast cast={page.cast} title={page.castTitle} />}
-    </ScrollView>
+        {page.file.length > 0 && (
+          <View style={padded}>
+            <FileFacts facts={page.file} />
+          </View>
+        )}
+        {page.versions.length > 0 && (
+          <View style={padded}>
+            <Versions onOpen={onOpen} versions={page.versions} />
+          </View>
+        )}
+        {page.seasons.length > 0 && <Seasons onOpen={onOpen} seasons={page.seasons} />}
+        {page.episodes.length > 0 && (
+          <View style={padded}>
+            <Episodes episodes={page.episodes} onOpen={onOpen} />
+          </View>
+        )}
+        {page.cast.length > 0 && <Cast cast={page.cast} title={page.castTitle} />}
+      </ScrollView>
+    </View>
   )
 }
 
@@ -486,7 +479,7 @@ const ItemNotice = ({ notice, onBack }: ItemNoticeProps) => {
         { paddingTop: insets.top, paddingLeft: gutters.left, paddingRight: gutters.right },
       ]}
     >
-      <TouchBack onPress={onBack} />
+      <TouchNav onBack={onBack} />
       <Text style={styles.summary}>{notice}</Text>
     </View>
   )
@@ -500,10 +493,11 @@ const useStyles = themedStyles((colours) =>
     ground: { flex: 1, backgroundColor: colours.ground },
     page: { gap: SIZES.space4 },
     notice: { gap: SIZES.space3 },
-    top: { position: 'absolute', top: 0, left: 0 },
+    scroll: { flex: 1 },
+    backdrop: { opacity: BACKDROP_OPACITY },
+    head: { gap: SIZES.space2 },
     hero: { gap: SIZES.space3 },
-    headRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SIZES.space3 },
-    headRowWide: { alignItems: 'flex-start' },
+    headRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.space3 },
     heading: { color: colours.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
     words: { flex: 1, gap: SIZES.space0 },
     eyebrow: { color: colours.muted, fontSize: SIZES.textSm, fontWeight: '600' },
@@ -531,12 +525,12 @@ const useStyles = themedStyles((colours) =>
     },
     actionLabel: { fontSize: SIZES.text, fontWeight: 'bold' },
     pressed: { opacity: OPACITIES.pressed },
-    // The raised surface under the words, so they read over the backdrop in every theme.
+    // The raised surface under the words, translucent so the backdrop shows faintly through.
     synopsis: {
       gap: SIZES.space2,
       padding: SIZES.space3,
       borderRadius: SIZES.radius,
-      backgroundColor: colours.raised,
+      backgroundColor: translucent({ colour: colours.raised, alpha: PLATE_ALPHA }),
     },
     tagline: { color: colours.text, fontSize: SIZES.text, fontStyle: 'italic' },
     summary: {

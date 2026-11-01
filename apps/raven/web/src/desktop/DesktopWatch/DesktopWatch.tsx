@@ -9,10 +9,9 @@ import {
   PLAYER_SOURCE_KINDS,
   type PlayerSource,
   readWatchQuery,
-  TITLE_REFUSALS,
   watchPathFor,
 } from '@raven/core'
-import { type NativePlayer, type PlayerServices, useUnlockPrompt } from '@raven/ui/headless'
+import type { NativePlayer, PlayerServices } from '@raven/ui/headless'
 import { type Query, useQuery } from '@tanstack/react-query'
 import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -199,7 +198,6 @@ const WatchTitle = ({
   onLost,
 }: WatchTitleProps) => {
   const { client, menu } = useDesktop()
-  const askPin = useUnlockPrompt((state) => state.ask)
   const { search } = useLocation()
   // Where to start and what follows, read once per title, so a later read of the video (its
   // position moving, a favourite) never asks main again: the address a play link opened says
@@ -256,18 +254,7 @@ const WatchTitle = ({
     })
     setRelock(null)
   }
-  // Each locked answer asks for the PIN once; a dismissed prompt is not asked again until main is.
-  const lockedAnswer =
-    reply !== null &&
-    reply.type === DESKTOP_REPLIES.titleRefused &&
-    reply.reason === TITLE_REFUSALS.locked
-      ? count
-      : null
   const { refetch } = title
-
-  useEffect(() => {
-    if (lockedAnswer !== null) askPin()
-  }, [lockedAnswer, askPin])
 
   const fileId =
     held !== null && held.source.kind === PLAYER_SOURCE_KINDS.file ? held.source.fileId : null

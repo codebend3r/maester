@@ -1,13 +1,10 @@
 import XCTest
 
-/// raven on the Apple TV, driven only by the Siri Remote and the platform's keyboard, against
+/// raven on the Apple TV, driven only by the Siri Remote, against
 /// `@raven/server`'s `serve:fixture` on the loopback. It drives the build installed on the
 /// simulator (Release, development variant), so it names the app by its bundle id.
 final class RemoteFlowTests: XCTestCase {
-  /// The fixture server's secrets, as `serve:fixture` prints them.
   private enum Fixture {
-    static let pin = "1357"
-    static let adminPassword = "Raven-Admin-2026"
     static let film = "Kestrel Point"
   }
 
@@ -17,8 +14,6 @@ final class RemoteFlowTests: XCTestCase {
     static let resume = "Resume from"
     static let markWatched = "Mark watched"
     static let watched = "Watched"
-    static let keyboardGo = "go"
-    static let bullet: Character = "•"
   }
 
   private let app = XCUIApplication(bundleIdentifier: "io.github.codebend3r.raven.app")
@@ -28,11 +23,10 @@ final class RemoteFlowTests: XCTestCase {
     continueAfterFailure = false
   }
 
-  /// Signs in, plays the film from Home, leaves with Menu, finds it under Continue watching with
+  /// Plays the film from Home, leaves with Menu, finds it under Continue watching with
   /// the focus back on the card it was opened from, then leaves the app with Menu on Home.
   func testPlaysFromHomeAndMenuComesBack() throws {
     app.launch()
-    signIn()
 
     XCTAssertTrue(waitForFocus(timeout: 60) { $0 == Fixture.film }, "Home opens on the film")
     XCTAssertFalse(app.staticTexts[Copy.continueWatching].exists, "Nothing is being watched yet")
@@ -80,28 +74,6 @@ final class RemoteFlowTests: XCTestCase {
 
   // MARK: - Steps
 
-  /// The PIN, then the admin password, each on the platform's keyboard.
-  private func signIn() {
-    enterSecret(Fixture.pin)
-    enterSecret(Fixture.adminPassword)
-  }
-
-  private func enterSecret(_ secret: String) {
-    let field = app.secureTextFields.firstMatch
-    XCTAssertTrue(field.waitForExistence(timeout: 30))
-    XCTAssertTrue(waitForFocus(timeout: 10) { _ in field.hasFocus })
-    press(.select)
-    sleep(2)
-    let isWhole = type(secret, into: field) { shown in
-      shown.count == secret.count && shown.allSatisfy { $0 == Copy.bullet }
-    }
-    XCTAssertTrue(isWhole, "Every character of the secret")
-    // tvOS can show the full keyboard for a secure PIN, not just a number pad.
-    XCTAssertTrue(waitForFocus(pressing: .down, tries: 8) { $0 == Copy.keyboardGo })
-    press(.select)
-    sleep(3)
-  }
-
   /// Leaves the fixture as it was found: a mark clears the saved spot, and taking it off again
   /// leaves the film never started, so the iPhone flows that follow see what they expect.
   private func clearTheSpot() {
@@ -115,48 +87,6 @@ final class RemoteFlowTests: XCTestCase {
     press(.select)
     XCTAssertTrue(waitForFocus(timeout: 15) { $0 == Copy.markWatched })
     XCTAssertTrue(app.buttons[Copy.play].waitForExistence(timeout: 15))
-  }
-
-  // MARK: - The keyboard
-
-  /// Types `text` on the open keyboard until `field` shows what `isRight` expects, clearing it
-  /// between tries, so a key the keyboard dropped is caught before the value is sent.
-  private func type(
-    _ text: String,
-    into field: XCUIElement,
-    tries: Int = 3,
-    _ isRight: @escaping (String) -> Bool
-  ) -> Bool {
-    (1...tries).contains { attempt in
-      if attempt > 1 { clear(field, typed: text) }
-      app.typeText(text)
-      return waitForValue(of: field, timeout: 3, isRight)
-    }
-  }
-
-  /// Deletes back over what the field holds, or what was typed, whichever is longer.
-  private func clear(_ field: XCUIElement, typed text: String) {
-    let count = max(valueOf(field).count, text.count)
-    app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count))
-  }
-
-  private func valueOf(_ field: XCUIElement) -> String {
-    field.value as? String ?? ""
-  }
-
-  /// Waits until the field's value passes `check`.
-  private func waitForValue(
-    of field: XCUIElement,
-    timeout: TimeInterval,
-    _ check: @escaping (String) -> Bool
-  ) -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    while Date() < deadline {
-      if check(valueOf(field)) { return true }
-      usleep(500_000)
-    }
-    print("The field held \(valueOf(field))")
-    return false
   }
 
   // MARK: - The remote and the focus

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { AUTH_EVENTS } from '@/lib/authClient'
-import { createSelectionStore, queryKeys, useUnlockPrompt } from '@raven/ui/headless'
+import { createSelectionStore, queryKeys } from '@raven/ui/headless'
 import { queryClient } from '@/lib/queryClient'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { useSelectionScopes } from '@/stores/selectionScope'
@@ -80,7 +80,6 @@ describe('useAuthSession account changes', () => {
     useAuthSession.getState().start({ config, createClient: () => fake.client })
     await settled()
     queryClient.setQueryData(queryKeys.libraries, ['private to the first account'])
-    useUnlockPrompt.getState().ask()
     const store = createSelectionStore()
     store.getState().start('card-1')
     useSelectionScopes.setState({
@@ -95,7 +94,6 @@ describe('useAuthSession account changes', () => {
     fake.emit({ event: 'SIGNED_IN', session: fakeSession({ userId: 'u2' }) })
 
     expect(queryClient.getQueryData(queryKeys.libraries)).toBeUndefined()
-    expect(useUnlockPrompt.getState().open).toBe(false)
     expect(store.getState().selecting).toBe(false)
     expect(useAuthSession.getState().session?.userId).toBe('u2')
   })
@@ -106,7 +104,6 @@ describe('useAuthSession account changes', () => {
     fake.emit({ event: 'SIGNED_OUT', session: null })
 
     expect(queryClient.getQueryData(queryKeys.libraries)).toBeUndefined()
-    expect(useUnlockPrompt.getState().open).toBe(false)
   })
 
   it('keeps everything through a token refresh of the same account', async () => {
@@ -120,7 +117,6 @@ describe('useAuthSession account changes', () => {
     expect(queryClient.getQueryData<string[]>(queryKeys.libraries)).toEqual([
       'private to the first account',
     ])
-    expect(useUnlockPrompt.getState().open).toBe(true)
     expect(store.getState().selecting).toBe(true)
   })
 

@@ -2,7 +2,7 @@ import { type ComponentType, type ReactNode, useState } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 
 import { Icon } from '@raven/native'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import {
@@ -70,7 +70,7 @@ type HeadingProps = { title: string }
 const Heading = ({ title }: HeadingProps) => {
   const styles = useStyles()
   return (
-    <Text accessibilityRole="header" style={styles.heading}>
+    <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
       {title}
     </Text>
   )
@@ -171,7 +171,7 @@ type HeroTitleWordsProps = HeroTitleProps
 const HeroTitleWords = ({ hero }: HeroTitleWordsProps) => {
   const styles = useStyles()
   return (
-    <Text accessibilityRole="header" style={styles.title}>
+    <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
       {hero.title}
     </Text>
   )
@@ -372,7 +372,11 @@ type PersonInitialsProps = PersonProps
 
 const PersonInitials = ({ person }: PersonInitialsProps) => {
   const styles = useStyles()
-  return <Text style={styles.initials}>{person.initials}</Text>
+  return (
+    <Text variant={TEXT_VARIANTS.display} style={styles.initials}>
+      {person.initials}
+    </Text>
+  )
 }
 
 /** A person's photo, else their initials. */

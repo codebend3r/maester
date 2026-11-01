@@ -149,3 +149,6 @@ export const heroPictureOf = (
   picture: hero.poster.picture,
   progress: 0,
 })
+
+/** Hooks for the render tests to find a part of the page by. */
+export const ITEM_TEST_IDS = { backdrop: 'item-backdrop' } as const

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Icon } from '@raven/native'
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import {
@@ -9,10 +10,10 @@ import {
   pickerLabelOf,
 } from '@/layouts/gridKit'
 import { PICKER_LIST_COPY } from '@/layouts/copy'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { PlateButton, usePlateStyles } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
-import { themedStyles } from '@/theme/useTheme'
+import { themedStyles, useTheme } from '@/theme/useTheme'
 
 /** What a picker does as its list opens or closes unless told more: nothing. */
 const NOTHING_ON_OPEN = (): void => undefined
@@ -43,7 +44,7 @@ export const PickerList = <K extends string>({
       <View style={styles.backdrop}>
         <View style={styles.shade} />
         <View accessibilityLabel={label} style={styles.panel}>
-          <Text accessibilityRole="header" style={styles.title}>
+          <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
             {label}
           </Text>
           <ScrollView contentContainerStyle={styles.options}>
@@ -69,7 +70,7 @@ export const PickerList = <K extends string>({
   )
 }
 
-type UsePickerListProps<K extends string> = PickerProps<K>
+type UsePickerListProps<K extends string> = Omit<PickerProps<K>, 'icon'>
 
 /**
  * What opens a TV picker's list, what the control that opens it is called aloud (`pickerLabelOf`),
@@ -91,7 +92,7 @@ export const usePickerList = <K extends string>({
   }
   return {
     open: () => setOpen(true),
-    label: pickerLabelOf({ label, options, value, onChoose }),
+    label: pickerLabelOf({ label, options, value }),
     list: {
       label,
       options,
@@ -116,29 +117,42 @@ const Picker = <K extends string>(props: PickerProps<K>) => {
   const ground = { isOverPicture: props.isOverPicture }
   const styles = useStyles(ground)
   const plateStyles = usePlateStyles(ground)
+  const colour = useTheme((theme) => (props.isOverPicture ? theme.overPicture : theme.palette).text)
   return (
     <>
       <Pressable
         accessibilityLabel={label}
         accessibilityRole="button"
         onPress={open}
-        style={({ focused }) => [plateStyles.plate, styles.chip, focused && plateStyles.focused]}
+        style={({ focused }) => [plateStyles.plate, focused && plateStyles.focused]}
       >
-        <Text style={styles.label}>{props.label}</Text>
-        <Text style={plateStyles.label}>{chosenLabelOf(props)}</Text>
+        {({ focused }) => (
+          <>
+            <Icon colour={colour} isFocused={focused} name={props.icon} size={TV_SIZES.textLg} />
+            <Text style={styles.label}>{props.label}</Text>
+            <Text style={plateStyles.label}>{chosenLabelOf(props)}</Text>
+          </>
+        )}
       </Pressable>
       <PickerList {...list} />
     </>
   )
 }
 
-const ToolButton = ({ label, accessibilityLabel, onPress, isOverPicture }: ToolButtonProps) => (
+const ToolButton = ({
+  label,
+  icon,
+  accessibilityLabel,
+  onPress,
+  isOverPicture,
+}: ToolButtonProps) => (
   <PlateButton
     label={accessibilityLabel}
     onPress={onPress}
     accessibilityRole="button"
     isOverPicture={isOverPicture}
     text={label}
+    icon={icon}
   />
 )
 
@@ -147,7 +161,6 @@ export const focusPicker: PickerKit = { Picker, ToolButton }
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
-    chip: { flexDirection: 'row', gap: TV_SIZES.space2 },
     focused: { borderColor: colours.text },
     label: { color: colours.muted, fontSize: TV_SIZES.text },
     chosen: { fontWeight: 'bold' },

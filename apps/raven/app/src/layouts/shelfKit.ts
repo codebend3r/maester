@@ -64,5 +64,5 @@ export const MENU_FOOT = {
   expand: 'Expand menu',
 } as const
 
-/** The way into Settings: a gear under the thumb, a plate in the TV's top row. */
-export const SETTINGS_ENTRY = { label: 'Settings', gear: '\u2699\uFE0E' } as const
+/** The way into Settings, and what it is called aloud. */
+export const SETTINGS_ENTRY = { label: 'Settings' } as const

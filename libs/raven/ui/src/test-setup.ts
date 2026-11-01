@@ -7,7 +7,6 @@ import { configureStorage } from '@/stores/configureStorage'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { usePlayerServices } from '@/stores/playerServices'
 import { useToasts } from '@/stores/toasts'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { resetBrowserSupport } from '@/test/canPlay'
 
 await configureStorage({ storage: window.localStorage })
@@ -17,7 +16,6 @@ const initialMediaOrigin = useMediaOrigin.getInitialState()
 const initialPageBackdrop = usePageBackdrop.getInitialState()
 const initialServices = usePlayerServices.getInitialState()
 const initialToasts = useToasts.getInitialState()
-const initialUnlockPrompt = useUnlockPrompt.getInitialState()
 
 afterEach(() => {
   cleanup()
@@ -26,7 +24,6 @@ afterEach(() => {
   usePageBackdrop.setState(initialPageBackdrop, true)
   usePlayerServices.setState(initialServices, true)
   useToasts.setState(initialToasts, true)
-  useUnlockPrompt.setState(initialUnlockPrompt, true)
   window.localStorage.clear()
   resetBrowserSupport()
 })

@@ -1,5 +1,7 @@
 import { formatDuration } from '@raven/core'
-import { useState } from 'react'
+import { Icon } from '@raven/native'
+import type { IconName } from '@raven/ui/iconDrawings'
+import { type ComponentRef, useRef, useState } from 'react'
 import {
   Animated,
   type GestureResponderEvent,
@@ -7,30 +9,31 @@ import {
   StatusBar,
   StyleSheet,
   View,
+  useWindowDimensions,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Video from 'react-native-video'
 
+import { pickerLabelOf } from '@/layouts/gridKit'
 import { LoadingMark } from '@/layouts/LoadingMark'
-import { Text } from '@/layouts/Text'
-import { touchPicker } from '@/layouts/Picker.touch'
+import { openPickerSheet } from '@/layouts/Picker.touch'
 import { CaptionText } from '@/layouts/PlayerCaption'
 import {
   PLAYER_COPY,
   type PlayerChromeKit,
   type PlayerChromeProps,
   SKIP_SECONDS,
+  type TrackPicker,
   type Transport,
   playedShareOf,
   scrubberAccessibilityOf,
   within,
 } from '@/layouts/playerKit'
-import { TouchBack } from '@/layouts/TouchBack'
+import { Text } from '@/layouts/Text'
+import { TitleArt } from '@/layouts/TitleArt'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
-import { pictureStyles } from '@/theme/useTheme'
-
-const { Picker, ToolButton } = touchPicker
+import { pictureStyles, useTheme } from '@/theme/useTheme'
 
 /** How dark the ground is laid over the picture under the controls. */
 const SCRIM_OPACITY = 0.45
@@ -38,13 +41,12 @@ const SCRIM_OPACITY = 0.45
 /** The scrubber's height: a finger's, though the line it draws is thin. */
 const SCRUBBER_HEIGHT = 44
 
-// The variation selector keeps the play triangle a glyph of the font rather than an emoji.
-const GLYPHS = {
-  play: '\u25B6\uFE0E',
-  pause: '\u275A\u275A',
-  back: `\u21BA ${SKIP_SECONDS}`,
-  forward: `${SKIP_SECONDS} \u21BB`,
-} as const
+/** The web's icon sizes: its transport, its play and its glass pills. */
+const ICON_SIZES = { transport: 24, play: 28, pill: 20 } as const
+
+/** How tall the title art in the corner stands, and the share of the screen's width it may take. */
+const LOGO_HEIGHT = SIZES.space6 * 1.5
+const LOGO_WIDTH_SHARE = 0.4
 
 type ScrubberProps = Pick<Transport, 'position' | 'onSeek'> & { duration: number }
 
@@ -85,80 +87,181 @@ const Scrubber = ({ position, duration, onSeek }: ScrubberProps) => {
   )
 }
 
-type RoundButtonProps = {
-  glyph: string
+type IconButtonProps = {
+  icon: IconName
   label: string
-  isLarge?: boolean
+  size: number
+  isGlass?: boolean
   onPress: () => void
 }
 
-const RoundButton = ({ glyph, label, isLarge = false, onPress }: RoundButtonProps) => {
+/** A round button wearing only the web's icon for it, said aloud by its label; glass where the web's is. */
+const IconButton = ({ icon, label, size, isGlass = false, onPress }: IconButtonProps) => {
   const styles = useStyles()
+  const colour = useTheme((theme) => theme.overPicture.text)
   return (
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="button"
-      hitSlop={SIZES.space2}
+      hitSlop={SIZES.space1}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.round,
-        isLarge && styles.roundLarge,
-        pressed && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.round, isGlass && styles.glass, pressed && styles.pressed]}
     >
-      <Text style={[styles.glyph, isLarge && styles.glyphLarge]}>{glyph}</Text>
+      <Icon colour={colour} name={icon} size={size} />
     </Pressable>
   )
 }
 
-type TransportControlsProps = { transport: Transport }
+type PickerButtonProps = {
+  icon: IconName
+  label: string
+  picker: TrackPicker
+}
 
-/** Play and pause between the skips, then the time over the line to drag along. */
-const TransportControls = ({ transport }: TransportControlsProps) => {
+/** A track picker as a glass icon, said with its choice, opening the system's dark sheet beside it. */
+const PickerButton = ({ icon, label, picker }: PickerButtonProps) => {
+  const anchor = useRef<ComponentRef<typeof View>>(null)
+  const styles = useStyles()
+  const colour = useTheme((theme) => theme.overPicture.text)
+  const props = { ...picker, label, isOverPicture: true }
+  return (
+    <Pressable
+      ref={anchor}
+      accessibilityLabel={pickerLabelOf(props)}
+      accessibilityRole="button"
+      hitSlop={SIZES.space1}
+      onPress={() => openPickerSheet({ ...props, anchor })}
+      style={({ pressed }) => [styles.round, styles.glass, pressed && styles.pressed]}
+    >
+      <Icon colour={colour} name={icon} size={ICON_SIZES.pill} />
+    </Pressable>
+  )
+}
+
+type TransportControlsProps = Pick<
+  PlayerChromeProps,
+  'audio' | 'subtitles' | 'next' | 'onPictureInPicture'
+> & { transport: Transport }
+
+/**
+ * The web's bar: the time over the line to drag along, then back to the start, back ten
+ * seconds, play or pause, forward ten seconds and next, with the glass icons for subtitles,
+ * audio and Picture in Picture at the right, wrapping under the transport on a narrow screen.
+ */
+const TransportControls = ({
+  transport,
+  audio,
+  subtitles,
+  next,
+  onPictureInPicture,
+}: TransportControlsProps) => {
   const { isPaused, position, duration, onTogglePlay, onSeek } = transport
   const length = duration ?? 0
   const styles = useStyles()
   return (
-    <>
-      <View pointerEvents="box-none" style={styles.middle}>
-        <RoundButton
-          glyph={GLYPHS.back}
-          label={PLAYER_COPY.back(SKIP_SECONDS)}
-          onPress={() => onSeek(position - SKIP_SECONDS)}
-        />
-        <RoundButton
-          glyph={isPaused ? GLYPHS.play : GLYPHS.pause}
-          isLarge
-          label={isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
-          onPress={onTogglePlay}
-        />
-        <RoundButton
-          glyph={GLYPHS.forward}
-          label={PLAYER_COPY.forward(SKIP_SECONDS)}
-          onPress={() => onSeek(position + SKIP_SECONDS)}
-        />
-      </View>
-      <View style={styles.bottom}>
+    <View style={styles.bottom}>
+      <View style={styles.timeline}>
         <Text style={styles.time}>{formatDuration(position)}</Text>
         <View style={styles.scrubberSlot}>
           <Scrubber duration={length} onSeek={onSeek} position={position} />
         </View>
         <Text style={styles.time}>{formatDuration(duration)}</Text>
       </View>
-    </>
+      <View style={styles.bar}>
+        <View style={styles.run}>
+          <IconButton
+            icon="skipPrevious"
+            label={PLAYER_COPY.restart}
+            onPress={() => onSeek(0)}
+            size={ICON_SIZES.transport}
+          />
+          <IconButton
+            icon="rewind"
+            label={PLAYER_COPY.back(SKIP_SECONDS)}
+            onPress={() => onSeek(position - SKIP_SECONDS)}
+            size={ICON_SIZES.transport}
+          />
+          <IconButton
+            icon={isPaused ? 'play' : 'pause'}
+            label={isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
+            onPress={onTogglePlay}
+            size={ICON_SIZES.play}
+          />
+          <IconButton
+            icon="forward"
+            label={PLAYER_COPY.forward(SKIP_SECONDS)}
+            onPress={() => onSeek(position + SKIP_SECONDS)}
+            size={ICON_SIZES.transport}
+          />
+          {next !== null && (
+            <IconButton
+              icon="skipNext"
+              label={next.label}
+              onPress={next.onPlay}
+              size={ICON_SIZES.transport}
+            />
+          )}
+        </View>
+        <View style={styles.run}>
+          {subtitles !== null && (
+            <PickerButton icon="captions" label={PLAYER_COPY.subtitles} picker={subtitles} />
+          )}
+          {audio !== null && (
+            <PickerButton icon="headphones" label={PLAYER_COPY.audio} picker={audio} />
+          )}
+          {onPictureInPicture !== null && (
+            <IconButton
+              icon="resize"
+              isGlass
+              label={PLAYER_COPY.pictureInPicture}
+              onPress={onPictureInPicture}
+              size={ICON_SIZES.pill}
+            />
+          )}
+        </View>
+      </View>
+    </View>
+  )
+}
+
+type PlayerLogoProps = Pick<PlayerChromeProps, 'heading' | 'title'>
+
+/**
+ * What is playing, in the top left corner, fading in and out with the controls: the show's or the
+ * film's title art, or its name where there is none, and an episode's season and number under it.
+ */
+const PlayerLogo = ({ heading, title }: PlayerLogoProps) => {
+  const { width } = useWindowDimensions()
+  const styles = useStyles()
+  const name = heading.show ?? (heading.title === '' ? title : heading.title)
+  return (
+    name !== '' && (
+      <View accessibilityRole="header" style={styles.logo}>
+        <TitleArt
+          height={LOGO_HEIGHT}
+          logo={heading.logo}
+          maxWidth={width * LOGO_WIDTH_SHARE}
+          name={name}
+          textStyle={styles.title}
+        />
+        {heading.place !== null && <Text style={styles.place}>{heading.place}</Text>}
+      </View>
+    )
   )
 }
 
 /**
- * Raven's controls over the video under the thumb: Back, the title and the track pickers along
- * the top, play and pause between the ten-second skips in the middle, the time and the line to
- * drag along the bottom, all inside the safe area while the video fills the screen. They fade
- * once the video has played untouched for the viewer's linger, and a tap brings them back. The
+ * Raven's controls over the video under the thumb, the web player's, in icons: Back at the top
+ * right, and along the bottom the time and the line to drag along, then the transport and the
+ * glass icons for subtitles, audio and Picture in Picture, all inside the safe area while the
+ * video fills the screen. They fade once the video has played untouched for the viewer's linger,
+ * and a tap brings them back; what is playing, in the top left corner, fades with them. The
  * video plays in Picture in Picture when the app is left, and on AirPlay; the silent switch never
  * mutes it, and leaving the app without Picture in Picture pauses it.
  */
 const PlayerChrome = ({
   title,
+  heading,
   surface,
   notice,
   isOpening,
@@ -227,38 +330,28 @@ const PlayerChrome = ({
         style={[StyleSheet.absoluteFill, { opacity }]}
       >
         <View pointerEvents="none" style={styles.scrim} />
+        <View pointerEvents="none" style={[styles.logoSlot, sides]}>
+          <PlayerLogo heading={heading} title={title} />
+        </View>
         <View pointerEvents="box-none" style={[styles.frame, sides]}>
           <View style={styles.top}>
-            <View style={styles.heading}>
-              <TouchBack isRaised onPress={onBack} />
-              <Text numberOfLines={2} style={styles.title}>
-                {title}
-              </Text>
-            </View>
-            <View style={styles.tools}>
-              {audio !== null && <Picker isOverPicture label={PLAYER_COPY.audio} {...audio} />}
-              {subtitles !== null && (
-                <Picker isOverPicture label={PLAYER_COPY.subtitles} {...subtitles} />
-              )}
-              {next !== null && (
-                <ToolButton
-                  accessibilityLabel={next.label}
-                  isOverPicture
-                  label={PLAYER_COPY.next}
-                  onPress={next.onPlay}
-                />
-              )}
-              {onPictureInPicture !== null && (
-                <ToolButton
-                  accessibilityLabel={PLAYER_COPY.pictureInPicture}
-                  isOverPicture
-                  label={PLAYER_COPY.pictureInPicture}
-                  onPress={onPictureInPicture}
-                />
-              )}
-            </View>
+            <IconButton
+              icon="back"
+              isGlass
+              label={PLAYER_COPY.leave}
+              onPress={onBack}
+              size={ICON_SIZES.pill}
+            />
           </View>
-          {transport !== null && <TransportControls transport={transport} />}
+          {transport !== null && (
+            <TransportControls
+              audio={audio}
+              next={next}
+              onPictureInPicture={onPictureInPicture}
+              subtitles={subtitles}
+              transport={transport}
+            />
+          )}
         </View>
       </Animated.View>
       {caption !== null && (
@@ -286,22 +379,33 @@ const useStyles = pictureStyles((colours) =>
       opacity: SCRIM_OPACITY,
     },
     frame: { flex: 1, justifyContent: 'space-between' },
-    top: { gap: SIZES.space2 },
-    heading: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space3 },
-    tools: {
+    top: { alignItems: 'flex-end' },
+    logoSlot: { ...StyleSheet.absoluteFill, alignItems: 'flex-start' },
+    logo: { gap: SIZES.space1 },
+    // The name where there is no art, over any picture, so a shadow keeps it readable unfaded.
+    title: {
+      color: colours.text,
+      fontSize: SIZES.textLg,
+      fontWeight: '600',
+      textShadowColor: colours.ground,
+      textShadowRadius: SIZES.space2,
+    },
+    place: {
+      color: colours.text,
+      fontSize: SIZES.textSm,
+      textShadowColor: colours.ground,
+      textShadowRadius: SIZES.space2,
+    },
+    bottom: { gap: SIZES.space1 },
+    timeline: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space3 },
+    bar: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      justifyContent: 'flex-end',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       gap: SIZES.space2,
     },
-    title: { flex: 1, color: colours.text, fontSize: SIZES.text, fontWeight: '600' },
-    middle: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: SIZES.space6,
-    },
-    bottom: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
+    run: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space1 },
     time: { color: colours.text, fontSize: SIZES.textSm, fontVariant: ['tabular-nums'] },
     scrubberSlot: { flex: 1 },
     scrubber: { height: SCRUBBER_HEIGHT, justifyContent: 'center' },
@@ -321,19 +425,15 @@ const useStyles = pictureStyles((colours) =>
       backgroundColor: colours.text,
     },
     round: {
-      minWidth: SIZES.controlLarge,
-      minHeight: SIZES.controlLarge,
+      width: SIZES.controlLarge,
+      height: SIZES.controlLarge,
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: SIZES.controlLarge,
-      paddingHorizontal: SIZES.space2,
-      backgroundColor: colours.raised,
     },
-    // The same dark glass as the skips, larger: the web's play is on-picture too, in every theme.
-    roundLarge: { minWidth: SIZES.controlLarge * 1.5, minHeight: SIZES.controlLarge * 1.5 },
+    // The web's pills and back: dark glass, the same in every theme.
+    glass: { backgroundColor: colours.quiet },
     pressed: { opacity: OPACITIES.pressed },
-    glyph: { color: colours.text, fontSize: SIZES.text, fontWeight: '600' },
-    glyphLarge: { fontSize: SIZES.textXl },
     captionSlot: {
       ...StyleSheet.absoluteFill,
       alignItems: 'center',

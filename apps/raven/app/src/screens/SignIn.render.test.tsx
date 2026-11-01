@@ -1,13 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import {
-  ADMIN_LOCK_STATES,
-  type AdminLock,
-  ApiError,
-  type Home,
-  type LockState,
-  type MediaTicket,
-  SERVERS_CAP,
-} from '@raven/core'
+import { ApiError, type Home, type MediaTicket, SERVERS_CAP } from '@raven/core'
 import type * as Native from '@raven/native'
 import { AUTH_OUTCOMES, type AuthOutcome, RAVEN_SERVER } from '@raven/native/headless'
 import { fireEvent, render, screen } from '@testing-library/react-native'
@@ -32,21 +24,9 @@ const mockDismissTo = jest.fn<(href: string) => void>()
 type MockSignInCallbackProps = { email: string; password: string }
 
 const mockSignIn = jest.fn<(input: MockSignInCallbackProps) => Promise<AuthOutcome>>()
-const mockSignOut = jest.fn()
-const getLock = jest.fn<() => Promise<LockState>>()
-const unlock = jest.fn<(pin: string) => Promise<LockState>>()
 const getHome = jest.fn<() => Promise<Home>>()
 const getMediaTicket = jest.fn<(id: number) => Promise<MediaTicket>>()
-const getAdminLock = jest.fn<() => Promise<AdminLock>>()
-const unlockAdmin = jest.fn<(password: string) => Promise<AdminLock>>()
-const mockApiFor = jest.fn((_server: unknown) => ({
-  getLock,
-  unlock,
-  getAdminLock,
-  unlockAdmin,
-  getHome,
-  getMediaTicket,
-}))
+const mockApiFor = jest.fn((_server: unknown) => ({ getHome, getMediaTicket }))
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ dismissTo: mockDismissTo }),
@@ -76,12 +56,10 @@ describe('SignIn', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     useActiveServer.setState({ servers: [], activeId: null })
-    useAccountSession.setState({ signIn: mockSignIn, signOut: mockSignOut })
+    useAccountSession.setState({ signIn: mockSignIn })
     mockSignIn.mockResolvedValue({ kind: AUTH_OUTCOMES.ok, session: SESSION })
-    getLock.mockResolvedValue({ available: false, unlocked: false })
     getHome.mockResolvedValue(HOME)
     getMediaTicket.mockResolvedValue({ ticket: 't', expiresAt: 1 })
-    getAdminLock.mockResolvedValue({ state: ADMIN_LOCK_STATES.off })
   })
 
   it("signs in with the account's email and password, then goes Home on the one server", async () => {
@@ -89,24 +67,12 @@ describe('SignIn', () => {
     await signInWith({ email: ' viewer@example.com ', password: 'hunter2' })
 
     expect(mockSignIn).toHaveBeenCalledWith({ email: 'viewer@example.com', password: 'hunter2' })
-    expect(unlock).not.toHaveBeenCalled()
     expect(getMediaTicket).toHaveBeenCalledWith(7)
     expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
     expect(useActiveServer.getState()).toMatchObject({
       servers: [{ id: RAVEN_SERVER.id }],
       activeId: RAVEN_SERVER.id,
     })
-  })
-
-  it('never asks for the PIN, even when the server keeps libraries behind one', async () => {
-    getLock.mockResolvedValue({ available: true, unlocked: false })
-    await render(<SignIn />)
-    await signInAsViewer()
-
-    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
-    expect(screen.queryByLabelText('PIN')).toBeNull()
-    expect(unlock).not.toHaveBeenCalled()
-    expect(getAdminLock).not.toHaveBeenCalled()
   })
 
   it('asks for both an email and a password before calling anyone', async () => {

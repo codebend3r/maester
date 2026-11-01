@@ -5,11 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import { Icon } from '@raven/native'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
-import { TouchBack } from '@/layouts/TouchBack'
-import { TouchCard, touchCaptionHeightOf } from '@/layouts/TouchCard'
+import { TouchNav } from '@/layouts/TouchNav'
+import { TouchCard, isCaptionless, touchCaptionHeightOf } from '@/layouts/TouchCard'
 import { fitJumpMarks } from '@/layouts/jumpMarks'
 import { BREAKPOINTS } from '@/layouts/screenSizes'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
@@ -85,7 +85,10 @@ const RowCard = ({ card, hasPicture, onPress }: RowCardProps) => {
       onPress={onPress}
       style={({ pressed }) => [styles.rowCard, pressed && styles.pressed]}
     >
-      {hasPicture && <CardPicture card={card} width={TILE_WIDTHS[card.shape]} />}
+      {hasPicture && (
+        // A tile is too small for title art, and its words sit beside it.
+        <CardPicture card={{ ...card, logo: null }} width={TILE_WIDTHS[card.shape]} />
+      )}
       <View style={styles.words}>
         <Text numberOfLines={1} style={styles.rowTitle}>
           {card.title}
@@ -195,7 +198,7 @@ const BucketRow = ({ row, grid }: BucketRowProps) => {
       ]}
     >
       <Text style={styles.chevron}>{row.isOpen ? CHEVRONS.open : CHEVRONS.shut}</Text>
-      <Text numberOfLines={1} style={styles.bucketTitle}>
+      <Text variant={TEXT_VARIANTS.display} numberOfLines={1} style={styles.bucketTitle}>
         {row.section.title}
       </Text>
       <Text style={styles.count}>{row.section.count}</Text>
@@ -285,7 +288,7 @@ const Grid = ({
     }
     return (
       pictureHeightOf({ shape: row.shape, width: widthOf(row.shape) }) +
-      touchCaptionHeightOf(screen.fontScale) +
+      (row.cards.every(isCaptionless) ? 0 : touchCaptionHeightOf(screen.fontScale)) +
       ROW_GAP
     )
   }
@@ -323,15 +326,14 @@ const Grid = ({
             onLayout={({ nativeEvent }) => setTop(nativeEvent.layout.height)}
             style={styles.header}
           >
-            <TouchBack onPress={onBack} />
+            <TouchNav onBack={onBack} search={search} />
             <View style={styles.titleRow}>
               {icon !== null && <Icon colour={text} name={icon} size={TITLE_ICON} />}
-              <Text accessibilityRole="header" style={styles.title}>
+              <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
                 {title}
               </Text>
             </View>
             {line !== null && <Text style={styles.line}>{line}</Text>}
-            {search}
             <View style={styles.toolbar}>{toolbar}</View>
             {notice !== null && <Text style={styles.notice}>{notice}</Text>}
           </View>

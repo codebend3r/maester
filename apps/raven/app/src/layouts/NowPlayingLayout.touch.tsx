@@ -16,7 +16,7 @@ import { NowPlayingAside } from '@/layouts/NowPlayingAside.touch'
 import { Cover, ListEntry, TouchPage, useMusicStyles } from '@/layouts/MusicParts.touch'
 import { touchPicker } from '@/layouts/Picker.touch'
 import { openAddToPlaylistSheet } from '@/layouts/playlistSheets'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -61,7 +61,7 @@ const PlayingHero = ({
     track !== null && (
       <View style={styles.stage}>
         <Cover cover={track.cover} title={track.title} />
-        <Text numberOfLines={2} style={own.trackTitle}>
+        <Text variant={TEXT_VARIANTS.display} numberOfLines={2} style={own.trackTitle}>
           {track.title}
         </Text>
         <Text numberOfLines={1} style={styles.muted}>
@@ -84,16 +84,19 @@ const PlayingHero = ({
         <View style={styles.controls}>
           <ToolButton
             accessibilityLabel={shuffleLabelOf(isShuffled)}
+            icon="shuffle"
             label={shuffleLabelOf(isShuffled)}
             onPress={onShuffle}
           />
           <ToolButton
             accessibilityLabel={MUSIC_COPY.repeat[repeat]}
+            icon="reset"
             label={MUSIC_COPY.repeat[repeat]}
             onPress={onRepeat}
           />
           <ToolButton
             accessibilityLabel={MUSIC_COPY.addToPlaylist}
+            icon="list"
             label={MUSIC_COPY.addToPlaylist}
             onPress={() =>
               openAddToPlaylistSheet({
@@ -129,7 +132,7 @@ export const NowPlayingLayout = (props: NowPlayingLayoutProps) => {
   const Playing = PLAYING_VIEWS[playingStateOf(track)]
   return (
     <TouchPage onBack={onBack}>
-      <Text accessibilityRole="header" style={styles.heading}>
+      <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
         {MUSIC_COPY.nowPlaying}
       </Text>
       <Playing {...props} />
@@ -137,11 +140,12 @@ export const NowPlayingLayout = (props: NowPlayingLayoutProps) => {
       {queue.length > 0 && (
         <View style={styles.section}>
           <View style={own.queueHead}>
-            <Text accessibilityRole="header" style={styles.heading}>
+            <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
               {MUSIC_COPY.upNext}
             </Text>
             <ToolButton
               accessibilityLabel={MUSIC_COPY.clear}
+              icon="close"
               label={MUSIC_COPY.clear}
               onPress={onClear}
             />
@@ -157,6 +161,7 @@ export const NowPlayingLayout = (props: NowPlayingLayoutProps) => {
             >
               <ToolButton
                 accessibilityLabel={MUSIC_COPY.removeTrack(row.title)}
+                icon="close"
                 label={MUSIC_COPY.remove}
                 onPress={() => onRemove(row.place)}
               />

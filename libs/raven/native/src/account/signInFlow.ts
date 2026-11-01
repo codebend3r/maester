@@ -5,10 +5,8 @@ import type { AccountSessionStore } from '@/account/accountSession'
 import {
   FINISH_OUTCOMES,
   SIGN_IN_STEPS,
-  type SecretStep,
   type SignInStep,
   finishSignIn,
-  stepAfterSecret,
 } from '@/account/signInSteps'
 import { AUTH_OUTCOMES } from '@/account/supabaseAuth'
 import { useSubmit } from '@/account/useSubmit'
@@ -21,14 +19,7 @@ type SignInCopy = {
   badAccount: string
   full: string
   notAdded: string
-  pin: string
-  pinPrompt: string
-  adminPassword: string
-  adminPrompt: string
 }
-
-/** What a secret step asks for: its prompt, its field's label, and whether it takes digits. */
-export type SecretPrompt = { prompt: string; label: string; isNumeric: boolean }
 
 type SignInFlowForProps = {
   account: Pick<AccountSessionStore, 'getState'>
@@ -36,8 +27,6 @@ type SignInFlowForProps = {
   apiOf: (server: AppServer) => ApiClient
   /** The one server the account signs in to, `RAVEN_SERVER`. */
   server: AppServer
-  /** An end to end build names an accountless fixture in its bundle, so it begins at the PIN. */
-  isBypassed: boolean
 }
 
 type UseSignInFlowProps = {
@@ -49,13 +38,9 @@ type UseSignInFlowProps = {
 
 type SubmitAccountProps = { password?: string }
 
-type SubmitSecretProps = { step: SecretStep; text: string }
-
 /**
  * The hook that runs sign-in's steps, as both apps do: the account's email and password, and
- * nothing more, since the PIN stays a secret that sign-in never asks for. A bypassed (end to
- * end) build has no account, so it begins at the PIN and then the admin password while the
- * admin lock would still hide them. Each screen keeps its fields, its layout and its copy.
+ * nothing more; no client ever asks for a PIN. Each screen keeps its fields, its layout and its copy.
  * Made per app at module scope, since a store handed to a hook at render reads to the hooks
  * rule as a hook used as a value.
  */
@@ -64,32 +49,12 @@ export const signInFlowFor = ({
   servers,
   apiOf,
   server: ravenServer,
-  isBypassed,
 }: SignInFlowForProps) => {
   const useSignInFlow = ({ copy, initial, onDone }: UseSignInFlowProps) => {
-    const [step, setStep] = useState<SignInStep>(
-      isBypassed
-        ? { kind: SIGN_IN_STEPS.pin, server: ravenServer }
-        : { kind: SIGN_IN_STEPS.account },
-    )
+    const [step, setStep] = useState<SignInStep>({ kind: SIGN_IN_STEPS.account })
     const [email, setEmail] = useState(initial.email)
     const [password, setPassword] = useState(initial.password)
-    const [secret, setSecret] = useState('')
     const { isBusy, error, setError, run } = useSubmit({ unreachable: copy.unreachable })
-
-    const secretSteps = {
-      [SIGN_IN_STEPS.pin]: { prompt: copy.pinPrompt, label: copy.pin, isNumeric: true },
-      [SIGN_IN_STEPS.admin]: {
-        prompt: copy.adminPrompt,
-        label: copy.adminPassword,
-        isNumeric: false,
-      },
-    } as const satisfies Record<SecretStep['kind'], SecretPrompt>
-
-    const askFor = (next: SignInStep) => {
-      setSecret('')
-      setStep(next)
-    }
 
     const finish = async (server: AppServer) => {
       const outcome = await finishSignIn({ servers, server, api: apiOf(server) })
@@ -98,7 +63,7 @@ export const signInFlowFor = ({
           onDone()
           return
         case FINISH_OUTCOMES.ticketsOff:
-          askFor({ kind: SIGN_IN_STEPS.ticketsOff })
+          setStep({ kind: SIGN_IN_STEPS.ticketsOff })
           return
         case FINISH_OUTCOMES.full:
           setError(copy.full)
@@ -135,40 +100,15 @@ export const signInFlowFor = ({
       })
     }
 
-    const submitSecret = ({ step: secretStep, text }: SubmitSecretProps) =>
-      run(async () => {
-        const { server } = secretStep
-        const next = await stepAfterSecret({ api: apiOf(server), step: secretStep, secret: text })
-        if (next !== null) {
-          askFor(next)
-          return
-        }
-        await finish(server)
-      })
-
-    const notNow = (secretStep: SecretStep) => run(() => finish(secretStep.server))
-
-    const signOut = () => {
-      account.getState().signOut()
-      askFor({ kind: SIGN_IN_STEPS.account })
-      setError(null)
-    }
-
     return {
       step,
       email,
       setEmail,
       password,
       setPassword,
-      secret,
-      setSecret,
       isBusy,
       error,
-      secretSteps,
       submitAccount,
-      submitSecret,
-      notNow,
-      signOut,
     }
   }
   return useSignInFlow

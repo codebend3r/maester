@@ -7,6 +7,7 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet, processColor } from 'react-native'
 
 import { LAUNCH_LOOK, LOGO_TEST_IDS, logoColoursOf } from '@/layouts/Logo'
+import { APP_ROUTES } from '@/routes'
 import { Home } from '@/screens/Home'
 import { Settings } from '@/screens/Settings'
 import { useActiveServer } from '@/stores/activeServer'
@@ -17,6 +18,7 @@ import { renderScreen } from '@/test/renderScreen'
 import { appThemeOf } from '@/theme/appTheme'
 
 const mockBack = jest.fn()
+const mockDismissTo = jest.fn()
 /** The paths each server was asked for, by its origin. */
 const mockAsked: string[] = []
 const mockApi = jest.fn((server: AppServer) => {
@@ -30,7 +32,9 @@ const mockApi = jest.fn((server: AppServer) => {
   }
 })
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ back: mockBack }) }))
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ back: mockBack, dismissTo: mockDismissTo }),
+}))
 jest.mock('@raven/native', () => ({
   ...jest.requireActual<typeof Native>('@raven/native'),
   apiFor: ({ server }: ApiForProps) => mockApi(server),
@@ -63,6 +67,12 @@ describe('Settings on a phone or tablet', () => {
     mockAsked.length = 0
     useActiveServer.setState({ servers: [NAS, OTHER], activeId: NAS.id })
     useAppPrefs.setState(DEFAULT_APP_PREFS)
+  })
+
+  it('takes the viewer Home from the header without stacking another screen', async () => {
+    await renderScreen({ ui: <Settings /> })
+    await fireEvent.press(screen.getByRole('button', { name: 'Home' }))
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 
   it("picks the theme from the system's sheet, every theme offered", async () => {

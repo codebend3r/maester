@@ -1,15 +1,13 @@
 import { type ComponentRef, type ComponentType, useRef, useState } from 'react'
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native'
 
-import { Text } from '@/layouts/Text'
-import { TitleArt } from '@/layouts/TitleArt'
-import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { CARD_SHAPES, type CardShape, type ShelfCard, cardLabelOf } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
 import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { DISPLAY_FONT } from '@/theme/fonts'
 import { TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -35,12 +33,17 @@ const EASE_OUT = Easing.bezier(0.2, 0.8, 0.2, 1)
 export const focusCaptionHeightOf = (fontScale: number): number =>
   TV_SIZES.space3 + linesHeightOf({ sizes: [TV_SIZES.textLg, TV_SIZES.text], fontScale })
 
-/** Whether a card's caption leads with its title in type, or with the title art it wears. */
-const CAPTION_TITLES = { words: 'words', art: 'art' } as const
+/** What leads a card's caption: an episode's name, the title in type, or nothing where title art says it. */
+const CAPTION_TITLES = { episode: 'episode', words: 'words', art: 'art' } as const
 
 type CaptionTitle = (typeof CAPTION_TITLES)[keyof typeof CAPTION_TITLES]
 
-type CaptionTitleProps = { card: ShelfCard; width: number; isFocused: boolean }
+const captionTitleOf = (card: ShelfCard): CaptionTitle => {
+  if (card.episode != null) return CAPTION_TITLES.episode
+  return card.logo == null ? CAPTION_TITLES.words : CAPTION_TITLES.art
+}
+
+type CaptionTitleProps = { card: ShelfCard; isFocused: boolean }
 
 const CaptionWords = ({ card, isFocused }: CaptionTitleProps) => {
   const styles = useStyles()
@@ -51,20 +54,23 @@ const CaptionWords = ({ card, isFocused }: CaptionTitleProps) => {
   )
 }
 
-const CaptionArt = ({ card, width, isFocused }: CaptionTitleProps) => {
+const CaptionEpisode = ({ card, isFocused }: CaptionTitleProps) => {
   const styles = useStyles()
   return (
-    <TitleArt
-      height={TV_SIZES.textLg * LINE_RATIO}
-      logo={card.logo ?? null}
-      maxWidth={width}
-      name={card.title}
-      textStyle={[styles.title, isFocused && styles.focusedTitle]}
-    />
+    <Text
+      variant={TEXT_VARIANTS.display}
+      numberOfLines={1}
+      style={[styles.title, isFocused && styles.focusedTitle]}
+    >
+      {card.episode?.name ?? card.title}
+    </Text>
   )
 }
 
+const CaptionArt = () => null
+
 const CAPTION_TITLE_VIEWS = {
+  [CAPTION_TITLES.episode]: CaptionEpisode,
   [CAPTION_TITLES.words]: CaptionWords,
   [CAPTION_TITLES.art]: CaptionArt,
 } as const satisfies Record<CaptionTitle, ComponentType<CaptionTitleProps>>
@@ -102,12 +108,8 @@ export const FocusCard = ({
   const [isFocused, setFocused] = useState(false)
   const [scale] = useState(() => new Animated.Value(1))
   const styles = useStyles()
-  // A Continue watching card (the one kind with a slot for title art) wears its show's or
-  // film's art in place of the name where it has some, and sets the episode's name under it in
-  // the display face either way.
-  const isContinuing = card.logo !== undefined
-  const CaptionTitle =
-    CAPTION_TITLE_VIEWS[card.logo == null ? CAPTION_TITLES.words : CAPTION_TITLES.art]
+  const CaptionTitle = CAPTION_TITLE_VIEWS[captionTitleOf(card)]
+  const line = card.episode?.mark ?? card.line
 
   const grow = (toValue: number) => {
     if (isReduced) {
@@ -125,7 +127,7 @@ export const FocusCard = ({
   return (
     <Pressable
       ref={pressable}
-      accessibilityLabel={card.title}
+      accessibilityLabel={cardLabelOf({ card })}
       accessibilityRole="button"
       hasTVPreferredFocus={isPreferred}
       onBlur={() => {
@@ -143,18 +145,17 @@ export const FocusCard = ({
       }}
     >
       <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
-        {/* The title art stands in the caption, in the name's place, so the picture goes without. */}
         <CardPicture
-          card={{ ...card, logo: null }}
+          card={card}
           radius={TV_SIZES.radius}
           ring={isFocused ? TV_SIZES.tvFocusRing : 0}
           width={width}
         />
         <View>
-          <CaptionTitle card={card} isFocused={isFocused} width={width} />
-          {card.line !== null && (
-            <Text numberOfLines={1} style={[styles.line, isContinuing && styles.displayLine]}>
-              {card.line}
+          <CaptionTitle card={card} isFocused={isFocused} />
+          {line !== null && (
+            <Text numberOfLines={1} style={styles.line}>
+              {line}
             </Text>
           )}
         </View>
@@ -174,7 +175,5 @@ const useStyles = themedStyles((colours) =>
     },
     focusedTitle: { color: colours.text },
     line: { color: colours.muted, fontSize: TV_SIZES.text, lineHeight: TV_SIZES.text * LINE_RATIO },
-    // The display face has one weight.
-    displayLine: { fontFamily: DISPLAY_FONT, fontWeight: 'normal' },
   }),
 )

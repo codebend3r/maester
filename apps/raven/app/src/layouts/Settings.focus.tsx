@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { FocusBand } from '@/layouts/FocusBand'
 import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
@@ -31,7 +31,7 @@ const SettingsPage = ({ title, children }: SettingsPageProps) => {
   const styles = useStyles()
   return (
     <ScrollView contentContainerStyle={styles.page} style={styles.ground}>
-      <Text accessibilityRole="header" style={styles.title}>
+      <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
         {title}
       </Text>
       {children}
@@ -43,7 +43,7 @@ const SettingsSection = ({ title, note, children }: SettingsSectionProps) => {
   const styles = useStyles()
   return (
     <View style={styles.section}>
-      <Text accessibilityRole="header" style={styles.heading}>
+      <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
         {title}
       </Text>
       {children}

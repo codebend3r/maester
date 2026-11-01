@@ -1,11 +1,12 @@
-import { libraryIconOf } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import type { ShelfCard } from '@/queries/cards'
-import { type ShelfView, continueArtIdsOf, homeShelvesOf } from '@/queries/homeShelves'
-import { useArtLogos } from '@/queries/useArtLogos'
+import { type ShelfView, homeShelvesOf } from '@/queries/homeShelves'
+import { showArtIdsOf } from '@/queries/showArt'
+import { pinnedLibrariesOf } from '@/queries/pinnedLibraries'
+import { useShowArts } from '@/queries/useShowArts'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
 import { Loading, Shelf, Shelves } from '@/layouts'
@@ -73,16 +74,16 @@ const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
   const home = useQuery(queries.homeQuery)
   const libraries = useQuery(queries.librariesQuery)
   const pictures = usePictures({ server, api })
-  const logos = useArtLogos({
+  const arts = useShowArts({
     queries,
-    ids: continueArtIdsOf(home.data?.inProgress ?? []),
+    ids: showArtIdsOf(home.data?.inProgress ?? []),
     pictures,
   })
 
   const shelves =
     home.data === undefined || libraries.data === undefined || pictures === null
       ? []
-      : homeShelvesOf({ home: home.data, libraries: libraries.data, logos, ...pictures })
+      : homeShelvesOf({ home: home.data, libraries: libraries.data, arts, ...pictures })
   const failure = home.error ?? libraries.error
   const isBare = home.isSuccess && libraries.isSuccess && pictures !== null && shelves.length === 0
   const isLoading = failure === null && !isBare && shelves.length === 0
@@ -91,9 +92,7 @@ const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
     return isBare ? HOME_COPY.bare : null
   })()
 
-  const pinnedLibraries = (libraries.data ?? [])
-    .filter((library) => library.settings.pinned)
-    .map(({ id, name, settings }) => ({ id, name, icon: libraryIconOf(settings) }))
+  const pinnedLibraries = pinnedLibrariesOf(libraries.data ?? [])
 
   const view: ViewOf<HomeViewProps> = isLoading
     ? { key: HOME_VIEW_KEYS.loading, props: { label: HOME_COPY.loading } }

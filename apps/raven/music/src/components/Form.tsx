@@ -34,23 +34,21 @@ export function Form({ title, note, children }: FormProps) {
   )
 }
 
-type FieldKindProps = { isSecret: boolean; isNumeric: boolean; isEmail: boolean }
+type FieldKindProps = { isSecret: boolean; isEmail: boolean }
 
 type AutoCompleteForProps = FieldKindProps
 
 /** What the system offers to fill a field with: the email, a saved password, or nothing. */
-const autoCompleteFor = ({ isSecret, isNumeric, isEmail }: AutoCompleteForProps) => {
+const autoCompleteFor = ({ isSecret, isEmail }: AutoCompleteForProps) => {
   if (isEmail) return 'email'
-  return isSecret && !isNumeric ? 'password' : 'off'
+  return isSecret ? 'password' : 'off'
 }
 
-type KeyboardForProps = FieldKindProps
+type KeyboardForProps = Pick<FieldKindProps, 'isEmail'>
 
-/** The keyboard a field brings up: digits for a PIN, the email one, else the default. */
-const keyboardFor = ({ isNumeric, isEmail }: KeyboardForProps): KeyboardTypeOptions => {
-  if (isNumeric) return 'number-pad'
-  return isEmail ? 'email-address' : 'default'
-}
+/** The keyboard a field brings up: the email one, else the default. */
+const keyboardFor = ({ isEmail }: KeyboardForProps): KeyboardTypeOptions =>
+  isEmail ? 'email-address' : 'default'
 
 type FieldProps = {
   label: string
@@ -58,7 +56,6 @@ type FieldProps = {
   onChangeText: (text: string) => void
   onSubmit: () => void
   isSecret?: boolean
-  isNumeric?: boolean
   isEmail?: boolean
 }
 
@@ -68,7 +65,6 @@ export function Field({
   onChangeText,
   onSubmit,
   isSecret = false,
-  isNumeric = false,
   isEmail = false,
 }: FieldProps) {
   return (
@@ -77,9 +73,9 @@ export function Field({
       <TextInput
         accessibilityLabel={label}
         autoCapitalize="none"
-        autoComplete={autoCompleteFor({ isSecret, isNumeric, isEmail })}
+        autoComplete={autoCompleteFor({ isSecret, isEmail })}
         autoCorrect={false}
-        keyboardType={keyboardFor({ isSecret, isNumeric, isEmail })}
+        keyboardType={keyboardFor({ isEmail })}
         onChangeText={onChangeText}
         onSubmitEditing={onSubmit}
         returnKeyType="go"

@@ -15,7 +15,7 @@ import {
 import { useMusicStyles } from '@/layouts/MusicParts.touch'
 import type { LyricsView, SyncedLyrics } from '@/layouts/musicRows'
 import { touchPicker } from '@/layouts/Picker.touch'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { useLineInView } from '@/layouts/useLineInView'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
@@ -56,13 +56,14 @@ const Book = ({ book }: BookProps) => {
           tone={BUTTON_TONES.quiet}
         />
         <Picker
+          icon="gauge"
           label={MUSIC_COPY.speed}
           onChoose={speedChooserOf(book.onSpeed)}
           options={SPEED_OPTIONS}
           value={String(book.speed)}
         />
       </View>
-      <Text accessibilityRole="header" style={styles.heading}>
+      <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
         {MUSIC_COPY.chapters}
       </Text>
       {book.chapters.length === 0 && <Text style={styles.muted}>{MUSIC_COPY.noChapters}</Text>}
@@ -163,7 +164,7 @@ const LyricsAside = ({ aside }: LyricsAsideProps) => {
   return (
     aside.kind === NOW_PLAYING_ASIDES.lyrics && (
       <View style={styles.section}>
-        <Text accessibilityRole="header" style={styles.heading}>
+        <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
           {MUSIC_COPY.lyrics}
         </Text>
         <LyricsBody lyrics={aside.lyrics} />

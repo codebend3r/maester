@@ -4,7 +4,9 @@ import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
 import { fireEvent, screen } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 
+import { ITEM_TEST_IDS } from '@/layouts/itemKit'
 import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Item } from '@/screens/Item'
 import { useActiveServer } from '@/stores/activeServer'
@@ -100,6 +102,26 @@ describe('Item on a phone or tablet', () => {
     ).toBeTruthy()
     expect(screen.getByText('Rudy / Director')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Play' })).toBeNull()
+  })
+
+  it('draws the backdrop behind the whole page, not as a banner above the poster', async () => {
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(BUSBOYS.id) })
+    await screen.findByRole('header', { name: 'Busboys' })
+
+    const backdrop = StyleSheet.flatten(
+      screen.getByTestId(ITEM_TEST_IDS.backdrop, { includeHiddenElements: true }).props.style,
+    )
+    expect(backdrop.position).toBe('absolute')
+    expect(backdrop.opacity).toBeLessThanOrEqual(0.3)
+  })
+
+  it('lets the backdrop show faintly through the synopsis plate', async () => {
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(BUSBOYS.id) })
+    const summary = await screen.findByText(
+      'Two busboys at a downtown steakhouse plan one last perfect shift.',
+    )
+    const plate = StyleSheet.flatten(summary.parent?.props.style)
+    expect(plate.backgroundColor).toMatch(/^#[\da-f]{6}[\da-f]{2}$/i)
   })
 
   it('plays the file Play starts', async () => {

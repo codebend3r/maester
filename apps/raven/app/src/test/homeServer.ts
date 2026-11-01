@@ -154,19 +154,12 @@ const ANSWERS: Record<string, unknown> = {
 
 /**
  * A client for `server` as it answers: `NAS` with `HOME` and its two libraries, `OTHER` with
- * its one, `SPARSE` with an empty shelf before Films, each 404 to the rest. `unlock` answers `{ available: true, unlocked: true }` to
- * the PIN `1234` and 403 to any other.
+ * its one, `SPARSE` with an empty shelf before Films, each 404 to the rest.
  */
 export const homeApi = (server: AppServer = NAS): ApiClient =>
   createApiClient({
     baseUrl: server.origin,
-    fetch: async (url, init) => {
-      const isUnlock = url === `${server.origin}${APP_CLIENT_CALLS.unlock.path}`
-      if (isUnlock) {
-        return (init?.body ?? null) === JSON.stringify({ pin: '1234' })
-          ? responseOf({ status: STATUSES.ok, body: { available: true, unlocked: true } })
-          : responseOf({ status: STATUSES.forbidden, body: { message: 'That PIN is not right.' } })
-      }
+    fetch: async (url) => {
       const body = ANSWERS[url]
       return responseOf(body === undefined ? NOT_FOUND : { status: STATUSES.ok, body })
     },

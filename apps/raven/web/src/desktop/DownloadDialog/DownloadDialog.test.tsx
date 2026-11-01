@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, spyOn } from 'bun:test'
+import { describe, expect, it, mock } from 'bun:test'
 import {
   AUTH_ROUTES,
   DESKTOP_PLATFORMS,
@@ -14,8 +14,6 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { DownloadDialog } from '@/desktop/DownloadDialog/DownloadDialog'
-import { api } from '@/lib/api'
-import { useDownloadAsk } from '@/stores/downloadAsk'
 import { Where, where } from '@/test/authPage'
 import {
   ASK_ID,
@@ -128,38 +126,11 @@ describe('DownloadDialog', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
-  it('asks for the PIN of a locked title, then asks main again', async () => {
-    const unlock = spyOn(api, 'unlock').mockResolvedValue({ available: true, unlocked: true })
-    const again = readyOf()
-    const client = fakeClient({
-      request: async (request) =>
-        request.type === DESKTOP_REQUESTS.retryDownloadAsk
-          ? { type: DESKTOP_REPLIES.downloadAsk, ask: again }
-          : { type: DESKTOP_REPLIES.done },
-    })
-    renderDialog({ ask: askOf({ kind: DOWNLOAD_ASK_KINDS.locked }), client })
-    await userEvent.type(await screen.findByLabelText('PIN'), '3001')
-    await userEvent.click(screen.getByRole('button', { name: 'Unlock' }))
-    await waitFor(() => expect(useDownloadAsk.getState().shown?.ask).toEqual(again))
-    expect(unlock).toHaveBeenCalledWith('3001')
-    expect(sentOfType({ client, type: DESKTOP_REQUESTS.retryDownloadAsk })).toEqual([
-      { type: DESKTOP_REQUESTS.retryDownloadAsk, askId: ASK_ID },
-    ])
-    unlock.mockRestore()
-  })
-
-  it('closes the PIN step once main has nothing more to ask, and declines a cancelled one', async () => {
-    const unlock = spyOn(api, 'unlock').mockResolvedValue({ available: true, unlocked: true })
-    const first = renderDialog({ ask: askOf({ kind: DOWNLOAD_ASK_KINDS.locked }) })
-    await userEvent.type(await screen.findByLabelText('PIN'), '3001')
-    await userEvent.click(screen.getByRole('button', { name: 'Unlock' }))
-    await waitFor(() => expect(first.onClose).toHaveBeenCalled())
-    unlock.mockRestore()
-  })
-
-  it('declines a PIN step that is cancelled', async () => {
+  it('says a locked title cannot be downloaded, asks for no PIN, and declines on Close', async () => {
     const { client, onClose } = renderDialog({ ask: askOf({ kind: DOWNLOAD_ASK_KINDS.locked }) })
-    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByText(/locked library/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('PIN')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.declineDownload })).toHaveLength(1)
   })

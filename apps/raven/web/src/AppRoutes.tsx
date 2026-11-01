@@ -7,7 +7,6 @@ import { DesktopHost } from '@/desktop/DesktopHost'
 import { DownloadsPage } from '@/desktop/DownloadsPage/DownloadsPage'
 import { LocalPage } from '@/desktop/LocalPage/LocalPage'
 import { PlayRoute } from '@/desktop/PlayPage/PlayPage'
-import { PinPrompt } from '@/components/PinPrompt/PinPrompt'
 import { BugReportsPage } from '@/pages/BugReportsPage/BugReportsPage'
 import { DesignPage } from '@/pages/DesignPage/DesignPage'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
@@ -102,7 +101,6 @@ export const AppRoutes = () => {
         <Route path="get" element={<GetPage />} />
       </Routes>
       {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}
-      <PinPrompt />
       {/* Toasts outlast the page that raised them, as Report this error's does the player. */}
       <Toaster />
       {isDesktop && <DesktopHost />}
