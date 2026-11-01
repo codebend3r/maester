@@ -9,6 +9,7 @@ import { MARKER_KINDS, MARKER_SOURCES } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { YIELD_MS } from '@/ffmpeg/playbackYield'
 import { detectFilmCredits } from '@/markers/creditsDetector'
 import type { KeptFingerprint } from '@/markers/fingerprintMatch'
 import { type EpisodeFile, type FilmFile, MarkerJobs } from '@/markers/markerJobs'
@@ -17,9 +18,6 @@ import { type FoundMarkers, detectSeasonMarkers } from '@/markers/seasonMarkers'
 import { createTaskQueue } from '@/scanner/concurrency'
 import { ScanControl } from '@/scanner/scanControl'
 import { SettingsRepository } from '@/settings/settingsRepository'
-
-/** How long a job waits, each time, while ffmpeg converts a file for someone watching. */
-export const YIELD_MS = 30_000
 
 type Grouped = { primaries: EpisodeFile[]; extras: { at: number; file: EpisodeFile }[] }
 
@@ -154,7 +152,6 @@ export class MarkerDetection implements OnApplicationBootstrap, OnModuleDestroy 
       },
     }
   }
-
   /** One job: wait for playback, detect, and mark every file done or failed; a job that throws fails all its files. */
   private async runJob<File extends { id: number }>({
     label,

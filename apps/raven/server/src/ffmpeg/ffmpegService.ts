@@ -72,6 +72,10 @@ type FfmpegServiceFingerprintProps = { path: string; start: number; seconds: num
 
 type FfmpegServicePictureStatsProps = { path: string; start: number }
 
+type FfmpegServiceRunAnalysisProps = { args: string[]; timeoutSeconds: number }
+
+type FfmpegServiceAnalyseErrProps = FfmpegServiceRunAnalysisProps
+
 /**
  * A picture pass: one frame a second, keyframes only, scaled small, with
  * the mean saturation and the share of pixels darker than luma 32 printed
@@ -227,25 +231,44 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
    * An ffmpeg run whose stdout is the answer, at the lowest CPU priority:
    * analysis is background work, and gives way to playback's own ffmpeg.
    */
-  private analyse(args: string[]): Promise<Buffer> {
-    const seconds = this.config.markerTimeoutSeconds
+  private async analyse(args: string[]): Promise<Buffer> {
+    const { stdout } = await this.runAnalysis({
+      args,
+      timeoutSeconds: this.config.markerTimeoutSeconds,
+    })
+    return stdout
+  }
+
+  /**
+   * An analysis whose answer ffmpeg prints to stderr, as a filter's summary
+   * is (ebur128's), at the same lowest priority, within `timeoutSeconds`.
+   */
+  async analyseErr({ args, timeoutSeconds }: FfmpegServiceAnalyseErrProps): Promise<string> {
+    const { stderr } = await this.runAnalysis({ args, timeoutSeconds })
+    return stderr.toString()
+  }
+
+  private runAnalysis({
+    args,
+    timeoutSeconds,
+  }: FfmpegServiceRunAnalysisProps): Promise<{ stdout: Buffer; stderr: Buffer }> {
     return new Promise((resolve, reject) => {
       const child = execFile(
         this.config.ffmpegPath,
         args,
         {
           encoding: 'buffer',
-          timeout: seconds * 1000,
+          timeout: timeoutSeconds * 1000,
           maxBuffer: 64 * 1024 * 1024,
           signal: this.scans.signal,
         },
         (error, stdout, stderr) => {
           if (error == null) {
-            resolve(stdout)
+            resolve({ stdout, stderr })
             return
           }
           if (wasKilled(error)) {
-            reject(new FfmpegTimeoutError({ tool: 'ffmpeg', seconds }))
+            reject(new FfmpegTimeoutError({ tool: 'ffmpeg', seconds: timeoutSeconds }))
             return
           }
           const said = lastLine(stderr.toString())

@@ -83,11 +83,23 @@ import { AlbumCovers } from '@/music/albumCovers'
 import { AlbumMatching } from '@/music/albumMatching'
 import { MusicBrainzClient } from '@/music/musicBrainzClient'
 import { LrclibClient } from '@/music/lrclibClient'
+import {
+  DEFAULT_LISTENBRAINZ_TIMEOUT_MS,
+  LISTENBRAINZ_TIMEOUT_MS,
+  ListenBrainzClient,
+} from '@/music/listenBrainzClient'
+import { ListenerScopes } from '@/music/listenerScope'
+import { Mixes } from '@/music/mixes'
+import { MixesController } from '@/music/mixesController'
 import { MusicFavourites } from '@/music/musicFavourites'
 import { Playlists } from '@/music/playlists'
 import { PlaylistsController } from '@/music/playlistsController'
+import { Radio } from '@/music/radio'
+import { SimilarArtists } from '@/music/similarArtists'
 import { TrackLyrics } from '@/music/trackLyrics'
 import { TranscodeCache } from '@/music/transcodeCache'
+import { LoudnessJobs } from '@/music/loudnessJobs'
+import { LoudnessScan } from '@/music/loudnessScan'
 import { AudioReader } from '@/music/audioReader'
 import {
   AlbumsController,
@@ -114,6 +126,14 @@ import { assertRoutesMarked } from '@/routeMarks'
 import { isNetworkShare, watchFolder } from '@/scanner/folderWatch'
 import { LibraryWatcher, WATCH_OPTIONS, type WatchOptions } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
+import { LastFmScrobbler } from '@/scrobbling/lastFmScrobbler'
+import { LastFmSignIns } from '@/scrobbling/lastFmSignIns'
+import { ListenBrainzScrobbler } from '@/scrobbling/listenBrainzScrobbler'
+import { ScrobbleCipher } from '@/scrobbling/scrobbleCipher'
+import { ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
+import { ScrobbleQueue } from '@/scrobbling/scrobbleQueue'
+import { ScrobbleSender } from '@/scrobbling/scrobbleSender'
+import { ScrobblingController } from '@/scrobbling/scrobblingController'
 import { SettingsController } from '@/settings/settingsController'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { STARTUP_HELD, StartupWork } from '@/startupWork'
@@ -141,6 +161,8 @@ export const CONTROLLERS = [
   ArtistsController,
   TracksController,
   PlaylistsController,
+  MixesController,
+  ScrobblingController,
   SettingsController,
   EventsController,
   LockController,
@@ -251,8 +273,23 @@ export class AppModule {
         LrclibClient,
         MusicFavourites,
         Playlists,
+        { provide: LISTENBRAINZ_TIMEOUT_MS, useValue: DEFAULT_LISTENBRAINZ_TIMEOUT_MS },
+        ListenBrainzClient,
+        SimilarArtists,
+        ListenerScopes,
+        Mixes,
+        Radio,
+        ScrobbleCipher,
+        ScrobbleLinks,
+        ScrobbleQueue,
+        ListenBrainzScrobbler,
+        LastFmScrobbler,
+        LastFmSignIns,
+        ScrobbleSender,
         TrackLyrics,
         TranscodeCache,
+        LoudnessJobs,
+        LoudnessScan,
         AlbumMatching,
         MatchFiles,
         AiDecisions,

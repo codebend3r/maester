@@ -7,7 +7,8 @@ import { PRODUCTION_STATISTICS } from '@/test/queryPlans'
  * none: `ai_decisions` was empty on the real server, and `saga_backdrops`,
  * `person_credits`, `score_requests`, `bug_reports`, `media_markers`,
  * `media_fingerprints`, the music tables, the playlists, the album and
- * artist favourites and the lyrics cache came after the copy was taken.
+ * artist favourites, the lyrics cache, the similar artists and the
+ * scrobbling tables came after the copy was taken.
  */
 const NOT_IN_THE_COPY: ReadonlySet<string> = new Set([
   'ai_decisions',
@@ -27,6 +28,9 @@ const NOT_IN_THE_COPY: ReadonlySet<string> = new Set([
   'album_favourites',
   'artist_favourites',
   'track_lyrics',
+  'similar_artists',
+  'scrobble_links',
+  'scrobble_queue',
 ])
 
 type KeyOfProps = { table: string; index: string | null }

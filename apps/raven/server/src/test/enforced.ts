@@ -13,6 +13,8 @@ import {
   MEDIA_TICKET_PARAM,
   type MediaOrigin,
   PICTURE_PATHS,
+  SCROBBLING_PATHS,
+  DISCOVERY_PATHS,
   createApiClient,
   isAuthRefusal,
   isMediaTicket,
@@ -21,9 +23,13 @@ import { CACHE_POLICIES, CONTENT_TYPES, HEADERS } from '@shared/server'
 import { createApp } from '@/app'
 import { ACCOUNT_REQUIREMENTS } from '@/auth/accountGuard'
 import { PASS_KINDS, type PassKind } from '@/auth/accountPasses'
+import type { LastFmKeys } from '@/config'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
+import type { MetadataFetch } from '@/metadata/tmdbClient'
+import { LISTENBRAINZ_API } from '@/music/listenBrainzClient'
 import { ScannerService } from '@/scanner/scannerService'
+import { LASTFM_API } from '@/scrobbling/lastFmScrobbler'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 import { NOT_WATCHING, ROUTE_METHODS, cookieSet, testConfig } from '@/test/app'
 import {
@@ -131,6 +137,17 @@ export const ROUTES = {
   deletePlaylist: { method: DELETE, path: '/api/playlists/:id', account: approved },
   replacePlaylistTracks: { method: PUT, path: '/api/playlists/:id/tracks', account: approved },
   appendPlaylistTracks: { method: POST, path: '/api/playlists/:id/tracks', account: approved },
+  playlistSharing: { method: PUT, path: '/api/playlists/:id/sharing', account: approved },
+  copyPlaylist: { method: POST, path: '/api/playlists/:id/copy', account: approved },
+  mixes: { method: GET, path: DISCOVERY_PATHS.mixes, account: approved },
+  mix: { method: GET, path: DISCOVERY_PATHS.mix, account: approved },
+  radio: { method: GET, path: DISCOVERY_PATHS.radio, account: approved },
+  recentAlbums: { method: GET, path: DISCOVERY_PATHS.recent, account: approved },
+  scrobbling: { method: GET, path: SCROBBLING_PATHS.root, account: approved },
+  linkListenBrainz: { method: PUT, path: SCROBBLING_PATHS.listenBrainz, account: approved },
+  startLastFm: { method: POST, path: SCROBBLING_PATHS.lastFmStart, account: approved },
+  lastFmCallback: { method: GET, path: SCROBBLING_PATHS.lastFmCallback, account: anyone },
+  unlinkScrobbling: { method: DELETE, path: SCROBBLING_PATHS.service, account: approved },
   lockState: { method: GET, path: '/api/lock', account: approved },
   relock: { method: POST, path: '/api/lock/lock', account: approved },
   unlock: { method: POST, path: '/api/lock/unlock', account: approved },
@@ -341,7 +358,21 @@ type CreateEnforcedAppProps = {
   accessRecheckMs?: number
   /** How long The Matrix runs, for a test that saves a spot further in than a second. */
   movieSeconds?: number
+  /** Answers for ListenBrainz and Last.fm, and the Last.fm keys the server holds, for the scrobbling tests. */
+  scrobbling?: { fetch: MetadataFetch; lastFm: LastFmKeys | null }
+  /** How long a membership answer is reused; 5 s when left out. */
+  membershipTtlMs?: number
 }
+
+type ScrobblingOrTmdbProps = { scrobbling: MetadataFetch; tmdb: MetadataFetch }
+
+/** The fake TMDB, with the scrobbling services' calls sent to their own fakes. */
+const scrobblingOrTmdb =
+  ({ scrobbling, tmdb }: ScrobblingOrTmdbProps): MetadataFetch =>
+  (request) =>
+    request.url.startsWith(LISTENBRAINZ_API) || request.url === LASTFM_API
+      ? scrobbling(request)
+      : tmdb(request)
 
 /**
  * A server with accounts `ready`, on which the owner has made and scanned
@@ -356,6 +387,8 @@ export const createEnforcedApp = async ({
   mediaOrigins = [],
   accessRecheckMs,
   movieSeconds = 1,
+  scrobbling,
+  membershipTtlMs,
 }: CreateEnforcedAppProps): Promise<{
   app: NestFastifyApplication
   mediaDir: string
@@ -372,13 +405,17 @@ export const createEnforcedApp = async ({
       auth: AUTH_TEST_CONFIG,
       libraryPin,
       tmdbApiToken: 'test-token',
+      lastFm: scrobbling?.lastFm ?? null,
     },
     authKeys: fixture.keys,
     authFetch: fixture.fetcher,
-    metadataFetch: fakeTmdb(ENFORCED_TITLES).fetch,
+    metadataFetch: scrobbling
+      ? scrobblingOrTmdb({ scrobbling: scrobbling.fetch, tmdb: fakeTmdb(ENFORCED_TITLES).fetch })
+      : fakeTmdb(ENFORCED_TITLES).fetch,
     quiet: true,
     watch: NOT_WATCHING,
     accessRecheckMs,
+    membershipTtlMs,
   })
   await app.init()
   await app.getHttpAdapter().getInstance().ready()

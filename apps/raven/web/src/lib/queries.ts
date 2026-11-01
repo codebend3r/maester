@@ -37,6 +37,7 @@ export const {
   albumQuery,
   artistQuery,
   playlistsQuery,
+  ownPlaylistsQuery,
   playlistQuery,
   lyricsQuery,
   albumMatchSearchQuery,

@@ -23,7 +23,7 @@ type AppendToProps = { id: number; name: string; tracks: readonly Track[] }
  * if it refuses.
  */
 export const usePlaylistAdd = ({ session: { api, queries } }: UsePlaylistAddProps) => {
-  const playlists = useQuery(queries.playlistsQuery)
+  const playlists = useQuery(queries.ownPlaylistsQuery)
   const { create, append } = useServerPlaylistMutations({ api })
   const [note, setNote] = useState<string | null>(null)
   const appendTo = ({ id, name, tracks }: AppendToProps) => {

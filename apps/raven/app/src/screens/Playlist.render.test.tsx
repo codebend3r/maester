@@ -10,7 +10,7 @@ import { Playlist } from '@/screens/Playlist'
 import { useActiveServer } from '@/stores/activeServer'
 import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
-import { AIRBAG, LUCKY, MIXTAPE, PARANOID, musicApi } from '@/test/musicServer'
+import { AIRBAG, LUCKY, MIXTAPE, PARANOID, THEIR_MIX, musicApi } from '@/test/musicServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 
 const mockBack = jest.fn()
@@ -145,5 +145,22 @@ describe('Playlist', () => {
         body: null,
       },
     ])
+  })
+
+  it("plays another account's shared playlist, offering none of its edits", async () => {
+    mockParams.mockReturnValue({ [APP_ROUTE_PARAMS.id]: String(THEIR_MIX.id) })
+    try {
+      shown.client = createScreenClient()
+      await renderScreen({ ui: <Playlist />, client: shown.client })
+      await screen.findByText(THEIR_MIX.name)
+
+      expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Rename playlist' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+      expect(screen.queryByRole('button', { name: /^Move .* up$/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /^Remove / })).toBeNull()
+    } finally {
+      mockParams.mockReturnValue({ [APP_ROUTE_PARAMS.id]: String(MIXTAPE.id) })
+    }
   })
 })

@@ -19,6 +19,7 @@ import {
 import { DatabaseService } from '@/db/database'
 import { MarkerDetection } from '@/markers/markerDetection'
 import { ScanControl } from '@/scanner/scanControl'
+import { LoudnessScan } from '@/music/loudnessScan'
 import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
@@ -187,6 +188,7 @@ export class MetadataService implements OnApplicationBootstrap {
     @Inject(MarkerDetection) private readonly markers: Pick<MarkerDetection, 'kick'>,
     @Inject(AlbumMatching) private readonly albums: Pick<AlbumMatching, 'matchLibrary' | 'retry'>,
     @Inject(ScanControl) private readonly scans: ScanControl,
+    @Inject(LoudnessScan) private readonly loudness: Pick<LoudnessScan, 'kick'>,
   ) {
     this.matchers = createMatchers({ files, metadata, pictures, decisions })
   }
@@ -495,6 +497,7 @@ export class MetadataService implements OnApplicationBootstrap {
     this.scoreSweep.kick()
     // Detection needs the episodes in their seasons, which the pass just placed.
     this.markers.kick()
+    this.loudness.kick()
   }
 
   private async matchAndClearUp(libraryId: number): Promise<void> {
