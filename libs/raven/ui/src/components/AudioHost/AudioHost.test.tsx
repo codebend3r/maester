@@ -245,6 +245,8 @@ describe('AudioHost', () => {
     act(() => store().clear())
     const [current] = audioElements()
     expect(current?.getAttribute('src')).toBeNull()
+    expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled()
+    expect(store().state).toBe(AUDIO_STATES.empty)
     expect(audioElements()).toHaveLength(1)
   })
 })

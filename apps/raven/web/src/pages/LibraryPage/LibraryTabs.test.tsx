@@ -371,9 +371,7 @@ describe('LibraryPage tabs', () => {
       adminLock: { state: 'on', available: true },
     })
     expect(
-      await screen.findByText(
-        'Turn the admin lock off in Settings to point these at the right show.',
-      ),
+      await screen.findByText('Turn the admin lock off in Admin to point these at the right show.'),
     ).toBeInTheDocument()
     expect(
       screen.getByText('Suggested: Archie: The Man Who Became Cary Grant (2023)'),

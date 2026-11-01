@@ -11,6 +11,7 @@ import {
 } from '@/music/musicBrainzClient'
 import { type AlbumToMatch, MusicRepository } from '@/music/musicRepository'
 import { mapWithConcurrency } from '@/scanner/concurrency'
+import { ScanControl } from '@/scanner/scanControl'
 
 /** What each fact is worth when a release agrees with the album, out of 100. */
 const WEIGHTS = {
@@ -128,6 +129,7 @@ export class AlbumMatching {
     @Inject(MusicBrainzClient) private readonly musicBrainz: MusicBrainzClient,
     @Inject(MusicRepository) private readonly music: MusicRepository,
     @Inject(ServerEvents) private readonly events: ServerEvents,
+    @Inject(ScanControl) private readonly scans: ScanControl,
   ) {}
 
   /** MusicBrainz's releases for an album, scored against it, best first. */
@@ -176,6 +178,7 @@ export class AlbumMatching {
       logger: this.logger,
       failed: 'Could not match an album',
       stopped: 'MusicBrainz stopped the pass',
+      signal: this.scans.signal,
       stops: isMusicBrainzAway,
     })
     const outcomes = await mapWithConcurrency({

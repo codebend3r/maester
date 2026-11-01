@@ -115,7 +115,7 @@ describe('the admin guard', () => {
     const guard = guardFor({ canManage: false, isLegacy: true })
     expect(() => guard.canActivate(contextOf(shelves.all))).toThrow(ForbiddenException)
     expect(() => guard.canActivate(contextOf(shelves.all))).toThrow(
-      'The admin lock is on. Turn it off in Settings to do this.',
+      'The admin lock is on. Turn it off in Admin to do this.',
     )
   })
 

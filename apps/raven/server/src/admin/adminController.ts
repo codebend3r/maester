@@ -10,11 +10,20 @@ import {
   Inject,
   NotFoundException,
   Post,
+  Put,
   Res,
 } from '@nestjs/common'
-import { type AdminLock, isAdminUnlockRequest } from '@raven/core'
+import {
+  type AdminLock,
+  isAdminUnlockRequest,
+  isScanControlState,
+  type ScanControlState,
+} from '@raven/core'
+import { ScanControl } from '@/scanner/scanControl'
+import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { RatingsRefresh } from '@/libraries/ratingsRefresh'
 import type { FastifyReply } from 'fastify'
-import { ForViewers } from '@/admin/adminGuard'
+import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { type AdminChange, AdminService } from '@/admin/adminService'
 import { Management } from '@/auth/management'
 import { RAVEN_HEADERS } from '@/http'
@@ -35,7 +44,34 @@ export class AdminController {
   constructor(
     @Inject(AdminService) private readonly admin: AdminService,
     @Inject(Management) private readonly management: Pick<Management, 'isLegacy'>,
+    @Inject(ScanControl) private readonly scans: ScanControl,
+    @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
+    @Inject(RatingsRefresh) private readonly ratings: RatingsRefresh,
   ) {}
+
+  @AdminOnly()
+  @Get('scans')
+  scanState(): ScanControlState {
+    return { isStopped: this.scans.isStopped }
+  }
+
+  @AdminOnly()
+  @Put('scans')
+  setScans(@Body() body: unknown): ScanControlState {
+    const { isStopped } = parseBody({
+      guard: isScanControlState,
+      body,
+      message: 'isStopped must be boolean',
+    })
+    this.scans.setStopped(isStopped)
+    if (isStopped) {
+      this.libraries.list().forEach(({ id }) => {
+        this.ratings.cancelQuickScan(id)
+        this.ratings.cancel(id)
+      })
+    }
+    return this.scanState()
+  }
 
   /** Once accounts are ready the owner manages raven, and the password and its cookie are inert. */
   private requireLegacy(): void {

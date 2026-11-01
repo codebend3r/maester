@@ -92,6 +92,48 @@ describe('createTaskQueue', () => {
     expect(ran).toEqual(['first', 'b', 'third'])
   })
 
+  it('keeps old work cancelled when a fresh signal allows new work', async () => {
+    const control = { abort: new AbortController() }
+    const queue = createTaskQueue({ concurrency: 1, signal: () => control.abort.signal })
+    const ran: string[] = []
+    const observed = { isAborted: false }
+    let release: () => void = () => undefined
+    const waiting = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    queue.push({
+      key: 'running',
+      task: async (signal) => {
+        await waiting
+        observed.isAborted = signal.aborted
+      },
+    })
+    queue.push({
+      key: 'old',
+      task: async () => {
+        ran.push('old')
+      },
+    })
+    queue.again({
+      key: 'running',
+      task: async () => {
+        ran.push('old rerun')
+      },
+    })
+    control.abort.abort()
+    control.abort = new AbortController()
+    queue.push({
+      key: 'new',
+      task: async () => {
+        ran.push('new')
+      },
+    })
+    release()
+    await queue.idle()
+    expect(ran).toEqual(['new'])
+    expect(observed.isAborted).toBe(true)
+  })
+
   it('survives a failing task', async () => {
     const queue = createTaskQueue({ concurrency: 1 })
     const ran: string[] = []

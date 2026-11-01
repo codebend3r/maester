@@ -14,6 +14,7 @@ type GuardState = { stopped: false } | { stopped: true; error: unknown }
 
 type PassGuardProps = {
   logger: Logger
+  signal?: AbortSignal
   /** Logged before a task's own failure: `Could not match`. */
   failed: string
   /** Logged once when the source stopped the pass: `Matching stopped for now`. */
@@ -37,11 +38,11 @@ export class PassGuard {
   }
 
   get isStopped(): boolean {
-    return this.state.stopped
+    return this.state.stopped || (this.options.signal?.aborted ?? false)
   }
 
   async run(task: () => Promise<unknown>): Promise<void> {
-    if (this.state.stopped) return
+    if (this.isStopped) return
     try {
       await task()
     } catch (error) {

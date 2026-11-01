@@ -21,6 +21,7 @@ import { MEMBERSHIP_TTL_MS, MembershipLookups } from '@/auth/membershipLookups'
 import { TicketAccesses } from '@/auth/ticketAccesses'
 import type { createTokenVerifier } from '@/auth/tokenVerifier'
 import { SOFTWARE } from '@/ffmpeg/encoder'
+import { ScanControl } from '@/scanner/scanControl'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import type { HlsSource } from '@/ffmpeg/hlsArgs'
 import { HlsSessions } from '@/hls/hlsSessions'
@@ -303,7 +304,7 @@ describe('an HLS session opened with an account ticket', () => {
     const config = testConfig({ dataDir, mediaDir: tmpdir() })
     const hls = new HlsSessions(
       config,
-      new FfmpegService(config, { playback: () => DEFAULT_PLAYBACK_SETTINGS }),
+      new FfmpegService(config, { playback: () => DEFAULT_PLAYBACK_SETTINGS }, new ScanControl()),
       // No session rests or is forgotten here: only its account's rechecks end it.
       STILL_CLOCK,
     )

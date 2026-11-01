@@ -3,6 +3,7 @@ type CouldNotProps = { verb: string; message: string }
 export const LIBRARY_ACTIONS_COPY = {
   verbs: {
     quickScan: 'quick scan',
+    scanMarkers: 'scan intros and credits',
     cancelQuickScan: 'cancel the quick scan',
     fullScan: 'run a full scan',
     cancelFullScan: 'cancel the full scan',
@@ -21,6 +22,8 @@ export const LIBRARY_ACTIONS_COPY = {
   matchAgain: 'Match again',
   editTitle: "Change this library's name, folders and settings",
   edit: 'Edit',
+  scanMarkers: 'Scan intros and credits',
+  markersQueued: 'Intro and credits scan queued.',
   quickScan: 'Quick scan',
   quickScanTitle:
     'Look only for videos added since the last scan and add them, then fetch their ratings once they are matched',

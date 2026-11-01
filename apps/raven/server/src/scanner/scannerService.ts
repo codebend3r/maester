@@ -1,3 +1,4 @@
+import { ScanControl } from '@/scanner/scanControl'
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common'
 import {
   KIND_RULES,
@@ -242,6 +243,7 @@ export class ScannerService implements OnApplicationBootstrap {
     @Inject(MusicIndexer) private readonly music: MusicIndexer,
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(StartupWork) private readonly startup: StartupWork,
+    @Inject(ScanControl) private readonly scans: ScanControl,
   ) {}
 
   /** The scans on boot are steps of the work on boot, a library each, so the server listens first. */
@@ -322,6 +324,7 @@ export class ScannerService implements OnApplicationBootstrap {
    * after, merged with whatever else waits.
    */
   private request({ libraryId, scope }: ScannerServiceRequestProps): void {
+    if (this.scans.isStopped) return
     const slot = this.slots.get(libraryId)
     if (slot) {
       slot.next = mergeScopes({ waiting: slot.next, scope })
@@ -332,7 +335,11 @@ export class ScannerService implements OnApplicationBootstrap {
 
   private start({ libraryId, scope }: ScannerServiceStartProps): void {
     const abort = new AbortController()
-    const running = this.run({ libraryId, scope, signal: abort.signal })
+    const running = this.run({
+      libraryId,
+      scope,
+      signal: AbortSignal.any([abort.signal, this.scans.signal]),
+    })
       .catch((error: unknown) => this.logger.error(`Scan failed: ${errorMessage(error)}`))
       .then(() => this.startNext(libraryId))
     this.slots.set(libraryId, { running, next: null, abort })
@@ -355,7 +362,7 @@ export class ScannerService implements OnApplicationBootstrap {
   /** The scan that waited, if any, now takes its turn. */
   private startNext(libraryId: number): void {
     const next = this.slots.get(libraryId)?.next
-    if (next) this.start({ libraryId, scope: next })
+    if (next && !this.scans.isStopped) this.start({ libraryId, scope: next })
     else this.slots.delete(libraryId)
   }
 

@@ -27,6 +27,7 @@ import {
 } from '@raven/core'
 import { readServerConfig } from '@/config'
 import { chapterMarkers, parseChapters } from '@/ffmpeg/chapters'
+import { ScanControl } from '@/scanner/scanControl'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { detectFilmCredits } from '@/markers/creditsDetector'
 import type { KeptFingerprint } from '@/markers/fingerprintMatch'
@@ -184,9 +185,13 @@ const main = async (): Promise<void> => {
       ? JSON.parse(readFileSync(cachePath, 'utf8'))
       : {}
   const cache: Record<string, KeptFingerprint> = isCache(read) ? read : {}
-  const ffmpeg = new FfmpegService(readServerConfig(process.env), {
-    playback: () => DEFAULT_PLAYBACK_SETTINGS,
-  })
+  const ffmpeg = new FfmpegService(
+    readServerConfig(process.env),
+    {
+      playback: () => DEFAULT_PLAYBACK_SETTINGS,
+    },
+    new ScanControl(),
+  )
   const showRows = await showsOf(fixture).reduce<Promise<Row[]>>(
     async (previous, { title, entries }) => {
       const done = await previous

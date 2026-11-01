@@ -14,6 +14,7 @@ import { NEVER, Subject } from 'rxjs'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { ACCOUNT_PASS_MS, type PassAccess } from '@/auth/accountPasses'
 import { SOFTWARE } from '@/ffmpeg/encoder'
+import { ScanControl } from '@/scanner/scanControl'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { HLS_CAPABILITY_PREFIX, isHlsCapability } from '@/hls/hlsCapability'
 import { HLS_SESSION_CAP, type HlsSession, HlsSessions } from '@/hls/hlsSessions'
@@ -59,9 +60,13 @@ describe("an account's HLS session", () => {
   const opened: HlsSessions[] = []
 
   const ffmpegFor = (dataDir: string) =>
-    new FfmpegService(testConfig({ dataDir, mediaDir: state.root }), {
-      playback: () => DEFAULT_PLAYBACK_SETTINGS,
-    })
+    new FfmpegService(
+      testConfig({ dataDir, mediaDir: state.root }),
+      {
+        playback: () => DEFAULT_PLAYBACK_SETTINGS,
+      },
+      new ScanControl(),
+    )
 
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-hls-passes-'))

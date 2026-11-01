@@ -19,6 +19,7 @@ import { ScoreSweep } from '@/metadata/scoreSweep'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 import { StartupWork } from '@/startupWork'
+import { ScanControl } from '@/scanner/scanControl'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -42,6 +43,7 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(ScoreSweep) private readonly scoreSweep: ScoreSweep,
     @Inject(ItemPictures) private readonly pictures: ItemPictures,
     @Inject(StartupWork) private readonly startup: StartupWork,
+    @Inject(ScanControl) private readonly scans: ScanControl,
   ) {}
 
   /**
@@ -69,7 +71,7 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
    */
   async refresh(itemId: number): Promise<boolean> {
     const item = this.metadata.get(itemId)
-    if (!item) return false
+    if (!item || this.scans.isStopped) return false
     if (isLocal(item.tmdbId)) return true
     try {
       await this.fetch(item)
@@ -129,7 +131,13 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** Fetches one season again; a season TMDB has dropped, or a made-up one, is left as it is. */
   private async refreshSeason(season: StoredItem): Promise<void> {
-    if (season.parentId == null || season.number == null || isLocal(season.tmdbId)) return
+    if (
+      this.scans.isStopped ||
+      season.parentId == null ||
+      season.number == null ||
+      isLocal(season.tmdbId)
+    )
+      return
     const show = this.metadata.get(season.parentId)
     if (!show) return
     const fetched = await this.tmdb
@@ -163,6 +171,7 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
       logger: this.logger,
       failed: 'Could not refresh',
       stopped: 'Refreshing stopped for now',
+      signal: this.scans.signal,
     })
     await mapWithConcurrency({
       items: stale,
@@ -170,6 +179,7 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
       fn: ({ id }) => guard.run(() => this.refresh(id)),
     })
     guard.reportStop()
+    if (guard.isStopped) return
     await this.fillTitleExtras()
     this.scoreSweep.kick()
     await this.pictures.clearUp()
@@ -187,6 +197,7 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
       logger: this.logger,
       failed: "Could not read a title's saga and logo",
       stopped: 'Reading sagas and logos stopped for now',
+      signal: this.scans.signal,
     })
     await mapWithConcurrency({
       items: this.metadata.extrasUnchecked(),

@@ -6,6 +6,7 @@ import { MediaIndex } from '@/media/mediaIndex'
 import { MdblistClient } from '@/metadata/mdblistClient'
 import { OmdbClient } from '@/metadata/omdbClient'
 import { Scores } from '@/metadata/scores'
+import { ScanControl } from '@/scanner/scanControl'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import { type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { BLANK_ITEM } from '@/metadata/tmdbShapes'
@@ -67,7 +68,7 @@ describe("a library's ratings", () => {
       new OmdbClient(config, refusing),
       new MdblistClient(config, refusing),
     )
-    return new ScoreSweep(scores(), fetching, libraries(), tmdb)
+    return new ScoreSweep(scores(), fetching, libraries(), tmdb, new ScanControl())
   }
 
   beforeAll(() => database.open())

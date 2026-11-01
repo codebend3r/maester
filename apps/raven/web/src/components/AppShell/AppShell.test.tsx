@@ -156,6 +156,7 @@ describe('AppShell', () => {
       'Favourites',
       'Movies',
       'Libraries',
+      'Admin',
       'Streams',
       'Bug reports',
       'Settings',
@@ -170,6 +171,7 @@ describe('AppShell', () => {
     expect(screen.queryByRole('link', { name: 'Streams' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Bug reports' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Reports' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Admin' })).toBeNull()
   })
 
   it('opens a page a link leads to at its top', async () => {
@@ -481,6 +483,7 @@ describe('AppShell', () => {
       ['Libraries', '/libraries'],
       ['Binge', '/binge'],
       ['Favourites', '/favourites'],
+      ['Admin', '/admin'],
       ['Streams', '/streams'],
       ['Reports', '/reports'],
       ['Settings', '/settings'],
@@ -490,6 +493,7 @@ describe('AppShell', () => {
       'libraries',
       'playback',
       'heart',
+      'settings',
       'playback',
       'alert',
       'settings',
@@ -563,6 +567,7 @@ describe('AppShell', () => {
       '/',
       '/favourites',
       '/libraries',
+      '/admin',
       '/streams',
       '/reports',
       DESKTOP_PATHS.local,
@@ -578,6 +583,7 @@ describe('AppShell', () => {
       'Home',
       'Libraries',
       'Favourites',
+      'Admin',
       'Streams',
       'Reports',
       'This Mac',

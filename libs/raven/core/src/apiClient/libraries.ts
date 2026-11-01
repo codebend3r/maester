@@ -108,6 +108,12 @@ export const libraryCalls = ({ send, expect, libraryGet }: Transport) => ({
     await send({ path: `/api/libraries/${id}`, method: 'DELETE' })
   },
 
+  scanLibraryMarkers: (id: number): Promise<Library> =>
+    expect({
+      request: send({ path: `/api/libraries/${id}/markers`, method: 'POST' }),
+      guard: isLibrary,
+    }),
+
   /** A full scan: every file in the library read again. */
   scanLibrary: (id: number): Promise<Library> =>
     expect({

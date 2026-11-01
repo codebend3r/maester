@@ -14,6 +14,7 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { RUN_LEAD_S } from '@/markers/seasonMatch'
 import { MARKER_DETECTOR_VERSION, MarkerJobs } from '@/markers/markerJobs'
 import { REGIONS } from '@/markers/seasonListen'
+import { ScanControl } from '@/scanner/scanControl'
 import { MarkerDetection, YIELD_MS } from '@/markers/markerDetection'
 import { MARKER_STATES } from '@/markers/markerRows'
 import { noise, pointsFor, withTheme } from '@/test/fingerprints'
@@ -115,12 +116,23 @@ describe('MarkerDetection', () => {
   type DetectionWithProps = {
     ffmpeg: DetectionFfmpeg
     detectMarkers?: boolean
+    scans?: ScanControl
   }
 
-  const detectionWith = ({ ffmpeg, detectMarkers = true }: DetectionWithProps) =>
-    new MarkerDetection(readServerConfig({}), jobs(), ffmpeg, {
-      playback: () => ({ ...DEFAULT_PLAYBACK_SETTINGS, detectMarkers }),
-    })
+  const detectionWith = ({
+    ffmpeg,
+    detectMarkers = true,
+    scans = new ScanControl(),
+  }: DetectionWithProps) =>
+    new MarkerDetection(
+      readServerConfig({}),
+      jobs(),
+      ffmpeg,
+      {
+        playback: () => ({ ...DEFAULT_PLAYBACK_SETTINGS, detectMarkers }),
+      },
+      scans,
+    )
   const stateOf = (name: string) =>
     database
       .get()
@@ -282,7 +294,46 @@ describe('MarkerDetection', () => {
     expect(stateOf('Show - S01E01.mkv')?.markers ?? null).toBe(MARKER_STATES.pending)
   })
 
+  it('manually detects just one library even when automatic detection is off', async () => {
+    const libraries = new LibrariesRepository(database.get()).list()
+    const tv = libraries.find(({ name }) => name === 'TV')
+    const films = libraries.find(({ name }) => name === 'Films')
+    if (!tv || !films) throw new Error('Missing test libraries')
+    jobs().requestLibrary(tv.id)
+    jobs().requestLibrary(films.id)
+    const { ffmpeg, pictureStats } = fakeFfmpeg()
+    const detection = detectionWith({ ffmpeg, detectMarkers: false })
+    expect(detection.scanLibrary(tv.id)).toBe(true)
+    await detection.whenIdle()
+    expect(jobs().seasonsDue(tv.id)).toEqual([])
+    expect(jobs().filmsDue(films.id)).toHaveLength(2)
+    expect(pictureStats).not.toHaveBeenCalled()
+  })
+
+  it('leaves interrupted detection pending even after scans are allowed again', async () => {
+    const { ffmpeg, pictureStats } = fakeFfmpeg()
+    let release: (frames: PictureStat[]) => void = () => undefined
+    pictureStats.mockImplementation(
+      () =>
+        new Promise<PictureStat[]>((resolve) => {
+          release = resolve
+        }),
+    )
+    const scans = new ScanControl()
+    const detection = detectionWith({ ffmpeg, scans })
+    detection.kick()
+    await vi.waitFor(() => expect(pictureStats).toHaveBeenCalled())
+    scans.setStopped(true)
+    scans.setStopped(false)
+    release([])
+    await detection.whenIdle()
+    expect(stateOf(FILMS.crawled)?.markers).toBe(MARKER_STATES.pending)
+  })
+
   it('waits while ffmpeg converts a file for someone watching', async () => {
+    const id = ids.get('Show - S01E01.mkv') ?? -1
+    index().markChanged({ id, size: 400, mtimeMs: 4 })
+    index().saveProbe({ id, probe: PROBE, tracks: TRACKS, chapters: [] })
     vi.useFakeTimers()
     try {
       const { ffmpeg, fingerprint, state } = fakeFfmpeg()

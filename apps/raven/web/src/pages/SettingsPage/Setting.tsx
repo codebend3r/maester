@@ -2,7 +2,6 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { type ReactNode, useId } from 'react'
 import type { IconName } from '@raven/ui'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import { cannotManageNote, useManagement } from '@/lib/management'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
@@ -72,17 +71,12 @@ type SettingsSectionProps<T> = {
   query: UseQueryResult<T>
   shape: ReactNode
   saveError: Error | null
-  browser?: ReactNode
   children: (data: T) => ReactNode
 }
 
 /**
- * One source of settings: its heading and what it covers, that the admin
- * lock keeps them as they are, why they could not be read or saved, `shape`
- * while they are read, and its settings once known. One fieldset holds them
- * all, disabled while the admin lock is on or a reset is saving. `browser`
- * holds what this browser keeps for itself, after and outside that fieldset,
- * so neither the admin lock nor the server's answer has a say in it.
+ * One admin settings source: its heading, load/save errors, and controls.
+ * The owning page enforces management access; a reset temporarily disables edits.
  */
 export const SettingsSection = <T,>({
   icon,
@@ -92,32 +86,16 @@ export const SettingsSection = <T,>({
   query,
   shape,
   saveError,
-  browser,
   children,
 }: SettingsSectionProps<T>) => {
   const headingId = useId()
-  const { mode, canManage } = useManagement()
   return (
     <section className={styles.section} aria-labelledby={headingId}>
       <header className={styles.sectionHead}>
         <h2 id={headingId} className={styles.heading}>
           <Titled icon={icon}>{title}</Titled>
         </h2>
-        <p className={styles.help}>
-          {hint}
-          {!canManage && (
-            <>
-              {' '}
-              <span>
-                {cannotManageNote({
-                  mode,
-                  action: SETTINGS_COPY.section.changeThese,
-                  lockPlace: SETTINGS_COPY.section.below,
-                })}
-              </span>
-            </>
-          )}
-        </p>
+        <p className={styles.help}>{hint}</p>
       </header>
       {query.isError && (
         <p className={styles.error} role="alert">
@@ -132,12 +110,11 @@ export const SettingsSection = <T,>({
       )}
       {/* The section names these already, so the fieldset is no group of its own to a screen reader. */}
       {query.data !== undefined && (
-        <fieldset role="none" className={styles.settings} disabled={!canManage || isResetting}>
+        <fieldset role="none" className={styles.settings} disabled={isResetting}>
           {children(query.data)}
         </fieldset>
       )}
       {query.isPending && <Loading label={SETTINGS_COPY.section.reading}>{shape}</Loading>}
-      {browser}
     </section>
   )
 }

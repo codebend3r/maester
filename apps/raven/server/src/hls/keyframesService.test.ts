@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { DEFAULT_PLAYBACK_SETTINGS, LIBRARY_KINDS } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
+import { ScanControl } from '@/scanner/scanControl'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { KeyframesService } from '@/hls/keyframesService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
@@ -49,6 +50,7 @@ describe('KeyframesService', () => {
     const ffmpeg = new CountingFfmpeg(
       { ...readServerConfig({}), ffprobePath },
       { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+      new ScanControl(),
     )
     return { ffmpeg, keyframes: new KeyframesService(ffmpeg, index()) }
   }
@@ -137,9 +139,13 @@ describe('KeyframesService', () => {
   })
 
   const gated = () => {
-    const ffmpeg = new GatedFfmpeg(readServerConfig({}), {
-      playback: () => DEFAULT_PLAYBACK_SETTINGS,
-    })
+    const ffmpeg = new GatedFfmpeg(
+      readServerConfig({}),
+      {
+        playback: () => DEFAULT_PLAYBACK_SETTINGS,
+      },
+      new ScanControl(),
+    )
     return { ffmpeg, keyframes: new KeyframesService(ffmpeg, index()) }
   }
 

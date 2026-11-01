@@ -8,7 +8,6 @@ import {
   type PlaybackSettings,
 } from '@raven/core'
 import { type ComponentType, useId, useState } from 'react'
-import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button } from '@raven/ui'
 import {
   AUTOPLAY_COUNTDOWN_SECONDS,
@@ -41,6 +40,8 @@ import { useServerReach } from '@/stores/serverReach'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
+import { ADMIN_COPY } from '@/pages/SettingsPage/adminCopy'
+import { ScanSwitch } from '@/pages/SettingsPage/ScanSwitch'
 
 const TITLES: Choices<DisplaySettings['titles']> = {
   logo: {
@@ -276,17 +277,11 @@ const OfflineSettings = () => {
 }
 
 /**
- * How the server plays video, and how pages look, for every viewer, then
- * the account, Raven's own settings inside the app, and the advanced
- * settings and the admin lock at the foot, for this browser. Each change
- * shows at once and saves on its own behind it, put back if the save
- * fails; Reset to defaults puts the server's settings back at once, after a
- * second click to be sure. Where the admin lock is on, or the viewer is not
- * the owner, the settings can be read but not changed.
+ * Server-wide settings and management, mounted only for an authorized admin.
+ * Changes save optimistically; Reset asks for confirmation before restoring defaults.
  */
 const ServerSettings = () => {
   const titleId = useId()
-  const isDesktop = useIsDesktop()
   const queryClient = useQueryClient()
   const [isConfirming, setConfirming] = useState(false)
   // Accounts show only to an approved viewer; the other states have a screen of their own.
@@ -350,19 +345,17 @@ const ServerSettings = () => {
       <header className={styles.header}>
         <BackButton fallback={HOME} className={styles.back} />
         <PageTitle id={titleId} icon="settings" className={styles.title}>
-          {COMMON_COPY.settings}
+          {ADMIN_COPY.heading}
         </PageTitle>
-        <AdminOnly>
-          {settings && (
-            <ResetControl
-              isConfirming={isConfirming}
-              isBusy={busy}
-              isAllAtDefaults={isAllAtDefaults}
-              onReset={() => reset.mutate()}
-              onConfirming={setConfirming}
-            />
-          )}
-        </AdminOnly>
+        {settings && (
+          <ResetControl
+            isConfirming={isConfirming}
+            isBusy={busy}
+            isAllAtDefaults={isAllAtDefaults}
+            onReset={() => reset.mutate()}
+            onConfirming={setConfirming}
+          />
+        )}
       </header>
       <output className={styles.status}>
         {reset.isSuccess && !!settings && isAllAtDefaults ? SETTINGS_COPY.resetDone : ''}
@@ -381,7 +374,6 @@ const ServerSettings = () => {
         query={playback}
         shape={<SettingsSkeleton count={Object.keys(DEFAULT_PLAYBACK_SETTINGS).length} />}
         saveError={save.failure}
-        browser={<BrowserPlayback isDesktop={isDesktop} />}
       >
         {({ settings: current, effective }) => (
           <>
@@ -483,18 +475,45 @@ const ServerSettings = () => {
           />
         )}
       </SettingsSection>
-      {access.kind === ACCESS_KINDS.approved && (
-        <>
-          <AccountSection account={access.account} />
-          {access.account.isOwner && (
-            <UsersSection key={access.account.id} userId={access.account.id} />
-          )}
-        </>
+      <ScanSwitch />
+      {access.kind === ACCESS_KINDS.approved && access.account.isOwner && (
+        <UsersSection key={access.account.id} userId={access.account.id} />
       )}
-      {isDesktop && <DesktopSettings />}
-      <AdvancedSection />
       {mode === MANAGEMENT_MODES.adminLock && <AdminLockSection />}
     </section>
+  )
+}
+
+const ViewerSettings = () => {
+  const titleId = useId()
+  const isDesktop = useIsDesktop()
+  const access = useAccessState()
+  return (
+    <section className={styles.page} aria-labelledby={titleId}>
+      <header className={styles.header}>
+        <BackButton fallback={HOME} className={styles.back} />
+        <PageTitle id={titleId} icon="settings" className={styles.title}>
+          {COMMON_COPY.settings}
+        </PageTitle>
+      </header>
+      <section className={styles.section} aria-label={SETTINGS_COPY.playback}>
+        <h2 className={styles.heading}>{SETTINGS_COPY.playback}</h2>
+        <BrowserPlayback isDesktop={isDesktop} />
+      </section>
+      {access.kind === ACCESS_KINDS.approved && <AccountSection account={access.account} />}
+      {isDesktop && <DesktopSettings />}
+      <AdvancedSection />
+    </section>
+  )
+}
+
+export const AdminPage = () => {
+  const { mode, canManage } = useManagement()
+  return (
+    <>
+      {canManage && <ServerSettings />}
+      {!canManage && mode === MANAGEMENT_MODES.adminLock && <AdminLockSection />}
+    </>
   )
 }
 
@@ -503,12 +522,11 @@ type ReachState = (typeof REACH_STATES)[keyof typeof REACH_STATES]
 
 const SETTINGS_VIEWS = {
   [REACH_STATES.offline]: OfflineSettings,
-  [REACH_STATES.online]: ServerSettings,
+  [REACH_STATES.online]: ViewerSettings,
 } as const satisfies Record<ReachState, ComponentType>
 
 /**
- * `/settings`: the server's settings and this browser's, or inside raven
- * player while its server is out of reach, only the app's own.
+ * Personal preferences and account settings, never server administration.
  */
 export const SettingsPage = () => {
   const isOffline = useServerReach((state) => state.isOffline)

@@ -75,9 +75,11 @@ export const createGate = ({ limit }: CreateGateProps): Gate => {
   }
 }
 
-type PushProps = { key: string; task: () => Promise<void> }
+type PushProps = { key: string; task: (signal: AbortSignal) => Promise<void> }
 
-type AgainProps = { key: string; task: () => Promise<void> }
+type AgainProps = PushProps
+
+type QueuedTask = { run: PushProps['task']; signal: AbortSignal }
 
 export type TaskQueue = {
   /** Queues `task` under `key`; a key already queued or running is ignored. */
@@ -94,18 +96,19 @@ export type TaskQueue = {
   size: () => number
 }
 
-type CreateTaskQueueProps = { concurrency: number }
+type CreateTaskQueueProps = { concurrency: number; signal?: () => AbortSignal }
 
 /**
  * A keyed background queue with fixed concurrency, for work that trickles in
  * from scans and should neither block them nor run twice for the same file.
  * A task that throws is dropped; tasks record their own failures.
  */
-export const createTaskQueue = ({ concurrency }: CreateTaskQueueProps): TaskQueue => {
-  const queued = new Map<string, () => Promise<void>>()
+export const createTaskQueue = ({ concurrency, signal }: CreateTaskQueueProps): TaskQueue => {
+  const fallback = new AbortController().signal
+  const queued = new Map<string, QueuedTask>()
   const running = new Set<string>()
   // Tasks asked for again while their key ran; each is queued once it ends.
-  const after = new Map<string, () => Promise<void>>()
+  const after = new Map<string, QueuedTask>()
   const waiters = new Set<() => void>()
 
   const settle = (): void => {
@@ -121,7 +124,7 @@ export const createTaskQueue = ({ concurrency }: CreateTaskQueueProps): TaskQueu
     const [key, task] = next.value
     queued.delete(key)
     running.add(key)
-    void task()
+    void (task.signal.aborted ? Promise.resolve() : task.run(task.signal))
       .catch(() => undefined)
       .finally(() => {
         running.delete(key)
@@ -136,13 +139,14 @@ export const createTaskQueue = ({ concurrency }: CreateTaskQueueProps): TaskQueu
   return {
     push: ({ key, task }) => {
       if (queued.has(key) || running.has(key)) return
-      queued.set(key, task)
+      queued.set(key, { run: task, signal: signal?.() ?? fallback })
       pump()
     },
     again: ({ key, task }) => {
       if (queued.has(key)) return
-      if (running.has(key)) after.set(key, task)
-      else queued.set(key, task)
+      const pending = { run: task, signal: signal?.() ?? fallback }
+      if (running.has(key)) after.set(key, pending)
+      else queued.set(key, pending)
       pump()
     },
     cancel: (key) => {

@@ -216,7 +216,7 @@ describe('NowPlayingBar', () => {
     store().playTracks({ tracks: TRACKS })
     act(() => store().engine.state(AUDIO_STATES.playing))
     renderWithProviders({ ui: <NowPlayingBar />, route: '/libraries/3' })
-    const bar = screen.getByRole('region', { name: 'Now playing' })
+    const bar = screen.getByRole('region', { name: 'Mini-player' })
     expect(bar).toHaveTextContent('Airbag')
     expect(bar).toHaveTextContent('Radiohead')
     expect(screen.getAllByRole('link', { name: 'Now playing' })[0]).toHaveAttribute(

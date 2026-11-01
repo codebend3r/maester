@@ -181,7 +181,7 @@ describe('BugReportsPage', () => {
     expect(screen.getByText(/"userAgent": "Mozilla\/5\.0 \(iPhone\)/)).toBeVisible()
   })
 
-  it('asks for nothing and points to Settings while the admin lock is on', () => {
+  it('asks for nothing and points to Admin while the admin lock is on', () => {
     renderWithProviders({
       ui: <BugReportsPage />,
       adminLock: { state: ADMIN_LOCK_STATES.on, available: true },
@@ -189,7 +189,7 @@ describe('BugReportsPage', () => {
     expect(
       screen.getByRole('heading', { name: 'Bug reports are for the admin' }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.getByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/admin')
     expect(spies.list).not.toHaveBeenCalled()
   })
 

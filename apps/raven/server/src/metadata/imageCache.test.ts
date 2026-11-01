@@ -5,6 +5,7 @@ import { DEFAULT_PLAYBACK_SETTINGS, POSTER_WIDTHS } from '@raven/core'
 import { HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
+import { ScanControl } from '@/scanner/scanControl'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { RAVEN_CONTENT_TYPES } from '@/http'
 import { ImageCache } from '@/metadata/imageCache'
@@ -57,7 +58,11 @@ describe('the image cache', () => {
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-images-'))
     const config = { ...readServerConfig({}), dataDir: join(state.root, 'data') }
-    state.ffmpeg = new CountingFfmpeg(config, { playback: () => DEFAULT_PLAYBACK_SETTINGS })
+    state.ffmpeg = new CountingFfmpeg(
+      config,
+      { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+      new ScanControl(),
+    )
     state.cache = new ImageCache(
       config,
       async ({ url }) => {

@@ -19,6 +19,7 @@ import {
 } from '@raven/core'
 import { type MockInstance, afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { SOFTWARE } from '@/ffmpeg/encoder'
+import { ScanControl } from '@/scanner/scanControl'
 import { type FfmpegStream, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, mediaClockOf } from '@/ffmpeg/probe'
 import {
@@ -115,9 +116,13 @@ describe('HlsSessions', () => {
   const opened: HlsSessions[] = []
 
   const ffmpegFor = (dataDir: string) =>
-    new WatchedFfmpeg(testConfig({ dataDir, mediaDir: state.root }), {
-      playback: () => DEFAULT_PLAYBACK_SETTINGS,
-    })
+    new WatchedFfmpeg(
+      testConfig({ dataDir, mediaDir: state.root }),
+      {
+        playback: () => DEFAULT_PLAYBACK_SETTINGS,
+      },
+      new ScanControl(),
+    )
 
   type PlanOfProps = { ffmpeg: FfmpegService; path: string }
 

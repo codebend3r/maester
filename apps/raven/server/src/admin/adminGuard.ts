@@ -79,6 +79,6 @@ export class AdminGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<FastifyRequest>()
     if (this.management.canManage({ request })) return true
     if (!this.management.isLegacy()) throw authFailure(AUTH_REFUSALS.notOwner)
-    throw new ForbiddenException('The admin lock is on. Turn it off in Settings to do this.')
+    throw new ForbiddenException('The admin lock is on. Turn it off in Admin to do this.')
   }
 }

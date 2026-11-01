@@ -14,6 +14,7 @@ import { Scores } from '@/metadata/scores'
 import { type DueScores, ScoresRepository, scoresDueBefore } from '@/metadata/scoresRepository'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
+import { ScanControl } from '@/scanner/scanControl'
 
 /** How long the sweep waits to try again after a drain that asked and got no answer at all. */
 export const RETRY_MS = 15 * 60 * 1000
@@ -146,6 +147,9 @@ type ScoreSweepDueProps = {
   limit: number
 }
 
+type ScoreSweepTopUpProps = { answeredBy: ReadonlySet<Asked>; signal: AbortSignal }
+type ScoreSweepRunProps = { round: Round; signal: AbortSignal }
+
 type ScoreSweepListDueProps = {
   asked: Asked
   before: string
@@ -167,7 +171,10 @@ type ScoreSweepListDueProps = {
 @Injectable()
 export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(ScoreSweep.name)
-  private readonly queue = createTaskQueue({ concurrency: 1 })
+  private readonly queue = createTaskQueue({
+    concurrency: 1,
+    signal: () => this.scans.signal,
+  })
   private readonly state: {
     pause: ScorePause | null
     wake: NodeJS.Timeout | null
@@ -189,6 +196,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(Scores) private readonly scores: Scores,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(TmdbClient) private readonly tmdb: Pick<TmdbClient, 'score' | 'enabled'>,
+    @Inject(ScanControl) private readonly scans: ScanControl,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -204,7 +212,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   /** Queues a drain; one already waiting covers this, and one running is followed by another. */
   kick(): void {
     if (this.state.isClosed) return
-    this.queue.again({ key: SWEEP_TASKS.drain, task: () => this.drain() })
+    this.queue.again({ key: SWEEP_TASKS.drain, task: (signal) => this.drain(signal) })
   }
 
   whenIdle(): Promise<void> {
@@ -236,14 +244,15 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     return this.state.pause
   }
 
-  private async drain(): Promise<void> {
+  private async drain(signal: AbortSignal): Promise<void> {
     this.state.pause = null
-    const stop = await this.drainOnce().catch((error: unknown) => {
+    const stop = await this.drainOnce(signal).catch((error: unknown) => {
       this.logger.error(`Topping up scores failed: ${errorMessage(error)}`)
       return STOPS.unavailable
     })
     if (this.state.wake) clearTimeout(this.state.wake)
     this.state.wake = null
+    if (signal.aborted) return
     const retry = new Date(Date.now() + RETRY_MS)
     switch (stop) {
       case STOPS.done:
@@ -285,10 +294,10 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    * for, so failed ones do not wait a day; one that answered and left other
    * failures behind waits for the next kick.
    */
-  private async drainOnce(): Promise<Stop> {
-    const { isSilent, answeredBy } = await this.topUp(new Set())
+  private async drainOnce(signal: AbortSignal): Promise<Stop> {
+    const { isSilent, answeredBy } = await this.topUp({ answeredBy: new Set(), signal })
     // The database closes with the app.
-    if (this.state.isClosed) return STOPS.done
+    if (this.state.isClosed || signal.aborted) return STOPS.done
     this.forgetFailures({ answeredBy, hasRunOut: !isSilent })
     this.settle()
     if (isSilent && answeredBy.size === 0) return STOPS.unavailable
@@ -304,11 +313,11 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    * again. A source whose day runs out midway hands over to the next. Each
    * title that fails joins its source's failures, so later rounds skip it.
    */
-  private async topUp(answeredBy: ReadonlySet<Asked>): Promise<Drained> {
-    if (this.state.isClosed) return { isSilent: false, answeredBy }
+  private async topUp({ answeredBy, signal }: ScoreSweepTopUpProps): Promise<Drained> {
+    if (this.state.isClosed || signal.aborted) return { isSilent: false, answeredBy }
     const round = this.nextRound()
     if (round == null) return { isSilent: false, answeredBy }
-    const { answered, failedIds } = await this.run(round)
+    const { answered, failedIds } = await this.run({ round, signal })
     const { asked } = round
     this.state.failed = {
       ...this.state.failed,
@@ -319,7 +328,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
     if (answered === 0 && failedIds.length > 0) return { isSilent: true, answeredBy: hasAnswered }
     if (answered === 0 && round.isCurrent()) return { isSilent: false, answeredBy: hasAnswered }
     if (!this.state.isClosed) this.settle()
-    return this.topUp(hasAnswered)
+    return this.topUp({ answeredBy: hasAnswered, signal })
   }
 
   /**
@@ -506,18 +515,20 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
    * titles answered, and which failed.
    */
   private async run({
-    due,
-    isDue,
-    isCurrent,
-    isSpent,
-    fetch,
-  }: Round): Promise<{ answered: number; failedIds: number[] }> {
+    round: { due, isDue, isCurrent, isSpent, fetch },
+    signal,
+  }: ScoreSweepRunProps): Promise<{ answered: number; failedIds: number[] }> {
     const streak = { failedInARow: 0 }
     const outcomes = await mapWithConcurrency({
       items: due,
       limit: AT_ONCE,
       fn: async (title): Promise<Outcome> => {
-        if (this.state.isClosed || streak.failedInARow >= GIVE_UP_AFTER || !isCurrent()) {
+        if (
+          this.state.isClosed ||
+          signal.aborted ||
+          streak.failedInARow >= GIVE_UP_AFTER ||
+          !isCurrent()
+        ) {
           return OUTCOMES.skipped
         }
         if (!isDue(title)) return OUTCOMES.skipped

@@ -44,6 +44,7 @@ type EpisodeRow = {
 export type FilmFile = { id: number; path: string; duration: number }
 
 type MarkerJobsStoredProps = { id: number; region: Region }
+type MarkerJobsEpisodesOfProps = { seasonId: number; libraryId?: number | null }
 
 type MarkerJobsSaveProps = RegionFingerprint
 
@@ -86,9 +87,15 @@ export class MarkerJobs {
    * length, and never analysed or analysed by an older detector. A season
    * that failed with this one waits for its files to change.
    */
-  seasonsDue(): number[] {
+  requestLibrary(libraryId: number): void {
+    this.db
+      .prepare('UPDATE media SET markers = ? WHERE library_id = ?')
+      .run(MARKER_STATES.pending, libraryId)
+  }
+
+  seasonsDue(libraryId: number | null = null): number[] {
     return this.db
-      .prepare<[string, number], { season_id: number }>(
+      .prepare<[string, number, number | null, number | null], { season_id: number }>(
         `SELECT DISTINCT e.parent_id AS season_id
            FROM media m
            JOIN media_items mi ON mi.media_id = m.id
@@ -96,25 +103,27 @@ export class MarkerJobs {
           WHERE m.probed = 1 AND m.probe_error IS NULL AND m.duration > 0
             AND e.parent_id IS NOT NULL
             AND (m.markers = ? OR m.markers_version < ?)
+            AND (? IS NULL OR m.library_id = ?)
           ORDER BY e.parent_id`,
       )
-      .all(MARKER_STATES.pending, MARKER_DETECTOR_VERSION)
+      .all(MARKER_STATES.pending, MARKER_DETECTOR_VERSION, libraryId, libraryId)
       .map(({ season_id }) => season_id)
   }
 
   /** The films with a file waiting for detection, as `seasonsDue` reads episodes. */
-  filmsDue(): FilmFile[] {
+  filmsDue(libraryId: number | null = null): FilmFile[] {
     return this.db
-      .prepare<[string, string, number], FilmFile>(
+      .prepare<[string, string, number, number | null, number | null], FilmFile>(
         `SELECT DISTINCT m.id, m.path, m.duration
            FROM media m
            JOIN media_items mi ON mi.media_id = m.id
            JOIN items f ON f.id = mi.item_id AND f.type = ?
           WHERE m.probed = 1 AND m.probe_error IS NULL AND m.duration > 0
             AND (m.markers = ? OR m.markers_version < ?)
+            AND (? IS NULL OR m.library_id = ?)
           ORDER BY m.id`,
       )
-      .all(ITEM_TYPES.movie, MARKER_STATES.pending, MARKER_DETECTOR_VERSION)
+      .all(ITEM_TYPES.movie, MARKER_STATES.pending, MARKER_DETECTOR_VERSION, libraryId, libraryId)
   }
 
   /** Whether a marker from `source` would be stored over what the file holds, so is worth looking for. */
@@ -123,19 +132,20 @@ export class MarkerJobs {
   }
 
   /** The files of a season's episodes, in episode order, the biggest picture first among an episode's versions. */
-  episodesOf(seasonId: number): EpisodeFile[] {
+  episodesOf({ seasonId, libraryId = null }: MarkerJobsEpisodesOfProps): EpisodeFile[] {
     const rows = this.db
-      .prepare<[number], EpisodeRow>(
+      .prepare<[number, number | null, number | null], EpisodeRow>(
         `SELECT m.id, m.path, m.duration, MIN(e.number) AS episode, m.chapters
            FROM items e
            JOIN media_items mi ON mi.item_id = e.id
            JOIN media m ON m.id = mi.media_id
           WHERE e.parent_id = ? AND e.type = 'episode'
             AND m.probed = 1 AND m.probe_error IS NULL AND m.duration > 0
+            AND (? IS NULL OR m.library_id = ?)
           GROUP BY m.id
           ORDER BY episode, COALESCE(m.width * m.height, 0) DESC, m.id`,
       )
-      .all(seasonId)
+      .all(seasonId, libraryId, libraryId)
     return rows.map(({ id, path, duration, episode, chapters }) => ({
       id,
       path,
