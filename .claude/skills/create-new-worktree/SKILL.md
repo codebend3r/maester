@@ -1,6 +1,7 @@
 ---
 name: create-new-worktree
-description: Use when a new piece of maester work should start in its own git worktree cut from main: "create a worktree", "new worktree for X", "make me a worktree", "start X in a worktree", "spin up a worktree off main", or when a plan, spec step or stacked PR needs a checkout beside the main one. Not for opening a worktree on a branch that already exists.
+description: >-
+  Use when a new piece of maester work should start in its own git worktree cut from main: "create a worktree", "new worktree for X", "make me a worktree", "start X in a worktree", "spin up a worktree off main", or when a plan, spec step or stacked PR needs a checkout beside the main one. Not for opening a worktree on a branch that already exists.
 argument-hint: <name>
 ---
 

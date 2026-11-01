@@ -1,6 +1,7 @@
 ---
 name: run-ios-e2e
-description: Use when running the `📱 App on iPhone and iPad` PR check locally on a Mac, or `app:e2e`: "run the iPhone CI locally", "run the iOS e2e", "run the app e2e on the simulator", "reproduce the app-ios job", "the iPhone and iPad check failed, run it here", "run ci:app:ios". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
+description: >-
+  Use when running the `📱 App on iPhone and iPad` PR check locally on a Mac, or `app:e2e`: "run the iPhone CI locally", "run the iOS e2e", "run the app e2e on the simulator", "reproduce the app-ios job", "the iPhone and iPad check failed, run it here", "run ci:app:ios". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
 ---
 
 # Run the iPhone and iPad check locally

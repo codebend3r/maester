@@ -1,6 +1,7 @@
 ---
 name: run-device-app
-description: Use when running raven's device app (`@raven/app`) locally on an iPhone, iPad or Apple TV simulator: "run the app in the simulator", "start the iPhone app dev server", "run the dev client", "hot reload the app", "build the iOS app", "run the app e2e flows", "boot a simulator for raven". Covers creating the simulators, the dev scripts (Metro and a Debug build with the raven server), the Release build, Xcode, and the Maestro flows.
+description: >-
+  Use when running raven's device app (`@raven/app`) locally on an iPhone, iPad or Apple TV simulator: "run the app in the simulator", "start the iPhone app dev server", "run the dev client", "hot reload the app", "build the iOS app", "run the app e2e flows", "boot a simulator for raven". Covers creating the simulators, the dev scripts (Metro and a Debug build with the raven server), the Release build, Xcode, and the Maestro flows.
 ---
 
 # Run the device app
