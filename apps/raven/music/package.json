@@ -6,7 +6,8 @@
   "main": "index.ts",
   "imports": {
     "#package": "./package.json",
-    "#app-config": "./app.config.ts"
+    "#app-config": "./app.config.ts",
+    "#plugins/*": "./plugins/*.ts"
   },
   "scripts": {
     "build:android": "./android/gradlew -p android assembleRelease",
@@ -38,16 +39,19 @@
     "@raven/core": "workspace:*",
     "@raven/native": "workspace:*",
     "@raven/ui": "workspace:*",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@tanstack/react-query": "5.103.1",
     "expo": "58.0.14",
     "expo-constants": "58.0.12",
+    "expo-file-system": "58.0.9",
     "expo-linking": "58.0.13",
     "expo-router": "58.0.23",
     "expo-splash-screen": "58.0.10",
     "react": "19.3.0",
     "react-native": "npm:react-native-tvos@0.88.0-0",
     "react-native-safe-area-context": "5.10.1",
-    "react-native-screens": "4.30.0"
+    "react-native-screens": "4.30.0",
+    "zustand": "5.0.15"
   },
   "devDependencies": {
     "@jest/globals": "30.5.2",
@@ -145,6 +149,9 @@
             "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
           },
           {
+            "env": "WREN_CARPLAY"
+          },
+          {
             "env": "DEVELOPER_DIR"
           },
           {
@@ -192,6 +199,9 @@
           },
           {
             "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+          },
+          {
+            "env": "WREN_CARPLAY"
           },
           {
             "env": "DEVELOPER_DIR"

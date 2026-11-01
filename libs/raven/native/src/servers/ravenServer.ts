@@ -5,6 +5,8 @@ import type { AppServer } from '@/servers/serverList'
  * `EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN`, which Expo writes into the bundle. Unset, as in every
  * real build, the app asks for the account.
  */
+// Written out, not read through a constant: babel-preset-expo inlines only a literal
+// `process.env.EXPO_PUBLIC_*`, and `process.env[name]` is undefined in the bundle.
 const BYPASS_ORIGIN = process.env.EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN ?? ''
 
 export const IS_SIGN_IN_BYPASSED = BYPASS_ORIGIN !== ''

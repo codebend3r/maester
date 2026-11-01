@@ -82,6 +82,7 @@ export const APP_CLIENT_CALLS = {
 
   ping: { method: get, path: '/api/media-origins/ping' },
   file: { method: get, path: '/api/media/:id/file' },
+  transcode: { method: get, path: '/api/media/:id/transcode' },
   stream: { method: get, path: '/api/media/:id/stream' },
   subtitles: { method: get, path: '/api/media/:id/subtitles/:trackId' },
   hlsMaster: { method: get, path: HLS_PATHS.master },

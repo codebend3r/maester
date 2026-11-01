@@ -7,6 +7,8 @@ import { fireEvent, renderRouter, screen, within } from 'expo-router/testing-lib
 import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@/session'
 import { AIRBAG, LISTENER, MIXTAPE, OK_COMPUTER, OK_COMPUTER_PAGE, musicApi } from '@/test/music'
+import { WREN_PAGES } from '@/routes'
+import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()
@@ -29,7 +31,7 @@ jest.mock('@raven/native', () => ({
   },
 }))
 
-const ALBUM_URL = `/album/${OK_COMPUTER.id}`
+const ALBUM_URL = pagePathOf({ page: WREN_PAGES.album, id: OK_COMPUTER.id })
 
 describe('Album', () => {
   beforeEach(() => {
@@ -122,7 +124,9 @@ describe('Album', () => {
   })
 
   it('says so when the album is not on the server', async () => {
-    await renderRouter(WREN_TREE, { initialUrl: '/album/not-a-number' })
+    await renderRouter(WREN_TREE, {
+      initialUrl: pagePathOf({ page: WREN_PAGES.album, id: 'not-a-number' }),
+    })
     expect(await screen.findByText('This album is not on the server.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy()
   })

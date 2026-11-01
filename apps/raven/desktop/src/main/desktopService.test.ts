@@ -102,6 +102,7 @@ const fakeDownloads = ({ grants, savedPosition, serverPosition, watched }: FakeD
       note('openTitle', input)
       return null
     },
+    trackPathOf: async () => null,
     sidecarsOf: () => [],
     fromLabelOf: ({ path }) =>
       path.startsWith(`${DOWNLOADED}/`) ? 'Downloaded from Vhagar' : null,

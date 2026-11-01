@@ -86,6 +86,7 @@ describe('mediaPlanePaths', () => {
       '/api/media/:id/hls/master.m3u8',
       '/api/media/:id/stream',
       '/api/media/:id/subtitles/:trackId',
+      '/api/media/:id/transcode',
     ])
   })
 })

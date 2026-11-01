@@ -17,4 +17,6 @@ export const WREN_ICONS = {
   shuffle: 'shuffle',
   favourite: 'heart',
   more: 'more',
+  download: 'download',
+  downloaded: 'check',
 } as const satisfies Record<string, IconName>

@@ -61,6 +61,16 @@ export const isStreamQuality = oneOf(keysOf(STREAM_QUALITIES))
 
 export type StreamQuality = Infer<typeof isStreamQuality>
 
+/** The bitrates, in kbps, an audio transcode is offered at: AAC in an `.m4a`, nothing else. */
+export const AUDIO_BITRATES = { low: 128, standard: 256, high: 320 } as const
+
+export const isAudioBitrate = oneOf(Object.values(AUDIO_BITRATES))
+
+export type AudioBitrate = Infer<typeof isAudioBitrate>
+
+/** The query key an audio transcode names its bitrate in. */
+export const AUDIO_BITRATE_PARAM = 'kbps'
+
 /** How far an origin reaches: the home network, the tailnet or the open internet. */
 export const MEDIA_ORIGIN_KINDS = { lan: 'lan', tailnet: 'tailnet', public: 'public' } as const
 

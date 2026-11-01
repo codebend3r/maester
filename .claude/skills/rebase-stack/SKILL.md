@@ -1,6 +1,7 @@
 ---
 name: rebase-stack
-description: Use when stacked PR branches in maester need to move onto the latest origin/main: "rebase these stacked branches against origin/main", "restack", "the bottom of my stack merged", "rebase the stack and push", "fix the stack's conflicts". Finds the stack from the open PRs' base branches, rebases each branch onto the one below it (the bottom onto origin/main), resolves conflicts, verifies, and force-pushes the whole stack with `--force-with-lease`. Not for rebasing every unrelated branch; use `rebase-everything-against-main` for that.
+description: >-
+  Use when stacked PR branches in maester need to move onto the latest origin/main: "rebase these stacked branches against origin/main", "restack", "the bottom of my stack merged", "rebase the stack and push", "fix the stack's conflicts". Finds the stack from the open PRs' base branches, rebases each branch onto the one below it (the bottom onto origin/main), resolves conflicts, verifies, and force-pushes the whole stack with `--force-with-lease`. Not for rebasing every unrelated branch; use `rebase-everything-against-main` for that.
 ---
 
 # Rebase a stack onto origin/main

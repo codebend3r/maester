@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
+  DOWNLOAD_TARGET_KINDS,
   type PlaylistDetails,
   QUEUE_SOURCE_KINDS,
   ROUTE_STATES,
@@ -12,6 +13,7 @@ import { useAudioQueue } from '@raven/ui/headless'
 import { type ComponentType, useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
+import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { PlaylistNameDialog } from '@/components/PlaylistNameDialog/PlaylistNameDialog'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
@@ -147,6 +149,11 @@ const PlaylistView = ({ details }: PlaylistViewProps) => {
           >
             {COMMON_COPY.shuffle}
           </Button>
+          {tracks.length > 0 && (
+            <DownloadButton
+              target={{ kind: DOWNLOAD_TARGET_KINDS.playlist, playlistId: playlist.id }}
+            />
+          )}
           <Button icon="edit" onClick={() => setDialog(OPEN_DIALOGS.rename)}>
             {PLAYLIST_PAGE_COPY.rename}
           </Button>

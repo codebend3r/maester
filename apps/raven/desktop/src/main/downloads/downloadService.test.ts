@@ -69,6 +69,7 @@ import {
 } from '@/main/test/downloadFakes'
 import { fakeTimers } from '@/main/test/playerFakes'
 import {
+  albumDetails,
   details,
   episode,
   fakeCalls,
@@ -77,6 +78,7 @@ import {
   ok,
   show,
   type Reply,
+  track,
 } from '@/main/test/serverFakes'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
@@ -191,6 +193,7 @@ const entryFor = (overrides: Partial<DownloadEntry>): DownloadEntry => ({
   serverPosition: 0,
   pending: NO_PENDING,
   createdAt: NOW - 1000,
+  track: undefined,
   ...overrides,
 })
 
@@ -808,6 +811,39 @@ describe('confirm', () => {
     ])
   })
 
+  it("keeps each track of an album it queues, which the track's view carries", async () => {
+    const airbag = track({ id: 101 })
+    const world = setup({
+      replies: {
+        [keyOf({ name: CALL_NAMES.getAlbum, albumId: 7 })]: ok(albumDetails([airbag])),
+        [keyOf({ name: CALL_NAMES.getLibrary, libraryId: 3 })]: ok(
+          library({ id: 3, watchedPercent: 90 }),
+        ),
+        [mediaCall(101)]: ok(
+          mediaItemFor({ id: 101, libraryId: 3, title: 'Airbag', container: 'flac' }),
+        ),
+      },
+    })
+    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.album, albumId: 7 } })
+    const reply = downloadsOf(await world.service.confirm({ askId: ask.askId, autoDelete: false }))
+    expect(world.store.read().entries.map((entry) => entry.track)).toEqual([airbag])
+    expect(reply.downloads.map((view) => view.track)).toEqual([airbag])
+  })
+
+  it("carries no track for another server's download, which the music engine cannot play", () => {
+    const airbag = track({ id: 101 })
+    const kept = entryFor({ mediaId: 101, track: airbag })
+    const elsewhere = entryFor({
+      downloadId: '00000000-0000-4000-8000-0000000000a1',
+      serverId: OTHER_SERVER_ID,
+      track: airbag,
+    })
+    const world = setup({ initial: { ...EMPTY_DOWNLOADS, entries: [kept, elsewhere] } })
+    const tracksById = new Map(world.service.views().map((view) => [view.downloadId, view.track]))
+    expect(tracksById.get(kept.downloadId) ?? null).toEqual(airbag)
+    expect(tracksById.get(elsewhere.downloadId)).toBeNull()
+  })
+
   it("keeps the dialog's choice as the default the next ask starts from", async () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE), [itemCall(5)]: ok(SEASON) } })
     const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
@@ -989,6 +1025,7 @@ describe('list and views', () => {
           artwork: { kind: 'none' },
           facts: factsBefore(newer),
           createdAt: newer.createdAt,
+          track: null,
         },
         // Marked watched, so watched whole, though no file was read for its share.
         expect.objectContaining({ downloadId: older.downloadId, watched: 1 }),

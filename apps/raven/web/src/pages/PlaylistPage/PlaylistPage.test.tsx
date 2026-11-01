@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:te
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { ApiError, QUEUE_SOURCE_KINDS } from '@raven/core'
 import { useToasts } from '@raven/ui'
-import { useAudioQueue } from '@raven/ui/headless'
+import { useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { ravenPlayer } from '@/lib/ravenPlayer'
 import { PlaylistPage } from '@/pages/PlaylistPage/PlaylistPage'
 import { playlistDetails, playlistSummary, track } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
@@ -152,5 +153,20 @@ describe('PlaylistPage', () => {
     )
     renderPage()
     expect(await screen.findByText('Nothing lives at this address')).toBeTruthy()
+  })
+
+  it('hands the playlist to Raven to download', async () => {
+    const handoff = spyOn(ravenPlayer, 'open').mockImplementation(() => {})
+    usePlayerPrefs.setState({ opensInRavenPlayer: true })
+    try {
+      renderPage()
+      fireEvent.click(await screen.findByRole('button', { name: 'Download to Raven' }))
+      expect(handoff).toHaveBeenCalledWith(
+        `raven://download?server=${encodeURIComponent(window.location.origin)}&playlist=5`,
+      )
+    } finally {
+      cleanup()
+      usePlayerPrefs.setState({ opensInRavenPlayer: false })
+    }
   })
 })

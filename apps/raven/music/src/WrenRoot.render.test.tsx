@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { audioPlayer } from '@raven/audio'
+import { AUDIO_BITRATES } from '@raven/core'
 import type * as Native from '@raven/native'
 import { queryKeys, useAudioQueue } from '@raven/ui/headless'
 import { router } from 'expo-router'
 import { act, renderRouter, screen, waitFor } from 'expo-router/testing-library'
 
+import {
+  DOWNLOAD_STATUSES,
+  type DownloadDisk,
+  downloadKeyOf,
+  useDownloads,
+} from '@/downloads/downloadStore'
 import { queryClient } from '@/queryClient'
 import { WREN_ROUTES } from '@/routes'
 import { useWrenAccount } from '@/session'
@@ -19,6 +26,8 @@ jest.mock('expo-splash-screen', () => ({
 }))
 jest.mock('@raven/native', () => ({
   ...jest.requireActual<typeof Native>('@raven/native'),
+  // jest has no NetInfo native module to ask; the device is on Wi-Fi.
+  isOnCellular: async () => false,
   apiFor: () => mockApi,
   watchNetwork: () => () => undefined,
   cookieJar: { read: async () => ({}), forget: async () => {} },
@@ -35,6 +44,7 @@ describe('WrenRoot', () => {
     queryClient.clear()
     useWrenAccount.setState({ session: LISTENER })
     useAudioQueue.getState().clear()
+    useDownloads.setState({ ownerId: null, entries: {}, playlists: {} })
   })
 
   it("forgets what one account read once another signs in, so it never shows the last one's playlists", async () => {
@@ -79,5 +89,78 @@ describe('WrenRoot', () => {
     expect(await screen.findByRole('header', { name: 'Home' })).toBeTruthy()
     expect(useAudioQueue.getState().queue.at).toBeNull()
     expect(screen.queryByRole('button', { name: /^Now Playing: Airbag/ })).toBeNull()
+  })
+
+  it("forgets the car's lists once another account signs in, though the first downloaded nothing", async () => {
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await screen.findByRole('header', { name: 'Home' })
+    expect(useDownloads.getState().ownerId).toBe(LISTENER.userId)
+
+    await act(async () => useWrenAccount.setState({ session: null }))
+    await act(async () => useWrenAccount.setState({ session: { ...LISTENER, userId: 'u2' } }))
+    await waitFor(() => expect(audioPlayer.clearBrowseCache).toHaveBeenCalledTimes(1))
+    expect(useDownloads.getState().ownerId).toBe('u2')
+  })
+
+  /** Airbag downloaded under the listener's account, on a disk a test can look at. */
+  const downloaded = () => {
+    const folder = 'downloads/raven/101'
+    const files = new Set([`${folder}/media.m4a`, `${folder}/cover.jpg`])
+    const disk: DownloadDisk = {
+      fetch: async () => 0,
+      uriOf: (path) => path,
+      exists: (path) => files.has(path),
+      folders: () => [folder],
+      remove: async (removed) =>
+        [...files]
+          .filter((path) => path.startsWith(`${removed}/`))
+          .forEach((path) => files.delete(path)),
+      removeAll: async () => files.clear(),
+    }
+    const entry = {
+      mediaId: AIRBAG.id,
+      serverId: 'raven',
+      kbps: AUDIO_BITRATES.standard,
+      bytes: 4_000_000,
+      path: `${folder}/media.m4a`,
+      coverPath: `${folder}/cover.jpg`,
+      track: AIRBAG,
+      album: null,
+      status: DOWNLOAD_STATUSES.done,
+      queueStamp: 1,
+    }
+    useDownloads.setState({
+      device: { ...useDownloads.getState().device, disk },
+      ownerId: LISTENER.userId,
+      entries: { [downloadKeyOf({ serverId: 'raven', id: AIRBAG.id })]: entry },
+    })
+    return { files }
+  }
+
+  it('keeps the downloads as Wren opens, and through a refused refresh until the same account signs in again', async () => {
+    const { files } = downloaded()
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await screen.findByRole('header', { name: 'Home' })
+    expect(Object.keys(useDownloads.getState().entries)).toHaveLength(1)
+
+    // A refresh the server refused signs the account out.
+    await act(async () => useWrenAccount.setState({ session: null }))
+    await act(async () => useWrenAccount.setState({ session: LISTENER }))
+    expect(Object.keys(useDownloads.getState().entries)).toHaveLength(1)
+    expect(files.size).toBe(2)
+    expect(audioPlayer.clearBrowseCache).not.toHaveBeenCalled()
+  })
+
+  it("removes the last account's downloads, files and all, once another account signs in", async () => {
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await screen.findByRole('header', { name: 'Home' })
+    const { files } = downloaded()
+
+    await act(async () => useWrenAccount.setState({ session: null }))
+    await act(async () => useWrenAccount.setState({ session: { ...LISTENER, userId: 'u2' } }))
+    expect(useDownloads.getState().entries).toEqual({})
+    expect(files.size).toBe(0)
+    // The car's kept lists held the last account's titles too.
+    await waitFor(() => expect(audioPlayer.clearBrowseCache).toHaveBeenCalledTimes(1))
   })
 })

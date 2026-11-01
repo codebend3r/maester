@@ -1,6 +1,7 @@
 ---
 name: run-sparrow
-description: Use when running sparrow's chat page locally to try it out, against raven running on this Mac or against the real raven deployed on Vhagar: "run sparrow", "run sparrow local", "run sparrow prod", "test sparrow against Vhagar", "start the sparrow sandbox", or the page at http://localhost:5190 saying "Couldn't reach sparrow; check that its server is running."
+description: >-
+  Use when running sparrow's chat page locally to try it out, against raven running on this Mac or against the real raven deployed on Vhagar: "run sparrow", "run sparrow local", "run sparrow prod", "test sparrow against Vhagar", "start the sparrow sandbox", or the page at http://localhost:5190 saying "Couldn't reach sparrow; check that its server is running."
 argument-hint: local | prod
 ---
 

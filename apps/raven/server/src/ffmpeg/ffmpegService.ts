@@ -35,6 +35,8 @@ const lastLine = (text: string): string =>
 
 type FfmpegTimeoutErrorProps = { tool: string; seconds: number }
 
+type FfmpegServiceExecProps = { args: string[]; timeoutSeconds?: number }
+
 /**
  * ffmpeg or ffprobe ran out of time. Almost always the share being slow to
  * read rather than anything wrong with the file, so callers retry later
@@ -381,16 +383,23 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  /** Runs ffmpeg to completion, rejecting with its own error line. */
-  async exec(args: string[]): Promise<void> {
+  /**
+   * Runs ffmpeg to completion, rejecting with its own error line. It may take
+   * `timeoutSeconds`, `FFMPEG_TIMEOUT_SECONDS` unless a run that reads a whole
+   * file says otherwise.
+   */
+  async exec({
+    args,
+    timeoutSeconds = this.config.ffmpegTimeoutSeconds,
+  }: FfmpegServiceExecProps): Promise<void> {
     try {
       await run(this.config.ffmpegPath, args, {
-        timeout: this.config.ffmpegTimeoutSeconds * 1000,
+        timeout: timeoutSeconds * 1000,
         maxBuffer: 4 * 1024 * 1024,
       })
     } catch (error) {
       if (wasKilled(error)) {
-        throw new FfmpegTimeoutError({ tool: 'ffmpeg', seconds: this.config.ffmpegTimeoutSeconds })
+        throw new FfmpegTimeoutError({ tool: 'ffmpeg', seconds: timeoutSeconds })
       }
       throw new Error(failureText(error), { cause: error })
     }

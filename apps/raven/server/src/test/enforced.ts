@@ -142,6 +142,7 @@ export const ROUTES = {
   deleteMedia: { method: DELETE, path: '/api/media/:id', account: owner },
   mediaFavourite: { method: PUT, path: '/api/media/:id/favourite', account: approved },
   file: { method: GET, path: '/api/media/:id/file', account: approved },
+  transcode: { method: GET, path: '/api/media/:id/transcode', account: approved },
   hlsMaster: { method: GET, path: HLS_PATHS.master, account: approved },
   hlsVideo: { method: GET, path: HLS_PATHS.video, account: approved },
   hlsInit: { method: GET, path: HLS_PATHS.init, account: approved },
@@ -185,7 +186,7 @@ export type Route = (typeof ROUTES)[keyof typeof ROUTES]
  * The routes each kind of account pass opens under accounts `ready`: an HLS
  * session's capability, in place of an account ticket, every route that
  * names the session; and the pass an account ticket earns by opening its
- * file, past the ticket's five minutes, that file alone.
+ * file, past the ticket's five minutes, that file alone and its transcodes.
  */
 export const PASS_ROUTES = {
   [PASS_KINDS.capability]: [
@@ -195,7 +196,7 @@ export const PASS_ROUTES = {
     ROUTES.hlsSubtitles,
     ROUTES.hlsSubtitleSegment,
   ],
-  [PASS_KINDS.ticket]: [ROUTES.file],
+  [PASS_KINDS.ticket]: [ROUTES.file, ROUTES.transcode],
 } as const satisfies Record<PassKind, readonly Route[]>
 
 type PathOfProps = {

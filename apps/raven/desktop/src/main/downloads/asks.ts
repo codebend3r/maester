@@ -81,7 +81,7 @@ type HeldAsk = { serverId: string; target: DownloadTarget; expansion: Expansion;
 type Server = { serverId: string; serverName: string }
 
 /**
- * Each file becomes `<mediaId>/video.<container>` on disk, so both must be safe to name a file
+ * Each file becomes `<mediaId>/video.<container>` or `<mediaId>/media.<container>` on disk, so both must be safe to name a file
  * by, and its size must be bytes a fetch can end at.
  */
 const isStorable = ({ media }: ExpandedFile): boolean =>
@@ -120,6 +120,7 @@ const entryOf = ({
   createdAt,
   artwork: file.artwork,
   facts: factsOf(file.media),
+  track: file.track,
 })
 
 /** The asks a download link raises: expanded, held for the page's answer, then queued or dropped. */

@@ -107,6 +107,7 @@ const entryFor = (n: number, overrides: Partial<DownloadEntry> = {}): DownloadEn
   serverPosition: 0,
   pending: NO_PENDING,
   createdAt: NOW,
+  track: undefined,
   ...overrides,
 })
 
@@ -162,7 +163,7 @@ const setup = ({
   const table: Record<string, Reply> = Object.fromEntries(
     entries.map(({ mediaId }) => [keyOf({ name: CALL_NAMES.getTracks, mediaId }), ok(tracks)]),
   )
-  const { calls } = fakeCalls(table)
+  const { calls, log: callLog } = fakeCalls(table)
   const finished: DownloadEntry[] = []
   const failed: DownloadEntry[] = []
   const dropped: (readonly DownloadEntry[])[] = []
@@ -205,6 +206,7 @@ const setup = ({
     network,
     media,
     table,
+    callLog,
     finished,
     failed,
     dropped,
@@ -1205,6 +1207,20 @@ describe('a finished file', () => {
     expect(world.warnings[0]).not.toContain(DOWNLOADS)
   })
 
+  it('asks for no track list for a track, and keeps it as media.<container>', async () => {
+    const world = setup({
+      entries: [entryFor(1, { container: 'flac' })],
+      tracks: tracksWith([subtitleTrack({ id: 'external-0' })]),
+    })
+    world.network.answers.file = serving({ size: 8 })
+    world.queue.kick()
+    await until(() => (world.statusOf(1)?.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready)
+    expect(world.drive.sizeOf(`${dirOf(1)}/media.flac`)).toBe(8)
+    expect(world.callLog).not.toContain(keyOf({ name: CALL_NAMES.getTracks, mediaId: 1 }))
+    expect(world.network.sidecarRequests()).toEqual([])
+    expect(world.warnings).toEqual([])
+  })
+
   it('finishes with no subtitles when the track list cannot be read', async () => {
     const world = setup({ entries: [entryFor(1)] })
     world.table[keyOf({ name: CALL_NAMES.getTracks, mediaId: 1 })] = { unreachable: 'gone' }
@@ -1305,6 +1321,30 @@ describe('remove', () => {
     expect(world.dropped.map((entries) => entries.map(({ downloadId }) => downloadId))).toEqual([
       [idOf(1)],
     ])
+  })
+
+  it('drops a track whose folder is still busy, says so, and sweeps the folder next launch', async () => {
+    const track = `${dirOf(5)}/media.flac`
+    const world = setup({
+      entries: [
+        entryFor(5, {
+          label: 'Airbag',
+          container: 'flac',
+          status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+        }),
+      ],
+      disk: { [track]: 8 },
+    })
+    world.drive.unremovable.add(dirOf(5))
+    await world.queue.remove({ downloadId: idOf(5) })
+    expect(world.store.read().entries).toEqual([])
+    expect(world.drive.files.has(track)).toBe(true)
+    expect(world.warnings).toEqual([
+      expect.stringContaining('Raven could not remove the files of Airbag'),
+    ])
+    world.drive.unremovable.delete(dirOf(5))
+    await world.queue.sweep({ wasSetAside: false })
+    expect(world.drive.files.has(track)).toBe(false)
   })
 
   it('removes every download and the whole downloads folder', async () => {

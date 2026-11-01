@@ -1,6 +1,7 @@
 ---
 name: run-android-tv-e2e
-description: Use when running the `📺 App on Android TV` PR check locally on a Mac, or any of its steps: "run the Android TV CI locally", "build the Android TV APK", "run the Android TV e2e", "run app:e2e:android-tv", "reproduce the Android TV job", "the Android TV check failed, run it here", "run ci:app:android-tv". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
+description: >-
+  Use when running the `📺 App on Android TV` PR check locally on a Mac, or any of its steps: "run the Android TV CI locally", "build the Android TV APK", "run the Android TV e2e", "run app:e2e:android-tv", "reproduce the Android TV job", "the Android TV check failed, run it here", "run ci:app:android-tv". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
 ---
 
 # Run the Android TV check locally

@@ -1,6 +1,7 @@
 ---
 name: run-desktop-e2e
-description: Use when running the `🎬 Desktop end to end` PR check locally on a Mac, or `desktop:e2e`: "run the desktop e2e", "run the Desktop end to end check locally", "run the Playwright tests for Raven", "the desktop e2e failed, run it here", "reproduce the desktop-playback job", "run ci:desktop:e2e". Covers the one command that runs the check, what it installs, its Nx caching, the traces and what appears on screen.
+description: >-
+  Use when running the `🎬 Desktop end to end` PR check locally on a Mac, or `desktop:e2e`: "run the desktop e2e", "run the Desktop end to end check locally", "run the Playwright tests for Raven", "the desktop e2e failed, run it here", "reproduce the desktop-playback job", "run ci:desktop:e2e". Covers the one command that runs the check, what it installs, its Nx caching, the traces and what appears on screen.
 ---
 
 # Run the Desktop end to end check locally

@@ -3,11 +3,11 @@ import {
   type AudioEvent,
   type DesktopPlatform,
   isAudioRequest,
-  PLAYER_SOURCE_KINDS,
 } from '@raven/core'
 import { type Mpv, type NativeTarget, openMpv } from '@raven/mpv'
 import { app, type BrowserWindow, powerSaveBlocker } from 'electron'
 import type { ConfigStore } from '@/main/desktopConfig'
+import type { DownloadService } from '@/main/downloads/downloadService'
 import { type AudioService, createAudioService } from '@/main/player/audioService'
 import {
   addonPathFor,
@@ -17,6 +17,7 @@ import {
   engineOptionsFor,
   openEngine,
 } from '@/main/player/engine'
+import { createMusicResolve } from '@/main/player/musicSource'
 import { readDevices } from '@/main/player/outputOptions'
 import { createSleepGuard } from '@/main/player/sleepGuard'
 import { attachWindowEngine, engineMode } from '@/main/player/windowEngine'
@@ -34,6 +35,8 @@ type AttachMusicPlayerProps = {
   /** The music relay's sources: a track's resolve and the words for its failure. */
   sources: Pick<ReturnType<typeof createServerSources>, 'resolve' | 'explain'>
   relay: Pick<MediaRelay, 'close'>
+  /** A track's ready download plays from its file, with no server. */
+  downloads: Pick<DownloadService, 'trackPathOf'>
   serverId: () => string
   timers: Timers
   platform: DesktopPlatform
@@ -52,6 +55,7 @@ export const attachMusicPlayer = ({
   config,
   sources,
   relay,
+  downloads,
   serverId,
   timers,
   platform,
@@ -83,8 +87,7 @@ export const attachMusicPlayer = ({
       await Promise.all(engineOptionsFor({ surface }).map((option) => mpv.set(option)))
       const service = createAudioService({
         mpv,
-        resolve: (mediaId) =>
-          sources.resolve({ kind: PLAYER_SOURCE_KINDS.server, serverId: serverId(), mediaId }),
+        resolve: createMusicResolve({ sources, downloads, serverId }),
         explain: sources.explain,
         closeLoad: (target) => relay.close(target.relay.loadId),
         canChooseAo: mode === ENGINE_MODES.window,

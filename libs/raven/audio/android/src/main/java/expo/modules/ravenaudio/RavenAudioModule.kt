@@ -42,6 +42,17 @@ class AudioItem : Record {
   )
 }
 
+/** One entry of the car's lists as the app answers it: see `BrowseNode` in `src/contract.ts`. */
+class BrowseNodeRecord : Record {
+  @Field val id: String = ""
+  @Field val title: String = ""
+  @Field val subtitle: String? = null
+  @Field val artworkUri: String? = null
+  @Field val isPlayable: Boolean = false
+
+  fun toNode() = BrowseNode(id = id, title = title, subtitle = subtitle, artworkUri = artworkUri, isPlayable = isPlayable)
+}
+
 /** The one event the module emits; its `type` says which player event it carries. */
 private const val AUDIO_EVENT = "onAudioEvent"
 
@@ -129,7 +140,17 @@ class RavenAudioModule : Module() {
     Name("RavenAudio")
     Events(AUDIO_EVENT)
 
+    // While the module lives, Android Auto's requests reach JS through it.
+    OnCreate {
+      RavenBrowse.ask = { requestId, parentId ->
+        sendEvent(AUDIO_EVENT, mapOf("type" to AudioEventTypes.BROWSE, "requestId" to requestId, "parentId" to parentId))
+      }
+      RavenBrowse.play = { id -> sendEvent(AUDIO_EVENT, mapOf("type" to AudioEventTypes.PLAY_FROM_BROWSE, "id" to id)) }
+    }
+
     OnDestroy {
+      RavenBrowse.ask = null
+      RavenBrowse.play = null
       letGo()
     }
 
@@ -164,6 +185,14 @@ class RavenAudioModule : Module() {
       // ExoPlayer stretches time and keeps a voice's pitch, as an audiobook's speed needs.
       playbackRate = rate.toFloat()
       withService(promise) { service -> service.player.setPlaybackSpeed(playbackRate) }
+    }.runOnQueue(Queues.MAIN)
+
+    AsyncFunction("answerBrowse") { requestId: String, nodes: List<BrowseNodeRecord>, artworkHeaders: Map<String, String> ->
+      RavenBrowse.answer(requestId, BrowseAnswer(nodes.map { it.toNode() }, artworkHeaders))
+    }.runOnQueue(Queues.MAIN)
+
+    AsyncFunction("clearBrowseCache") {
+      appContext.reactContext?.let(RavenBrowse::clear)
     }.runOnQueue(Queues.MAIN)
 
     AsyncFunction("stop") { promise: Promise ->

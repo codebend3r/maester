@@ -14,8 +14,16 @@ import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
 export const CALL_TIMEOUT_MS = 10_000
 export const MAX_REPLY_CHARS = 1_048_576
-/** `getSagas` answers every saga of a library with a whole `MediaItem` per movie, so it reads past the usual cap. */
-export const MAX_SAGAS_REPLY_CHARS = 8 * 1_048_576
+/**
+ * `getSagas` answers every saga of a library with a whole `MediaItem` per movie, and `getPlaylist`
+ * a whole `Track` per track of up to 5000, so they read past the usual cap.
+ */
+export const MAX_LONG_REPLY_CHARS = 8 * 1_048_576
+
+const LONG_REPLY_CALLS: ReadonlySet<AllowedCall['name']> = new Set([
+  CALL_NAMES.getSagas,
+  CALL_NAMES.getPlaylist,
+])
 export const MAX_IN_FLIGHT = 6
 /** Slots past `MAX_IN_FLIGHT` that only a `PUT` or `POST` may take, so reads never starve a save or a ticket. */
 export const WRITE_RESERVE = 2
@@ -43,9 +51,16 @@ export type ServerFetch = (
   input: ServerFetchProps,
 ) => Promise<{ status: number; text: (input: TextProps) => Promise<string> }>
 
+/** A call refused because the server already has every slot in flight; it is worth asking again. */
+type BusyRefusal = { ok: false; message: string; isBusy: true }
+
 export type ServerCallResult =
   | { ok: true; status: number; body: string }
   | { ok: false; message: string }
+  | BusyRefusal
+
+export const isBusyRefusal = (result: ServerCallResult): result is BusyRefusal =>
+  !result.ok && 'isBusy' in result && result.isBusy
 
 type CallProps = {
   serverId: string
@@ -134,7 +149,7 @@ const headersFor = ({ body, token, unlock }: HeadersForProps): Record<string, st
 
 /** How many characters of a call's reply main reads. */
 export const replyCapFor = (call: AllowedCall): number =>
-  call.name === CALL_NAMES.getSagas ? MAX_SAGAS_REPLY_CHARS : MAX_REPLY_CHARS
+  LONG_REPLY_CALLS.has(call.name) ? MAX_LONG_REPLY_CHARS : MAX_REPLY_CHARS
 
 const reasonOf = (error: unknown): string => (error instanceof Error ? error.message : 'unknown')
 
@@ -214,7 +229,9 @@ export const createServerCalls = ({
 
   /** One request to the server, in one of its slots. */
   const attempt = async ({ server, call, token }: AttemptProps): Promise<ServerCallResult> => {
-    if (isBusy({ server, call })) return { ok: false, message: CALL_MESSAGES.busy(server.name) }
+    if (isBusy({ server, call })) {
+      return { ok: false, message: CALL_MESSAGES.busy(server.name), isBusy: true }
+    }
     adjust({ serverId: server.id, by: 1 })
     try {
       return await request({ server, call, token })

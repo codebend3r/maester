@@ -448,7 +448,7 @@ describe('ravenQueriesFor', () => {
     expect(queryKeys.recentAlbums({ libraryId: 2, limit: 2 })).toEqual(query.queryKey)
     const cache = new QueryClient()
     const { result } = renderQueryHook({ client: cache, hook: () => useQuery(query) })
-    await waitFor(() => expect(result.current.data?.map(({ id }) => id)).toEqual([1, 2]))
+    await waitFor(() => expect((result.current.data ?? []).map(({ id }) => id)).toEqual([1, 2]))
     expect(calls.map(({ url }) => url)).toEqual(['/api/libraries/2/albums?sort=added&limit=2'])
     cache.clear()
   })

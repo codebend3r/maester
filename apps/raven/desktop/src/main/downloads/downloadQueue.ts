@@ -48,7 +48,7 @@ import {
   fits,
   partPathFor,
   readSpace,
-  videoPathFor,
+  mediaPathFor,
   type SpaceFs,
 } from '@/main/downloads/space'
 import { createSidecarDownload } from '@/main/downloads/sidecarDownload'
@@ -607,7 +607,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     }
     const job: Job = { entry, server, signal, disk, held }
     // A crash between the rename and the next save leaves the video whole and the file not ready.
-    const whole = await fs.size(videoPathFor(partsOf(entry)))
+    const whole = await fs.size(mediaPathFor(partsOf(entry)))
     if (signal.aborted) return
     if (whole === entry.size) {
       store.update((state) => finish(state, { downloadId }))
@@ -646,7 +646,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     if (signal.aborted) return
     await fs.rename({
       from: partPathFor(partsOf(entry)),
-      to: videoPathFor(partsOf(entry)),
+      to: mediaPathFor(partsOf(entry)),
     })
     // The video is in place, so the file is ready whatever was asked of it meanwhile.
     store.update((state) => finish(setSidecars(state, { downloadId, sidecars }), { downloadId }))

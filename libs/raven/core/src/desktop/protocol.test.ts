@@ -24,6 +24,7 @@ import {
   isDownloadAsk,
   isDownloadAskStatus,
   isDownloadGroup,
+  isMusicGroup,
   isDownloadKind,
   isDownloadStatus,
   isDownloadView,
@@ -97,6 +98,7 @@ const VIEW = {
     changedAt: '2026-10-16T00:00:00.000Z',
   },
   createdAt: 1_700_000_000_000,
+  track: null,
 } as const
 
 const SESSION = { accessToken: 'eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJhZGEifQ.c2ln', userId: id }
@@ -834,16 +836,36 @@ describe('the download guards', () => {
   })
 
   it('accepts every kind and refuses an unknown one', () => {
-    ;['movie', 'episode', 'season', 'show', 'saga'].forEach((kind) => {
+    ;['movie', 'episode', 'season', 'show', 'saga', 'album', 'playlist'].forEach((kind) => {
       expect(isDownloadKind(kind)).toBe(true)
     })
-    expect(isDownloadKind('album')).toBe(false)
+    expect(isDownloadKind('track')).toBe(false)
   })
 
   it('accepts a group and refuses one of an unknown kind or with no key', () => {
     const group = { kind: 'season', key: 'show:4', title: 'Severance', order: 20004 }
     expect(isDownloadGroup(group)).toBe(true)
-    expect(isDownloadGroup({ ...group, kind: 'album' })).toBe(false)
+    const cover = { albumId: 12, coverVersion: 'c1' }
+    const album = { kind: 'album', key: 'album:12', title: 'Ok', order: 1, cover, sourceId: 12 }
+    expect(isDownloadGroup(album)).toBe(true)
+    expect(
+      isDownloadGroup({
+        kind: 'playlist',
+        key: 'playlist:3',
+        title: 'Mix',
+        order: 0,
+        cover: null,
+        sourceId: 3,
+      }),
+    ).toBe(true)
+    expect(isDownloadGroup({ ...album, cover: { albumId: 12, coverVersion: null } })).toBe(true)
+    expect(isDownloadGroup({ kind: 'album', key: 'album:12', title: 'Ok', order: 1 })).toBe(false)
+    expect(isMusicGroup(album)).toBe(true)
+    expect(isMusicGroup({ ...album, sourceId: undefined })).toBe(false)
+    expect(isMusicGroup({ ...album, sourceId: '12' })).toBe(false)
+    expect(isMusicGroup({ ...group, cover: null })).toBe(false)
+    expect(isDownloadGroup({ ...album, cover: { albumId: '12', coverVersion: null } })).toBe(false)
+    expect(isDownloadGroup({ ...group, kind: 'track' })).toBe(false)
     expect(isDownloadGroup({ kind: 'season', title: 'Severance', order: 20004 })).toBe(false)
     expect(isDownloadGroup({ ...group, key: 4 })).toBe(false)
     expect(isDownloadGroup({ kind: 'season', key: 'show:4', title: 'Severance' })).toBe(false)
@@ -870,7 +892,8 @@ describe('the download ask and views', () => {
     expect(isDownloadAskStatus({ kind: 'locked' })).toBe(true)
     expect(isDownloadAskStatus({ kind: DOWNLOAD_ASK_KINDS.account })).toBe(true)
     expect(isDownloadAskStatus({ kind: 'hidden' })).toBe(false)
-    expect(isDownloadAskStatus({ ...READY, downloadKind: 'album' })).toBe(false)
+    expect(isDownloadAskStatus({ ...READY, downloadKind: 'album' })).toBe(true)
+    expect(isDownloadAskStatus({ ...READY, downloadKind: 'track' })).toBe(false)
     expect(isDownloadAskStatus({ ...READY, files: '3' })).toBe(false)
   })
 
@@ -896,6 +919,31 @@ describe('the download ask and views', () => {
       false,
     )
     expect(isDownloadView({ ...VIEW, facts: { ...VIEW.facts, pixels: 'big' } })).toBe(false)
+  })
+
+  it("carries a track's `Track`, and refuses one that is not a track", () => {
+    const track = {
+      id: 101,
+      libraryId: 3,
+      albumId: 7,
+      title: 'Airbag',
+      disc: 1,
+      number: 1,
+      duration: 284,
+      artists: [{ id: 1, name: 'Radiohead' }],
+      container: 'flac',
+      codec: 'flac',
+      bitrate: 900_000,
+      sampleRate: 44_100,
+      bitDepth: 16,
+      isLossless: true,
+      mbid: null,
+      addedAt: '2026-01-01T00:00:00Z',
+      album: { title: 'OK Computer', coverVersion: null },
+    }
+    expect(isDownloadView({ ...VIEW, track })).toBe(true)
+    expect(isDownloadView({ ...VIEW, track: { ...track, disc: 'one' } })).toBe(false)
+    expect(isDownloadView({ ...VIEW, track: undefined })).toBe(false)
   })
 
   it('names its server by an opaque id, never an origin', () => {

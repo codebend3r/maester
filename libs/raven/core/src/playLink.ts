@@ -29,9 +29,15 @@ export const playLinkFor = ({ origin, mediaId, at, next }: PlayRequest): string 
   return `raven://play?${query}&${toQueryString({ next: queue.join(',') })}`
 }
 
-export const DOWNLOAD_TARGET_KINDS = { media: 'media', item: 'item', saga: 'saga' } as const
+export const DOWNLOAD_TARGET_KINDS = {
+  media: 'media',
+  item: 'item',
+  saga: 'saga',
+  album: 'album',
+  playlist: 'playlist',
+} as const
 
-/** What a download link asks the desktop to keep: one file, one title, or one collection of a library. */
+/** What a download link asks the desktop to keep: one file, one title, one collection of a library, an album or a playlist. */
 export const isDownloadTarget = union(
   object({ kind: oneOf([DOWNLOAD_TARGET_KINDS.media]), mediaId: isMediaId }),
   object({ kind: oneOf([DOWNLOAD_TARGET_KINDS.item]), itemId: isMediaId }),
@@ -40,6 +46,8 @@ export const isDownloadTarget = union(
     libraryId: isMediaId,
     tmdbId: isSagaId,
   }),
+  object({ kind: oneOf([DOWNLOAD_TARGET_KINDS.album]), albumId: isMediaId }),
+  object({ kind: oneOf([DOWNLOAD_TARGET_KINDS.playlist]), playlistId: isMediaId }),
 )
 
 export type DownloadTarget = Infer<typeof isDownloadTarget>
@@ -66,6 +74,16 @@ export const downloadLinkFor = ({ origin, target }: DownloadRequest): string => 
       }
       const saga = `${target.libraryId}:${target.tmdbId}`
       return `raven://download?${toQueryString({ server: origin, saga })}`
+    }
+    case DOWNLOAD_TARGET_KINDS.album: {
+      if (!isMediaId(target.albumId)) throw new RangeError(`${target.albumId} is not an album id`)
+      return `raven://download?${toQueryString({ server: origin, album: String(target.albumId) })}`
+    }
+    case DOWNLOAD_TARGET_KINDS.playlist: {
+      if (!isMediaId(target.playlistId)) {
+        throw new RangeError(`${target.playlistId} is not a playlist id`)
+      }
+      return `raven://download?${toQueryString({ server: origin, playlist: String(target.playlistId) })}`
     }
     default: {
       const unreachable: never = target

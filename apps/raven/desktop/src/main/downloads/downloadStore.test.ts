@@ -3,9 +3,12 @@ import { describe, expect, it } from 'bun:test'
 import { EMPTY_DOWNLOADS, NO_PENDING, queue } from '@/main/downloads/downloadState'
 import { DOWNLOADS_DEBOUNCE_MS, loadDownloads } from '@/main/downloads/downloadStore'
 import type { StateFs } from '@/main/stateStore'
+import { entry } from '@/main/test/downloadEntries'
+import { track } from '@/main/test/serverFakes'
 
 const FILE = '/data/downloads.json'
 const NOW = 1700000000000
+const TRACK = track({ id: 31 })
 
 const missing = (): Error => Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
 
@@ -77,11 +80,54 @@ describe('loadDownloads', () => {
           serverPosition: 0,
           pending: NO_PENDING,
           createdAt: 1,
+          track: undefined,
         },
       ],
     })
     const { fs } = createFakeFs({ [FILE]: JSON.stringify(written) })
     expect(await load(fs)).toEqual({ state: written, wasSetAside: false })
+  })
+
+  it("loads a track's entry with its `Track` and its group's id", async () => {
+    const kept = {
+      downloadId: '00000000-0000-4000-8000-000000000001',
+      serverId: '11111111-1111-4111-8111-111111111111',
+      mediaId: 31,
+      label: 'Airbag',
+      group: {
+        kind: DOWNLOAD_KINDS.album,
+        key: 'album:7',
+        title: 'OK Computer',
+        order: 0,
+        cover: { albumId: 7, coverVersion: null },
+        sourceId: 7,
+      },
+      container: 'flac',
+      size: 1000,
+      duration: 284,
+      watchedPercent: 90,
+      sidecars: [],
+      status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+      autoDelete: false,
+      watchedAt: null,
+      serverPosition: 0,
+      pending: NO_PENDING,
+      createdAt: 1,
+      track: TRACK,
+    }
+    const written = { ...EMPTY_DOWNLOADS, entries: [kept] }
+    const { fs } = createFakeFs({ [FILE]: JSON.stringify(written) })
+    expect(await load(fs)).toEqual({
+      state: { ...EMPTY_DOWNLOADS, entries: [kept] },
+      wasSetAside: false,
+    })
+  })
+
+  it('sets aside a file whose kept track is not a track', async () => {
+    const notATrack = { ...entry(), track: { ...TRACK, disc: 'one' } }
+    const text = JSON.stringify({ ...EMPTY_DOWNLOADS, entries: [notATrack] })
+    const { fs } = createFakeFs({ [FILE]: text })
+    expect(await load(fs)).toEqual({ state: EMPTY_DOWNLOADS, wasSetAside: true })
   })
 
   it('upgrades a version 1 file, whose pending and owed belong to no account', async () => {
@@ -117,7 +163,7 @@ describe('loadDownloads', () => {
     expect(await load(fs)).toEqual({
       state: {
         ...EMPTY_DOWNLOADS,
-        entries: [{ ...entryV1, pending: shared }],
+        entries: [{ ...entryV1, pending: shared, track: undefined }],
         autoDeleteDefault: true,
         owed: [{ ...owedV1, pending: shared }],
       },

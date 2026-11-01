@@ -1,6 +1,7 @@
 ---
 name: run-tvos-e2e
-description: Use when running the `📺 App on Apple TV` PR check locally on a Mac, or `app:e2e:tvos`: "run the Apple TV CI locally", "run the tvOS e2e", "run the Siri Remote test", "reproduce the app-tvos job", "the Apple TV check failed, run it here", "run ci:app:tvos". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
+description: >-
+  Use when running the `📺 App on Apple TV` PR check locally on a Mac, or `app:e2e:tvos`: "run the Apple TV CI locally", "run the tvOS e2e", "run the Siri Remote test", "reproduce the app-tvos job", "the Apple TV check failed, run it here", "run ci:app:tvos". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
 ---
 
 # Run the Apple TV check locally

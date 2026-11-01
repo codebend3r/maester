@@ -196,6 +196,8 @@ describe('readDownloadLink', () => {
     ['media=7', { kind: 'media', mediaId: 7 }],
     ['item=10', { kind: 'item', itemId: 10 }],
     ['saga=1%3A100', { kind: 'saga', libraryId: 1, tmdbId: '100' }],
+    ['album=12', { kind: 'album', albumId: 12 }],
+    ['playlist=5', { kind: 'playlist', playlistId: 5 }],
   ])('reads %s', (query, target) => {
     expect(readDownloadLink(`${base}&${query}`)).toEqual({
       origin: 'https://raven.example',
@@ -207,6 +209,8 @@ describe('readDownloadLink', () => {
     { origin: 'https://raven.example', target: { kind: 'media', mediaId: 7 } },
     { origin: 'http://[::1]:3000', target: { kind: 'item', itemId: 9007199254740991 } },
     { origin: 'https://raven.example', target: { kind: 'saga', libraryId: 2, tmdbId: '86311' } },
+    { origin: 'https://raven.example', target: { kind: 'album', albumId: 12 } },
+    { origin: 'https://raven.example', target: { kind: 'playlist', playlistId: 5 } },
   ])('reads back what downloadLinkFor wrote for %p', (request) => {
     expect(readDownloadLink(downloadLinkFor(request))).toEqual(request)
   })
@@ -228,6 +232,12 @@ describe('readDownloadLink', () => {
   it.each([
     ['two targets at once', `${base}&media=7&item=10`],
     ['all three targets', `${base}&media=7&item=10&saga=1%3A100`],
+    ['an album and a playlist', `${base}&album=12&playlist=5`],
+    ['an album and a media', `${base}&album=12&media=7`],
+    ['album=0', `${base}&album=0`],
+    ['album=012', `${base}&album=012`],
+    ['playlist=abc', `${base}&playlist=abc`],
+    ['playlist past safe integers', `${base}&playlist=9007199254740992`],
     ['no target', base],
     ['a repeated media', `${base}&media=7&media=8`],
     ['a repeated server', `${base}&${server}&media=7`],

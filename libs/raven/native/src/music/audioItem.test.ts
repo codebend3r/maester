@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import {
   APP_CALL_METHODS,
   APP_CLIENT_CALLS,
+  AUDIO_BITRATES,
+  AUDIO_BITRATE_PARAM,
   AUDIO_CODECS,
   AUDIO_PLATFORMS,
   MAX_HEIGHTS,
@@ -9,9 +11,10 @@ import {
   type Track,
   appClientCallOf,
   createApiClient,
+  toQueryString,
 } from '@raven/core'
 
-import { audioItemOf } from '@/music/audioItem'
+import { type TrackPlan, audioItemOf } from '@/music/audioItem'
 import { mediaAccessFor } from '@/servers/mediaAccess'
 
 const ORIGIN = 'https://raven.example'
@@ -75,18 +78,29 @@ const ravenServer = () => {
   return { server: { api, sources }, heard }
 }
 
-describe('audioItemOf', () => {
-  it('gives no item for an ALAC track on Android, whose player plays it silent', async () => {
-    const { server, heard } = ravenServer()
-    expect(
-      await audioItemOf({ server, track: ALAC_AIRBAG, platform: AUDIO_PLATFORMS.android }),
-    ).toBeNull()
-    expect(heard).toEqual([])
-  })
+/** Wren's plan with nothing downloaded and the device on Wi-Fi: the file itself plays. */
+const ON_WIFI: TrackPlan = { downloadedOf: () => null, streamKbps: async () => null }
 
+const ON_CELLULAR: TrackPlan = { ...ON_WIFI, streamKbps: async () => AUDIO_BITRATES.standard }
+
+const DOWNLOADED_URI = 'file:///data/Documents/downloads/raven/101/media.m4a'
+const SAVED_COVER = 'file:///data/Documents/downloads/raven/101/cover.jpg'
+
+const transcodeUri = (kbps: number) =>
+  `${ORIGIN}/api/media/${AIRBAG.id}/transcode?${toQueryString({
+    [AUDIO_BITRATE_PARAM]: String(kbps),
+    [MEDIA_TICKET_PARAM]: TICKET,
+  })}`
+
+describe('audioItemOf', () => {
   it("plays a FLAC track on an iPhone from the file itself, by its ticket, with the lock screen's details", async () => {
     const { server } = ravenServer()
-    const item = await audioItemOf({ server, track: AIRBAG, platform: AUDIO_PLATFORMS.apple })
+    const item = await audioItemOf({
+      server,
+      track: AIRBAG,
+      platform: AUDIO_PLATFORMS.apple,
+      plan: ON_WIFI,
+    })
     expect(item).toEqual({
       id: AIRBAG.id,
       uri: `${ORIGIN}/api/media/${AIRBAG.id}/file?${MEDIA_TICKET_PARAM}=${TICKET}`,
@@ -99,9 +113,53 @@ describe('audioItemOf', () => {
     })
   })
 
-  it('plays ALAC on an iPhone, which decodes it', async () => {
+  it('plays a downloaded track from its file with no headers and its saved cover, asking the server nothing', async () => {
+    const { server, heard } = ravenServer()
+    const item = await audioItemOf({
+      server,
+      track: AIRBAG,
+      platform: AUDIO_PLATFORMS.android,
+      plan: {
+        ...ON_CELLULAR,
+        downloadedOf: () => ({ uri: DOWNLOADED_URI, artworkUri: SAVED_COVER }),
+      },
+    })
+    expect(item.uri).toBe(DOWNLOADED_URI)
+    expect(item.headers).toEqual({})
+    expect(item.artworkUri).toBe(SAVED_COVER)
+    expect(heard).toEqual([])
+  })
+
+  it('streams the transcode at the cellular bitrate on a mobile network', async () => {
     const { server } = ravenServer()
-    const item = await audioItemOf({ server, track: ALAC_AIRBAG, platform: AUDIO_PLATFORMS.apple })
-    expect(item?.id).toBe(AIRBAG.id)
+    const item = await audioItemOf({
+      server,
+      track: AIRBAG,
+      platform: AUDIO_PLATFORMS.apple,
+      plan: ON_CELLULAR,
+    })
+    expect(item.uri).toBe(transcodeUri(AUDIO_BITRATES.standard))
+  })
+
+  it('plays ALAC on Android from the transcode, since its player plays the file silent', async () => {
+    const { server } = ravenServer()
+    const item = await audioItemOf({
+      server,
+      track: ALAC_AIRBAG,
+      platform: AUDIO_PLATFORMS.android,
+      plan: ON_WIFI,
+    })
+    expect(item.uri).toBe(transcodeUri(AUDIO_BITRATES.standard))
+  })
+
+  it('plays ALAC on an iPhone from the file, which it decodes', async () => {
+    const { server } = ravenServer()
+    const item = await audioItemOf({
+      server,
+      track: ALAC_AIRBAG,
+      platform: AUDIO_PLATFORMS.apple,
+      plan: ON_WIFI,
+    })
+    expect(item.uri).toBe(`${ORIGIN}/api/media/${AIRBAG.id}/file?${MEDIA_TICKET_PARAM}=${TICKET}`)
   })
 })

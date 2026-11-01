@@ -60,6 +60,7 @@ export const viewOf = (overrides: Partial<DownloadView> = {}): DownloadView => (
     changedAt: '2026-10-16T00:00:00.000Z',
   },
   createdAt: 1_700_000_000_000,
+  track: null,
   ...overrides,
 })
 

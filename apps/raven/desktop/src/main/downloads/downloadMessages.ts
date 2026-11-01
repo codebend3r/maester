@@ -15,6 +15,8 @@ const FILE_NOUNS = {
   [DOWNLOAD_KINDS.episode]: 'episodes',
   [DOWNLOAD_KINDS.season]: 'episodes',
   [DOWNLOAD_KINDS.show]: 'episodes',
+  [DOWNLOAD_KINDS.album]: 'tracks',
+  [DOWNLOAD_KINDS.playlist]: 'tracks',
 } as const satisfies Record<DownloadKind, string>
 
 type QueuedProps = {

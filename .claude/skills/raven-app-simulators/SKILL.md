@@ -1,6 +1,7 @@
 ---
 name: raven-app-simulators
-description: Use when trying, previewing or testing the raven device app (`apps/raven/app`) on iPhone, iPad or Apple TV simulators, above all the first time on a Mac. Covers `open -a Simulator` failing with "Unable to find application named 'Simulator'", `pod install` failing with "Error installing ExpoModulesCore", `build:ios` failing at `SwiftExplicitDependencyGeneratePcm x86_64`, "No devices are booted", and the app showing "fetch failed: Could not connect to the server."
+description: >-
+  Use when trying, previewing or testing the raven device app (`apps/raven/app`) on iPhone, iPad or Apple TV simulators, above all the first time on a Mac. Covers `open -a Simulator` failing with "Unable to find application named 'Simulator'", `pod install` failing with "Error installing ExpoModulesCore", `build:ios` failing at `SwiftExplicitDependencyGeneratePcm x86_64`, "No devices are booted", and the app showing "fetch failed: Could not connect to the server."
 ---
 
 # raven app on the simulators

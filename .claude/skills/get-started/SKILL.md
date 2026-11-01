@@ -1,6 +1,7 @@
 ---
 name: get-started
-description: Use when setting up maester on a new machine or fresh clone, onboarding to the repo, installing everything needed to run its commands (dev servers, prebuilds, builds, unit and e2e tests, lint, typecheck, format), or when `bun run verify` (or the lefthook pre-push hook, which runs the same checks) fails on tasks nobody changed. Covers errors like "Failed to inspect Python interpreter", "Bad CPU type in executable", `Executable not found in $PATH: "ffmpeg"`, `uvx: command not found`, `nx: command not found` or `ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING` on `nx login`, `maestro: command not found` on `app:e2e`, a missing `pod`, `watchman` or Xcode, a wrong Bun version, or `bun run mpv:native` failing with missing source archives or `native-build/prefix/bin/ffmpeg ENOENT`.
+description: >-
+  Use when setting up maester on a new machine or fresh clone, onboarding to the repo, installing everything needed to run its commands (dev servers, prebuilds, builds, unit and e2e tests, lint, typecheck, format), or when `bun run verify` (or the lefthook pre-push hook, which runs the same checks) fails on tasks nobody changed. Covers errors like "Failed to inspect Python interpreter", "Bad CPU type in executable", `Executable not found in $PATH: "ffmpeg"`, `uvx: command not found`, `nx: command not found` or `ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING` on `nx login`, `maestro: command not found` on `app:e2e`, a missing `pod`, `watchman` or Xcode, a wrong Bun version, or `bun run mpv:native` failing with missing source archives or `native-build/prefix/bin/ffmpeg ENOENT`.
 ---
 
 # Get started

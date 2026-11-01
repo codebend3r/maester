@@ -14,11 +14,13 @@ import {
   isRecord,
   isSidecarTrackId,
   isString,
+  isTrack,
   isWatchedPercent,
   listOf,
   nullable,
   object,
   oneOf,
+  optional,
   union,
 } from '@raven/core'
 
@@ -109,6 +111,8 @@ const ENTRY_FIELDS = {
    */
   serverPosition: isNumber,
   createdAt: isNumber,
+  /** A track's `Track`, kept so Downloads queues it with no server; none for a video. */
+  track: optional(isTrack),
 }
 
 const isEntryBase = object({ ...ENTRY_FIELDS, pending: isPending })

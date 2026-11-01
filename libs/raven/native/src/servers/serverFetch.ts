@@ -8,13 +8,16 @@ export const FETCH_CREDENTIALS = { omit: 'omit' } as const
 
 export const RESPONSE_HEADERS = { setCookie: 'set-cookie' } as const
 
+/** What the app hands React Native's `fetch`: a request told to leave cookies alone. */
+type NativeFetchProps = FetchInit & { credentials: typeof FETCH_CREDENTIALS.omit }
+
 /**
  * React Native's `fetch` as the app calls it: told to leave cookies alone, with headers to
  * read back and `url`, where the request ended after any redirect ('' when not reported).
  */
 export type NativeFetch = (
   url: string,
-  init: FetchInit & { credentials: typeof FETCH_CREDENTIALS.omit },
+  init: NativeFetchProps,
 ) => Promise<FetchResponse & { url: string; headers: { get: (name: string) => string | null } }>
 
 type ServerFetchForProps = {

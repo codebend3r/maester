@@ -1,10 +1,13 @@
 import type {
+  AlbumDetails,
   EpisodeSummary,
   ItemDetails,
   ItemSummary,
   Library,
   MediaItem,
+  PlaylistDetails,
   SeasonSummary,
+  Track,
 } from '@raven/core'
 import { RATINGS_REFRESH_STATES } from '@raven/core'
 import { requestFor, type AllowedCall } from '@/main/servers/allowlist'
@@ -145,4 +148,65 @@ export const season = ({ id, number }: SeasonProps): SeasonSummary => ({
   type: 'season',
   episodeCount: 2,
   watchedCount: 0,
+})
+
+const RADIOHEAD = { id: 1, name: 'Radiohead' }
+
+/** A FLAC track of OK Computer, album 7 in music library 3. */
+export const track = (overrides: Partial<Track>): Track => ({
+  id: 101,
+  libraryId: 3,
+  albumId: 7,
+  title: 'Airbag',
+  disc: 1,
+  number: 1,
+  duration: 200,
+  artists: [RADIOHEAD],
+  container: 'flac',
+  codec: 'flac',
+  bitrate: 900_000,
+  sampleRate: 44_100,
+  bitDepth: 16,
+  isLossless: true,
+  mbid: null,
+  addedAt: '2026-01-01T00:00:00Z',
+  album: { title: 'OK Computer', coverVersion: 'cover-v1' },
+  ...overrides,
+})
+
+export const albumDetails = (tracks: Track[]): AlbumDetails => ({
+  album: {
+    id: 7,
+    libraryId: 3,
+    title: 'OK Computer',
+    sortTitle: 'OK Computer',
+    year: 1997,
+    releaseDate: null,
+    type: 'album',
+    artists: [RADIOHEAD],
+    isCompilation: false,
+    trackCount: tracks.length,
+    duration: 0,
+    coverVersion: 'cover-v1',
+    match: 'matched',
+    addedAt: '2026-01-01T00:00:00Z',
+  },
+  label: null,
+  genres: [],
+  mbid: null,
+  discCount: 2,
+  tracks,
+  isFavourite: false,
+})
+
+export const playlistDetails = (tracks: Track[]): PlaylistDetails => ({
+  playlist: {
+    id: 5,
+    name: 'Late night',
+    trackCount: tracks.length,
+    duration: 0,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  tracks,
 })

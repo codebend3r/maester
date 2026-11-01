@@ -5,6 +5,7 @@ export const PLAYER_MESSAGES = {
     'That video is no longer open. Open it again from the files on this computer or from Downloads.',
   cannotOpen: 'Raven could not open this video.',
   stopped: 'Raven could not keep playing this video.',
+  trackStopped: 'Raven could not keep playing this track.',
   engineStopped: ENGINE_STOPPED,
   noTrack: 'That track is not in this video.',
   failed: 'Raven could not do that.',
