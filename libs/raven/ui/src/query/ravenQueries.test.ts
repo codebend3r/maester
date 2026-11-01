@@ -14,6 +14,7 @@ import {
   MATCH_STATES,
   MATCH_SUBJECT_KINDS,
   MEDIA_SORTS,
+  MIX_KINDS,
   MUSIC_PAGE,
   MUSIC_SORTS,
 } from '@raven/core'
@@ -208,6 +209,30 @@ const QUERIES = [
     call: (api) => api.getPlaylist(5),
   }),
   asking({
+    name: 'scrobblingQuery',
+    key: queryKeys.scrobbling,
+    pick: (queries) => queries.scrobblingQuery,
+    call: (api) => api.getScrobbling(),
+  }),
+  asking({
+    name: 'mixesQuery',
+    key: queryKeys.mixes,
+    pick: (queries) => queries.mixesQuery,
+    call: (api) => api.listMixes(),
+  }),
+  asking({
+    name: 'mixQuery',
+    key: queryKeys.mix(MIX_KINDS.rediscover),
+    pick: (queries) => queries.mixQuery(MIX_KINDS.rediscover),
+    call: (api) => api.getMix({ id: MIX_KINDS.rediscover }),
+  }),
+  asking({
+    name: 'recentMusicQuery',
+    key: queryKeys.recentMusic,
+    pick: (queries) => queries.recentMusicQuery,
+    call: (api) => api.getRecentAlbums(),
+  }),
+  asking({
     name: 'lyricsQuery',
     key: queryKeys.lyrics(101),
     pick: (queries) => queries.lyricsQuery(101),
@@ -394,6 +419,11 @@ const WAITING = [
     name: 'playlistQuery',
     key: queryKeys.playlist(null),
     pick: (queries) => queries.playlistQuery(null),
+  }),
+  waiting({
+    name: 'mixQuery',
+    key: queryKeys.mix(null),
+    pick: (queries) => queries.mixQuery(null),
   }),
   waiting({
     name: 'lyricsQuery',

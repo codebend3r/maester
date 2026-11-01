@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import {
   LASTFM_AUTH_PAGE,
+  LASTFM_ERRORS,
+  LASTFM_METHODS,
   LASTFM_PARAMS,
   LastFmScrobbler,
   signed,
@@ -22,10 +24,19 @@ const LISTEN = {
 
 describe('LastFmScrobbler', () => {
   it("signs a call as Last.fm's docs spell it: names sorted, name then value, the secret, md5", () => {
-    const params = { token: 'tok', method: 'auth.getSession', api_key: 'key', format: 'json' }
+    const params = {
+      token: 'tok',
+      method: LASTFM_METHODS.getSession,
+      api_key: 'key',
+      format: 'json',
+    }
     expect(
       signed({ params, keys: { apiKey: 'key', apiSecret: 'secret' } })[LASTFM_PARAMS.apiSig],
-    ).toBe(createHash('md5').update('api_keykeymethodauth.getSessiontokentoksecret').digest('hex'))
+    ).toBe(
+      createHash('md5')
+        .update(`api_keykeymethod${LASTFM_METHODS.getSession}tokentoksecret`)
+        .digest('hex'),
+    )
   })
 
   it("sends the account to Last.fm's page with raven's key and the callback", () => {
@@ -57,7 +68,7 @@ describe('LastFmScrobbler', () => {
     await expect(lastFm.send({ secret: 'gone', listen: LISTEN })).resolves.toBe(
       SEND_OUTCOMES.unlinked,
     )
-    fake.setScrobbleError({ error: 16 })
+    fake.setScrobbleError({ error: LASTFM_ERRORS.temporary })
     await expect(lastFm.send({ secret: session?.secret ?? '', listen: LISTEN })).resolves.toBe(
       SEND_OUTCOMES.retry,
     )

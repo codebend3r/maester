@@ -308,7 +308,7 @@ describe('Open videos in Raven on SettingsPage', () => {
   it('sits in Playback, off until this browser turns it on', async () => {
     renderWithProviders({ ui: <SettingsPage />, playback: null })
     const playback = screen.getByRole('region', { name: 'Playback' })
-    expect(within(playback).queryByRole('radio')).toBeNull()
+    expect(within(playback).queryByRole('radio', { name: /Remux only/ })).toBeNull()
     expect(within(playback).getByRole('heading', { name: 'This browser' })).toBeInTheDocument()
     expect(toggle()).not.toBeChecked()
     expect(toggle().closest('label')).toHaveTextContent(
@@ -365,7 +365,9 @@ describe('Autoplay on SettingsPage', () => {
   it('sets how long the countdown runs, from 5 to 60 seconds, 15 at first', () => {
     renderWithProviders({ ui: <SettingsPage />, playback: null })
     const playback = screen.getByRole('region', { name: 'Playback' })
-    expect(within(playback).getByRole('slider')).toBe(slider())
+    expect(
+      within(playback).getByRole('slider', { name: 'Count down to what is up next for' }),
+    ).toBe(slider())
     expect(slider()).toHaveValue('15')
     expect(slider()).toHaveAttribute('min', '5')
     expect(slider()).toHaveAttribute('max', '60')
@@ -420,7 +422,7 @@ describe('Advanced on SettingsPage', () => {
     })
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(['Playback', 'Advanced'])
+    ).toEqual(['Playback', 'Scrobbling', 'Advanced'])
     expect(slider()).toBeEnabled()
   })
 })
@@ -456,7 +458,7 @@ describe('accounts on SettingsPage', () => {
 
   it('shows neither Account nor Users while accounts are off', () => {
     renderWithProviders({ ui: <SettingsPage /> })
-    expect(headings()).toEqual(['Playback', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Scrobbling', 'Advanced'])
     expect(spies.me).not.toHaveBeenCalled()
     expect(spies.members).not.toHaveBeenCalled()
   })
@@ -480,14 +482,14 @@ describe('accounts on SettingsPage', () => {
   it('shows Account but not Users to a member', async () => {
     renderSignedIn(fakeAccount())
     await screen.findByRole('heading', { name: 'Account' })
-    expect(headings()).toEqual(['Playback', 'Account', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Account', 'Scrobbling', 'Advanced'])
     expect(spies.members).not.toHaveBeenCalled()
   })
 
   it('keeps admin settings and Users off the personal settings page for the owner too', async () => {
     renderSignedIn(fakeAccount({ isOwner: true }))
     await screen.findByRole('heading', { name: 'Account' })
-    expect(headings()).toEqual(['Playback', 'Account', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Account', 'Scrobbling', 'Advanced'])
     expect(spies.members).not.toHaveBeenCalled()
   })
 

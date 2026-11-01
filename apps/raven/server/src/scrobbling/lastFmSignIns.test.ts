@@ -1,3 +1,4 @@
+import { SCROBBLE_RETURNS } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LASTFM_SIGN_IN_MS, LastFmSignIns } from '@/scrobbling/lastFmSignIns'
 import { ScrobbleCipher } from '@/scrobbling/scrobbleCipher'
@@ -6,7 +7,7 @@ import { manualClock } from '@/test/clock'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS } from '@/test/repositories'
 
-const SIGN_IN = { account: TEST_ACCOUNTS.b, returnTo: 'wren://scrobbling' }
+const SIGN_IN = { account: TEST_ACCOUNTS.b, returnTo: SCROBBLE_RETURNS.wren }
 
 describe('LastFmSignIns', () => {
   const database = testDatabase('raven-lastfm-sign-ins-')

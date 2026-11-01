@@ -15,9 +15,9 @@ describe('readServerConfig', () => {
   })
 
   it('measures loudness unless LOUDNESS_SCAN turns it off', () => {
-    expect(readServerConfig({})).toMatchObject({ loudnessScan: true })
+    expect(readServerConfig({})).toMatchObject({ shouldScanLoudness: true })
     expect(readServerConfig({ [MUSIC_ENV.loudnessScan]: 'off' })).toMatchObject({
-      loudnessScan: false,
+      shouldScanLoudness: false,
     })
   })
 

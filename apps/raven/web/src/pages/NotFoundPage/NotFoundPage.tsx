@@ -1,6 +1,7 @@
 import { themeOf } from '@raven/core'
 import { ButtonLink } from '@raven/ui'
-import { BackButton, HOME } from '@/components/BackButton/BackButton'
+import { BackButton } from '@/components/BackButton/BackButton'
+import { useMusicLinks } from '@/lib/useMusicLinks'
 import { useTheme } from '@/stores/theme'
 import { NOT_FOUND_COPY } from '@/pages/NotFoundPage/copy'
 import styles from '@/pages/NotFoundPage/NotFoundPage.module.scss'
@@ -15,14 +16,16 @@ const LIBRARIES_PATH = '/libraries'
 
 /**
  * What an address that names nothing shows: a 4, an empty poster holding
- * the mark, and a 4, then the way back to the libraries or home. The three
+ * the mark, and a 4, then the way back to the libraries or home, the
+ * music mode's own Home inside it. The three
  * figures are decoration; the heading says what happened.
  */
 export const NotFoundPage = () => {
   const tone = useTheme((state) => themeOf(state.theme).tone)
+  const { home } = useMusicLinks()
   return (
     <section className={styles.page}>
-      <BackButton fallback={HOME} className={styles.back} />
+      <BackButton fallback={home} className={styles.back} />
       <div className={styles.body}>
         <p className={styles.figures} aria-hidden="true">
           <span>{NOT_FOUND_COPY.figure}</span>
@@ -37,7 +40,7 @@ export const NotFoundPage = () => {
           <ButtonLink to={LIBRARIES_PATH} tone="primary" size="large">
             {NOT_FOUND_COPY.backToLibraries}
           </ButtonLink>
-          <ButtonLink to={HOME.to} size="large">
+          <ButtonLink to={home.to} size="large">
             {NOT_FOUND_COPY.goHome}
           </ButtonLink>
         </nav>

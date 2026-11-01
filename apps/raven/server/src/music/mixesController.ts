@@ -26,6 +26,7 @@ import { Public } from '@/lock/lockGuard'
 import { ListenerScopes } from '@/music/listenerScope'
 import { Mixes } from '@/music/mixes'
 import { RADIO_OUTCOMES, Radio } from '@/music/radio'
+import { ROUTE_PARAMS } from '@/requestParts'
 
 /**
  * The calling account's mixes, radio and Home's recent albums. None is in a
@@ -52,7 +53,7 @@ export class MixesController {
 
   /** One mix by its kind, with its tracks in today's order. */
   @Get(DISCOVERY_PATHS.mix)
-  get(@Param('id') id: string, @Req() request: FastifyRequest): MixDetails {
+  get(@Param(ROUTE_PARAMS.id) id: string, @Req() request: FastifyRequest): MixDetails {
     const mix = isMixKind(id) ? this.mixes.get({ kind: id, ...this.scopes.of({ request }) }) : null
     if (mix === null) throw new NotFoundException(`No mix ${id}`)
     return mix

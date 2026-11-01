@@ -30,6 +30,7 @@
   place-content: center;
   justify-items: center;
   gap: var(--space-0);
+  min-width: 0;
   border-radius: var(--radius-md);
   color: var(--color-lichen);
   font-size: var(--font-size-2xs);
@@ -39,6 +40,10 @@
 
   &:hover {
     color: var(--color-bark);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
   }
 
   &[aria-current='page'] {
@@ -52,8 +57,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .tab {
     transition:
-      background-color 150ms ease,
-      color 150ms ease;
+      background-color 150ms var(--ease-out),
+      color 150ms var(--ease-out);
   }
 }
 

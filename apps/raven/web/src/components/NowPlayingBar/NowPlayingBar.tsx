@@ -4,7 +4,7 @@ import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { Link, useLocation } from 'react-router-dom'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { NOW_PLAYING_BAR_COPY } from '@/components/NowPlayingBar/copy'
-import { NOW_PLAYING_PATH } from '@/lib/music'
+import { useMusicLinks } from '@/lib/useMusicLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/NowPlayingBar/NowPlayingBar.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
@@ -20,12 +20,13 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
   const toggle = useAudioQueue((store) => store.toggle)
   const skipNext = useAudioQueue((store) => store.next)
   const skipPrevious = useAudioQueue((store) => store.previous)
+  const links = useMusicLinks()
   const isPlaying = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
   const fraction = duration === null || duration === 0 ? 0 : Math.min(position / duration, 1)
   return (
     <section className={styles.bar} aria-label={NOW_PLAYING_BAR_COPY.miniPlayer}>
       <Link
-        to={NOW_PLAYING_PATH}
+        to={links.nowPlaying}
         className={styles.cover}
         aria-label={NOW_PLAYING_BAR_COPY.nowPlaying}
       >
@@ -38,7 +39,7 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
           sizes={POSTER_SIZES.bar}
         />
       </Link>
-      <Link to={NOW_PLAYING_PATH} className={styles.words}>
+      <Link to={links.nowPlaying} className={styles.words}>
         <span className={styles.title}>{track.title}</span>
         <span className={styles.artists}>{error === null ? artistNames(track) : error}</span>
       </Link>
@@ -87,6 +88,13 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
  */
 export const NowPlayingBar = () => {
   const track = useAudioQueue(playingTrackOf)
+  return useIsBarShown() && track !== null && <PlayingStrip track={track} />
+}
+
+/** Whether the bar shows: while a track is queued, anywhere but Now Playing. */
+export const useIsBarShown = (): boolean => {
+  const isQueued = useAudioQueue((store) => playingTrackOf(store) !== null)
   const { pathname } = useLocation()
-  return track !== null && pathname !== NOW_PLAYING_PATH && <PlayingStrip track={track} />
+  const { nowPlaying } = useMusicLinks()
+  return isQueued && pathname !== nowPlaying
 }

@@ -1,0 +1,67 @@
+// As the album grid lays its covers out, in columns of at least 10rem.
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
+  gap: var(--space-4) var(--space-3);
+}
+
+@media (max-width: 48rem) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(7.5rem, 100%), 1fr));
+  }
+}
+
+.card {
+  display: grid;
+  gap: var(--space-0);
+  min-width: 0;
+}
+
+.cover {
+  display: grid;
+  border-radius: var(--radius-md);
+}
+
+// Four covers in a square, two by two; fewer leave their cells to the ground.
+.covers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-moss);
+}
+
+.tile {
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+
+.name {
+  overflow: hidden;
+  font-weight: 600;
+  line-height: var(--line-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+
+  a:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+.facts {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-tight);
+}

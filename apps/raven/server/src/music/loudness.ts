@@ -61,7 +61,9 @@ export const parseEbur128 = (stderr: string): Measured | null => {
   return { integrated, truePeak }
 }
 
-export const trackGainOf = ({ integrated, truePeak }: Measured): TrackGain => ({
+type TrackGainOfProps = Measured
+
+export const trackGainOf = ({ integrated, truePeak }: TrackGainOfProps): TrackGain => ({
   gain: REFERENCE_LUFS - integrated,
   peak: 10 ** (truePeak / 20),
 })

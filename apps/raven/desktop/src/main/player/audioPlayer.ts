@@ -33,7 +33,7 @@ type AttachMusicPlayerProps = {
   window: BrowserWindow
   config: ConfigStore
   /** The music relay's sources: a track's resolve and the words for its failure. */
-  sources: Pick<ReturnType<typeof createServerSources>, 'resolve' | 'explain'>
+  sources: Pick<ReturnType<typeof createServerSources>, 'resolveTrack' | 'explain'>
   relay: Pick<MediaRelay, 'close'>
   /** A track's ready download plays from its file, with no server. */
   downloads: Pick<DownloadService, 'trackPathOf'>

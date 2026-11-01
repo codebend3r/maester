@@ -54,7 +54,7 @@ describe('the loudness scan', () => {
   /** A scan over the app's own stores that is switched on, as the app's own is not under test. */
   const scan = (): LoudnessScan =>
     new LoudnessScan(
-      { ...app().get<ServerConfig>(SERVER_CONFIG), loudnessScan: true },
+      { ...app().get<ServerConfig>(SERVER_CONFIG), shouldScanLoudness: true },
       app().get(LoudnessJobs),
       app().get(FfmpegService),
     )

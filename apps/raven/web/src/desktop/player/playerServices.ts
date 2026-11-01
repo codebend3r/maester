@@ -14,7 +14,7 @@ import type { PlayerServices, ProgressSink } from '@raven/ui/headless'
 import type { DesktopClient } from '@/desktop/client'
 import { handled } from '@/desktop/handled'
 import type { MenuHub } from '@/desktop/menuHub'
-import { playPathOf } from '@/desktop/paths'
+import { type DownloadsPage, playPathOf } from '@/desktop/paths'
 import { useWindowChrome } from '@/stores/windowChrome'
 
 /** What the page leaves in `location.state` when it opens a file: the files to play after it. */
@@ -131,6 +131,8 @@ type FileServicesForProps = {
   client: DesktopClient
   menu: MenuHub
   engine: EngineUse
+  /** The Downloads a download goes back to: raven's, or the music mode's it was opened from. */
+  downloadsPage: DownloadsPage
 }
 
 /** A local file's or a download's services, as main described the file. */
@@ -139,6 +141,7 @@ export const fileServicesFor = ({
   client,
   menu,
   engine,
+  downloadsPage,
 }: FileServicesForProps): PlayerServices => ({
   title: {
     label: file.label,
@@ -146,13 +149,13 @@ export const fileServicesFor = ({
     context: file.isDownload ? file.folder : null,
     duration: null,
     resumeAt: file.resumeAt,
-    backTo: file.isDownload ? DESKTOP_PATHS.downloads : DESKTOP_PATHS.local,
+    backTo: file.isDownload ? downloadsPage : DESKTOP_PATHS.local,
     next:
       file.next === null
         ? null
         : {
             to: playPathOf(file.next.fileId),
-            state: { queue: file.next.queue },
+            state: { queue: file.next.queue, from: downloadsPage },
             label: file.next.label,
           },
   },

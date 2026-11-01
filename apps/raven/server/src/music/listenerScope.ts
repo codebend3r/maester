@@ -21,8 +21,10 @@ export type ListenerScope = {
 export const LISTENABLE = `m.library_id IN (SELECT id FROM libraries WHERE kind = @music)
                            AND m.library_id NOT IN (SELECT value FROM json_each(@hidden))`
 
+type ListenerParamsProps = ListenerScope
+
 /** The parameters `LISTENABLE` and the account's plays read. */
-export const listenerParams = (scope: ListenerScope) => ({
+export const listenerParams = (scope: ListenerParamsProps) => ({
   account: scope.account,
   hidden: JSON.stringify(scope.hidden),
   played: PLAY_KINDS.played,

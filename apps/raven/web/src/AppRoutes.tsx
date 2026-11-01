@@ -30,7 +30,13 @@ import { AlbumPage } from '@/pages/AlbumPage/AlbumPage'
 import { ArtistPage } from '@/pages/ArtistPage/ArtistPage'
 import { NowPlayingPage } from '@/pages/NowPlayingPage/NowPlayingPage'
 import { PlaylistPage } from '@/pages/PlaylistPage/PlaylistPage'
-import { NOW_PLAYING_PATH, PLAYLIST_ROUTE } from '@/lib/music'
+import { MUSIC_PATHS, NOW_PLAYING_PATH, PLAYLIST_ROUTE } from '@/lib/music'
+import { MusicShell } from '@/components/MusicShell/MusicShell'
+import { PlayerLayer } from '@/components/PlayerLayer/PlayerLayer'
+import { MixPage } from '@/pages/MixPage/MixPage'
+import { MusicHomePage } from '@/pages/MusicHomePage/MusicHomePage'
+import { MUSIC_LIBRARY_SECTIONS, MusicLibraryPage } from '@/pages/MusicLibraryPage/MusicLibraryPage'
+import { MusicSearchPage } from '@/pages/MusicSearchPage/MusicSearchPage'
 import { GetPage } from '@/pages/GetPage/GetPage'
 import { CheckEmailPage } from '@/pages/CheckEmailPage/CheckEmailPage'
 import { ConfirmPage } from '@/pages/ConfirmPage/ConfirmPage'
@@ -44,9 +50,11 @@ import { BingePage } from '@/pages/BingePage/BingePage'
 import { BINGE_PATH } from '@/lib/binge'
 
 /**
- * Every page, behind the sign-in gate but the account pages and Get. Inside
- * Raven the frame adds Downloads and On this Mac, and the app's own
- * part of the page runs over every route.
+ * Every page, behind the sign-in gate but the account pages and Get. The
+ * browsing pages sit in one of two shells over the one player: raven's own,
+ * and the music mode's under `/music`, which shows the same album, artist,
+ * playlist and Now Playing pages. Inside Raven the frame adds Downloads and
+ * On this Mac, and the app's own part of the page runs over every route.
  */
 export const AppRoutes = () => {
   const isDesktop = useIsDesktop()
@@ -54,37 +62,66 @@ export const AppRoutes = () => {
     <>
       <Routes>
         <Route element={<AuthGate />}>
-          <Route element={<AppShell />}>
-            <Route index element={<HomePage />} />
-            <Route path="libraries" element={<LibrariesPage />} />
-            <Route path="libraries/:id" element={<LibraryPage />} />
-            <Route path="libraries/:id/history" element={<HistoryPage />} />
-            <Route path="libraries/:id/:section" element={<LibraryPage />} />
-            <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
-            <Route path="movies/:id" element={<MoviePage />} />
-            <Route path="shows/:id" element={<ShowPage />} />
-            <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
-            <Route path="episodes/:id" element={<EpisodePage />} />
-            <Route path="people/:id" element={<PersonPage />} />
-            <Route path="albums/:id" element={<AlbumPage />} />
-            <Route path="artists/:id" element={<ArtistPage />} />
-            <Route path={PLAYLIST_ROUTE} element={<PlaylistPage />} />
-            <Route path={NOW_PLAYING_PATH} element={<NowPlayingPage />} />
-            {!isDesktop && <Route path={BINGE_PATH} element={<BingePage />} />}
-            <Route path="favourites" element={<FavouritesPage />} />
-            <Route path="streams" element={<StreamsPage />} />
-            <Route path="reports" element={<BugReportsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path={ADMIN_PATH} element={<AdminPage />} />
-            <Route path={PAGE_PATHS.shortcuts} element={<ShortcutsPage />} />
-            <Route path="design" element={<DesignPage />} />
-            {isDesktop && (
-              <>
-                <Route path={DESKTOP_PATHS.downloads} element={<DownloadsPage />} />
-                <Route path={DESKTOP_PATHS.local} element={<LocalPage />} />
-              </>
-            )}
-            <Route path="*" element={<NotFoundPage />} />
+          <Route element={<PlayerLayer />}>
+            <Route element={<AppShell />}>
+              <Route index element={<HomePage />} />
+              <Route path="libraries" element={<LibrariesPage />} />
+              <Route path="libraries/:id" element={<LibraryPage />} />
+              <Route path="libraries/:id/history" element={<HistoryPage />} />
+              <Route path="libraries/:id/:section" element={<LibraryPage />} />
+              <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
+              <Route path="movies/:id" element={<MoviePage />} />
+              <Route path="shows/:id" element={<ShowPage />} />
+              <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
+              <Route path="episodes/:id" element={<EpisodePage />} />
+              <Route path="people/:id" element={<PersonPage />} />
+              <Route path="albums/:id" element={<AlbumPage />} />
+              <Route path="artists/:id" element={<ArtistPage />} />
+              <Route path={PLAYLIST_ROUTE} element={<PlaylistPage />} />
+              <Route path={NOW_PLAYING_PATH} element={<NowPlayingPage />} />
+              {!isDesktop && <Route path={BINGE_PATH} element={<BingePage />} />}
+              <Route path="favourites" element={<FavouritesPage />} />
+              <Route path="streams" element={<StreamsPage />} />
+              <Route path="reports" element={<BugReportsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path={ADMIN_PATH} element={<AdminPage />} />
+              <Route path={PAGE_PATHS.shortcuts} element={<ShortcutsPage />} />
+              <Route path="design" element={<DesignPage />} />
+              {isDesktop && (
+                <>
+                  <Route path={DESKTOP_PATHS.downloads} element={<DownloadsPage />} />
+                  <Route path={DESKTOP_PATHS.local} element={<LocalPage />} />
+                </>
+              )}
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+            <Route path={MUSIC_PATHS.root} element={<MusicShell />}>
+              <Route index element={<MusicHomePage />} />
+              <Route
+                path={MUSIC_PATHS.albums}
+                element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.albums} />}
+              />
+              <Route
+                path={MUSIC_PATHS.artists}
+                element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.artists} />}
+              />
+              <Route
+                path={MUSIC_PATHS.songs}
+                element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.songs} />}
+              />
+              <Route
+                path={MUSIC_PATHS.playlists}
+                element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.playlists} />}
+              />
+              <Route path={MUSIC_PATHS.album} element={<AlbumPage />} />
+              <Route path={MUSIC_PATHS.artist} element={<ArtistPage />} />
+              <Route path={MUSIC_PATHS.playlist} element={<PlaylistPage />} />
+              <Route path={MUSIC_PATHS.mix} element={<MixPage />} />
+              <Route path={MUSIC_PATHS.nowPlaying} element={<NowPlayingPage />} />
+              <Route path={MUSIC_PATHS.search} element={<MusicSearchPage />} />
+              {isDesktop && <Route path={MUSIC_PATHS.downloads} element={<DownloadsPage />} />}
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
           </Route>
           {/* The player takes the whole screen, outside the browsing frame, as a file Raven plays does. */}
           <Route path={`${PAGE_PATHS.watch}/:id`} element={<WatchPage />} />

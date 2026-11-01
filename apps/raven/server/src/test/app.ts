@@ -147,6 +147,6 @@ export const testConfig = ({
   scanOnStart: false,
   quickScanIntervalMinutes: 0,
   markerDetection: false,
-  loudnessScan: false,
+  shouldScanLoudness: false,
   adminPassword: ADMIN_PASSWORD,
 })

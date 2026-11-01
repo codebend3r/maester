@@ -1,4 +1,5 @@
 import {
+  type AudioBitrate,
   AUTH_REFUSALS,
   type AuthRefusal,
   isMediaId,
@@ -134,21 +135,20 @@ export const startRefusalOf = ({
 const accountRefusalIn = (result: ServerCallResult): AuthRefusal['reason'] | null =>
   result.ok ? refusalAt({ ...result, statuses: ACCOUNT_REFUSAL_STATUSES }) : null
 
-/** What a source plays: a video, with the server's subtitle sidecars, or music, which has none. */
-export const SOURCE_KINDS = { video: 'video', music: 'music' } as const
-
 type CreateServerSourcesProps = {
   serverOf: (serverId: string) => ServerEntry | null
   calls: Pick<ServerCalls, 'call'>
   tickets: Pick<AccountTickets, 'ticketFor'>
   relay: Pick<MediaRelay, 'open' | 'refusalOf' | 'close'>
-  kind: (typeof SOURCE_KINDS)[keyof typeof SOURCE_KINDS]
   warn: (message: string) => void
 }
 
+/** A track for the music engine: its file, or its AAC transcode at `kbps`. */
+type TrackSource = Omit<ServerSource, 'kind'> & { kbps: AudioBitrate | null }
+
 /**
  * Server titles for the player, which mpv plays through the loopback relay: main builds every
- * URL from the stored origin and the sidecars from the server's own track list, and no cookie,
+ * URL from the stored origin and a video's sidecars from the server's own track list, and no cookie,
  * token or ticket is in anything mpv holds. Main asks the relay, then the server, why when mpv
  * fails to open or stops one of its titles.
  */
@@ -157,10 +157,12 @@ export const createServerSources = ({
   calls,
   tickets,
   relay,
-  kind,
   warn,
 }: CreateServerSourcesProps): {
+  /** A video, with the server's subtitle sidecars. */
   resolve: (source: ServerSource) => Promise<ResolvedServerSource>
+  /** A track, which has no sidecars. */
+  resolveTrack: (source: TrackSource) => Promise<ResolvedServerSource>
   explain: FailureExplainer
   refusedAccount: AccountRefusalReader
 } => {
@@ -212,12 +214,14 @@ export const createServerSources = ({
     server: ServerEntry
     mediaId: number
     trackList: Promise<readonly SubtitleTrack[]>
+    kbps: AudioBitrate | null
   }
 
   const resolveRelayed = async ({
     server,
     mediaId,
     trackList,
+    kbps,
   }: ResolveRelayedProps): Promise<ResolvedServerSource> => {
     // The first ticket before anything opens: a title the account may not play is refused here.
     const [tracks, first] = await Promise.all([
@@ -228,7 +232,7 @@ export const createServerSources = ({
       return { ok: false, message: startRefusalOf({ outcome: first, name: server.name }).message }
     }
     const opened = await relay
-      .open({ server, mediaId, sidecarTrackIds: tracks.map((track) => track.id) })
+      .open({ server, mediaId, sidecarTrackIds: tracks.map((track) => track.id), kbps })
       .catch(() => null)
     if (opened === null) {
       warn(`Raven could not relay a title from ${loggable(server.name)}`)
@@ -253,16 +257,41 @@ export const createServerSources = ({
     }
   }
 
-  const resolve = async ({ serverId, mediaId }: ServerSource): Promise<ResolvedServerSource> => {
+  type ServerOfSourceProps = { serverId: string; mediaId: number }
+
+  /** The server a title is on, or why it cannot be opened. */
+  const serverOfSource = ({
+    serverId,
+    mediaId,
+  }: ServerOfSourceProps): { ok: true; server: ServerEntry } | { ok: false; message: string } => {
     if (!isOpaqueId(serverId) || !isMediaId(mediaId)) {
       return { ok: false, message: SOURCE_MESSAGES.badTitle }
     }
     const server = serverOf(serverId)
     if (server === null) return { ok: false, message: SOURCE_MESSAGES.unknownServer }
+    return { ok: true, server }
+  }
+
+  type ResolveProps = ServerSource
+
+  const resolve = async ({ serverId, mediaId }: ResolveProps): Promise<ResolvedServerSource> => {
+    const found = serverOfSource({ serverId, mediaId })
+    if (!found.ok) return found
     // Read while the first ticket is minted: a video wants its sidecars either way.
-    const trackList =
-      kind === SOURCE_KINDS.music ? Promise.resolve([]) : trackListOf({ server, mediaId })
-    return resolveRelayed({ server, mediaId, trackList })
+    const trackList = trackListOf({ server: found.server, mediaId })
+    return resolveRelayed({ server: found.server, mediaId, trackList, kbps: null })
+  }
+
+  type ResolveTrackProps = TrackSource
+
+  const resolveTrack = async ({
+    serverId,
+    mediaId,
+    kbps,
+  }: ResolveTrackProps): Promise<ResolvedServerSource> => {
+    const found = serverOfSource({ serverId, mediaId })
+    if (!found.ok) return found
+    return resolveRelayed({ server: found.server, mediaId, trackList: Promise.resolve([]), kbps })
   }
 
   /**
@@ -316,5 +345,5 @@ export const createServerSources = ({
       : { reason: PLAYER_ERROR_REASONS.decode, message: PLAYER_MESSAGES.stopped }
   }
 
-  return { resolve, explain, refusedAccount }
+  return { resolve, resolveTrack, explain, refusedAccount }
 }
