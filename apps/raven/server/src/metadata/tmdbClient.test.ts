@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { RAVEN_HEADERS } from '@/http'
 import { type MetadataFetch, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
-import { mergeCredits, pickLogo, toPerson, toSeason, toShow } from '@/metadata/tmdbShapes'
+import { mergeCredits, pickLogo, toMovie, toPerson, toSeason, toShow } from '@/metadata/tmdbShapes'
 import { fakeTmdb, keanuReeves, movieBody, personBody, seasonBody, showBody } from '@/test/fakeTmdb'
 
 const config = (token: string | null = 'secret-token') => ({
@@ -28,6 +28,29 @@ const json = ({ body, status = 200, headers = {} }: JsonProps) =>
   new Response(JSON.stringify(body), { status, headers })
 
 describe('TmdbClient', () => {
+  it('keeps the movie release date instead of a later local re-release date', () => {
+    expect(
+      toMovie({
+        body: {
+          id: 47,
+          title: 'Akira',
+          original_title: 'Akira',
+          release_date: '1988-07-16',
+          release_dates: {
+            results: [
+              {
+                iso_3166_1: 'US',
+                release_dates: [{ type: 3, release_date: '2026-01-01T00:00:00.000Z' }],
+              },
+            ],
+          },
+        },
+        country: 'US',
+        language: 'en',
+      }),
+    ).toMatchObject({ year: 1988, released: '1988-07-16' })
+  })
+
   it('reads a movie with its credits, rating, content rating and pictures', async () => {
     const tmdb = fakeTmdb({
       movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31', imdbId: 'tt0133093' }],
