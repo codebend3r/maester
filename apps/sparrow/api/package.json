@@ -1,6 +1,6 @@
 {
   "name": "@sparrow/api",
-  "version": "0.7.10",
+  "version": "0.7.11",
   "private": true,
   "description": "sparrow's agent, tools, chat and FastAPI app: a Python 3.12 project run through uv",
   "scripts": {
