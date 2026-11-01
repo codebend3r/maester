@@ -87,6 +87,16 @@ const VIEW = {
   watched: null,
   deletesAt: null,
   isLocked: false,
+  artwork: { kind: 'poster', itemId: 12, version: 'v1' },
+  facts: {
+    year: 2002,
+    score: 8.4,
+    bitrate: 9_000_000,
+    pixels: 2_073_600,
+    addedAt: '2026-10-16T00:00:00.000Z',
+    changedAt: '2026-10-16T00:00:00.000Z',
+  },
+  createdAt: 1_700_000_000_000,
 } as const
 
 const SESSION = { accessToken: 'eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJhZGEifQ.c2ln', userId: id }
@@ -875,6 +885,17 @@ describe('the download ask and views', () => {
     expect(isDownloadView({ ...VIEW, watched: 0.4, deletesAt: 1_700_000_600_000 })).toBe(true)
     expect(isDownloadView({ ...VIEW, isLocked: 'no' })).toBe(false)
     expect(isDownloadView({ ...VIEW, status: { kind: 'stalled' } })).toBe(false)
+  })
+
+  it('accepts a poster, an album cover or no picture, and refuses a path in place of ids', () => {
+    expect(isDownloadView({ ...VIEW, artwork: { kind: 'cover', albumId: 3, version: 'c1' } })).toBe(
+      true,
+    )
+    expect(isDownloadView({ ...VIEW, artwork: { kind: 'none' } })).toBe(true)
+    expect(isDownloadView({ ...VIEW, artwork: { kind: 'poster', path: '/etc/passwd' } })).toBe(
+      false,
+    )
+    expect(isDownloadView({ ...VIEW, facts: { ...VIEW.facts, pixels: 'big' } })).toBe(false)
   })
 
   it('names its server by an opaque id, never an origin', () => {

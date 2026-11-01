@@ -19,10 +19,13 @@ import {
 import { handled } from '@/desktop/handled'
 import { useChangeDownloads } from '@/desktop/downloadsApi'
 import { DOWNLOAD_ROW_COPY } from '@/desktop/DownloadsPage/copy'
-import { useOpenReply } from '@/desktop/openReply'
+import { DownloadActivity } from '@/desktop/DownloadsPage/DownloadActivity'
+import { DownloadArtwork } from '@/desktop/DownloadsPage/DownloadArtwork'
+import { usePlayDownload } from '@/desktop/DownloadsPage/usePlayDownload'
+import { useDownloadSpeed } from '@/desktop/useDownloadSpeed'
+import { POSTER_SIZES } from '@/lib/posters'
 import { watchedLabel } from '@/desktop/watched'
 import { api } from '@/lib/api'
-import { useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/DownloadsPage/DownloadsPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 
@@ -104,20 +107,24 @@ type StatusLineProps = { view: DownloadView; textId: string }
 
 type DownloadingLineProps = StatusLineProps
 
-const DownloadingLine = ({ view, textId }: DownloadingLineProps) =>
-  view.status.kind === DOWNLOAD_STATUS_KINDS.downloading && (
-    <>
-      <span id={textId}>
-        {DOWNLOAD_ROW_COPY.downloadedOf({ bytes: view.status.bytes, size: view.size })}
-      </span>
-      <progress
-        className={styles.gauge}
-        max={view.size}
-        value={view.status.bytes}
-        aria-labelledby={textId}
-      />
-    </>
+const DownloadingLine = ({ view, textId }: DownloadingLineProps) => {
+  const speed = useDownloadSpeed(view.downloadId)
+  return (
+    view.status.kind === DOWNLOAD_STATUS_KINDS.downloading && (
+      <>
+        <span id={textId} className={styles.progressText}>
+          <span>
+            {DOWNLOAD_ROW_COPY.downloadedOf({ bytes: view.status.bytes, size: view.size })}
+          </span>
+          <span className={styles.speed}>
+            {speed === null ? DOWNLOAD_ROW_COPY.starting : DOWNLOAD_ROW_COPY.speed(speed)}
+          </span>
+        </span>
+        <DownloadActivity value={view.status.bytes} max={view.size} labelledBy={textId} />
+      </>
+    )
   )
+}
 
 const QueuedLine = () => <span>{DOWNLOAD_ROW_COPY.waiting}</span>
 
@@ -231,6 +238,13 @@ const ViewingRow = ({
   const actionButton = ACTION_BUTTONS[action]
   return (
     <div className={styles.row}>
+      <span className={styles.art} aria-hidden="true">
+        <DownloadArtwork
+          artwork={view.artwork}
+          initial={view.group.title.slice(0, 1)}
+          sizes={POSTER_SIZES.bar}
+        />
+      </span>
       <span id={ids.label} className={styles.label}>
         {label}
       </span>
@@ -285,9 +299,8 @@ type DownloadRowProps = {
 
 /** One downloaded file: what it is, where it stands, and what can be done with it. */
 export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
-  const { client } = useDesktop()
   const change = useChangeDownloads()
-  const openReply = useOpenReply()
+  const play = usePlayDownload()
   const [mode, setMode] = useState<RowMode>(ROW_MODES.view)
   const [isUnlocking, setIsUnlocking] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -316,7 +329,7 @@ export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
   const act = async (): Promise<unknown> => {
     switch (action) {
       case ROW_ACTIONS.play:
-        return openReply(await client.request({ type: DESKTOP_REQUESTS.openDownload, downloadId }))
+        return play(downloadId)
       case ROW_ACTIONS.pause:
         return change({ type: DESKTOP_REQUESTS.pauseDownload, downloadId })
       case ROW_ACTIONS.resume:

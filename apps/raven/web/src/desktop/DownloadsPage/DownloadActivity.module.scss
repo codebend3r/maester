@@ -1,0 +1,39 @@
+// The gauge and its light share one cell, the light over the bar.
+.activity {
+  display: grid;
+  grid-template-areas: 'bar';
+}
+
+.gauge {
+  grid-area: bar;
+  width: 100%;
+}
+
+.sweep {
+  grid-area: bar;
+  align-self: stretch;
+  border-radius: var(--radius-pill);
+  pointer-events: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--color-bark) 55%, transparent),
+      transparent
+    );
+    background-repeat: no-repeat;
+    background-size: 40% 100%;
+    animation: activity-sweep 1.4s linear infinite;
+  }
+}
+
+@keyframes activity-sweep {
+  from {
+    background-position: -40% 0;
+  }
+
+  to {
+    background-position: 140% 0;
+  }
+}

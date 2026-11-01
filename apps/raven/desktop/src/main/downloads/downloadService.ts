@@ -3,12 +3,14 @@ import {
   DESKTOP_REPLIES,
   type DesktopEvent,
   type DesktopReply,
+  DOWNLOAD_ARTWORK_KINDS,
   DOWNLOAD_STATUS_KINDS,
   type DownloadStatus,
   type DownloadView,
 } from '@raven/core'
 import { type ConfigStore, serverById, serverOf, setLastAccount } from '@/main/desktopConfig'
 import { createDownloadAsks, type DownloadAsks } from '@/main/downloads/asks'
+import { factsBefore } from '@/main/downloads/artwork'
 import { createAutoDelete, isDueForDeletion } from '@/main/downloads/autoDelete'
 import { DOWNLOAD_MESSAGES, failedMessage, pausedMessage } from '@/main/downloads/downloadMessages'
 import {
@@ -215,6 +217,9 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         isLocked:
           entry.status.kind === DOWNLOAD_STATUS_KINDS.paused &&
           entry.status.reason === PAUSE_REASONS.relocked,
+        artwork: entry.artwork ?? { kind: DOWNLOAD_ARTWORK_KINDS.none },
+        facts: entry.facts ?? factsBefore(entry),
+        createdAt: entry.createdAt,
       }
     })
 

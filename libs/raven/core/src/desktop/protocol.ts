@@ -146,6 +146,45 @@ export const isDownloadStatus = union(
 
 export type DownloadStatus = Infer<typeof isDownloadStatus>
 
+export const DOWNLOAD_ARTWORK_KINDS = { poster: 'poster', cover: 'cover', none: 'none' } as const
+
+/**
+ * The picture a download shows, as the ids and version the server's capability address names:
+ * a title's poster, an album's cover for audio, or nothing. No origin or path, so the page builds
+ * the address itself and a title the server has no picture for shows its initial.
+ */
+export const isDownloadArtwork = union(
+  object({
+    kind: oneOf([DOWNLOAD_ARTWORK_KINDS.poster]),
+    itemId: isNumber,
+    version: isString,
+  }),
+  object({
+    kind: oneOf([DOWNLOAD_ARTWORK_KINDS.cover]),
+    albumId: isNumber,
+    version: isString,
+  }),
+  object({ kind: oneOf([DOWNLOAD_ARTWORK_KINDS.none]) }),
+)
+
+export type DownloadArtwork = Infer<typeof isDownloadArtwork>
+
+/**
+ * What a library sorts its files on that a download's own fields do not hold, kept from the file
+ * when it was confirmed so the Watch grid can sort on every field a library can. `pixels` is
+ * width times height, which is how resolution ranks; `score` is out of 10.
+ */
+export const isDownloadFacts = object({
+  year: nullable(isNumber),
+  score: nullable(isNumber),
+  bitrate: nullable(isNumber),
+  pixels: nullable(isNumber),
+  addedAt: isString,
+  changedAt: isString,
+})
+
+export type DownloadFacts = Infer<typeof isDownloadFacts>
+
 export const DOWNLOAD_ASK_KINDS = {
   ready: 'ready',
   locked: 'locked',
@@ -197,6 +236,10 @@ export const isDownloadView = object({
   watched: nullable(isNumber),
   deletesAt: nullable(isNumber),
   isLocked: isBoolean,
+  artwork: isDownloadArtwork,
+  facts: isDownloadFacts,
+  /** When the download was confirmed, in milliseconds since the epoch. */
+  createdAt: isNumber,
 })
 
 export type DownloadView = Infer<typeof isDownloadView>

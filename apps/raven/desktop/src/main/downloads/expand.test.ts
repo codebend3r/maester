@@ -113,7 +113,7 @@ describe('expandTarget', () => {
       libraryId: 1,
       title: 'Fellowship',
       year: 2001,
-      item: summary({ id: 1, type: 'movie' }),
+      item: summary({ id: 1, type: 'movie', posterVersion: 'p1' }),
     })
     const { expansion, log } = run({
       replies: { [mediaCall(9)]: ok(movie) },
@@ -127,6 +127,7 @@ describe('expandTarget', () => {
         media: movie,
         label: 'Fellowship (2001)',
         group: { kind: 'movie', key: 'movie:9', title: 'Fellowship (2001)', order: 0 },
+        artwork: { kind: 'poster', itemId: 1, version: 'p1' },
         watchedPercent: 90,
       },
     ])

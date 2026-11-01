@@ -2,6 +2,7 @@ import {
   AUTH_REFUSALS,
   DOWNLOAD_KINDS,
   DOWNLOAD_TARGET_KINDS,
+  type DownloadArtwork,
   type DownloadGroup,
   type DownloadKind,
   type DownloadTarget,
@@ -19,6 +20,7 @@ import {
   type MediaItem,
   mediaLabel,
 } from '@raven/core'
+import { artworkOfMedia, posterOf } from '@/main/downloads/artwork'
 import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import { ACCOUNT_REFUSAL_STATUSES, refusalAt } from '@/main/servers/authRefusals'
@@ -31,6 +33,7 @@ export type ExpandedFile = {
   media: MediaItem
   label: string
   group: DownloadGroup
+  artwork: DownloadArtwork
   watchedPercent: number
 }
 
@@ -68,6 +71,8 @@ type Draft = {
   title: string
   groupTitle: string
   groupKey: string
+  /** The picture every file of the title shows; none leaves each file its own. */
+  artwork: DownloadArtwork | null
   entries: Entry[]
 }
 type Calls = Pick<ServerCalls, 'call'>
@@ -180,6 +185,7 @@ const draftOfMedia = (media: MediaItem): Draft => {
       title,
       groupTitle: title,
       groupKey: movieGroupKey(media),
+      artwork: null,
       entries: [{ media, label: title, order: 0 }],
     }
   }
@@ -188,6 +194,7 @@ const draftOfMedia = (media: MediaItem): Draft => {
     title: mediaLabel(media),
     groupTitle: item.show?.title ?? item.title,
     groupKey: showGroupKey(item),
+    artwork: null,
     entries: [{ media, label: episodeLabel(item), order: episodeOrder(item) }],
   }
 }
@@ -223,6 +230,7 @@ const draftOfShow = async ({ server, details }: DraftOfShowProps): Promise<Read<
       title: details.title,
       groupTitle: details.title,
       groupKey: showGroupKey(details),
+      artwork: posterOf(details),
       entries: entries.value,
     },
   }
@@ -256,6 +264,7 @@ const draftOfItem = async ({ server, details }: DraftOfItemProps): Promise<Read<
           title: itemLabel(details),
           groupTitle: details.show?.title ?? details.title,
           groupKey: showGroupKey(details),
+          artwork: null,
           entries: [{ media: first, label: episodeLabel(details), order: episodeOrder(details) }],
         },
       }
@@ -268,6 +277,7 @@ const draftOfItem = async ({ server, details }: DraftOfItemProps): Promise<Read<
           title: itemLabel(details),
           groupTitle: details.show?.title ?? details.title,
           groupKey: showGroupKey(details),
+          artwork: posterOf(details),
           entries: episodesOf(details),
         },
       }
@@ -319,6 +329,7 @@ const draftOf = async ({ server, target }: DraftOfProps): Promise<Read<Draft>> =
           title: saga.name,
           groupTitle: saga.name,
           groupKey: sagaGroupKey(target),
+          artwork: null,
           entries: saga.media.map((media, order) => ({ media, label: mediaLabel(media), order })),
         },
       }
@@ -372,7 +383,7 @@ export const expandTarget = async ({
   const server = { calls, serverId, serverName }
   const draft = await draftOf({ server, target })
   if (!draft.ok) return draft.failure
-  const { kind, title, groupTitle, groupKey } = draft.value
+  const { kind, title, groupTitle, groupKey, artwork } = draft.value
   const entries = oncePerFile(draft.value.entries)
   if (entries.length > DOWNLOAD_MAX_FILES) {
     return { ok: false, reason: EXPAND_REASONS.tooMany, message: EXPAND_MESSAGES.tooMany }
@@ -389,6 +400,7 @@ export const expandTarget = async ({
       media,
       label,
       group: { kind, key: groupKey, title: groupTitle, order },
+      artwork: artwork ?? artworkOfMedia(media),
       watchedPercent: percents.value[media.libraryId],
     })),
   }

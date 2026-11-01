@@ -21,6 +21,7 @@ import {
   SERVER_NAME,
 } from '@/main/desktopConfig'
 import { ASK_TTL_MS } from '@/main/downloads/asks'
+import { factsBefore } from '@/main/downloads/artwork'
 import { AUTO_DELETE_DELAY_MS } from '@/main/downloads/autoDelete'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
@@ -780,6 +781,15 @@ describe('confirm', () => {
         serverPosition: 4200,
         pending: NO_PENDING,
         createdAt: NOW + 5000,
+        artwork: { kind: 'none' },
+        facts: {
+          year: null,
+          score: null,
+          bitrate: expect.any(Number),
+          pixels: expect.any(Number),
+          addedAt: expect.any(String),
+          changedAt: expect.any(String),
+        },
       },
       expect.objectContaining({ mediaId: 13, label: 'S01E03 In Perpetuity', autoDelete: true }),
     ])
@@ -976,6 +986,9 @@ describe('list and views', () => {
           watched: null,
           deletesAt: null,
           isLocked: false,
+          artwork: { kind: 'none' },
+          facts: factsBefore(newer),
+          createdAt: newer.createdAt,
         },
         // Marked watched, so watched whole, though no file was read for its share.
         expect.objectContaining({ downloadId: older.downloadId, watched: 1 }),
