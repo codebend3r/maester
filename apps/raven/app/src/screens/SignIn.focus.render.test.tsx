@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type { LockState } from '@raven/core'
 import type * as Native from '@raven/native'
 import { AUTH_OUTCOMES, type AuthOutcome } from '@raven/native/headless'
-import { fireEvent, render, screen } from '@testing-library/react-native'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 
 import { useAccountSession } from '@/account/session'
 import { SignIn } from '@/screens/SignIn'
@@ -63,7 +63,7 @@ describe('SignIn on a TV', () => {
 
   // Asked for as it mounts, the preferred focus comes before the field is in the window, which
   // on Android TV left the step with nothing focused.
-  it('asks for the remote on the field of each step once it is drawn', async () => {
+  it('asks for the remote on the field once it is drawn', async () => {
     await render(<SignIn />)
     expect(askedFor()).toEqual(['Email'])
 
@@ -73,8 +73,10 @@ describe('SignIn on a TV', () => {
     await fireEvent(screen.getByLabelText('Password'), NATIVE_EVENTS.submitEditing, {
       nativeEvent: { text: 'hunter2' },
     })
-    expect(await screen.findByLabelText('PIN')).toBeTruthy()
-    expect(askedFor()).toEqual(['Email', 'PIN'])
+    await waitFor(() => expect(mockSignIn).toHaveBeenCalled())
+    // The PIN is never asked after an account signs in, so no other step asks for the remote.
+    expect(screen.queryByLabelText('PIN')).toBeNull()
+    expect(askedFor()).toEqual(['Email'])
   })
 
   it('drops what was typed when Menu cancels the keyboard, as the field does', async () => {

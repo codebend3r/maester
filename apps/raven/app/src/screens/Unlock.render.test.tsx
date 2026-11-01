@@ -4,6 +4,7 @@ import type * as Native from '@raven/native'
 import { useUnlockPrompt } from '@raven/ui/headless'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 
+import { FORM_COPY } from '@/layouts/copy'
 import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES } from '@/routes'
 import { Unlock } from '@/screens/Unlock'
@@ -47,7 +48,8 @@ describe('Unlock', () => {
     const client = createScreenClient()
     const invalidate = jest.spyOn(client, 'invalidateQueries')
     await renderScreen({ ui: <Unlock />, client })
-    expect(screen.getByRole('header', { name: NAS.name })).toBeTruthy()
+    expect(screen.getByRole('header', { name: FORM_COPY.wordmark })).toBeTruthy()
+    expect(screen.getByText(NAS.name)).toBeTruthy()
 
     await enterPin('1234')
 

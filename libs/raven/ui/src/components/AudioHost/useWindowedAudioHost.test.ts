@@ -173,6 +173,25 @@ describe('useWindowedAudioHost', () => {
     expect(store().seek).toBeNull()
   })
 
+  it('does not echo asynchronous engine states back as playback commands after Next', () => {
+    const { calls, player } = fakePlayer()
+    renderHost({ player })
+    act(() => store().playTracks({ tracks: ALBUM }))
+    act(() => store().next())
+    const afterNext = [...calls]
+    act(() => store().engine.state(AUDIO_STATES.paused))
+    act(() => store().engine.state(AUDIO_STATES.loading))
+    act(() => store().engine.state(AUDIO_STATES.playing))
+    expect(calls).toEqual(afterNext)
+    act(() => store().pause())
+    expect(calls.at(-1)).toBe('pause')
+    const afterPause = [...calls]
+    act(() => store().engine.state(AUDIO_STATES.loading))
+    act(() => store().engine.state(AUDIO_STATES.playing))
+    expect(calls).toEqual(afterPause)
+    expect(store().shouldPlay).toBe(false)
+  })
+
   it('says a track the player cannot decode, and passes on to the next', async () => {
     const { calls, player } = fakePlayer({ unplayable: [2] })
     renderHost({ player })

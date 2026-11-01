@@ -139,12 +139,11 @@ type UseAudioElementProps = {
  * for it. Play and pause follow the store, and the speed `rate` says.
  */
 const useAudioElement = ({ ref, id, src, start, rate }: UseAudioElementProps) => {
-  const state = useAudioQueue((store) => store.state)
+  const shouldPlay = useAudioQueue((store) => store.shouldPlay)
   const seek = useAudioQueue((store) => store.seek)
   const engine = useAudioQueue((store) => store.engine)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const isMuted = usePlayerPrefs((prefs) => prefs.muted)
-  const shouldPlay = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
   const loaded = useRef<number | null>(null)
 
   useEffect(() => {

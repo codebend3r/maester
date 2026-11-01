@@ -4,7 +4,7 @@ import { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
 import { useListenCounter } from '@/components/AudioHost/useListenCounter'
 import { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
 import type { WatchHide } from '@/components/Player/useProgressReport'
-import { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
+import { nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 /**
@@ -108,12 +108,11 @@ export const useWindowedAudioHost = ({
   watchHide,
 }: UseWindowedAudioHostProps): WindowedAudioHost => {
   const track = useAudioQueue(playingTrackOf)
-  const state = useAudioQueue((store) => store.state)
+  const shouldPlay = useAudioQueue((store) => store.shouldPlay)
   const seek = useAudioQueue((store) => store.seek)
   const engine = useAudioQueue((store) => store.engine)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const isMuted = usePlayerPrefs((prefs) => prefs.muted)
-  const shouldPlay = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
   const loaded = useRef<Loaded | null>(null)
   // The tracks passed over since one last played, and the one the last pass moved to, so a
   // queue that holds nothing playable (repeat all over an ALAC album) stops rather than circles.
