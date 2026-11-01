@@ -652,7 +652,7 @@ describe('the admin lock', () => {
     })
     await expect(locking).rejects.toMatchObject({
       status: 403,
-      message: 'The admin lock is on. Turn it off in Settings to do this.',
+      message: 'The admin lock is on. Turn it off in Admin to do this.',
     })
     expect(
       await status(

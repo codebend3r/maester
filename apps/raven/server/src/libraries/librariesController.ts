@@ -51,6 +51,7 @@ import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { Management } from '@/auth/management'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import { RatingsRefresh } from '@/libraries/ratingsRefresh'
+import { MarkerDetection } from '@/markers/markerDetection'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
@@ -81,7 +82,7 @@ export const LOCKED_SCAN_ERROR = 'The last scan ran into trouble. Enter the PIN 
 
 /** A scan's failure for a viewer the admin lock holds, so who may not see the folders it names. */
 export const HIDDEN_SCAN_ERROR =
-  'The last scan ran into trouble. Turn the admin lock off in Settings to see what.'
+  'The last scan ran into trouble. Turn the admin lock off in Admin to see what.'
 
 /** A scan's failure for a member once accounts are on: only the owner sees the folders it names. */
 export const OWNER_SCAN_ERROR = 'The last scan ran into trouble. Only the owner can see what.'
@@ -131,6 +132,7 @@ export class LibrariesController {
     @Inject(Management) private readonly management: Management,
     @Inject(RatingsRefresh) private readonly ratings: RatingsRefresh,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
+    @Inject(MarkerDetection) private readonly markers: MarkerDetection,
   ) {}
 
   /** A library can only be locked behind a PIN that can open it again. */
@@ -344,6 +346,22 @@ export class LibrariesController {
     this.scanner.forget(id)
     // The pass finds no library, and clears up the items it left.
     this.metadata.enqueue(id)
+  }
+
+  @AdminOnly()
+  @Post(':id/markers')
+  @HttpCode(200)
+  scanMarkers(@Param('id', ParseIntPipe) id: number): Library {
+    return this.commanded({
+      id,
+      act: (libraryId) => {
+        if (!this.markers.scanLibrary(libraryId)) {
+          throw new ServiceUnavailableException(
+            'Scans are stopped or marker detection is disabled on this server.',
+          )
+        }
+      },
+    })
   }
 
   /** Cancels a full scan, or any scan running: it stops at its next step. */

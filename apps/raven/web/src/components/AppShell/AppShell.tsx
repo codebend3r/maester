@@ -16,6 +16,7 @@ import { api } from '@/lib/api'
 import { Logo } from '@/components/Logo/Logo'
 import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
+import { ADMIN_COPY, ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
 import { useFollowAdminLock } from '@/lib/adminLock'
@@ -331,6 +332,13 @@ export const AppShell = () => {
                   isIconsOnly={isIconsOnly}
                 />
                 <AdminOnly>
+                  <NavItem
+                    to={ADMIN_PATH}
+                    patterns={[ADMIN_PATH]}
+                    icon={<Icon name="settings" />}
+                    label={ADMIN_COPY.heading}
+                    isIconsOnly={isIconsOnly}
+                  />
                   <NavItem
                     to="/streams"
                     patterns={['/streams']}

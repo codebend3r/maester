@@ -62,6 +62,46 @@
   display: grid;
   grid-auto-flow: column;
   gap: var(--space-0);
+  align-items: center;
+}
+
+.equalizer {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-0);
+  block-size: var(--space-5);
+  padding-inline: var(--space-1);
+
+  span {
+    inline-size: var(--space-0);
+    block-size: 70%;
+    background: var(--color-leaf-bright);
+    border-radius: var(--radius-sm);
+  }
+}
+
+@media (max-width: 30rem) {
+  .bar {
+    grid-template-columns: var(--control-size-tall) minmax(0, 1fr);
+    grid-template-areas:
+      'progress progress'
+      'cover words'
+      'controls controls';
+  }
+
+  .controls {
+    justify-self: end;
+  }
+}
+
+@keyframes waveform {
+  from {
+    transform: scaleY(0.2);
+  }
+  to {
+    transform: scaleY(1);
+  }
 }
 
 // A hairline across the top, filled as far as the track has played.
@@ -79,6 +119,17 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .equalizer span {
+    animation: waveform 650ms ease-in-out infinite alternate;
+
+    &:nth-child(2n) {
+      animation-delay: -450ms;
+    }
+    &:nth-child(3n) {
+      animation-delay: -250ms;
+    }
+  }
+
   .played {
     transition: transform 250ms linear;
   }

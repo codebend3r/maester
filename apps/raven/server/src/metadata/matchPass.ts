@@ -75,6 +75,7 @@ export type Resolved =
     }
 
 export type MatchPassDeps = {
+  signal?: AbortSignal
   /** The library's tiers, from `tiersFor`: every search in the pass prefers them in order. */
   prefer: readonly CandidateTier[]
   tmdb: TmdbClient
@@ -162,6 +163,7 @@ export class MatchPass {
   constructor(private readonly deps: MatchPassDeps) {
     this.folders = new FolderReader(deps.files)
     this.guard = new PassGuard({
+      signal: deps.signal,
       logger: deps.logger,
       failed: 'Could not match',
       stopped: 'Matching stopped for now',

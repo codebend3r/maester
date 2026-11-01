@@ -18,6 +18,7 @@ import {
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { MarkerDetection } from '@/markers/markerDetection'
+import { ScanControl } from '@/scanner/scanControl'
 import { errorMessage } from '@/errorMessage'
 import { groupBy } from '@/groupBy'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
@@ -160,7 +161,10 @@ type MetadataServiceFixShowMatchProps = {
 @Injectable()
 export class MetadataService implements OnApplicationBootstrap {
   private readonly logger = new Logger(MetadataService.name)
-  private readonly queue = createTaskQueue({ concurrency: 1 })
+  private readonly queue = createTaskQueue({
+    concurrency: 1,
+    signal: () => this.scans.signal,
+  })
   private readonly matchers: Record<MatchItemType, KindMatcher>
   /** Each run of AI lookups under way, with how many of its groups wait for or are in one. */
   private readonly lookupRuns = new Set<{ left: number }>()
@@ -182,6 +186,7 @@ export class MetadataService implements OnApplicationBootstrap {
     @Inject(StartupWork) private readonly startup: StartupWork,
     @Inject(MarkerDetection) private readonly markers: Pick<MarkerDetection, 'kick'>,
     @Inject(AlbumMatching) private readonly albums: Pick<AlbumMatching, 'matchLibrary' | 'retry'>,
+    @Inject(ScanControl) private readonly scans: ScanControl,
   ) {
     this.matchers = createMatchers({ files, metadata, pictures, decisions })
   }
@@ -467,6 +472,7 @@ export class MetadataService implements OnApplicationBootstrap {
   /** A pass for a library of `kind`, whose searches prefer that type's results. */
   private newPass(kind: LibraryKind): MatchPass {
     return new MatchPass({
+      signal: this.scans.signal,
       tmdb: this.tmdb,
       metadata: this.metadata,
       files: this.files,
@@ -619,7 +625,7 @@ export class MetadataService implements OnApplicationBootstrap {
     pass,
     lookups,
   }: MetadataServiceLookUpProps): Promise<void> {
-    if (lookups.isHalted) return
+    if (lookups.isHalted || pass.guard.isStopped) return
     // The groups were listed before the lookups began, and the library may
     // have been removed or changed to a type that is not looked up since.
     const current = this.libraries.get(library.id)
@@ -634,7 +640,7 @@ export class MetadataService implements OnApplicationBootstrap {
         return null
       })
     // A library removed during the lookup keeps no decision.
-    if (outcome == null || this.libraries.get(library.id) == null) return
+    if (outcome == null || pass.guard.isStopped || this.libraries.get(library.id) == null) return
     this.decisions.record({ libraryId: library.id, place, outcome, model: this.aiMatcher.model })
     if (outcome.kind !== AI_OUTCOME_KINDS.chosen || outcome.confidence !== AI_CONFIDENCES.high) {
       return

@@ -9,6 +9,7 @@ import { useServerReach } from '@/stores/serverReach'
 import styles from '@/components/AppShell/TabBar.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
+import { ADMIN_COPY, ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 
 type TabProps = {
   to: string
@@ -61,6 +62,12 @@ export const TabBar = () => {
             label={COMMON_COPY.favourites}
           />
           <AdminOnly>
+            <Tab
+              to={ADMIN_PATH}
+              patterns={[ADMIN_PATH]}
+              icon="settings"
+              label={ADMIN_COPY.heading}
+            />
             <Tab
               to="/streams"
               patterns={['/streams']}

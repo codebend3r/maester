@@ -55,6 +55,7 @@ export const useLibraryActions = (library: Library) => {
   const cancelQuickScan = useLibraryCall({ library, call: (id) => api.cancelQuickScan(id) })
   const fullScan = useLibraryCall({ library, call: (id) => api.scanLibrary(id) })
   const cancelFullScan = useLibraryCall({ library, call: (id) => api.cancelScan(id) })
+  const scanMarkers = useLibraryCall({ library, call: (id) => api.scanLibraryMarkers(id) })
   const updateRatings = useLibraryCall({ library, call: (id) => api.updateLibraryRatings(id) })
   const cancelRatings = useLibraryCall({ library, call: (id) => api.cancelLibraryRatings(id) })
   useRatingsRefreshDone(library)
@@ -72,6 +73,7 @@ export const useLibraryActions = (library: Library) => {
     cancelQuickScan,
     fullScan,
     cancelFullScan,
+    scanMarkers,
     updateRatings,
     cancelRatings,
     rematch,
@@ -93,6 +95,7 @@ export const LibraryActionErrors = ({
     cancelQuickScan,
     fullScan,
     cancelFullScan,
+    scanMarkers,
     updateRatings,
     cancelRatings,
     rematch,
@@ -107,6 +110,7 @@ export const LibraryActionErrors = ({
     { verb: LIBRARY_ACTIONS_COPY.verbs.updateRatings, failure: updateRatings.error },
     { verb: LIBRARY_ACTIONS_COPY.verbs.cancelRatings, failure: cancelRatings.error },
     { verb: LIBRARY_ACTIONS_COPY.verbs.rematch, failure: rematch.error },
+    { verb: LIBRARY_ACTIONS_COPY.verbs.scanMarkers, failure: scanMarkers.error },
   ].map(
     ({ verb, failure }) =>
       failure && (
@@ -202,6 +206,7 @@ export const LibraryActions = ({
     updateRatings,
     cancelRatings,
     rematch,
+    scanMarkers,
   },
 }: LibraryActionsProps) => {
   const [isEditing, setEditing] = useState(false)
@@ -282,6 +287,17 @@ export const LibraryActions = ({
             onStart={() => fullScan.mutate()}
             onCancel={() => cancelFullScan.mutate()}
           />
+          {matchType && (
+            <Button
+              icon="skipNext"
+              disabled={scanMarkers.isPending}
+              onClick={() => scanMarkers.mutate()}
+            >
+              {LIBRARY_ACTIONS_COPY.scanMarkers}
+              {whose}
+            </Button>
+          )}
+          {scanMarkers.isSuccess && <output>{LIBRARY_ACTIONS_COPY.markersQueued}</output>}
           <LongAction
             label={LIBRARY_ACTIONS_COPY.updateRatings}
             icon="gauge"

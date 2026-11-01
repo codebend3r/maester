@@ -4,7 +4,7 @@ import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { MANAGERS_ONLY_COPY } from '@/components/ManagersOnly/copy'
 import { MANAGEMENT_MODES, type ManagementMode } from '@/lib/management'
 import styles from '@/components/ManagersOnly/ManagersOnly.module.scss'
-import { COMMON_COPY } from '@/lib/copy'
+import { ADMIN_COPY, ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 
 type ManagersOnlyProps = {
   mode: ManagementMode
@@ -25,7 +25,7 @@ const AdminNote = ({ name, forAdmin }: AdminNoteProps) => (
     <h1 className={styles.title}>{MANAGERS_ONLY_COPY.forTheAdmin(name)}</h1>
     <p>
       {MANAGERS_ONLY_COPY.turnOffBefore}
-      <Link to="/settings">{COMMON_COPY.settings}</Link>
+      <Link to={ADMIN_PATH}>{ADMIN_COPY.heading}</Link>
       {MANAGERS_ONLY_COPY.turnOffAfter(forAdmin)}
     </p>
   </>

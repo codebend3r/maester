@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { DEFAULT_PLAYBACK_SETTINGS } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
+import { ScanControl } from '@/scanner/scanControl'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
@@ -43,6 +44,7 @@ describe('TracksService', () => {
       new FfmpegService(
         { ...readServerConfig({}), ffprobePath },
         { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+        new ScanControl(),
       ),
       index(),
     )

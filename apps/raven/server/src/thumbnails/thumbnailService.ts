@@ -9,12 +9,15 @@ import { thumbnailArgs, thumbnailSeek } from '@/ffmpeg/args'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
 import { MediaIndex } from '@/media/mediaIndex'
 import { createTaskQueue } from '@/scanner/concurrency'
+import { ScanControl } from '@/scanner/scanControl'
 
 const exists = async (path: string): Promise<boolean> =>
   stat(path).then(
     (info) => info.size > 0,
     () => false,
   )
+
+type ThumbnailServiceGenerateProps = { id: number; signal: AbortSignal }
 
 type ThumbnailServiceRenderProps = {
   input: string
@@ -38,8 +41,12 @@ export class ThumbnailService implements OnApplicationBootstrap {
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
+    @Inject(ScanControl) private readonly scans: ScanControl,
   ) {
-    this.queue = createTaskQueue({ concurrency: config.thumbnailConcurrency })
+    this.queue = createTaskQueue({
+      concurrency: config.thumbnailConcurrency,
+      signal: () => this.scans.signal,
+    })
     this.dir = join(config.dataDir, 'thumbnails')
     mkdirSync(this.dir, { recursive: true })
   }
@@ -58,7 +65,7 @@ export class ThumbnailService implements OnApplicationBootstrap {
   }
 
   enqueue(id: number): void {
-    this.queue.push({ key: String(id), task: () => this.generate(id) })
+    this.queue.push({ key: String(id), task: (signal) => this.generate({ id, signal }) })
   }
 
   /** Forget media that is gone: drop its queued work and its cached file. */
@@ -93,7 +100,7 @@ export class ThumbnailService implements OnApplicationBootstrap {
     }
   }
 
-  private async generate(id: number): Promise<void> {
+  private async generate({ id, signal }: ThumbnailServiceGenerateProps): Promise<void> {
     const file = this.index.fileOf(id)
     if (!file || file.thumbnail === THUMBNAIL_STATES.ready) return
     const tonemap = file.hdr && (await this.ffmpeg.canTonemap())
@@ -102,7 +109,7 @@ export class ThumbnailService implements OnApplicationBootstrap {
       // A duration that overstates the real stream can seek past the last
       // frame; the first frame beats no thumbnail at all.
       const temp = await this.render({ input: file.path, seek, tonemap }).catch((error: unknown) =>
-        seek > 0 && !(error instanceof FfmpegTimeoutError)
+        seek > 0 && !signal.aborted && !(error instanceof FfmpegTimeoutError)
           ? this.render({ input: file.path, seek: 0, tonemap })
           : Promise.reject(error),
       )
@@ -111,7 +118,7 @@ export class ThumbnailService implements OnApplicationBootstrap {
       this.index.setThumbnail({ id, state: THUMBNAIL_STATES.ready })
     } catch (error) {
       // A slow share is not a broken file: leave it pending for the next scan.
-      const retryLater = error instanceof FfmpegTimeoutError
+      const retryLater = error instanceof FfmpegTimeoutError || signal.aborted
       this.logger.warn(`No thumbnail for ${file.fileName}: ${errorMessage(error)}`)
       this.index.setThumbnail({ id, state: retryLater ? 'pending' : 'failed' })
     }

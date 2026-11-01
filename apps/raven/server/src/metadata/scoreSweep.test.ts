@@ -23,6 +23,7 @@ import {
 } from '@/metadata/scoreSweep'
 import { type MetadataFetch, type TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 import { BLANK_ITEM } from '@/metadata/tmdbShapes'
+import { ScanControl } from '@/scanner/scanControl'
 import { ScannerService } from '@/scanner/scannerService'
 import { adminCookie, holdOpen, NOT_WATCHING, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
@@ -145,7 +146,13 @@ describe('the score sweep', () => {
   }: SweepWithProps) => {
     const repository = scores()
     const libraries = new LibrariesRepository(database.get())
-    const sweep = new ScoreSweep(repository, new Scores(repository, omdb, mdblist), libraries, tmdb)
+    const sweep = new ScoreSweep(
+      repository,
+      new Scores(repository, omdb, mdblist),
+      libraries,
+      tmdb,
+      new ScanControl(),
+    )
     sweeps.push(sweep)
     return { sweep, repository, libraries, tmdbScore: tmdb.score }
   }

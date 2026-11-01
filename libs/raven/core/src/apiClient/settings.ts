@@ -1,5 +1,8 @@
 import type { Transport } from '@/apiClient/transport'
 import {
+  isScanControlState,
+  SCAN_CONTROL_PATH,
+  type ScanControlState,
   type DisplaySettings,
   type DisplaySettingsChange,
   isDisplaySettings,
@@ -10,6 +13,14 @@ import {
 
 /** The server's settings, set once for every viewer. */
 export const settingsCalls = ({ send, expect }: Transport) => ({
+  getScanControl: (): Promise<ScanControlState> =>
+    expect({ request: send({ path: SCAN_CONTROL_PATH }), guard: isScanControlState }),
+
+  setScanControl: (state: ScanControlState): Promise<ScanControlState> =>
+    expect({
+      request: send({ path: SCAN_CONTROL_PATH, method: 'PUT', body: state }),
+      guard: isScanControlState,
+    }),
   /** How the server plays video, and what that comes to on this machine. */
   getPlaybackSettings: (): Promise<PlaybackSettingsState> =>
     expect({

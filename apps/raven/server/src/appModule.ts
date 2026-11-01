@@ -108,6 +108,7 @@ import { TracksService } from '@/playback/tracksService'
 import { MarkersService } from '@/markers/markersService'
 import { MarkerJobs } from '@/markers/markerJobs'
 import { MarkerDetection } from '@/markers/markerDetection'
+import { ScanControl } from '@/scanner/scanControl'
 import { assertRoutesMarked } from '@/routeMarks'
 import { isNetworkShare, watchFolder } from '@/scanner/folderWatch'
 import { LibraryWatcher, WATCH_OPTIONS, type WatchOptions } from '@/scanner/libraryWatcher'
@@ -272,6 +273,7 @@ export class AppModule {
         MarkersService,
         MarkerJobs,
         MarkerDetection,
+        ScanControl,
         KeyframesService,
         { provide: CLOCK, useValue: SYSTEM_CLOCK },
         HlsSessions,

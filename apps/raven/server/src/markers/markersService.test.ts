@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { DEFAULT_PLAYBACK_SETTINGS, MARKER_KINDS, MARKER_SOURCES } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
+import { ScanControl } from '@/scanner/scanControl'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MarkersService } from '@/markers/markersService'
@@ -29,6 +30,7 @@ describe('MarkersService', () => {
       new FfmpegService(
         { ...readServerConfig({}), ffprobePath },
         { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+        new ScanControl(),
       ),
       index(),
     )

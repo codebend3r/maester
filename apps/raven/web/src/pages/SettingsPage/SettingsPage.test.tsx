@@ -12,13 +12,17 @@ import {
 } from '@raven/core'
 import { usePlayerPrefs } from '@raven/ui/headless'
 import { api } from '@/lib/api'
-import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
+import { AdminPage, SettingsPage as ViewerSettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { held } from '@/test/held'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { useServerReach } from '@/stores/serverReach'
 import { asDesktop, downloadsMain } from '@/test/desktop'
 import { fakeAccount, readyConfig } from '@/test/authClient'
 import { renderWithProviders } from '@/test/render'
+
+const scanState = spyOn(api, 'getScanControl')
+beforeEach(() => scanState.mockResolvedValue({ isStopped: false }))
+afterEach(() => scanState.mockReset())
 
 const STATE: PlaybackSettingsState = {
   settings: DEFAULT_PLAYBACK_SETTINGS,
@@ -38,7 +42,8 @@ const CHANGED: PlaybackSettingsState = {
 
 const iconOf = (element: HTMLElement) => element.querySelector('svg')?.dataset.icon ?? null
 
-describe('SettingsPage', () => {
+describe('AdminPage', () => {
+  const SettingsPage = AdminPage
   const spies = {
     get: spyOn(api, 'getPlaybackSettings'),
     set: spyOn(api, 'setPlaybackSettings'),
@@ -197,25 +202,12 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('radio', { name: /Remux and transcode/ })).toBeChecked()
   })
 
-  it('shows the settings but keeps them as they are while the admin lock is on', async () => {
+  it('hides server settings while the legacy admin lock is on', () => {
     servePlayback(CHANGED)
-    renderWithProviders({
-      ui: <SettingsPage />,
-      playback: null,
-      display: null,
-      adminLock: { state: 'on', available: true },
-    })
-    await screen.findByRole('group', { name: 'Movie titles' })
-    const controls = [
-      ...screen.getAllByRole('radio'),
-      screen.getByRole('checkbox', { name: /HDR/ }),
-    ]
-    expect(controls).toHaveLength(18)
-    controls.forEach((control) => expect(control).toBeDisabled())
-    expect(screen.getByRole('radio', { name: /Remux only/ })).toBeChecked()
-    expect(screen.getAllByText('Turn the admin lock off below to change these.')).toHaveLength(2)
+    renderWithProviders({ ui: <SettingsPage />, adminLock: { state: 'on', available: true } })
+    expect(screen.queryByRole('group', { name: 'Movie titles' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Reset to defaults' })).toBeNull()
-    await userEvent.click(screen.getByRole('radio', { name: /Remux and transcode/ }))
+    expect(scanState).not.toHaveBeenCalled()
     expect(spies.set).not.toHaveBeenCalled()
   })
 
@@ -226,7 +218,8 @@ describe('SettingsPage', () => {
   })
 })
 
-describe('the admin lock on SettingsPage', () => {
+describe('the admin lock on AdminPage', () => {
+  const SettingsPage = AdminPage
   const spies = {
     get: spyOn(api, 'getAdminLock'),
     unlock: spyOn(api, 'unlockAdmin'),
@@ -304,6 +297,7 @@ describe('the admin lock on SettingsPage', () => {
 })
 
 describe('Open videos in Raven on SettingsPage', () => {
+  const SettingsPage = ViewerSettingsPage
   const spies = { get: spyOn(api, 'getPlaybackSettings') }
 
   beforeEach(() => spies.get.mockImplementation(async () => STATE))
@@ -314,7 +308,7 @@ describe('Open videos in Raven on SettingsPage', () => {
   it('sits in Playback, off until this browser turns it on', async () => {
     renderWithProviders({ ui: <SettingsPage />, playback: null })
     const playback = screen.getByRole('region', { name: 'Playback' })
-    await within(playback).findByRole('radio', { name: /Remux only/ })
+    expect(within(playback).queryByRole('radio')).toBeNull()
     expect(within(playback).getByRole('heading', { name: 'This browser' })).toBeInTheDocument()
     expect(toggle()).not.toBeChecked()
     expect(toggle().closest('label')).toHaveTextContent(
@@ -333,8 +327,8 @@ describe('Open videos in Raven on SettingsPage', () => {
       playback: null,
       adminLock: { state: 'on', available: true },
     })
-    expect(await screen.findByRole('radio', { name: /Remux only/ })).toBeDisabled()
-    expect(screen.getByRole('checkbox', { name: /Tone map HDR/ })).toBeDisabled()
+    expect(screen.queryByRole('radio', { name: /Remux only/ })).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: /Tone map HDR/ })).toBeNull()
     expect(toggle()).toBeEnabled()
     await userEvent.click(toggle())
     expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(true)
@@ -345,13 +339,14 @@ describe('Open videos in Raven on SettingsPage', () => {
       throw new Error('The server is away.')
     })
     renderWithProviders({ ui: <SettingsPage />, playback: null })
-    expect(await screen.findByText('The server is away.')).toBeInTheDocument()
+    expect(screen.queryByText('The server is away.')).toBeNull()
     await userEvent.click(toggle())
     expect(usePlayerPrefs.getState().opensInRavenPlayer).toBe(true)
   })
 })
 
 describe('Autoplay on SettingsPage', () => {
+  const SettingsPage = ViewerSettingsPage
   const spies = { get: spyOn(api, 'getPlaybackSettings') }
 
   beforeEach(() => spies.get.mockImplementation(async () => STATE))
@@ -396,6 +391,7 @@ describe('Autoplay on SettingsPage', () => {
 })
 
 describe('Advanced on SettingsPage', () => {
+  const SettingsPage = ViewerSettingsPage
   const spies = { get: spyOn(api, 'getPlaybackSettings') }
 
   beforeEach(() => spies.get.mockImplementation(async () => STATE))
@@ -424,12 +420,13 @@ describe('Advanced on SettingsPage', () => {
     })
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(['Playback', 'Display', 'Advanced', 'Admin'])
+    ).toEqual(['Playback', 'Advanced'])
     expect(slider()).toBeEnabled()
   })
 })
 
 describe('accounts on SettingsPage', () => {
+  const SettingsPage = ViewerSettingsPage
   const spies = {
     playback: spyOn(api, 'getPlaybackSettings'),
     me: spyOn(api, 'getMe'),
@@ -459,7 +456,7 @@ describe('accounts on SettingsPage', () => {
 
   it('shows neither Account nor Users while accounts are off', () => {
     renderWithProviders({ ui: <SettingsPage /> })
-    expect(headings()).toEqual(['Playback', 'Display', 'Advanced', 'Admin'])
+    expect(headings()).toEqual(['Playback', 'Advanced'])
     expect(spies.me).not.toHaveBeenCalled()
     expect(spies.members).not.toHaveBeenCalled()
   })
@@ -469,28 +466,29 @@ describe('accounts on SettingsPage', () => {
       ui: <SettingsPage />,
       authConfig: { state: AUTH_CONFIG_STATES.unavailable },
     })
-    expect(headings()).toEqual(['Playback', 'Display', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Advanced'])
     expect(spies.me).not.toHaveBeenCalled()
   })
 
   it('shows neither to an account that is not approved', async () => {
     renderSignedIn(fakeAccount({ status: MEMBER_STATUSES.pending, isOwner: true }))
     await waitFor(() => expect(spies.me).toHaveBeenCalled())
-    expect(headings()).toEqual(['Playback', 'Display', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Advanced'])
     expect(spies.members).not.toHaveBeenCalled()
   })
 
   it('shows Account but not Users to a member', async () => {
     renderSignedIn(fakeAccount())
     await screen.findByRole('heading', { name: 'Account' })
-    expect(headings()).toEqual(['Playback', 'Display', 'Account', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Account', 'Advanced'])
     expect(spies.members).not.toHaveBeenCalled()
   })
 
-  it('shows Account and Users, after Display, to the owner', async () => {
+  it('keeps admin settings and Users off the personal settings page for the owner too', async () => {
     renderSignedIn(fakeAccount({ isOwner: true }))
-    await screen.findByRole('heading', { name: 'Users' })
-    expect(headings()).toEqual(['Playback', 'Display', 'Account', 'Users', 'Advanced'])
+    await screen.findByRole('heading', { name: 'Account' })
+    expect(headings()).toEqual(['Playback', 'Account', 'Advanced'])
+    expect(spies.members).not.toHaveBeenCalled()
   })
 
   describe('who may change the server settings', () => {
@@ -504,6 +502,8 @@ describe('accounts on SettingsPage', () => {
 
     it('lets the owner change them, with no admin lock section and no request for the lock', async () => {
       renderSignedIn(fakeAccount({ isOwner: true }))
+      cleanup()
+      renderWithProviders({ ui: <AdminPage />, account: fakeAccount({ isOwner: true }) })
       await screen.findByRole('heading', { name: 'Users' })
       const remuxOnly = await screen.findByRole('radio', { name: /Remux only/ })
       expect(remuxOnly).toBeEnabled()
@@ -515,9 +515,11 @@ describe('accounts on SettingsPage', () => {
     it('holds them for a member, who is told only the owner can change them', async () => {
       renderSignedIn(fakeAccount())
       await screen.findByRole('heading', { name: 'Account' })
-      const remuxOnly = await screen.findByRole('radio', { name: /Remux only/ })
-      expect(remuxOnly).toBeDisabled()
-      expect(screen.getAllByText('Only the owner can change these.')).toHaveLength(2)
+      expect(screen.queryByRole('radio', { name: /Remux only/ })).toBeNull()
+      cleanup()
+      renderWithProviders({ ui: <AdminPage />, account: fakeAccount() })
+      expect(screen.queryByRole('heading', { name: 'Users' })).toBeNull()
+      expect(scanState).not.toHaveBeenCalled()
       expect(screen.queryByText(/admin lock/i)).toBeNull()
       expect(adminLock).not.toHaveBeenCalled()
       expect(setPlayback).not.toHaveBeenCalled()
@@ -526,6 +528,7 @@ describe('accounts on SettingsPage', () => {
 })
 
 describe('SettingsPage inside Raven', () => {
+  const SettingsPage = ViewerSettingsPage
   const spies = { get: spyOn(api, 'getPlaybackSettings') }
 
   beforeEach(() => spies.get.mockImplementation(async () => STATE))
@@ -537,7 +540,7 @@ describe('SettingsPage inside Raven', () => {
   it("adds the app's own sections, and leaves out this browser's Raven toggle", async () => {
     asDesktop(downloadsMain())
     renderWithProviders({ ui: <SettingsPage />, playback: null })
-    await screen.findByRole('radio', { name: /Remux only/ })
+    expect(screen.queryByRole('radio', { name: /Remux only/ })).toBeNull()
     expect(screen.queryByRole('checkbox', { name: /^Open videos in Raven/ })).toBeNull()
     expect(screen.getByRole('heading', { name: 'This app' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /^Autoplay/ })).toBeChecked()

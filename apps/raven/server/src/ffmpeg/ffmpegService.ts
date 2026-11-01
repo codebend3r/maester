@@ -14,6 +14,7 @@ import { type Chapter, ENCODER_KINDS, HW_ACCELS } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
 import { SettingsRepository } from '@/settings/settingsRepository'
+import { ScanControl } from '@/scanner/scanControl'
 import { encoderTestArgs } from '@/ffmpeg/args'
 import { parseChapters } from '@/ffmpeg/chapters'
 import { SOFTWARE, type VideoEncoder, encoderCandidates } from '@/ffmpeg/encoder'
@@ -97,6 +98,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
   constructor(
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(SettingsRepository) private readonly settings: Pick<SettingsRepository, 'playback'>,
+    @Inject(ScanControl) private readonly scans: ScanControl,
   ) {}
 
   /** ffprobe's full `-show_format -show_streams -show_chapters` report, parsed but unchecked. */
@@ -229,7 +231,12 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
       const child = execFile(
         this.config.ffmpegPath,
         args,
-        { encoding: 'buffer', timeout: seconds * 1000, maxBuffer: 64 * 1024 * 1024 },
+        {
+          encoding: 'buffer',
+          timeout: seconds * 1000,
+          maxBuffer: 64 * 1024 * 1024,
+          signal: this.scans.signal,
+        },
         (error, stdout, stderr) => {
           if (error == null) {
             resolve(stdout)

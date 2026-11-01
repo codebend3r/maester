@@ -16,13 +16,14 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
   const position = useAudioQueue((store) => store.position)
   const duration = useAudioQueue((store) => store.duration)
   const error = useAudioQueue((store) => store.error)
+  const clear = useAudioQueue((store) => store.clear)
   const toggle = useAudioQueue((store) => store.toggle)
   const skipNext = useAudioQueue((store) => store.next)
   const skipPrevious = useAudioQueue((store) => store.previous)
   const isPlaying = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
   const fraction = duration === null || duration === 0 ? 0 : Math.min(position / duration, 1)
   return (
-    <section className={styles.bar} aria-label={NOW_PLAYING_BAR_COPY.nowPlaying}>
+    <section className={styles.bar} aria-label={NOW_PLAYING_BAR_COPY.miniPlayer}>
       <Link
         to={NOW_PLAYING_PATH}
         className={styles.cover}
@@ -42,6 +43,15 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
         <span className={styles.artists}>{error === null ? artistNames(track) : error}</span>
       </Link>
       <div className={styles.controls}>
+        {state === AUDIO_STATES.playing && (
+          <span className={styles.equalizer} aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </span>
+        )}
         <Button
           tone="ghost"
           icon="skipPrevious"
@@ -60,6 +70,7 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
           aria-label={NOW_PLAYING_BAR_COPY.nextTrack}
           onClick={skipNext}
         />
+        <Button tone="ghost" icon="close" aria-label={NOW_PLAYING_BAR_COPY.close} onClick={clear} />
       </div>
       <div className={styles.progress} aria-hidden="true">
         <span className={styles.played} style={{ transform: `scaleX(${fraction})` }} />

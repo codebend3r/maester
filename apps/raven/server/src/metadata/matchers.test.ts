@@ -4,6 +4,7 @@ import { Logger } from '@nestjs/common'
 import { type LibraryKind, TIER_SETS } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
+import { ScanControl } from '@/scanner/scanControl'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -52,7 +53,11 @@ describe('matching by library type', () => {
     }
     const { images, metadata, scores } = repositories(database.get())
     const files = new MatchFiles(database.get(), metadata)
-    const ffmpeg = new FfmpegService(config, new SettingsRepository(database.get()))
+    const ffmpeg = new FfmpegService(
+      config,
+      new SettingsRepository(database.get()),
+      new ScanControl(),
+    )
     const cache = new ImageCache(config, tmdb.fetch, ffmpeg)
     const pictures = new ItemPictures(metadata, files, cache, images, {
       keptCovers: () => ({ albumIds: new Set(), coverArtIds: new Set() }),

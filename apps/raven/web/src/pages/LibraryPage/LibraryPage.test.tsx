@@ -39,6 +39,7 @@ describe('LibraryPage', () => {
     lockState: spyOn(api, 'getLock'),
     lock: spyOn(api, 'lock'),
     ratings: spyOn(api, 'updateLibraryRatings'),
+    markers: spyOn(api, 'scanLibraryMarkers'),
     counts: spyOn(api, 'getLibraryCounts').mockImplementation(async () => libraryCounts()),
   }
   const state: { sent: LibraryViewChange[]; listed: Array<{ sort?: MediaSort; seed?: number }> } = {
@@ -87,6 +88,7 @@ describe('LibraryPage', () => {
     spies.lockState.mockReset()
     spies.lock.mockReset()
     spies.ratings.mockReset()
+    spies.markers.mockReset()
     state.sent = []
     state.listed = []
   })
@@ -370,6 +372,21 @@ describe('LibraryPage', () => {
     )
   })
 
+  it('scans intros and credits for this library from one button', async () => {
+    spies.markers.mockResolvedValue(library({ id: 2 }))
+    serve({ settings: { kind: 'movies' } })
+    await userEvent.click(await screen.findByRole('button', { name: /^Scan intros and credits/ }))
+    expect(spies.markers).toHaveBeenCalledWith(2)
+    expect(await screen.findByText('Intro and credits scan queued.')).toBeInTheDocument()
+  })
+
+  it('reports a refused intro and credits scan', async () => {
+    spies.markers.mockRejectedValue(new Error('Scans are stopped'))
+    serve({ settings: { kind: 'movies' } })
+    await userEvent.click(await screen.findByRole('button', { name: /^Scan intros and credits/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Scans are stopped')
+  })
+
   it('updates the library’s ratings from its header', async () => {
     spies.ratings.mockImplementation(async () => library({ id: 2 }))
     serve()
@@ -440,6 +457,7 @@ describe('LibraryPage', () => {
     expect(await screen.findByRole('link', { name: /^History/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Quick scan/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Full scan/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Scan intros and credits/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Update ratings/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Match again/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull()

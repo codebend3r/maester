@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { readServerConfig } from '@/config'
 import { DEFAULT_PLAYBACK_SETTINGS, type HwAccel } from '@raven/core'
 import { FfmpegService, FfmpegTimeoutError } from '@/ffmpeg/ffmpegService'
+import { ScanControl } from '@/scanner/scanControl'
 import { RUN_EVENTS, RUN_SIGNALS } from '@/hls/segmentRun'
 
 describe('FfmpegService', () => {
@@ -70,6 +71,7 @@ describe('FfmpegService', () => {
         markerTimeoutSeconds: 1,
       },
       { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+      new ScanControl(),
     )
 
   it('warns at start when ffmpeg and ffprobe are different builds', async () => {
@@ -82,6 +84,7 @@ describe('FfmpegService', () => {
           ffprobePath: join(state.dir, 'ffprobe-9'),
         },
         { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+        new ScanControl(),
       ).warnOfMismatchedTools()
       expect(warn).toHaveBeenCalledTimes(1)
       expect(warn).toHaveBeenCalledWith(
@@ -175,6 +178,7 @@ describe('FfmpegService', () => {
         keyframeProbeTimeoutSeconds: 10,
       },
       { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+      new ScanControl(),
     )
 
     expect(await sleepy.probeKeyframes('/media/a.mkv')).toEqual([0])
@@ -193,6 +197,7 @@ describe('FfmpegService', () => {
           vaapiDevice: join(state.dir, 'renderD128'),
         },
         { playback: () => DEFAULT_PLAYBACK_SETTINGS },
+        new ScanControl(),
       ).videoEncoder()
 
     it('uses the GPU when its test encode works', async () => {

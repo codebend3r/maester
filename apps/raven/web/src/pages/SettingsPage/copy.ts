@@ -41,8 +41,6 @@ export const SETTINGS_COPY = {
   displayHint: 'How pages look, for every viewer.',
   movieTitles: 'Movie titles',
   section: {
-    changeThese: 'change these',
-    below: 'below',
     saveFailed: 'Could not save: ',
     reading: 'Reading the settings',
   },

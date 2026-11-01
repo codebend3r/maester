@@ -151,6 +151,7 @@ const useAudioElement = ({ ref, id, src, start, rate }: UseAudioElementProps) =>
     if (!element) return
     if (id === null) {
       loaded.current = null
+      element.pause()
       element.removeAttribute('src')
       element.load()
       return
@@ -207,7 +208,7 @@ const useAudioElement = ({ ref, id, src, start, rate }: UseAudioElementProps) =>
     on: {
       playing: () => engine.state(AUDIO_STATES.playing),
       pause: (element) => {
-        if (!element.ended) engine.state(AUDIO_STATES.paused)
+        if (id !== null && !element.ended) engine.state(AUDIO_STATES.paused)
       },
       waiting: () => engine.state(AUDIO_STATES.loading),
       timeupdate: report,

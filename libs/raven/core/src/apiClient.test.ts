@@ -174,6 +174,22 @@ describe('createApiClient', () => {
     expect(calls[0]?.url).toBe('http://nas:8484/api/libraries/3/media?sort=random&seed=42')
   })
 
+  it('reads and changes the global scan switch with a validated response', async () => {
+    const { client, calls } = clientReturning(respond({ body: { isStopped: true } }))
+    await expect(client.getScanControl()).resolves.toEqual({ isStopped: true })
+    await expect(client.setScanControl({ isStopped: true })).resolves.toEqual({ isStopped: true })
+    expect(calls.map(({ url }) => url)).toEqual([
+      'http://nas:8484/api/admin/scans',
+      'http://nas:8484/api/admin/scans',
+    ])
+    expect(calls[1]?.init).toMatchObject({
+      method: 'PUT',
+      body: JSON.stringify({ isStopped: true }),
+    })
+    const invalid = clientReturning(respond({ body: { isStopped: 'yes' } }))
+    await expect(invalid.client.getScanControl()).rejects.toBeInstanceOf(ApiError)
+  })
+
   it('asks the server to match a library again', async () => {
     const { client, calls } = clientReturning(respond({ body: library() }))
     await expect(client.matchLibrary(3)).resolves.toEqual(library())
@@ -185,6 +201,7 @@ describe('createApiClient', () => {
 
   it.each([
     { call: 'scanLibrary', path: 'scan' },
+    { call: 'scanLibraryMarkers', path: 'markers' },
     { call: 'cancelScan', path: 'scan/cancel' },
     { call: 'quickScanLibrary', path: 'quick-scan' },
     { call: 'cancelQuickScan', path: 'quick-scan/cancel' },
