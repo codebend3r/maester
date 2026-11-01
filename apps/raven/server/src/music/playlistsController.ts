@@ -20,15 +20,16 @@ import {
   type PlaylistDetails,
   type PlaylistSummary,
   isPlaylistInput,
+  isPlaylistSharing,
   isPlaylistTracksChange,
 } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { Management } from '@/auth/management'
-import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { ViewingAccounts } from '@/media/viewingAccounts'
+import { ListenerScopes } from '@/music/listenerScope'
 import { MusicRepository } from '@/music/musicRepository'
 import { Playlists } from '@/music/playlists'
 
@@ -36,7 +37,7 @@ const NAME_REFUSAL = `name must hold something besides spaces, up to ${PLAYLIST_
 
 const TRACKS_REFUSAL = `mediaIds must list up to ${PLAYLIST_LIMITS.tracks} track ids`
 
-type PlaylistsControllerScopeProps = { request: FastifyRequest }
+const SHARING_REFUSAL = 'isShared must be true or false'
 
 type PlaylistsControllerFindProps = { id: number; request: FastifyRequest }
 
@@ -48,11 +49,13 @@ type PlaylistsControllerCheckTracksProps = {
 type PlaylistsControllerTracksChangeProps = { id: number; body: unknown; request: FastifyRequest }
 
 /**
- * The calling account's playlists. A playlist is in no library, so the lock
+ * The calling account's playlists, and every account's shared ones, which
+ * it may read, play and copy. A playlist is in no library, so the lock
  * holds no route by its id; what a playlist holds is filtered instead: a
  * track in a library this caller may not see is left out of every answer
- * and cannot be added, as an album's page and its routes treat it. Another
- * account's playlist is answered as none at all.
+ * and every copy, and cannot be added, as an album's page and its routes
+ * treat it. Another account's playlist is answered as none at all when it
+ * is not shared, and to every write when it is.
  */
 @Controller('api/playlists')
 @Public()
@@ -60,24 +63,22 @@ export class PlaylistsController {
   constructor(
     @Inject(Playlists) private readonly playlists: Playlists,
     @Inject(MusicRepository) private readonly music: MusicRepository,
-    @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(LockService) private readonly lock: LockService,
     @Inject(Management) private readonly management: Management,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
+    @Inject(ListenerScopes) private readonly scopes: ListenerScopes,
   ) {}
 
-  /** Whose playlists a request reads, and the libraries whose tracks it may not see. */
-  private scope({ request }: PlaylistsControllerScopeProps) {
-    const viewer = this.lock.viewer({ request })
-    return {
-      account: this.accounts.keyOf({ request }),
-      hidden: [...this.libraries.lockedIds()].filter((id) => !viewer.seesLibrary(id)),
-    }
+  private find({ id, request }: PlaylistsControllerFindProps): PlaylistDetails {
+    const playlist = this.playlists.get({ id, ...this.scopes.of({ request }) })
+    if (!playlist) throw new NotFoundException(`No playlist ${id}`)
+    return playlist
   }
 
-  private find({ id, request }: PlaylistsControllerFindProps): PlaylistDetails {
-    const playlist = this.playlists.get({ id, ...this.scope({ request }) })
-    if (!playlist) throw new NotFoundException(`No playlist ${id}`)
+  /** The account's own playlist `id`; 404 for one it may only read, as for none. */
+  private findOwn({ id, request }: PlaylistsControllerFindProps): PlaylistDetails {
+    const playlist = this.find({ id, request })
+    if (!playlist.playlist.isOwn) throw new NotFoundException(`No playlist ${id}`)
     return playlist
   }
 
@@ -107,15 +108,15 @@ export class PlaylistsController {
    */
   private tracksChange({ id, body, request }: PlaylistsControllerTracksChangeProps) {
     if (!isPlaylistTracksChange(body)) throw new BadRequestException(TRACKS_REFUSAL)
-    this.find({ id, request })
+    this.findOwn({ id, request })
     this.checkTracks({ mediaIds: body.mediaIds, request })
-    return { id, mediaIds: body.mediaIds, ...this.scope({ request }) }
+    return { id, mediaIds: body.mediaIds, ...this.scopes.of({ request }) }
   }
 
-  /** The account's playlists, most recently changed first. */
+  /** The account's playlists and every account's shared ones, most recently changed first. */
   @Get()
   list(@Req() request: FastifyRequest): PlaylistSummary[] {
-    return this.playlists.list(this.scope({ request }))
+    return this.playlists.list(this.scopes.of({ request }))
   }
 
   @ForViewers()
@@ -182,5 +183,32 @@ export class PlaylistsController {
   ): PlaylistDetails {
     this.playlists.append(this.tracksChange({ id, body, request }))
     return this.find({ id, request })
+  }
+
+  /** Shares the account's own playlist with every account, or stops sharing it. */
+  @ForViewers()
+  @Put(':id/sharing')
+  setSharing(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+  ): PlaylistDetails {
+    if (!isPlaylistSharing(body)) throw new BadRequestException(SHARING_REFUSAL)
+    const isChanged = this.playlists.share({
+      id,
+      isShared: body.isShared,
+      account: this.accounts.keyOf({ request }),
+    })
+    if (!isChanged) throw new NotFoundException(`No playlist ${id}`)
+    return this.find({ id, request })
+  }
+
+  /** Copies a playlist the account may read, its own or a shared one, into a new one of its own. */
+  @ForViewers()
+  @Post(':id/copy')
+  copy(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): PlaylistDetails {
+    const copy = this.playlists.copy({ id, ...this.scopes.of({ request }) })
+    if (copy === null) throw new NotFoundException(`No playlist ${id}`)
+    return this.find({ id: copy, request })
   }
 }

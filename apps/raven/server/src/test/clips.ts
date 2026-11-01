@@ -373,6 +373,10 @@ type EncodeTrackProps = {
       | 'MUSICBRAINZ_ALBUMID'
       | 'MUSICBRAINZ_TRACKID'
       | 'MUSICBRAINZ_ARTISTID'
+      | 'REPLAYGAIN_TRACK_GAIN'
+      | 'REPLAYGAIN_TRACK_PEAK'
+      | 'REPLAYGAIN_ALBUM_GAIN'
+      | 'REPLAYGAIN_ALBUM_PEAK'
       | 'lyrics',
       string
     >

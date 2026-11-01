@@ -116,6 +116,17 @@ export const isTrack = object({
   addedAt: isString,
   /** The album's name and cover, so a queue, the bar and the lock screen need no second fetch. */
   album: object({ title: isString, coverVersion: nullable(isString) }),
+  /**
+   * ReplayGain in dB and true peaks as ratios of full scale, from the tags
+   * or the server's loudness scan; null where neither gave one. `levelOf`
+   * turns them into a volume factor.
+   */
+  gain: object({
+    track: nullable(isNumber),
+    album: nullable(isNumber),
+    trackPeak: nullable(isNumber),
+    albumPeak: nullable(isNumber),
+  }),
 })
 
 export type Track = Infer<typeof isTrack>

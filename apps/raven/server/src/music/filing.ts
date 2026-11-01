@@ -38,11 +38,15 @@ export type NamedArtist = { name: string; mbid: string | null }
 
 type NamedArtistsProps = { names: readonly string[]; mbids: readonly string[] }
 
-/** Each name with its id, where the tags list as many ids as names; else with none. */
+/**
+ * Each name with its id, where the tags list as many ids as names; else with
+ * none. Ids are kept lowercase, as MusicBrainz and ListenBrainz send them, so
+ * they join by plain equality on `artists.mbid`'s index.
+ */
 const namedArtists = ({ names, mbids }: NamedArtistsProps): NamedArtist[] =>
   names.map((name, at) => ({
     name,
-    mbid: mbids.length === names.length ? (mbids[at] ?? null) : null,
+    mbid: mbids.length === names.length ? (mbids[at]?.toLowerCase() ?? null) : null,
   }))
 
 /** How a file is filed: its album's identity and credits, read off its tags and, failing those, its folder. */

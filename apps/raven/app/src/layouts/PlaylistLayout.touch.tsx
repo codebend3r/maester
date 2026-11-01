@@ -14,7 +14,8 @@ const { ToolButton } = touchPicker
 
 /**
  * A playlist under the thumb: its name and facts, Play, Shuffle, Rename and Delete, then its
- * tracks, each pressed to play from it, moved up or taken out where it is.
+ * tracks, each pressed to play from it, moved up or taken out where it is. Another account's
+ * shared playlist offers only the playing.
  */
 export const PlaylistLayout = ({
   name,
@@ -22,6 +23,7 @@ export const PlaylistLayout = ({
   tracks,
   playingId,
   note,
+  isOwn,
   onPlay,
   onShuffle,
   onPlayFrom,
@@ -55,27 +57,29 @@ export const PlaylistLayout = ({
             tone={BUTTON_TONES.quiet}
           />
         </View>
-        <View style={styles.controls}>
-          <ToolButton
-            accessibilityLabel={MUSIC_COPY.renamePlaylist}
-            icon="edit"
-            label={MUSIC_COPY.rename}
-            onPress={() =>
-              askPlaylistName({
-                title: MUSIC_COPY.renamePlaylist,
-                initial: name,
-                submit: MUSIC_COPY.rename,
-                onName: onRename,
-              })
-            }
-          />
-          <ToolButton
-            accessibilityLabel={MUSIC_COPY.delete}
-            icon="trash"
-            label={MUSIC_COPY.delete}
-            onPress={() => confirmDeletePlaylist({ name, onDelete })}
-          />
-        </View>
+        {isOwn && (
+          <View style={styles.controls}>
+            <ToolButton
+              accessibilityLabel={MUSIC_COPY.renamePlaylist}
+              icon="edit"
+              label={MUSIC_COPY.rename}
+              onPress={() =>
+                askPlaylistName({
+                  title: MUSIC_COPY.renamePlaylist,
+                  initial: name,
+                  submit: MUSIC_COPY.rename,
+                  onName: onRename,
+                })
+              }
+            />
+            <ToolButton
+              accessibilityLabel={MUSIC_COPY.delete}
+              icon="trash"
+              label={MUSIC_COPY.delete}
+              onPress={() => confirmDeletePlaylist({ name, onDelete })}
+            />
+          </View>
+        )}
         {note !== null && <Text style={styles.error}>{note}</Text>}
       </View>
       {isEmpty && <Text style={styles.muted}>{MUSIC_COPY.emptyPlaylist(name)}</Text>}
@@ -89,7 +93,7 @@ export const PlaylistLayout = ({
             onPress={() => onPlayFrom(track.index)}
             title={track.title}
           >
-            {track.index > 0 && (
+            {isOwn && track.index > 0 && (
               <ToolButton
                 accessibilityLabel={MUSIC_COPY.moveUp(track.title)}
                 icon="up"
@@ -97,12 +101,14 @@ export const PlaylistLayout = ({
                 onPress={() => onMoveUp(track.index)}
               />
             )}
-            <ToolButton
-              accessibilityLabel={MUSIC_COPY.removeFrom(track.title)}
-              icon="close"
-              label={MUSIC_COPY.remove}
-              onPress={() => onRemove(track.index)}
-            />
+            {isOwn && (
+              <ToolButton
+                accessibilityLabel={MUSIC_COPY.removeFrom(track.title)}
+                icon="close"
+                label={MUSIC_COPY.remove}
+                onPress={() => onRemove(track.index)}
+              />
+            )}
           </ListEntry>
         ))}
       </View>

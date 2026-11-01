@@ -42,6 +42,7 @@ const track = (id: number): Track => ({
   mbid: null,
   addedAt: '2026-01-01T00:00:00Z',
   album: { title: 'OK Computer', coverVersion: 'v1' },
+  gain: { track: null, album: null, trackPeak: null, albumPeak: null },
 })
 
 const ALBUM = [track(1), track(2), track(3)]

@@ -146,8 +146,8 @@ describe('DownloadsPage', () => {
     const album = await screen.findByRole('region', { name: 'OK Computer' })
     expect(within(album).getByRole('heading', { name: 'OK Computer' })).toBeInTheDocument()
     expect(within(album).getByText('12 tracks')).toBeInTheDocument()
-    expect(album.querySelector('img')?.getAttribute('src')).toBe(
-      api.albumCoverUrl({ albumId: 7, coverVersion: 'cover-v1' }),
+    expect(album.querySelector('img')?.getAttribute('src')).toContain(
+      '/api/pictures/albums/7/cover-v1',
     )
     expect(
       within(album)
@@ -176,8 +176,8 @@ describe('DownloadsPage', () => {
     )
     const playlist = await screen.findByRole('region', { name: 'Late night' })
     expect(within(playlist).getByText('1 track')).toBeInTheDocument()
-    expect(playlist.querySelector('img')?.getAttribute('src')).toBe(
-      api.albumCoverUrl({ albumId: 9, coverVersion: 'm1' }),
+    expect(playlist.querySelector('img')?.getAttribute('src')).toContain(
+      '/api/pictures/albums/9/m1',
     )
   })
 

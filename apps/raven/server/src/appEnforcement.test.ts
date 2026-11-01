@@ -138,6 +138,7 @@ it('declares every route exactly as the inventory says', () => {
       ROUTES.itemPicture,
       ROUTES.photoPicture,
       ROUTES.albumCover,
+      ROUTES.lastFmCallback,
     ].toSorted(byRoute),
   )
 })
@@ -148,6 +149,9 @@ const CAPABILITY_ROUTES: ReadonlySet<Route> = new Set([
   ROUTES.photoPicture,
   ROUTES.albumCover,
 ])
+
+/** The open routes a signed state names the account for: they answer only a live one. */
+const STATE_ROUTES: ReadonlySet<Route> = new Set([ROUTES.lastFmCallback])
 
 it("opens only an HLS session's own routes to its capability, and only `file` and `transcode` to a ticket's pass", () => {
   const marks = routeMarks(CONTROLLERS)
@@ -201,7 +205,10 @@ describe('the default-deny gate', () => {
   it('answers the open routes to anyone without asking about accounts', async () => {
     const open = asSent(
       ROUTE_LIST.filter(
-        (route) => route.account === ACCOUNT_REQUIREMENTS.anyone && !CAPABILITY_ROUTES.has(route),
+        (route) =>
+          route.account === ACCOUNT_REQUIREMENTS.anyone &&
+          !CAPABILITY_ROUTES.has(route) &&
+          !STATE_ROUTES.has(route),
       ),
     )
     const callers: readonly CallerKind[] = [CALLER_KINDS.anonymous, CALLER_KINDS.member]
@@ -217,6 +224,22 @@ describe('the default-deny gate', () => {
       }),
     )
     expect(statuses.flat()).toEqual(Array.from({ length: open.length * callers.length }, () => 200))
+    expect(fixture.fetcher).not.toHaveBeenCalled()
+  })
+
+  it("answers Last.fm's callback to anyone with no live state as a bad request, never asking about accounts", async () => {
+    fixture.fetcher.mockClear()
+    const callers: readonly CallerKind[] = [CALLER_KINDS.anonymous, CALLER_KINDS.member]
+    const statuses = await Promise.all(
+      callers.flatMap((caller) =>
+        ['', '?token=t&state=forged.state'].map(async (query) => {
+          const headers = await headersFor({ fixture, caller, via: TOKEN_CARRIERS.bearer })
+          const url = `${pathOf({ route: ROUTES.lastFmCallback })}${query}`
+          return (await send({ options: { url, headers } })).statusCode
+        }),
+      ),
+    )
+    expect(statuses).toEqual([400, 400, 400, 400])
     expect(fixture.fetcher).not.toHaveBeenCalled()
   })
 

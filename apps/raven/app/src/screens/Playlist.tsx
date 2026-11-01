@@ -38,6 +38,7 @@ const PlaylistPage = ({ session: { api }, details }: PlaylistPageProps) => {
   return (
     <PlaylistLayout
       facts={playlistFactsOf({ playlist })}
+      isOwn={playlist.isOwn}
       name={playlist.name}
       note={failure === null ? null : PLAYLIST_COPY.failed(failure.message)}
       onBack={() => router.back()}

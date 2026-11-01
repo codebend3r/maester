@@ -22,6 +22,7 @@ const track = ({ id, title = `Track ${id}` }: TrackProps): Track => ({
   mbid: null,
   addedAt: '2026-01-01T00:00:00Z',
   album: { title: 'OK Computer', coverVersion: 'v1' },
+  gain: { track: null, album: null, trackPeak: null, albumPeak: null },
 })
 
 const ALBUM: Track[] = [track({ id: 1 }), track({ id: 2 }), track({ id: 3 })]

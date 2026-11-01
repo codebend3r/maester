@@ -14,6 +14,26 @@ describe('readServerConfig', () => {
     })
   })
 
+  it('measures loudness unless LOUDNESS_SCAN turns it off', () => {
+    expect(readServerConfig({})).toMatchObject({ loudnessScan: true })
+    expect(readServerConfig({ [MUSIC_ENV.loudnessScan]: 'off' })).toMatchObject({
+      loudnessScan: false,
+    })
+  })
+
+  it('leaves Last.fm off until both its key and its secret are set', () => {
+    expect(readServerConfig({}).lastFm).toBeNull()
+    expect(readServerConfig({ [MUSIC_ENV.lastFmApiKey]: 'key' }).lastFm).toBeNull()
+    expect(
+      readServerConfig({ [MUSIC_ENV.lastFmApiKey]: 'key', [MUSIC_ENV.lastFmApiSecret]: '  ' })
+        .lastFm,
+    ).toBeNull()
+    expect(
+      readServerConfig({ [MUSIC_ENV.lastFmApiKey]: ' key ', [MUSIC_ENV.lastFmApiSecret]: 'secret' })
+        .lastFm,
+    ).toEqual({ apiKey: 'key', apiSecret: 'secret' })
+  })
+
   it('quick-scans on boot and every 10 minutes unless told otherwise', () => {
     expect(readServerConfig({})).toMatchObject({ scanOnStart: true, quickScanIntervalMinutes: 10 })
     expect(

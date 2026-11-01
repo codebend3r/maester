@@ -16,6 +16,8 @@ export const HEADERS = {
 
 export const CONTENT_TYPES = {
   eventStream: 'text/event-stream',
+  /** A form body, as Last.fm takes its calls. */
+  form: 'application/x-www-form-urlencoded',
   html: 'text/html; charset=utf-8',
   json: 'application/json',
   /** An HLS playlist. */

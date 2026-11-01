@@ -68,6 +68,7 @@ import { ViewingRepository } from '@/media/viewingRepository'
 import { TranscodeCache } from '@/music/transcodeCache'
 import { parseBody } from '@/parseBody'
 import { ScannerService } from '@/scanner/scannerService'
+import { ScrobbleSender } from '@/scrobbling/scrobbleSender'
 import { clientOf, trackStream } from '@/streams/trackStream'
 import { StreamSessions } from '@/streams/streamSessions'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
@@ -129,6 +130,7 @@ export class MediaController {
     @Inject(AuthSessions) private readonly callers: AuthSessions,
     @Inject(FilePasses) private readonly passes: Pick<FilePasses, 'hold'>,
     @Inject(TranscodeCache) private readonly transcodes: Pick<TranscodeCache, 'fileFor'>,
+    @Inject(ScrobbleSender) private readonly scrobbles: Pick<ScrobbleSender, 'noteListen'>,
   ) {}
 
   private find({ id, account }: MediaControllerFindProps): MediaItem {
@@ -202,13 +204,21 @@ export class MediaController {
     }
   }
 
-  /** The player says a video started, for its library's history. */
+  /**
+   * The player counted a play, for its library's history; a music track's
+   * is forwarded to the services the account links.
+   */
   @ForViewers()
   @Post(':id/plays')
   @HttpCode(204)
   recordPlay(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): void {
-    if (!this.viewing.recordPlay({ id, account: this.accounts.keyOf({ request }) })) {
-      throw new NotFoundException(`No media ${id}`)
+    const account = this.accounts.keyOf({ request })
+    if (!this.viewing.recordPlay({ id, account })) throw new NotFoundException(`No media ${id}`)
+    try {
+      this.scrobbles.noteListen({ mediaId: id, account })
+    } catch {
+      // The play is kept whatever scrobbling does; the error could name an account.
+      this.logger.error('A play could not be queued for scrobbling.')
     }
   }
 
