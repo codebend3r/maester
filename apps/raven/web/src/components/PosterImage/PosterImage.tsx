@@ -18,25 +18,52 @@ type PictureViewProps = {
   onFail: (src: string) => void
 }
 
+type PictureLetterProps = { initial: string; isWaiting: boolean }
+
+/**
+ * The first letter, dead center in the frame. Once there is no picture it is the
+ * frame's text; while one is on its way it is drawn from `data-initial` on the
+ * shimmering stand-in, which no reader or test takes for the card's own words.
+ */
+const PictureLetter = ({ initial, isWaiting }: PictureLetterProps) =>
+  isWaiting ? (
+    <span
+      className={`${styles.placeholder} ${styles.waiting}`}
+      data-initial={initial}
+      aria-hidden="true"
+    />
+  ) : (
+    <span className={styles.placeholder} aria-hidden="true">
+      {initial}
+    </span>
+  )
+
 type PictureImageProps = PictureViewProps
 
-const PictureImage = ({ source, onFail }: PictureImageProps) =>
-  source !== undefined && (
-    <ViewportImage
-      key={source.src}
-      className={styles.image}
-      {...source}
-      alt=""
-      onError={() => onFail(source.src)}
-    />
+/** The picture fades in over its stand-in once it has arrived. */
+const PictureImage = ({ source, initial, onFail }: PictureImageProps) => {
+  const [isLoaded, setLoaded] = useState(false)
+  return (
+    <span className={styles.stack} aria-hidden="true">
+      <PictureLetter initial={initial} isWaiting={!isLoaded} />
+      {source !== undefined && (
+        <ViewportImage
+          key={source.src}
+          className={isLoaded ? `${styles.image} ${styles.loaded}` : styles.image}
+          {...source}
+          alt=""
+          onLoad={() => setLoaded(true)}
+          onError={() => onFail(source.src)}
+        />
+      )}
+    </span>
   )
+}
 
 type PictureInitialProps = PictureViewProps
 
 const PictureInitial = ({ initial }: PictureInitialProps) => (
-  <span className={styles.placeholder} aria-hidden="true">
-    {initial}
-  </span>
+  <PictureLetter initial={initial} isWaiting={false} />
 )
 
 const PICTURE_VIEWS = {
@@ -58,6 +85,7 @@ export const Picture = ({ sources, initial }: PictureProps) => {
     PICTURE_VIEWS[source === undefined ? PICTURE_STATES.initial : PICTURE_STATES.image]
   return (
     <View
+      key={source?.src}
       source={source}
       initial={initial}
       onFail={(src) => setFailed((current) => [...current, src])}

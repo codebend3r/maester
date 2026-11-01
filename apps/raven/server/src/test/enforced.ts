@@ -94,6 +94,7 @@ export const ROUTES = {
   history: { method: GET, path: '/api/libraries/:id/history', account: approved },
   inProgress: { method: GET, path: '/api/libraries/:id/in-progress', account: approved },
   matchLibrary: { method: POST, path: '/api/libraries/:id/match', account: owner },
+  mergeAlbums: { method: POST, path: '/api/libraries/:id/albums/merge', account: owner },
   libraryMedia: { method: GET, path: '/api/libraries/:id/media', account: approved },
   quickScan: { method: POST, path: '/api/libraries/:id/quick-scan', account: owner },
   updateRatings: { method: POST, path: '/api/libraries/:id/ratings', account: owner },

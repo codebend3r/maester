@@ -10,6 +10,7 @@ export const LIBRARY_ACTIONS_COPY = {
     updateRatings: 'update ratings',
     cancelRatings: 'cancel the ratings update',
     rematch: 'match again',
+    mergeAlbums: 'merge duplicate albums',
   },
   couldNot: ({ verb, message }: CouldNotProps) => `Could not ${verb}: ${message}`,
   cancel: (label: string) => `Cancel ${label.toLowerCase()}`,
@@ -22,6 +23,13 @@ export const LIBRARY_ACTIONS_COPY = {
   matchAgain: 'Match again',
   editTitle: "Change this library's name, folders and settings",
   edit: 'Edit',
+  mergeAlbums: 'Merge duplicate albums',
+  mergeAlbumsTitle:
+    'Look through the whole library and fold albums that are the same release into one: the same MusicBrainz release, or the same title, year and track count under an artist in common',
+  albumsMerged: (count: number) =>
+    count === 0
+      ? 'No duplicate albums found.'
+      : `Merged ${count} duplicate ${count === 1 ? 'album' : 'albums'}.`,
   scanMarkers: 'Scan intros and credits',
   markersQueued: 'Intro and credits scan queued.',
   quickScan: 'Quick scan',

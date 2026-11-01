@@ -141,6 +141,11 @@
   background: var(--color-night);
 }
 
+// An album's cover is square, never cropped to a poster's shape.
+.square {
+  aspect-ratio: 1;
+}
+
 .label {
   grid-area: label;
   font-weight: 600;

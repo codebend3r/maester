@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type Library,
+  LIBRARY_KINDS,
   METADATA_SERVICE_STATES,
   SCAN_KINDS,
   isRefreshingRatings,
@@ -68,7 +69,13 @@ export const useLibraryActions = (library: Library) => {
     },
   })
 
+  const mergeAlbums = useMutation({
+    mutationFn: () => api.mergeLibraryAlbums(library.id),
+    onSuccess: () => afterRematch({ queryClient, libraryId: library.id }),
+  })
+
   return {
+    mergeAlbums,
     quickScan,
     cancelQuickScan,
     fullScan,
@@ -99,6 +106,7 @@ export const LibraryActionErrors = ({
     updateRatings,
     cancelRatings,
     rematch,
+    mergeAlbums,
   },
   className,
 }: LibraryActionErrorsProps) =>
@@ -111,6 +119,7 @@ export const LibraryActionErrors = ({
     { verb: LIBRARY_ACTIONS_COPY.verbs.cancelRatings, failure: cancelRatings.error },
     { verb: LIBRARY_ACTIONS_COPY.verbs.rematch, failure: rematch.error },
     { verb: LIBRARY_ACTIONS_COPY.verbs.scanMarkers, failure: scanMarkers.error },
+    { verb: LIBRARY_ACTIONS_COPY.verbs.mergeAlbums, failure: mergeAlbums.error },
   ].map(
     ({ verb, failure }) =>
       failure && (
@@ -207,6 +216,7 @@ export const LibraryActions = ({
     cancelRatings,
     rematch,
     scanMarkers,
+    mergeAlbums,
   },
 }: LibraryActionsProps) => {
   const [isEditing, setEditing] = useState(false)
@@ -298,6 +308,21 @@ export const LibraryActions = ({
             </Button>
           )}
           {scanMarkers.isSuccess && <output>{LIBRARY_ACTIONS_COPY.markersQueued}</output>}
+          {library.settings.kind === LIBRARY_KINDS.music && (
+            <Button
+              icon="shuffle"
+              disabled={mergeAlbums.isPending}
+              title={LIBRARY_ACTIONS_COPY.mergeAlbumsTitle}
+              onClick={() => mergeAlbums.mutate()}
+            >
+              {mergeAlbums.isPending && <Spinner />}
+              {LIBRARY_ACTIONS_COPY.mergeAlbums}
+              {whose}
+            </Button>
+          )}
+          {mergeAlbums.isSuccess && (
+            <output>{LIBRARY_ACTIONS_COPY.albumsMerged(mergeAlbums.data.merged)}</output>
+          )}
           <LongAction
             label={LIBRARY_ACTIONS_COPY.updateRatings}
             icon="gauge"

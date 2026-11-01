@@ -47,8 +47,8 @@ const LOGO_HEIGHT = 56
 
 /** How wide the heading's picture stands: a poster, or an episode's wider still. */
 const HERO_WIDTHS = {
-  phone: { [CARD_SHAPES.poster]: 112, [CARD_SHAPES.wide]: 176 },
-  tablet: { [CARD_SHAPES.poster]: 168, [CARD_SHAPES.wide]: 288 },
+  phone: { [CARD_SHAPES.poster]: 112, [CARD_SHAPES.wide]: 176, [CARD_SHAPES.square]: 112 },
+  tablet: { [CARD_SHAPES.poster]: 168, [CARD_SHAPES.wide]: 288, [CARD_SHAPES.square]: 168 },
 } as const
 
 const SEASON_WIDTHS = { phone: 128, tablet: 168 } as const

@@ -37,6 +37,7 @@ import {
 } from '@/music/filing'
 import type { Release } from '@/music/musicBrainzClient'
 import { reconcileAlbums } from '@/music/reconcileAlbums'
+import { mergeSimilarAlbums } from '@/music/similarAlbums'
 
 /** Where an album's cover comes from: a picture embedded in one of its files, a file in its folder, or the Cover Art Archive. */
 export const COVER_SOURCES = { embedded: 'embedded', file: 'file', coverArtArchive: 'caa' } as const
@@ -146,13 +147,25 @@ const TRACK_ARTISTS = `(SELECT json_group_array(json_object('id', credited.id, '
                                   WHERE ta.media_id = m.id
                                   ORDER BY ta.position) credited)`
 
+/**
+ * A track unless the album holds another copy of it (same disc, number and title)
+ * that is better: more bits, then a higher sample rate, then the earlier file.
+ * Merged albums hold both copies of a release's files; each track shows once.
+ */
+const SHOWN_TRACK = `NOT EXISTS (
+  SELECT 1 FROM tracks copy
+   WHERE copy.album_id = t.album_id AND copy.media_id <> t.media_id AND copy.disc = t.disc
+     AND copy.number = t.number AND lower(copy.title) = lower(t.title)
+     AND (COALESCE(copy.bit_depth, 0) * 10000000 + COALESCE(copy.sample_rate, 0), -copy.media_id)
+       > (COALESCE(t.bit_depth, 0) * 10000000 + COALESCE(t.sample_rate, 0), -t.media_id))`
+
 /** An album with its credits, track count and length; `more` adds columns the album's page reads. */
 const selectAlbums = (more = ''): string =>
   `SELECT a.id, a.library_id, a.title, a.sort_title, a.year, a.release_date, a.type, a.is_compilation,
           a.cover_source, a.cover_ref, a.cover_stamp, a.mbid, a.match, a.added_at, ${ALBUM_ARTISTS} AS artists,
           COUNT(t.media_id) AS track_count, SUM(m.duration) AS duration${more}
      FROM albums a
-     LEFT JOIN tracks t ON t.album_id = a.id
+     LEFT JOIN tracks t ON t.album_id = a.id AND ${SHOWN_TRACK}
      LEFT JOIN media m ON m.id = t.media_id`
 
 const SELECT_ALBUMS = selectAlbums()
@@ -321,6 +334,7 @@ type MusicRepositoryArtistProps = {
 }
 
 type MusicRepositoryCoverProps = { id: number; version: string }
+type MusicRepositoryAlbumOfReleaseProps = { libraryId: number; mbid: string | null }
 type MusicRepositorySetCoverProps = { id: number; cover: AlbumCover }
 type MusicRepositoryEnrichProps = { id: number; release: Release }
 
@@ -471,6 +485,19 @@ export class MusicRepository implements OnModuleInit {
     )
     const distinct = [...new Set(artists.map((artist) => this.artistId(artist)))]
     distinct.forEach((artistId, position) => insert.run(ownerId, artistId, position))
+  }
+
+  /** The album already filed under a MusicBrainz release, unless the owner matched it by hand: a file of that release joins it, from whichever folder. */
+  private albumOfRelease({
+    libraryId,
+    mbid,
+  }: MusicRepositoryAlbumOfReleaseProps): { id: number } | undefined {
+    if (mbid === null) return undefined
+    return this.db
+      .prepare<[number, string, string], { id: number }>(
+        `SELECT id FROM albums WHERE library_id = ? AND mbid = ? AND match <> ? ORDER BY added_at, id LIMIT 1`,
+      )
+      .get(libraryId, mbid, MATCH_STATES.manual)
   }
 
   /** The first file of an album names it, its artists and everything else its tags say. */
@@ -638,11 +665,13 @@ export class MusicRepository implements OnModuleInit {
             `Resolve conflicting manual matches for albums ${previous.id} and ${conflict.id} before merging`,
           )
       }
-      const existing = this.db
-        .prepare<[number, string], { id: number }>(
-          'SELECT id FROM albums WHERE library_id = ? AND album_key = ?',
-        )
-        .get(libraryId, filing.albumKey)
+      const existing =
+        this.db
+          .prepare<[number, string], { id: number }>(
+            'SELECT id FROM albums WHERE library_id = ? AND album_key = ?',
+          )
+          .get(libraryId, filing.albumKey) ??
+        this.albumOfRelease({ libraryId, mbid: tags.releaseMbid })
       const albumId = existing?.id ?? this.insertAlbum({ libraryId, filing, tags, cover, at })
       const conflicting = this.db
         .prepare<[number, number], { id: number }>(
@@ -818,12 +847,49 @@ export class MusicRepository implements OnModuleInit {
   /** Every album's id, and every release id an album shows the archive's cover of, for the image cache's sweep. */
   keptCovers(): { albumIds: Set<number>; coverArtIds: Set<string> } {
     const rows = this.db
-      .prepare<[], { id: number; mbid: string | null }>('SELECT id, mbid FROM albums')
+      .prepare<[], { id: number; mbid: string | null; group: string | null }>(
+        'SELECT id, mbid, release_group_mbid AS "group" FROM albums',
+      )
       .all()
     return {
       albumIds: new Set(rows.map((row) => row.id)),
-      coverArtIds: new Set(rows.flatMap((row) => (row.mbid === null ? [] : [row.mbid]))),
+      coverArtIds: new Set(
+        rows.flatMap((row) =>
+          [row.mbid, row.group].flatMap((mbid) => (mbid === null ? [] : [mbid])),
+        ),
+      ),
     }
+  }
+
+  /**
+   * Looks through a library and folds every album that is the same release as
+   * another into one, by release id or by title, year, track count and artist.
+   * How many albums went.
+   */
+  mergeAlbums(libraryId: number): number {
+    const count = (): number =>
+      this.db
+        .prepare<[number], { total: number }>(
+          'SELECT COUNT(*) AS total FROM albums WHERE library_id = ?',
+        )
+        .get(libraryId)?.total ?? 0
+    return this.db.transaction(() => {
+      const before = count()
+      mergeSimilarAlbums({ db: this.db, libraryId })
+      reconcileAlbums({ db: this.db })
+      return before - count()
+    })()
+  }
+
+  /** The release group an album's release belongs to, which the archive files a cover under when the release has none. */
+  releaseGroupOf(id: number): string | null {
+    return (
+      this.db
+        .prepare<[number], { group: string | null }>(
+          'SELECT release_group_mbid AS "group" FROM albums WHERE id = ?',
+        )
+        .get(id)?.group ?? null
+    )
   }
 
   /**
@@ -839,6 +905,20 @@ export class MusicRepository implements OnModuleInit {
       .get(id)
     const cover = row === undefined ? null : coverOf(row)
     return cover !== null && this.pictureVersions.album({ id, cover }) === version ? cover : null
+  }
+
+  /** Every album that has a cover to show, with the version its address carries, for covers made ahead of a request. */
+  coverVersions(): { id: number; version: string }[] {
+    return this.db
+      .prepare<[], CoverOfProps & { id: number }>(
+        'SELECT id, cover_source AS source, cover_ref AS ref, cover_stamp AS stamp, mbid FROM albums ORDER BY id',
+      )
+      .all()
+      .flatMap((row) => {
+        const cover = coverOf(row)
+        const version = cover === null ? null : this.pictureVersions.album({ id: row.id, cover })
+        return version === null ? [] : [{ id: row.id, version }]
+      })
   }
 
   coverFiles(id: number): { id: number; path: string }[] {
@@ -990,7 +1070,7 @@ export class MusicRepository implements OnModuleInit {
     if (!row) return null
     const tracks = this.db
       .prepare<[number], TrackRow>(
-        `${SELECT_TRACKS} WHERE t.album_id = ?
+        `${SELECT_TRACKS} WHERE t.album_id = ? AND ${SHOWN_TRACK}
           ORDER BY t.disc, t.number IS NULL, t.number, t.title COLLATE NOCASE, m.id`,
       )
       .all(id)

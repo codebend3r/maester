@@ -56,6 +56,7 @@ function TrackBar({ session, place, track }: TrackBarProps) {
         <AlbumArt
           cover={coverOf({ albumId: track.albumId, coverVersion: track.album.coverVersion })}
           size={SIZES.fieldHeight}
+          initial={track.album.title.slice(0, 1)}
         />
         <View style={styles.text}>
           <Text numberOfLines={1} style={styles.title}>

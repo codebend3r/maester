@@ -64,6 +64,7 @@ function AlbumPage({ session, details }: AlbumPageProps) {
             <AlbumArt
               cover={coverOf({ albumId: album.id, coverVersion: album.coverVersion })}
               size={coverSize}
+              initial={album.title.slice(0, 1)}
             />
             <Text accessibilityRole="header" style={styles.title}>
               {album.title}

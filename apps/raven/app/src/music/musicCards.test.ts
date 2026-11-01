@@ -45,7 +45,7 @@ describe('musicCards', () => {
       key: 'album:7',
       title: 'OK Computer',
       line: 'Radiohead, Guest',
-      shape: CARD_SHAPES.poster,
+      shape: CARD_SHAPES.square,
       target: { kind: ROUTE_TARGETS.album, albumId: 7 },
     })
     expect(card.picture?.headers ?? null).toEqual({ cookie: 'raven_unlock=1' })

@@ -10,6 +10,7 @@ type FiledTrack = {
   library_id: number
   path: string
   disc: number
+  title: string
 }
 type Album = { id: number; album_key: string; match: string; mbid: string | null; added_at: string }
 
@@ -17,21 +18,102 @@ const COPIED_COLUMNS = `title, sort_title, year, original_year, mbid, release_gr
   label, genres, is_compilation, credited_by_tags, cover_source, cover_ref, replaygain_gain,
   replaygain_peak, added_at, match, match_confidence, matched_at, release_date, metadata_path, cover_stamp`
 
+type MergeByReleaseProps = { db: Sqlite.Database; groups: Map<string, FiledTrack[]> }
+type ReleaseAlbum = { id: number; mbid: string | null; match: string }
+
+/**
+ * Folders that belong to one album stay one: they hold the same MusicBrainz
+ * release (disc folders not named as discs, artist spellings that differ), or
+ * their files are already filed under one album, as a merge of copies of a
+ * release leaves them. A manual match is the owner's own choice of release for
+ * a folder, so it never joins another.
+ */
+const mergeByRelease = ({ db, groups }: MergeByReleaseProps): FiledTrack[][] => {
+  const releases = new Map(
+    db
+      .prepare<[], ReleaseAlbum>('SELECT id, mbid, match FROM albums')
+      .all()
+      .map((album) => [album.id, album]),
+  )
+  const parent = new Map([...groups.keys()].map((key) => [key, key]))
+  const rootOf = (key: string): string => {
+    const up = parent.get(key) ?? key
+    return up === key ? key : rootOf(up)
+  }
+  const join = (a: string, b: string): void => {
+    parent.set(rootOf(b), rootOf(a))
+  }
+  const owners = new Map<string, string>()
+  groups.forEach((files, key) => {
+    const albums = [...new Set(files.map((file) => file.album_id))].flatMap(
+      (id) => releases.get(id) ?? [],
+    )
+    if (albums.some((album) => album.match === MATCH_STATES.manual)) return
+    const mbids = [...new Set(albums.map((album) => album.mbid))]
+    const [mbid] = mbids
+    const shared = [
+      ...(mbids.length === 1 && mbid != null
+        ? [JSON.stringify([files[0]?.library_id, 'mbid', mbid])]
+        : []),
+      ...albums.map((album) => JSON.stringify(['album', album.id])),
+    ]
+    shared.forEach((owner) => {
+      const known = owners.get(owner)
+      if (known === undefined) owners.set(owner, key)
+      else join(known, key)
+    })
+  })
+  const merged = [...groups.entries()].reduce((found, [key, files]) => {
+    const root = rootOf(key)
+    found.set(root, [...(found.get(root) ?? []), ...files])
+    return found
+  }, new Map<string, FiledTrack[]>())
+  return [...merged.values()].map(numberedByDisc)
+}
+
+/**
+ * The files of an album in path order, a folder holding other tracks than the
+ * ones before it a disc of its own. A folder that holds the same tracks as an
+ * earlier one is a second copy, which keeps its disc and is shown once.
+ */
+const numberedByDisc = (files: FiledTrack[]): FiledTrack[] => {
+  const sorted = files.toSorted((a, b) => a.path.localeCompare(b.path))
+  const folders = [...new Set(sorted.map((file) => albumFolderOf(file.path)))]
+  const titlesOf = (folder: string): string[] =>
+    sorted
+      .filter((file) => albumFolderOf(file.path) === folder)
+      .map((file) => file.title.toLowerCase())
+  const discs = folders.reduce((numbers, folder, at) => {
+    const titles = titlesOf(folder)
+    const isCopy = folders
+      .slice(0, at)
+      .some((earlier) => titles.every((title) => titlesOf(earlier).includes(title)))
+    const next = isCopy ? 0 : Math.max(0, ...numbers.values()) + 1
+    return new Map([...numbers, [folder, next]])
+  }, new Map<string, number>())
+  return sorted.map((file) => {
+    const own = Math.max(file.disc, discOfPath(file.path))
+    const place = discs.get(albumFolderOf(file.path)) ?? 0
+    return { ...file, disc: folders.length > 1 && own === 1 && place > 0 ? place : own }
+  })
+}
+
 /** Repairs identities without recreating media, playlists, credits or per-account viewing data. */
 export const reconcileAlbums = ({ db }: ReconcileAlbumsProps): void => {
   const logger = new Logger('AlbumFolders')
   db.transaction(() => {
     const tracks = db
       .prepare<[], FiledTrack>(
-        `SELECT t.media_id, t.album_id, m.library_id, m.path, t.disc
+        `SELECT t.media_id, t.album_id, m.library_id, m.path, t.disc, t.title
          FROM tracks t JOIN media m ON m.id = t.media_id ORDER BY m.path, m.id`,
       )
       .all()
-    const groups = tracks.reduce((found, track) => {
+    const folderGroups = tracks.reduce((found, track) => {
       const key = JSON.stringify([track.library_id, albumFolderOf(track.path)])
       found.set(key, [...(found.get(key) ?? []), track])
       return found
     }, new Map<string, FiledTrack[]>())
+    const groups = mergeByRelease({ db, groups: folderGroups })
     const used = new Set<number>()
     groups.forEach((files) => {
       const first = files[0]

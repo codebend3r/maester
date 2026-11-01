@@ -24,7 +24,7 @@ import {
 import { ROUTE_TARGETS, type RouteTarget, itemTarget } from '@/routes'
 
 /** How a card is drawn: a poster stood upright, or a wide frame. */
-export const CARD_SHAPES = { poster: 'poster', wide: 'wide' } as const
+export const CARD_SHAPES = { poster: 'poster', wide: 'wide', square: 'square' } as const
 
 export type CardShape = (typeof CARD_SHAPES)[keyof typeof CARD_SHAPES]
 

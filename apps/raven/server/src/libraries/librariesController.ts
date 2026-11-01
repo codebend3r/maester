@@ -16,6 +16,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
+  type AlbumMerge,
   type Duplicates,
   type HistoryEntry,
   isJoinRequest,
@@ -26,6 +27,7 @@ import {
   isSagaBackdrop,
   isSplitRequest,
   ITEM_TYPES,
+  LIBRARY_KINDS,
   type Library,
   type LibraryCounts,
   type LibraryInput,
@@ -52,6 +54,8 @@ import { Management } from '@/auth/management'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import { RatingsRefresh } from '@/libraries/ratingsRefresh'
 import { MarkerDetection } from '@/markers/markerDetection'
+import { MusicRepository } from '@/music/musicRepository'
+import { ServerEvents } from '@/events/serverEvents'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
@@ -133,6 +137,8 @@ export class LibrariesController {
     @Inject(RatingsRefresh) private readonly ratings: RatingsRefresh,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(MarkerDetection) private readonly markers: MarkerDetection,
+    @Inject(MusicRepository) private readonly music: MusicRepository,
+    @Inject(ServerEvents) private readonly events: ServerEvents,
   ) {}
 
   /** A library can only be locked behind a PIN that can open it again. */
@@ -417,6 +423,24 @@ export class LibrariesController {
   @HttpCode(200)
   cancelRatings(@Param('id', ParseIntPipe) id: number): Library {
     return this.commanded({ id, act: (libraryId) => this.ratings.cancel(libraryId) })
+  }
+
+  /**
+   * Looks through a music library and folds every album that is the same
+   * release as another into one: the same MusicBrainz release, or the same
+   * title, year and track count under an artist in common. Fix match choices stay.
+   */
+  @AdminOnly()
+  @Post(':id/albums/merge')
+  @HttpCode(200)
+  mergeAlbums(@Param('id', ParseIntPipe) id: number): AlbumMerge {
+    const record = this.find(id)
+    if (record.settings.kind !== LIBRARY_KINDS.music) {
+      throw new BadRequestException('Only a library of music has albums to merge.')
+    }
+    const merged = this.music.mergeAlbums(id)
+    if (merged > 0) this.events.libraryChanged(id)
+    return { merged }
   }
 
   /**

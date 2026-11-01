@@ -48,6 +48,7 @@ const SYNOPSIS_OPACITY = 0.92
 const HERO_WIDTHS = {
   [CARD_SHAPES.poster]: tvSize(280),
   [CARD_SHAPES.wide]: tvSize(480),
+  [CARD_SHAPES.square]: tvSize(280),
 } as const
 
 /** How wide the words beside the picture run: about seventy characters at the TV's size. */

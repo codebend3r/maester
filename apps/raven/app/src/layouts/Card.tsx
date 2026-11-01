@@ -6,17 +6,21 @@ import { CARD_SHAPES, type CardShape, type Picture, type ShelfCard } from '@/que
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 
-const POSTER_RATIO = 3 / 2
-const WIDE_RATIO = 9 / 16
+/** A picture's height over its width: a poster at 2:3, a wide frame at 16:9, an album's cover square. */
+const SHAPE_RATIOS = {
+  [CARD_SHAPES.poster]: 3 / 2,
+  [CARD_SHAPES.wide]: 9 / 16,
+  [CARD_SHAPES.square]: 1,
+} as const satisfies Record<CardShape, number>
 
 /** How much of a card the title art may take, at its foot and to the left: wide and short, as title art runs. */
 const LOGO_SHARE = { width: 0.6, height: 0.32 } as const
 
 type PictureHeightOfProps = { shape: CardShape; width: number }
 
-/** How tall a card's picture stands for its width: a poster at 2:3, a wide frame at 16:9. */
+/** How tall a card's picture stands for its width. */
 export const pictureHeightOf = ({ shape, width }: PictureHeightOfProps): number =>
-  width * (shape === CARD_SHAPES.poster ? POSTER_RATIO : WIDE_RATIO)
+  width * SHAPE_RATIOS[shape]
 
 /** Whether a picture is drawn, or a stand-in for it in its place. */
 export const PICTURE_STATES = { shown: 'shown', missing: 'missing' } as const
@@ -34,26 +38,30 @@ type CardFaceProps = {
   onError: () => void
 }
 
-type CardImageProps = CardFaceProps
-
-const CardImage = ({ picture, onError }: CardImageProps) =>
-  picture !== null && (
-    <Image
-      onError={onError}
-      // Android decodes the picture at the size it is drawn, not the size it was sent at.
-      resizeMethod="resize"
-      resizeMode="cover"
-      source={picture}
-      style={StyleSheet.absoluteFill}
-    />
-  )
-
 type CardInitialProps = CardFaceProps
 
 const CardInitial = ({ title, height }: CardInitialProps) => {
   const styles = useStyles()
   return <Text style={[styles.initial, { fontSize: height / 3 }]}>{title.slice(0, 1)}</Text>
 }
+
+type CardImageProps = CardFaceProps
+
+/** The picture over its title's first letter, which shows while it loads and when it fails. */
+const CardImage = ({ picture, onError, title, height }: CardImageProps) =>
+  picture !== null && (
+    <>
+      <CardInitial title={title} height={height} picture={picture} onError={onError} />
+      <Image
+        onError={onError}
+        // Android decodes the picture at the size it is drawn, not the size it was sent at.
+        resizeMethod="resize"
+        resizeMode="cover"
+        source={picture}
+        style={StyleSheet.absoluteFill}
+      />
+    </>
+  )
 
 /** A card's face: its picture, else its title's first letter. */
 const CARD_FACES = {

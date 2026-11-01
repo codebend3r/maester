@@ -25,8 +25,8 @@ import { themedStyles } from '@/theme/useTheme'
 
 /** Card widths in points: about two and a half posters across a phone, more on a tablet. */
 const CARD_WIDTHS = {
-  phone: { [CARD_SHAPES.poster]: 128, [CARD_SHAPES.wide]: 248 },
-  tablet: { [CARD_SHAPES.poster]: 168, [CARD_SHAPES.wide]: 320 },
+  phone: { [CARD_SHAPES.poster]: 128, [CARD_SHAPES.wide]: 248, [CARD_SHAPES.square]: 128 },
+  tablet: { [CARD_SHAPES.poster]: 168, [CARD_SHAPES.wide]: 320, [CARD_SHAPES.square]: 168 },
 } as const
 
 const useCardWidths = () => {

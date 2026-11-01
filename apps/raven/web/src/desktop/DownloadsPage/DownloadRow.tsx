@@ -1,5 +1,6 @@
 import {
   DESKTOP_REQUESTS,
+  DOWNLOAD_ARTWORK_KINDS,
   DOWNLOAD_STATUS_KINDS,
   type DownloadStatus,
   type DownloadView,
@@ -238,7 +239,14 @@ const ViewingRow = ({
   const actionButton = ACTION_BUTTONS[action]
   return (
     <div className={styles.row}>
-      <span className={styles.art} aria-hidden="true">
+      <span
+        className={
+          view.artwork.kind === DOWNLOAD_ARTWORK_KINDS.cover
+            ? `${styles.art} ${styles.square}`
+            : styles.art
+        }
+        aria-hidden="true"
+      >
         <DownloadArtwork
           artwork={view.artwork}
           initial={view.group.title.slice(0, 1)}

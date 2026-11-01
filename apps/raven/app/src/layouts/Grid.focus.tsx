@@ -50,6 +50,7 @@ const LEAST_ROW_WIDTH = tvSize(480)
 const TILE_WIDTHS = {
   [CARD_SHAPES.poster]: tvSize(72),
   [CARD_SHAPES.wide]: tvSize(144),
+  [CARD_SHAPES.square]: tvSize(72),
 } as const
 
 /** Room above and below each row for a card grown by focus, as Home's rows leave it. */
