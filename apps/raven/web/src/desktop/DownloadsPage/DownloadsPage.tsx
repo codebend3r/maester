@@ -6,7 +6,7 @@ import {
   type SpaceView,
 } from '@raven/core'
 import { Button, type IconName } from '@raven/ui'
-import { type ComponentType, useId, useRef } from 'react'
+import { type ComponentType, useId, useRef, useState } from 'react'
 import {
   type DownloadsChange,
   isInProgress,
@@ -16,7 +16,11 @@ import {
 } from '@/desktop/downloadsApi'
 import { handled } from '@/desktop/handled'
 import { DOWNLOADS_PAGE_COPY } from '@/desktop/DownloadsPage/copy'
+import { DownloadActivity } from '@/desktop/DownloadsPage/DownloadActivity'
 import { DownloadRow } from '@/desktop/DownloadsPage/DownloadRow'
+import { DownloadsWatch } from '@/desktop/DownloadsPage/DownloadsWatch'
+import { useTotalSpeed } from '@/desktop/useDownloadSpeed'
+import { Tabs } from '@/components/Tabs/Tabs'
 import styles from '@/desktop/DownloadsPage/DownloadsPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
@@ -128,6 +132,56 @@ const LIST_VIEWS = {
   [READ_STATES.listed]: Listed,
 } as const satisfies Record<ReadState, ComponentType<ListViewProps>>
 
+type WatchListedProps = ListViewProps
+
+const WatchListed = ({ list }: WatchListedProps) => <DownloadsWatch downloads={list} />
+
+const WATCH_VIEWS = {
+  [READ_STATES.waiting]: Unread,
+  [READ_STATES.failed]: ListFailed,
+  [READ_STATES.empty]: ListEmpty,
+  [READ_STATES.listed]: WatchListed,
+} as const satisfies Record<ReadState, ComponentType<ListViewProps>>
+
+/** The page's two views of the same downloads: the list to manage them, and the grid to watch. */
+const PAGE_TABS = { manage: 'manage', watch: 'watch' } as const
+
+type PageTab = (typeof PAGE_TABS)[keyof typeof PAGE_TABS]
+
+const TAB_VIEWS = {
+  [PAGE_TABS.manage]: LIST_VIEWS,
+  [PAGE_TABS.watch]: WATCH_VIEWS,
+} as const satisfies Record<PageTab, Record<ReadState, ComponentType<ListViewProps>>>
+
+const TAB_LABELS = {
+  [PAGE_TABS.manage]: DOWNLOADS_PAGE_COPY.manage,
+  [PAGE_TABS.watch]: DOWNLOADS_PAGE_COPY.watch,
+} as const satisfies Record<PageTab, string>
+
+type ActivityProps = { downloads: DownloadView[] }
+
+const bytesSoFar = ({ status }: DownloadView): number =>
+  status.kind === DOWNLOAD_STATUS_KINDS.downloading ? status.bytes : 0
+
+/** What is downloading and how fast, over a bar that keeps moving while any of it does. */
+const Activity = ({ downloads }: ActivityProps) => {
+  const speed = useTotalSpeed()
+  const active = downloads.filter(isInProgress)
+  const label = DOWNLOADS_PAGE_COPY.activity({ files: active.length, speed })
+  return (
+    active.length > 0 && (
+      <div className={styles.activity}>
+        <p className={styles.line}>{label}</p>
+        <DownloadActivity
+          value={active.reduce((sum, view) => sum + bytesSoFar(view), 0)}
+          max={active.reduce((sum, view) => sum + view.size, 0)}
+          label={label}
+        />
+      </div>
+    )
+  )
+}
+
 type DiskViewProps = { disk: SpaceView | null; error: string | null; lineId: string }
 
 type DiskFailedProps = DiskViewProps
@@ -174,8 +228,9 @@ export const DownloadsPage = () => {
   const list = downloads.data?.downloads ?? null
   const bulks = bulksOf(list ?? [])
   const disk = space.data ?? null
+  const [tab, setTab] = useState<PageTab>(PAGE_TABS.manage)
   const ListView =
-    LIST_VIEWS[
+    TAB_VIEWS[tab][
       readStateOf({
         isRead: list !== null,
         isEmpty: list !== null && list.length === 0,
@@ -214,9 +269,25 @@ export const DownloadsPage = () => {
             {DOWNLOADS_PAGE_COPY.showInFinder}
           </Button>
         </div>
+        <Activity downloads={list ?? []} />
         <DiskView disk={disk} error={space.error?.message ?? null} lineId={ids.line} />
       </header>
-      <ListView list={list ?? []} error={downloads.error?.message ?? null} onDeleted={focusTitle} />
+      <Tabs
+        label={DOWNLOADS_PAGE_COPY.tabs}
+        tabs={Object.values(PAGE_TABS).map((value) => ({
+          value,
+          label: TAB_LABELS[value],
+          count: list?.length ?? 0,
+        }))}
+        chosen={tab}
+        onChoose={setTab}
+      >
+        <ListView
+          list={list ?? []}
+          error={downloads.error?.message ?? null}
+          onDeleted={focusTitle}
+        />
+      </Tabs>
     </section>
   )
 }

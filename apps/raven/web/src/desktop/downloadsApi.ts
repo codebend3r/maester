@@ -16,6 +16,7 @@ import {
 import { refusalText } from '@/desktop/client'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { useDesktop } from '@/stores/desktop'
+import { useDownloadSpeeds } from '@/stores/downloadSpeeds'
 
 const NO_DOWNLOADS = 'Raven could not read its downloads.'
 const NO_SPACE = 'Raven could not read its disk space.'
@@ -31,6 +32,7 @@ export const useDownloads = (): UseQueryResult<DownloadsData> => {
     queryFn: async () => {
       const reply = await client.request({ type: DESKTOP_REQUESTS.listDownloads })
       if (reply.type === DESKTOP_REPLIES.downloads) {
+        useDownloadSpeeds.getState().observe({ downloads: reply.downloads, now: Date.now() })
         return { downloads: reply.downloads, shouldAutoDelete: reply.shouldAutoDeleteByDefault }
       }
       throw new Error(refusalText({ reply, fallback: NO_DOWNLOADS }))
@@ -44,11 +46,13 @@ type ListChange = {
   event: { downloads: DownloadView[]; shouldAutoDeleteByDefault: boolean }
 }
 
-const setDownloads = ({ queryClient, event }: ListChange) =>
-  queryClient.setQueryData<DownloadsData>(DESKTOP_QUERY_KEYS.downloads, {
+const setDownloads = ({ queryClient, event }: ListChange) => {
+  useDownloadSpeeds.getState().observe({ downloads: event.downloads, now: Date.now() })
+  return queryClient.setQueryData<DownloadsData>(DESKTOP_QUERY_KEYS.downloads, {
     downloads: event.downloads,
     shouldAutoDelete: event.shouldAutoDeleteByDefault,
   })
+}
 
 type ListMove = { before: DownloadView[]; after: DownloadView[] }
 

@@ -11,6 +11,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     'title tools'
+    'activity activity'
     'disk disk';
   gap: var(--space-3) var(--space-4);
   align-items: center;
@@ -35,6 +36,7 @@
     grid-template-areas:
       'title'
       'tools'
+      'activity'
       'disk';
   }
 
@@ -48,6 +50,13 @@
     grid-auto-flow: row;
     justify-items: start;
   }
+}
+
+.activity {
+  grid-area: activity;
+  display: grid;
+  gap: var(--space-1);
+  max-width: var(--measure);
 }
 
 .disk {
@@ -109,13 +118,27 @@
 // The download: its name and size, then where it stands beside what can be done with it.
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    'label size'
-    'status actions';
+    'art label size'
+    'art status actions';
   gap: var(--space-1) var(--space-4);
   align-items: center;
   padding: var(--space-3) var(--space-4);
+}
+
+// The title's poster, or the album's cover, or its first letter, a control's width.
+.art {
+  --poster-letter: var(--font-size-lg);
+
+  grid-area: art;
+  display: grid;
+  width: var(--space-6);
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border: 1px solid var(--color-line-faint);
+  border-radius: var(--radius-md);
+  background: var(--color-night);
 }
 
 .label {
@@ -143,6 +166,18 @@
 
 .gauge {
   width: 100%;
+}
+
+// How far a download is beside how fast it is going.
+.progressText {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.speed {
+  font-variant-numeric: tabular-nums;
 }
 
 .actions {
@@ -199,9 +234,9 @@
 @container (max-width: 40rem) {
   .row {
     grid-template-areas:
-      'label size'
-      'status status'
-      'actions actions';
+      'art label size'
+      'art status status'
+      'actions actions actions';
   }
 
   .actions {

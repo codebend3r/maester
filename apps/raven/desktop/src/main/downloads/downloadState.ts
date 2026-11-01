@@ -3,10 +3,15 @@ import {
   type Infer,
   isBoolean,
   isContainerName,
+  type DownloadArtwork,
+  type DownloadFacts,
+  isDownloadArtwork,
+  isDownloadFacts,
   isDownloadGroup,
   isMediaId,
   isNumber,
   isOpaqueId,
+  isRecord,
   isSidecarTrackId,
   isString,
   isWatchedPercent,
@@ -106,7 +111,23 @@ const ENTRY_FIELDS = {
   createdAt: isNumber,
 }
 
-export const isDownloadEntry = object({ ...ENTRY_FIELDS, pending: isPending })
+const isEntryBase = object({ ...ENTRY_FIELDS, pending: isPending })
+
+type EntryExtras = { artwork?: DownloadArtwork; facts?: DownloadFacts }
+
+/**
+ * What the Downloads page shows of an entry: its picture and the facts its grid sorts on. A file
+ * written before they were kept has neither, which is fine, so they are not part of `ENTRY_FIELDS`.
+ */
+const isEntryExtras = (value: unknown): value is EntryExtras =>
+  isRecord(value) &&
+  (value.artwork === undefined || isDownloadArtwork(value.artwork)) &&
+  (value.facts === undefined || isDownloadFacts(value.facts))
+
+export type DownloadEntry = Infer<typeof isEntryBase> & EntryExtras
+
+export const isDownloadEntry = (value: unknown): value is DownloadEntry =>
+  isEntryBase(value) && isEntryExtras(value)
 
 /**
  * What a removed download still owed its server, kept until the server hears it: removing a
@@ -140,7 +161,6 @@ export type FailReason = Infer<typeof isFailReason>
 export type EntryStatus = Infer<typeof isEntryStatus>
 export type Sidecar = Infer<typeof isSidecar>
 export type Pending = Infer<typeof isPending>
-export type DownloadEntry = Infer<typeof isDownloadEntry>
 export type Owed = Infer<typeof isOwed>
 export type DownloadsState = Infer<typeof isDownloadsState>
 

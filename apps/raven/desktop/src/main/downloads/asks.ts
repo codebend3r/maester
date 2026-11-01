@@ -11,6 +11,7 @@ import {
   isMediaId,
 } from '@raven/core'
 import { type ConfigStore, SERVER_GONE, serverById } from '@/main/desktopConfig'
+import { factsOf } from '@/main/downloads/artwork'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   bytesOf,
@@ -117,6 +118,8 @@ const entryOf = ({
   serverPosition: file.media.position,
   pending: NO_PENDING,
   createdAt,
+  artwork: file.artwork,
+  facts: factsOf(file.media),
 })
 
 /** The asks a download link raises: expanded, held for the page's answer, then queued or dropped. */

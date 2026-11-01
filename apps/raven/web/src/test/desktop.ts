@@ -7,6 +7,7 @@ import {
   type DownloadView,
   type SpaceView,
   DESKTOP_PLATFORMS,
+  DOWNLOAD_ARTWORK_KINDS,
   DOWNLOAD_STATUS_KINDS,
   DOWNLOAD_KINDS,
   PLAYER_CONNECTION_STATUSES,
@@ -49,6 +50,16 @@ export const viewOf = (overrides: Partial<DownloadView> = {}): DownloadView => (
   watched: null,
   deletesAt: null,
   isLocked: false,
+  artwork: { kind: DOWNLOAD_ARTWORK_KINDS.poster, itemId: 4, version: 'v1' },
+  facts: {
+    year: 2022,
+    score: 8.7,
+    bitrate: 6_000_000,
+    pixels: 2_073_600,
+    addedAt: '2026-10-16T00:00:00.000Z',
+    changedAt: '2026-10-16T00:00:00.000Z',
+  },
+  createdAt: 1_700_000_000_000,
   ...overrides,
 })
 
