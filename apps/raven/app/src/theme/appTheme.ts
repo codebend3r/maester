@@ -97,6 +97,8 @@ export const SIZES = {
   space6: size('--space-6'),
   space8: size('--space-8'),
   radius: size('--radius-md'),
+  radiusLg: size('--radius-lg'),
+  radiusPill: size('--radius-pill'),
   textXs: size('--font-size-xs'),
   textSm: size('--font-size-sm'),
   text: size('--font-size-md'),

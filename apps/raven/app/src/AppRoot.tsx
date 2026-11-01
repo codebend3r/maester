@@ -6,15 +6,15 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { hideAsync, preventAutoHideAsync } from 'expo-splash-screen'
 import { useEffect, useState } from 'react'
-import { Appearance, StatusBar, StyleSheet, View } from 'react-native'
+import { Appearance, Platform, StatusBar, StyleSheet, View } from 'react-native'
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAccountSession } from '@/account/session'
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
+import { TouchMenu } from '@/layouts/TouchMenu'
 import { MusicHost } from '@/music/MusicHost'
 import { NowPlayingBar, useIsBarShown } from '@/music/NowPlayingBar'
-import { useUnlockRoute } from '@/queries/useUnlockRoute'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
 import { useActiveServer } from '@/stores/activeServer'
 import { configureAppPrefs } from '@/stores/appPrefs'
@@ -64,11 +64,6 @@ const ServerEvents = ({ session }: ServerEventsProps) => {
  */
 const wearSystemLook = ({ tone }: AppTheme) => Appearance.setColorScheme(tone)
 
-const UnlockRoute = () => {
-  useUnlockRoute()
-  return null
-}
-
 /** The routes, once the stores are read: every route but sign-in needs a server. */
 const AppRoutes = () => {
   const session = useAppQueries()
@@ -81,7 +76,6 @@ const AppRoutes = () => {
     <QueryClientProvider client={queryClient}>
       <StatusBar barStyle={tone === THEME_TONES.light ? 'dark-content' : 'light-content'} />
       {session !== null && <ServerEvents key={session.server.id} session={session} />}
-      <UnlockRoute />
       {/* Music plays above the routes, so leaving a screen stops nothing. */}
       {session !== null && <MusicHost key={session.server.id} session={session} />}
       {/* A screen's opening focus comes back once the transition that reveals it has ended:
@@ -110,13 +104,17 @@ const AppRoutes = () => {
               <Stack.Screen name={APP_SCREENS.playlist} />
               <Stack.Screen name={APP_SCREENS.nowPlaying} />
               <Stack.Screen name={APP_SCREENS.search} />
+              <Stack.Screen name={APP_SCREENS.favourites} />
               <Stack.Screen name={APP_SCREENS.settings} />
-              <Stack.Screen name={APP_SCREENS.unlock} />
             </Stack.Protected>
           </Stack>
         </SafeAreaInsetsContext.Provider>
         {/* The bar under the screens while a track plays; Now Playing is a screen of its own. */}
         {session !== null && <NowPlayingBar session={session} />}
+        {/* The side menu of phones and tablets slides over the routes and the bar; a TV has its own. */}
+        {session !== null && !Platform.isTV && (isSignedIn || IS_SIGN_IN_BYPASSED) && (
+          <TouchMenu key={session.server.id} session={session} />
+        )}
       </View>
     </QueryClientProvider>
   )

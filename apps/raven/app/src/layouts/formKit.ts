@@ -15,7 +15,6 @@ export type FieldProps = {
   onSubmit: (input: OnSubmitProps) => void
   placeholder?: string
   isSecret?: boolean
-  isNumeric?: boolean
   isEmail?: boolean
   /** The field the screen opens on: focused first, on a TV by the remote. */
   isFirst?: boolean
@@ -50,15 +49,13 @@ export type FormKit = {
   useFormStyles: () => FormStyles
 }
 
-type KeyboardForProps = Pick<FieldProps, 'isNumeric' | 'isSecret' | 'isEmail'>
+type KeyboardForProps = Pick<FieldProps, 'isSecret' | 'isEmail'>
 
-/** The keyboard a field opens: digits for a PIN, plain for a password, a web address's otherwise. */
+/** The keyboard a field opens: plain for a password, a web address's otherwise. */
 export const keyboardFor = ({
-  isNumeric = false,
   isSecret = false,
   isEmail = false,
 }: KeyboardForProps): KeyboardTypeOptions => {
-  if (isNumeric) return 'number-pad'
   if (isEmail) return 'email-address'
   return isSecret ? 'default' : 'url'
 }

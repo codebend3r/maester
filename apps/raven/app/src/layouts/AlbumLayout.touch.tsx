@@ -8,7 +8,7 @@ import { type AlbumLayoutProps, ROW_ACTIONS } from '@/layouts/musicKit'
 import { Cover, FavouriteButton, TouchPage, useMusicStyles } from '@/layouts/MusicParts.touch'
 import { touchPicker } from '@/layouts/Picker.touch'
 import { openAddToPlaylistSheet } from '@/layouts/playlistSheets'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -105,7 +105,7 @@ export const AlbumLayout = ({
     <TouchPage onBack={onBack}>
       <View style={styles.stage}>
         <Cover cover={cover} title={title} />
-        <Text accessibilityRole="header" style={styles.title}>
+        <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
           {title}
         </Text>
         {artists.map((artist) => (
@@ -125,16 +125,19 @@ export const AlbumLayout = ({
         <View style={styles.controls}>
           <ToolButton
             accessibilityLabel={MUSIC_COPY.playNext}
+            icon="skipNext"
             label={MUSIC_COPY.playNext}
             onPress={onPlayNext}
           />
           <ToolButton
             accessibilityLabel={MUSIC_COPY.addToQueue}
+            icon="plus"
             label={MUSIC_COPY.addToQueue}
             onPress={onAddToQueue}
           />
           <ToolButton
             accessibilityLabel={MUSIC_COPY.addToPlaylist}
+            icon="list"
             label={MUSIC_COPY.addToPlaylist}
             onPress={() => addFrom({ index: null, name: title })}
           />

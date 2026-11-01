@@ -21,7 +21,8 @@ import {
   videoShapeFor,
 } from '@/queries/cards'
 import { LIBRARY_GRID_COPY } from '@/queries/copy'
-import { type ArtLogos, continueCard } from '@/queries/homeShelves'
+import { continueCard } from '@/queries/homeShelves'
+import type { ShowArts } from '@/queries/showArt'
 
 /**
  * What a library lists, whatever its type: a TV library's shows and the files no show was found
@@ -47,7 +48,7 @@ export type GridSection = {
  */
 const SECTION_KEYS = { all: 'all', shows: 'shows', continue: 'continue' } as const
 
-type ContinueSectionsOfProps = Pictures & { entries: readonly PosterEntry[]; logos: ArtLogos }
+type ContinueSectionsOfProps = Pictures & { entries: readonly PosterEntry[]; arts: ShowArts }
 
 /**
  * A library's Continue watching page: its videos with a saved spot, the most recently watched
@@ -55,7 +56,7 @@ type ContinueSectionsOfProps = Pictures & { entries: readonly PosterEntry[]; log
  */
 export const continueSectionsOf = ({
   entries,
-  logos,
+  arts,
   ...pictures
 }: ContinueSectionsOfProps): GridSection[] =>
   entries.length === 0
@@ -66,7 +67,7 @@ export const continueSectionsOf = ({
           title: null,
           count: null,
           shape: CARD_SHAPES.wide,
-          cards: entries.map((entry) => continueCard({ entry, logos, ...pictures })),
+          cards: entries.map((entry) => continueCard({ entry, arts, ...pictures })),
         },
       ]
 

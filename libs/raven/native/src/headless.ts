@@ -1,8 +1,8 @@
 // What imports no React Native or Expo module, so bun's tests load it as the device does. What
 // reaches the device itself is in `index.ts`.
-export { SIGN_IN_STEPS, type SecretStep, type SignInStep } from '@/account/signInSteps'
+export { SIGN_IN_STEPS, type SignInStep } from '@/account/signInSteps'
 export { AUTH_OUTCOMES, type AccountSession, type AuthOutcome } from '@/account/supabaseAuth'
-export { type SecretPrompt, signInFlowFor } from '@/account/signInFlow'
+export { signInFlowFor } from '@/account/signInFlow'
 export { tokenRenewalFor } from '@/account/tokenRenewal'
 export { useSubmit } from '@/account/useSubmit'
 export { isDevelopmentVariant } from '@/config/appVariant'

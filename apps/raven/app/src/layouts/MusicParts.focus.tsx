@@ -9,7 +9,7 @@ import { useToneStyles } from '@/layouts/formStyles'
 import { Icon } from '@raven/native'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type FavouriteButtonProps } from '@/layouts/musicKit'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import type { Picture } from '@/queries/cards'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
@@ -113,7 +113,11 @@ type CoverInitialProps = CoverProps
 
 const CoverInitial = ({ title }: CoverInitialProps) => {
   const styles = useMusicStyles()
-  return <Text style={styles.initial}>{title.slice(0, 1)}</Text>
+  return (
+    <Text variant={TEXT_VARIANTS.display} style={styles.initial}>
+      {title.slice(0, 1)}
+    </Text>
+  )
 }
 
 /** A cover's face: its picture, else its title's first letter. */

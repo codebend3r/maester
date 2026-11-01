@@ -1,4 +1,4 @@
-import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
 import {
   type MatchItemType,
   type MatchSubject,
@@ -6,15 +6,8 @@ import {
   type MusicListOptions,
   type ViewingSession,
   ApiError,
-  isLockedError,
 } from '@raven/core'
 import { playerQueryKeys } from '@/lib/playerQueryKeys'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
-
-/** Anything refused for sitting in a locked library asks for the PIN, wherever it was asked for. */
-const askForPin = (error: Error): void => {
-  if (isLockedError(error)) useUnlockPrompt.getState().ask()
-}
 
 /**
  * How long a library's listing stays cached once nothing shows it, so going
@@ -24,8 +17,6 @@ export const LISTING_GC_MS = 30 * 60_000
 
 export const createQueryClient = (): QueryClient =>
   new QueryClient({
-    queryCache: new QueryCache({ onError: askForPin }),
-    mutationCache: new MutationCache({ onError: askForPin }),
     defaultOptions: {
       queries: {
         staleTime: 30_000,

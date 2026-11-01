@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import type { LockState } from '@raven/core'
 import type * as Native from '@raven/native'
 import { AUTH_OUTCOMES, type AuthOutcome } from '@raven/native/headless'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
@@ -11,7 +10,6 @@ import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import type * as NavigationFocus from '@/test/navigationFocus'
 import { askedFor, resetTestScreen } from '@/test/navigationFocus'
 
-const mockGetLock = jest.fn<() => Promise<LockState>>()
 type MockSignInCallbackProps = { email: string; password: string }
 
 const mockSignIn = jest.fn<(input: MockSignInCallbackProps) => Promise<AuthOutcome>>()
@@ -33,7 +31,10 @@ jest.mock(
 )
 jest.mock('@raven/native', () => ({
   ...jest.requireActual<typeof Native>('@raven/native'),
-  apiFor: () => ({ getLock: mockGetLock }),
+  apiFor: () => ({
+    getHome: async () => ({ inProgress: [], shelves: [] }),
+    getMediaTicket: async () => ({ ticket: 't', expiresAt: 1 }),
+  }),
   cookieJar: { forget: async () => {} },
   secretStore: {
     getItemAsync: async () => null,
@@ -58,7 +59,6 @@ describe('SignIn on a TV', () => {
         email: 'viewer@example.com',
       },
     })
-    mockGetLock.mockResolvedValue({ available: true, unlocked: false })
   })
 
   // Asked for as it mounts, the preferred focus comes before the field is in the window, which
@@ -74,8 +74,7 @@ describe('SignIn on a TV', () => {
       nativeEvent: { text: 'hunter2' },
     })
     await waitFor(() => expect(mockSignIn).toHaveBeenCalled())
-    // The PIN is never asked after an account signs in, so no other step asks for the remote.
-    expect(screen.queryByLabelText('PIN')).toBeNull()
+    // No other step asks for the remote.
     expect(askedFor()).toEqual(['Email'])
   })
 

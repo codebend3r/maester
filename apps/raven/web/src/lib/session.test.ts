@@ -6,7 +6,7 @@ import { type AuthClient, createAuthClient } from '@/lib/authClient'
 import { callAuth, resendConfirmation, signOut } from '@/lib/session'
 import { useAuthSession } from '@/stores/authSession'
 import { useSelectionScopes } from '@/stores/selectionScope'
-import { createSelectionStore, useUnlockPrompt } from '@raven/ui/headless'
+import { createSelectionStore } from '@raven/ui/headless'
 import { fakeAuthClient, readyConfig } from '@/test/authClient'
 import { answer, clearCookies, heldCookies, sessionOf } from '@/test/authCookies'
 
@@ -15,7 +15,6 @@ const credentials = { email: 'a@example.com', password: 'password' }
 const accountState = () => {
   const queryClient = new QueryClient()
   queryClient.setQueryData(['libraries'], [{ id: 1 }])
-  useUnlockPrompt.getState().ask()
   const store = createSelectionStore()
   store.getState().start('card-1')
   useSelectionScopes.setState({
@@ -68,7 +67,6 @@ describe('signOut', () => {
     await signOut({ queryClient })
 
     expect(queryClient.getQueryData(['libraries'])).toBeUndefined()
-    expect(useUnlockPrompt.getState().open).toBe(false)
     expect(store.getState().selecting).toBe(false)
     expect(store.getState().keys.size).toBe(0)
   })
@@ -79,7 +77,6 @@ describe('signOut', () => {
     await signOut({ queryClient })
 
     expect(queryClient.getQueryData(['libraries'])).toBeUndefined()
-    expect(useUnlockPrompt.getState().open).toBe(false)
   })
 
   it('ends the local session when Supabase cannot be reached', async () => {

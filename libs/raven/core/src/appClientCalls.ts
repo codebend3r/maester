@@ -13,7 +13,7 @@ const { get, put, post, delete: remove } = APP_CALL_METHODS
 /**
  * Every route raven's device app may ask a server for, through PR 9's screens: the
  * `@Public()` and viewer reads, the writes the spec allows (progress, plays, watched, the
- * favourites, the account's playlists, the PIN) and the admin lock's unlock, the media ticket and the media plane.
+ * favourites, the account's playlists) and the admin lock's unlock, the media ticket and the media plane.
  * A call the `ApiClient` makes is named after its method; the rest are the URLs the native
  * players, pictures and the event stream fetch. Nothing here is `@AdminOnly()` or kept for the
  * owner by the account gate: the server's `appClients.test.ts` checks every entry against its
@@ -21,7 +21,6 @@ const { get, put, post, delete: remove } = APP_CALL_METHODS
  */
 export const APP_CLIENT_CALLS = {
   getLock: { method: get, path: '/api/lock' },
-  unlock: { method: post, path: '/api/lock/unlock' },
   getAdminLock: { method: get, path: '/api/admin' },
   unlockAdmin: { method: post, path: '/api/admin/unlock' },
 
@@ -44,6 +43,8 @@ export const APP_CLIENT_CALLS = {
   getAlbum: { method: get, path: '/api/albums/:id' },
   getArtist: { method: get, path: '/api/artists/:id' },
   getLyrics: { method: get, path: '/api/tracks/:id/lyrics' },
+  listFavourites: { method: get, path: '/api/favourites' },
+  listFavouriteTitles: { method: get, path: '/api/favourites/titles' },
   listFavouriteAlbums: { method: get, path: '/api/favourites/albums' },
   listFavouriteArtists: { method: get, path: '/api/favourites/artists' },
   listPlaylists: { method: get, path: '/api/playlists' },

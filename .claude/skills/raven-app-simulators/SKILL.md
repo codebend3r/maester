@@ -43,7 +43,7 @@ xcrun simctl create "Apple TV 4K (3rd generation)" com.apple.CoreSimulator.SimDe
 
 ## 4. The fixture server
 
-When `curl -sf http://127.0.0.1:8490/api/health` fails, start it in the background and wait for its line `raven fixture server ready at http://127.0.0.1:8490 (PIN 1357, admin password Raven-Admin-2026)`:
+When `curl -sf http://127.0.0.1:8490/api/health` fails, start it in the background and wait for its line `raven fixture server ready at http://127.0.0.1:8490`:
 
 ```bash
 bunx nx run @raven/server:serve:fixture
@@ -73,26 +73,26 @@ xcrun simctl install <udid> apps/raven/app/build/ios/Build/Products/Release-ipho
 xcrun simctl launch --terminate-running-process <udid> io.github.codebend3r.raven.app
 ```
 
-The Apple TV installs `apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app` instead. Wait about five seconds past the splash, then `xcrun simctl io <udid> screenshot <file>.png` and look at it: raven shows either its PIN screen or Home.
+The Apple TV installs `apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app` instead. Wait about five seconds past the splash, then `xcrun simctl io <udid> screenshot <file>.png` and look at it: raven shows Home.
 
 Then show the screens: Xcode 27 and later have no Simulator.app, so `open /Applications/Xcode.app/Contents/Applications/DeviceHub.app`; an older Xcode uses `open -a Simulator`.
 
 ## Done
 
-Report to the user, per device, whether raven launched, and give them the sign-in: PIN `1357`, admin password `Raven-Admin-2026` (the build already names the server). Home then shows Kestrel Point, the film in the locked library, and Lantern Bay, the series. A simulator unlocked before skips the PIN, and its Home shows only Lantern Bay until it unlocks again; `xcrun simctl keychain <udid> reset` makes it ask. The automated runs are `bun run app:e2e` (iPhone, Maestro) and `bun run app:e2e:tvos` (Apple TV), with the server up.
+Report to the user, per device, whether raven launched, and say there is no sign-in (the build names the server and no client asks for a PIN). Home shows Kestrel Point, the film, and Lantern Bay, the series. The automated runs are `bun run app:e2e` (iPhone, Maestro) and `bun run app:e2e:tvos` (Apple TV), with the server up.
 
 ## When it fails
 
-| Symptom                                                       | Fix                                                                                              |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| "Unable to find application named 'Simulator'"                | Xcode 27 replaced it with DeviceHub, as in step 6                                                |
-| `xcrun: error: unable to find utility "simctl"`               | The Command Line Tools are selected: prefix `DEVELOPER_DIR`                                      |
-| `pod install` fails, "Error installing ExpoModulesCore"       | Usually a download that broke midway: run the same build again                                   |
-| `SwiftExplicitDependencyGeneratePcm x86_64 ... .pcm` failed   | Run the same build again; it resumes. If it fails twice, build Apple silicon only (below)        |
-| "No devices are booted"                                       | Boot it (step 6)                                                                                 |
-| "fetch failed: Could not connect to the server."              | The server is down: start it (step 4), then launch the app again. The unlock it kept still works |
-| The app refuses `http://127.0.0.1:8490`                       | The build lacked `APP_VARIANT=development`: build again with it                                  |
-| Installing the tvOS build on an iPhone, or the reverse, fails | Each platform installs its own build (step 6)                                                    |
+| Symptom                                                       | Fix                                                                                       |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| "Unable to find application named 'Simulator'"                | Xcode 27 replaced it with DeviceHub, as in step 6                                         |
+| `xcrun: error: unable to find utility "simctl"`               | The Command Line Tools are selected: prefix `DEVELOPER_DIR`                               |
+| `pod install` fails, "Error installing ExpoModulesCore"       | Usually a download that broke midway: run the same build again                            |
+| `SwiftExplicitDependencyGeneratePcm x86_64 ... .pcm` failed   | Run the same build again; it resumes. If it fails twice, build Apple silicon only (below) |
+| "No devices are booted"                                       | Boot it (step 6)                                                                          |
+| "fetch failed: Could not connect to the server."              | The server is down: start it (step 4), then launch the app again                          |
+| The app refuses `http://127.0.0.1:8490`                       | The build lacked `APP_VARIANT=development`: build again with it                           |
+| Installing the tvOS build on an iPhone, or the reverse, fails | Each platform installs its own build (step 6)                                             |
 
 The Apple silicon only build. The prebuild puts back the iPhone's `ios/` in case the Apple TV's was built since:
 

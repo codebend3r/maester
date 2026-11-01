@@ -8,12 +8,8 @@ import {
 } from '@raven/core'
 
 import { CARD_SHAPES } from '@/queries/cards'
-import {
-  type ArtLogos,
-  CONTINUE_WATCHING,
-  homeShelvesOf,
-  libraryShelvesOf,
-} from '@/queries/homeShelves'
+import { CONTINUE_WATCHING, homeShelvesOf, libraryShelvesOf } from '@/queries/homeShelves'
+import type { ShowArts } from '@/queries/showArt'
 import { FILMS, HOME, NAS, SERIES, homeApi } from '@/test/homeServer'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 import { ROUTE_TARGETS } from '@/routes'
@@ -21,13 +17,13 @@ import { ROUTE_TARGETS } from '@/routes'
 const COOKIE = { [AUTH_HEADERS.cookie]: 'raven_unlock=u.1' }
 const headersFor = () => COOKIE
 
-/** No title art read yet. */
-const NO_LOGOS: ArtLogos = new Map()
+/** No art read yet. */
+const NO_ARTS: ShowArts = new Map()
 
 describe('homeShelvesOf', () => {
   it('puts Continue watching first, then each library shelf under its name', () => {
     const shelves = homeShelvesOf({
-      logos: NO_LOGOS,
+      arts: NO_ARTS,
       home: HOME,
       libraries: [FILMS, SERIES],
       api: homeApi(),
@@ -43,7 +39,7 @@ describe('homeShelvesOf', () => {
 
   it('names the library each library shelf opens, and none for Continue watching', () => {
     const shelves = homeShelvesOf({
-      logos: NO_LOGOS,
+      arts: NO_ARTS,
       home: HOME,
       libraries: [FILMS, SERIES],
       api: homeApi(),
@@ -54,7 +50,7 @@ describe('homeShelvesOf', () => {
 
   it('shows Continue watching wide, on the backdrop, with how far in it is', () => {
     const [continuing] = homeShelvesOf({
-      logos: NO_LOGOS,
+      arts: NO_ARTS,
       home: HOME,
       libraries: [FILMS, SERIES],
       api: homeApi(),
@@ -69,12 +65,14 @@ describe('homeShelvesOf', () => {
       progress: 0.25,
       target: { kind: ROUTE_TARGETS.item, itemId: 40, libraryId: FILMS.id, fileId: null },
       logo: null,
+      episode: null,
+      resume: { timeLeft: '1h 15m left' },
     })
   })
 
   it("shows a movie library's and a show library's cards as posters", () => {
     const [, films, series] = homeShelvesOf({
-      logos: NO_LOGOS,
+      arts: NO_ARTS,
       home: HOME,
       libraries: [FILMS, SERIES],
       api: homeApi(),
@@ -103,7 +101,7 @@ describe('homeShelvesOf', () => {
   it('shows any other library as frame grabs, and a card with no picture as none', () => {
     const clips = { ...FILMS, id: 3, settings: { ...FILMS.settings, kind: LIBRARY_KINDS.other } }
     const [shelf] = homeShelvesOf({
-      logos: NO_LOGOS,
+      arts: NO_ARTS,
       home: {
         inProgress: [],
         shelves: [
@@ -149,31 +147,47 @@ describe('homeShelvesOf', () => {
     ])
   })
 
-  it("shows an episode in progress on its show's backdrop with the show's title art, not its own frame", () => {
-    const show = summaryFor({ id: 4, type: ITEM_TYPES.show, title: 'Severance', year: 2022 })
+  it("wears the show's title art and backdrop on an episode whose poster is its season", () => {
+    const show = summaryFor({ id: 4, type: ITEM_TYPES.show, title: "The Handmaid's Tale" })
+    const season = summaryFor({
+      id: 5,
+      type: ITEM_TYPES.season,
+      title: 'Season 5',
+      show: { id: show.id, title: show.title },
+      season: 5,
+      backdropVersion: null,
+    })
     const episode = mediaItemFor({
       id: 50,
+      position: 600,
+      duration: 3000,
       thumbnailVersion: 2,
       item: summaryFor({
         id: 60,
         type: ITEM_TYPES.episode,
-        title: 'Half Loop',
+        title: 'Morning',
         show: { id: show.id, title: show.title },
-        season: 1,
-        episode: 2,
+        season: 5,
+        episode: 1,
+        backdropVersion: null,
       }),
     })
     const logo = { uri: `${NAS.origin}/api/pictures/items/4/logo/l4`, headers: COOKIE }
+    const backdrop = { uri: `${NAS.origin}/api/pictures/items/4/backdrop/b4`, headers: COOKIE }
     const [shelf] = homeShelvesOf({
-      logos: new Map([[show.id, logo]]),
-      home: { inProgress: [{ media: episode, poster: show }], shelves: [] },
+      arts: new Map([[show.id, { logo, backdrop }]]),
+      home: { inProgress: [{ media: episode, poster: season }], shelves: [] },
       libraries: [],
       api: homeApi(),
       headersFor,
     })
     expect(shelf?.cards[0] ?? null).toMatchObject({
-      picture: { uri: `${NAS.origin}/api/pictures/items/4/backdrop/b4` },
+      title: "The Handmaid's Tale",
+      line: null,
+      picture: backdrop,
       logo,
+      episode: { name: 'Morning', mark: 'S5.E1' },
+      resume: { timeLeft: '40m left' },
     })
   })
 
@@ -198,7 +212,7 @@ describe('homeShelvesOf', () => {
       },
     })
     const [shelf] = homeShelvesOf({
-      logos: NO_LOGOS,
+      arts: NO_ARTS,
       home: { inProgress: [{ media: episode, poster: null }], shelves: [] },
       libraries: [],
       api: homeApi(),
@@ -206,7 +220,8 @@ describe('homeShelvesOf', () => {
     })
     expect(shelf?.cards[0] ?? null).toMatchObject({
       title: 'Severance',
-      line: 'S01E02 · Half Loop',
+      line: null,
+      episode: { name: 'Half Loop', mark: 'S1.E2' },
       picture: { uri: `${NAS.origin}/api/media/50/thumbnail?v=2` },
       target: { kind: ROUTE_TARGETS.item, itemId: 60, libraryId: 1, fileId: null },
     })
@@ -214,7 +229,7 @@ describe('homeShelvesOf', () => {
 
   it('leaves out a shelf for a library not in the list, and an empty Continue watching', () => {
     const shelves = homeShelvesOf({
-      logos: NO_LOGOS,
+      arts: NO_ARTS,
       home: { ...HOME, inProgress: [] },
       libraries: [SERIES],
       api: homeApi(),

@@ -46,7 +46,7 @@ The arguments go to the flows' `nx run`, so the build stays cached.
 
 - **Simulator** (on Xcode 27, **DeviceHub**, which replaced it) opens with the iPhone (`raven-phone`) and boots it to the home screen. It stays open afterwards.
 - During the build, nothing new: Expo, CocoaPods and `xcodebuild` print to the terminal.
-- Maestro opens nothing of its own; it drives the iPhone in Simulator. Each flow relaunches raven with its state cleared, so the sign-in repeats for each one: the PIN screen ("This server keeps some libraries behind a PIN."), the PIN `1357` and the admin password typed in by taps, then Home with **Kestrel Point** and **Lantern Bay**. Then, flow by flow: a library opened from See all and sorted, the film's page marked watched and back, a show's season and episode, the film playing under raven's controls and paused, and a search from Home's header.
+- Maestro opens nothing of its own; it drives the iPhone in Simulator. Each flow relaunches raven with its state cleared, so each one opens straight on Home with **Kestrel Point** and **Lantern Bay**. Then, flow by flow: a library opened from See all and sorted, the film's page marked watched and back, a show's season and episode, the film playing under raven's controls and paused, and a search from Home's header.
 - Ask the user not to click in Simulator while it runs; a tap can fail a flow.
 - The terminal prints each flow with a pass or fail mark.
 

@@ -1,6 +1,6 @@
 import { ScrollView, StyleSheet, View } from 'react-native'
 
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { useScreenFocusScope } from '@/layouts/focus'
 import {
   CLEAR_SEARCH,
@@ -59,7 +59,7 @@ const SearchLayout = ({ title, label, search, notice, children }: SearchLayoutPr
   return (
     <ScrollView contentContainerStyle={styles.page} style={styles.ground}>
       <View style={styles.header}>
-        <Text accessibilityRole="header" style={styles.title}>
+        <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
           {title}
         </Text>
         <SearchField isPreferred={isOpening} label={label} onFocused={settle} search={search} />

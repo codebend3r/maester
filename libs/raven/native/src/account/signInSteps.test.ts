@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'bun:test'
-import { ADMIN_LOCK_STATES, type AdminLock, ApiError, type Home, SERVERS_CAP } from '@raven/core'
+import { ApiError, type Home, SERVERS_CAP } from '@raven/core'
 
-import {
-  FINISH_OUTCOMES,
-  SIGN_IN_STEPS,
-  finishSignIn,
-  stepAfterSecret,
-} from '@/account/signInSteps'
+import { FINISH_OUTCOMES, finishSignIn } from '@/account/signInSteps'
 import { createActiveServerStore } from '@/servers/activeServerStore'
 import type { AppServer } from '@/servers/serverList'
 import { mediaItemFor } from '@/test/mediaItem'
@@ -21,66 +16,14 @@ const SERVER: AppServer = {
 
 const HOME: Home = { inProgress: [{ media: mediaItemFor({ id: 7 }), poster: null }], shelves: [] }
 
-type ApiOfProps = {
-  adminLock?: AdminLock
-  ticket?: () => Promise<{ ticket: string; expiresAt: number }>
-}
+type ApiOfProps = { ticket?: () => Promise<{ ticket: string; expiresAt: number }> }
 
-/** A fake server that records the secrets it was sent. */
-const apiOf = ({
-  adminLock = { state: ADMIN_LOCK_STATES.off },
-  ticket = async () => ({ ticket: 't', expiresAt: 1 }),
-}: ApiOfProps = {}) => {
-  const sent: string[] = []
-  return {
-    sent,
-    api: {
-      unlock: async (pin: string) => {
-        sent.push(`pin:${pin}`)
-        return { available: true, unlocked: true }
-      },
-      getAdminLock: async () => adminLock,
-      unlockAdmin: async (password: string): Promise<AdminLock> => {
-        sent.push(`admin:${password}`)
-        return { state: ADMIN_LOCK_STATES.off }
-      },
-      getHome: async () => HOME,
-      getMediaTicket: ticket,
-    },
-  }
-}
+const apiOf = ({ ticket = async () => ({ ticket: 't', expiresAt: 1 }) }: ApiOfProps = {}) => ({
+  api: { getHome: async () => HOME, getMediaTicket: ticket },
+})
 
 const serversOf = () =>
   createActiveServerStore({ store: memoryStore().store, jar: { forget: async () => {} } })
-
-describe('stepAfterSecret', () => {
-  it('sends the PIN, then asks for the admin password while the admin lock holds', async () => {
-    const { api, sent } = apiOf({
-      adminLock: { state: ADMIN_LOCK_STATES.on, available: true },
-    })
-    const step = { kind: SIGN_IN_STEPS.pin, server: SERVER }
-    expect(await stepAfterSecret({ api, step, secret: '1357' })).toEqual({
-      kind: SIGN_IN_STEPS.admin,
-      server: SERVER,
-    })
-    expect(sent).toEqual(['pin:1357'])
-  })
-
-  it.each([
-    ['off', { state: ADMIN_LOCK_STATES.off }],
-    ['on with no password set', { state: ADMIN_LOCK_STATES.on, available: false }],
-  ])('is done after the PIN when the admin lock is %s', async (_name, adminLock: AdminLock) => {
-    const step = { kind: SIGN_IN_STEPS.pin, server: SERVER }
-    expect(await stepAfterSecret({ api: apiOf({ adminLock }).api, step, secret: '1' })).toBeNull()
-  })
-
-  it('sends the admin password and is done', async () => {
-    const { api, sent } = apiOf({ adminLock: { state: ADMIN_LOCK_STATES.on, available: true } })
-    const step = { kind: SIGN_IN_STEPS.admin, server: SERVER }
-    expect(await stepAfterSecret({ api, step, secret: 'Pass#word2026' })).toBeNull()
-    expect(sent).toEqual(['admin:Pass#word2026'])
-  })
-})
 
 describe('finishSignIn', () => {
   it('adds the server, makes it the active one and is done', async () => {

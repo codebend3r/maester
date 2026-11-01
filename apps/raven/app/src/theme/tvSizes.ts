@@ -29,6 +29,8 @@ export const TV_SIZES = {
   space6: tvSize(SIZES.space6),
   space8: tvSize(SIZES.space8),
   radius: tvSize(SIZES.radius),
+  radiusLg: tvSize(SIZES.radiusLg),
+  radiusPill: tvSize(SIZES.radiusPill),
   textXs: tvSize(SIZES.textXs * TV_TYPE_BOOST),
   textSm: tvSize(SIZES.textSm * TV_TYPE_BOOST),
   text: tvSize(SIZES.text * TV_TYPE_BOOST),

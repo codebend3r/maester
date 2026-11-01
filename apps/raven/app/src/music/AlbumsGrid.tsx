@@ -96,6 +96,7 @@ export const AlbumsGrid = ({
           {toggle}
           <ToolButton
             accessibilityLabel={ALBUMS_GRID_COPY.shuffle(library.name)}
+            icon="shuffle"
             label={MUSIC_COPY.shuffle}
             onPress={() => void shuffle()}
           />

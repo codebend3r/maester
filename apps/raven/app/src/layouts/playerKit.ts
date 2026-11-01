@@ -13,7 +13,7 @@ export const SKIP_SECONDS = 10
 type PlayerNext = { label: string; onPlay: () => void }
 
 /** A track picker: what it offers, which is picked, and what to do with a pick; the chrome names it. */
-export type TrackPicker = Omit<PickerProps<string>, 'label'>
+export type TrackPicker = Omit<PickerProps<string>, 'label' | 'icon'>
 
 /** The transport, once there is a video to drive. */
 export type Transport = {
@@ -94,6 +94,7 @@ export const PLAYER_COPY = {
   /** What the opening mark is called aloud; it is never shown. */
   opening: 'Opening the video',
   next: 'Next episode',
+  restart: 'Back to the start',
   /** How each way of playing reads in the corner. */
   modes: {
     [PLAYBACK_MODES.direct]: 'Direct play',

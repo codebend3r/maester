@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Image, type StyleProp, type TextStyle, View } from 'react-native'
 
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import type { Picture } from '@/queries/cards'
 
 /** A logo's width for its height until the art says its own: title art runs wide. */
@@ -28,7 +28,7 @@ export const TitleArt = ({ name, logo, height, maxWidth, textStyle }: TitleArtPr
   const [failed, setFailed] = useState<string | null>(null)
   if (logo === null || failed === logo.uri) {
     return (
-      <Text numberOfLines={2} style={textStyle}>
+      <Text variant={TEXT_VARIANTS.display} numberOfLines={2} style={textStyle}>
         {name}
       </Text>
     )

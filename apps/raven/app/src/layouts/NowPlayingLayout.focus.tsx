@@ -16,7 +16,7 @@ import {
 } from '@/layouts/musicKit'
 import { NowPlayingAside } from '@/layouts/NowPlayingAside.focus'
 import { ActionPlate, Cover, FocusPage, FocusRow, useMusicStyles } from '@/layouts/MusicParts.focus'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -77,7 +77,7 @@ const PlayingHero = ({
         <View style={styles.hero}>
           <Cover cover={track.cover} size={PLAYING_COVER} title={track.title} />
           <View style={styles.words}>
-            <Text numberOfLines={2} style={styles.title}>
+            <Text variant={TEXT_VARIANTS.display} numberOfLines={2} style={styles.title}>
               {track.title}
             </Text>
             <Text numberOfLines={1} style={styles.line}>
@@ -172,7 +172,11 @@ export const NowPlayingLayout = (props: NowPlayingLayoutProps) => {
         <FocusBand>
           <View style={styles.section}>
             <View style={own.queueHead}>
-              <Text accessibilityRole="header" style={styles.heading}>
+              <Text
+                variant={TEXT_VARIANTS.display}
+                accessibilityRole="header"
+                style={styles.heading}
+              >
                 {MUSIC_COPY.upNext}
               </Text>
               <ActionPlate

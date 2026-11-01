@@ -1,5 +1,4 @@
 import {
-  ACCESS_REFUSALS,
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
   type ItemDetails,
@@ -32,7 +31,6 @@ import {
   useAudioQueue,
   usePlaybackPolicy,
   usePlayerPrefs,
-  useUnlockPrompt,
   videoReducer,
   KeyedView,
   type ViewOf,
@@ -49,10 +47,13 @@ import type { LoadingProps } from '@/layouts/loadingKit'
 import { NO_HEADING } from '@/layouts/playerHeading'
 import { PLAYER_COPY, type VideoSurface } from '@/layouts/playerKit'
 import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
+import { APP_PLATFORMS } from '@/platform/platform'
 import { planFor } from '@/platform/playbackPlan'
 import { mediaSourcesFor } from '@/player/mediaSources'
 import { isServerDrop } from '@/player/playerErrors'
 import { progressSinkFor } from '@/player/progressSink'
+import { NOT_LOADED, START_EVENTS, isHeldOf, isStartedOf, startReducer } from '@/player/startUp'
+import { useSeekGrace } from '@/player/useSeekGrace'
 import {
   AUDIO_HEARINGS,
   type AudioHearing,
@@ -154,6 +155,9 @@ const captionsFor = ({
   }
 }
 
+/** AVPlayer resumes by a seek of ours once loaded, not by the library's `startPosition`; see `startUp.ts`. */
+const IS_SEEKING_TO_RESUME = DEVICE_PLATFORM === APP_PLATFORMS.ios
+
 /** What the player saying it buffers, or not, tells the video state. */
 const bufferEventOf = (isBuffering: boolean) =>
   isBuffering ? VIDEO_EVENTS.waiting : VIDEO_EVENTS.flowing
@@ -236,6 +240,7 @@ const Playing = ({
   const [video, dispatchVideo] = useReducer(videoReducer, resumeAt, initialVideoState)
   const [isPaused, setPaused] = useState(false)
   const position = useRef(resumeAt)
+  const [startState, dispatchStart] = useReducer(startReducer, NOT_LOADED)
   // One per server, so the picture and its subtitles reach the video the same way.
   const sources = mediaSourcesFor(session.server)
   const { state, dispatch } = usePlaybackSession({
@@ -245,8 +250,9 @@ const Playing = ({
     audio: preferredAudio({ tracks, language: audioLanguage }),
     problems: plan.problems,
     sources,
-    // AVPlayer says it waits at the end of a file too, and the viewer's pause is no stall.
-    isWaiting: video.waiting && !isPaused && !video.ended,
+    // AVPlayer says it waits at the end of a file too, and the viewer's pause is no stall; a
+    // video still held for its resume seek is not stalled either.
+    isWaiting: video.waiting && !isPaused && !video.ended && !isHeldOf(startState),
     clock: video.time,
   })
   const [duration, setDuration] = useState(media.duration)
@@ -289,6 +295,11 @@ const Playing = ({
   const showing = activeCues({ cues, time: video.time })
   const startAt = ladder?.at ?? resumeAt
   const attempt = ladder?.attempt ?? null
+  const isStarted = !IS_SEEKING_TO_RESUME || isStartedOf({ state: startState, attempt })
+  useSeekGrace({
+    state: startState,
+    onLanded: (landed) => dispatchStart({ type: START_EVENTS.landed, attempt: landed }),
+  })
 
   // The session hands out a new source for each attempt, which the player loads from its spot.
   const source = useMemo(
@@ -298,17 +309,10 @@ const Playing = ({
         : {
             uri: sourced.source.uri,
             headers: sourced.source.headers,
-            startPosition: startAt * 1000,
+            ...(IS_SEEKING_TO_RESUME ? {} : { startPosition: startAt * 1000 }),
           },
     [sourced, startAt],
   )
-
-  const refusal = state.phase === SESSION_PHASES.refused ? state.refusal : null
-  useEffect(() => {
-    if (refusal !== null && refusal.reason === ACCESS_REFUSALS.locked) {
-      useUnlockPrompt.getState().ask()
-    }
-  }, [refusal])
 
   // ExoPlayer may play the original without the audio asked for, saying nothing: once the pick
   // has settled, a play with a way left below steps down when it did.
@@ -407,7 +411,12 @@ const Playing = ({
             if (length > 0) setDuration(length)
             dispatchVideo({ type: VIDEO_EVENTS.duration, duration: length > 0 ? length : null })
             dispatch({ type: SESSION_EVENTS.loaded, attempt })
+            if (!IS_SEEKING_TO_RESUME) return
+            dispatchStart({ type: START_EVENTS.loaded, attempt, at: startAt })
+            const current = player.current
+            if (startAt > 0 && current !== null) current.seek(startAt)
           },
+          onSeek: () => dispatchStart({ type: START_EVENTS.landed, attempt }),
           // AVPlayer says its buffer ran full only after it ran empty, which a fast stream never
           // does, so playing is also what says frames flow; without it the play never starts.
           onPlaybackStateChanged: ({ isPlaying }) => {
@@ -419,7 +428,7 @@ const Playing = ({
             dispatchVideo({ type: VIDEO_EVENTS.moved, time: currentTime, buffered: [] })
             hear({ type: AUDIO_HEARINGS.moved, attempt, clock: currentTime })
           },
-          paused: isPaused,
+          paused: isPaused || !isStarted,
           progressUpdateInterval: PROGRESS_EVERY_MS,
           selectedAudioTrack: audioTrack,
           selectedTextTrack: captions.textTrack,

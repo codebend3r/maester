@@ -8,7 +8,7 @@ import { BUTTON_TONES } from '@/layouts/formKit'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type PlaylistLayoutProps } from '@/layouts/musicKit'
 import { ActionPlate, FocusPage, FocusRow, useMusicStyles } from '@/layouts/MusicParts.focus'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 
 const styles = StyleSheet.create({ entryWords: { flex: 1 } })
 
@@ -103,7 +103,7 @@ export const PlaylistLayout = ({
       <FocusBand>
         <View style={music.words}>
           <Text style={music.eyebrow}>{MUSIC_COPY.playlist}</Text>
-          <Text accessibilityRole="header" style={music.title}>
+          <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={music.title}>
             {name}
           </Text>
           <Text style={music.muted}>{facts}</Text>

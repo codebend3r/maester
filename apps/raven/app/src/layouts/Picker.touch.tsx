@@ -1,4 +1,5 @@
 import { THEME_TONES } from '@raven/core'
+import { Icon } from '@raven/native'
 import { type ComponentRef, type RefObject, useRef } from 'react'
 import { ActionSheetIOS, Pressable, StyleSheet, View, findNodeHandle } from 'react-native'
 
@@ -12,7 +13,7 @@ import {
 } from '@/layouts/gridKit'
 import { Text } from '@/layouts/Text'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
-import { themeNow, themedStyles } from '@/theme/useTheme'
+import { themeNow, themedStyles, useTheme } from '@/theme/useTheme'
 
 type OpenPickerSheetProps<K extends string> = Pick<
   PickerProps<K>,
@@ -46,6 +47,14 @@ export const openPickerSheet = <K extends string>({
   )
 }
 
+type ChipIconProps = Pick<ToolButtonProps, 'icon' | 'isOverPicture'>
+
+/** The chip's icon, as large as its text and in its text colour, on the page or over the video. */
+const ChipIcon = ({ icon, isOverPicture = false }: ChipIconProps) => {
+  const colour = useTheme((theme) => (isOverPicture ? theme.overPicture : theme.palette).text)
+  return <Icon colour={colour} name={icon} size={SIZES.text} />
+}
+
 /**
  * A picker under the thumb: a chip that opens the system's action sheet, on an iPad as a
  * popover pointing at the chip. Only iPhones and iPads use the touch layout. Over the video the
@@ -62,13 +71,20 @@ const Picker = <K extends string>(props: PickerProps<K>) => {
       onPress={() => openPickerSheet({ ...props, anchor: chip })}
       style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
     >
+      <ChipIcon icon={props.icon} isOverPicture={props.isOverPicture} />
       <Text style={styles.label}>{props.label}</Text>
       <Text style={styles.value}>{chosenLabelOf(props)}</Text>
     </Pressable>
   )
 }
 
-const ToolButton = ({ label, accessibilityLabel, onPress, isOverPicture }: ToolButtonProps) => {
+const ToolButton = ({
+  label,
+  icon,
+  accessibilityLabel,
+  onPress,
+  isOverPicture,
+}: ToolButtonProps) => {
   const styles = useStyles({ isOverPicture })
   return (
     <Pressable
@@ -77,6 +93,7 @@ const ToolButton = ({ label, accessibilityLabel, onPress, isOverPicture }: ToolB
       onPress={onPress}
       style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
     >
+      <ChipIcon icon={icon} isOverPicture={isOverPicture} />
       <Text style={styles.value}>{label}</Text>
     </Pressable>
   )

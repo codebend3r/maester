@@ -2,7 +2,6 @@ import { type StateStorage, createJSONStorage } from 'zustand/middleware'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { usePlayerServices } from '@/stores/playerServices'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
 
 type ConfigureStorageProps = { storage: StateStorage }
 
@@ -15,11 +14,9 @@ export const configureStorage = async ({ storage }: ConfigureStorageProps): Prom
   usePlayerPrefs.persist.setOptions({ storage: createJSONStorage(() => storage) })
   usePageBackdrop.persist.setOptions({ storage: createJSONStorage(() => storage) })
   usePlayerServices.persist.setOptions({ storage: createJSONStorage(() => storage) })
-  useUnlockPrompt.persist.setOptions({ storage: createJSONStorage(() => storage) })
   await Promise.all([
     usePlayerPrefs.persist.rehydrate(),
     usePageBackdrop.persist.rehydrate(),
     usePlayerServices.persist.rehydrate(),
-    useUnlockPrompt.persist.rehydrate(),
   ])
 }

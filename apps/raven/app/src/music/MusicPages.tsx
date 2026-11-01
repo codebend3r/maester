@@ -1,4 +1,5 @@
 import type { Library } from '@raven/core'
+import type { IconName } from '@raven/ui/iconDrawings'
 import { type ComponentType, type ReactNode, useState } from 'react'
 
 import { ToolButton } from '@/layouts'
@@ -32,12 +33,20 @@ const PAGE_NAMES = {
 
 type MusicPageToggleProps = { page: MusicPage; onChange: (page: MusicPage) => void }
 
+/** What each page's button draws beside its name. */
+const PAGE_ICONS = {
+  [MUSIC_PAGES.albums]: 'disc',
+  [MUSIC_PAGES.artists]: 'music',
+  [MUSIC_PAGES.playlists]: 'list',
+} as const satisfies Record<MusicPage, IconName>
+
 /** One press from any page to each of the others: each named for where it goes. */
 const MusicPageToggle = ({ page, onChange }: MusicPageToggleProps) =>
   PAGE_ORDER.filter((other) => other !== page).map((other) => (
     <ToolButton
       key={other}
       accessibilityLabel={MUSIC_PAGES_COPY.show(PAGE_NAMES[other])}
+      icon={PAGE_ICONS[other]}
       label={PAGE_NAMES[other]}
       onPress={() => onChange(other)}
     />

@@ -1,23 +1,38 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { AUTH_HEADERS, SERVER_COOKIES, isRecord, isString } from '@raven/core'
+import { AUTH_HEADERS, SERVER_COOKIES, THEMES, isRecord, isString, themeOf } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import { bumpCookieVersion } from '@raven/native/headless'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
-import { StyleSheet } from 'react-native'
+import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import type { Picture } from '@/queries/cards'
 import { clearOnServerSwitch } from '@/queries/serverCache'
-import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
+import { TOUCH_NAV_COPY } from '@/layouts/touchMenuKit'
+import { APP_ROUTES, APP_ROUTE_PARAMS, searchHrefOf } from '@/routes'
 import { Home } from '@/screens/Home'
 import { useActiveServer } from '@/stores/activeServer'
+import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
+import { useTouchMenu } from '@/stores/touchMenu'
+import { SIZES } from '@/theme/appTheme'
 import { NAS, OTHER, homeApi } from '@/test/homeServer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { createScreenClient, renderScreen } from '@/test/renderScreen'
 
 const mockPush = jest.fn()
+const NAV_LABELS: ReadonlySet<string | undefined> = new Set([
+  TOUCH_NAV_COPY.menu,
+  TOUCH_NAV_COPY.theme,
+  TOUCH_NAV_COPY.runSearch,
+])
+
+/** The cards on the page: its buttons but the header's. */
+const cardsOnPage = () =>
+  screen.getAllByRole('button').filter((button) => !NAV_LABELS.has(button.props.accessibilityLabel))
 const mockApi = jest.fn(homeApi)
 const mockCookies = jest.fn<() => Record<string, string>>(() => ({}))
+/** The first light theme, which the default is not. */
+const LIGHT_THEME = THEMES.find((theme) => theme.tone !== themeOf(DEFAULT_APP_PREFS.theme).tone)
 const PHONE_WIDTH = 390
 const mockWindowWidth = jest.fn(() => PHONE_WIDTH)
 
@@ -42,7 +57,10 @@ const renderHome = async () => renderScreen({ ui: <Home /> })
 
 describe('Home on a phone or tablet', () => {
   beforeEach(() => {
+    jest.restoreAllMocks()
     jest.clearAllMocks()
+    useTouchMenu.setState({ isOpen: false })
+    useAppPrefs.setState(DEFAULT_APP_PREFS)
     mockCookies.mockReturnValue({})
     mockWindowWidth.mockReturnValue(PHONE_WIDTH)
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
@@ -58,7 +76,7 @@ describe('Home on a phone or tablet', () => {
   it('names every card by its title', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
-    const cards = screen.getAllByRole('button').map((card) => card.props.accessibilityLabel)
+    const cards = cardsOnPage().map((card) => card.props.accessibilityLabel)
     expect(cards).toEqual(['Busboys', 'Busboys', 'Night Train', 'Severance'])
   })
 
@@ -81,41 +99,75 @@ describe('Home on a phone or tablet', () => {
     expect(screen.queryByRole('link', { name: 'See all in Continue watching' })).toBeNull()
   })
 
-  it('opens the search through every library from its header', async () => {
+  it('shows the search as a field with a button that runs it, and no search button of its own', async () => {
     await renderHome()
-    await fireEvent.press(await screen.findByRole('link', { name: 'Search every library' }))
-    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.search)
+    await screen.findByRole('header', { name: 'Films' })
+    expect(screen.getByLabelText('Search every library')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Search every library' })).toBeNull()
+    await fireEvent.changeText(screen.getByLabelText('Search every library'), ' dune ')
+    expect(mockPush).not.toHaveBeenCalled()
+    await fireEvent.press(screen.getByRole('button', { name: TOUCH_NAV_COPY.runSearch }))
+    expect(mockPush).toHaveBeenCalledWith(searchHrefOf('dune'))
+    expect(screen.getByLabelText('Search every library').props.value).toBe('')
   })
 
-  it('opens Settings from the gear in its header', async () => {
+  it("runs the search at once on the keyboard's Search key", async () => {
     await renderHome()
-    await fireEvent.press(await screen.findByRole('link', { name: 'Settings' }))
-    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.settings)
+    await screen.findByRole('header', { name: 'Films' })
+    await fireEvent.changeText(screen.getByLabelText('Search every library'), 'dune')
+    await fireEvent(screen.getByLabelText('Search every library'), NATIVE_EVENTS.submitEditing, {
+      nativeEvent: { text: 'dune' },
+    })
+    expect(mockPush).toHaveBeenCalledWith(searchHrefOf('dune'))
+  })
+
+  it('draws the field in large type', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    const field = screen.getByLabelText('Search every library')
+    expect(StyleSheet.flatten(field.props.style)?.fontSize).toBe(SIZES.textXl)
+  })
+
+  it('opens the side menu from the menu button, with no Home button on Home itself', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    expect(screen.queryByRole('button', { name: TOUCH_NAV_COPY.home })).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: TOUCH_NAV_COPY.menu }))
+    expect(useTouchMenu.getState().isOpen).toBe(true)
+  })
+
+  it("swaps the theme from the header's button and wears it at once", async () => {
+    const asked: string[][] = []
+    jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((options, done) => {
+      asked.push(options.options)
+      done(options.options.indexOf(LIGHT_THEME?.name ?? ''))
+    })
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    await fireEvent.press(screen.getByRole('button', { name: TOUCH_NAV_COPY.theme }))
+    expect(asked).toEqual([[...THEMES.map((theme) => theme.name), 'Cancel']])
+    expect(useAppPrefs.getState().theme).toBe(LIGHT_THEME?.id)
   })
 
   it('draws each card as wide as its shape asks: a wide frame, then posters', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
-    const widths = screen
-      .getAllByRole('button')
-      .map((card) => StyleSheet.flatten(card.props.style)?.width ?? null)
-    expect(widths).toEqual([248, 128, 128, 128])
+    const widths = cardsOnPage().map((card) => StyleSheet.flatten(card.props.style)?.width ?? null)
+    expect(widths).toEqual([288, 128, 128, 128])
   })
 
   it('draws the cards larger on a tablet', async () => {
     mockWindowWidth.mockReturnValue(1024)
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
-    const widths = screen
-      .getAllByRole('button')
-      .map((card) => StyleSheet.flatten(card.props.style)?.width ?? null)
-    expect(widths).toEqual([320, 168, 168, 168])
+    const widths = cardsOnPage().map((card) => StyleSheet.flatten(card.props.style)?.width ?? null)
+    expect(widths).toEqual([400, 168, 168, 168])
   })
 
   it('asks for no focus on a touch screen', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
-    const cards = screen.getAllByRole('button')
+    const cards = cardsOnPage()
     expect(cards.some((card) => card.props.hasTVPreferredFocus === true)).toBe(false)
   })
 

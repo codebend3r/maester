@@ -7,7 +7,7 @@ import { type NewPlaylistButtonProps, type PlaylistLayoutProps } from '@/layouts
 import { ListEntry, TouchPage, useMusicStyles } from '@/layouts/MusicParts.touch'
 import { touchPicker } from '@/layouts/Picker.touch'
 import { askPlaylistName, confirmDeletePlaylist } from '@/layouts/playlistSheets'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 
 const { FormButton } = touchForm
 const { ToolButton } = touchPicker
@@ -37,7 +37,7 @@ export const PlaylistLayout = ({
     <TouchPage onBack={onBack}>
       <View style={styles.stage}>
         <Text style={styles.muted}>{MUSIC_COPY.playlist}</Text>
-        <Text accessibilityRole="header" style={styles.title}>
+        <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
           {name}
         </Text>
         <Text style={styles.muted}>{facts}</Text>
@@ -58,6 +58,7 @@ export const PlaylistLayout = ({
         <View style={styles.controls}>
           <ToolButton
             accessibilityLabel={MUSIC_COPY.renamePlaylist}
+            icon="edit"
             label={MUSIC_COPY.rename}
             onPress={() =>
               askPlaylistName({
@@ -70,6 +71,7 @@ export const PlaylistLayout = ({
           />
           <ToolButton
             accessibilityLabel={MUSIC_COPY.delete}
+            icon="trash"
             label={MUSIC_COPY.delete}
             onPress={() => confirmDeletePlaylist({ name, onDelete })}
           />
@@ -90,12 +92,14 @@ export const PlaylistLayout = ({
             {track.index > 0 && (
               <ToolButton
                 accessibilityLabel={MUSIC_COPY.moveUp(track.title)}
+                icon="up"
                 label={MUSIC_COPY.up}
                 onPress={() => onMoveUp(track.index)}
               />
             )}
             <ToolButton
               accessibilityLabel={MUSIC_COPY.removeFrom(track.title)}
+              icon="close"
               label={MUSIC_COPY.remove}
               onPress={() => onRemove(track.index)}
             />
@@ -110,6 +114,7 @@ export const PlaylistLayout = ({
 export const NewPlaylistButton = ({ onCreate }: NewPlaylistButtonProps) => (
   <ToolButton
     accessibilityLabel={MUSIC_COPY.newPlaylist}
+    icon="plus"
     label={MUSIC_COPY.newPlaylist}
     onPress={() =>
       askPlaylistName({

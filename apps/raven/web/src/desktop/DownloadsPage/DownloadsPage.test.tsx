@@ -11,7 +11,6 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { DownloadsPage } from '@/desktop/DownloadsPage/DownloadsPage'
-import { api } from '@/lib/api'
 import { Where, where } from '@/test/authPage'
 import {
   asDesktop,
@@ -188,8 +187,7 @@ describe('DownloadsPage', () => {
     expect(screen.getByText('Dune (2021)')).toBeInTheDocument()
   })
 
-  it('asks for the PIN before resuming a download from a library locked again', async () => {
-    const unlock = spyOn(api, 'unlock').mockResolvedValue({ available: true, unlocked: true })
+  it('resumes a download a relock paused with no PIN prompt', async () => {
     const client = downloadsMain({
       downloads: [
         viewOf({
@@ -200,14 +198,10 @@ describe('DownloadsPage', () => {
     })
     renderPage(client)
     await userEvent.click(await screen.findByRole('button', { name: 'Resume S01E01 Good News' }))
-    expect(sentOfType({ client, type: DESKTOP_REQUESTS.resumeDownload })).toEqual([])
-    await userEvent.type(await screen.findByLabelText('PIN'), '3001')
-    await userEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    expect(screen.queryByLabelText('PIN')).toBeNull()
     await waitFor(() =>
       expect(sentOfType({ client, type: DESKTOP_REQUESTS.resumeDownload })).toHaveLength(1),
     )
-    expect(unlock).toHaveBeenCalledWith('3001')
-    unlock.mockRestore()
   })
 
   it('says why main could not list its downloads or read the disk', async () => {

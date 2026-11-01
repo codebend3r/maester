@@ -7,7 +7,7 @@ import {
   formatBytes,
   KEYS,
 } from '@raven/core'
-import { Button, type IconName, UNLOCK_SECRETS, UnlockDialog } from '@raven/ui'
+import { Button, type IconName } from '@raven/ui'
 import {
   type ComponentType,
   type KeyboardEvent,
@@ -26,7 +26,6 @@ import { usePlayDownload } from '@/desktop/DownloadsPage/usePlayDownload'
 import { useDownloadSpeed } from '@/desktop/useDownloadSpeed'
 import { POSTER_SIZES } from '@/lib/posters'
 import { watchedLabel } from '@/desktop/watched'
-import { api } from '@/lib/api'
 import styles from '@/desktop/DownloadsPage/DownloadsPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 
@@ -310,7 +309,6 @@ export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
   const change = useChangeDownloads()
   const play = usePlayDownload()
   const [mode, setMode] = useState<RowMode>(ROW_MODES.view)
-  const [isUnlocking, setIsUnlocking] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const isDeletingNow = useRef(false)
   const row = useRef<HTMLLIElement>(null)
@@ -341,8 +339,6 @@ export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
       case ROW_ACTIONS.pause:
         return change({ type: DESKTOP_REQUESTS.pauseDownload, downloadId })
       case ROW_ACTIONS.resume:
-        // A library locked again needs its PIN before main can fetch from it.
-        if (view.isLocked) return setIsUnlocking(true)
         return change({ type: DESKTOP_REQUESTS.resumeDownload, downloadId })
       case ROW_ACTIONS.retry:
         return change({ type: DESKTOP_REQUESTS.retryDownload, downloadId })
@@ -394,18 +390,6 @@ export const DownloadRow = ({ view, onDeleted }: DownloadRowProps) => {
           )
         }
       />
-      {isUnlocking && (
-        <UnlockDialog
-          secret={UNLOCK_SECRETS.pin}
-          hint={DOWNLOAD_ROW_COPY.lockedHint}
-          unlock={(entered) => api.unlock(entered)}
-          onUnlocked={() => {
-            setIsUnlocking(false)
-            return change({ type: DESKTOP_REQUESTS.resumeDownload, downloadId })
-          }}
-          onClose={() => setIsUnlocking(false)}
-        />
-      )}
     </li>
   )
 }

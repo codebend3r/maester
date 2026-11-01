@@ -1,12 +1,7 @@
 import { afterEach } from 'bun:test'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import {
-  configureStorage,
-  usePageBackdrop,
-  usePlayerPrefs,
-  useUnlockPrompt,
-} from '@raven/ui/headless'
+import { configureStorage, usePageBackdrop, usePlayerPrefs } from '@raven/ui/headless'
 import { useToasts } from '@raven/ui'
 import { queryClient } from '@/lib/queryClient'
 import { useAuthSession } from '@/stores/authSession'
@@ -36,7 +31,6 @@ const initialAuthSession = useAuthSession.getInitialState()
 const initialPrefs = usePlayerPrefs.getInitialState()
 const initialPageBackdrop = usePageBackdrop.getInitialState()
 const initialSideMenu = useSideMenu.getInitialState()
-const initialUnlockPrompt = useUnlockPrompt.getInitialState()
 const initialTheme = useTheme.getInitialState()
 const initialCardLinks = useCardLinks.getInitialState()
 const initialHoverBackdrops = useHoverBackdrops.getInitialState()
@@ -62,7 +56,6 @@ afterEach(() => {
   usePlayerPrefs.setState(initialPrefs, true)
   usePageBackdrop.setState(initialPageBackdrop, true)
   useSideMenu.setState(initialSideMenu, true)
-  useUnlockPrompt.setState(initialUnlockPrompt, true)
   useTheme.setState(initialTheme, true)
   useCardLinks.setState(initialCardLinks, true)
   useHoverBackdrops.setState(initialHoverBackdrops, true)

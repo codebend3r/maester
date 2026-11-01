@@ -1,6 +1,7 @@
 import {
   type Library as LibraryRecord,
   type LibrarySettings,
+  type LibraryView,
   type MediaItem,
   type PosterEntry,
   KINDS,
@@ -29,6 +30,7 @@ import {
   sortParts,
   startingSort,
 } from '@raven/core'
+import type { IconName } from '@raven/ui/iconDrawings'
 import { useSearch, KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -36,8 +38,9 @@ import { type ReactNode, useState } from 'react'
 
 import { MusicPages } from '@/music/MusicPages'
 import type { ShelfCard } from '@/queries/cards'
-import { CONTINUE_WATCHING, continueArtIdsOf } from '@/queries/homeShelves'
-import { useArtLogos } from '@/queries/useArtLogos'
+import { CONTINUE_WATCHING } from '@/queries/homeShelves'
+import { showArtIdsOf } from '@/queries/showArt'
+import { useShowArts } from '@/queries/useShowArts'
 import { type Listing, continueSectionsOf, librarySectionsOf } from '@/queries/libraryGrid'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
@@ -62,6 +65,21 @@ const PAGE_NAMES = {
   [LIBRARY_PAGES.library]: LIBRARY_COPY.library,
 } as const satisfies Record<LibraryPage, string>
 
+/** What each view's chip draws beside its name: the web's icons for the views. */
+const VIEW_ICONS = {
+  [LIBRARY_VIEWS.grid]: 'grid',
+  [LIBRARY_VIEWS.covers]: 'covers',
+  [LIBRARY_VIEWS.list]: 'list',
+  [LIBRARY_VIEWS.tiles]: 'tiles',
+  [LIBRARY_VIEWS.grouped]: 'grouped',
+} as const satisfies Record<LibraryView, IconName>
+
+/** What each page's button draws beside its name, the web's icons for them. */
+const PAGE_ICONS = {
+  [LIBRARY_PAGES.continue]: 'history',
+  [LIBRARY_PAGES.library]: 'libraries',
+} as const satisfies Record<LibraryPage, IconName>
+
 /** The page the other one's button leads to. */
 const otherPageOf = (page: LibraryPage): LibraryPage =>
   page === LIBRARY_PAGES.continue ? LIBRARY_PAGES.library : LIBRARY_PAGES.continue
@@ -74,6 +92,7 @@ const PageToggle = ({ page, onChange }: PageToggleProps) => {
   return (
     <ToolButton
       accessibilityLabel={LIBRARY_COPY.showPage(PAGE_NAMES[other])}
+      icon={PAGE_ICONS[other]}
       label={PAGE_NAMES[other]}
       onPress={() => onChange(other)}
     />
@@ -88,6 +107,7 @@ const ShuffleButton = ({ library, choices }: ShuffleButtonProps) => {
   return (
     <ToolButton
       accessibilityLabel={LIBRARY_COPY.shuffleLibrary(library.name)}
+      icon="shuffle"
       label={LIBRARY_COPY.shuffle}
       onPress={() => {
         const target = shuffleTarget({ choices })
@@ -111,6 +131,7 @@ const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
   return (
     <>
       <Picker
+        icon="ascending"
         label={LIBRARY_COPY.sort}
         onChoose={(field) => onChange({ sort: startingSort(field) })}
         options={sortFieldsFor(settings.kind).map((field) => ({
@@ -124,11 +145,13 @@ const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
           accessibilityLabel={LIBRARY_COPY.order(
             SORT_DIRECTION_LABELS[parts.field][parts.direction],
           )}
+          icon={parts.direction}
           label={SORT_DIRECTION_LABELS[parts.field][parts.direction]}
           onPress={() => onChange({ sort: reversedSort(settings.sort) })}
         />
       )}
       <Picker
+        icon={VIEW_ICONS[settings.view]}
         label={LIBRARY_COPY.view}
         onChoose={(view) => onChange({ view })}
         options={appViewsFor(settings.kind).map((view) => ({
@@ -139,6 +162,7 @@ const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
       />
       {settings.view === LIBRARY_VIEWS.grouped && (
         <Picker
+          icon="grouped"
           label={LIBRARY_COPY.groupBy}
           onChoose={(groupBy) => onChange({ groupBy })}
           options={groupingsFor(settings.kind).map((grouping) => ({
@@ -201,8 +225,8 @@ const ContinueGrid = ({
 }: ContinueGridProps) => {
   const router = useRouter()
   const pictures = usePictures({ server, api })
-  const logos = useArtLogos({ queries, ids: continueArtIdsOf(entries), pictures })
-  const sections = pictures === null ? [] : continueSectionsOf({ entries, logos, ...pictures })
+  const arts = useShowArts({ queries, ids: showArtIdsOf(entries), pictures })
+  const sections = pictures === null ? [] : continueSectionsOf({ entries, arts, ...pictures })
   return (
     <Grid
       icon={libraryIconOf(library.settings)}

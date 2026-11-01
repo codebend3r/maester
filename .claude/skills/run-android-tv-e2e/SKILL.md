@@ -46,7 +46,7 @@ The arguments go to the flows' `nx run`, so the build stays cached.
 
 - **Android Emulator** opens as its own window ("Android Emulator - raven_tv:5554") with a Dock icon: the Android logo for a minute or two on a cold boot, then the Google TV home screen. macOS may ask once whether `qemu-system-aarch64` may accept incoming connections; either answer works, since everything is on the loopback.
 - During the build, nothing new: Expo and Gradle print to the terminal.
-- Maestro opens nothing of its own; it drives the emulator. Each flow relaunches raven with its state cleared, so the sign-in repeats: "This server keeps some libraries behind a PIN.", the focus moving by remote presses as the PIN and admin password are typed, then Home with **Films** (**Kestrel Point**) and, a few presses down, **Series** (**Lantern Bay**). In `play.dpad.yaml` the film's page opens with Play focused, the film plays and its controls fade, it pauses, skips ten seconds ahead, Back offers "Resume from ...", and Back again lands on Home with **Continue watching**.
+- Maestro opens nothing of its own; it drives the emulator. Each flow relaunches raven with its state cleared, so the app opens straight on the fixture's Home, with **Films** (**Kestrel Point**) and, a few presses down, **Series** (**Lantern Bay**). In `play.dpad.yaml` the film's page opens with Play focused, the film plays and its controls fade, it pauses, skips ten seconds ahead, Back offers "Resume from ...", and Back again lands on Home with **Continue watching**.
 - Ask the user not to click in the emulator while it runs.
 - The terminal prints each flow with a pass or fail mark.
 

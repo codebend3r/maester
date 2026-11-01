@@ -3,26 +3,7 @@ import { ApiError } from '@raven/core'
 import { createQueryClient, queryKeys } from '@/query/queryClient'
 import { playerQueriesFor } from '@/lib/playerQueries'
 import { playerQueryKeys } from '@/lib/playerQueryKeys'
-import { useUnlockPrompt } from '@/stores/unlockPrompt'
 import { recordingApi } from '@/test/recordingApi'
-
-const failWith = (status: number) => async (): Promise<never> => {
-  throw new ApiError({ status, message: 'No' })
-}
-
-describe('createQueryClient', () => {
-  it('asks for the PIN when a call is refused for a locked library', async () => {
-    const client = createQueryClient()
-    await client
-      .fetchQuery({ queryKey: ['other'], queryFn: failWith(404), retry: false })
-      .catch(() => null)
-    expect(useUnlockPrompt.getState().open).toBe(false)
-    await client
-      .fetchQuery({ queryKey: ['locked'], queryFn: failWith(423), retry: false })
-      .catch(() => null)
-    expect(useUnlockPrompt.getState().open).toBe(true)
-  })
-})
 
 describe('the retry policy', () => {
   it('gives up at once on a 404 and tries anything else once more', () => {

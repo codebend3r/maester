@@ -425,33 +425,12 @@ describe('WatchPage inside Raven', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(WATCH_COPY.unreadable)
   })
 
-  it('asks for the PIN for a locked library, then asks main again and plays', async () => {
-    const answers = [refusedWith(TITLE_REFUSALS.locked)]
-    const client = titleMain({
-      answer: (request) =>
-        answers.shift() ?? {
-          type: DESKTOP_REPLIES.title,
-          source: SERVER_SOURCE,
-          resumeAt: request.at,
-          next: request.next,
-        },
-    })
-    spy(spyOn(api, 'unlock').mockImplementation(async () => ({ available: true, unlocked: true })))
-    const fake = fakePlayer()
-    renderPlayers({ client, player: nativeOf(fake), route: WATCH })
-    await userEvent.type(await screen.findByLabelText('PIN'), '3001{Enter}')
-    await screen.findByRole('heading', { name: 'Busboys (2026)' })
-    await settled()
-    expect(sentOfType({ client, type: DESKTOP_REQUESTS.playTitle })).toHaveLength(2)
-    expect(loadsOf(fake)).toHaveLength(1)
-  })
-
-  it('leaves the locked title as it is when the PIN is not entered', async () => {
+  it('leaves a locked title as it is, with no prompt of any kind', async () => {
     const client = titleMain({ answer: () => refusedWith(TITLE_REFUSALS.locked) })
     renderPlayers({ client, player: nativeOf(fakePlayer()), route: WATCH })
-    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByLabelText('PIN')).toBeNull()
-    expect(screen.getByRole('alert')).toBeInTheDocument()
     await settled()
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.playTitle })).toHaveLength(1)
   })
@@ -459,7 +438,6 @@ describe('WatchPage inside Raven', () => {
   it('asks main again for a library locked mid-play, and carries on from where it stood', async () => {
     const answers: DesktopReply[] = [
       { type: DESKTOP_REPLIES.title, source: SERVER_SOURCE, resumeAt: 600, next: [] },
-      refusedWith(TITLE_REFUSALS.locked),
     ]
     const client = titleMain({
       answer: (request) =>
@@ -470,7 +448,6 @@ describe('WatchPage inside Raven', () => {
           next: request.next,
         },
     })
-    spy(spyOn(api, 'unlock').mockImplementation(async () => ({ available: true, unlocked: true })))
     const fake = fakePlayer()
     renderPlayers({ client, player: nativeOf(fake), route: WATCH })
     await screen.findByRole('heading', { name: 'Busboys (2026)' })
@@ -488,10 +465,9 @@ describe('WatchPage inside Raven', () => {
       reason: PLAYER_ERROR_REASONS.locked,
       message: 'raven locked this library again.',
     })
-    await userEvent.type(await screen.findByLabelText('PIN'), '3001{Enter}')
     await waitFor(() => expect(loadsOf(fake)).toHaveLength(2))
     expect(loadsOf(fake)[1]).toMatchObject({ source: SERVER_SOURCE, start: 706 })
-    expect(sentOfType({ client, type: DESKTOP_REQUESTS.playTitle })).toHaveLength(3)
+    expect(sentOfType({ client, type: DESKTOP_REQUESTS.playTitle })).toHaveLength(2)
   })
 
   it('keeps the title it plays when the page reads everything again', async () => {

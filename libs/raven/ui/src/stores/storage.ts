@@ -6,7 +6,6 @@ export const STORE_KEYS = {
   pageBackdrop: 'raven-page-backdrop',
   playerServices: 'raven-player-services',
   toasts: 'raven-toasts',
-  unlockPrompt: 'raven-unlock-prompt',
 } as const
 
 /**

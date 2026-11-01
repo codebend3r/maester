@@ -16,7 +16,6 @@ import { Route, Routes } from 'react-router-dom'
 import type { DesktopClient } from '@/desktop/client'
 import { PlayRoute } from '@/desktop/PlayPage/PlayPage'
 import { listenForPlayer, type PlayerConnections } from '@/desktop/playerConnection'
-import { PinPrompt } from '@/components/PinPrompt/PinPrompt'
 import { WatchPage } from '@/pages/WatchPage/WatchPage'
 import { Where } from '@/test/authPage'
 import { asPlayingDesktop } from '@/test/desktop'
@@ -56,7 +55,6 @@ export const renderPlayers = ({
         <Route path={DESKTOP_PATHS.play} element={<PlayRoute />} />
         <Route path="*" element={<Where />} />
       </Routes>
-      <PinPrompt />
       <Toaster />
       {beside}
     </>

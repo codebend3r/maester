@@ -21,7 +21,7 @@ const routeOf = ({ method, path }: AppClientCall) =>
   routes.find((route) => route.method === method && route.path === path)
 
 /**
- * The spec's writes (progress, plays, watched, the favourites, the PIN), and the admin lock's
+ * The spec's writes (progress, plays, watched, the favourites), and the admin lock's
  * unlock, ruled in by Task 17; and the account's playlists and its album and artist favourites,
  * by the audio spec's PR 7.
  */
@@ -38,7 +38,6 @@ const WRITES = [
   APP_CLIENT_CALLS.deletePlaylist,
   APP_CLIENT_CALLS.replacePlaylistTracks,
   APP_CLIENT_CALLS.appendPlaylistTracks,
-  APP_CLIENT_CALLS.unlock,
   APP_CLIENT_CALLS.unlockAdmin,
 ]
 
@@ -115,7 +114,6 @@ describe('the calls raven’s app may make', () => {
       api.deletePlaylist(6),
       api.replacePlaylistTracks({ id: 6, mediaIds: [7] }),
       api.appendPlaylistTracks({ id: 6, mediaIds: [7] }),
-      api.unlock('1234'),
       api.unlockAdmin('password'),
     ])
     expect(heard).toEqual(WRITES)

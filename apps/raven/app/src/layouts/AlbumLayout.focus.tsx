@@ -16,7 +16,7 @@ import {
   FocusRow,
   useMusicStyles,
 } from '@/layouts/MusicParts.focus'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -101,7 +101,7 @@ export const AlbumLayout = ({
         <View style={styles.hero}>
           <Cover cover={cover} size={ALBUM_COVER} title={title} />
           <View style={styles.words}>
-            <Text accessibilityRole="header" style={styles.title}>
+            <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
               {title}
             </Text>
             <Text style={styles.muted}>{facts}</Text>
@@ -159,7 +159,11 @@ export const AlbumLayout = ({
         <FocusBand key={disc.key}>
           <View style={styles.section}>
             {disc.title !== null && (
-              <Text accessibilityRole="header" style={styles.heading}>
+              <Text
+                variant={TEXT_VARIANTS.display}
+                accessibilityRole="header"
+                style={styles.heading}
+              >
                 {disc.title}
               </Text>
             )}

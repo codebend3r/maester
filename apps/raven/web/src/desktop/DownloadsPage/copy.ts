@@ -41,7 +41,6 @@ export const DOWNLOAD_ROW_COPY = {
     `Delete ${label}? ${formatBytes(bytes)} will be freed.`,
   actionLabel: ({ action, label }: ActionLabelProps) => `${action} ${label}`,
   deleteLabel: (label: string) => `Delete ${label}`,
-  lockedHint: 'This download is in a locked library. Enter the PIN to go on downloading it.',
 } as const
 
 export const WATCH_COPY = {

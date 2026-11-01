@@ -1,8 +1,6 @@
 // Primitive styles must precede the player's equal-specificity overrides in the CSS bundle.
 export { Button, ButtonLink } from '@/components/Button/Button'
 export type { ButtonTone, ButtonSize } from '@/components/Button/Button'
-export { UNLOCK_SECRETS, UnlockDialog } from '@/components/UnlockDialog/UnlockDialog'
-export type { UnlockSecret } from '@/components/UnlockDialog/UnlockDialog'
 export { Player } from '@/components/Player/Player'
 export { ICON_NAMES, Icon } from '@/components/Icon/Icon'
 export type { IconSize } from '@/components/Icon/Icon'

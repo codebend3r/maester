@@ -97,15 +97,14 @@ describe('serverFetchFor', () => {
     ])
   })
 
-  it('stores the cookies unlock and unlockAdmin set, and sends both next', async () => {
+  it('stores the cookies the unlock routes set, and sends both next', async () => {
     const jar = jarWith(null)
     const unlocking = recordingFetch({
       setCookie: 'raven_unlock=1760000000000.Ab-_9z; Path=/api; HttpOnly; SameSite=Strict',
     })
-    await createApiClient({
-      baseUrl: SERVER.origin,
-      fetch: serverFetchFor({ server: SERVER, jar, fetch: unlocking.fetch }),
-    }).unlock('1234')
+    await serverFetchFor({ server: SERVER, jar, fetch: unlocking.fetch })(
+      'http://nas:8080/api/lock/unlock',
+    )
     const admitting = recordingFetch({
       setCookie: 'raven_admin=1.2.xy; Path=/api; HttpOnly; SameSite=Strict; Max-Age=34560000',
       body: { state: ADMIN_LOCK_STATES.off },
@@ -116,7 +115,6 @@ describe('serverFetchFor', () => {
     })
     await api.unlockAdmin('Pass#word2026')
     await api.getAdminLock()
-    expect(unlocking.sent.map(({ init }) => init.body)).toEqual(['{"pin":"1234"}'])
     expect(admitting.sent.map(({ url, init }) => [url, init.headers?.cookie ?? null])).toEqual([
       ['http://nas:8080/api/admin/unlock', 'raven_unlock=1760000000000.Ab-_9z'],
       ['http://nas:8080/api/admin', 'raven_unlock=1760000000000.Ab-_9z; raven_admin=1.2.xy'],

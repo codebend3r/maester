@@ -45,7 +45,6 @@ const Field = ({
   onSubmit,
   placeholder,
   isSecret = false,
-  isNumeric = false,
   isEmail = false,
 }: FieldProps) => {
   const formStyles = useTouchFormStyles()
@@ -58,7 +57,7 @@ const Field = ({
         accessibilityLabel={label}
         autoCapitalize="none"
         autoCorrect={false}
-        keyboardType={keyboardFor({ isNumeric, isSecret, isEmail })}
+        keyboardType={keyboardFor({ isSecret, isEmail })}
         onChangeText={onChangeText}
         onSubmitEditing={({ nativeEvent }) => onSubmit({ text: nativeEvent.text })}
         placeholder={placeholder}
@@ -72,7 +71,7 @@ const Field = ({
         <ShowSecretToggle
           formStyles={formStyles}
           isShown={isShown}
-          label={isNumeric ? FIELD_COPY.showPin : FIELD_COPY.showPassword}
+          label={FIELD_COPY.showPassword}
           onToggle={() => setShown((shown) => !shown)}
         />
       )}

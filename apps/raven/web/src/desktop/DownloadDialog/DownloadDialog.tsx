@@ -1,20 +1,17 @@
 import {
-  DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   DOWNLOAD_ASK_KINDS,
   DOWNLOAD_KINDS,
   type DownloadAsk,
   type DownloadKind,
 } from '@raven/core'
-import { Button, UNLOCK_SECRETS, UnlockDialog } from '@raven/ui'
-import { useQueryClient } from '@tanstack/react-query'
+import { Button } from '@raven/ui'
 import { type ComponentType, type FormEvent, useId, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { DOWNLOAD_DIALOG_COPY } from '@/desktop/DownloadDialog/copy'
 import { handled } from '@/desktop/handled'
 import { useOpenReply } from '@/desktop/openReply'
 import { useModal } from '@/lib/useModal'
-import { api } from '@/lib/api'
 import { signInPath } from '@/lib/authRoutes'
 import { useComputerName, useDesktop } from '@/stores/desktop'
 import { declineAsk } from '@/stores/downloadAsk'
@@ -157,38 +154,36 @@ const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
 
 type LockedDialogProps = { ask: DownloadAsk; onClose: () => void }
 
-/**
- * The title sits in a locked library: the page enters the PIN as anywhere else, which main's own
- * calls then carry, and main reads the title again.
- */
+/** The title sits in a locked library, which no client opens: it says so and is declined. */
 const LockedDialog = ({ ask, onClose }: LockedDialogProps) => {
-  const { client } = useDesktop()
-  const openReply = useOpenReply()
-  const queryClient = useQueryClient()
+  const { dialog, close, keepKeys } = useModal()
+  const titleId = useId()
 
-  const retry = async () => {
-    const reply = await client.request({
-      type: DESKTOP_REQUESTS.retryDownloadAsk,
-      askId: ask.askId,
-    })
-    // The unlock dialog has closed itself, so nothing is left to show unless main asks again.
-    if (reply.type !== DESKTOP_REPLIES.downloadAsk) onClose()
-    openReply(reply)
-    // The PIN opened the locked libraries for every page too.
-    await queryClient.invalidateQueries()
+  const closed = () => {
+    declineAsk(ask)
+    onClose()
   }
 
   return (
-    <UnlockDialog
-      secret={UNLOCK_SECRETS.pin}
-      hint={DOWNLOAD_DIALOG_COPY.lockedHint}
-      unlock={(entered) => api.unlock(entered)}
-      onUnlocked={retry}
-      onClose={() => {
-        declineAsk(ask)
-        onClose()
-      }}
-    />
+    <dialog
+      ref={dialog}
+      className={styles.dialog}
+      aria-labelledby={titleId}
+      onClose={closed}
+      onKeyDown={keepKeys}
+    >
+      <div className={styles.form}>
+        <h2 id={titleId} className={styles.title}>
+          {DOWNLOAD_DIALOG_COPY.title}
+        </h2>
+        <p>{DOWNLOAD_DIALOG_COPY.locked}</p>
+        <div className={styles.actions}>
+          <Button tone="primary" onClick={close}>
+            {COMMON_COPY.close}
+          </Button>
+        </div>
+      </div>
+    </dialog>
   )
 }
 

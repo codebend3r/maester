@@ -15,16 +15,17 @@ import {
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import { ACCOUNT_ACCESS_MESSAGES, type AppServer } from '@raven/native/headless'
-import { SAVE_EVERY_S, usePlayerPrefs, useUnlockPrompt } from '@raven/ui/headless'
-import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
+import { SAVE_EVERY_S, usePlayerPrefs } from '@raven/ui/headless'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 import type { ReactVideoProps } from 'react-native-video'
 import { SelectedTrackType } from 'react-native-video'
 
 import { useAccountSession } from '@/account/session'
+import { PLAYER_COPY, SKIP_SECONDS } from '@/layouts/playerKit'
+import { SEEK_GRACE_MS } from '@/player/startUp'
 import { APPLE_ERROR_DOMAINS, URL_ERROR_HTTP_CODES } from '@/player/playerErrors'
-import { useUnlockRoute } from '@/queries/useUnlockRoute'
-import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
+import { APP_ROUTES, APP_ROUTE_PARAMS, PLAY_FROM } from '@/routes'
 import { Player } from '@/screens/Player'
 import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
@@ -33,6 +34,7 @@ import { NAS } from '@/test/homeServer'
 import {
   BUSBOYS_MP4,
   BUSBOYS_PICTURES,
+  BUSBOYS_UNSUBTITLED,
   CUE_TEXT,
   PICTURE_LANGUAGE,
   playerApi,
@@ -84,12 +86,6 @@ jest.mock('react-native-video', () =>
   jest.requireActual<typeof VideoMock>('@/test/videoMock').videoModuleMock(),
 )
 
-/** The player as the app hosts it, beside what opens the PIN screen on a 423. */
-const WithUnlock = () => {
-  useUnlockRoute()
-  return <Player />
-}
-
 const shown = { client: createScreenClient() }
 
 let servers = 0
@@ -97,7 +93,7 @@ let servers = 0
 const renderPlayer = async (params: Record<string, string>) => {
   mockParams.mockReturnValue(params)
   shown.client = createScreenClient()
-  return renderScreen({ ui: <WithUnlock />, client: shown.client })
+  return renderScreen({ ui: <Player />, client: shown.client })
 }
 
 /** The props the player was last drawn with. */
@@ -157,7 +153,6 @@ describe('Player on a phone or tablet', () => {
     mockServer.heard = []
     mockServer.ticketStatus = STATUSES.ok
     resetDrawnVideo()
-    useUnlockPrompt.setState({ open: false })
     useAppPrefs.setState(DEFAULT_APP_PREFS)
     usePlayerPrefs.setState({ subtitles: { on: false, language: null } })
     // A server of its own for each test, so no test plays on a ticket or a probe another held.
@@ -183,7 +178,7 @@ describe('Player on a phone or tablet', () => {
     expect(props.source!.uri).toBe(
       `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })}`,
     )
-    expect(props.source!.startPosition).toBe(BUSBOYS_MP4.position * 1000)
+    expect(props.source!.startPosition ?? null).toBeNull()
     expect(screen.getByText(mediaLabel(BUSBOYS_MP4))).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy()
   })
@@ -228,11 +223,11 @@ describe('Player on a phone or tablet', () => {
     expect(savedSpots()).toContainEqual({ position: ninety, audio: AUDIO_PLAYED })
   })
 
-  it('opens the PIN screen when the video sits in a locked library', async () => {
+  it('says so, with no PIN prompt, when the video sits in a locked library', async () => {
     mockServer.ticketStatus = STATUSES.locked
     await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
     expect(await screen.findByText("This video's library on nas:8080 is locked.")).toBeTruthy()
-    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.unlock)
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
   it('reloads the remux from the same spot when direct play fails', async () => {
@@ -251,7 +246,8 @@ describe('Player on a phone or tablet', () => {
     expect(videoProps().source!.uri).toBe(
       `${NAS.origin}${master}?${HLS_PARAMS.mode}=${PLAYBACK_MODES.remux}`,
     )
-    expect(videoProps().source!.startPosition).toBe(3125 * 1000)
+    await startVideo({ props: videoProps(), duration: BUSBOYS_MP4.duration ?? 0 })
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(3125)
   })
 
   describe('under an account', () => {
@@ -306,7 +302,8 @@ describe('Player on a phone or tablet', () => {
       })
       await screen.findByRole('button', { name: 'Pause' })
       expect(videoProps().source!.uri).toBe(`${NAS.origin}${master}?${remuxQuery}`)
-      expect(videoProps().source!.startPosition).toBe(4210 * 1000)
+      await start(videoProps())
+      expect(drawnVideo.seek).toHaveBeenLastCalledWith(4210)
       expect(
         screen.queryByText("This video didn't start in any of the ways the server offers."),
       ).toBeNull()
@@ -330,6 +327,104 @@ describe('Player on a phone or tablet', () => {
     expect(drawnVideo.seek).toHaveBeenLastCalledWith(100)
   })
 
+  it('holds the video paused, seeks to the resume spot once loaded, and plays when the seek lands', async () => {
+    await renderPlayer({
+      [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id),
+      [APP_ROUTE_PARAMS.at]: '1282',
+    })
+    const props = await loadedVideo()
+    // The library's own startPosition seeks and plays at once, which stalled a 4K file on an iPad.
+    expect(props.source?.startPosition ?? null).toBeNull()
+    expect(props.paused).toBe(true)
+    await act(async () => {
+      props.onLoad?.({
+        currentTime: 0,
+        duration: BUSBOYS_MP4.duration ?? 0,
+        naturalSize: { width: 3840, height: 2160, orientation: 'landscape' },
+        audioTracks: [],
+        textTracks: [],
+        videoTracks: [],
+      })
+    })
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(1282)
+    expect(videoProps().paused).toBe(true)
+    await act(async () => {
+      videoProps().onSeek?.({ currentTime: 1282, seekTime: 1282 })
+    })
+    expect(videoProps().paused).toBe(false)
+  })
+
+  it('plays anyway when the resume seek is never reported', async () => {
+    await renderPlayer({
+      [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id),
+      [APP_ROUTE_PARAMS.at]: '1282',
+    })
+    const props = await loadedVideo()
+    await act(async () => {
+      props.onLoad?.({
+        currentTime: 0,
+        duration: BUSBOYS_MP4.duration ?? 0,
+        naturalSize: { width: 3840, height: 2160, orientation: 'landscape' },
+        audioTracks: [],
+        textTracks: [],
+        videoTracks: [],
+      })
+    })
+    expect(videoProps().paused).toBe(true)
+    await waitFor(() => expect(videoProps().paused).toBe(false), { timeout: SEEK_GRACE_MS + 2000 })
+  })
+
+  it('plays a video from the very beginning as it loads, with no seek', async () => {
+    await renderPlayer({
+      [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_UNSUBTITLED.id),
+      [APP_ROUTE_PARAMS.from]: PLAY_FROM.start,
+    })
+    const props = await loadedVideo()
+    await act(async () => {
+      props.onLoad?.({
+        currentTime: 0,
+        duration: 100,
+        naturalSize: { width: 1920, height: 1080, orientation: 'landscape' },
+        audioTracks: [],
+        textTracks: [],
+        videoTracks: [],
+      })
+    })
+    expect(drawnVideo.seek).not.toHaveBeenCalled()
+    expect(videoProps().paused).toBe(false)
+  })
+
+  it('draws every control as an icon said by its label, with no words but the times', async () => {
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
+    const props = await loadedVideo()
+    await start(props)
+    ;[
+      PLAYER_COPY.leave,
+      PLAYER_COPY.restart,
+      PLAYER_COPY.back(SKIP_SECONDS),
+      PLAYER_COPY.pause,
+      PLAYER_COPY.forward(SKIP_SECONDS),
+      PLAYER_COPY.pictureInPicture,
+    ].forEach((name) => {
+      expect(screen.getByRole('button', { name })).toBeTruthy()
+      expect(screen.queryByText(name)).toBeNull()
+    })
+    expect(screen.queryByText(PLAYER_COPY.audio)).toBeNull()
+    expect(screen.queryByText(PLAYER_COPY.subtitles)).toBeNull()
+  })
+
+  it('hides what is playing in the top left corner with the controls', async () => {
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
+    const props = await loadedVideo()
+    await start(props)
+    expect(screen.getByText(mediaLabel(BUSBOYS_MP4))).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: PLAYER_COPY.hideControls }))
+    expect(screen.getByRole('button', { name: PLAYER_COPY.showControls })).toBeTruthy()
+    expect(screen.queryByText(mediaLabel(BUSBOYS_MP4))).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: PLAYER_COPY.showControls }))
+    expect(screen.getByText(mediaLabel(BUSBOYS_MP4))).toBeTruthy()
+  })
+
   it("draws the picked track's cues from the server's WebVTT while they last", async () => {
     usePlayerPrefs.setState({ subtitles: { on: true, language: null } })
     await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
@@ -342,7 +437,7 @@ describe('Player on a phone or tablet', () => {
     expect(screen.queryByText(CUE_TEXT)).toBeNull()
   })
 
-  it("keeps its chips, Play and Back the player's dark glass under Patina, and the sheet dark", async () => {
+  it("keeps its glass icons and the title the player's dark look under Patina, and the sheet dark", async () => {
     usePlayerPrefs.setState({ subtitles: { on: true, language: null } })
     useAppPrefs.setState({ theme: PATINA })
     const { palette, overPicture } = appThemeOf(PATINA)
@@ -354,20 +449,13 @@ describe('Player on a phone or tablet', () => {
     await loadedVideo()
 
     const chip = screen.getByRole('button', { name: 'Subtitles: English' })
-    expect(styleOf(chip)?.backgroundColor ?? null).toBe(overPicture.quiet)
-    expect(styleOf(within(chip).getByText('English'))?.color ?? null).toBe(overPicture.text)
-    expect(styleOf(within(chip).getByText('Subtitles'))?.color ?? null).toBe(overPicture.muted)
     expect(overPicture.quiet).not.toBe(palette.quiet)
     expect(overPicture.text).not.toBe(palette.text)
-    expect(
-      styleOf(screen.getByRole('button', { name: 'Picture in Picture' }))?.backgroundColor ?? null,
-    ).toBe(overPicture.quiet)
-    expect(styleOf(screen.getByRole('button', { name: 'Pause' }))?.backgroundColor ?? null).toBe(
-      overPicture.quiet,
-    )
-    expect(styleOf(screen.getByRole('button', { name: 'Back' }))?.backgroundColor ?? null).toBe(
-      overPicture.quiet,
-    )
+    ;['Subtitles: English', 'Picture in Picture', 'Back'].forEach((name) => {
+      expect(styleOf(screen.getByRole('button', { name }))?.backgroundColor ?? null).toBe(
+        overPicture.quiet,
+      )
+    })
     expect(styleOf(screen.getByText(mediaLabel(BUSBOYS_MP4)))?.color ?? null).toBe(overPicture.text)
 
     await fireEvent.press(chip)

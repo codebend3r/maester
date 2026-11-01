@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import type { ShelfCard } from '@/queries/cards'
 import type { ShelfView } from '@/queries/homeShelves'
 
@@ -53,7 +53,7 @@ const Shelves = ({
       <ScrollView contentContainerStyle={styles.shelves} style={styles.ground}>
         <View style={styles.pageRow}>
           <Logo width={TV_SIZES.textXl} />
-          <Text accessibilityRole="header" style={styles.pageTitle}>
+          <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.pageTitle}>
             {title}
           </Text>
         </View>
@@ -76,7 +76,7 @@ const ShelfTitle = ({ shelf, onOpenLibrary }: ShelfTitleProps) => {
   const styles = useStyles()
   return (
     <View style={styles.titleRow}>
-      <Text accessibilityRole="header" style={styles.shelfTitle}>
+      <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.shelfTitle}>
         {shelf.title}
       </Text>
       {libraryId !== null && (

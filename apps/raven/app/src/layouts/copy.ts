@@ -6,7 +6,7 @@ import type { PersonCard } from '@/queries/itemPage'
 export const FORM_COPY = { wordmark: 'Raven' } as const
 
 /** What the checkbox under a secret field says. */
-export const FIELD_COPY = { showPassword: 'Show password', showPin: 'Show PIN' } as const
+export const FIELD_COPY = { showPassword: 'Show password' } as const
 
 /** A TV picker's option chosen now, marked with a tick. */
 export const PICKER_LIST_COPY = { chosen: (label: string) => `✓ ${label}` } as const

@@ -36,7 +36,7 @@ Against a local backend instead, run `bun run app:server` (`@raven/server`'s `de
 What happens: the app's `predev:*` script regenerates `ios/` with `APP_VARIANT=development` (plain http to the loopback, needed for Debug builds against Metro), then `expo run:ios` builds the Debug configuration, installs and launches it, and keeps Metro on `:8081`. Edits to `src/` and `app/` reload live. A change to `@raven/core` or `@raven/ui` needs their `dist` rebuilt (`bunx nx run @raven/core:build`), since Metro reads the built package.
 
 - `ios/` is shared by iOS and tvOS, and `prebuild --clean` rewrites it, so switching devices re-runs the prebuild (a few minutes for `pod install`). Never edit `ios/`; change the Expo config or a plugin.
-- A local server needs `apps/raven/.env` and a library: pull Vhagar's `raven.db`, or use the fixture server (`bunx nx run @raven/server:serve:fixture`, `http://127.0.0.1:8490`, PIN `1357`).
+- A local server needs `apps/raven/.env` and a library: pull Vhagar's `raven.db`, or use the fixture server (`bunx nx run @raven/server:serve:fixture`, `http://127.0.0.1:8490`).
 - If Vhagar refuses connections, check its container with the `synology-nas-ssh` skill: after an auto-update the `raven` container can sit in `Created` when Docker cannot make the `/volume1/Vhagar/Caraxes` bind mount; `docker start raven` brings it up.
 - A debugger and native logs: after `bun run app:prebuild:ios`, open `apps/raven/app/ios/Raven.xcworkspace` (the workspace, not the project) in Xcode, pick the `Raven` scheme and a simulator, run it, and keep Metro going with `bun run app:start`. Xcode does not start Metro; a red "no bundle URL" screen means Metro is not running.
 

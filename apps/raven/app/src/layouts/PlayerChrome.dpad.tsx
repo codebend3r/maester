@@ -19,7 +19,7 @@ import Video from 'react-native-video'
 
 import { Icon } from '@raven/native'
 import { LoadingMark } from '@/layouts/LoadingMark'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { TITLE_LOOKS, type TitleLook } from '@/layouts/itemKit'
 import {
@@ -274,7 +274,7 @@ type HeadingTitleWordsProps = HeadingTitleProps
 const HeadingTitleWords = ({ heading }: HeadingTitleWordsProps) => {
   const styles = useStyles()
   return (
-    <Text numberOfLines={2} style={styles.title}>
+    <Text variant={TEXT_VARIANTS.display} numberOfLines={2} style={styles.title}>
       {heading.title}
     </Text>
   )

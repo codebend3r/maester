@@ -58,6 +58,13 @@ export const SEARCH_COPY = {
   nothingMatches: (query: string) => `Nothing in any library matches "${query}".`,
 } as const
 
+export const FAVOURITES_COPY = {
+  title: 'Favourites',
+  gathering: 'Gathering your favourites',
+  none: 'Nothing is a favourite yet. Mark a title, an album or an artist with its heart and it waits here.',
+  count: { one: 'favourite', many: 'favourites' },
+} as const
+
 export const SETTINGS_COPY = {
   title: 'Settings',
   account: 'Account',
@@ -83,11 +90,6 @@ export const SIGN_IN_COPY = {
   password: 'Password',
   badAccount: 'Enter your email and password.',
   unreachable: "Couldn't reach raven. Check your connection and try again.",
-  pin: 'PIN',
-  pinPrompt: 'This server keeps some libraries behind a PIN.',
-  adminPassword: 'Admin password',
-  adminPrompt:
-    "Locked libraries stay hidden on this device until the server's admin password is entered.",
   notAdded: "This server couldn't be added. Try its address again.",
   full: 'This device already keeps as many servers as it can.',
   signIn: 'Sign in',
@@ -95,17 +97,6 @@ export const SIGN_IN_COPY = {
   ticketsOff:
     "This server can't hand out media tickets. Set RAVEN_MEDIA_SECRET on it to play in the app",
   continue: 'Continue',
-  unlock: 'Unlock',
-  notNow: 'Not now',
-  signOut: 'Sign out',
-} as const
-
-export const UNLOCK_COPY = {
-  prompt: 'What you opened sits in a library this server keeps behind its PIN.',
-  pin: 'PIN',
-  unlock: 'Unlock',
-  notNow: 'Not now',
-  unreachable: "Couldn't reach the server. Check that raven is running.",
 } as const
 
 export const ALBUM_COPY = {

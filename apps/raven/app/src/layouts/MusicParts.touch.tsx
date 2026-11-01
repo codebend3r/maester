@@ -5,8 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type FavouriteButtonProps } from '@/layouts/musicKit'
-import { Text } from '@/layouts/Text'
-import { TouchBack } from '@/layouts/TouchBack'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { TouchNav } from '@/layouts/TouchNav'
 import type { Picture } from '@/queries/cards'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
@@ -80,7 +80,7 @@ export const TouchPage = ({ onBack, children }: TouchPageProps) => {
       ]}
       style={styles.ground}
     >
-      <TouchBack onPress={onBack} />
+      <TouchNav onBack={onBack} />
       {children}
     </ScrollView>
   )
@@ -99,7 +99,11 @@ type CoverInitialProps = CoverProps
 
 const CoverInitial = ({ title }: CoverInitialProps) => {
   const styles = useMusicStyles()
-  return <Text style={styles.initial}>{title.slice(0, 1)}</Text>
+  return (
+    <Text variant={TEXT_VARIANTS.display} style={styles.initial}>
+      {title.slice(0, 1)}
+    </Text>
+  )
 }
 
 /** A cover's face: its picture, else its title's first letter. */

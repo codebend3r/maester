@@ -17,28 +17,35 @@ jest.mock(
 const CARD: ShelfCard = {
   key: 'media-12',
   title: 'Severance',
-  line: 'S01E02 · Half Loop',
+  line: null,
   shape: CARD_SHAPES.wide,
   picture: null,
   progress: 0.4,
   logo: { uri: 'https://nas.example/api/items/4/images/logo', headers: {} },
+  episode: { name: 'Half Loop', mark: 'S1.E2' },
+  resume: { timeLeft: '42m left' },
   target: { kind: ROUTE_TARGETS.play, mediaId: 12, at: 0 },
 }
 
 describe('FocusCard', () => {
-  it("leads a Continue watching card's caption with its title art in the name's place", async () => {
+  it("says an episode's name and its S1.E2 place under the picture, each on its own line", async () => {
     await render(
       <FocusCard card={CARD} isPreferred={false} onPress={() => undefined} width={400} />,
     )
-    expect(screen.getByRole('image', { name: 'Severance' })).toBeTruthy()
+    expect(screen.getByText('Half Loop')).toBeTruthy()
+    expect(screen.getByText('S1.E2')).toBeTruthy()
     expect(screen.queryByText('Severance')).toBeNull()
-    expect(screen.getByText('S01E02 · Half Loop')).toBeTruthy()
   })
 
-  it('names a card with no title art in type', async () => {
-    await render(
+  it('leaves the words of a film that wears title art to the art, and names one without it', async () => {
+    const film = { ...CARD, episode: null, line: '2026' }
+    const { rerender } = await render(
+      <FocusCard card={film} isPreferred={false} onPress={() => undefined} width={400} />,
+    )
+    expect(screen.queryByText('Severance')).toBeNull()
+    await rerender(
       <FocusCard
-        card={{ ...CARD, logo: null }}
+        card={{ ...film, logo: null }}
         isPreferred={false}
         onPress={() => undefined}
         width={400}
