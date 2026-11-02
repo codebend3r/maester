@@ -2,6 +2,7 @@
 export const STORE_KEYS = {
   authSession: 'raven-auth-session',
   binge: 'raven-binge',
+  bingeTip: 'raven-binge-tip-seen',
   cardLinks: 'raven-card-links',
   desktop: 'raven-desktop',
   downloadAsk: 'raven-download-ask',

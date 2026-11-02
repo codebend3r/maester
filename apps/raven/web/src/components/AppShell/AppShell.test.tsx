@@ -341,15 +341,16 @@ describe('AppShell', () => {
     expect(screen.queryByText('Favourites', { selector: '[aria-hidden]' })).toBeNull()
   })
 
-  it('keeps Shortcuts in the menu with Manage folded, and opens its page', async () => {
+  it('folds Shortcuts and Design with Manage, then opens Shortcuts when restored', async () => {
     spies.list.mockImplementation(async () => [])
     renderShell({ route: '/' })
     const shortcuts = await within(nav()).findByRole('link', { name: 'Shortcuts' })
     expect(shortcuts).toHaveAttribute('href', PAGE_PATHS.shortcuts)
     expect(iconOf(shortcuts)).toBe('keyboard')
     await userEvent.click(within(nav()).getByRole('button', { name: 'Manage' }))
-    expect(within(nav()).getByRole('link', { name: 'Shortcuts' })).toBeInTheDocument()
+    expect(within(nav()).queryByRole('link', { name: 'Shortcuts' })).toBeNull()
     await userEvent.click(within(nav()).getByRole('button', { name: 'Manage' }))
+    expect(within(nav()).getByRole('link', { name: 'Shortcuts' })).toBeInTheDocument()
   })
 
   it('folds Libraries to Settings away under Manage, open or down to its icons, and keeps it so', async () => {

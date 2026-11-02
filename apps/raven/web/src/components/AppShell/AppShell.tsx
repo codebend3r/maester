@@ -351,23 +351,23 @@ export const AppShell = () => {
               label={COMMON_COPY.settings}
               isIconsOnly={isIconsOnly}
             />
-          </ManageGroup>
-          <NavItem
-            to={PAGE_PATHS.shortcuts}
-            patterns={[PAGE_PATHS.shortcuts]}
-            icon={<Icon name="keyboard" />}
-            label={APP_SHELL_COPY.shortcuts}
-            isIconsOnly={isIconsOnly}
-          />
-          <AdminOnly>
             <NavItem
-              to={DESIGN_PATH}
-              patterns={[DESIGN_PATH]}
-              icon={<Icon name="wand" />}
-              label={APP_SHELL_COPY.design}
+              to={PAGE_PATHS.shortcuts}
+              patterns={[PAGE_PATHS.shortcuts]}
+              icon={<Icon name="keyboard" />}
+              label={APP_SHELL_COPY.shortcuts}
               isIconsOnly={isIconsOnly}
             />
-          </AdminOnly>
+            <AdminOnly>
+              <NavItem
+                to={DESIGN_PATH}
+                patterns={[DESIGN_PATH]}
+                icon={<Icon name="wand" />}
+                label={APP_SHELL_COPY.design}
+                isIconsOnly={isIconsOnly}
+              />
+            </AdminOnly>
+          </ManageGroup>
           {!isMediumScreen && (
             <div className={styles.foot}>
               <div className={styles.toggle}>
