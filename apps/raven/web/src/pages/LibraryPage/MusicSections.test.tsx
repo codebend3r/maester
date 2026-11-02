@@ -56,23 +56,23 @@ describe('AlbumsSection', () => {
     expect(screen.queryByRole('navigation', { name: /Jump to/ })).toBeNull()
   })
 
-  it('lists the albums as covers with their artists and years', async () => {
+  it('opens albums as covers with newest releases first', async () => {
     renderWithProviders({ ui: <AlbumsSection library={MUSIC} />, route: '/libraries/3' })
     expect(await screen.findByRole('link', { name: 'OK Computer' })).toHaveAttribute(
       'href',
       '/albums/7',
     )
     expect(screen.getByRole('link', { name: 'Kid A' })).toBeTruthy()
-    expect(screen.getByRole('navigation', { name: 'Jump to a letter' })).toBeTruthy()
-    // Listed by artist, so the strip is the artists' letters, not the titles'.
-    expect(screen.getByRole('button', { name: 'R' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'O' })).toBeDisabled()
-    expect(screen.getByText('2000')).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveValue(MUSIC_SORTS.release)
+    expect(screen.getByRole('button', { name: 'Reverse sort order' })).toHaveTextContent(
+      'Descending',
+    )
+    expect(screen.getAllByText('2000').length).toBeGreaterThan(0)
     expect(api.listAlbums).toHaveBeenCalledWith({
       libraryId: 3,
       search: '',
-      sort: MUSIC_SORTS.artist,
-      order: SORT_DIRECTIONS.ascending,
+      sort: MUSIC_SORTS.release,
+      order: SORT_DIRECTIONS.descending,
       seed: 0,
     })
   })

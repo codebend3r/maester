@@ -27,8 +27,8 @@ const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
 /**
  * The view the address carries, `?q=&sort=&view=&group=`, so a refresh or a
  * shared link lands on the same search, order and layout; what the address
- * leaves out comes from the library's own settings, but the view, which
- * opens on the type's own (`openingSettings`).
+ * leaves out comes from `openingSettings`: the grid and newest releases
+ * first, with the library's saved grouping.
  */
 const viewFromUrl = (params: URLSearchParams): LibraryViewChange => {
   const sort = params.get('sort')
@@ -58,7 +58,7 @@ const writeView = ({ params, change }: WriteViewProps): URLSearchParams => {
 type UseLibraryViewProps = { library: Library }
 
 /**
- * How a library is being looked at: its saved settings under whatever the
+ * How a library is being looked at: its opening settings under whatever the
  * address says, and the search. A change of sort, view or grouping rides in
  * the address and saves behind; a failed save puts the library back as it was
  * and says so. Laying a big listing out takes a while, so `shown` takes the

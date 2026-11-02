@@ -51,6 +51,20 @@ describe('TmdbClient', () => {
     ).toMatchObject({ year: 1988, released: '1988-07-16' })
   })
 
+  it('keeps the verified Last Attack premiere when TMDB supplies an incorrect primary date', () => {
+    expect(
+      toMovie({
+        body: movieBody({
+          id: 1333100,
+          title: 'Attack on Titan: THE LAST ATTACK',
+          released: '2024-03-20',
+        }),
+        country: 'US',
+        language: 'en',
+      }),
+    ).toMatchObject({ year: 2024, released: '2024-11-08' })
+  })
+
   it('reads a movie with its credits, rating, content rating and pictures', async () => {
     const tmdb = fakeTmdb({
       movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31', imdbId: 'tt0133093' }],

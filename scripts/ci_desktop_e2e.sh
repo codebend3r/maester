@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the 🎬 Desktop end to end check from pull-request-checks.yml on this Mac:
+# Runs the 🎬 Desktop end to end check from main-native-checks.yml on this Mac:
 # Playwright drives the unpackaged Raven against the fixture servers and fake Auth the
 # tests start themselves. Without libmpv's addon, CI's native handoff is downloaded
 # from a recent run. `xcodebuild -version` is in the target's Nx cache key, which is
@@ -40,7 +40,7 @@ else
       found=yes
       break
     fi
-  done < <(gh run list --workflow pull-request-checks.yml --limit 20 --json databaseId,headSha --jq '.[] | "\(.databaseId) \(.headSha)"')
+  done < <(gh run list --workflow main-native-checks.yml --limit 20 --json databaseId,headSha --jq '.[] | "\(.databaseId) \(.headSha)"')
   if [ -z "$found" ]; then
     echo 'No run from the last day has a libmpv handoff built from these addon sources. Build it with bun run mpv:native (the full native toolchain, see the get-started skill).' >&2
     exit 1

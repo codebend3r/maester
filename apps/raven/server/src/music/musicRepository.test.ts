@@ -1,11 +1,17 @@
-import { LIBRARY_KINDS, MUSIC_SORTS, type MusicSort, musicListQuery } from '@raven/core'
+import {
+  LIBRARY_KINDS,
+  MEDIA_SORTS,
+  MUSIC_SORTS,
+  type MusicSort,
+  musicListQuery,
+} from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import type { AudioFormat, AudioTags } from '@/music/audioReader'
 import { COVER_SOURCES, MusicRepository } from '@/music/musicRepository'
 import { testDatabase } from '@/test/database'
-import { TEST_ACCOUNTS, pictureVersionsOf } from '@/test/repositories'
+import { TEST_ACCOUNTS, pictureVersionsOf, repositories } from '@/test/repositories'
 
 const NO_TAGS: AudioTags = {
   title: null,
@@ -456,6 +462,14 @@ describe('MusicRepository', () => {
       order: 'ascending',
     })
     expect(oldest.at(-1)?.releaseDate).toBeNull()
+    const files = repositories(database.get()).media.list({
+      libraryId: state.library,
+      account: TEST_ACCOUNTS.a,
+      sort: MEDIA_SORTS.yearNew,
+    })
+    expect([...new Set(files.map(({ album }) => album?.id ?? null))]).toEqual(
+      newest.map(({ id }) => id),
+    )
     const queued = repository().listTracks({
       libraryId: state.library,
       ...LIST,

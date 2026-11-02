@@ -25,7 +25,7 @@ import { MusicRepository } from '@/music/musicRepository'
 import { ViewingAccounts } from '@/media/viewingAccounts'
 import type { AccountKey } from '@/media/viewingAccountKeys'
 
-/** How many of a pinned library's newest arrivals its shelf on the home page holds. */
+/** How many of a pinned library's newest releases its shelf on the home page holds. */
 const SHELF_SIZE = 8
 
 /** How many of a library's matches a search from home shows; the library's own search lists them all. */
@@ -73,7 +73,7 @@ export class HomeController {
 
   /**
    * Every video in progress with the poster its card shows, then each pinned
-   * library's newest arrivals; libraries still locked stay out. What is in
+   * library's newest releases; libraries still locked stay out. What is in
    * progress in a locked library is the admin's alone, even once the PIN has
    * opened it for someone else.
    */
@@ -86,7 +86,7 @@ export class HomeController {
     const shelves = this.seenBy(viewer)
       .filter((library) => library.settings.pinned)
       .map((library) =>
-        this.shelf({ library, search: '', sort: MEDIA_SORTS.added, limit: SHELF_SIZE, account }),
+        this.shelf({ library, search: '', sort: MEDIA_SORTS.yearNew, limit: SHELF_SIZE, account }),
       )
     return {
       inProgress: this.media.withPosters(
@@ -102,7 +102,7 @@ export class HomeController {
   }
 
   /**
-   * A shelf of albums for each pinned music library, the one added last
+   * A shelf of albums for each pinned music library, the newest release
    * first, read apart from the shelves; libraries still locked stay out.
    */
   @Get('albums')
@@ -119,7 +119,7 @@ export class HomeController {
           .listAlbums({
             libraryId: library.id,
             search: '',
-            sort: MUSIC_SORTS.added,
+            sort: MUSIC_SORTS.release,
             order: SORT_DIRECTIONS.descending,
             account,
           })

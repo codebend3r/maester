@@ -96,6 +96,7 @@ describe('sort fields', () => {
       'size',
       'bitrate',
       'resolution',
+      'release',
       'random',
     ])
   })

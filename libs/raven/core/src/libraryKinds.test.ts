@@ -41,15 +41,15 @@ describe('defaultLibrarySettings', () => {
     expect(defaultLibrarySettings('other')).toEqual(DEFAULT_LIBRARY_SETTINGS)
   })
 
-  it('lists a new audio library by the month its files came in, saving spots only for audiobooks', () => {
+  it('opens audio libraries in a grid, saving spots only for audiobooks', () => {
     expect(defaultLibrarySettings('music')).toMatchObject({
       kind: 'music',
-      view: 'list',
+      view: 'grid',
       groupBy: 'month',
       saveProgress: false,
     })
     expect(defaultLibrarySettings('audiobooks')).toMatchObject({
-      view: 'list',
+      view: 'grid',
       groupBy: 'month',
       saveProgress: true,
     })
@@ -68,11 +68,21 @@ describe('defaultLibrarySettings', () => {
 })
 
 describe('openingSettings', () => {
+  it('opens every library on newest releases, ignoring an older saved sort', () => {
+    isLibraryKind.values.forEach((kind) => {
+      expect(defaultLibrarySettings(kind).sort).toBe('year-new')
+      expect(sortsFor(kind)).toContain('year-new')
+      expect(openingSettings({ ...defaultLibrarySettings(kind), sort: 'added' }).sort).toBe(
+        'year-new',
+      )
+    })
+  })
+
   it("opens a library on its type's own view, whatever it was left on", () => {
     const left: LibrarySettings = { ...defaultLibrarySettings('movies'), view: 'covers' }
     expect(openingSettings(left)).toEqual({ ...left, view: 'grid' })
     expect(openingSettings({ ...defaultLibrarySettings('shows'), view: 'list' }).view).toBe('grid')
-    expect(openingSettings({ ...defaultLibrarySettings('music'), view: 'grid' }).view).toBe('list')
+    expect(openingSettings({ ...defaultLibrarySettings('music'), view: 'list' }).view).toBe('grid')
   })
 })
 
@@ -102,11 +112,11 @@ describe('withLibraryKind', () => {
     })
   })
 
-  it('swaps a sort the new type has no use for back to title', () => {
+  it('keeps release sorting and falls back to newest releases for unsupported sorts', () => {
     const movies: LibrarySettings = { ...defaultLibrarySettings('movies'), sort: 'year-new' }
-    expect(withLibraryKind({ settings: movies, kind: 'other' }).sort).toBe('title')
+    expect(withLibraryKind({ settings: movies, kind: 'other' }).sort).toBe('year-new')
     const clips: LibrarySettings = { ...DEFAULT_LIBRARY_SETTINGS, sort: 'largest' }
-    expect(withLibraryKind({ settings: clips, kind: 'shows' }).sort).toBe('title')
+    expect(withLibraryKind({ settings: clips, kind: 'shows' }).sort).toBe('year-new')
   })
 
   it('keeps the lock, whatever the type', () => {
@@ -200,13 +210,13 @@ describe('the rules for each type of library', () => {
     expect(sortsFor('movies')).toHaveLength(17)
   })
 
-  it('leaves the per-file sorts out of a TV library, and the release and score sorts out of an Other one', () => {
+  it('leaves the per-file sorts out of a TV library, and the score sorts out of an Other one', () => {
     expect(sortsFor('shows')).not.toContain('largest')
     expect(sortsFor('shows')).not.toContain('resolution-low')
     expect(sortsFor('shows')).toContain('year-new')
     expect(sortsFor('shows')).toContain('bitrate-high')
     expect(sortsFor('shows')).toContain('bitrate-low')
-    expect(sortsFor('other')).not.toContain('year-new')
+    expect(sortsFor('other')).toContain('year-new')
     expect(sortsFor('other')).not.toContain('rating-high')
     expect(sortsFor('other')).toContain('largest')
   })

@@ -136,7 +136,7 @@ export const AlbumsSection = ({ library }: AlbumsSectionProps) => {
   const search = useAddressSearch()
   const [address, setAddress] = useSearchParams()
   const decoded = musicListQuery.decode(address.toString())
-  const sort = address.has(MUSIC_LIST_PARAMS.sort) ? decoded.sort : MUSIC_SORTS.artist
+  const sort = address.has(MUSIC_LIST_PARAMS.sort) ? decoded.sort : MUSIC_SORTS.release
   const order = decoded.order ?? MUSIC_DEFAULT_ORDERS[sort]
   const seed = decoded.seed ?? 0
   const setSort = (next: MusicSort) =>

@@ -89,7 +89,8 @@ const SELECT_COLUMNS = `
          f.added_at AS favourited_at,
          i.id AS item_id, i.type AS item_type, i.title AS item_title,
          i.original_title AS item_original_title, i.sort_title AS item_sort_title,
-         i.year AS item_year, i.released AS item_released, t.title AS item_tmdb_title,
+         COALESCE(i.year, a.year) AS item_year,
+         COALESCE(i.released, a.release_date) AS item_released, t.title AS item_tmdb_title,
          t.original_title AS item_tmdb_original_title,
          CASE WHEN i.type = 'movie'
               THEN (SELECT COUNT(*) FROM media_items x CROSS JOIN media y ON y.id = x.media_id
@@ -106,7 +107,9 @@ const FROM_MEDIA = `
     LEFT JOIN favourites f ON f.account_id = @account AND f.media_id = m.id
     LEFT JOIN ${FIRST_ITEM}
     LEFT JOIN shown_items i ON i.id = mi.item_id
-    LEFT JOIN items t ON t.id = mi.item_id`
+    LEFT JOIN items t ON t.id = mi.item_id
+    LEFT JOIN tracks audio ON audio.media_id = m.id
+    LEFT JOIN albums a ON a.id = audio.album_id`
 
 const SELECT_MEDIA = `${SELECT_COLUMNS}${FROM_MEDIA}`
 

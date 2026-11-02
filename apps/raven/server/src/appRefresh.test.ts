@@ -11,6 +11,7 @@ import { MetadataService } from '@/metadata/metadataService'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
 import { ScannerService } from '@/scanner/scannerService'
+import { StartupWork } from '@/startupWork'
 import { adminCookie, holdOpen, NOT_WATCHING, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { type FakeMovie, fakeTmdb } from '@/test/fakeTmdb'
@@ -151,6 +152,63 @@ const refreshServer = ({ prefix, files, fetch, config = {} }: RefreshServerProps
         .get()?.titles ?? 0,
   }
 }
+
+describe('upgrading cached anime release dates', () => {
+  const tmdb = fakeTmdb({
+    movies: [
+      { id: 149, title: 'Akira', released: '1988-07-16' },
+      { id: 121, title: 'New Anime', released: '2025-09-19' },
+    ],
+  })
+  const server = refreshServer({
+    prefix: 'raven-release-repair-',
+    files: ['Akira (1988).mp4', 'New Anime (2025).mp4'],
+    fetch: tmdb.fetch,
+  })
+  const settledBoot = async (): Promise<void> => {
+    await server.app().get(StartupWork).whenDone()
+    await server.settle()
+  }
+  const stored = () =>
+    server
+      .app()
+      .get(DatabaseService)
+      .db.prepare("SELECT released, fetched_at FROM items WHERE type = 'movie' AND tmdb_id = '149'")
+      .get()
+
+  beforeAll(server.open)
+  afterAll(async () => {
+    tmdb.state.down = false
+    await server.close()
+  })
+
+  it('repairs old re-release dates on boot and retries after a provider outage', async () => {
+    await settledBoot()
+    const { db } = server.app().get(DatabaseService)
+    db.prepare("UPDATE libraries SET kind = 'animeMovies' WHERE id = ?").run(server.state.libraryId)
+    db.exec(
+      "UPDATE items SET released = '2026-09-04', fetched_at = '2026-11-01' WHERE tmdb_id = '149'",
+    )
+    db.pragma('user_version = 50')
+    tmdb.state.down = true
+    await server.restart()
+    await settledBoot()
+    expect(stored()).toEqual({ released: '2026-09-04', fetched_at: '1970-01-01T00:00:00.000Z' })
+
+    tmdb.state.down = false
+    await server.restart()
+    await settledBoot()
+    expect(stored()).toEqual({ released: '1988-07-16', fetched_at: expect.any(String) })
+    expect(stored()).not.toMatchObject({ fetched_at: '1970-01-01T00:00:00.000Z' })
+    const shelf = (await server.api().getHome()).shelves.find(
+      (entry) => entry.libraryId === server.state.libraryId,
+    )
+    expect(shelf?.type).toBe('media')
+    expect(
+      shelf?.type === 'media' && shelf.media.map((media) => media.item?.title ?? null),
+    ).toEqual(['New Anime', 'Akira'])
+  })
+})
 
 describe('a library Update ratings and Quick scan', () => {
   const tmdb = fakeTmdb({ movies: MOVIES, mdblist: MDBLIST })

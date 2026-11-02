@@ -354,7 +354,7 @@ describe('the media server', () => {
           saveProgress: true,
           pinned: true,
           inHero: true,
-          sort: 'title',
+          sort: 'year-new',
           view: 'grid',
           groupBy: 'resolution',
           watchedPercent: 95,
@@ -387,13 +387,13 @@ describe('the media server', () => {
       it('never keeps a sort, view or grouping its type cannot show, whatever was sent', async () => {
         expect(
           (await putLibrary({ kind: 'shows', sort: 'largest', view: 'grouped' })).settings,
-        ).toMatchObject({ kind: 'shows', sort: 'title', view: 'grid' })
+        ).toMatchObject({ kind: 'shows', sort: 'year-new', view: 'grid' })
         expect(
           (await putLibrary({ groupBy: 'match', sort: 'rating-high' })).settings,
         ).toMatchObject({ kind: 'shows', groupBy: 'match', sort: 'rating-high' })
         expect((await putLibrary({ kind: 'other' })).settings).toMatchObject({
           kind: 'other',
-          sort: 'title',
+          sort: 'year-new',
           groupBy: 'resolution',
         })
       })
@@ -408,7 +408,7 @@ describe('the media server', () => {
         expect((await api().getLibrary(library.id)).settings).toMatchObject({
           kind: 'shows',
           view: 'grid',
-          sort: 'title',
+          sort: 'year-new',
         })
         await putLibrary({ kind: 'other', sort: 'title', view: 'grid', groupBy: 'resolution' })
       })
@@ -569,7 +569,7 @@ describe('the media server', () => {
       const shelfOf = async (libraryId: number) =>
         (await api().getHome()).shelves.find((shelf) => shelf.libraryId === libraryId)
 
-      it("shows what is in progress, then a pinned library's newest arrivals", async () => {
+      it("shows what is in progress, then a pinned library's newest releases", async () => {
         const [movie] = await listMedia(library.id)
         const id = movie?.id ?? -1
         await api().saveProgress({ id, position: 3, audio: null })
@@ -582,7 +582,7 @@ describe('the media server', () => {
           expect(await shelfOf(library.id)).toEqual({
             libraryId: library.id,
             type: 'media',
-            media: await api().listMedia({ libraryId: library.id, sort: 'added' }),
+            media: await api().listMedia({ libraryId: library.id, sort: 'year-new' }),
           })
         } finally {
           // Barely started again: the spot is cleared.

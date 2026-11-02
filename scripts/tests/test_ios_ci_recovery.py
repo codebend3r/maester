@@ -26,7 +26,7 @@ def test_ios_retry_only_recovers_screenshot_driver_crash(
     expected_exit: int,
     attempts: int,
 ):
-    workflow = (ROOT / ".github/workflows/pull-request-checks.yml").read_text()
+    workflow = (ROOT / ".github/workflows/native-checks.yml").read_text()
     step = workflow.split("      - name: 🎬 App end to end\n", 1)[1]
     block = step.split("        run: |\n", 1)[1].split("\n      #", 1)[0]
     bin_dir = tmp_path / "bin"

@@ -164,14 +164,31 @@ describe('Library on a phone or tablet', () => {
     mockServer.reads = async () => undefined
     mockFontScale.mockReturnValue(1)
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
-    useLibraryViews.setState({ choices: {} })
+    useLibraryViews.setState({
+      choices: {
+        [`${NAS.id}/${FILMS.id}`]: { sort: MEDIA_SORTS.title },
+        [`${NAS.id}/${SERIES.id}`]: { sort: MEDIA_SORTS.title },
+      },
+    })
   })
 
   afterEach(() => {
     jest.useRealTimers()
   })
 
-  it("lists a movies library's posters in the library's own sort", async () => {
+  it('opens without a device preference on newest releases first', async () => {
+    useLibraryViews.setState({ choices: {} })
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+    expect(cardTitles(FILM_TITLES)).toEqual(['Busboys', 'Night Train', 'Ashfall Gate'])
+    expect(mockServer.requests).toContain(
+      libraryPath({ call: listMedia, library: FILMS, sort: MEDIA_SORTS.yearNew }),
+    )
+    expect(screen.getByRole('button', { name: 'Sort: Release date' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Order: Newest first' })).toBeTruthy()
+  })
+
+  it("honours this device's chosen title sort", async () => {
     await renderLibrary({ id: FILMS.id })
 
     expect(await screen.findByRole('header', { name: 'Films' })).toBeTruthy()
@@ -233,6 +250,7 @@ describe('Library on a phone or tablet', () => {
     expect(screen.getByRole('button', { name: 'Order: Newest first' })).toBeTruthy()
     expect(useLibraryViews.getState().choices).toEqual({
       [`${NAS.id}/${FILMS.id}`]: { sort: MEDIA_SORTS.added },
+      [`${NAS.id}/${SERIES.id}`]: { sort: MEDIA_SORTS.title },
     })
   })
 
@@ -251,7 +269,7 @@ describe('Library on a phone or tablet', () => {
     expect(sheet!.options).not.toContain(SORT_FIELD_LABELS.resolution)
   })
 
-  it("lists a show library by title when this device's choice is one its type cannot use", async () => {
+  it("lists a show library by newest release when this device's choice is one its type cannot use", async () => {
     useLibraryViews.setState({
       choices: { [`${NAS.id}/${SERIES.id}`]: { sort: MEDIA_SORTS.largest } },
     })
@@ -259,10 +277,10 @@ describe('Library on a phone or tablet', () => {
     await screen.findByRole('button', { name: 'Saltmarsh' })
 
     expect(mockServer.requests).toContain(
-      libraryPath({ call: listShows, library: SERIES, sort: MEDIA_SORTS.title }),
+      libraryPath({ call: listShows, library: SERIES, sort: MEDIA_SORTS.yearNew }),
     )
     expect(mockServer.requests.some((path) => path.includes(MEDIA_SORTS.largest))).toBe(false)
-    expect(screen.getByRole('button', { name: 'Sort: Title' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Sort: Release date' })).toBeTruthy()
   })
 
   it("files a show library's shows under their letters, past a leading The, as the web does", async () => {
@@ -290,7 +308,7 @@ describe('Library on a phone or tablet', () => {
     expect(screen.queryByRole('button', { name: 'Busboys' })).toBeNull()
 
     await fireEvent.press(matched)
-    expect(cardTitles(FILM_TITLES)).toEqual(['Ashfall Gate', 'Busboys', 'Night Train'])
+    expect(cardTitles(FILM_TITLES)).toEqual(['Busboys', 'Night Train', 'Ashfall Gate'])
   })
 
   it('offers only the views and groupings the type has', async () => {
