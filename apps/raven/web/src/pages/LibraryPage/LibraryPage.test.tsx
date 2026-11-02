@@ -132,15 +132,17 @@ describe('LibraryPage', () => {
     await waitFor(() => expect(client.isFetching()).toBe(0))
   })
 
-  it('opens on the grid whatever view it was left in, and in the sort it was left in', async () => {
+  it('opens on the grid with newest releases first, ignoring saved view and sort', async () => {
     serve({ settings: { view: 'list', sort: 'largest' } })
     expect(await screen.findByRole('link', { name: 'Wide' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Grid' })).toHaveAttribute('aria-pressed', 'true')
-    expect(state.listed.at(-1)?.sort).toBe('largest')
+    expect(state.listed.at(-1)?.sort).toBe('year-new')
+    expect(screen.getByLabelText('Sort')).toHaveValue('release')
+    expect(screen.getByRole('button', { name: 'Order: Newest first' })).toBeInTheDocument()
   })
 
   it('opens in the view the address asks for', async () => {
-    serve({ settings: { sort: 'largest' }, route: '/libraries/2?view=list' })
+    serve({ settings: { sort: 'largest' }, route: '/libraries/2?view=list&sort=largest' })
     expect(await screen.findByRole('table', { name: 'Videos' })).toBeInTheDocument()
     expect(screen.getByLabelText('Sort')).toHaveValue('size')
     expect(screen.getByRole('button', { name: 'Order: Largest first' })).toBeInTheDocument()
@@ -149,7 +151,7 @@ describe('LibraryPage', () => {
   })
 
   it('shows on each card the value the library is sorted by', async () => {
-    serve({ settings: { sort: 'largest' }, route: '/libraries/2?view=grid' })
+    serve({ settings: { sort: 'largest' }, route: '/libraries/2?view=grid&sort=largest' })
     expect(await screen.findAllByText('1.6 GB')).toHaveLength(ITEMS.length)
   })
 
@@ -192,7 +194,7 @@ describe('LibraryPage', () => {
   })
 
   it('turns the order around with the button beside the sort', async () => {
-    serve({ settings: { sort: 'title' } })
+    serve({ settings: { sort: 'title' }, route: '/libraries/2?sort=title' })
     await screen.findByRole('link', { name: 'Wide' })
     await userEvent.click(screen.getByRole('button', { name: 'Order: A to Z' }))
     expect(state.sent.at(-1)).toEqual({ sort: 'title-desc' })
@@ -201,7 +203,7 @@ describe('LibraryPage', () => {
   })
 
   it('has no order to turn around while random', async () => {
-    serve({ settings: { sort: 'random' } })
+    serve({ settings: { sort: 'random' }, route: '/libraries/2?sort=random' })
     await screen.findByRole('link', { name: 'Wide' })
     expect(screen.getByLabelText('Sort')).toHaveValue('random')
     expect(screen.queryByRole('button', { name: /^Order:/ })).toBeNull()
@@ -329,7 +331,7 @@ describe('LibraryPage', () => {
   })
 
   it('offers the letters of its titles down the side', async () => {
-    serve({ settings: { sort: 'title' }, route: '/libraries/2?view=grid' })
+    serve({ settings: { sort: 'title' }, route: '/libraries/2?view=grid&sort=title' })
     const picker = await screen.findByRole('navigation', { name: 'Jump to a letter' })
     const enabled = within(picker)
       .getAllByRole('button')
@@ -341,7 +343,7 @@ describe('LibraryPage', () => {
   it('steps through what the listing is sorted by, a movie library grouped included', async () => {
     serve({
       settings: { kind: 'movies', sort: 'resolution-high' },
-      route: '/libraries/2?view=grouped',
+      route: '/libraries/2?view=grouped&sort=resolution-high',
     })
     const picker = await screen.findByRole('navigation', { name: 'Jump to a resolution' })
     const enabled = within(picker)

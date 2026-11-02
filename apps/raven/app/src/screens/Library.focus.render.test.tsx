@@ -131,7 +131,20 @@ describe('Library on a TV', () => {
     mockServer.inProgress = []
     resetTestScreen()
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
+    useLibraryViews.setState({
+      choices: {
+        [`${NAS.id}/${FILMS.id}`]: { sort: MEDIA_SORTS.title },
+        [`${NAS.id}/${SERIES.id}`]: { sort: MEDIA_SORTS.title },
+      },
+    })
+  })
+
+  it('focuses the newest release when this device has no sort preference', async () => {
     useLibraryViews.setState({ choices: {} })
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+    expect(preferred(FILM_TITLES)).toEqual(['Busboys'])
+    expect(screen.getByRole('button', { name: 'Sort: Release date' })).toBeTruthy()
   })
 
   it('puts focus on the first card as it opens, and on no other', async () => {
@@ -215,7 +228,9 @@ describe('Library on a TV', () => {
     mockServer.libraries = [GROUPED_FILMS]
     // A library opens on its grid; the grouped view is picked here.
     useLibraryViews.setState({
-      choices: { [`${NAS.id}/${FILMS.id}`]: { view: LIBRARY_VIEWS.grouped } },
+      choices: {
+        [`${NAS.id}/${FILMS.id}`]: { view: LIBRARY_VIEWS.grouped, sort: MEDIA_SORTS.title },
+      },
     })
     await renderLibrary({ id: FILMS.id })
     const bucket = await screen.findByRole('button', { name: 'Matched, 3 videos' })

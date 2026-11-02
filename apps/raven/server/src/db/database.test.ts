@@ -659,6 +659,61 @@ describe('migrations', () => {
     database.onModuleDestroy()
   })
 
+  it('queues cached anime movie dates for refresh once, preserving matches and viewing data', () => {
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, 50).forEach((sql) => before.exec(sql))
+    before.pragma('user_version = 50')
+    before.exec(`
+      INSERT INTO libraries (id, name, created_at, kind)
+      VALUES (1, 'Anime', '2026-01-01', 'animeMovies'),
+             (2, 'Movies', '2026-01-01', 'movies');
+      INSERT INTO media (id, library_id, path, file_name, folder, title, container, size, mtime_ms, added_at)
+      VALUES (1, 1, '/anime/Akira.mkv', 'Akira.mkv', '/anime', 'Akira', 'mkv', 1, 1, '2026-01-01'),
+             (2, 2, '/movies/Heat.mkv', 'Heat.mkv', '/movies', 'Heat', 'mkv', 1, 1, '2026-01-01');
+      INSERT INTO items (id, type, tmdb_id, title, sort_title, year, released, fetched_at)
+      VALUES (1, 'movie', '149', 'Akira', 'Akira', 1988, '2026-09-04', '2026-11-01'),
+             (2, 'movie', '949', 'Heat', 'Heat', 1995, '1995-12-15', '2026-11-01'),
+             (3, 'movie', 'local:film', 'Local', 'Local', 2024, '2024-01-01', '2026-11-01'),
+             (4, 'show', '1', 'Show', 'Show', 2024, '2024-01-01', '2026-11-01');
+      INSERT INTO media_items (media_id, item_id) VALUES (1, 1), (2, 2), (1, 3), (1, 4);
+      INSERT INTO item_overrides (item_id, title) VALUES (1, 'My Akira');
+      INSERT INTO favourites (account_id, media_id, added_at) VALUES ('local', 1, '2026-11-01');
+    `)
+    before.close()
+
+    const config = { ...readServerConfig({}), dataDir: state.dir }
+    const database = new DatabaseService(config)
+    expect(database.db.prepare('SELECT id, fetched_at FROM items ORDER BY id').all()).toEqual([
+      { id: 1, fetched_at: '1970-01-01T00:00:00.000Z' },
+      { id: 2, fetched_at: '2026-11-01' },
+      { id: 3, fetched_at: '2026-11-01' },
+      { id: 4, fetched_at: '2026-11-01' },
+    ])
+    expect(
+      database.db.prepare('SELECT title, released FROM shown_items WHERE id = 1').get(),
+    ).toEqual({
+      title: 'My Akira',
+      released: '2026-09-04',
+    })
+    expect(database.db.prepare('SELECT COUNT(*) AS count FROM media_items').get()).toEqual({
+      count: 4,
+    })
+    expect(database.db.prepare('SELECT media_id FROM favourites').all()).toEqual([{ media_id: 1 }])
+    database.db.exec(
+      "UPDATE items SET released = '1988-07-16', fetched_at = '2026-11-02' WHERE id = 1",
+    )
+    database.onModuleDestroy()
+
+    const reopened = new DatabaseService(config)
+    expect(
+      reopened.db.prepare('SELECT released, fetched_at FROM items WHERE id = 1').get(),
+    ).toEqual({
+      released: '1988-07-16',
+      fetched_at: '2026-11-02',
+    })
+    reopened.onModuleDestroy()
+  })
+
   it("keeps a version-48 database's playlists to their owners until one is shared", () => {
     const before = new Sqlite(join(state.dir, 'raven.db'))
     MIGRATIONS.slice(0, 48).forEach((sql) => before.exec(sql))
@@ -670,8 +725,7 @@ describe('migrations', () => {
     before.close()
 
     const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
-    expect(database.db.pragma('user_version', { simple: true })).toBe(50)
-    expect(MIGRATIONS).toHaveLength(50)
+    expect(database.db.pragma('user_version', { simple: true })).toBe(MIGRATIONS.length)
     expect(database.db.prepare('SELECT id, is_shared FROM playlists').all()).toEqual([
       { id: 1, is_shared: 0 },
     ])

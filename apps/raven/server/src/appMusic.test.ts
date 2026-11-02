@@ -182,12 +182,12 @@ describe('a music library', () => {
     ])
   })
 
-  it("gives Home one shelf of the pinned music library's albums, the one added last first", async () => {
+  it("gives Home one shelf of the pinned music library's albums, newest releases first", async () => {
     const [shelf, ...rest] = await api().getHomeAlbums()
-    const added = await api().listAlbums({ libraryId: state.library, sort: MUSIC_SORTS.added })
+    const released = await api().listAlbums({ libraryId: state.library, sort: MUSIC_SORTS.release })
     expect(rest).toEqual([])
     expect(shelf?.libraryId).toBe(state.library)
-    expect(shelf?.albums.map(({ id }) => id)).toEqual(added.map(({ id }) => id))
+    expect(shelf?.albums.map(({ id }) => id)).toEqual(released.map(({ id }) => id))
     expect(shelf?.albums.length).toBeGreaterThan(1)
   })
 

@@ -60,8 +60,8 @@ export type KindRules = {
   groupBy: MediaGroupBy
 }
 
-/** Release years come from names, and scores from TMDB, which only matched libraries read. */
-const MATCHED_FIELDS: readonly SortFieldName[] = [SORT_FIELD_NAMES.release, SORT_FIELD_NAMES.rating]
+/** Scores come from TMDB, which only matched video libraries read. */
+const MATCHED_FIELDS: readonly SortFieldName[] = [SORT_FIELD_NAMES.rating]
 
 /**
  * Fields only a file has, which a TV library's show cards cannot sort on. A
@@ -106,7 +106,7 @@ const SHOW_RULES = {
   groupBy: MEDIA_GROUPINGS.resolution,
 } as const satisfies KindRules
 
-/** A library that is never matched has no years, scores or match to sort or group by. */
+/** A library that is never matched has no scores or match to sort or group by. */
 const UNMATCHED_RULES = {
   media: MEDIA_TYPES.video,
   saveProgress: true,
@@ -120,11 +120,7 @@ const UNMATCHED_RULES = {
   groupBy: MEDIA_GROUPINGS.resolution,
 } as const satisfies KindRules
 
-/**
- * A library of audio files has no frame to sort or group by. Its files
- * list as before the albums page lands, as a list grouped by the month
- * each file came in.
- */
+/** A library of audio files has no frame to sort or group by. */
 const AUDIO_RULES = {
   media: MEDIA_TYPES.audio,
   saveProgress: true,
@@ -137,7 +133,7 @@ const AUDIO_RULES = {
   }),
   views: isLibraryView.values,
   groupings: [MEDIA_GROUPINGS.codec, MEDIA_GROUPINGS.month],
-  view: LIBRARY_VIEWS.list,
+  view: LIBRARY_VIEWS.grid,
   groupBy: MEDIA_GROUPINGS.month,
 } as const satisfies KindRules
 
@@ -237,7 +233,7 @@ export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   saveProgress: true,
   pinned: true,
   inHero: true,
-  sort: MEDIA_SORTS.title,
+  sort: MEDIA_SORTS.yearNew,
   view: LIBRARY_VIEWS.grid,
   groupBy: MEDIA_GROUPINGS.resolution,
   watchedPercent: 95,
@@ -268,13 +264,10 @@ export const coherentSettings = (settings: LibrarySettings): LibrarySettings => 
   }
 }
 
-/**
- * A library as it opens, on every visit: on its type's own view, the grid
- * for movies and shows, whatever view was last picked. A view picked while
- * it is open holds until it is left.
- */
+/** A library opens in its grid with newest releases first, regardless of saved choices. */
 export const openingSettings = (settings: LibrarySettings): LibrarySettings => ({
   ...settings,
+  sort: DEFAULT_LIBRARY_SETTINGS.sort,
   view: KIND_RULES[settings.kind].view,
 })
 

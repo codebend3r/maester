@@ -101,7 +101,7 @@ export const FILM_SEARCHES = { busboys: 'bus', nothing: 'zzz' } as const
 
 const { getLibrary, listInProgress, listLibraries, listMedia, listShows } = APP_CLIENT_CALLS
 
-/** Films sorted by title, then newest first, and searched; Series by title. */
+/** Films by title, date added or release date, and searched; Series by title or release date. */
 const ANSWERS: Record<string, unknown> = {
   [listLibraries.path]: [FILMS, SERIES],
   [libraryPath({ call: getLibrary, library: FILMS })]: FILMS,
@@ -128,7 +128,25 @@ const ANSWERS: Record<string, unknown> = {
     sort: MEDIA_SORTS.title,
     search: FILM_SEARCHES.nothing,
   })]: [],
+  [libraryPath({ call: listMedia, library: FILMS, sort: MEDIA_SORTS.yearNew })]: [
+    BUSBOYS,
+    NIGHT_TRAIN,
+    ASHFALL_GATE,
+  ],
+  [libraryPath({
+    call: listMedia,
+    library: FILMS,
+    sort: MEDIA_SORTS.yearNew,
+    search: FILM_SEARCHES.busboys,
+  })]: [BUSBOYS],
+  [libraryPath({
+    call: listMedia,
+    library: FILMS,
+    sort: MEDIA_SORTS.yearNew,
+    search: FILM_SEARCHES.nothing,
+  })]: [],
   [libraryPath({ call: listShows, library: SERIES, sort: MEDIA_SORTS.title })]: SHOWS,
+  [libraryPath({ call: listShows, library: SERIES, sort: MEDIA_SORTS.yearNew })]: SHOWS,
   [libraryPath({ call: listInProgress, library: FILMS })]: [],
   [libraryPath({ call: listInProgress, library: SERIES })]: [],
 }

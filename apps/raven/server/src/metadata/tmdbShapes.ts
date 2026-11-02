@@ -572,13 +572,18 @@ type ToMovieProps = {
   language: string
 }
 
+// TMDB's primary date predates the premiere: https://shingeki.tv/news/archives/8487
+const MOVIE_RELEASE_CORRECTIONS: Readonly<Record<string, string>> = {
+  '1333100': '2024-11-08',
+} as const
+
 /** A movie with its credits, release dates and external ids appended. */
 export const toMovie = ({ body, country, language }: ToMovieProps): FetchedItem | null => {
   const movie = record(body)
   const tmdbId = idOf(movie.id)
   const title = text(movie.title)
   if (tmdbId == null || title == null) return null
-  const primary = text(movie.release_date)
+  const primary = MOVIE_RELEASE_CORRECTIONS[tmdbId] ?? text(movie.release_date)
   const certification = movieCertification({ releaseDates: movie.release_dates, country })
   const credits = record(movie.credits)
   const extras = toMovieExtras({ body, language })

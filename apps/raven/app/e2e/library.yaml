@@ -10,13 +10,14 @@ tags:
 # Each library shelf's title has a way into the library beside it, named for the library.
 - tapOn: See all in Films
 - extendedWaitUntil:
-    visible: 'Sort: Title'
+    visible: 'Sort: Release date'
     timeout: 30000
 # A movie library opens on its grid, as on the web.
 - assertVisible: 'View: Grid'
+- assertVisible: 'Order: Newest first'
 - assertVisible: Kestrel Point
 # The sort opens the system's action sheet with the sorts a movie library has.
-- tapOn: 'Sort: Title'
+- tapOn: 'Sort: Release date'
 - assertVisible: File size
 - tapOn: Date added
 - extendedWaitUntil:
@@ -30,7 +31,7 @@ tags:
     visible: Lantern Bay
     timeout: 30000
 # A show library's cards are shows, so it has no sort by a file's size.
-- tapOn: 'Sort: Title'
+- tapOn: 'Sort: Release date'
 - assertNotVisible: File size
 - tapOn: Cancel
-- assertVisible: 'Sort: Title'
+- assertVisible: 'Sort: Release date'

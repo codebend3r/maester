@@ -197,7 +197,7 @@ const LibraryShelf = ({ shelf, library, query = '' }: LibraryShelfProps) => {
 
 type AlbumsShelfProps = { shelf: AlbumShelf; library: Library }
 
-/** A music library's row: its albums, the one added last first, one cover each, the library's name opening it. */
+/** A music library's row: its newest releases first, one cover each, the library's name opening it. */
 const AlbumsShelf = ({ shelf, library }: AlbumsShelfProps) => (
   <Shelf
     title={
@@ -299,7 +299,7 @@ const SearchResults = ({ query, libraries }: SearchResultsProps) => {
 
 type ShelvesProps = HomeBodyProps
 
-/** The hero's titles in turn, then what is being watched, then each pinned library's newest. */
+/** The hero's titles in turn, then what is being watched, then each pinned library's newest releases. */
 const Shelves = ({ libraries, areLibrariesPending }: ShelvesProps) => {
   const isDesktop = useIsDesktop()
   const home = useQuery(homeQuery)
@@ -344,7 +344,7 @@ const HOME_BODIES = {
 /**
  * `/`: the hero's titles, picked by the admin or the newest releases, taking turns, then what
  * is being watched, as wide tiles, then a row for each pinned library with
- * its eight newest arrivals, in the side menu's order. A search from the
+ * its eight newest releases, in the side menu's order. A search from the
  * shell's bar, which rides in the address as `?q=`, shows what it found in
  * place of all of it. Libraries still locked stay off it until the PIN
  * opens them.
