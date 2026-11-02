@@ -91,6 +91,7 @@ export const RADIOHEAD: Artist = {
   name: 'Radiohead',
   sortName: 'Radiohead',
   mbid: null,
+  photoVersion: null,
   albumCount: 1,
   trackCount: 3,
 }

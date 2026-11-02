@@ -45,6 +45,8 @@ const DUNE_RESULTS: HomeSearch = [
       {
         show: DUNE_PROPHECY,
         episodes: 6,
+        seasons: 1,
+        totalEpisodes: 6,
         watchedEpisodes: 0,
         endedYear: null,
         addedAt: '2026-10-16T00:00:00.000Z',

@@ -10,10 +10,10 @@ import { COMMON_COPY } from '@/lib/copy'
 type AlbumCardProps = { album: AlbumSummary }
 
 /** One album: its cover, linking to its page, with its title and artists under. */
-const AlbumCard = ({ album }: AlbumCardProps) => {
+export const AlbumCard = ({ album }: AlbumCardProps) => {
   const links = useMusicLinks()
   return (
-    <li className={styles.card}>
+    <li className={styles.card} data-entry={`album:${album.id}`}>
       {/* The title under it is the link read aloud; the cover is the same link for the pointer. */}
       <Link to={links.album(album.id)} className={styles.cover} aria-hidden="true" tabIndex={-1}>
         <AlbumCover album={album} sizes={POSTER_SIZES.grid} />

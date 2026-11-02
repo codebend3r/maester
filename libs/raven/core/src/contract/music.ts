@@ -46,8 +46,10 @@ export const isArtist = object({
   name: isString,
   /** The name as it sorts: "Beatles, The" for The Beatles, when the tags say. */
   sortName: isString,
-  /** The MusicBrainz artist id, when the tags carry one. */
+  /** The MusicBrainz artist id, when the tags or matching supply one. */
   mbid: nullable(isString),
+  /** The version of the artist's Wikimedia Commons photo, when MusicBrainz links one. */
+  photoVersion: nullable(isString),
   /** Albums credited to the artist: in the library listed, or on the artist's page in the libraries the caller sees. */
   albumCount: isNumber,
   /** Tracks credited to the artist, counted the same way. */

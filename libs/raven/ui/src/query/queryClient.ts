@@ -125,6 +125,8 @@ export const queryKeys = {
   homeSearches: ['home', 'search'],
   /** The hero's titles, under home's key so whatever reads home again reads them again too. */
   hero: ['home', 'hero'],
+  /** The albums shelves, under home's key like the hero. */
+  homeAlbums: ['home', 'albums'],
   /** The movies and shows the admin picked for the hero. */
   heroPicks: ['hero', 'picks'],
   history: ({ libraryId, show, limit }: QueryKeysHistoryProps) => [

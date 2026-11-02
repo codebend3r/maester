@@ -1,0 +1,182 @@
+// The backdrop fills the card and its words sit along the foot, over a shade
+// that keeps them readable on any picture. The card is a picture in every
+// theme, so its words keep the fixed light ink of words on a picture.
+.card {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'copy';
+  align-items: end;
+  min-height: 20rem;
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  color: var(--color-on-picture);
+  background: var(--color-stage);
+
+  // The ring goes round the whole card, which the picture's link covers.
+  &:has(.play:focus-visible) {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+// Darkest on the left and along the foot, under the words.
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  border-radius: inherit;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, var(--color-shade) 0%, var(--color-shade) 35%, transparent 80%),
+      linear-gradient(0deg, var(--color-shade) 0%, transparent 60%);
+  }
+}
+
+.picture {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+// The link that resumes the video reaches across the whole card, under the
+// title's own link.
+.play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  border-radius: inherit;
+  outline: none;
+}
+
+// Play, at the card's right, while it is pointed at or focused.
+.mark {
+  place-self: center end;
+  display: grid;
+  place-items: center;
+  width: var(--control-size);
+  height: var(--control-size);
+  margin-inline-end: var(--space-6);
+  border-radius: var(--radius-pill);
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+  opacity: 0;
+}
+
+.card:hover .mark,
+.play:focus-visible .mark {
+  opacity: 1;
+}
+
+.copy {
+  grid-area: copy;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  max-width: 40rem;
+}
+
+// Above the card's link, so its own click opens the page.
+.title {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-heading);
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+
+  &:hover {
+    text-decoration: underline;
+    text-decoration-color: currentcolor;
+    text-underline-offset: 0.18em;
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-color: var(--color-on-picture);
+    outline-offset: 2px;
+  }
+}
+
+.meta,
+.episode {
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-md);
+}
+
+.stars {
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-md);
+}
+
+// The names are the emphasis: in the display face.
+.star {
+  font-family: var(--font-display);
+  color: var(--color-on-picture);
+}
+
+// A snippet: the first lines, cut off with an ellipsis.
+.synopsis {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-md);
+  line-height: var(--line-body);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'bar left';
+  align-items: center;
+  gap: var(--space-3);
+  justify-self: stretch;
+  padding-top: var(--space-2);
+}
+
+.bar {
+  grid-area: bar;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+
+.left {
+  grid-area: left;
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mark {
+    transition: opacity 150ms ease-out;
+  }
+}
+
+@media (max-width: 48rem) {
+  .card {
+    min-height: 16rem;
+    padding: var(--space-4);
+  }
+
+  .title {
+    font-size: var(--font-size-xl);
+  }
+
+  .mark {
+    margin-inline-end: var(--space-3);
+  }
+}

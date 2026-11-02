@@ -26,6 +26,10 @@
   row-gap: var(--hero-drop);
 }
 
+.pullUp.withBackdrop {
+  row-gap: 0;
+}
+
 // Behind the shell's bar and the page's top padding, to the edges of the
 // page the shell pads: decorative, under everything else on the page.
 .backdrop {

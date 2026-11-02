@@ -60,6 +60,11 @@
   }
 }
 
+// A music file's cover: the frame's look, as a square.
+.square {
+  aspect-ratio: 1;
+}
+
 .thumbnail {
   width: 100%;
   height: 100%;

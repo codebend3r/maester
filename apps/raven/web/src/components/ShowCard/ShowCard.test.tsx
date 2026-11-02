@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test'
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { ShowCard, ShowGrid, ShowGridSkeleton } from '@/components/ShowCard/ShowCard'
 import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -13,7 +13,7 @@ describe('ShowCard', () => {
     usePageBackdrop.setState({ current: null, shown: null, recent: [], loaded: [] })
   })
 
-  it("lays its show's backdrop behind the page while pointed at", async () => {
+  it("does not load the show's backdrop when its card is hovered", () => {
     const entry = showEntry()
     const { container } = renderWithProviders({
       ui: (
@@ -28,9 +28,7 @@ describe('ShowCard', () => {
     fireEvent.pointerEnter(container.querySelector('li') ?? document.body, {
       pointerType: 'mouse',
     })
-    await waitFor(() =>
-      expect(usePageBackdrop.getState().current).toBe('/api/pictures/items/4/backdrop/b9'),
-    )
+    expect(usePageBackdrop.getState().current).toBeNull()
   })
 
   it('says when its newest episode came when shows are sorted by when they were added', () => {
@@ -97,6 +95,15 @@ describe('ShowCard', () => {
     expect(within(ratings).getByText('/10')).toBeInTheDocument()
   })
 
+  it('leaves ratings off show grid cards and shows total seasons and episodes', () => {
+    renderWithProviders({
+      ui: <ShowGrid shows={[showEntry({ seasons: 5, totalEpisodes: 62 })]} />,
+    })
+    expect(screen.getByText('5 seasons')).toBeInTheDocument()
+    expect(screen.getByText('62 episodes')).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /Ratings:/ })).toBeNull()
+  })
+
   it('gives an ended show both years, and no play button once every episode is watched', () => {
     renderWithProviders({
       ui: (
@@ -112,8 +119,8 @@ describe('ShowCard', () => {
         />
       ),
     })
-    expect(screen.getByText('2014 to 2024')).toBeInTheDocument()
-    expect(screen.getByText('1 episode')).toBeInTheDocument()
+    expect(screen.queryByText('2014 to 2024')).toBeNull()
+    expect(screen.getByText('9 episodes')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^Play/ })).toBeNull()
   })
 

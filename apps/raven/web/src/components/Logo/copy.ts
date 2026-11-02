@@ -1,3 +1,3 @@
 export const LOGO_COPY = {
-  word: 'raven',
+  word: 'Raven',
 } as const

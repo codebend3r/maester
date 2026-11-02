@@ -1,6 +1,5 @@
 export const BINGE_PATH = '/binge'
 export const BINGE_BROWSE_PATH = '/libraries'
-export const BINGE_LIMIT = 3
 export const BINGE_COPY = {
   title: 'Binge',
   binging: 'Binging',

@@ -42,6 +42,7 @@ import {
   sourceOf,
 } from '@/components/SelectionScope/SelectionScope'
 import { Loading } from '@/components/Skeleton/Skeleton'
+import { UnmatchedAlbumsSection } from '@/pages/LibraryPage/MusicSections'
 import { Spinner } from '@/components/Spinner/Spinner'
 import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
@@ -174,7 +175,6 @@ const EntryGrid = ({ library, entries }: EntryGridProps) => {
         posters={matchType != null}
         posterOf={(media) => posters.get(media.id) ?? null}
         matchType={matchType}
-        ratingsSource={library.settings.ratingsSource}
       />
     </SelectableCards>
   )
@@ -493,13 +493,7 @@ const UnmatchedShowFiles = ({ library, files }: UnmatchedShowFilesProps) => {
     <UnmatchedShows
       files={files}
       suggestionOf={suggestionsIn(files)}
-      renderFiles={(group) => (
-        <MediaGrid
-          items={group}
-          matchType={matchType}
-          ratingsSource={library.settings.ratingsSource}
-        />
-      )}
+      renderFiles={(group) => <MediaGrid items={group} matchType={matchType} />}
     />
   )
 }
@@ -510,11 +504,7 @@ type UnmatchedFileCardsProps = NotMatchedFilesProps
 const UnmatchedFileCards = ({ library, files }: UnmatchedFileCardsProps) => (
   <>
     <SuggestedMovies files={files} libraryId={library.id} />
-    <MediaGrid
-      items={files}
-      matchType={matchTypeFor(library.settings.kind)}
-      ratingsSource={library.settings.ratingsSource}
-    />
+    <MediaGrid items={files} matchType={matchTypeFor(library.settings.kind)} />
   </>
 )
 
@@ -635,6 +625,7 @@ const SECTION_VIEWS = {
   [LIBRARY_SECTIONS.albums]: AlbumsSection,
   [LIBRARY_SECTIONS.artists]: ArtistsSection,
   [LIBRARY_SECTIONS.playlists]: PlaylistsSection,
+  [LIBRARY_SECTIONS.unmatchedAlbums]: UnmatchedAlbumsSection,
   [LIBRARY_SECTIONS.inProgress]: InProgressSection,
   [LIBRARY_SECTIONS.favourites]: FavouritesSection,
   [LIBRARY_SECTIONS.sagas]: SagasSection,

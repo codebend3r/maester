@@ -250,6 +250,17 @@ export const DRAWINGS = {
     fill: roundRect({ x: 3, y: 5, w: 18, h: 14, r: 2.5 }),
     marks: smallPlay({ x: 10, y: 9, h: 6 }),
   },
+  // A ring open at the top right, its end marked with a dot, round a play: where you left off.
+  continue: {
+    stroke: 'M12 3.5a8.5 8.5 0 1 0 8.5 8.5',
+    fill: circle({ cx: 12, cy: 12, r: 8.5 }),
+    marks: `${smallPlay({ x: 10.2, y: 8.8, h: 6.4 })}${circle({ cx: 20.5, cy: 12, r: 1.3 })}`,
+  },
+  popcorn: {
+    stroke:
+      'M3 10h18l-2 9H5zM8 12.5 9 19M12 12.5V19M16 12.5 15 19M3.5 10a3 3 0 1 1 4.3-4.1 3.2 3.2 0 0 1 5.2-.8 3 3 0 0 1 5.2 1.3 2.8 2.8 0 0 1 2.3 3.6',
+    fill: 'M3.5 10a3 3 0 1 1 4.3-4.1 3.2 3.2 0 0 1 5.2-.8 3 3 0 0 1 5.2 1.3 2.8 2.8 0 0 1 2.3 3.6z',
+  },
   'file-play': {
     stroke: `${PAGE}M14 3.5v4h4`,
     fill: PAGE,

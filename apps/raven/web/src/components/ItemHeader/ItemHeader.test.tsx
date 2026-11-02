@@ -2,8 +2,9 @@ import { describe, expect, it } from 'bun:test'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
+import styles from '@/components/ItemHeader/ItemHeader.module.scss'
 
-const header = (logo: string | null) => (
+const header = (logo: string | null, pullUp = false) => (
   <MemoryRouter>
     <ItemHeader
       titleId="title"
@@ -14,6 +15,7 @@ const header = (logo: string | null) => (
       ratings={[]}
       backdrop={null}
       logo={logo}
+      pullUp={pullUp}
       back={{ to: '/libraries/4', label: '4k Movies' }}
     />
   </MemoryRouter>
@@ -24,6 +26,11 @@ describe('ItemHeader', () => {
     render(header('/api/pictures/items/835/logo/l1'))
     const heading = screen.getByRole('heading', { level: 1, name: 'Saving Private Ryan' })
     expect(heading.querySelector('img')).toHaveAttribute('src', '/api/pictures/items/835/logo/l1')
+  })
+
+  it('pulls movie and show content closer to the way back when requested', () => {
+    render(header(null, true))
+    expect(screen.getByRole('banner')).toHaveClass(styles.pullUp)
   })
 
   it('falls back to the words when the logo will not load', () => {

@@ -5,12 +5,10 @@ import { configureStorage, usePageBackdrop, usePlayerPrefs } from '@raven/ui/hea
 import { useToasts } from '@raven/ui'
 import { queryClient } from '@/lib/queryClient'
 import { useAuthSession } from '@/stores/authSession'
-import { useBinge } from '@/stores/binge'
 import { useCardLinks } from '@/stores/cardLinks'
 import { useDesktopBridge } from '@/stores/desktop'
 import { useDownloadAsk } from '@/stores/downloadAsk'
 import { useDragging } from '@/stores/dragging'
-import { useHoverBackdrops } from '@/stores/hoverBackdrops'
 import { useOriginProbe } from '@/stores/originProbe'
 import { useSelectionScopes } from '@/stores/selectionScope'
 import { useServerReach } from '@/stores/serverReach'
@@ -33,7 +31,6 @@ const initialPageBackdrop = usePageBackdrop.getInitialState()
 const initialSideMenu = useSideMenu.getInitialState()
 const initialTheme = useTheme.getInitialState()
 const initialCardLinks = useCardLinks.getInitialState()
-const initialHoverBackdrops = useHoverBackdrops.getInitialState()
 const initialOriginProbe = useOriginProbe.getInitialState()
 const initialSelectionScopes = useSelectionScopes.getInitialState()
 const initialDesktopBridge = useDesktopBridge.getInitialState()
@@ -52,13 +49,11 @@ afterEach(() => {
   cleanup()
   queryClient.clear()
   useAuthSession.setState(initialAuthSession, true)
-  useBinge.setState({ profiles: [] })
   usePlayerPrefs.setState(initialPrefs, true)
   usePageBackdrop.setState(initialPageBackdrop, true)
   useSideMenu.setState(initialSideMenu, true)
   useTheme.setState(initialTheme, true)
   useCardLinks.setState(initialCardLinks, true)
-  useHoverBackdrops.setState(initialHoverBackdrops, true)
   useOriginProbe.setState(initialOriginProbe, true)
   useSelectionScopes.setState(initialSelectionScopes, true)
   useDesktopBridge.setState(initialDesktopBridge, true)

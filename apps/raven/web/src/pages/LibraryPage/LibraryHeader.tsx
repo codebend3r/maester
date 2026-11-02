@@ -47,15 +47,17 @@ export const LibraryHeader = ({ titleId, library, actions, isShut }: LibraryHead
           <LibraryIcon settings={settings} size="0.6em" className={styles.titleIcon} />
           <span className={styles.name}>{library.name}</span>
         </h1>
-        <p className={styles.count}>
-          {KINDS[settings.kind].label}
-          {COMMON_COPY.separator}
-          {files(library.itemCount)}
-          {unmatched > 0 && LIBRARY_COPY.notMatchedCount(count.format(unmatched))}
-        </p>
-        <div className={styles.status}>
-          <ScanStatus scan={library.scan} expected={library.itemCount} isMusic={isMusic} />
-          <RatingsStatus refresh={library.ratingsRefresh} />
+        <div className={styles.stats}>
+          <p className={styles.count}>
+            {KINDS[settings.kind].label}
+            {COMMON_COPY.separator}
+            {files(library.itemCount)}
+            {unmatched > 0 && LIBRARY_COPY.notMatchedCount(count.format(unmatched))}
+          </p>
+          <div className={styles.status}>
+            <ScanStatus scan={library.scan} expected={library.itemCount} isMusic={isMusic} />
+            <RatingsStatus refresh={library.ratingsRefresh} />
+          </div>
         </div>
         <div className={styles.actions}>
           <LibraryActions

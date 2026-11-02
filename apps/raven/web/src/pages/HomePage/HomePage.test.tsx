@@ -8,10 +8,11 @@ import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { HomePage } from '@/pages/HomePage/HomePage'
 import { itemSummary, library, matchedMovie, mediaItem, showEntry } from '@/test/fixtures'
+import { album } from '@/test/music'
+import { fakeBinge } from '@/test/fakeBinge'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_CARD, SEVERANCE } from '@/test/tv'
-import { useBinge } from '@/stores/binge'
 import { asDesktop, downloadsMain } from '@/test/desktop'
 
 const LIBRARIES = [
@@ -31,13 +32,19 @@ describe('HomePage', () => {
   const spies = {
     home: spyOn(api, 'getHome'),
     hero: spyOn(api, 'getHero'),
+    albums: spyOn(api, 'getHomeAlbums'),
     libraries: spyOn(api, 'listLibraries'),
     search: spyOn(api, 'searchHome'),
     item: spyOn(api, 'getItem'),
   }
 
+  let fake = fakeBinge()
+
   beforeEach(() => {
     spies.hero.mockImplementation(async () => [])
+    spies.albums.mockImplementation(async () => [])
+    fake.restore()
+    fake = fakeBinge()
   })
 
   const open = (home: Home) => {
@@ -52,7 +59,9 @@ describe('HomePage', () => {
     spies.libraries.mockReset()
     spies.search.mockReset()
     spies.hero.mockReset()
+    spies.albums.mockReset()
     spies.item.mockReset()
+    fake.restore()
   })
 
   it('stands in for its shelves while home is read, hiding the stand-ins from a screen reader', async () => {
@@ -83,6 +92,30 @@ describe('HomePage', () => {
     renderWithProviders({ ui: <HomePage />, route: '/', behind: ['/libraries'] })
     expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument()
     expect(screen.queryAllByRole('link')).toEqual([])
+  })
+
+  it("shows a music library's row as its albums, one cover each, in the order the server gives", async () => {
+    spies.albums.mockImplementation(async () => [
+      {
+        libraryId: 5,
+        albums: [
+          album({ id: 3, title: 'The Works', artists: [{ id: 1, name: 'Queen' }] }),
+          album({ id: 4, title: 'Stage One', artists: [{ id: 2, name: 'Sean Paul' }] }),
+        ],
+      },
+    ])
+    open({
+      inProgress: [],
+      shelves: [{ libraryId: 5, type: 'media', media: [mediaItem({ id: 8, title: 'Clip' })] }],
+    })
+    const row = await screen.findByRole('region', { name: 'Clips' })
+    await waitFor(() => expect(within(row).getByRole('link', { name: 'The Works' })).toBeTruthy())
+    expect(within(row).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(row).queryByText('Clip')).toBeNull()
+    expect(within(row).getByRole('link', { name: 'Sean Paul' })).toHaveAttribute(
+      'href',
+      '/artists/2',
+    )
   })
 
   it('puts what is in progress first, then a row for each pinned library', async () => {
@@ -139,7 +172,8 @@ describe('HomePage', () => {
   })
 
   it('puts binge shows above the hero, but not in the desktop app', async () => {
-    useBinge.getState().toggle({ account: 'local', item: SEVERANCE })
+    fake.restore()
+    fake = fakeBinge({ ids: [SEVERANCE.id], hasSeenTip: true })
     spies.item.mockImplementation(async () => SEVERANCE)
     spies.hero.mockImplementation(async () => [
       {
@@ -215,8 +249,7 @@ describe('HomePage', () => {
     ])
   })
 
-  it('shows the first six videos in progress, and every one behind Show all', async () => {
-    const user = userEvent.setup()
+  it('shows the first six videos in progress, and links to a page of every one', async () => {
     const watching = Array.from({ length: 10 }, (_, index) => ({
       media: mediaItem({ id: 100 + index, title: `Halfway ${index}`, position: 60 }),
       poster: null,
@@ -226,11 +259,19 @@ describe('HomePage', () => {
     const section = shelf('Continue watching')
     expect(within(section).getAllByRole('listitem')).toHaveLength(6)
 
-    await user.click(within(section).getByRole('button', { name: 'Show all 10' }))
-    expect(within(section).getAllByRole('listitem')).toHaveLength(10)
+    const seeAll = within(section).getByRole('link', { name: /^See all 10/ })
+    expect(seeAll).toHaveAttribute('href', '/continue-watching')
+    expect(seeAll.textContent).toBe('See all 10')
+  })
 
-    await user.click(within(section).getByRole('button', { name: 'Show fewer' }))
-    expect(within(section).getAllByRole('listitem')).toHaveLength(6)
+  it('has no See all link when every video in progress already shows', async () => {
+    const watching = Array.from({ length: 6 }, (_, index) => ({
+      media: mediaItem({ id: 100 + index, title: `Halfway ${index}`, position: 60 }),
+      poster: null,
+    }))
+    open({ inProgress: watching, shelves: [] })
+    await screen.findByRole('heading', { name: 'Continue watching' })
+    expect(screen.queryByRole('link', { name: /See all/ })).toBeNull()
   })
 
   it('leaves the row out when nothing is in progress', async () => {

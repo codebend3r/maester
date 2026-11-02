@@ -1,0 +1,23 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.header {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.back {
+  justify-self: start;
+}
+
+.intro {
+  max-width: var(--measure);
+  color: var(--color-lichen);
+}
+
+.message {
+  color: var(--color-lichen);
+}

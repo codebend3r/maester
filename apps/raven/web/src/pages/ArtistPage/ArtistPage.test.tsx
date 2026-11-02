@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:te
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { ArtistDetails } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
+import { useAudioQueue } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 import { ArtistPage } from '@/pages/ArtistPage/ArtistPage'
-import { useAudioQueue } from '@raven/ui/headless'
-import { album, artist, artistDetails, track } from '@/test/music'
+import { album, albumDetails, artist, artistDetails, track } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 
 const renderPage = () =>
@@ -18,6 +18,8 @@ const renderPage = () =>
     route: '/artists/1',
   })
 
+const { playTracks } = useAudioQueue.getState()
+
 describe('ArtistPage', () => {
   beforeEach(() => {
     spyOn(api, 'getArtist').mockResolvedValue(
@@ -28,11 +30,16 @@ describe('ArtistPage', () => {
         ],
       }),
     )
+    spyOn(api, 'getAlbum').mockImplementation(async (id) =>
+      albumDetails({ album: album({ id }), tracks: [track({ id: id * 100 })] }),
+    )
   })
 
   afterEach(() => {
     cleanup()
     mock.restore()
+    // A spy on a store action is copied into every later state; put the real one back.
+    useAudioQueue.setState({ playTracks })
   })
 
   it('shows the artist with their albums and what they appear on', async () => {
@@ -42,6 +49,38 @@ describe('ArtistPage', () => {
     expect(screen.getByRole('link', { name: 'OK Computer' })).toHaveAttribute('href', '/albums/7')
     expect(screen.getByRole('heading', { name: 'Appears on' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Now 40' })).toHaveAttribute('href', '/albums/8')
+  })
+
+  it('plays albums in order and shuffles albums, features, or both', async () => {
+    const spy = spyOn(useAudioQueue.getState(), 'playTracks')
+    renderPage()
+    await screen.findByRole('heading', { level: 1, name: 'Radiohead' })
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Shuffle all' })).not.toBeDisabled(),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Play albums' }))
+    expect(spy).toHaveBeenCalledWith({
+      tracks: [expect.objectContaining({ id: 700 })],
+      source: { kind: 'artist', id: 1 },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Shuffle albums' }))
+    expect(spy).toHaveBeenLastCalledWith({
+      tracks: [expect.objectContaining({ id: 700 })],
+      source: { kind: 'artist', id: 1 },
+      isShuffled: true,
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Shuffle appears on' }))
+    expect(spy).toHaveBeenLastCalledWith({
+      tracks: [expect.objectContaining({ id: 800 })],
+      source: { kind: 'artist', id: 1 },
+      isShuffled: true,
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Shuffle all' }))
+    expect(spy).toHaveBeenLastCalledWith({
+      tracks: [expect.objectContaining({ id: 700 }), expect.objectContaining({ id: 800 })],
+      source: { kind: 'artist', id: 1 },
+      isShuffled: true,
+    })
   })
 
   it('says when nothing of theirs can be seen', async () => {

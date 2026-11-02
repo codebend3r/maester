@@ -1,4 +1,5 @@
 import { isItemSummary, isMediaItem, isMediaList, isShowEntry } from '@/contract/items'
+import { isAlbumList } from '@/contract/music'
 import {
   type Infer,
   isBoolean,
@@ -28,6 +29,18 @@ export const isHomeShelf = union(
 )
 
 export type HomeShelf = Infer<typeof isHomeShelf>
+
+/** A music library's row on the home page: its albums, the one added last first, one cover for each. */
+export const isAlbumShelf = object({ libraryId: isNumber, albums: isAlbumList })
+
+export type AlbumShelf = Infer<typeof isAlbumShelf>
+
+/**
+ * `GET /api/home/albums`: a shelf of albums for each pinned music library, as
+ * the side menu orders them. Read apart from the shelves, which keep each
+ * music library's files for the clients that do not draw albums.
+ */
+export const isAlbumShelves = listOf(isAlbumShelf)
 
 /**
  * A video, and the item whose poster its card shows: the movie, or an

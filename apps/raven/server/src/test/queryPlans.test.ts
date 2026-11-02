@@ -26,6 +26,8 @@ const NOT_IN_THE_COPY: ReadonlySet<string> = new Set([
   'playlists',
   'playlist_tracks',
   'album_favourites',
+  'binge_shows',
+  'binge_tips',
   'artist_favourites',
   'track_lyrics',
   'similar_artists',

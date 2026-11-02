@@ -1,6 +1,16 @@
+import type { Anthropic } from '@anthropic-ai/sdk'
 import { Inject, Injectable, Logger } from '@nestjs/common'
-import { type AlbumMatchCandidate, CONFIDENCE_STRONG, MATCH_STATES, foldTitle } from '@raven/core'
+import {
+  type AlbumMatchCandidate,
+  CONFIDENCE_STRONG,
+  MATCH_STATES,
+  foldTitle,
+  isRecord,
+  isString,
+} from '@raven/core'
+import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { ServerEvents } from '@/events/serverEvents'
+import { AiClient } from '@/metadata/aiClient'
 import { PassGuard } from '@/metadata/passGuard'
 import { artistToMatch } from '@/music/filing'
 import {
@@ -113,6 +123,41 @@ type AlbumMatchingSearchProps = AlbumMatchingSearchScoredProps
 
 type AlbumMatchingFixProps = { id: number; mbid: string | null }
 
+type AiAlbumChoice = { mbid: string; reason: string }
+
+const AI_ALBUM_TOOL = 'choose_album' as const
+const AI_ALBUM_MAX_TOKENS = 1200
+const AI_ALBUM_PROMPT = `You clean up unmatched albums in a private music library. Infer the album from its existing album title, album artist, year, track count, and the MusicBrainz candidates raven found. Choose only when one candidate is clearly the same release despite damaged tags, spelling, punctuation, a featured artist, or a file naming error. Return null rather than guessing. A chosen MusicBrainz id may cause duplicate rows for the same release to merge automatically.`
+
+const AI_ALBUM_TOOLS: Anthropic.Tool[] = [
+  {
+    name: AI_ALBUM_TOOL,
+    description: 'Choose the one offered MusicBrainz release that is clearly this album, or null.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        mbid: {
+          anyOf: [{ type: 'string' }, { type: 'null' }],
+          description:
+            'An offered MusicBrainz release id, or null when the evidence is not enough.',
+        },
+        reason: { type: 'string', description: 'One short sentence explaining the evidence.' },
+      },
+      required: ['mbid', 'reason'],
+      additionalProperties: false,
+    },
+  },
+]
+
+type AiChoiceOfProps = { input: unknown; offered: ReadonlySet<string> }
+type AlbumMatchingAiReleaseProps = { album: AlbumToMatch; scored: readonly Scored[] }
+
+/** A Claude choice only when it names one of the releases raven offered. */
+export const aiChoiceOf = ({ input, offered }: AiChoiceOfProps): AiAlbumChoice | null => {
+  if (!isRecord(input) || !isString(input.mbid) || !isString(input.reason)) return null
+  return offered.has(input.mbid) ? { mbid: input.mbid, reason: input.reason.slice(0, 500) } : null
+}
+
 /**
  * Matches a music library's albums to MusicBrainz releases. An album whose
  * tags carry a release id is matched already; the rest are searched by
@@ -126,8 +171,10 @@ export class AlbumMatching {
   private readonly logger = new Logger(AlbumMatching.name)
 
   constructor(
+    @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(MusicBrainzClient) private readonly musicBrainz: MusicBrainzClient,
     @Inject(MusicRepository) private readonly music: MusicRepository,
+    @Inject(AiClient) private readonly ai: AiClient,
     @Inject(ServerEvents) private readonly events: ServerEvents,
     @Inject(ScanControl) private readonly scans: ScanControl,
   ) {}
@@ -152,16 +199,58 @@ export class AlbumMatching {
    * everything the album takes from MusicBrainz, so no lookup follows; else
    * unmatched, with how close the best came. Whether it was sure.
    */
+  private async aiRelease({ album, scored }: AlbumMatchingAiReleaseProps): Promise<Scored | null> {
+    if (scored.length === 0 || !this.ai.take()) return null
+    const offered = new Set(scored.map(({ release }) => release.mbid))
+    const response = await this.ai.send({
+      model: this.config.aiMatchModel,
+      max_tokens: AI_ALBUM_MAX_TOKENS,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: this.config.aiMatchEffort },
+      system: AI_ALBUM_PROMPT,
+      tools: AI_ALBUM_TOOLS,
+      tool_choice: { type: 'tool', name: AI_ALBUM_TOOL },
+      messages: [
+        {
+          role: 'user',
+          content: JSON.stringify({
+            album,
+            candidates: scored.map(({ release, confidence }) => ({
+              mbid: release.mbid,
+              title: release.title,
+              artist: release.artist,
+              year: release.year,
+              trackCount: release.trackCount,
+              country: release.country,
+              isOfficial: release.isOfficial,
+              confidence,
+            })),
+          }),
+        },
+      ],
+    })
+    const choice = response.content.flatMap((block) =>
+      block.type === 'tool_use' && block.name === AI_ALBUM_TOOL ? [block] : [],
+    )[0]
+    if (!choice) return null
+    const picked = aiChoiceOf({ input: choice.input, offered })
+    return picked === null
+      ? null
+      : (scored.find(({ release }) => release.mbid === picked.mbid) ?? null)
+  }
+
   private async matchOne(album: AlbumToMatch): Promise<boolean> {
-    const [best] = await this.searchScored({ album })
-    const isSure = best !== undefined && best.confidence >= CONFIDENCE_STRONG
+    const scored = await this.searchScored({ album })
+    const [best] = scored
+    const sure = best !== undefined && best.confidence >= CONFIDENCE_STRONG ? best : null
+    const chosen = sure ?? (await this.aiRelease({ album, scored }))
     this.music.saveMatch({
       id: album.id,
-      release: isSure ? best.release : null,
-      match: isSure ? MATCH_STATES.matched : MATCH_STATES.unmatched,
-      confidence: best?.confidence ?? 0,
+      release: chosen?.release ?? null,
+      match: chosen === null ? MATCH_STATES.unmatched : MATCH_STATES.matched,
+      confidence: chosen?.confidence ?? best?.confidence ?? 0,
     })
-    return isSure
+    return chosen !== null
   }
 
   /**
@@ -203,8 +292,11 @@ export class AlbumMatching {
     })
     guard.reportStop()
     const matched = outcomes.filter(Boolean).length
+    const merged = this.music.mergeAlbums(libraryId)
     this.events.libraryChanged(libraryId)
-    this.logger.log(`Matched ${matched} of ${pending.length} albums of library ${libraryId}`)
+    this.logger.log(
+      `Matched ${matched} of ${pending.length} albums of library ${libraryId}; merged ${merged} duplicates`,
+    )
   }
 
   /** The albums no release was found for are searched again on the next pass. */

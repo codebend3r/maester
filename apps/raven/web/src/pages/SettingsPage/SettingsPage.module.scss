@@ -108,6 +108,13 @@
   color: var(--color-lichen);
 }
 
+.scanList {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0;
+  list-style: none;
+}
+
 // A section's settings, held in one fieldset so the admin lock or a reset
 // disables them all at once; spaced as the section around it.
 .settings {

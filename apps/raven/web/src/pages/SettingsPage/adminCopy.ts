@@ -3,8 +3,9 @@ export const ADMIN_PATH = '/admin'
 export const ADMIN_COPY = {
   heading: 'Admin',
   scans: 'Library scans',
-  stop: 'Stop all scans',
-  resume: 'Allow scans again',
-  hint: 'Stops all library scans, matching, ratings, thumbnails, and intro and credits detection. Scans stay stopped until allowed again or the server restarts. A request already in flight may finish.',
-  stopped: 'All scans are stopped.',
+  stop: 'Cancel all running scans',
+  hint: 'Shows scans running across every library. Cancelling stops only the work running now; scans can be started again from each library.',
+  fullScan: 'Full scan',
+  quickScan: 'Quick scan',
+  ratings: 'Updating ratings',
 } as const

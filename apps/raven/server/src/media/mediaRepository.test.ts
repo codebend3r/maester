@@ -262,9 +262,17 @@ describe("listing a TV library's shows", () => {
 
   it('gives each show its own first episode not yet watched, specials last, in one go', () => {
     const shows = media().listShows({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })
-    expect(shows.map((entry) => [entry.show.title, entry.episodes, entry.next?.fileName])).toEqual([
-      ['Aired', 2, 'Aired - S01E02.mkv'],
-      ['Special', 2, 'Special - S01E01.mkv'],
+    expect(
+      shows.map((entry) => [
+        entry.show.title,
+        entry.episodes,
+        entry.seasons,
+        entry.totalEpisodes,
+        entry.next?.fileName,
+      ]),
+    ).toEqual([
+      ['Aired', 2, 1, 2, 'Aired - S01E02.mkv'],
+      ['Special', 2, 2, 2, 'Special - S01E01.mkv'],
     ])
   })
 

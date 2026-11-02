@@ -9,6 +9,7 @@ import { LocalPage } from '@/desktop/LocalPage/LocalPage'
 import { PlayRoute } from '@/desktop/PlayPage/PlayPage'
 import { BugReportsPage } from '@/pages/BugReportsPage/BugReportsPage'
 import { DesignPage } from '@/pages/DesignPage/DesignPage'
+import { DESIGN_PATH } from '@/pages/DesignPage/copy'
 import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
 import { HistoryPage } from '@/pages/HistoryPage/HistoryPage'
 import { HomePage } from '@/pages/HomePage/HomePage'
@@ -47,7 +48,9 @@ import { SignUpPage } from '@/pages/SignUpPage/SignUpPage'
 import { WatchPage } from '@/pages/WatchPage/WatchPage'
 import { useIsDesktop } from '@/stores/desktop'
 import { BingePage } from '@/pages/BingePage/BingePage'
+import { ContinueWatchingPage } from '@/pages/ContinueWatchingPage/ContinueWatchingPage'
 import { BINGE_PATH } from '@/lib/binge'
+import { CONTINUE_WATCHING_PATH } from '@/lib/homeContinue'
 
 /**
  * Every page, behind the sign-in gate but the account pages and Get. The
@@ -80,13 +83,14 @@ export const AppRoutes = () => {
               <Route path={PLAYLIST_ROUTE} element={<PlaylistPage />} />
               <Route path={NOW_PLAYING_PATH} element={<NowPlayingPage />} />
               {!isDesktop && <Route path={BINGE_PATH} element={<BingePage />} />}
+              <Route path={CONTINUE_WATCHING_PATH} element={<ContinueWatchingPage />} />
               <Route path="favourites" element={<FavouritesPage />} />
               <Route path="streams" element={<StreamsPage />} />
               <Route path="reports" element={<BugReportsPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path={ADMIN_PATH} element={<AdminPage />} />
               <Route path={PAGE_PATHS.shortcuts} element={<ShortcutsPage />} />
-              <Route path="design" element={<DesignPage />} />
+              <Route path={DESIGN_PATH} element={<DesignPage />} />
               {isDesktop && (
                 <>
                   <Route path={DESKTOP_PATHS.downloads} element={<DownloadsPage />} />

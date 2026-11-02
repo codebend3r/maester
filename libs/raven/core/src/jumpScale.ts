@@ -1,4 +1,5 @@
 import {
+  type AlbumSummary,
   type MediaItem,
   type MediaSort,
   RATING_SOURCES,
@@ -6,12 +7,15 @@ import {
   SORT_DIRECTIONS,
   SORT_FIELD_NAMES,
   type ShowEntry,
+  type SortDirection,
   type SortFieldName,
 } from '@/contract'
-import { mediaEntryKey, showEntryKey } from '@/entryKeys'
+import { albumEntryKey, mediaEntryKey, showEntryKey } from '@/entryKeys'
 import { pickScore } from '@/items'
-import { LETTERS, type Letter, SPECIAL_LETTERS, mediaLetter, showLetter } from '@/letters'
+import { LETTERS, type Letter, SPECIAL_LETTERS, letterOf, mediaLetter, showLetter } from '@/letters'
 import { RESOLUTIONS, type Resolution, resolutionLabel } from '@/media'
+import { MUSIC_SORTS, type MusicSort } from '@/musicListQuery'
+import { sortTitle } from '@/naming'
 import { sortParts } from '@/sortFields'
 
 /** One step of the jump strip. */
@@ -270,6 +274,43 @@ const rulers = ({ source, hasShows }: RulersProps): Record<JumpField, Ruler> => 
   rating: scores(source),
 })
 
+type ScaleOfProps = {
+  field: JumpField
+  direction: SortDirection
+  ruler: Ruler
+  entries: readonly Entry[]
+}
+
+/** The strip for `entries` laid along `ruler`, its marks in the listing's `direction`. */
+const scaleOf = ({ field, direction, ruler, entries }: ScaleOfProps): JumpScale | null => {
+  const values = entries.map((entry) => ({ key: entry.key, value: ruler.value(entry) }))
+  const known = values.flatMap(({ value }) => value ?? [])
+  const range =
+    ruler.full ??
+    (known.length === 0 ? null : { low: Math.min(...known), high: Math.max(...known) })
+  if (!range) return null
+  const { of, face } = ruler.cut(range)
+  const first = of(range.low)
+  const marks = Array.from({ length: of(range.high) - first + 1 }, (_, at) => ({
+    key: String(first + at),
+    ...face(first + at),
+  }))
+  const under = values.reduce((found, { key, value }) => {
+    const mark = value == null ? UNKNOWN.key : String(of(value))
+    return found.set(mark, (found.get(mark) ?? new Set<string>()).add(key))
+  }, new Map<string, Set<string>>())
+  return {
+    field,
+    unit: ruler.unit,
+    // In the listing's direction, those for entries with no value last, as the server sorts them.
+    marks: [
+      ...(direction === SORT_DIRECTIONS.descending ? marks.toReversed() : marks),
+      ...(known.length < values.length ? [UNKNOWN] : []),
+    ],
+    entries: under,
+  }
+}
+
 type JumpScaleProps = {
   sort: MediaSort
   files: readonly MediaItem[]
@@ -294,34 +335,73 @@ export const jumpScale = ({
   const hasShows = shows.length > 0
   if (field === SORT_FIELD_NAMES.random || (hasShows && field === SORT_FIELD_NAMES.changed))
     return null
-  const ruler = rulers({ source, hasShows })[field]
-  const values = [
-    ...shows.map((entry) => fromShow({ entry, source })),
-    ...files.map((media) => fromMedia({ media, source })),
-  ].map((entry) => ({ key: entry.key, value: ruler.value(entry) }))
-  const known = values.flatMap(({ value }) => value ?? [])
-  const range =
-    ruler.full ??
-    (known.length === 0 ? null : { low: Math.min(...known), high: Math.max(...known) })
-  if (!range) return null
-  const { of, face } = ruler.cut(range)
-  const first = of(range.low)
-  const marks = Array.from({ length: of(range.high) - first + 1 }, (_, at) => ({
-    key: String(first + at),
-    ...face(first + at),
-  }))
-  const entries = values.reduce((under, { key, value }) => {
-    const mark = value == null ? UNKNOWN.key : String(of(value))
-    return under.set(mark, (under.get(mark) ?? new Set<string>()).add(key))
-  }, new Map<string, Set<string>>())
-  return {
+  return scaleOf({
     field,
-    unit: ruler.unit,
-    // In the listing's direction, those for entries with no value last, as the server sorts them.
-    marks: [
-      ...(direction === SORT_DIRECTIONS.descending ? marks.toReversed() : marks),
-      ...(known.length < values.length ? [UNKNOWN] : []),
+    direction,
+    ruler: rulers({ source, hasShows })[field],
+    entries: [
+      ...shows.map((entry) => fromShow({ entry, source })),
+      ...files.map((media) => fromMedia({ media, source })),
     ],
-    entries,
-  }
+  })
+}
+
+const ALBUM_SCALES = {
+  [MUSIC_SORTS.title]: { field: SORT_FIELD_NAMES.title, by: 'title' },
+  [MUSIC_SORTS.artist]: { field: SORT_FIELD_NAMES.title, by: 'artist' },
+  [MUSIC_SORTS.year]: { field: SORT_FIELD_NAMES.release, by: 'year' },
+  [MUSIC_SORTS.release]: { field: SORT_FIELD_NAMES.release, by: 'release' },
+  [MUSIC_SORTS.added]: { field: SORT_FIELD_NAMES.added, by: 'added' },
+} as const
+
+type AlbumEntryProps = {
+  album: AlbumSummary
+  by: 'title' | 'artist' | 'year' | 'release' | 'added'
+}
+
+const firstYear = (date: string | null): number | null => {
+  const year = Number.parseInt(date?.slice(0, 4) ?? '', 10)
+  return Number.isNaN(year) ? null : year
+}
+
+/** An album as the strip reads it: the letter, year or date its sort goes by. */
+const fromAlbum = ({ album, by }: AlbumEntryProps): Entry => ({
+  key: albumEntryKey(album),
+  letter: letterOf(by === 'artist' ? sortTitle(album.artists[0]?.name ?? '') : album.sortTitle),
+  bitrate: null,
+  size: null,
+  resolution: null,
+  year: by === 'release' ? (firstYear(album.releaseDate) ?? album.year) : album.year,
+  score: null,
+  added: album.addedAt,
+  changed: null,
+})
+
+type AlbumJumpScaleProps = {
+  sort: MusicSort
+  direction: SortDirection
+  albums: readonly AlbumSummary[]
+}
+
+/**
+ * The jump strip for albums listed by `sort`: letters of the title or of
+ * the first artist's sort name, years or decades for the year and the
+ * release date, months or years for when albums came. None for the sorts
+ * that run on the account's plays or at random, which have nothing to
+ * jump by.
+ */
+export const albumJumpScale = ({
+  sort,
+  direction,
+  albums,
+}: AlbumJumpScaleProps): JumpScale | null => {
+  if (sort === MUSIC_SORTS.played || sort === MUSIC_SORTS.plays || sort === MUSIC_SORTS.random)
+    return null
+  const { field, by } = ALBUM_SCALES[sort]
+  return scaleOf({
+    field,
+    direction,
+    ruler: rulers({ source: RATING_SOURCES.imdb, hasShows: false })[field],
+    entries: albums.map((album) => fromAlbum({ album, by })),
+  })
 }

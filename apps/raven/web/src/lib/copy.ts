@@ -50,6 +50,7 @@ export const COMMON_COPY = {
   /** Between the entries of a list read as one: "Alice, Bob". */
   listSeparator: ', ',
   episodes: (n: number) => plural({ n, one: 'episode', many: 'episodes' }),
+  seasons: (n: number) => plural({ n, one: 'season', many: 'seasons' }),
   videos: (n: number) => plural({ n, one: 'video', many: 'videos' }),
   tracks: (n: number) => plural({ n, one: 'track', many: 'tracks' }),
 } as const

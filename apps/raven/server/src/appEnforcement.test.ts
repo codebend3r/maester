@@ -137,6 +137,7 @@ it('declares every route exactly as the inventory says', () => {
       ROUTES.ping,
       ROUTES.itemPicture,
       ROUTES.photoPicture,
+      ROUTES.artistPicture,
       ROUTES.albumCover,
       ROUTES.lastFmCallback,
     ].toSorted(byRoute),
@@ -147,6 +148,7 @@ it('declares every route exactly as the inventory says', () => {
 const CAPABILITY_ROUTES: ReadonlySet<Route> = new Set([
   ROUTES.itemPicture,
   ROUTES.photoPicture,
+  ROUTES.artistPicture,
   ROUTES.albumCover,
 ])
 

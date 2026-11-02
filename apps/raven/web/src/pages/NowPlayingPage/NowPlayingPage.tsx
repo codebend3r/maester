@@ -16,6 +16,7 @@ import {
 import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AddToPlaylistDialog } from '@/components/AddToPlaylistDialog/AddToPlaylistDialog'
+import { Equalizer } from '@/components/Equalizer/Equalizer'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
@@ -208,7 +209,10 @@ const Playing = ({ track }: PlayingProps) => {
           />
         </div>
         <div className={styles.words}>
-          <h2 className={styles.trackTitle}>{track.title}</h2>
+          <div className={styles.heading}>
+            <h2 className={styles.trackTitle}>{track.title}</h2>
+            <Equalizer isPlaying={state === AUDIO_STATES.playing} />
+          </div>
           <p className={styles.artists}>
             {track.artists.map((artist, index) => (
               <span key={artist.id}>
@@ -306,6 +310,7 @@ const Playing = ({ track }: PlayingProps) => {
           currentPlace={queue.at}
           numberOf={({ index }) => index + 1}
           Trail={QueueControls}
+          shouldShowAlbumCovers
           label={NOW_PLAYING_COPY.queue}
         />
       </section>

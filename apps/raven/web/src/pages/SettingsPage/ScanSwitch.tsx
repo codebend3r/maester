@@ -1,34 +1,78 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { SCAN_CONTROL_PATH, type ScanControlState } from '@raven/core'
-import { Button } from '@raven/ui'
+import { RATINGS_REFRESH_STATES, SCAN_KINDS, SCAN_STATES, type Library } from '@raven/core'
+import { Button, Icon } from '@raven/ui'
 import { api } from '@/lib/api'
+import { librariesQuery } from '@/lib/queries'
 import { ADMIN_COPY } from '@/pages/SettingsPage/adminCopy'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 
-const SCAN_QUERY = { queryKey: [SCAN_CONTROL_PATH], queryFn: () => api.getScanControl() } as const
+type ActiveWork = { library: Library; label: string; cancel: () => Promise<Library> }
+
+const activeWorkOf = (libraries: Library[]): ActiveWork[] =>
+  libraries.flatMap((library) => {
+    const scan =
+      library.scan.state === SCAN_STATES.idle
+        ? []
+        : [
+            {
+              library,
+              label:
+                library.scan.kind === SCAN_KINDS.quick ? ADMIN_COPY.quickScan : ADMIN_COPY.fullScan,
+              cancel: () =>
+                library.scan.kind === SCAN_KINDS.quick
+                  ? api.cancelQuickScan(library.id)
+                  : api.cancelScan(library.id),
+            },
+          ]
+    const ratings =
+      library.ratingsRefresh.state === RATINGS_REFRESH_STATES.running
+        ? [
+            {
+              library,
+              label: ADMIN_COPY.ratings,
+              cancel: () => api.cancelLibraryRatings(library.id),
+            },
+          ]
+        : []
+    return [...scan, ...ratings]
+  })
 
 export const ScanSwitch = () => {
   const client = useQueryClient()
-  const state = useQuery({ ...SCAN_QUERY, refetchInterval: 5000 })
-  const change = useMutation({
-    mutationFn: (next: ScanControlState) => api.setScanControl(next),
-    onSuccess: (next) => client.setQueryData(SCAN_QUERY.queryKey, next),
-    onSettled: () => client.invalidateQueries({ queryKey: SCAN_QUERY.queryKey, exact: true }),
+  const state = useQuery({ ...librariesQuery, refetchInterval: 2000 })
+  const cancel = useMutation({
+    mutationFn: async () => {
+      const running = activeWorkOf(state.data ?? [])
+      await Promise.all(running.map(({ cancel: cancelOne }) => cancelOne()))
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: librariesQuery.queryKey, exact: true }),
   })
-  const error = state.error ?? change.error
+  const running = activeWorkOf(state.data ?? [])
+  const error = state.error ?? cancel.error
   return (
     <section className={styles.section}>
-      <h2 className={styles.heading}>{ADMIN_COPY.scans}</h2>
+      <h2 className={styles.heading}>
+        <Icon name="libraries" />
+        {ADMIN_COPY.scans}
+      </h2>
       <p className={styles.help}>{ADMIN_COPY.hint}</p>
       {state.data && (
-        <Button
-          disabled={change.isPending}
-          onClick={() => change.mutate({ isStopped: !state.data.isStopped })}
-        >
-          {state.data.isStopped ? ADMIN_COPY.resume : ADMIN_COPY.stop}
-        </Button>
+        <>
+          <ul className={styles.scanList}>
+            {running.map(({ library, label }) => (
+              <li key={`${library.id}-${label}`}>
+                {library.name}: {label}
+              </li>
+            ))}
+          </ul>
+          <Button
+            disabled={cancel.isPending || running.length === 0}
+            onClick={() => cancel.mutate()}
+          >
+            {ADMIN_COPY.stop}
+          </Button>
+        </>
       )}
-      {state.data?.isStopped && <output>{ADMIN_COPY.stopped}</output>}
       {error && <p role="alert">{error.message}</p>}
     </section>
   )

@@ -35,6 +35,7 @@ import { shuffle } from '@/media/shuffle'
 import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
+import { MusicRepository } from '@/music/musicRepository'
 
 /** A media row as the listings read it; the path is selected with the rest but never leaves here. */
 type MediaRow = {
@@ -159,6 +160,7 @@ const toItem = (row: MediaRow): MediaItem => ({
   versions: row.versions,
   variant: variantOf(row),
   card: row.item_type === ITEM_TYPES.movie ? row.split : null,
+  album: null,
 })
 
 /** A show in a TV library's listing, before its next episode is looked up. */
@@ -166,6 +168,8 @@ type ShowRow = {
   id: number
   ended: string | null
   episodes: number
+  seasons: number
+  total_episodes: number
   watched_episodes: number
   added_at: string
   bitrate: number | null
@@ -427,6 +431,7 @@ export class MediaRepository {
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(ItemImagesRepository) private readonly images: ItemImagesRepository,
     @Inject(SagaBackdrops) private readonly sagaBackdrops: SagaBackdrops,
+    @Inject(MusicRepository) private readonly music: MusicRepository,
   ) {}
 
   private get db() {
@@ -442,7 +447,12 @@ export class MediaRepository {
       entries: rows.map((row) => ({ libraryId: row.library_id, itemId: row.item_id })),
       lookup: (asked) => this.metadata.summaries(asked),
     })
-    return rows.map((row, index) => ({ ...toItem(row), item: summaries[index] ?? null }))
+    const albums = this.music.albumsOfMedia(rows.map((row) => row.id))
+    return rows.map((row, index) => ({
+      ...toItem(row),
+      item: summaries[index] ?? null,
+      album: albums.get(row.id) ?? null,
+    }))
   }
 
   /**
@@ -568,6 +578,9 @@ export class MediaRepository {
       .prepare<[ByAccount, number, string | null, string | null, string, string, number], ShowRow>(
         `WITH files AS (${EPISODE_FILES})
          SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes,
+                (SELECT COUNT(*) FROM items s WHERE s.parent_id = sh.id AND s.type = 'season') AS seasons,
+                (SELECT COUNT(*) FROM items e JOIN items s ON s.id = e.parent_id
+                  WHERE s.parent_id = sh.id AND s.type = 'season' AND e.type = 'episode') AS total_episodes,
                 COUNT(DISTINCT CASE WHEN f.watched = 1 THEN f.episode_id END) AS watched_episodes,
                 MAX(f.added_at) AS added_at,
                 MAX(f.changed_at) AS changed_at, AVG(f.bitrate) AS bitrate,
@@ -595,6 +608,8 @@ export class MediaRepository {
         {
           show,
           episodes: row.episodes,
+          seasons: row.seasons,
+          totalEpisodes: row.total_episodes,
           watchedEpisodes: row.watched_episodes,
           endedYear: row.ended == null ? null : Number(row.ended.slice(0, 4)) || null,
           addedAt: row.added_at,

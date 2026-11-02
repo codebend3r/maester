@@ -7,8 +7,15 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 12rem));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+
+  // The first show spans both columns. With only two shows the second is
+  // stacked under it at full width; with three or more they pair up below.
+  > :first-child,
+  > :nth-child(2):last-child {
+    grid-column: span 2;
+  }
 }
 
 .empty {
@@ -40,9 +47,5 @@
 @media (max-width: 40rem) {
   .empty {
     padding: var(--space-4);
-  }
-
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

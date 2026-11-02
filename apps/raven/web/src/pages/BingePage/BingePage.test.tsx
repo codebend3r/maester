@@ -6,24 +6,31 @@ import { createQueryClient } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 import { BINGE_COPY } from '@/lib/binge'
 import { BingePage, BingeSection } from '@/pages/BingePage/BingePage'
-import { useBinge } from '@/stores/binge'
+import { fakeBinge } from '@/test/fakeBinge'
 import { itemDetails } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 
-const mark = (id: number) =>
-  useBinge.getState().toggle({ account: 'local', item: { id, type: ITEM_TYPES.show } })
+let binge = fakeBinge()
+
+/** The ids the server holds, as `mark` adds them in order: the newest first. */
+const mark = (...ids: number[]) => {
+  binge.restore()
+  binge = fakeBinge({ ids: ids.toReversed() })
+}
 
 describe('BingePage', () => {
   const item = spyOn(api, 'getItem')
   afterEach(() => {
     cleanup()
     item.mockReset()
+    binge.restore()
+    binge = fakeBinge()
   })
 
-  it('explains binge mode with a library link when no shows are selected', () => {
+  it('explains binge mode with a library link when no shows are selected', async () => {
     renderWithProviders({ ui: <BingePage /> })
-    expect(screen.getByRole('heading', { name: BINGE_COPY.emptyTitle })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: BINGE_COPY.emptyTitle })).toBeInTheDocument()
     expect(screen.getByText(BINGE_COPY.emptyBody)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: BINGE_COPY.browse })).toHaveAttribute(
       'href',
@@ -38,8 +45,7 @@ describe('BingePage', () => {
   })
 
   it('lists only shows the server still allows, newest selection first', async () => {
-    mark(1)
-    mark(2)
+    mark(1, 2)
     item.mockImplementation(async (id) =>
       itemDetails({ id, type: ITEM_TYPES.show, title: `Series ${id}` }),
     )
@@ -58,12 +64,11 @@ describe('BingePage', () => {
     expect(screen.queryByRole('region')).toBeNull()
     view.unmount()
     renderWithProviders({ ui: <BingePage /> })
-    expect(screen.getByText(BINGE_COPY.loading)).toBeInTheDocument()
+    expect(await screen.findByText(BINGE_COPY.loading)).toBeInTheDocument()
   })
 
   it('does not show failed or non-show entries on home', async () => {
-    mark(1)
-    mark(2)
+    mark(1, 2)
     item.mockImplementation(async (id) => {
       if (id === 1) throw new Error('Access denied')
       return itemDetails({ id, type: ITEM_TYPES.movie })
@@ -103,6 +108,7 @@ describe('BingePage', () => {
     item.mockRejectedValue(new Error('Not found'))
     renderWithProviders({ ui: <BingePage /> })
     await userEvent.click(await screen.findByRole('button', { name: BINGE_COPY.remove }))
-    expect(screen.getByRole('heading', { name: BINGE_COPY.emptyTitle })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: BINGE_COPY.emptyTitle })).toBeInTheDocument()
+    expect(binge.state().ids).toEqual([])
   })
 })

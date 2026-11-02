@@ -41,6 +41,7 @@ const sample = (overrides: Partial<MediaItem> & Pick<MediaItem, 'id' | 'title'>)
   versions: 1,
   variant: null,
   card: null,
+  album: null,
   ...overrides,
 })
 
@@ -203,6 +204,8 @@ export const SAMPLE_SHOWS: ShowEntry[] = [
   {
     show: { ...sampleMovie({ id: -21, title: 'The Long Winter' }), type: 'show', year: 2019 },
     episodes: 18,
+    seasons: undefined,
+    totalEpisodes: undefined,
     watchedEpisodes: 0,
     endedYear: null,
     addedAt: '2026-10-02T12:00:00.000Z',
@@ -223,6 +226,8 @@ export const SAMPLE_SHOWS: ShowEntry[] = [
   {
     show: { ...sampleMovie({ id: -24, title: 'Ravens of the North' }), type: 'show', year: 2014 },
     episodes: 10,
+    seasons: undefined,
+    totalEpisodes: undefined,
     watchedEpisodes: 0,
     endedYear: 2016,
     addedAt: '2026-09-14T09:00:00.000Z',

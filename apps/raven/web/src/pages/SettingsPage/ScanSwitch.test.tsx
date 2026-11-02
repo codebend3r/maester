@@ -3,48 +3,84 @@ import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { api } from '@/lib/api'
 import { ScanSwitch } from '@/pages/SettingsPage/ScanSwitch'
+import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
-const read = spyOn(api, 'getScanControl')
-const save = spyOn(api, 'setScanControl')
+const read = spyOn(api, 'listLibraries')
+const cancelFull = spyOn(api, 'cancelScan')
+const cancelQuick = spyOn(api, 'cancelQuickScan')
+const cancelRatings = spyOn(api, 'cancelLibraryRatings')
 
 afterEach(() => {
   cleanup()
   read.mockReset()
-  save.mockReset()
+  cancelFull.mockReset()
+  cancelQuick.mockReset()
+  cancelRatings.mockReset()
 })
 
-describe('global scan switch', () => {
-  it('stops all scans, then allows them again', async () => {
-    const state = { isStopped: false }
-    read.mockImplementation(async () => ({ ...state }))
-    save.mockImplementation(async (next) => {
-      state.isStopped = next.isStopped
-      return { ...state }
+describe('library scans control', () => {
+  it('shows running work and cancels only that work', async () => {
+    let libraries = [
+      library({ id: 1, name: 'Films', scan: { ...library().scan, state: 'indexing' } }),
+      library({
+        id: 2,
+        name: 'Series',
+        scan: { ...library().scan, kind: 'quick', state: 'walking' },
+        ratingsRefresh: {
+          state: 'running',
+          done: 0,
+          total: 2,
+          startedAt: '2026-11-01T00:00:00.000Z',
+        },
+      }),
+      library({ id: 3, name: 'Idle' }),
+    ]
+    read.mockImplementation(async () => libraries)
+    cancelFull.mockImplementation(async () => {
+      libraries = libraries.map((entry) =>
+        entry.id === 1 ? library({ ...entry, scan: { ...entry.scan, state: 'idle' } }) : entry,
+      )
+      return library()
+    })
+    cancelQuick.mockImplementation(async () => {
+      libraries = libraries.map((entry) =>
+        entry.id === 2 ? library({ ...entry, scan: { ...entry.scan, state: 'idle' } }) : entry,
+      )
+      return library()
+    })
+    cancelRatings.mockImplementation(async () => {
+      libraries = libraries.map((entry) =>
+        entry.id === 2
+          ? library({ ...entry, ratingsRefresh: { state: 'idle', finishedAt: null } })
+          : entry,
+      )
+      return library()
     })
     renderWithProviders({ ui: <ScanSwitch /> })
-    await userEvent.click(await screen.findByRole('button', { name: 'Stop all scans' }))
-    expect(save).toHaveBeenCalledWith({ isStopped: true })
-    expect(await screen.findByText('All scans are stopped.')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Allow scans again' }))
-    await waitFor(() => expect(save).toHaveBeenCalledWith({ isStopped: false }))
-    expect(await screen.findByRole('button', { name: 'Stop all scans' })).toBeInTheDocument()
+
+    expect(await screen.findByText('Films: Full scan')).toBeInTheDocument()
+    expect(screen.getByText('Series: Quick scan')).toBeInTheDocument()
+    expect(screen.getByText('Series: Updating ratings')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel all running scans' }))
+    await waitFor(() => {
+      expect(cancelFull).toHaveBeenCalledWith(1)
+      expect(cancelQuick).toHaveBeenCalledWith(2)
+      expect(cancelRatings).toHaveBeenCalledWith(2)
+      expect(screen.getByRole('button', { name: 'Cancel all running scans' })).toBeDisabled()
+    })
   })
 
-  it('shows a failed stop without pretending scans stopped', async () => {
-    read.mockResolvedValue({ isStopped: false })
-    save.mockRejectedValue(new Error('Connection lost'))
+  it('disables cancellation when nothing is running', async () => {
+    read.mockResolvedValue([library()])
     renderWithProviders({ ui: <ScanSwitch /> })
-    await userEvent.click(await screen.findByRole('button', { name: 'Stop all scans' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Connection lost')
-    expect(screen.queryByText('All scans are stopped.')).toBeNull()
+    expect(await screen.findByRole('button', { name: 'Cancel all running scans' })).toBeDisabled()
   })
 
-  it('shows a read failure and no control until the state is known', async () => {
+  it('shows a read failure without a cancel control', async () => {
     read.mockRejectedValue(new Error('Server unavailable'))
     renderWithProviders({ ui: <ScanSwitch /> })
     expect(await screen.findByRole('alert')).toHaveTextContent('Server unavailable')
     expect(screen.queryByRole('button')).toBeNull()
-    expect(save).not.toHaveBeenCalled()
   })
 })

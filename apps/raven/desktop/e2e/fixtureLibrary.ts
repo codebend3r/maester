@@ -255,6 +255,8 @@ export const catalogOf = ({ media }: CatalogOfProps): FixtureCatalog => {
           {
             show: summary({ ...FIXTURE_SHOW, type: ITEM_TYPES.show, year: null }),
             episodes: 2,
+            seasons: 1,
+            totalEpisodes: 2,
             watchedEpisodes: 0,
             endedYear: null,
             addedAt: ADDED_AT,

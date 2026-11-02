@@ -61,8 +61,8 @@ describe('SignInPage', () => {
   it('asks for an email and a password, with links to the other auth pages', () => {
     renderSignIn()
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Welcome back' })).toBeInTheDocument()
-    expect(screen.getByText('Sign in to watch on localhost')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Sign in to watch' })).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/localhost|server/i)
     expect(email()).toHaveAttribute('type', 'email')
     expect(email()).toHaveAttribute('autocomplete', 'username')
     expect(password()).toHaveAttribute('type', 'password')

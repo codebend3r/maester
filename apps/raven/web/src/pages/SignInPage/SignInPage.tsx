@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { AUTH_ROUTES } from '@raven/core'
 import { EmailField, PasswordField } from '@/components/AuthScreen/AuthFields'
-import { AuthForm, Fields, Lead, Note, SubmitButton } from '@/components/AuthScreen/AuthCard'
+import { AuthForm, Fields, Note, SubmitButton } from '@/components/AuthScreen/AuthCard'
 import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
 import { AUTH_ERRORS, errorCodeOf, resendFailureCopy } from '@/lib/authErrors'
 import { AUTH_QUERY, checkEmailPath, safeReturnPath } from '@/lib/authRoutes'
@@ -51,11 +51,7 @@ const SignInForm = ({ returnPath }: SignInFormProps) => {
   }
 
   return (
-    <AuthForm
-      title={SIGN_IN_COPY.title}
-      lead={<Lead>{SIGN_IN_COPY.lead(window.location.hostname)}</Lead>}
-      onSubmit={submit}
-    >
+    <AuthForm title={SIGN_IN_COPY.title} lead={null} onSubmit={submit}>
       <Fields>
         <EmailField value={email} onChange={setEmail} />
         <PasswordField
@@ -109,7 +105,7 @@ export const SignInPage = () => {
   const returnPath = safeReturnPath(params.get(AUTH_QUERY.returnTo))
 
   return (
-    <AuthScreen audience={AUDIENCES.signedOut} approvedTo={returnPath}>
+    <AuthScreen audience={AUDIENCES.signedOut} approvedTo={returnPath} isCentered>
       <SignInForm returnPath={returnPath} />
     </AuthScreen>
   )

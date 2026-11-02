@@ -217,6 +217,32 @@ describe('MusicRepository', () => {
     ])
   })
 
+  it('stores one capability-addressed photo lookup for each album artist with a MusicBrainz id', () => {
+    database
+      .get()
+      .db.prepare('UPDATE artists SET mbid = ? WHERE name = ?')
+      .run('artist-radiohead', 'Radiohead')
+    const radiohead = repository()
+      .listArtists({ libraryId: state.library, ...LIST })
+      .find(({ mbid }) => mbid === 'artist-radiohead')
+    expect(radiohead?.photoVersion).not.toBeNull()
+    expect(
+      repository().artistPicture({
+        id: radiohead?.id ?? 0,
+        version: radiohead?.photoVersion ?? '',
+      }),
+    ).toEqual({ mbid: 'artist-radiohead', picture: null, isFetched: false })
+    const picture = 'https://commons.wikimedia.org/radiohead.jpg'
+    repository().setArtistPicture({ id: radiohead?.id ?? 0, picture })
+    expect(
+      repository().artistPicture({
+        id: radiohead?.id ?? 0,
+        version: radiohead?.photoVersion ?? '',
+      }),
+    ).toEqual({ mbid: 'artist-radiohead', picture, isFetched: true })
+    expect(repository().artistPicture({ id: radiohead?.id ?? 0, version: 'wrong' })).toBeNull()
+  })
+
   it('pages the tracks in the order asked, with the whole count', () => {
     const first = repository().listTracks({
       libraryId: state.library,
@@ -262,6 +288,14 @@ describe('MusicRepository', () => {
       bitDepth: 16,
       isLossless: true,
     })
+  })
+
+  it('names the album each music file is a track of, and leaves out a file that is none', () => {
+    const airbag = state.ids.get('/music/Radiohead/OK Computer/01 Airbag.flac') ?? 0
+    const albums = repository().albumsOfMedia([airbag, -1])
+    expect([...albums.keys()]).toEqual([airbag])
+    expect(albums.get(airbag)).toMatchObject({ title: 'OK Computer' })
+    expect(repository().albumsOfMedia([]).size).toBe(0)
   })
 
   it('gives an album’s page its tracks in disc order, its discs, label and genres', () => {

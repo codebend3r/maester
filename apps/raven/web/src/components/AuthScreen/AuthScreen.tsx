@@ -49,11 +49,11 @@ const DESTINATIONS = {
   [ACCESS_KINDS.approved]: (approvedTo: string) => approvedTo,
 } as const satisfies Record<Answered, (approvedTo: string) => string>
 
-type FrameProps = { children: ReactNode }
+type FrameProps = { children: ReactNode; isCentered: boolean }
 
-const Frame = ({ children }: FrameProps) => (
-  <div className={styles.page}>
-    <PosterWall />
+const Frame = ({ children, isCentered }: FrameProps) => (
+  <div className={isCentered ? `${styles.page} ${styles.centered}` : styles.page}>
+    <PosterWall shouldShowPromise={!isCentered} />
     <main className={styles.side}>{children}</main>
   </div>
 )
@@ -75,6 +75,7 @@ const Unavailable = () => (
 type AuthScreenProps = {
   audience: Audience
   approvedTo?: string
+  isCentered?: boolean
   children: ReactNode
 }
 
@@ -82,14 +83,14 @@ type ScreenViewProps = Required<AuthScreenProps>
 
 const ToHome = () => <Navigate replace to={HOME_PATH} />
 
-const Loading = () => (
-  <Frame>
+const Loading = ({ isCentered }: ScreenViewProps) => (
+  <Frame isCentered={isCentered}>
     <Waiting />
   </Frame>
 )
 
-const Unreachable = () => (
-  <Frame>
+const Unreachable = ({ isCentered }: ScreenViewProps) => (
+  <Frame isCentered={isCentered}>
     <Unavailable />
   </Frame>
 )
@@ -102,20 +103,26 @@ const ADMISSIONS = {
 
 type Admission = (typeof ADMISSIONS)[keyof typeof ADMISSIONS]
 
-type AdmissionViewProps = { to: string; children: ReactNode }
+type AdmissionViewProps = { to: string; isCentered: boolean; children: ReactNode }
 
 const ADMISSION_VIEWS = {
-  [ADMISSIONS.admitted]: ({ children }: AdmissionViewProps) => <Frame>{children}</Frame>,
+  [ADMISSIONS.admitted]: ({ children, isCentered }: AdmissionViewProps) => (
+    <Frame isCentered={isCentered}>{children}</Frame>
+  ),
   [ADMISSIONS.sent]: ({ to }: AdmissionViewProps) => <Navigate replace to={to} />,
 } as const satisfies Record<Admission, ComponentType<AdmissionViewProps>>
 
 /** The page for a visitor the server has answered about: its own, or a way on to where they belong. */
 const answeredView =
   (kind: Answered) =>
-  ({ audience, approvedTo, children }: ScreenViewProps) => {
+  ({ audience, approvedTo, isCentered, children }: ScreenViewProps) => {
     const isAdmitted = ADMITTED[audience].some((admitted) => admitted === kind)
     const View = ADMISSION_VIEWS[isAdmitted ? ADMISSIONS.admitted : ADMISSIONS.sent]
-    return <View to={DESTINATIONS[kind](approvedTo)}>{children}</View>
+    return (
+      <View to={DESTINATIONS[kind](approvedTo)} isCentered={isCentered}>
+        {children}
+      </View>
+    )
   }
 
 const SCREEN_VIEWS = {
@@ -130,17 +137,22 @@ const SCREEN_VIEWS = {
 } as const satisfies Record<AccessKind, ComponentType<ScreenViewProps>>
 
 /**
- * The screen every page of the auth flow sits in, beside the poster wall.
- * While accounts are off the page is not there; while they cannot be
- * reached it says so instead of showing a form that cannot work. Otherwise
- * it shows `children` to its `audience` and sends anyone else on: to sign
- * in, to the pending page, or, once approved, to `approvedTo`.
+ * The auth flow's frame, with its poster wall or centered form. While
+ * accounts are off the page is not there; while they cannot be reached it
+ * says so instead of showing a form that cannot work. Otherwise it shows
+ * `children` to its `audience` and sends anyone else on to sign in, pending,
+ * or, once approved, `approvedTo`.
  */
-export const AuthScreen = ({ audience, approvedTo = HOME_PATH, children }: AuthScreenProps) => {
+export const AuthScreen = ({
+  audience,
+  approvedTo = HOME_PATH,
+  isCentered = false,
+  children,
+}: AuthScreenProps) => {
   const access = useAccessState()
   const View = SCREEN_VIEWS[access.kind]
   return (
-    <View audience={audience} approvedTo={approvedTo}>
+    <View audience={audience} approvedTo={approvedTo} isCentered={isCentered}>
       {children}
     </View>
   )

@@ -271,6 +271,7 @@ export const PlayableItemView = ({
         facts={config.facts({ details, primary })}
         ratings={details.ratings}
         progress={config.showsTimeLeft ? timeLeft(primary) : undefined}
+        pullUp={config.pictures === PAGE_PICTURES.posterAndBackdrop}
         logo={
           showsLogo
             ? api.itemImageUrl({

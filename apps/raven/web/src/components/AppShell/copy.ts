@@ -8,6 +8,7 @@ export const APP_SHELL_COPY = {
   bugReports: 'Bug reports',
   reports: 'Reports',
   shortcuts: 'Shortcuts',
+  design: 'Design',
   manage: 'Manage',
   showManage: 'Show Manage',
   hideManage: 'Hide Manage',

@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
-import { LIBRARY_KINDS, MUSIC_SORTS, SORT_DIRECTIONS } from '@raven/core'
+import { LIBRARY_KINDS, MUSIC_LIST_PARAMS, MUSIC_SORTS, SORT_DIRECTIONS } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
 import { api } from '@/lib/api'
-import { AlbumsSection, ArtistsSection } from '@/pages/LibraryPage/MusicSections'
+import {
+  AlbumsSection,
+  ArtistsSection,
+  UnmatchedAlbumsSection,
+} from '@/pages/LibraryPage/MusicSections'
 import { library } from '@/test/fixtures'
 import { album, artist, track } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
@@ -33,6 +37,25 @@ describe('AlbumsSection', () => {
     useAudioQueue.getState().clear()
   })
 
+  it('jumps by title letter when listed by title', async () => {
+    renderWithProviders({
+      ui: <AlbumsSection library={MUSIC} />,
+      route: `/libraries/3?${MUSIC_LIST_PARAMS.sort}=${MUSIC_SORTS.title}`,
+    })
+    await screen.findByRole('link', { name: 'OK Computer' })
+    expect(screen.getByRole('button', { name: 'O' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'R' })).toBeDisabled()
+  })
+
+  it('has no jump strip when listed at random', async () => {
+    renderWithProviders({
+      ui: <AlbumsSection library={MUSIC} />,
+      route: `/libraries/3?${MUSIC_LIST_PARAMS.sort}=${MUSIC_SORTS.random}`,
+    })
+    await screen.findByRole('link', { name: 'OK Computer' })
+    expect(screen.queryByRole('navigation', { name: /Jump to/ })).toBeNull()
+  })
+
   it('lists the albums as covers with their artists and years', async () => {
     renderWithProviders({ ui: <AlbumsSection library={MUSIC} />, route: '/libraries/3' })
     expect(await screen.findByRole('link', { name: 'OK Computer' })).toHaveAttribute(
@@ -40,6 +63,10 @@ describe('AlbumsSection', () => {
       '/albums/7',
     )
     expect(screen.getByRole('link', { name: 'Kid A' })).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: 'Jump to a letter' })).toBeTruthy()
+    // Listed by artist, so the strip is the artists' letters, not the titles'.
+    expect(screen.getByRole('button', { name: 'R' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'O' })).toBeDisabled()
     expect(screen.getByText('2000')).toBeTruthy()
     expect(api.listAlbums).toHaveBeenCalledWith({
       libraryId: 3,
@@ -129,11 +156,39 @@ describe('AlbumsSection', () => {
   })
 })
 
+describe('UnmatchedAlbumsSection', () => {
+  afterEach(() => {
+    cleanup()
+    mock.restore()
+  })
+
+  it('lists unmatched albums only and offers the alphabet jump strip', async () => {
+    spyOn(api, 'listAlbums').mockResolvedValue([
+      album({ id: 9, title: 'Zooropa', sortTitle: 'Zooropa', match: 'unmatched' }),
+      album({ id: 10, title: 'The Bends', sortTitle: 'Bends', match: 'matched' }),
+    ])
+    renderWithProviders({
+      ui: <UnmatchedAlbumsSection library={MUSIC} />,
+      route: '/libraries/3/unmatched-albums',
+    })
+    expect(await screen.findByRole('link', { name: 'Zooropa' })).toHaveAttribute(
+      'href',
+      '/albums/9',
+    )
+    expect(screen.queryByRole('link', { name: 'The Bends' })).toBeNull()
+    const picker = screen.getByRole('navigation', { name: 'Jump to a letter' })
+    expect(screen.getByRole('button', { name: 'Z' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'O' })).toBeDisabled()
+    expect(picker).toBeTruthy()
+  })
+})
+
 describe('ArtistsSection', () => {
   beforeEach(() => {
     spyOn(api, 'listArtists').mockResolvedValue([
       artist(),
       artist({ id: 2, name: 'Blur', albumCount: 2, trackCount: 1 }),
+      artist({ id: 3, name: 'Featured guest', albumCount: 0, trackCount: 1 }),
     ])
   })
 
@@ -152,6 +207,7 @@ describe('ArtistsSection', () => {
     const list = screen.getByRole('list', { name: 'Artists' })
     expect(list).toHaveTextContent('1 album · 2 tracks')
     expect(list).toHaveTextContent('2 albums · 1 track')
+    expect(list).not.toHaveTextContent('Featured guest')
   })
 })
 

@@ -46,7 +46,7 @@ describe('MusicShell', () => {
   it('offers Home, Library and Search, with Back to raven at the foot', () => {
     spyOn(api, 'listLibraries').mockResolvedValue([musicLibrary()])
     renderShell(MUSIC_PATHS.root)
-    expect(namesOf(side())).toEqual(['ravenMusic', 'Home', 'Library', 'Search', 'Back to raven'])
+    expect(namesOf(side())).toEqual(['RavenMusic', 'Home', 'Library', 'Search', 'Back to raven'])
     expect(within(side()).getByRole('link', { name: 'raven Music' })).toHaveAttribute(
       'href',
       '/music',
@@ -80,7 +80,7 @@ describe('MusicShell', () => {
     cleanup()
     useServerReach.setState({ isOffline: true })
     renderShell(MUSIC_PATHS.root)
-    expect(namesOf(side())).toEqual(['ravenMusic', 'Downloads', 'Back to raven'])
+    expect(namesOf(side())).toEqual(['RavenMusic', 'Downloads', 'Back to raven'])
     expect(namesOf(tabs())).toEqual(['Downloads', 'raven'])
     expect(screen.queryByRole('button', { name: 'Account' })).toBeNull()
   })

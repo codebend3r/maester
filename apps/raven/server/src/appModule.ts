@@ -42,6 +42,8 @@ import { LockService } from '@/lock/lockService'
 import { HeroController } from '@/hero/heroController'
 import { HeroRepository } from '@/hero/heroRepository'
 import { HeroSelection } from '@/hero/heroSelection'
+import { BingeController } from '@/media/bingeController'
+import { BingeShows } from '@/media/bingeShows'
 import { FavouritesController } from '@/media/favouritesController'
 import { FilePasses } from '@/media/filePasses'
 import { HomeController } from '@/media/homeController'
@@ -145,6 +147,7 @@ export const CONTROLLERS = [
   MediaOriginsController,
   PlaybackController,
   HlsController,
+  BingeController,
   FavouritesController,
   WatchedController,
   HomeController,
@@ -262,6 +265,7 @@ export class AppModule {
         ViewingAccounts,
         ViewingRepository,
         TitleFavourites,
+        BingeShows,
         WatchedCards,
         WatchedRepository,
         MediaIndex,

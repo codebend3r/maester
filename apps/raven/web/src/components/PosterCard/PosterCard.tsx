@@ -1,21 +1,16 @@
 import {
   type ItemSummary,
   MATCH_STATES,
-  RATING_SOURCES,
   type MatchItemType,
   type MediaItem,
   type MediaSort,
-  type RatingSource,
   cardLink,
   cardTitle,
   formatRuntime,
   mediaEntryKey,
-  pickScore,
   cardSortFact,
   watchLink,
-  ITEM_IMAGE_KINDS,
 } from '@raven/core'
-import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark, FavouriteWords } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
@@ -25,9 +20,7 @@ import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
-import { api } from '@/lib/api'
 import type { PosterSizes } from '@/lib/posters'
-import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
 import { POSTER_CARD_COPY } from '@/components/PosterCard/copy'
 import styles from '@/components/PosterCard/PosterCard.module.scss'
@@ -65,15 +58,6 @@ export const PosterFrame = ({
   </span>
 )
 
-const backdropOf = (item: ItemSummary | null | undefined): string | null =>
-  item
-    ? api.itemImageUrl({
-        id: item.id,
-        kind: ITEM_IMAGE_KINDS.backdrop,
-        version: item.backdropVersion,
-      })
-    : null
-
 type PosterCardProps = {
   media: MediaItem
   /** The item whose poster the card shows, when not the video's own: an episode's season. */
@@ -82,8 +66,6 @@ type PosterCardProps = {
   sizes: PosterSizes
   /** What the library matches its files to, for the menu's Fix match. */
   matchType?: MatchItemType | null
-  /** Whose score the card shows, from the library's settings. */
-  ratingsSource?: RatingSource
   /** The order the listing is in, whose value the card shows. */
   sort?: MediaSort
 }
@@ -95,22 +77,10 @@ type PosterCardProps = {
  * Sorted, it shows the value its listing is sorted by above its facts. The
  * poster lifts toward the pointer, carrying its checkbox and menu with it.
  */
-export const PosterCard = ({
-  media,
-  matchType = null,
-  ratingsSource = RATING_SOURCES.tmdb,
-  sort,
-  poster,
-  sizes,
-}: PosterCardProps) => {
+export const PosterCard = ({ media, matchType = null, sort, poster, sizes }: PosterCardProps) => {
   const menu = useCardMenu({ media, matchType })
-  // The card's poster item's backdrop, else the video's own.
-  const hover = useHoverBackdrop(backdropOf(poster) ?? backdropOf(media.item))
   const { title, year } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
-  const score = media.item
-    ? pickScore({ ratings: media.item.ratings, source: ratingsSource })
-    : null
   const link = cardLink({ media, hasPages: true })
   const hasPage = link.state == null
   const pageItem = hasPage ? (media.item?.id ?? null) : null
@@ -126,7 +96,6 @@ export const PosterCard = ({
     <li
       className={`${styles.card} ${menu.hostClass}`}
       data-entry={mediaEntryKey(media)}
-      {...hover}
       {...select.rootProps}
     >
       <div className={styles.poster}>
@@ -168,11 +137,6 @@ export const PosterCard = ({
               {fact}
             </span>
           ))}
-          {score && (
-            <span className={styles.fact}>
-              <RatingBadge rating={score} />
-            </span>
-          )}
           <FavouriteWords media={media} />
           <PartlyWatched media={media} />
           <WatchedWords watched={media.watched} />

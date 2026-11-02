@@ -1,11 +1,4 @@
-import {
-  type ItemSummary,
-  type MatchItemType,
-  type MediaItem,
-  type MediaSort,
-  RATING_SOURCES,
-  type RatingSource,
-} from '@raven/core'
+import { type ItemSummary, type MatchItemType, type MediaItem, type MediaSort } from '@raven/core'
 import type { ComponentType } from 'react'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
@@ -21,25 +14,17 @@ type CardKind = (typeof CARD_KINDS)[keyof typeof CARD_KINDS]
 type GridCardProps = {
   media: MediaItem
   matchType: MatchItemType | null
-  ratingsSource: RatingSource
   sort?: MediaSort
   posterOf?: (media: MediaItem) => ItemSummary | null
 }
 
 type GridPosterCardProps = GridCardProps
 
-const GridPosterCard = ({
-  media,
-  matchType,
-  ratingsSource,
-  sort,
-  posterOf,
-}: GridPosterCardProps) => (
+const GridPosterCard = ({ media, matchType, sort, posterOf }: GridPosterCardProps) => (
   <PosterCard
     media={media}
     poster={posterOf?.(media)}
     matchType={matchType}
-    ratingsSource={ratingsSource}
     sort={sort}
     sizes={POSTER_SIZES.grid}
   />
@@ -65,7 +50,6 @@ type MediaGridProps = {
   items: MediaItem[]
   posters?: boolean
   matchType?: MatchItemType | null
-  ratingsSource?: RatingSource
   sort?: MediaSort
   /** The item whose poster a card shows, when not the video's own: an episode's season. */
   posterOf?: (media: MediaItem) => ItemSummary | null
@@ -80,7 +64,6 @@ export const MediaGrid = ({
   items,
   posters = false,
   matchType = null,
-  ratingsSource = RATING_SOURCES.tmdb,
   sort,
   posterOf,
 }: MediaGridProps) => {
@@ -88,14 +71,7 @@ export const MediaGrid = ({
   return (
     <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>
       {items.map((item) => (
-        <Card
-          key={item.id}
-          media={item}
-          matchType={matchType}
-          ratingsSource={ratingsSource}
-          sort={sort}
-          posterOf={posterOf}
-        />
+        <Card key={item.id} media={item} matchType={matchType} sort={sort} posterOf={posterOf} />
       ))}
     </ul>
   )

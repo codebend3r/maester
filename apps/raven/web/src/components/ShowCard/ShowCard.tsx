@@ -11,7 +11,6 @@ import {
   showYears,
   watchedStateOf,
   watchPageOf,
-  ITEM_IMAGE_KINDS,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
@@ -21,9 +20,7 @@ import { ItemPoster } from '@/components/PosterImage/PosterImage'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { WatchedCount, WatchedCountWords } from '@/components/WatchedCount/WatchedCount'
-import { api } from '@/lib/api'
 import { POSTER_SIZES, type PosterSizes, posterSources } from '@/lib/posters'
-import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
 import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import { SHOW_CARD_COPY } from '@/components/ShowCard/copy'
@@ -37,30 +34,22 @@ type UseShowCardProps = {
 }
 
 /**
- * What both shapes of a show's card share: its backdrop behind the page
- * while pointed at, its selection, its facts and score, and how its next
- * episode's play button is named.
+ * What both shapes of a show's card share: its selection, its facts and score,
+ * and how its next episode's play button is named.
  */
 const useShowCard = ({ entry, ratingsSource, sort }: UseShowCardProps) => {
   const { show, next } = entry
-  const hover = useHoverBackdrop(
-    api.itemImageUrl({
-      id: show.id,
-      kind: ITEM_IMAGE_KINDS.backdrop,
-      version: show.backdropVersion,
-    }),
-  )
   const select = useSelectable({ key: showEntryKey(show), title: show.title })
   const code = next?.item ? episodeCode(next.item) : null
   return {
-    hover,
     select,
     code,
     score: pickScore({ ratings: show.ratings, source: ratingsSource }),
     sorted: sort ? showSortFact({ entry, sort }) : null,
+    years: showYears({ year: show.year, endedYear: entry.endedYear }),
     facts: [
-      showYears({ year: show.year, endedYear: entry.endedYear }),
-      COMMON_COPY.episodes(entry.episodes),
+      entry.seasons == null ? null : COMMON_COPY.seasons(entry.seasons),
+      COMMON_COPY.episodes(entry.totalEpisodes ?? entry.episodes),
     ].filter((fact): fact is string => fact != null),
     playLabel: code
       ? SHOW_CARD_COPY.playEpisode({ title: show.title, code })
@@ -71,7 +60,7 @@ const useShowCard = ({ entry, ratingsSource, sort }: UseShowCardProps) => {
 type ShowFactsProps = {
   entry: ShowEntry
   facts: string[]
-  score: ReturnType<typeof pickScore>
+  score: ReturnType<typeof pickScore> | null
   className: string
 }
 
@@ -118,12 +107,7 @@ export const ShowCard = ({
   const card = useShowCard({ entry, ratingsSource, sort })
 
   return (
-    <li
-      className={styles.card}
-      data-entry={showEntryKey(show)}
-      {...card.hover}
-      {...card.select.rootProps}
-    >
+    <li className={styles.card} data-entry={showEntryKey(show)} {...card.select.rootProps}>
       <div className={styles.poster}>
         <CardLink
           to={`/shows/${show.id}`}
@@ -159,7 +143,12 @@ export const ShowCard = ({
           {show.title}
         </CardLink>
         {card.sorted && <span className={styles.sorted}>{card.sorted}</span>}
-        <ShowFacts entry={entry} facts={card.facts} score={card.score} className={styles.facts} />
+        <ShowFacts
+          entry={entry}
+          facts={[card.years, ...card.facts].filter((fact): fact is string => fact != null)}
+          score={card.score}
+          className={styles.facts}
+        />
       </div>
     </li>
   )
@@ -167,7 +156,6 @@ export const ShowCard = ({
 
 type WideShowCardProps = {
   entry: ShowEntry
-  ratingsSource?: RatingSource
   /** The order the listing is in, whose value the card shows. */
   sort?: MediaSort
 }
@@ -179,9 +167,9 @@ type WideShowCardProps = {
  * page and its play button starts that episode at once. The wash is the
  * poster again, blurred: the same file, so nothing more is fetched.
  */
-const WideShowCard = ({ entry, ratingsSource = RATING_SOURCES.tmdb, sort }: WideShowCardProps) => {
+const WideShowCard = ({ entry, sort }: WideShowCardProps) => {
   const { show, next } = entry
-  const card = useShowCard({ entry, ratingsSource, sort })
+  const card = useShowCard({ entry, ratingsSource: RATING_SOURCES.tmdb, sort })
   const wash = posterSources({ item: show, sizes: POSTER_SIZES.showCard })
   const isWatched =
     watchedStateOf({ watched: entry.watchedEpisodes, total: entry.episodes }) ===
@@ -189,12 +177,7 @@ const WideShowCard = ({ entry, ratingsSource = RATING_SOURCES.tmdb, sort }: Wide
   const nextLabel = [card.code, next?.item?.title].filter(Boolean).join(COMMON_COPY.separator)
 
   return (
-    <li
-      className={styles.wide}
-      data-entry={showEntryKey(show)}
-      {...card.hover}
-      {...card.select.rootProps}
-    >
+    <li className={styles.wide} data-entry={showEntryKey(show)} {...card.select.rootProps}>
       <CardLink
         to={`/shows/${show.id}`}
         className={styles.widePicture}
@@ -220,12 +203,7 @@ const WideShowCard = ({ entry, ratingsSource = RATING_SOURCES.tmdb, sort }: Wide
           {show.title}
         </CardLink>
         {card.sorted && <span className={styles.wideSorted}>{card.sorted}</span>}
-        <ShowFacts
-          entry={entry}
-          facts={card.facts}
-          score={card.score}
-          className={styles.wideFacts}
-        />
+        <ShowFacts entry={entry} facts={card.facts} score={null} className={styles.wideFacts} />
         {next && !card.select.selecting && (
           <CardLink
             to={watchPageOf(next.id)}
@@ -257,17 +235,13 @@ const WideShowCard = ({ entry, ratingsSource = RATING_SOURCES.tmdb, sort }: Wide
   )
 }
 
-type ShowGridProps = {
-  shows: ShowEntry[]
-  ratingsSource?: RatingSource
-  sort?: MediaSort
-}
+type ShowGridProps = { shows: ShowEntry[]; sort?: MediaSort }
 
 /** The grid a TV library lays its shows out in, each a wide card. */
-export const ShowGrid = ({ shows, ratingsSource = RATING_SOURCES.tmdb, sort }: ShowGridProps) => (
+export const ShowGrid = ({ shows, sort }: ShowGridProps) => (
   <ul className={styles.grid}>
     {shows.map((entry) => (
-      <WideShowCard key={entry.show.id} entry={entry} ratingsSource={ratingsSource} sort={sort} />
+      <WideShowCard key={entry.show.id} entry={entry} sort={sort} />
     ))}
   </ul>
 )

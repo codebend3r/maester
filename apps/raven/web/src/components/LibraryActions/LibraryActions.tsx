@@ -231,6 +231,7 @@ export const LibraryActions = ({
   const isQuickScanning = quickScan.isPending || (isScanRunning && scan.kind === SCAN_KINDS.quick)
   const isFullScanning = fullScan.isPending || (isScanRunning && scan.kind === SCAN_KINDS.full)
   const isUpdatingRatings = updateRatings.isPending || isRefreshingRatings(library)
+  const canMergeAlbums = library.settings.kind === LIBRARY_KINDS.music
 
   return (
     <>
@@ -306,7 +307,7 @@ export const LibraryActions = ({
             </Button>
           )}
           {scanMarkers.isSuccess && <output>{LIBRARY_ACTIONS_COPY.markersQueued}</output>}
-          {library.settings.kind === LIBRARY_KINDS.music && (
+          {canMergeAlbums && (
             <Button
               icon="shuffle"
               disabled={mergeAlbums.isPending}
@@ -318,7 +319,7 @@ export const LibraryActions = ({
               {whose}
             </Button>
           )}
-          {mergeAlbums.isSuccess && (
+          {canMergeAlbums && mergeAlbums.isSuccess && (
             <output>{LIBRARY_ACTIONS_COPY.albumsMerged(mergeAlbums.data.merged)}</output>
           )}
           <LongAction

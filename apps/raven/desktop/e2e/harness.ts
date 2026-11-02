@@ -392,7 +392,7 @@ type SignInProps = { page: Page }
 
 /** Signs the fixture's account in through the web's own sign-in page and waits for Home. */
 export const signIn = async ({ page }: SignInProps): Promise<void> => {
-  await expect(heading({ page, name: 'Welcome back' })).toBeVisible()
+  await expect(heading({ page, name: 'Sign in to watch' })).toBeVisible()
   await page.getByRole('textbox', { name: 'Email' }).fill(FIXTURE_ACCOUNT.email)
   await page.getByRole('textbox', { name: 'Password' }).fill(FIXTURE_ACCOUNT.password)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()

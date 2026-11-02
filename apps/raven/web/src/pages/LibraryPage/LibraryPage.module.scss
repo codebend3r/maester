@@ -35,12 +35,10 @@
 .heading {
   grid-area: heading;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    'title'
-    'count'
-    'status'
-    'actions';
+    'title stats'
+    'actions actions';
   gap: var(--space-1) var(--space-4);
 }
 
@@ -61,15 +59,25 @@
   overflow-wrap: anywhere;
 }
 
-.count {
-  grid-area: count;
+.stats {
+  grid-area: stats;
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  gap: var(--space-0);
   color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
+.count {
+  color: inherit;
+}
+
 .status {
-  grid-area: status;
   display: grid;
+  justify-items: end;
   gap: var(--space-0);
 }
 
@@ -146,6 +154,20 @@
 // global .visually-hidden hides, rule for rule: that class cannot apply
 // under a media query, and @raven/ui ships no SCSS to share.
 @media (max-width: 40rem) {
+  .heading {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'title'
+      'stats'
+      'actions';
+  }
+
+  .stats,
+  .status {
+    justify-items: start;
+    text-align: left;
+  }
+
   .tabs {
     grid-auto-columns: minmax(max-content, 1fr);
     gap: 0;
@@ -265,6 +287,12 @@
       'sort order'
       'play shuffle';
   }
+}
+
+// The admin's Smart match button, kept to its own width in the section's grid.
+.playlistsToolbar {
+  display: grid;
+  justify-items: start;
 }
 
 .musicSearch {

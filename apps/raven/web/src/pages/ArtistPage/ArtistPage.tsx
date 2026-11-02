@@ -1,13 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import {
-  type ArtistDetails,
+  QUEUE_SOURCE_KINDS,
   RADIO_SEED_KINDS,
+  type ArtistDetails,
   ROUTE_STATES,
   type RouteQuery,
   routeState,
 } from '@raven/core'
+import { Button } from '@raven/ui'
 import { useId } from 'react'
-import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
+import { KeyedView, type ViewOf, type ViewsOf, useAudioQueue } from '@raven/ui/headless'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
@@ -16,7 +18,7 @@ import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { START_RADIO_LOOKS, StartRadio } from '@/components/StartRadio/StartRadio'
 import { useMusicLinks } from '@/lib/useMusicLinks'
-import { artistQuery } from '@/lib/queries'
+import { albumQuery, artistQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
 import { useArtistFavourite } from '@/lib/useMusicFavourite'
 import { ARTIST_COPY } from '@/pages/ArtistPage/copy'
@@ -33,6 +35,17 @@ const ArtistView = ({ details }: ArtistViewProps) => {
   const { artist, albums, appearsOn } = details
   const favourite = useArtistFavourite({ artistId: artist.id })
   const links = useMusicLinks()
+  const playTracks = useAudioQueue((store) => store.playTracks)
+  const albumQueries = useQueries({ queries: albums.map(({ id }) => albumQuery(id)) })
+  const featureQueries = useQueries({ queries: appearsOn.map(({ id }) => albumQuery(id)) })
+  const albumTracks = albumQueries.flatMap((query) => query.data?.tracks ?? [])
+  const featureTracks = featureQueries.flatMap((query) => query.data?.tracks ?? [])
+  const source = { kind: QUEUE_SOURCE_KINDS.artist, id: artist.id }
+  const isAlbumTrackListReady =
+    albums.length === 0 || albumQueries.every((query) => query.isSuccess)
+  const isFeatureTrackListReady =
+    appearsOn.length === 0 || featureQueries.every((query) => query.isSuccess)
+  const allTracks = [...albumTracks, ...featureTracks]
   return (
     <article className={styles.page} aria-labelledby={titleId}>
       <BackButton fallback={links.home} className={styles.back} />
@@ -50,6 +63,36 @@ const ArtistView = ({ details }: ArtistViewProps) => {
           />
         </div>
         <p className={styles.count}>{MUSIC_COPY.artistCounts(artist)}</p>
+        <div className={styles.actions}>
+          <Button
+            icon="play"
+            disabled={!isAlbumTrackListReady || albumTracks.length === 0}
+            onClick={() => playTracks({ tracks: albumTracks, source })}
+          >
+            {ARTIST_COPY.playAlbums}
+          </Button>
+          <Button
+            icon="shuffle"
+            disabled={!isAlbumTrackListReady || albumTracks.length === 0}
+            onClick={() => playTracks({ tracks: albumTracks, source, isShuffled: true })}
+          >
+            {ARTIST_COPY.shuffleAlbums}
+          </Button>
+          <Button
+            icon="shuffle"
+            disabled={!isFeatureTrackListReady || featureTracks.length === 0}
+            onClick={() => playTracks({ tracks: featureTracks, source, isShuffled: true })}
+          >
+            {ARTIST_COPY.shuffleAppearsOn}
+          </Button>
+          <Button
+            icon="shuffle"
+            disabled={!isAlbumTrackListReady || !isFeatureTrackListReady || allTracks.length === 0}
+            onClick={() => playTracks({ tracks: allTracks, source, isShuffled: true })}
+          >
+            {ARTIST_COPY.shuffleAll}
+          </Button>
+        </div>
       </header>
       {albums.length > 0 && (
         <section className={styles.section} aria-labelledby={albumsId}>

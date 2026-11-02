@@ -15,6 +15,7 @@ import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
 import { api } from '@/lib/api'
+import { DESIGN_PATH } from '@/pages/DesignPage/copy'
 import { ravenVersion } from '@/lib/version'
 import { usePageBackdrop } from '@raven/ui/headless'
 import { useAuthSession } from '@/stores/authSession'
@@ -62,7 +63,7 @@ const renderShell = ({ route, adminLock, account }: RenderShellProps) =>
 
 const nav = () => screen.getByRole('navigation', { name: 'Main' })
 const tabs = () => screen.getByRole('navigation', { name: 'Tabs' })
-const logo = () => screen.getByRole('link', { name: 'raven' })
+const logo = () => screen.getByRole('link', { name: 'Raven' })
 const toggle = () => screen.getByRole('button', { name: 'Side menu' })
 const iconOf = (element: HTMLElement) => element.querySelector('svg')?.dataset.icon
 const iconsOf = (element: HTMLElement) =>
@@ -115,7 +116,7 @@ describe('AppShell', () => {
   it('links home from the logo, named by its word alone', () => {
     spies.list.mockImplementation(async () => [])
     renderShell({ route: '/favourites' })
-    const home = screen.getByRole('link', { name: 'raven' })
+    const home = screen.getByRole('link', { name: 'Raven' })
     expect(home).toHaveAttribute('href', '/')
     expect(home.querySelector('img')).toHaveAttribute('src', '/brand/raven-mark-on-dark.svg')
   })
@@ -168,8 +169,9 @@ describe('AppShell', () => {
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toEqual([
-      'raven',
+      'Raven',
       'Home',
+      'Continue watching',
       'Binge',
       'Favourites',
       'Movies',
@@ -179,6 +181,7 @@ describe('AppShell', () => {
       'Bug reports',
       'Settings',
       'Shortcuts',
+      'Design',
     ])
   })
 
@@ -457,12 +460,12 @@ describe('AppShell', () => {
     renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Movies' })
     expect(within(nav()).getByText('Pinned')).toBeInTheDocument()
-    expect(within(logo()).getByText('raven')).not.toHaveClass('visually-hidden')
+    expect(within(logo()).getByText('Raven')).not.toHaveClass('visually-hidden')
 
     await userEvent.click(toggle())
     expect(within(nav()).queryByText('Pinned')).toBeNull()
     expect(within(nav()).getByRole('list', { name: 'Pinned' })).toBeInTheDocument()
-    expect(within(logo()).getByText('raven')).toHaveClass('visually-hidden')
+    expect(within(logo()).getByText('Raven')).toHaveClass('visually-hidden')
   })
 
   it('has no Pinned heading with nothing pinned', () => {
@@ -482,7 +485,7 @@ describe('AppShell', () => {
     expect(
       screen.getByText('Tutorials (locked)', { selector: '[aria-hidden]' }),
     ).toBeInTheDocument()
-    expect(within(logo()).getByText('raven')).toHaveClass('visually-hidden')
+    expect(within(logo()).getByText('Raven')).toHaveClass('visually-hidden')
     expect(within(nav()).queryByText('Pinned')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Side menu' })).toBeNull()
     expect(screen.queryByRole('complementary', { name: 'Tip' })).toBeNull()
@@ -509,7 +512,7 @@ describe('AppShell', () => {
     expect(links.map(iconOf)).toEqual([
       'home',
       'libraries',
-      'playback',
+      'popcorn',
       'heart',
       'settings',
       'playback',
@@ -583,6 +586,7 @@ describe('AppShell', () => {
     ).toEqual([
       '/',
       '/',
+      '/continue-watching',
       '/favourites',
       '/libraries',
       '/admin',
@@ -592,6 +596,7 @@ describe('AppShell', () => {
       DESKTOP_PATHS.downloads,
       PAGE_PATHS.settings,
       PAGE_PATHS.shortcuts,
+      DESIGN_PATH,
     ])
     expect(
       within(tabs())
@@ -631,7 +636,7 @@ describe('AppShell', () => {
       within(nav())
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['raven', 'On this PC', 'Downloads', 'Settings', 'Shortcuts'])
+    ).toEqual(['Raven', 'On this PC', 'Downloads', 'Settings', 'Shortcuts', 'Design'])
     expect(
       within(tabs())
         .getAllByRole('link')
@@ -647,7 +652,7 @@ describe('AppShell', () => {
       within(nav())
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['raven', 'On this Mac', 'Downloads', 'Settings', 'Shortcuts'])
+    ).toEqual(['Raven', 'On this Mac', 'Downloads', 'Settings', 'Shortcuts', 'Design'])
     expect(
       within(tabs())
         .getAllByRole('link')

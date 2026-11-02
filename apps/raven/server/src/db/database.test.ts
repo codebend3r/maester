@@ -670,8 +670,8 @@ describe('migrations', () => {
     before.close()
 
     const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
-    expect(database.db.pragma('user_version', { simple: true })).toBe(49)
-    expect(MIGRATIONS).toHaveLength(49)
+    expect(database.db.pragma('user_version', { simple: true })).toBe(50)
+    expect(MIGRATIONS).toHaveLength(50)
     expect(database.db.prepare('SELECT id, is_shared FROM playlists').all()).toEqual([
       { id: 1, is_shared: 0 },
     ])
