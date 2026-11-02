@@ -14,6 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: read
 
 # One run at a time. GitHub keeps one pending run and drops older pending ones, which is
