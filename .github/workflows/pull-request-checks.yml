@@ -1,9 +1,12 @@
 name: 🧪 Pull request checks
 
 # Every pull request, into any base branch: runs when it opens or reopens and
-# on each push to its branch. Every check in the repo runs against every
-# project, not just the affected ones, then the production images are built
-# and health checked. Merges to main are covered by main-smoke-test.yml.
+# on each push to its branch. Each check runs on the projects the PR affects (a
+# change to this workflow runs every check on every project), then the production
+# images are built and health checked. The device app, Wren and Windows jobs are the
+# slow ones: they run here only when the PR changes what the native compile reads
+# (native-checks.yml), and on every merge to main otherwise (main-native-checks.yml).
+# Merges to main are also covered by main-smoke-test.yml.
 on:
   pull_request:
 
@@ -11,12 +14,6 @@ permissions:
   contents: read
 
 env:
-  # Nx Cloud's remote cache: a task any job or earlier run already did, on the same
-  # inputs, restores instead of running. Nx Cloud also groups every job's runs in this
-  # workflow run under one CI pipeline execution, linked at the end of each nx command's
-  # output. Not `nx start-ci-run --no-distribution`: Nx Cloud rejects it outside its
-  # Enterprise plan. Unset (a fork's PR), Nx caches locally only and records nothing.
-  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
   # raven's device app loads babel.config.ts through Node's own type stripping, which
   # needs Node 22.18 or newer, wherever Metro or jest-expo runs.
   APP_NODE_VERSION: 24.21.0
@@ -40,6 +37,9 @@ jobs:
     strategy:
       # The cancel step below ends the whole run on the first failure, in any job.
       fail-fast: true
+      # Nx Cloud bills the peak number of jobs connected at once beyond the 10 included, so
+      # the matrix leaves room for the Supabase and desktop jobs that run beside it.
+      max-parallel: 5
       matrix:
         check:
           - name: 🎨 Format
@@ -69,12 +69,22 @@ jobs:
           - name: 🧼 Dead CSS
             target: dead-css
     env:
+      # Nx Cloud's remote cache: a task any job or earlier run already did, on the same
+      # inputs, restores instead of running. Nx Cloud also groups the runs of a workflow run
+      # under one CI pipeline execution, which it bills, so only the jobs a cache hit saves
+      # real time in carry the token. Not `nx start-ci-run --no-distribution`: Nx Cloud
+      # rejects it outside its Enterprise plan. Unset (a fork's PR), Nx caches locally only
+      # and records nothing.
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
       # uv runs against the committed lockfiles, never re-resolving them.
       UV_FROZEN: '1'
     steps:
-      # The PR's merge commit with its base, which is what lands if it merges.
+      # The PR's merge commit with its base, which is what lands if it merges. The whole
+      # history, so Nx can find what the PR changed against the base.
       - name: 📥 Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       # Bun's version comes from `packageManager` in package.json.
       - name: 🍞 Set up Bun
@@ -116,9 +126,18 @@ jobs:
       - name: 📦 Install
         run: bun install --frozen-lockfile
 
-      # `static` keeps every test's output; Nx's CI default collapses passing tasks.
+      # `static` keeps every test's output; Nx's CI default collapses passing tasks. A change
+      # to this workflow touches only the root project, so it runs the check on everything.
       - name: ${{ matrix.check.name }}
-        run: bunx nx run-many --outputStyle=static -t ${{ matrix.check.target }}
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          TARGET: ${{ matrix.check.target }}
+        run: |
+          if git diff --quiet "$BASE" HEAD -- .github/workflows/pull-request-checks.yml; then
+            bunx nx affected --outputStyle=static --base="$BASE" --head=HEAD -t "$TARGET"
+          else
+            bunx nx run-many --outputStyle=static -t "$TARGET"
+          fi
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.
       # A fork's read-only token can't cancel, which is why this never fails the job.
@@ -130,7 +149,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # Every project builds once the matrix checks have passed.
+  # Keep the existing order: every matrix check finishes, then every project builds.
   build:
     name: 🏗️ Build
     needs: checks
@@ -140,6 +159,8 @@ jobs:
       actions: write
       contents: read
     timeout-minutes: 30
+    env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
@@ -191,6 +212,8 @@ jobs:
       actions: write
       contents: read
     timeout-minutes: 15
+    env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -234,6 +257,8 @@ jobs:
   # job packages its addon and dylibs, and the two playback checks load them side by side.
   desktop-native:
     name: 🎞️ Desktop native
+    needs: app-affected
+    if: needs.app-affected.outputs.desktop == 'true'
     # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
     runs-on: macos-26
     permissions:
@@ -241,6 +266,7 @@ jobs:
       contents: read
     timeout-minutes: 120
     env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       HOMEBREW_NO_AUTO_UPDATE: '1'
     steps:
@@ -310,77 +336,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # The Windows libmpv is a pinned prebuilt, not a source build: this places it under
-  # resources/win32-x64, audits the DLL (x64, self-contained, the exports the addon
-  # calls), builds the addon against it with MSVC and runs the headless libmpv tests.
-  windows-native:
-    name: 🪟 Windows native
-    runs-on: windows-2025
-    permissions:
-      actions: write
-      contents: read
-    timeout-minutes: 15
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v7
-
-      # Bun's version comes from `packageManager` in package.json.
-      - name: 🍞 Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
-
-      - name: 📦 Install
-        run: bun install --frozen-lockfile
-
-      # MSVC's compiler and lib.exe on PATH, as a Developer Command Prompt has them; the
-      # addon builds with Ninja against them.
-      - name: 🛠️ Set up MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
-      # The native tests make their clips with ffmpeg; the image has none. One of BtbN's
-      # month-end builds, which it keeps, checked by digest: a package feed that fails can
-      # report success with nothing installed.
-      - name: 🎞️ Install ffmpeg
-        env:
-          FFMPEG_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-win64-lgpl-8.1.zip
-          FFMPEG_SHA256: 4a7642b2264c03e8a0ce8a3825b933ee5580656f45695a086fe7e294045ffc0a
-        run: |
-          set -euo pipefail
-          archive="$RUNNER_TEMP/ffmpeg.zip"
-          curl -fsSL -o "$archive" "$FFMPEG_URL"
-          echo "$FFMPEG_SHA256  $archive" | sha256sum -c -
-          unzip -q "$archive" -d "$RUNNER_TEMP/ffmpeg"
-          bin="$(dirname "$(find "$RUNNER_TEMP/ffmpeg" -name ffmpeg.exe | head -n 1)")"
-          "$bin/ffmpeg.exe" -version | head -n 1
-          cygpath -w "$bin" >> "$GITHUB_PATH"
-
-      - name: 🔩 Fetch libmpv, build the addon, audit and test them
-        run: bun run mpv:native:windows
-
-      # The DLL, the addon, the headers and the provenance the audit wrote.
-      - name: 📤 Windows native resources
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-native-win32-x64-${{ github.event.pull_request.head.sha }}
-          path: libs/raven/mpv/resources/win32-x64
-          if-no-files-found: error
-
-      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
-      # A fork's read-only token can't cancel, which is why this never fails the job.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
-
   # Forge bundles the addon and libmpv (stage:mpv), so this waits for the native build.
   desktop-app:
     name: 📦 Desktop app
@@ -391,6 +346,7 @@ jobs:
       contents: read
     timeout-minutes: 30
     env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
       # Keeps the Xcode version the cached app is keyed on the same as the native job's.
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
@@ -457,77 +413,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # Forge bundles the addon and libmpv (stage:mpv), so this waits for the Windows native build.
-  windows-app:
-    name: 🪟 Windows app
-    needs: windows-native
-    runs-on: windows-2025
-    permissions:
-      actions: write
-      contents: read
-    timeout-minutes: 30
-    defaults:
-      run:
-        shell: bash
-    steps:
-      # The same head commit the artifact is named for, so the app and its engine match.
-      - name: 📥 Checkout exact PR head
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      # Bun's version comes from `packageManager` in package.json.
-      - name: 🍞 Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
-
-      # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
-      - name: 📦 Install
-        run: bun install --frozen-lockfile
-
-      # The DLL, the addon and their provenance, back where the native job built them.
-      - name: 📥 Windows native resources
-        uses: actions/download-artifact@v8
-        with:
-          name: raven-native-win32-x64-${{ github.event.pull_request.head.sha }}
-          path: libs/raven/mpv/resources/win32-x64
-
-      # Builds the web app first, which the packaged app serves from its resources.
-      - name: 🏗️ Build desktop app
-        run: bun run desktop:build
-
-      # Squirrel's setup exe and the portable zip, unsigned.
-      - name: 📦 Make the unsigned installer
-        run: bun run desktop:make
-
-      # Every addon and DLL of the engine is x64, the addon loads only Windows, libmpv and
-      # Node, and libmpv is the one the lock pins.
-      - name: 🔎 Audit the packaged app
-        run: bun run desktop:audit:bundle
-
-      # Launches the packaged app with no test hooks and checks it starts and quits cleanly.
-      - name: 🚬 Smoke the packaged app
-        run: bun run desktop:smoke:packaged
-
-      # The unsigned installer and zip, for trying the PR's build by hand.
-      - name: 📤 Unsigned Raven
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-player-win32-x64-${{ github.event.pull_request.head.sha }}
-          path: apps/raven/desktop/out/make
-          if-no-files-found: error
-
-      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
-      # A fork's read-only token can't cancel, which is why this never fails the job.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
-
   desktop-playback:
     name: ${{ matrix.check.name }}
     needs: desktop-native
@@ -549,6 +434,7 @@ jobs:
             target: e2e
             traces: true
     env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
       # Keeps the Xcode version the cached results are keyed on the same as the native job's.
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       # The source-built ffmpeg has VideoToolbox; `-allow_sw 1` falls back to Apple's
@@ -607,10 +493,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # Whether this PR touches raven's device app, what it imports (core and ui, through
-  # Nx's graph), the server its flows sign in to, or this workflow; and the same for Wren
-  # (`music`). The app and Wren jobs below are cold React Native builds, so they run only
-  # then; the 🖥️ Desktop gate takes their skip as a pass.
+  # What this PR touches, for the jobs that build natively. The desktop player (`desktop`)
+  # runs when @raven/desktop or its @raven/mpv addon is affected, or this workflow or the
+  # native build's action changed. The device app (`app`), Wren (`music`) and the Windows
+  # installer (`windows`) take 12 to 25 minutes, so a PR waits for them only when it changes
+  # something their compile reads: a dependency, the app config, a config plugin, a local
+  # native module, the flows, or the setup actions. Everything else about them runs on main
+  # (main-native-checks.yml). The 🖥️ Desktop gate takes a skip as a pass.
   app-affected:
     name: 🔍 App affected
     runs-on: ubuntu-24.04
@@ -619,8 +508,10 @@ jobs:
       contents: read
     timeout-minutes: 10
     outputs:
-      affected: ${{ steps.affected.outputs.affected }}
+      app: ${{ steps.affected.outputs.app }}
       music: ${{ steps.affected.outputs.music }}
+      windows: ${{ steps.affected.outputs.windows }}
+      desktop: ${{ steps.affected.outputs.desktop }}
     steps:
       # The PR's head with its whole history, so Nx can find the merge base with the base.
       - name: 📥 Checkout exact PR head
@@ -649,17 +540,25 @@ jobs:
           echo "Affected: $projects"
           # Anything but a list of names fails the job here, rather than reading as no app.
           echo "$projects" | jq -e 'type == "array" and all(type == "string")' > /dev/null
-          workflow="$(git diff --name-only "$BASE...$HEAD" -- .github/workflows/pull-request-checks.yml)"
-          if echo "$projects" | jq -e 'index("@raven/app") != null or index("@raven/server") != null' > /dev/null || [ -n "$workflow" ]; then
-            echo "affected=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "affected=false" >> "$GITHUB_OUTPUT"
-          fi
-          if echo "$projects" | jq -e 'index("@raven/music") != null or index("@raven/server") != null' > /dev/null || [ -n "$workflow" ]; then
-            echo "music=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "music=false" >> "$GITHUB_OUTPUT"
-          fi
+          affects() { echo "$projects" | jq -e --arg name "$1" 'index($name) != null' > /dev/null; }
+          # Not `git diff | grep -q`: grep quitting early can fail the pipe under pipefail.
+          changed() { [ -n "$(git diff --name-only "$BASE...$HEAD" -- "$@")" ]; }
+          emit() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
+          verdict() { if "$@"; then echo true; else echo false; fi; }
+
+          workflow_changed() { changed .github/workflows/pull-request-checks.yml .github/workflows/native-checks.yml; }
+          app_compile_changed() { changed bun.lock apps/raven/app/package.json apps/raven/app/app.config.ts apps/raven/app/plugins apps/raven/app/modules apps/raven/app/e2e apps/raven/app/tvos-e2e libs/raven/audio/android libs/raven/audio/ios libs/raven/audio/expo-module.config.json libs/raven/audio/package.json .github/actions/raven-app-setup .github/actions/raven-android-avd; }
+          music_compile_changed() { changed bun.lock apps/raven/music/package.json apps/raven/music/app.config.ts apps/raven/music/plugins apps/raven/music/e2e libs/raven/audio/android libs/raven/audio/ios libs/raven/audio/expo-module.config.json libs/raven/audio/package.json .github/actions/raven-app-setup .github/actions/raven-android-avd; }
+          windows_compile_changed() { changed bun.lock libs/raven/mpv/native libs/raven/mpv/package.json apps/raven/desktop/forge.config.ts apps/raven/desktop/package.json apps/raven/desktop/resources; }
+          desktop_changed() { affects @raven/desktop || affects @raven/mpv || changed .github/workflows/pull-request-checks.yml .github/actions/raven-desktop-native; }
+          app() { workflow_changed || { { affects @raven/app || affects @raven/server; } && app_compile_changed; }; }
+          music() { workflow_changed || { { affects @raven/music || affects @raven/server; } && music_compile_changed; }; }
+          windows() { workflow_changed || windows_compile_changed; }
+
+          emit app "$(verdict app)"
+          emit music "$(verdict music)"
+          emit windows "$(verdict windows)"
+          emit desktop "$(verdict desktop_changed)"
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.
       # A fork's read-only token can't cancel, which is why this never fails the job.
@@ -671,645 +570,43 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # raven's device app on Apple TV: the simulator build and an XCUITest that drives it
-  # with the Siri Remote against a real raven server. It runs beside app-ios, on its own
-  # runner, since the two builds share nothing.
-  app-tvos:
-    name: 📺 App on Apple TV
-    needs: app-affected
-    if: needs.app-affected.outputs.affected == 'true'
-    runs-on: macos-26
+  # The device app, Wren and the Windows installer, built by the shared workflow only when
+  # this PR changes what their compile reads (app-affected). Their other runs are on main.
+  native:
+    name: 🧱 Native apps
     permissions:
       actions: write
       contents: read
-    # One Release build of React Native, its compile cached by ccache, and the remote flow.
-    timeout-minutes: 60
-    steps:
-      # The PR's head commit, so the artifact name below matches the commit that was built.
-      - name: 📥 Checkout exact PR head
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      # Bun, Node, the build caches restored from what app-caches.yml saved on main,
-      # ffmpeg, ccache, the build environment, the install and the libraries (built once, so
-      # the fixture server and the app build below skip their own).
-      - name: 🧰 Set up the app build
-        uses: ./.github/actions/raven-app-setup
-        with:
-          platform: tvos
-          node-version: ${{ env.APP_NODE_VERSION }}
-
-      # A real raven server with a locked film library and an open series library, started
-      # while the app builds. It prints its ready line once its libraries are scanned.
-      - name: 🗄️ Start the fixture server
-        run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
-
-      # Runs `prebuild:tvos` first (bun runs it before `build:tvos`), which regenerates
-      # ios/ and installs the pods, so the pods are checked right after. Nx caches only what
-      # the steps below read: the app, the lockfiles, and the project with the remote test
-      # target. Pods/ and DerivedData ran Nx Cloud's upload out of open files (EMFILE), so no
-      # Apple build was ever stored and every PR compiled from scratch.
-      - name: 📺 Build for the Apple TV simulator
-        run: bunx nx run @raven/app:build:tvos --excludeTaskDependencies
-
-      # How much of the compile ccache served, to tell a warm cache from a cold one.
-      - name: 📊 ccache
-        run: ccache --show-stats
-
-      # `expo prebuild` exits 0 when `pod install` fails, so the pods are checked by hand:
-      # CocoaPods writes Pods/Manifest.lock as a copy of Podfile.lock once it has installed.
-      - name: 🔎 Check the Apple TV pods
-        working-directory: apps/raven/app/ios
-        run: |
-          grep -q 'SDKROOT = appletvos' Raven.xcodeproj/project.pbxproj
-          cmp Podfile.lock Pods/Manifest.lock
-
-      - name: 🗄️ Wait for the fixture server
-        run: |
-          for _ in $(seq 1 90); do
-            if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
-              grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
-              exit 0
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/fixture.log"
-          exit 1
-
-      # A fresh Apple TV 4K on the tvOS runtime of the selected Xcode's SDK, booted, with the
-      # build on it. A runner with no such runtime fails here rather than testing on another.
-      - name: 📺 Boot the Apple TV simulator
-        run: |
-          sdk="$(xcrun --sdk appletvsimulator --show-sdk-version)"
-          runtime="$(xcrun simctl list -j runtimes tvOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
-          device="$(xcrun simctl create raven-tv com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K "$runtime")"
-          xcrun simctl boot "$device"
-          xcrun simctl bootstatus "$device" -b
-          xcrun simctl install "$device" apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app
-
-      # The XCUITest the tvOS prebuild added (`tvos-e2e/`) signs in, plays the film from
-      # Home and returns with the Siri Remote. The screen it ends on goes up with the app.
-      - name: 🎬 Apple TV end to end
-        env:
-          TVOS_SIMULATOR: raven-tv
-        run: |
-          bun run app:e2e:tvos
-          xcrun simctl io raven-tv screenshot "$RUNNER_TEMP/raven-tv.png"
-          xcrun simctl shutdown raven-tv
-
-      - name: 📤 End to end logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-tvos-e2e-logs-${{ github.event.pull_request.head.sha }}
-          path: |
-            apps/raven/app/build/tvos-e2e/Logs/Test
-            ${{ runner.temp }}/fixture.log
-          if-no-files-found: ignore
-
-      # The build zipped as Finder would, which keeps the execute bits an artifact drops,
-      # so the unzipped app still launches.
-      - name: 📦 Pack the simulator app
-        run: ditto -c -k --keepParent apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app "$RUNNER_TEMP/raven-appletvsimulator.zip"
-
-      # The build, for trying the PR's app by hand on a simulator, and the flow's screenshot.
-      - name: 📤 Simulator app
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-tvos-simulator-${{ github.event.pull_request.head.sha }}
-          path: |
-            ${{ runner.temp }}/raven-appletvsimulator.zip
-            ${{ runner.temp }}/raven-tv.png
-          if-no-files-found: error
-
-      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
-      # A fork's read-only token can't cancel, which is why this never fails the job.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
-
-  # raven's device app on iPhone and iPad: the simulator build and the Maestro flows on
-  # the iPhone simulator against a real raven server.
-  app-ios:
-    name: 📱 App on iPhone and iPad
     needs: app-affected
-    if: needs.app-affected.outputs.affected == 'true'
-    runs-on: macos-26
-    permissions:
-      actions: write
-      contents: read
-    # One Release build of React Native, its compile cached by ccache, and the flows.
-    timeout-minutes: 60
-    steps:
-      # The PR's head commit, so the artifact names below match the commit that was built.
-      - name: 📥 Checkout exact PR head
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      # Bun, Node, the build caches restored from what app-caches.yml saved on main,
-      # ffmpeg, ccache, the build environment, the install and the libraries (built once, so
-      # the fixture server and the app build below skip their own).
-      - name: 🧰 Set up the app build
-        uses: ./.github/actions/raven-app-setup
-        with:
-          platform: ios
-          node-version: ${{ env.APP_NODE_VERSION }}
-
-      # The fixture server and Maestro's download do not depend on the build, so they start
-      # before it and finish while it compiles. Each runs in the background; the steps after
-      # the build wait for them. The fixture server prints its ready line once its libraries
-      # are scanned.
-      - name: 🗄️ Start the fixture server
-        run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
-
-      # Maestro's own release, the zip its Homebrew formula installs, pinned by version and
-      # checksum. It runs on the runner's Java. The download runs in the background and
-      # leaves `maestro.ok` or `maestro.failed` for the wait step.
-      - name: 🎭 Install Maestro
-        env:
-          MAESTRO_VERSION: 2.11.0
-          MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
-        run: |
-          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
-          {
-            if curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip" &&
-              echo "$MAESTRO_SHA256  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c - &&
-              unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"; then
-              touch "$RUNNER_TEMP/maestro.ok"
-            else
-              touch "$RUNNER_TEMP/maestro.failed"
-            fi
-          } > "$RUNNER_TEMP/maestro.log" 2>&1 &
-
-      # Runs `prebuild:ios` first (bun runs it before `build:ios`), which regenerates ios/
-      # and installs the pods, so the pods are checked right after. Nx caches only the app
-      # and the two lockfiles, so a PR that leaves the app's inputs alone restores the build.
-      - name: 📱 Build for the iPhone and iPad simulator
-        run: bunx nx run @raven/app:build:ios --excludeTaskDependencies
-
-      # How much of the compile ccache served, to tell a warm cache from a cold one.
-      - name: 📊 ccache
-        run: ccache --show-stats
-
-      - name: 🔎 Check the iPhone and iPad pods
-        working-directory: apps/raven/app/ios
-        run: cmp Podfile.lock Pods/Manifest.lock
-
-      # A fresh iPhone 16 on the iOS runtime of the selected Xcode's SDK, booted, with the
-      # build on it. A runner with no such runtime fails here rather than testing on another.
-      # It boots after the build, as the Apple TV does: booted during the compile, it shared
-      # the runner's three cores and its memory, and the build took twice the Apple TV's.
-      - name: 📱 Boot the iPhone simulator
-        run: |
-          sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)"
-          runtime="$(xcrun simctl list -j runtimes iOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
-          device="$(xcrun simctl create raven-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
-          xcrun simctl boot "$device"
-          xcrun simctl bootstatus "$device" -b
-          xcrun simctl install "$device" apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app
-
-      # A real raven server with a locked film library and an open series library, started
-      # above for the flows.
-      - name: 🗄️ Wait for the fixture server
-        run: |
-          for _ in $(seq 1 90); do
-            if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
-              grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
-              exit 0
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/fixture.log"
-          exit 1
-
-      - name: 🎭 Wait for Maestro
-        run: |
-          for _ in $(seq 1 90); do
-            test -f "$RUNNER_TEMP/maestro.ok" && exit 0
-            if test -f "$RUNNER_TEMP/maestro.failed"; then
-              cat "$RUNNER_TEMP/maestro.log"
-              exit 1
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/maestro.log"
-          exit 1
-
-      # Every flow in `apps/raven/app/e2e`, each signing in with the PIN and the admin password
-      # first. A fresh runner can start Maestro's XCTest driver slower than it waits by default,
-      # so it waits five minutes (in milliseconds).
-      - name: 🎬 App end to end
-        env:
-          MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
-        run: |
-          if bun run app:e2e; then
-            exit 0
-          fi
-          # Maestro's XCTest server dies on a screenshot timeout (upstream #3538).
-          if ! grep -R -F -q 'Failed to get screenshot: Timed out while requesting screenshot.' "$HOME/.maestro/tests"; then
-            exit 1
-          fi
-          echo '::warning::Maestro screenshot service timed out; rebooting the simulator and retrying once'
-          xcrun simctl shutdown raven-phone
-          xcrun simctl boot raven-phone
-          xcrun simctl bootstatus raven-phone -b
-          bun run app:e2e
-
-      # Maestro's screenshots and logs and the fixture server's log, only when a step failed.
-      - name: 📤 End to end logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-e2e-logs-${{ github.event.pull_request.head.sha }}
-          path: |
-            ~/.maestro/tests
-            ${{ runner.temp }}/fixture.log
-          if-no-files-found: ignore
-
-      # The build zipped as Finder would, which keeps the execute bits an artifact drops,
-      # so the unzipped app still launches.
-      - name: 📦 Pack the simulator app
-        run: ditto -c -k --keepParent apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app "$RUNNER_TEMP/raven-iphonesimulator.zip"
-
-      # The build, for trying the PR's app by hand on a simulator.
-      - name: 📤 Simulator app
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-ios-simulator-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/raven-iphonesimulator.zip
-          if-no-files-found: error
-
-      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
-      # A fork's read-only token can't cancel, which is why this never fails the job.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
-
-  # raven's device app for Android TV, on Linux (Ruling 20): GitHub's macOS arm64 runners
-  # cannot run the Android emulator. The Release APK, then, against a real raven server, the
-  # Maestro flows on an Android TV emulator, driven by the remote's keys.
-  app-android-tv:
-    name: 📺 App on Android TV
-    needs: app-affected
-    if: needs.app-affected.outputs.affected == 'true'
-    runs-on: ubuntu-24.04
-    permissions:
-      actions: write
-      contents: read
-    # A Release build of React Native, its compile cached by ccache and Gradle, the
-    # emulator's boot and the flows.
-    timeout-minutes: 60
-    steps:
-      # The PR's head commit, so the artifact name below matches the commit that was built.
-      - name: 📥 Checkout exact PR head
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      # Bun, Node, JDK 17 (Gradle and Maestro run on it; the runner's Android SDK is
-      # ANDROID_HOME already), the build caches restored from what app-caches.yml saved on
-      # main, ffmpeg, ccache, the build environment (an x86_64-only APK), the install and
-      # the libraries.
-      - name: 🧰 Set up the app build
-        uses: ./.github/actions/raven-app-setup
-        with:
-          platform: android-tv
-          node-version: ${{ env.APP_NODE_VERSION }}
-
-      # Runs `prebuild:android-tv` first, which regenerates android/ with the leanback
-      # launcher, then Gradle's Release APK.
-      - name: 📺 Build the Android TV APK
-        run: bunx nx run @raven/app:build:android-tv --excludeTaskDependencies
-
-      # How much of the compile ccache served, to tell a warm cache from a cold one.
-      - name: 📊 ccache
-        run: ccache --show-stats
-
-      # The Release APK, signed with the debug key Expo's template sets up. It holds only
-      # x86_64 code, so it installs on an x86_64 emulator, not on a TV.
-      - name: 📤 Android TV APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-android-tv-${{ github.event.pull_request.head.sha }}
-          path: apps/raven/app/android/app/build/outputs/apk/release
-          if-no-files-found: error
-
-      # The Android TV emulator's settings and KVM, and the AVD with its booted snapshot,
-      # restored from what app-caches.yml saved on main (a PR's own 2.7 GB copy would be its
-      # alone), or made and booted once on a miss.
-      - name: 📺 Android TV AVD
-        id: avd
-        uses: ./.github/actions/raven-android-avd
-
-      # A real raven server with a locked film library and an open series library, in the
-      # background for the flows. It prints its ready line once its libraries are scanned.
-      - name: 🗄️ Start the fixture server
-        run: |
-          bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
-          for _ in $(seq 1 90); do
-            if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
-              grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
-              exit 0
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/fixture.log"
-          exit 1
-
-      # Maestro's own release, the zip its Homebrew formula installs, pinned by version and
-      # checksum, as the Apple job installs it.
-      - name: 🎭 Install Maestro
-        env:
-          MAESTRO_VERSION: 2.11.0
-          MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
-        run: |
-          curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip"
-          echo "$MAESTRO_SHA256  $RUNNER_TEMP/maestro.zip" | sha256sum -c -
-          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
-
-      # Boots the AVD from its snapshot, installs the APK and runs the flows the remote drives
-      # (`e2e:android-tv`, every flow but the touch ones), which first point the emulator's
-      # 127.0.0.1:8490 at the runner's with `adb reverse`, so the app signs in to the address
-      # the iPhone uses. The runner runs each line of the script as its own command. Maestro's
-      # driver can start slower on a fresh emulator than it waits by default, so it waits five
-      # minutes (in milliseconds).
-      - name: 🎬 App end to end
-        # reactivecircus/android-emulator-runner v2.38.0
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
-        env:
-          MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
-        with:
-          api-level: ${{ steps.avd.outputs.api-level }}
-          target: ${{ steps.avd.outputs.target }}
-          arch: ${{ steps.avd.outputs.arch }}
-          profile: ${{ steps.avd.outputs.profile }}
-          emulator-build: ${{ steps.avd.outputs.emulator-build }}
-          cores: ${{ steps.avd.outputs.cores }}
-          ram-size: ${{ steps.avd.outputs.ram-size }}
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save ${{ steps.avd.outputs.emulator-options }}
-          disable-animations: true
-          disable-spellchecker: true
-          script: |
-            adb install apps/raven/app/android/app/build/outputs/apk/release/app-release.apk
-            bun run app:e2e:android-tv
-
-      # Maestro's screenshots and logs and the fixture server's log, only when a step failed.
-      - name: 📤 End to end logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-android-tv-e2e-logs-${{ github.event.pull_request.head.sha }}
-          path: |
-            ~/.maestro/tests
-            ${{ runner.temp }}/fixture.log
-          if-no-files-found: ignore
-
-      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
-      # A fork's read-only token can't cancel, which is why this never fails the job.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
-
-  # Wren, raven's music app, on the iPhone: its simulator build and its Maestro flows against
-  # the fixture server's music library, on a simulator of its own, as app-ios runs the app's.
-  music-ios:
-    name: 🎵 Wren on iPhone
-    needs: app-affected
-    if: needs.app-affected.outputs.music == 'true'
-    runs-on: macos-26
-    permissions:
-      actions: write
-      contents: read
-    # One Release build of React Native, its compile cached by ccache, and the flows.
-    timeout-minutes: 60
-    steps:
-      # The PR's head commit, so the artifact names below match the commit that was built.
-      - name: 📥 Checkout exact PR head
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      # The app's setup, iOS caches and all: Wren builds on the same React Native and pods.
-      - name: 🧰 Set up the app build
-        uses: ./.github/actions/raven-app-setup
-        with:
-          platform: ios
-          node-version: ${{ env.APP_NODE_VERSION }}
-
-      # In the background while Wren builds; it prints its ready line once its libraries,
-      # the music library among them, are scanned.
-      - name: 🗄️ Start the fixture server
-        run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
-
-      # Maestro's own release, pinned by version and checksum, as app-ios installs it.
-      - name: 🎭 Install Maestro
-        env:
-          MAESTRO_VERSION: 2.11.0
-          MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
-        run: |
-          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
-          {
-            if curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip" &&
-              echo "$MAESTRO_SHA256  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c - &&
-              unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"; then
-              touch "$RUNNER_TEMP/maestro.ok"
-            else
-              touch "$RUNNER_TEMP/maestro.failed"
-            fi
-          } > "$RUNNER_TEMP/maestro.log" 2>&1 &
-
-      # Runs `prebuild:ios` first, which regenerates ios/ and installs the pods.
-      - name: 🎵 Build Wren for the iPhone simulator
-        run: bunx nx run @raven/music:build:ios --excludeTaskDependencies
-
-      - name: 📊 ccache
-        run: ccache --show-stats
-
-      # `expo prebuild` exits 0 when `pod install` fails.
-      - name: 🔎 Check Wren's pods
-        working-directory: apps/raven/music/ios
-        run: cmp Podfile.lock Pods/Manifest.lock
-
-      # A fresh iPhone 16 named wren-phone, as `ci:wren` makes one, on the iOS runtime of the
-      # selected Xcode's SDK, booted after the build, with Wren on it.
-      - name: 📱 Boot the iPhone simulator
-        run: |
-          sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)"
-          runtime="$(xcrun simctl list -j runtimes iOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
-          device="$(xcrun simctl create wren-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
-          xcrun simctl boot "$device"
-          xcrun simctl bootstatus "$device" -b
-          xcrun simctl install "$device" apps/raven/music/build/ios/Build/Products/Release-iphonesimulator/Wren.app
-
-      - name: 🗄️ Wait for the fixture server
-        run: |
-          for _ in $(seq 1 90); do
-            if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
-              grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
-              exit 0
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/fixture.log"
-          exit 1
-
-      - name: 🎭 Wait for Maestro
-        run: |
-          for _ in $(seq 1 90); do
-            test -f "$RUNNER_TEMP/maestro.ok" && exit 0
-            if test -f "$RUNNER_TEMP/maestro.failed"; then
-              cat "$RUNNER_TEMP/maestro.log"
-              exit 1
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/maestro.log"
-          exit 1
-
-      # Every flow in `apps/raven/music/e2e`: sign in to Home, and play the fixture's album.
-      - name: 🎬 Wren end to end
-        env:
-          MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
-        run: bunx nx run @raven/music:e2e
-
-      # What Wren and the system logged on the simulator, only when a step failed.
-      - name: 🪵 Simulator log
-        if: failure()
-        run: xcrun simctl spawn wren-phone log show --last 30m --style compact --predicate 'process == "Wren"' > "$RUNNER_TEMP/wren-simulator.log" || true
-
-      - name: 📤 End to end logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-music-e2e-logs-${{ github.event.pull_request.head.sha }}
-          path: |
-            ~/.maestro/tests
-            ${{ runner.temp }}/fixture.log
-            ${{ runner.temp }}/wren-simulator.log
-          if-no-files-found: ignore
-
-      # Zipped as Finder would, which keeps the execute bits an artifact drops.
-      - name: 📦 Pack the simulator app
-        run: ditto -c -k --keepParent apps/raven/music/build/ios/Build/Products/Release-iphonesimulator/Wren.app "$RUNNER_TEMP/wren-iphonesimulator.zip"
-
-      - name: 📤 Simulator app
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-music-ios-simulator-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/wren-iphonesimulator.zip
-          if-no-files-found: error
-
-      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
-      # A fork's read-only token can't cancel, which is why this never fails the job.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
-
-  # Wren for Android phones, built on Linux beside the Android TV job; it has no flows yet.
-  music-android:
-    name: 🎵 Wren for Android
-    needs: app-affected
-    if: needs.app-affected.outputs.music == 'true'
-    runs-on: ubuntu-24.04
-    permissions:
-      actions: write
-      contents: read
-    # A Release build of React Native, its compile cached by ccache and Gradle.
-    timeout-minutes: 60
-    steps:
-      - name: 📥 Checkout exact PR head
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      # The Android TV job's setup, its caches and its x86_64-only build among them.
-      - name: 🧰 Set up the app build
-        uses: ./.github/actions/raven-app-setup
-        with:
-          platform: android-tv
-          node-version: ${{ env.APP_NODE_VERSION }}
-
-      # Runs `prebuild:android` first, which regenerates android/, then Gradle's Release APK.
-      - name: 🎵 Build the Wren APK
-        run: bunx nx run @raven/music:build:android --excludeTaskDependencies
-
-      - name: 📊 ccache
-        run: ccache --show-stats
-
-      # The Release APK, signed with the debug key Expo's template sets up. It holds only
-      # x86_64 code, so it installs on an x86_64 emulator, not on a phone.
-      - name: 📤 Wren APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-music-android-${{ github.event.pull_request.head.sha }}
-          path: apps/raven/music/android/app/build/outputs/apk/release
-          if-no-files-found: error
-
-      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
-      # A fork's read-only token can't cancel, which is why this never fails the job.
-      - name: 🛑 Cancel the run
-        if: failure()
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+    if: needs.app-affected.outputs.app == 'true' || needs.app-affected.outputs.music == 'true' || needs.app-affected.outputs.windows == 'true'
+    uses: ./.github/workflows/native-checks.yml
+    with:
+      sha: ${{ github.event.pull_request.head.sha }}
+      app: ${{ needs.app-affected.outputs.app == 'true' }}
+      music: ${{ needs.app-affected.outputs.music == 'true' }}
+      windows: ${{ needs.app-affected.outputs.windows == 'true' }}
+    secrets: inherit
 
   # The "Protect main" ruleset requires a check named 🖥️ Desktop, so this one stands
-  # for every desktop, device app and Wren job and passes only when all of them did. The
-  # app and Wren jobs may also be skipped, when the PR leaves them alone (app-affected).
+  # for every desktop, device app, Wren and Windows job and passes only when all of them
+  # did. Any of them but app-affected may also be skipped, when the PR leaves them alone
+  # (app-affected); a job that failed fails the gate through its own result.
   desktop:
     name: 🖥️ Desktop
-    needs:
-      [
-        desktop-native,
-        windows-native,
-        desktop-app,
-        windows-app,
-        desktop-playback,
-        app-affected,
-        app-tvos,
-        app-ios,
-        app-android-tv,
-        music-ios,
-        music-android,
-      ]
+    needs: [desktop-native, desktop-app, desktop-playback, app-affected, native]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       # Prints each needed job's result, then fails on the first that isn't a success, or
-      # for the app jobs a skip.
+      # for the others a skip.
       - name: ✅ Every desktop job passed
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
-          REQUIRED: >-
-            ${{ needs.desktop-native.result }} ${{ needs.windows-native.result }}
-            ${{ needs.desktop-app.result }} ${{ needs.windows-app.result }}
-            ${{ needs.desktop-playback.result }} ${{ needs.app-affected.result }}
+          REQUIRED: ${{ needs.app-affected.result }}
           APP_RESULTS: >-
-            ${{ needs.app-tvos.result }} ${{ needs.app-ios.result }} ${{ needs.app-android-tv.result }}
-            ${{ needs.music-ios.result }} ${{ needs.music-android.result }}
+            ${{ needs.desktop-native.result }} ${{ needs.desktop-app.result }}
+            ${{ needs.desktop-playback.result }} ${{ needs.native.result }}
         run: |
           echo "$RESULTS"
           for result in $REQUIRED; do
