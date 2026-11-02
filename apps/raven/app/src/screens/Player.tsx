@@ -318,9 +318,10 @@ const Playing = ({
   // has settled, a play with a way left below steps down when it did.
   const heardAudio = useRef<HeardAudio | null>(null)
   const hear = (hearing: AudioHearing) => {
-    const { heard, toJudge } = hearAudio({ heard: heardAudio.current, hearing })
+    const canJudge = state.phase === SESSION_PHASES.playing && hasWayBelow(state)
+    const { heard, toJudge } = hearAudio({ heard: heardAudio.current, hearing, canJudge })
     heardAudio.current = heard
-    if (toJudge === null || state.phase !== SESSION_PHASES.playing || !hasWayBelow(state)) return
+    if (toJudge === null) return
     if (isAudioDropped({ platform: DEVICE_PLATFORM, mode, place: audioPlace, reported: toJudge })) {
       dispatch({ type: SESSION_EVENTS.failed, attempt: hearing.attempt, at: position.current })
     }
