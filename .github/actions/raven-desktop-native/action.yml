@@ -4,8 +4,8 @@ description: >-
   toolchain, the install, the Nx cached libmpv and MoltenVK source build and the N-API
   addon. The caller audits them.
 
-# Shared by the PR's 🎞️ Desktop native job (pull-request-checks.yml) and the release
-# build (desktop-release.yml), so a release builds exactly as the PR did. A composite
+# Shared by main's 🎞️ Desktop native job (main-native-checks.yml) and the release
+# build (desktop-release.yml), so a release builds exactly as main did. A composite
 # action reads no secrets: the calling workflow sets DEVELOPER_DIR, HOMEBREW_NO_AUTO_UPDATE
 # and NX_CLOUD_ACCESS_TOKEN in its env, which every step here inherits.
 runs:
