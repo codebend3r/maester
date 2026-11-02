@@ -1,6 +1,5 @@
 import {
   ITEM_IMAGE_KINDS,
-  ITEM_TYPES,
   type ItemDetails,
   PLAYBACK_MODES,
   type MediaItem,
@@ -9,13 +8,15 @@ import {
   type PlaybackPolicy,
   ROUTE_STATES,
   type RouteQuery,
-  SESSION_KINDS,
+  SESSION_PARAMS,
   type SubtitleTrack,
   type ViewingSession,
   activeCues,
+  asksServerForNext,
   episodeCode,
   isPictureSubtitle,
   mediaLabel,
+  readSessionQuery,
   resumeAtFor,
   routeIdOf,
   routeState,
@@ -54,6 +55,7 @@ import { isServerDrop } from '@/player/playerErrors'
 import { progressSinkFor } from '@/player/progressSink'
 import { NOT_LOADED, START_EVENTS, isHeldOf, isStartedOf, startReducer } from '@/player/startUp'
 import { useSeekGrace } from '@/player/useSeekGrace'
+import { viewingOf } from '@/player/viewing'
 import {
   AUDIO_HEARINGS,
   type AudioHearing,
@@ -91,7 +93,6 @@ import { useAppPrefs } from '@/stores/appPrefs'
 const PROGRESS_EVERY_MS = 250
 
 /** An episode rolls on through its show, so its next is the show's next in turn. */
-const SHOW_SESSION = { kind: SESSION_KINDS.show } as const satisfies ViewingSession
 
 /** "Next episode, S01E03 Half Loop": what the Next button is called aloud. */
 const nextLabelOf = (next: MediaItem): string =>
@@ -177,9 +178,11 @@ type PlayingProps = {
   /** Starts at the very beginning, past any spot the server saved. */
   isFromStart: boolean
   session: AppQueries
+  /** What the route says the viewer chose to watch; null for the video's own. */
+  chosen: ViewingSession | null
   onBack: () => void
   /** Plays another video in this one's place. */
-  onPlayNext: (next: MediaItem) => void
+  onPlayNext: (next: MediaItem, viewing: ViewingSession) => void
 }
 
 /**
@@ -196,16 +199,18 @@ const Playing = ({
   at,
   isFromStart,
   session,
+  chosen,
   onBack,
   onPlayNext,
 }: PlayingProps) => {
   const queryClient = useQueryClient()
   const audioLanguage = usePlayerPrefs((prefs) => prefs.audioLanguage)
   const shouldAutoplay = usePlayerPrefs((prefs) => prefs.autoplay)
-  // Only an episode has a next; a film asks nothing.
+  // A show's episodes and a saga's films have a next; a video on its own asks nothing.
+  const viewing = viewingOf({ chosen, itemType: media.item?.type ?? null })
   const next = useQuery({
-    ...session.queries.nextInSessionQuery({ id: media.id, session: SHOW_SESSION }),
-    enabled: (media.item?.type ?? null) === ITEM_TYPES.episode,
+    ...session.queries.nextInSessionQuery({ id: media.id, session: viewing }),
+    enabled: asksServerForNext(viewing),
   })
   const nextMedia = next.data ?? null
   // The end and a press of Next can both ask in one tick; the player leaves once.
@@ -213,7 +218,7 @@ const Playing = ({
   const playNext = () => {
     if (nextMedia === null || hasLeft.current) return
     hasLeft.current = true
-    onPlayNext(nextMedia)
+    onPlayNext(nextMedia, viewing)
   }
   const subtitlePrefs = usePlayerPrefs((prefs) => prefs.subtitles)
   const setAudioLanguage = usePlayerPrefs((prefs) => prefs.setAudioLanguage)
@@ -488,8 +493,9 @@ type ReadyPlayerProps = {
   at: number
   isFromStart: boolean
   session: AppQueries
+  chosen: ViewingSession | null
   onBack: () => void
-  onPlayNext: (next: MediaItem) => void
+  onPlayNext: (next: MediaItem, viewing: ViewingSession) => void
 }
 
 type WaitingProps = {
@@ -574,6 +580,7 @@ const ReadyPlayer = (props: ReadyPlayerProps) => {
 
 type ServerPlayerProps = {
   session: AppQueries
+  chosen: ViewingSession | null
   mediaId: number | null
   at: number
   isFromStart: boolean
@@ -603,7 +610,7 @@ const SERVER_PLAYER_VIEWS = {
 type ServerPlayerViewOfProps = Omit<ServerPlayerProps, 'mediaId'> & {
   page: RouteQuery<MediaItem>
   onBack: () => void
-  onPlayNext: (next: MediaItem) => void
+  onPlayNext: ReadyPlayerProps['onPlayNext']
 }
 
 type WaitingViewProps = WaitingProps
@@ -640,14 +647,15 @@ const serverPlayerViewOf = ({
   }
 }
 
-const ServerPlayer = ({ session, mediaId, at, isFromStart }: ServerPlayerProps) => {
+const ServerPlayer = ({ session, chosen, mediaId, at, isFromStart }: ServerPlayerProps) => {
   const router = useRouter()
   const onBack = () => router.back()
-  // The next takes this video's place, so Back from it still goes to the page that pressed Play.
-  const onPlayNext = (next: MediaItem) =>
-    router.replace(hrefOf({ kind: ROUTE_TARGETS.play, mediaId: next.id, at: 0 }))
+  // The next takes this video's place, so Back from it still goes to the page that pressed Play,
+  // and it plays in the same session, so a saga's films keep walking the saga.
+  const onPlayNext = (next: MediaItem, viewing: ViewingSession) =>
+    router.replace(hrefOf({ kind: ROUTE_TARGETS.play, mediaId: next.id, at: 0, session: viewing }))
   const page = routeState({ id: mediaId, query: useQuery(session.queries.mediaQuery(mediaId)) })
-  const view = serverPlayerViewOf({ page, onBack, onPlayNext, at, isFromStart, session })
+  const view = serverPlayerViewOf({ page, onBack, onPlayNext, at, isFromStart, session, chosen })
   return <KeyedView<ServerPlayerViewProps> view={view} views={SERVER_PLAYER_VIEWS} />
 }
 
@@ -662,12 +670,17 @@ export const Player = () => {
   const mediaId = routeIdOf(params[APP_ROUTE_PARAMS.mediaId])
   const at = secondsOf(params[APP_ROUTE_PARAMS.at])
   const isFromStart = params[APP_ROUTE_PARAMS.from] === PLAY_FROM.start
+  const chosen = readSessionQuery({
+    session: params[SESSION_PARAMS.session],
+    scope: params[SESSION_PARAMS.scope],
+  })
   const session = useAppQueries()
   return (
     session !== null && (
       <ServerPlayer
         key={session.server.id}
         at={at}
+        chosen={chosen}
         isFromStart={isFromStart}
         mediaId={mediaId}
         session={session}

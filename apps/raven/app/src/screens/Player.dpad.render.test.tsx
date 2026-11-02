@@ -7,6 +7,8 @@ import {
   HLS_PARAMS,
   HLS_PATHS,
   PLAYBACK_MODES,
+  SESSION_KINDS,
+  SESSION_PARAMS,
   THEMES,
   type PlaybackSettings,
   formatDuration,
@@ -452,7 +454,10 @@ describe('Player on Android TV', () => {
   /** Where the next episode's play goes, in the current one's place. */
   const nextHref = {
     pathname: APP_ROUTES.play,
-    params: { [APP_ROUTE_PARAMS.mediaId]: String(HALF_LOOP_MP4.id) },
+    params: {
+      [APP_ROUTE_PARAMS.mediaId]: String(HALF_LOOP_MP4.id),
+      [SESSION_PARAMS.session]: SESSION_KINDS.show,
+    },
   }
 
   it("offers an episode's next on Next, which plays it in this one's place", async () => {

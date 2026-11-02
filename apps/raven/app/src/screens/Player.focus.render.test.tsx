@@ -1,14 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import {
-  APP_CALL_METHODS,
-  APP_CLIENT_CALLS,
-  HLS_PARAMS,
-  HLS_PATHS,
-  ITEM_IMAGE_KINDS,
-  PLAYBACK_MODES,
-  appClientCallOf,
-  mediaLabel,
-} from '@raven/core'
+import { APP_CALL_METHODS, APP_CLIENT_CALLS, appClientCallOf } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
@@ -21,7 +12,6 @@ import { Player } from '@/screens/Player'
 import { useActiveServer } from '@/stores/activeServer'
 import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
-import { BUSBOYS } from '@/test/itemServer'
 import { BUSBOYS_MP4, BUSBOYS_UNSUBTITLED, CUE_TEXT, playerApi } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 import type * as VideoMock from '@/test/videoMock'
@@ -131,48 +121,42 @@ describe('Player on a TV', () => {
     shown.client.clear()
   })
 
-  it("plays a file with no subtitles as it is, under the system's transport and info panel", async () => {
+  it("plays a file with no subtitles as it is, under raven's own controls", async () => {
     await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_UNSUBTITLED.id) })
     const props = await loadedVideo()
-    expect(props.controls).toBe(true)
+    expect(props.controls).toBeFalsy()
     expect(props.source!.uri).toBe(
       `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_UNSUBTITLED.id })}`,
     )
-    const poster = playerApi({ hear: () => undefined }).itemImageUrl({
-      id: BUSBOYS.id,
-      kind: ITEM_IMAGE_KINDS.poster,
-      version: BUSBOYS.posterVersion,
-    })
-    expect(props.source!.metadata).toEqual({
-      title: mediaLabel(BUSBOYS_UNSUBTITLED),
-      description: BUSBOYS.summary,
-      imageUri: poster,
-    })
-    // The system's transport is the only one: raven draws no controls of its own over it.
-    expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+    expect(props.source!.metadata).toBeUndefined()
+    // Raven draws the transport, with the skips either side of play and pause.
+    expect(await screen.findByRole('button', { name: 'Back 10 seconds' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Forward 10 seconds' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy()
   })
 
-  it('starts a file with a text track at the remux, whose renditions the system panel lists', async () => {
+  it('plays a file with a text track as it is and draws its cues itself', async () => {
     usePlayerPrefs.setState({ subtitles: { on: true, language: null } })
     await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
     const props = await loadedVideo()
-    const master = pathFor({ path: HLS_PATHS.master, id: BUSBOYS_MP4.id })
     expect(props.source!.uri).toBe(
-      `${NAS.origin}${master}?${HLS_PARAMS.mode}=${PLAYBACK_MODES.remux}`,
+      `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })}`,
     )
-    // The preferred track is the first rendition, picked for the system to draw.
-    expect(props.selectedTextTrack).toEqual({ type: SelectedTrackType.INDEX, value: 0 })
+    expect(props.selectedTextTrack).toEqual({ type: SelectedTrackType.DISABLED })
+    await start(props)
+    await moveVideoTo({ props, seconds: 15 })
+    expect(await screen.findByText(CUE_TEXT)).toBeTruthy()
+    expect(subtitleReads()).not.toEqual([])
+  })
+
+  it('draws no cue while the viewer has the subtitles off', async () => {
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
+    const props = await loadedVideo()
+    expect(props.selectedTextTrack).toEqual({ type: SelectedTrackType.DISABLED })
     await start(props)
     await moveVideoTo({ props, seconds: 15 })
     expect(screen.queryByText(CUE_TEXT)).toBeNull()
     expect(subtitleReads()).toEqual([])
-  })
-
-  it("leaves the subtitles to the system's choice when the viewer has them off", async () => {
-    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
-    const props = await loadedVideo()
-    expect(props.selectedTextTrack).toBeUndefined()
   })
 
   it("gives the remote's focus to Back once, when nothing plays", async () => {

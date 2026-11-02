@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 
+import { SESSION_KINDS, SESSION_PARAMS } from '@raven/core'
+
 import {
   APP_ROUTES,
   APP_ROUTE_PARAMS,
@@ -20,6 +22,24 @@ describe('hrefOf', () => {
         [APP_ROUTE_PARAMS.id]: '40',
         [APP_ROUTE_PARAMS.library]: '1',
         [APP_ROUTE_PARAMS.file]: '20',
+      },
+    })
+  })
+
+  it("plays a saga's film in its session, so the next is the saga's", () => {
+    expect(
+      hrefOf({
+        kind: ROUTE_TARGETS.play,
+        mediaId: 20,
+        at: 0,
+        session: { kind: SESSION_KINDS.saga, sagaId: '10' },
+      }),
+    ).toEqual({
+      pathname: APP_ROUTES.play,
+      params: {
+        [APP_ROUTE_PARAMS.mediaId]: '20',
+        [SESSION_PARAMS.session]: SESSION_KINDS.saga,
+        [SESSION_PARAMS.scope]: '10',
       },
     })
   })

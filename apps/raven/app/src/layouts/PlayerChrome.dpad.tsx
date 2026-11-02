@@ -36,6 +36,9 @@ import { CaptionText } from '@/layouts/PlayerCaption'
 import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import {
   PLAYER_COPY,
+  SKIP_DIRECTIONS,
+  SKIP_ICONS,
+  SKIP_SECONDS,
   SURFACE_STATES,
   type PlayerChromeKit,
   type PlayerChromeProps,
@@ -318,8 +321,8 @@ const Heading = ({ heading }: HeadingProps) => {
 
 /**
  * The controls over the video, dark in every theme as the web's: the title along the top; the
- * time and the line along the bottom, over play and pause, an episode's Next, the track pickers
- * and Back, on the player's glass, with the lists they open. The line takes the remote's focus
+ * time and the line along the bottom, over back to the start, skip back, play and pause, skip
+ * forward, the next episode or film, the track pickers and Back, on the player's glass, with the lists they open. The line takes the remote's focus
  * as they appear, so a press of left or right goes on skipping; the buttons are a band, so Down
  * from the line lands on the first of them rather than on the one under the thumb.
  */
@@ -365,12 +368,34 @@ const Controls = ({
         <FocusBand>
           <View style={styles.buttons}>
             {transport !== null && (
-              <PlateButton
-                icon={transport.isPaused ? 'play' : 'pause'}
-                isOverPicture
-                label={transport.isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
-                onPress={transport.onTogglePlay}
-              />
+              <>
+                <PlateButton
+                  icon="skipPrevious"
+                  isOverPicture
+                  label={PLAYER_COPY.restart}
+                  onPress={() => transport.onSeek(0)}
+                />
+                <PlateButton
+                  icon={SKIP_ICONS[SKIP_DIRECTIONS.back]}
+                  isOverPicture
+                  label={PLAYER_COPY.back(SKIP_SECONDS)}
+                  onPress={() => transport.onSeek(transport.position - SKIP_SECONDS)}
+                  text={String(SKIP_SECONDS)}
+                />
+                <PlateButton
+                  icon={transport.isPaused ? 'play' : 'pause'}
+                  isOverPicture
+                  label={transport.isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
+                  onPress={transport.onTogglePlay}
+                />
+                <PlateButton
+                  icon={SKIP_ICONS[SKIP_DIRECTIONS.forward]}
+                  isOverPicture
+                  label={PLAYER_COPY.forward(SKIP_SECONDS)}
+                  onPress={() => transport.onSeek(transport.position + SKIP_SECONDS)}
+                  text={String(SKIP_SECONDS)}
+                />
+              </>
             )}
             {next !== null && (
               <PlateButton icon="skipNext" isOverPicture label={next.label} onPress={next.onPlay} />
@@ -594,11 +619,21 @@ const PlayerChrome = (props: PlayerChromeProps) => {
   return <PlayerView {...props} />
 }
 
-/** The player on Android TV: raven's controls, which the d-pad drives, with raven's subtitles. */
+/** Android TV's player: raven's controls, which the d-pad drives, with raven's subtitles. */
 export const dpadPlayerChrome: PlayerChromeKit = {
   PlayerChrome,
   shouldDrawCaptions: true,
   canDrawPictureSubtitles: true,
+}
+
+/**
+ * Apple TV's player: the same controls, which the Siri Remote drives through the same events,
+ * with raven's subtitles. AVPlayer draws no picture subtitles, so those are burned in by the
+ * server there.
+ */
+export const tvosPlayerChrome: PlayerChromeKit = {
+  ...dpadPlayerChrome,
+  canDrawPictureSubtitles: false,
 }
 
 const useStyles = pictureStyles((colours) =>

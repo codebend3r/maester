@@ -108,11 +108,14 @@ describe('Item on a phone or tablet', () => {
     await renderItem({ [APP_ROUTE_PARAMS.id]: String(BUSBOYS.id) })
     await screen.findByRole('header', { name: 'Busboys' })
 
-    const backdrop = StyleSheet.flatten(
-      screen.getByTestId(ITEM_TEST_IDS.backdrop, { includeHiddenElements: true }).props.style,
-    )
+    const picture = screen.getByTestId(ITEM_TEST_IDS.backdrop, { includeHiddenElements: true })
+    const backdrop = StyleSheet.flatten(picture.props.style)
     expect(backdrop.position).toBe('absolute')
-    expect(backdrop.opacity).toBeLessThanOrEqual(0.3)
+    expect(backdrop.opacity).toBeLessThan(1)
+    // Its box is pinned to the top and fades into the ground, so the page below is the theme's colour.
+    const box = StyleSheet.flatten(picture.parent?.props.style)
+    expect(box.position).toBe('absolute')
+    expect(box.top).toBe(0)
   })
 
   it('lets the backdrop show faintly through the synopsis plate', async () => {

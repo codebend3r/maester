@@ -5,7 +5,7 @@ import { configureStorage, createQueryClient } from '@raven/ui/headless'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { hideAsync, preventAutoHideAsync } from 'expo-splash-screen'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Appearance, Platform, StatusBar, StyleSheet, View } from 'react-native'
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -75,9 +75,14 @@ const AppRoutes = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <StatusBar barStyle={tone === THEME_TONES.light ? 'dark-content' : 'light-content'} />
-      {session !== null && <ServerEvents key={session.server.id} session={session} />}
-      {/* Music plays above the routes, so leaving a screen stops nothing. */}
-      {session !== null && <MusicHost key={session.server.id} session={session} />}
+      {/* One key for both, so a server switch remounts them together and no two siblings share it. */}
+      {session !== null && (
+        <Fragment key={session.server.id}>
+          <ServerEvents session={session} />
+          {/* Music plays above the routes, so leaving a screen stops nothing. */}
+          <MusicHost session={session} />
+        </Fragment>
+      )}
       {/* A screen's opening focus comes back once the transition that reveals it has ended:
           on Android TV the transition takes the focus from anything asked for before then. */}
       <View style={styles.frame}>
