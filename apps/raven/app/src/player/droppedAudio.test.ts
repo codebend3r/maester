@@ -75,11 +75,14 @@ const pickedAt = (picked: number) => [
 
 const ATTEMPT = 1
 
-/** Hears each in turn from nothing, and gives what was heard last and every report judged. */
-const hearAll = (hearings: readonly AudioHearing[]) =>
+/**
+ * Hears each in turn from nothing, and gives what was heard last and every report judged.
+ * `canJudge` says, for the hearing at an index, whether the session could act on a judgement.
+ */
+const hearAll = (hearings: readonly AudioHearing[], canJudge = (_index: number) => true) =>
   hearings.reduce<{ heard: HeardAudio | null; judged: unknown[] }>(
-    ({ heard, judged }, hearing) => {
-      const next = hearAudio({ heard, hearing })
+    ({ heard, judged }, hearing, index) => {
+      const next = hearAudio({ heard, hearing, canJudge: canJudge(index) })
       return {
         heard: next.heard,
         judged: next.toJudge === null ? judged : [...judged, next.toJudge],
@@ -163,6 +166,14 @@ describe('hearAudio', () => {
     expect(hearAll(back).judged).toEqual([pickedAt(0)])
   })
 
+  it('keeps its one judgement until the session can act on it', () => {
+    // ExoPlayer's first tick comes with the load, before the screen has drawn the playing
+    // session, so a judgement made then would be spent on a play that cannot step down.
+    const hearings = [loaded({ place: null, picked: 0 }), moved(0), moved(0.25), moved(0.5)]
+    expect(hearAll(hearings, () => false).judged).toEqual([])
+    expect(hearAll(hearings, (index) => index >= 2).judged).toEqual([pickedAt(0)])
+  })
+
   it('judges each attempt once, and leaves an earlier attempt alone', () => {
     const { heard, judged } = hearAll([
       loaded({ place: 1, picked: 1 }),
@@ -171,7 +182,11 @@ describe('hearAudio', () => {
       moved(5),
     ])
     expect(judged).toHaveLength(1)
-    const stale = hearAudio({ heard, hearing: { ...moved(6), attempt: ATTEMPT - 1 } })
+    const stale = hearAudio({
+      heard,
+      hearing: { ...moved(6), attempt: ATTEMPT - 1 },
+      canJudge: true,
+    })
     expect(stale).toEqual({ heard, toJudge: null })
   })
 })

@@ -94,6 +94,8 @@ const freshFor = (attempt: number): HeardAudio => ({
 type HearAudioProps = {
   heard: HeardAudio | null
   hearing: AudioHearing
+  /** Whether the session could step down on a judgement now: it is playing, with a way below. */
+  canJudge: boolean
 }
 
 /**
@@ -102,11 +104,14 @@ type HearAudioProps = {
  * 6.19.3 hands ExoPlayer the asked track only as it reports the load, so `onLoad` still names
  * ExoPlayer's own first pick and `onAudioTracks` the settled one. A load whose pick is already
  * the asked one is judged at the next tick; another waits for `onAudioTracks`, or for
- * `AUDIO_SETTLE_SECONDS` of play.
+ * `AUDIO_SETTLE_SECONDS` of play. The judgement is made once, so a tick that cannot act on it
+ * (`canJudge` false) leaves it for a later one: ExoPlayer's first tick comes with the load,
+ * before the screen has drawn the playing session.
  */
 export const hearAudio = ({
   heard,
   hearing,
+  canJudge,
 }: HearAudioProps): { heard: HeardAudio | null; toJudge: ReportedAudio | null } => {
   const last = heard !== null && heard.attempt === hearing.attempt ? heard : null
   switch (hearing.type) {
@@ -126,7 +131,7 @@ export const hearAudio = ({
       if (last === null || !last.hasLoaded || last.isJudged) return { heard, toJudge: null }
       const since = last.clock ?? hearing.clock
       const played = last.played + Math.max(0, hearing.clock - since)
-      const isJudged = last.isSettled || played >= AUDIO_SETTLE_SECONDS
+      const isJudged = canJudge && (last.isSettled || played >= AUDIO_SETTLE_SECONDS)
       return {
         heard: { ...last, played, clock: hearing.clock, isJudged },
         toJudge: isJudged ? last.reported : null,

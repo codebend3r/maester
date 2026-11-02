@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import { Children, type ComponentType } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
@@ -20,9 +20,16 @@ import {
   shelfStateOf,
 } from '@/layouts/shelfKit'
 import { Logo } from '@/layouts/Logo'
+import { SCROLL_AXES, useScrollWindow } from '@/layouts/useScrollWindow'
 import { SideMenu } from '@/layouts/SideMenu.focus'
 import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
+
+/** Shelves drawn before any scroll, and the shelves a scroll toward the end adds. */
+const SHELF_WINDOW = { first: 3, step: 2 } as const
+
+/** Cards drawn in a row before any scroll, and the cards a scroll toward its end adds. */
+const CARD_WINDOW = { first: 8, step: 4 } as const
 
 /**
  * Home's shelves under its title, with the side menu beside them. Home draws them only once the
@@ -41,6 +48,12 @@ const Shelves = ({
 }: ShelvesProps) => {
   // Home's hold on its screen's focus; the menu's rows and the shelves' cards spend the opening focus themselves.
   useScreenFocusScope()
+  const shelves = Children.toArray(children)
+  const shelfWindow = useScrollWindow({
+    ...SHELF_WINDOW,
+    total: shelves.length,
+    axis: SCROLL_AXES.vertical,
+  })
   const styles = useStyles()
   return (
     <View style={styles.screen}>
@@ -50,7 +63,14 @@ const Shelves = ({
         onSearch={onSearch}
         onSettings={onSettings}
       />
-      <ScrollView contentContainerStyle={styles.shelves} style={styles.ground}>
+      <ScrollView
+        contentContainerStyle={styles.shelves}
+        onContentSizeChange={shelfWindow.onContentSizeChange}
+        onLayout={shelfWindow.onLayout}
+        onScroll={shelfWindow.onScroll}
+        scrollEventThrottle={100}
+        style={styles.ground}
+      >
         <View style={styles.pageRow}>
           <Logo width={TV_SIZES.textXl} />
           <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.pageTitle}>
@@ -58,7 +78,7 @@ const Shelves = ({
           </Text>
         </View>
         {notice !== null && <Text style={styles.notice}>{notice}</Text>}
-        {children}
+        {shelves.slice(0, shelfWindow.count)}
       </ScrollView>
     </View>
   )
@@ -114,15 +134,24 @@ type CardsRowProps = ShelfProps
 /** A shelf's row of cards, a band the remote comes into on a card. */
 const CardsRow = ({ shelf, onOpen, isFirst = false }: CardsRowProps) => {
   const { isOpening } = useOpeningFocus()
+  const cardWindow = useScrollWindow({
+    ...CARD_WINDOW,
+    total: shelf.cards.length,
+    axis: SCROLL_AXES.horizontal,
+  })
   const styles = useStyles()
   return (
     <FocusBand>
       <ScrollView
         contentContainerStyle={styles.row}
         horizontal
+        onContentSizeChange={cardWindow.onContentSizeChange}
+        onLayout={cardWindow.onLayout}
+        onScroll={cardWindow.onScroll}
+        scrollEventThrottle={100}
         showsHorizontalScrollIndicator={false}
       >
-        {shelf.cards.map((card, index) => (
+        {shelf.cards.slice(0, cardWindow.count).map((card, index) => (
           <FocusCard
             key={card.key}
             card={card}
