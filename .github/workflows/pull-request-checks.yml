@@ -33,10 +33,13 @@ jobs:
   checks:
     name: ${{ matrix.check.name }}
     runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
     timeout-minutes: 30
     strategy:
-      # Report every portable check in one run, even when another check fails.
-      fail-fast: false
+      # The cancel step below ends the whole run on the first failure, in any job.
+      fail-fast: true
       matrix:
         check:
           - name: 🎨 Format
@@ -117,12 +120,25 @@ jobs:
       - name: ${{ matrix.check.name }}
         run: bunx nx run-many --outputStyle=static -t ${{ matrix.check.target }}
 
-  # Keep the existing order: every matrix check finishes, then every project builds.
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
+  # Every project builds once the matrix checks have passed.
   build:
     name: 🏗️ Build
     needs: checks
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
     timeout-minutes: 30
     steps:
       - name: 📥 Checkout
@@ -138,6 +154,16 @@ jobs:
 
       - name: 🏗️ Build
         run: bun run build
+
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
   # The "Protect main" ruleset requires this stable check name. It passes only
   # when every matrix check and the build passed.
@@ -161,6 +187,9 @@ jobs:
   supabase:
     name: 🗄️ Supabase
     runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -191,12 +220,25 @@ jobs:
         if: always()
         run: bunx nx run @raven/supabase:db:stop
 
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # One native build feeds the other desktop jobs, handed over as an artifact: the app
   # job packages its addon and dylibs, and the two playback checks load them side by side.
   desktop-native:
     name: 🎞️ Desktop native
     # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
     runs-on: macos-26
+    permissions:
+      actions: write
+      contents: read
     timeout-minutes: 120
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
@@ -258,12 +300,25 @@ jobs:
           path: libs/raven/mpv/native-build/source-bundle
           if-no-files-found: error
 
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # The Windows libmpv is a pinned prebuilt, not a source build: this places it under
   # resources/win32-x64, audits the DLL (x64, self-contained, the exports the addon
   # calls), builds the addon against it with MSVC and runs the headless libmpv tests.
   windows-native:
     name: 🪟 Windows native
     runs-on: windows-2025
+    permissions:
+      actions: write
+      contents: read
     timeout-minutes: 15
     defaults:
       run:
@@ -316,11 +371,24 @@ jobs:
           path: libs/raven/mpv/resources/win32-x64
           if-no-files-found: error
 
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # Forge bundles the addon and libmpv (stage:mpv), so this waits for the native build.
   desktop-app:
     name: 📦 Desktop app
     needs: desktop-native
     runs-on: macos-26
+    permissions:
+      actions: write
+      contents: read
     timeout-minutes: 30
     env:
       # Keeps the Xcode version the cached app is keyed on the same as the native job's.
@@ -379,11 +447,24 @@ jobs:
           path: apps/raven/desktop/out/make
           if-no-files-found: error
 
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # Forge bundles the addon and libmpv (stage:mpv), so this waits for the Windows native build.
   windows-app:
     name: 🪟 Windows app
     needs: windows-native
     runs-on: windows-2025
+    permissions:
+      actions: write
+      contents: read
     timeout-minutes: 30
     defaults:
       run:
@@ -437,10 +518,23 @@ jobs:
           path: apps/raven/desktop/out/make
           if-no-files-found: error
 
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   desktop-playback:
     name: ${{ matrix.check.name }}
     needs: desktop-native
     runs-on: macos-26
+    permissions:
+      actions: write
+      contents: read
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -503,6 +597,16 @@ jobs:
           path: apps/raven/desktop/test-results
           if-no-files-found: ignore
 
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # Whether this PR touches raven's device app, what it imports (core and ui, through
   # Nx's graph), the server its flows sign in to, or this workflow; and the same for Wren
   # (`music`). The app and Wren jobs below are cold React Native builds, so they run only
@@ -510,6 +614,9 @@ jobs:
   app-affected:
     name: 🔍 App affected
     runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
     timeout-minutes: 10
     outputs:
       affected: ${{ steps.affected.outputs.affected }}
@@ -554,6 +661,16 @@ jobs:
             echo "music=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # raven's device app on Apple TV: the simulator build and an XCUITest that drives it
   # with the Siri Remote against a real raven server. It runs beside app-ios, on its own
   # runner, since the two builds share nothing.
@@ -562,6 +679,9 @@ jobs:
     needs: app-affected
     if: needs.app-affected.outputs.affected == 'true'
     runs-on: macos-26
+    permissions:
+      actions: write
+      contents: read
     # One Release build of React Native, its compile cached by ccache, and the remote flow.
     timeout-minutes: 60
     steps:
@@ -663,6 +783,16 @@ jobs:
             ${{ runner.temp }}/raven-tv.png
           if-no-files-found: error
 
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # raven's device app on iPhone and iPad: the simulator build and the Maestro flows on
   # the iPhone simulator against a real raven server.
   app-ios:
@@ -670,6 +800,9 @@ jobs:
     needs: app-affected
     if: needs.app-affected.outputs.affected == 'true'
     runs-on: macos-26
+    permissions:
+      actions: write
+      contents: read
     # One Release build of React Native, its compile cached by ccache, and the flows.
     timeout-minutes: 60
     steps:
@@ -812,6 +945,16 @@ jobs:
           path: ${{ runner.temp }}/raven-iphonesimulator.zip
           if-no-files-found: error
 
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # raven's device app for Android TV, on Linux (Ruling 20): GitHub's macOS arm64 runners
   # cannot run the Android emulator. The Release APK, then, against a real raven server, the
   # Maestro flows on an Android TV emulator, driven by the remote's keys.
@@ -820,6 +963,9 @@ jobs:
     needs: app-affected
     if: needs.app-affected.outputs.affected == 'true'
     runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
     # A Release build of React Native, its compile cached by ccache and Gradle, the
     # emulator's boot and the flows.
     timeout-minutes: 60
@@ -930,6 +1076,16 @@ jobs:
             ${{ runner.temp }}/fixture.log
           if-no-files-found: ignore
 
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # Wren, raven's music app, on the iPhone: its simulator build and its Maestro flows against
   # the fixture server's music library, on a simulator of its own, as app-ios runs the app's.
   music-ios:
@@ -937,6 +1093,9 @@ jobs:
     needs: app-affected
     if: needs.app-affected.outputs.music == 'true'
     runs-on: macos-26
+    permissions:
+      actions: write
+      contents: read
     # One Release build of React Native, its compile cached by ccache, and the flows.
     timeout-minutes: 60
     steps:
@@ -1056,12 +1215,25 @@ jobs:
           path: ${{ runner.temp }}/wren-iphonesimulator.zip
           if-no-files-found: error
 
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # Wren for Android phones, built on Linux beside the Android TV job; it has no flows yet.
   music-android:
     name: 🎵 Wren for Android
     needs: app-affected
     if: needs.app-affected.outputs.music == 'true'
     runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
     # A Release build of React Native, its compile cached by ccache and Gradle.
     timeout-minutes: 60
     steps:
@@ -1092,6 +1264,16 @@ jobs:
           name: raven-music-android-${{ github.event.pull_request.head.sha }}
           path: apps/raven/music/android/app/build/outputs/apk/release
           if-no-files-found: error
+
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
   # The "Protect main" ruleset requires a check named 🖥️ Desktop, so this one stands
   # for every desktop, device app and Wren job and passes only when all of them did. The
@@ -1140,4 +1322,7 @@ jobs:
   # The production images, built and health checked by the shared smoke workflow.
   smoke:
     name: 🐳 Smoke test
+    permissions:
+      actions: write
+      contents: read
     uses: ./.github/workflows/smoke-test.yml
