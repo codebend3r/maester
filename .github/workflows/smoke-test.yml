@@ -27,7 +27,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
-      # Each product is checked on its own; one failing doesn't cancel the others.
+      # A pull request's cancel step ends the run on the first failure; main's run
+      # still checks every product on its own.
       fail-fast: false
       matrix:
         include:
@@ -140,3 +141,13 @@ jobs:
       - name: 🧹 Stop container
         if: always()
         run: docker rm -f "$PRODUCT" || true
+
+      # On a pull request a failure ends the whole run, so no other job keeps burning
+      # minutes. Needs the actions: write the caller grants. A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure() && github.event_name == 'pull_request'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
