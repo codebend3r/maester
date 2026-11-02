@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { refusalText } from '@/desktop/client'
+import { type DownloadsPage, playOriginFor } from '@/desktop/paths'
 import { useIsOutputFixed } from '@/desktop/output'
 import { PLAY_PAGE_COPY } from '@/desktop/PlayPage/copy'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
@@ -106,13 +107,14 @@ type PlayingProps = {
   file: LocalFile
   chosen: Chosen
   isOutputFixed: boolean
+  downloadsPage: DownloadsPage
 }
 
 /**
  * A granted file on mpv, or on Chromium's own video through `raven-file://` when mpv never
  * started or stops mid-play, carrying on from where it was.
  */
-const Playing = ({ file, chosen, isOutputFixed }: PlayingProps) => {
+const Playing = ({ file, chosen, isOutputFixed, downloadsPage }: PlayingProps) => {
   const { client, menu } = useDesktop()
   const showNotice = useToasts((state) => state.show)
   const [lostAt, setLostAt] = useState<number | null>(null)
@@ -128,8 +130,8 @@ const Playing = ({ file, chosen, isOutputFixed }: PlayingProps) => {
     [file, lostAt],
   )
   const base = useMemo(
-    () => fileServicesFor({ file: played, client, menu, engine }),
-    [played, client, menu, engine],
+    () => fileServicesFor({ file: played, client, menu, engine, downloadsPage }),
+    [played, client, menu, engine, downloadsPage],
   )
   // The output arrives on its own time; folding it in keeps the progress sink, so the
   // player neither remounts nor forgets the length it reported.
@@ -168,13 +170,21 @@ type PageViewProps = {
   chosen: Chosen | null
   isOutputFixed: boolean
   message: string | null
+  downloadsPage: DownloadsPage
 }
 
 type ReadyFileProps = PageViewProps
 
-const ReadyFile = ({ file, chosen, isOutputFixed }: ReadyFileProps) =>
+const ReadyFile = ({ file, chosen, isOutputFixed, downloadsPage }: ReadyFileProps) =>
   file !== null &&
-  chosen !== null && <Playing file={file} chosen={chosen} isOutputFixed={isOutputFixed} />
+  chosen !== null && (
+    <Playing
+      file={file}
+      chosen={chosen}
+      isOutputFixed={isOutputFixed}
+      downloadsPage={downloadsPage}
+    />
+  )
 
 type FileMessageProps = PageViewProps
 
@@ -187,9 +197,9 @@ const PAGE_VIEWS = {
   [PAGE_KINDS.message]: FileMessage,
 } as const satisfies Record<PageKind, ComponentType<PageViewProps>>
 
-type PlayPageProps = { fileId: string; queue: string[] }
+type PlayPageProps = { fileId: string; queue: string[]; downloadsPage: DownloadsPage }
 
-const PlayPage = ({ fileId, queue }: PlayPageProps) => {
+const PlayPage = ({ fileId, queue, downloadsPage }: PlayPageProps) => {
   const { client } = useDesktop()
   useLeaveSignal({ client, fileId })
   const chosen = useChosenEngine()
@@ -218,6 +228,7 @@ const PlayPage = ({ fileId, queue }: PlayPageProps) => {
       chosen={chosen}
       isOutputFixed={isOutputFixed}
       message={file.isError ? file.error.message : null}
+      downloadsPage={downloadsPage}
     />
   )
 }
@@ -227,12 +238,18 @@ const ROUTE_KINDS = { granted: 'granted', invalid: 'invalid' } as const
 
 type RouteKind = (typeof ROUTE_KINDS)[keyof typeof ROUTE_KINDS]
 
-type RouteViewProps = { fileId: string | undefined; queue: string[] }
+type RouteViewProps = {
+  fileId: string | undefined
+  queue: string[]
+  downloadsPage: DownloadsPage
+}
 
 type GrantedFileProps = RouteViewProps
 
-const GrantedFile = ({ fileId, queue }: GrantedFileProps) =>
-  isOpaqueId(fileId) && <PlayPage key={fileId} fileId={fileId} queue={queue} />
+const GrantedFile = ({ fileId, queue, downloadsPage }: GrantedFileProps) =>
+  isOpaqueId(fileId) && (
+    <PlayPage key={fileId} fileId={fileId} queue={queue} downloadsPage={downloadsPage} />
+  )
 
 const InvalidFile = () => (
   <PlayerMessage message={PLAY_PAGE_COPY.notOpenable} fallback={OPENED_FROM} />
@@ -249,8 +266,15 @@ const ROUTE_VIEWS = {
  */
 export const PlayRoute = () => {
   const { fileId } = useParams()
-  const state: unknown = useLocation().state
+  const location = useLocation()
+  const state: unknown = location.state
   const queue = isPlayState(state) ? state.queue : []
   const View = ROUTE_VIEWS[isOpaqueId(fileId) ? ROUTE_KINDS.granted : ROUTE_KINDS.invalid]
-  return <View fileId={fileId} queue={queue} />
+  return (
+    <View
+      fileId={fileId}
+      queue={queue}
+      downloadsPage={playOriginFor({ state, pathname: location.pathname })}
+    />
+  )
 }

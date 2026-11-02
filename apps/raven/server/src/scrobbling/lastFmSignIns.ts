@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
-import { isNumber, isString, object } from '@raven/core'
+import { type ScrobbleReturn, isNumber, isScrobbleReturn, isString, object } from '@raven/core'
 import { CLOCK, type Clock } from '@/clock'
 import { parseJsonAs } from '@/db/json'
 import type { AccountKey } from '@/media/viewingAccountKeys'
@@ -14,13 +14,13 @@ const MAX_WAITING = 256
 
 const isSignInState = object({
   account: isString,
-  returnTo: isString,
+  returnTo: isScrobbleReturn,
   nonce: isString,
   expires: isNumber,
 })
 
-/** A sign-in the callback finished: whose it was, and where it goes back to. */
-type SignIn = { account: AccountKey; returnTo: string }
+/** A sign-in the callback finished: whose it was, and the return it named. */
+type SignIn = { account: AccountKey; returnTo: ScrobbleReturn }
 
 type LastFmSignInsStartProps = SignIn
 

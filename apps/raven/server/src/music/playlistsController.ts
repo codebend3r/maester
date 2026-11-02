@@ -32,6 +32,7 @@ import { ViewingAccounts } from '@/media/viewingAccounts'
 import { ListenerScopes } from '@/music/listenerScope'
 import { MusicRepository } from '@/music/musicRepository'
 import { Playlists } from '@/music/playlists'
+import { ROUTE_PARAMS } from '@/requestParts'
 
 const NAME_REFUSAL = `name must hold something besides spaces, up to ${PLAYLIST_LIMITS.name} characters`
 
@@ -131,14 +132,17 @@ export class PlaylistsController {
   }
 
   @Get(':id')
-  get(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): PlaylistDetails {
+  get(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): PlaylistDetails {
     return this.find({ id, request })
   }
 
   @ForViewers()
   @Put(':id')
   rename(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
   ): PlaylistDetails {
@@ -155,7 +159,7 @@ export class PlaylistsController {
   @ForViewers()
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): void {
+  remove(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number, @Req() request: FastifyRequest): void {
     if (!this.playlists.remove({ id, account: this.accounts.keyOf({ request }) })) {
       throw new NotFoundException(`No playlist ${id}`)
     }
@@ -165,7 +169,7 @@ export class PlaylistsController {
   @ForViewers()
   @Put(':id/tracks')
   replaceTracks(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
   ): PlaylistDetails {
@@ -177,7 +181,7 @@ export class PlaylistsController {
   @ForViewers()
   @Post(':id/tracks')
   appendTracks(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
   ): PlaylistDetails {
@@ -189,7 +193,7 @@ export class PlaylistsController {
   @ForViewers()
   @Put(':id/sharing')
   setSharing(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
   ): PlaylistDetails {
@@ -206,7 +210,10 @@ export class PlaylistsController {
   /** Copies a playlist the account may read, its own or a shared one, into a new one of its own. */
   @ForViewers()
   @Post(':id/copy')
-  copy(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): PlaylistDetails {
+  copy(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): PlaylistDetails {
     const copy = this.playlists.copy({ id, ...this.scopes.of({ request }) })
     if (copy === null) throw new NotFoundException(`No playlist ${id}`)
     return this.find({ id: copy, request })

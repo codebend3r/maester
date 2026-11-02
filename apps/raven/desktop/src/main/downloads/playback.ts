@@ -222,7 +222,9 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
    */
   const playing: { page: Slot; engine: Slot } = { page: NO_SLOT, engine: NO_SLOT }
 
-  const mediaPathOf = ({ serverId, mediaId, container }: DownloadEntry): string =>
+  type MediaPathOfProps = DownloadEntry
+
+  const mediaPathOf = ({ serverId, mediaId, container }: MediaPathOfProps): string =>
     mediaPathFor({ userData: deps.userData, serverId, mediaId, container })
 
   const entryAt = (path: string): DownloadEntry | null =>

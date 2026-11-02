@@ -1,13 +1,19 @@
-import type {
-  AlbumDetails,
-  AlbumMatchCandidate,
-  AlbumSummary,
-  Artist,
-  ArtistDetails,
-  PlaylistDetails,
-  PlaylistSummary,
-  Track,
+import {
+  type AlbumDetails,
+  type AlbumMatchCandidate,
+  type AlbumSummary,
+  type Artist,
+  type ArtistDetails,
+  LIBRARY_KINDS,
+  type Library,
+  MIX_KINDS,
+  type MixDetails,
+  type MixSummary,
+  type PlaylistDetails,
+  type PlaylistSummary,
+  type Track,
 } from '@raven/core'
+import { library } from '@/test/fixtures'
 
 const RADIOHEAD = { id: 1, name: 'Radiohead' } as const
 
@@ -108,6 +114,29 @@ export const playlistSummary = (overrides: Partial<PlaylistSummary> = {}): Playl
 
 export const playlistDetails = (overrides: Partial<PlaylistDetails> = {}): PlaylistDetails => ({
   playlist: playlistSummary(),
+  tracks: [track(), track({ id: 102, title: 'Paranoid Android', number: 2 })],
+  ...overrides,
+})
+
+/** A music library, the one the album and track fixtures sit in. */
+export const musicLibrary = (overrides: Partial<Library> = {}): Library =>
+  library({
+    id: 3,
+    name: 'Music',
+    settings: { ...library().settings, kind: LIBRARY_KINDS.music, pinned: false },
+    ...overrides,
+  })
+
+export const mixSummary = (overrides: Partial<MixSummary> = {}): MixSummary => ({
+  id: MIX_KINDS.heavyRotation,
+  trackCount: 12,
+  duration: 2400,
+  covers: [{ albumId: 7, coverVersion: 'cover-v1' }],
+  ...overrides,
+})
+
+export const mixDetails = (overrides: Partial<MixDetails> = {}): MixDetails => ({
+  mix: mixSummary(),
   tracks: [track(), track({ id: 102, title: 'Paranoid Android', number: 2 })],
   ...overrides,
 })

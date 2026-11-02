@@ -1,4 +1,10 @@
-import { REPEAT_MODES, type Track } from '@raven/core'
+import {
+  QUEUE_SOURCE_KINDS,
+  type QueueSource,
+  RADIO_SEED_KINDS,
+  REPEAT_MODES,
+  type Track,
+} from '@raven/core'
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
 
@@ -169,5 +175,47 @@ describe('useAudioQueue', () => {
     expect(playingTrackOf(store())?.id).toBe(1)
     expect(store()).toMatchObject({ state: AUDIO_STATES.loading, position: 0 })
     expect(store().seek?.seconds).toBe(0)
+  })
+
+  it('shuffles and repeats a radio queue as it does an album', () => {
+    type StepsOfProps = { source: QueueSource }
+    // What a listener sees: the shuffle keeps the playing track, repeat all wraps, repeat one stays.
+    const stepsOf = ({ source }: StepsOfProps) => {
+      store().clear()
+      store().playTracks({ tracks: ALBUM, startAt: 1, source })
+      store().toggleShuffle()
+      const shuffled = {
+        playing: playingTrackOf(store())?.id ?? null,
+        isShuffled: store().queue.isShuffled,
+        held: store().queue.order.toSorted(),
+      }
+      store().toggleShuffle()
+      Object.values(REPEAT_MODES).forEach(() => {
+        if (store().queue.repeat !== REPEAT_MODES.all) store().cycleRepeat()
+      })
+      store().jump(2)
+      store().engine.ended()
+      const wrapped = playingTrackOf(store())?.id ?? null
+      store().cycleRepeat()
+      const repeat = store().queue.repeat
+      store().engine.ended()
+      return { shuffled, wrapped, repeat, again: playingTrackOf(store())?.id ?? null }
+    }
+    const album = stepsOf({ source: { kind: QUEUE_SOURCE_KINDS.album, id: 7 } })
+    const radio = stepsOf({
+      source: { kind: QUEUE_SOURCE_KINDS.radio, id: 2, seed: RADIO_SEED_KINDS.track },
+    })
+    expect(radio).toEqual(album)
+    expect(radio).toEqual({
+      shuffled: { playing: 2, isShuffled: true, held: [0, 1, 2] },
+      wrapped: 1,
+      repeat: REPEAT_MODES.one,
+      again: 1,
+    })
+    expect(store().queue.source).toEqual({
+      kind: QUEUE_SOURCE_KINDS.radio,
+      id: 2,
+      seed: RADIO_SEED_KINDS.track,
+    })
   })
 })

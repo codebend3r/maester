@@ -23,6 +23,8 @@ export const MPV_OPTIONS = {
   ao: 'ao',
   accessReferences: 'access-references',
   voNullFps: 'vo-null-fps',
+  af: 'af',
+  replaygain: 'replaygain',
 } as const
 
 export type MpvOption = { name: string; value: string | number | boolean }

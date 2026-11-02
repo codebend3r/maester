@@ -1,0 +1,25 @@
+.page {
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-heading);
+  letter-spacing: var(--tracking-display);
+}
+
+.field {
+  max-width: 30rem;
+}
+
+.hint {
+  color: var(--color-lichen);
+}
+
+.results {
+  display: grid;
+  gap: var(--space-3);
+}

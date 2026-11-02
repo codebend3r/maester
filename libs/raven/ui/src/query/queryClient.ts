@@ -4,6 +4,7 @@ import {
   type MatchSubject,
   type MediaSort,
   type MusicListOptions,
+  type MixKind,
   type ViewingSession,
   ApiError,
 } from '@raven/core'
@@ -197,6 +198,11 @@ export const queryKeys = {
     'songs',
     { libraryIds, search, sort },
   ],
+  /** The account's mixes for today, and each one's tracks, under the music so a scan reads them again. */
+  mixes: ['music', 'mixes'],
+  mix: (id: MixKind | null) => ['music', 'mixes', id],
+  /** The albums the account played last and those added last, for the music mode's Home. */
+  recentMusic: ['music', 'recent'],
   album: (id: number | null) => ['music', 'albums', id],
   artist: (id: number | null) => ['music', 'artists', id],
   /** A track's lyrics, under the music's prefix so a scan reads them again. */
@@ -205,6 +211,8 @@ export const queryKeys = {
   playlists: ['playlists'],
   playlistList: ['playlists', 'list'],
   playlist: (id: number | null) => ['playlists', id],
+  /** The services the account forwards its listens to. */
+  scrobbling: ['scrobbling'],
   albumMatchSearch: ({ albumId, query }: QueryKeysAlbumMatchSearchProps) => [
     'music',
     'albums',

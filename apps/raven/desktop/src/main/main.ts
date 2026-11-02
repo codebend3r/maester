@@ -96,7 +96,7 @@ import { createMediaRelay, listenOnLoopback } from '@/main/servers/mediaRelay'
 import { createServerCalls, fetchThrough } from '@/main/servers/serverCalls'
 import { clearFormerPartitions, PARTITIONS_DIR } from '@/main/servers/formerSessions'
 import { createPageUnlock } from '@/main/servers/pageUnlock'
-import { createServerSources, SOURCE_KINDS } from '@/main/servers/serverSources'
+import { createServerSources } from '@/main/servers/serverSources'
 import { createServerTitles } from '@/main/servers/serverTitles'
 import {
   createShutdown,
@@ -476,7 +476,6 @@ const startApp = (): void => {
       calls: serverCalls,
       tickets: accountTickets,
       relay,
-      kind: SOURCE_KINDS.video,
       warn,
     })
     // Music has a relay of its own, so a video and a track never retire each other's
@@ -495,7 +494,6 @@ const startApp = (): void => {
       calls: serverCalls,
       tickets: accountTickets,
       relay: musicRelay,
-      kind: SOURCE_KINDS.music,
       warn,
     })
     // Grants hold real paths, so the downloads are named from the real folder too: a profile

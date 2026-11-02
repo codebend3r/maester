@@ -34,8 +34,12 @@ describe('usePlaylistMutations', () => {
   const append = spyOn(api, 'appendPlaylistTracks')
   const remove = spyOn(api, 'deletePlaylist')
   const list = spyOn(api, 'listPlaylists')
+  const share = spyOn(api, 'setPlaylistSharing')
+  const copy = spyOn(api, 'copyPlaylist')
 
-  afterEach(() => [create, rename, replace, append, remove, list].forEach((spy) => spy.mockReset()))
+  afterEach(() =>
+    [create, rename, replace, append, remove, list, share, copy].forEach((spy) => spy.mockReset()),
+  )
 
   it('renames the playlist on its page and in the list before the server answers', async () => {
     const answer = Promise.withResolvers<PlaylistDetails>()
@@ -146,5 +150,31 @@ describe('usePlaylistMutations', () => {
 
     expect(listIn(client)).toEqual([PAGE.playlist])
     expect(pageIn(client)).toEqual(PAGE)
+  })
+
+  it('shares a playlist and keeps the page the server answers with', async () => {
+    const shared = playlistDetails({ playlist: { ...PAGE.playlist, isShared: true } })
+    share.mockResolvedValue(shared)
+    list.mockResolvedValue([shared.playlist])
+    const client = holdingPlaylist()
+    const { result } = renderQueryHook({ client, hook: () => usePlaylistMutations() })
+
+    await act(() => result.current.share.mutateAsync({ id: PAGE.playlist.id, isShared: true }))
+
+    expect(share).toHaveBeenCalledWith({ id: PAGE.playlist.id, isShared: true })
+    expect(pageIn(client)?.playlist.isShared ?? null).toBe(true)
+  })
+
+  it("copies a playlist and keeps the copy's page", async () => {
+    const copied = playlistDetails({ playlist: { ...PAGE.playlist, id: 12, isOwn: true } })
+    copy.mockResolvedValue(copied)
+    list.mockResolvedValue([PAGE.playlist, copied.playlist])
+    const client = holdingPlaylist()
+    const { result } = renderQueryHook({ client, hook: () => usePlaylistMutations() })
+
+    await act(() => result.current.copy.mutateAsync(PAGE.playlist.id))
+
+    expect(copy).toHaveBeenCalledWith({ id: PAGE.playlist.id })
+    expect(client.getQueryData<PlaylistDetails>(queryKeys.playlist(12))).toEqual(copied)
   })
 })

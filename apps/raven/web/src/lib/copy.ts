@@ -1,4 +1,4 @@
-import { plural } from '@raven/core'
+import { MIX_KINDS, type MixKind, plural } from '@raven/core'
 
 type ArtistCountsProps = { albumCount: number; trackCount: number }
 
@@ -55,6 +55,14 @@ export const COMMON_COPY = {
 } as const
 
 export const MUSIC_COPY = {
+  /** What each mix is called, on Home and its own page. */
+  mixNames: {
+    [MIX_KINDS.heavyRotation]: 'Heavy rotation',
+    [MIX_KINDS.rediscover]: 'Rediscover',
+    [MIX_KINDS.onThisDay]: 'On this day',
+    [MIX_KINDS.recentlyAdded]: 'Recently added',
+  } as const satisfies Record<MixKind, string>,
+  noMusic: 'raven has no music library yet.',
   minutes: (minutes: number) => `${minutes} min`,
   artistCounts: ({ albumCount, trackCount }: ArtistCountsProps) =>
     `${plural({ n: albumCount, one: 'album', many: 'albums' })}${COMMON_COPY.separator}${COMMON_COPY.tracks(trackCount)}`,

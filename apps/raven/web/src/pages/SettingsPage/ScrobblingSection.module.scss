@@ -1,0 +1,55 @@
+// The services, one card each, side by side where there is room.
+.services {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-3);
+  list-style: none;
+}
+
+// A service: its name, where the account stands with it, and the way to link or unlink it.
+.service {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+}
+
+// The user token's field beside Link, the reason under both.
+.token {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'label label'
+    'input submit'
+    'error error';
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.tokenLabel {
+  grid-area: label;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.tokenInput {
+  grid-area: input;
+  background-color: var(--color-deep);
+}
+
+.tokenSubmit {
+  grid-area: submit;
+}
+
+.tokenError {
+  grid-area: error;
+}
+
+// What the account is linked as, or Connect, over the reason one failed.
+.connect {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}

@@ -3,13 +3,25 @@ import {
   AUDIO_EVENTS,
   type AudioCommand,
   type AudioEvent,
+  AUDIO_BITRATES,
+  DEFAULT_LEVELLING_MODE,
+  EQ_PRESET_NAMES,
+  EQ_PRESETS,
+  FLAT_EQUALIZER,
+  LEVELLING_MODES,
   LIBRARY_KINDS,
   type Library,
   PLAYER_CONNECTION_STATUSES,
   PLAYER_ERROR_REASONS,
   REMOTE_COMMANDS,
 } from '@raven/core'
-import { AUDIO_STATES, useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
+import {
+  AUDIO_STATES,
+  MUSIC_QUALITIES,
+  playingTrackOf,
+  useAudioQueue,
+  usePlayerPrefs,
+} from '@raven/ui/headless'
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { act, cleanup, waitFor } from '@testing-library/react'
 import { DesktopAudioHost } from '@/desktop/audio/DesktopAudioHost'
@@ -84,6 +96,9 @@ afterEach(() => {
   act(() => store().clear())
   mock.restore()
   usePlayerPrefs.getState().setAudiobookSpeed(1)
+  usePlayerPrefs.getState().setMusicQuality(MUSIC_QUALITIES.original)
+  usePlayerPrefs.getState().setLevelling(DEFAULT_LEVELLING_MODE)
+  usePlayerPrefs.getState().setEqualizer(FLAT_EQUALIZER)
 })
 
 describe('DesktopAudioHost', () => {
@@ -95,7 +110,7 @@ describe('DesktopAudioHost', () => {
       }),
     })
     renderWithProviders({ ui: <DesktopAudioHost api={api} reprobe={() => undefined} /> })
-    expect(document.querySelectorAll('audio')).toHaveLength(1)
+    expect(document.querySelectorAll('audio')).toHaveLength(2)
   })
 
   it("plays through the page's own audio host once main's engine is lost", () => {
@@ -103,7 +118,7 @@ describe('DesktopAudioHost', () => {
       audio: audioConnectionsOf({ status: CONNECTION_STATUSES.lost, message: 'Gone.' }),
     })
     renderWithProviders({ ui: <DesktopAudioHost api={api} reprobe={() => undefined} /> })
-    expect(document.querySelectorAll('audio')).toHaveLength(1)
+    expect(document.querySelectorAll('audio')).toHaveLength(2)
   })
 
   it("renders nothing while main's answer is on its way", () => {
@@ -117,7 +132,14 @@ describe('DesktopAudioHost', () => {
     act(() => store().playTracks({ tracks: TRACKS }))
     await act(async () => {})
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })).toEqual([
-      { type: AUDIO_COMMANDS.load, mediaId: 1, next: 2, start: 0 },
+      {
+        type: AUDIO_COMMANDS.load,
+        mediaId: 1,
+        level: 1,
+        next: { mediaId: 2, level: 1, kbps: null },
+        start: 0,
+        kbps: null,
+      },
     ])
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.nowPlaying })).toMatchObject([
       { info: { title: TRACKS[0].title, album: TRACKS[0].album.title, artwork: null } },
@@ -125,7 +147,7 @@ describe('DesktopAudioHost', () => {
     act(() => store().playNext([track({ id: 9 })]))
     await act(async () => {})
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.queueNext })).toEqual([
-      { type: AUDIO_COMMANDS.queueNext, next: 9 },
+      { type: AUDIO_COMMANDS.queueNext, next: { mediaId: 9, level: 1, kbps: null } },
     ])
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })).toHaveLength(1)
   })
@@ -154,7 +176,7 @@ describe('DesktopAudioHost', () => {
     expect(store().queue.at).toBe(1)
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })).toHaveLength(1)
     expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.queueNext })).toEqual([
-      { type: AUDIO_COMMANDS.queueNext, next: 3 },
+      { type: AUDIO_COMMANDS.queueNext, next: { mediaId: 3, level: 1, kbps: null } },
     ])
   })
 
@@ -233,13 +255,117 @@ describe('DesktopAudioHost', () => {
     act(() => store().playTracks({ tracks: [BOOK] }))
     await waitFor(() =>
       expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })).toEqual([
-        { type: AUDIO_COMMANDS.load, mediaId: BOOK.id, next: null, start: 600 },
+        {
+          type: AUDIO_COMMANDS.load,
+          mediaId: BOOK.id,
+          level: 1,
+          next: null,
+          start: 600,
+          kbps: null,
+        },
       ]),
     )
     audio.emit({ type: AUDIO_EVENTS.paused, paused: false })
     audio.emit({ type: AUDIO_EVENTS.time, time: 612 })
     audio.emit({ type: AUDIO_EVENTS.paused, paused: true })
     await waitFor(() => expect(saves).toEqual([612, 612]))
+  })
+
+  it('asks main for the transcode at the bitrate the prefs pick, the queued track again as it changes, and an audiobook for its file', async () => {
+    usePlayerPrefs.getState().setMusicQuality(AUDIO_BITRATES.standard)
+    spyOn(api, 'getMedia').mockResolvedValue(mediaItem({ id: BOOK.id, position: 0 }))
+    const audio = renderNative({ libraries: [MUSIC, BOOKS] })
+    const loads = () => ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })
+    act(() => store().playTracks({ tracks: TRACKS }))
+    await waitFor(() =>
+      expect(loads()).toEqual([
+        {
+          type: AUDIO_COMMANDS.load,
+          mediaId: 1,
+          level: 1,
+          next: { mediaId: 2, level: 1, kbps: 256 },
+          start: 0,
+          kbps: 256,
+        },
+      ]),
+    )
+    const queues = () => ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.queueNext })
+    act(() => usePlayerPrefs.getState().setMusicQuality(AUDIO_BITRATES.high))
+    await waitFor(() =>
+      expect(queues().at(-1)).toEqual({
+        type: AUDIO_COMMANDS.queueNext,
+        next: { mediaId: 2, level: 1, kbps: 320 },
+      }),
+    )
+    act(() => store().playTracks({ tracks: [BOOK] }))
+    await waitFor(() =>
+      expect(loads().at(-1)).toEqual({
+        type: AUDIO_COMMANDS.load,
+        mediaId: BOOK.id,
+        level: 1,
+        next: null,
+        start: 0,
+        kbps: null,
+      }),
+    )
+  })
+
+  it("tells main each track's level and the equalizer's gains as they change", async () => {
+    const quiet = track({
+      id: 1,
+      gain: { track: -6.0206, album: null, trackPeak: null, albumPeak: null },
+    })
+    const loud = track({ id: 2, gain: { track: 0, album: null, trackPeak: null, albumPeak: null } })
+    const audio = renderNative()
+    const sounds = () => ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.sound })
+    await waitFor(() =>
+      expect(sounds()).toEqual([
+        { type: AUDIO_COMMANDS.sound, level: 1, nextLevel: null, eq: FLAT_EQUALIZER.gains },
+      ]),
+    )
+    act(() => store().playTracks({ tracks: [quiet, loud] }))
+    await waitFor(() =>
+      expect(ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.load })).toMatchObject([
+        { mediaId: 1, level: expect.closeTo(0.5, 4), next: { mediaId: 2, level: 1 } },
+      ]),
+    )
+    await waitFor(() =>
+      expect(sounds().at(-1)).toMatchObject({ level: expect.closeTo(0.5, 4), nextLevel: 1 }),
+    )
+    act(() =>
+      usePlayerPrefs
+        .getState()
+        .setEqualizer({ preset: EQ_PRESET_NAMES.vocal, gains: EQ_PRESETS.vocal }),
+    )
+    await waitFor(() => expect(sounds().at(-1)).toMatchObject({ eq: EQ_PRESETS.vocal }))
+    audio.emit({ type: AUDIO_EVENTS.advanced })
+    await waitFor(() =>
+      expect(sounds().at(-1)).toEqual({
+        type: AUDIO_COMMANDS.sound,
+        level: 1,
+        nextLevel: null,
+        eq: EQ_PRESETS.vocal,
+      }),
+    )
+    act(() => usePlayerPrefs.getState().setLevelling(LEVELLING_MODES.off))
+    act(() => store().previous())
+    await waitFor(() => expect(playingTrackOf(store())?.id).toBe(1))
+    await waitFor(() => expect(sounds().at(-1)).toMatchObject({ level: 1 }))
+  })
+
+  it('sends the sound once a run of equalizer changes settles, with the last gains', async () => {
+    const audio = renderNative()
+    const sounds = () => ofType({ commands: audio.sent(), type: AUDIO_COMMANDS.sound })
+    act(() => store().playTracks({ tracks: TRACKS }))
+    await waitFor(() => expect(sounds()).toHaveLength(1))
+    const steps = [EQ_PRESETS.bassBoost, EQ_PRESETS.trebleBoost, EQ_PRESETS.vocal]
+    steps.forEach((gains) =>
+      act(() => usePlayerPrefs.getState().setEqualizer({ preset: EQ_PRESET_NAMES.vocal, gains })),
+    )
+    await waitFor(() => expect(sounds()).toHaveLength(2))
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(sounds()).toHaveLength(2)
+    expect(sounds().at(-1)).toMatchObject({ eq: EQ_PRESETS.vocal })
   })
 
   it('fails the track when main refuses to load it', async () => {

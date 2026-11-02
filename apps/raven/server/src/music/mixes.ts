@@ -86,6 +86,10 @@ const ADDED_ALBUMS = `SELECT a.id FROM albums a
 
 type MixesGetProps = { kind: MixKind } & ListenerScope
 
+type MixesListProps = ListenerScope
+
+type MixesRecentProps = ListenerScope
+
 type MixesIdsProps = { sql: string; scope: ListenerScope; params?: Record<string, string | number> }
 
 type MixesPicksProps = { kind: MixKind; scope: ListenerScope; now: number }
@@ -184,12 +188,12 @@ export class Mixes {
   }
 
   /** Today's mixes in `MIX_KINDS` order, those with too few tracks left out. */
-  list(scope: ListenerScope): MixSummary[] {
+  list(scope: MixesListProps): MixSummary[] {
     return Object.values(MIX_KINDS).flatMap((kind) => this.get({ kind, ...scope })?.mix ?? [])
   }
 
   /** The albums the account played last, and those added last, each in a library it sees. */
-  recent(scope: ListenerScope): RecentAlbums {
+  recent(scope: MixesRecentProps): RecentAlbums {
     return {
       played: this.music.albumsInOrder(this.ids({ sql: PLAYED_ALBUMS, scope })),
       added: this.music.albumsInOrder(this.ids({ sql: ADDED_ALBUMS, scope })),

@@ -1,0 +1,183 @@
+// The side menu beside the page; on a phone the page alone, over a tab bar.
+.shell {
+  --side-top: max(var(--space-5), calc(var(--titlebar-inset) + var(--space-3)));
+
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'side main';
+  // The screen less what PlayerLayer keeps under the shell: the bar and a phone's tab bar.
+  min-height: calc(100dvh - var(--tab-bar-room, 0px) - var(--player-room, 0px));
+}
+
+// The menu holds still as the page scrolls, stopping short of the
+// now-playing bar: the brand, the places, and the way back at its foot.
+.side {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  grid-area: side;
+  align-self: start;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'brand'
+    'links'
+    'back';
+  row-gap: var(--space-4);
+  width: 13rem;
+  height: calc(100dvh - var(--player-room, 0px));
+  padding: var(--side-top) var(--space-2) var(--space-4);
+  border-right: 1px solid var(--color-line-faint);
+}
+
+.brand {
+  grid-area: brand;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--field-size);
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--color-bark);
+  text-decoration: none;
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+// The mode's name after the wordmark, as an eyebrow beside it.
+.mode {
+  color: var(--color-leaf-bright);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.links {
+  grid-area: links;
+  display: grid;
+  align-content: start;
+  gap: var(--space-0);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.item {
+  display: grid;
+  min-width: 0;
+}
+
+.navLink {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-size);
+  padding: var(--space-0) var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover {
+    background: var(--color-hover);
+    color: var(--color-bark);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+
+  &[aria-current='page'] {
+    --icon-tint: 0.4;
+
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+}
+
+// Under a rule at the menu's foot.
+.back {
+  grid-area: back;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-line);
+  border-radius: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .navLink {
+    transition:
+      background-color 150ms var(--ease-out),
+      color 150ms var(--ease-out);
+  }
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// The theme and account buttons over the page, then the page.
+.main {
+  --page-top: var(--side-top);
+  --bar-gap: var(--space-4);
+  --page-start: calc(var(--page-top) + var(--field-size) + var(--bar-gap));
+
+  grid-area: main;
+  display: grid;
+  grid-template-columns: minmax(0, var(--max-width));
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'corner'
+    'page';
+  align-content: start;
+  justify-content: center;
+  row-gap: var(--bar-gap);
+  min-width: 0;
+  padding: var(--page-top) var(--gutter) var(--section-gap);
+}
+
+.corner {
+  grid-area: corner;
+  z-index: 2;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: end;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--field-size);
+
+  &:has([aria-expanded='true']) {
+    z-index: 4;
+  }
+}
+
+.page {
+  grid-area: page;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+}
+
+@media (max-width: 64rem) {
+  .side {
+    width: 11rem;
+  }
+}
+
+@media (max-width: 48rem) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'main';
+  }
+
+  .side {
+    display: none;
+  }
+}

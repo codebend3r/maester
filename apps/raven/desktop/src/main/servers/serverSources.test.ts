@@ -19,7 +19,6 @@ import {
   EXPLAIN_TIMEOUT_MS,
   SOURCE_MESSAGES,
   TRACKS_TIMEOUT_MS,
-  SOURCE_KINDS,
 } from '@/main/servers/serverSources'
 
 const SERVER: ServerEntry = {
@@ -134,7 +133,6 @@ const setup = ({
   const order: string[] = []
   const relayed = fakeRelay({ refusal, isOpenFailing })
   const sources = createServerSources({
-    kind: SOURCE_KINDS.video,
     serverOf: (serverId) => servers.find((server) => server.id === serverId) ?? null,
     calls,
     tickets: {
@@ -191,10 +189,29 @@ describe('resolve', () => {
     ])
     expect(minted).toEqual([{ serverId: SERVER.id, mediaId: 7, isFresh: false }])
     expect(opened).toEqual([
-      { server: SERVER, mediaId: 7, sidecarTrackIds: ['external-0', 'external-1'] },
+      { server: SERVER, mediaId: 7, sidecarTrackIds: ['external-0', 'external-1'], kbps: null },
     ])
     expect(order).toEqual(['mint', 'open'])
     expect(warnings).toEqual([])
+  })
+
+  test('a track asks for no sidecars, and opens its transcode at the bitrate asked', async () => {
+    const { sources, made, opened } = setup()
+    const track = { serverId: SERVER.id, mediaId: 7 }
+    expect(await sources.resolveTrack({ ...track, kbps: 256 })).toEqual({
+      ok: true,
+      target: RELAYED_TARGET,
+    })
+    await sources.resolveTrack({ ...track, kbps: null })
+    expect(made).toEqual([])
+    expect(opened).toEqual([
+      { server: SERVER, mediaId: 7, sidecarTrackIds: [], kbps: 256 },
+      { server: SERVER, mediaId: 7, sidecarTrackIds: [], kbps: null },
+    ])
+    expect(await sources.resolveTrack({ ...track, serverId: 'vhagar', kbps: null })).toEqual({
+      ok: false,
+      message: SOURCE_MESSAGES.badTitle,
+    })
   })
 
   test('only sidecars named external-N are relayed, so nothing else reaches a path', async () => {
@@ -257,7 +274,6 @@ describe('resolve', () => {
     const warnings: string[] = []
     const { relay } = fakeRelay({})
     const sources = createServerSources({
-      kind: SOURCE_KINDS.video,
       serverOf: () => SERVER,
       calls: { call: () => Promise.reject(new Error('gone')) },
       tickets: { ticketFor: async () => ({ kind: TICKET_OUTCOMES.ticket, ticket: 't' }) },

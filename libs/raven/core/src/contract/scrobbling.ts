@@ -40,13 +40,22 @@ export const isListenBrainzLink = object({ token: isListenBrainzToken })
 export type ListenBrainzLink = Infer<typeof isListenBrainzLink>
 
 /**
- * Where Last.fm's sign-in comes back to, exactly: the web's Settings, a
- * path on the web app's own origin, or Wren's scrobbling screen.
+ * Where Last.fm's sign-in comes back to, by name: `web`, the web app's
+ * Settings, on the web address the server knows for itself (which a page
+ * inside Raven, or on a LAN address, cannot name), or Wren's scrobbling
+ * screen, as it is.
  */
-export const SCROBBLE_RETURNS = { web: '/settings', wren: 'wren://scrobbling' } as const
+export const SCROBBLE_RETURNS = { web: 'web', wren: 'wren://scrobbling' } as const
+
+export const isScrobbleReturn = oneOf(Object.values(SCROBBLE_RETURNS))
+
+export type ScrobbleReturn = Infer<typeof isScrobbleReturn>
+
+/** The web app's Settings, the page `SCROBBLE_RETURNS.web` names, on the server's web address. */
+export const SCROBBLE_WEB_PATH = '/settings'
 
 /** `POST /api/me/scrobbling/lastfm/start`: where to come back to once Last.fm signed the account in. */
-export const isLastFmStart = object({ returnTo: isString })
+export const isLastFmStart = object({ returnTo: isScrobbleReturn })
 
 export type LastFmStart = Infer<typeof isLastFmStart>
 

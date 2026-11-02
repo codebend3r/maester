@@ -4,6 +4,8 @@ import {
   DEFAULT_LISTENBRAINZ_TIMEOUT_MS,
   LISTENBRAINZ_AWAY_MS,
   LISTENBRAINZ_LABS,
+  LISTENBRAINZ_LABS_ROUTES,
+  LB_PARAMS,
   ListenBrainzClient,
 } from '@/music/listenBrainzClient'
 import { STILL_CLOCK, manualClock } from '@/test/clock'
@@ -35,9 +37,11 @@ describe('ListenBrainzClient', () => {
     ])
     const [request] = fake.requests
     const url = new URL(request?.url ?? '')
-    expect(`${url.origin}${url.pathname}`).toBe(`${LISTENBRAINZ_LABS}/similar-artists/json`)
-    expect(url.searchParams.get('artist_mbids')).toBe(SEED)
-    expect(url.searchParams.get('algorithm')).toMatch(/^session_based_days_7500_/)
+    expect(`${url.origin}${url.pathname}`).toBe(
+      `${LISTENBRAINZ_LABS}${LISTENBRAINZ_LABS_ROUTES.similarArtists}`,
+    )
+    expect(url.searchParams.get(LB_PARAMS.artists)).toBe(SEED)
+    expect(url.searchParams.get(LB_PARAMS.algorithm)).toMatch(/^session_based_days_7500_/)
     expect(request?.userAgent).toMatch(
       /^raven\/\S+ \(https:\/\/github\.com\/codebend3r\/maester\)$/,
     )

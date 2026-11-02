@@ -22,9 +22,9 @@ export const dayShuffle = <T>({ items, now, key }: DayShuffleProps<T>): T[] => {
 /** The artist a track is filed under for spacing: its first credited, or none. */
 const leadOf = (track: Track): number | null => track.artists[0]?.id ?? null
 
-type CountsProps = { tracks: readonly Track[] }
+type CountsOfProps = { tracks: readonly Track[] }
 
-const countsOf = ({ tracks }: CountsProps): Map<number | null, number> =>
+const countsOf = ({ tracks }: CountsOfProps): Map<number | null, number> =>
   tracks.reduce(
     (counts, track) => counts.set(leadOf(track), (counts.get(leadOf(track)) ?? 0) + 1),
     new Map<number | null, number>(),

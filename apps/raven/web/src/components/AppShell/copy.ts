@@ -3,6 +3,7 @@ export const APP_SHELL_COPY = {
   tabs: 'Tabs',
   pinned: 'Pinned',
   locked: 'locked',
+  music: 'Music',
   streams: 'Streams',
   bugReports: 'Bug reports',
   reports: 'Reports',

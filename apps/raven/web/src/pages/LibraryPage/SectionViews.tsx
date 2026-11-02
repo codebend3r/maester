@@ -57,7 +57,8 @@ import {
 } from '@/lib/queries'
 import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import { LibraryListing, LibraryListingSkeleton } from '@/pages/LibraryPage/LibraryViews'
-import { AlbumsSection, ArtistsSection, PlaylistsSection } from '@/pages/LibraryPage/MusicSections'
+import { PlaylistsSection } from '@/components/PlaylistsSection/PlaylistsSection'
+import { AlbumsSection, ArtistsSection } from '@/pages/LibraryPage/MusicSections'
 import { SelectableCards } from '@/pages/LibraryPage/SelectableCards'
 import {
   LISTING_STATES,

@@ -50,8 +50,10 @@ export const isRadioSeed = object({ kind: isRadioSeedKind, id: isWholeId })
 
 export type RadioSeed = Infer<typeof isRadioSeed>
 
+type RadioSeedTextProps = RadioSeed
+
 /** The seed as `?seed=` carries it. */
-export const radioSeedText = ({ kind, id }: RadioSeed): string => `${kind}:${id}`
+export const radioSeedText = ({ kind, id }: RadioSeedTextProps): string => `${kind}:${id}`
 
 /** The seed a `?seed=` names, or null for one it cannot read. */
 export const radioSeedOf = (text: unknown): RadioSeed | null => {

@@ -1,13 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
-import { type ArtistDetails, ROUTE_STATES, type RouteQuery, routeState } from '@raven/core'
+import {
+  type ArtistDetails,
+  RADIO_SEED_KINDS,
+  ROUTE_STATES,
+  type RouteQuery,
+  routeState,
+} from '@raven/core'
 import { useId } from 'react'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
-import { BackButton, HOME } from '@/components/BackButton/BackButton'
+import { BackButton } from '@/components/BackButton/BackButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { Bone } from '@/components/Skeleton/Skeleton'
+import { START_RADIO_LOOKS, StartRadio } from '@/components/StartRadio/StartRadio'
+import { useMusicLinks } from '@/lib/useMusicLinks'
 import { artistQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
 import { useArtistFavourite } from '@/lib/useMusicFavourite'
@@ -24,9 +32,10 @@ const ArtistView = ({ details }: ArtistViewProps) => {
   const appearsId = useId()
   const { artist, albums, appearsOn } = details
   const favourite = useArtistFavourite({ artistId: artist.id })
+  const links = useMusicLinks()
   return (
     <article className={styles.page} aria-labelledby={titleId}>
-      <BackButton fallback={HOME} className={styles.back} />
+      <BackButton fallback={links.home} className={styles.back} />
       <header className={styles.header}>
         <p className={styles.eyebrow}>{ARTIST_COPY.eyebrow}</p>
         <div className={styles.titleRow}>
@@ -34,6 +43,11 @@ const ArtistView = ({ details }: ArtistViewProps) => {
             {artist.name}
           </h1>
           <FavouriteButton isFavourite={details.isFavourite} onToggle={favourite.mutate} />
+          <StartRadio
+            seed={{ kind: RADIO_SEED_KINDS.artist, id: artist.id }}
+            title={artist.name}
+            look={START_RADIO_LOOKS.icon}
+          />
         </div>
         <p className={styles.count}>{MUSIC_COPY.artistCounts(artist)}</p>
       </header>

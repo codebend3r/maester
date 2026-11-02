@@ -95,7 +95,8 @@ export const resolveSourceWith =
 export type ResolveSource = ReturnType<typeof resolveSourceWith>
 
 /** mpv's `%len%` quoting, so a value may hold `,` or `=` without ending the option. */
-const quoted = (value: string): string => `%${new TextEncoder().encode(value).length}%${value}`
+export const quoted = (value: string): string =>
+  `%${new TextEncoder().encode(value).length}%${value}`
 
 type LoadfileOptionsForProps = { target: LoadTarget; start: number }
 
