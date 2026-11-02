@@ -1,3 +1,4 @@
+import type { AlbumSummary } from '@raven/core'
 import { type ComponentType, useId } from 'react'
 import { Link } from 'react-router-dom'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
@@ -13,10 +14,11 @@ import { SongList } from '@/pages/MusicLibraryPage/SongList'
 import { MUSIC_LIBRARY_COPY } from '@/pages/MusicLibraryPage/copy'
 import styles from '@/pages/MusicLibraryPage/MusicLibraryPage.module.scss'
 
-/** The library's four lists, each at its own address. */
+/** The library's five lists, each at its own address. */
 export const MUSIC_LIBRARY_SECTIONS = {
   albums: 'albums',
   artists: 'artists',
+  noArtwork: 'no-artwork',
   songs: 'songs',
   playlists: 'playlists',
 } as const
@@ -33,6 +35,11 @@ const SECTION_LINKS = [
     section: MUSIC_LIBRARY_SECTIONS.artists,
     to: MUSIC_PATHS.artists,
     label: MUSIC_LIBRARY_COPY.artists,
+  },
+  {
+    section: MUSIC_LIBRARY_SECTIONS.noArtwork,
+    to: MUSIC_PATHS.noArtwork,
+    label: MUSIC_LIBRARY_COPY.noArtwork,
   },
   { section: MUSIC_LIBRARY_SECTIONS.songs, to: MUSIC_PATHS.songs, label: MUSIC_LIBRARY_COPY.songs },
   {
@@ -59,20 +66,32 @@ type EmptyOfProps<T> = { listing: MusicListing<T>; empty: string }
 const emptyOf = <T,>({ listing, empty }: EmptyOfProps<T>): string =>
   listing.hasNoMusic ? MUSIC_COPY.noMusic : empty
 
-/** Every music library's albums, by title. */
-const AlbumsList = () => {
+type AlbumsSectionProps = { isShown: (album: AlbumSummary) => boolean; empty: string }
+
+/** Every music library's albums that `isShown` keeps, by title. */
+const AlbumsSection = ({ isShown, empty }: AlbumsSectionProps) => {
   const albums = useAllAlbums({ search: '' })
   return (
     <ListState
-      entries={albums.isRead ? albums.entries : undefined}
+      entries={albums.isRead ? albums.entries.filter(isShown) : undefined}
       error={albums.error}
-      empty={emptyOf({ listing: albums, empty: MUSIC_LIBRARY_COPY.noAlbums })}
+      empty={emptyOf({ listing: albums, empty })}
       loading={<AlbumGridSkeleton />}
     >
       {(entries) => <AlbumGrid albums={entries} />}
     </ListState>
   )
 }
+
+const AlbumsList = () => <AlbumsSection isShown={() => true} empty={MUSIC_LIBRARY_COPY.noAlbums} />
+
+/** The albums with no cover. */
+const NoArtworkList = () => (
+  <AlbumsSection
+    isShown={(album) => album.coverVersion == null}
+    empty={MUSIC_LIBRARY_COPY.noArtworkAlbums}
+  />
+)
 
 /** Every music library's artists, each once, by name. */
 const ArtistsList = () => {
@@ -113,6 +132,7 @@ const SongsList = () => {
 const SECTION_VIEWS = {
   [MUSIC_LIBRARY_SECTIONS.albums]: AlbumsList,
   [MUSIC_LIBRARY_SECTIONS.artists]: ArtistsList,
+  [MUSIC_LIBRARY_SECTIONS.noArtwork]: NoArtworkList,
   [MUSIC_LIBRARY_SECTIONS.songs]: SongsList,
   [MUSIC_LIBRARY_SECTIONS.playlists]: PlaylistsSection,
 } as const satisfies Record<MusicLibrarySection, ComponentType>

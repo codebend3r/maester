@@ -43,6 +43,7 @@ export const MUSIC_PATHS = {
   root: '/music',
   albums: '/music/albums',
   artists: '/music/artists',
+  noArtwork: '/music/no-artwork',
   songs: '/music/songs',
   playlists: '/music/playlists',
   album: '/music/albums/:id',

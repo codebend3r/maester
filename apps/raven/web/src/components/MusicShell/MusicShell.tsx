@@ -35,6 +35,7 @@ const LIBRARY_PLACE = {
   patterns: [
     MUSIC_PATHS.albums,
     MUSIC_PATHS.artists,
+    MUSIC_PATHS.noArtwork,
     MUSIC_PATHS.songs,
     MUSIC_PATHS.playlists,
     MUSIC_PATHS.album,
