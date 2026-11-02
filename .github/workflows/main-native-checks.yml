@@ -1,6 +1,6 @@
 name: 🧱 Main native checks
 
-# Every push to main runs all desktop, device app, Wren and Windows builds and flows.
+# Every push to main runs affected desktop, device app, Wren and Windows checks.
 # These checks never block pull requests. A failure emails the pusher,
 # as any failed run on main does.
 # Run it by hand from the Actions tab on any branch to check before merging.
@@ -15,19 +15,53 @@ permissions:
 
 # No concurrency group: every push must build, without replacing a pending run.
 jobs:
+  affected:
+    name: 🔎 Select affected native checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      app: ${{ steps.select.outputs.app }}
+      music: ${{ steps.select.outputs.music }}
+      desktop: ${{ steps.select.outputs.desktop }}
+    steps:
+      - name: 📥 Checkout exact commit and history
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      - name: 🔎 Select checks since the last successful ancestor
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NX_DAEMON: 'false'
+        run: python3 scripts/select_native_checks.py
+
   native:
     name: 🧱 Native apps
+    needs: affected
+    if: needs.affected.outputs.app == 'true' || needs.affected.outputs.music == 'true' || needs.affected.outputs.desktop == 'true'
     uses: ./.github/workflows/native-checks.yml
     with:
       sha: ${{ github.sha }}
-      app: true
-      music: true
-      windows: true
+      app: ${{ needs.affected.outputs.app == 'true' }}
+      music: ${{ needs.affected.outputs.music == 'true' }}
+      windows: ${{ needs.affected.outputs.desktop == 'true' }}
     secrets: inherit
 
   # One native build feeds packaging and both playback checks through an artifact.
   desktop-native:
     name: 🎞️ Desktop native
+    needs: affected
+    if: needs.affected.outputs.desktop == 'true'
     # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
     runs-on: macos-26
     timeout-minutes: 120
