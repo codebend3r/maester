@@ -33,7 +33,15 @@ export const LIBRARY_COPY = {
   missing: 'This library is not on the server.',
   nothingInProgress: 'Nothing in progress here yet.',
   showPage: (page: string) => `Show ${page}`,
-  gathering: { shows: 'Gathering the shows', videos: 'Gathering the videos' },
+  gathering: {
+    shows: 'Gathering the shows',
+    videos: 'Gathering the videos',
+    sagas: 'Gathering the sagas',
+  },
+  sagas: 'Sagas',
+  saga: { one: 'saga', many: 'sagas' },
+  sagasEmpty: (name: string) =>
+    `No sagas in ${name} yet. One shows here once two movies or more from the same TMDB collection are in the library.`,
   sort: 'Sort',
   order: (direction: string) => `Order: ${direction}`,
   view: 'View',
@@ -102,6 +110,12 @@ export const SIGN_IN_COPY = {
 export const ALBUM_COPY = {
   opening: 'Opening the album',
   missing: 'This album is not on the server.',
+} as const
+
+export const SAGA_COPY = {
+  opening: 'Opening the saga',
+  missing: 'This saga is not on the server.',
+  playAll: 'Play all',
 } as const
 
 export const ARTIST_COPY = {

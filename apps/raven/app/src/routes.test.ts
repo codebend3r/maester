@@ -44,6 +44,13 @@ describe('hrefOf', () => {
     })
   })
 
+  it("opens a saga's page by its collection's id, naming the library that lists it", () => {
+    expect(hrefOf({ kind: ROUTE_TARGETS.saga, libraryId: 1, sagaId: '119' })).toEqual({
+      pathname: APP_ROUTES.saga,
+      params: { [APP_ROUTE_PARAMS.id]: '119', [APP_ROUTE_PARAMS.library]: '1' },
+    })
+  })
+
   it('plays a file, from the spot Resume names', () => {
     expect(hrefOf({ kind: ROUTE_TARGETS.play, mediaId: 20, at: 0 })).toEqual({
       pathname: APP_ROUTES.play,

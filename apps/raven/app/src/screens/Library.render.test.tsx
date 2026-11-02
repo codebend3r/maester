@@ -5,6 +5,7 @@ import {
   LIBRARY_VIEWS,
   LIBRARY_VIEW_LABELS,
   MEDIA_SORTS,
+  type Saga,
   SEARCH_DELAY_MS,
   SORT_FIELD_LABELS,
   sortFieldsFor,
@@ -17,10 +18,17 @@ import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import { APP_ROUTE_PARAMS, APP_ROUTES } from '@/routes'
 import { Library } from '@/screens/Library'
+import { LIBRARY_COPY } from '@/screens/copy'
 import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
-import { FILM_SEARCHES, GROUPED_FILMS, libraryApi, libraryPath } from '@/test/libraryServer'
+import {
+  FILM_SEARCHES,
+  GROUPED_FILMS,
+  NIGHT_SAGA,
+  libraryApi,
+  libraryPath,
+} from '@/test/libraryServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import { keyboardTapsAbove, renderScreen } from '@/test/renderScreen'
 import { linesHeightOf } from '@/layouts/textHeights'
@@ -51,10 +59,12 @@ const mockParams = jest.fn((): Record<string, string> => ({
 const mockServer: {
   requests: string[]
   libraries: LibraryRecord[]
+  sagas: Saga[]
   reads: (path: string) => Promise<void>
 } = {
   requests: [],
   libraries: [],
+  sagas: [NIGHT_SAGA],
   reads: async () => undefined,
 }
 const mockApi = jest.fn((_server: AppServer) =>
@@ -63,6 +73,7 @@ const mockApi = jest.fn((_server: AppServer) =>
       mockServer.requests = [...mockServer.requests, path]
     },
     libraries: () => mockServer.libraries,
+    sagas: () => mockServer.sagas,
     reads: (path) => mockServer.reads(path),
   }),
 )
@@ -161,6 +172,7 @@ describe('Library on a phone or tablet', () => {
     jest.clearAllMocks()
     mockServer.requests = []
     mockServer.libraries = []
+    mockServer.sagas = [NIGHT_SAGA]
     mockServer.reads = async () => undefined
     mockFontScale.mockReturnValue(1)
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
@@ -488,5 +500,45 @@ describe('Library on a phone or tablet', () => {
         path.startsWith(`${APP_CLIENT_CALLS.listLibraries.path}/`),
       ),
     ).toBe(false)
+  })
+
+  describe('sagas', () => {
+    it("opens a movies library's sagas from a button, each a card that opens its page", async () => {
+      await renderLibrary({ id: FILMS.id })
+      await screen.findByRole('button', { name: 'Night Train' })
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Show Sagas' }))
+
+      expect(await screen.findByRole('button', { name: 'Night Trains' })).toBeTruthy()
+      expect(screen.getByText('2 movies, 2021 to 2025')).toBeTruthy()
+      expect(screen.getByText('Sagas, 1 saga')).toBeTruthy()
+      await fireEvent.press(screen.getByRole('button', { name: 'Night Trains' }))
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: APP_ROUTES.saga,
+        params: {
+          [APP_ROUTE_PARAMS.id]: NIGHT_SAGA.tmdbId,
+          [APP_ROUTE_PARAMS.library]: String(FILMS.id),
+        },
+      })
+      // Back to the listing, and on to the sagas again: the buttons name where each goes.
+      expect(screen.getByRole('button', { name: 'Show Library' })).toBeTruthy()
+    })
+
+    it('says so when the library has none', async () => {
+      mockServer.sagas = []
+      await renderLibrary({ id: FILMS.id })
+      await screen.findByRole('button', { name: 'Night Train' })
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Show Sagas' }))
+
+      expect(await screen.findByText(LIBRARY_COPY.sagasEmpty('Films'))).toBeTruthy()
+    })
+
+    it('offers no sagas where files are not matched to movies', async () => {
+      await renderLibrary({ id: SERIES.id })
+      await screen.findByRole('button', { name: 'Saltmarsh' })
+
+      expect(screen.queryByRole('button', { name: 'Show Sagas' })).toBeNull()
+    })
   })
 })

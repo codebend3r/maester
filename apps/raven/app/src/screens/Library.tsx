@@ -1,5 +1,6 @@
 import {
   type Library as LibraryRecord,
+  type LibraryKind,
   type LibrarySettings,
   type LibraryView,
   type MediaItem,
@@ -37,6 +38,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { type ReactNode, useState } from 'react'
 
 import { MusicPages } from '@/music/MusicPages'
+import { hasSagas } from '@/queries/sagaCards'
+import { SagasGrid, type SagasGridProps } from '@/screens/LibrarySagas'
 import type { ShelfCard } from '@/queries/cards'
 import { CONTINUE_WATCHING } from '@/queries/homeShelves'
 import { showArtIdsOf } from '@/queries/showArt'
@@ -53,16 +56,18 @@ import { appViewsFor, useLibraryView } from '@/screens/useLibraryView'
 import type { LibraryChoice } from '@/stores/libraryViews'
 
 /**
- * The two pages a library opens on: what is being watched in it, for picking up where one left
- * off, and the library itself, its listing sorted, laid out and searched.
+ * The pages a library opens on: what is being watched in it, for picking up where one left
+ * off, the library itself, its listing sorted, laid out and searched, and, in a movie library,
+ * its sagas.
  */
-const LIBRARY_PAGES = { continue: 'continue', library: 'library' } as const
+const LIBRARY_PAGES = { continue: 'continue', library: 'library', sagas: 'sagas' } as const
 
 type LibraryPage = (typeof LIBRARY_PAGES)[keyof typeof LIBRARY_PAGES]
 
 const PAGE_NAMES = {
   [LIBRARY_PAGES.continue]: CONTINUE_WATCHING,
   [LIBRARY_PAGES.library]: LIBRARY_COPY.library,
+  [LIBRARY_PAGES.sagas]: LIBRARY_COPY.sagas,
 } as const satisfies Record<LibraryPage, string>
 
 /** What each view's chip draws beside its name: the web's icons for the views. */
@@ -78,26 +83,34 @@ const VIEW_ICONS = {
 const PAGE_ICONS = {
   [LIBRARY_PAGES.continue]: 'history',
   [LIBRARY_PAGES.library]: 'libraries',
+  [LIBRARY_PAGES.sagas]: 'covers',
 } as const satisfies Record<LibraryPage, IconName>
 
-/** The page the other one's button leads to. */
-const otherPageOf = (page: LibraryPage): LibraryPage =>
-  page === LIBRARY_PAGES.continue ? LIBRARY_PAGES.library : LIBRARY_PAGES.continue
+/** The pages a library has, in the order their buttons stand: Sagas only where files are matched to movies. */
+const pagesOf = (kind: LibraryKind): LibraryPage[] =>
+  hasSagas(kind)
+    ? [LIBRARY_PAGES.continue, LIBRARY_PAGES.library, LIBRARY_PAGES.sagas]
+    : [LIBRARY_PAGES.continue, LIBRARY_PAGES.library]
 
-type PageToggleProps = { page: LibraryPage; onChange: (page: LibraryPage) => void }
-
-/** The one press from either page to the other: named for where it goes. */
-const PageToggle = ({ page, onChange }: PageToggleProps) => {
-  const other = otherPageOf(page)
-  return (
-    <ToolButton
-      accessibilityLabel={LIBRARY_COPY.showPage(PAGE_NAMES[other])}
-      icon={PAGE_ICONS[other]}
-      label={PAGE_NAMES[other]}
-      onPress={() => onChange(other)}
-    />
-  )
+type PageTogglesProps = {
+  page: LibraryPage
+  pages: readonly LibraryPage[]
+  onChange: (page: LibraryPage) => void
 }
+
+/** A press to each of the other pages, each named for where it goes. */
+const PageToggles = ({ page, pages, onChange }: PageTogglesProps) =>
+  pages
+    .filter((other) => other !== page)
+    .map((other) => (
+      <ToolButton
+        accessibilityLabel={LIBRARY_COPY.showPage(PAGE_NAMES[other])}
+        icon={PAGE_ICONS[other]}
+        key={other}
+        label={PAGE_NAMES[other]}
+        onPress={() => onChange(other)}
+      />
+    ))
 
 type ShuffleButtonProps = { library: LibraryRecord; choices: readonly MediaItem[] }
 
@@ -357,12 +370,14 @@ type LibraryPagesViewProps = {
   [LIBRARY_PAGES_VIEW_KEYS.loading]: LoadingProps
   [LIBRARY_PAGES_VIEW_KEYS.continue]: ContinueGridProps
   [LIBRARY_PAGES_VIEW_KEYS.library]: LibraryGridProps
+  [LIBRARY_PAGES_VIEW_KEYS.sagas]: SagasGridProps
 }
 
 const LIBRARY_PAGES_VIEWS = {
   [LIBRARY_PAGES_VIEW_KEYS.loading]: Loading,
   [LIBRARY_PAGES_VIEW_KEYS.continue]: ContinueGrid,
   [LIBRARY_PAGES_VIEW_KEYS.library]: LibraryGrid,
+  [LIBRARY_PAGES_VIEW_KEYS.sagas]: SagasGrid,
 } as const satisfies ViewsOf<LibraryPagesViewProps>
 
 type LibraryPagesViewOfProps = LibraryPagesProps & {
@@ -389,6 +404,11 @@ const libraryPagesViewOf = ({
       return { key: LIBRARY_PAGES_VIEW_KEYS.continue, props: { ...shown, entries, toggle } }
     case LIBRARY_PAGES.library:
       return { key: LIBRARY_PAGES_VIEW_KEYS.library, props: { ...shown, toggle } }
+    case LIBRARY_PAGES.sagas:
+      return {
+        key: LIBRARY_PAGES_VIEW_KEYS.sagas,
+        props: { session: shown.session, library: shown.library, toggle },
+      }
     default: {
       const unknown: never = page
       return unknown
@@ -397,8 +417,8 @@ const libraryPagesViewOf = ({
 }
 
 /**
- * A library's two pages, Continue watching and the library itself, with the one press between
- * them. It opens on Continue watching while anything in it is in progress, so a show is picked
+ * A library's pages, Continue watching, the library itself and, in a movie library, its Sagas,
+ * with a press to each of the others. It opens on Continue watching while anything in it is in progress, so a show is picked
  * up in one press, and on the library otherwise; a search handed over opens the library too.
  */
 const LibraryPages = (props: LibraryPagesProps) => {
@@ -413,7 +433,9 @@ const LibraryPages = (props: LibraryPagesProps) => {
     page,
     isWaiting: entries === null && inProgress.isPending && chosen === null,
     entries: entries ?? [],
-    toggle: <PageToggle onChange={setChosen} page={page} />,
+    toggle: (
+      <PageToggles onChange={setChosen} page={page} pages={pagesOf(props.library.settings.kind)} />
+    ),
     onBack: () => router.back(),
   })
   return <KeyedView<LibraryPagesViewProps> view={view} views={LIBRARY_PAGES_VIEWS} />
