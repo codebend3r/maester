@@ -157,7 +157,7 @@ type MediaCardProps = Pictures & { media: MediaItem; order?: Order }
  */
 type MovieCardProps = MediaCardProps
 
-const movieCard = ({ media, api, headersFor, order = null }: MovieCardProps): ShelfCard => {
+export const movieCard = ({ media, api, headersFor, order = null }: MovieCardProps): ShelfCard => {
   const { title, year } = cardTitle(media)
   return videoCard({
     media,

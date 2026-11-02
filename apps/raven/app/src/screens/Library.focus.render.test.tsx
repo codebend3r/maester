@@ -24,6 +24,7 @@ import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import {
   FILM_SEARCHES,
   GROUPED_FILMS,
+  NIGHT_SAGA,
   NIGHT_TRAIN_IN_PROGRESS,
   libraryApi,
   libraryPath,
@@ -396,5 +397,22 @@ describe('Library on a TV', () => {
     await renderScreen({ ui: <Library /> })
     await layOut()
     expect(await screen.findByRole('button', { name: 'Busboys' })).toBeTruthy()
+  })
+
+  it("opens a movies library's sagas from a plate", async () => {
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Show Sagas' }))
+    await layOut()
+
+    expect(await screen.findByRole('button', { name: NIGHT_SAGA.name })).toBeTruthy()
+  })
+
+  it('offers no sagas in a library of shows', async () => {
+    await renderLibrary({ id: SERIES.id })
+    await screen.findByRole('button', { name: 'Saltmarsh' })
+
+    expect(screen.queryByRole('button', { name: 'Show Sagas' })).toBeNull()
   })
 })

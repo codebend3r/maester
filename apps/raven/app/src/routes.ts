@@ -9,6 +9,7 @@ export const APP_ROUTES = {
   play: '/play/[mediaId]',
   album: '/album/[id]',
   artist: '/artist/[id]',
+  saga: '/saga/[id]',
   playlist: '/playlist/[id]',
   nowPlaying: '/now-playing',
   search: '/search',
@@ -43,6 +44,7 @@ export const APP_SCREENS = {
   play: 'play/[mediaId]',
   album: 'album/[id]',
   artist: 'artist/[id]',
+  saga: 'saga/[id]',
   playlist: 'playlist/[id]',
   nowPlaying: 'now-playing',
   search: 'search',
@@ -52,7 +54,7 @@ export const APP_SCREENS = {
 
 /**
  * Where a card or a link takes the viewer: an item's page, the player, a library, an album, an
- * artist or one of the account's playlists.
+ * artist, a saga or one of the account's playlists.
  */
 export const ROUTE_TARGETS = {
   item: 'item',
@@ -60,6 +62,7 @@ export const ROUTE_TARGETS = {
   library: 'library',
   album: 'album',
   artist: 'artist',
+  saga: 'saga',
   playlist: 'playlist',
 } as const
 
@@ -90,6 +93,8 @@ export type RouteTarget =
     }
   | { kind: typeof ROUTE_TARGETS.album; albumId: number }
   | { kind: typeof ROUTE_TARGETS.artist; artistId: number }
+  /** A saga's page, by the library that lists it and its TMDB collection's id. */
+  | { kind: typeof ROUTE_TARGETS.saga; libraryId: number; sagaId: string }
   | { kind: typeof ROUTE_TARGETS.playlist; playlistId: number }
 
 /** An item's page, with neither a library nor a file named. */
@@ -154,6 +159,14 @@ export const hrefOf = (target: RouteTarget): Href => {
       return {
         pathname: APP_ROUTES.artist,
         params: { [APP_ROUTE_PARAMS.id]: String(target.artistId) },
+      }
+    case ROUTE_TARGETS.saga:
+      return {
+        pathname: APP_ROUTES.saga,
+        params: {
+          [APP_ROUTE_PARAMS.id]: target.sagaId,
+          [APP_ROUTE_PARAMS.library]: String(target.libraryId),
+        },
       }
     case ROUTE_TARGETS.playlist:
       return {

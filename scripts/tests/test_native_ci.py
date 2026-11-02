@@ -1,3 +1,4 @@
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,24 @@ def test_pull_requests_do_not_run_or_wait_for_native_or_desktop_jobs():
     assert set(jobs) == {"checks", "build", "checks-complete", "supabase", "smoke"}
     assert all(job.get("uses") != NATIVE_WORKFLOW for job in jobs.values())
     assert all(job.get("runs-on") != "macos-26" for job in jobs.values())
+
+
+def test_supabase_reserves_its_ports_before_any_network_activity():
+    workflow = yaml.load(
+        (WORKFLOWS / "pull-request-checks.yml").read_text(), Loader=yaml.BaseLoader
+    )
+    first_step = workflow["jobs"]["supabase"]["steps"][0]
+    command, port_range = first_step["run"].split("=", 1)
+    assert command == "sudo sysctl -w net.ipv4.ip_local_reserved_ports"
+    first, last = map(int, port_range.split("-"))
+    config = tomllib.loads((ROOT / "apps/raven/supabase/config.toml").read_text())
+    ports = {
+        config["api"]["port"],
+        config["db"]["port"],
+        config["db"]["shadow_port"],
+        config["local_smtp"]["port"],
+    }
+    assert ports <= set(range(first, last + 1))
 
 
 def test_every_main_push_runs_all_native_apps_without_filtering_or_cancellation():

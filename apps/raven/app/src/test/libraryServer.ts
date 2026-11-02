@@ -4,12 +4,14 @@ import {
   type AppClientCall,
   ITEM_TYPES,
   LIBRARY_VIEWS,
+  DEFAULT_SAGA_BACKDROP,
   type Library,
   MATCH_STATES,
   MEDIA_GROUPINGS,
   MEDIA_SORTS,
   type MediaSort,
   type PosterEntry,
+  type Saga,
   type ShowEntry,
   type ShowListing,
   createApiClient,
@@ -99,7 +101,16 @@ export const libraryPath = ({ call, library, sort, search }: LibraryPathProps): 
 /** What a viewer types in Films' search box to find Busboys, and to find nothing. */
 export const FILM_SEARCHES = { busboys: 'bus', nothing: 'zzz' } as const
 
-const { getLibrary, listInProgress, listLibraries, listMedia, listShows } = APP_CLIENT_CALLS
+const { getLibrary, listInProgress, listLibraries, listMedia, listSagas, listShows } =
+  APP_CLIENT_CALLS
+
+/** Ashfall Gate, watched, then Night Train: one TMDB collection, oldest first. */
+export const NIGHT_SAGA: Saga = {
+  tmdbId: '77',
+  name: 'Night Trains',
+  backdrop: DEFAULT_SAGA_BACKDROP,
+  media: [{ ...ASHFALL_GATE, watched: true }, NIGHT_TRAIN],
+}
 
 /** Films by title, date added or release date, and searched; Series by title or release date. */
 const ANSWERS: Record<string, unknown> = {
@@ -172,6 +183,8 @@ type LibraryApiProps = {
   reads?: (path: string) => Promise<void>
   /** What Films has in progress; nothing unless a test says. */
   inProgress?: () => PosterEntry[]
+  /** Films' sagas; `NIGHT_SAGA` unless a test says. */
+  sagas?: () => Saga[]
 }
 
 /**
@@ -183,22 +196,24 @@ export const libraryApi = ({
   libraries = () => [],
   reads = async () => undefined,
   inProgress = () => [],
+  sagas = () => [NIGHT_SAGA],
 }: LibraryApiProps = {}): ApiClient =>
   createApiClient({
     baseUrl: NAS.origin,
     fetch: allowlistedFetch({
       fetch: async (url) => {
+        const bodyFor = (path: string): unknown => {
+          if (path === libraryPath({ call: listInProgress, library: FILMS })) return inProgress()
+          if (path === libraryPath({ call: listSagas, library: FILMS })) return sagas()
+          return ANSWERS[path]
+        }
         const path = url.slice(NAS.origin.length)
         record(path)
         await reads(path)
         const override = libraries().find(
           (library) => path === libraryPath({ call: getLibrary, library }),
         )
-        const body =
-          override ??
-          (path === libraryPath({ call: listInProgress, library: FILMS })
-            ? inProgress()
-            : ANSWERS[path])
+        const body = override ?? bodyFor(path)
         return responseOf(body === undefined ? NOT_FOUND : { status: STATUSES.ok, body })
       },
     }),
