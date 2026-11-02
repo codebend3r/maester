@@ -38,7 +38,7 @@ def test_supabase_reserves_its_ports_before_any_network_activity():
     assert ports <= set(range(first, last + 1))
 
 
-def test_every_main_push_runs_all_native_apps_without_filtering_or_cancellation():
+def test_every_main_push_selects_native_apps_without_cancellation():
     workflow = yaml.load((WORKFLOWS / "main-native-checks.yml").read_text(), Loader=yaml.BaseLoader)
     assert workflow["on"] == {
         "push": {"branches": ["main"]},
@@ -46,16 +46,22 @@ def test_every_main_push_runs_all_native_apps_without_filtering_or_cancellation(
     }
     assert "concurrency" not in workflow
     assert workflow["permissions"]["actions"] == "write"
-    assert set(workflow["jobs"]) == {"native"} | DESKTOP_JOBS
+    assert set(workflow["jobs"]) == {"affected", "native"} | DESKTOP_JOBS
+    affected = workflow["jobs"]["affected"]
+    assert affected["runs-on"] == "ubuntu-24.04"
+    assert affected["steps"][0]["with"]["fetch-depth"] == "0"
+    assert affected["steps"][-1]["run"] == "python3 scripts/select_native_checks.py"
     native = workflow["jobs"]["native"]
     assert native["uses"] == NATIVE_WORKFLOW
-    assert "needs" not in native
-    assert "if" not in native
+    assert native["needs"] == "affected"
+    assert all(
+        f"needs.affected.outputs.{group}" in native["if"] for group in ("app", "music", "desktop")
+    )
     assert native["with"] == {
         "sha": "${{ github.sha }}",
-        "app": "true",
-        "music": "true",
-        "windows": "true",
+        "app": "${{ needs.affected.outputs.app == 'true' }}",
+        "music": "${{ needs.affected.outputs.music == 'true' }}",
+        "windows": "${{ needs.affected.outputs.desktop == 'true' }}",
     }
     assert native["secrets"] == "inherit"
 
@@ -65,15 +71,16 @@ def test_main_desktop_jobs_build_the_pushed_commit_and_keep_the_handoff(job_name
     workflow = yaml.load((WORKFLOWS / "main-native-checks.yml").read_text(), Loader=yaml.BaseLoader)
     job = workflow["jobs"][job_name]
     assert job["runs-on"] == "macos-26"
-    assert "if" not in job
     assert "pull_request" not in str(job)
     checkout = job["steps"][0]
     assert checkout["uses"] == "actions/checkout@v7"
     assert checkout["with"]["ref"] == "${{ github.sha }}"
     if job_name == "desktop-native":
-        assert "needs" not in job
+        assert job["needs"] == "affected"
+        assert job["if"] == "needs.affected.outputs.desktop == 'true'"
         handoff_action = "actions/upload-artifact@v7"
     else:
+        assert "if" not in job
         assert job["needs"] == "desktop-native"
         handoff_action = "actions/download-artifact@v8"
     assert any(
