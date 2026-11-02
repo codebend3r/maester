@@ -5,6 +5,7 @@ import { ITEM_TYPES } from '@raven/core'
 import { BingeButton } from '@/components/BingeButton/BingeButton'
 import { BINGE_COPY } from '@/lib/binge'
 import { useAuthSession } from '@/stores/authSession'
+import { STORE_KEYS } from '@/stores/storage'
 import { fakeBinge } from '@/test/fakeBinge'
 import { renderWithProviders } from '@/test/render'
 
@@ -12,7 +13,10 @@ const show = { id: 4, type: ITEM_TYPES.show } as const
 
 describe('BingeButton', () => {
   let binge = fakeBinge()
-  afterEach(() => binge.restore())
+  afterEach(() => {
+    binge.restore()
+    window.localStorage.removeItem(STORE_KEYS.bingeTip)
+  })
 
   it('highlights a first visit, explains the feature, and remembers dismissal', async () => {
     binge = fakeBinge()
@@ -78,12 +82,13 @@ describe('BingeButton', () => {
     binge = fakeBinge({ ids: [4], hasSeenTip: true })
     renderWithProviders({ ui: <BingeButton item={show} /> })
     expect(await screen.findByRole('button', { name: BINGE_COPY.binging })).toBeInTheDocument()
+    window.localStorage.setItem(STORE_KEYS.bingeTip, 'true')
     binge.get.mockImplementation(async () => ({ ids: [], hasSeenTip: false }))
     act(() => useAuthSession.setState({ session: { userId: 'other', accessToken: 't' } }))
     expect(await screen.findByRole('button', { name: BINGE_COPY.add })).toHaveAttribute(
       'aria-pressed',
       'false',
     )
-    expect(await screen.findByRole('note')).toBeInTheDocument()
+    expect(screen.queryByRole('note')).toBeNull()
   })
 })
