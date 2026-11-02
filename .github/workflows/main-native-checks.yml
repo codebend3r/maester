@@ -1,0 +1,87 @@
+name: 🧱 Main native checks
+
+# The device app, Wren and Windows installer builds and flows that pull requests skip
+# unless they change what the native compile reads (pull-request-checks.yml). They run
+# here on each merge that touches what they build, from the same definition
+# (native-checks.yml), so a break the PR did not see shows up on the merge that caused it.
+# A failure emails the pusher, as any failed run on main does.
+#
+# Run it by hand from the Actions tab on any branch, a PR's among them, to build everything
+# before a risky native change merges.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time. GitHub keeps one pending run and drops older pending ones, which is
+# fine: each run builds the whole of main as of its commit, not just its own diff.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  # Which of the native builds the merge touches, through Nx's graph. By hand, all of them.
+  affected:
+    name: 🔍 Native affected
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      app: ${{ steps.affected.outputs.app }}
+      music: ${{ steps.affected.outputs.music }}
+      windows: ${{ steps.affected.outputs.windows }}
+    steps:
+      # The merge's whole history, so Nx can diff against the commit main was on before.
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Bun's version comes from `packageManager` in package.json.
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      # Nx reads the project graph from the installed workspace.
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      - name: 🔍 Which native builds
+        id: affected
+        env:
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          emit() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
+          # A manual run, or a first push with no earlier commit, builds everything.
+          if [ "$EVENT" = workflow_dispatch ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ]; then
+            emit app true; emit music true; emit windows true
+            exit 0
+          fi
+          projects="$(bunx nx show projects --affected --base="$BEFORE" --head="$GITHUB_SHA" --json)"
+          echo "Affected: $projects"
+          # Anything but a list of names fails the job here, rather than reading as no builds.
+          echo "$projects" | jq -e 'type == "array" and all(type == "string")' > /dev/null
+          affects() { echo "$projects" | jq -e --arg name "$1" 'index($name) != null' > /dev/null; }
+          verdict() { if "$@"; then echo true; else echo false; fi; }
+          app() { affects @raven/app || affects @raven/server; }
+          music() { affects @raven/music || affects @raven/server; }
+          windows() { affects @raven/desktop || affects @raven/mpv; }
+          emit app "$(verdict app)"
+          emit music "$(verdict music)"
+          emit windows "$(verdict windows)"
+
+  native:
+    name: 🧱 Native apps
+    needs: affected
+    if: needs.affected.outputs.app == 'true' || needs.affected.outputs.music == 'true' || needs.affected.outputs.windows == 'true'
+    uses: ./.github/workflows/native-checks.yml
+    with:
+      sha: ${{ github.sha }}
+      app: ${{ needs.affected.outputs.app == 'true' }}
+      music: ${{ needs.affected.outputs.music == 'true' }}
+      windows: ${{ needs.affected.outputs.windows == 'true' }}
+    secrets: inherit
