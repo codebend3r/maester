@@ -73,6 +73,7 @@ export const artist = (overrides: Partial<Artist> = {}): Artist => ({
   name: RADIOHEAD.name,
   sortName: 'Radiohead',
   mbid: null,
+  photoVersion: null,
   albumCount: 1,
   trackCount: 2,
   ...overrides,

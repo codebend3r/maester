@@ -16,7 +16,7 @@ import {
   watchLink,
   watchedStateOf,
 } from '@raven/core'
-import { type ReactNode, useId, useState } from 'react'
+import { useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink } from '@raven/ui'
@@ -41,7 +41,6 @@ import { LIBRARY_LOCK_STATES, type LibraryLock, useLibraryLock } from '@/lib/lib
 import { libraryQuery, sagasQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
-import { useOwnBackdrop } from '@/lib/useHoverBackdrop'
 import { LIBRARY_SECTIONS, sectionPath } from '@/pages/LibraryPage/librarySections'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { SagaBackdropDialog } from '@/pages/SagaPage/SagaBackdropDialog'
@@ -93,14 +92,6 @@ const SagaWatchedToggle = ({ saga, libraryId }: SagaWatchedToggleProps) => {
   return <WatchedToggle {...toggle} />
 }
 
-type OwnBackdropProps = { children: ReactNode }
-
-/** The saga has a backdrop of its own, which pointing at a movie leaves up. */
-const OwnBackdrop = ({ children }: OwnBackdropProps) => {
-  const isOwn = useOwnBackdrop()
-  return isOwn && children
-}
-
 type ShownSagaProps = { library: Library; saga: Saga }
 
 /** The saga, found in its library. */
@@ -115,85 +106,83 @@ const ShownSaga = ({ library, saga }: ShownSagaProps) => {
   const [first] = saga.media
 
   return (
-    <OwnBackdrop>
-      <SelectionScope {...sourceOf(saga.media.map(mediaEntryOf))}>
-        <section className={styles.page} aria-labelledby={titleId}>
-          <ItemHeader
-            back={{
-              to: sectionPath({ libraryId: library.id, section: LIBRARY_SECTIONS.sagas }),
-              label: SAGA_COPY.sagas,
+    <SelectionScope {...sourceOf(saga.media.map(mediaEntryOf))}>
+      <section className={styles.page} aria-labelledby={titleId}>
+        <ItemHeader
+          back={{
+            to: sectionPath({ libraryId: library.id, section: LIBRARY_SECTIONS.sagas }),
+            label: SAGA_COPY.sagas,
+          }}
+          titleId={titleId}
+          eyebrow={[SAGA_COPY.saga, count].filter((part): part is string => part != null)}
+          title={saga.name}
+          byline={library.name}
+          contentRating={null}
+          facts={[...span, ...(runtime ? [runtime] : [])]}
+          ratings={[]}
+          progress={
+            saga.media.length > 0
+              ? {
+                  fraction: watchedCount / saga.media.length,
+                  label: SAGA_COPY.watchedOf({ watched: watchedCount, total: saga.media.length }),
+                }
+              : undefined
+          }
+          backdrop={backdrop}
+          manage={
+            backdrop && (
+              <AdminOnly>
+                <Button icon="edit" onClick={() => setEditing(true)}>
+                  {SAGA_COPY.editBackdrop}
+                </Button>
+              </AdminOnly>
+            )
+          }
+        >
+          {first && (
+            <ButtonLink
+              tone="primary"
+              icon="play"
+              {...watchLink({
+                media: first,
+                session: { kind: SESSION_KINDS.saga, sagaId: saga.tmdbId },
+              })}
+            >
+              {SAGA_COPY.playAll}
+            </ButtonLink>
+          )}
+          <DownloadButton
+            target={{
+              kind: DOWNLOAD_TARGET_KINDS.saga,
+              libraryId: library.id,
+              tmdbId: saga.tmdbId,
             }}
-            titleId={titleId}
-            eyebrow={[SAGA_COPY.saga, count].filter((part): part is string => part != null)}
-            title={saga.name}
-            byline={library.name}
-            contentRating={null}
-            facts={[...span, ...(runtime ? [runtime] : [])]}
-            ratings={[]}
-            progress={
-              saga.media.length > 0
-                ? {
-                    fraction: watchedCount / saga.media.length,
-                    label: SAGA_COPY.watchedOf({ watched: watchedCount, total: saga.media.length }),
-                  }
-                : undefined
-            }
-            backdrop={backdrop}
-            manage={
-              backdrop && (
-                <AdminOnly>
-                  <Button icon="edit" onClick={() => setEditing(true)}>
-                    {SAGA_COPY.editBackdrop}
-                  </Button>
-                </AdminOnly>
-              )
-            }
-          >
-            {first && (
-              <ButtonLink
-                tone="primary"
-                icon="play"
-                {...watchLink({
-                  media: first,
-                  session: { kind: SESSION_KINDS.saga, sagaId: saga.tmdbId },
-                })}
-              >
-                {SAGA_COPY.playAll}
-              </ButtonLink>
-            )}
-            <DownloadButton
-              target={{
-                kind: DOWNLOAD_TARGET_KINDS.saga,
-                libraryId: library.id,
-                tmdbId: saga.tmdbId,
-              }}
-            />
-            {first && <SagaWatchedToggle saga={saga} libraryId={library.id} />}
-            <SelectButton />
-          </ItemHeader>
-          <section className={styles.films} aria-labelledby={filmsId}>
-            <SectionHeading id={filmsId} aside={SAGA_COPY.releaseOrder}>
-              {SAGA_COPY.inOrder}
-            </SectionHeading>
-            <SagaFilms
-              media={saga.media}
-              sagaId={saga.tmdbId}
-              ratingsSource={library.settings.ratingsSource}
-            />
-          </section>
-          <AdminOnly>
-            {isEditing && (
-              <SagaBackdropDialog
-                libraryId={library.id}
-                saga={saga}
-                onClose={() => setEditing(false)}
-              />
-            )}
-          </AdminOnly>
-          <SelectionBar />
+          />
+          {first && <SagaWatchedToggle saga={saga} libraryId={library.id} />}
+          <SelectButton />
+        </ItemHeader>
+        <section className={styles.films} aria-labelledby={filmsId}>
+          <SectionHeading id={filmsId} aside={SAGA_COPY.releaseOrder}>
+            {SAGA_COPY.inOrder}
+          </SectionHeading>
+          <SagaFilms
+            media={saga.media}
+            sagaId={saga.tmdbId}
+            ratingsSource={library.settings.ratingsSource}
+          />
         </section>
-      </SelectionScope>
-    </OwnBackdrop>
+        <AdminOnly>
+          {isEditing && (
+            <SagaBackdropDialog
+              libraryId={library.id}
+              saga={saga}
+              onClose={() => setEditing(false)}
+            />
+          )}
+        </AdminOnly>
+        <SelectionBar />
+      </section>
+    </SelectionScope>
   )
 }
 

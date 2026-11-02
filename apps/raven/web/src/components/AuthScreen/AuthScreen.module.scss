@@ -13,6 +13,31 @@
   }
 }
 
+.centered {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'form';
+
+  .art {
+    grid-area: form;
+  }
+
+  .side {
+    z-index: 2;
+  }
+
+  .brand img {
+    height: var(--space-6);
+  }
+
+  .brand span span {
+    font-size: calc(var(--font-size-xl) * 1.5);
+  }
+
+  .title {
+    font-size: var(--font-size-lg);
+  }
+}
+
 // The wall, its fade and the promise share one cell. Size containment keeps
 // the oversized wall from stretching the page; the panel takes the row's
 // height, set by the form and the screen.

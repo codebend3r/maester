@@ -54,7 +54,19 @@
   grid-area: list;
 }
 
-.dismiss {
+// The tip is dark glass in every theme, so the ghost button's themed ink and hover would
+// vanish on it in a light theme: it wears the fixed ink of words on a picture instead.
+.tip .dismiss {
   grid-area: dismiss;
   justify-self: end;
+  color: var(--color-on-picture);
+  background: color-mix(in srgb, var(--color-on-picture) 10%, transparent);
+
+  &:hover:not(:disabled, [aria-disabled='true']) {
+    background: color-mix(in srgb, var(--color-on-picture) 20%, transparent);
+  }
+
+  &:focus-visible {
+    outline-color: var(--color-on-picture);
+  }
 }

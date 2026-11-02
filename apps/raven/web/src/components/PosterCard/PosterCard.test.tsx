@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test'
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { POSTER_SIZES } from '@/lib/posters'
 import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
@@ -17,7 +17,7 @@ describe('PosterCard', () => {
 
   const shownBehind = () => usePageBackdrop.getState().current
 
-  it("lays its movie's backdrop behind the page while pointed at, and puts it away after", async () => {
+  it('does not load a page backdrop when the card is hovered', () => {
     const { container } = renderWithProviders({
       ui: (
         <PosterCard
@@ -28,13 +28,10 @@ describe('PosterCard', () => {
     })
     const card = container.querySelector('li') ?? document.body
     fireEvent.pointerEnter(card, { pointerType: 'mouse' })
-    await waitFor(() => expect(shownBehind()).toBe('/api/pictures/items/40/backdrop/b9'))
-    fireEvent.pointerLeave(card, { pointerType: 'mouse' })
-    expect(shownBehind()).not.toBeNull()
-    await waitFor(() => expect(shownBehind()).toBeNull())
+    expect(shownBehind()).toBeNull()
   })
 
-  it('shows the backdrop as soon as the card is focused', () => {
+  it('does not load a page backdrop when the card is focused', () => {
     renderWithProviders({
       ui: (
         <PosterCard
@@ -44,7 +41,7 @@ describe('PosterCard', () => {
       ),
     })
     fireEvent.focus(screen.getByRole('link', { name: 'Busboys' }))
-    expect(shownBehind()).toBe('/api/pictures/items/40/backdrop/b9')
+    expect(shownBehind()).toBeNull()
   })
 
   it('leaves the page alone for a touch, and for a movie with no backdrop', async () => {
@@ -83,6 +80,7 @@ describe('PosterCard', () => {
     expect(screen.getByRole('link', { name: 'Play Busboys' })).toHaveAttribute('href', '/watch/7')
     expect(screen.getByLabelText('Video resolution: 1080p')).toBeInTheDocument()
     expect(screen.getByText('2026')).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /Ratings:/ })).toBeNull()
   })
 
   it('offers its poster at each width, so the browser fetches the narrowest its grid needs', async () => {

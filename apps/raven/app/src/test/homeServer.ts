@@ -101,6 +101,8 @@ export const HOME: Home = {
         {
           show: summaryFor({ id: 4, type: ITEM_TYPES.show, title: 'Severance', year: 2022 }),
           episodes: 9,
+          seasons: 1,
+          totalEpisodes: 9,
           watchedEpisodes: 0,
           endedYear: null,
           addedAt: '2026-10-16T00:00:00.000Z',

@@ -19,6 +19,7 @@ export const {
   favouriteArtistsQuery,
   homeQuery,
   heroQuery,
+  homeAlbumsQuery,
   heroPicksQuery,
   homeSearchQuery,
   mediaQuery,

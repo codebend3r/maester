@@ -289,6 +289,8 @@ type ItemHeaderProps = {
   library?: BackFallback
   /** A line of how far through the item the viewer is, where the page has one. */
   progress?: HeaderProgress
+  /** Pull a movie or show's picture and title closer to the way back. */
+  pullUp?: boolean
   /**
    * The page's own actions: Play, favourite, Watched, Select. One whose label
    * cannot shrink marks itself `data-wide`, and the row makes room for it.
@@ -323,10 +325,13 @@ export const ItemHeader = ({
   back,
   library,
   progress,
+  pullUp = false,
   children,
   manage,
 }: ItemHeaderProps) => (
-  <header className={backdrop ? `${styles.hero} ${styles.withBackdrop}` : styles.hero}>
+  <header
+    className={`${styles.hero}${backdrop ? ` ${styles.withBackdrop}` : ''}${pullUp ? ` ${styles.pullUp}` : ''}`}
+  >
     {backdrop && <Backdrop backdrop={backdrop} />}
     <div className={styles.top}>
       <BackButton fallback={back} />

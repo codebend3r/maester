@@ -1,5 +1,6 @@
 import {
   type MatchItemType,
+  type MediaAlbum,
   type MediaItem,
   type MediaSort,
   cardLink,
@@ -15,6 +16,7 @@ import {
 } from '@raven/core'
 import { Icon } from '@raven/ui'
 import type { ComponentType } from 'react'
+import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark, FavouriteWords } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
@@ -24,6 +26,7 @@ import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
 import { api } from '@/lib/api'
+import { POSTER_SIZES } from '@/lib/posters'
 import { useSelectable } from '@/lib/useSelectable'
 import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import { MEDIA_CARD_COPY } from '@/components/MediaCard/copy'
@@ -31,17 +34,32 @@ import styles from '@/components/MediaCard/MediaCard.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 
 const FRAME_KINDS = {
+  cover: 'cover',
   thumbnail: 'thumbnail',
   placeholder: 'placeholder',
 } as const
 type FrameKind = (typeof FRAME_KINDS)[keyof typeof FRAME_KINDS]
 
-type FramePictureProps = { thumbnail: string | null; label: string }
+type FramePictureProps = { thumbnail: string | null; label: string; album: MediaAlbum | null }
 
 type FrameThumbnailProps = FramePictureProps
 
 const FrameThumbnail = ({ thumbnail }: FrameThumbnailProps) => (
   <ViewportImage className={styles.thumbnail} src={thumbnail ?? ''} alt="" />
+)
+
+type FrameCoverProps = FramePictureProps
+
+/** A music file's frame is its album's cover, square like every cover. */
+const FrameCover = ({ album, label }: FrameCoverProps) => (
+  <AlbumCover
+    album={{
+      id: album?.id ?? 0,
+      title: album?.title ?? label,
+      coverVersion: album?.coverVersion ?? null,
+    }}
+    sizes={POSTER_SIZES.grid}
+  />
 )
 
 type FramePlaceholderProps = FramePictureProps
@@ -53,9 +71,17 @@ const FramePlaceholder = ({ label }: FramePlaceholderProps) => (
 )
 
 const FRAME_PICTURES = {
+  [FRAME_KINDS.cover]: FrameCover,
   [FRAME_KINDS.thumbnail]: FrameThumbnail,
   [FRAME_KINDS.placeholder]: FramePlaceholder,
 } as const satisfies Record<FrameKind, ComponentType<FramePictureProps>>
+
+type FrameKindOfProps = { album: MediaAlbum | null; thumbnail: string | null }
+
+const frameKindOf = ({ album, thumbnail }: FrameKindOfProps): FrameKind => {
+  if (album !== null) return FRAME_KINDS.cover
+  return thumbnail ? FRAME_KINDS.thumbnail : FRAME_KINDS.placeholder
+}
 
 type MediaCardProps = {
   media: MediaItem
@@ -89,7 +115,8 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
   // A listing sorted by resolution says it under the title, so the corner leaves it out.
   const resolution = resolutionLabel(media)
   const cornerResolution = resolution === sorted ? null : resolution
-  const FramePicture = FRAME_PICTURES[thumbnail ? FRAME_KINDS.thumbnail : FRAME_KINDS.placeholder]
+  const frameKind = frameKindOf({ album: media.album, thumbnail })
+  const FramePicture = FRAME_PICTURES[frameKind]
   const facts = [
     formatRuntime(media.duration),
     media.videoCodec ? codecLabel(media.videoCodec) : null,
@@ -111,8 +138,12 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
             ? { 'aria-label': MEDIA_CARD_COPY.play(label), tabIndex: select.linkTabIndex }
             : { 'aria-hidden': true, tabIndex: -1 })}
         >
-          <span className={styles.frame}>
-            <FramePicture thumbnail={thumbnail} label={label} />
+          <span
+            className={
+              frameKind === FRAME_KINDS.cover ? `${styles.frame} ${styles.square}` : styles.frame
+            }
+          >
+            <FramePicture thumbnail={thumbnail} label={label} album={media.album} />
             <span className={styles.scrim} />
             {timeLeft && (
               <span className={styles.left}>

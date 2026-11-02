@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test'
+import { type AlbumSummary, MATCH_STATES, SORT_DIRECTIONS } from '@/contract'
 import type { MediaItem, ShowEntry } from '@/contract'
 import { mediaEntryKey } from '@/entryKeys'
-import { jumpScale, niceStep } from '@/jumpScale'
+import { albumJumpScale, jumpScale, niceStep } from '@/jumpScale'
+import { MUSIC_SORTS } from '@/musicListQuery'
 import { itemSummary, mediaItem, showEntry } from '@/test/fixtures'
 
 /** The strip's marks as `label` for the pressable ones and `(label)` for the rest. */
@@ -228,5 +230,70 @@ describe('jumpScale', () => {
     })
     expect(strip(scale)).toHaveLength(2)
     expect(strip(scale).filter((label) => !label.startsWith('('))).toHaveLength(2)
+  })
+})
+
+type AlbumOverrides = Partial<AlbumSummary> & { artist?: string }
+
+const albumOf = ({ artist = 'Radiohead', ...overrides }: AlbumOverrides): AlbumSummary => ({
+  id: 1,
+  libraryId: 1,
+  title: 'Kid A',
+  sortTitle: 'Kid A',
+  year: 2000,
+  releaseDate: null,
+  type: 'album',
+  artists: [{ id: 1, name: artist }],
+  isCompilation: false,
+  trackCount: 10,
+  duration: 3000,
+  coverVersion: null,
+  match: MATCH_STATES.matched,
+  addedAt: '2026-10-01T00:00:00Z',
+  ...overrides,
+})
+
+describe('albumJumpScale', () => {
+  const albums = [
+    albumOf({ id: 1, sortTitle: 'Kid A', artist: 'The Beatles', year: 1969 }),
+    albumOf({ id: 2, sortTitle: 'Abbey Road', artist: 'Zappa', year: 2001 }),
+  ]
+
+  it('jumps by the first artist under an artist sort, not by the title', () => {
+    const scale = albumJumpScale({
+      sort: MUSIC_SORTS.artist,
+      direction: SORT_DIRECTIONS.ascending,
+      albums,
+    })
+    expect(under({ scale, label: 'B' })).toEqual(['album:1'])
+    expect(under({ scale, label: 'Z' })).toEqual(['album:2'])
+    expect(under({ scale, label: 'K' })).toEqual([])
+  })
+
+  it('jumps by title letter under a title sort, reversed when descending', () => {
+    const scale = albumJumpScale({
+      sort: MUSIC_SORTS.title,
+      direction: SORT_DIRECTIONS.descending,
+      albums,
+    })
+    expect(under({ scale, label: 'A' })).toEqual(['album:2'])
+    expect(scale?.marks[0]?.label).toBe('Z')
+  })
+
+  it('jumps by year under a year sort', () => {
+    const scale = albumJumpScale({
+      sort: MUSIC_SORTS.year,
+      direction: SORT_DIRECTIONS.ascending,
+      albums,
+    })
+    expect(under({ scale, label: '1960s' })).toEqual(['album:1'])
+    expect(under({ scale, label: '2000s' })).toEqual(['album:2'])
+  })
+
+  it('has no strip for plays or a random order', () => {
+    const input = { direction: SORT_DIRECTIONS.ascending, albums }
+    expect(albumJumpScale({ ...input, sort: MUSIC_SORTS.random })).toBeNull()
+    expect(albumJumpScale({ ...input, sort: MUSIC_SORTS.plays })).toBeNull()
+    expect(albumJumpScale({ ...input, sort: MUSIC_SORTS.played })).toBeNull()
   })
 })

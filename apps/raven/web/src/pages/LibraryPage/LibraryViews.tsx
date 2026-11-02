@@ -33,7 +33,7 @@ type ShowsViewProps = { settings: LibrarySettings; shows: ShowEntry[] }
 type ShowGridViewProps = ShowsViewProps
 
 const ShowGridView = ({ settings, shows }: ShowGridViewProps) => (
-  <ShowGrid shows={shows} ratingsSource={settings.ratingsSource} sort={settings.sort} />
+  <ShowGrid shows={shows} sort={settings.sort} />
 )
 
 /** A TV library's shows for each view setting; the grouped view is the grid, as the page itself splits matched from not. */
@@ -85,7 +85,6 @@ const MEDIA_VIEWS = {
       by={settings.groupBy}
       posters={isMovieLibrary(settings)}
       matchType={matchTypeFor(settings.kind)}
-      ratingsSource={settings.ratingsSource}
       sort={settings.sort}
     />
   ),
@@ -94,7 +93,6 @@ const MEDIA_VIEWS = {
       items={items}
       posters={isMovieLibrary(settings)}
       matchType={matchTypeFor(settings.kind)}
-      ratingsSource={settings.ratingsSource}
       sort={settings.sort}
     />
   ),

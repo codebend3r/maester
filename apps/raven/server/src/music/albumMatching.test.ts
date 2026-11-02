@@ -1,6 +1,6 @@
 import { ALBUM_TYPES, CONFIDENCE_STRONG } from '@raven/core'
 import { describe, expect, it } from 'vitest'
-import { candidatesOf, scoreRelease } from '@/music/albumMatching'
+import { aiChoiceOf, candidatesOf, scoreRelease } from '@/music/albumMatching'
 import { FALLBACK_ARTISTS } from '@/music/filing'
 import type { Release } from '@/music/musicBrainzClient'
 import type { AlbumToMatch } from '@/music/musicRepository'
@@ -28,6 +28,27 @@ const release = (over: Partial<Release> = {}): Release => ({
   isOfficial: true,
   score: 100,
   ...over,
+})
+
+describe('AI album cleanup choices', () => {
+  const offered = new Set(['rel-1'])
+
+  it('accepts only an offered release', () => {
+    expect(aiChoiceOf({ input: { mbid: 'rel-1', reason: 'The credits match.' }, offered })).toEqual(
+      {
+        mbid: 'rel-1',
+        reason: 'The credits match.',
+      },
+    )
+    expect(aiChoiceOf({ input: { mbid: 'invented', reason: 'Guess.' }, offered })).toBeNull()
+  })
+
+  it('rejects no choice and malformed answers', () => {
+    expect(
+      aiChoiceOf({ input: { mbid: null, reason: 'Not enough evidence.' }, offered }),
+    ).toBeNull()
+    expect(aiChoiceOf({ input: { mbid: 'rel-1' }, offered })).toBeNull()
+  })
 })
 
 describe('scoreRelease', () => {

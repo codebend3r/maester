@@ -1,7 +1,9 @@
-import { artistNames, type Track } from '@raven/core'
+import { artistNames, formatDuration, type Track } from '@raven/core'
 import { Button } from '@raven/ui'
 import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { Equalizer } from '@/components/Equalizer/Equalizer'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { NOW_PLAYING_BAR_COPY } from '@/components/NowPlayingBar/copy'
 import { useMusicLinks } from '@/lib/useMusicLinks'
@@ -21,8 +23,11 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
   const skipNext = useAudioQueue((store) => store.next)
   const skipPrevious = useAudioQueue((store) => store.previous)
   const links = useMusicLinks()
+  const seekTo = useAudioQueue((store) => store.seekTo)
+  const [hoverFraction, setHoverFraction] = useState<number | null>(null)
+  const length = duration ?? track.duration ?? 0
   const isPlaying = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
-  const fraction = duration === null || duration === 0 ? 0 : Math.min(position / duration, 1)
+  const fraction = length > 0 ? Math.min(position / length, 1) : 0
   return (
     <section className={styles.bar} aria-label={NOW_PLAYING_BAR_COPY.miniPlayer}>
       <Link
@@ -42,17 +47,12 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
       <Link to={links.nowPlaying} className={styles.words}>
         <span className={styles.title}>{track.title}</span>
         <span className={styles.artists}>{error === null ? artistNames(track) : error}</span>
+        <span className={styles.time}>
+          {formatDuration(position)} / {formatDuration(duration ?? track.duration)}
+        </span>
       </Link>
       <div className={styles.controls}>
-        {state === AUDIO_STATES.playing && (
-          <span className={styles.equalizer} aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-          </span>
-        )}
+        <Equalizer isPlaying={state === AUDIO_STATES.playing} />
         <Button
           tone="ghost"
           icon="skipPrevious"
@@ -73,8 +73,41 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
         />
         <Button tone="ghost" icon="close" aria-label={NOW_PLAYING_BAR_COPY.close} onClick={clear} />
       </div>
-      <div className={styles.progress} aria-hidden="true">
-        <span className={styles.played} style={{ transform: `scaleX(${fraction})` }} />
+      <div className={styles.progress}>
+        <span
+          className={styles.played}
+          style={{ transform: `scaleX(${fraction})` }}
+          aria-hidden="true"
+        />
+        <input
+          type="range"
+          className={styles.seek}
+          aria-label={NOW_PLAYING_BAR_COPY.position}
+          aria-valuetext={`${formatDuration(position)} / ${formatDuration(length)}`}
+          min={0}
+          max={Math.max(length, 1)}
+          step={1}
+          value={Math.min(position, length)}
+          disabled={length <= 0}
+          onChange={(event) => seekTo(Number(event.target.value))}
+          onMouseMove={(event) => {
+            const { left, width } = event.currentTarget.getBoundingClientRect()
+            if (width <= 0) return
+            setHoverFraction(Math.max(0, Math.min((event.clientX - left) / width, 1)))
+          }}
+          onMouseLeave={() => setHoverFraction(null)}
+        />
+        {hoverFraction !== null && length > 0 && (
+          <span
+            className={styles.hoverTime}
+            style={{
+              left: `clamp(var(--space-5), ${hoverFraction * 100}%, calc(100% - var(--space-5)))`,
+            }}
+            aria-hidden="true"
+          >
+            {formatDuration(Math.round(hoverFraction * length))}
+          </span>
+        )}
       </div>
     </section>
   )

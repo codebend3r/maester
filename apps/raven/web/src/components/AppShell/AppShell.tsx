@@ -14,6 +14,7 @@ import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { Logo } from '@/components/Logo/Logo'
 import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
+import { DESIGN_PATH } from '@/pages/DesignPage/copy'
 import { ADMIN_COPY, ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
@@ -29,6 +30,8 @@ import { SIDE_MENU_KEY, useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
+import { CONTINUE_WATCHING_PATH } from '@/lib/homeContinue'
+import { CONTINUE_WATCHING_COPY } from '@/pages/ContinueWatchingPage/copy'
 
 type NavItemProps = {
   to: string
@@ -250,11 +253,18 @@ export const AppShell = () => {
                 label={COMMON_COPY.home}
                 isIconsOnly={isIconsOnly}
               />
+              <NavItem
+                to={CONTINUE_WATCHING_PATH}
+                patterns={[CONTINUE_WATCHING_PATH]}
+                icon={<Icon name="continue" />}
+                label={CONTINUE_WATCHING_COPY.title}
+                isIconsOnly={isIconsOnly}
+              />
               {!isDesktop && (
                 <NavItem
                   to={BINGE_PATH}
                   patterns={[BINGE_PATH]}
-                  icon={<Icon name="playback" />}
+                  icon={<Icon name="popcorn" />}
                   label={BINGE_COPY.title}
                   isIconsOnly={isIconsOnly}
                 />
@@ -349,6 +359,15 @@ export const AppShell = () => {
             label={APP_SHELL_COPY.shortcuts}
             isIconsOnly={isIconsOnly}
           />
+          <AdminOnly>
+            <NavItem
+              to={DESIGN_PATH}
+              patterns={[DESIGN_PATH]}
+              icon={<Icon name="wand" />}
+              label={APP_SHELL_COPY.design}
+              isIconsOnly={isIconsOnly}
+            />
+          </AdminOnly>
           {!isMediumScreen && (
             <div className={styles.foot}>
               <div className={styles.toggle}>

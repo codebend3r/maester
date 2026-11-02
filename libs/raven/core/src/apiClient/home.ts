@@ -1,10 +1,12 @@
 import type { Transport } from '@/apiClient/transport'
 import {
+  type AlbumShelf,
   type Hero,
   type HeroPickChange,
   type HeroPicks,
   type Home,
   type HomeSearch,
+  isAlbumShelves,
   isFavouriteTitles,
   isHero,
   isHeroPicks,
@@ -31,6 +33,10 @@ export const homeCalls = ({ send, expect }: Transport) => ({
   /** The titles home's hero takes turns with, each with the line it reads; libraries still locked stay out. */
   getHero: (): Promise<Hero> =>
     expect({ request: send({ path: '/api/home/hero' }), guard: isHero }),
+
+  /** A shelf of albums for each pinned music library, the one added last first; libraries still locked stay out. */
+  getHomeAlbums: (): Promise<AlbumShelf[]> =>
+    expect({ request: send({ path: '/api/home/albums' }), guard: isAlbumShelves }),
 
   /** The movies and shows the admin picked for the hero, and how many it holds at most. */
   getHeroPicks: (): Promise<HeroPicks> =>

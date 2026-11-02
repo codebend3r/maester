@@ -6,6 +6,7 @@ import type { AdoptedCounts } from '@/media/viewingAdoption'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { PictureVersions } from '@/metadata/pictureVersions'
+import { MusicRepository } from '@/music/musicRepository'
 import { ScoresRepository } from '@/metadata/scoresRepository'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { SettingsRepository } from '@/settings/settingsRepository'
@@ -36,7 +37,13 @@ export const repositories = (database: DatabaseService) => {
     scores,
     metadata,
     sagaBackdrops,
-    media: new MediaRepository(database, metadata, images, sagaBackdrops),
+    media: new MediaRepository(
+      database,
+      metadata,
+      images,
+      sagaBackdrops,
+      new MusicRepository(database, pictureVersions),
+    ),
   }
 }
 

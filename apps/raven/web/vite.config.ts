@@ -7,6 +7,7 @@ import react from '@vitejs/plugin-react'
 const ENV = {
   apiOrigin: 'RAVEN_API_ORIGIN',
   devApiOrigin: 'RAVEN_DEV_API_ORIGIN',
+  homeContinueCount: 'RAVEN_HOME_CONTINUE_COUNT',
   netlify: 'NETLIFY',
 } as const
 
@@ -92,9 +93,28 @@ const restartOnRavenEnv = (): Plugin => ({
   },
 })
 
+/** How many Continue watching tiles the home page shows before its See all link, when the env does not say. */
+const DEFAULT_HOME_CONTINUE_COUNT = 6
+
+/**
+ * RAVEN_HOME_CONTINUE_COUNT from the shell, else from raven's `.env`, else 6:
+ * a whole number of tiles, at least 1.
+ */
+const homeContinueCount = (mode: string): number => {
+  const given =
+    process.env[ENV.homeContinueCount] ?? loadEnv(mode, RAVEN_DIR, '')[ENV.homeContinueCount] ?? ''
+  if (given.trim() === '') return DEFAULT_HOME_CONTINUE_COUNT
+  const count = Number(given)
+  if (!Number.isInteger(count) || count < 1) {
+    throw new Error(`RAVEN_HOME_CONTINUE_COUNT must be a whole number of at least 1, not ${given}`)
+  }
+  return count
+}
+
 export default defineConfig(({ mode }) => ({
   plugins: [react(), netlifyApiProxy(), restartOnRavenEnv()],
   define: {
+    'import.meta.env.VITE_HOME_CONTINUE_COUNT': JSON.stringify(String(homeContinueCount(mode))),
     'import.meta.env.VITE_PICTURE_CDN': JSON.stringify(
       process.env[ENV.netlify] === NETLIFY_VALUES.on ? NETLIFY_IMAGE_CDN : '',
     ),

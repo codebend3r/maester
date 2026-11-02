@@ -55,6 +55,8 @@ export const LIBRARY_COPY = {
     `No album in ${name} matches "${query}".`,
   noAlbums: (name: string) =>
     `No albums in ${name} yet. A scan files each audio file under its album as it reads its tags.`,
+  noUnmatchedAlbums: (name: string) => `Every album in ${name} has a MusicBrainz match.`,
+  smartMatchAlbums: 'Smart match unmatched albums',
   searchArtists: 'Search artists',
   noArtists: (name: string) => `No artists in ${name} yet.`,
   artists: 'Artists',
@@ -71,6 +73,7 @@ export const LIBRARY_COPY = {
     albums: COMMON_COPY.albums,
     artists: 'Artists',
     playlists: 'Playlists',
+    unmatchedAlbums: 'Unmatched albums',
     inProgress: 'In progress',
     favourites: COMMON_COPY.favourites,
     sagas: 'Sagas',

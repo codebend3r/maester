@@ -48,6 +48,7 @@ export const RADIOHEAD: Artist = {
   name: 'Radiohead',
   sortName: 'Radiohead',
   mbid: null,
+  photoVersion: null,
   albumCount: 1,
   trackCount: 3,
 }
@@ -57,6 +58,7 @@ export const PORTISHEAD: Artist = {
   name: 'Portishead',
   sortName: 'Portishead',
   mbid: null,
+  photoVersion: null,
   albumCount: 2,
   trackCount: 1,
 }

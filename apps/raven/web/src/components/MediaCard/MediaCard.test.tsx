@@ -36,6 +36,18 @@ describe('MediaCard', () => {
     expect(screen.getByRole('link', { name: `Play ${label}` })).toHaveAttribute('href', '/watch/13')
   })
 
+  it("draws a music file's album cover, under the album's initial, not a frame grab", () => {
+    const album = { id: 4, title: 'Real Talk', coverVersion: 'cover-v1' }
+    const { container } = renderWithProviders({ ui: <MediaCard media={mediaItem({ album })} /> })
+    expect(container.querySelector('[data-initial="R"]')).not.toBeNull()
+  })
+
+  it('stands the album initial in for a cover the album lacks', () => {
+    const album = { id: 4, title: 'Real Talk', coverVersion: null }
+    renderWithProviders({ ui: <MediaCard media={mediaItem({ album })} /> })
+    expect(screen.getByText('R')).toBeInTheDocument()
+  })
+
   it('shows the value its listing is sorted by, first', () => {
     renderWithProviders({ ui: <MediaCard media={mediaItem()} sort="largest" /> })
     expect(screen.getByText('1.6 GB')).toBeInTheDocument()

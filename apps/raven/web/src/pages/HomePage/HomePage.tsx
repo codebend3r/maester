@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
+  type AlbumShelf,
   HOME_SHELF_TYPES,
   type HomeShelf,
   ITEM_TYPES,
@@ -11,6 +12,7 @@ import {
 import { type ComponentType, type ReactNode, useId } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
+import { AlbumCard } from '@/components/AlbumGrid/AlbumGrid'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
@@ -18,7 +20,13 @@ import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { ShowCard } from '@/components/ShowCard/ShowCard'
 import { Bone, Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
-import { heroQuery, homeQuery, homeSearchQuery, librariesQuery } from '@/lib/queries'
+import {
+  heroQuery,
+  homeAlbumsQuery,
+  homeQuery,
+  homeSearchQuery,
+  librariesQuery,
+} from '@/lib/queries'
 import { ContinueWatching } from '@/pages/HomePage/ContinueWatching'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import { HomeHero } from '@/pages/HomePage/HomeHero'
@@ -75,13 +83,8 @@ type ShelfCardProps = {
 
 type PosterShelfCardProps = ShelfCardProps
 
-const PosterShelfCard = ({ media, matchType, ratingsSource }: PosterShelfCardProps) => (
-  <PosterCard
-    media={media}
-    matchType={matchType}
-    ratingsSource={ratingsSource}
-    sizes={POSTER_SIZES.row}
-  />
+const PosterShelfCard = ({ media, matchType }: PosterShelfCardProps) => (
+  <PosterCard media={media} matchType={matchType} sizes={POSTER_SIZES.row} />
 )
 
 type FrameShelfCardProps = ShelfCardProps
@@ -192,6 +195,36 @@ const LibraryShelf = ({ shelf, library, query = '' }: LibraryShelfProps) => {
   )
 }
 
+type AlbumsShelfProps = { shelf: AlbumShelf; library: Library }
+
+/** A music library's row: its albums, the one added last first, one cover each, the library's name opening it. */
+const AlbumsShelf = ({ shelf, library }: AlbumsShelfProps) => (
+  <Shelf
+    title={
+      <Link to={`/libraries/${library.id}`} className={styles.headingLink}>
+        {library.name}
+      </Link>
+    }
+    isEmpty={shelf.albums.length === 0}
+  >
+    {shelf.albums.map((album) => (
+      <AlbumCard key={album.id} album={album} />
+    ))}
+  </Shelf>
+)
+
+type LibraryRowProps = { shelf: HomeShelf; library: Library; albumShelves: readonly AlbumShelf[] }
+
+/** A library's row on Home: its albums when it is a music library, else its shelf laid out as its files are. */
+const LibraryRow = ({ shelf, library, albumShelves }: LibraryRowProps) => {
+  const albums = albumShelves.find(({ libraryId }) => libraryId === library.id)
+  return albums === undefined ? (
+    <LibraryShelf shelf={shelf} library={library} />
+  ) : (
+    <AlbumsShelf shelf={albums} library={library} />
+  )
+}
+
 /** The hero's shape, standing in while its titles are read. */
 const HeroSkeleton = () => (
   <Loading label={HOME_COPY.gatheringHero}>
@@ -271,6 +304,7 @@ const Shelves = ({ libraries, areLibrariesPending }: ShelvesProps) => {
   const isDesktop = useIsDesktop()
   const home = useQuery(homeQuery)
   const hero = useQuery(heroQuery)
+  const albums = useQuery(homeAlbumsQuery)
   const shelves = withLibraries({ shelves: home.data?.shelves ?? [], libraries })
   const featured = featuredOf({ hero: hero.data ?? [], libraries })
   const inProgress = home.data?.inProgress ?? []
@@ -291,7 +325,12 @@ const Shelves = ({ libraries, areLibrariesPending }: ShelvesProps) => {
       {featured.length > 0 && <HomeHero featured={featured} />}
       {inProgress.length > 0 && <ContinueWatching entries={inProgress} />}
       {shelves.map(({ shelf, library }) => (
-        <LibraryShelf key={library.id} shelf={shelf} library={library} />
+        <LibraryRow
+          key={library.id}
+          shelf={shelf}
+          library={library}
+          albumShelves={albums.data ?? []}
+        />
       ))}
     </div>
   )

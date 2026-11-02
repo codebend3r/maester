@@ -104,6 +104,8 @@ describe('librarySectionsOf', () => {
           {
             show: { ...BUSBOYS.item!, id: 60, title: 'Ashfall', type: ITEM_TYPES.show, year: 2020 },
             episodes: 8,
+            seasons: 1,
+            totalEpisodes: 8,
             watchedEpisodes: 0,
             endedYear: 2022,
             addedAt: '2026-10-16T00:00:00.000Z',

@@ -84,6 +84,30 @@ describe('MusicBrainzClient', () => {
     await expect(client.release('rel-2')).resolves.toMatchObject({ title: 'OK Computer' })
   })
 
+  it('finds an artist photo through MusicBrainz and Wikidata', async () => {
+    const fetch: MetadataFetch = async ({ url }) => {
+      if (url.includes('musicbrainz.org')) {
+        return new Response(
+          JSON.stringify({
+            relations: [
+              { type: 'wikidata', url: { resource: 'https://www.wikidata.org/wiki/Q123' } },
+            ],
+          }),
+        )
+      }
+      return new Response(
+        JSON.stringify({
+          entities: {
+            Q123: { claims: { P18: [{ mainsnak: { datavalue: { value: 'Artist Photo.jpg' } } }] } },
+          },
+        }),
+      )
+    }
+    await expect(new MusicBrainzClient(fetch).artistPhoto('artist-id')).resolves.toBe(
+      'https://commons.wikimedia.org/wiki/Special:Redirect/file/Artist_Photo.jpg?width=500',
+    )
+  })
+
   it('tells an id MusicBrainz lacks from MusicBrainz being away, and waits a 503 out before giving up', async () => {
     const fake = fakeMusicBrainz({ releases: [] })
     const client = new MusicBrainzClient(fake.fetch)

@@ -1,5 +1,6 @@
 import { Controller, Get, Req, Inject, Query } from '@nestjs/common'
 import {
+  type AlbumShelf,
   HOME_SHELF_TYPES,
   type Hero,
   type Home,
@@ -7,7 +8,11 @@ import {
   type HomeShelf,
   MEDIA_SORTS,
   type MediaSort,
+  LIBRARY_LISTINGS,
+  SORT_DIRECTIONS,
+  MUSIC_SORTS,
   isString,
+  listingFor,
   listsShows,
 } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
@@ -16,6 +21,7 @@ import { HeroSelection } from '@/hero/heroSelection'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { LockService, type Viewer } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
+import { MusicRepository } from '@/music/musicRepository'
 import { ViewingAccounts } from '@/media/viewingAccounts'
 import type { AccountKey } from '@/media/viewingAccountKeys'
 
@@ -39,6 +45,7 @@ export class HomeController {
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(MusicRepository) private readonly music: MusicRepository,
     @Inject(LockService) private readonly lock: LockService,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(HeroSelection) private readonly hero: HeroSelection,
@@ -92,6 +99,32 @@ export class HomeController {
       ),
       shelves,
     }
+  }
+
+  /**
+   * A shelf of albums for each pinned music library, the one added last
+   * first, read apart from the shelves; libraries still locked stay out.
+   */
+  @Get('albums')
+  albums(@Req() request: FastifyRequest): AlbumShelf[] {
+    const account = this.accounts.keyOf({ request })
+    return this.seenBy(this.lock.viewer({ request }))
+      .filter(
+        (library) =>
+          library.settings.pinned && listingFor(library.settings.kind) === LIBRARY_LISTINGS.albums,
+      )
+      .map((library) => ({
+        libraryId: library.id,
+        albums: this.music
+          .listAlbums({
+            libraryId: library.id,
+            search: '',
+            sort: MUSIC_SORTS.added,
+            order: SORT_DIRECTIONS.descending,
+            account,
+          })
+          .slice(0, SHELF_SIZE),
+      }))
   }
 
   /**

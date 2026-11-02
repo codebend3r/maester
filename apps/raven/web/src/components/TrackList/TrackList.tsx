@@ -4,6 +4,8 @@ import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import type { ComponentType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { TRACK_LIST_COPY } from '@/components/TrackList/copy'
+import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
+import { POSTER_SIZES } from '@/lib/posters'
 import { trackLength } from '@/lib/music'
 import { useMusicLinks } from '@/lib/useMusicLinks'
 import styles from '@/components/TrackList/TrackList.module.scss'
@@ -37,6 +39,7 @@ type TrackRowProps = {
   trail: ReactNode
   /** Whether the row names the artists, which an album by one artist need not. */
   shouldShowArtists: boolean
+  shouldShowAlbumCover: boolean
 }
 
 const TrackRow = ({
@@ -47,14 +50,33 @@ const TrackRow = ({
   onPlay,
   trail,
   shouldShowArtists,
+  shouldShowAlbumCover,
 }: TrackRowProps) => {
   const links = useMusicLinks()
   const Lead = LEADS[isPlaying ? LEAD_KINDS.speaker : LEAD_KINDS.number]
   return (
     <li
-      className={isPlaying || isPaused ? `${styles.row} ${styles.current}` : styles.row}
+      className={[
+        styles.row,
+        isPlaying || isPaused ? styles.current : '',
+        shouldShowAlbumCover ? styles.withCover : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       aria-current={isPlaying || isPaused ? 'true' : undefined}
     >
+      {shouldShowAlbumCover && (
+        <span className={styles.cover}>
+          <AlbumCover
+            album={{
+              id: track.albumId,
+              title: track.album.title,
+              coverVersion: track.album.coverVersion,
+            }}
+            sizes={POSTER_SIZES.download}
+          />
+        </span>
+      )}
       <span className={styles.number} aria-hidden="true">
         <Lead number={number} />
       </span>
@@ -104,6 +126,7 @@ type TrackListProps = {
   Trail?: (props: TrailProps) => ReactNode
   /** Whether every row names its artists; on by default, off for an album by one artist. */
   shouldShowArtists?: boolean
+  shouldShowAlbumCovers?: boolean
   label: string
 }
 
@@ -119,6 +142,7 @@ export const TrackList = ({
   Trail,
   currentPlace,
   shouldShowArtists = true,
+  shouldShowAlbumCovers = false,
   label,
 }: TrackListProps) => {
   const playing = useAudioQueue(playingTrackOf)
@@ -141,6 +165,7 @@ export const TrackList = ({
             onPlay={() => (isCurrent ? toggle() : onPlay(index))}
             trail={Trail !== undefined && <Trail track={track} index={index} />}
             shouldShowArtists={shouldShowArtists}
+            shouldShowAlbumCover={shouldShowAlbumCovers}
           />
         )
       })}

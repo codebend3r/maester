@@ -1,5 +1,7 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  MATCH_STATES,
+  albumJumpScale,
   type Library,
   MUSIC_SORTS,
   type MusicSort,
@@ -13,8 +15,11 @@ import {
 } from '@raven/core'
 import { Button } from '@raven/ui'
 import { type Search, useAudioQueue } from '@raven/ui/headless'
+import { useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
+import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
+import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { ArtistList } from '@/components/ArtistList/ArtistList'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { libraryTracks } from '@/lib/music'
@@ -23,6 +28,7 @@ import { useAddressSearch } from '@/lib/useSearch'
 import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { api } from '@/lib/api'
 
 type AlbumsToolbarProps = {
   library: Library
@@ -126,6 +132,7 @@ type AlbumsSectionProps = { library: Library }
 
 /** A music library's albums: searched and sorted, with Play and Shuffle. */
 export const AlbumsSection = ({ library }: AlbumsSectionProps) => {
+  const cards = useRef<HTMLDivElement>(null)
   const search = useAddressSearch()
   const [address, setAddress] = useSearchParams()
   const decoded = musicListQuery.decode(address.toString())
@@ -155,8 +162,14 @@ export const AlbumsSection = ({ library }: AlbumsSectionProps) => {
   const albums = useQuery(
     albumsQuery({ libraryId: library.id, search: search.query, sort, order, seed }),
   )
+  const scale = albumJumpScale({ sort, direction: order, albums: albums.data ?? [] })
   return (
-    <div className={styles.section}>
+    <div
+      ref={cards}
+      className={
+        albums.data?.length && scale ? `${styles.section} ${styles.withJump}` : styles.section
+      }
+    >
       <AlbumsToolbar
         library={library}
         search={search}
@@ -182,6 +195,68 @@ export const AlbumsSection = ({ library }: AlbumsSectionProps) => {
         </p>
       )}
       {albums.data && albums.data.length > 0 && <AlbumGrid albums={albums.data} />}
+      {albums.data && albums.data.length > 0 && scale && <JumpPicker scale={scale} scope={cards} />}
+    </div>
+  )
+}
+
+type UnmatchedAlbumsSectionProps = { library: Library }
+
+/** Albums whose MusicBrainz match pass found no confident release, alphabetically. */
+export const UnmatchedAlbumsSection = ({ library }: UnmatchedAlbumsSectionProps) => {
+  const cards = useRef<HTMLDivElement>(null)
+  const queryClient = useQueryClient()
+  const list = albumsQuery({
+    libraryId: library.id,
+    search: '',
+    sort: MUSIC_SORTS.title,
+    order: SORT_DIRECTIONS.ascending,
+    seed: 0,
+  })
+  const albums = useQuery({
+    ...list,
+    refetchInterval: (current) =>
+      current.state.data?.some((album) => album.match === MATCH_STATES.pending) ? 2000 : false,
+  })
+  const unmatched = albums.data?.filter((album) => album.match === MATCH_STATES.unmatched) ?? []
+  const scale = albumJumpScale({
+    sort: MUSIC_SORTS.title,
+    direction: SORT_DIRECTIONS.ascending,
+    albums: unmatched,
+  })
+  const smartMatch = useMutation({
+    mutationFn: () => api.matchLibrary(library.id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: list.queryKey }),
+  })
+  return (
+    <div ref={cards} className={scale ? `${styles.section} ${styles.withJump}` : styles.section}>
+      <div className={styles.playlistsToolbar}>
+        <AdminOnly>
+          <Button
+            icon="search"
+            disabled={smartMatch.isPending || unmatched.length === 0}
+            onClick={() => smartMatch.mutate()}
+          >
+            {LIBRARY_COPY.smartMatchAlbums}
+          </Button>
+        </AdminOnly>
+      </div>
+      {smartMatch.error && (
+        <p className={styles.message} role="alert">
+          {smartMatch.error.message}
+        </p>
+      )}
+      {albums.isPending && <AlbumGridSkeleton />}
+      {albums.error && (
+        <p className={styles.message} role="alert">
+          {albums.error.message}
+        </p>
+      )}
+      {albums.data && unmatched.length === 0 && (
+        <p className={styles.message}>{LIBRARY_COPY.noUnmatchedAlbums(library.name)}</p>
+      )}
+      {unmatched.length > 0 && <AlbumGrid albums={unmatched} />}
+      {unmatched.length > 0 && scale && <JumpPicker scale={scale} scope={cards} />}
     </div>
   )
 }
@@ -192,6 +267,7 @@ type ArtistsSectionProps = { library: Library }
 export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
   const search = useAddressSearch()
   const artists = useQuery(artistsQuery({ libraryId: library.id, search: search.query }))
+  const albumArtists = artists.data?.filter(({ albumCount }) => albumCount > 0)
   return (
     <div className={styles.section}>
       <div className={styles.musicToolbar}>
@@ -208,11 +284,11 @@ export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
           {artists.error.message}
         </p>
       )}
-      {artists.data && artists.data.length === 0 && (
+      {albumArtists && albumArtists.length === 0 && (
         <p className={styles.message}>{LIBRARY_COPY.noArtists(library.name)}</p>
       )}
-      {artists.data && artists.data.length > 0 && (
-        <ArtistList artists={artists.data} label={LIBRARY_COPY.artists} />
+      {albumArtists && albumArtists.length > 0 && (
+        <ArtistList artists={albumArtists} label={LIBRARY_COPY.artists} />
       )}
     </div>
   )

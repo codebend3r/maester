@@ -6,7 +6,6 @@ export const STORE_KEYS = {
   desktop: 'raven-desktop',
   downloadAsk: 'raven-download-ask',
   dragging: 'raven-dragging',
-  hoverBackdrops: 'raven-hover-backdrops',
   originProbe: 'raven-origin-probe',
   selectionScopes: 'raven-selection-scopes',
   serverReach: 'raven-server-reach',

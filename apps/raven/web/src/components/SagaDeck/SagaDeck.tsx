@@ -1,12 +1,10 @@
-import { type Saga, sagaCover, sagaEntryKey, sagaFacts, sagaPath } from '@raven/core'
+import { type Saga, sagaEntryKey, sagaFacts, sagaPath } from '@raven/core'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
-import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
-import { useHoverBackdrop } from '@/lib/useHoverBackdrop'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/SagaDeck/SagaDeck.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
@@ -30,13 +28,11 @@ type SagaDeckProps = { saga: Saga; to: string }
  * page four pictures, not dozens.
  */
 const SagaDeck = ({ saga, to }: SagaDeckProps) => {
-  const cover = sagaCover(saga)
-  const hover = useHoverBackdrop(cover && api.sagaPictureUrl(cover))
   const select = useSelectable({ key: sagaEntryKey(saga), title: saga.name })
   const [isFanned, setFanned] = useState(false)
   const fan = () => setFanned(true)
   return (
-    <li className={styles.item} data-entry={sagaEntryKey(saga)} {...hover} {...select.rootProps}>
+    <li className={styles.item} data-entry={sagaEntryKey(saga)} {...select.rootProps}>
       <SelectCheckbox select={select} className={styles.select} />
       <Link
         to={to}

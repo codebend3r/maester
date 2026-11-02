@@ -1,30 +1,30 @@
 import { useId } from 'react'
-import { type ItemSummary } from '@raven/core'
+import { BINGE_LIMIT, type ItemSummary } from '@raven/core'
 import { Button } from '@raven/ui'
-import { BINGE_COPY, BINGE_LIMIT } from '@/lib/binge'
-import { useBinge, useBingeProfile } from '@/stores/binge'
+import { BINGE_COPY } from '@/lib/binge'
+import { useBingeProfile, useDismissBingeTip, useSetBinge } from '@/lib/useBinge'
 import styles from '@/components/BingeButton/BingeButton.module.scss'
 
 type BingeButtonProps = { item: Pick<ItemSummary, 'id' | 'type'> }
 
 export const BingeButton = ({ item }: BingeButtonProps) => {
   const tipId = useId()
-  const { account, ids, hasSeenTip } = useBingeProfile()
-  const toggle = useBinge((state) => state.toggle)
-  const dismissTip = useBinge((state) => state.dismissTip)
+  const { ids, hasSeenTip } = useBingeProfile()
+  const setBinge = useSetBinge()
+  const dismissTip = useDismissBingeTip()
   const isBinging = ids.includes(item.id)
   const isFull = !isBinging && ids.length >= BINGE_LIMIT
   const shouldShowTip = !hasSeenTip && !isBinging
   return (
     <span className={styles.control} data-wide>
       <Button
-        icon="playback"
+        icon="popcorn"
         aria-pressed={isBinging}
         aria-disabled={isFull}
         aria-describedby={isFull || shouldShowTip ? tipId : undefined}
         className={shouldShowTip ? styles.highlight : undefined}
         onClick={() => {
-          if (!isFull) toggle({ account, item })
+          if (!isFull) setBinge.mutate({ id: item.id, binge: !isBinging })
         }}
       >
         {isBinging ? BINGE_COPY.binging : BINGE_COPY.add}
@@ -32,7 +32,7 @@ export const BingeButton = ({ item }: BingeButtonProps) => {
       {shouldShowTip && !isFull && (
         <span className={styles.tip} role="note">
           <span id={tipId}>{BINGE_COPY.tip}</span>
-          <Button tone="ghost" onClick={() => dismissTip(account)}>
+          <Button tone="ghost" onClick={() => dismissTip.mutate()}>
             {BINGE_COPY.dismiss}
           </Button>
         </span>

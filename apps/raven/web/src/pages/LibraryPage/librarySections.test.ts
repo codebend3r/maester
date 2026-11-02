@@ -43,6 +43,8 @@ describe('the tabs of a library', () => {
     expect(sectionFrom({ param: 'duplicates', kind: 'movies' })).toBe('duplicates')
     expect(sectionFrom({ param: 'artists', kind: 'music' })).toBe('artists')
     expect(sectionFrom({ param: 'playlists', kind: 'music' })).toBe('playlists')
+    expect(sectionFrom({ param: 'unmatched-albums', kind: 'music' })).toBe('unmatched-albums')
+    expect(sectionFrom({ param: 'not-matched', kind: 'music' })).toBe('not-matched')
     expect(sectionFrom({ param: 'all', kind: 'movies' })).toBeNull()
     expect(sectionFrom({ param: 'albums', kind: 'music' })).toBeNull()
     expect(sectionFrom({ param: 'history', kind: 'movies' })).toBeNull()
@@ -54,11 +56,12 @@ describe('the tabs of a library', () => {
     expect(sectionPath({ libraryId: 4, section: 'not-matched' })).toBe('/libraries/4/not-matched')
   })
 
-  it('gives a music library Albums and Artists in place of All, and no matching tabs', () => {
+  it('gives a music library its album, artist, playlist and unmatched-album tabs', () => {
     expect(sectionsFor('music')).toEqual([
       'albums',
       'artists',
       'playlists',
+      'unmatched-albums',
       'in-progress',
       'favourites',
       'finished',
@@ -72,6 +75,7 @@ describe('the tabs of a library', () => {
       countText({ section, tallies: { ...library, ...counts } })
     expect(Object.values(LIBRARY_SECTIONS).map(countOf)).toEqual([
       '1,204',
+      null,
       null,
       null,
       null,
@@ -91,6 +95,7 @@ describe('the tabs of a library', () => {
       null,
       null,
       null,
+      null,
       '0',
       null,
       null,
@@ -104,8 +109,13 @@ describe('the tabs of a library', () => {
     expect(finished(1500)).toBe('48+')
   })
 
-  it('gives every tab an icon of its own', () => {
-    const icons = Object.values(LIBRARY_SECTIONS).map((section) => SECTIONS[section].icon)
-    expect(new Set(icons).size).toBe(icons.length)
+  it('gives each library distinct tab icons', () => {
+    const icons = (kind: 'movies' | 'shows' | 'music') =>
+      sectionsFor(kind).map((section) => SECTIONS[section].icon)
+    const kinds = ['movies', 'shows', 'music'] as const
+    kinds.forEach((kind) => {
+      const ownIcons = icons(kind)
+      expect(new Set(ownIcons).size).toBe(ownIcons.length)
+    })
   })
 })

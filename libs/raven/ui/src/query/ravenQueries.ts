@@ -197,6 +197,12 @@ export const ravenQueriesFor = (api: ApiClient) => {
       queryFn: () => api.getHero(),
     }),
 
+    /** A shelf of albums for each pinned music library, read apart from the shelves. */
+    homeAlbumsQuery: queryOptions({
+      queryKey: queryKeys.homeAlbums,
+      queryFn: () => api.getHomeAlbums(),
+    }),
+
     /** The admin's picks for the hero, and how many it holds at most. */
     heroPicksQuery: queryOptions({
       queryKey: queryKeys.heroPicks,

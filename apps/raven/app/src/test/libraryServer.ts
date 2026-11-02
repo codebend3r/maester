@@ -63,6 +63,8 @@ type ShowForProps = { id: number; title: string }
 const showFor = ({ id, title }: ShowForProps): ShowEntry => ({
   show: summaryFor({ id, type: ITEM_TYPES.show, title, year: 2024 }),
   episodes: 8,
+  seasons: 1,
+  totalEpisodes: 8,
   watchedEpisodes: 0,
   endedYear: null,
   addedAt: '2026-10-16T00:00:00.000Z',

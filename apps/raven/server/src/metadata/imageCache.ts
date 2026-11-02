@@ -75,6 +75,8 @@ type ImageCacheLocalProps = {
   width: ImageWidth
 }
 
+type ImageCacheArtistProps = { artistId: number; source: string }
+
 type ImageCacheAlbumProps = {
   albumId: number
   /** The file the cover is read from: the one that embeds it, or the picture itself. */
@@ -106,6 +108,7 @@ const ownerOf = (file: string): number => Number(file.split('-')[0])
 
 /** The folder under `images/` that holds the Cover Art Archive's covers as fetched, named by release id. */
 const COVER_ART_DIR = 'cover-art'
+const ARTIST_DIR = 'artists'
 
 /**
  * Posters, backdrops, photos and stills on disk beside the thumbnails, each
@@ -135,7 +138,7 @@ export class ImageCache {
     KEPT_WIDTHS.forEach((width) =>
       mkdirSync(join(this.root, 'tmdb', `w${width}`), { recursive: true }),
     )
-    const scaled: readonly string[] = [...Object.values(SCALED_DIRS), COVER_ART_DIR]
+    const scaled: readonly string[] = [...Object.values(SCALED_DIRS), COVER_ART_DIR, ARTIST_DIR]
     scaled.forEach((dir) => mkdirSync(join(this.root, dir), { recursive: true }))
   }
 
@@ -220,6 +223,16 @@ export class ImageCache {
           }
         })
       },
+    })
+  }
+
+  /** An artist photo from Wikimedia Commons, cached once at the width Commons serves. */
+  artist({ artistId, source }: ImageCacheArtistProps): Promise<string | null> {
+    const identity = createHash('sha256').update(source).digest('hex').slice(0, 12)
+    return this.downloaded({
+      target: join(this.root, ARTIST_DIR, `${artistId}-${identity}.jpg`),
+      url: source,
+      what: `the photo of artist ${artistId}`,
     })
   }
 

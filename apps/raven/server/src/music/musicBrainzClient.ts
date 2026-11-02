@@ -14,6 +14,8 @@ import { RAVEN_USER_AGENT } from '@/music/userAgent'
 import { type RateLimit, createRateLimit, sleep } from '@/scanner/concurrency'
 
 const API = 'https://musicbrainz.org/ws/2'
+const WIKIDATA_ENTITY = 'https://www.wikidata.org/wiki/Special:EntityData'
+const COMMONS_FILE = 'https://commons.wikimedia.org/wiki/Special:Redirect/file'
 
 /** One call may take this long before it counts as MusicBrainz being down. */
 const TIMEOUT_MS = 10_000
@@ -91,6 +93,7 @@ const MB_FIELDS = {
 } as const
 
 const MB_STATUSES = { official: 'Official' } as const
+const MB_RELATION_TYPES = { wikidata: 'wikidata' } as const
 
 type AtProps = { record: Record<string, unknown>; key: string }
 
@@ -197,6 +200,31 @@ export const toRelease = (value: unknown): Release | null => {
   }
 }
 
+const wikidataIdOf = (value: unknown): string | null => {
+  if (!isRecord(value)) return null
+  const relations = listAt({ record: value, key: 'relations' }).filter(isRecord)
+  const resource = relations.flatMap((relation) => {
+    if (relation.type !== MB_RELATION_TYPES.wikidata) return []
+    const url = recordAt({ record: relation, key: 'url' }).resource
+    return isString(url) ? [url] : []
+  })[0]
+  const match = resource === undefined ? null : /\/wiki\/(Q\d+)$/.exec(resource)
+  return match?.[1] ?? null
+}
+
+type CommonsFileOfProps = { value: unknown; id: string }
+
+const commonsFileOf = ({ value, id }: CommonsFileOfProps): string | null => {
+  if (!isRecord(value)) return null
+  const entity = recordAt({ record: recordAt({ record: value, key: 'entities' }), key: id })
+  const claims = recordAt({ record: entity, key: 'claims' })
+  const image = listAt({ record: claims, key: 'P18' }).find(isRecord)
+  if (image === undefined) return null
+  const snak = recordAt({ record: image, key: 'mainsnak' })
+  const data = recordAt({ record: snak, key: 'datavalue' }).value
+  return isString(data) && data.trim() !== '' ? data : null
+}
+
 /** A Lucene term with its quotes and operators escaped, so a title is searched for as words. */
 const quoted = (text: string): string => `"${text.replace(/["\\]/g, (char) => `\\${char}`)}"`
 
@@ -254,6 +282,28 @@ export class MusicBrainzClient {
       return response.json()
     }
     return attempt(RETRIES)
+  }
+
+  /** The artist's Wikimedia Commons photo through MusicBrainz's Wikidata relation, when both have one. */
+  async artistPhoto(mbid: string): Promise<string | null> {
+    const artist = await this.get({
+      path: `/artist/${encodeURIComponent(mbid)}`,
+      params: { inc: 'url-rels' },
+    })
+    const wikidataId = wikidataIdOf(artist)
+    if (wikidataId === null) return null
+    const response = await this.fetch({
+      url: `${WIKIDATA_ENTITY}/${wikidataId}.json`,
+      init: {
+        headers: { [HEADERS.accept]: CONTENT_TYPES.json, [HEADERS.userAgent]: RAVEN_USER_AGENT },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+    }).catch(() => null)
+    if (!response?.ok) return null
+    const file = commonsFileOf({ value: await response.json(), id: wikidataId })
+    return file === null
+      ? null
+      : `${COMMONS_FILE}/${encodeURIComponent(file.replaceAll(' ', '_'))}?width=500`
   }
 
   /** Releases matching an album's title and artist, MusicBrainz's best first. */

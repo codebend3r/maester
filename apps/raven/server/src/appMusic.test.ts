@@ -117,7 +117,7 @@ describe('a music library', () => {
     const library = await api().createLibrary({
       name: 'Music',
       paths: [at()],
-      settings: { kind: LIBRARY_KINDS.music },
+      settings: { kind: LIBRARY_KINDS.music, pinned: true },
     })
     state.library = library.id
     await app().get(ScannerService).whenIdle(library.id)
@@ -180,6 +180,15 @@ describe('a music library', () => {
       { title: 'Live 1994', artists: ['Bootlegs'], year: null, trackCount: 1, hasCover: true },
       { title: 'OK Computer', artists: ['Radiohead'], year: 1997, trackCount: 2, hasCover: true },
     ])
+  })
+
+  it("gives Home one shelf of the pinned music library's albums, the one added last first", async () => {
+    const [shelf, ...rest] = await api().getHomeAlbums()
+    const added = await api().listAlbums({ libraryId: state.library, sort: MUSIC_SORTS.added })
+    expect(rest).toEqual([])
+    expect(shelf?.libraryId).toBe(state.library)
+    expect(shelf?.albums.map(({ id }) => id)).toEqual(added.map(({ id }) => id))
+    expect(shelf?.albums.length).toBeGreaterThan(1)
   })
 
   it('matches each album to MusicBrainz: by the id in its tags, by a sure search, or not at all', async () => {
@@ -291,7 +300,7 @@ describe('a music library', () => {
     const artists = await api().listArtists({ libraryId: state.library })
     expect(
       artists.map(({ name, albumCount, trackCount }) => `${name} ${albumCount}/${trackCount}`),
-    ).toEqual(['Blur 1/1', 'Bootlegs 1/1', 'Radiohead 1/2'])
+    ).toEqual(['Blur 1/1', 'Bootlegs 0/1', 'Radiohead 1/2', 'Someone Else 1/0'])
     const radiohead = artists.find(({ name }) => name === 'Radiohead')
     const page = await api().getArtist(radiohead?.id ?? 0)
     expect(page.albums.map(({ title }) => title)).toEqual(['OK Computer'])

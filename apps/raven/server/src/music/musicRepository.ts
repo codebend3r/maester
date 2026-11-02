@@ -4,6 +4,7 @@ import {
   type AlbumDetails,
   MATCH_STATES,
   type AlbumSummary,
+  type MediaAlbum,
   type Artist,
   type ArtistCredit,
   type ArtistDetails,
@@ -19,6 +20,7 @@ import {
   listOf,
   sortTitle,
 } from '@raven/core'
+import { sameSecret } from '@shared/server'
 import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
@@ -136,6 +138,9 @@ type ArtistRow = {
   album_count: number
   track_count: number
 }
+
+type ArtistPictureRow = { mbid: string | null; picture: string | null; fetched_at: string | null }
+type ArtistPicture = { mbid: string; picture: string | null; isFetched: boolean }
 
 /** An album's artists in credit order, as one JSON list per row. */
 const ALBUM_ARTISTS = `(SELECT json_group_array(json_object('id', credited.id, 'name', credited.name))
@@ -344,6 +349,8 @@ type MusicRepositoryCoverProps = { id: number; version: string }
 type MusicRepositoryAlbumOfReleaseProps = { libraryId: number; mbid: string | null }
 type MusicRepositorySetCoverProps = { id: number; cover: AlbumCover }
 type MusicRepositoryEnrichProps = { id: number; release: Release }
+type MusicRepositorySetArtistPictureProps = { id: number; picture: string | null }
+type MusicRepositoryArtistPictureProps = { id: number; version: string }
 
 type MusicRepositoryArtistsProps = {
   ids: readonly number[]
@@ -458,6 +465,7 @@ export class MusicRepository implements OnModuleInit {
       name: row.name,
       sortName: row.sort_name,
       mbid: row.mbid,
+      photoVersion: this.pictureVersions.artist({ id: row.id, mbid: row.mbid }),
       albumCount: row.album_count,
       trackCount: row.track_count,
     }
@@ -770,28 +778,57 @@ export class MusicRepository implements OnModuleInit {
   albumsToEnrich(libraryId: number): { id: number; mbid: string }[] {
     return this.db
       .prepare<[number], { id: number; mbid: string }>(
-        `SELECT id, mbid FROM albums WHERE library_id = ? AND mbid IS NOT NULL
-        AND fetched_at IS NULL AND (release_date IS NULL OR length(release_date) < 10) ORDER BY id`,
+        `SELECT a.id, a.mbid FROM albums a WHERE a.library_id = ? AND a.mbid IS NOT NULL
+          AND ((a.fetched_at IS NULL AND (a.release_date IS NULL OR length(a.release_date) < 10))
+            OR EXISTS (
+              SELECT 1 FROM album_artists aa JOIN artists ar ON ar.id = aa.artist_id
+              WHERE aa.album_id = a.id AND ar.mbid IS NULL
+            ))
+          ORDER BY a.id`,
       )
       .all(libraryId)
   }
 
   enrich({ id, release }: MusicRepositoryEnrichProps): void {
-    this.db
-      .prepare(`UPDATE albums SET
+    this.db.transaction(() => {
+      this.db
+        .prepare(`UPDATE albums SET
       release_date = CASE WHEN release_date IS NULL OR
         (substr(release_date, 1, 4) = substr(@date, 1, 4) AND length(@date) > length(release_date))
         THEN COALESCE(@date, release_date) ELSE release_date END,
       year = COALESCE(year, @year), label = COALESCE(label, @label), fetched_at = @at
       WHERE id = @id AND mbid = @mbid`)
-      .run({
-        id,
-        mbid: release.mbid,
-        date: release.releaseDate,
-        year: release.year,
-        label: release.label,
-        at: new Date().toISOString(),
-      })
+        .run({
+          id,
+          mbid: release.mbid,
+          date: release.releaseDate,
+          year: release.year,
+          label: release.label,
+          at: new Date().toISOString(),
+        })
+      if (release.artists.length > 0) {
+        this.credit({ credits: CREDITS.album, ownerId: id, artists: release.artists })
+      }
+    })()
+  }
+
+  setArtistPicture({ id, picture }: MusicRepositorySetArtistPictureProps): void {
+    this.db
+      .prepare('UPDATE artists SET picture = ?, fetched_at = ? WHERE id = ?')
+      .run(picture, new Date().toISOString(), id)
+  }
+
+  artistPicture({ id, version }: MusicRepositoryArtistPictureProps): ArtistPicture | null {
+    const row = this.db
+      .prepare<[number], ArtistPictureRow>(
+        'SELECT mbid, picture, fetched_at FROM artists WHERE id = ?',
+      )
+      .get(id)
+    if (row === undefined || row.mbid === null) return null
+    const current = this.pictureVersions.artist({ id, mbid: row.mbid })
+    return current !== null && sameSecret({ given: version, expected: current })
+      ? { mbid: row.mbid, picture: row.picture, isFetched: row.fetched_at !== null }
+      : null
   }
 
   /** The library's albums no pass has looked at yet, oldest first. */
@@ -819,9 +856,10 @@ export class MusicRepository implements OnModuleInit {
    * follows the release id, so nothing of it is written here.
    */
   saveMatch({ id, release, match, confidence }: MusicRepositorySaveMatchProps): void {
-    this.db
-      .prepare(
-        `UPDATE albums
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `UPDATE albums
             SET match = @match, match_confidence = @confidence, matched_at = @at,
                 mbid = @mbid, fetched_at = CASE WHEN mbid IS @mbid THEN fetched_at ELSE NULL END,
                 release_group_mbid = CASE WHEN @mbid IS NULL THEN NULL
@@ -833,20 +871,24 @@ export class MusicRepository implements OnModuleInit {
                 label = COALESCE(label, @label),
                 type = CASE WHEN type = @plain AND @type IS NOT NULL THEN @type ELSE type END
           WHERE id = @id`,
-      )
-      .run({
-        id,
-        match,
-        confidence,
-        at: new Date().toISOString(),
-        mbid: release?.mbid ?? null,
-        releaseGroupMbid: release?.releaseGroupMbid ?? null,
-        year: release?.year ?? null,
-        releaseDate: release?.releaseDate ?? null,
-        label: release?.label ?? null,
-        type: release?.type ?? null,
-        plain: ALBUM_TYPES.album,
-      })
+        )
+        .run({
+          id,
+          match,
+          confidence,
+          at: new Date().toISOString(),
+          mbid: release?.mbid ?? null,
+          releaseGroupMbid: release?.releaseGroupMbid ?? null,
+          year: release?.year ?? null,
+          releaseDate: release?.releaseDate ?? null,
+          label: release?.label ?? null,
+          type: release?.type ?? null,
+          plain: ALBUM_TYPES.album,
+        })
+      if (release !== null && release.artists.length > 0) {
+        this.credit({ credits: CREDITS.album, ownerId: id, artists: release.artists })
+      }
+    })()
   }
 
   /** The library's albums no release was found for go back to pending; how many. */
@@ -940,6 +982,29 @@ export class MusicRepository implements OnModuleInit {
         const version = cover === null ? null : this.pictureVersions.album({ id: row.id, cover })
         return version === null ? [] : [{ id: row.id, version }]
       })
+  }
+
+  /** The album each of these files is a track of, by file id, with its cover's version; a file that is no track is left out. */
+  albumsOfMedia(mediaIds: readonly number[]): Map<number, MediaAlbum> {
+    if (mediaIds.length === 0) return new Map()
+    return new Map(
+      this.db
+        .prepare<[string], CoverOfProps & { media_id: number; id: number; title: string }>(
+          `SELECT t.media_id, a.id, a.title, a.cover_source AS source, a.cover_ref AS ref,
+                  a.cover_stamp AS stamp, a.mbid
+             FROM tracks t JOIN albums a ON a.id = t.album_id
+            WHERE t.media_id IN (SELECT value FROM json_each(?))`,
+        )
+        .all(JSON.stringify(mediaIds))
+        .map((row) => [
+          row.media_id,
+          {
+            id: row.id,
+            title: row.title,
+            coverVersion: this.pictureVersions.album({ id: row.id, cover: coverOf(row) }),
+          },
+        ]),
+    )
   }
 
   coverFiles(id: number): { id: number; path: string }[] {

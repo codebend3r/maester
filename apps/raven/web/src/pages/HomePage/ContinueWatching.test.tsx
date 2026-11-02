@@ -89,6 +89,11 @@ describe('ContinueWatching', () => {
       expect.stringContaining('/api/pictures/items/4/backdrop'),
     ])
     expect(section().querySelector('img[src*="/logo"]')?.getAttribute('alt')).toBe('')
+    // The logo stands for the name: it is the page link, and the name is not written out again.
+    const page = within(section()).getByRole('link', { name: mediaLabel(episode) })
+    expect(page).toHaveAttribute('href', '/episodes/7?library=2')
+    expect(page.querySelector('img[src*="/logo"]')).not.toBeNull()
+    expect(page.textContent).toBe('')
   })
 
   it('shows a frame grab as its backdrop where the show has no art to read', async () => {

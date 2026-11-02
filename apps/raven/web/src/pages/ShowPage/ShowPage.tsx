@@ -162,6 +162,7 @@ const ShowView = ({ details }: ShowViewProps) => {
         <ItemHeader
           back={library}
           library={library}
+          pullUp
           titleId={ids.title}
           eyebrow={[SHOW_COPY.eyebrow]}
           title={details.title}

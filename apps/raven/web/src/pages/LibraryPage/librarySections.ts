@@ -20,6 +20,7 @@ export const LIBRARY_SECTIONS = {
   albums: 'albums',
   artists: 'artists',
   playlists: 'playlists',
+  unmatchedAlbums: 'unmatched-albums',
   inProgress: 'in-progress',
   favourites: 'favourites',
   sagas: 'sagas',
@@ -35,7 +36,8 @@ const always = (): boolean => true
 /** TMDB keeps collections of movies alone, and only a movie gathers several files on one card. */
 const matchedToMovies = (kind: LibraryKind): boolean => matchTypeFor(kind) === ITEM_TYPES.movie
 
-const matched = (kind: LibraryKind): boolean => matchTypeFor(kind) != null
+const matchedFiles = (kind: LibraryKind): boolean =>
+  matchTypeFor(kind) != null && !listsAlbums(kind)
 
 /** A music library lists albums, and has its artists on a tab of their own; every other lists its files or shows. */
 const listsAlbums = (kind: LibraryKind): boolean => listingFor(kind) === LIBRARY_LISTINGS.albums
@@ -56,7 +58,8 @@ export const FINISHED_LIMIT = 48
  * screen shows of it), which types of library have it, the tally its count
  * reads, and the most it lists, past which the count reads as that many
  * and more. Sagas and Duplicates are only where files are matched to
- * movies, and Not matched wherever files are matched at all.
+ * movies, and Not matched for matched video libraries. Music libraries have
+ * a separate tab for albums whose MusicBrainz match is still missing.
  */
 export const SECTIONS = {
   all: {
@@ -88,6 +91,13 @@ export const SECTIONS = {
     tally: null,
     most: null,
   },
+  'unmatched-albums': {
+    label: LIBRARY_COPY.sectionLabels.unmatchedAlbums,
+    icon: 'alert',
+    isFor: listsAlbums,
+    tally: null,
+    most: null,
+  },
   'in-progress': {
     label: LIBRARY_COPY.sectionLabels.inProgress,
     icon: 'playback',
@@ -112,7 +122,7 @@ export const SECTIONS = {
   'not-matched': {
     label: LIBRARY_COPY.sectionLabels.notMatched,
     icon: 'alert',
-    isFor: matched,
+    isFor: matchedFiles,
     tally: 'unmatchedCount',
     most: null,
   },

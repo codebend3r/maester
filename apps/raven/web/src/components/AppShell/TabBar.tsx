@@ -40,7 +40,7 @@ export const TabBar = ({ hasMusic }: TabBarProps) => {
             label={COMMON_COPY.libraries}
           />
           {!isDesktop && (
-            <Tab to={BINGE_PATH} patterns={[BINGE_PATH]} icon="playback" label={BINGE_COPY.title} />
+            <Tab to={BINGE_PATH} patterns={[BINGE_PATH]} icon="popcorn" label={BINGE_COPY.title} />
           )}
           <Tab
             to="/favourites"

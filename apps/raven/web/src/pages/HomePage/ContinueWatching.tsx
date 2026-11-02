@@ -9,15 +9,16 @@ import {
   tileWords,
   watchLink,
 } from '@raven/core'
-import { Button, Icon } from '@raven/ui'
+import { ButtonLink, Icon } from '@raven/ui'
 import { useQuery } from '@tanstack/react-query'
-import { type ComponentType, useId, useState } from 'react'
+import { type ComponentType, useId } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
+import { CONTINUE_WATCHING_PATH, HOME_CONTINUE_COUNT } from '@/lib/homeContinue'
 import { itemQuery } from '@/lib/queries'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import styles from '@/pages/HomePage/ContinueWatching.module.scss'
@@ -66,25 +67,34 @@ type TileTitleProps = {
   page: ReturnType<typeof cardLink>
   title: string
   label: string
+  /** The title's logo, which stands for its name where there is one. */
+  logo: string | null
   onContextMenu: ReturnType<typeof useCardMenu>['onContextMenu']
 }
 
 type LinkedTitleProps = TileTitleProps
 
-const LinkedTitle = ({ page, title, label, onContextMenu }: LinkedTitleProps) => (
+const LinkedTitle = ({ page, title, label, logo, onContextMenu }: LinkedTitleProps) => (
   <CardLink
     {...page}
-    className={`${styles.title} ${styles.link}`}
+    className={`${logo ? styles.logoSlot : styles.title} ${styles.link}`}
     aria-label={label}
     onContextMenu={onContextMenu}
   >
-    {title}
+    {logo ? <img className={styles.logo} src={logo} alt="" decoding="async" /> : title}
   </CardLink>
 )
 
 type PlainTitleProps = TileTitleProps
 
-const PlainTitle = ({ title }: PlainTitleProps) => <span className={styles.title}>{title}</span>
+const PlainTitle = ({ title, logo }: PlainTitleProps) =>
+  logo ? (
+    <span className={styles.logoSlot}>
+      <img className={styles.logo} src={logo} alt={title} decoding="async" />
+    </span>
+  ) : (
+    <span className={styles.title}>{title}</span>
+  )
 
 const TILE_TITLES = {
   [TITLE_KINDS.linked]: LinkedTitle,
@@ -95,8 +105,8 @@ type ContinueTileProps = { entry: PosterEntry }
 
 /**
  * A video in progress as a wide tile on its show's or film's backdrop, the
- * title's logo in the top left corner, and along the foot its name, the
- * episode or year, how far in it is and how long is left. The tile resumes
+ * title's logo in the top left corner, standing for its name, or the name
+ * along the foot where it has no logo, then the episode or year, how far in it is and how long is left. The tile resumes
  * it; its name opens its page, where it has one. A right click opens the
  * card's menu.
  */
@@ -123,9 +133,25 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
           <Icon name="play" size={20} />
         </span>
       </CardLink>
-      {art.logo && <img className={styles.logo} src={art.logo} alt="" decoding="async" />}
+      {art.logo && (
+        <TileTitle
+          page={page}
+          title={title}
+          label={label}
+          logo={art.logo}
+          onContextMenu={menu.onContextMenu}
+        />
+      )}
       <span className={styles.copy}>
-        <TileTitle page={page} title={title} label={label} onContextMenu={menu.onContextMenu} />
+        {!art.logo && (
+          <TileTitle
+            page={page}
+            title={title}
+            label={label}
+            logo={null}
+            onContextMenu={menu.onContextMenu}
+          />
+        )}
         {(line || resolution != null) && (
           <span className={styles.line}>
             {line && <span>{line}</span>}
@@ -155,44 +181,47 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
   )
 }
 
-/** Three rows of two: as many as fit before the library rows without burying them. */
-const FIRST_TILES = 6
+type ContinueTilesProps = { entries: readonly PosterEntry[]; id?: string }
+
+/** The tiles, two across, one for each video in progress. */
+export const ContinueTiles = ({ entries, id }: ContinueTilesProps) => (
+  <ul id={id} className={styles.tiles}>
+    {entries.map((entry) => (
+      <ContinueTile key={entry.media.id} entry={entry} />
+    ))}
+  </ul>
+)
 
 type ContinueWatchingProps = { entries: PosterEntry[] }
 
 /**
- * Every video in progress, the most recently watched first, as wide tiles
- * two across. Past the first three rows the rest wait behind Show all.
+ * The first few videos in progress, the most recently watched first, as wide
+ * tiles two across. How many is `HOME_CONTINUE_COUNT`; when there are more,
+ * See all, with an arrow, goes to the page that lists every one.
  */
 export const ContinueWatching = ({ entries }: ContinueWatchingProps) => {
   const id = useId()
-  const [isAll, setAll] = useState(false)
-  const hasMore = entries.length > FIRST_TILES
-  const shown = isAll ? entries : entries.slice(0, FIRST_TILES)
+  const hasMore = entries.length > HOME_CONTINUE_COUNT
   return (
     <section className={styles.section} aria-labelledby={id}>
       <SectionHeading
         id={id}
         aside={
           hasMore && (
-            <Button
+            <ButtonLink
               tone="ghost"
-              aria-expanded={isAll}
-              aria-controls={`${id}-tiles`}
-              onClick={() => setAll((now) => !now)}
+              to={CONTINUE_WATCHING_PATH}
+              aria-label={HOME_COPY.seeAllLabel(entries.length)}
             >
-              {isAll ? HOME_COPY.showFewer : HOME_COPY.showAll(entries.length)}
-            </Button>
+              {HOME_COPY.seeAll(entries.length)}
+              <Icon name="next" size={16} />
+            </ButtonLink>
           )
         }
       >
         {HOME_COPY.continueWatching}
       </SectionHeading>
-      <ul id={`${id}-tiles`} className={styles.tiles}>
-        {shown.map((entry) => (
-          <ContinueTile key={entry.media.id} entry={entry} />
-        ))}
-      </ul>
+      <ContinueTiles entries={entries.slice(0, HOME_CONTINUE_COUNT)} />
     </section>
   )
 }

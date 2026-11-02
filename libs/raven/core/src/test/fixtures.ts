@@ -82,6 +82,7 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   versions: 1,
   variant: null,
   card: null,
+  album: null,
   ...overrides,
 })
 
@@ -138,6 +139,8 @@ export const episodeSummary = (overrides: Partial<EpisodeSummary> = {}): Episode
 export const showEntry = (overrides: Partial<ShowEntry> = {}): ShowEntry => ({
   show: itemSummary({ id: 4, type: 'show', title: 'Severance', year: 2022 }),
   episodes: 9,
+  seasons: 1,
+  totalEpisodes: 9,
   watchedEpisodes: 0,
   endedYear: null,
   addedAt: '2026-09-27T00:00:00.000Z',

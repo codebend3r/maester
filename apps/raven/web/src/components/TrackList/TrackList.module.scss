@@ -26,6 +26,19 @@
   color: var(--color-leaf-bright);
 }
 
+.withCover {
+  grid-template-columns: 3rem 2rem var(--control-size) minmax(0, 1fr) auto auto;
+  grid-template-areas: 'cover number play title length trail';
+}
+
+.cover {
+  grid-area: cover;
+  inline-size: 3rem;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
 .number {
   grid-area: number;
   display: grid;
@@ -90,6 +103,15 @@
   .row {
     grid-template-columns: var(--control-size) minmax(0, 1fr) auto auto;
     grid-template-areas: 'play title length trail';
+  }
+
+  .withCover {
+    grid-template-columns: 2.5rem var(--control-size) minmax(0, 1fr) auto auto;
+    grid-template-areas: 'cover play title length trail';
+  }
+
+  .cover {
+    inline-size: 2.5rem;
   }
 
   .number {

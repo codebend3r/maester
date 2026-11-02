@@ -61,6 +61,7 @@ export const APP_CLIENT_CALLS = {
   personPhoto: { method: get, path: '/api/people/:id/photo' },
   itemPicture: { method: get, path: PICTURE_PATHS.item },
   personPicture: { method: get, path: PICTURE_PATHS.photo },
+  artistPicture: { method: get, path: PICTURE_PATHS.artist },
   albumCover: { method: get, path: PICTURE_PATHS.album },
 
   getMedia: { method: get, path: '/api/media/:id' },

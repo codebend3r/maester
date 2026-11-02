@@ -40,6 +40,7 @@ const ARTIST: Artist = {
   name: 'Radiohead',
   sortName: 'Radiohead',
   mbid: null,
+  photoVersion: null,
   albumCount: 1,
   trackCount: 1,
 }

@@ -94,6 +94,15 @@ export const isItemSummary = object({
 
 export type ItemSummary = Infer<typeof isItemSummary>
 
+/** The album a music file is a track of, with the version of its cover, which is null when it has none. */
+export const isMediaAlbum = object({
+  id: isNumber,
+  title: isString,
+  coverVersion: nullable(isString),
+})
+
+export type MediaAlbum = Infer<typeof isMediaAlbum>
+
 export const isMediaItem = object({
   id: isNumber,
   libraryId: isNumber,
@@ -154,6 +163,8 @@ export const isMediaItem = object({
    * for anything but a movie.
    */
   card: nullable(isString),
+  /** The album a music file belongs to; null for anything else. */
+  album: nullable(isMediaAlbum),
 })
 
 export type MediaItem = Infer<typeof isMediaItem>
@@ -315,6 +326,10 @@ export const isShowEntry = object({
    * the bitrate sorts go by; null until one of them is probed.
    */
   bitrate: nullable(isNumber),
+  /** Known season count from the matched show's metadata. */
+  seasons: optional(isNumber),
+  /** Known episode count from the matched show's metadata. */
+  totalEpisodes: optional(isNumber),
   /** The first episode not yet watched by the library's measure, or null when every one is. */
   next: nullable(isMediaItem),
 })

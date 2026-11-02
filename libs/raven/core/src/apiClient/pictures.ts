@@ -57,6 +57,11 @@ type PhotoUrlProps = {
   photoVersion: string | null
 }
 
+type ArtistPhotoUrlProps = {
+  artistId: number
+  photoVersion: string | null
+}
+
 type AlbumCoverUrlProps = {
   albumId: number
   coverVersion: string | null
@@ -206,6 +211,16 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
         : pictureAt({
             path: PICTURE_PATHS.photo
               .replace(`:${PICTURE_PARAMS.id}`, String(personId))
+              .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(photoVersion)),
+          }),
+
+    /** An artist's Wikimedia Commons photo; null while none has been found. */
+    artistPhotoUrl: ({ artistId, photoVersion }: ArtistPhotoUrlProps): string | null =>
+      photoVersion == null
+        ? null
+        : pictureAt({
+            path: PICTURE_PATHS.artist
+              .replace(`:${PICTURE_PARAMS.id}`, String(artistId))
               .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(photoVersion)),
           }),
 
