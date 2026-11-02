@@ -226,6 +226,9 @@ export const DRAWINGS = {
   forward: { stroke: DOUBLE_ON, fill: DOUBLE_ON },
   skipNext: { stroke: `${SKIP_PLAY}M17.5 6.5v11`, fill: SKIP_PLAY },
   skipPrevious: { stroke: `${SKIP_BACK}M6.5 6.5v11`, fill: SKIP_BACK },
+  // A circle open at the top with an arrowhead, as Plex draws its skip; the player sets the seconds inside.
+  skipBack: { stroke: 'M6.7 8.2A7.5 7.5 0 1 0 12 6M12 6l3-2.5M12 6l3 2.5' },
+  skipForward: { stroke: 'M17.3 8.2A7.5 7.5 0 1 1 12 6M12 6l-3-2.5M12 6l-3 2.5' },
   shuffle: {
     stroke:
       'M4 16.5h2.6a3 3 0 0 0 2.3-1.1l.6-.7M14.5 9.3l.6-.7a3 3 0 0 1 2.3-1.1H20M4 7.5h2.6a3 3 0 0 1 2.3 1.1l6.2 6.8a3 3 0 0 0 2.3 1.1H20M17.5 5l2.5 2.5-2.5 2.5M17.5 14l2.5 2.5-2.5 2.5',

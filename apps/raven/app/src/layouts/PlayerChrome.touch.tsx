@@ -1,5 +1,6 @@
 import { formatDuration } from '@raven/core'
 import { Icon } from '@raven/native'
+import { usePlayerPrefs } from '@raven/ui/headless'
 import type { IconName } from '@raven/ui/iconDrawings'
 import { type ComponentRef, useRef, useState } from 'react'
 import {
@@ -22,7 +23,10 @@ import {
   PLAYER_COPY,
   type PlayerChromeKit,
   type PlayerChromeProps,
+  SKIP_DIRECTIONS,
+  SKIP_ICONS,
   SKIP_SECONDS,
+  type SkipDirection,
   type TrackPicker,
   type Transport,
   playedShareOf,
@@ -32,6 +36,7 @@ import {
 import { Text } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
+import { VOLUME_ACTION_LIST, volumeAfterAction, volumeAt, volumeIconOf } from '@/layouts/volumeKit'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { pictureStyles, useTheme } from '@/theme/useTheme'
 
@@ -42,7 +47,10 @@ const SCRIM_OPACITY = 0.45
 const SCRUBBER_HEIGHT = 44
 
 /** The web's icon sizes: its transport, its play and its glass pills. */
-const ICON_SIZES = { transport: 24, play: 28, pill: 20 } as const
+const ICON_SIZES = { transport: 24, play: 28, pill: 20, skip: 32 } as const
+
+/** How wide the volume slider is: a thumb's reach, beside its speaker. */
+const VOLUME_WIDTH = 96
 
 /** How tall the title art in the corner stands, and the share of the screen's width it may take. */
 const LOGO_HEIGHT = SIZES.space6 * 1.5
@@ -112,6 +120,74 @@ const IconButton = ({ icon, label, size, isGlass = false, onPress }: IconButtonP
   )
 }
 
+type SkipButtonProps = { direction: SkipDirection; label: string; onPress: () => void }
+
+/** A skip as Plex draws it: a circle open at the top with an arrowhead, the seconds set inside. */
+const SkipButton = ({ direction, label, onPress }: SkipButtonProps) => {
+  const styles = useStyles()
+  const colour = useTheme((theme) => theme.overPicture.text)
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      hitSlop={SIZES.space1}
+      onPress={onPress}
+      style={({ pressed }) => [styles.round, pressed && styles.pressed]}
+    >
+      <View style={styles.skipIcon}>
+        <Icon colour={colour} name={SKIP_ICONS[direction]} size={ICON_SIZES.skip} />
+        <Text style={styles.skipSeconds}>{String(SKIP_SECONDS)}</Text>
+      </View>
+    </Pressable>
+  )
+}
+
+/** The speaker, which mutes, and the slider beside it, as the web's volume. */
+const VolumeControl = () => {
+  const [width, setWidth] = useState(0)
+  const styles = useStyles()
+  const volume = usePlayerPrefs((prefs) => prefs.volume)
+  const isMuted = usePlayerPrefs((prefs) => prefs.muted)
+  const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
+  const shown = isMuted ? 0 : volume
+  const drag = (event: GestureResponderEvent) =>
+    setVolume({ volume: volumeAt({ x: event.nativeEvent.locationX, width }), muted: false })
+  return (
+    <View style={styles.run}>
+      <IconButton
+        icon={volumeIconOf({ volume, isMuted })}
+        label={isMuted ? PLAYER_COPY.unmute : PLAYER_COPY.mute}
+        onPress={() => setVolume({ volume, muted: !isMuted })}
+        size={ICON_SIZES.pill}
+      />
+      <View
+        accessible
+        accessibilityActions={VOLUME_ACTION_LIST}
+        accessibilityLabel={PLAYER_COPY.volume}
+        accessibilityRole="adjustable"
+        accessibilityValue={{ min: 0, max: 100, now: Math.round(shown * 100) }}
+        onAccessibilityAction={({ nativeEvent }) =>
+          setVolume({
+            volume: volumeAfterAction({ volume: shown, name: nativeEvent.actionName }),
+            muted: false,
+          })
+        }
+        onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={drag}
+        onResponderMove={drag}
+        onStartShouldSetResponder={() => true}
+        style={styles.volumeSlider}
+      >
+        <View pointerEvents="none" style={styles.line}>
+          <View style={[styles.played, { width: `${shown * 100}%` }]} />
+        </View>
+        <View pointerEvents="none" style={[styles.thumb, { left: `${shown * 100}%` }]} />
+      </View>
+    </View>
+  )
+}
+
 type PickerButtonProps = {
   icon: IconName
   label: string
@@ -175,11 +251,10 @@ const TransportControls = ({
             onPress={() => onSeek(0)}
             size={ICON_SIZES.transport}
           />
-          <IconButton
-            icon="rewind"
+          <SkipButton
+            direction={SKIP_DIRECTIONS.back}
             label={PLAYER_COPY.back(SKIP_SECONDS)}
             onPress={() => onSeek(position - SKIP_SECONDS)}
-            size={ICON_SIZES.transport}
           />
           <IconButton
             icon={isPaused ? 'play' : 'pause'}
@@ -187,11 +262,10 @@ const TransportControls = ({
             onPress={onTogglePlay}
             size={ICON_SIZES.play}
           />
-          <IconButton
-            icon="forward"
+          <SkipButton
+            direction={SKIP_DIRECTIONS.forward}
             label={PLAYER_COPY.forward(SKIP_SECONDS)}
             onPress={() => onSeek(position + SKIP_SECONDS)}
-            size={ICON_SIZES.transport}
           />
           {next !== null && (
             <IconButton
@@ -203,6 +277,7 @@ const TransportControls = ({
           )}
         </View>
         <View style={styles.run}>
+          <VolumeControl />
           {subtitles !== null && (
             <PickerButton icon="captions" label={PLAYER_COPY.subtitles} picker={subtitles} />
           )}
@@ -274,6 +349,8 @@ const PlayerChrome = ({
   onBack,
 }: PlayerChromeProps) => {
   const insets = useSafeAreaInsets()
+  const volume = usePlayerPrefs((prefs) => prefs.volume)
+  const isMuted = usePlayerPrefs((prefs) => prefs.muted)
   const styles = useStyles()
   const isPlaying = transport !== null && !transport.isPaused
   const { isVisible, opacity, stir, toggle } = useControlsLinger({ isPlaying })
@@ -293,9 +370,11 @@ const PlayerChrome = ({
           controls={false}
           enterPictureInPictureOnLeave
           ignoreSilentSwitch="ignore"
+          muted={isMuted}
           playInBackground={false}
           resizeMode="contain"
           style={StyleSheet.absoluteFill}
+          volume={volume}
         />
       )}
       <Pressable
@@ -406,6 +485,21 @@ const useStyles = pictureStyles((colours) =>
       gap: SIZES.space2,
     },
     run: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space1 },
+    skipIcon: {
+      width: ICON_SIZES.skip,
+      height: ICON_SIZES.skip,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    // The circle's centre sits a little below the icon's, so the seconds do too.
+    skipSeconds: {
+      position: 'absolute',
+      color: colours.text,
+      fontSize: SIZES.textXs,
+      fontWeight: 'bold',
+      marginTop: SIZES.space0,
+    },
+    volumeSlider: { width: VOLUME_WIDTH, height: SCRUBBER_HEIGHT, justifyContent: 'center' },
     time: { color: colours.text, fontSize: SIZES.textSm, fontVariant: ['tabular-nums'] },
     scrubberSlot: { flex: 1 },
     scrubber: { height: SCRUBBER_HEIGHT, justifyContent: 'center' },

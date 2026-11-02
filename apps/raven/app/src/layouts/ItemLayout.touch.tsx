@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Icon } from '@raven/native'
@@ -63,12 +64,20 @@ const PHOTO_SIZE = 72
 const PERSON_WIDTH = 96
 
 /**
- * The backdrop is the page's ground, as the web's `PageBackdrop` is: fixed behind the content
- * while it scrolls, faded well back over the theme's ground so the text keeps its contrast. The
- * ground is the text's opposite in every theme (light ground and dark text, or the reverse), so
- * one opacity dims the picture towards the contrast the text needs on light and dark alike.
+ * The backdrop is the top of the page's ground: fixed behind the content while it scrolls, it
+ * covers this share of the window's height and fades into the theme's ground by its foot, so the
+ * picture shows and the rest of the page is the theme's own colour. The ground is the text's
+ * opposite in every theme, so a light dimming plus the fade keeps the text's contrast on light
+ * and dark alike.
  */
-const BACKDROP_OPACITY = 0.28
+const BACKDROP_REACH = 0.8
+
+const BACKDROP_OPACITY = 0.75
+
+/** Where the fade starts, as a share of the backdrop's height; it is the ground's own colour at the foot. */
+const BACKDROP_FADE_FROM = 0.3
+
+const BACKDROP_GRADIENT_ID = 'item-backdrop-fade'
 
 /** How much of the theme's raised colour the synopsis plate keeps, so the backdrop shows faintly through. */
 const PLATE_ALPHA = 0.75
@@ -170,12 +179,28 @@ const HERO_TITLES = {
   [TITLE_LOOKS.words]: HeroTitleWords,
 } as const satisfies Record<TitleLook, ComponentType<HeroTitleProps>>
 
+type SynopsisProps = { hero: ItemHero; isBeside?: boolean }
+
+/** The tagline and summary on their plate: beside the poster on a tablet, below the actions on a phone. */
+const Synopsis = ({ hero, isBeside = false }: SynopsisProps) => {
+  const styles = useStyles()
+  return (
+    (hero.tagline !== null || hero.summary !== null) && (
+      <View style={[styles.synopsis, isBeside && styles.synopsisBeside]}>
+        {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
+        {hero.summary !== null && <Text style={styles.summary}>{hero.summary}</Text>}
+      </View>
+    )
+  )
+}
+
 type HeroProps = { hero: ItemHero; actions: ItemAction[]; links: ItemAction[] }
 
 const Hero = ({ hero, actions, links }: HeroProps) => {
   const styles = useStyles()
   const { width, height } = useWindowDimensions()
-  const widths = isTablet({ width, height }) ? HERO_WIDTHS.tablet : HERO_WIDTHS.phone
+  const isWide = isTablet({ width, height })
+  const widths = isWide ? HERO_WIDTHS.tablet : HERO_WIDTHS.phone
   const facts = heroFactsOf(hero)
   const Title = HERO_TITLES[titleLookOf(hero.logo)]
   return (
@@ -197,6 +222,7 @@ const Hero = ({ hero, actions, links }: HeroProps) => {
           {hero.byline !== null && <Text style={styles.byline}>{hero.byline}</Text>}
           {facts !== '' && <Text style={styles.small}>{facts}</Text>}
           {hero.progress !== null && <ProgressLine progress={hero.progress} />}
+          {isWide && <Synopsis hero={hero} isBeside />}
         </View>
       </View>
       <View style={styles.actions}>
@@ -211,12 +237,7 @@ const Hero = ({ hero, actions, links }: HeroProps) => {
           ))}
         </View>
       )}
-      {(hero.tagline !== null || hero.summary !== null) && (
-        <View style={styles.synopsis}>
-          {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
-          {hero.summary !== null && <Text style={styles.summary}>{hero.summary}</Text>}
-        </View>
-      )}
+      {!isWide && <Synopsis hero={hero} />}
     </View>
   )
 }
@@ -411,14 +432,29 @@ type BackdropProps = { backdrop: NonNullable<ItemPage['hero']['backdrop']> }
 
 const Backdrop = ({ backdrop }: BackdropProps) => {
   const styles = useStyles()
+  const ground = useTheme((theme) => theme.palette.ground)
+  const { width, height: windowHeight } = useWindowDimensions()
+  const height = windowHeight * BACKDROP_REACH
   return (
-    <Image
-      accessibilityElementsHidden
-      resizeMode="cover"
-      source={backdrop}
-      style={[StyleSheet.absoluteFill, styles.backdrop]}
-      testID={ITEM_TEST_IDS.backdrop}
-    />
+    <View pointerEvents="none" style={[styles.backdropBox, { height }]}>
+      <Image
+        accessibilityElementsHidden
+        resizeMode="cover"
+        source={backdrop}
+        style={[StyleSheet.absoluteFill, styles.backdrop]}
+        testID={ITEM_TEST_IDS.backdrop}
+      />
+      <Svg height={height} style={StyleSheet.absoluteFill} width={width}>
+        <Defs>
+          <LinearGradient id={BACKDROP_GRADIENT_ID} x1="0" x2="0" y1="0" y2="1">
+            <Stop offset={0} stopColor={ground} stopOpacity={0} />
+            <Stop offset={BACKDROP_FADE_FROM} stopColor={ground} stopOpacity={0} />
+            <Stop offset={1} stopColor={ground} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
+        <Rect fill={`url(#${BACKDROP_GRADIENT_ID})`} height={height} width={width} x={0} y={0} />
+      </Svg>
+    </View>
   )
 }
 
@@ -494,7 +530,9 @@ const useStyles = themedStyles((colours) =>
     page: { gap: SIZES.space4 },
     notice: { gap: SIZES.space3 },
     scroll: { flex: 1 },
+    backdropBox: { position: 'absolute', top: 0, left: 0, right: 0 },
     backdrop: { opacity: BACKDROP_OPACITY },
+    synopsisBeside: { marginTop: SIZES.space2 },
     head: { gap: SIZES.space2 },
     hero: { gap: SIZES.space3 },
     headRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.space3 },

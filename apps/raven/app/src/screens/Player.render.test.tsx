@@ -327,6 +327,18 @@ describe('Player on a phone or tablet', () => {
     expect(drawnVideo.seek).toHaveBeenLastCalledWith(100)
   })
 
+  it("mutes and unmutes from the speaker, which sits by the volume's slider", async () => {
+    usePlayerPrefs.setState({ volume: 0.6, muted: false })
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
+    const props = await loadedVideo()
+    await start(props)
+    expect(screen.getByRole('adjustable', { name: PLAYER_COPY.volume })).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: PLAYER_COPY.mute }))
+    expect(usePlayerPrefs.getState().muted).toBe(true)
+    expect(await screen.findByRole('button', { name: PLAYER_COPY.unmute })).toBeTruthy()
+    expect(drawnVideo.props?.muted).toBe(true)
+  })
+
   it('holds the video paused, seeks to the resume spot once loaded, and plays when the seek lands', async () => {
     await renderPlayer({
       [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id),

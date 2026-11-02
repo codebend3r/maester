@@ -6,8 +6,7 @@ import { focusItem } from '@/layouts/ItemLayout.focus'
 import { touchItem } from '@/layouts/ItemLayout.touch'
 import { touchGrid } from '@/layouts/Grid.touch'
 import { focusPicker } from '@/layouts/Picker.focus'
-import { dpadPlayerChrome } from '@/layouts/PlayerChrome.dpad'
-import { focusPlayerChrome } from '@/layouts/PlayerChrome.focus'
+import { dpadPlayerChrome, tvosPlayerChrome } from '@/layouts/PlayerChrome.dpad'
 import { focusSearch } from '@/layouts/Search.focus'
 import { focusSettings } from '@/layouts/Settings.focus'
 import { touchSettings } from '@/layouts/Settings.touch'
@@ -81,14 +80,13 @@ export const {
 } = Platform.isTV ? focusMusic : touchMusic
 
 /**
- * Each platform's player controls, the one layout that differs between the two TVs: Apple TV's
- * system transport, which the Siri Remote drives and whose panel lists the stream's renditions;
- * raven's own under the d-pad on Android TV and under the thumb on iPhones and iPads, both with
- * the subtitle cues raven draws itself.
+ * Each platform's player controls: raven's own on every one, under the thumb on iPhones and iPads
+ * and under the remote on the two TVs (the Siri Remote and the d-pad), all with the subtitle cues
+ * raven draws itself.
  */
 const PLAYER_CHROMES = {
   [APP_PLATFORMS.ios]: touchPlayerChrome,
-  [APP_PLATFORMS.tvos]: focusPlayerChrome,
+  [APP_PLATFORMS.tvos]: tvosPlayerChrome,
   [APP_PLATFORMS.androidTv]: dpadPlayerChrome,
 } as const satisfies Record<AppPlatform, PlayerChromeKit>
 

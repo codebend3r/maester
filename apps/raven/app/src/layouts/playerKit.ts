@@ -3,11 +3,23 @@ import type { ComponentProps, ReactNode } from 'react'
 import type { AccessibilityActionEvent, AccessibilityActionInfo } from 'react-native'
 import type Video from 'react-native-video'
 
+import type { IconName } from '@raven/ui/iconDrawings'
+
 import type { PickerProps } from '@/layouts/gridKit'
 import type { PlayerHeading } from '@/layouts/playerHeading'
 
-/** How far a skip button moves, in seconds, as the web's Back 10 and Forward 10 do. */
+/** How far a skip button moves, in seconds, either way. */
 export const SKIP_SECONDS = 10
+
+export const SKIP_DIRECTIONS = { back: 'back', forward: 'forward' } as const
+
+export type SkipDirection = (typeof SKIP_DIRECTIONS)[keyof typeof SKIP_DIRECTIONS]
+
+/** Each skip's icon: a circle open at the top with an arrowhead, the seconds set inside it. */
+export const SKIP_ICONS = {
+  [SKIP_DIRECTIONS.back]: 'skipBack',
+  [SKIP_DIRECTIONS.forward]: 'skipForward',
+} as const satisfies Record<SkipDirection, IconName>
 
 /** What plays after the video, an episode's next in its show, and how to play it now. */
 type PlayerNext = { label: string; onPlay: () => void }
@@ -95,6 +107,9 @@ export const PLAYER_COPY = {
   opening: 'Opening the video',
   next: 'Next episode',
   restart: 'Back to the start',
+  mute: 'Mute',
+  unmute: 'Unmute',
+  volume: 'Volume',
   /** How each way of playing reads in the corner. */
   modes: {
     [PLAYBACK_MODES.direct]: 'Direct play',

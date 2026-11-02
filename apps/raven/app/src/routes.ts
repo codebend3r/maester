@@ -1,3 +1,5 @@
+import { type ViewingSession, sessionQueryOf } from '@raven/core'
+
 /** The app's route paths, one per file under `app/`. */
 export const APP_ROUTES = {
   home: '/',
@@ -77,6 +79,8 @@ export type RouteTarget =
       at: number
       /** Starts at the very beginning, past any spot the server saved: Play from the beginning. */
       isFromStart?: boolean
+      /** What the viewer chose to watch, which says what plays next; left out for the video's own (a show for an episode). */
+      session?: ViewingSession
     }
   | {
       kind: typeof ROUTE_TARGETS.library
@@ -130,6 +134,7 @@ export const hrefOf = (target: RouteTarget): Href => {
             name: APP_ROUTE_PARAMS.from,
             value: target.isFromStart === true ? PLAY_FROM.start : null,
           }),
+          ...(target.session === undefined ? {} : sessionQueryOf(target.session)),
         },
       }
     case ROUTE_TARGETS.library:
