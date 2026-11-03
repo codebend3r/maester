@@ -110,6 +110,10 @@ export const AppRoutes = () => {
                 element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.artists} />}
               />
               <Route
+                path={MUSIC_PATHS.noArtwork}
+                element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.noArtwork} />}
+              />
+              <Route
                 path={MUSIC_PATHS.songs}
                 element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.songs} />}
               />

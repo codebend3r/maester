@@ -65,6 +65,20 @@ describe('MusicLibraryPage', () => {
     )
   })
 
+  it('lists only the albums with no cover under the No artwork tab', async () => {
+    spyOn(api, 'listAlbums').mockResolvedValue([
+      album({ id: 7, title: 'OK Computer', sortTitle: 'OK Computer', coverVersion: null }),
+      album({ id: 8, title: 'Amnesiac', sortTitle: 'Amnesiac', coverVersion: 'v1' }),
+    ])
+    renderPage({ route: MUSIC_PATHS.noArtwork, libraries: [musicLibrary()] })
+    await screen.findByRole('link', { name: 'OK Computer' })
+    expect(screen.queryByRole('link', { name: 'Amnesiac' })).toBeNull()
+    expect(within(lists()).getByRole('link', { name: 'No artwork' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
   it('lists each artist once, by name', async () => {
     spyOn(api, 'listArtists').mockImplementation(async ({ libraryId }) =>
       libraryId === 3
