@@ -29,7 +29,7 @@ export type Featured = {
   /** Where it is: "Featured in Movies". */
   eyebrow: string
   title: string
-  /** The year and the length, or a show's years and episodes. */
+  /** The release day (or year) and the length, or a show's years and episodes. */
   facts: string[]
   /** A movie's resolution and whether it is HDR; null for a show, or a file not yet probed. */
   picture: Picture | null
@@ -79,14 +79,14 @@ const fromMedia = ({ media, line, library }: FromMediaProps): Featured[] => {
   if (!item) return []
   const artwork = artworkOf(item)
   if (!artwork) return []
-  const { title, year } = cardTitle(media)
+  const { title, date } = cardTitle(media)
   return [
     {
       key: `media:${media.id}`,
       ...artwork,
       eyebrow: HOME_COPY.featuredIn(library.name),
       title,
-      facts: [year == null ? null : String(year), formatRuntime(media.duration)].filter(isFact),
+      facts: [date, formatRuntime(media.duration)].filter(isFact),
       picture: pictureOf(media),
       line,
       play: watchLink({ media }),

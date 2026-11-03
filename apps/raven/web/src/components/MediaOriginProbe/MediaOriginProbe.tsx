@@ -4,6 +4,8 @@ import { useIsServed } from '@/lib/accessState'
 import { api } from '@/lib/api'
 import { useIsDesktop } from '@/stores/desktop'
 import { useOriginProbe } from '@/stores/originProbe'
+import { ProxiedMediaNotice } from '@/components/MediaOriginProbe/ProxiedMediaNotice'
+import { IS_API_PROXIED } from '@/lib/apiOrigin'
 
 type MediaOriginProbeProps = { children: ReactNode }
 
@@ -27,7 +29,14 @@ export const MediaOriginProbe = ({ children }: MediaOriginProbeProps) => {
     }
   }, [reprobe])
   const isProbing = useOriginProbe((state) => state.reprobe !== null)
-  return isProbing && children
+  return (
+    isProbing && (
+      <>
+        {isEnabled && <ProxiedMediaNotice isProxiedHost={IS_API_PROXIED} />}
+        {children}
+      </>
+    )
+  )
 }
 
 /** Probes the origins again: for a player that could not reach the one picked. */

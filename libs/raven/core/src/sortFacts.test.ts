@@ -62,26 +62,26 @@ describe('cardSortFact', () => {
     item: itemSummary({ released: '2026-03-07' }),
   })
 
-  it('says the year for a release sort that gives the day, and for no other', () => {
+  it('says the date for a release sort that gives the day, and for no other', () => {
     expect(cardSortFact({ media: released, sort: 'year-new' })).toEqual({
       sorted: formatAirDate('2026-03-07'),
-      isYearSaid: true,
+      isDateSaid: true,
     })
     expect(cardSortFact({ media: released, sort: 'largest' })).toEqual({
       sorted: '4.9 GB',
-      isYearSaid: false,
+      isDateSaid: false,
     })
   })
 
-  it('leaves the year to the card when there is no order or no day', () => {
+  it('leaves the date to the card when there is no order or no day', () => {
     expect(cardSortFact({ media: released, sort: undefined })).toEqual({
       sorted: null,
-      isYearSaid: false,
+      isDateSaid: false,
     })
     const undated = mediaItem({ item: itemSummary({ released: null }) })
     expect(cardSortFact({ media: undated, sort: 'year-new' })).toEqual({
       sorted: null,
-      isYearSaid: false,
+      isDateSaid: false,
     })
   })
 })

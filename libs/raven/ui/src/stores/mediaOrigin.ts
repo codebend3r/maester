@@ -10,6 +10,8 @@ type MediaOriginState = {
   /** The origin media plays from, and when it was chosen (epoch ms); null plays through the web host. */
   pick: MediaPick | null
   isProbing: boolean
+  /** Whether a probe has ended since launch; before one, an empty pick says nothing yet. */
+  hasProbed: boolean
   setPick: (pick: MediaPick | null) => void
   setProbing: (isProbing: boolean) => void
 }
@@ -40,8 +42,10 @@ export const useMediaOrigin = create<MediaOriginState>()(
       (set) => ({
         pick: null,
         isProbing: false,
+        hasProbed: false,
         setPick: (pick) => set({ pick }),
-        setProbing: (isProbing) => set({ isProbing }),
+        setProbing: (isProbing) =>
+          set((state) => ({ isProbing, hasProbed: state.hasProbed || !isProbing })),
       }),
       {
         name: STORE_KEYS.mediaOrigin,

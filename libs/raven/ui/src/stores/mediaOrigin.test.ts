@@ -50,6 +50,19 @@ describe('useMediaOrigin', () => {
     expect(useMediaOrigin.getState().pick).toBeNull()
   })
 
+  it('remembers that a probe has ended, and never keeps that', async () => {
+    useMediaOrigin.setState({ hasProbed: false })
+    useMediaOrigin.getState().setProbing(true)
+    expect(useMediaOrigin.getState().hasProbed).toBe(false)
+    useMediaOrigin.getState().setProbing(false)
+    expect(useMediaOrigin.getState().hasProbed).toBe(true)
+    const stored = JSON.parse(window.localStorage.getItem(STORE_KEYS.mediaOrigin) ?? 'null')
+    expect(Object.keys(stored.state)).toEqual(['pick'])
+    useMediaOrigin.setState({ hasProbed: false })
+    await useMediaOrigin.persist.rehydrate()
+    expect(useMediaOrigin.getState().hasProbed).toBe(false)
+  })
+
   it('keeps the pick in the store when localStorage throws', () => {
     withThrowingLocalStorage(() => {
       useMediaOrigin.getState().setPick({ origin, at: 7 })

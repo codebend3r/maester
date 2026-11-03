@@ -65,18 +65,18 @@ type ShowSortFactProps = {
 
 type CardSortFactProps = { media: MediaItem; sort: MediaSort | undefined }
 
-type CardSortFact = { sorted: string | null; isYearSaid: boolean }
+type CardSortFact = { sorted: string | null; isDateSaid: boolean }
 
 /**
  * A card's `sortFact`, for a listing in any order or none, and whether it
- * says the card's year already: a release sort's day does, so the card
- * leaves its year out.
+ * says the card's release day already: a release sort's does, so the card
+ * leaves its date out.
  */
 export const cardSortFact = ({ media, sort }: CardSortFactProps): CardSortFact => {
   const sorted = sort == null ? null : sortFact({ media, sort })
   return {
     sorted,
-    isYearSaid:
+    isDateSaid:
       sorted != null && sort != null && sortParts(sort).field === SORT_FIELD_NAMES.release,
   }
 }

@@ -1,3 +1,4 @@
+import { formatAirDate } from '@/itemFacts'
 import { describe, expect, it } from 'bun:test'
 import {
   cardTitle,
@@ -11,7 +12,7 @@ import {
   tileWords,
 } from '@/items'
 import { ITEM_TYPES } from '@/contract'
-import { itemSummary, mediaItem } from '@/test/fixtures'
+import { RELEASED_LABEL, itemSummary, mediaItem } from '@/test/fixtures'
 
 describe('episodeCode', () => {
   it('pads seasons and episodes to two digits, and keeps three', () => {
@@ -71,7 +72,7 @@ describe('mediaLabel and cardTitle', () => {
   it('prefer the matched item', () => {
     const matched = mediaItem({ title: 'Matrix', year: 1998, item: itemSummary() })
     expect(mediaLabel(matched)).toBe('The Matrix (1999)')
-    expect(cardTitle(matched)).toEqual({ title: 'The Matrix', year: 1999 })
+    expect(cardTitle(matched)).toEqual({ title: 'The Matrix', date: RELEASED_LABEL })
   })
 
   it("name a split movie's card by its cut after the title", () => {
@@ -79,13 +80,13 @@ describe('mediaLabel and cardTitle', () => {
       variant: 'Final Cut',
       item: itemSummary({ title: 'Alexander', year: 2004 }),
     })
-    expect(cardTitle(split)).toEqual({ title: 'Alexander (Final Cut)', year: 2004 })
+    expect(cardTitle(split)).toEqual({ title: 'Alexander (Final Cut)', date: RELEASED_LABEL })
   })
 
   it('fall back to the parsed title and year', () => {
     const parsed = mediaItem({ title: 'Heat', year: 1995 })
     expect(mediaLabel(parsed)).toBe('Heat (1995)')
-    expect(cardTitle(parsed)).toEqual({ title: 'Heat', year: 1995 })
+    expect(cardTitle(parsed)).toEqual({ title: 'Heat', date: '1995' })
     expect(mediaLabel(mediaItem({ title: 'Clip' }))).toBe('Clip')
   })
   it('name an episode by its show and number as well, with no year', () => {
@@ -99,7 +100,7 @@ describe('mediaLabel and cardTitle', () => {
         episode: 1,
       }),
     })
-    expect(cardTitle(episode)).toEqual({ title: mediaLabel(episode), year: null })
+    expect(cardTitle(episode)).toEqual({ title: mediaLabel(episode), date: null })
     expect(cardTitle(episode).title).toContain('The Acolyte')
   })
 })
@@ -154,8 +155,14 @@ describe('tileWords', () => {
     expect(tileWords(episode())).toEqual({ title: 'Severance', line: 'S01E02 · Half Loop' })
   })
 
-  it('names a movie by its title, with its year under it', () => {
-    const movie = mediaItem({ item: itemSummary({ title: 'Busboys', year: 2026 }) })
+  it('names a movie by its title, with its release day under it, or its year when that is all it has', () => {
+    const dated = mediaItem({
+      item: itemSummary({ title: 'Busboys', year: 2026, released: '2026-03-06' }),
+    })
+    expect(tileWords(dated)).toEqual({ title: 'Busboys', line: formatAirDate('2026-03-06') })
+    const movie = mediaItem({
+      item: itemSummary({ title: 'Busboys', year: 2026, released: null }),
+    })
     expect(tileWords(movie)).toEqual({ title: 'Busboys', line: '2026' })
   })
 

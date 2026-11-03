@@ -4,7 +4,7 @@ import { mediaLabel } from '@raven/core'
 import { QueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@raven/ui/headless'
 import { ContinueWatching, timeLeft } from '@/pages/HomePage/ContinueWatching'
-import { itemDetails, itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
+import { RELEASED_LABEL, itemDetails, itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_CARD } from '@/test/tv'
 import { reported } from '@/test/viewport'
@@ -50,7 +50,7 @@ describe('ContinueWatching', () => {
     )
     expect(tiles().map((tile) => tile.textContent)).toEqual([
       'SeveranceS01E02 · Half Loop1080p45m left',
-      'Busboys20261080p1h 15m left',
+      `Busboys${RELEASED_LABEL}1080p1h 15m left`,
     ])
   })
 

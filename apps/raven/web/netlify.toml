@@ -8,6 +8,9 @@
 [build]
 command = "bash apps/raven/netlify-build.sh"
 publish = "apps/raven/web/dist"
+# Production builds only on release, through the build hook release.yml calls;
+# previews only when something the site bundles changed (netlify-ignore.sh).
+ignore = "bash apps/raven/netlify-ignore.sh apps/raven/web apps/raven/netlify-build.sh libs/raven/core libs/raven/ui scripts/bump_version.sh"
 
 [build.environment]
 BUN_VERSION = "1.4.2"

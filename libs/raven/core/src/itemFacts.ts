@@ -76,7 +76,7 @@ type MovieFactsProps = {
 /** Release day (the year when TMDB gave none), runtime, up to three genres, and how many files the movie is once there are two or more. */
 export const movieFacts = ({ details, primary }: MovieFactsProps): string[] =>
   present([
-    formatAirDate(details.released) ?? (details.year == null ? null : String(details.year)),
+    releaseLabel(details),
     runtimeFact({ file: primary, runtime: details.runtime }),
     ...details.genres.slice(0, 3),
     details.versions.length > 1
@@ -126,6 +126,12 @@ export const formatAirDate = (date: string | null): string | null => {
   if (date == null || !/^\d{4}-\d{2}-\d{2}/.test(date)) return null
   return airDate.format(new Date(`${date.slice(0, 10)}T12:00:00`))
 }
+
+type ReleaseLabelProps = { released?: string | null; year: number | null }
+
+/** When a title came out: the day, "18 Feb 2022", or its year alone when the day is unknown; null for neither. */
+export const releaseLabel = ({ released, year }: ReleaseLabelProps): string | null =>
+  formatAirDate(released ?? null) ?? (year == null ? null : String(year))
 
 type FileFactsProps = {
   media: MediaItem

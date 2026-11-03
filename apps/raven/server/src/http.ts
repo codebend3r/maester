@@ -6,6 +6,7 @@ export const RAVEN_HEADERS = {
   authorization: AUTH_HEADERS.authorization,
   cookie: AUTH_HEADERS.cookie,
   forwardedFor: 'x-forwarded-for',
+  referer: 'referer',
   retryAfter: 'retry-after',
   userAgent: 'user-agent',
 } as const

@@ -78,6 +78,9 @@ export const preflightHeaders = ({
   ...(wantsPrivateNetwork ? { [CORS_HEADERS.allowPrivateNetwork]: CORS_FLAGS.true } : {}),
 })
 
+const isMediaPlaneMethod = (method: string): boolean =>
+  Object.values(MEDIA_PLANE_METHODS).some((allowed) => allowed === method)
+
 const withOrigin = (existing: string | number | string[] | undefined): string => {
   const current = Array.isArray(existing) ? existing.join(', ') : String(existing ?? '')
   const names = current.split(',').map((name) => name.trim().toLowerCase())
@@ -85,27 +88,47 @@ const withOrigin = (existing: string | number | string[] | undefined): string =>
   return current === '' ? VARIES.origin : `${current}, ${VARIES.origin}`
 }
 
-type RegisterMediaPlaneCorsProps = {
+/** The origin of a `Referer`, or null for a missing or malformed one. */
+const refererOrigin = (referer: string | string[] | undefined): string | null => {
+  const value = Array.isArray(referer) ? referer[0] : referer
+  if (value === undefined || !URL.canParse(value)) return null
+  return new URL(value).origin
+}
+
+type RegisterMediaPlaneHookProps = {
   fastify: FastifyInstance
   isMediaPlanePath: (path: string) => boolean
   isAllowedOrigin: (origin: string | undefined) => boolean
+  /** Told the web origin whose `/api` proxy a media request came through. */
+  onProxied: (webOrigin: string) => void
 }
 
 /**
  * Lets the web origins call the media plane routes from another origin: it
  * answers their preflight and puts the CORS headers on the reply, so a 423
  * is one the page can read. Credentials are never allowed; a ticket in the
- * address stands in for the cookie. Any other route, method or origin is
- * left alone.
+ * address stands in for the cookie. A page on a media origin sends `Origin`;
+ * a page whose `/api` proxy forwards the request sends none, since to the
+ * browser it is the same origin, but the `Referer` the proxy passes on still
+ * names the page's origin, one of the web origins, and `onProxied` hears it.
+ * The ping never comes that way: the probe always fetches it cross-origin.
+ * Any other route, method or origin is left alone.
  */
-export const registerMediaPlaneCors = ({
+export const registerMediaPlaneHook = ({
   fastify,
   isMediaPlanePath,
   isAllowedOrigin,
-}: RegisterMediaPlaneCorsProps): void => {
+  onProxied,
+}: RegisterMediaPlaneHookProps): void => {
   fastify.addHook('onRequest', async (request, reply) => {
+    if (!isMediaPlaneMethod(request.method) || !isMediaPlanePath(request.url)) return
     const { origin } = request.headers
-    if (origin === undefined || !isAllowedOrigin(origin) || !isMediaPlanePath(request.url)) return
+    if (origin === undefined) {
+      const webOrigin = refererOrigin(request.headers[RAVEN_HEADERS.referer])
+      if (webOrigin !== null && isAllowedOrigin(webOrigin)) onProxied(webOrigin)
+      return
+    }
+    if (!isAllowedOrigin(origin)) return
     if (request.method === MEDIA_PLANE_METHODS.options) {
       const wantsPrivateNetwork =
         request.headers[CORS_HEADERS.requestPrivateNetwork] === CORS_FLAGS.true

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'bun:test'
 import { type Hero, RESOLUTIONS, SESSION_KINDS } from '@raven/core'
 import { featuredOf } from '@/pages/HomePage/featured'
-import { itemSummary, library, matchedMovie, mediaItem, showEntry } from '@/test/fixtures'
+import {
+  RELEASED_LABEL,
+  itemSummary,
+  library,
+  matchedMovie,
+  mediaItem,
+  showEntry,
+} from '@/test/fixtures'
 
 const FILMS = library({ id: 2, name: 'Films' })
 const SERIES = library({ id: 3, name: 'Series' })
@@ -113,7 +120,7 @@ describe('featuredOf', () => {
       backdrop: '/api/pictures/items/105/backdrop/b5',
       eyebrow: 'Featured in Films',
       title: 'Movie 5',
-      facts: ['2026', '2h 46m'],
+      facts: [RELEASED_LABEL, '2h 46m'],
       picture: { resolution: RESOLUTIONS.uhd, isHdr: true },
       details: '/movies/105?library=2',
     })
@@ -127,7 +134,7 @@ describe('featuredOf', () => {
     const movie = arrival({ id: 6, addedAt: '2026-10-10T00:00:00.000Z' })
     const bare = { ...movie, duration: null, width: null, height: null }
     const [featured] = featuredOf({ hero: [movieEntry({ media: bare })], libraries: LIBRARIES })
-    expect(featured?.facts).toEqual(['2026'])
+    expect(featured?.facts).toEqual([RELEASED_LABEL])
     expect(featured?.picture).toBeNull()
   })
 

@@ -79,16 +79,16 @@ type PosterCardProps = {
  */
 export const PosterCard = ({ media, matchType = null, sort, poster, sizes }: PosterCardProps) => {
   const menu = useCardMenu({ media, matchType })
-  const { title, year } = cardTitle(media)
+  const { title, date } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
   const link = cardLink({ media, hasPages: true })
   const hasPage = link.state == null
   const pageItem = hasPage ? (media.item?.id ?? null) : null
-  const { sorted, isYearSaid } = cardSortFact({ media, sort })
+  const { sorted, isDateSaid } = cardSortFact({ media, sort })
   const facts = [
-    year == null || isYearSaid ? null : String(year),
+    date == null || isDateSaid ? null : date,
     media.versions > 1 ? POSTER_CARD_COPY.versions(media.versions) : null,
-    year == null && media.versions === 1 ? formatRuntime(media.duration) : null,
+    date == null && media.versions === 1 ? formatRuntime(media.duration) : null,
     media.match === MATCH_STATES.unmatched ? COMMON_COPY.notMatched : null,
   ].filter((fact): fact is string => fact != null && fact !== sorted)
 

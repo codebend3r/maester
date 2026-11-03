@@ -40,6 +40,14 @@ export const SETTINGS_COPY = {
   display: 'Display',
   displayHint: 'How pages look, for every viewer.',
   movieTitles: 'Movie titles',
+  server: {
+    heading: 'Server',
+    help: 'Where this app keeps its media: the server every library, picture and stream comes from.',
+    name: 'Name',
+    address: 'Address',
+    later:
+      'Switching between servers, and adding one, comes in a later update. Until then this is the only server, set when the app was built.',
+  },
   sound: {
     heading: 'Music',
     quality: 'Music quality',

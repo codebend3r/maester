@@ -15,6 +15,7 @@ import {
   type Review,
   type ShowEntry,
   type UnmatchedFile,
+  formatAirDate,
 } from '@raven/core'
 
 export const library = (overrides: Partial<Library> = {}): Library => ({
@@ -114,6 +115,10 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   ...overrides,
 })
 
+/** When the fixture movie came out, and what a card says for it. */
+const RELEASED = '1999-03-31'
+export const RELEASED_LABEL = formatAirDate(RELEASED) ?? ''
+
 export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary => ({
   id: 40,
   type: 'movie',
@@ -125,7 +130,7 @@ export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary =
   posterVersion: 'p1',
   backdropVersion: null,
   ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 1200 }],
-  released: '1999-03-31',
+  released: RELEASED,
   ...overrides,
 })
 

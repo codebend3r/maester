@@ -12,7 +12,7 @@ import {
 import { handled } from '@/desktop/handled'
 import { useChangeDownloads, useDownloads, useSpace } from '@/desktop/downloadsApi'
 import { DOWNLOADS_SECTION_COPY } from '@/desktop/settings/copy'
-import { Section } from '@/desktop/settings/Section'
+import { Section } from '@/pages/SettingsPage/Section'
 import { useComputerName } from '@/stores/desktop'
 import styles from '@/desktop/settings/DesktopSettings.module.scss'
 import settings from '@/pages/SettingsPage/SettingsPage.module.scss'

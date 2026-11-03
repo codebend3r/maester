@@ -6,6 +6,7 @@ import {
   type Rating,
   type RatingSource,
 } from '@/contract'
+import { releaseLabel } from '@/itemFacts'
 
 const pad = (value: number): string => String(value).padStart(2, '0')
 
@@ -59,20 +60,26 @@ export const episodePlace = (media: MediaItem): string | null => {
 export const primaryVersion = (versions: readonly MediaItem[]): MediaItem | undefined =>
   versions.find((version) => version.position > 0) ?? versions[0]
 
-/**
- * The title a card shows, and the year beneath it. An episode's title alone
- * says little on a poster, so it comes with its show and number, and no year.
- * A movie split onto several cards names each card's cut or release after
- * the title: `Alexander (Revisited the Final Cut)`.
- */
-export const cardTitle = (media: MediaItem): { title: string; year: number | null } => {
-  if (!media.item) return { title: media.title, year: media.year }
-  if (media.item.type === ITEM_TYPES.episode) return { title: itemLabel(media.item), year: null }
-  const title = media.variant == null ? media.item.title : `${media.item.title} (${media.variant})`
-  return { title, year: media.item.year }
+export type CardTitle = {
+  title: string
+  /** The release day, or the year when that is all that is known; what a card says under the title. */
+  date: string | null
 }
 
-/** What a wide tile names: the show, with the episode under it, else the movie and its year. */
+/**
+ * The title a card shows, and the release day beneath it. An episode's title
+ * alone says little on a poster, so it comes with its show and number, and no
+ * date. A movie split onto several cards names each card's cut or release
+ * after the title: `Alexander (Revisited the Final Cut)`.
+ */
+export const cardTitle = (media: MediaItem): CardTitle => {
+  if (!media.item) return { title: media.title, date: releaseLabel({ year: media.year }) }
+  if (media.item.type === ITEM_TYPES.episode) return { title: itemLabel(media.item), date: null }
+  const title = media.variant == null ? media.item.title : `${media.item.title} (${media.variant})`
+  return { title, date: releaseLabel(media.item) }
+}
+
+/** What a wide tile names: the show, with the episode under it, else the movie and its release day. */
 export const tileWords = (media: MediaItem): { title: string; line: string | null } => {
   const { item } = media
   if (item && item.type === ITEM_TYPES.episode && item.show) {
@@ -81,8 +88,8 @@ export const tileWords = (media: MediaItem): { title: string; line: string | nul
       .join(' · ')
     return { title: item.show.title, line: line === '' ? null : line }
   }
-  const { title, year } = cardTitle(media)
-  return { title, line: year == null ? null : String(year) }
+  const { title, date } = cardTitle(media)
+  return { title, line: date }
 }
 
 type PickScoreProps = {

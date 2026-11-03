@@ -6,6 +6,7 @@ import {
   MEDIA_PLANE_ENV,
   parseMediaOrigins,
   parseWebOrigins,
+  proxiedMediaProblem,
   readMediaPlaneConfig,
   readMediaSecret,
 } from '@/media/mediaPlaneConfig'
@@ -258,5 +259,32 @@ describe('readMediaPlaneConfig', () => {
     const config = readMediaPlaneConfig({ RAVEN_MEDIA_SECRET: 'short' })
     expect(config.secret).toBeNull()
     expect(config.secretProblems).toHaveLength(1)
+  })
+
+  it('warns that media streams through the web origins when they are set without media origins', () => {
+    const config = readMediaPlaneConfig({
+      RAVEN_WEB_ORIGINS: 'https://raven-player.netlify.app, https://*--raven-player.netlify.app',
+    })
+    expect(config.problems).toEqual([
+      proxiedMediaProblem([
+        'https://raven-player.netlify.app',
+        'https://*--raven-player.netlify.app',
+      ]),
+    ])
+    expect(config.problems[0]).toContain('https://raven-player.netlify.app')
+    expect(config.problems[0]).toContain(MEDIA_PLANE_ENV.origins)
+    expect(config.secretProblems).toEqual([])
+  })
+
+  it('says nothing about proxied media once a media origin is set, or when no web origin is', () => {
+    expect(
+      readMediaPlaneConfig({
+        RAVEN_WEB_ORIGINS: 'https://raven-player.netlify.app',
+        RAVEN_MEDIA_ORIGINS: 'public:https://raven.tail.ts.net',
+      }).problems,
+    ).toEqual([])
+    expect(
+      readMediaPlaneConfig({ RAVEN_WEB_ORIGINS: 'http://evil.example' }).problems,
+    ).toHaveLength(1)
   })
 })

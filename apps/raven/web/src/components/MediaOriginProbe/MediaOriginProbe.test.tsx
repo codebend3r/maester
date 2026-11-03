@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { type AuthConfig, AUTH_CONFIG_STATES } from '@raven/core'
 import { useMediaOrigin } from '@raven/ui'
-import { render, renderHook } from '@testing-library/react'
+import { cleanup, render, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MediaOriginProbe, useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { api } from '@/lib/api'
@@ -11,7 +11,11 @@ import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { SIGNED_IN, fakeAccount, readyConfig } from '@/test/authClient'
 import { asDesktop } from '@/test/desktop'
 
-afterEach(() => useMediaOrigin.setState({ pick: null, isProbing: false }))
+// Unmounted first: the notice beneath the probe reads the store, and a reset it sees is an update outside act.
+afterEach(() => {
+  cleanup()
+  useMediaOrigin.setState({ pick: null, isProbing: false, hasProbed: false })
+})
 
 type ClientWithProps = { config: AuthConfig }
 

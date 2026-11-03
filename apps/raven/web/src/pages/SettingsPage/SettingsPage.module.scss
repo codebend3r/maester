@@ -130,6 +130,22 @@
   font-size: var(--font-size-sm);
 }
 
+// What is known about a thing, one fact a row: its label in the muted
+// colour, its value beside it.
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-4);
+
+  dt {
+    color: var(--color-lichen);
+  }
+
+  dd {
+    overflow-wrap: anywhere;
+  }
+}
+
 .error {
   color: var(--color-leaf-bright);
 }

@@ -27,6 +27,7 @@ import { AccountSection } from '@/pages/SettingsPage/AccountSection'
 import { AdminLockSection } from '@/pages/SettingsPage/AdminLockSection'
 import { AdvancedSection } from '@/pages/SettingsPage/AdvancedSection'
 import { ScrobblingSection } from '@/pages/SettingsPage/ScrobblingSection'
+import { ServerSection } from '@/pages/SettingsPage/ServerSection'
 import {
   type Choices,
   Setting,
@@ -285,6 +286,7 @@ const OfflineSettings = () => {
  */
 const ServerSettings = () => {
   const titleId = useId()
+  const isDesktop = useIsDesktop()
   const queryClient = useQueryClient()
   const [isConfirming, setConfirming] = useState(false)
   // Accounts show only to an approved viewer; the other states have a screen of their own.
@@ -369,6 +371,7 @@ const ServerSettings = () => {
           {reset.error.message}
         </p>
       )}
+      {!isDesktop && <ServerSection />}
       <SettingsSection
         icon="playback"
         title={SETTINGS_COPY.playback}

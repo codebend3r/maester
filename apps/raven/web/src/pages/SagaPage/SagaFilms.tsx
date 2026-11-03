@@ -49,12 +49,12 @@ const standings = (media: readonly MediaItem[]): Standing[] => {
   })
 }
 
-/** "2001 · 2h 58m · 4K HDR": the year, how long it runs, and its picture. */
+/** "22 May 2001 · 2h 58m · 4K HDR": when it came out, how long it runs, and its picture. */
 const filmFacts = (media: MediaItem): ReactNode[] => {
-  const { year } = cardTitle(media)
+  const { date } = cardTitle(media)
   const resolution = resolutionLabel(media)
   return [
-    year == null ? null : String(year),
+    date,
     formatRuntime(media.duration),
     resolution && (
       <PictureFact

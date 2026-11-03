@@ -145,6 +145,8 @@ export default defineConfig(({ mode }) => ({
     'import.meta.env.VITE_PICTURE_CDN': JSON.stringify(
       process.env[ENV.netlify] === NETLIFY_VALUES.on ? NETLIFY_IMAGE_CDN : '',
     ),
+    // Where /api goes when it is the proxy above; '' when /api is raven itself.
+    'import.meta.env.VITE_API_ORIGIN': JSON.stringify(process.env[ENV.apiOrigin] ?? ''),
   },
   resolve: {
     alias: {

@@ -2,6 +2,7 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { type ReactNode, useId } from 'react'
 import type { IconName } from '@raven/ui'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
+import { Section } from '@/pages/SettingsPage/Section'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
@@ -92,15 +93,8 @@ export const SettingsSection = <T,>({
   saveError,
   children,
 }: SettingsSectionProps<T>) => {
-  const headingId = useId()
   return (
-    <section className={styles.section} aria-labelledby={headingId}>
-      <header className={styles.sectionHead}>
-        <h2 id={headingId} className={styles.heading}>
-          <Titled icon={icon}>{title}</Titled>
-        </h2>
-        <p className={styles.help}>{hint}</p>
-      </header>
+    <Section icon={icon} title={title} help={hint}>
       {query.isError && (
         <p className={styles.error} role="alert">
           {query.error.message}
@@ -119,6 +113,6 @@ export const SettingsSection = <T,>({
         </fieldset>
       )}
       {query.isPending && <Loading label={SETTINGS_COPY.section.reading}>{shape}</Loading>}
-    </section>
+    </Section>
   )
 }

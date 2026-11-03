@@ -93,13 +93,13 @@ const MediaTile = ({ media, note, posters, withWatched, matchType, sort }: Media
   const menu = useCardMenu({ media, matchType })
   const thumbnail = api.thumbnailUrl(media)
   const link = cardLink({ media, hasPages: posters })
-  const { year } = cardTitle(media)
-  const label = posters ? cardTitle(media).title : mediaLabel(media)
+  const { title, date } = cardTitle(media)
+  const label = posters ? title : mediaLabel(media)
   const select = useSelectable({ key: mediaEntryKey(media), title: label })
-  const { sorted, isYearSaid } = cardSortFact({ media, sort })
+  const { sorted, isDateSaid } = cardSortFact({ media, sort })
   const TilePicture = TILE_PICTURES[pictureKindOf({ posters, thumbnail })]
   const facts = [
-    posters && year != null && !isYearSaid ? String(year) : null,
+    posters && date != null && !isDateSaid ? date : null,
     posters && media.versions > 1 ? MEDIA_TILES_COPY.versions(media.versions) : null,
     formatRuntime(media.duration),
     resolutionLabel(media),

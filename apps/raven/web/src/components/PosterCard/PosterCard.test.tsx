@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test'
 import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { POSTER_SIZES } from '@/lib/posters'
-import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
+import { RELEASED_LABEL, itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { usePageBackdrop } from '@raven/ui/headless'
 import { atPixelRatio, restorePixelRatio } from '@/test/pixelRatio'
 import { renderWithProviders } from '@/test/render'
@@ -71,7 +71,7 @@ describe('PosterCard', () => {
     expect(screen.getByText('2.2 Mb/s')).toBeInTheDocument()
   })
 
-  it("opens a matched movie's page, plays from its button, and shows the year", () => {
+  it("opens a matched movie's page, plays from its button, and shows the release day", () => {
     renderWithProviders({ ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie()} /> })
     expect(screen.getByRole('link', { name: 'Busboys' })).toHaveAttribute(
       'href',
@@ -79,8 +79,20 @@ describe('PosterCard', () => {
     )
     expect(screen.getByRole('link', { name: 'Play Busboys' })).toHaveAttribute('href', '/watch/7')
     expect(screen.getByLabelText('Video resolution: 1080p')).toBeInTheDocument()
-    expect(screen.getByText('2026')).toBeInTheDocument()
+    expect(screen.getByText(RELEASED_LABEL)).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: /Ratings:/ })).toBeNull()
+  })
+
+  it('says the year alone when the release day is unknown', () => {
+    renderWithProviders({
+      ui: (
+        <PosterCard
+          sizes={POSTER_SIZES.grid}
+          media={matchedMovie({ item: itemSummary({ released: null }) })}
+        />
+      ),
+    })
+    expect(screen.getByText('2026')).toBeInTheDocument()
   })
 
   it('offers its poster at each width, so the browser fetches the narrowest its grid needs', async () => {

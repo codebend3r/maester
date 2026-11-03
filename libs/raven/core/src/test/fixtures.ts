@@ -1,4 +1,5 @@
 import { BUG_REPORT_STATUSES } from '@/contract'
+import { formatAirDate } from '@/itemFacts'
 import type { CanPlay } from '@/playback'
 import type {
   BugReport,
@@ -86,6 +87,10 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   ...overrides,
 })
 
+/** When the fixture movie came out, and what a card says for it. */
+const RELEASED = '1999-03-31'
+export const RELEASED_LABEL = formatAirDate(RELEASED) ?? ''
+
 export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary => ({
   id: 1,
   type: 'movie',
@@ -97,7 +102,7 @@ export const itemSummary = (overrides: Partial<ItemSummary> = {}): ItemSummary =
   posterVersion: 'f89JxwBCi9N',
   backdropVersion: null,
   ratings: [{ source: 'tmdb', kind: 'audience', value: 8.2, votes: 26_000 }],
-  released: '1999-03-31',
+  released: RELEASED,
   ...overrides,
 })
 
@@ -170,7 +175,7 @@ export const itemDetails = (overrides: Partial<ItemDetails> = {}): ItemDetails =
   tagline: 'Welcome to the Real World.',
   summary: 'Set in the 22nd century, The Matrix tells the story of a computer hacker.',
   contentRating: 'R',
-  released: '1999-03-31',
+  released: RELEASED,
   ended: null,
   runtime: 136,
   studio: 'Warner Bros. Pictures',

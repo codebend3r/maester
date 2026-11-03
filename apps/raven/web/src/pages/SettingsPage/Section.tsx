@@ -10,7 +10,7 @@ type SectionProps = {
   children: ReactNode
 }
 
-/** One of Raven's settings sections, headed and ruled as Settings' own are. */
+/** A settings section with a plain heading and help line, for one that reads no settings source. */
 export const Section = ({ icon, title, help, children }: SectionProps) => {
   const headingId = useId()
   return (
