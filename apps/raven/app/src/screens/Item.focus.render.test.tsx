@@ -205,7 +205,8 @@ describe('Item on a TV', () => {
     await leaveTestScreen()
     expect(askedFor()).toEqual([])
     await returnToTestScreen()
-    expect(askedFor()).toEqual(['Season 1'])
+    // Once as the screen comes to the front, again as the transition that reveals it ends.
+    expect(askedFor()).toEqual(['Season 1', 'Season 1'])
     expect(preferred()).toEqual([])
   })
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { albumDateLabel, formatReleaseDate, releaseDateOf } from '@/musicDates'
+import {
+  EARLIEST_RELEASE_YEAR,
+  albumDateLabel,
+  formatReleaseDate,
+  releaseDateOf,
+  releaseYearOf,
+} from '@/musicDates'
 
 describe('music release dates', () => {
   it('keeps the actual precision and rejects invalid calendar dates', () => {
@@ -19,5 +25,21 @@ describe('music release dates', () => {
     expect(formatReleaseDate('1997')).toBe('1997')
     expect(albumDateLabel({ releaseDate: null, year: 1997 })).toBe('1997')
     expect(albumDateLabel({ releaseDate: null, year: null })).toBeNull()
+  })
+
+  it('keeps only years a release can have, from the phonograph to next year', () => {
+    const nextYear = new Date().getUTCFullYear() + 1
+    expect(releaseYearOf(1997)).toBe(1997)
+    expect(releaseYearOf(EARLIEST_RELEASE_YEAR)).toBe(EARLIEST_RELEASE_YEAR)
+    expect(releaseYearOf(nextYear)).toBe(nextYear)
+    ;[6, 1876, nextYear + 1, 1997.5, '1997', null].forEach((year) =>
+      expect(releaseYearOf(year)).toBeNull(),
+    )
+  })
+
+  it('drops a release date or a year no release can have, so a tag of 6 shows nothing', () => {
+    expect(releaseDateOf('0006')).toBeNull()
+    expect(releaseDateOf('1066-10-14')).toBeNull()
+    expect(albumDateLabel({ releaseDate: null, year: 6 })).toBeNull()
   })
 })

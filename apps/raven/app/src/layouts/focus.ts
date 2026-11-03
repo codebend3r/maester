@@ -5,10 +5,12 @@ import { requestTVFocus } from '@/layouts/tvFocus'
 import {
   coverScreen,
   drawCard,
+  isAskedIn,
   isOpeningIn,
   leaveScreen,
   rememberOpener,
   settleScreen,
+  spendAsk,
   takeOpener,
   useScreenFocus,
 } from '@/stores/screenFocus'
@@ -74,6 +76,26 @@ export const useScreenFocusScope = (): OpeningFocus => {
   return useOpeningFocus()
 }
 
+type UseAskedAgainProps = {
+  screen: string | null
+  card: string
+  view: RefObject<unknown>
+}
+
+/**
+ * Asks the remote's focus for the view `view` holds once more, when the screen `screen` names it
+ * as the transition that brought the screen back ends: a card or the strip that took the focus
+ * back as the screen came to the front, since the transition can take that first ask away.
+ */
+export const useAskedAgain = ({ screen, card, view }: UseAskedAgainProps): void => {
+  const isAsked = useScreenFocus((state) => screen !== null && isAskedIn({ state, screen, card }))
+  useEffect(() => {
+    if (screen === null || !isAsked) return
+    spendAsk({ screen })
+    requestTVFocus(view.current)
+  }, [isAsked, screen, view])
+}
+
 type UseOpenerFocusProps = {
   place: string
   view: RefObject<unknown>
@@ -84,7 +106,9 @@ type UseOpenerFocusProps = {
  * calls `remember` as it opens one; when this screen returns, the card remembered asks for the
  * remote's focus once, whether its view lived on under the screen on top or mounted afresh
  * there; it says as it is drawn and as it goes, so a return whose card has gone gives the
- * screen's opening focus instead. `place` is the card's place on its screen, unique there.
+ * screen's opening focus instead. It asks once more as the transition that brings the screen
+ * back ends, which can take the first ask away. `place` is the card's place on its screen,
+ * unique there.
  */
 export const useOpenerFocus = ({ place, view }: UseOpenerFocusProps): { remember: () => void } => {
   const screen = useRoute().key
@@ -98,5 +122,6 @@ export const useOpenerFocus = ({ place, view }: UseOpenerFocusProps): { remember
       if (takeOpener({ screen, card: place })) requestTVFocus(view.current)
     },
   })
+  useAskedAgain({ screen, card: place, view })
   return { remember: () => rememberOpener({ screen, card: place }) }
 }

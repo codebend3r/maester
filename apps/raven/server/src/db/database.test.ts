@@ -154,6 +154,50 @@ describe('migrations', () => {
     database.onModuleDestroy()
   })
 
+  it('clears album years and dates no release can have, so MusicBrainz is asked again', () => {
+    const last = MIGRATIONS.length - 1
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, last).forEach((sql) => before.exec(sql))
+    before.pragma(`user_version = ${last}`)
+    before.exec(
+      "INSERT INTO libraries (name, created_at, kind) VALUES ('Music', '2026-01-01T00:00:00.000Z', 'music')",
+    )
+    const album = before.prepare(
+      `INSERT INTO albums (library_id, album_key, title, sort_title, year, original_year, release_date, added_at, fetched_at)
+       VALUES (1, ?, ?, ?, ?, ?, ?, '2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z')`,
+    )
+    album.run('queen', 'Greatest Hits', 'Greatest Hits', 6, 6, null)
+    album.run('gucci', 'Against All Odds', 'Against All Odds', 2026, 2026, '2026-10-16')
+    album.run('bad-date', 'Old', 'Old', 1999, null, '1066-10-14')
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(
+      database.db
+        .prepare(
+          'SELECT album_key, year, original_year, release_date, fetched_at FROM albums ORDER BY id',
+        )
+        .all(),
+    ).toEqual([
+      { album_key: 'queen', year: null, original_year: null, release_date: null, fetched_at: null },
+      {
+        album_key: 'gucci',
+        year: 2026,
+        original_year: 2026,
+        release_date: '2026-10-16',
+        fetched_at: '2026-01-02T00:00:00.000Z',
+      },
+      {
+        album_key: 'bad-date',
+        year: 1999,
+        original_year: null,
+        release_date: null,
+        fetched_at: null,
+      },
+    ])
+    database.onModuleDestroy()
+  })
+
   it('gives a library made before folder layouts the auto layout, and its paths none yet', () => {
     const before = new Sqlite(join(state.dir, 'raven.db'))
     MIGRATIONS.slice(0, 18).forEach((sql) => before.exec(sql))

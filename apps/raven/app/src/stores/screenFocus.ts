@@ -12,6 +12,15 @@ type ScreenFocus = {
   /** Whether anything on the screen has had the focus, which spends its opening focus. */
   hasSettled: boolean
   opener: Opener | null
+  /**
+   * The card that took the opener as the screen came to the front. It asks for the focus once
+   * more when the transition that reveals the screen ends, since the transition can take the
+   * focus from a view that asked before then: on Android TV always, on tvOS now and then, when
+   * the remote lands on the screen's first control instead.
+   */
+  returning: string | null
+  /** The card asked to take the focus again now that the transition has ended. */
+  asked: string | null
 }
 
 type ScreenFocusState = { screens: Readonly<Record<string, ScreenFocus>> }
@@ -22,7 +31,7 @@ type ScreenFocusState = { screens: Readonly<Record<string, ScreenFocus>> }
  */
 export const useScreenFocus = create<ScreenFocusState>()(() => ({ screens: {} }))
 
-const FRESH: ScreenFocus = { hasSettled: false, opener: null }
+const FRESH: ScreenFocus = { hasSettled: false, opener: null, returning: null, asked: null }
 
 type ScreenOfProps = { state: ScreenFocusState; screen: string }
 
@@ -81,7 +90,7 @@ type TakeOpenerProps = { screen: string; card: string }
 /** Hands the opener back once, and only to the card it names: true for that card, then never. */
 export const takeOpener = ({ screen, card }: TakeOpenerProps): boolean => {
   if ((openerOf({ screen })?.card ?? null) !== card) return false
-  change({ screen, to: { opener: null } })
+  change({ screen, to: { opener: null, returning: card } })
   return true
 }
 
@@ -93,12 +102,10 @@ type CoverScreenProps = { screen: string }
  * return from a screen no card opened asks for nothing.
  */
 export const coverScreen = ({ screen }: CoverScreenProps): void => {
-  const opener = openerOf({ screen })
-  if (opener === null) return
-  change({
-    screen,
-    to: { opener: opener.hasBeenCovered ? null : { ...opener, hasBeenCovered: true } },
-  })
+  const { opener, returning, asked } = screenOf({ state: useScreenFocus.getState(), screen })
+  if (opener === null && returning === null && asked === null) return
+  const kept = opener === null || opener.hasBeenCovered ? null : { ...opener, hasBeenCovered: true }
+  change({ screen, to: { opener: kept, returning: null, asked: null } })
 }
 
 type ReturnScreenProps = { screen: string }
@@ -109,13 +116,29 @@ type ReturnScreenProps = { screen: string }
  * went while the screen was covered) has nothing to take the focus back to, so the screen gives
  * its opening focus again rather than leave the remote on nothing, as Android TV would. It waits
  * for the transition's end, since on Android TV the transition takes the focus from anything
- * asked for before then.
+ * asked for before then. The card that took the focus back as the screen came to the front
+ * asks for it again now, for the same reason.
  */
 export const returnScreen = ({ screen }: ReturnScreenProps): void => {
-  const opener = openerOf({ screen })
+  const { opener, returning } = screenOf({ state: useScreenFocus.getState(), screen })
+  if (returning !== null) {
+    change({ screen, to: { returning: null, asked: returning } })
+    return
+  }
   if (opener === null || opener.isDrawn) return
   change({ screen, to: { hasSettled: false, opener: null } })
 }
+
+type IsAskedInProps = { state: ScreenFocusState; screen: string; card: string }
+
+/** Whether the card at `card` is asked to take the focus again. */
+export const isAskedIn = ({ state, screen, card }: IsAskedInProps): boolean =>
+  screenOf({ state, screen }).asked === card
+
+type SpendAskProps = { screen: string }
+
+/** The card asked has asked, so one drawn afresh later does not ask again. */
+export const spendAsk = ({ screen }: SpendAskProps): void => change({ screen, to: { asked: null } })
 
 type LeaveScreenProps = { screen: string }
 

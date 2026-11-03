@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native'
 
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
+import { useAskedAgain } from '@/layouts/focus'
 import { frontRouteKeyOf } from '@/layouts/frontRoute'
 import { Icon } from '@raven/native'
 import { MUSIC_COPY } from '@/layouts/copy'
@@ -115,6 +116,7 @@ export const NowPlayingStrip = ({
       requestTVFocus(view.current)
     }
   }, [front])
+  useAskedAgain({ screen: front, card: STRIP_PLACE, view })
   return (
     <View style={styles.strip}>
       <Pressable

@@ -7,6 +7,7 @@ import {
   NO_LYRICS,
   lyricsOfText,
   releaseDateOf,
+  releaseYearOf,
 } from '@raven/core'
 import {
   type IAudioMetadata,
@@ -125,10 +126,10 @@ const whole = (value: number | null | undefined): number | null =>
 const positive = (value: number | undefined): number | null =>
   value != null && Number.isFinite(value) && value > 0 ? value : null
 
-/** The year a tag's date opens with: `2003-04-01`, `2003`, or nothing. */
+/** The year a tag's date opens with: `2003-04-01`, `2003`, or nothing, nor for a year no release has. */
 const yearOf = (date: string | undefined): number | null => {
   const match = /^(\d{4})/.exec(date?.trim() ?? '')
-  return match?.[1] === undefined ? null : Number(match[1])
+  return match?.[1] === undefined ? null : releaseYearOf(Number(match[1]))
 }
 
 /** The codec as ffprobe names it, from `music-metadata`'s name. */
@@ -159,8 +160,8 @@ export const audioTagsOf = (common: ICommonTagsResult): AudioTags => ({
   albumArtists: credited({ names: common.albumartists ?? [], one: common.albumartist }),
   trackNumber: whole(common.track.no),
   disc: whole(common.disk.no),
-  year: whole(common.year) ?? yearOf(common.date) ?? yearOf(common.releasedate),
-  originalYear: whole(common.originalyear) ?? yearOf(common.originaldate),
+  year: releaseYearOf(common.year) ?? yearOf(common.date) ?? yearOf(common.releasedate),
+  originalYear: releaseYearOf(common.originalyear) ?? yearOf(common.originaldate),
   releaseDate: releaseDateOf(common.releasedate) ?? releaseDateOf(common.date),
   genres: texts(common.genre),
   isCompilation: common.compilation === true,
