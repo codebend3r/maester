@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it } from 'bun:test'
 import {
   coverScreen,
   drawCard,
+  isAskedIn,
   isOpeningIn,
   leaveScreen,
   rememberOpener,
   returnScreen,
   settleScreen,
+  spendAsk,
   takeOpener,
   useScreenFocus,
 } from '@/stores/screenFocus'
@@ -67,7 +69,12 @@ describe('screen focus', () => {
     rememberOpener({ screen: ITEM, card: BUSBOYS })
     leaveScreen({ screen: HOME })
     expect(useScreenFocus.getState().screens).toEqual({
-      [ITEM]: { hasSettled: true, opener: { card: BUSBOYS, isDrawn: true, hasBeenCovered: false } },
+      [ITEM]: {
+        hasSettled: true,
+        opener: { card: BUSBOYS, isDrawn: true, hasBeenCovered: false },
+        returning: null,
+        asked: null,
+      },
     })
     expect(isOpeningIn({ state: useScreenFocus.getState(), screen: HOME })).toBe(true)
   })
@@ -98,5 +105,35 @@ describe('screen focus', () => {
     returnScreen({ screen: HOME })
     expect(takeOpener({ screen: HOME, card: NIGHT_TRAIN })).toBe(true)
     expect(useScreenFocus.getState().screens[ITEM]).toBeUndefined()
+  })
+
+  it('asks the card that took the focus back to take it again as the transition ends', () => {
+    rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
+    coverScreen({ screen: HOME })
+    expect(takeOpener({ screen: HOME, card: NIGHT_TRAIN })).toBe(true)
+    expect(isAskedIn({ state: useScreenFocus.getState(), screen: HOME, card: NIGHT_TRAIN })).toBe(
+      false,
+    )
+    returnScreen({ screen: HOME })
+    expect(isAskedIn({ state: useScreenFocus.getState(), screen: HOME, card: NIGHT_TRAIN })).toBe(
+      true,
+    )
+    expect(isAskedIn({ state: useScreenFocus.getState(), screen: HOME, card: BUSBOYS })).toBe(false)
+    spendAsk({ screen: HOME })
+    returnScreen({ screen: HOME })
+    expect(isAskedIn({ state: useScreenFocus.getState(), screen: HOME, card: NIGHT_TRAIN })).toBe(
+      false,
+    )
+  })
+
+  it('asks nothing again once another screen covers this one before the transition ends', () => {
+    rememberOpener({ screen: HOME, card: NIGHT_TRAIN })
+    coverScreen({ screen: HOME })
+    takeOpener({ screen: HOME, card: NIGHT_TRAIN })
+    coverScreen({ screen: HOME })
+    returnScreen({ screen: HOME })
+    expect(isAskedIn({ state: useScreenFocus.getState(), screen: HOME, card: NIGHT_TRAIN })).toBe(
+      false,
+    )
   })
 })

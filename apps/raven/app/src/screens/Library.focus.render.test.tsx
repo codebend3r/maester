@@ -348,7 +348,8 @@ describe('Library on a TV', () => {
     await leaveTestScreen()
     expect(askedFor()).toEqual([])
     await returnToTestScreen()
-    expect(askedFor()).toEqual(['Night Train'])
+    // Once as the screen comes to the front, again as the transition that reveals it ends.
+    expect(askedFor()).toEqual(['Night Train', 'Night Train'])
     expect(preferred(FILM_TITLES)).toEqual([])
   })
 
@@ -361,7 +362,8 @@ describe('Library on a TV', () => {
     await fireEvent.press(card)
     await leaveTestScreen()
     await returnToTestScreen()
-    expect(askedFor()).toEqual(['Busboys'])
+    // Once as the screen comes to the front, again as the transition that reveals it ends.
+    expect(askedFor()).toEqual(['Busboys', 'Busboys'])
   })
 
   it('opens on Continue watching while something is in progress, its card first, one press from the library', async () => {

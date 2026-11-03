@@ -253,6 +253,8 @@ const albumOf = ({ artist = 'Radiohead', ...overrides }: AlbumOverrides): AlbumS
   ...overrides,
 })
 
+const THIS_YEAR = 2026
+
 describe('albumJumpScale', () => {
   const albums = [
     albumOf({ id: 1, sortTitle: 'Kid A', artist: 'The Beatles', year: 1969 }),
@@ -264,6 +266,7 @@ describe('albumJumpScale', () => {
       sort: MUSIC_SORTS.artist,
       direction: SORT_DIRECTIONS.ascending,
       albums,
+      thisYear: THIS_YEAR,
     })
     expect(under({ scale, label: 'B' })).toEqual(['album:1'])
     expect(under({ scale, label: 'Z' })).toEqual(['album:2'])
@@ -275,23 +278,74 @@ describe('albumJumpScale', () => {
       sort: MUSIC_SORTS.title,
       direction: SORT_DIRECTIONS.descending,
       albums,
+      thisYear: THIS_YEAR,
     })
     expect(under({ scale, label: 'A' })).toEqual(['album:2'])
     expect(scale?.marks[0]?.label).toBe('Z')
   })
 
-  it('jumps by year under a year sort', () => {
+  it('jumps by runs of whole years under a year sort, counted back from this year', () => {
+    const scale = albumJumpScale({
+      sort: MUSIC_SORTS.year,
+      direction: SORT_DIRECTIONS.descending,
+      albums,
+      thisYear: THIS_YEAR,
+    })
+    // 1969 to 2026 is 57 years: five-year runs, each named by its newest year.
+    expect(strip(scale)).toEqual([
+      '(2026)',
+      '(2021)',
+      '(2016)',
+      '(2011)',
+      '(2006)',
+      '2001',
+      '(1996)',
+      '(1991)',
+      '(1986)',
+      '(1981)',
+      '(1976)',
+      '1971',
+    ])
+    expect(under({ scale, label: '1971' })).toEqual(['album:1'])
+    expect(scale?.marks.find((mark) => mark.label === '1971')?.name).toBe('1967 to 1971')
+  })
+
+  it('starts the strip on this year, one year a mark, when the albums span a few', () => {
+    const scale = albumJumpScale({
+      sort: MUSIC_SORTS.release,
+      direction: SORT_DIRECTIONS.descending,
+      albums: [
+        albumOf({ id: 1, year: 2024 }),
+        albumOf({ id: 2, year: 2025, releaseDate: '2025-08-21' }),
+      ],
+      thisYear: THIS_YEAR,
+    })
+    expect(strip(scale)).toEqual(['(2026)', '2025', '2024'])
+  })
+
+  it('puts a year no release can have under not known, without stretching the strip', () => {
+    const scale = albumJumpScale({
+      sort: MUSIC_SORTS.release,
+      direction: SORT_DIRECTIONS.descending,
+      albums: [albumOf({ id: 1, year: 6 }), albumOf({ id: 2, releaseDate: '2026-10-16' })],
+      thisYear: THIS_YEAR,
+    })
+    expect(strip(scale)).toEqual(['2026', '?'])
+    expect(under({ scale, label: '?' })).toEqual(['album:1'])
+  })
+
+  it('runs oldest first when ascending, ending on this year', () => {
     const scale = albumJumpScale({
       sort: MUSIC_SORTS.year,
       direction: SORT_DIRECTIONS.ascending,
-      albums,
+      albums: [albumOf({ id: 1, year: 2024 })],
+      thisYear: THIS_YEAR,
     })
-    expect(under({ scale, label: '1960s' })).toEqual(['album:1'])
-    expect(under({ scale, label: '2000s' })).toEqual(['album:2'])
+    expect(strip(scale)).toEqual(['2024', '(2025)', '(2026)'])
   })
 
   it('has no strip for plays or a random order', () => {
-    const input = { direction: SORT_DIRECTIONS.ascending, albums }
+    const input = { direction: SORT_DIRECTIONS.ascending, albums, thisYear: THIS_YEAR }
     expect(albumJumpScale({ ...input, sort: MUSIC_SORTS.random })).toBeNull()
     expect(albumJumpScale({ ...input, sort: MUSIC_SORTS.plays })).toBeNull()
     expect(albumJumpScale({ ...input, sort: MUSIC_SORTS.played })).toBeNull()

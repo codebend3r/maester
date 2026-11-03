@@ -202,7 +202,8 @@ describe('Home on a TV', () => {
     await leaveTestScreen()
     expect(askedFor()).toEqual([])
     await returnToTestScreen()
-    expect(askedFor()).toEqual(['Settings'])
+    // Once as Home comes to the front, again as the transition that reveals it ends.
+    expect(askedFor()).toEqual(['Settings', 'Settings'])
     expect(preferred()).toEqual([])
   })
 
@@ -244,7 +245,8 @@ describe('Home on a TV', () => {
     await leaveTestScreen()
     expect(askedFor()).toEqual([])
     await returnToTestScreen()
-    expect(askedFor()).toEqual(['Night Train'])
+    // Once as Home comes to the front, again as the transition that reveals it ends.
+    expect(askedFor()).toEqual(['Night Train', 'Night Train'])
     expect(preferred()).toEqual([])
   })
 
@@ -256,8 +258,10 @@ describe('Home on a TV', () => {
     await fireEvent.press(inFilms!)
     await leaveTestScreen()
     await returnToTestScreen()
-    const [instance, ...more] = focusRequested()
-    expect(more).toEqual([])
+    const [instance, again, ...more] = focusRequested()
+    // The same view asks again as the transition ends; compared by identity, not deeply.
+    expect(again === instance).toBe(true)
+    expect(more.length).toBe(0)
     // The view the card hands over is drawn as the element on screen with its own handlers.
     const [inContinue, inFilmsNow] = screen.getAllByRole('button')
     const focusOf = (view: unknown) =>
@@ -272,14 +276,15 @@ describe('Home on a TV', () => {
     await fireEvent.press(screen.getAllByRole('button')[2]!)
     await leaveTestScreen()
     await returnToTestScreen()
-    expect(askedFor()).toEqual(['Night Train'])
+    // Once as Home comes to the front, again as the transition that reveals it ends.
+    expect(askedFor()).toEqual(['Night Train', 'Night Train'])
 
     // The viewer moves on, then opens the search, which is not a card, and comes back.
     await fireEvent(screen.getAllByRole('button')[3]!, NATIVE_EVENTS.focus)
     await fireEvent.press(screen.getByRole('link', { name: 'Search' }))
     await leaveTestScreen()
     await returnToTestScreen()
-    expect(askedFor()).toEqual(['Night Train'])
+    expect(askedFor()).toEqual(['Night Train', 'Night Train'])
   })
 
   it('takes the focus back to a card drawn afresh while another screen covered Home', async () => {
@@ -293,7 +298,8 @@ describe('Home on a TV', () => {
     await answerHome({ home: HOME, card: NIGHT_TRAIN, isDrawn: true })
 
     await returnToTestScreen()
-    expect(askedFor()).toEqual([NIGHT_TRAIN])
+    // Once as Home comes to the front, again as the transition that reveals it ends.
+    expect(askedFor()).toEqual([NIGHT_TRAIN, NIGHT_TRAIN])
   })
 
   it('lets go of an opener no card took, once another screen covers Home again', async () => {

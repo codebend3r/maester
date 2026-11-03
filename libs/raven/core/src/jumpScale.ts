@@ -14,6 +14,7 @@ import { albumEntryKey, mediaEntryKey, showEntryKey } from '@/entryKeys'
 import { pickScore } from '@/items'
 import { LETTERS, type Letter, SPECIAL_LETTERS, letterOf, mediaLetter, showLetter } from '@/letters'
 import { RESOLUTIONS, type Resolution, resolutionLabel } from '@/media'
+import { releaseYearOf } from '@/musicDates'
 import { MUSIC_SORTS, type MusicSort } from '@/musicListQuery'
 import { sortTitle } from '@/naming'
 import { sortParts } from '@/sortFields'
@@ -105,6 +106,8 @@ type Ruler = {
   unit: string | null
   value: (entry: Entry) => number | null
   full?: Range
+  /** Widens the entries' range before it is cut, as album years reach to this year. */
+  reach?: (known: Range) => Range
   cut: (range: Range) => Cut
 }
 
@@ -235,6 +238,30 @@ const RELEASE: Ruler = {
         },
 }
 
+/**
+ * Album years, always as whole years counted back from `thisYear`, so this year is the newest
+ * mark whatever the albums hold, and the steps reach back past the oldest album in as few round
+ * runs of years (one, two, five, ten, twenty...) as fit the strip. A year after this one (a
+ * pre-order) sits under this year's mark.
+ */
+const albumYears = (thisYear: number): Ruler => ({
+  unit: null,
+  value: (entry) => entry.year,
+  reach: ({ low }) => ({ low: Math.min(low, thisYear), high: thisYear }),
+  cut: ({ low, high }) => {
+    // Whole years only: a short span would otherwise step by fifths of a year.
+    const step = Math.max(1, niceStep({ span: high - low, most: MOST_STEPS }))
+    return {
+      of: (year) => -Math.floor((high - Math.min(year, high)) / step),
+      face: (index) => {
+        const latest = high + index * step
+        const name = step === 1 ? String(latest) : `${latest - step + 1} to ${latest}`
+        return { label: String(latest), name }
+      },
+    }
+  },
+})
+
 /** A TV library's bitrate step, the same whatever its shows run to. */
 const SHOW_BITRATE_STEP = 5
 
@@ -285,9 +312,8 @@ type ScaleOfProps = {
 const scaleOf = ({ field, direction, ruler, entries }: ScaleOfProps): JumpScale | null => {
   const values = entries.map((entry) => ({ key: entry.key, value: ruler.value(entry) }))
   const known = values.flatMap(({ value }) => value ?? [])
-  const range =
-    ruler.full ??
-    (known.length === 0 ? null : { low: Math.min(...known), high: Math.max(...known) })
+  const spread = known.length === 0 ? null : { low: Math.min(...known), high: Math.max(...known) }
+  const range = ruler.full ?? (spread && (ruler.reach?.(spread) ?? spread))
   if (!range) return null
   const { of, face } = ruler.cut(range)
   const first = of(range.low)
@@ -371,7 +397,7 @@ const fromAlbum = ({ album, by }: AlbumEntryProps): Entry => ({
   bitrate: null,
   size: null,
   resolution: null,
-  year: by === 'release' ? (firstYear(album.releaseDate) ?? album.year) : album.year,
+  year: releaseYearOf(by === 'release' ? (firstYear(album.releaseDate) ?? album.year) : album.year),
   score: null,
   added: album.addedAt,
   changed: null,
@@ -381,12 +407,15 @@ type AlbumJumpScaleProps = {
   sort: MusicSort
   direction: SortDirection
   albums: readonly AlbumSummary[]
+  /** The year the strip counts back from, its newest mark under a year or release sort. */
+  thisYear: number
 }
 
 /**
  * The jump strip for albums listed by `sort`: letters of the title or of
- * the first artist's sort name, years or decades for the year and the
- * release date, months or years for when albums came. None for the sorts
+ * the first artist's sort name, whole years counted back from this year for
+ * the year and the release date (a year no release can have counts as not
+ * known), months or years for when albums came. None for the sorts
  * that run on the account's plays or at random, which have nothing to
  * jump by.
  */
@@ -394,6 +423,7 @@ export const albumJumpScale = ({
   sort,
   direction,
   albums,
+  thisYear,
 }: AlbumJumpScaleProps): JumpScale | null => {
   if (sort === MUSIC_SORTS.played || sort === MUSIC_SORTS.plays || sort === MUSIC_SORTS.random)
     return null
@@ -401,7 +431,10 @@ export const albumJumpScale = ({
   return scaleOf({
     field,
     direction,
-    ruler: rulers({ source: RATING_SOURCES.imdb, hasShows: false })[field],
+    ruler:
+      field === SORT_FIELD_NAMES.release
+        ? albumYears(thisYear)
+        : rulers({ source: RATING_SOURCES.imdb, hasShows: false })[field],
     entries: albums.map((album) => fromAlbum({ album, by })),
   })
 }

@@ -7,6 +7,7 @@ import {
   isRecord,
   isString,
   releaseDateOf,
+  releaseYearOf,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
@@ -116,7 +117,7 @@ const recordAt = ({ record, key }: RecordAtProps): Record<string, unknown> => {
 /** The year a MusicBrainz date opens with: `1997-05-21`, `1997`, or nothing. */
 const yearOf = (date: unknown): number | null => {
   const match = /^(\d{4})/.exec(isString(date) ? date : '')
-  return match?.[1] === undefined ? null : Number(match[1])
+  return match?.[1] === undefined ? null : releaseYearOf(Number(match[1]))
 }
 
 /**

@@ -162,7 +162,12 @@ export const AlbumsSection = ({ library }: AlbumsSectionProps) => {
   const albums = useQuery(
     albumsQuery({ libraryId: library.id, search: search.query, sort, order, seed }),
   )
-  const scale = albumJumpScale({ sort, direction: order, albums: albums.data ?? [] })
+  const scale = albumJumpScale({
+    sort,
+    direction: order,
+    albums: albums.data ?? [],
+    thisYear: new Date().getFullYear(),
+  })
   return (
     <div
       ref={cards}
@@ -223,6 +228,7 @@ export const UnmatchedAlbumsSection = ({ library }: UnmatchedAlbumsSectionProps)
     sort: MUSIC_SORTS.title,
     direction: SORT_DIRECTIONS.ascending,
     albums: unmatched,
+    thisYear: new Date().getFullYear(),
   })
   const smartMatch = useMutation({
     mutationFn: () => api.matchLibrary(library.id),
