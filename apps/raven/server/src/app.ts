@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
 import { compressResponses, serveWebApp } from '@shared/server'
@@ -8,7 +9,8 @@ import type { ServerConfig } from '@/config'
 import type { AiFetch } from '@/metadata/aiClient'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
 import { isAllowedWebOrigin } from '@/media/mediaPlaneConfig'
-import { mediaPlanePaths, pathMatcher, registerMediaPlaneCors } from '@/media/mediaPlaneCors'
+import { mediaPlanePaths, pathMatcher, registerMediaPlaneHook } from '@/media/mediaPlaneCors'
+import { proxiedMediaWarner } from '@/media/mediaPlaneFallback'
 import type { WatchOptions } from '@/scanner/libraryWatcher'
 
 type CreateAppProps = {
@@ -63,11 +65,16 @@ export const createApp = async ({
   )
 
   await compressResponses({ app })
-  registerMediaPlaneCors({
+  const mediaPlaneLogger = new Logger(proxiedMediaWarner.name)
+  registerMediaPlaneHook({
     fastify: app.getHttpAdapter().getInstance(),
     isMediaPlanePath: pathMatcher(mediaPlanePaths(CONTROLLERS)),
     isAllowedOrigin: (origin) =>
       isAllowedWebOrigin({ origin, allowed: config.mediaPlane.webOrigins }),
+    onProxied: proxiedMediaWarner({
+      hasMediaOrigins: config.mediaPlane.origins.length > 0,
+      warn: (message) => mediaPlaneLogger.warn(message),
+    }),
   })
   // In Docker the server hands out the built web app too, so it and the API
   // share one port. Only the media plane routes answer CORS, for the web

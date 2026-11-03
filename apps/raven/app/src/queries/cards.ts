@@ -153,16 +153,16 @@ type MediaCardProps = Pictures & { media: MediaItem; order?: Order }
 
 /**
  * A movie as its poster, else its frame grab, as the web's poster card draws it, under its
- * year or the value its grid is sorted by.
+ * release day or the value its grid is sorted by.
  */
 type MovieCardProps = MediaCardProps
 
 export const movieCard = ({ media, api, headersFor, order = null }: MovieCardProps): ShelfCard => {
-  const { title, year } = cardTitle(media)
+  const { title, date } = cardTitle(media)
   return videoCard({
     media,
     title,
-    line: sortedLine({ media, order }) ?? (year === null ? null : String(year)),
+    line: sortedLine({ media, order }) ?? date,
     shape: CARD_SHAPES.poster,
     uri:
       imageOf({ api, item: media.item, kind: ITEM_IMAGE_KINDS.poster }) ?? api.thumbnailUrl(media),

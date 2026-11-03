@@ -8,7 +8,7 @@ import {
   mediaPlanePaths,
   pathMatcher,
   preflightHeaders,
-  registerMediaPlaneCors,
+  registerMediaPlaneHook,
   responseHeaders,
 } from '@/media/mediaPlaneCors'
 
@@ -91,7 +91,7 @@ describe('mediaPlanePaths', () => {
   })
 })
 
-describe('registerMediaPlaneCors', () => {
+describe('registerMediaPlaneHook', () => {
   /** A route whose vary is already set when the hook runs, as compression or a controller would leave it. */
   const varyOf = async (
     existing: string | null,
@@ -100,10 +100,11 @@ describe('registerMediaPlaneCors', () => {
     fastify.addHook('onRequest', async (_request, reply) => {
       if (existing !== null) reply.header(HEADERS.vary, existing)
     })
-    registerMediaPlaneCors({
+    registerMediaPlaneHook({
       fastify,
       isMediaPlanePath: pathMatcher(['/api/media/:id/file']),
       isAllowedOrigin: (origin) => origin === ORIGIN,
+      onProxied: () => {},
     })
     fastify.get('/api/media/:id/file', async () => 'bytes')
     const response = await fastify.inject({

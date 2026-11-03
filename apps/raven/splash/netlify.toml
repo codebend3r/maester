@@ -5,6 +5,9 @@
 [build]
 command = "bun run build:raven:splash"
 publish = "apps/raven/splash/dist"
+# Production builds only on release, through the build hook release.yml calls;
+# previews only when something the site bundles changed (netlify-ignore.sh).
+ignore = "bash apps/raven/netlify-ignore.sh apps/raven/splash"
 
 [build.environment]
 BUN_VERSION = "1.4.2"

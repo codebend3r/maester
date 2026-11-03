@@ -198,17 +198,30 @@ export const readMediaSecret = (
   return { secret, problems: [] }
 }
 
+/**
+ * Web origins with no media origins: those sites' players fall back to
+ * their own `/api` proxy for every media byte, which the proxy's host
+ * (Netlify) bills as bandwidth. Said at boot, since nothing else would.
+ */
+export const proxiedMediaProblem = (webOrigins: readonly string[]): string =>
+  `${MEDIA_PLANE_ENV.webOrigins} names ${webOrigins.join(', ')} but ${MEDIA_PLANE_ENV.origins} is unset, so every video, file and subtitle those sites play streams through their /api proxy, which its host bills as bandwidth. Set ${MEDIA_PLANE_ENV.origins} to an origin the browser can reach raven at directly.`
+
 export const readMediaPlaneConfig = (env: NodeJS.ProcessEnv): MediaPlaneConfig => {
   const origins = parseMediaOrigins(env[MEDIA_PLANE_ENV.origins])
   const webOrigins = parseWebOrigins(env[MEDIA_PLANE_ENV.webOrigins])
   const secret = readMediaSecret(env[MEDIA_PLANE_ENV.secret])
   const hasSecretValue = (env[MEDIA_PLANE_ENV.secret]?.trim() ?? '') !== ''
   const needsSecret = origins.origins.length > 0 || hasSecretValue
+  const isProxiedMedia = webOrigins.origins.length > 0 && origins.origins.length === 0
   return {
     origins: origins.origins,
     webOrigins: webOrigins.origins,
     secret: secret.secret,
-    problems: [...origins.problems, ...webOrigins.problems],
+    problems: [
+      ...origins.problems,
+      ...webOrigins.problems,
+      ...(isProxiedMedia ? [proxiedMediaProblem(webOrigins.origins)] : []),
+    ],
     secretProblems: needsSecret ? secret.problems : [],
   }
 }

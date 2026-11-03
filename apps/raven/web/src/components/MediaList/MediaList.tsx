@@ -8,7 +8,6 @@ import {
   cardTitle,
   formatBitrate,
   formatBytes,
-  formatAirDate,
   formatRuntime,
   mediaEntryKey,
   resolutionLabel,
@@ -79,7 +78,7 @@ type MediaRowProps = {
  */
 const MediaRow = ({ media, movies, matchType }: MediaRowProps) => {
   const menu = useCardMenu({ media, matchType, inline: true })
-  const { title, year } = cardTitle(media)
+  const { title, date } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
   const link = cardLink({ media, hasPages: movies })
   const RowPictureView = ROW_PICTURE_VIEWS[movies ? ROW_PICTURES.poster : ROW_PICTURES.frame]
@@ -132,9 +131,7 @@ const MediaRow = ({ media, movies, matchType }: MediaRowProps) => {
       <td className={`${styles.number} ${styles.extra}`}>{formatBitrate(media.bitrate)}</td>
       <td className={styles.extra}>{day.format(new Date(media.addedAt))}</td>
       <td className={movies ? undefined : styles.extra}>
-        {movies
-          ? (formatAirDate(media.item?.released ?? null) ?? year ?? '')
-          : day.format(new Date(media.changedAt))}
+        {movies ? (date ?? '') : day.format(new Date(media.changedAt))}
       </td>
       <td className={styles.menuCell}>{menu.menu}</td>
     </tr>
@@ -192,7 +189,7 @@ const COLUMNS: Record<Column, SortColumn<MediaItem>> = {
   // The cell's own fallback: a movie TMDB gave no day sorts by its year, which sorts before any day in it.
   released: {
     value: (media) => {
-      const { year } = cardTitle(media)
+      const year = media.item?.year ?? media.year
       return media.item?.released ?? (year == null ? null : String(year))
     },
     first: 'desc',

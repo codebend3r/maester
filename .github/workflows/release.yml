@@ -58,3 +58,24 @@ jobs:
             args+=(--prerelease)
           fi
           gh release create "$TAG" "${args[@]}"
+
+      # The Netlify sites build production only here: their ignore command
+      # (apps/raven/netlify-ignore.sh) skips every push to main, and a build
+      # hook is the one trigger it cannot cancel. Only a vX.Y.Z tag deploys;
+      # a build tag (vX.Y.Z.N) or a prerelease leaves the sites on the last
+      # release. The hook URLs are secrets: anyone holding one can spend a
+      # deploy's credits.
+      - name: 🌐 Deploy the Netlify sites
+        env:
+          TAG: ${{ github.ref_name }}
+          RAVEN_HOOK: ${{ secrets.NETLIFY_RAVEN_BUILD_HOOK }}
+          SPLASH_HOOK: ${{ secrets.NETLIFY_SPLASH_BUILD_HOOK }}
+        run: |
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "$TAG is a build tag; the sites stay on the last release."
+            exit 0
+          fi
+          for hook in "$RAVEN_HOOK" "$SPLASH_HOOK"; do
+            [ -n "$hook" ] || continue
+            curl --fail --silent --show-error -X POST -d '{}' "$hook?trigger_title=$TAG"
+          done
