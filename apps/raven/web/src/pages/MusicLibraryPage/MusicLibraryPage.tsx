@@ -12,18 +12,8 @@ import { type MusicListing, useAllAlbums, useAllArtists, useAllSongs } from '@/l
 import { PlaylistsSection } from '@/components/PlaylistsSection/PlaylistsSection'
 import { SongList } from '@/pages/MusicLibraryPage/SongList'
 import { MUSIC_LIBRARY_COPY } from '@/pages/MusicLibraryPage/copy'
+import { MUSIC_LIBRARY_SECTIONS, type MusicLibrarySection } from '@/pages/MusicLibraryPage/sections'
 import styles from '@/pages/MusicLibraryPage/MusicLibraryPage.module.scss'
-
-/** The library's five lists, each at its own address. */
-export const MUSIC_LIBRARY_SECTIONS = {
-  albums: 'albums',
-  artists: 'artists',
-  noArtwork: 'no-artwork',
-  songs: 'songs',
-  playlists: 'playlists',
-} as const
-
-type MusicLibrarySection = (typeof MUSIC_LIBRARY_SECTIONS)[keyof typeof MUSIC_LIBRARY_SECTIONS]
 
 const SECTION_LINKS = [
   {
