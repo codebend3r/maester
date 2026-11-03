@@ -1,0 +1,17 @@
+appId: io.github.codebend3r.raven.app
+name: Press Back, and press it again if a system banner took the press
+---
+# Back sits in the top left corner, under where iOS draws its banners. A fresh simulator posts an
+# Apple Intelligence follow-up a few minutes in, and a press that lands on its banner opens
+# Settings instead, leaving raven in the background on the page Back was meant to leave. Settings
+# then shows "Return to Raven" in the status bar, so go back and press Back once more.
+- tapOn: Back
+- runFlow:
+    when:
+      visible: Return to Raven
+    commands:
+      - tapOn: Return to Raven
+      - extendedWaitUntil:
+          visible: Back
+          timeout: 10000
+      - tapOn: Back

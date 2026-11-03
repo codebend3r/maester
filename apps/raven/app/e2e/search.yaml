@@ -22,7 +22,7 @@ tags:
 - extendedWaitUntil:
     visible: Seasons
     timeout: 30000
-- tapOn: Back
+- runFlow: steps/back.yaml
 # A search that finds nothing says so.
 - tapOn: Clear search
 - tapOn: Search every library
@@ -31,7 +31,7 @@ tags:
 - extendedWaitUntil:
     visible: Nothing in any library matches "nowhere".
     timeout: 30000
-- tapOn: Back
+- runFlow: steps/back.yaml
 # A library's own box searches it.
 - extendedWaitUntil:
     visible: See all in Films
