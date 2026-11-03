@@ -2,6 +2,7 @@ import '@fontsource/young-serif'
 import '@fontsource-variable/instrument-sans/wdth.css'
 import '@/styles/globals.scss'
 import '@/styles/page.scss'
+import '@/styles/landing.scss'
 
 import { byId, el, link } from '@/dom'
 import { fileItem } from '@/fileItem'

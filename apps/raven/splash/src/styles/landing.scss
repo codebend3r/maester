@@ -1,0 +1,517 @@
+// The landing page: a hero over a wall of posters, three features, the
+// screens raven plays on, then the colophon.
+
+.landing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'hero'
+    'main'
+    'colophon';
+  justify-items: center;
+
+  > .colophon {
+    width: 100%;
+    max-width: 76rem;
+    padding: var(--space-4) var(--gutter) var(--space-6);
+  }
+}
+
+.hero {
+  grid-area: hero;
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'masthead'
+    'pitch';
+  width: 100%;
+  min-height: 42.5rem;
+  isolation: isolate;
+
+  .masthead {
+    grid-area: masthead;
+    padding: var(--space-4) var(--gutter);
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-night) 90%, transparent),
+      transparent
+    );
+  }
+}
+
+// The wall and its scrim sit behind the hero's content and are clipped to it,
+// so the download menu can still hang below the hero.
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+
+  &::after {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(
+        ellipse 60% 60% at 50% 55%,
+        color-mix(in srgb, var(--color-night) 97%, transparent) 30%,
+        color-mix(in srgb, var(--color-night) 70%, transparent) 65%,
+        color-mix(in srgb, var(--color-night) 35%, transparent) 100%
+      ),
+      linear-gradient(to top, var(--color-night) 0%, transparent 25%);
+    content: '';
+  }
+}
+
+.wall {
+  position: absolute;
+  top: -8.75rem;
+  right: -15%;
+  left: -15%;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: var(--space-2-5);
+  rotate: -8deg;
+
+  li {
+    aspect-ratio: 2 / 3;
+    border-radius: var(--radius-poster);
+    box-shadow: var(--shadow-poster);
+  }
+
+  // Fewer, larger posters, so the wall still fills a tall, narrow hero.
+  @media (max-width: 48rem) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.hero-pitch {
+  grid-area: pitch;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--gutter) var(--space-7);
+  text-align: center;
+
+  h1 {
+    max-width: 53.75rem;
+    font-family: var(--font-display);
+    font-size: var(--font-size-title);
+    font-weight: 400;
+    line-height: var(--line-display);
+    letter-spacing: var(--tracking-display);
+    text-wrap: balance;
+  }
+
+  .actions {
+    @media (max-width: 30rem) {
+      width: 100%;
+    }
+  }
+}
+
+.play-badge {
+  display: grid;
+  place-items: center;
+  width: 4.75rem;
+  aspect-ratio: 1;
+  padding-left: var(--space-1);
+  border-radius: 50%;
+  background: var(--color-leaf);
+  box-shadow:
+    0 0 0 var(--space-2) color-mix(in srgb, var(--color-leaf) 20%, transparent),
+    var(--shadow-lift);
+  color: var(--color-on-leaf);
+  font-size: 1.875rem;
+}
+
+.lede {
+  max-width: 40rem;
+  color: var(--color-birch);
+  font-size: var(--font-size-lede);
+  line-height: var(--line-relaxed);
+  text-wrap: pretty;
+}
+
+.landing-main {
+  grid-area: main;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'features'
+    'screens';
+  justify-items: center;
+  width: 100%;
+  padding-bottom: var(--space-5);
+}
+
+.features {
+  grid-area: features;
+  width: 100%;
+  max-width: 80rem;
+  padding: var(--space-6) var(--inset);
+}
+
+// The 1px gap shows the list's background through, drawing the dividers:
+// upright side by side, level once the features stack.
+.feature-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--color-line);
+
+  @media (max-width: 48rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.feature {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4-5);
+  background: var(--color-night);
+  text-align: center;
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: var(--font-size-heading);
+    font-weight: 400;
+    line-height: var(--line-heading);
+  }
+
+  p {
+    color: var(--color-lichen);
+    text-wrap: pretty;
+  }
+}
+
+.feature-icon {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--color-amber) 40%, transparent);
+  border-radius: 50%;
+  color: var(--color-amber);
+  font-size: 1.875rem;
+}
+
+.screens {
+  grid-area: screens;
+  width: 100%;
+  max-width: 76rem;
+  padding: 0 var(--inset);
+}
+
+.screens-card {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21.25rem), 1fr));
+  align-items: center;
+  gap: var(--space-6);
+  padding: clamp(2rem, 4.5vw, 3.5rem) clamp(1.5rem, 4vw, 3rem);
+  border-radius: var(--radius-card);
+  background: radial-gradient(
+    700px 400px at 75% 40%,
+    var(--color-canopy-hi),
+    var(--color-canopy) 70%
+  );
+}
+
+.screens-copy {
+  display: grid;
+  gap: var(--space-2-5);
+  max-width: 26.25rem;
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: var(--font-size-section);
+    font-weight: 400;
+    line-height: var(--line-tight);
+  }
+
+  p {
+    color: var(--color-birch);
+    font-size: var(--font-size-body-lg);
+    text-wrap: pretty;
+  }
+}
+
+.platforms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1-5) var(--space-2-5);
+  font-size: var(--font-size-ui);
+
+  li {
+    display: grid;
+    grid-auto-flow: column;
+    justify-content: start;
+    align-items: center;
+    gap: var(--space-1-5);
+  }
+
+  .icon {
+    color: var(--color-amber);
+    font-size: var(--font-size-screen);
+  }
+}
+
+// A television, a laptop and a phone, each playing raven, placed in
+// percentages of one box so the group scales as one.
+.devices {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 600 / 420;
+  container-type: inline-size;
+}
+
+.tv {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  grid-template-areas:
+    'screen'
+    'stand';
+  width: 84%;
+}
+
+.tv-screen {
+  grid-area: screen;
+  display: grid;
+  grid-template-areas: 'picture';
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 10px solid var(--color-bezel);
+  border-radius: var(--radius-poster);
+  box-shadow: var(--shadow-hero);
+}
+
+.tv-chrome {
+  grid-area: picture;
+  align-self: end;
+  display: grid;
+  gap: var(--space-1);
+  padding: clamp(var(--space-2), 5.5cqi, var(--space-5))
+    clamp(var(--space-1), 3.2cqi, var(--space-2-5)) clamp(var(--space-1), 2.5cqi, var(--space-3));
+  background: var(--fade-from-bottom);
+  color: var(--color-on-picture);
+}
+
+.tv-title {
+  font-family: var(--font-display);
+  font-size: clamp(var(--font-size-micro), 3.2cqi, var(--font-size-screen));
+}
+
+.timeline {
+  display: grid;
+  grid-template-areas: 'line';
+  width: 60%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-bark-faint);
+}
+
+// The one moment of motion: the film plays on for a few seconds after the page opens.
+.played {
+  grid-area: line;
+  width: 38%;
+  border-radius: var(--radius-pill);
+  background: var(--color-leaf-bright);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: play 6s var(--ease-out) both;
+  }
+}
+
+@keyframes play {
+  from {
+    width: 31%;
+  }
+
+  to {
+    width: 38%;
+  }
+}
+
+.tv-stand {
+  grid-area: stand;
+  justify-self: center;
+  width: 20%;
+  height: 1.5rem;
+  background: linear-gradient(var(--color-bezel), var(--color-canopy));
+  clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
+}
+
+// The base reaches 6% past the screen on each side, so the laptop's box is
+// that much wider than its screen and starts that much further left.
+.laptop {
+  position: absolute;
+  bottom: 5%;
+  left: -3.5%;
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 100fr) minmax(0, 6fr);
+  grid-template-areas:
+    '. screen .'
+    'base base base';
+  width: 65%;
+}
+
+.laptop-screen {
+  grid-area: screen;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-content: start;
+  gap: var(--space-0-5);
+  aspect-ratio: 16 / 10;
+  padding: var(--space-1-5);
+  overflow: hidden;
+  border: 8px solid var(--color-bezel);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--color-night);
+
+  li {
+    aspect-ratio: 2 / 3;
+    border-radius: var(--radius-sm);
+  }
+}
+
+.laptop-base {
+  grid-area: base;
+  height: 0.875rem;
+  border-radius: 0 0 var(--radius-poster) var(--radius-poster);
+  background: linear-gradient(var(--color-moss-hi), var(--color-canopy));
+  box-shadow: var(--shadow-device);
+}
+
+.phone {
+  position: absolute;
+  right: 6%;
+  bottom: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  width: 21%;
+  aspect-ratio: 9 / 19;
+  padding: clamp(var(--space-1), 3.5cqi, var(--space-3-5))
+    clamp(var(--space-0), 1.5cqi, var(--space-1)) clamp(var(--space-0), 1.5cqi, var(--space-1));
+  overflow: hidden;
+  border: 7px solid var(--color-bezel);
+  border-radius: var(--radius-phone);
+  background: var(--color-deep);
+  box-shadow: var(--shadow-device);
+}
+
+.phone-hero {
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-md);
+  background: linear-gradient(170deg, var(--color-sand), var(--color-leaf));
+}
+
+.phone-title {
+  font-family: var(--font-display);
+  font-size: clamp(var(--font-size-nano), 2cqi, var(--font-size-micro));
+  line-height: var(--line-heading);
+}
+
+.phone-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-0-5);
+}
+
+.phone-tile {
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-sm);
+}
+
+// The posters and stills, drawn in the palette's own colours until real
+// artwork replaces them.
+.tone-1 {
+  background:
+    radial-gradient(
+      ellipse 36% 30% at 62% 44%,
+      var(--color-sun) 0%,
+      color-mix(in srgb, var(--color-amber) 45%, transparent) 35%,
+      transparent 70%
+    ),
+    linear-gradient(
+      to bottom,
+      var(--color-deep) 0%,
+      var(--color-moss) 38%,
+      var(--color-dusk) 50%,
+      var(--color-deep) 52%,
+      var(--color-canopy-hi) 100%
+    );
+}
+
+.tone-2 {
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      color-mix(in srgb, var(--color-amber) 90%, transparent) 0 14%,
+      transparent 15%
+    ),
+    linear-gradient(170deg, var(--color-sand), var(--color-leaf));
+}
+
+.tone-3 {
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% 110%,
+      color-mix(in srgb, var(--color-fern) 50%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(200deg, var(--color-pine), var(--color-deep));
+}
+
+.tone-4 {
+  background:
+    radial-gradient(
+      ellipse 70% 40% at 50% 100%,
+      color-mix(in srgb, var(--color-leaf-bright) 70%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(150deg, var(--color-wine), var(--color-deep));
+}
+
+.tone-5 {
+  background: linear-gradient(
+    to bottom,
+    var(--color-canopy-hi) 0 48%,
+    var(--color-amber) 48% 49%,
+    var(--color-deep) 49% 100%
+  );
+}
+
+.tone-6 {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-birch) 18%, transparent) 0 6px,
+      transparent 6px 28px
+    ),
+    linear-gradient(160deg, var(--color-moss-hi), var(--color-deep));
+}
+
+.tone-7 {
+  background:
+    radial-gradient(circle at 70% 30%, var(--color-amber) 0 4%, transparent 5%),
+    linear-gradient(190deg, var(--color-canopy-hi), var(--color-deep));
+}
+
+.tone-8 {
+  background: linear-gradient(190deg, var(--color-canopy-hi), var(--color-moss));
+}
+
+.tone-moss {
+  background: linear-gradient(160deg, var(--color-moss-hi), var(--color-deep));
+}
+
+.tone-pine {
+  background: linear-gradient(200deg, var(--color-pine), var(--color-deep));
+}
