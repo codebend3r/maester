@@ -63,6 +63,7 @@ export const libraryCounts = (overrides: Partial<LibraryCounts> = {}): LibraryCo
   sagas: 0,
   duplicates: 0,
   finished: 0,
+  dolbyVisionOnly: 0,
   ...overrides,
 })
 
@@ -94,6 +95,7 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   videoCodec: 'hevc',
   videoBitDepth: 10,
   hdr: false,
+  isDolbyVisionOnly: false,
   audioCodec: 'aac',
   audioChannels: 6,
   bitrate: 2_215_000,

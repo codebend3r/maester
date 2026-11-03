@@ -11,15 +11,8 @@
 - A `package.json` script runs one command. Steps become scripts of their own, chained with `bun run --sequential build:clean build:compile` (or `--parallel`), never with `&&`, `||` or `;`. The pre-push hook and the `one-command-per-script` target (in `verify`, `affected` and the PR checks) reject a chained script.
 - Every import of a project's own modules goes through its `@/` alias and names no extension: `@/lib/api`, never `./api`, `../lib/api` or `@/lib/api.js`. oxlint's `no-restricted-imports` fails on anything else. Non-TypeScript assets keep their extension (`@/components/Player/Player.module.scss`). Node needs relative `.js` paths at runtime, so the server and core builds run `tsc-alias` after `tsc` to rewrite the alias in `dist` only.
 - Writing: no em dashes or en dashes anywhere, including comments and UI copy.
-- `e2e`, `test:native`, `make`, `audit:bundle` and `smoke:packaged` need macOS on Apple Silicon, or Windows x64 for all but `e2e`, so `verify` and `affected` leave them out and `main-native-checks.yml` runs the macOS desktop jobs on every push to main. On Windows, `🪟 Windows native` runs `@raven/mpv`'s `audit:native:windows` and `test:native:windows`, and `🪟 Windows app` runs `make`, `audit:bundle` and `smoke:packaged`. `e2e` stays macOS-only, since the Playwright harness assumes macOS; Windows has no end to end check. Locally they run only on such a machine, and `smoke:packaged` uses your own `~/Library/Application Support/raven` and `~/Library/Logs/raven`. A packaged app reads no test hook, so the smoke also makes the real launch check against GitHub and writes `updates.checkedAt` into that folder's `desktop-config.json`, moving an older file to version 5. `@raven/app`'s native targets stay out of `verify` and `affected` too. `prebuild:ios`, `prebuild:tvos`, `build:ios`, `build:tvos`, `e2e` and `e2e:tvos` need a Mac with Xcode, and the `📱 App on iPhone and iPad` and `📺 App on Apple TV` jobs run them on macOS. `prebuild:android-tv`, `build:android-tv` and `e2e:android-tv` need the Android SDK, and `e2e:android-tv` a running Android TV emulator, so the `📺 App on Android TV` job runs them on Linux, since GitHub's macOS runners cannot run the Android emulator. Wren's (`@raven/music`) stay out too: `prebuild:ios`, `build:ios` and `e2e` need a Mac with Xcode, and the `🎵 Wren on iPhone` job runs them on macOS (`bun run ci:wren` locally); `prebuild:android` and `build:android` need the Android SDK, and the `🎵 Wren for Android` job runs them on Linux. The app, Wren and Windows jobs (`native-checks.yml`) and the macOS desktop jobs never run on PRs; `main-native-checks.yml` uses Nx affected-project selection on every push to main, comparing against the latest successful ancestor run (or running everything if none is found in the latest 100 successful push runs). Shared workflow, tooling, script and workspace configuration changes run everything; server fixture changes also select all native clients, and web changes select desktop checks. Every selected desktop check keeps its native artifact prerequisite. Earlier pushes are never cancelled. Manual runs on any branch run everything. The PR `🖥️ Desktop` gate is removed; update required checks in the repository ruleset accordingly. `desktop-release.yml` runs only for release tags or manual dry runs, never PRs. The app's `typecheck`, `lint:ts`, `format:check`, `test` and `test:screens` run in `verify` as every project's do.
-
-- `@raven/web`'s `e2e:browser` drives the built web app in Google Chrome with Playwright, against `@raven/server`'s `serve:fixture` started on port 8491 with that build (`FIXTURE_SERVER` in `@raven/core`), so it needs Chrome and ffmpeg. `verify` and `affected` leave it out; the PR checks' `🌐 Web end to end` job runs it. Locally, `bun run web:e2e`.
-
-- `@raven/supabase`'s `test:db` and `lint:db` need Docker and a running local stack, and its `check:functions` and `test:functions` need Deno, which runs its Edge Functions. `verify` and `affected` leave those targets out; the PR checks' `🗄️ Supabase` job sets up Deno, starts the stack and runs them.
 
 ## TypeScript
-
-These apply to every TypeScript project: everything but `@sparrow/api` and the Python in `scripts`.
 
 - Use type guards wherever possible.
 - Never use `any`; narrow the type or write a type guard. oxlint's `no-explicit-any` fails on it.
@@ -57,12 +50,13 @@ These apply to every TypeScript project: everything but `@sparrow/api` and the P
 - Never use a non-null assertion (`!`) outside a test file; narrow the value or fail explicitly instead. oxlint fails on it everywhere but the test files.
 - Never `@ts-ignore`. If a suppression is truly unavoidable, use `@ts-expect-error` with a reason on the same line.
 - Validate untrusted data (route params, query strings, request bodies, fetch responses, file contents) with a type guard at the boundary. Code past the boundary trusts the narrowed type; it does not re-check. raven's guards live in `@raven/core`.
-- Never type a function's or component's parameters inline. Define a named type alias directly above it, called the function's name plus `Props` (`MatchupGate` takes `MatchupGateProps`), and annotate the parameter with it. Do: `type MatchupGateProps = { message: string; children?: ReactNode }` then `function MatchupGate({ message, children }: MatchupGateProps)`. Don't: `function MatchupGate({ message, children }: { message: string; children?: ReactNode })`. This applies to every function that takes an object parameter, not only React components; an audit should flag any inline object type in a parameter position.
+- Never use inline types for a function signature, lean towards using defined types even for one-off functions
 
 ## Code style
 
 - Never use `for`, `for...of` or `for...in` loops; reach for the array methods (`map`, `filter`, `reduce`, `flatMap` and the rest). Prefer `reduce` to accumulate.
 - `!!value` for boolean conversion.
+- do not use `foo?.boo === true`, always use the double bang (`!!`) to make the code more readable
 - Never nest ternaries. One ternary is fine; a ternary inside another's condition or either branch is not. Reach for an `as const` lookup object, a named variable or a small function with guard clauses instead.
 - Prefer optional chaining (`?.`), and always pair it with nullish coalescing (`??`) to supply a fallback.
 - One object parameter instead of several positional ones, so argument order doesn't matter: `doSomething({ foo, bar, hello })`, never `doSomething(foo, bar, hello)`.
@@ -76,6 +70,7 @@ These apply to every TypeScript project: everything but `@sparrow/api` and the P
 - Throw only `Error` instances or subclasses, never strings or plain objects.
 - Named exports only. A config file a tool reads through a default export (`vite.config.ts`, `vitest.config.ts`) is exempt in its project's `.oxlintrc.json`.
 - Name booleans as predicates: `is`, `has`, `should`, `can`.
+- If a comment is one line it should not be formatted as a multiline comment
 
 ## React
 

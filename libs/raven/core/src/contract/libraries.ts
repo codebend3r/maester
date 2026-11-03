@@ -10,6 +10,7 @@ import {
   nullable,
   object,
   oneOf,
+  optional,
   union,
 } from '@/schema'
 
@@ -341,6 +342,8 @@ export const isLibraryCounts = object({
   sagas: isNumber,
   duplicates: isNumber,
   finished: isNumber,
+  /** Titles with a Dolby Vision profile 5 file; absent from an older server, whose tab stays hidden. */
+  dolbyVisionOnly: optional(isNumber),
 })
 
 export type LibraryCounts = Infer<typeof isLibraryCounts>

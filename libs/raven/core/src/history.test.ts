@@ -16,6 +16,7 @@ const entry = ({
   furthest: 0,
   watched: false,
   marked: false,
+  poster: null,
   ...rest,
 })
 

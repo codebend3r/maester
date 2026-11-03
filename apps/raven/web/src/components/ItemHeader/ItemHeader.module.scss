@@ -41,6 +41,9 @@
   height: var(--backdrop-height);
   overflow: hidden;
   pointer-events: none;
+  // The picture and the night over it fade out together at the foot, so the hero melts into
+  // whatever ground the theme lays under the page instead of stopping at an edge.
+  mask-image: linear-gradient(to bottom, var(--color-stage) 60%, transparent);
 
   // The night rises from the foot and runs in from the left, where the
   // title reads, so the words keep their contrast over any picture.

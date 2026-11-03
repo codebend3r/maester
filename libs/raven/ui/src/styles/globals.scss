@@ -88,6 +88,12 @@
   --color-resolution-4k: #e8c069;
   --color-resolution-8k: #cfaef5;
   --color-resolution-ink: #10161a;
+  // The codec's and the light's chips beside the tier: HEVC sky, any HDR range rose, on the
+  // same ink at 7:1 or better. Other codecs stay on glass, as SD does.
+  --color-codec-hevc: #8cc8f2;
+  --color-range-hdr: #f4a3b8;
+  // Dolby Vision profile 5, which a browser shows purple and green: a warning's apricot, 9:1.
+  --color-range-dv5: #f7a35c;
   // Brand marks keep their own colours in every theme.
   --color-brand-rotten-tomatoes: #d8414a;
   --color-brand-imdb: #e3b45f;

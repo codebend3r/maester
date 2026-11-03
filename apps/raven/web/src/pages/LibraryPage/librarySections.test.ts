@@ -6,6 +6,7 @@ import {
   type LibrarySection,
   SECTIONS,
   countText,
+  isListed,
   sectionFrom,
   sectionPath,
   sectionsFor,
@@ -20,6 +21,7 @@ describe('the tabs of a library', () => {
       'sagas',
       'not-matched',
       'duplicates',
+      'dolby-vision',
       'finished',
     ]
     expect(sectionsFor('movies')).toEqual(everything)
@@ -31,9 +33,16 @@ describe('the tabs of a library', () => {
       'in-progress',
       'favourites',
       'not-matched',
+      'dolby-vision',
       'finished',
     ])
-    expect(sectionsFor('youtube')).toEqual(['all', 'in-progress', 'favourites', 'finished'])
+    expect(sectionsFor('youtube')).toEqual([
+      'all',
+      'in-progress',
+      'favourites',
+      'dolby-vision',
+      'finished',
+    ])
   })
 
   it("reads the library's opening tab from no param, a tab from its name, and nothing from anything else", () => {
@@ -70,7 +79,14 @@ describe('the tabs of a library', () => {
 
   it("counts All and Not matched from the library, and the rest from the account's counts once they come", () => {
     const library = { itemCount: 1204, unmatchedCount: 0 }
-    const counts = { inProgress: 2, favourites: 5, sagas: 3, duplicates: 4, finished: 31 }
+    const counts = libraryCounts({
+      inProgress: 2,
+      favourites: 5,
+      sagas: 3,
+      duplicates: 4,
+      dolbyVisionOnly: 6,
+      finished: 31,
+    })
     const countOf = (section: LibrarySection) =>
       countText({ section, tallies: { ...library, ...counts } })
     expect(Object.values(LIBRARY_SECTIONS).map(countOf)).toEqual([
@@ -84,6 +100,7 @@ describe('the tabs of a library', () => {
       '3',
       '0',
       '4',
+      '6',
       '31',
     ])
     const waiting = (section: LibrarySection) => countText({ section, tallies: library })
@@ -99,7 +116,18 @@ describe('the tabs of a library', () => {
       '0',
       null,
       null,
+      null,
     ])
+  })
+
+  it('shows the Dolby Vision 5 tab only once the library holds any, and every other tab always', () => {
+    const listed = (dolbyVisionOnly: number | undefined) =>
+      sectionsFor('shows').filter((section) =>
+        isListed({ section, tallies: libraryCounts({ dolbyVisionOnly }) }),
+      )
+    expect(listed(3)).toContain('dolby-vision')
+    expect(listed(0)).toEqual(['all', 'in-progress', 'favourites', 'not-matched', 'finished'])
+    expect(listed(undefined)).not.toContain('dolby-vision')
   })
 
   it('counts Recently finished up to the most it lists, and that many and more past it', () => {

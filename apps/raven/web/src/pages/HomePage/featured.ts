@@ -12,6 +12,7 @@ import {
   cardLink,
   cardTitle,
   formatRuntime,
+  rangeLabel,
   resolutionLabel,
   showYears,
   watchLink,
@@ -60,12 +61,13 @@ const artworkOf = (item: ItemSummary): { poster: string; backdrop: string } | nu
 
 const isFact = (fact: string | null): fact is string => fact != null && fact !== ''
 
-type Picture = { resolution: Resolution | null; isHdr: boolean }
+type Picture = { resolution: Resolution | null; range: string | null }
 
-/** 4K and HDR, 1080p alone, or null before the file is probed. */
+/** 4K and HDR (or DV5), 1080p alone, or null before the file is probed. */
 const pictureOf = (media: MediaItem): Picture | null => {
   const resolution = resolutionLabel(media)
-  return resolution == null && !media.hdr ? null : { resolution, isHdr: media.hdr }
+  const range = rangeLabel(media)
+  return resolution == null && range == null ? null : { resolution, range }
 }
 
 type FromMediaProps = {

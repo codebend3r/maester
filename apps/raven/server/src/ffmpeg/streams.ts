@@ -7,7 +7,13 @@ import {
   isRecord,
   isString,
 } from '@raven/core'
-import { CODEC_TYPES, COLOR_TRANSFERS, hasDolbyVision, numeric } from '@/ffmpeg/probe'
+import {
+  CODEC_TYPES,
+  COLOR_TRANSFERS,
+  hasDolbyVision,
+  isDolbyVisionOnly,
+  numeric,
+} from '@/ffmpeg/probe'
 
 type Stream = Record<string, unknown>
 
@@ -68,6 +74,7 @@ export const parseStreams = (output: unknown): MediaStreams => {
         profile: profileOf(picture),
         bitrate: bitrateOf(picture),
         range: rangeOf(picture),
+        isDolbyVisionOnly: isDolbyVisionOnly(picture),
       }
     : null
   const audio = streams

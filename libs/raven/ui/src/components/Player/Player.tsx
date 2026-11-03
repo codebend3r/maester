@@ -6,6 +6,7 @@ import { useHostServices } from '@/stores/playerServices'
 import { KeyedView, type ViewOf, type ViewsOf } from '@/components/KeyedView/KeyedView'
 import { NativeStage } from '@/components/Player/NativeStage'
 import { Preloader } from '@/components/Player/Preloader'
+import { DolbyVisionNotice } from '@/components/Player/DolbyVisionNotice'
 import { DIRECT_RENDITION } from '@/components/Player/rendition'
 import { Stage } from '@/components/Player/Stage'
 import { Unplayable } from '@/components/Player/Unplayable'
@@ -252,6 +253,8 @@ const PlayingStage = ({ source, onBack, playback, selection }: PlayingStageProps
     onSlow={playback.slow ?? undefined}
     steppedDown={playback.steppedDown}
     choices={playback.choices}
+    // A browser has no Dolby Vision processing, so profile 5 needs saying here.
+    notice={<DolbyVisionNotice api={source.api} media={source.media} />}
   />
 )
 

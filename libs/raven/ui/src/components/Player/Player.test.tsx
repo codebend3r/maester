@@ -107,6 +107,37 @@ describe('Player', () => {
     expect(document.activeElement).toBe(video)
   })
 
+  it('plays a Dolby Vision profile 5 file on, and says why its colours are off until dismissed', async () => {
+    const getStreams = spyOn(api, 'getStreams').mockImplementation(async () => ({
+      video: {
+        codec: 'hevc',
+        profile: 'Main 10',
+        bitrate: null,
+        range: 'dolbyVision',
+        isDolbyVisionOnly: true,
+      },
+      audio: [],
+    }))
+    spies.push(getStreams)
+    const { container } = renderWithProviders({
+      ui: (
+        <TestPlayer
+          media={mediaItem({ container: 'mp4', hdr: true, versions: 2 })}
+          backTo="/libraries/2"
+        />
+      ),
+    })
+    const notice = await screen.findByRole('complementary', { name: 'Why the colours look off' })
+    expect(within(notice).getByText(/Apple TV 4K/)).toBeInTheDocument()
+    expect(
+      within(notice).getByText('Or go back and pick another version of it.'),
+    ).toBeInTheDocument()
+    expect(container.querySelector('video')).toHaveAttribute('src', '/api/media/7/file')
+    await userEvent.click(within(notice).getByRole('button', { name: 'Keep watching' }))
+    expect(screen.queryByRole('complementary', { name: 'Why the colours look off' })).toBeNull()
+    expect(container.querySelector('video')).toHaveAttribute('src', '/api/media/7/file')
+  })
+
   it('explains why a file cannot play instead of loading it', () => {
     const { container } = renderWithProviders({
       ui: <TestPlayer media={mediaItem()} backTo="/libraries/2" />,
@@ -840,6 +871,10 @@ describe('the player chrome', () => {
   beforeEach(() => {
     stubTracks()
     spies.push(spyOn(api, 'getSubtitles').mockImplementation(async () => []))
+    // The HDR file is probed for Dolby Vision as it plays.
+    spies.push(
+      spyOn(api, 'getStreams').mockImplementation(async () => ({ video: null, audio: [] })),
+    )
   })
 
   const uhd = mediaItem({
@@ -849,6 +884,7 @@ describe('the player chrome', () => {
     width: 3840,
     height: 2160,
     hdr: true,
+    isDolbyVisionOnly: false,
   })
 
   it('says under the title what is playing and how, and the pills say what each is set to', async () => {

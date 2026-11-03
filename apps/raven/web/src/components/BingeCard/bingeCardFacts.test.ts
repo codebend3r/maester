@@ -24,7 +24,7 @@ describe('bingeCardFacts', () => {
       stars: ['First Star', 'Second Star'],
       synopsis: 'Mark is told to go on.',
       episodeLine: 'S01E02 · Half Loop',
-      left: '45m left',
+      status: '45m left',
     })
     expect(facts.media).toBe(EPISODE_TWO)
   })
@@ -32,7 +32,7 @@ describe('bingeCardFacts', () => {
   it("falls back to the show's synopsis until its episode is read, and with no episode to play", () => {
     const facts = bingeCardFacts({ details: SEVERANCE, next: null, episode: null })
     expect(facts.synopsis).toBe(SEVERANCE.summary)
-    expect(facts).toMatchObject({ media: null, left: null, episodeLine: null, runtime: '45m' })
+    expect(facts).toMatchObject({ media: null, status: null, episodeLine: null, runtime: '45m' })
   })
 
   it('gives a movie its own synopsis, length and progress', () => {
@@ -55,10 +55,22 @@ describe('bingeCardFacts', () => {
       runtime: '1h 40m',
       synopsis: 'A crew and a cop.',
       episodeLine: null,
-      left: '1h 15m left',
+      status: '1h 15m left',
       stars: ['First Star', 'Second Star'],
     })
     expect(facts.media).toBe(file)
+  })
+
+  it('names the episode to start on until it is started, and nothing for a movie not started', () => {
+    const fresh = { ...EPISODE_TWO, position: 0 }
+    expect(bingeCardFacts({ details: SEVERANCE, next: fresh, episode: null }).status).toBe(
+      'Start season 1 episode 2',
+    )
+    const movie = itemDetails({
+      type: 'movie',
+      versions: [matchedMovie({ id: 20, duration: 6000, position: 0 })],
+    })
+    expect(bingeCardFacts({ details: movie, next: null, episode: null }).status).toBeNull()
   })
 
   it('names fewer stars when the cast is short, and none when it is empty', () => {

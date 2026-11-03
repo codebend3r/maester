@@ -891,6 +891,14 @@ export const MIGRATIONS: readonly string[] = [
    WHERE CAST(substr(release_date, 1, 4) AS INTEGER) < 1877
       OR CAST(substr(release_date, 1, 4) AS INTEGER) > CAST(strftime('%Y', 'now') AS INTEGER) + 1;
   `,
+  // Dolby Vision profile 5, which only Dolby Vision can show: a browser plays it purple and
+  // green. Only an HDR file can be Dolby Vision, so those alone are probed again by the next
+  // scan someone starts, to read it.
+  `
+  ALTER TABLE media ADD COLUMN dolby_vision_only INTEGER NOT NULL DEFAULT 0;
+  CREATE INDEX media_library_dolby_vision_only ON media (library_id) WHERE dolby_vision_only = 1;
+  UPDATE media SET probed = 0 WHERE hdr = 1;
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

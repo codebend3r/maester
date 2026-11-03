@@ -154,10 +154,7 @@ const Slide = ({ entry, place, isCurrent }: SlideProps) => (
         {entry.picture && (
           <>
             {entry.facts.length > 0 && <span aria-hidden="true">{COMMON_COPY.separator}</span>}
-            <PictureFact
-              resolution={entry.picture.resolution}
-              rest={entry.picture.isHdr ? COMMON_COPY.hdr : null}
-            />
+            <PictureFact resolution={entry.picture.resolution} rest={entry.picture.range} />
           </>
         )}
       </p>

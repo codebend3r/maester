@@ -55,6 +55,25 @@ describe('BingeCard', () => {
     )
   })
 
+  it('stands its logo in the corner for its name, and names the episode to start on before it is started', async () => {
+    spies.next.mockResolvedValue({ ...EPISODE_TWO, position: 0 })
+    spies.item.mockResolvedValue(itemDetails({ id: 7, type: 'episode' }))
+    renderWithProviders({
+      ui: (
+        <ul>
+          <BingeCard details={{ ...SHOW, logoVersion: 'l1' }} />
+        </ul>
+      ),
+    })
+    const card = screen.getByRole('listitem')
+    const title = within(card).getByRole('link', { name: 'Severance' })
+    expect(title).toHaveAttribute('href', '/shows/4')
+    expect(title.querySelector('img')?.getAttribute('src')).toContain('/api/pictures/items/4/logo')
+    expect(within(card).queryByText('Severance')).toBeNull()
+    expect(await within(card).findByText('Start season 1 episode 2')).toBeInTheDocument()
+    expect(within(card).queryByText(/left$/)).toBeNull()
+  })
+
   it("keeps the show's synopsis and offers no Play while it has no episode to play", async () => {
     spies.next.mockResolvedValue(null)
     renderWithProviders({

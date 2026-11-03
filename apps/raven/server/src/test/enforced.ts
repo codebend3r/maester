@@ -98,6 +98,7 @@ export const ROUTES = {
   deleteLibrary: { method: DELETE, path: '/api/libraries/:id', account: owner },
   libraryCounts: { method: GET, path: '/api/libraries/:id/counts', account: approved },
   duplicates: { method: GET, path: '/api/libraries/:id/duplicates', account: approved },
+  dolbyVisionOnly: { method: GET, path: '/api/libraries/:id/dolby-vision', account: approved },
   joinDuplicates: { method: POST, path: '/api/libraries/:id/duplicates/join', account: owner },
   splitDuplicates: { method: POST, path: '/api/libraries/:id/duplicates/split', account: owner },
   libraryFavourites: { method: GET, path: '/api/libraries/:id/favourites', account: approved },

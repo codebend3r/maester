@@ -7,6 +7,7 @@ import {
   nullable,
   object,
   oneOf,
+  optional,
 } from '@/schema'
 
 export const isAudioTrack = object({
@@ -81,6 +82,12 @@ export const isVideoStream = object({
   /** Bits per second; Matroska says only when its muxer wrote a `BPS` tag. */
   bitrate: nullable(isNumber),
   range: isVideoRange,
+  /**
+   * Dolby Vision with no base layer anything else can show (profile 5): without
+   * Dolby Vision's processing its colours come out purple and green. Absent
+   * from an older server.
+   */
+  isDolbyVisionOnly: optional(isBoolean),
 })
 
 export type VideoStream = Infer<typeof isVideoStream>

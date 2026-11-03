@@ -77,6 +77,7 @@ describe('LoudnessJobs', () => {
         videoCodec: null,
         videoBitDepth: null,
         hdr: false,
+        isDolbyVisionOnly: false,
         audioCodec: 'flac',
         audioChannels: 2,
         bitrate: 900000,

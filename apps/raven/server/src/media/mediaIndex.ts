@@ -298,8 +298,8 @@ export class MediaIndex {
       this.db
         .prepare(
           `UPDATE media SET probed = 1, probe_error = NULL, duration = ?, width = ?, height = ?,
-                  video_codec = ?, video_bit_depth = ?, hdr = ?, audio_codec = ?, audio_channels = ?,
-                  bitrate = ?, tracks = ?
+                  video_codec = ?, video_bit_depth = ?, hdr = ?, dolby_vision_only = ?,
+                  audio_codec = ?, audio_channels = ?, bitrate = ?, tracks = ?
             WHERE id = ?`,
         )
         .run(
@@ -309,6 +309,7 @@ export class MediaIndex {
           probe.videoCodec,
           probe.videoBitDepth,
           probe.hdr ? 1 : 0,
+          probe.isDolbyVisionOnly ? 1 : 0,
           probe.audioCodec,
           probe.audioChannels,
           probe.bitrate,

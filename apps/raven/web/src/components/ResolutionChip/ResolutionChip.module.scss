@@ -24,7 +24,10 @@
 .hd,
 .fullHd,
 .uhd,
-.uhd8k {
+.uhd8k,
+.hevc,
+.hdr,
+.dolbyVisionOnly {
   box-shadow: var(--shadow-outline);
   color: var(--color-resolution-ink);
 }
@@ -51,6 +54,19 @@
 
 .uhd8k {
   background: var(--color-resolution-8k);
+}
+
+// The codec and the light beside the tier, each in a colour no tier wears.
+.hevc {
+  background: var(--color-codec-hevc);
+}
+
+.hdr {
+  background: var(--color-range-hdr);
+}
+
+.dolbyVisionOnly {
+  background: var(--color-range-dv5);
 }
 
 // A fact led by its resolution: the chip, then the rest of it on its line.

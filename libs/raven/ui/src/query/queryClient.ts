@@ -145,6 +145,7 @@ export const queryKeys = {
   sagas: (libraryId: number | null) => ['libraries', libraryId, 'sagas'],
   unmatched: (libraryId: number) => ['libraries', libraryId, 'unmatched'],
   duplicates: (libraryId: number) => ['libraries', libraryId, 'duplicates'],
+  dolbyVisionOnly: (libraryId: number) => ['libraries', libraryId, 'dolby-vision'],
   browse: (path: string | null) => ['browse', path],
   /** Every item page shares this prefix, so a match or refresh refetches them all. */
   items: ['items'],

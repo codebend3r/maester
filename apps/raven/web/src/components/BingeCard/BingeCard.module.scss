@@ -1,13 +1,19 @@
-// The backdrop fills the card and its words sit along the foot, over a shade
-// that keeps them readable on any picture. The card is a picture in every
+// The backdrop fills the card, the logo sits in its top left corner, its words
+// above the foot and the progress across the foot, over a shade that keeps
+// them readable on any picture. The card is a picture in every
 // theme, so its words keep the fixed light ink of words on a picture.
 .card {
   position: relative;
   isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'copy';
-  align-items: end;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'logo'
+    '.'
+    'copy'
+    'progress';
+  gap: var(--space-4);
   min-height: 20rem;
   padding: var(--space-6);
   border-radius: var(--radius-lg);
@@ -43,6 +49,33 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+// Tucked into the corner, small enough to leave the words their room. Above
+// the card's link, so its own click opens the page.
+.logoSlot {
+  position: relative;
+  z-index: 1;
+  grid-area: logo;
+  justify-self: start;
+  align-self: start;
+  display: grid;
+  max-width: 44%;
+  border-radius: var(--radius-sm);
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-color: var(--color-on-picture);
+    outline-offset: 2px;
+  }
+}
+
+.logo {
+  max-width: 100%;
+  max-height: 5.5rem;
+  object-fit: contain;
+  object-position: left top;
+  filter: drop-shadow(0 1px 4px var(--color-shade));
 }
 
 // The link that resumes the video reaches across the whole card, under the
@@ -137,12 +170,11 @@
 
 .progress {
   display: grid;
+  grid-area: progress;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'bar left';
+  grid-template-areas: 'bar status';
   align-items: center;
   gap: var(--space-3);
-  justify-self: stretch;
-  padding-top: var(--space-2);
 }
 
 .bar {
@@ -152,8 +184,8 @@
   border-radius: var(--radius-pill);
 }
 
-.left {
-  grid-area: left;
+.status {
+  grid-area: status;
   font-family: var(--font-display);
   font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
@@ -174,6 +206,14 @@
 
   .title {
     font-size: var(--font-size-xl);
+  }
+
+  .logoSlot {
+    max-width: 55%;
+  }
+
+  .logo {
+    max-height: 3.85rem;
   }
 
   .mark {

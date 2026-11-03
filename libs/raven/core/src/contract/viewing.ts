@@ -1,4 +1,4 @@
-import { isMediaItem } from '@/contract/items'
+import { isItemSummary, isMediaItem } from '@/contract/items'
 import {
   type Infer,
   isBoolean,
@@ -8,6 +8,7 @@ import {
   nullable,
   object,
   oneOf,
+  optional,
   union,
 } from '@/schema'
 import { MAX_WATCH_TARGETS } from '@/watched'
@@ -23,6 +24,8 @@ export const isHistoryEntry = object({
   watched: isBoolean,
   /** Whether Mark as watched holds it watched; `plays` and `furthest` count real plays only. */
   marked: isBoolean,
+  /** The poster it stands under: an episode's show's, a movie's own. Absent from an older server. */
+  poster: optional(nullable(isItemSummary)),
 })
 
 export type HistoryEntry = Infer<typeof isHistoryEntry>

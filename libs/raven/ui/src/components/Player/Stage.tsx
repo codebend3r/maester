@@ -175,6 +175,8 @@ export type StageProps = {
   onSlow?: (delivery: Delivery) => void
   steppedDown?: StepDown | null
   choices?: PlayChoices | null
+  /** What the picture needs said over it as it plays. */
+  notice?: ReactNode
 }
 
 export const Stage = ({ engine, ...props }: StageProps) => {
@@ -209,6 +211,8 @@ type PlayerChromeProps = {
   steppedDown?: StepDown | null
   /** The ways to play this file and the viewer's pick among them; null where there is one. */
   choices?: PlayChoices | null
+  /** What the engine's host needs said over the picture as it plays, beside the keyboard tip. */
+  notice?: ReactNode
 }
 
 /**
@@ -227,6 +231,7 @@ export const PlayerChrome = ({
   file = null,
   steppedDown = null,
   choices = null,
+  notice = null,
 }: PlayerChromeProps) => {
   const { mode, quality } = rendition
   const { title, hostActions, favourite, chrome, isVolumeFixed, handoff } = useHostServices()
@@ -589,6 +594,7 @@ export const PlayerChrome = ({
           {...(handoff && { onHandoff: () => handOff(handoff), handoffLabel: handoff.label })}
         />
       )}
+      {notice}
       {shortcutsTip.isShown && <ShortcutsTip onDismiss={shortcutsTip.dismiss} />}
       {overlay === OVERLAYS.shortcuts && (
         <ShortcutsDialog

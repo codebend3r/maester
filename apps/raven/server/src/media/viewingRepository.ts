@@ -45,6 +45,9 @@ type ViewingRepositoryReportProps = {
   at?: Date
 }
 
+/** A history entry as the plays say it, before the poster it stands under is looked up. */
+export type PlayedEntry = Omit<HistoryEntry, 'poster'>
+
 type ViewingRepositoryHistoryProps = {
   libraryId: number
   limit: number
@@ -222,7 +225,7 @@ export class ViewingRepository {
     limit,
     watchedOnly = false,
     account,
-  }: ViewingRepositoryHistoryProps): HistoryEntry[] {
+  }: ViewingRepositoryHistoryProps): PlayedEntry[] {
     const rows = this.db
       .prepare<[ByAccount, number, number], HistoryRow>(
         `SELECT pl.media_id AS id, MAX(pl.played_at) AS last_played_at,
@@ -245,7 +248,7 @@ export class ViewingRepository {
         .getMany({ ids: rows.map((row) => row.id), account })
         .map((item) => [item.id, item]),
     )
-    return rows.flatMap((row): HistoryEntry[] => {
+    return rows.flatMap((row): PlayedEntry[] => {
       const item = media.get(row.id)
       return item
         ? [

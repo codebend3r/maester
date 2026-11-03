@@ -54,6 +54,7 @@ import { MediaOriginsController } from '@/media/mediaOriginsController'
 import { MediaRepository } from '@/media/mediaRepository'
 import { MediaTickets } from '@/media/mediaTickets'
 import { SagaBackdrops } from '@/media/sagaBackdrops'
+import { DolbyVisionOnly } from '@/media/dolbyVisionOnly'
 import { MovieSplits } from '@/media/movieSplits'
 import { TitleFavourites } from '@/media/titleFavourites'
 import { ViewingAccounts } from '@/media/viewingAccounts'
@@ -261,6 +262,7 @@ export class AppModule {
         HeroRepository,
         HeroSelection,
         MovieSplits,
+        DolbyVisionOnly,
         ViewingAdoption,
         ViewingAccounts,
         ViewingRepository,

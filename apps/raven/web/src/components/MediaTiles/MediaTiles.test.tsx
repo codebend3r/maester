@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test'
 import { cleanup, screen, within } from '@testing-library/react'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
 import { POSTER_SIZES } from '@/lib/posters'
-import { matchedMovie, mediaItem } from '@/test/fixtures'
+import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { atPixelRatio, restorePixelRatio } from '@/test/pixelRatio'
 import { renderWithProviders } from '@/test/render'
 import { reported } from '@/test/viewport'
@@ -33,6 +33,18 @@ describe('MediaTiles', () => {
     expect(poster).toHaveAttribute('src', '/api/pictures/items/40/poster/p1')
     expect(poster?.getAttribute('srcset')).toContain('/api/pictures/items/40/poster/p1?w=185 185w')
     expect(poster).toHaveAttribute('sizes', POSTER_SIZES.movieTile)
+  })
+
+  it("draws the poster it is given in place of an episode's frame grab, the title still the episode's", async () => {
+    const show = itemSummary({ id: 4, type: 'show', title: 'Severance', posterVersion: 's1' })
+    const { container } = renderWithProviders({
+      ui: (
+        <MediaTiles items={[mediaItem({ folder: 'Severance/Season 1' })]} posterOf={() => show} />
+      ),
+    })
+    await reported()
+    expect(container.querySelector('img')).toHaveAttribute('src', '/api/pictures/items/4/poster/s1')
+    expect(screen.getByRole('link', { name: 'Busboys (2026)' })).toHaveAttribute('href', '/watch/7')
   })
 
   it('keeps the widths at 3x, where a tile poster 56 px wide needs no more than 185', () => {

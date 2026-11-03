@@ -230,6 +230,7 @@ describe('LibraryPage select mode', () => {
         furthest: 100,
         watched: true,
         marked: false,
+        poster: null,
       },
     ])
     open({ kind: 'movies', route: '/libraries/2/finished' })

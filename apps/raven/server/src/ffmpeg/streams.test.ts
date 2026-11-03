@@ -37,7 +37,13 @@ describe('parseStreams', () => {
       ],
     })
     expect(streams).toEqual({
-      video: { codec: 'h264', profile: 'High', bitrate: 11_100_000, range: 'sdr' },
+      video: {
+        codec: 'h264',
+        profile: 'High',
+        bitrate: 11_100_000,
+        range: 'sdr',
+        isDolbyVisionOnly: false,
+      },
       audio: [
         {
           index: 0,
@@ -77,6 +83,33 @@ describe('parseStreams', () => {
     ).toBe(range)
   })
 
+  it.each([
+    [0, true],
+    [1, false],
+    [4, false],
+    [6, false],
+  ])(
+    'reads a Dolby Vision base layer of compatibility %d as needing Dolby Vision: %s',
+    (compatibility, isOnly) => {
+      const video = parseStreams({
+        streams: [
+          {
+            codec_type: 'video',
+            codec_name: 'hevc',
+            side_data_list: [
+              {
+                side_data_type: 'DOVI configuration record',
+                dv_bl_signal_compatibility_id: compatibility,
+              },
+            ],
+          },
+        ],
+      }).video
+      expect(video?.range).toBe('dolbyVision')
+      expect(video?.isDolbyVisionOnly).toBe(isOnly)
+    },
+  )
+
   it('leaves out what ffprobe does not know', () => {
     expect(
       parseStreams({
@@ -86,7 +119,13 @@ describe('parseStreams', () => {
         ],
       }),
     ).toEqual({
-      video: { codec: null, profile: null, bitrate: null, range: 'sdr' },
+      video: {
+        codec: null,
+        profile: null,
+        bitrate: null,
+        range: 'sdr',
+        isDolbyVisionOnly: false,
+      },
       audio: [
         { index: 0, codec: null, profile: null, channels: null, bitrate: null, sampleRate: null },
       ],

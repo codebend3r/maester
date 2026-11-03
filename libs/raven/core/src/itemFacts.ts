@@ -8,11 +8,12 @@ import {
   type MediaItem,
   type MediaTracks,
   type SeasonSummary,
+  VIDEO_RANGES,
 } from '@/contract'
 import { formatBitrate, formatBytes, formatChannels, formatRuntime } from '@/format'
 import { languageName } from '@/languageName'
 import { resolutionLabel } from '@/media'
-import { codecLabel } from '@/playback'
+import { VIDEO_RANGE_LABELS, codecLabel } from '@/playback'
 import { plural } from '@/plural'
 
 const present = (facts: ReadonlyArray<string | null>): string[] =>
@@ -163,11 +164,51 @@ const audioFact = ({ codec, channels, language }: AudioFactProps): string => {
     : [name, bracketed].filter((part): part is string => part != null).join(' ')
 }
 
+/**
+ * How the facts name a file's high range of light from what the scan keeps:
+ * Dolby Vision profile 5, which a browser cannot show, or any other HDR.
+ */
+export const PICTURE_RANGES = { hdr: 'HDR', dolbyVisionOnly: 'DV5' } as const
+
+type RangeLabelProps = Pick<MediaItem, 'hdr' | 'isDolbyVisionOnly'>
+
+/** A file's range as its facts name it (`DV5`, `HDR`), or null for SDR. */
+export const rangeLabel = ({ hdr, isDolbyVisionOnly }: RangeLabelProps): string | null => {
+  if (!!isDolbyVisionOnly) return PICTURE_RANGES.dolbyVisionOnly
+  return hdr ? PICTURE_RANGES.hdr : null
+}
+
+/** Every name a high range of light goes by in the facts: the scan's, and the probe's own. */
+const HDR_RANGES: ReadonlySet<string> = new Set([
+  ...Object.values(PICTURE_RANGES),
+  VIDEO_RANGE_LABELS[VIDEO_RANGES.hdr10],
+  VIDEO_RANGE_LABELS[VIDEO_RANGES.hlg],
+  VIDEO_RANGE_LABELS[VIDEO_RANGES.dolbyVision],
+])
+
+/** The codec a video fact names in brackets after its resolution, as `fileFacts` writes it: `(HEVC) HDR`. */
+const BRACKETED_CODEC = /^\(([^)]+)\)\s*/
+
+/** What a video fact says after its resolution: its codec, its range, and any other words. */
+type PictureRest = { codec: string | null; range: string | null; words: string | null }
+
+/** Reads `splitResolution`'s rest of a video fact back into its codec, its range and the rest. */
+export const splitPictureRest = (rest: string | null): PictureRest => {
+  const bracketed = BRACKETED_CODEC.exec(rest ?? '')
+  const after = (rest ?? '').slice(bracketed?.[0].length ?? 0)
+  const isRange = HDR_RANGES.has(after)
+  return {
+    codec: bracketed?.[1] ?? null,
+    range: isRange ? after : null,
+    words: isRange || after === '' ? null : after,
+  }
+}
+
 /** The file's video, audio and subtitles, as the tracks the scan stored describe them. */
 export const fileFacts = ({ media, tracks }: FileFactsProps): FileFact[] => {
   const resolution = resolutionLabel(media)
   const codec = media.videoCodec ? codecLabel(media.videoCodec) : null
-  const video = [resolution, codec == null ? null : `(${codec})`, media.hdr ? 'HDR' : null]
+  const video = [resolution, codec == null ? null : `(${codec})`, rangeLabel(media)]
     .filter((part): part is string => part != null)
     .join(' ')
   // Every track, the default first; a file whose tracks are unknown is its own codec alone.
@@ -195,7 +236,7 @@ export const fileFacts = ({ media, tracks }: FileFactsProps): FileFact[] => {
 export const versionFacts = (media: MediaItem): string[] =>
   [
     resolutionLabel(media),
-    media.hdr ? 'HDR' : null,
+    rangeLabel(media),
     media.videoCodec ? codecLabel(media.videoCodec) : null,
     formatBytes(media.size),
   ].filter((fact): fact is string => fact != null && fact !== '')
@@ -266,11 +307,16 @@ export const episodesWatched = (
   total: episodes.length,
 })
 
-/** An episode row's air date and length, the file's own where it has been probed. */
+/**
+ * An episode row's air date and length, the file's own where it has been
+ * probed, and `DV5` where its file is Dolby Vision profile 5, which a browser
+ * plays purple and green.
+ */
 export const episodeRowFacts = (episode: EpisodeSummary): string[] =>
   present([
     formatAirDate(episode.released),
     runtimeFact({ file: episode.primary ?? undefined, runtime: episode.runtime }),
+    !!episode.primary?.isDolbyVisionOnly ? PICTURE_RANGES.dolbyVisionOnly : null,
   ])
 
 type EpisodeStillUrlProps = {

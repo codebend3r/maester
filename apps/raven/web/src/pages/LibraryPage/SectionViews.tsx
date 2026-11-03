@@ -1,6 +1,7 @@
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import {
   type AiSuggestion,
+  type DolbyVisionOnlyListing,
   emptyListingMessage,
   finishedNote,
   isScanning,
@@ -32,6 +33,7 @@ import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { LibraryToolbar, ShowLevelPicker } from '@/components/LibraryToolbar/LibraryToolbar'
 import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
+import { ShowGrid } from '@/components/ShowCard/ShowCard'
 import { PlayButtons } from '@/components/PlayButtons/PlayButtons'
 import { SagaDecks } from '@/components/SagaDeck/SagaDeck'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
@@ -48,6 +50,7 @@ import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import { cannotManageNote, useManagement } from '@/lib/management'
 import {
+  dolbyVisionOnlyQuery,
   duplicatesQuery,
   historyQuery,
   inProgressQuery,
@@ -574,6 +577,54 @@ const DuplicatesSection = ({ library }: DuplicatesSectionProps) => {
   )
 }
 
+type DolbyVisionOnlyListingViewProps = { library: Library; listing: DolbyVisionOnlyListing }
+
+/** Why the tab is there, then its shows, each with how many episodes are profile 5, then its other files. */
+const DolbyVisionOnlyListingView = ({ library, listing }: DolbyVisionOnlyListingViewProps) => {
+  const counts = new Map(listing.shows.map(({ entry, episodes }) => [entry.show.id, episodes]))
+  return (
+    <>
+      <p className={styles.message}>{LIBRARY_COPY.dolbyVisionOnlyNote}</p>
+      {listing.shows.length > 0 && (
+        <ShowGrid
+          shows={listing.shows.map(({ entry }) => entry)}
+          note={(entry) =>
+            LIBRARY_COPY.dolbyVisionOnlyEpisodes({
+              count: counts.get(entry.show.id) ?? 0,
+              total: entry.episodes,
+            })
+          }
+        />
+      )}
+      {listing.files.length > 0 && <EntryGrid library={library} entries={listing.files} />}
+    </>
+  )
+}
+
+type DolbyVisionOnlySectionProps = { library: Library }
+
+/**
+ * What in the library is Dolby Vision profile 5, which a browser plays
+ * purple and green: its shows, with how many of their episodes are, and its
+ * other such files, each wearing the DV5 chip.
+ */
+const DolbyVisionOnlySection = ({ library }: DolbyVisionOnlySectionProps) => {
+  const query = useQuery(dolbyVisionOnlyQuery(library.id))
+  return (
+    <SectionBody
+      query={query}
+      shape={<MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />}
+      empty={(listing) =>
+        listing.shows.length + listing.files.length === 0
+          ? LIBRARY_COPY.dolbyVisionOnlyEmpty(library.name)
+          : null
+      }
+    >
+      {(listing) => <DolbyVisionOnlyListingView library={library} listing={listing} />}
+    </SectionBody>
+  )
+}
+
 type FinishedSectionProps = { library: Library }
 
 /** What was watched to the end most recently, with a way to the whole history. */
@@ -595,12 +646,14 @@ const FinishedSection = ({ library }: FinishedSectionProps) => {
     >
       {(entries) => {
         const notes = new Map(entries.map((entry) => [entry.media.id, finishedNote({ entry })]))
+        const posters = new Map(entries.map(({ media, poster }) => [media.id, poster ?? null]))
         return (
           <SelectableCards entries={entries.map(({ media }) => mediaEntryOf(media))}>
             <MediaTiles
               items={entries.map((entry) => entry.media)}
               note={(media) => notes.get(media.id) ?? null}
               posters={matchType === ITEM_TYPES.movie}
+              posterOf={(media) => posters.get(media.id) ?? null}
               matchType={matchType}
             />
             <ButtonLink
@@ -631,6 +684,7 @@ const SECTION_VIEWS = {
   [LIBRARY_SECTIONS.sagas]: SagasSection,
   [LIBRARY_SECTIONS.notMatched]: NotMatchedSection,
   [LIBRARY_SECTIONS.duplicates]: DuplicatesSection,
+  [LIBRARY_SECTIONS.dolbyVisionOnly]: DolbyVisionOnlySection,
   [LIBRARY_SECTIONS.finished]: FinishedSection,
 } as const satisfies Record<LibrarySection, ComponentType<SectionProps>>
 

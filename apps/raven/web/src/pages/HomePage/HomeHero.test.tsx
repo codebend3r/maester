@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
-import { RESOLUTIONS, watchLink } from '@raven/core'
+import { PICTURE_RANGES, RESOLUTIONS, watchLink } from '@raven/core'
 import { type Featured } from '@/pages/HomePage/featured'
 import { HERO_MS, HomeHero, LESS_MOTION, titleSize } from '@/pages/HomePage/HomeHero'
 import { matchedMovie } from '@/test/fixtures'
@@ -13,7 +13,7 @@ const arrival = (id: number): Featured => ({
   eyebrow: 'Featured in Films',
   title: `Movie ${id}`,
   facts: ['2024', '2h 46m'],
-  picture: { resolution: RESOLUTIONS.uhd, isHdr: true },
+  picture: { resolution: RESOLUTIONS.uhd, range: PICTURE_RANGES.hdr },
   line: `What happens in ${id}.`,
   play: watchLink({ media: matchedMovie({ id }) }),
   details: `/movies/${id + 100}?library=2`,

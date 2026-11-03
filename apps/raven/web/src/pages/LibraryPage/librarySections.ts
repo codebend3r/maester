@@ -26,6 +26,7 @@ export const LIBRARY_SECTIONS = {
   sagas: 'sagas',
   notMatched: 'not-matched',
   duplicates: 'duplicates',
+  dolbyVisionOnly: 'dolby-vision',
   finished: 'finished',
 } as const
 
@@ -68,6 +69,7 @@ export const SECTIONS = {
     isFor: listsFiles,
     tally: 'itemCount',
     most: null,
+    onlyWhenAny: false,
   },
   albums: {
     label: LIBRARY_COPY.sectionLabels.albums,
@@ -75,6 +77,7 @@ export const SECTIONS = {
     isFor: listsAlbums,
     tally: null,
     most: null,
+    onlyWhenAny: false,
   },
   artists: {
     label: LIBRARY_COPY.sectionLabels.artists,
@@ -82,6 +85,7 @@ export const SECTIONS = {
     isFor: listsAlbums,
     tally: null,
     most: null,
+    onlyWhenAny: false,
   },
   // The account's own playlists, which span every music library it may see.
   playlists: {
@@ -90,6 +94,7 @@ export const SECTIONS = {
     isFor: listsAlbums,
     tally: null,
     most: null,
+    onlyWhenAny: false,
   },
   'unmatched-albums': {
     label: LIBRARY_COPY.sectionLabels.unmatchedAlbums,
@@ -97,6 +102,7 @@ export const SECTIONS = {
     isFor: listsAlbums,
     tally: null,
     most: null,
+    onlyWhenAny: false,
   },
   'in-progress': {
     label: LIBRARY_COPY.sectionLabels.inProgress,
@@ -104,6 +110,7 @@ export const SECTIONS = {
     isFor: always,
     tally: 'inProgress',
     most: null,
+    onlyWhenAny: false,
   },
   favourites: {
     label: LIBRARY_COPY.sectionLabels.favourites,
@@ -111,6 +118,7 @@ export const SECTIONS = {
     isFor: always,
     tally: 'favourites',
     most: null,
+    onlyWhenAny: false,
   },
   sagas: {
     label: LIBRARY_COPY.sectionLabels.sagas,
@@ -118,6 +126,7 @@ export const SECTIONS = {
     isFor: matchedToMovies,
     tally: 'sagas',
     most: null,
+    onlyWhenAny: false,
   },
   'not-matched': {
     label: LIBRARY_COPY.sectionLabels.notMatched,
@@ -125,6 +134,7 @@ export const SECTIONS = {
     isFor: matchedFiles,
     tally: 'unmatchedCount',
     most: null,
+    onlyWhenAny: false,
   },
   duplicates: {
     label: LIBRARY_COPY.sectionLabels.duplicates,
@@ -132,6 +142,16 @@ export const SECTIONS = {
     isFor: matchedToMovies,
     tally: 'duplicates',
     most: null,
+    onlyWhenAny: false,
+  },
+  // What a browser plays purple and green; the tab is there only while the library holds some.
+  'dolby-vision': {
+    label: LIBRARY_COPY.sectionLabels.dolbyVisionOnly,
+    icon: 'sun',
+    isFor: listsFiles,
+    tally: 'dolbyVisionOnly',
+    most: null,
+    onlyWhenAny: true,
   },
   finished: {
     label: LIBRARY_COPY.sectionLabels.finished,
@@ -139,6 +159,7 @@ export const SECTIONS = {
     isFor: always,
     tally: 'finished',
     most: FINISHED_LIMIT,
+    onlyWhenAny: false,
   },
 } as const satisfies Record<
   LibrarySection,
@@ -149,6 +170,8 @@ export const SECTIONS = {
     /** The count beside the tab; null for a tab that shows none. */
     tally: keyof Tallies | null
     most: number | null
+    /** Whether the tab shows only once its tally is more than none. */
+    onlyWhenAny: boolean
   }
 >
 
@@ -178,6 +201,15 @@ export const hasSection = ({ kind, section }: HasSectionProps): boolean =>
 
 export const sectionsFor = (kind: LibraryKind): LibrarySection[] =>
   Object.values(LIBRARY_SECTIONS).filter((section) => hasSection({ kind, section }))
+
+type IsListedProps = { section: LibrarySection; tallies: Partial<Tallies> }
+
+/** Whether a tab of the library shows beside the others: always, or once its tally holds any. */
+export const isListed = ({ section, tallies }: IsListedProps): boolean => {
+  const { onlyWhenAny, tally } = SECTIONS[section]
+  if (!onlyWhenAny) return true
+  return tally != null && (tallies[tally] ?? 0) > 0
+}
 
 type SectionPathProps = {
   libraryId: number

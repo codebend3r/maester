@@ -197,7 +197,7 @@ describe('MoviePage', () => {
     open({ details: itemDetails() })
     expect(await screen.findByText('English (Dolby Digital Plus 5.1)')).toBeInTheDocument()
     expect(screen.getByLabelText('Video resolution: 1080p')).toHaveTextContent('1080p')
-    expect(screen.getByText('(HEVC)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Video codec: HEVC')).toHaveTextContent('HEVC')
     expect(screen.getByText('English, Spanish')).toBeInTheDocument()
   })
 

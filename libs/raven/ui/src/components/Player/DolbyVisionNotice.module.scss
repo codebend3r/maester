@@ -1,0 +1,75 @@
+// A see-through layer over the stage whose padding parks the notice top left, under the title
+// bar and clear of the control bar and of the keyboard tip, which sits top right.
+.layer {
+  grid-area: stage;
+  position: relative;
+  z-index: 3;
+  display: grid;
+  align-items: start;
+  justify-items: start;
+  padding: calc(var(--space-8) + var(--space-4) + var(--titlebar-inset)) var(--space-4)
+    var(--space-10);
+  pointer-events: none;
+}
+
+// Dark glass over the picture in every theme, as the keyboard tip is.
+.notice {
+  display: grid;
+  grid-template-areas:
+    'heading'
+    'body'
+    'dismiss';
+  gap: var(--space-3);
+  width: min(28rem, 100%);
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--color-picture-glass);
+  color: var(--color-on-picture);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: var(--filter-glass);
+  pointer-events: auto;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: rise 300ms var(--ease-out) backwards;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--space-2)));
+  }
+}
+
+.heading {
+  grid-area: heading;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.body {
+  grid-area: body;
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-on-picture-soft);
+  line-height: var(--line-body);
+}
+
+// Dark glass in every theme, so the ghost button wears the fixed ink of words on a picture.
+.notice .dismiss {
+  grid-area: dismiss;
+  justify-self: end;
+  color: var(--color-on-picture);
+  background: color-mix(in srgb, var(--color-on-picture) 10%, transparent);
+
+  &:hover:not(:disabled, [aria-disabled='true']) {
+    background: color-mix(in srgb, var(--color-on-picture) 20%, transparent);
+  }
+
+  &:focus-visible {
+    outline-color: var(--color-on-picture);
+  }
+}
