@@ -111,6 +111,33 @@ const homeContinueCount = (mode: string): number => {
   return count
 }
 
+/**
+ * The dependencies that change on their own schedule, each in a chunk of its
+ * own, so a release of the app leaves their cached chunks as they were and no
+ * chunk nears Vite's 500 kB warning. raven's own libraries make one more, and
+ * what two or more pages share a last one, so a page the browser fetches on
+ * its first visit (`AppRoutes`) brings no slivers of shared code with it.
+ */
+const VENDOR_CHUNKS = [
+  { name: 'react', packages: ['react', 'react-dom', 'scheduler'] },
+  { name: 'router', packages: ['react-router', 'react-router-dom'] },
+  { name: 'query', packages: ['@tanstack/react-query', '@tanstack/query-core'] },
+  { name: 'supabase', packages: ['@supabase'] },
+] as const
+
+/** Above rolldown's own chunking, which decides what is left. */
+const CHUNK_PRIORITIES = { vendor: 10, raven: 9, shared: 8 } as const
+
+/** A module's id with `/` between folders, whatever the build machine writes. */
+const posixId = (id: string) => id.replaceAll('\\', '/')
+
+const vendorChunkTest = (packages: readonly string[]) => (id: string) =>
+  packages.some((name) => posixId(id).includes(`/node_modules/${name}/`))
+
+const isRavenLib = (id: string) => posixId(id).includes('/libs/raven/')
+
+const isAppModule = (id: string) => !posixId(id).includes('/node_modules/')
+
 export default defineConfig(({ mode }) => ({
   plugins: [react(), netlifyApiProxy(), restartOnRavenEnv()],
   define: {
@@ -130,6 +157,33 @@ export default defineConfig(({ mode }) => ({
     // The Host header follows the target, as a raven behind a name expects.
     proxy: {
       '/api': { target: devApiOrigin(mode), changeOrigin: true },
+    },
+  },
+  build: {
+    // One stylesheet, so the cascade keeps the shared primitives before the host's overrides
+    // whichever chunk loads first; `main.styles.test.ts` checks that order.
+    cssCodeSplit: false,
+    rolldownOptions: {
+      // The build's time goes to sass over the SCSS modules; rolldown's note about it has nothing to act on.
+      checks: { bundlerTimings: false },
+      output: {
+        codeSplitting: {
+          groups: [
+            ...VENDOR_CHUNKS.map(({ name, packages }) => ({
+              name,
+              test: vendorChunkTest(packages),
+              priority: CHUNK_PRIORITIES.vendor,
+            })),
+            { name: 'raven', test: isRavenLib, priority: CHUNK_PRIORITIES.raven },
+            {
+              name: 'shared',
+              test: isAppModule,
+              minShareCount: 2,
+              priority: CHUNK_PRIORITIES.shared,
+            },
+          ],
+        },
+      },
     },
   },
 }))

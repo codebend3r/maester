@@ -158,33 +158,10 @@
         ]
       },
       "make": {
-        "cache": true,
+        "cache": false,
         "dependsOn": [
           "build",
           "stage:mpv"
-        ],
-        "inputs": [
-          "production",
-          "^production",
-          {
-            "dependentTasksOutputFiles": "**/*",
-            "transitive": true
-          },
-          {
-            "env": "RAVEN_SIGN_IDENTITY"
-          },
-          {
-            "env": "RAVEN_NOTARIZE_PROFILE"
-          },
-          {
-            "runtime": "xcodebuild -version"
-          },
-          {
-            "runtime": "uname -m"
-          }
-        ],
-        "outputs": [
-          "{projectRoot}/out"
         ]
       },
       "audit:bundle": {
