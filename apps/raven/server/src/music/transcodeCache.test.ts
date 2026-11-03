@@ -188,15 +188,21 @@ describe('the transcode cache', () => {
     expect(await readdir(dirname(served))).toEqual([basename(served)])
   })
 
-  it('serves the transcode with byte ranges, by ticket', async () => {
+  it('prepares a cold transcode with HEAD and serves it with byte ranges, by ticket', async () => {
     const { ticket } = await api().getMediaTicket(state.track)
     const url = apiFor({ app: app() }).transcodeUrl({
       mediaId: state.track,
       kbps: standard,
       access: ownAddress(ticket),
     })
+    const prepared = await app().inject({ method: 'HEAD', url })
+    expect(prepared.statusCode).toBe(200)
+    expect(prepared.rawPayload.length).toBe(0)
+    expect(await readdir(join(transcodes(), String(state.track)))).toHaveLength(1)
+
     const whole = await app().inject({ method: 'GET', url })
     expect(whole.statusCode).toBe(200)
+    expect(prepared.headers[HEADERS.contentLength]).toBe(whole.headers[HEADERS.contentLength])
     expect(whole.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.audioMp4)
     expect(Number(whole.headers[HEADERS.contentLength])).toBe(whole.rawPayload.length)
 

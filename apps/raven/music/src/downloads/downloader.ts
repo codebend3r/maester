@@ -1,9 +1,12 @@
+import { HTTP_METHODS } from '@raven/core'
 import { Directory, File, Paths } from 'expo-file-system'
 
 import { DOWNLOADS_FOLDER, type DownloadDisk } from '@/downloads/downloadStore'
 
 /** What a file is called while its bytes come in. */
 const PART_SUFFIX = '.part'
+
+const PREPARE_REQUEST = { method: HTTP_METHODS.head, credentials: 'omit' } as const
 
 const fileOf = (path: string): File => new File(Paths.document, path)
 
@@ -35,6 +38,9 @@ export const deviceDisk: DownloadDisk = {
     const part = fileOf(`${path}${PART_SUFFIX}`)
     file.parentDirectory.create({ intermediates: true, idempotent: true })
     try {
+      // React Native's fetch can wait for a cold transcode; iOS's file downloader times out after 60 s.
+      const prepared = await fetch(source.uri, { ...PREPARE_REQUEST, headers: source.headers })
+      if (!prepared.ok) throw new Error(`Could not prepare download (${prepared.status})`)
       await File.downloadFileAsync(source.uri, part, { headers: source.headers, idempotent: true })
       deleteIfThere(file)
       part.moveSync(file)
