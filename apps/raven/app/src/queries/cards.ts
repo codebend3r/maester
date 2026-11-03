@@ -93,7 +93,7 @@ type VideoTargetProps = { media: MediaItem; hasPages: boolean }
  * Where a video's card goes, as the web's card links decide: its item's page in the card's
  * library where `hasPages`, naming the file of a card a movie was split onto, else the player.
  */
-const videoTarget = ({ media, hasPages }: VideoTargetProps): RouteTarget => {
+export const videoTarget = ({ media, hasPages }: VideoTargetProps): RouteTarget => {
   const destination = cardDestination({ media, hasPages })
   switch (destination.kind) {
     case CARD_DESTINATIONS.page:

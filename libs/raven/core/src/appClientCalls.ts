@@ -25,6 +25,7 @@ export const APP_CLIENT_CALLS = {
   unlockAdmin: { method: post, path: '/api/admin/unlock' },
 
   getHome: { method: get, path: '/api/home' },
+  getHero: { method: get, path: '/api/home/hero' },
   searchHome: { method: get, path: '/api/home/search' },
   events: { method: get, path: '/api/events' },
   getPlaybackSettings: { method: get, path: '/api/settings/playback' },

@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { type Home as HomeAnswer, isRecord } from '@raven/core'
+import { type Hero, type Home as HomeAnswer, isRecord } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
-import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
+import { APP_ROUTES, APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf, itemTarget } from '@/routes'
 import { Home } from '@/screens/Home'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { FILMS, HOME, NAS, SPARSE, homeApi } from '@/test/homeServer'
+import { FILMS, HERO, HOME, NAS, SPARSE, homeApi } from '@/test/homeServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import type * as NavigationFocus from '@/test/navigationFocus'
@@ -24,9 +24,10 @@ import {
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 
 /** What Home's read waits on before it is answered, and what it answers when not the server's. */
-const mockHome: { answer: Promise<void>; home: HomeAnswer | null } = {
+const mockHome: { answer: Promise<void>; home: HomeAnswer | null; hero: Hero | null } = {
   answer: Promise.resolve(),
   home: null,
+  hero: null,
 }
 const mockApi = jest.fn((server: AppServer) => {
   const api = homeApi(server)
@@ -36,6 +37,7 @@ const mockApi = jest.fn((server: AppServer) => {
       await mockHome.answer
       return mockHome.home ?? api.getHome()
     },
+    getHero: async () => mockHome.hero ?? api.getHero(),
   }
 })
 
@@ -116,6 +118,7 @@ describe('Home on a TV', () => {
     resetTestScreen()
     mockHome.answer = Promise.resolve()
     mockHome.home = null
+    mockHome.hero = null
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
 
@@ -339,5 +342,87 @@ describe('Home on a TV', () => {
     await returnToTestScreen()
     expect(askedFor()).toEqual([])
     expect(preferred()).toEqual([BUSBOYS])
+  })
+})
+
+describe("Home's hero on a TV", () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    resetTestScreen()
+    mockHome.answer = Promise.resolve()
+    mockHome.home = null
+    mockHome.hero = HERO
+    useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
+    useReduceMotion.setState({ isReduced: true })
+  })
+
+  it('draws the first featured title over the shelves, with the focus on its Play', async () => {
+    await renderHome()
+    expect(await screen.findByText('FEATURED IN FILMS')).toBeTruthy()
+    expect(screen.getByText('A train runs all night.')).toBeTruthy()
+    expect(screen.getByText('1 / 2')).toBeTruthy()
+    expect(screen.getByRole('header', { name: 'Films' })).toBeTruthy()
+    expect(preferred()).toEqual(['Play Night Train'])
+  })
+
+  it('plays the title or opens its page', async () => {
+    await renderHome()
+    await fireEvent.press(await screen.findByRole('button', { name: 'Play Night Train' }))
+    expect(mockPush).toHaveBeenLastCalledWith(
+      hrefOf({ kind: ROUTE_TARGETS.play, mediaId: 21, at: 0 }),
+    )
+    await fireEvent.press(screen.getByRole('button', { name: 'Details for Night Train' }))
+    expect(mockPush).toHaveBeenLastCalledWith(
+      hrefOf({ kind: ROUTE_TARGETS.item, itemId: 41, libraryId: FILMS.id, fileId: null }),
+    )
+  })
+
+  it('steps to the next title by hand, a show with nothing left offering only its page', async () => {
+    await renderHome()
+    await fireEvent.press(await screen.findByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('FEATURED IN SERIES')).toBeTruthy()
+    expect(screen.getByText('2 / 2')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Play Pluribus' })).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: 'Details for Pluribus' }))
+    expect(mockPush).toHaveBeenLastCalledWith(hrefOf(itemTarget(5)))
+    await fireEvent.press(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('FEATURED IN FILMS')).toBeTruthy()
+  })
+
+  it('moves on by itself while the remote is elsewhere, and holds while it is on the hero', async () => {
+    await renderHome()
+    await screen.findByText('FEATURED IN FILMS')
+    jest.useFakeTimers()
+    try {
+      // Motion is allowed only now, so the hero's timer runs on the fake clock.
+      await act(async () => useReduceMotion.setState({ isReduced: false }))
+      await act(async () => jest.advanceTimersByTime(7000))
+      expect(screen.getByText('FEATURED IN SERIES')).toBeTruthy()
+      await fireEvent(screen.getByRole('button', { name: 'Next' }), NATIVE_EVENTS.focus)
+      await act(async () => jest.advanceTimersByTime(14000))
+      expect(screen.getByText('FEATURED IN SERIES')).toBeTruthy()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('stands still when the system asks for less motion', async () => {
+    await renderHome()
+    await screen.findByText('FEATURED IN FILMS')
+    jest.useFakeTimers()
+    try {
+      await act(async () => jest.advanceTimersByTime(14000))
+      expect(screen.getByText('FEATURED IN FILMS')).toBeTruthy()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('leaves the shelves at the top, the first card focused, when there is nothing to feature', async () => {
+    mockHome.hero = []
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    expect(screen.queryByText('FEATURED IN FILMS')).toBeNull()
+    expect(preferred()).toEqual(['Busboys'])
   })
 })

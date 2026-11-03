@@ -14,6 +14,8 @@ import { touchSearch } from '@/layouts/Search.touch'
 import { touchPicker } from '@/layouts/Picker.touch'
 import { focusShelf } from '@/layouts/Shelf.focus'
 import { touchShelf } from '@/layouts/Shelf.touch'
+import { focusHero } from '@/layouts/HomeHero.focus'
+import { touchHero } from '@/layouts/HomeHero.touch'
 import { touchForm } from '@/layouts/Form.touch'
 import { focusLoading } from '@/layouts/Loading.focus'
 import { focusMusic } from '@/layouts/Music.focus'
@@ -34,6 +36,9 @@ export const { Form, Field, FormButton, useFormStyles } = Platform.isTV ? focusF
 
 /** Home's shelves: rows the remote moves along on a TV, rows under the thumb everywhere else. */
 export const { Shelves, Shelf } = Platform.isTV ? focusShelf : touchShelf
+
+/** Home's hero over its shelves: the featured titles in turn on a TV, nothing yet under the thumb. */
+export const { HomeHero } = Platform.isTV ? focusHero : touchHero
 
 /** A library's grid: rows the remote moves through on a TV, columns under the thumb elsewhere. */
 export const { Grid } = Platform.isTV ? focusGrid : touchGrid

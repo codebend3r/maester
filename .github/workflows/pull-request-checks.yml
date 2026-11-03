@@ -23,8 +23,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The checks `bun run verify` runs before the build, one target per runner so
-  # they execute in parallel and each has its own named log. Nx Cloud still shares
+  # The checks `bun run verify` runs before the build, and the web's browser end to end
+  # suite, which `verify` leaves out, one target per runner so they execute in parallel and
+  # each has its own named log. Nx Cloud still shares
   # completed tasks between jobs through its remote cache.
   checks:
     name: ${{ matrix.check.name }}
@@ -63,6 +64,12 @@ jobs:
           - name: 📸 Screen tests
             target: test:screens
             node: true
+          # raven's web app in Google Chrome, which the runner image has, against the server's
+          # fixture, which encodes its clips with ffmpeg.
+          - name: 🌐 Web end to end
+            target: e2e:browser
+            ffmpeg: true
+            traces: apps/raven/web/test-results
           - name: 🧹 Dead code
             target: dead-code
           - name: 🧼 Dead CSS
@@ -137,6 +144,15 @@ jobs:
           else
             bunx nx run-many --outputStyle=static -t "$TARGET"
           fi
+
+      # Playwright keeps a failed test's trace, which shows each step's page.
+      - name: 📤 Upload the end to end traces
+        if: failure() && matrix.check.traces
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-traces-${{ github.sha }}
+          path: ${{ matrix.check.traces }}
+          if-no-files-found: ignore
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.
       # A fork's read-only token can't cancel, which is why this never fails the job.

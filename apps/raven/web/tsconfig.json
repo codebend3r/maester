@@ -2,8 +2,9 @@
   "extends": "../../../tooling/tsconfig/react.json",
   "compilerOptions": {
     "paths": {
+      "@/e2e/*": ["./e2e/*"],
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "vite.config.ts", "../../../tooling/web"]
+  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts", "../../../tooling/web"]
 }

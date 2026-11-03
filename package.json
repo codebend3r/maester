@@ -71,7 +71,8 @@
     "typecheck": "nx run-many -t typecheck",
     "typescript-only": "nx run maester:typescript-only",
     "verify": "nx run-many -t spellcheck typescript-only one-command-per-script dead-code dead-css lint:py lint:ts lint:css format:check typecheck test test:screens build",
-    "verify:uncached": "bun run verify --skip-nx-cache"
+    "verify:uncached": "bun run verify --skip-nx-cache",
+    "web:e2e": "nx run @raven/web:e2e:browser"
   },
   "devDependencies": {
     "knip": "6.41.0",

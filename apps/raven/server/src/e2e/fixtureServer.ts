@@ -2,8 +2,9 @@ import { randomBytes } from 'node:crypto'
 import { rmSync } from 'node:fs'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { constants, tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { LIBRARY_KINDS } from '@raven/core'
+import { join, resolve } from 'node:path'
+import { FIXTURE_SERVER, LIBRARY_KINDS } from '@raven/core'
+import { wholeNumber } from '@shared/server'
 import { createApp } from '@/app'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
@@ -22,45 +23,44 @@ import { apiFor } from '@/test/server'
  * MusicBrainz release, so the album keeps its tags and no request leaves the Mac. The music
  * library is neither pinned nor in the hero, so the device app's Home is as it was without it.
  * It listens on a fixed port on the loopback, which the iOS and tvOS simulators share with the
- * Mac, and lives until it is stopped.
+ * Mac, and lives until it is stopped. The web's browser suite starts it on a port of its own
+ * with the built web app's folder, which it then serves beside its API, as raven's image does.
  */
 const FIXTURE = {
-  host: '127.0.0.1',
-  port: 8490,
-  movie: { library: 'Films', folder: 'Kestrel Point (2024)', file: 'Kestrel Point (2024).mkv' },
+  movie: { folder: 'Kestrel Point (2024)', file: 'Kestrel Point (2024).mkv' },
   show: {
-    library: 'Series',
     folder: join('Lantern Bay', 'Season 1'),
     file: 'Lantern Bay - S01E01 - Low Tide.mkv',
     direct: 'Lantern Bay - S01E02 - High Water.mp4',
     sidecar: 'Lantern Bay - S01E02 - High Water.en.srt',
   },
   album: {
-    library: 'Music',
-    folder: join('The Fixture Birds', 'Morning Chorus'),
+    folder: join(FIXTURE_SERVER.album.artist, FIXTURE_SERVER.album.title),
     tags: {
-      album: 'Morning Chorus',
-      album_artist: 'The Fixture Birds',
-      artist: 'The Fixture Birds',
+      album: FIXTURE_SERVER.album.title,
+      album_artist: FIXTURE_SERVER.album.artist,
+      artist: FIXTURE_SERVER.album.artist,
       date: '2024',
     },
     // Long enough that a flow reads the bar before the track ends and the next one starts.
     seconds: 20,
-    tracks: ['First Light', 'Dawn Song', 'Open Sky'],
   },
 } as const
 
+const fixtureWebDir = process.env[FIXTURE_SERVER.env.webDir]?.trim() ?? ''
+const fixturePort = wholeNumber(process.env[FIXTURE_SERVER.env.port]) ?? FIXTURE_SERVER.appPort
+
 const tmdb = fakeTmdb({
-  movies: [{ id: 9001, title: 'Kestrel Point', released: '2024-03-08' }],
+  movies: [{ id: 9001, title: FIXTURE_SERVER.movie.title, released: '2024-03-08' }],
   shows: [
     {
       id: 9002,
-      title: 'Lantern Bay',
+      title: FIXTURE_SERVER.show.title,
       first: '2024-01-05',
       seasons: {
         1: [
-          { number: 1, title: 'Low Tide', aired: '2024-01-05' },
-          { number: 2, title: 'High Water', aired: '2024-01-12' },
+          { number: 1, title: FIXTURE_SERVER.show.episodes[0], aired: '2024-01-05' },
+          { number: 2, title: FIXTURE_SERVER.show.episodes[1], aired: '2024-01-12' },
         ],
       },
     },
@@ -95,7 +95,7 @@ const serve = async (): Promise<string> => {
   const music = join(media, 'music')
   const { album } = FIXTURE
   await Promise.all([
-    ...album.tracks.map((title, index) =>
+    ...FIXTURE_SERVER.album.tracks.map((title, index) =>
       encodeTrack({
         path: join(music, album.folder, `0${index + 1} ${title}.flac`),
         seconds: album.seconds,
@@ -114,9 +114,13 @@ const serve = async (): Promise<string> => {
 
   const app = await createApp({
     config: {
-      ...testConfig({ dataDir: join(root, 'data'), mediaDir: media }),
-      host: FIXTURE.host,
-      port: FIXTURE.port,
+      ...testConfig({
+        dataDir: join(root, 'data'),
+        mediaDir: media,
+        webDir: fixtureWebDir === '' ? null : resolve(fixtureWebDir),
+      }),
+      host: FIXTURE_SERVER.host,
+      port: fixturePort,
       tmdbApiToken: 'fixture-token',
       mediaPlane: {
         origins: [],
@@ -130,22 +134,22 @@ const serve = async (): Promise<string> => {
     metadataFetch: tmdb.fetch,
   })
   hasShutdownHook = true
-  await app.listen({ host: FIXTURE.host, port: FIXTURE.port })
+  await app.listen({ host: FIXTURE_SERVER.host, port: fixturePort })
 
   const api = apiFor({ app, cookie: await adminCookie(app) })
   const libraries = await Promise.all([
     api.createLibrary({
-      name: FIXTURE.movie.library,
+      name: FIXTURE_SERVER.movie.library,
       paths: [movies],
       settings: { kind: LIBRARY_KINDS.movies },
     }),
     api.createLibrary({
-      name: FIXTURE.show.library,
+      name: FIXTURE_SERVER.show.library,
       paths: [shows],
       settings: { kind: LIBRARY_KINDS.shows },
     }),
     api.createLibrary({
-      name: album.library,
+      name: FIXTURE_SERVER.album.library,
       paths: [music],
       settings: { kind: LIBRARY_KINDS.music, pinned: false, inHero: false },
     }),
@@ -153,7 +157,7 @@ const serve = async (): Promise<string> => {
   await Promise.all(libraries.map((library) => app.get(ScannerService).whenIdle(library.id)))
   await app.get(MetadataService).whenIdle()
   await app.get(ThumbnailService).whenIdle()
-  return `http://${FIXTURE.host}:${FIXTURE.port}`
+  return `http://${FIXTURE_SERVER.host}:${fixturePort}`
 }
 
 // A failed start (an encode, the port taken, a library refused) leaves no folder behind.
