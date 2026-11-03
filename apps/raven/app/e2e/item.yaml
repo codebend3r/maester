@@ -23,7 +23,7 @@ tags:
 - extendedWaitUntil:
     visible: Mark watched
     timeout: 10000
-- tapOn: Back
+- runFlow: steps/back.yaml
 # A show lists its seasons, and a season its episodes, each opening its page.
 - extendedWaitUntil:
     visible: Lantern Bay

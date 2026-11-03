@@ -42,7 +42,7 @@ tags:
 - assertVisible: Position
 - assertVisible: Back 10 seconds
 - assertVisible: Forward 10 seconds
-- tapOn: Back
+- runFlow: steps/back.yaml
 # The film is a minute long and a tap on a playing video can take several seconds to settle, so
 # the server may already count it watched by the pause. Either way the page is back, and a watched
 # film has its mark taken off first, so the marks below start from the same place.
