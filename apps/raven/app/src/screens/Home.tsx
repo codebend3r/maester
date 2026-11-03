@@ -3,32 +3,37 @@ import { useRouter } from 'expo-router'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import type { ShelfCard } from '@/queries/cards'
+import { type HeroSlide, heroSlidesOf } from '@/queries/heroSlides'
 import { type ShelfView, homeShelvesOf } from '@/queries/homeShelves'
 import { showArtIdsOf } from '@/queries/showArt'
 import { pinnedLibrariesOf } from '@/queries/pinnedLibraries'
 import { useShowArts } from '@/queries/useShowArts'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
-import { Loading, Shelf, Shelves } from '@/layouts'
+import { HomeHero, Loading, Shelf, Shelves } from '@/layouts'
 import type { LoadingProps } from '@/layouts/loadingKit'
 import type { ShelvesProps } from '@/layouts/shelfKit'
-import { APP_ROUTES, ROUTE_TARGETS, hrefOf } from '@/routes'
+import { APP_ROUTES, ROUTE_TARGETS, type RouteTarget, hrefOf } from '@/routes'
 import { HOME_COPY } from '@/screens/copy'
 
 type HomeShelvesProps = {
+  /** The titles the hero takes turns with, over the shelves; none leaves the shelves at the top. */
+  slides: readonly HeroSlide[]
   shelves: readonly ShelfView[]
   notice: string | null
   libraries: ShelvesProps['libraries']
 }
 
-/** Home's shelves beside the side menu, the focus on the first card. */
-const HomeShelves = ({ shelves, notice, libraries }: HomeShelvesProps) => {
+/** Home's hero and shelves beside the side menu, the focus on the hero's Play, else the first card. */
+const HomeShelves = ({ slides, shelves, notice, libraries }: HomeShelvesProps) => {
   const router = useRouter()
+  const hasHero = slides.length > 0
 
-  // Focus starts on a card, so on the first shelf that has one.
-  const focusShelf = shelves.findIndex(({ cards }) => cards.length > 0)
+  // Focus starts on the hero, else on a card, so on the first shelf that has one.
+  const focusShelf = hasHero ? -1 : shelves.findIndex(({ cards }) => cards.length > 0)
 
-  const open = ({ target }: ShelfCard) => router.push(hrefOf(target))
+  const go = (target: RouteTarget) => router.push(hrefOf(target))
+  const open = ({ target }: ShelfCard) => go(target)
 
   const openLibrary = (libraryId: number) =>
     router.push(hrefOf({ kind: ROUTE_TARGETS.library, libraryId, query: '' }))
@@ -42,6 +47,7 @@ const HomeShelves = ({ shelves, notice, libraries }: HomeShelvesProps) => {
       onSettings={() => router.push(APP_ROUTES.settings)}
       title={HOME_COPY.title}
     >
+      {hasHero && <HomeHero key="hero" isPreferred onOpen={go} slides={slides} />}
       {shelves.map((shelf, index) => (
         <Shelf
           key={shelf.key}
@@ -72,6 +78,7 @@ type ServerHomeProps = { session: AppQueries }
 
 const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
   const home = useQuery(queries.homeQuery)
+  const hero = useQuery(queries.heroQuery)
   const libraries = useQuery(queries.librariesQuery)
   const pictures = usePictures({ server, api })
   const arts = useShowArts({
@@ -84,9 +91,14 @@ const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
     home.data === undefined || libraries.data === undefined || pictures === null
       ? []
       : homeShelvesOf({ home: home.data, libraries: libraries.data, arts, ...pictures })
+  const slides =
+    hero.data === undefined || libraries.data === undefined || pictures === null
+      ? []
+      : heroSlidesOf({ hero: hero.data, libraries: libraries.data, ...pictures })
   const failure = home.error ?? libraries.error
   const isBare = home.isSuccess && libraries.isSuccess && pictures !== null && shelves.length === 0
-  const isLoading = failure === null && !isBare && shelves.length === 0
+  // The hero is waited for, so its Play is there to take the opening focus; one that fails is left out.
+  const isLoading = failure === null && ((!isBare && shelves.length === 0) || hero.isPending)
   const notice = ((): string | null => {
     if (failure !== null) return failure.message
     return isBare ? HOME_COPY.bare : null
@@ -96,7 +108,10 @@ const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
 
   const view: ViewOf<HomeViewProps> = isLoading
     ? { key: HOME_VIEW_KEYS.loading, props: { label: HOME_COPY.loading } }
-    : { key: HOME_VIEW_KEYS.shelves, props: { shelves, notice, libraries: pinnedLibraries } }
+    : {
+        key: HOME_VIEW_KEYS.shelves,
+        props: { slides, shelves, notice, libraries: pinnedLibraries },
+      }
   return <KeyedView<HomeViewProps> view={view} views={HOME_VIEWS} />
 }
 

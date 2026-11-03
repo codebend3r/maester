@@ -11,6 +11,7 @@ import {
   RATINGS_REFRESH_STATES,
   SCAN_KINDS,
   SCAN_STATES,
+  type Hero,
   type Home,
   ITEM_TYPES,
   LIBRARY_KINDS,
@@ -113,6 +114,32 @@ export const HOME: Home = {
     },
   ],
 }
+
+/** The hero a test hands Home: a film with its line, then a show with nothing left to watch. */
+export const HERO: Hero = [
+  {
+    libraryId: FILMS.id,
+    type: HOME_SHELF_TYPES.media,
+    media: NIGHT_TRAIN,
+    line: 'A train runs all night.',
+  },
+  {
+    libraryId: SERIES.id,
+    type: HOME_SHELF_TYPES.shows,
+    entry: {
+      show: summaryFor({ id: 5, type: ITEM_TYPES.show, title: 'Pluribus', year: 2025 }),
+      episodes: 9,
+      seasons: 1,
+      totalEpisodes: 9,
+      watchedEpisodes: 9,
+      endedYear: null,
+      addedAt: '2026-10-16T00:00:00.000Z',
+      bitrate: null,
+      next: null,
+    },
+    line: null,
+  },
+]
 
 /** A second server, whose Home is one series and nothing in progress. */
 export const OTHER: AppServer = {

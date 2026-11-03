@@ -9,6 +9,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "e2e:browser": "playwright test",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint:css": "gale \"src/**/*.scss\"",
@@ -38,6 +39,7 @@
   "devDependencies": {
     "@codebend3r/gale": "0.3.1",
     "@happy-dom/global-registrator": "20.14.5",
+    "@playwright/test": "1.64.1",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.7",
@@ -65,6 +67,7 @@
       "dev",
       "build",
       "preview",
+      "e2e:browser",
       "typecheck",
       "lint:ts",
       "lint:ts:fix",
@@ -89,6 +92,25 @@
           {
             "env": "VITE_RAVEN_VERSION"
           }
+        ]
+      },
+      "e2e:browser": {
+        "cache": true,
+        "dependsOn": [
+          "build",
+          "^build",
+          {
+            "projects": [
+              "@shared/server"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/apps/raven/server/src/**/*",
+          "{workspaceRoot}/libs/shared/server/src/**/*"
         ]
       }
     }

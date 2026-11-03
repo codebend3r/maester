@@ -11,3 +11,8 @@ export const ITEM_PAGE_COPY = {
   episodes: { one: 'episode', many: 'episodes' },
   episodeNumber: (episode: number) => `E${episode}`,
 } as const
+
+export const HOME_HERO_COPY = {
+  featuredIn: (library: string) => `Featured in ${library}`,
+  episodes: { one: 'episode', many: 'episodes' },
+} as const

@@ -133,6 +133,7 @@ GROUPS: tuple[Group, ...] = (
                 "dev:raven:splash", "raven's splash page (maester.netlify.app) with hot reload."
             ),
             Command("build:raven:splash", "Builds raven's splash page."),
+            Command("preview:raven:splash", "Serves the built splash page, as Netlify would."),
             Command("dev:sparrow", "sparrow's API and chat page."),
             Command("sandbox:sparrow", "sparrow's sandbox for testing its answers."),
             Command("dev:rookery", "rookery's sign-in server and its login pages."),
@@ -235,6 +236,11 @@ GROUPS: tuple[Group, ...] = (
             Command("ci:app:android-tv", "The 📺 App on Android TV job.", "Android SDK"),
             Command("ci:wren", "The 🎵 Wren on iPhone job.", "macOS + Xcode"),
             Command("ci:desktop:e2e", "The 🎬 Desktop end to end job.", "macOS"),
+            Command(
+                "web:e2e",
+                "The 🌐 Web end to end job: Playwright drives the web app against a fixture server.",
+                "Chrome + ffmpeg",
+            ),
         ),
     ),
     Group(
