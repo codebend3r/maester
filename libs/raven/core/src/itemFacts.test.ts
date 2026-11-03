@@ -16,6 +16,8 @@ import {
   seasonFacts,
   seasonsOf,
   seasonsWatched,
+  rangeLabel,
+  splitPictureRest,
   versionFacts,
   watchedCountLabel,
 } from '@/itemFacts'
@@ -81,6 +83,7 @@ describe('versionFacts', () => {
           width: 3840,
           height: 2160,
           hdr: true,
+          isDolbyVisionOnly: false,
           videoCodec: 'hevc',
           size: 61_000_000_000,
         }),
@@ -89,6 +92,46 @@ describe('versionFacts', () => {
     expect(
       versionFacts(mediaItem({ width: null, height: null, videoCodec: null, size: 1_500_000_000 })),
     ).toEqual(['1.5 GB'])
+  })
+})
+
+describe('rangeLabel', () => {
+  it('names profile 5 DV5 over HDR, any other HDR HDR, SDR nothing, and an older server by HDR alone', () => {
+    expect([
+      rangeLabel({ hdr: true, isDolbyVisionOnly: true }),
+      rangeLabel({ hdr: true, isDolbyVisionOnly: false }),
+      rangeLabel({ hdr: false, isDolbyVisionOnly: false }),
+      rangeLabel({ hdr: true, isDolbyVisionOnly: undefined }),
+    ]).toEqual(['DV5', 'HDR', null, 'HDR'])
+  })
+
+  it('writes DV5 into the version and video facts, and reads it back as a range', () => {
+    const media = mediaItem({ width: 3840, height: 2160, hdr: true, isDolbyVisionOnly: true })
+    expect(versionFacts(media)).toContain('DV5')
+    expect(splitPictureRest('(HEVC) DV5')).toEqual({ codec: 'HEVC', range: 'DV5', words: null })
+  })
+})
+
+describe('splitPictureRest', () => {
+  it('reads the bracketed codec and the range apart', () => {
+    expect(splitPictureRest('(HEVC) HDR')).toEqual({ codec: 'HEVC', range: 'HDR', words: null })
+  })
+
+  it('takes the probe range names as ranges', () => {
+    expect(splitPictureRest('Dolby Vision')).toEqual({
+      codec: null,
+      range: 'Dolby Vision',
+      words: null,
+    })
+  })
+
+  it('keeps anything else as words', () => {
+    expect(splitPictureRest('(AV1) SDR')).toEqual({ codec: 'AV1', range: null, words: 'SDR' })
+  })
+
+  it('says nothing for an empty rest', () => {
+    expect(splitPictureRest(null)).toEqual({ codec: null, range: null, words: null })
+    expect(splitPictureRest('')).toEqual({ codec: null, range: null, words: null })
   })
 })
 
@@ -184,6 +227,14 @@ describe('seasons and episodes', () => {
     expect(episodeRowFacts(episodeSummary({ released: null, runtime: 54, primary: null }))).toEqual(
       ['54m'],
     )
+  })
+
+  it('marks an episode row whose file is Dolby Vision profile 5', () => {
+    const primary = mediaItem({ duration: 3300, hdr: true, isDolbyVisionOnly: true })
+    expect(episodeRowFacts(episodeSummary({ released: null, runtime: 54, primary }))).toEqual([
+      '55m',
+      'DV5',
+    ])
   })
 })
 

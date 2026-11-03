@@ -3,12 +3,15 @@ import {
   type AudioTrack,
   type LiveDownload,
   type LiveStream,
+  type MediaItem,
+  PICTURE_RANGES,
   PLAYBACK_MODES,
   type PlaybackMode,
   STREAM_PURPOSES,
   STREAM_QUALITIES,
   type StreamQuality,
   VIDEO_RANGE_LABELS,
+  type VideoStream,
   audioLabel,
   codecLabel,
   codecWithProfile,
@@ -19,17 +22,14 @@ import {
   formatDuration,
   mediaLabel,
   plural,
+  rangeLabel,
   resolutionLabel,
 } from '@raven/core'
 import { Button } from '@raven/ui'
 import { type ComponentType, type ReactNode, useId, useState } from 'react'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
-import {
-  PictureChip,
-  PictureFact,
-  ResolutionChip,
-} from '@/components/ResolutionChip/ResolutionChip'
+import { PictureFact, RangeChip, ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useManagement } from '@/lib/management'
@@ -55,15 +55,27 @@ type Fact = { term: string; value: ReactNode }
 /** A fact worth a line: one with a value. */
 const hasValue = ({ value }: Fact): boolean => value != null && value !== false
 
-type PictureRangeProps = {
-  range: keyof typeof VIDEO_RANGE_LABELS | null
-  isHdr: boolean
+type PictureRangeProps = { video: VideoStream | null; media: MediaItem }
+
+/** The picture's range as the probe read it (profile 5 as `DV5`), else as the scan saw it, else none. */
+const pictureRange = ({ video, media }: PictureRangeProps): string | null => {
+  if (video == null) return rangeLabel(media)
+  if (!!video.isDolbyVisionOnly) return PICTURE_RANGES.dolbyVisionOnly
+  return VIDEO_RANGE_LABELS[video.range]
 }
 
-/** The picture's range as the probe read it, else HDR where the scan saw it, else none. */
-const pictureRange = ({ range, isHdr }: PictureRangeProps): string | null => {
-  if (range != null) return VIDEO_RANGE_LABELS[range]
-  return isHdr ? COMMON_COPY.hdr : null
+type RangeTagProps = { media: MediaItem }
+
+/** The file's range as a chip among a row's tags, as the scan saw it; nothing for SDR. */
+const RangeTag = ({ media }: RangeTagProps) => {
+  const range = rangeLabel(media)
+  return (
+    range != null && (
+      <li className={styles.chip}>
+        <RangeChip range={range} />
+      </li>
+    )
+  )
 }
 
 const joined = (parts: ReadonlyArray<string | null>): string =>
@@ -154,7 +166,7 @@ const StreamDetails = ({ id, stream, track }: StreamDetailsProps) => {
   const probe = useQuery(mediaStreamsQuery(media.id))
   const video = probe.data?.video ?? null
   const sound = probe.data?.audio.find(({ index }) => index === stream.audio) ?? null
-  const range = pictureRange({ range: video?.range ?? null, isHdr: media.hdr })
+  const range = pictureRange({ video: video ?? null, media })
   const resolution = resolutionLabel(media)
   return (
     <div id={id} className={styles.details}>
@@ -306,11 +318,7 @@ const StreamRow = ({ stream }: StreamRowProps) => {
           <li className={styles.chip}>
             <ResolutionChip resolution={resolutionLabel(stream.media)} />
           </li>
-          {stream.media.hdr && (
-            <li className={styles.chip}>
-              <PictureChip>{COMMON_COPY.hdr}</PictureChip>
-            </li>
-          )}
+          <RangeTag media={stream.media} />
           {track != null && (
             <li className={styles.tag}>
               {joined([audioLabel(track).name, sentAudio({ mode: stream.mode, track })])}
@@ -378,11 +386,7 @@ const DownloadRow = ({ stream }: DownloadRowProps) => {
           <li className={styles.chip}>
             <ResolutionChip resolution={resolutionLabel(stream.media)} />
           </li>
-          {stream.media.hdr && (
-            <li className={styles.chip}>
-              <PictureChip>{COMMON_COPY.hdr}</PictureChip>
-            </li>
-          )}
+          <RangeTag media={stream.media} />
           <li className={styles.tag}>{formatBytes(size)}</li>
         </ul>
         <div className={styles.download}>

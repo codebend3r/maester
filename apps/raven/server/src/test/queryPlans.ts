@@ -47,6 +47,7 @@ export const PRODUCTION_STATISTICS = [
   ['match_overrides', 'sqlite_autoindex_match_overrides_1', '5 2 1'],
   ['media', 'media_library_added', '60708 5519 35'],
   ['media', 'media_library_changed', '60708 5519 35'],
+  ['media', 'media_library_dolby_vision_only', '41 14'],
   ['media', 'media_library_probed', '60642 5513 149 77'],
   ['media', 'media_library_title', '60708 5519 1'],
   ['media', 'media_library_unmatched', '95 32'],

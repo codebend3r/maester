@@ -155,7 +155,7 @@ describe('migrations', () => {
   })
 
   it('clears album years and dates no release can have, so MusicBrainz is asked again', () => {
-    const last = MIGRATIONS.length - 1
+    const last = MIGRATIONS.findIndex((sql) => sql.includes('WHERE year < 1877'))
     const before = new Sqlite(join(state.dir, 'raven.db'))
     MIGRATIONS.slice(0, last).forEach((sql) => before.exec(sql))
     before.pragma(`user_version = ${last}`)
@@ -194,6 +194,32 @@ describe('migrations', () => {
         release_date: null,
         fetched_at: null,
       },
+    ])
+    database.onModuleDestroy()
+  })
+
+  it('probes every HDR file again, and only those, to find Dolby Vision profile 5', () => {
+    const last = MIGRATIONS.findIndex((sql) => sql.includes('dolby_vision_only INTEGER'))
+    const before = new Sqlite(join(state.dir, 'raven.db'))
+    MIGRATIONS.slice(0, last).forEach((sql) => before.exec(sql))
+    before.pragma(`user_version = ${last}`)
+    before.exec(
+      "INSERT INTO libraries (name, created_at, kind) VALUES ('TV', '2026-01-01T00:00:00.000Z', 'tv')",
+    )
+    const file = before.prepare(
+      `INSERT INTO media (library_id, path, file_name, folder, title, container, size, mtime_ms, probed, hdr, added_at)
+       VALUES (1, ?, ?, '', ?, 'mkv', 1, 1, 1, ?, '2026-01-01T00:00:00.000Z')`,
+    )
+    file.run('/tv/hdr.mkv', 'hdr.mkv', 'hdr', 1)
+    file.run('/tv/sdr.mkv', 'sdr.mkv', 'sdr', 0)
+    before.close()
+
+    const database = new DatabaseService({ ...readServerConfig({}), dataDir: state.dir })
+    expect(
+      database.db.prepare('SELECT title, probed, dolby_vision_only FROM media ORDER BY id').all(),
+    ).toEqual([
+      { title: 'hdr', probed: 0, dolby_vision_only: 0 },
+      { title: 'sdr', probed: 1, dolby_vision_only: 0 },
     ])
     database.onModuleDestroy()
   })

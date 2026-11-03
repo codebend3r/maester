@@ -8,6 +8,8 @@ export type ProbeResult = {
   videoCodec: string | null
   videoBitDepth: number | null
   hdr: boolean
+  /** Dolby Vision profile 5: no base layer anything but Dolby Vision can show. */
+  isDolbyVisionOnly: boolean
   audioCodec: string | null
   audioChannels: number | null
   bitrate: number | null
@@ -49,14 +51,30 @@ const bitDepthOf = (stream: Stream): number | null => {
 
 const HDR_TRANSFERS: ReadonlySet<string> = new Set(Object.values(COLOR_TRANSFERS))
 
-/** Whether the stream carries a Dolby Vision configuration record. */
-export const hasDolbyVision = (stream: Stream): boolean => {
+/** The stream's Dolby Vision configuration record, if it carries one. */
+const doviRecordOf = (stream: Stream): Record<string, unknown> | null => {
   const sideData = Array.isArray(stream.side_data_list) ? stream.side_data_list : []
-  return sideData.some(
-    (entry) =>
-      isRecord(entry) && isString(entry.side_data_type) && entry.side_data_type.includes('DOVI'),
+  return (
+    sideData
+      .filter(isRecord)
+      .find((entry) => isString(entry.side_data_type) && entry.side_data_type.includes('DOVI')) ??
+    null
   )
 }
+
+/** Whether the stream carries a Dolby Vision configuration record. */
+export const hasDolbyVision = (stream: Stream): boolean => doviRecordOf(stream) !== null
+
+/** The record's `dv_bl_signal_compatibility_id` when the base layer is something only Dolby Vision can show. */
+const NO_COMPATIBLE_BASE = 0
+
+/**
+ * Whether the picture is Dolby Vision with no base layer anything else can
+ * show: profile 5, whose IPTPQc2 colours look purple and green without
+ * Dolby Vision's processing. Profiles 7 and 8 sit on HDR10, HLG or SDR.
+ */
+export const isDolbyVisionOnly = (stream: Stream): boolean =>
+  doviRecordOf(stream)?.dv_bl_signal_compatibility_id === NO_COMPATIBLE_BASE
 
 /** PQ or HLG transfer, or a Dolby Vision record (profile 5 carries no HDR10 transfer at all). */
 const isHdr = (stream: Stream): boolean => {
@@ -172,6 +190,7 @@ export const parseProbe = (output: unknown): ProbeResult | null => {
     videoCodec: video && isString(video.codec_name) ? video.codec_name : null,
     videoBitDepth: video ? bitDepthOf(video) : null,
     hdr: video ? isHdr(video) : false,
+    isDolbyVisionOnly: video ? isDolbyVisionOnly(video) : false,
     audioCodec: audio && isString(audio.codec_name) ? audio.codec_name : null,
     audioChannels: numeric(audio?.channels),
     bitrate: numeric(format.bit_rate),

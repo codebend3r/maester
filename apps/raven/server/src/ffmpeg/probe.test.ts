@@ -30,6 +30,7 @@ describe('parseProbe', () => {
       videoCodec: 'hevc',
       videoBitDepth: 10,
       hdr: true,
+      isDolbyVisionOnly: false,
       audioCodec: 'eac3',
       audioChannels: 6,
       bitrate: 13515263,
@@ -56,6 +57,7 @@ describe('parseProbe', () => {
       videoCodec: 'h264',
       videoBitDepth: 8,
       hdr: false,
+      isDolbyVisionOnly: false,
       audioCodec: 'aac',
     })
   })
@@ -73,6 +75,30 @@ describe('parseProbe', () => {
       format: {},
     })
     expect(result?.hdr).toBe(true)
+  })
+
+  it('marks profile 5, whose base layer only Dolby Vision can show, and not profile 8', () => {
+    type ProfileOfProps = { compatibility: number }
+    const profileOf = ({ compatibility }: ProfileOfProps) =>
+      parseProbe({
+        streams: [
+          {
+            codec_name: 'hevc',
+            codec_type: 'video',
+            side_data_list: [
+              {
+                side_data_type: 'DOVI configuration record',
+                dv_bl_signal_compatibility_id: compatibility,
+              },
+            ],
+          },
+        ],
+        format: {},
+      })?.isDolbyVisionOnly
+    expect([profileOf({ compatibility: 0 }), profileOf({ compatibility: 1 })]).toEqual([
+      true,
+      false,
+    ])
   })
 
   it('returns null for a file with nothing playable', () => {

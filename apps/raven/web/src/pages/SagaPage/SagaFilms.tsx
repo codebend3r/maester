@@ -8,6 +8,7 @@ import {
   formatRuntime,
   mediaEntryKey,
   pickScore,
+  rangeLabel,
   resolutionLabel,
   watchLink,
 } from '@raven/core'
@@ -56,13 +57,7 @@ const filmFacts = (media: MediaItem): ReactNode[] => {
   return [
     date,
     formatRuntime(media.duration),
-    resolution && (
-      <PictureFact
-        key="picture"
-        resolution={resolution}
-        rest={media.hdr ? COMMON_COPY.hdr : null}
-      />
-    ),
+    resolution && <PictureFact key="picture" resolution={resolution} rest={rangeLabel(media)} />,
     media.versions > 1 ? SAGA_COPY.versions(media.versions) : null,
   ].filter((fact) => fact != null)
 }

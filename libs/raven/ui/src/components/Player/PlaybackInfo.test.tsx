@@ -26,7 +26,13 @@ const TRACKS: MediaTracks = {
 }
 
 const STREAMS: MediaStreams = {
-  video: { codec: 'hevc', profile: 'Main 10', bitrate: 11_100_000, range: 'hdr10' },
+  video: {
+    codec: 'hevc',
+    profile: 'Main 10',
+    bitrate: 11_100_000,
+    range: 'hdr10',
+    isDolbyVisionOnly: false,
+  },
   audio: [
     {
       index: 0,

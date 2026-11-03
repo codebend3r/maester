@@ -9,6 +9,7 @@ import {
   formatRuntime,
   mediaEntryKey,
   mediaLabel,
+  rangeLabel,
   resolutionLabel,
   sortFact,
   timeLeftOf,
@@ -21,7 +22,7 @@ import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark, FavouriteWords } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
-import { FactText, PictureChip, ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
+import { FactText, RangeChip, ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
@@ -31,7 +32,6 @@ import { useSelectable } from '@/lib/useSelectable'
 import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import { MEDIA_CARD_COPY } from '@/components/MediaCard/copy'
 import styles from '@/components/MediaCard/MediaCard.module.scss'
-import { COMMON_COPY } from '@/lib/copy'
 
 const FRAME_KINDS = {
   cover: 'cover',
@@ -115,6 +115,7 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
   // A listing sorted by resolution says it under the title, so the corner leaves it out.
   const resolution = resolutionLabel(media)
   const cornerResolution = resolution === sorted ? null : resolution
+  const range = rangeLabel(media)
   const frameKind = frameKindOf({ album: media.album, thumbnail })
   const FramePicture = FRAME_PICTURES[frameKind]
   const facts = [
@@ -158,10 +159,10 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
             <WatchedMark decorative watched={media.watched} className={styles.watched} />
           </span>
         </CardLink>
-        {(cornerResolution != null || media.hdr) && (
+        {(cornerResolution != null || range != null) && (
           <span className={styles.badges}>
             <ResolutionChip resolution={cornerResolution} />
-            {media.hdr && <PictureChip label={COMMON_COPY.hdr}>{COMMON_COPY.hdr}</PictureChip>}
+            {range != null && <RangeChip range={range} />}
           </span>
         )}
         <SelectCheckbox select={select} className={styles.select} />

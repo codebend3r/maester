@@ -17,6 +17,7 @@ import {
 } from '@nestjs/common'
 import {
   type AlbumMerge,
+  type DolbyVisionOnlyListing,
   type Duplicates,
   type HistoryEntry,
   isJoinRequest,
@@ -61,10 +62,13 @@ import { LockService } from '@/lock/lockService'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MediaRepository } from '@/media/mediaRepository'
+import { DolbyVisionOnly } from '@/media/dolbyVisionOnly'
 import { MovieSplits } from '@/media/movieSplits'
 import { SagaBackdrops } from '@/media/sagaBackdrops'
 import { ViewingAccounts } from '@/media/viewingAccounts'
 import { ViewingRepository } from '@/media/viewingRepository'
+import { withShowPosters } from '@/media/historyPosters'
+import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { parseBody } from '@/parseBody'
 import { LibraryWatcher } from '@/scanner/libraryWatcher'
@@ -125,12 +129,14 @@ export class LibrariesController {
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(MovieSplits) private readonly splits: MovieSplits,
+    @Inject(DolbyVisionOnly) private readonly dolbyVisionOnly: DolbyVisionOnly,
     @Inject(SagaBackdrops) private readonly sagaBackdrops: SagaBackdrops,
     @Inject(ViewingRepository) private readonly viewing: ViewingRepository,
     @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(MediaArtifacts) private readonly artifacts: MediaArtifacts,
     @Inject(ScannerService) private readonly scanner: ScannerService,
     @Inject(MetadataService) private readonly metadata: MetadataService,
+    @Inject(MetadataRepository) private readonly items: MetadataRepository,
     @Inject(LibraryWatcher) private readonly watcher: LibraryWatcher,
     @Inject(LockService) private readonly lock: LockService,
     @Inject(Management) private readonly management: Management,
@@ -476,12 +482,13 @@ export class LibrariesController {
     @Query('watched') watched?: string,
   ): HistoryEntry[] {
     this.find(id)
-    return this.viewing.history({
+    const entries = this.viewing.history({
       libraryId: id,
       limit: historyLimit(limit),
       watchedOnly: watched === QUERY_FLAGS.true,
       account: this.accounts.keyOf({ request }),
     })
+    return withShowPosters({ entries, libraryId: id, metadata: this.items })
   }
 
   /** A TV shows library as its shows, with the files no show was found for after. */
@@ -529,6 +536,7 @@ export class LibrariesController {
       sagas: isMovies ? this.media.countSagas({ libraryId: id, account }) : 0,
       duplicates: isMovies ? this.splits.count(id) : 0,
       finished: this.viewing.finishedCount({ libraryId: id, account }),
+      dolbyVisionOnly: this.dolbyVisionOnly.count(id),
     }
   }
 
@@ -618,6 +626,16 @@ export class LibrariesController {
       throw new BadRequestException('Only a library of movies has duplicates to split.')
     }
     return record
+  }
+
+  /** What in it is Dolby Vision profile 5: its shows with how many episodes are, and its other such files. */
+  @Get(':id/dolby-vision')
+  listDolbyVisionOnly(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): DolbyVisionOnlyListing {
+    this.find(id)
+    return this.dolbyVisionOnly.list({ libraryId: id, account: this.accounts.keyOf({ request }) })
   }
 
   /** Its movies with more than one file, split apart or not; none in a library not matched to movies. */

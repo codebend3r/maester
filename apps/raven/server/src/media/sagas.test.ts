@@ -14,6 +14,7 @@ const PROBE = {
   videoCodec: 'h264',
   videoBitDepth: 8,
   hdr: false,
+  isDolbyVisionOnly: false,
   audioCodec: 'aac',
   audioChannels: 2,
   bitrate: 5_000_000,

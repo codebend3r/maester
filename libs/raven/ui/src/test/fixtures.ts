@@ -35,6 +35,7 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   videoCodec: 'hevc',
   videoBitDepth: 10,
   hdr: false,
+  isDolbyVisionOnly: false,
   audioCodec: 'aac',
   audioChannels: 6,
   bitrate: 2_215_000,

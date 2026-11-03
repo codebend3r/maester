@@ -1,4 +1,5 @@
 import {
+  type ItemSummary,
   MATCH_STATES,
   type MatchItemType,
   type MediaItem,
@@ -10,6 +11,7 @@ import {
   formatRuntime,
   mediaEntryKey,
   mediaLabel,
+  rangeLabel,
   resolutionLabel,
   cardSortFact,
 } from '@raven/core'
@@ -39,12 +41,22 @@ const PICTURE_KINDS = {
 } as const
 type PictureKind = (typeof PICTURE_KINDS)[keyof typeof PICTURE_KINDS]
 
-type TilePictureProps = { media: MediaItem; thumbnail: string | null; withWatched: boolean }
+type TilePictureProps = {
+  media: MediaItem
+  poster: ItemSummary | null
+  thumbnail: string | null
+  withWatched: boolean
+}
 
 type TilePosterProps = TilePictureProps
 
-const TilePoster = ({ media, withWatched }: TilePosterProps) => (
-  <PosterFrame media={media} sizes={POSTER_SIZES.movieTile} withWatched={withWatched} />
+const TilePoster = ({ media, poster, withWatched }: TilePosterProps) => (
+  <PosterFrame
+    media={media}
+    poster={poster ?? undefined}
+    sizes={POSTER_SIZES.movieTile}
+    withWatched={withWatched}
+  />
 )
 
 type TileThumbnailProps = TilePictureProps
@@ -65,10 +77,10 @@ const TILE_PICTURES = {
   [PICTURE_KINDS.placeholder]: TilePlaceholder,
 } as const satisfies Record<PictureKind, ComponentType<TilePictureProps>>
 
-type PictureKindOfProps = { posters: boolean; thumbnail: string | null }
+type PictureKindOfProps = { isPoster: boolean; thumbnail: string | null }
 
-const pictureKindOf = ({ posters, thumbnail }: PictureKindOfProps): PictureKind => {
-  if (posters) return PICTURE_KINDS.poster
+const pictureKindOf = ({ isPoster, thumbnail }: PictureKindOfProps): PictureKind => {
+  if (isPoster) return PICTURE_KINDS.poster
   if (thumbnail) return PICTURE_KINDS.thumbnail
   return PICTURE_KINDS.placeholder
 }
@@ -77,6 +89,8 @@ type MediaTileProps = {
   media: MediaItem
   note: string | null
   posters: boolean
+  /** The poster drawn in place of the frame grab: an episode's show's. */
+  poster: ItemSummary | null
   withWatched: boolean
   matchType: MatchItemType | null
   sort: MediaSort | undefined
@@ -89,7 +103,15 @@ type MediaTileProps = {
  * order and the reading order; the title is the link. A right click on
  * either opens the tile's menu.
  */
-const MediaTile = ({ media, note, posters, withWatched, matchType, sort }: MediaTileProps) => {
+const MediaTile = ({
+  media,
+  note,
+  posters,
+  poster,
+  withWatched,
+  matchType,
+  sort,
+}: MediaTileProps) => {
   const menu = useCardMenu({ media, matchType })
   const thumbnail = api.thumbnailUrl(media)
   const link = cardLink({ media, hasPages: posters })
@@ -97,20 +119,21 @@ const MediaTile = ({ media, note, posters, withWatched, matchType, sort }: Media
   const label = posters ? title : mediaLabel(media)
   const select = useSelectable({ key: mediaEntryKey(media), title: label })
   const { sorted, isDateSaid } = cardSortFact({ media, sort })
-  const TilePicture = TILE_PICTURES[pictureKindOf({ posters, thumbnail })]
+  const isPoster = posters || poster != null
+  const TilePicture = TILE_PICTURES[pictureKindOf({ isPoster, thumbnail })]
   const facts = [
     posters && date != null && !isDateSaid ? date : null,
     posters && media.versions > 1 ? MEDIA_TILES_COPY.versions(media.versions) : null,
     formatRuntime(media.duration),
     resolutionLabel(media),
-    media.hdr ? COMMON_COPY.hdr : null,
+    rangeLabel(media),
     media.videoCodec ? codecLabel(media.videoCodec) : null,
     formatBytes(media.size),
   ].filter((fact): fact is string => fact != null && fact !== sorted)
 
   return (
     <li
-      className={[styles.tile, posters ? styles.posterTile : '', menu.hostClass]
+      className={[styles.tile, isPoster ? styles.posterTile : '', menu.hostClass]
         .filter(Boolean)
         .join(' ')}
       data-entry={mediaEntryKey(media)}
@@ -119,14 +142,19 @@ const MediaTile = ({ media, note, posters, withWatched, matchType, sort }: Media
       <SelectCheckbox select={select} className={styles.select} />
       <CardLink
         {...link}
-        className={posters ? styles.posterFrame : styles.frame}
+        className={isPoster ? styles.posterFrame : styles.frame}
         tabIndex={-1}
         aria-hidden="true"
         onContextMenu={menu.onContextMenu}
       >
-        <TilePicture media={media} thumbnail={thumbnail} withWatched={withWatched} />
-        {!posters && <ResumeBar media={media} className={styles.resume} />}
-        {!posters && (
+        <TilePicture
+          media={media}
+          poster={poster}
+          thumbnail={thumbnail}
+          withWatched={withWatched}
+        />
+        {!isPoster && <ResumeBar media={media} className={styles.resume} />}
+        {!isPoster && (
           <WatchedMark
             decorative
             watched={withWatched && media.watched}
@@ -179,6 +207,8 @@ type MediaTilesProps = {
   note?: (media: MediaItem) => string | null
   /** A Movies library's tiles: small posters, opening the movie's page. */
   posters?: boolean
+  /** A poster to draw in place of a video's frame grab, such as its show's; none keeps the frame. */
+  posterOf?: (media: MediaItem) => ItemSummary | null
   /** Off for the history, whose notes say what was watched. */
   withWatched?: boolean
   /** What the library matches its files to, for the menu's Fix match. */
@@ -196,6 +226,7 @@ export const MediaTiles = ({
   items,
   note,
   posters = false,
+  posterOf,
   withWatched = true,
   matchType = null,
   sort,
@@ -207,6 +238,7 @@ export const MediaTiles = ({
         media={item}
         note={note ? note(item) : null}
         posters={posters}
+        poster={posterOf?.(item) ?? null}
         withWatched={withWatched}
         matchType={matchType}
         sort={sort}

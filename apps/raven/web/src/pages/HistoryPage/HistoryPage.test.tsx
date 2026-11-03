@@ -21,6 +21,7 @@ const played = ({ id, title, watched }: PlayedProps): HistoryEntry => ({
   furthest: watched ? 95 : 40,
   watched,
   marked: false,
+  poster: null,
 })
 
 const FINISHED = played({ id: 1, title: 'Finished', watched: true })

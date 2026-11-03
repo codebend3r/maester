@@ -5,6 +5,7 @@ import {
   FactText,
   PictureChip,
   PictureFact,
+  RangeChip,
   ResolutionChip,
   WordFact,
 } from '@/components/ResolutionChip/ResolutionChip'
@@ -51,13 +52,70 @@ describe('ResolutionChip', () => {
     expect(container.textContent).toBe('4K HDR')
   })
 
+  it('marks the codec and the range of light with chips of their own', () => {
+    const { container } = render(<FactText fact="4K (HEVC) HDR" />)
+    expect(screen.getByLabelText('Video resolution: 4K')).toHaveClass(styles.uhd ?? '')
+    expect(screen.getByLabelText('Video codec: HEVC')).toHaveClass(styles.hevc ?? '')
+    expect(screen.getByLabelText('HDR')).toHaveClass(styles.hdr ?? '')
+    expect(container.textContent).toBe('4K HEVC HDR')
+  })
+
+  it('leaves another codec on plain glass', () => {
+    render(<FactText fact="1080p (H.264)" />)
+    expect(screen.getByLabelText('Video codec: H.264')).toHaveAttribute('class', styles.chip)
+  })
+
+  it.each(['HDR10', 'HLG', 'Dolby Vision'])('colours %s as a range of light', (range) => {
+    render(<PictureFact resolution="4K" rest={range} />)
+    expect(screen.getByLabelText(range)).toHaveClass(styles.hdr ?? '')
+  })
+
+  it('keeps words that are no codec or range as words', () => {
+    const { container } = render(<PictureFact resolution="4K" rest="SDR" />)
+    expect(screen.queryByLabelText('SDR')).toBeNull()
+    expect(container.textContent).toBe('4K SDR')
+  })
+
+  it('colours a bare range chip the same way', () => {
+    render(<RangeChip range="HDR" />)
+    expect(screen.getByLabelText('HDR')).toHaveClass(styles.hdr ?? '')
+  })
+
   it('shows a picture with no resolution as its words alone', () => {
     const { container } = render(<PictureFact resolution={null} rest="HDR" />)
     expect(screen.queryByLabelText(/Video resolution/)).toBeNull()
     expect(container).toHaveTextContent('HDR')
   })
 
-  it('marks a word of a list only when it is a resolution', () => {
+  it('warns of Dolby Vision profile 5 with a chip of its own, alone or after a resolution', () => {
+    const { container } = render(
+      <>
+        <RangeChip range="DV5" />
+        <PictureFact resolution="4K" rest="(HEVC) DV5" />
+      </>,
+    )
+    const chips = screen.getAllByLabelText(
+      'Dolby Vision profile 5: its colours come out wrong in a browser',
+    )
+    expect(chips).toHaveLength(2)
+    chips.forEach((chip) => expect(chip).toHaveClass(styles.dolbyVisionOnly ?? ''))
+    expect(container).toHaveTextContent('DV54K HEVC DV5')
+  })
+
+  it('marks a range of light alone as its chip, a word of a list or a fact', () => {
+    render(
+      <>
+        <WordFact fact="HDR" />
+        <FactText fact="DV5" />
+      </>,
+    )
+    expect(screen.getByLabelText('HDR')).toHaveClass(styles.hdr ?? '')
+    expect(
+      screen.getByLabelText('Dolby Vision profile 5: its colours come out wrong in a browser'),
+    ).toHaveTextContent('DV5')
+  })
+
+  it('marks a word of a list as a resolution only when it is one', () => {
     const { container } = render(
       <>
         <WordFact fact="720p" />

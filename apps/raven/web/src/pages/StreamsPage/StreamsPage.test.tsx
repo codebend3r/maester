@@ -25,7 +25,13 @@ const TRACKS: MediaTracks = {
 }
 
 const PROBE: MediaStreams = {
-  video: { codec: 'hevc', profile: 'Main 10', bitrate: 38_100_000, range: VIDEO_RANGES.hdr10 },
+  video: {
+    codec: 'hevc',
+    profile: 'Main 10',
+    bitrate: 38_100_000,
+    range: VIDEO_RANGES.hdr10,
+    isDolbyVisionOnly: false,
+  },
   audio: [
     {
       index: 0,
@@ -46,6 +52,7 @@ const remux = () =>
       width: 3840,
       height: 2160,
       hdr: true,
+      isDolbyVisionOnly: false,
       bitrate: 38_100_000,
       item: itemSummary({ type: 'movie', title: 'Croods', year: 2020 }),
     }),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { type Hero, RESOLUTIONS, SESSION_KINDS } from '@raven/core'
+import { type Hero, PICTURE_RANGES, RESOLUTIONS, SESSION_KINDS } from '@raven/core'
 import { featuredOf } from '@/pages/HomePage/featured'
 import {
   RELEASED_LABEL,
@@ -121,7 +121,7 @@ describe('featuredOf', () => {
       eyebrow: 'Featured in Films',
       title: 'Movie 5',
       facts: [RELEASED_LABEL, '2h 46m'],
-      picture: { resolution: RESOLUTIONS.uhd, isHdr: true },
+      picture: { resolution: RESOLUTIONS.uhd, range: PICTURE_RANGES.hdr },
       details: '/movies/105?library=2',
     })
     expect(featured?.play).toEqual({

@@ -121,6 +121,11 @@ export const isMediaItem = object({
   videoCodec: nullable(isString),
   videoBitDepth: nullable(isNumber),
   hdr: isBoolean,
+  /**
+   * Dolby Vision profile 5, with no base layer anything else can show: a
+   * browser plays it purple and green. Absent from an older server.
+   */
+  isDolbyVisionOnly: optional(isBoolean),
   /** ffprobe codec names: 'aac', 'ac3', 'eac3', 'opus', 'truehd', ... */
   audioCodec: nullable(isString),
   audioChannels: nullable(isNumber),

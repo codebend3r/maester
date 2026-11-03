@@ -59,6 +59,7 @@ const historyEntry = (media: MediaItem): HistoryEntry => ({
   furthest: 100,
   watched: false,
   marked: false,
+  poster: null,
 })
 
 describe('watchedEdits', () => {

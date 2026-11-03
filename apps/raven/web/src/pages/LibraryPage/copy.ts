@@ -17,6 +17,8 @@ type FinishedEmptyProps = { name: string; percent: number }
 
 type NoAlbumMatchesProps = { name: string; query: string }
 
+type DolbyVisionOnlyEpisodesProps = { count: number; total: number }
+
 export const LIBRARY_COPY = {
   noun: 'library',
   videos: 'videos',
@@ -45,6 +47,11 @@ export const LIBRARY_COPY = {
     `Open a file's menu and choose Fix match to point it at the right ${title}.`,
   allMatched: (name: string) => `Every file in ${name} is matched.`,
   duplicatesEmpty: (name: string) => `No movie in ${name} has more than one file.`,
+  dolbyVisionOnlyEmpty: (name: string) => `Nothing in ${name} is in Dolby Vision profile 5.`,
+  dolbyVisionOnlyNote:
+    'Dolby Vision profile 5 shows true colours only on a device with Dolby Vision, such as an Apple TV 4K or a Dolby Vision TV. A browser plays it purple and green.',
+  dolbyVisionOnlyEpisodes: ({ count, total }: DolbyVisionOnlyEpisodesProps) =>
+    `${count} of ${plural({ n: total, one: 'episode', many: 'episodes' })} in profile 5`,
   finishedEmpty: ({ name, percent }: FinishedEmptyProps) =>
     `Nothing finished in ${name} yet. A video counts once playback gets ${percent}% of the way through, or when you mark it watched.`,
   fullHistory: 'Full history',
@@ -79,6 +86,7 @@ export const LIBRARY_COPY = {
     sagas: 'Sagas',
     notMatched: COMMON_COPY.notMatched,
     duplicates: 'Duplicates',
+    dolbyVisionOnly: 'Dolby Vision 5',
     finished: 'Recently finished',
   },
 } as const

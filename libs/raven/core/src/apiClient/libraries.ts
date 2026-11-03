@@ -2,10 +2,12 @@ import type { Transport } from '@/apiClient/transport'
 import {
   type AlbumMerge,
   type DirectoryListing,
+  type DolbyVisionOnlyListing,
   type Duplicates,
   type HistoryEntry,
   isAlbumMerge,
   isDirectoryListing,
+  isDolbyVisionOnlyListing,
   isDuplicates,
   isHistory,
   isLibrary,
@@ -226,6 +228,10 @@ export const libraryCalls = ({ send, expect, libraryGet }: Transport) => ({
   /** A library's files no movie or show was found for, each with the AI lookup's suggestion for its folder. */
   listUnmatched: (libraryId: number): Promise<UnmatchedFile[]> =>
     libraryGet({ libraryId, path: 'unmatched', guard: isUnmatchedList }),
+
+  /** What in a library is Dolby Vision profile 5: its shows with how many episodes are, and its other such files. */
+  listDolbyVisionOnly: (libraryId: number): Promise<DolbyVisionOnlyListing> =>
+    libraryGet({ libraryId, path: 'dolby-vision', guard: isDolbyVisionOnlyListing }),
 
   /** A movie library's movies with more than one file, each with its cards, split apart or not. */
   listDuplicates: (libraryId: number): Promise<Duplicates> =>

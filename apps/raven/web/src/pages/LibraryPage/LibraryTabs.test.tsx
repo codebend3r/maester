@@ -16,6 +16,7 @@ import {
   libraryCounts,
   matchedMovie,
   mediaItem,
+  showEntry,
   metadataHealth,
   unmatchedFile,
 } from '@/test/fixtures'
@@ -37,6 +38,7 @@ describe('LibraryPage tabs', () => {
     sagas: spyOn(api, 'listSagas'),
     unmatched: spyOn(api, 'listUnmatched'),
     duplicates: spyOn(api, 'listDuplicates'),
+    dolbyVisionOnly: spyOn(api, 'listDolbyVisionOnly'),
     counts: spyOn(api, 'getLibraryCounts'),
     history: spyOn(api, 'listHistory'),
     lockState: spyOn(api, 'getLock'),
@@ -52,6 +54,7 @@ describe('LibraryPage tabs', () => {
     spies.sagas.mockImplementation(async () => [])
     spies.unmatched.mockImplementation(async () => [])
     spies.duplicates.mockImplementation(async () => [])
+    spies.dolbyVisionOnly.mockImplementation(async () => ({ shows: [], files: [] }))
     spies.counts.mockImplementation(async () => libraryCounts())
     spies.history.mockImplementation(async () => [])
     spies.lockState.mockImplementation(async () => ({ available: false, unlocked: false }))
@@ -191,6 +194,37 @@ describe('LibraryPage tabs', () => {
     open({ route: '/libraries/2/duplicates' })
     expect(await screen.findByRole('heading', { name: 'Alexander' })).toBeInTheDocument()
     expect(spies.duplicates).toHaveBeenCalledWith(2)
+    expect(spies.list).not.toHaveBeenCalled()
+  })
+
+  it('shows the Dolby Vision 5 tab only while the library holds some', async () => {
+    open({ kind: 'shows' })
+    expect(await screen.findByRole('link', { name: 'In progress' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Dolby Vision 5' })).toBeNull()
+    cleanup()
+    spies.counts.mockImplementation(async () => libraryCounts({ dolbyVisionOnly: 2 }))
+    open({ kind: 'shows' })
+    expect(await screen.findByRole('link', { name: 'Dolby Vision 5' })).toHaveAttribute(
+      'href',
+      '/libraries/2/dolby-vision',
+    )
+  })
+
+  it('lists each show with how many of its episodes are profile 5, and the files that are no show’s', async () => {
+    spies.counts.mockImplementation(async () => libraryCounts({ dolbyVisionOnly: 2 }))
+    spies.dolbyVisionOnly.mockImplementation(async () => ({
+      shows: [{ entry: showEntry({ episodes: 24 }), episodes: 3 }],
+      files: [
+        {
+          media: mediaItem({ id: 9, title: 'Loose', hdr: true, isDolbyVisionOnly: true }),
+          poster: null,
+        },
+      ],
+    }))
+    open({ kind: 'shows', route: '/libraries/2/dolby-vision' })
+    expect(await screen.findByText('3 of 24 episodes in profile 5')).toBeInTheDocument()
+    expect(screen.getAllByText('Loose').length).toBeGreaterThan(0)
+    expect(spies.dolbyVisionOnly).toHaveBeenCalledWith(2)
     expect(spies.list).not.toHaveBeenCalled()
   })
 
@@ -488,6 +522,7 @@ describe('LibraryPage tabs', () => {
         furthest: 100,
         watched: true,
         marked: false,
+        poster: null,
       },
     ])
     open({ route: '/libraries/2/finished' })

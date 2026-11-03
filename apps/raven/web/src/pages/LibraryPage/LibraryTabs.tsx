@@ -8,6 +8,7 @@ import {
   SECTIONS,
   type Tallies,
   countText,
+  isListed,
   sectionPath,
   sectionsFor,
 } from '@/pages/LibraryPage/librarySections'
@@ -37,27 +38,29 @@ export const LibraryTabs = ({ library, current }: LibraryTabsProps) => {
   return (
     <nav aria-label={LIBRARY_COPY.sections} className={styles.tabsNav}>
       <ul className={styles.tabs}>
-        {sectionsFor(library.settings.kind).map((section) => {
-          const text = countText({ section, tallies })
-          return (
-            <li key={section} className={styles.tabItem}>
-              <Link
-                to={sectionPath({ libraryId: library.id, section })}
-                replace
-                className={styles.tab}
-                aria-current={section === current ? 'page' : undefined}
-              >
-                <Icon name={SECTIONS[section].icon} size="1.15em" />
-                <span className={styles.tabLabel}>{SECTIONS[section].label}</span>
-                {text != null && (
-                  <span className={styles.tabCount} aria-hidden="true">
-                    {text}
-                  </span>
-                )}
-              </Link>
-            </li>
-          )
-        })}
+        {sectionsFor(library.settings.kind)
+          .filter((section) => isListed({ section, tallies }))
+          .map((section) => {
+            const text = countText({ section, tallies })
+            return (
+              <li key={section} className={styles.tabItem}>
+                <Link
+                  to={sectionPath({ libraryId: library.id, section })}
+                  replace
+                  className={styles.tab}
+                  aria-current={section === current ? 'page' : undefined}
+                >
+                  <Icon name={SECTIONS[section].icon} size="1.15em" />
+                  <span className={styles.tabLabel}>{SECTIONS[section].label}</span>
+                  {text != null && (
+                    <span className={styles.tabCount} aria-hidden="true">
+                      {text}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            )
+          })}
       </ul>
     </nav>
   )

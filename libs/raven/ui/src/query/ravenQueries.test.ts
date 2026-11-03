@@ -173,6 +173,12 @@ const QUERIES = [
     call: (api) => api.listDuplicates(2),
   }),
   asking({
+    name: 'dolbyVisionOnlyQuery',
+    key: queryKeys.dolbyVisionOnly(2),
+    pick: (queries) => queries.dolbyVisionOnlyQuery(2),
+    call: (api) => api.listDolbyVisionOnly(2),
+  }),
+  asking({
     name: 'favouritesQuery',
     key: queryKeys.favourites,
     pick: (queries) => queries.favouritesQuery,

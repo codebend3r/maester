@@ -158,6 +158,8 @@ type WideShowCardProps = {
   entry: ShowEntry
   /** The order the listing is in, whose value the card shows. */
   sort?: MediaSort
+  /** A line about the show under its title, as the list holding it says it, in place of the sorted value. */
+  note?: string | null
 }
 
 /**
@@ -167,7 +169,7 @@ type WideShowCardProps = {
  * page and its play button starts that episode at once. The wash is the
  * poster again, blurred: the same file, so nothing more is fetched.
  */
-const WideShowCard = ({ entry, sort }: WideShowCardProps) => {
+const WideShowCard = ({ entry, sort, note = null }: WideShowCardProps) => {
   const { show, next } = entry
   const card = useShowCard({ entry, ratingsSource: RATING_SOURCES.tmdb, sort })
   const wash = posterSources({ item: show, sizes: POSTER_SIZES.showCard })
@@ -175,6 +177,8 @@ const WideShowCard = ({ entry, sort }: WideShowCardProps) => {
     watchedStateOf({ watched: entry.watchedEpisodes, total: entry.episodes }) ===
     WATCHED_STATES.watched
   const nextLabel = [card.code, next?.item?.title].filter(Boolean).join(COMMON_COPY.separator)
+  // The list's own line stands in the sorted value's place.
+  const line = note ?? card.sorted
 
   return (
     <li className={styles.wide} data-entry={showEntryKey(show)} {...card.select.rootProps}>
@@ -202,7 +206,7 @@ const WideShowCard = ({ entry, sort }: WideShowCardProps) => {
         >
           {show.title}
         </CardLink>
-        {card.sorted && <span className={styles.wideSorted}>{card.sorted}</span>}
+        {line && <span className={styles.wideSorted}>{line}</span>}
         <ShowFacts entry={entry} facts={card.facts} score={null} className={styles.wideFacts} />
         {next && !card.select.selecting && (
           <CardLink
@@ -235,13 +239,18 @@ const WideShowCard = ({ entry, sort }: WideShowCardProps) => {
   )
 }
 
-type ShowGridProps = { shows: ShowEntry[]; sort?: MediaSort }
+type ShowGridProps = {
+  shows: ShowEntry[]
+  sort?: MediaSort
+  /** The line under each show's title, if the list has one to say. */
+  note?: (entry: ShowEntry) => string | null
+}
 
 /** The grid a TV library lays its shows out in, each a wide card. */
-export const ShowGrid = ({ shows, sort }: ShowGridProps) => (
+export const ShowGrid = ({ shows, sort, note }: ShowGridProps) => (
   <ul className={styles.grid}>
     {shows.map((entry) => (
-      <WideShowCard key={entry.show.id} entry={entry} sort={sort} />
+      <WideShowCard key={entry.show.id} entry={entry} sort={sort} note={note?.(entry) ?? null} />
     ))}
   </ul>
 )

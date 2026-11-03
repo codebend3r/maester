@@ -13,6 +13,7 @@ export const {
   sagasQuery,
   unmatchedQuery,
   duplicatesQuery,
+  dolbyVisionOnlyQuery,
   favouritesQuery,
   favouriteTitlesQuery,
   favouriteAlbumsQuery,

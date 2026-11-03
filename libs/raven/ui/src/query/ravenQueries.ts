@@ -176,6 +176,12 @@ export const ravenQueriesFor = (api: ApiClient) => {
         queryFn: () => api.listDuplicates(libraryId),
       }),
 
+    dolbyVisionOnlyQuery: (libraryId: number) =>
+      queryOptions({
+        queryKey: queryKeys.dolbyVisionOnly(libraryId),
+        queryFn: () => api.listDolbyVisionOnly(libraryId),
+      }),
+
     favouritesQuery: queryOptions({
       queryKey: queryKeys.favourites,
       queryFn: () => api.listFavourites(),

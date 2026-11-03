@@ -382,7 +382,14 @@ describe('createApiClient', () => {
         call: (client) => client.listUnmatched(3),
       }),
       await asked({
-        body: { inProgress: 1, favourites: 2, sagas: 3, duplicates: 4, finished: 5 },
+        body: {
+          inProgress: 1,
+          favourites: 2,
+          sagas: 3,
+          duplicates: 4,
+          finished: 5,
+          dolbyVisionOnly: 0,
+        },
         call: (client) => client.getLibraryCounts(3),
       }),
     ]).toEqual([
@@ -459,6 +466,7 @@ describe('createApiClient', () => {
       furthest: 30,
       watched: false,
       marked: false,
+      poster: null,
     }
     const { client, calls } = clientReturning(respond({ body: [entry] }))
     await expect(client.listHistory({ libraryId: 3, limit: 50 })).resolves.toEqual([entry])
@@ -568,7 +576,13 @@ describe('playback calls', () => {
 
   it("fetches a file's streams and checks them", async () => {
     const streams: MediaStreams = {
-      video: { codec: 'h264', profile: 'High', bitrate: 11_100_000, range: 'sdr' },
+      video: {
+        codec: 'h264',
+        profile: 'High',
+        bitrate: 11_100_000,
+        range: 'sdr',
+        isDolbyVisionOnly: false,
+      },
       audio: [
         {
           index: 0,

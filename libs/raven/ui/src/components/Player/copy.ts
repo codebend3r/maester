@@ -133,6 +133,15 @@ export const SHORTCUTS_TIP_COPY = {
   dismiss: 'Got it',
 } as const
 
+export const DOLBY_VISION_NOTICE_COPY = {
+  heading: 'Why the colours look off',
+  body: 'This video is in Dolby Vision profile 5, which no browser can show, so its colours come out purple and green. It keeps playing as it is.',
+  advice:
+    'To see it as it should look, play it on a device with Dolby Vision, such as an Apple TV 4K or a Dolby Vision TV.',
+  otherVersions: 'Or go back and pick another version of it.',
+  dismiss: 'Keep watching',
+} as const
+
 export const SHORTCUTS_DIALOG_COPY = {
   heading: 'Keyboard shortcuts',
   close: 'Close shortcuts',
