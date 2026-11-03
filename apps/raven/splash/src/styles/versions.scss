@@ -1,4 +1,32 @@
-// The versions page: one entry per release, its files and its notes.
+// The versions page: a plain document, the masthead, the list of releases and
+// the colophon in one column held to the web app's measure.
+.document {
+  display: grid;
+  grid-template-columns: minmax(0, var(--max-width));
+  grid-template-areas:
+    'masthead'
+    'page'
+    'colophon';
+  justify-content: center;
+  gap: var(--section-gap);
+  padding: var(--space-4) var(--gutter) var(--space-8);
+
+  > .masthead {
+    grid-area: masthead;
+  }
+
+  > .colophon {
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--color-line);
+  }
+}
+
+.page {
+  grid-area: page;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .versions {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -7,6 +35,29 @@
     'status'
     'list';
   gap: var(--space-6);
+}
+
+.pitch {
+  grid-area: pitch;
+  display: grid;
+  gap: var(--space-4);
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: var(--font-size-title);
+    font-weight: 400;
+    line-height: var(--line-display);
+    letter-spacing: var(--tracking-display);
+    text-wrap: balance;
+  }
+
+  p {
+    max-width: var(--measure);
+    color: var(--color-birch);
+    font-size: var(--font-size-lede);
+    line-height: var(--line-relaxed);
+    text-wrap: pretty;
+  }
 }
 
 .versions-status {
@@ -43,7 +94,6 @@
 
 .version-heading {
   grid-area: heading;
-  margin: 0;
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
   font-weight: 400;

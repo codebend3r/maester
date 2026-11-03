@@ -13,15 +13,21 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Every version of Raven</title>
   </head>
-  <body>
+  <body class="document">
     <header class="masthead">
       <a class="wordmark" href="/">
-        <img src="/brand/raven-mark-on-dark.svg" alt="" width="36" height="39" />
-        <span>raven</span>
+        <img src="/brand/raven-mark-on-dark.svg" alt="" width="34" height="37" />
+        <span>Raven</span>
       </a>
       <nav class="masthead-links" aria-label="Project">
-        <a href="https://github.com/codebend3r/maester">Source</a>
-        <a href="https://github.com/codebend3r/maester/releases">Releases</a>
+        <a href="https://github.com/codebend3r/maester">
+          <svg class="icon" aria-hidden="true"><use href="/brand/icons.svg#github" /></svg>
+          <span>Source</span>
+        </a>
+        <a href="/releases/" aria-current="page">
+          <svg class="icon" aria-hidden="true"><use href="/brand/icons.svg#tag" /></svg>
+          <span>Releases</span>
+        </a>
       </nav>
     </header>
 
@@ -40,10 +46,14 @@
     </main>
 
     <footer class="colophon">
-      <p>raven is open source. The code, the roadmap and every release are on GitHub.</p>
-      <p>
-        <a href="https://github.com/codebend3r/maester">github.com/codebend3r/maester</a>
-      </p>
+      <span class="colophon-mark">
+        <img src="/brand/raven-mark-on-dark.svg" alt="" width="20" height="22" />
+        <span>raven</span>
+      </span>
+      <nav class="colophon-links" aria-label="Footer">
+        <a href="https://github.com/codebend3r/maester">Source</a>
+        <a href="https://github.com/codebend3r/maester/releases">Releases on GitHub</a>
+      </nav>
     </footer>
 
     <script type="module" src="/src/versions.ts"></script>
