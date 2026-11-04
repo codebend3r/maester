@@ -30,6 +30,7 @@ import { SIDE_MENU_KEY, useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
+import { PLAY_HISTORY_COPY, PLAY_HISTORY_ROUTES } from '@/pages/PlayHistoryPage/copy'
 import { CONTINUE_WATCHING_PATH } from '@/lib/homeContinue'
 import { CONTINUE_WATCHING_COPY } from '@/pages/ContinueWatchingPage/copy'
 
@@ -340,7 +341,21 @@ export const AppShell = () => {
                     label={APP_SHELL_COPY.bugReports}
                     isIconsOnly={isIconsOnly}
                   />
+                  <NavItem
+                    to={PLAY_HISTORY_ROUTES.everyone}
+                    patterns={[PLAY_HISTORY_ROUTES.everyone]}
+                    icon={<Icon name="list" />}
+                    label={PLAY_HISTORY_COPY.everyoneTitle}
+                    isIconsOnly={isIconsOnly}
+                  />
                 </AdminOnly>
+                <NavItem
+                  to={PLAY_HISTORY_ROUTES.own}
+                  patterns={[PLAY_HISTORY_ROUTES.own]}
+                  icon={<Icon name="history" />}
+                  label={PLAY_HISTORY_COPY.title}
+                  isIconsOnly={isIconsOnly}
+                />
               </>
             )}
             {isDesktop && <DesktopNavItems isIconsOnly={isIconsOnly} />}

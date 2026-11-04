@@ -5,6 +5,7 @@ import {
   type MediaSort,
   type MusicListOptions,
   type MixKind,
+  type PlayHistoryShow,
   type ViewingSession,
   ApiError,
 } from '@raven/core'
@@ -49,6 +50,8 @@ type QueryKeysSongsProps = { libraryIds: readonly number[]; search: string; sort
 
 type QueryKeysAlbumMatchSearchProps = { albumId: number; query: string }
 
+type QueryKeysEveryonesHistoryProps = { accountId: string | null; show: PlayHistoryShow }
+
 type QueryKeysNextInSessionProps = { id: number; session: ViewingSession }
 
 type QueryKeysShowsProps = {
@@ -85,7 +88,7 @@ export const queryKeys = {
   authConfig: ['auth', 'config'],
   account: (userId: string | null) => ['auth', 'account', userId],
   /** Every account on this raven, as the owner who asked for them sees it. */
-  members: (userId: string) => ['auth', 'members', userId],
+  members: (userId: string | null) => ['auth', 'members', userId],
   libraries: ['libraries'],
   library: (id: number | null) => ['libraries', id],
   media: ({ libraryId, search, sort, seed }: QueryKeysMediaProps) => [
@@ -134,6 +137,15 @@ export const queryKeys = {
     libraryId,
     'history',
     { show, limit },
+  ],
+  /** The account's own play history, as one list of pages. */
+  playHistory: (show: PlayHistoryShow) => ['play-history', 'own', show],
+  /** Everyone's play history for the owner, or one account's. */
+  everyonesHistory: ({ accountId, show }: QueryKeysEveryonesHistoryProps) => [
+    'play-history',
+    'everyone',
+    accountId,
+    show,
   ],
   /** The prefix every history of a library, or of all of them, shares. */
   historyLists: (libraryId: number | null) => ['libraries', libraryId, 'history'],

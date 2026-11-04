@@ -472,6 +472,7 @@ describe('each account sees only its own viewing', () => {
       { route: ROUTES.libraryMedia, params: { id: library } },
       { route: ROUTES.shows, params: { id: tv.library } },
       { route: ROUTES.history, params: { id: library } },
+      { route: ROUTES.playHistory, params: {} },
       { route: ROUTES.inProgress, params: { id: library } },
       { route: ROUTES.libraryFavourites, params: { id: library } },
       { route: ROUTES.sagas, params: { id: library } },
@@ -783,6 +784,7 @@ describe('the viewing from before accounts', () => {
   const NO_PAST = {
     spots: 0,
     plays: 0,
+    history: 0,
     favourites: 0,
     titleFavourites: 0,
     albumFavourites: 0,
@@ -908,6 +910,7 @@ describe('the viewing from before accounts', () => {
       ...NO_PAST,
       spots: 1,
       plays: 2,
+      history: 1,
       favourites: 1,
       titleFavourites: 1,
     })

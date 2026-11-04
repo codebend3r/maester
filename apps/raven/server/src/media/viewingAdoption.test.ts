@@ -22,6 +22,7 @@ const day = (date: number): string => new Date(Date.UTC(2026, 9, date, 12)).toIS
 const NOTHING = {
   spots: 0,
   plays: 0,
+  history: 0,
   favourites: 0,
   titleFavourites: 0,
   albumFavourites: 0,
@@ -33,6 +34,7 @@ const NOTHING = {
 const THE_PAST = {
   spots: 1,
   plays: 2,
+  history: 1,
   favourites: 1,
   titleFavourites: 1,
   albumFavourites: 1,
@@ -122,6 +124,28 @@ describe('the owner adopting the viewing from before accounts', () => {
       )
       .run(account, mediaId, at, kind)
 
+  type HistoryEntryProps = {
+    account: AccountKey
+    mediaId: number
+    id: number
+    at: string
+  }
+
+  const historyEntry = ({ account, mediaId, id, at }: HistoryEntryProps) =>
+    db()
+      .prepare(
+        `INSERT INTO play_history (account_id, id, media_id, started_at, last_played_at, furthest)
+         VALUES (?, ?, ?, ?, ?, 0)`,
+      )
+      .run(account, id, mediaId, at, at)
+
+  const historyOf = (account: AccountKey) =>
+    db()
+      .prepare<[string], { id: number; media_id: number }>(
+        'SELECT id, media_id FROM play_history WHERE account_id = ? ORDER BY id',
+      )
+      .all(account)
+
   /** Every viewing row, in a fixed order, so two reads compare whole. */
   const rows = () => ({
     spots: db()
@@ -172,6 +196,7 @@ describe('the owner adopting the viewing from before accounts', () => {
     spot({ account: LOCAL, mediaId: ids.first, position: 30, at: day(1) })
     play({ account: LOCAL, mediaId: ids.first, at: day(1), kind: PLAY_KINDS.played })
     play({ account: LOCAL, mediaId: ids.second, at: day(2), kind: PLAY_KINDS.marked })
+    historyEntry({ account: LOCAL, mediaId: ids.first, id: 1, at: day(1) })
     favourite({ account: LOCAL, mediaId: ids.first, at: day(1) })
     titleFavourite({ account: LOCAL, itemId: ids.show, at: day(2) })
     albumFavourite({ account: LOCAL, albumId: ids.album, at: day(2) })
@@ -282,6 +307,23 @@ describe('the owner adopting the viewing from before accounts', () => {
         { account_id: OWNER, name: 'Mine' },
       ],
     })
+  })
+
+  it("numbers the history it adopts after the owner's own, in the order it was played", () => {
+    historyEntry({ account: OWNER, mediaId: ids.second, id: 1, at: day(3) })
+    historyEntry({ account: OWNER, mediaId: ids.second, id: 2, at: day(4) })
+    historyEntry({ account: LOCAL, mediaId: ids.first, id: 1, at: day(1) })
+    historyEntry({ account: LOCAL, mediaId: ids.first, id: 2, at: day(2) })
+
+    adoption().adopt({ ownerId: OWNER })
+
+    expect(historyOf(LOCAL)).toEqual([])
+    expect(historyOf(OWNER)).toEqual([
+      { id: 1, media_id: ids.second },
+      { id: 2, media_id: ids.second },
+      { id: 3, media_id: ids.first },
+      { id: 4, media_id: ids.first },
+    ])
   })
 
   it('leaves every row from before accounts, and no owner, when it fails part way', () => {

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { type HistoryEntry, MARKER_KINDS } from '@raven/core'
 import { DatabaseService } from '@/db/database'
+import { continueVideoSitting, startVideoSitting } from '@/history/playHistorySql'
 import { FAVOURITE_OUTCOMES, type FavouriteOutcome } from '@/media/favouriteOutcomes'
 import { MediaRepository } from '@/media/mediaRepository'
 import { fileWatched } from '@/media/mediaSql'
@@ -133,14 +134,23 @@ export class ViewingRepository {
             WHERE account_id = @account AND id = ?`,
         )
         .run({ account }, at.toISOString(), position, latest.id)
+      continueVideoSitting({ db: this.db, account, playId: latest.id, at, position })
       return
     }
-    this.db
+    const made = this.db
       .prepare(
         `INSERT INTO plays (account_id, media_id, played_at, furthest, kind)
          VALUES (@account, ?, ?, ?, ?)`,
       )
       .run({ account }, id, at.toISOString(), position, PLAY_KINDS.played)
+    startVideoSitting({
+      db: this.db,
+      account,
+      playId: Number(made.lastInsertRowid),
+      mediaId: id,
+      at,
+      position,
+    })
   }
 
   /** A video started playing. False when there is no such video. */

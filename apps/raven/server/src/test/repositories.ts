@@ -62,6 +62,7 @@ export const viewingCountsOf = ({
       `SELECT
          (SELECT COUNT(*) FROM playback_progress WHERE account_id = @account) AS spots,
          (SELECT COUNT(*) FROM plays WHERE account_id = @account) AS plays,
+         (SELECT COUNT(*) FROM play_history WHERE account_id = @account) AS history,
          (SELECT COUNT(*) FROM favourites WHERE account_id = @account) AS favourites,
          (SELECT COUNT(*) FROM item_favourites WHERE account_id = @account) AS titleFavourites,
          (SELECT COUNT(*) FROM album_favourites WHERE account_id = @account) AS albumFavourites,

@@ -235,5 +235,7 @@ export const musicApi = () => ({
   getMediaTicket: jest.fn(async () => ({ ticket: 'tkt.wren', expiresAt: 0 })),
   fileUrl: addresses.fileUrl,
   recordPlay: jest.fn(async (_id: number) => undefined),
+  startListen: jest.fn(async () => 1),
+  reportListen: jest.fn(async () => undefined),
   albumCoverUrl: (): string | null => null,
 })

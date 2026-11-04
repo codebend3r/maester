@@ -31,6 +31,8 @@ const routeOf = ({ method, path }: AppClientCall) =>
 const WRITES = [
   APP_CLIENT_CALLS.saveProgress,
   APP_CLIENT_CALLS.recordPlay,
+  APP_CLIENT_CALLS.startListen,
+  APP_CLIENT_CALLS.reportListen,
   APP_CLIENT_CALLS.setWatched,
   APP_CLIENT_CALLS.setFavourite,
   APP_CLIENT_CALLS.setItemFavourite,
@@ -112,6 +114,8 @@ describe('the calls raven’s app may make', () => {
     await Promise.allSettled([
       api.saveProgress({ id: 7, position: 12, audio: null }),
       api.recordPlay(7),
+      api.startListen({ mediaId: 7, position: 0 }),
+      api.reportListen({ id: 3, position: 12 }),
       api.setWatched({ watched: true, targets: [{ kind: WATCH_TARGET_KINDS.media, id: 7 }] }),
       api.setFavourite({ id: 7, favourite: true }),
       api.setItemFavourite({ id: 3, favourite: true }),

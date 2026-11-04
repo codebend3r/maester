@@ -1,0 +1,179 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.header {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.back {
+  justify-self: start;
+}
+
+.heading {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.everyone {
+  justify-self: start;
+}
+
+.intro {
+  max-width: var(--measure);
+  color: var(--color-birch);
+  text-wrap: pretty;
+}
+
+// The kind switch and, in everyone's history, the account picker, side by side while they fit.
+.filters {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: end;
+  gap: var(--space-4);
+
+  @media (max-width: 40rem) {
+    grid-auto-flow: row;
+  }
+}
+
+// A well with the kinds side by side, the one shown filled in.
+.shows {
+  display: grid;
+  grid-auto-flow: column;
+  justify-self: start;
+  gap: var(--space-0);
+  min-width: 0;
+  padding: var(--space-0);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+}
+
+.show {
+  min-height: var(--control-size);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-lichen);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  &:hover {
+    color: var(--color-bark);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+
+  &[aria-pressed='true'] {
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+}
+
+.picker {
+  display: grid;
+  gap: var(--space-1);
+  justify-self: start;
+  color: var(--color-lichen);
+}
+
+// The table's room is the page's to give: the columns drop by the room the
+// table has, and anything still too wide scrolls inside it, never the page.
+.room {
+  container-type: inline-size;
+  overflow-x: auto;
+}
+
+// The element defaults draw the table; this sets its rhythm: eyebrow
+// headers, faint rules between rows and a tint under the pointer.
+.table {
+  width: 100%;
+
+  thead th {
+    padding-block: var(--space-2);
+  }
+
+  tbody tr:hover {
+    background: var(--color-hover);
+  }
+
+  th,
+  td {
+    padding-inline: var(--space-1);
+    text-align: start;
+  }
+}
+
+.when,
+.reach {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.title {
+  font-weight: 500;
+}
+
+.from,
+.library,
+.account,
+.when {
+  color: var(--color-birch);
+}
+
+// The heading over a run of one album's tracks.
+.run th {
+  padding-block: var(--space-2);
+  color: var(--color-bark);
+  font-weight: 600;
+}
+
+@container (max-width: 48rem) {
+  .library {
+    display: none;
+  }
+}
+
+@container (max-width: 30rem) {
+  .from {
+    display: none;
+  }
+}
+
+.more {
+  justify-self: center;
+}
+
+.message {
+  max-width: var(--measure);
+  color: var(--color-lichen);
+}
+
+.bones {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.bone {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}

@@ -28,6 +28,7 @@ const REQUEST = {}
 const ADOPTED = {
   spots: 1,
   plays: 2,
+  history: 8,
   favourites: 3,
   titleFavourites: 4,
   albumFavourites: 5,

@@ -1,0 +1,120 @@
+import { describe, expect, it } from 'bun:test'
+import { PLAYED_KINDS, type PlayHistoryEntry, type Played } from '@/contract'
+import { HISTORY_ROW_KINDS, REACH_KINDS, historyRows, playedContext, reachOf } from '@/playHistory'
+
+type EntryProps = { id: number; played: Played; accountId?: string }
+
+const entry = ({ id, played, accountId = 'a' }: EntryProps): PlayHistoryEntry => ({
+  id,
+  accountId,
+  mediaId: id,
+  startedAt: '2026-11-04T12:00:00.000Z',
+  lastPlayedAt: '2026-11-04T12:00:00.000Z',
+  furthest: 10,
+  duration: 200,
+  libraryId: 1,
+  libraryName: 'Music',
+  played,
+})
+
+type TrackProps = { number: number; albumId?: number }
+
+const track = ({ number, albumId = 7 }: TrackProps): Played => ({
+  kind: PLAYED_KINDS.track,
+  title: `Song ${number}`,
+  artist: 'Radiohead',
+  album: albumId === 7 ? 'OK Computer' : 'Kid A',
+  albumId,
+  disc: 1,
+  number,
+  albumTracks: 3,
+})
+
+const film: Played = { kind: PLAYED_KINDS.video, title: 'Heat', year: 1995 }
+
+const shapeOf = (rows: ReturnType<typeof historyRows>) =>
+  rows.map((row) =>
+    row.kind === HISTORY_ROW_KINDS.album
+      ? `album ${row.run.album} ${row.run.tracksHeard}/${row.run.albumTracks}${row.run.isWhole ? ' whole' : ''}`
+      : `entry ${row.entry.id}`,
+  )
+
+describe('historyRows', () => {
+  it('heads a run of one album’s tracks, and says when the whole album was heard', () => {
+    const rows = historyRows([
+      entry({ id: 5, played: track({ number: 3 }) }),
+      entry({ id: 4, played: track({ number: 2 }) }),
+      entry({ id: 3, played: track({ number: 1 }) }),
+      entry({ id: 2, played: film }),
+      entry({ id: 1, played: track({ number: 1 }) }),
+    ])
+    expect(shapeOf(rows)).toEqual([
+      'album OK Computer 3/3 whole',
+      'entry 5',
+      'entry 4',
+      'entry 3',
+      'entry 2',
+      'entry 1',
+    ])
+  })
+
+  it('starts a new run for another album or another account', () => {
+    const rows = historyRows([
+      entry({ id: 4, played: track({ number: 2 }) }),
+      entry({ id: 3, played: track({ number: 1 }) }),
+      entry({ id: 2, played: track({ number: 1, albumId: 8 }) }),
+      entry({ id: 1, played: track({ number: 3 }), accountId: 'b' }),
+    ])
+    expect(shapeOf(rows)).toEqual([
+      'album OK Computer 2/3',
+      'entry 4',
+      'entry 3',
+      'entry 2',
+      'entry 1',
+    ])
+  })
+
+  it('counts a track heard twice once towards the album', () => {
+    const rows = historyRows([
+      entry({ id: 2, played: track({ number: 1 }) }),
+      entry({ id: 1, played: track({ number: 1 }) }),
+    ])
+    expect(shapeOf(rows)).toEqual(['album OK Computer 1/3', 'entry 2', 'entry 1'])
+  })
+})
+
+describe('reachOf', () => {
+  it('reads how far a sitting got', () => {
+    expect(reachOf({ furthest: null, duration: 200 })).toEqual({ kind: REACH_KINDS.unknown })
+    expect(reachOf({ furthest: 195, duration: 200 })).toEqual({ kind: REACH_KINDS.finished })
+    expect(reachOf({ furthest: 1, duration: 200 })).toEqual({
+      kind: REACH_KINDS.partial,
+      furthest: 1,
+      duration: 200,
+      percent: 0,
+    })
+    expect(reachOf({ furthest: 30, duration: null })).toEqual({
+      kind: REACH_KINDS.partial,
+      furthest: 30,
+      duration: null,
+      percent: null,
+    })
+  })
+})
+
+describe('playedContext', () => {
+  it('names what a file belongs to', () => {
+    expect(
+      playedContext({
+        kind: PLAYED_KINDS.episode,
+        show: 'Severance',
+        season: 1,
+        episode: 2,
+        title: 'Half Loop',
+      }),
+    ).toBe('Severance · S01E02')
+    expect(playedContext(track({ number: 1 }))).toBe('Radiohead · OK Computer')
+    expect(playedContext(film)).toBe('1995')
+    expect(playedContext({ ...film, year: null })).toBeNull()
+  })
+})

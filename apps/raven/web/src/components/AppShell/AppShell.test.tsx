@@ -179,6 +179,8 @@ describe('AppShell', () => {
       'Admin',
       'Streams',
       'Bug reports',
+      'Everyone’s history',
+      'Play history',
       'Settings',
       'Shortcuts',
       'Design',
@@ -508,6 +510,7 @@ describe('AppShell', () => {
       ['Admin', '/admin'],
       ['Streams', '/streams'],
       ['Reports', '/reports'],
+      ['Play history', '/history'],
       ['Settings', '/settings'],
     ])
     expect(links.map(iconOf)).toEqual([
@@ -518,6 +521,7 @@ describe('AppShell', () => {
       'settings',
       'playback',
       'alert',
+      'history',
       'settings',
     ])
     expect(within(tabs()).getByRole('link', { name: 'Favourites' })).toHaveAttribute(
@@ -593,6 +597,8 @@ describe('AppShell', () => {
       '/admin',
       '/streams',
       '/reports',
+      '/history/everyone',
+      '/history',
       DESKTOP_PATHS.local,
       DESKTOP_PATHS.downloads,
       PAGE_PATHS.settings,
@@ -610,6 +616,7 @@ describe('AppShell', () => {
       'Admin',
       'Streams',
       'Reports',
+      'Play history',
       'This Mac',
       'Downloads',
       'Settings',

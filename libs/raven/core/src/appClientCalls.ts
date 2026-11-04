@@ -1,4 +1,10 @@
-import { DISCOVERY_PATHS, HLS_PATHS, PICTURE_PATHS, SCROBBLING_PATHS } from '@/contract'
+import {
+  DISCOVERY_PATHS,
+  HLS_PATHS,
+  PICTURE_PATHS,
+  PLAY_HISTORY_PATHS,
+  SCROBBLING_PATHS,
+} from '@/contract'
 
 /** The methods raven's device app sends. */
 export const APP_CALL_METHODS = { get: 'GET', put: 'PUT', post: 'POST', delete: 'DELETE' } as const
@@ -76,6 +82,8 @@ export const APP_CLIENT_CALLS = {
 
   saveProgress: { method: put, path: '/api/media/:id/progress' },
   recordPlay: { method: post, path: '/api/media/:id/plays' },
+  startListen: { method: post, path: PLAY_HISTORY_PATHS.startListen },
+  reportListen: { method: put, path: PLAY_HISTORY_PATHS.listen },
   setWatched: { method: put, path: '/api/watched' },
   setFavourite: { method: put, path: '/api/media/:id/favourite' },
   setItemFavourite: { method: put, path: '/api/items/:id/favourite' },

@@ -16,6 +16,8 @@ import {
   type MediaSort,
   type MixKind,
   type MusicSort,
+  type PlayHistoryPage,
+  type PlayHistoryShow,
   type TrackPage,
   type ViewingSession,
   asksServerForNext,
@@ -34,6 +36,12 @@ type Listing = { libraryId: number; search: string; sort: MediaSort; seed: numbe
 type SongsPage = { at: number; offset: number }
 
 const FIRST_SONGS_PAGE: SongsPage = { at: 0, offset: 0 }
+
+/** A history's first page has no cursor before it. */
+const FIRST_HISTORY_PAGE: string | null = null
+
+/** The cursor of the page after `last`; undefined after the last page, which ends the list. */
+const nextHistoryPage = (last: PlayHistoryPage): string | undefined => last.next ?? undefined
 
 /** How long a person's page waits between asks while their filmography is on its way. */
 const FILMOGRAPHY_POLL_MS = 1_500
@@ -71,6 +79,10 @@ export const ravenQueriesFor = (api: ApiClient) => {
     sort: MusicSort
   }
   type RavenQueriesForAlbumMatchSearchQueryProps = { albumId: number; query: string }
+  type RavenQueriesForEveryonesHistoryQueryProps = {
+    accountId: string | null
+    show: PlayHistoryShow
+  }
 
   type RavenQueriesForMatchSearchQueryProps = {
     type: MatchItemType
@@ -344,6 +356,27 @@ export const ravenQueriesFor = (api: ApiClient) => {
         gcTime: LISTING_GC_MS,
       }),
 
+    /** The account's own play history, a page at a time, newest first; read afresh whenever it shows. */
+    playHistoryQuery: (show: PlayHistoryShow) =>
+      infiniteQueryOptions({
+        queryKey: queryKeys.playHistory(show),
+        queryFn: ({ pageParam }) => api.listPlayHistory({ before: pageParam, show }),
+        initialPageParam: FIRST_HISTORY_PAGE,
+        getNextPageParam: nextHistoryPage,
+        staleTime: 0,
+      }),
+
+    /** Everyone's play history, or one account's, for the owner; read afresh whenever it shows. */
+    everyonesHistoryQuery: ({ accountId, show }: RavenQueriesForEveryonesHistoryQueryProps) =>
+      infiniteQueryOptions({
+        queryKey: queryKeys.everyonesHistory({ accountId, show }),
+        queryFn: ({ pageParam }) =>
+          api.listEveryonesHistory({ accountId, before: pageParam, show }),
+        initialPageParam: FIRST_HISTORY_PAGE,
+        getNextPageParam: nextHistoryPage,
+        staleTime: 0,
+      }),
+
     /** The account's mixes for today; each holds the same tracks all day. */
     mixesQuery: queryOptions({
       queryKey: queryKeys.mixes,
@@ -527,10 +560,11 @@ export const ravenQueriesFor = (api: ApiClient) => {
       }),
 
     /** Every account on this raven. Keyed by the owner asking, so another account never reads this list, and never retried: a refusal is the answer. */
-    membersQuery: (userId: string) =>
+    /** The owner `userId`'s list of accounts; none asks for nothing, as for anyone but the owner. */
+    membersQuery: (userId: string | null) =>
       queryOptions({
         queryKey: queryKeys.members(userId),
-        queryFn: () => api.listMembers(),
+        queryFn: userId === null ? skipToken : () => api.listMembers(),
         retry: false,
       }),
   }

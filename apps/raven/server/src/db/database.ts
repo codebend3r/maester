@@ -899,6 +899,38 @@ export const MIGRATIONS: readonly string[] = [
   CREATE INDEX media_library_dolby_vision_only ON media (library_id) WHERE dolby_vision_only = 1;
   UPDATE media SET probed = 0 WHERE hdr = 1;
   `,
+  // Every sitting with a video or a track, however short, by account, for the play history.
+  // `id` counts up within each account, so its key is also the account's order, newest last;
+  // the owner's view of everyone reads by start time. A video's entry follows its play
+  // (`play_id`) as that sitting's reports come in; a track's follows the listen its player
+  // started. The plays kept so far start it: a video's with how far it got, a music
+  // listen's with no reach (NULL), since a listen only ever noted that it counted.
+  `
+  CREATE TABLE play_history (
+    account_id TEXT NOT NULL,
+    id INTEGER NOT NULL,
+    media_id INTEGER NOT NULL REFERENCES media (id) ON DELETE CASCADE,
+    play_id INTEGER,
+    started_at TEXT NOT NULL,
+    last_played_at TEXT NOT NULL,
+    furthest REAL,
+    PRIMARY KEY (account_id, id)
+  ) WITHOUT ROWID;
+  CREATE INDEX play_history_media ON play_history (media_id);
+  CREATE INDEX play_history_play ON play_history (account_id, play_id) WHERE play_id IS NOT NULL;
+  CREATE INDEX play_history_started ON play_history (started_at, account_id, id);
+  INSERT INTO play_history (account_id, id, media_id, play_id, started_at, last_played_at, furthest)
+    SELECT pl.account_id,
+           ROW_NUMBER() OVER (PARTITION BY pl.account_id ORDER BY pl.played_at, pl.id),
+           pl.media_id,
+           CASE WHEN t.media_id IS NULL THEN pl.id END,
+           pl.played_at,
+           pl.played_at,
+           CASE WHEN t.media_id IS NULL OR pl.furthest > 0 THEN pl.furthest END
+      FROM plays pl
+      LEFT JOIN tracks t ON t.media_id = pl.media_id
+     WHERE pl.kind <> 'marked';
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

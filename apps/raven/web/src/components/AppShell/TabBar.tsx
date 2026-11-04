@@ -7,6 +7,7 @@ import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import { COMMON_COPY } from '@/lib/copy'
 import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
+import { PLAY_HISTORY_COPY, PLAY_HISTORY_ROUTES } from '@/pages/PlayHistoryPage/copy'
 import { ADMIN_COPY, ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 import { MUSIC_PATHS } from '@/lib/music'
 
@@ -76,6 +77,12 @@ export const TabBar = ({ hasMusic }: TabBarProps) => {
               label={APP_SHELL_COPY.reports}
             />
           </AdminOnly>
+          <Tab
+            to={PLAY_HISTORY_ROUTES.own}
+            patterns={[PLAY_HISTORY_ROUTES.own, PLAY_HISTORY_ROUTES.everyone]}
+            icon="history"
+            label={PLAY_HISTORY_COPY.title}
+          />
         </>
       )}
       {isDesktop && (

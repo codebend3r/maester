@@ -5,6 +5,7 @@ import { failureMessage } from '@/components/Player/useMediaSource'
 import { useMediaPlane } from '@/components/Player/useMediaPlane'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import { useListenCounter } from '@/components/AudioHost/useListenCounter'
+import { useListenHistory } from '@/components/AudioHost/useListenHistory'
 import { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
 import {
   type Crossfade,
@@ -401,6 +402,7 @@ export const AudioHost = ({ api, reprobe }: AudioHostProps) => {
   useLevelledVolume({ ref: other, track: upNext })
   useMediaSession({ api, track, rate })
   useListenCounter({ api, track })
+  useListenHistory({ api, track })
   const crossOrigin = isRouted ? CROSS_ORIGIN : undefined
   return (
     <div className={styles.host} aria-hidden="true">

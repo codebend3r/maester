@@ -7,6 +7,7 @@ import { SettingsRepository } from '@/settings/settingsRepository'
 export type AdoptedCounts = {
   spots: number
   plays: number
+  history: number
   favourites: number
   titleFavourites: number
   albumFavourites: number
@@ -33,6 +34,7 @@ type FavouriteTable = (typeof FAVOURITE_TABLES)[keyof typeof FAVOURITE_TABLES]
 const VIEWING_TABLES = [
   'playback_progress',
   'plays',
+  'play_history',
   ...Object.values(FAVOURITE_TABLES).map(({ table }) => table),
   'playlists',
 ] as const
@@ -113,6 +115,20 @@ export class ViewingAdoption {
       const plays = this.db
         .prepare<Adopting>('UPDATE plays SET account_id = @owner WHERE account_id = @local')
         .run(adopting).changes
+      // Numbered on past the owner's newest, so the history keeps its order and no key repeats.
+      // Read first: a subquery in the UPDATE would see the rows it has already moved.
+      const newest =
+        this.db
+          .prepare<Pick<Adopting, 'owner'>, { id: number }>(
+            'SELECT COALESCE(MAX(id), 0) AS id FROM play_history WHERE account_id = @owner',
+          )
+          .get({ owner: ownerId })?.id ?? 0
+      const history = this.db
+        .prepare<Adopting & { newest: number }>(
+          `UPDATE play_history SET account_id = @owner, id = id + @newest
+            WHERE account_id = @local`,
+        )
+        .run({ ...adopting, newest }).changes
       // A playlist is the owner's as it was: no two are the same list, so none merge.
       const playlists = this.db
         .prepare<Adopting>('UPDATE playlists SET account_id = @owner WHERE account_id = @local')
@@ -123,6 +139,7 @@ export class ViewingAdoption {
       const counts: AdoptedCounts = {
         spots,
         plays,
+        history,
         favourites: this.mergeFavourites({ of: FAVOURITE_TABLES.favourites, adopting }),
         titleFavourites: this.mergeFavourites({ of: FAVOURITE_TABLES.titleFavourites, adopting }),
         albumFavourites: this.mergeFavourites({ of: FAVOURITE_TABLES.albumFavourites, adopting }),
