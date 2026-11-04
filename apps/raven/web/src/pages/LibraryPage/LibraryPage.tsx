@@ -44,7 +44,9 @@ const OpenLibrary = ({ library, section, titleId, lock, actions }: OpenLibraryPr
     <section className={styles.page} aria-labelledby={titleId}>
       <LibraryHeader titleId={titleId} library={library} actions={actions} isShut={isShut} />
 
-      {lock.state === LIBRARY_LOCK_STATES.shut && <LockedLibrary name={library.name} />}
+      {lock.state === LIBRARY_LOCK_STATES.shut && (
+        <LockedLibrary name={library.name} available={lock.available} />
+      )}
 
       {!isShut && (
         <>

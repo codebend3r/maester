@@ -2,6 +2,7 @@
 export const KEYS = {
   space: ' ',
   enter: 'Enter',
+  backspace: 'Backspace',
   escape: 'Escape',
   tab: 'Tab',
   arrowUp: 'ArrowUp',
