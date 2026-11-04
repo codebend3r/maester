@@ -1,0 +1,125 @@
+.dialog {
+  width: min(var(--measure-narrow), calc(100vw - 2 * var(--space-3)));
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+  color: var(--color-bark);
+  box-shadow: var(--shadow-popover);
+
+  &::backdrop {
+    background: var(--color-scrim);
+  }
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.hint {
+  color: var(--color-lichen);
+}
+
+// The digits so far, as dots, in a well the height of one line of them.
+.entered {
+  display: grid;
+  place-items: center;
+  min-height: var(--control-size-tall);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--color-deep);
+}
+
+.dots {
+  font-size: var(--font-size-lg);
+  letter-spacing: var(--tracking-wide);
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+// Three across, as a phone's keypad: 1 to 9, then Backspace, 0 and Unlock.
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, var(--control-size-large));
+  justify-content: center;
+  gap: var(--space-2) var(--space-4);
+  min-inline-size: 0;
+  padding: 0;
+  border: 0;
+}
+
+.key,
+.enter {
+  display: grid;
+  place-items: center;
+  width: var(--control-size-large);
+  height: var(--control-size-large);
+  padding: 0;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-moss);
+  color: var(--color-bark);
+  font-family: var(--font-body);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  // Young Serif's figures are old style and bob; a keypad's sit on one line.
+  font-variant-numeric: lining-nums tabular-nums;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--color-moss-hi);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: var(--opacity-held);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 150ms var(--ease-out);
+  }
+}
+
+.enter {
+  border-color: transparent;
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+
+  &:hover:not(:disabled) {
+    background: var(--color-leaf-hi);
+  }
+}
+
+.error {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-leaf-bright);
+  background: var(--color-night);
+  font-size: var(--font-size-sm);
+  text-align: start;
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: center;
+}

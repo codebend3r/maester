@@ -37,6 +37,7 @@ describe('LibraryPage', () => {
     view: spyOn(api, 'setLibraryView'),
     lockState: spyOn(api, 'getLock'),
     lock: spyOn(api, 'lock'),
+    unlock: spyOn(api, 'unlock'),
     ratings: spyOn(api, 'updateLibraryRatings'),
     markers: spyOn(api, 'scanLibraryMarkers'),
     counts: spyOn(api, 'getLibraryCounts').mockImplementation(async () => libraryCounts()),
@@ -86,6 +87,7 @@ describe('LibraryPage', () => {
     spies.view.mockReset()
     spies.lockState.mockReset()
     spies.lock.mockReset()
+    spies.unlock.mockReset()
     spies.ratings.mockReset()
     spies.markers.mockReset()
     state.sent = []
@@ -478,17 +480,98 @@ describe('LibraryPage', () => {
     expect(screen.getByRole('button', { name: 'Shuffle' })).toBeDisabled()
   })
 
-  it('keeps a locked library shut, asking for nothing', async () => {
+  it('keeps a locked library shut, offering the owner Unlock without asking for the PIN', async () => {
     spies.lockState.mockImplementation(async () => ({ available: true, unlocked: false }))
     serve({ settings: { locked: true } })
     const locked = await screen.findByRole('region', { name: 'Locked' })
     expect(locked).toHaveTextContent('Movies is locked.')
     expect(screen.queryByRole('search')).toBeNull()
     expect(state.listed).toEqual([])
+    expect(within(locked).getByRole('button', { name: 'Unlock' })).toBeEnabled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('offers no Unlock to a caller who cannot enter the PIN', async () => {
+    spies.lockState.mockImplementation(async () => ({ available: false, unlocked: false }))
+    serve({ settings: { locked: true } })
+    const locked = await screen.findByRole('region', { name: 'Locked' })
     expect(within(locked).queryByRole('button')).toBeNull()
   })
 
-  it('holds Edit back while the library is locked, as its folders are, with no prompt', async () => {
+  it('opens a locked library once the right PIN is pressed on the pad', async () => {
+    const lock = { unlocked: false }
+    spies.lockState.mockImplementation(async () => ({ available: true, unlocked: lock.unlocked }))
+    spies.unlock.mockImplementation(async () => {
+      lock.unlocked = true
+      return { available: true, unlocked: true }
+    })
+    serve({ settings: { locked: true } })
+    await userEvent.click(await screen.findByRole('button', { name: 'Unlock' }))
+    const pad = within(screen.getByRole('dialog', { name: 'Unlock libraries' }))
+    expect(pad.getByRole('button', { name: 'Unlock' })).toBeDisabled()
+    await userEvent.click(pad.getByRole('button', { name: '1' }))
+    await userEvent.click(pad.getByRole('button', { name: '2' }))
+    await userEvent.click(pad.getByRole('button', { name: '9' }))
+    await userEvent.click(pad.getByRole('button', { name: 'Delete the last digit' }))
+    await userEvent.click(pad.getByRole('button', { name: '0' }))
+    expect(pad.getByText('3 digits entered')).toBeInTheDocument()
+    await userEvent.click(pad.getByRole('button', { name: 'Unlock' }))
+    expect(spies.unlock).toHaveBeenCalledWith('120')
+    expect(await screen.findByRole('link', { name: /Wide/ })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('takes the PIN from the keyboard too, Enter unlocking', async () => {
+    spies.lockState.mockImplementation(async () => ({ available: true, unlocked: false }))
+    spies.unlock.mockImplementation(async () => ({ available: true, unlocked: true }))
+    serve({ settings: { locked: true } })
+    await userEvent.click(await screen.findByRole('button', { name: 'Unlock' }))
+    const pad = within(screen.getByRole('dialog', { name: 'Unlock libraries' }))
+    await userEvent.click(pad.getByRole('button', { name: '4' }))
+    await userEvent.keyboard('321{Backspace}5{Enter}')
+    expect(spies.unlock).toHaveBeenCalledWith('4325')
+  })
+
+  it("keeps a locked library shut on a wrong PIN, saying the server's reason", async () => {
+    spies.lockState.mockImplementation(async () => ({ available: true, unlocked: false }))
+    spies.unlock.mockImplementation(async () => {
+      throw new Error('Wrong PIN.')
+    })
+    serve({ settings: { locked: true } })
+    await userEvent.click(await screen.findByRole('button', { name: 'Unlock' }))
+    const pad = within(screen.getByRole('dialog', { name: 'Unlock libraries' }))
+    await userEvent.click(pad.getByRole('button', { name: '7' }))
+    await userEvent.click(pad.getByRole('button', { name: 'Unlock' }))
+    expect(await pad.findByRole('alert')).toHaveTextContent('Wrong PIN.')
+    expect(pad.getByText('0 digits entered')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Locked' })).toBeInTheDocument()
+  })
+
+  it('closes the pad on Cancel, leaving the library shut', async () => {
+    spies.lockState.mockImplementation(async () => ({ available: true, unlocked: false }))
+    serve({ settings: { locked: true } })
+    await userEvent.click(await screen.findByRole('button', { name: 'Unlock' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(spies.unlock).not.toHaveBeenCalled()
+  })
+
+  it('asks for no PIN once an unlocked library is locked again', async () => {
+    const lock = { unlocked: true }
+    spies.lockState.mockImplementation(async () => ({ available: true, unlocked: lock.unlocked }))
+    spies.lock.mockImplementation(async () => {
+      lock.unlocked = false
+      return { available: true, unlocked: false }
+    })
+    serve({ settings: { locked: true } })
+    await screen.findByRole('link', { name: /Wide/ })
+    await userEvent.click(screen.getByRole('button', { name: 'Lock' }))
+    const locked = await screen.findByRole('region', { name: 'Locked' })
+    expect(within(locked).getByRole('button', { name: 'Unlock' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('holds Edit back while the library is locked, as its folders are, with no dialog', async () => {
     spies.lockState.mockImplementation(async () => ({ available: true, unlocked: false }))
     serve({ settings: { locked: true } })
     await screen.findByRole('region', { name: 'Locked' })

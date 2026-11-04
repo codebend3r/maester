@@ -19,6 +19,7 @@ describe('lockState', () => {
     })
     expect(lockState({ locked: true, lock: { available: false, unlocked: false } })).toEqual({
       state: 'shut',
+      available: false,
     })
   })
 })

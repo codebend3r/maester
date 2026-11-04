@@ -118,6 +118,11 @@ export const DRAWINGS = {
   download: { stroke: 'M12 4.5V15M7.5 10.5l4.5 4.5 4.5-4.5M5 19.5h14' },
   plus: { stroke: 'M12 5.5v13M5.5 12h13' },
   close: { stroke: 'M7 7l10 10M17 7L7 17' },
+  // A key that takes the last digit back: a tag pointing left, crossed out.
+  backspace: {
+    stroke: 'M9 5.5h9.5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9L3.5 12zM11.5 9.5l5 5M16.5 9.5l-5 5',
+    fill: 'M9 5.5h9.5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9L3.5 12z',
+  },
   // A drawn window's own controls, beside close.
   minimize: { stroke: 'M6.5 12h11' },
   maximize: { stroke: 'M7 7h10v10H7z' },
