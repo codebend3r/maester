@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { type Hero, PICTURE_RANGES, RESOLUTIONS, SESSION_KINDS } from '@raven/core'
+import { api } from '@/lib/api'
 import { featuredOf } from '@/pages/HomePage/featured'
 import {
   RELEASED_LABEL,
@@ -157,5 +158,17 @@ describe('featuredOf', () => {
     expect(
       featuredOf({ hero: [showHeroEntry({ entry })], libraries: LIBRARIES })[0]?.play,
     ).toBeNull()
+  })
+
+  it("offers the image CDN's narrower copies of the backdrop, and none without one", () => {
+    const movie = arrival({ id: 5, addedAt: '2026-10-10T00:00:00.000Z' })
+    const [plain] = featuredOf({ hero: [movieEntry({ media: movie })], libraries: LIBRARIES })
+    expect(plain?.backdropSrcSet).toBeNull()
+    const srcSet = '/.netlify/images?w=480 480w, /.netlify/images 1280w'
+    const widths = spyOn(api, 'backdropSrcSet').mockReturnValue(srcSet)
+    const [featured] = featuredOf({ hero: [movieEntry({ media: movie })], libraries: LIBRARIES })
+    expect(widths).toHaveBeenCalledWith({ id: 105, version: 'b5' })
+    expect(featured?.backdropSrcSet).toBe(srcSet)
+    widths.mockRestore()
   })
 })

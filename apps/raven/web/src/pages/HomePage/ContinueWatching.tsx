@@ -1,5 +1,6 @@
 import {
   ITEM_IMAGE_KINDS,
+  type ItemDetails,
   type MediaItem,
   type PosterEntry,
   cardLink,
@@ -30,25 +31,39 @@ export const timeLeft = (media: MediaItem): string | null => {
   return left == null ? null : HOME_COPY.timeLeft(left)
 }
 
+/** A tile's backdrop: half the page across the two columns, all of it under 48rem. */
+export const TILE_BACKDROP_SIZES = 'auto, (max-width: 48rem) 100vw, 50vw'
+
+type TileBackdrop = { src: string | null; srcSet: string | null }
+
+type TileBackdropOfProps = {
+  media: MediaItem
+  art: Pick<ItemDetails, 'id' | 'backdropVersion'> | undefined
+}
+
+/**
+ * The show's or film's backdrop, with the image CDN's narrower copies so a
+ * tile half the page wide never fetches the full one, else the video's frame grab.
+ */
+const tileBackdropOf = ({ media, art }: TileBackdropOfProps): TileBackdrop => {
+  if (art?.backdropVersion == null) return { src: api.thumbnailUrl(media), srcSet: null }
+  const picture = { id: art.id, version: art.backdropVersion }
+  return {
+    src: api.itemImageUrl({ ...picture, kind: ITEM_IMAGE_KINDS.backdrop }),
+    srcSet: api.backdropSrcSet(picture),
+  }
+}
+
 type TileArtProps = { entry: PosterEntry }
 
 /**
- * The art a tile wears: the backdrop of the show or film it belongs to, else
- * the frame grab the video already has, and the title's logo for the corner.
+ * The art a tile wears: its backdrop and the title's logo for the corner.
  * An episode's summary carries neither version, so the show's page is read
  * once through the query cache every page shares.
  */
 const useTileArt = ({ entry: { media } }: TileArtProps) => {
   const artId = media.item?.show?.id ?? media.item?.id ?? null
   const { data } = useQuery({ ...itemQuery(artId ?? 0), enabled: artId !== null })
-  const backdrop =
-    data?.backdropVersion == null
-      ? api.thumbnailUrl(media)
-      : api.itemImageUrl({
-          id: data.id,
-          kind: ITEM_IMAGE_KINDS.backdrop,
-          version: data.backdropVersion,
-        })
   const logo =
     data?.logoVersion == null
       ? null
@@ -57,7 +72,7 @@ const useTileArt = ({ entry: { media } }: TileArtProps) => {
           kind: ITEM_IMAGE_KINDS.logo,
           version: data.logoVersion,
         })
-  return { backdrop, logo }
+  return { backdrop: tileBackdropOf({ media, art: data }), logo }
 }
 
 const TITLE_KINDS = { linked: 'linked', plain: 'plain' } as const
@@ -166,10 +181,12 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
         )}
       </span>
       <span className={styles.backdrop}>
-        {art.backdrop && (
+        {art.backdrop.src && (
           <img
             className={styles.picture}
-            src={art.backdrop}
+            src={art.backdrop.src}
+            srcSet={art.backdrop.srcSet ?? undefined}
+            sizes={TILE_BACKDROP_SIZES}
             alt=""
             loading="lazy"
             decoding="async"

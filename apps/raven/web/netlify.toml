@@ -12,6 +12,12 @@ publish = "apps/raven/web/dist"
 # previews only when something the site bundles changed (netlify-ignore.sh).
 ignore = "bash apps/raven/netlify-ignore.sh apps/raven/web apps/raven/netlify-build.sh libs/raven/core libs/raven/ui scripts/bump_version.sh"
 
+# The functions, bundled by Netlify after the build: each is the file named after its
+# folder, so a test beside it is never bundled. RAVEN_API_ORIGIN is scoped to them too,
+# for the pictures function.
+[functions]
+directory = "apps/raven/web/netlify/functions"
+
 [build.environment]
 BUN_VERSION = "1.4.2"
 BUN_FLAGS = "--frozen-lockfile"

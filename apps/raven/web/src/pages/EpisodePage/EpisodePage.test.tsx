@@ -113,6 +113,18 @@ describe('EpisodePage', () => {
     await waitFor(() => expect(backdrop()).toContain('/api/pictures/items/7/still/still1'))
   })
 
+  it("offers the image CDN's narrower copies of its show's backdrop, as wide as the screen", async () => {
+    const srcSet = '/.netlify/images?w=480 480w, /.netlify/images 1280w'
+    const widths = spyOn(api, 'backdropSrcSet').mockReturnValue(srcSet)
+    open({ show: { ...SEVERANCE, backdropVersion: 'b4', libraryPictures: [] } })
+    const backdrop = () => document.querySelector('img[src*="/api/pictures/items/4/backdrop/b4"]')
+    await waitFor(() => expect(backdrop()).not.toBeNull())
+    expect(widths).toHaveBeenCalledWith({ id: 4, version: 'b4' })
+    expect(backdrop()).toHaveAttribute('srcset', srcSet)
+    expect(backdrop()).toHaveAttribute('sizes', '100vw')
+    widths.mockRestore()
+  })
+
   it('plays from its still', async () => {
     open()
     const still = await screen.findByRole('link', { name: 'Play Half Loop' })

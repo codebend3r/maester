@@ -23,6 +23,12 @@ type Choice = (typeof CHOICES)[keyof typeof CHOICES]
 
 const LABELS = SAGA_COPY.motions satisfies Record<Choice, { label: string; hint: string }>
 
+/**
+ * A movie's tile: one across a phone, else two across a dialog no wider
+ * than `--measure`, 38rem, less its padding, so 18rem at most.
+ */
+export const SAGA_PICTURE_SIZES = 'auto, (max-width: 30rem) 100vw, 18rem'
+
 type SagaBackdropDialogProps = {
   libraryId: number
   saga: Saga
@@ -112,7 +118,14 @@ export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDia
                     onChange={() => setCoverId(picture.id)}
                   />
                   <label htmlFor={`${ids.cover}-${picture.id}`}>
-                    <img src={api.sagaPictureUrl(picture)} alt="" loading="lazy" decoding="async" />
+                    <img
+                      src={api.sagaPictureUrl(picture)}
+                      srcSet={api.backdropSrcSet(picture) ?? undefined}
+                      sizes={SAGA_PICTURE_SIZES}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
                     <span className={styles.caption}>{picture.title}</span>
                   </label>
                 </li>

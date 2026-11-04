@@ -64,7 +64,10 @@ const headerBackdrop = (saga: Saga): HeaderBackdrop | null => {
   const { backdrop } = saga
   switch (backdrop.type) {
     case SAGA_BACKDROP_TYPES.slideshow: {
-      const slides = sagaPictures(saga).map((picture) => api.sagaPictureUrl(picture))
+      const slides = sagaPictures(saga).map((picture) => ({
+        src: api.sagaPictureUrl(picture),
+        srcSet: api.backdropSrcSet(picture),
+      }))
       return slides.length === 0 ? null : { type: 'slideshow', slides, motion: backdrop.motion }
     }
     case SAGA_BACKDROP_TYPES.still: {

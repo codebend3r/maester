@@ -29,6 +29,10 @@ export default {
       ignoreBinaries: ['watchman', 'maestro'],
       ignoreDependencies: ['expo-updates'],
     },
+    'apps/raven/web': {
+      // Netlify runs each function by its folder's file of the same name, which no import names.
+      entry: ['netlify/functions/*/*.ts'],
+    },
     'apps/raven/desktop': {
       // Electron's main and preload bundles and the Forge config are entry
       // points no import names.

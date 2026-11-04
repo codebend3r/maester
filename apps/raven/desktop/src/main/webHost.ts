@@ -93,24 +93,37 @@ const HOP_BY_HOP = new Set<string>([
 // The web signs in with Supabase Auth directly: the one origin the page calls besides its own.
 const SUPABASE_ORIGINS = 'https://*.supabase.co'
 
+/** The page's inline scripts and styles, each hashed as its CSP directive names it. */
+export type InlineHashes = {
+  scripts: readonly string[]
+  styles: readonly string[]
+}
+
+const NO_INLINE_HASHES = { scripts: [], styles: [] } as const satisfies InlineHashes
+
 type ContentSecurityPolicyProps = {
-  scriptHashes: readonly string[]
+  inlineHashes: InlineHashes
   authOrigin: string | null
 }
 
+type SourcesProps = { directive: string; hashes: readonly string[] }
+
+const sources = ({ directive, hashes }: SourcesProps): string =>
+  [`${directive} 'self'`, ...hashes.map((hash) => `'sha256-${hash}'`)].join(' ')
+
 /**
  * The page's policy. Its styles, fonts and scripts are files of its own build, its posters come
- * through `/api`, and only its inline scripts (the theme, set before first paint) need a hash.
- * `authOrigin` is the test hook's Supabase Auth, or null.
+ * through `/api`, and only what index.html carries inline before first paint (the theme script,
+ * the loader's styles) needs a hash. `authOrigin` is the test hook's Supabase Auth, or null.
  */
 export const contentSecurityPolicy = ({
-  scriptHashes,
+  inlineHashes,
   authOrigin,
 }: ContentSecurityPolicyProps): string =>
   [
     "default-src 'self'",
-    ["script-src 'self'", ...scriptHashes.map((hash) => `'sha256-${hash}'`)].join(' '),
-    "style-src 'self'",
+    sources({ directive: 'script-src', hashes: inlineHashes.scripts }),
+    sources({ directive: 'style-src', hashes: inlineHashes.styles }),
     "font-src 'self'",
     "img-src 'self' data:",
     `media-src 'self' ${FILE_SCHEME}:`,
@@ -124,11 +137,20 @@ export const contentSecurityPolicy = ({
 
 const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/gi
 
-/** Each inline script of a page, hashed as `script-src` names it. */
-export const inlineScriptHashes = (html: string): string[] =>
-  [...html.matchAll(INLINE_SCRIPT)].map(([, body = '']) =>
+const INLINE_STYLE = /<style>([\s\S]*?)<\/style>/gi
+
+type HashesOfProps = { html: string; pattern: RegExp }
+
+const hashesOf = ({ html, pattern }: HashesOfProps): string[] =>
+  [...html.matchAll(pattern)].map(([, body = '']) =>
     createHash('sha256').update(body).digest('base64'),
   )
+
+/** Each inline script and style of a page, hashed as `script-src` and `style-src` name them. */
+export const inlineHashesOf = (html: string): InlineHashes => ({
+  scripts: hashesOf({ html, pattern: INLINE_SCRIPT }),
+  styles: hashesOf({ html, pattern: INLINE_STYLE }),
+})
 
 type WebRootForProps = {
   isPackaged: boolean
@@ -237,8 +259,8 @@ export const createWebHostHandler = ({
   // Told once each time it changes, since the page asks again and again while it is down.
   const reach = { isReachable: true }
 
-  const guarded = (scriptHashes: readonly string[] = []): OutgoingHttpHeaders => ({
-    [HTTP_HEADERS.contentSecurityPolicy]: contentSecurityPolicy({ scriptHashes, authOrigin }),
+  const guarded = (inlineHashes: InlineHashes = NO_INLINE_HASHES): OutgoingHttpHeaders => ({
+    [HTTP_HEADERS.contentSecurityPolicy]: contentSecurityPolicy({ inlineHashes, authOrigin }),
     [HTTP_HEADERS.contentTypeOptions]: 'nosniff',
   })
 
@@ -288,13 +310,13 @@ export const createWebHostHandler = ({
       return
     }
     const type = CONTENT_TYPES.get(extensionOf(basename(file.path))) ?? 'application/octet-stream'
-    const scriptHashes =
-      type === HTML_TYPE ? inlineScriptHashes(new TextDecoder().decode(file.bytes)) : []
+    const inlineHashes =
+      type === HTML_TYPE ? inlineHashesOf(new TextDecoder().decode(file.bytes)) : NO_INLINE_HASHES
     answer({
       response,
       status: HTTP_STATUSES.ok,
       headers: {
-        ...guarded(scriptHashes),
+        ...guarded(inlineHashes),
         [HTTP_HEADERS.contentType]: type,
         [HTTP_HEADERS.contentLength]: `${file.bytes.byteLength}`,
         [HTTP_HEADERS.cacheControl]:

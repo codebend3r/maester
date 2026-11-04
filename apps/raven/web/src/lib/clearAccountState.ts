@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { listingStore } from '@/lib/listingStore'
-import { stopKeepingListings } from '@/lib/savedListings'
+import { stopKeepingSaved } from '@/lib/keepSaved'
 import { useSelectionScopes } from '@/stores/selectionScope'
 
 type ClearAccountStateProps = {
@@ -13,12 +13,12 @@ type ClearAccountStateProps = {
  * watching it until their next render, and a page that clears twice (the
  * session's change, then the sign out) would leave the gate waiting on a
  * query nothing fetches. A mutation under way, the sign out among them, keeps
- * its state for the button that started it. The listings kept on this device
- * go too.
+ * its state for the button that started it. The listings and home kept on
+ * this device go too.
  */
 export const clearAccountState = async ({ queryClient }: ClearAccountStateProps): Promise<void> => {
   useSelectionScopes.getState().scopes.forEach((scope) => scope.store.getState().end())
-  stopKeepingListings()
+  stopKeepingSaved()
   await queryClient.resetQueries()
   await listingStore.clear()
 }

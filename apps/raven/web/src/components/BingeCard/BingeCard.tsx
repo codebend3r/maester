@@ -18,6 +18,13 @@ import { COMMON_COPY } from '@/lib/copy'
 import { itemQuery, nextEpisodeQuery } from '@/lib/queries'
 import styles from '@/components/BingeCard/BingeCard.module.scss'
 
+/**
+ * The card's backdrop: the first card spans the Binge grid's two columns,
+ * the rest take one, and the card does not know which it is, so past the
+ * width Chrome lays it out at it allows for the whole screen.
+ */
+export const BINGE_BACKDROP_SIZES = 'auto, 100vw'
+
 type BingeCardProps = { details: ItemDetails }
 
 /**
@@ -48,6 +55,7 @@ export const BingeCard = ({ details }: BingeCardProps) => {
           kind: ITEM_IMAGE_KINDS.backdrop,
           version: details.backdropVersion,
         })
+  const backdropSrcSet = api.backdropSrcSet({ id: details.id, version: details.backdropVersion })
   const logo =
     details.logoVersion == null
       ? null
@@ -106,7 +114,15 @@ export const BingeCard = ({ details }: BingeCardProps) => {
       )}
       <span className={styles.backdrop}>
         {backdrop && (
-          <img className={styles.picture} src={backdrop} alt="" loading="lazy" decoding="async" />
+          <img
+            className={styles.picture}
+            src={backdrop}
+            srcSet={backdropSrcSet ?? undefined}
+            sizes={BINGE_BACKDROP_SIZES}
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
         )}
       </span>
     </li>

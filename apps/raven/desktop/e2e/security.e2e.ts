@@ -21,12 +21,14 @@ import {
 } from '@/e2e/harness'
 
 // Written out rather than imported, so the test checks the header against the spec, not
-// against the module that sends it. `script-src` names the page's inline script by its hash,
-// which changes with every web build, so it is read apart.
+// against the module that sends it. `script-src` and `style-src` name the page's inline script
+// and style by their hashes, which change with every web build, so they are read apart.
 const CONTENT_SECURITY_POLICY =
-  "default-src 'self'; script-src; style-src 'self'; font-src 'self'; img-src 'self' data:; media-src 'self' raven-file:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+  "default-src 'self'; script-src; style-src; font-src 'self'; img-src 'self' data:; media-src 'self' raven-file:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 const SCRIPT_SOURCES = /script-src [^;]+/u
 const INLINE_HASH = /^script-src 'self'( 'sha256-[A-Za-z0-9+/=]+')+$/u
+const STYLE_SOURCES = /style-src [^;]+/u
+const INLINE_STYLE_HASH = /^style-src 'self'( 'sha256-[A-Za-z0-9+/=]+')+$/u
 
 const NAVIGATION_KEY = 'ravenE2eNavigation'
 const ELSEWHERE = 'https://example.com/'
@@ -178,8 +180,11 @@ test.describe('the security baseline', () => {
       }
     })
     expect(answer.status).toBe(200)
-    expect(answer.policy.replace(SCRIPT_SOURCES, 'script-src')).toBe(CONTENT_SECURITY_POLICY)
+    expect(
+      answer.policy.replace(SCRIPT_SOURCES, 'script-src').replace(STYLE_SOURCES, 'style-src'),
+    ).toBe(CONTENT_SECURITY_POLICY)
     expect(SCRIPT_SOURCES.exec(answer.policy)?.[0] ?? '').toMatch(INLINE_HASH)
+    expect(STYLE_SOURCES.exec(answer.policy)?.[0] ?? '').toMatch(INLINE_STYLE_HASH)
   })
 
   test("refuses an encoded way out of the web app's folder", async () => {

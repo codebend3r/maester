@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { KINDS, type Library } from '@raven/core'
+import { KINDS, LIBRARY_BACKDROP_TYPES, type Library, type LibraryBackdrop } from '@raven/core'
 import { type ComponentType, type ReactNode, useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
@@ -120,6 +120,15 @@ const HeroCheckbox = ({ library }: HeroCheckboxProps) => {
   )
 }
 
+/** The row's picture covers the right 55% of a card no wider than the screen. */
+export const LIBRARY_BACKDROP_SIZES = 'auto, 55vw'
+
+/** A movie's or show's backdrop at the image CDN's narrower widths; a frame grab has none. */
+const libraryBackdropSrcSet = (backdrop: LibraryBackdrop): string | null =>
+  backdrop.type === LIBRARY_BACKDROP_TYPES.item
+    ? api.backdropSrcSet({ id: backdrop.id, version: backdrop.version })
+    : null
+
 type LibraryRowProps = {
   library: Library
   isShut: boolean
@@ -139,7 +148,7 @@ type LibraryRowProps = {
 const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
   const detailsId = useId()
   const actions = useLibraryActions(library)
-  const backdrop = !isShut && library.backdrop && api.libraryBackdropUrl(library.backdrop)
+  const picture = isShut ? null : library.backdrop
   const lockNote = isShut ? LIBRARIES_COPY.locked : LIBRARIES_COPY.unlocked
   // The server sends no folders to a browser with the admin lock on; this holds a list cached from before to the same.
   const canManage = useCanManage()
@@ -147,8 +156,16 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
 
   return (
     <li className={styles.row}>
-      {backdrop && (
-        <span className={styles.backdrop} style={{ backgroundImage: `url("${backdrop}")` }} />
+      {picture && (
+        <img
+          className={styles.backdrop}
+          src={api.libraryBackdropUrl(picture)}
+          srcSet={libraryBackdropSrcSet(picture) ?? undefined}
+          sizes={LIBRARY_BACKDROP_SIZES}
+          alt=""
+          loading="lazy"
+          decoding="async"
+        />
       )}
       <div className={isOpen ? styles.details : `${styles.details} ${styles.folded}`}>
         <span className={styles.well}>

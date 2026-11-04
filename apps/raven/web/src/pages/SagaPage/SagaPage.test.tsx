@@ -13,6 +13,7 @@ import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { POSTER_SIZES } from '@/lib/posters'
+import { SAGA_PICTURE_SIZES } from '@/pages/SagaPage/SagaBackdropDialog'
 import { SagaPage } from '@/pages/SagaPage/SagaPage'
 import { itemSummary, library, matchedMovie } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
@@ -167,6 +168,19 @@ describe('SagaPage', () => {
     expect(backdropOf({ id: 90, version: 'b2' })).not.toBeNull()
   })
 
+  it("offers the image CDN's narrower copies of each slide, as wide as the screen", async () => {
+    const widths = spyOn(api, 'backdropSrcSet').mockImplementation(
+      ({ id }) => `/.netlify/images?w=480&id=${id} 480w`,
+    )
+    open({ backdrop: { type: 'slideshow', motion: 'fade' } })
+    await screen.findByRole('heading', { name: 'The Lord of the Rings Collection' })
+    const first = backdropOf({ id: 80, version: 'b1' })
+    expect(widths).toHaveBeenCalledWith(expect.objectContaining({ id: 80, version: 'b1' }))
+    expect(first).toHaveAttribute('srcset', '/.netlify/images?w=480&id=80 480w')
+    expect(first).toHaveAttribute('sizes', '100vw')
+    widths.mockRestore()
+  })
+
   it('holds still the backdrop picked for it, and only that one', async () => {
     open({ backdrop: { type: 'still', itemId: 90 } })
     await screen.findByRole('heading', { name: 'The Lord of the Rings Collection' })
@@ -214,6 +228,19 @@ describe('SagaPage', () => {
     })
     await waitFor(() => expect(spies.sagas).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it("offers the image CDN's narrower copies of each movie's tile in Edit backdrop", async () => {
+    const widths = spyOn(api, 'backdropSrcSet').mockImplementation(
+      ({ id }) => `/.netlify/images?w=480&id=${id} 480w`,
+    )
+    open({ backdrop: { type: 'still', itemId: 90 } })
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit backdrop' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit backdrop' })
+    const tile = dialog.querySelector('img[src*="/api/pictures/items/80/backdrop/b1"]')
+    expect(tile).toHaveAttribute('srcset', '/.netlify/images?w=480&id=80 480w')
+    expect(tile).toHaveAttribute('sizes', SAGA_PICTURE_SIZES)
+    widths.mockRestore()
   })
 
   it('saves a slideshow by the motion picked', async () => {

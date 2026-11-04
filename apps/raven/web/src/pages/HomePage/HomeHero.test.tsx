@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { PICTURE_RANGES, RESOLUTIONS, watchLink } from '@raven/core'
 import { type Featured } from '@/pages/HomePage/featured'
-import { HERO_MS, HomeHero, LESS_MOTION, titleSize } from '@/pages/HomePage/HomeHero'
+import { HERO_MS, HomeHero, LESS_MOTION, WASH_SIZES, titleSize } from '@/pages/HomePage/HomeHero'
 import { matchedMovie } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
@@ -10,6 +10,7 @@ const arrival = (id: number): Featured => ({
   key: `media:${id}`,
   poster: `/poster-${id}.jpg`,
   backdrop: `/backdrop-${id}.jpg`,
+  backdropSrcSet: null,
   eyebrow: 'Featured in Films',
   title: `Movie ${id}`,
   facts: ['2024', '2h 46m'],
@@ -91,6 +92,22 @@ describe('HomeHero', () => {
     // The others' words keep the hero their height, out of reach.
     expect(hero().querySelectorAll('article')).toHaveLength(3)
     expect(hero().querySelectorAll('article[inert][aria-hidden="true"]')).toHaveLength(2)
+  })
+
+  it("offers the backdrop's narrower copies at the wash's width, the one up first and not lazily", () => {
+    const srcSet = '/backdrop-1-480.jpg 480w, /backdrop-1.jpg 1280w'
+    open([{ ...arrival(1), backdropSrcSet: srcSet }, arrival(2)])
+    const shown = hero().querySelector('img[class*="shown"]')
+    expect(shown).toHaveAttribute('src', '/backdrop-1.jpg')
+    expect(shown).toHaveAttribute('srcset', srcSet)
+    expect(shown).toHaveAttribute('sizes', WASH_SIZES)
+    expect(shown).toHaveAttribute('fetchpriority', 'high')
+    expect(shown).not.toHaveAttribute('loading')
+    // One with no narrower copies asks for no sizes.
+    const next = hero().querySelector('img[src="/backdrop-2.jpg"]')
+    expect(next).not.toHaveAttribute('srcset')
+    expect(next).not.toHaveAttribute('sizes')
+    expect(next).toHaveAttribute('fetchpriority', 'auto')
   })
 
   it('fetches only the posters in view and the one the next turn brings in', () => {

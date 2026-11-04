@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { mediaLabel } from '@raven/core'
 import { QueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@raven/ui/headless'
-import { ContinueWatching, timeLeft } from '@/pages/HomePage/ContinueWatching'
+import { api } from '@/lib/api'
+import { ContinueWatching, TILE_BACKDROP_SIZES, timeLeft } from '@/pages/HomePage/ContinueWatching'
 import { RELEASED_LABEL, itemDetails, itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_CARD } from '@/test/tv'
@@ -94,6 +95,23 @@ describe('ContinueWatching', () => {
     expect(page).toHaveAttribute('href', '/episodes/7?library=2')
     expect(page.querySelector('img[src*="/logo"]')).not.toBeNull()
     expect(page.textContent).toBe('')
+  })
+
+  it("offers the image CDN's narrower backdrops, sized to the tile", async () => {
+    const srcSet = '/.netlify/images?w=480 480w, /.netlify/images 1280w'
+    const widths = spyOn(api, 'backdropSrcSet').mockReturnValue(srcSet)
+    const client = new QueryClient()
+    client.setQueryData(queryKeys.item(40), itemDetails({ id: 40, backdropVersion: 'b9' }))
+    renderWithProviders({
+      ui: <ContinueWatching entries={[{ media: MOVIE, poster: null }]} />,
+      client,
+    })
+    await reported()
+    const backdrop = section().querySelector('img[src*="/backdrop"]')
+    expect(widths).toHaveBeenCalledWith({ id: 40, version: 'b9' })
+    expect(backdrop).toHaveAttribute('srcset', srcSet)
+    expect(backdrop).toHaveAttribute('sizes', TILE_BACKDROP_SIZES)
+    widths.mockRestore()
   })
 
   it('shows a frame grab as its backdrop where the show has no art to read', async () => {

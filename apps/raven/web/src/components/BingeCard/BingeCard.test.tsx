@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { api } from '@/lib/api'
-import { BingeCard } from '@/components/BingeCard/BingeCard'
+import { BINGE_BACKDROP_SIZES, BingeCard } from '@/components/BingeCard/BingeCard'
 import { itemDetails, matchedMovie } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEVERANCE } from '@/test/tv'
@@ -53,6 +53,25 @@ describe('BingeCard', () => {
     expect(card.querySelector('img')?.getAttribute('src')).toContain(
       '/api/pictures/items/4/backdrop',
     )
+  })
+
+  it("offers the image CDN's narrower backdrops, sized to the card", async () => {
+    spies.next.mockResolvedValue(EPISODE_TWO)
+    spies.item.mockResolvedValue(itemDetails({ id: 7, type: 'episode' }))
+    const srcSet = '/.netlify/images?w=480 480w, /.netlify/images 1280w'
+    const widths = spyOn(api, 'backdropSrcSet').mockReturnValue(srcSet)
+    renderWithProviders({
+      ui: (
+        <ul>
+          <BingeCard details={SHOW} />
+        </ul>
+      ),
+    })
+    const backdrop = screen.getByRole('listitem').querySelector('img[src*="/backdrop"]')
+    expect(widths).toHaveBeenCalledWith({ id: 4, version: 'b4' })
+    expect(backdrop).toHaveAttribute('srcset', srcSet)
+    expect(backdrop).toHaveAttribute('sizes', BINGE_BACKDROP_SIZES)
+    widths.mockRestore()
   })
 
   it('stands its logo in the corner for its name, and names the episode to start on before it is started', async () => {
