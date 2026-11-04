@@ -16,9 +16,81 @@
         if (theme) document.documentElement.dataset.theme = theme
       } catch {}
     </script>
+    <style>
+      /* The loader in #root paints before the app's stylesheet arrives, so it
+         carries its own styles; the fallbacks are globals.scss's default theme
+         and the theme's tokens take over once the stylesheet loads. It matches
+         RavenLoader, which AuthGate shows next, so React's swap goes unseen. */
+      .boot-loader {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: var(--color-night, #15201e);
+        color: var(--color-bark, #e6e1d6);
+      }
+
+      .boot-loader svg {
+        inline-size: 40px;
+        overflow: visible;
+      }
+
+      .boot-loader path {
+        fill: currentcolor;
+        stroke: var(--color-leaf-bright, #d8414a);
+        stroke-width: 5;
+        stroke-linejoin: round;
+        stroke-dasharray: 1;
+      }
+
+      .boot-loader span {
+        position: absolute;
+        inline-size: 1px;
+        block-size: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .boot-loader path {
+          animation: boot-draw 3.6s cubic-bezier(0.6, 0, 0.3, 1) infinite;
+        }
+      }
+
+      @keyframes boot-draw {
+        0% {
+          stroke-dashoffset: 1;
+          fill-opacity: 0;
+        }
+
+        55% {
+          stroke-dashoffset: 0;
+          fill-opacity: 0;
+        }
+
+        75%,
+        90% {
+          stroke-dashoffset: 0;
+          fill-opacity: 1;
+        }
+
+        100% {
+          stroke-dashoffset: 0;
+          fill-opacity: 0;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <output class="boot-loader" aria-live="polite">
+        <svg viewBox="0 0 646 705" aria-hidden="true" focusable="false">
+          <path pathLength="1" d="__RAVEN_MARK_PATH__" />
+        </svg>
+        <span>Loading</span>
+      </output>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

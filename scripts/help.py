@@ -132,6 +132,7 @@ GROUPS: tuple[Group, ...] = (
             Command(
                 "dev:raven:splash", "raven's splash page (maester.netlify.app) with hot reload."
             ),
+            Command("web:build", "Builds raven's web app, as Netlify and the desktop app ship it."),
             Command("build:raven:splash", "Builds raven's splash page."),
             Command("preview:raven:splash", "Serves the built splash page, as Netlify would."),
             Command("dev:sparrow", "sparrow's API and chat page."),

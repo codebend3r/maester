@@ -13,6 +13,7 @@ import {
 } from '@raven/core'
 import { queryKeys } from '@raven/ui/headless'
 import { type ListedLibrary, isCacheable, listingKeyOf, seedListing } from '@/lib/libraryListing'
+import { keepSaved } from '@/lib/keepSaved'
 import type { ListingStore } from '@/lib/listingStore'
 import { librariesQuery } from '@/lib/queries'
 import { ravenVersion } from '@/lib/version'
@@ -20,9 +21,6 @@ import { warmLibraries } from '@/lib/warmLibraries'
 
 /** A saved listing older than this is not trusted to be worth showing first. */
 const MAX_AGE_MS = 24 * 60 * 60_000
-
-/** How long after a listing changes before the saved copy is brought up to date, so a scan's polling writes once, not on every poll. */
-const SAVE_DELAY_MS = 5_000
 
 /** Whose listings these are when accounts are off. */
 export const OPEN_SCOPE = 'open'
@@ -100,53 +98,29 @@ export const restoreListings = async ({
   })
 }
 
-const keepers = new Set<() => void>()
-
 type KeepListingsSavedProps = {
   store: ListingStore
   scope: string
   queryClient: QueryClient
 }
 
-/**
- * Saves the listings again after the cache changes, at most once every few
- * seconds. Returns what stops it.
- */
+/** Saves the listings again after the libraries are read, so a scan's polling writes once, not on every poll. */
 export const keepListingsSaved = ({
   store,
   scope,
   queryClient,
-}: KeepListingsSavedProps): (() => void) => {
-  let timer: ReturnType<typeof setTimeout> | null = null
-  const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-    if (event.type !== 'updated' || event.action.type !== 'success') return
-    if (event.query.queryKey[0] !== queryKeys.libraries[0] || timer !== null) return
-    timer = setTimeout(() => {
-      timer = null
+}: KeepListingsSavedProps): (() => void) =>
+  keepSaved({
+    queryClient,
+    isSaved: (query) => query.queryKey[0] === queryKeys.libraries[0],
+    save: () =>
       saveListings({
         store,
         scope,
         queryClient,
         libraries: queryClient.getQueryData(librariesQuery.queryKey) ?? [],
-      }).catch((error) => console.error(error))
-    }, SAVE_DELAY_MS)
+      }),
   })
-  const stop = () => {
-    keepers.delete(stop)
-    unsubscribe()
-    if (timer !== null) clearTimeout(timer)
-    timer = null
-  }
-  keepers.add(stop)
-  return stop
-}
-
-/**
- * Stops every save in waiting, so what is read after the account changes is
- * never kept under the one that left. Whatever is still showing starts a new
- * one with its next change of libraries.
- */
-export const stopKeepingListings = (): void => [...keepers].forEach((stop) => stop())
 
 type KeepListingsProps = {
   store: ListingStore

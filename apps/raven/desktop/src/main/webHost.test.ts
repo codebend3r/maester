@@ -16,7 +16,7 @@ import { ERROR_CODES, type Timers } from '@/main/stateStore'
 import {
   contentSecurityPolicy,
   createWebHostHandler,
-  inlineScriptHashes,
+  inlineHashesOf,
   listenWebHost,
   LOOPBACK_ADDRESSES,
   webHostFailureText,
@@ -26,8 +26,13 @@ import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
 const ROOT = '/opt/raven/web'
 const THEME_SCRIPT = "\n      document.documentElement.dataset.theme = 'dusk'\n    "
-const INDEX = `<html><head><script>${THEME_SCRIPT}</script><script type="module" src="/assets/app.js"></script></head></html>`
-const THEME_HASH = createHash('sha256').update(THEME_SCRIPT).digest('base64')
+const LOADER_STYLE = '.boot-loader{display:grid}'
+const INDEX = `<html><head><script>${THEME_SCRIPT}</script><style>${LOADER_STYLE}</style><script type="module" src="/assets/app.js"></script></head></html>`
+const sha256 = (body: string) => createHash('sha256').update(body).digest('base64')
+const THEME_HASH = sha256(THEME_SCRIPT)
+const LOADER_HASH = sha256(LOADER_STYLE)
+const INDEX_HASHES = { scripts: [THEME_HASH], styles: [LOADER_HASH] }
+const NO_HASHES = { scripts: [], styles: [] }
 
 const FILES: Record<string, string> = {
   [`${ROOT}/index.html`]: INDEX,
@@ -160,36 +165,43 @@ const host = async ({
 }
 
 describe('contentSecurityPolicy', () => {
-  it('allows the page its own origin, Supabase Auth, raven-file media and its inline scripts', () => {
-    expect(contentSecurityPolicy({ scriptHashes: ['abc='], authOrigin: null })).toBe(
-      "default-src 'self'; script-src 'self' 'sha256-abc='; style-src 'self'; font-src 'self'; img-src 'self' data:; media-src 'self' raven-file:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+  it('allows the page its own origin, Supabase Auth, raven-file media and its inline scripts and styles', () => {
+    expect(
+      contentSecurityPolicy({
+        inlineHashes: { scripts: ['abc='], styles: ['def='] },
+        authOrigin: null,
+      }),
+    ).toBe(
+      "default-src 'self'; script-src 'self' 'sha256-abc='; style-src 'self' 'sha256-def='; font-src 'self'; img-src 'self' data:; media-src 'self' raven-file:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
     )
   })
 
-  it('allows no inline script when there is none', () => {
-    expect(contentSecurityPolicy({ scriptHashes: [], authOrigin: null })).toContain(
-      "script-src 'self';",
-    )
+  it('allows no inline script or style when there is none', () => {
+    const policy = contentSecurityPolicy({ inlineHashes: NO_HASHES, authOrigin: null })
+    expect(policy).toContain("script-src 'self';")
+    expect(policy).toContain("style-src 'self';")
   })
 
   it("lets the page call the test hook's Auth origin beside Supabase", () => {
     expect(
-      contentSecurityPolicy({ scriptHashes: [], authOrigin: 'http://127.0.0.1:9000' }),
+      contentSecurityPolicy({ inlineHashes: NO_HASHES, authOrigin: 'http://127.0.0.1:9000' }),
     ).toContain("connect-src 'self' https://*.supabase.co http://127.0.0.1:9000;")
   })
 })
 
-describe('inlineScriptHashes', () => {
-  it('recognises script tags in any case without changing the body being hashed', () => {
-    expect(inlineScriptHashes(`<SCRIPT>${THEME_SCRIPT}</sCrIpT>`)).toEqual([THEME_HASH])
+describe('inlineHashesOf', () => {
+  it('recognises script and style tags in any case without changing the body being hashed', () => {
+    expect(
+      inlineHashesOf(`<SCRIPT>${THEME_SCRIPT}</sCrIpT><STYLE>${LOADER_STYLE}</sTyLe>`),
+    ).toEqual(INDEX_HASHES)
   })
-  it('hashes each inline script and skips the ones loaded from a file', () => {
-    expect(inlineScriptHashes(INDEX)).toEqual([THEME_HASH])
-    expect(inlineScriptHashes('<script>a</script><p></p><script>b</script>')).toEqual([
-      createHash('sha256').update('a').digest('base64'),
-      createHash('sha256').update('b').digest('base64'),
-    ])
-    expect(inlineScriptHashes('<html></html>')).toEqual([])
+  it('hashes each inline script and style and skips the ones loaded from a file', () => {
+    expect(inlineHashesOf(INDEX)).toEqual(INDEX_HASHES)
+    expect(inlineHashesOf('<script>a</script><p></p><script>b</script><style>c</style>')).toEqual({
+      scripts: [sha256('a'), sha256('b')],
+      styles: [sha256('c')],
+    })
+    expect(inlineHashesOf('<html></html>')).toEqual(NO_HASHES)
   })
 })
 
@@ -246,14 +258,14 @@ describe('the web host: Host check', () => {
 })
 
 describe('the web host: the web app', () => {
-  it('serves index.html at / with its inline script allowed by hash', async () => {
+  it('serves index.html at / with its inline script and style allowed by hash', async () => {
     const { port } = await host()
     const reply = await ask({ port, path: '/' })
     expect(reply.status).toBe(200)
     expect(reply.body).toBe(INDEX)
     expect(reply.headers[HTTP_HEADERS.contentType]).toBe('text/html; charset=utf-8')
     expect(reply.headers[HTTP_HEADERS.contentSecurityPolicy]).toBe(
-      contentSecurityPolicy({ scriptHashes: [THEME_HASH], authOrigin: null }),
+      contentSecurityPolicy({ inlineHashes: INDEX_HASHES, authOrigin: null }),
     )
     expect(reply.headers[HTTP_HEADERS.contentTypeOptions]).toBe('nosniff')
     expect(reply.headers[HTTP_HEADERS.cacheControl]).toBe('no-cache')
@@ -263,7 +275,7 @@ describe('the web host: the web app', () => {
     const { port } = await host({ authOrigin: 'http://127.0.0.1:9000' })
     const reply = await ask({ port, path: '/' })
     expect(reply.headers[HTTP_HEADERS.contentSecurityPolicy]).toBe(
-      contentSecurityPolicy({ scriptHashes: [THEME_HASH], authOrigin: 'http://127.0.0.1:9000' }),
+      contentSecurityPolicy({ inlineHashes: INDEX_HASHES, authOrigin: 'http://127.0.0.1:9000' }),
     )
   })
 
@@ -278,7 +290,7 @@ describe('the web host: the web app', () => {
     expect(reply.headers[HTTP_HEADERS.contentType]).toBe(type)
     expect(reply.headers[HTTP_HEADERS.cacheControl]).toBe('public, max-age=31536000, immutable')
     expect(reply.headers[HTTP_HEADERS.contentSecurityPolicy]).toBe(
-      contentSecurityPolicy({ scriptHashes: [], authOrigin: null }),
+      contentSecurityPolicy({ inlineHashes: NO_HASHES, authOrigin: null }),
     )
   })
 

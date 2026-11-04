@@ -4,9 +4,9 @@
   "ignorePatterns": ["dist", "public", "test-results"],
   "overrides": [
     {
-      // Vite and Playwright read their config through a default export; ambient .d.ts files
-      // declare, they don't export.
-      "files": ["vite.config.ts", "playwright.config.ts", "**/*.d.ts"],
+      // Vite and Playwright read their config, and Netlify a function, through a default export;
+      // ambient .d.ts files declare, they don't export.
+      "files": ["vite.config.ts", "playwright.config.ts", "netlify/functions/*/*.ts", "**/*.d.ts"],
       "rules": {
         "import/no-default-export": "off"
       }
@@ -19,7 +19,13 @@
       }
     },
     {
-      "files": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test/**", "src/test-setup.ts"],
+      "files": [
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx",
+        "netlify/**/*.test.ts",
+        "src/test/**",
+        "src/test-setup.ts"
+      ],
       "rules": {
         "no-console": "off",
         "typescript/no-non-null-assertion": "off",

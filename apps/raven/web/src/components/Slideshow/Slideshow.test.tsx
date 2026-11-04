@@ -4,6 +4,8 @@ import { LESS_MOTION, SLIDE_MS, Slideshow, slideRoles } from '@/components/Slide
 
 const SLIDES = ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg']
 
+const PICTURES = SLIDES.map((src) => ({ src, srcSet: null }))
+
 describe('slideRoles', () => {
   it('starts on the first, the next laid out unseen', () => {
     expect(slideRoles({ slides: SLIDES, step: 0 })).toEqual([
@@ -49,7 +51,9 @@ describe('Slideshow', () => {
 
   it('moves on to the next picture every few seconds, first to last and round again', () => {
     jest.useFakeTimers()
-    const { container } = render(<Slideshow slides={SLIDES.slice(0, 3)} motion="fade" />)
+    const { container } = render(
+      <Slideshow slides={PICTURES.slice(0, 3)} motion="fade" sizes="100vw" />,
+    )
     expect(shown(container)).toEqual(['a.jpg', 'b.jpg'])
     act(() => jest.advanceTimersByTime(SLIDE_MS))
     expect(shown(container)).toEqual(['a.jpg', 'b.jpg', 'c.jpg'])
@@ -65,9 +69,28 @@ describe('Slideshow', () => {
     const matchMedia = spyOn(window, 'matchMedia').mockImplementation((query) =>
       real(query === LESS_MOTION ? 'all' : 'not all'),
     )
-    const { container } = render(<Slideshow slides={SLIDES} motion="slide" />)
+    const { container } = render(<Slideshow slides={PICTURES} motion="slide" sizes="100vw" />)
     act(() => jest.advanceTimersByTime(SLIDE_MS * 3))
     expect(container.querySelector('img[src="a.jpg"]')?.className).toContain('first')
     matchMedia.mockRestore()
+  })
+
+  it("offers a slide's narrower copies at the width it shows, and no sizes for a slide with none", () => {
+    const { container } = render(
+      <Slideshow
+        slides={[
+          { src: 'a.jpg', srcSet: 'a-480.jpg 480w, a.jpg 1280w' },
+          { src: 'b.jpg', srcSet: null },
+        ]}
+        motion="fade"
+        sizes="100vw"
+      />,
+    )
+    const first = container.querySelector('img[src="a.jpg"]')
+    expect(first).toHaveAttribute('srcset', 'a-480.jpg 480w, a.jpg 1280w')
+    expect(first).toHaveAttribute('sizes', '100vw')
+    const second = container.querySelector('img[src="b.jpg"]')
+    expect(second).not.toHaveAttribute('srcset')
+    expect(second).not.toHaveAttribute('sizes')
   })
 })

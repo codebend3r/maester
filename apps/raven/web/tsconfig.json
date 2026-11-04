@@ -3,8 +3,16 @@
   "compilerOptions": {
     "paths": {
       "@/e2e/*": ["./e2e/*"],
+      "@/netlify/*": ["./netlify/*"],
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts", "../../../tooling/web"]
+  "include": [
+    "src",
+    "e2e",
+    "netlify",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "../../../tooling/web"
+  ]
 }

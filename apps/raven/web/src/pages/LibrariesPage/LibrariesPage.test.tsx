@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-libra
 import userEvent from '@testing-library/user-event'
 import type { Library, LibraryViewChange } from '@raven/core'
 import { api } from '@/lib/api'
-import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
+import { LIBRARY_BACKDROP_SIZES, LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
 import { useQuery } from '@tanstack/react-query'
 import { fakeAccount } from '@/test/authClient'
 import { library, mediaItem, metadataHealth } from '@/test/fixtures'
@@ -13,7 +13,7 @@ import { pollFast } from '@/test/polls'
 import { renderWithProviders } from '@/test/render'
 
 /** The picture laid behind a row; the icons carry a style too, for their size. */
-const BACKDROP = '[style*="background-image"]'
+const BACKDROP = 'img[class*="backdrop"]'
 
 /** Opens every card, which start folded, once the libraries are there. */
 const openAll = async () => {
@@ -280,11 +280,29 @@ describe('LibrariesPage', () => {
     const pictureBehind = async (name: string) => {
       const row = (await screen.findByRole('link', { name })).closest('li')
       const picture = row?.querySelector(BACKDROP)
-      return picture instanceof HTMLElement ? picture.style.backgroundImage : null
+      return picture?.getAttribute('src') ?? null
     }
     expect(await pictureBehind('Films')).toContain('/api/pictures/items/7/backdrop/abc')
     expect(await pictureBehind('Clips')).toContain('/api/media/9/thumbnail?v=41')
     expect(await pictureBehind('Empty')).toBeNull()
+  })
+
+  it("offers the image CDN's narrower copies of a movie's backdrop, and none of a frame grab", async () => {
+    const srcSet = '/.netlify/images?w=480 480w, /.netlify/images 1280w'
+    const widths = spyOn(api, 'backdropSrcSet').mockReturnValue(srcSet)
+    spies.list.mockImplementation(async () => [
+      library({ id: 1, name: 'Films', backdrop: { type: 'item', id: 7, version: 'abc' } }),
+      library({ id: 2, name: 'Clips', backdrop: { type: 'thumbnail', id: 9, version: 41 } }),
+    ])
+    renderWithProviders({ ui: <LibrariesPage /> })
+    const pictureBehind = async (name: string) =>
+      (await screen.findByRole('link', { name })).closest('li')?.querySelector(BACKDROP)
+    const films = await pictureBehind('Films')
+    expect(widths).toHaveBeenCalledWith({ id: 7, version: 'abc' })
+    expect(films).toHaveAttribute('srcset', srcSet)
+    expect(films).toHaveAttribute('sizes', LIBRARY_BACKDROP_SIZES)
+    expect(await pictureBehind('Clips')).not.toHaveAttribute('srcset')
+    widths.mockRestore()
   })
 
   it("keeps a locked library's folders and picture hidden until this browser has the PIN", async () => {

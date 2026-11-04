@@ -16,6 +16,8 @@ mis = "mis"
 tha = "tha"
 # The media element's `seeked` event, as React's `onSeeked`.
 seeked = "seeked"
+# The width axis of a variable font, in @fontsource's file names (`instrument-sans-latin-wdth-normal`).
+wdth = "wdth"
 # Mi Vida Loca (1993), a film raven matches by its English title.
 loca = "loca"
 # The MP4 track box, which the HLS tests read the clock from.

@@ -67,6 +67,13 @@ type IsInWashProps = {
 const isInWash = ({ index, at, from, count }: IsInWashProps): boolean =>
   index === at || index === from || index === (at + 1) % count
 
+/**
+ * The wash's width: `min(47.5rem, 100%)` of the hero, which is never wider
+ * than the screen. Not lazy, as the one up is the largest picture above the
+ * fold, so `auto` would not apply.
+ */
+export const WASH_SIZES = '(max-width: 47.5rem) 100vw, 47.5rem'
+
 const STEPS: Readonly<Partial<Record<string, number>>> = { ArrowLeft: -1, ArrowRight: 1 }
 
 /**
@@ -211,11 +218,13 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
         {featured
           .map((entry, index) => ({ entry, index }))
           .filter(({ index }) => isInWash({ index, at, from: turn.from, count }))
-          .map(({ entry: { key, backdrop }, index }) => (
+          .map(({ entry: { key, backdrop, backdropSrcSet }, index }) => (
             <img
               key={key}
               className={index === at ? `${styles.backdrop} ${styles.shown}` : styles.backdrop}
               src={backdrop}
+              srcSet={backdropSrcSet ?? undefined}
+              sizes={backdropSrcSet == null ? undefined : WASH_SIZES}
               alt=""
               decoding="async"
               fetchPriority={index === at ? 'high' : 'auto'}

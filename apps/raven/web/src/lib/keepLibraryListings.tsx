@@ -4,6 +4,7 @@ import { ACCESS_KINDS, type AccessState, useAccessState } from '@/lib/accessStat
 import { listedLibraryOf } from '@/lib/libraryListing'
 import { listingStore } from '@/lib/listingStore'
 import { librariesQuery } from '@/lib/queries'
+import { keepHome } from '@/lib/savedHome'
 import { OPEN_SCOPE, keepListings } from '@/lib/savedListings'
 
 /** Whose listings these are, or null while no one is served. */
@@ -54,6 +55,19 @@ const Keep = ({ scope }: KeepProps) => {
   return null
 }
 
+/** Puts back the home this device saved for `scope` as soon as the viewer is served, and keeps it saved. */
+const KeepHome = ({ scope }: KeepProps) => {
+  const queryClient = useQueryClient()
+  useEffect(() => {
+    const controller = new AbortController()
+    keepHome({ store: listingStore, scope, queryClient, signal: controller.signal }).catch(
+      (error) => console.error(error),
+    )
+    return () => controller.abort()
+  }, [queryClient, scope])
+  return null
+}
+
 type KeepLibraryListingsProps = { children: ReactNode }
 
 /**
@@ -61,13 +75,19 @@ type KeepLibraryListingsProps = { children: ReactNode }
  * saved, reads the rest in the background one library at a time while the
  * browser is idle, and keeps the cache saved for the next visit. It waits
  * for an approved account when accounts are on, as the server answers no
- * one else, and keeps each account's listings apart.
+ * one else, and keeps each account's listings apart. Home's shelves, hero and
+ * albums are kept the same way, so a return visit draws home at once.
  */
 export const KeepLibraryListings = ({ children }: KeepLibraryListingsProps) => {
   const scope = scopeOf(useAccessState())
   return (
     <>
-      {scope !== null && <Keep scope={scope} />}
+      {scope !== null && (
+        <>
+          <Keep scope={scope} />
+          <KeepHome scope={scope} />
+        </>
+      )}
       {children}
     </>
   )

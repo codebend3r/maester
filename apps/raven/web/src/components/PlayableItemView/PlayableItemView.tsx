@@ -246,14 +246,14 @@ export const PlayableItemView = ({
       version: details.backdropVersion,
     }) ?? api.thumbnailUrl(primary)
   const showBackdrop = show.data
-    ? api.itemImageUrl({
+    ? itemBackdrop({
         id: show.data.id,
-        kind: ITEM_IMAGE_KINDS.backdrop,
         version: picturesIn({ details: show.data, libraryId: primary.libraryId }).backdropVersion,
       })
     : null
   // The still stands in only for a show with no backdrop, not while the show is read.
-  const episodeBackdrop = item.show && show.isPending ? null : (showBackdrop ?? still)
+  const episodeBackdrop =
+    item.show && show.isPending ? null : (showBackdrop ?? pictureBackdrop(still))
   const hasSummary = !!tagline || !!details.summary
   const About =
     ABOUT_VIEWS[config.showsNeighbours ? ABOUT_LAYOUTS.withNeighbours : ABOUT_LAYOUTS.alone]
@@ -296,7 +296,7 @@ export const PlayableItemView = ({
             }
           : {
               picture: { shape: 'still', url: still, play: playPicture },
-              backdrop: pictureBackdrop(episodeBackdrop),
+              backdrop: episodeBackdrop,
             })}
         manage={
           <AdminOnly>

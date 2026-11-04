@@ -7,7 +7,7 @@ import { type BackFallback, BackButton } from '@/components/BackButton/BackButto
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { RatingPanel } from '@/components/RatingPanel/RatingPanel'
 import { Bone } from '@/components/Skeleton/Skeleton'
-import { Slideshow } from '@/components/Slideshow/Slideshow'
+import { type Slide, Slideshow } from '@/components/Slideshow/Slideshow'
 import { api } from '@/lib/api'
 import { FactText } from '@/components/ResolutionChip/ResolutionChip'
 import { ITEM_HEADER_COPY } from '@/components/ItemHeader/copy'
@@ -28,12 +28,12 @@ type HeaderPicture = {
 
 const HEADER_BACKDROP_TYPES = { picture: 'picture', slideshow: 'slideshow' } as const
 
-/** What fades into the page behind the header: one picture, or several in turn, by their urls. */
+/** What fades into the page behind the header: one picture, or several in turn. */
 export type HeaderBackdrop =
   | { type: typeof HEADER_BACKDROP_TYPES.picture; url: string; srcSet: string | null }
   | {
       type: typeof HEADER_BACKDROP_TYPES.slideshow
-      slides: readonly string[]
+      slides: readonly Slide[]
       motion: SlideshowMotion
     }
 
@@ -72,13 +72,16 @@ type BackdropViewProps<Type extends BackdropType> = { backdrop: BackdropOf<Type>
 
 type PictureBackdropProps = BackdropViewProps<typeof HEADER_BACKDROP_TYPES.picture>
 
+/** The backdrop runs to the page's edges, so it is as wide as the screen. */
+const BACKDROP_SIZES = '100vw'
+
 // The page's largest picture, so it is fetched ahead of what lazy lists ask for.
 const PictureBackdrop = ({ backdrop }: PictureBackdropProps) => (
   <img
     className={styles.backdropPicture}
     src={backdrop.url}
     srcSet={backdrop.srcSet ?? undefined}
-    sizes={backdrop.srcSet == null ? undefined : '100vw'}
+    sizes={backdrop.srcSet == null ? undefined : BACKDROP_SIZES}
     alt=""
     decoding="async"
     fetchPriority="high"
@@ -88,7 +91,12 @@ const PictureBackdrop = ({ backdrop }: PictureBackdropProps) => (
 type SlideshowBackdropProps = BackdropViewProps<typeof HEADER_BACKDROP_TYPES.slideshow>
 
 const SlideshowBackdrop = ({ backdrop }: SlideshowBackdropProps) => (
-  <Slideshow className={styles.backdropPicture} slides={backdrop.slides} motion={backdrop.motion} />
+  <Slideshow
+    className={styles.backdropPicture}
+    slides={backdrop.slides}
+    motion={backdrop.motion}
+    sizes={BACKDROP_SIZES}
+  />
 )
 
 /** Each backdrop type's view props, or only `Types`' for a builder generic over the type. */

@@ -84,12 +84,15 @@
 // Decorative: the library's newest video over the card's right half, faded
 // in from its left edge so the name stays clear. Its opacity would paint it
 // over the details, and its clicks with it, so it takes none and the details
-// sit above.
+// sit above. Size containment keeps the picture's own height out of the
+// card's: the details set it, and the picture stretches to fill it.
 .backdrop {
+  contain: size;
   justify-self: end;
+  align-self: stretch;
   width: 55%;
-  background-position: center 25%;
-  background-size: cover;
+  object-fit: cover;
+  object-position: center 25%;
   opacity: 0.32;
   mask-image: linear-gradient(to right, transparent, var(--color-stage) 70%);
   pointer-events: none;

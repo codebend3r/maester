@@ -1,14 +1,10 @@
 import { describe, expect, it, jest } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@raven/ui/headless'
+import { stopKeepingSaved } from '@/lib/keepSaved'
 import type { ListingStore } from '@/lib/listingStore'
 import { librariesQuery } from '@/lib/queries'
-import {
-  keepListingsSaved,
-  restoreListings,
-  saveListings,
-  stopKeepingListings,
-} from '@/lib/savedListings'
+import { keepListingsSaved, restoreListings, saveListings } from '@/lib/savedListings'
 import { library, mediaItem } from '@/test/fixtures'
 
 const memoryStore = (): ListingStore & { records: Map<string, unknown> } => {
@@ -180,7 +176,7 @@ describe('keepListingsSaved', () => {
       client.setQueryData(librariesQuery.queryKey, [library({ id: 1 })])
       keepListingsSaved({ store, scope: 'a', queryClient: client })
       client.setQueryData(queryKeys.media(listing(1)), items)
-      stopKeepingListings()
+      stopKeepingSaved()
       jest.advanceTimersByTime(10_000)
       expect(store.records.size).toBe(0)
     } finally {

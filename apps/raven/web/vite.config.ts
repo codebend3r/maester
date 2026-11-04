@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { URL_PROTOCOLS } from '@raven/core'
 import { type Plugin, defineConfig, loadEnv } from 'vite'
@@ -93,6 +94,97 @@ const restartOnRavenEnv = (): Plugin => ({
   },
 })
 
+/** Where index.html's loader takes the mark's path, filled in from the brand file below. */
+const MARK_PLACEHOLDER = '__RAVEN_MARK_PATH__'
+
+/** raven's mark, the file the player's own preloader copies its path from too. */
+const MARK_FILE = fileURLToPath(new URL('./public/brand/raven-mark-mono.svg', import.meta.url))
+
+const MARK_PATH_PATTERN = /\sd="([^"]+)"/
+
+const ravenMarkPath = async (): Promise<string> => {
+  const path = MARK_PATH_PATTERN.exec(await readFile(MARK_FILE, 'utf8'))?.[1]
+  if (!path) throw new Error(`No path in ${MARK_FILE}`)
+  return path
+}
+
+/** Draws raven's mark in the loader index.html shows before the app runs. */
+const inlineRavenMark = (): Plugin => ({
+  name: 'raven-inline-mark',
+  transformIndexHtml: {
+    order: 'pre',
+    handler: async (html) => {
+      if (!html.includes(MARK_PLACEHOLDER)) {
+        throw new Error(`index.html has no ${MARK_PLACEHOLDER} for the loader's mark`)
+      }
+      return html.replace(MARK_PLACEHOLDER, await ravenMarkPath())
+    },
+  },
+})
+
+const STYLESHEET_LINK = /<link rel="stylesheet"([^>]*)>/g
+
+/**
+ * Turns the stylesheet Vite links in the head into a preload, so it stops
+ * holding back the first paint and index.html's loader shows as soon as the
+ * page arrives. The download still starts at once; `applyStylesheets`
+ * (main.tsx) makes it a stylesheet and waits for it before the app renders,
+ * so nothing draws unstyled.
+ */
+const preloadStylesheets = (): Plugin => ({
+  name: 'raven-preload-stylesheets',
+  apply: 'build',
+  transformIndexHtml: {
+    order: 'post',
+    handler: (html) => html.replace(STYLESHEET_LINK, '<link rel="preload" as="style"$1>'),
+  },
+})
+
+/**
+ * The latin files of the two fonts every page sets its words in (`main.tsx`'s
+ * `@fontsource` imports): Instrument Sans for the body, Young Serif for the
+ * headings. The monospace font is the system's.
+ */
+const PRELOADED_FONTS = [
+  /^assets\/instrument-sans-latin-wdth-normal-[\w-]+\.woff2$/,
+  /^assets\/young-serif-latin-400-normal-[\w-]+\.woff2$/,
+] as const
+
+/**
+ * Names the page's fonts in the head, so the browser fetches them with the
+ * code rather than after the stylesheet has arrived and the first words are
+ * laid out, and the words never draw in a fallback font first.
+ */
+const preloadFonts = (): Plugin => ({
+  name: 'raven-preload-fonts',
+  apply: 'build',
+  transformIndexHtml: {
+    order: 'post',
+    handler: (html, { bundle }) => {
+      const files = Object.keys(bundle ?? {})
+      const fonts = PRELOADED_FONTS.map((pattern) => {
+        const file = files.find((name) => pattern.test(name))
+        if (!file) throw new Error(`No font in the bundle matches ${pattern}`)
+        return file
+      })
+      return {
+        html,
+        tags: fonts.map((file) => ({
+          tag: 'link',
+          attrs: {
+            rel: 'preload',
+            as: 'font',
+            type: 'font/woff2',
+            crossorigin: '',
+            href: `/${file}`,
+          },
+          injectTo: 'head',
+        })),
+      }
+    },
+  },
+})
+
 /** How many Continue watching tiles the home page shows before its See all link, when the env does not say. */
 const DEFAULT_HOME_CONTINUE_COUNT = 6
 
@@ -139,7 +231,14 @@ const isRavenLib = (id: string) => posixId(id).includes('/libs/raven/')
 const isAppModule = (id: string) => !posixId(id).includes('/node_modules/')
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), netlifyApiProxy(), restartOnRavenEnv()],
+  plugins: [
+    react(),
+    netlifyApiProxy(),
+    restartOnRavenEnv(),
+    inlineRavenMark(),
+    preloadStylesheets(),
+    preloadFonts(),
+  ],
   define: {
     'import.meta.env.VITE_HOME_CONTINUE_COUNT': JSON.stringify(String(homeContinueCount(mode))),
     'import.meta.env.VITE_PICTURE_CDN': JSON.stringify(

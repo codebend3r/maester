@@ -79,9 +79,14 @@ const useStep = (count: number): number => {
   return step
 }
 
+/** A picture in the show, with the narrower copies an image CDN makes of it, or null for none. */
+export type Slide = { src: string; srcSet: string | null }
+
 type SlideshowProps = {
-  slides: readonly string[]
+  slides: readonly Slide[]
   motion: SlideshowMotion
+  /** How wide the pictures show, as an `img`'s `sizes`, for the browser to pick from a slide's `srcSet`. */
+  sizes: string
   className?: string
 }
 
@@ -91,7 +96,7 @@ type SlideshowProps = {
  * slide that pushes the last one out. Decorative: it takes no pointer and
  * says nothing to a screen reader. `className` frames it.
  */
-export const Slideshow = ({ slides, motion, className }: SlideshowProps) => {
+export const Slideshow = ({ slides, motion, sizes, className }: SlideshowProps) => {
   const step = useStep(slides.length)
   return (
     <div
@@ -101,9 +106,11 @@ export const Slideshow = ({ slides, motion, className }: SlideshowProps) => {
     >
       {slideRoles({ slides, step }).map(({ slide, role }) => (
         <img
-          key={slide}
+          key={slide.src}
           className={[styles.picture, ROLES[role]].filter(Boolean).join(' ')}
-          src={slide}
+          src={slide.src}
+          srcSet={slide.srcSet ?? undefined}
+          sizes={slide.srcSet == null ? undefined : sizes}
           alt=""
           decoding="async"
         />
