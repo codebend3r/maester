@@ -83,16 +83,35 @@ type UseAskedAgainProps = {
 }
 
 /**
+ * How long after the transition ends a returning card asks a last time. On tvOS an ask as the
+ * transition ends can still be refused, and the focus engine then gives the remote to the
+ * screen's top left control (Home's Search): under Home's hero, the card the screen was opened
+ * from can sit at the foot of the screen, below a Continue watching row added while it was
+ * covered, until the shelves settle.
+ */
+const LAST_ASK_MS = 400
+
+/**
  * Asks the remote's focus for the view `view` holds once more, when the screen `screen` names it
  * as the transition that brought the screen back ends: a card or the strip that took the focus
- * back as the screen came to the front, since the transition can take that first ask away.
+ * back as the screen came to the front, since the transition can take that first ask away. It
+ * asks a last time `LAST_ASK_MS` later, for tvOS, whose engine can refuse that one too.
  */
 export const useAskedAgain = ({ screen, card, view }: UseAskedAgainProps): void => {
   const isAsked = useScreenFocus((state) => screen !== null && isAskedIn({ state, screen, card }))
+  const lastAsk = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (lastAsk.current !== null) clearTimeout(lastAsk.current)
+    },
+    [],
+  )
   useEffect(() => {
     if (screen === null || !isAsked) return
     spendAsk({ screen })
     requestTVFocus(view.current)
+    // Kept past `isAsked` turning false, which spending the ask does at once; cleared only as the view goes.
+    lastAsk.current = setTimeout(() => requestTVFocus(view.current), LAST_ASK_MS)
   }, [isAsked, screen, view])
 }
 

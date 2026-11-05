@@ -341,6 +341,38 @@ export const encodeImage = async ({ path, size = '200x300' }: EncodeImageProps):
   ])
 }
 
+type EncodePictureProps = {
+  path: string
+  /** The frame size, `WIDTHxHEIGHT`. */
+  size: string
+  /** The gradient's colours, as ffmpeg writes one: `0x1d3557`. */
+  colours: readonly [string, string, string]
+}
+
+/**
+ * A JPEG about as heavy as TMDB's own at the same size: a gradient under blurred grain, which
+ * compresses the way a film still does, where `encodeImage`'s flat colour comes to almost nothing.
+ */
+export const encodePicture = async ({ path, size, colours }: EncodePictureProps): Promise<void> => {
+  const [first, second, third] = colours
+  await mkdir(dirname(path), { recursive: true })
+  await run('ffmpeg', [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
+    '-f',
+    'lavfi',
+    '-i',
+    `gradients=s=${size}:c0=${first}:c1=${second}:c2=${third}:n=3:speed=0,noise=all_strength=40:all_flags=u,boxblur=4`,
+    '-frames:v',
+    '1',
+    '-q:v',
+    '4',
+    path,
+  ])
+}
+
 /** How wide and tall a JPEG says it is, read from its frame header. */
 export const jpegSize = (jpeg: Buffer): { width: number; height: number } => {
   const read = (at: number): { width: number; height: number } => {

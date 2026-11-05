@@ -170,6 +170,11 @@ const storedDownloads = async ({ userData }: StoredDownloadsProps): Promise<Down
   return value
 }
 
+type TitleProps = Pick<DownloadsState['owed'][number], 'mediaId'>
+
+// Whether a stored download, or a play it still owes, is the first fixture movie's.
+const isFirst = ({ mediaId }: TitleProps): boolean => mediaId === FIXTURE_MEDIA.first
+
 const askDialog = (page: Page) => page.getByRole('dialog', { name: 'Download to Raven' })
 
 type ConfirmDownloadProps = { page: Page; question: string }
@@ -467,22 +472,25 @@ test.describe.serial('downloading from the web pages, and playing offline', () =
           .getByRole('button', { name: `Play ${label}` })
           .click()
         await expectPlayingNatively({ page, title: label })
-        // Paused, so the position main keeps for the server stays put. With no server the page
-        // has not signed main in, so the play is kept for the account last signed in.
+        // Paused, so the position main keeps for the server stays put. Even with no server the
+        // page signs main in from its saved session and auth config, so the play waits on the
+        // download itself, under that account, not in `owed`, which holds other accounts' plays.
         await page.keyboard.press('k')
         await expectButton({ page, name: 'Play (k)' })
-        const owedOf = async () =>
-          (await storedDownloads({ userData })).owed.find(
-            ({ mediaId }) => mediaId === FIXTURE_MEDIA.first,
-          )?.pending ?? null
+        const keptOf = async () => {
+          const { entries, owed } = await storedDownloads({ userData })
+          const pending = entries.find(isFirst)?.pending ?? null
+          return {
+            play: pending?.play ?? false,
+            accountId: pending?.accountId ?? null,
+            isOwed: owed.some(isFirst),
+          }
+        }
         await expect
-          .poll(async () => {
-            const owed = await owedOf()
-            return owed === null ? null : { play: owed.play, accountId: owed.accountId }
-          })
-          .toEqual({ play: true, accountId: FIXTURE_ACCOUNT.id })
+          .poll(keptOf)
+          .toEqual({ play: true, accountId: FIXTURE_ACCOUNT.id, isOwed: false })
 
-        // The server comes back as it was: the page finds it, signs main in again, and main sends.
+        // The server comes back as it was, and main sends what the download kept for it.
         await fixture.reopen()
         type HeardProps = { method: string; path: string }
 

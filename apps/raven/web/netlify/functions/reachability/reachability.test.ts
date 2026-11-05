@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto'
 import { describe, expect, it, mock } from 'bun:test'
-import { REACHABILITY_PROBLEMS, REMOTE_ACCESS_STATES } from '@raven/core'
-import { checkReachability } from '@/netlify/functions/reachability/reachability'
+import { REACHABILITY_CHECK_PATH, REACHABILITY_PROBLEMS, REMOTE_ACCESS_STATES } from '@raven/core'
+import { checkReachability, config } from '@/netlify/functions/reachability/reachability'
 
 const NONCE = 'AbCdEfGhIjKlMnOpQrStUv'
 const HOST = 'raven.example.synology.me'
@@ -138,5 +138,11 @@ describe('checkReachability', () => {
       REACHABILITY_PROBLEMS.certificate,
       REACHABILITY_PROBLEMS.timeout,
     ])
+  })
+})
+
+describe('the function config', () => {
+  it("routes the check at core's path, for GET alone", () => {
+    expect(config).toEqual({ path: REACHABILITY_CHECK_PATH, method: ['GET'] })
   })
 })

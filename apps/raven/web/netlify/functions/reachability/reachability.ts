@@ -3,7 +3,6 @@ import { lookup } from 'node:dns/promises'
 import { request as httpsRequest } from 'node:https'
 import { type LookupFunction, isIP } from 'node:net'
 import {
-  REACHABILITY_CHECK_PATH,
   REACHABILITY_PROBLEMS,
   REACHABILITY_TIMINGS,
   REMOTE_ACCESS_PARAMS,
@@ -216,4 +215,7 @@ export default (request: Request, context: NetlifyContext): Promise<Response> =>
     connectTarget: requestPinned,
   })
 
-export const config = { path: REACHABILITY_CHECK_PATH, method: [HTTP_METHODS.get] }
+// Netlify reads `config` without running the module, so it sees only literals: a constant here
+// arrives as nothing and fails the deploy. The test holds the path to core's
+// `REACHABILITY_CHECK_PATH`.
+export const config = { path: '/remote-access/check', method: ['GET'] }

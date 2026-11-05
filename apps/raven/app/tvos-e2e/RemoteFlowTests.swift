@@ -10,6 +10,8 @@ final class RemoteFlowTests: XCTestCase {
 
   private enum Copy {
     static let play = "Play"
+    /// The hero's Play says the title it plays: "Play Kestrel Point".
+    static let heroPlay = "Play "
     static let continueWatching = "Continue watching"
     static let resume = "Resume from"
     static let markWatched = "Mark watched"
@@ -23,12 +25,21 @@ final class RemoteFlowTests: XCTestCase {
     continueAfterFailure = false
   }
 
-  /// Plays the film from Home, leaves with Menu, finds it under Continue watching with
-  /// the focus back on the card it was opened from, then leaves the app with Menu on Home.
+  /// Moves from the hero's Play, which Home opens on, down to the film, plays it, leaves with
+  /// Menu, finds it under Continue watching with the focus back on the card it was opened from,
+  /// then leaves the app with Menu on Home.
   func testPlaysFromHomeAndMenuComesBack() throws {
     app.launch()
 
-    XCTAssertTrue(waitForFocus(timeout: 60) { $0 == Fixture.film }, "Home opens on the film")
+    XCTAssertTrue(
+      waitForFocus(timeout: 60) { $0.hasPrefix(Copy.heroPlay) },
+      "Home opens on the hero's Play"
+    )
+    // Down from the hero can stop on the shelf's See all, above its row, before the film's card.
+    XCTAssertTrue(
+      waitForFocus(pressing: .down, tries: 3) { $0 == Fixture.film },
+      "Down goes to the film's card"
+    )
     XCTAssertFalse(app.staticTexts[Copy.continueWatching].exists, "Nothing is being watched yet")
 
     press(.select)
@@ -51,9 +62,12 @@ final class RemoteFlowTests: XCTestCase {
     // on the card the page was opened from, not on the new first card.
     press(.menu)
     XCTAssertTrue(app.staticTexts[Copy.continueWatching].waitForExistence(timeout: 30))
-    XCTAssertTrue(waitForFocus(timeout: 10) { $0 == Fixture.film })
     let cards = app.buttons.matching(NSPredicate(format: "label == %@", Fixture.film))
       .allElementsBoundByIndex
+    XCTAssertTrue(
+      waitForFocus(timeout: 10) { $0 == Fixture.film },
+      "Back on Home the focus is on the film's card; the cards are at \(cards.map(\.frame))"
+    )
     XCTAssertEqual(cards.count, 2, "The film sits under Continue watching and on its own shelf")
     let continuing = cards.min { $0.frame.minY < $1.frame.minY }
     let focused = focusedElement()

@@ -72,9 +72,12 @@ jobs:
             traces: apps/raven/web/test-results
             artifact: e2e-traces
           # raven's web build in Google Chrome on simulated mobile and desktop, served over HTTP/2
-          # with Brotli as Netlify serves it; fails below the floors in its lighthouserc.json.
+          # with Brotli as Netlify serves it: the sign-in page, and Home against the server's
+          # Lighthouse fixture, which encodes its pictures and clip with ffmpeg. Fails below the
+          # floors in its lighthouserc.json.
           - name: 🔦 Lighthouse
             target: lighthouse
+            ffmpeg: true
             traces: apps/raven/web/.lighthouseci
             artifact: lighthouse-reports
           - name: 🧹 Dead code
