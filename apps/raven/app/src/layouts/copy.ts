@@ -22,6 +22,12 @@ export const ITEM_LAYOUT_COPY = {
   values: (values: readonly string[]) => values.join(', '),
 } as const
 
+/** What a screen reader says of a chip of the picture's: "Video resolution: 4K". */
+export const FACT_CHIP_COPY = {
+  videoResolution: (resolution: string) => `Video resolution: ${resolution}`,
+  videoCodec: (codec: string) => `Video codec: ${codec}`,
+} as const
+
 type ChapterLabelProps = { title: string; at: string }
 
 /** The words both platforms' music pages say. */

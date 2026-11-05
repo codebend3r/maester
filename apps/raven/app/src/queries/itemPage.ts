@@ -4,8 +4,10 @@ import {
   type ItemDetails,
   type MediaItem,
   type MediaTracks,
-  allFileFacts,
+  FACT_PART_KINDS,
+  type FactPart,
   type FileFact,
+  allFileFacts,
   castMembers,
   createdBy,
   directedBy,
@@ -15,6 +17,7 @@ import {
   episodeStillUrl,
   episodesOf,
   episodesWatched,
+  factParts,
   initialsOf,
   movieFacts,
   picturesIn,
@@ -27,6 +30,7 @@ import {
   timeLeftOf,
   versionFacts,
   watchedCountLabel,
+  wordPart,
 } from '@raven/core'
 
 import {
@@ -81,17 +85,33 @@ export type PersonCard = {
   picture: Picture | null
 }
 
-/** One of a movie's files, with what sets it apart, playing on its own. */
-export type VersionRow = { key: string; fileName: string; facts: string[]; target: RouteTarget }
+/**
+ * One of a movie's files, with what sets it apart, playing on its own: its picture as chips (its
+ * resolution, range and codec), then the rest in words (its size, edition and library).
+ */
+export type VersionRow = {
+  key: string
+  fileName: string
+  chips: FactPart[]
+  facts: string[]
+  target: RouteTarget
+}
+
+/** One of the file's facts as the page draws it: its label, the picture's chips, and the rest in words. */
+type FileFactRow = { label: string; chips: FactPart[]; values: string[] }
 
 /** One episode on disk: its card, and what its row adds to it. */
-export type EpisodeRow = ShelfCard & { summary: string | null; isWatched: boolean }
+export type EpisodeRow = ShelfCard & {
+  summary: string | null
+  isWatched: boolean
+  chips: readonly FactPart[]
+}
 
 /** Everything an item's page shows but its actions, which are the screen's. */
 export type ItemPage = {
   hero: ItemHero
   /** The file Play starts, as its facts; none for a show or season. */
-  file: FileFact[]
+  file: FileFactRow[]
   /** A movie's files, once there are two or more. */
   versions: VersionRow[]
   seasons: ShelfCard[]
@@ -143,6 +163,20 @@ type BackdropOfProps = Pictures & { details: ItemDetails | null }
 
 const backdropOf = ({ details, api, headersFor }: BackdropOfProps): Picture | null =>
   pictureAt({ uri: imageOf({ api, item: details, kind: ITEM_IMAGE_KINDS.backdrop }), headersFor })
+
+type ChipsAndWords = { chips: FactPart[]; words: string[] }
+
+/** The parts the page draws as chips (a resolution, codec or range), apart from the words. */
+const chipsAndWords = (parts: readonly FactPart[]): ChipsAndWords => ({
+  chips: parts.filter((part) => part.kind !== FACT_PART_KINDS.text),
+  words: parts.flatMap((part) => (part.kind === FACT_PART_KINDS.text ? [part.text] : [])),
+})
+
+/** A file's fact with its picture marked as chips: the Video fact's `4K (HEVC) HDR`. */
+const fileFactRow = ({ label, values }: FileFact): FileFactRow => {
+  const { chips, words } = chipsAndWords(values.flatMap(factParts))
+  return { label, chips, values: words }
+}
 
 /** A line of facts, or null when it has none to say. */
 const lineOrNull = (line: string): string | null => (line === '' ? null : line)
@@ -255,16 +289,20 @@ type VersionRowsOfProps = Pick<PlayablePageProps, 'everyFile' | 'libraryNames'>
 const versionRowsOf = ({ everyFile, libraryNames }: VersionRowsOfProps): VersionRow[] => {
   if (everyFile.length < 2) return []
   const isAcrossLibraries = new Set(everyFile.map(({ libraryId }) => libraryId)).size > 1
-  return everyFile.map((version) => ({
-    key: String(version.id),
-    fileName: version.fileName,
-    facts: [
-      ...versionFacts(version),
-      version.edition,
-      isAcrossLibraries ? (libraryNames.get(version.libraryId) ?? null) : null,
-    ].filter((fact): fact is string => fact !== null && fact !== ''),
-    target: { kind: ROUTE_TARGETS.play, mediaId: version.id, at: 0 },
-  }))
+  return everyFile.map((version) => {
+    const { chips, words } = chipsAndWords(versionFacts(version).map(wordPart))
+    return {
+      key: String(version.id),
+      fileName: version.fileName,
+      chips,
+      facts: [
+        ...words,
+        version.edition,
+        isAcrossLibraries ? (libraryNames.get(version.libraryId) ?? null) : null,
+      ].filter((fact): fact is string => fact !== null && fact !== ''),
+      target: { kind: ROUTE_TARGETS.play, mediaId: version.id, at: 0 },
+    }
+  })
 }
 
 /**
@@ -303,7 +341,7 @@ export const playablePage = ({
   return pageOf({
     hero,
     details,
-    file: allFileFacts({ media: primary, tracks }),
+    file: allFileFacts({ media: primary, tracks }).map(fileFactRow),
     versions: versionRowsOf({ everyFile, libraryNames }),
     castTitle: isEpisode ? CAST_TITLES.guests : CAST_TITLES.everyone,
     ...pictures,
@@ -372,30 +410,34 @@ export const seasonPage = ({ season, show, ...pictures }: SeasonPageProps): Item
       summary: season.summary,
     },
     details: season,
-    episodes: episodes.map((episode): EpisodeRow => ({
-      key: episodeEntryKey(episode),
-      title: [
-        episode.episode === null ? null : ITEM_PAGE_COPY.episodeNumber(episode.episode),
-        episode.title,
-      ]
-        .filter((part): part is string => part !== null)
-        .join(' · '),
-      line: lineOrNull(episodeRowFacts(episode).join(' · ')),
-      shape: CARD_SHAPES.wide,
-      picture: pictureAt({
-        uri: episodeStillUrl({ ...pictures, episode }),
-        headersFor: pictures.headersFor,
-      }),
-      progress: episode.primary === null ? 0 : progressOf(episode.primary),
-      target: {
-        kind: ROUTE_TARGETS.item,
-        itemId: episode.id,
-        libraryId: episode.primary?.libraryId ?? null,
-        fileId: null,
-      },
-      summary: episode.summary,
-      isWatched: episode.watched,
-    })),
+    episodes: episodes.map((episode): EpisodeRow => {
+      const { chips, words } = chipsAndWords(episodeRowFacts(episode).map(wordPart))
+      return {
+        key: episodeEntryKey(episode),
+        title: [
+          episode.episode === null ? null : ITEM_PAGE_COPY.episodeNumber(episode.episode),
+          episode.title,
+        ]
+          .filter((part): part is string => part !== null)
+          .join(' · '),
+        line: lineOrNull(words.join(' · ')),
+        chips,
+        shape: CARD_SHAPES.wide,
+        picture: pictureAt({
+          uri: episodeStillUrl({ ...pictures, episode }),
+          headersFor: pictures.headersFor,
+        }),
+        progress: episode.primary === null ? 0 : progressOf(episode.primary),
+        target: {
+          kind: ROUTE_TARGETS.item,
+          itemId: episode.id,
+          libraryId: episode.primary?.libraryId ?? null,
+          fileId: null,
+        },
+        summary: episode.summary,
+        isWatched: episode.watched,
+      }
+    }),
     ...pictures,
   })
 }

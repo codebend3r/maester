@@ -1,7 +1,21 @@
-// The tiles side by side, as many as fit at 20rem or more.
+// The tiles side by side: four across a desktop's page, never more, and
+// fewer as the page narrows below four of 16rem, down to one on a phone.
+// The page's width hangs on the side menu, open or collapsed, so the tiles
+// step down by the room they have rather than by the screen's width.
 .tiles {
+  --tile-columns: 4;
+
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(
+      max(
+        min(16rem, 100%),
+        calc((100% - (var(--tile-columns) - 1) * var(--space-2)) / var(--tile-columns))
+      ),
+      1fr
+    )
+  );
   gap: var(--space-2);
 
   // A library can hold thousands of tiles, so the browser lays out and
@@ -14,7 +28,7 @@
   }
 
   > .posterTile {
-    contain-intrinsic-block-size: auto 8rem;
+    contain-intrinsic-block-size: auto 10.5rem;
   }
 
   // Skipping also clips what a tile draws to its box, which would cut off
@@ -116,11 +130,12 @@
   min-width: 0;
 }
 
-// The title keeps clear of the menu's button in the tile's corner.
+// The title, in the display serif, keeps clear of the menu's button in the tile's corner.
 .title {
   padding-inline-end: calc(2rem + var(--space-1));
-  font-size: var(--font-size-sm);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: var(--font-size-md);
+  font-weight: 400;
   line-height: var(--line-tight);
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -131,8 +146,8 @@
   }
 }
 
-// The facts read as one line of words, wrapping between facts rather than
-// inside one, a dot apart.
+// A line of facts reads as words, wrapping between facts rather than
+// inside one, a dot apart: the release day, then the runtime and size.
 .facts {
   color: var(--color-birch);
   font-size: var(--font-size-xs);
@@ -154,15 +169,17 @@
   font-size: var(--font-size-sm);
 }
 
-.folder {
-  color: var(--color-lichen);
-  font-size: var(--font-size-xs);
-  overflow-wrap: anywhere;
+// The picture's chips on a line of their own, between the release day and the runtime.
+.chips {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
 }
 
-// A Movies library's tile: a small poster rather than a wide frame grab.
+// A Movies library's tile: a poster rather than a wide frame grab, as
+// wide as the tile can spare, up to 7rem.
 .posterTile {
-  grid-template-columns: clamp(3.5rem, 12vw, 5rem) minmax(0, 1fr);
+  grid-template-columns: clamp(4.5rem, 40%, 7rem) minmax(0, 1fr);
 }
 
 .posterFrame {

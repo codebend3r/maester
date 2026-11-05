@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { createApiClient } from '@/apiClient'
 import { ITEM_TYPES, THUMBNAIL_STATES } from '@/contract'
 import {
+  FACT_PART_KINDS,
   allFileFacts,
   episodeByline,
   episodeFacts,
@@ -9,9 +10,12 @@ import {
   episodeStillUrl,
   episodesOf,
   episodesWatched,
+  factParts,
   formatAirDate,
   movieFacts,
   nextEpisodeIn,
+  pictureParts,
+  pictureRestParts,
   runtimeFact,
   seasonFacts,
   seasonsOf,
@@ -20,6 +24,7 @@ import {
   splitPictureRest,
   versionFacts,
   watchedCountLabel,
+  wordPart,
 } from '@/itemFacts'
 import { episodeSummary, itemDetails, mediaItem, seasonSummary } from '@/test/fixtures'
 
@@ -132,6 +137,67 @@ describe('splitPictureRest', () => {
   it('says nothing for an empty rest', () => {
     expect(splitPictureRest(null)).toEqual({ codec: null, range: null, words: null })
     expect(splitPictureRest('')).toEqual({ codec: null, range: null, words: null })
+  })
+})
+
+describe('wordPart', () => {
+  it('marks a whole resolution, video codec or range, and leaves any other word as words', () => {
+    expect(wordPart('4K')).toEqual({ kind: FACT_PART_KINDS.resolution, text: '4K' })
+    expect(wordPart('HEVC')).toEqual({ kind: FACT_PART_KINDS.codec, text: 'HEVC' })
+    expect(wordPart('H.264')).toEqual({ kind: FACT_PART_KINDS.codec, text: 'H.264' })
+    expect(wordPart('DV5')).toEqual({ kind: FACT_PART_KINDS.range, text: 'DV5' })
+    expect(wordPart('HDR')).toEqual({ kind: FACT_PART_KINDS.range, text: 'HDR' })
+    expect(wordPart('25.4 GB')).toEqual({ kind: FACT_PART_KINDS.text, text: '25.4 GB' })
+  })
+
+  it('keeps a name someone chose whole, even one that opens with a resolution', () => {
+    expect(wordPart('4K Movies')).toEqual({ kind: FACT_PART_KINDS.text, text: '4K Movies' })
+  })
+})
+
+describe('factParts', () => {
+  it("reads core's video fact into its resolution, codec and range", () => {
+    expect(factParts('1080p (HEVC) HDR')).toEqual([
+      { kind: FACT_PART_KINDS.resolution, text: '1080p' },
+      { kind: FACT_PART_KINDS.codec, text: 'HEVC' },
+      { kind: FACT_PART_KINDS.range, text: 'HDR' },
+    ])
+    expect(factParts('4K')).toEqual([{ kind: FACT_PART_KINDS.resolution, text: '4K' }])
+  })
+
+  it('takes a fact with no resolution as one word', () => {
+    expect(factParts('DV5')).toEqual([{ kind: FACT_PART_KINDS.range, text: 'DV5' }])
+    expect(factParts('HEVC')).toEqual([{ kind: FACT_PART_KINDS.codec, text: 'HEVC' }])
+    expect(factParts('English (AAC 2.0)')).toEqual([
+      { kind: FACT_PART_KINDS.text, text: 'English (AAC 2.0)' },
+    ])
+  })
+})
+
+describe('pictureRestParts', () => {
+  it('keeps words that are no codec or range as words after the chips', () => {
+    expect(pictureRestParts({ resolution: '4K', rest: '(AV1) SDR' })).toEqual([
+      { kind: FACT_PART_KINDS.resolution, text: '4K' },
+      { kind: FACT_PART_KINDS.codec, text: 'AV1' },
+      { kind: FACT_PART_KINDS.text, text: 'SDR' },
+    ])
+    expect(pictureRestParts({ resolution: null, rest: null })).toEqual([])
+  })
+})
+
+describe('pictureParts', () => {
+  it("names a file's resolution, range and codec, each as its chip", () => {
+    const media = mediaItem({ width: 3840, height: 2160, hdr: true, videoCodec: 'hevc' })
+    expect(pictureParts(media)).toEqual([
+      { kind: FACT_PART_KINDS.resolution, text: '4K' },
+      { kind: FACT_PART_KINDS.range, text: 'HDR' },
+      { kind: FACT_PART_KINDS.codec, text: 'HEVC' },
+    ])
+  })
+
+  it('names nothing for a file not yet probed', () => {
+    const media = mediaItem({ width: null, height: null })
+    expect(pictureParts(media)).toEqual([])
   })
 })
 

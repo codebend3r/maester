@@ -4,6 +4,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Icon } from '@raven/native'
+import { TouchFactChips } from '@/layouts/FactChips'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
@@ -252,7 +253,13 @@ const FileFacts = ({ facts }: FileFactsProps) => {
       {facts.map((fact) => (
         <View key={fact.label} style={styles.fact}>
           <Text style={styles.factLabel}>{fact.label}</Text>
-          <Text style={styles.factValue}>{ITEM_LAYOUT_COPY.values(fact.values)}</Text>
+          <View style={styles.factValues}>
+            <TouchFactChips parts={fact.chips}>
+              {fact.values.length > 0 && (
+                <Text style={styles.factValue}>{ITEM_LAYOUT_COPY.values(fact.values)}</Text>
+              )}
+            </TouchFactChips>
+          </View>
         </View>
       ))}
     </View>
@@ -275,7 +282,11 @@ const Versions = ({ versions, onOpen }: VersionsProps) => {
           style={({ pressed }) => [styles.row, pressed && styles.pressed]}
         >
           <View style={styles.words}>
-            <Text style={styles.rowTitle}>{dotted(version.facts)}</Text>
+            <TouchFactChips parts={version.chips}>
+              {version.facts.length > 0 && (
+                <Text style={styles.rowTitle}>{dotted(version.facts)}</Text>
+              )}
+            </TouchFactChips>
             <Text numberOfLines={1} style={styles.small}>
               {version.fileName}
             </Text>
@@ -349,6 +360,7 @@ const Episodes = ({ episodes, onOpen }: EpisodesProps) => {
           <View style={styles.words}>
             <Text style={styles.rowTitle}>{episode.title}</Text>
             {episode.line !== null && <Text style={styles.small}>{episode.line}</Text>}
+            {episode.chips.length > 0 && <TouchFactChips parts={episode.chips} />}
             {episode.summary !== null && (
               <Text numberOfLines={3} style={styles.small}>
                 {episode.summary}
@@ -587,7 +599,8 @@ const useStyles = themedStyles((colours) =>
       borderTopColor: colours.line,
     },
     factLabel: { width: '30%', color: colours.muted, fontSize: SIZES.textSm },
-    factValue: { flex: 1, color: colours.text, fontSize: SIZES.textSm },
+    factValues: { flex: 1 },
+    factValue: { flexShrink: 1, color: colours.text, fontSize: SIZES.textSm },
     row: {
       flexDirection: 'row',
       alignItems: 'center',

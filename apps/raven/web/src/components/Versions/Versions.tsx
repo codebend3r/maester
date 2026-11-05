@@ -1,48 +1,40 @@
 import {
+  FACT_PART_KINDS,
+  type FactPartKind,
   type Library,
   type MediaItem,
-  type Resolution,
-  isResolution,
   versionFacts,
   watchPageOf,
+  wordPart,
 } from '@raven/core'
 import { type ComponentType, useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '@raven/ui'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
-import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
+import { WordFact } from '@/components/ResolutionChip/ResolutionChip'
 import { VERSIONS_COPY } from '@/components/Versions/copy'
 import styles from '@/components/Versions/Versions.module.scss'
 
-/** Whether a fact is a resolution, drawn as its chip, or plain words in a chip of their own. */
-const FACT_KINDS = { resolution: 'resolution', words: 'words' } as const
+type FactViewProps = { fact: string }
 
-type FactKind = (typeof FACT_KINDS)[keyof typeof FACT_KINDS]
+/** A resolution, codec or range, drawn as its own chip. */
+const PictureWord = ({ fact }: FactViewProps) => <WordFact fact={fact} />
 
-type FactViewProps = { fact: string; resolution: Resolution | null }
-
-type ResolutionFactProps = FactViewProps
-
-const ResolutionFact = ({ resolution }: ResolutionFactProps) => (
-  <ResolutionChip resolution={resolution} />
-)
-
-type WordsFactProps = FactViewProps
-
-const WordsFact = ({ fact }: WordsFactProps) => <span className={styles.chip}>{fact}</span>
+/** Plain words (the size, an edition, a library) in a chip of their own. */
+const WordsFact = ({ fact }: FactViewProps) => <span className={styles.chip}>{fact}</span>
 
 const FACT_VIEWS = {
-  [FACT_KINDS.resolution]: ResolutionFact,
-  [FACT_KINDS.words]: WordsFact,
-} as const satisfies Record<FactKind, ComponentType<FactViewProps>>
+  [FACT_PART_KINDS.resolution]: PictureWord,
+  [FACT_PART_KINDS.codec]: PictureWord,
+  [FACT_PART_KINDS.range]: PictureWord,
+  [FACT_PART_KINDS.text]: WordsFact,
+} as const satisfies Record<FactPartKind, ComponentType<FactViewProps>>
 
 type VersionFactProps = { fact: string }
 
 const VersionFact = ({ fact }: VersionFactProps) => {
-  const resolution = isResolution(fact) ? fact : null
-  const View: ComponentType<FactViewProps> =
-    FACT_VIEWS[resolution === null ? FACT_KINDS.words : FACT_KINDS.resolution]
-  return <View fact={fact} resolution={resolution} />
+  const View = FACT_VIEWS[wordPart(fact).kind]
+  return <View fact={fact} />
 }
 
 type VersionsProps = {

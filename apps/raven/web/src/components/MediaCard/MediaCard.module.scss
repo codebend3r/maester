@@ -210,6 +210,7 @@
 .fact {
   display: inline-block;
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .fact:has(+ .fact)::after {

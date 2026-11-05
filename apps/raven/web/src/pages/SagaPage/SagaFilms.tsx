@@ -8,8 +8,7 @@ import {
   formatRuntime,
   mediaEntryKey,
   pickScore,
-  rangeLabel,
-  resolutionLabel,
+  pictureParts,
   watchLink,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
@@ -21,7 +20,7 @@ import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
-import { PictureFact } from '@/components/ResolutionChip/ResolutionChip'
+import { PictureChips } from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -50,14 +49,13 @@ const standings = (media: readonly MediaItem[]): Standing[] => {
   })
 }
 
-/** "22 May 2001 · 2h 58m · 4K HDR": when it came out, how long it runs, and its picture. */
+/** "22 May 2001 · 2h 58m · 4K HDR HEVC": when it came out, how long it runs, and its picture. */
 const filmFacts = (media: MediaItem): ReactNode[] => {
   const { date } = cardTitle(media)
-  const resolution = resolutionLabel(media)
   return [
     date,
     formatRuntime(media.duration),
-    resolution && <PictureFact key="picture" resolution={resolution} rest={rangeLabel(media)} />,
+    pictureParts(media).length > 0 ? <PictureChips key="picture" media={media} /> : null,
     media.versions > 1 ? SAGA_COPY.versions(media.versions) : null,
   ].filter((fact) => fact != null)
 }
@@ -105,7 +103,7 @@ const SagaFilm = ({ media, session, place, standing, ratingsSource }: SagaFilmPr
         aria-hidden="true"
         onContextMenu={menu.onContextMenu}
       >
-        <PosterFrame media={media} sizes={POSTER_SIZES.movieTile} withWatched={false} />
+        <PosterFrame media={media} sizes={POSTER_SIZES.sagaFilm} withWatched={false} />
       </CardLink>
       <SelectCheckbox select={select} className={styles.select} />
       <span className={styles.body}>

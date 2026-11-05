@@ -1,14 +1,20 @@
 import {
+  FACT_PART_KINDS,
+  type FactPart,
+  type FactPartKind,
+  type MediaItem,
   PICTURE_RANGES,
   RESOLUTIONS,
   type Resolution,
   VIDEO_CODECS,
   codecLabel,
+  factParts,
   isResolution,
-  splitPictureRest,
-  splitResolution,
+  pictureParts,
+  pictureRestParts,
+  wordPart,
 } from '@raven/core'
-import type { ComponentType, ReactNode } from 'react'
+import { type ComponentType, Fragment, type ReactNode } from 'react'
 import { RESOLUTION_CHIP_COPY } from '@/components/ResolutionChip/copy'
 import styles from '@/components/ResolutionChip/ResolutionChip.module.scss'
 
@@ -92,121 +98,109 @@ export const RangeChip = ({ range }: RangeChipProps) => {
   )
 }
 
+type PartViewProps = { text: string }
+
+const ResolutionPart = ({ text }: PartViewProps) => (
+  <ResolutionChip resolution={isResolution(text) ? text : null} />
+)
+
+const CodecPart = ({ text }: PartViewProps) => <CodecChip codec={text} />
+
+const RangePart = ({ text }: PartViewProps) => <RangeChip range={text} />
+
+const TextPart = ({ text }: PartViewProps) => text
+
+const PART_VIEWS = {
+  [FACT_PART_KINDS.resolution]: ResolutionPart,
+  [FACT_PART_KINDS.codec]: CodecPart,
+  [FACT_PART_KINDS.range]: RangePart,
+  [FACT_PART_KINDS.text]: TextPart,
+} as const satisfies Record<FactPartKind, ComponentType<PartViewProps>>
+
+type PartProps = { part: FactPart }
+
+const Part = ({ part }: PartProps) => {
+  const View = PART_VIEWS[part.kind]
+  return <View text={part.text} />
+}
+
+/** Whether a line of parts says nothing, is one part on its own, or is a run of them. */
+const PART_RUNS = { none: 'none', one: 'one', many: 'many' } as const
+type PartRun = (typeof PART_RUNS)[keyof typeof PART_RUNS]
+
+const partRunOf = (parts: readonly FactPart[]): PartRun => {
+  if (parts.length === 0) return PART_RUNS.none
+  return parts.length === 1 ? PART_RUNS.one : PART_RUNS.many
+}
+
+type FactPartsProps = { parts: readonly FactPart[] }
+
+const NoParts = () => null
+
+const OnePart = ({ parts }: FactPartsProps) =>
+  parts.map((part) => <Part key={part.kind} part={part} />)
+
+/**
+ * The parts in a row, the grid's gap between them. The spaces between them
+ * are real text, so a copy or a search reads `4K HEVC HDR`.
+ */
+const ManyParts = ({ parts }: FactPartsProps) => (
+  <span className={styles.fact}>
+    {parts.map((part, index) => (
+      <Fragment key={`${part.kind}:${part.text}`}>
+        {index > 0 && ' '}
+        <Part part={part} />
+      </Fragment>
+    ))}
+  </span>
+)
+
+const PART_LINES = {
+  [PART_RUNS.none]: NoParts,
+  [PART_RUNS.one]: OnePart,
+  [PART_RUNS.many]: ManyParts,
+} as const satisfies Record<PartRun, ComponentType<FactPartsProps>>
+
+/** A line of facts' parts as `@raven/core` reads them: each resolution, codec and range its chip, the rest words. */
+export const FactParts = ({ parts }: FactPartsProps) => {
+  const Line = PART_LINES[partRunOf(parts)]
+  return <Line parts={parts} />
+}
+
 type PictureFactProps = { resolution: Resolution | null; rest: string | null }
 
 /**
  * A picture as a line of facts says it: the resolution's chip, then the
  * codec's and the range's (`(HEVC) HDR`) as chips of their own, and anything
- * else as words. The spaces between them are real text, so a copy or a
- * search reads `4K HEVC HDR`; the grid's gap draws them.
+ * else as words.
  */
-export const PictureFact = ({ resolution, rest }: PictureFactProps) => {
-  const { codec, range, words } = splitPictureRest(rest)
-  return (
-    <span className={styles.fact}>
-      <ResolutionChip resolution={resolution} />
-      {codec != null && (
-        <>
-          {' '}
-          <CodecChip codec={codec} />
-        </>
-      )}
-      {range != null && (
-        <>
-          {' '}
-          <RangeChip range={range} />
-        </>
-      )}
-      {words != null && <span> {words}</span>}
-    </span>
-  )
-}
-
-/**
- * Whether a fact or word opens with a resolution, drawn as the chip, is a
- * range of light alone (`HDR`, `DV5`), drawn as its chip, or is plain text.
- */
-const FACT_KINDS = { chip: 'chip', range: 'range', text: 'text' } as const
-type FactKind = (typeof FACT_KINDS)[keyof typeof FACT_KINDS]
-
-type FactKindOfProps = { resolution: Resolution | null; range: string | null }
-
-const factKindOf = ({ resolution, range }: FactKindOfProps): FactKind => {
-  if (resolution != null) return FACT_KINDS.chip
-  if (range != null) return FACT_KINDS.range
-  return FACT_KINDS.text
-}
-
-/** The range a fact or word is, when it is that alone: `DV5`, not `(HEVC) HDR`. */
-const rangeWordOf = (fact: string): string | null => {
-  const { codec, range } = splitPictureRest(fact)
-  return codec == null ? range : null
-}
-
-type SplitFactProps = {
-  fact: string
-  resolution: Resolution | null
-  rest: string | null
-  range: string | null
-}
-
-type PlainFactProps = SplitFactProps
-
-const PlainFact = ({ fact }: PlainFactProps) => fact
-
-type ChipFactProps = SplitFactProps
-
-const ChipFact = ({ resolution, rest }: ChipFactProps) => (
-  <PictureFact resolution={resolution} rest={rest} />
+export const PictureFact = ({ resolution, rest }: PictureFactProps) => (
+  <FactParts parts={pictureRestParts({ resolution, rest })} />
 )
 
-type RangeWordProps = SplitFactProps
+type PictureChipsProps = { media: MediaItem }
 
-const RangeWord = ({ range }: RangeWordProps) => range != null && <RangeChip range={range} />
-
-const FACT_VIEWS = {
-  [FACT_KINDS.chip]: ChipFact,
-  [FACT_KINDS.range]: RangeWord,
-  [FACT_KINDS.text]: PlainFact,
-} as const satisfies Record<FactKind, ComponentType<SplitFactProps>>
+/** A file's resolution, range and video codec as chips, in that order; nothing before it is probed. */
+export const PictureChips = ({ media }: PictureChipsProps) => (
+  <FactParts parts={pictureParts(media)} />
+)
 
 type FactTextProps = { fact: string }
 
 /**
  * A fact `@raven/core` writes with the resolution first (`4K HDR`,
- * `1080p (HEVC) HDR`), its resolution as the chip. The device app shows
- * these as they are, so the web marks the resolution here. Only for core's
- * facts: a name someone chose, such as a library called "4K Movies", is
- * not a picture and stays text. A range alone (`DV5` on an episode's row)
- * is its chip; any other fact with no resolution stays plain text.
+ * `1080p (HEVC) HDR`), or a codec or range alone (`DV5` on an episode's
+ * row), with each of those as its chip; the device app reads the same parts
+ * through `factParts`. Only for core's facts: a name someone chose, such as
+ * a library called "4K Movies", is not a picture and stays text.
  */
-export const FactText = ({ fact }: FactTextProps) => {
-  const { resolution, rest } = splitResolution(fact)
-  const range = rangeWordOf(fact)
-  const View = FACT_VIEWS[factKindOf({ resolution, range })]
-  return <View fact={fact} resolution={resolution} rest={rest} range={range} />
-}
-
-type ChipWordProps = SplitFactProps
-
-const ChipWord = ({ resolution }: ChipWordProps) => <ResolutionChip resolution={resolution} />
-
-const WORD_VIEWS = {
-  [FACT_KINDS.chip]: ChipWord,
-  [FACT_KINDS.range]: RangeWord,
-  [FACT_KINDS.text]: PlainFact,
-} as const satisfies Record<FactKind, ComponentType<SplitFactProps>>
+export const FactText = ({ fact }: FactTextProps) => <FactParts parts={factParts(fact)} />
 
 type WordFactProps = { fact: string }
 
 /**
  * One word of a list of facts, such as `versionFacts`' or a tile's: the
- * chip when the word is a resolution or a range of light, else the word. Names someone chose
- * (an edition, a library) are not words of these lists, so they stay text.
+ * chip when the word is a resolution, a video codec or a range of light,
+ * else the word. Names someone chose (an edition, a library) stay text.
  */
-export const WordFact = ({ fact }: WordFactProps) => {
-  const resolution = isResolution(fact) ? fact : null
-  const range = rangeWordOf(fact)
-  const View = WORD_VIEWS[factKindOf({ resolution, range })]
-  return <View fact={fact} resolution={resolution} rest={null} range={range} />
-}
+export const WordFact = ({ fact }: WordFactProps) => <FactParts parts={[wordPart(fact)]} />

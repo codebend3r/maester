@@ -4,6 +4,7 @@ import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard, cardLabelOf } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
+import { FocusFactChips } from '@/layouts/FactChips'
 import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
@@ -110,6 +111,7 @@ export const FocusCard = ({
   const styles = useStyles()
   const CaptionTitle = CAPTION_TITLE_VIEWS[captionTitleOf(card)]
   const line = card.episode?.mark ?? card.line
+  const chips = card.chips ?? []
 
   const grow = (toValue: number) => {
     if (isReduced) {
@@ -158,6 +160,7 @@ export const FocusCard = ({
               {line}
             </Text>
           )}
+          {chips.length > 0 && <FocusFactChips parts={chips} />}
         </View>
       </Animated.View>
     </Pressable>

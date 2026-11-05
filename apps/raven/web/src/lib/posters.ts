@@ -49,8 +49,10 @@ export const POSTER_SIZES = {
   showTile: 'auto, 6rem',
   /** A TV library's card, its poster beside its words: `6rem`. */
   showCard: '6rem',
-  /** A Movies library's tile: `clamp(3.5rem, 12vw, 5rem)`. */
-  movieTile: 'auto, 5rem',
+  /** A Movies library's tile: `clamp(4.5rem, 40%, 7rem)` of the tile. */
+  movieTile: 'auto, 7rem',
+  /** A film on a saga's row: `5rem`, `4rem` under 48rem. */
+  sagaFilm: 'auto, 5rem',
   /** A row of a Movies or TV library's list: `2.25rem`. */
   list: '2.25rem',
   /** A movie on the Duplicates tab. */
@@ -71,7 +73,8 @@ const NARROWEST: Record<PosterSizes, number> = {
   [POSTER_SIZES.season]: 144,
   [POSTER_SIZES.showTile]: 64,
   [POSTER_SIZES.showCard]: 96,
-  [POSTER_SIZES.movieTile]: 56,
+  [POSTER_SIZES.movieTile]: 72,
+  [POSTER_SIZES.sagaFilm]: 56,
   [POSTER_SIZES.list]: 36,
   [POSTER_SIZES.duplicate]: 56,
   [POSTER_SIZES.album]: 256,

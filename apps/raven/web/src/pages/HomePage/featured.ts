@@ -6,14 +6,13 @@ import {
   type ItemSummary,
   type Library,
   type MediaItem,
-  type Resolution,
+  type FactPart,
   type ShowEntry,
   type WatchState,
   cardLink,
   cardTitle,
   formatRuntime,
-  rangeLabel,
-  resolutionLabel,
+  pictureParts,
   showYears,
   watchLink,
   ITEM_IMAGE_KINDS,
@@ -34,8 +33,8 @@ export type Featured = {
   title: string
   /** The release day (or year) and the length, or a show's years and episodes. */
   facts: string[]
-  /** A movie's resolution and whether it is HDR; null for a show, or a file not yet probed. */
-  picture: Picture | null
+  /** A movie's resolution, range and codec as chips; none for a show, or a file not yet probed. */
+  picture: FactPart[]
   /** Its summary, else its tagline; null when it has neither. */
   line: string | null
   /** The video Play starts, handed over; null when a show has nothing left to watch. */
@@ -70,15 +69,6 @@ const artworkOf = (
 
 const isFact = (fact: string | null): fact is string => fact != null && fact !== ''
 
-type Picture = { resolution: Resolution | null; range: string | null }
-
-/** 4K and HDR (or DV5), 1080p alone, or null before the file is probed. */
-const pictureOf = (media: MediaItem): Picture | null => {
-  const resolution = resolutionLabel(media)
-  const range = rangeLabel(media)
-  return resolution == null && range == null ? null : { resolution, range }
-}
-
 type FromMediaProps = {
   media: MediaItem
   line: string | null
@@ -98,7 +88,7 @@ const fromMedia = ({ media, line, library }: FromMediaProps): Featured[] => {
       eyebrow: HOME_COPY.featuredIn(library.name),
       title,
       facts: [date, formatRuntime(media.duration)].filter(isFact),
-      picture: pictureOf(media),
+      picture: pictureParts(media),
       line,
       play: watchLink({ media }),
       details: cardLink({ media, hasPages: true }).to,
@@ -126,7 +116,7 @@ const fromShow = ({ entry, line, library }: FromShowProps): Featured[] => {
         showYears({ year: show.year, endedYear: entry.endedYear }),
         COMMON_COPY.episodes(entry.episodes),
       ].filter(isFact),
-      picture: null,
+      picture: [],
       line,
       play: next ? watchLink({ media: next }) : null,
       details: `/shows/${show.id}`,

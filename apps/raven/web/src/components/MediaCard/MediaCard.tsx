@@ -22,7 +22,12 @@ import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark, FavouriteWords } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
-import { FactText, RangeChip, ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
+import {
+  FactText,
+  RangeChip,
+  ResolutionChip,
+  WordFact,
+} from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
@@ -185,7 +190,7 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
         <span className={styles.facts}>
           {facts.map((fact) => (
             <span key={fact} className={styles.fact}>
-              {fact}
+              <WordFact fact={fact} />
             </span>
           ))}
           <FavouriteWords media={media} />
