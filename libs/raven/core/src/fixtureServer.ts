@@ -1,13 +1,16 @@
 /**
  * What `@raven/server`'s `serve:fixture` holds and how it is started, shared by the server that
- * builds it and the web's browser end to end suite that reads it. The device app's and Wren's
- * Maestro flows name the same titles in YAML, which can import nothing.
+ * builds it and the web's browser end to end suite that reads it. `serve:lighthouse` is the
+ * larger library the web's Lighthouse run scores Home against, on a port of its own. The device
+ * app's and Wren's Maestro flows name the same titles in YAML, which can import nothing.
  */
 export const FIXTURE_SERVER = {
   /** The device apps' fixture listens here, the port their builds name. */
   appPort: 8490,
   /** The web suite's listens here, so it never meets a device fixture left running. */
   webPort: 8491,
+  /** The Lighthouse fixture's, which the web's Lighthouse server starts and sends `/api` to. */
+  lighthousePort: 8492,
   host: '127.0.0.1',
   /** What a runner polls until the fixture answers: it listens only once its scans are done. */
   readyPath: '/api/health',

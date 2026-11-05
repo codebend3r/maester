@@ -4,12 +4,8 @@ tags:
   - dpad
 ---
 - runFlow: signIn.yaml
-# Home opens with the remote on the film, its first card.
-- extendedWaitUntil:
-    visible:
-      text: Kestrel Point
-      focused: true
-    timeout: 30000
+# Home opens with the remote on the hero's Play, and Down moves it to the first shelf's card.
+- runFlow: steps/heroToFilm.dpad.yaml
 # A run stopped part way can leave the film under Continue watching, so the flow clears it
 # first, and then nothing is being watched.
 - runFlow:
@@ -18,12 +14,8 @@ tags:
     commands:
       - runFlow: steps/clearSpot.dpad.yaml
       # The card the page was opened from went with its shelf, so Home gives its opening
-      # focus again, to the film on its own shelf.
-      - extendedWaitUntil:
-          visible:
-            text: Kestrel Point
-            focused: true
-          timeout: 10000
+      # focus again, to the hero's Play, and Down goes to the film on its own shelf.
+      - runFlow: steps/heroToFilm.dpad.yaml
 - assertNotVisible: Continue watching
 # Select opens the film's page with the remote on Play.
 - pressKey: Remote Dpad Center

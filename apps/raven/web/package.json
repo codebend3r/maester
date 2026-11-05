@@ -117,7 +117,14 @@
       },
       "lighthouse": {
         "dependsOn": [
-          "build"
+          "build",
+          "^build",
+          {
+            "projects": [
+              "@shared/server"
+            ],
+            "target": "build"
+          }
         ],
         "cache": false
       }

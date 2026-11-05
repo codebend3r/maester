@@ -1,0 +1,21 @@
+appId: io.github.codebend3r.raven.app
+name: From the hero's Play, which Home opens on, move down to the film on the first shelf
+---
+# The hero holds its slide while it has the focus, whichever title it opened on.
+- extendedWaitUntil:
+    visible:
+      text: Play .*
+      focused: true
+    timeout: 30000
+# Down from the hero can stop on the shelf's See all, above its row, before the film's card.
+- repeat:
+    while:
+      notVisible:
+        text: Kestrel Point
+        focused: true
+    times: 3
+    commands:
+      - pressKey: Remote Dpad Down
+- assertVisible:
+    text: Kestrel Point
+    focused: true

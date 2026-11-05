@@ -1,18 +1,10 @@
-import { randomBytes } from 'node:crypto'
-import { rmSync } from 'node:fs'
-import { mkdtemp, writeFile } from 'node:fs/promises'
-import { constants, tmpdir } from 'node:os'
+import { writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { FIXTURE_SERVER, LIBRARY_KINDS } from '@raven/core'
 import { wholeNumber } from '@shared/server'
-import { createApp } from '@/app'
-import { MetadataService } from '@/metadata/metadataService'
-import { ScannerService } from '@/scanner/scannerService'
-import { ThumbnailService } from '@/thumbnails/thumbnailService'
-import { NOT_WATCHING, adminCookie, testConfig } from '@/test/app'
+import { runFixture } from '@/e2e/fixtureRun'
 import { encodeClip, encodeRichClip, encodeTrack } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
-import { apiFor } from '@/test/server'
 
 /**
  * A real raven server for the device app's and Wren's Maestro flows (`apps/raven/app/e2e`,
@@ -22,9 +14,8 @@ import { apiFor } from '@/test/server'
  * sidecar, which it plays as it is. Both are matched against a fake TMDB, which knows no
  * MusicBrainz release, so the album keeps its tags and no request leaves the Mac. The music
  * library is neither pinned nor in the hero, so the device app's Home is as it was without it.
- * It listens on a fixed port on the loopback, which the iOS and tvOS simulators share with the
- * Mac, and lives until it is stopped. The web's browser suite starts it on a port of its own
- * with the built web app's folder, which it then serves beside its API, as raven's image does.
+ * It listens on a fixed port (`runFixture`). The web's browser suite starts it on a port of its
+ * own with the built web app's folder, which it then serves beside its API, as raven's image does.
  */
 const FIXTURE = {
   movie: { folder: 'Kestrel Point (2024)', file: 'Kestrel Point (2024).mkv' },
@@ -46,9 +37,6 @@ const FIXTURE = {
     seconds: 20,
   },
 } as const
-
-const fixtureWebDir = process.env[FIXTURE_SERVER.env.webDir]?.trim() ?? ''
-const fixturePort = wholeNumber(process.env[FIXTURE_SERVER.env.port]) ?? FIXTURE_SERVER.appPort
 
 const tmdb = fakeTmdb({
   movies: [{ id: 9001, title: FIXTURE_SERVER.movie.title, released: '2024-03-08' }],
@@ -72,100 +60,51 @@ const CUES = ['1', '00:00:02,000 --> 00:00:05,000', 'The tide is turning.', ''].
 /** The sidecar's one cue lasts nearly all of the clip, so a player paused anywhere shows it. */
 const SIDECAR_CUES = ['1', '00:00:01,000 --> 00:00:58,000', 'The water is rising.', ''].join('\n')
 
-const STOP_SIGNALS = ['SIGINT', 'SIGTERM'] as const
+const fixtureWebDir = process.env[FIXTURE_SERVER.env.webDir]?.trim() ?? ''
 
-const root = await mkdtemp(join(tmpdir(), 'raven-app-fixture-'))
-const removeRoot = () => rmSync(root, { recursive: true, force: true, maxRetries: 5 })
-
-// Until the server's own shutdown hook is registered, a stop ends the process here, so a
-// signal during the encodes cannot leave it running; after that the hook ends it once the
-// server has closed. Either way the folder goes first, synchronously.
-let hasShutdownHook = false
-STOP_SIGNALS.forEach((signal) =>
-  process.once(signal, () => {
-    removeRoot()
-    if (!hasShutdownHook) process.exit(128 + constants.signals[signal])
-  }),
-)
-
-const serve = async (): Promise<string> => {
-  const media = join(root, 'media')
-  const movies = join(media, 'movies')
-  const shows = join(media, 'shows')
-  const music = join(media, 'music')
-  const { album } = FIXTURE
-  await Promise.all([
-    ...FIXTURE_SERVER.album.tracks.map((title, index) =>
-      encodeTrack({
-        path: join(music, album.folder, `0${index + 1} ${title}.flac`),
-        seconds: album.seconds,
-        tags: { ...album.tags, title, track: String(index + 1) },
+await runFixture({
+  name: 'fixture server',
+  port: wholeNumber(process.env[FIXTURE_SERVER.env.port]) ?? FIXTURE_SERVER.appPort,
+  webDir: fixtureWebDir === '' ? null : resolve(fixtureWebDir),
+  metadataFetchFor: () => tmdb.fetch,
+  prepare: async ({ media }) => {
+    const movies = join(media, 'movies')
+    const shows = join(media, 'shows')
+    const music = join(media, 'music')
+    const { album } = FIXTURE
+    await Promise.all([
+      ...FIXTURE_SERVER.album.tracks.map((title, index) =>
+        encodeTrack({
+          path: join(music, album.folder, `0${index + 1} ${title}.flac`),
+          seconds: album.seconds,
+          tags: { ...album.tags, title, track: String(index + 1) },
+        }),
+      ),
+      encodeRichClip({
+        path: join(movies, FIXTURE.movie.folder, FIXTURE.movie.file),
+        seconds: 60,
+        cues: CUES,
       }),
-    ),
-    encodeRichClip({
-      path: join(movies, FIXTURE.movie.folder, FIXTURE.movie.file),
-      seconds: 60,
-      cues: CUES,
-    }),
-    encodeRichClip({ path: join(shows, FIXTURE.show.folder, FIXTURE.show.file), cues: CUES }),
-    encodeClip({ path: join(shows, FIXTURE.show.folder, FIXTURE.show.direct), seconds: 60 }),
-  ])
-  await writeFile(join(shows, FIXTURE.show.folder, FIXTURE.show.sidecar), SIDECAR_CUES)
-
-  const app = await createApp({
-    config: {
-      ...testConfig({
-        dataDir: join(root, 'data'),
-        mediaDir: media,
-        webDir: fixtureWebDir === '' ? null : resolve(fixtureWebDir),
-      }),
-      host: FIXTURE_SERVER.host,
-      port: fixturePort,
-      tmdbApiToken: 'fixture-token',
-      mediaPlane: {
-        origins: [],
-        webOrigins: [],
-        secret: randomBytes(32),
-        problems: [],
-        secretProblems: [],
+      encodeRichClip({ path: join(shows, FIXTURE.show.folder, FIXTURE.show.file), cues: CUES }),
+      encodeClip({ path: join(shows, FIXTURE.show.folder, FIXTURE.show.direct), seconds: 60 }),
+    ])
+    await writeFile(join(shows, FIXTURE.show.folder, FIXTURE.show.sidecar), SIDECAR_CUES)
+    return [
+      {
+        name: FIXTURE_SERVER.movie.library,
+        paths: [movies],
+        settings: { kind: LIBRARY_KINDS.movies },
       },
-    },
-    watch: NOT_WATCHING,
-    metadataFetch: tmdb.fetch,
-  })
-  hasShutdownHook = true
-  await app.listen({ host: FIXTURE_SERVER.host, port: fixturePort })
-
-  const api = apiFor({ app, cookie: await adminCookie(app) })
-  const libraries = await Promise.all([
-    api.createLibrary({
-      name: FIXTURE_SERVER.movie.library,
-      paths: [movies],
-      settings: { kind: LIBRARY_KINDS.movies },
-    }),
-    api.createLibrary({
-      name: FIXTURE_SERVER.show.library,
-      paths: [shows],
-      settings: { kind: LIBRARY_KINDS.shows },
-    }),
-    api.createLibrary({
-      name: FIXTURE_SERVER.album.library,
-      paths: [music],
-      settings: { kind: LIBRARY_KINDS.music, pinned: false, inHero: false },
-    }),
-  ])
-  await Promise.all(libraries.map((library) => app.get(ScannerService).whenIdle(library.id)))
-  await app.get(MetadataService).whenIdle()
-  await app.get(ThumbnailService).whenIdle()
-  return `http://${FIXTURE_SERVER.host}:${fixturePort}`
-}
-
-// A failed start (an encode, the port taken, a library refused) leaves no folder behind.
-try {
-  const address = await serve()
-  console.log(`raven fixture server ready at ${address}`)
-} catch (error) {
-  removeRoot()
-  console.error('raven fixture server could not start:', error)
-  process.exit(1)
-}
+      {
+        name: FIXTURE_SERVER.show.library,
+        paths: [shows],
+        settings: { kind: LIBRARY_KINDS.shows },
+      },
+      {
+        name: FIXTURE_SERVER.album.library,
+        paths: [music],
+        settings: { kind: LIBRARY_KINDS.music, pinned: false, inHero: false },
+      },
+    ]
+  },
+})
