@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, mock, setSystemTime } from 'bun:test'
-import { MEDIA_PROBE_BYTES, type MediaOrigin } from '@raven/core'
+import { MEDIA_PROBE_BYTES, type MediaOrigin, PICK_FRESH_MS } from '@raven/core'
 import { act, fireEvent, renderHook } from '@testing-library/react'
 import { type ProbeFetch } from '@/lib/probeOrigins'
-import { PICK_FRESH_MS, useMediaOrigin } from '@/stores/mediaOrigin'
+import { useMediaOrigin } from '@/stores/mediaOrigin'
 import { PROBE_EVENTS, useMediaOriginProbe } from '@/lib/useMediaOriginProbe'
 import { api } from '@/test/api'
 

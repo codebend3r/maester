@@ -1,4 +1,4 @@
-import { type MediaOrigin, isMediaOrigin } from '@raven/core'
+import { type MediaOrigin, PICK_FRESH_MS, isMediaOrigin } from '@raven/core'
 import { create } from 'zustand'
 import { createJSONStorage, devtools, persist } from 'zustand/middleware'
 import { localOrMemoryStorage } from '@/stores/browserStorage'
@@ -15,9 +15,6 @@ type MediaOriginState = {
   setPick: (pick: MediaPick | null) => void
   setProbing: (isProbing: boolean) => void
 }
-
-/** How long a pick is trusted before the origins are probed again. */
-export const PICK_FRESH_MS = 600_000
 
 type IsFreshPickProps = { pick: MediaPick | null; now: number }
 

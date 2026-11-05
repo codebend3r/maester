@@ -11,6 +11,9 @@ const ORIGIN_KIND_RANK = { lan: 0, tailnet: 1, public: 2 } as const satisfies Re
   number
 >
 
+/** How long a client trusts a pick before it probes the origins again. */
+export const PICK_FRESH_MS = 600_000
+
 /** How much slower than the best an origin may be and still win on its kind. */
 const PREFERENCE_BAND = 0.2
 
