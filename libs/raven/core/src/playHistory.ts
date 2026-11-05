@@ -57,11 +57,8 @@ export const playedContext = (played: Played): string | null => {
   }
 }
 
-export const HISTORY_ROW_KINDS = { entry: 'entry', album: 'album' } as const
-
 /** A run of one account's tracks off one album, back to back: how many played, and whether that was all of it. */
 export type AlbumRun = {
-  key: string
   album: string
   artist: string | null
   /** How many of the album's tracks the run heard at least once. */
@@ -71,17 +68,17 @@ export type AlbumRun = {
   isWhole: boolean
 }
 
-/** A history as a table shows it: each entry, under a heading for each run of an album's tracks. */
-export type HistoryRow =
-  | { kind: typeof HISTORY_ROW_KINDS.entry; key: string; entry: PlayHistoryEntry }
-  | { kind: typeof HISTORY_ROW_KINDS.album; key: string; run: AlbumRun }
+/** Entries back to back, newest first, under a heading when they are a run of an album's tracks. */
+export type HistoryGroup = {
+  key: string
+  run: AlbumRun | null
+  entries: readonly PlayHistoryEntry[]
+}
 
 type TrackOf = Extract<Played, { kind: typeof PLAYED_KINDS.track }>
 
 const trackOf = (entry: PlayHistoryEntry): TrackOf | null =>
   entry.played.kind === PLAYED_KINDS.track ? entry.played : null
-
-const entryKey = (entry: PlayHistoryEntry): string => `${entry.accountId}:${entry.id}`
 
 type Run = { albumId: number | null; accountId: string; entries: PlayHistoryEntry[] }
 
@@ -111,12 +108,10 @@ const runsOf = (entries: readonly PlayHistoryEntry[]): Run[] =>
 const albumRunOf = (entries: readonly PlayHistoryEntry[]): AlbumRun | null => {
   const tracks = entries.flatMap((entry) => trackOf(entry) ?? [])
   const [first] = tracks
-  const [newest] = entries
-  if (!first || !newest || tracks.length < 2) return null
+  if (!first || tracks.length < 2) return null
   const tracksHeard = new Set(tracks.map(({ disc, number, title }) => `${disc}:${number ?? title}`))
     .size
   return {
-    key: `album:${entryKey(newest)}`,
     album: first.album,
     artist: first.artist,
     tracksHeard,
@@ -126,18 +121,14 @@ const albumRunOf = (entries: readonly PlayHistoryEntry[]): AlbumRun | null => {
 }
 
 /**
- * The rows a history table shows, in the entries' order: two or more of an
+ * A history as a table shows it, in the entries' order: two or more of an
  * account's tracks off one album, back to back, sit under a heading for the
  * album that says how much of it they heard. A run broken by anything else
  * starts again after it, and a run is grouped only within what has loaded.
  */
-export const historyRows = (entries: readonly PlayHistoryEntry[]): HistoryRow[] =>
-  runsOf(entries).flatMap((run): HistoryRow[] => {
-    const rows = run.entries.map((entry): HistoryRow => ({
-      kind: HISTORY_ROW_KINDS.entry,
-      key: entryKey(entry),
-      entry,
-    }))
-    const album = albumRunOf(run.entries)
-    return album ? [{ kind: HISTORY_ROW_KINDS.album, key: album.key, run: album }, ...rows] : rows
-  })
+export const historyGroups = (entries: readonly PlayHistoryEntry[]): HistoryGroup[] =>
+  runsOf(entries).map((run) => ({
+    key: run.entries.map((entry) => entry.id).join(':'),
+    run: albumRunOf(run.entries),
+    entries: run.entries,
+  }))

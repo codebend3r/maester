@@ -3,7 +3,6 @@ import type { Anthropic } from '@anthropic-ai/sdk'
 import { type AuthConfig, type HwAccel, isHwAccel, oneOf } from '@raven/core'
 import { ACCOUNTS_OPT_OUT, AUTH_ENV, readAuthConfig } from '@/auth/authConfig'
 import { readMediaPlaneConfig, type MediaPlaneConfig } from '@/media/mediaPlaneConfig'
-import { REQUEST_LOG_ENV } from '@/requestLog'
 import { flag, type ListenConfig, readListenConfig, wholeNumber } from '@shared/server'
 
 /** The effort levels the AI lookup can ask for, as `output_config.effort` takes them. */
@@ -117,8 +116,6 @@ export type ServerConfig = ListenConfig & {
   auth: AuthConfig
   /** `RAVEN_ACCOUNTS=off` exactly: the operator's explicit rollback from enforced accounts. */
   isAccountsOptedOut: boolean
-  /** Log a line for every request answered; off unless `RAVEN_LOG_REQUESTS` turns it on, which the dev script does. */
-  shouldLogRequests: boolean
 }
 
 /** The DI token the config is provided under. */
@@ -173,5 +170,4 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   mediaPlane: readMediaPlaneConfig(env),
   auth: readAuthConfig(env),
   isAccountsOptedOut: env[AUTH_ENV.accounts] === ACCOUNTS_OPT_OUT,
-  shouldLogRequests: flag({ value: env[REQUEST_LOG_ENV.logRequests], fallback: false }),
 })

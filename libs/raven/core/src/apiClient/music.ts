@@ -18,7 +18,7 @@ import {
   isTrackPage,
 } from '@/contract'
 import { type MusicListOptions, musicListQuery } from '@/musicListQuery'
-import { toQueryString } from '@/query'
+import { pathWithQuery } from '@/query'
 
 type ListMusicProps = { libraryId: number } & MusicListOptions
 
@@ -78,7 +78,10 @@ export const musicCalls = ({ send, expect }: Transport) => ({
   }: SearchAlbumMatchesProps): Promise<AlbumMatchCandidate[]> =>
     expect({
       request: send({
-        path: `/api/albums/${albumId}/match/search${query === undefined ? '' : `?${toQueryString({ query })}`}`,
+        path: pathWithQuery({
+          path: `/api/albums/${albumId}/match/search`,
+          query: query === undefined ? {} : { query },
+        }),
       }),
       guard: isAlbumMatchCandidateList,
     }),

@@ -29,16 +29,12 @@ import {
 } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
-import {
-  type HistoryCursor,
-  PlayHistoryRepository,
-  parseCursor,
-} from '@/history/playHistoryRepository'
-import { LibrariesRepository } from '@/libraries/librariesRepository'
+import { PlayHistoryRepository } from '@/history/playHistoryRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
-import { LockService, PRIVACIES } from '@/lock/lockService'
+import { PRIVACIES } from '@/lock/lockService'
 import { type AccountKey, VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
 import { ViewingAccounts } from '@/media/viewingAccounts'
+import { type ListenerScope, ListenerScopes } from '@/music/listenerScope'
 import { parseBody } from '@/parseBody'
 import { ROUTE_PARAMS } from '@/requestParts'
 
@@ -50,7 +46,7 @@ type PageQuery = {
 }
 
 type ReadPageProps = PageQuery & {
-  request: FastifyRequest
+  scope: ListenerScope
   whose: AccountKey | null
 }
 
@@ -67,10 +63,11 @@ const showOf = (asked: unknown): PlayHistoryShow => {
   throw new BadRequestException(`show must be one of ${isPlayHistoryShow.values.join(', ')}`)
 }
 
-const cursorOf = (asked: unknown): HistoryCursor | null => {
+/** The `next` an earlier page answered: an entry's id. */
+const cursorOf = (asked: unknown): number | null => {
   if (asked === undefined) return null
-  const cursor = isString(asked) ? parseCursor(asked) : null
-  if (cursor === null) throw new BadRequestException('before is not a cursor this server made')
+  const cursor = isString(asked) && /^[1-9]\d*$/.test(asked) ? Number(asked) : Number.NaN
+  if (!Number.isSafeInteger(cursor)) throw new BadRequestException('before is not an entry id')
   return cursor
 }
 
@@ -92,20 +89,17 @@ export class PlayHistoryController {
   constructor(
     @Inject(PlayHistoryRepository) private readonly history: PlayHistoryRepository,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
-    @Inject(LockService) private readonly lock: Pick<LockService, 'viewer'>,
-    @Inject(LibrariesRepository) private readonly libraries: Pick<LibrariesRepository, 'lockedIds'>,
+    @Inject(ListenerScopes) private readonly scopes: ListenerScopes,
   ) {}
 
   /** Locked libraries' entries stay out of sight until this caller unlocks them, the owner's view included. */
-  private readPage({ request, whose, before, limit, show }: ReadPageProps): PlayHistoryPage {
-    const viewer = this.lock.viewer({ request })
+  private readPage({ scope, whose, before, limit, show }: ReadPageProps): PlayHistoryPage {
     return this.history.page({
       whose,
       before: cursorOf(before),
       show: showOf(show),
       limit: limitOf(limit),
-      hidden: [...this.libraries.lockedIds()].filter((id) => !viewer.seesLibrary(id)),
-      reader: this.accounts.keyOf({ request }),
+      scope,
     })
   }
 
@@ -117,7 +111,8 @@ export class PlayHistoryController {
     @Query(PLAY_HISTORY_PARAMS.limit) limit: unknown,
     @Query(PLAY_HISTORY_PARAMS.show) show: unknown,
   ): PlayHistoryPage {
-    return this.readPage({ request, whose: this.accounts.keyOf({ request }), before, limit, show })
+    const scope = this.scopes.of({ request })
+    return this.readPage({ scope, whose: scope.account, before, limit, show })
   }
 
   /**
@@ -134,7 +129,13 @@ export class PlayHistoryController {
     @Query(PLAY_HISTORY_PARAMS.show) show: unknown,
     @Query(PLAY_HISTORY_PARAMS.account) account: unknown,
   ): PlayHistoryPage {
-    return this.readPage({ request, whose: accountOf(account), before, limit, show })
+    return this.readPage({
+      scope: this.scopes.of({ request }),
+      whose: accountOf(account),
+      before,
+      limit,
+      show,
+    })
   }
 
   /** A track started playing: its listen's id, for the reports that follow. */

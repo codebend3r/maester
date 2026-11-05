@@ -1,12 +1,9 @@
-import type { ApiClient, Track } from '@raven/core'
+import { type ApiClient, FINISHED_AT, type Track } from '@raven/core'
 import { useEffect, useEffectEvent, useRef } from 'react'
 import { AUDIO_STATES, useAudioQueue } from '@/stores/audioQueue'
 
 /** How much further a listen gets before the history hears of it again, in seconds. */
 export const LISTEN_REPORT_STEP_S = 15
-
-/** A track heard this far through and then back at its top is playing again, as repeat one plays it. */
-const REPLAY_AFTER = 0.9
 
 /** How near its top a track must be to count as starting over, in seconds. */
 const TOP_S = 1
@@ -34,7 +31,7 @@ const report = ({ api, listen }: ReportProps): Listen => {
 type IsReplayProps = { listen: Listen; position: number; duration: number | null }
 
 const isReplay = ({ listen, position, duration }: IsReplayProps): boolean =>
-  duration !== null && listen.furthest >= duration * REPLAY_AFTER && position < TOP_S
+  duration !== null && listen.furthest >= duration * FINISHED_AT && position < TOP_S
 
 type UseListenHistoryProps = {
   api: ApiClient
@@ -45,8 +42,8 @@ type UseListenHistoryProps = {
  * Keeps the play history of every track that plays, however briefly: a
  * listen starts as the track starts playing, and its reach is reported as it
  * plays on, when it pauses, and when another track takes over. A track
- * heard to its end and started again (repeat one, or the same track queued
- * twice) is a new listen; a seek back within it is not.
+ * finished (past `FINISHED_AT`) and started again (repeat one, or the same
+ * track queued twice) is a new listen; a seek back within it is not.
  */
 export const useListenHistory = ({ api, track }: UseListenHistoryProps) => {
   const position = useAudioQueue((store) => store.position)
@@ -74,6 +71,7 @@ export const useListenHistory = ({ api, track }: UseListenHistoryProps) => {
           : moved
       return
     }
+    // The listen it replaces gets its last word in; nothing reads what it was reported as after.
     if (current) report({ api, listen: current })
     listen.current = {
       trackId: id,

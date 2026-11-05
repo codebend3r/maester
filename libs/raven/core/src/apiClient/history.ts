@@ -10,11 +10,11 @@ import {
   isListenStarted,
   isPlayHistoryPage,
 } from '@/contract'
-import { toQueryString } from '@/query'
+import { fillPath, pathWithQuery } from '@/query'
 
 type HistoryPageQuery = {
   /** The cursor a page before this one answered as `next`; null for the newest page. */
-  before: string | null
+  before: number | null
   show: PlayHistoryShow
   limit?: number
 }
@@ -29,20 +29,19 @@ type StartListenProps = { mediaId: number } & ListenStart
 type ReportListenProps = { id: number } & ListenReport
 
 const queryOf = ({ before, show, limit }: HistoryPageQuery): Record<string, string> => ({
-  ...(before === null ? {} : { [PLAY_HISTORY_PARAMS.before]: before }),
+  ...(before === null ? {} : { [PLAY_HISTORY_PARAMS.before]: String(before) }),
   ...(show === PLAY_HISTORY_SHOWS.all ? {} : { [PLAY_HISTORY_PARAMS.show]: show }),
   ...(limit === undefined ? {} : { [PLAY_HISTORY_PARAMS.limit]: String(limit) }),
 })
-
-const withQuery = (path: string, query: Record<string, string>): string =>
-  Object.keys(query).length === 0 ? path : `${path}?${toQueryString(query)}`
 
 /** The play history: an account's own, everyone's for the owner, and the listens a music player reports. */
 export const historyCalls = ({ send, expect }: Transport) => ({
   /** One page of the signed-in account's history, newest first. */
   listPlayHistory: (query: HistoryPageQuery): Promise<PlayHistoryPage> =>
     expect({
-      request: send({ path: withQuery(PLAY_HISTORY_PATHS.own, queryOf(query)) }),
+      request: send({
+        path: pathWithQuery({ path: PLAY_HISTORY_PATHS.own, query: queryOf(query) }),
+      }),
       guard: isPlayHistoryPage,
     }),
 
@@ -50,9 +49,12 @@ export const historyCalls = ({ send, expect }: Transport) => ({
   listEveryonesHistory: ({ accountId, ...query }: EveryoneHistoryQuery): Promise<PlayHistoryPage> =>
     expect({
       request: send({
-        path: withQuery(PLAY_HISTORY_PATHS.everyone, {
-          ...queryOf(query),
-          ...(accountId === null ? {} : { [PLAY_HISTORY_PARAMS.account]: accountId }),
+        path: pathWithQuery({
+          path: PLAY_HISTORY_PATHS.everyone,
+          query: {
+            ...queryOf(query),
+            ...(accountId === null ? {} : { [PLAY_HISTORY_PARAMS.account]: accountId }),
+          },
         }),
       }),
       guard: isPlayHistoryPage,
@@ -62,7 +64,10 @@ export const historyCalls = ({ send, expect }: Transport) => ({
   startListen: async ({ mediaId, position }: StartListenProps): Promise<number> => {
     const started = await expect({
       request: send({
-        path: PLAY_HISTORY_PATHS.startListen.replace(`:${PLAY_HISTORY_PARAMS.id}`, String(mediaId)),
+        path: fillPath({
+          path: PLAY_HISTORY_PATHS.startListen,
+          params: { [PLAY_HISTORY_PARAMS.id]: mediaId },
+        }),
         method: 'POST',
         body: { position } satisfies ListenStart,
       }),
@@ -74,7 +79,7 @@ export const historyCalls = ({ send, expect }: Transport) => ({
   /** Notes how far a listen has got. */
   reportListen: async ({ id, position }: ReportListenProps): Promise<void> => {
     await send({
-      path: PLAY_HISTORY_PATHS.listen.replace(`:${PLAY_HISTORY_PARAMS.id}`, String(id)),
+      path: fillPath({ path: PLAY_HISTORY_PATHS.listen, params: { [PLAY_HISTORY_PARAMS.id]: id } }),
       method: 'PUT',
       body: { position } satisfies ListenReport,
     })

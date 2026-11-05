@@ -115,20 +115,10 @@ export class ViewingAdoption {
       const plays = this.db
         .prepare<Adopting>('UPDATE plays SET account_id = @owner WHERE account_id = @local')
         .run(adopting).changes
-      // Numbered on past the owner's newest, so the history keeps its order and no key repeats.
-      // Read first: a subquery in the UPDATE would see the rows it has already moved.
-      const newest =
-        this.db
-          .prepare<Pick<Adopting, 'owner'>, { id: number }>(
-            'SELECT COALESCE(MAX(id), 0) AS id FROM play_history WHERE account_id = @owner',
-          )
-          .get({ owner: ownerId })?.id ?? 0
+      // An entry's id is its place in everyone's history, so moving it keeps the owner's in order.
       const history = this.db
-        .prepare<Adopting & { newest: number }>(
-          `UPDATE play_history SET account_id = @owner, id = id + @newest
-            WHERE account_id = @local`,
-        )
-        .run({ ...adopting, newest }).changes
+        .prepare<Adopting>('UPDATE play_history SET account_id = @owner WHERE account_id = @local')
+        .run(adopting).changes
       // A playlist is the owner's as it was: no two are the same list, so none merge.
       const playlists = this.db
         .prepare<Adopting>('UPDATE playlists SET account_id = @owner WHERE account_id = @local')

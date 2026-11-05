@@ -11,7 +11,6 @@ import type { MetadataFetch } from '@/metadata/tmdbClient'
 import { isAllowedWebOrigin } from '@/media/mediaPlaneConfig'
 import { mediaPlanePaths, pathMatcher, registerMediaPlaneHook } from '@/media/mediaPlaneCors'
 import { proxiedMediaWarner } from '@/media/mediaPlaneFallback'
-import { registerRequestLog } from '@/requestLog'
 import type { WatchOptions } from '@/scanner/libraryWatcher'
 
 type CreateAppProps = {
@@ -66,13 +65,6 @@ export const createApp = async ({
   )
 
   await compressResponses({ app })
-  if (config.shouldLogRequests && !quiet) {
-    const requestLogger = new Logger(registerRequestLog.name)
-    registerRequestLog({
-      fastify: app.getHttpAdapter().getInstance(),
-      log: (line) => requestLogger.log(line),
-    })
-  }
   const mediaPlaneLogger = new Logger(proxiedMediaWarner.name)
   registerMediaPlaneHook({
     fastify: app.getHttpAdapter().getInstance(),

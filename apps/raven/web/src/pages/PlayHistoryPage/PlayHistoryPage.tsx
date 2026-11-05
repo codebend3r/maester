@@ -13,7 +13,7 @@ import {
   isPlayHistoryShow,
 } from '@raven/core'
 import { Button } from '@raven/ui'
-import { type ComponentType, useId } from 'react'
+import { type ComponentType, type ReactNode, useId } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
@@ -22,11 +22,8 @@ import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { type ManagementMode, useManagement } from '@/lib/management'
 import { everyonesHistoryQuery, membersQuery, playHistoryQuery } from '@/lib/queries'
-import {
-  PLAY_HISTORY_COPY,
-  PLAY_HISTORY_ROUTES,
-  PLAY_HISTORY_SEARCH,
-} from '@/pages/PlayHistoryPage/copy'
+import { PLAY_HISTORY_ROUTES, PLAY_HISTORY_SEARCH } from '@/lib/playHistory'
+import { PLAY_HISTORY_COPY } from '@/pages/PlayHistoryPage/copy'
 import { type AccountName, PlayHistoryTable } from '@/pages/PlayHistoryPage/PlayHistoryTable'
 import styles from '@/pages/PlayHistoryPage/PlayHistoryPage.module.scss'
 
@@ -136,6 +133,28 @@ const HistoryResults = ({ history, show, nameOf }: HistoryResultsProps) => {
   )
 }
 
+type HistoryHeaderProps = {
+  titleId: string
+  title: string
+  intro: string
+  /** A link the page offers beside its title. */
+  action?: ReactNode
+}
+
+/** A history page's top: the way back, its title and what it holds. */
+const HistoryHeader = ({ titleId, title, intro, action }: HistoryHeaderProps) => (
+  <header className={styles.header}>
+    <BackButton fallback={HOME} className={styles.back} />
+    <hgroup className={styles.heading}>
+      <PageTitle id={titleId} icon="history">
+        {title}
+      </PageTitle>
+      <p className={styles.intro}>{intro}</p>
+    </hgroup>
+    {action}
+  </header>
+)
+
 /**
  * `/history`: everything the signed-in account played, newest first, every
  * video and every track however briefly, as a plain table. Only ever the
@@ -148,20 +167,18 @@ export const PlayHistoryPage = () => {
   const { canManage } = useManagement()
   return (
     <section className={styles.page} aria-labelledby={titleId}>
-      <header className={styles.header}>
-        <BackButton fallback={HOME} className={styles.back} />
-        <hgroup className={styles.heading}>
-          <PageTitle id={titleId} icon="history">
-            {PLAY_HISTORY_COPY.title}
-          </PageTitle>
-          <p className={styles.intro}>{PLAY_HISTORY_COPY.intro}</p>
-        </hgroup>
-        {canManage && (
-          <Link className={styles.everyone} to={PLAY_HISTORY_ROUTES.everyone}>
-            {PLAY_HISTORY_COPY.seeEveryone}
-          </Link>
-        )}
-      </header>
+      <HistoryHeader
+        titleId={titleId}
+        title={PLAY_HISTORY_COPY.title}
+        intro={PLAY_HISTORY_COPY.intro}
+        action={
+          canManage && (
+            <Link className={styles.everyone} to={PLAY_HISTORY_ROUTES.everyone}>
+              {PLAY_HISTORY_COPY.seeEveryone}
+            </Link>
+          )
+        }
+      />
       <ShowSwitch show={show} onShow={setShow} />
       <HistoryResults history={history} show={show} nameOf={null} />
     </section>
@@ -219,15 +236,11 @@ const EveryoneHistory = () => {
     emails.get(id) ?? (isAccountId(id) ? id : PLAY_HISTORY_COPY.thisServer)
   return (
     <section className={styles.page} aria-labelledby={titleId}>
-      <header className={styles.header}>
-        <BackButton fallback={HOME} className={styles.back} />
-        <hgroup className={styles.heading}>
-          <PageTitle id={titleId} icon="history">
-            {PLAY_HISTORY_COPY.everyoneTitle}
-          </PageTitle>
-          <p className={styles.intro}>{PLAY_HISTORY_COPY.everyoneIntro}</p>
-        </hgroup>
-      </header>
+      <HistoryHeader
+        titleId={titleId}
+        title={PLAY_HISTORY_COPY.everyoneTitle}
+        intro={PLAY_HISTORY_COPY.everyoneIntro}
+      />
       <div className={styles.filters}>
         <ShowSwitch show={show} onShow={setShow} />
         {accounts.length > 0 && (

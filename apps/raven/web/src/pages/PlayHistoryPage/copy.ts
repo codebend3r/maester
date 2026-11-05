@@ -7,27 +7,32 @@ import {
   plural,
 } from '@raven/core'
 
-/** The play history's pages: each account's own, and everyone's for the owner. */
-export const PLAY_HISTORY_ROUTES = {
-  own: '/history',
-  everyone: '/history/everyone',
-} as const
+type PartOfProps = { furthest: string; duration: string; percent: number }
 
-/** The address's search params the pages read. */
-export const PLAY_HISTORY_SEARCH = { show: 'show', account: 'account' } as const
+/** The words for how far a sitting got. */
+const REACH_COPY = {
+  finished: 'Finished',
+  /** A music listen kept from before the history, which noted only that it counted. */
+  listened: 'Listened',
+  partOf: ({ furthest, duration, percent }: PartOfProps) =>
+    `${furthest} of ${duration} (${percent}%)`,
+} as const
 
 /** How far a sitting got, in words: finished, a listen that only counted, or the spot and its share. */
 const reachText = (reach: Reach): string => {
   switch (reach.kind) {
     case REACH_KINDS.finished:
-      return 'Finished'
-    // A music listen kept from before the history, which noted only that it counted.
+      return REACH_COPY.finished
     case REACH_KINDS.unknown:
-      return 'Listened'
+      return REACH_COPY.listened
     case REACH_KINDS.partial:
       return reach.duration === null || reach.percent === null
         ? formatDuration(reach.furthest)
-        : `${formatDuration(reach.furthest)} of ${formatDuration(reach.duration)} (${reach.percent}%)`
+        : REACH_COPY.partOf({
+            furthest: formatDuration(reach.furthest),
+            duration: formatDuration(reach.duration),
+            percent: reach.percent,
+          })
     default: {
       const unreachable: never = reach
       return unreachable

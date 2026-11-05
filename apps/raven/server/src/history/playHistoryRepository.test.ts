@@ -1,7 +1,7 @@
 import { LIBRARY_KINDS, PLAYED_KINDS, PLAY_HISTORY_SHOWS } from '@raven/core'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DatabaseService } from '@/db/database'
-import { PlayHistoryRepository, cursorText, parseCursor } from '@/history/playHistoryRepository'
+import { PlayHistoryRepository } from '@/history/playHistoryRepository'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import type { AccountKey } from '@/media/viewingAccountKeys'
@@ -51,7 +51,7 @@ type PageOfProps = {
   whose: AccountKey | null
   hidden?: readonly number[]
   limit?: number
-  before?: string | null
+  before?: number | null
   show?: (typeof PLAY_HISTORY_SHOWS)[keyof typeof PLAY_HISTORY_SHOWS]
 }
 
@@ -65,11 +65,10 @@ const pageOf = ({
 }: PageOfProps) =>
   stores({ database }).history.page({
     whose,
-    before: before === null ? null : parseCursor(before),
+    before,
     show,
     limit,
-    hidden,
-    reader: someone,
+    scope: { account: someone, hidden },
   })
 
 describe('the play history', () => {
@@ -186,10 +185,10 @@ describe('the play history', () => {
     const own = pageOf({ database: database.get(), whose: another }).entries
     const everyone = pageOf({ database: database.get(), whose: null }).entries
 
-    expect(own.map(({ accountId, id }) => [accountId, id])).toEqual([[another, 1]])
+    expect(own.map(({ accountId, id }) => [accountId, id])).toEqual([[another, 2]])
     expect(everyone.map(({ accountId, id }) => [accountId, id])).toEqual([
-      [someone, 2],
-      [another, 1],
+      [someone, 3],
+      [another, 2],
       [someone, 1],
     ])
   })
@@ -211,7 +210,7 @@ describe('the play history', () => {
       limit: 1,
       before: ownFirst.next,
     })
-    expect([...ownFirst.entries, ...ownSecond.entries].map(({ id }) => id)).toEqual([2, 1])
+    expect([...ownFirst.entries, ...ownSecond.entries].map(({ id }) => id)).toEqual([3, 1])
     expect(ownSecond.next).toBeNull()
 
     const allFirst = pageOf({ database: database.get(), whose: null, limit: 2 })
@@ -248,22 +247,19 @@ describe('the play history', () => {
     database.get().db.prepare('DELETE FROM media WHERE id = ?').run(ids.tracks[0])
     expect(pageOf({ database: database.get(), whose: someone }).entries).toEqual([])
   })
-
-  it('refuses a cursor it did not make', () => {
-    expect(parseCursor('nonsense')).toBeNull()
-    expect(parseCursor('2026~acct~0')).toBeNull()
-    const cursor = { startedAt: minute(0).toISOString(), accountId: another, id: 3 }
-    expect(parseCursor(cursorText(cursor))).toEqual(cursor)
-  })
 })
 
 type ReadProps = { database: DatabaseService; track: number }
 
 type Read = (from: ReadProps) => unknown
 
-const before = cursorText({ startedAt: minute(30).toISOString(), accountId: another, id: 900 })
+const before = 900
 
-/** Every statement over the history that SQLite plans; an insert of values has no plan to read. */
+/**
+ * Every statement over the history that SQLite plans. A listen's start
+ * reads only the track, and a video's sitting is an upsert by
+ * `play_history_play`, so neither has a step over the history to read.
+ */
 const STATEMENTS = {
   'an account’s page': ({ database }) => pageOf({ database, whose: another }),
   'an account’s later page': ({ database }) => pageOf({ database, whose: another, before }),
@@ -271,20 +267,16 @@ const STATEMENTS = {
     pageOf({ database, whose: another, show: PLAY_HISTORY_SHOWS.music }),
   'everyone’s page': ({ database }) => pageOf({ database, whose: null }),
   'everyone’s later page': ({ database }) => pageOf({ database, whose: null, before }),
-  'a listen started': ({ database, track }) =>
-    stores({ database }).history.startListen({ account: another, mediaId: track, position: 0 }),
   'a listen reported': ({ database }) =>
     stores({ database }).history.reportListen({ account: another, id: 1, position: 9 }),
-  'a video’s sitting': ({ database }) =>
-    stores({ database }).viewing.report({ id: 1, position: 9, account: another }),
 } as const satisfies Record<string, Read>
 
 /** A step over the history, by its alias or its name. */
 const HISTORY_STEP = /^[A-Z-]+ (h|play_history)\b/
 
-/** An entry found by its key, account first, or by an index kept for the read, never every entry. */
+/** An entry found by its id, or by its account's index, never every entry. */
 const BY_KEY =
-  /^SEARCH (h|play_history) USING (PRIMARY KEY \(account_id=\?|(COVERING )?INDEX play_history_(play \(account_id=\?|started \(\(started_at,account_id,id\)<\(\?,\?,\?\)\)))/
+  /^SEARCH (h|play_history) USING (INTEGER PRIMARY KEY \(rowid[<=]\?\)|(COVERING )?INDEX play_history_account \(account_id=\? AND rowid[<=]\?\))/
 
 describe.each([
   { statistics: 'no statistics', prepare: (): void => undefined },

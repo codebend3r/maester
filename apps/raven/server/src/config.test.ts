@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ACCOUNTS_OPT_OUT, AUTH_ENV } from '@/auth/authConfig'
 import { MUSIC_ENV, readServerConfig } from '@/config'
-import { REQUEST_LOG_ENV } from '@/requestLog'
 
 describe('readServerConfig', () => {
   it('keeps 20 GiB of track transcodes unless TRANSCODE_CACHE_GB says otherwise', () => {
@@ -33,13 +32,6 @@ describe('readServerConfig', () => {
       readServerConfig({ [MUSIC_ENV.lastFmApiKey]: ' key ', [MUSIC_ENV.lastFmApiSecret]: 'secret' })
         .lastFm,
     ).toEqual({ apiKey: 'key', apiSecret: 'secret' })
-  })
-
-  it('logs requests only when RAVEN_LOG_REQUESTS turns it on', () => {
-    expect(readServerConfig({})).toMatchObject({ shouldLogRequests: false })
-    expect(readServerConfig({ [REQUEST_LOG_ENV.logRequests]: 'true' })).toMatchObject({
-      shouldLogRequests: true,
-    })
   })
 
   it('quick-scans on boot and every 10 minutes unless told otherwise', () => {

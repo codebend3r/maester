@@ -9,6 +9,7 @@ import {
   isBugReportList,
   type PlaybackDiagnostics,
 } from '@/contract'
+import { fillPath } from '@/query'
 
 type SetBugReportStatusProps = {
   id: number
@@ -32,7 +33,7 @@ export const reportCalls = ({ send, expect }: Transport) => ({
   setBugReportStatus: ({ id, status }: SetBugReportStatusProps): Promise<BugReport> =>
     expect({
       request: send({
-        path: BUG_REPORT_PATHS.status.replace(`:${BUG_REPORT_PARAMS.id}`, String(id)),
+        path: fillPath({ path: BUG_REPORT_PATHS.status, params: { [BUG_REPORT_PARAMS.id]: id } }),
         method: 'PUT',
         body: { status } satisfies BugReportStatusChange,
       }),

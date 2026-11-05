@@ -9,42 +9,27 @@ import {
   type Played,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
-import { NEXT_HISTORY_ID } from '@/history/playHistorySql'
+import { PLAY_HISTORY_KINDS } from '@/history/playHistorySql'
 import { MediaRepository } from '@/media/mediaRepository'
 import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
+import type { ListenerScope } from '@/music/listenerScope'
 
-/** Where a page ends: the last entry's start, account and number, which the next page reads before. */
-export type HistoryCursor = { startedAt: string; accountId: string; id: number }
+/** A first page reads from past the newest entry. */
+const NEWEST = Number.MAX_SAFE_INTEGER
 
-const CURSOR_SEPARATOR = '~'
+type PlayHistoryKind = (typeof PLAY_HISTORY_KINDS)[keyof typeof PLAY_HISTORY_KINDS]
 
-/** A cursor as a page hands it on: plain text, since none of its parts holds the separator. */
-export const cursorText = ({ startedAt, accountId, id }: HistoryCursor): string =>
-  [startedAt, accountId, String(id)].join(CURSOR_SEPARATOR)
-
-/** A cursor a client sent back, or null when it is not one this server made. */
-export const parseCursor = (text: string): HistoryCursor | null => {
-  const parts = text.split(CURSOR_SEPARATOR)
-  if (parts.length !== 3) return null
-  const [startedAt = '', accountId = '', idText = ''] = parts
-  const id = Number(idText)
-  if (!Number.isSafeInteger(id) || id < 1 || startedAt === '' || accountId === '') return null
-  return { startedAt, accountId, id }
-}
-
-/** Past every real start time, so a first page reads from the newest. */
-const NEWEST = { startedAt: '￿', accountId: '￿', id: Number.MAX_SAFE_INTEGER } as const
-
-/** What each choice of `show` keeps, as a condition on the track row joined in. */
-const SHOW_FILTERS = {
-  [PLAY_HISTORY_SHOWS.all]: '',
-  [PLAY_HISTORY_SHOWS.video]: 'AND t.media_id IS NULL',
-  [PLAY_HISTORY_SHOWS.music]: 'AND t.media_id IS NOT NULL',
-} as const satisfies Record<PlayHistoryShow, string>
+/** The kind of entry each choice of `show` keeps; null keeps every kind. */
+const SHOW_KINDS = {
+  [PLAY_HISTORY_SHOWS.all]: null,
+  [PLAY_HISTORY_SHOWS.video]: PLAY_HISTORY_KINDS.video,
+  [PLAY_HISTORY_SHOWS.music]: PLAY_HISTORY_KINDS.listen,
+} as const satisfies Record<PlayHistoryShow, PlayHistoryKind | null>
 
 type HistoryRow = {
   account_id: string
   id: number
+  kind: PlayHistoryKind
   media_id: number
   started_at: string
   last_played_at: string
@@ -63,7 +48,7 @@ type HistoryRow = {
 }
 
 const COLUMNS = `
-  SELECT h.account_id, h.id, h.media_id, h.started_at, h.last_played_at, h.furthest,
+  SELECT h.account_id, h.id, h.kind, h.media_id, h.started_at, h.last_played_at, h.furthest,
          m.duration, m.library_id, l.name AS library_name, m.title AS file_title,
          t.title AS track_title, t.disc, t.number AS track_number,
          a.id AS album_id, a.title AS album_title,
@@ -99,8 +84,9 @@ const playedVideo = ({ media, title }: PlayedVideoProps): Played => {
 
 type PlayedOfProps = { row: HistoryRow; media: MediaItem | undefined }
 
+/** A listen reads as its track; one whose track has since lost its album reads as its file, as a video does. */
 const playedOf = ({ row, media }: PlayedOfProps): Played => {
-  if (row.album_id === null || row.track_title === null) {
+  if (row.kind === PLAY_HISTORY_KINDS.video || row.album_id === null || row.track_title === null) {
     return playedVideo({ media, title: row.file_title })
   }
   return {
@@ -118,13 +104,12 @@ const playedOf = ({ row, media }: PlayedOfProps): Played => {
 type PlayHistoryRepositoryPageProps = {
   /** Whose history: one account's, or null for everyone's. */
   whose: AccountKey | null
-  before: HistoryCursor | null
+  /** The `next` a page before this one answered; null for the newest page. */
+  before: number | null
   show: PlayHistoryShow
   limit: number
-  /** Libraries the reader may not see: their entries are left out. */
-  hidden: readonly number[]
-  /** Who reads, for the files' facts. */
-  reader: AccountKey
+  /** Who reads, for the files' facts, and the libraries whose entries they may not see. */
+  scope: ListenerScope
 }
 
 type PlayHistoryRepositoryStartListenProps = {
@@ -142,22 +127,16 @@ type PlayHistoryRepositoryReportListenProps = {
 }
 
 type PageBinding = {
-  hidden: string
+  before: number
   limit: number
-  startedAt: string
-  accountId: string
-  id: number
-}
-
-type RowsOfProps = {
-  whose: AccountKey | null
-  show: PlayHistoryShow
-  binding: PageBinding
+  hidden: string
+  account: AccountKey | null
+  kind: PlayHistoryKind | null
 }
 
 /**
  * The play history: a row for every sitting with a video or a track, by
- * account. A video's rows are kept with its plays (`startVideoSitting`, `continueVideoSitting`); a
+ * account. A video's rows are kept with its plays (`keepVideoSitting`); a
  * track's are the listens its player starts and reports here.
  */
 @Injectable()
@@ -171,57 +150,37 @@ export class PlayHistoryRepository {
     return this.database.db
   }
 
-  private rowsOf({ whose, show, binding }: RowsOfProps): HistoryRow[] {
-    const filters = `${SHOW_FILTERS[show]}
-      AND m.library_id NOT IN (SELECT value FROM json_each(@hidden))`
-    if (whose === null) {
-      return this.db
-        .prepare<PageBinding, HistoryRow>(
-          `${COLUMNS}
-            WHERE (h.started_at, h.account_id, h.id) < (@startedAt, @accountId, @id) ${filters}
-            ORDER BY h.started_at DESC, h.account_id DESC, h.id DESC
-            LIMIT @limit`,
-        )
-        .all(binding)
-    }
-    // The account's numbers grow with its start times, so its key is its order.
-    return this.db
-      .prepare<PageBinding & ByAccount, HistoryRow>(
+  /** One page of `whose` history, newest first, and the cursor of the page after it. */
+  page({ whose, before, show, limit, scope }: PlayHistoryRepositoryPageProps): PlayHistoryPage {
+    const kind = SHOW_KINDS[show]
+    const conditions = [
+      'h.id < @before',
+      'm.library_id NOT IN (SELECT value FROM json_each(@hidden))',
+      ...(whose === null ? [] : ['h.account_id = @account']),
+      ...(kind === null ? [] : ['h.kind = @kind']),
+    ]
+    const rows = this.db
+      .prepare<PageBinding, HistoryRow>(
         `${COLUMNS}
-          WHERE h.account_id = @account AND h.id < @id ${filters}
+          WHERE ${conditions.join(' AND ')}
           ORDER BY h.id DESC
           LIMIT @limit`,
       )
-      .all({ ...binding, account: whose })
-  }
-
-  /** One page of `whose` history, newest first, and the cursor of the page after it. */
-  page({
-    whose,
-    before,
-    show,
-    limit,
-    hidden,
-    reader,
-  }: PlayHistoryRepositoryPageProps): PlayHistoryPage {
-    const from = before ?? NEWEST
-    const rows = this.rowsOf({
-      whose,
-      show,
-      binding: {
-        hidden: JSON.stringify(hidden),
+      .all({
+        before: before ?? NEWEST,
         limit: limit + 1,
-        startedAt: from.startedAt,
-        accountId: from.accountId,
-        id: from.id,
-      },
-    })
+        hidden: JSON.stringify(scope.hidden),
+        account: whose,
+        kind,
+      })
     const shown = rows.slice(0, limit)
     const videos = new Map(
       this.media
         .getMany({
-          ids: shown.filter((row) => row.album_id === null).map((row) => row.media_id),
-          account: reader,
+          ids: shown
+            .filter((row) => row.kind === PLAY_HISTORY_KINDS.video)
+            .map((row) => row.media_id),
+          account: scope.account,
         })
         .map((item) => [item.id, item]),
     )
@@ -237,11 +196,7 @@ export class PlayHistoryRepository {
       libraryName: row.library_name,
       played: playedOf({ row, media: videos.get(row.media_id) }),
     }))
-    const last = shown.at(-1)
-    const next =
-      rows.length > limit && last
-        ? cursorText({ startedAt: last.started_at, accountId: last.account_id, id: last.id })
-        : null
+    const next = rows.length > limit ? (shown.at(-1)?.id ?? null) : null
     return { entries, next }
   }
 
@@ -252,24 +207,14 @@ export class PlayHistoryRepository {
     position,
     at = new Date(),
   }: PlayHistoryRepositoryStartListenProps): number | null {
-    return this.db.transaction((): number | null => {
-      const isTrack = !!this.db
-        .prepare<[number], { media_id: number }>('SELECT media_id FROM tracks WHERE media_id = ?')
-        .get(mediaId)
-      if (!isTrack) return null
-      const next = this.db
-        .prepare<ByAccount, { id: number }>(`SELECT ${NEXT_HISTORY_ID} AS id`)
-        .get({ account })
-      const id = next?.id ?? 1
-      const when = at.toISOString()
-      this.db
-        .prepare<[ByAccount, number, number, string, string, number]>(
-          `INSERT INTO play_history (account_id, id, media_id, started_at, last_played_at, furthest)
-           VALUES (@account, ?, ?, ?, ?, ?)`,
-        )
-        .run({ account }, id, mediaId, when, when, position)
-      return id
-    })()
+    const when = at.toISOString()
+    const made = this.db
+      .prepare<[ByAccount, string, string, string, number, number]>(
+        `INSERT INTO play_history (account_id, kind, media_id, started_at, last_played_at, furthest)
+         SELECT @account, ?, media_id, ?, ?, ? FROM tracks WHERE media_id = ?`,
+      )
+      .run({ account }, PLAY_HISTORY_KINDS.listen, when, when, position, mediaId)
+    return made.changes > 0 ? Number(made.lastInsertRowid) : null
   }
 
   /** A listen got to `position`; false when the account started no such listen. */
@@ -280,11 +225,11 @@ export class PlayHistoryRepository {
     at = new Date(),
   }: PlayHistoryRepositoryReportListenProps): boolean {
     const { changes } = this.db
-      .prepare<[ByAccount, string, number, number]>(
+      .prepare<[ByAccount, string, number, number, string]>(
         `UPDATE play_history SET last_played_at = ?, furthest = MAX(COALESCE(furthest, 0), ?)
-          WHERE account_id = @account AND id = ? AND play_id IS NULL`,
+          WHERE id = ? AND account_id = @account AND kind = ?`,
       )
-      .run({ account }, at.toISOString(), position, id)
+      .run({ account }, at.toISOString(), position, id, PLAY_HISTORY_KINDS.listen)
     return changes > 0
   }
 }

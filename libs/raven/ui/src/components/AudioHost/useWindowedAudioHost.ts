@@ -1,8 +1,7 @@
 import { type ApiClient, REMOTE_COMMANDS, type RemoteCommand, type Track } from '@raven/core'
 import { useEffect, useEffectEvent, useRef } from 'react'
 import { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
-import { useListenCounter } from '@/components/AudioHost/useListenCounter'
-import { useListenHistory } from '@/components/AudioHost/useListenHistory'
+import { useTrackListening } from '@/components/AudioHost/useTrackListening'
 import { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
 import type { WatchHide } from '@/components/Player/useProgressReport'
 import { nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
@@ -121,8 +120,7 @@ export const useWindowedAudioHost = ({
   const passingTo = useRef<number | null>(null)
   const trackId = track?.id ?? null
   const nextId = useAudioQueue((store) => nextTrackOf(store)?.id ?? null)
-  useListenCounter({ api, track })
-  useListenHistory({ api, track })
+  useTrackListening({ api, track })
   const start = startOf(useAudiobookSpot({ api, track, watchHide }))
 
   const passOver = useEffectEvent((id: number) => {

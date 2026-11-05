@@ -10,6 +10,7 @@ import { SETTINGS_KEYS, SettingsRepository } from '@/settings/settingsRepository
 import { AUTH_TEST_IDS } from '@/test/auth'
 import { testDatabase } from '@/test/database'
 import { repositories, viewingCountsOf } from '@/test/repositories'
+import { PLAY_HISTORY_KINDS } from '@/history/playHistorySql'
 
 const OWNER = AUTH_TEST_IDS.owner
 const LOCAL = VIEWING_ACCOUNTS.local
@@ -127,17 +128,16 @@ describe('the owner adopting the viewing from before accounts', () => {
   type HistoryEntryProps = {
     account: AccountKey
     mediaId: number
-    id: number
     at: string
   }
 
-  const historyEntry = ({ account, mediaId, id, at }: HistoryEntryProps) =>
+  const historyEntry = ({ account, mediaId, at }: HistoryEntryProps) =>
     db()
       .prepare(
-        `INSERT INTO play_history (account_id, id, media_id, started_at, last_played_at, furthest)
+        `INSERT INTO play_history (account_id, kind, media_id, started_at, last_played_at, furthest)
          VALUES (?, ?, ?, ?, ?, 0)`,
       )
-      .run(account, id, mediaId, at, at)
+      .run(account, PLAY_HISTORY_KINDS.listen, mediaId, at, at)
 
   const historyOf = (account: AccountKey) =>
     db()
@@ -196,7 +196,7 @@ describe('the owner adopting the viewing from before accounts', () => {
     spot({ account: LOCAL, mediaId: ids.first, position: 30, at: day(1) })
     play({ account: LOCAL, mediaId: ids.first, at: day(1), kind: PLAY_KINDS.played })
     play({ account: LOCAL, mediaId: ids.second, at: day(2), kind: PLAY_KINDS.marked })
-    historyEntry({ account: LOCAL, mediaId: ids.first, id: 1, at: day(1) })
+    historyEntry({ account: LOCAL, mediaId: ids.first, at: day(1) })
     favourite({ account: LOCAL, mediaId: ids.first, at: day(1) })
     titleFavourite({ account: LOCAL, itemId: ids.show, at: day(2) })
     albumFavourite({ account: LOCAL, albumId: ids.album, at: day(2) })
@@ -309,20 +309,18 @@ describe('the owner adopting the viewing from before accounts', () => {
     })
   })
 
-  it("numbers the history it adopts after the owner's own, in the order it was played", () => {
-    historyEntry({ account: OWNER, mediaId: ids.second, id: 1, at: day(3) })
-    historyEntry({ account: OWNER, mediaId: ids.second, id: 2, at: day(4) })
-    historyEntry({ account: LOCAL, mediaId: ids.first, id: 1, at: day(1) })
-    historyEntry({ account: LOCAL, mediaId: ids.first, id: 2, at: day(2) })
+  it("keeps the history it adopts in the order it was played among the owner's own", () => {
+    historyEntry({ account: LOCAL, mediaId: ids.first, at: day(1) })
+    historyEntry({ account: OWNER, mediaId: ids.second, at: day(2) })
+    historyEntry({ account: LOCAL, mediaId: ids.first, at: day(3) })
 
     adoption().adopt({ ownerId: OWNER })
 
     expect(historyOf(LOCAL)).toEqual([])
     expect(historyOf(OWNER)).toEqual([
-      { id: 1, media_id: ids.second },
+      { id: 1, media_id: ids.first },
       { id: 2, media_id: ids.second },
       { id: 3, media_id: ids.first },
-      { id: 4, media_id: ids.first },
     ])
   })
 

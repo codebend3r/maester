@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { PLAYED_KINDS, type PlayHistoryEntry, type Played } from '@/contract'
-import { HISTORY_ROW_KINDS, REACH_KINDS, historyRows, playedContext, reachOf } from '@/playHistory'
+import { REACH_KINDS, historyGroups, playedContext, reachOf } from '@/playHistory'
 
 type EntryProps = { id: number; played: Played; accountId?: string }
 
@@ -32,16 +32,17 @@ const track = ({ number, albumId = 7 }: TrackProps): Played => ({
 
 const film: Played = { kind: PLAYED_KINDS.video, title: 'Heat', year: 1995 }
 
-const shapeOf = (rows: ReturnType<typeof historyRows>) =>
-  rows.map((row) =>
-    row.kind === HISTORY_ROW_KINDS.album
-      ? `album ${row.run.album} ${row.run.tracksHeard}/${row.run.albumTracks}${row.run.isWhole ? ' whole' : ''}`
-      : `entry ${row.entry.id}`,
-  )
+const shapeOf = (groups: ReturnType<typeof historyGroups>) =>
+  groups.flatMap(({ run, entries }) => [
+    ...(run
+      ? [`album ${run.album} ${run.tracksHeard}/${run.albumTracks}${run.isWhole ? ' whole' : ''}`]
+      : []),
+    ...entries.map(({ id }) => `entry ${id}`),
+  ])
 
-describe('historyRows', () => {
+describe('historyGroups', () => {
   it('heads a run of one album’s tracks, and says when the whole album was heard', () => {
-    const rows = historyRows([
+    const rows = historyGroups([
       entry({ id: 5, played: track({ number: 3 }) }),
       entry({ id: 4, played: track({ number: 2 }) }),
       entry({ id: 3, played: track({ number: 1 }) }),
@@ -59,7 +60,7 @@ describe('historyRows', () => {
   })
 
   it('starts a new run for another album or another account', () => {
-    const rows = historyRows([
+    const rows = historyGroups([
       entry({ id: 4, played: track({ number: 2 }) }),
       entry({ id: 3, played: track({ number: 1 }) }),
       entry({ id: 2, played: track({ number: 1, albumId: 8 }) }),
@@ -75,7 +76,7 @@ describe('historyRows', () => {
   })
 
   it('counts a track heard twice once towards the album', () => {
-    const rows = historyRows([
+    const rows = historyGroups([
       entry({ id: 2, played: track({ number: 1 }) }),
       entry({ id: 1, played: track({ number: 1 }) }),
     ])

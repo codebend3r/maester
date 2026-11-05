@@ -72,7 +72,7 @@ export type Played = Infer<typeof isPlayed>
 
 /** One sitting with one file: when it started, when it last played, and how far it got. */
 export const isPlayHistoryEntry = object({
-  /** The entry's number in its account's history, which only grows. */
+  /** The entry's number, which grows with every sitting any account starts: the history's order. */
   id: isNumber,
   accountId: isString,
   mediaId: isNumber,
@@ -89,10 +89,10 @@ export const isPlayHistoryEntry = object({
 
 export type PlayHistoryEntry = Infer<typeof isPlayHistoryEntry>
 
-/** One page of a history, and the cursor of the next, or null after the last. */
+/** One page of a history, and the cursor of the next (its last entry's id), or null after the last. */
 export const isPlayHistoryPage = object({
   entries: listOf(isPlayHistoryEntry),
-  next: nullable(isString),
+  next: nullable(isNumber),
 })
 
 export type PlayHistoryPage = Infer<typeof isPlayHistoryPage>

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { type HistoryEntry, MARKER_KINDS } from '@raven/core'
 import { DatabaseService } from '@/db/database'
-import { continueVideoSitting, startVideoSitting } from '@/history/playHistorySql'
+import { keepVideoSitting } from '@/history/playHistorySql'
 import { FAVOURITE_OUTCOMES, type FavouriteOutcome } from '@/media/favouriteOutcomes'
 import { MediaRepository } from '@/media/mediaRepository'
 import { fileWatched } from '@/media/mediaSql'
@@ -31,7 +31,16 @@ type ViewingRepositoryNotePlayProps = {
   position: number
   at: Date
   account: AccountKey
+  /** A track's play is only counted: its music player keeps its history entry itself. */
+  isTrack: boolean
 }
+
+/** Whether a file `m` is a music track, as 1 or 0. */
+const IS_TRACK = 'EXISTS (SELECT 1 FROM tracks t WHERE t.media_id = m.id)'
+
+type PlayedFile = { isTrack: boolean }
+
+type ViewingRepositoryPlayProps = Omit<ViewingRepositoryNotePlayProps, 'isTrack'>
 
 type ViewingRepositoryRecordPlayProps = {
   id: number
@@ -76,8 +85,14 @@ export class ViewingRepository {
     return this.database.db
   }
 
-  private exists(id: number): boolean {
-    return !!this.db.prepare<[number], { id: number }>('SELECT id FROM media WHERE id = ?').get(id)
+  /** The file `id`, as far as a play needs it; null when there is no such file. */
+  private fileOf(id: number): PlayedFile | null {
+    const row = this.db
+      .prepare<[number], { is_track: number }>(
+        `SELECT ${IS_TRACK} AS is_track FROM media m WHERE m.id = ?`,
+      )
+      .get(id)
+    return row ? { isTrack: row.is_track === 1 } : null
   }
 
   /**
@@ -118,7 +133,15 @@ export class ViewingRepository {
    * playing again after Mark as unwatched starts a new play. The play lasts
    * until `at`, and has got at least as far as `position`.
    */
-  private notePlay({ id, position, at, account }: ViewingRepositoryNotePlayProps): void {
+  private notePlay({ id, position, at, account, isTrack }: ViewingRepositoryNotePlayProps): void {
+    const playId =
+      this.continuePlay({ id, position, at, account }) ??
+      this.startPlay({ id, position, at, account })
+    if (!isTrack) keepVideoSitting({ db: this.db, account, playId, mediaId: id, at, position })
+  }
+
+  /** Carries the account's latest real play of `id` on to `at`, while it is in the same sitting; its id, or null. */
+  private continuePlay({ id, position, at, account }: ViewingRepositoryPlayProps): number | null {
     const since = new Date(at.getTime() - SITTING_MS).toISOString()
     const latest = this.db
       .prepare<[ByAccount, number, string, string], { id: number }>(
@@ -127,37 +150,33 @@ export class ViewingRepository {
           ORDER BY played_at DESC, id DESC LIMIT 1`,
       )
       .get({ account }, id, since, PLAY_KINDS.played)
-    if (latest) {
-      this.db
-        .prepare(
-          `UPDATE plays SET played_at = ?, furthest = MAX(furthest, ?)
-            WHERE account_id = @account AND id = ?`,
-        )
-        .run({ account }, at.toISOString(), position, latest.id)
-      continueVideoSitting({ db: this.db, account, playId: latest.id, at, position })
-      return
-    }
+    if (!latest) return null
+    this.db
+      .prepare(
+        `UPDATE plays SET played_at = ?, furthest = MAX(furthest, ?)
+          WHERE account_id = @account AND id = ?`,
+      )
+      .run({ account }, at.toISOString(), position, latest.id)
+    return latest.id
+  }
+
+  /** A new play of `id` at `at`; its id. */
+  private startPlay({ id, position, at, account }: ViewingRepositoryPlayProps): number {
     const made = this.db
       .prepare(
         `INSERT INTO plays (account_id, media_id, played_at, furthest, kind)
          VALUES (@account, ?, ?, ?, ?)`,
       )
       .run({ account }, id, at.toISOString(), position, PLAY_KINDS.played)
-    startVideoSitting({
-      db: this.db,
-      account,
-      playId: Number(made.lastInsertRowid),
-      mediaId: id,
-      at,
-      position,
-    })
+    return Number(made.lastInsertRowid)
   }
 
   /** A video started playing. False when there is no such video. */
   recordPlay({ id, account, at = new Date() }: ViewingRepositoryRecordPlayProps): boolean {
     return this.db.transaction(() => {
-      if (!this.exists(id)) return false
-      this.notePlay({ id, position: 0, at, account })
+      const file = this.fileOf(id)
+      if (!file) return false
+      this.notePlay({ id, position: 0, at, account, isTrack: file.isTrack })
       return true
     })()
   }
@@ -186,9 +205,11 @@ export class ViewingRepository {
             save_progress: number
             watched_percent: number
             credits_start: number | null
+            is_track: number
           }
         >(
-          `SELECT m.duration, l.save_progress, l.watched_percent, mk.start_s AS credits_start
+          `SELECT m.duration, l.save_progress, l.watched_percent, mk.start_s AS credits_start,
+                  ${IS_TRACK} AS is_track
              FROM media m
              JOIN libraries l ON l.id = m.library_id
              LEFT JOIN media_markers mk ON mk.media_id = m.id AND mk.kind = ?
@@ -200,7 +221,7 @@ export class ViewingRepository {
       // The credits are the end of the story: reaching them counts as the whole play.
       const isAtCredits = target.credits_start != null && position >= target.credits_start
       const furthest = isAtCredits && duration != null ? Math.max(position, duration) : position
-      this.notePlay({ id, position: furthest, at, account })
+      this.notePlay({ id, position: furthest, at, account, isTrack: target.is_track === 1 })
       if (target.save_progress !== 1) return true
       const finished =
         isAtCredits || (duration != null && position >= (duration * target.watched_percent) / 100)

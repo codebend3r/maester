@@ -38,10 +38,10 @@ type SongsPage = { at: number; offset: number }
 const FIRST_SONGS_PAGE: SongsPage = { at: 0, offset: 0 }
 
 /** A history's first page has no cursor before it. */
-const FIRST_HISTORY_PAGE: string | null = null
+const FIRST_HISTORY_PAGE: number | null = null
 
 /** The cursor of the page after `last`; undefined after the last page, which ends the list. */
-const nextHistoryPage = (last: PlayHistoryPage): string | undefined => last.next ?? undefined
+const nextHistoryPage = (last: PlayHistoryPage): number | undefined => last.next ?? undefined
 
 /** How long a person's page waits between asks while their filmography is on its way. */
 const FILMOGRAPHY_POLL_MS = 1_500
@@ -559,8 +559,12 @@ export const ravenQueriesFor = (api: ApiClient) => {
         retry: false,
       }),
 
-    /** Every account on this raven. Keyed by the owner asking, so another account never reads this list, and never retried: a refusal is the answer. */
-    /** The owner `userId`'s list of accounts; none asks for nothing, as for anyone but the owner. */
+    /**
+     * Every account on this raven, as the owner `userId` sees it; a null
+     * `userId` (anyone but the owner) asks for nothing. Keyed by the owner
+     * asking, so another account never reads this list, and never retried:
+     * a refusal is the answer.
+     */
     membersQuery: (userId: string | null) =>
       queryOptions({
         queryKey: queryKeys.members(userId),

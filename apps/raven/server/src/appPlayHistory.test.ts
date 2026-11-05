@@ -87,9 +87,9 @@ describe('the play history under accounts', () => {
     })
   })
 
-  it('refuses a cursor it did not make', async () => {
+  it('refuses a cursor that is no entry id', async () => {
     const guest = await clientFor({ id: AUTH_TEST_IDS.guest })
-    await expect(guest.listPlayHistory({ ...PAGE, before: 'nonsense' })).rejects.toMatchObject({
+    await expect(guest.listPlayHistory({ ...PAGE, before: 0 })).rejects.toMatchObject({
       status: 400,
     })
   })

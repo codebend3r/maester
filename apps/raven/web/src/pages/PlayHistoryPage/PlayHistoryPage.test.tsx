@@ -97,7 +97,7 @@ describe('PlayHistoryPage', () => {
   it('shows one kind when asked, and more when there is more', async () => {
     spies.own.mockImplementation(async ({ before }) =>
       before === null
-        ? { entries: [entry({ id: 2, played: track(1) })], next: 'cursor' }
+        ? { entries: [entry({ id: 2, played: track(1) })], next: 2 }
         : { entries: [entry({ id: 1, played: episode })], next: null },
     )
     renderWithProviders({ ui: <PlayHistoryPage /> })
@@ -105,7 +105,7 @@ describe('PlayHistoryPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Show more' }))
     expect(await screen.findByRole('rowheader', { name: 'Half Loop' })).toBeInTheDocument()
-    expect(spies.own).toHaveBeenCalledWith({ before: 'cursor', show: PLAY_HISTORY_SHOWS.all })
+    expect(spies.own).toHaveBeenCalledWith({ before: 2, show: PLAY_HISTORY_SHOWS.all })
 
     await userEvent.click(screen.getByRole('button', { name: 'Music' }))
     await waitFor(() =>

@@ -20,6 +20,7 @@ import {
   type StreamQuality,
   type SubtitleCue,
 } from '@/contract'
+import { fillPath } from '@/query'
 import { parseWebVtt } from '@/subtitles'
 
 type FileUrlProps = { id: number; access?: MediaAccess | null }
@@ -128,7 +129,7 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
    */
   hlsUrl: ({ id, mode, audio, quality, access, burn = null }: HlsUrlProps): string =>
     mediaUrl({
-      path: HLS_PATHS.master.replace(`:${HLS_PARAMS.id}`, String(id)),
+      path: fillPath({ path: HLS_PATHS.master, params: { [HLS_PARAMS.id]: id } }),
       query: {
         [HLS_PARAMS.mode]: mode,
         ...(audio == null ? {} : { [HLS_PARAMS.audio]: String(audio) }),
