@@ -3,10 +3,21 @@ import { describe, expect, it } from 'vitest'
 import { registerRequestLog, requestLogLine } from '@/requestLog'
 
 describe('requestLogLine', () => {
-  it('names the method, the address, the status and the whole milliseconds', () => {
+  it('names the method, the path, the status and the whole milliseconds', () => {
     expect(
-      requestLogLine({ method: 'GET', url: '/api/home?x=1', statusCode: 200, elapsedMs: 12.4 }),
-    ).toBe('GET    /api/home?x=1 200 12ms')
+      requestLogLine({ method: 'GET', url: '/api/home', statusCode: 200, elapsedMs: 12.4 }),
+    ).toBe('GET    /api/home 200 12ms')
+  })
+
+  it('leaves the query out, so a ticket in it is never logged', () => {
+    const line = requestLogLine({
+      method: 'GET',
+      url: '/api/media/7/file?t=account.secret-ticket&x=1',
+      statusCode: 206,
+      elapsedMs: 3,
+    })
+    expect(line).toBe('GET    /api/media/7/file 206 3ms')
+    expect(line).not.toContain('secret-ticket')
   })
 })
 
@@ -17,7 +28,7 @@ describe('registerRequestLog', () => {
     registerRequestLog({ fastify, log: (line) => lines.push(line) })
     fastify.get('/api/health', async () => ({ ok: true }))
 
-    await fastify.inject({ method: 'GET', url: '/api/health' })
+    await fastify.inject({ method: 'GET', url: '/api/health?t=hls.capability' })
     await fastify.inject({ method: 'POST', url: '/api/nowhere' })
 
     expect(lines).toHaveLength(2)
