@@ -35,7 +35,6 @@ import styles from '@/pages/HomePage/HomePage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
 import { BingeSection } from '@/pages/BingePage/BingePage'
-import { useIsDesktop } from '@/stores/desktop'
 
 const SHELF_STATES = { empty: 'empty', filled: 'filled' } as const
 type ShelfState = (typeof SHELF_STATES)[keyof typeof SHELF_STATES]
@@ -301,7 +300,6 @@ type ShelvesProps = HomeBodyProps
 
 /** The hero's titles in turn, then what is being watched, then each pinned library's newest releases. */
 const Shelves = ({ libraries, areLibrariesPending }: ShelvesProps) => {
-  const isDesktop = useIsDesktop()
   const home = useQuery(homeQuery)
   const hero = useQuery(heroQuery)
   const albums = useQuery(homeAlbumsQuery)
@@ -312,7 +310,7 @@ const Shelves = ({ libraries, areLibrariesPending }: ShelvesProps) => {
 
   return (
     <div className={styles.sections}>
-      {!isDesktop && <BingeSection isHome />}
+      <BingeSection isHome />
       {home.isError && (
         <p className={styles.message} role="alert">
           {home.error.message}

@@ -592,6 +592,7 @@ describe('AppShell', () => {
       '/',
       '/',
       '/continue-watching',
+      '/binge',
       '/favourites',
       '/libraries',
       '/admin',
@@ -612,6 +613,7 @@ describe('AppShell', () => {
     ).toEqual([
       'Home',
       'Libraries',
+      'Binge',
       'Favourites',
       'Admin',
       'Streams',
