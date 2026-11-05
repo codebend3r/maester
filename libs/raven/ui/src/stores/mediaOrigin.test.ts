@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import type { MediaOrigin } from '@raven/core'
-import { PICK_FRESH_MS, isFreshPick, useMediaOrigin } from '@/stores/mediaOrigin'
+import { type MediaOrigin, PICK_FRESH_MS } from '@raven/core'
+import { isFreshPick, useMediaOrigin } from '@/stores/mediaOrigin'
 import { STORE_KEYS } from '@/stores/storage'
 
 const origin: MediaOrigin = { kind: 'lan', url: 'https://lan.example' }

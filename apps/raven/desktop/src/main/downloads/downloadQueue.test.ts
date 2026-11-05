@@ -32,11 +32,11 @@ import {
   DOWNLOAD_MINTS,
   type AccessOutcome,
   type MediaAccess,
-  type ProbeFetch,
   ACCESS_REFUSALS,
 } from '@/main/downloads/mediaAccess'
 import { SPACE_RESERVE_BYTES } from '@/main/downloads/space'
 import { ACCOUNT_TICKET_RENEW_MS, TICKET_OUTCOMES } from '@/main/servers/accountTickets'
+import { createOriginPicks, type ProbeFetch } from '@/main/servers/originPicks'
 import {
   accountTicket,
   cutting,
@@ -556,14 +556,17 @@ describe('an outage', () => {
       }),
     })
     const media = createMediaAccess({
-      calls,
       serverOf: (serverId) => SERVERS.find((server) => server.id === serverId) ?? null,
-      probe: wholePing,
-      probeClock: () => 0,
+      picks: createOriginPicks({
+        calls,
+        probe: wholePing,
+        probeClock: () => 0,
+        now: () => NOW,
+        warn: () => undefined,
+      }),
       now: () => NOW,
       timers: fakeTimers().timers,
       tickets: { ticketFor: async () => ({ kind: TICKET_OUTCOMES.unreachable }) },
-      warn: () => undefined,
     })
     const world = setup({
       entries: [entryFor(1), entryFor(2), entryFor(3), entryFor(5, { serverId: OTHER_SERVER_ID })],
@@ -821,10 +824,14 @@ describe('an account ticket', () => {
     const mintTimers = fakeTimers()
     const count = 40
     const media = createMediaAccess({
-      calls: fakeCalls({}).calls,
       serverOf: (serverId) => SERVERS.find((server) => server.id === serverId) ?? null,
-      probe: wholePing,
-      probeClock: () => 0,
+      picks: createOriginPicks({
+        calls: fakeCalls({}).calls,
+        probe: wholePing,
+        probeClock: () => 0,
+        now: () => clock.now,
+        warn: () => undefined,
+      }),
       now: () => clock.now,
       timers: mintTimers.timers,
       tickets: {
@@ -833,7 +840,6 @@ describe('an account ticket', () => {
           return { kind: TICKET_OUTCOMES.ticket, ticket: `account.${mediaId}` }
         },
       },
-      warn: () => undefined,
     })
     const world = setup({
       entries: Array.from({ length: count }, (_, index) => entryFor(index + 1)),

@@ -87,6 +87,7 @@ import {
   TRACKS_TIMEOUT_MS,
 } from '@/main/servers/serverSources'
 import { NO_SERVERS, noExplanation, noRefusedAccount } from '@/main/test/playerFakes'
+import { fixedPicks } from '@/main/test/serverFakes'
 import { createNodeTimers } from '@/main/timers'
 
 /** The id the server gives a title's first sidecar (Ruling 18). */
@@ -1759,6 +1760,8 @@ const accountPartsFor = async ({
     isSignedIn: () => account.accountId() !== null,
     now,
   })
+  // The fixture server lists no media origin, so every title is relayed from its own address.
+  const { picks } = fixedPicks()
   // Every request the relay heard, as mpv sent it, and the listener, to close after.
   const heard: string[] = []
   const listeners: Server[] = []
@@ -1779,6 +1782,8 @@ const accountPartsFor = async ({
     tickets,
     newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
     capacity: 1,
+    picks,
+    timers: createNodeTimers(),
     warn,
   })
   const sources = createServerSources({
@@ -1786,6 +1791,7 @@ const accountPartsFor = async ({
     calls,
     tickets,
     relay,
+    picks,
     warn,
   })
   const page = await pageSessionFor({ fixture, account, now })

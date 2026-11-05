@@ -1,7 +1,7 @@
-import { type ApiClient, pickOrigin } from '@raven/core'
+import { type ApiClient, PICK_FRESH_MS, pickOrigin } from '@raven/core'
 import { useCallback, useEffect, useRef } from 'react'
 import { type ProbeFetch, probeOrigins } from '@/lib/probeOrigins'
-import { PICK_FRESH_MS, isFreshPick, useMediaOrigin } from '@/stores/mediaOrigin'
+import { isFreshPick, useMediaOrigin } from '@/stores/mediaOrigin'
 
 type ProbeSetup = {
   api: ApiClient
