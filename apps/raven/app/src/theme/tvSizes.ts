@@ -28,6 +28,7 @@ export const TV_SIZES = {
   space5: tvSize(SIZES.space5),
   space6: tvSize(SIZES.space6),
   space8: tvSize(SIZES.space8),
+  radiusSm: tvSize(SIZES.radiusSm),
   radius: tvSize(SIZES.radius),
   radiusLg: tvSize(SIZES.radiusLg),
   radiusPill: tvSize(SIZES.radiusPill),

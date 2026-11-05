@@ -15,6 +15,7 @@ const row = (overrides: Partial<EpisodeRow> = {}): EpisodeRow => ({
   target: itemTarget(8),
   summary: null,
   isWatched: false,
+  chips: [],
   ...overrides,
 })
 

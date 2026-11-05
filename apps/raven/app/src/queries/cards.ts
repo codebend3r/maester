@@ -1,6 +1,7 @@
 import {
   type ApiClient,
   CARD_DESTINATIONS,
+  type FactPart,
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
   type ItemSummary,
@@ -45,6 +46,8 @@ export type ShelfCard = {
   logo?: Picture | null
   /** An episode's own name and place, set under the picture in place of `line`. */
   episode?: EpisodeWords | null
+  /** The picture's chips drawn under `line`: an episode's `DV5`. */
+  chips?: readonly FactPart[]
   /** Set on a card that resumes a video: it is drawn as a resume card, with what is left to watch. */
   resume?: { timeLeft: string | null } | null
   /** Where pressing it goes: its item's page, or the player for a file with no page. */

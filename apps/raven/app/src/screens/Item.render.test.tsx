@@ -7,6 +7,7 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
 import { ITEM_TEST_IDS } from '@/layouts/itemKit'
+import { CHIP_COLOURS } from '@/theme/appTheme'
 import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
 import { Item } from '@/screens/Item'
 import { useActiveServer } from '@/stores/activeServer'
@@ -125,6 +126,15 @@ describe('Item on a phone or tablet', () => {
     )
     const plate = StyleSheet.flatten(summary.parent?.props.style)
     expect(plate.backgroundColor).toMatch(/^#[\da-f]{6}[\da-f]{2}$/i)
+  })
+
+  it("chips the file's resolution and codec in the web's colours, with the dark ink", async () => {
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(BUSBOYS.id) })
+    const resolution = await screen.findByLabelText('Video resolution: 1080p')
+    expect(StyleSheet.flatten(resolution.props.style).backgroundColor).toBe(CHIP_COLOURS.p1080)
+    const codec = screen.getByLabelText('Video codec: HEVC')
+    expect(StyleSheet.flatten(codec.props.style).backgroundColor).toBe(CHIP_COLOURS.hevc)
+    expect(StyleSheet.flatten(screen.getByText('HEVC').props.style).color).toBe(CHIP_COLOURS.ink)
   })
 
   it('plays the file Play starts', async () => {

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'bun:test'
-import { AUTH_HEADERS, ITEM_TYPES, movieFacts } from '@raven/core'
+import {
+  AUTH_HEADERS,
+  FACT_PART_KINDS,
+  ITEM_TYPES,
+  PICTURE_RANGES,
+  RESOLUTIONS,
+  VIDEO_CODECS,
+  codecLabel,
+  movieFacts,
+} from '@raven/core'
 
 import { CARD_SHAPES } from '@/queries/cards'
 import { ART_PLACES, playablePage, seasonPage, showPage } from '@/queries/itemPage'
@@ -94,7 +103,25 @@ describe('playablePage', () => {
       ['Busboys (2026).mkv', { kind: ROUTE_TARGETS.play, mediaId: 20, at: 0 }],
       ['Busboys (2026).mkv', { kind: ROUTE_TARGETS.play, mediaId: 22, at: 0 }],
     ])
-    expect(rows[1]!.facts).toEqual(['4K', 'HEVC', '40.0 GB'])
+    expect(rows[1]!.chips).toEqual([
+      { kind: FACT_PART_KINDS.resolution, text: RESOLUTIONS.uhd },
+      { kind: FACT_PART_KINDS.codec, text: codecLabel(VIDEO_CODECS.hevc) },
+    ])
+    expect(rows[1]!.facts).toEqual(['40.0 GB'])
+  })
+
+  it("marks the file's picture as chips, its other facts staying words", () => {
+    const [video, audio] = movie().file
+    expect(video).toEqual({
+      label: 'Video',
+      chips: [
+        { kind: FACT_PART_KINDS.resolution, text: RESOLUTIONS.p1080 },
+        { kind: FACT_PART_KINDS.codec, text: codecLabel(VIDEO_CODECS.hevc) },
+      ],
+      values: [],
+    })
+    expect(audio?.chips).toEqual([])
+    expect(audio?.values.length).toBeGreaterThan(0)
   })
 
   it('lists every file of the item, in every library, each naming its library', () => {
@@ -230,6 +257,20 @@ describe('seasonPage', () => {
       ],
     ])
     expect(page.episodes[0]!.picture).toEqual(at('/api/pictures/items/6/still/s6'))
+  })
+
+  it("chips an episode's Dolby Vision profile 5, apart from its line", () => {
+    const children = SEVERANCE_ONE.children.map((child) =>
+      child.type === ITEM_TYPES.episode && child.primary !== null
+        ? { ...child, primary: { ...child.primary, isDolbyVisionOnly: true } }
+        : child,
+    )
+    const season = { ...SEVERANCE_ONE, children }
+    const [first] = seasonPage({ season, show: SEVERANCE, ...pictures }).episodes
+    expect(first?.chips).toEqual([
+      { kind: FACT_PART_KINDS.range, text: PICTURE_RANGES.dolbyVisionOnly },
+    ])
+    expect(first?.line).not.toContain(PICTURE_RANGES.dolbyVisionOnly)
   })
 
   it('waits for the show for its backdrop', () => {

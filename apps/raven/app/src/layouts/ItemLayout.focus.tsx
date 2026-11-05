@@ -15,6 +15,7 @@ import {
 import { CardPicture, PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
 import { ITEM_LAYOUT_COPY } from '@/layouts/copy'
 import { FocusBand } from '@/layouts/FocusBand'
+import { FocusFactChips } from '@/layouts/FactChips'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { BUTTON_TONES } from '@/layouts/formKit'
@@ -182,15 +183,20 @@ const HERO_TITLES = {
   [TITLE_LOOKS.words]: HeroTitleWords,
 } as const satisfies Record<TitleLook, ComponentType<HeroTitleProps>>
 
-/** Whether a file's fact holds one value or several. */
-const FACT_COUNTS = { one: 'one', several: 'several' } as const
+/** Whether a file's fact holds no words past its chips, one value, or several. */
+const FACT_COUNTS = { none: 'none', one: 'one', several: 'several' } as const
 
 type FactCount = (typeof FACT_COUNTS)[keyof typeof FACT_COUNTS]
 
-const factCountOf = (values: readonly string[]): FactCount =>
-  values.length === 1 ? FACT_COUNTS.one : FACT_COUNTS.several
+const factCountOf = (values: readonly string[]): FactCount => {
+  if (values.length === 0) return FACT_COUNTS.none
+  return values.length === 1 ? FACT_COUNTS.one : FACT_COUNTS.several
+}
 
 type FactValuesProps = { values: readonly string[] }
+
+/** A fact said wholly by its chips, the Video fact's `4K HEVC HDR`. */
+const NoFactValue = () => null
 
 type FactValueProps = FactValuesProps
 
@@ -213,6 +219,7 @@ const FactChips = ({ values }: FactChipsProps) => {
 }
 
 const FACT_VALUE_VIEWS = {
+  [FACT_COUNTS.none]: NoFactValue,
   [FACT_COUNTS.one]: FactValue,
   [FACT_COUNTS.several]: FactChips,
 } as const satisfies Record<FactCount, ComponentType<FactValuesProps>>
@@ -276,7 +283,9 @@ const Hero = ({ hero, actions, links, file }: HeroProps) => {
                 <View key={fact.label} style={styles.fileRow}>
                   <Text style={styles.fileLabel}>{fact.label}</Text>
                   <View style={styles.fileValues}>
-                    <Values values={fact.values} />
+                    <FocusFactChips parts={fact.chips}>
+                      <Values values={fact.values} />
+                    </FocusFactChips>
                   </View>
                 </View>
               )
@@ -347,7 +356,11 @@ const Versions = ({ versions, onOpen }: VersionsProps) => {
               onPress={() => onOpen(version.target)}
               style={({ focused }) => [styles.version, focused && styles.focused]}
             >
-              <Text style={styles.versionTitle}>{dotted(version.facts)}</Text>
+              <FocusFactChips parts={version.chips}>
+                {version.facts.length > 0 && (
+                  <Text style={styles.versionTitle}>{dotted(version.facts)}</Text>
+                )}
+              </FocusFactChips>
               <Text numberOfLines={1} style={styles.line}>
                 {version.fileName}
               </Text>
@@ -516,7 +529,7 @@ const useStyles = themedStyles((colours) =>
       textTransform: 'uppercase',
       lineHeight: TV_SIZES.text * LINE_RATIO,
     },
-    fileValues: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: TV_SIZES.space1 },
+    fileValues: { flex: 1 },
     fileValue: {
       color: colours.text,
       fontSize: TV_SIZES.text,

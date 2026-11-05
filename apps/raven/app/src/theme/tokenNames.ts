@@ -33,3 +33,22 @@ export const OVER_PICTURE_TOKENS = {
   text: '--color-on-picture',
   muted: '--color-on-picture-soft',
 } as const satisfies Partial<Record<keyof typeof PALETTE_TOKENS, string>>
+
+/**
+ * The fills of the picture's chips, from globals.scss and the same in every theme, as the web's
+ * `ResolutionChip` wears them: each resolution tier its own, HEVC sky, any high range rose, Dolby
+ * Vision profile 5 a warning's orange, all with the same dark ink. SD and any other codec stay
+ * on the theme's raised ground.
+ */
+export const CHIP_TOKENS = {
+  ink: '--color-resolution-ink',
+  p320: '--color-resolution-320',
+  p480: '--color-resolution-480',
+  p720: '--color-resolution-720',
+  p1080: '--color-resolution-1080',
+  uhd: '--color-resolution-4k',
+  uhd8k: '--color-resolution-8k',
+  hevc: '--color-codec-hevc',
+  hdr: '--color-range-hdr',
+  dolbyVisionOnly: '--color-range-dv5',
+} as const

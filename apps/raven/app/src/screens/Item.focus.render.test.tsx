@@ -4,11 +4,13 @@ import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
 import { fireEvent, screen, within } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 
 import { APP_ROUTES, APP_ROUTE_PARAMS, PLAY_FROM } from '@/routes'
 import { Item } from '@/screens/Item'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
+import { CHIP_COLOURS } from '@/theme/appTheme'
 import { NAS } from '@/test/homeServer'
 import { pathFor } from '@/test/fixtureFetch'
 import {
@@ -232,6 +234,14 @@ describe('Item on a TV', () => {
       params: { [APP_ROUTE_PARAMS.id]: String(SEVERANCE_ONE.id) },
     })
     expect(preferred()).toEqual(['Play'])
+  })
+
+  it("chips the file's resolution and codec in the web's colours", async () => {
+    await renderItem(BUSBOYS.id)
+    const resolution = await screen.findByLabelText('Video resolution: 1080p')
+    expect(StyleSheet.flatten(resolution.props.style).backgroundColor).toBe(CHIP_COLOURS.p1080)
+    const codec = screen.getByLabelText('Video codec: HEVC')
+    expect(StyleSheet.flatten(codec.props.style).backgroundColor).toBe(CHIP_COLOURS.hevc)
   })
 
   it('asks a film for no next and gives it no way up', async () => {

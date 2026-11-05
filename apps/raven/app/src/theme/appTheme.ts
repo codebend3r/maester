@@ -2,7 +2,7 @@ import { DEFAULT_THEME, THEMES, type ThemeId, type ThemeTone, themeOf } from '@r
 import { nativeTokens } from '@raven/native/headless'
 import { designTokens, themeTokens } from '@raven/ui/designTokens'
 
-import { OVER_PICTURE_TOKENS, PALETTE_TOKENS } from '@/theme/tokenNames'
+import { CHIP_TOKENS, OVER_PICTURE_TOKENS, PALETTE_TOKENS } from '@/theme/tokenNames'
 
 const { numbers, colours: rootColours } = nativeTokens(
   Object.fromEntries(designTokens.map(({ name, value }) => [name, value])),
@@ -26,6 +26,20 @@ const size = (name: string): number => tokenOf({ tokens: numbers, name })
 const fixed = (name: string): string => tokenOf({ tokens: rootColours, name })
 
 export type Palette = Record<keyof typeof PALETTE_TOKENS, string>
+
+/** The picture's chips' fills and their ink, the same in every theme and over the video. */
+export const CHIP_COLOURS = {
+  ink: fixed(CHIP_TOKENS.ink),
+  p320: fixed(CHIP_TOKENS.p320),
+  p480: fixed(CHIP_TOKENS.p480),
+  p720: fixed(CHIP_TOKENS.p720),
+  p1080: fixed(CHIP_TOKENS.p1080),
+  uhd: fixed(CHIP_TOKENS.uhd),
+  uhd8k: fixed(CHIP_TOKENS.uhd8k),
+  hevc: fixed(CHIP_TOKENS.hevc),
+  hdr: fixed(CHIP_TOKENS.hdr),
+  dolbyVisionOnly: fixed(CHIP_TOKENS.dolbyVisionOnly),
+} as const satisfies Record<keyof typeof CHIP_TOKENS, string>
 
 /**
  * A theme as the app wears it: its colours, the ones it wears over the video, and whether its
@@ -96,6 +110,7 @@ export const SIZES = {
   space5: size('--space-5'),
   space6: size('--space-6'),
   space8: size('--space-8'),
+  radiusSm: size('--radius-sm'),
   radius: size('--radius-md'),
   radiusLg: size('--radius-lg'),
   radiusPill: size('--radius-pill'),
