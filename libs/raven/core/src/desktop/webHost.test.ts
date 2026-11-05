@@ -42,7 +42,7 @@ describe('the web host', () => {
       serverOrigin: 'RAVEN_DESKTOP_SERVER_ORIGIN',
       linkOrigins: 'RAVEN_DESKTOP_LINK_ORIGINS',
     })
-    expect(DEFAULT_SERVER_ORIGIN).toBe('https://vhagar2.synology.me:8443')
+    expect(DEFAULT_SERVER_ORIGIN).toBe('https://raven-player.synology.me:8443')
   })
 
   it("names the web app's site as the default server's built-in link origin", () => {

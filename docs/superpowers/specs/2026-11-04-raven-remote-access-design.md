@@ -77,7 +77,7 @@ The owner saves remote access in the Admin page. It is server state, kept in SQL
 While `isEnabled` holds and a hostname and a public port are set, the public origin is `https://<hostname>` with `:<publicPort>` unless it is 443. raven then:
 
 - **Lists it as a `public` media origin** in `GET /api/media-origins`, after the env's `RAVEN_MEDIA_ORIGINS` (still read, now `lan` and `public` only). The web probe, the desktop's downloads and playback pick, and the device app's `mediaAccessFor` already probe every listed origin and pick by speed, preferring `lan`, so at home the LAN origin keeps winning and away the public one does. Nothing in the clients changes for this.
-- **Is the API origin.** The public origin is core's `DEFAULT_SERVER_ORIGIN`, which the Netlify build and its pictures function read, and `netlify.toml` proxies `/api` to the same origin, signed (section 8); `netlifyToml.test.ts` fails when the two differ, so no environment variable names it. The web app, the device app and Wren, which all call `https://raven-player.netlify.app`, then reach raven through Netlify's proxy and the public origin. The desktop talks to the public origin directly: its default server (`DEFAULT_SERVER_ORIGIN`) is `https://vhagar2.synology.me:8443`, the hostname the owner chose, which a build's `RAVEN_DESKTOP_SERVER_ORIGIN` still overrides. The Netlify site stays an alias the desktop's `raven://` links may name, since the web pages there name their own origin.
+- **Is the API origin.** The public origin is core's `DEFAULT_SERVER_ORIGIN`, which the Netlify build and its pictures function read, and `netlify.toml` proxies `/api` to the same origin, signed (section 8); `netlifyToml.test.ts` fails when the two differ, so no environment variable names it. The web app, the device app and Wren, which all call `https://raven-player.netlify.app`, then reach raven through Netlify's proxy and the public origin. The desktop talks to the public origin directly: its default server (`DEFAULT_SERVER_ORIGIN`) is `https://raven-player.synology.me:8443`, the hostname the owner chose, which a build's `RAVEN_DESKTOP_SERVER_ORIGIN` still overrides. The Netlify site stays an alias the desktop's `raven://` links may name, since the web pages there name their own origin.
 
 The `tailnet` kind goes from `MEDIA_ORIGIN_KINDS`. An env entry that still names it is dropped at boot with a problem in the log, as any unknown kind is.
 
@@ -140,7 +140,7 @@ A direct play or a remux is the original video, so the server cannot shrink it. 
 | --- | --- | --- |
 | Web on Netlify | `/api` through `netlify.toml`'s signed proxy to the public origin | the probe picks `lan` at home (Chromium asks for Local Network Access once, as today), `public` away; `/api` through Netlify when neither answers |
 | Web served by raven itself | same origin | same |
-| Desktop (Raven) | its web host to the public origin, `https://vhagar2.synology.me:8443`, by default, or a build's `RAVEN_DESKTOP_SERVER_ORIGIN` | its relay and downloads pick from the same origins; away, mpv asks for the server's transcode over the limit |
+| Desktop (Raven) | its web host to the public origin, `https://raven-player.synology.me:8443`, by default, or a build's `RAVEN_DESKTOP_SERVER_ORIGIN` | its relay and downloads pick from the same origins; away, mpv asks for the server's transcode over the limit |
 | Device app: iPhone, iPad, Apple TV, Android TV | `https://raven-player.netlify.app`, unchanged | `mediaAccessFor` picks from the same origins; from a `public` origin it asks its Settings away cap, and the server holds it to the remote limit |
 | Wren | `https://raven-player.netlify.app`, unchanged | the same origins |
 
@@ -190,13 +190,13 @@ Nothing here is done by the code, a deploy or a PR.
 5. **Port forward** on the router: TCP, external port the public port (`8443`), internal address the NAS's LAN address, internal port the private port (`8443`). Forward nothing else to the NAS.
 6. **Firewall.** If DSM's firewall is on, allow the private port.
 7. **raven.** Admin, Remote Access: tick Enable, hostname `<name>.synology.me`, public port `8443`, private port blank (or the private port if it differs), your upload speed, a remote limit; Apply.
-8. **Environment.** On Vhagar's `.env`: `RAVEN_MEDIA_ORIGINS=lan:https://<lan name>` (keep the QuickConnect LAN name, or any https name for the LAN address), `RAVEN_WEB_URL` and `RAVEN_WEB_ORIGINS` stay `https://raven-player.netlify.app`. In Netlify: `RAVEN_PROXY_SECRET` (32 random characters or more, `openssl rand -base64 33`), scoped to Runtime, which signs the `/api` proxy and lets the reachability function check raven's signature, then redeploy; put the same `RAVEN_PROXY_SECRET` in Vhagar's `.env`. The API origin is no variable: a hostname other than `vhagar2.synology.me:8443` means changing `DEFAULT_SERVER_ORIGIN` and `netlify.toml`'s `/api` rule together.
+8. **Environment.** On Vhagar's `.env`: `RAVEN_MEDIA_ORIGINS=lan:https://<lan name>` (keep the QuickConnect LAN name, or any https name for the LAN address), `RAVEN_WEB_URL` and `RAVEN_WEB_ORIGINS` stay `https://raven-player.netlify.app`. In Netlify: `RAVEN_PROXY_SECRET` (32 random characters or more, `openssl rand -base64 33`), scoped to Runtime, which signs the `/api` proxy and lets the reachability function check raven's signature, then redeploy; put the same `RAVEN_PROXY_SECRET` in Vhagar's `.env`. The API origin is no variable: a hostname other than `raven-player.synology.me:8443` means changing `DEFAULT_SERVER_ORIGIN` and `netlify.toml`'s `/api` rule together.
 9. **Supabase.** Redirect allowlist and site URL: the Netlify site (and the public origin, if the web app is ever opened there directly); remove the Funnel address.
 10. **CGNAT check.** If the status stays "timeout" and the router's own WAN address is in `100.64.0.0/10`, or differs from the public address the status shows, the ISP puts the home network behind CGNAT and no port forward can work; ask the ISP for a public IPv4 address.
 
 ## Decisions (confirmed by the owner, 2026-11-04)
 
-- Raven's default server is the public origin, `https://vhagar2.synology.me:8443`; `RAVEN_DESKTOP_SERVER_ORIGIN` overrides it.
+- Raven's default server is the public origin, `https://raven-player.synology.me:8443`; `RAVEN_DESKTOP_SERVER_ORIGIN` overrides it.
 - A remote stream may use all of the upload speed, as with Plex.
 - Players away from home switch to a transcode for a file over the limit, which the server holds to it (section 6).
 - A per-address rate limiter ships with this change, before the port is forwarded (section 8).
