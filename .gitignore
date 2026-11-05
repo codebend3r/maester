@@ -34,3 +34,9 @@ __pycache__/
 
 # claude code worktrees
 .claude/worktrees/
+
+# the Netlify CLI's local state
+.netlify/
+
+# Lighthouse CI's runs and reports
+.lighthouseci/

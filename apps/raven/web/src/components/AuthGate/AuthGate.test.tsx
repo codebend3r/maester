@@ -20,7 +20,14 @@ import { queryClient } from '@/lib/queryClient'
 import { signOut } from '@/lib/session'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { useServerReach } from '@/stores/serverReach'
-import { SIGNED_IN, fakeAccount, fakeAuthClient, fakeSession, readyConfig } from '@/test/authClient'
+import {
+  SIGNED_IN,
+  fakeAccount,
+  fakeAuthClient,
+  fakeSession,
+  readyConfig,
+  SESSION_PAGE,
+} from '@/test/authClient'
 import { Where } from '@/test/authPage'
 import { FILE_ID } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
@@ -239,7 +246,9 @@ describe('AuthGate', () => {
       },
     })
     useAuthSession.setState({ client: null, session: null, status: AUTH_SESSION_STATUSES.booting })
-    useAuthSession.getState().start({ config: readyConfig, createClient: () => fake.client })
+    useAuthSession
+      .getState()
+      .start({ config: readyConfig, createClient: async () => fake.client, page: SESSION_PAGE })
     const LeaveButton = () => {
       const client = useQueryClient()
       return <button onClick={() => signOut({ queryClient: client })}>Leave</button>

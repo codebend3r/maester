@@ -11,6 +11,7 @@
     "src",
     "e2e",
     "netlify",
+    "lighthouse",
     "vite.config.ts",
     "playwright.config.ts",
     "../../../tooling/web"

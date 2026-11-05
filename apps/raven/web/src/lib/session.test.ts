@@ -102,7 +102,7 @@ describe('signOut', () => {
 
   it('removes every chunk of a session that spans three cookies', async () => {
     answer({ body: sessionOf({ padding: 5000 }), status: 200 })
-    const client = createAuthClient({ config: readyConfig })
+    const client = await createAuthClient({ config: readyConfig })
     await client.signInWithPassword(credentials)
     expect(heldCookies().map((cookie) => cookie.name)).toEqual([
       `${AUTH_COOKIE}.0`,

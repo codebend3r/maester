@@ -32,6 +32,10 @@ export default defineConfig({
     },
     rolldownOptions: {
       external: (id) => peers.some((peer) => id === peer || id.startsWith(`${peer}/`)),
+      // One file per source module, so an app that imports a button bundles the button and not
+      // the player: a single index.js is one module to the app's bundler, which can neither
+      // drop what the app never uses from it nor split it between the app's pages.
+      output: { preserveModules: true, preserveModulesRoot: 'src', entryFileNames: '[name].js' },
     },
   },
 })

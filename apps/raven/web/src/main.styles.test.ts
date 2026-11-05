@@ -80,18 +80,30 @@ const built: Promise<readonly Emitted[]> = build({
     ),
 )
 
-test('web emitted CSS keeps shared Button defaults before host and Player overrides', async () => {
-  const stylesheets = (await built).filter(({ fileName }) => fileName.endsWith('.css'))
-  expect(stylesheets).toHaveLength(1)
-  const css = stylesheets[0]?.text
-  if (css === undefined) throw new Error('Web build emitted no stylesheet')
-  const quiet = expectPlayerOverridesAfterPrimitives(css)
-  const itemHeaderBack = ruleIndex({
-    css,
-    selector: /^\._back_[\w-]+$/,
-    declaration: 'background:var(--color-night-glass)',
-  })
-  expect(itemHeaderBack).toBeGreaterThan(quiet)
+/** The stylesheets `index.html` names, which load before the app renders: every page's shared primitives. */
+const FIRST_STYLESHEETS = /href="\/(assets\/[^"]+\.css)"/g
+
+/** ItemHeader's back link over a backdrop, which overrides the shared Button's quiet look. */
+const ITEM_HEADER_BACK = /\._back_[\w-]+\{[^}]*background:var\(--color-night-glass\)/
+
+test('web emitted CSS keeps shared Button defaults first, and host overrides in what loads after', async () => {
+  const emitted = await built
+  const html = emitted.find(({ fileName }) => fileName === 'index.html')?.text ?? ''
+  const first = [...html.matchAll(FIRST_STYLESHEETS)].map(([, fileName]) => fileName)
+  const stylesheets = emitted.filter(({ fileName }) => fileName.endsWith('.css'))
+  const isFirst = ({ fileName }: Emitted) => first.includes(fileName)
+  expect(first.length).toBeGreaterThan(0)
+  expectPlayerOverridesAfterPrimitives(
+    stylesheets
+      .filter(isFirst)
+      .map(({ text }) => text)
+      .join(''),
+  )
+  // A page's stylesheet is added once its chunk loads, so after the first ones in the cascade.
+  const overriding = stylesheets.filter(
+    (stylesheet) => !isFirst(stylesheet) && ITEM_HEADER_BACK.test(stylesheet.text),
+  )
+  expect(overriding.length).toBeGreaterThan(0)
 }, 30_000)
 
 test('emitted index.html paints its loader before the stylesheet arrives, and fetches its fonts at once', async () => {

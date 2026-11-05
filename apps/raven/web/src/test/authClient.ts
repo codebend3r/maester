@@ -13,6 +13,12 @@ export const readyConfig: ReadyAuthConfig = {
   cookieName: AUTH_COOKIE,
 }
 
+/**
+ * The page a signed-in browser starts the session on: Supabase's cookie is there, so the session
+ * waits for the client to read it instead of settling signed out before Supabase's code loads.
+ */
+export const SESSION_PAGE = { cookies: `${AUTH_COOKIE}=base64-test`, search: '', hash: '' } as const
+
 export const ACCOUNT_ID = '0b8e6f2a-4c1d-4e3b-9a7f-5d2c1e8b6a40'
 
 /** The session store's view of `fakeAccount` signed in. */

@@ -72,10 +72,18 @@ type SeedProps<T> = {
   saved: { updatedAt: number; data: T } | null
 }
 
-/** Puts one saved query back, unless it was not saved or was already read this visit. */
+/**
+ * Puts one saved query back, unless it was not saved or was already read this visit, and marks it
+ * stale: a save from moments ago is still inside the query's stale time, so the page would draw it
+ * and never ask again, missing what changed since, such as a film just played.
+ */
 const seed = <T>({ queryClient, queryKey, saved }: SeedProps<T>): void => {
   if (saved === null || queryClient.getQueryData(queryKey) !== undefined) return
   queryClient.setQueryData(queryKey, saved.data, { updatedAt: saved.updatedAt })
+  // Marking it stale fetches nothing, so there is no answer to wait for or fail.
+  queryClient
+    .invalidateQueries({ queryKey, exact: true, refetchType: 'none' })
+    .catch(() => undefined)
 }
 
 type RestoreHomeProps = SaveHomeProps
