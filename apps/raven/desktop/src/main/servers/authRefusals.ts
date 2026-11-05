@@ -1,29 +1,14 @@
 import { AUTH_REFUSALS, isAuthRefusal, type AuthRefusal } from '@raven/core'
 import { parseJson } from '@/main/parseJson'
+import { OVERFLOWS, readCapped } from '@/main/servers/cappedBody'
 import { HTTP_STATUSES } from '@/shared/httpStatuses'
 
 /** What a refused request's body is read up to, for the reason it carries. */
 const REFUSAL_MAX_CHARS = 4096
 
-/** Reads a short body to its end or to `REFUSAL_MAX_CHARS`, then lets go of the rest. */
-export const readShort = async (body: ReadableStream<Uint8Array> | null): Promise<string> => {
-  if (body === null) return ''
-  const reader = body.getReader()
-  const decoder = new TextDecoder()
-  const readFrom = async (text: string): Promise<string> => {
-    const { done, value } = await reader.read()
-    if (done) return `${text}${decoder.decode()}`
-    const next = `${text}${decoder.decode(value, { stream: true })}`
-    return next.length >= REFUSAL_MAX_CHARS ? next : readFrom(next)
-  }
-  try {
-    return await readFrom('')
-  } catch {
-    return ''
-  } finally {
-    await reader.cancel().catch(() => undefined)
-  }
-}
+/** Reads a short body to its end or just past `REFUSAL_MAX_CHARS`, then lets go of the rest; a failed read is empty. */
+export const readShort = (body: ReadableStream<Uint8Array> | null): Promise<string> =>
+  readCapped({ body, maxChars: REFUSAL_MAX_CHARS, onOverflow: OVERFLOWS.truncate }).catch(() => '')
 
 /** The reason a refused answer's body gives, or null when the body is no auth refusal. */
 const refusalIn = (body: string): AuthRefusal['reason'] | null => {

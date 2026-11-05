@@ -12,6 +12,10 @@ export const RAVEN_HEADERS = {
   userAgent: 'user-agent',
 } as const
 
+/** A request header as one string: its values joined as one header would list them, trimmed, and empty when absent. */
+export const headerOf = (value: string | string[] | undefined): string =>
+  (Array.isArray(value) ? value.join(',') : (value ?? '')).trim()
+
 /** Content types raven sends or reads beyond `@shared/server`'s `CONTENT_TYPES`. */
 export const RAVEN_CONTENT_TYPES = {
   anyImage: 'image/*',

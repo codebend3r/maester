@@ -12,7 +12,6 @@ import {
   type LiveStream,
   MEDIA_PROBE_BYTES,
   type MediaOrigin,
-  type MediaOrigins,
   type MediaStreams,
   type MediaTicket,
   type MediaTracks,
@@ -20,6 +19,7 @@ import {
   type StreamQuality,
   type SubtitleCue,
 } from '@/contract'
+import { type MediaOriginsAnswer, readMediaOrigins } from '@/mediaOrigins'
 import { fillPath } from '@/query'
 import { parseWebVtt } from '@/subtitles'
 
@@ -91,8 +91,10 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
     expect({ request: send({ path: `/api/media/${id}/streams` }), guard: isMediaStreams }),
 
   /** The origins a browser may fetch media from directly, best first; none while tickets are off. */
-  getMediaOrigins: (): Promise<MediaOrigins> =>
-    expect({ request: send({ path: '/api/media-origins' }), guard: isMediaOrigins }),
+  getMediaOrigins: async (): Promise<MediaOriginsAnswer> =>
+    readMediaOrigins(
+      await expect({ request: send({ path: '/api/media-origins' }), guard: isMediaOrigins }),
+    ),
 
   /** A short-lived ticket that stands in for the cookie on this video's media requests to another origin. */
   getMediaTicket: (id: number): Promise<MediaTicket> =>

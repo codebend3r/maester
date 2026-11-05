@@ -131,22 +131,29 @@ type TestConfigProps = {
 }
 
 /**
+ * DSM's reverse proxy as raven's socket sees it: the gateway of the network
+ * `docker-compose.vhagar.yml` pins, which every test server trusts as
+ * Vhagar's does.
+ */
+export const TRUSTED_PROXY = '172.30.84.1'
+
+/**
  * A test's server: no scan on start, no rescans, no intro detection in the
  * background, the CPU encoder, and the admin password above.
  */
-export const testConfig = ({
-  dataDir,
-  mediaDir,
-  webDir = null,
-}: TestConfigProps): ServerConfig => ({
-  ...readServerConfig({}),
-  hwAccel: 'none',
-  dataDir,
-  webDir,
-  browseRoot: mediaDir,
-  scanOnStart: false,
-  quickScanIntervalMinutes: 0,
-  markerDetection: false,
-  shouldScanLoudness: false,
-  adminPassword: ADMIN_PASSWORD,
-})
+export const testConfig = ({ dataDir, mediaDir, webDir = null }: TestConfigProps): ServerConfig => {
+  const base = readServerConfig({})
+  return {
+    ...base,
+    remoteAccess: { ...base.remoteAccess, trustedProxies: [TRUSTED_PROXY] },
+    hwAccel: 'none',
+    dataDir,
+    webDir,
+    browseRoot: mediaDir,
+    scanOnStart: false,
+    quickScanIntervalMinutes: 0,
+    markerDetection: false,
+    shouldScanLoudness: false,
+    adminPassword: ADMIN_PASSWORD,
+  }
+}

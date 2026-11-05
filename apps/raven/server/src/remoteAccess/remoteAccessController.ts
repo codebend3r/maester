@@ -27,7 +27,7 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { Public } from '@/lock/lockGuard'
 import { parseBody } from '@/parseBody'
 import { StrictlyLimited } from '@/rateLimits/rateTiers'
-import { isLanRequest } from '@/remoteAccess/clientNetwork'
+import { isAddressForwarded } from '@/remoteAccess/clientNetwork'
 import { Reachability } from '@/remoteAccess/reachability'
 import { SettingsRepository } from '@/settings/settingsRepository'
 
@@ -99,7 +99,7 @@ export class RemoteAccessController {
   echo(@Param(REMOTE_ACCESS_PARAMS.nonce) nonce: string, @Req() request: FastifyRequest): void {
     const isAnswered =
       isEchoNonce(nonce) &&
-      this.reachability.answerEcho({ nonce, isFromLan: isLanRequest({ request }) })
+      this.reachability.answerEcho({ nonce, isAddressForwarded: isAddressForwarded({ request }) })
     if (!isAnswered) throw new NotFoundException()
   }
 }

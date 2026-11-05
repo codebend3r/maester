@@ -6,10 +6,10 @@ import {
   type PlaybackPlan,
   type PlaybackPolicy,
   TRANSCODINGS,
+  type PlayNetwork,
   planForNetwork,
   planPlayback,
 } from '@raven/core'
-import type { PlayNetwork } from '@raven/native/headless'
 
 import { canPlayFor } from '@/platform/canPlay'
 import type { AppPlatform } from '@/platform/platform'
@@ -49,7 +49,7 @@ type PlanForProps = {
  * the plan is as it was.
  */
 export const planFor = ({ network, ...props }: PlanForProps): PlaybackPlan =>
-  planForNetwork({ plan: planHere(props), media: props.media, ...network }).plan
+  planForNetwork({ plan: planHere(props), media: props.media, ...network })
 
 type PlanHereProps = Omit<PlanForProps, 'network'>
 

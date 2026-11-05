@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto'
 import { describe, expect, it, mock } from 'bun:test'
 import { REACHABILITY_PROBLEMS, REMOTE_ACCESS_STATES } from '@raven/core'
 import { checkReachability } from '@/netlify/functions/reachability/reachability'
@@ -5,40 +6,50 @@ import { checkReachability } from '@/netlify/functions/reachability/reachability
 const NONCE = 'AbCdEfGhIjKlMnOpQrStUv'
 const HOST = 'raven.example.synology.me'
 const HOME = '203.0.113.9'
+const SECRET = 'the-site-and-raven-share-this'
 
-const CHECK = `https://raven-player.netlify.app/remote-access/check?host=${HOST}&port=8443&nonce=${NONCE}`
+const signatureOf = (secret: string) => createHmac('sha256', secret).update(NONCE).digest('hex')
+
+const SIGNATURE = signatureOf(SECRET)
+
+const CHECK = `https://raven-player.netlify.app/remote-access/check?host=${HOST}&port=8443&nonce=${NONCE}&signature=${SIGNATURE}`
+
+type ConnectTarget = Parameters<typeof checkReachability>[0]['connectTarget']
 
 type RunProps = {
   url?: string
+  secret?: string | null
   resolved?: string[] | Error
-  target?: () => Promise<Response>
+  target?: () => Promise<number>
 }
 
 const run = async ({
   url = CHECK,
+  secret = SECRET,
   resolved = [HOME],
-  target = async () => new Response(null, { status: 204 }),
+  target = async () => 204,
 }: RunProps = {}) => {
-  const fetchTarget = mock(async (_url: string, _init: RequestInit) => target())
+  const connectTarget = mock<ConnectTarget>(async () => target())
   const response = await checkReachability({
     request: new Request(url),
     callerAddress: HOME,
+    secret,
     resolveHost: async () => {
       if (resolved instanceof Error) throw resolved
       return resolved
     },
-    fetchTarget,
+    connectTarget,
   })
-  return { response, body: await response.json(), fetchTarget }
+  return { response, body: await response.json(), connectTarget }
 }
 
-const failing = (code: string) => async (): Promise<Response> => {
-  throw new TypeError('fetch failed', { cause: Object.assign(new Error(code), { code }) })
+const failing = (code: string) => async (): Promise<number> => {
+  throw Object.assign(new Error(code), { code })
 }
 
 describe('checkReachability', () => {
-  it("fetches raven's echo at the public origin and reports it reachable, with the caller's address", async () => {
-    const { response, body, fetchTarget } = await run()
+  it("asks raven's echo at the vetted address and reports it reachable, with the caller's address", async () => {
+    const { response, body, connectTarget } = await run()
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(body).toEqual({
@@ -46,9 +57,29 @@ describe('checkReachability', () => {
       publicAddress: HOME,
       resolved: [HOME],
     })
-    const [target, init] = fetchTarget.mock.calls[0] ?? []
-    expect(target).toBe(`https://${HOST}:8443/api/remote-access/echo/${NONCE}`)
-    expect(init?.redirect).toBe('manual')
+    expect(connectTarget).toHaveBeenCalledWith({
+      host: HOST,
+      address: HOME,
+      port: 8443,
+      path: `/api/remote-access/echo/${NONCE}`,
+    })
+  })
+
+  it('connects to the address it vetted, never resolving the name again', async () => {
+    const { connectTarget } = await run({ resolved: ['198.51.100.7', '198.51.100.8'] })
+    expect(connectTarget.mock.calls.map(([target]) => target.address)).toEqual(['198.51.100.7'])
+  })
+
+  it('refuses a check raven did not sign, looking at nothing', async () => {
+    const unsigned = CHECK.replace(`&signature=${SIGNATURE}`, '')
+    const results = await Promise.all([
+      run({ url: unsigned }),
+      run({ url: CHECK.replace(SIGNATURE, signatureOf('another-secret')) }),
+      run({ secret: null }),
+      run({ secret: '' }),
+    ])
+    expect(results.map(({ response }) => response.status)).toEqual([400, 403, 403, 403])
+    expect(results.every(({ connectTarget }) => connectTarget.mock.calls.length === 0)).toBe(true)
   })
 
   it('refuses anything but a DNS name, a port and a nonce, fetching nothing', async () => {
@@ -60,7 +91,7 @@ describe('checkReachability', () => {
     ]
     const results = await Promise.all(bad.map((url) => run({ url })))
     expect(results.map(({ response }) => response.status)).toEqual([400, 400, 400, 400])
-    expect(results.every(({ fetchTarget }) => fetchTarget.mock.calls.length === 0)).toBe(true)
+    expect(results.every(({ connectTarget }) => connectTarget.mock.calls.length === 0)).toBe(true)
   })
 
   it('says the name does not resolve, or resolves to a private address, without fetching', async () => {
@@ -72,12 +103,20 @@ describe('checkReachability', () => {
       problem: REACHABILITY_PROBLEMS.privateAddress,
       resolved: ['192.168.50.6'],
     })
-    expect(lan.fetchTarget).not.toHaveBeenCalled()
+    expect(lan.connectTarget).not.toHaveBeenCalled()
+    const rebound = await run({ resolved: [HOME, '10.0.0.5'] })
+    expect(rebound.body).toMatchObject({ problem: REACHABILITY_PROBLEMS.privateAddress })
+    expect(rebound.connectTarget).not.toHaveBeenCalled()
   })
 
   it('says something else answered when the echo is not a 204', async () => {
-    const { body } = await run({ target: async () => new Response('DSM', { status: 200 }) })
-    expect(body).toMatchObject({ problem: REACHABILITY_PROBLEMS.notRaven })
+    const answered = await Promise.all(
+      [200, 302].map((status) => run({ target: async () => status })),
+    )
+    expect(answered.map(({ body }) => body)).toMatchObject([
+      { problem: REACHABILITY_PROBLEMS.notRaven },
+      { problem: REACHABILITY_PROBLEMS.notRaven },
+    ])
   })
 
   it('names a timeout, a refusal and a bad certificate', async () => {

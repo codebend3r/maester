@@ -27,7 +27,7 @@ const harness = ({ client = new QueryClient() }: HarnessProps = {}) => {
 }
 
 const pickOrigin = (origin: MediaOrigin) =>
-  act(() => useMediaOrigin.getState().setPick({ origin, at: Date.now() }))
+  act(() => useMediaOrigin.getState().setPick({ origin, at: Date.now(), remote: null }))
 
 const flushMicrotasks = () => new Promise<void>((resolve) => queueMicrotask(resolve))
 

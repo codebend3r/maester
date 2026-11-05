@@ -48,7 +48,7 @@ const VideoTrack = ({ session, track, rate, start }: VideoTrackProps) => {
     queryKey: [MUSIC_SOURCE_KEY, session.server.id, track.id],
     queryFn: () =>
       mediaSourcesFor(session.server).source({
-        media: track,
+        media: { id: track.id },
         mode: PLAYBACK_MODES.direct,
         audio: null,
         burn: null,

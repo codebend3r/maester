@@ -7,10 +7,9 @@ import {
   type StreamQuality,
   remoteQualityFor,
 } from '@raven/core'
-import type { FastifyRequest } from 'fastify'
 import { transcodeBitrate } from '@/ffmpeg/args'
 import { streamSizeOf } from '@/playback/conversion'
-import { isLanRequest } from '@/remoteAccess/clientNetwork'
+import { type ClientRequest, isLanRequest } from '@/remoteAccess/clientNetwork'
 
 type StreamSize = (typeof STREAM_QUALITIES)[StreamQuality]
 
@@ -52,7 +51,7 @@ export const sizeForNetwork = ({
 type StreamSizeForProps = {
   quality: string | undefined
   mode: StreamMode
-  request: Pick<FastifyRequest, 'ip' | 'headers'>
+  request: ClientRequest
   remote: RemoteLimits
   playback: Pick<PlaybackSettings, 'quality'>
 }

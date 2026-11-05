@@ -174,7 +174,7 @@ describe('AudioHost', () => {
       expiresAt: Date.now() + 300_000,
     }))
     useMediaOrigin.setState({
-      pick: { origin: { kind: 'lan', url: 'http://nas.local:8484' }, at: Date.now() },
+      pick: { origin: { kind: 'lan', url: 'http://nas.local:8484' }, at: Date.now(), remote: null },
     })
     renderHost({ api })
     act(() => store().playTracks({ tracks: [track(3)] }))
@@ -189,7 +189,7 @@ describe('AudioHost', () => {
       expiresAt: Date.now() + 300_000,
     })
     useMediaOrigin.setState({
-      pick: { origin: { kind: 'lan', url: 'http://nas.local:8484' }, at: Date.now() },
+      pick: { origin: { kind: 'lan', url: 'http://nas.local:8484' }, at: Date.now(), remote: null },
     })
     renderHost({ api })
     act(() => store().playTracks({ tracks: [track(3)] }))

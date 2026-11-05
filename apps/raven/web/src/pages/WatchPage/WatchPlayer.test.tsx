@@ -119,7 +119,7 @@ describe('Player file link on the media plane', () => {
   const lan = { kind: 'lan', url: 'https://raven.home.example' } as const
 
   it('copies a ticketed link on the picked origin and says how long it works', async () => {
-    useMediaOrigin.setState({ pick: { origin: lan, at: Date.now() } })
+    useMediaOrigin.setState({ pick: { origin: lan, at: Date.now(), remote: null } })
     spies.push(
       spyOn(api, 'getMediaOrigins').mockImplementation(async () => ({
         origins: [lan],
@@ -153,7 +153,7 @@ describe('Player file link on the media plane', () => {
   })
 
   it("says a link copied with accounts on works for up to an account ticket's five minutes", async () => {
-    useMediaOrigin.setState({ pick: { origin: lan, at: Date.now() } })
+    useMediaOrigin.setState({ pick: { origin: lan, at: Date.now(), remote: null } })
     spies.push(
       spyOn(api, 'getMediaOrigins').mockImplementation(async () => ({
         origins: [lan],

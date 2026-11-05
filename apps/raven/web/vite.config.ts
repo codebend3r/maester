@@ -1,12 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { URL_PROTOCOLS } from '@raven/core'
+import { DEFAULT_SERVER_ORIGIN, URL_PROTOCOLS } from '@raven/core'
 import { type Plugin, defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
 /** The environment variables the build and the dev server read. */
 const ENV = {
-  apiOrigin: 'RAVEN_API_ORIGIN',
   devApiOrigin: 'RAVEN_DEV_API_ORIGIN',
   homeContinueCount: 'RAVEN_HOME_CONTINUE_COUNT',
   netlify: 'NETLIFY',
@@ -28,31 +27,17 @@ const NETLIFY_VALUES = { on: 'true' } as const
  */
 const NETLIFY_IMAGE_CDN = '/.netlify/images'
 
+/** Whether this is a Netlify build, which `netlify.toml` serves with /api proxied to raven. */
+const IS_NETLIFY = process.env[ENV.netlify] === NETLIFY_VALUES.on
+
 /**
- * On Netlify the app is served apart from raven, and `netlify.toml` proxies
- * /api, signed, to raven's public origin, so the app still calls its own
- * origin and the PIN and admin lock cookies stay first party. RAVEN_API_ORIGIN
- * names that origin to the build (`VITE_API_ORIGIN`) and the functions, so a
- * Netlify build without a valid one fails here.
+ * Where /api goes on Netlify, where the app is served apart from raven and
+ * `netlify.toml` proxies /api, signed, to raven's public origin, so the app
+ * still calls its own origin and the PIN and admin lock cookies stay first
+ * party. core's `DEFAULT_SERVER_ORIGIN` is that origin, and `netlifyToml.test.ts`
+ * fails when the proxy names any other; '' when /api is raven itself.
  */
-const netlifyApiOrigin = (): Plugin => ({
-  name: 'raven-netlify-api-origin',
-  apply: 'build',
-  generateBundle() {
-    const origin = process.env[ENV.apiOrigin]
-    // Netlify sets NETLIFY; without the proxy every /api call would get index.html.
-    if (!origin && process.env[ENV.netlify] === NETLIFY_VALUES.on) {
-      return this.error("Set RAVEN_API_ORIGIN in the Netlify site, to raven's public origin.")
-    }
-    if (!origin) return
-    const url = URL.canParse(origin) ? new URL(origin) : null
-    if (url?.protocol !== URL_PROTOCOLS.https || url.origin !== origin.replace(/\/+$/, '')) {
-      return this.error(
-        `RAVEN_API_ORIGIN must be an https origin with no path, such as https://raven.example.synology.me:8443, not ${origin}`,
-      )
-    }
-  },
-})
+const PROXIED_API_ORIGIN = IS_NETLIFY ? DEFAULT_SERVER_ORIGIN : ''
 
 /**
  * The raven the dev server proxies /api to: RAVEN_DEV_API_ORIGIN from the
@@ -222,21 +207,11 @@ const vendorChunkTest = (packages: readonly string[]) => (id: string) =>
   packages.some((name) => posixId(id).includes(`/node_modules/${name}/`))
 
 export default defineConfig(({ mode }) => ({
-  plugins: [
-    react(),
-    netlifyApiOrigin(),
-    restartOnRavenEnv(),
-    inlineRavenMark(),
-    preloadStylesheets(),
-    preloadFonts(),
-  ],
+  plugins: [react(), restartOnRavenEnv(), inlineRavenMark(), preloadStylesheets(), preloadFonts()],
   define: {
     'import.meta.env.VITE_HOME_CONTINUE_COUNT': JSON.stringify(String(homeContinueCount(mode))),
-    'import.meta.env.VITE_PICTURE_CDN': JSON.stringify(
-      process.env[ENV.netlify] === NETLIFY_VALUES.on ? NETLIFY_IMAGE_CDN : '',
-    ),
-    // Where /api goes when it is the proxy above; '' when /api is raven itself.
-    'import.meta.env.VITE_API_ORIGIN': JSON.stringify(process.env[ENV.apiOrigin] ?? ''),
+    'import.meta.env.VITE_PICTURE_CDN': JSON.stringify(IS_NETLIFY ? NETLIFY_IMAGE_CDN : ''),
+    'import.meta.env.VITE_API_ORIGIN': JSON.stringify(PROXIED_API_ORIGIN),
   },
   resolve: {
     alias: {

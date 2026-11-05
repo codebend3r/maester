@@ -61,6 +61,7 @@
 
 .form {
   display: grid;
+  gap: var(--space-5);
 }
 
 // A field's label over its input, what it means under that.

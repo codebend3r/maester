@@ -3,8 +3,10 @@ import {
   DEFAULT_REMOTE_ACCESS_SETTINGS,
   REMOTE_ACCESS_STATES,
   REMOTE_LIMITS,
+  isCheckSignature,
   isEchoNonce,
   isPort,
+  isReachabilityQuery,
   isPublicHostname,
   isRemoteAccessChange,
   isRemoteAccessSettings,
@@ -13,11 +15,19 @@ import {
   isMediaOrigins,
   MEDIA_ORIGIN_KINDS,
   PLAYBACK_MODES,
+  REACHABILITY_PROBLEMS,
+  readReachabilityQuery,
+  reachabilityQueryString,
 } from '@/contract'
 import {
+  AT_HOME,
+  PUBLIC_ORIGIN_STATES,
+  checkFactsOf,
   isAwayPlay,
   planForNetwork,
   publicOriginOf,
+  publicOriginStateOf,
+  remoteLimitApplies,
   remoteQualityFor,
   remoteStreamsAt,
   remoteTranscodeFor,
@@ -90,6 +100,106 @@ describe('remote access settings', () => {
     expect(isEchoNonce('short')).toBe(false)
     expect(isEchoNonce('AAAAAAAAAAAAAAAAAAAAA/')).toBe(false)
   })
+
+  it('knows a signature by its form: 64 lower case hex digits', () => {
+    expect(isCheckSignature('a'.repeat(64))).toBe(true)
+    expect(isCheckSignature('0123456789abcdef'.repeat(4))).toBe(true)
+    expect(isCheckSignature('A'.repeat(64))).toBe(false)
+    expect(isCheckSignature('a'.repeat(63))).toBe(false)
+    expect(isCheckSignature('g'.repeat(64))).toBe(false)
+  })
+})
+
+describe('the reachability query', () => {
+  const query = {
+    host: 'raven.example.com',
+    port: 8443,
+    nonce: 'AAAAAAAAAAAAAAAAAAAAAA',
+    signature: 'ab'.repeat(32),
+  }
+
+  it('reads back what raven builds, with its question mark or without', () => {
+    const search = reachabilityQueryString(query)
+    expect(search).toBe(
+      `host=raven.example.com&port=8443&nonce=AAAAAAAAAAAAAAAAAAAAAA&signature=${'ab'.repeat(32)}`,
+    )
+    expect(readReachabilityQuery(search)).toEqual(query)
+    expect(readReachabilityQuery(`?${search}`)).toEqual(query)
+    expect(isReachabilityQuery(query)).toBe(true)
+  })
+
+  it('reads nothing with a part missing or malformed', () => {
+    const search = (overrides: Record<string, string>) =>
+      reachabilityQueryString(query).replace(/([a-z]+)=([^&]*)/g, (pair, key: string) =>
+        key in overrides ? `${key}=${overrides[key]}` : pair,
+      )
+    expect(readReachabilityQuery('')).toBeNull()
+    expect(readReachabilityQuery(search({ host: '203.0.113.4' }))).toBeNull()
+    expect(readReachabilityQuery(search({ port: '0x20FB' }))).toBeNull()
+    expect(readReachabilityQuery(search({ port: '' }))).toBeNull()
+    expect(readReachabilityQuery(search({ port: '70000' }))).toBeNull()
+    expect(readReachabilityQuery(search({ nonce: 'short' }))).toBeNull()
+    expect(readReachabilityQuery(search({ signature: 'AB'.repeat(32) }))).toBeNull()
+    expect(
+      readReachabilityQuery('host=raven.example.com&port=8443&nonce=AAAAAAAAAAAAAAAAAAAAAA'),
+    ).toBeNull()
+  })
+})
+
+describe('publicOriginStateOf', () => {
+  const configured = { isEnabled: true, hostname: 'raven.example.com', publicPort: 8443 }
+
+  it('gives the origin with the hostname and the port it is made of', () => {
+    expect(publicOriginStateOf(configured)).toEqual({
+      state: PUBLIC_ORIGIN_STATES.configured,
+      origin: 'https://raven.example.com:8443',
+      hostname: 'raven.example.com',
+      publicPort: 8443,
+    })
+  })
+
+  it('says it is off before it says anything is missing', () => {
+    expect(publicOriginStateOf({ ...configured, isEnabled: false, hostname: null })).toEqual({
+      state: PUBLIC_ORIGIN_STATES.disabled,
+    })
+    expect(publicOriginStateOf({ ...configured, hostname: null })).toEqual({
+      state: PUBLIC_ORIGIN_STATES.unconfigured,
+    })
+    expect(publicOriginStateOf({ ...configured, publicPort: null })).toEqual({
+      state: PUBLIC_ORIGIN_STATES.unconfigured,
+    })
+  })
+})
+
+describe('checkFactsOf', () => {
+  const facts = {
+    publicAddress: '203.0.113.9',
+    resolved: ['203.0.113.9'],
+    checkedAt: '2026-11-04T00:00:00.000Z',
+  }
+
+  it('gives what a check saw, reachable or not', () => {
+    expect(
+      checkFactsOf({
+        state: REMOTE_ACCESS_STATES.reachable,
+        isClientAddressForwarded: true,
+        ...facts,
+      }),
+    ).toEqual(facts)
+    expect(
+      checkFactsOf({
+        state: REMOTE_ACCESS_STATES.unreachable,
+        problem: REACHABILITY_PROBLEMS.timeout,
+        ...facts,
+      }),
+    ).toEqual(facts)
+  })
+
+  it('is null for a status no check made', () => {
+    expect(checkFactsOf({ state: REMOTE_ACCESS_STATES.disabled })).toBeNull()
+    expect(checkFactsOf({ state: REMOTE_ACCESS_STATES.unconfigured })).toBeNull()
+    expect(checkFactsOf({ state: REMOTE_ACCESS_STATES.unchecked })).toBeNull()
+  })
 })
 
 describe('publicOriginOf', () => {
@@ -144,7 +254,36 @@ describe('isAwayPlay', () => {
     expect(isAwayPlay({ origin: { kind: MEDIA_ORIGIN_KINDS.public }, remote: null })).toBe(true)
     expect(isAwayPlay({ origin: { kind: MEDIA_ORIGIN_KINDS.lan }, remote: null })).toBe(false)
     expect(isAwayPlay({ origin: null, remote: { limit: null, isOutside: true } })).toBe(true)
-    expect(isAwayPlay({ origin: null, remote: undefined })).toBe(false)
+    expect(isAwayPlay(AT_HOME)).toBe(false)
+  })
+})
+
+describe('remoteLimitApplies', () => {
+  const limited = { limit: 'medium720', isOutside: true } as const
+
+  it('is a play away from home from a server that names a limit', () => {
+    expect(
+      remoteLimitApplies({ origin: { kind: MEDIA_ORIGIN_KINDS.public }, remote: limited }),
+    ).toBe(true)
+    expect(remoteLimitApplies({ origin: null, remote: limited })).toBe(true)
+  })
+
+  it('is not a play at home, one with no limit, or one from a server that says nothing', () => {
+    expect(remoteLimitApplies({ origin: { kind: MEDIA_ORIGIN_KINDS.lan }, remote: limited })).toBe(
+      false,
+    )
+    expect(remoteLimitApplies({ origin: null, remote: { ...limited, isOutside: false } })).toBe(
+      false,
+    )
+    expect(
+      remoteLimitApplies({
+        origin: { kind: MEDIA_ORIGIN_KINDS.public },
+        remote: { ...limited, limit: null },
+      }),
+    ).toBe(false)
+    expect(remoteLimitApplies({ origin: { kind: MEDIA_ORIGIN_KINDS.public }, remote: null })).toBe(
+      false,
+    )
   })
 })
 
@@ -172,7 +311,7 @@ describe('remoteTranscodeFor', () => {
     expect(
       remoteTranscodeFor({ media: big, origin: away, remote: { ...remote, limit: null } }),
     ).toBeNull()
-    expect(remoteTranscodeFor({ media: big, origin: away, remote: undefined })).toBeNull()
+    expect(remoteTranscodeFor({ media: big, origin: away, remote: null })).toBeNull()
   })
 })
 
@@ -187,26 +326,19 @@ describe('planForNetwork', () => {
     remote: { limit: 'high720', isOutside: true },
   } as const
 
-  it('starts with the transcode at the limit, the rest behind it', () => {
+  it('starts with the transcode, the rest behind it, and leaves the size to the server', () => {
     expect(planForNetwork({ plan, ...props })).toEqual({
-      plan: {
-        modes: [PLAYBACK_MODES.transcode, PLAYBACK_MODES.direct, PLAYBACK_MODES.remux],
-        problems: [],
-      },
-      quality: 'high720',
+      modes: [PLAYBACK_MODES.transcode, PLAYBACK_MODES.direct, PLAYBACK_MODES.remux],
+      problems: [],
     })
   })
 
   it('keeps a plan that can not transcode, and one at home', () => {
     const noTranscode = { modes: [PLAYBACK_MODES.direct], problems: [] }
-    expect(planForNetwork({ plan: noTranscode, ...props })).toEqual({
-      plan: noTranscode,
-      quality: null,
-    })
-    expect(planForNetwork({ plan, ...props, origin: { kind: MEDIA_ORIGIN_KINDS.lan } })).toEqual({
+    expect(planForNetwork({ plan: noTranscode, ...props })).toEqual(noTranscode)
+    expect(planForNetwork({ plan, ...props, origin: { kind: MEDIA_ORIGIN_KINDS.lan } })).toEqual(
       plan,
-      quality: null,
-    })
+    )
   })
 })
 

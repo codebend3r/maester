@@ -1,32 +1,43 @@
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
+import { request as httpsRequest } from 'node:https'
+import { type LookupFunction, isIP } from 'node:net'
 import {
   REACHABILITY_CHECK_PATH,
-  REACHABILITY_PARAMS,
   REACHABILITY_PROBLEMS,
+  REACHABILITY_TIMINGS,
   REMOTE_ACCESS_PARAMS,
   REMOTE_ACCESS_PATHS,
   REMOTE_ACCESS_STATES,
   type ReachabilityProblem,
+  type ReachabilityQuery,
   type ReachabilityReport,
-  isEchoNonce,
-  isPort,
+  fillPath,
   isPrivateAddress,
-  isPublicHostname,
   isRecord,
   isString,
+  readReachabilityQuery,
 } from '@raven/core'
+
+/** The site's environment variables the function reads, scoped to Runtime. */
+const ENV = { proxySecret: 'RAVEN_PROXY_SECRET' } as const
 
 const HEADERS = { cacheControl: 'cache-control' } as const
 
 const CACHE_POLICIES = { none: 'no-store' } as const
 
-/** How long the check waits for raven to answer. */
-const TARGET_TIMEOUT_MS = 8_000
+/** How raven signs a check's nonce, with the secret the site's /api proxy signs with too. */
+const SIGNATURE = { algorithm: 'sha256', encoding: 'hex' } as const
+
+const HTTP_METHODS = { get: 'GET' } as const
+
+/** The events of Node's outgoing request the check listens for. */
+const REQUEST_EVENTS = { response: 'response', error: 'error' } as const
 
 /** What raven's echo answers a nonce a check in flight holds. */
 const ECHO_ANSWERED = 204
 
-/** The `name` `AbortSignal.timeout` aborts with. */
+/** The `name` the check's own deadline fails with, as `AbortSignal.timeout`'s does. */
 const TIMEOUT_ERROR = 'TimeoutError'
 
 /** Node's codes for a connection that never answered. */
@@ -35,21 +46,26 @@ const TIMEOUT_CODES = new Set(['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_
 /** Node's codes for a name that does not resolve. */
 const DNS_CODES = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ENODATA'])
 
-/** What a fetch's TLS failures have in their code: an untrusted, expired or misnamed certificate. */
+/** What a request's TLS failures have in their code: an untrusted, expired or misnamed certificate. */
 const CERTIFICATE_CODE = /CERT|SSL|TLS|SELF_SIGNED|UNABLE_TO_VERIFY|UNABLE_TO_GET_ISSUER/
 
 /** The one lookup the check makes; `dns.lookup` with `all` is one. */
 type ResolveHost = (host: string) => Promise<string[]>
 
-/** The one call the check makes to raven; `fetch` is one. */
-type FetchTarget = (url: string, init: RequestInit) => Promise<Response>
+/** Where the check asks raven: the host the certificate must name, at the address the check vetted. */
+type Target = { host: string; address: string; port: number; path: string }
+
+/** The one call the check makes to raven, answering the status it got; `requestPinned` is one. */
+type ConnectTarget = (target: Target) => Promise<number>
 
 type CheckReachabilityProps = {
   request: Request
   /** The address the call came from: the home network's, when raven asks. */
   callerAddress: string | null
+  /** The secret raven signs a check's nonce with; null when the site has none. */
+  secret: string | null
   resolveHost: ResolveHost
-  fetchTarget: FetchTarget
+  connectTarget: ConnectTarget
 }
 
 /** What the check answers: a report, or why it would not look. */
@@ -60,6 +76,18 @@ type AnswerProps = { body: Answer; status?: number }
 const answer = ({ body, status = 200 }: AnswerProps): Response =>
   Response.json(body, { status, headers: { [HEADERS.cacheControl]: CACHE_POLICIES.none } })
 
+type IsSignedProps = { query: ReachabilityQuery; secret: string | null }
+
+/** Whether raven, holding the secret, signed the query's nonce; compared in constant time. */
+const isSigned = ({ query, secret }: IsSignedProps): boolean => {
+  if (!secret) return false
+  const expected = createHmac(SIGNATURE.algorithm, secret)
+    .update(query.nonce)
+    .digest(SIGNATURE.encoding)
+  // Both are 64 hex digits, the query's guard says, so the lengths timingSafeEqual needs agree.
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(query.signature))
+}
+
 /** The `code` of an error, or of the error it wraps, as undici's `fetch failed` wraps Node's. */
 const codeOf = (error: unknown): string => {
   if (!isRecord(error)) return ''
@@ -67,7 +95,7 @@ const codeOf = (error: unknown): string => {
   return isRecord(error.cause) ? codeOf(error.cause) : ''
 }
 
-/** Why the fetch of raven's echo failed, in the check's words. */
+/** Why the request for raven's echo failed, in the check's words. */
 const problemOf = (error: unknown): ReachabilityProblem => {
   if (isRecord(error) && error.name === TIMEOUT_ERROR) return REACHABILITY_PROBLEMS.timeout
   const code = codeOf(error)
@@ -80,40 +108,48 @@ const problemOf = (error: unknown): ReachabilityProblem => {
 
 /**
  * Whether raven answers at `https://<host>:<port>` from the internet, which
- * raven can not test from inside its own network. Only raven, holding the
- * nonce of a check it started, answers its echo with a 204, so anything else
- * that answers is not it. The check takes a DNS name and a port and nothing
- * else, refuses a name that resolves to a private address (Netlify's own
- * network included), fetches one fixed path without following redirects, and
- * passes on no byte of what it got back.
+ * raven can not test from inside its own network. Only raven signs a check,
+ * with the secret it shares with the site, so no one else can make the
+ * function probe a host. Only raven, holding the nonce of a check it started,
+ * answers its echo with a 204, so anything else that answers is not it. The
+ * check takes a DNS name and a port and nothing else, refuses a name that
+ * resolves to a private address (Netlify's own network included), connects to
+ * the address it vetted rather than resolving the name again (so a rebinding
+ * name can not slip a private address past it), asks one fixed path without
+ * following redirects, and passes on no byte of what it got back.
  */
 export const checkReachability = async ({
   request,
   callerAddress,
+  secret,
   resolveHost,
-  fetchTarget,
+  connectTarget,
 }: CheckReachabilityProps): Promise<Response> => {
-  const query = new URL(request.url).searchParams
-  const host = query.get(REACHABILITY_PARAMS.host) ?? ''
-  const port = Number(query.get(REACHABILITY_PARAMS.port) ?? '')
-  const nonce = query.get(REACHABILITY_PARAMS.nonce) ?? ''
-  if (!isPublicHostname(host) || !isPort(port) || !isEchoNonce(nonce)) {
-    return answer({ body: { error: 'Give a DNS name, a port and a nonce.' }, status: 400 })
+  const query = readReachabilityQuery(new URL(request.url).search)
+  if (query === null) {
+    return answer({
+      body: { error: 'Give a DNS name, a port, a nonce and its signature.' },
+      status: 400,
+    })
   }
+  if (!isSigned({ query, secret })) {
+    return answer({ body: { error: 'Only raven may ask for a check.' }, status: 403 })
+  }
+  const { host, port, nonce } = query
   const seen = { publicAddress: callerAddress }
-  const resolved = await resolveHost(host).catch(() => [])
+  const resolved = await resolveHost(host).catch((): string[] => [])
   const unreachable = (problem: ReachabilityProblem) =>
     answer({ body: { state: REMOTE_ACCESS_STATES.unreachable, problem, ...seen, resolved } })
-  if (resolved.length === 0) return unreachable(REACHABILITY_PROBLEMS.dns)
+  const [address] = resolved
+  if (address === undefined) return unreachable(REACHABILITY_PROBLEMS.dns)
   if (resolved.some(isPrivateAddress)) return unreachable(REACHABILITY_PROBLEMS.privateAddress)
-  const path = REMOTE_ACCESS_PATHS.echo.replace(`:${REMOTE_ACCESS_PARAMS.nonce}`, nonce)
+  const path = fillPath({
+    path: REMOTE_ACCESS_PATHS.echo,
+    params: { [REMOTE_ACCESS_PARAMS.nonce]: nonce },
+  })
   try {
-    const response = await fetchTarget(`https://${host}:${port}${path}`, {
-      redirect: 'manual',
-      signal: AbortSignal.timeout(TARGET_TIMEOUT_MS),
-    })
-    await response.body?.cancel()
-    if (response.status !== ECHO_ANSWERED) return unreachable(REACHABILITY_PROBLEMS.notRaven)
+    const status = await connectTarget({ host, address, port, path })
+    if (status !== ECHO_ANSWERED) return unreachable(REACHABILITY_PROBLEMS.notRaven)
     return answer({ body: { state: REMOTE_ACCESS_STATES.reachable, ...seen, resolved } })
   } catch (error) {
     return unreachable(problemOf(error))
@@ -123,6 +159,50 @@ export const checkReachability = async ({
 const resolveWithDns: ResolveHost = async (host) =>
   (await lookup(host, { all: true })).map(({ address }) => address)
 
+/** A lookup that answers the one address the check vetted, whatever name it is asked. */
+const pinnedLookup =
+  (address: string): LookupFunction =>
+  (_hostname, options, callback) => {
+    const family = isIP(address)
+    if (options.all) {
+      callback(null, [{ address, family }])
+      return
+    }
+    callback(null, address, family)
+  }
+
+/**
+ * An https GET of the target's path at its vetted address. TLS still names
+ * the host, so the certificate is checked for it; a redirect is answered as
+ * its status, never followed; the body is read off and dropped; the whole
+ * request has `REACHABILITY_TIMINGS.targetTimeoutMs` to answer.
+ */
+const requestPinned: ConnectTarget = ({ host, address, port, path }) =>
+  new Promise((resolve, reject) => {
+    const outgoing = httpsRequest({
+      host,
+      port,
+      path,
+      method: HTTP_METHODS.get,
+      servername: host,
+      lookup: pinnedLookup(address),
+    })
+    const deadline = setTimeout(
+      () => outgoing.destroy(new DOMException('raven did not answer in time', TIMEOUT_ERROR)),
+      REACHABILITY_TIMINGS.targetTimeoutMs,
+    )
+    outgoing.on(REQUEST_EVENTS.response, (response) => {
+      clearTimeout(deadline)
+      response.resume()
+      resolve(response.statusCode ?? 0)
+    })
+    outgoing.on(REQUEST_EVENTS.error, (error) => {
+      clearTimeout(deadline)
+      reject(error)
+    })
+    outgoing.end()
+  })
+
 /** What Netlify hands a function beside the request: the caller's address among it. */
 type NetlifyContext = { ip?: string }
 
@@ -131,8 +211,9 @@ export default (request: Request, context: NetlifyContext): Promise<Response> =>
   checkReachability({
     request,
     callerAddress: context.ip ?? null,
+    secret: process.env[ENV.proxySecret] ?? null,
     resolveHost: resolveWithDns,
-    fetchTarget: fetch,
+    connectTarget: requestPinned,
   })
 
-export const config = { path: REACHABILITY_CHECK_PATH, method: ['GET'] }
+export const config = { path: REACHABILITY_CHECK_PATH, method: [HTTP_METHODS.get] }

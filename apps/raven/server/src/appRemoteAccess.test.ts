@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -26,9 +26,9 @@ import { RAVEN_HEADERS } from '@/http'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MEDIA_PLANE_ENV, readMediaPlaneConfig } from '@/media/mediaPlaneConfig'
 import type { ReachabilityFetch } from '@/remoteAccess/reachability'
-import { readRemoteAccessConfig } from '@/remoteAccess/remoteAccessConfig'
+import { REMOTE_ACCESS_ENV, readRemoteAccessConfig } from '@/remoteAccess/remoteAccessConfig'
 import { ScannerService } from '@/scanner/scannerService'
-import { NOT_WATCHING, adminCookie, routePath, testConfig } from '@/test/app'
+import { NOT_WATCHING, TRUSTED_PROXY, adminCookie, routePath, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 
@@ -37,8 +37,11 @@ const LAN = 'https://raven.home.example'
 const HOSTNAME = 'raven.example.synology.me'
 const PUBLIC_ORIGIN = `https://${HOSTNAME}:8443`
 
-/** Where the outside check reaches raven from: Netlify, through the NAS's reverse proxy on Docker's bridge. */
-const OUTSIDE = { remoteAddress: '172.17.0.1', forwardedFor: '198.51.100.7' } as const
+/** Where the outside check reaches raven from: Netlify, through the NAS's reverse proxy. */
+const OUTSIDE = { remoteAddress: TRUSTED_PROXY, forwardedFor: '198.51.100.7' } as const
+
+/** What raven signs each check with, as the reachability function's own variable holds it. */
+const PROXY_SECRET = 'a-proxy-secret-of-at-least-32-characters'
 
 /** The home network's address, as the outside check sees the call. */
 const HOME_WAN = '203.0.113.9'
@@ -102,7 +105,11 @@ describe('Remote Access', () => {
       config: {
         ...testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
         mediaPlane: readMediaPlaneConfig(env),
-        remoteAccess: readRemoteAccessConfig(env),
+        remoteAccess: readRemoteAccessConfig({
+          ...env,
+          [REMOTE_ACCESS_ENV.trustedProxies]: TRUSTED_PROXY,
+          [REMOTE_ACCESS_ENV.proxySecret]: PROXY_SECRET,
+        }),
       },
       quiet: true,
       watch: NOT_WATCHING,
@@ -194,6 +201,10 @@ describe('Remote Access', () => {
     const query = fromQueryString(url.slice(url.indexOf('?') + 1))
     expect(query[REACHABILITY_PARAMS.host]).toBe(HOSTNAME)
     expect(query[REACHABILITY_PARAMS.port]).toBe('8443')
+    const nonce = query[REACHABILITY_PARAMS.nonce] ?? ''
+    expect(query[REACHABILITY_PARAMS.signature]).toBe(
+      createHmac('sha256', PROXY_SECRET).update(nonce).digest('hex'),
+    )
   })
 
   it("keeps a check's answer for a minute on reading, and checks again on an empty change", async () => {

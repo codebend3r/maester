@@ -34,11 +34,11 @@ type ProxiedMediaNoticeProps = {
  * pick is empty until then.
  */
 export const ProxiedMediaNotice = ({ isProxiedHost }: ProxiedMediaNoticeProps) => {
-  const pick = useMediaOrigin((state) => state.pick)
+  const origin = useMediaOrigin((state) => state.pick?.origin ?? null)
   const isProbing = useMediaOrigin((state) => state.isProbing)
   const hasProbed = useMediaOrigin((state) => state.hasProbed)
   const [hasFallenBack, setFallenBack] = useState(false)
-  const isFallback = isProxiedHost && hasProbed && !isProbing && pick === null
+  const isFallback = isProxiedHost && hasProbed && !isProbing && origin === null
   if (isFallback && !hasFallenBack) setFallenBack(true)
   useEffect(() => {
     if (hasFallenBack) console.warn(PROXIED_MEDIA_WARNING)

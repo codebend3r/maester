@@ -2,8 +2,6 @@ import { describe, expect, it } from 'bun:test'
 import {
   type ApiClient,
   ApiError,
-  type FetchInit,
-  type FetchResponse,
   type MediaAccess,
   createApiClient,
   isLockedError,
@@ -15,9 +13,7 @@ import {
   BUG_REPORT_STATUSES,
   CDN_BACKDROP_WIDTHS,
   CDN_POSTER_WIDTHS,
-  DEFAULT_REMOTE_ACCESS_SETTINGS,
   DEFAULT_SAGA_BACKDROP,
-  REMOTE_ACCESS_STATES,
   POSTER_OWN_WIDTH,
   AUTH_CONFIG_STATES,
   AUTH_HEADERS,
@@ -37,6 +33,7 @@ import {
   type MetadataHealth,
   type PersonDetails,
 } from '@/contract'
+import { type Call, clientReturning, respond } from '@/test/apiClientFakes'
 import {
   bugReport,
   itemDetails,
@@ -46,30 +43,6 @@ import {
   playbackDiagnostics,
   showEntry,
 } from '@/test/fixtures'
-
-type Call = { url: string; init?: FetchInit }
-
-type RespondProps = { status?: number; body?: unknown }
-
-const respond = ({ status = 200, body }: RespondProps): FetchResponse => ({
-  ok: status >= 200 && status < 300,
-  status,
-  statusText: status === 200 ? 'OK' : 'Error',
-  json: async () => body,
-  text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
-})
-
-const clientReturning = (response: FetchResponse) => {
-  const calls: Call[] = []
-  const client = createApiClient({
-    baseUrl: 'http://nas:8484/',
-    fetch: async (url, init) => {
-      calls.push({ url, init })
-      return response
-    },
-  })
-  return { client, calls }
-}
 
 describe('account API client', () => {
   it('reads public configuration and preserves structured refusals', async () => {
@@ -451,24 +424,6 @@ describe('createApiClient', () => {
     ])
   })
 
-  it('reads remote access and sends a change, which the server checks again', async () => {
-    const state = {
-      settings: { ...DEFAULT_REMOTE_ACCESS_SETTINGS, isEnabled: true },
-      privateAddress: null,
-      publicOrigin: null,
-      status: { state: REMOTE_ACCESS_STATES.unconfigured },
-    }
-    const { client, calls } = clientReturning(respond({ body: state }))
-    await expect(client.getRemoteAccess()).resolves.toEqual(state)
-    await expect(client.setRemoteAccess({ publicPort: 8443 })).resolves.toEqual(state)
-    expect(calls.map((call) => [call.url, call.init?.method, call.init?.body])).toEqual([
-      ['http://nas:8484/api/remote-access', 'GET', undefined],
-      ['http://nas:8484/api/remote-access', 'PUT', JSON.stringify({ publicPort: 8443 })],
-    ])
-    const { client: broken } = clientReturning(respond({ body: { settings: {} } }))
-    await expect(broken.getRemoteAccess()).rejects.toMatchObject({ status: 502 })
-  })
-
   it('records that a video started playing', async () => {
     const { client, calls } = clientReturning(respond({ status: 204 }))
     await client.recordPlay(6)
@@ -625,9 +580,8 @@ describe('playback calls', () => {
 
   it('fetches the media origins and checks them', async () => {
     const origins: MediaOrigin[] = [{ kind: 'lan', url: 'https://raven.home.example' }]
-    const remote = { limit: 'low720', isOutside: true } as const
-    const { client, calls } = clientReturning(respond({ body: { origins, remote } }))
-    await expect(client.getMediaOrigins()).resolves.toEqual({ origins, remote })
+    const { client, calls } = clientReturning(respond({ body: { origins } }))
+    await expect(client.getMediaOrigins()).resolves.toEqual({ origins, remote: null })
     expect(calls[0]?.url).toBe('http://nas:8484/api/media-origins')
     const { client: broken } = clientReturning(respond({ body: { origins: [{ kind: 'moon' }] } }))
     await expect(broken.getMediaOrigins()).rejects.toMatchObject({ status: 502 })

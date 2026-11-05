@@ -231,7 +231,7 @@ export const musicApi = () => ({
     id === AIRBAG.id ? AIRBAG_LYRICS : NO_LYRICS,
   ),
   getMarkers: jest.fn(async (_id: number) => ({ intro: null, credits: null, chapters: [] })),
-  getMediaOrigins: jest.fn(async () => ({ origins: [] })),
+  getMediaOrigins: jest.fn(async () => ({ origins: [], remote: null })),
   getMediaTicket: jest.fn(async () => ({ ticket: 'tkt.wren', expiresAt: 0 })),
   fileUrl: addresses.fileUrl,
   recordPlay: jest.fn(async (_id: number) => undefined),

@@ -71,7 +71,7 @@ To go back to following `main`, redo step 2 of the normal path and run `update.s
 
 ## Public through Remote Access
 
-raven is public the way Plex is: the router forwards one public port to DSM's reverse proxy, which terminates TLS for a DDNS hostname and proxies to `localhost:8484`. Admin's Remote Access section holds the hostname and the ports and says whether raven is "Fully accessible outside your network" (README, "Remote access"; the design is `docs/superpowers/specs/2026-11-04-raven-remote-access-design.md`). Netlify's copy of the web app proxies `/api` to the public origin through its `RAVEN_API_ORIGIN`.
+raven is public the way Plex is: the router forwards one public port to DSM's reverse proxy, which terminates TLS for a DDNS hostname and proxies to `localhost:8484`. Admin's Remote Access section holds the hostname and the ports and says whether raven is "Fully accessible outside your network" (README, "Remote access"; the design is `docs/superpowers/specs/2026-11-04-raven-remote-access-design.md`). Netlify's copy of the web app proxies `/api` to the public origin, core's `DEFAULT_SERVER_ORIGIN`, which `apps/raven/web/netlify.toml`'s `/api` rule names too (a test checks they match), signed with the site's `RAVEN_PROXY_SECRET`, which Vhagar's `.env` holds as well; the same secret signs raven's reachability check, which stays `unchecked` without it.
 
 Going public is the user's call, every time: it puts every unlocked library on the internet. The router, DDNS, certificate and reverse proxy steps are the user's to do in DSM and the router; never do them from here. Before it, `.env` needs `ADMIN_PASSWORD` (check with `ssh vhagar "grep -c '^ADMIN_PASSWORD=.' /volume1/docker/raven/.env"`) unless accounts are `ready`, or the admin lock holds for the owner too. Check from the Mac once it is set up:
 
@@ -81,7 +81,7 @@ curl -s https://<name>.synology.me:<port>/api/health
 
 To take raven off the internet: untick Enable in Admin, Remote Access, and remove the router's port forward.
 
-A box that still runs the old Funnel sidecar (`raven-tailscale`, from before Remote Access) is cleaned up once Remote Access answers and Netlify's `RAVEN_API_ORIGIN` points at the public origin: `$nas sudo vhagar 'cd /volume1/docker/raven && docker stop raven-tailscale && docker rm raven-tailscale'`, then `ssh vhagar 'rm -rf /volume1/docker/raven/funnel /volume1/docker/raven/tailscale'`, take `TS_AUTHKEY` out of `.env`, and stage the new compose file and `update.sh` (step 2 above). Ask the user before each of these.
+A box that still runs the old Funnel sidecar (`raven-tailscale`, from before Remote Access) is cleaned up once Remote Access answers and the Netlify site deployed with its `/api` rule on the public origin: `$nas sudo vhagar 'cd /volume1/docker/raven && docker stop raven-tailscale && docker rm raven-tailscale'`, then `ssh vhagar 'rm -rf /volume1/docker/raven/funnel /volume1/docker/raven/tailscale'`, take `TS_AUTHKEY` out of `.env`, and stage the new compose file and `update.sh` (step 2 above). Ask the user before each of these.
 
 ## Roll back
 

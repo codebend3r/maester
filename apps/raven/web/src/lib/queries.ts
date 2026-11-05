@@ -1,4 +1,5 @@
-import { ravenQueriesFor } from '@raven/ui/headless'
+import { queryOptions } from '@tanstack/react-query'
+import { queryKeys, ravenQueriesFor } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 
 export const {
@@ -63,3 +64,9 @@ export const {
   accountQuery,
   membersQuery,
 } = ravenQueriesFor(api)
+
+/** Remote Access for the owner: the settings, the addresses and what the outside check found. */
+export const remoteAccessQuery = queryOptions({
+  queryKey: queryKeys.remoteAccess,
+  queryFn: () => api.getRemoteAccess(),
+})

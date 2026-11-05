@@ -13,7 +13,6 @@ type CheckedAtProps = { at: string }
 export const REMOTE_ACCESS_COPY = {
   heading: 'Remote Access',
   help: 'How raven is reached from outside your home network: a port your router forwards to the NAS, a hostname with a trusted certificate, and how much of your upload a remote viewer may take.',
-  reading: 'Reading remote access',
   route: 'How raven is reached',
   privateLabel: 'Private',
   publicLabel: 'Public',
@@ -44,9 +43,8 @@ export const REMOTE_ACCESS_COPY = {
   checkAgain: 'Check again',
   checking: 'Checking from outside your network',
   checkedAt: ({ at }: CheckedAtProps) => `Checked ${at}.`,
-  saveFailed: 'Could not save: ',
   notForwarded:
-    'Viewers away from home reach raven looking as if they were at home, so their streams are not limited. Add an X-Forwarded-For header to the reverse proxy rule.',
+    "raven can not see the addresses of viewers away from home, so it can not tell them apart or from home. Add an X-Forwarded-For header to the reverse proxy rule, and name the proxy's address in RAVEN_TRUSTED_PROXIES.",
 } as const
 
 /** The status line: what the outside check found, or why it could not look. */
@@ -55,7 +53,7 @@ export const REMOTE_ACCESS_STATUS_COPY = {
   [REMOTE_ACCESS_STATES.unconfigured]:
     'Enter a public hostname and port to reach raven outside your network.',
   [REMOTE_ACCESS_STATES.unchecked]:
-    'raven cannot check from outside your network: set RAVEN_WEB_URL on the server.',
+    'raven cannot check from outside your network: set RAVEN_WEB_URL and RAVEN_PROXY_SECRET on the server.',
   [REMOTE_ACCESS_STATES.reachable]: 'Fully accessible outside your network',
   [REMOTE_ACCESS_STATES.unreachable]: 'Not reachable outside your network',
 } as const satisfies Record<RemoteAccessStatus['state'], string>

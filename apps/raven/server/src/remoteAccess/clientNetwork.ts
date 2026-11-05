@@ -1,27 +1,47 @@
 import { isPrivateAddress } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
-import { RAVEN_HEADERS } from '@/http'
-
-type ClientAddressOfProps = { request: Pick<FastifyRequest, 'ip' | 'headers'> }
+import { RAVEN_HEADERS, headerOf } from '@/http'
 
 /**
- * Where a request came from, as far as raven can trust it. A socket on a
- * public address is the client itself. A socket on a private one is the LAN,
- * or the reverse proxy and Docker's bridge in front of raven, so the last
- * `X-Forwarded-For` entry wins: the one the proxy appended for its own peer.
- * Whatever a client writes in the header itself stands before that entry, so
- * it can not pass for a viewer at home.
+ * What raven reads of a request to tell where it came from: Fastify's
+ * proxy-aware `ip` and `ips`, and the headers a proxy forwards. Every reader
+ * of the client's address takes this one shape, so none can lean on a part
+ * of the request the others do not see.
  */
-export const clientAddressOf = ({ request }: ClientAddressOfProps): string => {
-  if (!isPrivateAddress(request.ip)) return request.ip
-  const header = request.headers[RAVEN_HEADERS.forwardedFor]
-  const forwarded = (Array.isArray(header) ? header.join(',') : (header ?? ''))
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter((entry) => entry !== '')
-  return forwarded.at(-1) ?? request.ip
-}
+export type ClientRequest = Pick<FastifyRequest, 'ip' | 'ips' | 'headers'>
 
-/** Whether a request comes from the home network: not from the internet, and not through Netlify's proxy. */
-export const isLanRequest = ({ request }: ClientAddressOfProps): boolean =>
-  isPrivateAddress(clientAddressOf({ request }))
+type ClientRequestProps = { request: ClientRequest }
+
+/**
+ * Where a request came from, as far as raven can trust it. Fastify's
+ * `trustProxy` (`RAVEN_TRUSTED_PROXIES`) has already walked
+ * `X-Forwarded-For` from the right past the trusted proxies, so `ip` is the
+ * first address no trusted proxy stands for: the socket itself when it is
+ * not one of them, whatever the header says.
+ */
+export const clientAddressOf = ({ request }: ClientRequestProps): string => request.ip
+
+/**
+ * Whether a trusted proxy vouched for the client's address: Fastify's `ips`
+ * holds the socket and each address the trusted hops forwarded, so more than
+ * one means raven sees past its proxy.
+ */
+export const isAddressForwarded = ({ request }: ClientRequestProps): boolean =>
+  (request.ips?.length ?? 0) > 1
+
+const hasForwardedHeader = ({ request }: ClientRequestProps): boolean =>
+  headerOf(request.headers[RAVEN_HEADERS.forwardedFor])
+    .split(',')
+    .some((entry) => entry.trim() !== '')
+
+/**
+ * Whether a request comes from the home network: a private address raven
+ * can stand behind. A private socket that forwards an `X-Forwarded-For`
+ * raven was not told to trust is a proxy raven can not see past, so it is
+ * taken for the internet, never for home.
+ */
+export const isLanRequest = ({ request }: ClientRequestProps): boolean => {
+  const address = clientAddressOf({ request })
+  if (!isPrivateAddress(address)) return false
+  return !hasForwardedHeader({ request }) || isAddressForwarded({ request })
+}

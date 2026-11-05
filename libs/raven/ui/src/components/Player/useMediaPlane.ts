@@ -28,13 +28,13 @@ export const useMediaPlane = ({
   reprobe,
   isEnabled = true,
 }: UseMediaPlaneProps): MediaPlane => {
-  const pick = useMediaOrigin((state) => state.pick)
+  const origin = useMediaOrigin((state) => state.pick?.origin ?? null)
   const ticket = useQuery({
     ...playerQueriesFor(api).mediaTicket(mediaId),
-    enabled: pick !== null && isEnabled,
+    enabled: origin !== null && isEnabled,
   })
-  const kind = pick?.origin.kind ?? null
-  const url = pick?.origin.url ?? null
+  const kind = origin?.kind ?? null
+  const url = origin?.url ?? null
   const ticketValue = ticket.data?.ticket ?? null
   const access = useMemo<MediaAccess | null>(
     () => (kind && url && ticketValue ? { origin: { kind, url }, ticket: ticketValue } : null),

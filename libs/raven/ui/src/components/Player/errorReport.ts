@@ -179,6 +179,13 @@ const trackFacts = ({
   }
 }
 
+/** Where the picture was picked to play from, and when; null when it plays through the web host. */
+const originFacts = (pick: MediaPick | null): PlaybackDiagnostics['origin'] => {
+  const origin = pick?.origin ?? null
+  if (pick === null || origin === null) return null
+  return { kind: origin.kind, url: origin.url, pickedAt: new Date(pick.at).toISOString() }
+}
+
 type GatherDiagnosticsProps = {
   title: string
   problems: string[]
@@ -216,11 +223,7 @@ export const gatherDiagnostics = ({
       canPlay: browserCanPlay,
       canStream: browserCanStream,
     }),
-    origin: pick && {
-      kind: pick.origin.kind,
-      url: pick.origin.url,
-      pickedAt: new Date(pick.at).toISOString(),
-    },
+    origin: originFacts(pick),
     isProbingOrigins,
     device: readDevice(),
     app: {

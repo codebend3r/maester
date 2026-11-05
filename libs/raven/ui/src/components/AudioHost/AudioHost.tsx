@@ -60,7 +60,7 @@ type UseTrackSourceProps = {
  * reloads mid-track; once they have failed it plays from its file.
  */
 const useTrackSource = ({ api, track, reprobe }: UseTrackSourceProps): string | null => {
-  const pick = useMediaOrigin((state) => state.pick)
+  const origin = useMediaOrigin((state) => state.pick?.origin ?? null)
   const queries = useMemo(() => ravenQueriesFor(api), [api])
   const libraries = useQuery({ ...queries.librariesQuery, enabled: track !== null })
   const kbps = useTrackBitrate({ api, track })
@@ -71,7 +71,7 @@ const useTrackSource = ({ api, track, reprobe }: UseTrackSourceProps): string | 
     isEnabled: track !== null,
   })
   if (track === null || libraries.isPending) return null
-  if (pick !== null && plane.access === null) return null
+  if (origin !== null && plane.access === null) return null
   if (kbps === null) return api.fileUrl({ id: track.id, access: plane.access })
   return api.transcodeUrl({ mediaId: track.id, kbps, access: plane.access })
 }

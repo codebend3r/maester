@@ -7,21 +7,24 @@ import {
   MEDIA_PROBE_BYTES,
   type MediaOrigin,
   type MediaOrigins,
+  type RemoteAccessSettings,
   publicOriginOf,
   remoteQualityFor,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS, wholeNumber, CACHE_POLICIES } from '@shared/server'
-import type { FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyReply } from 'fastify'
 import { OpenToAnyone } from '@/auth/accountGuard'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { Public } from '@/lock/lockGuard'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MediaTickets } from '@/media/mediaTickets'
-import { isLanRequest } from '@/remoteAccess/clientNetwork'
+import { type ClientRequest, isLanRequest } from '@/remoteAccess/clientNetwork'
 import { SettingsRepository } from '@/settings/settingsRepository'
 
 const MAX_PROBE_BYTES = 1_048_576
+
+type OriginsProps = { remoteAccess: RemoteAccessSettings }
 
 /**
  * Where a browser may fetch media from directly, and the speed probe it
@@ -51,21 +54,22 @@ export class MediaOriginsController {
 
   @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
   @Get()
-  list(@Req() request: Pick<FastifyRequest, 'ip' | 'headers'>): MediaOrigins {
+  list(@Req() request: ClientRequest): MediaOrigins {
     const isOffered = this.auth.state === AUTH_CONFIG_STATES.ready || this.tickets.isOn
+    const remoteAccess = this.settings.remoteAccess()
     return {
-      origins: isOffered ? this.origins() : [],
+      origins: isOffered ? this.origins({ remoteAccess }) : [],
       // Every viewer learns the remote limit, so a player away from home asks for a transcode at it.
       remote: {
-        limit: remoteQualityFor(this.settings.remoteAccess()),
+        limit: remoteQualityFor(remoteAccess),
         isOutside: !isLanRequest({ request }),
       },
     }
   }
 
-  private origins(): MediaOrigin[] {
+  private origins({ remoteAccess }: OriginsProps): MediaOrigin[] {
     const listed = this.config.mediaPlane.origins
-    const url = publicOriginOf(this.settings.remoteAccess())
+    const url = publicOriginOf(remoteAccess)
     const isListed = listed.some((origin) => origin.url === url)
     return url === null || isListed ? listed : [...listed, { kind: MEDIA_ORIGIN_KINDS.public, url }]
   }

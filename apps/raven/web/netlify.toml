@@ -2,9 +2,9 @@
 # (README, "Remote access").
 # The site's package directory is apps/raven/web and its base directory the
 # repo root, where bun.lock is: Netlify installs and builds there, so the
-# paths below are from the root. RAVEN_API_ORIGIN, set in the site's
-# environment variables, names raven's public origin to the build and the
-# functions (vite.config.ts); the /api proxy below goes to the same origin.
+# paths below are from the root. raven's public origin is core's
+# DEFAULT_SERVER_ORIGIN: the build (vite.config.ts) and the pictures function
+# read it there, and netlifyToml.test.ts checks the /api proxy below names it.
 
 [build]
 command = "bash apps/raven/netlify-build.sh"
@@ -14,9 +14,9 @@ publish = "apps/raven/web/dist"
 ignore = "bash apps/raven/netlify-ignore.sh apps/raven/web apps/raven/netlify-build.sh libs/raven/core libs/raven/ui scripts/bump_version.sh"
 
 # The functions, bundled by Netlify after the build: each is the file named after its
-# folder, so a test beside it is never bundled. RAVEN_API_ORIGIN is scoped to them too,
-# for the pictures function. The reachability function checks Remote Access from outside
-# the home network, at /remote-access/check.
+# folder, so a test beside it is never bundled. The reachability function checks Remote
+# Access from outside the home network, at /remote-access/check, and RAVEN_PROXY_SECRET
+# (scoped to Runtime, so functions read it too) verifies that raven asked.
 [functions]
 directory = "apps/raven/web/netlify/functions"
 

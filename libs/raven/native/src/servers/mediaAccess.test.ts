@@ -42,16 +42,11 @@ import {
 /** The token of the account signed in; the tests never read what it says. */
 const ACCOUNT_TOKEN = 'token.signed-in'
 
-const BUSBOYS = { id: 20, bitrate: null }
-/** A 4K remux at 60 Mb/s, over every remote limit. */
-const HEAVY = { id: 20, bitrate: 60_000_000 }
-/** A small file at 1.5 Mb/s, under every remote limit but the smallest. */
-const LIGHT = { id: 20, bitrate: 1_500_000 }
+const BUSBOYS = { id: 20 }
 const READ_AT = 1_000_000
 /** The sizes a cap asks a transcode for, typed so a name `STREAM_QUALITIES` lacks fails the check. */
 const LOW_1080: StreamQuality = 'low1080'
 const LOW_720: StreamQuality = 'low720'
-const HIGH_1080: StreamQuality = 'high1080'
 const MEDIUM_720: StreamQuality = 'medium720'
 
 const QUICK_LAN = { [LAN.url]: 20, [PUBLIC.url]: 200 }
@@ -242,62 +237,14 @@ describe('mediaAccessFor', () => {
     expect(qualityOf(await media.source(remux))).toBeNull()
   })
 
-  it('asks a transcode from the public origin for the remote limit when the file is over it', async () => {
+  it('asks only the away cap, never the remote limit, which the server applies itself', async () => {
     const remote = { limit: MEDIUM_720, isOutside: true }
-    const { media } = setUp({ server: mediaServer({ remote }), elapsedMs: AWAY })
-    expect(qualityOf(await media.source({ ...transcode, media: HEAVY }))).toBe(MEDIUM_720)
-  })
-
-  it('asks the one of the away cap and the remote limit with the fewer bits', async () => {
-    const remote = { limit: HIGH_1080, isOutside: true }
-    const { media, away } = setUp({ server: mediaServer({ remote }), elapsedMs: AWAY })
-    expect(qualityOf(await media.source({ ...transcode, media: HEAVY }))).toBe(LOW_1080)
-    away.maxHeight = MAX_HEIGHTS.uhd
-    expect(qualityOf(await media.source({ ...transcode, media: HEAVY }))).toBe(HIGH_1080)
-    const tight = setUp({
-      server: mediaServer({ remote: { limit: MEDIUM_720, isOutside: true } }),
-      elapsedMs: AWAY,
-    })
-    expect(qualityOf(await tight.media.source({ ...transcode, media: HEAVY }))).toBe(MEDIUM_720)
-  })
-
-  it('asks the away cap alone for a file under the remote limit, and nothing at 4K', async () => {
-    const remote = { limit: MEDIUM_720, isOutside: true }
-    const { media, away } = setUp({ server: mediaServer({ remote }), elapsedMs: AWAY })
-    expect(qualityOf(await media.source({ ...transcode, media: LIGHT }))).toBe(LOW_1080)
-    away.maxHeight = MAX_HEIGHTS.uhd
-    expect(qualityOf(await media.source({ ...transcode, media: LIGHT }))).toBeNull()
-  })
-
-  it('asks no remote limit from a LAN origin, however heavy the file', async () => {
-    const remote = { limit: MEDIUM_720, isOutside: true }
-    const { media } = setUp({ server: mediaServer({ remote }) })
-    const outcome = await media.source({ ...transcode, media: HEAVY })
-    expect(sourceOf(outcome).uri.startsWith(`${LAN.url}/`)).toBe(true)
-    expect(qualityOf(outcome)).toBeNull()
-  })
-
-  it("holds a transcode from the server's own address to the remote limit and the cap when the device is outside", async () => {
-    const outside = setUp({
-      server: mediaServer({
-        origins: [],
-        remote: { limit: MEDIUM_720, isOutside: true },
-      }),
-      accessToken: ACCOUNT_TOKEN,
-    })
-    const outcome = await outside.media.source({ ...transcode, media: HEAVY })
+    const away = setUp({ server: mediaServer({ remote }), elapsedMs: AWAY })
+    expect(qualityOf(await away.media.source(transcode))).toBe(LOW_1080)
+    const own = setUp({ server: mediaServer({ origins: [], remote }), accessToken: ACCOUNT_TOKEN })
+    const outcome = await own.media.source(transcode)
     expect(sourceOf(outcome).uri.startsWith(`${NAS.origin}/`)).toBe(true)
-    expect(qualityOf(outcome)).toBe(MEDIUM_720)
-    outside.away.maxHeight = MAX_HEIGHTS.hd
-    expect(qualityOf(await outside.media.source({ ...transcode, media: LIGHT }))).toBe(LOW_720)
-    const inside = setUp({
-      server: mediaServer({
-        origins: [],
-        remote: { limit: MEDIUM_720, isOutside: false },
-      }),
-      accessToken: ACCOUNT_TOKEN,
-    })
-    expect(qualityOf(await inside.media.source({ ...transcode, media: HEAVY }))).toBeNull()
+    expect(qualityOf(outcome)).toBeNull()
   })
 
   it('tells the plan the kind of origin a video plays from and what the server said of remote play', async () => {

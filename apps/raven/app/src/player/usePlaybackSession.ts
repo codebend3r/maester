@@ -298,7 +298,7 @@ export const isOpeningOf = (state: SessionState): boolean =>
   state.phase === SESSION_PHASES.sourcing || state.phase === SESSION_PHASES.loading
 
 type UsePlaybackSessionProps = {
-  media: Pick<MediaItem, 'id' | 'bitrate'>
+  media: Pick<MediaItem, 'id'>
   modes: readonly PlaybackMode[]
   at: number
   audio: number | null

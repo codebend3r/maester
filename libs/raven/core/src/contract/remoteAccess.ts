@@ -1,4 +1,5 @@
 import { isStreamQuality } from '@/contract/streaming'
+import { fromQueryString, toQueryString } from '@/query'
 import {
   type Infer,
   exactPartial,
@@ -26,7 +27,23 @@ export const REMOTE_ACCESS_PARAMS = { nonce: 'nonce' } as const
 export const REACHABILITY_CHECK_PATH = '/remote-access/check'
 
 /** The query keys of the reachability check. */
-export const REACHABILITY_PARAMS = { host: 'host', port: 'port', nonce: 'nonce' } as const
+export const REACHABILITY_PARAMS = {
+  host: 'host',
+  port: 'port',
+  nonce: 'nonce',
+  signature: 'signature',
+} as const
+
+/**
+ * How long each side of a reachability check waits: the function for raven's
+ * echo, raven for the function (the function's wait and then some), and how
+ * long a check's nonce opens the echo (raven's wait and then some).
+ */
+export const REACHABILITY_TIMINGS = {
+  targetTimeoutMs: 8_000,
+  checkTimeoutMs: 15_000,
+  nonceMs: 30_000,
+} as const
 
 /** The numbers a TCP port can be. */
 export const PORT_RANGE = { min: 1, max: 65_535 } as const
@@ -174,3 +191,46 @@ export type RemoteAccessState = Infer<typeof isRemoteAccessState>
 
 /** A check's nonce: 16 random bytes in base64url without padding. */
 export const isEchoNonce = matching(/^[A-Za-z0-9_-]{22}$/)
+
+/** A check's signature: the HMAC-SHA256 of its nonce, as 64 lower case hex digits. */
+export const isCheckSignature = matching(/^[0-9a-f]{64}$/)
+
+/** What raven asks the reachability function: where to look, the nonce its echo holds, and the nonce's signature. */
+export const isReachabilityQuery = object({
+  host: isPublicHostname,
+  port: isPort,
+  nonce: isEchoNonce,
+  signature: isCheckSignature,
+})
+
+export type ReachabilityQuery = Infer<typeof isReachabilityQuery>
+
+/** The query string raven sends the reachability function, without its `?`. */
+export const reachabilityQueryString = ({
+  host,
+  port,
+  nonce,
+  signature,
+}: ReachabilityQuery): string =>
+  toQueryString({
+    [REACHABILITY_PARAMS.host]: host,
+    [REACHABILITY_PARAMS.port]: String(port),
+    [REACHABILITY_PARAMS.nonce]: nonce,
+    [REACHABILITY_PARAMS.signature]: signature,
+  })
+
+/** A port as a query writes it: plain decimal digits, never hex, an exponent or a sign. */
+const PORT_DIGITS = /^\d{1,5}$/
+
+/** The reachability query in a URL's search (with its `?` or without), or null when any part is missing or malformed. */
+export const readReachabilityQuery = (search: string): ReachabilityQuery | null => {
+  const params = fromQueryString(search)
+  const portText = params[REACHABILITY_PARAMS.port] ?? ''
+  const query = {
+    host: params[REACHABILITY_PARAMS.host],
+    port: PORT_DIGITS.test(portText) ? Number(portText) : Number.NaN,
+    nonce: params[REACHABILITY_PARAMS.nonce],
+    signature: params[REACHABILITY_PARAMS.signature],
+  }
+  return isReachabilityQuery(query) ? query : null
+}

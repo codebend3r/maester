@@ -9,7 +9,7 @@ import {
   ApiError,
   type ApiClient,
   LOCKED_STATUS,
-  isAwayPlay,
+  MEDIA_ORIGIN_KINDS,
   MEDIA_PROBE_BYTES,
   MEDIA_PROBE_TIMEOUT_MS,
   MEDIA_TICKET_PARAM,
@@ -18,15 +18,16 @@ import {
   type TicketedOrigin,
   type MediaItem,
   type MediaOrigin,
+  type MediaOriginsAnswer,
   type OriginProbe,
   PLAYBACK_MODES,
   type PlaybackMode,
-  type RemotePlayback,
+  type PlayNetwork,
+  AT_HOME,
   STREAM_QUALITIES,
   type StreamQuality,
   isStreamQuality,
   pickOrigin,
-  remoteTranscodeFor,
   serverOriginOf,
   ticketRenewAt,
   toQueryString,
@@ -38,20 +39,11 @@ import { cookieHeadersFor } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
 import { TICKETS_OFF_STATUS } from '@/servers/tickets'
 
-/** What the server said of remote play: null from one that says nothing, or cannot be read. */
-type RemoteWord = RemotePlayback | null
+/** The origin picked to play from, null for none, and the server's word on remote play (null when it says nothing). */
+type Picked = Pick<PlayNetwork, 'remote'> & { origin: MediaOrigin | null }
 
-/** The origins the server lists, and its word on remote play. */
-type Listed = { listed: MediaOrigin[]; remote: RemoteWord }
-
-/** The origin picked to play from, null for none, and the server's word on remote play. */
-type Picked = { origin: MediaOrigin | null; remote: RemoteWord }
-
-/** Where one piece of media is placed: the origin and ticket `access` names, or the server's own address (null). */
-type Placed = { access: MediaAccess | null; remote: RemoteWord }
-
-/** The play nothing could be read for: the server's own address, held to nothing. */
-export const AT_HOME: PlayNetwork = { origin: null, remote: null }
+/** What a server whose origins cannot be read lists: nothing, and no word on remote play. */
+const NOTHING_LISTED: MediaOriginsAnswer = { origins: [], remote: null }
 
 type ProbeFetchProps = {
   url: string
@@ -79,8 +71,7 @@ export type SourceOutcome = { ok: true; source: PlayerSource } | AccessRefusal
 
 /** A video to play and how: direct is the file itself, remux and transcode the HLS master playlist. */
 export type SourceRequest = {
-  /** The video, with its bitrate, which a transcode away from home is held under. */
-  media: Pick<MediaItem, 'id' | 'bitrate'>
+  media: Pick<MediaItem, 'id'>
   mode: PlaybackMode
   audio: number | null
   /** A transcode's picture subtitle to burn into the picture, by track id; null for none. */
@@ -97,19 +88,6 @@ export type SourceRequest = {
 const awayQualityOf = (maxHeight: MaxHeight): StreamQuality | null =>
   isStreamQuality.values
     .filter((key) => STREAM_QUALITIES[key].height === maxHeight)
-    .toSorted((a, b) => STREAM_QUALITIES[a].bitrate - STREAM_QUALITIES[b].bitrate)[0] ?? null
-
-/**
- * Where a video plays from, as core's `planForNetwork` and `remoteTranscodeFor` read it: the
- * kind of the media origin in use (null for the server's own address) and what the server said
- * of remote play (null from one that says nothing).
- */
-export type PlayNetwork = Pick<Parameters<typeof remoteTranscodeFor>[0], 'origin' | 'remote'>
-
-/** The size with the fewest bits; null when none holds anything back. */
-const fewestBitsOf = (qualities: readonly (StreamQuality | null)[]): StreamQuality | null =>
-  qualities
-    .filter((quality) => quality !== null)
     .toSorted((a, b) => STREAM_QUALITIES[a].bitrate - STREAM_QUALITIES[b].bitrate)[0] ?? null
 
 /** A track to play: the file itself (`kbps` null), or the server's AAC transcode of it at `kbps`. */
@@ -201,9 +179,6 @@ type Access =
   | { kind: typeof ACCESS_WAYS.cookies }
   | { kind: typeof ACCESS_WAYS.refused; refusal: AccessRefusal }
 
-/** How one video is reached, and the server's word on remote play. */
-type Reach = { access: Access; remote: RemoteWord }
-
 type AccessRefusalProps = {
   reason: AccessRefusalReason
   server: AppServer
@@ -289,11 +264,10 @@ type MediaAccessForProps = {
  * ticket is read per video and renewed `TICKET_RENEW_MS` after it was read, inside an account ticket's five minutes,, by `now`. A
  * server that lists no origin, has none answering, or hands out no ticket (the 503 of one
  * without `RAVEN_MEDIA_SECRET`) plays from its own address with its cookies as headers, which
- * `cookieHeadersFor` gives only to its own API. A transcode away from home (from the `public`
- * origin, or from the server's own address when the server says the device is outside) asks
- * for whichever has the fewer bits of the size `awayMaxHeight` reads at the moment, Settings'
- * cap, and the server's remote limit for a file over it; `networkFor` tells the plan where the
- * play is. A signed-in
+ * `cookieHeadersFor` gives only to its own API. A transcode from the `public` origin, away
+ * from home, asks for the size `awayMaxHeight` reads at the moment, Settings' cap; the server
+ * holds every transcode away from home to its remote limit itself. `networkFor` tells the plan
+ * where the play is. A signed-in
  * account (`readAccessToken`) that has no origin to play from plays from the server's own
  * address by its ticket, never by its Bearer, and a ticket the server refuses it (`401`, `403`)
  * is the account's refusal in core's words. Nothing here logs: a ticket is only ever in the
@@ -331,12 +305,9 @@ export const mediaAccessFor = ({
 
   /** Never rejects: a server that lists nothing readable, or whose origins all fail, picks none. */
   const pickFor = async (): Promise<Picked> => {
-    const { listed, remote } = await api.getMediaOrigins().then(
-      (answer): Listed => ({ listed: answer.origins, remote: answer.remote ?? null }),
-      (): Listed => ({ listed: [], remote: null }),
-    )
+    const { origins, remote } = await api.getMediaOrigins().catch(() => NOTHING_LISTED)
     // The server's word is never taken as it comes: React Native's `fetch` reads `file:` too.
-    const trusted = listed.flatMap((origin) => {
+    const trusted = origins.flatMap((origin) => {
       const url = serverOriginOf(origin.url)
       return url === null ? [] : [{ kind: origin.kind, url }]
     })
@@ -394,28 +365,21 @@ export const mediaAccessFor = ({
     return readTicket(mediaId)
   }
 
-  type TranscodeQualityOfProps = { media: SourceRequest['media']; network: PlayNetwork }
-
-  /**
-   * A transcode's size. Away from home it is whichever of Settings' cap and the server's remote
-   * limit (core's `remoteTranscodeFor`, for a file over it) has the fewer bits, so the device
-   * never asks for more than the server would send; at home, or with neither, the server's own.
-   */
-  const transcodeQualityOf = ({ media, network }: TranscodeQualityOfProps): StreamQuality | null =>
-    isAwayPlay(network)
-      ? fewestBitsOf([awayQualityOf(awayMaxHeight()), remoteTranscodeFor({ media, ...network })])
+  /** A transcode's size: capped away from home, from the `public` origin, and else the server's. */
+  const transcodeQualityOf = (access: MediaAccess | null): StreamQuality | null =>
+    access !== null && access.origin.kind === MEDIA_ORIGIN_KINDS.public
+      ? awayQualityOf(awayMaxHeight())
       : null
 
   /** The address one piece of media is at, on the origin `access` names or on the server's own. */
-  type UriOf = (placed: Placed) => string
+  type UriOf = (access: MediaAccess | null) => string
 
   type UriForProps = {
     request: SourceRequest
-    placed: Placed
+    access: MediaAccess | null
   }
 
-  const uriFor = ({ request: { media, mode, audio, burn }, placed }: UriForProps): string => {
-    const { access, remote } = placed
+  const uriFor = ({ request: { media, mode, audio, burn }, access }: UriForProps): string => {
     switch (mode) {
       case PLAYBACK_MODES.direct:
         return api.fileUrl({ id: media.id, access })
@@ -426,10 +390,7 @@ export const mediaAccessFor = ({
           id: media.id,
           mode,
           audio,
-          quality: transcodeQualityOf({
-            media,
-            network: { origin: access?.origin ?? null, remote },
-          }),
+          quality: transcodeQualityOf(access),
           access,
           burn,
         })
@@ -442,15 +403,13 @@ export const mediaAccessFor = ({
 
   const trackUriOf =
     ({ mediaId, kbps }: TrackRequest): UriOf =>
-    ({ access }) =>
+    (access) =>
       kbps === null
         ? api.fileUrl({ id: mediaId, access })
         : api.transcodeUrl({ mediaId, kbps, access })
 
-  type CookieSourceProps = { uriOf: UriOf; remote: RemoteWord }
-
-  const cookieSource = async ({ uriOf, remote }: CookieSourceProps): Promise<SourceOutcome> => {
-    const uri = uriOf({ access: null, remote })
+  const cookieSource = async (uriOf: UriOf): Promise<SourceOutcome> => {
+    const uri = uriOf(null)
     const headers = cookieHeadersFor({
       server,
       cookies: await readCookies(),
@@ -488,27 +447,17 @@ export const mediaAccessFor = ({
 
   type SourceForProps = { mediaId: number; uriOf: UriOf }
 
-  /** How one video is reached, and what the server said of remote play, from the same pick. */
-  const reachOf = async (mediaId: number): Promise<Reach> => {
-    const [access, { remote }] = await Promise.all([accessOf(mediaId), pickOf()])
-    return { access, remote }
-  }
-
   const sourceFor = async ({ mediaId, uriOf }: SourceForProps): Promise<SourceOutcome> => {
-    const { access, remote } = await reachOf(mediaId)
+    const access = await accessOf(mediaId)
     switch (access.kind) {
       case ACCESS_WAYS.refused:
         return access.refusal
       case ACCESS_WAYS.cookies:
-        return cookieSource({ uriOf, remote })
+        return cookieSource(uriOf)
       case ACCESS_WAYS.ownAddress:
-        return ticketedSource({
-          uri: withTicket({ uri: uriOf({ access: null, remote }), ticket: access.ticket }),
-        })
+        return ticketedSource({ uri: withTicket({ uri: uriOf(null), ticket: access.ticket }) })
       case ACCESS_WAYS.origin:
-        return ticketedSource({
-          uri: uriOf({ access: { origin: access.origin, ticket: access.ticket }, remote }),
-        })
+        return ticketedSource({ uri: uriOf({ origin: access.origin, ticket: access.ticket }) })
       default: {
         const unreachable: never = access
         return unreachable
@@ -534,8 +483,9 @@ export const mediaAccessFor = ({
     }
   }
 
+  /** Where a video plays from, by the same pick and ticket as its source, and what the server said of remote play. */
   const networkFor = async (mediaId: number): Promise<PlayNetwork> => {
-    const { access, remote } = await reachOf(mediaId)
+    const [access, { remote }] = await Promise.all([accessOf(mediaId), pickOf()])
     return {
       origin: access.kind === ACCESS_WAYS.origin ? { kind: access.origin.kind } : null,
       remote,
@@ -551,7 +501,7 @@ export const mediaAccessFor = ({
     source: (request) =>
       outcomeOf({
         mediaId: request.media.id,
-        uriOf: (placed) => uriFor({ request, placed }),
+        uriOf: (access) => uriFor({ request, access }),
       }),
     trackSource: (request) => outcomeOf({ mediaId: request.mediaId, uriOf: trackUriOf(request) }),
     subtitleAccess: (mediaId) => subtitleAccess(mediaId).catch(() => null),

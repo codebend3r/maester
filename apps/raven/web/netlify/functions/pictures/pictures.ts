@@ -1,5 +1,4 @@
-/** Where raven is: the site's environment variable, scoped to builds and functions. */
-const ENV = { apiOrigin: 'RAVEN_API_ORIGIN' } as const
+import { DEFAULT_SERVER_ORIGIN } from '@raven/core'
 
 const HEADERS = {
   cacheControl: 'cache-control',
@@ -28,8 +27,8 @@ type FetchUpstream = (url: URL, init: UpstreamInit) => Promise<Response>
 
 type ProxyPictureProps = {
   request: Request
-  /** raven's origin, or undefined when the site does not give functions one. */
-  origin: string | undefined
+  /** raven's public origin, the one `netlify.toml` proxies /api to. */
+  origin: string
   fetchUpstream: FetchUpstream
 }
 
@@ -46,10 +45,6 @@ export const proxyPicture = async ({
   origin,
   fetchUpstream,
 }: ProxyPictureProps): Promise<Response> => {
-  if (!origin) {
-    console.error(`${ENV.apiOrigin} is not set for functions`)
-    return new Response(null, { status: 502 })
-  }
   // The path alone: no query string reaches raven or splits the cache.
   const { pathname } = new URL(request.url)
   const upstream = await fetchUpstream(new URL(pathname, origin), { method: request.method })
@@ -74,7 +69,7 @@ export const proxyPicture = async ({
 
 // Netlify runs a function through its default export and routes by `config`.
 export default (request: Request): Promise<Response> =>
-  proxyPicture({ request, origin: process.env[ENV.apiOrigin], fetchUpstream: fetch })
+  proxyPicture({ request, origin: DEFAULT_SERVER_ORIGIN, fetchUpstream: fetch })
 
 /** Ahead of the `/api/*` proxy in `netlify.toml`, which still carries every other call. */
 export const config = { path: '/api/pictures/*', method: ['GET', 'HEAD'] }

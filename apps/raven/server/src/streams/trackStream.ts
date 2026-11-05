@@ -2,14 +2,12 @@ import type { PlaybackMode, StreamPurpose, StreamQuality } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import { type AuthSessions, accountOf } from '@/auth/authSessions'
-import { RAVEN_HEADERS } from '@/http'
+import { RAVEN_HEADERS, headerOf } from '@/http'
+import { clientAddressOf } from '@/remoteAccess/clientNetwork'
 import type { StreamClient, StreamSessions } from '@/streams/streamSessions'
 
 /** The events of a Node response that raven listens for. */
 export const RESPONSE_EVENTS = { close: 'close' } as const
-
-const headerOf = (value: string | string[] | undefined): string =>
-  (Array.isArray(value) ? value[0] : value) ?? ''
 
 type ClientOfProps = {
   request: FastifyRequest
@@ -17,16 +15,15 @@ type ClientOfProps = {
 }
 
 /**
- * Who sent a request. Behind a proxy the socket is the proxy's, so the first
- * address it forwards wins; the header is the client's to set, which is
- * fine for a label on the admin's Streams page and for nothing else. The
- * viewer is the account the gate bound to the request, never a header's.
+ * Who sent a request: the address raven trusts (`clientAddressOf`), past
+ * the proxies `RAVEN_TRUSTED_PROXIES` names, never a place in a header the
+ * client wrote. The viewer is the account the gate bound to the request,
+ * never a header's.
  */
 export const clientOf = ({ request, auth }: ClientOfProps): StreamClient => {
   const account = accountOf(auth.callerOf({ request }))
   return {
-    address:
-      headerOf(request.headers[RAVEN_HEADERS.forwardedFor]).split(',')[0]?.trim() || request.ip,
+    address: clientAddressOf({ request }),
     userAgent: headerOf(request.headers[RAVEN_HEADERS.userAgent]),
     viewer: account == null ? null : { id: account.id, email: account.email },
   }
