@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import { cleanup, screen, within } from '@testing-library/react'
 import { MediaTiles } from '@/components/MediaTiles/MediaTiles'
+import styles from '@/components/MediaTiles/MediaTiles.module.scss'
 import { POSTER_SIZES } from '@/lib/posters'
 import { itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
 import { atPixelRatio, restorePixelRatio } from '@/test/pixelRatio'
@@ -10,7 +11,7 @@ import { reported } from '@/test/viewport'
 describe('MediaTiles', () => {
   afterEach(restorePixelRatio)
 
-  it('shows each video with its facts and the folder it sits in', () => {
+  it('shows each video with its facts, and leaves out the folder it sits in', () => {
     renderWithProviders({ ui: <MediaTiles items={[mediaItem({ folder: 'Comedy/2026' })]} /> })
     const tile = screen.getByRole('listitem')
     expect(within(tile).getByRole('link', { name: 'Busboys (2026)' })).toHaveAttribute(
@@ -18,10 +19,30 @@ describe('MediaTiles', () => {
       '/watch/7',
     )
     expect(tile).toHaveTextContent('1h 37m')
-    expect(tile).toHaveTextContent('1080p')
-    expect(tile).toHaveTextContent('HEVC')
     expect(tile).toHaveTextContent('1.6 GB')
-    expect(tile).toHaveTextContent('Comedy/2026')
+    expect(tile).not.toHaveTextContent('Comedy/2026')
+  })
+
+  it('chips the resolution, the range and the codec on a line apart from the runtime and size', () => {
+    const media = matchedMovie({ width: 3840, height: 2160, hdr: true, size: 25_400_000_000 })
+    renderWithProviders({ ui: <MediaTiles items={[media]} posters /> })
+    const resolution = screen.getByLabelText('Video resolution: 4K')
+    const range = screen.getByLabelText('HDR')
+    const codec = screen.getByLabelText('Video codec: HEVC')
+    const chips = resolution.closest(`.${styles.chips}`)
+    expect(chips).not.toBeNull()
+    expect(chips).toContainElement(range)
+    expect(chips).toContainElement(codec)
+    const runtime = screen.getByText('1h 37m')
+    expect(chips).not.toContainElement(runtime)
+    expect(runtime.closest(`.${styles.facts}`)).toHaveTextContent('1h 37m25.4 GB')
+  })
+
+  it('says the release day and the version count on their own line, above the chips', () => {
+    const media = matchedMovie({ versions: 2 })
+    renderWithProviders({ ui: <MediaTiles items={[media]} posters /> })
+    const versions = screen.getByText('2 versions')
+    expect(versions.closest(`.${styles.facts}`)).not.toContainElement(screen.getByText('1h 37m'))
   })
 
   it("gives a Movies library's tile a poster no wider than its small column needs", async () => {
@@ -47,7 +68,7 @@ describe('MediaTiles', () => {
     expect(screen.getByRole('link', { name: 'Busboys (2026)' })).toHaveAttribute('href', '/watch/7')
   })
 
-  it('keeps the widths at 3x, where a tile poster 56 px wide needs no more than 185', () => {
+  it('keeps the widths at 3x, where a tile poster 72 px wide needs more than 185', () => {
     atPixelRatio(3)
     const { container } = renderWithProviders({
       ui: <MediaTiles items={[matchedMovie()]} posters />,

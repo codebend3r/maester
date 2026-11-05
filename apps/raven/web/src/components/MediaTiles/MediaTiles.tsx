@@ -6,13 +6,11 @@ import {
   type MediaSort,
   cardLink,
   cardTitle,
-  codecLabel,
   formatBytes,
   formatRuntime,
   mediaEntryKey,
   mediaLabel,
-  rangeLabel,
-  resolutionLabel,
+  pictureParts,
   cardSortFact,
 } from '@raven/core'
 import type { ComponentType } from 'react'
@@ -21,7 +19,7 @@ import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
-import { FactText, WordFact } from '@/components/ResolutionChip/ResolutionChip'
+import { FactParts, FactText } from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
@@ -96,9 +94,17 @@ type MediaTileProps = {
   sort: MediaSort | undefined
 }
 
+type ShownProps = { facts: ReadonlyArray<string | null>; sorted: string | null }
+
+/** The facts worth a word: those with a value, less the one the sorted line says already. */
+const shown = ({ facts, sorted }: ShownProps): string[] =>
+  facts.filter((fact): fact is string => fact != null && fact !== '' && fact !== sorted)
+
 /**
- * One video as a tile: a card with a small thumbnail, or a small poster in
- * a Movies library, beside its facts, and its menu's button in the corner.
+ * One video as a tile: a card with a small thumbnail, or a poster in a
+ * Movies library, beside its facts, and its menu's button in the corner.
+ * The words run title, release day, the picture's chips, then the runtime
+ * and size, each on a line of its own.
  * The picture is a second way to the same place, so it stays out of the tab
  * order and the reading order; the title is the link. A right click on
  * either opens the tile's menu.
@@ -121,15 +127,15 @@ const MediaTile = ({
   const { sorted, isDateSaid } = cardSortFact({ media, sort })
   const isPoster = posters || poster != null
   const TilePicture = TILE_PICTURES[pictureKindOf({ isPoster, thumbnail })]
-  const facts = [
-    posters && date != null && !isDateSaid ? date : null,
-    posters && media.versions > 1 ? MEDIA_TILES_COPY.versions(media.versions) : null,
-    formatRuntime(media.duration),
-    resolutionLabel(media),
-    rangeLabel(media),
-    media.videoCodec ? codecLabel(media.videoCodec) : null,
-    formatBytes(media.size),
-  ].filter((fact): fact is string => fact != null && fact !== sorted)
+  const released = shown({
+    facts: [
+      posters && !isDateSaid ? date : null,
+      posters && media.versions > 1 ? MEDIA_TILES_COPY.versions(media.versions) : null,
+    ],
+    sorted,
+  })
+  const picture = pictureParts(media).filter((part) => part.text !== sorted)
+  const facts = shown({ facts: [formatRuntime(media.duration), formatBytes(media.size)], sorted })
 
   return (
     <li
@@ -176,6 +182,20 @@ const MediaTile = ({
             <FactText fact={sorted} />
           </span>
         )}
+        {released.length > 0 && (
+          <span className={styles.facts}>
+            {released.map((fact) => (
+              <span key={fact} className={styles.fact}>
+                {fact}
+              </span>
+            ))}
+          </span>
+        )}
+        {picture.length > 0 && (
+          <span className={styles.chips}>
+            <FactParts parts={picture} />
+          </span>
+        )}
         <span className={styles.facts}>
           {media.favourite && (
             <span className={styles.fact}>
@@ -184,13 +204,12 @@ const MediaTile = ({
           )}
           {facts.map((fact) => (
             <span key={fact} className={styles.fact}>
-              <WordFact fact={fact} />
+              {fact}
             </span>
           ))}
           <PartlyWatched media={media} />
           <WatchedWords watched={withWatched && media.watched} />
         </span>
-        {media.folder !== '' && <span className={styles.folder}>{media.folder}</span>}
         {posters && media.match === MATCH_STATES.unmatched && (
           <span className={styles.note}>{COMMON_COPY.notMatched}</span>
         )}
