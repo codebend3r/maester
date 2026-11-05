@@ -116,6 +116,8 @@ import { Filmographies } from '@/people/filmographies'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { PlaybackController } from '@/playback/playbackController'
 import { BugReportsController } from '@/reports/bugReportsController'
+import { PlayHistoryController } from '@/history/playHistoryController'
+import { PlayHistoryRepository } from '@/history/playHistoryRepository'
 import { BugReportsRepository } from '@/reports/bugReportsRepository'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { StreamsController } from '@/streams/streamsController'
@@ -173,6 +175,7 @@ export const CONTROLLERS = [
   AdminController,
   StreamsController,
   BugReportsController,
+  PlayHistoryController,
   AuthController,
 ] as const
 
@@ -334,6 +337,7 @@ export class AppModule {
         MediaTickets,
         StreamSessions,
         BugReportsRepository,
+        PlayHistoryRepository,
         // First the account gate: with accounts ready, every route but the open ones needs an account.
         { provide: APP_GUARD, useClass: AccountGuard },
         // Every route passes the lock first; those marked PrivateBy, or on a controller that is, are held.

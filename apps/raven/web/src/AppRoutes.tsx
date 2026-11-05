@@ -21,6 +21,7 @@ import { ShowPage } from '@/pages/ShowPage/ShowPage'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { PendingPage } from '@/pages/PendingPage/PendingPage'
 import { PersonPage } from '@/pages/PersonPage/PersonPage'
+import { PLAY_HISTORY_ROUTES } from '@/lib/playHistory'
 import { lazyPage } from '@/lib/lazyPage'
 import { MUSIC_PATHS, NOW_PLAYING_PATH, PLAYLIST_ROUTE } from '@/lib/music'
 import { MusicShell } from '@/components/MusicShell/MusicShell'
@@ -63,6 +64,12 @@ const MusicLibraryPage = lazyPage(() =>
 )
 const MusicSearchPage = lazyPage(() =>
   import('@/pages/MusicSearchPage/MusicSearchPage').then((page) => page.MusicSearchPage),
+)
+const PlayHistoryPage = lazyPage(() =>
+  import('@/pages/PlayHistoryPage/PlayHistoryPage').then((page) => page.PlayHistoryPage),
+)
+const EveryonesHistoryPage = lazyPage(() =>
+  import('@/pages/PlayHistoryPage/PlayHistoryPage').then((page) => page.EveryonesHistoryPage),
 )
 const StreamsPage = lazyPage(() =>
   import('@/pages/StreamsPage/StreamsPage').then((page) => page.StreamsPage),
@@ -127,6 +134,8 @@ export const AppRoutes = () => {
                 {!isDesktop && <Route path={BINGE_PATH} element={<BingePage />} />}
                 <Route path={CONTINUE_WATCHING_PATH} element={<ContinueWatchingPage />} />
                 <Route path="favourites" element={<FavouritesPage />} />
+                <Route path={PLAY_HISTORY_ROUTES.own} element={<PlayHistoryPage />} />
+                <Route path={PLAY_HISTORY_ROUTES.everyone} element={<EveryonesHistoryPage />} />
                 <Route path="streams" element={<StreamsPage />} />
                 <Route path="reports" element={<BugReportsPage />} />
                 <Route path="settings" element={<SettingsPage />} />

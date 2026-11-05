@@ -12,7 +12,7 @@ import {
   type MediaTicket,
   type MemberStatusChange,
 } from '@/contract'
-import { toQueryString } from '@/query'
+import { fillPath, toQueryString } from '@/query'
 
 type ListMembersProps = { pageSize?: number; pageOffset?: number }
 
@@ -42,7 +42,7 @@ export const authCalls = ({ send, expect }: Transport) => ({
   setMemberStatus: ({ id, change }: SetMemberStatusProps): Promise<Account> =>
     expect({
       request: send({
-        path: AUTH_PATHS.memberStatus.replace(`:${AUTH_PARAMS.id}`, encodeURIComponent(id)),
+        path: fillPath({ path: AUTH_PATHS.memberStatus, params: { [AUTH_PARAMS.id]: id } }),
         method: AUTH_METHODS.post,
         body: change,
       }),
@@ -52,7 +52,7 @@ export const authCalls = ({ send, expect }: Transport) => ({
   getAccountMediaTicket: ({ id }: GetAccountMediaTicketProps): Promise<MediaTicket> =>
     expect({
       request: send({
-        path: AUTH_PATHS.ticket.replace(`:${AUTH_PARAMS.id}`, String(id)),
+        path: fillPath({ path: AUTH_PATHS.ticket, params: { [AUTH_PARAMS.id]: id } }),
         method: AUTH_METHODS.post,
       }),
       guard: isMediaTicket,

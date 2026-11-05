@@ -189,9 +189,10 @@ describe('upgrading cached anime release dates', () => {
     db.exec(
       "UPDATE items SET released = '2026-09-04', fetched_at = '2026-11-01' WHERE tmdb_id = '149'",
     )
-    // Rewinding runs every later migration again; undo the one a second run would refuse.
+    // Rewinding runs every later migration again; undo the ones a second run would refuse.
     db.exec('DROP INDEX media_library_dolby_vision_only')
     db.exec('ALTER TABLE media DROP COLUMN dolby_vision_only')
+    db.exec('DROP TABLE play_history')
     db.pragma('user_version = 50')
     tmdb.state.down = true
     await server.restart()

@@ -1,5 +1,6 @@
 import { authCalls } from '@/apiClient/auth'
 import { bingeCalls } from '@/apiClient/binge'
+import { historyCalls } from '@/apiClient/history'
 import { homeCalls } from '@/apiClient/home'
 import { itemCalls } from '@/apiClient/items'
 import { libraryCalls } from '@/apiClient/libraries'
@@ -71,6 +72,7 @@ export const createApiClient = ({
     ...mediaCalls(transport),
     ...itemCalls(transport),
     ...homeCalls(transport),
+    ...historyCalls(transport),
     ...matchingCalls(transport),
     ...bingeCalls(transport),
     ...musicCalls(transport),

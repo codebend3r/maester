@@ -7,7 +7,7 @@ import {
   startOf,
   useAudiobookSpot,
   useAudioQueue,
-  useListenCounter,
+  useTrackListening,
   usePlayerPrefs,
   useTrackRate,
 } from '@raven/ui/headless'
@@ -111,7 +111,7 @@ type VideoAudioHostProps = { session: MusicSession }
 export const VideoAudioHost = ({ session }: VideoAudioHostProps) => {
   const track = useAudioQueue(playingTrackOf)
   const rate = useTrackRate({ api: session.api, track })
-  useListenCounter({ api: session.api, track })
+  useTrackListening({ api: session.api, track })
   // A book waits for its spot, so it never starts from the top and saves that over it.
   const start = startOf(useAudiobookSpot({ api: session.api, track, watchHide: watchAppHide }))
   return (

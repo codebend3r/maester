@@ -7,6 +7,8 @@ export const {
   mediaListQuery,
   showListQuery,
   historyQuery,
+  playHistoryQuery,
+  everyonesHistoryQuery,
   libraryCountsQuery,
   inProgressQuery,
   libraryFavouritesQuery,

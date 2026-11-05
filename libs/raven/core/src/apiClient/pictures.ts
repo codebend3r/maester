@@ -18,7 +18,7 @@ import {
   type PosterWidth,
   THUMBNAIL_STATES,
 } from '@/contract'
-import { toQueryString } from '@/query'
+import { fillPath, toQueryString } from '@/query'
 import type { SagaPicture } from '@/sagas'
 
 type ItemPicturePathProps = {
@@ -32,10 +32,14 @@ type ItemPicturePathProps = {
  * which it changes with, so it can be cached for good, by anyone.
  */
 const itemPicturePath = ({ id, kind, version }: ItemPicturePathProps): string =>
-  PICTURE_PATHS.item
-    .replace(`:${PICTURE_PARAMS.id}`, String(id))
-    .replace(`:${PICTURE_PARAMS.kind}`, kind)
-    .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(version))
+  fillPath({
+    path: PICTURE_PATHS.item,
+    params: {
+      [PICTURE_PARAMS.id]: id,
+      [PICTURE_PARAMS.kind]: kind,
+      [PICTURE_PARAMS.version]: version,
+    },
+  })
 
 type ItemImageUrlProps = {
   id: number
@@ -76,9 +80,10 @@ type AlbumCoverPathProps = { albumId: number; coverVersion: string }
 
 /** The capability address of an album's cover at `coverVersion`, which it changes with. */
 const albumCoverPath = ({ albumId, coverVersion }: AlbumCoverPathProps): string =>
-  PICTURE_PATHS.album
-    .replace(`:${PICTURE_PARAMS.id}`, String(albumId))
-    .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(coverVersion))
+  fillPath({
+    path: PICTURE_PATHS.album,
+    params: { [PICTURE_PARAMS.id]: albumId, [PICTURE_PARAMS.version]: coverVersion },
+  })
 
 type ImageOptionUrlProps = {
   id: number
@@ -209,9 +214,10 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
       photoVersion == null
         ? null
         : pictureAt({
-            path: PICTURE_PATHS.photo
-              .replace(`:${PICTURE_PARAMS.id}`, String(personId))
-              .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(photoVersion)),
+            path: fillPath({
+              path: PICTURE_PATHS.photo,
+              params: { [PICTURE_PARAMS.id]: personId, [PICTURE_PARAMS.version]: photoVersion },
+            }),
           }),
 
     /** An artist's Wikimedia Commons photo; null while none has been found. */
@@ -219,9 +225,10 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
       photoVersion == null
         ? null
         : pictureAt({
-            path: PICTURE_PATHS.artist
-              .replace(`:${PICTURE_PARAMS.id}`, String(artistId))
-              .replace(`:${PICTURE_PARAMS.version}`, encodeURIComponent(photoVersion)),
+            path: fillPath({
+              path: PICTURE_PATHS.artist,
+              params: { [PICTURE_PARAMS.id]: artistId, [PICTURE_PARAMS.version]: photoVersion },
+            }),
           }),
 
     /** An album's cover at its own width; null while the album has none. Versioned, so cached for good. */

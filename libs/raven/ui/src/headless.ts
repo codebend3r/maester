@@ -124,7 +124,7 @@ export { createSelectionStore, releaseSelectionStore } from '@/stores/selection'
 export type { SelectionStore } from '@/stores/selection'
 export { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
 export type { AudioState } from '@/stores/audioQueue'
-export { useListenCounter } from '@/components/AudioHost/useListenCounter'
+export { useTrackListening } from '@/components/AudioHost/useTrackListening'
 export { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
 export { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
 export {

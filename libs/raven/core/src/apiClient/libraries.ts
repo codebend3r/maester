@@ -35,7 +35,7 @@ import {
   type UnmatchedFile,
 } from '@/contract'
 import { type MediaListOptions, mediaListQuery } from '@/mediaListQuery'
-import { toQueryString } from '@/query'
+import { pathWithQuery, toQueryString } from '@/query'
 
 type UpdateLibraryProps = { id: number; input: LibraryInput }
 
@@ -280,9 +280,10 @@ export const libraryCalls = ({ send, expect, libraryGet }: Transport) => ({
 
   /** The server's folders, for picking a library's paths. */
   browse: (path?: string): Promise<DirectoryListing> => {
-    const query = path ? `?${toQueryString({ path })}` : ''
     return expect({
-      request: send({ path: `/api/fs/browse${query}` }),
+      request: send({
+        path: pathWithQuery({ path: '/api/fs/browse', query: path ? { path } : {} }),
+      }),
       guard: isDirectoryListing,
     })
   },

@@ -631,6 +631,7 @@ raven app imports `@raven/core` and `@raven/ui/headless` and answers the direct-
 | `WEB_DIR`                     | unset (`/app/web` in Docker)   | Built web app to serve; unset in development |
 | `BROWSE_ROOT`                 | `/` (`/media` in Docker)       | The folder picker never goes above this      |
 | `SCAN_ON_START`               | `true`                         | Quick-scan every library on boot             |
+| `RAVEN_LOG_REQUESTS`          | `false` (`true` in `bun run app:server`) | Log a line for every request: method, path (never the query, which can hold a ticket), status and milliseconds |
 | `QUICK_SCAN_INTERVAL_MINUTES` | `10`                           | Check the libraries that refresh automatically but no watch hears of (a network share) this often; `0` turns the timer off. Full scans run only on demand |
 | `HERO_COUNT`                  | `10`                           | The most titles Home's hero takes turns with. Read at start, so a change needs a restart |
 | `PROBE_CONCURRENCY`           | `4`                            | Parallel ffprobe runs during a scan          |

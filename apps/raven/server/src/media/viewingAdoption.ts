@@ -7,6 +7,7 @@ import { SettingsRepository } from '@/settings/settingsRepository'
 export type AdoptedCounts = {
   spots: number
   plays: number
+  history: number
   favourites: number
   titleFavourites: number
   albumFavourites: number
@@ -33,6 +34,7 @@ type FavouriteTable = (typeof FAVOURITE_TABLES)[keyof typeof FAVOURITE_TABLES]
 const VIEWING_TABLES = [
   'playback_progress',
   'plays',
+  'play_history',
   ...Object.values(FAVOURITE_TABLES).map(({ table }) => table),
   'playlists',
 ] as const
@@ -113,6 +115,10 @@ export class ViewingAdoption {
       const plays = this.db
         .prepare<Adopting>('UPDATE plays SET account_id = @owner WHERE account_id = @local')
         .run(adopting).changes
+      // An entry's id is its place in everyone's history, so moving it keeps the owner's in order.
+      const history = this.db
+        .prepare<Adopting>('UPDATE play_history SET account_id = @owner WHERE account_id = @local')
+        .run(adopting).changes
       // A playlist is the owner's as it was: no two are the same list, so none merge.
       const playlists = this.db
         .prepare<Adopting>('UPDATE playlists SET account_id = @owner WHERE account_id = @local')
@@ -123,6 +129,7 @@ export class ViewingAdoption {
       const counts: AdoptedCounts = {
         spots,
         plays,
+        history,
         favourites: this.mergeFavourites({ of: FAVOURITE_TABLES.favourites, adopting }),
         titleFavourites: this.mergeFavourites({ of: FAVOURITE_TABLES.titleFavourites, adopting }),
         albumFavourites: this.mergeFavourites({ of: FAVOURITE_TABLES.albumFavourites, adopting }),
