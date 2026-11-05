@@ -131,7 +131,7 @@ export const AppRoutes = () => {
                 <Route path="artists/:id" element={<ArtistPage />} />
                 <Route path={PLAYLIST_ROUTE} element={<PlaylistPage />} />
                 <Route path={NOW_PLAYING_PATH} element={<NowPlayingPage />} />
-                {!isDesktop && <Route path={BINGE_PATH} element={<BingePage />} />}
+                <Route path={BINGE_PATH} element={<BingePage />} />
                 <Route path={CONTINUE_WATCHING_PATH} element={<ContinueWatchingPage />} />
                 <Route path="favourites" element={<FavouritesPage />} />
                 <Route path={PLAY_HISTORY_ROUTES.own} element={<PlayHistoryPage />} />

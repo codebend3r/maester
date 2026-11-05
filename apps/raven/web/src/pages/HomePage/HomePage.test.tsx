@@ -171,7 +171,7 @@ describe('HomePage', () => {
     ).toEqual(['Busboys', 'Continue watching', 'Films', 'Series'])
   })
 
-  it('puts binge shows above the hero, but not in the desktop app', async () => {
+  it('puts binge shows above the hero, in the desktop app too', async () => {
     fake.restore()
     fake = fakeBinge({ ids: [SEVERANCE.id], hasSeenTip: true })
     spies.item.mockImplementation(async () => SEVERANCE)
@@ -197,7 +197,7 @@ describe('HomePage', () => {
     asDesktop(downloadsMain())
     open({ inProgress: [], shelves: [] })
     await screen.findByRole('region', { name: 'Featured' })
-    expect(screen.queryByRole('region', { name: 'Binge' })).toBeNull()
+    expect(await screen.findByRole('region', { name: 'Binge' })).toBeInTheDocument()
   })
 
   it('leaves the hero out when the server chose nothing', async () => {

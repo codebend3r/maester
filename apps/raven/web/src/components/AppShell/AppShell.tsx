@@ -262,15 +262,13 @@ export const AppShell = () => {
                 label={CONTINUE_WATCHING_COPY.title}
                 isIconsOnly={isIconsOnly}
               />
-              {!isDesktop && (
-                <NavItem
-                  to={BINGE_PATH}
-                  patterns={[BINGE_PATH]}
-                  icon={<Icon name="popcorn" />}
-                  label={BINGE_COPY.title}
-                  isIconsOnly={isIconsOnly}
-                />
-              )}
+              <NavItem
+                to={BINGE_PATH}
+                patterns={[BINGE_PATH]}
+                icon={<Icon name="popcorn" />}
+                label={BINGE_COPY.title}
+                isIconsOnly={isIconsOnly}
+              />
               <NavItem
                 to="/favourites"
                 patterns={['/favourites']}

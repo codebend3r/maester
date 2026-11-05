@@ -55,14 +55,13 @@ describe('ShowPage', () => {
     spies.setItemMatch.mockReset()
   })
 
-  it('offers binge mode on the web only', async () => {
+  it('offers binge mode on the web and in the desktop app', async () => {
     open()
     expect(await screen.findByRole('button', { name: BINGE_COPY.add })).toBeInTheDocument()
     cleanup()
     asDesktop(downloadsMain())
     open()
-    await screen.findByRole('heading', { name: 'Severance', level: 1 })
-    expect(screen.queryByRole('button', { name: BINGE_COPY.add })).toBeNull()
+    expect(await screen.findByRole('button', { name: BINGE_COPY.add })).toBeInTheDocument()
   })
 
   it('shows the creator, years, network, genres and a Play for the next episode', async () => {
