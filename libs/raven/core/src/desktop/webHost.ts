@@ -58,7 +58,7 @@ export const DESKTOP_ENV = {
  * reverse proxy in front of raven, so Raven signs in to the same accounts and keeps the same
  * library, progress and favourites as the web wherever the Mac is, at home or away.
  */
-export const DEFAULT_SERVER_ORIGIN = 'https://vhagar2.synology.me:8443'
+export const DEFAULT_SERVER_ORIGIN = 'https://raven-player.synology.me:8443'
 
 /**
  * The web app's Netlify site, which proxies `/api` to the same server. Its watch pages build
