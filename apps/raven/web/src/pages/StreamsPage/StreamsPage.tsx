@@ -21,15 +21,18 @@ import {
   formatChannels,
   formatDuration,
   mediaLabel,
+  pictureParts,
+  pictureRestParts,
   plural,
   rangeLabel,
   resolutionLabel,
+  wordPart,
 } from '@raven/core'
 import { Button } from '@raven/ui'
 import { type ComponentType, type ReactNode, useId, useState } from 'react'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
-import { PictureFact, RangeChip, ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
+import { FactParts } from '@/components/ResolutionChip/ResolutionChip'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useManagement } from '@/lib/management'
@@ -64,19 +67,15 @@ const pictureRange = ({ video, media }: PictureRangeProps): string | null => {
   return VIDEO_RANGE_LABELS[video.range]
 }
 
-type RangeTagProps = { media: MediaItem }
+type PictureTagsProps = { media: MediaItem }
 
-/** The file's range as a chip among a row's tags, as the scan saw it; nothing for SDR. */
-const RangeTag = ({ media }: RangeTagProps) => {
-  const range = rangeLabel(media)
-  return (
-    range != null && (
-      <li className={styles.chip}>
-        <RangeChip range={range} />
-      </li>
-    )
-  )
-}
+/** The file's resolution, range and video codec, each a chip among a row's tags, as the scan saw them. */
+const PictureTags = ({ media }: PictureTagsProps) =>
+  pictureParts(media).map((part) => (
+    <li key={part.kind} className={styles.chip}>
+      <FactParts parts={[part]} />
+    </li>
+  ))
 
 const joined = (parts: ReadonlyArray<string | null>): string =>
   parts.filter((part): part is string => !!part).join(COMMON_COPY.separator)
@@ -167,7 +166,11 @@ const StreamDetails = ({ id, stream, track }: StreamDetailsProps) => {
   const video = probe.data?.video ?? null
   const sound = probe.data?.audio.find(({ index }) => index === stream.audio) ?? null
   const range = pictureRange({ video: video ?? null, media })
-  const resolution = resolutionLabel(media)
+  const codec = video?.codec ?? media.videoCodec
+  const picture = [
+    ...pictureRestParts({ resolution: resolutionLabel(media), rest: range }),
+    ...(codec == null ? [] : [wordPart(codecLabel(codec))]),
+  ]
   return (
     <div id={id} className={styles.details}>
       <Facts
@@ -186,14 +189,12 @@ const StreamDetails = ({ id, stream, track }: StreamDetailsProps) => {
         facts={[
           {
             term: STREAMS_COPY.picture,
-            value: (resolution != null || range != null) && (
-              <PictureFact resolution={resolution} rest={range} />
-            ),
+            value: picture.length > 0 && <FactParts parts={picture} />,
           },
           {
             term: STREAMS_COPY.codec,
             value: codecWithProfile({
-              codec: video?.codec ?? media.videoCodec,
+              codec,
               profile: video?.profile ?? null,
             }),
           },
@@ -315,10 +316,7 @@ const StreamRow = ({ stream }: StreamRowProps) => {
       <div className={styles.overview}>
         <CardTop stream={stream} title={title} />
         <ul className={styles.tags} aria-label={STREAMS_COPY.howItPlays}>
-          <li className={styles.chip}>
-            <ResolutionChip resolution={resolutionLabel(stream.media)} />
-          </li>
-          <RangeTag media={stream.media} />
+          <PictureTags media={stream.media} />
           {track != null && (
             <li className={styles.tag}>
               {joined([audioLabel(track).name, sentAudio({ mode: stream.mode, track })])}
@@ -383,10 +381,7 @@ const DownloadRow = ({ stream }: DownloadRowProps) => {
       <div className={styles.overview}>
         <CardTop stream={stream} title={title} />
         <ul className={styles.tags} aria-label={STREAMS_COPY.whatItDownloads}>
-          <li className={styles.chip}>
-            <ResolutionChip resolution={resolutionLabel(stream.media)} />
-          </li>
-          <RangeTag media={stream.media} />
+          <PictureTags media={stream.media} />
           <li className={styles.tag}>{formatBytes(size)}</li>
         </ul>
         <div className={styles.download}>

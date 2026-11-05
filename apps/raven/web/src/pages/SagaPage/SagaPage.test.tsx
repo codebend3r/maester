@@ -155,9 +155,9 @@ describe('SagaPage', () => {
     await screen.findByRole('heading', { name: 'The Lord of the Rings Collection' })
     const posters = [...document.querySelectorAll('img[src*="/poster/"]')]
     expect(posters.map((poster) => poster.getAttribute('sizes'))).toEqual([
-      POSTER_SIZES.movieTile,
-      POSTER_SIZES.movieTile,
-      POSTER_SIZES.movieTile,
+      POSTER_SIZES.sagaFilm,
+      POSTER_SIZES.sagaFilm,
+      POSTER_SIZES.sagaFilm,
     ])
   })
 

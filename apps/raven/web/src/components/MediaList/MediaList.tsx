@@ -10,7 +10,6 @@ import {
   formatBytes,
   formatRuntime,
   mediaEntryKey,
-  resolutionLabel,
   sortTitle,
 } from '@raven/core'
 import type { ComponentType } from 'react'
@@ -19,7 +18,7 @@ import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
-import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
+import { PictureChips } from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
@@ -125,7 +124,7 @@ const MediaRow = ({ media, movies, matchType }: MediaRowProps) => {
         {formatRuntime(media.duration)}
       </td>
       <td className={movies ? styles.extra : styles.roomy}>
-        <ResolutionChip resolution={resolutionLabel(media)} />
+        <PictureChips media={media} />
       </td>
       <td className={`${styles.number} ${styles.extra}`}>{formatBytes(media.size)}</td>
       <td className={`${styles.number} ${styles.extra}`}>{formatBitrate(media.bitrate)}</td>

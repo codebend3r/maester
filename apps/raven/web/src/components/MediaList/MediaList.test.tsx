@@ -25,7 +25,7 @@ describe('MediaList', () => {
     const cells = within(row)
       .getAllByRole('cell')
       .map((cell) => cell.textContent)
-    expect(cells.slice(0, 4)).toEqual(['1h 37m', '1080p', '1.6 GB', '2.2 Mb/s'])
+    expect(cells.slice(0, 4)).toEqual(['1h 37m', '1080p HEVC', '1.6 GB', '2.2 Mb/s'])
     expect(cells[4]).toContain('2026')
   })
 

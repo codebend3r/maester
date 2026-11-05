@@ -1,5 +1,13 @@
 import { describe, expect, it, spyOn } from 'bun:test'
-import { type Hero, PICTURE_RANGES, RESOLUTIONS, SESSION_KINDS } from '@raven/core'
+import {
+  FACT_PART_KINDS,
+  type Hero,
+  PICTURE_RANGES,
+  RESOLUTIONS,
+  SESSION_KINDS,
+  VIDEO_CODECS,
+  codecLabel,
+} from '@raven/core'
 import { api } from '@/lib/api'
 import { featuredOf } from '@/pages/HomePage/featured'
 import {
@@ -122,7 +130,11 @@ describe('featuredOf', () => {
       eyebrow: 'Featured in Films',
       title: 'Movie 5',
       facts: [RELEASED_LABEL, '2h 46m'],
-      picture: { resolution: RESOLUTIONS.uhd, range: PICTURE_RANGES.hdr },
+      picture: [
+        { kind: FACT_PART_KINDS.resolution, text: RESOLUTIONS.uhd },
+        { kind: FACT_PART_KINDS.range, text: PICTURE_RANGES.hdr },
+        { kind: FACT_PART_KINDS.codec, text: codecLabel(VIDEO_CODECS.hevc) },
+      ],
       details: '/movies/105?library=2',
     })
     expect(featured?.play).toEqual({
@@ -136,7 +148,7 @@ describe('featuredOf', () => {
     const bare = { ...movie, duration: null, width: null, height: null }
     const [featured] = featuredOf({ hero: [movieEntry({ media: bare })], libraries: LIBRARIES })
     expect(featured?.facts).toEqual([RELEASED_LABEL])
-    expect(featured?.picture).toBeNull()
+    expect(featured?.picture).toEqual([])
   })
 
   it('says how long a show has run and how much of it there is, and plays what is next', () => {
@@ -147,7 +159,7 @@ describe('featuredOf', () => {
       eyebrow: 'Featured in Series',
       title: 'Show 9',
       facts: ['2022 to 2025', '9 episodes'],
-      picture: null,
+      picture: [],
       details: '/shows/9',
     })
     expect(featured?.play?.to).toBe('/watch/12')

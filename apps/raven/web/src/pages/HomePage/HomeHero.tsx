@@ -1,7 +1,7 @@
 import { Button, ButtonLink } from '@raven/ui'
 import { Fragment, type KeyboardEvent, useEffect, useState, useSyncExternalStore } from 'react'
 import type { Featured } from '@/pages/HomePage/featured'
-import { PictureFact } from '@/components/ResolutionChip/ResolutionChip'
+import { FactParts } from '@/components/ResolutionChip/ResolutionChip'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import styles from '@/pages/HomePage/HomeHero.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
@@ -158,10 +158,10 @@ const Slide = ({ entry, place, isCurrent }: SlideProps) => (
             {fact}
           </Fragment>
         ))}
-        {entry.picture && (
+        {entry.picture.length > 0 && (
           <>
             {entry.facts.length > 0 && <span aria-hidden="true">{COMMON_COPY.separator}</span>}
-            <PictureFact resolution={entry.picture.resolution} rest={entry.picture.range} />
+            <FactParts parts={entry.picture} />
           </>
         )}
       </p>

@@ -4,6 +4,7 @@ import { resolutionLabel } from '@raven/core'
 import {
   FactText,
   PictureChip,
+  PictureChips,
   PictureFact,
   RangeChip,
   ResolutionChip,
@@ -125,6 +126,39 @@ describe('ResolutionChip', () => {
     expect(screen.getByLabelText('Video resolution: 720p')).toHaveClass(styles.hd ?? '')
     expect(container).toHaveTextContent('720p4K Movies')
     expect(screen.queryByLabelText('Video resolution: 4K')).toBeNull()
+  })
+
+  it('marks a video codec word of a list as its chip, HEVC in its own fill', () => {
+    render(
+      <>
+        <WordFact fact="HEVC" />
+        <WordFact fact="H.264" />
+      </>,
+    )
+    expect(screen.getByLabelText('Video codec: HEVC')).toHaveClass(styles.hevc ?? '')
+    expect(screen.getByLabelText('Video codec: H.264')).toHaveAttribute('class', styles.chip)
+  })
+
+  it("marks a codec alone as its chip, as a group's heading names it", () => {
+    render(<FactText fact="HEVC" />)
+    expect(screen.getByLabelText('Video codec: HEVC')).toHaveClass(styles.hevc ?? '')
+  })
+
+  it("draws a file's resolution, range and codec as chips, in that order", () => {
+    const media = mediaItem({ width: 3840, height: 2160, hdr: true, isDolbyVisionOnly: true })
+    const { container } = render(<PictureChips media={media} />)
+    expect(screen.getByLabelText('Video resolution: 4K')).toHaveClass(styles.uhd ?? '')
+    expect(
+      screen.getByLabelText('Dolby Vision profile 5: its colours come out wrong in a browser'),
+    ).toHaveClass(styles.dolbyVisionOnly ?? '')
+    expect(screen.getByLabelText('Video codec: HEVC')).toHaveClass(styles.hevc ?? '')
+    expect(container.textContent).toBe('4K DV5 HEVC')
+  })
+
+  it('draws nothing for a file not yet probed', () => {
+    const media = mediaItem({ width: null, height: null, videoCodec: null, hdr: false })
+    const { container } = render(<PictureChips media={media} />)
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('leaves a fact with no resolution as plain text', () => {

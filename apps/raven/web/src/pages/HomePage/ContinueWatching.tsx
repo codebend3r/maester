@@ -6,7 +6,7 @@ import {
   cardLink,
   formatRuntime,
   mediaLabel,
-  resolutionLabel,
+  pictureParts,
   tileWords,
   watchLink,
 } from '@raven/core'
@@ -15,7 +15,7 @@ import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useId } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
-import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
+import { FactParts } from '@/components/ResolutionChip/ResolutionChip'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
@@ -133,7 +133,7 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
   const left = timeLeft(media)
   const page = cardLink({ media, hasPages: true })
   const TileTitle = TILE_TITLES[page.state == null ? TITLE_KINDS.linked : TITLE_KINDS.plain]
-  const resolution = resolutionLabel(media)
+  const picture = pictureParts(media)
   const art = useTileArt({ entry })
 
   return (
@@ -167,10 +167,10 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
             onContextMenu={menu.onContextMenu}
           />
         )}
-        {(line || resolution != null) && (
+        {(line || picture.length > 0) && (
           <span className={styles.line}>
             {line && <span>{line}</span>}
-            <ResolutionChip resolution={resolution} />
+            <FactParts parts={picture} />
           </span>
         )}
         {left && (

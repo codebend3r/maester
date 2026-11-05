@@ -12,8 +12,8 @@ import {
 } from '@/contract'
 import { formatBitrate, formatBytes, formatChannels, formatRuntime } from '@/format'
 import { languageName } from '@/languageName'
-import { resolutionLabel } from '@/media'
-import { VIDEO_RANGE_LABELS, codecLabel } from '@/playback'
+import { type Resolution, isResolution, resolutionLabel, splitResolution } from '@/media'
+import { VIDEO_CODECS, VIDEO_RANGE_LABELS, codecLabel } from '@/playback'
 import { plural } from '@/plural'
 
 const present = (facts: ReadonlyArray<string | null>): string[] =>
@@ -202,6 +202,84 @@ export const splitPictureRest = (rest: string | null): PictureRest => {
     range: isRange ? after : null,
     words: isRange || after === '' ? null : after,
   }
+}
+
+/**
+ * What one part of a line of facts is, so every client marks the same
+ * parts as chips: a resolution (`4K`), a video codec (`HEVC`), a high range
+ * of light (`HDR`, `DV5`), or plain words.
+ */
+export const FACT_PART_KINDS = {
+  resolution: 'resolution',
+  codec: 'codec',
+  range: 'range',
+  text: 'text',
+} as const
+
+export type FactPartKind = (typeof FACT_PART_KINDS)[keyof typeof FACT_PART_KINDS]
+
+/** A part of a line of facts and the words it shows. */
+export type FactPart = { kind: FactPartKind; text: string }
+
+/** The names the facts give the video codecs the clients treat apart: `H.264`, `HEVC`, `AV1`, `VP9`. */
+const VIDEO_CODEC_NAMES: ReadonlySet<string> = new Set(Object.values(VIDEO_CODECS).map(codecLabel))
+
+/**
+ * One word of a list of facts, such as `versionFacts`' or a tile's, as the
+ * part it is: a resolution, a video codec or a range when it is that whole
+ * word, else words. Names someone chose (an edition, a library called "4K
+ * Movies") are never more than words.
+ */
+export const wordPart = (word: string): FactPart => {
+  if (isResolution(word)) return { kind: FACT_PART_KINDS.resolution, text: word }
+  if (VIDEO_CODEC_NAMES.has(word)) return { kind: FACT_PART_KINDS.codec, text: word }
+  if (HDR_RANGES.has(word)) return { kind: FACT_PART_KINDS.range, text: word }
+  return { kind: FACT_PART_KINDS.text, text: word }
+}
+
+type PartOfProps = { kind: FactPartKind; text: string | null }
+
+const partOf = ({ kind, text }: PartOfProps): FactPart[] => (text == null ? [] : [{ kind, text }])
+
+type PictureRestPartsProps = { resolution: Resolution | null; rest: string | null }
+
+/** A picture as its resolution, then `splitPictureRest`'s codec, range and any other words. */
+export const pictureRestParts = ({ resolution, rest }: PictureRestPartsProps): FactPart[] => {
+  const { codec, range, words } = splitPictureRest(rest)
+  return [
+    ...partOf({ kind: FACT_PART_KINDS.resolution, text: resolution }),
+    ...partOf({ kind: FACT_PART_KINDS.codec, text: codec }),
+    ...partOf({ kind: FACT_PART_KINDS.range, text: range }),
+    ...partOf({ kind: FACT_PART_KINDS.text, text: words }),
+  ]
+}
+
+/**
+ * A fact `@raven/core` writes with the resolution first (`4K HDR`,
+ * `1080p (HEVC) HDR`) as its parts; one with no resolution is a single
+ * word's part (`DV5`, `HEVC`), or its words. Only for core's facts: a name
+ * someone chose goes through `wordPart`, whole.
+ */
+export const factParts = (fact: string): FactPart[] => {
+  const { resolution, rest } = splitResolution(fact)
+  if (resolution == null) return [wordPart(fact)]
+  return pictureRestParts({ resolution, rest: rest === '' ? null : rest })
+}
+
+type PicturePartsProps = Pick<
+  MediaItem,
+  'width' | 'height' | 'hdr' | 'isDolbyVisionOnly' | 'videoCodec'
+>
+
+/** A file's picture as chips: its resolution, its range, then its video codec; none before it is probed. */
+export const pictureParts = (media: PicturePartsProps): FactPart[] => {
+  const resolution = resolutionLabel(media)
+  if (resolution == null) return []
+  return [
+    resolution,
+    rangeLabel(media),
+    media.videoCodec ? codecLabel(media.videoCodec) : null,
+  ].flatMap((word) => (word == null ? [] : [wordPart(word)]))
 }
 
 /** The file's video, audio and subtitles, as the tracks the scan stored describe them. */

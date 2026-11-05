@@ -50,8 +50,8 @@ describe('ContinueWatching', () => {
       'Continue watching',
     )
     expect(tiles().map((tile) => tile.textContent)).toEqual([
-      'SeveranceS01E02 · Half Loop1080p45m left',
-      `Busboys${RELEASED_LABEL}1080p1h 15m left`,
+      'SeveranceS01E02 · Half Loop1080p HEVC45m left',
+      `Busboys${RELEASED_LABEL}1080p HEVC1h 15m left`,
     ])
   })
 
