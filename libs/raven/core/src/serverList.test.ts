@@ -10,7 +10,7 @@ describe('SERVERS_CAP', () => {
 
 describe('serverNameFor', () => {
   it('is the host of the origin', () => {
-    expect(serverNameFor('https://raven.example.ts.net')).toBe('raven.example.ts.net')
+    expect(serverNameFor('https://raven.example.synology.me')).toBe('raven.example.synology.me')
   })
 
   it('keeps a port that is not the default', () => {

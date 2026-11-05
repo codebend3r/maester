@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, jest, test } from 'bun:test'
 import {
   AUTH_REFUSALS,
+  MEDIA_ORIGIN_KINDS,
+  type MediaOrigin,
   type MediaTracks,
   PLAYER_ERROR_REASONS,
   PLAYER_SOURCE_KINDS,
+  type RemotePlayback,
   type SubtitleTrack,
 } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
@@ -12,12 +15,14 @@ import { PLAYER_PHASES } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import { TICKET_OUTCOMES, type TicketOutcome } from '@/main/servers/accountTickets'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
-import type { MediaRelay } from '@/main/servers/mediaRelay'
+import { type MediaRelay, RELAYED_MEDIA_KINDS } from '@/main/servers/mediaRelay'
 import type { ServerCallResult } from '@/main/servers/serverCalls'
 import { fixedPicks } from '@/main/test/serverFakes'
+import { mediaItemFor } from '@/shared/test/mediaItem'
 import {
   createServerSources,
   EXPLAIN_TIMEOUT_MS,
+  MEDIA_TIMEOUT_MS,
   SOURCE_MESSAGES,
   TRACKS_TIMEOUT_MS,
 } from '@/main/servers/serverSources'
@@ -120,7 +125,9 @@ type SetupProps = {
   refusal?: ReturnType<MediaRelay['refusalOf']>
   isOpenFailing?: boolean
   /** The media origin picked; unset, each server's own address. */
-  origin?: string
+  origin?: MediaOrigin
+  /** What the server says of remote play; unset, nothing. */
+  remote?: RemotePlayback
 }
 
 const setup = ({
@@ -130,9 +137,10 @@ const setup = ({
   refusal = null,
   isOpenFailing = false,
   origin,
+  remote,
 }: SetupProps = {}) => {
   const { calls, made } = fakeCalls({ answer })
-  const { picks, forgotten } = fixedPicks({ origin })
+  const { picks, forgotten } = fixedPicks({ origin, remote })
   const warnings: string[] = []
   const minted: { serverId: string; mediaId: number; isFresh: boolean }[] = []
   const order: string[] = []
@@ -200,7 +208,7 @@ describe('resolve', () => {
         origin: SERVER.origin,
         mediaId: 7,
         sidecarTrackIds: ['external-0', 'external-1'],
-        kbps: null,
+        media: { kind: RELAYED_MEDIA_KINDS.file },
       },
     ])
     expect(order).toEqual(['mint', 'open'])
@@ -208,11 +216,11 @@ describe('resolve', () => {
   })
 
   test('relays a video and a track from the media origin picked', async () => {
-    const lan = 'https://192-168-50-6.vhagar.example'
+    const lan = { kind: MEDIA_ORIGIN_KINDS.lan, url: 'https://192-168-50-6.vhagar.example' }
     const { sources, opened, minted } = setup({ origin: lan })
     await sources.resolve(SOURCE)
     await sources.resolveTrack({ serverId: SERVER.id, mediaId: 8, kbps: 256 })
-    expect(opened.map(({ origin }) => origin)).toEqual([lan, lan])
+    expect(opened.map(({ origin }) => origin)).toEqual([lan.url, lan.url])
     expect(opened.map(({ server }) => server)).toEqual([SERVER, SERVER])
     expect(minted).toHaveLength(2)
   })
@@ -227,8 +235,20 @@ describe('resolve', () => {
     await sources.resolveTrack({ ...track, kbps: null })
     expect(made).toEqual([])
     expect(opened).toEqual([
-      { server: SERVER, origin: SERVER.origin, mediaId: 7, sidecarTrackIds: [], kbps: 256 },
-      { server: SERVER, origin: SERVER.origin, mediaId: 7, sidecarTrackIds: [], kbps: null },
+      {
+        server: SERVER,
+        origin: SERVER.origin,
+        mediaId: 7,
+        sidecarTrackIds: [],
+        media: { kind: RELAYED_MEDIA_KINDS.audio, kbps: 256 },
+      },
+      {
+        server: SERVER,
+        origin: SERVER.origin,
+        mediaId: 7,
+        sidecarTrackIds: [],
+        media: { kind: RELAYED_MEDIA_KINDS.file },
+      },
     ])
     expect(await sources.resolveTrack({ ...track, serverId: 'vhagar', kbps: null })).toEqual({
       ok: false,
@@ -543,5 +563,126 @@ describe('explain', () => {
       reason: PLAYER_ERROR_REASONS.account,
       message: SOURCE_MESSAGES.signInAgain('Vhagar'),
     })
+  })
+})
+
+describe('resolve away from home', () => {
+  const PUBLIC = { kind: MEDIA_ORIGIN_KINDS.public, url: 'https://raven.example' }
+  const LAN = { kind: MEDIA_ORIGIN_KINDS.lan, url: 'https://192-168-50-6.vhagar.example' }
+  const HELD = { limit: 'high720', isOutside: true } as const satisfies RemotePlayback
+  const TRANSCODE = { kind: RELAYED_MEDIA_KINDS.transcode, quality: 'high720' } as const
+  const FILE = { kind: RELAYED_MEDIA_KINDS.file } as const
+
+  type AnswerOfProps = { bitrate: number | null }
+
+  /** The server: the tracks, and the title at `bitrate`. */
+  const answerOf =
+    ({ bitrate }: AnswerOfProps) =>
+    (call: AllowedCall): ServerCallResult =>
+      call.name === CALL_NAMES.getMedia
+        ? reply({ status: 200, body: JSON.stringify(mediaItemFor({ bitrate })) })
+        : reply({ status: 200, body: JSON.stringify(TRACKS) })
+
+  const OVER = answerOf({ bitrate: 30_000_000 })
+
+  test("a file over the limit from the public origin plays as the server's transcode at that limit", async () => {
+    const { sources, opened, made } = setup({ answer: OVER, origin: PUBLIC, remote: HELD })
+    const resolved = await sources.resolve(SOURCE)
+    expect(resolved.ok).toBe(true)
+    expect(opened.map(({ media, origin }) => ({ media, origin }))).toEqual([
+      { media: TRANSCODE, origin: PUBLIC.url },
+    ])
+    expect(made.map(({ call }) => call.name).toSorted()).toEqual([
+      CALL_NAMES.getMedia,
+      CALL_NAMES.getTracks,
+    ])
+  })
+
+  test("from the server's own address, the server's word on where the Mac is decides", async () => {
+    const outside = setup({ answer: OVER, remote: HELD })
+    await outside.sources.resolve(SOURCE)
+    expect(outside.opened.map(({ media }) => media)).toEqual([TRANSCODE])
+
+    const inside = setup({ answer: OVER, remote: { ...HELD, isOutside: false } })
+    await inside.sources.resolve(SOURCE)
+    expect(inside.opened.map(({ media }) => media)).toEqual([FILE])
+    expect(inside.made.map(({ call }) => call.name)).toEqual([CALL_NAMES.getTracks])
+  })
+
+  test('a LAN origin plays the file and asks for no bitrate, whatever the server says of outside', async () => {
+    const { sources, opened, made } = setup({ answer: OVER, origin: LAN, remote: HELD })
+    await sources.resolve(SOURCE)
+    expect(opened.map(({ media }) => media)).toEqual([FILE])
+    expect(made.map(({ call }) => call.name)).toEqual([CALL_NAMES.getTracks])
+  })
+
+  test('a file under the limit, or one of no known bitrate, plays as it is', async () => {
+    const under = setup({ answer: answerOf({ bitrate: 3_000_000 }), origin: PUBLIC, remote: HELD })
+    await under.sources.resolve(SOURCE)
+    const unknown = setup({ answer: answerOf({ bitrate: null }), origin: PUBLIC, remote: HELD })
+    await unknown.sources.resolve(SOURCE)
+    expect([...under.opened, ...unknown.opened].map(({ media }) => media)).toEqual([FILE, FILE])
+  })
+
+  test('no limit, or a server that says nothing of remote play, plays the file with no call more', async () => {
+    const none = setup({ answer: OVER, origin: PUBLIC, remote: { limit: null, isOutside: true } })
+    await none.sources.resolve(SOURCE)
+    const older = setup({ answer: OVER, origin: PUBLIC })
+    await older.sources.resolve(SOURCE)
+    expect([...none.opened, ...older.opened].map(({ media }) => media)).toEqual([FILE, FILE])
+    expect([...none.made, ...older.made].map(({ call }) => call.name)).toEqual([
+      CALL_NAMES.getTracks,
+      CALL_NAMES.getTracks,
+    ])
+  })
+
+  test('a bitrate the server does not give plays the file, with a warning', async () => {
+    const { sources, opened, warnings } = setup({
+      answer: (call) =>
+        call.name === CALL_NAMES.getMedia
+          ? reply({ status: 500, body: '' })
+          : reply({ status: 200, body: JSON.stringify(TRACKS) }),
+      origin: PUBLIC,
+      remote: HELD,
+    })
+    await sources.resolve(SOURCE)
+    expect(opened.map(({ media }) => media)).toEqual([FILE])
+    expect(warnings).toEqual(["Vhagar did not say a title's bitrate, so it plays its file"])
+  })
+
+  test('a bitrate that does not come in time plays the file', async () => {
+    jest.useFakeTimers()
+    try {
+      const { sources, opened } = setup({
+        answer: (call) =>
+          call.name === CALL_NAMES.getMedia
+            ? null
+            : reply({ status: 200, body: JSON.stringify(TRACKS) }),
+        origin: PUBLIC,
+        remote: HELD,
+      })
+      const resolving = sources.resolve(SOURCE)
+      // The bitrate is asked for once the pick is in, a few turns after the resolve began.
+      await Array.from({ length: 10 }).reduce<Promise<void>>(
+        (turns) => turns.then(() => undefined),
+        Promise.resolve(),
+      )
+      jest.advanceTimersByTime(MEDIA_TIMEOUT_MS)
+      await resolving
+      expect(opened.map(({ media }) => media)).toEqual([FILE])
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  test('a track away from home stays its file or its own transcode', async () => {
+    const { sources, opened, made } = setup({ answer: OVER, origin: PUBLIC, remote: HELD })
+    await sources.resolveTrack({ serverId: SERVER.id, mediaId: 8, kbps: null })
+    await sources.resolveTrack({ serverId: SERVER.id, mediaId: 8, kbps: 256 })
+    expect(opened.map(({ media }) => media)).toEqual([
+      FILE,
+      { kind: RELAYED_MEDIA_KINDS.audio, kbps: 256 },
+    ])
+    expect(made).toEqual([])
   })
 })

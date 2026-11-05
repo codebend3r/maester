@@ -1,6 +1,6 @@
 /**
  * raven's origin when this page's `/api` is a proxy to it (Netlify's
- * `_redirects`, from `RAVEN_API_ORIGIN`); '' when `/api` is raven itself.
+ * `netlify.toml`, the origin `RAVEN_API_ORIGIN` names); '' when `/api` is raven itself.
  */
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? ''
 

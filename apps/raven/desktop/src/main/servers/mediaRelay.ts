@@ -10,10 +10,23 @@ import {
   isSidecarTrackId,
   LOCKED_STATUS,
   MEDIA_TICKET_PARAM,
+  type StreamQuality,
   toQueryString,
 } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { quietly } from '@/main/log/quietly'
+import {
+  HLS_MASTER_PATH,
+  HLS_PARTS,
+  type HlsPart,
+  hlsPartOf,
+  type HlsSession,
+  masterRequestOf,
+  REWRITE_OUTCOMES,
+  type RewrittenPlaylist,
+  rewritePlaylist,
+  sessionUrlOf,
+} from '@/main/servers/hlsRelay'
 import type { OriginPicks } from '@/main/servers/originPicks'
 import {
   type AccountTickets,
@@ -125,10 +138,22 @@ type RelayedLoad = {
   loadId: string
   /** `http://127.0.0.1:<port>/<secret>`, which the player blanks in mpv's warnings. */
   base: string
+  /** What mpv opens: `<base>/file`, or `<base>/hls/master.m3u8` for a transcode. */
   fileUrl: string
   /** In the order of the track ids given; an id that is not `external-N` is left out. */
   sidecarUrls: readonly string[]
 }
+
+/** What a load relays of the title. */
+export const RELAYED_MEDIA_KINDS = { file: 'file', audio: 'audio', transcode: 'transcode' } as const
+
+export type RelayedMedia =
+  /** The file itself. */
+  | { kind: typeof RELAYED_MEDIA_KINDS.file }
+  /** A track's AAC transcode at this bitrate. */
+  | { kind: typeof RELAYED_MEDIA_KINDS.audio; kbps: AudioBitrate }
+  /** A video's HLS transcode at this size, as a viewer away from home is held to. */
+  | { kind: typeof RELAYED_MEDIA_KINDS.transcode; quality: StreamQuality }
 
 type OpenProps = {
   server: Pick<ServerEntry, 'id' | 'origin' | 'name'>
@@ -136,8 +161,7 @@ type OpenProps = {
   origin: string
   mediaId: number
   sidecarTrackIds: readonly string[]
-  /** A track's AAC transcode at this bitrate in place of its file; null for the file. */
-  kbps: AudioBitrate | null
+  media: RelayedMedia
 }
 
 export type MediaRelay = {
@@ -154,12 +178,26 @@ export type MediaRelay = {
   refusalOf: (loadId: string) => AuthRefusal['reason'] | null
 }
 
+const ROUTE_KINDS = { ticketed: 'ticketed', session: 'session' } as const
+
 /**
- * What a path mpv asks for stands for: a path under `/api/media/<id>/` and the query it carries
- * beside the ticket. `isMedia` marks the title's own bytes, the file or its transcode, whose
- * refusal ends the title; a sidecar's does not.
+ * What a path mpv asks for stands for. A ticketed route is a server path and the query it carries
+ * beside an account ticket; a session route is a part of the HLS session the load's master opened,
+ * asked for with that session's key. `isMedia` marks the title's own bytes, the file or its
+ * transcode, whose refusal ends the title; a sidecar's does not. `isPlaylist` marks an HLS
+ * playlist, which the relay rewrites before mpv reads it.
  */
-type Route = { path: string; query: Readonly<Record<string, string>>; isMedia: boolean }
+type Route =
+  | {
+      kind: typeof ROUTE_KINDS.ticketed
+      path: string
+      query: Readonly<Record<string, string>>
+      isMedia: boolean
+      isPlaylist: boolean
+    }
+  | { kind: typeof ROUTE_KINDS.session; part: HlsPart; isMedia: true; isPlaylist: boolean }
+
+type TicketedRoute = Extract<Route, { kind: typeof ROUTE_KINDS.ticketed }>
 
 type Load = {
   loadId: string
@@ -168,15 +206,45 @@ type Load = {
   origins: readonly string[]
   name: string
   mediaId: number
-  /** Each path mpv may ask for, to what it stands for. */
+  /** `/<secret>/`, which every path of the load begins with. */
+  prefix: string
+  /** Each path mpv may ask for besides an HLS session's, to what it stands for. */
   routes: ReadonlyMap<string, Route>
+  /** For a transcode, the master playlist and the session it opened last; null for a file. */
+  hls: { master: TicketedRoute; session: HlsSession | null } | null
 }
 
-/** The title's own bytes: its file, or a track's transcode at `kbps`. */
-const mediaRouteOf = (kbps: AudioBitrate | null): Route =>
-  kbps === null
-    ? { path: MEDIA_FILE_PATH, query: {}, isMedia: true }
-    : { path: MEDIA_TRANSCODE_PATH, query: { [AUDIO_BITRATE_PARAM]: String(kbps) }, isMedia: true }
+type MediaRouteOfProps = { mediaId: number; media: RelayedMedia }
+
+/** The title's own bytes: its file, a track's transcode, or a video's HLS master playlist. */
+const mediaRouteOf = ({ mediaId, media }: MediaRouteOfProps): TicketedRoute => {
+  const under = `${API_PATHS.media}/${mediaId}`
+  const route = { kind: ROUTE_KINDS.ticketed, isMedia: true } as const
+  switch (media.kind) {
+    case RELAYED_MEDIA_KINDS.file:
+      return { ...route, path: `${under}/${MEDIA_FILE_PATH}`, query: {}, isPlaylist: false }
+    case RELAYED_MEDIA_KINDS.audio:
+      return {
+        ...route,
+        path: `${under}/${MEDIA_TRANSCODE_PATH}`,
+        query: { [AUDIO_BITRATE_PARAM]: String(media.kbps) },
+        isPlaylist: false,
+      }
+    case RELAYED_MEDIA_KINDS.transcode:
+      return { ...route, ...masterRequestOf({ mediaId, quality: media.quality }), isPlaylist: true }
+    default: {
+      const unreachable: never = media
+      return unreachable
+    }
+  }
+}
+
+/** What mpv opens under the secret for the title's own bytes. */
+const mediaPathOf = (media: RelayedMedia): string =>
+  media.kind === RELAYED_MEDIA_KINDS.transcode ? HLS_MASTER_PATH : MEDIA_FILE_PATH
+
+/** The most of a playlist the relay reads: a VOD playlist of a long film is a few hundred KB. */
+const PLAYLIST_MAX_BYTES = 8 * 1024 * 1024
 
 type Request = { loadId: string; controller: AbortController }
 
@@ -254,6 +322,72 @@ const passedHeaders = (upstream: Upstream): Record<string, string> =>
     }),
   )
 
+type TicketFailure = Exclude<TicketOutcome, { kind: typeof TICKET_OUTCOMES.ticket }>
+
+/** What the relay fetched for a request: the upstream's answer, or why no ticket was minted. */
+type Fetched = { kind: typeof TICKET_OUTCOMES.ticket; upstream: Upstream } | TicketFailure
+
+type ReadState = { text: string; bytes: number }
+
+/** A playlist's text, read to its end; null past `PLAYLIST_MAX_BYTES` or when the read fails. */
+const readPlaylistText = async (
+  body: ReadableStream<Uint8Array> | null,
+): Promise<string | null> => {
+  if (body === null) return ''
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  const readFrom = async ({ text, bytes }: ReadState): Promise<string | null> => {
+    const { done, value } = await reader.read()
+    if (done) return `${text}${decoder.decode()}`
+    const total = bytes + value.length
+    if (total > PLAYLIST_MAX_BYTES) return null
+    return readFrom({ text: `${text}${decoder.decode(value, { stream: true })}`, bytes: total })
+  }
+  try {
+    return await readFrom({ text: '', bytes: 0 })
+  } catch {
+    return null
+  } finally {
+    await reader.cancel().catch(() => undefined)
+  }
+}
+
+/** What reopening a load's HLS session came to: the session, or the answer mpv's request gets instead. */
+const SESSION_STEPS = { session: 'session', failed: 'failed', answered: 'answered' } as const
+
+type SessionStep =
+  | { kind: typeof SESSION_STEPS.session; session: HlsSession }
+  | { kind: typeof SESSION_STEPS.failed; outcome: TicketFailure }
+  | { kind: typeof SESSION_STEPS.answered; status: number; text: string }
+
+type FailedStep = Exclude<SessionStep, { kind: typeof SESSION_STEPS.session }>
+
+/**
+ * A step that is no session as a fetch of its own: a reopen is shared between the requests that
+ * found the session lost, so each gets its own copy of the body read off the master.
+ */
+const fetchedOfStep = (step: FailedStep): Fetched => {
+  switch (step.kind) {
+    case SESSION_STEPS.failed:
+      return step.outcome
+    case SESSION_STEPS.answered: {
+      const response = new Response(step.text === '' ? null : step.text)
+      return {
+        kind: TICKET_OUTCOMES.ticket,
+        upstream: { status: step.status, headers: response.headers, body: response.body },
+      }
+    }
+    default: {
+      const unreachable: never = step
+      return unreachable
+    }
+  }
+}
+
+/** A session the server forgot (it restarted, or let it go) answers 404, or 401 for its key. */
+const isLostSession = (status: number): boolean =>
+  status === HTTP_STATUSES.notFound || status === HTTP_STATUSES.unauthorized
+
 type CreateMediaRelayProps = {
   listen: RelayListen
   fetchUpstream: UpstreamFetch
@@ -281,6 +415,9 @@ const REFUSALS_KEPT = 8
  * main holds and renews, on the media origin the load was opened with (the server's own address
  * when that one stops answering). No ticket, token or server address ever enters an mpv URL,
  * header or log.
+ * A transcode is HLS instead: mpv opens `<secret>/hls/master.m3u8`, the relay asks the server's
+ * master with a ticket, rewrites each playlist to names of its own, and asks the session's video
+ * playlist, init and segments with the session's key, which stays in main like the ticket.
  * Only the newest loads' paths are served, only to `GET` and `HEAD`; anything else is a 404 that
  * sends nothing upstream.
  */
@@ -436,7 +573,7 @@ export const createMediaRelay = ({
 
   type TicketedProps = {
     load: Load
-    route: Route
+    route: TicketedRoute
     method: RelayMethod
     headers: Record<string, string>
     signal: AbortSignal
@@ -450,10 +587,7 @@ export const createMediaRelay = ({
     headers,
     signal,
     isFresh,
-  }: TicketedProps): Promise<
-    | { kind: typeof TICKET_OUTCOMES.ticket; upstream: Upstream }
-    | Exclude<TicketOutcome, { kind: typeof TICKET_OUTCOMES.ticket }>
-  > => {
+  }: TicketedProps): Promise<Fetched> => {
     const outcome = await tickets.ticketFor({
       serverId: load.serverId,
       mediaId: load.mediaId,
@@ -464,12 +598,189 @@ export const createMediaRelay = ({
     const upstream = await fetchFirst({
       load,
       origins: originsOf(load),
-      path: `${API_PATHS.media}/${load.mediaId}/${route.path}?${query}`,
+      path: `${route.path}?${query}`,
       method,
       headers,
       signal,
     })
     return { kind: TICKET_OUTCOMES.ticket, upstream }
+  }
+
+  type FetchTicketedProps = Omit<TicketedProps, 'isFresh'>
+
+  /** A ticketed request; a ticket the server no longer takes (it restarted, or the clocks disagree) is minted once more. */
+  const fetchTicketed = async (request: FetchTicketedProps): Promise<Fetched> => {
+    const first = await ticketed({ ...request, isFresh: false })
+    return first.kind === TICKET_OUTCOMES.ticket &&
+      first.upstream.status === HTTP_STATUSES.unauthorized
+      ? discard(first.upstream).then(() => ticketed({ ...request, isFresh: true }))
+      : first
+  }
+
+  type KeepSessionProps = { load: Load; session: HlsSession }
+
+  const keepSession = ({ load, session }: KeepSessionProps): void => {
+    loads = loads.map((live) =>
+      live.loadId === load.loadId && live.hls !== null
+        ? { ...live, hls: { ...live.hls, session } }
+        : live,
+    )
+  }
+
+  /** The load's HLS session as it stands: a reopen since this request began is the one it uses. */
+  const sessionOf = (load: Load): HlsSession | null =>
+    loads.find((live) => live.loadId === load.loadId)?.hls?.session ?? null
+
+  type ReadPlaylistProps = { load: Load; upstream: Upstream }
+
+  /** A playlist rewritten for mpv, keeping the session it names; null for one the relay does not pass on. */
+  const readPlaylist = async ({
+    load,
+    upstream,
+  }: ReadPlaylistProps): Promise<RewrittenPlaylist | null> => {
+    const text = await readPlaylistText(upstream.body)
+    if (text === null) return null
+    const rewritten = rewritePlaylist({ text, mediaId: load.mediaId })
+    if (rewritten.kind === REWRITE_OUTCOMES.refused) return null
+    if (rewritten.session !== null && isCurrent(load)) {
+      keepSession({ load, session: rewritten.session })
+    }
+    return rewritten
+  }
+
+  /** Each load's reopen in flight, so the requests that found its session lost share one. */
+  let reopenings: ReadonlyMap<string, Promise<SessionStep>> = new Map()
+
+  /**
+   * Asks the load's master playlist again, with a ticket, for a new session to go on with. The
+   * fetch is the load's own, so retiring the load ends it, but no one request's.
+   */
+  const reopen = async (load: Load): Promise<SessionStep> => {
+    const master = load.hls?.master ?? null
+    if (master === null) throw new Error('The relay has no master playlist for this load.')
+    const entry: Request = { loadId: load.loadId, controller: new AbortController() }
+    requests = [...requests, entry]
+    try {
+      const fetched = await fetchTicketed({
+        load,
+        route: master,
+        method: RELAY_METHODS.get,
+        headers: {},
+        signal: entry.controller.signal,
+      })
+      if (fetched.kind !== TICKET_OUTCOMES.ticket) {
+        return { kind: SESSION_STEPS.failed, outcome: fetched }
+      }
+      const { upstream } = fetched
+      if (!isSuccessStatus(upstream.status)) {
+        const text = await readShort(upstream.body)
+        return { kind: SESSION_STEPS.answered, status: upstream.status, text }
+      }
+      const read = await readPlaylist({ load, upstream })
+      if (read === null || read.session === null) {
+        safeWarn(`${loggable(load.name)} sent a master playlist the relay does not pass on`)
+        return { kind: SESSION_STEPS.answered, status: HTTP_STATUSES.badGateway, text: '' }
+      }
+      return { kind: SESSION_STEPS.session, session: read.session }
+    } finally {
+      requests = requests.filter((known) => known !== entry)
+    }
+  }
+
+  type OpenSessionProps = { load: Load; lost: HlsSession | null }
+
+  /** The session to ask: the load's own, unless it is the one found lost, else one reopened. */
+  const openSession = ({ load, lost }: OpenSessionProps): Promise<SessionStep> => {
+    const current = sessionOf(load)
+    if (current !== null && current.id !== lost?.id) {
+      return Promise.resolve({ kind: SESSION_STEPS.session, session: current })
+    }
+    const running = reopenings.get(load.loadId)
+    if (running !== undefined) return running
+    const step = reopen(load).finally(() => {
+      reopenings = new Map([...reopenings].filter(([loadId]) => loadId !== load.loadId))
+    })
+    reopenings = new Map([...reopenings, [load.loadId, step]])
+    return step
+  }
+
+  type SessionedProps = {
+    load: Load
+    part: HlsPart
+    method: RelayMethod
+    headers: Record<string, string>
+    signal: AbortSignal
+  }
+
+  type FromSessionProps = SessionedProps & { session: HlsSession }
+
+  const fromSession = async ({
+    load,
+    part,
+    session,
+    ...request
+  }: FromSessionProps): Promise<Fetched> => ({
+    kind: TICKET_OUTCOMES.ticket,
+    upstream: await fetchFirst({
+      load,
+      origins: originsOf(load),
+      path: sessionUrlOf({ mediaId: load.mediaId, session, part }),
+      ...request,
+    }),
+  })
+
+  /**
+   * A part of the load's HLS session, with the session's key. A session the server no longer has
+   * is opened again from the master once, and the part asked for in the new one: its segments are
+   * cut the same way, so mpv goes on where it was.
+   */
+  const sessioned = async (request: SessionedProps): Promise<Fetched> => {
+    const step = await openSession({ load: request.load, lost: null })
+    if (step.kind !== SESSION_STEPS.session) return fetchedOfStep(step)
+    const fetched = await fromSession({ ...request, session: step.session })
+    if (fetched.kind !== TICKET_OUTCOMES.ticket || !isLostSession(fetched.upstream.status)) {
+      return fetched
+    }
+    await discard(fetched.upstream)
+    const again = await openSession({ load: request.load, lost: step.session })
+    if (again.kind !== SESSION_STEPS.session) return fetchedOfStep(again)
+    return fromSession({ ...request, session: again.session })
+  }
+
+  type AnswerPlaylistProps = {
+    load: Load
+    upstream: Upstream
+    method: RelayMethod
+    response: ServerResponse
+  }
+
+  /** A playlist goes to mpv whole and rewritten, never as the server wrote it. */
+  const answerPlaylist = async ({
+    load,
+    upstream,
+    method,
+    response,
+  }: AnswerPlaylistProps): Promise<void> => {
+    const type = upstream.headers.get(HTTP_HEADERS.contentType)
+    const typed: Record<string, string> = type === null ? {} : { [HTTP_HEADERS.contentType]: type }
+    if (method === RELAY_METHODS.head) {
+      await discard(upstream)
+      response.writeHead(upstream.status, typed)
+      response.end()
+      return
+    }
+    const read = await readPlaylist({ load, upstream })
+    if (read === null) {
+      safeWarn(`${loggable(load.name)} sent a playlist the relay does not pass on`)
+      answer({ response, status: HTTP_STATUSES.badGateway })
+      return
+    }
+    const bytes = new TextEncoder().encode(read.text)
+    response.writeHead(upstream.status, {
+      ...typed,
+      [HTTP_HEADERS.contentLength]: String(bytes.length),
+    })
+    response.end(bytes)
   }
 
   type RelayProps = {
@@ -489,14 +800,13 @@ export const createMediaRelay = ({
     response,
     signal,
   }: RelayProps): Promise<void> => {
-    const headers: Record<string, string> = range === null ? {} : { [HTTP_HEADERS.range]: range }
-    const request = { load, route, method, headers, signal }
-    const first = await ticketed({ ...request, isFresh: false })
-    // A ticket the server no longer takes (it restarted, or the clocks disagree) is minted once more.
+    // A playlist is read whole to be rewritten, so it is never asked for in part.
+    const headers: Record<string, string> =
+      range === null || route.isPlaylist ? {} : { [HTTP_HEADERS.range]: range }
     const outcome =
-      first.kind === TICKET_OUTCOMES.ticket && first.upstream.status === HTTP_STATUSES.unauthorized
-        ? await discard(first.upstream).then(() => ticketed({ ...request, isFresh: true }))
-        : first
+      route.kind === ROUTE_KINDS.session
+        ? await sessioned({ load, part: route.part, method, headers, signal })
+        : await fetchTicketed({ load, route, method, headers, signal })
     if (outcome.kind !== TICKET_OUTCOMES.ticket) {
       if (outcome.kind === TICKET_OUTCOMES.refused) record({ load, route, reason: outcome.reason })
       answer({ response, status: statusForOutcome(outcome) })
@@ -517,6 +827,10 @@ export const createMediaRelay = ({
     if (route.isMedia && isSuccessStatus(upstream.status) && isCurrent(load)) {
       forget(load.loadId)
     }
+    if (route.isPlaylist && isSuccessStatus(upstream.status)) {
+      await answerPlaylist({ load, upstream, method, response })
+      return
+    }
     response.writeHead(upstream.status, passedHeaders(upstream))
     if (method === RELAY_METHODS.head || upstream.body === null) {
       await discard(upstream)
@@ -530,19 +844,39 @@ export const createMediaRelay = ({
     response.end()
   }
 
+  type Served = { load: Load; route: Route }
+
+  /** The load a path is under and the route it stands for, or null for a path no live load serves. */
+  const servedOf = (url: string): Served | null => {
+    const load = loads.find((live) => url.startsWith(live.prefix)) ?? null
+    if (load === null) return null
+    const fixed = load.routes.get(url)
+    if (fixed !== undefined) return { load, route: fixed }
+    const part = load.hls === null ? null : hlsPartOf(url.slice(load.prefix.length))
+    if (part === null) return null
+    return {
+      load,
+      route: {
+        kind: ROUTE_KINDS.session,
+        part,
+        isMedia: true,
+        isPlaylist: part.kind === HLS_PARTS.video,
+      },
+    }
+  }
+
   type ServeProps = {
     request: IncomingMessage
     response: ServerResponse
   }
 
   const serve = async ({ request, response }: ServeProps): Promise<void> => {
-    const url = request.url ?? ''
-    const load = loads.find((live) => live.routes.has(url)) ?? null
-    const route = load?.routes.get(url) ?? null
-    if (!isRelayMethod(request.method) || load === null || route === null) {
+    const served = servedOf(request.url ?? '')
+    if (!isRelayMethod(request.method) || served === null) {
       answer({ response, status: HTTP_STATUSES.notFound })
       return
     }
+    const { load, route } = served
     const entry: Request = { loadId: load.loadId, controller: new AbortController() }
     requests = [...requests, entry]
     response.once(STREAM_EVENTS.close, () => {
@@ -583,7 +917,7 @@ export const createMediaRelay = ({
   }
 
   return {
-    open: async ({ server, origin, mediaId, sidecarTrackIds, kbps }) => {
+    open: async ({ server, origin, mediaId, sidecarTrackIds, media }) => {
       if (!isMediaId(mediaId)) throw new RangeError('The relay needs a media id.')
       const { port } = await portOf()
       const secret = newSecret(RELAY_SECRET_BYTES)
@@ -596,25 +930,35 @@ export const createMediaRelay = ({
       opened += 1
       const loadId = String(opened)
       const sidecars = sidecarTrackIds.filter(isSidecarTrackId)
-      // mpv asks for `/file` either way; the relay knows which bytes it stands for.
+      const prefix = `/${secret}/`
+      const mediaRoute = mediaRouteOf({ mediaId, media })
+      // mpv asks for `/file` for a file or a track's transcode; the relay knows which bytes it stands for.
       const routes = new Map<string, Route>([
-        [`/${secret}/${MEDIA_FILE_PATH}`, mediaRouteOf(kbps)],
+        [`${prefix}${mediaPathOf(media)}`, mediaRoute],
         ...sidecars.map((id): [string, Route] => [
-          `/${secret}/${subtitlePathOf(id)}`,
-          { path: subtitlePathOf(id), query: {}, isMedia: false },
+          `${prefix}${subtitlePathOf(id)}`,
+          {
+            kind: ROUTE_KINDS.ticketed,
+            path: `${API_PATHS.media}/${mediaId}/${subtitlePathOf(id)}`,
+            query: {},
+            isMedia: false,
+            isPlaylist: false,
+          },
         ]),
       ])
       // The server's own address is the fallback, so a media origin that goes away mid-title is passed over.
       const origins = [...new Set([origin, server.origin])]
+      const hls =
+        media.kind === RELAYED_MEDIA_KINDS.transcode ? { master: mediaRoute, session: null } : null
       loads = [
         ...loads,
-        { loadId, serverId: server.id, origins, name: server.name, mediaId, routes },
+        { loadId, serverId: server.id, origins, name: server.name, mediaId, prefix, routes, hls },
       ]
       const base = `http://${RELAY_HOST}:${port}/${secret}`
       return {
         loadId,
         base,
-        fileUrl: `${base}/${MEDIA_FILE_PATH}`,
+        fileUrl: `${base}/${mediaPathOf(media)}`,
         sidecarUrls: sidecars.map((id) => `${base}/${subtitlePathOf(id)}`),
       }
     },

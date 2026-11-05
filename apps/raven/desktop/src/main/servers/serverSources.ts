@@ -3,6 +3,7 @@ import {
   AUTH_REFUSALS,
   type AuthRefusal,
   isMediaId,
+  isMediaItem,
   isMediaTracks,
   isOpaqueId,
   LOCKED_STATUS,
@@ -10,6 +11,8 @@ import {
   PLAYER_SOURCE_KINDS,
   type PlayerErrorReason,
   type PlayerSource,
+  isAwayPlay,
+  remoteTranscodeFor,
   type SubtitleTrack,
   TITLE_REFUSALS,
   type TitleRefusal,
@@ -32,8 +35,8 @@ import {
 } from '@/main/servers/accountTickets'
 import { CALL_NAMES } from '@/main/servers/allowlist'
 import { ACCOUNT_REFUSAL_STATUSES, refusalAt } from '@/main/servers/authRefusals'
-import type { MediaRelay } from '@/main/servers/mediaRelay'
-import type { OriginPicks } from '@/main/servers/originPicks'
+import { type MediaRelay, RELAYED_MEDIA_KINDS, type RelayedMedia } from '@/main/servers/mediaRelay'
+import type { MediaPlace, OriginPicks } from '@/main/servers/originPicks'
 import { loggable, type ServerCallResult, type ServerCalls } from '@/main/servers/serverCalls'
 import { sidecarTracksOf } from '@/main/servers/sidecarTracks'
 import { HTTP_STATUSES } from '@/shared/httpStatuses'
@@ -59,6 +62,20 @@ export const EXPLAIN_TIMEOUT_MS = 5000
  * title (or a Back after it) for long: past this the title plays without sidecars.
  */
 export const TRACKS_TIMEOUT_MS = 3000
+/**
+ * How long a title away from home waits on its media's bitrate before it plays its file as it
+ * would at home: the load waits on it, as on the tracks.
+ */
+export const MEDIA_TIMEOUT_MS = 3000
+
+const THE_FILE: RelayedMedia = { kind: RELAYED_MEDIA_KINDS.file }
+
+/**
+ * Whether the remote limit could hold back any file played from `place`: core's decision for the
+ * largest file there could be. False at home, with no limit, or from a server that says nothing.
+ */
+const mayHold = (place: MediaPlace): boolean =>
+  (place.remote?.limit ?? null) !== null && isAwayPlay(place)
 
 type Sidecars = ServerTarget['sidecars']
 type Failure = { reason: PlayerErrorReason; message: string }
@@ -215,31 +232,82 @@ export const createServerSources = ({
     }
   }
 
+  type BitrateOfProps = { server: ServerEntry; mediaId: number }
+
+  /** The media's bitrate as the server knows it; null when it does not, or does not say in time. */
+  const bitrateOf = async ({ server, mediaId }: BitrateOfProps): Promise<number | null> => {
+    const name = loggable(server.name)
+    const bounded = await within({
+      task: calls.call({ serverId: server.id, call: { name: CALL_NAMES.getMedia, mediaId } }),
+      ms: MEDIA_TIMEOUT_MS,
+    })
+    if (bounded.outcome !== BOUNDED_OUTCOMES.answered) {
+      warn(`${name} did not say a title's bitrate, so it plays its file`)
+      return null
+    }
+    const { result } = bounded
+    const parsed = result.ok && result.status === HTTP_STATUSES.ok ? parseJson(result.body) : null
+    if (!isMediaItem(parsed)) {
+      warn(`${name} did not say a title's bitrate, so it plays its file`)
+      return null
+    }
+    return parsed.bitrate
+  }
+
+  type VideoMediaOfProps = { server: ServerEntry; mediaId: number; place: MediaPlace }
+
+  /**
+   * What a video plays: its file, or away from home, when the file is over the remote limit, the
+   * server's transcode at that limit (core's `remoteTranscodeFor`). The bitrate is asked for only
+   * when the limit could hold a file back, so a play at home makes no call more.
+   */
+  const videoMediaOf = async ({
+    server,
+    mediaId,
+    place,
+  }: VideoMediaOfProps): Promise<RelayedMedia> => {
+    if (!mayHold(place)) return THE_FILE
+    const bitrate = await bitrateOf({ server, mediaId })
+    const quality = remoteTranscodeFor({
+      media: { bitrate },
+      origin: place.origin,
+      remote: place.remote,
+    })
+    return quality === null ? THE_FILE : { kind: RELAYED_MEDIA_KINDS.transcode, quality }
+  }
+
   type ResolveRelayedProps = {
     server: ServerEntry
     mediaId: number
     trackList: Promise<readonly SubtitleTrack[]>
-    kbps: AudioBitrate | null
+    /** What the load relays, given where it is played from. */
+    mediaFor: (place: MediaPlace) => Promise<RelayedMedia>
   }
 
   const resolveRelayed = async ({
     server,
     mediaId,
     trackList,
-    kbps,
+    mediaFor,
   }: ResolveRelayedProps): Promise<ResolvedServerSource> => {
     // The first ticket before anything opens: a title the account may not play is refused here.
     // The origin is picked meanwhile; a ticket opens the file on any of the server's origins.
-    const [tracks, first, origin] = await Promise.all([
+    const [tracks, first, placed] = await Promise.all([
       trackList,
       tickets.ticketFor({ serverId: server.id, mediaId, isFresh: false }),
-      picks.originOf(server),
+      picks.placeOf(server).then(async (place) => ({ place, media: await mediaFor(place) })),
     ])
     if (first.kind !== TICKET_OUTCOMES.ticket) {
       return { ok: false, message: startRefusalOf({ outcome: first, name: server.name }).message }
     }
     const opened = await relay
-      .open({ server, origin, mediaId, sidecarTrackIds: tracks.map((track) => track.id), kbps })
+      .open({
+        server,
+        origin: placed.place.url,
+        mediaId,
+        sidecarTrackIds: tracks.map((track) => track.id),
+        media: placed.media,
+      })
       .catch(() => null)
     if (opened === null) {
       warn(`Raven could not relay a title from ${loggable(server.name)}`)
@@ -286,7 +354,12 @@ export const createServerSources = ({
     if (!found.ok) return found
     // Read while the first ticket is minted: a video wants its sidecars either way.
     const trackList = trackListOf({ server: found.server, mediaId })
-    return resolveRelayed({ server: found.server, mediaId, trackList, kbps: null })
+    return resolveRelayed({
+      server: found.server,
+      mediaId,
+      trackList,
+      mediaFor: (place) => videoMediaOf({ server: found.server, mediaId, place }),
+    })
   }
 
   type ResolveTrackProps = TrackSource
@@ -298,7 +371,13 @@ export const createServerSources = ({
   }: ResolveTrackProps): Promise<ResolvedServerSource> => {
     const found = serverOfSource({ serverId, mediaId })
     if (!found.ok) return found
-    return resolveRelayed({ server: found.server, mediaId, trackList: Promise.resolve([]), kbps })
+    const media: RelayedMedia = kbps === null ? THE_FILE : { kind: RELAYED_MEDIA_KINDS.audio, kbps }
+    return resolveRelayed({
+      server: found.server,
+      mediaId,
+      trackList: Promise.resolve([]),
+      mediaFor: async () => media,
+    })
   }
 
   /**

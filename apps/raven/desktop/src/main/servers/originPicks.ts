@@ -6,6 +6,7 @@ import {
   type OriginProbe,
   PICK_FRESH_MS,
   pickOrigin,
+  type RemotePlayback,
   toQueryString,
 } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
@@ -92,9 +93,22 @@ const trustedOrigin = (origin: MediaOrigin): MediaOrigin | null => {
   }
 }
 
+/**
+ * Where a server's media is fetched from and what that means for a play: the origin's address
+ * (the pick's, or the server's own when none answers), the origin picked (null for the server's
+ * own address), and what the server said of remote play (null when it said nothing).
+ */
+export type MediaPlace = {
+  url: string
+  origin: MediaOrigin | null
+  remote: RemotePlayback | null
+}
+
 export type OriginPicks = {
   /** The origin a server's media is fetched from: the pick, or the server's own address when none answers. */
   originOf: (server: ServerEntry) => Promise<string>
+  /** The same pick as `originOf`, with the origin it is and the server's word on remote play. */
+  placeOf: (server: ServerEntry) => Promise<MediaPlace>
   /** Lets go of the server's pick, so the next ask probes again: its origin went away, or the network moved. */
   forget: (serverId: string) => void
 }
@@ -110,10 +124,11 @@ type CreateOriginPicksProps = {
 }
 
 /**
- * What one probe came to: the origin picked, or none, and whether the server listed an origin to
- * try. A server that lists none (or nothing readable) is asked again only once the pick ages.
+ * What one probe came to: the origin picked, or none, whether the server listed an origin to
+ * try, and what it said of remote play. A server that lists none (or nothing readable) is asked
+ * again only once the pick ages.
  */
-type Picked = { origin: MediaOrigin | null; isListed: boolean }
+type Picked = { origin: MediaOrigin | null; isListed: boolean; remote: RemotePlayback | null }
 
 type Held = { pick: Promise<Picked>; at: number }
 
@@ -145,7 +160,7 @@ export const createOriginPicks = ({
       reply !== null && reply.ok && reply.status === HTTP_STATUSES.ok ? parseJson(reply.body) : null
     if (!isMediaOrigins(body)) {
       safeWarn(`${loggable(server.name)} did not list media origins Raven can read`)
-      return { origin: null, isListed: false }
+      return { origin: null, isListed: false, remote: null }
     }
     const checked = body.origins.map((origin) => ({
       kind: origin.kind,
@@ -166,7 +181,7 @@ export const createOriginPicks = ({
         result.status === 'fulfilled' && result.value !== null ? [result.value] : [],
       ),
     )
-    return { origin, isListed: trusted.length > 0 }
+    return { origin, isListed: trusted.length > 0, remote: body.remote ?? null }
   }
 
   const isFresh = (entry: Held): boolean => {
@@ -193,8 +208,14 @@ export const createOriginPicks = ({
     return pick
   }
 
+  const placeOf: OriginPicks['placeOf'] = async (server) => {
+    const { origin, remote } = await pickOf(server)
+    return { url: origin?.url ?? server.origin, origin, remote }
+  }
+
   return {
-    originOf: async (server) => (await pickOf(server)).origin?.url ?? server.origin,
+    originOf: async (server) => (await placeOf(server)).url,
+    placeOf,
     forget,
   }
 }

@@ -21,7 +21,7 @@ const MB = 1_000_000
 
 const LAN: MediaOrigin = { kind: 'lan', url: 'http://192.168.1.5:3000' }
 const LAN_TWO: MediaOrigin = { kind: 'lan', url: 'http://192.168.1.6:3000' }
-const TAILNET: MediaOrigin = { kind: 'tailnet', url: 'http://vhagar.tail.ts.net:3000' }
+const AWAY: MediaOrigin = { kind: 'public', url: 'https://raven.example.synology.me:8443' }
 const PUBLIC: MediaOrigin = { kind: 'public', url: 'https://media.example.com' }
 
 const originsCall = keyOf({ name: CALL_NAMES.getMediaOrigins })
@@ -63,15 +63,15 @@ const pickedFrom = ({ origins, answers }: PickedFromProps): Promise<string> =>
   run({ replies: withOrigins(origins), answers }).picks.originOf(SERVER)
 
 describe('the pick', () => {
-  it('takes a tailnet origin over a lan one far slower than it', async () => {
+  it('takes a public origin over a lan one far slower than it', async () => {
     const picked = await pickedFrom({
-      origins: [LAN, TAILNET],
+      origins: [LAN, AWAY],
       answers: {
         [LAN.url]: { firstByteMs: 5, bytesPerSecond: 1 * MB },
-        [TAILNET.url]: { firstByteMs: 5, bytesPerSecond: 20 * MB },
+        [AWAY.url]: { firstByteMs: 5, bytesPerSecond: 20 * MB },
       },
     })
-    expect(picked).toBe(TAILNET.url)
+    expect(picked).toBe(AWAY.url)
   })
 
   it('takes a fast lan origin over the slow public address', async () => {
@@ -87,10 +87,10 @@ describe('the pick', () => {
 
   it('takes the nearer kind when it is a little slower', async () => {
     const picked = await pickedFrom({
-      origins: [PUBLIC, TAILNET, LAN],
+      origins: [PUBLIC, AWAY, LAN],
       answers: {
         [PUBLIC.url]: { firstByteMs: 5, bytesPerSecond: 10 * MB },
-        [TAILNET.url]: { firstByteMs: 5, bytesPerSecond: 10 * MB },
+        [AWAY.url]: { firstByteMs: 5, bytesPerSecond: 10 * MB },
         [LAN.url]: { firstByteMs: 5, bytesPerSecond: 9 * MB },
       },
     })
@@ -121,10 +121,10 @@ describe('the pick', () => {
 
   it('leaves out a probe that fails, answers non-2xx, breaks off or ends short', async () => {
     const picked = await pickedFrom({
-      origins: [LAN, LAN_TWO, TAILNET, { kind: 'tailnet', url: 'http://10.1.1.1:3000' }, PUBLIC],
+      origins: [LAN, LAN_TWO, AWAY, { kind: 'lan', url: 'http://10.1.1.1:3000' }, PUBLIC],
       answers: {
         [LAN_TWO.url]: { status: 503 },
-        [TAILNET.url]: { isBroken: true },
+        [AWAY.url]: { isBroken: true },
         'http://10.1.1.1:3000': { bytes: MEDIA_PROBE_BYTES - 1 },
         [PUBLIC.url]: { firstByteMs: 80, bytesPerSecond: 2 * MB },
       },
@@ -134,10 +134,10 @@ describe('the pick', () => {
 
   it("uses the server's own origin when no probe scores", async () => {
     const picked = await pickedFrom({
-      origins: [LAN, LAN_TWO, TAILNET, PUBLIC],
+      origins: [LAN, LAN_TWO, AWAY, PUBLIC],
       answers: {
         [LAN_TWO.url]: { status: 500 },
-        [TAILNET.url]: { isBroken: true },
+        [AWAY.url]: { isBroken: true },
         [PUBLIC.url]: { bytes: 0 },
       },
     })
@@ -175,13 +175,13 @@ describe('createOriginPicks', () => {
   })
 
   it('holds the pick until forget, then reads the origins and probes them again', async () => {
-    const answers: Record<string, PingAnswer> = { [LAN.url]: {}, [TAILNET.url]: {} }
-    const { picks, log, asked } = run({ replies: withOrigins([LAN, TAILNET]), answers })
+    const answers: Record<string, PingAnswer> = { [LAN.url]: {}, [AWAY.url]: {} }
+    const { picks, log, asked } = run({ replies: withOrigins([LAN, AWAY]), answers })
     expect(await picks.originOf(SERVER)).toBe(LAN.url)
     answers[LAN.url] = { status: 503 }
     expect(await picks.originOf(SERVER)).toBe(LAN.url)
     picks.forget(SERVER.id)
-    expect(await picks.originOf(SERVER)).toBe(TAILNET.url)
+    expect(await picks.originOf(SERVER)).toBe(AWAY.url)
     expect(log.filter((key) => key === originsCall)).toHaveLength(2)
     expect(asked).toHaveLength(4)
   })
@@ -259,7 +259,7 @@ describe('createOriginPicks', () => {
   it('drops origins that are not plain http or https, probing none of them', async () => {
     const hostile: MediaOrigin[] = [
       { kind: 'lan', url: 'file:///etc/hosts?' },
-      { kind: 'tailnet', url: '/relative' },
+      { kind: 'public', url: '/relative' },
       { kind: 'public', url: 'javascript:alert(1)' },
       { kind: 'lan', url: 'http://user:pass@192.168.1.9:3000' },
     ]
@@ -268,7 +268,7 @@ describe('createOriginPicks', () => {
     expect(asked).toEqual([])
     expect(warnings).toHaveLength(1)
     expect(warnings[0]).toContain('Vhagar')
-    expect(warnings[0]).toContain('lan, tailnet, public, lan')
+    expect(warnings[0]).toContain('lan, public, public, lan')
     expect(warnings.join(' ')).not.toMatch(/etc|relative|javascript|pass/u)
   })
 
@@ -323,5 +323,42 @@ describe('createOriginPicks', () => {
       },
     })
     expect(await picks.originOf(SERVER)).toBe(SERVER.origin)
+  })
+})
+
+describe('placeOf', () => {
+  const REMOTE = { limit: 'high720', isOutside: true } as const
+
+  it('answers the origin picked and what the server said of remote play, from the one probe', async () => {
+    const { picks, log } = run({
+      replies: { [originsCall]: ok({ origins: [AWAY], remote: REMOTE }) },
+      answers: { [AWAY.url]: { firstByteMs: 5 } },
+    })
+    expect(await picks.placeOf(SERVER)).toEqual({ url: AWAY.url, origin: AWAY, remote: REMOTE })
+    expect(await picks.originOf(SERVER)).toBe(AWAY.url)
+    expect(log).toEqual([originsCall])
+  })
+
+  it("answers the server's own address, and the server's word, when no origin answers", async () => {
+    const { picks } = run({
+      replies: { [originsCall]: ok({ origins: [], remote: REMOTE }) },
+      answers: {},
+    })
+    expect(await picks.placeOf(SERVER)).toEqual({
+      url: SERVER.origin,
+      origin: null,
+      remote: REMOTE,
+    })
+  })
+
+  it('says nothing of remote play for an older server, or one whose list cannot be read', async () => {
+    const older = run({ replies: withOrigins([]), answers: {} })
+    expect((await older.picks.placeOf(SERVER)).remote).toBeNull()
+    const unreadable = run({ replies: { [originsCall]: ok({ nope: true }) }, answers: {} })
+    expect(await unreadable.picks.placeOf(SERVER)).toEqual({
+      url: SERVER.origin,
+      origin: null,
+      remote: null,
+    })
   })
 })

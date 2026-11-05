@@ -29,33 +29,28 @@ const NETLIFY_VALUES = { on: 'true' } as const
 const NETLIFY_IMAGE_CDN = '/.netlify/images'
 
 /**
- * On Netlify (netlify.toml) the app is served apart from raven, so the build
- * writes a `_redirects` that proxies /api to RAVEN_API_ORIGIN, raven's public
- * address. The app still calls its own origin, which keeps the PIN and admin
- * lock cookies first party. Netlify reads no environment variables in
- * netlify.toml's redirects, hence a file written here.
+ * On Netlify the app is served apart from raven, and `netlify.toml` proxies
+ * /api, signed, to raven's public origin, so the app still calls its own
+ * origin and the PIN and admin lock cookies stay first party. RAVEN_API_ORIGIN
+ * names that origin to the build (`VITE_API_ORIGIN`) and the functions, so a
+ * Netlify build without a valid one fails here.
  */
-const netlifyApiProxy = (): Plugin => ({
-  name: 'raven-netlify-api-proxy',
+const netlifyApiOrigin = (): Plugin => ({
+  name: 'raven-netlify-api-origin',
   apply: 'build',
   generateBundle() {
     const origin = process.env[ENV.apiOrigin]
     // Netlify sets NETLIFY; without the proxy every /api call would get index.html.
     if (!origin && process.env[ENV.netlify] === NETLIFY_VALUES.on) {
-      return this.error('Set RAVEN_API_ORIGIN in the Netlify site, to raven on Vhagar.')
+      return this.error("Set RAVEN_API_ORIGIN in the Netlify site, to raven's public origin.")
     }
     if (!origin) return
     const url = URL.canParse(origin) ? new URL(origin) : null
     if (url?.protocol !== URL_PROTOCOLS.https || url.origin !== origin.replace(/\/+$/, '')) {
       return this.error(
-        `RAVEN_API_ORIGIN must be an https origin with no path, such as https://raven.example.ts.net, not ${origin}`,
+        `RAVEN_API_ORIGIN must be an https origin with no path, such as https://raven.example.synology.me:8443, not ${origin}`,
       )
     }
-    this.emitFile({
-      type: 'asset',
-      fileName: '_redirects',
-      source: `/api/*  ${url.origin}/api/:splat  200\n`,
-    })
   },
 })
 
@@ -229,7 +224,7 @@ const vendorChunkTest = (packages: readonly string[]) => (id: string) =>
 export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
-    netlifyApiProxy(),
+    netlifyApiOrigin(),
     restartOnRavenEnv(),
     inlineRavenMark(),
     preloadStylesheets(),

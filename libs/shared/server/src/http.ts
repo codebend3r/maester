@@ -9,6 +9,7 @@ export const HEADERS = {
   contentRange: 'content-range',
   contentType: 'content-type',
   range: 'range',
+  retryAfter: 'retry-after',
   setCookie: 'set-cookie',
   vary: 'vary',
   xNoCompression: 'x-no-compression',

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ACCOUNTS_OPT_OUT, AUTH_ENV } from '@/auth/authConfig'
 import { MUSIC_ENV, readServerConfig } from '@/config'
 import { REQUEST_LOG_ENV } from '@/requestLog'
+import { REMOTE_ACCESS_ENV } from '@/remoteAccess/remoteAccessConfig'
 
 describe('readServerConfig', () => {
   it('keeps 20 GiB of track transcodes unless TRANSCODE_CACHE_GB says otherwise', () => {
@@ -125,5 +126,14 @@ describe('readServerConfig', () => {
         (value) => readServerConfig({ [AUTH_ENV.accounts]: value }).isAccountsOptedOut,
       ),
     ).toEqual([false, false, false, false, false, false])
+  })
+
+  it("takes Netlify's proxy secret only when it is long enough to be no guess", () => {
+    const secretOf = (value?: string) =>
+      readServerConfig(value === undefined ? {} : { [REMOTE_ACCESS_ENV.proxySecret]: value })
+        .remoteAccess.proxySecret
+    expect(secretOf()).toBeNull()
+    expect(secretOf('short')).toBeNull()
+    expect(secretOf(` ${'s'.repeat(32)} `)).toEqual(new TextEncoder().encode('s'.repeat(32)))
   })
 })

@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'bun:test'
-import { DEFAULT_SERVER_ORIGIN, DESKTOP_ENV } from '@raven/core'
-import { AUTH_ORIGIN_HOOK, authOriginFrom, linkOriginsFrom, serverOriginFrom } from '@/main/origins'
-import { isServerOrigin } from '@raven/core'
+import {
+  DEFAULT_LINK_ORIGINS,
+  DEFAULT_SERVER_ORIGIN,
+  DESKTOP_ENV,
+  isServerOrigin,
+} from '@raven/core'
+import { namesServer } from '@/main/desktopConfig'
+import {
+  AUTH_ORIGIN_HOOK,
+  authOriginFrom,
+  fixedServerFrom,
+  LEGACY_FUNNEL_ORIGIN,
+  linkOriginsFrom,
+  serverOriginFrom,
+} from '@/main/origins'
 
 describe('authOriginFrom', () => {
   const HOOK = 'http://127.0.0.1:9000'
@@ -44,12 +56,13 @@ describe('authOriginFrom', () => {
 })
 
 describe('isServerOrigin', () => {
-  it.each(['https://raven.example.ts.net', 'http://192.168.50.6:8484', DEFAULT_SERVER_ORIGIN])(
-    'accepts %p',
-    (origin) => {
-      expect(isServerOrigin(origin)).toBe(true)
-    },
-  )
+  it.each([
+    'https://raven.example.synology.me:8443',
+    'http://192.168.50.6:8484',
+    DEFAULT_SERVER_ORIGIN,
+  ])('accepts %p', (origin) => {
+    expect(isServerOrigin(origin)).toBe(true)
+  })
 
   it.each([
     'https://raven.example/',
@@ -67,7 +80,7 @@ describe('isServerOrigin', () => {
 })
 
 describe('serverOriginFrom', () => {
-  const BUILT = 'https://raven.example.ts.net'
+  const BUILT = 'https://raven.example.synology.me:8443'
   const HOOK = 'http://127.0.0.1:9000'
 
   type PickProps = {
@@ -170,5 +183,43 @@ describe('linkOriginsFrom', () => {
       origins: [],
       warnings: ['Raven ignored 3 of RAVEN_DESKTOP_LINK_ORIGINS: not http or https origins.'],
     })
+  })
+})
+
+describe('fixedServerFrom', () => {
+  const [WEB_APP = ''] = DEFAULT_LINK_ORIGINS
+
+  it("gives the default server the web app's site as an alias and the Funnel origin as a former one", () => {
+    expect(fixedServerFrom({ origin: DEFAULT_SERVER_ORIGIN, linkOrigins: [] })).toEqual({
+      origin: DEFAULT_SERVER_ORIGIN,
+      aliases: [WEB_APP],
+      former: [LEGACY_FUNNEL_ORIGIN],
+    })
+  })
+
+  it("adds the build's link origins to the built-in ones, each once and never the server's own", () => {
+    expect(
+      fixedServerFrom({
+        origin: DEFAULT_SERVER_ORIGIN,
+        linkOrigins: ['http://192.168.50.6:8484', WEB_APP, DEFAULT_SERVER_ORIGIN],
+      }).aliases,
+    ).toEqual([WEB_APP, 'http://192.168.50.6:8484'])
+  })
+
+  it('gives another server only the link origins the build names', () => {
+    expect(
+      fixedServerFrom({ origin: 'http://localhost:8484', linkOrigins: ['http://127.0.0.1:8484'] }),
+    ).toEqual({
+      origin: 'http://localhost:8484',
+      aliases: ['http://127.0.0.1:8484'],
+      former: [],
+    })
+  })
+
+  it("takes a link naming the web app's site as the default server's, and not the Funnel's", () => {
+    const server = fixedServerFrom({ origin: DEFAULT_SERVER_ORIGIN, linkOrigins: [] })
+    expect(namesServer({ server, origin: WEB_APP })).toBe(true)
+    expect(namesServer({ server, origin: DEFAULT_SERVER_ORIGIN })).toBe(true)
+    expect(namesServer({ server, origin: LEGACY_FUNNEL_ORIGIN })).toBe(false)
   })
 })

@@ -17,7 +17,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   warn.mockRestore()
-  useMediaOrigin.setState({ pick: null, isProbing: false, hasProbed: false })
+  useMediaOrigin.setState({ pick: null, remote: null, isProbing: false, hasProbed: false })
   useToasts.setState({ toasts: [] })
 })
 

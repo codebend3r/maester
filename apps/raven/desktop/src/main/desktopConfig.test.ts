@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test'
-import { DEFAULT_OUTPUT_SETTINGS, type PassthroughFormat } from '@raven/core'
+import {
+  DEFAULT_LINK_ORIGINS,
+  DEFAULT_OUTPUT_SETTINGS,
+  DEFAULT_SERVER_ORIGIN,
+  type PassthroughFormat,
+} from '@raven/core'
 import {
   CONFIG_FILE,
   DEFAULT_UPDATE_SETTINGS,
@@ -16,6 +21,7 @@ import {
   setUpdates,
   upgradeConfig,
 } from '@/main/desktopConfig'
+import { fixedServerFrom, LEGACY_FUNNEL_ORIGIN } from '@/main/origins'
 import { configFor } from '@/main/test/configFakes'
 import type { StateFs } from '@/main/stateStore'
 
@@ -24,9 +30,10 @@ type IdForProps = { n: number }
 const idFor = ({ n }: IdForProps): string =>
   `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`
 
-const ORIGIN = 'https://raven.example.ts.net'
+const ORIGIN = 'https://raven.example.synology.me:8443'
 const ALIAS = 'http://192.168.50.6:8484'
-const SERVER = { origin: ORIGIN, aliases: [ALIAS] }
+const FORMER = 'https://raven.former.example'
+const SERVER = { origin: ORIGIN, aliases: [ALIAS], former: [FORMER] }
 const NEW_ID = idFor({ n: 99 })
 const newId = () => NEW_ID
 
@@ -152,6 +159,87 @@ describe('namesServer', () => {
     expect(namesServer({ server: SERVER, origin: ORIGIN })).toBe(true)
     expect(namesServer({ server: SERVER, origin: ALIAS })).toBe(true)
     expect(namesServer({ server: SERVER, origin: 'https://other.example' })).toBe(false)
+  })
+
+  it('takes no former origin as the server, since only adoption reads those', () => {
+    expect(namesServer({ server: SERVER, origin: FORMER })).toBe(false)
+  })
+})
+
+describe('the default server and an older install', () => {
+  const DEFAULT = fixedServerFrom({ origin: DEFAULT_SERVER_ORIGIN, linkOrigins: [] })
+  const [WEB_APP = ''] = DEFAULT_LINK_ORIGINS
+
+  it.each([
+    ['the Tailscale Funnel origin', LEGACY_FUNNEL_ORIGIN],
+    ["the web app's site", WEB_APP],
+  ])('keeps a version 5 install under %s, with its id, account and downloads', (_name, origin) => {
+    const stored = { ...configFor({ id: idFor({ n: 1 }), origin }), lastAccountId: 'ada' }
+    expect(upgradeConfig({ stored, server: DEFAULT, newId })).toEqual({
+      config: {
+        ...configFor({ id: idFor({ n: 1 }), origin: DEFAULT_SERVER_ORIGIN }),
+        lastAccountId: 'ada',
+      },
+      adopted: [],
+      isChanged: true,
+    })
+  })
+
+  it.each([
+    ['the Tailscale Funnel origin', LEGACY_FUNNEL_ORIGIN],
+    ["the web app's site", WEB_APP],
+  ])('adopts a version 4 server under %s as the default one', (_name, origin) => {
+    const stored = {
+      version: 4 as const,
+      output: DEFAULT_OUTPUT_SETTINGS,
+      servers: [
+        listedFor({ n: 1, origin: 'https://other.example' }),
+        listedFor({ n: 2, origin }),
+        listedFor({ n: 3, origin: DEFAULT_SERVER_ORIGIN }),
+      ],
+      updates: UPDATES,
+    }
+    expect(upgradeConfig({ stored, server: DEFAULT, newId })).toEqual({
+      config: {
+        ...configFor({ id: idFor({ n: 2 }), origin: DEFAULT_SERVER_ORIGIN }),
+        updates: UPDATES,
+      },
+      adopted: [idFor({ n: 3 })],
+      isChanged: true,
+    })
+  })
+
+  it('adopts both legacy origins listed together under the first one', () => {
+    const stored = {
+      version: 3 as const,
+      output: DEFAULT_OUTPUT_SETTINGS,
+      servers: [
+        listedFor({ n: 1, origin: LEGACY_FUNNEL_ORIGIN }),
+        listedFor({ n: 2, origin: WEB_APP }),
+      ],
+      updates: UPDATES,
+    }
+    const { config, adopted } = upgradeConfig({ stored, server: DEFAULT, newId })
+    expect(config.server).toEqual({ id: idFor({ n: 1 }), origin: DEFAULT_SERVER_ORIGIN })
+    expect(adopted).toEqual([idFor({ n: 2 })])
+  })
+
+  it('does not adopt the legacy origins for a build that names another server', () => {
+    const other = fixedServerFrom({ origin: ORIGIN, linkOrigins: [] })
+    const stored = {
+      version: 4 as const,
+      output: DEFAULT_OUTPUT_SETTINGS,
+      servers: [
+        listedFor({ n: 1, origin: LEGACY_FUNNEL_ORIGIN }),
+        listedFor({ n: 2, origin: WEB_APP }),
+      ],
+      updates: UPDATES,
+    }
+    expect(upgradeConfig({ stored, server: other, newId })).toEqual({
+      config: { ...configFor({ id: NEW_ID, origin: ORIGIN }), updates: UPDATES },
+      adopted: [],
+      isChanged: true,
+    })
   })
 })
 

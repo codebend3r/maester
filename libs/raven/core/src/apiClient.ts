@@ -12,6 +12,7 @@ import { musicCalls } from '@/apiClient/music'
 import { pictureCalls } from '@/apiClient/pictures'
 import { playlistCalls } from '@/apiClient/playlists'
 import { playbackCalls } from '@/apiClient/playback'
+import { remoteAccessCalls } from '@/apiClient/remoteAccess'
 import { reportCalls } from '@/apiClient/reports'
 import { scrobblingCalls } from '@/apiClient/scrobbling'
 import { settingsCalls } from '@/apiClient/settings'
@@ -81,6 +82,7 @@ export const createApiClient = ({
     ...scrobblingCalls(transport),
     ...pictureCalls({ transport, pictureCdn }),
     ...settingsCalls(transport),
+    ...remoteAccessCalls(transport),
     ...playbackCalls(transport),
     ...reportCalls(transport),
   }

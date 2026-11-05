@@ -22,6 +22,7 @@ import {
   routeState,
 } from '@raven/core'
 import { watchAppHide } from '@raven/native'
+import { AT_HOME, type PlayNetwork } from '@raven/native/headless'
 import {
   VIDEO_EVENTS,
   initialVideoState,
@@ -88,6 +89,9 @@ import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTE_PARAMS, PLAY_FROM, ROUTE_TARGETS, hrefOf, secondsOf } from '@/routes'
 import { PLAYER_SCREEN_COPY } from '@/screens/copy'
 import { useAppPrefs } from '@/stores/appPrefs'
+
+/** The cache key where a video plays from sits under, with the server and the video. */
+const PLAY_NETWORK_KEY = 'playNetwork'
 
 /** How often the player says where it is, in milliseconds: often enough for a smooth clock. */
 const PROGRESS_EVERY_MS = 250
@@ -174,6 +178,8 @@ type PlayingProps = {
   tracks: MediaTracks | null
   summary: string | null
   policy: PlaybackPolicy
+  /** Where the video plays from, which holds a file over the remote limit to a transcode away from home. */
+  network: PlayNetwork
   at: number
   /** Starts at the very beginning, past any spot the server saved. */
   isFromStart: boolean
@@ -196,6 +202,7 @@ const Playing = ({
   tracks,
   summary,
   policy,
+  network,
   at,
   isFromStart,
   session,
@@ -239,8 +246,9 @@ const Playing = ({
         policy,
         prefs: { shouldPreferDirectPlay, isTranscodeAllowed },
         shouldDrawCaptions,
+        network,
       }),
-    [media, tracks, policy, shouldPreferDirectPlay, isTranscodeAllowed],
+    [media, tracks, policy, shouldPreferDirectPlay, isTranscodeAllowed, network],
   )
   const [video, dispatchVideo] = useReducer(videoReducer, resumeAt, initialVideoState)
   const [isPaused, setPaused] = useState(false)
@@ -540,15 +548,17 @@ type ReadyPlayerViewOfProps = ReadyPlayerProps & {
   policy: ReturnType<typeof usePlaybackPolicy>
   tracks: Pick<UseQueryResult<MediaTracks>, 'isPending' | 'data'>
   details: Pick<UseQueryResult<ItemDetails>, 'isLoading' | 'data'>
+  network: Pick<UseQueryResult<PlayNetwork>, 'isPending' | 'data'>
 }
 
 const readyPlayerViewOf = ({
   policy,
   tracks,
   details,
+  network,
   ...playing
 }: ReadyPlayerViewOfProps): ViewOf<ReadyPlayerViewProps> => {
-  if (policy === null || tracks.isPending || details.isLoading) {
+  if (policy === null || tracks.isPending || details.isLoading || network.isPending) {
     return {
       key: READY_PLAYER_VIEW_KEYS.loading,
       props: { label: PLAYER_SCREEN_COPY.opening, onBack: playing.onBack },
@@ -560,21 +570,31 @@ const readyPlayerViewOf = ({
     props: {
       ...playing,
       policy,
+      network: network.data ?? AT_HOME,
       summary: details.data?.summary ?? null,
       tracks: tracks.data ?? null,
     },
   }
 }
 
-/** A video once the server's playback settings and its tracks are known. */
+/** A video once the server's playback settings, its tracks and where it plays from are known. */
 const ReadyPlayer = (props: ReadyPlayerProps) => {
   const { session, media } = props
   const policy = usePlaybackPolicy({ queries: session.queries })
   const tracks = useQuery(session.queries.tracksQuery(media.id))
+  // Read before the plan is made, which starts a file over the remote limit at the transcode
+  // away from home; the pick and the ticket are the ones its first source then plays by.
+  const network = useQuery({
+    queryKey: [PLAY_NETWORK_KEY, session.server.id, media.id],
+    queryFn: () => mediaSourcesFor(session.server).networkFor(media.id),
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: 0,
+    retry: false,
+  })
   // Read before the source is handed over, which carries the synopsis on a TV: a source that
   // changes once playing reloads the video.
   const details = useQuery(session.queries.itemQuery(media.item?.id ?? null))
-  const view = readyPlayerViewOf({ ...props, policy, tracks, details })
+  const view = readyPlayerViewOf({ ...props, policy, tracks, details, network })
   return <KeyedView<ReadyPlayerViewProps> view={view} views={READY_PLAYER_VIEWS} />
 }
 

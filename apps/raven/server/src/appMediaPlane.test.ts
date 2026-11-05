@@ -25,10 +25,13 @@ import { apiFor } from '@/test/server'
 
 const ORIGINS: MediaOrigin[] = [
   { kind: 'lan', url: 'https://raven.home.example' },
-  { kind: 'tailnet', url: 'https://raven.tail.ts.net' },
+  { kind: 'public', url: 'https://raven.example.com:8443' },
 ]
 
 const MIB = 1_048_576
+
+/** What a request from the LAN hears of remote play on a server with no limit. */
+const HOME_REMOTE = { limit: null, isOutside: false } as const
 
 const SIX_HOURS = 21_600_000
 
@@ -127,9 +130,10 @@ describe('the media plane routes', () => {
     const response = await on().app.inject({ method: 'GET', url: '/api/media-origins' })
     expect(response.statusCode).toBe(200)
     expect(response.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
-    expect(response.json()).toEqual({ origins: ORIGINS })
+    expect(response.json()).toEqual({ origins: ORIGINS, remote: HOME_REMOTE })
     await expect(apiFor({ app: on().app }).getMediaOrigins()).resolves.toEqual({
       origins: ORIGINS,
+      remote: HOME_REMOTE,
     })
   })
 
@@ -183,7 +187,7 @@ describe('the media plane routes', () => {
 
   it('lists no origins and answers 503 for a ticket when the secret is unusable', async () => {
     const client = apiFor({ app: off().app })
-    await expect(client.getMediaOrigins()).resolves.toEqual({ origins: [] })
+    await expect(client.getMediaOrigins()).resolves.toEqual({ origins: [], remote: HOME_REMOTE })
     const listed = await off().app.inject({ method: 'GET', url: '/api/media-origins' })
     expect(listed.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
     await expect(client.getMediaTicket(off().video)).rejects.toMatchObject({ status: 503 })

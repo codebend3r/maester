@@ -11,7 +11,6 @@ import {
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { ERROR_NAMES } from '@/errorMessage'
-import { RAVEN_HEADERS } from '@/http'
 import {
   type ExternalScore,
   SCORE_ANSWERS,
@@ -109,7 +108,7 @@ type IsDaySpentProps = { body: unknown; headers: Headers }
  */
 const isDaySpent = ({ body, headers }: IsDaySpentProps): boolean =>
   (isRecord(body) && body.error === DAILY_LIMIT_ERROR) ||
-  (wholeHeader(headers.get(RAVEN_HEADERS.retryAfter)) ?? 0) > BURST_WAIT_SECONDS ||
+  (wholeHeader(headers.get(HEADERS.retryAfter)) ?? 0) > BURST_WAIT_SECONDS ||
   wholeHeader(headers.get(MDBLIST_HEADERS.remaining)) === 0
 
 type MdblistClientNoteReportedProps = { headers: Headers; atCall: number }
@@ -226,7 +225,7 @@ export class MdblistClient implements ScoreSource {
           throw new Error(this.status.error)
         }
         if (retriesLeft > 0) {
-          await sleep(retryAfterMs(response.headers.get(RAVEN_HEADERS.retryAfter)))
+          await sleep(retryAfterMs(response.headers.get(HEADERS.retryAfter)))
           return attempt(retriesLeft - 1)
         }
       }

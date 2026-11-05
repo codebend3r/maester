@@ -36,7 +36,7 @@ const MINUTE_MS = 60_000
 const MB = 1_000_000
 
 const LAN: MediaOrigin = { kind: 'lan', url: 'http://192.168.1.5:3000' }
-const TAILNET: MediaOrigin = { kind: 'tailnet', url: 'http://vhagar.tail.ts.net:3000' }
+const AWAY: MediaOrigin = { kind: 'public', url: 'https://raven.example.synology.me:8443' }
 const PUBLIC: MediaOrigin = { kind: 'public', url: 'https://media.example.com' }
 
 const originsCall = keyOf({ name: CALL_NAMES.getMediaOrigins })
@@ -142,15 +142,15 @@ describe('createMediaAccess', () => {
   })
 
   it('holds the pick until forget, then reads the origins and probes them again', async () => {
-    const answers: Record<string, PingAnswer> = { [LAN.url]: {}, [TAILNET.url]: {} }
-    const { access, log, asked } = run({ replies: withOrigins([LAN, TAILNET]), answers })
+    const answers: Record<string, PingAnswer> = { [LAN.url]: {}, [AWAY.url]: {} }
+    const { access, log, asked } = run({ replies: withOrigins([LAN, AWAY]), answers })
     const accessed = async () =>
       succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE }))
     expect((await accessed()).url).toBe(LAN.url)
     answers[LAN.url] = { status: 503 }
     expect((await accessed()).url).toBe(LAN.url)
     access.forget(SERVER_ID)
-    expect((await accessed()).url).toBe(TAILNET.url)
+    expect((await accessed()).url).toBe(AWAY.url)
     expect(log.filter((key) => key === originsCall)).toHaveLength(2)
     expect(asked).toHaveLength(4)
   })

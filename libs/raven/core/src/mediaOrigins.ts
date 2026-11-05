@@ -6,10 +6,7 @@ export type OriginProbe = {
   bytesPerSecond: number
 }
 
-const ORIGIN_KIND_RANK = { lan: 0, tailnet: 1, public: 2 } as const satisfies Record<
-  MediaOriginKind,
-  number
->
+const ORIGIN_KIND_RANK = { lan: 0, public: 1 } as const satisfies Record<MediaOriginKind, number>
 
 /** How long a client trusts a pick before it probes the origins again. */
 export const PICK_FRESH_MS = 600_000

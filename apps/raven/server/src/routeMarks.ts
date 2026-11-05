@@ -7,11 +7,12 @@ import { type AccountRequirement, accountRuleOf } from '@/auth/accountGuard'
 import { type PassKind, passKindOf } from '@/auth/accountPasses'
 import { type LockMark, lockMarkOf, lockMarkProblems } from '@/lock/lockGuard'
 import { isMediaPlaneRoute } from '@/media/mediaPlaneMark'
+import { type RateTier, rateTierOf } from '@/rateLimits/rateTiers'
 
 /** Where a route's mark is read: its handler, then its controller, the first mark found winning. */
 export type MarkTargets = Parameters<Reflector['getAllAndOverride']>[1]
 
-/** A route as its decorators declare it, with what it says to the PIN lock, to the admin lock and to the account gate, whether it is on the media plane, and which account pass opens it, if any. */
+/** A route as its decorators declare it, with what it says to the PIN lock, to the admin lock and to the account gate, whether it is on the media plane, which account pass opens it, if any, and the tier its requests are counted in. */
 export type RouteMark = {
   method: string
   path: string
@@ -20,6 +21,7 @@ export type RouteMark = {
   account: AccountRequirement
   mediaPlane: boolean
   pass: PassKind | null
+  rate: RateTier
 }
 
 const decorators = new Reflector()
@@ -56,6 +58,7 @@ export const routeMarks = (controllers: readonly Type[]): RouteMark[] =>
           account: accountRuleOf(targets).requirement,
           mediaPlane: isMediaPlaneRoute(targets),
           pass: passKindOf(targets),
+          rate: rateTierOf(targets),
         },
       ]
     })

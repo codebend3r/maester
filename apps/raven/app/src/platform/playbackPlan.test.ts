@@ -10,9 +10,12 @@ import {
   SUBTITLE_SOURCES,
   type SubtitleTrack,
   AUDIO_CODECS,
+  MEDIA_ORIGIN_KINDS,
+  type StreamQuality,
   TRANSCODINGS,
   VIDEO_CODECS,
 } from '@raven/core'
+import { AT_HOME, type PlayNetwork } from '@raven/native/headless'
 import { mediaItemFor } from '@/test/mediaItem'
 import { SUBTITLE_CODECS } from '@/test/subtitleCodecs'
 
@@ -92,6 +95,7 @@ type PlanOnProps = {
   tracks: MediaTracks | null
   policy?: PlaybackPolicy
   prefs?: PlaybackPrefs
+  network?: PlayNetwork
 }
 
 const planOn = ({
@@ -101,7 +105,8 @@ const planOn = ({
   tracks,
   policy = AUTO,
   prefs = DEFAULT_APP_PREFS,
-}: PlanOnProps) => planFor({ platform, shouldDrawCaptions, media, tracks, policy, prefs })
+  network = AT_HOME,
+}: PlanOnProps) => planFor({ platform, shouldDrawCaptions, media, tracks, policy, prefs, network })
 
 const modesOn = (input: Parameters<typeof planOn>[0]) => planOn(input).modes
 
@@ -264,5 +269,51 @@ describe("planFor narrowed by this device's settings", () => {
         prefs: NO_MAYBES,
       }),
     ).toEqual([PLAYBACK_MODES.direct])
+  })
+})
+
+/** The remote limit the server holds a play away from home to: 720p at 3 Mb/s. */
+const LIMIT: StreamQuality = 'medium720'
+
+const LIMITED = { limit: LIMIT, isOutside: false }
+const PUBLIC_PLAY: PlayNetwork = { origin: { kind: MEDIA_ORIGIN_KINDS.public }, remote: LIMITED }
+const LAN_PLAY: PlayNetwork = { origin: { kind: MEDIA_ORIGIN_KINDS.lan }, remote: LIMITED }
+
+/** The MP4 at 20 Mb/s, over the limit. */
+const HEAVY_MP4 = { ...MP4, bitrate: 20_000_000 }
+/** The MP4 at 2 Mb/s, under it. */
+const LIGHT_MP4 = { ...MP4, bitrate: 2_000_000 }
+
+const TRANSCODE_FIRST = [PLAYBACK_MODES.transcode, PLAYBACK_MODES.direct, PLAYBACK_MODES.remux]
+
+describe('planFor away from home', () => {
+  it('starts a file over the remote limit at the transcode from the public origin', () => {
+    expect(modesOn({ ...IPHONE, media: HEAVY_MP4, network: PUBLIC_PLAY })).toEqual(TRANSCODE_FIRST)
+  })
+
+  it('plans as at home from a LAN origin, however heavy the file', () => {
+    expect(modesOn({ ...IPHONE, media: HEAVY_MP4, network: LAN_PLAY })).toEqual(EVERY_WAY)
+  })
+
+  it('plans as at home for a file under the remote limit', () => {
+    expect(modesOn({ ...IPHONE, media: LIGHT_MP4, network: PUBLIC_PLAY })).toEqual(EVERY_WAY)
+  })
+
+  it("starts at the transcode from the server's own address only when the device is outside", () => {
+    const outside = { origin: null, remote: { ...LIMITED, isOutside: true } }
+    expect(modesOn({ ...IPHONE, media: HEAVY_MP4, network: outside })).toEqual(TRANSCODE_FIRST)
+    const inside = { origin: null, remote: LIMITED }
+    expect(modesOn({ ...IPHONE, media: HEAVY_MP4, network: inside })).toEqual(EVERY_WAY)
+  })
+
+  it('keeps a plan with no transcode as it is, as this device allowing none leaves it', () => {
+    expect(
+      modesOn({
+        ...IPHONE,
+        media: HEAVY_MP4,
+        network: PUBLIC_PLAY,
+        prefs: NO_TRANSCODE,
+      }),
+    ).toEqual([PLAYBACK_MODES.direct, PLAYBACK_MODES.remux])
   })
 })

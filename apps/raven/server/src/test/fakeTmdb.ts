@@ -1,5 +1,5 @@
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
-import { RAVEN_CONTENT_TYPES, RAVEN_HEADERS } from '@/http'
+import { RAVEN_CONTENT_TYPES } from '@/http'
 import {
   type MetadataFetch,
   TMDB_EXTERNAL_SOURCES,
@@ -534,7 +534,7 @@ export const fakeTmdb = ({
         return json({
           body: { error: 'Daily API limit exceeded!' },
           status: 429,
-          headers: { [RAVEN_HEADERS.retryAfter]: '3600' },
+          headers: { [HEADERS.retryAfter]: '3600' },
         })
       }
       const title = /^\/tmdb\/(movie|show)\/(\d+)\/$/.exec(parsed.pathname)

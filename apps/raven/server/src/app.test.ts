@@ -890,6 +890,7 @@ describe('live updates', () => {
       })
       expect(response.headers.get(HEADERS.contentType)).toContain(CONTENT_TYPES.eventStream)
       expect(response.headers.get(HEADERS.contentEncoding)).toBeNull()
+      expect(response.headers.get(RAVEN_HEADERS.accelBuffering)).toBe('no')
       const reader = response.body?.getReader()
       if (!reader) throw new Error('no body to read')
       const decoder = new TextDecoder()

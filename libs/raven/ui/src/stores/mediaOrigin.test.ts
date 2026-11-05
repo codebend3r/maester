@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'bun:test'
-import { type MediaOrigin, PICK_FRESH_MS } from '@raven/core'
+import { type MediaOrigin, PICK_FRESH_MS, type RemotePlayback } from '@raven/core'
 import { isFreshPick, useMediaOrigin } from '@/stores/mediaOrigin'
 import { STORE_KEYS } from '@/stores/storage'
 
 const origin: MediaOrigin = { kind: 'lan', url: 'https://lan.example' }
+const remote: RemotePlayback = { limit: 'high720', isOutside: true }
 
 const withThrowingLocalStorage = (run: () => void) => {
   const original = Object.getOwnPropertyDescriptor(window, 'localStorage')
@@ -21,11 +22,12 @@ const withThrowingLocalStorage = (run: () => void) => {
 }
 
 describe('useMediaOrigin', () => {
-  it('keeps the pick in localStorage, and only the pick', () => {
+  it('keeps the pick and the remote limit in localStorage, and only those', () => {
     useMediaOrigin.getState().setProbing(true)
+    useMediaOrigin.getState().setRemote(remote)
     useMediaOrigin.getState().setPick({ origin, at: 1000 })
     const stored = JSON.parse(window.localStorage.getItem(STORE_KEYS.mediaOrigin) ?? 'null')
-    expect(stored.state).toEqual({ pick: { origin, at: 1000 } })
+    expect(stored.state).toEqual({ pick: { origin, at: 1000 }, remote })
     useMediaOrigin.getState().setPick(null)
     expect(useMediaOrigin.getState().pick).toBeNull()
     const cleared = JSON.parse(window.localStorage.getItem(STORE_KEYS.mediaOrigin) ?? 'null')
@@ -35,19 +37,24 @@ describe('useMediaOrigin', () => {
   it('takes a stored pick back on rehydrate, and drops one that is not a pick', async () => {
     window.localStorage.setItem(
       STORE_KEYS.mediaOrigin,
-      JSON.stringify({ state: { pick: { origin, at: 5 } }, version: 0 }),
+      JSON.stringify({ state: { pick: { origin, at: 5 }, remote }, version: 0 }),
     )
     await useMediaOrigin.persist.rehydrate()
     expect(useMediaOrigin.getState().pick).toEqual({ origin, at: 5 })
+    expect(useMediaOrigin.getState().remote).toEqual(remote)
     window.localStorage.setItem(
       STORE_KEYS.mediaOrigin,
       JSON.stringify({
-        state: { pick: { origin: { kind: 'moon', url: 3 }, at: 'now' } },
+        state: {
+          pick: { origin: { kind: 'moon', url: 3 }, at: 'now' },
+          remote: { limit: 'huge', isOutside: 'yes' },
+        },
         version: 0,
       }),
     )
     await useMediaOrigin.persist.rehydrate()
     expect(useMediaOrigin.getState().pick).toBeNull()
+    expect(useMediaOrigin.getState().remote).toBeNull()
   })
 
   it('remembers that a probe has ended, and never keeps that', async () => {
@@ -57,7 +64,7 @@ describe('useMediaOrigin', () => {
     useMediaOrigin.getState().setProbing(false)
     expect(useMediaOrigin.getState().hasProbed).toBe(true)
     const stored = JSON.parse(window.localStorage.getItem(STORE_KEYS.mediaOrigin) ?? 'null')
-    expect(Object.keys(stored.state)).toEqual(['pick'])
+    expect(Object.keys(stored.state)).toEqual(['pick', 'remote'])
     useMediaOrigin.setState({ hasProbed: false })
     await useMediaOrigin.persist.rehydrate()
     expect(useMediaOrigin.getState().hasProbed).toBe(false)

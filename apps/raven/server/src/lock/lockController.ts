@@ -15,6 +15,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { LockService } from '@/lock/lockService'
 import { parseBody } from '@/parseBody'
+import { StrictlyLimited } from '@/rateLimits/rateTiers'
 
 @Controller('api/lock')
 export class LockController {
@@ -27,6 +28,7 @@ export class LockController {
 
   /** `{ pin }`: opens every locked library for this browser, to the owner once accounts are ready. */
   @ForViewers()
+  @StrictlyLimited()
   @Post('unlock')
   @HttpCode(200)
   unlock(

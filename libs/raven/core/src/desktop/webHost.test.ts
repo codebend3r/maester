@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  DEFAULT_LINK_ORIGINS,
   DEFAULT_SERVER_ORIGIN,
   DESKTOP_ENV,
   isUnreachableAnswer,
@@ -41,6 +42,11 @@ describe('the web host', () => {
       serverOrigin: 'RAVEN_DESKTOP_SERVER_ORIGIN',
       linkOrigins: 'RAVEN_DESKTOP_LINK_ORIGINS',
     })
-    expect(DEFAULT_SERVER_ORIGIN).toBe('https://raven.tail5586d4.ts.net')
+    expect(DEFAULT_SERVER_ORIGIN).toBe('https://vhagar2.synology.me:8443')
+  })
+
+  it("names the web app's site as the default server's built-in link origin", () => {
+    expect(DEFAULT_LINK_ORIGINS).toEqual(['https://raven-player.netlify.app'])
+    expect(DEFAULT_LINK_ORIGINS).not.toContain(DEFAULT_SERVER_ORIGIN)
   })
 })

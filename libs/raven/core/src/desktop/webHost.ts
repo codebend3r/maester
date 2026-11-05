@@ -30,7 +30,8 @@ type IsUnreachableAnswerProps = { status: number; body: unknown }
 
 /**
  * Whether an answer says the server is out of reach rather than answering: Raven's web
- * host said so, or a proxy in front of it (a Funnel with the NAS down) gave a gateway status
+ * host said so, or a proxy in front of it (Netlify's, or the NAS's reverse proxy with raven down)
+ * gave a gateway status
  * with a body that is not JSON, which the server itself never sends. `body` is null when the
  * body did not parse.
  */
@@ -53,8 +54,17 @@ export const DESKTOP_ENV = {
 } as const
 
 /**
- * The server a build without `RAVEN_DESKTOP_SERVER_ORIGIN` uses: Vhagar's Tailscale Funnel, where
- * Netlify's `RAVEN_API_ORIGIN` sends the web app's `/api`, so Raven signs in to the same
- * accounts and keeps the same library, progress and favourites as the web.
+ * The server a build without `RAVEN_DESKTOP_SERVER_ORIGIN` uses: raven's public origin, the NAS's
+ * reverse proxy in front of raven, so Raven signs in to the same accounts and keeps the same
+ * library, progress and favourites as the web wherever the Mac is, at home or away.
  */
-export const DEFAULT_SERVER_ORIGIN = 'https://raven.tail5586d4.ts.net'
+export const DEFAULT_SERVER_ORIGIN = 'https://vhagar2.synology.me:8443'
+
+/**
+ * The web app's Netlify site, which proxies `/api` to the same server. Its watch pages build
+ * `raven://` links naming it (`window.location.origin`), so it names the default server too.
+ */
+const WEB_APP_ORIGIN = 'https://raven-player.netlify.app'
+
+/** The origins whose `raven://` links name the default server besides its own, built in. */
+export const DEFAULT_LINK_ORIGINS = [WEB_APP_ORIGIN] as const

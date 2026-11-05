@@ -6,6 +6,7 @@ import {
   MEDIA_ORIGIN_KINDS,
   MEDIA_PROBE_BYTES,
   type MediaOrigin,
+  type RemotePlayback,
   SERVER_COOKIES,
   appClientCallOf,
   createApiClient,
@@ -52,18 +53,21 @@ const refusalOf = (status: number): Answer => ({
 type MediaServerProps = {
   origins?: readonly MediaOrigin[]
   originsStatus?: number
+  /** What the server says of remote play beside its origins; left out, as an older server does. */
+  remote?: RemotePlayback
   tickets?: readonly number[]
 }
 
 /**
  * The NAS as `apiFor` reaches it, through the app's allowlist: `getMediaOrigins` lists `origins`
- * (or refuses with `originsStatus`), and each ticket read answers the next status of `tickets`,
+ * (or refuses with `originsStatus`) with `remote` beside them, and each ticket read answers the next status of `tickets`,
  * 200 handing out the next of `TICKETS` and the last status standing for every read after it.
  * `heard` is every path it was asked for, in order.
  */
 export const mediaServer = ({
   origins = [LAN, PUBLIC],
   originsStatus = STATUSES.ok,
+  remote,
   tickets = [STATUSES.ok],
 }: MediaServerProps): { api: ApiClient; heard: string[] } => {
   const heard: string[] = []
@@ -83,7 +87,7 @@ export const mediaServer = ({
     if (call === APP_CLIENT_CALLS.getMediaTicket) return ticketAnswer()
     if (call !== APP_CLIENT_CALLS.getMediaOrigins) return NOT_FOUND
     return originsStatus === STATUSES.ok
-      ? { status: originsStatus, body: { origins } }
+      ? { status: originsStatus, body: { origins, ...(remote === undefined ? {} : { remote }) } }
       : refusalOf(originsStatus)
   }
   const api = createApiClient({

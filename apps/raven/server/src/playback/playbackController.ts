@@ -39,6 +39,7 @@ import { KeyframesService } from '@/hls/keyframesService'
 import { MarkersService } from '@/markers/markersService'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { PrivateBy } from '@/lock/lockGuard'
+import { streamSizeFor } from '@/remoteAccess/remoteCap'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
@@ -50,7 +51,6 @@ import {
   refuseWhatSettingsTurnOff,
   sizeOnDisk,
   streamModeOf,
-  streamSizeOf,
   videoEncodingOf,
 } from '@/playback/conversion'
 import { SubtitlesService } from '@/playback/subtitlesService'
@@ -58,6 +58,7 @@ import { TracksService } from '@/playback/tracksService'
 import { StreamSessions } from '@/streams/streamSessions'
 import { RESPONSE_EVENTS, trackStream } from '@/streams/trackStream'
 import { ROUTE_PARAMS } from '@/requestParts'
+import { StrictlyLimited } from '@/rateLimits/rateTiers'
 
 /**
  * What a player needs beyond the file itself: the tracks to choose from,
@@ -96,6 +97,7 @@ export class PlaybackController {
    * Bearer caller only; without them, one signed with the media secret.
    */
   @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
+  @StrictlyLimited()
   @Get(':id/ticket')
   ticket(
     @Req() request: FastifyRequest,
@@ -184,7 +186,13 @@ export class PlaybackController {
     const streamMode = streamModeOf(mode)
     const playback = this.settings.playback()
     refuseWhatSettingsTurnOff({ playback, mode: streamMode })
-    const sized = streamSizeOf({ quality, mode: streamMode })
+    const sized = streamSizeFor({
+      quality,
+      mode: streamMode,
+      request,
+      remote: this.settings.remoteAccess(),
+      playback,
+    })
     const size = sized?.size ?? null
     const from = start == null ? 0 : Number(start)
     if (!Number.isFinite(from) || from < 0) {

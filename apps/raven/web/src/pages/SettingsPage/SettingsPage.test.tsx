@@ -6,7 +6,9 @@ import {
   AUTH_CONFIG_STATES,
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
+  DEFAULT_REMOTE_ACCESS_SETTINGS,
   MEMBER_STATUSES,
+  REMOTE_ACCESS_STATES,
   type Account,
   type PlaybackSettingsState,
 } from '@raven/core'
@@ -21,8 +23,20 @@ import { fakeAccount, readyConfig } from '@/test/authClient'
 import { renderWithProviders } from '@/test/render'
 
 const scanState = spyOn(api, 'getScanControl')
-beforeEach(() => scanState.mockResolvedValue({ isStopped: false }))
-afterEach(() => scanState.mockReset())
+const remoteAccess = spyOn(api, 'getRemoteAccess')
+beforeEach(() => {
+  scanState.mockResolvedValue({ isStopped: false })
+  remoteAccess.mockResolvedValue({
+    settings: DEFAULT_REMOTE_ACCESS_SETTINGS,
+    privateAddress: null,
+    publicOrigin: null,
+    status: { state: REMOTE_ACCESS_STATES.disabled },
+  })
+})
+afterEach(() => {
+  scanState.mockReset()
+  remoteAccess.mockReset()
+})
 
 const STATE: PlaybackSettingsState = {
   settings: DEFAULT_PLAYBACK_SETTINGS,

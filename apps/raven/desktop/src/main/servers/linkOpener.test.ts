@@ -1,6 +1,14 @@
-import { type DesktopReply, isDesktopReply, watchPathFor, DESKTOP_REPLIES } from '@raven/core'
+import {
+  DEFAULT_SERVER_ORIGIN,
+  type DesktopReply,
+  isDesktopReply,
+  watchPathFor,
+  DESKTOP_REPLIES,
+} from '@raven/core'
 import { describe, expect, it } from 'bun:test'
+import { namesServer } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
+import { fixedServerFrom, LEGACY_FUNNEL_ORIGIN } from '@/main/origins'
 import { LINK_MESSAGES, createLinkOpener } from '@/main/servers/linkOpener'
 
 const ORIGIN = 'https://raven.example'
@@ -125,5 +133,31 @@ describe('createLinkOpener', () => {
     expect((await world.opener.openBatch([LINK])).type).toBe(DESKTOP_REPLIES.navigate)
     expect(await world.opener.openBatch([])).toEqual({ type: 'done' })
     expect(world.warnings).toEqual([])
+  })
+
+  describe('for the default server', () => {
+    const server = fixedServerFrom({ origin: DEFAULT_SERVER_ORIGIN, linkOrigins: [] })
+    const opener = createLinkOpener({
+      isServerOrigin: (origin) => namesServer({ server, origin }),
+      serverId: () => SERVER_ID,
+      downloads: { ask: async () => ASK_REPLY },
+      warn: () => undefined,
+    })
+    const playLinkFor = (origin: string): string =>
+      `raven://play?server=${encodeURIComponent(origin)}&media=7`
+
+    it("opens a link the web app's site built, and one naming the public origin", async () => {
+      const navigate = { type: DESKTOP_REPLIES.navigate, to: '/watch/7' }
+      expect(await opener.open({ link: playLinkFor('https://raven-player.netlify.app') })).toEqual(
+        navigate,
+      )
+      expect(await opener.open({ link: playLinkFor(DEFAULT_SERVER_ORIGIN) })).toEqual(navigate)
+    })
+
+    it('refuses a link naming the Funnel origin, which nothing builds any more', async () => {
+      expect(await opener.open({ link: playLinkFor(LEGACY_FUNNEL_ORIGIN) })).toEqual(
+        refused(LINK_MESSAGES.otherServer),
+      )
+    })
   })
 })

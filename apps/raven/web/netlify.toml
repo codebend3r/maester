@@ -1,9 +1,10 @@
-# raven's web app on Netlify, with its API on Vhagar behind Tailscale Funnel.
+# raven's web app on Netlify, with its API on Vhagar at raven's public origin
+# (README, "Remote access").
 # The site's package directory is apps/raven/web and its base directory the
 # repo root, where bun.lock is: Netlify installs and builds there, so the
 # paths below are from the root. RAVEN_API_ORIGIN, set in the site's
-# environment variables, is where the build's _redirects sends /api (see
-# vite.config.ts).
+# environment variables, names raven's public origin to the build and the
+# functions (vite.config.ts); the /api proxy below goes to the same origin.
 
 [build]
 command = "bash apps/raven/netlify-build.sh"
@@ -14,7 +15,8 @@ ignore = "bash apps/raven/netlify-ignore.sh apps/raven/web apps/raven/netlify-bu
 
 # The functions, bundled by Netlify after the build: each is the file named after its
 # folder, so a test beside it is never bundled. RAVEN_API_ORIGIN is scoped to them too,
-# for the pictures function.
+# for the pictures function. The reachability function checks Remote Access from outside
+# the home network, at /remote-access/check.
 [functions]
 directory = "apps/raven/web/netlify/functions"
 
@@ -29,8 +31,19 @@ for = "/assets/*"
 [headers.values]
 Cache-Control = "public, max-age=31536000, immutable"
 
-# The single-page app's fallback. Netlify reads _redirects first, so /api
-# never lands here.
+# /api goes to raven's public origin (core's DEFAULT_SERVER_ORIGIN; a test
+# checks they match), signed: Netlify adds an x-nf-sign JWS keyed with the
+# site's RAVEN_PROXY_SECRET (scoped to Runtime), which raven checks before it
+# believes the visitor address Netlify passes on, so its rate limits count
+# each visitor apart. Only netlify.toml can sign a proxy, not _redirects.
+[[redirects]]
+from = "/api/*"
+to = "https://vhagar2.synology.me:8443/api/:splat"
+status = 200
+force = true
+signed = "RAVEN_PROXY_SECRET"
+
+# The single-page app's fallback, after the /api proxy, so /api never lands here.
 [[redirects]]
 from = "/*"
 to = "/index.html"

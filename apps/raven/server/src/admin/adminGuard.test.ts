@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { AdminGuard, AdminOnly, ForViewers, audienceMarkProblems } from '@/admin/adminGuard'
 import { CONTROLLERS } from '@/appModule'
 import { ACCOUNT_REQUIREMENTS } from '@/auth/accountGuard'
+import { RATE_TIERS } from '@/rateLimits/rateTiers'
 import { assertRoutesMarked, routeMarks } from '@/routeMarks'
 
 @Controller('api/shelves')
@@ -63,6 +64,7 @@ describe('who each route is for', () => {
         account: ACCOUNT_REQUIREMENTS.owner,
         mediaPlane: false,
         pass: null,
+        rate: RATE_TIERS.standard,
       },
       {
         method: 'PUT',
@@ -72,6 +74,7 @@ describe('who each route is for', () => {
         account: ACCOUNT_REQUIREMENTS.approved,
         mediaPlane: false,
         pass: null,
+        rate: RATE_TIERS.standard,
       },
       {
         method: 'DELETE',
@@ -81,6 +84,7 @@ describe('who each route is for', () => {
         account: ACCOUNT_REQUIREMENTS.owner,
         mediaPlane: false,
         pass: null,
+        rate: RATE_TIERS.standard,
       },
     ])
   })

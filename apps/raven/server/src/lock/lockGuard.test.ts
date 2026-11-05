@@ -6,6 +6,7 @@ import { CONTROLLERS } from '@/appModule'
 import { ACCOUNT_REQUIREMENTS } from '@/auth/accountGuard'
 import { LockGuard, PrivateBy, Public, lockMarkProblems } from '@/lock/lockGuard'
 import { MediaPlane } from '@/media/mediaPlaneMark'
+import { RATE_TIERS } from '@/rateLimits/rateTiers'
 import { assertRoutesMarked, routeMarks } from '@/routeMarks'
 
 @Controller('api/things')
@@ -94,6 +95,7 @@ describe('the lock marks on routes', () => {
         account: ACCOUNT_REQUIREMENTS.approved,
         mediaPlane: false,
         pass: null,
+        rate: RATE_TIERS.standard,
       },
       {
         method: 'GET',
@@ -103,6 +105,7 @@ describe('the lock marks on routes', () => {
         account: ACCOUNT_REQUIREMENTS.approved,
         mediaPlane: true,
         pass: null,
+        rate: RATE_TIERS.media,
       },
       {
         method: 'PUT',
@@ -112,6 +115,7 @@ describe('the lock marks on routes', () => {
         account: ACCOUNT_REQUIREMENTS.approved,
         mediaPlane: false,
         pass: null,
+        rate: RATE_TIERS.standard,
       },
     ])
   })

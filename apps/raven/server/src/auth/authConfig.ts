@@ -12,7 +12,8 @@ export const ACCOUNTS_OPT_OUT = 'off'
 
 const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]'] as const
 
-const originOf = (value: string): string | null => {
+/** An https origin with no path (http only on loopback), or null. */
+export const originOf = (value: string): string | null => {
   try {
     const url = new URL(value)
     const isLocal = LOOPBACK_HOSTS.some((host) => url.hostname === host)
