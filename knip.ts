@@ -30,8 +30,11 @@ export default {
       ignoreDependencies: ['expo-updates'],
     },
     'apps/raven/web': {
-      // Netlify runs each function by its folder's file of the same name, which no import names.
-      entry: ['netlify/functions/*/*.ts'],
+      // Netlify runs each function by its folder's file of the same name, and Lighthouse CI the
+      // server lighthouserc.json names; no import names either.
+      entry: ['netlify/functions/*/*.ts', 'lighthouse/serve.ts'],
+      // The Lighthouse server makes its certificate with the OS's openssl.
+      ignoreBinaries: ['openssl'],
     },
     'apps/raven/desktop': {
       // Electron's main and preload bundles and the Forge config are entry

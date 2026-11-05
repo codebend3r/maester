@@ -156,15 +156,15 @@ describe('GetPage', () => {
     expect(within(footer).getByRole('link', { name: 'Open web app' })).toHaveAttribute('href', '/')
   })
 
-  it('takes the whole screen at /get, outside the side menu', () => {
+  it('takes the whole screen at /get, outside the side menu', async () => {
     renderWithProviders({ ui: <AppRoutes />, route: '/get' })
 
-    expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
     expect(
-      screen.getByRole('heading', {
+      await screen.findByRole('heading', {
         level: 1,
         name: 'Your films and shows, from your own server.',
       }),
     ).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
   })
 })

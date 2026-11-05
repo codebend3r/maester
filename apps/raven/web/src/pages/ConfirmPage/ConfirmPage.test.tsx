@@ -25,6 +25,7 @@ import {
   fakeAuthClient,
   fakeSession,
   readyConfig,
+  SESSION_PAGE,
 } from '@/test/authClient'
 import { Where, renderAuthPage, where } from '@/test/authPage'
 import { held } from '@/test/held'
@@ -96,7 +97,9 @@ const renderConfirm = async ({
   )
   const fake = fakeAuthClient({ session, calls: { verifyOtp } })
   if (authConfig.state === AUTH_CONFIG_STATES.ready) {
-    useAuthSession.getState().start({ config: readyConfig, createClient: () => fake.client })
+    useAuthSession
+      .getState()
+      .start({ config: readyConfig, createClient: async () => fake.client, page: SESSION_PAGE })
     await waitFor(() => expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready))
   }
   const rendered = renderWithProviders({

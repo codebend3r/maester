@@ -12,6 +12,9 @@
     "e2e:browser": "playwright test",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
+    "lighthouse": "bun run --sequential lighthouse:mobile lighthouse:desktop",
+    "lighthouse:desktop": "lhci autorun --collect.settings.preset=desktop --upload.outputDir=.lighthouseci/desktop",
+    "lighthouse:mobile": "lhci autorun --upload.outputDir=.lighthouseci/mobile",
     "lint:css": "gale \"src/**/*.scss\"",
     "lint:css:fix": "gale --fix \"src/**/*.scss\"",
     "lint:ts": "oxlint",
@@ -39,6 +42,7 @@
   "devDependencies": {
     "@codebend3r/gale": "0.3.1",
     "@happy-dom/global-registrator": "20.14.5",
+    "@lhci/cli": "0.16.0",
     "@playwright/test": "1.64.1",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
@@ -68,6 +72,7 @@
       "build",
       "preview",
       "e2e:browser",
+      "lighthouse",
       "typecheck",
       "lint:ts",
       "lint:ts:fix",
@@ -112,6 +117,12 @@
           "{workspaceRoot}/apps/raven/server/src/**/*",
           "{workspaceRoot}/libs/shared/server/src/**/*"
         ]
+      },
+      "lighthouse": {
+        "dependsOn": [
+          "build"
+        ],
+        "cache": false
       }
     }
   }

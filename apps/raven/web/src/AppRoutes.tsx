@@ -2,47 +2,88 @@ import { Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { AUTH_ROUTES, DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
 import { Toaster } from '@raven/ui'
-import { AppShell } from '@/components/AppShell/AppShell'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
-import { DesktopHost } from '@/desktop/DesktopHost'
 import { DESIGN_PATH } from '@/pages/DesignPage/copy'
-import { FavouritesPage } from '@/pages/FavouritesPage/FavouritesPage'
-import { HistoryPage } from '@/pages/HistoryPage/HistoryPage'
-import { HomePage } from '@/pages/HomePage/HomePage'
-import { LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
-import { LibraryPage } from '@/pages/LibraryPage/LibraryPage'
-import { EpisodePage } from '@/pages/EpisodePage/EpisodePage'
-import { MoviePage } from '@/pages/MoviePage/MoviePage'
-import { SeasonPage } from '@/pages/SeasonPage/SeasonPage'
-import { SagaPage } from '@/pages/SagaPage/SagaPage'
 import { ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
-import { ShowPage } from '@/pages/ShowPage/ShowPage'
-import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { PendingPage } from '@/pages/PendingPage/PendingPage'
-import { PersonPage } from '@/pages/PersonPage/PersonPage'
 import { PLAY_HISTORY_ROUTES } from '@/lib/playHistory'
 import { lazyPage } from '@/lib/lazyPage'
 import { MUSIC_PATHS, NOW_PLAYING_PATH, PLAYLIST_ROUTE } from '@/lib/music'
-import { MusicShell } from '@/components/MusicShell/MusicShell'
-import { PlayerLayer } from '@/components/PlayerLayer/PlayerLayer'
 import { MUSIC_LIBRARY_SECTIONS } from '@/pages/MusicLibraryPage/sections'
-import { GetPage } from '@/pages/GetPage/GetPage'
 import { CheckEmailPage } from '@/pages/CheckEmailPage/CheckEmailPage'
 import { ConfirmPage } from '@/pages/ConfirmPage/ConfirmPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage/ResetPasswordPage'
 import { SignInPage } from '@/pages/SignInPage/SignInPage'
 import { SignUpPage } from '@/pages/SignUpPage/SignUpPage'
-import { WatchPage } from '@/pages/WatchPage/WatchPage'
 import { useIsDesktop } from '@/stores/desktop'
-import { BingePage } from '@/pages/BingePage/BingePage'
-import { ContinueWatchingPage } from '@/pages/ContinueWatchingPage/ContinueWatchingPage'
 import { BINGE_PATH } from '@/lib/binge'
 import { CONTINUE_WATCHING_PATH } from '@/lib/homeContinue'
 
-// The pages a visit seldom reaches load as chunks of their own, the first time a route asks for
-// them: the music mode and its pages, the settings and admin pages, and Raven's own pages.
+// Only the account pages load with the app: a first visit lands on the sign-in page, and every
+// page behind the gate, with the shells and the player around them, loads as a chunk of its own
+// the first time a route asks for it, so a visitor who is signed out downloads none of it.
+const AppShell = lazyPage(() =>
+  import('@/components/AppShell/AppShell').then((module) => module.AppShell),
+)
+const MusicShell = lazyPage(() =>
+  import('@/components/MusicShell/MusicShell').then((module) => module.MusicShell),
+)
+const PlayerLayer = lazyPage(() =>
+  import('@/components/PlayerLayer/PlayerLayer').then((module) => module.PlayerLayer),
+)
+const DesktopHost = lazyPage(() =>
+  import('@/desktop/DesktopHost').then((module) => module.DesktopHost),
+)
+const FavouritesPage = lazyPage(() =>
+  import('@/pages/FavouritesPage/FavouritesPage').then((module) => module.FavouritesPage),
+)
+const HistoryPage = lazyPage(() =>
+  import('@/pages/HistoryPage/HistoryPage').then((module) => module.HistoryPage),
+)
+const HomePage = lazyPage(() =>
+  import('@/pages/HomePage/HomePage').then((module) => module.HomePage),
+)
+const LibrariesPage = lazyPage(() =>
+  import('@/pages/LibrariesPage/LibrariesPage').then((module) => module.LibrariesPage),
+)
+const LibraryPage = lazyPage(() =>
+  import('@/pages/LibraryPage/LibraryPage').then((module) => module.LibraryPage),
+)
+const EpisodePage = lazyPage(() =>
+  import('@/pages/EpisodePage/EpisodePage').then((module) => module.EpisodePage),
+)
+const MoviePage = lazyPage(() =>
+  import('@/pages/MoviePage/MoviePage').then((module) => module.MoviePage),
+)
+const SeasonPage = lazyPage(() =>
+  import('@/pages/SeasonPage/SeasonPage').then((module) => module.SeasonPage),
+)
+const SagaPage = lazyPage(() =>
+  import('@/pages/SagaPage/SagaPage').then((module) => module.SagaPage),
+)
+const ShowPage = lazyPage(() =>
+  import('@/pages/ShowPage/ShowPage').then((module) => module.ShowPage),
+)
+const NotFoundPage = lazyPage(() =>
+  import('@/pages/NotFoundPage/NotFoundPage').then((module) => module.NotFoundPage),
+)
+const PersonPage = lazyPage(() =>
+  import('@/pages/PersonPage/PersonPage').then((module) => module.PersonPage),
+)
+const GetPage = lazyPage(() => import('@/pages/GetPage/GetPage').then((module) => module.GetPage))
+const WatchPage = lazyPage(() =>
+  import('@/pages/WatchPage/WatchPage').then((module) => module.WatchPage),
+)
+const BingePage = lazyPage(() =>
+  import('@/pages/BingePage/BingePage').then((module) => module.BingePage),
+)
+const ContinueWatchingPage = lazyPage(() =>
+  import('@/pages/ContinueWatchingPage/ContinueWatchingPage').then(
+    (module) => module.ContinueWatchingPage,
+  ),
+)
 const AlbumPage = lazyPage(() =>
   import('@/pages/AlbumPage/AlbumPage').then((page) => page.AlbumPage),
 )
@@ -200,7 +241,11 @@ export const AppRoutes = () => {
       {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}
       {/* Toasts outlast the page that raised them, as Report this error's does the player. */}
       <Toaster />
-      {isDesktop && <DesktopHost />}
+      {isDesktop && (
+        <Suspense>
+          <DesktopHost />
+        </Suspense>
+      )}
     </>
   )
 }

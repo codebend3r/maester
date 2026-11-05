@@ -70,6 +70,13 @@ jobs:
             target: e2e:browser
             ffmpeg: true
             traces: apps/raven/web/test-results
+            artifact: e2e-traces
+          # raven's web build in Google Chrome on simulated mobile and desktop, served over HTTP/2
+          # with Brotli as Netlify serves it; fails below the floors in its lighthouserc.json.
+          - name: 🔦 Lighthouse
+            target: lighthouse
+            traces: apps/raven/web/.lighthouseci
+            artifact: lighthouse-reports
           - name: 🧹 Dead code
             target: dead-code
           - name: 🧼 Dead CSS
@@ -145,13 +152,16 @@ jobs:
             bunx nx run-many --outputStyle=static -t "$TARGET"
           fi
 
-      # Playwright keeps a failed test's trace, which shows each step's page.
-      - name: 📤 Upload the end to end traces
+      # Playwright keeps a failed test's trace, which shows each step's page, and Lighthouse CI
+      # the report of every run.
+      - name: 📤 Upload the traces and reports
         if: failure() && matrix.check.traces
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-traces-${{ github.sha }}
+          name: ${{ matrix.check.artifact }}-${{ github.sha }}
           path: ${{ matrix.check.traces }}
+          # Lighthouse CI writes to `.lighthouseci`, which the action skips as a hidden folder by default.
+          include-hidden-files: true
           if-no-files-found: ignore
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.

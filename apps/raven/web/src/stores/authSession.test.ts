@@ -4,16 +4,58 @@ import { createSelectionStore, queryKeys } from '@raven/ui/headless'
 import { queryClient } from '@/lib/queryClient'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { useSelectionScopes } from '@/stores/selectionScope'
-import { fakeAuthClient, fakeSession, readyConfig as config } from '@/test/authClient'
+import { fakeAuthClient, fakeSession, readyConfig as config, SESSION_PAGE } from '@/test/authClient'
 
 const settled = () => Promise.resolve().then(() => undefined)
 
 describe('useAuthSession', () => {
+  it('settles signed out at once on a page with no session cookie, before Supabase loads', () => {
+    useAuthSession.getState().start({
+      config,
+      createClient: () => new Promise(() => undefined),
+      page: { cookies: 'raven-theme=dusk', search: '', hash: '' },
+    })
+
+    expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready)
+    expect(useAuthSession.getState().session).toBeNull()
+  })
+
+  it.each([
+    { name: 'a session cookie', page: SESSION_PAGE },
+    {
+      name: 'a chunked session cookie',
+      page: { cookies: `${config.cookieName}.0=x`, search: '', hash: '' },
+    },
+    { name: 'a sign-in link code', page: { cookies: '', search: '?code=abc', hash: '' } },
+    { name: 'a token in the hash', page: { cookies: '', search: '', hash: '#access_token=abc' } },
+  ])('waits for Supabase with $name', ({ page }) => {
+    useAuthSession
+      .getState()
+      .start({ config, createClient: () => new Promise(() => undefined), page })
+
+    expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.booting)
+  })
+
+  it('settles signed out when Supabase fails to load', async () => {
+    useAuthSession.getState().start({
+      config,
+      createClient: () => Promise.reject(new Error('chunk failed')),
+      page: SESSION_PAGE,
+    })
+    await settled()
+    await settled()
+
+    expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready)
+    expect(useAuthSession.getState().session).toBeNull()
+  })
+
   it('boots with the stored session and carries its token', async () => {
     const { client } = fakeAuthClient({ session: fakeSession({ userId: 'u1', accessToken: 't1' }) })
     expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.booting)
 
-    useAuthSession.getState().start({ config, createClient: () => client })
+    useAuthSession
+      .getState()
+      .start({ config, createClient: async () => client, page: SESSION_PAGE })
     await settled()
 
     expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready)
@@ -23,7 +65,9 @@ describe('useAuthSession', () => {
   it('boots signed out without a stored session', async () => {
     const { client } = fakeAuthClient()
 
-    useAuthSession.getState().start({ config, createClient: () => client })
+    useAuthSession
+      .getState()
+      .start({ config, createClient: async () => client, page: SESSION_PAGE })
     await settled()
 
     expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready)
@@ -32,7 +76,9 @@ describe('useAuthSession', () => {
 
   it('follows the session through sign in, refresh and sign out', async () => {
     const fake = fakeAuthClient()
-    useAuthSession.getState().start({ config, createClient: () => fake.client })
+    useAuthSession
+      .getState()
+      .start({ config, createClient: async () => fake.client, page: SESSION_PAGE })
     await settled()
 
     fake.emit({ event: 'SIGNED_IN', session: fakeSession({ userId: 'u2', accessToken: 'a' }) })
@@ -50,7 +96,10 @@ describe('useAuthSession', () => {
 
   it('starts once, however often it is asked', async () => {
     const fake = fakeAuthClient()
-    const start = () => useAuthSession.getState().start({ config, createClient: () => fake.client })
+    const start = () =>
+      useAuthSession
+        .getState()
+        .start({ config, createClient: async () => fake.client, page: SESSION_PAGE })
 
     start()
     start()
@@ -66,7 +115,9 @@ describe('useAuthSession', () => {
       getSession: () => Promise.reject(new Error('storage refused')),
     }
 
-    useAuthSession.getState().start({ config, createClient: () => failing })
+    useAuthSession
+      .getState()
+      .start({ config, createClient: async () => failing, page: SESSION_PAGE })
     await settled()
 
     expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready)
@@ -77,7 +128,9 @@ describe('useAuthSession', () => {
 describe('useAuthSession account changes', () => {
   const signedInAs = async (userId: string) => {
     const fake = fakeAuthClient({ session: fakeSession({ userId }) })
-    useAuthSession.getState().start({ config, createClient: () => fake.client })
+    useAuthSession
+      .getState()
+      .start({ config, createClient: async () => fake.client, page: SESSION_PAGE })
     await settled()
     queryClient.setQueryData(queryKeys.libraries, ['private to the first account'])
     const store = createSelectionStore()
@@ -122,7 +175,9 @@ describe('useAuthSession account changes', () => {
 
   it('asks again for what was read while nobody was signed in, and keeps the auth queries', async () => {
     const fake = fakeAuthClient()
-    useAuthSession.getState().start({ config, createClient: () => fake.client })
+    useAuthSession
+      .getState()
+      .start({ config, createClient: async () => fake.client, page: SESSION_PAGE })
     await settled()
     queryClient.setQueryData(queryKeys.libraries, ['read while signed out'])
     queryClient.setQueryData(queryKeys.authConfig, config)
@@ -140,7 +195,9 @@ describe('useAuthSession account changes', () => {
 describe('useAuthSession recovery', () => {
   const started = async () => {
     const fake = fakeAuthClient()
-    useAuthSession.getState().start({ config, createClient: () => fake.client })
+    useAuthSession
+      .getState()
+      .start({ config, createClient: async () => fake.client, page: SESSION_PAGE })
     await settled()
     return fake
   }

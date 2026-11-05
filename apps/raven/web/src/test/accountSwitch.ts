@@ -3,7 +3,7 @@ import { act, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, spyOn } from 'bun:test'
 import { AUTH_HEADERS, AUTH_SCHEME } from '@raven/core'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { fakeAuthClient, fakeSession, readyConfig } from '@/test/authClient'
+import { fakeAuthClient, fakeSession, readyConfig, SESSION_PAGE } from '@/test/authClient'
 
 const AUTH_CHANGES = { signedIn: 'SIGNED_IN' } as const satisfies Record<string, AuthChangeEvent>
 
@@ -79,8 +79,13 @@ type SignInThroughProps = { account: TestAccount }
 /** Signs `account` in through a fake Supabase client, which can then switch the browser to another. */
 export const signInThrough = async ({ account }: SignInThroughProps) => {
   const fake = fakeAuthClient({ session: fakeSession(account) })
-  useAuthSession.getState().start({ config: readyConfig, createClient: () => fake.client })
-  await waitFor(() => expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready))
+  useAuthSession
+    .getState()
+    .start({ config: readyConfig, createClient: async () => fake.client, page: SESSION_PAGE })
+  await waitFor(() => {
+    expect(useAuthSession.getState().status).toBe(AUTH_SESSION_STATUSES.ready)
+    expect(useAuthSession.getState().session?.userId).toBe(account.userId)
+  })
   type SignInThroughSwitchToProps = { next: TestAccount }
 
   return {

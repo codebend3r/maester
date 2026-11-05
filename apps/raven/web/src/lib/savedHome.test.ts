@@ -60,6 +60,15 @@ describe('saved home', () => {
     expect(dataOf({ client: fresh, queryKey: homeQuery.queryKey })).toBe(read)
   })
 
+  it('marks what it puts back stale, so a home saved moments ago is still asked again', async () => {
+    const store = memoryStore()
+    await saveHome({ store, scope: 'account-1', queryClient: clientWithHome(), now: NOW })
+    const client = new QueryClient()
+    await restoreHome({ store, scope: 'account-1', queryClient: client, now: NOW })
+    expect(client.getQueryState(homeQuery.queryKey)?.isInvalidated).toBe(true)
+    expect(client.getQueryState(heroQuery.queryKey)?.isInvalidated).toBe(true)
+  })
+
   it('ignores a saved record that is not a home', async () => {
     const store = memoryStore()
     store.records.set('home:account-1', { version: 'x', savedAt: NOW, home: { data: 1 } })

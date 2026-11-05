@@ -1,4 +1,3 @@
-import { AuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js'
 import type { QueryClient } from '@tanstack/react-query'
 import type { AuthClient } from '@/lib/authClient'
 import { clearAccountState } from '@/lib/clearAccountState'
@@ -32,13 +31,20 @@ type ResendConfirmationProps = { email: string }
 export const resendConfirmation = ({ email }: ResendConfirmationProps) =>
   callAuth((client) => client.resend({ type: RESEND_TYPES.signup, email }))
 
-/** Supabase answered and refused the refresh token, as opposed to failing to answer. */
-const isRefusedRefresh = (error: unknown): boolean =>
-  isAuthSessionMissingError(error) ||
-  (error instanceof AuthApiError &&
-    error.status >= 400 &&
-    error.status < 500 &&
-    error.status !== RATE_LIMITED_STATUS)
+/**
+ * Supabase answered and refused the refresh token, as opposed to failing to answer. Its error
+ * classes load with its client, which is built before any refresh can run.
+ */
+const isRefusedRefresh = async (error: unknown): Promise<boolean> => {
+  const { AuthApiError, isAuthSessionMissingError } = await import('@supabase/supabase-js')
+  return (
+    isAuthSessionMissingError(error) ||
+    (error instanceof AuthApiError &&
+      error.status >= 400 &&
+      error.status < 500 &&
+      error.status !== RATE_LIMITED_STATUS)
+  )
+}
 
 export const refreshSession = async (): Promise<RefreshOutcome> => {
   const client = useAuthSession.getState().client
@@ -48,7 +54,7 @@ export const refreshSession = async (): Promise<RefreshOutcome> => {
     if (data.session !== null) {
       return { kind: REFRESH_OUTCOMES.refreshed, accessToken: data.session.access_token }
     }
-    return isRefusedRefresh(error)
+    return (await isRefusedRefresh(error))
       ? { kind: REFRESH_OUTCOMES.rejected }
       : { kind: REFRESH_OUTCOMES.unreachable }
   } catch {

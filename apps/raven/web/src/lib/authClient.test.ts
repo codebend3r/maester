@@ -46,7 +46,7 @@ afterEach(() => {
 describe('createAuthClient', () => {
   it('keeps a small session in one host-only maester-auth cookie', async () => {
     answer({ body: sessionOf({ padding: 0 }), status: 200 })
-    const client = createAuthClient({ config })
+    const client = await createAuthClient({ config })
     const { error } = await client.signInWithPassword(credentials)
     expect(error).toBeNull()
     expect(heldCookies().map((cookie) => cookie.name)).toEqual([AUTH_COOKIE])
@@ -63,7 +63,7 @@ describe('createAuthClient', () => {
 
   it('leaves no value in any maester-auth cookie after sign out', async () => {
     answer({ body: sessionOf({ padding: 0 }), status: 200 })
-    const client = createAuthClient({ config })
+    const client = await createAuthClient({ config })
     await client.signInWithPassword(credentials)
     await client.signOut()
     expect(heldCookies()).toEqual([])
@@ -71,7 +71,7 @@ describe('createAuthClient', () => {
 
   it('splits a session over one cookie into chunks and removes every one on sign out', async () => {
     answer({ body: sessionOf({ padding: 6000 }), status: 200 })
-    const client = createAuthClient({ config })
+    const client = await createAuthClient({ config })
     await client.signInWithPassword(credentials)
     const names = heldCookies().map((cookie) => cookie.name)
     expect(names.length).toBeGreaterThan(1)
@@ -90,7 +90,7 @@ describe('createAuthClient', () => {
       },
       status: 400,
     })
-    const client = createAuthClient({ config })
+    const client = await createAuthClient({ config })
     const { error } = await client.signInWithPassword(credentials)
     expect(error?.code).toBe(AUTH_ERRORS.invalidCredentials)
     expect(heldCookies()).toEqual([])
