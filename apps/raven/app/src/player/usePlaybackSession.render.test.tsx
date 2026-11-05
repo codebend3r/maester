@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
-import { AT_HOME, type MediaSources, type SourceRequest } from '@raven/native/headless'
+import { AT_HOME, PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
+import type { MediaSources, SourceRequest } from '@raven/native/headless'
 import { act, renderHook } from '@testing-library/react-native'
 
 import {
@@ -36,7 +36,7 @@ const renderSession = (modes: readonly PlaybackMode[]) =>
   renderHook(
     ({ isWaiting, clock = 0 }: RenderSessionProps) =>
       usePlaybackSession({
-        media: { id: 20, bitrate: null },
+        media: { id: 20 },
         modes,
         at: 0,
         audio: null,

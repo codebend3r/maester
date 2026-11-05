@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, spyOn } from 'bun:test'
+import { describe, expect, it, mock } from 'bun:test'
 import { proxyPicture } from '@/netlify/functions/pictures/pictures'
 
 const ORIGIN = 'https://raven.example.synology.me:8443'
@@ -46,19 +46,6 @@ describe('proxyPicture', () => {
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(response.headers.get('netlify-cdn-cache-control')).toBe('no-store')
     expect(response.headers.get('netlify-cache-id')).toBeNull()
-  })
-
-  it("answers 502 without raven's origin, fetching nothing", async () => {
-    const quiet = spyOn(console, 'error').mockImplementation(() => {})
-    const fetchUpstream = upstream()
-    const response = await proxyPicture({
-      request: new Request(PICTURE),
-      origin: undefined,
-      fetchUpstream,
-    })
-    expect(response.status).toBe(502)
-    expect(fetchUpstream).not.toHaveBeenCalled()
-    quiet.mockRestore()
   })
 
   it('asks raven with the method it was asked with', async () => {

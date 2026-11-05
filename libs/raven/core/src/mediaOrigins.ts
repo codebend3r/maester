@@ -1,4 +1,10 @@
-import { MEDIA_PROBE_BYTES, type MediaOrigin, type MediaOriginKind } from '@/contract'
+import {
+  MEDIA_PROBE_BYTES,
+  type MediaOrigin,
+  type MediaOriginKind,
+  type MediaOrigins,
+  type RemotePlayback,
+} from '@/contract'
 
 export type OriginProbe = {
   origin: MediaOrigin
@@ -7,6 +13,15 @@ export type OriginProbe = {
 }
 
 const ORIGIN_KIND_RANK = { lan: 0, public: 1 } as const satisfies Record<MediaOriginKind, number>
+
+/** `GET /api/media-origins` as every client reads it: `remote` is null from an older server that sends none. */
+export type MediaOriginsAnswer = Omit<MediaOrigins, 'remote'> & { remote: RemotePlayback | null }
+
+/** The one place a client reads the server's media origins: an absent `remote` becomes null. */
+export const readMediaOrigins = ({ origins, remote }: MediaOrigins): MediaOriginsAnswer => ({
+  origins,
+  remote: remote ?? null,
+})
 
 /** How long a client trusts a pick before it probes the origins again. */
 export const PICK_FRESH_MS = 600_000

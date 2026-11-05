@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { RAVEN_HEADERS } from '@/http'
 import { ScannerService } from '@/scanner/scannerService'
-import { adminCookie, testConfig } from '@/test/app'
+import { TRUSTED_PROXY, adminCookie, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 
@@ -38,14 +38,19 @@ describe('who is streaming', () => {
   /** A browser with the admin lock off, and one with it on. */
   const admin = (): ApiClient => apiFor({ app: app(), cookie: state.admin })
   const viewer = (): ApiClient => apiFor({ app: app() })
-  /** As the viewer's browser sends it, to the media plane. */
+  /** As the viewer's browser sends it, to the media plane, through the reverse proxy. */
   const asViewer = {
     [HEADERS.range]: 'bytes=0-99',
     [RAVEN_HEADERS.userAgent]: CHROME_MAC,
-    [RAVEN_HEADERS.forwardedFor]: `${ADDRESS}, 10.0.0.1`,
+    [RAVEN_HEADERS.forwardedFor]: `10.0.0.1, ${ADDRESS}`,
   }
   const play = () =>
-    app().inject({ method: 'GET', url: `/api/media/${videoId()}/file`, headers: asViewer })
+    app().inject({
+      method: 'GET',
+      url: `/api/media/${videoId()}/file`,
+      headers: asViewer,
+      remoteAddress: TRUSTED_PROXY,
+    })
 
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-streams-'))
@@ -76,6 +81,7 @@ describe('who is streaming', () => {
       url: `/api/media/${videoId()}/progress`,
       payload,
       headers: asViewer,
+      remoteAddress: TRUSTED_PROXY,
     })
 
   it('lists a direct play with its browser, device, address, progress and audio track', async () => {
@@ -138,6 +144,7 @@ describe('who is streaming', () => {
       method: 'GET',
       url: `/api/media/${videoId()}/file?${MEDIA_PURPOSE_PARAM}=${STREAM_PURPOSES.download}`,
       headers: { ...asViewer, [HEADERS.range]: 'bytes=50-' },
+      remoteAddress: TRUSTED_PROXY,
     })
     expect(fetched.statusCode).toBe(206)
 

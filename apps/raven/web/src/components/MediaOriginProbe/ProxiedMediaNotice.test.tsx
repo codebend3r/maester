@@ -17,7 +17,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   warn.mockRestore()
-  useMediaOrigin.setState({ pick: null, remote: null, isProbing: false, hasProbed: false })
+  useMediaOrigin.setState({ pick: null, isProbing: false, hasProbed: false })
   useToasts.setState({ toasts: [] })
 })
 
@@ -45,7 +45,7 @@ const renderNotice = ({ isProxiedHost = true, isLocked = false }: RenderNoticePr
 const probeEndsWith = (pick: { kind: 'lan'; url: string } | null) => {
   act(() => useMediaOrigin.getState().setProbing(true))
   act(() => {
-    useMediaOrigin.getState().setPick(pick ? { origin: pick, at: Date.now() } : null)
+    useMediaOrigin.getState().setPick({ origin: pick, at: Date.now(), remote: null })
     useMediaOrigin.getState().setProbing(false)
   })
 }

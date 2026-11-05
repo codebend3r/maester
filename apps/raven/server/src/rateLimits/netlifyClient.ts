@@ -1,7 +1,7 @@
 import { isIP } from 'node:net'
-import type { FastifyRequest } from 'fastify'
 import { jwtVerify } from 'jose'
-import { RAVEN_HEADERS } from '@/http'
+import { headerOf } from '@/http'
+import type { ClientRequest } from '@/remoteAccess/clientNetwork'
 
 /**
  * What Netlify's signed proxy adds to each request it passes on: `x-nf-sign`,
@@ -22,11 +22,8 @@ const NETLIFY_ALGORITHMS = ['HS256']
 /** The claims a signature must carry, so one can not be replayed past its expiry. */
 const REQUIRED_CLAIMS = ['exp']
 
-const headerOf = (value: string | string[] | undefined): string =>
-  (Array.isArray(value) ? value.join(',') : (value ?? '')).trim()
-
 type NetlifyClientOfProps = {
-  request: Pick<FastifyRequest, 'headers'>
+  request: ClientRequest
   /** The secret Netlify signs with; null when the server has none, and no request is believed. */
   secret: Uint8Array | null
 }
@@ -37,9 +34,9 @@ type NetlifyClientOfProps = {
  * Netlify's few addresses, so counting them by those would let one of them
  * spend everyone's budget. Netlify's address headers can be written by
  * anyone who calls the public origin directly, so they are believed only
- * beside a valid signature, which only Netlify, holding the secret, makes:
- * `x-nf-client-connection-ip` first, else the `X-Forwarded-For` entry Netlify
- * appended, the one before the reverse proxy's own.
+ * beside a valid signature, which only Netlify, holding the secret, makes,
+ * and only `x-nf-client-connection-ip`: no place in `X-Forwarded-For` is
+ * taken on trust. Without it the visitor is counted by Netlify's address.
  */
 export const netlifyClientOf = async ({
   request,
@@ -57,10 +54,5 @@ export const netlifyClientOf = async ({
     return null
   }
   const stated = headerOf(request.headers[NETLIFY_HEADERS.clientAddress])
-  if (isIP(stated) !== 0) return stated
-  const forwarded = headerOf(request.headers[RAVEN_HEADERS.forwardedFor])
-    .split(',')
-    .map((entry) => entry.trim())
-  const appended = forwarded.at(-2) ?? ''
-  return isIP(appended) === 0 ? null : appended
+  return isIP(stated) === 0 ? null : stated
 }

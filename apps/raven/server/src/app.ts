@@ -72,7 +72,8 @@ export const createApp = async ({
       shouldHoldStartupWork,
       clock,
     }),
-    new FastifyAdapter(),
+    // Only the listed proxies' X-Forwarded-For moves `request.ip` off the socket.
+    new FastifyAdapter({ trustProxy: [...config.remoteAccess.trustedProxies] }),
     { logger: quiet ? false : ['log', 'warn', 'error'] },
   )
 

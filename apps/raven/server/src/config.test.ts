@@ -136,4 +136,34 @@ describe('readServerConfig', () => {
     expect(secretOf('short')).toBeNull()
     expect(secretOf(` ${'s'.repeat(32)} `)).toEqual(new TextEncoder().encode('s'.repeat(32)))
   })
+
+  it('trusts no proxy unless RAVEN_TRUSTED_PROXIES names its addresses and ranges', () => {
+    const proxiesOf = (value?: string) =>
+      readServerConfig(value === undefined ? {} : { [REMOTE_ACCESS_ENV.trustedProxies]: value })
+        .remoteAccess.trustedProxies
+    expect(proxiesOf()).toEqual([])
+    expect(proxiesOf(' , ')).toEqual([])
+    expect(proxiesOf(' 172.17.0.1, 172.30.84.0/24 ,fd00::/8,::1 ')).toEqual([
+      '172.17.0.1',
+      '172.30.84.0/24',
+      'fd00::/8',
+      '::1',
+    ])
+  })
+
+  it('refuses to start with a trusted proxy that is no address or range', () => {
+    const malformed = [
+      'loopback',
+      '172.17.0.1/33',
+      'fd00::/129',
+      '10.0.0.0/8/8',
+      '10.0.0.0/',
+      '10.0.0.0/-1',
+    ]
+    malformed.forEach((value) => {
+      expect(() => readServerConfig({ [REMOTE_ACCESS_ENV.trustedProxies]: value })).toThrow(
+        REMOTE_ACCESS_ENV.trustedProxies,
+      )
+    })
+  })
 })

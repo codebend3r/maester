@@ -5,7 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_RAVEN_VERSION?: string
   /** The Image CDN's path on a Netlify build, `/.netlify/images`; '' elsewhere (`vite.config.ts`). */
   readonly VITE_PICTURE_CDN?: string
-  /** raven's origin on a build whose `/api` proxies to it, from `RAVEN_API_ORIGIN`; '' when `/api` is raven itself (`vite.config.ts`). */
+  /** raven's origin on a build whose `/api` proxies to it, core's `DEFAULT_SERVER_ORIGIN` on Netlify; '' when `/api` is raven itself (`vite.config.ts`). */
   readonly VITE_API_ORIGIN?: string
   /** How many Continue watching tiles the home page shows, from `RAVEN_HOME_CONTINUE_COUNT` (`vite.config.ts`). */
   readonly VITE_HOME_CONTINUE_COUNT?: string

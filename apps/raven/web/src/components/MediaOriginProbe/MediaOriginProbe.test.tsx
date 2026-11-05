@@ -14,7 +14,7 @@ import { asDesktop } from '@/test/desktop'
 // Unmounted first: the notice beneath the probe reads the store, and a reset it sees is an update outside act.
 afterEach(() => {
   cleanup()
-  useMediaOrigin.setState({ pick: null, remote: null, isProbing: false, hasProbed: false })
+  useMediaOrigin.setState({ pick: null, isProbing: false, hasProbed: false })
 })
 
 type ClientWithProps = { config: AuthConfig }

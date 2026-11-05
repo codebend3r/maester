@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { isPrivateAddress } from '@/networkAddress'
+import { isPrivateAddress, keyOfAddress } from '@/networkAddress'
 
 describe('isPrivateAddress', () => {
   it.each([
@@ -15,6 +15,7 @@ describe('isPrivateAddress', () => {
     '0.0.0.0',
     '::ffff:172.17.0.1',
     '::FFFF:192.168.1.2',
+    '::ffff:c0a8:102',
     '::1',
     '::',
     'fd12:3456:789a::1',
@@ -41,9 +42,39 @@ describe('isPrivateAddress', () => {
     expect(isPrivateAddress(address)).toBe(false)
   })
 
-  it('counts what is not an address as private, so a refusal of private ones refuses it', () => {
-    expect(isPrivateAddress('raven.example.com')).toBe(true)
-    expect(isPrivateAddress('')).toBe(true)
-    expect(isPrivateAddress('300.1.1.1')).toBe(true)
+  it.each(['raven.example.com', '', 'unknown', '300.1.1.1', 'fc00::zz', 'fe80:1', '1::2::3'])(
+    'counts %s, which is no address, as not private',
+    (address) => {
+      expect(isPrivateAddress(address)).toBe(false)
+    },
+  )
+})
+
+describe('keyOfAddress', () => {
+  it('counts an IPv4 client by its address, mapped into IPv6 or not', () => {
+    expect(keyOfAddress({ address: '198.51.100.20', prefixBits: 64 })).toBe('198.51.100.20')
+    expect(keyOfAddress({ address: '::ffff:198.51.100.20', prefixBits: 64 })).toBe('198.51.100.20')
+    expect(keyOfAddress({ address: '::FFFF:c633:6414', prefixBits: 48 })).toBe('198.51.100.20')
+  })
+
+  it('counts an IPv6 client by the /64 it lies in, however the address is written', () => {
+    expect(keyOfAddress({ address: '2001:db8:1:2:3:4:5:6', prefixBits: 64 })).toBe(
+      '2001:db8:1:2::/64',
+    )
+    expect(keyOfAddress({ address: '2001:0DB8:0001:0002:ffff::1', prefixBits: 64 })).toBe(
+      '2001:db8:1:2::/64',
+    )
+    expect(keyOfAddress({ address: '2001:db8::1%eth0', prefixBits: 64 })).toBe('2001:db8:0:0::/64')
+  })
+
+  it('counts a /48 as one client where the strict tier asks', () => {
+    const one = keyOfAddress({ address: '2001:db8:1:2a00::1', prefixBits: 48 })
+    expect(one).toBe('2001:db8:1:0::/48')
+    expect(keyOfAddress({ address: '2001:db8:1:ffff::1', prefixBits: 48 })).toBe(one)
+    expect(keyOfAddress({ address: '2001:db8:2::1', prefixBits: 48 })).not.toBe(one)
+  })
+
+  it('keys what is not an address as itself, trimmed and in lower case', () => {
+    expect(keyOfAddress({ address: ' Unknown ', prefixBits: 64 })).toBe('unknown')
   })
 })

@@ -1,13 +1,13 @@
+import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
-import { CACHE_POLICIES, HEADERS } from '@/http'
 import {
   RATE_VERDICTS,
   RequestCounts,
   TOO_MANY_REQUESTS,
   WHEN_FULL,
   limitRequests,
-} from '@/rateLimits'
+} from '@/rateLimits/limitRequests'
 
 const TIERS = { tight: 'tight', loose: 'loose' } as const
 
@@ -31,6 +31,10 @@ const HOME = '192.168.1.5'
 const tierOf = (request: FastifyRequest): Tier =>
   request.url === PATHS.tight ? TIERS.tight : TIERS.loose
 
+/** The tier, or null for the home network, which this server never counts. */
+const countedTierOf = (request: FastifyRequest): Tier | null =>
+  request.ip === HOME ? null : tierOf(request)
+
 type Booted = { fastify: FastifyInstance; advance: (ms: number) => void }
 
 const boot = (): Booted => {
@@ -39,9 +43,8 @@ const boot = (): Booted => {
   limitRequests({
     fastify,
     limits: LIMITS,
-    tierOf,
+    tierOf: countedTierOf,
     clientOf: async ({ request }) => request.ip,
-    isExempt: (request) => request.ip === HOME,
     now: () => clock.now,
   })
   fastify.get(PATHS.tight, async () => ({ ok: true }))
@@ -72,8 +75,9 @@ describe('limitRequests', () => {
   }
 
   afterEach(async () => {
-    await state.booted?.fastify.close()
+    const open = state.booted
     state.booted = null
+    if (open !== null) await open.fastify.close()
   })
 
   it('answers the request past the limit with 429, Retry-After in seconds and a JSON error', async () => {
@@ -103,7 +107,7 @@ describe('limitRequests', () => {
     ).resolves.toEqual([200, 200, 200, 200, 200, TOO_MANY_REQUESTS])
   })
 
-  it('never counts an exempt request', async () => {
+  it('never counts a request it has no tier for', async () => {
     const { fastify } = booted()
     const answered = await statuses({ fastify, url: PATHS.tight, from: HOME, times: 50 })
     expect(answered.every((status) => status === 200)).toBe(true)
@@ -151,14 +155,12 @@ describe('RequestCounts', () => {
       RATE_VERDICTS.allowed,
     ])
     expect(counts.hit({ key: 'f', now: 400 })).toEqual({
-      verdict: RATE_VERDICTS.limited,
+      verdict: RATE_VERDICTS.overflowed,
       retryAfterS: 1,
-      isOverflow: true,
     })
     expect(counts.hit({ key: 'a', now: 400 })).toEqual({
       verdict: RATE_VERDICTS.limited,
       retryAfterS: 1,
-      isOverflow: false,
     })
     expect(counts.hit({ key: 'g', now: 1_000 }).verdict).toBe(RATE_VERDICTS.allowed)
     expect(counts.size).toBe(3)
@@ -187,7 +189,7 @@ describe('RequestCounts', () => {
       RATE_VERDICTS.allowed,
     ])
     expect(counts.size).toBe(3)
-    expect(counts.hit({ key: 'g', now: 1_000 }).verdict).toBe(RATE_VERDICTS.limited)
+    expect(counts.hit({ key: 'g', now: 1_000 }).verdict).toBe(RATE_VERDICTS.overflowed)
   })
 })
 
@@ -198,18 +200,13 @@ describe('limitRequests per tier', () => {
     [TIERS.loose]: { ...small, whenFull: WHEN_FULL.allow },
   } as const
 
-  type BootSmallProps = { deferred?: number[] }
-
-  const bootSmall = ({ deferred }: BootSmallProps = {}) => {
+  const bootSmall = () => {
     const fastify = Fastify()
     limitRequests({
       fastify,
       limits: LIMITED,
       tierOf,
       clientOf: async ({ request, tier }) => `${tier} ${request.ip}`,
-      isExempt: () => false,
-      deferOverflow:
-        deferred === undefined ? undefined : ({ retryAfterS }) => deferred.push(retryAfterS),
       now: () => 0,
     })
     fastify.get(PATHS.tight, async () => ({ ok: true }))
@@ -236,19 +233,6 @@ describe('limitRequests per tier', () => {
       Promise.resolve([]),
     )
     expect(looses).toEqual([200, 200, 200])
-    await fastify.close()
-  })
-
-  it("hands an overflow refusal on to the server instead of answering it, a client's own refusal never", async () => {
-    const deferred: number[] = []
-    const fastify = bootSmall({ deferred })
-    const senders = ['198.51.100.1', '198.51.100.2', '198.51.100.3', '198.51.100.4']
-    const answered = await senders.reduce<Promise<number[]>>(
-      async (all, from) => [...(await all), await sent({ fastify, url: PATHS.tight, from })],
-      Promise.resolve([]),
-    )
-    expect(answered).toEqual([200, 200, 200, 200])
-    expect(deferred).toEqual([10])
     await fastify.close()
   })
 })

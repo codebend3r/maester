@@ -2,6 +2,7 @@ import {
   type AudioBitrate,
   AUTH_REFUSALS,
   type AuthRefusal,
+  type Guard,
   isMediaId,
   isMediaItem,
   isMediaTracks,
@@ -11,7 +12,7 @@ import {
   PLAYER_SOURCE_KINDS,
   type PlayerErrorReason,
   type PlayerSource,
-  isAwayPlay,
+  remoteLimitApplies,
   remoteTranscodeFor,
   type SubtitleTrack,
   TITLE_REFUSALS,
@@ -69,13 +70,6 @@ export const TRACKS_TIMEOUT_MS = 3000
 export const MEDIA_TIMEOUT_MS = 3000
 
 const THE_FILE: RelayedMedia = { kind: RELAYED_MEDIA_KINDS.file }
-
-/**
- * Whether the remote limit could hold back any file played from `place`: core's decision for the
- * largest file there could be. False at home, with no limit, or from a server that says nothing.
- */
-const mayHold = (place: MediaPlace): boolean =>
-  (place.remote?.limit ?? null) !== null && isAwayPlay(place)
 
 type Sidecars = ServerTarget['sidecars']
 type Failure = { reason: PlayerErrorReason; message: string }
@@ -166,6 +160,47 @@ type CreateServerSourcesProps = {
 /** A track for the music engine: its file, or its AAC transcode at `kbps`. */
 type TrackSource = Omit<ServerSource, 'kind'> & { kbps: AudioBitrate | null }
 
+type ServerCall = Parameters<ServerCalls['call']>[0]['call']
+
+const JSON_READS = {
+  read: 'read',
+  late: 'late',
+  failed: 'failed',
+  refused: 'refused',
+  status: 'status',
+  misshapen: 'misshapen',
+} as const
+
+type JsonRead<T> =
+  | { kind: typeof JSON_READS.read; value: T }
+  | { kind: typeof JSON_READS.late }
+  | { kind: typeof JSON_READS.failed; message: string }
+  | { kind: typeof JSON_READS.refused; message: string }
+  | { kind: typeof JSON_READS.status; status: number }
+  | { kind: typeof JSON_READS.misshapen }
+
+type JsonProblem<T> = Exclude<JsonRead<T>, { kind: typeof JSON_READS.read }>
+
+/** Why a title's tracks gave no sidecars, as the log says it. */
+const tracksProblemOf = <T>(problem: JsonProblem<T>): string => {
+  switch (problem.kind) {
+    case JSON_READS.late:
+      return 'its tracks did not answer in time'
+    case JSON_READS.failed:
+      return `its tracks failed: ${loggable(problem.message)}`
+    case JSON_READS.refused:
+      return loggable(problem.message)
+    case JSON_READS.status:
+      return `its tracks answered ${problem.status}`
+    case JSON_READS.misshapen:
+      return 'its tracks were not a track list'
+    default: {
+      const unreachable: never = problem
+      return unreachable
+    }
+  }
+}
+
 /**
  * Server titles for the player, which mpv plays through the loopback relay: main builds every
  * URL from the media origin `picks` holds (the stored origin when none answers) and a video's
@@ -188,6 +223,34 @@ export const createServerSources = ({
   explain: FailureExplainer
   refusedAccount: AccountRefusalReader
 } => {
+  type ReadJsonProps<T> = {
+    server: ServerEntry
+    call: ServerCall
+    ms: number
+    guard: Guard<T>
+  }
+
+  /** One bounded call's JSON, narrowed by `guard`, or why there is none. */
+  const readJson = async <T>({
+    server,
+    call,
+    ms,
+    guard,
+  }: ReadJsonProps<T>): Promise<JsonRead<T>> => {
+    const bounded = await within({ task: calls.call({ serverId: server.id, call }), ms })
+    if (bounded.outcome === BOUNDED_OUTCOMES.late) return { kind: JSON_READS.late }
+    if (bounded.outcome === BOUNDED_OUTCOMES.failed) {
+      return { kind: JSON_READS.failed, message: messageOf(bounded.error) }
+    }
+    const { result } = bounded
+    if (!result.ok) return { kind: JSON_READS.refused, message: result.message }
+    if (result.status !== HTTP_STATUSES.ok)
+      return { kind: JSON_READS.status, status: result.status }
+    const parsed = parseJson(result.body)
+    if (!guard(parsed)) return { kind: JSON_READS.misshapen }
+    return { kind: JSON_READS.read, value: parsed }
+  }
+
   type TrackListOfProps = {
     server: ServerEntry
     mediaId: number
@@ -199,33 +262,15 @@ export const createServerSources = ({
   }: TrackListOfProps): Promise<readonly SubtitleTrack[]> => {
     const name = loggable(server.name)
     try {
-      const bounded = await within({
-        task: calls.call({ serverId: server.id, call: { name: CALL_NAMES.getTracks, mediaId } }),
+      const read = await readJson({
+        server,
+        call: { name: CALL_NAMES.getTracks, mediaId },
         ms: TRACKS_TIMEOUT_MS,
+        guard: isMediaTracks,
       })
-      if (bounded.outcome === BOUNDED_OUTCOMES.late) {
-        warn(`no sidecars from ${name}: its tracks did not answer in time`)
-        return []
-      }
-      if (bounded.outcome === BOUNDED_OUTCOMES.failed) {
-        warn(`no sidecars from ${name}: its tracks failed: ${loggable(messageOf(bounded.error))}`)
-        return []
-      }
-      const { result } = bounded
-      if (!result.ok) {
-        warn(`no sidecars from ${name}: ${loggable(result.message)}`)
-        return []
-      }
-      if (result.status !== HTTP_STATUSES.ok) {
-        warn(`no sidecars from ${name}: its tracks answered ${result.status}`)
-        return []
-      }
-      const parsed = parseJson(result.body)
-      if (!isMediaTracks(parsed)) {
-        warn(`no sidecars from ${name}: its tracks were not a track list`)
-        return []
-      }
-      return sidecarTracksOf(parsed)
+      if (read.kind === JSON_READS.read) return sidecarTracksOf(read.value)
+      warn(`no sidecars from ${name}: ${tracksProblemOf(read)}`)
+      return []
     } catch (error) {
       warn(`no sidecars from ${name}: ${loggable(messageOf(error))}`)
       return []
@@ -236,37 +281,31 @@ export const createServerSources = ({
 
   /** The media's bitrate as the server knows it; null when it does not, or does not say in time. */
   const bitrateOf = async ({ server, mediaId }: BitrateOfProps): Promise<number | null> => {
-    const name = loggable(server.name)
-    const bounded = await within({
-      task: calls.call({ serverId: server.id, call: { name: CALL_NAMES.getMedia, mediaId } }),
+    const read = await readJson({
+      server,
+      call: { name: CALL_NAMES.getMedia, mediaId },
       ms: MEDIA_TIMEOUT_MS,
+      guard: isMediaItem,
     })
-    if (bounded.outcome !== BOUNDED_OUTCOMES.answered) {
-      warn(`${name} did not say a title's bitrate, so it plays its file`)
-      return null
-    }
-    const { result } = bounded
-    const parsed = result.ok && result.status === HTTP_STATUSES.ok ? parseJson(result.body) : null
-    if (!isMediaItem(parsed)) {
-      warn(`${name} did not say a title's bitrate, so it plays its file`)
-      return null
-    }
-    return parsed.bitrate
+    if (read.kind === JSON_READS.read) return read.value.bitrate
+    warn(`${loggable(server.name)} did not say a title's bitrate, so it plays its file`)
+    return null
   }
 
   type VideoMediaOfProps = { server: ServerEntry; mediaId: number; place: MediaPlace }
 
   /**
    * What a video plays: its file, or away from home, when the file is over the remote limit, the
-   * server's transcode at that limit (core's `remoteTranscodeFor`). The bitrate is asked for only
-   * when the limit could hold a file back, so a play at home makes no call more.
+   * server's transcode at that limit (core's `remoteTranscodeFor`, whose size the master's URL
+   * must name). The bitrate is asked for only when the limit applies (core's
+   * `remoteLimitApplies`), so a play at home makes no call more.
    */
   const videoMediaOf = async ({
     server,
     mediaId,
     place,
   }: VideoMediaOfProps): Promise<RelayedMedia> => {
-    if (!mayHold(place)) return THE_FILE
+    if (!remoteLimitApplies(place)) return THE_FILE
     const bitrate = await bitrateOf({ server, mediaId })
     const quality = remoteTranscodeFor({
       media: { bitrate },

@@ -22,39 +22,52 @@ const withThrowingLocalStorage = (run: () => void) => {
 }
 
 describe('useMediaOrigin', () => {
-  it('keeps the pick and the remote limit in localStorage, and only those', () => {
+  it('keeps the pick, with its word on remote play, in localStorage, and only that', () => {
     useMediaOrigin.getState().setProbing(true)
-    useMediaOrigin.getState().setRemote(remote)
-    useMediaOrigin.getState().setPick({ origin, at: 1000 })
+    useMediaOrigin.getState().setPick({ origin, at: 1000, remote })
     const stored = JSON.parse(window.localStorage.getItem(STORE_KEYS.mediaOrigin) ?? 'null')
-    expect(stored.state).toEqual({ pick: { origin, at: 1000 }, remote })
+    expect(stored.state).toEqual({ pick: { origin, at: 1000, remote } })
+    useMediaOrigin.getState().setPick({ origin: null, at: 2000, remote: null })
+    const none = JSON.parse(window.localStorage.getItem(STORE_KEYS.mediaOrigin) ?? 'null')
+    expect(none.state.pick).toEqual({ origin: null, at: 2000, remote: null })
     useMediaOrigin.getState().setPick(null)
     expect(useMediaOrigin.getState().pick).toBeNull()
-    const cleared = JSON.parse(window.localStorage.getItem(STORE_KEYS.mediaOrigin) ?? 'null')
-    expect(cleared.state.pick).toBeNull()
   })
 
   it('takes a stored pick back on rehydrate, and drops one that is not a pick', async () => {
     window.localStorage.setItem(
       STORE_KEYS.mediaOrigin,
-      JSON.stringify({ state: { pick: { origin, at: 5 }, remote }, version: 0 }),
+      JSON.stringify({ state: { pick: { origin, at: 5, remote } }, version: 0 }),
     )
     await useMediaOrigin.persist.rehydrate()
-    expect(useMediaOrigin.getState().pick).toEqual({ origin, at: 5 })
-    expect(useMediaOrigin.getState().remote).toEqual(remote)
+    expect(useMediaOrigin.getState().pick).toEqual({ origin, at: 5, remote })
     window.localStorage.setItem(
       STORE_KEYS.mediaOrigin,
       JSON.stringify({
-        state: {
-          pick: { origin: { kind: 'moon', url: 3 }, at: 'now' },
-          remote: { limit: 'huge', isOutside: 'yes' },
-        },
+        state: { pick: { origin, at: 5, remote: { limit: 'huge', isOutside: 'yes' } } },
         version: 0,
       }),
     )
     await useMediaOrigin.persist.rehydrate()
     expect(useMediaOrigin.getState().pick).toBeNull()
-    expect(useMediaOrigin.getState().remote).toBeNull()
+    window.localStorage.setItem(
+      STORE_KEYS.mediaOrigin,
+      JSON.stringify({
+        state: { pick: { origin: { kind: 'moon', url: 3 }, at: 'now', remote: null } },
+        version: 0,
+      }),
+    )
+    await useMediaOrigin.persist.rehydrate()
+    expect(useMediaOrigin.getState().pick).toBeNull()
+  })
+
+  it('drops a pick stored before it carried its word on remote play', async () => {
+    window.localStorage.setItem(
+      STORE_KEYS.mediaOrigin,
+      JSON.stringify({ state: { pick: { origin, at: 5 }, remote }, version: 0 }),
+    )
+    await useMediaOrigin.persist.rehydrate()
+    expect(useMediaOrigin.getState().pick).toBeNull()
   })
 
   it('remembers that a probe has ended, and never keeps that', async () => {
@@ -64,7 +77,7 @@ describe('useMediaOrigin', () => {
     useMediaOrigin.getState().setProbing(false)
     expect(useMediaOrigin.getState().hasProbed).toBe(true)
     const stored = JSON.parse(window.localStorage.getItem(STORE_KEYS.mediaOrigin) ?? 'null')
-    expect(Object.keys(stored.state)).toEqual(['pick', 'remote'])
+    expect(Object.keys(stored.state)).toEqual(['pick'])
     useMediaOrigin.setState({ hasProbed: false })
     await useMediaOrigin.persist.rehydrate()
     expect(useMediaOrigin.getState().hasProbed).toBe(false)
@@ -72,14 +85,14 @@ describe('useMediaOrigin', () => {
 
   it('keeps the pick in the store when localStorage throws', () => {
     withThrowingLocalStorage(() => {
-      useMediaOrigin.getState().setPick({ origin, at: 7 })
-      expect(useMediaOrigin.getState().pick).toEqual({ origin, at: 7 })
+      useMediaOrigin.getState().setPick({ origin, at: 7, remote })
+      expect(useMediaOrigin.getState().pick).toEqual({ origin, at: 7, remote })
     })
   })
 })
 
 describe('isFreshPick', () => {
-  const pick = { origin, at: 10_000 }
+  const pick = { origin, at: 10_000, remote }
 
   it('is fresh for ten minutes after the probe', () => {
     expect(isFreshPick({ pick, now: 10_000 })).toBe(true)

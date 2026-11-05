@@ -1,6 +1,6 @@
 import { net } from 'electron'
 import type { StreamFetch } from '@/main/downloads/fetchFile'
-import type { UpstreamFetch } from '@/main/servers/mediaRelay'
+import type { UpstreamFetch } from '@/main/servers/relayUpstream'
 import type { ProbeFetch } from '@/main/servers/originPicks'
 import type { UpdateFetch } from '@/main/updates'
 

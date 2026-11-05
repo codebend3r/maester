@@ -3,12 +3,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { HLS_PARAMS } from '@raven/core'
-import { CACHE_POLICIES, HEADERS, TOO_MANY_REQUESTS } from '@shared/server'
+import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { RAVEN_HEADERS } from '@/http'
+import { TOO_MANY_REQUESTS } from '@/rateLimits/limitRequests'
 import { RATE_LIMITS, RATE_TIERS } from '@/rateLimits/rateTiers'
-import { type InjectOptions, NOT_WATCHING, ROUTE_METHODS, testConfig } from '@/test/app'
+import {
+  type InjectOptions,
+  NOT_WATCHING,
+  ROUTE_METHODS,
+  TRUSTED_PROXY,
+  testConfig,
+} from '@/test/app'
 import { manualClock } from '@/test/clock'
 import { RATE_ROUTES, ROUTES, type Route, pathOf } from '@/test/enforced'
 
@@ -17,12 +24,26 @@ const STANDARD = RATE_LIMITS[RATE_TIERS.standard].limit
 const MEDIA = RATE_LIMITS[RATE_TIERS.media].limit
 const WINDOW_MS = RATE_LIMITS[RATE_TIERS.strict].windowMs
 
-/** The NAS's reverse proxy, on Docker's bridge, as raven's socket sees it. */
-const PROXY = '172.17.0.1'
+/** The NAS's reverse proxy, as raven's socket sees it, which the test server trusts. */
+const PROXY = TRUSTED_PROXY
 const HOME = '192.168.1.20'
+/** A device at home of its own, so the strict tier it fills is no other test's. */
+const HOME_GUESSER = '192.168.1.21'
+/** A private socket raven was not told to trust: a proxy it can not see past. */
+const UNTRUSTED = '172.18.0.1'
 
 /** A public address of its own for each test, so no test spends another's budget. */
 const away = (n: number): string => `198.51.100.${n}`
+
+/**
+ * The strict route the account gate refuses on this server, which has no
+ * accounts, before `AccountRateGuard` counts it; `appAccountRateLimits`
+ * counts it with accounts ready.
+ */
+const GATED = ROUTES.accountTicket
+
+/** The strict routes the gate lets through here, so their tier is counted. */
+const COUNTED_STRICT = RATE_ROUTES[RATE_TIERS.strict].filter((route) => route !== GATED)
 
 const ECHO = pathOf({ route: ROUTES.remoteAccessEcho, params: { nonce: 'AAAAAAAAAAAAAAAAAAAAAA' } })
 
@@ -88,7 +109,7 @@ describe('rate limits', () => {
 
   it('limits every strict route at the strict limit', async () => {
     const refusals = await Promise.all(
-      RATE_ROUTES[RATE_TIERS.strict].map(async (route, n) => {
+      COUNTED_STRICT.map(async (route, n) => {
         const options = requestOf({ route, remoteAddress: away(10 + n) })
         await statuses({ options, times: STRICT })
         const refused = await app().inject(options)
@@ -100,12 +121,23 @@ describe('rate limits', () => {
       }),
     )
     expect(refusals).toEqual(
-      RATE_ROUTES[RATE_TIERS.strict].map(({ path }) => ({
+      COUNTED_STRICT.map(({ path }) => ({
         path,
         status: TOO_MANY_REQUESTS,
         wait: String(WINDOW_MS / 1000),
       })),
     )
+  })
+
+  it('counts no strict request the account gate refused, as the guard after it counts the tier', async () => {
+    const remoteAddress = away(80)
+    const gated = await statuses({
+      options: requestOf({ route: GATED, remoteAddress }),
+      times: STRICT + 1,
+    })
+    expect(gated.filter((status) => status === TOO_MANY_REQUESTS)).toEqual([])
+    const echoed = await statuses({ options: { url: ECHO, remoteAddress }, times: STRICT })
+    expect(echoed.filter((status) => status === TOO_MANY_REQUESTS)).toEqual([])
   })
 
   it('lets an ordinary route take the standard limit, and counts a path no route declares with it', async () => {
@@ -145,20 +177,38 @@ describe('rate limits', () => {
     ).toBe(200)
   })
 
-  it('never limits the home network, on its own socket or behind the proxy', async () => {
-    const direct = await statuses({
-      options: { url: ECHO, remoteAddress: HOME },
-      times: STRICT * 3,
+  it('never limits the home network on an ordinary route, on its own socket or behind the proxy', async () => {
+    const lockState = pathOf({ route: ROUTES.lockState })
+    const direct = await allStatuses({
+      options: { url: lockState, remoteAddress: HOME },
+      times: STANDARD + 10,
     })
-    const proxied = await statuses({
+    const proxied = await allStatuses({
       options: {
-        url: ECHO,
+        url: lockState,
         remoteAddress: PROXY,
         headers: { [RAVEN_HEADERS.forwardedFor]: HOME },
       },
-      times: STRICT * 3,
+      times: STANDARD + 10,
     })
     expect([...direct, ...proxied].filter((status) => status === TOO_MANY_REQUESTS)).toEqual([])
+  })
+
+  it('limits the home network on the strict routes, so nothing passing for home can guess a secret', async () => {
+    const options = { url: ECHO, remoteAddress: HOME_GUESSER }
+    await statuses({ options, times: STRICT })
+    expect((await app().inject(options)).statusCode).toBe(TOO_MANY_REQUESTS)
+  })
+
+  it('takes a private socket it does not trust that forwards a header for the internet, counted by that socket', async () => {
+    const forged = (claimed: string): InjectOptions => ({
+      url: pathOf({ route: ROUTES.lockState }),
+      remoteAddress: UNTRUSTED,
+      headers: { [RAVEN_HEADERS.forwardedFor]: claimed },
+    })
+    const answered = await allStatuses({ options: forged(HOME), times: STANDARD })
+    expect(answered.filter((status) => status === TOO_MANY_REQUESTS)).toEqual([])
+    expect((await app().inject(forged(away(70)))).statusCode).toBe(TOO_MANY_REQUESTS)
   })
 
   it('counts a client behind the proxy by the address the proxy appended', async () => {

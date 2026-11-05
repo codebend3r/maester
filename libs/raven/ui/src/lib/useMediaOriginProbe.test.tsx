@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, mock, setSystemTime } from
 import {
   MEDIA_PROBE_BYTES,
   type MediaOrigin,
-  type MediaOrigins,
+  type MediaOriginsAnswer,
   PICK_FRESH_MS,
   type RemotePlayback,
 } from '@raven/core'
@@ -31,13 +31,13 @@ const answering = (): ProbeFetch =>
     }
   })
 
-const AT_HOME: RemotePlayback = { limit: null, isOutside: false }
+const INSIDE: RemotePlayback = { limit: null, isOutside: false }
 
 type ClientWithProps = { origins: MediaOrigin[]; remote?: RemotePlayback }
 
-const clientWith = ({ origins, remote = AT_HOME }: ClientWithProps) => ({
+const clientWith = ({ origins, remote = INSIDE }: ClientWithProps) => ({
   ...api,
-  getMediaOrigins: mock(async (): Promise<MediaOrigins> => ({ origins, remote })),
+  getMediaOrigins: mock(async (): Promise<MediaOriginsAnswer> => ({ origins, remote })),
 })
 
 const settle = () =>
@@ -60,40 +60,40 @@ afterEach(() => {
 })
 
 describe('useMediaOriginProbe', () => {
-  it('clears the pick and probes nothing when the server offers no origins', async () => {
-    useMediaOrigin.getState().setPick({ origin: lan, at: NOW })
+  it('picks no origin and probes nothing when the server offers none', async () => {
+    useMediaOrigin.getState().setPick({ origin: lan, at: NOW, remote: INSIDE })
     const fetch = answering()
     renderHook(() =>
       useMediaOriginProbe({ isEnabled: true, api: clientWith({ origins: [] }), fetch }),
     )
     await settle()
-    expect(useMediaOrigin.getState().pick).toBeNull()
+    expect(useMediaOrigin.getState().pick).toEqual({ origin: null, at: NOW, remote: INSIDE })
     expect(fetch).not.toHaveBeenCalled()
     expect(useMediaOrigin.getState().isProbing).toBe(false)
   })
 
-  it('picks the winner of a probe and stamps the time', async () => {
+  it('picks the winner of a probe and stamps the time, with what the server said of remote play', async () => {
     const fetch = answering()
     renderHook(() =>
       useMediaOriginProbe({ isEnabled: true, api: clientWith({ origins: [lan, pub] }), fetch }),
     )
     await settle()
-    expect(useMediaOrigin.getState().pick).toEqual({ origin: pub, at: NOW })
+    expect(useMediaOrigin.getState().pick).toEqual({ origin: pub, at: NOW, remote: INSIDE })
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('clears the pick when no origin answers', async () => {
-    useMediaOrigin.getState().setPick({ origin: lan, at: NOW - PICK_FRESH_MS * 2 })
+  it('picks no origin when none answers', async () => {
+    useMediaOrigin.getState().setPick({ origin: lan, at: NOW - PICK_FRESH_MS * 2, remote: INSIDE })
     const fetch: ProbeFetch = async () => ({ ok: false, body: null })
     renderHook(() =>
       useMediaOriginProbe({ isEnabled: true, api: clientWith({ origins: [lan] }), fetch }),
     )
     await settle()
-    expect(useMediaOrigin.getState().pick).toBeNull()
+    expect(useMediaOrigin.getState().pick).toEqual({ origin: null, at: NOW, remote: INSIDE })
   })
 
   it('keeps a fresh stored pick without probing, and probes a stale one', async () => {
-    useMediaOrigin.getState().setPick({ origin: lan, at: NOW - 1000 })
+    useMediaOrigin.getState().setPick({ origin: lan, at: NOW - 1000, remote: INSIDE })
     const fresh = answering()
     const mounted = renderHook(() =>
       useMediaOriginProbe({
@@ -107,7 +107,7 @@ describe('useMediaOriginProbe', () => {
     expect(useMediaOrigin.getState().pick?.origin ?? null).toEqual(lan)
     mounted.unmount()
 
-    useMediaOrigin.getState().setPick({ origin: lan, at: NOW - PICK_FRESH_MS })
+    useMediaOrigin.getState().setPick({ origin: lan, at: NOW - PICK_FRESH_MS, remote: INSIDE })
     const stale = answering()
     renderHook(() =>
       useMediaOriginProbe({
@@ -122,11 +122,10 @@ describe('useMediaOriginProbe', () => {
   })
 
   it('takes the remote limit on every answer, even when the fresh pick is kept', async () => {
-    useMediaOrigin.getState().setPick({ origin: lan, at: NOW - 1000 })
-    useMediaOrigin.getState().setRemote(AT_HOME)
+    useMediaOrigin.getState().setPick({ origin: lan, at: NOW - 1000, remote: INSIDE })
     const away: RemotePlayback = { limit: 'high720', isOutside: true }
     const fetch = answering()
-    const mounted = renderHook(() =>
+    renderHook(() =>
       useMediaOriginProbe({
         isEnabled: true,
         api: clientWith({ origins: [lan, pub], remote: away }),
@@ -135,21 +134,11 @@ describe('useMediaOriginProbe', () => {
     )
     await settle()
     expect(fetch).not.toHaveBeenCalled()
-    expect(useMediaOrigin.getState().remote).toEqual(away)
-    mounted.unmount()
-
-    // An older server says nothing of remote play, so nothing is held back.
-    const older = {
-      ...api,
-      getMediaOrigins: mock(async () => ({ origins: [lan], remote: undefined })),
-    }
-    renderHook(() => useMediaOriginProbe({ isEnabled: true, api: older, fetch }))
-    await settle()
-    expect(useMediaOrigin.getState().remote).toBeNull()
+    expect(useMediaOrigin.getState().pick).toEqual({ origin: lan, at: NOW - 1000, remote: away })
   })
 
   it('probes again when the fresh pick is no longer one of the origins', async () => {
-    useMediaOrigin.getState().setPick({ origin: lan, at: NOW })
+    useMediaOrigin.getState().setPick({ origin: lan, at: NOW, remote: INSIDE })
     const fetch = answering()
     renderHook(() =>
       useMediaOriginProbe({ isEnabled: true, api: clientWith({ origins: [pub] }), fetch }),
@@ -175,7 +164,7 @@ describe('useMediaOriginProbe', () => {
   })
 
   it('folds re-probes asked for while one runs into a single follow-up', async () => {
-    const getMediaOrigins = mock(async () => ({ origins: [lan], remote: AT_HOME }))
+    const getMediaOrigins = mock(async () => ({ origins: [lan], remote: INSIDE }))
     const { result } = renderHook(() =>
       useMediaOriginProbe({
         isEnabled: true,
@@ -213,7 +202,7 @@ describe('useMediaOriginProbe', () => {
   })
 
   it('swallows a failing origins request and leaves the pick alone', async () => {
-    useMediaOrigin.getState().setPick({ origin: lan, at: NOW - PICK_FRESH_MS * 2 })
+    useMediaOrigin.getState().setPick({ origin: lan, at: NOW - PICK_FRESH_MS * 2, remote: INSIDE })
     const failing = { ...api, getMediaOrigins: mock(async () => Promise.reject(new Error('down'))) }
     renderHook(() => useMediaOriginProbe({ isEnabled: true, api: failing, fetch: answering() }))
     await settle()
@@ -230,7 +219,7 @@ describe('useMediaOriginProbe', () => {
     const getMediaOrigins = mock(async () => {
       calls += 1
       if (calls === 1) await gate
-      return { origins: [lan, pub], remote: AT_HOME }
+      return { origins: [lan, pub], remote: INSIDE }
     })
     const fetch = answering()
     const { result } = renderHook(() =>

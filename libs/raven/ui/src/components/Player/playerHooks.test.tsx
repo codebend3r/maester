@@ -263,7 +263,7 @@ const playFrom = ({ origin, remote, bitrate }: PlayFromProps) => {
   setBrowserSupport(() => true)
   setStreamSupport(() => true)
   // In act: a hook rendered earlier in the same test reads the store too.
-  act(() => useMediaOrigin.setState({ pick: origin && { origin, at: Date.now() }, remote }))
+  act(() => useMediaOrigin.setState({ pick: { origin, at: Date.now(), remote } }))
   const media = mediaItem({ width: 1920, height: 1080, bitrate })
   return renderHook(
     () => usePlaybackLadder({ api, media, audio: null, isDefaultAudio: true, burn: null }),
@@ -275,10 +275,10 @@ describe('usePlaybackLadder away from home', () => {
   // Unmounted first, so the reset is not an update outside act.
   afterEach(() => {
     cleanup()
-    useMediaOrigin.setState({ pick: null, remote: null })
+    useMediaOrigin.setState({ pick: null })
   })
 
-  it('starts a file over the remote limit as a transcode at the limit from a public origin', () => {
+  it('starts a file over the remote limit as a transcode from a public origin, the size left to the server', () => {
     const { result } = playFrom({
       origin: PUBLIC_ORIGIN,
       remote: HELD_TO_720,
@@ -288,12 +288,9 @@ describe('usePlaybackLadder away from home', () => {
     if (away.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
     expect(away.rendition).toEqual({
       mode: PLAYBACK_MODES.transcode,
-      quality: 'high720',
+      quality: null,
       burn: null,
     })
-    const sizes = away.choices.groups.find((group) => group.legend === 'Quality')
-    const checked = sizes?.options.find((option) => option.isChecked)
-    expect(checked?.pick).toEqual({ kind: PICK_KINDS.size, quality: 'high720' })
 
     // The other ways stay behind it to step down to.
     act(() => away.fail(failure('broke')))
@@ -332,7 +329,7 @@ describe('usePlaybackLadder away from home', () => {
     }).result
     if (outside.current.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
     expect(outside.current.rendition.mode).toBe(PLAYBACK_MODES.transcode)
-    expect(outside.current.rendition.quality).toBe('high720')
+    expect(outside.current.rendition.quality).toBeNull()
 
     const inside = playFrom({ origin: null, remote: HELD_TO_720, bitrate: 24_000_000 }).result
     if (inside.current.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')

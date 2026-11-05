@@ -107,8 +107,8 @@ type UsePlaybackLadderProps = {
  * for anything but a transcode: that holds for the rest of the playback.
  * The viewer can pick any way the plan offers; it starts there, and a
  * failure steps down from it. Away from home, a file over the remote limit
- * starts as a transcode at that limit, as Plex does, unless the viewer picks
- * another size or way.
+ * starts as a transcode, as Plex does, unless the viewer picks another way;
+ * the server holds that transcode to the limit.
  */
 export const usePlaybackLadder = ({
   media,
@@ -119,9 +119,9 @@ export const usePlaybackLadder = ({
 }: UsePlaybackLadderProps): PlaybackStatus => {
   const settings = useQuery(playerQueriesFor(api).playbackSettings)
   const policy = settings.data?.settings ?? (settings.isError ? DEFAULT_PLAYBACK_SETTINGS : null)
-  const originKind = useMediaOrigin((state) => state.pick?.origin.kind ?? null)
-  const remote = useMediaOrigin((state) => state.remote)
-  const network = useMemo(
+  const originKind = useMediaOrigin((state) => state.pick?.origin?.kind ?? null)
+  const remote = useMediaOrigin((state) => state.pick?.remote ?? null)
+  const plan = useMemo(
     () =>
       policy &&
       planForNetwork({
@@ -138,7 +138,6 @@ export const usePlaybackLadder = ({
       }),
     [media, isDefaultAudio, policy, originKind, remote],
   )
-  const plan = network?.plan ?? null
   const [forced, setForced] = useState(false)
   const [fallback, setFallback] = useState<{ ladder: Ladder; step: number } | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
@@ -186,11 +185,9 @@ export const usePlaybackLadder = ({
     }
   }
   const isConverting = mode === PLAYBACK_MODES.transcode
-  // A viewer's size wins; without one, a play away from home converts at the remote limit.
-  const quality = picked?.kind === PICK_KINDS.size ? picked.quality : (network?.quality ?? null)
   const rendition: Rendition = {
     mode,
-    quality: isConverting ? quality : null,
+    quality: isConverting && picked?.kind === PICK_KINDS.size ? picked.quality : null,
     // A burn's ladder is the transcode alone, so a burning rendition is always converting.
     burn: isBurning ? burn : null,
   }

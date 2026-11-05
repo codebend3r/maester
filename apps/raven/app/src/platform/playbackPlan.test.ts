@@ -11,11 +11,14 @@ import {
   type SubtitleTrack,
   AUDIO_CODECS,
   MEDIA_ORIGIN_KINDS,
+  STREAM_QUALITIES,
   type StreamQuality,
   TRANSCODINGS,
+  isStreamQuality,
   VIDEO_CODECS,
+  AT_HOME,
+  type PlayNetwork,
 } from '@raven/core'
-import { AT_HOME, type PlayNetwork } from '@raven/native/headless'
 import { mediaItemFor } from '@/test/mediaItem'
 import { SUBTITLE_CODECS } from '@/test/subtitleCodecs'
 
@@ -273,7 +276,10 @@ describe("planFor narrowed by this device's settings", () => {
 })
 
 /** The remote limit the server holds a play away from home to: 720p at 3 Mb/s. */
-const LIMIT: StreamQuality = 'medium720'
+const LIMIT: StreamQuality = isStreamQuality.values.find(
+  (quality) =>
+    STREAM_QUALITIES[quality].height === 720 && STREAM_QUALITIES[quality].bitrate === 3_000_000,
+)!
 
 const LIMITED = { limit: LIMIT, isOutside: false }
 const PUBLIC_PLAY: PlayNetwork = { origin: { kind: MEDIA_ORIGIN_KINDS.public }, remote: LIMITED }

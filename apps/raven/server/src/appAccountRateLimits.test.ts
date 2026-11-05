@@ -1,8 +1,9 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { HEADERS, TOO_MANY_REQUESTS } from '@shared/server'
+import { HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { TOO_MANY_REQUESTS } from '@/rateLimits/limitRequests'
 import { ACCOUNT_STRICT_LIMIT, RATE_LIMITS, RATE_TIERS } from '@/rateLimits/rateTiers'
 import { authFixture } from '@/test/auth'
 import {

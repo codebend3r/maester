@@ -89,9 +89,6 @@
           "production",
           "^production",
           {
-            "env": "RAVEN_API_ORIGIN"
-          },
-          {
             "env": "NETLIFY"
           },
           {

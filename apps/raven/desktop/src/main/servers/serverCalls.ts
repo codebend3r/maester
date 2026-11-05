@@ -10,6 +10,7 @@ import {
   type AllowedCall,
   type ServerMethod,
 } from '@/main/servers/allowlist'
+import { OVERFLOWS, readCapped } from '@/main/servers/cappedBody'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
 export const CALL_TIMEOUT_MS = 10_000
@@ -78,31 +79,6 @@ export type ServerCalls = {
   settleWrites: () => Promise<void>
 }
 
-type ReadCappedProps = {
-  reader: {
-    read: () => Promise<{ done: true; value?: undefined } | { done: false; value: Uint8Array }>
-    cancel: () => Promise<void>
-  }
-  decoder: TextDecoder
-  text: string
-  maxChars: number
-}
-
-/** Reads a reply's text, stopping one chunk past `maxChars`, so a huge one is never held whole. */
-const readCapped = async ({
-  reader,
-  decoder,
-  text,
-  maxChars,
-}: ReadCappedProps): Promise<string> => {
-  const { done, value } = await reader.read()
-  if (done) return `${text}${decoder.decode()}`
-  const next = `${text}${decoder.decode(value, { stream: true })}`
-  if (next.length <= maxChars) return readCapped({ reader, decoder, text: next, maxChars })
-  await reader.cancel().catch(() => undefined)
-  return next
-}
-
 /**
  * A `ServerFetch` over `net.fetch`: no cookie from any jar goes along, only the headers the call
  * names, a redirect fails the call rather than carrying them to wherever it points, and a call
@@ -122,15 +98,9 @@ export const fetchThrough =
     const stream = response.body
     return {
       status: response.status,
+      // Read one chunk past `maxChars`, so the call can tell a reply that ran over.
       text: ({ maxChars }) =>
-        stream === null
-          ? Promise.resolve('')
-          : readCapped({
-              reader: stream.getReader(),
-              decoder: new TextDecoder(),
-              text: '',
-              maxChars,
-            }),
+        readCapped({ body: stream, maxChars, onOverflow: OVERFLOWS.truncate }),
     }
   }
 

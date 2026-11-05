@@ -182,6 +182,8 @@ export const queryKeys = {
   /** What viewers reported from the player, for the admin. */
   bugReports: ['reports'],
   displaySettings: ['settings', 'display'],
+  /** Remote Access's settings and what the outside check found, for the owner. */
+  remoteAccess: ['remote-access'],
   nextEpisode: (showId: number) => ['items', showId, 'next'],
   person: (id: number | null) => ['people', id],
   /** A music library's albums, artists and tracks, under the library so a library event reads them again. */

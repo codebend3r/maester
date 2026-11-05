@@ -25,6 +25,9 @@ services:
       - .env
     environment:
       - QUICK_SCAN_INTERVAL_MINUTES=10
+      # DSM's reverse proxy reaches raven through this network's gateway
+      # (below), the one address whose X-Forwarded-For raven believes.
+      - RAVEN_TRUSTED_PROXIES=172.30.84.1
     volumes:
       - /volume1/docker/raven/data:/config
       # Every NAS's share under /media/<nas>, read-write so deleting in the
@@ -36,3 +39,12 @@ services:
       - /volume1/Vhagar/Syrax:/media/syrax
       - /volume1/Vhagar/Vermithor:/media/vermithor
 
+# A fixed subnet, so the gateway RAVEN_TRUSTED_PROXIES names stays the one
+# DSM's reverse proxy comes through. Changing it needs `docker compose down`
+# once, since compose will not move a running network.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.84.0/24
+          gateway: 172.30.84.1

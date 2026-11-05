@@ -10,17 +10,17 @@ import {
   type RemoteAccessStatus,
   type RemoteLimit,
   STREAM_QUALITIES,
+  checkFactsOf,
   formatBitrate,
   isRemoteLimit,
   remoteQualityFor,
   remoteStreamsAt,
 } from '@raven/core'
 import { Button } from '@raven/ui'
-import { type FormEvent, type InputHTMLAttributes, useId, useState } from 'react'
-import { Loading } from '@/components/Skeleton/Skeleton'
+import { type FormEvent, type InputHTMLAttributes, type ReactNode, useId, useState } from 'react'
 import { api } from '@/lib/api'
-import { Section } from '@/pages/SettingsPage/Section'
-import { SettingsSkeleton } from '@/pages/SettingsPage/Setting'
+import { remoteAccessQuery } from '@/lib/queries'
+import { SettingsSection, SettingsSkeleton } from '@/pages/SettingsPage/Setting'
 import {
   REACHABILITY_PROBLEM_COPY,
   REMOTE_ACCESS_COPY,
@@ -28,9 +28,6 @@ import {
 } from '@/pages/SettingsPage/remoteAccessCopy'
 import pageStyles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import styles from '@/pages/SettingsPage/RemoteAccessSection.module.scss'
-
-/** The query key Remote Access is kept under; only this section reads it. */
-const REMOTE_ACCESS_QUERY_KEY = ['remoteAccess'] as const
 
 /** How the status line reads: good once reachable, a problem once not, plain otherwise. */
 const STATUS_TONES = {
@@ -101,7 +98,7 @@ type RouteProps = { state: RemoteAccessState }
 /** Private, then public, then the internet, as Plex draws the way in. */
 const RemoteAccessRoute = ({ state }: RouteProps) => {
   const { settings, status, privateAddress } = state
-  const publicAddress = 'publicAddress' in status ? status.publicAddress : null
+  const publicAddress = checkFactsOf(status)?.publicAddress ?? null
   return (
     <ol className={styles.route} aria-label={REMOTE_ACCESS_COPY.route}>
       <li className={styles.hop}>
@@ -129,18 +126,17 @@ const RemoteAccessRoute = ({ state }: RouteProps) => {
   )
 }
 
+type FieldControlProps = { id: string; hintId: string }
+
 type FieldProps = {
   label: string
   hint: string
-  value: string
-  onChange: (value: string) => void
-  /** What the input takes, so the browser checks it before Apply. */
-  input: Pick<InputHTMLAttributes<HTMLInputElement>, 'type' | 'inputMode' | 'min' | 'max' | 'step'>
-  placeholder?: string
+  /** The control, given the ids its label and its hint name. */
+  children: (control: FieldControlProps) => ReactNode
 }
 
-/** One labelled text field with what it means under it. */
-const Field = ({ label, hint, value, onChange, input, placeholder }: FieldProps) => {
+/** One labelled control with what it means under it. */
+const Field = ({ label, hint, children }: FieldProps) => {
   const id = useId()
   const hintId = useId()
   return (
@@ -148,15 +144,7 @@ const Field = ({ label, hint, value, onChange, input, placeholder }: FieldProps)
       <label htmlFor={id} className={styles.fieldLabel}>
         {label}
       </label>
-      <input
-        id={id}
-        className={styles.input}
-        value={value}
-        {...input}
-        placeholder={placeholder}
-        aria-describedby={hintId}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      {children({ id, hintId })}
       <span id={hintId} className={styles.fieldHint}>
         {hint}
       </span>
@@ -164,90 +152,126 @@ const Field = ({ label, hint, value, onChange, input, placeholder }: FieldProps)
   )
 }
 
+type TextFieldSpec = {
+  label: string
+  hint: string
+  /** What the input takes, so the browser checks it before Apply. */
+  input: Pick<InputHTMLAttributes<HTMLInputElement>, 'type' | 'inputMode' | 'min' | 'max' | 'step'>
+  placeholder?: string
+}
+
+/** The settings the form edits as text, in the order it shows them. */
+const TEXT_FIELDS = {
+  hostname: {
+    label: REMOTE_ACCESS_COPY.hostname,
+    hint: REMOTE_ACCESS_COPY.hostnameHint,
+    input: HOSTNAME_INPUT,
+  },
+  publicPort: {
+    label: REMOTE_ACCESS_COPY.publicPort,
+    hint: REMOTE_ACCESS_COPY.publicPortHint,
+    input: PORT_INPUT,
+  },
+  privatePort: {
+    label: REMOTE_ACCESS_COPY.privatePort,
+    hint: REMOTE_ACCESS_COPY.privatePortHint,
+    input: PORT_INPUT,
+    placeholder: REMOTE_ACCESS_COPY.privatePortPlaceholder,
+  },
+  uploadMbps: {
+    label: REMOTE_ACCESS_COPY.uploadMbps,
+    hint: REMOTE_ACCESS_COPY.uploadHint,
+    input: UPLOAD_INPUT,
+  },
+} as const satisfies Partial<Record<keyof RemoteAccessSettings, TextFieldSpec>>
+
+type TextFieldName = keyof typeof TEXT_FIELDS
+
+const isTextFieldName = (name: string): name is TextFieldName => name in TEXT_FIELDS
+
+const TEXT_FIELD_NAMES = Object.keys(TEXT_FIELDS).filter(isTextFieldName)
+
+/** The form's draft: the settings, each text field as the text its input shows. */
+type Draft = Omit<RemoteAccessSettings, TextFieldName> & Record<TextFieldName, string>
+
+const draftOf = (settings: RemoteAccessSettings): Draft => ({
+  isEnabled: settings.isEnabled,
+  hostname: textOf(settings.hostname),
+  publicPort: textOf(settings.publicPort),
+  privatePort: textOf(settings.privatePort),
+  uploadMbps: textOf(settings.uploadMbps),
+  remoteLimit: settings.remoteLimit,
+})
+
+/** The change Apply sends: every field, a blank one as none and the hostname as a certificate names it. */
+const changeOf = (draft: Draft): RemoteAccessChange => {
+  const hostname = draft.hostname.trim().toLowerCase()
+  return {
+    isEnabled: draft.isEnabled,
+    hostname: hostname === '' ? null : hostname,
+    publicPort: numberOf(draft.publicPort),
+    privatePort: numberOf(draft.privatePort),
+    uploadMbps: numberOf(draft.uploadMbps),
+    remoteLimit: draft.remoteLimit,
+  }
+}
+
 type FormProps = {
   settings: RemoteAccessSettings
-  isSaving: boolean
   onApply: (change: RemoteAccessChange) => void
 }
 
 /** The settings as a form: nothing is saved until Apply, which checks again from outside. */
-const RemoteAccessForm = ({ settings, isSaving, onApply }: FormProps) => {
-  const limitId = useId()
-  const [isEnabled, setEnabled] = useState(settings.isEnabled)
-  const [hostname, setHostname] = useState(textOf(settings.hostname))
-  const [publicPort, setPublicPort] = useState(textOf(settings.publicPort))
-  const [privatePort, setPrivatePort] = useState(textOf(settings.privatePort))
-  const [uploadMbps, setUploadMbps] = useState(textOf(settings.uploadMbps))
-  const [remoteLimit, setRemoteLimit] = useState<RemoteLimit>(settings.remoteLimit)
-  const upload = numberOf(uploadMbps)
-  const cap = remoteQualityFor({ remoteLimit, uploadMbps: upload })
+const RemoteAccessForm = ({ settings, onApply }: FormProps) => {
+  const [draft, setDraft] = useState(() => draftOf(settings))
+  const edit = (change: Partial<Draft>) => setDraft((current) => ({ ...current, ...change }))
+  const upload = numberOf(draft.uploadMbps)
+  const cap = remoteQualityFor({ remoteLimit: draft.remoteLimit, uploadMbps: upload })
 
   const apply = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const name = hostname.trim().toLowerCase()
-    onApply({
-      isEnabled,
-      hostname: name === '' ? null : name,
-      publicPort: numberOf(publicPort),
-      privatePort: numberOf(privatePort),
-      uploadMbps: upload,
-      remoteLimit,
-    })
+    onApply(changeOf(draft))
   }
 
   return (
     <form className={styles.form} onSubmit={apply}>
-      {/* The section names these already, so the fieldset is no group of its own to a screen reader. */}
-      <fieldset role="none" className={pageStyles.settings} disabled={isSaving}>
-        <label className={pageStyles.choice}>
-          <input
-            type="checkbox"
-            checked={isEnabled}
-            onChange={(event) => setEnabled(event.target.checked)}
-          />
-          <span className={pageStyles.choiceLabel}>{REMOTE_ACCESS_COPY.enable}</span>
-          <span className={pageStyles.choiceHint}>{REMOTE_ACCESS_COPY.enableHint}</span>
-        </label>
-        <Field
-          label={REMOTE_ACCESS_COPY.hostname}
-          hint={REMOTE_ACCESS_COPY.hostnameHint}
-          value={hostname}
-          onChange={setHostname}
-          input={HOSTNAME_INPUT}
+      <label className={pageStyles.choice}>
+        <input
+          type="checkbox"
+          checked={draft.isEnabled}
+          onChange={(event) => edit({ isEnabled: event.target.checked })}
         />
-        <Field
-          label={REMOTE_ACCESS_COPY.publicPort}
-          hint={REMOTE_ACCESS_COPY.publicPortHint}
-          value={publicPort}
-          onChange={setPublicPort}
-          input={PORT_INPUT}
-        />
-        <Field
-          label={REMOTE_ACCESS_COPY.privatePort}
-          hint={REMOTE_ACCESS_COPY.privatePortHint}
-          value={privatePort}
-          onChange={setPrivatePort}
-          input={PORT_INPUT}
-          placeholder={REMOTE_ACCESS_COPY.privatePortPlaceholder}
-        />
-        <Field
-          label={REMOTE_ACCESS_COPY.uploadMbps}
-          hint={REMOTE_ACCESS_COPY.uploadHint}
-          value={uploadMbps}
-          onChange={setUploadMbps}
-          input={UPLOAD_INPUT}
-        />
-        <div className={styles.field}>
-          <label htmlFor={limitId} className={styles.fieldLabel}>
-            {REMOTE_ACCESS_COPY.remoteLimit}
-          </label>
+        <span className={pageStyles.choiceLabel}>{REMOTE_ACCESS_COPY.enable}</span>
+        <span className={pageStyles.choiceHint}>{REMOTE_ACCESS_COPY.enableHint}</span>
+      </label>
+      {TEXT_FIELD_NAMES.map((name) => {
+        const field: TextFieldSpec = TEXT_FIELDS[name]
+        return (
+          <Field key={name} label={field.label} hint={field.hint}>
+            {({ id, hintId }) => (
+              <input
+                id={id}
+                className={styles.input}
+                value={draft[name]}
+                {...field.input}
+                placeholder={field.placeholder}
+                aria-describedby={hintId}
+                onChange={(event) => edit({ [name]: event.target.value })}
+              />
+            )}
+          </Field>
+        )
+      })}
+      <Field label={REMOTE_ACCESS_COPY.remoteLimit} hint={REMOTE_ACCESS_COPY.remoteLimitHint}>
+        {({ id, hintId }) => (
           <select
-            id={limitId}
+            id={id}
             className={styles.input}
-            value={remoteLimit}
+            value={draft.remoteLimit}
+            aria-describedby={hintId}
             onChange={(event) => {
               const picked = event.target.value
-              if (isRemoteLimit(picked)) setRemoteLimit(picked)
+              if (isRemoteLimit(picked)) edit({ remoteLimit: picked })
             }}
           >
             {isRemoteLimit.values.map((limit) => (
@@ -256,27 +280,32 @@ const RemoteAccessForm = ({ settings, isSaving, onApply }: FormProps) => {
               </option>
             ))}
           </select>
-          <span className={styles.fieldHint}>{REMOTE_ACCESS_COPY.remoteLimitHint}</span>
-        </div>
-        {cap !== null && upload !== null && (
-          <p className={pageStyles.hint}>
-            {REMOTE_ACCESS_COPY.streamsHint({
-              quality: limitLabel(cap),
-              streams: remoteStreamsAt({ quality: cap, uploadMbps: upload }),
-            })}
-          </p>
         )}
-        <div className={styles.actions}>
-          <Button type="submit" tone="primary">
-            {REMOTE_ACCESS_COPY.apply}
-          </Button>
-          <Button type="button" onClick={() => onApply({})}>
-            {REMOTE_ACCESS_COPY.checkAgain}
-          </Button>
-        </div>
-      </fieldset>
+      </Field>
+      {cap !== null && upload !== null && (
+        <p className={pageStyles.hint}>
+          {REMOTE_ACCESS_COPY.streamsHint({
+            quality: limitLabel(cap),
+            streams: remoteStreamsAt({ quality: cap, uploadMbps: upload }),
+          })}
+        </p>
+      )}
+      <div className={styles.actions}>
+        <Button type="submit" tone="primary">
+          {REMOTE_ACCESS_COPY.apply}
+        </Button>
+        <Button type="button" onClick={() => onApply({})}>
+          {REMOTE_ACCESS_COPY.checkAgain}
+        </Button>
+      </div>
     </form>
   )
+}
+
+/** When the outside check last looked, in the viewer's time; null before any check. */
+const checkedTimeOf = (status: RemoteAccessStatus): string | null => {
+  const facts = checkFactsOf(status)
+  return facts === null ? null : new Date(facts.checkedAt).toLocaleTimeString()
 }
 
 /**
@@ -286,53 +315,42 @@ const RemoteAccessForm = ({ settings, isSaving, onApply }: FormProps) => {
  */
 export const RemoteAccessSection = () => {
   const queryClient = useQueryClient()
-  const state = useQuery({
-    queryKey: REMOTE_ACCESS_QUERY_KEY,
-    queryFn: () => api.getRemoteAccess(),
-  })
+  const state = useQuery(remoteAccessQuery)
   const save = useMutation({
     mutationFn: (change: RemoteAccessChange) => api.setRemoteAccess(change),
-    onSuccess: (next) => queryClient.setQueryData(REMOTE_ACCESS_QUERY_KEY, next),
+    onSuccess: (next) => queryClient.setQueryData(remoteAccessQuery.queryKey, next),
   })
-  const checkedAt =
-    state.data !== undefined && 'checkedAt' in state.data.status
-      ? new Date(state.data.status.checkedAt).toLocaleTimeString()
-      : null
   return (
-    <Section icon="globe" title={REMOTE_ACCESS_COPY.heading} help={REMOTE_ACCESS_COPY.help}>
-      {state.isError && (
-        <p className={pageStyles.error} role="alert">
-          {state.error.message}
-        </p>
-      )}
-      {save.isError && (
-        <p className={pageStyles.error} role="alert">
-          {REMOTE_ACCESS_COPY.saveFailed}
-          {save.error.message}
-        </p>
-      )}
-      {state.data !== undefined && (
-        <>
-          <RemoteAccessStatusLine status={state.data.status} />
-          <RemoteAccessRoute state={state.data} />
-          <p className={pageStyles.hint} aria-live="polite">
-            {save.isPending && REMOTE_ACCESS_COPY.checking}
-            {!save.isPending &&
-              checkedAt !== null &&
-              REMOTE_ACCESS_COPY.checkedAt({ at: checkedAt })}
-          </p>
-          <RemoteAccessForm
-            settings={state.data.settings}
-            isSaving={save.isPending}
-            onApply={(change) => save.mutate(change)}
-          />
-        </>
-      )}
-      {state.isPending && (
-        <Loading label={REMOTE_ACCESS_COPY.reading}>
-          <SettingsSkeleton count={3} />
-        </Loading>
-      )}
-    </Section>
+    <SettingsSection
+      icon="globe"
+      title={REMOTE_ACCESS_COPY.heading}
+      hint={REMOTE_ACCESS_COPY.help}
+      isResetting={save.isPending}
+      query={state}
+      shape={<SettingsSkeleton count={3} />}
+      saveError={save.error}
+    >
+      {(data) => {
+        const checkedAt = checkedTimeOf(data.status)
+        return (
+          <>
+            <RemoteAccessStatusLine status={data.status} />
+            <RemoteAccessRoute state={data} />
+            <p className={pageStyles.hint} aria-live="polite">
+              {save.isPending && REMOTE_ACCESS_COPY.checking}
+              {!save.isPending &&
+                checkedAt !== null &&
+                REMOTE_ACCESS_COPY.checkedAt({ at: checkedAt })}
+            </p>
+            {/* Keyed by the read, so whatever reads Remote Access again starts the draft again. */}
+            <RemoteAccessForm
+              key={state.dataUpdatedAt}
+              settings={data.settings}
+              onApply={(change) => save.mutate(change)}
+            />
+          </>
+        )
+      }}
+    </SettingsSection>
   )
 }

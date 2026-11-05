@@ -47,7 +47,7 @@ export const useMediaOriginProbe = ({
 
   const run = useCallback(async function runProbe({ isForced }: RunProbeProps) {
     if (!setup.current.isEnabled) return
-    const { isProbing, setPick, setProbing, setRemote } = useMediaOrigin.getState()
+    const { isProbing, setPick, setProbing } = useMediaOrigin.getState()
     if (isProbing) {
       // Unreachable or back online while a probe runs: what it measures may predate that, so go again after it.
       if (isForced) isForcedPending.current = true
@@ -57,18 +57,18 @@ export const useMediaOriginProbe = ({
     try {
       const current = setup.current
       const { origins, remote } = await current.api.getMediaOrigins()
-      // Where this request came from can change while the pick is kept, so the remote limit is taken every time.
-      setRemote(remote ?? null)
-      if (origins.length === 0) return setPick(null)
+      if (origins.length === 0) return setPick({ origin: null, at: Date.now(), remote })
       const { pick } = useMediaOrigin.getState()
+      const kept = pick?.origin ?? null
       const isKept =
         !isForced &&
-        pick !== null &&
+        kept !== null &&
         isFreshPick({ pick, now: Date.now() }) &&
-        origins.some(({ url }) => url === pick.origin.url)
-      if (isKept) return
+        origins.some(({ url }) => url === kept.url)
+      // Where this request came from can change while the origin is kept, so its word on remote play is taken every time.
+      if (isKept && pick !== null) return setPick({ ...pick, remote })
       const winner = pickOrigin(await probeOrigins({ origins, ...current }))
-      setPick(winner ? { origin: winner, at: Date.now() } : null)
+      setPick({ origin: winner, at: Date.now(), remote })
     } catch {
       // The pick stays as it was; the next event tries again.
     } finally {

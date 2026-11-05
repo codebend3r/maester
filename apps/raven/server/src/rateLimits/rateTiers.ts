@@ -1,7 +1,8 @@
 import { SetMetadata } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { type RateLimit, WHEN_FULL } from '@shared/server'
+import type { AddressPrefixBits } from '@raven/core'
 import { isMediaPlaneRoute } from '@/media/mediaPlaneMark'
+import { type RateLimit, WHEN_FULL } from '@/rateLimits/limitRequests'
 import type { MarkTargets } from '@/routeMarks'
 
 /** The budgets a route's requests are counted in, per client address. */
@@ -15,9 +16,10 @@ const MINUTE_MS = 60_000
 const MAX_CLIENTS = 10_000
 
 /**
- * Each tier's requests per client a minute, from the internet only: the home
- * network is never counted. Each tier counts in a map of its own, and none
- * drops a running window to make room.
+ * Each tier's requests per client a minute. `limitRavenRequests` counts
+ * `standard` and `media` from the internet only, the home network never;
+ * `AccountRateGuard` counts `strict`, the home network too. Each tier counts
+ * in a map of its own, and none drops a running window to make room.
  *
  * - `standard`, 1,200 (20 a second): a library grid scrolled hard asks a
  *   poster per card, a few hundred a minute, and the web app's first load
@@ -31,9 +33,10 @@ const MAX_CLIENTS = 10_000
  *   counts every new address together, 600 a minute in all
  *   (`overflowLimit`): moving through addresses still meets that ceiling,
  *   and a flood that fills the map degrades the tier to it, never to zero.
- *   A refusal by that shared ceiling is decided by `AccountRateGuard`, after
- *   the account gate: a signed-in account goes by its own budget alone, so
- *   no flood of strangers can lock the owner out of the PIN or a ticket.
+ *   `AccountRateGuard` counts it after the account gate, so a refusal by
+ *   that shared ceiling holds back only a caller with no account: a
+ *   signed-in account goes by its own budget alone, so no flood of
+ *   strangers can lock the owner out of the PIN or a ticket.
  * - `media`, 3,000 (50 a second): HLS asks a 6 s segment every 6 s, with a
  *   playlist and a subtitle segment beside it, under 40 a minute a viewer;
  *   a seek asks a few segments or one `file` range. Ten viewers behind one
@@ -79,16 +82,16 @@ export const ACCOUNT_STRICT_LIMIT = {
 } as const satisfies RateLimit
 
 /**
- * How much of an IPv6 address counts as one client in each tier: a home or a
- * phone is handed a /64, and a home a /56 or a site a /48, which the
- * `strict` tier takes as one client so one allocation can not mint thousands
- * of keys to fill its map.
+ * How much of an IPv6 address counts as one client in each tier: a phone or
+ * a home's network is a /64, and a whole home or site is handed as much as a
+ * /48, which the `strict` tier takes as one client so one allocation can not
+ * mint thousands of keys to fill its map.
  */
 export const RATE_PREFIX_BITS = {
   [RATE_TIERS.standard]: 64,
   [RATE_TIERS.strict]: 48,
   [RATE_TIERS.media]: 64,
-} as const satisfies Record<RateTier, number>
+} as const satisfies Record<RateTier, AddressPrefixBits>
 
 const STRICTLY_LIMITED = Symbol('STRICTLY_LIMITED')
 
@@ -103,6 +106,6 @@ const decorators = new Reflector()
  * limited the moment it exists.
  */
 export const rateTierOf = (targets: MarkTargets): RateTier => {
-  if (decorators.getAllAndOverride(STRICTLY_LIMITED, targets) === true) return RATE_TIERS.strict
+  if (!!decorators.getAllAndOverride(STRICTLY_LIMITED, targets)) return RATE_TIERS.strict
   return isMediaPlaneRoute(targets) ? RATE_TIERS.media : RATE_TIERS.standard
 }
