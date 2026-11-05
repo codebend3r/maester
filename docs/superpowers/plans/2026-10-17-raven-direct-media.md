@@ -76,7 +76,7 @@ The stack sits on `main`, not on `redesign` (decided 2026-10-17, after the plan 
 - Commit also: `docs/superpowers/specs/2026-10-16-raven-direct-media-design.md`, `docs/superpowers/plans/2026-10-17-raven-direct-media.md`
 
 **Interfaces:**
-- Produces in `@raven/core` (`contract.ts`): `isMediaOriginKind = oneOf(['lan', 'tailnet', 'public'])`, `isMediaOrigin = object({ kind: isMediaOriginKind, url: isString })`, `isMediaOrigins = object({ origins: listOf(isMediaOrigin) })`, `isMediaTicket = object({ ticket: isString, expiresAt: isNumber })`, types `MediaOriginKind`, `MediaOrigin`, `MediaOrigins`, `MediaTicket`, and the constants `MEDIA_TICKET_SECONDS = 21_600`, `MEDIA_TICKET_REFRESH_SECONDS = 600`, `MEDIA_PROBE_BYTES = 262_144`.
+- Produces in `@raven/core` (`contract.ts`): `isMediaOriginKind = oneOf(['lan', 'public'])`, `isMediaOrigin = object({ kind: isMediaOriginKind, url: isString })`, `isMediaOrigins = object({ origins: listOf(isMediaOrigin) })`, `isMediaTicket = object({ ticket: isString, expiresAt: isNumber })`, types `MediaOriginKind`, `MediaOrigin`, `MediaOrigins`, `MediaTicket`, and the constants `MEDIA_TICKET_SECONDS = 21_600`, `MEDIA_TICKET_REFRESH_SECONDS = 600`, `MEDIA_PROBE_BYTES = 262_144`.
 - Produces in `mediaPlaneConfig.ts`: `type MediaPlaneConfig = { origins: MediaOrigin[]; webOrigins: string[]; secret: Buffer | null; problems: string[] }`; `readMediaPlaneConfig(env: NodeJS.ProcessEnv): MediaPlaneConfig`; `parseMediaOrigins(value: string | undefined): { origins: MediaOrigin[]; problems: string[] }`; `parseWebOrigins(value: string | undefined): { origins: string[]; problems: string[] }`; `readMediaSecret(value: string | undefined): { secret: Buffer | null; problems: string[] }`; `isAllowedWebOrigin({ origin, allowed }: { origin: string | undefined; allowed: readonly string[] }): boolean`; `MEDIA_PLANE_ENV = { origins: 'RAVEN_MEDIA_ORIGINS', webOrigins: 'RAVEN_WEB_ORIGINS', secret: 'RAVEN_MEDIA_SECRET' } as const`.
 - `ServerConfig` gains `mediaPlane: MediaPlaneConfig`.
 
@@ -85,8 +85,8 @@ The stack sits on `main`, not on `redesign` (decided 2026-10-17, after the plan 
 ```ts
 describe('parseMediaOrigins', () => {
   it('reads kind:url entries best first and keeps their order', () => {
-    expect(parseMediaOrigins('lan:https://raven.home.example.com, tailnet:https://raven.tail.ts.net').origins)
-      .toEqual([{ kind: 'lan', url: 'https://raven.home.example.com' }, { kind: 'tailnet', url: 'https://raven.tail.ts.net' }])
+    expect(parseMediaOrigins('lan:https://raven.home.example.com, public:https://raven.example.com').origins)
+      .toEqual([{ kind: 'lan', url: 'https://raven.home.example.com' }, { kind: 'public', url: 'https://raven.example.com' }])
   })
   it('strips a trailing slash and drops a path, a query, an unknown kind or a missing kind, naming each', () => {
     const parsed = parseMediaOrigins('lan:https://a.example/,lan:https://a.example/api,vpn:https://b.example,https://c.example')
@@ -304,7 +304,7 @@ Branch: `git switch -c direct-media-client` from the tip of PR 1.
 - Modify: `libs/raven/core/src/apiClient.ts`, `libs/raven/core/src/index.ts`, every caller of `fileUrl` and `streamUrl` (`libs/raven/ui/src/components/Player/useMediaSource.ts`, `apps/raven/web/src/pages/WatchPage/WatchPage.tsx`)
 
 **Interfaces:**
-- Produces in `mediaOrigins.ts`: `type OriginProbe = { origin: MediaOrigin; firstByteMs: number; bytesPerSecond: number }`; `ORIGIN_KIND_RANK = { lan: 0, tailnet: 1, public: 2 } as const satisfies Record<MediaOriginKind, number>`; `PREFERENCE_BAND = 0.2`; `pickOrigin(probes: readonly OriginProbe[]): MediaOrigin | null`. A probe's score is its effective throughput for the probe body, `MEDIA_PROBE_BYTES / (firstByteMs / 1000 + MEDIA_PROBE_BYTES / bytesPerSecond)` in bytes per second, so latency and bandwidth both count. The best is the highest score; among the probes whose score is at least `(1 - PREFERENCE_BAND)` of the best, the lowest `ORIGIN_KIND_RANK` wins, then the lowest `firstByteMs`. Empty input gives null.
+- Produces in `mediaOrigins.ts`: `type OriginProbe = { origin: MediaOrigin; firstByteMs: number; bytesPerSecond: number }`; `ORIGIN_KIND_RANK = { lan: 0, public: 1 } as const satisfies Record<MediaOriginKind, number>`; `PREFERENCE_BAND = 0.2`; `pickOrigin(probes: readonly OriginProbe[]): MediaOrigin | null`. A probe's score is its effective throughput for the probe body, `MEDIA_PROBE_BYTES / (firstByteMs / 1000 + MEDIA_PROBE_BYTES / bytesPerSecond)` in bytes per second, so latency and bandwidth both count. The best is the highest score; among the probes whose score is at least `(1 - PREFERENCE_BAND)` of the best, the lowest `ORIGIN_KIND_RANK` wins, then the lowest `firstByteMs`. Empty input gives null.
 - Produces in `apiClient.ts`: `type MediaAccess = { origin: MediaOrigin; ticket: string }`; `fileUrl({ id, access = null }: { id: number; access?: MediaAccess | null }): string`; `streamUrl({ id, mode, start, audio, access = null })`; `getSubtitles({ id, trackId, window = 0, access = null })`. With `access`, the URL is `${access.origin.url}${path}` and the query gains `t: access.ticket` (through `toQueryString`); without, exactly today's.
 
 - [ ] **Step 1: Write the failing tests**
@@ -313,7 +313,7 @@ Branch: `git switch -c direct-media-client` from the tip of PR 1.
 describe('pickOrigin', () => {
   // every probe below has firstByteMs 10 unless said, so the score is its bytesPerSecond
   it('takes the fastest when the others are more than 20% slower', ...)   // public 100e6 vs lan 70e6 -> public
-  it('prefers lan over tailnet over public within the band', ...)          // lan 85e6, tailnet 100e6, public 100e6 -> lan; tailnet 85e6, public 100e6 -> tailnet
+  it('prefers lan over public within the band', ...)                     // lan 85e6, public 100e6 -> lan
   it('counts latency: a slow first byte pulls a fast link down', ...)      // lan 100e6 at 2000 ms vs public 50e6 at 10 ms -> public (lan's score is about 128 kB/s)
   it('breaks a tie in kind by time to first byte', ...)
   it('is null with nothing answered', ...)
@@ -429,7 +429,7 @@ git commit -m "MAE: stream raven's video from the picked media origin"
 
 - [ ] **Step 2: Run to verify failure.** Run: `bunx nx run @raven/web:test`. Expected: FAIL.
 
-- [ ] **Step 3: Implement**, then update the README's "On Netlify" paragraph that begins "Every `/api` request goes through Netlify, video included" to describe the control plane and the media plane: the three env vars, the probe, the ticket, that thumbnails and JSON still go through Netlify, and the Vhagar setup list from the spec (lan: a DSM reverse proxy rule or Caddy, a DNS-challenge certificate and a local DNS record; tailnet: Tailscale Serve; public: unchanged Funnel). Add the `localhost` dev recipe: `RAVEN_MEDIA_ORIGINS=lan:http://localhost:8484 RAVEN_WEB_ORIGINS=http://localhost:5173 RAVEN_MEDIA_SECRET=$(openssl rand -base64 32)`.
+- [ ] **Step 3: Implement**, then update the README's "On Netlify" paragraph that begins "Every `/api` request goes through Netlify, video included" to describe the control plane and the media plane: the three env vars, the probe, the ticket, that thumbnails and JSON still go through Netlify, and the Vhagar setup list from the spec (lan: a DSM reverse proxy rule or Caddy, a DNS-challenge certificate and a local DNS record; public: a router port forward to the reverse proxy). Add the `localhost` dev recipe: `RAVEN_MEDIA_ORIGINS=lan:http://localhost:8484 RAVEN_WEB_ORIGINS=http://localhost:5173 RAVEN_MEDIA_SECRET=$(openssl rand -base64 32)`.
 
 - [ ] **Step 4: Run to verify pass.** Run: `bunx nx run-many -t typecheck lint:ts format:check test -p @raven/web @raven/ui`. Expected: PASS.
 
@@ -606,4 +606,4 @@ gh pr create --base direct-media-stepdown --title "MAE: add a quality picker to 
 
 - Rebase `redesign` onto `direct-media-quality`'s tip (`git rebase direct-media-quality` on `redesign`), resolve every conflict keeping both the redesign's chrome and the stack's behaviour, run `bunx nx run-many -t typecheck lint:ts lint:css format:check test -p @raven/ui @raven/web @raven/desktop`, and `git push --force-with-lease origin redesign`. PR 197 (`redesign` into `main`) then shows only the redesign over the stack.
 - Run the `reviews-cover-whole-branch` rule on each PR before asking for review: `origin/<base>...HEAD`, every commit.
-- README's rollout list for Vhagar (spec "Rollout"): ship with the env vars unset, then `tailnet` only, then `lan`; measure with the overlay at home and away; decide on Phase 3 and the public route. The spec's open questions 1 to 4 and 8 are answered then.
+- README's rollout list for Vhagar (spec "Rollout"): ship with the env vars unset, then `lan`; measure with the overlay at home and away; decide on Phase 3 and the public route. The spec's open questions 1 to 4 and 8 are answered then.

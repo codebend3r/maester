@@ -83,18 +83,11 @@ export const linkOriginsFrom = ({
   return [...new Set(origins.filter((origin) => origin !== null))]
 }
 
-/**
- * The Tailscale Funnel origin Raven's default server had before raven's public origin. Only for
- * adopting an install that still names it: no link names it and no build reaches it.
- */
-export const LEGACY_FUNNEL_ORIGIN = 'https://raven.tail5586d4.ts.net'
-
 type FixedServerFromProps = { origin: string; linkOrigins: readonly string[] }
 
 /**
- * The server a build plays from, with the origins its links may name it by and the ones an older
- * install may have filed it under. The default server also answers to the web app's site
- * (`DEFAULT_LINK_ORIGINS`), whose watch pages name it, and was once the Funnel origin; another
+ * The server a build plays from, with the origins its links may name it by. The default server
+ * also answers to the web app's site (`DEFAULT_LINK_ORIGINS`), whose watch pages name it; another
  * server has only the aliases the build or the hook names.
  */
 export const fixedServerFrom = ({ origin, linkOrigins }: FixedServerFromProps): FixedServer => {
@@ -103,6 +96,5 @@ export const fixedServerFrom = ({ origin, linkOrigins }: FixedServerFromProps): 
   return {
     origin,
     aliases: [...new Set([...builtIn, ...linkOrigins])].filter((alias) => alias !== origin),
-    former: isDefault ? [LEGACY_FUNNEL_ORIGIN] : [],
   }
 }

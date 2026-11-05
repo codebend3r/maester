@@ -24,7 +24,7 @@ describe('parseMediaOrigins', () => {
 
   it('strips a trailing slash and drops a path, a query, an unknown kind or a missing kind, naming each', () => {
     const parsed = parseMediaOrigins(
-      'lan:https://a.example/,lan:https://a.example/api,vpn:https://b.example,https://c.example,tailnet:https://d.example',
+      'lan:https://a.example/,lan:https://a.example/api,vpn:https://b.example,https://c.example,relay:https://d.example',
     )
     expect(parsed.origins).toEqual([{ kind: 'lan', url: 'https://a.example' }])
     expect(parsed.problems).toHaveLength(4)
@@ -34,7 +34,7 @@ describe('parseMediaOrigins', () => {
     )
     expect(parsed.problems[2]).toContain('https://c.example')
     expect(parsed.problems[3]).toBe(
-      'RAVEN_MEDIA_ORIGINS entry "tailnet:https://d.example" has an unknown kind; use lan or public.',
+      'RAVEN_MEDIA_ORIGINS entry "relay:https://d.example" has an unknown kind; use lan or public.',
     )
   })
 

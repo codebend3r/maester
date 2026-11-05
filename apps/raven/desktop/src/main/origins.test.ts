@@ -10,7 +10,6 @@ import {
   AUTH_ORIGIN_HOOK,
   authOriginFrom,
   fixedServerFrom,
-  LEGACY_FUNNEL_ORIGIN,
   linkOriginsFrom,
   serverOriginFrom,
 } from '@/main/origins'
@@ -189,11 +188,10 @@ describe('linkOriginsFrom', () => {
 describe('fixedServerFrom', () => {
   const [WEB_APP = ''] = DEFAULT_LINK_ORIGINS
 
-  it("gives the default server the web app's site as an alias and the Funnel origin as a former one", () => {
+  it("gives the default server the web app's site as an alias", () => {
     expect(fixedServerFrom({ origin: DEFAULT_SERVER_ORIGIN, linkOrigins: [] })).toEqual({
       origin: DEFAULT_SERVER_ORIGIN,
       aliases: [WEB_APP],
-      former: [LEGACY_FUNNEL_ORIGIN],
     })
   })
 
@@ -212,14 +210,13 @@ describe('fixedServerFrom', () => {
     ).toEqual({
       origin: 'http://localhost:8484',
       aliases: ['http://127.0.0.1:8484'],
-      former: [],
     })
   })
 
-  it("takes a link naming the web app's site as the default server's, and not the Funnel's", () => {
+  it("takes a link naming the web app's site as the default server's, and not another's", () => {
     const server = fixedServerFrom({ origin: DEFAULT_SERVER_ORIGIN, linkOrigins: [] })
     expect(namesServer({ server, origin: WEB_APP })).toBe(true)
     expect(namesServer({ server, origin: DEFAULT_SERVER_ORIGIN })).toBe(true)
-    expect(namesServer({ server, origin: LEGACY_FUNNEL_ORIGIN })).toBe(false)
+    expect(namesServer({ server, origin: 'https://other.example' })).toBe(false)
   })
 })

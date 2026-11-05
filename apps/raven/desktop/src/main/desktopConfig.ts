@@ -84,13 +84,11 @@ const NO_CONFIG: StoredConfig = { version: 1, output: DEFAULT_OUTPUT_SETTINGS }
 
 /**
  * The server a build plays from (`RAVEN_DESKTOP_SERVER_ORIGIN`), the other origins its links may
- * name for it (`RAVEN_DESKTOP_LINK_ORIGINS`, and the default server's built-in ones), and the
- * origins an older install may have kept it under, which only adoption reads.
+ * name for it (`RAVEN_DESKTOP_LINK_ORIGINS`, and the default server's built-in ones).
  */
 export type FixedServer = {
   origin: string
   aliases: readonly string[]
-  former: readonly string[]
 }
 
 type NamesServerProps = { server: FixedServer; origin: string }
@@ -166,17 +164,13 @@ type FromListProps = {
   newId: () => string
 }
 
-/** Whether an older install's server was the fixed server: by its origin, an alias or a former origin. */
-const wasServer = ({ server, origin }: NamesServerProps): boolean =>
-  namesServer({ server, origin }) || server.former.includes(origin)
-
 /**
  * The id the fixed server goes by: the first kept server that was it, so its downloads keep
  * their files, owed plays and sync; else a new one. The other servers that were it are adopted.
  */
 const fromList = ({ servers, server, newId }: FromListProps): { id: string; adopted: string[] } => {
   const ids = [
-    ...new Set(servers.filter(({ origin }) => wasServer({ server, origin })).map(({ id }) => id)),
+    ...new Set(servers.filter(({ origin }) => namesServer({ server, origin })).map(({ id }) => id)),
   ]
   const [first, ...adopted] = ids
   return { id: first ?? newId(), adopted }

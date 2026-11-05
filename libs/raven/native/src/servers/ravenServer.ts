@@ -1,3 +1,5 @@
+import { DEFAULT_SERVER_ORIGIN } from '@raven/core'
+
 import type { AppServer } from '@/servers/serverList'
 
 /**
@@ -12,13 +14,13 @@ const BYPASS_ORIGIN = process.env.EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN ?? ''
 export const IS_SIGN_IN_BYPASSED = BYPASS_ORIGIN !== ''
 
 /**
- * The one server raven's apps talk to: raven on Vhagar, reached through the same public
- * address as the web app, which proxies `/api` to it. The id is fixed so the server's cookies,
- * kept under it, survive a relaunch.
+ * The one server raven's apps talk to: raven on Vhagar, at its public origin (core's
+ * `DEFAULT_SERVER_ORIGIN`, the desktop's default too), with no Netlify proxy on the way. The id
+ * is fixed so the server's cookies, kept under it, survive a relaunch and a change of origin.
  */
 export const RAVEN_SERVER: AppServer = {
   id: '7c1f4e2a-3b5d-4a6e-8f90-1a2b3c4d5e6f',
   name: 'raven',
-  origin: IS_SIGN_IN_BYPASSED ? BYPASS_ORIGIN : 'https://raven-player.netlify.app',
+  origin: IS_SIGN_IN_BYPASSED ? BYPASS_ORIGIN : DEFAULT_SERVER_ORIGIN,
   addedAt: 0,
 }

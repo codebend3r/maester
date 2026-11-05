@@ -790,9 +790,9 @@ describe('the media plane guards', () => {
       isMediaOrigins({ origins: [{ kind: 'public', url: 'https://raven.example.com:8443' }] }),
     ).toBe(true)
     expect(isMediaOrigins({ origins: [{ kind: 'public' }] })).toBe(false)
-    expect(
-      isMediaOrigins({ origins: [{ kind: 'tailnet', url: 'https://raven.example.com' }] }),
-    ).toBe(false)
+    expect(isMediaOrigins({ origins: [{ kind: 'relay', url: 'https://raven.example.com' }] })).toBe(
+      false,
+    )
   })
 
   it('takes a ticket with an expiry', () => {
