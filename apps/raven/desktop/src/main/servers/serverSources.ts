@@ -33,6 +33,7 @@ import {
 import { CALL_NAMES } from '@/main/servers/allowlist'
 import { ACCOUNT_REFUSAL_STATUSES, refusalAt } from '@/main/servers/authRefusals'
 import type { MediaRelay } from '@/main/servers/mediaRelay'
+import type { OriginPicks } from '@/main/servers/originPicks'
 import { loggable, type ServerCallResult, type ServerCalls } from '@/main/servers/serverCalls'
 import { sidecarTracksOf } from '@/main/servers/sidecarTracks'
 import { HTTP_STATUSES } from '@/shared/httpStatuses'
@@ -140,6 +141,8 @@ type CreateServerSourcesProps = {
   calls: Pick<ServerCalls, 'call'>
   tickets: Pick<AccountTickets, 'ticketFor'>
   relay: Pick<MediaRelay, 'open' | 'refusalOf' | 'close'>
+  /** The media origin each title is relayed from, shared with the downloads. */
+  picks: OriginPicks
   warn: (message: string) => void
 }
 
@@ -148,7 +151,8 @@ type TrackSource = Omit<ServerSource, 'kind'> & { kbps: AudioBitrate | null }
 
 /**
  * Server titles for the player, which mpv plays through the loopback relay: main builds every
- * URL from the stored origin and a video's sidecars from the server's own track list, and no cookie,
+ * URL from the media origin `picks` holds (the stored origin when none answers) and a video's
+ * sidecars from the server's own track list, and no cookie,
  * token or ticket is in anything mpv holds. Main asks the relay, then the server, why when mpv
  * fails to open or stops one of its titles.
  */
@@ -157,6 +161,7 @@ export const createServerSources = ({
   calls,
   tickets,
   relay,
+  picks,
   warn,
 }: CreateServerSourcesProps): {
   /** A video, with the server's subtitle sidecars. */
@@ -224,15 +229,17 @@ export const createServerSources = ({
     kbps,
   }: ResolveRelayedProps): Promise<ResolvedServerSource> => {
     // The first ticket before anything opens: a title the account may not play is refused here.
-    const [tracks, first] = await Promise.all([
+    // The origin is picked meanwhile; a ticket opens the file on any of the server's origins.
+    const [tracks, first, origin] = await Promise.all([
       trackList,
       tickets.ticketFor({ serverId: server.id, mediaId, isFresh: false }),
+      picks.originOf(server),
     ])
     if (first.kind !== TICKET_OUTCOMES.ticket) {
       return { ok: false, message: startRefusalOf({ outcome: first, name: server.name }).message }
     }
     const opened = await relay
-      .open({ server, mediaId, sidecarTrackIds: tracks.map((track) => track.id), kbps })
+      .open({ server, origin, mediaId, sidecarTrackIds: tracks.map((track) => track.id), kbps })
       .catch(() => null)
     if (opened === null) {
       warn(`Raven could not relay a title from ${loggable(server.name)}`)
@@ -319,6 +326,8 @@ export const createServerSources = ({
     const relayed = refusedAccount(target)
     endRelayedLoad(target)
     if (relayed !== null) return relayed
+    // The origin picked may be why the title stopped; the next title probes again.
+    picks.forget(server.id)
     const bounded = await within({
       task: calls.call({
         serverId: server.id,

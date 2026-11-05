@@ -14,6 +14,7 @@ import { TICKET_OUTCOMES, type TicketOutcome } from '@/main/servers/accountTicke
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import type { MediaRelay } from '@/main/servers/mediaRelay'
 import type { ServerCallResult } from '@/main/servers/serverCalls'
+import { fixedPicks } from '@/main/test/serverFakes'
 import {
   createServerSources,
   EXPLAIN_TIMEOUT_MS,
@@ -118,6 +119,8 @@ type SetupProps = {
   ticket?: TicketOutcome
   refusal?: ReturnType<MediaRelay['refusalOf']>
   isOpenFailing?: boolean
+  /** The media origin picked; unset, each server's own address. */
+  origin?: string
 }
 
 const setup = ({
@@ -126,8 +129,10 @@ const setup = ({
   ticket = { kind: TICKET_OUTCOMES.ticket, ticket: 'account.t1' },
   refusal = null,
   isOpenFailing = false,
+  origin,
 }: SetupProps = {}) => {
   const { calls, made } = fakeCalls({ answer })
+  const { picks, forgotten } = fixedPicks({ origin })
   const warnings: string[] = []
   const minted: { serverId: string; mediaId: number; isFresh: boolean }[] = []
   const order: string[] = []
@@ -149,11 +154,12 @@ const setup = ({
         return relayed.relay.open(input)
       },
     },
+    picks,
     warn: (message) => {
       warnings.push(message)
     },
   })
-  return { sources, made, warnings, minted, order, ...relayed }
+  return { sources, made, warnings, minted, order, forgotten, ...relayed }
 }
 
 const RELAYED_TARGET: ServerTarget = {
@@ -189,10 +195,26 @@ describe('resolve', () => {
     ])
     expect(minted).toEqual([{ serverId: SERVER.id, mediaId: 7, isFresh: false }])
     expect(opened).toEqual([
-      { server: SERVER, mediaId: 7, sidecarTrackIds: ['external-0', 'external-1'], kbps: null },
+      {
+        server: SERVER,
+        origin: SERVER.origin,
+        mediaId: 7,
+        sidecarTrackIds: ['external-0', 'external-1'],
+        kbps: null,
+      },
     ])
     expect(order).toEqual(['mint', 'open'])
     expect(warnings).toEqual([])
+  })
+
+  test('relays a video and a track from the media origin picked', async () => {
+    const lan = 'https://192-168-50-6.vhagar.example'
+    const { sources, opened, minted } = setup({ origin: lan })
+    await sources.resolve(SOURCE)
+    await sources.resolveTrack({ serverId: SERVER.id, mediaId: 8, kbps: 256 })
+    expect(opened.map(({ origin }) => origin)).toEqual([lan, lan])
+    expect(opened.map(({ server }) => server)).toEqual([SERVER, SERVER])
+    expect(minted).toHaveLength(2)
   })
 
   test('a track asks for no sidecars, and opens its transcode at the bitrate asked', async () => {
@@ -205,8 +227,8 @@ describe('resolve', () => {
     await sources.resolveTrack({ ...track, kbps: null })
     expect(made).toEqual([])
     expect(opened).toEqual([
-      { server: SERVER, mediaId: 7, sidecarTrackIds: [], kbps: 256 },
-      { server: SERVER, mediaId: 7, sidecarTrackIds: [], kbps: null },
+      { server: SERVER, origin: SERVER.origin, mediaId: 7, sidecarTrackIds: [], kbps: 256 },
+      { server: SERVER, origin: SERVER.origin, mediaId: 7, sidecarTrackIds: [], kbps: null },
     ])
     expect(await sources.resolveTrack({ ...track, serverId: 'vhagar', kbps: null })).toEqual({
       ok: false,
@@ -278,6 +300,7 @@ describe('resolve', () => {
       calls: { call: () => Promise.reject(new Error('gone')) },
       tickets: { ticketFor: async () => ({ kind: TICKET_OUTCOMES.ticket, ticket: 't' }) },
       relay,
+      picks: fixedPicks().picks,
       warn: (message) => {
         warnings.push(message)
       },
@@ -494,6 +517,18 @@ describe('explain', () => {
     })
     expect(made).toEqual([{ serverId: SERVER.id, call: { name: CALL_NAMES.getMedia, mediaId: 7 } }])
     expect(closed).toEqual(['1'])
+  })
+
+  test('lets go of the origin picked, so the next title probes again', async () => {
+    const { sources, forgotten } = setup({ answer: () => reply({ status: 200, body: '{}' }) })
+    await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })
+    expect(forgotten).toEqual([SERVER.id])
+  })
+
+  test('keeps the origin picked for a title the account was refused', async () => {
+    const { sources, forgotten } = setup({ refusal: AUTH_REFUSALS.revoked })
+    await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })
+    expect(forgotten).toEqual([])
   })
 
   test("the server's own account refusal of the title is the account's", async () => {

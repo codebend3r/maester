@@ -1,15 +1,9 @@
 import {
   AUTH_REFUSALS,
   isMediaId,
-  isMediaOrigins,
   isSidecarTrackId,
-  MEDIA_PROBE_BYTES,
-  MEDIA_PROBE_TIMEOUT_MS,
   MEDIA_PURPOSE_PARAM,
   MEDIA_TICKET_PARAM,
-  type MediaOrigin,
-  type OriginProbe,
-  pickOrigin,
   STREAM_PURPOSES,
   toQueryString,
 } from '@raven/core'
@@ -17,17 +11,15 @@ import { SIGNAL_EVENTS } from '@/main/bounded'
 import { SERVER_GONE, type ServerEntry } from '@/main/desktopConfig'
 import { accountRefusedMessage, DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
-import { quietly } from '@/main/log/quietly'
-import { parseJson } from '@/main/parseJson'
 import {
   type AccountTickets,
   TICKET_OUTCOMES,
   type TicketOutcome,
 } from '@/main/servers/accountTickets'
-import { API_PATHS, CALL_NAMES, MEDIA_FILE_PATH, subtitlePathOf } from '@/main/servers/allowlist'
-import { CALL_MESSAGES, loggable, type ServerCalls } from '@/main/servers/serverCalls'
+import { API_PATHS, MEDIA_FILE_PATH, subtitlePathOf } from '@/main/servers/allowlist'
+import type { OriginPicks } from '@/main/servers/originPicks'
+import { CALL_MESSAGES } from '@/main/servers/serverCalls'
 import { TIMER_MAX_MS, type Timers } from '@/main/stateStore'
-import { HTTP_STATUSES } from '@/shared/httpStatuses'
 
 /**
  * The most account tickets a server's downloads mint in any `windowMs`, a ticket's life on the
@@ -35,19 +27,6 @@ import { HTTP_STATUSES } from '@/shared/httpStatuses'
  * playback, on every device, rather than spending them all.
  */
 export const DOWNLOAD_MINTS = { budget: 16, windowMs: 300_000 } as const
-
-type ProbeFetchProps = {
-  url: string
-  timeoutMs: number
-}
-
-/**
- * Main builds this on `net.fetch`. It owns the timeout, which covers reading the body too: a probe
- * that fails rejects, and one that stalls past the timeout errors its body's read.
- */
-export type ProbeFetch = (
-  input: ProbeFetchProps,
-) => Promise<{ ok: boolean; body: ReadableStream<Uint8Array> | null }>
 
 /**
  * The origin a file is fetched from and the account ticket it goes with. The server checks the
@@ -76,54 +55,6 @@ export type MediaAccess = {
   /** `signal` is the run's: a run stopped while it waits on the mint budget mints nothing. */
   accessFor: (input: AccessForProps) => Promise<AccessOutcome>
   forget: (serverId: string) => void
-}
-
-type MeasureOriginProps = {
-  origin: MediaOrigin
-  probe: ProbeFetch
-  clock: () => number
-}
-
-/**
- * Times the whole ping body as the web player's probe does: the first byte from the call, then the
- * body's bytes over the time from its first byte to its last. Null for an answer that is not 2xx or
- * whose body ends short of `MEDIA_PROBE_BYTES`; it rejects when the fetch fails or times out.
- */
-const measureOrigin = async ({
-  origin,
-  probe,
-  clock,
-}: MeasureOriginProps): Promise<OriginProbe | null> => {
-  const url = `${origin.url}/api/media-origins/ping?${toQueryString({ bytes: String(MEDIA_PROBE_BYTES) })}`
-  const startedAt = clock()
-  const response = await probe({ url, timeoutMs: MEDIA_PROBE_TIMEOUT_MS })
-  if (response.body === null) return null
-  const reader = response.body.getReader()
-  const countFrom = async (received: number): Promise<number> => {
-    const { done, value } = await reader.read()
-    if (done) return received
-    return countFrom(received + value.length)
-  }
-  try {
-    if (!response.ok) return null
-    const first = await reader.read()
-    const firstByteAt = clock()
-    if (first.done) return null
-    const received = await countFrom(first.value.length)
-    const doneAt = clock()
-    if (received < MEDIA_PROBE_BYTES) return null
-    // A body that lands in one read has no measurable transfer time; a millisecond keeps the rate finite.
-    const measuredMs = doneAt - firstByteAt
-    const transferMs = measuredMs > 0 ? measuredMs : 1
-    return {
-      origin,
-      firstByteMs: firstByteAt - startedAt,
-      bytesPerSecond: received / (transferMs / 1000),
-    }
-  } finally {
-    // Lets go of a body left unread or broken off; one read to its end has nothing left to cancel.
-    await reader.cancel().catch(() => undefined)
-  }
 }
 
 type MediaUrlForProps = {
@@ -158,22 +89,6 @@ type SidecarUrlForProps = {
 export const sidecarUrlFor = ({ access, mediaId, trackId }: SidecarUrlForProps): string => {
   if (!isSidecarTrackId(trackId)) throw new RangeError('A subtitle needs an external track id')
   return mediaUrlFor({ access, mediaId, path: subtitlePathOf(trackId) })
-}
-
-/**
- * The origin a server listed, cut down to scheme, host and port, or null when it is
- * not a plain http or https address: `net.fetch` also reads `file:`, so the server's
- * word is never taken as it comes.
- */
-const trustedOrigin = (origin: MediaOrigin): MediaOrigin | null => {
-  try {
-    const url = new URL(origin.url)
-    const isWeb = url.protocol === 'http:' || url.protocol === 'https:'
-    if (!isWeb || url.username !== '' || url.password !== '') return null
-    return { kind: origin.kind, url: url.origin }
-  } catch {
-    return null
-  }
 }
 
 type MintRefusalOfProps = {
@@ -220,80 +135,24 @@ const mintRefusalOf = ({ outcome, server }: MintRefusalOfProps): AccessOutcome =
 }
 
 type CreateMediaAccessProps = {
-  calls: Pick<ServerCalls, 'call'>
   serverOf: (serverId: string) => ServerEntry | null
-  probe: ProbeFetch
-  probeClock: () => number
+  picks: OriginPicks
   now: () => number
   timers: Timers
   tickets: Pick<AccountTickets, 'ticketFor'>
-  warn: (message: string) => void
 }
 
 /**
- * Each run reaches the server with an account ticket minted for it, on the media origin the probes
- * pick. `probeClock` times the probes in monotonic milliseconds, so a wall clock that jumps never
- * skews one; `now` is the wall clock the mint budget is kept by.
+ * Each run reaches the server with an account ticket minted for it, on the media origin `picks`
+ * holds for the server (shared with the relay); `now` is the wall clock the mint budget is kept by.
  */
 export const createMediaAccess = ({
-  calls,
   serverOf,
-  probe,
-  probeClock,
+  picks,
   now,
   timers,
   tickets,
-  warn,
 }: CreateMediaAccessProps): MediaAccess => {
-  /** The pick is held as a promise so two files asking at once share one read and one probe. */
-  let picks: ReadonlyMap<string, Promise<MediaOrigin | null>> = new Map()
-
-  /** A log line never fails an access: the pick it belongs to is held for good. */
-  const safeWarn = quietly(warn)
-
-  /** Never rejects: a pick is held for good, so a rejected one would fail every later call. */
-  const pickFor = async (server: ServerEntry): Promise<MediaOrigin | null> => {
-    const reply = await calls
-      .call({ serverId: server.id, call: { name: CALL_NAMES.getMediaOrigins } })
-      .catch(() => null)
-    const body =
-      reply !== null && reply.ok && reply.status === HTTP_STATUSES.ok ? parseJson(reply.body) : null
-    if (!isMediaOrigins(body)) {
-      safeWarn(`${loggable(server.name)} did not list media origins Raven can read`)
-      return null
-    }
-    const checked = body.origins.map((origin) => ({
-      kind: origin.kind,
-      trusted: trustedOrigin(origin),
-    }))
-    const refused = checked.filter((entry) => entry.trusted === null).map((entry) => entry.kind)
-    if (refused.length > 0) {
-      safeWarn(
-        `${loggable(server.name)} listed media origins Raven does not trust: ${refused.join(', ')}`,
-      )
-    }
-    const settled = await Promise.allSettled(
-      checked.flatMap((entry) =>
-        entry.trusted === null
-          ? []
-          : [measureOrigin({ origin: entry.trusted, probe, clock: probeClock })],
-      ),
-    )
-    return pickOrigin(
-      settled.flatMap((result) =>
-        result.status === 'fulfilled' && result.value !== null ? [result.value] : [],
-      ),
-    )
-  }
-
-  const pickOf = (server: ServerEntry): Promise<MediaOrigin | null> => {
-    const held = picks.get(server.id)
-    if (held !== undefined) return held
-    const pick = pickFor(server)
-    picks = new Map([...picks, [server.id, pick]])
-    return pick
-  }
-
   /** When each server's downloads minted, by Raven's clock, inside the last window. */
   let minted: ReadonlyMap<string, readonly number[]> = new Map()
 
@@ -364,12 +223,12 @@ export const createMediaAccess = ({
         message: CALL_MESSAGES.unreachable(server.name),
       }
     }
-    const [origin, outcome] = await Promise.all([
-      pickOf(server),
+    const [url, outcome] = await Promise.all([
+      picks.originOf(server),
       tickets.ticketFor({ serverId: server.id, mediaId, isFresh: true }),
     ])
     if (outcome.kind !== TICKET_OUTCOMES.ticket) return mintRefusalOf({ outcome, server })
-    return { ok: true, access: { url: origin?.url ?? server.origin, ticket: outcome.ticket } }
+    return { ok: true, access: { url, ticket: outcome.ticket } }
   }
 
   return {
@@ -379,8 +238,6 @@ export const createMediaAccess = ({
         return { ok: false, reason: ACCESS_REFUSALS.unreachable, message: SERVER_GONE }
       return accountAccess({ server, mediaId, signal })
     },
-    forget: (serverId) => {
-      picks = new Map([...picks].filter(([id]) => id !== serverId))
-    },
+    forget: picks.forget,
   }
 }

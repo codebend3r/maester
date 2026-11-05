@@ -1,10 +1,4 @@
-import {
-  AUTH_REFUSALS,
-  MEDIA_ORIGIN_KINDS,
-  MEDIA_PROBE_BYTES,
-  MEDIA_PROBE_TIMEOUT_MS,
-  type MediaOrigin,
-} from '@raven/core'
+import { AUTH_REFUSALS, MEDIA_ORIGIN_KINDS, type MediaOrigin } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { CALL_NAMES } from '@/main/servers/allowlist'
 import { SERVER_GONE, type ServerEntry } from '@/main/desktopConfig'
@@ -17,14 +11,15 @@ import {
   sidecarUrlFor,
   type Access,
   type AccessOutcome,
-  type ProbeFetch,
   ACCESS_REFUSALS,
 } from '@/main/downloads/mediaAccess'
 import { TICKET_OUTCOMES, type TicketOutcome } from '@/main/servers/accountTickets'
+import { createOriginPicks } from '@/main/servers/originPicks'
 import { CALL_MESSAGES } from '@/main/servers/serverCalls'
 import { ticks } from '@/main/test/downloadFakes'
+import { pingNetwork, type PingAnswer } from '@/main/test/pingNetwork'
 import { fakeTimers } from '@/main/test/playerFakes'
-import { fakeCalls, keyOf, ok, type Reply } from '@/main/test/serverFakes'
+import { fakeCalls, fixedPicks, keyOf, ok, type Reply } from '@/main/test/serverFakes'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
 const SERVER: ServerEntry = {
@@ -41,13 +36,10 @@ const MINUTE_MS = 60_000
 const MB = 1_000_000
 
 const LAN: MediaOrigin = { kind: 'lan', url: 'http://192.168.1.5:3000' }
-const LAN_TWO: MediaOrigin = { kind: 'lan', url: 'http://192.168.1.6:3000' }
 const TAILNET: MediaOrigin = { kind: 'tailnet', url: 'http://vhagar.tail.ts.net:3000' }
 const PUBLIC: MediaOrigin = { kind: 'public', url: 'https://media.example.com' }
 
 const originsCall = keyOf({ name: CALL_NAMES.getMediaOrigins })
-const pingOf = (origin: MediaOrigin): string =>
-  `${origin.url}/api/media-origins/ping?bytes=${MEDIA_PROBE_BYTES}`
 
 const TICKET = 'account.one'
 
@@ -59,87 +51,6 @@ const succeeded = (outcome: AccessOutcome): Access => {
 const failed = (outcome: AccessOutcome) => {
   if (outcome.ok) throw new Error('expected a refusal')
   return outcome
-}
-
-/**
- * How one origin answers its ping. The first chunk lands `firstByteMs` after the probe starts and
- * the rest at `bytesPerSecond`; `isBroken` errors the body after its first chunk, as the timeout
- * firing mid-read does.
- */
-type PingAnswer = {
-  firstByteMs?: number
-  bytesPerSecond?: number
-  bytes?: number
-  status?: number
-  isBroken?: boolean
-}
-
-const FIRST_CHUNK_BYTES = 16_384
-
-/**
- * Ping answers timed on one fake clock. Every wait is released in time order, one a macrotask, so
- * probes that run at once each measure only their own times. An origin with no answer rejects, as
- * a probe that fails to connect does.
- */
-const pingNetwork = (answers: Record<string, PingAnswer>) => {
-  let time = 0
-  let waits: { at: number; release: () => void }[] = []
-  let isDriving = false
-  const asked: { url: string; timeoutMs: number; at: number }[] = []
-
-  const step = (): void => {
-    const [next, ...rest] = waits.toSorted((a, b) => a.at - b.at)
-    if (next === undefined) {
-      isDriving = false
-      return
-    }
-    waits = rest
-    time = next.at
-    next.release()
-    setTimeout(step, 0)
-  }
-
-  const until = (at: number): Promise<void> =>
-    new Promise((resolve) => {
-      waits = [...waits, { at, release: resolve }]
-      if (isDriving) return
-      isDriving = true
-      setTimeout(step, 0)
-    })
-
-  type BodyOfProps = { answer: PingAnswer; startedAt: number }
-
-  const bodyOf = ({ answer, startedAt }: BodyOfProps) => {
-    const bytes = answer.bytes ?? MEDIA_PROBE_BYTES
-    const firstAt = startedAt + (answer.firstByteMs ?? 10)
-    const lastAt = firstAt + (bytes / (answer.bytesPerSecond ?? 50 * MB)) * 1000
-    const firstBytes = Math.min(FIRST_CHUNK_BYTES, bytes)
-    const parts = [
-      { at: firstAt, size: firstBytes },
-      { at: lastAt, size: bytes - firstBytes },
-    ].filter((part) => part.size > 0)
-    let sent = 0
-    return new ReadableStream<Uint8Array>({
-      pull: async (controller) => {
-        if (sent > 0 && answer.isBroken === true) throw new Error('The operation was aborted')
-        const part = parts[sent]
-        if (part === undefined) return controller.close()
-        sent += 1
-        await until(part.at)
-        controller.enqueue(new Uint8Array(part.size))
-      },
-    })
-  }
-
-  const probe: ProbeFetch = async ({ url, timeoutMs }) => {
-    asked.push({ url, timeoutMs, at: time })
-    const answer = Object.entries(answers).find(([prefix]) => url.startsWith(prefix))?.[1] ?? null
-    if (answer === null) throw new Error('timed out')
-    const status = answer.status ?? 200
-    return { ok: status >= 200 && status < 300, body: bodyOf({ answer, startedAt: time }) }
-  }
-
-  return { probe, clock: () => time, asked }
 }
 
 type RunProps = {
@@ -164,11 +75,18 @@ const run = ({
   const mints: { serverId: string; mediaId: number; isFresh: boolean }[] = []
   const clock = { now }
   const { timers, pending } = fakeTimers()
-  const access = createMediaAccess({
+  const picks = createOriginPicks({
     calls,
-    serverOf: (serverId) => (server !== null && serverId === server.id ? server : null),
     probe: network.probe,
     probeClock: network.clock,
+    now: () => clock.now,
+    warn: (message) => {
+      warnings.push(message)
+    },
+  })
+  const access = createMediaAccess({
+    serverOf: (serverId) => (server !== null && serverId === server.id ? server : null),
+    picks,
     now: () => clock.now,
     timers,
     tickets: {
@@ -177,97 +95,12 @@ const run = ({
         return minted()
       },
     },
-    warn: (message) => {
-      warnings.push(message)
-    },
   })
   return { access, log, warnings, asked: network.asked, mints, clock, pending }
 }
 
 const withOrigins = (origins: MediaOrigin[]): Record<string, Reply> => ({
   [originsCall]: ok({ origins }),
-})
-
-type PickedFromProps = {
-  origins: MediaOrigin[]
-  answers: Record<string, PingAnswer>
-}
-
-const pickedFrom = async ({ origins, answers }: PickedFromProps): Promise<Access> => {
-  const { access } = run({ replies: withOrigins(origins), answers })
-  return succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE }))
-}
-
-describe('the pick', () => {
-  it('takes a tailnet origin over a lan one far slower than it', async () => {
-    const picked = await pickedFrom({
-      origins: [LAN, TAILNET],
-      answers: {
-        [LAN.url]: { firstByteMs: 5, bytesPerSecond: 1 * MB },
-        [TAILNET.url]: { firstByteMs: 5, bytesPerSecond: 20 * MB },
-      },
-    })
-    expect(picked).toEqual({ url: TAILNET.url, ticket: TICKET })
-  })
-
-  it('takes the nearer kind when it is a little slower', async () => {
-    const picked = await pickedFrom({
-      origins: [PUBLIC, TAILNET, LAN],
-      answers: {
-        [PUBLIC.url]: { firstByteMs: 5, bytesPerSecond: 10 * MB },
-        [TAILNET.url]: { firstByteMs: 5, bytesPerSecond: 10 * MB },
-        [LAN.url]: { firstByteMs: 5, bytesPerSecond: 9 * MB },
-      },
-    })
-    expect(picked.url).toBe(LAN.url)
-  })
-
-  it('counts a slow first byte against an origin', async () => {
-    const picked = await pickedFrom({
-      origins: [LAN, PUBLIC],
-      answers: {
-        [LAN.url]: { firstByteMs: 400, bytesPerSecond: 10 * MB },
-        [PUBLIC.url]: { firstByteMs: 5, bytesPerSecond: 10 * MB },
-      },
-    })
-    expect(picked.url).toBe(PUBLIC.url)
-  })
-
-  it('takes the quicker first byte between two of a kind inside the band', async () => {
-    const picked = await pickedFrom({
-      origins: [LAN, LAN_TWO],
-      answers: {
-        [LAN.url]: { firstByteMs: 12, bytesPerSecond: 10 * MB },
-        [LAN_TWO.url]: { firstByteMs: 6, bytesPerSecond: 10 * MB },
-      },
-    })
-    expect(picked.url).toBe(LAN_TWO.url)
-  })
-
-  it('leaves out a probe that fails, answers non-2xx, breaks off or ends short', async () => {
-    const picked = await pickedFrom({
-      origins: [LAN, LAN_TWO, TAILNET, { kind: 'tailnet', url: 'http://10.1.1.1:3000' }, PUBLIC],
-      answers: {
-        [LAN_TWO.url]: { status: 503 },
-        [TAILNET.url]: { isBroken: true },
-        'http://10.1.1.1:3000': { bytes: MEDIA_PROBE_BYTES - 1 },
-        [PUBLIC.url]: { firstByteMs: 80, bytesPerSecond: 2 * MB },
-      },
-    })
-    expect(picked.url).toBe(PUBLIC.url)
-  })
-
-  it("uses the server's own origin when no probe scores", async () => {
-    const picked = await pickedFrom({
-      origins: [LAN, LAN_TWO, TAILNET, PUBLIC],
-      answers: {
-        [LAN_TWO.url]: { status: 500 },
-        [TAILNET.url]: { isBroken: true },
-        [PUBLIC.url]: { bytes: 0 },
-      },
-    })
-    expect(picked).toEqual({ url: SERVER.origin, ticket: TICKET })
-  })
 })
 
 describe('createMediaAccess', () => {
@@ -279,18 +112,22 @@ describe('createMediaAccess', () => {
     expect(log).toEqual([originsCall])
   })
 
-  it('starts every probe before any answers, each with the brief timeout', async () => {
-    const { access, asked } = run({
+  it('fetches from the media origin picked, a fast lan one over the public address', async () => {
+    const { access } = run({
       replies: withOrigins([PUBLIC, LAN]),
-      answers: { [PUBLIC.url]: { firstByteMs: 10 }, [LAN.url]: { firstByteMs: 12 } },
+      answers: {
+        [PUBLIC.url]: { firstByteMs: 60, bytesPerSecond: 0.58 * MB },
+        [LAN.url]: { firstByteMs: 3, bytesPerSecond: 10.8 * MB },
+      },
     })
-    expect(
-      succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })),
-    ).toEqual({ url: LAN.url, ticket: TICKET })
-    expect(asked).toEqual([
-      { url: pingOf(PUBLIC), timeoutMs: MEDIA_PROBE_TIMEOUT_MS, at: 0 },
-      { url: pingOf(LAN), timeoutMs: MEDIA_PROBE_TIMEOUT_MS, at: 0 },
-    ])
+    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })
+    expect(succeeded(outcome)).toEqual({ url: LAN.url, ticket: TICKET })
+  })
+
+  it("fetches from the server's own origin when the listed origin does not answer", async () => {
+    const { access } = run({ replies: withOrigins([LAN]), answers: {} })
+    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })
+    expect(succeeded(outcome)).toEqual({ url: SERVER.origin, ticket: TICKET })
   })
 
   it('mints an account ticket afresh for every run', async () => {
@@ -302,17 +139,6 @@ describe('createMediaAccess', () => {
       { serverId: SERVER_ID, mediaId: 7, isFresh: true },
     ])
     expect(log).toEqual([originsCall])
-  })
-
-  it('reads the origins once per server across two files, and probes once', async () => {
-    const { access, log, asked } = run({ replies: withOrigins([LAN]), answers: { [LAN.url]: {} } })
-    await Promise.all([
-      access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE }),
-      access.accessFor({ serverId: SERVER_ID, mediaId: 8, signal: LIVE }),
-    ])
-    await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })
-    expect(log.filter((key) => key === originsCall)).toHaveLength(1)
-    expect(asked).toHaveLength(1)
   })
 
   it('holds the pick until forget, then reads the origins and probes them again', async () => {
@@ -327,98 +153,6 @@ describe('createMediaAccess', () => {
     expect((await accessed()).url).toBe(TAILNET.url)
     expect(log.filter((key) => key === originsCall)).toHaveLength(2)
     expect(asked).toHaveLength(4)
-  })
-
-  it('uses the server origin, naming no URL in the log, on a bad origins body', async () => {
-    const { access, warnings, asked } = run({
-      replies: {
-        [originsCall]: ok({ origins: [{ kind: 'lan', url: 'http://secret.example:3000' }, 7] }),
-      },
-      answers: {},
-    })
-    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })
-    expect(succeeded(outcome).url).toBe(SERVER.origin)
-    expect(asked).toEqual([])
-    expect(warnings).toHaveLength(1)
-    expect(warnings[0]).toContain('Vhagar')
-    expect(warnings.join(' ')).not.toContain('secret.example')
-  })
-
-  it('uses the server origin, warning once, when the origins read fails', async () => {
-    const { access, warnings } = run({
-      replies: { [originsCall]: { unreachable: 'http://10.0.0.1 refused' } },
-      answers: {},
-    })
-    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })
-    expect(succeeded(outcome).url).toBe(SERVER.origin)
-    expect(warnings).toHaveLength(1)
-    expect(warnings[0]).not.toContain('10.0.0.1')
-  })
-
-  it('drops origins that are not plain http or https, probing none of them', async () => {
-    const hostile: MediaOrigin[] = [
-      { kind: 'lan', url: 'file:///etc/hosts?' },
-      { kind: 'tailnet', url: '/relative' },
-      { kind: 'public', url: 'javascript:alert(1)' },
-      { kind: 'lan', url: 'http://user:pass@192.168.1.9:3000' },
-    ]
-    const { access, warnings, asked } = run({ replies: withOrigins(hostile), answers: {} })
-    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })
-    expect(succeeded(outcome).url).toBe(SERVER.origin)
-    expect(asked).toEqual([])
-    expect(warnings).toHaveLength(1)
-    expect(warnings[0]).toContain('Vhagar')
-    expect(warnings[0]).toContain('lan, tailnet, public, lan')
-    expect(warnings.join(' ')).not.toMatch(/etc|relative|javascript|pass/u)
-  })
-
-  it('keeps a trusted origin beside a dropped one', async () => {
-    const { access, asked } = run({
-      replies: withOrigins([{ kind: 'lan', url: 'file:///etc/hosts?' }, LAN]),
-      answers: { [LAN.url]: {} },
-    })
-    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })
-    expect(succeeded(outcome).url).toBe(LAN.url)
-    expect(asked).toHaveLength(1)
-  })
-
-  it('cuts an origin with a path, query or trailing slash down to its origin', async () => {
-    const { access, asked } = run({
-      replies: withOrigins([{ kind: 'lan', url: `${LAN.url}/base/?x=1#h` }]),
-      answers: { [LAN.url]: {} },
-    })
-    const outcome = await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE })
-    expect(asked.map((entry) => entry.url)).toEqual([
-      `${LAN.url}/api/media-origins/ping?bytes=${MEDIA_PROBE_BYTES}`,
-    ])
-    expect(succeeded(outcome).url).toBe(LAN.url)
-  })
-
-  it('treats an origins call that rejects as a failed read, and does not hold the rejection', async () => {
-    const network = pingNetwork({})
-    const warnings: string[] = []
-    const access = createMediaAccess({
-      calls: {
-        call: async () => {
-          throw new Error('boom http://10.0.0.1')
-        },
-      },
-      serverOf: () => SERVER,
-      probe: network.probe,
-      probeClock: network.clock,
-      now: () => 0,
-      timers: fakeTimers().timers,
-      tickets: { ticketFor: async () => ({ kind: TICKET_OUTCOMES.ticket, ticket: TICKET }) },
-      warn: (message) => {
-        warnings.push(message)
-      },
-    })
-    const accessed = async () =>
-      succeeded(await access.accessFor({ serverId: SERVER_ID, mediaId: 7, signal: LIVE }))
-    expect((await accessed()).url).toBe(SERVER.origin)
-    expect((await accessed()).url).toBe(SERVER.origin)
-    expect(warnings).toHaveLength(1)
-    expect(warnings[0]).not.toContain('10.0.0.1')
   })
 
   it('answers unreachable for a server that is gone, and mints nothing', async () => {
@@ -530,18 +264,14 @@ describe('createMediaAccess', () => {
 
   it('keeps a budget for each server of its own', async () => {
     const other: ServerEntry = { ...SERVER, id: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }
-    const { calls } = fakeCalls(withOrigins([]))
     const { timers, pending } = fakeTimers()
     const servers = [SERVER, other]
     const access = createMediaAccess({
-      calls,
       serverOf: (serverId) => servers.find((server) => server.id === serverId) ?? null,
-      probe: pingNetwork({}).probe,
-      probeClock: () => 0,
+      picks: fixedPicks().picks,
       now: () => NOW,
       timers,
       tickets: { ticketFor: async () => ({ kind: TICKET_OUTCOMES.ticket, ticket: TICKET }) },
-      warn: () => undefined,
     })
     await Promise.all(
       Array.from({ length: DOWNLOAD_MINTS.budget }, (_, index) =>

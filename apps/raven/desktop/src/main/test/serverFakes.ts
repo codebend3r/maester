@@ -11,7 +11,25 @@ import type {
 } from '@raven/core'
 import { RATINGS_REFRESH_STATES } from '@raven/core'
 import { requestFor, type AllowedCall } from '@/main/servers/allowlist'
+import type { OriginPicks } from '@/main/servers/originPicks'
 import type { ServerCalls } from '@/main/servers/serverCalls'
+
+type FixedPicksProps = { origin?: string }
+
+/**
+ * Picks that answer `origin` for every server, or each server's own address when none is given,
+ * keeping which servers were let go of.
+ */
+export const fixedPicks = ({ origin }: FixedPicksProps = {}) => {
+  const forgotten: string[] = []
+  const picks: OriginPicks = {
+    originOf: async (server) => origin ?? server.origin,
+    forget: (serverId) => {
+      forgotten.push(serverId)
+    },
+  }
+  return { picks, forgotten }
+}
 
 /** What the fake server answers one call: a status and a body, or no answer at all. */
 export type Reply = { status: number; body: unknown } | { unreachable: string }

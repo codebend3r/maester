@@ -12,10 +12,13 @@ import {
 import {
   createMediaRelay,
   listenOnLoopback,
+  ORIGIN_ANSWER_MS,
   RELAY_HOST,
   RELAY_SECRET_BYTES,
   type UpstreamFetch,
 } from '@/main/servers/mediaRelay'
+import { fakeTimers } from '@/main/test/playerFakes'
+import { fixedPicks } from '@/main/test/serverFakes'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 
 const SERVER: ServerEntry = {
@@ -52,7 +55,8 @@ const refusalBody = (reason: string) => JSON.stringify({ reason, message: 'no' }
 type AnswerProps = { heard: Heard; count: number }
 
 type SetupProps = {
-  answer?: (input: AnswerProps) => Answer
+  /** What the upstream sends back; one that throws or rejects is a fetch that failed to connect. */
+  answer?: (input: AnswerProps) => Answer | Promise<Answer>
   outcomes?: TicketOutcome[]
   /** One load at a time, as the video relay keeps, unless a test asks for the music relay's two. */
   capacity?: number
@@ -83,9 +87,18 @@ const setup = ({
   const warnings: string[] = []
   const secrets: number[] = []
   const listens = { count: 0 }
+  const { picks, forgotten } = fixedPicks()
+  const { timers, pending } = fakeTimers()
   const fetchUpstream: UpstreamFetch = async (input) => {
     heard.push(input)
-    const { status, headers = {}, body = null } = answer({ heard: input, count: heard.length })
+    const {
+      status,
+      headers = {},
+      body = null,
+    } = await answer({
+      heard: input,
+      count: heard.length,
+    })
     const response = new Response(body, { status, headers })
     return { status: response.status, headers: response.headers, body: response.body }
   }
@@ -117,18 +130,31 @@ const setup = ({
       return `${'s'.repeat(42)}${secrets.length}`
     },
     capacity,
+    picks,
+    timers,
     warn: (message) => {
       warnings.push(message)
     },
   })
-  return { relay, heard, asked, warnings, secrets, listens }
+  return { relay, heard, asked, warnings, secrets, listens, forgotten, pending }
 }
 
 const OPEN = {
   server: SERVER,
+  origin: SERVER.origin,
   mediaId: 7,
   sidecarTrackIds: ['external-0', 'external-3'],
   kbps: null,
+}
+
+/** A media origin the server listed, other than its own address. */
+const LAN = 'https://192-168-50-6.vhagar.example'
+
+/** Resolves once `isDone` holds, looking again every millisecond. */
+const until = async (isDone: () => boolean): Promise<void> => {
+  if (isDone()) return
+  await new Promise((resolve) => setTimeout(resolve, 1))
+  return until(isDone)
 }
 
 const rangeOf = (url: string) => fetch(url, { headers: { [HTTP_HEADERS.range]: 'bytes=0-3' } })
@@ -195,6 +221,8 @@ describe('open', () => {
       tickets: { ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.unreachable }) },
       newSecret: () => 'x'.repeat(43),
       capacity: 1,
+      picks: fixedPicks().picks,
+      timers: fakeTimers().timers,
       warn: () => undefined,
     })
     await expect(relay.open(OPEN)).rejects.toThrow('no socket')
@@ -208,6 +236,8 @@ describe('open', () => {
       tickets: { ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.unreachable }) },
       newSecret: () => 'short/../',
       capacity: 1,
+      picks: fixedPicks().picks,
+      timers: fakeTimers().timers,
       warn: () => undefined,
     })
     await expect(relay.open(OPEN)).rejects.toThrow()
@@ -299,6 +329,94 @@ describe('a relayed request', () => {
       },
     ])
     expect(asked).toEqual([{ serverId: SERVER.id, mediaId: 7, isFresh: false }])
+  })
+
+  test('goes to the media origin the load was opened with, sidecars too', async () => {
+    const { relay, heard, pending } = setup()
+    const { fileUrl, sidecarUrls } = await relay.open({ ...OPEN, origin: LAN })
+    expect((await rangeOf(fileUrl)).status).toBe(206)
+    await fetch(sidecarUrls[0] ?? '')
+    expect(heard.map(({ url }) => url)).toEqual([
+      `${LAN}/api/media/7/file?t=account.t1`,
+      `${LAN}/api/media/7/subtitles/external-0?t=account.t2`,
+    ])
+    // The server's own address is left to fall back on, so each request had a deadline, now cleared.
+    expect(pending.size).toBe(0)
+  })
+
+  test("a media origin that fails to connect gives way to the server's own address for good", async () => {
+    const { relay, heard, warnings, forgotten } = setup({
+      answer: ({ heard: { url } }) => {
+        if (url.startsWith(LAN)) throw new Error(`connect EHOSTUNREACH ${LAN}`)
+        return { status: 206, body: 'abcd' }
+      },
+    })
+    const { fileUrl } = await relay.open({ ...OPEN, origin: LAN })
+    expect((await rangeOf(fileUrl)).status).toBe(206)
+    expect((await rangeOf(fileUrl)).status).toBe(206)
+    expect(heard.map(({ url }) => url)).toEqual([
+      `${LAN}/api/media/7/file?t=account.t1`,
+      'https://raven.example/api/media/7/file?t=account.t1',
+      'https://raven.example/api/media/7/file?t=account.t2',
+    ])
+    expect(forgotten).toEqual([SERVER.id])
+    expect(warnings).toEqual([
+      "Vhagar's media origin did not answer; the relay goes to its own address",
+    ])
+  })
+
+  test("a media origin that does not answer in time gives way to the server's own address", async () => {
+    const { relay, heard, pending, forgotten } = setup({
+      answer: ({ heard: { url, signal } }) =>
+        url.startsWith(LAN)
+          ? new Promise<Answer>((_resolve, reject) => {
+              signal.addEventListener(SIGNAL_EVENTS.abort, () => reject(new Error('aborted')))
+            })
+          : { status: 206, body: 'abcd' },
+    })
+    const { fileUrl } = await relay.open({ ...OPEN, origin: LAN })
+    const answered = rangeOf(fileUrl)
+    await until(() => pending.size > 0)
+    expect([...pending.values()].map(({ ms }) => ms)).toEqual([ORIGIN_ANSWER_MS])
+    ;[...pending.values()].forEach(({ run }) => run())
+    expect((await answered).status).toBe(206)
+    expect(heard.map(({ url }) => url)).toEqual([
+      `${LAN}/api/media/7/file?t=account.t1`,
+      'https://raven.example/api/media/7/file?t=account.t1',
+    ])
+    expect(forgotten).toEqual([SERVER.id])
+    expect(ORIGIN_ANSWER_MS).toBe(5000)
+  })
+
+  test("the server's own address has no deadline and nothing to fall back on", async () => {
+    const { relay, heard, pending, forgotten } = setup({
+      answer: () => {
+        throw new Error('connect ECONNREFUSED')
+      },
+    })
+    const { fileUrl } = await relay.open(OPEN)
+    expect((await rangeOf(fileUrl)).status).toBe(502)
+    expect(heard).toHaveLength(1)
+    expect(pending.size).toBe(0)
+    expect(forgotten).toEqual([])
+  })
+
+  test('a request mpv let go of while the media origin was silent tries no other', async () => {
+    const { relay, heard, forgotten } = setup({
+      answer: ({ heard: { signal } }) =>
+        new Promise<Answer>((_resolve, reject) => {
+          signal.addEventListener(SIGNAL_EVENTS.abort, () => reject(new Error('aborted')))
+        }),
+    })
+    const { fileUrl } = await relay.open({ ...OPEN, origin: LAN })
+    const downstream = new AbortController()
+    const asking = fetch(fileUrl, { signal: downstream.signal }).catch(() => null)
+    await until(() => heard.length > 0)
+    downstream.abort()
+    await asking
+    await until(() => heard[0]?.signal.aborted ?? false)
+    expect(heard).toHaveLength(1)
+    expect(forgotten).toEqual([])
   })
 
   test('a track opened at a bitrate is its transcode, behind the same /file path', async () => {
@@ -487,6 +605,8 @@ describe('a relayed request', () => {
       },
       newSecret: () => 'r'.repeat(43),
       capacity: 1,
+      picks: fixedPicks().picks,
+      timers: fakeTimers().timers,
       warn: () => undefined,
     })
     const old = await relay.open(OPEN)
@@ -578,6 +698,8 @@ describe('a relayed request', () => {
       },
       newSecret: () => 'w'.repeat(43),
       capacity: 1,
+      picks: fixedPicks().picks,
+      timers: fakeTimers().timers,
       warn: (message) => {
         warnings.push(message)
       },
@@ -625,6 +747,8 @@ describe('a relayed request', () => {
       }),
       newSecret: () => 'v'.repeat(43),
       capacity: 1,
+      picks: fixedPicks().picks,
+      timers: fakeTimers().timers,
       warn: () => undefined,
     })
     const { fileUrl, loadId } = await relay.open(OPEN)
@@ -658,6 +782,8 @@ describe('a relayed request', () => {
       },
       newSecret: () => 'q'.repeat(43),
       capacity: 1,
+      picks: fixedPicks().picks,
+      timers: fakeTimers().timers,
       warn: (message) => {
         warnings.push(message)
       },

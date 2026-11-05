@@ -93,6 +93,7 @@ import { createQuitMark } from '@/main/quitMark'
 import { createAccountTickets } from '@/main/servers/accountTickets'
 import { createLinkOpener } from '@/main/servers/linkOpener'
 import { createMediaRelay, listenOnLoopback } from '@/main/servers/mediaRelay'
+import { createOriginPicks } from '@/main/servers/originPicks'
 import { createServerCalls, fetchThrough } from '@/main/servers/serverCalls'
 import { clearFormerPartitions, PARTITIONS_DIR } from '@/main/servers/formerSessions'
 import { createPageUnlock } from '@/main/servers/pageUnlock'
@@ -458,6 +459,14 @@ const startApp = (): void => {
       isSignedIn: (input) => accountIdOf(input) !== null,
       now: Date.now,
     })
+    // Where media is fetched from, for the relays and the downloads alike: one probe serves both.
+    const originPicks = createOriginPicks({
+      calls: serverCalls,
+      probe: fetchProbe,
+      probeClock: () => performance.now(),
+      now: Date.now,
+      warn,
+    })
     const relay = createMediaRelay({
       listen: listenOnLoopback({ createServer: (handler) => createServer(handler), warn }),
       fetchUpstream: fetchRelayed,
@@ -465,17 +474,26 @@ const startApp = (): void => {
       newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
       // One load at a time: a new title retires the last one's secret.
       capacity: 1,
+      picks: originPicks,
+      timers,
       warn,
     })
     // A sign out: the title stops being relayed. A ticket is the account's that minted it, so
     // another account mints its own.
     accessEnds.listen(({ serverId }) => relay.closeServer(serverId))
     accountSwitches.listen(({ serverId }) => accountTickets.forget(serverId))
+    // Signed in, the origins are probed at once, so the first title does not wait on the probe.
+    accountSwitches.listen(({ serverId }) => {
+      const server = serverOfId(serverId)
+      if (server === null || accountIdOf({ serverId }) === null) return
+      originPicks.originOf(server).catch(() => undefined)
+    })
     const sources = createServerSources({
       serverOf: serverOfId,
       calls: serverCalls,
       tickets: accountTickets,
       relay,
+      picks: originPicks,
       warn,
     })
     // Music has a relay of its own, so a video and a track never retire each other's
@@ -486,6 +504,8 @@ const startApp = (): void => {
       tickets: accountTickets,
       newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
       capacity: 2,
+      picks: originPicks,
+      timers,
       warn,
     })
     accessEnds.listen(({ serverId }) => musicRelay.closeServer(serverId))
@@ -494,6 +514,7 @@ const startApp = (): void => {
       calls: serverCalls,
       tickets: accountTickets,
       relay: musicRelay,
+      picks: originPicks,
       warn,
     })
     // Grants hold real paths, so the downloads are named from the real folder too: a profile
@@ -538,14 +559,11 @@ const startApp = (): void => {
       send,
       warn,
       access: createMediaAccess({
-        calls: serverCalls,
         serverOf: serverOfId,
-        probe: fetchProbe,
-        probeClock: () => performance.now(),
+        picks: originPicks,
         now: Date.now,
         timers,
         tickets: accountTickets,
-        warn,
       }),
       fetch: fetchDownload,
       fs: {

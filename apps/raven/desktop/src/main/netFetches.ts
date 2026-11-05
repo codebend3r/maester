@@ -1,7 +1,7 @@
 import { net } from 'electron'
 import type { StreamFetch } from '@/main/downloads/fetchFile'
-import type { ProbeFetch } from '@/main/downloads/mediaAccess'
 import type { UpstreamFetch } from '@/main/servers/mediaRelay'
+import type { ProbeFetch } from '@/main/servers/originPicks'
 import type { UpdateFetch } from '@/main/updates'
 
 type FetchBareProps = {
@@ -28,7 +28,7 @@ export const fetchRelayed: UpstreamFetch = ({ url, method, headers, signal }) =>
   })
 
 /**
- * A media origin's probe, which `mediaAccess` times over the whole body. The timeout's signal
+ * A media origin's probe, which `originPicks` times over the whole body. The timeout's signal
  * aborts the body's read too, so a probe that stalls mid-body fails at the timeout.
  */
 export const fetchProbe: ProbeFetch = ({ url, timeoutMs }) =>

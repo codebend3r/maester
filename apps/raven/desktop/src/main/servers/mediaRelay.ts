@@ -14,6 +14,7 @@ import {
 } from '@raven/core'
 import type { ServerEntry } from '@/main/desktopConfig'
 import { quietly } from '@/main/log/quietly'
+import type { OriginPicks } from '@/main/servers/originPicks'
 import {
   type AccountTickets,
   TICKET_OUTCOMES,
@@ -27,6 +28,7 @@ import {
 } from '@/main/servers/allowlist'
 import { accountRefusalOf, readShort } from '@/main/servers/authRefusals'
 import { loggable } from '@/main/servers/serverCalls'
+import type { Timers } from '@/main/stateStore'
 import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
 
@@ -34,6 +36,12 @@ import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
 export const RELAY_HOST = '127.0.0.1'
 /** Each load's secret: 32 random bytes, the capability its paths carry. */
 export const RELAY_SECRET_BYTES = 32
+/**
+ * How long a media origin has to answer a relayed request when the server's own address is left
+ * to fall back on. A LAN origin off this network may take a minute to refuse a connection, so the
+ * relay goes to the server's own address well inside mpv's 15 s read and the stall budget.
+ */
+export const ORIGIN_ANSWER_MS = 5000
 
 const RELAY_METHODS = { get: HTTP_METHODS.get, head: HTTP_METHODS.head } as const
 type RelayMethod = (typeof RELAY_METHODS)[keyof typeof RELAY_METHODS]
@@ -124,6 +132,8 @@ type RelayedLoad = {
 
 type OpenProps = {
   server: Pick<ServerEntry, 'id' | 'origin' | 'name'>
+  /** Where the title's bytes are fetched from: the media origin picked, or the server's own address. */
+  origin: string
   mediaId: number
   sidecarTrackIds: readonly string[]
   /** A track's AAC transcode at this bitrate in place of its file; null for the file. */
@@ -154,7 +164,8 @@ type Route = { path: string; query: Readonly<Record<string, string>>; isMedia: b
 type Load = {
   loadId: string
   serverId: string
-  origin: string
+  /** Where requests go, the first that answers: the origin picked, then the server's own address. */
+  origins: readonly string[]
   name: string
   mediaId: number
   /** Each path mpv may ask for, to what it stands for. */
@@ -254,6 +265,10 @@ type CreateMediaRelayProps = {
    * video, two for music, whose next track mpv opens while the playing one still streams.
    */
   capacity: number
+  /** Told when a media origin stops answering, so the next title probes again. */
+  picks: Pick<OriginPicks, 'forget'>
+  /** Times a media origin's answer (`ORIGIN_ANSWER_MS`). */
+  timers: Timers
   warn: (message: string) => void
 }
 
@@ -263,7 +278,9 @@ const REFUSALS_KEPT = 8
 /**
  * The loopback media relay: mpv opens `http://127.0.0.1:<port>/<secret>/file` (and its sidecars),
  * and each request it makes, every seek and reconnect, goes to the server with an account ticket
- * main holds and renews. No ticket, token or server address ever enters an mpv URL, header or log.
+ * main holds and renews, on the media origin the load was opened with (the server's own address
+ * when that one stops answering). No ticket, token or server address ever enters an mpv URL,
+ * header or log.
  * Only the newest loads' paths are served, only to `GET` and `HEAD`; anything else is a 404 that
  * sends nothing upstream.
  */
@@ -273,6 +290,8 @@ export const createMediaRelay = ({
   tickets,
   newSecret,
   capacity,
+  picks,
+  timers,
   warn,
 }: CreateMediaRelayProps): MediaRelay => {
   // Oldest first, never more than `capacity`.
@@ -324,6 +343,97 @@ export const createMediaRelay = ({
     safeWarn(`${loggable(load.name)} refused a relayed request: ${reason}`)
   }
 
+  type FallBackProps = { load: Load; origin: string }
+
+  /**
+   * The load goes on without an origin that did not answer, and the server's pick is let go of.
+   * Requests that met it at once (the file and a sidecar) drop it once between them.
+   */
+  const fallBack = ({ load, origin }: FallBackProps): void => {
+    const isLive = loads.some(
+      (live) => live.loadId === load.loadId && live.origins.includes(origin),
+    )
+    if (!isLive) return
+    loads = loads.map((live) =>
+      live.loadId === load.loadId
+        ? { ...live, origins: live.origins.filter((known) => known !== origin) }
+        : live,
+    )
+    picks.forget(load.serverId)
+    safeWarn(
+      `${loggable(load.name)}'s media origin did not answer; the relay goes to its own address`,
+    )
+  }
+
+  type FetchFromProps = {
+    url: string
+    method: RelayMethod
+    headers: Record<string, string>
+    signal: AbortSignal
+    hasFallback: boolean
+  }
+
+  /** One upstream fetch, given `ORIGIN_ANSWER_MS` to answer when another origin is left to try. */
+  const fetchFrom = async ({
+    url,
+    method,
+    headers,
+    signal,
+    hasFallback,
+  }: FetchFromProps): Promise<Upstream> => {
+    if (!hasFallback) return fetchUpstream({ url, method, headers, signal })
+    const late = new AbortController()
+    const timer = timers.set({ run: () => late.abort(), ms: ORIGIN_ANSWER_MS })
+    try {
+      // The same signal ends the body, so only mpv letting go stops it once it has answered.
+      return await fetchUpstream({
+        url,
+        method,
+        headers,
+        signal: AbortSignal.any([signal, late.signal]),
+      })
+    } finally {
+      timers.clear(timer)
+    }
+  }
+
+  type FetchFirstProps = {
+    load: Load
+    origins: readonly string[]
+    path: string
+    method: RelayMethod
+    headers: Record<string, string>
+    signal: AbortSignal
+  }
+
+  /**
+   * Fetches from the load's origins in turn: one that fails to answer, or answers too late, gives
+   * way to the next, the server's own address last. A request mpv let go of tries no other.
+   */
+  const fetchFirst = async ({
+    load,
+    origins,
+    path,
+    method,
+    headers,
+    signal,
+  }: FetchFirstProps): Promise<Upstream> => {
+    const [origin, ...rest] = origins
+    if (origin === undefined) throw new Error('The relay has no origin to fetch from.')
+    const hasFallback = rest.length > 0
+    try {
+      return await fetchFrom({ url: `${origin}${path}`, method, headers, signal, hasFallback })
+    } catch (error) {
+      if (signal.aborted || !hasFallback) throw error
+      fallBack({ load, origin })
+      return fetchFirst({ load, origins: rest, path, method, headers, signal })
+    }
+  }
+
+  /** The load's origins as they stand: an origin dropped since this request began is not tried. */
+  const originsOf = (load: Load): readonly string[] =>
+    loads.find((live) => live.loadId === load.loadId)?.origins ?? load.origins
+
   type TicketedProps = {
     load: Load
     route: Route
@@ -351,8 +461,10 @@ export const createMediaRelay = ({
     })
     if (outcome.kind !== TICKET_OUTCOMES.ticket) return outcome
     const query = toQueryString({ ...route.query, [MEDIA_TICKET_PARAM]: outcome.ticket })
-    const upstream = await fetchUpstream({
-      url: `${load.origin}${API_PATHS.media}/${load.mediaId}/${route.path}?${query}`,
+    const upstream = await fetchFirst({
+      load,
+      origins: originsOf(load),
+      path: `${API_PATHS.media}/${load.mediaId}/${route.path}?${query}`,
       method,
       headers,
       signal,
@@ -471,7 +583,7 @@ export const createMediaRelay = ({
   }
 
   return {
-    open: async ({ server, mediaId, sidecarTrackIds, kbps }) => {
+    open: async ({ server, origin, mediaId, sidecarTrackIds, kbps }) => {
       if (!isMediaId(mediaId)) throw new RangeError('The relay needs a media id.')
       const { port } = await portOf()
       const secret = newSecret(RELAY_SECRET_BYTES)
@@ -492,9 +604,11 @@ export const createMediaRelay = ({
           { path: subtitlePathOf(id), query: {}, isMedia: false },
         ]),
       ])
+      // The server's own address is the fallback, so a media origin that goes away mid-title is passed over.
+      const origins = [...new Set([origin, server.origin])]
       loads = [
         ...loads,
-        { loadId, serverId: server.id, origin: server.origin, name: server.name, mediaId, routes },
+        { loadId, serverId: server.id, origins, name: server.name, mediaId, routes },
       ]
       const base = `http://${RELAY_HOST}:${port}/${secret}`
       return {
