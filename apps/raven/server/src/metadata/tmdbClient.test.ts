@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
-import { RAVEN_HEADERS } from '@/http'
+import { HEADERS } from '@shared/server'
 import { type MetadataFetch, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 import { mergeCredits, pickLogo, toMovie, toPerson, toSeason, toShow } from '@/metadata/tmdbShapes'
 import { fakeTmdb, keanuReeves, movieBody, personBody, seasonBody, showBody } from '@/test/fakeTmdb'
@@ -257,7 +257,7 @@ describe('TmdbClient', () => {
     const client = new TmdbClient(
       config(),
       respond([
-        () => json({ body: {}, status: 429, headers: { [RAVEN_HEADERS.retryAfter]: '0' } }),
+        () => json({ body: {}, status: 429, headers: { [HEADERS.retryAfter]: '0' } }),
         () => json({ body: { results: [] } }),
         () => json({ body: { results: [] } }),
       ]),

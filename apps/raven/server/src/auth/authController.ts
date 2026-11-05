@@ -38,6 +38,7 @@ import { PrivateBy, Public } from '@/lock/lockGuard'
 import { PRIVACIES } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
 import { parseBody } from '@/parseBody'
+import { StrictlyLimited } from '@/rateLimits/rateTiers'
 
 const pageNumber = (value: unknown): number | null => (isString(value) ? wholeNumber(value) : null)
 
@@ -136,6 +137,7 @@ export class AuthController {
   @PrivateBy(PRIVACIES.media)
   @RequireAccount(ACCOUNT_REQUIREMENTS.approved)
   @HttpCode(200)
+  @StrictlyLimited()
   @Post(AUTH_PATHS.ticket)
   ticket(
     @Req() request: FastifyRequest,

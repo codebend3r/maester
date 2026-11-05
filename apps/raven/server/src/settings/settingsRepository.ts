@@ -3,9 +3,13 @@ import { Inject, Injectable } from '@nestjs/common'
 import {
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
+  DEFAULT_REMOTE_ACCESS_SETTINGS,
   type DisplaySettings,
   type PlaybackSettings,
+  type RemoteAccessChange,
+  type RemoteAccessSettings,
   isDisplaySettings,
+  isRemoteAccessSettings,
   type Guard,
   isAccountId,
   isPlaybackSettings,
@@ -24,6 +28,7 @@ export const SETTINGS_KEYS = {
   accounts: 'accounts',
   viewing: 'viewing',
   scrobble: 'scrobble',
+  remoteAccess: 'remoteAccess',
 } as const
 
 /** The owner who took over the viewing recorded before accounts, and when. */
@@ -108,6 +113,22 @@ export class SettingsRepository {
   setDisplay(change: Partial<DisplaySettings>): DisplaySettings {
     const next: DisplaySettings = { ...this.display(), ...change }
     this.write({ key: SETTINGS_KEYS.display, value: next })
+    return next
+  }
+
+  /** How raven is reached from outside the home network. */
+  remoteAccess(): RemoteAccessSettings {
+    return this.merged({
+      key: SETTINGS_KEYS.remoteAccess,
+      defaults: DEFAULT_REMOTE_ACCESS_SETTINGS,
+      guard: isRemoteAccessSettings,
+    })
+  }
+
+  /** Changes the fields given and keeps the rest. */
+  setRemoteAccess(change: RemoteAccessChange): RemoteAccessSettings {
+    const next: RemoteAccessSettings = { ...this.remoteAccess(), ...change }
+    this.write({ key: SETTINGS_KEYS.remoteAccess, value: next })
     return next
   }
 

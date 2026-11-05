@@ -14,6 +14,7 @@ import {
   type MediaOrigin,
   PICTURE_PATHS,
   PLAY_HISTORY_PATHS,
+  REMOTE_ACCESS_PATHS,
   SCROBBLING_PATHS,
   DISCOVERY_PATHS,
   createApiClient,
@@ -26,6 +27,7 @@ import { ACCOUNT_REQUIREMENTS } from '@/auth/accountGuard'
 import { PASS_KINDS, type PassKind } from '@/auth/accountPasses'
 import type { LastFmKeys } from '@/config'
 import { MetadataRepository } from '@/metadata/metadataRepository'
+import { RATE_TIERS, type RateTier } from '@/rateLimits/rateTiers'
 import { MetadataService } from '@/metadata/metadataService'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
 import { LISTENBRAINZ_API } from '@/music/listenBrainzClient'
@@ -203,6 +205,9 @@ export const ROUTES = {
   saveDisplaySettings: { method: PUT, path: '/api/settings/display', account: owner },
   playbackSettings: { method: GET, path: '/api/settings/playback', account: approved },
   savePlaybackSettings: { method: PUT, path: '/api/settings/playback', account: owner },
+  remoteAccess: { method: GET, path: REMOTE_ACCESS_PATHS.settings, account: owner },
+  saveRemoteAccess: { method: PUT, path: REMOTE_ACCESS_PATHS.settings, account: owner },
+  remoteAccessEcho: { method: GET, path: REMOTE_ACCESS_PATHS.echo, account: anyone },
   streams: { method: GET, path: '/api/streams', account: owner },
   stopStream: { method: POST, path: '/api/streams/:id/stop', account: owner },
   watched: { method: PUT, path: '/api/watched', account: approved },
@@ -226,6 +231,34 @@ export const PASS_ROUTES = {
   ],
   [PASS_KINDS.ticket]: [ROUTES.file, ROUTES.transcode],
 } as const satisfies Record<PassKind, readonly Route[]>
+
+/**
+ * The routes counted in each tier but `standard`, which holds every other
+ * route: `strict` for those that check or hand out a secret, `media` for the
+ * media plane's bytes and its ping.
+ */
+export const RATE_ROUTES = {
+  [RATE_TIERS.strict]: [
+    ROUTES.unlock,
+    ROUTES.adminUnlock,
+    ROUTES.remoteAccessEcho,
+    ROUTES.accountTicket,
+    ROUTES.mediaTicket,
+  ],
+  [RATE_TIERS.media]: [
+    ROUTES.ping,
+    ROUTES.file,
+    ROUTES.stream,
+    ROUTES.transcode,
+    ROUTES.subtitles,
+    ROUTES.hlsMaster,
+    ROUTES.hlsVideo,
+    ROUTES.hlsInit,
+    ROUTES.hlsSegment,
+    ROUTES.hlsSubtitles,
+    ROUTES.hlsSubtitleSegment,
+  ],
+} as const satisfies Record<Exclude<RateTier, typeof RATE_TIERS.standard>, readonly Route[]>
 
 type PathOfProps = {
   route: Route

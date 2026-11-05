@@ -28,6 +28,7 @@ import { MEMBERSHIP_TTL_MS } from '@/auth/membershipLookups'
 import { RAVEN_CACHE_POLICIES } from '@/http'
 import { OWNER_SCAN_ERROR } from '@/libraries/librariesController'
 import { MediaTickets } from '@/media/mediaTickets'
+import { RATE_TIERS } from '@/rateLimits/rateTiers'
 import { type RouteMark, routeMarks } from '@/routeMarks'
 import { ScannerService } from '@/scanner/scannerService'
 import {
@@ -53,6 +54,7 @@ import {
   CALLER_KINDS,
   type CallerKind,
   PASS_ROUTES,
+  RATE_ROUTES,
   ROUTES,
   type Route,
   TOKEN_CARRIERS,
@@ -140,6 +142,7 @@ it('declares every route exactly as the inventory says', () => {
       ROUTES.artistPicture,
       ROUTES.albumCover,
       ROUTES.lastFmCallback,
+      ROUTES.remoteAccessEcho,
     ].toSorted(byRoute),
   )
 })
@@ -155,6 +158,9 @@ const CAPABILITY_ROUTES: ReadonlySet<Route> = new Set([
 /** The open routes a signed state names the account for: they answer only a live one. */
 const STATE_ROUTES: ReadonlySet<Route> = new Set([ROUTES.lastFmCallback])
 
+/** The open routes that answer only a nonce a check in flight holds. */
+const NONCE_ROUTES: ReadonlySet<Route> = new Set([ROUTES.remoteAccessEcho])
+
 it("opens only an HLS session's own routes to its capability, and only `file` and `transcode` to a ticket's pass", () => {
   const marks = routeMarks(CONTROLLERS)
   const kinds = Object.values(PASS_KINDS)
@@ -165,6 +171,25 @@ it("opens only an HLS session's own routes to its capability, and only `file` an
       .toSorted(byRoute),
   )
   expect(opened).toEqual(kinds.map((kind) => PASS_ROUTES[kind].toSorted(byRoute)))
+})
+
+it('counts the secret routes as strict and the media plane as media, and every other route as standard', () => {
+  const marks = routeMarks(CONTROLLERS)
+  const tiers = Object.values(RATE_TIERS)
+  const counted = tiers.map((tier) =>
+    marks
+      .filter(({ rate }) => rate === tier)
+      .map(({ method, path, account }) => ({ method, path, account }))
+      .toSorted(byRoute),
+  )
+  const listed: ReadonlySet<Route> = new Set(Object.values(RATE_ROUTES).flat())
+  expect(counted).toEqual(
+    tiers.map((tier) =>
+      tier === RATE_TIERS.standard
+        ? ROUTE_LIST.filter((route) => !listed.has(route)).toSorted(byRoute)
+        : RATE_ROUTES[tier].toSorted(byRoute),
+    ),
+  )
 })
 
 describe('the default-deny gate', () => {
@@ -210,7 +235,8 @@ describe('the default-deny gate', () => {
         (route) =>
           route.account === ACCOUNT_REQUIREMENTS.anyone &&
           !CAPABILITY_ROUTES.has(route) &&
-          !STATE_ROUTES.has(route),
+          !STATE_ROUTES.has(route) &&
+          !NONCE_ROUTES.has(route),
       ),
     )
     const callers: readonly CallerKind[] = [CALLER_KINDS.anonymous, CALLER_KINDS.member]
@@ -242,6 +268,22 @@ describe('the default-deny gate', () => {
       ),
     )
     expect(statuses).toEqual([400, 400, 400, 400])
+    expect(fixture.fetcher).not.toHaveBeenCalled()
+  })
+
+  it('answers the reachability echo to anyone as not found while no check holds the nonce, never asking about accounts', async () => {
+    fixture.fetcher.mockClear()
+    const callers: readonly CallerKind[] = [CALLER_KINDS.anonymous, CALLER_KINDS.member]
+    const statuses = await Promise.all(
+      callers.flatMap((caller) =>
+        ['AAAAAAAAAAAAAAAAAAAAAA', 'not-a-nonce'].map(async (nonce) => {
+          const headers = await headersFor({ fixture, caller, via: TOKEN_CARRIERS.bearer })
+          const url = pathOf({ route: ROUTES.remoteAccessEcho, params: { nonce } })
+          return (await send({ options: { url, headers } })).statusCode
+        }),
+      ),
+    )
+    expect(statuses).toEqual([404, 404, 404, 404])
     expect(fixture.fetcher).not.toHaveBeenCalled()
   })
 
@@ -496,7 +538,7 @@ describe('owner-only management', () => {
 
   it('refuses every owner route to an approved member', async () => {
     const ownerRoutes = ROUTE_LIST.filter(({ account }) => account === ACCOUNT_REQUIREMENTS.owner)
-    expect(ownerRoutes).toHaveLength(43)
+    expect(ownerRoutes).toHaveLength(45)
     const headers = await asMember()
     const observed = await Promise.all(
       asSent(ownerRoutes).map(async ({ route, method }) => {
@@ -531,12 +573,13 @@ describe('owner-only management', () => {
       [
         send({ options: { url: ROUTES.streams.path, headers } }),
         send({ options: { url: ROUTES.browse.path, headers } }),
+        send({ options: { url: ROUTES.remoteAccess.path, headers } }),
         send({
           options: { url: pathOf({ route: ROUTES.location, params: { id: video } }), headers },
         }),
       ].map(async (request) => (await request).statusCode),
     )
-    expect([display.statusCode, ...reads]).toEqual([200, 200, 200, 200])
+    expect([display.statusCode, ...reads]).toEqual([200, 200, 200, 200, 200])
 
     const created = await send({
       options: {

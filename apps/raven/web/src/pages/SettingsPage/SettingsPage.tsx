@@ -26,6 +26,7 @@ import { DesktopSettings } from '@/desktop/settings/DesktopSettings'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
 import { AdminLockSection } from '@/pages/SettingsPage/AdminLockSection'
 import { AdvancedSection } from '@/pages/SettingsPage/AdvancedSection'
+import { RemoteAccessSection } from '@/pages/SettingsPage/RemoteAccessSection'
 import { ScrobblingSection } from '@/pages/SettingsPage/ScrobblingSection'
 import { ServerSection } from '@/pages/SettingsPage/ServerSection'
 import {
@@ -481,6 +482,7 @@ const ServerSettings = () => {
           />
         )}
       </SettingsSection>
+      <RemoteAccessSection />
       <ScanSwitch />
       {access.kind === ACCESS_KINDS.approved && access.account.isOwner && (
         <UsersSection key={access.account.id} userId={access.account.id} />

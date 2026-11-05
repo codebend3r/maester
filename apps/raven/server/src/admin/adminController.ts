@@ -28,6 +28,7 @@ import { type AdminChange, AdminService } from '@/admin/adminService'
 import { Management } from '@/auth/management'
 import { RAVEN_HEADERS } from '@/http'
 import { parseBody } from '@/parseBody'
+import { StrictlyLimited } from '@/rateLimits/rateTiers'
 
 type AppliedProps = { change: AdminChange; reply: FastifyReply }
 
@@ -91,6 +92,7 @@ export class AdminController {
 
   /** `{ password }`: turns the admin lock off for this browser. */
   @ForViewers()
+  @StrictlyLimited()
   @Post('unlock')
   @HttpCode(200)
   unlock(@Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply): AdminLock {

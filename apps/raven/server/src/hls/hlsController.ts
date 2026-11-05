@@ -56,11 +56,11 @@ import {
   refuseWhatSettingsTurnOff,
   sizeOnDisk,
   streamModeOf,
-  streamSizeOf,
   videoEncodingOf,
 } from '@/playback/conversion'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
+import { streamSizeFor } from '@/remoteAccess/remoteCap'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { StreamSessions } from '@/streams/streamSessions'
 import { RESPONSE_EVENTS, trackStream } from '@/streams/trackStream'
@@ -170,7 +170,13 @@ export class HlsController {
     const streamMode = streamModeOf(mode)
     const playback = this.settings.playback()
     refuseWhatSettingsTurnOff({ playback, mode: streamMode })
-    const sized = streamSizeOf({ quality, mode: streamMode })
+    const sized = streamSizeFor({
+      quality,
+      mode: streamMode,
+      request,
+      remote: this.settings.remoteAccess(),
+      playback,
+    })
     const size = sized?.size ?? null
     const file = this.fileOf(id)
     const bytes = await sizeOnDisk(file)

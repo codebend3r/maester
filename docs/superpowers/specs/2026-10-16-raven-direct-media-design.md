@@ -1,5 +1,7 @@
 # raven direct media
 
+> **2026-11-04:** Tailscale is gone. The `tailnet` kind, the Funnel and every `ts.net` address below are superseded by `2026-11-04-raven-remote-access-design.md`: the origin kinds are `lan` and `public`, and the public origin is a router port forward to DSM's reverse proxy.
+
 On Netlify, raven lags on large files while Plex on the same NAS plays them smoothly on the LAN. The cause is the route the bytes take, not the server: every `/api` request, the video included, goes browser → Netlify edge → Tailscale Funnel relay → Vhagar and back the same way. This splits raven into a **control plane** (JSON, cookies, events), which can stay behind Netlify's proxy, and a **media plane** (streams, files), which goes from the browser straight to Vhagar by the fastest route available.
 
 ## What was measured

@@ -1,4 +1,4 @@
-import { isMediaOriginKind, type MediaOrigin } from '@raven/core'
+import { MEDIA_ORIGIN_KINDS, isMediaOriginKind, type MediaOrigin } from '@raven/core'
 
 export const MEDIA_PLANE_ENV = {
   origins: 'RAVEN_MEDIA_ORIGINS',
@@ -85,7 +85,7 @@ const parseMediaOrigin = (
   if (!isMediaOriginKind(kind) || url === '') {
     return {
       origin: null,
-      problem: `${MEDIA_PLANE_ENV.origins} entry "${entry}" has an unknown kind; use lan, tailnet or public.`,
+      problem: `${MEDIA_PLANE_ENV.origins} entry "${entry}" has an unknown kind; use ${Object.values(MEDIA_ORIGIN_KINDS).join(' or ')}.`,
     }
   }
   const origin = normalisedOrigin(url)

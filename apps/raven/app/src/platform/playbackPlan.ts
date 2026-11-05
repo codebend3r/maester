@@ -6,8 +6,10 @@ import {
   type PlaybackPlan,
   type PlaybackPolicy,
   TRANSCODINGS,
+  planForNetwork,
   planPlayback,
 } from '@raven/core'
+import type { PlayNetwork } from '@raven/native/headless'
 
 import { canPlayFor } from '@/platform/canPlay'
 import type { AppPlatform } from '@/platform/platform'
@@ -26,6 +28,8 @@ type PlanForProps = {
   policy: PlaybackPolicy
   prefs: PlaybackPrefs
   shouldDrawCaptions: boolean
+  /** Where the video plays from, as `mediaAccessFor`'s `networkFor` tells it. */
+  network: PlayNetwork
 }
 
 /**
@@ -40,15 +44,24 @@ type PlanForProps = {
  * (Apple TV's system transport), the platform's player shows only an HLS stream's renditions,
  * so a file with text subtitles starts at the remux. Direct play stays only as the one way
  * left: when the server converts nothing, or forces the original.
+ * Away from home (`network`), core's `planForNetwork` starts a file over the server's remote
+ * limit at the transcode, as Plex does, with the other ways behind it to step down to; at home
+ * the plan is as it was.
  */
-export const planFor = ({
+export const planFor = ({ network, ...props }: PlanForProps): PlaybackPlan =>
+  planForNetwork({ plan: planHere(props), media: props.media, ...network }).plan
+
+type PlanHereProps = Omit<PlanForProps, 'network'>
+
+/** The plan on this device under its prefs and its chrome, wherever it plays from. */
+const planHere = ({
   platform,
   media,
   tracks,
   policy,
   prefs,
   shouldDrawCaptions,
-}: PlanForProps): PlaybackPlan => {
+}: PlanHereProps): PlaybackPlan => {
   const { canPlay, canPlaySurely, canStream } = canPlayFor(platform)
   const isTranscodeTaken = !prefs.isTranscodeAllowed && policy.transcoding === TRANSCODINGS.on
   const policyHere = isTranscodeTaken ? { ...policy, transcoding: TRANSCODINGS.remuxOnly } : policy

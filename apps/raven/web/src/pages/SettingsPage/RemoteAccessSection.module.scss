@@ -1,0 +1,98 @@
+// The status line over what to do about it.
+.status {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.headline {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+}
+
+.plain {
+  color: var(--color-bark);
+}
+
+.good {
+  color: var(--color-fern);
+}
+
+.bad {
+  color: var(--color-amber);
+}
+
+// Private, then public, then the internet, each hop on a card, an arrow
+// pointing back from each to the one before it as Plex draws the way in.
+.route {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, max-content);
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.hop {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-2);
+
+  & + &::before {
+    color: var(--color-lichen);
+    content: '\2190';
+  }
+}
+
+.hopLabel {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.hopValue {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.form {
+  display: grid;
+}
+
+// A field's label over its input, what it means under that.
+.field {
+  display: grid;
+  gap: var(--space-1);
+  max-width: 28rem;
+}
+
+.fieldLabel {
+  font-weight: 600;
+}
+
+.input {
+  background-color: var(--color-deep);
+}
+
+.fieldHint {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  text-wrap: pretty;
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-2);
+}
+
+@media (max-width: 30rem) {
+  .route {
+    grid-auto-flow: row;
+  }
+}

@@ -52,7 +52,7 @@ describe('proxiedMediaWarner', () => {
     await fastify.inject({ url: '/api/media/12/tracks', headers: { referer: `${WEB_ORIGIN}/` } })
     await fastify.inject({
       url: '/api/media/12/stream',
-      headers: { referer: 'https://raven.tail.ts.net/watch/12' },
+      headers: { referer: 'https://raven.example.com:8443/watch/12' },
     })
     await fastify.inject({ url: '/api/media/12/stream', headers: { referer: 'not a url' } })
     await fastify.inject({

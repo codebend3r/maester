@@ -14,34 +14,37 @@ import {
 describe('parseMediaOrigins', () => {
   it('reads kind:url entries best first and keeps their order', () => {
     expect(
-      parseMediaOrigins('lan:https://raven.home.example.com, tailnet:https://raven.tail.ts.net')
+      parseMediaOrigins('lan:https://raven.home.example.com, public:https://raven.example.com:8443')
         .origins,
     ).toEqual([
       { kind: 'lan', url: 'https://raven.home.example.com' },
-      { kind: 'tailnet', url: 'https://raven.tail.ts.net' },
+      { kind: 'public', url: 'https://raven.example.com:8443' },
     ])
   })
 
   it('strips a trailing slash and drops a path, a query, an unknown kind or a missing kind, naming each', () => {
     const parsed = parseMediaOrigins(
-      'lan:https://a.example/,lan:https://a.example/api,vpn:https://b.example,https://c.example',
+      'lan:https://a.example/,lan:https://a.example/api,vpn:https://b.example,https://c.example,tailnet:https://d.example',
     )
     expect(parsed.origins).toEqual([{ kind: 'lan', url: 'https://a.example' }])
-    expect(parsed.problems).toHaveLength(3)
+    expect(parsed.problems).toHaveLength(4)
     expect(parsed.problems[0]).toContain('lan:https://a.example/api')
     expect(parsed.problems[1]).toBe(
-      'RAVEN_MEDIA_ORIGINS entry "vpn:https://b.example" has an unknown kind; use lan, tailnet or public.',
+      'RAVEN_MEDIA_ORIGINS entry "vpn:https://b.example" has an unknown kind; use lan or public.',
     )
     expect(parsed.problems[2]).toContain('https://c.example')
+    expect(parsed.problems[3]).toBe(
+      'RAVEN_MEDIA_ORIGINS entry "tailnet:https://d.example" has an unknown kind; use lan or public.',
+    )
   })
 
   it('lower-cases the host and drops a default port', () => {
-    expect(
-      parseMediaOrigins('lan:https://A.example,tailnet:https://a.example:443').origins,
-    ).toEqual([
-      { kind: 'lan', url: 'https://a.example' },
-      { kind: 'tailnet', url: 'https://a.example' },
-    ])
+    expect(parseMediaOrigins('lan:https://A.example,public:https://a.example:443').origins).toEqual(
+      [
+        { kind: 'lan', url: 'https://a.example' },
+        { kind: 'public', url: 'https://a.example' },
+      ],
+    )
     expect(parseMediaOrigins('lan:https://a.example:8443').origins).toEqual([
       { kind: 'lan', url: 'https://a.example:8443' },
     ])
@@ -280,7 +283,7 @@ describe('readMediaPlaneConfig', () => {
     expect(
       readMediaPlaneConfig({
         RAVEN_WEB_ORIGINS: 'https://raven-player.netlify.app',
-        RAVEN_MEDIA_ORIGINS: 'public:https://raven.tail.ts.net',
+        RAVEN_MEDIA_ORIGINS: 'public:https://raven.example.com:8443',
       }).problems,
     ).toEqual([])
     expect(

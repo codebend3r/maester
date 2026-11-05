@@ -1,4 +1,11 @@
-import { DEFAULT_SERVER_ORIGIN, DESKTOP_ENV, isServerOrigin, serverOriginOf } from '@raven/core'
+import {
+  DEFAULT_LINK_ORIGINS,
+  DEFAULT_SERVER_ORIGIN,
+  DESKTOP_ENV,
+  isServerOrigin,
+  serverOriginOf,
+} from '@raven/core'
+import type { FixedServer } from '@/main/desktopConfig'
 
 /**
  * A test hook: another Supabase Auth origin the page may call, as e2e's stand-in Auth on
@@ -52,7 +59,7 @@ export const authOriginFrom = ({ isPackaged, env, warn }: HookInput): string | n
 }
 
 /**
- * The other origins whose `raven://` links name the server: a LAN address beside the tailnet
+ * The other origins whose `raven://` links name the server: a LAN address beside the public
  * name, say. The build's comma separated list, which an unpackaged run may replace from the
  * environment (a test hook; a packaged app never reads it). An entry that is not an http or https
  * origin is left out, with a warning.
@@ -74,4 +81,28 @@ export const linkOriginsFrom = ({
     warn(`Raven ignored ${ignored} of ${DESKTOP_ENV.linkOrigins}: not http or https origins.`)
   }
   return [...new Set(origins.filter((origin) => origin !== null))]
+}
+
+/**
+ * The Tailscale Funnel origin Raven's default server had before raven's public origin. Only for
+ * adopting an install that still names it: no link names it and no build reaches it.
+ */
+export const LEGACY_FUNNEL_ORIGIN = 'https://raven.tail5586d4.ts.net'
+
+type FixedServerFromProps = { origin: string; linkOrigins: readonly string[] }
+
+/**
+ * The server a build plays from, with the origins its links may name it by and the ones an older
+ * install may have filed it under. The default server also answers to the web app's site
+ * (`DEFAULT_LINK_ORIGINS`), whose watch pages name it, and was once the Funnel origin; another
+ * server has only the aliases the build or the hook names.
+ */
+export const fixedServerFrom = ({ origin, linkOrigins }: FixedServerFromProps): FixedServer => {
+  const isDefault = origin === DEFAULT_SERVER_ORIGIN
+  const builtIn: readonly string[] = isDefault ? DEFAULT_LINK_ORIGINS : []
+  return {
+    origin,
+    aliases: [...new Set([...builtIn, ...linkOrigins])].filter((alias) => alias !== origin),
+    former: isDefault ? [LEGACY_FUNNEL_ORIGIN] : [],
+  }
 }

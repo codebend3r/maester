@@ -53,7 +53,6 @@ import {
 } from '@/main/budgets'
 import {
   CONFIG_FILE,
-  type FixedServer,
   loadConfig,
   namesServer,
   serverById,
@@ -111,7 +110,7 @@ import { createJsonStore, createStateStore, loadState } from '@/main/stateStore'
 import { createNodeTimers } from '@/main/timers'
 import { createMenuCheck, createUpdateService, updateSourceFrom } from '@/main/updateService'
 import { checkForUpdates } from '@/main/updates'
-import { linkOriginsFrom, serverOriginFrom } from '@/main/origins'
+import { fixedServerFrom, linkOriginsFrom, serverOriginFrom } from '@/main/origins'
 import { controlWindow, createWindowResizer } from '@/main/windowChrome'
 import { IPC_CHANNELS } from '@/shared/hostNames'
 import { LINK_SCHEME } from '@/shared/playLink'
@@ -217,20 +216,20 @@ const startApp = (): void => {
 
   // The server this build plays from, and the other origins its links may name it by. Each is
   // replaced by `bun build --define` with what the build was given.
-  const fixedServer: FixedServer = {
+  const fixedServer = fixedServerFrom({
     origin: serverOriginFrom({
       isPackaged: app.isPackaged,
       built: process.env.RAVEN_DESKTOP_SERVER_ORIGIN,
       env: process.env,
       warn,
     }),
-    aliases: linkOriginsFrom({
+    linkOrigins: linkOriginsFrom({
       isPackaged: app.isPackaged,
       built: process.env.RAVEN_DESKTOP_LINK_ORIGINS,
       env: process.env,
       warn,
     }),
-  }
+  })
 
   const windows: { current: BrowserWindow | null } = { current: null }
   const players: { current: WindowPlayer | null } = { current: null }

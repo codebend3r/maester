@@ -35,8 +35,8 @@ type ProxyPictureProps = {
 
 /**
  * One of raven's capability pictures, fetched from raven. The `/api` proxy in
- * `_redirects` is cached by each edge node on its own and emptied by every
- * deploy, so a picture went back to raven, through its Funnel, on most
+ * `netlify.toml` is cached by each edge node on its own and emptied by every
+ * deploy, so a picture went back to raven, through the NAS's upload, on most
  * requests. A function's `durable` response is shared by every node instead.
  * The address names the picture's version, so a kept copy never goes stale,
  * and anyone may keep it (`PicturesController`). A refusal is passed on uncached.
@@ -76,5 +76,5 @@ export const proxyPicture = async ({
 export default (request: Request): Promise<Response> =>
   proxyPicture({ request, origin: process.env[ENV.apiOrigin], fetchUpstream: fetch })
 
-/** Ahead of the `/api/*` proxy in `_redirects`, which still carries every other call. */
+/** Ahead of the `/api/*` proxy in `netlify.toml`, which still carries every other call. */
 export const config = { path: '/api/pictures/*', method: ['GET', 'HEAD'] }

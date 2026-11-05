@@ -28,20 +28,13 @@ describe('pickOrigin', () => {
     ).toEqual(origin('public'))
   })
 
-  it('prefers lan over tailnet over public within the band', () => {
+  it('prefers lan over public within the band', () => {
     expect(
       pickOrigin([
         probe({ kind: 'public', bytesPerSecond: 100e6 }),
-        probe({ kind: 'tailnet', bytesPerSecond: 100e6 }),
         probe({ kind: 'lan', bytesPerSecond: 85e6 }),
       ]),
     ).toEqual(origin('lan'))
-    expect(
-      pickOrigin([
-        probe({ kind: 'public', bytesPerSecond: 100e6 }),
-        probe({ kind: 'tailnet', bytesPerSecond: 85e6 }),
-      ]),
-    ).toEqual(origin('tailnet'))
   })
 
   it('counts latency: a slow first byte pulls a fast link down', () => {
@@ -85,7 +78,7 @@ describe('pickOrigin', () => {
     expect(
       pickOrigin([
         probe({ kind: 'lan', bytesPerSecond: Number.NaN }),
-        probe({ kind: 'tailnet', bytesPerSecond: -5 }),
+        probe({ kind: 'lan', bytesPerSecond: -5 }),
         probe({ kind: 'public', bytesPerSecond: 1e6 }),
       ]),
     ).toEqual(origin('public'))

@@ -15,7 +15,9 @@ import {
   BUG_REPORT_STATUSES,
   CDN_BACKDROP_WIDTHS,
   CDN_POSTER_WIDTHS,
+  DEFAULT_REMOTE_ACCESS_SETTINGS,
   DEFAULT_SAGA_BACKDROP,
+  REMOTE_ACCESS_STATES,
   POSTER_OWN_WIDTH,
   AUTH_CONFIG_STATES,
   AUTH_HEADERS,
@@ -449,6 +451,24 @@ describe('createApiClient', () => {
     ])
   })
 
+  it('reads remote access and sends a change, which the server checks again', async () => {
+    const state = {
+      settings: { ...DEFAULT_REMOTE_ACCESS_SETTINGS, isEnabled: true },
+      privateAddress: null,
+      publicOrigin: null,
+      status: { state: REMOTE_ACCESS_STATES.unconfigured },
+    }
+    const { client, calls } = clientReturning(respond({ body: state }))
+    await expect(client.getRemoteAccess()).resolves.toEqual(state)
+    await expect(client.setRemoteAccess({ publicPort: 8443 })).resolves.toEqual(state)
+    expect(calls.map((call) => [call.url, call.init?.method, call.init?.body])).toEqual([
+      ['http://nas:8484/api/remote-access', 'GET', undefined],
+      ['http://nas:8484/api/remote-access', 'PUT', JSON.stringify({ publicPort: 8443 })],
+    ])
+    const { client: broken } = clientReturning(respond({ body: { settings: {} } }))
+    await expect(broken.getRemoteAccess()).rejects.toMatchObject({ status: 502 })
+  })
+
   it('records that a video started playing', async () => {
     const { client, calls } = clientReturning(respond({ status: 204 }))
     await client.recordPlay(6)
@@ -525,13 +545,13 @@ describe('createApiClient', () => {
     const broken = clientReturning(respond({ status: 502, body: { message: 'Bad gateway' } }))
     const failure = await broken.client.getAuthConfig().catch((error: unknown) => error)
     expect(failure).toMatchObject({ status: 502, isServerUnreachable: false })
-    const funnel = clientReturning({
+    const proxied = clientReturning({
       ...respond({ status: 504 }),
       json: async () => {
         throw new SyntaxError('Unexpected token <')
       },
     })
-    const away = await funnel.client.getAuthConfig().catch((error: unknown) => error)
+    const away = await proxied.client.getAuthConfig().catch((error: unknown) => error)
     expect(away).toMatchObject({ status: 504, isServerUnreachable: true })
   })
 
@@ -605,8 +625,9 @@ describe('playback calls', () => {
 
   it('fetches the media origins and checks them', async () => {
     const origins: MediaOrigin[] = [{ kind: 'lan', url: 'https://raven.home.example' }]
-    const { client, calls } = clientReturning(respond({ body: { origins } }))
-    await expect(client.getMediaOrigins()).resolves.toEqual({ origins })
+    const remote = { limit: 'low720', isOutside: true } as const
+    const { client, calls } = clientReturning(respond({ body: { origins, remote } }))
+    await expect(client.getMediaOrigins()).resolves.toEqual({ origins, remote })
     expect(calls[0]?.url).toBe('http://nas:8484/api/media-origins')
     const { client: broken } = clientReturning(respond({ body: { origins: [{ kind: 'moon' }] } }))
     await expect(broken.getMediaOrigins()).rejects.toMatchObject({ status: 502 })
@@ -623,12 +644,12 @@ describe('playback calls', () => {
 
   it("points a speed probe at an origin's ping, a quarter of a MiB by default", () => {
     const { client } = clientReturning(respond({}))
-    const origin: MediaOrigin = { kind: 'tailnet', url: 'https://raven.tail.ts.net' }
+    const origin: MediaOrigin = { kind: 'public', url: 'https://raven.example.com:8443' }
     expect(client.pingUrl({ origin })).toBe(
-      `https://raven.tail.ts.net/api/media-origins/ping?bytes=${MEDIA_PROBE_BYTES}`,
+      `https://raven.example.com:8443/api/media-origins/ping?bytes=${MEDIA_PROBE_BYTES}`,
     )
     expect(client.pingUrl({ origin, bytes: 1000 })).toBe(
-      'https://raven.tail.ts.net/api/media-origins/ping?bytes=1000',
+      'https://raven.example.com:8443/api/media-origins/ping?bytes=1000',
     )
   })
 
@@ -672,12 +693,12 @@ describe('playback calls', () => {
     const vtt = 'WEBVTT\n\n05:01.000 --> 05:02.000\nHello'
     const { client, calls } = clientReturning(respond({ body: vtt }))
     const access = {
-      origin: { kind: 'tailnet', url: 'https://raven.tail.example' },
+      origin: { kind: 'public', url: 'https://raven.away.example' },
       ticket: 'abc.def',
     } as const satisfies MediaAccess
     await client.getSubtitles({ id: 7, trackId: 'embedded-2', window: 1, access })
     expect(calls[0]?.url).toBe(
-      'https://raven.tail.example/api/media/7/subtitles/embedded-2?window=1&t=abc.def',
+      'https://raven.away.example/api/media/7/subtitles/embedded-2?window=1&t=abc.def',
     )
   })
 

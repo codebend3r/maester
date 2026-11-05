@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, mock, setSystemTime } from 'bun:test'
-import { MEDIA_PROBE_BYTES, type MediaOrigin, PICK_FRESH_MS } from '@raven/core'
+import {
+  MEDIA_PROBE_BYTES,
+  type MediaOrigin,
+  type MediaOrigins,
+  PICK_FRESH_MS,
+  type RemotePlayback,
+} from '@raven/core'
 import { act, fireEvent, renderHook } from '@testing-library/react'
 import { type ProbeFetch } from '@/lib/probeOrigins'
 import { useMediaOrigin } from '@/stores/mediaOrigin'
@@ -25,11 +31,13 @@ const answering = (): ProbeFetch =>
     }
   })
 
-type ClientWithProps = { origins: MediaOrigin[] }
+const AT_HOME: RemotePlayback = { limit: null, isOutside: false }
 
-const clientWith = ({ origins }: ClientWithProps) => ({
+type ClientWithProps = { origins: MediaOrigin[]; remote?: RemotePlayback }
+
+const clientWith = ({ origins, remote = AT_HOME }: ClientWithProps) => ({
   ...api,
-  getMediaOrigins: mock(async () => ({ origins })),
+  getMediaOrigins: mock(async (): Promise<MediaOrigins> => ({ origins, remote })),
 })
 
 const settle = () =>
@@ -113,6 +121,33 @@ describe('useMediaOriginProbe', () => {
     expect(useMediaOrigin.getState().pick?.origin ?? null).toEqual(pub)
   })
 
+  it('takes the remote limit on every answer, even when the fresh pick is kept', async () => {
+    useMediaOrigin.getState().setPick({ origin: lan, at: NOW - 1000 })
+    useMediaOrigin.getState().setRemote(AT_HOME)
+    const away: RemotePlayback = { limit: 'high720', isOutside: true }
+    const fetch = answering()
+    const mounted = renderHook(() =>
+      useMediaOriginProbe({
+        isEnabled: true,
+        api: clientWith({ origins: [lan, pub], remote: away }),
+        fetch,
+      }),
+    )
+    await settle()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(useMediaOrigin.getState().remote).toEqual(away)
+    mounted.unmount()
+
+    // An older server says nothing of remote play, so nothing is held back.
+    const older = {
+      ...api,
+      getMediaOrigins: mock(async () => ({ origins: [lan], remote: undefined })),
+    }
+    renderHook(() => useMediaOriginProbe({ isEnabled: true, api: older, fetch }))
+    await settle()
+    expect(useMediaOrigin.getState().remote).toBeNull()
+  })
+
   it('probes again when the fresh pick is no longer one of the origins', async () => {
     useMediaOrigin.getState().setPick({ origin: lan, at: NOW })
     const fetch = answering()
@@ -140,7 +175,7 @@ describe('useMediaOriginProbe', () => {
   })
 
   it('folds re-probes asked for while one runs into a single follow-up', async () => {
-    const getMediaOrigins = mock(async () => ({ origins: [lan] }))
+    const getMediaOrigins = mock(async () => ({ origins: [lan], remote: AT_HOME }))
     const { result } = renderHook(() =>
       useMediaOriginProbe({
         isEnabled: true,
@@ -195,7 +230,7 @@ describe('useMediaOriginProbe', () => {
     const getMediaOrigins = mock(async () => {
       calls += 1
       if (calls === 1) await gate
-      return { origins: [lan, pub] }
+      return { origins: [lan, pub], remote: AT_HOME }
     })
     const fetch = answering()
     const { result } = renderHook(() =>

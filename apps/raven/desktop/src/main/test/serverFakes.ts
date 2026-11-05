@@ -5,7 +5,9 @@ import type {
   ItemSummary,
   Library,
   MediaItem,
+  MediaOrigin,
   PlaylistDetails,
+  RemotePlayback,
   SeasonSummary,
   Track,
 } from '@raven/core'
@@ -14,16 +16,21 @@ import { requestFor, type AllowedCall } from '@/main/servers/allowlist'
 import type { OriginPicks } from '@/main/servers/originPicks'
 import type { ServerCalls } from '@/main/servers/serverCalls'
 
-type FixedPicksProps = { origin?: string }
+type FixedPicksProps = { origin?: MediaOrigin; remote?: RemotePlayback }
 
 /**
  * Picks that answer `origin` for every server, or each server's own address when none is given,
- * keeping which servers were let go of.
+ * with what `remote` says of remote play, keeping which servers were let go of.
  */
-export const fixedPicks = ({ origin }: FixedPicksProps = {}) => {
+export const fixedPicks = ({ origin, remote }: FixedPicksProps = {}) => {
   const forgotten: string[] = []
   const picks: OriginPicks = {
-    originOf: async (server) => origin ?? server.origin,
+    originOf: async (server) => origin?.url ?? server.origin,
+    placeOf: async (server) => ({
+      url: origin?.url ?? server.origin,
+      origin: origin ?? null,
+      remote: remote ?? null,
+    }),
     forget: (serverId) => {
       forgotten.push(serverId)
     },

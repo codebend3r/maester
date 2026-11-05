@@ -262,7 +262,7 @@ export class TmdbClient {
         })
       if (response.status === 429 && retriesLeft > 0) {
         this.limit.slowDown()
-        await sleep(retryAfterMs(response.headers.get(RAVEN_HEADERS.retryAfter)))
+        await sleep(retryAfterMs(response.headers.get(HEADERS.retryAfter)))
         return attempt(retriesLeft - 1)
       }
       if (response.status === 401) {

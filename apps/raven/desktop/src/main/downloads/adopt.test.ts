@@ -1,8 +1,15 @@
-import { DOWNLOAD_STATUS_KINDS } from '@raven/core'
+import {
+  DEFAULT_LINK_ORIGINS,
+  DEFAULT_OUTPUT_SETTINGS,
+  DEFAULT_SERVER_ORIGIN,
+  DOWNLOAD_STATUS_KINDS,
+} from '@raven/core'
 import { describe, expect, it } from 'bun:test'
+import { upgradeConfig } from '@/main/desktopConfig'
 import { settleDownloads, type AdoptFs } from '@/main/downloads/adopt'
 import { EMPTY_DOWNLOADS, NO_PENDING, type DownloadsState } from '@/main/downloads/downloadState'
 import { entryDirFor } from '@/main/downloads/space'
+import { fixedServerFrom, LEGACY_FUNNEL_ORIGIN } from '@/main/origins'
 import { entry, id, SERVER_A, SERVER_B, stateOf } from '@/main/test/downloadEntries'
 
 const USER_DATA = '/data'
@@ -180,5 +187,40 @@ describe('settleDownloads', () => {
     expect(await settling).toBe(state)
     expect(made).toEqual([])
     expect(await settle({ state: EMPTY_DOWNLOADS, fs, adopted: [] }).settling).toBe(EMPTY_DOWNLOADS)
+  })
+})
+
+describe('an install that names a legacy origin', () => {
+  const server = fixedServerFrom({ origin: DEFAULT_SERVER_ORIGIN, linkOrigins: [] })
+  const [WEB_APP = ''] = DEFAULT_LINK_ORIGINS
+
+  it('keeps the downloads of the Funnel server and the web site, filed under the first', async () => {
+    const stored = {
+      version: 4 as const,
+      output: DEFAULT_OUTPUT_SETTINGS,
+      servers: [
+        { id: SERVER_A, origin: LEGACY_FUNNEL_ORIGIN },
+        { id: SERVER_B, origin: WEB_APP },
+      ],
+      updates: { isEnabled: true, checkedAt: null },
+    }
+    const { config, adopted } = upgradeConfig({ stored, server, newId: () => id(9) })
+    expect(config.server).toEqual({ id: SERVER_A, origin: DEFAULT_SERVER_ORIGIN })
+    const kept = entry({ downloadId: id(1), mediaId: 1, serverId: SERVER_A, status: ready })
+    const moving = entry({ downloadId: id(2), mediaId: 2, serverId: SERVER_B, status: ready })
+    const { fs, present } = fakeFs({ folders: [dirOf(kept), dirOf(moving)] })
+    const settled = await settleDownloads({
+      state: stateOf(kept, moving),
+      serverId: config.server.id,
+      adopted,
+      userData: USER_DATA,
+      fs,
+      warn: () => undefined,
+    })
+    expect(settled.entries).toEqual([kept, { ...moving, serverId: SERVER_A }])
+    expect([...present].toSorted()).toEqual([
+      dirOf({ serverId: SERVER_A, mediaId: 1 }),
+      dirOf({ serverId: SERVER_A, mediaId: 2 }),
+    ])
   })
 })

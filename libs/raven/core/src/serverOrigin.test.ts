@@ -3,9 +3,9 @@ import { MAX_ORIGIN_LENGTH, isServerOrigin, serverOriginOf } from '@/serverOrigi
 
 describe('serverOriginOf', () => {
   it.each([
-    ['https://raven.example.ts.net', 'https://raven.example.ts.net'],
-    ['https://raven.example.ts.net/', 'https://raven.example.ts.net'],
-    ['  HTTPS://Raven.Example.TS.net  ', 'https://raven.example.ts.net'],
+    ['https://raven.example.synology.me', 'https://raven.example.synology.me'],
+    ['https://raven.example.synology.me/', 'https://raven.example.synology.me'],
+    ['  HTTPS://Raven.Example.Synology.me  ', 'https://raven.example.synology.me'],
     ['http://127.0.0.1:8080', 'http://127.0.0.1:8080'],
     ['http://[::1]:3000', 'http://[::1]:3000'],
     ['http://localhost:3000', 'http://localhost:3000'],

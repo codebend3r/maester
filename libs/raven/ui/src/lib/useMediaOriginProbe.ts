@@ -25,8 +25,9 @@ const browserNow = (): number => performance.now()
 /**
  * Chooses where media plays from: probes the server's origins on mount, when
  * the network comes back, and when the tab returns after a long absence, and
- * keeps the winner in `useMediaOrigin`. A host mounts it once, near the root,
- * and enables it once the server answers its calls.
+ * keeps the winner, and what the server says of remote play, in
+ * `useMediaOrigin`. A host mounts it once, near the root, and enables it
+ * once the server answers its calls.
  */
 export const useMediaOriginProbe = ({
   api,
@@ -46,7 +47,7 @@ export const useMediaOriginProbe = ({
 
   const run = useCallback(async function runProbe({ isForced }: RunProbeProps) {
     if (!setup.current.isEnabled) return
-    const { isProbing, setPick, setProbing } = useMediaOrigin.getState()
+    const { isProbing, setPick, setProbing, setRemote } = useMediaOrigin.getState()
     if (isProbing) {
       // Unreachable or back online while a probe runs: what it measures may predate that, so go again after it.
       if (isForced) isForcedPending.current = true
@@ -55,7 +56,9 @@ export const useMediaOriginProbe = ({
     setProbing(true)
     try {
       const current = setup.current
-      const { origins } = await current.api.getMediaOrigins()
+      const { origins, remote } = await current.api.getMediaOrigins()
+      // Where this request came from can change while the pick is kept, so the remote limit is taken every time.
+      setRemote(remote ?? null)
       if (origins.length === 0) return setPick(null)
       const { pick } = useMediaOrigin.getState()
       const isKept =

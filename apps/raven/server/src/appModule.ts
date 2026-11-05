@@ -24,7 +24,7 @@ import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { BrowseController } from '@/fs/browseController'
 import { HealthController } from '@/health/healthController'
 import { HlsController } from '@/hls/hlsController'
-import { CLOCK, SYSTEM_CLOCK } from '@/clock'
+import { CLOCK, type Clock, SYSTEM_CLOCK } from '@/clock'
 import { HlsSessions } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import { ItemsController } from '@/items/itemsController'
@@ -139,6 +139,13 @@ import { ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
 import { ScrobbleQueue } from '@/scrobbling/scrobbleQueue'
 import { ScrobbleSender } from '@/scrobbling/scrobbleSender'
 import { ScrobblingController } from '@/scrobbling/scrobblingController'
+import {
+  REACHABILITY_FETCH,
+  Reachability,
+  type ReachabilityFetch,
+} from '@/remoteAccess/reachability'
+import { RemoteAccessController } from '@/remoteAccess/remoteAccessController'
+import { AccountRateGuard } from '@/rateLimits/accountRateGuard'
 import { SettingsController } from '@/settings/settingsController'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { STARTUP_HELD, StartupWork } from '@/startupWork'
@@ -170,6 +177,7 @@ export const CONTROLLERS = [
   MixesController,
   ScrobblingController,
   SettingsController,
+  RemoteAccessController,
   EventsController,
   LockController,
   AdminController,
@@ -193,10 +201,13 @@ type AppModuleRegisterProps = {
   watch?: Partial<WatchOptions>
   authFetch?: AuthFetch
   authKeys?: JWTVerifyGetKey
+  /** Stands in for the web app's reachability function in tests. */
+  reachabilityFetch?: ReachabilityFetch
   accessRecheckMs?: number
   membershipTtlMs?: number
   /** Holds the work on boot until `main.ts` says the server listens; a test's app runs it at once. */
   shouldHoldStartupWork?: boolean
+  clock?: Clock
 }
 
 /**
@@ -213,9 +224,11 @@ export class AppModule {
     watch = {},
     authFetch = ({ url, init }) => fetch(url, init),
     authKeys,
+    reachabilityFetch = ({ url, init }) => fetch(url, init),
     accessRecheckMs = DEFAULT_ACCESS_RECHECK_MS,
     membershipTtlMs = MEMBERSHIP_TTL_MS,
     shouldHoldStartupWork = false,
+    clock = SYSTEM_CLOCK,
   }: AppModuleRegisterProps): DynamicModule {
     assertRoutesMarked(CONTROLLERS)
     return {
@@ -246,6 +259,8 @@ export class AppModule {
         AccessRechecks,
         { provide: METADATA_FETCH, useValue: metadataFetch },
         { provide: AI_FETCH, useValue: aiFetch },
+        { provide: REACHABILITY_FETCH, useValue: reachabilityFetch },
+        Reachability,
         { provide: WATCH_OPTIONS, useValue: { ...DEFAULT_WATCH, ...watch } },
         { provide: STARTUP_HELD, useValue: shouldHoldStartupWork },
         StartupWork,
@@ -323,7 +338,7 @@ export class AppModule {
         MarkerDetection,
         ScanControl,
         KeyframesService,
-        { provide: CLOCK, useValue: SYSTEM_CLOCK },
+        { provide: CLOCK, useValue: clock },
         HlsSessions,
         FilePasses,
         TicketAccesses,
@@ -340,6 +355,8 @@ export class AppModule {
         PlayHistoryRepository,
         // First the account gate: with accounts ready, every route but the open ones needs an account.
         { provide: APP_GUARD, useClass: AccountGuard },
+        // Then each account's own budget on the routes that check or hand out a secret.
+        { provide: APP_GUARD, useClass: AccountRateGuard },
         // Every route passes the lock first; those marked PrivateBy, or on a controller that is, are held.
         { provide: APP_GUARD, useClass: LockGuard },
         // Then the admin lock, which holds back the routes marked AdminOnly.

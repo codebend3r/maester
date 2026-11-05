@@ -8,6 +8,7 @@ import {
   PICTURE_SUBTITLES,
   PLAYBACK_MODES,
   offeredQualities,
+  planForNetwork,
   planPlayback,
 } from '@raven/core'
 import { useMemo, useState } from 'react'
@@ -23,6 +24,7 @@ import {
 } from '@/components/Player/playChoices'
 import type { Rendition } from '@/components/Player/rendition'
 import type { Delivery } from '@/lib/streamSource'
+import { useMediaOrigin } from '@/stores/mediaOrigin'
 
 /** The ways to play, best first, for one audio track; a step down belongs to one ladder. */
 type Ladder = { modes: readonly PlaybackMode[]; audio: number | null }
@@ -104,7 +106,9 @@ type UsePlaybackLadderProps = {
  * starts again at the top, unless the connection already proved too slow
  * for anything but a transcode: that holds for the rest of the playback.
  * The viewer can pick any way the plan offers; it starts there, and a
- * failure steps down from it.
+ * failure steps down from it. Away from home, a file over the remote limit
+ * starts as a transcode at that limit, as Plex does, unless the viewer picks
+ * another size or way.
  */
 export const usePlaybackLadder = ({
   media,
@@ -115,18 +119,26 @@ export const usePlaybackLadder = ({
 }: UsePlaybackLadderProps): PlaybackStatus => {
   const settings = useQuery(playerQueriesFor(api).playbackSettings)
   const policy = settings.data?.settings ?? (settings.isError ? DEFAULT_PLAYBACK_SETTINGS : null)
-  const plan = useMemo(
+  const originKind = useMediaOrigin((state) => state.pick?.origin.kind ?? null)
+  const remote = useMediaOrigin((state) => state.remote)
+  const network = useMemo(
     () =>
       policy &&
-      planPlayback({
+      planForNetwork({
+        plan: planPlayback({
+          media,
+          canPlay: browserCanPlay,
+          canStream: browserCanStream,
+          defaultAudio: isDefaultAudio,
+          policy,
+        }),
         media,
-        canPlay: browserCanPlay,
-        canStream: browserCanStream,
-        defaultAudio: isDefaultAudio,
-        policy,
+        origin: originKind === null ? null : { kind: originKind },
+        remote,
       }),
-    [media, isDefaultAudio, policy],
+    [media, isDefaultAudio, policy, originKind, remote],
   )
+  const plan = network?.plan ?? null
   const [forced, setForced] = useState(false)
   const [fallback, setFallback] = useState<{ ladder: Ladder; step: number } | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
@@ -174,9 +186,11 @@ export const usePlaybackLadder = ({
     }
   }
   const isConverting = mode === PLAYBACK_MODES.transcode
+  // A viewer's size wins; without one, a play away from home converts at the remote limit.
+  const quality = picked?.kind === PICK_KINDS.size ? picked.quality : (network?.quality ?? null)
   const rendition: Rendition = {
     mode,
-    quality: isConverting && picked?.kind === PICK_KINDS.size ? picked.quality : null,
+    quality: isConverting ? quality : null,
     // A burn's ladder is the transcode alone, so a burning rendition is always converting.
     burn: isBurning ? burn : null,
   }

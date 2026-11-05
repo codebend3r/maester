@@ -1,6 +1,7 @@
 import { isMediaItem } from '@/contract/items'
 import {
   type Infer,
+  isBoolean,
   isNumber,
   isString,
   listOf,
@@ -8,6 +9,7 @@ import {
   nullable,
   object,
   oneOf,
+  optional,
   union,
 } from '@/schema'
 
@@ -71,8 +73,8 @@ export type AudioBitrate = Infer<typeof isAudioBitrate>
 /** The query key an audio transcode names its bitrate in. */
 export const AUDIO_BITRATE_PARAM = 'kbps'
 
-/** How far an origin reaches: the home network, the tailnet or the open internet. */
-export const MEDIA_ORIGIN_KINDS = { lan: 'lan', tailnet: 'tailnet', public: 'public' } as const
+/** How far an origin reaches: the home network, or the open internet. */
+export const MEDIA_ORIGIN_KINDS = { lan: 'lan', public: 'public' } as const
 
 export const isMediaOriginKind = oneOf(Object.values(MEDIA_ORIGIN_KINDS))
 
@@ -83,8 +85,22 @@ export const isMediaOrigin = object({ kind: isMediaOriginKind, url: isString })
 
 export type MediaOrigin = Infer<typeof isMediaOrigin>
 
-/** What `GET /api/media-origins` returns: the origins raven has, best first. */
-export const isMediaOrigins = object({ origins: listOf(isMediaOrigin) })
+/**
+ * What a viewer away from home is held to, as `GET /api/media-origins` tells
+ * every viewer: the size a remote stream is made at (the lower of the owner's
+ * remote limit and the upload speed; null when nothing holds it back), and
+ * whether that request reached raven from outside its network, which is
+ * where a play from the server's own address comes from too.
+ */
+export const isRemotePlayback = object({ limit: nullable(isStreamQuality), isOutside: isBoolean })
+
+export type RemotePlayback = Infer<typeof isRemotePlayback>
+
+/** What `GET /api/media-origins` returns: the origins raven has, best first, and the remote limit; an older server sends no `remote`. */
+export const isMediaOrigins = object({
+  origins: listOf(isMediaOrigin),
+  remote: optional(isRemotePlayback),
+})
 
 export type MediaOrigins = Infer<typeof isMediaOrigins>
 
