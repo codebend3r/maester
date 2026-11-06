@@ -1,5 +1,5 @@
 # The ✅ Checks job's toolchain (.github/workflows/pull-request-checks.yml):
-# Ubuntu 24.04 with Bun, Node, uv and ffmpeg. Built and run by scripts/ci_docker.sh.
+# Ubuntu 24.04 with Bun, Node, uv and CI's pinned ffmpeg. Built and run by scripts/ci_docker.sh.
 FROM ubuntu:24.04
 
 ARG BUN_VERSION
@@ -9,8 +9,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-    build-essential ca-certificates curl ffmpeg git python3 rsync unzip xz-utils \
+    build-essential ca-certificates curl git python3 rsync tzdata unzip xz-utils \
   && rm -rf /var/lib/apt/lists/*
+
+# CI's pinned ffmpeg rather than Ubuntu's 6.1; install_ffmpeg.sh holds the pin for both.
+COPY install_ffmpeg.sh /tmp/install_ffmpeg.sh
+RUN bash /tmp/install_ffmpeg.sh && rm /tmp/install_ffmpeg.sh
 
 RUN arch="$(dpkg --print-architecture)" \
   && node_arch="$([ "$arch" = arm64 ] && echo arm64 || echo x64)" \

@@ -1,6 +1,6 @@
 import re
 
-from help import COLOURS, GROUPS, described, render, root_scripts
+from help import COLOURS, GROUPS, ROOT, described, render, render_markdown, root_scripts
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -34,3 +34,16 @@ def test_keeps_within_the_width_and_never_splits_a_tag():
     plain = render(colour=False, width=80)
     assert all(len(line) <= 80 for line in plain.splitlines())
     assert "[macOS + Xcode]" in plain
+
+
+def test_docs_commands_is_what_markdown_writes():
+    written = (ROOT / "docs" / "commands.md").read_text()
+    assert written == render_markdown(), (
+        "docs/commands.md is stale: python3 scripts/help.py --markdown > docs/commands.md"
+    )
+
+
+def test_markdown_lists_every_command_once_under_its_group():
+    markdown = render_markdown()
+    assert all(f"| `{name}` " in markdown for name in described())
+    assert all(f"## {group.title}" in markdown for group in GROUPS)

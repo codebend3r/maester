@@ -34,7 +34,9 @@ bun run verify     # spellcheck, lint, format check, typecheck, tests and build 
 bun run affected   # the same for the projects changed since main; spellcheck still covers the whole repo
 ```
 
-Every pull request runs each check on every project in its own parallel matrix job, then builds and health checks both production images (`.github/workflows/pull-request-checks.yml`).
+[Commands](docs/commands.md) lists every root `package.json` script with what it does; `bun run help` prints the same list.
+
+Every pull request runs each check on every project in its own parallel matrix job, then builds and health checks both production images (`.github/workflows/pull-request-checks.yml`). The `ci:*` commands run those jobs on this machine, so a failing check reproduces without a push; [Pull request checks, locally](docs/ci-commands.md) lists them.
 
 The git hooks are lefthook's (`lefthook.yml`):
 
@@ -63,7 +65,7 @@ apps/<product>/<project>/  its Nx projects, e.g. apps/sparrow/api
 libs/<product>/<lib>/      libraries a product shares between its projects
 libs/shared/<lib>/         libraries more than one product uses
 scripts/                   repo tooling
-docs/                      the tracker's roadmap and every product's design specs
+docs/                      the command lists, the tracker's roadmap and every product's design specs
 ```
 
 The root holds only what the workspace needs. Projects have no `project.json`: Nx infers targets from each `package.json`'s scripts, limited to its `nx.includedScripts`. A Python project's scripts call uv.
