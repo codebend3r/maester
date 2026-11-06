@@ -23,7 +23,8 @@ export const BingeButton = ({ item }: BingeButtonProps) => {
         icon="popcorn"
         aria-pressed={isBinging}
         aria-disabled={isFull}
-        aria-describedby={isFull || shouldShowTip ? tipId : undefined}
+        aria-describedby={shouldShowTip ? tipId : undefined}
+        title={isFull ? BINGE_COPY.limit : undefined}
         className={shouldShowTip ? styles.highlight : undefined}
         onClick={() => {
           if (!isFull) {
@@ -47,11 +48,6 @@ export const BingeButton = ({ item }: BingeButtonProps) => {
             {BINGE_COPY.dismiss}
           </Button>
         </span>
-      )}
-      {isFull && (
-        <output className={styles.tip} id={tipId}>
-          {BINGE_COPY.limit}
-        </output>
       )}
     </span>
   )

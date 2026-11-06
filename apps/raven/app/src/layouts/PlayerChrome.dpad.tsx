@@ -1,4 +1,4 @@
-import { formatDuration } from '@raven/core'
+import { FACT_PART_KINDS, formatDuration } from '@raven/core'
 import {
   type ComponentRef,
   type ComponentType,
@@ -31,6 +31,7 @@ import {
 } from '@/layouts/centreMark'
 import { useFocusOnMount } from '@/layouts/focus'
 import { FocusBand } from '@/layouts/FocusBand'
+import { FocusFactChips } from '@/layouts/FactChips'
 import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import { CaptionText } from '@/layouts/PlayerCaption'
 import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
@@ -52,6 +53,7 @@ import {
 import { isSeekingWith, pressedKeyOf, remoteAnswerOf } from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
 import type { IconName } from '@raven/ui/iconDrawings'
+import { LINE_RATIO } from '@/layouts/textHeights'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useClock } from '@/layouts/useClock'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
@@ -141,7 +143,15 @@ const Scrubber = ({ view, transport, onScrubbing }: ScrubberProps) => {
 
 type ControlsProps = Pick<
   PlayerChromeProps,
-  'heading' | 'transport' | 'audio' | 'subtitles' | 'next' | 'mode' | 'onBack'
+  | 'heading'
+  | 'transport'
+  | 'audio'
+  | 'subtitles'
+  | 'quality'
+  | 'next'
+  | 'previous'
+  | 'mode'
+  | 'onBack'
 > & {
   /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
   isVisible: boolean
@@ -180,6 +190,9 @@ const TrackButton = ({ icon, label, picker, onPicking }: TrackButtonProps) => {
 /** How tall a show's title art stands over the video; its width follows the art's own shape. */
 const LOGO_HEIGHT = TV_SIZES.space8 * 1.5
 
+/** How large the time of day stands in the corner: larger than any line of the page's type. */
+const CLOCK_SIZE = TV_SIZES.textXl * 1.5
+
 type CornerProps = Pick<PlayerChromeProps, 'mode'>
 
 /** The top right corner: the time of day, and how the video plays, read out together. */
@@ -193,7 +206,9 @@ const Corner = ({ mode }: CornerProps) => {
       accessible
       style={styles.corner}
     >
-      <Text style={styles.clock}>{clock}</Text>
+      <Text variant={TEXT_VARIANTS.display} style={styles.clock}>
+        {clock}
+      </Text>
       {way !== null && (
         <View style={styles.chip}>
           <Text style={styles.chipText}>{way}</Text>
@@ -290,7 +305,8 @@ const HEADING_TITLES = {
 
 /**
  * The title along the top as lines: the show, then its season and episode, quieter, then the
- * episode's own name with its length in a chip beside it. A film is its name and chip alone.
+ * episode's own name with its length in a chip beside it and the file's resolution under that,
+ * in its tier's colour as every other resolution chip wears it. A film is its name and chips alone.
  */
 const Heading = ({ heading }: HeadingProps) => {
   const styles = useStyles()
@@ -309,29 +325,38 @@ const Heading = ({ heading }: HeadingProps) => {
       {heading.place !== null && <Text style={styles.place}>{heading.place}</Text>}
       <View style={styles.titleRow}>
         <Title heading={heading} />
-        {heading.length !== null && (
-          <View style={styles.chip}>
-            <Text style={styles.chipText}>{heading.length}</Text>
-          </View>
-        )}
+        <View style={styles.chips}>
+          {heading.length !== null && (
+            <View style={styles.chip}>
+              <Text style={styles.chipText}>{heading.length}</Text>
+            </View>
+          )}
+          {heading.quality !== null && (
+            <FocusFactChips parts={[{ kind: FACT_PART_KINDS.resolution, text: heading.quality }]} />
+          )}
+        </View>
       </View>
     </View>
   )
 }
 
 /**
- * The controls over the video, dark in every theme as the web's: the title along the top; the
- * time and the line along the bottom, over back to the start, skip back, play and pause, skip
- * forward, the next episode or film, the track pickers and Back, on the player's glass, with the lists they open. The line takes the remote's focus
- * as they appear, so a press of left or right goes on skipping; the buttons are a band, so Down
- * from the line lands on the first of them rather than on the one under the thumb.
+ * The controls over the video, dark in every theme as the web's: Back at the top left, then the
+ * title; the time and the line along the bottom, over back to the start, skip back, play and
+ * pause, skip forward, the next episode or film, and the audio, subtitle and quality pickers, on
+ * the player's glass, with the lists they open. The line takes the remote's focus as they
+ * appear, so a press of left or right goes on skipping; the buttons are a band, so Down from the
+ * line lands on the first of them rather than on the one under the thumb, and Back is a band of
+ * its own, so Up from anywhere below reaches it.
  */
 const Controls = ({
   heading,
   transport,
   audio,
   subtitles,
+  quality,
   next,
+  previous,
   mode,
   onBack,
   onScrubbing,
@@ -349,7 +374,12 @@ const Controls = ({
   return (
     <View style={styles.frame}>
       <View style={styles.top}>
-        <Heading heading={heading} />
+        <View style={styles.topStart}>
+          <FocusBand>
+            <PlateButton icon="back" isOverPicture label={PLAYER_COPY.leave} onPress={onBack} />
+          </FocusBand>
+          <Heading heading={heading} />
+        </View>
         <Corner mode={mode} />
       </View>
       <View
@@ -372,8 +402,8 @@ const Controls = ({
                 <PlateButton
                   icon="skipPrevious"
                   isOverPicture
-                  label={PLAYER_COPY.restart}
-                  onPress={() => transport.onSeek(0)}
+                  label={previous?.label ?? PLAYER_COPY.restart}
+                  onPress={previous?.onPlay ?? (() => transport.onSeek(0))}
                 />
                 <PlateButton
                   icon={SKIP_ICONS[SKIP_DIRECTIONS.back]}
@@ -416,7 +446,14 @@ const Controls = ({
                 picker={subtitles}
               />
             )}
-            <PlateButton icon="back" isOverPicture label={PLAYER_COPY.leave} onPress={onBack} />
+            {quality !== null && (
+              <TrackButton
+                icon="settings"
+                label={PLAYER_COPY.quality}
+                onPicking={onPicking}
+                picker={quality}
+              />
+            )}
           </View>
         </FocusBand>
       </View>
@@ -467,7 +504,9 @@ const DpadPlayer = ({
   transport,
   audio,
   subtitles,
+  quality,
   next,
+  previous,
   mode,
   onBack,
 }: DpadPlayerProps) => {
@@ -578,9 +617,11 @@ const DpadPlayer = ({
             heading={heading}
             mode={mode}
             next={next}
+            previous={previous}
             onBack={onBack}
             onBottomHeight={setBottomHeight}
             onPicking={setPicking}
+            quality={quality}
             isVisible={isVisible}
             onScrubbing={(isOnLine) => {
               isScrubbing.current = isOnLine
@@ -646,12 +687,18 @@ const useStyles = pictureStyles((colours) =>
     },
     frame: { flex: 1, justifyContent: 'space-between', padding: TV_GUTTER },
     top: { flexDirection: 'row', justifyContent: 'space-between', gap: TV_SIZES.space4 },
+    topStart: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      flexShrink: 1,
+      gap: TV_SIZES.space4,
+    },
     heading: { gap: TV_SIZES.space1, maxWidth: TV_SIZES.measure },
     corner: { alignItems: 'flex-end', gap: TV_SIZES.space1 },
     clock: {
       color: colours.text,
-      fontSize: TV_SIZES.textXl,
-      fontWeight: 'bold',
+      fontSize: CLOCK_SIZE,
+      lineHeight: CLOCK_SIZE * LINE_RATIO,
       fontVariant: ['tabular-nums'],
     },
     show: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
@@ -663,6 +710,8 @@ const useStyles = pictureStyles((colours) =>
     },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
     title: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.textLg },
+    // The runtime over the resolution, each as wide as its words.
+    chips: { alignItems: 'flex-start', gap: TV_SIZES.space1 },
     chip: {
       paddingHorizontal: TV_SIZES.space2,
       paddingVertical: TV_SIZES.space0,

@@ -7,7 +7,7 @@ description: Use when running raven's web app locally against a local backend to
 
 Imports production's database from Vhagar, then starts raven's server (`@raven/server`, http://localhost:8484) and the web app's Vite dev server (`@raven/web`, with `@raven/ui` rebuilding in watch mode). Vite proxies `/api` to :8484, so open the Vite address, never :8484.
 
-The server reads `apps/raven/.env`. With `SUPABASE_*` there (the usual case) it enforces accounts and the page asks for a real sign-in; without it, it runs open. It migrates `apps/raven/server/data/raven.db` on start, skips the library scan (`SCAN_ON_START=false`) and logs a line for every request it answers (`RAVEN_LOG_REQUESTS=true`, both set by the server's `dev` script). To point the web app at Vhagar's raven instead of a local one, use `bun run dev:raven:prod` and stop here.
+The server reads `apps/raven/.env`. With `SUPABASE_*` there (the usual case) it enforces accounts and the page asks for a real sign-in; without it, it runs open. It migrates `apps/raven/server/data/raven.db` on start, skips the library scan (`SCAN_ON_START=false`) and logs a line for every request it answers (`RAVEN_LOG_REQUESTS=true`, both set by the server's `dev` script). To point the web app at Vhagar's raven instead of a local one, skip the steps below. At home, use `bun run dev:raven:vhagar`: Vite proxies `/api` to Vhagar's LAN origin and the player streams straight from Vhagar, which is the fastest way to load and play (Vhagar's `RAVEN_WEB_ORIGINS` lists `http://localhost:5173` and `http://localhost:5174` for it). Away from home, use `bun run dev:raven:prod`, which goes through Netlify. Both write real watch progress to the signed-in account, and neither runs server code from the checkout.
 
 ## Steps
 

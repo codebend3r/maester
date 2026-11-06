@@ -16,6 +16,8 @@ const Watching = () => {
     <p>
       Watching {handed ? handed.media.fileName : 'nothing handed over'}
       {handed?.session.kind === SESSION_KINDS.queue && `, shuffled, then ${after}`}
+      {handed?.session.kind === SESSION_KINDS.shuffle &&
+        `, shuffling show ${handed.session.showId}`}
     </p>
   )
 }
@@ -23,11 +25,18 @@ const Watching = () => {
 describe('ShuffleButton', () => {
   const random = spyOn(api, 'shuffleEpisodes')
 
-  const open = () =>
+  const open = (isWholeShow = false) =>
     renderWithProviders({
       ui: (
         <Routes>
-          <Route path="shows/:id" element={<ShuffleButton itemId={4}>Shuffle</ShuffleButton>} />
+          <Route
+            path="shows/:id"
+            element={
+              <ShuffleButton itemId={4} isWholeShow={isWholeShow}>
+                Shuffle
+              </ShuffleButton>
+            }
+          />
           <Route path="watch/:id" element={<Watching />} />
         </Routes>
       ),
@@ -49,6 +58,15 @@ describe('ShuffleButton', () => {
       ),
     ).toBeInTheDocument()
     expect(random.mock.calls).toEqual([[4]])
+  })
+
+  it('shuffles a whole show without end, the server drawing each next from any season', async () => {
+    random.mockImplementation(async () => [EPISODE_TWO, EPISODE_ONE])
+    open(true)
+    await userEvent.click(screen.getByRole('button', { name: 'Shuffle' }))
+    expect(
+      await screen.findByText(`Watching ${EPISODE_TWO.fileName}, shuffling show 4`),
+    ).toBeInTheDocument()
   })
 
   it('says so when there is nothing to play', async () => {

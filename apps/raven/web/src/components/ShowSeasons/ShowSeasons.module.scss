@@ -1,0 +1,203 @@
+.seasons {
+  display: grid;
+  gap: var(--space-4);
+}
+
+// Grid or Table as one segmented control: a well holding a button for each,
+// the chosen one lit in moss, as a library's views are.
+.views {
+  display: grid;
+  grid-auto-flow: column;
+  padding: calc((var(--field-size) - var(--control-size)) / 2);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+}
+
+.view {
+  border-radius: var(--radius-md);
+  color: var(--color-lichen);
+
+  &:hover:not(:disabled) {
+    color: var(--color-bark);
+  }
+
+  &[aria-pressed='true'] {
+    --icon-tint: 0.4;
+
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+
+  &[aria-pressed='true']:hover:not(:disabled) {
+    background: var(--color-moss-hi);
+  }
+}
+
+// Posters as wide as `POSTER_SIZES.season` fetches them, as many to a line as
+// fit, wrapping onto the next; a little room above for the lift on hover.
+.grid {
+  --season-width: 9rem;
+
+  display: grid;
+  grid-template-columns: repeat(auto-fill, var(--season-width));
+  gap: var(--space-5) var(--space-4);
+  padding: var(--space-1) var(--space-0) var(--space-0);
+}
+
+.card {
+  position: relative;
+}
+
+// In the poster's top corner opposite the count.
+.select {
+  position: absolute;
+  inset: var(--space-1) auto auto var(--space-1);
+  z-index: 2;
+}
+
+.cardLink {
+  display: grid;
+  gap: var(--space-2);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+
+  &:hover .title {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .poster {
+      transition: transform 250ms var(--ease-out);
+    }
+
+    &:hover .poster {
+      transform: translateY(calc(-1 * var(--space-0)));
+    }
+  }
+}
+
+// One cell exactly the frame's size, so a poster of another shape is cropped
+// to it and the count stays in its corner.
+.poster,
+.thumb {
+  display: grid;
+  grid-template: 'poster' minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-canopy);
+  color: var(--color-lichen);
+  font-family: var(--font-display);
+
+  > * {
+    grid-area: poster;
+  }
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.poster {
+  box-shadow: var(--shadow-poster);
+  font-size: var(--font-size-xl);
+}
+
+.thumb {
+  width: var(--space-6);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+// How much of the season is watched, in the poster's top corner.
+.watched {
+  position: relative;
+  inset: var(--space-1) var(--space-1) auto auto;
+  align-self: start;
+  justify-self: end;
+}
+
+.text {
+  display: grid;
+}
+
+.title {
+  font-weight: 600;
+  line-height: var(--line-tight);
+}
+
+.facts {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+}
+
+// A narrow page scrolls the table sideways rather than squeezing its columns.
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+
+  th,
+  td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--color-line);
+    text-align: start;
+    white-space: nowrap;
+  }
+
+  thead th {
+    color: var(--color-lichen);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+  }
+}
+
+.row:hover {
+  background: var(--color-line-faint);
+}
+
+.nameCell {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-3);
+  font-weight: 400;
+}
+
+.rowLink {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-3);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+
+  &:hover .title {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+
+.table .number {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+@media (max-width: 48rem) {
+  .grid {
+    --season-width: 8rem;
+  }
+}

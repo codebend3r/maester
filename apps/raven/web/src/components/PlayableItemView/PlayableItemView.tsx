@@ -11,7 +11,8 @@ import {
   WATCHED_STATES,
   directedBy,
   episodeBackPath,
-  episodeByline,
+  seasonPath,
+  showPath,
   episodeFacts,
   formatDuration,
   formatRuntime,
@@ -23,8 +24,8 @@ import {
   watchLink,
   ITEM_IMAGE_KINDS,
 } from '@raven/core'
-import { type ComponentType, useId, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { type ComponentType, type ReactNode, useId, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink } from '@raven/ui'
 import type { BackFallback } from '@/components/BackButton/BackButton'
@@ -73,7 +74,7 @@ type PlayableConfig = {
   matchType: MatchItemType
   back: (facts: Facts & { libraries: readonly Library[] }) => BackFallback
   /** The small line over the title: an episode's show and number. */
-  eyebrow: (details: ItemDetails) => string[]
+  eyebrow: (details: ItemDetails) => ReactNode[]
   byline: (details: ItemDetails) => string | null
   facts: (facts: Facts) => string[]
   pictures: (typeof PAGE_PICTURES)[keyof typeof PAGE_PICTURES]
@@ -120,7 +121,7 @@ const PLAYABLE = {
       to: episodeBackPath({ item: details, libraryId: primary.libraryId }),
       label: details.show?.title ?? COMMON_COPY.library,
     }),
-    eyebrow: (details) => [episodeByline(details)].filter(Boolean),
+    eyebrow: (details) => episodeEyebrow(details),
     byline: () => null,
     facts: episodeFacts,
     pictures: PAGE_PICTURES.still,
@@ -135,6 +136,30 @@ const PLAYABLE = {
     castTitle: PLAYABLE_ITEM_VIEW_COPY.guestStars,
   },
 } as const satisfies Record<'movie' | 'episode', PlayableConfig>
+
+/**
+ * An episode's line over its title: its show and its season, each a link to
+ * that page, then its number. A part the episode does not know is left out.
+ */
+const episodeEyebrow = ({ show, season, episode }: ItemDetails): ReactNode[] =>
+  [
+    show && (
+      <Link key="show" to={showPath(show.id)} className={styles.eyebrowLink}>
+        {show.title}
+      </Link>
+    ),
+    show && season != null && (
+      <Link
+        key="season"
+        to={seasonPath({ showId: show.id, season })}
+        className={styles.eyebrowLink}
+      >
+        {PLAYABLE_ITEM_VIEW_COPY.season(season)}
+      </Link>
+    ),
+    !show && season != null && PLAYABLE_ITEM_VIEW_COPY.season(season),
+    episode != null && PLAYABLE_ITEM_VIEW_COPY.episode(episode),
+  ].filter((part) => !!part)
 
 /** How much of a video started is left, with its line; nothing for one not started. */
 const timeLeft = (media: MediaItem): HeaderProgress | undefined => {

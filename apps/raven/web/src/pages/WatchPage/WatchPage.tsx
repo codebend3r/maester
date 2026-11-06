@@ -5,6 +5,7 @@ import {
   type RoutePending,
   type RouteQuery,
   SESSION_KINDS,
+  SHOW_SESSION,
   type ViewingSession,
   episodePlace,
   mediaLabel,
@@ -51,9 +52,6 @@ import { useIsDesktop } from '@/stores/desktop'
 import { WATCH_PAGE_COPY } from '@/pages/WatchPage/copy'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
-
-/** Where a season played on its own looks for the next season's first episode. */
-const SHOW_SESSION = { kind: SESSION_KINDS.show } as const satisfies ViewingSession
 
 /** Where a video that cannot play goes back to. */
 const LIBRARIES_PATH = '/libraries'

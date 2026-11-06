@@ -2,13 +2,25 @@ import { isBoolean, isRecord } from '@raven/core'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 
-/** The key the side menu's state is stored under. */
-export const SIDE_MENU_KEY = 'raven-side-menu'
+/**
+ * The key the side menu's state is stored under. It names the pin, not the fold an older app
+ * kept, so every TV starts folded once and keeps only a pin chosen since.
+ */
+export const SIDE_MENU_KEY = 'raven-side-menu-pin'
+
+/** How long the remote may be between two of the menu's rows before it counts as gone. */
+const LEAVE_MS = 150
 
 type SideMenu = {
-  /** Whether a TV's side menu is down to its icons, as the web's collapses. */
-  isCollapsed: boolean
+  /** Whether the viewer keeps a TV's side menu open; folded to its icons otherwise. */
+  isPinned: boolean
+  /** Whether the remote is on one of the menu's rows, which opens a folded menu over the page. */
+  hasFocus: boolean
   toggle: () => void
+  /** The remote came onto a row. */
+  enter: () => void
+  /** The remote left a row; the menu folds unless it lands on another within `LEAVE_MS`. */
+  leave: () => void
 }
 
 /** Holds the place of the storage until `configureSideMenu`, as the player prefs do. */
@@ -18,29 +30,54 @@ const UNCONFIGURED: StateStorage = {
   removeItem: () => undefined,
 }
 
-/** Whether what was read back folds the menu, open when it says nothing a menu can use. */
-const isCollapsedIn = (saved: unknown): boolean =>
-  isRecord(saved) && isBoolean(saved.isCollapsed) ? saved.isCollapsed : false
+/** Whether what was read back pins the menu open, folded when it says nothing a menu can use. */
+const isPinnedIn = (saved: unknown): boolean =>
+  isRecord(saved) && isBoolean(saved.isPinned) ? saved.isPinned : false
+
+// Moving between two rows is a leave then an enter; the wait keeps the menu from folding between.
+let leaving: ReturnType<typeof setTimeout> | null = null
+
+const stopLeaving = (): void => {
+  if (leaving !== null) clearTimeout(leaving)
+  leaving = null
+}
 
 /**
- * Whether a TV's side menu is folded to its icons, kept on this device in AsyncStorage and
- * guarded when read, as the web keeps its own in local storage.
+ * A TV's side menu: folded to its icons unless the viewer pins it open, kept on this device in
+ * AsyncStorage and guarded when read, and open over the page while the remote is in it.
  */
 export const useSideMenu = create<SideMenu>()(
   persist(
     (set) => ({
-      isCollapsed: false,
-      toggle: () => set((menu) => ({ isCollapsed: !menu.isCollapsed })),
+      isPinned: false,
+      hasFocus: false,
+      toggle: () => set((menu) => ({ isPinned: !menu.isPinned })),
+      enter: () => {
+        stopLeaving()
+        set({ hasFocus: true })
+      },
+      leave: () => {
+        stopLeaving()
+        leaving = setTimeout(() => {
+          leaving = null
+          set({ hasFocus: false })
+        }, LEAVE_MS)
+      },
     }),
     {
       name: SIDE_MENU_KEY,
       storage: createJSONStorage(() => UNCONFIGURED),
       skipHydration: true,
-      partialize: ({ isCollapsed }) => ({ isCollapsed }),
-      merge: (saved, current) => ({ ...current, isCollapsed: isCollapsedIn(saved) }),
+      partialize: ({ isPinned }) => ({ isPinned }),
+      merge: (saved, current) => ({ ...current, isPinned: isPinnedIn(saved) }),
     },
   ),
 )
+
+type MenuOpenProps = Pick<SideMenu, 'isPinned' | 'hasFocus'>
+
+/** Whether the menu shows its labels: pinned open, or the remote in it. */
+export const isMenuOpen = ({ isPinned, hasFocus }: MenuOpenProps): boolean => isPinned || hasFocus
 
 type ConfigureSideMenuProps = { storage: StateStorage }
 

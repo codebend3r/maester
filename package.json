@@ -46,6 +46,7 @@
     "dev:sparrow": "nx run-many -t dev -p @sparrow/api @sparrow/web",
     "dev:raven": "nx run-many -t dev -p @raven/server @raven/ui @raven/web",
     "dev:raven:prod": "RAVEN_DEV_API_ORIGIN=https://raven-player.netlify.app nx run-many -t dev -p @raven/ui @raven/web",
+    "dev:raven:vhagar": "RAVEN_DEV_API_ORIGIN=https://192-168-50-6.vhagar2.direct.quickconnect.to nx run-many -t dev -p @raven/ui @raven/web",
     "dev:raven:db": "scripts/pull_raven_db.sh",
     "build:raven:splash": "nx run @raven/splash:build",
     "dev:raven:splash": "nx run @raven/splash:dev",

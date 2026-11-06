@@ -9,7 +9,7 @@ import {
   type TrackLabel,
   audioLabel,
   isShowableSubtitle,
-  subtitleLabel,
+  languageName,
 } from '@raven/core'
 
 import { PLAYER_TRACKS_COPY } from '@/player/copy'
@@ -26,6 +26,15 @@ const labelText = ({ name, details }: TrackLabel): string =>
 /** The file's audio tracks, keyed by their index. */
 export const audioOptionsOf = (tracks: MediaTracks): TrackOption[] =>
   tracks.audio.map((track) => ({ key: String(track.index), label: labelText(audioLabel(track)) }))
+
+/**
+ * How a subtitle track reads on a TV: its language, and SDH when it is for the deaf and hard of
+ * hearing. The title, forced flag, sidecar and how a picture track is shown stay out.
+ */
+const subtitleLabelOf = (track: SubtitleTrack): string => {
+  const name = languageName({ tag: track.language }) ?? PLAYER_TRACKS_COPY.unknownLanguage
+  return track.hearingImpaired ? `${name} · ${PLAYER_TRACKS_COPY.hearingImpaired}` : name
+}
 
 /** The subtitle tracks every player can show: text ones, which become WebVTT. */
 const showable = (tracks: MediaTracks): SubtitleTrack[] =>
@@ -52,13 +61,13 @@ type SubtitleOptionsOfProps = {
 
 /**
  * Subtitles off, then each track the player can show now, keyed by its id: the text tracks,
- * and the picture tracks too unless pictures are hidden, each saying how it is shown.
+ * and the picture tracks too unless pictures are hidden, each by its language and SDH alone.
  */
 export const subtitleOptionsOf = ({ tracks, pictures }: SubtitleOptionsOfProps): TrackOption[] => [
   { key: SUBTITLE_CHOICES.off, label: PLAYER_TRACKS_COPY.off },
   ...tracks.subtitles
     .filter((track) => isShowableSubtitle({ track, pictures }))
-    .map((track) => ({ key: track.id, label: labelText(subtitleLabel({ track, pictures })) })),
+    .map((track) => ({ key: track.id, label: subtitleLabelOf(track) })),
 ]
 
 type FilePlaceForProps = { tracks: MediaTracks; subtitle: string }

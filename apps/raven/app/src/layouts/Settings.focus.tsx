@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { FocusBand } from '@/layouts/FocusBand'
+import { HomePlate } from '@/layouts/HomePlate.focus'
 import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { chosenLabelOf } from '@/layouts/gridKit'
@@ -31,6 +32,7 @@ const SettingsPage = ({ title, children }: SettingsPageProps) => {
   const styles = useStyles()
   return (
     <ScrollView contentContainerStyle={styles.page} style={styles.ground}>
+      <HomePlate />
       <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
         {title}
       </Text>

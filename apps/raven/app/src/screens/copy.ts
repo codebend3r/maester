@@ -18,14 +18,16 @@ export const ITEM_COPY = {
   nextEpisode: 'Next episode',
   /** "Next S01E03": the episode after this one in its show. */
   nextCode: (code: string) => `Next ${code}`,
+  /** "View saga The Lord of the Rings Collection": the way from a movie to its saga. */
+  viewSaga: (name: string) => `View saga ${name}`,
+  playAll: 'Play all',
+  shuffle: 'Shuffle',
   /** "Go to Severance": the way up from an episode to its show or season. */
   goTo: (title: string) => `Go to ${title}`,
   markWatched: 'Mark watched',
   watched: 'Watched',
   favourite: 'Favourite',
 } as const
-
-type LibraryLineProps = { kind: string; count: string }
 
 export const LIBRARY_COPY = {
   library: 'Library',
@@ -47,8 +49,9 @@ export const LIBRARY_COPY = {
   view: 'View',
   groupBy: 'Group by',
   search: (library: string) => `Search ${library}`,
-  line: ({ kind, count }: LibraryLineProps) => `${kind}, ${count}`,
   videos: { one: 'video', many: 'videos' },
+  shows: { one: 'show', many: 'shows' },
+  inProgress: { one: 'video in progress', many: 'videos in progress' },
   shuffle: 'Shuffle',
   shuffleLibrary: (library: string) => `Shuffle ${library}`,
 } as const

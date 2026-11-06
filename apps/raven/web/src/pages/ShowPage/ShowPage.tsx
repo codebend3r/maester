@@ -4,11 +4,10 @@ import {
   type ItemDetails,
   ROUTE_STATES,
   type RouteQuery,
-  type SeasonSummary,
   TITLE_DISPLAYS,
   createdBy,
   episodeCode,
-  itemPath,
+  firstSeasonIn,
   picturesIn,
   seasonEntryKey,
   seasonsOf,
@@ -21,13 +20,14 @@ import {
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
 } from '@raven/core'
-import { type ReactNode, useId, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useId, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { Button, ButtonLink } from '@raven/ui'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { CastRow } from '@/components/CastRow/CastRow'
+import { PlayAllButton } from '@/components/PlayAllButton/PlayAllButton'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
@@ -36,92 +36,29 @@ import { ItemHeader, ItemHeaderSkeleton, itemBackdrop } from '@/components/ItemH
 import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { RouteState } from '@/components/RouteState/RouteState'
-import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
-import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
 import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
 import { ShuffleButton } from '@/components/ShuffleButton/ShuffleButton'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
-import { WatchedCount } from '@/components/WatchedCount/WatchedCount'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { HeroToggle } from '@/components/HeroToggle/HeroToggle'
 import { api } from '@/lib/api'
-import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { displaySettingsQuery, librariesQuery, nextEpisodeQuery } from '@/lib/queries'
 import { useRouteItem } from '@/lib/routeQuery'
 import { useItemFavourite } from '@/lib/useItemFavourite'
-import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { SHOW_COPY } from '@/pages/ShowPage/copy'
 import styles from '@/pages/ShowPage/ShowPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { BingeButton } from '@/components/BingeButton/BingeButton'
-
-const SEASON_POSTER_KEYS = { picture: 'picture', number: 'number' } as const
-
-type SeasonPictureProps = { poster: NonNullable<ReturnType<typeof posterSources>> }
-
-const SeasonPicture = ({ poster }: SeasonPictureProps) => (
-  <img {...poster} alt="" loading="lazy" decoding="async" />
-)
-
-type SeasonNumberProps = { number: ReactNode }
-
-const SeasonNumber = ({ number }: SeasonNumberProps) => <span aria-hidden="true">{number}</span>
-
-type SeasonPosterProps = {
-  [SEASON_POSTER_KEYS.picture]: SeasonPictureProps
-  [SEASON_POSTER_KEYS.number]: SeasonNumberProps
-}
-
-const SEASON_POSTERS = {
-  [SEASON_POSTER_KEYS.picture]: SeasonPicture,
-  [SEASON_POSTER_KEYS.number]: SeasonNumber,
-} as const satisfies ViewsOf<SeasonPosterProps>
-
-type SeasonPosterOfProps = { season: SeasonSummary }
-
-/** A season's poster where it has one, else its number in the poster's place. */
-const seasonPosterOf = ({ season }: SeasonPosterOfProps): ViewOf<SeasonPosterProps> => {
-  const poster = posterSources({ item: season, sizes: POSTER_SIZES.season })
-  if (poster) return { key: SEASON_POSTER_KEYS.picture, props: { poster } }
-  return { key: SEASON_POSTER_KEYS.number, props: { number: season.season ?? '' } }
-}
-
-type SeasonCardProps = { season: SeasonSummary; show: ItemDetails }
-
-/** One season in the row: its poster, name and how many episodes are on disk. */
-const SeasonCard = ({ season, show }: SeasonCardProps) => {
-  const to = itemPath(season) ?? `/shows/${show.id}`
-  const count = season.episodeCount
-  const select = useSelectable({ key: seasonEntryKey(season), title: season.title })
-  return (
-    <li className={styles.season} data-entry={seasonEntryKey(season)} {...select.rootProps}>
-      <SelectCheckbox select={select} className={styles.select} />
-      <Link to={to} className={styles.seasonLink} tabIndex={select.linkTabIndex}>
-        <span className={styles.seasonPoster}>
-          <KeyedView<SeasonPosterProps> views={SEASON_POSTERS} view={seasonPosterOf({ season })} />
-          <WatchedCount
-            watched={season.watchedCount}
-            total={season.episodeCount}
-            className={styles.seasonWatched}
-          />
-        </span>
-        <span className={styles.seasonText}>
-          <span className={styles.seasonTitle}>{season.title}</span>
-          <span className={styles.seasonCount}>{COMMON_COPY.episodes(count)}</span>
-        </span>
-      </Link>
-    </li>
-  )
-}
+import { ShowSeasons } from '@/components/ShowSeasons/ShowSeasons'
 
 type ShowViewProps = { details: ItemDetails }
 
 const ShowView = ({ details }: ShowViewProps) => {
-  const ids = { title: useId(), seasons: useId() }
+  const ids = { title: useId() }
   const navigate = useNavigate()
   const [fixing, setFixing] = useState(false)
   const [editingImages, setEditingImages] = useState(false)
@@ -142,6 +79,7 @@ const ShowView = ({ details }: ShowViewProps) => {
   const code = next.data?.item ? episodeCode(next.data.item) : null
   const seasons = seasonsOf(details)
   const marks = seasonsWatched(seasons)
+  const firstSeason = firstSeasonIn(seasons)
   const toggle = useWatchedToggle({
     state: watchedStateOf(marks),
     targets: [{ kind: WATCH_TARGET_KINDS.item, id: details.id, libraryId: null }],
@@ -214,12 +152,15 @@ const ShowView = ({ details }: ShowViewProps) => {
               {SHOW_COPY.play(code)}
             </ButtonLink>
           )}
+          {firstSeason && marks.total > 0 && <PlayAllButton seasonId={firstSeason.id} />}
           <BingeButton item={details} />
           {details.favourite != null && (
             <FavouriteButton isFavourite={details.favourite} onToggle={favourite.mutate} />
           )}
           {marks.total > 0 && (
-            <ShuffleButton itemId={details.id}>{COMMON_COPY.shuffle}</ShuffleButton>
+            <ShuffleButton itemId={details.id} isWholeShow>
+              {COMMON_COPY.shuffle}
+            </ShuffleButton>
           )}
           <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.item, itemId: details.id }} />
           <WatchedToggle {...toggle} />
@@ -249,16 +190,7 @@ const ShowView = ({ details }: ShowViewProps) => {
 
         <Summary tagline={details.tagline} summary={details.summary} />
 
-        {seasons.length > 0 && (
-          <section className={styles.seasons} aria-labelledby={ids.seasons}>
-            <SectionHeading id={ids.seasons}>{SHOW_COPY.seasons}</SectionHeading>
-            <ul className={styles.seasonRow}>
-              {seasons.map((season) => (
-                <SeasonCard key={season.id} season={season} show={details} />
-              ))}
-            </ul>
-          </section>
-        )}
+        {seasons.length > 0 && <ShowSeasons seasons={seasons} show={details} />}
 
         <CastRow credits={details.credits} />
         <ReviewCards reviews={details.reviews} />
@@ -318,7 +250,7 @@ const showPageView = ({ page }: ShowPageViewProps): ViewOf<ShowViewsProps> => {
 /**
  * `/shows/:id`: a show's backdrop, poster, creator, years, network, scores,
  * Play for the next episode and Shuffle for a random one, then its summary,
- * its seasons as posters in a row, its people and its reviews.
+ * its seasons as a grid of posters or a table, its people and its reviews.
  */
 export const ShowPage = () => {
   const page = useRouteItem(ITEM_TYPES.show)

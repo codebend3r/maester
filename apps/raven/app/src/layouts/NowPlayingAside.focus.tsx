@@ -1,6 +1,6 @@
 import { LYRICS_KINDS } from '@raven/core'
 import type { ComponentType } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { MUSIC_COPY } from '@/layouts/copy'
@@ -17,20 +17,26 @@ import { focusPicker } from '@/layouts/Picker.focus'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { useLineInView } from '@/layouts/useLineInView'
 import { BUTTON_TONES } from '@/layouts/formKit'
-import { TV_SIZES, tvSize } from '@/theme/tvSizes'
+import { LINE_RATIO } from '@/layouts/textHeights'
+import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
 const { Picker } = focusPicker
 
-/** How tall the synced lyrics' box stands, so the line sung keeps to the middle of it. */
-const LYRICS_HEIGHT = tvSize(360)
+/**
+ * How much of the screen's height the synced lyrics' box takes, so the line sung keeps to the
+ * middle of it beside the cover and the controls.
+ */
+const LYRICS_SHARE = 0.72
+
+/** The lyrics' type: larger than the page's, in the display face. */
+const LYRIC_SIZE = TV_SIZES.textXl * 1.25
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
-    lyricBox: { height: LYRICS_HEIGHT },
-    lyricLines: { gap: TV_SIZES.space2, paddingVertical: TV_SIZES.space2 },
-    lyric: { color: colours.muted, fontSize: TV_SIZES.textLg },
-    lyricOn: { color: colours.text, fontWeight: 'bold' },
+    lyricLines: { gap: TV_SIZES.space3, paddingVertical: TV_SIZES.space4 },
+    lyric: { color: colours.muted, fontSize: LYRIC_SIZE, lineHeight: LYRIC_SIZE * LINE_RATIO },
+    lyricOn: { color: colours.text },
   }),
 )
 
@@ -107,6 +113,7 @@ type SyncedLinesProps = { lyrics: SyncedLyrics }
  */
 const SyncedLines = ({ lyrics }: SyncedLinesProps) => {
   const styles = useStyles()
+  const screen = useWindowDimensions()
   const { scroll, onBoxLayout, lineLayoutOf } = useLineInView({ current: lyrics.current })
   return (
     <ScrollView
@@ -115,11 +122,12 @@ const SyncedLines = ({ lyrics }: SyncedLinesProps) => {
       contentContainerStyle={styles.lyricLines}
       onLayout={onBoxLayout}
       scrollEnabled={false}
-      style={styles.lyricBox}
+      style={{ height: screen.height * LYRICS_SHARE }}
     >
       {lyrics.lines.map((line, place) => (
         <Text
           key={line.key}
+          variant={TEXT_VARIANTS.display}
           accessibilityState={{ selected: line.isCurrent }}
           onLayout={lineLayoutOf(place)}
           style={[styles.lyric, line.isCurrent && styles.lyricOn]}
@@ -141,8 +149,14 @@ const SyncedBody = ({ lyrics }: SyncedBodyProps) =>
 type PlainBodyProps = LyricsBodyProps
 
 const PlainBody = ({ lyrics }: PlainBodyProps) => {
-  const styles = useMusicStyles()
-  return lyrics.kind === LYRICS_KINDS.plain && <Text style={styles.line}>{lyrics.text}</Text>
+  const styles = useStyles()
+  return (
+    lyrics.kind === LYRICS_KINDS.plain && (
+      <Text variant={TEXT_VARIANTS.display} style={[styles.lyric, styles.lyricOn]}>
+        {lyrics.text}
+      </Text>
+    )
+  )
 }
 
 const NoLyrics = () => {

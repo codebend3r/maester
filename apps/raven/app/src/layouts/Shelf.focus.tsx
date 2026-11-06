@@ -21,7 +21,7 @@ import {
 } from '@/layouts/shelfKit'
 import { Logo } from '@/layouts/Logo'
 import { SCROLL_AXES, useScrollWindow } from '@/layouts/useScrollWindow'
-import { SideMenu } from '@/layouts/SideMenu.focus'
+import { SideMenu, useSideMenuRoom } from '@/layouts/SideMenu.focus'
 import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -55,8 +55,9 @@ const Shelves = ({
     axis: SCROLL_AXES.vertical,
   })
   const styles = useStyles()
+  const menuRoom = useSideMenuRoom()
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingLeft: menuRoom }]}>
       <SideMenu
         libraries={libraries}
         onOpenLibrary={onOpenLibrary}

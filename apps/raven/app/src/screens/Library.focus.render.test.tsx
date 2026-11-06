@@ -15,7 +15,7 @@ import type { AppServer } from '@raven/native/headless'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
-import { APP_ROUTE_PARAMS } from '@/routes'
+import { APP_ROUTE_PARAMS, APP_ROUTES } from '@/routes'
 import { Library } from '@/screens/Library'
 import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
@@ -66,9 +66,10 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   Object.defineProperty(platform.default, 'isTV', { get: () => true })
   return platform
 })
+const mockDismissTo = jest.fn()
 jest.mock('expo-router', () => ({
   ...jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').navigationFocusMocks,
-  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: jest.fn(), back: jest.fn(), dismissTo: mockDismissTo }),
   useLocalSearchParams: () => mockParams(),
 }))
 jest.mock(
@@ -154,28 +155,33 @@ describe('Library on a TV', () => {
     expect(preferred(FILM_TITLES)).toEqual(['Ashfall Gate'])
   })
 
-  it('has a search box the remote reaches, which never takes the opening focus', async () => {
+  it('puts the way Home first, at the top left, without taking the opening focus', async () => {
+    mockDismissTo.mockClear()
     await renderLibrary({ id: FILMS.id })
     await screen.findByRole('button', { name: 'Night Train' })
-    const field = screen.getByLabelText('Search Films')
-    expect(field.props.hasTVPreferredFocus).not.toBe(true)
+    const [first] = screen.getAllByRole('button')
+    if (first === undefined) throw new Error('No button')
+    expect(first.props.accessibilityLabel).toBe('Home')
+    expect(first.props.hasTVPreferredFocus).not.toBe(true)
+
+    await fireEvent(first, NATIVE_EVENTS.focus)
     expect(preferred(FILM_TITLES)).toEqual(['Ashfall Gate'])
 
-    await fireEvent(screen.getByRole('button', { name: 'Ashfall Gate' }), NATIVE_EVENTS.focus)
-    await fireEvent.changeText(field, FILM_SEARCHES.busboys)
-    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
-      nativeEvent: { text: FILM_SEARCHES.busboys },
-    })
-    expect(mockServer.requests).toContain(
-      libraryPath({
-        call: APP_CLIENT_CALLS.listMedia,
-        library: FILMS,
-        sort: MEDIA_SORTS.title,
-        search: FILM_SEARCHES.busboys,
-      }),
-    )
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Night Train' })).toBeNull())
-    expect(preferred(FILM_TITLES)).toEqual([])
+    await fireEvent.press(first)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
+  })
+
+  it('has no search box of its own, a TV searching from Home, and opens on its first card', async () => {
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+    expect(screen.queryByLabelText('Search Films')).toBeNull()
+    expect(preferred(FILM_TITLES)).toEqual(['Ashfall Gate'])
+  })
+
+  it('draws a poster alone, its title said aloud rather than written under it', async () => {
+    await renderLibrary({ id: FILMS.id })
+    expect(await screen.findByRole('button', { name: /Ashfall Gate/u })).toBeTruthy()
+    expect(screen.queryByText('Ashfall Gate')).toBeNull()
   })
 
   it('grows the focused card and rings it, as Home does', async () => {
@@ -296,14 +302,6 @@ describe('Library on a TV', () => {
     if (header === null) throw new Error('No header')
     await fireEvent(header, NATIVE_EVENTS.focus)
     expect(preferred(FILM_TITLES)).toEqual([])
-
-    const field = screen.getByLabelText('Search Films')
-    await fireEvent.changeText(field, FILM_SEARCHES.busboys)
-    await fireEvent(field, NATIVE_EVENTS.submitEditing, {
-      nativeEvent: { text: FILM_SEARCHES.busboys },
-    })
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Night Train' })).toBeNull())
-    expect(screen.getByRole('button', { name: 'Busboys' }).props.hasTVPreferredFocus).not.toBe(true)
   })
 
   it('picks a sort from a focusable list rather than a sheet, offering only what the type allows', async () => {
@@ -369,18 +367,18 @@ describe('Library on a TV', () => {
   it('opens on Continue watching while something is in progress, its card first, one press from the library', async () => {
     mockServer.inProgress = [NIGHT_TRAIN_IN_PROGRESS]
     await renderLibrary({ id: FILMS.id })
-    expect(await screen.findByText('Continue watching, 1 video')).toBeTruthy()
+    expect(await screen.findByText('1 video in progress')).toBeTruthy()
     expect(preferred(FILM_TITLES)).toEqual(['Night Train'])
     expect(screen.queryByRole('button', { name: 'Ashfall Gate' })).toBeNull()
 
     await fireEvent.press(screen.getByRole('button', { name: 'Show Library' }))
     await layOut()
     expect(await screen.findByRole('button', { name: 'Ashfall Gate' })).toBeTruthy()
-    expect(screen.getByText(/^Movies, \d+ videos$/u)).toBeTruthy()
+    expect(screen.getByText(/^\d+ videos$/u)).toBeTruthy()
 
     await fireEvent.press(screen.getByRole('button', { name: 'Show Continue watching' }))
     await layOut()
-    expect(await screen.findByText('Continue watching, 1 video')).toBeTruthy()
+    expect(await screen.findByText('1 video in progress')).toBeTruthy()
   })
 
   it('opens on the library when nothing is in progress, and still offers Continue watching', async () => {
@@ -414,6 +412,8 @@ describe('Library on a TV', () => {
   it('offers no sagas in a library of shows', async () => {
     await renderLibrary({ id: SERIES.id })
     await screen.findByRole('button', { name: 'Saltmarsh' })
+    // A library of shows counts its shows, not their videos, and does not say its type.
+    expect(screen.getByText(/^\d+ shows?$/u)).toBeTruthy()
 
     expect(screen.queryByRole('button', { name: 'Show Sagas' })).toBeNull()
   })

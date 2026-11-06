@@ -216,19 +216,22 @@ const PickerButton = ({ icon, label, picker }: PickerButtonProps) => {
 
 type TransportControlsProps = Pick<
   PlayerChromeProps,
-  'audio' | 'subtitles' | 'next' | 'onPictureInPicture'
+  'audio' | 'subtitles' | 'quality' | 'next' | 'previous' | 'onPictureInPicture'
 > & { transport: Transport }
 
 /**
  * The web's bar: the time over the line to drag along, then back to the start, back ten
  * seconds, play or pause, forward ten seconds and next, with the glass icons for subtitles,
- * audio and Picture in Picture at the right, wrapping under the transport on a narrow screen.
+ * audio, quality and Picture in Picture at the right, wrapping under the transport on a narrow
+ * screen.
  */
 const TransportControls = ({
   transport,
   audio,
   subtitles,
+  quality,
   next,
+  previous,
   onPictureInPicture,
 }: TransportControlsProps) => {
   const { isPaused, position, duration, onTogglePlay, onSeek } = transport
@@ -247,8 +250,8 @@ const TransportControls = ({
         <View style={styles.run}>
           <IconButton
             icon="skipPrevious"
-            label={PLAYER_COPY.restart}
-            onPress={() => onSeek(0)}
+            label={previous?.label ?? PLAYER_COPY.restart}
+            onPress={previous?.onPlay ?? (() => onSeek(0))}
             size={ICON_SIZES.transport}
           />
           <SkipButton
@@ -284,6 +287,9 @@ const TransportControls = ({
           {audio !== null && (
             <PickerButton icon="headphones" label={PLAYER_COPY.audio} picker={audio} />
           )}
+          {quality !== null && (
+            <PickerButton icon="settings" label={PLAYER_COPY.quality} picker={quality} />
+          )}
           {onPictureInPicture !== null && (
             <IconButton
               icon="resize"
@@ -302,8 +308,9 @@ const TransportControls = ({
 type PlayerLogoProps = Pick<PlayerChromeProps, 'heading' | 'title'>
 
 /**
- * What is playing, in the top left corner, fading in and out with the controls: the show's or the
- * film's title art, or its name where there is none, and an episode's season and number under it.
+ * What is playing, beside Back in the top left corner, fading in and out with the controls: the
+ * show's or the film's title art, or its name where there is none, and an episode's season and
+ * number under it.
  */
 const PlayerLogo = ({ heading, title }: PlayerLogoProps) => {
   const { width } = useWindowDimensions()
@@ -327,10 +334,10 @@ const PlayerLogo = ({ heading, title }: PlayerLogoProps) => {
 
 /**
  * Raven's controls over the video under the thumb, the web player's, in icons: Back at the top
- * right, and along the bottom the time and the line to drag along, then the transport and the
- * glass icons for subtitles, audio and Picture in Picture, all inside the safe area while the
- * video fills the screen. They fade once the video has played untouched for the viewer's linger,
- * and a tap brings them back; what is playing, in the top left corner, fades with them. The
+ * left with what is playing beside it, and along the bottom the time and the line to drag along, then the transport and the
+ * glass icons for subtitles, audio, quality and Picture in Picture, all inside the safe area
+ * while the video fills the screen. They fade once the video has played untouched for the
+ * viewer's linger, and a tap brings them back; what is playing fades with them. The
  * video plays in Picture in Picture when the app is left, and on AirPlay; the silent switch never
  * mutes it, and leaving the app without Picture in Picture pauses it.
  */
@@ -344,7 +351,9 @@ const PlayerChrome = ({
   transport,
   audio,
   subtitles,
+  quality,
   next,
+  previous,
   onPictureInPicture,
   onBack,
 }: PlayerChromeProps) => {
@@ -409,11 +418,8 @@ const PlayerChrome = ({
         style={[StyleSheet.absoluteFill, { opacity }]}
       >
         <View pointerEvents="none" style={styles.scrim} />
-        <View pointerEvents="none" style={[styles.logoSlot, sides]}>
-          <PlayerLogo heading={heading} title={title} />
-        </View>
         <View pointerEvents="box-none" style={[styles.frame, sides]}>
-          <View style={styles.top}>
+          <View pointerEvents="box-none" style={styles.top}>
             <IconButton
               icon="back"
               isGlass
@@ -421,12 +427,17 @@ const PlayerChrome = ({
               onPress={onBack}
               size={ICON_SIZES.pill}
             />
+            <View pointerEvents="none" style={styles.logoSlot}>
+              <PlayerLogo heading={heading} title={title} />
+            </View>
           </View>
           {transport !== null && (
             <TransportControls
               audio={audio}
               next={next}
+              previous={previous}
               onPictureInPicture={onPictureInPicture}
+              quality={quality}
               subtitles={subtitles}
               transport={transport}
             />
@@ -458,8 +469,9 @@ const useStyles = pictureStyles((colours) =>
       opacity: SCRIM_OPACITY,
     },
     frame: { flex: 1, justifyContent: 'space-between' },
-    top: { alignItems: 'flex-end' },
-    logoSlot: { ...StyleSheet.absoluteFill, alignItems: 'flex-start' },
+    top: { flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.space3 },
+    // Beside Back, its art centred on the button's height until the art stands taller.
+    logoSlot: { flexShrink: 1, minHeight: SIZES.controlLarge, justifyContent: 'center' },
     logo: { gap: SIZES.space1 },
     // The name where there is no art, over any picture, so a shadow keeps it readable unfaded.
     title: {

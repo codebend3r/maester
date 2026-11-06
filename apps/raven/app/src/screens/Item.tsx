@@ -3,9 +3,10 @@ import {
   type ItemDetails,
   type MediaItem,
   ROUTE_STATES,
+  type Saga,
   type RouteQuery,
-  SESSION_KINDS,
-  type ViewingSession,
+  SHOW_SESSION,
+  shuffleSessionOf,
   WATCHED_STATES,
   WATCH_TARGET_KINDS,
   type WatchedState,
@@ -32,7 +33,7 @@ import {
   type ViewOf,
   type ViewsOf,
 } from '@raven/ui/headless'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 
@@ -60,10 +61,10 @@ const ACTION_KEYS = {
   watched: 'watched',
   show: 'show',
   season: 'season',
+  saga: 'saga',
+  playAll: 'playAll',
+  shuffle: 'shuffle',
 } as const
-
-/** An episode rolls on through its show, so its next is the show's next in turn. */
-const SHOW_SESSION = { kind: SESSION_KINDS.show } as const satisfies ViewingSession
 
 /** A Watched toggle reads as ticked for all of it, half ticked for some, as the web's does. */
 const WATCHED_CHECKS = {
@@ -199,6 +200,32 @@ const linkOf = ({ key, title, text, itemId, context }: LinkOfProps): ItemAction 
   onPress: () => context.onOpen(itemTarget(itemId)),
 })
 
+type SagaLinkOfProps = { saga: Saga; libraryId: number; context: ItemContext }
+
+/** "View saga The Lord of the Rings Collection": the way from a movie to the saga it is part of. */
+const sagaLinkOf = ({ saga, libraryId, context }: SagaLinkOfProps): ItemAction => ({
+  kind: ITEM_ACTIONS.link,
+  key: ACTION_KEYS.saga,
+  icon: 'covers',
+  label: ITEM_COPY.viewSaga(saga.name),
+  text: saga.name,
+  onPress: () => context.onOpen({ kind: ROUTE_TARGETS.saga, libraryId, sagaId: saga.tmdbId }),
+})
+
+type MovieLinksOfProps = {
+  itemId: number
+  libraryId: number
+  /** The library's sagas, once read; the web's `SagaLink` finds the movie's the same way. */
+  sagas: readonly Saga[]
+  context: ItemContext
+}
+
+/** A movie's link to its saga, when it is in one. */
+const movieLinksOf = ({ itemId, libraryId, sagas, context }: MovieLinksOfProps): ItemAction[] => {
+  const saga = sagas.find((each) => each.media.some((media) => media.item?.id === itemId))
+  return saga === undefined ? [] : [sagaLinkOf({ saga, libraryId, context })]
+}
+
 type EpisodeLinksOfProps = {
   details: ItemDetails
   /** The episode's show, once read; its seasons name the one this episode is in. */
@@ -265,8 +292,8 @@ type PlayableItemProps = {
 /**
  * A movie or an episode once the library's files it shows are known: Play, or Resume where it
  * stopped, an episode's Next once the server names one, then Favourite where its library allows
- * one, then Watched, each mark shown before the server answers, and an episode's links up to its
- * show and season last.
+ * one, then Watched, each mark shown before the server answers, and last the links: an episode's
+ * up to its show and season, a movie's to its saga.
  */
 const PlayableItem = ({
   kind,
@@ -283,6 +310,8 @@ const PlayableItem = ({
   const tracks = useQuery(queries.tracksQuery(primary.id))
   // An episode sits under its show's backdrop, and its links up name the show's seasons.
   const show = useQuery(queries.itemQuery(isEpisode ? (details.show?.id ?? null) : null))
+  // A movie's link to its saga reads its library's sagas; an episode asks nothing.
+  const sagas = useQuery(queries.sagasQuery(isEpisode ? null : primary.libraryId))
   // Only an episode has a next; a film asks nothing.
   const next = useQuery({
     ...queries.nextInSessionQuery({ id: primary.id, session: SHOW_SESSION }),
@@ -326,7 +355,16 @@ const PlayableItem = ({
   return (
     <ItemLayout
       actions={actions}
-      links={isEpisode ? episodeLinksOf({ details, show: show.data ?? null, context }) : []}
+      links={
+        isEpisode
+          ? episodeLinksOf({ details, show: show.data ?? null, context })
+          : movieLinksOf({
+              itemId: details.id,
+              libraryId: primary.libraryId,
+              sagas: sagas.data ?? [],
+              context,
+            })
+      }
       isPlayPending={false}
       onBack={context.onBack}
       onOpen={context.onOpen}
@@ -364,6 +402,74 @@ const playNextActionsOf = ({
   return []
 }
 
+type WordedOptionOfProps = Pick<ItemAction, 'key' | 'icon' | 'label'> & {
+  /** What the press does; null while there is nothing to press, which draws no option. */
+  onPress: (() => void) | null
+}
+
+/** Another way to play that says its words beside its icon: Play all, Shuffle. */
+const wordedOptionOf = ({ key, icon, label, onPress }: WordedOptionOfProps): ItemAction[] =>
+  onPress === null ? [] : [{ kind: ITEM_ACTIONS.option, key, icon, label, text: label, onPress }]
+
+type PlayAllOfProps = { first: MediaItem | null; context: ItemContext }
+
+/**
+ * Play all: the first episode, from the very beginning, in the show's session, so it carries on
+ * across the seasons, specials last; none until the first episode is known.
+ */
+const playAllOf = ({ first, context }: PlayAllOfProps): ItemAction[] =>
+  wordedOptionOf({
+    key: ACTION_KEYS.playAll,
+    icon: 'play',
+    label: ITEM_COPY.playAll,
+    onPress:
+      first === null
+        ? null
+        : () =>
+            context.onOpen({
+              kind: ROUTE_TARGETS.play,
+              mediaId: first.id,
+              at: 0,
+              isFromStart: true,
+              session: SHOW_SESSION,
+            }),
+  })
+
+type ShuffleOfProps = { onShuffle: (() => void) | null }
+
+/** Shuffle: a random episode of the whole show, each next random too; none without a show. */
+const shuffleOf = ({ onShuffle }: ShuffleOfProps): ItemAction[] =>
+  wordedOptionOf({
+    key: ACTION_KEYS.shuffle,
+    icon: 'shuffle',
+    label: ITEM_COPY.shuffle,
+    onPress: onShuffle,
+  })
+
+type UseShowShuffleProps = { showId: number | null; session: AppQueries; context: ItemContext }
+
+/**
+ * What Shuffle does for show `showId`: the server deals its episodes, and the first not yet
+ * watched (else the first dealt) plays in the show's shuffle session, where the server draws
+ * every next one. Null without a show to shuffle.
+ */
+const useShowShuffle = ({ showId, session, context }: UseShowShuffleProps): (() => void) | null => {
+  const deal = useMutation({
+    mutationFn: (id: number) => session.api.shuffleEpisodes(id),
+    onSuccess: (dealt, id) => {
+      const first = dealt.find((media) => !media.watched) ?? dealt.at(0)
+      if (first === undefined) return
+      context.onOpen({
+        kind: ROUTE_TARGETS.play,
+        mediaId: first.id,
+        at: 0,
+        session: shuffleSessionOf(id),
+      })
+    },
+  })
+  return showId === null ? null : () => deal.mutate(showId)
+}
+
 type ShowItemProps = {
   details: ItemDetails
   session: AppQueries
@@ -371,8 +477,8 @@ type ShowItemProps = {
 }
 
 /**
- * A show: Play for the episode the server says comes next, once it says, Favourite and Watched
- * over every episode, then its seasons.
+ * A show: Play for the episode the server says comes next, once it says, Play all from its first
+ * episode, Shuffle, Favourite and Watched over every episode, then its seasons.
  */
 const ShowItem = ({ details, session, context }: ShowItemProps) => {
   const next = useQuery(session.queries.nextEpisodeQuery(details.id))
@@ -391,8 +497,11 @@ const ShowItem = ({ details, session, context }: ShowItemProps) => {
   const nextFile = next.data ?? null
   const nextItem = nextFile?.item ?? null
   const nextCode = nextItem === null ? null : episodeCode(nextItem)
+  const onShuffle = useShowShuffle({ showId: details.id, session, context })
   const actions = [
     ...playNextActionsOf({ next: nextFile, code: nextCode, first: firstFile, state, context }),
+    ...playAllOf({ first: firstFile, context }),
+    ...shuffleOf({ onShuffle }),
     ...marksOf({ details, favourite, watched: toggle }),
   ]
   return (
@@ -413,7 +522,10 @@ type SeasonItemProps = {
   context: ItemContext
 }
 
-/** A season: Play for its first episode not yet watched, Favourite and Watched, then its episodes. */
+/**
+ * A season: Play for its first episode not yet watched, Play all from its first episode on through
+ * the show, Shuffle over the whole show, Favourite and Watched, then its episodes.
+ */
 const SeasonItem = ({ details, session, context }: SeasonItemProps) => {
   // A season sits under its show's backdrop, and carries its show's content rating.
   const show = useQuery(session.queries.itemQuery(details.show?.id ?? null))
@@ -427,6 +539,8 @@ const SeasonItem = ({ details, session, context }: SeasonItemProps) => {
   const next = nextEpisodeIn(episodes)
   const nextFile = next?.primary ?? null
   const firstFile = firstEpisodeIn(episodes)?.primary ?? null
+  // A season's Shuffle is its show's: every next is drawn from any season.
+  const onShuffle = useShowShuffle({ showId: details.show?.id ?? null, session, context })
   const actions = [
     ...playNextActionsOf({
       next: nextFile,
@@ -435,6 +549,8 @@ const SeasonItem = ({ details, session, context }: SeasonItemProps) => {
       state: toggle.state,
       context,
     }),
+    ...playAllOf({ first: firstFile, context }),
+    ...shuffleOf({ onShuffle }),
     ...marksOf({ details, favourite, watched: toggle }),
   ]
   return (

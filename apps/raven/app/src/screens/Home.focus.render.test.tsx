@@ -131,6 +131,18 @@ describe('Home on a TV', () => {
     expect(cards).toEqual(['Busboys', 'Busboys', 'Night Train', 'Severance'])
   })
 
+  it('draws no way Home on Home, while it loads or once its shelves are drawn', async () => {
+    const { answer, release } = heldAnswer()
+    mockHome.answer = answer
+    await renderHome()
+    expect(await screen.findByLabelText('Gathering your libraries')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Home' })).toBeNull()
+
+    release()
+    await screen.findByRole('header', { name: 'Films' })
+    expect(screen.queryByRole('button', { name: 'Home' })).toBeNull()
+  })
+
   it('puts focus on the first card as it opens, and on no other', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })

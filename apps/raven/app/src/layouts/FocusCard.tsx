@@ -82,6 +82,8 @@ type FocusCardProps = {
   width: number
   isPreferred: boolean
   jump?: JumpFocus | null
+  /** Whether the title and its line show under the picture; a grid of posters leaves them out. */
+  hasCaption?: boolean
   onPress: () => void
 }
 
@@ -99,6 +101,7 @@ export const FocusCard = ({
   width,
   isPreferred,
   jump = null,
+  hasCaption = true,
   onPress,
 }: FocusCardProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
@@ -153,15 +156,17 @@ export const FocusCard = ({
           ring={isFocused ? TV_SIZES.tvFocusRing : 0}
           width={width}
         />
-        <View>
-          <CaptionTitle card={card} isFocused={isFocused} />
-          {line !== null && (
-            <Text numberOfLines={1} style={styles.line}>
-              {line}
-            </Text>
-          )}
-          {chips.length > 0 && <FocusFactChips parts={chips} />}
-        </View>
+        {hasCaption && (
+          <View>
+            <CaptionTitle card={card} isFocused={isFocused} />
+            {line !== null && (
+              <Text numberOfLines={1} style={styles.line}>
+                {line}
+              </Text>
+            )}
+            {chips.length > 0 && <FocusFactChips parts={chips} />}
+          </View>
+        )}
       </Animated.View>
     </Pressable>
   )

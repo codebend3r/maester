@@ -7,6 +7,7 @@ import {
   type RoutePending,
   type RouteQuery,
   SESSION_KINDS,
+  SHOW_SESSION,
   type ViewingSession,
   episodeCode,
   episodeEntryKey,
@@ -14,6 +15,7 @@ import {
   episodeStillUrl,
   episodesOf,
   episodesWatched,
+  firstEpisodeIn,
   nextEpisodeIn,
   routeState,
   seasonFacts,
@@ -28,6 +30,7 @@ import { type ReactNode, useId } from 'react'
 import { Link } from 'react-router-dom'
 import { ButtonLink, Icon } from '@raven/ui'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
+import { PLAY_ALL_COPY } from '@/components/PlayAllButton/copy'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import {
@@ -181,6 +184,7 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
   const { watched: watchedCount, total: count } = episodesWatched(episodes)
   const next = nextEpisodeIn(episodes)
   const nextFile = next?.primary ?? null
+  const firstFile = firstEpisodeIn(episodes)?.primary ?? null
   const nextCode = next ? episodeCode(next) : null
   const hasFiles = episodes.some((episode) => episode.primary != null)
   const toggle = useWatchedToggle({
@@ -228,13 +232,22 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
               {SEASON_COPY.play(nextCode)}
             </ButtonLink>
           )}
+          {firstFile && (
+            <ButtonLink icon="play" {...watchLink({ media: firstFile, session: SHOW_SESSION })}>
+              {PLAY_ALL_COPY.playAll}
+            </ButtonLink>
+          )}
           {season.favourite != null && (
             <FavouriteButton isFavourite={season.favourite} onToggle={favourite.mutate} />
           )}
           {hasFiles && (
             <ShuffleButton itemId={season.id}>{SEASON_COPY.shuffleSeason}</ShuffleButton>
           )}
-          {hasFiles && <ShuffleButton itemId={show.id}>{SEASON_COPY.shuffleShow}</ShuffleButton>}
+          {hasFiles && (
+            <ShuffleButton itemId={show.id} isWholeShow>
+              {SEASON_COPY.shuffleShow}
+            </ShuffleButton>
+          )}
           <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.item, itemId: season.id }} />
           <WatchedToggle {...toggle} />
           <SelectButton />

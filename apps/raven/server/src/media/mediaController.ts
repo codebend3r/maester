@@ -54,7 +54,9 @@ import { AuthSessions } from '@/auth/authSessions'
 import { ERROR_CODES, errorMessage } from '@/errorMessage'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES, RAVEN_HEADERS } from '@/http'
 import { sendImage } from '@/items/sendImage'
+import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy } from '@/lock/lockGuard'
+import { LockService } from '@/lock/lockService'
 import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
 import { FilePasses } from '@/media/filePasses'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
@@ -132,6 +134,8 @@ export class MediaController {
     @Inject(FilePasses) private readonly passes: Pick<FilePasses, 'hold'>,
     @Inject(TranscodeCache) private readonly transcodes: Pick<TranscodeCache, 'fileFor'>,
     @Inject(ScrobbleSender) private readonly scrobbles: Pick<ScrobbleSender, 'noteListen'>,
+    @Inject(LockService) private readonly lock: LockService,
+    @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
   ) {}
 
   private find({ id, account }: MediaControllerFindProps): MediaItem {
@@ -153,7 +157,8 @@ export class MediaController {
 
   /**
    * What plays after this video in the session the query names, from the
-   * same library, for the player's up next; null at the session's end.
+   * same library (a shuffle's from any this caller may see), for the
+   * player's up next; null at the session's end.
    */
   @Get(':id/next')
   next(
@@ -165,9 +170,11 @@ export class MediaController {
     const viewing = readSessionQuery({ session, scope })
     if (!viewing) throw new BadRequestException('session must name a viewing session')
     const account = this.accounts.keyOf({ request })
+    const viewer = this.lock.viewer({ request })
     return this.media.nextInSession({
       media: this.find({ id, account }),
       session: viewing,
+      libraryIds: this.libraries.ids().filter((libraryId) => viewer.seesLibrary(libraryId)),
       account,
     })
   }

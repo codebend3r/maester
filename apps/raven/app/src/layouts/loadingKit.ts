@@ -5,6 +5,8 @@ export type LoadingProps = {
   label: string
   /** The way back while it loads, under the thumb; a TV's remote has its own. */
   onBack?: () => void
+  /** Home's own loading, which draws no way Home. */
+  isHome?: boolean
 }
 
 /** The screen a page shows while it loads, each platform at its own scale. */

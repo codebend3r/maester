@@ -76,6 +76,11 @@ export type SourceRequest = {
   audio: number | null
   /** A transcode's picture subtitle to burn into the picture, by track id; null for none. */
   burn: string | null
+  /**
+   * The size the viewer picked for a transcode, asked in place of the away cap's; null or left
+   * out for none, when a transcode away from home still asks the cap's.
+   */
+  quality?: StreamQuality | null
 }
 
 /**
@@ -265,7 +270,8 @@ type MediaAccessForProps = {
  * server that lists no origin, has none answering, or hands out no ticket (the 503 of one
  * without `RAVEN_MEDIA_SECRET`) plays from its own address with its cookies as headers, which
  * `cookieHeadersFor` gives only to its own API. A transcode from the `public` origin, away
- * from home, asks for the size `awayMaxHeight` reads at the moment, Settings' cap; the server
+ * from home, asks for the size `awayMaxHeight` reads at the moment, Settings' cap, unless the
+ * viewer picked a size (`SourceRequest['quality']`), which it asks wherever it plays; the server
  * holds every transcode away from home to its remote limit itself. `networkFor` tells the plan
  * where the play is. A signed-in
  * account (`readAccessToken`) that has no origin to play from plays from the server's own
@@ -379,7 +385,10 @@ export const mediaAccessFor = ({
     access: MediaAccess | null
   }
 
-  const uriFor = ({ request: { media, mode, audio, burn }, access }: UriForProps): string => {
+  const uriFor = ({
+    request: { media, mode, audio, burn, quality = null },
+    access,
+  }: UriForProps): string => {
     switch (mode) {
       case PLAYBACK_MODES.direct:
         return api.fileUrl({ id: media.id, access })
@@ -390,7 +399,7 @@ export const mediaAccessFor = ({
           id: media.id,
           mode,
           audio,
-          quality: transcodeQualityOf(access),
+          quality: quality ?? transcodeQualityOf(access),
           access,
           burn,
         })

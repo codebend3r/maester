@@ -119,6 +119,14 @@ describe('SeasonPage', () => {
     expect(screen.getByText('E2')).toBeInTheDocument()
   })
 
+  it('plays all from the first episode, however much is watched', async () => {
+    openWith(withWatched([true, false]))
+    expect(await screen.findByRole('link', { name: 'Play all' })).toHaveAttribute(
+      'href',
+      '/watch/12',
+    )
+  })
+
   it('offers no Play once every episode is watched', async () => {
     openWith(withWatched([true, true]))
     expect(await screen.findAllByText('2 of 2 watched')).toHaveLength(2)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { PLAYED_KINDS, type PlayHistoryEntry, type Played } from '@/contract'
-import { REACH_KINDS, historyGroups, playedContext, reachOf } from '@/playHistory'
+import { REACH_KINDS, historyGroups, reachOf } from '@/playHistory'
 
 type EntryProps = { id: number; played: Played; accountId?: string }
 
@@ -23,6 +23,7 @@ const track = ({ number, albumId = 7 }: TrackProps): Played => ({
   kind: PLAYED_KINDS.track,
   title: `Song ${number}`,
   artist: 'Radiohead',
+  artists: [{ id: 3, name: 'Radiohead' }],
   album: albumId === 7 ? 'OK Computer' : 'Kid A',
   albumId,
   disc: 1,
@@ -30,7 +31,7 @@ const track = ({ number, albumId = 7 }: TrackProps): Played => ({
   albumTracks: 3,
 })
 
-const film: Played = { kind: PLAYED_KINDS.video, title: 'Heat', year: 1995 }
+const film: Played = { kind: PLAYED_KINDS.video, title: 'Heat', year: 1995, itemId: 5 }
 
 const shapeOf = (groups: ReturnType<typeof historyGroups>) =>
   groups.flatMap(({ run, entries }) => [
@@ -100,22 +101,5 @@ describe('reachOf', () => {
       duration: null,
       percent: null,
     })
-  })
-})
-
-describe('playedContext', () => {
-  it('names what a file belongs to', () => {
-    expect(
-      playedContext({
-        kind: PLAYED_KINDS.episode,
-        show: 'Severance',
-        season: 1,
-        episode: 2,
-        title: 'Half Loop',
-      }),
-    ).toBe('Severance · S01E02')
-    expect(playedContext(track({ number: 1 }))).toBe('Radiohead · OK Computer')
-    expect(playedContext(film)).toBe('1995')
-    expect(playedContext({ ...film, year: null })).toBeNull()
   })
 })

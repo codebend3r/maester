@@ -60,8 +60,8 @@ export const PINNED_HEADING = 'Pinned'
 
 /** The side menu's foot on a TV: the toggle that folds it to its icons, and back. */
 export const MENU_FOOT = {
-  collapse: 'Collapse menu',
-  expand: 'Expand menu',
+  pin: 'Keep menu open',
+  unpin: 'Fold menu away',
 } as const
 
 /** The way into Settings, and what it is called aloud. */

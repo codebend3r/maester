@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CALL_METHODS, APP_CLIENT_CALLS, WATCH_TARGET_KINDS } from '@raven/core'
+import {
+  APP_CALL_METHODS,
+  APP_CLIENT_CALLS,
+  SESSION_KINDS,
+  SESSION_PARAMS,
+  WATCH_TARGET_KINDS,
+} from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
@@ -8,7 +14,7 @@ import { StyleSheet } from 'react-native'
 
 import { ITEM_TEST_IDS } from '@/layouts/itemKit'
 import { CHIP_COLOURS } from '@/theme/appTheme'
-import { APP_ROUTES, APP_ROUTE_PARAMS } from '@/routes'
+import { APP_ROUTES, APP_ROUTE_PARAMS, PLAY_FROM } from '@/routes'
 import { Item } from '@/screens/Item'
 import { useActiveServer } from '@/stores/activeServer'
 import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
@@ -16,6 +22,7 @@ import { NAS, SERIES } from '@/test/homeServer'
 import {
   BUSBOYS,
   BUSBOYS_FILE,
+  BUSBOYS_SAGA,
   GOOD_NEWS_ABOUT_HELL,
   SEVERANCE,
   SEVERANCE_ONE,
@@ -233,6 +240,48 @@ describe('Item on a phone or tablet', () => {
       params: {
         [APP_ROUTE_PARAMS.id]: String(GOOD_NEWS_ABOUT_HELL.id),
         [APP_ROUTE_PARAMS.library]: String(SERIES.id),
+      },
+    })
+  })
+
+  it("links a movie to its saga, as the web's saga card does", async () => {
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(BUSBOYS.id) })
+
+    await fireEvent.press(await screen.findByRole('link', { name: 'View saga Busboys Collection' }))
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: APP_ROUTES.saga,
+      params: {
+        [APP_ROUTE_PARAMS.id]: BUSBOYS_SAGA.tmdbId,
+        [APP_ROUTE_PARAMS.library]: String(BUSBOYS_FILE.libraryId),
+      },
+    })
+  })
+
+  it("plays a show all from its first episode, on through the show's session", async () => {
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE.id) })
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Play all' }))
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: APP_ROUTES.play,
+      params: {
+        [APP_ROUTE_PARAMS.mediaId]: '12',
+        [APP_ROUTE_PARAMS.from]: PLAY_FROM.start,
+        [SESSION_PARAMS.session]: SESSION_KINDS.show,
+      },
+    })
+  })
+
+  it("shuffles a season's whole show, each next drawn by the server", async () => {
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE_ONE.id) })
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Shuffle' }))
+    await untilIdle(shown.client)
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: APP_ROUTES.play,
+      params: {
+        [APP_ROUTE_PARAMS.mediaId]: '12',
+        [SESSION_PARAMS.session]: SESSION_KINDS.shuffle,
+        [SESSION_PARAMS.scope]: String(SEVERANCE.id),
       },
     })
   })

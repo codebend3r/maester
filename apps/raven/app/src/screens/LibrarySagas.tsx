@@ -55,10 +55,7 @@ export const SagasGrid = ({
     <Grid
       icon={libraryIconOf(library.settings)}
       jump={null}
-      line={LIBRARY_COPY.line({
-        kind: LIBRARY_COPY.sagas,
-        count: plural({ n: listed?.length ?? 0, ...LIBRARY_COPY.saga }),
-      })}
+      line={plural({ n: listed?.length ?? 0, ...LIBRARY_COPY.saga })}
       notice={sagasNoticeOf({
         library,
         count: listed?.length ?? null,

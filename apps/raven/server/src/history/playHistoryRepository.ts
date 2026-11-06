@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import {
+  ITEM_TYPES,
+  artistNames,
   type MediaItem,
   PLAYED_KINDS,
   PLAY_HISTORY_SHOWS,
@@ -11,6 +13,7 @@ import {
 import { DatabaseService } from '@/db/database'
 import { PLAY_HISTORY_KINDS } from '@/history/playHistorySql'
 import { MediaRepository } from '@/media/mediaRepository'
+import { TRACK_ARTISTS, creditsOf } from '@/music/musicRepository'
 import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
 import type { ListenerScope } from '@/music/listenerScope'
 
@@ -44,7 +47,8 @@ type HistoryRow = {
   album_id: number | null
   album_title: string | null
   album_tracks: number | null
-  artist: string | null
+  /** The track's artists as a JSON list of `{ id, name }`, in credit order. */
+  artists: string
 }
 
 const COLUMNS = `
@@ -53,10 +57,7 @@ const COLUMNS = `
          t.title AS track_title, t.disc, t.number AS track_number,
          a.id AS album_id, a.title AS album_title,
          (SELECT COUNT(*) FROM tracks at WHERE at.album_id = a.id) AS album_tracks,
-         (SELECT group_concat(name, ', ')
-            FROM (SELECT ar.name FROM track_artists ta
-                    JOIN artists ar ON ar.id = ta.artist_id
-                   WHERE ta.media_id = m.id ORDER BY ta.position)) AS artist
+         ${TRACK_ARTISTS} AS artists
     FROM play_history h
     JOIN media m ON m.id = h.media_id
     JOIN libraries l ON l.id = m.library_id
@@ -76,10 +77,19 @@ const playedVideo = ({ media, title }: PlayedVideoProps): Played => {
       season: item.season,
       episode: item.episode,
       title: item.title,
+      itemId: item.id,
+      showId: show.id,
     }
   }
-  if (item) return { kind: PLAYED_KINDS.video, title: item.title, year: item.year }
-  return { kind: PLAYED_KINDS.video, title, year: media?.year ?? null }
+  if (item) {
+    return {
+      kind: PLAYED_KINDS.video,
+      title: item.title,
+      year: item.year,
+      itemId: item.type === ITEM_TYPES.movie ? item.id : null,
+    }
+  }
+  return { kind: PLAYED_KINDS.video, title, year: media?.year ?? null, itemId: null }
 }
 
 type PlayedOfProps = { row: HistoryRow; media: MediaItem | undefined }
@@ -89,10 +99,12 @@ const playedOf = ({ row, media }: PlayedOfProps): Played => {
   if (row.kind === PLAY_HISTORY_KINDS.video || row.album_id === null || row.track_title === null) {
     return playedVideo({ media, title: row.file_title })
   }
+  const artists = creditsOf(row.artists)
   return {
     kind: PLAYED_KINDS.track,
     title: row.track_title,
-    artist: row.artist,
+    artist: artists.length > 0 ? artistNames({ artists }) : null,
+    artists,
     album: row.album_title ?? '',
     albumId: row.album_id,
     disc: row.disc ?? 1,

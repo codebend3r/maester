@@ -511,7 +511,7 @@ describe('Library on a phone or tablet', () => {
 
       expect(await screen.findByRole('button', { name: 'Night Trains' })).toBeTruthy()
       expect(screen.getByText('2 movies, 2021 to 2025')).toBeTruthy()
-      expect(screen.getByText('Sagas, 1 saga')).toBeTruthy()
+      expect(screen.getByText('1 saga')).toBeTruthy()
       await fireEvent.press(screen.getByRole('button', { name: 'Night Trains' }))
       expect(mockPush).toHaveBeenCalledWith({
         pathname: APP_ROUTES.saga,

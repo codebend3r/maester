@@ -347,6 +347,9 @@ type MediaRepositoryNextEpisodeProps = {
 type MediaRepositoryNextInSessionProps = {
   media: MediaItem
   session: ViewingSession
+  /** The libraries the viewer may see, where a shuffle draws its episodes from. */
+  libraryIds: readonly number[]
+  roll?: () => number
   account: AccountKey
 }
 
@@ -354,6 +357,14 @@ type MediaRepositoryNextInShowProps = {
   mediaId: number
   libraryId: number
   isSeasonOnly: boolean
+  account: AccountKey
+}
+
+type MediaRepositoryNextShuffledProps = {
+  mediaId: number
+  showId: number
+  libraryIds: readonly number[]
+  roll: () => number
   account: AccountKey
 }
 
@@ -671,10 +682,17 @@ export class MediaRepository {
 
   /**
    * What plays after `media` in `session`, from the same library: the next
-   * episode of its season or its show, or the next film of its saga; null
-   * at the session's end, and for a session whose next is not the server's.
+   * episode of its season or its show, or the next film of its saga; a
+   * shuffle draws from every library in `libraryIds` with `roll`. Null at
+   * the session's end, and for a session whose next is not the server's.
    */
-  nextInSession({ media, session, account }: MediaRepositoryNextInSessionProps): MediaItem | null {
+  nextInSession({
+    media,
+    session,
+    libraryIds,
+    roll = Math.random,
+    account,
+  }: MediaRepositoryNextInSessionProps): MediaItem | null {
     switch (session.kind) {
       case SESSION_KINDS.season:
       case SESSION_KINDS.show:
@@ -686,6 +704,14 @@ export class MediaRepository {
         })
       case SESSION_KINDS.saga:
         return this.nextInSaga({ media, sagaId: session.sagaId, account })
+      case SESSION_KINDS.shuffle:
+        return this.nextShuffled({
+          mediaId: media.id,
+          showId: Number(session.showId),
+          libraryIds,
+          roll,
+          account,
+        })
       case SESSION_KINDS.single:
       case SESSION_KINDS.queue:
         return null
@@ -737,6 +763,49 @@ export class MediaRepository {
       )
       .get({ mediaId, libraryId, isSeasonOnly: isSeasonOnly ? 1 : 0 })
     return row ? this.get({ id: row.media_id, account }) : null
+  }
+
+  /**
+   * A random episode of show `showId`, any season, specials too, for a
+   * shuffle that never ends: never an episode the file `mediaId` holds, and
+   * one `account` has not watched while any such remain, else any of the
+   * rest. Each episode is as likely as the next, however many files it has,
+   * and the best of its files in `libraryIds` is the one, as
+   * `shuffledEpisodes` chooses. Null when the show has no other episode.
+   */
+  private nextShuffled({
+    mediaId,
+    showId,
+    libraryIds,
+    roll,
+    account,
+  }: MediaRepositoryNextShuffledProps): MediaItem | null {
+    const rows = this.db
+      .prepare<[ByAccount, number, string, number], { media_id: number; watched: number }>(
+        `WITH files AS (
+           SELECT m.id AS media_id, e.id AS episode_id,
+                  COALESCE(m.width * m.height, 0) AS pixels,
+                  ${fileWatched('m')} AS watched
+             FROM media m
+             JOIN libraries l ON l.id = m.library_id
+             JOIN media_items mi ON mi.media_id = m.id
+             JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+             JOIN shown_items s ON s.id = e.parent_id
+            WHERE s.parent_id = ?
+              AND m.library_id IN (SELECT value FROM json_each(?))
+              AND e.id NOT IN (SELECT item_id FROM media_items WHERE media_id = ?)),
+         ranked AS (
+           SELECT media_id,
+                  MAX(watched) OVER (PARTITION BY episode_id) AS watched,
+                  ROW_NUMBER() OVER (PARTITION BY episode_id ORDER BY pixels DESC, media_id) AS rank
+             FROM files)
+         SELECT media_id, watched FROM ranked WHERE rank = 1 ORDER BY media_id`,
+      )
+      .all({ account }, showId, JSON.stringify(libraryIds), mediaId)
+    const unwatched = rows.filter((row) => row.watched === 0)
+    const pool = unwatched.length > 0 ? unwatched : rows
+    const drawn = pool[Math.floor(roll() * pool.length)]
+    return drawn ? this.get({ id: drawn.media_id, account }) : null
   }
 
   /** The film after `media`'s in saga `sagaId` of its library, oldest first, as the saga's page lists them. */

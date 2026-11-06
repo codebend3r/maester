@@ -71,6 +71,16 @@ describe('Settings on a TV', () => {
     expect(preferred()).toEqual([])
   })
 
+  it('puts the way Home at the top left, which leaves the opening focus on Sign out', async () => {
+    await renderScreen({ ui: <Settings /> })
+    const [first] = screen.getAllByRole('button')
+    if (first === undefined) throw new Error('No button')
+    expect(first.props.accessibilityLabel).toBe('Home')
+
+    await fireEvent(first, NATIVE_EVENTS.focus)
+    expect(preferred()).toEqual(['Sign out'])
+  })
+
   it('lets go of the opening focus for whatever the remote reaches first', async () => {
     await renderScreen({ ui: <Settings /> })
     await fireEvent(screen.getByRole('switch', { name: 'Prefer direct play' }), NATIVE_EVENTS.focus)

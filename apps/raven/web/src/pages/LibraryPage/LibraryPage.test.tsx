@@ -9,6 +9,7 @@ import type {
   MediaItem,
   MediaSort,
 } from '@raven/core'
+import { useToasts } from '@raven/ui'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import {
@@ -380,7 +381,11 @@ describe('LibraryPage', () => {
     serve({ settings: { kind: 'movies' } })
     await userEvent.click(await screen.findByRole('button', { name: /^Scan intros and credits/ }))
     expect(spies.markers).toHaveBeenCalledWith(2)
-    expect(await screen.findByText('Intro and credits scan queued.')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(useToasts.getState().toasts.map((toast) => toast.message)).toEqual([
+        'Intro and credits scan queued.',
+      ]),
+    )
   })
 
   it('reports a refused intro and credits scan', async () => {

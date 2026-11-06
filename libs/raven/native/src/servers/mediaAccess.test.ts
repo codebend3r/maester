@@ -219,6 +219,33 @@ describe('mediaAccessFor', () => {
     expect(qualityOf(await media.source(transcode))).toBe(LOW_720)
   })
 
+  it("asks a transcode for the size the viewer picked, in place of the away cap's", async () => {
+    const { media } = setUp({ elapsedMs: AWAY })
+    const picked = await media.source({ ...transcode, quality: LOW_720 })
+    expect(sourceOf(picked).uri.startsWith(`${PUBLIC.url}/`)).toBe(true)
+    expect(qualityOf(picked)).toBe(LOW_720)
+    const unpicked = await media.source({ ...transcode, quality: null })
+    expect(qualityOf(unpicked)).toBe(LOW_1080)
+  })
+
+  it('asks the picked size at home too, and burns along with it', async () => {
+    const { media } = setUp()
+    const query = toQueryString({
+      [HLS_PARAMS.mode]: PLAYBACK_MODES.transcode,
+      [HLS_PARAMS.audio]: '0',
+      [HLS_PARAMS.quality]: LOW_720,
+      [HLS_PARAMS.burn]: 'embedded-1',
+      [MEDIA_TICKET_PARAM]: TICKETS[0],
+    })
+    const outcome = await media.source({ ...transcode, burn: 'embedded-1', quality: LOW_720 })
+    expect(sourceOf(outcome).uri).toBe(`${LAN.url}${masterPath}?${query}`)
+  })
+
+  it('asks no picked size of a remux, which the server sizes not', async () => {
+    const { media } = setUp()
+    expect(qualityOf(await media.source({ ...remux, quality: LOW_720 }))).toBeNull()
+  })
+
   it('asks no cap at 4K, which the server ladder has no size for', async () => {
     const { media, away } = setUp({ elapsedMs: AWAY })
     away.maxHeight = MAX_HEIGHTS.uhd

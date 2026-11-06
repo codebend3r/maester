@@ -72,8 +72,15 @@ export type PlayerChromeProps = {
   transport: Transport | null
   audio: TrackPicker | null
   subtitles: TrackPicker | null
-  /** The next episode, once the server has named one; null for a film or the show's last. */
+  /** The original or a size to convert down to, the web's Quality list; null with only one to offer. */
+  quality: TrackPicker | null
+  /** The next episode, once the server has named one, or the next video in a shuffle; null for a film or the show's last. */
   next: PlayerNext | null
+  /**
+   * The video before this one in a shuffle, which the back-to-the-start button plays in place of
+   * starting this one again; null where there is none.
+   */
+  previous: PlayerNext | null
   /** How the video plays, for the corner that says so; null while no way has been picked. */
   mode: PlaybackMode | null
   /** Hands the video to Picture in Picture; null where the player cannot. */
@@ -106,6 +113,8 @@ export const PLAYER_COPY = {
   /** What the opening mark is called aloud; it is never shown. */
   opening: 'Opening the video',
   next: 'Next episode',
+  nextVideo: 'Next',
+  previousVideo: 'Previous',
   restart: 'Back to the start',
   mute: 'Mute',
   unmute: 'Unmute',
@@ -122,6 +131,7 @@ export const PLAYER_COPY = {
   of: ({ at, length }: PLAYER_COPYOfProps) => `${at} of ${length}`,
   audio: 'Audio',
   subtitles: 'Subtitles',
+  quality: 'Quality',
   pictureInPicture: 'Picture in Picture',
   showControls: 'Show the controls',
   hideControls: 'Hide the controls',

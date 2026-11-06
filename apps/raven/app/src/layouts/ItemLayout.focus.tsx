@@ -1,5 +1,6 @@
 import { type ComponentType, type ReactNode, useState } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
 import { Icon } from '@raven/native'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
@@ -17,6 +18,7 @@ import { ITEM_LAYOUT_COPY } from '@/layouts/copy'
 import { FocusBand } from '@/layouts/FocusBand'
 import { FocusFactChips } from '@/layouts/FactChips'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
+import { HomePlate } from '@/layouts/HomePlate.focus'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
@@ -37,13 +39,14 @@ import {
 } from '@/layouts/itemKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
+import { translucent } from '@/theme/translucent'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 
 /** How tall a show's title art stands over an episode's name: larger than the player's. */
 const LOGO_HEIGHT = tvSize(150)
 
-/** The synopsis plate shows a little of the backdrop through it. */
-const SYNOPSIS_OPACITY = 0.92
+/** How much of the synopsis plate's colour covers the backdrop; the words over it stay whole. */
+const SYNOPSIS_ALPHA = 0.72
 
 /** The heading's picture in points on a 1920 by 1080 point screen: a poster, or a still. */
 const HERO_WIDTHS = {
@@ -63,6 +66,44 @@ const PERSON_WIDTH = tvSize(176)
 /** The backdrop fills the screen's width at 16:9, dimmed so the words over it read. */
 const BACKDROP_RATIO = 9 / 16
 const BACKDROP_OPACITY = 0.3
+
+/** Where down the backdrop it starts to fade into the page's ground, which it reaches at its foot. */
+const BACKDROP_FADE_FROM = 0.45
+
+const BACKDROP_GRADIENT_ID = 'tv-item-backdrop-fade'
+
+type BackdropProps = { backdrop: NonNullable<ItemPage['hero']['backdrop']> }
+
+/**
+ * The item's backdrop across the top of the page, dimmed, fading into the theme's ground toward
+ * its foot as the web's and the touch page's do, so the page below it is the theme's own colour.
+ */
+const Backdrop = ({ backdrop }: BackdropProps) => {
+  const styles = useStyles()
+  const ground = useTheme((theme) => theme.palette.ground)
+  const { width } = useWindowDimensions()
+  const height = width * BACKDROP_RATIO
+  return (
+    <View pointerEvents="none" style={[styles.backdropBox, { height }]}>
+      <Image
+        accessibilityElementsHidden
+        resizeMode="cover"
+        source={backdrop}
+        style={[StyleSheet.absoluteFill, styles.backdrop]}
+      />
+      <Svg height={height} style={StyleSheet.absoluteFill} width={width}>
+        <Defs>
+          <LinearGradient id={BACKDROP_GRADIENT_ID} x1="0" x2="0" y1="0" y2="1">
+            <Stop offset={0} stopColor={ground} stopOpacity={0} />
+            <Stop offset={BACKDROP_FADE_FROM} stopColor={ground} stopOpacity={0} />
+            <Stop offset={1} stopColor={ground} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
+        <Rect fill={`url(#${BACKDROP_GRADIENT_ID})`} height={height} width={width} x={0} y={0} />
+      </Svg>
+    </View>
+  )
+}
 
 type Opens = ItemLayoutProps['onOpen']
 
@@ -438,19 +479,18 @@ const Person = ({ person }: PersonProps) => {
  */
 const ItemLayout = ({ page, actions, links, isPlayPending, onOpen }: ItemLayoutProps) => {
   const styles = useStyles()
-  const screen = useWindowDimensions()
   // The page's hold on its screen's focus; each part below reads the opening focus itself.
   useScreenFocusScope()
   return (
     <View style={styles.ground}>
-      {page.hero.backdrop !== null && (
-        <Image
-          resizeMode="cover"
-          source={page.hero.backdrop}
-          style={[styles.backdrop, { height: screen.width * BACKDROP_RATIO }]}
-        />
-      )}
+      {page.hero.backdrop !== null && <Backdrop backdrop={page.hero.backdrop} />}
       <ScrollView contentContainerStyle={styles.page} style={styles.scroll}>
+        {/* Drawn with Play, so while Play waits there is nothing for tvOS to give the focus to. */}
+        {!isPlayPending && (
+          <View style={styles.padded}>
+            <HomePlate />
+          </View>
+        )}
         <FocusBand>
           <View style={styles.padded}>
             <Hero
@@ -485,12 +525,15 @@ const ItemLayout = ({ page, actions, links, isPlayPending, onOpen }: ItemLayoutP
   )
 }
 
-/** Menu goes back on a TV, so the notice is only its line. */
+/** Menu goes back on a TV, so the notice is its line, with only the way Home above it. */
 const ItemNotice = ({ notice }: ItemNoticeProps) => {
   const styles = useStyles()
   return (
-    <View style={[styles.ground, styles.notice]}>
-      <Text style={styles.summary}>{notice}</Text>
+    <View style={[styles.ground, styles.noticePage]}>
+      <HomePlate />
+      <View style={styles.notice}>
+        <Text style={styles.summary}>{notice}</Text>
+      </View>
     </View>
   )
 }
@@ -501,11 +544,13 @@ export const focusItem: ItemKit = { ItemLayout, ItemNotice }
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     ground: { flex: 1, backgroundColor: colours.ground },
-    backdrop: { position: 'absolute', top: 0, left: 0, right: 0, opacity: BACKDROP_OPACITY },
+    backdropBox: { position: 'absolute', top: 0, left: 0, right: 0 },
+    backdrop: { opacity: BACKDROP_OPACITY },
     scroll: { flex: 1 },
     page: { gap: TV_SIZES.space5, paddingTop: TV_SIZES.space6, paddingBottom: TV_SIZES.space6 },
     padded: { paddingHorizontal: TV_GUTTER },
-    notice: { justifyContent: 'center', paddingHorizontal: TV_GUTTER },
+    noticePage: { gap: TV_SIZES.space5, paddingTop: TV_SIZES.space6, paddingHorizontal: TV_GUTTER },
+    notice: { flex: 1, justifyContent: 'center' },
     hero: { flexDirection: 'row', alignItems: 'flex-start', gap: TV_SIZES.space6 },
     words: { flex: 1, maxWidth: WORDS_WIDTH, gap: TV_SIZES.space2 },
     eyebrow: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
@@ -557,8 +602,7 @@ const useStyles = themedStyles((colours) =>
       gap: TV_SIZES.space2,
       padding: TV_SIZES.space3,
       borderRadius: TV_SIZES.radius,
-      backgroundColor: colours.raised,
-      opacity: SYNOPSIS_OPACITY,
+      backgroundColor: translucent({ colour: colours.raised, alpha: SYNOPSIS_ALPHA }),
     },
     tagline: { color: colours.text, fontSize: TV_SIZES.textLg, fontStyle: 'italic' },
     summary: {

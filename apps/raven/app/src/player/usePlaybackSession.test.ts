@@ -206,6 +206,141 @@ describe('the playback ladder', () => {
     ).toBe(remuxOnly)
   })
 
+  it('moves to the transcode at a picked size, and back to where it played once the original is picked', () => {
+    const playing = loaded(sourced(opened()))
+    const sized = sessionReducer(playing, {
+      type: SESSION_EVENTS.qualityPicked,
+      quality: 'low720',
+      at: 640,
+    })
+    expect(sized).toMatchObject({ phase: SESSION_PHASES.sourcing, quality: 'low720', at: 640 })
+    expect(modeOf(sized)).toBe(transcode)
+    const resized = sessionReducer(loaded(sourced(sized)), {
+      type: SESSION_EVENTS.qualityPicked,
+      quality: 'sd480',
+      at: 660,
+    })
+    expect(resized).toMatchObject({ quality: 'sd480', at: 660 })
+    expect(modeOf(resized)).toBe(transcode)
+    const original = sessionReducer(loaded(sourced(resized)), {
+      type: SESSION_EVENTS.qualityPicked,
+      quality: null,
+      at: 700,
+    })
+    expect(original).toMatchObject({ phase: SESSION_PHASES.sourcing, quality: null, at: 700 })
+    expect(modeOf(original)).toBe(direct)
+  })
+
+  it('moves to the transcode once for a size and the burn it carries with it', () => {
+    const playing = loaded(sourced(opened()))
+    const both = sessionReducer(playing, {
+      type: SESSION_EVENTS.qualityPicked,
+      quality: 'low720',
+      burn: 'embedded-1',
+      at: 640,
+    })
+    expect(both).toMatchObject({
+      phase: SESSION_PHASES.sourcing,
+      quality: 'low720',
+      burn: 'embedded-1',
+      at: 640,
+    })
+    expect(modeOf(both)).toBe(transcode)
+  })
+
+  it('plays the file itself on Direct play, dropping any size and burn, from the spot', () => {
+    const sized = loaded(
+      sourced(
+        sessionReducer(loaded(sourced(opened())), {
+          type: SESSION_EVENTS.qualityPicked,
+          quality: 'low720',
+          at: 640,
+        }),
+      ),
+    )
+    const pickedDirect = sessionReducer(sized, { type: SESSION_EVENTS.directPicked, at: 700 })
+    expect(pickedDirect).toMatchObject({
+      phase: SESSION_PHASES.sourcing,
+      quality: null,
+      burn: null,
+      at: 700,
+    })
+    expect(modeOf(pickedDirect)).toBe(direct)
+  })
+
+  it('tries the file itself on Direct play even where the plan left it out, stepping down as ever', () => {
+    const remuxing = loaded(sourced(opened({ modes: [remux, transcode] })))
+    const tried = sessionReducer(remuxing, { type: SESSION_EVENTS.directPicked, at: 90 })
+    expect(tried).toMatchObject({
+      phase: SESSION_PHASES.sourcing,
+      modes: [direct, remux, transcode],
+      at: 90,
+    })
+    expect(modeOf(tried)).toBe(direct)
+  })
+
+  it('changes nothing on Direct play while the file already plays as it is', () => {
+    const playing = loaded(sourced(opened()))
+    expect(sessionReducer(playing, { type: SESSION_EVENTS.directPicked, at: 10 })).toBe(playing)
+  })
+
+  it('changes nothing when the size picked is the one playing', () => {
+    const playing = loaded(sourced(opened()))
+    expect(
+      sessionReducer(playing, { type: SESSION_EVENTS.qualityPicked, quality: null, at: 640 }),
+    ).toBe(playing)
+  })
+
+  it('offers no size where the plan holds no transcode', () => {
+    const remuxOnly = loaded(sourced(opened({ modes: [direct, remux] })))
+    expect(
+      sessionReducer(remuxOnly, { type: SESSION_EVENTS.qualityPicked, quality: 'low720', at: 9 }),
+    ).toBe(remuxOnly)
+  })
+
+  it('keeps the transcode while a burn or a size still holds it, and goes back once neither does', () => {
+    const playing = loaded(sourced(opened()))
+    const burning = loaded(
+      sourced(
+        sessionReducer(playing, { type: SESSION_EVENTS.burnPicked, burn: 'embedded-1', at: 10 }),
+      ),
+    )
+    const both = loaded(
+      sourced(
+        sessionReducer(burning, { type: SESSION_EVENTS.qualityPicked, quality: 'low720', at: 20 }),
+      ),
+    )
+    expect(both).toMatchObject({ burn: 'embedded-1', quality: 'low720' })
+    expect(modeOf(both)).toBe(transcode)
+    const sizeCleared = loaded(
+      sourced(sessionReducer(both, { type: SESSION_EVENTS.qualityPicked, quality: null, at: 30 })),
+    )
+    expect(sizeCleared).toMatchObject({ burn: 'embedded-1', quality: null })
+    expect(modeOf(sizeCleared)).toBe(transcode)
+    const sizedAgain = loaded(
+      sourced(
+        sessionReducer(sizeCleared, {
+          type: SESSION_EVENTS.qualityPicked,
+          quality: 'sd480',
+          at: 40,
+        }),
+      ),
+    )
+    const burnCleared = sessionReducer(sizedAgain, {
+      type: SESSION_EVENTS.burnPicked,
+      burn: null,
+      at: 50,
+    })
+    expect(burnCleared).toMatchObject({ burn: null, quality: 'sd480' })
+    expect(modeOf(burnCleared)).toBe(transcode)
+    const neither = sessionReducer(loaded(sourced(burnCleared)), {
+      type: SESSION_EVENTS.qualityPicked,
+      quality: null,
+      at: 60,
+    })
+    expect(modeOf(neither)).toBe(direct)
+  })
+
   it('says what stands in for the video until frames flow, and hands the source over meanwhile', () => {
     const asking = opened()
     expect([noticeOf(asking), isOpeningOf(asking), sourcedOf(asking)]).toEqual([null, true, null])

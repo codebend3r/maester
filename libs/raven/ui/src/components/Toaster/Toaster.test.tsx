@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from 'bun:test'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { Toaster } from '@/components/Toaster/Toaster'
-import { TOAST_MS, useToasts } from '@/stores/toasts'
+import { TOAST_FADE_MS, TOAST_MS, useToasts } from '@/stores/toasts'
 
 const show = (message: string) => act(() => useToasts.getState().show(message))
 
@@ -28,6 +28,30 @@ describe('Toaster', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
     expect(screen.queryByText('Error reported.')).toBeNull()
     expect(useToasts.getState().toasts).toEqual([])
+  })
+
+  it('fades a toast out over the end of its time, then takes it away', () => {
+    render(<Toaster />)
+    show('Error reported.')
+    const toast = () => screen.getByText('Error reported.').parentElement
+    act(() => jest.advanceTimersByTime(TOAST_MS - TOAST_FADE_MS - 1))
+    expect(toast()?.className ?? '').not.toContain('leaving')
+    act(() => jest.advanceTimersByTime(1))
+    expect(toast()?.className ?? '').toContain('leaving')
+    act(() => jest.advanceTimersByTime(TOAST_FADE_MS))
+    expect(screen.queryByText('Error reported.')).toBeNull()
+  })
+
+  it('stacks toasts and lets each go on its own clock', () => {
+    render(<Toaster />)
+    show('Error reported.')
+    act(() => jest.advanceTimersByTime(TOAST_MS / 2))
+    show('Saved.')
+    act(() => jest.advanceTimersByTime(TOAST_MS / 2))
+    expect(screen.queryByText('Error reported.')).toBeNull()
+    expect(screen.getByText('Saved.')).toBeInTheDocument()
+    act(() => jest.advanceTimersByTime(TOAST_MS / 2))
+    expect(screen.queryByText('Saved.')).toBeNull()
   })
 
   it('takes each toast away by itself after a few seconds', () => {

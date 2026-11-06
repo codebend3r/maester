@@ -40,6 +40,7 @@ const track = (number: number): Played => ({
   kind: PLAYED_KINDS.track,
   title: `Song ${number}`,
   artist: 'Radiohead',
+  artists: [{ id: 3, name: 'Radiohead' }],
   album: 'OK Computer',
   albumId: 7,
   disc: 1,
@@ -53,7 +54,11 @@ const episode: Played = {
   season: 1,
   episode: 2,
   title: 'Half Loop',
+  itemId: 11,
+  showId: 10,
 }
+
+const film: Played = { kind: PLAYED_KINDS.video, title: 'Heat', year: 1995, itemId: 5 }
 
 describe('PlayHistoryPage', () => {
   const spies = {
@@ -85,13 +90,59 @@ describe('PlayHistoryPage', () => {
     expect(within(table).queryAllByRole('img')).toEqual([])
     expect(within(table).getByText('OK Computer by Radiohead: the whole album')).toBeInTheDocument()
     expect(within(table).getByRole('rowheader', { name: 'Half Loop' })).toBeInTheDocument()
-    expect(within(table).getByText('Severance · S01E02')).toBeInTheDocument()
+    expect(within(table).getByRole('cell', { name: 'Severance · S01E02' })).toBeInTheDocument()
     expect(within(table).getByText('10:00 of 50:00 (20%)')).toBeInTheDocument()
     expect(within(table).getByText('0:01 of 3:20 (0%)')).toBeInTheDocument()
     expect(within(table).getByText('Finished')).toBeInTheDocument()
     expect(within(table).getByText('Listened')).toBeInTheDocument()
     expect(within(table).queryByRole('columnheader', { name: 'Account' })).toBeNull()
     expect(spies.everyone).not.toHaveBeenCalled()
+  })
+
+  it('links each title and what it belongs to, so a viewer can carry on from there', async () => {
+    spies.own.mockImplementation(async () => ({
+      entries: [
+        entry({ id: 3, played: track(1) }),
+        entry({ id: 2, played: episode }),
+        entry({ id: 1, played: film }),
+      ],
+      next: null,
+    }))
+    renderWithProviders({ ui: <PlayHistoryPage /> })
+    const table = await screen.findByRole('table')
+    const hrefOf = (name: string) =>
+      within(table)
+        .getAllByRole('link', { name })
+        .map((link) => link.getAttribute('href'))
+
+    expect(hrefOf('Heat')).toEqual(['/movies/5?library=1&file=1'])
+    expect(hrefOf('Half Loop')).toEqual(['/episodes/11?library=1&file=2'])
+    expect(hrefOf('S01E02')).toEqual(['/episodes/11?library=1&file=2'])
+    expect(hrefOf('Severance')).toEqual(['/shows/10'])
+    expect(hrefOf('Song 1')).toEqual(['/albums/7'])
+    expect(hrefOf('Radiohead')).toEqual(['/artists/3'])
+    expect(hrefOf('OK Computer')).toEqual(['/albums/7'])
+  })
+
+  it("opens an unmatched video's player, and leaves an older server's parts as text", async () => {
+    spies.own.mockImplementation(async () => ({
+      entries: [
+        entry({
+          id: 2,
+          played: { ...episode, itemId: undefined, showId: undefined },
+        }),
+        entry({ id: 1, played: { ...film, itemId: null } }),
+      ],
+      next: null,
+    }))
+    renderWithProviders({ ui: <PlayHistoryPage /> })
+    const table = await screen.findByRole('table')
+    expect(within(table).getByRole('link', { name: 'Heat' })).toHaveAttribute('href', '/watch/1')
+    expect(within(table).getByRole('link', { name: 'Half Loop' })).toHaveAttribute(
+      'href',
+      '/watch/2',
+    )
+    expect(within(table).queryByRole('link', { name: 'Severance' })).toBeNull()
   })
 
   it('shows one kind when asked, and more when there is more', async () => {

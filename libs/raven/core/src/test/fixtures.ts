@@ -119,6 +119,7 @@ export const seasonSummary = (overrides: Partial<SeasonSummary> = {}): SeasonSum
   type: 'season',
   episodeCount: 9,
   watchedCount: 0,
+  runtime: null,
   ...overrides,
 })
 

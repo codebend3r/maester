@@ -15,7 +15,7 @@ import {
   type ShelvesProps,
 } from '@/layouts/shelfKit'
 import { useAppPrefs } from '@/stores/appPrefs'
-import { useSideMenu } from '@/stores/sideMenu'
+import { isMenuOpen, useSideMenu } from '@/stores/sideMenu'
 import { THEME_PICKER } from '@/theme/themeOptions'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles, useTheme } from '@/theme/useTheme'
@@ -26,6 +26,22 @@ const SETTINGS_PLACE = 'settings'
 /** How wide a side menu icon stands: the size of the menu's own type, larger. */
 const MENU_ICON = TV_SIZES.textXl
 
+/** How wide the menu stands open. */
+const OPEN_WIDTH = TV_SIZES.space8 * 5
+
+/** How wide it stands folded: an icon inside its row's padding and ring, inside the menu's padding. */
+const FOLDED_WIDTH = MENU_ICON + 2 * (TV_SIZES.space3 + TV_SIZES.space2 + TV_SIZES.tvFocusRing)
+
+/** Lines a label may take while the remote is elsewhere; the one it is on shows whole. */
+const LABEL_LINES = 2
+
+/**
+ * How much room the menu keeps beside the page: its open width while pinned, else its folded
+ * width, since a folded menu opens over the page rather than pushing it along.
+ */
+export const useSideMenuRoom = (): number =>
+  useSideMenu((menu) => (menu.isPinned ? OPEN_WIDTH : FOLDED_WIDTH))
+
 type MenuRowProps = {
   label: string
   icon: IconName
@@ -35,11 +51,14 @@ type MenuRowProps = {
 
 /**
  * One row of the side menu: its icon and a link the remote moves down, its edge and fill showing
- * focus. Folded, the row is its icon alone, and its label is what it is called aloud.
+ * focus. Folded, the row is its icon alone, and its label is what it is called aloud; open, a long
+ * label takes a second line, and the row the remote is on shows its label whole.
  */
 const MenuRow = ({ label, icon, onPress, ref }: MenuRowProps) => {
   const { settle } = useOpeningFocus()
-  const isCollapsed = useSideMenu((menu) => menu.isCollapsed)
+  const isOpen = useSideMenu(isMenuOpen)
+  const enter = useSideMenu((menu) => menu.enter)
+  const leave = useSideMenu((menu) => menu.leave)
   const text = useTheme((theme) => theme.palette.text)
   const styles = useStyles()
   return (
@@ -47,15 +66,19 @@ const MenuRow = ({ label, icon, onPress, ref }: MenuRowProps) => {
       ref={ref}
       accessibilityLabel={label}
       accessibilityRole="link"
-      onFocus={settle}
+      onBlur={leave}
+      onFocus={() => {
+        enter()
+        settle()
+      }}
       onPress={onPress}
       style={({ focused }) => [styles.row, focused && styles.focused]}
     >
       {({ focused }) => (
         <>
           <Icon colour={text} isFocused={focused} name={icon} size={MENU_ICON} />
-          {!isCollapsed && (
-            <Text numberOfLines={1} style={styles.label}>
+          {isOpen && (
+            <Text numberOfLines={focused ? undefined : LABEL_LINES} style={styles.label}>
               {label}
             </Text>
           )}
@@ -112,21 +135,24 @@ type SideMenuProps = Pick<ShelvesProps, 'onSearch' | 'onSettings' | 'onOpenLibra
 
 /**
  * The side menu, as the web's: the search, then the pinned libraries under their heading, each
- * with its icon, and at the foot Settings, the theme and the toggle that folds the menu down to
- * its icons, kept on this device. It is the left column of Home on a TV, the remote's way to every
- * library.
+ * with its icon, and at the foot Settings, the theme and the toggle that pins the menu open, kept
+ * on this device. It is folded to its icons until the remote moves into it, when it opens over
+ * the page, labels and all, and folds again as the remote leaves; pinned, it stays open beside
+ * the page. It is the left column of Home on a TV, the remote's way to every library, drawn over
+ * the page: the page keeps `useSideMenuRoom` for it.
  */
 export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: SideMenuProps) => {
-  const isCollapsed = useSideMenu((menu) => menu.isCollapsed)
+  const isOpen = useSideMenu(isMenuOpen)
+  const isPinned = useSideMenu((menu) => menu.isPinned)
   const toggle = useSideMenu((menu) => menu.toggle)
   const styles = useStyles()
   return (
     <ScrollView
       contentContainerStyle={styles.content}
-      style={[styles.menu, isCollapsed && styles.collapsed]}
+      style={[styles.menu, !isOpen && styles.folded]}
     >
       <MenuRow icon="search" label={SEARCH_EVERY_LIBRARY.text} onPress={onSearch} />
-      {libraries.length > 0 && !isCollapsed && (
+      {libraries.length > 0 && isOpen && (
         <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
           {PINNED_HEADING}
         </Text>
@@ -141,22 +167,25 @@ export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: Sid
       ))}
       <SettingsEntry onPress={onSettings} />
       <ThemeChoice />
-      <MenuRow
-        icon="sidebar"
-        label={isCollapsed ? MENU_FOOT.expand : MENU_FOOT.collapse}
-        onPress={toggle}
-      />
+      <MenuRow icon="sidebar" label={isPinned ? MENU_FOOT.unpin : MENU_FOOT.pin} onPress={toggle} />
     </ScrollView>
   )
 }
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
-    menu: { flexGrow: 0, width: TV_SIZES.space8 * 5, backgroundColor: colours.raised },
-    // The icons alone: an icon inside its row's padding and ring, inside the menu's padding.
-    collapsed: {
-      width: MENU_ICON + 2 * (TV_SIZES.space3 + TV_SIZES.space2 + TV_SIZES.tvFocusRing),
+    // Over the page's left edge, which keeps `useSideMenuRoom` free for it.
+    menu: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      zIndex: 1,
+      elevation: 1,
+      width: OPEN_WIDTH,
+      backgroundColor: colours.raised,
     },
+    folded: { width: FOLDED_WIDTH },
     content: {
       gap: TV_SIZES.space1,
       paddingHorizontal: TV_SIZES.space3,
@@ -180,6 +209,6 @@ const useStyles = themedStyles((colours) =>
       paddingVertical: TV_SIZES.space1,
     },
     focused: { borderColor: colours.text, backgroundColor: colours.quiet },
-    label: { color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+    label: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
   }),
 )

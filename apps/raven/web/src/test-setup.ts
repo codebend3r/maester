@@ -10,6 +10,7 @@ import { useDesktopBridge } from '@/stores/desktop'
 import { useDownloadAsk } from '@/stores/downloadAsk'
 import { useDragging } from '@/stores/dragging'
 import { useOriginProbe } from '@/stores/originProbe'
+import { useSeasonView } from '@/stores/seasonView'
 import { useSelectionScopes } from '@/stores/selectionScope'
 import { useServerReach } from '@/stores/serverReach'
 import { useSideMenu } from '@/stores/sideMenu'
@@ -38,6 +39,7 @@ const initialDownloadAsk = useDownloadAsk.getInitialState()
 const initialDragging = useDragging.getInitialState()
 const initialServerReach = useServerReach.getInitialState()
 const initialToasts = useToasts.getInitialState()
+const initialSeasonView = useSeasonView.getInitialState()
 const initialWindowChrome = useWindowChrome.getInitialState()
 
 // Bun test does not unmount between tests the way vitest globals do. The
@@ -61,6 +63,7 @@ afterEach(() => {
   useDragging.setState(initialDragging, true)
   useServerReach.setState(initialServerReach, true)
   useToasts.setState(initialToasts, true)
+  useSeasonView.setState(initialSeasonView, true)
   useWindowChrome.setState(initialWindowChrome, true)
   delete document.documentElement.dataset.desktop
   resetBrowserSupport()

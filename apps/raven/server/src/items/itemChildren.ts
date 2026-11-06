@@ -38,6 +38,7 @@ export const itemChildren = ({
   const episodeIds = ofType({ children, type: ITEM_TYPES.episode })
   const onDisk = metadata.episodesOnDisk(ofType({ children, type: ITEM_TYPES.season }))
   const rows = metadata.episodeRows(episodeIds)
+  const runtimes = metadata.episodeRuntimes([...onDisk.values()].flat())
   const files = media.forItems({ itemIds: episodeIds, account })
   const watched = new Set(
     media
@@ -48,12 +49,14 @@ export const itemChildren = ({
     switch (child.type) {
       case ITEM_TYPES.season: {
         const shown = (onDisk.get(child.id) ?? []).filter((id) => viewer.seesItem(id))
+        const timed = shown.flatMap((id) => runtimes.get(id) ?? [])
         return [
           {
             ...child,
             type: ITEM_TYPES.season,
             episodeCount: shown.length,
             watchedCount: shown.filter((id) => watched.has(id)).length,
+            runtime: timed.length > 0 ? timed.reduce((sum, minutes) => sum + minutes, 0) : null,
           },
         ]
       }

@@ -3,6 +3,7 @@ import {
   APP_CLIENT_CALLS,
   type ApiClient,
   CREDIT_JOBS,
+  DEFAULT_SAGA_BACKDROP,
   type EpisodeSummary,
   ITEM_TYPES,
   type ItemDetails,
@@ -12,6 +13,7 @@ import {
   type SeasonSummary,
   createApiClient,
   isRecord,
+  type Saga,
 } from '@raven/core'
 import { allowlistedFetch } from '@raven/native/headless'
 
@@ -120,6 +122,7 @@ const seasonFor = ({ id, season }: SeasonForProps): SeasonSummary => ({
   type: ITEM_TYPES.season,
   episodeCount: 2,
   watchedCount: 0,
+  runtime: null,
 })
 
 type EpisodeForProps = {
@@ -205,10 +208,20 @@ const {
   nextEpisode,
   nextInSession,
   getTracks,
+  listSagas,
+  shuffleEpisodes,
   setWatched,
   setFavourite,
   setItemFavourite,
 } = APP_CLIENT_CALLS
+
+/** The saga Busboys is part of, as the films' library lists it. */
+export const BUSBOYS_SAGA: Saga = {
+  tmdbId: '505',
+  name: 'Busboys Collection',
+  backdrop: DEFAULT_SAGA_BACKDROP,
+  media: [BUSBOYS_FILE],
+}
 
 const READS: Record<string, unknown> = {
   [listLibraries.path]: [FILMS, SERIES],
@@ -220,6 +233,11 @@ const READS: Record<string, unknown> = {
   [pathFor({ path: nextInSession.path, id: 12 })]: HALF_LOOP.primary,
   [pathFor({ path: getTracks.path, id: BUSBOYS_FILE.id })]: TRACKS,
   [pathFor({ path: getTracks.path, id: 12 })]: TRACKS,
+  [pathFor({ path: listSagas.path, id: FILMS.id })]: [BUSBOYS_SAGA],
+  [pathFor({ path: shuffleEpisodes.path, id: SEVERANCE.id })]: [
+    GOOD_NEWS.primary,
+    HALF_LOOP.primary,
+  ],
 }
 
 /** Whether a favourite change asks for a favourite. */

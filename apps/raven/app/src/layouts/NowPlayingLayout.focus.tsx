@@ -20,8 +20,8 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
-/** The cover on Now Playing, the page's picture. */
-const PLAYING_COVER = tvSize(560)
+/** The cover on Now Playing, the page's picture, as wide as the column under it. */
+const PLAYING_COVER = tvSize(640)
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
@@ -29,6 +29,11 @@ const useStyles = themedStyles((colours) =>
     time: { color: colours.muted, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },
     queueHead: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space4 },
     entryWords: { flex: 1, gap: TV_SIZES.space0 },
+    // What plays on the left, the lyrics or a book's controls taking the rest of the width.
+    columns: { flexDirection: 'row', alignItems: 'flex-start', gap: TV_SIZES.space8 },
+    playing: { width: PLAYING_COVER, gap: TV_SIZES.space4 },
+    words: { gap: TV_SIZES.space2 },
+    aside: { flex: 1 },
   }),
 )
 
@@ -54,7 +59,7 @@ const QueueEntry = ({ row, onJump }: QueueEntryProps) => {
 
 type PlayingHeroProps = NowPlayingLayoutProps & { isOpening: boolean }
 
-/** What plays: the cover large beside its words and the controls, Play or Pause first. */
+/** What plays: the cover large, and under it its words and the controls, Play or Pause first. */
 const PlayingHero = ({
   track,
   error,
@@ -74,9 +79,9 @@ const PlayingHero = ({
   return (
     track !== null && (
       <FocusBand>
-        <View style={styles.hero}>
+        <View style={own.playing}>
           <Cover cover={track.cover} size={PLAYING_COVER} title={track.title} />
-          <View style={styles.words}>
+          <View style={own.words}>
             <Text variant={TEXT_VARIANTS.display} numberOfLines={2} style={styles.title}>
               {track.title}
             </Text>
@@ -151,9 +156,10 @@ const PLAYING_VIEWS = {
 } as const satisfies Record<PlayingState, ComponentType<PlayingHeroProps>>
 
 /**
- * Now Playing on a TV: the cover large beside what plays and the controls the remote opens on,
- * Play or Pause first, then a book's controls or the lyrics, and the queue below them to move
- * down through and play from. Menu goes back.
+ * Now Playing on a TV: on the left the cover large over what plays and the controls the remote
+ * opens on, Play or Pause first; on the right a book's controls or the lyrics, given the rest of
+ * the width and most of the screen's height; and the queue below them to move down through and
+ * play from. Menu goes back.
  */
 export const NowPlayingLayout = (props: NowPlayingLayoutProps) => {
   const { track, queue, onClear, onJump, aside } = props
@@ -166,8 +172,12 @@ export const NowPlayingLayout = (props: NowPlayingLayoutProps) => {
       <Text accessibilityRole="header" style={styles.eyebrow}>
         {MUSIC_COPY.nowPlaying}
       </Text>
-      <Playing {...props} isOpening={isOpening} />
-      <NowPlayingAside aside={aside} />
+      <View style={own.columns}>
+        <Playing {...props} isOpening={isOpening} />
+        <View style={own.aside}>
+          <NowPlayingAside aside={aside} />
+        </View>
+      </View>
       {queue.length > 0 && (
         <FocusBand>
           <View style={styles.section}>
