@@ -123,20 +123,15 @@ jobs:
           enable-cache: true
           cache-dependency-glob: '**/uv.lock'
 
-      # Pin a month-end build (kept for two years); daily builds expire after 14 builds.
-      # The pinned build keeps raven's encoded test cues stable across runner images.
+      # The pinned build keeps raven's encoded test cues stable across runner images;
+      # scripts/install_ffmpeg.sh holds the pin, shared with the local image (ci.Dockerfile).
       - name: 🎞️ Install test system tools
         if: matrix.check.ffmpeg == true
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata
-          build=ffmpeg-n9.0.2-17-g2a571b6068-linux64-gpl-9.0
-          curl -fsSL -o "/tmp/$build.tar.xz" "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/$build.tar.xz"
-          echo "68ee646831adaae2495618346f3bba94ff207ff83bbd34d643e7004730d66269  /tmp/$build.tar.xz" | sha256sum -c -
-          tar -xf "/tmp/$build.tar.xz" -C /tmp
-          sudo install -m 755 "/tmp/$build/bin/ffmpeg" "/tmp/$build/bin/ffprobe" /usr/local/bin/
-          ffmpeg -version | head -n 1
+          sudo bash scripts/install_ffmpeg.sh
 
       # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
       - name: 📦 Install

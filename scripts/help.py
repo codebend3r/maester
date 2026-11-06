@@ -1,11 +1,13 @@
 """Print every root `package.json` script, grouped, with what each one does.
 
-    bun run help             grouped and coloured
-    bun run help -- --plain  no colour, as when piped or with NO_COLOR set
+    bun run help                 grouped and coloured
+    bun run help -- --plain      no colour, as when piped or with NO_COLOR set
+    bun run help -- --markdown   docs/commands.md, which this writes: never edit it by hand
 
 `GROUPS` is the one place a script is described. `tests/test_help.py` fails when the root
-`package.json` gains a script this file does not describe, or loses one it still does, so
-the help never drifts from what `bun run` can actually run.
+`package.json` gains a script this file does not describe, or loses one it still does, and
+when `docs/commands.md` is not what `--markdown` writes, so neither drifts from what `bun run`
+can actually run.
 """
 
 import argparse
@@ -14,6 +16,7 @@ import os
 import shutil
 import sys
 import textwrap
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -393,6 +396,48 @@ def render(*, colour: bool, width: int) -> str:
     return "\n".join(lines)
 
 
+def cell_width(text: str) -> int:
+    """How many columns text takes in a monospaced table: an emoji or other wide character takes two."""
+    return sum(2 if unicodedata.east_asian_width(char) in "WF" else 1 for char in text)
+
+
+def markdown_table(rows: list[tuple[str, ...]]) -> list[str]:
+    """A table padded as oxfmt pads one, so the written file passes the format check."""
+    widths = [max(cell_width(row[i]) for row in rows) for i in range(len(rows[0]))]
+
+    def line(cells: tuple[str, ...]) -> str:
+        padded = (
+            cell + " " * (width - cell_width(cell))
+            for cell, width in zip(cells, widths, strict=True)
+        )
+        return f"| {' | '.join(padded)} |"
+
+    rule = tuple("-" * width for width in widths)
+    return [line(rows[0]), line(rule), *(line(row) for row in rows[1:])]
+
+
+def render_markdown() -> str:
+    """docs/commands.md: every group as a table of its commands."""
+    lines = [
+        "<!-- Written by scripts/help.py --markdown from its GROUPS; edit them, never this file. -->",
+        "",
+        "# Commands",
+        "",
+        "Every script in the root `package.json`, grouped. Run any of them from the repo root with "
+        "`bun run <command>`; `bun run help` prints the same list in the terminal, and "
+        "[Pull request checks, locally](ci-commands.md) explains the `ci:*` commands. The Needs "
+        "column names what a command needs beyond Bun, uv and ffmpeg.",
+    ]
+    for group in GROUPS:
+        rows = [("Command", "What it does", "Needs")]
+        rows.extend(
+            (f"`{command.name}`", command.summary.replace("|", "\\|"), command.needs)
+            for command in group.commands
+        )
+        lines.extend(["", f"## {group.title}", "", group.blurb, "", *markdown_table(rows)])
+    return "\n".join(lines) + "\n"
+
+
 def wants_colour(*, plain: bool) -> bool:
     """Colour only on a terminal, and never with --plain or NO_COLOR (no-color.org)."""
     if plain or "NO_COLOR" in os.environ:
@@ -403,7 +448,11 @@ def wants_colour(*, plain: bool) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser(description="List every root command with what it does.")
     parser.add_argument("--plain", action="store_true", help="print without colour")
+    parser.add_argument("--markdown", action="store_true", help="print docs/commands.md")
     args = parser.parse_args()
+    if args.markdown:
+        sys.stdout.write(render_markdown())
+        return
     width = shutil.get_terminal_size(fallback=(100, 24)).columns
     print(render(colour=wants_colour(plain=args.plain), width=min(width, 120)))
 
