@@ -88,11 +88,26 @@ describe('the track pickers', () => {
     ).toEqual([SUBTITLE_CHOICES.off, ENGLISH.id, PICTURES.id, FRENCH.id, SIDECAR.id, UNTAGGED.id])
   })
 
-  it('says how a picture track it offers is shown, never that it cannot be', () => {
+  it('names a picture track by its language alone, however it is shown', () => {
     const labelOf = (pictures: PictureSubtitles) =>
       subtitleOptionsOf({ tracks: TRACKS, pictures }).find(({ key }) => key === PICTURES.id)?.label
-    expect(labelOf(PICTURE_SUBTITLES.drawn)).toBe('English · Picture subtitles')
-    expect(labelOf(PICTURE_SUBTITLES.burned)).toBe('English · Picture subtitles, burned in')
+    expect(labelOf(PICTURE_SUBTITLES.drawn)).toBe('English')
+    expect(labelOf(PICTURE_SUBTITLES.burned)).toBe('English')
+  })
+
+  it('labels each subtitle by its language, adding SDH and nothing else', () => {
+    const tracks: MediaTracks = {
+      ...TRACKS,
+      subtitles: [
+        subtitle({ id: 'embedded-0', title: 'Full', forced: true }),
+        subtitle({ id: 'embedded-1', language: 'fr', hearingImpaired: true }),
+        SIDECAR,
+        UNTAGGED,
+      ],
+    }
+    expect(
+      subtitleOptionsOf({ tracks, pictures: PICTURE_SUBTITLES.hidden }).map(({ label }) => label),
+    ).toEqual(['Off', 'English', 'French · SDH', 'English', 'Unknown language'])
   })
 })
 

@@ -1,5 +1,6 @@
 import {
   AT_HOME,
+  DEFAULT_PLAYBACK_SETTINGS,
   ITEM_IMAGE_KINDS,
   type ItemDetails,
   PLAYBACK_MODES,
@@ -22,6 +23,7 @@ import {
   resumeAtFor,
   routeIdOf,
   routeState,
+  SESSION_KINDS,
 } from '@raven/core'
 import { watchAppHide } from '@raven/native'
 import {
@@ -74,6 +76,7 @@ import {
   subtitleOptionsOf,
   subtitlePlaceFor,
 } from '@/player/playerTracks'
+import { pickedQualityOf, qualityKeyOf, qualityOptionsOf } from '@/player/qualityOptions'
 import {
   SESSION_EVENTS,
   SESSION_PHASES,
@@ -90,6 +93,7 @@ import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTE_PARAMS, PLAY_FROM, ROUTE_TARGETS, hrefOf, secondsOf } from '@/routes'
 import { PLAYER_SCREEN_COPY } from '@/screens/copy'
 import { useAppPrefs } from '@/stores/appPrefs'
+import { queueNeighbourOf, useVideoQueue } from '@/stores/videoQueue'
 
 /** The cache key where a video plays from sits under, with the server and the video. */
 const PLAY_NETWORK_KEY = 'playNetwork'
@@ -97,13 +101,44 @@ const PLAY_NETWORK_KEY = 'playNetwork'
 /** How often the player says where it is, in milliseconds: often enough for a smooth clock. */
 const PROGRESS_EVERY_MS = 250
 
-/** An episode rolls on through its show, so its next is the show's next in turn. */
+type VideoLabelOfProps = { word: string; media: MediaItem }
+
+/** "Previous The Matrix": what a shuffle's next or previous is called aloud. */
+const videoLabelOf = ({ word, media }: VideoLabelOfProps): string => `${word} ${media.title}`
 
 /** "Next episode, S01E03 Half Loop": what the Next button is called aloud. */
 const nextLabelOf = (next: MediaItem): string =>
   [PLAYER_COPY.next, next.item === null ? null : episodeCode(next.item), next.title]
     .filter((part): part is string => part !== null)
     .join(' ')
+
+type Neighbours = {
+  next: MediaItem | null
+  previous: MediaItem | null
+  /** What the Next button is called aloud for `next`. */
+  nextLabel: (to: MediaItem) => string
+}
+
+type NeighboursOfProps = {
+  isQueued: boolean
+  queued: readonly MediaItem[]
+  mediaId: number
+  /** The next the server named, for a session it answers for. */
+  serverNext: MediaItem | null
+}
+
+/**
+ * What plays either side of this video: a library's shuffle walks the device's queue forward
+ * and back, and every other session has only the next the server names.
+ */
+const neighboursOf = ({ isQueued, queued, mediaId, serverNext }: NeighboursOfProps): Neighbours => {
+  if (!isQueued) return { next: serverNext, previous: null, nextLabel: nextLabelOf }
+  return {
+    next: queueNeighbourOf({ items: queued, mediaId, step: 1 }),
+    previous: queueNeighbourOf({ items: queued, mediaId, step: -1 }),
+    nextLabel: (to) => videoLabelOf({ word: PLAYER_COPY.nextVideo, media: to }),
+  }
+}
 
 type CaptionsForProps = {
   mode: PlaybackMode | null
@@ -220,14 +255,22 @@ const Playing = ({
     ...session.queries.nextInSessionQuery({ id: media.id, session: viewing }),
     enabled: asksServerForNext(viewing),
   })
-  const nextMedia = next.data ?? null
+  const queued = useVideoQueue((queue) => queue.items)
+  const neighbours = neighboursOf({
+    isQueued: viewing.kind === SESSION_KINDS.queue,
+    queued,
+    mediaId: media.id,
+    serverNext: next.data ?? null,
+  })
+  const { next: nextMedia, previous: previousMedia } = neighbours
   // The end and a press of Next can both ask in one tick; the player leaves once.
   const hasLeft = useRef(false)
-  const playNext = () => {
-    if (nextMedia === null || hasLeft.current) return
+  const leaveFor = (to: MediaItem | null) => {
+    if (to === null || hasLeft.current) return
     hasLeft.current = true
-    onPlayNext(nextMedia, viewing)
+    onPlayNext(to, viewing)
   }
+  const playNext = () => leaveFor(nextMedia)
   const subtitlePrefs = usePlayerPrefs((prefs) => prefs.subtitles)
   const setAudioLanguage = usePlayerPrefs((prefs) => prefs.setAudioLanguage)
   const setSubtitles = usePlayerPrefs((prefs) => prefs.setSubtitles)
@@ -236,6 +279,9 @@ const Playing = ({
   const [subtitle, setSubtitle] = useState(() =>
     preferredSubtitle({ tracks, subtitles: subtitlePrefs }),
   )
+  // The same query the policy is read from, already answered: its height caps the sizes offered.
+  const settings = useQuery(session.queries.playbackSettingsQuery)
+  const maxHeight = settings.data?.settings.maxHeight ?? DEFAULT_PLAYBACK_SETTINGS.maxHeight
   const shouldPreferDirectPlay = useAppPrefs((prefs) => prefs.shouldPreferDirectPlay)
   const isTranscodeAllowed = useAppPrefs((prefs) => prefs.isTranscodeAllowed)
   const plan = useMemo(
@@ -387,6 +433,21 @@ const Playing = ({
     }
   }
 
+  // Direct play plays the file itself, whatever the plan started with. A size moves the play to
+  // the transcode, where only a burn shows a picture track ExoPlayer drew.
+  const pickQuality = (key: string) => {
+    const quality = pickedQualityOf(key)
+    if (quality === null) {
+      dispatch({ type: SESSION_EVENTS.directPicked, at: position.current })
+      return
+    }
+    const track = tracks?.subtitles.find((each) => each.id === subtitle) ?? null
+    const burn = burning ?? (track !== null && isPictureSubtitle(track) ? track.id : null)
+    dispatch({ type: SESSION_EVENTS.qualityPicked, quality, burn, at: position.current })
+  }
+  const qualityOptions =
+    ladder === null ? [] : qualityOptionsOf({ media, modes: ladder.modes, maxHeight })
+
   const subtitleOptions =
     tracks === null
       ? []
@@ -469,7 +530,26 @@ const Playing = ({
               }
         }
         mode={mode}
-        next={nextMedia === null ? null : { label: nextLabelOf(nextMedia), onPlay: playNext }}
+        next={
+          nextMedia === null ? null : { label: neighbours.nextLabel(nextMedia), onPlay: playNext }
+        }
+        previous={
+          previousMedia === null
+            ? null
+            : {
+                label: videoLabelOf({ word: PLAYER_COPY.previousVideo, media: previousMedia }),
+                onPlay: () => leaveFor(previousMedia),
+              }
+        }
+        quality={
+          ladder === null
+            ? null
+            : {
+                options: qualityOptions,
+                value: qualityKeyOf({ mode, quality: ladder.quality }),
+                onChoose: pickQuality,
+              }
+        }
         isOpening={isOpeningOf(state)}
         notice={noticeOf(state)}
         onBack={onBack}
@@ -525,6 +605,8 @@ const Waiting = ({ notice, onBack }: WaitingProps) => (
     isOpening={false}
     mode={null}
     next={null}
+    previous={null}
+    quality={null}
     subtitles={null}
     summary={null}
     surface={null}

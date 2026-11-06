@@ -98,8 +98,12 @@ describe("a library's sagas", () => {
       const playing = media().get({ id: id(name), account: TEST_ACCOUNTS.a })
       if (!playing) throw new Error(`no ${name}`)
       return (
-        media().nextInSession({ media: playing, session, account: TEST_ACCOUNTS.a })?.fileName ??
-        null
+        media().nextInSession({
+          media: playing,
+          session,
+          libraryIds: [state.libraryId],
+          account: TEST_ACCOUNTS.a,
+        })?.fileName ?? null
       )
     }
     expect(next('Fellowship.mkv')).toBe('Two Towers.mkv')
@@ -117,6 +121,7 @@ describe("a library's sagas", () => {
       media().nextInSession({
         media: playing,
         session: { kind: SESSION_KINDS.saga, sagaId: '1241' },
+        libraryIds: [state.libraryId],
         account: TEST_ACCOUNTS.a,
       }),
     ).toBeNull()

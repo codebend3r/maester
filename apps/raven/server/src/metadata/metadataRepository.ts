@@ -230,6 +230,20 @@ export class MetadataRepository {
       )
   }
 
+  /** Each episode's runtime in minutes, from TMDB, for those that have one, in one read. */
+  episodeRuntimes(ids: readonly number[]): Map<number, number> {
+    if (ids.length === 0) return new Map()
+    return new Map(
+      this.db
+        .prepare<[string], { id: number; runtime: number }>(
+          `SELECT id, runtime FROM shown_items
+            WHERE runtime IS NOT NULL AND id IN (SELECT value FROM json_each(?))`,
+        )
+        .all(JSON.stringify(ids))
+        .map((row) => [row.id, row.runtime]),
+    )
+  }
+
   /** What an episode's row on its season's page shows beside its card, for each episode, in two reads. */
   episodeRows(ids: readonly number[]): Map<
     number,

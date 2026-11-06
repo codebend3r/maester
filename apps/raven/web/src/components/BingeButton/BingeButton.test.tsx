@@ -67,12 +67,13 @@ describe('BingeButton', () => {
     )
   })
 
-  it('explains the three-show limit without disabling removal', async () => {
+  it('explains the three-show limit on hover only, without disabling removal', async () => {
     binge = fakeBinge({ ids: [3, 2, 1], hasSeenTip: true })
     renderWithProviders({ ui: <BingeButton item={show} /> })
     const button = await screen.findByRole('button', { name: BINGE_COPY.add })
     expect(button).toHaveAttribute('aria-disabled', 'true')
-    expect(button).toHaveAccessibleDescription(BINGE_COPY.limit)
+    expect(button).toHaveAttribute('title', BINGE_COPY.limit)
+    expect(screen.queryByText(BINGE_COPY.limit)).toBeNull()
     await userEvent.click(button)
     expect(binge.set).not.toHaveBeenCalled()
     expect(binge.state().ids).toEqual([3, 2, 1])

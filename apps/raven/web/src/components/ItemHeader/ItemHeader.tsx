@@ -274,13 +274,13 @@ export const Dotted = ({ parts }: DottedProps) =>
     </Fragment>
   ))
 
-const NO_EYEBROW: readonly string[] = []
+const NO_EYEBROW: readonly ReactNode[] = []
 
 type ItemHeaderProps = {
   titleId: string
   title: string
   /** What the item is, above its title: "Show", a season's show, "Saga · 3 movies". */
-  eyebrow?: readonly string[]
+  eyebrow?: readonly ReactNode[]
   /** "Directed by ...", "Created by ...". */
   byline: string | null
   contentRating: string | null

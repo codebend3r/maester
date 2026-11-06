@@ -18,6 +18,7 @@ export const SEASON_ONE_SUMMARY: SeasonSummary = {
   type: 'season',
   episodeCount: 2,
   watchedCount: 0,
+  runtime: null,
 }
 
 /** A show, its first season and two episodes, as the item routes would answer. */

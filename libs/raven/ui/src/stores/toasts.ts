@@ -6,6 +6,9 @@ import { STORE_KEYS } from '@/stores/storage'
 /** How long a toast stays before it goes by itself. */
 export const TOAST_MS = 5_000
 
+/** How long a toast takes to fade, at the end of its `TOAST_MS`; `Toaster.module.scss` matches it. */
+export const TOAST_FADE_MS = 300
+
 export type Toast = { id: number; message: string }
 
 type ToastsState = {

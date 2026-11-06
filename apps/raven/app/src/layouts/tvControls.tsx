@@ -17,6 +17,7 @@ import { Icon } from '@raven/native'
 import { Text } from '@/layouts/Text'
 import { useFocusOnMount } from '@/layouts/focus'
 import { useTvFormStyles } from '@/layouts/formStyles'
+import { useLastFocus } from '@/stores/lastFocus'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 
@@ -175,12 +176,18 @@ export const PlateButton = ({
 }: PlateButtonProps) => {
   const plateStyles = usePlateStyles({ isOverPicture })
   const colour = useTheme((theme) => (isOverPicture ? theme.overPicture : theme.palette).text)
+  const view = useRef<ComponentRef<typeof Pressable>>(null)
+  const note = useLastFocus((state) => state.note)
   return (
     <Pressable
+      ref={view}
       accessibilityLabel={label}
       accessibilityRole={accessibilityRole}
       hasTVPreferredFocus={isPreferred}
-      onFocus={onFocused}
+      onFocus={() => {
+        note(view.current)
+        onFocused()
+      }}
       onPress={onPress}
       style={({ focused }) => [plateStyles.plate, focused && plateStyles.focused]}
     >

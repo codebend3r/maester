@@ -5,7 +5,6 @@ import {
   type LibraryView,
   type MediaItem,
   type PosterEntry,
-  KINDS,
   LIBRARY_LISTINGS,
   LIBRARY_VIEWS,
   GROUPING_LABELS,
@@ -50,7 +49,8 @@ import { usePictures } from '@/queries/usePictures'
 import { Grid, Loading, Picker, SearchField, ToolButton } from '@/layouts'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
 import { LIBRARY_COPY } from '@/screens/copy'
-import { shuffleTarget } from '@/screens/shuffleTarget'
+import { shuffleDeal } from '@/screens/shuffleDeal'
+import { useVideoQueue } from '@/stores/videoQueue'
 import type { LoadingProps } from '@/layouts/loadingKit'
 import { appViewsFor, useLibraryView } from '@/screens/useLibraryView'
 import type { LibraryChoice } from '@/stores/libraryViews'
@@ -114,17 +114,24 @@ const PageToggles = ({ page, pages, onChange }: PageTogglesProps) =>
 
 type ShuffleButtonProps = { library: LibraryRecord; choices: readonly MediaItem[] }
 
-/** Shuffle, first after the way to the other page: one of `choices` at random, from where it was left. */
+/**
+ * Shuffle, first after the way to the other page: `choices` dealt into the device's video queue
+ * and the first of them played from where it was left, the player's Next and back walking the
+ * rest of the deal.
+ */
 const ShuffleButton = ({ library, choices }: ShuffleButtonProps) => {
   const router = useRouter()
+  const start = useVideoQueue((queue) => queue.start)
   return (
     <ToolButton
       accessibilityLabel={LIBRARY_COPY.shuffleLibrary(library.name)}
       icon="shuffle"
       label={LIBRARY_COPY.shuffle}
       onPress={() => {
-        const target = shuffleTarget({ choices })
-        if (target !== null) router.push(hrefOf(target))
+        const { queue, target } = shuffleDeal({ choices })
+        if (target === null) return
+        start(queue)
+        router.push(hrefOf(target))
       }}
     />
   )
@@ -189,6 +196,17 @@ const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
   )
 }
 
+type LineOfProps = { settings: LibrarySettings; library: LibraryRecord; listed: Listing | null }
+
+/**
+ * What a library holds, under its name: a library of shows counts its shows, once they are read,
+ * and any other its videos. Its type is not said, since its name says it.
+ */
+const lineOf = ({ settings, library, listed }: LineOfProps): string | null => {
+  if (!listsShows(settings.kind)) return plural({ n: library.itemCount, ...LIBRARY_COPY.videos })
+  return listed === null ? null : plural({ n: listed.shows.length, ...LIBRARY_COPY.shows })
+}
+
 type UseListingProps = {
   queries: AppQueries['queries']
   library: LibraryRecord
@@ -244,10 +262,7 @@ const ContinueGrid = ({
     <Grid
       icon={libraryIconOf(library.settings)}
       jump={null}
-      line={LIBRARY_COPY.line({
-        kind: CONTINUE_WATCHING,
-        count: plural({ n: entries.length, ...LIBRARY_COPY.videos }),
-      })}
+      line={plural({ n: entries.length, ...LIBRARY_COPY.inProgress })}
       notice={entries.length === 0 ? LIBRARY_COPY.nothingInProgress : null}
       onBack={() => router.back()}
       onOpen={({ target }) => router.push(hrefOf(target))}
@@ -332,10 +347,7 @@ const LibraryGrid = ({
     <Grid
       icon={libraryIconOf(library.settings)}
       jump={jump}
-      line={LIBRARY_COPY.line({
-        kind: KINDS[settings.kind].label,
-        count: plural({ n: library.itemCount, ...LIBRARY_COPY.videos }),
-      })}
+      line={lineOf({ settings, library, listed })}
       notice={notice}
       onBack={() => router.back()}
       onOpen={open}

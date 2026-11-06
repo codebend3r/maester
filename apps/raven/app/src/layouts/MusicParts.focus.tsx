@@ -4,6 +4,7 @@ import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
 import { useFocusOnMount, useOpeningFocus } from '@/layouts/focus'
+import { HomePlate } from '@/layouts/HomePlate.focus'
 import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import { Icon } from '@raven/native'
@@ -12,6 +13,7 @@ import { type FavouriteButtonProps } from '@/layouts/musicKit'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import type { Picture } from '@/queries/cards'
+import { useLastFocus } from '@/stores/lastFocus'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 
@@ -92,11 +94,15 @@ export const useMusicStyles = themedStyles((colours) =>
 
 type FocusPageProps = { children: ReactNode }
 
-/** A music page on a TV: one column scrolled as the remote moves down it, over the ground. */
+/**
+ * A music page on a TV: one column scrolled as the remote moves down it, over the ground, the way
+ * Home at its top.
+ */
 export const FocusPage = ({ children }: FocusPageProps) => {
   const styles = useMusicStyles()
   return (
     <ScrollView contentContainerStyle={styles.page} style={styles.ground}>
+      <HomePlate />
       {children}
     </ScrollView>
   )
@@ -170,6 +176,7 @@ export const ActionPlate = ({
   const palette = useTheme((theme) => theme.palette)
   const colour = tone === BUTTON_TONES.primary ? palette.onAccent : palette.text
   useFocusOnMount({ view, isAsked: isPreferred })
+  const note = useLastFocus((state) => state.note)
   return (
     <Pressable
       ref={view}
@@ -177,7 +184,10 @@ export const ActionPlate = ({
       accessibilityRole="button"
       accessibilityState={{ selected: isOn }}
       hasTVPreferredFocus={isPreferred}
-      onFocus={settle}
+      onFocus={() => {
+        note(view.current)
+        settle()
+      }}
       onPress={onPress}
       style={({ focused }) => [styles.action, toneStyles[tone].button, focused && styles.focused]}
     >
@@ -221,12 +231,18 @@ type FocusRowProps = {
 export const FocusRow = ({ label, isSelected, onPress, children }: FocusRowProps) => {
   const { settle } = useOpeningFocus()
   const styles = useMusicStyles()
+  const view = useRef<ComponentRef<typeof Pressable>>(null)
+  const note = useLastFocus((state) => state.note)
   return (
     <Pressable
+      ref={view}
       accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ selected: isSelected }}
-      onFocus={settle}
+      onFocus={() => {
+        note(view.current)
+        settle()
+      }}
       onPress={onPress}
       style={({ focused }) => [styles.row, focused && styles.focusedRow]}
     >

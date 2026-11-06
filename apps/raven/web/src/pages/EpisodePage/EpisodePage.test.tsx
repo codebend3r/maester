@@ -55,7 +55,7 @@ describe('EpisodePage', () => {
   it('shows the show and number, the title, air date, summary, guests and Resume', async () => {
     open()
     expect(await screen.findByRole('heading', { level: 1, name: 'Half Loop' })).toBeInTheDocument()
-    expect(screen.getByText('Severance · Season 1 · Episode 2')).toBeInTheDocument()
+    expect(screen.getByText('Episode 2')).toBeInTheDocument()
     expect(screen.getByText(/18 Feb 2022|Feb 18, 2022/)).toBeInTheDocument()
     expect(screen.getByText('Half Loop is an episode.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Resume from 10:00' })).toHaveAttribute(
@@ -64,7 +64,15 @@ describe('EpisodePage', () => {
     )
     expect(screen.getByRole('heading', { name: 'Guest stars & crew' })).toBeInTheDocument()
     expect(screen.getByText('Mr. Milchick')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Severance' })).toHaveAttribute(
+    expect(
+      screen.getAllByRole('link', { name: 'Severance' }).map((link) => link.getAttribute('href')),
+    ).toEqual(['/shows/4/seasons/1', '/shows/4'])
+  })
+
+  it('links its show and its season from the line over its title', async () => {
+    open()
+    await screen.findByRole('heading', { level: 1, name: 'Half Loop' })
+    expect(screen.getByRole('link', { name: 'Season 1' })).toHaveAttribute(
       'href',
       '/shows/4/seasons/1',
     )

@@ -25,17 +25,26 @@ export const PAGE_PATHS = {
 /** The page that plays a video. */
 export const watchPageOf = (mediaId: number): AppPath => `${PAGE_PATHS.watch}/${mediaId}`
 
+/** A movie's page. */
+export const moviePath = (itemId: number): AppPath => `/movies/${itemId}`
+
+/** A show's page. */
+export const showPath = (itemId: number): AppPath => `/shows/${itemId}`
+
+/** An episode's page. */
+export const episodePath = (itemId: number): AppPath => `/episodes/${itemId}`
+
 type SeasonPathProps = { showId: number; season: number }
 
 /** A season's page, by its show and number. */
 export const seasonPath = ({ showId, season }: SeasonPathProps): AppPath =>
-  `/shows/${showId}/seasons/${season}`
+  `${showPath(showId)}/seasons/${season}`
 
 /** Where an item's page lives, or null for one that has no page of its own. */
 export const itemPath = (item: ItemSummary): AppPath | null => {
-  if (item.type === ITEM_TYPES.movie) return `/movies/${item.id}`
-  if (item.type === ITEM_TYPES.show) return `/shows/${item.id}`
-  if (item.type === ITEM_TYPES.episode) return `/episodes/${item.id}`
+  if (item.type === ITEM_TYPES.movie) return moviePath(item.id)
+  if (item.type === ITEM_TYPES.show) return showPath(item.id)
+  if (item.type === ITEM_TYPES.episode) return episodePath(item.id)
   return item.show && item.season != null
     ? seasonPath({ showId: item.show.id, season: item.season })
     : null
@@ -124,7 +133,7 @@ type EpisodeBackPathProps = {
 export const episodeBackPath = ({ item, libraryId }: EpisodeBackPathProps): string => {
   if (!item.show) return `/libraries/${libraryId}`
   return item.season == null
-    ? `/shows/${item.show.id}`
+    ? showPath(item.show.id)
     : seasonPath({ showId: item.show.id, season: item.season })
 }
 

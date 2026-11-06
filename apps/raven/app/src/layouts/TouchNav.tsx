@@ -1,13 +1,12 @@
 import { Icon } from '@raven/native'
 import type { IconName } from '@raven/ui/iconDrawings'
-import { useRouter } from 'expo-router'
 import { type ComponentRef, type ReactNode, type Ref, useRef } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 
 import { openPickerSheet } from '@/layouts/Picker.touch'
 import { TouchBack } from '@/layouts/TouchBack'
 import { TOUCH_NAV_COPY } from '@/layouts/touchMenuKit'
-import { APP_ROUTES } from '@/routes'
+import { useGoHome } from '@/layouts/useGoHome'
 import { useAppPrefs } from '@/stores/appPrefs'
 import { useTouchMenu } from '@/stores/touchMenu'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
@@ -46,15 +45,8 @@ type HomeButtonProps = NavPartProps
 
 /** Back to Home, taking the screens above it off the stack rather than stacking another. */
 const HomeButton = ({ isRaised }: HomeButtonProps) => {
-  const router = useRouter()
-  return (
-    <NavButton
-      icon="home"
-      isRaised={isRaised}
-      label={TOUCH_NAV_COPY.home}
-      onPress={() => router.dismissTo(APP_ROUTES.home)}
-    />
-  )
+  const goHome = useGoHome()
+  return <NavButton icon="home" isRaised={isRaised} label={TOUCH_NAV_COPY.home} onPress={goHome} />
 }
 
 type MenuButtonProps = NavPartProps

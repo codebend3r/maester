@@ -528,6 +528,25 @@ describe('MusicRepository', () => {
     )
   })
 
+  it('orders a random listing of tracks one track at a time, stable across its pages', () => {
+    const options = { libraryId: state.library, ...LIST, sort: MUSIC_SORTS.random, seed: 345 }
+    const all = repository().listTracks(options)
+    const byTitle = repository().listTracks({ ...options, sort: MUSIC_SORTS.title })
+    expect(all.tracks.map(({ id }) => id).toSorted()).toEqual(
+      byTitle.tracks.map(({ id }) => id).toSorted(),
+    )
+    const pages = Array.from(
+      { length: all.total },
+      (_, offset) => repository().listTracks({ ...options, limit: 1, offset }).tracks[0]?.id,
+    )
+    expect(pages).toEqual(all.tracks.map(({ id }) => id))
+    const byHash = all.tracks
+      .map(({ id }) => ({ id, place: (id * (1103515245 + 345 * 2)) % 2147483647 }))
+      .toSorted((a, b) => a.place - b.place || a.id - b.id)
+      .map(({ id }) => id)
+    expect(all.tracks.map(({ id }) => id)).toEqual(byHash)
+  })
+
   it('drops an album with its last file, and a cover that was in a file now gone gives way to the archive', () => {
     const airbag = state.ids.get('/music/Radiohead/OK Computer/01 Airbag.flac') ?? 0
     new MediaIndex(database.get()).remove([airbag])

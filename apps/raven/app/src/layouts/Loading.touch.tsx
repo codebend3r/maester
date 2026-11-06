@@ -7,7 +7,7 @@ import { TouchNav } from '@/layouts/TouchNav'
 import { SIZES } from '@/theme/appTheme'
 
 /** The loading screen under the thumb, with the header at the top while a page opens. */
-const Loading = ({ label, onBack }: LoadingProps) => {
+const Loading = ({ label, onBack, isHome = false }: LoadingProps) => {
   const insets = useSafeAreaInsets()
   return (
     <View style={styles.screen}>
@@ -22,7 +22,7 @@ const Loading = ({ label, onBack }: LoadingProps) => {
           },
         ]}
       >
-        <TouchNav onBack={onBack} />
+        <TouchNav isHome={isHome} onBack={onBack} />
       </View>
     </View>
   )

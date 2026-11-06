@@ -34,3 +34,17 @@
       'aside';
   }
 }
+
+// An episode's show and season in the line over its title, each a link to its page.
+.eyebrowLink {
+  color: inherit;
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color-bark);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}

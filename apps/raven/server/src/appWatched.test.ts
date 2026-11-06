@@ -8,6 +8,7 @@ import {
   type ItemChild,
   type LibraryInput,
   MAX_WATCH_TARGETS,
+  SESSION_KINDS,
   type WatchTarget,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
@@ -293,6 +294,17 @@ describe('marking videos watched', () => {
       [id('Mixed S01E01.mp4'), id('Mixed S01E02.mp4')].toSorted((a, b) => a - b),
     )
     expect(await api().shuffleEpisodes(item('Heat (1995)'))).toEqual([])
+  })
+
+  it('shuffles a show on from the libraries the browser may see only', async () => {
+    const pin = await unlock()
+    const unlocked = cookies(state.admin, pin)
+    const session = { kind: SESSION_KINDS.shuffle, showId: String(item('Mixed')) } as const
+    const playing = id('Mixed S01E02.mp4')
+    expect(await api().nextInSession({ id: playing, session })).toBeNull()
+    expect((await api(unlocked).nextInSession({ id: playing, session }))?.id).toBe(
+      id('Mixed S01E01.mp4'),
+    )
   })
 
   it('counts only the libraries the browser may see', async () => {

@@ -136,6 +136,9 @@ describe("a page's children", () => {
     expect(
       everything.map((child) => (child.type === ITEM_TYPES.season ? child.episodeCount : null)),
     ).toEqual([2, 1])
+    expect(
+      everything.map((child) => (child.type === ITEM_TYPES.season ? child.runtime : undefined)),
+    ).toEqual([83, null])
     const locked = itemChildren({
       parentId: state.showId,
       viewer: viewerHiding({ hidden: state.locked, metadata }),
@@ -147,6 +150,9 @@ describe("a page's children", () => {
     expect(
       locked.map((child) => (child.type === ITEM_TYPES.season ? child.episodeCount : null)),
     ).toEqual([1])
+    expect(
+      locked.map((child) => (child.type === ITEM_TYPES.season ? child.runtime : undefined)),
+    ).toEqual([41])
   })
 
   it('gives each episode its row and the file Play starts, from what this browser may see', () => {

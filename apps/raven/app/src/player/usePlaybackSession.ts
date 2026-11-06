@@ -1,4 +1,10 @@
-import { type AccessRefusal, type MediaItem, PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
+import {
+  type AccessRefusal,
+  type MediaItem,
+  PLAYBACK_MODES,
+  type PlaybackMode,
+  type StreamQuality,
+} from '@raven/core'
 import { type MediaSources, type SourceOutcome, useCookieVersion } from '@raven/native/headless'
 import { useEffect, useEffectEvent, useReducer } from 'react'
 
@@ -35,6 +41,8 @@ export const SESSION_EVENTS = {
   timedOut: 'timedOut',
   audioPicked: 'audioPicked',
   burnPicked: 'burnPicked',
+  qualityPicked: 'qualityPicked',
+  directPicked: 'directPicked',
   retried: 'retried',
 } as const
 
@@ -56,8 +64,13 @@ type Ladder = {
   reopenedAt: number | null
   /** The picture subtitle a transcode burns into the picture, by track id; null for none. */
   burn: string | null
-  /** The way played before a burn moved to the transcode, which clearing it goes back to. */
-  stepBeforeBurn: number | null
+  /** The size picked for a transcode, one of core's `STREAM_QUALITIES`; null for the server's own. */
+  quality: StreamQuality | null
+  /**
+   * The way played before a burn or a picked size moved to the transcode, which clearing the
+   * last of them goes back to; null while neither holds it there.
+   */
+  stepBeforeTranscode: number | null
 }
 
 export type SessionState =
@@ -75,6 +88,14 @@ type SessionEvent =
   | { type: typeof SESSION_EVENTS.timedOut; attempt: number }
   | { type: typeof SESSION_EVENTS.audioPicked; audio: number | null; at: number }
   | { type: typeof SESSION_EVENTS.burnPicked; burn: string | null; at: number }
+  | {
+      type: typeof SESSION_EVENTS.qualityPicked
+      quality: StreamQuality | null
+      /** The burn to hold beside the size, when the subtitle on is a picture track; else the ladder's. */
+      burn?: string | null
+      at: number
+    }
+  | { type: typeof SESSION_EVENTS.directPicked; at: number }
   | { type: typeof SESSION_EVENTS.retried }
 
 type FailedWithProps = {
@@ -114,7 +135,8 @@ export const initialSession = ({
         problems,
         reopenedAt: null,
         burn: null,
-        stepBeforeBurn: null,
+        quality: null,
+        stepBeforeTranscode: null,
       }
 
 /** The way being tried, or null once every way has failed. */
@@ -141,33 +163,98 @@ const sourcing = ({ ladder, step, at }: SourcingProps): SessionState => ({
   problems: ladder.problems,
   reopenedAt: step === ladder.step ? ladder.reopenedAt : null,
   burn: ladder.burn,
-  stepBeforeBurn: ladder.stepBeforeBurn,
+  quality: ladder.quality,
+  stepBeforeTranscode: ladder.stepBeforeTranscode,
 })
 
-type BurnPickedProps = { ladder: Ladder; burn: string | null; at: number }
+/** What may hold the ladder at the transcode: a burn, a picked size, or both. */
+type TranscodeHolds = Pick<Ladder, 'burn' | 'quality'>
+
+/** Whether a burn or a picked size holds the ladder at the transcode. */
+const isHeldAtTranscode = ({ burn, quality }: TranscodeHolds): boolean =>
+  burn !== null || quality !== null
+
+type HoldTranscodeProps = { ladder: Ladder; held: TranscodeHolds; at: number }
 
 /**
- * A picture subtitle picked to burn in, or a burn cleared, from `at`. Only a transcode re-encodes
- * the picture, so a burn moves to the plan's transcode, remembering the way it played before;
- * clearing it goes back to that way. A plan with no transcode (transcoding off) burns nothing.
+ * The ladder once a burn or a size is picked or cleared, from `at`. Only a transcode re-encodes
+ * the picture, so the first of them to hold it moves to the plan's transcode, remembering the
+ * way it played before; clearing the last of them goes back to that way. A plan with no
+ * transcode (transcoding off) moves for neither.
  */
-const burnPicked = ({ ladder, burn, at }: BurnPickedProps): Ladder | null => {
-  if (burn === ladder.burn) return null
-  if (burn === null) {
+const holdTranscode = ({ ladder, held, at }: HoldTranscodeProps): Ladder | null => {
+  if (!isHeldAtTranscode(held)) {
     return {
       ...ladder,
-      burn: null,
-      step: ladder.stepBeforeBurn ?? ladder.step,
-      stepBeforeBurn: null,
+      ...held,
+      step: ladder.stepBeforeTranscode ?? ladder.step,
+      stepBeforeTranscode: null,
+      at,
     }
   }
   const transcode = ladder.modes.indexOf(PLAYBACK_MODES.transcode)
   if (transcode < 0) return null
   return {
     ...ladder,
-    burn,
+    ...held,
     step: transcode,
-    stepBeforeBurn: ladder.burn === null ? ladder.step : ladder.stepBeforeBurn,
+    stepBeforeTranscode: isHeldAtTranscode(ladder) ? ladder.stepBeforeTranscode : ladder.step,
+    at,
+  }
+}
+
+type BurnPickedProps = { ladder: Ladder; burn: string | null; at: number }
+
+/** A picture subtitle picked to burn in, or a burn cleared, from `at`; null when nothing changes. */
+const burnPicked = ({ ladder, burn, at }: BurnPickedProps): Ladder | null =>
+  burn === ladder.burn
+    ? null
+    : holdTranscode({ ladder, held: { burn, quality: ladder.quality }, at })
+
+type QualityPickedProps = {
+  ladder: Ladder
+  quality: StreamQuality | null
+  burn: string | null
+  at: number
+}
+
+/**
+ * A size picked to convert down to, or the original picked back, from `at`, with the burn it
+ * holds beside it, in one move; null when nothing changes. A size moves to the transcode as a
+ * burn does, and a burn and a size hold it together.
+ */
+const qualityPicked = ({ ladder, quality, burn, at }: QualityPickedProps): Ladder | null =>
+  quality === ladder.quality && burn === ladder.burn
+    ? null
+    : holdTranscode({ ladder, held: { burn, quality }, at })
+
+type DirectPickedProps = { ladder: Ladder; at: number }
+
+/**
+ * Direct play picked, from `at`: the file itself, whatever the plan started with. A plan that
+ * left direct play out (a file this device may not decode, or a server's own choice) gets it
+ * first again, so the viewer can try the original; should it fail, the ladder steps down as
+ * ever. Any size and burn go, since the file carries neither. Null while it already plays so.
+ */
+const directPicked = ({ ladder, at }: DirectPickedProps): Ladder | null => {
+  const modes = ladder.modes.includes(PLAYBACK_MODES.direct)
+    ? ladder.modes
+    : [PLAYBACK_MODES.direct, ...ladder.modes]
+  const step = modes.indexOf(PLAYBACK_MODES.direct)
+  const isAlready =
+    modes === ladder.modes &&
+    step === ladder.step &&
+    ladder.quality === null &&
+    ladder.burn === null
+  if (isAlready) return null
+  return {
+    ...ladder,
+    modes,
+    step,
+    quality: null,
+    burn: null,
+    stepBeforeTranscode: null,
+    reopenedAt: null,
     at,
   }
 }
@@ -254,6 +341,21 @@ export const sessionReducer = (state: SessionState, event: SessionEvent): Sessio
       const moved = burnPicked({ ladder: state, burn: event.burn, at: event.at })
       if (moved === null) return state
       return sourcing({ ladder: { ...moved, step: state.step }, step: moved.step, at: event.at })
+    }
+    case SESSION_EVENTS.qualityPicked: {
+      const moved = qualityPicked({
+        ladder: state,
+        quality: event.quality,
+        burn: event.burn ?? state.burn,
+        at: event.at,
+      })
+      if (moved === null) return state
+      return sourcing({ ladder: { ...moved, step: state.step }, step: moved.step, at: event.at })
+    }
+    case SESSION_EVENTS.directPicked: {
+      const moved = directPicked({ ladder: state, at: event.at })
+      if (moved === null) return state
+      return sourcing({ ladder: moved, step: moved.step, at: event.at })
     }
     case SESSION_EVENTS.retried:
       if (state.phase !== SESSION_PHASES.refused) return state
@@ -343,12 +445,14 @@ export const usePlaybackSession = ({
     const mode = modeOf(state)
     if (state.phase !== SESSION_PHASES.sourcing || mode === null) return () => undefined
     const { at: from } = state
+    const isTranscode = mode === PLAYBACK_MODES.transcode
     sources
       .source({
         media,
         mode,
         audio: state.audio,
-        burn: mode === PLAYBACK_MODES.transcode ? state.burn : null,
+        burn: isTranscode ? state.burn : null,
+        quality: isTranscode ? state.quality : null,
       })
       .then(
         (outcome) => {

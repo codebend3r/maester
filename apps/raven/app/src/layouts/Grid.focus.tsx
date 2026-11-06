@@ -15,6 +15,8 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import { focusCardWidthOf, FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
+import { FocusBand } from '@/layouts/FocusBand'
+import { HomePlate } from '@/layouts/HomePlate.focus'
 import { useOpenerFocus, useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
@@ -62,6 +64,46 @@ const headerHeightOf = (fontScale: number): number =>
     TV_SIZES.controlLarge,
     linesHeightOf({ sizes: [TV_SIZES.textXl], fontScale }) + 2 * TV_SIZES.tvFocusRing,
   ) + TV_SIZES.space3
+
+/** Rows of cards the list's height holds whole at the least, so a library shows more than one row. */
+const ROWS_IN_VIEW = 3
+
+/**
+ * Room left for a glimpse of the next row, a share of a row. The grid also widens each card a
+ * little to fill its row, which makes the rows taller than planned, and this keeps them in view.
+ */
+const NEXT_ROW_GLIMPSE = 0.25
+
+/**
+ * Whether a grid card of `shape` wears its caption. A poster (a show's or a film's) is the
+ * picture alone, its title said aloud, so more fit; an episode's still or an album's cover keeps
+ * its words, which the picture does not carry.
+ */
+const hasCaptionOf = (shape: CardShape): boolean => shape !== CARD_SHAPES.poster
+
+type CaptionHeightOfProps = { shape: CardShape; captionHeight: number }
+
+/** How tall a grid card's caption stands: none for a poster. */
+const captionHeightOf = ({ shape, captionHeight }: CaptionHeightOfProps): number =>
+  hasCaptionOf(shape) ? captionHeight : 0
+
+type CardWidthForRowsProps = { shape: CardShape; listHeight: number; captionHeight: number }
+
+/**
+ * The widest a card of `shape` may stand for `ROWS_IN_VIEW` rows of it and a glimpse of the next,
+ * caption and room to grow included, to fit the list's height; the shelves' own width where that is narrower already, or
+ * before the list is measured.
+ */
+const cardWidthForRows = ({ shape, listHeight, captionHeight }: CardWidthForRowsProps): number => {
+  const shelfWidth = focusCardWidthOf(shape)
+  if (listHeight <= 0) return shelfWidth
+  const pictureHeight =
+    listHeight / (ROWS_IN_VIEW + NEXT_ROW_GLIMPSE) -
+    captionHeightOf({ shape, captionHeight }) -
+    2 * GROWTH_ROOM
+  const perWidth = pictureHeightOf({ shape, width: 1 })
+  return Math.max(tvSize(1), Math.min(shelfWidth, pictureHeight / perWidth))
+}
 
 /** Rows drawn at once: a screen's worth of posters, with one more coming into view. */
 const GRID_ROWS_AT_ONCE = 4
@@ -204,6 +246,7 @@ type CardCellProps = GridCellProps
 const CardCell = ({ card, width, grid }: CardCellProps) => (
   <FocusCard
     card={card}
+    hasCaption={hasCaptionOf(card.shape)}
     isPreferred={card.key === grid.preferred}
     jump={grid.jumpOf(card)}
     onPress={() => grid.onOpen(card)}
@@ -285,31 +328,24 @@ const gridRowViewOf = <K extends GridRowKind>({
 }: GridRowViewOfProps<K>): ViewOf<GridRowViewsProps<K>, K> => ({ key: kind, props: { row, grid } })
 
 /**
- * A library on a TV: its name, what it holds, its search box beside the pickers and the jump
- * row held at the top, and below them the cards in rows the remote moves through, never the
- * touch layout made larger. Focus starts on the first card, and each jump moves it to the card
- * jumped to.
+ * A library on a TV: along the top Home and then the page's buttons, under them its name and what
+ * it holds with the jump row beside them, and below them the cards in rows the remote moves
+ * through, small enough for three rows to show, never the touch layout made larger. A library's
+ * own search box is the touch layout's alone; a TV searches from Home. Focus starts on the first
+ * card, and each jump moves it to the card jumped to.
  */
-const Grid = ({
-  title,
-  icon,
-  line,
-  notice,
-  search,
-  toolbar,
-  sections,
-  view,
-  jump,
-  onOpen,
-}: GridProps) => {
+const Grid = ({ title, icon, line, notice, toolbar, sections, view, jump, onOpen }: GridProps) => {
   const screen = useWindowDimensions()
   const styles = useStyles()
   const text = useTheme((theme) => theme.palette.text)
   const isRows = isRowView(view)
+  const [listHeight, setListHeight] = useState(0)
+  const captionHeight = focusCaptionHeightOf(screen.fontScale)
   const { columnsOf, widthOf } = gridColumnsOf({
     room: screen.width - 2 * TV_GUTTER,
     gap: GAP,
-    leastOf: (shape) => (isRows ? LEAST_ROW_WIDTH : focusCardWidthOf(shape)),
+    leastOf: (shape) =>
+      isRows ? LEAST_ROW_WIDTH : cardWidthForRows({ shape, listHeight, captionHeight }),
   })
   const wordsHeight = linesHeightOf({
     sizes: [TV_SIZES.textLg, TV_SIZES.text],
@@ -327,7 +363,7 @@ const Grid = ({
     }
     return (
       pictureHeightOf({ shape: row.shape, width: widthOf(row.shape) }) +
-      focusCaptionHeightOf(screen.fontScale) +
+      captionHeightOf({ shape: row.shape, captionHeight }) +
       2 * GROWTH_ROOM
     )
   }
@@ -337,7 +373,6 @@ const Grid = ({
     heightOf,
     top: 0,
   })
-  const [listHeight, setListHeight] = useState(0)
   // Each jump counts, the same card twice included. The count last handled is kept apart from
   // rendering, so the card jumped to asks for the focus once for its jump and never again as it
   // mounts afresh: scrolled back to, its bucket reopened, the grid sorted again.
@@ -380,30 +415,37 @@ const Grid = ({
 
   return (
     <View style={styles.ground}>
+      <View style={styles.top}>
+        {/* Outside the header, whose controls spend the opening focus: the first card keeps it. */}
+        <HomePlate />
+        {toolbar !== null && (
+          <View onFocus={settle} style={styles.toolbarSlot}>
+            <FocusBand>
+              <View style={styles.toolbar}>{toolbar}</View>
+            </FocusBand>
+          </View>
+        )}
+      </View>
       <View onFocus={settle} style={styles.header}>
         <View style={styles.titleRow}>
           {icon !== null && <Icon colour={text} name={icon} size={TITLE_ICON} />}
           <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
             {title}
           </Text>
+          {line !== null && <Text style={styles.line}>{line}</Text>}
+          {jump !== null && (
+            <JumpRow
+              jump={jump}
+              onJump={(keys) => {
+                const card = jumpTo(keys)
+                if (card === null) return
+                settle()
+                // From the latest count, so two presses before a render make two jumps.
+                setJumped((was) => ({ card, count: (was?.count ?? 0) + 1 }))
+              }}
+            />
+          )}
         </View>
-        {line !== null && <Text style={styles.line}>{line}</Text>}
-        <View style={styles.toolbar}>
-          {search}
-          {toolbar}
-        </View>
-        {jump !== null && (
-          <JumpRow
-            jump={jump}
-            onJump={(keys) => {
-              const card = jumpTo(keys)
-              if (card === null) return
-              settle()
-              // From the latest count, so two presses before a render make two jumps.
-              setJumped((was) => ({ card, count: (was?.count ?? 0) + 1 }))
-            }}
-          />
-        )}
         {notice !== null && <Text style={styles.notice}>{notice}</Text>}
       </View>
       {/* On a TV the fork wraps the list's ScrollView in a TVFocusGuideView that takes no
@@ -440,20 +482,30 @@ export const focusGrid: GridKit = { Grid }
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     ground: { flex: 1, backgroundColor: colours.ground },
+    top: {
+      flexShrink: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: TV_SIZES.space3,
+      paddingTop: TV_SIZES.space6,
+      paddingHorizontal: TV_GUTTER,
+    },
+    toolbarSlot: { flex: 1 },
     header: {
       flexShrink: 0,
       gap: TV_SIZES.space2,
-      paddingTop: TV_SIZES.space6,
+      paddingTop: TV_SIZES.space2,
       paddingHorizontal: TV_GUTTER,
       paddingBottom: TV_SIZES.space2,
     },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
     title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     line: { color: colours.muted, fontSize: TV_SIZES.textLg },
-    toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: TV_SIZES.space3 },
+    toolbar: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
     notice: { color: colours.muted, fontSize: TV_SIZES.textLg },
     // A horizontal ScrollView grows by default, which would leave the cards below no room.
-    jumpScroll: { flexGrow: 0 },
+    // Beside the name and the line, taking the rest of the row and scrolling within it.
+    jumpScroll: { flexGrow: 1, flexShrink: 1 },
     jumpRow: { gap: TV_SIZES.space0, paddingVertical: TV_SIZES.space1, alignItems: 'center' },
     unit: { color: colours.muted, fontSize: TV_SIZES.text, paddingRight: TV_SIZES.space1 },
     mark: {

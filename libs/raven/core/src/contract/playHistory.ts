@@ -1,5 +1,16 @@
+import { isArtistCredit } from '@/contract/music'
 import { isSeconds } from '@/contract/viewing'
-import { type Infer, isNumber, isString, listOf, nullable, object, oneOf, union } from '@/schema'
+import {
+  type Infer,
+  isNumber,
+  isString,
+  listOf,
+  nullable,
+  object,
+  oneOf,
+  optional,
+  union,
+} from '@/schema'
 
 /*
  * Play history: every time an account started a video or a track, however
@@ -43,6 +54,8 @@ const isPlayedVideo = object({
   kind: oneOf([PLAYED_KINDS.video]),
   title: isString,
   year: nullable(isNumber),
+  /** The movie it was matched to, for its page; null for a file with none, absent from an older server. */
+  itemId: optional(nullable(isNumber)),
 })
 
 const isPlayedEpisode = object({
@@ -51,6 +64,9 @@ const isPlayedEpisode = object({
   season: nullable(isNumber),
   episode: nullable(isNumber),
   title: isString,
+  /** The episode's and its show's items, for their pages; absent from an older server. */
+  itemId: optional(isNumber),
+  showId: optional(isNumber),
 })
 
 const isPlayedTrack = object({
@@ -58,6 +74,8 @@ const isPlayedTrack = object({
   title: isString,
   /** Every artist credited on the track, in order; null when its tags name none. */
   artist: nullable(isString),
+  /** The same artists one by one, for their pages; absent from an older server. */
+  artists: optional(listOf(isArtistCredit)),
   album: isString,
   albumId: isNumber,
   disc: isNumber,

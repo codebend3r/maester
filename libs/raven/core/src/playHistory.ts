@@ -1,5 +1,4 @@
 import { PLAYED_KINDS, type PlayHistoryEntry, type Played } from '@/contract'
-import { episodeCode } from '@/items'
 
 /** How far through counts as finished: the default watched percentage. */
 export const FINISHED_AT = 0.95
@@ -34,26 +33,6 @@ export const reachOf = ({ furthest, duration }: ReachOfProps): Reach => {
     furthest,
     duration,
     percent: Math.floor((furthest / duration) * 100),
-  }
-}
-
-const CONTEXT_SEPARATOR = ' · '
-
-/** What a played file belongs to: "Severance · S01E02", "Radiohead · OK Computer"; null for a film or a clip. */
-export const playedContext = (played: Played): string | null => {
-  switch (played.kind) {
-    case PLAYED_KINDS.episode:
-      return [played.show, episodeCode(played)]
-        .filter((part) => part !== null)
-        .join(CONTEXT_SEPARATOR)
-    case PLAYED_KINDS.track:
-      return [played.artist, played.album].filter((part) => part !== null).join(CONTEXT_SEPARATOR)
-    case PLAYED_KINDS.video:
-      return played.year === null ? null : String(played.year)
-    default: {
-      const unreachable: never = played
-      return unreachable
-    }
   }
 }
 

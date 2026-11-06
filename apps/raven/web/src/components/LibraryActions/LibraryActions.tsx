@@ -10,7 +10,7 @@ import {
 } from '@raven/core'
 import { type ReactNode, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button, ButtonLink, type IconName } from '@raven/ui'
+import { Button, ButtonLink, type IconName, useToasts } from '@raven/ui'
 import { useRatingsRefreshDone } from '@/components/LibraryActions/useRatingsRefreshDone'
 import { LibraryDialog } from '@/components/LibraryDialog/LibraryDialog'
 import styles from '@/components/LibraryActions/LibraryActions.module.scss'
@@ -52,11 +52,19 @@ const useLibraryCall = ({ library, call }: UseLibraryCallProps) => {
  */
 export const useLibraryActions = (library: Library) => {
   const queryClient = useQueryClient()
+  const showToast = useToasts((state) => state.show)
   const quickScan = useLibraryCall({ library, call: (id) => api.quickScanLibrary(id) })
   const cancelQuickScan = useLibraryCall({ library, call: (id) => api.cancelQuickScan(id) })
   const fullScan = useLibraryCall({ library, call: (id) => api.scanLibrary(id) })
   const cancelFullScan = useLibraryCall({ library, call: (id) => api.cancelScan(id) })
-  const scanMarkers = useLibraryCall({ library, call: (id) => api.scanLibraryMarkers(id) })
+  const scanMarkers = useLibraryCall({
+    library,
+    call: async (id) => {
+      const updated = await api.scanLibraryMarkers(id)
+      showToast(LIBRARY_ACTIONS_COPY.markersQueued)
+      return updated
+    },
+  })
   const updateRatings = useLibraryCall({ library, call: (id) => api.updateLibraryRatings(id) })
   const cancelRatings = useLibraryCall({ library, call: (id) => api.cancelLibraryRatings(id) })
   useRatingsRefreshDone(library)
@@ -71,7 +79,10 @@ export const useLibraryActions = (library: Library) => {
 
   const mergeAlbums = useMutation({
     mutationFn: () => api.mergeLibraryAlbums(library.id),
-    onSuccess: () => afterRematch({ queryClient, libraryId: library.id }),
+    onSuccess: ({ merged }) => {
+      showToast(LIBRARY_ACTIONS_COPY.albumsMerged(merged))
+      return afterRematch({ queryClient, libraryId: library.id })
+    },
   })
 
   return {
@@ -306,7 +317,6 @@ export const LibraryActions = ({
               {whose}
             </Button>
           )}
-          {scanMarkers.isSuccess && <output>{LIBRARY_ACTIONS_COPY.markersQueued}</output>}
           {canMergeAlbums && (
             <Button
               icon="shuffle"
@@ -318,9 +328,6 @@ export const LibraryActions = ({
               {LIBRARY_ACTIONS_COPY.mergeAlbums}
               {whose}
             </Button>
-          )}
-          {canMergeAlbums && mergeAlbums.isSuccess && (
-            <output>{LIBRARY_ACTIONS_COPY.albumsMerged(mergeAlbums.data.merged)}</output>
           )}
           <LongAction
             label={LIBRARY_ACTIONS_COPY.updateRatings}

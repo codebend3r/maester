@@ -173,6 +173,7 @@ export const season = ({ id, number }: SeasonProps): SeasonSummary => ({
   type: 'season',
   episodeCount: 2,
   watchedCount: 0,
+  runtime: null,
 })
 
 const RADIOHEAD = { id: 1, name: 'Radiohead' }

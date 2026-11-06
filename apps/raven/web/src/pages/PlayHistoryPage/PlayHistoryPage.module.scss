@@ -129,6 +129,20 @@
   font-weight: 500;
 }
 
+// What a row names opens its page: plain in the row's colour, underlined under the pointer.
+.link {
+  color: inherit;
+  text-decoration-line: none;
+
+  &:hover {
+    text-decoration-line: underline;
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
 .from,
 .library,
 .account,

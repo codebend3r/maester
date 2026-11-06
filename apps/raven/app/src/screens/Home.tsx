@@ -107,7 +107,7 @@ const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
   const pinnedLibraries = pinnedLibrariesOf(libraries.data ?? [])
 
   const view: ViewOf<HomeViewProps> = isLoading
-    ? { key: HOME_VIEW_KEYS.loading, props: { label: HOME_COPY.loading } }
+    ? { key: HOME_VIEW_KEYS.loading, props: { label: HOME_COPY.loading, isHome: true } }
     : {
         key: HOME_VIEW_KEYS.shelves,
         props: { slides, shelves, notice, libraries: pinnedLibraries },

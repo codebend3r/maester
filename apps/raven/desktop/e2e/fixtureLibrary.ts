@@ -134,6 +134,7 @@ const seasonCard: SeasonSummary = {
   type: ITEM_TYPES.season,
   episodeCount: 2,
   watchedCount: 0,
+  runtime: null,
 }
 
 type EpisodeCardProps = {

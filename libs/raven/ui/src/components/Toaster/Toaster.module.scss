@@ -28,9 +28,15 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  // The fade lasts TOAST_FADE_MS, so the toast is out of sight as it leaves the list.
   .toast {
     animation: toast-in 200ms var(--ease-out);
+    transition: opacity 300ms var(--ease-out);
   }
+}
+
+.leaving {
+  opacity: 0;
 }
 
 @keyframes toast-in {

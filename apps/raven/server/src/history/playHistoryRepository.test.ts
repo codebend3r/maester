@@ -113,7 +113,12 @@ describe('the play history', () => {
         lastPlayedAt: minute(10).toISOString(),
       },
     ])
-    expect(entries[0]?.played).toEqual({ kind: PLAYED_KINDS.video, title: 'Beach Day', year: null })
+    expect(entries[0]?.played).toEqual({
+      kind: PLAYED_KINDS.video,
+      title: 'Beach Day',
+      year: null,
+      itemId: null,
+    })
     expect(entries[0]?.libraryName).toBe('Home videos')
   })
 
@@ -150,6 +155,7 @@ describe('the play history', () => {
           title: 'Two',
           album: 'Album',
           artist: 'Band',
+          artists: [{ id: expect.any(Number), name: 'Band' }],
           albumTracks: 2,
         }),
       },

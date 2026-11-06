@@ -1,10 +1,7 @@
-import {
-  type AlbumRun,
-  type PlayHistoryEntry,
-  historyGroups,
-  playedContext,
-  reachOf,
-} from '@raven/core'
+import { type AlbumRun, type PlayHistoryEntry, historyGroups, reachOf } from '@raven/core'
+import { useMusicLinks } from '@/lib/useMusicLinks'
+import { PartLink, PlayedFrom } from '@/pages/PlayHistoryPage/PlayedCells'
+import { playedLinks } from '@/pages/PlayHistoryPage/playedLinks'
 import { PLAY_HISTORY_COPY } from '@/pages/PlayHistoryPage/copy'
 import styles from '@/pages/PlayHistoryPage/PlayHistoryPage.module.scss'
 
@@ -40,20 +37,26 @@ const HEAD_CLASSES: Partial<Record<Column, string>> = {
 
 type EntryLineProps = { entry: PlayHistoryEntry; nameOf: AccountName | null }
 
-const EntryLine = ({ entry, nameOf }: EntryLineProps) => (
-  <tr>
-    <td className={styles.when}>
-      <time dateTime={entry.startedAt}>{when.format(new Date(entry.startedAt))}</time>
-    </td>
-    <th scope="row" className={styles.title}>
-      {entry.played.title}
-    </th>
-    <td className={styles.from}>{playedContext(entry.played)}</td>
-    <td className={styles.library}>{entry.libraryName}</td>
-    <td className={styles.reach}>{PLAY_HISTORY_COPY.reach(reachOf(entry))}</td>
-    {nameOf && <td className={styles.account}>{nameOf(entry.accountId)}</td>}
-  </tr>
-)
+const EntryLine = ({ entry, nameOf }: EntryLineProps) => {
+  const music = useMusicLinks()
+  const links = playedLinks({ entry, music })
+  return (
+    <tr>
+      <td className={styles.when}>
+        <time dateTime={entry.startedAt}>{when.format(new Date(entry.startedAt))}</time>
+      </td>
+      <th scope="row" className={styles.title}>
+        <PartLink part={links.title} />
+      </th>
+      <td className={styles.from}>
+        <PlayedFrom groups={links.from} />
+      </td>
+      <td className={styles.library}>{entry.libraryName}</td>
+      <td className={styles.reach}>{PLAY_HISTORY_COPY.reach(reachOf(entry))}</td>
+      {nameOf && <td className={styles.account}>{nameOf(entry.accountId)}</td>}
+    </tr>
+  )
+}
 
 type AlbumRunRowProps = { run: AlbumRun; span: number }
 

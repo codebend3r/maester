@@ -66,6 +66,10 @@ export const PLAY_HISTORY_COPY = {
   /** The viewer of a server without accounts, and every play kept from before accounts. */
   thisServer: 'This server',
   table: 'What was played',
+  /** Between what a row belongs to: a show and its episode, a track's artists and its album. */
+  contextSeparator: ' · ',
+  /** Between a track's artists. */
+  listSeparator: ', ',
   columns: {
     when: 'Played',
     title: 'Title',

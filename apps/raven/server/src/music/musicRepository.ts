@@ -150,7 +150,8 @@ const ALBUM_ARTISTS = `(SELECT json_group_array(json_object('id', credited.id, '
                                   WHERE aa.album_id = a.id
                                   ORDER BY aa.position) credited)`
 
-const TRACK_ARTISTS = `(SELECT json_group_array(json_object('id', credited.id, 'name', credited.name))
+/** A track's artists in credit order, as one JSON list per row of media `m`. */
+export const TRACK_ARTISTS = `(SELECT json_group_array(json_object('id', credited.id, 'name', credited.name))
                            FROM (SELECT ar.id, ar.name
                                    FROM track_artists ta
                                    JOIN artists ar ON ar.id = ta.artist_id
@@ -255,8 +256,15 @@ const ALBUM_SEARCH = `(a.title LIKE @pattern ESCAPE '\\' OR EXISTS (
 
 type TrackOrderOfProps = AlbumOrderOfProps & Pick<MusicListParams, 'byAlbum'>
 
+/**
+ * Each track's place in a random listing, the albums' hash over the track's own id, so a
+ * shuffle of the library draws its tracks from every album rather than an album at a time.
+ */
+const TRACK_RANDOM = '((m.id * (1103515245 + @seed * 2)) % 2147483647)'
+
 const trackOrderOf = ({ sort, order, byAlbum = false }: TrackOrderOfProps): string => {
   const direction = order === SORT_DIRECTIONS.descending ? 'DESC' : 'ASC'
+  if (!byAlbum && sort === MUSIC_SORTS.random) return `${TRACK_RANDOM}, m.id`
   if (!byAlbum && sort === MUSIC_SORTS.title) return `t.title COLLATE NOCASE ${direction}, m.id`
   if (!byAlbum && sort === MUSIC_SORTS.added) {
     const addedDirection = order === SORT_DIRECTIONS.ascending ? 'ASC' : 'DESC'
@@ -276,7 +284,8 @@ const CREDITS = {
   track: { table: 'track_artists', owner: 'media_id' },
 } as const
 
-const creditsOf = (json: string): ArtistCredit[] =>
+/** The artists a credit list's JSON names, or none when it is not what the queries write. */
+export const creditsOf = (json: string): ArtistCredit[] =>
   parseJsonAs({ json, guard: isArtistCredits }) ?? []
 
 type CoverOfProps = {

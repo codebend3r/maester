@@ -5,6 +5,9 @@ import type { PersonCard } from '@/queries/itemPage'
 /** The name every form wears above its own title, always in the display font. */
 export const FORM_COPY = { wordmark: 'Raven' } as const
 
+/** The way back to Home every screen but Home, sign-in and the player wears at its top left. */
+export const HOME_NAV_COPY = { home: 'Home' } as const
+
 /** What the checkbox under a secret field says. */
 export const FIELD_COPY = { showPassword: 'Show password' } as const
 

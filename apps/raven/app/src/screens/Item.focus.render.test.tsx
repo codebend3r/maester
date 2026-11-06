@@ -171,12 +171,29 @@ describe('Item on a TV', () => {
 
     // Nothing focusable is drawn yet, so tvOS has nothing else to give the focus to.
     const seasonEarly = screen.queryByRole('button', { name: 'Season 1' })
+    const homeEarly = screen.queryByRole('button', { name: 'Home' })
     next.release()
     expect(seasonEarly).toBeNull()
+    expect(homeEarly).toBeNull()
 
     await screen.findByRole('button', { name: 'Play S01E01' })
     expect(preferred()).toEqual(['Play S01E01'])
     expect(screen.getByRole('button', { name: 'Season 1' })).toBeTruthy()
+  })
+
+  it('puts the way Home in a band of its own above the actions, which Up from Play reaches', async () => {
+    await renderItem(SEVERANCE.id)
+    const play = await screen.findByRole('button', { name: 'Play S01E01' })
+    const home = screen.getByRole('button', { name: 'Home' })
+    expect(screen.getAllByRole('button')[0]).toBe(home)
+    const homeBand = guideAround(home)
+    const actions = guideAround(play)
+    if (homeBand === null || actions === null) throw new Error('No focus guide')
+    expect(homeBand).not.toBe(actions)
+    expect(within(homeBand).queryByRole('button', { name: 'Play S01E01' })).toBeNull()
+
+    await fireEvent(home, NATIVE_EVENTS.focus)
+    expect(preferred()).toEqual(['Play S01E01'])
   })
 
   it("puts a season's episodes on a row, each opening its page", async () => {
@@ -244,10 +261,11 @@ describe('Item on a TV', () => {
     expect(StyleSheet.flatten(codec.props.style).backgroundColor).toBe(CHIP_COLOURS.hevc)
   })
 
-  it('asks a film for no next and gives it no way up', async () => {
+  it('asks a film for no next and gives it no way up, only the way to its saga', async () => {
     await renderItem(BUSBOYS.id)
     await screen.findByRole('button', { name: 'Resume from 50:00' })
-    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.queryByRole('link', { name: /^Go to/u })).toBeNull()
+    expect(await screen.findByRole('link', { name: 'View saga Busboys Collection' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Next/u })).toBeNull()
   })
 

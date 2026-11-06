@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { usePlayerPrefs } from '@raven/ui/headless'
 import type { AdminLock, ItemDetails } from '@raven/core'
@@ -13,6 +13,7 @@ import { renderWithProviders } from '@/test/render'
 import { EPISODE_ONE, EPISODE_TWO, SEASON_ONE_SUMMARY, SEVERANCE } from '@/test/tv'
 import { asDesktop, downloadsMain } from '@/test/desktop'
 import { BINGE_COPY } from '@/lib/binge'
+import { SEASON_VIEWS, useSeasonView } from '@/stores/seasonView'
 
 const Watching = () => <p>Watching {useParams().id}</p>
 const Elsewhere = () => <p>Show {useParams().id}</p>
@@ -231,6 +232,36 @@ describe('ShowPage', () => {
       watchedCount,
       episodeCount,
     })),
+  })
+
+  it("shows each season's whole runtime beside its episode count", async () => {
+    open({
+      details: {
+        ...SEVERANCE,
+        children: [{ ...SEASON_ONE_SUMMARY, episodeCount: 9, runtime: 570 }],
+      },
+    })
+    expect(await screen.findByText('9 episodes · 9h 30m')).toBeInTheDocument()
+  })
+
+  it('lays the seasons out as a table from the view toggle, and remembers it', async () => {
+    open({ details: withSeasons([[1, 3]]) })
+    const grid = await screen.findByRole('button', { name: 'Grid' })
+    expect(grid).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('table')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Table' }))
+    const table = await screen.findByRole('table', { name: 'Seasons' })
+    const row = within(table).getByRole('row', { name: /Season 1/ })
+    expect(
+      within(row)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['3', '1 of 3', 'Unknown'])
+    expect(within(row).getByRole('link', { name: /Season 1/ })).toHaveAttribute(
+      'href',
+      '/shows/4/seasons/1',
+    )
+    expect(useSeasonView.getState().view).toBe(SEASON_VIEWS.table)
   })
 
   it('shows how many episodes of a season are left unwatched', async () => {

@@ -1,18 +1,24 @@
 ---
 name: pr-format
 description: >-
-  Use when opening, drafting, or editing a pull request in maester: "open a PR", "write the PR description", `gh pr create`, `gh pr edit`, "update the PR body", "clean up the PR", "add screenshots to the PR", or after pushing new commits to a branch with an open PR. Covers the `MAE:` title, the What / Why / Testing body split by Nx project, screenshots of visual changes, keeping the PR in sync with the branch, and zero agent attribution. For commit messages, use `commit-format`.
+  Use when opening, drafting, or editing a pull request in maester: "open a PR", "write the PR description", `gh pr create`, `gh pr edit`, "update the PR body", "clean up the PR", "add screenshots to the PR", or after pushing new commits to a branch with an open PR. Covers the `MAE:` title, the What / Why / Testing body grouped by Nx project and area (a superset of the commit message), screenshots of visual changes, keeping the PR in sync with the branch, and zero agent attribution. For commit messages, use `commit-format`.
 ---
 
 # PR format
+
+The PR body is the superset of the commit message (`commit-format`): the same **What** grouped by project and the same **Why**, as markdown, plus Testing, screenshots, follow-ups, issue links and the checklist. Write the What and Why once and the squash-merge commit is the same text with the markdown headings made plain.
 
 ## House style
 
 Shared with `commit-format`. Keep the two copies identical.
 
 - **`MAE:` prefix.** Every commit subject and PR title starts with `MAE: `. No other prefix (`feat:`, `fix:`, `chore:`)
-- **Short, concise sentences.** One idea per line. No filler ("This PR…", "I added…"), no restating
-- **Prefer bullets.** Use `-` bullets over paragraphs. Nest one level at most
+- **Segmented by project.** What changed is grouped under one heading per Nx project, ordered: the app a user sees (`@raven/web`), other apps, libs, `apps/<product>`, then `Workspace`. The project name is the heading, so a bullet never repeats it
+- **Grouped by area inside a project.** Past about five bullets, gather related ones under a plain lead bullet (`- Player:`) with the changes nested beneath. Nest one level at most
+- **One change per bullet.** Lead with what changed, then what it now does, in the present tense: ``- `qualityOptions.ts`: Direct play first, then the web's lower sizes``. Most visible change first, internals after, tests and docs last
+- **What, then Why.** What says what changed, not how the code works. Why gives the reason, not a restatement: "Friends could see tools they can't call" is a reason, "Filter tools by tier" is not
+- **Short, concise sentences.** No filler ("This PR…", "I added…"), no restating, no hedging
+- **One line per bullet.** Never hard-wrap inside a bullet; a wrapped line breaks the nesting in `git log` and on GitHub. Split a long bullet into nested ones instead
 - **Backtick code.** File names, paths, commands, env vars, model ids, and code symbols
 - **No agent attribution.** Never mention Claude, Anthropic, Copilot, Cursor, Codex, or "AI-generated" anywhere: subject, body, or trailer. This overrides the default `Co-Authored-By: Claude` trailer and "Generated with Claude Code" footer. Human co-authors are fine
 - **No emoji** in commits, PR titles, or PR bodies
@@ -32,7 +38,9 @@ Follows `.github/pull_request_template.md`. **What** and **Why** are always requ
 ### `@raven/web`
 
 - `path/or/symbol`: <what changed>
-- <what now happens that didn't before>
+- <Area>:
+  - <what changed>
+  - <what changed>
 
 | <Screen>                                                                                  | <Screen>      |
 | ----------------------------------------------------------------------------------------- | ------------- |
@@ -64,6 +72,7 @@ Follow-ups:
 
 - `@raven/web`, 111 tests: <what they cover>
 - `@raven/server`, 135 tests: <what they cover>
+- Pre-push hook: <passes, or what it reported>
 - Manual: <what was clicked through, where>
 - Not verified: <what, and why>
 
@@ -80,12 +89,13 @@ Closes #<n>
 - **Sections** are named by package name in backticks (`@sparrow/api`, `@raven/server`, `@raven/web`, `@raven/core`, `scripts`); the root `CLAUDE.md` table maps paths to projects
 - Order: the app a user sees (`@raven/web`), then other apps (`@raven/server`, `@sparrow/api`), then libs (`@raven/core`), then `apps/<product>`, then `Workspace`. Leave out a section with no changes. A one-project PR still gets its heading
 - `apps/<product>` takes product files outside a project (`Dockerfile`, compose, README) and root files that serve only that product (its spec and plan in `docs/superpowers/`, its workflow job). `Workspace` takes the rest of the root
-- **What** says what changed, one change per bullet, not how the code works
-- **Why** gives the reason, not a restatement of What. "Friends could see tools they can't call" is a reason; "Filter tools by tier" is not
-- **Testing** gives one current result per project, led by its name, then manual checks, then what was skipped. It describes the branch as it is now: no per-commit or per-push blocks ("on `3da7783`…")
-- **Screenshots** are required when the branch changes anything a user sees (a page, component, style, dialog, the player). Put them in the section of the project that draws the screen, even when the data behind it comes from elsewhere. How to take and host them: `screenshots.md` in this folder
+- **What** says what changed, one change per bullet, not how the code works. A section past about five bullets groups them by area under a plain lead bullet (`- Player:`, `- Lighthouse fixture:`), never under a `####` heading
+- **Why** gives the reason, not a restatement of What, as bullets in the order a reviewer needs them: the problem first, then the constraint that shaped the fix. `Follow-ups:` lists known gaps after it, and is left out when there are none
+- **Testing** gives one current result per project, led by its name, then the pre-push hook, then manual checks, then what was skipped. It describes the branch as it is now: no per-commit or per-push blocks ("on `3da7783`…")
+- **Screenshots** are required when the branch changes anything a user sees (a page, component, style, dialog, the player). Put them in the section of the project that draws the screen, after its bullets, even when the data behind it comes from elsewhere. How to take and host them: `screenshots.md` in this folder
 - Link issues with `Closes #n` (one per issue), `Part of #n` for the parent epic, `Refs #n` when the PR doesn't finish it. Find them with `gh issue list`; with none, drop the line. Never link the PR's own number
 - Tick every checklist item; add `(n/a)` after the ones that don't apply. Never delete one
+- Keep the body reviewable: about 300 to 400 words outside the checklist and screenshots. If What runs longer, the bullets are describing how instead of what, or the PR should be split
 
 ## Creating
 
@@ -110,7 +120,8 @@ Strip any attribution line an older body had.
 ## Checklist
 
 - [ ] Title starts with `MAE: `, 72 chars or fewer
-- [ ] What has one `###` section per touched project, in order
+- [ ] What has one `###` section per touched project, in order, with no project name repeated in a bullet
+- [ ] One change per bullet, one line each, area groups past five bullets
 - [ ] Every visual change has a screenshot, taken from demo data
 - [ ] Why present, as short bullets
 - [ ] Testing has one current result per project and says what didn't run

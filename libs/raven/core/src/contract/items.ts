@@ -225,6 +225,11 @@ export const isSeasonSummary = object({
   episodeCount: isNumber,
   /** Of `episodeCount`, those watched. */
   watchedCount: isNumber,
+  /**
+   * Minutes of those `episodeCount` episodes, from TMDB; null when none has a
+   * runtime, and missing from an older server.
+   */
+  runtime: optional(nullable(isNumber)),
 })
 
 export type SeasonSummary = Infer<typeof isSeasonSummary>

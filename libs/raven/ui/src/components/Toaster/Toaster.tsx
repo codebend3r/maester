@@ -1,21 +1,26 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
 import { TOASTER_COPY } from '@/components/Toaster/copy'
 import styles from '@/components/Toaster/Toaster.module.scss'
-import { TOAST_MS, type Toast, useToasts } from '@/stores/toasts'
+import { TOAST_FADE_MS, TOAST_MS, type Toast, useToasts } from '@/stores/toasts'
 
 type ToastNoteProps = { toast: Toast }
 
 const ToastNote = ({ toast }: ToastNoteProps) => {
   const dismiss = useToasts((state) => state.dismiss)
+  const [isLeaving, setLeaving] = useState(false)
   useEffect(() => {
+    const fade = setTimeout(() => setLeaving(true), TOAST_MS - TOAST_FADE_MS)
     const timer = setTimeout(() => dismiss(toast.id), TOAST_MS)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(fade)
+      clearTimeout(timer)
+    }
   }, [toast.id, dismiss])
   return (
     // An output holds phrasing content only, so each toast is a span.
-    <span className={styles.toast}>
+    <span className={[styles.toast, isLeaving ? styles.leaving : ''].filter(Boolean).join(' ')}>
       <Icon name="check" />
       <span className={styles.message}>{toast.message}</span>
       <Button

@@ -12,7 +12,7 @@ import type { Viewer } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { WatchedCards } from '@/media/watchedCards'
-import { WatchedRepository } from '@/media/watchedRepository'
+import { PLAY_KINDS, WatchedRepository } from '@/media/watchedRepository'
 import { BLANK_ITEM, type FetchedItem, type FetchedSaga } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
@@ -348,7 +348,12 @@ describe("listing a TV library's shows", () => {
       const playing = media().get({ id: state.ids.get(name) ?? -1, account: TEST_ACCOUNTS.a })
       if (!playing) throw new Error(`no ${name}`)
       return fileName(
-        media().nextInSession({ media: playing, session, account: TEST_ACCOUNTS.a })?.id ?? null,
+        media().nextInSession({
+          media: playing,
+          session,
+          libraryIds: [state.libraryId],
+          account: TEST_ACCOUNTS.a,
+        })?.id ?? null,
       )
     }
     const show = { kind: SESSION_KINDS.show } as const
@@ -363,6 +368,54 @@ describe("listing a TV library's shows", () => {
     expect(next({ name: 'Binge - S01E01.mkv', session: { kind: SESSION_KINDS.single } })).toBe(
       'none',
     )
+  })
+
+  it('shuffles a show without end, never the episode just played, unwatched ones first', () => {
+    const showId = addShow({
+      title: 'Dealt',
+      episodes: [
+        [1, 1],
+        [1, 2],
+        [2, 1],
+        [0, 1],
+      ],
+    })
+    type DrawProps = { name: string; roll: number; libraryIds?: readonly number[] }
+    const draw = ({ name, roll, libraryIds = [state.libraryId] }: DrawProps) => {
+      const playing = media().get({ id: state.ids.get(name) ?? -1, account: TEST_ACCOUNTS.a })
+      if (!playing) throw new Error(`no ${name}`)
+      return fileName(
+        media().nextInSession({
+          media: playing,
+          session: { kind: SESSION_KINDS.shuffle, showId: String(showId) },
+          libraryIds,
+          roll: () => roll,
+          account: TEST_ACCOUNTS.a,
+        })?.id ?? null,
+      )
+    }
+    const drawn = (name: string) => [0, 0.34, 0.67, 0.999].map((roll) => draw({ name, roll }))
+    expect(drawn('Dealt - S01E01.mkv')).toEqual([
+      'Dealt - S01E02.mkv',
+      'Dealt - S02E01.mkv',
+      'Dealt - S00E01.mkv',
+      'Dealt - S00E01.mkv',
+    ])
+    expect(drawn('Dealt - S01E01.mkv')).not.toContain('Dealt - S01E01.mkv')
+    const mark = database.get().db.prepare<[string, number, string]>(
+      `INSERT INTO plays (account_id, media_id, played_at, furthest, kind)
+         VALUES (?, ?, '2026-01-01T00:00:00.000Z', 0, ?)`,
+    )
+    const markWatched = (name: string) =>
+      mark.run(TEST_ACCOUNTS.a, state.ids.get(name) ?? -1, PLAY_KINDS.marked)
+    markWatched('Dealt - S01E02.mkv')
+    markWatched('Dealt - S02E01.mkv')
+    expect(new Set(drawn('Dealt - S01E01.mkv'))).toEqual(new Set(['Dealt - S00E01.mkv']))
+    markWatched('Dealt - S00E01.mkv')
+    expect(new Set(drawn('Dealt - S01E01.mkv'))).toEqual(
+      new Set(['Dealt - S01E02.mkv', 'Dealt - S02E01.mkv', 'Dealt - S00E01.mkv']),
+    )
+    expect(draw({ name: 'Dealt - S01E01.mkv', roll: 0, libraryIds: [] })).toBe('none')
   })
 
   it('lists the next episode of a show partway through as in progress, from the start', () => {

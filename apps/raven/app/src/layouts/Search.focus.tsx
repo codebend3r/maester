@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, View } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { useScreenFocusScope } from '@/layouts/focus'
+import { HomePlate } from '@/layouts/HomePlate.focus'
 import {
   CLEAR_SEARCH,
   type SearchFieldProps,
@@ -59,6 +60,7 @@ const SearchLayout = ({ title, label, search, notice, children }: SearchLayoutPr
   return (
     <ScrollView contentContainerStyle={styles.page} style={styles.ground}>
       <View style={styles.header}>
+        <HomePlate />
         <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
           {title}
         </Text>

@@ -30,6 +30,9 @@ type AlbumsGridProps = {
   toggle: ReactNode
 }
 
+/** How many seeds a shuffle picks among: the server reads at most a million. */
+const SHUFFLE_SEEDS = 1_000_000
+
 /**
  * A music library: its albums as covers, by artist, of those the search finds, with Shuffle,
  * which plays the tracks those albums hold, as many as one page of them, in a random order.
@@ -58,13 +61,16 @@ export const AlbumsGrid = ({
   })()
   const open = ({ target }: ShelfCard) => router.push(hrefOf(target))
   const playTracks = useAudioQueue((store) => store.playTracks)
-  // A read that fails leaves the queue as it was.
+  // A fresh seed each press: the server draws the most a page holds at random from the whole
+  // library, never the first artists by name, and the queue shuffles them again. A read that
+  // fails leaves the queue as it was.
   const shuffle = () =>
     api
       .listTracks({
         libraryId: library.id,
         search: search.query,
-        sort: MUSIC_SORTS.artist,
+        sort: MUSIC_SORTS.random,
+        seed: Math.floor(Math.random() * SHUFFLE_SEEDS),
         limit: MUSIC_PAGE.most,
       })
       .then(
