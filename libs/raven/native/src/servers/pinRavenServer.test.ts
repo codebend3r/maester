@@ -13,19 +13,29 @@ const NAS: AppServer = {
   addedAt: 1,
 }
 
-describe('pinRavenServer', () => {
-  it('leaves raven the one server, and the active one', async () => {
-    const forgotten: string[] = []
-    const useServers = createActiveServerStore({
-      store: memoryStore().store,
-      jar: {
-        forget: async (id) => {
-          forgotten.push(id)
-        },
+/** A server store whose jar records the ids it forgets. */
+const storeWithForgetLog = () => {
+  const forgotten: string[] = []
+  const useServers = createActiveServerStore({
+    store: memoryStore().store,
+    jar: {
+      forget: async (id) => {
+        forgotten.push(id)
       },
-    })
+    },
+  })
+  return { useServers, forgotten }
+}
+
+describe('pinRavenServer', () => {
+  it('leaves raven the one server, and the active one, in one change', () => {
+    const { useServers, forgotten } = storeWithForgetLog()
     useServers.getState().add(NAS)
     useServers.getState().activate(NAS.id)
+    const activeIds: (string | null)[] = []
+    useServers.subscribe(({ activeId }) => {
+      activeIds.push(activeId)
+    })
 
     pinRavenServer({ servers: useServers })
 
@@ -33,16 +43,20 @@ describe('pinRavenServer', () => {
       servers: [RAVEN_SERVER],
       activeId: RAVEN_SERVER.id,
     })
+    expect(activeIds).toEqual([RAVEN_SERVER.id])
     expect(forgotten).toEqual([NAS.id])
   })
 
-  it('keeps raven as it was when it is listed already', () => {
-    const useServers = createActiveServerStore({
-      store: memoryStore().store,
-      jar: { forget: async () => {} },
-    })
-    useServers.getState().add(RAVEN_SERVER)
+  it('moves raven stored under an older origin to the current one, keeping its cookies', () => {
+    const { useServers, forgotten } = storeWithForgetLog()
+    useServers.getState().add({ ...RAVEN_SERVER, origin: 'https://raven-player.netlify.app' })
+
     pinRavenServer({ servers: useServers })
-    expect(useServers.getState().servers).toEqual([RAVEN_SERVER])
+
+    expect(useServers.getState()).toMatchObject({
+      servers: [RAVEN_SERVER],
+      activeId: RAVEN_SERVER.id,
+    })
+    expect(forgotten).toEqual([])
   })
 })

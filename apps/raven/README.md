@@ -511,7 +511,7 @@ From the repo root, on an Apple Silicon Mac, with the CI-built libmpv and addon 
 
 The app builds `@raven/web` first and serves that build, so there is one UI. The server it talks to is fixed at build time:
 
-- `RAVEN_DESKTOP_SERVER_ORIGIN` is the raven server's address. Unset, the app points at raven's public origin, `https://raven-player.synology.me:8443` ([Remote access](#remote-access)), so a viewer who signs in sees the same library and picks up where the web left off, at home or away. An install from before this, set up for the Tailscale Funnel or the Netlify address, keeps its downloads and its last account. Set it to `http://localhost:8484` to build against a local `bunx nx run @raven/server:dev`.
+- `RAVEN_DESKTOP_SERVER_ORIGIN` is the raven server's address. Unset, the app points at raven's public origin, `https://raven-player.synology.me:8443` ([Remote access](#remote-access)), so a viewer who signs in sees the same library and picks up where the web left off, at home or away. An install from before this, set up for the Netlify address, keeps its downloads and its last account. Set it to `http://localhost:8484` to build against a local `bunx nx run @raven/server:dev`.
 - `RAVEN_DESKTOP_LINK_ORIGINS` is an optional comma separated list of other origins whose `raven://` links name the same server, such as a LAN address. Links from the web app's Netlify site (`https://raven-player.netlify.app`) are accepted for the default server without it.
 
 An unpackaged `dev` run reads both from the environment too, so a different server needs no rebuild.
@@ -544,7 +544,7 @@ raven app is raven on iPhone, iPad, Apple TV and Android TV: browse the librarie
 
 ### Which server
 
-The app talks to raven at `https://raven-player.netlify.app`, the same public web address, and signs in with the same Supabase account as the web. It never asks for the PIN, and a locked library stays unavailable. The server address is fixed in the build, so there is no server picker.
+The app talks to raven at its public origin, `https://raven-player.synology.me:8443` ([Remote access](#remote-access)), as the desktop does, and signs in with the same Supabase account as the web. It never asks for the PIN, and a locked library stays unavailable. The server address is fixed in the build, so there is no server picker.
 
 A release build reaches that HTTPS address only. Development builds may use plain HTTP for Metro and for the end to end fixture. The fixture build sets `APP_VARIANT=development` and `EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490`, which skips account sign-in on that accountless server and starts at its PIN.
 

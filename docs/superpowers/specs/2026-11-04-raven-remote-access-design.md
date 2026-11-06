@@ -2,7 +2,7 @@
 
 Date: 2026-11-04. Status: built, on branch `trusted-proxies`; revised 2026-11-05 after a code review (the server alone sizes a remote transcode, the strict tier is counted whole after the account gate, the reachability check is signed and pinned to its vetted address, and the Netlify build reads its API origin from core).
 
-raven reaches the internet through Tailscale Funnel today. Funnel was measured at about 0.58 MB/s (4.7 Mb/s), which makes a 25.7 Mb/s 4K file unwatchable away from home, while the LAN origin carries about 86 Mb/s. This design takes Tailscale out of raven on every device and platform and makes raven reachable the way Plex is: a router port forward to the NAS, a public port the owner names in the Admin page, a status line that says whether raven is "Fully accessible outside your network", an upload speed and a limit on remote stream bitrate.
+raven reaches the internet through a third-party relay today. The relay was measured at about 0.58 MB/s (4.7 Mb/s), which makes a 25.7 Mb/s 4K file unwatchable away from home, while the LAN origin carries about 86 Mb/s. This design takes the relay out of raven on every device and platform and makes raven reachable the way Plex is: a router port forward to the NAS, a public port the owner names in the Admin page, a status line that says whether raven is "Fully accessible outside your network", an upload speed and a limit on remote stream bitrate.
 
 ## What exists today
 
@@ -10,17 +10,17 @@ raven reaches the internet through Tailscale Funnel today. Funnel was measured a
 | --- | --- |
 | raven | Docker, `8484:8484`, bridge network |
 | `RAVEN_WEB_URL`, `RAVEN_WEB_ORIGINS` | `https://raven-player.netlify.app` |
-| `RAVEN_MEDIA_ORIGINS` | `lan:` a QuickConnect "direct" name for the LAN address (DSM's nginx, Synology's `*.<id>.direct.quickconnect.to` certificate), `public:` the Funnel address |
-| Netlify `RAVEN_API_ORIGIN` | the Funnel address, written into `_redirects` at build time |
-| Desktop `DEFAULT_SERVER_ORIGIN` | the Funnel address, compiled in |
-| Device app and Wren | `https://raven-player.netlify.app`, so their API calls ride Netlify and then the Funnel |
-| Root `dev:raven:prod` | the Funnel address |
+| `RAVEN_MEDIA_ORIGINS` | `lan:` a QuickConnect "direct" name for the LAN address (DSM's nginx, Synology's `*.<id>.direct.quickconnect.to` certificate), `public:` the relay's address |
+| Netlify `RAVEN_API_ORIGIN` | the relay's address, written into `_redirects` at build time |
+| Desktop `DEFAULT_SERVER_ORIGIN` | the relay's address, compiled in |
+| Device app and Wren | `https://raven-player.netlify.app`, so their API calls ride Netlify and then the relay |
+| Root `dev:raven:prod` | the relay's address |
 
-The media origin kinds are `lan`, `tailnet` and `public`. `tailnet` only ever meant Tailscale.
+The media origin kinds are `lan`, `public` and a third that only ever meant the relay's private network.
 
 ## Goals
 
-- No Tailscale anywhere: no sidecar, no `ts.net` default, no `tailnet` kind, no doc that tells anyone to use it.
+- No third-party relay anywhere: no sidecar, no relay address as a default, no third origin kind, no doc that tells anyone to use one.
 - Away from home, media comes straight from Vhagar at the speed of its upload.
 - The owner configures remote access in the Admin page, as Plex's Remote Access settings do, and sees whether it works from outside.
 - A remote stream can be held under a bitrate the owner picks, so one remote viewer cannot use the whole upload.
@@ -77,9 +77,9 @@ The owner saves remote access in the Admin page. It is server state, kept in SQL
 While `isEnabled` holds and a hostname and a public port are set, the public origin is `https://<hostname>` with `:<publicPort>` unless it is 443. raven then:
 
 - **Lists it as a `public` media origin** in `GET /api/media-origins`, after the env's `RAVEN_MEDIA_ORIGINS` (still read, now `lan` and `public` only). The web probe, the desktop's downloads and playback pick, and the device app's `mediaAccessFor` already probe every listed origin and pick by speed, preferring `lan`, so at home the LAN origin keeps winning and away the public one does. Nothing in the clients changes for this.
-- **Is the API origin.** The public origin is core's `DEFAULT_SERVER_ORIGIN`, which the Netlify build and its pictures function read, and `netlify.toml` proxies `/api` to the same origin, signed (section 8); `netlifyToml.test.ts` fails when the two differ, so no environment variable names it. The web app, the device app and Wren, which all call `https://raven-player.netlify.app`, then reach raven through Netlify's proxy and the public origin. The desktop talks to the public origin directly: its default server (`DEFAULT_SERVER_ORIGIN`) is `https://raven-player.synology.me:8443`, the hostname the owner chose, which a build's `RAVEN_DESKTOP_SERVER_ORIGIN` still overrides. The Netlify site stays an alias the desktop's `raven://` links may name, since the web pages there name their own origin.
+- **Is the API origin.** The public origin is core's `DEFAULT_SERVER_ORIGIN`, which the Netlify build and its pictures function read, and `netlify.toml` proxies `/api` to the same origin, signed (section 8); `netlifyToml.test.ts` fails when the two differ, so no environment variable names it. The web app, which calls `https://raven-player.netlify.app`, then reaches raven through Netlify's proxy and the public origin. The desktop, the device app and Wren talk to the public origin directly: their default server (`DEFAULT_SERVER_ORIGIN`) is `https://raven-player.synology.me:8443`, the hostname the owner chose, which a desktop build's `RAVEN_DESKTOP_SERVER_ORIGIN` still overrides. The Netlify site stays an alias the desktop's `raven://` links may name, since the web pages there name their own origin.
 
-The `tailnet` kind goes from `MEDIA_ORIGIN_KINDS`. An env entry that still names it is dropped at boot with a problem in the log, as any unknown kind is.
+The third kind goes from `MEDIA_ORIGIN_KINDS`, leaving `lan` and `public`. An env entry that still names it is dropped at boot with a problem in the log, as any unknown kind is.
 
 ## 5. The reachability check
 
@@ -134,21 +134,21 @@ A direct play or a remux is the original video, so the server cannot shrink it. 
 > [!TIP]
 > The limit is applied in one place, the server. The first build also capped the quality in core's plan, the web ladder, the device app and the desktop, and the five disagreed; the clients now keep only the mode decision.
 
-## 7. Every client without Tailscale
+## 7. Every client on the public origin
 
 | Client | API | Media |
 | --- | --- | --- |
 | Web on Netlify | `/api` through `netlify.toml`'s signed proxy to the public origin | the probe picks `lan` at home (Chromium asks for Local Network Access once, as today), `public` away; `/api` through Netlify when neither answers |
 | Web served by raven itself | same origin | same |
 | Desktop (Raven) | its web host to the public origin, `https://raven-player.synology.me:8443`, by default, or a build's `RAVEN_DESKTOP_SERVER_ORIGIN` | its relay and downloads pick from the same origins; away, mpv asks for the server's transcode over the limit |
-| Device app: iPhone, iPad, Apple TV, Android TV | `https://raven-player.netlify.app`, unchanged | `mediaAccessFor` picks from the same origins; from a `public` origin it asks its Settings away cap, and the server holds it to the remote limit |
-| Wren | `https://raven-player.netlify.app`, unchanged | the same origins |
+| Device app: iPhone, iPad, Apple TV, Android TV | the public origin, `https://raven-player.synology.me:8443` (core's `DEFAULT_SERVER_ORIGIN`), directly | `mediaAccessFor` picks from the same origins; from a `public` origin it asks its Settings away cap, and the server holds it to the remote limit |
+| Wren | the public origin, directly, as the device app | the same origins |
 
-The device app and Wren need no new build for the switch: the Netlify site is their fixed front door, and only its `/api` rule (core's `DEFAULT_SERVER_ORIGIN`) and raven's settings move. A desktop build from before this change points at the Funnel and keeps working only while the Funnel runs, so the Funnel goes last (section 9). A new desktop build adopts an install whose config names the Funnel or the Netlify origin as the same server, keeping its id, its account and its downloads, and writes the new origin.
+The device app and Wren talk to the public origin directly, through core's `DEFAULT_SERVER_ORIGIN`, so their API calls no longer ride Netlify. An install that stored the Netlify origin is moved to the new one on launch by `pinRavenServer`, which keeps its cookies, since they are kept under the fixed server id. A desktop build from before this change points at the relay and keeps working only while the relay runs, so the relay goes last (section 9). A new desktop build adopts only the fixed origin and its aliases (the Netlify site) as the same server, keeping its id, its account and its downloads, and writes the fixed origin.
 
 ## 8. Security
 
-Exposing raven directly is what the Funnel already did: the Funnel was a public address too. What changes is who terminates TLS (DSM, not Tailscale) and that the bytes no longer pass a relay.
+Exposing raven directly is what the relay already did: the relay's address was public too. What changes is who terminates TLS (DSM, not the relay) and that the bytes no longer pass a relay.
 
 - **Only the reverse proxy is forwarded.** The router forwards the public port to the DSM rule's port and nothing else: never `8484`, never DSM's `5000` or `5001`.
 - **The account gate is default-deny.** With accounts `ready`, every route needs an approved account unless it is marked `@OpenToAnyone()`, and the inventory test lists every open one. Media goes by five-minute account tickets and their passes; the PIN follows the account; owner-only routes (`@AdminOnly()`, which includes the new Remote Access routes) answer 403 to members.
@@ -161,18 +161,18 @@ Exposing raven directly is what the Funnel already did: the Funnel was a public 
 > DNS rebinding was first an accepted risk, since the fetch's answer is reduced to one status. The review closed it anyway, and closed the open probe with it: the function pins its connection to the vetted address and refuses any caller that does not hold `RAVEN_PROXY_SECRET`.
 - **SSE through nginx.** DSM's nginx buffers responses, which holds back server events; the event stream sends `X-Accel-Buffering: no`, and the proxy rule's read timeout is raised (setup, step 4).
 
-## 9. Migration from the Funnel
+## 9. Migration from the relay
 
-1. Ship this change. Nothing moves yet: the env's `public:` Funnel entry is still a valid `public` origin, the Funnel still runs, and remote access is off until it is enabled.
+1. Ship this change. Nothing moves yet: the env's `public:` entry for the relay is still a valid `public` origin, the relay still runs, and remote access is off until it is enabled.
 2. Do the manual setup below (DDNS, certificate, reverse proxy rule, port forward).
 3. In Admin, Remote Access: enable, enter the hostname and the public port, Apply, and wait for "Fully accessible outside your network".
-4. Deploy the Netlify site, whose `/api` rule names the public origin (core's `DEFAULT_SERVER_ORIGIN`), with `RAVEN_PROXY_SECRET` set. The web app, the device app and Wren move over on that deploy.
-5. On Vhagar, take the Funnel entry out of `RAVEN_MEDIA_ORIGINS`, leaving `lan:` only (the public origin now comes from the settings), and restart raven.
-6. In Supabase Auth, take the Funnel address out of the redirect allowlist.
+4. Deploy the Netlify site, whose `/api` rule names the public origin (core's `DEFAULT_SERVER_ORIGIN`), with `RAVEN_PROXY_SECRET` set. The web app moves over on that deploy; the device app and Wren move with the build that names the public origin (section 7).
+5. On Vhagar, take the relay's entry out of `RAVEN_MEDIA_ORIGINS`, leaving `lan:` only (the public origin now comes from the settings), and restart raven.
+6. In Supabase Auth, take the relay's address out of the redirect allowlist.
 7. Release a desktop build and let it update.
-8. Remove the Funnel: stop the sidecar, delete `funnel/` and `tailscale/`, take `TS_AUTHKEY` out of `.env`, copy the new compose file and `update.sh`, and remove the `raven` node in the Tailscale admin console.
+8. Remove the relay: stop its sidecar, delete its configuration folders, take its auth key out of `.env`, copy the new compose file and `update.sh`, and remove the `raven` node in the relay's admin console.
 
-Rollback before step 8 is pointing `netlify.toml`'s `/api` rule and core's `DEFAULT_SERVER_ORIGIN` back at the Funnel address and redeploying; after it, the Funnel setup is in git history.
+Rollback before step 8 is pointing `netlify.toml`'s `/api` rule and core's `DEFAULT_SERVER_ORIGIN` back at the relay's address and redeploying; after it, the relay setup is in git history.
 
 ## 10. Manual setup (Vhagar; the same on Meleys or any Synology)
 
@@ -191,7 +191,7 @@ Nothing here is done by the code, a deploy or a PR.
 6. **Firewall.** If DSM's firewall is on, allow the private port.
 7. **raven.** Admin, Remote Access: tick Enable, hostname `<name>.synology.me`, public port `8443`, private port blank (or the private port if it differs), your upload speed, a remote limit; Apply.
 8. **Environment.** On Vhagar's `.env`: `RAVEN_MEDIA_ORIGINS=lan:https://<lan name>` (keep the QuickConnect LAN name, or any https name for the LAN address), `RAVEN_WEB_URL` and `RAVEN_WEB_ORIGINS` stay `https://raven-player.netlify.app`. In Netlify: `RAVEN_PROXY_SECRET` (32 random characters or more, `openssl rand -base64 33`), scoped to Runtime, which signs the `/api` proxy and lets the reachability function check raven's signature, then redeploy; put the same `RAVEN_PROXY_SECRET` in Vhagar's `.env`. The API origin is no variable: a hostname other than `raven-player.synology.me:8443` means changing `DEFAULT_SERVER_ORIGIN` and `netlify.toml`'s `/api` rule together.
-9. **Supabase.** Redirect allowlist and site URL: the Netlify site (and the public origin, if the web app is ever opened there directly); remove the Funnel address.
+9. **Supabase.** Redirect allowlist and site URL: the Netlify site (and the public origin, if the web app is ever opened there directly); remove the relay's address.
 10. **CGNAT check.** If the status stays "timeout" and the router's own WAN address is in `100.64.0.0/10`, or differs from the public address the status shows, the ISP puts the home network behind CGNAT and no port forward can work; ask the ISP for a public IPv4 address.
 
 ## Decisions (confirmed by the owner, 2026-11-04)
@@ -200,4 +200,4 @@ Nothing here is done by the code, a deploy or a PR.
 - A remote stream may use all of the upload speed, as with Plex.
 - Players away from home switch to a transcode for a file over the limit, which the server holds to it (section 6).
 - A per-address rate limiter ships with this change, before the port is forwarded (section 8).
-- `tailnet` is removed outright rather than kept as an alias for `public`.
+- The third origin kind is removed outright rather than kept as an alias for `public`.

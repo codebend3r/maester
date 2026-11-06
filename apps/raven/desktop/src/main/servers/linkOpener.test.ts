@@ -8,7 +8,7 @@ import {
 import { describe, expect, it } from 'bun:test'
 import { namesServer } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
-import { fixedServerFrom, LEGACY_FUNNEL_ORIGIN } from '@/main/origins'
+import { fixedServerFrom } from '@/main/origins'
 import { LINK_MESSAGES, createLinkOpener } from '@/main/servers/linkOpener'
 
 const ORIGIN = 'https://raven.example'
@@ -152,12 +152,6 @@ describe('createLinkOpener', () => {
         navigate,
       )
       expect(await opener.open({ link: playLinkFor(DEFAULT_SERVER_ORIGIN) })).toEqual(navigate)
-    })
-
-    it('refuses a link naming the Funnel origin, which nothing builds any more', async () => {
-      expect(await opener.open({ link: playLinkFor(LEGACY_FUNNEL_ORIGIN) })).toEqual(
-        refused(LINK_MESSAGES.otherServer),
-      )
     })
   })
 })

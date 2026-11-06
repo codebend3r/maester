@@ -81,8 +81,6 @@ curl -s https://<name>.synology.me:<port>/api/health
 
 To take raven off the internet: untick Enable in Admin, Remote Access, and remove the router's port forward.
 
-A box that still runs the old Funnel sidecar (`raven-tailscale`, from before Remote Access) is cleaned up once Remote Access answers and the Netlify site deployed with its `/api` rule on the public origin: `$nas sudo vhagar 'cd /volume1/docker/raven && docker stop raven-tailscale && docker rm raven-tailscale'`, then `ssh vhagar 'rm -rf /volume1/docker/raven/funnel /volume1/docker/raven/tailscale'`, take `TS_AUTHKEY` out of `.env`, and stage the new compose file and `update.sh` (step 2 above). Ask the user before each of these.
-
 ## Roll back
 
 Set `image:` in `/volume1/docker/raven/docker-compose.yml` to `ghcr.io/codebend3r/raven:<version>` (`0.5.3.4`, as the side menu and the GitHub Releases name it) or `:<full commit sha>` of the build to go back to, run `update.sh`, and put `latest` back when done. The index from before each update sits in `backups/<stamp>/`; with raven stopped, copy its files back into `data/`.

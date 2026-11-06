@@ -1,8 +1,8 @@
 # raven direct media
 
-> **2026-11-04:** Tailscale is gone. The `tailnet` kind, the Funnel and every `ts.net` address below are superseded by `2026-11-04-raven-remote-access-design.md`: the origin kinds are `lan` and `public`, and the public origin is a router port forward to DSM's reverse proxy.
+> **2026-11-04:** The public route is now raven's own: `2026-11-04-raven-remote-access-design.md` makes the public origin a router port forward to DSM's reverse proxy, and the origin kinds are `lan` and `public`.
 
-On Netlify, raven lags on large files while Plex on the same NAS plays them smoothly on the LAN. The cause is the route the bytes take, not the server: every `/api` request, the video included, goes browser → Netlify edge → Tailscale Funnel relay → Vhagar and back the same way. This splits raven into a **control plane** (JSON, cookies, events), which can stay behind Netlify's proxy, and a **media plane** (streams, files), which goes from the browser straight to Vhagar by the fastest route available.
+On Netlify, raven lags on large files while Plex on the same NAS plays them smoothly on the LAN. The cause is the route the bytes take, not the server: every `/api` request, the video included, goes browser → Netlify edge → a third-party relay → Vhagar and back the same way. This splits raven into a **control plane** (JSON, cookies, events), which can stay behind Netlify's proxy, and a **media plane** (streams, files), which goes from the browser straight to Vhagar by the fastest route available.
 
 ## What was measured
 
@@ -10,13 +10,13 @@ On `raven-player.netlify.app`, 2026-10-16, playing American Fiction (2160p HEVC 
 
 | Observation | Value |
 | --- | --- |
-| Route of `/api/media/6354/stream?mode=remux` | Netlify (`cache-status: fwd=miss`), then `RAVEN_API_ORIGIN`, the Funnel address |
+| Route of `/api/media/6354/stream?mode=remux` | Netlify (`cache-status: fwd=miss`), then `RAVEN_API_ORIGIN`, the relay's address |
 | Time to first byte of small API calls (cast photos, tracks, logo, `/api/home`) | 9 to 12 seconds |
 | Time to first byte of `/api/admin`, `/api/settings/playback` at idle | 0.35 to 1.8 seconds |
 | Buffer ahead shortly after starting | about 0.5 seconds |
 | Stream shape | One long fMP4 response per start point (by design, see README, Playback) |
 
-Plex on the LAN reads from the NAS directly, so its ceiling is the LAN. raven's ceiling is the smallest of: Vhagar's upload, Tailscale Funnel's relay (Tailscale documents Funnel traffic as subject to non-configurable bandwidth limits), and Netlify's proxy (26 seconds to first byte, counted bandwidth). Even at home the bytes leave the house and come back.
+Plex on the LAN reads from the NAS directly, so its ceiling is the LAN. raven's ceiling is the smallest of: Vhagar's upload, the third-party relay (its provider documents relayed traffic as subject to non-configurable bandwidth limits), and Netlify's proxy (26 seconds to first byte, counted bandwidth). Even at home the bytes leave the house and come back.
 
 ## Goals
 
@@ -40,18 +40,15 @@ raven learns a list of origins that serve its media routes, best first:
 | Kind | Example | Who it reaches |
 | --- | --- | --- |
 | `lan` | `https://raven.home.example.com` (split DNS to Vhagar's LAN IP, DSM reverse proxy, Let's Encrypt via DNS challenge) | Browsers on the home network |
-| `tailnet` | `https://raven.<tailnet>.ts.net` reached as a tailnet peer (Tailscale Serve) | Devices signed in to the tailnet, at home or away, over WireGuard, direct when possible |
-| `public` | the Funnel address, or a forwarded domain | Everyone else |
+| `public` | `https://raven.example.com`, a router port forward to the reverse proxy | Everyone else, away from home |
 
 Every origin must be HTTPS: the Netlify page is HTTPS, so an `http://192.168.x.x` media URL is blocked as mixed content.
-
-On a tailnet device, MagicDNS resolves the `ts.net` name to Vhagar's tailnet address, so the same hostname is direct for tailnet devices and relayed through Funnel for the rest. That alone may make the `tailnet` and `public` entries the same URL; the client still measures which it gets.
 
 **Config.** A new env var on Vhagar:
 
 ```
 # Origins the browser may fetch media from, best first. Each kind:url.
-RAVEN_MEDIA_ORIGINS=lan:https://raven.home.example.com,tailnet:https://raven.<tailnet>.ts.net
+RAVEN_MEDIA_ORIGINS=lan:https://raven.home.example.com,public:https://raven.example.com
 # Origins allowed to call the media routes cross-origin (the Netlify site, previews).
 RAVEN_WEB_ORIGINS=https://raven-player.netlify.app
 # Signs media tickets. 32+ random bytes, base64. Rotating it ends every ticket.
@@ -63,7 +60,7 @@ Unset, raven behaves as today: media URLs are relative and go wherever `/api` go
 **Contract.** A new guard in `libs/raven/core/src/contract.ts`, `isMediaOrigins`, read off by `GET /api/media-origins` (`@Public()`, `cache-control: no-store`):
 
 ```ts
-{ origins: [{ kind: 'lan' | 'tailnet' | 'public', url: string }] }
+{ origins: [{ kind: 'lan' | 'public', url: string }] }
 ```
 
 ### Choosing an origin in the browser
@@ -71,7 +68,7 @@ Unset, raven behaves as today: media URLs are relative and go wherever `/api` go
 A new `useMediaOrigin` in `@raven/ui` (platform logic in `@raven/core` as a pure `pickOrigin`):
 
 1. On app start, and again on `online` and on `visibilitychange` to visible after 10 minutes away, probe each origin in parallel with `GET {origin}/api/media-origins/ping?bytes=262144` (CORS, `no-store`), a 2 second timeout each.
-2. Score each origin that answers by time to first byte and the measured throughput of the 256 KB body. Prefer `lan` over `tailnet` over `public` when within 20% of each other.
+2. Score each origin that answers by time to first byte and the measured throughput of the 256 KB body. Prefer `lan` over `public` when within 20% of each other.
 3. No origin answers: fall back to the relative path (today's route through Netlify).
 4. Keep the pick in memory and in `sessionStorage` (wrapped in try/catch). A stream that fails to connect triggers a re-probe.
 
@@ -116,8 +113,7 @@ Any other origin gets no CORS headers, so a foreign page cannot read the bytes.
 ### Vhagar setup (outside the code)
 
 - `lan`: a DSM reverse proxy rule (or Caddy) for `raven.home.example.com` → `raven:8484`, a certificate by DNS challenge, and a local DNS record (router or DSM DNS Server) pointing the name at Vhagar's LAN IP.
-- `tailnet`: Tailscale Serve already terminates TLS for the `ts.net` name inside the tailnet. Confirm viewing devices are on the tailnet and the ACL lets them reach the `raven` node on 443.
-- `public`: unchanged Funnel, or a router port forward of 443 to the reverse proxy if Funnel's limits are too low for remote 4K (see open questions).
+- `public`: a router port forward of 443 to the reverse proxy, with a DDNS hostname and its certificate (see open questions).
 
 ## Phase 2: playback that copes with the route
 
@@ -169,7 +165,7 @@ A "Stats for nerds" toggle in the player (key `i`): media origin and kind, mode 
 
 ## Rollout
 
-1. Ship Phase 1 with `RAVEN_MEDIA_ORIGINS` unset (no behaviour change), then set `tailnet` only, then `lan`.
+1. Ship Phase 1 with `RAVEN_MEDIA_ORIGINS` unset (no behaviour change), then set `lan`, then `public`.
 2. Measure with Diagnostics at home and away.
 3. Ship Phase 2.
 4. Decide on Phase 3 and on the public route.
@@ -188,11 +184,11 @@ Answered before implementation; the plan in `docs/superpowers/plans/2026-10-17-r
 
 Answers from CJ that decide the choices above:
 
-1. **Who watches away from home**, and are those devices on your tailnet? Only you and family on Tailscale means `tailnet` covers remote playback and Funnel only matters for guests.
+1. **Who watches away from home**: only you and family, or guests too? This decides whether the `public` origin is needed at all.
 2. **Do you have a domain** you'd use for `raven.home.<domain>` (and possibly a public `raven.<domain>`), and where is its DNS hosted (needed for the DNS-challenge certificate)?
 3. **Home internet**: ISP, plan upload speed, and whether you're behind CGNAT. This sets the remote ceiling and whether a port forward is possible.
 4. **Vhagar's network**: its LAN IP, whether DSM's reverse proxy or another service already uses 443, and what does local DNS on your network (router model, Pi-hole, DSM DNS Server).
-5. **Why Netlify** for the web app: always up when Vhagar is down, a shareable URL, or something else? If it is only for the URL, serving the app from Vhagar at the `ts.net` or own-domain name removes the cross-origin work entirely.
+5. **Why Netlify** for the web app: always up when Vhagar is down, a shareable URL, or something else? If it is only for the URL, serving the app from Vhagar at its own domain name removes the cross-origin work entirely.
 6. **Which web origins** besides `raven-player.netlify.app` should be allowed: deploy previews, a custom domain on Netlify?
 7. **Target clients**: Chrome, Safari, iOS, a TV browser? iOS uses `ManagedMediaSource` and Safari has no Private Network Access, which changes testing.
-8. **Remote 4K**: should remote viewers ever get the original 4K, or always a 1080p transcode? This decides whether a port forward is worth it over Funnel.
+8. **Remote 4K**: should remote viewers ever get the original 4K, or always a 1080p transcode? This decides whether the `public` origin's upload can carry the original.

@@ -52,7 +52,7 @@ xcrun simctl launch booted io.github.codebend3r.raven.app
 
 ## Reaching raven
 
-The app talks to raven at `https://raven-player.netlify.app`, the same public web address, and asks for the account's email and password. It never asks for the PIN, and a locked library stays unavailable. The account session and the server's cookies stay in the device's keychain or keystore.
+The app talks to raven at its public origin, `https://raven-player.synology.me:8443` (core's `DEFAULT_SERVER_ORIGIN`), as the desktop does, and asks for the account's email and password. It never asks for the PIN, and a locked library stays unavailable. The account session and the server's cookies stay in the device's keychain or keystore.
 
 A release build reaches that HTTPS address only. A development build may use plain HTTP for Metro and for the end to end fixture: `APP_VARIANT=development` sets `NSAllowsLocalNetworking` on Apple and `usesCleartextTraffic` on Android. The fixture build also sets `EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490`, which skips account sign-in on that accountless server and starts at its PIN.
 

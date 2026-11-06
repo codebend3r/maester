@@ -21,7 +21,7 @@ import {
   setUpdates,
   upgradeConfig,
 } from '@/main/desktopConfig'
-import { fixedServerFrom, LEGACY_FUNNEL_ORIGIN } from '@/main/origins'
+import { fixedServerFrom } from '@/main/origins'
 import { configFor } from '@/main/test/configFakes'
 import type { StateFs } from '@/main/stateStore'
 
@@ -32,8 +32,7 @@ const idFor = ({ n }: IdForProps): string =>
 
 const ORIGIN = 'https://raven.example.synology.me:8443'
 const ALIAS = 'http://192.168.50.6:8484'
-const FORMER = 'https://raven.former.example'
-const SERVER = { origin: ORIGIN, aliases: [ALIAS], former: [FORMER] }
+const SERVER = { origin: ORIGIN, aliases: [ALIAS] }
 const NEW_ID = idFor({ n: 99 })
 const newId = () => NEW_ID
 
@@ -160,21 +159,14 @@ describe('namesServer', () => {
     expect(namesServer({ server: SERVER, origin: ALIAS })).toBe(true)
     expect(namesServer({ server: SERVER, origin: 'https://other.example' })).toBe(false)
   })
-
-  it('takes no former origin as the server, since only adoption reads those', () => {
-    expect(namesServer({ server: SERVER, origin: FORMER })).toBe(false)
-  })
 })
 
 describe('the default server and an older install', () => {
   const DEFAULT = fixedServerFrom({ origin: DEFAULT_SERVER_ORIGIN, linkOrigins: [] })
   const [WEB_APP = ''] = DEFAULT_LINK_ORIGINS
 
-  it.each([
-    ['the Tailscale Funnel origin', LEGACY_FUNNEL_ORIGIN],
-    ["the web app's site", WEB_APP],
-  ])('keeps a version 5 install under %s, with its id, account and downloads', (_name, origin) => {
-    const stored = { ...configFor({ id: idFor({ n: 1 }), origin }), lastAccountId: 'ada' }
+  it("keeps a version 5 install under the web app's site, with its id, account and downloads", () => {
+    const stored = { ...configFor({ id: idFor({ n: 1 }), origin: WEB_APP }), lastAccountId: 'ada' }
     expect(upgradeConfig({ stored, server: DEFAULT, newId })).toEqual({
       config: {
         ...configFor({ id: idFor({ n: 1 }), origin: DEFAULT_SERVER_ORIGIN }),
@@ -185,16 +177,13 @@ describe('the default server and an older install', () => {
     })
   })
 
-  it.each([
-    ['the Tailscale Funnel origin', LEGACY_FUNNEL_ORIGIN],
-    ["the web app's site", WEB_APP],
-  ])('adopts a version 4 server under %s as the default one', (_name, origin) => {
+  it("adopts a version 4 server under the web app's site as the default one", () => {
     const stored = {
       version: 4 as const,
       output: DEFAULT_OUTPUT_SETTINGS,
       servers: [
         listedFor({ n: 1, origin: 'https://other.example' }),
-        listedFor({ n: 2, origin }),
+        listedFor({ n: 2, origin: WEB_APP }),
         listedFor({ n: 3, origin: DEFAULT_SERVER_ORIGIN }),
       ],
       updates: UPDATES,
@@ -209,12 +198,12 @@ describe('the default server and an older install', () => {
     })
   })
 
-  it('adopts both legacy origins listed together under the first one', () => {
+  it('adopts the public origin and the web site listed together under the first one', () => {
     const stored = {
       version: 3 as const,
       output: DEFAULT_OUTPUT_SETTINGS,
       servers: [
-        listedFor({ n: 1, origin: LEGACY_FUNNEL_ORIGIN }),
+        listedFor({ n: 1, origin: DEFAULT_SERVER_ORIGIN }),
         listedFor({ n: 2, origin: WEB_APP }),
       ],
       updates: UPDATES,
@@ -224,13 +213,13 @@ describe('the default server and an older install', () => {
     expect(adopted).toEqual([idFor({ n: 2 })])
   })
 
-  it('does not adopt the legacy origins for a build that names another server', () => {
+  it("does not adopt the default server's origins for a build that names another server", () => {
     const other = fixedServerFrom({ origin: ORIGIN, linkOrigins: [] })
     const stored = {
       version: 4 as const,
       output: DEFAULT_OUTPUT_SETTINGS,
       servers: [
-        listedFor({ n: 1, origin: LEGACY_FUNNEL_ORIGIN }),
+        listedFor({ n: 1, origin: DEFAULT_SERVER_ORIGIN }),
         listedFor({ n: 2, origin: WEB_APP }),
       ],
       updates: UPDATES,

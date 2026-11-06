@@ -29,6 +29,12 @@ type ActiveServerState = {
   rename: (input: RenameProps) => boolean
   /** Makes a listed server the one the app talks to; an id not on the list changes nothing. */
   activate: (id: string) => void
+  /**
+   * Leaves `server` the one listed and the active one in a single change, as it is now: a stored
+   * copy under its id takes its current origin and name and keeps its cookies, which are kept
+   * under the id, and every other server's cookies are forgotten.
+   */
+  pin: (server: AppServer) => Promise<void>
 }
 
 /** The secure-store key the list and the active id are kept under, as one JSON value. */
@@ -69,6 +75,11 @@ export const createActiveServerStore = ({ store, jar }: CreateActiveServerStoreP
         },
         activate: (id) => {
           if (get().servers.some((server) => server.id === id)) set({ activeId: id })
+        },
+        pin: async (server) => {
+          const others = get().servers.filter(({ id }) => id !== server.id)
+          set({ servers: [server], activeId: server.id })
+          await Promise.all(others.map(({ id }) => jar.forget(id)))
         },
       }),
       {
