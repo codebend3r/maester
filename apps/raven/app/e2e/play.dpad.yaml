@@ -8,15 +8,18 @@ tags:
 - runFlow: steps/heroToFilm.dpad.yaml
 # A run stopped part way can leave the film under Continue watching, so the flow clears it
 # first, and then nothing is being watched.
+# The side menu has a row named Continue watching too, so the shelf is found by its key.
 - runFlow:
     when:
-      visible: Continue watching
+      visible:
+        id: in-progress
     commands:
       - runFlow: steps/clearSpot.dpad.yaml
       # The card the page was opened from went with its shelf, so Home gives its opening
       # focus again, to the hero's Play, and Down goes to the film on its own shelf.
       - runFlow: steps/heroToFilm.dpad.yaml
-- assertNotVisible: Continue watching
+- assertNotVisible:
+    id: in-progress
 # Select opens the film's page with the remote on Play.
 - pressKey: Remote Dpad Center
 - extendedWaitUntil:
@@ -64,7 +67,8 @@ tags:
 # is back on the card the page was opened from, on the films' own shelf below.
 - pressKey: Back
 - extendedWaitUntil:
-    visible: Continue watching
+    visible:
+      id: in-progress
     timeout: 30000
 - extendedWaitUntil:
     visible:

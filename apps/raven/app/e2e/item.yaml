@@ -4,11 +4,15 @@ tags:
   - touch
 ---
 - runFlow: signIn.yaml
-- extendedWaitUntil:
-    visible: Kestrel Point
-    timeout: 30000
 # A movie's card opens its page, with Play from the top, as it was never started.
-- tapOn: Kestrel Point
+- runFlow:
+    file: steps/shelfCard.touch.yaml
+    env:
+      TITLE: Kestrel Point
+      SHELF: Films
+- tapOn:
+    text: Kestrel Point
+    below: Films
 - extendedWaitUntil:
     visible: Mark watched
     timeout: 30000
@@ -25,10 +29,14 @@ tags:
     timeout: 10000
 - runFlow: steps/back.yaml
 # A show lists its seasons, and a season its episodes, each opening its page.
-- extendedWaitUntil:
-    visible: Lantern Bay
-    timeout: 30000
-- tapOn: Lantern Bay
+- runFlow:
+    file: steps/shelfCard.touch.yaml
+    env:
+      TITLE: Lantern Bay
+      SHELF: Series
+- tapOn:
+    text: Lantern Bay
+    below: Series
 - extendedWaitUntil:
     visible: Seasons
     timeout: 30000

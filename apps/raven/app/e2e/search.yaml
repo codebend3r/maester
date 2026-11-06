@@ -4,9 +4,6 @@ tags:
   - touch
 ---
 - runFlow: signIn.yaml
-- extendedWaitUntil:
-    visible: Lantern Bay
-    timeout: 30000
 # Home's header holds the search through every library; Search hands what was typed to its page.
 - tapOn: Search every library
 - inputText: lantern
@@ -33,8 +30,9 @@ tags:
     timeout: 30000
 - runFlow: steps/back.yaml
 # A library's own box searches it.
-- extendedWaitUntil:
-    visible: See all in Films
+- scrollUntilVisible:
+    element: See all in Films
+    direction: DOWN
     timeout: 30000
 - tapOn: See all in Films
 - extendedWaitUntil:

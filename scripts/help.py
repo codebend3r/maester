@@ -238,9 +238,82 @@ GROUPS: tuple[Group, ...] = (
         "red",
         (
             Command("ci:docker", "The ✅ Checks job inside an Ubuntu 24.04 container.", "Docker"),
-            Command("ci:app:ios", "The 📱 App on iPhone and iPad job.", "macOS + Xcode"),
+            Command(
+                "ci:app:ios",
+                "The 📱 App on iPhone and iPad job: every ci:app:ios step below, in order.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:app:ios:tools",
+                "Its tools: Homebrew's, Maestro and the iOS simulator runtime.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:app:ios:simulator",
+                "Boots the raven-phone iPhone simulator, making it when there is none.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:app:ios:build",
+                "The fixture's Release build for the iPhone simulator.",
+                "macOS + Xcode",
+            ),
+            Command("ci:app:ios:pods", "Checks the build's pod install finished.", "macOS + Xcode"),
+            Command(
+                "ci:app:ios:install", "Installs the build on the iPhone simulator.", "macOS + Xcode"
+            ),
+            Command(
+                "ci:app:ios:e2e",
+                "The touch Maestro flows on the iPhone simulator.",
+                "macOS + Xcode",
+            ),
             Command("ci:app:tvos", "The 📺 App on Apple TV job.", "macOS + Xcode"),
-            Command("ci:app:android-tv", "The 📺 App on Android TV job.", "Android SDK"),
+            Command(
+                "ci:app:android-tv",
+                "The 📺 App on Android TV job: every ci:app:android-tv step below, in order.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:app:android-tv:tools",
+                "Its tools: Android Studio, the SDK, the TV system image and Maestro.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:app:android-tv:emulator",
+                "Starts the raven_tv emulator, making it when there is none.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:app:android-tv:build",
+                "The fixture's Release APK for the emulator.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:app:android-tv:emulator:wait",
+                "Waits for the emulator to boot and turns its animations off.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:app:android-tv:install", "Installs the APK on the emulator.", "Android SDK"
+            ),
+            Command(
+                "ci:app:android-tv:e2e",
+                "The remote's Maestro flows on the emulator.",
+                "Android SDK",
+            ),
+            Command("ci:app:install", "The device app jobs' bun install."),
+            Command(
+                "ci:app:libraries",
+                "Builds the libraries the fixture server and the device app read.",
+            ),
+            Command(
+                "ci:app:fixture",
+                "The device app jobs' fixture server on :8490, in the foreground.",
+                "ffmpeg",
+            ),
+            Command(
+                "ci:app:fixture:wait", "Waits up to three minutes for the fixture server to answer."
+            ),
             Command("ci:wren", "The 🎵 Wren on iPhone job.", "macOS + Xcode"),
             Command("ci:desktop:e2e", "The 🎬 Desktop end to end job.", "macOS"),
             Command(

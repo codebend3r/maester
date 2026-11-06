@@ -4,10 +4,12 @@ tags:
   - touch
 ---
 - runFlow: signIn.yaml
-- extendedWaitUntil:
-    visible: Kestrel Point
+# Each library shelf's title has a way into the library beside it, named for the library, and
+# on an iPhone the hero pushes the shelves down the screen.
+- scrollUntilVisible:
+    element: See all in Films
+    direction: DOWN
     timeout: 30000
-# Each library shelf's title has a way into the library beside it, named for the library.
 - tapOn: See all in Films
 - extendedWaitUntil:
     visible: 'Sort: Release date'
@@ -26,6 +28,10 @@ tags:
 - assertVisible: Kestrel Point
 - assertVisible: 'Order: Newest first'
 - runFlow: steps/back.yaml
+- scrollUntilVisible:
+    element: See all in Series
+    direction: DOWN
+    timeout: 30000
 - tapOn: See all in Series
 - extendedWaitUntil:
     visible: Lantern Bay

@@ -25,7 +25,7 @@ step 'Check the Apple TV pods'
 grep -q 'SDKROOT = appletvos' apps/raven/app/ios/raven.xcodeproj/project.pbxproj
 cmp apps/raven/app/ios/Podfile.lock apps/raven/app/ios/Pods/Manifest.lock
 
-wait_for_fixture
+await_fixture
 
 step 'Boot the Apple TV simulator'
 boot_simulator "$TVOS_SIMULATOR" com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K

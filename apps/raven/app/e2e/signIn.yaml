@@ -6,6 +6,8 @@ name: Open the fixture server on a clean install
 - launchApp:
     clearState: true
     clearKeychain: true
+# Home is ready once its shelves are drawn. The hero rotates through the titles, so a title's
+# name says nothing of the shelves.
 - extendedWaitUntil:
-    visible: Kestrel Point
+    visible: Films
     timeout: 60000

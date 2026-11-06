@@ -1,0 +1,12 @@
+appId: io.github.codebend3r.raven.app
+name: Scroll Home to ${TITLE}'s card on the ${SHELF} shelf
+---
+# The hero above the shelves rotates through the titles, so a title's name alone may be the
+# hero's slide; its card is the one below its shelf's title. On an iPhone the hero fills most
+# of the screen, so Home scrolls down to the card.
+- scrollUntilVisible:
+    element:
+      text: ${TITLE}
+      below: ${SHELF}
+    direction: DOWN
+    timeout: 30000
