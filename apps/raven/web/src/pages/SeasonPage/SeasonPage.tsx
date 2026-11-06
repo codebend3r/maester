@@ -28,7 +28,7 @@ import {
 } from '@raven/core'
 import { type ReactNode, useId } from 'react'
 import { Link } from 'react-router-dom'
-import { ButtonLink, Icon } from '@raven/ui'
+import { ButtonLink, Icon, FactText } from '@raven/ui'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { PLAY_ALL_COPY } from '@/components/PlayAllButton/copy'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
@@ -59,7 +59,6 @@ import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { SEASON_COPY } from '@/pages/SeasonPage/copy'
-import { FactText } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
 
 /** A season's page plays the rest of that season, then stops. */

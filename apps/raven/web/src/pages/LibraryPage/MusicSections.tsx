@@ -20,7 +20,8 @@ import { useSearchParams } from 'react-router-dom'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
-import { ArtistList } from '@/components/ArtistList/ArtistList'
+import { ArtistList, ArtistListSkeleton } from '@/components/ArtistList/ArtistList'
+import { Loading } from '@/components/Skeleton/Skeleton'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { libraryTracks } from '@/lib/music'
 import { albumsQuery, artistsQuery } from '@/lib/queries'
@@ -284,7 +285,11 @@ export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
           placeholder={LIBRARY_COPY.searchArtists}
         />
       </div>
-      {artists.isPending && <output>{LIBRARY_COPY.loadingArtists}</output>}
+      {artists.isPending && (
+        <Loading label={LIBRARY_COPY.loadingArtists}>
+          <ArtistListSkeleton />
+        </Loading>
+      )}
       {artists.error && (
         <p className={styles.message} role="alert">
           {artists.error.message}

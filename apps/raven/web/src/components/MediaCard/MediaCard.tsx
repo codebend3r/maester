@@ -15,19 +15,13 @@ import {
   timeLeftOf,
   watchLink,
 } from '@raven/core'
-import { Icon } from '@raven/ui'
+import { Icon, FactText, RangeChip, ResolutionChip, WordFact } from '@raven/ui'
 import type { ComponentType } from 'react'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark, FavouriteWords } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
-import {
-  FactText,
-  RangeChip,
-  ResolutionChip,
-  WordFact,
-} from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'

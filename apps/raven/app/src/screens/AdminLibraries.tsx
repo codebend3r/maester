@@ -1,23 +1,16 @@
 import {
   type ApiClient,
   LIBRARY_KINDS,
+  LIBRARY_WORK_KINDS,
   type Library,
-  RATINGS_REFRESH_STATES,
-  SCAN_KINDS,
-  SCAN_STATES,
-  isRefreshingRatings,
-  isScanning,
+  type LibraryWorkKind,
   matchTypeFor,
 } from '@raven/core'
-import { afterRematch, afterRescan, queryKeys } from '@raven/ui/headless'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useServerActiveWork, useServerLibraryActions } from '@raven/ui/headless'
 
 import { SettingsButton, SettingsLine, SettingsSection } from '@/layouts'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { ADMIN_COPY, LIBRARY_ACTIONS_COPY } from '@/screens/adminCopy'
-
-/** How often the scans are read again while the owner's settings are open, as the web's. */
-const SCANS_POLL_MS = 2000
 
 /** What a merge says it did: none found, or how many albums it joined. */
 const mergedLineOf = (merged: number): string => {
@@ -25,48 +18,11 @@ const mergedLineOf = (merged: number): string => {
   return LIBRARY_ACTIONS_COPY.albumsMerged(merged)
 }
 
-type ActiveWork = { library: Library; label: string; cancel: () => Promise<Library> }
-
-type ActiveWorkOfProps = { api: ApiClient; libraries: readonly Library[] }
-
-/** Every scan and ratings update running, each with the call that stops it. */
-const activeWorkOf = ({ api, libraries }: ActiveWorkOfProps): ActiveWork[] =>
-  libraries.flatMap((library) => {
-    const isQuick = library.scan.kind === SCAN_KINDS.quick
-    const label = isQuick ? LIBRARY_ACTIONS_COPY.quickScan : LIBRARY_ACTIONS_COPY.fullScan
-    const cancel = isQuick
-      ? () => api.cancelQuickScan(library.id)
-      : () => api.cancelScan(library.id)
-    const scan = library.scan.state === SCAN_STATES.idle ? [] : [{ library, label, cancel }]
-    const ratings =
-      library.ratingsRefresh.state === RATINGS_REFRESH_STATES.running
-        ? [
-            {
-              library,
-              label: ADMIN_COPY.ratingsWork,
-              cancel: () => api.cancelLibraryRatings(library.id),
-            },
-          ]
-        : []
-    return [...scan, ...ratings]
-  })
-
-type UseLibraryCallProps = {
-  library: Library
-  call: (id: number) => Promise<Library>
-}
-
-/** One call about a library whose answer is the library after it, put in the cache at once. */
-const useLibraryCall = ({ library, call }: UseLibraryCallProps) => {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: () => call(library.id),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(queryKeys.library(library.id), updated)
-      return afterRescan(queryClient)
-    },
-  })
-}
+const WORK_LABELS = {
+  [LIBRARY_WORK_KINDS.quickScan]: LIBRARY_ACTIONS_COPY.quickScan,
+  [LIBRARY_WORK_KINDS.fullScan]: LIBRARY_ACTIONS_COPY.fullScan,
+  [LIBRARY_WORK_KINDS.ratings]: ADMIN_COPY.ratingsWork,
+} as const satisfies Record<LibraryWorkKind, string>
 
 type LongActionProps = {
   label: string
@@ -106,31 +62,22 @@ type LibraryAdminProps = { api: ApiClient; library: Library }
  * credits, Merge duplicate albums, Update ratings and Match again, each long one with its Cancel.
  */
 const LibraryAdmin = ({ api, library }: LibraryAdminProps) => {
-  const queryClient = useQueryClient()
-  const quickScan = useLibraryCall({ library, call: (id) => api.quickScanLibrary(id) })
-  const cancelQuickScan = useLibraryCall({ library, call: (id) => api.cancelQuickScan(id) })
-  const fullScan = useLibraryCall({ library, call: (id) => api.scanLibrary(id) })
-  const cancelFullScan = useLibraryCall({ library, call: (id) => api.cancelScan(id) })
-  const scanMarkers = useLibraryCall({ library, call: (id) => api.scanLibraryMarkers(id) })
-  const updateRatings = useLibraryCall({ library, call: (id) => api.updateLibraryRatings(id) })
-  const cancelRatings = useLibraryCall({ library, call: (id) => api.cancelLibraryRatings(id) })
-  const rematch = useMutation({
-    mutationFn: () => api.matchLibrary(library.id),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(queryKeys.library(library.id), updated)
-      return afterRematch({ queryClient, libraryId: library.id })
-    },
-  })
-  const mergeAlbums = useMutation({
-    mutationFn: () => api.mergeLibraryAlbums(library.id),
-    onSuccess: () => afterRematch({ queryClient, libraryId: library.id }),
-  })
+  const {
+    quickScan,
+    cancelQuickScan,
+    fullScan,
+    cancelFullScan,
+    scanMarkers,
+    updateRatings,
+    cancelRatings,
+    rematch,
+    mergeAlbums,
+    isScanRunning,
+    isQuickScanning,
+    isFullScanning,
+    isUpdatingRatings,
+  } = useServerLibraryActions({ api, library })
   const matchType = matchTypeFor(library.settings.kind)
-  const isScanRunning = isScanning(library.scan)
-  const isQuickScanning =
-    quickScan.isPending || (isScanRunning && library.scan.kind === SCAN_KINDS.quick)
-  const isFullScanning =
-    fullScan.isPending || (isScanRunning && library.scan.kind === SCAN_KINDS.full)
   const failures = [
     { label: LIBRARY_ACTIONS_COPY.quickScan, error: quickScan.error ?? cancelQuickScan.error },
     { label: LIBRARY_ACTIONS_COPY.fullScan, error: fullScan.error ?? cancelFullScan.error },
@@ -191,7 +138,7 @@ const LibraryAdmin = ({ api, library }: LibraryAdminProps) => {
       <LongAction
         isCancelling={cancelRatings.isPending}
         isDisabled={updateRatings.isPending}
-        isRunning={updateRatings.isPending || isRefreshingRatings(library)}
+        isRunning={isUpdatingRatings}
         label={LIBRARY_ACTIONS_COPY.updateRatings}
         library={library}
         onCancel={() => cancelRatings.mutate()}
@@ -232,28 +179,20 @@ type AdminLibrariesProps = { session: AppQueries }
  * stops it all; then each library's own scans, read again every two seconds while open.
  */
 export const AdminLibraries = ({ session: { api, queries } }: AdminLibrariesProps) => {
-  const queryClient = useQueryClient()
-  const state = useQuery({ ...queries.librariesQuery, refetchInterval: SCANS_POLL_MS })
-  const libraries = state.data ?? []
-  const running = activeWorkOf({ api, libraries })
-  const cancel = useMutation({
-    mutationFn: async () => {
-      await Promise.all(activeWorkOf({ api, libraries }).map((work) => work.cancel()))
-    },
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: queries.librariesQuery.queryKey, exact: true }),
+  const { state, running, cancel, error } = useServerActiveWork({
+    api,
+    librariesQuery: queries.librariesQuery,
   })
-  const error = state.error ?? cancel.error
   return (
     <>
       <SettingsSection note={ADMIN_COPY.scansHint} title={ADMIN_COPY.scans}>
         {state.data !== undefined && running.length === 0 && (
           <SettingsLine text={ADMIN_COPY.noScans} />
         )}
-        {running.map(({ library, label }) => (
+        {running.map(({ library, kind }) => (
           <SettingsLine
-            key={`${library.id}-${label}`}
-            text={ADMIN_COPY.running({ library: library.name, work: label })}
+            key={`${library.id}-${kind}`}
+            text={ADMIN_COPY.running({ library: library.name, work: WORK_LABELS[kind] })}
           />
         ))}
         {state.data !== undefined && (
@@ -265,7 +204,7 @@ export const AdminLibraries = ({ session: { api, queries } }: AdminLibrariesProp
         )}
         {error !== null && <SettingsLine isAlert text={error.message} />}
       </SettingsSection>
-      {libraries.map((library) => (
+      {(state.data ?? []).map((library) => (
         <LibraryAdmin key={library.id} api={api} library={library} />
       ))}
     </>

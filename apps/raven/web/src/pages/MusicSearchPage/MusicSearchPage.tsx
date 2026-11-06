@@ -1,6 +1,7 @@
 import { type ReactNode, useId } from 'react'
-import { AlbumGrid } from '@/components/AlbumGrid/AlbumGrid'
-import { ArtistList } from '@/components/ArtistList/ArtistList'
+import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
+import { ArtistList, ArtistListSkeleton } from '@/components/ArtistList/ArtistList'
+import { TrackListSkeleton } from '@/components/TrackList/TrackList'
 import { ListState } from '@/components/ListState/ListState'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { SearchField } from '@/components/SearchField/SearchField'
@@ -37,6 +38,7 @@ const Matches = ({ query }: MatchesProps) => {
           entries={albums.isRead ? albums.entries : undefined}
           error={albums.error}
           empty={MUSIC_SEARCH_COPY.noAlbums(query)}
+          loading={<AlbumGridSkeleton />}
         >
           {(entries) => <AlbumGrid albums={entries} />}
         </ListState>
@@ -46,6 +48,7 @@ const Matches = ({ query }: MatchesProps) => {
           entries={artists.isRead ? artists.entries : undefined}
           error={artists.error}
           empty={MUSIC_SEARCH_COPY.noArtists(query)}
+          loading={<ArtistListSkeleton />}
         >
           {(entries) => <ArtistList artists={entries} label={MUSIC_SEARCH_COPY.artists} />}
         </ListState>
@@ -55,6 +58,7 @@ const Matches = ({ query }: MatchesProps) => {
           entries={songs.isRead ? songs.entries : undefined}
           error={songs.error}
           empty={MUSIC_SEARCH_COPY.noSongs(query)}
+          loading={<TrackListSkeleton />}
         >
           {(tracks) => (
             <SongList

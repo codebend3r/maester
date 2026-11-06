@@ -1,0 +1,35 @@
+// The clock over its chips, both against the bar's far edge.
+.status {
+  grid-area: status;
+  display: grid;
+  gap: var(--space-1);
+  justify-items: end;
+  align-content: center;
+}
+
+.clock {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  line-height: var(--line-tight);
+  letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chips {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+}
+
+// A phone keeps the room for the title; the settings pill still says how it plays.
+@media (max-width: 30rem) {
+  .clock {
+    font-size: var(--font-size-lg);
+  }
+
+  .chips {
+    display: none;
+  }
+}

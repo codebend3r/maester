@@ -5,7 +5,7 @@ import { ApiError, ITEM_TYPES, type ItemDetails } from '@raven/core'
 import { createQueryClient } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 import { BINGE_COPY } from '@/lib/binge'
-import { BingePage, BingeSection } from '@/pages/BingePage/BingePage'
+import { BingePage, HomeBinge } from '@/pages/BingePage/BingePage'
 import { fakeBinge } from '@/test/fakeBinge'
 import { itemDetails } from '@/test/fixtures'
 import { held } from '@/test/held'
@@ -40,7 +40,7 @@ describe('BingePage', () => {
   })
 
   it('renders nothing on home when no shows are selected', () => {
-    renderWithProviders({ ui: <BingeSection isHome /> })
+    renderWithProviders({ ui: <HomeBinge /> })
     expect(screen.queryByRole('region')).toBeNull()
   })
 
@@ -60,7 +60,7 @@ describe('BingePage', () => {
   it('shows loading on its page but hides the home section until a show arrives', async () => {
     mark(1)
     item.mockImplementation(() => held<ItemDetails>().promise)
-    const view = renderWithProviders({ ui: <BingeSection isHome /> })
+    const view = renderWithProviders({ ui: <HomeBinge /> })
     expect(screen.queryByRole('region')).toBeNull()
     view.unmount()
     renderWithProviders({ ui: <BingePage /> })
@@ -73,7 +73,7 @@ describe('BingePage', () => {
       if (id === 1) throw new Error('Access denied')
       return itemDetails({ id, type: ITEM_TYPES.movie })
     })
-    renderWithProviders({ ui: <BingeSection isHome /> })
+    renderWithProviders({ ui: <HomeBinge /> })
     await waitFor(() => expect(item).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('region')).toBeNull()
   })
@@ -83,7 +83,7 @@ describe('BingePage', () => {
     const client = createQueryClient()
     client.setDefaultOptions({ queries: { retry: false } })
     item.mockRejectedValue(new ApiError({ status: 423, message: 'Locked' }))
-    const view = renderWithProviders({ ui: <BingeSection isHome />, client })
+    const view = renderWithProviders({ ui: <HomeBinge />, client })
     await waitFor(() => expect(client.isFetching()).toBe(0))
     expect(screen.queryByRole('region')).toBeNull()
     view.unmount()

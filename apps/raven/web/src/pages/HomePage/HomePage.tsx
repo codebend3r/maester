@@ -18,7 +18,6 @@ import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { ShowCard } from '@/components/ShowCard/ShowCard'
-import { Bone, Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
 import {
   heroQuery,
@@ -30,11 +29,13 @@ import {
 import { ContinueWatching } from '@/pages/HomePage/ContinueWatching'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import { HomeHero } from '@/pages/HomePage/HomeHero'
+import { HeroSkeleton, SearchSkeleton, ShelvesSkeleton } from '@/pages/HomePage/HomeSkeleton'
 import { featuredOf } from '@/pages/HomePage/featured'
 import styles from '@/pages/HomePage/HomePage.module.scss'
+import frames from '@/pages/HomePage/HomeFrames.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
-import { BingeSection } from '@/pages/BingePage/BingePage'
+import { HomeBinge } from '@/pages/BingePage/BingePage'
 
 const SHELF_STATES = { empty: 'empty', filled: 'filled' } as const
 type ShelfState = (typeof SHELF_STATES)[keyof typeof SHELF_STATES]
@@ -45,7 +46,7 @@ const EmptyShelf = () => <p className={styles.message}>{HOME_COPY.emptyShelf}</p
 
 type FilledShelfProps = ShelfBodyProps
 
-const FilledShelf = ({ children }: FilledShelfProps) => <ul className={styles.row}>{children}</ul>
+const FilledShelf = ({ children }: FilledShelfProps) => <ul className={frames.row}>{children}</ul>
 
 const SHELF_BODIES = {
   [SHELF_STATES.empty]: EmptyShelf,
@@ -64,7 +65,7 @@ const Shelf = ({ title, isEmpty, children }: ShelfProps) => {
   const id = useId()
   const Body = SHELF_BODIES[isEmpty ? SHELF_STATES.empty : SHELF_STATES.filled]
   return (
-    <section className={styles.shelf} aria-labelledby={id}>
+    <section className={frames.section} aria-labelledby={id}>
       <SectionHeading id={id}>{title}</SectionHeading>
       <Body>{children}</Body>
     </section>
@@ -224,40 +225,6 @@ const LibraryRow = ({ shelf, library, albumShelves }: LibraryRowProps) => {
   )
 }
 
-/** The hero's shape, standing in while its titles are read. */
-const HeroSkeleton = () => (
-  <Loading label={HOME_COPY.gatheringHero}>
-    <div className={styles.skeletonHero}>
-      <div className={styles.skeletonWords}>
-        <Bone shape="small" width="short" />
-        <Bone shape="hero" width="most" />
-        <Bone shape="text" width="most" />
-        <Bone shape="text" width="half" />
-        <Bone shape="button" />
-      </div>
-      <div className={styles.skeletonPoster}>
-        <Bone shape="poster" />
-      </div>
-    </div>
-  </Loading>
-)
-
-type SkeletonShelvesProps = { label: string; count: number }
-
-/** Rows of cards standing in while they are read. */
-const SkeletonShelves = ({ label, count }: SkeletonShelvesProps) => (
-  <Loading label={label}>
-    {Array.from({ length: count }, (_, index) => (
-      <section key={index} className={styles.shelf}>
-        <Bone shape="heading" width="short" />
-        <ul className={styles.row}>
-          <SkeletonCards picture="poster" count={8} />
-        </ul>
-      </section>
-    ))}
-  </Loading>
-)
-
 const HOME_VIEWS = { search: 'search', shelves: 'shelves' } as const
 type HomeView = (typeof HOME_VIEWS)[keyof typeof HOME_VIEWS]
 
@@ -275,7 +242,7 @@ const SearchResults = ({ query, libraries }: SearchResultsProps) => {
   const shelves = withLibraries({ shelves: results.data ?? [], libraries })
   return (
     <section
-      className={styles.sections}
+      className={frames.sections}
       aria-label={HOME_COPY.searchResultsFor(query)}
       aria-busy={results.isFetching}
     >
@@ -284,7 +251,7 @@ const SearchResults = ({ query, libraries }: SearchResultsProps) => {
           {results.error.message}
         </p>
       )}
-      {results.isPending && <SkeletonShelves label={HOME_COPY.searching} count={1} />}
+      {results.isPending && <SearchSkeleton />}
       {/* The last search's answer stands in while this one is read: it says nothing of this one. */}
       {results.isSuccess && !results.isPlaceholderData && shelves.length === 0 && (
         <p className={styles.message}>{HOME_COPY.noMatches(query)}</p>
@@ -309,15 +276,15 @@ const Shelves = ({ libraries, areLibrariesPending }: ShelvesProps) => {
   const isBare = home.isSuccess && inProgress.length === 0 && home.data.shelves.length === 0
 
   return (
-    <div className={styles.sections}>
-      <BingeSection isHome />
+    <div className={frames.sections}>
+      <HomeBinge />
       {home.isError && (
         <p className={styles.message} role="alert">
           {home.error.message}
         </p>
       )}
       {(hero.isPending || areLibrariesPending) && <HeroSkeleton />}
-      {home.isPending && <SkeletonShelves label={HOME_COPY.gatheringLibraries} count={2} />}
+      {home.isPending && <ShelvesSkeleton />}
       {isBare && <p className={styles.message}>{HOME_COPY.bare}</p>}
 
       {featured.length > 0 && <HomeHero featured={featured} />}

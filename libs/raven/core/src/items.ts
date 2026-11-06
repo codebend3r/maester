@@ -79,14 +79,30 @@ export const cardTitle = (media: MediaItem): CardTitle => {
   return { title, date: releaseLabel(media.item) }
 }
 
+type EpisodeLineProps = EpisodeCodeProps & { title: string }
+
+/** An episode's code and title, "S01E02 · Half Loop", as its show's name or art heads it; null with neither. */
+export const episodeLine = ({ season, episode, title }: EpisodeLineProps): string | null => {
+  const line = [episodeCode({ season, episode }), title]
+    .filter((part): part is string => part != null && part !== '')
+    .join(' · ')
+  return line === '' ? null : line
+}
+
+/** What `artItemIdOf` reads of an item: its id, and its show's when it is part of one. */
+type ArtItem = Pick<ItemSummary, 'id' | 'show'>
+
+/**
+ * The item whose art stands for `item`: an episode or season wears its show's, since only a show
+ * or a film has title art and a backdrop.
+ */
+export const artItemIdOf = (item: ArtItem): number => item.show?.id ?? item.id
+
 /** What a wide tile names: the show, with the episode under it, else the movie and its release day. */
 export const tileWords = (media: MediaItem): { title: string; line: string | null } => {
   const { item } = media
   if (item && item.type === ITEM_TYPES.episode && item.show) {
-    const line = [episodeCode(item), item.title]
-      .filter((part): part is string => part != null && part !== '')
-      .join(' · ')
-    return { title: item.show.title, line: line === '' ? null : line }
+    return { title: item.show.title, line: episodeLine(item) }
   }
   const { title, date } = cardTitle(media)
   return { title, line: date }

@@ -1,8 +1,10 @@
 import { formatAirDate } from '@/itemFacts'
 import { describe, expect, it } from 'bun:test'
 import {
+  artItemIdOf,
   cardTitle,
   episodeCode,
+  episodeLine,
   episodePlace,
   formatScore,
   itemLabel,
@@ -134,6 +136,22 @@ describe('primaryVersion', () => {
     expect(primaryVersion([best, resumed])).toBe(resumed)
     expect(primaryVersion([best, mediaItem({ id: 3 })])).toBe(best)
     expect(primaryVersion([])).toBeUndefined()
+  })
+})
+
+describe('episodeLine', () => {
+  it('joins the code and the title, and leaves out whichever is missing', () => {
+    expect(episodeLine({ season: 1, episode: 2, title: 'Half Loop' })).toBe('S01E02 · Half Loop')
+    expect(episodeLine({ season: null, episode: 2, title: 'Half Loop' })).toBe('Half Loop')
+    expect(episodeLine({ season: 1, episode: 2, title: '' })).toBe('S01E02')
+    expect(episodeLine({ season: null, episode: null, title: '' })).toBeNull()
+  })
+})
+
+describe('artItemIdOf', () => {
+  it("gives an episode or season its show's art, and a film or show its own", () => {
+    expect(artItemIdOf(itemSummary({ id: 6, show: { id: 4, title: 'Severance' } }))).toBe(4)
+    expect(artItemIdOf(itemSummary({ id: 1, show: null }))).toBe(1)
   })
 })
 

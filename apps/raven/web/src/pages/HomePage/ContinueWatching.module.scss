@@ -1,31 +1,8 @@
-.section {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
-}
-
-.tiles {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
-}
-
-// The backdrop fills the tile, the logo sits in its top left corner and the
-// words along its foot. The tile is a picture in every theme, so its words
-// keep the fixed light ink of words on a picture.
+// The backdrop fills the tile, laid out by `HomeFrames`' tile. The tile is a
+// picture in every theme, so its words keep the fixed light ink of words on a picture.
 .tile {
   position: relative;
   isolation: isolate;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    'logo'
-    '.'
-    'copy';
-  gap: var(--space-3);
-  min-height: 12.5rem;
-  padding: var(--space-4);
   border-radius: var(--radius-lg);
   color: var(--color-on-picture);
 
@@ -187,17 +164,6 @@
 }
 
 @media (max-width: 48rem) {
-  .tiles {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-3);
-  }
-
-  .tile {
-    gap: var(--space-3);
-    min-height: 9.5rem;
-    padding: var(--space-3);
-  }
-
   .title {
     font-size: var(--font-size-lg);
   }

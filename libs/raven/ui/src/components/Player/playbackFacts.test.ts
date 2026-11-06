@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import { type MediaTracks, PLAYBACK_MODES, type SubtitleTrack } from '@raven/core'
 import {
   aboutLine,
+  playingRange,
+  playingResolution,
   audioPillLabel,
   endsAtLabel,
   pictureLabel,
@@ -44,10 +46,8 @@ describe('pictureLabel', () => {
 })
 
 describe('aboutLine', () => {
-  it('gives the year, the picture and how it plays', () => {
-    expect(aboutLine({ media: { ...uhd, year: 2019 }, label: 'Abominable', mode: 'direct' })).toBe(
-      '2019 · 4K HDR · Direct play',
-    )
+  it('gives the year alone, since the picture has chips of its own', () => {
+    expect(aboutLine({ media: { ...uhd, year: 2019 }, label: 'Abominable' })).toBe('2019')
   })
 
   it('takes a matched item’s year, and leaves it out when the title ends with it', () => {
@@ -66,16 +66,12 @@ describe('aboutLine', () => {
         released: null,
       },
     })
-    expect(aboutLine({ media: matched, label: 'Abominable', mode: 'remux' })).toBe(
-      '2019 · 1080p · Audio converted',
-    )
-    expect(aboutLine({ media: matched, label: 'Abominable (2019)', mode: 'transcode' })).toBe(
-      '1080p · Converted',
-    )
+    expect(aboutLine({ media: matched, label: 'Abominable' })).toBe('2019')
+    expect(aboutLine({ media: matched, label: 'Abominable (2019)' })).toBe('')
   })
 
-  it('says only how a local file plays', () => {
-    expect(aboutLine({ media: null, label: 'clip.mp4', mode: 'direct' })).toBe('Direct play')
+  it('says nothing of a local file', () => {
+    expect(aboutLine({ media: null, label: 'clip.mp4' })).toBe('')
   })
 
   it('puts where the title came from first, when the host names it', () => {
@@ -83,32 +79,64 @@ describe('aboutLine', () => {
       aboutLine({
         media: null,
         label: 'S01E01 Good News',
-        mode: 'direct',
         context: 'Downloaded from Vhagar',
       }),
-    ).toBe('Downloaded from Vhagar · Direct play')
+    ).toBe('Downloaded from Vhagar')
     expect(
       aboutLine({
         media: { ...uhd, year: 2019 },
         label: 'Abominable',
-        mode: 'direct',
         context: 'Downloaded from Vhagar',
       }),
-    ).toBe('Downloaded from Vhagar · 2019 · 4K HDR · Direct play')
-    expect(aboutLine({ media: null, label: 'clip.mp4', mode: 'direct', context: null })).toBe(
-      'Direct play',
+    ).toBe('Downloaded from Vhagar · 2019')
+    expect(aboutLine({ media: null, label: 'clip.mp4', context: null })).toBe('')
+  })
+})
+
+describe('playingResolution', () => {
+  it("names the file's own resolution while it reaches the screen untouched", () => {
+    expect(playingResolution({ media: uhd, mode: 'direct' })).toBe('4K')
+    expect(playingResolution({ media: uhd, mode: 'remux' })).toBe('4K')
+  })
+
+  it('names the size a transcode was picked at, keeping the shape and never above the file', () => {
+    expect(playingResolution({ media: uhd, mode: 'transcode', quality: 'high720' })).toBe('720p')
+    const scope = mediaItem({ width: 3840, height: 1608 })
+    expect(playingResolution({ media: scope, mode: 'transcode', quality: 'high1080' })).toBe(
+      '1080p',
     )
+    const small = mediaItem({ width: 1280, height: 534 })
+    expect(playingResolution({ media: small, mode: 'transcode', quality: 'high1080' })).toBe('720p')
+  })
+
+  it('says nothing of an unknown file, or a transcode at the server’s size', () => {
+    expect(playingResolution({ media: null, mode: 'direct' })).toBeNull()
+    expect(playingResolution({ media: uhd, mode: 'transcode' })).toBeNull()
+  })
+})
+
+describe('playingRange', () => {
+  it("names the file's range while the picture reaches the screen untouched", () => {
+    expect(playingRange({ media: uhd, mode: 'direct' })).toBe('HDR')
+    expect(playingRange({ media: uhd, mode: 'remux' })).toBe('HDR')
+    expect(playingRange({ media: { ...uhd, isDolbyVisionOnly: true }, mode: 'direct' })).toBe('DV5')
+  })
+
+  it('says nothing of SDR, an unknown file or a transcode', () => {
+    expect(playingRange({ media: mediaItem(), mode: 'direct' })).toBeNull()
+    expect(playingRange({ media: null, mode: 'direct' })).toBeNull()
+    expect(playingRange({ media: uhd, mode: 'transcode' })).toBeNull()
   })
 })
 
 describe('qualityLabel', () => {
   it('names the picture while it reaches the screen untouched', () => {
     expect(qualityLabel({ media: uhd, mode: 'direct' })).toBe('4K · Direct play')
-    expect(qualityLabel({ media: uhd, mode: 'remux' })).toBe('4K · Audio converted')
+    expect(qualityLabel({ media: uhd, mode: 'remux' })).toBe('4K · Remux')
   })
 
   it('leaves the size of a conversion, and of an unknown file, unsaid', () => {
-    expect(qualityLabel({ media: uhd, mode: 'transcode' })).toBe('Converted')
+    expect(qualityLabel({ media: uhd, mode: 'transcode' })).toBe('Transcode')
     expect(qualityLabel({ media: null, mode: 'direct' })).toBe('Direct play')
   })
 })

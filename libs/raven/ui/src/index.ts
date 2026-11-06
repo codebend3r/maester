@@ -19,3 +19,11 @@ export { Toaster } from '@/components/Toaster/Toaster'
 export { AudioHost } from '@/components/AudioHost/AudioHost'
 export { watchPageHide } from '@/components/Player/watchPageHide'
 export { useToasts } from '@/stores/toasts'
+export {
+  FactParts,
+  FactText,
+  PictureChips,
+  RangeChip,
+  ResolutionChip,
+  WordFact,
+} from '@/components/ResolutionChip/ResolutionChip'

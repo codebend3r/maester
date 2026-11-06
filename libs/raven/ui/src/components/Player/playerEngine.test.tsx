@@ -28,6 +28,7 @@ import { api } from '@/test/api'
 import { renderWithProviders } from '@/test/render'
 import { PLAYER_PREFS_KEY, usePlayerPrefs } from '@/stores/playerPrefs'
 import { usePlayerServices } from '@/stores/playerServices'
+import styles from '@/components/Player/Player.module.scss'
 
 const servicesFor = (): PlayerServices => ({
   title: { label: 'Local clip', duration: 120, resumeAt: 20, backTo: '/', next: null },
@@ -347,15 +348,15 @@ describe('the line under a local file’s title', () => {
     return screen.getByRole('heading', { level: 1, name: 'Local clip' }).nextElementSibling
   }
 
-  it('says only how it plays when the host names no context', () => {
-    expect(aboutOf(servicesFor())).toHaveTextContent(/^Direct play$/)
+  it('is left out when the host names no context', () => {
+    expect(aboutOf(servicesFor())).not.toHaveClass(styles.about)
   })
 
-  it('says where it came from before how it plays', () => {
+  it('says where it came from', () => {
     const services = servicesFor()
     expect(
       aboutOf({ ...services, title: { ...services.title, context: 'Downloaded from Vhagar' } }),
-    ).toHaveTextContent(/^Downloaded from Vhagar · Direct play$/)
+    ).toHaveTextContent(/^Downloaded from Vhagar$/)
   })
 })
 

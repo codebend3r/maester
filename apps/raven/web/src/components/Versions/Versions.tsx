@@ -9,9 +9,8 @@ import {
 } from '@raven/core'
 import { type ComponentType, useId } from 'react'
 import { Link } from 'react-router-dom'
-import { Icon } from '@raven/ui'
+import { Icon, WordFact } from '@raven/ui'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
-import { WordFact } from '@/components/ResolutionChip/ResolutionChip'
 import { VERSIONS_COPY } from '@/components/Versions/copy'
 import styles from '@/components/Versions/Versions.module.scss'
 

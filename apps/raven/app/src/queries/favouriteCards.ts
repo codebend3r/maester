@@ -6,6 +6,7 @@ import {
   ITEM_TYPES,
   type ItemSummary,
   type PosterEntry,
+  artItemIdOf,
 } from '@raven/core'
 
 import { albumCard, artistCard } from '@/music/musicCards'
@@ -35,7 +36,7 @@ type TitleCardProps = Pictures & { item: ItemSummary; arts: ShowArts }
 
 /** The art of the show or film `item` wears: an episode or season wears its show's. */
 const artOfItem = ({ item, arts }: Pick<TitleCardProps, 'item' | 'arts'>) =>
-  arts.get(item.show?.id ?? item.id) ?? null
+  arts.get(artItemIdOf(item)) ?? null
 
 /**
  * A favourite show or season: where its show has a backdrop, a wide card with the logo over it,

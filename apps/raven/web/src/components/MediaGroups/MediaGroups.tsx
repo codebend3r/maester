@@ -7,7 +7,7 @@ import {
 } from '@raven/core'
 import { Bucket } from '@/components/Bucket/Bucket'
 import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
-import { FactText } from '@/components/ResolutionChip/ResolutionChip'
+import { FactText } from '@raven/ui'
 import styles from '@/components/MediaGroups/MediaGroups.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 

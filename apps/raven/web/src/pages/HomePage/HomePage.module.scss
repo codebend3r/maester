@@ -1,6 +1,5 @@
 // The header, then the hero, the tiles and the rows, a section's gap apart.
-.page,
-.sections {
+.page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--section-gap);
@@ -37,12 +36,6 @@
   color: var(--color-lichen);
 }
 
-.shelf {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
-}
-
 .headingLink {
   border-radius: var(--radius-sm);
   text-decoration: none;
@@ -51,57 +44,5 @@
     text-decoration: underline;
     text-decoration-color: var(--color-leaf-bright);
     text-underline-offset: 0.18em;
-  }
-}
-
-// Eight to a row, as `POSTER_SIZES.row` measures them.
-.row {
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: var(--space-4) var(--space-3);
-}
-
-// The hero's shape while home is read: words at the left, a poster beside them.
-.skeletonHero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-  grid-template-areas: 'words poster';
-  align-items: center;
-  gap: var(--space-5);
-}
-
-.skeletonWords {
-  grid-area: words;
-  display: grid;
-  gap: var(--space-3);
-}
-
-.skeletonPoster {
-  grid-area: poster;
-  justify-self: center;
-  display: grid;
-  width: min(18.75rem, 100%);
-}
-
-@media (max-width: 64rem) {
-  .row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .skeletonHero {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'poster'
-      'words';
-  }
-
-  .skeletonPoster {
-    width: min(14.375rem, 62%);
-  }
-}
-
-@media (max-width: 40rem) {
-  .row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

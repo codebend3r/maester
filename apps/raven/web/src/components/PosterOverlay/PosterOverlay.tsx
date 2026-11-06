@@ -1,7 +1,6 @@
-import { Icon } from '@raven/ui'
+import { Icon, ResolutionChip } from '@raven/ui'
 import { type AppPath, type MediaItem, resolutionLabel } from '@raven/core'
 import { CardLink } from '@/components/CardLink/CardLink'
-import { ResolutionChip } from '@/components/ResolutionChip/ResolutionChip'
 import styles from '@/components/PosterOverlay/PosterOverlay.module.scss'
 
 type PosterOverlayProps = {

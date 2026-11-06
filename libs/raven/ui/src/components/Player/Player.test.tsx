@@ -903,10 +903,15 @@ describe('the player chrome', () => {
     isDolbyVisionOnly: false,
   })
 
-  it('says under the title what is playing and how, and the pills say what each is set to', async () => {
+  it('says under the title what is playing, at the far end how, and the pills say what each is set to', async () => {
     renderWithProviders({ ui: <TestPlayer media={uhd} backTo="/libraries/2" /> })
     expect(screen.getByRole('heading', { level: 1, name: 'Busboys' })).toBeInTheDocument()
-    expect(screen.getByText('2026 · 4K HDR · Direct play')).toBeInTheDocument()
+    expect(screen.getByText('2026')).toBeInTheDocument()
+    const playingAs = screen.getByRole('list', { name: 'Playing as' })
+    expect(within(playingAs).getByLabelText('Video resolution: 4K')).toHaveTextContent('4K')
+    expect(within(playingAs).getByText('HDR')).toBeInTheDocument()
+    expect(within(playingAs).getByText('Direct play')).toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).getByText(/^\d{1,2}:\d{2}/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Subtitles: Off' })).toHaveTextContent(
       'Subtitles · Off',
     )
@@ -935,7 +940,7 @@ describe('the player chrome', () => {
       'src',
       '/art/busboys.png',
     )
-    expect(screen.getByText('2026 · 4K HDR · Direct play')).toBeInTheDocument()
+    expect(screen.getByText('2026')).toBeInTheDocument()
   })
 
   it("puts an episode's place and name beside its show's art, and spells the label out when the art fails", () => {

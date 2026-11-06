@@ -20,7 +20,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useId, useState } from 'react'
 import { Icon } from '@/components/Icon/Icon'
-import { PLAYBACK_INFO_COPY } from '@/components/Player/copy'
+import { PLAYBACK_INFO_COPY, PLAYBACK_MODE_NAMES } from '@/components/Player/copy'
 import type { EngineStats } from '@/components/Player/engine'
 import { stepDownNote } from '@/components/Player/playbackFacts'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
@@ -34,12 +34,6 @@ const REFRESH_MS = 1000
 export type PlaybackFile = { media: MediaItem; api: ApiClient }
 
 type Fact = { term: string; value: string | null }
-
-const METHODS = {
-  direct: PLAYBACK_INFO_COPY.directPlay,
-  remux: PLAYBACK_INFO_COPY.remux,
-  transcode: PLAYBACK_INFO_COPY.transcode,
-} as const satisfies Record<PlaybackMode, string>
 
 type DimensionsProps = { width: number; height: number }
 
@@ -259,7 +253,7 @@ export const PlaybackInfo = ({
             note={steppedDown && stepDownNote(steppedDown)}
             facts={[
               { term: PLAYBACK_INFO_COPY.player, value: stats.engine },
-              { term: PLAYBACK_INFO_COPY.method, value: METHODS[mode] },
+              { term: PLAYBACK_INFO_COPY.method, value: PLAYBACK_MODE_NAMES[mode] },
               {
                 term: PLAYBACK_INFO_COPY.delivery,
                 value:

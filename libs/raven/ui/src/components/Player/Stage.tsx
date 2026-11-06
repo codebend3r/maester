@@ -49,6 +49,7 @@ import { useBezel, useFullscreen, useIdle, useNow } from '@/components/Player/us
 import { SkipButton } from '@/components/Player/SkipButton'
 import { TitleHeading } from '@/components/Player/TitleHeading'
 import { UpNextCard } from '@/components/Player/UpNextCard'
+import { PlayerStatus } from '@/components/Player/PlayerStatus'
 import { useShortcutsTip } from '@/components/Player/useShortcutsTip'
 import { useSkipIntro } from '@/components/Player/useSkipIntro'
 import { useUpNext } from '@/components/Player/useUpNext'
@@ -421,7 +422,6 @@ export const PlayerChrome = ({
   const about = aboutLine({
     media,
     label: logo?.name ?? label,
-    mode,
     context: title.context ?? null,
   })
 
@@ -477,7 +477,7 @@ export const PlayerChrome = ({
           onClick={onBack}
         />
         <TitleHeading label={label} logo={logo} onFail={setFailedLogo} />
-        <p className={styles.about}>{about}</p>
+        {!!about && <p className={styles.about}>{about}</p>}
         {favourite && (
           <Button
             tone="ghost"
@@ -505,6 +505,7 @@ export const PlayerChrome = ({
             <span className={styles.nextLabel}>{nextLink.label}</span>
           </ButtonLink>
         )}
+        <PlayerStatus media={media} mode={mode} quality={quality} />
         {resumedAt != null && (
           <p className={styles.resumed} aria-live="polite">
             <span>{STAGE_COPY.resumedAt(formatDuration(resumedAt))}</span>

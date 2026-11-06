@@ -131,7 +131,7 @@ describe('PlayPage', () => {
       client: playMain({ describeFile: () => ({ type: DESKTOP_REPLIES.file, file: download }) }),
       route: playPathOf(A),
     })
-    expect(await screen.findByText('Downloaded from raven · Direct play')).toBeInTheDocument()
+    expect(await screen.findByText('Downloaded from raven')).toBeInTheDocument()
   })
 
   it('links the next video and replaces the entry with it when the menu says next', async () => {

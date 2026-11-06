@@ -1,13 +1,12 @@
 import {
-  CREDIT_JOBS,
+  BINGE_STATUS_KINDS,
+  type BingeStatus,
   ITEM_IMAGE_KINDS,
-  ITEM_TYPES,
   type ItemDetails,
   type MediaItem,
-  formatRuntime,
+  bingeCardFacts,
   pictureParts,
   progressOf,
-  tileWords,
 } from '@raven/core'
 
 import { CARD_SHAPES, type Pictures, type ShelfCard, pictureAt } from '@/queries/cards'
@@ -24,9 +23,6 @@ export const BINGE_COPY = {
   listSeparator: ', ',
   start: ({ season, episode }: StartProps) => `Start season ${season} episode ${episode}`,
 } as const
-
-/** How many of the cast the card names, as the web's. */
-const STAR_COUNT = 2
 
 /**
  * A binged show as Home's Binge section draws it, the web's Binge card's facts: its year and
@@ -49,12 +45,18 @@ export type BingeCard = ShelfCard & {
 }
 
 /** "23m left" once started, else "Start season 1 episode 2" for an episode not yet started. */
-const statusOf = (media: MediaItem | null): string | null => {
-  if (media === null) return null
-  if (progressOf(media) > 0) return timeLeftOf(media)
-  const { item } = media
-  if (item?.type !== ITEM_TYPES.episode || item.season == null || item.episode == null) return null
-  return BINGE_COPY.start({ season: item.season, episode: item.episode })
+const statusWordsOf = (status: BingeStatus | null): string | null => {
+  if (status === null) return null
+  switch (status.kind) {
+    case BINGE_STATUS_KINDS.left:
+      return timeLeftOf(status.media)
+    case BINGE_STATUS_KINDS.start:
+      return BINGE_COPY.start({ season: status.season, episode: status.episode })
+    default: {
+      const unreachable: never = status
+      return unreachable
+    }
+  }
 }
 
 type JoinedOrNullProps = { parts: readonly (string | null)[]; separator: string }
@@ -98,11 +100,7 @@ export const bingeCardOf = ({
     headersFor,
   })
   const thumbnail = next === null ? null : pictureAt({ uri: api.thumbnailUrl(next), headersFor })
-  const seconds = next?.duration ?? (show.runtime == null ? null : show.runtime * 60)
-  const stars = show.credits
-    .filter((credit) => credit.job === CREDIT_JOBS.cast)
-    .slice(0, STAR_COUNT)
-    .map((credit) => credit.name)
+  const facts = bingeCardFacts({ details: show, next, episode })
   return {
     key: `binge:${show.id}`,
     title: show.title,
@@ -121,15 +119,14 @@ export const bingeCardOf = ({
     chips: next === null ? [] : pictureParts(next),
     resume: null,
     target: next === null ? page : { kind: ROUTE_TARGETS.play, mediaId: next.id, at: 0 },
-    meta: joinedOrNull({
-      parts: [show.year == null ? null : String(show.year), formatRuntime(seconds)],
-      separator: BINGE_COPY.separator,
-    }),
-    episodeLine: next === null ? null : tileWords(next).line,
+    meta: joinedOrNull({ parts: [facts.year, facts.runtime], separator: BINGE_COPY.separator }),
+    episodeLine: facts.episodeLine,
     starring:
-      stars.length === 0 ? null : `${BINGE_COPY.starring} ${stars.join(BINGE_COPY.listSeparator)}`,
-    synopsis: episode?.summary ?? show.summary ?? null,
-    status: statusOf(next),
+      facts.stars.length === 0
+        ? null
+        : `${BINGE_COPY.starring} ${facts.stars.join(BINGE_COPY.listSeparator)}`,
+    synopsis: facts.synopsis,
+    status: statusWordsOf(facts.status),
     page,
   }
 }

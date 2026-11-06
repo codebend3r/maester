@@ -1,4 +1,3 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
@@ -11,11 +10,8 @@ import { type ComponentType, useId, useState } from 'react'
 import { Button } from '@raven/ui'
 import {
   AUTOPLAY_COUNTDOWN_SECONDS,
-  edit,
-  mutationKeys,
-  queryKeys,
-  useOptimisticMutation,
   usePlayerPrefs,
+  useServerSettingsSaves,
 } from '@raven/ui/headless'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
@@ -99,18 +95,6 @@ const HW_ACCEL: Choices<PlaybackSettings['hwAccel']> = {
   vaapi: { label: 'VAAPI', hint: 'An Intel or AMD GPU on Linux, through its render node.' },
   videotoolbox: { label: 'VideoToolbox', hint: 'The media engine in a Mac.' },
 }
-
-type IsAtDefaultsProps<T extends Record<string, unknown>> = {
-  current: T
-  defaults: T
-}
-
-/** Whether every setting in `current` is where a fresh install has it. */
-const isAtDefaults = <T extends Record<string, unknown>>({
-  current,
-  defaults,
-}: IsAtDefaultsProps<T>): boolean =>
-  Object.keys(defaults).every((key) => current[key] === defaults[key])
 
 const ENCODER_NAMES = {
   software: 'libx264 on the CPU',
@@ -288,63 +272,17 @@ const OfflineSettings = () => {
 const ServerSettings = () => {
   const titleId = useId()
   const isDesktop = useIsDesktop()
-  const queryClient = useQueryClient()
   const [isConfirming, setConfirming] = useState(false)
   // Accounts show only to an approved viewer; the other states have a screen of their own.
   const access = useAccessState()
   const { mode } = useManagement()
-  const playback = useQuery(playbackSettingsQuery)
-  const display = useQuery(displaySettingsQuery)
-  const save = useOptimisticMutation({
-    mutationKey: mutationKeys.playbackSettings,
-    mutationFn: (change: Partial<PlaybackSettings>) => api.setPlaybackSettings(change),
-    edits: (change) => [
-      edit({
-        queryKey: playbackSettingsQuery.queryKey,
-        update: (state) => ({ ...state, settings: { ...state.settings, ...change } }),
-      }),
-    ],
-    settle: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.playbackSettings, exact: true }),
-  })
-  const saveDisplay = useOptimisticMutation({
-    mutationKey: mutationKeys.displaySettings,
-    mutationFn: (change: Partial<DisplaySettings>) => api.setDisplaySettings(change),
-    edits: (change) => [
-      edit({
-        queryKey: displaySettingsQuery.queryKey,
-        update: (shown) => ({ ...shown, ...change }),
-      }),
-    ],
-    settle: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.displaySettings, exact: true }),
-  })
-  const reset = useMutation({
-    mutationFn: () =>
-      Promise.all([
-        api.setPlaybackSettings(DEFAULT_PLAYBACK_SETTINGS),
-        api.setDisplaySettings(DEFAULT_DISPLAY_SETTINGS),
-      ]),
-    onSuccess: ([played, shown]) => {
-      queryClient.setQueryData(queryKeys.playbackSettings, played)
-      queryClient.setQueryData(queryKeys.displaySettings, shown)
-      setConfirming(false)
-    },
-    // A reset may land on one source and fail on the other; both are read
-    // again, so the page shows what the server holds either way.
-    onSettled: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.playbackSettings }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.displaySettings }),
-      ]),
-  })
+  const { playback, display, save, saveDisplay, reset, isBusy, isAllAtDefaults } =
+    useServerSettingsSaves({
+      api,
+      queries: { playbackSettingsQuery, displaySettingsQuery },
+      onReset: () => setConfirming(false),
+    })
   const settings = playback.data?.settings
-  const busy = save.isPending || saveDisplay.isPending || reset.isPending
-  const isAllAtDefaults =
-    (settings == null ||
-      isAtDefaults({ current: settings, defaults: DEFAULT_PLAYBACK_SETTINGS })) &&
-    (display.data == null ||
-      isAtDefaults({ current: display.data, defaults: DEFAULT_DISPLAY_SETTINGS }))
 
   return (
     <section className={styles.page} aria-labelledby={titleId}>
@@ -356,7 +294,7 @@ const ServerSettings = () => {
         {settings && (
           <ResetControl
             isConfirming={isConfirming}
-            isBusy={busy}
+            isBusy={isBusy}
             isAllAtDefaults={isAllAtDefaults}
             onReset={() => reset.mutate()}
             onConfirming={setConfirming}

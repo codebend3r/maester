@@ -3,7 +3,8 @@ import {
   ITEM_TYPES,
   type ItemDetails,
   type MediaItem,
-  episodeCode,
+  artItemIdOf,
+  episodeLine,
 } from '@raven/core'
 import type { TitleLogo } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
@@ -13,11 +14,8 @@ import { itemQuery } from '@/lib/queries'
 type CaptionOfProps = { item: MediaItem['item'] }
 
 /** What a show's art leaves out of an episode: "S01E02 · Half Loop". Null for anything else. */
-const captionOf = ({ item }: CaptionOfProps): string | null => {
-  if (item?.type !== ITEM_TYPES.episode) return null
-  const parts = [episodeCode(item), item.title].filter((part): part is string => !!part)
-  return parts.length > 0 ? parts.join(' · ') : null
-}
+const captionOf = ({ item }: CaptionOfProps): string | null =>
+  item?.type === ITEM_TYPES.episode ? episodeLine(item) : null
 
 type TitleLogoOfProps = {
   media: MediaItem
@@ -51,7 +49,7 @@ type UseTitleLogoProps = {
  * titles elsewhere; null without, and the player spells the title out in its display face.
  */
 export const useTitleLogo = ({ media }: UseTitleLogoProps): TitleLogo | null => {
-  const artId = media?.item?.show?.id ?? media?.item?.id ?? null
+  const artId = media?.item == null ? null : artItemIdOf(media.item)
   const art = useQuery(itemQuery(artId)).data
   if (media === null) return null
   return titleLogoOf({ media, art })
