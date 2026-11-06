@@ -1,0 +1,46 @@
+// The hero's shape while home is read: words at the left, a poster beside them.
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-areas: 'words poster';
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.words {
+  grid-area: words;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.poster {
+  grid-area: poster;
+  justify-self: center;
+  display: grid;
+  width: min(18.75rem, 100%);
+}
+
+.tileLogo {
+  grid-area: logo;
+  display: grid;
+  width: min(10rem, 40%);
+}
+
+.tileCopy {
+  grid-area: copy;
+  display: grid;
+  gap: var(--space-2);
+}
+
+@media (max-width: 64rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'poster'
+      'words';
+  }
+
+  .poster {
+    width: min(14.375rem, 62%);
+  }
+}

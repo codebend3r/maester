@@ -53,9 +53,9 @@ import {
 import { isSeekingWith, pressedKeyOf, remoteAnswerOf } from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
 import type { IconName } from '@raven/ui/iconDrawings'
+import { PLAYBACK_MODE_NAMES, useClock } from '@raven/ui/headless'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { requestTVFocus } from '@/layouts/tvFocus'
-import { useClock } from '@/layouts/useClock'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
 import { useHeldSeek } from '@/layouts/useHeldSeek'
 import { useReduceMotion } from '@/stores/reduceMotion'
@@ -199,7 +199,7 @@ type CornerProps = Pick<PlayerChromeProps, 'mode'>
 const Corner = ({ mode }: CornerProps) => {
   const styles = useStyles()
   const clock = useClock()
-  const way = mode === null ? null : PLAYER_COPY.modes[mode]
+  const way = mode === null ? null : PLAYBACK_MODE_NAMES[mode]
   return (
     <View
       accessibilityLabel={[clock, way].filter((part): part is string => part !== null).join(', ')}

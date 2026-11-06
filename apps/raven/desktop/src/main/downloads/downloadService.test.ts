@@ -1497,6 +1497,7 @@ describe('playing a download', () => {
     expect(world.service.sidecarsOf(fileId)).toHaveLength(1)
     expect(world.service.fromLabelOf({ path: VIDEO })).toBe('Downloaded from raven')
     expect(world.service.labelOf({ path: VIDEO })).toBe('S01E01 Good News')
+    expect(world.service.mediaIdOf({ path: VIDEO })).toBe(11)
     world.service.noteOpened({ fileId })
     world.service.notePlaying({ fileId })
     world.state.update((state) =>

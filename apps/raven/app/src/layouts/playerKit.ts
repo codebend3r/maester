@@ -1,4 +1,4 @@
-import { PLAYBACK_MODES, type PlaybackMode, formatDuration } from '@raven/core'
+import { type PlaybackMode, formatDuration } from '@raven/core'
 import type { ComponentProps, ReactNode } from 'react'
 import type { AccessibilityActionEvent, AccessibilityActionInfo } from 'react-native'
 import type Video from 'react-native-video'
@@ -119,12 +119,6 @@ export const PLAYER_COPY = {
   mute: 'Mute',
   unmute: 'Unmute',
   volume: 'Volume',
-  /** How each way of playing reads in the corner. */
-  modes: {
-    [PLAYBACK_MODES.direct]: 'Direct play',
-    [PLAYBACK_MODES.remux]: 'Remux',
-    [PLAYBACK_MODES.transcode]: 'Transcode',
-  } satisfies Record<PlaybackMode, string>,
   back: (seconds: number) => `Back ${seconds} seconds`,
   forward: (seconds: number) => `Forward ${seconds} seconds`,
   seek: 'Position',

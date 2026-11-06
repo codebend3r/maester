@@ -76,6 +76,10 @@ const CAPTION_TITLE_VIEWS = {
   [CAPTION_TITLES.art]: CaptionArt,
 } as const satisfies Record<CaptionTitle, ComponentType<CaptionTitleProps>>
 
+const NOTE_LINES = 2
+
+const NO_NOTES: readonly string[] = []
+
 type FocusCardProps = {
   card: ShelfCard
   place?: string
@@ -84,6 +88,8 @@ type FocusCardProps = {
   jump?: JumpFocus | null
   /** Whether the title and its line show under the picture; a grid of posters leaves them out. */
   hasCaption?: boolean
+  /** Lines under the caption, each its own: a binged show's facts, its synopsis last but one. */
+  notes?: readonly string[]
   onPress: () => void
 }
 
@@ -102,6 +108,7 @@ export const FocusCard = ({
   isPreferred,
   jump = null,
   hasCaption = true,
+  notes = NO_NOTES,
   onPress,
 }: FocusCardProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
@@ -165,6 +172,11 @@ export const FocusCard = ({
               </Text>
             )}
             {chips.length > 0 && <FocusFactChips parts={chips} />}
+            {notes.map((note) => (
+              <Text key={note} numberOfLines={NOTE_LINES} style={styles.line}>
+                {note}
+              </Text>
+            ))}
           </View>
         )}
       </Animated.View>

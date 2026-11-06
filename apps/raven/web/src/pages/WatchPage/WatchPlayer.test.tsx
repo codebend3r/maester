@@ -7,6 +7,7 @@ import {
   type MediaTracks,
   PLAY_LINK_MAX_NEXT,
   SESSION_KINDS,
+  TITLE_DISPLAYS,
   type ViewingSession,
   playLinkFor,
   type SubtitleTrack,
@@ -23,7 +24,7 @@ import { api } from '@/lib/api'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { fakeAccount } from '@/test/authClient'
 import { setBrowserSupport } from '@/test/canPlay'
-import { bugReport, itemSummary, mediaItem } from '@/test/fixtures'
+import { bugReport, itemDetails, itemSummary, mediaItem } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 import { ravenVersion } from '@/lib/version'
@@ -407,6 +408,66 @@ describe('WatchPlayer up next', () => {
     if (!video) throw new Error('no video')
     fireEvent(video, new Event('ended'))
     expect(await screen.findByText('Playing 8, then 9')).toBeInTheDocument()
+  })
+})
+
+describe('WatchPlayer title art', () => {
+  beforeEach(() => stubPlayerReads())
+
+  const episode = mediaItem({
+    container: 'mp4',
+    item: itemSummary({
+      id: 41,
+      type: ITEM_TYPES.episode,
+      title: 'Half Loop',
+      show: { id: 4, title: 'Severance' },
+      season: 1,
+      episode: 2,
+    }),
+  })
+
+  const stubShow = () => {
+    const getItem = spyOn(api, 'getItem').mockImplementation(async () =>
+      itemDetails({ id: 4, type: ITEM_TYPES.show, title: 'Severance', logoVersion: 'l1' }),
+    )
+    spies.push(getItem)
+    return getItem
+  }
+
+  it("heads an episode with its show's logo, its place and name beside it", async () => {
+    const getItem = stubShow()
+    renderWithProviders({
+      ui: <Player media={episode} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+    })
+    const logo = await screen.findByRole('img', { name: 'Severance' })
+    expect(logo.getAttribute('src') ?? '').toContain('/pictures/items/4/logo/l1')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('S01E02 · Half Loop')
+    expect(getItem).toHaveBeenCalledWith(4)
+  })
+
+  it('draws the logo even when Settings spells titles out elsewhere', async () => {
+    const getItem = stubShow()
+    renderWithProviders({
+      ui: <Player media={episode} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+      display: { titles: TITLE_DISPLAYS.text },
+    })
+    expect(await screen.findByRole('img', { name: 'Severance' })).toBeInTheDocument()
+    expect(getItem).toHaveBeenCalledWith(4)
+  })
+
+  it('spells the title out in its display face when the show has no logo', async () => {
+    const getItem = spyOn(api, 'getItem').mockImplementation(async () =>
+      itemDetails({ id: 4, type: ITEM_TYPES.show, title: 'Severance', logoVersion: null }),
+    )
+    spies.push(getItem)
+    renderWithProviders({
+      ui: <Player media={episode} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+    })
+    await waitFor(() => expect(getItem).toHaveBeenCalledWith(4))
+    expect(screen.queryByRole('img', { name: 'Severance' })).toBeNull()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Severance · S01E02 · Half Loop' }),
+    ).toBeInTheDocument()
   })
 })
 

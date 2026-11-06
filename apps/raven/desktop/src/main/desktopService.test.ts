@@ -64,6 +64,10 @@ const SPACE_REPLY = {
 const DOWNLOADED = `/data/downloads/${SERVER}`
 const DOWNLOAD_ONE = `${DOWNLOADED}/11/video.mkv`
 const DOWNLOAD_TWO = `${DOWNLOADED}/12/video.mkv`
+const DOWNLOAD_MEDIA = new Map([
+  [DOWNLOAD_ONE, 11],
+  [DOWNLOAD_TWO, 12],
+])
 const DOWNLOAD_LABELS = new Map([
   [DOWNLOAD_ONE, 'S01E01 Good News'],
   [DOWNLOAD_TWO, 'S01E02 Half Loop'],
@@ -107,6 +111,7 @@ const fakeDownloads = ({ grants, savedPosition, serverPosition, watched }: FakeD
     fromLabelOf: ({ path }) =>
       path.startsWith(`${DOWNLOADED}/`) ? 'Downloaded from Vhagar' : null,
     labelOf: ({ path }) => DOWNLOAD_LABELS.get(path) ?? null,
+    mediaIdOf: ({ path }) => DOWNLOAD_MEDIA.get(path) ?? null,
     isStaleDownload: ({ path }) => path.startsWith(`${DOWNLOADED}/`) && !DOWNLOAD_LABELS.has(path),
     serverPositionOf: () => serverPosition,
     isWatched: ({ path }) => watched.includes(path),
@@ -653,6 +658,7 @@ describe('describeFile', () => {
       label: 'Episode 1',
       folder: 'Show',
       isDownload: false,
+      mediaId: null,
       resumeAt: 0,
     })
     expect(reply.file.next!.label).toBe('Episode 2')
@@ -737,7 +743,7 @@ describe('describeFile', () => {
     )
   })
 
-  it('describes a download by its title and its server, and tells the download service it opened', async () => {
+  it('describes a download by its title, its server and its media, and tells the download service it opened', async () => {
     const { service, reached } = setup({ files: { [DOWNLOAD_ONE]: {}, [DOWNLOAD_TWO]: {} } })
     const target = idOf(await service.openPaths([DOWNLOAD_ONE, DOWNLOAD_TWO]))
     const reply = await describeFile({ service, fileId: target.fileId, queue: target.queue })
@@ -747,6 +753,7 @@ describe('describeFile', () => {
       label: 'S01E01 Good News',
       folder: 'Downloaded from Vhagar',
       isDownload: true,
+      mediaId: 11,
     })
     expect(reply.file.next).toMatchObject({ label: 'S01E02 Half Loop' })
     expect(reached).toEqual([{ name: 'noteOpened', input: { fileId: target.fileId } }])

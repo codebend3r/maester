@@ -1,12 +1,21 @@
 import { useRouter } from 'expo-router'
-import type { ComponentType } from 'react'
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { type ComponentType, useState } from 'react'
+import {
+  type LayoutChangeEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native'
 
+import { BingeCardView } from '@/layouts/BingeCard.touch'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES } from '@/queries/cards'
 import { TouchCard } from '@/layouts/TouchCard'
 import { BREAKPOINTS } from '@/layouts/screenSizes'
 import {
+  type BingeShelfProps,
   NOTHING_HERE,
   SEE_ALL,
   SHELF_STATES,
@@ -14,9 +23,13 @@ import {
   type ShelfProps,
   type ShelfState,
   type ShelvesProps,
+  bingeRowsOf,
   seeAllLabelOf,
+  seeAllOf,
   shelfStateOf,
 } from '@/layouts/shelfKit'
+import { BINGE_COPY } from '@/queries/bingeCards'
+import { SHELF_LAYOUTS, type ShelfLayout } from '@/queries/homeShelves'
 import { TouchNotice, TouchShelfPage } from '@/layouts/TouchShelfPage'
 import { SearchEveryLibrary } from '@/layouts/TouchSearchBar'
 import { searchHrefOf } from '@/routes'
@@ -34,6 +47,34 @@ const useCardWidths = () => {
   return width >= BREAKPOINTS.tablet ? CARD_WIDTHS.tablet : CARD_WIDTHS.phone
 }
 
+/** Whether the window is wide enough for two columns of wide cards, as on a tablet. */
+const useIsWide = (): boolean => useWindowDimensions().width >= BREAKPOINTS.tablet
+
+/** A grid's columns: two where there is room, one stacked column on a phone. */
+const columnsOf = (isWide: boolean): number => (isWide ? 2 : 1)
+
+/**
+ * The width a section has for its cards: the window's less the page's side margins until it
+ * is laid out, then what it measures, which also takes the side insets held sideways out.
+ */
+const useMeasuredWidth = () => {
+  const { width: windowWidth } = useWindowDimensions()
+  const [measured, setMeasured] = useState<number | null>(null)
+  const onLayout = (event: LayoutChangeEvent) => setMeasured(event.nativeEvent.layout.width)
+  return { width: measured ?? windowWidth - SIZES.space3 * 2, onLayout }
+}
+
+type ColumnWidthOfProps = { width: number; columns: number }
+
+const columnWidthOf = ({ width, columns }: ColumnWidthOfProps): number =>
+  (width - SIZES.space3 * (columns - 1)) / columns
+
+/**
+ * A binge card's height for its width: taller than a resume card's 16:9 everywhere, so the
+ * synopsis has room, and short and wide where one card spans a tablet.
+ */
+const BINGE_RATIOS = { full: 0.42, half: 0.7, stacked: 0.78 } as const
+
 const Shelves = ({ title, notice, children }: ShelvesProps) => {
   const router = useRouter()
   return (
@@ -48,14 +89,15 @@ const Shelves = ({ title, notice, children }: ShelvesProps) => {
   )
 }
 
-type ShelfTitleProps = Pick<ShelfProps, 'shelf' | 'onOpenLibrary'>
+type ShelfTitleProps = Pick<ShelfProps, 'shelf' | 'onOpenLibrary' | 'onOpenContinue'>
 
 /**
  * A shelf's title, and beside a library's the way into the library, as the web's shelf
- * heading links to it.
+ * heading links to it; beside Continue watching, the way to every video in progress once it
+ * holds more than Home shows.
  */
-const ShelfTitle = ({ shelf, onOpenLibrary }: ShelfTitleProps) => {
-  const { libraryId } = shelf
+const ShelfTitle = ({ shelf, onOpenLibrary, onOpenContinue }: ShelfTitleProps) => {
+  const seeAll = seeAllOf({ shelf, onOpenLibrary, onOpenContinue })
   const styles = useStyles()
   return (
     <View style={styles.titleRow}>
@@ -67,12 +109,12 @@ const ShelfTitle = ({ shelf, onOpenLibrary }: ShelfTitleProps) => {
       >
         {shelf.title}
       </Text>
-      {libraryId !== null && (
+      {seeAll !== null && (
         <Pressable
           accessibilityLabel={seeAllLabelOf(shelf.title)}
           accessibilityRole="link"
           hitSlop={SIZES.space2}
-          onPress={() => onOpenLibrary(libraryId)}
+          onPress={seeAll}
           style={({ pressed }) => pressed && styles.pressed}
         >
           <Text style={styles.seeAll}>{SEE_ALL}</Text>
@@ -118,28 +160,111 @@ const CardsRow = ({ shelf, onOpen }: CardsRowProps) => {
   )
 }
 
+/**
+ * Wide cards in a grid that does not scroll: two columns on a tablet, one stacked column on a
+ * phone, each card as wide as its column.
+ */
+const CardsGrid = ({ shelf, onOpen }: CardsRowProps) => {
+  const styles = useStyles()
+  const { width, onLayout } = useMeasuredWidth()
+  const columnWidth = columnWidthOf({ width, columns: columnsOf(useIsWide()) })
+  return (
+    <View onLayout={onLayout} style={styles.grid}>
+      {width > 0 &&
+        shelf.cards.map((card) => (
+          <TouchCard key={card.key} card={card} onPress={() => onOpen(card)} width={columnWidth} />
+        ))}
+    </View>
+  )
+}
+
+const SHELF_FILLS = {
+  [SHELF_LAYOUTS.row]: CardsRow,
+  [SHELF_LAYOUTS.grid]: CardsGrid,
+} as const satisfies Record<ShelfLayout, ComponentType<ShelfProps>>
+
+const FilledShelf = (props: ShelfProps) => {
+  const Fill = SHELF_FILLS[props.shelf.layout]
+  return <Fill {...props} />
+}
+
 const SHELF_ROWS = {
   [SHELF_STATES.empty]: EmptyRow,
-  [SHELF_STATES.filled]: CardsRow,
+  [SHELF_STATES.filled]: FilledShelf,
 } as const satisfies Record<ShelfState, ComponentType<ShelfProps>>
 
 /**
  * A shelf under the thumb: its title, then a row that scrolls sideways and comes to rest on a
- * card's edge, each card as wide as its own shape asks.
+ * card's edge, each card as wide as its own shape asks, or Continue watching's grid.
  */
 const Shelf = (props: ShelfProps) => {
   const styles = useStyles()
   const Row = SHELF_ROWS[shelfStateOf(props.shelf)]
   return (
     <View style={styles.shelf}>
-      <ShelfTitle onOpenLibrary={props.onOpenLibrary} shelf={props.shelf} />
+      <ShelfTitle
+        onOpenContinue={props.onOpenContinue}
+        onOpenLibrary={props.onOpenLibrary}
+        shelf={props.shelf}
+      />
       <Row {...props} />
     </View>
   )
 }
 
-/** Home on a phone or tablet: the shelves stacked down the page, each scrolled sideways. */
-export const touchShelf: ShelfKit = { Shelves, Shelf }
+/**
+ * The shows the viewer binges, first on Home: on a tablet the first across the whole width and
+ * the rest side by side under it, as the web's; on a phone stacked, each larger than a resume
+ * card. Nothing is drawn while there are none.
+ */
+const BingeShelf = ({ cards, onOpen }: BingeShelfProps) => {
+  const styles = useStyles()
+  const isWide = useIsWide()
+  const { width, onLayout } = useMeasuredWidth()
+  const rows = isWide ? bingeRowsOf(cards) : cards.map((card) => [card])
+  return (
+    cards.length > 0 && (
+      <View style={styles.shelf}>
+        <View style={styles.titleRow}>
+          <Text
+            variant={TEXT_VARIANTS.display}
+            accessibilityRole="header"
+            numberOfLines={1}
+            style={styles.shelfTitle}
+          >
+            {BINGE_COPY.title}
+          </Text>
+        </View>
+        <View onLayout={onLayout} style={styles.grid}>
+          {width > 0 &&
+            rows.flatMap((row) => {
+              const cardWidth = columnWidthOf({ width, columns: row.length })
+              const ratio = bingeRatioOf({ isWide, columns: row.length })
+              return row.map((card) => (
+                <BingeCardView
+                  key={card.key}
+                  card={card}
+                  height={cardWidth * ratio}
+                  onOpen={onOpen}
+                  width={cardWidth}
+                />
+              ))
+            })}
+        </View>
+      </View>
+    )
+  )
+}
+
+type BingeRatioOfProps = { isWide: boolean; columns: number }
+
+const bingeRatioOf = ({ isWide, columns }: BingeRatioOfProps): number => {
+  if (!isWide) return BINGE_RATIOS.stacked
+  return columns === 1 ? BINGE_RATIOS.full : BINGE_RATIOS.half
+}
+
+/** Home on a phone or tablet: Binge, then the shelves stacked down the page, each scrolled sideways. */
+export const touchShelf: ShelfKit = { Shelves, Shelf, BingeShelf }
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
@@ -156,5 +281,12 @@ const useStyles = themedStyles((colours) =>
     pressed: { opacity: OPACITIES.pressed },
     // The bottom room keeps a resume card's shadow from being cut off by the row.
     row: { gap: SIZES.space3, paddingHorizontal: SIZES.space3, paddingBottom: SIZES.space2 },
+    grid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: SIZES.space3,
+      marginHorizontal: SIZES.space3,
+      paddingBottom: SIZES.space2,
+    },
   }),
 )

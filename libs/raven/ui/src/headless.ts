@@ -21,6 +21,7 @@ export type {
   PlayerFavourite,
   PlayerServices,
   PlayerTitle,
+  TitleLogo,
   ProgressSink,
   TrackChoice,
 } from '@/components/Player/PlayerServices'
@@ -36,6 +37,8 @@ export { configureStorage } from '@/stores/configureStorage'
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
 export { useTrackCues } from '@/lib/useTrackCues'
+export { useClock } from '@/lib/useClock'
+export { PLAYBACK_MODE_NAMES } from '@/components/Player/copy'
 export { playerQueryKeys } from '@/lib/playerQueryKeys'
 export { useSearch } from '@/lib/useSearch'
 export type { Search } from '@/lib/useSearch'
@@ -119,6 +122,10 @@ export {
 } from '@/query/useServerEvents'
 export type { ServerEventSource } from '@/query/useServerEvents'
 export { useServerWatchedToggle, watchedChangeFor } from '@/query/useWatchedChange'
+export { useServerActiveWork } from '@/query/useServerActiveWork'
+export { useServerRemoteAccess } from '@/query/useServerRemoteAccess'
+export { useServerLibraryActions } from '@/query/useServerLibraryActions'
+export { useServerSettingsSaves } from '@/query/useServerSettingsSaves'
 export { usePageBackdrop } from '@/stores/pageBackdrop'
 export { createSelectionStore, releaseSelectionStore } from '@/stores/selection'
 export type { SelectionStore } from '@/stores/selection'

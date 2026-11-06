@@ -3,25 +3,20 @@ import {
   type MediaTracks,
   PLAYBACK_MODES,
   type PlaybackMode,
+  type Resolution,
   STREAM_QUALITIES,
   type StreamQuality,
   type SubtitleTrack,
   audioLabel,
   formatBitrate,
   formatChannels,
+  rangeLabel,
   resolutionLabel,
   subtitleLabel,
 } from '@raven/core'
-import { PLAYBACK_FACTS_COPY } from '@/components/Player/copy'
+import { PLAYBACK_FACTS_COPY, PLAYBACK_MODE_NAMES } from '@/components/Player/copy'
 import { playingAudio } from '@/components/Player/selection'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
-
-/** How each mode reads in the chrome, short enough for a pill. */
-const MODE_NAMES = {
-  direct: 'Direct play',
-  remux: 'Audio converted',
-  transcode: 'Converted',
-} as const satisfies Record<PlaybackMode, string>
 
 /** Each mode as the subject of a sentence. */
 const MODE_NOUNS = {
@@ -48,21 +43,18 @@ export const pictureLabel = (media: MediaItem): string | null => {
 type AboutLineProps = {
   media: MediaItem | null
   label: string
-  mode: PlaybackMode
   context?: string | null
 }
 
 /**
  * The line under the player's title: where the title came from when the host
- * names it, the year, unless the title already ends with it, then the picture
- * and how it is playing.
+ * names it, and the year, unless the title already ends with it. The
+ * picture and how it plays have chips of their own at the far end of the bar.
  */
-export const aboutLine = ({ media, label, mode, context = null }: AboutLineProps): string => {
+export const aboutLine = ({ media, label, context = null }: AboutLineProps): string => {
   const year = media?.item?.year ?? media?.year ?? null
   const shownYear = year != null && !label.includes(`(${year})`) ? String(year) : null
-  return joined({
-    parts: [context, shownYear, media ? pictureLabel(media) : null, MODE_NAMES[mode]],
-  })
+  return joined({ parts: [context, shownYear] })
 }
 
 type QualityLabelProps = {
@@ -78,11 +70,48 @@ type QualityLabelProps = {
 export const qualityLabel = ({ media, mode, quality = null }: QualityLabelProps): string => {
   if (mode === PLAYBACK_MODES.transcode && quality != null) {
     return joined({
-      parts: [PLAYBACK_FACTS_COPY.height(STREAM_QUALITIES[quality].height), MODE_NAMES[mode]],
+      parts: [
+        PLAYBACK_FACTS_COPY.height(STREAM_QUALITIES[quality].height),
+        PLAYBACK_MODE_NAMES[mode],
+      ],
     })
   }
   const picture = media && mode !== PLAYBACK_MODES.transcode ? resolutionLabel(media) : null
-  return joined({ parts: [picture, MODE_NAMES[mode]] })
+  return joined({ parts: [picture, PLAYBACK_MODE_NAMES[mode]] })
+}
+
+/**
+ * The resolution that reaches the screen, for the top bar's quality chip:
+ * the file's own unless it is transcoded, then the size picked, never above
+ * the file's. Null before the file is probed, and for a transcode at the
+ * server's own size, which the player does not know.
+ */
+export const playingResolution = ({
+  media,
+  mode,
+  quality = null,
+}: QualityLabelProps): Resolution | null => {
+  if (media == null) return null
+  if (mode !== PLAYBACK_MODES.transcode) return resolutionLabel(media)
+  if (quality == null || media.width == null || media.height == null) return null
+  // The server caps the height and keeps the shape, never scaling up.
+  const scale = Math.min(1, STREAM_QUALITIES[quality].height / media.height)
+  return resolutionLabel({
+    width: Math.round(media.width * scale),
+    height: Math.round(media.height * scale),
+  })
+}
+
+type PlayingRangeProps = { media: MediaItem | null; mode: PlaybackMode }
+
+/**
+ * The file's high range of light (`HDR`, `DV5`) while the picture reaches
+ * the screen untouched; null for SDR, an unknown file, or a transcode, which
+ * the server may tone map.
+ */
+export const playingRange = ({ media, mode }: PlayingRangeProps): string | null => {
+  if (media == null || mode === PLAYBACK_MODES.transcode) return null
+  return rangeLabel(media)
 }
 
 /** "24.2 Mbps, 4K HDR" for the original in the quality list; null before the file is probed. */

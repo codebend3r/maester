@@ -47,6 +47,7 @@ import { ravenPlayer } from '@/lib/ravenPlayer'
 import { useRouteId } from '@/lib/routeQuery'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import { useTicketFollowsSession } from '@/lib/useTicketFollowsSession'
+import { useTitleLogo } from '@/lib/useTitleLogo'
 import { ravenVersion } from '@/lib/version'
 import { useIsDesktop } from '@/stores/desktop'
 import { WATCH_PAGE_COPY } from '@/pages/WatchPage/copy'
@@ -246,9 +247,11 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
     )
   }
   const isDesktop = useIsDesktop()
+  const logo = useTitleLogo({ media })
   const services: PlayerServices = {
     title: {
       label: mediaLabel(media),
+      logo,
       duration: media.duration,
       resumeAt: resumeAtFor({ at: 0, media }),
       backTo,

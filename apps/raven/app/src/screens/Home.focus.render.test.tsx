@@ -222,6 +222,32 @@ describe('Home on a TV', () => {
     expect(preferred()).toEqual([])
   })
 
+  it('offers Continue watching in the side menu, and takes the focus back to it on return', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    const entry = screen.getByRole('link', { name: 'Continue watching' })
+
+    await fireEvent(entry, NATIVE_EVENTS.focus)
+    await fireEvent.press(entry)
+    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.continueWatching)
+    await leaveTestScreen()
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Continue watching', 'Continue watching'])
+  })
+
+  it('offers every library in the side menu, and takes the focus back to it on return', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    const entry = screen.getByRole('link', { name: 'Libraries' })
+
+    await fireEvent(entry, NATIVE_EVENTS.focus)
+    await fireEvent.press(entry)
+    expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.libraries)
+    await leaveTestScreen()
+    await returnToTestScreen()
+    expect(askedFor()).toEqual(['Libraries', 'Libraries'])
+  })
+
   it('puts focus on the first card of the first shelf that has one', async () => {
     useActiveServer.setState({ servers: [SPARSE], activeId: SPARSE.id })
     await renderHome()

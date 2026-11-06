@@ -40,6 +40,8 @@ export type ItemAction =
       kind: typeof ITEM_ACTIONS.toggle
       /** Whether the mark is on; `mixed` for a show or season only partly watched. */
       isOn: CheckState
+      /** Whether the mark cannot be turned on now, as Binge once three other shows are; it still takes the focus, and its label says why. */
+      isDisabled: boolean
     })
   | (ActionFace & { kind: typeof ITEM_ACTIONS.link })
 
@@ -100,23 +102,47 @@ export const actionLookOf = (
   state: AccessibilityState | undefined
   icon: IconName
   text: string | null
+  /** Drawn faint: a mark that cannot be turned on now. */
+  isDisabled: boolean
 } => {
   const { icon, text } = action
   switch (action.kind) {
     case ITEM_ACTIONS.play:
-      return { tone: BUTTON_TONES.primary, role: 'button', state: undefined, icon, text }
+      return {
+        tone: BUTTON_TONES.primary,
+        role: 'button',
+        state: undefined,
+        icon,
+        text,
+        isDisabled: false,
+      }
     case ITEM_ACTIONS.option:
-      return { tone: BUTTON_TONES.quiet, role: 'button', state: undefined, icon, text }
+      return {
+        tone: BUTTON_TONES.quiet,
+        role: 'button',
+        state: undefined,
+        icon,
+        text,
+        isDisabled: false,
+      }
     case ITEM_ACTIONS.toggle:
       return {
         tone: action.isOn === true ? BUTTON_TONES.primary : BUTTON_TONES.quiet,
         role: 'checkbox',
-        state: { checked: action.isOn },
+        state: { checked: action.isOn, disabled: action.isDisabled },
         icon,
         text,
+        isDisabled: action.isDisabled,
       }
     case ITEM_ACTIONS.link:
-      return { tone: BUTTON_TONES.ghost, role: 'link', state: undefined, icon, text }
+      return {
+        tone: BUTTON_TONES.ghost,
+        role: 'link',
+        state: undefined,
+        icon,
+        text,
+        isDisabled: false,
+      }
     default: {
       const unknown: never = action
       return unknown

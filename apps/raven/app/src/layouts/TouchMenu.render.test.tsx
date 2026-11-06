@@ -53,7 +53,7 @@ describe('the side menu of a phone or tablet', () => {
     expect(screen.queryByLabelText(TOUCH_NAV_COPY.closeMenu)).toBeNull()
   })
 
-  it("holds the web's menu: Home, Favourites, the pinned libraries, Settings, no theme row", async () => {
+  it("holds the web's menu: Home, Favourites, Continue watching, Libraries, the pinned libraries, Settings, no theme row", async () => {
     await openMenu()
     expect(await screen.findByRole('link', { name: 'Films' })).toBeTruthy()
     expect(screen.queryByLabelText('Search every library')).toBeNull()
@@ -61,6 +61,8 @@ describe('the side menu of a phone or tablet', () => {
     expect(screen.getAllByRole('link').map((link) => link.props.accessibilityLabel)).toEqual([
       'Home',
       'Favourites',
+      'Continue watching',
+      'Libraries',
       'Films',
       'Series',
       'Settings',
@@ -92,6 +94,22 @@ describe('the side menu of a phone or tablet', () => {
     await fireEvent.press(await screen.findByRole('link', { name: 'Favourites' }))
     expect(mockReplace).toHaveBeenCalledWith({ pathname: APP_ROUTES.favourites, params: {} })
     expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it('opens Continue watching on top of Home', async () => {
+    await openMenu()
+    await fireEvent.press(
+      await screen.findByRole('link', { name: TOUCH_NAV_COPY.continueWatching }),
+    )
+    expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.continueWatching, params: {} })
+    expect(useTouchMenu.getState().isOpen).toBe(false)
+  })
+
+  it('opens every library on top of Home', async () => {
+    await openMenu()
+    await fireEvent.press(await screen.findByRole('link', { name: TOUCH_NAV_COPY.libraries }))
+    expect(mockPush).toHaveBeenCalledWith({ pathname: APP_ROUTES.libraries, params: {} })
+    expect(useTouchMenu.getState().isOpen).toBe(false)
   })
 
   it('goes to Settings, and back to Home without stacking another', async () => {

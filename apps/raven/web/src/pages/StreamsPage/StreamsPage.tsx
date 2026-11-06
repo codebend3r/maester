@@ -28,11 +28,10 @@ import {
   resolutionLabel,
   wordPart,
 } from '@raven/core'
-import { Button } from '@raven/ui'
+import { Button, FactParts } from '@raven/ui'
 import { type ComponentType, type ReactNode, useId, useState } from 'react'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
-import { FactParts } from '@/components/ResolutionChip/ResolutionChip'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useManagement } from '@/lib/management'

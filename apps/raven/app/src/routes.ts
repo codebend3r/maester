@@ -14,6 +14,8 @@ export const APP_ROUTES = {
   nowPlaying: '/now-playing',
   search: '/search',
   favourites: '/favourites',
+  continueWatching: '/continue-watching',
+  libraries: '/libraries',
   settings: '/settings',
 } as const
 
@@ -49,6 +51,8 @@ export const APP_SCREENS = {
   nowPlaying: 'now-playing',
   search: 'search',
   favourites: 'favourites',
+  continueWatching: 'continue-watching',
+  libraries: 'libraries',
   settings: 'settings',
 } as const
 

@@ -40,6 +40,11 @@ rewrite meleys Meleys
 rewrite syrax Syrax
 rewrite vermithor Vermithor
 
+echo "🏠 Turning Remote Access off in the copy..."
+# Left on, the local server lists Vhagar's public origin as a media origin, and
+# the player sends it the local server's account tickets, which Vhagar answers 401.
+sqlite3 "${copy}" "UPDATE settings SET value = json_set(value, '\$.isEnabled', json('false')) WHERE key = 'remoteAccess';"
+
 echo "🔄 Swapping it in (old one kept in data/backups/${stamp})... 💾"
 for file in raven.db raven.db-wal raven.db-shm; do
   [ -e "${data_dir}/${file}" ] && mv "${data_dir}/${file}" "${data_dir}/backups/${stamp}/${file}"

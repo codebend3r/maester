@@ -1,7 +1,6 @@
-import { Button, ButtonLink } from '@raven/ui'
+import { Button, ButtonLink, FactParts } from '@raven/ui'
 import { Fragment, type KeyboardEvent, useEffect, useState, useSyncExternalStore } from 'react'
 import type { Featured } from '@/pages/HomePage/featured'
-import { FactParts } from '@/components/ResolutionChip/ResolutionChip'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import styles from '@/pages/HomePage/HomeHero.module.scss'
 import { COMMON_COPY } from '@/lib/copy'

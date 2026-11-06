@@ -38,6 +38,7 @@ import {
   titleLookOf,
 } from '@/layouts/itemKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
+import { OPACITIES } from '@/theme/appTheme'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { translucent } from '@/theme/translucent'
 import { themedStyles, useTheme } from '@/theme/useTheme'
@@ -144,6 +145,7 @@ const ActionButton = ({ action, isFirst }: ActionButtonProps) => {
       style={({ focused }) => [
         styles.action,
         toneStyles[look.tone].button,
+        look.isDisabled && styles.disabled,
         focused && styles.focused,
       ]}
     >
@@ -628,6 +630,7 @@ const useStyles = themedStyles((colours) =>
     },
     actionLabel: { fontSize: TV_SIZES.textLg, fontWeight: 'bold' },
     focused: { borderColor: colours.text },
+    disabled: { opacity: OPACITIES.disabled },
     section: { gap: TV_SIZES.space1 },
     heading: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     row: { gap: TV_SIZES.space5, paddingHorizontal: TV_GUTTER, paddingVertical: TV_SIZES.space4 },

@@ -1,8 +1,10 @@
 import {
+  AUTH_PATHS,
   DISCOVERY_PATHS,
   HLS_PATHS,
   PICTURE_PATHS,
   PLAY_HISTORY_PATHS,
+  REMOTE_ACCESS_PATHS,
   SCROBBLING_PATHS,
 } from '@/contract'
 
@@ -17,18 +19,43 @@ export type AppClientCall = { method: AppCallMethod; path: string }
 const { get, put, post, delete: remove } = APP_CALL_METHODS
 
 /**
+ * The routes the server keeps for the owner that the app's Settings call, and only for the
+ * signed-in account `GET /api/me` names the owner: the web's Admin page, as the owner asked for
+ * it on every device. The server stays the authority: each answers 403 to anyone else.
+ */
+export const APP_OWNER_CALLS = {
+  setPlaybackSettings: { method: put, path: '/api/settings/playback' },
+  setDisplaySettings: { method: put, path: '/api/settings/display' },
+  getRemoteAccess: { method: get, path: REMOTE_ACCESS_PATHS.settings },
+  setRemoteAccess: { method: put, path: REMOTE_ACCESS_PATHS.settings },
+  listMembers: { method: get, path: AUTH_PATHS.members },
+  setMemberStatus: { method: post, path: AUTH_PATHS.memberStatus },
+  quickScanLibrary: { method: post, path: '/api/libraries/:id/quick-scan' },
+  cancelQuickScan: { method: post, path: '/api/libraries/:id/quick-scan/cancel' },
+  scanLibrary: { method: post, path: '/api/libraries/:id/scan' },
+  cancelScan: { method: post, path: '/api/libraries/:id/scan/cancel' },
+  scanLibraryMarkers: { method: post, path: '/api/libraries/:id/markers' },
+  mergeLibraryAlbums: { method: post, path: '/api/libraries/:id/albums/merge' },
+  updateLibraryRatings: { method: post, path: '/api/libraries/:id/ratings' },
+  cancelLibraryRatings: { method: post, path: '/api/libraries/:id/ratings/cancel' },
+  matchLibrary: { method: post, path: '/api/libraries/:id/match' },
+} as const satisfies Record<string, AppClientCall>
+
+/**
  * Every route raven's device app may ask a server for, through PR 10's screens: the
  * `@Public()` and viewer reads, the writes the spec allows (progress, plays, watched, the
- * favourites, the account's playlists, their sharing and copies, and scrobbling links), the mixes and radio and the admin lock's unlock, the media ticket and the media plane.
+ * favourites, the account's playlists, their sharing and copies, scrobbling links and the binge list), the mixes and radio and the admin lock's unlock, the media ticket and the media plane.
  * A call the `ApiClient` makes is named after its method; the rest are the URLs the native
- * players, pictures and the event stream fetch. Nothing here is `@AdminOnly()` or kept for the
- * owner by the account gate: the server's `appClients.test.ts` checks every entry against its
- * route marks.
+ * players, pictures and the event stream fetch. The only entries the server keeps for the owner
+ * (`@AdminOnly()`, or the account gate's owner) are `APP_OWNER_CALLS`'s: the server's
+ * `appClients.test.ts` checks every entry against its route marks.
  */
 export const APP_CLIENT_CALLS = {
   getLock: { method: get, path: '/api/lock' },
   getAdminLock: { method: get, path: '/api/admin' },
   unlockAdmin: { method: post, path: '/api/admin/unlock' },
+
+  getMe: { method: get, path: AUTH_PATHS.me },
 
   getHome: { method: get, path: '/api/home' },
   getHero: { method: get, path: '/api/home/hero' },
@@ -54,6 +81,7 @@ export const APP_CLIENT_CALLS = {
   listFavouriteTitles: { method: get, path: '/api/favourites/titles' },
   listFavouriteAlbums: { method: get, path: '/api/favourites/albums' },
   listFavouriteArtists: { method: get, path: '/api/favourites/artists' },
+  getBinge: { method: get, path: '/api/binge' },
   listPlaylists: { method: get, path: '/api/playlists' },
   getPlaylist: { method: get, path: '/api/playlists/:id' },
   listMixes: { method: get, path: DISCOVERY_PATHS.mixes },
@@ -89,6 +117,7 @@ export const APP_CLIENT_CALLS = {
   setItemFavourite: { method: put, path: '/api/items/:id/favourite' },
   setAlbumFavourite: { method: put, path: '/api/albums/:id/favourite' },
   setArtistFavourite: { method: put, path: '/api/artists/:id/favourite' },
+  setBinge: { method: put, path: '/api/binge/:id' },
   createPlaylist: { method: post, path: '/api/playlists' },
   renamePlaylist: { method: put, path: '/api/playlists/:id' },
   deletePlaylist: { method: remove, path: '/api/playlists/:id' },
@@ -112,6 +141,8 @@ export const APP_CLIENT_CALLS = {
   hlsSegment: { method: get, path: HLS_PATHS.segment },
   hlsSubtitles: { method: get, path: HLS_PATHS.subtitles },
   hlsSubtitleSegment: { method: get, path: HLS_PATHS.subtitleSegment },
+
+  ...APP_OWNER_CALLS,
 } as const satisfies Record<string, AppClientCall>
 
 export type AppClientCallName = keyof typeof APP_CLIENT_CALLS

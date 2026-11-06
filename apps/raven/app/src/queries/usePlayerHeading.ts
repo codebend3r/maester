@@ -1,4 +1,4 @@
-import { ITEM_IMAGE_KINDS, type MediaItem } from '@raven/core'
+import { ITEM_IMAGE_KINDS, type MediaItem, artItemIdOf } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 
 import { type PlayerHeading, playerHeadingOf } from '@/layouts/playerHeading'
@@ -14,7 +14,7 @@ type UsePlayerHeadingProps = { media: MediaItem; session: AppQueries }
  * server's headers once they are known.
  */
 export const usePlayerHeading = ({ media, session }: UsePlayerHeadingProps): PlayerHeading => {
-  const artId = media.item?.show?.id ?? media.item?.id ?? null
+  const artId = media.item === null ? null : artItemIdOf(media.item)
   const art = useQuery(session.queries.itemQuery(artId))
   const pictures = usePictures(session)
   const version = art.data?.logoVersion ?? null

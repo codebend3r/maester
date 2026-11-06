@@ -1,6 +1,6 @@
 import { type MediaItem, type MediaTracks, allFileFacts } from '@raven/core'
 import { useId } from 'react'
-import { FactText } from '@/components/ResolutionChip/ResolutionChip'
+import { FactText } from '@raven/ui'
 import styles from '@/components/PlayableItemView/FileFacts.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 

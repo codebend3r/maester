@@ -3,6 +3,7 @@ import {
   type ItemDetails,
   type MediaItem,
   type PosterEntry,
+  artItemIdOf,
   cardLink,
   formatRuntime,
   mediaLabel,
@@ -10,12 +11,11 @@ import {
   tileWords,
   watchLink,
 } from '@raven/core'
-import { ButtonLink, Icon } from '@raven/ui'
+import { ButtonLink, Icon, FactParts } from '@raven/ui'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useId } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
-import { FactParts } from '@/components/ResolutionChip/ResolutionChip'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
@@ -23,6 +23,7 @@ import { CONTINUE_WATCHING_PATH, HOME_CONTINUE_COUNT } from '@/lib/homeContinue'
 import { itemQuery } from '@/lib/queries'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import styles from '@/pages/HomePage/ContinueWatching.module.scss'
+import frames from '@/pages/HomePage/HomeFrames.module.scss'
 
 /** "23m left", "1h 12m left"; null until the video's length is known. */
 export const timeLeft = (media: MediaItem): string | null => {
@@ -62,7 +63,7 @@ type TileArtProps = { entry: PosterEntry }
  * once through the query cache every page shares.
  */
 const useTileArt = ({ entry: { media } }: TileArtProps) => {
-  const artId = media.item?.show?.id ?? media.item?.id ?? null
+  const artId = media.item === null ? null : artItemIdOf(media.item)
   const { data } = useQuery({ ...itemQuery(artId ?? 0), enabled: artId !== null })
   const logo =
     data?.logoVersion == null
@@ -137,7 +138,7 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
   const art = useTileArt({ entry })
 
   return (
-    <li className={`${styles.tile} ${menu.hostClass}`}>
+    <li className={`${frames.tile} ${styles.tile} ${menu.hostClass}`}>
       <CardLink
         {...watchLink({ media })}
         className={styles.play}
@@ -202,7 +203,7 @@ type ContinueTilesProps = { entries: readonly PosterEntry[]; id?: string }
 
 /** The tiles, two across, one for each video in progress. */
 export const ContinueTiles = ({ entries, id }: ContinueTilesProps) => (
-  <ul id={id} className={styles.tiles}>
+  <ul id={id} className={frames.tiles}>
     {entries.map((entry) => (
       <ContinueTile key={entry.media.id} entry={entry} />
     ))}
@@ -220,7 +221,7 @@ export const ContinueWatching = ({ entries }: ContinueWatchingProps) => {
   const id = useId()
   const hasMore = entries.length > HOME_CONTINUE_COUNT
   return (
-    <section className={styles.section} aria-labelledby={id}>
+    <section className={frames.section} aria-labelledby={id}>
       <SectionHeading
         id={id}
         aside={

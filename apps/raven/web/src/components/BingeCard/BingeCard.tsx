@@ -3,6 +3,7 @@ import {
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
   type ItemDetails,
+  bingeCardFacts,
   itemPath,
   mediaLabel,
   watchLink,
@@ -10,9 +11,10 @@ import {
 import { Icon } from '@raven/ui'
 import { Link } from 'react-router-dom'
 import { BINGE_CARD_COPY } from '@/components/BingeCard/copy'
-import { bingeCardFacts } from '@/components/BingeCard/bingeCardFacts'
+import { bingeStatusWords } from '@/components/BingeCard/bingeStatus'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
+import { Bone, SkeletonPanel } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
 import { COMMON_COPY } from '@/lib/copy'
 import { itemQuery, nextEpisodeQuery } from '@/lib/queries'
@@ -46,7 +48,8 @@ export const BingeCard = ({ details }: BingeCardProps) => {
     next: next.data ?? null,
     episode: episode.data ?? null,
   })
-  const { media } = facts
+  const media = next.data ?? null
+  const status = bingeStatusWords(facts.status)
   const backdrop =
     details.backdropVersion == null
       ? media && api.thumbnailUrl(media)
@@ -68,7 +71,7 @@ export const BingeCard = ({ details }: BingeCardProps) => {
   const meta = [facts.year, facts.runtime].filter((fact): fact is string => fact != null)
 
   return (
-    <li className={styles.card}>
+    <li className={`${styles.frame} ${styles.card}`}>
       {media && (
         <CardLink
           {...watchLink({ media })}
@@ -81,14 +84,14 @@ export const BingeCard = ({ details }: BingeCardProps) => {
         </CardLink>
       )}
       {logo && (
-        <Link to={page} className={styles.logoSlot} aria-label={facts.title}>
+        <Link to={page} className={styles.logoSlot} aria-label={details.title}>
           <img className={styles.logo} src={logo} alt="" decoding="async" />
         </Link>
       )}
       <span className={styles.copy}>
         {!logo && (
           <Link to={page} className={styles.title}>
-            {facts.title}
+            {details.title}
           </Link>
         )}
         {meta.length > 0 && <span className={styles.meta}>{meta.join(COMMON_COPY.separator)}</span>}
@@ -106,10 +109,10 @@ export const BingeCard = ({ details }: BingeCardProps) => {
         )}
         {facts.synopsis && <span className={styles.synopsis}>{facts.synopsis}</span>}
       </span>
-      {media && facts.status && (
+      {media && status && (
         <span className={styles.progress}>
           <ResumeBar media={media} className={styles.bar} />
-          <span className={styles.status}>{facts.status}</span>
+          <span className={styles.status}>{status}</span>
         </span>
       )}
       <span className={styles.backdrop}>
@@ -128,3 +131,23 @@ export const BingeCard = ({ details }: BingeCardProps) => {
     </li>
   )
 }
+
+/**
+ * A binged title on its way, in the card's own shape: a line for its logo in
+ * the corner, its words above the foot and its progress across it.
+ */
+export const BingeCardSkeleton = () => (
+  <SkeletonPanel className={styles.frame}>
+    <span className={styles.skeletonLogo}>
+      <Bone shape="heading" />
+    </span>
+    <span className={styles.skeletonCopy}>
+      <Bone shape="small" width="short" />
+      <Bone shape="text" width="most" />
+      <Bone shape="text" width="half" />
+    </span>
+    <span className={styles.skeletonProgress}>
+      <Bone shape="small" />
+    </span>
+  </SkeletonPanel>
+)

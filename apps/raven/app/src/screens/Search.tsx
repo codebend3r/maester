@@ -8,7 +8,7 @@ import { libraryShelvesOf } from '@/queries/homeShelves'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
 import { SearchLayout, Shelf } from '@/layouts'
-import { APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf } from '@/routes'
+import { APP_ROUTE_PARAMS, APP_ROUTES, ROUTE_TARGETS, hrefOf } from '@/routes'
 import { SEARCH_COPY } from '@/screens/copy'
 
 type ServerSearchProps = { session: AppQueries; asked: string }
@@ -53,7 +53,13 @@ const ServerSearch = ({ session: { server, api, queries }, asked }: ServerSearch
       title={SEARCH_COPY.title}
     >
       {shelves.map((shelf) => (
-        <Shelf key={shelf.key} onOpen={open} onOpenLibrary={openLibrary} shelf={shelf} />
+        <Shelf
+          key={shelf.key}
+          onOpen={open}
+          onOpenContinue={() => router.push(APP_ROUTES.continueWatching)}
+          onOpenLibrary={openLibrary}
+          shelf={shelf}
+        />
       ))}
     </SearchLayout>
   )

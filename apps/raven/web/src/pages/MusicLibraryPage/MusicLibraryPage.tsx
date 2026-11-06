@@ -3,7 +3,8 @@ import { type ComponentType, useId } from 'react'
 import { Link } from 'react-router-dom'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
 import { useIsCurrent } from '@/components/AppShell/currentPage'
-import { ArtistList } from '@/components/ArtistList/ArtistList'
+import { ArtistList, ArtistListSkeleton } from '@/components/ArtistList/ArtistList'
+import { TrackListSkeleton } from '@/components/TrackList/TrackList'
 import { ListState } from '@/components/ListState/ListState'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { MUSIC_COPY } from '@/lib/copy'
@@ -91,6 +92,7 @@ const ArtistsList = () => {
       entries={artists.isRead ? artists.entries : undefined}
       error={artists.error}
       empty={emptyOf({ listing: artists, empty: MUSIC_LIBRARY_COPY.noArtists })}
+      loading={<ArtistListSkeleton />}
     >
       {(entries) => <ArtistList artists={entries} label={MUSIC_LIBRARY_COPY.artists} />}
     </ListState>
@@ -105,6 +107,7 @@ const SongsList = () => {
       entries={songs.isRead ? songs.entries : undefined}
       error={songs.error}
       empty={emptyOf({ listing: songs, empty: MUSIC_LIBRARY_COPY.noSongs })}
+      loading={<TrackListSkeleton />}
     >
       {(tracks) => (
         <SongList

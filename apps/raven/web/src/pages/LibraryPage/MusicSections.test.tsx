@@ -220,7 +220,7 @@ describe('artist request states', () => {
   it('shows a loading state rather than a blank page', () => {
     spyOn(api, 'listArtists').mockImplementation(() => new Promise(() => undefined))
     renderWithProviders({ ui: <ArtistsSection library={MUSIC} />, route: '/libraries/3/artists' })
-    expect(screen.getByRole('status')).toHaveTextContent('Loading artists')
+    expect(screen.getByText('Loading artists')).toBeInTheDocument()
   })
 
   it('shows a failed artist request', async () => {

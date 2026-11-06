@@ -4,6 +4,7 @@ import { AUTH_ROUTES, DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
 import { Toaster } from '@raven/ui'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
+import { HomeSkeleton } from '@/pages/HomePage/HomeSkeleton'
 import { DESIGN_PATH } from '@/pages/DesignPage/copy'
 import { ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 import { PendingPage } from '@/pages/PendingPage/PendingPage'
@@ -157,7 +158,14 @@ export const AppRoutes = () => {
           <Route element={<AuthGate />}>
             <Route element={<PlayerLayer />}>
               <Route element={<AppShell />}>
-                <Route index element={<HomePage />} />
+                <Route
+                  index
+                  element={
+                    <Suspense fallback={<HomeSkeleton />}>
+                      <HomePage />
+                    </Suspense>
+                  }
+                />
                 <Route path="libraries" element={<LibrariesPage />} />
                 <Route path="libraries/:id" element={<LibraryPage />} />
                 <Route path="libraries/:id/history" element={<HistoryPage />} />

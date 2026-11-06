@@ -1,0 +1,69 @@
+// The layout Home's sections and cards share with their skeletons, kept apart
+// from the page's look so the skeleton that loads with the app pulls in
+// nothing else of the page's.
+
+// The sections a section's gap apart.
+.sections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--section-gap);
+}
+
+// A heading over its cards.
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+// Eight to a row, as `POSTER_SIZES.row` measures them.
+.row {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-3);
+}
+
+// Continue watching's tiles, two across.
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+// A tile's size and places: its logo in the top left, its words along the foot.
+.tile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'logo'
+    '.'
+    'copy';
+  gap: var(--space-3);
+  min-height: 12.5rem;
+  padding: var(--space-4);
+}
+
+@media (max-width: 64rem) {
+  .row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 48rem) {
+  .tiles {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .tile {
+    min-height: 9.5rem;
+    padding: var(--space-3);
+  }
+}
+
+@media (max-width: 40rem) {
+  .row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

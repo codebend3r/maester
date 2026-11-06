@@ -1,31 +1,43 @@
 import { useQueries } from '@tanstack/react-query'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
-import { ITEM_TYPES } from '@raven/core'
+import { ITEM_TYPES, type ItemDetails } from '@raven/core'
 import { Button, ButtonLink, Icon } from '@raven/ui'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
-import { BingeCard } from '@/components/BingeCard/BingeCard'
+import { BingeCard, BingeCardSkeleton } from '@/components/BingeCard/BingeCard'
+import { Loading } from '@/components/Skeleton/Skeleton'
 import { BINGE_BROWSE_PATH, BINGE_COPY, BINGE_PATH } from '@/lib/binge'
 import { bingeQuery } from '@/lib/bingeQuery'
 import { useBingeProfile, useSetBinge } from '@/lib/useBinge'
 import styles from '@/pages/BingePage/BingePage.module.scss'
 
-type BingeSectionProps = { isHome?: boolean }
+/** How many cards stand in on the Binge page before the list says how many it holds. */
+const UNKNOWN_SKELETON_COUNT = 2
 
-export const BingeSection = ({ isHome = false }: BingeSectionProps) => {
-  const headingId = useId()
+type BingeSkeletonProps = { count: number }
+
+/** The cards on their way, laid out as the grid lays the real ones. */
+const BingeSkeleton = ({ count }: BingeSkeletonProps) => (
+  <Loading label={BINGE_COPY.loading}>
+    <ul className={styles.grid}>
+      {Array.from({ length: count }, (_, index) => (
+        <BingeCardSkeleton key={index} />
+      ))}
+    </ul>
+  </Loading>
+)
+
+/** The binge list read: its shows, whether any is still on its way, and those that could not be read. */
+const useBingeShows = () => {
   const { ids, isPending: isListPending } = useBingeProfile()
-  const setBinge = useSetBinge()
   const queries = useQueries({ queries: ids.map((id) => bingeQuery(id)) })
   const shows = queries.flatMap((query) =>
     query.isSuccess && query.data !== null && query.data.type === ITEM_TYPES.show
       ? [query.data]
       : [],
   )
-  const hasShows = shows.length > 0
-  const isPending = queries.some((query) => query.isPending)
   const failures = queries.flatMap((query, index) => {
     const id = ids[index]
     return id !== undefined &&
@@ -34,54 +46,97 @@ export const BingeSection = ({ isHome = false }: BingeSectionProps) => {
       ? [{ id, query }]
       : []
   })
+  return {
+    ids,
+    isListPending,
+    isPending: queries.some((query) => query.isPending),
+    shows,
+    failures,
+  }
+}
 
+type BingeGridProps = {
+  shows: readonly ItemDetails[]
+  /** How many cards stand in while no show has arrived; none draws nothing then. */
+  skeletons: number
+}
+
+/** The shows as cards, the first across the grid; until one arrives, cards of their shape. */
+const BingeGrid = ({ shows, skeletons }: BingeGridProps) => (
+  <>
+    {shows.length === 0 && skeletons > 0 && <BingeSkeleton count={skeletons} />}
+    {shows.length > 0 && (
+      <ul className={styles.grid}>
+        {shows.map((item) => (
+          <BingeCard key={item.id} details={item} />
+        ))}
+      </ul>
+    )}
+  </>
+)
+
+/**
+ * Home's Binge section, first on the page: drawn once the list says it holds shows, with
+ * cards of their shape until they arrive, and nothing for a list that is empty.
+ */
+export const HomeBinge = () => {
+  const headingId = useId()
+  const { ids, isPending, shows } = useBingeShows()
   return (
-    <>
-      {(!isHome || hasShows) && (
-        <section className={styles.section} aria-labelledby={isHome ? headingId : undefined}>
-          {isHome && (
-            <SectionHeading id={headingId}>
-              <Link to={BINGE_PATH}>{BINGE_COPY.title}</Link>
-            </SectionHeading>
-          )}
-          {!isHome && !isListPending && ids.length === 0 && (
-            <section className={styles.empty}>
-              <Icon name="playback" size={40} />
-              <h2>{BINGE_COPY.emptyTitle}</h2>
-              <p>{BINGE_COPY.emptyBody}</p>
-              <p>{BINGE_COPY.emptyHelp}</p>
-              <ButtonLink to={BINGE_BROWSE_PATH} icon="libraries">
-                {BINGE_COPY.browse}
-              </ButtonLink>
-            </section>
-          )}
-          {!isHome && isPending && <output>{BINGE_COPY.loading}</output>}
-          {!isHome &&
-            failures.map(({ id, query }) => (
-              <section key={id} className={styles.failure}>
-                <p role="alert">{BINGE_COPY.unavailable}</p>
-                <Button
-                  onClick={() => {
-                    query.refetch().catch(() => undefined)
-                  }}
-                >
-                  {BINGE_COPY.retry}
-                </Button>
-                <Button onClick={() => setBinge.mutate({ id, binge: false })}>
-                  {BINGE_COPY.remove}
-                </Button>
-              </section>
-            ))}
-          {hasShows && (
-            <ul className={styles.grid}>
-              {shows.map((item) => (
-                <BingeCard key={item.id} details={item} />
-              ))}
-            </ul>
-          )}
+    (shows.length > 0 || isPending) && (
+      <section className={styles.section} aria-labelledby={headingId}>
+        <SectionHeading id={headingId}>
+          <Link to={BINGE_PATH}>{BINGE_COPY.title}</Link>
+        </SectionHeading>
+        <BingeGrid shows={shows} skeletons={isPending ? ids.length : 0} />
+      </section>
+    )
+  )
+}
+
+type PageSkeletonCountProps = { isListPending: boolean; isPending: boolean; count: number }
+
+/** How many cards stand in on the page: a guess before the list is read, then one per show on its way. */
+const pageSkeletonCountOf = ({ isListPending, isPending, count }: PageSkeletonCountProps) => {
+  if (isListPending) return UNKNOWN_SKELETON_COUNT
+  return isPending ? count : 0
+}
+
+/** The Binge page's list: the way to find shows while it is empty, each show that failed, then the cards. */
+const BingeList = () => {
+  const { ids, isListPending, isPending, shows, failures } = useBingeShows()
+  const setBinge = useSetBinge()
+  return (
+    <section className={styles.section}>
+      {!isListPending && ids.length === 0 && (
+        <section className={styles.empty}>
+          <Icon name="playback" size={40} />
+          <h2>{BINGE_COPY.emptyTitle}</h2>
+          <p>{BINGE_COPY.emptyBody}</p>
+          <p>{BINGE_COPY.emptyHelp}</p>
+          <ButtonLink to={BINGE_BROWSE_PATH} icon="libraries">
+            {BINGE_COPY.browse}
+          </ButtonLink>
         </section>
       )}
-    </>
+      {failures.map(({ id, query }) => (
+        <section key={id} className={styles.failure}>
+          <p role="alert">{BINGE_COPY.unavailable}</p>
+          <Button
+            onClick={() => {
+              query.refetch().catch(() => undefined)
+            }}
+          >
+            {BINGE_COPY.retry}
+          </Button>
+          <Button onClick={() => setBinge.mutate({ id, binge: false })}>{BINGE_COPY.remove}</Button>
+        </section>
+      ))}
+      <BingeGrid
+        shows={shows}
+        skeletons={pageSkeletonCountOf({ isListPending, isPending, count: ids.length })}
+      />
+    </section>
   )
 }
 
@@ -93,7 +148,7 @@ export const BingePage = () => {
       <PageTitle id={titleId} icon="popcorn">
         {BINGE_COPY.title}
       </PageTitle>
-      <BingeSection />
+      <BingeList />
     </section>
   )
 }

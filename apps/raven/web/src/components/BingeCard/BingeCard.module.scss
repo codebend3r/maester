@@ -1,10 +1,6 @@
-// The backdrop fills the card, the logo sits in its top left corner, its words
-// above the foot and the progress across the foot, over a shade that keeps
-// them readable on any picture. The card is a picture in every
-// theme, so its words keep the fixed light ink of words on a picture.
-.card {
-  position: relative;
-  isolation: isolate;
+// The card's size and places, which its skeleton shares: the logo in the top
+// left corner, its words above the foot and the progress across the foot.
+.frame {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto auto;
@@ -16,6 +12,14 @@
   gap: var(--space-4);
   min-height: 20rem;
   padding: var(--space-6);
+}
+
+// The backdrop fills the card, under a shade that keeps the words readable on
+// any picture. The card is a picture in every theme, so its words keep the
+// fixed light ink of words on a picture.
+.card {
+  position: relative;
+  isolation: isolate;
   border-radius: var(--radius-lg);
   color: var(--color-on-picture);
   background: var(--color-stage);
@@ -198,8 +202,27 @@
   }
 }
 
+// A card on its way takes the frame's places with grey lines.
+.skeletonLogo {
+  grid-area: logo;
+  display: grid;
+  width: min(14rem, 44%);
+}
+
+.skeletonCopy {
+  grid-area: copy;
+  display: grid;
+  gap: var(--space-2);
+  max-width: 40rem;
+}
+
+.skeletonProgress {
+  grid-area: progress;
+  display: grid;
+}
+
 @media (max-width: 48rem) {
-  .card {
+  .frame {
     min-height: 16rem;
     padding: var(--space-4);
   }

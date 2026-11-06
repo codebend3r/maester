@@ -2,10 +2,15 @@ import { useQuery } from '@tanstack/react-query'
 import { useId } from 'react'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
+import { Loading } from '@/components/Skeleton/Skeleton'
 import { homeQuery } from '@/lib/queries'
 import { CONTINUE_WATCHING_COPY } from '@/pages/ContinueWatchingPage/copy'
 import styles from '@/pages/ContinueWatchingPage/ContinueWatchingPage.module.scss'
 import { ContinueTiles } from '@/pages/HomePage/ContinueWatching'
+import { ContinueTileShapes } from '@/pages/HomePage/HomeSkeleton'
+
+/** How many tiles stand in while the list is read: three rows of two. */
+const SKELETON_COUNT = 6
 
 /**
  * `/continue-watching`: every video in progress, the most recently watched
@@ -30,7 +35,9 @@ export const ContinueWatchingPage = () => {
         </p>
       )}
       {home.isPending && (
-        <output className={styles.message}>{CONTINUE_WATCHING_COPY.loading}</output>
+        <Loading label={CONTINUE_WATCHING_COPY.loading}>
+          <ContinueTileShapes count={SKELETON_COUNT} />
+        </Loading>
       )}
       {home.isSuccess && entries.length === 0 && (
         <p className={styles.message}>{CONTINUE_WATCHING_COPY.empty}</p>

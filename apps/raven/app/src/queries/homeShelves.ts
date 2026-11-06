@@ -23,10 +23,28 @@ import { episodeWordsOf } from '@/queries/episodeMark'
 import { type ShowArts, logoOf, showArtOf } from '@/queries/showArt'
 import { timeLeftOf } from '@/queries/timeLeft'
 
-/** A shelf of cards; a library's names the library its title opens, Continue watching none. */
-export type ShelfView = { key: string; title: string; libraryId: number | null; cards: ShelfCard[] }
+/** How a shelf lays its cards out: one row that scrolls sideways, or a grid of wide cards. */
+export const SHELF_LAYOUTS = { row: 'row', grid: 'grid' } as const
+
+export type ShelfLayout = (typeof SHELF_LAYOUTS)[keyof typeof SHELF_LAYOUTS]
+
+/**
+ * A shelf of cards; a library's names the library its title opens, Continue watching none. A
+ * grid that `hasMore` than it shows opens the whole list from its title.
+ */
+export type ShelfView = {
+  key: string
+  title: string
+  libraryId: number | null
+  cards: ShelfCard[]
+  layout: ShelfLayout
+  hasMore: boolean
+}
 
 export const CONTINUE_WATCHING = 'Continue watching'
+
+/** How many of the videos in progress Home shows, as the web's: three rows of two. */
+export const HOME_CONTINUE_COUNT = 6
 
 const IN_PROGRESS_KEY = 'in-progress'
 
@@ -101,6 +119,8 @@ export const libraryShelvesOf = ({
     title: library.name,
     libraryId: library.id,
     cards: libraryCards({ shelf, library, ...pictures }),
+    layout: SHELF_LAYOUTS.row,
+    hasMore: false,
   }))
 
 type HomeShelvesOfProps = Pictures & {
@@ -111,8 +131,9 @@ type HomeShelvesOfProps = Pictures & {
 }
 
 /**
- * Home's shelves as the web lays them out: what is being watched, then each pinned
- * library's newest (`libraryShelvesOf`). An empty Continue watching is left out.
+ * Home's shelves as the web lays them out: what is being watched, its newest
+ * `HOME_CONTINUE_COUNT` as a grid, then each pinned library's newest (`libraryShelvesOf`). An
+ * empty Continue watching is left out.
  */
 export const homeShelvesOf = ({
   home,
@@ -128,7 +149,11 @@ export const homeShelvesOf = ({
             key: IN_PROGRESS_KEY,
             title: CONTINUE_WATCHING,
             libraryId: null,
-            cards: home.inProgress.map((entry) => continueCard({ entry, arts, ...pictures })),
+            cards: home.inProgress
+              .slice(0, HOME_CONTINUE_COUNT)
+              .map((entry) => continueCard({ entry, arts, ...pictures })),
+            layout: SHELF_LAYOUTS.grid,
+            hasMore: home.inProgress.length > HOME_CONTINUE_COUNT,
           },
         ]
   return [...continuing, ...libraryShelvesOf({ shelves: home.shelves, libraries, ...pictures })]

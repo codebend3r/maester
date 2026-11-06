@@ -1,3 +1,5 @@
+import { PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
+
 type MenuPillLabelProps = { title: string; value: string }
 
 type DroppedFramesProps = { dropped: string; total: string }
@@ -52,10 +54,14 @@ export const SETTINGS_MENU_COPY = {
   closeMenu: 'Close menu',
 } as const
 
+/** Each way of playing by its one name, wherever a player shows it: the chips, the info panel, the TVs' corner. */
+export const PLAYBACK_MODE_NAMES = {
+  [PLAYBACK_MODES.direct]: 'Direct play',
+  [PLAYBACK_MODES.remux]: 'Remux',
+  [PLAYBACK_MODES.transcode]: 'Transcode',
+} as const satisfies Record<PlaybackMode, string>
+
 export const PLAYBACK_INFO_COPY = {
-  directPlay: 'Direct play',
-  remux: 'Remux',
-  transcode: 'Transcode',
   hdr: 'HDR',
   sdr: 'SDR',
   standardDefinition: 'SD',
@@ -114,6 +120,7 @@ export const STAGE_COPY = {
   upNext: 'Up next',
   resumedAt: (time: string) => `Resumed at ${time}`,
   startOver: 'Start over',
+  playingAs: 'Playing as',
 } as const
 
 export const UNPLAYABLE_COPY = {

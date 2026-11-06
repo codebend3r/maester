@@ -1,13 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  type Library,
-  LIBRARY_KINDS,
-  METADATA_SERVICE_STATES,
-  SCAN_KINDS,
-  isRefreshingRatings,
-  isScanning,
-  matchTypeFor,
-} from '@raven/core'
+import { useQuery } from '@tanstack/react-query'
+import { type Library, LIBRARY_KINDS, METADATA_SERVICE_STATES, matchTypeFor } from '@raven/core'
 import { type ReactNode, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink, type IconName, useToasts } from '@raven/ui'
@@ -17,85 +9,26 @@ import styles from '@/components/LibraryActions/LibraryActions.module.scss'
 import { LIBRARY_ACTIONS_COPY } from '@/components/LibraryActions/copy'
 import { Spinner } from '@/components/Spinner/Spinner'
 import { api } from '@/lib/api'
-import { afterRematch, afterRescan, queryKeys } from '@raven/ui/headless'
+import { useServerLibraryActions } from '@raven/ui/headless'
 import { metadataHealthQuery } from '@/lib/queries'
 import { COMMON_COPY } from '@/lib/copy'
-
-type UseLibraryCallProps = {
-  library: Library
-  call: (id: number) => Promise<Library>
-}
-
-/**
- * One call to the server about a library, whose answer is the library as it
- * stands after: it goes into the cache at once, and the listings that hold
- * a scan's progress are read again.
- */
-const useLibraryCall = ({ library, call }: UseLibraryCallProps) => {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: () => call(library.id),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(queryKeys.library(library.id), updated)
-      return afterRescan(queryClient)
-    },
-  })
-}
 
 /**
  * Quick scan, Full scan, Update ratings and Match again for a library, each
  * of the first three with the Cancel that stops it. The caller holds them, as
  * their errors show on its page below the tabs and in its row below the
- * scan's status. Their progress comes from the library, not from these: an
- * answer can already be idle, for a library with nothing to ask the sources
- * about.
+ * scan's status. A queued markers scan and a merge each say so in a toast.
  */
 export const useLibraryActions = (library: Library) => {
-  const queryClient = useQueryClient()
   const showToast = useToasts((state) => state.show)
-  const quickScan = useLibraryCall({ library, call: (id) => api.quickScanLibrary(id) })
-  const cancelQuickScan = useLibraryCall({ library, call: (id) => api.cancelQuickScan(id) })
-  const fullScan = useLibraryCall({ library, call: (id) => api.scanLibrary(id) })
-  const cancelFullScan = useLibraryCall({ library, call: (id) => api.cancelScan(id) })
-  const scanMarkers = useLibraryCall({
+  const actions = useServerLibraryActions({
+    api,
     library,
-    call: async (id) => {
-      const updated = await api.scanLibraryMarkers(id)
-      showToast(LIBRARY_ACTIONS_COPY.markersQueued)
-      return updated
-    },
+    onMarkersQueued: () => showToast(LIBRARY_ACTIONS_COPY.markersQueued),
+    onAlbumsMerged: (merged) => showToast(LIBRARY_ACTIONS_COPY.albumsMerged(merged)),
   })
-  const updateRatings = useLibraryCall({ library, call: (id) => api.updateLibraryRatings(id) })
-  const cancelRatings = useLibraryCall({ library, call: (id) => api.cancelLibraryRatings(id) })
   useRatingsRefreshDone(library)
-
-  const rematch = useMutation({
-    mutationFn: () => api.matchLibrary(library.id),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(queryKeys.library(library.id), updated)
-      return afterRematch({ queryClient, libraryId: library.id })
-    },
-  })
-
-  const mergeAlbums = useMutation({
-    mutationFn: () => api.mergeLibraryAlbums(library.id),
-    onSuccess: ({ merged }) => {
-      showToast(LIBRARY_ACTIONS_COPY.albumsMerged(merged))
-      return afterRematch({ queryClient, libraryId: library.id })
-    },
-  })
-
-  return {
-    mergeAlbums,
-    quickScan,
-    cancelQuickScan,
-    fullScan,
-    cancelFullScan,
-    scanMarkers,
-    updateRatings,
-    cancelRatings,
-    rematch,
-  }
+  return actions
 }
 
 type LibraryActionErrorsProps = {
@@ -228,6 +161,10 @@ export const LibraryActions = ({
     rematch,
     scanMarkers,
     mergeAlbums,
+    isScanRunning,
+    isQuickScanning,
+    isFullScanning,
+    isUpdatingRatings,
   },
 }: LibraryActionsProps) => {
   const [isEditing, setEditing] = useState(false)
@@ -236,12 +173,6 @@ export const LibraryActions = ({
   const metadata = useQuery({ ...metadataHealthQuery, enabled: matchType != null })
   const canMatch = metadata.data?.tmdb === METADATA_SERVICE_STATES.ok
   const whose = <span className="visually-hidden"> {library.name}</span>
-  // A press shows at once; the library's own status keeps it up until the work has ended.
-  const { scan } = library
-  const isScanRunning = isScanning(scan)
-  const isQuickScanning = quickScan.isPending || (isScanRunning && scan.kind === SCAN_KINDS.quick)
-  const isFullScanning = fullScan.isPending || (isScanRunning && scan.kind === SCAN_KINDS.full)
-  const isUpdatingRatings = updateRatings.isPending || isRefreshingRatings(library)
   const canMergeAlbums = library.settings.kind === LIBRARY_KINDS.music
 
   return (

@@ -1,8 +1,10 @@
 import type { IconName } from '@raven/ui/iconDrawings'
+import { useRouter } from 'expo-router'
 import { type ComponentRef, type Ref, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { LIBRARIES_ENTRY } from '@/layouts/copy'
 import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import { Icon } from '@raven/native'
 import { PickerList, usePickerList } from '@/layouts/Picker.focus'
@@ -14,14 +16,20 @@ import {
   type MenuLibrary,
   type ShelvesProps,
 } from '@/layouts/shelfKit'
+import { CONTINUE_WATCHING } from '@/queries/homeShelves'
+import { APP_ROUTES } from '@/routes'
 import { useAppPrefs } from '@/stores/appPrefs'
 import { isMenuOpen, useSideMenu } from '@/stores/sideMenu'
 import { THEME_PICKER } from '@/theme/themeOptions'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 
-/** Where the Settings entry sits on Home, a place no shelf's card shares. */
-const SETTINGS_PLACE = 'settings'
+/** Where the entries that open a screen sit on Home, places no shelf's card shares. */
+const MENU_PLACES = {
+  settings: 'settings',
+  continueWatching: 'continue-watching',
+  libraries: 'libraries',
+} as const
 
 /** How wide a side menu icon stands: the size of the menu's own type, larger. */
 const MENU_ICON = TV_SIZES.textXl
@@ -88,20 +96,21 @@ const MenuRow = ({ label, icon, onPress, ref }: MenuRowProps) => {
   )
 }
 
-type SettingsEntryProps = { onPress: () => void }
+type OpenerRowProps = Omit<MenuRowProps, 'ref'> & {
+  place: (typeof MENU_PLACES)[keyof typeof MENU_PLACES]
+}
 
 /**
- * The way into Settings, which takes the remote's focus back when Settings goes, as a card does
- * for the screen it opened: Android TV restores nothing on its own.
+ * A row that opens a screen and takes the remote's focus back when that screen goes, as a card
+ * does for the screen it opened: Android TV restores nothing on its own.
  */
-const SettingsEntry = ({ onPress }: SettingsEntryProps) => {
+const OpenerRow = ({ place, onPress, ...row }: OpenerRowProps) => {
   const view = useRef<ComponentRef<typeof Pressable>>(null)
-  const { remember } = useOpenerFocus({ place: SETTINGS_PLACE, view })
+  const { remember } = useOpenerFocus({ place, view })
   return (
     <MenuRow
+      {...row}
       ref={view}
-      icon="settings"
-      label={SETTINGS_ENTRY.label}
       onPress={() => {
         remember()
         onPress()
@@ -134,9 +143,9 @@ const ThemeChoice = () => {
 type SideMenuProps = Pick<ShelvesProps, 'onSearch' | 'onSettings' | 'onOpenLibrary' | 'libraries'>
 
 /**
- * The side menu, as the web's: the search, then the pinned libraries under their heading, each
- * with its icon, and at the foot Settings, the theme and the toggle that pins the menu open, kept
- * on this device. It is folded to its icons until the remote moves into it, when it opens over
+ * The side menu, as the web's: the search, Continue watching and every library, then the
+ * pinned libraries under their heading, each with its icon, and at the foot Settings, the theme and the toggle
+ * that pins the menu open, kept on this device. It is folded to its icons until the remote moves into it, when it opens over
  * the page, labels and all, and folds again as the remote leaves; pinned, it stays open beside
  * the page. It is the left column of Home on a TV, the remote's way to every library, drawn over
  * the page: the page keeps `useSideMenuRoom` for it.
@@ -145,6 +154,7 @@ export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: Sid
   const isOpen = useSideMenu(isMenuOpen)
   const isPinned = useSideMenu((menu) => menu.isPinned)
   const toggle = useSideMenu((menu) => menu.toggle)
+  const router = useRouter()
   const styles = useStyles()
   return (
     <ScrollView
@@ -152,6 +162,18 @@ export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: Sid
       style={[styles.menu, !isOpen && styles.folded]}
     >
       <MenuRow icon="search" label={SEARCH_EVERY_LIBRARY.text} onPress={onSearch} />
+      <OpenerRow
+        icon="continue"
+        label={CONTINUE_WATCHING}
+        onPress={() => router.push(APP_ROUTES.continueWatching)}
+        place={MENU_PLACES.continueWatching}
+      />
+      <OpenerRow
+        icon="libraries"
+        label={LIBRARIES_ENTRY.label}
+        onPress={() => router.push(APP_ROUTES.libraries)}
+        place={MENU_PLACES.libraries}
+      />
       {libraries.length > 0 && isOpen && (
         <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
           {PINNED_HEADING}
@@ -165,7 +187,12 @@ export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: Sid
           onPress={() => onOpenLibrary(library.id)}
         />
       ))}
-      <SettingsEntry onPress={onSettings} />
+      <OpenerRow
+        icon="settings"
+        label={SETTINGS_ENTRY.label}
+        onPress={onSettings}
+        place={MENU_PLACES.settings}
+      />
       <ThemeChoice />
       <MenuRow icon="sidebar" label={isPinned ? MENU_FOOT.unpin : MENU_FOOT.pin} onPress={toggle} />
     </ScrollView>

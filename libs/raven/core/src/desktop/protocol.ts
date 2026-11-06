@@ -317,6 +317,8 @@ export const isLocalFile = object({
   folder: isString,
   /** A download's `folder` says where it came from, so the player's header names it. */
   isDownload: isBoolean,
+  /** A download's media on the server, whose art the player's header draws; null for any other file. */
+  mediaId: nullable(isMediaId),
   resumeAt: isNumber,
   next: nullable(object({ fileId: isOpaqueId, label: isString, queue: listOf(isOpaqueId) })),
   tracks: nullable(isTrackChoice),

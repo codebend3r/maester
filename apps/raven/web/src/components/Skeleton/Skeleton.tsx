@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { COMMON_COPY } from '@/lib/copy'
 import styles from '@/components/Skeleton/Skeleton.module.scss'
 
 /** What a stand-in stands in for: a picture, a line of type at one size, or a button. */
@@ -6,6 +7,7 @@ const SHAPES = {
   poster: styles.poster,
   frame: styles.frame,
   fill: styles.fill,
+  square: styles.square,
   hero: styles.hero,
   heading: styles.heading,
   text: styles.text,
@@ -60,6 +62,20 @@ type SkeletonCardsProps = {
 export const SkeletonCards = ({ picture, count = 12 }: SkeletonCardsProps) =>
   Array.from({ length: count }, (_, index) => <SkeletonCard key={index} picture={picture} />)
 
+type SkeletonPanelProps = {
+  /** The real card's layout class, so the stand-in takes its size and places its lines as it does. */
+  className: string
+  children: ReactNode
+}
+
+/**
+ * A card drawn on its picture (a binged title, a tile in progress) on its
+ * way: the card's whole shape in grey, its lines lighter on it.
+ */
+export const SkeletonPanel = ({ className, children }: SkeletonPanelProps) => (
+  <li className={`${styles.bone} ${styles.panel} ${className}`}>{children}</li>
+)
+
 type LoadingProps = { label: string; children: ReactNode }
 
 /**
@@ -75,4 +91,20 @@ export const Loading = ({ label, children }: LoadingProps) => (
       {children}
     </div>
   </div>
+)
+
+/**
+ * A page whose code is still on its way, inside the shell: the way back, its
+ * title and a grid of cards. Each page swaps in its own shape once it runs.
+ */
+export const PageSkeleton = () => (
+  <Loading label={COMMON_COPY.loading}>
+    <div className={styles.page}>
+      <Bone shape="button" />
+      <Bone shape="hero" width="half" />
+      <ul className={styles.grid}>
+        <SkeletonCards picture="poster" />
+      </ul>
+    </div>
+  </Loading>
 )

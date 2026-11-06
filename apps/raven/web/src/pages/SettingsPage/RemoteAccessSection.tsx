@@ -1,25 +1,30 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   MAX_UPLOAD_MBPS,
   PORT_RANGE,
   REMOTE_ACCESS_STATES,
-  REMOTE_LIMITS,
+  REMOTE_ACCESS_TEXT_FIELDS,
   type RemoteAccessChange,
+  type RemoteAccessDraft,
   type RemoteAccessSettings,
   type RemoteAccessState,
   type RemoteAccessStatus,
+  type RemoteAccessTextField,
   type RemoteLimit,
-  STREAM_QUALITIES,
-  checkFactsOf,
-  formatBitrate,
+  addressLineOf,
+  checkedTimeOf,
+  draftNumberOf,
   isRemoteLimit,
+  remoteAccessChangeOf,
+  remoteAccessDraftOf,
+  remoteAccessHopsOf,
+  remoteLimitLabelOf,
   remoteQualityFor,
   remoteStreamsAt,
 } from '@raven/core'
 import { Button } from '@raven/ui'
+import { useServerRemoteAccess } from '@raven/ui/headless'
 import { type FormEvent, type InputHTMLAttributes, type ReactNode, useId, useState } from 'react'
 import { api } from '@/lib/api'
-import { remoteAccessQuery } from '@/lib/queries'
 import { SettingsSection, SettingsSkeleton } from '@/pages/SettingsPage/Setting'
 import {
   REACHABILITY_PROBLEM_COPY,
@@ -42,9 +47,7 @@ const SINGLE_SPACE = ' '
 
 /** A limit's words: Original, or a size with the bitrate it is held under. */
 const limitLabel = (limit: RemoteLimit): string =>
-  limit === REMOTE_LIMITS.original
-    ? REMOTE_ACCESS_COPY.original
-    : `${STREAM_QUALITIES[limit].label}, ${formatBitrate(STREAM_QUALITIES[limit].bitrate) ?? ''}`
+  remoteLimitLabelOf({ limit, copy: REMOTE_ACCESS_COPY })
 
 const HOSTNAME_INPUT = { type: 'text', inputMode: 'url' } as const
 
@@ -63,18 +66,6 @@ const UPLOAD_INPUT = {
   max: MAX_UPLOAD_MBPS,
   step: 'any',
 } as const
-
-/** What a field holds as the text its input shows: '' for none. */
-const textOf = (value: number | string | null): string => (value === null ? '' : String(value))
-
-/** A field's number, or null when it is blank. */
-const numberOf = (text: string): number | null => (text.trim() === '' ? null : Number(text))
-
-type AddressProps = { address: string | null; port: number | null }
-
-/** `address:port`, saying which of the two is not known yet. */
-const addressLine = ({ address, port }: AddressProps): string =>
-  `${address ?? REMOTE_ACCESS_COPY.unknownAddress}:${port ?? REMOTE_ACCESS_COPY.noPort}`
 
 type StatusProps = { status: RemoteAccessStatus }
 
@@ -97,26 +88,19 @@ type RouteProps = { state: RemoteAccessState }
 
 /** Private, then public, then the internet, as Plex draws the way in. */
 const RemoteAccessRoute = ({ state }: RouteProps) => {
-  const { settings, status, privateAddress } = state
-  const publicAddress = checkFactsOf(status)?.publicAddress ?? null
+  const { privateHop, publicHop } = remoteAccessHopsOf(state)
   return (
     <ol className={styles.route} aria-label={REMOTE_ACCESS_COPY.route}>
       <li className={styles.hop}>
         <span className={styles.hopLabel}>{REMOTE_ACCESS_COPY.privateLabel}</span>
         <span className={styles.hopValue}>
-          {addressLine({
-            address: privateAddress,
-            port: settings.privatePort ?? settings.publicPort,
-          })}
+          {addressLineOf({ ...privateHop, copy: REMOTE_ACCESS_COPY })}
         </span>
       </li>
       <li className={styles.hop}>
         <span className={styles.hopLabel}>{REMOTE_ACCESS_COPY.publicLabel}</span>
         <span className={styles.hopValue}>
-          {addressLine({
-            address: publicAddress ?? settings.hostname,
-            port: settings.publicPort,
-          })}
+          {addressLineOf({ ...publicHop, copy: REMOTE_ACCESS_COPY })}
         </span>
       </li>
       <li className={styles.hop}>
@@ -183,38 +167,7 @@ const TEXT_FIELDS = {
     hint: REMOTE_ACCESS_COPY.uploadHint,
     input: UPLOAD_INPUT,
   },
-} as const satisfies Partial<Record<keyof RemoteAccessSettings, TextFieldSpec>>
-
-type TextFieldName = keyof typeof TEXT_FIELDS
-
-const isTextFieldName = (name: string): name is TextFieldName => name in TEXT_FIELDS
-
-const TEXT_FIELD_NAMES = Object.keys(TEXT_FIELDS).filter(isTextFieldName)
-
-/** The form's draft: the settings, each text field as the text its input shows. */
-type Draft = Omit<RemoteAccessSettings, TextFieldName> & Record<TextFieldName, string>
-
-const draftOf = (settings: RemoteAccessSettings): Draft => ({
-  isEnabled: settings.isEnabled,
-  hostname: textOf(settings.hostname),
-  publicPort: textOf(settings.publicPort),
-  privatePort: textOf(settings.privatePort),
-  uploadMbps: textOf(settings.uploadMbps),
-  remoteLimit: settings.remoteLimit,
-})
-
-/** The change Apply sends: every field, a blank one as none and the hostname as a certificate names it. */
-const changeOf = (draft: Draft): RemoteAccessChange => {
-  const hostname = draft.hostname.trim().toLowerCase()
-  return {
-    isEnabled: draft.isEnabled,
-    hostname: hostname === '' ? null : hostname,
-    publicPort: numberOf(draft.publicPort),
-    privatePort: numberOf(draft.privatePort),
-    uploadMbps: numberOf(draft.uploadMbps),
-    remoteLimit: draft.remoteLimit,
-  }
-}
+} as const satisfies Record<RemoteAccessTextField, TextFieldSpec>
 
 type FormProps = {
   settings: RemoteAccessSettings
@@ -223,14 +176,15 @@ type FormProps = {
 
 /** The settings as a form: nothing is saved until Apply, which checks again from outside. */
 const RemoteAccessForm = ({ settings, onApply }: FormProps) => {
-  const [draft, setDraft] = useState(() => draftOf(settings))
-  const edit = (change: Partial<Draft>) => setDraft((current) => ({ ...current, ...change }))
-  const upload = numberOf(draft.uploadMbps)
+  const [draft, setDraft] = useState(() => remoteAccessDraftOf(settings))
+  const edit = (change: Partial<RemoteAccessDraft>) =>
+    setDraft((current) => ({ ...current, ...change }))
+  const upload = draftNumberOf(draft.uploadMbps)
   const cap = remoteQualityFor({ remoteLimit: draft.remoteLimit, uploadMbps: upload })
 
   const apply = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    onApply(changeOf(draft))
+    onApply(remoteAccessChangeOf(draft))
   }
 
   return (
@@ -244,7 +198,7 @@ const RemoteAccessForm = ({ settings, onApply }: FormProps) => {
         <span className={pageStyles.choiceLabel}>{REMOTE_ACCESS_COPY.enable}</span>
         <span className={pageStyles.choiceHint}>{REMOTE_ACCESS_COPY.enableHint}</span>
       </label>
-      {TEXT_FIELD_NAMES.map((name) => {
+      {REMOTE_ACCESS_TEXT_FIELDS.map((name) => {
         const field: TextFieldSpec = TEXT_FIELDS[name]
         return (
           <Field key={name} label={field.label} hint={field.hint}>
@@ -302,24 +256,13 @@ const RemoteAccessForm = ({ settings, onApply }: FormProps) => {
   )
 }
 
-/** When the outside check last looked, in the viewer's time; null before any check. */
-const checkedTimeOf = (status: RemoteAccessStatus): string | null => {
-  const facts = checkFactsOf(status)
-  return facts === null ? null : new Date(facts.checkedAt).toLocaleTimeString()
-}
-
 /**
  * Admin's Remote Access, modelled on Plex's: whether raven is reachable from
  * outside the home network, the private and public address and port, the
  * public port to forward, the upload speed and the limit on remote streams.
  */
 export const RemoteAccessSection = () => {
-  const queryClient = useQueryClient()
-  const state = useQuery(remoteAccessQuery)
-  const save = useMutation({
-    mutationFn: (change: RemoteAccessChange) => api.setRemoteAccess(change),
-    onSuccess: (next) => queryClient.setQueryData(remoteAccessQuery.queryKey, next),
-  })
+  const { state, save } = useServerRemoteAccess({ api })
   return (
     <SettingsSection
       icon="globe"

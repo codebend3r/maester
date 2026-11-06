@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test'
-import { APP_CALL_METHODS, APP_CLIENT_CALLS, appClientCallOf } from '@/appClientCalls'
+import {
+  APP_CALL_METHODS,
+  APP_CLIENT_CALLS,
+  APP_OWNER_CALLS,
+  appClientCallOf,
+} from '@/appClientCalls'
 
 const { get, put, post, delete: remove } = APP_CALL_METHODS
 
@@ -65,7 +70,8 @@ describe('appClientCallOf', () => {
     expect(callOf({ method: remove, url: '/api/playlists/4' })).toBe(
       APP_CLIENT_CALLS.deletePlaylist,
     )
-    expect(callOf({ method: post, url: '/api/libraries/1/scan' })).toBeNull()
+    expect(callOf({ method: post, url: '/api/libraries' })).toBeNull()
+    expect(callOf({ method: remove, url: '/api/libraries/1' })).toBeNull()
     expect(callOf({ method: get, url: '/api/fs/browse' })).toBeNull()
     expect(callOf({ method: get, url: '/api/lock/' })).toBeNull()
   })
@@ -80,6 +86,18 @@ describe('appClientCallOf', () => {
   it('refuses an address that is not a path or an absolute URL', () => {
     expect(callOf({ method: get, url: 'api/home' })).toBeNull()
     expect(callOf({ method: get, url: '' })).toBeNull()
+  })
+
+  it("lists the owner's calls among the rest, under the same names", () => {
+    expect(
+      Object.entries(APP_OWNER_CALLS).every(([name, call]) =>
+        Object.entries(APP_CLIENT_CALLS).some(([listed, at]) => listed === name && at === call),
+      ),
+    ).toBe(true)
+    expect(callOf({ method: post, url: '/api/libraries/1/scan' })).toBe(APP_OWNER_CALLS.scanLibrary)
+    expect(callOf({ method: get, url: '/api/auth/members?pageSize=100' })).toBe(
+      APP_OWNER_CALLS.listMembers,
+    )
   })
 
   it('names every call it lists', () => {

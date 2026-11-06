@@ -5,6 +5,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { TRACK_LIST_COPY } from '@/components/TrackList/copy'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
+import { Bone } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
 import { trackLength } from '@/lib/music'
 import { useMusicLinks } from '@/lib/useMusicLinks'
@@ -172,3 +173,20 @@ export const TrackList = ({
     </ol>
   )
 }
+
+/** How many rows stand in while the tracks are read. */
+const SKELETON_COUNT = 12
+
+/** The tracks on their way, as rows of the list's own shape: a title over its artists. */
+export const TrackListSkeleton = () => (
+  <ol className={styles.list} aria-hidden="true">
+    {Array.from({ length: SKELETON_COUNT }, (_, index) => (
+      <li key={index} className={styles.row}>
+        <span className={styles.title}>
+          <Bone shape="text" width="half" />
+          <Bone shape="small" width="short" />
+        </span>
+      </li>
+    ))}
+  </ol>
+)

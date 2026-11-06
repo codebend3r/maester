@@ -41,6 +41,7 @@ import type { Pictures } from '@/queries/cards'
 import { episodeMarkOf } from '@/queries/episodeMark'
 import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
+import { type BingeToggle, useBingeToggle } from '@/queries/useBinge'
 import { usePictures } from '@/queries/usePictures'
 import { ItemLayout, ItemNotice, Loading } from '@/layouts'
 import {
@@ -64,6 +65,7 @@ const ACTION_KEYS = {
   saga: 'saga',
   playAll: 'playAll',
   shuffle: 'shuffle',
+  binge: 'binge',
 } as const
 
 /** A Watched toggle reads as ticked for all of it, half ticked for some, as the web's does. */
@@ -143,6 +145,7 @@ const favouriteOf = ({ isOn, onToggle }: FavouriteOfProps): ItemAction => ({
   label: ITEM_COPY.favourite,
   text: null,
   isOn,
+  isDisabled: false,
   onPress: () => onToggle(!isOn),
 })
 
@@ -159,7 +162,30 @@ const watchedOf = ({ state, onToggle }: WatchedOfProps): ItemAction => ({
   label: state === WATCHED_STATES.watched ? ITEM_COPY.watched : ITEM_COPY.markWatched,
   text: null,
   isOn: WATCHED_CHECKS[state],
+  isDisabled: false,
   onPress: onToggle,
+})
+
+/** Binge's label: what pressing it does, that it is on, or, while the list is full, why it cannot be. */
+const bingeLabelOf = ({ isBinging, isFull }: Omit<BingeToggle, 'toggle'>): string => {
+  if (isBinging) return ITEM_COPY.binging
+  if (isFull) return `${ITEM_COPY.markBinging}. ${ITEM_COPY.bingeLimit}`
+  return ITEM_COPY.markBinging
+}
+
+/**
+ * Binge, a show's only: on the account's binge list, which holds `BINGE_LIMIT` shows. While
+ * the list is full of others it is drawn faint and its press does nothing, as the web's does.
+ */
+const bingeOf = ({ isBinging, isFull, toggle }: BingeToggle): ItemAction => ({
+  kind: ITEM_ACTIONS.toggle,
+  key: ACTION_KEYS.binge,
+  icon: 'popcorn',
+  label: bingeLabelOf({ isBinging, isFull }),
+  text: null,
+  isOn: isBinging,
+  isDisabled: isFull,
+  onPress: toggle,
 })
 
 /** "Play S01E02" for the episode a show or season plays next, or plain Play without a number. */
@@ -478,7 +504,7 @@ type ShowItemProps = {
 
 /**
  * A show: Play for the episode the server says comes next, once it says, Play all from its first
- * episode, Shuffle, Favourite and Watched over every episode, then its seasons.
+ * episode, Shuffle, Favourite and Watched over every episode, Binge, then its seasons.
  */
 const ShowItem = ({ details, session, context }: ShowItemProps) => {
   const next = useQuery(session.queries.nextEpisodeQuery(details.id))
@@ -498,11 +524,13 @@ const ShowItem = ({ details, session, context }: ShowItemProps) => {
   const nextItem = nextFile?.item ?? null
   const nextCode = nextItem === null ? null : episodeCode(nextItem)
   const onShuffle = useShowShuffle({ showId: details.id, session, context })
+  const binge = useBingeToggle(details.id)
   const actions = [
     ...playNextActionsOf({ next: nextFile, code: nextCode, first: firstFile, state, context }),
     ...playAllOf({ first: firstFile, context }),
     ...shuffleOf({ onShuffle }),
     ...marksOf({ details, favourite, watched: toggle }),
+    bingeOf(binge),
   ]
   return (
     <ItemLayout

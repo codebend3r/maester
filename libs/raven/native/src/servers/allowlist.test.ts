@@ -39,8 +39,8 @@ describe('allowlistedFetch', () => {
     await expect(api.deleteMedia(3)).rejects.toThrow(
       "raven's app does not call DELETE http://nas.local:8484/api/media/3",
     )
-    await expect(api.scanLibrary(1)).rejects.toThrow(
-      'POST http://nas.local:8484/api/libraries/1/scan',
+    await expect(api.deleteLibrary(1)).rejects.toThrow(
+      'DELETE http://nas.local:8484/api/libraries/1',
     )
     await expect(api.browse('/volume1')).rejects.toThrow('GET http://nas.local:8484/api/fs/browse')
     await expect(api.lockAdmin()).rejects.toThrow('POST http://nas.local:8484/api/admin/lock')

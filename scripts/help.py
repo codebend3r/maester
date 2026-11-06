@@ -124,6 +124,12 @@ GROUPS: tuple[Group, ...] = (
                 "raven's web app and UI against the live server on Vhagar, with no local server.",
             ),
             Command(
+                "dev:raven:vhagar",
+                "raven's web app and UI against Vhagar over the home network, playing straight "
+                "from it. The fastest way to load and play at home.",
+                "Vhagar",
+            ),
+            Command(
                 "dev:raven:db",
                 "Replaces the local raven database with a copy of Vhagar's, paths rewritten to "
                 "this Mac's mounts. Stop the dev server first.",

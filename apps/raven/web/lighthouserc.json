@@ -8,7 +8,7 @@
       "settings": {
         "chromeFlags": "--ignore-certificate-errors"
       },
-      "numberOfRuns": 3
+      "numberOfRuns": 5
     },
     "assert": {
       "assertMatrix": [

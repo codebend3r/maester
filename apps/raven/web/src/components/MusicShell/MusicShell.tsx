@@ -1,6 +1,7 @@
 import { Icon, type IconName } from '@raven/ui'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
+import { ShellOutlet } from '@/components/ShellOutlet/ShellOutlet'
 import { FollowServer } from '@/components/AppShell/FollowServer'
 import { useIsCurrent } from '@/components/AppShell/currentPage'
 import { HOME } from '@/components/BackButton/BackButton'
@@ -9,7 +10,7 @@ import { MUSIC_SHELL_COPY } from '@/components/MusicShell/copy'
 import { Tab, TabStrip } from '@/components/TabStrip/TabStrip'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
 import { MUSIC_PATHS } from '@/lib/music'
-import { TopCardNote, useScrollReset } from '@/lib/useScrollReset'
+import { useScrollReset } from '@/lib/useScrollReset'
 import { useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/components/MusicShell/MusicShell.module.scss'
@@ -127,9 +128,7 @@ export const MusicShell = () => {
           {!isOffline && <AccountMenu />}
         </div>
         <div className={styles.page}>
-          <TopCardNote pageKey={key}>
-            <Outlet />
-          </TopCardNote>
+          <ShellOutlet pageKey={key} />
         </div>
       </main>
       <TabStrip label={MUSIC_SHELL_COPY.tabs}>

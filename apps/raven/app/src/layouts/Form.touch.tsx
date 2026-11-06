@@ -46,6 +46,7 @@ const Field = ({
   placeholder,
   isSecret = false,
   isEmail = false,
+  isNumber = false,
 }: FieldProps) => {
   const formStyles = useTouchFormStyles()
   const [isShown, setShown] = useState(false)
@@ -57,7 +58,7 @@ const Field = ({
         accessibilityLabel={label}
         autoCapitalize="none"
         autoCorrect={false}
-        keyboardType={keyboardFor({ isSecret, isEmail })}
+        keyboardType={keyboardFor({ isSecret, isEmail, isNumber })}
         onChangeText={onChangeText}
         onSubmitEditing={({ nativeEvent }) => onSubmit({ text: nativeEvent.text })}
         placeholder={placeholder}

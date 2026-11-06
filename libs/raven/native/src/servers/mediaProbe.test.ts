@@ -7,8 +7,8 @@ import { LAN, mediaServer } from '@/test/mediaServer'
 
 const PING = mediaServer({}).api.pingUrl({ origin: LAN })
 
-/** A route the app never calls: a library's scan, which is the owner's. */
-const SCAN = `${LAN.url}/api/libraries/1/scan`
+/** A route the app never calls: the server's folder browser, which is the owner's. */
+const SCAN = `${LAN.url}/api/fs/browse`
 
 type Sent = { url: string; credentials: string; isAborted: () => boolean }
 

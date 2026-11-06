@@ -11,7 +11,7 @@ import {
   pictureParts,
   watchLink,
 } from '@raven/core'
-import { Icon } from '@raven/ui'
+import { Icon, PictureChips } from '@raven/ui'
 import type { ReactNode } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
@@ -20,7 +20,6 @@ import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
 import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
-import { PictureChips } from '@/components/ResolutionChip/ResolutionChip'
 import { PartlyWatched } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { POSTER_SIZES } from '@/lib/posters'

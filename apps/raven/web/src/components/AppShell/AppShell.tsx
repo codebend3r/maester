@@ -1,9 +1,10 @@
 import { DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, type ReactNode, useId } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Button, Icon, type IconName, useKeyShortcut } from '@raven/ui'
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
+import { ShellOutlet } from '@/components/ShellOutlet/ShellOutlet'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
 import { isAnyOf, libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
 import { FollowServer } from '@/components/AppShell/FollowServer'
@@ -20,7 +21,7 @@ import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
 import { MUSIC_PATHS, musicLibrariesOf } from '@/lib/music'
 import { librariesQuery } from '@/lib/queries'
-import { TopCardNote, useScrollReset } from '@/lib/useScrollReset'
+import { useScrollReset } from '@/lib/useScrollReset'
 import { ravenVersion } from '@/lib/version'
 import { useInProgressCount } from '@/desktop/downloadsApi'
 import { usePageBackdrop } from '@raven/ui/headless'
@@ -416,9 +417,7 @@ export const AppShell = () => {
           </div>
         </div>
         <div className={styles.page}>
-          <TopCardNote pageKey={key}>
-            <Outlet />
-          </TopCardNote>
+          <ShellOutlet pageKey={key} />
         </div>
       </main>
       <TabBar hasMusic={hasMusic} />

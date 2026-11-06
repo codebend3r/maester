@@ -16,7 +16,7 @@ import {
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
-import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@raven/ui/headless'
+import { CONTROLS_LINGER_SECONDS, PLAYBACK_MODE_NAMES, usePlayerPrefs } from '@raven/ui/headless'
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 import type { ReactVideoProps } from 'react-native-video'
@@ -533,7 +533,7 @@ describe('Player on Android TV', () => {
 
   it('says the time of day and how the video plays in the top right', async () => {
     await playing({ id: BUSBOYS_UNSUBTITLED.id })
-    const corner = screen.getByLabelText(new RegExp(`, ${PLAYER_COPY.modes.direct}$`, 'u'))
+    const corner = screen.getByLabelText(new RegExp(`, ${PLAYBACK_MODE_NAMES.direct}$`, 'u'))
     expect(corner.props.accessibilityLabel).toMatch(/^\d{1,2}:\d{2}/u)
   })
 
