@@ -149,6 +149,7 @@ describe('the building blocks', () => {
         label: 'film.mkv',
         folder: 'Movies',
         isDownload: false,
+        mediaId: null,
         resumeAt: 12,
         next: { fileId: other, label: 'next.mkv', queue: [other] },
         tracks: { audio: 1, subtitle: 'embedded-0' },
@@ -159,12 +160,26 @@ describe('the building blocks', () => {
         fileId: id,
         label: 'film.mkv',
         folder: 'Movies',
-        isDownload: false,
+        isDownload: true,
+        mediaId: 42,
         resumeAt: 0,
         next: null,
         tracks: null,
       }),
     ).toBe(true)
+    const download = {
+      fileId: id,
+      label: 'film.mkv',
+      folder: 'Downloaded from raven',
+      isDownload: true,
+      resumeAt: 0,
+      next: null,
+      tracks: null,
+    }
+    expect(isLocalFile(download)).toBe(false)
+    expect(isLocalFile({ ...download, mediaId: 0 })).toBe(false)
+    expect(isLocalFile({ ...download, mediaId: '42' })).toBe(false)
+    expect(isLocalFile({ ...download, mediaId: 1.5 })).toBe(false)
     expect(isRecentView({ recentId: id, label: 'film.mkv', from: 'Movies', watched: null })).toBe(
       true,
     )
@@ -437,6 +452,7 @@ describe('isDesktopReply', () => {
           label: 'a.mkv',
           folder: 'Movies',
           isDownload: false,
+          mediaId: null,
           resumeAt: 0,
           next: null,
           tracks: null,

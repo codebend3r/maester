@@ -40,10 +40,12 @@ const mockServer: {
   heard: HeardRequest[]
   writes: () => Promise<void>
   reads: (path: string) => Promise<void>
+  binge: readonly number[]
 } = {
   heard: [],
   writes: async () => undefined,
   reads: async () => undefined,
+  binge: [],
 }
 const mockApi = jest.fn((_server: AppServer) =>
   itemApi({
@@ -52,6 +54,12 @@ const mockApi = jest.fn((_server: AppServer) =>
     },
     writes: () => mockServer.writes(),
     reads: (path) => mockServer.reads(path),
+    binge: {
+      read: () => mockServer.binge,
+      write: (ids) => {
+        mockServer.binge = ids
+      },
+    },
   }),
 )
 
@@ -71,7 +79,7 @@ jest.mock('@raven/native', () => ({
   },
 }))
 
-const { setWatched, setItemFavourite } = APP_CLIENT_CALLS
+const { setWatched, setItemFavourite, setBinge } = APP_CLIENT_CALLS
 
 /** The client this test's screen reads through. */
 const shown = { client: createScreenClient() }
@@ -92,6 +100,7 @@ describe('Item on a phone or tablet', () => {
     mockServer.heard = []
     mockServer.writes = async () => undefined
     mockServer.reads = async () => undefined
+    mockServer.binge = []
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
 
@@ -223,6 +232,43 @@ describe('Item on a phone or tablet', () => {
       },
     ])
     release()
+  })
+
+  it('marks a show as binging and takes it off again, as the server answers', async () => {
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE.id) })
+
+    await fireEvent.press(
+      await screen.findByRole('checkbox', { name: 'Mark as binging', checked: false }),
+    )
+    await fireEvent.press(await screen.findByRole('checkbox', { name: 'Binging', checked: true }))
+
+    expect(
+      await screen.findByRole('checkbox', { name: 'Mark as binging', checked: false }),
+    ).toBeTruthy()
+    const bingePath = pathFor({ path: setBinge.path, id: SEVERANCE.id })
+    expect(writes()).toEqual([
+      { method: APP_CALL_METHODS.put, path: bingePath, body: { binge: true } },
+      { method: APP_CALL_METHODS.put, path: bingePath, body: { binge: false } },
+    ])
+  })
+
+  it('says why a show cannot join a full binge list, and asks nothing when pressed', async () => {
+    mockServer.binge = [1, 2, 3]
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE.id) })
+
+    const binge = await screen.findByRole('checkbox', {
+      name: 'Mark as binging. You can binge up to three shows. Remove a show to make room for another.',
+      disabled: true,
+    })
+    await fireEvent.press(binge)
+
+    expect(writes()).toEqual([])
+  })
+
+  it('offers no Binge on a season', async () => {
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE_ONE.id) })
+    await screen.findByRole('checkbox', { name: 'Mark watched' })
+    expect(screen.queryByRole('checkbox', { name: 'Mark as binging' })).toBeNull()
   })
 
   it("lists a season's episodes, each opening its page in its library", async () => {

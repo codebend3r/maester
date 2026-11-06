@@ -23,7 +23,22 @@ export type SettingsToggleProps = {
   onToggle: (isOn: boolean) => void
 }
 
-export type SettingsButtonProps = { text: string; isDisabled: boolean; onPress: () => void }
+export type SettingsButtonProps = {
+  text: string
+  isDisabled: boolean
+  onPress: () => void
+  /** What a screen reader calls it, when the text alone is the same on several: "Quick scan Films". */
+  name?: string
+  /** The button a TV's remote opens the page on, once. */
+  isOpener?: boolean
+}
+
+/** A line of its own between the controls: a status, a fact or why something failed. */
+export type SettingsLineProps = {
+  text: string
+  /** Read out the moment it shows, as something gone wrong is. */
+  isAlert?: boolean
+}
 
 /** A setting picked from a list: its row shows the label and what is chosen now. */
 export type SettingsChoiceProps<K extends string> = Pick<
@@ -37,5 +52,6 @@ export type SettingsKit = {
   SettingsSection: (props: SettingsSectionProps) => ReactNode
   SettingsToggle: (props: SettingsToggleProps) => ReactNode
   SettingsButton: (props: SettingsButtonProps) => ReactNode
+  SettingsLine: (props: SettingsLineProps) => ReactNode
   SettingsChoice: <K extends string>(props: SettingsChoiceProps<K>) => ReactNode
 }

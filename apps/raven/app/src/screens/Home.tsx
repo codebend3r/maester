@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
+import type { BingeCard } from '@/queries/bingeCards'
 import type { ShelfCard } from '@/queries/cards'
 import { type HeroSlide, heroSlidesOf } from '@/queries/heroSlides'
 import { type ShelfView, homeShelvesOf } from '@/queries/homeShelves'
@@ -10,13 +11,16 @@ import { pinnedLibrariesOf } from '@/queries/pinnedLibraries'
 import { useShowArts } from '@/queries/useShowArts'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
-import { HomeHero, Loading, Shelf, Shelves } from '@/layouts'
+import { useBingeCards } from '@/queries/useBingeCards'
+import { BingeShelf, HomeHero, Loading, Shelf, Shelves } from '@/layouts'
 import type { LoadingProps } from '@/layouts/loadingKit'
 import type { ShelvesProps } from '@/layouts/shelfKit'
 import { APP_ROUTES, ROUTE_TARGETS, type RouteTarget, hrefOf } from '@/routes'
 import { HOME_COPY } from '@/screens/copy'
 
 type HomeShelvesProps = {
+  /** The shows the viewer binges, first on the page; none leaves the hero at the top. */
+  binge: readonly BingeCard[]
   /** The titles the hero takes turns with, over the shelves; none leaves the shelves at the top. */
   slides: readonly HeroSlide[]
   shelves: readonly ShelfView[]
@@ -24,13 +28,18 @@ type HomeShelvesProps = {
   libraries: ShelvesProps['libraries']
 }
 
-/** Home's hero and shelves beside the side menu, the focus on the hero's Play, else the first card. */
-const HomeShelves = ({ slides, shelves, notice, libraries }: HomeShelvesProps) => {
+/**
+ * Home: the shows the viewer binges, then the hero, then Continue watching and the library
+ * shelves, beside the side menu on a TV. The focus starts on the first binge card, else on the
+ * hero's Play, else on the first card.
+ */
+const HomeShelves = ({ binge, slides, shelves, notice, libraries }: HomeShelvesProps) => {
   const router = useRouter()
+  const hasBinge = binge.length > 0
   const hasHero = slides.length > 0
 
-  // Focus starts on the hero, else on a card, so on the first shelf that has one.
-  const focusShelf = hasHero ? -1 : shelves.findIndex(({ cards }) => cards.length > 0)
+  // Focus starts on Binge, then the hero, else on a card, so on the first shelf that has one.
+  const focusShelf = hasBinge || hasHero ? -1 : shelves.findIndex(({ cards }) => cards.length > 0)
 
   const go = (target: RouteTarget) => router.push(hrefOf(target))
   const open = ({ target }: ShelfCard) => go(target)
@@ -47,12 +56,14 @@ const HomeShelves = ({ slides, shelves, notice, libraries }: HomeShelvesProps) =
       onSettings={() => router.push(APP_ROUTES.settings)}
       title={HOME_COPY.title}
     >
-      {hasHero && <HomeHero key="hero" isPreferred onOpen={go} slides={slides} />}
+      {hasBinge && <BingeShelf key="binge" cards={binge} isFirst onOpen={go} />}
+      {hasHero && <HomeHero key="hero" isPreferred={!hasBinge} onOpen={go} slides={slides} />}
       {shelves.map((shelf, index) => (
         <Shelf
           key={shelf.key}
           isFirst={index === focusShelf}
           onOpen={open}
+          onOpenContinue={() => router.push(APP_ROUTES.continueWatching)}
           onOpenLibrary={openLibrary}
           shelf={shelf}
         />
@@ -81,6 +92,7 @@ const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
   const hero = useQuery(queries.heroQuery)
   const libraries = useQuery(queries.librariesQuery)
   const pictures = usePictures({ server, api })
+  const binge = useBingeCards({ queries, pictures })
   const arts = useShowArts({
     queries,
     ids: showArtIdsOf(home.data?.inProgress ?? []),
@@ -110,13 +122,14 @@ const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
     ? { key: HOME_VIEW_KEYS.loading, props: { label: HOME_COPY.loading, isHome: true } }
     : {
         key: HOME_VIEW_KEYS.shelves,
-        props: { slides, shelves, notice, libraries: pinnedLibraries },
+        props: { binge, slides, shelves, notice, libraries: pinnedLibraries },
       }
   return <KeyedView<HomeViewProps> view={view} views={HOME_VIEWS} />
 }
 
 /**
- * `/`: what is being watched, then each pinned library's newest, as shelves of cards. A card
+ * `/`: the shows being binged, the featured titles, what is being watched, then each pinned
+ * library's newest, as shelves of cards. A card
  * opens its item, a library shelf's See all the library, and Search the search through every
  * library. Each server gets a Home of its own, so nothing one showed, its scroll or its focus,
  * carries over to the next.

@@ -195,6 +195,38 @@
   white-space: nowrap;
 }
 
+// The title's art stands where its name would, as on a Continue watching
+// tile, with an episode's place and name beside it.
+.titleArt {
+  grid-area: title;
+  align-self: end;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-3);
+  align-items: end;
+  min-width: 0;
+}
+
+.logo {
+  max-width: 18rem;
+  max-height: 3.5rem;
+  object-fit: contain;
+  object-position: left bottom;
+  filter: drop-shadow(0 1px 4px var(--color-shade));
+}
+
+.caption {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  line-height: var(--line-tight);
+  letter-spacing: var(--tracking-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .about {
   grid-area: about;
   align-self: start;
@@ -241,6 +273,15 @@
 
   .title {
     font-size: var(--font-size-lg);
+  }
+
+  .logo {
+    max-width: 10rem;
+    max-height: 2.5rem;
+  }
+
+  .caption {
+    font-size: var(--font-size-md);
   }
 }
 

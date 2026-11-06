@@ -1,5 +1,5 @@
-import { Children, type ComponentType } from 'react'
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Children, type ComponentType, useState } from 'react'
+import { type LayoutChangeEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import type { ShelfCard } from '@/queries/cards'
@@ -9,6 +9,7 @@ import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import {
+  type BingeShelfProps,
   NOTHING_HERE,
   SEE_ALL,
   SHELF_STATES,
@@ -16,13 +17,18 @@ import {
   type ShelfProps,
   type ShelfState,
   type ShelvesProps,
+  bingeRowsOf,
   seeAllLabelOf,
+  seeAllOf,
   shelfStateOf,
 } from '@/layouts/shelfKit'
+import { BINGE_COPY, type BingeCard } from '@/queries/bingeCards'
+import { SHELF_LAYOUTS, type ShelfLayout } from '@/queries/homeShelves'
 import { Logo } from '@/layouts/Logo'
 import { SCROLL_AXES, useScrollWindow } from '@/layouts/useScrollWindow'
 import { SideMenu, useSideMenuRoom } from '@/layouts/SideMenu.focus'
-import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
+import { TV_DESIGN_WIDTH } from '@/theme/tvScale'
+import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
 /** Shelves drawn before any scroll, and the shelves a scroll toward the end adds. */
@@ -85,14 +91,15 @@ const Shelves = ({
   )
 }
 
-type ShelfTitleProps = Pick<ShelfProps, 'shelf' | 'onOpenLibrary'>
+type ShelfTitleProps = Pick<ShelfProps, 'shelf' | 'onOpenLibrary' | 'onOpenContinue'>
 
 /**
  * A shelf's title, and after a library's the way into the library, which the remote reaches
- * above the row, as the web's shelf heading links to it.
+ * above the row, as the web's shelf heading links to it; after Continue watching, the way to
+ * every video in progress once it holds more than Home shows.
  */
-const ShelfTitle = ({ shelf, onOpenLibrary }: ShelfTitleProps) => {
-  const { libraryId } = shelf
+const ShelfTitle = ({ shelf, onOpenLibrary, onOpenContinue }: ShelfTitleProps) => {
+  const seeAll = seeAllOf({ shelf, onOpenLibrary, onOpenContinue })
   const { settle } = useOpeningFocus()
   const styles = useStyles()
   return (
@@ -100,12 +107,12 @@ const ShelfTitle = ({ shelf, onOpenLibrary }: ShelfTitleProps) => {
       <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.shelfTitle}>
         {shelf.title}
       </Text>
-      {libraryId !== null && (
+      {seeAll !== null && (
         <Pressable
           accessibilityLabel={seeAllLabelOf(shelf.title)}
           accessibilityRole="link"
           onFocus={settle}
-          onPress={() => onOpenLibrary(libraryId)}
+          onPress={seeAll}
           style={({ focused }) => [styles.seeAll, focused && styles.focusedLink]}
         >
           {({ focused }) => (
@@ -167,9 +174,67 @@ const CardsRow = ({ shelf, onOpen, isFirst = false }: CardsRowProps) => {
   )
 }
 
+/** The columns of Continue watching's grid on a TV, as on the web: three rows of two. */
+const GRID_COLUMNS = 2
+
+/**
+ * The width a section has for its cards: the window's less the side menu and the gutters
+ * until it is laid out, then what it measures.
+ */
+const useMeasuredWidth = () => {
+  const windowWidth = tvSize(TV_DESIGN_WIDTH)
+  const menuRoom = useSideMenuRoom()
+  const [measured, setMeasured] = useState<number | null>(null)
+  const onLayout = (event: LayoutChangeEvent) => setMeasured(event.nativeEvent.layout.width)
+  return { width: measured ?? windowWidth - menuRoom - TV_GUTTER * 2, onLayout }
+}
+
+type ColumnWidthOfProps = { width: number; columns: number }
+
+const columnWidthOf = ({ width, columns }: ColumnWidthOfProps): number =>
+  (width - TV_SIZES.space5 * (columns - 1)) / columns
+
+/**
+ * Continue watching's wide cards in two columns that do not scroll sideways, one band the
+ * remote comes into on its first card and moves through by where the cards sit.
+ */
+const CardsGrid = ({ shelf, onOpen, isFirst = false }: CardsRowProps) => {
+  const { isOpening } = useOpeningFocus()
+  const { width, onLayout } = useMeasuredWidth()
+  const styles = useStyles()
+  const cardWidth = columnWidthOf({ width, columns: GRID_COLUMNS })
+  return (
+    <FocusBand>
+      <View onLayout={onLayout} style={styles.grid}>
+        {width > 0 &&
+          shelf.cards.map((card, index) => (
+            <FocusCard
+              key={card.key}
+              card={card}
+              isPreferred={isOpening && isFirst && index === 0}
+              onPress={() => onOpen(card)}
+              place={placeOf({ shelf, card })}
+              width={cardWidth}
+            />
+          ))}
+      </View>
+    </FocusBand>
+  )
+}
+
+const SHELF_FILLS = {
+  [SHELF_LAYOUTS.row]: CardsRow,
+  [SHELF_LAYOUTS.grid]: CardsGrid,
+} as const satisfies Record<ShelfLayout, ComponentType<ShelfProps>>
+
+const FilledShelf = (props: ShelfProps) => {
+  const Fill = SHELF_FILLS[props.shelf.layout]
+  return <Fill {...props} />
+}
+
 const SHELF_ROWS = {
   [SHELF_STATES.empty]: EmptyRow,
-  [SHELF_STATES.filled]: CardsRow,
+  [SHELF_STATES.filled]: FilledShelf,
 } as const satisfies Record<ShelfState, ComponentType<ShelfProps>>
 
 /**
@@ -182,9 +247,65 @@ const Shelf = (props: ShelfProps) => {
   const Row = SHELF_ROWS[shelfStateOf(props.shelf)]
   return (
     <View style={styles.shelf}>
-      <ShelfTitle onOpenLibrary={props.onOpenLibrary} shelf={props.shelf} />
+      <ShelfTitle
+        onOpenContinue={props.onOpenContinue}
+        onOpenLibrary={props.onOpenLibrary}
+        shelf={props.shelf}
+      />
       <Row {...props} />
     </View>
+  )
+}
+
+const BINGE_KEY = 'binge'
+
+/** A binge card's facts under its picture on a TV, in the web card's order. */
+const bingeNotesOf = (card: BingeCard): string[] =>
+  [card.meta, card.episodeLine, card.starring, card.synopsis, card.status].filter(
+    (note): note is string => note !== null,
+  )
+
+/**
+ * The shows the viewer binges, first on Home, as the web lays them out: the first across the
+ * whole width, the rest side by side under it, each with its episode's synopsis. One band the
+ * remote comes into on the first card; nothing is drawn while there are none.
+ */
+const BingeShelf = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
+  const { isOpening } = useOpeningFocus()
+  const { width, onLayout } = useMeasuredWidth()
+  const styles = useStyles()
+  return (
+    cards.length > 0 && (
+      <View style={styles.shelf}>
+        <View style={styles.titleRow}>
+          <Text
+            variant={TEXT_VARIANTS.display}
+            accessibilityRole="header"
+            style={styles.shelfTitle}
+          >
+            {BINGE_COPY.title}
+          </Text>
+        </View>
+        <FocusBand>
+          <View onLayout={onLayout} style={styles.grid}>
+            {width > 0 &&
+              bingeRowsOf(cards).flatMap((row, rowIndex) =>
+                row.map((card, index) => (
+                  <FocusCard
+                    key={card.key}
+                    card={card}
+                    isPreferred={isOpening && isFirst && rowIndex === 0 && index === 0}
+                    notes={bingeNotesOf(card)}
+                    onPress={() => onOpen(card.target)}
+                    place={`${BINGE_KEY}/${card.key}`}
+                    width={columnWidthOf({ width, columns: row.length })}
+                  />
+                )),
+              )}
+          </View>
+        </FocusBand>
+      </View>
+    )
   )
 }
 
@@ -193,7 +314,7 @@ const Shelf = (props: ShelfProps) => {
  * layout made larger. The rows run to the screen's edges, past the title-safe margin the
  * titles keep, and leave room above and below for a card grown by focus.
  */
-export const focusShelf: ShelfKit = { Shelves, Shelf }
+export const focusShelf: ShelfKit = { Shelves, Shelf, BingeShelf }
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
@@ -229,6 +350,13 @@ const useStyles = themedStyles((colours) =>
     row: {
       gap: TV_SIZES.space5,
       paddingHorizontal: TV_GUTTER,
+      paddingVertical: TV_SIZES.space4,
+    },
+    grid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: TV_SIZES.space5,
+      marginHorizontal: TV_GUTTER,
       paddingVertical: TV_SIZES.space4,
     },
   }),

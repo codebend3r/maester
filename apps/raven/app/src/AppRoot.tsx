@@ -111,6 +111,8 @@ const AppRoutes = () => {
               <Stack.Screen name={APP_SCREENS.nowPlaying} />
               <Stack.Screen name={APP_SCREENS.search} />
               <Stack.Screen name={APP_SCREENS.favourites} />
+              <Stack.Screen name={APP_SCREENS.continueWatching} />
+              <Stack.Screen name={APP_SCREENS.libraries} />
               <Stack.Screen name={APP_SCREENS.settings} />
             </Stack.Protected>
           </Stack>

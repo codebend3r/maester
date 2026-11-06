@@ -47,6 +47,7 @@ import { ShortcutsTip } from '@/components/Player/ShortcutsTip'
 import { OVERLAYS, type Overlay, usePlayerActions } from '@/components/Player/usePlayerActions'
 import { useBezel, useFullscreen, useIdle, useNow } from '@/components/Player/useStageChrome'
 import { SkipButton } from '@/components/Player/SkipButton'
+import { TitleHeading } from '@/components/Player/TitleHeading'
 import { UpNextCard } from '@/components/Player/UpNextCard'
 import { useShortcutsTip } from '@/components/Player/useShortcutsTip'
 import { useSkipIntro } from '@/components/Player/useSkipIntro'
@@ -237,6 +238,9 @@ export const PlayerChrome = ({
   const { title, hostActions, favourite, chrome, isVolumeFixed, handoff } = useHostServices()
   const media = file?.media ?? null
   const label = title.label
+  // A logo that fails to load gives way to the label for the rest of the title.
+  const [failedLogo, setFailedLogo] = useState<string | null>(null)
+  const logo = title.logo && title.logo.url !== failedLogo ? title.logo : null
   const { state, duration, actions } = engine
   const seek = actions.seek
   const root = useRef<HTMLDivElement>(null)
@@ -413,7 +417,13 @@ export const PlayerChrome = ({
   // seen, and so does an intro's first seconds, so Skip intro is.
   const chromeShown = idle.active || upNext.isCardShown || intro.isPrompting
   const chapterStarts = markers?.chapters.map(({ start }) => start) ?? []
-  const about = aboutLine({ media, label, mode, context: title.context ?? null })
+  // The art spells out only the name, so the line under it gives the year the label would.
+  const about = aboutLine({
+    media,
+    label: logo?.name ?? label,
+    mode,
+    context: title.context ?? null,
+  })
 
   // The scrubber and the clock keep what they showed while the controls are
   // hidden, so a quiet page changes nothing in the DOM. Adjusting state during
@@ -466,7 +476,7 @@ export const PlayerChrome = ({
           className={styles.back}
           onClick={onBack}
         />
-        <h1 className={styles.title}>{label}</h1>
+        <TitleHeading label={label} logo={logo} onFail={setFailedLogo} />
         <p className={styles.about}>{about}</p>
         {favourite && (
           <Button

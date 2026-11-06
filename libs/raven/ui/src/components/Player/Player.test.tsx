@@ -26,13 +26,29 @@ type TestPlayerProps = {
   backTo: string
   next?: PlayerTitle['next']
   markers?: PlayerTitle['markers']
+  logo?: PlayerTitle['logo']
   favourite?: PlayerFavourite
 }
 
 /** A host as the web's is: new services on every render, the player only once they are in the store. */
-const TestPlayer = ({ media, backTo, next = null, markers = null, favourite }: TestPlayerProps) => {
+const TestPlayer = ({
+  media,
+  backTo,
+  next = null,
+  markers = null,
+  logo = null,
+  favourite,
+}: TestPlayerProps) => {
   const isHosting = useHostPlayer({
-    title: { label: media.title, duration: media.duration, resumeAt: 0, backTo, next, markers },
+    title: {
+      label: media.title,
+      logo,
+      duration: media.duration,
+      resumeAt: 0,
+      backTo,
+      next,
+      markers,
+    },
     posterUrl: null,
     escape: null,
     progress: { started: () => {}, save: () => {}, left: () => {} },
@@ -901,6 +917,41 @@ describe('the player chrome', () => {
       /^4K · Direct play$/,
     )
     expect(screen.getByRole('button', { name: 'Full screen (f)' })).toHaveTextContent('Full screen')
+  })
+
+  it("draws the title's art in place of its name, and the year the art leaves out under it", () => {
+    const film = mediaItem({ ...uhd, title: 'Busboys (2026)' })
+    renderWithProviders({
+      ui: (
+        <TestPlayer
+          media={film}
+          backTo="/libraries/2"
+          logo={{ url: '/art/busboys.png', name: 'Busboys', caption: null }}
+        />
+      ),
+    })
+    const heading = screen.getByRole('heading', { level: 1, name: 'Busboys' })
+    expect(within(heading).getByRole('img', { name: 'Busboys' })).toHaveAttribute(
+      'src',
+      '/art/busboys.png',
+    )
+    expect(screen.getByText('2026 · 4K HDR · Direct play')).toBeInTheDocument()
+  })
+
+  it("puts an episode's place and name beside its show's art, and spells the label out when the art fails", () => {
+    renderWithProviders({
+      ui: (
+        <TestPlayer
+          media={uhd}
+          backTo="/libraries/2"
+          logo={{ url: '/art/show.png', name: 'Severance', caption: 'S01E02 · Half Loop' }}
+        />
+      ),
+    })
+    const heading = screen.getByRole('heading', { level: 1, name: 'Severance S01E02 · Half Loop' })
+    fireEvent.error(within(heading).getByRole('img', { name: 'Severance' }))
+    expect(screen.getByRole('heading', { level: 1, name: 'Busboys' })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Severance' })).toBeNull()
   })
 
   it('opens one menu at a time and gives focus back to its pill', async () => {

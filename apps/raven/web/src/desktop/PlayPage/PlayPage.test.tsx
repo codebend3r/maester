@@ -36,6 +36,11 @@ import {
 } from '@/test/desktop'
 import { handedOver, renderPlayers, sourcedVideo } from '@/test/desktopPlayer'
 import '@/test/mediaError'
+import { api } from '@/lib/api'
+import { SIGNED_IN } from '@/test/authClient'
+import { itemDetails, itemSummary, mediaItem } from '@/test/fixtures'
+import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
+import { useServerReach } from '@/stores/serverReach'
 
 const A = FILE_ID
 const B = DL_1
@@ -45,6 +50,7 @@ const CLIP_A: LocalFile = {
   label: 'Clip 01',
   folder: 'Clips',
   isDownload: false,
+  mediaId: null,
   resumeAt: 0,
   next: { fileId: B, label: 'Clip 02', queue: [] },
   tracks: null,
@@ -286,6 +292,76 @@ describe('PlayPage', () => {
     renderPlayers({ client, route: playPathOf('not-an-id') })
     expect(await screen.findByRole('alert')).toHaveTextContent('Raven cannot open that video.')
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.describeFile })).toEqual([])
+  })
+})
+
+describe('PlayPage title art', () => {
+  const spies: Array<{ mockRestore: () => void }> = []
+  const DOWNLOAD: LocalFile = {
+    ...CLIP_A,
+    label: 'Busboys',
+    folder: 'Downloaded from raven',
+    isDownload: true,
+    mediaId: 7,
+  }
+  const describeDownload = () => ({ type: DESKTOP_REPLIES.file, file: DOWNLOAD }) as const
+
+  const stubServer = () => {
+    const getMedia = spyOn(api, 'getMedia').mockImplementation(async () =>
+      mediaItem({ id: 7, item: itemSummary({ id: 40, title: 'Busboys' }) }),
+    )
+    const getItem = spyOn(api, 'getItem').mockImplementation(async () =>
+      itemDetails({ id: 40, title: 'Busboys', logoVersion: 'l1' }),
+    )
+    spies.push(getMedia, getItem)
+    return { getMedia, getItem }
+  }
+
+  const signIn = () =>
+    useAuthSession.setState({ status: AUTH_SESSION_STATUSES.ready, session: SIGNED_IN })
+
+  afterEach(() => {
+    spies.splice(0).forEach((made) => made.mockRestore())
+  })
+
+  it("heads a download with its media's logo once the server answers", async () => {
+    const { getMedia } = stubServer()
+    signIn()
+    renderPlayers({ client: playMain({ describeFile: describeDownload }), route: playPathOf(A) })
+    const logo = await screen.findByRole('img', { name: 'Busboys' })
+    expect(logo.getAttribute('src') ?? '').toContain('/pictures/items/40/logo/l1')
+    expect(screen.getByRole('heading', { level: 1, name: 'Busboys' })).toContainElement(logo)
+    expect(getMedia).toHaveBeenCalledWith(7)
+    await settled()
+  })
+
+  it('spells a download out, asking nothing, while the server is out of reach', async () => {
+    const { getMedia } = stubServer()
+    signIn()
+    useServerReach.setState({ isOffline: true })
+    renderPlayers({ client: playMain({ describeFile: describeDownload }), route: playPathOf(A) })
+    await screen.findByRole('heading', { level: 1, name: 'Busboys' })
+    await videoOf(A)
+    expect(screen.queryByRole('img', { name: 'Busboys' })).toBeNull()
+    expect(getMedia).not.toHaveBeenCalled()
+  })
+
+  it('spells a download out, asking nothing, while signed out', async () => {
+    const { getMedia } = stubServer()
+    renderPlayers({ client: playMain({ describeFile: describeDownload }), route: playPathOf(A) })
+    await screen.findByRole('heading', { level: 1, name: 'Busboys' })
+    await videoOf(A)
+    expect(getMedia).not.toHaveBeenCalled()
+  })
+
+  it('spells a local file out, asking the server nothing', async () => {
+    const { getMedia } = stubServer()
+    signIn()
+    renderPlayers({ client: playMain(), route: playPathOf(A) })
+    await screen.findByRole('heading', { level: 1, name: 'Clip 01' })
+    await videoOf(A)
+    expect(screen.queryByRole('img')).toBeNull()
+    expect(getMedia).not.toHaveBeenCalled()
   })
 })
 

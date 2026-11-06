@@ -38,7 +38,11 @@ import { type Chosen, useChosenEngine } from '@/desktop/player/useChosenEngine'
 import { useLeaveSignal } from '@/desktop/player/useLeaveSignal'
 import { useMenuNext } from '@/desktop/player/useMenuNext'
 import { CONNECTION_STATUSES } from '@/desktop/playerConnection'
+import { mediaQuery } from '@/lib/queries'
+import { useTitleLogo } from '@/lib/useTitleLogo'
+import { useAuthSession } from '@/stores/authSession'
 import { useDesktop } from '@/stores/desktop'
+import { useServerReach } from '@/stores/serverReach'
 
 /**
  * Where a file that is not playing goes back to when no page of the app is behind it: Back
@@ -103,6 +107,20 @@ const ENGINE_VIEWS = {
   [ENGINE_USES.stopped]: HtmlFilePlaying,
 } as const satisfies Record<EngineUse, ComponentType<EngineViewProps>>
 
+type UseDownloadLogoProps = { mediaId: LocalFile['mediaId'] }
+
+/**
+ * A download's art from its media on the server, as the server's player draws it. Offline,
+ * signed out or for a plain local file nothing is asked, and the header spells the title out.
+ */
+const useDownloadLogo = ({ mediaId }: UseDownloadLogoProps) => {
+  const isOffline = useServerReach((state) => state.isOffline)
+  const isSignedIn = useAuthSession((state) => state.session !== null)
+  const asked = !isOffline && isSignedIn ? mediaId : null
+  const media = useQuery(mediaQuery(asked)).data ?? null
+  return useTitleLogo({ media })
+}
+
 type PlayingProps = {
   file: LocalFile
   chosen: Chosen
@@ -133,12 +151,17 @@ const Playing = ({ file, chosen, isOutputFixed, downloadsPage }: PlayingProps) =
     () => fileServicesFor({ file: played, client, menu, engine, downloadsPage }),
     [played, client, menu, engine, downloadsPage],
   )
-  // The output arrives on its own time; folding it in keeps the progress sink, so the
-  // player neither remounts nor forgets the length it reported.
+  const logo = useDownloadLogo({ mediaId: file.mediaId })
+  // The output and the art arrive on their own time; folding them in keeps the progress sink,
+  // so the player neither remounts nor forgets the length it reported.
   // Chromium mixes the html engine's sound itself, so only mpv's bitstream fixes the volume.
   const services = useMemo(
-    () => ({ ...base, isVolumeFixed: isOutputFixed && engine === ENGINE_USES.native }),
-    [base, isOutputFixed, engine],
+    () => ({
+      ...base,
+      title: { ...base.title, logo },
+      isVolumeFixed: isOutputFixed && engine === ENGINE_USES.native,
+    }),
+    [base, logo, isOutputFixed, engine],
   )
 
   useMenuNext({

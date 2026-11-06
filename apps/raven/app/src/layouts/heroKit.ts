@@ -93,3 +93,46 @@ export type HomeHeroProps = {
 
 /** Home's hero, which each platform draws its own way. */
 export type HeroKit = { HomeHero: (props: HomeHeroProps) => ReactNode }
+
+/** Where a page sits: a slide's own, or the copy standing before the first or after the last. */
+const PAGE_PLACES = { before: 'before', own: 'own', after: 'after' } as const
+
+/** A page of the loop; a copy is hidden from the screen reader, which reaches its slide itself. */
+type LoopPage<T> = { key: string; slide: T; isCopy: boolean }
+
+type LoopPagesOfProps<T> = { slides: readonly T[] }
+
+type PagePlace = (typeof PAGE_PLACES)[keyof typeof PAGE_PLACES]
+
+type Keyed = { key: string }
+
+type PageOfProps<T> = { slide: T; place: PagePlace }
+
+const pageOf = <T extends Keyed>({ slide, place }: PageOfProps<T>): LoopPage<T> => ({
+  key: `${place}:${slide.key}`,
+  slide,
+  isCopy: place !== PAGE_PLACES.own,
+})
+
+/**
+ * The pages the list scrolls through: the slides with a copy of the last before the first and a
+ * copy of the first after the last, so a swipe past either end shows the slide round the corner,
+ * and the list then hops onto that slide itself without a jump the viewer can see.
+ */
+export const loopPagesOf = <T extends Keyed>({ slides }: LoopPagesOfProps<T>): LoopPage<T>[] => {
+  const own = slides.map((slide) => pageOf({ slide, place: PAGE_PLACES.own }))
+  const first = slides.at(0)
+  const last = slides.at(-1)
+  if (first === undefined || last === undefined || slides.length < 2) return own
+  return [
+    pageOf({ slide: last, place: PAGE_PLACES.before }),
+    ...own,
+    pageOf({ slide: first, place: PAGE_PLACES.after }),
+  ]
+}
+
+type SlideOfPageProps = { page: number; count: number }
+
+/** The slide a page shows: the copies at either end stand for the slide round the corner. */
+export const slideOfPage = ({ page, count }: SlideOfPageProps): number =>
+  (((page - 1) % count) + count) % count

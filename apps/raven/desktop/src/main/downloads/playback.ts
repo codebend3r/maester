@@ -125,6 +125,8 @@ export type DownloadPlayback = {
   fromLabelOf: (input: FromLabelOfProps) => string | null
   /** The title of the download whose video is at `path`, else null. */
   labelOf: (input: LabelOfProps) => string | null
+  /** The server's media id of the download whose video is at `path`, else null. */
+  mediaIdOf: (input: LabelOfProps) => number | null
   /**
    * Whether `path` lies in the downloads folder but is no download's video: a deleted download
    * that a play queue still holds a grant for, since a grant outlives its download.
@@ -493,6 +495,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     sidecarsOf,
     fromLabelOf,
     labelOf: ({ path }) => entryAt(path)?.label ?? null,
+    mediaIdOf: ({ path }) => entryAt(path)?.mediaId ?? null,
     isStaleDownload,
     serverPositionOf: ({ fileId }) => entryOfFile(fileId)?.serverPosition ?? 0,
     noteOpened,

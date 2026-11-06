@@ -35,9 +35,9 @@ export const { Loading } = Platform.isTV ? focusLoading : touchLoading
 export const { Form, Field, FormButton, useFormStyles } = Platform.isTV ? focusForm : touchForm
 
 /** Home's shelves: rows the remote moves along on a TV, rows under the thumb everywhere else. */
-export const { Shelves, Shelf } = Platform.isTV ? focusShelf : touchShelf
+export const { Shelves, Shelf, BingeShelf } = Platform.isTV ? focusShelf : touchShelf
 
-/** Home's hero over its shelves: the featured titles in turn on a TV, nothing yet under the thumb. */
+/** Home's hero over its shelves: the featured titles in turn on a TV, a swiped carousel under the thumb. */
 export const { HomeHero } = Platform.isTV ? focusHero : touchHero
 
 /** A library's grid: rows the remote moves through on a TV, columns under the thumb elsewhere. */
@@ -66,8 +66,14 @@ export const { SearchField, SearchLayout } = Platform.isTV ? focusSearch : touch
  * Settings: plates the remote moves down through and the TV's picker lists on a TV, a rename in
  * a sheet that Menu or Back closes; the system's switches and sheets under the thumb.
  */
-export const { SettingsPage, SettingsSection, SettingsToggle, SettingsButton, SettingsChoice } =
-  Platform.isTV ? focusSettings : touchSettings
+export const {
+  SettingsPage,
+  SettingsSection,
+  SettingsToggle,
+  SettingsButton,
+  SettingsLine,
+  SettingsChoice,
+} = Platform.isTV ? focusSettings : touchSettings
 
 /**
  * The music pages: an album's, a playlist's and Now Playing, rows and plates the remote moves

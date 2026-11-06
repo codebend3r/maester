@@ -66,17 +66,14 @@ const PERSON_WIDTH = 96
 
 /**
  * The backdrop is the top of the page's ground: fixed behind the content while it scrolls, it
- * covers this share of the window's height and fades into the theme's ground by its foot, so the
- * picture shows and the rest of the page is the theme's own colour. The ground is the text's
- * opposite in every theme, so a light dimming plus the fade keeps the text's contrast on light
- * and dark alike.
+ * covers this share of the window's height at `BACKDROP_OPACITY` at its top, fading evenly to
+ * the theme's ground by its foot, so the rest of the page is the theme's own colour. The ground
+ * is the text's opposite in every theme, so the dimming plus the fade keeps the text's contrast
+ * on light and dark alike.
  */
 const BACKDROP_REACH = 0.8
 
-const BACKDROP_OPACITY = 0.75
-
-/** Where the fade starts, as a share of the backdrop's height; it is the ground's own colour at the foot. */
-const BACKDROP_FADE_FROM = 0.3
+const BACKDROP_OPACITY = 0.5
 
 const BACKDROP_GRADIENT_ID = 'item-backdrop-fade'
 
@@ -117,6 +114,7 @@ const ActionButton = ({ action }: ActionButtonProps) => {
       style={({ pressed }) => [
         styles.action,
         toneStyles[look.tone].button,
+        look.isDisabled && styles.disabled,
         pressed && styles.pressed,
       ]}
     >
@@ -460,7 +458,6 @@ const Backdrop = ({ backdrop }: BackdropProps) => {
         <Defs>
           <LinearGradient id={BACKDROP_GRADIENT_ID} x1="0" x2="0" y1="0" y2="1">
             <Stop offset={0} stopColor={ground} stopOpacity={0} />
-            <Stop offset={BACKDROP_FADE_FROM} stopColor={ground} stopOpacity={0} />
             <Stop offset={1} stopColor={ground} stopOpacity={1} />
           </LinearGradient>
         </Defs>
@@ -575,6 +572,7 @@ const useStyles = themedStyles((colours) =>
     },
     actionLabel: { fontSize: SIZES.text, fontWeight: 'bold' },
     pressed: { opacity: OPACITIES.pressed },
+    disabled: { opacity: OPACITIES.disabled },
     // The raised surface under the words, translucent so the backdrop shows faintly through.
     synopsis: {
       gap: SIZES.space2,

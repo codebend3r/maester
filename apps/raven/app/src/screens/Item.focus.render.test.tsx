@@ -196,6 +196,17 @@ describe('Item on a TV', () => {
     expect(preferred()).toEqual(['Play S01E01'])
   })
 
+  it('marks a show as binging from its actions row, the mark filled once it is on', async () => {
+    await renderItem(SEVERANCE.id)
+    await screen.findByRole('button', { name: 'Play S01E01' })
+    const binge = screen.getByRole('checkbox', { name: 'Mark as binging', checked: false })
+
+    await fireEvent(binge, NATIVE_EVENTS.focus)
+    await fireEvent.press(binge)
+
+    expect(await screen.findByRole('checkbox', { name: 'Binging', checked: true })).toBeTruthy()
+  })
+
   it("puts a season's episodes on a row, each opening its page", async () => {
     await renderItem(SEVERANCE_ONE.id)
     expect(await screen.findByRole('button', { name: 'E2 · Half Loop' })).toBeTruthy()

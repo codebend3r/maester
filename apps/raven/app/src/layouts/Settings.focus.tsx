@@ -10,6 +10,7 @@ import type {
   SettingsButtonProps,
   SettingsChoiceProps,
   SettingsKit,
+  SettingsLineProps,
   SettingsPageProps,
   SettingsSectionProps,
   SettingsToggleProps,
@@ -24,7 +25,7 @@ const TOGGLE_STATES = { on: 'On', off: 'Off' } as const
 
 /**
  * Settings on a TV: one column within the title-safe margin, read from the sofa. Menu or Back
- * leaves it, as the native stack pops it. The remote opens on the first button, once: anything
+ * leaves it, as the native stack pops it. The remote opens on the opener button, once: anything
  * here taking the focus spends the opening focus.
  */
 const SettingsPage = ({ title, children }: SettingsPageProps) => {
@@ -81,19 +82,25 @@ const SettingsToggle = ({ label, hint, isOn, onToggle }: SettingsToggleProps) =>
 }
 
 /** A button at the start of its line, in a band as wide as the page. */
-const SettingsButton = ({ text, isDisabled, onPress }: SettingsButtonProps) => {
+const SettingsButton = ({
+  text,
+  isDisabled,
+  onPress,
+  name = text,
+  isOpener = false,
+}: SettingsButtonProps) => {
   const { isOpening, settle } = useOpeningFocus()
   const styles = useStyles()
   const plateStyles = usePlateStyles()
   return (
     <FocusBand>
       <Pressable
-        accessibilityLabel={text}
+        accessibilityLabel={name}
         accessibilityRole="button"
         accessibilityState={{ disabled: isDisabled }}
         disabled={isDisabled}
         focusable={!isDisabled}
-        hasTVPreferredFocus={isOpening && !isDisabled}
+        hasTVPreferredFocus={isOpener && isOpening && !isDisabled}
         onFocus={settle}
         onPress={onPress}
         style={({ focused }) => [
@@ -106,6 +113,15 @@ const SettingsButton = ({ text, isDisabled, onPress }: SettingsButtonProps) => {
         <Text style={plateStyles.label}>{text}</Text>
       </Pressable>
     </FocusBand>
+  )
+}
+
+const SettingsLine = ({ text, isAlert = false }: SettingsLineProps) => {
+  const styles = useStyles()
+  return (
+    <Text accessibilityRole={isAlert ? 'alert' : 'text'} style={styles.line}>
+      {text}
+    </Text>
   )
 }
 
@@ -141,6 +157,7 @@ export const focusSettings: SettingsKit = {
   SettingsSection,
   SettingsToggle,
   SettingsButton,
+  SettingsLine,
   SettingsChoice,
 }
 

@@ -8,7 +8,13 @@ import {
 } from '@raven/core'
 
 import { CARD_SHAPES } from '@/queries/cards'
-import { CONTINUE_WATCHING, homeShelvesOf, libraryShelvesOf } from '@/queries/homeShelves'
+import {
+  CONTINUE_WATCHING,
+  HOME_CONTINUE_COUNT,
+  SHELF_LAYOUTS,
+  homeShelvesOf,
+  libraryShelvesOf,
+} from '@/queries/homeShelves'
 import type { ShowArts } from '@/queries/showArt'
 import { FILMS, HOME, NAS, SERIES, homeApi } from '@/test/homeServer'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'
@@ -225,6 +231,40 @@ describe('homeShelvesOf', () => {
       picture: { uri: `${NAS.origin}/api/media/50/thumbnail?v=2` },
       target: { kind: ROUTE_TARGETS.item, itemId: 60, libraryId: 1, fileId: null },
     })
+  })
+
+  it('lays Continue watching out as a grid of its newest six, and says when it holds more', () => {
+    const [entry] = HOME.inProgress
+    if (entry === undefined) throw new Error('No video in progress')
+    const many = Array.from({ length: HOME_CONTINUE_COUNT + 2 }, (_, index) => ({
+      ...entry,
+      media: { ...entry.media, id: 900 + index },
+    }))
+    const shelves = homeShelvesOf({
+      arts: NO_ARTS,
+      home: { ...HOME, inProgress: many },
+      libraries: [FILMS, SERIES],
+      api: homeApi(),
+      headersFor,
+    })
+    expect(
+      shelves.map(({ layout, hasMore, cards }) => ({ layout, hasMore, count: cards.length })),
+    ).toEqual([
+      { layout: SHELF_LAYOUTS.grid, hasMore: true, count: HOME_CONTINUE_COUNT },
+      { layout: SHELF_LAYOUTS.row, hasMore: false, count: 2 },
+      { layout: SHELF_LAYOUTS.row, hasMore: false, count: 1 },
+    ])
+  })
+
+  it('says Continue watching holds no more when it shows them all', () => {
+    const [continuing] = homeShelvesOf({
+      arts: NO_ARTS,
+      home: HOME,
+      libraries: [FILMS, SERIES],
+      api: homeApi(),
+      headersFor,
+    })
+    expect(continuing?.hasMore ?? null).toBe(false)
   })
 
   it('leaves out a shelf for a library not in the list, and an empty Continue watching', () => {

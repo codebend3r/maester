@@ -312,6 +312,13 @@ describe('what names a download', () => {
     expect(world.playback.labelOf({ path: VIDEO })).toBe('S01E01 Good News')
     expect(world.playback.labelOf({ path: MOVIE_PATH })).toBeNull()
   })
+
+  it("names a download's video by its server media, and nothing for another file", () => {
+    const world = setup({ entries: [entryFor({})] })
+    expect(world.playback.mediaIdOf({ path: VIDEO })).toBe(11)
+    expect(world.playback.mediaIdOf({ path: videoOf(12) })).toBeNull()
+    expect(world.playback.mediaIdOf({ path: MOVIE_PATH })).toBeNull()
+  })
 })
 
 describe('notePosition', () => {

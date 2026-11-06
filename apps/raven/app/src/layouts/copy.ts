@@ -8,6 +8,9 @@ export const FORM_COPY = { wordmark: 'Raven' } as const
 /** The way back to Home every screen but Home, sign-in and the player wears at its top left. */
 export const HOME_NAV_COPY = { home: 'Home' } as const
 
+/** The side menus' way to every library on the server, pinned or not, and that screen's title. */
+export const LIBRARIES_ENTRY = { label: 'Libraries' } as const
+
 /** What the checkbox under a secret field says. */
 export const FIELD_COPY = { showPassword: 'Show password' } as const
 

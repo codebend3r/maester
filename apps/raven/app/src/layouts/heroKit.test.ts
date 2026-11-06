@@ -7,6 +7,8 @@ import {
   fanPlaceOf,
   isInFan,
   isInWash,
+  loopPagesOf,
+  slideOfPage,
   stepTurn,
   titleSizeOf,
 } from '@/layouts/heroKit'
@@ -61,5 +63,27 @@ describe('titleSizeOf', () => {
     expect(titleSizeOf('Dune')).toBe(TITLE_SIZES.display)
     expect(titleSizeOf('Interstellar')).toBe(TITLE_SIZES.long)
     expect(titleSizeOf('The Lord of the Rings: The Return of the King')).toBe(TITLE_SIZES.longest)
+  })
+})
+
+describe('the touch carousel loop', () => {
+  const slides = [{ key: 'a' }, { key: 'b' }, { key: 'c' }]
+
+  it('puts a copy of the last before the first and of the first after the last', () => {
+    expect(loopPagesOf({ slides }).map(({ key }) => key)).toEqual([
+      'before:c',
+      'own:a',
+      'own:b',
+      'own:c',
+      'after:a',
+    ])
+  })
+
+  it('leaves a lone slide without copies', () => {
+    expect(loopPagesOf({ slides: [{ key: 'a' }] }).map(({ key }) => key)).toEqual(['own:a'])
+  })
+
+  it('reads either copy as the slide round the corner', () => {
+    expect([0, 1, 2, 3, 4].map((page) => slideOfPage({ page, count: 3 }))).toEqual([2, 0, 1, 2, 0])
   })
 })

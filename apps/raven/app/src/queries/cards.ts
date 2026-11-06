@@ -5,6 +5,7 @@ import {
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
   type ItemSummary,
+  type LibraryIconName,
   type LibraryKind,
   type MediaItem,
   type MediaSort,
@@ -50,6 +51,8 @@ export type ShelfCard = {
   chips?: readonly FactPart[]
   /** Set on a card that resumes a video: it is drawn as a resume card, with what is left to watch. */
   resume?: { timeLeft: string | null } | null
+  /** A library's icon, drawn before a row's words, as the side menu's row wears it. */
+  icon?: LibraryIconName | null
   /** Where pressing it goes: its item's page, or the player for a file with no page. */
   target: RouteTarget
 }

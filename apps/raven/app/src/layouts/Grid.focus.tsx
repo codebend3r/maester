@@ -126,6 +126,7 @@ type RowCardProps = {
 const RowCard = ({ card, hasPicture, isPreferred, jump, onPress }: RowCardProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
   const styles = useStyles()
+  const text = useTheme((theme) => theme.palette.text)
   useJumpFocus({ jump, view: pressable })
   const { remember } = useOpenerFocus({ place: card.key, view: pressable })
   const { settle } = useOpeningFocus()
@@ -145,6 +146,7 @@ const RowCard = ({ card, hasPicture, isPreferred, jump, onPress }: RowCardProps)
       {hasPicture && (
         <CardPicture card={card} radius={TV_SIZES.radius} width={TILE_WIDTHS[card.shape]} />
       )}
+      {!!card.icon && <Icon colour={text} name={card.icon} size={TV_SIZES.textXl} />}
       <View style={styles.words}>
         <Text numberOfLines={1} style={styles.rowTitle}>
           {card.title}

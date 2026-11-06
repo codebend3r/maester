@@ -40,7 +40,7 @@ import {
   settled,
 } from '@/test/desktop'
 import { renderPlayers } from '@/test/desktopPlayer'
-import { mediaItem } from '@/test/fixtures'
+import { itemDetails, itemSummary, mediaItem } from '@/test/fixtures'
 
 const MEDIA = mediaItem({ position: 600 })
 const NEXT = mediaItem({ id: 8, title: 'Busboys 2 (2027)' })
@@ -139,6 +139,22 @@ afterEach(() => {
 })
 
 describe('WatchPage inside Raven', () => {
+  it("heads the title on mpv with its logo, as the browser's player does", async () => {
+    const film = mediaItem({ ...MEDIA, item: itemSummary({ id: 40, title: 'Busboys' }) })
+    spy(spyOn(api, 'getMedia').mockImplementation(async () => film))
+    spy(
+      spyOn(api, 'getItem').mockImplementation(async () =>
+        itemDetails({ id: 40, title: 'Busboys', logoVersion: 'l1' }),
+      ),
+    )
+    const fake = fakePlayer()
+    renderPlayers({ client: titleMain(), player: nativeOf(fake), route: WATCH })
+    const logo = await screen.findByRole('img', { name: 'Busboys' })
+    expect(logo.getAttribute('src') ?? '').toContain('/pictures/items/40/logo/l1')
+    expect(screen.getByRole('heading', { level: 1, name: 'Busboys' })).toContainElement(logo)
+    await settled()
+  })
+
   it('asks main for the title and plays what it hands over on mpv, from the saved spot', async () => {
     const client = titleMain()
     const fake = fakePlayer()

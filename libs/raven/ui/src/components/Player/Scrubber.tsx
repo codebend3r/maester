@@ -25,8 +25,9 @@ type ChapterMaskProps = {
 /**
  * A mask that cuts a gap into the track at each chapter's start, so the
  * buffered and played stretches break there too. A mask reads only alpha,
- * so any opaque colour does for the parts that show. Null without chapters
- * inside the video.
+ * so any opaque colour does for the parts that show, but only one opaque in
+ * every host: the stage's is transparent over a native surface, which would
+ * hide the whole rail. Null without chapters inside the video.
  */
 export const chapterMask = ({ chapters, duration }: ChapterMaskProps): string | null => {
   const cuts = chapters
@@ -34,7 +35,7 @@ export const chapterMask = ({ chapters, duration }: ChapterMaskProps): string | 
     .toSorted((a, b) => a - b)
     .map((start) => share({ time: start, duration }))
   if (cuts.length === 0) return null
-  const solid = 'var(--color-stage)'
+  const solid = 'var(--color-on-picture)'
   const stops = cuts.reduce<{ from: string; parts: string[] }>(
     (acc, at) => ({
       from: gapEnd(at),

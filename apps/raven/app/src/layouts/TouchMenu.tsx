@@ -96,9 +96,9 @@ const MenuEntry = ({ icon, label, onPress, ref }: MenuEntryProps) => {
 type MenuContentProps = { session: AppQueries }
 
 /**
- * What the menu holds, in the web's side menu's order: Home and Favourites, the
- * pinned libraries under their heading, a rule, then Settings. Choosing an entry shuts the
- * menu and goes there.
+ * What the menu holds, in the web's side menu's order: Home, Favourites, Continue watching
+ * and Libraries, the pinned libraries under their heading, a rule, then Settings. Choosing an
+ * entry shuts the menu and goes there.
  */
 const MenuContent = ({ session: { queries } }: MenuContentProps) => {
   const router = useRouter()
@@ -132,6 +132,16 @@ const MenuContent = ({ session: { queries } }: MenuContentProps) => {
         icon="heart"
         label={TOUCH_NAV_COPY.favourites}
         onPress={() => go({ pathname: APP_ROUTES.favourites, params: {} })}
+      />
+      <MenuEntry
+        icon="continue"
+        label={TOUCH_NAV_COPY.continueWatching}
+        onPress={() => go({ pathname: APP_ROUTES.continueWatching, params: {} })}
+      />
+      <MenuEntry
+        icon="libraries"
+        label={TOUCH_NAV_COPY.libraries}
+        onPress={() => go({ pathname: APP_ROUTES.libraries, params: {} })}
       />
       {pinned.length > 0 && (
         <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
@@ -269,8 +279,9 @@ type TouchMenuProps = { session: AppQueries }
 /**
  * The side menu of a phone or tablet, mounted once above the routes: out from a menu button in
  * a page's header, or from a swipe in from Home's left edge; the web's side menu's content,
- * Home, Favourites, the pinned libraries and, below a rule, Settings. It stays off the video
- * player, whose screen is its own, and shuts itself when the player opens.
+ * Home, Favourites, Continue watching, Libraries, the pinned libraries and, below a rule,
+ * Settings. It
+ * stays off the video player, whose screen is its own, and shuts itself when the player opens.
  */
 export const TouchMenu = ({ session }: TouchMenuProps) => {
   const pathname = usePathname()

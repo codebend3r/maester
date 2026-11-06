@@ -10,6 +10,7 @@ import type {
   SettingsButtonProps,
   SettingsChoiceProps,
   SettingsKit,
+  SettingsLineProps,
   SettingsPageProps,
   SettingsSectionProps,
   SettingsToggleProps,
@@ -77,10 +78,11 @@ const SettingsToggle = ({ label, hint, isOn, onToggle }: SettingsToggleProps) =>
   )
 }
 
-const SettingsButton = ({ text, isDisabled, onPress }: SettingsButtonProps) => {
+const SettingsButton = ({ text, isDisabled, onPress, name = text }: SettingsButtonProps) => {
   const styles = useStyles()
   return (
     <Pressable
+      accessibilityLabel={name}
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled }}
       disabled={isDisabled}
@@ -89,6 +91,15 @@ const SettingsButton = ({ text, isDisabled, onPress }: SettingsButtonProps) => {
     >
       <Text style={styles.chipLabel}>{text}</Text>
     </Pressable>
+  )
+}
+
+const SettingsLine = ({ text, isAlert = false }: SettingsLineProps) => {
+  const styles = useStyles()
+  return (
+    <Text accessibilityRole={isAlert ? 'alert' : 'text'} style={styles.line}>
+      {text}
+    </Text>
   )
 }
 
@@ -119,6 +130,7 @@ export const touchSettings: SettingsKit = {
   SettingsSection,
   SettingsToggle,
   SettingsButton,
+  SettingsLine,
   SettingsChoice,
 }
 

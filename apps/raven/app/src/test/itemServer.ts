@@ -213,6 +213,8 @@ const {
   setWatched,
   setFavourite,
   setItemFavourite,
+  getBinge,
+  setBinge,
 } = APP_CLIENT_CALLS
 
 /** The saga Busboys is part of, as the films' library lists it. */
@@ -258,6 +260,29 @@ const WRITES: Record<string, (body: unknown) => Answer> = {
   }),
 }
 
+type BingeAfterProps = {
+  method: string
+  path: string
+  body: unknown
+  ids: readonly number[]
+}
+
+/** The binge list once a write adds Severance to it or takes it off; null for any other call. */
+const bingeAfter = ({ method, path, body, ids }: BingeAfterProps): readonly number[] | null => {
+  const isSevering =
+    method === APP_CALL_METHODS.put && path === pathFor({ path: setBinge.path, id: SEVERANCE.id })
+  if (!isSevering) return null
+  const others = ids.filter((id) => id !== SEVERANCE.id)
+  return isRecord(body) && body.binge === true ? [SEVERANCE.id, ...others] : others
+}
+
+type IsBingeCallProps = { method: string; path: string }
+
+/** Whether a call reads or writes the binge list, which the server answers with the list. */
+const isBingeCall = ({ method, path }: IsBingeCallProps): boolean =>
+  (method === APP_CALL_METHODS.get && path === getBinge.path) ||
+  (method === APP_CALL_METHODS.put && path === pathFor({ path: setBinge.path, id: SEVERANCE.id }))
+
 type AnswerForProps = {
   method: string
   path: string
@@ -276,22 +301,40 @@ const bodyOf = (body: string | undefined): unknown => (body === undefined ? null
 /** The path a request names, without its query: the session a next is asked for. */
 const pathOnly = (path: string): string => path.split('?')[0] ?? path
 
+/** Where a test keeps the account's binge list: what it holds now, and the list a write leaves. */
+type BingeList = { read: () => readonly number[]; write: (ids: readonly number[]) => void }
+
+/** A binge list of the server's own, empty as it opens. */
+const ownBingeList = (): BingeList => {
+  let ids: readonly number[] = []
+  return {
+    read: () => ids,
+    write: (next) => {
+      ids = next
+    },
+  }
+}
+
 type ItemApiProps = {
   hear?: (request: HeardRequest) => void
   writes?: () => Promise<void>
   reads?: (path: string) => Promise<void>
+  /** The account's binge list, most recently added first, where the test keeps it across its screens' clients. */
+  binge?: BingeList
 }
 
 /**
  * Busboys, Severance, its first season and that season's first episode, behind the app's
  * allowlist so an unlisted call fails the test. Every write is heard, and answered once
  * `writes` lets it through, and every read once `reads` lets its path through, so a test can
- * look at the screen while the server is still busy.
+ * look at the screen while the server is still busy. The binge list is `binge`'s, and keeps what the
+ * writes do to it.
  */
 export const itemApi = ({
   hear = () => undefined,
   writes = async () => undefined,
   reads = async () => undefined,
+  binge = ownBingeList(),
 }: ItemApiProps = {}): ApiClient =>
   createApiClient({
     baseUrl: NAS.origin,
@@ -302,7 +345,12 @@ export const itemApi = ({
         const sent = bodyOf(init.body)
         hear({ method, path, body: sent })
         await (method === APP_CALL_METHODS.get ? reads(path) : writes())
-        return responseOf(answerFor({ method, path, body: sent }))
+        binge.write(bingeAfter({ method, path, body: sent, ids: binge.read() }) ?? binge.read())
+        return responseOf(
+          isBingeCall({ method, path })
+            ? { status: STATUSES.ok, body: { ids: binge.read(), hasSeenTip: true } }
+            : answerFor({ method, path, body: sent }),
+        )
       },
     }),
   })

@@ -72,13 +72,19 @@ describe('Scrubber', () => {
     const mask = chapterMask({ chapters: [50, 25], duration: 100 })
     expect(mask).toBe(
       [
-        'linear-gradient(to right, var(--color-stage) 0% calc(25% - var(--chapter-gap) / 2)',
+        'linear-gradient(to right, var(--color-on-picture) 0% calc(25% - var(--chapter-gap) / 2)',
         'transparent calc(25% - var(--chapter-gap) / 2) calc(25% + var(--chapter-gap) / 2)',
-        'var(--color-stage) calc(25% + var(--chapter-gap) / 2) calc(50% - var(--chapter-gap) / 2)',
+        'var(--color-on-picture) calc(25% + var(--chapter-gap) / 2) calc(50% - var(--chapter-gap) / 2)',
         'transparent calc(50% - var(--chapter-gap) / 2) calc(50% + var(--chapter-gap) / 2)',
-        'var(--color-stage) calc(50% + var(--chapter-gap) / 2) 100%)',
+        'var(--color-on-picture) calc(50% + var(--chapter-gap) / 2) 100%)',
       ].join(', '),
     )
+  })
+
+  it('masks with a colour that stays opaque over a native surface, where the stage is clear', () => {
+    const mask = chapterMask({ chapters: [30], duration: 100 }) ?? ''
+    expect(mask).not.toContain('--color-stage')
+    expect(mask).toContain('var(--color-on-picture) 0%')
   })
 
   it('draws an unbroken track without chapters', () => {

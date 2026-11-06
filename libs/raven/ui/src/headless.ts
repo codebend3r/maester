@@ -21,6 +21,7 @@ export type {
   PlayerFavourite,
   PlayerServices,
   PlayerTitle,
+  TitleLogo,
   ProgressSink,
   TrackChoice,
 } from '@/components/Player/PlayerServices'

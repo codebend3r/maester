@@ -1,10 +1,14 @@
 import {
   APP_CALL_METHODS,
   APP_CLIENT_CALLS,
+  APP_OWNER_CALLS,
   type AppClientCall,
   type FetchLike,
   SCROBBLE_RETURNS,
   SCROBBLE_SERVICES,
+  TITLE_DISPLAYS,
+  TRANSCODINGS,
+  MEMBER_STATUSES,
   WATCH_TARGET_KINDS,
   appClientCallOf,
   createApiClient,
@@ -26,7 +30,8 @@ const routeOf = ({ method, path }: AppClientCall) =>
  * The spec's writes (progress, plays, watched, the favourites), and the admin lock's
  * unlock, ruled in by Task 17; and the account's playlists and its album and artist favourites,
  * by the audio spec's PR 7; and the account's scrobbling links, a playlist's sharing and its
- * copies, by the music spec's PR 10.
+ * copies, by the music spec's PR 10; and the account's binge list, by the device Home's binge cards;
+ * and the owner's own, which only `APP_OWNER_CALLS` lists, by the app's admin settings.
  */
 const WRITES = [
   APP_CLIENT_CALLS.saveProgress,
@@ -38,6 +43,7 @@ const WRITES = [
   APP_CLIENT_CALLS.setItemFavourite,
   APP_CLIENT_CALLS.setAlbumFavourite,
   APP_CLIENT_CALLS.setArtistFavourite,
+  APP_CLIENT_CALLS.setBinge,
   APP_CLIENT_CALLS.createPlaylist,
   APP_CLIENT_CALLS.renamePlaylist,
   APP_CLIENT_CALLS.deletePlaylist,
@@ -49,7 +55,22 @@ const WRITES = [
   APP_CLIENT_CALLS.startLastFm,
   APP_CLIENT_CALLS.unlinkScrobbling,
   APP_CLIENT_CALLS.unlockAdmin,
+  APP_OWNER_CALLS.setPlaybackSettings,
+  APP_OWNER_CALLS.setDisplaySettings,
+  APP_OWNER_CALLS.setRemoteAccess,
+  APP_OWNER_CALLS.setMemberStatus,
+  APP_OWNER_CALLS.quickScanLibrary,
+  APP_OWNER_CALLS.cancelQuickScan,
+  APP_OWNER_CALLS.scanLibrary,
+  APP_OWNER_CALLS.cancelScan,
+  APP_OWNER_CALLS.scanLibraryMarkers,
+  APP_OWNER_CALLS.mergeLibraryAlbums,
+  APP_OWNER_CALLS.updateLibraryRatings,
+  APP_OWNER_CALLS.cancelLibraryRatings,
+  APP_OWNER_CALLS.matchLibrary,
 ]
+
+const ownerCallNames: readonly string[] = Object.keys(APP_OWNER_CALLS)
 
 /** A server that answers every request with an empty body, writing down which listed call each one was. */
 const recordingFetch = (heard: (AppClientCall | null)[]): FetchLike => {
@@ -76,15 +97,28 @@ describe('the calls raven’s app may make', () => {
     )
   })
 
-  it('names no route for the owner alone: none marked AdminOnly, none the account gate keeps for the owner', () => {
-    const isOwners = (call: AppClientCall): boolean => {
-      const route = routeOf(call)
-      return (
-        (route?.audience ?? null) === AUDIENCES.admin ||
-        (route?.account ?? null) === ACCOUNT_REQUIREMENTS.owner
-      )
-    }
-    expect(calls.filter(([, call]) => isOwners(call)).map(([name]) => name)).toEqual([])
+  const isOwners = (call: AppClientCall): boolean => {
+    const route = routeOf(call)
+    return (
+      (route?.audience ?? null) === AUDIENCES.admin ||
+      (route?.account ?? null) === ACCOUNT_REQUIREMENTS.owner
+    )
+  }
+
+  it('names a route for the owner alone only from APP_OWNER_CALLS: none marked AdminOnly, none the account gate keeps for the owner, elsewhere', () => {
+    expect(
+      calls
+        .filter(([name, call]) => isOwners(call) && !ownerCallNames.includes(name))
+        .map(([name]) => name),
+    ).toEqual([])
+  })
+
+  it('lists in APP_OWNER_CALLS only routes the server keeps for the owner', () => {
+    expect(
+      Object.entries(APP_OWNER_CALLS)
+        .filter(([, call]) => !isOwners(call))
+        .map(([name]) => name),
+    ).toEqual([])
   })
 
   it('writes only what the spec lets it write', () => {
@@ -121,6 +155,7 @@ describe('the calls raven’s app may make', () => {
       api.setItemFavourite({ id: 3, favourite: true }),
       api.setAlbumFavourite({ albumId: 4, favourite: true }),
       api.setArtistFavourite({ artistId: 5, favourite: true }),
+      api.setBinge({ id: 8, binge: true }),
       api.createPlaylist({ name: 'Mix' }),
       api.renamePlaylist({ id: 6, name: 'Mix' }),
       api.deletePlaylist(6),
@@ -132,6 +167,22 @@ describe('the calls raven’s app may make', () => {
       api.startLastFm({ returnTo: SCROBBLE_RETURNS.wren }),
       api.unlinkScrobbling({ service: SCROBBLE_SERVICES.lastFm }),
       api.unlockAdmin('password'),
+      api.setPlaybackSettings({ transcoding: TRANSCODINGS.remuxOnly }),
+      api.setDisplaySettings({ titles: TITLE_DISPLAYS.text }),
+      api.setRemoteAccess({}),
+      api.setMemberStatus({
+        id: '0f8fad5b-d9cb-469f-a165-70867728950e',
+        change: { status: MEMBER_STATUSES.approved },
+      }),
+      api.quickScanLibrary(1),
+      api.cancelQuickScan(1),
+      api.scanLibrary(1),
+      api.cancelScan(1),
+      api.scanLibraryMarkers(1),
+      api.mergeLibraryAlbums(1),
+      api.updateLibraryRatings(1),
+      api.cancelLibraryRatings(1),
+      api.matchLibrary(1),
     ])
     expect(heard).toEqual(WRITES)
   })

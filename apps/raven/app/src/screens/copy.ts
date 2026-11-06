@@ -1,3 +1,6 @@
+import { LIBRARIES_ENTRY } from '@/layouts/copy'
+import { CONTINUE_WATCHING } from '@/queries/homeShelves'
+
 export const HOME_COPY = {
   title: 'Home',
   loading: 'Gathering your libraries',
@@ -27,6 +30,10 @@ export const ITEM_COPY = {
   markWatched: 'Mark watched',
   watched: 'Watched',
   favourite: 'Favourite',
+  markBinging: 'Mark as binging',
+  binging: 'Binging',
+  /** What a show's Binge says while three other shows fill the list. */
+  bingeLimit: 'You can binge up to three shows. Remove a show to make room for another.',
 } as const
 
 export const LIBRARY_COPY = {
@@ -74,6 +81,19 @@ export const FAVOURITES_COPY = {
   gathering: 'Gathering your favourites',
   none: 'Nothing is a favourite yet. Mark a title, an album or an artist with its heart and it waits here.',
   count: { one: 'favourite', many: 'favourites' },
+} as const
+
+export const CONTINUE_WATCHING_COPY = {
+  title: CONTINUE_WATCHING,
+  gathering: 'Gathering what you were watching',
+  none: 'Nothing in progress. Start a video and it waits here.',
+} as const
+
+export const LIBRARIES_COPY = {
+  title: LIBRARIES_ENTRY.label,
+  gathering: 'Gathering the libraries',
+  none: 'No libraries here yet. An admin adds them on the web.',
+  library: { one: 'library', many: 'libraries' },
 } as const
 
 export const SETTINGS_COPY = {

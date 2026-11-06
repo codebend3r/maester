@@ -149,19 +149,21 @@ describe('Home on a phone or tablet', () => {
     expect(useAppPrefs.getState().theme).toBe(LIGHT_THEME?.id)
   })
 
-  it('draws each card as wide as its shape asks: a wide frame, then posters', async () => {
+  it('draws Continue watching across the page, then posters as wide as their shape asks', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
     const widths = cardsOnPage().map((card) => StyleSheet.flatten(card.props.style)?.width ?? null)
-    expect(widths).toEqual([288, 128, 128, 128])
+    // Continue watching is one stacked column on a phone, as wide as the page less its margins.
+    expect(widths).toEqual([PHONE_WIDTH - SIZES.space3 * 2, 128, 128, 128])
   })
 
-  it('draws the cards larger on a tablet', async () => {
+  it('draws Continue watching in two columns and the posters larger on a tablet', async () => {
     mockWindowWidth.mockReturnValue(1024)
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
     const widths = cardsOnPage().map((card) => StyleSheet.flatten(card.props.style)?.width ?? null)
-    expect(widths).toEqual([400, 168, 168, 168])
+    // Continue watching is two columns on a tablet.
+    expect(widths).toEqual([(1024 - SIZES.space3 * 3) / 2, 168, 168, 168])
   })
 
   it('asks for no focus on a touch screen', async () => {

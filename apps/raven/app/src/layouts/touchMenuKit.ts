@@ -1,4 +1,5 @@
-import { HOME_NAV_COPY } from '@/layouts/copy'
+import { HOME_NAV_COPY, LIBRARIES_ENTRY } from '@/layouts/copy'
+import { CONTINUE_WATCHING } from '@/queries/homeShelves'
 import { APP_ROUTES } from '@/routes'
 
 /** What the touch header's buttons and the side menu are called aloud, and the field's button. */
@@ -10,6 +11,8 @@ export const TOUCH_NAV_COPY = {
   theme: 'Theme',
   runSearch: 'Search',
   favourites: 'Favourites',
+  continueWatching: CONTINUE_WATCHING,
+  libraries: LIBRARIES_ENTRY.label,
 } as const
 
 /** How long the menu takes to slide, in milliseconds. */

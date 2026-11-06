@@ -45,6 +45,7 @@ const Field = ({
   placeholder,
   isSecret = false,
   isEmail = false,
+  isNumber = false,
   isFirst = false,
 }: FieldProps) => {
   const formStyles = useTvFormStyles()
@@ -54,7 +55,7 @@ const Field = ({
       <Text style={[formStyles.label, styles.label]}>{label}</Text>
       <TvTextField
         isPreferred={isFirst}
-        keyboardType={keyboardFor({ isSecret, isEmail })}
+        keyboardType={keyboardFor({ isSecret, isEmail, isNumber })}
         label={label}
         onChangeText={onChangeText}
         onSubmit={(text) => onSubmit({ text })}

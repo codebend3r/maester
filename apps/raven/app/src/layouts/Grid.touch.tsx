@@ -78,6 +78,7 @@ type RowCardProps = {
 /** A card of the list or tiles view: a row of words, with its picture in the tiles view. */
 const RowCard = ({ card, hasPicture, onPress }: RowCardProps) => {
   const styles = useStyles()
+  const text = useTheme((theme) => theme.palette.text)
   return (
     <Pressable
       accessibilityLabel={card.title}
@@ -89,6 +90,7 @@ const RowCard = ({ card, hasPicture, onPress }: RowCardProps) => {
         // A tile is too small for title art, and its words sit beside it.
         <CardPicture card={{ ...card, logo: null }} width={TILE_WIDTHS[card.shape]} />
       )}
+      {!!card.icon && <Icon colour={text} name={card.icon} size={SIZES.textXl} />}
       <View style={styles.words}>
         <Text numberOfLines={1} style={styles.rowTitle}>
           {card.title}

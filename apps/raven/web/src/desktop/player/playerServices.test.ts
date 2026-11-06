@@ -27,6 +27,7 @@ const FILE: LocalFile = {
   label: 'Clip 01',
   folder: 'Clips',
   isDownload: false,
+  mediaId: null,
   resumeAt: 42,
   next: null,
   tracks: null,
