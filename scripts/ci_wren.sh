@@ -42,7 +42,7 @@ step 'Install Wren on the iPhone simulator'
 xcrun simctl bootstatus "$SIM_DEVICE" -b
 xcrun simctl install "$SIM_DEVICE" "$WREN_APP"
 
-wait_for_fixture
+await_fixture
 
 # Named by its id, so the flows run on this simulator even with another one booted.
 step 'Wren end to end'

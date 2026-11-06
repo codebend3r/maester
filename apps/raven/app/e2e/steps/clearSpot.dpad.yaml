@@ -32,6 +32,7 @@ name: From Home's focused film, clear its saved spot with a mark and its undoing
 - assertVisible: Play
 - pressKey: Back
 - extendedWaitUntil:
-    notVisible: Continue watching
+    notVisible:
+      id: in-progress
     timeout: 30000
 - assertVisible: Kestrel Point

@@ -4,10 +4,14 @@ tags:
   - touch
 ---
 - runFlow: signIn.yaml
-- extendedWaitUntil:
-    visible: Kestrel Point
-    timeout: 30000
-- tapOn: Kestrel Point
+- runFlow:
+    file: steps/shelfCard.touch.yaml
+    env:
+      TITLE: Kestrel Point
+      SHELF: Films
+- tapOn:
+    text: Kestrel Point
+    below: Films
 - extendedWaitUntil:
     visible: Mark watched
     timeout: 30000

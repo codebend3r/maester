@@ -246,7 +246,10 @@ const Shelf = (props: ShelfProps) => {
   const styles = useStyles()
   const Row = SHELF_ROWS[shelfStateOf(props.shelf)]
   return (
-    <View style={styles.shelf}>
+    // The key names the shelf to the e2e flows: the side menu also has a row named Continue
+    // watching, and the remote on a card below can scroll the title off the screen, so the
+    // whole shelf carries it.
+    <View style={styles.shelf} testID={props.shelf.key}>
       <ShelfTitle
         onOpenContinue={props.onOpenContinue}
         onOpenLibrary={props.onOpenLibrary}

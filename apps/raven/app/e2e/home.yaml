@@ -2,10 +2,6 @@ appId: io.github.codebend3r.raven.app
 name: Home shows the fixture's movie and series
 ---
 - runFlow: signIn.yaml
-- extendedWaitUntil:
-    visible: Kestrel Point
-    timeout: 30000
-- assertVisible: Films
 # On a TV the series' shelf sits below the screen, under the hero and the films (and Continue
 # watching, when anything is), so the remote moves down to it: from the hero's Play to the film,
 # to the series' See all, then to its card.
@@ -19,5 +15,13 @@ name: Home shows the fixture's movie and series
           times: 5
           commands:
             - pressKey: Remote Dpad Down
+# On an iPhone the hero fills most of the screen, so Home scrolls down to the series' card.
+- runFlow:
+    when:
+      platform: iOS
+    file: steps/shelfCard.touch.yaml
+    env:
+      TITLE: Lantern Bay
+      SHELF: Series
 - assertVisible: Series
 - assertVisible: Lantern Bay
