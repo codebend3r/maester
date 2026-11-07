@@ -31,32 +31,32 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@formatjs/intl-displaynames": "7.3.15",
-    "@formatjs/intl-getcanonicallocales": "3.2.12",
-    "@formatjs/intl-locale": "5.3.12",
-    "@formatjs/intl-pluralrules": "6.3.15",
-    "@formatjs/intl-relativetimeformat": "12.3.15",
+    "@formatjs/intl-displaynames": "8.0.1",
+    "@formatjs/intl-getcanonicallocales": "3.3.0",
+    "@formatjs/intl-locale": "5.4.2",
+    "@formatjs/intl-pluralrules": "7.0.2",
+    "@formatjs/intl-relativetimeformat": "13.0.1",
     "@raven/audio": "workspace:*",
     "@raven/core": "workspace:*",
     "@raven/ui": "workspace:*",
     "@react-native-community/netinfo": "12.0.1",
     "expo-secure-store": "58.0.2",
     "react-native-sse": "1.2.1",
-    "react-native-svg": "15.16.0"
+    "react-native-svg": "15.16.1"
   },
   "devDependencies": {
-    "@types/bun": "1.4.2",
+    "@types/bun": "1.4.4",
     "@types/react": "19.3.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
-    "oxfmt": "0.68.0",
-    "oxlint": "1.83.0",
-    "react-native": "npm:react-native-tvos@0.88.0-0",
-    "tsc-alias": "1.9.7",
+    "oxfmt": "0.77.0",
+    "oxlint": "1.92.0",
+    "react-native": "npm:react-native-tvos@0.88.1-0",
+    "tsc-alias": "1.9.10",
     "typescript": "6.0.3"
   },
   "peerDependencies": {
     "react": "19.3.0",
-    "zustand": "5.0.15"
+    "zustand": "5.1.0"
   },
   "nx": {
     "projectType": "library",

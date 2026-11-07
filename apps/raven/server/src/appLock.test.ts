@@ -448,7 +448,7 @@ describe('a library locked behind the PIN', () => {
     })
   })
 
-  it('keeps a locked library off the home page until it is unlocked', async () => {
+  it('keeps a locked library off the home page, even once it is unlocked', async () => {
     const { cookie } = await unlock('3001')
     await api(cookie).saveProgress({ id: state.privateVideo, position: 1, audio: null })
     const home = async (holding?: string) => {
@@ -458,10 +458,7 @@ describe('a library locked behind the PIN', () => {
         shelves: answer.shelves.map((shelf) => shelf.libraryId),
       }
     }
-    expect(await home(cookie)).toEqual({
-      inProgress: [state.privateVideo],
-      shelves: [state.privateMusic, state.open, state.private],
-    })
+    expect(await home(cookie)).toEqual({ inProgress: [], shelves: [state.open] })
     expect(await home()).toEqual({ inProgress: [], shelves: [state.open] })
   })
 

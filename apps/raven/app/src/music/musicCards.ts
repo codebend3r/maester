@@ -51,11 +51,7 @@ type AlbumSectionsOfProps = Pick<AlbumCardProps, 'api' | 'headersFor'> & {
 }
 
 /** A music library's one run of cards: its albums in the order listed. */
-export const albumSectionsOf = ({
-  api,
-  headersFor,
-  albums,
-}: AlbumSectionsOfProps): GridSection[] =>
+export const albumSectionsOf = ({ api, headersFor, albums }: AlbumSectionsOfProps): GridSection[] =>
   albums.length === 0
     ? []
     : [

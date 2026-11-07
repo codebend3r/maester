@@ -367,12 +367,13 @@ export const isWaitingOnOutage = ({ status }: DownloadEntry): boolean =>
   (status.kind === DOWNLOAD_STATUS_KINDS.paused && status.reason === PAUSE_REASONS.unreachable) ||
   (status.kind === DOWNLOAD_STATUS_KINDS.failed && status.reason === FAIL_REASONS.unreachable)
 
+const isTouched = (entry: DownloadEntry): boolean => isPausable(entry) || isWaitingOnOutage(entry)
+
 /**
  * The viewer's Pause all: what runs or waits pauses, and so does what waits on an outage, or
  * the outage retry would start it again. A relocked file keeps its reason, so it still unlocks.
  */
 export const pauseEverything = (state: DownloadsState): DownloadsState => {
-  const isTouched = (entry: DownloadEntry): boolean => isPausable(entry) || isWaitingOnOutage(entry)
   if (!state.entries.some(isTouched)) return state
   return {
     ...state,

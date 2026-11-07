@@ -188,7 +188,7 @@ describe('HomePage', () => {
     await screen.findByRole('region', { name: 'Featured' })
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(['Binge', 'Busboys'])
+    ).toEqual(['Busboys'])
     expect(within(binge).getByRole('link', { name: /Severance/ })).toHaveAttribute(
       'href',
       '/shows/4',

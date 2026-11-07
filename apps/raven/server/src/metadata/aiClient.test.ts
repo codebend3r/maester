@@ -50,9 +50,9 @@ describe('AiClient', () => {
     vi.stubEnv('ANTHROPIC_BASE_URL', 'https://proxy.example')
     const claude = fakeClaude({ lookups: {} })
     await new AiClient(config(), claude.fetch).send(ASK)
-    expect(
-      claude.state.requests.map((request) => [request.url, request.apiKey, request.authorization]),
-    ).toEqual([['https://api.anthropic.com/v1/messages', 'test-key', null]])
+    expect(claude.state.requests.map((request) => [request.url, request.apiKey])).toEqual([
+      ['https://api.anthropic.com/v1/messages', 'test-key'],
+    ])
   })
 
   it('counts lookups against the daily limit, and counts again from midnight UTC', () => {

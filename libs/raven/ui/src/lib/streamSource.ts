@@ -199,6 +199,10 @@ const updateEnd = (buffer: SourceBufferLike): Promise<void> =>
     buffer.addEventListener(BUFFER_EVENTS.error, fail)
   })
 
+const settle = async (buffer: SourceBufferLike): Promise<void> => {
+  if (buffer.updating) await updateEnd(buffer)
+}
+
 const isQuotaError = (error: unknown): boolean =>
   error instanceof Error && error.name === ERROR_NAMES.quotaExceeded
 
@@ -278,10 +282,6 @@ export const createStreamSession = <S extends MediaSourceLike>({
 
   const current = (generation: number): boolean =>
     !state.destroyed && generation === state.generation
-
-  const settle = async (buffer: SourceBufferLike): Promise<void> => {
-    if (buffer.updating) await updateEnd(buffer)
-  }
 
   type EvictBehindProps = {
     buffer: SourceBufferLike

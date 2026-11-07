@@ -197,16 +197,16 @@ export const libraryApi = ({
   reads = async () => undefined,
   inProgress = () => [],
   sagas = () => [NIGHT_SAGA],
-}: LibraryApiProps = {}): ApiClient =>
-  createApiClient({
+}: LibraryApiProps = {}): ApiClient => {
+  const bodyFor = (path: string): unknown => {
+    if (path === libraryPath({ call: listInProgress, library: FILMS })) return inProgress()
+    if (path === libraryPath({ call: listSagas, library: FILMS })) return sagas()
+    return ANSWERS[path]
+  }
+  return createApiClient({
     baseUrl: NAS.origin,
     fetch: allowlistedFetch({
       fetch: async (url) => {
-        const bodyFor = (path: string): unknown => {
-          if (path === libraryPath({ call: listInProgress, library: FILMS })) return inProgress()
-          if (path === libraryPath({ call: listSagas, library: FILMS })) return sagas()
-          return ANSWERS[path]
-        }
         const path = url.slice(NAS.origin.length)
         record(path)
         await reads(path)
@@ -218,3 +218,4 @@ export const libraryApi = ({
       },
     }),
   })
+}

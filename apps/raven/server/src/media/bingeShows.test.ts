@@ -21,7 +21,7 @@ const showNamed = ({ tmdbId, title }: ShowNamedProps): FetchedItem => ({
 
 describe('binge shows', () => {
   const database = testDatabase('raven-binge-shows-')
-  const state = { open: [] as number[], hidden: 0, episode: 0 }
+  const state = { open: [] as number[], hidden: 0, episode: 0, later: 0, laterLibrary: 0 }
   const binge = () => {
     const { metadata } = repositories(database.get())
     return new BingeShows(database.get(), metadata, new LibrariesRepository(database.get()))
@@ -31,6 +31,12 @@ describe('binge shows', () => {
     await database.open()
     const libraries = new LibrariesRepository(database.get())
     const open = libraries.create({ name: 'TV', paths: ['/tv'], settings: { kind: 'shows' } }).id
+    const later = libraries.create({
+      name: 'Later TV',
+      paths: ['/later'],
+      settings: { kind: 'shows' },
+    }).id
+    state.laterLibrary = later
     const locked = libraries.create({
       name: 'Private TV',
       paths: ['/private'],
@@ -48,7 +54,11 @@ describe('binge shows', () => {
         season: localSeason({ showTmdbId: tmdbId, number: 1 }),
         episodes: [localEpisode({ showTmdbId: tmdbId, season: 1, number: 1, title: 'Pilot' })],
       })
-      const root = libraryId === open ? '/tv' : '/private'
+      const roots = new Map([
+        [open, '/tv'],
+        [later, '/later'],
+      ])
+      const root = roots.get(libraryId) ?? '/private'
       const mediaId = index.insert({
         libraryId,
         kind: 'shows',
@@ -65,6 +75,7 @@ describe('binge shows', () => {
     const hidden = shelve({ libraryId: locked, tmdbId: '899', title: 'Hidden' })
     state.hidden = hidden.showId
     state.episode = shelve({ libraryId: open, tmdbId: '898', title: 'Other' }).episode
+    state.later = shelve({ libraryId: later, tmdbId: '897', title: 'Later' }).showId
   })
   afterAll(() => database.close())
 
@@ -102,6 +113,21 @@ describe('binge shows', () => {
     )
     expect(binge().set({ itemId: 999_999, binge: true, account })).toBe(BINGE_OUTCOMES.missing)
     expect(binge().set({ itemId: 999_999, binge: false, account })).toBe(BINGE_OUTCOMES.done)
+  })
+
+  it('leaves a show off the list while its library is locked, and keeps it for when it opens', () => {
+    const account = '30000000-0000-4000-8000-000000000005'
+    const libraries = new LibrariesRepository(database.get())
+    const lockedAs = (locked: boolean) =>
+      libraries.update({
+        id: state.laterLibrary,
+        input: { name: 'Later TV', paths: ['/later'], settings: { kind: 'shows', locked } },
+      })
+    expect(binge().set({ itemId: state.later, binge: true, account })).toBe(BINGE_OUTCOMES.done)
+    lockedAs(true)
+    expect(binge().state({ account }).ids).toEqual([])
+    lockedAs(false)
+    expect(binge().state({ account }).ids).toEqual([state.later])
   })
 
   it('remembers the tip was dismissed, per account', () => {

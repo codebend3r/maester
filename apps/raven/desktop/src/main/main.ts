@@ -181,6 +181,13 @@ const appLog = createAppLog({
 })
 const { log, warn, reportError, mark } = appLog
 
+// The Help actions settle every failure themselves; this only keeps a surprise off the floor.
+const fromMenu = (action: () => Promise<void>) => () => {
+  action().catch((error: unknown) => {
+    reportError({ text: 'Raven could not finish a Help item.', error })
+  })
+}
+
 const reportEndFailure = (error: unknown): void => {
   console.error('Raven could not end.', error)
 }
@@ -789,13 +796,6 @@ const startApp = (): void => {
       notify: (message) => send({ type: DESKTOP_EVENTS.notice, message }),
       warn,
     })
-    // The actions settle every failure themselves; this only keeps a surprise off the floor.
-    const fromMenu = (action: () => Promise<void>) => () => {
-      action().catch((error: unknown) => {
-        reportError({ text: 'Raven could not finish a Help item.', error })
-      })
-    }
-
     // The menu's check always runs, switched off or not (Ruling 9).
     const checkFromMenu = createMenuCheck({
       updates,

@@ -1,14 +1,12 @@
 import { useQueries } from '@tanstack/react-query'
 import { useId } from 'react'
-import { Link } from 'react-router-dom'
 import { ITEM_TYPES, type ItemDetails } from '@raven/core'
 import { Button, ButtonLink, Icon } from '@raven/ui'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
-import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { BingeCard, BingeCardSkeleton } from '@/components/BingeCard/BingeCard'
 import { Loading } from '@/components/Skeleton/Skeleton'
-import { BINGE_BROWSE_PATH, BINGE_COPY, BINGE_PATH } from '@/lib/binge'
+import { BINGE_BROWSE_PATH, BINGE_COPY } from '@/lib/binge'
 import { bingeQuery } from '@/lib/bingeQuery'
 import { useBingeProfile, useSetBinge } from '@/lib/useBinge'
 import styles from '@/pages/BingePage/BingePage.module.scss'
@@ -76,18 +74,15 @@ const BingeGrid = ({ shows, skeletons }: BingeGridProps) => (
 )
 
 /**
- * Home's Binge section, first on the page: drawn once the list says it holds shows, with
- * cards of their shape until they arrive, and nothing for a list that is empty.
+ * Home's Binge section, first on the page and right under its title: drawn once the list says
+ * it holds shows, with cards of their shape until they arrive, and nothing for a list that is
+ * empty. It shows no heading, so the cards start as high as they can; its name is for screen readers.
  */
 export const HomeBinge = () => {
-  const headingId = useId()
   const { ids, isPending, shows } = useBingeShows()
   return (
     (shows.length > 0 || isPending) && (
-      <section className={styles.section} aria-labelledby={headingId}>
-        <SectionHeading id={headingId}>
-          <Link to={BINGE_PATH}>{BINGE_COPY.title}</Link>
-        </SectionHeading>
+      <section className={styles.section} aria-label={BINGE_COPY.title}>
         <BingeGrid shows={shows} skeletons={isPending ? ids.length : 0} />
       </section>
     )

@@ -16,7 +16,6 @@ import {
   listsShows,
 } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
-import { Management } from '@/auth/management'
 import { HeroSelection } from '@/hero/heroSelection'
 import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRepository'
 import { LockService, type Viewer } from '@/lock/lockService'
@@ -49,7 +48,6 @@ export class HomeController {
     @Inject(LockService) private readonly lock: LockService,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(HeroSelection) private readonly hero: HeroSelection,
-    @Inject(Management) private readonly management: Management,
   ) {}
 
   /** A library's row: its shows for a TV shows library, its videos for any other. */
@@ -66,49 +64,48 @@ export class HomeController {
       : { libraryId: id, type: 'media', media: this.media.list(listing) }
   }
 
-  /** The libraries `viewer` may see, as the side menu orders them. */
-  private seenBy(viewer: Viewer): LibraryRecord[] {
-    return this.libraries.list().filter((library) => viewer.seesLibrary(library.id))
+  /**
+   * The libraries home shows `viewer`, as the side menu orders them. A locked
+   * library is never one, for anyone, even once the PIN has opened it.
+   */
+  private onHome(viewer: Viewer): LibraryRecord[] {
+    return this.libraries
+      .list()
+      .filter((library) => !library.settings.locked && viewer.seesLibrary(library.id))
   }
 
-  /**
-   * Every video in progress with the poster its card shows, then each pinned
-   * library's newest releases; libraries still locked stay out. What is in
-   * progress in a locked library is the admin's alone, even once the PIN has
-   * opened it for someone else.
-   */
+  /** Every video in progress with the poster its card shows, then each pinned library's newest releases. */
   @Get()
   home(@Req() request: FastifyRequest): Home {
-    const viewer = this.lock.viewer({ request })
     const account = this.accounts.keyOf({ request })
-    const locked = this.libraries.lockedIds()
-    const canManage = this.management.canManage({ request })
-    const shelves = this.seenBy(viewer)
-      .filter((library) => library.settings.pinned)
-      .map((library) =>
-        this.shelf({ library, search: '', sort: MEDIA_SORTS.yearNew, limit: SHELF_SIZE, account }),
-      )
+    const libraries = this.onHome(this.lock.viewer({ request }))
+    const shown = new Set(libraries.map(({ id }) => id))
     return {
       inProgress: this.media.withPosters(
-        this.media
-          .listInProgress({ account })
-          .filter(
-            ({ libraryId }) =>
-              viewer.seesLibrary(libraryId) && (!locked.has(libraryId) || canManage),
-          ),
+        this.media.listInProgress({ account }).filter(({ libraryId }) => shown.has(libraryId)),
       ),
-      shelves,
+      shelves: libraries
+        .filter((library) => library.settings.pinned)
+        .map((library) =>
+          this.shelf({
+            library,
+            search: '',
+            sort: MEDIA_SORTS.yearNew,
+            limit: SHELF_SIZE,
+            account,
+          }),
+        ),
     }
   }
 
   /**
    * A shelf of albums for each pinned music library, the newest release
-   * first, read apart from the shelves; libraries still locked stay out.
+   * first, read apart from the shelves.
    */
   @Get('albums')
   albums(@Req() request: FastifyRequest): AlbumShelf[] {
     const account = this.accounts.keyOf({ request })
-    return this.seenBy(this.lock.viewer({ request }))
+    return this.onHome(this.lock.viewer({ request }))
       .filter(
         (library) =>
           library.settings.pinned && listingFor(library.settings.kind) === LIBRARY_LISTINGS.albums,

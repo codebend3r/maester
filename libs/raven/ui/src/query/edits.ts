@@ -466,6 +466,13 @@ export const itemWatchedEdits = ({ itemId, watched }: ItemWatchedEditsProps): Ed
 
 type LibraryOrderEditsProps = { ids: readonly number[] }
 
+type RankOfProps = LibraryOrderEditsProps & { library: Library }
+
+const rankOf = ({ ids, library }: RankOfProps): number => {
+  const place = ids.indexOf(library.id)
+  return place === -1 ? ids.length : place
+}
+
 /**
  * The libraries were put in the order of `ids`: the list the side menu and
  * the Libraries page read. A library `ids` leaves out follows the rest.
@@ -474,11 +481,9 @@ export const libraryOrderEdits = ({ ids }: LibraryOrderEditsProps): Edit[] => [
   editKey<Library[]>({
     queryKey: queryKeys.libraries,
     update: (libraries) => {
-      const rank = (library: Library): number => {
-        const place = ids.indexOf(library.id)
-        return place === -1 ? ids.length : place
-      }
-      const ordered = libraries.toSorted((a, b) => rank(a) - rank(b))
+      const ordered = libraries.toSorted(
+        (a, b) => rankOf({ ids, library: a }) - rankOf({ ids, library: b }),
+      )
       return ordered.every((library, index) => library === libraries[index]) ? libraries : ordered
     },
   }),
