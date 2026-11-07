@@ -1,6 +1,6 @@
 import { STOP_REASONS } from '@/metadata/aiMatcher'
 import type { Anthropic } from '@anthropic-ai/sdk'
-import { type MatchItemType, isRecord, isString } from '@raven/core'
+import { AUTH_SCHEME, type MatchItemType, isRecord, isString } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { RAVEN_HEADERS } from '@/http'
 import type { AiFetch } from '@/metadata/aiClient'
@@ -21,8 +21,12 @@ const ROLES = { assistant: 'assistant' } as const satisfies Record<
   Anthropic.Message['role']
 >
 
-/** The headers the SDK sends a key in and reads a retry hint from. */
-const CLAUDE_HEADERS = { apiKey: 'x-api-key', shouldRetry: 'x-should-retry' } as const
+/** The header the SDK reads a retry hint from. */
+const CLAUDE_HEADERS = { shouldRetry: 'x-should-retry' } as const
+
+/** The key a request carried: the SDK sends an API key as `Authorization: Bearer <key>`. */
+const keyOf = (headers: Headers): string | null =>
+  headers.get(RAVEN_HEADERS.authorization)?.replace(`${AUTH_SCHEME} `, '') ?? null
 
 /** One reply Claude gives in a lookup, in turn: a tool call, a refusal, or words and no tool. */
 export type FakeReply =
@@ -47,9 +51,8 @@ export type FakeReply =
 /** A request raven sent Claude. */
 type SeenRequest = {
   url: string
+  /** The one key it carried, raven's own unless something else got in. */
   apiKey: string | null
-  /** The bearer token header, which raven never sends. */
-  authorization: string | null
   /** The body as sent. */
   raw: string
   body: Record<string, unknown>
@@ -214,8 +217,7 @@ export const fakeClaude = ({ lookups }: FakeClaudeProps) => {
     const headers = new Headers(init?.headers)
     state.requests.push({
       url: String(input),
-      apiKey: headers.get(CLAUDE_HEADERS.apiKey),
-      authorization: headers.get(RAVEN_HEADERS.authorization),
+      apiKey: keyOf(headers),
       raw,
       body,
       place,

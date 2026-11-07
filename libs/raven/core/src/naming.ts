@@ -270,11 +270,7 @@ const wordsOf = (text: string): string[] => text.match(WORD) ?? []
 
 /** A word as two namings of it agree: `Director’s` and `directors` alike. */
 const foldWord = (word: string): string =>
-  word
-    .normalize('NFKD')
-    .replace(/\p{M}/gu, '')
-    .replace(/['’]/g, '')
-    .toLowerCase()
+  word.normalize('NFKD').replace(/\p{M}/gu, '').replace(/['’]/g, '').toLowerCase()
 
 /**
  * A name without its tags, in two: what names the movie, its title and any

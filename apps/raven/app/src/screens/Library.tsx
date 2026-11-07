@@ -310,11 +310,13 @@ const LibraryGrid = ({
     seed: view.seed,
   })
   const pictures = usePictures({ server, api })
+  // Taken once, as the screen opens: render stays pure, and a listing never needs the clock to tick.
+  const [now] = useState(() => new Date())
 
   const sections =
     listed === null || pictures === null
       ? []
-      : librarySectionsOf({ settings, listing: listed, now: new Date(), ...pictures })
+      : librarySectionsOf({ settings, listing: listed, now, ...pictures })
   // Nothing matches only once the server says so, not while the last search stands in.
   const empty =
     listed === null || isStandIn

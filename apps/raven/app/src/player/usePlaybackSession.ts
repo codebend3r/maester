@@ -117,12 +117,7 @@ type InitialSessionProps = {
 }
 
 /** Opens the ladder at the plan's first way, from `at`; a plan with none has failed already. */
-export const initialSession = ({
-  modes,
-  at,
-  audio,
-  problems,
-}: InitialSessionProps): SessionState =>
+export const initialSession = ({ modes, at, audio, problems }: InitialSessionProps): SessionState =>
   modes.length === 0
     ? failedWith({ problems, fallback: SESSION_COPY.noWay })
     : {

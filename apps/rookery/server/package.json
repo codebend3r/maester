@@ -19,9 +19,9 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@nestjs/common": "12.3.3",
-    "@nestjs/core": "12.3.3",
-    "@nestjs/platform-fastify": "12.3.3",
+    "@nestjs/common": "12.4.0",
+    "@nestjs/core": "12.4.0",
+    "@nestjs/platform-fastify": "12.4.0",
     "@shared/server": "workspace:*",
     "better-sqlite3": "13.0.3",
     "fastify": "5.12.8",
@@ -30,14 +30,14 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",
-    "@types/node": "24.19.0",
+    "@types/node": "24.19.2",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
-    "oxfmt": "0.68.0",
-    "oxlint": "1.83.0",
-    "tsc-alias": "1.9.7",
+    "oxfmt": "0.77.0",
+    "oxlint": "1.92.0",
+    "tsc-alias": "1.9.10",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "vitest": "5.0.2"
+    "vitest": "5.1.0"
   },
   "nx": {
     "projectType": "application",
