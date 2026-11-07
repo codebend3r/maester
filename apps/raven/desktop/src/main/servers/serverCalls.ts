@@ -158,6 +158,9 @@ type CreateServerCallsProps = {
   warn: (message: string) => void
 }
 
+const slotsFor = (call: AllowedCall): number =>
+  requestFor(call).method === SERVER_METHODS.get ? MAX_IN_FLIGHT : MAX_IN_FLIGHT + WRITE_RESERVE
+
 /**
  * Runs allowlisted calls against the server. Every URL is its stored origin plus the path
  * `requestFor` builds, and each carries the page's access token as its Bearer when there is one,
@@ -183,9 +186,6 @@ export const createServerCalls = ({
   const adjust = ({ serverId, by }: AdjustProps): void => {
     inFlight = new Map([...inFlight, [serverId, countOf(serverId) + by]])
   }
-
-  const slotsFor = (call: AllowedCall): number =>
-    requestFor(call).method === SERVER_METHODS.get ? MAX_IN_FLIGHT : MAX_IN_FLIGHT + WRITE_RESERVE
 
   type IsBusyProps = { server: ServerEntry; call: AllowedCall }
 

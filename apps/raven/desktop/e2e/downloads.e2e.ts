@@ -175,6 +175,17 @@ type TitleProps = Pick<DownloadsState['owed'][number], 'mediaId'>
 // Whether a stored download, or a play it still owes, is the first fixture movie's.
 const isFirst = ({ mediaId }: TitleProps): boolean => mediaId === FIXTURE_MEDIA.first
 
+// What the stored downloads kept of the first title's play while the server was away.
+const keptOf = async ({ userData }: StoredDownloadsProps) => {
+  const { entries, owed } = await storedDownloads({ userData })
+  const pending = entries.find(isFirst)?.pending ?? null
+  return {
+    play: pending?.play ?? false,
+    accountId: pending?.accountId ?? null,
+    isOwed: owed.some(isFirst),
+  }
+}
+
 const askDialog = (page: Page) => page.getByRole('dialog', { name: 'Download to Raven' })
 
 type ConfirmDownloadProps = { page: Page; question: string }
@@ -477,17 +488,8 @@ test.describe.serial('downloading from the web pages, and playing offline', () =
         // download itself, under that account, not in `owed`, which holds other accounts' plays.
         await page.keyboard.press('k')
         await expectButton({ page, name: 'Play (k)' })
-        const keptOf = async () => {
-          const { entries, owed } = await storedDownloads({ userData })
-          const pending = entries.find(isFirst)?.pending ?? null
-          return {
-            play: pending?.play ?? false,
-            accountId: pending?.accountId ?? null,
-            isOwed: owed.some(isFirst),
-          }
-        }
         await expect
-          .poll(keptOf)
+          .poll(() => keptOf({ userData }))
           .toEqual({ play: true, accountId: FIXTURE_ACCOUNT.id, isOwed: false })
 
         // The server comes back as it was, and main sends what the download kept for it.
