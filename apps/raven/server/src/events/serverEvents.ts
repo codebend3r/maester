@@ -1,18 +1,41 @@
 import { Injectable, type OnModuleDestroy } from '@nestjs/common'
-import type { ServerEvent } from '@raven/core'
+import { SERVER_EVENT_TYPES, type ServerEvent } from '@raven/core'
 import { type Observable, Subject } from 'rxjs'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 
-/** What changes as it happens, for every client listening on `/api/events`. */
+/**
+ * An event with whom it is for: every stream, or only the streams of one account (its viewing
+ * key), so one account's spots and binge list never reach another's screens.
+ */
+export type ServerEventEnvelope = { event: ServerEvent; account: AccountKey | null }
+
+type IsForAccountProps = { envelope: ServerEventEnvelope; account: AccountKey }
+
+/** Whether a stream opened by `account` is handed `envelope`. */
+export const isForAccount = ({ envelope, account }: IsForAccountProps): boolean =>
+  envelope.account === null || envelope.account === account
+
+/** What changes as it happens, for the clients listening on `/api/events`. */
 @Injectable()
 export class ServerEvents implements OnModuleDestroy {
-  private readonly subject = new Subject<ServerEvent>()
+  private readonly subject = new Subject<ServerEventEnvelope>()
 
   /** A library's videos were added, removed, renamed or replaced. */
   libraryChanged(libraryId: number): void {
-    this.subject.next({ type: 'library', libraryId })
+    this.subject.next({ event: { type: SERVER_EVENT_TYPES.library, libraryId }, account: null })
   }
 
-  stream(): Observable<ServerEvent> {
+  /** The account's viewing changed on one of its devices: a spot saved, a play counted, a mark made. */
+  viewingChanged(account: AccountKey): void {
+    this.subject.next({ event: { type: SERVER_EVENT_TYPES.viewing }, account })
+  }
+
+  /** The account's binge list changed on one of its devices. */
+  bingeChanged(account: AccountKey): void {
+    this.subject.next({ event: { type: SERVER_EVENT_TYPES.binge }, account })
+  }
+
+  stream(): Observable<ServerEventEnvelope> {
     return this.subject.asObservable()
   }
 

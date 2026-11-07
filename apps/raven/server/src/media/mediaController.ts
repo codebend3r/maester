@@ -65,6 +65,7 @@ import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MediaRepository } from '@/media/mediaRepository'
 import { RANGE_OUTCOMES, RANGE_UNITS, parseRange } from '@/media/range'
 import { ViewingAccounts } from '@/media/viewingAccounts'
+import { ServerEvents } from '@/events/serverEvents'
 import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { TranscodeCache } from '@/music/transcodeCache'
@@ -130,6 +131,7 @@ export class MediaController {
     @Inject(StreamSessions) private readonly streams: StreamSessions,
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
+    @Inject(ServerEvents) private readonly events: ServerEvents,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
     @Inject(FilePasses) private readonly passes: Pick<FilePasses, 'hold'>,
     @Inject(TranscodeCache) private readonly transcodes: Pick<TranscodeCache, 'fileFor'>,
@@ -207,9 +209,11 @@ export class MediaController {
       position,
       audio,
     })
-    if (!this.viewing.report({ id, position, account: this.accounts.keyOf({ request }) })) {
+    const account = this.accounts.keyOf({ request })
+    if (!this.viewing.report({ id, position, account })) {
       throw new NotFoundException(`No media ${id}`)
     }
+    this.events.viewingChanged(account)
   }
 
   /**
@@ -225,6 +229,7 @@ export class MediaController {
   ): void {
     const account = this.accounts.keyOf({ request })
     if (!this.viewing.recordPlay({ id, account })) throw new NotFoundException(`No media ${id}`)
+    this.events.viewingChanged(account)
     try {
       this.scrobbles.noteListen({ mediaId: id, account })
     } catch {

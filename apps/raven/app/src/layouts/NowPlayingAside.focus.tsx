@@ -29,13 +29,29 @@ const { Picker } = focusPicker
  */
 const LYRICS_SHARE = 0.72
 
-/** The lyrics' type: larger than the page's, in the display face. */
-const LYRIC_SIZE = TV_SIZES.textXl * 1.25
+/** How large the lyrics are drawn: beside the player, or large once the remote has opened them. */
+export const LYRIC_SIZES = { normal: 'normal', large: 'large' } as const
+
+export type LyricSize = (typeof LYRIC_SIZES)[keyof typeof LYRIC_SIZES]
+
+/** The lyrics' type at each size: larger than the page's, in the display face. */
+const LYRIC_POINTS = {
+  [LYRIC_SIZES.normal]: TV_SIZES.textXl * 1.25,
+  [LYRIC_SIZES.large]: TV_SIZES.textXl * 1.85,
+} as const satisfies Record<LyricSize, number>
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     lyricLines: { gap: TV_SIZES.space3, paddingVertical: TV_SIZES.space4 },
-    lyric: { color: colours.muted, fontSize: LYRIC_SIZE, lineHeight: LYRIC_SIZE * LINE_RATIO },
+    lyric: { color: colours.muted },
+    [LYRIC_SIZES.normal]: {
+      fontSize: LYRIC_POINTS.normal,
+      lineHeight: LYRIC_POINTS.normal * LINE_RATIO,
+    },
+    [LYRIC_SIZES.large]: {
+      fontSize: LYRIC_POINTS.large,
+      lineHeight: LYRIC_POINTS.large * LINE_RATIO,
+    },
     lyricOn: { color: colours.text },
   }),
 )
@@ -105,13 +121,13 @@ const Book = ({ book }: BookProps) => {
   )
 }
 
-type SyncedLinesProps = { lyrics: SyncedLyrics }
+type SyncedLinesProps = { lyrics: SyncedLyrics; size: LyricSize }
 
 /**
  * Lines timed to the music in a box of their own, the one sung marked and kept in its middle.
  * Nothing in it takes the remote's focus; the box scrolls by itself.
  */
-const SyncedLines = ({ lyrics }: SyncedLinesProps) => {
+const SyncedLines = ({ lyrics, size }: SyncedLinesProps) => {
   const styles = useStyles()
   const screen = useWindowDimensions()
   const { scroll, onBoxLayout, lineLayoutOf } = useLineInView({ current: lyrics.current })
@@ -130,7 +146,7 @@ const SyncedLines = ({ lyrics }: SyncedLinesProps) => {
           variant={TEXT_VARIANTS.display}
           accessibilityState={{ selected: line.isCurrent }}
           onLayout={lineLayoutOf(place)}
-          style={[styles.lyric, line.isCurrent && styles.lyricOn]}
+          style={[styles.lyric, styles[size], line.isCurrent && styles.lyricOn]}
         >
           {line.text}
         </Text>
@@ -139,20 +155,20 @@ const SyncedLines = ({ lyrics }: SyncedLinesProps) => {
   )
 }
 
-type LyricsBodyProps = { lyrics: LyricsView }
+type LyricsBodyProps = { lyrics: LyricsView; size: LyricSize }
 
 type SyncedBodyProps = LyricsBodyProps
 
-const SyncedBody = ({ lyrics }: SyncedBodyProps) =>
-  lyrics.kind === LYRICS_KINDS.synced && <SyncedLines lyrics={lyrics} />
+const SyncedBody = ({ lyrics, size }: SyncedBodyProps) =>
+  lyrics.kind === LYRICS_KINDS.synced && <SyncedLines lyrics={lyrics} size={size} />
 
 type PlainBodyProps = LyricsBodyProps
 
-const PlainBody = ({ lyrics }: PlainBodyProps) => {
+const PlainBody = ({ lyrics, size }: PlainBodyProps) => {
   const styles = useStyles()
   return (
     lyrics.kind === LYRICS_KINDS.plain && (
-      <Text variant={TEXT_VARIANTS.display} style={[styles.lyric, styles.lyricOn]}>
+      <Text variant={TEXT_VARIANTS.display} style={[styles.lyric, styles[size], styles.lyricOn]}>
         {lyrics.text}
       </Text>
     )
@@ -172,12 +188,12 @@ const LYRICS_BODIES = {
 } as const satisfies Record<LyricsView['kind'], ComponentType<LyricsBodyProps>>
 
 /** The words themselves: timed lines, plain text, or a quiet word that there are none. */
-const LyricsBody = ({ lyrics }: LyricsBodyProps) => {
+const LyricsBody = ({ lyrics, size }: LyricsBodyProps) => {
   const Body = LYRICS_BODIES[lyrics.kind]
-  return <Body lyrics={lyrics} />
+  return <Body lyrics={lyrics} size={size} />
 }
 
-type NowPlayingAsideProps = { aside: Aside }
+type NowPlayingAsideProps = { aside: Aside; size: LyricSize }
 
 type BookAsideProps = NowPlayingAsideProps
 
@@ -186,7 +202,7 @@ const BookAside = ({ aside }: BookAsideProps) =>
 
 type LyricsAsideProps = NowPlayingAsideProps
 
-const LyricsAside = ({ aside }: LyricsAsideProps) => {
+const LyricsAside = ({ aside, size }: LyricsAsideProps) => {
   const styles = useMusicStyles()
   return (
     aside.kind === NOW_PLAYING_ASIDES.lyrics && (
@@ -194,7 +210,7 @@ const LyricsAside = ({ aside }: LyricsAsideProps) => {
         <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
           {MUSIC_COPY.lyrics}
         </Text>
-        <LyricsBody lyrics={aside.lyrics} />
+        <LyricsBody lyrics={aside.lyrics} size={size} />
       </View>
     )
   )
@@ -209,8 +225,8 @@ const ASIDES = {
   [NOW_PLAYING_ASIDES.none]: NoAside,
 } as const satisfies Record<Aside['kind'], ComponentType<NowPlayingAsideProps>>
 
-/** What sits below Now Playing's controls on a TV: a book's controls, or the lyrics under a heading. */
-export const NowPlayingAside = ({ aside }: NowPlayingAsideProps) => {
+/** What stands fixed beside Now Playing's column on a TV: a book's controls, or the lyrics under a heading. */
+export const NowPlayingAside = ({ aside, size }: NowPlayingAsideProps) => {
   const AsideView = ASIDES[aside.kind]
-  return <AsideView aside={aside} />
+  return <AsideView aside={aside} size={size} />
 }

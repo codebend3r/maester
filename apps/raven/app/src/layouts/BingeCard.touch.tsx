@@ -5,7 +5,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { TouchFactChips } from '@/layouts/FactChips'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { LINE_RATIO } from '@/layouts/textHeights'
-import { type BingeCard, bingeArtLabelOf } from '@/queries/bingeCards'
+import { BINGE_COPY, type BingeCard, bingeArtLabelOf } from '@/queries/bingeCards'
 import { cardLabelOf } from '@/queries/cards'
 import type { RouteTarget } from '@/routes'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
@@ -116,9 +116,9 @@ export const BingeCardView = ({ card, width, height, onOpen }: BingeCardViewProp
               {card.episodeLine}
             </Text>
           )}
-          {card.starring !== null && (
+          {card.stars !== null && (
             <Text numberOfLines={1} style={styles.starring}>
-              {card.starring}
+              {`${BINGE_COPY.starring} ${card.stars}`}
             </Text>
           )}
           {card.synopsis !== null && (

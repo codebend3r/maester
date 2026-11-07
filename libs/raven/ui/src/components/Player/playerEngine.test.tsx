@@ -345,7 +345,9 @@ describe('the line under a local file’s title', () => {
     renderWithProviders({
       ui: <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:local-clip' } }} />,
     })
-    return screen.getByRole('heading', { level: 1, name: 'Local clip' }).nextElementSibling
+    // The runtime line shares its row with the heart, under the title.
+    const row = screen.getByRole('heading', { level: 1, name: 'Local clip' }).nextElementSibling
+    return row?.querySelector(`.${styles.about ?? ''}`) ?? null
   }
 
   it('gives the runtime alone when the host names no context', () => {

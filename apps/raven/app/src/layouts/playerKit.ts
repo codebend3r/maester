@@ -1,4 +1,4 @@
-import { type PlaybackMode, formatDuration } from '@raven/core'
+import { type Chapter, type PlaybackMode, formatDuration } from '@raven/core'
 import type { ComponentProps, ReactNode } from 'react'
 import type { AccessibilityActionEvent, AccessibilityActionInfo } from 'react-native'
 import type Video from 'react-native-video'
@@ -90,6 +90,8 @@ export type PlayerChromeProps = {
   favourite: PlayerFavourite | null
   /** What plays next in words, "Lucky · S01 · E02 · Make 'em Dance", for the corner; null with nothing after. */
   upNext: string | null
+  /** The file's chapters, in order, for a platform that offers them to jump to; empty while none are known. */
+  chapters: readonly Chapter[]
   /** Hands the video to Picture in Picture; null where the player cannot. */
   onPictureInPicture: (() => void) | null
   onBack: () => void
@@ -111,6 +113,8 @@ export type PlayerChromeKit = {
 }
 
 type PLAYER_COPYOfProps = { at: string; length: string }
+
+type PLAYER_COPYChapterProps = { name: string; at: string }
 
 export const PLAYER_COPY = {
   play: 'Play',
@@ -138,6 +142,11 @@ export const PLAYER_COPY = {
   hideControls: 'Hide the controls',
   favourite: 'Favourite',
   upNext: 'Up next',
+  chapters: 'Chapters',
+  /** An untitled chapter by its place: "Chapter 3". */
+  chapter: (place: number) => `Chapter ${place}`,
+  /** A chapter as read out: "Chapter 3, The Dam, at 12:04". */
+  chapterLabel: ({ name, at }: PLAYER_COPYChapterProps) => `${name}, at ${at}`,
   separator: ' · ',
 } as const
 

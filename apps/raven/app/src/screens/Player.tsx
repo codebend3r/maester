@@ -1,5 +1,6 @@
 import {
   AT_HOME,
+  type Chapter,
   DEFAULT_PLAYBACK_SETTINGS,
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
@@ -61,6 +62,12 @@ import { mediaSourcesFor } from '@/player/mediaSources'
 import { isServerDrop } from '@/player/playerErrors'
 import { progressSinkFor } from '@/player/progressSink'
 import { NOT_LOADED, START_EVENTS, isHeldOf, isStartedOf, startReducer } from '@/player/startUp'
+import {
+  PICTURE_HEARINGS,
+  type PictureHearing,
+  type PictureWatch,
+  watchPicture,
+} from '@/player/missingPicture'
 import { useSeekGrace } from '@/player/useSeekGrace'
 import { viewingOf } from '@/player/viewing'
 import {
@@ -103,6 +110,8 @@ const PLAY_NETWORK_KEY = 'playNetwork'
 
 /** How often the player says where it is, in milliseconds: often enough for a smooth clock. */
 const PROGRESS_EVERY_MS = 250
+
+const NO_CHAPTERS: readonly Chapter[] = []
 
 type VideoLabelOfProps = { word: string; media: MediaItem }
 
@@ -208,8 +217,13 @@ const captionsFor = ({
   }
 }
 
-/** AVPlayer resumes by a seek of ours once loaded, not by the library's `startPosition`; see `startUp.ts`. */
-const IS_SEEKING_TO_RESUME = DEVICE_PLATFORM === APP_PLATFORMS.ios
+/**
+ * AVPlayer, on iPhone, iPad and Apple TV alike, resumes by a seek of ours once loaded, not by the
+ * library's `startPosition`; see `startUp.ts`. The library applies a `startPosition` of 0 too, so
+ * on Apple TV every start, from the beginning as well, sat on the opening mark for good.
+ */
+const IS_SEEKING_TO_RESUME =
+  DEVICE_PLATFORM === APP_PLATFORMS.ios || DEVICE_PLATFORM === APP_PLATFORMS.tvos
 
 /** What the player saying it buffers, or not, tells the video state. */
 const bufferEventOf = (isBuffering: boolean) =>
@@ -294,6 +308,8 @@ const Playing = ({
   )
   // The same query the policy is read from, already answered: its height caps the sizes offered.
   const settings = useQuery(session.queries.playbackSettingsQuery)
+  // The chapters come when they come; playback never waits on them, as on the web.
+  const markers = useQuery(session.queries.markersQuery(media.id))
   const maxHeight = settings.data?.settings.maxHeight ?? DEFAULT_PLAYBACK_SETTINGS.maxHeight
   const shouldPreferDirectPlay = useAppPrefs((prefs) => prefs.shouldPreferDirectPlay)
   const isTranscodeAllowed = useAppPrefs((prefs) => prefs.isTranscodeAllowed)
@@ -371,6 +387,11 @@ const Playing = ({
   const startAt = ladder?.at ?? resumeAt
   const attempt = ladder?.attempt ?? null
   const isStarted = !IS_SEEKING_TO_RESUME || isStartedOf({ state: startState, attempt })
+  // Read by the player's events, which may come to a handler from an earlier render.
+  const hasStarted = useRef(isStarted)
+  useEffect(() => {
+    hasStarted.current = isStarted
+  }, [isStarted])
   useSeekGrace({
     state: startState,
     onLanded: (landed) => dispatchStart({ type: START_EVENTS.landed, attempt: landed }),
@@ -402,6 +423,23 @@ const Playing = ({
     if (isAudioDropped({ platform: DEVICE_PLATFORM, mode, place: audioPlace, reported: toJudge })) {
       dispatch({ type: SESSION_EVENTS.failed, attempt: hearing.attempt, at: position.current })
     }
+  }
+
+  /*
+   * AVPlayer may play a file's sound without its picture, saying nothing (HEVC under `hev1`): a
+   * direct play with a way left below steps down once its clock has run with nothing drawn.
+   */
+  const watchedPicture = useRef<PictureWatch | null>(null)
+  const seePicture = (hearing: PictureHearing) => {
+    const { watch, isMissing } = watchPicture({
+      watch: watchedPicture.current,
+      hearing,
+      platform: DEVICE_PLATFORM,
+      mode,
+    })
+    watchedPicture.current = watch
+    if (!isMissing || state.phase !== SESSION_PHASES.playing || !hasWayBelow(state)) return
+    dispatch({ type: SESSION_EVENTS.failed, attempt: hearing.attempt, at: position.current })
   }
 
   // A seek before the video has loaded is lost by the player, so it is not taken at all.
@@ -525,10 +563,14 @@ const Playing = ({
             if (isPlaying) dispatchVideo({ type: VIDEO_EVENTS.flowing })
           },
           onProgress: ({ currentTime }) => {
+            // Before the resume seek lands the player says 0:00, which is not where the viewer is.
+            if (!hasStarted.current) return
             position.current = currentTime
             dispatchVideo({ type: VIDEO_EVENTS.moved, time: currentTime, buffered: [] })
             hear({ type: AUDIO_HEARINGS.moved, attempt, clock: currentTime })
+            seePicture({ type: PICTURE_HEARINGS.moved, attempt, clock: currentTime })
           },
+          onReadyForDisplay: () => seePicture({ type: PICTURE_HEARINGS.drawn, attempt }),
           paused: isPaused || !isStarted,
           progressUpdateInterval: PROGRESS_EVERY_MS,
           selectedAudioTrack: audioTrack,
@@ -560,6 +602,7 @@ const Playing = ({
           onToggle: () => favourite.mutate(!media.favourite),
         }}
         upNext={nextMedia === null ? null : upNextWordsOf(nextMedia)}
+        chapters={markers.data?.chapters ?? NO_CHAPTERS}
         next={
           nextMedia === null ? null : { label: neighbours.nextLabel(nextMedia), onPlay: playNext }
         }
@@ -636,6 +679,7 @@ const Waiting = ({ notice, onBack }: WaitingProps) => (
     mode={null}
     favourite={null}
     upNext={null}
+    chapters={NO_CHAPTERS}
     next={null}
     previous={null}
     quality={null}

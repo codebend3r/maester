@@ -21,8 +21,26 @@ const APP_ID = 'io.github.codebend3r.raven.app'
 const buildNumber = buildNumberOf({ runNumber: process.env[BUILD_ENV.runNumber] })
 const isDevelopment = isDevelopmentVariant({ variant: process.env[BUILD_ENV.appVariant] })
 const isTv = isTvPrebuild({ value: process.env[TV_ENV.tv] })
+/*
+ * The team a device build is signed under, from `scripts/deploy_tvos.sh` or the shell; a prebuild
+ * rewrites `ios/`, and with no team written Xcode asks for one on every regeneration.
+ */
+const appleTeamId = process.env[BUILD_ENV.appleTeamId]?.trim() ?? ''
 
 const LOCAL_NETWORK_USE = 'raven reaches your raven server on your local network.'
+
+/** Where `scripts/tv_apple_icons.sh` draws the Apple TV's icon layers and Top Shelf images. */
+const APPLE_TV_IMAGES = './assets/images/tv_apple'
+
+type AppleTVIconLayers = { front: string; back: string }
+
+type AppleTVIconLayersProps = { name: string }
+
+/** One Apple TV icon size as its two layers: the mark in front, the ground behind. */
+const appleTVIconLayersOf = ({ name }: AppleTVIconLayersProps): AppleTVIconLayers => ({
+  front: `${APPLE_TV_IMAGES}/${name}-front.png`,
+  back: `${APPLE_TV_IMAGES}/${name}-back.png`,
+})
 
 /**
  * The default theme's ground, from themes.scss through the built tokens the app reads, for what
@@ -61,6 +79,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       bundleIdentifier: APP_ID,
       buildNumber: String(buildNumber),
+      ...(appleTeamId === '' ? {} : { appleTeamId }),
       supportsTablet: true,
       infoPlist: {
         NSLocalNetworkUsageDescription: LOCAL_NETWORK_USE,
@@ -94,8 +113,24 @@ export default ({ config }: ConfigContext): ExpoConfig => {
        * config-tv acts only when EXPO_TV=1, which the TV prebuild scripts set. The banner is the
        * tile the Android TV launcher shows in its apps row: 320 by 180 dp, the mark and the
        * wordmark, drawn by `scripts/tv_banner.sh` at every density (`withTvBannerDensities`).
+       * The Apple TV's icon and Top Shelf images are `scripts/tv_apple_icons.sh`'s: the ground
+       * behind the mark as two layers, for tvOS's parallax.
        */
-      ['@react-native-tvos/config-tv', { androidTVBanner: './assets/images/tv_banner.png' }],
+      [
+        '@react-native-tvos/config-tv',
+        {
+          androidTVBanner: './assets/images/tv_banner.png',
+          appleTVImages: {
+            iconSmallLayers: appleTVIconLayersOf({ name: 'icon-small' }),
+            iconSmall2xLayers: appleTVIconLayersOf({ name: 'icon-small-2x' }),
+            iconLayers: appleTVIconLayersOf({ name: 'icon-large' }),
+            topShelf: `${APPLE_TV_IMAGES}/top-shelf.png`,
+            topShelf2x: `${APPLE_TV_IMAGES}/top-shelf-2x.png`,
+            topShelfWide: `${APPLE_TV_IMAGES}/top-shelf-wide.png`,
+            topShelfWide2x: `${APPLE_TV_IMAGES}/top-shelf-wide-2x.png`,
+          },
+        },
+      ],
       /*
        * Picture in Picture needs the audio background mode. The player still pauses when the
        * app leaves the screen without it (`playInBackground` off): this is video.

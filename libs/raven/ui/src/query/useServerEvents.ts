@@ -1,7 +1,12 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query'
 import { type ApiClient, SERVER_EVENT_TYPES, type ServerEvent, parseServerEvent } from '@raven/core'
 import { useEffect } from 'react'
-import { afterLibraryEvent, afterReconnect } from '@/query/invalidate'
+import {
+  afterBingeEvent,
+  afterLibraryEvent,
+  afterReconnect,
+  afterWatched,
+} from '@/query/invalidate'
 
 /** What an event stream says happened to it, as `EventSource` names it. */
 export const SERVER_STREAM_EVENTS = { message: 'message', error: 'error', open: 'open' } as const
@@ -44,8 +49,13 @@ const follow = ({ queryClient, event }: FollowProps): Promise<unknown> => {
   switch (event.type) {
     case SERVER_EVENT_TYPES.library:
       return afterLibraryEvent({ queryClient, libraryId: event.libraryId })
+    // A spot, play or mark on another of the account's devices: what a mark made here reads again.
+    case SERVER_EVENT_TYPES.viewing:
+      return afterWatched(queryClient)
+    case SERVER_EVENT_TYPES.binge:
+      return afterBingeEvent(queryClient)
     default: {
-      const unknown: never = event.type
+      const unknown: never = event
       return Promise.resolve(unknown)
     }
   }
@@ -83,7 +93,9 @@ export const serverEventsFor = ({
   /**
    * Keeps the browsing pages in step with the server as it changes: a
    * library whose folders changed is read again, its listings and counts
-   * with it, and whatever pages and favourites its videos show on. The
+   * with it, and whatever pages and favourites its videos show on; a spot,
+   * play or mark from another of the account's devices reads Continue
+   * watching and the listings again, and a binge change the list and Home. The
    * source reconnects on its own when the stream drops, and everything is
    * read again once it is back, for the changes sent while it was down. A
    * stream the source closed is opened again after `EVENTS_RETRY_MS`, and a

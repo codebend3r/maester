@@ -163,7 +163,8 @@
   }
 }
 
-.episodeLine {
+// Its season and number, length and year, with the heart beside them on the same row.
+.aboutLine {
   display: grid;
   grid-auto-flow: column;
   justify-content: start;

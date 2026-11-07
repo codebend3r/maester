@@ -15,6 +15,7 @@ import type { IconName } from '@raven/ui/iconDrawings'
 import { BODY_FONT } from '@/theme/fonts'
 import { Icon } from '@raven/native'
 import { Text } from '@/layouts/Text'
+import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { useFocusOnMount } from '@/layouts/focus'
 import { useTvFormStyles } from '@/layouts/formStyles'
 import { useLastFocus } from '@/stores/lastFocus'
@@ -139,7 +140,7 @@ export const usePlateStyles = themedStyles((colours) =>
       borderColor: 'transparent',
       backgroundColor: colours.quiet,
     },
-    focused: { borderColor: colours.text },
+    focused: { ...FOCUS_FRONT, borderColor: colours.text },
     // A mark that is on, as the heart of a favourite: the primary fill.
     on: { backgroundColor: colours.accent },
     label: { color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },

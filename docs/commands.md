@@ -84,6 +84,7 @@ Expo on react-native-tvos: iPhone, iPad, Apple TV and Android TV.
 | `app:build:ios`           | A Release build for the iPhone simulator.                              | Xcode       |
 | `app:build:tvos`          | A Release build for the Apple TV simulator.                            | Xcode       |
 | `app:build:android-tv`    | A Release APK for Android TV, to install on the emulator or a TV.      | Android SDK |
+| `app:deploy:tvos`         | Builds the signed Release and puts it on the paired Apple TV.          | Xcode       |
 | `app:e2e`                 | The Maestro flows on the iPhone simulator, against the fixture server. | Maestro     |
 | `app:e2e:tvos`            | The Siri Remote XCUITest on the Apple TV simulator.                    | Xcode       |
 | `app:e2e:android-tv`      | The Maestro flows on the Android TV emulator, driven by the remote.    | emulator    |

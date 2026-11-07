@@ -8,6 +8,12 @@ export const FORM_COPY = { wordmark: 'Raven' } as const
 /** The way back to Home every screen but Home, sign-in and the player wears at its top left. */
 export const HOME_NAV_COPY = { home: 'Home' } as const
 
+/** The TV grid's size picker, and what each size is called. */
+export const GRID_SIZE_COPY = {
+  label: 'Size',
+  sizes: { small: 'Small', medium: 'Medium', large: 'Large' },
+} as const
+
 /** The side menus' way to every library on the server, pinned or not, and that screen's title. */
 export const LIBRARIES_ENTRY = { label: 'Libraries' } as const
 
@@ -79,6 +85,18 @@ export const MUSIC_COPY = {
     `Nothing in ${name} yet. Add tracks from an album, or from Now Playing.`,
   lyrics: 'Lyrics',
   noLyrics: 'No lyrics for this track.',
+  /** The lyrics column on a TV: select makes it large, select again small. */
+  lyricsEnlarge: 'Lyrics. Select to make them larger',
+  lyricsShrink: 'Lyrics. Select to make them smaller',
+  crossfade: 'Crossfade',
+  /** A crossfade length as the picker names it: "Off", "12 seconds". */
+  crossfadeFor: (seconds: number) => (seconds === 0 ? 'Off' : `${seconds} seconds`),
+  /** The cover with the equalizer over it: what a select does. */
+  coverEqualizerOn: 'Album cover, with the equalizer. Select to hide the equalizer',
+  coverEqualizerOff: 'Album cover. Select to show the equalizer',
+  /** The equalizer in a cover's place, for a track with no artwork. */
+  equalizerOn: 'The equalizer. Select to hide it',
+  equalizerOff: 'No album cover. Select to show the equalizer',
   instrumental: '♪',
   chapters: 'Chapters',
   noChapters: 'This book names no chapters.',

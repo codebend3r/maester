@@ -2,6 +2,7 @@ import { Children, type ComponentType, useState } from 'react'
 import { type LayoutChangeEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { FOCUS_FRONT } from '@/layouts/focusFront'
 import type { ShelfCard } from '@/queries/cards'
 import type { ShelfView } from '@/queries/homeShelves'
 
@@ -22,7 +23,7 @@ import {
   seeAllOf,
   shelfStateOf,
 } from '@/layouts/shelfKit'
-import { BINGE_COPY, type BingeCard } from '@/queries/bingeCards'
+import { BingeCardFocus } from '@/layouts/BingeCard.focus'
 import { SHELF_LAYOUTS, type ShelfLayout } from '@/queries/homeShelves'
 import { Logo } from '@/layouts/Logo'
 import { SCROLL_AXES, useScrollWindow } from '@/layouts/useScrollWindow'
@@ -178,6 +179,14 @@ const CardsRow = ({ shelf, onOpen, isFirst = false }: CardsRowProps) => {
 const GRID_COLUMNS = 2
 
 /**
+ * A picture's height over its width in Home's TV sections. Continue watching's tiles stand at
+ * about the web's, whose fixed 12.5rem height over half a laptop's page comes to near 3:1, so
+ * its three rows fit the screen. A Binge row is 32:9 across the whole width, and the two
+ * cards of its second row stand at least that tall.
+ */
+const TV_FRAMES = { tile: 1 / 3, binge: 9 / 32 } as const
+
+/**
  * The width a section has for its cards: the window's less the side menu and the gutters
  * until it is laid out, then what it measures.
  */
@@ -191,8 +200,9 @@ const useMeasuredWidth = () => {
 
 type ColumnWidthOfProps = { width: number; columns: number }
 
+/** A column's width, rounded down: tvOS rounds to whole pixels, and two halves a fraction too wide wrapped to one column. */
 const columnWidthOf = ({ width, columns }: ColumnWidthOfProps): number =>
-  (width - TV_SIZES.space5 * (columns - 1)) / columns
+  Math.floor((width - TV_SIZES.space5 * (columns - 1)) / columns)
 
 /**
  * Continue watching's wide cards in two columns that do not scroll sideways, one band the
@@ -214,6 +224,7 @@ const CardsGrid = ({ shelf, onOpen, isFirst = false }: CardsRowProps) => {
               isPreferred={isOpening && isFirst && index === 0}
               onPress={() => onOpen(card)}
               place={placeOf({ shelf, card })}
+              ratio={TV_FRAMES.tile}
               width={cardWidth}
             />
           ))}
@@ -264,16 +275,11 @@ const Shelf = (props: ShelfProps) => {
 
 const BINGE_KEY = 'binge'
 
-/** A binge card's facts under its picture on a TV, in the web card's order. */
-const bingeNotesOf = (card: BingeCard): string[] =>
-  [card.meta, card.episodeLine, card.starring, card.synopsis, card.status].filter(
-    (note): note is string => note !== null,
-  )
-
 /**
- * The shows the viewer binges, first on Home, as the web lays them out: the first across the
- * whole width, the rest side by side under it, each with its episode's synopsis. One band the
- * remote comes into on the first card; nothing is drawn while there are none.
+ * The shows the viewer binges, first on Home, right under its title and with no heading of its
+ * own, as the web's: one show is a single 32:9 card across the width, two stack, and a third
+ * sits beside the second in two columns under the first, every fact inside its card. One band
+ * the remote comes into on the first card; nothing is drawn while there are none.
  */
 const BingeShelf = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
   const { isOpening } = useOpeningFocus()
@@ -281,35 +287,24 @@ const BingeShelf = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
   const styles = useStyles()
   return (
     cards.length > 0 && (
-      <View style={styles.shelf}>
-        <View style={styles.titleRow}>
-          <Text
-            variant={TEXT_VARIANTS.display}
-            accessibilityRole="header"
-            style={styles.shelfTitle}
-          >
-            {BINGE_COPY.title}
-          </Text>
+      <FocusBand>
+        <View onLayout={onLayout} style={styles.bingeGrid}>
+          {width > 0 &&
+            bingeRowsOf(cards).flatMap((row, rowIndex) =>
+              row.map((card, index) => (
+                <BingeCardFocus
+                  key={card.key}
+                  card={card}
+                  height={width * TV_FRAMES.binge}
+                  isPreferred={isOpening && isFirst && rowIndex === 0 && index === 0}
+                  onPress={() => onOpen(card.target)}
+                  place={`${BINGE_KEY}/${card.key}`}
+                  width={columnWidthOf({ width, columns: row.length })}
+                />
+              )),
+            )}
         </View>
-        <FocusBand>
-          <View onLayout={onLayout} style={styles.grid}>
-            {width > 0 &&
-              bingeRowsOf(cards).flatMap((row, rowIndex) =>
-                row.map((card, index) => (
-                  <FocusCard
-                    key={card.key}
-                    card={card}
-                    isPreferred={isOpening && isFirst && rowIndex === 0 && index === 0}
-                    notes={bingeNotesOf(card)}
-                    onPress={() => onOpen(card.target)}
-                    place={`${BINGE_KEY}/${card.key}`}
-                    width={columnWidthOf({ width, columns: row.length })}
-                  />
-                )),
-              )}
-          </View>
-        </FocusBand>
-      </View>
+      </FocusBand>
     )
   )
 }
@@ -349,13 +344,22 @@ const useStyles = themedStyles((colours) =>
       borderWidth: TV_SIZES.tvFocusRing,
       borderColor: 'transparent',
     },
-    focusedLink: { borderColor: colours.text, backgroundColor: colours.quiet },
+    focusedLink: { ...FOCUS_FRONT, borderColor: colours.text, backgroundColor: colours.quiet },
     seeAllLabel: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
     focusedLabel: { color: colours.text },
     row: {
       gap: TV_SIZES.space5,
       paddingHorizontal: TV_GUTTER,
       paddingVertical: TV_SIZES.space4,
+    },
+    bingeGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: TV_SIZES.space5,
+      marginHorizontal: TV_GUTTER,
+      paddingTop: TV_SIZES.space1,
+      // With the shelves' gap, clears the hero's wash, which reaches `space6` above the hero.
+      paddingBottom: TV_SIZES.space4,
     },
     grid: {
       flexDirection: 'row',

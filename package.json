@@ -16,6 +16,7 @@
     "app:build:tvos": "nx run @raven/app:build:tvos",
     "app:dev:ios": "nx run @raven/app:dev:ios",
     "app:dev:ipad": "nx run @raven/app:dev:ipad",
+    "app:deploy:tvos": "nx run @raven/app:deploy:tvos",
     "app:dev:tvos": "nx run @raven/app:dev:tvos",
     "app:e2e": "nx run @raven/app:e2e",
     "app:e2e:android-tv": "nx run @raven/app:e2e:android-tv",

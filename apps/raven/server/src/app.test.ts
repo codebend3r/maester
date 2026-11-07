@@ -902,6 +902,8 @@ describe('live updates', () => {
         if (chunk.done) throw new Error(`the stream ended before "${text}": ${read}`)
         return readUntil({ text, read: read + decoder.decode(chunk.value) })
       }
+      // Another account's viewing never reaches this stream; the library event after it does.
+      app().get(ServerEvents).viewingChanged('someone-else')
       app().get(ServerEvents).libraryChanged(42)
       /*
        * Compressed, the event would wait in the compressor for more to pack
@@ -914,6 +916,7 @@ describe('live updates', () => {
         ),
       ])
       expect(read).toContain('data: {"type":"library","libraryId":42}')
+      expect(read).not.toContain('"viewing"')
     } finally {
       aborter.abort()
     }

@@ -196,6 +196,8 @@ describe('Player on a TV', () => {
         textTracks: [],
         videoTracks: [],
       })
+      // Apple TV resumes by a seek of the app's, as a phone does, and plays once it lands.
+      props.onSeek?.({ currentTime: 0, seekTime: 0 })
       props.onPlaybackStateChanged?.({ isPlaying: true, isSeeking: false })
     })
     await moveVideoTo({ props, seconds: 20 })

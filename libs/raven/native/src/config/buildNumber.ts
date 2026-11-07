@@ -2,6 +2,8 @@
 export const BUILD_ENV = {
   runNumber: 'GITHUB_RUN_NUMBER',
   appVariant: 'APP_VARIANT',
+  /** The Apple team that signs a device build, written into the Xcode project so no one picks it in Xcode. */
+  appleTeamId: 'APPLE_TEAM_ID',
 } as const
 
 type BuildNumberOfProps = { runNumber: string | undefined }

@@ -2,6 +2,7 @@ import { type ComponentRef, type ComponentType, useRef, useState } from 'react'
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { CARD_SHAPES, type CardShape, type ShelfCard, cardLabelOf } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
 import { FocusFactChips } from '@/layouts/FactChips'
@@ -76,20 +77,16 @@ const CAPTION_TITLE_VIEWS = {
   [CAPTION_TITLES.art]: CaptionArt,
 } as const satisfies Record<CaptionTitle, ComponentType<CaptionTitleProps>>
 
-const NOTE_LINES = 2
-
-const NO_NOTES: readonly string[] = []
-
 type FocusCardProps = {
   card: ShelfCard
   place?: string
   width: number
+  /** The picture's height over its width where the layout frames it otherwise than its shape. */
+  ratio?: number
   isPreferred: boolean
   jump?: JumpFocus | null
   /** Whether the title and its line show under the picture; a grid of posters leaves them out. */
   hasCaption?: boolean
-  /** Lines under the caption, each its own: a binged show's facts, its synopsis last but one. */
-  notes?: readonly string[]
   onPress: () => void
 }
 
@@ -105,10 +102,10 @@ export const FocusCard = ({
   card,
   place = card.key,
   width,
+  ratio,
   isPreferred,
   jump = null,
   hasCaption = true,
-  notes = NO_NOTES,
   onPress,
 }: FocusCardProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
@@ -146,6 +143,7 @@ export const FocusCard = ({
         setFocused(false)
         grow(1)
       }}
+      style={isFocused && FOCUS_FRONT}
       onFocus={() => {
         setFocused(true)
         grow(FOCUS_SCALE)
@@ -159,6 +157,7 @@ export const FocusCard = ({
       <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
         <CardPicture
           card={card}
+          ratio={ratio}
           radius={TV_SIZES.radius}
           ring={isFocused ? TV_SIZES.tvFocusRing : 0}
           width={width}
@@ -172,11 +171,6 @@ export const FocusCard = ({
               </Text>
             )}
             {chips.length > 0 && <FocusFactChips parts={chips} />}
-            {notes.map((note) => (
-              <Text key={note} numberOfLines={NOTE_LINES} style={styles.line}>
-                {note}
-              </Text>
-            ))}
           </View>
         )}
       </Animated.View>

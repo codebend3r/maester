@@ -10,6 +10,7 @@ import {
   pickerLabelOf,
 } from '@/layouts/gridKit'
 import { PICKER_LIST_COPY } from '@/layouts/copy'
+import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { PlateButton, usePlateStyles } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
@@ -161,7 +162,7 @@ export const focusPicker: PickerKit = { Picker, ToolButton }
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
-    focused: { borderColor: colours.text },
+    focused: { ...FOCUS_FRONT, borderColor: colours.text },
     label: { color: colours.muted, fontSize: TV_SIZES.text },
     chosen: { fontWeight: 'bold' },
     backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center' },

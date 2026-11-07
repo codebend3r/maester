@@ -13,6 +13,7 @@ import { Animated, Easing, Image, Pressable, StyleSheet, View } from 'react-nati
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { FocusBand } from '@/layouts/FocusBand'
+import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { useFocusOnMount, useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
@@ -495,7 +496,7 @@ const useStyles = themedStyles((colours) =>
       borderRadius: TV_SIZES.radius,
       borderWidth: TV_SIZES.tvFocusRing,
     },
-    focusedButton: { borderColor: colours.text },
+    focusedButton: { ...FOCUS_FRONT, borderColor: colours.text },
     buttonLabel: { fontSize: TV_SIZES.textLg, fontWeight: 'bold' },
     counter: { color: colours.muted, fontSize: TV_SIZES.textLg, paddingLeft: TV_SIZES.space1 },
     fan: { width: FAN_WIDTH, height: FAN_HEIGHT, alignItems: 'center' },

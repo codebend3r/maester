@@ -12,11 +12,15 @@ import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import { Icon } from '@raven/native'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import { focusCardWidthOf, FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
 import { FocusBand } from '@/layouts/FocusBand'
 import { HomePlate } from '@/layouts/HomePlate.focus'
+import { GRID_SIZE_COPY } from '@/layouts/copy'
+import { focusPicker } from '@/layouts/Picker.focus'
+import { GRID_SIZES, type GridSize, useAppPrefs } from '@/stores/appPrefs'
 import { useOpenerFocus, useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
@@ -65,8 +69,22 @@ const headerHeightOf = (fontScale: number): number =>
     linesHeightOf({ sizes: [TV_SIZES.textXl], fontScale }) + 2 * TV_SIZES.tvFocusRing,
   ) + TV_SIZES.space3
 
-/** Rows of cards the list's height holds whole at the least, so a library shows more than one row. */
-const ROWS_IN_VIEW = 3
+/**
+ * What each grid size fits: the rows of cards the list's height holds whole at the least, and the
+ * widest a card may stand as a share of a shelf's. Small is three rows no wider than a shelf's
+ * cards, as the sofa reads them; medium, the default, two rows of larger cards, and large one row
+ * of cards larger again, each step half as wide again as the last.
+ */
+const GRID_SIZE_FITS = {
+  [GRID_SIZES.small]: { rows: 3, widest: 1 },
+  [GRID_SIZES.medium]: { rows: 2, widest: 1.5 },
+  [GRID_SIZES.large]: { rows: 1, widest: 2.25 },
+} as const satisfies Record<GridSize, { rows: number; widest: number }>
+
+const GRID_SIZE_OPTIONS = Object.values(GRID_SIZES).map((size) => ({
+  key: size,
+  label: GRID_SIZE_COPY.sizes[size],
+}))
 
 /**
  * Room left for a glimpse of the next row, a share of a row. The grid also widens each card a
@@ -87,26 +105,39 @@ type CaptionHeightOfProps = { shape: CardShape; captionHeight: number }
 const captionHeightOf = ({ shape, captionHeight }: CaptionHeightOfProps): number =>
   hasCaptionOf(shape) ? captionHeight : 0
 
-type CardWidthForRowsProps = { shape: CardShape; listHeight: number; captionHeight: number }
+type CardWidthForRowsProps = {
+  shape: CardShape
+  listHeight: number
+  captionHeight: number
+  size: GridSize
+}
 
 /**
- * The widest a card of `shape` may stand for `ROWS_IN_VIEW` rows of it and a glimpse of the next,
- * caption and room to grow included, to fit the list's height; the shelves' own width where that is narrower already, or
- * before the list is measured.
+ * The widest a card of `shape` may stand for the size's rows of it and a glimpse of the next,
+ * caption and room to grow included, to fit the list's height; the size's share of a shelf's
+ * width where that is narrower already, or before the list is measured.
  */
-const cardWidthForRows = ({ shape, listHeight, captionHeight }: CardWidthForRowsProps): number => {
-  const shelfWidth = focusCardWidthOf(shape)
+const cardWidthForRows = ({
+  shape,
+  listHeight,
+  captionHeight,
+  size,
+}: CardWidthForRowsProps): number => {
+  const fit = GRID_SIZE_FITS[size]
+  const shelfWidth = focusCardWidthOf(shape) * fit.widest
   if (listHeight <= 0) return shelfWidth
   const pictureHeight =
-    listHeight / (ROWS_IN_VIEW + NEXT_ROW_GLIMPSE) -
+    listHeight / (fit.rows + NEXT_ROW_GLIMPSE) -
     captionHeightOf({ shape, captionHeight }) -
     2 * GROWTH_ROOM
   const perWidth = pictureHeightOf({ shape, width: 1 })
   return Math.max(tvSize(1), Math.min(shelfWidth, pictureHeight / perWidth))
 }
 
-/** Rows drawn at once: a screen's worth of posters, with one more coming into view. */
+/** Rows drawn at once: a screen's worth of the smallest posters, with one more coming into view. */
 const GRID_ROWS_AT_ONCE = 4
+
+const SizePicker = focusPicker.Picker
 
 /** Screens of rows kept drawn: the one in view and one above and below it. */
 const GRID_WINDOW = 3
@@ -341,13 +372,15 @@ const Grid = ({ title, icon, line, notice, toolbar, sections, view, jump, onOpen
   const styles = useStyles()
   const text = useTheme((theme) => theme.palette.text)
   const isRows = isRowView(view)
+  const size = useAppPrefs((prefs) => prefs.gridSize)
+  const changePrefs = useAppPrefs((prefs) => prefs.change)
   const [listHeight, setListHeight] = useState(0)
   const captionHeight = focusCaptionHeightOf(screen.fontScale)
   const { columnsOf, widthOf } = gridColumnsOf({
     room: screen.width - 2 * TV_GUTTER,
     gap: GAP,
     leastOf: (shape) =>
-      isRows ? LEAST_ROW_WIDTH : cardWidthForRows({ shape, listHeight, captionHeight }),
+      isRows ? LEAST_ROW_WIDTH : cardWidthForRows({ shape, listHeight, captionHeight, size }),
   })
   const wordsHeight = linesHeightOf({
     sizes: [TV_SIZES.textLg, TV_SIZES.text],
@@ -424,10 +457,21 @@ const Grid = ({ title, icon, line, notice, toolbar, sections, view, jump, onOpen
       <View style={styles.top}>
         {/* Outside the header, whose controls spend the opening focus: the first card keeps it. */}
         <HomePlate />
-        {toolbar !== null && (
+        {(toolbar !== null || !isRows) && (
           <View onFocus={settle} style={styles.toolbarSlot}>
             <FocusBand>
-              <View style={styles.toolbar}>{toolbar}</View>
+              <View style={styles.toolbar}>
+                {toolbar}
+                {!isRows && (
+                  <SizePicker
+                    icon="grid"
+                    label={GRID_SIZE_COPY.label}
+                    onChoose={(gridSize) => changePrefs({ gridSize })}
+                    options={GRID_SIZE_OPTIONS}
+                    value={size}
+                  />
+                )}
+              </View>
             </FocusBand>
           </View>
         )}
@@ -527,7 +571,7 @@ const useStyles = themedStyles((colours) =>
     },
     markLabel: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
     markEmpty: { color: colours.line },
-    focused: { borderColor: colours.text, backgroundColor: colours.quiet },
+    focused: { ...FOCUS_FRONT, borderColor: colours.text, backgroundColor: colours.quiet },
     listSlot: { flex: 1 },
     content: { paddingHorizontal: TV_GUTTER, paddingBottom: TV_SIZES.space6 },
     bucketRow: { justifyContent: 'center' },

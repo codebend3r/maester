@@ -29,7 +29,8 @@ build="ffmpeg-$VERSION-$target-gpl-9.0"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-curl -fsSL -o "$work/$build.tar.xz" \
+# GitHub's release downloads answer a 503 now and then, and one such answer cancelled a whole run.
+curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$work/$build.tar.xz" \
   "https://github.com/BtbN/FFmpeg-Builds/releases/download/$RELEASE/$build.tar.xz"
 echo "$digest  $work/$build.tar.xz" | sha256sum -c -
 tar -xf "$work/$build.tar.xz" -C "$work"

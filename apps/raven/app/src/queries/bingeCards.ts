@@ -34,8 +34,8 @@ export type BingeCard = ShelfCard & {
   meta: string | null
   /** The episode it is on, `S01E02 · Half Loop`; null with none. */
   episodeLine: string | null
-  /** `Starring A, B`; null with no cast. */
-  starring: string | null
+  /** The two leading stars, `A, B`, which a layout puts after `BINGE_COPY.starring`; null with no cast. */
+  stars: string | null
   /** The episode's synopsis, else the show's; null when neither has one. */
   synopsis: string | null
   /** What is left of the episode, or which one it starts on; null with none. */
@@ -121,10 +121,7 @@ export const bingeCardOf = ({
     target: next === null ? page : { kind: ROUTE_TARGETS.play, mediaId: next.id, at: 0 },
     meta: joinedOrNull({ parts: [facts.year, facts.runtime], separator: BINGE_COPY.separator }),
     episodeLine: facts.episodeLine,
-    starring:
-      facts.stars.length === 0
-        ? null
-        : `${BINGE_COPY.starring} ${facts.stars.join(BINGE_COPY.listSeparator)}`,
+    stars: facts.stars.length === 0 ? null : facts.stars.join(BINGE_COPY.listSeparator),
     synopsis: facts.synopsis,
     status: statusWordsOf(facts.status),
     page,

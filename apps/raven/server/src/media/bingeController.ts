@@ -18,6 +18,7 @@ import { ForViewers } from '@/admin/adminGuard'
 import { Public } from '@/lock/lockGuard'
 import { BINGE_OUTCOMES } from '@/media/bingeOutcomes'
 import { BingeShows } from '@/media/bingeShows'
+import { ServerEvents } from '@/events/serverEvents'
 import { ViewingAccounts } from '@/media/viewingAccounts'
 
 /** The shows an account is binging, the same on every device it signs in on. */
@@ -26,6 +27,7 @@ export class BingeController {
   constructor(
     @Inject(BingeShows) private readonly binge: BingeShows,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
+    @Inject(ServerEvents) private readonly events: ServerEvents,
   ) {}
 
   @Get()
@@ -39,6 +41,7 @@ export class BingeController {
   dismissTip(@Req() request: FastifyRequest): BingeState {
     const account = this.accounts.keyOf({ request })
     this.binge.dismissTip({ account })
+    this.events.bingeChanged(account)
     return this.binge.state({ account })
   }
 
@@ -59,6 +62,7 @@ export class BingeController {
     const outcome = this.binge.set({ itemId: id, binge: body.binge, account })
     switch (outcome) {
       case BINGE_OUTCOMES.done:
+        this.events.bingeChanged(account)
         return this.binge.state({ account })
       case BINGE_OUTCOMES.missing:
         throw new NotFoundException(`No show ${id}`)

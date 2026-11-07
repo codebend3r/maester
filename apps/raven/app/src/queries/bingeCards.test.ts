@@ -81,7 +81,7 @@ describe('bingeCardOf', () => {
       headersFor,
     })
     expect(card.meta).toBe('2022 · 50m')
-    expect(card.starring).toBe(`${BINGE_COPY.starring} Adam Scott, Britt Lower`)
+    expect(card.stars).toBe('Adam Scott, Britt Lower')
     expect((card.chips ?? []).map(({ text }) => text)).toEqual(['4K', 'HDR', 'HEVC'])
   })
 

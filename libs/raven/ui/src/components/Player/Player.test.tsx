@@ -1046,6 +1046,21 @@ describe('the player chrome', () => {
     )
   })
 
+  it('keeps the heart on the same row as the runtime line', () => {
+    renderWithProviders({
+      ui: (
+        <TestPlayer
+          media={uhd}
+          backTo="/libraries/2"
+          favourite={{ isFavourite: false, toggle: () => {} }}
+        />
+      ),
+    })
+    const heart = screen.getByRole('button', { name: 'Favourite' })
+    expect(heart.parentElement).toHaveClass('aboutLine')
+    expect(heart.parentElement?.querySelector('.about')).not.toBeNull()
+  })
+
   it('shows a large play mark while paused, and drops it once the video plays', () => {
     const { container } = renderWithProviders({
       ui: <TestPlayer media={uhd} backTo="/libraries/2" />,

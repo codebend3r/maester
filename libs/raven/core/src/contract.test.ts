@@ -518,9 +518,12 @@ describe('the metadata guards', () => {
 })
 
 describe('isServerEvent', () => {
-  it("accepts a library's change and nothing else", () => {
+  it("accepts a library's change, a viewing change and a binge change, and nothing else", () => {
     expect(isServerEvent({ type: 'library', libraryId: 3 })).toBe(true)
+    expect(isServerEvent({ type: 'viewing' })).toBe(true)
+    expect(isServerEvent({ type: 'binge' })).toBe(true)
     expect(isServerEvent({ type: 'library', libraryId: '3' })).toBe(false)
+    expect(isServerEvent({ type: 'library' })).toBe(false)
     expect(isServerEvent({ type: 'scan', libraryId: 3 })).toBe(false)
   })
 })

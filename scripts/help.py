@@ -183,6 +183,11 @@ GROUPS: tuple[Group, ...] = (
                 "Android SDK",
             ),
             Command(
+                "app:deploy:tvos",
+                "Builds the signed Release and puts it on the paired Apple TV.",
+                "Xcode",
+            ),
+            Command(
                 "app:e2e",
                 "The Maestro flows on the iPhone simulator, against the fixture server.",
                 "Maestro",
