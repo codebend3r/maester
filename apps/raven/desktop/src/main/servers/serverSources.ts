@@ -329,8 +329,10 @@ export const createServerSources = ({
     trackList,
     mediaFor,
   }: ResolveRelayedProps): Promise<ResolvedServerSource> => {
-    // The first ticket before anything opens: a title the account may not play is refused here.
-    // The origin is picked meanwhile; a ticket opens the file on any of the server's origins.
+    /*
+     * The first ticket before anything opens: a title the account may not play is refused here.
+     * The origin is picked meanwhile; a ticket opens the file on any of the server's origins.
+     */
     const [tracks, first, placed] = await Promise.all([
       trackList,
       tickets.ticketFor({ serverId: server.id, mediaId, isFresh: false }),

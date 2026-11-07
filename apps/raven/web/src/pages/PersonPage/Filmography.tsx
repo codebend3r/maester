@@ -90,8 +90,10 @@ const ListedFilmography = ({ name, entries }: ListedFilmographyProps) => {
   const counts = useMemo(() => tabCounts({ entries, isSelfShown }), [entries, isSelfShown])
   const asked = address.get('credits')
   const tab = isFilmographyTab(asked) && counts[asked] > 0 ? asked : 'all'
-  // Each keystroke draws the page again, but the rows, and so the table,
-  // change only once the query the search settles on does.
+  /*
+   * Each keystroke draws the page again, but the rows, and so the table,
+   * change only once the query the search settles on does.
+   */
   const query = search.query
   const rows = useMemo(() => {
     const folded = fold(query)

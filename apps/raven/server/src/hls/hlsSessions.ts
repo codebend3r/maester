@@ -469,9 +469,11 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
       return ready(path)
     }
     if (run && run.isWrittenSoon(n)) return waitThenRetry(run.waitFor(n))
-    // A run is not killed before it has written what it was started for, or
-    // stalled on it, so two requests far apart cannot keep replacing each
-    // other's runs.
+    /*
+     * A run is not killed before it has written what it was started for, or
+     * stalled on it, so two requests far apart cannot keep replacing each
+     * other's runs.
+     */
     if (run && !run.canBeReplaced) {
       return waitThenRetry(
         run.waitForStart().catch((error: unknown) => {
@@ -543,8 +545,10 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     await this.stopRun({ entry, reason: new RunReplaced() })
     const dialect = await this.ffmpeg.hlsDialect()
     entry.runs += 1
-    // Each run writes into a folder of its own, so a segment another run
-    // wrote stays whole and servable while this one writes its own.
+    /*
+     * Each run writes into a folder of its own, so a segment another run
+     * wrote stays whole and servable while this one writes its own.
+     */
     const folder = join(entry.folder, String(entry.runs))
     await mkdir(folder, { recursive: true })
     if (!this.isKept(entry)) {

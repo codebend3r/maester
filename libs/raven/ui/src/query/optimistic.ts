@@ -121,16 +121,20 @@ export const useOptimisticMutation = <TVariables>({
 }: UseOptimisticMutationProps<TVariables>) => {
   const queryClient = useQueryClient()
   const [failure, setFailure] = useState<Error | null>(null)
-  // The change asking is still counted while its own callbacks run, and a
-  // change waiting its turn counts too.
+  /*
+   * The change asking is still counted while its own callbacks run, and a
+   * change waiting its turn counts too.
+   */
   const isLast = (): boolean => queryClient.isMutating({ mutationKey }) <= 1
   const mutation = useMutation({
     mutationKey,
     scope: { id: hashKey(mutationKey) },
     mutationFn,
     onMutate: (variables: TVariables) => applyEdits({ queryClient, edits: edits(variables) }),
-    // A change still waiting its turn was made over this one, so only the
-    // last puts the cache back; the reading again after it settles the rest.
+    /*
+     * A change still waiting its turn was made over this one, so only the
+     * last puts the cache back; the reading again after it settles the rest.
+     */
     onError: (error, _variables, snapshot) => {
       setFailure(error)
       if (!snapshot || !isLast()) return

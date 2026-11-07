@@ -129,8 +129,10 @@ export const attachPlayer = ({
     },
   }
   const resolveFrom = resolveSourceWith({ grants, servers, sidecarsOf: downloads.sidecarsOf })
-  // Told as each load begins, in the order the loads come: a server title that resolves
-  // slowly must not clear a download loaded after it.
+  /*
+   * Told as each load begins, in the order the loads come: a server title that resolves
+   * slowly must not clear a download loaded after it.
+   */
   const resolveSource: typeof resolveFrom = (source) => {
     downloads.notePlaying({
       fileId: source.kind === PLAYER_SOURCE_KINDS.file ? source.fileId : null,
@@ -215,8 +217,10 @@ export const attachPlayer = ({
     return opened
   }
 
-  // Why there is no engine, for Copy Diagnostics. The message the engine fell back with, not
-  // the error behind it, which the log keeps: a failed dlopen names the addon's path.
+  /*
+   * Why there is no engine, for Copy Diagnostics. The message the engine fell back with, not
+   * the error behind it, which the log keeps: a failed dlopen names the addon's path.
+   */
   let engineNote: string | null = null
   const attached = attachWindowEngine<PlayerCommand, PlayerEvent, NativeEngine>({
     window,
@@ -265,8 +269,10 @@ export const attachPlayer = ({
   screen.on('display-removed', followDisplay)
   screen.on('display-metrics-changed', followDisplay)
 
-  // A crashed page holds no port: put the window back for a page with no video even when the
-  // service had nothing left to stop.
+  /*
+   * A crashed page holds no port: put the window back for a page with no video even when the
+   * service had nothing left to stop.
+   */
   window.webContents.on('render-process-gone', () => activity.hide())
 
   // Each page load starts with no video, whatever the last one left the window showing.

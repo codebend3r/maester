@@ -61,9 +61,11 @@ export const AlbumsGrid = ({
   })()
   const open = ({ target }: ShelfCard) => router.push(hrefOf(target))
   const playTracks = useAudioQueue((store) => store.playTracks)
-  // A fresh seed each press: the server draws the most a page holds at random from the whole
-  // library, never the first artists by name, and the queue shuffles them again. A read that
-  // fails leaves the queue as it was.
+  /*
+   * A fresh seed each press: the server draws the most a page holds at random from the whole
+   * library, never the first artists by name, and the queue shuffles them again. A read that
+   * fails leaves the queue as it was.
+   */
   const shuffle = () =>
     api
       .listTracks({

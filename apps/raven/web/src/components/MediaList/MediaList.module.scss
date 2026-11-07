@@ -1,13 +1,17 @@
-// The table's room is the page's to give, and the side menu narrows it
-// whatever the screen's width, so the columns drop by the room the table
-// has rather than by the screen's. Contained, the room also never grows
-// to the table's own width and pushes the page wider than the screen.
+/*
+ * The table's room is the page's to give, and the side menu narrows it
+ * whatever the screen's width, so the columns drop by the room the table
+ * has rather than by the screen's. Contained, the room also never grows
+ * to the table's own width and pushes the page wider than the screen.
+ */
 .room {
   container-type: inline-size;
 }
 
-// The element defaults draw the table; this sets its rhythm: eyebrow
-// headers, faint rules between rows and a tint under the pointer.
+/*
+ * The element defaults draw the table; this sets its rhythm: eyebrow
+ * headers, faint rules between rows and a tint under the pointer.
+ */
 .table {
   thead th {
     padding-block: var(--space-2);
@@ -44,17 +48,21 @@
   }
 }
 
-// The title's column takes whatever the facts leave, so a title is never
-// squeezed to a letter a line.
+/*
+ * The title's column takes whatever the facts leave, so a title is never
+ * squeezed to a letter a line.
+ */
 .titleHeader {
   width: 100%;
 }
 
-// The th stays a table cell so the columns size properly; its picture,
-// title, marks and resume line are laid out in here. The floor keeps the
-// title readable: when the columns' breakpoints below misjudge the room
-// (a wider font, a longer label), the table runs over rather than the
-// title wrapping a letter a line.
+/*
+ * The th stays a table cell so the columns size properly; its picture,
+ * title, marks and resume line are laid out in here. The floor keeps the
+ * title readable: when the columns' breakpoints below misjudge the room
+ * (a wider font, a longer label), the table runs over rather than the
+ * title wrapping a letter a line.
+ */
 .titleCell {
   --title-floor: 16rem;
 
@@ -140,10 +148,12 @@
   width: 1px;
 }
 
-// Each breakpoint is the title's floor plus what the columns still showing
-// take: a Movies library's release date, scores and file facts come to
-// about 92rem, without the file facts 46rem, and any other library's facts come
-// to about 38rem. A column drops before it would eat into the title.
+/*
+ * Each breakpoint is the title's floor plus what the columns still showing
+ * take: a Movies library's release date, scores and file facts come to
+ * about 92rem, without the file facts 46rem, and any other library's facts come
+ * to about 38rem. A column drops before it would eat into the title.
+ */
 @container (max-width: 92rem) {
   .movies .extra {
     display: none;
@@ -156,8 +166,10 @@
   }
 }
 
-// A phone's room keeps the title rather than its picture, and a Movies
-// library's release date rather than its length.
+/*
+ * A phone's room keeps the title rather than its picture, and a Movies
+ * library's release date rather than its length.
+ */
 @container (max-width: 30rem) {
   .roomy,
   .spare,

@@ -52,8 +52,10 @@ const isQueuedTrack = object({
 })
 
 export const isAudioCommand = union(
-  // Plays `mediaId` from `start` at `level`, from its file or its AAC transcode at `kbps`, with
-  // `next` ready to follow it.
+  /*
+   * Plays `mediaId` from `start` at `level`, from its file or its AAC transcode at `kbps`, with
+   * `next` ready to follow it.
+   */
   object({
     type: oneOf([AUDIO_COMMANDS.load]),
     mediaId: isMediaId,
@@ -71,8 +73,10 @@ export const isAudioCommand = union(
   // How fast it plays: an audiobook's chosen speed, 1 for music; the pitch stays as it was.
   object({ type: oneOf([AUDIO_COMMANDS.speed]), rate: isNumber }),
   object({ type: oneOf([AUDIO_COMMANDS.nowPlaying]), info: isNowPlayingInfo }),
-  // How music sounds: the playing track's levelling factor, the queued one's (null for none),
-  // and the equalizer's gains, from 32 Hz up.
+  /*
+   * How music sounds: the playing track's levelling factor, the queued one's (null for none),
+   * and the equalizer's gains, from 32 Hz up.
+   */
   object({
     type: oneOf([AUDIO_COMMANDS.sound]),
     level: isLevel,

@@ -92,15 +92,19 @@
   color: var(--color-lichen);
 }
 
-// The table's room is the page's to give: the columns drop by the room the
-// table has, and anything still too wide scrolls inside it, never the page.
+/*
+ * The table's room is the page's to give: the columns drop by the room the
+ * table has, and anything still too wide scrolls inside it, never the page.
+ */
 .room {
   container-type: inline-size;
   overflow-x: auto;
 }
 
-// The element defaults draw the table; this sets its rhythm: eyebrow
-// headers, faint rules between rows and a tint under the pointer.
+/*
+ * The element defaults draw the table; this sets its rhythm: eyebrow
+ * headers, faint rules between rows and a tint under the pointer.
+ */
 .table {
   width: 100%;
 

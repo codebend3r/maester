@@ -7,8 +7,10 @@ import { nativeTokens } from '@raven/native/headless'
 import { appThemeOf } from '@/theme/appTheme'
 import { OVER_PICTURE_TOKENS, PALETTE_TOKENS } from '@/theme/tokenNames'
 
-// The stylesheets themselves, not the built `@raven/ui/designTokens` the app reads, so a
-// stale build or a parse that drifted from them fails here.
+/*
+ * The stylesheets themselves, not the built `@raven/ui/designTokens` the app reads, so a
+ * stale build or a parse that drifted from them fails here.
+ */
 const STYLES = join(import.meta.dir, '../../../../../libs/raven/ui/src/styles')
 const themesScss = parseThemes(readFileSync(join(STYLES, 'themes.scss'), 'utf8'))
 const root = nativeTokens(

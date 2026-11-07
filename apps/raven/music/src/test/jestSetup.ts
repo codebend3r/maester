@@ -2,12 +2,16 @@ import { jest } from '@jest/globals'
 import type * as Audio from '@raven/audio'
 import { configure } from '@testing-library/react-native'
 
-// A loaded CI runner can spend seconds on a file's first render while jest compiles what
-// the screen imports, past the library's one second wait.
+/*
+ * A loaded CI runner can spend seconds on a file's first render while jest compiles what
+ * the screen imports, past the library's one second wait.
+ */
 configure({ asyncUtilTimeout: 10_000 })
 
-// `WrenRoot` mounts the audio host on every screen, and jest has no native player: each call
-// resolves, and a test reads what the host asked of it.
+/*
+ * `WrenRoot` mounts the audio host on every screen, and jest has no native player: each call
+ * resolves, and a test reads what the host asked of it.
+ */
 jest.mock('@raven/audio', () => ({
   ...jest.requireActual<typeof Audio>('@raven/audio'),
   audioPlayer: {
@@ -25,8 +29,10 @@ jest.mock('@raven/audio', () => ({
   },
 }))
 
-// jest has no AsyncStorage native module: Wren's prefs and downloads read nothing back and
-// keep what they write for the test alone.
+/*
+ * jest has no AsyncStorage native module: Wren's prefs and downloads read nothing back and
+ * keep what they write for the test alone.
+ */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: {

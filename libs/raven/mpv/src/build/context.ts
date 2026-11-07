@@ -129,8 +129,10 @@ export const inSequence = async <T>({ items, each }: InSequenceProps<T>): Promis
 
 export const isWindows = () => process.platform === PLATFORMS.win32
 
-// Windows' tar is bsdtar in System32. A Git for Windows bash puts GNU tar first on PATH,
-// and that one reads `D:\\...` as a host name.
+/*
+ * Windows' tar is bsdtar in System32. A Git for Windows bash puts GNU tar first on PATH,
+ * and that one reads `D:\\...` as a host name.
+ */
 const ENV_NAMES = { systemRoot: 'SystemRoot' } as const
 export const TAR = isWindows()
   ? join(process.env[ENV_NAMES.systemRoot] ?? 'C:\\Windows', 'System32', 'tar.exe')

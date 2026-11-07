@@ -1,8 +1,10 @@
-// The checkbox sits in the card's box, since a grid skips drawing its
-// offscreen cards (`content-visibility: auto`), which also clips whatever a
-// card draws outside it. The card places it; this decides when it shows:
-// only in select mode, on every card at once, never under a passing pointer.
-// Over a picture it sits on glass of the ground, as the badges do.
+/*
+ * The checkbox sits in the card's box, since a grid skips drawing its
+ * offscreen cards (`content-visibility: auto`), which also clips whatever a
+ * card draws outside it. The card places it; this decides when it shows:
+ * only in select mode, on every card at once, never under a passing pointer.
+ * Over a picture it sits on glass of the ground, as the badges do.
+ */
 .box {
   display: none;
   width: 1.5rem;
@@ -20,15 +22,19 @@
   background: var(--color-bark);
 }
 
-// Selecting leaves a card's ring a little room, so its words do not touch it,
-// and its words are not selected as text by a shift-click.
+/*
+ * Selecting leaves a card's ring a little room, so its words do not touch it,
+ * and its words are not selected as text by a shift-click.
+ */
 [data-entry][data-selecting] {
   padding-inline: var(--space-0);
   user-select: none;
 }
 
-// A selected card is ringed inside its own edge, where a card that skips
-// drawing (`content-visibility`) does not clip it.
+/*
+ * A selected card is ringed inside its own edge, where a card that skips
+ * drawing (`content-visibility`) does not clip it.
+ */
 [data-entry][data-selected] {
   outline: var(--focus-ring);
   outline-offset: -0.125rem;

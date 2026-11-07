@@ -1,5 +1,7 @@
-// A see-through layer over the stage whose padding parks the menu above the
-// pills, bottom right, clear of the control bar.
+/*
+ * A see-through layer over the stage whose padding parks the menu above the
+ * pills, bottom right, clear of the control bar.
+ */
 .layer {
   grid-area: stage;
   position: relative;
@@ -7,7 +9,7 @@
   display: grid;
   align-items: end;
   justify-items: end;
-  padding: var(--space-3) var(--space-4) var(--space-10);
+  padding: var(--space-3) var(--space-4) var(--space-9);
   pointer-events: none;
 }
 
@@ -124,8 +126,10 @@
   }
 }
 
-// The element default draws the radio in the theme's text colour; over the
-// picture it takes the fixed light one.
+/*
+ * The element default draws the radio in the theme's text colour; over the
+ * picture it takes the fixed light one.
+ */
 .radio {
   grid-area: radio;
   border-color: var(--color-on-picture-soft);
@@ -168,8 +172,10 @@
   font-size: var(--font-size-xs);
 }
 
-// How the file reaches the browser, and the way to the detail, ruled off
-// from the speed under them.
+/*
+ * How the file reaches the browser, and the way to the detail, ruled off
+ * from the speed under them.
+ */
 .playing {
   display: grid;
   gap: var(--space-0);
@@ -234,6 +240,6 @@
 
 @media (max-width: 30rem) {
   .layer {
-    padding: var(--space-3) var(--space-3) calc(var(--space-10) + var(--space-7));
+    padding: var(--space-3) var(--space-3) calc(var(--space-9) + var(--space-7));
   }
 }

@@ -141,9 +141,11 @@ const NativeAudioHost = ({ api, player }: NativeAudioHostProps) => {
   })
   useEffect(() => setRate(rate), [rate])
 
-  // Main queues the next track again when its level or the EQ changes; a sound that only names
-  // what main already holds, as after mpv moved on, sets nothing there. It waits for a dragged
-  // slider to settle: a load carries its own level, so the wait costs nothing at a seam.
+  /*
+   * Main queues the next track again when its level or the EQ changes; a sound that only names
+   * what main already holds, as after mpv moved on, sets nothing there. It waits for a dragged
+   * slider to settle: a load carries its own level, so the wait costs nothing at a seam.
+   */
   const setSound = useEffectEvent((sound: SetSoundProps) => {
     player.send({ type: AUDIO_COMMANDS.sound, ...sound }).catch(() => undefined)
   })
@@ -152,8 +154,10 @@ const NativeAudioHost = ({ api, player }: NativeAudioHostProps) => {
     return () => clearTimeout(timer)
   }, [level, nextLevel, eq])
 
-  // A bitrate that changes while a track is queued (the libraries came, or the quality moved)
-  // queues it again at the new one.
+  /*
+   * A bitrate that changes while a track is queued (the libraries came, or the quality moved)
+   * queues it again at the new one.
+   */
   const requeue = useEffectEvent((bitrate: AudioBitrate | null) => {
     if (trackId === null || next === null) return
     const queued = queuedOf({ next, levelling, kbps: bitrate })

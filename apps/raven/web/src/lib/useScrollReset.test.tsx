@@ -95,8 +95,10 @@ describe('useScrollReset', () => {
     page.scrollTo(450)
     await act(() => router.navigate('/movie'))
     await act(() => router.navigate(-1))
-    // The browser scrolls back as far as it was, but the cards above stood
-    // in shorter than they turn out once drawn.
+    /*
+     * The browser scrolls back as far as it was, but the cards above stood
+     * in shorter than they turn out once drawn.
+     */
     layOut(120)
     page.scrollTo(450)
     page.frame()

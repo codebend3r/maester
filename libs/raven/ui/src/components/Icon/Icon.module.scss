@@ -3,8 +3,10 @@
   overflow: visible;
 }
 
-// The soft tint under the main shape: 20% at rest, more where a control
-// sets --icon-tint, as the current page's link does.
+/*
+ * The soft tint under the main shape: 20% at rest, more where a control
+ * sets --icon-tint, as the current page's link does.
+ */
 .fill {
   fill-opacity: var(--icon-tint, 0.2);
   transform-box: fill-box;
@@ -16,9 +18,11 @@
   transform-origin: center;
 }
 
-// The control an icon sits in, directly or through one wrapper (a library's
-// icon with its lock), pointed at, doubles its tint. The colour change holds
-// under reduced motion; the motion below does not.
+/*
+ * The control an icon sits in, directly or through one wrapper (a library's
+ * icon with its lock), pointed at, doubles its tint. The colour change holds
+ * under reduced motion; the motion below does not.
+ */
 $hovered: ":is(a, button, summary, label, [role='button']):hover";
 $through: '#{$hovered} > span';
 
@@ -29,8 +33,10 @@ $through: '#{$hovered} > span';
   }
 }
 
-// It squashes and springs past full size, or an arrow nudges its way, and
-// solid marks spin in last.
+/*
+ * It squashes and springs past full size, or an arrow nudges its way, and
+ * solid marks spin in last.
+ */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   #{$hovered} > .pop,
   #{$through} > .pop {

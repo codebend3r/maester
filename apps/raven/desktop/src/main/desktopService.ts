@@ -128,8 +128,10 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
 
   type TitleOfProps = { path: string; name: string }
 
-  // A download is `video.<container>` or `media.<container>` in a folder named by its media id, so its title
-  // and its server come from the download service, and any other file names itself.
+  /*
+   * A download is `video.<container>` or `media.<container>` in a folder named by its media id, so its title
+   * and its server come from the download service, and any other file names itself.
+   */
   const titleOf = ({ path, name }: TitleOfProps): string =>
     deps.downloads.labelOf({ path }) ?? titleFromFileName(name)
 
@@ -186,8 +188,10 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
     if (queued !== null) {
       return { fileId: queued.fileId, label: titleOf(queued), queue: queue.slice(index + 1) }
     }
-    // A download's next is the rest of its group, each in a folder of its own. GrantedFile keeps
-    // only the real path, so a symlinked file's next comes from the folder it really lives in.
+    /*
+     * A download's next is the rest of its group, each in a folder of its own. GrantedFile keeps
+     * only the real path, so a symlinked file's next comes from the folder it really lives in.
+     */
     const following =
       (await deps.downloads.nextOf({ fileId: file.fileId })) ??
       (await grantNext({ path: file.path, readdir, grants }))
@@ -200,12 +204,16 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   ): Promise<DesktopReply> => {
     const file = grants.fileOf(request.fileId)
     if (file === null) return refused(MESSAGES.notOpen)
-    // A grant outlives its download, so a play queue can reach a deleted one: it is missing,
-    // and must not rejoin On this Mac's recents before its load fails.
+    /*
+     * A grant outlives its download, so a play queue can reach a deleted one: it is missing,
+     * and must not rejoin On this Mac's recents before its load fails.
+     */
     if (deps.downloads.isStaleDownload({ path: file.path })) return refused(MESSAGES.missing)
     store.update((state) => addRecent({ state, path: file.path, at: now() }))
-    // A download's file is `mediaPathFor`'s, in a folder named by its media id, and stays listed
-    // after a delete, so File > Open Recent leaves it to On this Mac's recents.
+    /*
+     * A download's file is `mediaPathFor`'s, in a folder named by its media id, and stays listed
+     * after a delete, so File > Open Recent leaves it to On this Mac's recents.
+     */
     if (deps.downloads.labelOf({ path: file.path }) === null) deps.addRecentDocument(file.path)
     // The page describes a file each time it opens one, so this is where a play begins.
     deps.downloads.noteOpened({ fileId: file.fileId })
@@ -286,8 +294,10 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
 
   type ShareOfProps = { state: PlayerState; path: string }
 
-  // A recent's bar must agree with where playback starts, so a file replaced on disk shows none.
-  // Only a file with a saved position needs the check; the rest are not started either way.
+  /*
+   * A recent's bar must agree with where playback starts, so a file replaced on disk shows none.
+   * Only a file with a saved position needs the check; the rest are not started either way.
+   */
   const shareOf = async ({ state, path }: ShareOfProps) => {
     if (!state.resume.some((entry) => entry.path === path)) return null
     const file = await factsWithin(path)

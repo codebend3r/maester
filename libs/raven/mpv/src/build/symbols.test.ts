@@ -7,8 +7,10 @@ import {
   symbolProblems,
 } from '@/build/symbols'
 
-// Lines copied from `nm -um` and `nm -jU` of the CI libmpv built from f24529e, whose
-// window surface crashed in pl_glslang_init, and of its addon.
+/*
+ * Lines copied from `nm -um` and `nm -jU` of the CI libmpv built from f24529e, whose
+ * window surface crashed in pl_glslang_init, and of its addon.
+ */
 const brokenImports = [
   '                 (undefined) external _CVBufferCopyAttachments (from CoreVideo)',
   '                 (undefined) weak external __swift_FORCE_LOAD_$_swiftCoreFoundation (from libswiftCoreFoundation)',

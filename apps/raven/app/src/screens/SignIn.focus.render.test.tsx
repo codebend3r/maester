@@ -61,8 +61,10 @@ describe('SignIn on a TV', () => {
     })
   })
 
-  // Asked for as it mounts, the preferred focus comes before the field is in the window, which
-  // on Android TV left the step with nothing focused.
+  /*
+   * Asked for as it mounts, the preferred focus comes before the field is in the window, which
+   * on Android TV left the step with nothing focused.
+   */
   it('asks for the remote on the field once it is drawn', async () => {
     await render(<SignIn />)
     expect(askedFor()).toEqual(['Email'])
@@ -82,8 +84,10 @@ describe('SignIn on a TV', () => {
     await render(<SignIn />)
     const field = screen.getByLabelText('Email')
     await fireEvent.changeText(field, 'viewer@exa')
-    // tvOS reports each key as it is typed, then puts the field back on Menu, saying so
-    // only as the edit ends.
+    /*
+     * tvOS reports each key as it is typed, then puts the field back on Menu, saying so
+     * only as the edit ends.
+     */
     await fireEvent(field, NATIVE_EVENTS.endEditing, { nativeEvent: { text: '' } })
     expect(screen.getByLabelText('Email').props.value).toBe('')
 

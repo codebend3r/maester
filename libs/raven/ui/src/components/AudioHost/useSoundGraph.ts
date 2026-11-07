@@ -50,8 +50,10 @@ export const useSoundGraph = ({ elements, isRouted, gains }: UseSoundGraphProps)
     [],
   )
 
-  // A graph a play built with no gesture behind it (a media key, an advance, a fade) stays
-  // suspended, its elements playing into silence, until the next gesture resumes it.
+  /*
+   * A graph a play built with no gesture behind it (a media key, an advance, a fade) stays
+   * suspended, its elements playing into silence, until the next gesture resumes it.
+   */
   useEffect(() => {
     if (!isRouted) return
     const resume = () => {

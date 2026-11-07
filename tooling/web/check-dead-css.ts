@@ -2,13 +2,15 @@ import { dirname, relative, resolve } from 'node:path'
 import { compile } from 'sass'
 import ts from 'typescript'
 
-// Every class a `*.module.scss` defines is read by the component that imports
-// it, and every class a component reads exists in the module, so a dead
-// selector or a misspelt class name fails the check. Runs as the root
-// project's `dead-css` target over every project with a gale.json, so in
-// `verify`, `affected` and the PR checks. A computed key (`styles[tone]`) is
-// checked through its type, which has to be a union of string literals: the
-// shape CLAUDE.md's constants rule produces.
+/*
+ * Every class a `*.module.scss` defines is read by the component that imports
+ * it, and every class a component reads exists in the module, so a dead
+ * selector or a misspelt class name fails the check. Runs as the root
+ * project's `dead-css` target over every project with a gale.json, so in
+ * `verify`, `affected` and the PR checks. A computed key (`styles[tone]`) is
+ * checked through its type, which has to be a union of string literals: the
+ * shape CLAUDE.md's constants rule produces.
+ */
 
 type Use = { className: string; file: string; line: number }
 type Problem = { file: string; line?: number; message: string }
@@ -42,8 +44,10 @@ type ResolveStylesheetProps = {
   configDir: string
 }
 
-// Resolves a stylesheet import the way the project's `paths` do, from the
-// folder of the tsconfig that declares them.
+/*
+ * Resolves a stylesheet import the way the project's `paths` do, from the
+ * folder of the tsconfig that declares them.
+ */
 const resolveStylesheet = ({
   specifier,
   from,
@@ -75,8 +79,10 @@ const classNamesOf = (css: string): string[] => {
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '')
     .replace(/\[[^\]]*\]/g, '')
-  // Text before a `{` that holds no `{`, `}` or `;` is a selector list or an
-  // at-rule prelude; declarations end with `;`, so none of them qualify.
+  /*
+   * Text before a `{` that holds no `{`, `}` or `;` is a selector list or an
+   * at-rule prelude; declarations end with `;`, so none of them qualify.
+   */
   return [...bare.matchAll(/([^{};]+)\{/g)].flatMap(([, prelude]) => {
     if (prelude === undefined || prelude.trim().startsWith('@')) {
       return []

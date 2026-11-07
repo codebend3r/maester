@@ -9,8 +9,10 @@
   min-height: calc(100dvh - var(--tab-bar-room, 0px) - var(--player-room, 0px));
 }
 
-// The menu holds still as the page scrolls, stopping short of the
-// now-playing bar: the brand, the places, and the way back at its foot.
+/*
+ * The menu holds still as the page scrolls, stopping short of the
+ * now-playing bar: the brand, the places, and the way back at its foot.
+ */
 .side {
   position: sticky;
   top: 0;

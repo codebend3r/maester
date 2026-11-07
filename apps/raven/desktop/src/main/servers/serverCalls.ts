@@ -125,8 +125,10 @@ const reasonOf = (error: unknown): string => (error instanceof Error ? error.mes
 
 const LOG_TEXT_MAX = 200
 
-// Controls, format characters (bidi overrides, zero widths), line and paragraph
-// separators and lone surrogates could break a log line or disguise it.
+/*
+ * Controls, format characters (bidi overrides, zero widths), line and paragraph
+ * separators and lone surrogates could break a log line or disguise it.
+ */
 const UNPRINTABLE = /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/gu
 
 /** Text fit for one log line: unprintable characters escaped, the length bounded. */

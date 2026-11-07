@@ -14,8 +14,10 @@ const VARIANT_STYLES = {
   [TEXT_VARIANTS.display]: { fontFamily: DISPLAY_FONT },
 } as const satisfies Record<TextVariant, { fontFamily: string }>
 
-// Young Serif has one weight: a bold or semibold style would make the system synthesize a
-// smeared bold, so display text is forced to normal after the caller's style.
+/*
+ * Young Serif has one weight: a bold or semibold style would make the system synthesize a
+ * smeared bold, so display text is forced to normal after the caller's style.
+ */
 const DISPLAY_WEIGHT = { fontWeight: 'normal' } as const
 
 type TextProps = NativeTextProps & { variant?: TextVariant }

@@ -28,8 +28,10 @@
   }
 }
 
-// A round button on dark glass, which keeps its dark in every theme, and
-// the one action's leaf under the pointer.
+/*
+ * A round button on dark glass, which keeps its dark in every theme, and
+ * the one action's leaf under the pointer.
+ */
 .play {
   grid-area: play;
   display: grid;

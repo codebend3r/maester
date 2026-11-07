@@ -11,6 +11,8 @@
 - A `package.json` script runs one command. Steps become scripts of their own, chained with `bun run --sequential build:clean build:compile` (or `--parallel`), never with `&&`, `||` or `;`. The pre-push hook and the `one-command-per-script` target (in `verify`, `affected` and the PR checks) reject a chained script.
 - Every import of a project's own modules goes through its `@/` alias and names no extension: `@/lib/api`, never `./api`, `../lib/api` or `@/lib/api.js`. oxlint's `no-restricted-imports` fails on anything else. Non-TypeScript assets keep their extension (`@/components/Player/Player.module.scss`). Node needs relative `.js` paths at runtime, so the server and core builds run `tsc-alias` after `tsc` to rewrite the alias in `dist` only.
 - Writing: no em dashes or en dashes anywhere, including comments and UI copy.
+- A comment that fits on one line uses `//`. A comment that spans more than one line uses one block, `/* ... */`, or `/** ... */` when it documents an export, a type or one of its fields. Never stack `//` lines into a paragraph, and never wrap a one-line comment in `/* */`. The pre-push hook and the `comment-style` target (in `verify` and `affected`) reject stacked `//` lines; lint directives (`// oxlint-disable-next-line`) don't count.
+- Exceptions: comments inside JSX stay `{/* ... */}`, since JSX has no `//`; a trailing comment after code on the same line is always `//`; and a `/** ... */` doc comment that fits on one line stays as it is, because editors only show `/** */` comments on hover.
 
 ## TypeScript
 
@@ -70,7 +72,6 @@
 - Throw only `Error` instances or subclasses, never strings or plain objects.
 - Named exports only. A config file a tool reads through a default export (`vite.config.ts`, `vitest.config.ts`) is exempt in its project's `.oxlintrc.json`.
 - Name booleans as predicates: `is`, `has`, `should`, `can`.
-- If a comment is one line it should not be formatted as a multiline comment
 
 ## React
 

@@ -4,9 +4,11 @@ import { themeTokens } from '@raven/ui/designTokens'
 import type { ConfigContext, ExpoConfig } from 'expo/config'
 
 import packageJson from '#package'
-// Expo loads this file with its own require hook, which reads no tsconfig
-// `paths`, and Node's resolver adds no `.ts`, so the modules it shares with
-// the app come in by their relative path and extension.
+/*
+ * Expo loads this file with its own require hook, which reads no tsconfig
+ * `paths`, and Node's resolver adds no `.ts`, so the modules it shares with
+ * the app come in by their relative path and extension.
+ */
 import { PALETTE_TOKENS } from './src/theme/tokenNames.ts'
 import { withAndroidAuto } from './plugins/withAndroidAuto.ts'
 import { CARPLAY_FLAG, withCarPlay } from './plugins/withCarPlay.ts'
@@ -49,8 +51,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         NSLocalNetworkUsageDescription: LOCAL_NETWORK_USE,
         // Music goes on playing with the screen locked or another app in front.
         UIBackgroundModes: ['audio'],
-        // Expo's template allows local networking in every build, so the whole dictionary is
-        // written here: a LAN server without TLS is for development, and a release keeps ATS.
+        /*
+         * Expo's template allows local networking in every build, so the whole dictionary is
+         * written here: a LAN server without TLS is for development, and a release keeps ATS.
+         */
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: false,
           NSAllowsLocalNetworking: isDevelopment,
@@ -62,14 +66,18 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       versionCode: buildNumber,
       // Android 14 starts a media playback foreground service only with this permission.
       permissions: ['android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK'],
-      // The window's own colour, under the app. iOS reads its counterpart only through
-      // expo-system-ui; there the splash covers the window until Wren draws.
+      /*
+       * The window's own colour, under the app. iOS reads its counterpart only through
+       * expo-system-ui; there the splash covers the window until Wren draws.
+       */
       backgroundColor: ground,
     },
     plugins: ['expo-router', ['expo-splash-screen', { backgroundColor: ground }]],
   }
-  // CarPlay and Android Auto browse and play through `@raven/audio`'s browse bridge. CarPlay's
-  // entitlement waits for Apple's grant, so a build declares it only when asked to.
+  /*
+   * CarPlay and Android Auto browse and play through `@raven/audio`'s browse bridge. CarPlay's
+   * entitlement waits for Apple's grant, so a build declares it only when asked to.
+   */
   const app = withAndroidAuto(isCarPlay ? withCarPlay(base) : base)
   return isDevelopment ? withCleartextTraffic(app) : app
 }

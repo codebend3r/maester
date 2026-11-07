@@ -22,8 +22,10 @@ export default defineConfig({
   outputDir: 'test-results',
   use: {
     baseURL: origin,
-    // Google Chrome, not Playwright's Chromium, which has no H.264 or AAC to play the fixture's
-    // films with. GitHub's Ubuntu runners have it installed.
+    /*
+     * Google Chrome, not Playwright's Chromium, which has no H.264 or AAC to play the fixture's
+     * films with. GitHub's Ubuntu runners have it installed.
+     */
     channel: 'chrome',
     trace: 'retain-on-failure',
   },

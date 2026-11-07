@@ -289,8 +289,10 @@ describe('looking up the other titles of a show', () => {
     alternativeTitles,
     seasons: {},
   })
-  // TMDB lists the show Archie is known by in Britain sixth, after five
-  // shows with Archie somewhere in their names.
+  /*
+   * TMDB lists the show Archie is known by in Britain sixth, after five
+   * shows with Archie somewhere in their names.
+   */
   const tmdb = fakeTmdb({
     movies: [],
     shows: [
@@ -351,8 +353,10 @@ describe('looking up the other titles of a show known only by an alternative', (
     alternativeTitles,
     seasons: {},
   })
-  // TMDB finds Loveland by its alternative title "Expired", but lists it after
-  // five shows with Expired mid-title.
+  /*
+   * TMDB finds Loveland by its alternative title "Expired", but lists it after
+   * five shows with Expired mid-title.
+   */
   const tmdb = fakeTmdb({
     movies: [],
     shows: [

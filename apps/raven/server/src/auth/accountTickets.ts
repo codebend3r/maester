@@ -112,8 +112,10 @@ export class AccountTickets {
   }: AccountTicketsRedeemProps): Promise<PassGrant | null> {
     const entry = this.entries.get(ticket)
     if (entry === undefined || entry.id !== id || entry.expiresAt <= now) return null
-    // Recheck with the user's JWT on every redemption, so removal takes effect
-    // before the next range, stream or subtitle request, without privileged keys.
+    /*
+     * Recheck with the user's JWT on every redemption, so removal takes effect
+     * before the next range, stream or subtitle request, without privileged keys.
+     */
     const { account } = await this.sessions.authenticate({ token: entry.token })
     requireApproved(account)
     return { account, unlockedUntil: entry.unlockedUntil }

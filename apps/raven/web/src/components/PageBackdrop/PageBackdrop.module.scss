@@ -1,6 +1,8 @@
-// Fixed behind everything, the page's own ground under it: under the content
-// in the page's stacking, over the night the body paints. Every picture
-// shares the one cell, the newest on top.
+/*
+ * Fixed behind everything, the page's own ground under it: under the content
+ * in the page's stacking, over the night the body paints. Every picture
+ * shares the one cell, the newest on top.
+ */
 .backdrop {
   position: fixed;
   inset: 0;
@@ -11,9 +13,11 @@
   pointer-events: none;
 }
 
-// Faint, and fading towards the foot, so text over it keeps its contrast;
-// fainter still on a light theme, by the theme's colour wash, and gone in
-// high contrast.
+/*
+ * Faint, and fading towards the foot, so text over it keeps its contrast;
+ * fainter still on a light theme, by the theme's colour wash, and gone in
+ * high contrast.
+ */
 .layer {
   grid-area: layer;
   width: 100%;

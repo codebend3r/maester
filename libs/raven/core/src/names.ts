@@ -1,10 +1,12 @@
 /** The longest name a person may give a server, in code points. */
 export const NAME_MAX = 80
 
-// Control and format characters: a bidi control can reorder what is shown around it, and a
-// zero width space hides between letters. The joiners (ZWNJ, ZWJ) and the tag characters
-// stay: Persian spelling and emoji sequences, subdivision flags among them, need them, and
-// none of them can reorder text.
+/*
+ * Control and format characters: a bidi control can reorder what is shown around it, and a
+ * zero width space hides between letters. The joiners (ZWNJ, ZWJ) and the tag characters
+ * stay: Persian spelling and emoji sequences, subdivision flags among them, need them, and
+ * none of them can reorder text.
+ */
 const HIDDEN = /(?!\u200c|\u200d|[\u{E0020}-\u{E007F}])[\p{Cc}\p{Cf}]/u
 const HIDDEN_ALL = /(?!\u200c|\u200d|[\u{E0020}-\u{E007F}])[\p{Cc}\p{Cf}]/gu
 const WHITESPACE = /\s+/gu

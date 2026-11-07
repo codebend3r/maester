@@ -488,8 +488,10 @@ describe('movie metadata', () => {
       ]),
     })
 
-    // TMDB is slow the first time anyone asks for Keanu: the page says it is on its way, and
-    // the next ask, as the page polls, waits on the same fetch.
+    /*
+     * TMDB is slow the first time anyone asks for Keanu: the page says it is on its way, and
+     * the next ask, as the page polls, waits on the same fetch.
+     */
     const asked = tmdb.state.personCalls
     const letGo = tmdb.holdPerson(6384)
     const waiting = shape({ response: await personAt('Keanu Reeves'), guard: isPersonDetails })

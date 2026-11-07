@@ -36,14 +36,18 @@ const LOOP_LAG_LIMIT_MS = 40
 // The first lag mark comes five seconds into playback; this only turns a missed one into an error.
 const LOOP_MARK_WAIT_MS = 15_000
 const FIRST_FRAME_WAIT_MS = 10_000
-// Spec Review Focus 5: mpv is destroyed and the app gone within a second of quitting, read
-// from main's own mark. The wall clock only guards against a hang.
+/*
+ * Spec Review Focus 5: mpv is destroyed and the app gone within a second of quitting, read
+ * from main's own mark. The wall clock only guards against a hang.
+ */
 const QUIT_LIMIT_MS = 1000
 const QUIT_HANG_MS = 3000
 const QUIT_MARK_WAIT_MS = 1000
 const NEXT_WAIT_MS = 15_000
-// The window's colour behind the page and under a video, as Electron reports them: main sets
-// the clear one as `#00000000`, and `getBackgroundColor` leaves the alpha off.
+/*
+ * The window's colour behind the page and under a video, as Electron reports them: main sets
+ * the clear one as `#00000000`, and `getBackgroundColor` leaves the alpha off.
+ */
 const NIGHT = '#15201E'
 const CLEAR = '#000000'
 const ERROR_CODES = { eperm: 'EPERM' } as const
@@ -343,8 +347,10 @@ test.describe.serial('playing a local file through mpv', () => {
         await tapPlayerPort({ page })
         await playNatively({ app, page, path: clips.second, title: 'Clip 02 Été' })
 
-        // A second `ready`: main closes the old port, which stops mpv, and hands over a new
-        // one. The page reloads on the same file, which it opens again on the new port.
+        /*
+         * A second `ready`: main closes the old port, which stops mpv, and hands over a new
+         * one. The page reloads on the same file, which it opens again on the new port.
+         */
         await page.reload()
         await expect.poll(async () => (await trafficOf({ page })).ports).toBe(1)
         await expectPlayingNatively({ page, title: 'Clip 02 Été' })
@@ -417,8 +423,10 @@ test.describe.serial('playing a local file through mpv', () => {
         ])
         expect(events).toEqual([])
         expect(strays).toEqual([])
-        // A load main accepts makes the window clear for the picture before it answers, so
-        // an opaque window once every reply is in means none of them reached mpv.
+        /*
+         * A load main accepts makes the window clear for the picture before it answers, so
+         * an opaque window once every reply is in means none of them reached mpv.
+         */
         expect(await backgroundOf(app)).toBe(NIGHT)
         await expectLeftPlayer(page)
       },
@@ -447,8 +455,10 @@ test.describe.serial('playing a local file through mpv', () => {
       expect(wallMs).toBeLessThan(QUIT_HANG_MS)
       await expect.poll(() => tree.filter(isAlive)).toEqual([])
     } finally {
-      // Already gone when the test passed; a failure above must not leave the app running,
-      // and a second failure here must not hide the first.
+      /*
+       * Already gone when the test passed; a failure above must not leave the app running,
+       * and a second failure here must not hide the first.
+       */
       await closeApp({ app }).catch(() => undefined)
     }
   })

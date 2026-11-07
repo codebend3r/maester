@@ -1,9 +1,13 @@
-// Design tokens and the few true primitives. Component styles live next to
-// their component as *.module.scss and use only these values.
+/*
+ * Design tokens and the few true primitives. Component styles live next to
+ * their component as *.module.scss and use only these values.
+ */
 
-// The palette is the rookery itself: night stone for the ground, a lit
-// window's parchment for text, and Plex's amber kept for the one thing this
-// app is for, signing in with Plex.
+/*
+ * The palette is the rookery itself: night stone for the ground, a lit
+ * window's parchment for text, and Plex's amber kept for the one thing this
+ * app is for, signing in with Plex.
+ */
 :root {
   --color-ground: #16181d;
   --color-wall: #1f232a;

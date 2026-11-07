@@ -160,8 +160,10 @@ describe('Player on a phone or tablet', () => {
     useActiveServer.setState({ servers: [server], activeId: server.id })
   })
 
-  // The subtitle windows keep their own half hour in the cache, which would hold jest open: the
-  // screen goes first, so no query is let go of after the cache is emptied.
+  /*
+   * The subtitle windows keep their own half hour in the cache, which would hold jest open: the
+   * screen goes first, so no query is let go of after the cache is emptied.
+   */
   afterEach(async () => {
     await untilIdle(shown.client)
     await cleanup()

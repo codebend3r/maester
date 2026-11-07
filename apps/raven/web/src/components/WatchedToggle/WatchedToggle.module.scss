@@ -1,5 +1,7 @@
-// Pressed takes the shared Button's accent outline; partly is a dashed edge,
-// so the state reads without its colour and in forced colours.
+/*
+ * Pressed takes the shared Button's accent outline; partly is a dashed edge,
+ * so the state reads without its colour and in forced colours.
+ */
 .toggle {
   &[aria-pressed='mixed'] {
     border-style: dashed;

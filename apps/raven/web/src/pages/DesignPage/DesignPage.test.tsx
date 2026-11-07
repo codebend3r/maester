@@ -6,8 +6,10 @@ import { useTheme } from '@/stores/theme'
 import { Route, Routes, useLocation, useNavigationType } from 'react-router-dom'
 import { renderWithProviders } from '@/test/render'
 
-// Vite hands the page globals.scss as text; Bun cannot, so the tests give it
-// a small stylesheet of their own, with a token of every kind the page draws.
+/*
+ * Vite hands the page globals.scss as text; Bun cannot, so the tests give it
+ * a small stylesheet of their own, with a token of every kind the page draws.
+ */
 mock.module('@raven/ui/designTokens', () => ({
   designTokens: parseTokens(`
     :root {

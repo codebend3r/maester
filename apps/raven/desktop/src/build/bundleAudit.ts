@@ -69,8 +69,10 @@ export type AuditedFile = {
   isExecutable: boolean
 }
 
-// `@executable_path` is the folder of the process's executable: an executable's own, and for a
-// library the app's, since the engine is loaded by the app itself.
+/*
+ * `@executable_path` is the folder of the process's executable: an executable's own, and for a
+ * library the app's, since the engine is loaded by the app itself.
+ */
 const executableDirOf = (file: AuditedFile): string =>
   file.isExecutable ? file.dir : EXECUTABLE_DIR
 
@@ -107,8 +109,10 @@ type EngineProblemsProps = {
   exists: (path: string) => boolean
 }
 
-// Only the engine's links are resolved here. Electron's resolve through its framework layout,
-// as Forge ships it, and the packaged smoke proves they load.
+/*
+ * Only the engine's links are resolved here. Electron's resolve through its framework layout,
+ * as Forge ships it, and the packaged smoke proves they load.
+ */
 const engineProblems = ({ file, exists }: EngineProblemsProps): string[] => {
   const searched = file.rpaths.flatMap((rpath) => {
     const dir = resolveRelative({ path: rpath, file })

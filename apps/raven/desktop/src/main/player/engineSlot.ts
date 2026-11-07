@@ -81,8 +81,10 @@ export const createEngineSlot = <T>({
 
   const begin = () => {
     state = SLOT_STATES.opening
-    // Deferred, so the pending open is on record before any of it runs: a quit can arrive
-    // inside it (the inspector runs at interrupts), and must find something to stop.
+    /*
+     * Deferred, so the pending open is on record before any of it runs: a quit can arrive
+     * inside it (the inspector runs at interrupts), and must find something to stop.
+     */
     const raw = Promise.resolve()
       .then(() => (state === SLOT_STATES.opening ? open() : UNAVAILABLE))
       .catch((error: unknown): OpenedEngine<T> => {

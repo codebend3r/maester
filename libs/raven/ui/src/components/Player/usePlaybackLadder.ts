@@ -145,8 +145,10 @@ export const usePlaybackLadder = ({
   const [picked, setPicked] = useState<PlayPick | null>(null)
   const [attempts, setAttempts] = useState<PlaybackAttempt[]>([])
 
-  // The server's settings say whether to force the original file and what it
-  // converts; a plan made without them starts a stream it may refuse.
+  /*
+   * The server's settings say whether to force the original file and what it
+   * converts; a plan made without them starts a stream it may refuse.
+   */
   if (!plan) return { status: PLAYBACK_STATUSES.waiting }
 
   const canBurn = plan.modes.includes(PLAYBACK_MODES.transcode)

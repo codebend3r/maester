@@ -47,8 +47,10 @@ export const namedAs = ({
       }
     }
     case ITEM_TYPES.show: {
-      // An episode keeps its tidied file name until it is matched, since the
-      // name alone rarely says which show it is; the year is the show's.
+      /*
+       * An episode keeps its tidied file name until it is matched, since the
+       * name alone rarely says which show it is; the year is the show's.
+       */
       const parsed = parseEpisodeName({ fileName, folder })
       return {
         title: titleFromFileName(fileName),

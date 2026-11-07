@@ -128,8 +128,10 @@ describe('Search on a TV', () => {
     await renderScreen({ ui: <Search /> })
     const field = screen.getByLabelText(FIELD)
     await fireEvent.changeText(field, 'du')
-    // tvOS reports each key as it is typed, then puts the field back on Menu, saying so only
-    // as the edit ends.
+    /*
+     * tvOS reports each key as it is typed, then puts the field back on Menu, saying so only
+     * as the edit ends.
+     */
     await fireEvent(field, NATIVE_EVENTS.endEditing, { nativeEvent: { text: '' } })
     expect(screen.getByLabelText(FIELD).props.value).toBe('')
     await pause(SEARCH_DELAY_MS * 5)
@@ -147,8 +149,10 @@ describe('Search on a TV', () => {
     await fireEvent.press(show)
     await leaveTestScreen()
     await returnToTestScreen()
-    // The field asked as the screen opened; the return asks only for the result, once as the
-    // screen comes to the front and again as the transition that reveals it ends.
+    /*
+     * The field asked as the screen opened; the return asks only for the result, once as the
+     * screen comes to the front and again as the transition that reveals it ends.
+     */
     expect(askedFor()).toEqual([FIELD, 'Dune: Prophecy', 'Dune: Prophecy'])
     expect(preferred()).toEqual([])
   })

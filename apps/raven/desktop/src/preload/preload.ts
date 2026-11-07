@@ -19,8 +19,10 @@ type Envelope =
 const invoke = (envelope: Envelope): Promise<unknown> =>
   ipcRenderer.invoke(IPC_CHANNELS.request, envelope)
 
-// The preload builds the envelope, so the page can ask for things but never hand main a path:
-// only a drop carries paths, and those come from `webUtils`, not from the page.
+/*
+ * The preload builds the envelope, so the page can ask for things but never hand main a path:
+ * only a drop carries paths, and those come from `webUtils`, not from the page.
+ */
 const bridge = {
   request: (request) => invoke({ kind: ENVELOPE_KINDS.page, request }),
   // Typed as what it is: whatever the page passed, which `dropPaths` checks itself.
@@ -40,13 +42,17 @@ const bridge = {
   platform: desktopPlatformFor({ platform: process.platform }),
 } satisfies RavenDesktopBridge
 
-// Only the web host's page gets the bridge. Main refuses any other frame too, and the window
-// never navigates away, so this is a second lock rather than the only one.
+/*
+ * Only the web host's page gets the bridge. Main refuses any other frame too, and the window
+ * never navigates away, so this is a second lock rather than the only one.
+ */
 if (window.location.origin === PAGE_ORIGIN) {
   contextBridge.exposeInMainWorld('ravenDesktop', bridge)
 
-  // The player's port cannot cross `contextBridge`, so it reaches the page as a window message
-  // on the page's origin, which the page checks before taking the port.
+  /*
+   * The player's port cannot cross `contextBridge`, so it reaches the page as a window message
+   * on the page's origin, which the page checks before taking the port.
+   */
   ipcRenderer.on(IPC_CHANNELS.player, (event, payload: unknown) =>
     forwardPlayerPort({
       payload,

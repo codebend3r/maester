@@ -306,8 +306,10 @@ export const createSync = ({
         due: first,
         call: { name: CALL_NAMES.recordPlay, mediaId: first.mediaId },
       })
-      // The play stays pending when the answer was lost, though the server may have taken it:
-      // delivery is at least once, so a play can be recorded twice but never none.
+      /*
+       * The play stays pending when the answer was lost, though the server may have taken it:
+       * delivery is at least once, so a play can be recorded twice but never none.
+       */
       if (played !== DELIVERIES.taken) return notTaken({ due: first, delivery: played })
       clearSent({ due: first, sentPlay: true, sentPosition: null, sentFurthest: null })
     }
@@ -353,8 +355,10 @@ export const createSync = ({
     const entry = entryById(store.read(), { downloadId })
     // A server that could not be reached hears this download at the retry, not every save.
     if (entry !== null && unreachable.has(entry.serverId)) return
-    // A timer already running is left alone, not pushed back: positions arrive every few
-    // seconds, and one that kept resetting it would send nothing while a title plays.
+    /*
+     * A timer already running is left alone, not pushed back: positions arrive every few
+     * seconds, and one that kept resetting it would send nothing while a title plays.
+     */
     debouncing.set(
       downloadId,
       timers.set({

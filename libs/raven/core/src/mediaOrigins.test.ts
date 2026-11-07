@@ -10,8 +10,10 @@ type ProbeProps = {
   firstByteMs?: number
 }
 
-// A probe answers instantly unless said, so its score is exactly its bytesPerSecond: the
-// 256 KiB body is so small that even 10 ms to first byte would weigh as much as the transfer.
+/*
+ * A probe answers instantly unless said, so its score is exactly its bytesPerSecond: the
+ * 256 KiB body is so small that even 10 ms to first byte would weigh as much as the transfer.
+ */
 const probe = ({ kind, bytesPerSecond, firstByteMs = 0 }: ProbeProps): OriginProbe => ({
   origin: origin(kind),
   firstByteMs,

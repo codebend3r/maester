@@ -52,8 +52,10 @@ describe('Fix match confidence', () => {
     shows: [
       { id: 30981, title: 'Monster', first: '2004-04-07', popularity: 50, seasons: { 1: run(74) } },
       { id: 65806, title: 'Monster', first: '2016-03-12', popularity: 10, seasons: { 1: run(50) } },
-      // Ahead of better titles in TMDB's order, so the details read are the
-      // five that score best, not TMDB's first five.
+      /*
+       * Ahead of better titles in TMDB's order, so the details read are the
+       * five that score best, not TMDB's first five.
+       */
       { id: 51808, title: 'Robot and Monster', first: '2012-08-04', seasons: { 1: run(26) } },
       {
         id: 64198,

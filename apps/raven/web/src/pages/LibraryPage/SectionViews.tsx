@@ -274,8 +274,10 @@ const AllSection = ({ library }: AllSectionProps) => {
   })
   const listed = listing.state === LISTING_STATES.listed ? listing : NOTHING_LISTED
   const queue = playQueue({ settings, listing: listed })
-  // The strip down the side follows the order: letters for titles, steps of
-  // the value sorted by for the rest, none for a random order.
+  /*
+   * The strip down the side follows the order: letters for titles, steps of
+   * the value sorted by for the rest, none for a random order.
+   */
   const scale = jumpScale({
     sort: settings.sort,
     files: listed.files,
@@ -292,8 +294,10 @@ const AllSection = ({ library }: AllSectionProps) => {
         })
       : null
 
-  // The item rides along in router state, as a card click hands it over, so
-  // the player starts without fetching it again.
+  /*
+   * The item rides along in router state, as a card click hands it over, so
+   * the player starts without fetching it again.
+   */
   const watch = (item: MediaItem | undefined) => {
     if (!item) return
     const link = watchLink({ media: item })

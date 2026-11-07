@@ -159,8 +159,10 @@ const runCut = ({ source, from, seekKeyframes, timeBase }: RunCutProps): RunCut 
     }
   }
   const tolerance = frameRate == null ? REMUX_CUT_TOLERANCE : 0.5 / frameRate
-  // The seek counts from `format.start_time` as ffprobe read it, so ffprobe
-  // and ffmpeg must agree on it (FfmpegService warns when they differ).
+  /*
+   * The seek counts from `format.start_time` as ffprobe read it, so ffprobe
+   * and ffmpeg must agree on it (FfmpegService warns when they differ).
+   */
   const fromStart = (time: number): string[] =>
     time - startTime > 0 ? ['-ss', secondsArg(time - startTime)] : []
   if (source.burn !== null) {

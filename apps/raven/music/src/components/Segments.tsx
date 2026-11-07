@@ -25,8 +25,10 @@ export function Segments<K extends SegmentKey>({ segments, selected, onSelect }:
   const scroller = useRef<ScrollViewInstance>(null)
   const viewportWidth = useRef(0)
   const spans = useRef(new Map<string, Span>())
-  // Centred when the row overflows; a row that fits clamps back to the start. Layout events
-  // arrive in no fixed order, so the tab and the row each ask again once they are measured.
+  /*
+   * Centred when the row overflows; a row that fits clamps back to the start. Layout events
+   * arrive in no fixed order, so the tab and the row each ask again once they are measured.
+   */
   const revealSelected = () => {
     const span = spans.current.get(String(selected))
     if (span === undefined || viewportWidth.current === 0) return

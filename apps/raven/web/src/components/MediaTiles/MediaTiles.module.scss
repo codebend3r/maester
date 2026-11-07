@@ -1,7 +1,9 @@
-// The tiles side by side: four across a desktop's page, never more, and
-// fewer as the page narrows below four of 16rem, down to one on a phone.
-// The page's width hangs on the side menu, open or collapsed, so the tiles
-// step down by the room they have rather than by the screen's width.
+/*
+ * The tiles side by side: four across a desktop's page, never more, and
+ * fewer as the page narrows below four of 16rem, down to one on a phone.
+ * The page's width hangs on the side menu, open or collapsed, so the tiles
+ * step down by the room they have rather than by the screen's width.
+ */
 .tiles {
   --tile-columns: 4;
 
@@ -18,10 +20,12 @@
   );
   gap: var(--space-2);
 
-  // A library can hold thousands of tiles, so the browser lays out and
-  // draws only those near the screen. One it skips stands in at the height
-  // it had when last drawn, else at about a tile's height 1440 wide. The
-  // stand-in is what sits inside the tile's padding, which adds to it.
+  /*
+   * A library can hold thousands of tiles, so the browser lays out and
+   * draws only those near the screen. One it skips stands in at the height
+   * it had when last drawn, else at about a tile's height 1440 wide. The
+   * stand-in is what sits inside the tile's padding, which adds to it.
+   */
   > li {
     content-visibility: auto;
     contain-intrinsic-block-size: auto 5.5rem;
@@ -31,8 +35,10 @@
     contain-intrinsic-block-size: auto 10.5rem;
   }
 
-  // Skipping also clips what a tile draws to its box, which would cut off
-  // a focus ring, so a tile holding the focus is drawn whole.
+  /*
+   * Skipping also clips what a tile draws to its box, which would cut off
+   * a focus ring, so a tile holding the focus is drawn whole.
+   */
   > li:focus-within {
     content-visibility: visible;
   }
@@ -146,8 +152,10 @@
   }
 }
 
-// A line of facts reads as words, wrapping between facts rather than
-// inside one, a dot apart: the release day, then the runtime and size.
+/*
+ * A line of facts reads as words, wrapping between facts rather than
+ * inside one, a dot apart: the release day, then the runtime and size.
+ */
 .facts {
   color: var(--color-birch);
   font-size: var(--font-size-xs);
@@ -176,8 +184,10 @@
   justify-content: start;
 }
 
-// A Movies library's tile: a poster rather than a wide frame grab, as
-// wide as the tile can spare, up to 7rem.
+/*
+ * A Movies library's tile: a poster rather than a wide frame grab, as
+ * wide as the tile can spare, up to 7rem.
+ */
 .posterTile {
   grid-template-columns: clamp(4.5rem, 40%, 7rem) minmax(0, 1fr);
 }
@@ -189,8 +199,10 @@
   text-decoration: none;
 }
 
-// The value the listing is sorted by: a line of its own above the facts, so
-// a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
+/*
+ * The value the listing is sorted by: a line of its own above the facts, so
+ * a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
+ */
 .sorted {
   color: var(--color-bark);
   font-size: var(--font-size-xs);

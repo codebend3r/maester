@@ -1,8 +1,10 @@
-// Along the foot of a phone's screen, glass over the page, clear of the
-// home indicator. Its rows, padding and hairline make the shell's
-// --tab-bar-height, the room the page leaves under itself. Over the page's
-// own layers, a card's and the selection bar's included; a dialog's top
-// layer still covers it.
+/*
+ * Along the foot of a phone's screen, glass over the page, clear of the
+ * home indicator. Its rows, padding and hairline make the shell's
+ * --tab-bar-height, the room the page leaves under itself. Over the page's
+ * own layers, a card's and the selection bar's included; a dialog's top
+ * layer still covers it.
+ */
 .tabs {
   position: fixed;
   inset: auto 0 0;

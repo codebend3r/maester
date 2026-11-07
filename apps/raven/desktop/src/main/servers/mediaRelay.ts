@@ -622,8 +622,10 @@ export const createMediaRelay = ({
       answer({ response, status: upstream.status })
       return
     }
-    // The file served again after a refusal (the owner let the account back in): it plays on,
-    // so its end is a plain one.
+    /*
+     * The file served again after a refusal (the owner let the account back in): it plays on,
+     * so its end is a plain one.
+     */
     if (route.isMedia && isSuccessStatus(upstream.status) && isCurrent(load)) {
       forget(load.loadId)
     }
@@ -780,8 +782,10 @@ export const createMediaRelay = ({
       }
     },
     close: (loadId) => retire((load) => load.loadId === loadId),
-    // Access ends on a sign out, a removed server or a moved sign-in host: the title playing
-    // stops at the end of what mpv holds, and that is read as an account to sign in to again.
+    /*
+     * Access ends on a sign out, a removed server or a moved sign-in host: the title playing
+     * stops at the end of what mpv holds, and that is read as an account to sign in to again.
+     */
     closeServer: (serverId) => {
       const ended = loads.filter((load) => load.serverId === serverId)
       retire((load) => load.serverId === serverId)

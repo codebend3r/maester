@@ -7,8 +7,10 @@
   justify-items: end;
 }
 
-// In a list row or a tile the menu takes its own cell instead, on the
-// ground rather than over a picture.
+/*
+ * In a list row or a tile the menu takes its own cell instead, on the
+ * ground rather than over a picture.
+ */
 .inline {
   position: relative;
   top: auto;
@@ -47,8 +49,10 @@
   }
 }
 
-// In a card, row or tile the button waits out of sight for the pointer or
-// focus. A touch screen has no hover to bring it, so there it stays.
+/*
+ * In a card, row or tile the button waits out of sight for the pointer or
+ * focus. A touch screen has no hover to bring it, so there it stays.
+ */
 @media (hover: hover) {
   .host .trigger {
     opacity: 0;
@@ -63,10 +67,12 @@
   }
 }
 
-// A grid skips drawing its offscreen cards (`content-visibility: auto`),
-// which also clips what a card draws to its box, under the cards after it.
-// The open list and a failure note hang out of the card, so while either
-// shows, the card is drawn whole.
+/*
+ * A grid skips drawing its offscreen cards (`content-visibility: auto`),
+ * which also clips what a card draws to its box, under the cards after it.
+ * The open list and a failure note hang out of the card, so while either
+ * shows, the card is drawn whole.
+ */
 .host:has(.list, .failure) {
   content-visibility: visible;
 }
@@ -93,9 +99,11 @@
   }
 }
 
-// Beside its button, not under it: a tile's menu opens over the tile's own
-// words and past its edge instead of hanging off its foot. A narrow screen
-// has no room beside the button, so there it drops below again.
+/*
+ * Beside its button, not under it: a tile's menu opens over the tile's own
+ * words and past its edge instead of hanging off its foot. A narrow screen
+ * has no room beside the button, so there it drops below again.
+ */
 .beside .list {
   top: 0;
   right: calc(100% + var(--space-1));

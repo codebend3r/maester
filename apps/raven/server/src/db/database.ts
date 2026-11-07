@@ -78,14 +78,18 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE libraries ADD COLUMN view_mode TEXT NOT NULL DEFAULT 'grid';
   ALTER TABLE libraries ADD COLUMN group_by TEXT NOT NULL DEFAULT 'resolution';
   `,
-  // A video's embedded audio and subtitle tracks as JSON, found by the scan's
-  // probe so the player need not run ffprobe again. NULL until known.
+  /*
+   * A video's embedded audio and subtitle tracks as JSON, found by the scan's
+   * probe so the player need not run ffprobe again. NULL until known.
+   */
   `
   ALTER TABLE media ADD COLUMN tracks TEXT;
   `,
-  // One row per sitting with a video: when it was last playing and the
-  // furthest it got, so a library's history can say what was watched, by
-  // the library's own measure of watched.
+  /*
+   * One row per sitting with a video: when it was last playing and the
+   * furthest it got, so a library's history can say what was watched, by
+   * the library's own measure of watched.
+   */
   `
   CREATE TABLE plays (
     id INTEGER PRIMARY KEY,
@@ -100,10 +104,12 @@ export const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE libraries ADD COLUMN kind TEXT NOT NULL DEFAULT 'other';
   `,
-  // What each file in a Movies or TV shows library is, from TMDB. Items are
-  // shared by every file and library that holds them; overrides keep a Fix
-  // match by folder, so renames and re-downloads keep it; and media gains
-  // what its name says and how far matching got, other libraries being off.
+  /*
+   * What each file in a Movies or TV shows library is, from TMDB. Items are
+   * shared by every file and library that holds them; overrides keep a Fix
+   * match by folder, so renames and re-downloads keep it; and media gains
+   * what its name says and how far matching got, other libraries being off.
+   */
   `
   CREATE TABLE items (
     id INTEGER PRIMARY KEY,
@@ -184,8 +190,10 @@ export const MIGRATIONS: readonly string[] = [
     WHERE library_id IN (SELECT id FROM libraries WHERE kind = 'other');
   CREATE INDEX media_match_pending ON media (match) WHERE match = 'pending';
   `,
-  // Reviews by TMDB members; which score a library's cards show and sort by;
-  // and when OMDb last answered for an item, so its scores fill over days.
+  /*
+   * Reviews by TMDB members; which score a library's cards show and sort by;
+   * and when OMDb last answered for an item, so its scores fill over days.
+   */
   `
   CREATE TABLE reviews (
     id INTEGER PRIMARY KEY,
@@ -202,17 +210,21 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE libraries ADD COLUMN ratings_source TEXT NOT NULL DEFAULT 'tmdb';
   ALTER TABLE items ADD COLUMN omdb_fetched_at TEXT;
   `,
-  // A Movies library opens on its matched and not matched buckets; one
-  // still on the old defaults moves over, a chosen view stays. A TV library
-  // is always split that way, so it keeps its grid.
+  /*
+   * A Movies library opens on its matched and not matched buckets; one
+   * still on the old defaults moves over, a chosen view stays. A TV library
+   * is always split that way, so it keeps its grid.
+   */
   `
   UPDATE libraries SET view_mode = 'grouped', group_by = 'match'
    WHERE view_mode = 'grid' AND group_by = 'resolution' AND kind = 'movies';
   `,
-  // Edit metadata: what the viewer wrote over TMDB's, a column per field,
-  // NULL where TMDB's stands. The rows in items stay TMDB's own, so a
-  // refresh never loses an edit and the original can always be shown.
-  // Reads go through shown_items, where the edit wins.
+  /*
+   * Edit metadata: what the viewer wrote over TMDB's, a column per field,
+   * NULL where TMDB's stands. The rows in items stay TMDB's own, so a
+   * refresh never loses an edit and the original can always be shown.
+   * Reads go through shown_items, where the edit wins.
+   */
   `
   CREATE TABLE item_overrides (
     item_id INTEGER PRIMARY KEY REFERENCES items (id) ON DELETE CASCADE,
@@ -237,16 +249,20 @@ export const MIGRATIONS: readonly string[] = [
       FROM items i
       LEFT JOIN item_overrides o ON o.item_id = i.id;
   `,
-  // Server-wide settings, one JSON value per key: 'playback' holds how
-  // video is played for every viewer.
+  /*
+   * Server-wide settings, one JSON value per key: 'playback' holds how
+   * video is played for every viewer.
+   */
   `
   CREATE TABLE settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
   `,
-  // Edit metadata can empty a field TMDB fills: '' for words, or 0 for the
-  // year, is written over TMDB's like any edit and shown as nothing.
+  /*
+   * Edit metadata can empty a field TMDB fills: '' for words, or 0 for the
+   * year, is written over TMDB's like any edit and shown as nothing.
+   */
   `
   DROP VIEW shown_items;
   CREATE VIEW shown_items AS
@@ -263,9 +279,11 @@ export const MIGRATIONS: readonly string[] = [
       FROM items i
       LEFT JOIN item_overrides o ON o.item_id = i.id;
   `,
-  // A library refreshes itself as its folders change, unless turned off; and
-  // each file keeps when it was last found, renamed, moved or replaced, for
-  // the Recently changed sort. Files already indexed changed when they came.
+  /*
+   * A library refreshes itself as its folders change, unless turned off; and
+   * each file keeps when it was last found, renamed, moved or replaced, for
+   * the Recently changed sort. Files already indexed changed when they came.
+   */
   `
   ALTER TABLE libraries ADD COLUMN auto_refresh INTEGER NOT NULL DEFAULT 1;
   ALTER TABLE media ADD COLUMN changed_at TEXT NOT NULL DEFAULT '';
@@ -276,42 +294,52 @@ export const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE libraries ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
   `,
-  // A movie's saga: the TMDB collection it belongs to, for a library's Sagas.
-  // Movies stored before this learn theirs from TMDB once, in the daily
-  // sweep; saga_checked marks the ones that have, every item stored after.
+  /*
+   * A movie's saga: the TMDB collection it belongs to, for a library's Sagas.
+   * Movies stored before this learn theirs from TMDB once, in the daily
+   * sweep; saga_checked marks the ones that have, every item stored after.
+   */
   `
   ALTER TABLE items ADD COLUMN saga_tmdb_id TEXT;
   ALTER TABLE items ADD COLUMN saga_name TEXT;
   ALTER TABLE items ADD COLUMN saga_checked INTEGER NOT NULL DEFAULT 0;
   `,
-  // A movie's logo, its title as art, sits in item_images as kind 'logo'.
-  // Movies stored before this learn theirs from TMDB once, in the daily
-  // sweep; logo_checked marks the ones that have, every item stored after.
+  /*
+   * A movie's logo, its title as art, sits in item_images as kind 'logo'.
+   * Movies stored before this learn theirs from TMDB once, in the daily
+   * sweep; logo_checked marks the ones that have, every item stored after.
+   */
   `
   ALTER TABLE items ADD COLUMN logo_checked INTEGER NOT NULL DEFAULT 0;
   `,
-  // A movie's files in one library share its card unless split apart:
-  // NULL keeps a file on the movie's own card, 'file:<id>' gives it a card
-  // of its own, named by its media id, and 'cut:<label>' one it shares with
-  // the movie's other files of that cut. Kept on the file, so rescans and
-  // renames keep it too; matching the file to another movie clears it.
+  /*
+   * A movie's files in one library share its card unless split apart:
+   * NULL keeps a file on the movie's own card, 'file:<id>' gives it a card
+   * of its own, named by its media id, and 'cut:<label>' one it shares with
+   * the movie's other files of that cut. Kept on the file, so rescans and
+   * renames keep it too; matching the file to another movie clears it.
+   */
   `
   ALTER TABLE media ADD COLUMN split TEXT;
   `,
-  // How a library's folders are read: 'auto' reads letter folders (A/, #/)
-  // and group folders (Requests/) as holding the titles, 'flat' reads every
-  // top folder as a title. Each path keeps what its last full scan found:
-  // 'flat', 'lettered' or 'grouped', and how many group folders.
+  /*
+   * How a library's folders are read: 'auto' reads letter folders (A/, #/)
+   * and group folders (Requests/) as holding the titles, 'flat' reads every
+   * top folder as a title. Each path keeps what its last full scan found:
+   * 'flat', 'lettered' or 'grouped', and how many group folders.
+   */
   `
   ALTER TABLE libraries ADD COLUMN folder_layout TEXT NOT NULL DEFAULT 'auto';
   ALTER TABLE library_paths ADD COLUMN layout TEXT;
   ALTER TABLE library_paths ADD COLUMN group_folders INTEGER NOT NULL DEFAULT 0;
   `,
-  // What the AI lookup decided for each group it was asked about, by place
-  // as a Fix match is kept: the TMDB id it chose (NULL when it chose nothing
-  // or ended without a choice), that result's title, year and poster for the
-  // Not matched suggestion, how sure it was, and why. A group with a row is
-  // never asked again; Match again clears the rows with no id.
+  /*
+   * What the AI lookup decided for each group it was asked about, by place
+   * as a Fix match is kept: the TMDB id it chose (NULL when it chose nothing
+   * or ended without a choice), that result's title, year and poster for the
+   * Not matched suggestion, how sure it was, and why. A group with a row is
+   * never asked again; Match again clears the rows with no id.
+   */
   `
   CREATE TABLE ai_decisions (
     library_id INTEGER NOT NULL REFERENCES libraries (id) ON DELETE CASCADE,
@@ -327,16 +355,20 @@ export const MIGRATIONS: readonly string[] = [
     PRIMARY KEY (library_id, place)
   );
   `,
-  // The icon a library picked, NULL wearing its type's. Sporting events are
-  // matched as movies now, so their files wait to be matched: the start-up
-  // pass reads their names again, extras going back to off, and matches them.
+  /*
+   * The icon a library picked, NULL wearing its type's. Sporting events are
+   * matched as movies now, so their files wait to be matched: the start-up
+   * pass reads their names again, extras going back to off, and matches them.
+   */
   `
   ALTER TABLE libraries ADD COLUMN icon TEXT;
   UPDATE media SET match = 'pending'
     WHERE library_id IN (SELECT id FROM libraries WHERE kind = 'sports');
   `,
-  // What each library's saga pages show behind their titles, a `SagaBackdrop`
-  // as JSON; a saga with no row shows the default slideshow.
+  /*
+   * What each library's saga pages show behind their titles, a `SagaBackdrop`
+   * as JSON; a saga with no row shows the default slideshow.
+   */
   `
   CREATE TABLE saga_backdrops (
     library_id INTEGER NOT NULL REFERENCES libraries (id) ON DELETE CASCADE,
@@ -345,10 +377,12 @@ export const MIGRATIONS: readonly string[] = [
     PRIMARY KEY (library_id, saga_tmdb_id)
   );
   `,
-  // shown_items reads each edit by its key rather than joining them. SQLite
-  // cannot fold a view holding a LEFT JOIN into a query that LEFT JOINs it,
-  // which every listing does, so it copied every item on each read; a view
-  // of one table it folds in, and reads only the items asked for.
+  /*
+   * shown_items reads each edit by its key rather than joining them. SQLite
+   * cannot fold a view holding a LEFT JOIN into a query that LEFT JOINs it,
+   * which every listing does, so it copied every item on each read; a view
+   * of one table it folds in, and reads only the items asked for.
+   */
   `
   DROP VIEW shown_items;
   CREATE VIEW shown_items AS
@@ -371,25 +405,29 @@ export const MIGRATIONS: readonly string[] = [
            i.runtime, i.studio, i.genres, i.imdb_id, i.tvdb_id, i.fetched_at, i.omdb_fetched_at
       FROM items i;
   `,
-  // Each library's counts read these rather than every file: the files no
-  // match was found for, and the probed files' sizes, for how many are 4K.
-  // Both are partial so a read of a library's files by library alone never
-  // picks one: a full index sorted by size would scatter that read across
-  // the table, where the indexes it uses keep the order files came in.
-  // Probing and matching fill them without changing how many files there
-  // are, so their statistics stay as a library's first scan left them; that
-  // is harmless only while no other read can use them.
+  /*
+   * Each library's counts read these rather than every file: the files no
+   * match was found for, and the probed files' sizes, for how many are 4K.
+   * Both are partial so a read of a library's files by library alone never
+   * picks one: a full index sorted by size would scatter that read across
+   * the table, where the indexes it uses keep the order files came in.
+   * Probing and matching fill them without changing how many files there
+   * are, so their statistics stay as a library's first scan left them; that
+   * is harmless only while no other read can use them.
+   */
   `
   CREATE INDEX media_library_unmatched ON media (library_id) WHERE match = 'unmatched';
   CREATE INDEX media_library_probed ON media (library_id, width, height) WHERE width IS NOT NULL;
   `,
-  // A play is a real one ('played'), one Mark as watched wrote ('marked',
-  // which always counts), or a real one Mark as unwatched set aside
-  // ('cleared', which stays in the history and never counts). Watched at is
-  // now also where a resume spot clears, so a library still at the old
-  // default of 90 moves to 95, and a spot at or past its library's
-  // threshold, which a watched play would have cleared, goes. A file whose
-  // length is unknown has no threshold, so it keeps its spot.
+  /*
+   * A play is a real one ('played'), one Mark as watched wrote ('marked',
+   * which always counts), or a real one Mark as unwatched set aside
+   * ('cleared', which stays in the history and never counts). Watched at is
+   * now also where a resume spot clears, so a library still at the old
+   * default of 90 moves to 95, and a spot at or past its library's
+   * threshold, which a watched play would have cleared, goes. A file whose
+   * length is unknown has no threshold, so it keeps its spot.
+   */
   `
   ALTER TABLE plays ADD COLUMN kind TEXT NOT NULL DEFAULT 'played'
     CHECK (kind IN ('played', 'marked', 'cleared'));
@@ -402,15 +440,19 @@ export const MIGRATIONS: readonly string[] = [
        JOIN playback_progress p ON p.media_id = m.id
       WHERE m.duration > 0 AND p.position >= m.duration * l.watched_percent / 100.0);
   `,
-  // When each library's last full scan and last quick scan finished, so the
-  // Libraries page still says after a restart. Null until each has run.
+  /*
+   * When each library's last full scan and last quick scan finished, so the
+   * Libraries page still says after a restart. Null until each has run.
+   */
   `
   ALTER TABLE libraries ADD COLUMN full_scanned_at TEXT;
   ALTER TABLE libraries ADD COLUMN quick_scanned_at TEXT;
   `,
-  // A show's logo sits in item_images as a movie's does; shows stored before
-  // learn theirs from TMDB once, in the daily sweep. Shows and seasons can
-  // be favourites as videos can, one row each, by item.
+  /*
+   * A show's logo sits in item_images as a movie's does; shows stored before
+   * learn theirs from TMDB once, in the daily sweep. Shows and seasons can
+   * be favourites as videos can, one row each, by item.
+   */
   `
   UPDATE items SET logo_checked = 0 WHERE type = 'show';
   CREATE TABLE item_favourites (
@@ -418,10 +460,12 @@ export const MIGRATIONS: readonly string[] = [
     added_at TEXT NOT NULL
   );
   `,
-  // What TMDB says of a person and everything they appear in, for the person
-  // page. `filmography_fetched_at` is null until the credits were fetched, and
-  // `department` is TMDB's own, with `Acting` for a cast credit. One person
-  // can hold several credits on one title, so `credit_id` is the key.
+  /*
+   * What TMDB says of a person and everything they appear in, for the person
+   * page. `filmography_fetched_at` is null until the credits were fetched, and
+   * `department` is TMDB's own, with `Acting` for a cast credit. One person
+   * can hold several credits on one title, so `credit_id` is the key.
+   */
   `
   ALTER TABLE people ADD COLUMN imdb_id TEXT;
   ALTER TABLE people ADD COLUMN birthday TEXT;
@@ -446,17 +490,21 @@ export const MIGRATIONS: readonly string[] = [
     PRIMARY KEY (person_id, credit_id)
   );
   `,
-  // Which provider wrote each score, so MDBList's and OMDb's never wipe each
-  // other's, and when MDBList last answered for an item. Every score that is
-  // not TMDB's came from OMDb until now.
+  /*
+   * Which provider wrote each score, so MDBList's and OMDb's never wipe each
+   * other's, and when MDBList last answered for an item. Every score that is
+   * not TMDB's came from OMDb until now.
+   */
   `
   ALTER TABLE ratings ADD COLUMN provider TEXT NOT NULL DEFAULT 'tmdb';
   UPDATE ratings SET provider = 'omdb' WHERE source <> 'tmdb';
   ALTER TABLE items ADD COLUMN mdblist_fetched_at TEXT;
   `,
-  // A library's Refresh: the movies and shows whose scores it asked for
-  // again, each until a source settles it, when it began, how many titles
-  // it asked for, and when the last one finished.
+  /*
+   * A library's Refresh: the movies and shows whose scores it asked for
+   * again, each until a source settles it, when it began, how many titles
+   * it asked for, and when the last one finished.
+   */
   `
   CREATE TABLE score_requests (
     library_id INTEGER NOT NULL REFERENCES libraries (id) ON DELETE CASCADE,
@@ -468,19 +516,21 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE libraries ADD COLUMN ratings_refresh_total INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE libraries ADD COLUMN ratings_refreshed_at TEXT;
   `,
-  // Each account keeps its own resume spots, plays, watched marks and
-  // favourites, so every row names its account. A migration cannot know who
-  // owns the server, so what was recorded before goes to the local account,
-  // which the owner adopts at runtime; a server without accounts keeps
-  // reading and writing it. The rebuilt tables have no default account, so
-  // a write that forgets one fails; the plays default only fills the rows
-  // already there. A row whose video or title is gone, left by a database
-  // that once ran without foreign keys, is not copied, so it cannot stop the
-  // start. Each table keeps an index by its video or title, as plays_media
-  // stays, so a delete's cascade never reads the whole table. The
-  // rebuilt tables are WITHOUT ROWID, keyed by account first: with a
-  // handful of rows a rowid table's key index looked dearer to SQLite than
-  // reading the whole table for every card.
+  /*
+   * Each account keeps its own resume spots, plays, watched marks and
+   * favourites, so every row names its account. A migration cannot know who
+   * owns the server, so what was recorded before goes to the local account,
+   * which the owner adopts at runtime; a server without accounts keeps
+   * reading and writing it. The rebuilt tables have no default account, so
+   * a write that forgets one fails; the plays default only fills the rows
+   * already there. A row whose video or title is gone, left by a database
+   * that once ran without foreign keys, is not copied, so it cannot stop the
+   * start. Each table keeps an index by its video or title, as plays_media
+   * stays, so a delete's cascade never reads the whole table. The
+   * rebuilt tables are WITHOUT ROWID, keyed by account first: with a
+   * handful of rows a rowid table's key index looked dearer to SQLite than
+   * reading the whole table for every card.
+   */
   `
   CREATE TABLE progress_by_account (
     account_id TEXT NOT NULL,
@@ -525,10 +575,12 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE plays ADD COLUMN account_id TEXT NOT NULL DEFAULT '${VIEWING_ACCOUNTS.local}';
   CREATE INDEX plays_account ON plays (account_id, media_id, played_at);
   `,
-  // What a viewer's player sends with Report this error, for the admin to
-  // work through. A report outlives its video, so media_id is no foreign
-  // key; diagnostics is the JSON the player gathered. Reports are found by
-  // account and time to hold back one account sending too many.
+  /*
+   * What a viewer's player sends with Report this error, for the admin to
+   * work through. A report outlives its video, so media_id is no foreign
+   * key; diagnostics is the JSON the player gathered. Reports are found by
+   * account and time to hold back one account sending too many.
+   */
   `
   CREATE TABLE bug_reports (
     id INTEGER PRIMARY KEY,
@@ -544,14 +596,18 @@ export const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX bug_reports_account ON bug_reports (account_id, created_at);
   `,
-  // The video keyframes of a file in seconds, a JSON array probed once on its
-  // first HLS play and cleared when the file changes, like its tracks.
+  /*
+   * The video keyframes of a file in seconds, a JSON array probed once on its
+   * first HLS play and cleared when the file changes, like its tracks.
+   */
   `
   ALTER TABLE media ADD COLUMN keyframes TEXT;
   `,
-  // The movies and shows the admin picked for home's hero, one row each, in
-  // the order they were picked. With none, the hero shows each pinned
-  // library's newest release.
+  /*
+   * The movies and shows the admin picked for home's hero, one row each, in
+   * the order they were picked. With none, the hero shows each pinned
+   * library's newest release.
+   */
   `
   CREATE TABLE hero_picks (
     item_id INTEGER PRIMARY KEY REFERENCES items (id) ON DELETE CASCADE,
@@ -570,11 +626,13 @@ export const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE libraries ADD COLUMN position INTEGER;
   `,
-  // A file's chapters, a JSON array read with its probe and cleared when the
-  // file changes; null until read, so a file probed before is read on its
-  // first play. And where its intro and credits are, one of each at most,
-  // in seconds on the file's clock: a stronger source replaces a weaker one,
-  // and an admin's own (manual) outlives a replaced file.
+  /*
+   * A file's chapters, a JSON array read with its probe and cleared when the
+   * file changes; null until read, so a file probed before is read on its
+   * first play. And where its intro and credits are, one of each at most,
+   * in seconds on the file's clock: a stronger source replaces a weaker one,
+   * and an admin's own (manual) outlives a replaced file.
+   */
   `
   ALTER TABLE media ADD COLUMN chapters TEXT;
 
@@ -589,11 +647,13 @@ export const MIGRATIONS: readonly string[] = [
     PRIMARY KEY (media_id, kind)
   ) WITHOUT ROWID;
   `,
-  // Where each file stands in intro detection, and by which version of the
-  // detector, so an improved one runs again; and the audio fingerprint of
-  // each file's head, kept so a new episode is matched against its season
-  // without decoding its neighbours again. A fingerprint is packed uint32
-  // points from the file's start, `seconds` long.
+  /*
+   * Where each file stands in intro detection, and by which version of the
+   * detector, so an improved one runs again; and the audio fingerprint of
+   * each file's head, kept so a new episode is matched against its season
+   * without decoding its neighbours again. A fingerprint is packed uint32
+   * points from the file's start, `seconds` long.
+   */
   `
   ALTER TABLE media ADD COLUMN markers TEXT NOT NULL DEFAULT 'pending';
   ALTER TABLE media ADD COLUMN markers_version INTEGER NOT NULL DEFAULT 0;
@@ -607,14 +667,18 @@ export const MIGRATIONS: readonly string[] = [
     PRIMARY KEY (media_id, region)
   ) WITHOUT ROWID;
   `,
-  // Cards show the critics' Metascore by default; a library still on the
-  // old default of TMDB's moves over. A title with no Metascore shows TMDB's.
+  /*
+   * Cards show the critics' Metascore by default; a library still on the
+   * old default of TMDB's moves over. A title with no Metascore shows TMDB's.
+   */
   `
   UPDATE libraries SET ratings_source = 'metacritic' WHERE ratings_source = 'tmdb';
   `,
-  // Edit images chooses a picture for one library's card of a title, not
-  // for every library holding it. A choice made before goes to each library
-  // that held the title, so nothing looks different until one is changed.
+  /*
+   * Edit images chooses a picture for one library's card of a title, not
+   * for every library holding it. A choice made before goes to each library
+   * that held the title, so nothing looks different until one is changed.
+   */
   `
   CREATE TABLE library_item_images (
     library_id INTEGER NOT NULL REFERENCES libraries (id) ON DELETE CASCADE,
@@ -638,13 +702,15 @@ export const MIGRATIONS: readonly string[] = [
    WHERE c.source = 'chosen';
   DELETE FROM item_images WHERE source = 'chosen';
   `,
-  // Music: artists shared across libraries, each library's albums, and its
-  // tracks keyed by the file's media row, so plays, favourites, progress,
-  // tickets and downloads work on a track as they do on any file. An album
-  // or an artist is found again by its MusicBrainz id when the tags carry
-  // one, else by its key: a normalised name (and the library and album
-  // artist for an album), or the album folder for files with no album tag.
-  // Credits keep every artist of "A feat. B" and of a compilation.
+  /*
+   * Music: artists shared across libraries, each library's albums, and its
+   * tracks keyed by the file's media row, so plays, favourites, progress,
+   * tickets and downloads work on a track as they do on any file. An album
+   * or an artist is found again by its MusicBrainz id when the tags carry
+   * one, else by its key: a normalised name (and the library and album
+   * artist for an album), or the album folder for files with no album tag.
+   * Credits keep every artist of "A feat. B" and of a compilation.
+   */
   `
   CREATE TABLE artists (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -715,9 +781,11 @@ export const MIGRATIONS: readonly string[] = [
   ) WITHOUT ROWID;
   CREATE INDEX track_artists_artist ON track_artists (artist_id, media_id);
   `,
-  // Where each album stands with MusicBrainz: `pending` until a pass looks,
-  // `matched` by a tag's release id or a sure search, `manual` by Fix match,
-  // `unmatched` when no release was found, with how sure the search was.
+  /*
+   * Where each album stands with MusicBrainz: `pending` until a pass looks,
+   * `matched` by a tag's release id or a sure search, `manual` by Fix match,
+   * `unmatched` when no release was found, with how sure the search was.
+   */
   `
   ALTER TABLE albums ADD COLUMN match TEXT NOT NULL DEFAULT 'pending';
   ALTER TABLE albums ADD COLUMN match_confidence INTEGER;
@@ -725,12 +793,14 @@ export const MIGRATIONS: readonly string[] = [
   UPDATE albums SET match = 'matched', matched_at = added_at WHERE mbid IS NOT NULL;
   CREATE INDEX albums_library_match ON albums (library_id, match);
   `,
-  // Each account's playlists, its favourite albums and artists, and what
-  // LRCLIB said of a track's lyrics, asked once per track. A playlist's
-  // tracks are kept by position, so the same track may come twice; the
-  // media and album indexes let a removed file, album or artist cascade by
-  // key. An audiobook read before chapters were kept stored none, so it
-  // reads them again on its next play.
+  /*
+   * Each account's playlists, its favourite albums and artists, and what
+   * LRCLIB said of a track's lyrics, asked once per track. A playlist's
+   * tracks are kept by position, so the same track may come twice; the
+   * media and album indexes let a removed file, album or artist cascade by
+   * key. An audiobook read before chapters were kept stored none, so it
+   * reads them again on its next play.
+   */
   `
   CREATE TABLE playlists (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -784,9 +854,11 @@ export const MIGRATIONS: readonly string[] = [
   UPDATE media SET probed = 0
    WHERE library_id IN (SELECT id FROM libraries WHERE kind = 'music');
   `,
-  // The loudness scan: where each track stands in it, by which scan, and
-  // whether a track's or an album's gain came from its tags or the scan. A
-  // gain already kept was read from the tags.
+  /*
+   * The loudness scan: where each track stands in it, by which scan, and
+   * whether a track's or an album's gain came from its tags or the scan. A
+   * gain already kept was read from the tags.
+   */
   `
   ALTER TABLE tracks ADD COLUMN loudness_state TEXT NOT NULL DEFAULT 'pending';
   ALTER TABLE tracks ADD COLUMN loudness_version INTEGER NOT NULL DEFAULT 0;
@@ -795,12 +867,14 @@ export const MIGRATIONS: readonly string[] = [
   UPDATE tracks SET replaygain_source = 'tags' WHERE replaygain_gain IS NOT NULL;
   UPDATE albums SET replaygain_source = 'tags' WHERE replaygain_gain IS NOT NULL;
   `,
-  // The artists ListenBrainz finds similar to each of ours, shared by every
-  // account and asked again after 30 days. A similar artist is kept by its
-  // MusicBrainz id, held in a library or not, so one added later is found
-  // without asking again, the ids lowercase on both sides so they join on
-  // `artists.mbid`'s index; one id already held in another case keeps its own.
-  // Home lists the albums added last.
+  /*
+   * The artists ListenBrainz finds similar to each of ours, shared by every
+   * account and asked again after 30 days. A similar artist is kept by its
+   * MusicBrainz id, held in a library or not, so one added later is found
+   * without asking again, the ids lowercase on both sides so they join on
+   * `artists.mbid`'s index; one id already held in another case keeps its own.
+   * Home lists the albums added last.
+   */
   `
   UPDATE OR IGNORE artists SET mbid = lower(mbid) WHERE mbid <> lower(mbid);
   CREATE TABLE similar_artists (
@@ -812,13 +886,15 @@ export const MIGRATIONS: readonly string[] = [
   ) WITHOUT ROWID;
   CREATE INDEX albums_added ON albums (added_at);
   `,
-  // Scrobbling: each account's link to ListenBrainz or Last.fm, its token
-  // or session key sealed with the server's key, and the listens waiting to
-  // go out, numbered per account and service. `listened_at` is in Unix
-  // seconds, as both services take it, and `next_at` in the server's
-  // milliseconds; the sender finds what is due by service and time, sweeps
-  // what is too old by when it began, and a removed file takes its waiting
-  // listens with it.
+  /*
+   * Scrobbling: each account's link to ListenBrainz or Last.fm, its token
+   * or session key sealed with the server's key, and the listens waiting to
+   * go out, numbered per account and service. `listened_at` is in Unix
+   * seconds, as both services take it, and `next_at` in the server's
+   * milliseconds; the sender finds what is due by service and time, sweeps
+   * what is too old by when it began, and a removed file takes its waiting
+   * listens with it.
+   */
   `
   CREATE TABLE scrobble_links (
     account_id TEXT NOT NULL,
@@ -843,16 +919,20 @@ export const MIGRATIONS: readonly string[] = [
   CREATE INDEX scrobble_queue_media ON scrobble_queue (media_id);
   CREATE INDEX scrobble_queue_listened ON scrobble_queue (listened_at);
   `,
-  // A playlist its owner shares, which every account on the server may
-  // read, play and copy; every playlist kept so far stays its owner's. The
-  // shared ones are few, so a partial index finds them without the rest.
+  /*
+   * A playlist its owner shares, which every account on the server may
+   * read, play and copy; every playlist kept so far stays its owner's. The
+   * shared ones are few, so a partial index finds them without the rest.
+   */
   `
   ALTER TABLE playlists ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0;
   CREATE INDEX playlists_shared ON playlists (is_shared) WHERE is_shared = 1;
   `,
-  // The shows each account is binging, kept here so every device an account
-  // signs in on sees the same list, and whether it has dismissed the binge
-  // tip. The limit on how many is the service's, not the table's.
+  /*
+   * The shows each account is binging, kept here so every device an account
+   * signs in on sees the same list, and whether it has dismissed the binge
+   * tip. The limit on how many is the service's, not the table's.
+   */
   `
   CREATE TABLE binge_shows (
     account_id TEXT NOT NULL,
@@ -866,8 +946,10 @@ export const MIGRATIONS: readonly string[] = [
     account_id TEXT PRIMARY KEY
   ) WITHOUT ROWID;
   `,
-  // Cached anime movies can still carry regional re-release dates. The boot
-  // sweep fetches their original dates again; failures stay stale for retry.
+  /*
+   * Cached anime movies can still carry regional re-release dates. The boot
+   * sweep fetches their original dates again; failures stay stale for retry.
+   */
   `
   UPDATE items SET fetched_at = '1970-01-01T00:00:00.000Z'
    WHERE type = 'movie' AND tmdb_id NOT LIKE 'local:%'
@@ -878,10 +960,12 @@ export const MIGRATIONS: readonly string[] = [
         WHERE l.kind = 'animeMovies'
      );
   `,
-  // A tag like \`6\` was kept as an album's year and sorted it first by release
-  // date. Years no release can have (before 1877, the phonograph's, or past next
-  // year: \`EARLIEST_RELEASE_YEAR\` in \`@raven/core\`) go, and MusicBrainz is asked
-  // again for those albums' dates.
+  /*
+   * A tag like \`6\` was kept as an album's year and sorted it first by release
+   * date. Years no release can have (before 1877, the phonograph's, or past next
+   * year: \`EARLIEST_RELEASE_YEAR\` in \`@raven/core\`) go, and MusicBrainz is asked
+   * again for those albums' dates.
+   */
   `
   UPDATE albums SET year = NULL, fetched_at = NULL
    WHERE year < 1877 OR year > CAST(strftime('%Y', 'now') AS INTEGER) + 1;
@@ -891,21 +975,25 @@ export const MIGRATIONS: readonly string[] = [
    WHERE CAST(substr(release_date, 1, 4) AS INTEGER) < 1877
       OR CAST(substr(release_date, 1, 4) AS INTEGER) > CAST(strftime('%Y', 'now') AS INTEGER) + 1;
   `,
-  // Dolby Vision profile 5, which only Dolby Vision can show: a browser plays it purple and
-  // green. Only an HDR file can be Dolby Vision, so those alone are probed again by the next
-  // scan someone starts, to read it.
+  /*
+   * Dolby Vision profile 5, which only Dolby Vision can show: a browser plays it purple and
+   * green. Only an HDR file can be Dolby Vision, so those alone are probed again by the next
+   * scan someone starts, to read it.
+   */
   `
   ALTER TABLE media ADD COLUMN dolby_vision_only INTEGER NOT NULL DEFAULT 0;
   CREATE INDEX media_library_dolby_vision_only ON media (library_id) WHERE dolby_vision_only = 1;
   UPDATE media SET probed = 0 WHERE hdr = 1;
   `,
-  // Every sitting with a video or a track, however short, by account, for the play history.
-  // `id` counts up across every account in the order the sittings started, so it is both the
-  // history's order and its page cursor. `kind` says how the entry is kept: a 'video' follows
-  // its play (`play_id`) as that sitting's reports come in; a 'listen' follows the reports of
-  // the listen its music player started. The plays kept so far start it, oldest first: a
-  // video's with how far it got, a music listen's with no reach (NULL), since a listen only
-  // ever noted that it counted.
+  /*
+   * Every sitting with a video or a track, however short, by account, for the play history.
+   * `id` counts up across every account in the order the sittings started, so it is both the
+   * history's order and its page cursor. `kind` says how the entry is kept: a 'video' follows
+   * its play (`play_id`) as that sitting's reports come in; a 'listen' follows the reports of
+   * the listen its music player started. The plays kept so far start it, oldest first: a
+   * video's with how far it got, a music listen's with no reach (NULL), since a listen only
+   * ever noted that it counted.
+   */
   `
   CREATE TABLE play_history (
     id INTEGER PRIMARY KEY,

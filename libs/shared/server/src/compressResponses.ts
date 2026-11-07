@@ -5,8 +5,10 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import type { FastifyRequest } from 'fastify'
 import { CONTENT_TYPES, HEADERS } from '@/http'
 
-// Past this list the plugin asks mime-db, which marks no video and neither JPEG
-// nor PNG compressible, and leaves out the HLS playlist, which is text.
+/*
+ * Past this list the plugin asks mime-db, which marks no video and neither JPEG
+ * nor PNG compressible, and leaves out the HLS playlist, which is text.
+ */
 const COMPRESSIBLE = /^text\/(?!event-stream)|[+/](?:json|xml)(?:;|$)/u
 
 const baseTypeOf = (type: string): string => type.split(';', 1)[0]?.trim().toLowerCase() ?? ''
@@ -58,13 +60,15 @@ export const compressResponses = async ({ app }: CompressResponsesProps): Promis
       skipCompression({ request, reason: SKIP_REASONS.range })
     }
   })
-  // The plugin compresses a reply with no type as JSON, and Fastify names no
-  // type for a stream, so a stream that names none would be packed and lose
-  // its length. Called bytes, it goes out as it is. Fastify runs this hook
-  // before the plugin's, which it adds to each route.
-  //
-  // mime-db 1.54 calls octet-stream compressible, and on a media server that
-  // is a video, so bytes are marked for the plugin to skip.
+  /*
+   * The plugin compresses a reply with no type as JSON, and Fastify names no
+   * type for a stream, so a stream that names none would be packed and lose
+   * its length. Called bytes, it goes out as it is. Fastify runs this hook
+   * before the plugin's, which it adds to each route.
+   *
+   * mime-db 1.54 calls octet-stream compressible, and on a media server that
+   * is a video, so bytes are marked for the plugin to skip.
+   */
   fastify.addHook('onSend', async (request, reply, payload) => {
     if (reply.getHeader(HEADERS.contentType) === undefined && isStream(payload)) {
       reply.header(HEADERS.contentType, CONTENT_TYPES.octetStream)

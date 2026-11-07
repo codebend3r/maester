@@ -339,9 +339,11 @@ export const useDownloads = create<Downloads>()(
         const fetched = await fetchOne(next)
         const now = get().entries[keyOfEntry(next)]
         const isCurrent = now !== undefined && now.queueStamp === next.queueStamp
-        // Removed while it downloaded, what it wrote goes too, and a failure leaves no file.
-        // Removed and queued again, the folder is the newer fetch's, and this one, done or
-        // failed, lands nowhere.
+        /*
+         * Removed while it downloaded, what it wrote goes too, and a failure leaves no file.
+         * Removed and queued again, the folder is the newer fetch's, and this one, done or
+         * failed, lands nowhere.
+         */
         if (now === undefined || (isCurrent && fetched.status === DOWNLOAD_STATUSES.failed)) {
           await get().device.disk.remove(folderOfPath(next.path)).catch(IGNORED)
         }

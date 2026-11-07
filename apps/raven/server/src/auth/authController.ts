@@ -110,9 +110,11 @@ export class AuthController {
     const accountId = id.toLowerCase()
     type SettleProps = { isRefused: boolean }
 
-    // Runs however the change ends: a response lost after the change was made
-    // must not leave the old answer cached, so only a plain refusal keeps the
-    // account's token held.
+    /*
+     * Runs however the change ends: a response lost after the change was made
+     * must not leave the old answer cached, so only a plain refusal keeps the
+     * account's token held.
+     */
     const settle = ({ isRefused }: SettleProps): void => {
       this.lookups.forget({ accountId })
       if (change.status !== MEMBER_STATUSES.approved && !isRefused) {

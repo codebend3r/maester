@@ -171,8 +171,10 @@ export class PeopleRepository {
           biography: person.biography,
           knownFor: person.knownFor,
         })
-      // A person cleared up while TMDB was answering has no row to hang credits
-      // on, and their id may since have gone to someone else.
+      /*
+       * A person cleared up while TMDB was answering has no row to hang credits
+       * on, and their id may since have gone to someone else.
+       */
       if (updated.changes === 0) return
       this.db.prepare('DELETE FROM person_credits WHERE person_id = ?').run(personId)
       const insert = this.db.prepare(

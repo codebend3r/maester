@@ -516,8 +516,10 @@ export const parseEpisodeName = ({
   const fromFile = readName(before.replace(ABSOLUTE, ' ').replace(AIR_DATE, ' '))
   const fromFolder =
     showFolder !== '' && seasonFolderNumber(showFolder) == null ? readName(showFolder) : null
-  // Shows have no editions, so a name ending in a word an edition would,
-  // "Australia Remastered", is read whole.
+  /*
+   * Shows have no editions, so a name ending in a word an edition would,
+   * "Australia Remastered", is read whole.
+   */
   const fileNamed = fromFile.withEdition ?? fromFile.title
   const named = (fromFolder?.withEdition ?? fromFolder?.title) || fileNamed || fallbackShow
   // The suffix is not searched on, but kept to choose between two shows of the name.

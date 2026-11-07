@@ -46,8 +46,10 @@ describe('serverOriginOf', () => {
     expect(serverOriginOf(raw)).toBe(origin)
   })
 
-  // UTS 46 folds case rather than lowering it: Cherokee folds to its capitals, and a Greek
-  // letter with iota subscript to the letter and an iota. Final sigma and sharp s stay.
+  /*
+   * UTS 46 folds case rather than lowering it: Cherokee folds to its capitals, and a Greek
+   * letter with iota subscript to the letter and an iota. Final sigma and sharp s stay.
+   */
   it.each([
     ['https://Ꭴbc.example', 'https://xn--bc-98l.example'],
     ['https://ꭴbc.example', 'https://xn--bc-98l.example'],
@@ -141,9 +143,11 @@ describe('serverOriginOf', () => {
     expect(serverOriginOf(raw)).toBeNull()
   })
 
-  // URL takes these, but no server address needs them.
-  // URL folds each of these to nothing, so `rav<it>en` would be raven.example under it; refused
-  // here rather than written as a second, look-alike host.
+  /*
+   * URL takes these, but no server address needs them.
+   * URL folds each of these to nothing, so `rav<it>en` would be raven.example under it; refused
+   * here rather than written as a second, look-alike host.
+   */
   it.each([
     0x00ad, 0x034f, 0x061c, 0x115f, 0x1160, 0x17b4, 0x17b5, 0x180b, 0x180f, 0x3164, 0xfe00, 0xfe0f,
     0xffa0, 0xe0100,

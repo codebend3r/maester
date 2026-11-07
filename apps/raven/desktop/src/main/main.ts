@@ -131,8 +131,10 @@ const OPEN_BATCH_MS = 100
 const STATE_DEBOUNCE_MS = 2000
 
 const platform = desktopPlatformFor({ platform: process.platform })
-// Squirrel's installer runs Raven on each install event and waits for it to exit, so such a
-// launch does its step and quits before anything starts.
+/*
+ * Squirrel's installer runs Raven on each install event and waits for it to exit, so such a
+ * launch does its step and quits before anything starts.
+ */
 const isLaunch = takeSquirrelStep({
   step: squirrelStepFor({ platform, argv: process.argv, execPath: process.execPath }),
   run: ({ command, args, done }) => {
@@ -169,8 +171,10 @@ app.setAppLogsPath(
 // A second instance hands its files to the first and quits.
 const isPrimary = isLaunch && app.requestSingleInstanceLock()
 
-// Music plays in mpv, not in the page, so Chromium must not answer the media keys or hold
-// Now Playing for a page's media: the addon owns both (the audio spec's Now Playing spike).
+/*
+ * Music plays in mpv, not in the page, so Chromium must not answer the media keys or hold
+ * Now Playing for a page's media: the addon owns both (the audio spec's Now Playing spike).
+ */
 app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling,MediaSessionService')
 
 const appLog = createAppLog({
@@ -197,18 +201,22 @@ const startApp = (): void => {
   protocol.registerSchemesAsPrivileged([
     {
       scheme: FILE_SCHEME,
-      // standard and secure: a media source the secure page may load; stream: `<video>` reads
-      // the response as it arrives and asks for byte ranges. It does not bypass the CSP,
-      // which names `raven-file:` in `media-src`.
+      /*
+       * standard and secure: a media source the secure page may load; stream: `<video>` reads
+       * the response as it arrives and asks for byte ranges. It does not bypass the CSP,
+       * which names `raven-file:` in `media-src`.
+       */
       privileges: { standard: true, secure: true, stream: true },
     },
   ])
 
   const quitMark = createQuitMark({ isEnabled: true, now: () => performance.now(), write: mark })
   app.on('before-quit', quitMark.started)
-  // Not on `quit`, after which nothing waits for a write: ahead of the quit gate's own
-  // `will-quit`, which then finds the mark in the log and holds the quit while it writes.
-  // So `raven-quit-ms` ends before that last flush of the log, which it does not count.
+  /*
+   * Not on `quit`, after which nothing waits for a write: ahead of the quit gate's own
+   * `will-quit`, which then finds the mark in the log and holds the quit while it writes.
+   * So `raven-quit-ms` ends before that last flush of the log, which it does not count.
+   */
   app.on('will-quit', quitMark.ended)
 
   const marks = createMarks({
@@ -221,8 +229,10 @@ const startApp = (): void => {
   // A file opened before the window is ready is a cold "Open With", timed to its first frame.
   const launch = { isWindowReady: false }
 
-  // The server this build plays from, and the other origins its links may name it by. Each is
-  // replaced by `bun build --define` with what the build was given.
+  /*
+   * The server this build plays from, and the other origins its links may name it by. Each is
+   * replaced by `bun build --define` with what the build was given.
+   */
   const fixedServer = fixedServerFrom({
     origin: serverOriginFrom({
       isPackaged: app.isPackaged,
@@ -319,8 +329,10 @@ const startApp = (): void => {
     if (event !== null) send(event)
   }
 
-  // Resolves once the window is open. The batches deliver only after the page's `ready`,
-  // which the window's page sends, so by then it has resolved.
+  /*
+   * Resolves once the window is open. The batches deliver only after the page's `ready`,
+   * which the window's page sends, so by then it has resolved.
+   */
   const services: { ready: Promise<DesktopService> | null } = { ready: null }
   const openFromMain = async (paths: readonly string[]): Promise<void> => {
     const service = await services.ready
@@ -363,8 +375,10 @@ const startApp = (): void => {
     launchPaths({ argv, isDefaultApp: process.defaultApp }).forEach(fileBatch.push)
     linksFromArgv(argv).forEach(linkBatch.push)
   })
-  // Forge writes the scheme into macOS's Info.plist only; Windows learns it from the app. Only
-  // packaged, so a development run never claims the person's links for itself.
+  /*
+   * Forge writes the scheme into macOS's Info.plist only; Windows learns it from the app. Only
+   * packaged, so a development run never claims the person's links for itself.
+   */
   if (platform === DESKTOP_PLATFORMS.windows && app.isPackaged) {
     app.setAsDefaultProtocolClient(LINK_SCHEME)
   }
@@ -420,8 +434,10 @@ const startApp = (): void => {
     })
     const theServer = () => serverOf(config.read())
     const serverOfId = (serverId: string) => serverById({ config: config.read(), serverId })
-    // Nothing opens an older Raven's server sessions any more, so none of the folders
-    // it removes is open; the removals go on while the window opens.
+    /*
+     * Nothing opens an older Raven's server sessions any more, so none of the folders
+     * it removes is open; the removals go on while the window opens.
+     */
     const formerSessions = await clearFormerPartitions({
       dir: join(userData, PARTITIONS_DIR),
       fs: { readdir: (path) => readdir(path), remove: removeTree },
@@ -437,8 +453,10 @@ const startApp = (): void => {
     const grants = createGrants({ fs: { realpath, stat }, newId: randomUUID })
     // The page enters the library PIN, so main's own calls carry the unlock cookie it holds.
     const pageUnlock = createPageUnlock({ cookies: session.defaultSession.cookies, warn })
-    // The page's sign in: a sign out ends what main holds on the account's behalf (`accessEnds`),
-    // and a change of account reaches what keeps data per account (`accountSwitches`).
+    /*
+     * The page's sign in: a sign out ends what main holds on the account's behalf (`accessEnds`),
+     * and a change of account reaches what keeps data per account (`accountSwitches`).
+     */
     const accessEnds = createServerSignal()
     const accountSwitches = createServerSignal()
     const account = createPageAccount({
@@ -484,8 +502,10 @@ const startApp = (): void => {
       timers,
       warn,
     })
-    // A sign out: the title stops being relayed. A ticket is the account's that minted it, so
-    // another account mints its own.
+    /*
+     * A sign out: the title stops being relayed. A ticket is the account's that minted it, so
+     * another account mints its own.
+     */
     accessEnds.listen(({ serverId }) => relay.closeServer(serverId))
     accountSwitches.listen(({ serverId }) => accountTickets.forget(serverId))
     // Signed in, the origins are probed at once, so the first title does not wait on the probe.
@@ -502,8 +522,10 @@ const startApp = (): void => {
       picks: originPicks,
       warn,
     })
-    // Music has a relay of its own, so a video and a track never retire each other's
-    // secrets, and it keeps two loads: the track playing and the one mpv opens after it.
+    /*
+     * Music has a relay of its own, so a video and a track never retire each other's
+     * secrets, and it keeps two loads: the track playing and the one mpv opens after it.
+     */
     const musicRelay = createMediaRelay({
       listen: listenOnLoopback({ createServer: (handler) => createServer(handler), warn }),
       fetchUpstream: fetchRelayed,
@@ -523,8 +545,10 @@ const startApp = (): void => {
       picks: originPicks,
       warn,
     })
-    // Grants hold real paths, so the downloads are named from the real folder too: a profile
-    // reached through a link (a temporary folder on macOS) would otherwise match none of them.
+    /*
+     * Grants hold real paths, so the downloads are named from the real folder too: a profile
+     * reached through a link (a temporary folder on macOS) would otherwise match none of them.
+     */
     const downloadsUserData = await realpath(userData).catch(() => userData)
     const downloadsFile = join(userData, DOWNLOADS_FILE)
     const loadedDownloads = await loadDownloads({ fs: TEXT_FS, file: downloadsFile, now: Date.now })
@@ -539,8 +563,10 @@ const startApp = (): void => {
         send({ type: DESKTOP_EVENTS.notice, message: STORE_NOTICES.downloads })
       },
     })
-    // Every download filed under the one server, its folders moved first, and saved before the
-    // config that says which servers were adopted, so a launch cut short does it all again.
+    /*
+     * Every download filed under the one server, its folders moved first, and saved before the
+     * config that says which servers were adopted, so a launch cut short does it all again.
+     */
     const settled = await settleDownloads({
       state: loadedDownloads.state,
       serverId: theServer().id,
@@ -591,10 +617,12 @@ const startApp = (): void => {
       stat: (path) => stat(path),
       accountIdOf,
     })
-    // Before the quit gate's own `before-quit`: each running file's bytes on disk are saved
-    // while it is still downloading, then every fetch is aborted, so the gate's first flush
-    // keeps them for the next launch. A run already renaming its finished video still marks
-    // it ready, which the gate's second flush writes.
+    /*
+     * Before the quit gate's own `before-quit`: each running file's bytes on disk are saved
+     * while it is still downloading, then every fetch is aborted, so the gate's first flush
+     * keeps them for the next launch. A run already renaming its finished video still marks
+     * it ready, which the gate's second flush writes.
+     */
     app.once('before-quit', () => downloads.dispose())
     // A sign out: the downloads fetched with the account's ticket stop too.
     accessEnds.listen(({ serverId }) => downloads.accessEnded({ serverId }))
@@ -649,8 +677,10 @@ const startApp = (): void => {
       clearRecentDocuments: () => app.clearRecentDocuments(),
       stat: (path) => stat(path),
       timers,
-      // The page sends `ready` once per mount; a reload sends it again, which the batches ignore
-      // and which hands the new page a fresh player port (Ruling 12).
+      /*
+       * The page sends `ready` once per mount; a reload sends it again, which the batches ignore
+       * and which hands the new page a fresh player port (Ruling 12).
+       */
       onReady: () => {
         fileBatch.ready()
         linkBatch.ready()
@@ -746,8 +776,10 @@ const startApp = (): void => {
       flush: shutdown.settle,
       timeoutMs: QUIT_FLUSH_MS,
       quit: () => app.quit(),
-      // Reached when the flush timed out or the stores are still dirty; see `hardExitFor`
-      // for why a live mpv means killing the process, and what that costs.
+      /*
+       * Reached when the flush timed out or the stores are still dirty; see `hardExitFor`
+       * for why a live mpv means killing the process, and what that costs.
+       */
       exit: () => {
         const ending = hardExitFor({ isEngineAlive: isAnyEngineAlive(engines()) })
         const end = () => {
@@ -765,8 +797,10 @@ const startApp = (): void => {
           }
         }
         quitMark.ended()
-        // Neither ending runs `will-quit`, so the quit mark is written here, for as long as
-        // the log is given on a normal quit.
+        /*
+         * Neither ending runs `will-quit`, so the quit mark is written here, for as long as
+         * the log is given on a normal quit.
+         */
         endAfterLog({ log, wait: (ms) => sleep(ms), end }).catch(reportEndFailure)
       },
       wait: (ms) => sleep(ms),
@@ -778,8 +812,10 @@ const startApp = (): void => {
     await app.whenReady()
     // Packaged, the bundle's icon.icns is the Dock's; unpackaged, Electron's own would be.
     if (!app.isPackaged) app.dock?.setIcon(join(app.getAppPath(), `${APP_ICON}.png`))
-    // `powerMonitor` answers only once the app is ready. A sleep stops the downloads where
-    // they are, and the wake starts them again.
+    /*
+     * `powerMonitor` answers only once the app is ready. A sleep stops the downloads where
+     * they are, and the wake starts them again.
+     */
     powerMonitor.on('suspend', () => downloads.onSuspend())
     powerMonitor.on('resume', () => downloads.onResume())
     await startWebHost({ serverOrigin: fixedServer.origin, timers, appLog })

@@ -228,8 +228,10 @@ export const openWindow = ({
     store.update((state) => setWindowBounds({ state, bounds: { ...current, displayId } }))
   }
   window.on('moved', remember)
-  // Not 'resized': on Windows that fires only after a native resize, never after the
-  // setBounds a page-drawn resize handle drives. The store debounces the writes.
+  /*
+   * Not 'resized': on Windows that fires only after a native resize, never after the
+   * setBounds a page-drawn resize handle drives. The store debounces the writes.
+   */
   window.on('resize', remember)
 
   window

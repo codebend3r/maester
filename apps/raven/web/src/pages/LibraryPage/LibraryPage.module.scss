@@ -4,18 +4,22 @@
   gap: var(--space-4);
 }
 
-// Room down the right edge for All's jump strip, as wide as a decade's step,
-// where the page's own padding is narrower than the strip. The whole page
-// makes room, so the header's buttons stay clear of the strip too.
+/*
+ * Room down the right edge for All's jump strip, as wide as a decade's step,
+ * where the page's own padding is narrower than the strip. The whole page
+ * makes room, so the header's buttons stay clear of the strip too.
+ */
 .page:has(.withJump) {
   @media (max-width: 64rem) {
     padding-right: var(--space-6);
   }
 }
 
-// The way back over the heading, which is the rest of the header.
-// The header is a container, so its buttons go under the title by the room
-// the page leaves it, whatever the side menu takes.
+/*
+ * The way back over the heading, which is the rest of the header.
+ * The header is a container, so its buttons go under the title by the room
+ * the page leaves it, whatever the side menu takes.
+ */
 .header {
   container-type: inline-size;
   display: grid;
@@ -30,8 +34,10 @@
   grid-area: back;
 }
 
-// The title over its counts, how the scan stands, and the buttons under them,
-// whatever the page's width: up to eight buttons beside the title would squeeze it.
+/*
+ * The title over its counts, how the scan stands, and the buttons under them,
+ * whatever the page's width: up to eight buttons beside the title would squeeze it.
+ */
 .heading {
   grid-area: heading;
   display: grid;
@@ -94,9 +100,11 @@
   gap: var(--space-3);
 }
 
-// The tabs as one row over a hairline, the open one underlined in the leaf.
-// A narrow screen scrolls the row sideways, so each tab draws its focus ring
-// inside itself, where the scrolling cannot clip it.
+/*
+ * The tabs as one row over a hairline, the open one underlined in the leaf.
+ * A narrow screen scrolls the row sideways, so each tab draws its focus ring
+ * inside itself, where the scrolling cannot clip it.
+ */
 .tabsNav {
   min-width: 0;
 }
@@ -148,11 +156,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-// A narrow screen keeps each tab to its icon and count, the tabs sharing
-// the width, so a phone's row fits whole; counts too long for it still
-// scroll. The name stays for a screen reader. The label is hidden as the
-// global .visually-hidden hides, rule for rule: that class cannot apply
-// under a media query, and @raven/ui ships no SCSS to share.
+/*
+ * A narrow screen keeps each tab to its icon and count, the tabs sharing
+ * the width, so a phone's row fits whole; counts too long for it still
+ * scroll. The name stays for a screen reader. The label is hidden as the
+ * global .visually-hidden hides, rule for rule: that class cannot apply
+ * under a media query, and @raven/ui ships no SCSS to share.
+ */
 @media (max-width: 40rem) {
   .heading {
     grid-template-columns: minmax(0, 1fr);
@@ -199,8 +209,10 @@
   }
 }
 
-// One column as wide as the page and no wider, so a wide table scrolls in
-// its own place rather than stretching the toolbar past the screen.
+/*
+ * One column as wide as the page and no wider, so a wide table scrolls in
+ * its own place rather than stretching the toolbar past the screen.
+ */
 .section {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -215,8 +227,10 @@
   gap: var(--space-1);
 }
 
-// The listing and, over its top edge while a change of view lays itself out,
-// the note saying so. The old view stays, dimmed, until the new one is ready.
+/*
+ * The listing and, over its top edge while a change of view lays itself out,
+ * the note saying so. The old view stays, dimmed, until the new one is ready.
+ */
 .listing {
   display: grid;
   grid-template-areas: 'stack';

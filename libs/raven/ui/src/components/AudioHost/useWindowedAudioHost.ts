@@ -114,8 +114,10 @@ export const useWindowedAudioHost = ({
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const isMuted = usePlayerPrefs((prefs) => prefs.muted)
   const loaded = useRef<Loaded | null>(null)
-  // The tracks passed over since one last played, and the one the last pass moved to, so a
-  // queue that holds nothing playable (repeat all over an ALAC album) stops rather than circles.
+  /*
+   * The tracks passed over since one last played, and the one the last pass moved to, so a
+   * queue that holds nothing playable (repeat all over an ALAC album) stops rather than circles.
+   */
   const passed = useRef<ReadonlySet<number>>(new Set())
   const passingTo = useRef<number | null>(null)
   const trackId = track?.id ?? null
@@ -207,8 +209,10 @@ export const useWindowedAudioHost = ({
       engine.ended()
       const store = useAudioQueue.getState()
       const again = playingTrackOf(store)
-      // The same track once more (repeat one): the player has closed it, and the queue has not
-      // moved for `follow` to see, so it is loaded again here.
+      /*
+       * The same track once more (repeat one): the player has closed it, and the queue has not
+       * moved for `follow` to see, so it is loaded again here.
+       */
       if (over === null || again === null || again.id !== over.id) return
       load({ playing: again, next: nextTrackOf(store), start: 0 })
     },

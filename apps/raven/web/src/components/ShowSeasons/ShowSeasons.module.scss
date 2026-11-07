@@ -3,8 +3,10 @@
   gap: var(--space-4);
 }
 
-// Grid or Table as one segmented control: a well holding a button for each,
-// the chosen one lit in moss, as a library's views are.
+/*
+ * Grid or Table as one segmented control: a well holding a button for each,
+ * the chosen one lit in moss, as a library's views are.
+ */
 .views {
   display: grid;
   grid-auto-flow: column;
@@ -34,8 +36,10 @@
   }
 }
 
-// Posters as wide as `POSTER_SIZES.season` fetches them, as many to a line as
-// fit, wrapping onto the next; a little room above for the lift on hover.
+/*
+ * Posters as wide as `POSTER_SIZES.season` fetches them, as many to a line as
+ * fit, wrapping onto the next; a little room above for the lift on hover.
+ */
 .grid {
   --season-width: 9rem;
 
@@ -78,8 +82,10 @@
   }
 }
 
-// One cell exactly the frame's size, so a poster of another shape is cropped
-// to it and the count stays in its corner.
+/*
+ * One cell exactly the frame's size, so a poster of another shape is cropped
+ * to it and the count stays in its corner.
+ */
 .poster,
 .thumb {
   display: grid;

@@ -1,6 +1,8 @@
-// Glass of the ground with a hairline, so it reads over a pale picture too.
-// It sets its own face, so a grouped heading's serif leaves it the body
-// face it wears in a table or a line of facts.
+/*
+ * Glass of the ground with a hairline, so it reads over a pale picture too.
+ * It sets its own face, so a grouped heading's serif leaves it the body
+ * face it wears in a table or a line of facts.
+ */
 .chip {
   display: inline-grid;
   padding: var(--space-0) var(--space-1);
@@ -17,8 +19,10 @@
   white-space: nowrap;
 }
 
-// A tier fills the chip with its own colour, dark ink on it, so the
-// tiers tell apart at a glance; the hairline keeps it off a pale picture.
+/*
+ * A tier fills the chip with its own colour, dark ink on it, so the
+ * tiers tell apart at a glance; the hairline keeps it off a pale picture.
+ */
 .p320,
 .p480,
 .hd,

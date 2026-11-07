@@ -1,5 +1,7 @@
-// elements.scss gives the dialog its frame, padding and scrim; this holds
-// it at a reading width, within the screen's height.
+/*
+ * elements.scss gives the dialog its frame, padding and scrim; this holds
+ * it at a reading width, within the screen's height.
+ */
 .dialog {
   width: min(var(--measure), calc(100vw - 2 * var(--space-3)));
   max-height: calc(100dvh - 2 * var(--space-3));
@@ -59,8 +61,10 @@
   }
 }
 
-// Each movie's backdrop as a tile: a radio kept out of sight, its label the
-// tile. Two to a row, one on a narrow screen.
+/*
+ * Each movie's backdrop as a tile: a radio kept out of sight, its label the
+ * tile. Two to a row, one on a narrow screen.
+ */
 .pictures {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

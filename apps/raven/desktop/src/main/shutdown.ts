@@ -98,8 +98,10 @@ export const createShutdown = ({
   warn,
   wait,
 }: CreateShutdownProps): { isPending: () => boolean; settle: () => Promise<void> } => {
-  // Once mpv or the saves have missed their deadline, a later settle (the quit gate's
-  // second attempt) goes straight to the stores rather than waiting on them again.
+  /*
+   * Once mpv or the saves have missed their deadline, a later settle (the quit gate's
+   * second attempt) goes straight to the stores rather than waiting on them again.
+   */
   let hasTimedOut = false
   let hasWritesTimedOut = false
   let hasLogTimedOut = false

@@ -23,9 +23,11 @@ export const serveWebApp = async ({
   serverPrefixes,
 }: ServeWebAppProps): Promise<void> => {
   if (webDir) {
-    // Registered straight on Fastify and awaited: Nest's own useStaticAssets
-    // imports the plugin lazily and drops the promise, so the plugin lands
-    // after Fastify has started booting and `ready()` never resolves.
+    /*
+     * Registered straight on Fastify and awaited: Nest's own useStaticAssets
+     * imports the plugin lazily and drops the promise, so the plugin lands
+     * after Fastify has started booting and `ready()` never resolves.
+     */
     await app.register(fastifyStatic, {
       root: webDir,
       prefix: '/',

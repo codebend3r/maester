@@ -18,8 +18,10 @@
   opacity: 1;
 }
 
-// The title's first letter, dim and dead center in the frame. The frame sets
-// how large through `--poster-letter`: a grid's poster far larger than a tile's.
+/*
+ * The title's first letter, dim and dead center in the frame. The frame sets
+ * how large through `--poster-letter`: a grid's poster far larger than a tile's.
+ */
 .placeholder {
   display: grid;
   grid-area: picture;

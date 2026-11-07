@@ -1,13 +1,17 @@
-// The table's room is the page's to give, and the side menu narrows it
-// whatever the screen's width, so the columns drop by the room the table
-// has rather than by the screen's. Contained, the room also never grows
-// to the table's own width and pushes the page wider than the screen.
+/*
+ * The table's room is the page's to give, and the side menu narrows it
+ * whatever the screen's width, so the columns drop by the room the table
+ * has rather than by the screen's. Contained, the room also never grows
+ * to the table's own width and pushes the page wider than the screen.
+ */
 .room {
   container-type: inline-size;
 }
 
-// The element defaults draw the table; this sets its rhythm: eyebrow
-// headers, faint rules between rows and a tint under the pointer.
+/*
+ * The element defaults draw the table; this sets its rhythm: eyebrow
+ * headers, faint rules between rows and a tint under the pointer.
+ */
 .table {
   thead th {
     padding-block: var(--space-2);
@@ -43,8 +47,10 @@
   width: 3rem;
 }
 
-// The title's column takes whatever the facts leave, so a title is never
-// squeezed to a letter a line.
+/*
+ * The title's column takes whatever the facts leave, so a title is never
+ * squeezed to a letter a line.
+ */
 .titleHeader {
   width: 100%;
 }
@@ -94,17 +100,21 @@
   grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
   gap: var(--space-2);
 
-  // A library can hold thousands of shows, so the browser lays out and
-  // draws only those near the screen. One it skips stands in at the height
-  // it had when last drawn, else at about a tile's height 1440 wide. The
-  // stand-in is what sits inside the tile's padding, which adds to it.
+  /*
+   * A library can hold thousands of shows, so the browser lays out and
+   * draws only those near the screen. One it skips stands in at the height
+   * it had when last drawn, else at about a tile's height 1440 wide. The
+   * stand-in is what sits inside the tile's padding, which adds to it.
+   */
   > li {
     content-visibility: auto;
     contain-intrinsic-block-size: auto 9rem;
   }
 
-  // Skipping also clips what a tile draws to its box, which would cut off
-  // a focus ring, so a tile holding the focus is drawn whole.
+  /*
+   * Skipping also clips what a tile draws to its box, which would cut off
+   * a focus ring, so a tile holding the focus is drawn whole.
+   */
   > li:focus-within {
     content-visibility: visible;
   }
@@ -179,8 +189,10 @@
   min-width: 0;
 }
 
-// The facts read as one line of words, wrapping between facts rather than
-// inside one, a dot apart.
+/*
+ * The facts read as one line of words, wrapping between facts rather than
+ * inside one, a dot apart.
+ */
 .facts {
   color: var(--color-birch);
   font-size: var(--font-size-xs);
@@ -204,8 +216,10 @@
   }
 }
 
-// A phone's room keeps the title, its count and the play button rather
-// than its poster, years and episodes.
+/*
+ * A phone's room keeps the title, its count and the play button rather
+ * than its poster, years and episodes.
+ */
 @container (max-width: 30rem) {
   .rowFrame,
   .spare {
@@ -213,8 +227,10 @@
   }
 }
 
-// The value the listing is sorted by: a line of its own above the facts, so
-// a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
+/*
+ * The value the listing is sorted by: a line of its own above the facts, so
+ * a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
+ */
 .sorted {
   color: var(--color-bark);
   font-size: var(--font-size-xs);

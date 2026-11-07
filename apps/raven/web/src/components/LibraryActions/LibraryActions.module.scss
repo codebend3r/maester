@@ -1,5 +1,7 @@
-// A row of buttons packed together, as wide as each needs: History and the
-// rest of what manages the library, then the scans and Update ratings.
+/*
+ * A row of buttons packed together, as wide as each needs: History and the
+ * rest of what manages the library, then the scans and Update ratings.
+ */
 .row {
   display: grid;
   grid-auto-flow: column;

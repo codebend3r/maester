@@ -306,8 +306,10 @@ export class MetadataService implements OnApplicationBootstrap {
       task: this.logged({
         what: `type change of library ${libraryId}`,
         task: async () => {
-          // Forgetting a sure pick would unlink its group, and the clear-up could
-          // delete the item, edits and all, before a new lookup was sure.
+          /*
+           * Forgetting a sure pick would unlink its group, and the clear-up could
+           * delete the item, edits and all, before a new lookup was sure.
+           */
           this.decisions.forgetUnsure(libraryId)
           // The layout saved with this change is read even when the type moved on since.
           this.relayoutNow(libraryId)
@@ -512,9 +514,11 @@ export class MetadataService implements OnApplicationBootstrap {
       this.tmdb.newPass()
       const pass = this.newPass(kind)
       const isStopped = await this.matchPending({ libraryId, type, pass })
-      // The items of files still waiting for TMDB stay, with their edits and
-      // pictures, until a pass that gets through matches the files to them
-      // again. A library removed meanwhile is cleared up all the same.
+      /*
+       * The items of files still waiting for TMDB stay, with their edits and
+       * pictures, until a pass that gets through matches the files to them
+       * again. A library removed meanwhile is cleared up all the same.
+       */
       if (isStopped && this.libraries.get(libraryId) != null) return
       await this.lookUpUnmatched({ library, type, pass })
       // A lookup that found TMDB away stops the pass the same way.
@@ -594,9 +598,11 @@ export class MetadataService implements OnApplicationBootstrap {
         : [],
     )
     const lookups = { isHalted: false }
-    // Counted in the health check, so a page showing what the lookups find
-    // knows when to read it again. A group skipped once the lookups halt or
-    // TMDB stops the pass counts as done at once.
+    /*
+     * Counted in the health check, so a page showing what the lookups find
+     * knows when to read it again. A group skipped once the lookups halt or
+     * TMDB stops the pass counts as done at once.
+     */
     const run = { left: groups.length }
     this.lookupRuns.add(run)
     try {
@@ -629,8 +635,10 @@ export class MetadataService implements OnApplicationBootstrap {
     lookups,
   }: MetadataServiceLookUpProps): Promise<void> {
     if (lookups.isHalted || pass.guard.isStopped) return
-    // The groups were listed before the lookups began, and the library may
-    // have been removed or changed to a type that is not looked up since.
+    /*
+     * The groups were listed before the lookups began, and the library may
+     * have been removed or changed to a type that is not looked up since.
+     */
     const current = this.libraries.get(library.id)
     if (current == null || matchTypeFor(current.settings.kind) !== type) return
     if (!this.ai.take()) return

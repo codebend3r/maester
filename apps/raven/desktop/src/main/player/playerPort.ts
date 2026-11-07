@@ -67,8 +67,10 @@ export const connectPort = <C extends { type: string }, E>({
   isRequest,
   warn,
 }: ConnectPortProps<C, E>): { close: () => void } => {
-  // `isRefusing` quiets the warnings for a run of messages it cannot use, as
-  // `isOverflowing` does for a run of commands past `MAX_PENDING`: one warning per run.
+  /*
+   * `isRefusing` quiets the warnings for a run of messages it cannot use, as
+   * `isOverflowing` does for a run of commands past `MAX_PENDING`: one warning per run.
+   */
   const state = { isOpen: true, pending: 0, isOverflowing: false, isRefusing: false }
   let queue: Promise<void> = Promise.resolve()
 

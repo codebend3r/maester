@@ -21,18 +21,24 @@ const isWebProtocol = (value: string): value is keyof typeof DEFAULT_PORTS =>
 const UNREACHABLE_PORT = 0
 const MAX_PORT = 65_535
 
-// What URL silently drops (tabs, newlines) or folds to nothing (zero-width characters, variation
-// selectors, fillers: every default-ignorable code point) is refused up front, so a hidden
-// character never makes a second host that looks like the first.
+/*
+ * What URL silently drops (tabs, newlines) or folds to nothing (zero-width characters, variation
+ * selectors, fillers: every default-ignorable code point) is refused up front, so a hidden
+ * character never makes a second host that looks like the first.
+ */
 const HIDDEN = /[\s\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}]/u
-// UTS 46 refuses unassigned, private-use and surrogate code points, the noncharacters
-// (unassigned too) and the replacement character.
+/*
+ * UTS 46 refuses unassigned, private-use and surrogate code points, the noncharacters
+ * (unassigned too) and the replacement character.
+ */
 const DISALLOWED = /[\p{Cn}\p{Co}\p{Cs}\p{Noncharacter_Code_Point}\ufffd]/u
 const HTTP_ORIGIN_ONLY = /^(https?:)\/\/([^/\\]+)\/?$/i
 const BRACKETED = /^\[([^\]]*)\](?::(.*))?$/
 const PORT = /^\d*$/
-// WHATWG's forbidden domain code points that the checks above let through, plus `%`:
-// URL would percent-decode it into another name, which no server address needs.
+/*
+ * WHATWG's forbidden domain code points that the checks above let through, plus `%`:
+ * URL would percent-decode it into another name, which no server address needs.
+ */
 const FORBIDDEN_DOMAIN = /[#%/:<>?@[\\\]^|]/u
 // Controls and spaces are refused before this is asked.
 const ASCII_ONLY = /^[\u0021-\u007e]*$/u

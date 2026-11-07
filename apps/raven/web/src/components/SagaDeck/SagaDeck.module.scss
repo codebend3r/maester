@@ -18,8 +18,10 @@
   z-index: 2;
 }
 
-// The deck over the saga's name and facts. Raised while open, so a fanned
-// deck lies over its neighbours rather than under them.
+/*
+ * The deck over the saga's name and facts. Raised while open, so a fanned
+ * deck lies over its neighbours rather than under them.
+ */
 .card {
   display: grid;
   grid-template-rows: auto auto auto;
@@ -37,13 +39,15 @@
   }
 }
 
-// Every poster in one cell, the first on top. `--offset` is a poster's place
-// from the middle of the deck: -1, 0 and 1 for a deck of three. Stacked, each
-// one under the top peeks out a little further to the right; fanned, they
-// spread about the middle and turn about a point below the deck, the edges
-// dipping, as a hand of cards does. The spread narrows as the deck grows, so
-// a long saga still fans within reach of its card. The deck keeps its
-// posters' stacking to itself, so they never rise over a menu.
+/*
+ * Every poster in one cell, the first on top. `--offset` is a poster's place
+ * from the middle of the deck: -1, 0 and 1 for a deck of three. Stacked, each
+ * one under the top peeks out a little further to the right; fanned, they
+ * spread about the middle and turn about a point below the deck, the edges
+ * dipping, as a hand of cards does. The spread narrows as the deck grows, so
+ * a long saga still fans within reach of its card. The deck keeps its
+ * posters' stacking to itself, so they never rise over a menu.
+ */
 .deck {
   display: grid;
   grid-template-areas: 'deck';

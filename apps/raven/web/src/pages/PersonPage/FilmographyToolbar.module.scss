@@ -1,5 +1,7 @@
-// The toolbar's room is the section's to give, so the search and the toggle
-// stack by the room it has rather than by the screen's width.
+/*
+ * The toolbar's room is the section's to give, so the search and the toggle
+ * stack by the room it has rather than by the screen's width.
+ */
 .toolbar {
   container-type: inline-size;
   display: grid;
@@ -58,9 +60,11 @@
   }
 }
 
-// The tabs as one row over a hairline, the open one underlined in the leaf.
-// A narrow screen scrolls the row sideways, so each tab draws its focus ring
-// inside itself, where the scrolling cannot clip it.
+/*
+ * The tabs as one row over a hairline, the open one underlined in the leaf.
+ * A narrow screen scrolls the row sideways, so each tab draws its focus ring
+ * inside itself, where the scrolling cannot clip it.
+ */
 .tabsNav {
   min-width: 0;
 }

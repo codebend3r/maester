@@ -285,8 +285,10 @@ const startFixture = async (): Promise<void> => {
     cwd: SERVER_DIR,
     stdio: ['ignore', 'ignore', 'inherit'],
   })
-  // Lighthouse CI stops this server with a signal once it is done; the fixture goes with it and
-  // takes its temporary folder.
+  /*
+   * Lighthouse CI stops this server with a signal once it is done; the fixture goes with it and
+   * takes its temporary folder.
+   */
   const stop = () => {
     fixture.kill()
     process.exit(0)

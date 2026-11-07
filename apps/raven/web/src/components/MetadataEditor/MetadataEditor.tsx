@@ -154,9 +154,11 @@ export const MetadataEditor = ({
     event.preventDefault()
     // A blank title would be refused; keep the one shown.
     if (!draft || !original || draft.title.trim() === '') return
-    // A field back at TMDB's words is cleared rather than written over with
-    // the same. One emptied where TMDB has words goes as '' (0 for the year),
-    // which shows nothing, as null would bring TMDB's back.
+    /*
+     * A field back at TMDB's words is cleared rather than written over with
+     * the same. One emptied where TMDB has words goes as '' (0 for the year),
+     * which shows nothing, as null would bring TMDB's back.
+     */
     const change = FIELDS.reduce<ItemMetadataChange>((sent, field) => {
       const value = valueOf({ key: field.key, text: draft[field.key] })
       const empty = field.key === FIELD_KEYS.year ? 0 : ''

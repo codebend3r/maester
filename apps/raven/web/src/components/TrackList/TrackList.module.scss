@@ -4,8 +4,10 @@
   padding: 0;
 }
 
-// Number, play, title, length, and the row's own controls: the title takes
-// the room, the rest sits at its width. Hovering swaps the number for play.
+/*
+ * Number, play, title, length, and the row's own controls: the title takes
+ * the room, the rest sits at its width. Hovering swaps the number for play.
+ */
 .row {
   display: grid;
   grid-template-columns: 2rem var(--control-size) minmax(0, 1fr) auto auto;

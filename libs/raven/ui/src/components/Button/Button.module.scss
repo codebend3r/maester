@@ -26,8 +26,10 @@
     }
   }
 
-  // Held while what it started runs: still focusable, so focus stays on it,
-  // where `disabled` would drop it to the page.
+  /*
+   * Held while what it started runs: still focusable, so focus stays on it,
+   * where `disabled` would drop it to the page.
+   */
   &[aria-disabled='true'] {
     cursor: progress;
     opacity: var(--opacity-held);
@@ -42,9 +44,11 @@
     cursor: not-allowed;
   }
 
-  // On, for every toggle (Favourite, In hero, Watched, Pin): an outline and
-  // a glow in the accent, and the icon coloured and filled in, so it reads
-  // at a glance without relying on a fill that a tone may already have.
+  /*
+   * On, for every toggle (Favourite, In hero, Watched, Pin): an outline and
+   * a glow in the accent, and the icon coloured and filled in, so it reads
+   * at a glance without relying on a fill that a tone may already have.
+   */
   &[aria-pressed='true']:not(:disabled) {
     --icon-tint: 0.9;
 
@@ -110,9 +114,11 @@
   }
 }
 
-// Bigger in every way, its icon with it, as the icon is sized in ems, and
-// lifted on a glow of its own colour. A phone has no room for it beside the
-// page's other actions, so there it keeps the regular size.
+/*
+ * Bigger in every way, its icon with it, as the icon is sized in ems, and
+ * lifted on a glow of its own colour. A phone has no room for it beside the
+ * page's other actions, so there it keeps the regular size.
+ */
 .large {
   @media not (max-width: 30rem) {
     min-height: var(--control-size-large);

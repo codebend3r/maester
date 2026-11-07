@@ -1,5 +1,7 @@
-// What imports no React Native or Expo module, so bun's tests load it as the device does. What
-// reaches the device itself is in `index.ts`.
+/**
+ * What imports no React Native or Expo module, so bun's tests load it as the device does. What
+ * reaches the device itself is in `index.ts`.
+ */
 export { SIGN_IN_STEPS, type SignInStep } from '@/account/signInSteps'
 export { AUTH_OUTCOMES, type AccountSession, type AuthOutcome } from '@/account/supabaseAuth'
 export { signInFlowFor } from '@/account/signInFlow'

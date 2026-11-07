@@ -6,11 +6,13 @@ import { readPe } from '@/pe'
 import { WINDOWS_FILES } from '@/build/windowsLock'
 import { ARCHITECTURES } from '@/target'
 
-// The DLL came from MinGW, so MSVC gets an import library made from the DLL's own export
-// list; CMake runs lib.exe over it.
-// Ninja with MSVC's compiler on PATH (a Developer Command Prompt, or msvc-dev-cmd in CI):
-// cmake-js's own Visual Studio lookup overflows its buffer on a runner's full install, and
-// CMake's Visual Studio generator cannot see the install from the job either.
+/*
+ * The DLL came from MinGW, so MSVC gets an import library made from the DLL's own export
+ * list; CMake runs lib.exe over it.
+ * Ninja with MSVC's compiler on PATH (a Developer Command Prompt, or msvc-dev-cmd in CI):
+ * cmake-js's own Visual Studio lookup overflows its buffer on a runner's full install, and
+ * CMake's Visual Studio generator cannot see the install from the job either.
+ */
 const NINJA = 'Ninja'
 
 const buildWindowsAddon = async () => {

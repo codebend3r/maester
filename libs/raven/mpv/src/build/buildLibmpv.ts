@@ -133,8 +133,10 @@ const cmake = async ({ name, options }: CmakeProps) => {
   await run({ args: ['cmake', '--install', build], env })
 }
 
-// Stage every MoltenVK dependency from checked archives. Its fetchDependencies script
-// clones full repositories, so we reproduce its staging/build steps without network.
+/*
+ * Stage every MoltenVK dependency from checked archives. Its fetchDependencies script
+ * clones full repositories, so we reproduce its staging/build steps without network.
+ */
 const mvk = src('moltenvk')
 await inSequence({
   items: [
@@ -246,8 +248,10 @@ await meson({
     '-Dvulkan=enabled',
     '-Dvk-proc-addr=enabled',
     '-Dglslang=enabled',
-    // libplacebo's meson searches this directory for libSPIRV.a, but not for libglslang.a or
-    // libglslang-default-resource-limits.a, so libmpv's link names those itself
+    /*
+     * libplacebo's meson searches this directory for libSPIRV.a, but not for libglslang.a or
+     * libglslang-default-resource-limits.a, so libmpv's link names those itself
+     */
     `-Dvulkan-sdk=${prefix}`,
     '-Ddovi=enabled',
     '-Ddemos=false',
@@ -330,8 +334,10 @@ await meson({
   name: 'mpv',
   stepEnv: withLinkLibraries({ env, libraries: libmpvLinkLibraries }),
   options: [
-    // mpv defaults b_lundef to false, which makes meson link libmpv with
-    // `-undefined dynamic_lookup` and ship unresolved symbols; true fails the link instead
+    /*
+     * mpv defaults b_lundef to false, which makes meson link libmpv with
+     * `-undefined dynamic_lookup` and ship unresolved symbols; true fails the link instead
+     */
     '-Db_lundef=true',
     '-Ddefault_library=shared',
     // prefer_static makes meson look only for a static libiconv, which macOS does not ship

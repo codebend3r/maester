@@ -39,9 +39,11 @@ export const serverFetchFor = ({ server, jar, fetch }: ServerFetchForProps): Fet
     const cookie = isOwnApi(url) ? cookieHeaderOf(await jar.read(server.id)) : null
     const headers =
       cookie === null ? init.headers : { ...init.headers, [AUTH_HEADERS.cookie]: cookie }
-    // React Native follows redirects natively, carrying the headers it was given, and has no
-    // `redirect: 'manual'`, so a hop off the origin cannot be stopped before it is sent the
-    // cookies; raven's API never redirects. What a redirect hands back is refused below.
+    /*
+     * React Native follows redirects natively, carrying the headers it was given, and has no
+     * `redirect: 'manual'`, so a hop off the origin cannot be stopped before it is sent the
+     * cookies; raven's API never redirects. What a redirect hands back is refused below.
+     */
     const response = await fetch(url, {
       ...init,
       ...(headers === undefined ? {} : { headers }),

@@ -7,8 +7,10 @@ export type Clips = { folder: string; first: string; second: string }
 
 export const CLIP_SECONDS = 30
 
-// H.264 in MP4, which Chromium decodes; `-allow_sw 1` lets VideoToolbox fall back to its
-// software encoder on a runner without a hardware one.
+/*
+ * H.264 in MP4, which Chromium decodes; `-allow_sw 1` lets VideoToolbox fall back to its
+ * software encoder on a runner without a hardware one.
+ */
 const encodeArgs = (output: string): string[] => [
   '-hide_banner',
   '-loglevel',

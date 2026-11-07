@@ -113,9 +113,11 @@ export const watchEachFolder = ({
       })
       watchers.set(folder, watcher)
     } catch (error) {
-      // A subfolder that went before it could be watched is its parent's
-      // news, which the parent's watch reports; only the root, or running
-      // out of watches, stops the watch.
+      /*
+       * A subfolder that went before it could be watched is its parent's
+       * news, which the parent's watch reports; only the root, or running
+       * out of watches, stops the watch.
+       */
       if (folder === root || isOutOfWatches(error)) onError(error)
     }
   }

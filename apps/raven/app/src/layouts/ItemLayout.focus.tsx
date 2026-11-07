@@ -472,8 +472,10 @@ const Person = ({ person }: PersonProps) => {
   const [isFocused, setFocused] = useState(false)
   const Photo = PERSON_PHOTOS[pictureStateOf(person.picture)]
   return (
-    // Deliberately inert until the app has a person page: it takes the focus only so the
-    // remote can move along the row and scroll it.
+    /*
+     * Deliberately inert until the app has a person page: it takes the focus only so the
+     * remote can move along the row and scroll it.
+     */
     <Pressable
       accessibilityLabel={ITEM_LAYOUT_COPY.person(person)}
       accessibilityRole="text"

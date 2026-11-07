@@ -111,14 +111,18 @@ export const useMediaSource = ({
     accessRef.current = access
   }, [access])
   const originUrl = access?.origin.url ?? null
-  // A stream reads the newest ticket on its next request; a <video src> holds
-  // its address and would keep asking with the old ticket until it died.
+  /*
+   * A stream reads the newest ticket on its next request; a <video src> holds
+   * its address and would keep asking with the old ticket until it died.
+   */
   const fileTicket = mode === PLAYBACK_MODES.direct ? (access?.ticket ?? null) : null
-  // The source this render wants, and the one attached. They differ from
-  // the commit that picks a new source until the effect swaps it in, and a
-  // failure the browser queued for the old one can land in between; it
-  // must not count against the new one. A file's ticket is part of the
-  // key because a new ticket re-attaches it.
+  /*
+   * The source this render wants, and the one attached. They differ from
+   * the commit that picks a new source until the effect swaps it in, and a
+   * failure the browser queued for the old one can land in between; it
+   * must not count against the new one. A file's ticket is part of the
+   * key because a new ticket re-attaches it.
+   */
   const wanted = JSON.stringify([id, mode, audio, quality, burn, originUrl, fileTicket])
   const attached = useRef<string | null>(null)
   const report = (message: string) => {

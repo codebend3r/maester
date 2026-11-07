@@ -1,5 +1,7 @@
-// A well in the dialog: where it is, the folders inside, and the button
-// that takes it at the end.
+/*
+ * A well in the dialog: where it is, the folders inside, and the button
+ * that takes it at the end.
+ */
 .browser {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

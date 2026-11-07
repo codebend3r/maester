@@ -28,8 +28,10 @@
   gap: var(--space-2);
 }
 
-// A card is a container, so it lays out by its own width, whatever the side
-// menu takes.
+/*
+ * A card is a container, so it lays out by its own width, whatever the side
+ * menu takes.
+ */
 .row {
   container-type: inline-size;
   display: grid;

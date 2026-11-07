@@ -270,8 +270,10 @@ describe('playback', () => {
         await fetchStream(streamUrl({ mode: 'remux', start: 12, audio: 1 })),
       )
       const video = times.video - STREAM_TIME_SHIFT - state.lead
-      // Keyframes fall every two seconds from the video's start; ffmpeg
-      // starts at one before the target.
+      /*
+       * Keyframes fall every two seconds from the video's start; ffmpeg
+       * starts at one before the target.
+       */
       expect(video).toBeGreaterThanOrEqual(8)
       expect(video).toBeLessThanOrEqual(12)
       expect(Number.isInteger(ms(video))).toBe(true)

@@ -106,8 +106,10 @@
   background: var(--color-lichen);
 }
 
-// The curve plays as the row is pointed at; under reduced motion the square
-// stays where it is.
+/*
+ * The curve plays as the row is pointed at; under reduced motion the square
+ * stays where it is.
+ */
 @media (prefers-reduced-motion: no-preference) {
   .ease {
     transition-property: transform;

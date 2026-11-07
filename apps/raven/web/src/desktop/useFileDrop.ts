@@ -18,8 +18,10 @@ type UseFileDropProps = {
  * the files go to main in the order dropped, and what main answers goes to `onReply`.
  */
 export const useFileDrop = ({ client, onReply }: UseFileDropProps) => {
-  // Entering a child element fires dragenter on it before dragleave on the one left, so a
-  // count, not a flag, keeps the drop zone from flickering.
+  /*
+   * Entering a child element fires dragenter on it before dragleave on the one left, so a
+   * count, not a flag, keeps the drop zone from flickering.
+   */
   const depth = useRef(0)
   const reply = useEffectEvent(onReply)
 
@@ -45,8 +47,10 @@ export const useFileDrop = ({ client, onReply }: UseFileDropProps) => {
       depth.current = Math.max(0, depth.current - 1)
       if (depth.current === 0) setIsDragging(false)
     }
-    // Without preventDefault on dragover the page is no drop target, and a dropped file would
-    // navigate the window to it.
+    /*
+     * Without preventDefault on dragover the page is no drop target, and a dropped file would
+     * navigate the window to it.
+     */
     const over = (event: DragEvent) => event.preventDefault()
     const drop = (event: DragEvent) => {
       event.preventDefault()

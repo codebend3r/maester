@@ -1,5 +1,7 @@
-// The way back in the corner row, then everything down the middle, the block
-// centred in what is left of most of the screen's height.
+/*
+ * The way back in the corner row, then everything down the middle, the block
+ * centred in what is left of most of the screen's height.
+ */
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -24,8 +26,10 @@
   gap: var(--space-4);
 }
 
-// Twice the home hero's size: 104px on a phone to 208px on a wide screen.
-// The poster is sized in ems, so it keeps its place between the figures.
+/*
+ * Twice the home hero's size: 104px on a phone to 208px on a wide screen.
+ * The poster is sized in ems, so it keeps its place between the figures.
+ */
 .figures {
   display: grid;
   grid-auto-flow: column;

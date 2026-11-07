@@ -37,8 +37,10 @@ export class BrowseController {
     const configuredPrefix = configuredRoot.endsWith(sep)
       ? configuredRoot
       : `${configuredRoot}${sep}`
-    // Accept the configured alias too, such as macOS's /var pointing at /private/var,
-    // by rebasing it onto the real root so one prefix check guards the path.
+    /*
+     * Accept the configured alias too, such as macOS's /var pointing at /private/var,
+     * by rebasing it onto the real root so one prefix check guards the path.
+     */
     const isAliased = resolved === configuredRoot || resolved.startsWith(configuredPrefix)
     const requestedPath = isAliased ? join(root, resolved.slice(configuredRoot.length)) : resolved
     if (requestedPath !== root && !requestedPath.startsWith(prefix)) {

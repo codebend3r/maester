@@ -123,8 +123,10 @@ const Harness = ({ mode, mediaPlane, onCommit = ignore, onFailure = ignore }: Ha
     onRefused: () => {},
     onFailure: (message) => onFailure(`${mode}: ${message}`),
   })
-  // After the commit and before the effect that swaps the source: where
-  // an event the browser queued for the old source can still land.
+  /*
+   * After the commit and before the effect that swaps the source: where
+   * an event the browser queued for the old source can still land.
+   */
   useLayoutEffect(() => {
     onCommit(videoRef.current)
   })

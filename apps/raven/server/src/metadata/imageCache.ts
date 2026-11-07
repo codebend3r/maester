@@ -124,8 +124,10 @@ export class ImageCache {
   private readonly root: string
   private readonly working = createOnce<string | null>()
   private readonly downloads: Gate = createGate({ limit: 4 })
-  // Scaling takes CPU the server shares with transcodes, and matching a
-  // library of pictures beside its media asks for three widths of each.
+  /*
+   * Scaling takes CPU the server shares with transcodes, and matching a
+   * library of pictures beside its media asks for three widths of each.
+   */
   private readonly scales: Gate = createGate({ limit: 2 })
   private readonly warned = new Set<string>()
 
@@ -271,8 +273,10 @@ export class ImageCache {
         const current = `${prefix}${identity}-${Math.round(info.mtimeMs)}-`
         const target = join(dir, `${current}${width}.jpg`)
         if (await exists(target)) return target
-        // A scale made before the name carried the source's identity is the same picture
-        // (it names the same mtime), so it moves to its new name instead of being made again.
+        /*
+         * A scale made before the name carried the source's identity is the same picture
+         * (it names the same mtime), so it moves to its new name instead of being made again.
+         */
         const legacy = join(dir, `${prefix}${Math.round(info.mtimeMs)}-${width}.jpg`)
         if (
           await rename(legacy, target).then(

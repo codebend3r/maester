@@ -82,8 +82,10 @@ export class PeopleController {
     if (!person) throw new NotFoundException(`No person ${id}`)
     const viewer = this.lock.viewer({ request })
     const credits = person.credits.filter((credit) => viewer.seesItem(credit.item.id))
-    // A person whose titles are all hidden from this caller is never looked
-    // up; the rest share two lookups at a time, with 20 waiting.
+    /*
+     * A person whose titles are all hidden from this caller is never looked
+     * up; the rest share two lookups at a time, with 20 waiting.
+     */
     const asked = credits.length > 0 ? await this.filmographies.ensure({ personId: id }) : null
     // Read again, for the name and photo a fetch just brought.
     const latest = this.people.profile(id) ?? { ...person, profile: null }

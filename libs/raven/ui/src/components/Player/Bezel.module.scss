@@ -13,8 +13,10 @@
   color: var(--color-on-picture);
   backdrop-filter: var(--filter-glass);
   pointer-events: none;
-  // Without motion it stays out of sight, as it always ended; the player's
-  // live region says the same words.
+  /*
+   * Without motion it stays out of sight, as it always ended; the player's
+   * live region says the same words.
+   */
   opacity: 0;
 
   @media (prefers-reduced-motion: no-preference) {

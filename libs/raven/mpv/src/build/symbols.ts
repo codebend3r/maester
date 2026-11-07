@@ -6,8 +6,10 @@ export type Import =
   | { kind: typeof IMPORT_KINDS.bound; symbol: string; library: string }
   | { kind: typeof IMPORT_KINDS.lookup; symbol: string }
 
-// `nm -um` prints every undefined symbol with the library it binds to, or marks it
-// "dynamically looked up" when the link was told to leave it unresolved.
+/*
+ * `nm -um` prints every undefined symbol with the library it binds to, or marks it
+ * "dynamically looked up" when the link was told to leave it unresolved.
+ */
 const importLine =
   /^\(undefined\) (?:weak )?external (?<symbol>.+) \((?:from (?<library>[^()]+)|dynamically looked up)\)$/
 
@@ -46,15 +48,19 @@ type Policy = {
   defines: readonly string[]
 }
 
-// libplacebo's shader compiler entry points: pl_glslang_init calls the first and
-// pl_glslang_compile the second. Both were null in the libmpv whose window surface crashed.
+/*
+ * libplacebo's shader compiler entry points: pl_glslang_init calls the first and
+ * pl_glslang_compile the second. Both were null in the libmpv whose window surface crashed.
+ */
 const glslangEntryPoints = ['__ZN7glslang17InitializeProcessEv', '__Z19GetDefaultResourcesv']
 
 const symbolPolicies = {
   'lib/libMoltenVK.dylib': { lookups: [], defines: [] },
   'lib/libmpv.2.dylib': { lookups: [], defines: glslangEntryPoints },
-  // An N-API addon links with `-undefined dynamic_lookup`; Node or Electron supplies N-API,
-  // and libuv for the handle that finishes exit cleanup on the loop thread.
+  /*
+   * An N-API addon links with `-undefined dynamic_lookup`; Node or Electron supplies N-API,
+   * and libuv for the handle that finishes exit cleanup on the loop thread.
+   */
   'raven_mpv.node': { lookups: ['_napi_', '_node_api_', '_uv_'], defines: [] },
 } as const satisfies Record<string, Policy>
 

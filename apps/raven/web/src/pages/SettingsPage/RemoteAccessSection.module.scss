@@ -21,8 +21,10 @@
   color: var(--color-amber);
 }
 
-// Private, then public, then the internet, each hop on a card, an arrow
-// pointing back from each to the one before it as Plex draws the way in.
+/*
+ * Private, then public, then the internet, each hop on a card, an arrow
+ * pointing back from each to the one before it as Plex draws the way in.
+ */
 .route {
   display: grid;
   grid-auto-flow: column;

@@ -23,8 +23,10 @@ type CreateAppLogProps = {
 }
 
 export const createAppLog = ({ isPrimary, isPackaged, dir, timers }: CreateAppLogProps): AppLog => {
-  // A second instance would write a false launch into the first one's file and rotate that
-  // file from two processes.
+  /*
+   * A second instance would write a false launch into the first one's file and rotate that
+   * file from two processes.
+   */
   const log = isPrimary
     ? createLog({
         dir,

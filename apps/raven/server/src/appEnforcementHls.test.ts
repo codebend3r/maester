@@ -235,8 +235,10 @@ describe("an account's HLS session", () => {
   const setStatus = ({ id, status }: SetStatusProps) =>
     plane.ownerApi.setMemberStatus({ id, change: { status } })
 
-  // These move the clock ahead and back first, so a membership answer cached while it was ahead
-  // must never hide what the tests after them check.
+  /*
+   * These move the clock ahead and back first, so a membership answer cached while it was ahead
+   * must never hide what the tests after them check.
+   */
   it("carries the owner's PIN unlock into the session, and ends it once the unlock lapses", async () => {
     await pin.setLocked({ isLocked: true })
     vi.useFakeTimers({ toFake: ['Date'] })

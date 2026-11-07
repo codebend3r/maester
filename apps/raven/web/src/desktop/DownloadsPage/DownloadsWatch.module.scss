@@ -40,8 +40,10 @@
   min-width: 0;
 }
 
-// A tile: the poster over its title, its episode and its size. The button and the plain tile
-// share one look; only a ready one is pressed.
+/*
+ * A tile: the poster over its title, its episode and its size. The button and the plain tile
+ * share one look; only a ready one is pressed.
+ */
 .tile {
   --poster-letter: var(--font-size-xl);
 

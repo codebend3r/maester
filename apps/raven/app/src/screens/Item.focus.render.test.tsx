@@ -217,8 +217,10 @@ describe('Item on a TV', () => {
   it("brings the remote down from a show's actions to its seasons, and up again", async () => {
     await renderItem(SEVERANCE.id)
     const play = await screen.findByRole('button', { name: 'Play S01E01' })
-    // Each is a guide the width of the page: Play sits to the right of the poster, past the
-    // seasons' first card, so without them Down skipped the row for whatever lay under Play.
+    /*
+     * Each is a guide the width of the page: Play sits to the right of the poster, past the
+     * seasons' first card, so without them Down skipped the row for whatever lay under Play.
+     */
     const seasons = guideAround(screen.getByRole('button', { name: 'Season 1' }))
     const actions = guideAround(play)
     if (seasons === null || actions === null) throw new Error('No focus guide')

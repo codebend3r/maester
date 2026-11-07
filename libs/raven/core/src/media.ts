@@ -130,8 +130,10 @@ type ResolutionLabelProps = {
 /** "8K", "4K", "1080p", "720p", "480p", "320p" or "SD", from the frame size. */
 export const resolutionLabel = ({ width, height }: ResolutionLabelProps): Resolution | null => {
   if (width == null || height == null) return null
-  // Scope and letterboxed encodes shave height, so width decides as well:
-  // 1920x800 is a 1080p file, not a 800p one.
+  /*
+   * Scope and letterboxed encodes shave height, so width decides as well:
+   * 1920x800 is a 1080p file, not a 800p one.
+   */
   if (width >= 6400 || height >= 3600) return RESOLUTIONS.uhd8k
   if (width >= 3200 || height >= 1800) return RESOLUTIONS.uhd
   if (width >= 1800 || height >= 1000) return RESOLUTIONS.p1080

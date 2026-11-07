@@ -1,7 +1,9 @@
-// A reader for the parts of a Windows PE file the audit looks at: the machine the
-// code is for, the DLLs it imports and the names it exports. The platform's own
-// tools (dumpbin, objdump) are not on every machine the audit runs on, and the
-// format is small enough to read directly.
+/*
+ * A reader for the parts of a Windows PE file the audit looks at: the machine the
+ * code is for, the DLLs it imports and the names it exports. The platform's own
+ * tools (dumpbin, objdump) are not on every machine the audit runs on, and the
+ * format is small enough to read directly.
+ */
 
 const DOS_MAGIC = 0x5a4d
 const PE_SIGNATURE = 0x00004550

@@ -68,8 +68,10 @@ const mockServer: { heard: HeardRequest[]; directPlay: PlaybackSettings['directP
   directPlay: DIRECT_PLAYS.auto,
 }
 
-// The layouts pick their variant once, as they load, so the TV is set before anything does,
-// and the platform is Android TV's, whose chrome is raven's own under the d-pad.
+/*
+ * The layouts pick their variant once, as they load, so the TV is set before anything does,
+ * and the platform is Android TV's, whose chrome is raven's own under the d-pad.
+ */
 jest.mock('react-native/Libraries/Utilities/Platform', () => {
   const platform = jest.requireActual<{ default: object }>(
     'react-native/Libraries/Utilities/Platform',

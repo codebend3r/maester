@@ -38,8 +38,10 @@ export const useSelectionScopes = create<SelectionScopes>()(
     }),
     {
       name: 'raven/selectionScopes',
-      // A scope holds the Select button's element, and React's fiber on it
-      // would have devtools serialize the whole tree.
+      /*
+       * A scope holds the Select button's element, and React's fiber on it
+       * would have devtools serialize the whole tree.
+       */
       serialize: {
         replacer: (_key: string, value: unknown) =>
           value instanceof Element ? `<${value.localName}>` : value,

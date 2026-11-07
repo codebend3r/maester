@@ -111,9 +111,11 @@ const Scrubber = ({ view, transport, onScrubbing }: ScrubberProps) => {
   const duration = transport.duration ?? 0
   const share = playedShareOf({ at: position, duration })
   return (
-    // Left and right are the scrubber's own: they seek, and a hold runs the playhead. Without the
-    // trap the system moves the focus on the key going down, before the press reaches the player,
-    // and left carried it off to Back, up and to the left, so it never skipped back.
+    /*
+     * Left and right are the scrubber's own: they seek, and a hold runs the playhead. Without the
+     * trap the system moves the focus on the key going down, before the press reaches the player,
+     * and left carried it off to Back, up and to the left, so it never skipped back.
+     */
     <TVFocusGuideView trapFocusLeft trapFocusRight>
       <Pressable
         ref={view}
@@ -391,8 +393,10 @@ const Controls = ({
 }: ControlsProps) => {
   const scrubber: Focusable = useRef(null)
   const styles = useStyles()
-  // Brought back while they fade out, the controls are still drawn, and the hidden state's
-  // catcher, which had the focus, goes: the line asks again.
+  /*
+   * Brought back while they fade out, the controls are still drawn, and the hidden state's
+   * catcher, which had the focus, goes: the line asks again.
+   */
   useEffect(() => {
     if (isVisible) requestTVFocus(scrubber.current)
   }, [isVisible])
@@ -762,8 +766,10 @@ const useStyles = pictureStyles((colours) =>
     bottom: { gap: TV_SIZES.space3 },
     timeline: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
     time: { color: colours.text, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },
-    // Room at each end for the focused thumb, which is centred on the line's end and would
-    // otherwise sit over the time beside it.
+    /*
+     * Room at each end for the focused thumb, which is centred on the line's end and would
+     * otherwise sit over the time beside it.
+     */
     scrubberSlot: { flex: 1, paddingHorizontal: THUMB_FOCUSED / 2 },
     scrubber: { height: TV_SIZES.controlLarge, justifyContent: 'center' },
     line: {

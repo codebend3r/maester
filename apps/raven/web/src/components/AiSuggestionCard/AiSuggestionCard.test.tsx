@@ -65,8 +65,10 @@ describe('AiSuggestionCard', () => {
     await userEvent.click(accept)
     expect(accepted).toEqual(['201000'])
     pending.answer(undefined)
-    // Not toBeEnabled: each miss prints the whole DOM (about 50 MB), and on CI a few
-    // misses outlast waitFor's timeout before the mutation settles.
+    /*
+     * Not toBeEnabled: each miss prints the whole DOM (about 50 MB), and on CI a few
+     * misses outlast waitFor's timeout before the mutation settles.
+     */
     await waitFor(() => expect(accept).not.toHaveAttribute('disabled'))
   })
 

@@ -96,8 +96,10 @@ describe("a page's children", () => {
     }
 
     const episode = ({ season, number }: EpisodeProps) => season.episodes.get(number) ?? -1
-    // Episode 1 is in both libraries, the open copy watched part way; episode 2 only in the
-    // locked one; episode 3 has no file. Season 2's only episode sits in the locked library.
+    /*
+     * Episode 1 is in both libraries, the open copy watched part way; episode 2 only in the
+     * locked one; episode 3 has no file. Season 2's only episode sits in the locked library.
+     */
     metadata.link({
       mediaIds: [file({ libraryId: state.open, path: 'Andor/S01E01.mkv' })],
       itemIds: [episode({ season: seasonOne, number: 1 })],

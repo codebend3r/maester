@@ -238,8 +238,10 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     if (known !== undefined) {
       const knownEntry = entryById(store.read(), { downloadId: known })
       if (knownEntry !== null) return knownEntry
-      // A grant can land after its download was removed, so a stale mapping gives way to the
-      // path, where the same title downloaded again lives.
+      /*
+       * A grant can land after its download was removed, so a stale mapping gives way to the
+       * path, where the same title downloaded again lives.
+       */
       downloadIdByFile.delete(fileId)
       freshFiles.delete(fileId)
       sittings.delete(fileId)
@@ -429,8 +431,10 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     deps.onNoted({ downloadId })
   }
 
-  // The page may say it left one file after the next one opened, so only a leave of the file
-  // the page is still on clears it.
+  /*
+   * The page may say it left one file after the next one opened, so only a leave of the file
+   * the page is still on clears it.
+   */
   const playbackLeft: DownloadPlayback['playbackLeft'] = ({ fileId }) => {
     if (playing.page.fileId === fileId) play({ side: PLAY_SIDES.page, fileId: null })
   }

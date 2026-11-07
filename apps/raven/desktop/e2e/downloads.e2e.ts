@@ -483,9 +483,11 @@ test.describe.serial('downloading from the web pages, and playing offline', () =
           .getByRole('button', { name: `Play ${label}` })
           .click()
         await expectPlayingNatively({ page, title: label })
-        // Paused, so the position main keeps for the server stays put. Even with no server the
-        // page signs main in from its saved session and auth config, so the play waits on the
-        // download itself, under that account, not in `owed`, which holds other accounts' plays.
+        /*
+         * Paused, so the position main keeps for the server stays put. Even with no server the
+         * page signs main in from its saved session and auth config, so the play waits on the
+         * download itself, under that account, not in `owed`, which holds other accounts' plays.
+         */
         await page.keyboard.press('k')
         await expectButton({ page, name: 'Play (k)' })
         await expect

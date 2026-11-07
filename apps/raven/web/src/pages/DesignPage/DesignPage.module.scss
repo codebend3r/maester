@@ -1,6 +1,8 @@
-// The contents bar is the article's own child, beside the sections rather
-// than in the header, so it stays stuck for the whole page. The sections'
-// padding is what keeps the first one well clear of it.
+/*
+ * The contents bar is the article's own child, beside the sections rather
+ * than in the header, so it stays stuck for the whole page. The sections'
+ * padding is what keeps the first one well clear of it.
+ */
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -10,7 +12,7 @@
 .sections {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-10);
+  gap: var(--space-9);
   padding-top: var(--space-8);
 
   @media (max-width: 48rem) {
@@ -60,8 +62,10 @@
   }
 }
 
-// One row of pills on glass, scrolling sideways where the page is too narrow
-// for all of them.
+/*
+ * One row of pills on glass, scrolling sideways where the page is too narrow
+ * for all of them.
+ */
 .contents {
   position: sticky;
   top: var(--space-2);
@@ -131,8 +135,10 @@
   display: grid;
 }
 
-// Between a section heading and a page title, as befits a chapter of a page
-// that is all sections.
+/*
+ * Between a section heading and a page title, as befits a chapter of a page
+ * that is all sections.
+ */
 .sectionTitle {
   display: grid;
   grid-auto-flow: column;
@@ -158,8 +164,10 @@
   text-wrap: pretty;
 }
 
-// A row: the name and a note at the left, the specimen at the right, a
-// hairline under all but the last. One column on a narrow screen.
+/*
+ * A row: the name and a note at the left, the specimen at the right, a
+ * hairline under all but the last. One column on a narrow screen.
+ */
 .specimen {
   display: grid;
   grid-template-columns: 13.75rem minmax(0, 1fr);
@@ -463,8 +471,10 @@
   max-width: 23.75rem;
 }
 
-// Black, with a made-up picture inset as a letterboxed film would be, and
-// the bar over its foot.
+/*
+ * Black, with a made-up picture inset as a letterboxed film would be, and
+ * the bar over its foot.
+ */
 .stage {
   display: grid;
   grid-template-areas: 'stack';

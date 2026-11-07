@@ -153,8 +153,10 @@ describe('touch', () => {
     held.open(UNREACHABLE)
     await ticks(5)
     expect(world.log).toHaveLength(1)
-    // The position saved meanwhile owes a send of its own, which waits for the retry now that
-    // the server could not be reached.
+    /*
+     * The position saved meanwhile owes a send of its own, which waits for the retry now that
+     * the server could not be reached.
+     */
     world.server.answer = async () => NO_CONTENT
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)

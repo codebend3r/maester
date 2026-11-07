@@ -110,8 +110,10 @@ export class ThumbnailService implements OnApplicationBootstrap {
     const tonemap = file.hdr && (await this.ffmpeg.canTonemap())
     const seek = thumbnailSeek(file.duration)
     try {
-      // A duration that overstates the real stream can seek past the last
-      // frame; the first frame beats no thumbnail at all.
+      /*
+       * A duration that overstates the real stream can seek past the last
+       * frame; the first frame beats no thumbnail at all.
+       */
       const temp = await this.render({ input: file.path, seek, tonemap }).catch((error: unknown) =>
         seek > 0 && !signal.aborted && !(error instanceof FfmpegTimeoutError)
           ? this.render({ input: file.path, seek: 0, tonemap })

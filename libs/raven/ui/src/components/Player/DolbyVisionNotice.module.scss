@@ -1,5 +1,7 @@
-// A see-through layer over the stage whose padding parks the notice top left, under the title
-// bar and clear of the control bar and of the keyboard tip, which sits top right.
+/*
+ * A see-through layer over the stage whose padding parks the notice top left, under the title
+ * bar and clear of the control bar and of the keyboard tip, which sits top right.
+ */
 .layer {
   grid-area: stage;
   position: relative;
@@ -8,7 +10,7 @@
   align-items: start;
   justify-items: start;
   padding: calc(var(--space-8) + var(--space-4) + var(--titlebar-inset)) var(--space-4)
-    var(--space-10);
+    var(--space-9);
   pointer-events: none;
 }
 

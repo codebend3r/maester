@@ -21,8 +21,10 @@ const created = (): SignUpResult => ({
   error: null,
 })
 
-// Supabase answers a confirmed address with a user that has no identities, so
-// the response gives nothing away.
+/*
+ * Supabase answers a confirmed address with a user that has no identities, so
+ * the response gives nothing away.
+ */
 const alreadyRegistered = (): SignUpResult => ({
   data: { user: { ...fakeSession().user, identities: [] }, session: null },
   error: null,

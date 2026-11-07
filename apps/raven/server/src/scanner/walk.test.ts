@@ -122,8 +122,10 @@ describe('walkVideos', () => {
     ])
     expect(movies.files).toHaveLength(2)
     expect(tv.files).toHaveLength(1)
-    // Stat: Movies and TV themselves. Readdir: Movies, Heat, TV, Show, Season 1. Stat: the
-    // symlink, then the three videos.
+    /*
+     * Stat: Movies and TV themselves. Readdir: Movies, Heat, TV, Show, Season 1. Stat: the
+     * symlink, then the three videos.
+     */
     expect(counts.calls).toBe(11)
     expect(counts.peak).toBe(2)
   })

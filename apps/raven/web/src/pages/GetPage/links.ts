@@ -4,8 +4,10 @@ export const REPOSITORY = 'https://github.com/codebend3r/maester'
 
 export const RELEASES = `${REPOSITORY}/releases`
 
-// No release publishes installers yet, so every download opens the newest
-// release, where they will be once one does.
+/**
+ * No release publishes installers yet, so every download opens the newest
+ * release, where they will be once one does.
+ */
 export const LATEST_RELEASE = `${RELEASES}/latest`
 
 type WebAppAddressProps = { typed: string; origin: string }

@@ -114,8 +114,10 @@ export const ThisComputerSection = () => {
   const [refusal, setRefusal] = useState('')
   // What the person chose and main has not answered yet, oldest first, shown over what main stores.
   const [picks, setPicks] = useState<readonly OutputPick[]>([])
-  // One write at a time, each built from the last settings main confirmed, so a refused pick
-  // never rides along in the write of a later one.
+  /*
+   * One write at a time, each built from the last settings main confirmed, so a refused pick
+   * never rides along in the write of a later one.
+   */
   const writes = useRef<Promise<void>>(Promise.resolve())
   const confirmed = useRef<OutputSettings | null>(null)
   const nextId = useRef(0)

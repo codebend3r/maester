@@ -1,5 +1,7 @@
-// The card's size and places, which its skeleton shares: the logo in the top
-// left corner, its words above the foot and the progress across the foot.
+/*
+ * The card's size and places, which its skeleton shares: the logo in the top
+ * left corner, its words above the foot and the progress across the foot.
+ */
 .frame {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -14,9 +16,11 @@
   padding: var(--space-6);
 }
 
-// The backdrop fills the card, under a shade that keeps the words readable on
-// any picture. The card is a picture in every theme, so its words keep the
-// fixed light ink of words on a picture.
+/*
+ * The backdrop fills the card, under a shade that keeps the words readable on
+ * any picture. The card is a picture in every theme, so its words keep the
+ * fixed light ink of words on a picture.
+ */
 .card {
   position: relative;
   isolation: isolate;
@@ -55,8 +59,10 @@
   object-fit: cover;
 }
 
-// Tucked into the corner, small enough to leave the words their room. Above
-// the card's link, so its own click opens the page.
+/*
+ * Tucked into the corner, small enough to leave the words their room. Above
+ * the card's link, so its own click opens the page.
+ */
 .logoSlot {
   position: relative;
   z-index: 1;
@@ -82,12 +88,15 @@
   filter: drop-shadow(0 1px 4px var(--color-shade));
 }
 
-// The link that resumes the video reaches across the whole card, under the
-// title's own link.
+/*
+ * The link that resumes the video reaches across the whole card, under the
+ * title's own link.
+ */
 .play {
   position: absolute;
   inset: 0;
   display: grid;
+  padding-inline-end: var(--space-6);
   border-radius: inherit;
   outline: none;
 }
@@ -99,7 +108,6 @@
   place-items: center;
   width: var(--control-size);
   height: var(--control-size);
-  margin-inline-end: var(--space-6);
   border-radius: var(--radius-pill);
   background: var(--color-leaf);
   color: var(--color-on-leaf);
@@ -239,7 +247,7 @@
     max-height: 3.85rem;
   }
 
-  .mark {
-    margin-inline-end: var(--space-3);
+  .play {
+    padding-inline-end: var(--space-3);
   }
 }

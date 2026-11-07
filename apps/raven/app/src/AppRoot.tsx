@@ -37,8 +37,10 @@ preventAutoHideAsync().catch(SPLASH_IGNORED)
 const useTokenRenewal = tokenRenewalFor({ session: useAccountSession })
 
 const loadStores = async (): Promise<void> => {
-  // A store whose storage cannot be read starts from its defaults rather than holding
-  // the app on a blank screen; the next write puts the file right.
+  /*
+   * A store whose storage cannot be read starts from its defaults rather than holding
+   * the app on a blank screen; the next write puts the file right.
+   */
   await Promise.allSettled([
     configureStorage({ storage: AsyncStorage }),
     configureLibraryViews({ storage: AsyncStorage }),

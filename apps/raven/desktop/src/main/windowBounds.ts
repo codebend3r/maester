@@ -47,8 +47,10 @@ export const placeWindow = ({ saved, displays, primary }: PlaceWindowProps): Rec
   if (saved === null) return centred(primary.workArea)
   const display = displays.find(({ id }) => id === saved.displayId)
   if (display === undefined) return centred(primary.workArea)
-  // Checked after clamping: a window wider than its display shrinks from the right, so
-  // the clamped rect, not the saved one, is what has to stay on screen.
+  /*
+   * Checked after clamping: a window wider than its display shrinks from the right, so
+   * the clamped rect, not the saved one, is what has to stay on screen.
+   */
   const clamped = {
     x: saved.x,
     y: saved.y,

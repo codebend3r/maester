@@ -1,5 +1,7 @@
-// A panel on the page, as Edit images is: the title and Cancel over a
-// hairline, then the files, the fields, and Save at the end under another.
+/*
+ * A panel on the page, as Edit images is: the title and Cancel over a
+ * hairline, then the files, the fields, and Save at the end under another.
+ */
 .editor {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -67,8 +69,10 @@
   }
 }
 
-// Fields take their look from elements.scss; on the panel's canopy they sit
-// in a well instead, or they would vanish into it.
+/*
+ * Fields take their look from elements.scss; on the panel's canopy they sit
+ * in a well instead, or they would vanish into it.
+ */
 .control,
 .withWand {
   input,

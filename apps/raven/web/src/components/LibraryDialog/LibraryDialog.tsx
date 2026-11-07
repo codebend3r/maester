@@ -209,8 +209,10 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
     onError: (error) => setErrors([error.message]),
   })
 
-  // A new library takes the view, grouping and saved spots its type starts
-  // with; one being edited keeps its own where the new type can show them.
+  /*
+   * A new library takes the view, grouping and saved spots its type starts
+   * with; one being edited keeps its own where the new type can show them.
+   */
   const pickKind = (kind: LibraryKind) =>
     setSettings((current) => {
       if (library) return withLibraryKind({ settings: current, kind })

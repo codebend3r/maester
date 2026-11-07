@@ -1,6 +1,8 @@
-// A frame of handles around the window, each the thickness of a native resize border.
-// The frame lets every click through; only the handles take the pointer, above the
-// window controls and the strip that drags the window.
+/*
+ * A frame of handles around the window, each the thickness of a native resize border.
+ * The frame lets every click through; only the handles take the pointer, above the
+ * window controls and the strip that drags the window.
+ */
 .edges {
   position: fixed;
   inset: 0;

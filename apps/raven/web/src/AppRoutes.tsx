@@ -22,9 +22,11 @@ import { useIsDesktop } from '@/stores/desktop'
 import { BINGE_PATH } from '@/lib/binge'
 import { CONTINUE_WATCHING_PATH } from '@/lib/homeContinue'
 
-// Only the account pages load with the app: a first visit lands on the sign-in page, and every
-// page behind the gate, with the shells and the player around them, loads as a chunk of its own
-// the first time a route asks for it, so a visitor who is signed out downloads none of it.
+/*
+ * Only the account pages load with the app: a first visit lands on the sign-in page, and every
+ * page behind the gate, with the shells and the player around them, loads as a chunk of its own
+ * the first time a route asks for it, so a visitor who is signed out downloads none of it.
+ */
 const AppShell = lazyPage(() =>
   import('@/components/AppShell/AppShell').then((module) => module.AppShell),
 )

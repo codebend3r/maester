@@ -29,8 +29,10 @@
   background: var(--color-bark);
 }
 
-// Sized by its width, so the ground keeps its own shape; at this width the
-// mark stands a little over half the ground's height.
+/*
+ * Sized by its width, so the ground keeps its own shape; at this width the
+ * mark stands a little over half the ground's height.
+ */
 .markImage {
   width: 40%;
   height: auto;
@@ -106,8 +108,10 @@
   background: var(--color-canopy);
 }
 
-// Turned over: bark for the ground, night for the word, and the mark drawn
-// for the other tone.
+/*
+ * Turned over: bark for the ground, night for the word, and the mark drawn
+ * for the other tone.
+ */
 .lockupInverse {
   grid-template-columns: auto auto;
   align-items: center;

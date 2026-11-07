@@ -1,6 +1,8 @@
-// The bar sits low over the picture on a fade rising from the bottom, and
-// stays dark in every theme: its text, buttons and pills read the fixed
-// on-picture colours.
+/*
+ * The bar sits low over the picture on a fade rising from the bottom, and
+ * stays dark in every theme: its text, buttons and pills read the fixed
+ * on-picture colours.
+ */
 .controls {
   grid-area: stage;
   align-self: end;
@@ -27,9 +29,11 @@
   pointer-events: none;
 }
 
-// The up next card keeps to the right, in a row of its own above the
-// timeline, so it never covers the bar. The row is there only with the card,
-// or its gap would lift the bar.
+/*
+ * The up next card keeps to the right, in a row of its own above the
+ * timeline, so it never covers the bar. The row is there only with the card,
+ * or its gap would lift the bar.
+ */
 .withCard {
   grid-template-areas:
     'card card card card card card card card card'
@@ -155,9 +159,11 @@
   gap: var(--space-1);
 }
 
-// Dark glass, lifted a little toward the text colour so it shows on the
-// fade as well as on a bright picture. Round, holding only its icon; the tip
-// shares its cell and is lifted above it.
+/*
+ * Dark glass, lifted a little toward the text colour so it shows on the
+ * fade as well as on a bright picture. Round, holding only its icon; the tip
+ * shares its cell and is lifted above it.
+ */
 .pill {
   position: relative;
   display: grid;
@@ -193,8 +199,10 @@
   }
 }
 
-// What the pill is, above it, in the same glass. The last pill sits at the
-// bar's edge, so its tip lines up with its right side instead of its centre.
+/*
+ * What the pill is, above it, in the same glass. The last pill sits at the
+ * bar's edge, so its tip lines up with its right side instead of its centre.
+ */
 .tip {
   position: absolute;
   inset-block-end: calc(100% + var(--space-1));
@@ -247,8 +255,10 @@
   }
 }
 
-// On a phone the transport takes a row of its own, mute moves down beside
-// the pills, and the end time gives way to the time played.
+/*
+ * On a phone the transport takes a row of its own, mute moves down beside
+ * the pills, and the end time gives way to the time played.
+ */
 @media (max-width: 30rem) {
   .controls {
     grid-template-columns: repeat(5, auto) minmax(0, 1fr);

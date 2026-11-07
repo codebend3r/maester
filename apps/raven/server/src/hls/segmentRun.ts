@@ -97,8 +97,10 @@ export class SegmentRun {
       this.finished(line.trim()),
     )
     child.once(RUN_EVENTS.close, () => this.ended())
-    // Once spawned, an 'error' (a signal that could not be sent) leaves it running; only
-    // 'close' ends it. One that never spawned has no pid and gets no 'close'.
+    /*
+     * Once spawned, an 'error' (a signal that could not be sent) leaves it running; only
+     * 'close' ends it. One that never spawned has no pid and gets no 'close'.
+     */
     child.once(RUN_EVENTS.error, () => {
       if (child.pid === undefined) this.ended()
     })

@@ -34,6 +34,9 @@ pre-push:
     - name: 🧩 One command per script
       run: bun run one-command-per-script
 
+    - name: 💬 Comment style
+      run: bun run comment-style
+
     - name: 🧪 test
       run: bun run test
 

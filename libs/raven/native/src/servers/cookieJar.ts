@@ -30,13 +30,17 @@ const COOKIE_NAMES = Object.values(SERVER_COOKIES)
 const isServerCookieName = oneOf(COOKIE_NAMES)
 const COOKIE_ATTRIBUTES = { maxAge: 'max-age' } as const
 
-// The server signs each value in base64url with `.` between the parts; anything wider,
-// a `,`, `;`, space or line break above all, would split the header or add one.
+/*
+ * The server signs each value in base64url with `.` between the parts; anything wider,
+ * a `,`, `;`, space or line break above all, would split the header or add one.
+ */
 const COOKIE_VALUE = /^[A-Za-z0-9._~-]+$/u
 
-// iOS and Android hand several `Set-Cookie` headers over as one, joined with commas, so a
-// cookie starts the header or follows a comma before a `name=`. An `Expires` date's comma
-// is followed by the day of the month, never by a name and an `=`.
+/*
+ * iOS and Android hand several `Set-Cookie` headers over as one, joined with commas, so a
+ * cookie starts the header or follows a comma before a `name=`. An `Expires` date's comma
+ * is followed by the day of the month, never by a name and an `=`.
+ */
 const COOKIE_START = /,(?=\s*[\w!#$%&'*+.^`|~-]+=)/u
 
 export const cookieKeyFor = (serverId: string): string => `${COOKIE_KEY_PREFIX}${serverId}`

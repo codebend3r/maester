@@ -152,9 +152,11 @@ const Playing = ({ file, chosen, isOutputFixed, downloadsPage }: PlayingProps) =
     [played, client, menu, engine, downloadsPage],
   )
   const logo = useDownloadLogo({ mediaId: file.mediaId })
-  // The output and the art arrive on their own time; folding them in keeps the progress sink,
-  // so the player neither remounts nor forgets the length it reported.
-  // Chromium mixes the html engine's sound itself, so only mpv's bitstream fixes the volume.
+  /*
+   * The output and the art arrive on their own time; folding them in keeps the progress sink,
+   * so the player neither remounts nor forgets the length it reported.
+   * Chromium mixes the html engine's sound itself, so only mpv's bitstream fixes the volume.
+   */
   const services = useMemo(
     () => ({
       ...base,
@@ -235,8 +237,10 @@ const PlayPage = ({ fileId, queue, downloadsPage }: PlayPageProps) => {
       if (reply.type === DESKTOP_REPLIES.file) return reply.file
       throw new Error(refusalText({ reply, fallback: PLAY_PAGE_COPY.notOpenable }))
     },
-    // Opening a file also records it as recent and reads its resume point: asking again while it
-    // plays (focus, remount, a page reading everything again after a PIN) would move both.
+    /*
+     * Opening a file also records it as recent and reads its resume point: asking again while it
+     * plays (focus, remount, a page reading everything again after a PIN) would move both.
+     */
     staleTime: 'static',
     // Coming back to a file later must read its resume point afresh.
     gcTime: 0,

@@ -92,29 +92,37 @@ export const SILENT_LOG: Log = {
 export const LOG_QUEUE_MAX = 1000
 
 const COOKIE_HEADER = /(cookie|set-cookie)(\s*(?::|%3A)\s*)[^\r\n]*/gi
-// Our cookies: the admin and unlock cookies, the web's `maester-auth` and Supabase's default
-// `sb-<ref>-auth-token`, which `@supabase/ssr` splits into `.0`, `.1` chunks. The ref is bounded
-// so a run of `sb-` starts costs a fixed number of steps each.
+/*
+ * Our cookies: the admin and unlock cookies, the web's `maester-auth` and Supabase's default
+ * `sb-<ref>-auth-token`, which `@supabase/ssr` splits into `.0`, `.1` chunks. The ref is bounded
+ * so a run of `sb-` starts costs a fixed number of steps each.
+ */
 const COOKIE_NAMES = /(?:raven_(?:unlock|admin)|maester-auth|sb-[\w-]{1,64}-auth-token)/
-// Any letter case, `=` or its URL encoding, spaces around it, and any name that starts with ours.
-// The suffix is bounded: a longer one would be rescanned from every name in a run of names.
+/*
+ * Any letter case, `=` or its URL encoding, spaces around it, and any name that starts with ours.
+ * The suffix is bounded: a longer one would be rescanned from every name in a run of names.
+ */
 const SESSION_COOKIE = new RegExp(
   `(${COOKIE_NAMES.source}[\\w.-]{0,32})(\\s*(?:=|%3D)\\s*)[^;,\\s"'\`\\\\]*`,
   'gi',
 )
 const JSON_SECRET = /("(?:pin|password)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi
 
-// A value as JSON, JSON inside a JSON string (`\"...\"`), util.inspect (`'...'` or a backtick
-// string) or a form field writes it. An unclosed quote runs to the line end; a bare value runs
-// to a delimiter or the line end, spaces included, so no part of `correct horse battery` stays.
+/*
+ * A value as JSON, JSON inside a JSON string (`\"...\"`), util.inspect (`'...'` or a backtick
+ * string) or a form field writes it. An unclosed quote runs to the line end; a bare value runs
+ * to a delimiter or the line end, spaces included, so no part of `correct horse battery` stays.
+ */
 const ESCAPED_STRING = /\\"(?:[^"\\]|\\[^"\\]|\\\\(?:\\.|[^\\]))*\\"/
 const DOUBLE_STRING = /"(?:[^"\\]|\\.)*"/
 const SINGLE_STRING = /'(?:[^'\\]|\\.)*'/
 const BACKTICK_STRING = /`(?:[^`\\]|\\.)*`/
 const UNCLOSED_STRING = /\\?["'`][^\r\n]*/
 const BARE_VALUE = /[^\s"'`,;&)}\]](?:[^"'`,;&)}\]\r\n]*[^\s"'`,;&)}\]])?/
-// Skipping a value already blanked keeps `redact` idempotent. A value never starts with an
-// encoded space: the separator takes it, and giving it back would let `%20[redacted]` match.
+/*
+ * Skipping a value already blanked keeps `redact` idempotent. A value never starts with an
+ * encoded space: the separator takes it, and giving it back would let `%20[redacted]` match.
+ */
 const NOT_REDACTED = /(?!%20|\\?["'`]?\[redacted\])/
 const VALUE = `${NOT_REDACTED.source}(?:${[
   ESCAPED_STRING,
@@ -128,29 +136,37 @@ const VALUE = `${NOT_REDACTED.source}(?:${[
   .join('|')})`
 // The key's closing quote, plain or escaped, then `:` or `=`, either of them URL encoded.
 const SEPARATOR = /\\?["'`]?(?:\s|%20)*(?::|=|%3[AaDd])(?:\s|%20)*/
-// `pin`, `PIN`, `adminPin`, `newPassword`, `password_confirmation`, `x-pin`; never `spin` or `pinned`.
-// The prefix words are bounded because every `-` starts a word, so an unbounded run is tried
-// from each of them (quadratic on `a-a-a-...`); a longer hyphenated key still matches from a
-// later word.
+/*
+ * `pin`, `PIN`, `adminPin`, `newPassword`, `password_confirmation`, `x-pin`; never `spin` or `pinned`.
+ * The prefix words are bounded because every `-` starts a word, so an unbounded run is tried
+ * from each of them (quadratic on `a-a-a-...`); a longer hyphenated key still matches from a
+ * later word.
+ */
 const SECRET_KEY =
   /\b(?:[A-Za-z0-9]*[a-z0-9](?:Pin|PIN|Password|PASSWORD)|(?:[A-Za-z0-9]+[_-]){0,16}(?:[Pp]in|PIN|[Pp]assword|PASSWORD))(?:[_-][A-Za-z0-9]+)*/
 const SECRET_FIELD = new RegExp(`(${SECRET_KEY.source}${SEPARATOR.source})(${VALUE})`, 'g')
 // A quoted `cookie` key (`{"Cookie":"sid=..."}`); the bare header form is COOKIE_HEADER's.
 const COOKIE_FIELD = new RegExp(`(\\b(?:set-)?cookie\\\\?["'\`]\\s*[:=]\\s*)(${VALUE})`, 'gi')
-// Electron's cookie shape, `{ name: 'raven_unlock', value: '...' }`, inspected or as JSON. The
-// gap is bounded so a run of names is not rescanned to the end from each; OBJECT below blanks
-// the value of any object holding one of our names, however long it is.
+/*
+ * Electron's cookie shape, `{ name: 'raven_unlock', value: '...' }`, inspected or as JSON. The
+ * gap is bounded so a run of names is not rescanned to the end from each; OBJECT below blanks
+ * the value of any object holding one of our names, however long it is.
+ */
 const COOKIE_PAIR = new RegExp(
   `(${COOKIE_NAMES.source}[^{}]{0,256}?\\bvalue${SEPARATOR.source})(${VALUE})`,
   'gi',
 )
-// A secret that follows a percent escape (`%3D`, `%20`, `%2F`) starts a new word although the
-// escape ends in a letter or digit.
+/*
+ * A secret that follows a percent escape (`%3D`, `%20`, `%2F`) starts a new word although the
+ * escape ends in a letter or digit.
+ */
 const AFTER_ESCAPE = '(?<=%[0-9A-Fa-f]{2})'
-// Sign-in secrets as a field: the Supabase tokens and key, an `authorization` header, and our
-// session cookies by name. A letter or digit before the name makes it another word (`tokens`
-// and `mytoken` stay), `_` and `-` do not (`x-api-key`, `my_token`). The lookbehind also keeps a
-// run of names from being tried from every position.
+/*
+ * Sign-in secrets as a field: the Supabase tokens and key, an `authorization` header, and our
+ * session cookies by name. A letter or digit before the name makes it another word (`tokens`
+ * and `mytoken` stay), `_` and `-` do not (`x-api-key`, `my_token`). The lookbehind also keeps a
+ * run of names from being tried from every position.
+ */
 const TOKEN_KEY = new RegExp(
   `(?:(?<![A-Za-z0-9])|${AFTER_ESCAPE})(?:authorization|access_?token|refresh_?token|provider_?token|token_?hash|token|api[_-]?key|${COOKIE_NAMES.source}(?:\\.\\d+)?)`,
 )
@@ -159,8 +175,10 @@ const BEARER = new RegExp(
   `((?<![A-Za-z])Bearer(?:\\s|%20)+)${NOT_REDACTED.source}[^\\s"'\`,;\\\\]+`,
   'gi',
 )
-// `eyJ`, the base64url of `{"`, opens a JWT's header. Starting only at the head of a base64url
-// run keeps a run of `eyJ` from rescanning the rest of the run from every one.
+/*
+ * `eyJ`, the base64url of `{"`, opens a JWT's header. Starting only at the head of a base64url
+ * run keeps a run of `eyJ` from rescanning the rest of the run from every one.
+ */
 const JWT = new RegExp(
   `(?:(?<![A-Za-z0-9_-])|${AFTER_ESCAPE})eyJ[A-Za-z0-9_-]*\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+`,
   'g',
@@ -174,21 +192,25 @@ const TICKET_PARAM = /(?<=[?&]|%3[Ff]|%26)(t(?:=|%3[Dd]))(?:(?!%26)[^&#\s"'`\\])
 // The relay's per-load secret is 32 bytes in base64url (43 characters) as a loopback path segment.
 const RELAY_SECRET_URL =
   /(127\.0\.0\.1(?::|%3[Aa])\d{1,5}(?:\/|%2[Ff]))[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g
-// The local part and the domain's labels stop at the first character that cannot be in them, and
-// the local part starts only at the head of its run, so no input rescans a long run. `name@2x.png`
-// and `pkg@1.2.3` are not addresses: a top level domain is letters, and `\d+x.` is a pixel ratio.
+/*
+ * The local part and the domain's labels stop at the first character that cannot be in them, and
+ * the local part starts only at the head of its run, so no input rescans a long run. `name@2x.png`
+ * and `pkg@1.2.3` are not addresses: a top level domain is letters, and `\d+x.` is a pixel ratio.
+ */
 const EMAIL =
   /(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+(?:@|%40)(?!\d+x\.)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g
 const OBJECT = /\{[^{}]*\}/g
 const OUR_COOKIE = new RegExp(COOKIE_NAMES.source, 'i')
 const VALUE_FIELD = new RegExp(`(\\bvalue${SEPARATOR.source})(${VALUE})`, 'gi')
 
-// A path names a person's files (Ruling 12), and a name may hold the quote around it, a colon,
-// spaces or a line break. So a quoted path runs to the last same quote on its line; when its
-// line has none, to the next one past the break; and when it never closes (the message cap cut
-// it), to the end. A quote that opens another path never closes one, or a second run would
-// blank that path and `redact` would not be idempotent. A bare path, or a file URL, runs to the
-// line's end.
+/*
+ * A path names a person's files (Ruling 12), and a name may hold the quote around it, a colon,
+ * spaces or a line break. So a quoted path runs to the last same quote on its line; when its
+ * line has none, to the next one past the break; and when it never closes (the message cap cut
+ * it), to the end. A quote that opens another path never closes one, or a second run would
+ * blank that path and `redact` would not be idempotent. A bare path, or a file URL, runs to the
+ * line's end.
+ */
 const quotedPath = (quote: string): RegExp => {
   const start = '(?:file:\\/\\/|~)?\\/'
   const close = `(?:[^\\r\\n]*${quote}|[^${quote}]*${quote}(?:[^\\r\\n]*${quote})?)(?!${start})`
@@ -256,9 +278,11 @@ const cut = ({ text, max }: CutProps): string => {
   return HIGH_SURROGATE_AT_END.test(head) ? head.slice(0, -1) : head
 }
 
-// A few redaction patterns backtrack quadratically on a long run of near matches, so a huge
-// message is cut before `redact` sees it. The line is cut again, shorter, after redaction, so
-// whatever this cap leaves of a secret is either blanked or past the line's end.
+/*
+ * A few redaction patterns backtrack quadratically on a long run of near matches, so a huge
+ * message is cut before `redact` sees it. The line is cut again, shorter, after redaction, so
+ * whatever this cap leaves of a secret is either blanked or past the line's end.
+ */
 const MESSAGE_MAX = LOG_LINE_MAX * 4
 
 type LogLineProps = {
@@ -340,8 +364,10 @@ export const createLog = ({ dir, fs, now, timers, onError }: CreateLogProps): Lo
   let isWriting = false
   let timer: { handle: unknown } | null = null
   let drains: Promise<void> = Promise.resolve()
-  // Bytes in the live file; null until the folder is made and the file measured, and again
-  // after any failure, since a failed write leaves the file's real size unknown.
+  /*
+   * Bytes in the live file; null until the folder is made and the file measured, and again
+   * after any failure, since a failed write leaves the file's real size unknown.
+   */
   let knownSize: number | null = null
   let windowStart: number | null = null
   let windowCount = 0
@@ -394,9 +420,11 @@ export const createLog = ({ dir, fs, now, timers, onError }: CreateLogProps): Lo
     } catch (cause) {
       if (isMissingFile(cause)) return
       const error = new LogWriteError({ op: LOG_FS_OPS.rename, cause })
-      // Only the live file has to move. A locked or damaged older file is reported and skipped,
-      // which may cost that file's history (the next move replaces its target) but never stops
-      // the log; failing to move the live file drops the batch, so it never grows past the cap.
+      /*
+       * Only the live file has to move. A locked or damaged older file is reported and skipped,
+       * which may cost that file's history (the next move replaces its target) but never stops
+       * the log; failing to move the live file drops the batch, so it never grows past the cap.
+       */
       if (from === file) throw error
       report(error)
     }

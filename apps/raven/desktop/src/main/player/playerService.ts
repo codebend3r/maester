@@ -147,8 +147,10 @@ export const createPlayerService = ({
   onFirstFrame: reportFirstFrame,
   warn: reportWarning,
 }: CreatePlayerServiceProps): PlayerService => {
-  // What the newest load opened, and its ticket, which an ending explains and a server's
-  // removal stops.
+  /*
+   * What the newest load opened, and its ticket, which an ending explains and a server's
+   * removal stops.
+   */
   let opened: LoadTarget | null = null
   // These run inside the wrapper's event drain, so nothing they throw may escape.
   const warn = (message: string) => {
@@ -181,26 +183,36 @@ export const createPlayerService = ({
   /** What a command overtaken during an await answers: the engine stopping is a failure. */
   const overtaken = () => (isDead() ? ENGINE_GONE : OK)
   let phase: Phase = PLAYER_PHASES.idle
-  // Bumped by every load, file-loaded, stop, ending and engine stop, so an async step
-  // started for one of them notices it was overtaken and goes no further.
+  /*
+   * Bumped by every load, file-loaded, stop, ending and engine stop, so an async step
+   * started for one of them notices it was overtaken and goes no further.
+   */
   let epoch = 0
-  // Bumped by every load, stop, ending and engine stop but never by file-loaded: a
-  // replaced file's file-loaded can land while a load waits on mpv, and must not make
-  // that load think it was overtaken and skip its loadfile.
+  /*
+   * Bumped by every load, stop, ending and engine stop but never by file-loaded: a
+   * replaced file's file-loaded can land while a load waits on mpv, and must not make
+   * that load think it was overtaken and skip its loadfile.
+   */
   let generation = 0
-  // The newest generation whose loadfile mpv accepted, marked in stream order by the
-  // wrapper's `onReply`. Events are ordered with replies, so a file-loaded, end-file or
-  // redirect that comes before it belongs to the file this load replaces, and one after
-  // a refused loadfile belongs to no load at all.
+  /*
+   * The newest generation whose loadfile mpv accepted, marked in stream order by the
+   * wrapper's `onReply`. Events are ordered with replies, so a file-loaded, end-file or
+   * redirect that comes before it belongs to the file this load replaces, and one after
+   * a refused loadfile belongs to no load at all.
+   */
   let answeredGeneration = -1
-  // Bumped by every load and stop, so a load still resolving its source notices it was
-  // overtaken before it touches anything.
+  /*
+   * Bumped by every load and stop, so a load still resolving its source notices it was
+   * overtaken before it touches anything.
+   */
   let loadTicket = 0
   let openedTicket = 0
   // Loads the stall budget ended while they waited on mpv: they answer a lost connection.
   let stalledTickets: ReadonlySet<number> = new Set()
-  // Bumped as each subtitle pick starts, before mpv hears it, so a late sidecar's
-  // selection can tell a pick still on its way.
+  /*
+   * Bumped as each subtitle pick starts, before mpv hears it, so a late sidecar's
+   * selection can tell a pick still on its way.
+   */
   let subtitlePicks = 0
   let wanted: Wanted = { audio: null, subtitle: null }
   let pendingSeek: number | null = null
@@ -216,8 +228,10 @@ export const createPlayerService = ({
   let isWaiting = false
   let bufferedShown: readonly Range[] | null = null
   let stallTimer: unknown = null
-  // The newest time handed to the page, sent or held, and a count of the seeks sent, so
-  // a time read that answers late cannot step the clock back unless a seek moved it.
+  /*
+   * The newest time handed to the page, sent or held, and a count of the seeks sent, so
+   * a time read that answers late cannot step the clock back unless a seek moved it.
+   */
   let shownTime: number | null = null
   let seeks = 0
   let isReadingTime = false
@@ -478,15 +492,19 @@ export const createPlayerService = ({
   }
 
   const onFileLoaded = () => {
-    // A file-loaded while loaded can only be the newer file arriving after one it
-    // replaced already reported, so it takes over with a fresh snapshot.
+    /*
+     * A file-loaded while loaded can only be the newer file arriving after one it
+     * replaced already reported, so it takes over with a fresh snapshot.
+     */
     if (phase !== PLAYER_PHASES.loading && phase !== PLAYER_PHASES.loaded) return
     if (answeredGeneration !== generation) return
     phase = PLAYER_PHASES.loaded
     epoch += 1
     resetFile()
-    // The addon's time-pos throttle can drop every update before an early eof, so the
-    // short-eof check starts from where the file was asked to start.
+    /*
+     * The addon's time-pos throttle can drop every update before an early eof, so the
+     * short-eof check starts from where the file was asked to start.
+     */
     lastTime = loadStart
     isAwaitingFirstFrame = true
     snapshot(epoch).catch((error: unknown) => {
@@ -557,8 +575,10 @@ export const createPlayerService = ({
       onRedirect()
       return
     }
-    // mpv reports `stop` for a file replaced by a load or ended by our own stop, which
-    // belongs to a file this service already left.
+    /*
+     * mpv reports `stop` for a file replaced by a load or ended by our own stop, which
+     * belongs to a file this service already left.
+     */
     if (
       reason !== MPV_END_FILE_REASONS.eof &&
       reason !== MPV_END_FILE_REASONS.error &&
@@ -661,8 +681,10 @@ export const createPlayerService = ({
         lastTime = event.data
         showTime(event.data)
         return
-      // mpv clears the duration, the track list and the frame rate as a file closes, and
-      // can report that before its end-file, so those emptied values are not the file's.
+      /*
+       * mpv clears the duration, the track list and the frame rate as a file closes, and
+       * can report that before its end-file, so those emptied values are not the file's.
+       */
       case MPV_PROPERTIES.duration:
         if (event.data === null) return
         duration = event.data
@@ -696,8 +718,10 @@ export const createPlayerService = ({
         return
       case MPV_PROPERTIES.demuxerCacheState:
         buffered.push(event.data?.['seekable-ranges'] ?? [])
-        // A slow link fills the cache for longer than the budget while the clock stands still;
-        // bytes still arriving mean the server is there, so only a quiet one runs the budget out.
+        /*
+         * A slow link fills the cache for longer than the budget while the clock stands still;
+         * bytes still arriving mean the server is there, so only a quiet one runs the budget out.
+         */
         if (stallTimer !== null && (event.data?.['raw-input-rate'] ?? 0) > 0) restartStall()
         return
       default:
@@ -754,17 +778,21 @@ export const createPlayerService = ({
   const load = async (command: Extract<PlayerCommand, { type: typeof PLAYER_COMMANDS.load }>) => {
     loadTicket += 1
     const ticket = loadTicket
-    // What a load overtaken while it waits answers: its stall budget running out is a
-    // refusal the page can show, since nothing will play; an engine stop is a failure, and
-    // a newer load or a stop is no failure of this one.
+    /*
+     * What a load overtaken while it waits answers: its stall budget running out is a
+     * refusal the page can show, since nothing will play; an engine stop is a failure, and
+     * a newer load or a stop is no failure of this one.
+     */
     const bail = () => {
       if (isDead()) return ENGINE_GONE
       if (stalledTickets.has(ticket)) return refuse(PLAYER_MESSAGES.lost)
       return OK
     }
     const resolved = await resolveSource(command.source)
-    // A newer load or a stop while the source resolved: this load touches nothing, as one
-    // overtaken while it waits on mpv sends no loadfile.
+    /*
+     * A newer load or a stop while the source resolved: this load touches nothing, as one
+     * overtaken while it waits on mpv sends no loadfile.
+     */
     if (ticket !== loadTicket || isDead()) return bail()
     if (!resolved.ok) return refuse(resolved.message)
     opened = resolved.target
@@ -790,9 +818,11 @@ export const createPlayerService = ({
         return refuse(PLAYER_MESSAGES.failed)
       }
       await mpv.set({ name: MPV_PROPERTIES.pause, value: false })
-      // A stop, reset or newer load overtook this one: sending loadfile now would play
-      // a file no page shows. A newer load or a stop is not a failure of this load, so
-      // it answers ok; an engine that stopped meanwhile is, so the page can fall back.
+      /*
+       * A stop, reset or newer load overtook this one: sending loadfile now would play
+       * a file no page shows. A newer load or a stop is not a failure of this load, so
+       * it answers ok; an engine that stopped meanwhile is, so the page can fall back.
+       */
       if (token !== generation) return bail()
       await mpv.command({
         args: [
@@ -931,8 +961,10 @@ export const createPlayerService = ({
     await handle({ type: PLAYER_COMMANDS.stop })
   }
 
-  // Sent before anything else, so mpv applies it before any loadfile. It fails closed:
-  // a failed set refuses every load.
+  /*
+   * Sent before anything else, so mpv applies it before any loadfile. It fails closed:
+   * a failed set refuses every load.
+   */
   const hardening = harden(HARDENED_OPTIONS)
 
   OBSERVED.forEach((name) => mpv.observe({ name }))

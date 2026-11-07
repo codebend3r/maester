@@ -1,5 +1,7 @@
-// The landing page: a hero over a wall of posters, three features, the
-// screens raven plays on, then the colophon.
+/*
+ * The landing page: a hero over a wall of posters, three features, the
+ * screens raven plays on, then the colophon.
+ */
 
 .landing {
   display: grid;
@@ -13,7 +15,7 @@
   > .colophon {
     width: 100%;
     max-width: 76rem;
-    padding: var(--space-4) var(--gutter) var(--space-6);
+    padding: var(--space-9) var(--gutter) var(--space-12);
   }
 }
 
@@ -31,7 +33,7 @@
 
   .masthead {
     grid-area: masthead;
-    padding: var(--space-4) var(--gutter);
+    padding: var(--space-9) var(--gutter);
     background: linear-gradient(
       to bottom,
       color-mix(in srgb, var(--color-night) 90%, transparent),
@@ -40,8 +42,10 @@
   }
 }
 
-// The wall and its scrim sit behind the hero's content and are clipped to it,
-// so the download menu can still hang below the hero.
+/*
+ * The wall and its scrim sit behind the hero's content and are clipped to it,
+ * so the download menu can still hang below the hero.
+ */
 .backdrop {
   position: absolute;
   inset: 0;
@@ -70,7 +74,7 @@
   left: -15%;
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: var(--space-2-5);
+  gap: var(--space-7);
   rotate: -8deg;
 
   li {
@@ -90,8 +94,8 @@
   display: grid;
   justify-items: center;
   align-content: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--gutter) var(--space-7);
+  gap: var(--space-9);
+  padding: var(--space-6) var(--gutter) var(--space-13);
   text-align: center;
 
   h1 {
@@ -116,14 +120,14 @@
   place-items: center;
   width: 4.75rem;
   aspect-ratio: 1;
-  padding-left: var(--space-1);
+  padding-left: var(--space-3);
   border-radius: 50%;
   background: var(--color-leaf);
   box-shadow:
-    0 0 0 var(--space-2) color-mix(in srgb, var(--color-leaf) 20%, transparent),
+    0 0 0 var(--space-5) color-mix(in srgb, var(--color-leaf) 20%, transparent),
     var(--shadow-lift);
   color: var(--color-on-leaf);
-  font-size: 1.875rem;
+  font-size: var(--font-size-glyph);
 }
 
 .lede {
@@ -143,18 +147,20 @@
     'screens';
   justify-items: center;
   width: 100%;
-  padding-bottom: var(--space-5);
+  padding-bottom: var(--space-11);
 }
 
 .features {
   grid-area: features;
   width: 100%;
   max-width: 80rem;
-  padding: var(--space-6) var(--inset);
+  padding: var(--space-12) var(--inset);
 }
 
-// The 1px gap shows the list's background through, drawing the dividers:
-// upright side by side, level once the features stack.
+/*
+ * The 1px gap shows the list's background through, drawing the dividers:
+ * upright side by side, level once the features stack.
+ */
 .feature-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -170,8 +176,8 @@
   display: grid;
   justify-items: center;
   align-content: start;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-4-5);
+  gap: var(--space-5);
+  padding: var(--space-9) var(--space-10);
   background: var(--color-night);
   text-align: center;
 
@@ -196,7 +202,7 @@
   border: 1px solid color-mix(in srgb, var(--color-amber) 40%, transparent);
   border-radius: 50%;
   color: var(--color-amber);
-  font-size: 1.875rem;
+  font-size: var(--font-size-glyph);
 }
 
 .screens {
@@ -210,7 +216,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 21.25rem), 1fr));
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--space-12);
   padding: clamp(2rem, 4.5vw, 3.5rem) clamp(1.5rem, 4vw, 3rem);
   border-radius: var(--radius-card);
   background: radial-gradient(
@@ -222,7 +228,7 @@
 
 .screens-copy {
   display: grid;
-  gap: var(--space-2-5);
+  gap: var(--space-7);
   max-width: 26.25rem;
 
   h2 {
@@ -242,7 +248,7 @@
 .platforms {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-1-5) var(--space-2-5);
+  gap: var(--space-4) var(--space-7);
   font-size: var(--font-size-ui);
 
   li {
@@ -250,7 +256,7 @@
     grid-auto-flow: column;
     justify-content: start;
     align-items: center;
-    gap: var(--space-1-5);
+    gap: var(--space-4);
   }
 
   .icon {
@@ -259,8 +265,10 @@
   }
 }
 
-// A television, a laptop and a phone, each playing raven, placed in
-// percentages of one box so the group scales as one.
+/*
+ * A television, a laptop and a phone, each playing raven, placed in
+ * percentages of one box so the group scales as one.
+ */
 .devices {
   position: relative;
   width: 100%;
@@ -294,9 +302,9 @@
   grid-area: picture;
   align-self: end;
   display: grid;
-  gap: var(--space-1);
-  padding: clamp(var(--space-2), 5.5cqi, var(--space-5))
-    clamp(var(--space-1), 3.2cqi, var(--space-2-5)) clamp(var(--space-1), 2.5cqi, var(--space-3));
+  gap: var(--space-3);
+  padding: clamp(var(--space-5), 5.5cqi, var(--space-11))
+    clamp(var(--space-3), 3.2cqi, var(--space-7)) clamp(var(--space-3), 2.5cqi, var(--space-6));
   background: var(--fade-from-bottom);
   color: var(--color-on-picture);
 }
@@ -347,8 +355,10 @@
   clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
 }
 
-// The base reaches 6% past the screen on each side, so the laptop's box is
-// that much wider than its screen and starts that much further left.
+/*
+ * The base reaches 6% past the screen on each side, so the laptop's box is
+ * that much wider than its screen and starts that much further left.
+ */
 .laptop {
   position: absolute;
   bottom: 5%;
@@ -366,9 +376,9 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-content: start;
-  gap: var(--space-0-5);
+  gap: var(--space-2);
   aspect-ratio: 16 / 10;
-  padding: var(--space-1-5);
+  padding: var(--space-4);
   overflow: hidden;
   border: 8px solid var(--color-bezel);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -394,11 +404,11 @@
   bottom: 0;
   display: grid;
   align-content: start;
-  gap: var(--space-1);
+  gap: var(--space-3);
   width: 21%;
   aspect-ratio: 9 / 19;
-  padding: clamp(var(--space-1), 3.5cqi, var(--space-3-5))
-    clamp(var(--space-0), 1.5cqi, var(--space-1)) clamp(var(--space-0), 1.5cqi, var(--space-1));
+  padding: clamp(var(--space-3), 3.5cqi, var(--space-8))
+    clamp(var(--space-1), 1.5cqi, var(--space-3)) clamp(var(--space-1), 1.5cqi, var(--space-3));
   overflow: hidden;
   border: 7px solid var(--color-bezel);
   border-radius: var(--radius-phone);
@@ -421,7 +431,7 @@
 .phone-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-0-5);
+  gap: var(--space-2);
 }
 
 .phone-tile {
@@ -429,8 +439,10 @@
   border-radius: var(--radius-sm);
 }
 
-// The posters and stills, drawn in the palette's own colours until real
-// artwork replaces them.
+/*
+ * The posters and stills, drawn in the palette's own colours until real
+ * artwork replaces them.
+ */
 .tone-1 {
   background:
     radial-gradient(

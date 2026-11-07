@@ -360,8 +360,10 @@ describe('Home on a TV', () => {
     expect(askedFor()).toEqual([])
   })
 
-  // Android TV restores no focus as a screen comes back, so with the card gone nothing on Home
-  // would have it.
+  /*
+   * Android TV restores no focus as a screen comes back, so with the card gone nothing on Home
+   * would have it.
+   */
   it('gives Home its opening focus again when the card a screen was opened from has gone', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })

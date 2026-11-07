@@ -190,8 +190,10 @@ export const createAudioService = ({
   let playing: Held | null = null
   let queued: Queued | null = null
   let phase: Phase = PLAYER_PHASES.idle
-  // Bumped by every load, stop and engine stop, so a step started for one of them notices it
-  // was overtaken.
+  /*
+   * Bumped by every load, stop and engine stop, so a step started for one of them notices it
+   * was overtaken.
+   */
   let epoch = 0
   let lastTime = 0
   let duration: number | null = null
@@ -360,8 +362,10 @@ export const createAudioService = ({
     switch (reason) {
       case MPV_END_FILE_REASONS.eof: {
         if (queued !== null) {
-          // mpv has already gone on to the queued track; the page follows.
-          // It started with the `af` it was queued with, so the page's `sound` for it is no news.
+          /*
+           * mpv has already gone on to the queued track; the page follows.
+           * It started with the `af` it was queued with, so the page's `sound` for it is no news.
+           */
           retire(playing)
           playing = queued
           soundFilter = queued.filter
@@ -651,8 +655,10 @@ export const createAudioService = ({
     }
   }
 
-  // Sent before anything else, so mpv applies it before any loadfile. It fails closed:
-  // a failed set refuses every load.
+  /*
+   * Sent before anything else, so mpv applies it before any loadfile. It fails closed:
+   * a failed set refuses every load.
+   */
   const hardening = harden(HARDENED_OPTIONS)
 
   AUDIO_OBSERVED.forEach((name) => mpv.observe({ name }))

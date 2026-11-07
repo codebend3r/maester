@@ -9,8 +9,10 @@
   gap: var(--space-3);
 }
 
-// The poster down the left; the title, the cards and, once split, the way
-// to put them back together stacked beside it.
+/*
+ * The poster down the left; the title, the cards and, once split, the way
+ * to put them back together stacked beside it.
+ */
 .movie {
   display: grid;
   grid-template-columns: 5rem minmax(0, 1fr);

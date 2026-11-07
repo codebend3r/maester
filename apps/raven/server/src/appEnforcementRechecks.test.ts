@@ -81,8 +81,10 @@ describe('open responses once access goes', () => {
   })
 
   afterAll(async () => {
-    // A body read to its end can leave its keep-alive socket not yet idle
-    // when the server closes, which would then wait out the keep-alive timeout.
+    /*
+     * A body read to its end can leave its keep-alive socket not yet idle
+     * when the server closes, which would then wait out the keep-alive timeout.
+     */
     open.app.getHttpAdapter().getInstance().server.closeAllConnections()
     await open.app.close()
     await rm(liveRoot, { recursive: true, force: true, maxRetries: 5 })
