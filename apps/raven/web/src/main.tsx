@@ -8,11 +8,11 @@ import '@fontsource-variable/instrument-sans/wdth.css'
 import '@raven/ui/styles.css'
 import { configureStorage } from '@raven/ui/headless'
 import { AppRoutes } from '@/AppRoutes'
+import { startMediaOrigin } from '@/lib/apiOrigin'
 import { applyStylesheets } from '@/lib/applyStylesheets'
 import { CardLinks } from '@/components/CardLink/CardLink'
 import { startDesktop } from '@/desktop/startDesktop'
 import { KeepLibraryListings } from '@/lib/keepLibraryListings'
-import { MediaOriginProbe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { queryClient } from '@/lib/queryClient'
 import { keepAuthConfigSaved, restoreAuthConfig } from '@/lib/savedAuthConfig'
 import { PrefetchPlaybackSettings } from '@/lib/prefetchPlaybackSettings'
@@ -20,6 +20,7 @@ import { StartAuthSession } from '@/lib/startAuthSession'
 import { followTheme } from '@/stores/theme'
 
 followTheme()
+startMediaOrigin()
 restoreAuthConfig({ storage: window.localStorage, queryClient })
 keepAuthConfigSaved({ storage: window.localStorage, queryClient })
 startDesktop({ bridge: window.ravenDesktop, root: document.documentElement, target: window })
@@ -37,11 +38,9 @@ if (rootElement) {
           <StartAuthSession>
             <PrefetchPlaybackSettings>
               <KeepLibraryListings>
-                <MediaOriginProbe>
-                  <CardLinks>
-                    <AppRoutes />
-                  </CardLinks>
-                </MediaOriginProbe>
+                <CardLinks>
+                  <AppRoutes />
+                </CardLinks>
               </KeepLibraryListings>
             </PrefetchPlaybackSettings>
           </StartAuthSession>

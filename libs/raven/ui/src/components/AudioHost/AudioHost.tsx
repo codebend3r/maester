@@ -22,7 +22,6 @@ import {
   playingTrackOf,
   useAudioQueue,
 } from '@/stores/audioQueue'
-import { useMediaOrigin } from '@/stores/mediaOrigin'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import styles from '@/components/AudioHost/AudioHost.module.scss'
 
@@ -48,7 +47,6 @@ type ElementRef = RefObject<HTMLAudioElement | null>
 type UseTrackSourceProps = {
   api: ApiClient
   track: Track | null
-  reprobe: () => void
 }
 
 /**
@@ -59,19 +57,17 @@ type UseTrackSourceProps = {
  * and while the libraries that pick between the two are, as the element never
  * reloads mid-track; once they have failed it plays from its file.
  */
-const useTrackSource = ({ api, track, reprobe }: UseTrackSourceProps): string | null => {
-  const origin = useMediaOrigin((state) => state.pick?.origin ?? null)
+const useTrackSource = ({ api, track }: UseTrackSourceProps): string | null => {
   const queries = useMemo(() => ravenQueriesFor(api), [api])
   const libraries = useQuery({ ...queries.librariesQuery, enabled: track !== null })
   const kbps = useTrackBitrate({ api, track })
   const plane = useMediaPlane({
     api,
     mediaId: track?.id ?? 0,
-    reprobe,
     isEnabled: track !== null,
   })
   if (track === null || libraries.isPending) return null
-  if (origin !== null && plane.access === null) return null
+  if (plane.isAwaitingTicket) return null
   if (kbps === null) return api.fileUrl({ id: track.id, access: plane.access })
   return api.transcodeUrl({ mediaId: track.id, kbps, access: plane.access })
 }
@@ -311,11 +307,7 @@ const useAudioElement = ({
   useVideoEvents({ videoRef: second, on })
 }
 
-type AudioHostProps = {
-  api: ApiClient
-  /** Asks the media origins to be probed again when the picked one cannot be reached. */
-  reprobe: () => void
-}
+type AudioHostProps = { api: ApiClient }
 
 /**
  * Whether the elements' sound goes through Web Audio: from the first time
@@ -348,15 +340,15 @@ const useIsRouted = (): boolean => {
  * crossfades, in or out; music saves none. The chrome (the bar, Now Playing, the queue
  * page) reads and drives the store, never this.
  */
-export const AudioHost = ({ api, reprobe }: AudioHostProps) => {
+export const AudioHost = ({ api }: AudioHostProps) => {
   const first = useRef<HTMLAudioElement>(null)
   const second = useRef<HTMLAudioElement>(null)
   const elements = useMemo(() => [first, second] as const, [])
   const loads = useRef<ElementLoads>(new WeakMap())
   const track = useAudioQueue(playingTrackOf)
   const upNext = useAudioQueue(nextTrackOf)
-  const src = useTrackSource({ api, track, reprobe })
-  const preload = useTrackSource({ api, track: upNext, reprobe })
+  const src = useTrackSource({ api, track })
+  const preload = useTrackSource({ api, track: upNext })
   const rate = useTrackRate({ api, track })
   const isAudiobook = useIsAudiobook({ api, track })
   const isNextAudiobook = useIsAudiobook({ api, track: upNext })

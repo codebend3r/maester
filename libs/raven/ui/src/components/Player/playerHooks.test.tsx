@@ -1,13 +1,7 @@
-import { afterEach, describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import {
-  MEDIA_ORIGIN_KINDS,
-  type MediaOrigin,
-  PICTURE_SUBTITLES,
-  PLAYBACK_MODES,
-  type RemotePlayback,
-} from '@raven/core'
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { PICTURE_SUBTITLES, PLAYBACK_MODES } from '@raven/core'
+import { act, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import {
   PLAYBACK_STATUSES,
@@ -21,7 +15,6 @@ import { playerQueryKeys as queryKeys } from '@/lib/playerQueryKeys'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { mediaItem } from '@/test/fixtures'
 import { DEFAULT_PLAYBACK_STATE } from '@/test/render'
-import { useMediaOrigin } from '@/stores/mediaOrigin'
 
 describe('videoReducer', () => {
   it('starts paused at the resume point, and follows the element', () => {
@@ -249,113 +242,5 @@ describe('usePlaybackLadder', () => {
     if (remux.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
     expect(remux.rendition.mode).toBe(PLAYBACK_MODES.remux)
     expect(remux.slow).toBeNull()
-  })
-})
-
-const PUBLIC_ORIGIN: MediaOrigin = { kind: MEDIA_ORIGIN_KINDS.public, url: 'https://raven.example' }
-const LAN_ORIGIN: MediaOrigin = { kind: MEDIA_ORIGIN_KINDS.lan, url: 'https://lan.example' }
-const HELD_TO_720: RemotePlayback = { limit: 'high720', isOutside: false }
-
-type PlayFromProps = { origin: MediaOrigin | null; remote: RemotePlayback; bitrate: number }
-
-/** A 1080p file the browser plays as it is, from `origin` (null for the server's own address). */
-const playFrom = ({ origin, remote, bitrate }: PlayFromProps) => {
-  setBrowserSupport(() => true)
-  setStreamSupport(() => true)
-  // In act: a hook rendered earlier in the same test reads the store too.
-  act(() => useMediaOrigin.setState({ pick: { origin, at: Date.now(), remote } }))
-  const media = mediaItem({ width: 1920, height: 1080, bitrate })
-  return renderHook(
-    () => usePlaybackLadder({ api, media, audio: null, isDefaultAudio: true, burn: null }),
-    { wrapper: withSettings },
-  )
-}
-
-describe('usePlaybackLadder away from home', () => {
-  // Unmounted first, so the reset is not an update outside act.
-  afterEach(() => {
-    cleanup()
-    useMediaOrigin.setState({ pick: null })
-  })
-
-  it('starts a file over the remote limit as a transcode from a public origin, the size left to the server', () => {
-    const { result } = playFrom({
-      origin: PUBLIC_ORIGIN,
-      remote: HELD_TO_720,
-      bitrate: 24_000_000,
-    })
-    const away = result.current
-    if (away.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
-    expect(away.rendition).toEqual({
-      mode: PLAYBACK_MODES.transcode,
-      quality: null,
-      burn: null,
-    })
-
-    // The other ways stay behind it to step down to.
-    act(() => away.fail(failure('broke')))
-    const stepped = result.current
-    if (stepped.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
-    expect(stepped.rendition.mode).toBe(PLAYBACK_MODES.direct)
-  })
-
-  it('plays as at home from a LAN origin, or for a file under the limit', () => {
-    const lan = playFrom({ origin: LAN_ORIGIN, remote: HELD_TO_720, bitrate: 24_000_000 }).result
-    if (lan.current.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
-    expect(lan.current.rendition).toEqual({
-      mode: PLAYBACK_MODES.direct,
-      quality: null,
-      burn: null,
-    })
-
-    const small = playFrom({
-      origin: PUBLIC_ORIGIN,
-      remote: HELD_TO_720,
-      bitrate: 3_000_000,
-    }).result
-    if (small.current.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
-    expect(small.current.rendition).toEqual({
-      mode: PLAYBACK_MODES.direct,
-      quality: null,
-      burn: null,
-    })
-  })
-
-  it('goes by where the request came from when no media origin is picked', () => {
-    const outside = playFrom({
-      origin: null,
-      remote: { ...HELD_TO_720, isOutside: true },
-      bitrate: 24_000_000,
-    }).result
-    if (outside.current.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
-    expect(outside.current.rendition.mode).toBe(PLAYBACK_MODES.transcode)
-    expect(outside.current.rendition.quality).toBeNull()
-
-    const inside = playFrom({ origin: null, remote: HELD_TO_720, bitrate: 24_000_000 }).result
-    if (inside.current.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
-    expect(inside.current.rendition.mode).toBe(PLAYBACK_MODES.direct)
-  })
-
-  it('lets a viewer pick a size or the original over the remote limit', () => {
-    const { result } = playFrom({
-      origin: PUBLIC_ORIGIN,
-      remote: HELD_TO_720,
-      bitrate: 24_000_000,
-    })
-    const away = result.current
-    if (away.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
-    act(() => away.choices.select({ kind: PICK_KINDS.size, quality: 'sd480' }))
-    const small = result.current
-    if (small.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
-    expect(small.rendition).toEqual({
-      mode: PLAYBACK_MODES.transcode,
-      quality: 'sd480',
-      burn: null,
-    })
-
-    act(() => small.choices.select({ kind: PICK_KINDS.mode, mode: PLAYBACK_MODES.direct }))
-    const original = result.current
-    if (original.status !== PLAYBACK_STATUSES.playing) throw new Error('Not playing')
-    expect(original.rendition).toEqual({ mode: PLAYBACK_MODES.direct, quality: null, burn: null })
   })
 })

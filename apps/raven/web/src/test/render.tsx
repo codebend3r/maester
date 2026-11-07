@@ -15,7 +15,6 @@ import { render } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, parsePath } from 'react-router-dom'
 import { CardLinks } from '@/components/CardLink/CardLink'
-import { MediaOriginProbe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { queryKeys } from '@raven/ui/headless'
 import { PrefetchPlaybackSettings } from '@/lib/prefetchPlaybackSettings'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
@@ -47,7 +46,7 @@ type RenderWithProvidersProps = {
 /**
  * Renders `ui` inside a fresh query client and an in-memory router, starting at
  * `route` with the pages in `behind` before it in history, wrapped as
- * `main.tsx` wraps the app: the playback settings prefetch, the media origin probe, and what card
+ * `main.tsx` wraps the app: the playback settings prefetch and what card
  * links follow. The server's playback and display settings
  * are already known, as they are once a page has read them, and so is the
  * admin lock, off as in an admin's browser so every action shows, and so is
@@ -92,9 +91,7 @@ export const renderWithProviders = ({
         initialIndex={behind.length}
       >
         <PrefetchPlaybackSettings>
-          <MediaOriginProbe>
-            <CardLinks>{ui}</CardLinks>
-          </MediaOriginProbe>
+          <CardLinks>{ui}</CardLinks>
         </PrefetchPlaybackSettings>
       </MemoryRouter>
     </QueryClientProvider>,

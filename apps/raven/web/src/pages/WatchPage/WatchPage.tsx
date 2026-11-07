@@ -37,7 +37,6 @@ import {
   type ViewOf,
   type ViewsOf,
 } from '@raven/ui/headless'
-import { useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { DesktopWatch } from '@/desktop/DesktopWatch/DesktopWatch'
 import { PlayerMessage } from '@/desktop/player/PlayerMessage'
 import { api } from '@/lib/api'
@@ -234,7 +233,7 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
   const offered = next ?? (isSeasonOver ? nextSeason : null)
   // Playback never waits on these: the chapters and markers show once they come.
   const markers = useQuery(markersQuery(media.id)).data ?? null
-  const mediaPlane = useMediaPlane({ api, mediaId: media.id, reprobe: useReprobe() })
+  const mediaPlane = useMediaPlane({ api, mediaId: media.id })
   useTicketFollowsSession({ mediaId: media.id })
   const hasAccounts = (useQuery(authConfigQuery).data?.state ?? null) === AUTH_CONFIG_STATES.ready
   const copyLink = () => {

@@ -14,6 +14,7 @@ const access = (ticket: string): MediaAccess => ({
 
 const planeWith = (granted: MediaAccess | null): MediaPlane => ({
   access: granted,
+  isAwaitingTicket: false,
   refreshTicket: async () => true,
   reportUnreachable: () => {},
 })
@@ -178,6 +179,16 @@ describe('useMediaSource', () => {
     const { container } = render(<Harness mode="direct" mediaPlane={planeWith(null)} />)
     await act(async () => {})
     expect(srcOf(container)).toBe('/api/media/7/file')
+  })
+
+  it('attaches nothing while the ticket for the origin is on its way, then plays from the origin', async () => {
+    const awaiting: MediaPlane = { ...planeWith(null), isAwaitingTicket: true }
+    const { container, rerender } = render(<Harness mode="direct" mediaPlane={awaiting} />)
+    await act(async () => {})
+    expect(srcOf(container)).toBeNull()
+    rerender(<Harness mode="direct" mediaPlane={planeWith(access('abc.def'))} />)
+    await act(async () => {})
+    expect(srcOf(container)).toBe('https://raven.home.example/api/media/7/file?t=abc.def')
   })
 
   it('moves the file to the web host when the access goes away', async () => {

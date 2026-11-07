@@ -8,7 +8,6 @@ import {
   PICTURE_SUBTITLES,
   PLAYBACK_MODES,
   offeredQualities,
-  planForNetwork,
   planPlayback,
 } from '@raven/core'
 import { useMemo, useState } from 'react'
@@ -24,7 +23,6 @@ import {
 } from '@/components/Player/playChoices'
 import type { Rendition } from '@/components/Player/rendition'
 import type { Delivery } from '@/lib/streamSource'
-import { useMediaOrigin } from '@/stores/mediaOrigin'
 
 /** The ways to play, best first, for one audio track; a step down belongs to one ladder. */
 type Ladder = { modes: readonly PlaybackMode[]; audio: number | null }
@@ -106,9 +104,8 @@ type UsePlaybackLadderProps = {
  * starts again at the top, unless the connection already proved too slow
  * for anything but a transcode: that holds for the rest of the playback.
  * The viewer can pick any way the plan offers; it starts there, and a
- * failure steps down from it. Away from home, a file over the remote limit
- * starts as a transcode, as Plex does, unless the viewer picks another way;
- * the server holds that transcode to the limit.
+ * failure steps down from it. Away from home the server holds a transcode
+ * to the remote limit itself.
  */
 export const usePlaybackLadder = ({
   media,
@@ -119,24 +116,17 @@ export const usePlaybackLadder = ({
 }: UsePlaybackLadderProps): PlaybackStatus => {
   const settings = useQuery(playerQueriesFor(api).playbackSettings)
   const policy = settings.data?.settings ?? (settings.isError ? DEFAULT_PLAYBACK_SETTINGS : null)
-  const originKind = useMediaOrigin((state) => state.pick?.origin?.kind ?? null)
-  const remote = useMediaOrigin((state) => state.pick?.remote ?? null)
   const plan = useMemo(
     () =>
       policy &&
-      planForNetwork({
-        plan: planPlayback({
-          media,
-          canPlay: browserCanPlay,
-          canStream: browserCanStream,
-          defaultAudio: isDefaultAudio,
-          policy,
-        }),
+      planPlayback({
         media,
-        origin: originKind === null ? null : { kind: originKind },
-        remote,
+        canPlay: browserCanPlay,
+        canStream: browserCanStream,
+        defaultAudio: isDefaultAudio,
+        policy,
       }),
-    [media, isDefaultAudio, policy, originKind, remote],
+    [media, isDefaultAudio, policy],
   )
   const [forced, setForced] = useState(false)
   const [fallback, setFallback] = useState<{ ladder: Ladder; step: number } | null>(null)

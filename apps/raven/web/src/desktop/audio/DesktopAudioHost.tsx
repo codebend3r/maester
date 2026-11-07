@@ -225,7 +225,6 @@ const NativeAudioHost = ({ api, player }: NativeAudioHostProps) => {
 
 type AudioViewProps = {
   api: ApiClient
-  reprobe: () => void
   connection: AudioConnection
 }
 
@@ -241,9 +240,7 @@ const NativeAudioView = ({ api, connection }: NativeAudioViewProps) =>
 
 type HtmlAudioViewProps = AudioViewProps
 
-const HtmlAudioView = ({ api, reprobe }: HtmlAudioViewProps) => (
-  <AudioHost api={api} reprobe={reprobe} />
-)
+const HtmlAudioView = ({ api }: HtmlAudioViewProps) => <AudioHost api={api} />
 
 const AUDIO_VIEWS = {
   [CONNECTION_STATUSES.waiting]: AwaitingAudio,
@@ -252,19 +249,15 @@ const AUDIO_VIEWS = {
   [CONNECTION_STATUSES.lost]: HtmlAudioView,
 } as const satisfies Record<AudioConnection['status'], ComponentType<AudioViewProps>>
 
-type DesktopAudioHostProps = {
-  api: ApiClient
-  /** Asks the media origins to be probed again when the picked one cannot be reached, for the html host. */
-  reprobe: () => void
-}
+type DesktopAudioHostProps = { api: ApiClient }
 
 /**
  * Music inside Raven: through main's music engine once it is handed over, and through
  * the web's own `<audio>` host when there is none, or it is lost. Nothing renders while
  * main's answer is on its way, so a track never changes engine mid-play.
  */
-export const DesktopAudioHost = ({ api, reprobe }: DesktopAudioHostProps) => {
+export const DesktopAudioHost = ({ api }: DesktopAudioHostProps) => {
   const connection = useAudioConnection()
   const View = AUDIO_VIEWS[connection.status]
-  return <View api={api} reprobe={reprobe} connection={connection} />
+  return <View api={api} connection={connection} />
 }

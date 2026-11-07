@@ -74,7 +74,7 @@ type RenderHostProps = { api: ApiClient; client?: QueryClient }
 const renderHost = ({ api, client = clientWith(LIBRARY_KINDS.music) }: RenderHostProps) =>
   render(
     <QueryClientProvider client={client}>
-      <AudioHost api={api} reprobe={() => undefined} />
+      <AudioHost api={api} />
     </QueryClientProvider>,
   )
 
@@ -174,7 +174,7 @@ describe('AudioHost', () => {
       expiresAt: Date.now() + 300_000,
     }))
     useMediaOrigin.setState({
-      pick: { origin: { kind: 'lan', url: 'http://nas.local:8484' }, at: Date.now(), remote: null },
+      pick: { origin: { kind: 'lan', url: 'http://nas.local:8484' }, at: Date.now() },
     })
     renderHost({ api })
     act(() => store().playTracks({ tracks: [track(3)] }))
@@ -189,7 +189,7 @@ describe('AudioHost', () => {
       expiresAt: Date.now() + 300_000,
     })
     useMediaOrigin.setState({
-      pick: { origin: { kind: 'lan', url: 'http://nas.local:8484' }, at: Date.now(), remote: null },
+      pick: { origin: { kind: 'lan', url: 'http://nas.local:8484' }, at: Date.now() },
     })
     renderHost({ api })
     act(() => store().playTracks({ tracks: [track(3)] }))

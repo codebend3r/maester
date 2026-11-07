@@ -85,7 +85,7 @@ const renderNative = ({ libraries = [MUSIC] }: RenderNativeProps = {}) => {
     audio: audioConnectionsOf({ status: CONNECTION_STATUSES.native, player: audio.player }),
   })
   renderWithProviders({
-    ui: <DesktopAudioHost api={api} reprobe={() => undefined} />,
+    ui: <DesktopAudioHost api={api} />,
     libraries,
   })
   return audio
@@ -109,7 +109,7 @@ describe('DesktopAudioHost', () => {
         message: 'No mpv.',
       }),
     })
-    renderWithProviders({ ui: <DesktopAudioHost api={api} reprobe={() => undefined} /> })
+    renderWithProviders({ ui: <DesktopAudioHost api={api} /> })
     expect(document.querySelectorAll('audio')).toHaveLength(2)
   })
 
@@ -117,13 +117,13 @@ describe('DesktopAudioHost', () => {
     asPlayingDesktop({
       audio: audioConnectionsOf({ status: CONNECTION_STATUSES.lost, message: 'Gone.' }),
     })
-    renderWithProviders({ ui: <DesktopAudioHost api={api} reprobe={() => undefined} /> })
+    renderWithProviders({ ui: <DesktopAudioHost api={api} /> })
     expect(document.querySelectorAll('audio')).toHaveLength(2)
   })
 
   it("renders nothing while main's answer is on its way", () => {
     asPlayingDesktop({ audio: audioConnectionsOf({ status: CONNECTION_STATUSES.waiting }) })
-    renderWithProviders({ ui: <DesktopAudioHost api={api} reprobe={() => undefined} /> })
+    renderWithProviders({ ui: <DesktopAudioHost api={api} /> })
     expect(document.querySelectorAll('audio')).toHaveLength(0)
   })
 
@@ -377,7 +377,7 @@ describe('DesktopAudioHost', () => {
       audio: audioConnectionsOf({ status: CONNECTION_STATUSES.native, player: audio.player }),
     })
     renderWithProviders({
-      ui: <DesktopAudioHost api={api} reprobe={() => undefined} />,
+      ui: <DesktopAudioHost api={api} />,
       libraries: [MUSIC],
     })
     act(() => store().playTracks({ tracks: TRACKS }))

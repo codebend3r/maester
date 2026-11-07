@@ -95,7 +95,6 @@ describe('gathering a report', () => {
       resumeAt: 0,
       context: NO_CONTEXT,
       pick: null,
-      isProbingOrigins: true,
       appVersion: null,
       now: new Date(Date.UTC(2026, 9, 20, 12)),
     })
@@ -105,7 +104,7 @@ describe('gathering a report', () => {
       media: null,
       playback: null,
       origin: null,
-      isProbingOrigins: true,
+      isProbingOrigins: false,
       reportedAt: '2026-10-20T12:00:00.000Z',
     })
   })
@@ -142,7 +141,6 @@ describe('gathering a report', () => {
         },
       },
       pick: null,
-      isProbingOrigins: false,
       appVersion: '1.0.0',
     })
     expect(diagnostics.playback?.attempts.map(({ message }) => message) ?? []).toEqual([
