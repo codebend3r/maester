@@ -11,6 +11,15 @@
     // Side-effect imports are how fonts and globals.scss get pulled into main.tsx.
     "import/no-unassigned-import": "off",
     // Fetch chains here exist for their side effects, not to pass values on.
-    "promise/always-return": "off"
+    "promise/always-return": "off",
+    // Safari before 18 and Chrome before 126 have no URL.parse, so a call blanks the page there.
+    "no-restricted-properties": [
+      "error",
+      {
+        "object": "URL",
+        "property": "parse",
+        "message": "Older Safari and Chrome lack URL.parse; use new URL() in a try."
+      }
+    ]
   }
 }

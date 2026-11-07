@@ -230,6 +230,48 @@ describe('HomePage', () => {
     )
   })
 
+  it("scores every row by Metacritic, else TMDB, whatever each library's own source", async () => {
+    const metascore = { source: 'metacritic', kind: 'critic', value: 7.4, votes: null } as const
+    const tmdb = { source: 'tmdb', kind: 'audience', value: 8.2, votes: 1200 } as const
+    open({
+      inProgress: [],
+      shelves: [
+        { libraryId: 2, type: 'media', media: [matchedMovie()] },
+        {
+          libraryId: 3,
+          type: 'shows',
+          shows: [
+            showEntry({
+              show: itemSummary({
+                id: 4,
+                type: 'show',
+                title: 'Severance',
+                ratings: [tmdb, metascore],
+              }),
+            }),
+          ],
+        },
+        {
+          libraryId: 5,
+          type: 'media',
+          media: [
+            mediaItem({
+              id: 8,
+              title: 'Clip',
+              match: 'matched',
+              item: itemSummary({ id: 41, title: 'Clip', ratings: [metascore] }),
+            }),
+          ],
+        },
+      ],
+    })
+    await screen.findByRole('heading', { name: 'Films' })
+    expect(within(shelf('Films')).getByText(/^TMDB: /)).toBeInTheDocument()
+    expect(within(shelf('Series')).getByText(/^Metacritic: 74/)).toBeInTheDocument()
+    expect(within(shelf('Series')).queryByText(/^TMDB: /)).toBeNull()
+    expect(within(shelf('Clips')).getByText(/^Metacritic: 74/)).toBeInTheDocument()
+  })
+
   it('sizes every poster as its row or tile lays it out', async () => {
     open({
       inProgress: [{ media: EPISODE_TWO, poster: SEASON_ONE_CARD }],

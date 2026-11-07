@@ -4,6 +4,7 @@ import {
   type MatchItemType,
   type MediaItem,
   type MediaSort,
+  type RatingSource,
   cardLink,
   cardTitle,
   formatRuntime,
@@ -17,6 +18,7 @@ import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
+import { ScoreFact } from '@/components/RatingPanel/RatingPanel'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
@@ -68,6 +70,8 @@ type PosterCardProps = {
   matchType?: MatchItemType | null
   /** The order the listing is in, whose value the card shows. */
   sort?: MediaSort
+  /** Whose score the card shows among its facts; none when absent. */
+  ratingsSource?: RatingSource
 }
 
 /**
@@ -77,7 +81,14 @@ type PosterCardProps = {
  * Sorted, it shows the value its listing is sorted by above its facts. The
  * poster lifts toward the pointer, carrying its checkbox and menu with it.
  */
-export const PosterCard = ({ media, matchType = null, sort, poster, sizes }: PosterCardProps) => {
+export const PosterCard = ({
+  media,
+  matchType = null,
+  sort,
+  poster,
+  sizes,
+  ratingsSource,
+}: PosterCardProps) => {
   const menu = useCardMenu({ media, matchType })
   const { title, date } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
@@ -137,6 +148,13 @@ export const PosterCard = ({ media, matchType = null, sort, poster, sizes }: Pos
               {fact}
             </span>
           ))}
+          {ratingsSource && (
+            <ScoreFact
+              ratings={media.item?.ratings ?? []}
+              source={ratingsSource}
+              className={styles.fact}
+            />
+          )}
           <FavouriteWords media={media} />
           <PartlyWatched media={media} />
           <WatchedWords watched={media.watched} />
