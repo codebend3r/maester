@@ -31,6 +31,7 @@ import {
   versionFacts,
   watchedCountLabel,
   wordPart,
+  episodeTag,
 } from '@raven/core'
 
 import {
@@ -43,7 +44,6 @@ import {
   pictureAt,
 } from '@/queries/cards'
 import { ITEM_PAGE_COPY } from '@/queries/copy'
-import { episodeMarkOf } from '@/queries/episodeMark'
 import { ROUTE_TARGETS, type RouteTarget, itemTarget } from '@/routes'
 
 /** How far through something the viewer is, and what that is in words. */
@@ -250,7 +250,7 @@ const episodeHero = ({
     headersFor: pictures.headersFor,
   })
   const logo = logoOf({ details: show, place: ART_PLACES.over, ...pictures })
-  const mark = episodeMarkOf({ season: details.season, episode: details.episode })
+  const mark = episodeTag({ season: details.season, episode: details.episode })
   return {
     eyebrow: lineOrNull(
       [logo === null ? (details.show?.title ?? null) : null, mark]

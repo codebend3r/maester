@@ -60,8 +60,9 @@
   }
 }
 
-// The top bar: the way back, then the title over what is playing and how,
-// the heart beside them, what plays next, then the clock and how it plays at the far end.
+// The top bar: the way back, then the title on a row of its own, an
+// episode's own title and the heart under it, and the line of what it is;
+// at the far end the clock over how it plays and what plays next.
 .chrome {
   grid-area: stage;
   align-self: start;
@@ -70,13 +71,12 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: auto minmax(0, max-content) auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    'back title favourite . next status'
-    'back about favourite . next status'
-    '. resumed resumed resumed resumed resumed';
+    'back heading status'
+    '. resumed resumed';
   gap: 0 var(--space-3);
-  align-items: center;
+  align-items: start;
   padding: calc(var(--space-4) + var(--titlebar-inset)) var(--space-4) var(--space-7);
   background: var(--fade-from-top);
   // Browsers ignore this; the desktop's window drags by the player header.
@@ -122,17 +122,65 @@
   @include glass-button;
 
   grid-area: back;
+  align-self: start;
   min-width: var(--control-size-tall);
   min-height: var(--control-size-tall);
+}
+
+// The title over an episode's own title and the heart, over the line of what it is.
+.heading {
+  grid-area: heading;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+// The title's name or art, as a link to its page where the host gives one.
+.home {
+  display: grid;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+
+  &:hover {
+    text-decoration: underline;
+    text-decoration-thickness: from-font;
+    text-underline-offset: var(--space-1);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--space-0);
+  }
+}
+
+.episodeLine {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+}
+
+.episode {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  line-height: var(--line-tight);
+  letter-spacing: var(--tracking-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 // The playing video's heart, when the host keeps favourites.
 .favourite {
   @include glass-button;
 
-  grid-area: favourite;
-  min-width: var(--control-size-tall);
-  min-height: var(--control-size-tall);
+  min-width: var(--field-size);
+  min-height: var(--field-size);
 }
 
 // Filled as well as coloured, so a favourite does not rest on colour alone,
@@ -160,12 +208,11 @@
 }
 
 // What plays next, when the video came with more to play after it: a pill
-// naming it after a softer "Up next". On a phone "Up next" alone stays, so
-// the playing video's title keeps the room.
+// naming it after a softer "Up next", under the clock and the chips. On a
+// phone "Up next" alone stays, so the playing video's title keeps the room.
 .next {
   @include glass-button;
 
-  grid-area: next;
   grid-template-columns: auto auto minmax(0, max-content);
   max-width: 22rem;
   border-radius: var(--radius-pill);
@@ -183,8 +230,7 @@
 }
 
 .title {
-  grid-area: title;
-  align-self: end;
+  max-width: 100%;
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
   font-weight: 400;
@@ -196,40 +242,23 @@
 }
 
 // The title's art stands where its name would, as on a Continue watching
-// tile, with an episode's place and name beside it.
+// tile, on a row of its own.
 .titleArt {
-  grid-area: title;
-  align-self: end;
   display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  gap: var(--space-3);
-  align-items: end;
+  justify-items: start;
   min-width: 0;
 }
 
 .logo {
-  max-width: 18rem;
-  max-height: 3.5rem;
+  max-width: min(24rem, 100%);
+  max-height: 4.5rem;
   object-fit: contain;
   object-position: left bottom;
   filter: drop-shadow(0 1px 4px var(--color-shade));
 }
 
-.caption {
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  font-weight: 400;
-  line-height: var(--line-tight);
-  letter-spacing: var(--tracking-tight);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .about {
-  grid-area: about;
-  align-self: start;
+  max-width: 100%;
   color: var(--color-on-picture-soft);
   font-size: var(--font-size-sm);
   overflow: hidden;
@@ -261,8 +290,7 @@
     padding: calc(var(--space-3) + var(--titlebar-inset)) var(--space-3) var(--space-6);
   }
 
-  .back,
-  .favourite {
+  .back {
     min-width: var(--field-size);
     min-height: var(--field-size);
   }
@@ -276,11 +304,11 @@
   }
 
   .logo {
-    max-width: 10rem;
-    max-height: 2.5rem;
+    max-width: min(12rem, 100%);
+    max-height: 3rem;
   }
 
-  .caption {
+  .episode {
     font-size: var(--font-size-md);
   }
 }

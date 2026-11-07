@@ -42,8 +42,12 @@
   overflow: hidden;
   pointer-events: none;
   // The picture and the night over it fade out together at the foot, so the hero melts into
-  // whatever ground the theme lays under the page instead of stopping at an edge.
-  mask-image: linear-gradient(to bottom, var(--color-stage) 60%, transparent);
+  // whatever ground the theme lays under the page instead of stopping at an edge, and
+  // soften at the sides into the glow past them.
+  mask-image:
+    linear-gradient(to bottom, var(--color-stage) 60%, transparent),
+    linear-gradient(90deg, transparent, var(--color-stage) 6%, var(--color-stage) 94%, transparent);
+  mask-composite: intersect;
 
   // The night rises from the foot and runs in from the left, where the
   // title reads, so the words keep their contrast over any picture.
@@ -54,6 +58,39 @@
       linear-gradient(90deg, var(--color-night) 0%, var(--color-night-wash) 45%, transparent 80%),
       linear-gradient(to top, var(--color-night), transparent 55%);
   }
+}
+
+// Past the column, to the shell's edges on a screen wider than the page:
+// the picture's colours, blurred, so the backdrop has no hard sides. The
+// shell's main is the container, so 100cqw is its width inside its gutters.
+.glow {
+  position: absolute;
+  top: calc(-1 * var(--page-start, var(--space-5)));
+  left: calc(50% - 50cqw - var(--gutter));
+  z-index: -1;
+  display: grid;
+  grid-template-areas: 'glow';
+  width: calc(100cqw + 2 * var(--gutter));
+  height: var(--backdrop-height);
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, var(--color-stage) 45%, transparent);
+
+  &::after {
+    content: '';
+    grid-area: glow;
+    background: var(--color-night-wash);
+  }
+}
+
+.glowPicture {
+  grid-area: glow;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: var(--glow);
+  filter: blur(48px);
+  scale: 1.2;
 }
 
 // As strong as the theme's colour wash: faint on a light theme, gone in
@@ -87,8 +124,35 @@
   gap: calc(var(--space-5) + var(--space-1));
 }
 
+// A still's top lines up with the title's, the library and the line over
+// the title in a row above both: the details share the content's rows.
 .withStill {
   grid-template-columns: var(--still-width) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    '. details'
+    'picture details';
+  row-gap: var(--space-3);
+
+  .picture {
+    align-self: start;
+  }
+
+  .details {
+    grid-template-rows: subgrid;
+    grid-template-areas:
+      'lead'
+      'body';
+  }
+
+  .lead {
+    grid-area: lead;
+  }
+
+  .body {
+    grid-area: body;
+    align-self: start;
+  }
 }
 
 .noPicture {
@@ -183,6 +247,14 @@
   grid-area: details;
   display: grid;
   align-content: end;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+// The library and the line over the title, then the title and the rest.
+.lead,
+.body {
+  display: grid;
   gap: var(--space-3);
   min-width: 0;
 }
@@ -352,10 +424,23 @@
   .content,
   .withStill {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
     grid-template-areas:
       'picture'
       'details';
     gap: var(--space-4);
+  }
+
+  .withStill {
+    .details {
+      grid-template-rows: none;
+      grid-template-areas: none;
+    }
+
+    .lead,
+    .body {
+      grid-area: auto;
+    }
   }
 
   .picture {

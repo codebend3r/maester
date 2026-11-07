@@ -121,6 +121,7 @@ export const STAGE_COPY = {
   resumedAt: (time: string) => `Resumed at ${time}`,
   startOver: 'Start over',
   playingAs: 'Playing as',
+  goTo: (name: string) => `Go to ${name}`,
 } as const
 
 export const UNPLAYABLE_COPY = {

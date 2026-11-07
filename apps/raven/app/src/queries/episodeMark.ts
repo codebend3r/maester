@@ -1,25 +1,13 @@
-import { ITEM_TYPES, type MediaItem } from '@raven/core'
+import { ITEM_TYPES, type MediaItem, episodeTag } from '@raven/core'
 
-type EpisodeMarkOfProps = { season: number | null; episode: number | null }
-
-const pad = (n: number): string => String(n).padStart(2, '0')
-
-/**
- * An episode's place in short: "S02 · E05", or "Special 5" for one of season 0; null without a
- * season. The pages and the player use it in place of the words, which crowd a TV.
- */
-export const episodeMarkOf = ({ season, episode }: EpisodeMarkOfProps): string | null => {
-  if (season === null) return null
-  if (season === 0) return episode === null ? 'Specials' : `Special ${episode}`
-  return episode === null ? `S${pad(season)}` : `S${pad(season)} · E${pad(episode)}`
-}
+type CardMarkOfProps = { season: number | null; episode: number | null }
 
 /**
  * An episode's place as its card says it, on one line and unpadded: "S5.E1", or "S5" for a
- * season; a special reads as `episodeMarkOf` does. Null without a season.
+ * season; a special reads as core's `episodeTag` says it. Null without a season.
  */
-export const cardMarkOf = ({ season, episode }: EpisodeMarkOfProps): string | null => {
-  if (season === null || season === 0) return episodeMarkOf({ season, episode })
+export const cardMarkOf = ({ season, episode }: CardMarkOfProps): string | null => {
+  if (season === null || season === 0) return episodeTag({ season, episode })
   return episode === null ? `S${season}` : `S${season}.E${episode}`
 }
 

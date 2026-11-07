@@ -120,16 +120,46 @@ const backdropViewOf = <Type extends BackdropType>({
   props: { backdrop },
 })
 
+/** The glow is blurred past any detail, so a narrow copy of the picture serves. */
+const GLOW_SIZES = '25vw'
+
+/** The picture's own colours, blurred, past the page's column on a wide screen. */
+const PictureGlow = ({ backdrop }: PictureBackdropProps) => (
+  <img
+    className={styles.glowPicture}
+    src={backdrop.url}
+    srcSet={backdrop.srcSet ?? undefined}
+    sizes={backdrop.srcSet == null ? undefined : GLOW_SIZES}
+    alt=""
+    decoding="async"
+  />
+)
+
+// A slideshow changes its picture on a timer of its own, which a second copy would not keep to.
+const NoGlow = () => null
+
+const GLOW_VIEWS = {
+  [HEADER_BACKDROP_TYPES.picture]: PictureGlow,
+  [HEADER_BACKDROP_TYPES.slideshow]: NoGlow,
+} as const satisfies ViewsOf<BackdropViewsProps>
+
 type BackdropProps = { backdrop: HeaderBackdrop }
 
 /**
- * The picture behind the top of the page, faded into the night at its foot
- * and its left, where the title reads. Decorative, and it takes no clicks.
+ * The picture behind the top of the page, as wide as the page's column and
+ * faded into the night at its foot and its left, where the title reads.
+ * On a screen wider than the column its colours, blurred, glow on to the
+ * page's edges. Decorative, and it takes no clicks.
  */
 const Backdrop = ({ backdrop }: BackdropProps) => (
-  <div className={styles.backdrop} aria-hidden="true">
-    <KeyedView<BackdropViewsProps> views={BACKDROP_VIEWS} view={backdropViewOf({ backdrop })} />
-  </div>
+  <>
+    <div className={styles.glow} aria-hidden="true">
+      <KeyedView<BackdropViewsProps> views={GLOW_VIEWS} view={backdropViewOf({ backdrop })} />
+    </div>
+    <div className={styles.backdrop} aria-hidden="true">
+      <KeyedView<BackdropViewsProps> views={BACKDROP_VIEWS} view={backdropViewOf({ backdrop })} />
+    </div>
+  </>
 )
 
 /** The content's columns for each kind of picture, or for none. */
@@ -346,50 +376,56 @@ export const ItemHeader = ({
     <div className={LAYOUTS[picture?.shape ?? PICTURE_SHAPES.none]}>
       {picture && <Picture picture={picture} title={title} />}
       <div className={styles.details}>
-        {library && (
-          <Link to={library.to} className={styles.library}>
-            <Icon name="back" size={14} />
-            {library.label}
-          </Link>
-        )}
-        {eyebrow.length > 0 && (
-          <p className={styles.eyebrow}>
-            <Dotted parts={eyebrow} />
-          </p>
-        )}
-        <h1 id={titleId} className={styles.title}>
-          <TitleArt key={logo ?? 'none'} title={title} logo={logo} />
-        </h1>
-        {byline && <p className={styles.byline}>{byline}</p>}
-        {(contentRating != null || facts.length > 0) && (
-          // Words that wrap as text does, so long genres take a second line on a phone.
-          <p className={styles.facts}>
-            {contentRating != null && (
-              <>
-                <span className={`${styles.part} ${styles.ratedPart}`}>
-                  <span className={styles.rated}>
-                    <span className="visually-hidden">{ITEM_HEADER_COPY.rated}</span>
-                    {contentRating}
-                  </span>
-                </span>
-                <wbr />
-              </>
+        {(!!library || eyebrow.length > 0) && (
+          <div className={styles.lead}>
+            {library && (
+              <Link to={library.to} className={styles.library}>
+                <Icon name="back" size={14} />
+                {library.label}
+              </Link>
             )}
-            <Dotted
-              parts={facts.map((fact) => (
-                <FactText key={fact} fact={fact} />
-              ))}
-            />
-          </p>
-        )}
-        <RatingPanel ratings={ratings} />
-        {progress && <Progress progress={progress} />}
-        {(!!children || !!manage) && (
-          <div className={styles.actions}>
-            {!!children && <div className={styles.group}>{children}</div>}
-            {!!manage && <div className={`${styles.group} ${styles.manage}`}>{manage}</div>}
+            {eyebrow.length > 0 && (
+              <p className={styles.eyebrow}>
+                <Dotted parts={eyebrow} />
+              </p>
+            )}
           </div>
         )}
+        <div className={styles.body}>
+          <h1 id={titleId} className={styles.title}>
+            <TitleArt key={logo ?? 'none'} title={title} logo={logo} />
+          </h1>
+          {byline && <p className={styles.byline}>{byline}</p>}
+          {(contentRating != null || facts.length > 0) && (
+            // Words that wrap as text does, so long genres take a second line on a phone.
+            <p className={styles.facts}>
+              {contentRating != null && (
+                <>
+                  <span className={`${styles.part} ${styles.ratedPart}`}>
+                    <span className={styles.rated}>
+                      <span className="visually-hidden">{ITEM_HEADER_COPY.rated}</span>
+                      {contentRating}
+                    </span>
+                  </span>
+                  <wbr />
+                </>
+              )}
+              <Dotted
+                parts={facts.map((fact) => (
+                  <FactText key={fact} fact={fact} />
+                ))}
+              />
+            </p>
+          )}
+          <RatingPanel ratings={ratings} />
+          {progress && <Progress progress={progress} />}
+          {(!!children || !!manage) && (
+            <div className={styles.actions}>
+              {!!children && <div className={styles.group}>{children}</div>}
+              {!!manage && <div className={`${styles.group} ${styles.manage}`}>{manage}</div>}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   </header>
@@ -414,13 +450,15 @@ export const ItemHeaderSkeleton = ({ picture }: ItemHeaderSkeletonProps) => (
         </span>
       )}
       <div className={styles.details}>
-        <Bone shape="hero" width="most" />
-        <Bone shape="text" width="half" />
-        <Bone shape="small" width="short" />
-        <span className={styles.group}>
-          <Bone shape="button" />
-          <Bone shape="button" />
-        </span>
+        <div className={styles.body}>
+          <Bone shape="hero" width="most" />
+          <Bone shape="text" width="half" />
+          <Bone shape="small" width="short" />
+          <span className={styles.group}>
+            <Bone shape="button" />
+            <Bone shape="button" />
+          </span>
+        </div>
       </div>
     </div>
   </div>

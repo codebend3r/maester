@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import {
+  ITEM_TYPES,
   MARKER_KINDS,
   MARKER_SOURCES,
   type Marker,
@@ -16,7 +17,7 @@ import { Player } from '@/components/Player/Player'
 import type { PlayerFavourite, PlayerTitle } from '@/components/Player/PlayerServices'
 import { api } from '@/test/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
-import { mediaItem } from '@/test/fixtures'
+import { itemSummary, mediaItem } from '@/test/fixtures'
 import { DEFAULT_PLAYBACK_STATE, renderWithProviders } from '@/test/render'
 import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostPlayer } from '@/stores/playerServices'
@@ -27,6 +28,7 @@ type TestPlayerProps = {
   next?: PlayerTitle['next']
   markers?: PlayerTitle['markers']
   logo?: PlayerTitle['logo']
+  homeTo?: PlayerTitle['homeTo']
   favourite?: PlayerFavourite
 }
 
@@ -37,12 +39,14 @@ const TestPlayer = ({
   next = null,
   markers = null,
   logo = null,
+  homeTo = null,
   favourite,
 }: TestPlayerProps) => {
   const isHosting = useHostPlayer({
     title: {
       label: media.title,
       logo,
+      homeTo,
       duration: media.duration,
       resumeAt: 0,
       backTo,
@@ -906,9 +910,10 @@ describe('the player chrome', () => {
   it('says under the title what is playing, at the far end how, and the pills say what each is set to', async () => {
     renderWithProviders({ ui: <TestPlayer media={uhd} backTo="/libraries/2" /> })
     expect(screen.getByRole('heading', { level: 1, name: 'Busboys' })).toBeInTheDocument()
-    expect(screen.getByText('2026')).toBeInTheDocument()
+    expect(screen.getByText(/2026$/)).toBeInTheDocument()
     const playingAs = screen.getByRole('list', { name: 'Playing as' })
     expect(within(playingAs).getByLabelText('Video resolution: 4K')).toHaveTextContent('4K')
+    expect(within(playingAs).getByText('HEVC')).toBeInTheDocument()
     expect(within(playingAs).getByText('HDR')).toBeInTheDocument()
     expect(within(playingAs).getByText('Direct play')).toBeInTheDocument()
     expect(within(screen.getByRole('banner')).getByText(/^\d{1,2}:\d{2}/)).toBeInTheDocument()
@@ -924,14 +929,14 @@ describe('the player chrome', () => {
     expect(screen.getByRole('button', { name: 'Full screen (f)' })).toHaveTextContent('Full screen')
   })
 
-  it("draws the title's art in place of its name, and the year the art leaves out under it", () => {
+  it("draws the title's art on a row of its own, and the year the art leaves out under it", () => {
     const film = mediaItem({ ...uhd, title: 'Busboys (2026)' })
     renderWithProviders({
       ui: (
         <TestPlayer
           media={film}
           backTo="/libraries/2"
-          logo={{ url: '/art/busboys.png', name: 'Busboys', caption: null }}
+          logo={{ url: '/art/busboys.png', name: 'Busboys' }}
         />
       ),
     })
@@ -940,23 +945,54 @@ describe('the player chrome', () => {
       'src',
       '/art/busboys.png',
     )
-    expect(screen.getByText('2026')).toBeInTheDocument()
+    expect(screen.getByText(/2026$/)).toBeInTheDocument()
   })
 
-  it("puts an episode's place and name beside its show's art, and spells the label out when the art fails", () => {
+  it('heads an episode with its show, its own title under it, then its season and number, and spells the show out when the art fails', () => {
+    const episode = mediaItem({
+      ...uhd,
+      item: itemSummary({
+        type: ITEM_TYPES.episode,
+        title: 'Half Loop',
+        year: 2022,
+        show: { id: 9, title: 'Severance' },
+        season: 1,
+        episode: 2,
+      }),
+    })
     renderWithProviders({
       ui: (
         <TestPlayer
-          media={uhd}
+          media={episode}
           backTo="/libraries/2"
-          logo={{ url: '/art/show.png', name: 'Severance', caption: 'S01E02 · Half Loop' }}
+          logo={{ url: '/art/show.png', name: 'Severance' }}
         />
       ),
     })
-    const heading = screen.getByRole('heading', { level: 1, name: 'Severance S01E02 · Half Loop' })
+    const heading = screen.getByRole('heading', { level: 1, name: 'Severance' })
+    expect(screen.getByText('Half Loop')).toBeInTheDocument()
+    expect(screen.getByText(/^S01 · E02 · .+ · 2022$/)).toBeInTheDocument()
     fireEvent.error(within(heading).getByRole('img', { name: 'Severance' }))
-    expect(screen.getByRole('heading', { level: 1, name: 'Busboys' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Severance' })).toHaveTextContent(
+      'Severance',
+    )
     expect(screen.queryByRole('img', { name: 'Severance' })).toBeNull()
+  })
+
+  it('links the title to its page when the host gives one, and to nothing when it does not', () => {
+    const { unmount } = renderWithProviders({
+      ui: <TestPlayer media={uhd} backTo="/libraries/2" homeTo="/movies/40" />,
+    })
+    const heading = screen.getByRole('heading', { level: 1, name: 'Busboys' })
+    expect(within(heading).getByRole('link', { name: 'Busboys' })).toHaveAttribute(
+      'href',
+      '/movies/40',
+    )
+    unmount()
+    renderWithProviders({ ui: <TestPlayer media={uhd} backTo="/libraries/2" /> })
+    expect(
+      within(screen.getByRole('heading', { level: 1, name: 'Busboys' })).queryByRole('link'),
+    ).toBeNull()
   })
 
   it('opens one menu at a time and gives focus back to its pill', async () => {

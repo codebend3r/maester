@@ -1,4 +1,4 @@
-import { FACT_PART_KINDS, formatDuration } from '@raven/core'
+import { FACT_PART_KINDS, type FactPart, PLAYBACK_MODES, formatDuration } from '@raven/core'
 import {
   type ComponentRef,
   type ComponentType,
@@ -11,6 +11,7 @@ import {
   Animated,
   Pressable,
   StyleSheet,
+  TVFocusGuideView,
   type TVRemoteEvent,
   View,
   useTVEventHandler,
@@ -21,7 +22,6 @@ import { Icon } from '@raven/native'
 import { LoadingMark } from '@/layouts/LoadingMark'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
-import { TITLE_LOOKS, type TitleLook } from '@/layouts/itemKit'
 import {
   CENTRE_MARK_LOOKS,
   type CentreMark,
@@ -111,33 +111,38 @@ const Scrubber = ({ view, transport, onScrubbing }: ScrubberProps) => {
   const duration = transport.duration ?? 0
   const share = playedShareOf({ at: position, duration })
   return (
-    <Pressable
-      ref={view}
-      {...scrubberAccessibilityOf({ position, shown: position, duration, onSeek })}
-      hasTVPreferredFocus={isOpening}
-      onBlur={() => onScrubbing(false)}
-      onFocus={() => {
-        setOpening(false)
-        onScrubbing(true)
-      }}
-      onPress={onTogglePlay}
-      style={styles.scrubber}
-    >
-      {({ focused }) => (
-        <>
-          <View style={[styles.line, focused && styles.lineFocused]}>
-            <View style={[styles.played, { width: share }]} />
-          </View>
-          <View
-            style={[
-              styles.thumb,
-              focused && styles.thumbFocused,
-              { left: share, marginLeft: -(focused ? THUMB_FOCUSED : THUMB) / 2 },
-            ]}
-          />
-        </>
-      )}
-    </Pressable>
+    // Left and right are the scrubber's own: they seek, and a hold runs the playhead. Without the
+    // trap the system moves the focus on the key going down, before the press reaches the player,
+    // and left carried it off to Back, up and to the left, so it never skipped back.
+    <TVFocusGuideView trapFocusLeft trapFocusRight>
+      <Pressable
+        ref={view}
+        {...scrubberAccessibilityOf({ position, shown: position, duration, onSeek })}
+        hasTVPreferredFocus={isOpening}
+        onBlur={() => onScrubbing(false)}
+        onFocus={() => {
+          setOpening(false)
+          onScrubbing(true)
+        }}
+        onPress={onTogglePlay}
+        style={styles.scrubber}
+      >
+        {({ focused }) => (
+          <>
+            <View style={[styles.line, focused && styles.lineFocused]}>
+              <View style={[styles.played, { width: share }]} />
+            </View>
+            <View
+              style={[
+                styles.thumb,
+                focused && styles.thumbFocused,
+                { left: share, marginLeft: -(focused ? THUMB_FOCUSED : THUMB) / 2 },
+              ]}
+            />
+          </>
+        )}
+      </Pressable>
+    </TVFocusGuideView>
   )
 }
 
@@ -151,6 +156,8 @@ type ControlsProps = Pick<
   | 'next'
   | 'previous'
   | 'mode'
+  | 'favourite'
+  | 'upNext'
   | 'onBack'
 > & {
   /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
@@ -193,25 +200,61 @@ const LOGO_HEIGHT = TV_SIZES.space8 * 1.5
 /** How large the time of day stands in the corner: larger than any line of the page's type. */
 const CLOCK_SIZE = TV_SIZES.textXl * 1.5
 
-type CornerProps = Pick<PlayerChromeProps, 'mode'>
+type CornerProps = Pick<PlayerChromeProps, 'mode' | 'heading' | 'upNext'>
 
-/** The top right corner: the time of day, and how the video plays, read out together. */
-const Corner = ({ mode }: CornerProps) => {
+type PictureChipsOfProps = Pick<CornerProps, 'mode' | 'heading'>
+
+/** The picture's chips: its size, then, while it reaches the screen as the file has it, its codec and range. */
+const pictureChipsOf = ({ mode, heading }: PictureChipsOfProps): FactPart[] =>
+  [
+    { kind: FACT_PART_KINDS.resolution, text: heading.quality },
+    ...(mode === PLAYBACK_MODES.transcode
+      ? []
+      : [
+          { kind: FACT_PART_KINDS.codec, text: heading.codec },
+          { kind: FACT_PART_KINDS.range, text: heading.range },
+        ]),
+  ].flatMap(({ kind, text }) => (text === null ? [] : [{ kind, text }]))
+
+/**
+ * The top right corner, one thing under another: the time of day, the picture's chips and how
+ * the video plays, then what plays next, read out together.
+ */
+const Corner = ({ mode, heading, upNext }: CornerProps) => {
   const styles = useStyles()
   const clock = useClock()
   const way = mode === null ? null : PLAYBACK_MODE_NAMES[mode]
+  const chips = pictureChipsOf({ mode, heading })
   return (
     <View
-      accessibilityLabel={[clock, way].filter((part): part is string => part !== null).join(', ')}
+      accessibilityLabel={[
+        clock,
+        ...chips.map(({ text }) => text),
+        way,
+        upNext === null ? null : `${PLAYER_COPY.upNext} ${upNext}`,
+      ]
+        .filter((part): part is string => part !== null)
+        .join(', ')}
       accessible
       style={styles.corner}
     >
       <Text variant={TEXT_VARIANTS.display} style={styles.clock}>
         {clock}
       </Text>
-      {way !== null && (
-        <View style={styles.chip}>
-          <Text style={styles.chipText}>{way}</Text>
+      <View style={styles.cornerChips}>
+        {chips.length > 0 && <FocusFactChips parts={chips} />}
+        {way !== null && (
+          <View style={styles.chip}>
+            <Text style={styles.chipText}>{way}</Text>
+          </View>
+        )}
+      </View>
+      {upNext !== null && (
+        <View style={styles.upNext}>
+          <Text style={styles.upNextLead}>{PLAYER_COPY.upNext}</Text>
+          <Text numberOfLines={1} style={styles.upNextLabel}>
+            {upNext}
+          </Text>
         </View>
       )}
     </View>
@@ -266,76 +309,56 @@ const Centre = ({ mark, isFading }: CentreProps) => {
   )
 }
 
-type HeadingProps = Pick<PlayerChromeProps, 'heading'>
+type HeadingFavouriteProps = Pick<PlayerChromeProps, 'favourite'>
 
-type HeadingTitleProps = HeadingProps
-
-type HeadingTitleArtProps = HeadingTitleProps
-
-/** A film's name as its title art, where it has some. */
-const HeadingTitleArt = ({ heading }: HeadingTitleArtProps) => {
-  const styles = useStyles()
-  return (
-    <TitleArt
-      height={LOGO_HEIGHT}
-      logo={heading.logo}
-      maxWidth={TV_SIZES.measure}
-      name={heading.title}
-      textStyle={styles.show}
+/** The playing video's heart, filled while it is a favourite. */
+const HeadingFavourite = ({ favourite }: HeadingFavouriteProps) =>
+  favourite !== null && (
+    <PlateButton
+      icon="heart"
+      isOn={favourite.isOn}
+      isOverPicture
+      label={PLAYER_COPY.favourite}
+      onPress={favourite.onToggle}
     />
   )
-}
 
-type HeadingTitleWordsProps = HeadingTitleProps
-
-/** An episode's own name, under its show's art. */
-const HeadingTitleWords = ({ heading }: HeadingTitleWordsProps) => {
-  const styles = useStyles()
-  return (
-    <Text variant={TEXT_VARIANTS.display} numberOfLines={2} style={styles.title}>
-      {heading.title}
-    </Text>
-  )
-}
-
-const HEADING_TITLES = {
-  [TITLE_LOOKS.art]: HeadingTitleArt,
-  [TITLE_LOOKS.words]: HeadingTitleWords,
-} as const satisfies Record<TitleLook, ComponentType<HeadingTitleProps>>
+type HeadingLinesProps = Pick<PlayerChromeProps, 'heading' | 'favourite'>
 
 /**
- * The title along the top as lines: the show, then its season and episode, quieter, then the
- * episode's own name with its length in a chip beside it and the file's resolution under that,
- * in its tier's colour as every other resolution chip wears it. A film is its name and chips alone.
+ * The title along the top as lines, as the web player's: the show's art (or a film's) on a row
+ * of its own, an episode's own name with the heart beside it, then the line of what it is: its
+ * season and number, its length and its year.
  */
-const Heading = ({ heading }: HeadingProps) => {
+const Heading = ({ heading, favourite }: HeadingLinesProps) => {
   const styles = useStyles()
-  const Title = HEADING_TITLES[heading.show === null ? TITLE_LOOKS.art : TITLE_LOOKS.words]
+  const details = [heading.place, heading.length, heading.year]
+    .filter((part): part is string => part !== null)
+    .join(PLAYER_COPY.separator)
+  // A film's art is its own name; an episode's is its show's, with its own name under it.
+  const episodeName = heading.show === null ? null : heading.title
   return (
-    <View accessibilityRole="header" style={styles.heading}>
-      {heading.show !== null && (
+    <View style={styles.heading}>
+      <View accessibilityRole="header">
         <TitleArt
           height={LOGO_HEIGHT}
           logo={heading.logo}
           maxWidth={TV_SIZES.measure}
-          name={heading.show}
+          name={heading.show ?? heading.title}
           textStyle={styles.show}
         />
-      )}
-      {heading.place !== null && <Text style={styles.place}>{heading.place}</Text>}
-      <View style={styles.titleRow}>
-        <Title heading={heading} />
-        <View style={styles.chips}>
-          {heading.length !== null && (
-            <View style={styles.chip}>
-              <Text style={styles.chipText}>{heading.length}</Text>
-            </View>
-          )}
-          {heading.quality !== null && (
-            <FocusFactChips parts={[{ kind: FACT_PART_KINDS.resolution, text: heading.quality }]} />
-          )}
-        </View>
       </View>
+      <FocusBand>
+        <View style={styles.titleRow}>
+          {episodeName !== null && (
+            <Text variant={TEXT_VARIANTS.display} numberOfLines={2} style={styles.title}>
+              {episodeName}
+            </Text>
+          )}
+          <HeadingFavourite favourite={favourite} />
+        </View>
+      </FocusBand>
+      {details !== '' && <Text style={styles.details}>{details}</Text>}
     </View>
   )
 }
@@ -358,6 +381,8 @@ const Controls = ({
   next,
   previous,
   mode,
+  favourite,
+  upNext,
   onBack,
   onScrubbing,
   onPicking,
@@ -378,9 +403,9 @@ const Controls = ({
           <FocusBand>
             <PlateButton icon="back" isOverPicture label={PLAYER_COPY.leave} onPress={onBack} />
           </FocusBand>
-          <Heading heading={heading} />
+          <Heading heading={heading} favourite={favourite} />
         </View>
-        <Corner mode={mode} />
+        <Corner mode={mode} heading={heading} upNext={upNext} />
       </View>
       <View
         onLayout={({ nativeEvent }) => onBottomHeight(nativeEvent.layout.height)}
@@ -508,6 +533,8 @@ const DpadPlayer = ({
   next,
   previous,
   mode,
+  favourite,
+  upNext,
   onBack,
 }: DpadPlayerProps) => {
   // Only the remote's handler reads whether the line has the focus, so it is no render's concern.
@@ -614,6 +641,7 @@ const DpadPlayer = ({
           <View pointerEvents="none" style={styles.scrim} />
           <Controls
             audio={audio}
+            favourite={favourite}
             heading={heading}
             mode={mode}
             next={next}
@@ -628,6 +656,7 @@ const DpadPlayer = ({
             }}
             subtitles={subtitles}
             transport={controlled}
+            upNext={upNext}
           />
         </Animated.View>
       )}
@@ -693,8 +722,21 @@ const useStyles = pictureStyles((colours) =>
       flexShrink: 1,
       gap: TV_SIZES.space4,
     },
-    heading: { gap: TV_SIZES.space1, maxWidth: TV_SIZES.measure },
-    corner: { alignItems: 'flex-end', gap: TV_SIZES.space1 },
+    heading: { gap: TV_SIZES.space2, maxWidth: TV_SIZES.measure },
+    corner: { alignItems: 'flex-end', gap: TV_SIZES.space2, maxWidth: TV_SIZES.measure / 2 },
+    cornerChips: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space1 },
+    // What plays next, on the glass under the chips: a softer "Up next" before its words.
+    upNext: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: TV_SIZES.space2,
+      paddingHorizontal: TV_SIZES.space3,
+      paddingVertical: TV_SIZES.space1,
+      borderRadius: TV_SIZES.radius,
+      backgroundColor: colours.raised,
+    },
+    upNextLead: { color: colours.muted, fontSize: TV_SIZES.text },
+    upNextLabel: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.text },
     clock: {
       color: colours.text,
       fontSize: CLOCK_SIZE,
@@ -702,16 +744,14 @@ const useStyles = pictureStyles((colours) =>
       fontVariant: ['tabular-nums'],
     },
     show: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-    place: {
+    // Its season and number, its length and its year.
+    details: {
       color: colours.muted,
       fontSize: TV_SIZES.textLg,
-      fontWeight: '600',
       fontVariant: ['tabular-nums'],
     },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
-    title: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.textLg },
-    // The runtime over the resolution, each as wide as its words.
-    chips: { alignItems: 'flex-start', gap: TV_SIZES.space1 },
+    title: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.textXl },
     chip: {
       paddingHorizontal: TV_SIZES.space2,
       paddingVertical: TV_SIZES.space0,

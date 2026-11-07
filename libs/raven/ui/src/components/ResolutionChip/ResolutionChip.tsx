@@ -67,7 +67,7 @@ const CODEC_FILLS: Readonly<Record<string, string>> = {
 type CodecChipProps = { codec: string }
 
 /** A video's codec as a chip beside its resolution, by the name the facts give it (`HEVC`). */
-const CodecChip = ({ codec }: CodecChipProps) => (
+export const CodecChip = ({ codec }: CodecChipProps) => (
   <PictureChip label={RESOLUTION_CHIP_COPY.videoCodec(codec)} className={CODEC_FILLS[codec]}>
     {codec}
   </PictureChip>

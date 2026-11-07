@@ -1,13 +1,21 @@
-import { ITEM_TYPES, type MediaItem, formatRuntime, mediaLabel, resolutionLabel } from '@raven/core'
+import {
+  ITEM_TYPES,
+  type MediaItem,
+  codecLabel,
+  formatRuntime,
+  mediaLabel,
+  rangeLabel,
+  resolutionLabel,
+  episodeTag,
+} from '@raven/core'
 
 import type { Picture } from '@/queries/cards'
-import { episodeMarkOf } from '@/queries/episodeMark'
 
 /**
- * The player's title as lines: an episode's show over its season and number, then its own name;
- * anything else its name alone. `length` is the runtime for the chip beside the name, `quality`
- * the file's resolution for the chip under it, and `logo` the show's title art, drawn in place of
- * its name where it has one.
+ * The player's title as lines: an episode's show over its own name, then its season and number;
+ * anything else its name alone. `length` is the runtime and `year` the release year for the line
+ * of what it is, `quality`, `codec` and `range` the file's picture for its chips, and `logo` the
+ * show's title art, drawn in place of its name where it has one.
  */
 export type PlayerHeading = {
   show: string | null
@@ -18,6 +26,12 @@ export type PlayerHeading = {
   length: string | null
   /** "4K", "1080p", "720p": the file's resolution, null when the index has no frame size. */
   quality: string | null
+  /** "HEVC": the file's video codec, null when the index does not know it. */
+  codec: string | null
+  /** "HDR", "DV5": the file's range of light, null for SDR. */
+  range: string | null
+  /** The release year, null when unknown or when the title already ends with it. */
+  year: string | null
 }
 
 type PlayerHeadingOfProps = { media: MediaItem; logo: Picture | null }
@@ -25,19 +39,33 @@ type PlayerHeadingOfProps = { media: MediaItem; logo: Picture | null }
 /** The heading over a playing video: "Slow Horses", "S01 · E03", "Bad Tradecraft". */
 export const playerHeadingOf = ({ media, logo }: PlayerHeadingOfProps): PlayerHeading => {
   const { item } = media
-  const length = formatRuntime(media.duration)
-  const quality = resolutionLabel({ width: media.width, height: media.height })
+  const picture = {
+    length: formatRuntime(media.duration),
+    quality: resolutionLabel({ width: media.width, height: media.height }),
+    codec: media.videoCodec ? codecLabel(media.videoCodec) : null,
+    range: rangeLabel(media),
+  }
+  const year = item?.year ?? media.year
   if (item !== null && item.type === ITEM_TYPES.episode) {
     return {
       show: item.show?.title ?? null,
       logo,
-      place: episodeMarkOf({ season: item.season, episode: item.episode }),
+      place: episodeTag({ season: item.season, episode: item.episode }),
       title: item.title,
-      length,
-      quality,
+      ...picture,
+      year: year === null ? null : String(year),
     }
   }
-  return { show: null, logo, place: null, title: mediaLabel(media), length, quality }
+  const title = mediaLabel(media)
+  const isYearInTitle = year === null || title.includes(`(${year})`)
+  return {
+    show: null,
+    logo,
+    place: null,
+    title,
+    ...picture,
+    year: isYearInTitle ? null : String(year),
+  }
 }
 
 /** The heading of the player's page while nothing plays: no title at all. */
@@ -48,4 +76,7 @@ export const NO_HEADING: PlayerHeading = {
   title: '',
   length: null,
   quality: null,
+  codec: null,
+  range: null,
+  year: null,
 }

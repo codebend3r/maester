@@ -64,9 +64,16 @@ const PHOTO_SIZE = tvSize(120)
 /** A person's column: their photo, with room either side for a name under it. */
 const PERSON_WIDTH = tvSize(176)
 
-/** The backdrop fills the screen's width at 16:9, dimmed so the words over it read. */
+/**
+ * The backdrop is drawn at its own 16:9 inside a band `BACKDROP_INSET` in from each side of the
+ * screen and `BACKDROP_HEIGHT` tall, its top at the band's, dimmed so the words over it read. The
+ * same picture, blurred by `GLOW_BLUR`, fills the screen behind it as its glow.
+ */
 const BACKDROP_RATIO = 9 / 16
 const BACKDROP_OPACITY = 0.3
+const BACKDROP_INSET = tvSize(40)
+const BACKDROP_HEIGHT = tvSize(700)
+const GLOW_BLUR = 40
 
 /** Where down the backdrop it starts to fade into the page's ground, which it reaches at its foot. */
 const BACKDROP_FADE_FROM = 0.45
@@ -76,23 +83,34 @@ const BACKDROP_GRADIENT_ID = 'tv-item-backdrop-fade'
 type BackdropProps = { backdrop: NonNullable<ItemPage['hero']['backdrop']> }
 
 /**
- * The item's backdrop across the top of the page, dimmed, fading into the theme's ground toward
- * its foot as the web's and the touch page's do, so the page below it is the theme's own colour.
+ * The item's backdrop across the top of the page as the web's: the picture at its own edges in a
+ * band just in from the screen's, its top at the page's, the same picture blurred behind it as a
+ * glow out to the edges, all dimmed and fading into the theme's ground toward the foot, so the
+ * page below is the theme's own colour.
  */
 const Backdrop = ({ backdrop }: BackdropProps) => {
   const styles = useStyles()
   const ground = useTheme((theme) => theme.palette.ground)
   const { width } = useWindowDimensions()
-  const height = width * BACKDROP_RATIO
+  const inner = width - 2 * BACKDROP_INSET
   return (
-    <View pointerEvents="none" style={[styles.backdropBox, { height }]}>
+    <View pointerEvents="none" style={[styles.backdropBox, { height: BACKDROP_HEIGHT }]}>
       <Image
         accessibilityElementsHidden
+        blurRadius={GLOW_BLUR}
         resizeMode="cover"
         source={backdrop}
         style={[StyleSheet.absoluteFill, styles.backdrop]}
       />
-      <Svg height={height} style={StyleSheet.absoluteFill} width={width}>
+      <View style={styles.backdropBand}>
+        <Image
+          accessibilityElementsHidden
+          resizeMode="cover"
+          source={backdrop}
+          style={[styles.backdrop, { width: inner, height: inner * BACKDROP_RATIO }]}
+        />
+      </View>
+      <Svg height={BACKDROP_HEIGHT} style={StyleSheet.absoluteFill} width={width}>
         <Defs>
           <LinearGradient id={BACKDROP_GRADIENT_ID} x1="0" x2="0" y1="0" y2="1">
             <Stop offset={0} stopColor={ground} stopOpacity={0} />
@@ -100,7 +118,13 @@ const Backdrop = ({ backdrop }: BackdropProps) => {
             <Stop offset={1} stopColor={ground} stopOpacity={1} />
           </LinearGradient>
         </Defs>
-        <Rect fill={`url(#${BACKDROP_GRADIENT_ID})`} height={height} width={width} x={0} y={0} />
+        <Rect
+          fill={`url(#${BACKDROP_GRADIENT_ID})`}
+          height={BACKDROP_HEIGHT}
+          width={width}
+          x={0}
+          y={0}
+        />
       </Svg>
     </View>
   )
@@ -546,7 +570,14 @@ export const focusItem: ItemKit = { ItemLayout, ItemNotice }
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     ground: { flex: 1, backgroundColor: colours.ground },
-    backdropBox: { position: 'absolute', top: 0, left: 0, right: 0 },
+    backdropBox: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden' },
+    // The picture's own band, its sides the picture's own edges, over the glow.
+    backdropBand: {
+      ...StyleSheet.absoluteFill,
+      left: BACKDROP_INSET,
+      right: BACKDROP_INSET,
+      overflow: 'hidden',
+    },
     backdrop: { opacity: BACKDROP_OPACITY },
     scroll: { flex: 1 },
     page: { gap: TV_SIZES.space5, paddingTop: TV_SIZES.space6, paddingBottom: TV_SIZES.space6 },

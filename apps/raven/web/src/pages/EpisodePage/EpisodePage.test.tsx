@@ -55,7 +55,7 @@ describe('EpisodePage', () => {
   it('shows the show and number, the title, air date, summary, guests and Resume', async () => {
     open()
     expect(await screen.findByRole('heading', { level: 1, name: 'Half Loop' })).toBeInTheDocument()
-    expect(screen.getByText('Episode 2')).toBeInTheDocument()
+    expect(screen.getByText('E02')).toBeInTheDocument()
     expect(screen.getByText(/18 Feb 2022|Feb 18, 2022/)).toBeInTheDocument()
     expect(screen.getByText('Half Loop is an episode.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Resume from 10:00' })).toHaveAttribute(
@@ -121,15 +121,17 @@ describe('EpisodePage', () => {
     await waitFor(() => expect(backdrop()).toContain('/api/pictures/items/7/still/still1'))
   })
 
-  it("offers the image CDN's narrower copies of its show's backdrop, as wide as the screen", async () => {
+  it("offers the image CDN's narrower copies of its show's backdrop, as wide as the screen, and a narrow one for the glow past the column", async () => {
     const srcSet = '/.netlify/images?w=480 480w, /.netlify/images 1280w'
     const widths = spyOn(api, 'backdropSrcSet').mockReturnValue(srcSet)
     open({ show: { ...SEVERANCE, backdropVersion: 'b4', libraryPictures: [] } })
-    const backdrop = () => document.querySelector('img[src*="/api/pictures/items/4/backdrop/b4"]')
-    await waitFor(() => expect(backdrop()).not.toBeNull())
+    const pictures = () => [
+      ...document.querySelectorAll('img[src*="/api/pictures/items/4/backdrop/b4"]'),
+    ]
+    await waitFor(() => expect(pictures()).toHaveLength(2))
     expect(widths).toHaveBeenCalledWith({ id: 4, version: 'b4' })
-    expect(backdrop()).toHaveAttribute('srcset', srcSet)
-    expect(backdrop()).toHaveAttribute('sizes', '100vw')
+    expect(pictures().map((picture) => picture.getAttribute('srcset'))).toEqual([srcSet, srcSet])
+    expect(pictures().map((picture) => picture.getAttribute('sizes'))).toEqual(['25vw', '100vw'])
     widths.mockRestore()
   })
 

@@ -6,6 +6,7 @@ import {
   episodeCode,
   episodeLine,
   episodePlace,
+  episodeTag,
   formatScore,
   itemLabel,
   mediaLabel,
@@ -22,6 +23,20 @@ describe('episodeCode', () => {
     expect(episodeCode({ season: 1, episode: 123 })).toBe('S01E123')
     expect(episodeCode({ season: 0, episode: null })).toBe('S00')
     expect(episodeCode({ season: null, episode: 3 })).toBeNull()
+  })
+})
+
+describe('episodeTag', () => {
+  it('sets the season and episode apart with a dot, and gives a season alone its mark', () => {
+    expect(episodeTag({ season: 1, episode: 2 })).toBe('S01 · E02')
+    expect(episodeTag({ season: 1, episode: 123 })).toBe('S01 · E123')
+    expect(episodeTag({ season: 2, episode: null })).toBe('S02')
+    expect(episodeTag({ season: null, episode: 3 })).toBeNull()
+  })
+
+  it('names a special and the specials in words', () => {
+    expect(episodeTag({ season: 0, episode: 5 })).toBe('Special 5')
+    expect(episodeTag({ season: 0, episode: null })).toBe('Specials')
   })
 })
 

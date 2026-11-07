@@ -2,6 +2,7 @@ import {
   AT_HOME,
   DEFAULT_PLAYBACK_SETTINGS,
   ITEM_IMAGE_KINDS,
+  ITEM_TYPES,
   type ItemDetails,
   PLAYBACK_MODES,
   type MediaItem,
@@ -24,6 +25,7 @@ import {
   routeIdOf,
   routeState,
   SESSION_KINDS,
+  episodeTag,
 } from '@raven/core'
 import { watchAppHide } from '@raven/native'
 import {
@@ -35,6 +37,7 @@ import {
   useTrackCues,
   useAudioQueue,
   usePlaybackPolicy,
+  useServerMediaMutations,
   usePlayerPrefs,
   videoReducer,
   KeyedView,
@@ -111,6 +114,15 @@ const nextLabelOf = (next: MediaItem): string =>
   [PLAYER_COPY.next, next.item === null ? null : episodeCode(next.item), next.title]
     .filter((part): part is string => part !== null)
     .join(' ')
+
+/** "Lucky · S01 · E02 · Make 'em Dance": what plays next, as the corner shows it. */
+const upNextWordsOf = (next: MediaItem): string => {
+  const { item } = next
+  if (item === null || item.type !== ITEM_TYPES.episode) return mediaLabel(next)
+  return [item.show?.title ?? null, episodeTag(item), item.title]
+    .filter((part): part is string => part !== null && part !== '')
+    .join(PLAYER_COPY.separator)
+}
 
 type Neighbours = {
   next: MediaItem | null
@@ -276,6 +288,7 @@ const Playing = ({
   const setSubtitles = usePlayerPrefs((prefs) => prefs.setSubtitles)
   const [resumeAt] = useState(() => (isFromStart ? 0 : resumeAtFor({ at, media })))
   const heading = usePlayerHeading({ media, session })
+  const { favourite } = useServerMediaMutations({ api: session.api, media })
   const [subtitle, setSubtitle] = useState(() =>
     preferredSubtitle({ tracks, subtitles: subtitlePrefs }),
   )
@@ -530,6 +543,11 @@ const Playing = ({
               }
         }
         mode={mode}
+        favourite={{
+          isOn: media.favourite,
+          onToggle: () => favourite.mutate(!media.favourite),
+        }}
+        upNext={nextMedia === null ? null : upNextWordsOf(nextMedia)}
         next={
           nextMedia === null ? null : { label: neighbours.nextLabel(nextMedia), onPlay: playNext }
         }
@@ -604,6 +622,8 @@ const Waiting = ({ notice, onBack }: WaitingProps) => (
     heading={NO_HEADING}
     isOpening={false}
     mode={null}
+    favourite={null}
+    upNext={null}
     next={null}
     previous={null}
     quality={null}

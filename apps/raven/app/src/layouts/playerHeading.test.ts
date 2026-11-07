@@ -24,7 +24,7 @@ const episode = ({ season }: EpisodeProps) =>
   })
 
 describe('playerHeadingOf', () => {
-  it('sets an episode out as its show and its art, its place, then its name, length and quality', () => {
+  it("sets an episode out as its show and its art, its name, its place, length and year, and its picture's facts", () => {
     expect(playerHeadingOf({ media: episode({ season: 1 }), logo: LOGO })).toEqual({
       show: 'Slow Horses',
       logo: LOGO,
@@ -32,6 +32,9 @@ describe('playerHeadingOf', () => {
       title: 'Bad Tradecraft',
       length: '42m',
       quality: '1080p',
+      codec: 'HEVC',
+      range: null,
+      year: '2026',
     })
   })
 
@@ -39,11 +42,13 @@ describe('playerHeadingOf', () => {
     expect(playerHeadingOf({ media: episode({ season: 0 }), logo: null }).place).toBe('Special 3')
   })
 
-  it('gives a film its name and year alone, with its length and its own art', () => {
+  it('gives a film its name and year alone, with its length and its own art, and no second year', () => {
     const media = mediaItemFor({
       duration: 7380,
       width: 3840,
       height: 1600,
+      hdr: true,
+      isDolbyVisionOnly: true,
       item: summaryFor({ id: 4, title: 'Valhalla Rising', year: 2010 }),
     })
     expect(playerHeadingOf({ media, logo: LOGO })).toEqual({
@@ -53,6 +58,9 @@ describe('playerHeadingOf', () => {
       title: 'Valhalla Rising (2010)',
       length: '2h 3m',
       quality: '4K',
+      codec: 'HEVC',
+      range: 'DV5',
+      year: null,
     })
   })
 

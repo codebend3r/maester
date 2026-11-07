@@ -348,15 +348,17 @@ describe('the line under a local file’s title', () => {
     return screen.getByRole('heading', { level: 1, name: 'Local clip' }).nextElementSibling
   }
 
-  it('is left out when the host names no context', () => {
-    expect(aboutOf(servicesFor())).not.toHaveClass(styles.about)
+  it('gives the runtime alone when the host names no context', () => {
+    const about = aboutOf(servicesFor())
+    expect(about).toHaveClass(styles.about ?? '')
+    expect(about).toHaveTextContent(/^2m$/)
   })
 
-  it('says where it came from', () => {
+  it('says where it came from, before the runtime', () => {
     const services = servicesFor()
     expect(
       aboutOf({ ...services, title: { ...services.title, context: 'Downloaded from Vhagar' } }),
-    ).toHaveTextContent(/^Downloaded from Vhagar$/)
+    ).toHaveTextContent(/^Downloaded from Vhagar · 2m$/)
   })
 })
 

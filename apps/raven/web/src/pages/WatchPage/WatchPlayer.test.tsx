@@ -434,14 +434,16 @@ describe('WatchPlayer title art', () => {
     return getItem
   }
 
-  it("heads an episode with its show's logo, its place and name beside it", async () => {
+  it("heads an episode with its show's logo, linked to the show, its own title and number under it", async () => {
     const getItem = stubShow()
     renderWithProviders({
       ui: <Player media={episode} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
     })
     const logo = await screen.findByRole('img', { name: 'Severance' })
     expect(logo.getAttribute('src') ?? '').toContain('/pictures/items/4/logo/l1')
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('S01E02 · Half Loop')
+    expect(screen.getByRole('link', { name: 'Severance' })).toHaveAttribute('href', '/shows/4')
+    expect(screen.getByText('Half Loop')).toBeInTheDocument()
+    expect(screen.getByText(/^S01 · E02/)).toBeInTheDocument()
     expect(getItem).toHaveBeenCalledWith(4)
   })
 
@@ -465,9 +467,7 @@ describe('WatchPlayer title art', () => {
     })
     await waitFor(() => expect(getItem).toHaveBeenCalledWith(4))
     expect(screen.queryByRole('img', { name: 'Severance' })).toBeNull()
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'Severance · S01E02 · Half Loop' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Severance' })).toBeInTheDocument()
   })
 })
 

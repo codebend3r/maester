@@ -372,8 +372,11 @@
 // The bar over the page, then the page; PlayerLayer leaves the room that
 // clears the tab bar on a phone. --page-start is how far the page sits under
 // main's top, which an item's backdrop reaches up through to cover the bar.
+// A container, so an item's backdrop glow can reach its edges past the column.
 .main {
   --page-top: var(--side-top);
+
+  container-type: inline-size;
   --bar-gap: var(--space-5);
   --page-start: calc(var(--page-top) + var(--field-size) + var(--bar-gap));
 
