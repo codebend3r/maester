@@ -2,9 +2,11 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// sparrow's API, proxied in development so the browser sees one origin. The
-// sandbox (`sparrow-sandbox`) listens on the same port as the real server, so
-// this one config serves either.
+/*
+ * sparrow's API, proxied in development so the browser sees one origin. The
+ * sandbox (`sparrow-sandbox`) listens on the same port as the real server, so
+ * this one config serves either.
+ */
 const server = 'http://localhost:8020'
 
 export default defineConfig({

@@ -31,8 +31,10 @@ const matchKey = (item: MediaItem): string =>
 
 const matchOrder = (key: string): number => MATCHES.findIndex((bucket) => bucket.key === key)
 
-// Months are read in UTC, as the server stamps them, so every client groups
-// a video the same way whatever its own time zone.
+/*
+ * Months are read in UTC, as the server stamps them, so every client groups
+ * a video the same way whatever its own time zone.
+ */
 const monthName = new Intl.DateTimeFormat('en', {
   month: 'long',
   year: 'numeric',

@@ -5,10 +5,13 @@ const SCSS = `
 // The palette.
 :root {
   --color-night: #15201e;
-  // 7:1 on --color-night,
-  // 6:1 on --color-canopy.
+  /*
+   * 7:1 on --color-night,
+   * 6:1 on --color-canopy.
+   */
   --color-lichen: #9db0a8;
 
+  // The smallest step.
   --space-0: 0.25rem;
   --radius-md: 8px;
   --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
@@ -34,7 +37,7 @@ describe('parseTokens', () => {
         group: 'colour',
         note: '7:1 on --color-night, 6:1 on --color-canopy.',
       },
-      { name: '--space-0', value: '0.25rem', group: 'space', note: null },
+      { name: '--space-0', value: '0.25rem', group: 'space', note: 'The smallest step.' },
       { name: '--radius-md', value: '8px', group: 'radius', note: null },
       {
         name: '--font-body',

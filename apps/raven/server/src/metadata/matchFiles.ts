@@ -360,8 +360,10 @@ export class MatchFiles {
     const dropFix = this.db.prepare(
       'DELETE FROM match_overrides WHERE library_id = ? AND place = ?',
     )
-    // The plan never lands two Fix matches on one place; were it to, the one
-    // already there would win rather than the relayout, and so the boot, fail.
+    /*
+     * The plan never lands two Fix matches on one place; were it to, the one
+     * already there would win rather than the relayout, and so the boot, fail.
+     */
     const addFix = this.db.prepare(
       `INSERT INTO match_overrides (library_id, place, tmdb_id) VALUES (?, ?, ?)
        ON CONFLICT (library_id, place) DO NOTHING`,
@@ -375,8 +377,10 @@ export class MatchFiles {
           : [{ id: file.id, fileName: file.fileName, was: file.folder, folder }]
       })
       plan.moves.forEach((move) => setFolder.run(move.folder, move.id))
-      // Compared with the name as the old folder reads it, not the stored
-      // title, which may predate the parser and would rematch for no reason.
+      /*
+       * Compared with the name as the old folder reads it, not the stored
+       * title, which may predate the parser and would rematch for no reason.
+       */
       const regrouped =
         matchTypeFor(kind) === ITEM_TYPES.show
           ? moved
@@ -392,9 +396,11 @@ export class MatchFiles {
             })
       this.metadata.unlink(regrouped.map((file) => file.id))
       this.rewriteNames({ rows: regrouped, kind })
-      // Every Fix match that leaves its place is read, then all are cleared
-      // before any lands, so one moving into a place another leaves never
-      // meets it, whatever order they come in.
+      /*
+       * Every Fix match that leaves its place is read, then all are cleared
+       * before any lands, so one moving into a place another leaves never
+       * meets it, whatever order they come in.
+       */
       const landing = plan.overrides.flatMap(({ from, to }) => {
         const fix = to == null ? undefined : readFix.get(libraryId, from)
         return to == null || fix == null ? [] : [{ to, tmdbId: fix.tmdb_id }]

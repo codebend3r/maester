@@ -1,5 +1,7 @@
-// Subtitles sit low over the picture and rise clear of the controls when
-// those show, as they do on YouTube.
+/*
+ * Subtitles sit low over the picture and rise clear of the controls when
+ * those show, as they do on YouTube.
+ */
 .overlay {
   grid-area: stage;
   align-self: end;
@@ -17,7 +19,7 @@
 }
 
 .lifted {
-  padding-bottom: calc(var(--space-10) + var(--space-4));
+  padding-bottom: calc(var(--space-9) + var(--space-4));
 }
 
 .cue {
@@ -51,6 +53,6 @@
 // The bar has three rows on a phone, so the lines rise further.
 @media (max-width: 30rem) {
   .lifted {
-    padding-bottom: calc(var(--space-10) + var(--space-7));
+    padding-bottom: calc(var(--space-9) + var(--space-7));
   }
 }

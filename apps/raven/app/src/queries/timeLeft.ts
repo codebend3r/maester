@@ -1,14 +1,15 @@
 const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
 
+type HoursAndMinutes = { hours: number; minutes: number }
+
 /** How a resume card says how much is left to watch. */
 const TIME_LEFT_COPY = {
   left: (time: string) => `${time} left`,
   underMinute: 'Under 1m left',
   hours: (hours: number) => `${hours}h`,
   minutes: (minutes: number) => `${minutes}m`,
-  hoursAndMinutes: ({ hours, minutes }: { hours: number; minutes: number }) =>
-    `${hours}h ${minutes}m`,
+  hoursAndMinutes: ({ hours, minutes }: HoursAndMinutes) => `${hours}h ${minutes}m`,
 } as const
 
 type TimeLeftOfProps = { duration: number | null; position: number }

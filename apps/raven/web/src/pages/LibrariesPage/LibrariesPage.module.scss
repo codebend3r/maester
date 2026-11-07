@@ -4,9 +4,11 @@
   gap: var(--space-5);
 }
 
-// The way back, then the title over how many there are with Add library at
-// its right on the summary's line. The way back takes the corner row, so the
-// theme button clears everything under it.
+/*
+ * The way back, then the title over how many there are with Add library at
+ * its right on the summary's line. The way back takes the corner row, so the
+ * theme button clears everything under it.
+ */
 .header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -49,9 +51,11 @@
   gap: var(--space-2);
 }
 
-// A card: the picture and the details share its one cell, the picture beneath.
-// The card is a container, so its details lay out by its own width, whatever
-// the side menu takes.
+/*
+ * A card: the picture and the details share its one cell, the picture beneath.
+ * The card is a container, so its details lay out by its own width, whatever
+ * the side menu takes.
+ */
 .row {
   container-type: inline-size;
   display: grid;
@@ -81,11 +85,13 @@
   grid-area: card;
 }
 
-// Decorative: the library's newest video over the card's right half, faded
-// in from its left edge so the name stays clear. Its opacity would paint it
-// over the details, and its clicks with it, so it takes none and the details
-// sit above. Size containment keeps the picture's own height out of the
-// card's: the details set it, and the picture stretches to fill it.
+/*
+ * Decorative: the library's newest video over the card's right half, faded
+ * in from its left edge so the name stays clear. Its opacity would paint it
+ * over the details, and its clicks with it, so it takes none and the details
+ * sit above. Size containment keeps the picture's own height out of the
+ * card's: the details set it, and the picture stretches to fill it.
+ */
 .backdrop {
   contain: size;
   justify-self: end;
@@ -102,10 +108,12 @@
   opacity: 0.45;
 }
 
-// The icon's well down the left, the name and counts beside it and the
-// toggle at their right, and what an open card adds under them, whatever the
-// card's width: up to eight buttons sit beside the lines nowhere without
-// squeezing the folders and the scan's words. A folded card is the first two rows.
+/*
+ * The icon's well down the left, the name and counts beside it and the
+ * toggle at their right, and what an open card adds under them, whatever the
+ * card's width: up to eight buttons sit beside the lines nowhere without
+ * squeezing the folders and the scan's words. A folded card is the first two rows.
+ */
 .details {
   z-index: 1;
   display: grid;
@@ -175,18 +183,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-// The folders a line to a parent, its names after it. The lines share the
-// parent column, so the names line up under one another. The column is capped
-// at half the width, so a long parent wraps inside it and leaves the names
-// room; a long name wraps in its own column.
+/*
+ * The folders a line to a parent, its names after it. The lines share the
+ * parent column, so the names line up under one another. The column is capped
+ * at half the width, so a long parent wraps inside it and leaves the names
+ * room; a long name wraps in its own column.
+ */
 .paths {
   display: grid;
-  grid-template-columns: fit-content(50%) minmax(0, 1fr);
+  grid-template-columns: [path-start] fit-content(50%) minmax(0, 1fr) [path-end];
   gap: var(--space-0) var(--space-3);
 }
 
 .path {
-  grid-column: 1 / -1;
+  grid-column: path;
   display: grid;
   grid-template-columns: subgrid;
   font-size: var(--font-size-xs);
@@ -233,14 +243,18 @@
   gap: var(--space-1);
 }
 
-// A disabled button is an empty outline, which the picture would show
-// through; a haze of the card keeps its word legible.
+/*
+ * A disabled button is an empty outline, which the picture would show
+ * through; a haze of the card keeps its word legible.
+ */
 .actions button:disabled {
   background: var(--color-canopy-haze);
 }
 
-// Pin as a toggle: outlined with an empty pin while off, the moss fill and a
-// filled pin while on.
+/*
+ * Pin as a toggle: outlined with an empty pin while off, the moss fill and a
+ * filled pin while on.
+ */
 .pin[aria-pressed] {
   border-color: var(--color-line-strong);
 }
@@ -272,8 +286,10 @@
   }
 }
 
-// A library in edit mode: one thin line, grip then icon then name, with its
-// two move buttons at the right. The whole line drags.
+/*
+ * A library in edit mode: one thin line, grip then icon then name, with its
+ * two move buttons at the right. The whole line drags.
+ */
 .thin {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto;

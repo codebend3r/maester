@@ -1,5 +1,7 @@
-// Sticks to the foot of the screen while its section is in view, over the
-// cards, and above the tab bar where a phone has one.
+/*
+ * Sticks to the foot of the screen while its section is in view, over the
+ * cards, and above the tab bar where a phone has one.
+ */
 .bar {
   --tab-room: var(--tab-bar-room, 0px);
 

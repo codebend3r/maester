@@ -1,8 +1,10 @@
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-  // The `@/` alias from tsconfig.json; tsc-alias rewrites it for the
-  // compiled output, and this resolves it for the tests.
+  /*
+   * The `@/` alias from tsconfig.json; tsc-alias rewrites it for the
+   * compiled output, and this resolves it for the tests.
+   */
   resolve: { tsconfigPaths: true },
   test: {
     include: ['src/**/*.test.ts'],

@@ -22,8 +22,10 @@ export class KeyframesService {
   async of({ id, path }: ProbeTarget): Promise<number[]> {
     const stored = this.index.storedKeyframes(id)
     if (stored) return stored
-    // A probe is of one version of the file: one asked for after the file
-    // changed is a new probe, and one begun before it saves nothing.
+    /*
+     * A probe is of one version of the file: one asked for after the file
+     * changed is a new probe, and one begun before it saves nothing.
+     */
     const mtimeMs = this.index.fileOf(id)?.mtimeMs ?? null
     const key = `${id}:${mtimeMs}`
     const running = this.running.get(key)

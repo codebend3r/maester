@@ -17,8 +17,10 @@ const PLATFORM_COPY = {
 
 type Download = { platform: Platform; label: string }
 
-// The release workflow names Raven's files raven-player-<version>-<download>, one row
-// here per download it ships. Intel Macs are not built, so x64 is always Windows.
+/*
+ * The release workflow names Raven's files raven-player-<version>-<download>, one row
+ * here per download it ships. Intel Macs are not built, so x64 is always Windows.
+ */
 const DOWNLOADS = {
   'arm64.dmg': { platform: PLATFORMS.mac, label: 'Mac, disk image' },
   'arm64.zip': { platform: PLATFORMS.mac, label: 'Mac, zip archive' },

@@ -39,8 +39,10 @@ const SignUpForm = () => {
     mutationFn: (credentials: SignUpMutationFnProps) =>
       callAuth(async (client) => {
         const answer = await client.signUp({ ...credentials, options: { emailRedirectTo } })
-        // The same answer for a new address and for one that already has an
-        // account, so the page gives nothing away about who is registered.
+        /*
+         * The same answer for a new address and for one that already has an
+         * account, so the page gives nothing away about who is registered.
+         */
         return errorCodeOf(answer.error) === AUTH_ERRORS.userAlreadyExists
           ? { error: null }
           : answer

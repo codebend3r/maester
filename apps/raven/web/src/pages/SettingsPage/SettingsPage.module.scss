@@ -5,8 +5,10 @@
   max-width: 56rem;
 }
 
-// The way back, then the title with Reset to defaults at its right. The way
-// back takes the corner row, so the theme button clears the rest.
+/*
+ * The way back, then the title with Reset to defaults at its right. The way
+ * back takes the corner row, so the theme button clears the rest.
+ */
 .header {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -29,8 +31,10 @@
   grid-area: reset;
 }
 
-// The question Reset to defaults asks first, over its two answers, which
-// take the button's place; the question wraps to their width.
+/*
+ * The question Reset to defaults asks first, over its two answers, which
+ * take the button's place; the question wraps to their width.
+ */
 .asking {
   grid-area: reset;
   display: grid;
@@ -74,8 +78,10 @@
   gap: var(--space-4);
 }
 
-// A section's title in the large serif and a line of help, ruled off from
-// its settings.
+/*
+ * A section's title in the large serif and a line of help, ruled off from
+ * its settings.
+ */
 .sectionHead {
   display: grid;
   gap: var(--space-1);
@@ -115,8 +121,10 @@
   list-style: none;
 }
 
-// A section's settings, held in one fieldset so the admin lock or a reset
-// disables them all at once; spaced as the section around it.
+/*
+ * A section's settings, held in one fieldset so the admin lock or a reset
+ * disables them all at once; spaced as the section around it.
+ */
 .settings {
   display: grid;
   gap: var(--space-5);
@@ -130,8 +138,10 @@
   font-size: var(--font-size-sm);
 }
 
-// What is known about a thing, one fact a row: its label in the muted
-// colour, its value beside it.
+/*
+ * What is known about a thing, one fact a row: its label in the muted
+ * colour, its value beside it.
+ */
 .facts {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -197,8 +207,10 @@
   gap: var(--space-1);
 }
 
-// A choice as a card: its radio or checkbox, its label, and what it means
-// under that. The chosen card is filled and ruled.
+/*
+ * A choice as a card: its radio or checkbox, its label, and what it means
+ * under that. The chosen card is filled and ruled.
+ */
 .choice {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -266,8 +278,10 @@
   outline: none;
 }
 
-// Checked, a radio is a ring around a dot in the accent, and a checkbox a
-// ring around a tick.
+/*
+ * Checked, a radio is a ring around a dot in the accent, and a checkbox a
+ * ring around a tick.
+ */
 .choice input[type='radio']::before {
   width: 0.625rem;
   height: 0.625rem;
@@ -352,8 +366,10 @@
   }
 }
 
-// The admin password, asked for under the switch it turns off: the field
-// beside its buttons, which drop under it on a phone.
+/*
+ * The admin password, asked for under the switch it turns off: the field
+ * beside its buttons, which drop under it on a phone.
+ */
 .password {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

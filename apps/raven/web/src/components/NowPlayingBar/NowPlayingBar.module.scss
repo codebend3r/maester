@@ -1,5 +1,7 @@
-// Along the foot of the page, glass over it, clear of a phone's tab bar:
-// the cover, the words, the controls, and a hairline of progress on top.
+/*
+ * Along the foot of the page, glass over it, clear of a phone's tab bar:
+ * the cover, the words, the controls, and a hairline of progress on top.
+ */
 .bar {
   display: grid;
   grid-template-columns: var(--control-size-tall) minmax(0, 1fr) auto;

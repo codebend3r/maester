@@ -5,9 +5,11 @@ import type { ConfigContext, ExpoConfig } from 'expo/config'
 import { type ConfigPlugin, withAndroidManifest } from 'expo/config-plugins'
 
 import packageJson from '#package'
-// Expo loads this file with its own require hook, which reads no tsconfig
-// `paths`, and Node's resolver adds no `.ts`, so the modules it shares with
-// the app come in by their relative path and extension.
+/*
+ * Expo loads this file with its own require hook, which reads no tsconfig
+ * `paths`, and Node's resolver adds no `.ts`, so the modules it shares with
+ * the app come in by their relative path and extension.
+ */
 import { TV_ENV, isTvPrebuild } from './src/config/tvPrebuild.ts'
 import { PALETTE_TOKENS } from './src/theme/tokenNames.ts'
 import { withAndroidFonts } from './plugins/withAndroidFonts.ts'
@@ -62,8 +64,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       supportsTablet: true,
       infoPlist: {
         NSLocalNetworkUsageDescription: LOCAL_NETWORK_USE,
-        // Expo's template allows local networking in every build, so the whole dictionary is
-        // written here: a LAN server without TLS is for development, and a release keeps ATS.
+        /*
+         * Expo's template allows local networking in every build, so the whole dictionary is
+         * written here: a LAN server without TLS is for development, and a release keeps ATS.
+         */
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: false,
           NSAllowsLocalNetworking: isDevelopment,
@@ -78,23 +82,31 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         foregroundImage: './assets/images/adaptive-icon.png',
         backgroundColor: ground,
       },
-      // The window's own colour, under the app. iOS reads its counterpart only through
-      // expo-system-ui; there the splash covers the window until raven draws.
+      /*
+       * The window's own colour, under the app. iOS reads its counterpart only through
+       * expo-system-ui; there the splash covers the window until raven draws.
+       */
       backgroundColor: ground,
     },
     plugins: [
       'expo-router',
-      // config-tv acts only when EXPO_TV=1, which the TV prebuild scripts set. The banner is the
-      // tile the Android TV launcher shows in its apps row: 320 by 180 dp, the mark and the
-      // wordmark, drawn by `scripts/tv_banner.sh` at every density (`withTvBannerDensities`).
+      /*
+       * config-tv acts only when EXPO_TV=1, which the TV prebuild scripts set. The banner is the
+       * tile the Android TV launcher shows in its apps row: 320 by 180 dp, the mark and the
+       * wordmark, drawn by `scripts/tv_banner.sh` at every density (`withTvBannerDensities`).
+       */
       ['@react-native-tvos/config-tv', { androidTVBanner: './assets/images/tv_banner.png' }],
-      // Picture in Picture needs the audio background mode. The player still pauses when the
-      // app leaves the screen without it (`playInBackground` off): this is video.
+      /*
+       * Picture in Picture needs the audio background mode. The player still pauses when the
+       * app leaves the screen without it (`playInBackground` off): this is video.
+       */
       ['react-native-video', { enableBackgroundAudio: true }],
       // Held up by `AppRoot` until the stores are read, so the theme picked is the first frame.
       ['expo-splash-screen', { backgroundColor: ground }],
-      // Apple's fonts, Young Serif and Instrument Sans: a family is the one inside its file.
-      // Android's are copied by `withAndroidFonts`, which names a family by its file instead.
+      /*
+       * Apple's fonts, Young Serif and Instrument Sans: a family is the one inside its file.
+       * Android's are copied by `withAndroidFonts`, which names a family by its file instead.
+       */
       [
         'expo-font',
         {
@@ -109,8 +121,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ],
     ],
   }
-  // The Apple TV's remote-driven end to end test joins only the TV's native project, and the
-  // Android TV's banner at each density only the TV's.
+  /*
+   * The Apple TV's remote-driven end to end test joins only the TV's native project, and the
+   * Android TV's banner at each density only the TV's.
+   */
   const withTests = isTv ? withTvRemoteTests(withTvBannerDensities(app)) : app
   const withFonts = withAndroidFonts(withTests)
   return isDevelopment ? withCleartextTraffic(withFonts) : withFonts

@@ -42,11 +42,13 @@ const initialToasts = useToasts.getInitialState()
 const initialSeasonView = useSeasonView.getInitialState()
 const initialWindowChrome = useWindowChrome.getInitialState()
 
-// Bun test does not unmount between tests the way vitest globals do. The
-// stores reset after the unmount, or a store still subscribed to redraws
-// outside act(). A test file's own afterEach runs before this one, so one
-// that resets its api spies calls cleanup() first: a page still mounted
-// would refetch from a spy that now answers undefined.
+/*
+ * Bun test does not unmount between tests the way vitest globals do. The
+ * stores reset after the unmount, or a store still subscribed to redraws
+ * outside act(). A test file's own afterEach runs before this one, so one
+ * that resets its api spies calls cleanup() first: a page still mounted
+ * would refetch from a spy that now answers undefined.
+ */
 afterEach(() => {
   cleanup()
   queryClient.clear()

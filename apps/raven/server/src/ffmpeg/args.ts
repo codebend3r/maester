@@ -195,8 +195,10 @@ export const transcodeVideo = ({
   const squeeze = QUALITY[quality]
   const trim = trimFrom == null ? [] : [`trim=start=${secondsArg(trimFrom)}`]
   const cpuAfter = [`scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
-  // A keyframe every two seconds keeps fragments small, so playback starts
-  // and seeks quickly.
+  /*
+   * A keyframe every two seconds keeps fragments small, so playback starts
+   * and seeks quickly.
+   */
   const shared = ['-profile:v', 'high', '-g', '48']
 
   if (encoder.kind === ENCODER_KINDS.videotoolbox) {
@@ -372,8 +374,10 @@ export const streamArgs = ({
           burn: burn?.stream ?? null,
         })
   })()
-  // ffmpeg 5.1 lays a picture subtitle over nothing after a seek on the file's clock, so a burn
-  // reads on a clock that starts at the seek and moves its output back onto the file's.
+  /*
+   * ffmpeg 5.1 lays a picture subtitle over nothing after a seek on the file's clock, so a burn
+   * reads on a clock that starts at the seek and moves its output back onto the file's.
+   */
   const clock =
     burn === null
       ? { input: ['-copyts', '-start_at_zero'], shift: streamShift }
@@ -409,8 +413,10 @@ export const streamArgs = ({
     audioOnly
       ? 'empty_moov+default_base_moof+frag_discont'
       : 'frag_keyframe+empty_moov+default_base_moof+frag_discont',
-    // A remux cannot shorten the source GOP. Flush at least every second
-    // even between keyframes so slow reads do not hold several seconds of A/V.
+    /*
+     * A remux cannot shorten the source GOP. Flush at least every second
+     * even between keyframes so slow reads do not hold several seconds of A/V.
+     */
     '-frag_duration',
     '1000000',
     'pipe:1',

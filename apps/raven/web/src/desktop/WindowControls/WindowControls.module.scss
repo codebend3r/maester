@@ -1,5 +1,7 @@
-// The controls sit in the title bar strip's height, over the page as it scrolls and over
-// the player, and stay clickable inside the strip that drags the window.
+/*
+ * The controls sit in the title bar strip's height, over the page as it scrolls and over
+ * the player, and stay clickable inside the strip that drags the window.
+ */
 .controls {
   position: fixed;
   inset: 0 0 auto auto;

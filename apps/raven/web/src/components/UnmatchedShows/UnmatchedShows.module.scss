@@ -11,8 +11,10 @@
     'suggestion suggestion'
     'files files';
   align-items: center;
-  // The suggestion and the files region bring their own top padding, so an
-  // entry without them adds no row gap.
+  /*
+   * The suggestion and the files region bring their own top padding, so an
+   * entry without them adds no row gap.
+   */
   gap: 0 var(--space-2);
   border-bottom: 1px solid var(--color-line);
   padding-bottom: var(--space-1);
@@ -22,6 +24,7 @@
   grid-area: toggle;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'chevron title count';
   align-items: center;
   gap: var(--space-2);
   min-height: var(--control-size);
@@ -43,6 +46,7 @@
 }
 
 .chevron {
+  grid-area: chevron;
   display: grid;
   color: var(--color-lichen);
 }
@@ -52,6 +56,7 @@
 }
 
 .title {
+  grid-area: title;
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
   line-height: var(--line-tight);
@@ -59,6 +64,7 @@
 }
 
 .count {
+  grid-area: count;
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
   white-space: nowrap;
@@ -96,10 +102,9 @@
 
   .toggle {
     grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .count {
-    grid-column: 2;
+    grid-template-areas:
+      'chevron title'
+      '. count';
   }
 
   .fix {

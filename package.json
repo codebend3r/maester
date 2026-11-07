@@ -9,7 +9,7 @@
   ],
   "type": "module",
   "scripts": {
-    "affected": "bun run --sequential spellcheck typescript-only one-command-per-script dead-code dead-css affected:tasks",
+    "affected": "bun run --sequential spellcheck typescript-only one-command-per-script comment-style dead-code dead-css affected:tasks",
     "affected:tasks": "nx affected -t lint:py lint:ts lint:css format:check typecheck test test:screens build",
     "app:build:android-tv": "nx run @raven/app:build:android-tv",
     "app:build:ios": "nx run @raven/app:build:ios",
@@ -49,6 +49,7 @@
     "ci:wren": "bash scripts/ci_wren.sh",
     "claude-audit": "bash scripts/audit_claude_md.sh",
     "build": "nx run-many -t build",
+    "comment-style": "nx run maester:comment-style",
     "dead-code": "nx run maester:dead-code",
     "dead-css": "nx run maester:dead-css",
     "desktop:audit:bundle": "nx run @raven/desktop:audit:bundle",
@@ -87,7 +88,7 @@
     "test:screens": "nx run-many -t test:screens",
     "typecheck": "nx run-many -t typecheck",
     "typescript-only": "nx run maester:typescript-only",
-    "verify": "nx run-many -t spellcheck typescript-only one-command-per-script dead-code dead-css lint:py lint:ts lint:css format:check typecheck test test:screens build",
+    "verify": "nx run-many -t spellcheck typescript-only one-command-per-script comment-style dead-code dead-css lint:py lint:ts lint:css format:check typecheck test test:screens build",
     "verify:uncached": "bun run verify --skip-nx-cache",
     "web:build": "nx run @raven/web:build",
     "web:e2e": "nx run @raven/web:e2e:browser"
@@ -137,6 +138,14 @@
         "inputs": [
           "{workspaceRoot}/**/package.json",
           "{workspaceRoot}/scripts/check_one_command_per_script.sh"
+        ]
+      },
+      "comment-style": {
+        "command": "bash scripts/check_comment_style.sh",
+        "cache": true,
+        "inputs": [
+          "{workspaceRoot}/**/*.{ts,tsx,scss}",
+          "{workspaceRoot}/scripts/check_comment_style.sh"
         ]
       },
       "dead-code": {

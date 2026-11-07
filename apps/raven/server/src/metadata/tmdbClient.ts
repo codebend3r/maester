@@ -316,8 +316,10 @@ export class TmdbClient {
       ),
     )
     if (hasTitle || includeAdult) return movies
-    // Some feature-length releases are filed only under TV. A movie search
-    // can return unrelated films instead, especially with no year filter.
+    /*
+     * Some feature-length releases are filed only under TV. A movie search
+     * can return unrelated films instead, especially with no year filter.
+     */
     const shows = await this.searchShows({ query, year })
     return [
       ...movies,

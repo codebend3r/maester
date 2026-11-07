@@ -769,9 +769,11 @@ describe('the admin lock', () => {
   })
 
   it('holds back every route marked AdminOnly, until the password is entered', async () => {
-    // Ids that name nothing pass the PIN lock, and leave a route nothing to change. An item no
-    // library holds is hidden while a library is locked, so an item's routes take the open
-    // movie: sent no body, and with TMDB off, none of them changes it.
+    /*
+     * Ids that name nothing pass the PIN lock, and leave a route nothing to change. An item no
+     * library holds is hidden while a library is locked, so an item's routes take the open
+     * movie: sent no body, and with TMDB off, none of them changes it.
+     */
     const absent = 999999
     const ids: Record<Privacy, number> = {
       library: absent,

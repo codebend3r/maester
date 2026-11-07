@@ -33,20 +33,33 @@ const groupOf = (name: string): TokenGroup =>
 
 const DECLARATION = /^(--[\w-]+):\s*(.+);$/
 const COMMENT = /^\/\/\s?(.*)$/
+const BLOCK_COMMENT = /\/\*+([\s\S]*?)\*\//g
+const BLOCK_LINE_STAR = /^\*\s?/
+
+/** Rewrites each block comment as `//` lines, so both kinds read as one note. */
+const asLineComments = (scss: string): string =>
+  scss.replace(BLOCK_COMMENT, (_block, body: string) =>
+    body
+      .split('\n')
+      .map((line) => line.trim().replace(BLOCK_LINE_STAR, ''))
+      .filter((line) => line !== '')
+      .map((line) => `// ${line}`)
+      .join('\n'),
+  )
 
 type Reading = { tokens: DesignToken[]; comment: string[] }
 
 /**
  * Reads the design tokens out of a stylesheet's `:root` block, in the order
- * they are declared. A `//` comment directly above a token is its note; a
- * blank line in between, or any other declaration, drops it.
+ * they are declared. A comment directly above a token, `//` lines or a
+ * block comment, is its note; a blank line in between, or any other
+ * declaration, drops it.
  */
 export const parseTokens = (scss: string): DesignToken[] => {
   const start = scss.indexOf(':root {')
   if (start === -1) return []
   const end = scss.indexOf('\n}', start)
-  const lines = scss
-    .slice(start + ':root {'.length, end === -1 ? undefined : end)
+  const lines = asLineComments(scss.slice(start + ':root {'.length, end === -1 ? undefined : end))
     .split('\n')
     .map((line) => line.trim())
   return lines.reduce<Reading>(

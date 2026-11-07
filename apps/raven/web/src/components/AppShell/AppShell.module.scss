@@ -1,6 +1,8 @@
 .shell {
-  // How far the logo and the bar sit under the top: Raven's window
-  // runs its traffic lights over it, so there they clear those too.
+  /*
+   * How far the logo and the bar sit under the top: Raven's window
+   * runs its traffic lights over it, so there they clear those too.
+   */
   --side-top: max(var(--space-5), calc(var(--titlebar-inset) + var(--space-3)));
 
   display: grid;
@@ -10,14 +12,16 @@
   min-height: calc(100dvh - var(--tab-bar-room, 0px) - var(--player-room, 0px));
 }
 
-// The menu holds still as the page scrolls: as tall as the screen, the logo
-// at its top and the dock at its foot, with only the links between scrolling
-// when more libraries are pinned than there is room for. Its top padding is
-// main's --page-top, so the logo sits level with the theme button. The
-// frost's blur would make the menu a stacking context only while a card is
-// pointed at, moving the tip under the page and back, so the menu is always
-// one: over the page (for the tip), still under a card's open menu, which
-// comes later.
+/*
+ * The menu holds still as the page scrolls: as tall as the screen, the logo
+ * at its top and the dock at its foot, with only the links between scrolling
+ * when more libraries are pinned than there is room for. Its top padding is
+ * main's --page-top, so the logo sits level with the theme button. The
+ * frost's blur would make the menu a stacking context only while a card is
+ * pointed at, moving the tip under the page and back, so the menu is always
+ * one: over the page (for the tip), still under a card's open menu, which
+ * comes later.
+ */
 .side {
   position: sticky;
   top: 0;
@@ -66,8 +70,10 @@
   text-decoration: none;
 }
 
-// Its padding leaves room for a row's focus ring, which the scrolling would
-// otherwise clip.
+/*
+ * Its padding leaves room for a row's focus ring, which the scrolling would
+ * otherwise clip.
+ */
 .links {
   grid-area: links;
   display: grid;
@@ -111,8 +117,10 @@
   min-width: 0;
 }
 
-// Under a rule where the libraries end: the Manage button, Libraries to
-// Settings, then raven's version and the toggle under a fainter rule.
+/*
+ * Under a rule where the libraries end: the Manage button, Libraries to
+ * Settings, then raven's version and the toggle under a fainter rule.
+ */
 .dock {
   grid-area: dock;
   display: grid;
@@ -283,8 +291,10 @@
   overflow-wrap: anywhere;
 }
 
-// Down to its icons, by the toggle or on a medium screen: each row keeps its
-// name for screen readers and as a tooltip, and the mark stands alone.
+/*
+ * Down to its icons, by the toggle or on a medium screen: each row keeps its
+ * name for screen readers and as a tooltip, and the mark stands alone.
+ */
 @mixin icons-only {
   .side {
     width: auto;
@@ -369,10 +379,12 @@
   }
 }
 
-// The bar over the page, then the page; PlayerLayer leaves the room that
-// clears the tab bar on a phone. --page-start is how far the page sits under
-// main's top, which an item's backdrop reaches up through to cover the bar.
-// A container, so an item's backdrop glow can reach its edges past the column.
+/*
+ * The bar over the page, then the page; PlayerLayer leaves the room that
+ * clears the tab bar on a phone. --page-start is how far the page sits under
+ * main's top, which an item's backdrop reaches up through to cover the bar.
+ * A container, so an item's backdrop glow can reach its edges past the column.
+ */
 .main {
   --page-top: var(--side-top);
 
@@ -417,9 +429,11 @@
   align-content: start;
 }
 
-// The theme button, then the account button. Over an item page's backdrop,
-// still under a dialog's top layer. A menu open from either rises over the
-// page and the selection bar.
+/*
+ * The theme button, then the account button. Over an item page's backdrop,
+ * still under a dialog's top layer. A menu open from either rises over the
+ * page and the selection bar.
+ */
 .corner {
   grid-area: corner;
   z-index: 2;

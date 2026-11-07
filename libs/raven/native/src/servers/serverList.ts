@@ -8,8 +8,10 @@ import {
   object,
 } from '@raven/core'
 
-// What expo-crypto's `randomUUID` returns. The id names the server's cookie in the secure
-// store, whose keys take only letters, digits, `.`, `-` and `_`.
+/*
+ * What expo-crypto's `randomUUID` returns. The id names the server's cookie in the secure
+ * store, whose keys take only letters, digits, `.`, `-` and `_`.
+ */
 const SERVER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 const isServerId = (value: unknown): value is string => isString(value) && SERVER_ID.test(value)

@@ -1,9 +1,11 @@
-// Fixed to the right edge, so it holds still as the page scrolls, centred in
-// the height between the theme button's corner at the top and, on a phone,
-// the tab bar at the foot, so it clears both. Each step is a 27th of that
-// height, the alphabet's share, so the longest strip always fits and a
-// shorter one sits tighter. As wide as its widest step, a number or a decade
-// where it is not letters.
+/*
+ * Fixed to the right edge, so it holds still as the page scrolls, centred in
+ * the height between the theme button's corner at the top and, on a phone,
+ * the tab bar at the foot, so it clears both. Each step is a 27th of that
+ * height, the alphabet's share, so the longest strip always fits and a
+ * shorter one sits tighter. As wide as its widest step, a number or a decade
+ * where it is not letters.
+ */
 .picker {
   --jump-top: calc(var(--page-top, 2rem) + var(--field-size) + var(--space-2));
   --jump-bottom: calc(var(--space-3) + var(--tab-bar-room, 0px));

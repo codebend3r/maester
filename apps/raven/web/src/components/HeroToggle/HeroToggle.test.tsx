@@ -18,8 +18,10 @@ describe('HeroToggle', () => {
     renderWithProviders({ ui: <HeroToggle itemId={7} />, client })
   }
 
-  // The settle step refetches after the server answers; a test that ends first
-  // lets that refetch redraw the switch outside act().
+  /*
+   * The settle step refetches after the server answers; a test that ends first
+   * lets that refetch redraw the switch outside act().
+   */
   const untilRefetched = () => waitFor(() => expect(client.isFetching()).toBe(0))
 
   afterEach(() => {

@@ -1,10 +1,12 @@
 import { parseArgs } from 'node:util'
 
-// Bun's own coverageThreshold holds every file to the floor on its own, so one
-// component with an untested callback fails the run, and the run still ends
-// "0 fail" with nothing saying why. This holds the total in Bun's lcov report
-// to the floor instead. Bun leaves a file no test imports out of the report
-// entirely, so such a file neither raises nor lowers the total.
+/*
+ * Bun's own coverageThreshold holds every file to the floor on its own, so one
+ * component with an untested callback fails the run, and the run still ends
+ * "0 fail" with nothing saying why. This holds the total in Bun's lcov report
+ * to the floor instead. Bun leaves a file no test imports out of the report
+ * entirely, so such a file neither raises nor lowers the total.
+ */
 
 type Counter = 'LF' | 'LH' | 'FNF' | 'FNH'
 

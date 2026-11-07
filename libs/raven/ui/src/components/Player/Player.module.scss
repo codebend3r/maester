@@ -1,6 +1,8 @@
-// The player keeps one dark look over the picture in every theme: its text,
-// glass and focus ring are the fixed on-picture colours, and only the
-// timeline's played stretch follows the theme.
+/*
+ * The player keeps one dark look over the picture in every theme: its text,
+ * glass and focus ring are the fixed on-picture colours, and only the
+ * timeline's played stretch follows the theme.
+ */
 .stage {
   --focus-ring: var(--border-thick) solid var(--color-on-picture);
 
@@ -30,9 +32,11 @@
   }
 }
 
-// The large mark in the middle while paused. It lets clicks through to the
-// picture, which plays, and waits a beat before showing, so the flash after
-// a key press has gone and an autoplay that starts at once never shows it.
+/*
+ * The large mark in the middle while paused. It lets clicks through to the
+ * picture, which plays, and waits a beat before showing, so the flash after
+ * a key press has gone and an autoplay that starts at once never shows it.
+ */
 .paused {
   grid-area: stage;
   place-self: center;
@@ -60,14 +64,18 @@
   }
 }
 
-// The top bar: the way back, then the title on a row of its own, an
-// episode's own title and the heart under it, and the line of what it is;
-// at the far end the clock over how it plays and what plays next.
+/*
+ * The top bar: the way back, then the title on a row of its own, an
+ * episode's own title and the heart under it, and the line of what it is;
+ * at the far end the clock over how it plays and what plays next.
+ */
 .chrome {
   grid-area: stage;
   align-self: start;
-  // A <video> gets its own compositing layer; without a stacking order the
-  // bar would paint underneath it.
+  /*
+   * A <video> gets its own compositing layer; without a stacking order the
+   * bar would paint underneath it.
+   */
   position: relative;
   z-index: 2;
   display: grid;
@@ -183,8 +191,10 @@
   min-height: var(--field-size);
 }
 
-// Filled as well as coloured, so a favourite does not rest on colour alone,
-// and it springs as it fills.
+/*
+ * Filled as well as coloured, so a favourite does not rest on colour alone,
+ * and it springs as it fills.
+ */
 .favourited {
   color: var(--color-leaf-bright);
 
@@ -207,9 +217,11 @@
   }
 }
 
-// What plays next, when the video came with more to play after it: a pill
-// naming it after a softer "Up next", under the clock and the chips. On a
-// phone "Up next" alone stays, so the playing video's title keeps the room.
+/*
+ * What plays next, when the video came with more to play after it: a pill
+ * naming it after a softer "Up next", under the clock and the chips. On a
+ * phone "Up next" alone stays, so the playing video's title keeps the room.
+ */
 .next {
   @include glass-button;
 
@@ -241,8 +253,10 @@
   white-space: nowrap;
 }
 
-// The title's art stands where its name would, as on a Continue watching
-// tile, on a row of its own.
+/*
+ * The title's art stands where its name would, as on a Continue watching
+ * tile, on a row of its own.
+ */
 .titleArt {
   display: grid;
   justify-items: start;
@@ -407,8 +421,10 @@
   gap: var(--space-1);
 }
 
-// A row of three, a host's handoff before Try playing anyway and the escape,
-// needs about 39rem of window; one or two keep their row down to 30rem.
+/*
+ * A row of three, a host's handoff before Try playing anyway and the escape,
+ * needs about 39rem of window; one or two keep their row down to 30rem.
+ */
 @media (max-width: 40rem) {
   .panelActions:has(> :nth-child(3)) {
     grid-auto-flow: row;

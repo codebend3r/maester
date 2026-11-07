@@ -25,8 +25,10 @@ export const WINDOW_MESSAGE_TYPES = {
 /** Main's words once mpv has gone. They ride with reason `engine`, which is what the page reads. */
 export const ENGINE_STOPPED = "Raven's video engine stopped. Open the video again."
 
-// A standard scheme lowercases its host, so an id must already be lowercase to
-// survive a round trip through `raven-file://<id>`.
+/*
+ * A standard scheme lowercases its host, so an id must already be lowercase to
+ * survive a round trip through `raven-file://<id>`.
+ */
 const OPAQUE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 /** What `crypto.randomUUID()` returns: the only handle the page ever holds for a file. */
@@ -54,11 +56,13 @@ export const WATCH_PARAMS = { at: 'at', next: 'next' } as const
 /** Where to start and what plays after, as a watch path's query carries them. */
 export type WatchQuery = { at: number; next: number[] }
 
+type WatchPathForProps = { mediaId: number } & WatchQuery
+
 /**
  * The web's watch page for a title, with where to start (whole seconds, left out at 0) and the
  * titles after it (left out when there are none).
  */
-export const watchPathFor = ({ mediaId, at, next }: { mediaId: number } & WatchQuery): string => {
+export const watchPathFor = ({ mediaId, at, next }: WatchPathForProps): string => {
   if (!isMediaId(mediaId)) throw new RangeError(`${mediaId} is not a media id`)
   const start = Number.isFinite(at) ? Math.max(0, Math.floor(at)) : 0
   const queue = next.filter(isMediaId).slice(0, PLAY_LINK_MAX_NEXT)

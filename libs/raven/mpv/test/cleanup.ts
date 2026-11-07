@@ -56,8 +56,10 @@ if (isMainThread) {
   const mode = process.argv[3]
   if (!clip || !isCleanupMode(mode)) throw new Error('Missing cleanup-test fixture or mode')
   assert.deepEqual(counts(), { owners: 0, callbacks: 0, handles: 0 })
-  // Keep this environment's addon loaded so its process-wide counters outlive
-  // each worker's N-API environment, including discarded TSFN callbacks.
+  /*
+   * Keep this environment's addon loaded so its process-wide counters outlive
+   * each worker's N-API environment, including discarded TSFN callbacks.
+   */
   await Array.from({ length: 3 }).reduce(async (previous) => {
     await previous
     const worker = new Worker(new URL(import.meta.url), {
@@ -98,8 +100,10 @@ if (isMainThread) {
   }
   if (mode === CLEANUP_MODES.gc) {
     await collectUntil({ matches: () => counts().handles === 0 })
-    // The async cleanup hook intentionally retains abandoned owners until exit.
-    // The parent verifies those owners and their TSFNs are then reclaimed too.
+    /*
+     * The async cleanup hook intentionally retains abandoned owners until exit.
+     * The parent verifies those owners and their TSFNs are then reclaimed too.
+     */
   }
   process.exit(0)
 }

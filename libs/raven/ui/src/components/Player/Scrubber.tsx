@@ -90,8 +90,10 @@ export const Scrubber = ({
     return Math.min(total, Math.max(0, ((clientX - box.left) / box.width) * total))
   }
 
-  // The tip follows the pointer through the DOM, not state, so a sweep across
-  // the bar renders nothing in React.
+  /*
+   * The tip follows the pointer through the DOM, not state, so a sweep across
+   * the bar renders nothing in React.
+   */
   const moveTip = (at: number | null) => {
     const tip = tipRef.current
     if (tip === null) return
@@ -127,9 +129,11 @@ export const Scrubber = ({
   })
 
   return (
-    // A range input cannot draw buffered stretches under its track or wait
-    // for release to seek, so this is an ARIA slider driven by the
-    // player's own arrow, Home and End keys.
+    /*
+     * A range input cannot draw buffered stretches under its track or wait
+     * for release to seek, so this is an ARIA slider driven by the
+     * player's own arrow, Home and End keys.
+     */
     <div
       ref={track}
       className={[styles.scrubber, dragging != null ? styles.dragging : '']

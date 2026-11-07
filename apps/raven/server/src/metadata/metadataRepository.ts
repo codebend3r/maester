@@ -122,6 +122,7 @@ type MetadataRepositorySaveSeasonProps = {
 }
 
 type MetadataRepositorySaveShowLogoProps = { itemId: number; logo: string | null }
+type MetadataRepositorySaveMovieExtrasProps = { itemId: number } & MovieExtras
 
 type MetadataRepositoryLinkProps = { mediaIds: readonly number[]; itemIds: readonly number[] }
 
@@ -580,7 +581,7 @@ export class MetadataRepository {
   }
 
   /** Notes the saga a movie belongs to and TMDB's logo for it, or that it has neither. */
-  saveMovieExtras({ itemId, saga, logo }: { itemId: number } & MovieExtras): void {
+  saveMovieExtras({ itemId, saga, logo }: MetadataRepositorySaveMovieExtrasProps): void {
     this.db.transaction(() => {
       this.db
         .prepare(

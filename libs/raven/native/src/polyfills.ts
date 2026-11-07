@@ -1,10 +1,12 @@
-// Hermes has no Intl.Locale, Intl.PluralRules, Intl.RelativeTimeFormat or
-// Intl.DisplayNames on Apple TV or Android TV, and @raven/core builds the
-// last two at module scope. Each `polyfill.js` entry installs itself only when
-// the engine lacks the constructor or its English data, so what Hermes has
-// natively (NumberFormat, DateTimeFormat) stays native. Each one needs the
-// ones above it, and each locale's data follows its polyfill. Its Array has no
-// `toSorted` either, which core sorts with: see `installToSorted`.
+/*
+ * Hermes has no Intl.Locale, Intl.PluralRules, Intl.RelativeTimeFormat or
+ * Intl.DisplayNames on Apple TV or Android TV, and @raven/core builds the
+ * last two at module scope. Each `polyfill.js` entry installs itself only when
+ * the engine lacks the constructor or its English data, so what Hermes has
+ * natively (NumberFormat, DateTimeFormat) stays native. Each one needs the
+ * ones above it, and each locale's data follows its polyfill. Its Array has no
+ * `toSorted` either, which core sorts with: see `installToSorted`.
+ */
 import { installToSorted } from '@/arrayToSorted'
 import '@formatjs/intl-getcanonicallocales/polyfill.js'
 import '@formatjs/intl-locale/polyfill.js'

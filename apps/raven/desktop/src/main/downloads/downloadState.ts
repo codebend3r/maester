@@ -578,8 +578,10 @@ export const keepOneServer = ({
     if (entry.status.kind !== DOWNLOAD_STATUS_KINDS.ready) return []
     return [hasPending(entry) ? { ...entry, pending: NO_PENDING } : entry]
   })
-  // An adopted server's download that stayed where it was (a twin of a title the server has, or a
-  // folder that could not move) still owes what was watched of it, now to the server.
+  /*
+   * An adopted server's download that stayed where it was (a twin of a title the server has, or a
+   * folder that could not move) still owes what was watched of it, now to the server.
+   */
   const unmoved = state.entries
     .filter(
       (entry) =>

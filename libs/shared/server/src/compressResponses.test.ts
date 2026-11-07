@@ -23,8 +23,10 @@ const VTT = [
 const PAGE = `<!doctype html><title>app</title>${'<!-- padding -->'.repeat(100)}`
 const SCRIPT = `console.log(${JSON.stringify(LIST)})`
 const LOGO = `<svg xmlns="http://www.w3.org/2000/svg">${'<rect width="1" height="1"/>'.repeat(100)}</svg>`
-// A PNG's signature and then bytes that would compress well, so leaving them
-// alone is the server's choice rather than zlib finding nothing to gain.
+/*
+ * A PNG's signature and then bytes that would compress well, so leaving them
+ * alone is the server's choice rather than zlib finding nothing to gain.
+ */
 const POSTER = Buffer.concat([
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
   Buffer.alloc(16 * 1024, 0),
@@ -285,8 +287,10 @@ describe('compressResponses', () => {
         return readUntil({ text, read: read + decoder.decode(chunk.value) })
       }
       events.next('first')
-      // A compressed stream would hold the event back until it had more to
-      // pack, and this read would never finish.
+      /*
+       * A compressed stream would hold the event back until it had more to
+       * pack, and this read would never finish.
+       */
       const read = await Promise.race([
         readUntil({ text: 'data: first', read: '' }),
         new Promise<never>((_, reject) =>

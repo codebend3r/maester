@@ -263,23 +263,29 @@ export class MatchPass {
           null
 
         const results = await ask({ query: title })
-        // TMDB finds nothing for "The Few Good Men"; without the article it
-        // offers "A Few Good Men", which folds to the same title.
+        /*
+         * TMDB finds nothing for "The Few Good Men"; without the article it
+         * offers "A Few Good Men", which folds to the same title.
+         */
         const bare = sortTitle(title)
         const retried =
           results.length === 0 && bare !== title ? await ask({ query: bare }) : results
         const sure = pick({ results: retried })
         if (sure != null) return sure
-        // TMDB's search reads alternative titles too, so "Expired" finds
-        // Loveland (2022), the name it was released under abroad.
+        /*
+         * TMDB's search reads alternative titles too, so "Expired" finds
+         * Loveland (2022), the name it was released under abroad.
+         */
         const aliased = pick({
           results: retried,
           aliases: await this.aliasesOf({ type, title, year, results: retried }),
         })
         if (aliased != null || type !== ITEM_TYPES.movie) return aliased
-        // TMDB leaves some films out of a search without adult titles though
-        // it does not mark them adult, as with "Paprika" (1991). Only the
-        // same title counts there, never a lone result of another.
+        /*
+         * TMDB leaves some films out of a search without adult titles though
+         * it does not mark them adult, as with "Paprika" (1991). Only the
+         * same title counts there, never a lone result of another.
+         */
         return pick({
           results: await ask({ query: title, includeAdult: true }),
           canTakeLoneResult: false,

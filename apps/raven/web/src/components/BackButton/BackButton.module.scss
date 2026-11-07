@@ -1,7 +1,9 @@
-// A touch more glass than a pill's own, so it holds on a backdrop picture
-// as well as on a plain page. As wide as its label, and no wider than its
-// row, a long name cut short, so it never runs off a phone's edge. A page
-// places it with `grid-area` alone.
+/*
+ * A touch more glass than a pill's own, so it holds on a backdrop picture
+ * as well as on a plain page. As wide as its label, and no wider than its
+ * row, a long name cut short, so it never runs off a phone's edge. A page
+ * places it with `grid-area` alone.
+ */
 .back {
   justify-self: start;
   max-width: 100%;

@@ -50,9 +50,11 @@ export const runFixture = async ({
   const root = await mkdtemp(join(tmpdir(), `raven-${name.toLowerCase().replaceAll(' ', '-')}-`))
   const removeRoot = () => rmSync(root, { recursive: true, force: true, maxRetries: 5 })
 
-  // Until the server's own shutdown hook is registered, a stop ends the process here, so a
-  // signal during the encodes cannot leave it running; after that the hook ends it once the
-  // server has closed. Either way the folder goes first, synchronously.
+  /*
+   * Until the server's own shutdown hook is registered, a stop ends the process here, so a
+   * signal during the encodes cannot leave it running; after that the hook ends it once the
+   * server has closed. Either way the folder goes first, synchronously.
+   */
   let hasShutdownHook = false
   STOP_SIGNALS.forEach((signal) =>
     process.once(signal, () => {

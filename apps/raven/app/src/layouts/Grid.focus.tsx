@@ -375,9 +375,11 @@ const Grid = ({ title, icon, line, notice, toolbar, sections, view, jump, onOpen
     heightOf,
     top: 0,
   })
-  // Each jump counts, the same card twice included. The count last handled is kept apart from
-  // rendering, so the card jumped to asks for the focus once for its jump and never again as it
-  // mounts afresh: scrolled back to, its bucket reopened, the grid sorted again.
+  /*
+   * Each jump counts, the same card twice included. The count last handled is kept apart from
+   * rendering, so the card jumped to asks for the focus once for its jump and never again as it
+   * mounts afresh: scrolled back to, its bucket reopened, the grid sorted again.
+   */
   const [jumped, setJumped] = useState<{ card: string; count: number } | null>(null)
   const handledJump = useRef(0)
   const claimJump = (count: number): boolean => {
@@ -387,9 +389,11 @@ const Grid = ({ title, icon, line, notice, toolbar, sections, view, jump, onOpen
   }
   const jumpOf = (card: ShelfCard): JumpFocus | null =>
     jumped !== null && card.key === jumped.card ? { count: jumped.count, claim: claimJump } : null
-  // The first card, or bucket, takes the focus as the grid opens, and only then: once anything
-  // on the screen has had it, a card drawn later (after a sort, or once a search finds some)
-  // must not pull it from the viewer. The header hears its controls' focus as it bubbles up.
+  /*
+   * The first card, or bucket, takes the focus as the grid opens, and only then: once anything
+   * on the screen has had it, a card drawn later (after a sort, or once a search finds some)
+   * must not pull it from the viewer. The header hears its controls' focus as it bubbles up.
+   */
   const { isOpening, settle } = useScreenFocusScope()
   const preferred = isOpening ? firstKeyOf(rows) : null
   // What the rows draw from beyond `rows` itself, the one value while neither changes.
@@ -505,8 +509,10 @@ const useStyles = themedStyles((colours) =>
     line: { color: colours.muted, fontSize: TV_SIZES.textLg },
     toolbar: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
     notice: { color: colours.muted, fontSize: TV_SIZES.textLg },
-    // A horizontal ScrollView grows by default, which would leave the cards below no room.
-    // Beside the name and the line, taking the rest of the row and scrolling within it.
+    /*
+     * A horizontal ScrollView grows by default, which would leave the cards below no room.
+     * Beside the name and the line, taking the rest of the row and scrolling within it.
+     */
     jumpScroll: { flexGrow: 1, flexShrink: 1 },
     jumpRow: { gap: TV_SIZES.space0, paddingVertical: TV_SIZES.space1, alignItems: 'center' },
     unit: { color: colours.muted, fontSize: TV_SIZES.text, paddingRight: TV_SIZES.space1 },

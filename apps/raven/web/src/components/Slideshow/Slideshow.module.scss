@@ -1,5 +1,7 @@
-// Every picture in one cell, the one coming in on top of the one it covers.
-// Shaped as a backdrop is, so it takes the place a single picture would.
+/*
+ * Every picture in one cell, the one coming in on top of the one it covers.
+ * Shaped as a backdrop is, so it takes the place a single picture would.
+ */
 .slideshow {
   display: grid;
   grid-template-areas: 'slide';
@@ -33,8 +35,10 @@
     animation: fade-in 1.2s ease-in-out both;
   }
 
-  // A slow zoom across the whole of a picture's turn, held at its end while
-  // the next fades in over it.
+  /*
+   * A slow zoom across the whole of a picture's turn, held at its end while
+   * the next fades in over it.
+   */
   .kenBurns {
     .picture {
       transform-origin: 50% 30%;

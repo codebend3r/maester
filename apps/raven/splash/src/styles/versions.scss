@@ -1,5 +1,7 @@
-// The versions page: a plain document, the masthead, the list of releases and
-// the colophon in one column held to the web app's measure.
+/*
+ * The versions page: a plain document, the masthead, the list of releases and
+ * the colophon in one column held to the web app's measure.
+ */
 .document {
   display: grid;
   grid-template-columns: minmax(0, var(--max-width));
@@ -9,14 +11,14 @@
     'colophon';
   justify-content: center;
   gap: var(--section-gap);
-  padding: var(--space-4) var(--gutter) var(--space-8);
+  padding: var(--space-9) var(--gutter) var(--space-14);
 
   > .masthead {
     grid-area: masthead;
   }
 
   > .colophon {
-    padding-top: var(--space-5);
+    padding-top: var(--space-11);
     border-top: 1px solid var(--color-line);
   }
 }
@@ -34,13 +36,13 @@
     'pitch'
     'status'
     'list';
-  gap: var(--space-6);
+  gap: var(--space-12);
 }
 
 .pitch {
   grid-area: pitch;
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-9);
 
   h1 {
     font-family: var(--font-display);
@@ -67,7 +69,7 @@
 .version-list {
   grid-area: list;
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-11);
 }
 
 .version {
@@ -78,8 +80,8 @@
     'date files'
     'notes files';
   align-content: start;
-  gap: var(--space-1) var(--space-6);
-  padding-top: var(--space-5);
+  gap: var(--space-3) var(--space-12);
+  padding-top: var(--space-11);
   border-top: 1px solid var(--color-line);
 
   @media (max-width: 40rem) {

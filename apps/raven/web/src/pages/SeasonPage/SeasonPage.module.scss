@@ -13,8 +13,10 @@
   display: grid;
 }
 
-// The still, what the episode is, then its Watched and Play. The row lights
-// under the pointer, rounded, with no rule of its own.
+/*
+ * The still, what the episode is, then its Watched and Play. The row lights
+ * under the pointer, rounded, with no rule of its own.
+ */
 .episode {
   --still-width: 16.25rem;
 
@@ -43,13 +45,17 @@
   z-index: 2;
 }
 
-// The still, with where playback stopped along its foot and the check in
-// its corner, both drawn in the picture's own light.
+/*
+ * The still, with where playback stopped along its foot and the check in
+ * its corner, both drawn in the picture's own light.
+ */
 .still {
   grid-area: still;
   display: grid;
-  // One cell exactly the frame's size, so a still of another shape is
-  // cropped to it and the check and the line stay inside.
+  /*
+   * One cell exactly the frame's size, so a still of another shape is
+   * cropped to it and the check and the line stay inside.
+   */
   grid-template: 'frame' minmax(0, 1fr) / minmax(0, 1fr);
   aspect-ratio: 16 / 9;
   overflow: hidden;
@@ -75,8 +81,10 @@
   font-size: var(--font-size-xl);
 }
 
-// The check in the top corner and where playback stopped along the foot,
-// both inset from the still's edges.
+/*
+ * The check in the top corner and where playback stopped along the foot,
+ * both inset from the still's edges.
+ */
 .overlay {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -191,8 +199,10 @@
   }
 }
 
-// The still across the row, what the episode is under it, the buttons
-// beside the title.
+/*
+ * The still across the row, what the episode is under it, the buttons
+ * beside the title.
+ */
 @media (max-width: 48rem) {
   .episode {
     grid-template-columns: minmax(0, 1fr) auto;

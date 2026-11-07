@@ -1,13 +1,17 @@
-// The backdrop fills the tile, laid out by `HomeFrames`' tile. The tile is a
-// picture in every theme, so its words keep the fixed light ink of words on a picture.
+/*
+ * The backdrop fills the tile, laid out by `HomeFrames`' tile. The tile is a
+ * picture in every theme, so its words keep the fixed light ink of words on a picture.
+ */
 .tile {
   position: relative;
   isolation: isolate;
   border-radius: var(--radius-lg);
   color: var(--color-on-picture);
 
-  // The open menu hangs past the tile's edge, so the tile itself clips
-  // nothing; its backdrop does, and the open one rises over its neighbours.
+  /*
+   * The open menu hangs past the tile's edge, so the tile itself clips
+   * nothing; its backdrop does, and the open one rises over its neighbours.
+   */
   &:has([aria-expanded='true']) {
     z-index: 1;
   }
@@ -59,8 +63,10 @@
   filter: drop-shadow(0 1px 4px var(--color-shade));
 }
 
-// The link that resumes the video reaches across the whole tile, under its
-// name's own link and its menu.
+/*
+ * The link that resumes the video reaches across the whole tile, under its
+ * name's own link and its menu.
+ */
 .play {
   position: absolute;
   inset: 0;

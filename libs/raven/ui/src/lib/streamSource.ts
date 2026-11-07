@@ -222,8 +222,10 @@ export const browserEnvironment = (video: HTMLVideoElement): StreamEnvironment<M
     video.src = url
     return () => {
       URL.revokeObjectURL(url)
-      // The element may already be pointed at something else, such as the
-      // original file after stepping back to direct play.
+      /*
+       * The element may already be pointed at something else, such as the
+       * original file after stepping back to direct play.
+       */
       if (video.src === url) {
         video.removeAttribute('src')
         video.load()
@@ -378,8 +380,10 @@ export const createStreamSession = <S extends MediaSourceLike>({
 
   const append = async ({ buffer, chunk, generation }: AppendProps): Promise<void> => {
     if (!current(generation)) return
-    // Prune even when delivery never gets a minute ahead. Otherwise old
-    // frames occupy the quota while a slower stream is trying to catch up.
+    /*
+     * Prune even when delivery never gets a minute ahead. Otherwise old
+     * frames occupy the quota while a slower stream is trying to catch up.
+     */
     await evictBehind({ buffer, generation })
     await waitForRoom({ buffer, generation })
     if (!current(generation)) return
@@ -392,8 +396,10 @@ export const createStreamSession = <S extends MediaSourceLike>({
       if (!isQuotaError(error)) throw error
       // A full buffer means delivery has outrun playback.
       state.meter = null
-      // Thirty seconds can itself exceed the quota. Retaining all of it
-      // deadlocks once playback reaches the end and cannot wake this retry.
+      /*
+       * Thirty seconds can itself exceed the quota. Retaining all of it
+       * deadlocks once playback reaches the end and cannot wake this retry.
+       */
       const freed = await evictBehind({
         buffer,
         generation,
@@ -446,10 +452,12 @@ export const createStreamSession = <S extends MediaSourceLike>({
     state.streamingFrom = from
     state.meter = null
     try {
-      // A network read can stop partway through a fragment, and removing
-      // what is buffered leaves the parser holding that fragment; the new
-      // stream would be read as its rest. Only abort lets go of it, and
-      // it throws once the stream has ended, which leaves nothing held.
+      /*
+       * A network read can stop partway through a fragment, and removing
+       * what is buffered leaves the parser holding that fragment; the new
+       * stream would be read as its rest. Only abort lets go of it, and
+       * it throws once the stream has ended, which leaves nothing held.
+       */
       if (source?.readyState === MEDIA_SOURCE_STATES.open) buffer.abort()
       if (buffer.buffered.length > 0) {
         buffer.remove(0, Infinity)

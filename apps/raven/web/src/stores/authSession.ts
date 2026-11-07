@@ -151,8 +151,10 @@ export const useAuthSession = create<AuthSessionState>()(
           const build = () => {
             void createClient({ config }).then(follow, () => settle(null))
           }
-          // Signed out, the sign-in page draws first and its form waits for the client, so the client
-          // loads once the page has, not beside the page's own code.
+          /*
+           * Signed out, the sign-in page draws first and its form waits for the client, so the client
+           * loads once the page has, not beside the page's own code.
+           */
           if (isSignedOut) return afterPageLoad(build)
           build()
         },

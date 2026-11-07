@@ -139,8 +139,10 @@ export const createAutoDelete = (deps: AutoDeleteDeps): AutoDelete => {
 
   type ArmProps = { downloadId: string; at: number }
 
-  // A wait past what a timer holds (a clock put back since the title was watched) is cut to it,
-  // and the timer then arms the rest, so the clock never runs out early.
+  /*
+   * A wait past what a timer holds (a clock put back since the title was watched) is cut to it,
+   * and the timer then arms the rest, so the clock never runs out early.
+   */
   const arm = ({ downloadId, at }: ArmProps): void => {
     if (isDisposed) return
     const wait = at - deps.now()

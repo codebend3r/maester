@@ -4,27 +4,33 @@
   grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
   gap: var(--space-1);
 
-  // A library can hold thousands of covers, so the browser lays out and
-  // draws only those near the screen. One it skips stands in at the height
-  // it had when last drawn, else at about a frame grab's 1440 wide.
-  // Skipping clips what a cover draws to its box, so it may draw a little
-  // past it as it grows and casts its shadow.
+  /*
+   * A library can hold thousands of covers, so the browser lays out and
+   * draws only those near the screen. One it skips stands in at the height
+   * it had when last drawn, else at about a frame grab's 1440 wide.
+   * Skipping clips what a cover draws to its box, so it may draw a little
+   * past it as it grows and casts its shadow.
+   */
   > li {
     content-visibility: auto;
     contain-intrinsic-block-size: auto 8.5rem;
     overflow-clip-margin: var(--space-5);
   }
 
-  // The clip would also cut off a focus ring and a cover growing to the
-  // pointer, so a cover pointed at or holding the focus is drawn whole.
+  /*
+   * The clip would also cut off a focus ring and a cover growing to the
+   * pointer, so a cover pointed at or holding the focus is drawn whole.
+   */
   > li:hover,
   > li:focus-within {
     content-visibility: visible;
   }
 }
 
-// Posters are narrower than frame grabs, so more fit a row, and narrower
-// still on a narrower screen.
+/*
+ * Posters are narrower than frame grabs, so more fit a row, and narrower
+ * still on a narrower screen.
+ */
 .posters {
   grid-template-columns: repeat(auto-fill, minmax(min(8.5rem, 100%), 1fr));
 
@@ -39,8 +45,10 @@
   }
 }
 
-// Raised while pointed at or focused, so a grown cover lies over its
-// neighbours.
+/*
+ * Raised while pointed at or focused, so a grown cover lies over its
+ * neighbours.
+ */
 .cover {
   position: relative;
   display: grid;

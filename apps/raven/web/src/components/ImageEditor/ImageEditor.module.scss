@@ -1,5 +1,7 @@
-// A panel on the page, or the dialog's whole body from a card's menu: the
-// title and Done over a hairline, then the files and the pictures.
+/*
+ * A panel on the page, or the dialog's whole body from a card's menu: the
+ * title and Done over a hairline, then the files and the pictures.
+ */
 .editor {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -14,9 +16,11 @@
   }
 }
 
-// From a card's menu the editor is the dialog's own panel, so the dialog
-// itself has no frame. It lets go of the measure elements.scss caps a
-// dialog at, as the pictures want the room.
+/*
+ * From a card's menu the editor is the dialog's own panel, so the dialog
+ * itself has no frame. It lets go of the measure elements.scss caps a
+ * dialog at, as the pictures want the room.
+ */
 .dialog {
   width: min(60rem, calc(100vw - 2 * var(--space-3)));
   max-width: none;
@@ -196,8 +200,10 @@
   aspect-ratio: 16 / 9;
 }
 
-// A logo keeps its own shape, held in a short band, on the dark glass it is
-// shown on over a backdrop, whatever the theme.
+/*
+ * A logo keeps its own shape, held in a short band, on the dark glass it is
+ * shown on over a backdrop, whatever the theme.
+ */
 .logos .option img {
   aspect-ratio: 3 / 1;
   padding: var(--space-2);

@@ -71,8 +71,10 @@ const iconsOf = (element: HTMLElement) =>
 
 const SCREEN_SIZES = { wide: 'wide', medium: 'medium' } as const
 
-// `all` matches any screen and `not all` none, so only a medium screen
-// matches the side menu's query for one.
+/*
+ * `all` matches any screen and `not all` none, so only a medium screen
+ * matches the side menu's query for one.
+ */
 const real = window.matchMedia.bind(window)
 const screenOf =
   (size: (typeof SCREEN_SIZES)[keyof typeof SCREEN_SIZES]) =>

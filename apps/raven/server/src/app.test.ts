@@ -903,8 +903,10 @@ describe('live updates', () => {
         return readUntil({ text, read: read + decoder.decode(chunk.value) })
       }
       app().get(ServerEvents).libraryChanged(42)
-      // Compressed, the event would wait in the compressor for more to pack
-      // and never reach the reader.
+      /*
+       * Compressed, the event would wait in the compressor for more to pack
+       * and never reach the reader.
+       */
       const read = await Promise.race([
         readUntil({ text: '"libraryId":42', read: '' }),
         new Promise<never>((_, reject) =>

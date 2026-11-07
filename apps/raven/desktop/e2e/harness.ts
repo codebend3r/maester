@@ -92,8 +92,10 @@ const hasExited = (app: ElectronApplication): boolean => {
   return child.exitCode !== null || child.signalCode !== null
 }
 
-// Listens from the moment launch returns: Playwright holds `ready` until it has connected,
-// so the window, and every mark printed from then on, come after.
+/*
+ * Listens from the moment launch returns: Playwright holds `ready` until it has connected,
+ * so the window, and every mark printed from then on, come after.
+ */
 const readMarks = (app: ElectronApplication): Marks => {
   const listeners = new Set<() => void>()
   const marks = {
@@ -209,12 +211,16 @@ export const launchApp = async ({
   env = {},
 }: LaunchAppProps): Promise<Launched> => {
   const app = await _electron.launch({
-    // Chromium's fake audio sink: playback is clocked by the audio output, so a real device
-    // whose clock has stalled (an asleep USB interface) would freeze `currentTime` at 0.
+    /*
+     * Chromium's fake audio sink: playback is clocked by the audio output, so a real device
+     * whose clock has stalled (an asleep USB interface) would freeze `currentTime` at 0.
+     */
     args: ['--disable-audio-output', '.'],
     cwd: PROJECT_DIR,
-    // e2e never drives the window surface (Ruling 15). A hook exported in the developer's
-    // shell is dropped, so only the hooks a test names reach the app.
+    /*
+     * e2e never drives the window surface (Ruling 15). A hook exported in the developer's
+     * shell is dropped, so only the hooks a test names reach the app.
+     */
     env: {
       ...withoutTestHooks({ env: process.env }),
       RAVEN_DESKTOP_USER_DATA: userData,

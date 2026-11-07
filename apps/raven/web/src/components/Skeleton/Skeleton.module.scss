@@ -1,7 +1,9 @@
-// Stand-ins for what is on its way: the canopy's own colour, with a band of
-// its lighter shade sweeping across where motion is welcome. A whole
-// stand-in comes in after a beat, so an answer that is quick never flashes
-// one up.
+/*
+ * Stand-ins for what is on its way: the canopy's own colour, with a band of
+ * its lighter shade sweeping across where motion is welcome. A whole
+ * stand-in comes in after a beat, so an answer that is quick never flashes
+ * one up.
+ */
 
 .loading {
   display: grid;
@@ -20,8 +22,10 @@
   background-color: var(--color-canopy);
 }
 
-// A picture keeps the shape of the one it stands in for; `fill` takes
-// whatever its container gives it, as a header's picture does.
+/*
+ * A picture keeps the shape of the one it stands in for; `fill` takes
+ * whatever its container gives it, as a header's picture does.
+ */
 .poster,
 .frame,
 .fill {
@@ -90,8 +94,10 @@
   min-width: 0;
 }
 
-// A card drawn on its picture: the whole card is the bone, its lines a
-// lighter grey on it. The card's own class gives its size and layout.
+/*
+ * A card drawn on its picture: the whole card is the bone, its lines a
+ * lighter grey on it. The card's own class gives its size and layout.
+ */
 .panel {
   border-radius: var(--radius-lg);
 

@@ -229,8 +229,10 @@ export class AiMatcher {
       max_tokens: MAX_TOKENS,
       thinking: { type: 'adaptive' },
       output_config: { effort: this.config.aiMatchEffort },
-      // The prompt and the tools never change, so this one breakpoint caches
-      // them for every lookup; the top-level one follows the conversation.
+      /*
+       * The prompt and the tools never change, so this one breakpoint caches
+       * them for every lookup; the top-level one follows the conversation.
+       */
       system: [{ type: 'text', text: AI_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       tools: AI_TOOLS,
       tool_choice: { type: 'auto' },

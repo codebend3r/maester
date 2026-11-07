@@ -65,8 +65,10 @@ export const trackStream = ({
   request,
   reply,
 }: TrackStreamProps): void => {
-  // A finished response lets go of its socket before it says it closed, so
-  // the count is read off the socket held from the start.
+  /*
+   * A finished response lets go of its socket before it says it closed, so
+   * the count is read off the socket held from the start.
+   */
   const socket = reply.raw.socket
   const connection = {
     close: () => reply.raw.destroy(),

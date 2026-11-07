@@ -109,8 +109,10 @@ const bare =
   ({ body }: BareCallbackProps): AllowedCall | null =>
     body.kind === BODY_KINDS.none ? call : null
 
-// Matched on the whole string, digits only, so no query, fragment, dot segment,
-// escape, extra slash or absolute URL can match; `$` without the `m` flag ends the input.
+/*
+ * Matched on the whole string, digits only, so no query, fragment, dot segment,
+ * escape, extra slash or absolute URL can match; `$` without the `m` flag ends the input.
+ */
 const ROUTES: readonly Route[] = [
   {
     kind: ROUTE_KINDS.numbered,

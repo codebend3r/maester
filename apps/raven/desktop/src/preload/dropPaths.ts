@@ -1,7 +1,9 @@
 type ElementAtProps = { list: unknown[]; index: number }
 
-// An element read through its descriptor: a getter is never run, so the page cannot
-// hand over a different value than the one it put in the list.
+/*
+ * An element read through its descriptor: a getter is never run, so the page cannot
+ * hand over a different value than the one it put in the list.
+ */
 const elementAt = ({ list, index }: ElementAtProps): unknown => {
   const descriptor = Object.getOwnPropertyDescriptor(list, index)
   if (descriptor === undefined || !('value' in descriptor)) return undefined

@@ -1,5 +1,7 @@
-// A see-through layer over the stage whose padding parks the tip top right,
-// under the title bar's end and clear of the control bar.
+/*
+ * A see-through layer over the stage whose padding parks the tip top right,
+ * under the title bar's end and clear of the control bar.
+ */
 .layer {
   grid-area: stage;
   position: relative;
@@ -8,7 +10,7 @@
   align-items: start;
   justify-items: end;
   padding: calc(var(--space-8) + var(--space-4) + var(--titlebar-inset)) var(--space-4)
-    var(--space-10);
+    var(--space-9);
   pointer-events: none;
 }
 
@@ -54,8 +56,10 @@
   grid-area: list;
 }
 
-// The tip is dark glass in every theme, so the ghost button's themed ink and hover would
-// vanish on it in a light theme: it wears the fixed ink of words on a picture instead.
+/*
+ * The tip is dark glass in every theme, so the ghost button's themed ink and hover would
+ * vanish on it in a light theme: it wears the fixed ink of words on a picture instead.
+ */
 .tip .dismiss {
   grid-area: dismiss;
   justify-self: end;

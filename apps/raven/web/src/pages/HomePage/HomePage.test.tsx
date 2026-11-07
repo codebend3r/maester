@@ -425,8 +425,10 @@ describe('HomePage', () => {
       expect(await screen.findByRole('heading', { name: 'Continue watching' })).toBeInTheDocument()
 
       await userEvent.type(searchbox(), 'bus')
-      // The cached results show a render before the deferred query writes the
-      // address, so waiting on them alone lets that write land outside act().
+      /*
+       * The cached results show a render before the deferred query writes the
+       * address, so waiting on them alone lets that write land outside act().
+       */
       await waitFor(() =>
         expect(screen.getByLabelText('Current address')).toHaveTextContent(/^\/\?q=bus$/),
       )

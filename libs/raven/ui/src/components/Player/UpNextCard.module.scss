@@ -1,5 +1,7 @@
-// Dark glass over the picture in every theme, as the rest of the player's
-// chrome is: the picture on the left, the words and the actions beside it.
+/*
+ * Dark glass over the picture in every theme, as the rest of the player's
+ * chrome is: the picture on the left, the words and the actions beside it.
+ */
 .card {
   display: grid;
   grid-template-columns: 8rem minmax(0, 1fr);

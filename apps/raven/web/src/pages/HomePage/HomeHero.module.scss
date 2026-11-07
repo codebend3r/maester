@@ -1,6 +1,8 @@
-// The words and their controls at the left, centred on the fan of posters
-// at the right; under 64rem the fan goes above them. Its own stacking, so
-// the wash can sit under the words without going under the page.
+/*
+ * The words and their controls at the left, centred on the fan of posters
+ * at the right; under 64rem the fan goes above them. Its own stacking, so
+ * the wash can sit under the words without going under the page.
+ */
 .hero {
   position: relative;
   isolation: isolate;
@@ -15,9 +17,11 @@
   gap: 0 var(--space-5);
 }
 
-// The arrival's backdrop, blurred to a colour and faded out at its edges,
-// up behind the fan. It stops at the hero's right edge: past it, it would
-// widen the page.
+/*
+ * The arrival's backdrop, blurred to a colour and faded out at its edges,
+ * up behind the fan. It stops at the hero's right edge: past it, it would
+ * widen the page.
+ */
 .wash {
   position: absolute;
   top: calc(-1 * var(--space-8));
@@ -51,9 +55,11 @@
   grid-template-areas: 'turn';
 }
 
-// Each line as wide as the column, so a long word breaks inside it rather
-// than running under the fan. A shorter one sits at the foot of the cell,
-// so Play and Details hold their place from one arrival to the next.
+/*
+ * Each line as wide as the column, so a long word breaks inside it rather
+ * than running under the fan. A shorter one sits at the foot of the cell,
+ * so Play and Details hold their place from one arrival to the next.
+ */
 .slide {
   grid-area: turn;
   align-self: end;
@@ -89,8 +95,10 @@
   }
 }
 
-// A long name breaks between syllables, else anywhere, before it would
-// run off a phone.
+/*
+ * A long name breaks between syllables, else anywhere, before it would
+ * run off a phone.
+ */
 .title {
   font-size: var(--font-size-display);
   line-height: var(--line-display);
@@ -108,8 +116,10 @@
   line-height: var(--line-heading);
 }
 
-// Room for three lines whether or not the words have come, so the buttons
-// under them hold still as the arrivals change.
+/*
+ * Room for three lines whether or not the words have come, so the buttons
+ * under them hold still as the arrivals change.
+ */
 .line {
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -176,8 +186,10 @@
   display: grid;
 }
 
-// Every poster in one cell, the arrival on top, the ones before and after
-// it tilted out to either side, the rest tucked out of sight behind.
+/*
+ * Every poster in one cell, the arrival on top, the ones before and after
+ * it tilted out to either side, the rest tucked out of sight behind.
+ */
 .fan {
   --main: min(18.75rem, 56cqi);
 

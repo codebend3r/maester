@@ -180,16 +180,20 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     firstPage.ready = resolve
   })
 
-  // Declared before everything that reads it. Its own dependencies are read only once a clock
-  // runs, after construction, so they may come later.
+  /*
+   * Declared before everything that reads it. Its own dependencies are read only once a clock
+   * runs, after construction, so they may come later.
+   */
   const deleteClock = createAutoDelete({
     store,
     timers: deps.timers,
     now: deps.now,
     isPlaying: (downloadId) => playback.isPlaying(downloadId),
     isMidTitle: (downloadId) => playback.isMidTitle(downloadId),
-    // The viewer may open the file, or switch the option off, while the removal waits on the
-    // server, so it looks again before it removes.
+    /*
+     * The viewer may open the file, or switch the option off, while the removal waits on the
+     * server, so it looks again before it removes.
+     */
     remove: (downloadId) =>
       removeAfterSync({ downloadId, isKept: () => isKeptAfterAll(downloadId) }),
     onDeleted: (entry) => {
@@ -222,8 +226,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         artwork: entry.artwork ?? { kind: DOWNLOAD_ARTWORK_KINDS.none },
         facts: entry.facts ?? factsBefore(entry),
         createdAt: entry.createdAt,
-        // The music engine plays the current server's downloads alone, so another server's
-        // tracks have nothing to queue them by.
+        /*
+         * The music engine plays the current server's downloads alone, so another server's
+         * tracks have nothing to queue them by.
+         */
         track:
           serverById({ config: config.read(), serverId: entry.serverId }) === null
             ? null
@@ -289,8 +295,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     serverNameOf,
     change,
     announce,
-    // Every position noted may set when the title counts as watched, or clear the spot a held
-    // deletion waits on.
+    /*
+     * Every position noted may set when the title counts as watched, or clear the spot a held
+     * deletion waits on.
+     */
     onNoted: (input) => {
       sync.touch(input)
       deleteClock.schedule(input)
@@ -323,8 +331,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
       playback.forget(entries)
       entries.forEach(({ downloadId }) => deleteClock.cancel({ downloadId }))
     },
-    // After the settle, so a deletion that came due in the sleep finds the network back and
-    // the server hears what was watched first.
+    /*
+     * After the settle, so a deletion that came due in the sleep finds the network back and
+     * the server hears what was watched first.
+     */
     onAwake: () => deleteClock.rearm(),
     onFailed: (entry) => {
       const { status } = entry
@@ -491,8 +501,10 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     queue.dispose()
   }
 
-  // `send` drops an event while there is no window, so a deletion due at once waits for the
-  // first page to say ready before it tells of itself. A page that never does starts none.
+  /*
+   * `send` drops an event while there is no window, so a deletion due at once waits for the
+   * first page to say ready before it tells of itself. A page that never does starts none.
+   */
   const startClocks = async (): Promise<void> => {
     await isPageReady
     if (isDisposed) return
@@ -501,10 +513,12 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     if (views().some(({ deletesAt }) => deletesAt !== null)) announce()
   }
 
-  // A launch picks up what the last run left, once the folders no download names are gone,
-  // reads each file it kept for its share watched, tries again what an outage stopped and
-  // starts the clocks of what deletes once watched. A deletion due at once waits for the
-  // network, so the server hears what was watched before the file goes.
+  /*
+   * A launch picks up what the last run left, once the folders no download names are gone,
+   * reads each file it kept for its share watched, tries again what an outage stopped and
+   * starts the clocks of what deletes once watched. A deletion due at once waits for the
+   * network, so the server hears what was watched before the file goes.
+   */
   const resumeLaunch = async (): Promise<void> => {
     await Promise.all([queue.sweep({ wasSetAside: deps.wasSetAside }), deps.ready])
     playback.readFiles(

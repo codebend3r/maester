@@ -344,8 +344,10 @@ export const PlayerChrome = ({
     if (isInForeignDialog({ target: event.target, root: root.current })) return
     idle.wake()
     const action = shortcutFor(event)
-    // Form controls keep their own keys (the radios' arrows, the volume
-    // slider's); only Escape reaches past them, to close what they sit in.
+    /*
+     * Form controls keep their own keys (the radios' arrows, the volume
+     * slider's); only Escape reaches past them, to close what they sit in.
+     */
     const isEscape = action !== null && action.type === PLAYER_ACTIONS.escape
     if (isTypingTarget(event.target) && !isEscape) return
     if (isPressedByControl(event)) return
@@ -415,8 +417,10 @@ export const PlayerChrome = ({
     })
   }
 
-  // The up next card keeps the controls up, so it and the ring it fills can be
-  // seen, and so does an intro's first seconds, so Skip intro is.
+  /*
+   * The up next card keeps the controls up, so it and the ring it fills can be
+   * seen, and so does an intro's first seconds, so Skip intro is.
+   */
   const chromeShown = idle.active || upNext.isCardShown || intro.isPrompting
   const chapterStarts = markers?.chapters.map(({ start }) => start) ?? []
   const heading = headerTitleOf({ media, label })
@@ -428,9 +432,11 @@ export const PlayerChrome = ({
     duration,
   })
 
-  // The scrubber and the clock keep what they showed while the controls are
-  // hidden, so a quiet page changes nothing in the DOM. Adjusting state during
-  // render is React's way to derive this from the previous render.
+  /*
+   * The scrubber and the clock keep what they showed while the controls are
+   * hidden, so a quiet page changes nothing in the DOM. Adjusting state during
+   * render is React's way to derive this from the previous render.
+   */
   const [held, setHeld] = useState({ time: state.time, buffered: state.buffered })
   if (chromeShown && (held.time !== state.time || held.buffered !== state.buffered)) {
     setHeld({ time: state.time, buffered: state.buffered })

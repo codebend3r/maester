@@ -142,8 +142,10 @@ test.describe.serial('playing a local file through the web engine fallback', () 
         await expect.poll(async () => isPlaying(await videoFacts(page))).toBe(true)
         await expectClockAdvancing(page)
 
-        // Paused before the seek, so the position main stores is exactly half way and the
-        // next test can read 50%: a seek while playing keeps moving until the pause lands.
+        /*
+         * Paused before the seek, so the position main stores is exactly half way and the
+         * next test can read 50%: a seek while playing keeps moving until the pause lands.
+         */
         await page.keyboard.press('k')
         await expect.poll(async () => isPaused(await videoFacts(page))).toBe(true)
         await page.keyboard.press('5')
@@ -170,8 +172,10 @@ test.describe.serial('playing a local file through the web engine fallback', () 
         await expectClockAdvancing(page)
         await expectNoticeClearOfControls(page)
 
-        // It plays on from 0:15, so park it at half way again for the next test: pause,
-        // then 0% (a jump of ten seconds or more saves) and back to 50%, both saved.
+        /*
+         * It plays on from 0:15, so park it at half way again for the next test: pause,
+         * then 0% (a jump of ten seconds or more saves) and back to 50%, both saved.
+         */
         await page.keyboard.press('k')
         await expect.poll(async () => isPaused(await videoFacts(page))).toBe(true)
         await page.keyboard.press('0')

@@ -224,8 +224,10 @@ export const useAudioQueue = create<AudioQueueState>()(
           ended: () => {
             const before = get().queue
             const after = afterEnd(before)
-            // The same track again (repeat one, or repeat all with one track): a restart,
-            // since nothing about the queue changes for an engine to see.
+            /*
+             * The same track again (repeat one, or repeat all with one track): a restart,
+             * since nothing about the queue changes for an engine to see.
+             */
             if (
               currentOf(after) !== null &&
               currentOf(after) === currentOf(before) &&

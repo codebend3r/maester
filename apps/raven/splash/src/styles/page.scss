@@ -1,5 +1,7 @@
-// What both pages share: the icons, the masthead, the actions, the release
-// files and the colophon.
+/*
+ * What both pages share: the icons, the masthead, the actions, the release
+ * files and the colophon.
+ */
 
 .icon {
   width: 1em;
@@ -16,7 +18,7 @@
   grid-template-columns: auto 1fr;
   grid-template-areas: 'wordmark links';
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-6);
 }
 
 .wordmark {
@@ -24,7 +26,7 @@
   display: grid;
   grid-template-columns: auto auto;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-5);
   font-family: var(--font-display);
   font-size: var(--font-size-heading);
   text-decoration: none;
@@ -35,7 +37,7 @@
   display: grid;
   grid-auto-flow: column;
   justify-content: end;
-  gap: var(--space-3-5);
+  gap: var(--space-8);
   color: var(--color-birch);
   font-size: var(--font-size-ui);
 
@@ -43,7 +45,7 @@
     display: grid;
     grid-auto-flow: column;
     align-items: center;
-    gap: var(--space-1);
+    gap: var(--space-3);
     min-height: var(--control-size-touch);
     text-decoration: none;
 
@@ -57,7 +59,7 @@
   }
 
   @media (max-width: 30rem) {
-    gap: var(--space-3);
+    gap: var(--space-6);
 
     .icon {
       display: none;
@@ -70,7 +72,7 @@
   grid-auto-flow: column;
   justify-content: center;
   align-items: start;
-  gap: var(--space-2);
+  gap: var(--space-5);
 
   @media (max-width: 30rem) {
     grid-auto-flow: row;
@@ -83,9 +85,9 @@
   grid-auto-flow: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-1-5);
+  gap: var(--space-4);
   min-height: var(--control-size-tall);
-  padding: 0 var(--space-4-5);
+  padding: 0 var(--space-10);
   border-radius: var(--radius-pill);
   font-size: var(--font-size-md);
   font-weight: 600;
@@ -129,8 +131,10 @@
   }
 }
 
-// The download menu: the primary action opens a short list of the latest
-// release's files, one line each with its size.
+/*
+ * The download menu: the primary action opens a short list of the latest
+ * release's files, one line each with its size.
+ */
 .download {
   position: relative;
 
@@ -146,12 +150,12 @@
 
 .download-menu {
   position: absolute;
-  top: calc(100% + var(--space-1));
+  top: calc(100% + var(--space-3));
   left: 50%;
   z-index: 1;
   display: grid;
   min-width: 22rem;
-  padding: var(--space-1);
+  padding: var(--space-3);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-lg);
   background: var(--color-canopy);
@@ -170,8 +174,8 @@
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: baseline;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-6);
   border-radius: var(--radius-md);
   text-decoration: none;
 
@@ -193,7 +197,7 @@
   grid-template-areas: 'mark links';
   justify-content: space-between;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-6);
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
 }
@@ -203,14 +207,14 @@
   display: grid;
   grid-auto-flow: column;
   align-items: center;
-  gap: var(--space-1-5);
+  gap: var(--space-4);
 }
 
 .colophon-links {
   grid-area: links;
   display: grid;
   grid-auto-flow: column;
-  gap: var(--space-3-5);
+  gap: var(--space-8);
 
   a {
     text-decoration: none;

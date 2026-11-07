@@ -98,8 +98,10 @@ export const AddToPlaylistDialog = ({ tracks, onClose }: AddToPlaylistDialogProp
   const failure = create.error ?? playlists.error
   const what = whatOf({ tracks })
 
-  // The tracks show in the playlist at once, so the dialog closes before the
-  // server answers; a refusal takes them out again and says so in a toast.
+  /*
+   * The tracks show in the playlist at once, so the dialog closes before the
+   * server answers; a refusal takes them out again and says so in a toast.
+   */
   const addTo = (playlist: PlaylistSummary) => {
     show(ADD_TO_PLAYLIST_COPY.added({ what, name: playlist.name }))
     close()

@@ -450,16 +450,20 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     const { entry, disk } = job
     /** What the part held when the fetch last asked: its `Range`, so a cut can tell it made progress. */
     const asked = { bytes: disk.bytes }
-    // `bytes` is advisory, for the views, so it may be stored mid-stream: every resume reads
-    // `part.size()` for its `Range` and corrects it.
+    /*
+     * `bytes` is advisory, for the views, so it may be stored mid-stream: every resume reads
+     * `part.size()` for its `Range` and corrects it.
+     */
     const onDisk = (bytes: number): void =>
       store.update((state) => advance(state, { downloadId: entry.downloadId, bytes }))
     const part = await fs.openPart(partPathFor(partsOf(entry)))
     const outcome = await fetchToFile({
       fetch: deps.fetch,
       url: fileUrlFor({ access, mediaId: entry.mediaId }),
-      // The run counts every byte as it lands; a resumed row shows the bytes already on disk at
-      // once, not from the first progress step.
+      /*
+       * The run counts every byte as it lands; a resumed row shows the bytes already on disk at
+       * once, not from the first progress step.
+       */
       part: {
         ...part,
         size: async () => {
@@ -510,8 +514,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
         deps.access.forget(server.id)
         failUnreachable(job)
         return
-      // A ticket refused again, or refused outright, is the account's refusal: the reason its
-      // body gives, or the one its status stands for.
+      /*
+       * A ticket refused again, or refused outright, is the account's refusal: the reason its
+       * body gives, or the one its status stands for.
+       */
       case FETCH_REASONS.unauthorized:
         failAccountFor({ job, reason: outcome.refusal ?? AUTH_REFUSALS.signedOut })
         return
@@ -637,8 +643,10 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       return
     await fs.mkdir(entryDirFor(partsOf(entry)))
     if (signal.aborted) return
-    // The server checks an account ticket when each request starts and keeps it five minutes, so
-    // the subtitles go first, on the run's fresh ticket, before a long video outlives it.
+    /*
+     * The server checks an account ticket when each request starts and keeps it five minutes, so
+     * the subtitles go first, on the run's fresh ticket, before a long video outlives it.
+     */
     const sidecars = await sidecarsFor({ job, access })
     if (signal.aborted) return
     const fetched = await fetchVideo({ job, access, hasRetried: false })

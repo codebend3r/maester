@@ -219,17 +219,21 @@ export default defineConfig(({ mode }) => ({
     },
   },
   server: {
-    // The server runs on its own port in development, or on another machine
-    // (`devApiOrigin`); in Docker it serves this app itself and nothing is proxied.
-    // The Host header follows the target, as a raven behind a name expects.
+    /*
+     * The server runs on its own port in development, or on another machine
+     * (`devApiOrigin`); in Docker it serves this app itself and nothing is proxied.
+     * The Host header follows the target, as a raven behind a name expects.
+     */
     proxy: {
       '/api': { target: devApiOrigin(mode), changeOrigin: true },
     },
   },
   build: {
-    // Each page's styles load with its chunk, after the first stylesheet, which holds the shared
-    // primitives, so a page's overrides still come after what they override in the cascade;
-    // `main.styles.test.ts` checks that order.
+    /*
+     * Each page's styles load with its chunk, after the first stylesheet, which holds the shared
+     * primitives, so a page's overrides still come after what they override in the cascade;
+     * `main.styles.test.ts` checks that order.
+     */
     cssCodeSplit: true,
     rolldownOptions: {
       // The build's time goes to sass over the SCSS modules; rolldown's note about it has nothing to act on.

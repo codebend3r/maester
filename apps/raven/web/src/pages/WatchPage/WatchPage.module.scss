@@ -1,5 +1,7 @@
-// Waiting for the video or saying why it is not there, on the player's own
-// dark stage in every theme, so nothing flashes light before it plays.
+/*
+ * Waiting for the video or saying why it is not there, on the player's own
+ * dark stage in every theme, so nothing flashes light before it plays.
+ */
 .page {
   --focus-ring: var(--border-thick) solid var(--color-on-picture);
 

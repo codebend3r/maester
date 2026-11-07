@@ -47,8 +47,10 @@ export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDia
   const [choice, setChoice] = useState<Choice>(
     saga.backdrop.type === SAGA_BACKDROP_TYPES.slideshow ? saga.backdrop.motion : CHOICES.off,
   )
-  // The cover the page shows, so a pick whose movie has left the saga starts
-  // on the one standing in for it, and kept while the motions are tried.
+  /*
+   * The cover the page shows, so a pick whose movie has left the saga starts
+   * on the one standing in for it, and kept while the motions are tried.
+   */
   const [coverId, setCoverId] = useState(sagaCover(saga)?.id ?? null)
 
   const chosen = (): SagaBackdrop | null => {

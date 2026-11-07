@@ -11,8 +11,10 @@ import type { WatchNetwork } from '@/servers/mediaAccess'
 /** What the key reads of a state NetInfo reports. */
 type NetworkState = { type: string; isConnected: boolean | null; details: unknown }
 
-// NetInfo checks for the internet by asking Google's generate_204 page now and then. raven has no
-// business there, and only a move to another network matters to it.
+/*
+ * NetInfo checks for the internet by asking Google's generate_204 page now and then. raven has no
+ * business there, and only a move to another network matters to it.
+ */
 configure({ reachabilityShouldRun: () => false })
 
 type NetworkKeyOfProps = NetworkState

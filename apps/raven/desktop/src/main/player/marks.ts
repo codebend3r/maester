@@ -34,8 +34,10 @@ export const createMarks = ({
   histogram: makeHistogram,
 }: CreateMarksProps) => {
   let loadedAt: number | null = null
-  // The cold open is measured once a run: `waiting` from the first early `opened` until
-  // its first frame, `done` after, so neither a later open nor a later frame measures again.
+  /*
+   * The cold open is measured once a run: `waiting` from the first early `opened` until
+   * its first frame, `done` after, so neither a later open nor a later frame measures again.
+   */
   let coldOpen:
     | { stage: typeof COLD_OPEN_STAGES.none }
     | { stage: typeof COLD_OPEN_STAGES.waiting; at: number }

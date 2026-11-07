@@ -1,6 +1,8 @@
-// The frame, its corners and its shadow are elements.scss's; the dialog sets
-// its width, lets go of the measure elements.scss caps it at, and leaves the
-// padding to the form so the footer can run edge to edge.
+/*
+ * The frame, its corners and its shadow are elements.scss's; the dialog sets
+ * its width, lets go of the measure elements.scss caps it at, and leaves the
+ * padding to the form so the footer can run edge to edge.
+ */
 .dialog {
   width: min(40rem, calc(100vw - 2 * var(--space-3)));
   max-width: none;
@@ -44,8 +46,10 @@
   gap: var(--space-2);
   min-width: 0;
 
-  // The group's own legend, as an eyebrow: labels inside a control, like
-  // the icon picker's tiles, keep their own look.
+  /*
+   * The group's own legend, as an eyebrow: labels inside a control, like
+   * the icon picker's tiles, keep their own look.
+   */
   > legend {
     padding: 0 0 var(--space-2);
     color: var(--color-birch);
@@ -56,8 +60,10 @@
   }
 }
 
-// One group after another, a hairline under each but the last. The line is
-// each group's bottom border: a fieldset's top border runs through its legend.
+/*
+ * One group after another, a hairline under each but the last. The line is
+ * each group's bottom border: a fieldset's top border runs through its legend.
+ */
 .body {
   grid-area: body;
   display: grid;
@@ -82,10 +88,12 @@
   }
 }
 
-// The types two to a row, so each sits beside its counterpart: Movies with
-// TV shows, then the anime pair and the family pair, then Documentaries with
-// Sporting events and YouTube videos with Other. One to a row on a narrow
-// screen.
+/*
+ * The types two to a row, so each sits beside its counterpart: Movies with
+ * TV shows, then the anime pair and the family pair, then Documentaries with
+ * Sporting events and YouTube videos with Other. One to a row on a narrow
+ * screen.
+ */
 .kinds {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -113,8 +121,10 @@
   font-size: var(--font-size-sm);
 }
 
-// Fields take their look from elements.scss; on the dialog's canopy they sit
-// in a well instead, or they would vanish into it.
+/*
+ * Fields take their look from elements.scss; on the dialog's canopy they sit
+ * in a well instead, or they would vanish into it.
+ */
 .input {
   width: 100%;
   background-color: var(--color-deep);
@@ -232,8 +242,10 @@
   }
 }
 
-// Stays at the foot of the dialog as the form scrolls under it, on the
-// dialog's own canopy: Delete at the start, Cancel then Save at the end.
+/*
+ * Stays at the foot of the dialog as the form scrolls under it, on the
+ * dialog's own canopy: Delete at the start, Cancel then Save at the end.
+ */
 .actions {
   grid-area: actions;
   position: sticky;

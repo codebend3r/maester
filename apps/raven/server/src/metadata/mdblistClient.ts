@@ -38,8 +38,10 @@ const DAILY_LIMIT_ERROR = 'Daily API limit exceeded!'
 /** The longest wait a burst's 429 asks for: past MDBList's 5-minute window, the day is spent. */
 const BURST_WAIT_SECONDS = 300
 
-// The URL, a rating's fields and how an unknown title answers are unconfirmed
-// until checked with a key; they live in the next four helpers alone.
+/*
+ * The URL, a rating's fields and how an unknown title answers are unconfirmed
+ * until checked with a key; they live in the next four helpers alone.
+ */
 
 type MdblistUrlProps = {
   type: MatchItemType

@@ -703,8 +703,10 @@ describe('HlsSessions', () => {
   })
 
   it('pauses a run ten segments past the furthest asked, and resumes it when asked further', async () => {
-    // Two-second segments at the pace: one every quarter second, and the run
-    // lasts five seconds, so it is alive and mid-file when it is paused.
+    /*
+     * Two-second segments at the pace: one every quarter second, and the run
+     * lasts five seconds, so it is alive and mid-file when it is paused.
+     */
     const { ffmpeg, sessions } = open({ pace: PACE })
     const session = mintIn({ sessions, plan: state.keyframePlan })
     await sessions.segment({ session: session.id, n: 0 })

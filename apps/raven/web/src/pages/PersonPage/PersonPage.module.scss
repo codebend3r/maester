@@ -4,9 +4,11 @@
   gap: var(--space-6);
 }
 
-// The way back, then the photo beside who they are, which stack on a phone.
-// Who they are sits level with the photo until it runs taller, and then
-// the photo keeps to the top.
+/*
+ * The way back, then the photo beside who they are, which stack on a phone.
+ * Who they are sits level with the photo until it runs taller, and then
+ * the photo keeps to the top.
+ */
 .header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -53,8 +55,10 @@
   line-height: 1;
 }
 
-// The name and its eyebrow, when and where they were born, the biography
-// and the links, one under the next; a part TMDB leaves out leaves no gap.
+/*
+ * The name and its eyebrow, when and where they were born, the biography
+ * and the links, one under the next; a part TMDB leaves out leaves no gap.
+ */
 .about {
   grid-area: about;
   display: grid;
@@ -76,10 +80,12 @@
   text-transform: uppercase;
 }
 
-// TMDB's text can hold a run with no space to wrap at, as a long one-word
-// name or a biography's non-breaking spaces from Wikipedia, which would
-// otherwise set how wide the header is and push the page past a phone's
-// screen. Any point in such a run may break.
+/*
+ * TMDB's text can hold a run with no space to wrap at, as a long one-word
+ * name or a biography's non-breaking spaces from Wikipedia, which would
+ * otherwise set how wide the header is and push the page past a phone's
+ * screen. Any point in such a run may break.
+ */
 .name {
   font-size: var(--font-size-title);
   overflow-wrap: anywhere;
@@ -92,8 +98,10 @@
   text-wrap: pretty;
 }
 
-// The biography as a lead, its paragraphs kept, and More or Less on its
-// left edge under it.
+/*
+ * The biography as a lead, its paragraphs kept, and More or Less on its
+ * left edge under it.
+ */
 .bio {
   display: grid;
   justify-items: start;

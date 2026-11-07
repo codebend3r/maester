@@ -1,5 +1,7 @@
-// happy-dom keeps `devicePixelRatio` as the window's own accessor, so a stub
-// replaces it and the restore puts that accessor back rather than deleting it.
+/*
+ * happy-dom keeps `devicePixelRatio` as the window's own accessor, so a stub
+ * replaces it and the restore puts that accessor back rather than deleting it.
+ */
 const NATIVE = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio')
 
 /** Makes the screen as dense as `ratio` until `restorePixelRatio`. */

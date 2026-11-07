@@ -16,8 +16,10 @@ export const LINK_SCHEME = 'raven'
 export const URL_PROTOCOLS = { http: 'http:', https: 'https:', raven: `${LINK_SCHEME}:` } as const
 const ROOT_PATH = '/'
 
-// `new URL` silently drops tabs and newlines and ignores zero-width characters
-// in a host, so what it would rewrite is refused up front.
+/*
+ * `new URL` silently drops tabs and newlines and ignores zero-width characters
+ * in a host, so what it would rewrite is refused up front.
+ */
 const HIDDEN = /[\s\p{Cc}\p{Cf}]/u
 // A watch page's scheme and authority as written: `new URL` drops an empty user.
 const WATCH_AUTHORITY = /^https?:\/\/[^/?#\\]*/i

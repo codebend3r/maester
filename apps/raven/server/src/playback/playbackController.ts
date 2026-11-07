@@ -233,8 +233,10 @@ export class PlaybackController {
         burn: burnWith,
       }),
     )
-    // The response closes when it finishes or when the client goes away;
-    // killing an ffmpeg that already exited does nothing.
+    /*
+     * The response closes when it finishes or when the client goes away;
+     * killing an ffmpeg that already exited does nothing.
+     */
     reply.raw.on(RESPONSE_EVENTS.close, () => child.kill(FFMPEG_SIGNALS.kill))
     trackStream({
       sessions: this.streams,

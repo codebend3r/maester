@@ -4,23 +4,29 @@
   grid-template-columns: repeat(auto-fill, minmax(min(17.5rem, 100%), 1fr));
   gap: var(--space-3);
 
-  // A library can hold thousands of shows, so the browser lays out and
-  // draws only those near the screen. One it skips stands in at the height
-  // it had when last drawn, else at a card's height.
+  /*
+   * A library can hold thousands of shows, so the browser lays out and
+   * draws only those near the screen. One it skips stands in at the height
+   * it had when last drawn, else at a card's height.
+   */
   > li {
     content-visibility: auto;
     contain-intrinsic-block-size: auto 11rem;
   }
 
-  // Skipping also clips what a card draws to its box, which would cut off
-  // a focus ring, so a card holding the focus is drawn whole.
+  /*
+   * Skipping also clips what a card draws to its box, which would cut off
+   * a focus ring, so a card holding the focus is drawn whole.
+   */
   > li:focus-within {
     content-visibility: visible;
   }
 }
 
-// The poster over its words, as a home row lays it out. Raised while
-// pointed at or focused, so the lifted poster lies over the cards after it.
+/*
+ * The poster over its words, as a home row lays it out. Raised while
+ * pointed at or focused, so the lifted poster lies over the cards after it.
+ */
 .card {
   --poster-letter: var(--font-size-title);
 
@@ -39,8 +45,10 @@
     z-index: 1;
   }
 
-  // In select mode the checkbox shares the poster's top corner with the
-  // resolution, which steps aside for it.
+  /*
+   * In select mode the checkbox shares the poster's top corner with the
+   * resolution, which steps aside for it.
+   */
   &:has(.select)[data-selecting] {
     --select-room: calc(1.5rem + var(--space-1));
   }
@@ -64,9 +72,11 @@
 .frame {
   display: grid;
   grid-template-areas: 'frame';
-  // Its shape sets its height either way, but under the default alignment
-  // Chrome lays a shaped box in nested grids out several times over: 4x
-  // the layout of a library of thousands of cards.
+  /*
+   * Its shape sets its height either way, but under the default alignment
+   * Chrome lays a shaped box in nested grids out several times over: 4x
+   * the layout of a library of thousands of cards.
+   */
   align-self: start;
   aspect-ratio: 2 / 3;
   // One cell the shape sets, which a tall picture cannot stretch.
@@ -89,8 +99,10 @@
   filter: brightness(1.12);
 }
 
-// The number left, or a check, in the poster's top corner, over the picture
-// and its hover filter.
+/*
+ * The number left, or a check, in the poster's top corner, over the picture
+ * and its hover filter.
+ */
 .marks {
   position: relative;
   z-index: 1;
@@ -131,8 +143,10 @@
   }
 }
 
-// The facts read as one line of words, wrapping between facts rather than
-// inside one, a dot apart.
+/*
+ * The facts read as one line of words, wrapping between facts rather than
+ * inside one, a dot apart.
+ */
 .facts {
   color: var(--color-lichen);
   font-size: var(--font-size-xs);
@@ -150,17 +164,21 @@
   padding-inline: var(--space-0);
 }
 
-// The value the listing is sorted by: a line of its own above the facts, so
-// a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
+/*
+ * The value the listing is sorted by: a line of its own above the facts, so
+ * a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
+ */
 .sorted {
   color: var(--color-bark);
   font-size: var(--font-size-xs);
   font-stretch: 90%;
 }
 
-// The wide card: its poster beside its words, on the canopy washed toward
-// the poster's colours from the far side. `--ground` is what the wash
-// starts from, a shade lighter under the pointer.
+/*
+ * The wide card: its poster beside its words, on the canopy washed toward
+ * the poster's colours from the far side. `--ground` is what the wash
+ * starts from, a shade lighter under the pointer.
+ */
 .wide {
   --ground: var(--color-canopy);
 
@@ -189,8 +207,10 @@
   }
 }
 
-// The poster again, blurred into a colour: as strong as the theme's glow,
-// so none in high contrast.
+/*
+ * The poster again, blurred into a colour: as strong as the theme's glow,
+ * so none in high contrast.
+ */
 .wash {
   position: absolute;
   inset: 0;
@@ -295,9 +315,11 @@
   line-height: var(--line-body);
 }
 
-// The next episode, as the one action the card is for, its play icon solid.
-// It waits for the pointer or the focus on its card, as the poster cards'
-// play button does, and is always out on a touch screen.
+/*
+ * The next episode, as the one action the card is for, its play icon solid.
+ * It waits for the pointer or the focus on its card, as the poster cards'
+ * play button does, and is always out on a touch screen.
+ */
 .next {
   --icon-tint: 1;
 

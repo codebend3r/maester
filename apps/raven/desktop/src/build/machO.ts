@@ -86,9 +86,11 @@ type ListSignablesProps = { app: string }
 /** Every regular Mach-O file and every nested `.app` or `.framework` inside the app; symlinks are skipped. */
 export const listSignables = async ({ app }: ListSignablesProps): Promise<Signable[]> => {
   const entries = await readdir(app, { recursive: true, withFileTypes: true })
-  // Defensive: on the real app Bun and Node list the same entries, but a recursive readdir
-  // that descended into a symlinked folder (a framework's Versions/Current) would list its
-  // files twice, so whatever sits under a symlink is dropped by path.
+  /*
+   * Defensive: on the real app Bun and Node list the same entries, but a recursive readdir
+   * that descended into a symlinked folder (a framework's Versions/Current) would list its
+   * files twice, so whatever sits under a symlink is dropped by path.
+   */
   const links = entries.filter((entry) => entry.isSymbolicLink()).map(pathOf)
   const isUnderLink = (path: string) => links.some((link) => path.startsWith(`${link}${sep}`))
   const real = entries.filter((entry) => !entry.isSymbolicLink() && !isUnderLink(pathOf(entry)))

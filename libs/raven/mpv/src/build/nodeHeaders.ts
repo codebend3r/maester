@@ -11,8 +11,10 @@ import {
   write,
 } from '@/build/context'
 
-// The header and import library digests match Node's official v24.19.0/SHASUMS256.txt.
-// The license digest was measured from the corresponding official tagged source.
+/**
+ * The header and import library digests match Node's official v24.19.0/SHASUMS256.txt.
+ * The license digest was measured from the corresponding official tagged source.
+ */
 export const nodeHeaders = {
   version: '24.19.0',
   archive: {

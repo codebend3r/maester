@@ -33,8 +33,10 @@ const BAR_STYLE =
 const useTokenRenewal = tokenRenewalFor({ session: useWrenAccount })
 
 const loadStores = async (): Promise<void> => {
-  // A store whose keychain or AsyncStorage cannot be read starts empty rather than holding
-  // Wren on the splash.
+  /*
+   * A store whose keychain or AsyncStorage cannot be read starts empty rather than holding
+   * Wren on the splash.
+   */
   await Promise.allSettled([
     useActiveServer.persist.rehydrate(),
     useWrenAccount.persist.rehydrate(),

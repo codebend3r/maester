@@ -421,8 +421,10 @@ describe('matching by library type', () => {
   it('places the files for the layout saved with a type change the library has moved on from', async () => {
     const folders = async () => (await mediaOf(state.animeFilmLibrary)).map((file) => file.folder)
     expect(await folders()).toEqual(['A/Alien (1979)'])
-    // As if saved with a change to Anime movies whose task runs once the type is Movies again:
-    // stored as is, so that task is the only one to read it.
+    /*
+     * As if saved with a change to Anime movies whose task runs once the type is Movies again:
+     * stored as is, so that task is the only one to read it.
+     */
     app()
       .get(LibrariesRepository)
       .update({

@@ -629,11 +629,15 @@ export class ScannerService implements OnApplicationBootstrap {
     const known = new Map(
       Array.from(indexed).filter(([path]) => inScope({ path, scope, unreadable: walk.unreadable })),
     )
-    // A layout or type change can land during the walk; what follows is
-    // synchronous, so the settings read here are the ones the files are filed under.
+    /*
+     * A layout or type change can land during the walk; what follows is
+     * synchronous, so the settings read here are the ones the files are filed under.
+     */
     const { kind, folderLayout } = this.libraries.get(library.id)?.settings ?? library.settings
-    // Each file is filed under the folder its titles sit in, a letter folder
-    // or a group folder when its path has one, before anything reads it.
+    /*
+     * Each file is filed under the folder its titles sit in, a letter folder
+     * or a group folder when its path has one, before anything reads it.
+     */
     const changes = reconcile({
       known,
       found: withTitleRoots({ files: walk.files, kind, layout: folderLayout }),

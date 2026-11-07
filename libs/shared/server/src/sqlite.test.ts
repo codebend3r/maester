@@ -128,8 +128,10 @@ describe('refreshStatistics', () => {
     addNotes({ db, bodies: twoBodies(4) })
     refreshStatistics({ db })
     expect(statistics(db)).toEqual({ notes_body: '4 2' })
-    // Nothing has read the table on this connection, which SQLite's default
-    // optimize waits for before it looks at a table's size again.
+    /*
+     * Nothing has read the table on this connection, which SQLite's default
+     * optimize waits for before it looks at a table's size again.
+     */
     addNotes({ db, bodies: twoBodies(396) })
     refreshStatistics({ db })
     expect(statistics(db)).toEqual({ notes_body: '400 200' })

@@ -265,11 +265,15 @@ const Grid = ({
   const styles = useStyles()
   const text = useTheme((theme) => theme.palette.text)
   const [top, setTop] = useState(0)
-  // The strip's slot runs between the top and bottom insets; until it is laid out, that is
-  // the window's height between them.
+  /*
+   * The strip's slot runs between the top and bottom insets; until it is laid out, that is
+   * the window's height between them.
+   */
   const [stripRoom, setStripRoom] = useState<number | null>(null)
-  // The side insets keep the cards and the strip clear of the Dynamic Island and the corners
-  // of a phone held sideways.
+  /*
+   * The side insets keep the cards and the strip clear of the Dynamic Island and the corners
+   * of a phone held sideways.
+   */
   const left = GUTTER + insets.left
   const right = GUTTER + (jump === null ? 0 : STRIP_WIDTH) + insets.right
   const isRows = isRowView(view)
@@ -319,8 +323,10 @@ const Grid = ({
         }}
         data={rows}
         keyExtractor={(row) => row.key}
-        // The search box sits in the header: a drag puts its keyboard away, and with the
-        // keyboard up a card or the clear button still takes the first tap.
+        /*
+         * The search box sits in the header: a drag puts its keyboard away, and with the
+         * keyboard up a card or the clear button still takes the first tap.
+         */
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={

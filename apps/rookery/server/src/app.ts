@@ -20,8 +20,10 @@ const READ_METHODS = {
   options: HTTP_METHODS.options,
 } as const
 const READS = new Set<string>(Object.values(READ_METHODS))
-// Where the server's own routes live: never cached, and a miss under one is a
-// JSON 404 rather than the web app.
+/*
+ * Where the server's own routes live: never cached, and a miss under one is a
+ * JSON 404 rather than the web app.
+ */
 const SERVER_PREFIXES = ['/api/', '/internal/', '/auth/']
 
 /** Why a write was refused before reaching its route. */
@@ -51,9 +53,11 @@ export const createApp = async ({
   )
 
   const fastify = app.getHttpAdapter().getInstance()
-  // Every write is JSON. A page on a sibling subdomain can only send a
-  // credentialed JSON request after a CORS preflight, which rookery never
-  // answers, so this is its CSRF protection along with SameSite=Lax.
+  /*
+   * Every write is JSON. A page on a sibling subdomain can only send a
+   * credentialed JSON request after a CORS preflight, which rookery never
+   * answers, so this is its CSRF protection along with SameSite=Lax.
+   */
   fastify.addHook('onRequest', async (request, reply) => {
     if (SERVER_PREFIXES.some((prefix) => request.url.startsWith(prefix))) {
       reply.header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
@@ -67,8 +71,10 @@ export const createApp = async ({
   })
 
   await compressResponses({ app })
-  // In Docker the server hands out the built web app too, so there is one
-  // port. In development Vite serves it and proxies the server's routes here.
+  /*
+   * In Docker the server hands out the built web app too, so there is one
+   * port. In development Vite serves it and proxies the server's routes here.
+   */
   await serveWebApp({ app, webDir: config.webDir, serverPrefixes: SERVER_PREFIXES })
   app.enableShutdownHooks()
   return app

@@ -5,8 +5,10 @@ type Tile = { hue: number; lightness: number; opacity: number }
 
 type PosterWallProps = { shouldShowPromise?: boolean }
 
-// Eight rows of six, so the wall still covers a tall panel once it is tilted.
-// 47 and 360 share no factor, so every tile's hue is its own.
+/*
+ * Eight rows of six, so the wall still covers a tall panel once it is tilted.
+ * 47 and 360 share no factor, so every tile's hue is its own.
+ */
 const TILES: readonly Tile[] = Array.from({ length: 48 }, (_, index) => ({
   hue: (index * 47) % 360,
   lightness: 0.55 + (index % 3) * 0.05,

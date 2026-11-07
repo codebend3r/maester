@@ -215,7 +215,9 @@ export default (request: Request, context: NetlifyContext): Promise<Response> =>
     connectTarget: requestPinned,
   })
 
-// Netlify reads `config` without running the module, so it sees only literals: a constant here
-// arrives as nothing and fails the deploy. The test holds the path to core's
-// `REACHABILITY_CHECK_PATH`.
+/**
+ * Netlify reads `config` without running the module, so it sees only literals: a constant here
+ * arrives as nothing and fails the deploy. The test holds the path to core's
+ * `REACHABILITY_CHECK_PATH`.
+ */
 export const config = { path: '/remote-access/check', method: ['GET'] }

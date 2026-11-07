@@ -43,6 +43,7 @@ Workspace-wide checks for rules no linter covers.
 | `spellcheck`             | Spellchecks the repo with typos.                                                                       |             |
 | `typescript-only`        | Fails on any .js, .jsx, .mjs or .cjs file.                                                             |             |
 | `one-command-per-script` | Fails on a package.json script chained with &&, \|\| or ;.                                             |             |
+| `comment-style`          | Fails on stacked // comment lines in TypeScript or SCSS.                                               |             |
 | `dead-code`              | Finds unused exports, files and dependencies with knip.                                                |             |
 | `dead-css`               | Finds SCSS module classes no component reads.                                                          |             |
 | `claude-audit`           | Has Claude Code read your unpushed commits against the CLAUDE.md files for the rules no linter checks. | Claude Code |

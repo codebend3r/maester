@@ -104,10 +104,12 @@ export const createApp = async ({
     now: () => clock.now(),
     proxySecret: config.remoteAccess.proxySecret,
   })
-  // In Docker the server hands out the built web app too, so it and the API
-  // share one port. Only the media plane routes answer CORS, for the web
-  // origins in RAVEN_WEB_ORIGINS. In development Vite serves the app and
-  // proxies /api here.
+  /*
+   * In Docker the server hands out the built web app too, so it and the API
+   * share one port. Only the media plane routes answer CORS, for the web
+   * origins in RAVEN_WEB_ORIGINS. In development Vite serves the app and
+   * proxies /api here.
+   */
   await serveWebApp({ app, webDir: config.webDir, serverPrefixes: ['/api/'] })
   app.enableShutdownHooks()
   return app

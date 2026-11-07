@@ -54,8 +54,10 @@
   min-height: var(--field-size);
 }
 
-// Fields take their look from elements.scss; on the dialog's canopy they sit
-// in a well instead, or they would vanish into it.
+/*
+ * Fields take their look from elements.scss; on the dialog's canopy they sit
+ * in a well instead, or they would vanish into it.
+ */
 .field {
   display: grid;
   gap: var(--space-1);
@@ -207,8 +209,10 @@
   }
 }
 
-// Stays at the foot of the dialog as the results scroll under it: Not a
-// movie at the start, Cancel at the end.
+/*
+ * Stays at the foot of the dialog as the results scroll under it: Not a
+ * movie at the start, Cancel at the end.
+ */
 .actions {
   position: sticky;
   bottom: 0;

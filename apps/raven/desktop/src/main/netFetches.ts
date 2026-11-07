@@ -9,8 +9,10 @@ type FetchBareProps = {
   init: { headers: Record<string, string>; signal: AbortSignal }
 }
 
-// No cookie rides along, a redirect fails rather than carry the request elsewhere, and
-// nothing is cached: the releases list, a media origin's probe and a ticketed download.
+/*
+ * No cookie rides along, a redirect fails rather than carry the request elsewhere, and
+ * nothing is cached: the releases list, a media origin's probe and a ticketed download.
+ */
 const fetchBare = ({ url, init }: FetchBareProps) =>
   net.fetch(url, { ...init, credentials: 'omit', redirect: 'error', cache: 'no-store' })
 

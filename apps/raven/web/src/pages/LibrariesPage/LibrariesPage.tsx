@@ -60,8 +60,10 @@ type PinButtonProps = { library: Library }
  */
 const PinButton = ({ library }: PinButtonProps) => {
   const queryClient = useQueryClient()
-  // Only the pin is sent; the server keeps the rest of the library as it is.
-  // It shows at once, here and in the side menu; home's shelves follow it.
+  /*
+   * Only the pin is sent; the server keeps the rest of the library as it is.
+   * It shows at once, here and in the side menu; home's shelves follow it.
+   */
   const pin = useOptimisticMutation({
     mutationKey: mutationKeys.pin,
     mutationFn: (pinned: boolean) => api.setLibraryView({ id: library.id, change: { pinned } }),
@@ -421,8 +423,10 @@ export const LibrariesPage = () => {
   const { mode, canManage } = useManagement()
   const libraries = useQuery({
     ...librariesQuery,
-    // Poll while something scans (1.5 s) or a Refresh runs (5 s), so the counts
-    // climb live, and read once when a waiting Refresh resumes.
+    /*
+     * Poll while something scans (1.5 s) or a Refresh runs (5 s), so the counts
+     * climb live, and read once when a waiting Refresh resumes.
+     */
     refetchInterval: (query) => libraryPollDelay({ libraries: query.state.data ?? [] }),
   })
   // The ones opened, kept while the cards are thin so they open again after.

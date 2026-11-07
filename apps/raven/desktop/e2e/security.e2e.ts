@@ -20,9 +20,11 @@ import {
   stubBrowser,
 } from '@/e2e/harness'
 
-// Written out rather than imported, so the test checks the header against the spec, not
-// against the module that sends it. `script-src` and `style-src` name the page's inline script
-// and style by their hashes, which change with every web build, so they are read apart.
+/*
+ * Written out rather than imported, so the test checks the header against the spec, not
+ * against the module that sends it. `script-src` and `style-src` name the page's inline script
+ * and style by their hashes, which change with every web build, so they are read apart.
+ */
 const CONTENT_SECURITY_POLICY =
   "default-src 'self'; script-src; style-src; font-src 'self'; img-src 'self' data:; media-src 'self' raven-file:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 const SCRIPT_SOURCES = /script-src [^;]+/u
@@ -121,9 +123,11 @@ test.describe('the security baseline', () => {
       }
     }
 
-    // On the page's origin it has the bridge, so the preload runs in such a window; a missing
-    // asset keeps the web app from starting there. Under another name for the web host's port,
-    // which it refuses, it has none.
+    /*
+     * On the page's origin it has the bridge, so the preload runs in such a window; a missing
+     * asset keeps the web app from starting there. Under another name for the web host's port,
+     * which it refuses, it has none.
+     */
     expect(await bridgeIn(`${PAGE_ORIGIN}/assets/missing.js`)).toEqual({
       origin: PAGE_ORIGIN,
       bridge: 'object',
@@ -188,11 +192,13 @@ test.describe('the security baseline', () => {
   })
 
   test("refuses an encoded way out of the web app's folder", async () => {
-    // The folder is the web app's `dist`. `%2e%2e` is normalized away by URL parsing before
-    // the handler sees it, leaving `/package.json`, which the folder does not hold, so the
-    // single-page app answers with its page. The other two decode to paths outside the folder,
-    // the first to the web project's own package.json, so only the containment check stands
-    // between them and that file.
+    /*
+     * The folder is the web app's `dist`. `%2e%2e` is normalized away by URL parsing before
+     * the handler sees it, leaving `/package.json`, which the folder does not hold, so the
+     * single-page app answers with its page. The other two decode to paths outside the folder,
+     * the first to the web project's own package.json, so only the containment check stands
+     * between them and that file.
+     */
     const paths = ['/%2e%2e/package.json', '/..%2fpackage.json', '/..%2f..%2f..%2fpackage.json']
     const answers = await running().page.evaluate(
       (sent) =>
@@ -223,21 +229,27 @@ test.describe('the security baseline', () => {
     )
     expect(outcome).toBe('error')
 
-    // The page may not fetch `raven-file:` itself (the CSP's connect-src), so main asks its
-    // own handler: a 404 is the grant check answering, where a broken scheme would throw.
+    /*
+     * The page may not fetch `raven-file:` itself (the CSP's connect-src), so main asks its
+     * own handler: a 404 is the grant check answering, where a broken scheme would throw.
+     */
     const status = await app.evaluate(
       async ({ net }, url) => (await net.fetch(url)).status,
       unknown,
     )
     expect(status).toBe(404)
   })
-  // Last: Playwright never hears that a navigation the app cancelled has ended, so locators on
-  // the page would wait for it from then on. Only evaluations follow it.
+  /*
+   * Last: Playwright never hears that a navigation the app cancelled has ended, so locators on
+   * the page would wait for it from then on. Only evaluations follow it.
+   */
   test('opens another origin in the browser and keeps the page', async () => {
     const { app, page } = running()
     await stubBrowser({ app })
-    // The app's own will-navigate listener was added when the window was made, so this one
-    // runs after it and sees whether it prevented the navigation.
+    /*
+     * The app's own will-navigate listener was added when the window was made, so this one
+     * runs after it and sees whether it prevented the navigation.
+     */
     await app.evaluate(({ BrowserWindow }, key) => {
       const [window] = BrowserWindow.getAllWindows()
       if (window === undefined) throw new Error('Raven has no window.')

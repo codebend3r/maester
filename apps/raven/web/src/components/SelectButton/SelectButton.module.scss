@@ -1,5 +1,7 @@
-// A toggle pill: an outline while off, bark with night's text while on, as a
-// chosen filter reads.
+/*
+ * A toggle pill: an outline while off, bark with night's text while on, as a
+ * chosen filter reads.
+ */
 .select[aria-pressed] {
   border-color: var(--color-line-strong);
   border-radius: var(--radius-pill);

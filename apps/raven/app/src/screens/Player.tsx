@@ -323,8 +323,10 @@ const Playing = ({
     audio: preferredAudio({ tracks, language: audioLanguage }),
     problems: plan.problems,
     sources,
-    // AVPlayer says it waits at the end of a file too, and the viewer's pause is no stall; a
-    // video still held for its resume seek is not stalled either.
+    /*
+     * AVPlayer says it waits at the end of a file too, and the viewer's pause is no stall; a
+     * video still held for its resume seek is not stalled either.
+     */
     isWaiting: video.waiting && !isPaused && !video.ended && !isHeldOf(startState),
     clock: video.time,
   })
@@ -387,8 +389,10 @@ const Playing = ({
     [sourced, startAt],
   )
 
-  // ExoPlayer may play the original without the audio asked for, saying nothing: once the pick
-  // has settled, a play with a way left below steps down when it did.
+  /*
+   * ExoPlayer may play the original without the audio asked for, saying nothing: once the pick
+   * has settled, a play with a way left below steps down when it did.
+   */
   const heardAudio = useRef<HeardAudio | null>(null)
   const hear = (hearing: AudioHearing) => {
     const canJudge = state.phase === SESSION_PHASES.playing && hasWayBelow(state)
@@ -432,8 +436,10 @@ const Playing = ({
     dispatch({ type: SESSION_EVENTS.audioPicked, audio: track.index, at: position.current })
   }
 
-  // The player draws a picture track itself only from the file it plays; anywhere else the
-  // server burns it into a transcode.
+  /*
+   * The player draws a picture track itself only from the file it plays; anywhere else the
+   * server burns it into a transcode.
+   */
   const canDrawPictures = canDrawPictureSubtitles && mode === PLAYBACK_MODES.direct
   const pickSubtitle = (key: string) => {
     const id = key === SUBTITLE_CHOICES.off ? null : key
@@ -446,8 +452,10 @@ const Playing = ({
     }
   }
 
-  // Direct play plays the file itself, whatever the plan started with. A size moves the play to
-  // the transcode, where only a burn shows a picture track ExoPlayer drew.
+  /*
+   * Direct play plays the file itself, whatever the plan started with. A size moves the play to
+   * the transcode, where only a burn shows a picture track ExoPlayer drew.
+   */
   const pickQuality = (key: string) => {
     const quality = pickedQualityOf(key)
     if (quality === null) {
@@ -485,8 +493,10 @@ const Playing = ({
             dispatchVideo({ type: VIDEO_EVENTS.ended })
             if (shouldAutoplay) playNext()
           },
-          // The server letting go of the source (a ticket past its life, an HLS session it ended)
-          // opens the same way again from the spot; any other failure steps down the ladder.
+          /*
+           * The server letting go of the source (a ticket past its life, an HLS session it ended)
+           * opens the same way again from the spot; any other failure steps down the ladder.
+           */
           onError: (failure) =>
             dispatch({
               type: isServerDrop(failure) ? SESSION_EVENTS.dropped : SESSION_EVENTS.failed,
@@ -506,8 +516,10 @@ const Playing = ({
             if (startAt > 0 && current !== null) current.seek(startAt)
           },
           onSeek: () => dispatchStart({ type: START_EVENTS.landed, attempt }),
-          // AVPlayer says its buffer ran full only after it ran empty, which a fast stream never
-          // does, so playing is also what says frames flow; without it the play never starts.
+          /*
+           * AVPlayer says its buffer ran full only after it ran empty, which a fast stream never
+           * does, so playing is also what says frames flow; without it the play never starts.
+           */
           onPlaybackStateChanged: ({ isPlaying }) => {
             dispatchVideo({ type: isPlaying ? VIDEO_EVENTS.played : VIDEO_EVENTS.paused })
             if (isPlaying) dispatchVideo({ type: VIDEO_EVENTS.flowing })
@@ -685,8 +697,10 @@ const ReadyPlayer = (props: ReadyPlayerProps) => {
   const { session, media } = props
   const policy = usePlaybackPolicy({ queries: session.queries })
   const tracks = useQuery(session.queries.tracksQuery(media.id))
-  // Read before the plan is made, which starts a file over the remote limit at the transcode
-  // away from home; the pick and the ticket are the ones its first source then plays by.
+  /*
+   * Read before the plan is made, which starts a file over the remote limit at the transcode
+   * away from home; the pick and the ticket are the ones its first source then plays by.
+   */
   const network = useQuery({
     queryKey: [PLAY_NETWORK_KEY, session.server.id, media.id],
     queryFn: () => mediaSourcesFor(session.server).networkFor(media.id),
@@ -694,8 +708,10 @@ const ReadyPlayer = (props: ReadyPlayerProps) => {
     gcTime: 0,
     retry: false,
   })
-  // Read before the source is handed over, which carries the synopsis on a TV: a source that
-  // changes once playing reloads the video.
+  /*
+   * Read before the source is handed over, which carries the synopsis on a TV: a source that
+   * changes once playing reloads the video.
+   */
   const details = useQuery(session.queries.itemQuery(media.item?.id ?? null))
   const view = readyPlayerViewOf({ ...props, policy, tracks, details, network })
   return <KeyedView<ReadyPlayerViewProps> view={view} views={READY_PLAYER_VIEWS} />
@@ -773,8 +789,10 @@ const serverPlayerViewOf = ({
 const ServerPlayer = ({ session, chosen, mediaId, at, isFromStart }: ServerPlayerProps) => {
   const router = useRouter()
   const onBack = () => router.back()
-  // The next takes this video's place, so Back from it still goes to the page that pressed Play,
-  // and it plays in the same session, so a saga's films keep walking the saga.
+  /*
+   * The next takes this video's place, so Back from it still goes to the page that pressed Play,
+   * and it plays in the same session, so a saga's films keep walking the saga.
+   */
   const onPlayNext = (next: MediaItem, viewing: ViewingSession) =>
     router.replace(hrefOf({ kind: ROUTE_TARGETS.play, mediaId: next.id, at: 0, session: viewing }))
   const page = routeState({ id: mediaId, query: useQuery(session.queries.mediaQuery(mediaId)) })

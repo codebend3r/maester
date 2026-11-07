@@ -116,8 +116,10 @@ export const DownloadsSection = () => {
   const hasDownloads = (data?.downloads.length ?? 0) > 0
   const used = space.data?.used ?? null
 
-  // Focus follows the swap: into the question, then back to the button that asked, or beside it
-  // once nothing is left to delete.
+  /*
+   * Focus follows the swap: into the question, then back to the button that asked, or beside it
+   * once nothing is left to delete.
+   */
   useEffect(() => {
     const was = wasAsking.current
     wasAsking.current = isAsking

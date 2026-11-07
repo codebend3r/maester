@@ -100,10 +100,12 @@ export const useScrollReset = (): void => {
     if (navigationType !== NavigationType.Pop) window.scrollTo({ top: 0 })
   }, [pathname, navigationType])
 
-  // A second quick Back stops the hold the first started, so two never
-  // fight over the scroll; so does leaving the shell. Not the effect's
-  // cleanup: a library page writes its search into the address as it
-  // arrives, with replace, which changes the key while the hold must go on.
+  /*
+   * A second quick Back stops the hold the first started, so two never
+   * fight over the scroll; so does leaving the shell. Not the effect's
+   * cleanup: a library page writes its search into the address as it
+   * arrives, with replace, which changes the key while the hold must go on.
+   */
   const holding = useRef<(() => void) | null>(null)
   useEffect(() => {
     if (navigationType !== NavigationType.Pop) return
@@ -111,8 +113,10 @@ export const useScrollReset = (): void => {
     holding.current = null
     const card = topCards.get(key)
     if (!card) return
-    // Only the same card in the same place among the page's cards: a list
-    // dealt again, or with a bucket folded that was open, is left to the browser.
+    /*
+     * Only the same card in the same place among the page's cards: a list
+     * dealt again, or with a bucket folded that was open, is left to the browser.
+     */
     const element = cardsOnPage()[card.index]
     if (!element || element.dataset.entry !== card.entry) return
     holding.current = holdInPlace({ card: element, top: card.top })

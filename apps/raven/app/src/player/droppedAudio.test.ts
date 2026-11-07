@@ -167,8 +167,10 @@ describe('hearAudio', () => {
   })
 
   it('keeps its one judgement until the session can act on it', () => {
-    // ExoPlayer's first tick comes with the load, before the screen has drawn the playing
-    // session, so a judgement made then would be spent on a play that cannot step down.
+    /*
+     * ExoPlayer's first tick comes with the load, before the screen has drawn the playing
+     * session, so a judgement made then would be spent on a play that cannot step down.
+     */
     const hearings = [loaded({ place: null, picked: 0 }), moved(0), moved(0.25), moved(0.5)]
     expect(hearAll(hearings, () => false).judged).toEqual([])
     expect(hearAll(hearings, (index) => index >= 2).judged).toEqual([pickedAt(0)])

@@ -133,8 +133,10 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
     accept = 'application/json',
     body,
   }: CallProps): Promise<FetchResponse> => {
-    // Absolute media URLs are a separate trust boundary, even when their origin
-    // happens to match the server. Only the generated API URL receives credentials.
+    /*
+     * Absolute media URLs are a separate trust boundary, even when their origin
+     * happens to match the server. Only the generated API URL receives credentials.
+     */
     const token = href === url(path) && path.startsWith(AUTH_API_PREFIX) ? accessToken() : null
     const response = await fetch(href, {
       method,

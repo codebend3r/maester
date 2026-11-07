@@ -257,8 +257,10 @@ const showMatcher = (deps: MatcherDeps): KindMatcher => {
         Promise.resolve([]),
       )
       .catch((error: unknown) => {
-        // A folder placed in part, say when TMDB went away fetching a season,
-        // would sit under two shows; it waits to be matched whole instead.
+        /*
+         * A folder placed in part, say when TMDB went away fetching a season,
+         * would sit under two shows; it waits to be matched whole instead.
+         */
         deps.files.setMatch({ ids, match: MATCH_STATES.pending })
         throw error
       })

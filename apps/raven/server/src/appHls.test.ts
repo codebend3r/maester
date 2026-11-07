@@ -678,8 +678,10 @@ describe('the HLS route', () => {
         `X-TIMESTAMP-MAP=MPEGTS:${STREAM_TIME_SHIFT * 90_000},LOCAL:00:00:00.000`,
       ),
     )
-    // Each cue at its time in the sidecar plus where the file's clock starts:
-    // 2.5 s, or a few milliseconds before where an encoder's AC-3 starts early.
+    /*
+     * Each cue at its time in the sidecar plus where the file's clock starts:
+     * 2.5 s, or a few milliseconds before where an encoder's AC-3 starts early.
+     */
     const start = Number(
       await ffprobe({
         path: join(state.root, 'media', FILES.late),

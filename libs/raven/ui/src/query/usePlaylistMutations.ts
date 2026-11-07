@@ -29,8 +29,10 @@ type UseServerPlaylistMutationsProps = { api: ApiClient }
  */
 export const useServerPlaylistMutations = ({ api }: UseServerPlaylistMutationsProps) => {
   const queryClient = useQueryClient()
-  // The answer is the new playlist's page, so only the list is read again, and
-  // not waited on: the caller goes on with the playlist as soon as it exists.
+  /*
+   * The answer is the new playlist's page, so only the list is read again, and
+   * not waited on: the caller goes on with the playlist as soon as it exists.
+   */
   const keep = (details: PlaylistDetails) => {
     queryClient.setQueryData(queryKeys.playlist(details.playlist.id), details)
     queryClient.invalidateQueries({ queryKey: queryKeys.playlistList }).catch(() => undefined)

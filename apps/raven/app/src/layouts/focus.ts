@@ -70,8 +70,10 @@ export const useOpeningFocus = (): OpeningFocus => {
 export const useScreenFocusScope = (): OpeningFocus => {
   const screen = useRoute().key
   useScreenTurn({ isToFront: false, onTurn: () => coverScreen({ screen }) })
-  // A layout that takes another's place on the same route (Home's, on a server switch) first
-  // draws with the entry it leaves, and again with a fresh one once this forgets it.
+  /*
+   * A layout that takes another's place on the same route (Home's, on a server switch) first
+   * draws with the entry it leaves, and again with a fresh one once this forgets it.
+   */
   useEffect(() => () => leaveScreen({ screen }), [screen])
   return useOpeningFocus()
 }

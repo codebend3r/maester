@@ -1,17 +1,23 @@
-// The way back, then the picture and the details. The backdrop is laid out
-// apart from them, from the header's own corner.
+/*
+ * The way back, then the picture and the details. The backdrop is laid out
+ * apart from them, from the header's own corner.
+ */
 .hero {
   --backdrop-height: 45rem;
-  // How far the picture and title drop below the way back, so the backdrop
-  // shows between them.
-  --hero-drop: calc(var(--space-10) + var(--space-8));
+  /*
+   * How far the picture and title drop below the way back, so the backdrop
+   * shows between them.
+   */
+  --hero-drop: calc(var(--space-9) + var(--space-8));
   // The poster's width, and a still's.
   --poster-width: 17.5rem;
   --still-width: 26.25rem;
 
-  // Not a layer of its own: the backdrop, which runs on below the header,
-  // goes under the whole page's content, the summary after it included,
-  // and the theme button stays over the corner.
+  /*
+   * Not a layer of its own: the backdrop, which runs on below the header,
+   * goes under the whole page's content, the summary after it included,
+   * and the theme button stays over the corner.
+   */
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -30,8 +36,10 @@
   row-gap: 0;
 }
 
-// Behind the shell's bar and the page's top padding, to the edges of the
-// page the shell pads: decorative, under everything else on the page.
+/*
+ * Behind the shell's bar and the page's top padding, to the edges of the
+ * page the shell pads: decorative, under everything else on the page.
+ */
 .backdrop {
   position: absolute;
   inset: calc(-1 * var(--page-start, var(--space-5))) calc(-1 * var(--gutter)) auto;
@@ -41,16 +49,20 @@
   height: var(--backdrop-height);
   overflow: hidden;
   pointer-events: none;
-  // The picture and the night over it fade out together at the foot, so the hero melts into
-  // whatever ground the theme lays under the page instead of stopping at an edge, and
-  // soften at the sides into the glow past them.
+  /*
+   * The picture and the night over it fade out together at the foot, so the hero melts into
+   * whatever ground the theme lays under the page instead of stopping at an edge, and
+   * soften at the sides into the glow past them.
+   */
   mask-image:
     linear-gradient(to bottom, var(--color-stage) 60%, transparent),
     linear-gradient(90deg, transparent, var(--color-stage) 6%, var(--color-stage) 94%, transparent);
   mask-composite: intersect;
 
-  // The night rises from the foot and runs in from the left, where the
-  // title reads, so the words keep their contrast over any picture.
+  /*
+   * The night rises from the foot and runs in from the left, where the
+   * title reads, so the words keep their contrast over any picture.
+   */
   &::after {
     content: '';
     grid-area: backdrop;
@@ -60,9 +72,11 @@
   }
 }
 
-// Past the column, to the shell's edges on a screen wider than the page:
-// the picture's colours, blurred, so the backdrop has no hard sides. The
-// shell's main is the container, so 100cqw is its width inside its gutters.
+/*
+ * Past the column, to the shell's edges on a screen wider than the page:
+ * the picture's colours, blurred, so the backdrop has no hard sides. The
+ * shell's main is the container, so 100cqw is its width inside its gutters.
+ */
 .glow {
   position: absolute;
   top: calc(-1 * var(--page-start, var(--space-5)));
@@ -93,8 +107,10 @@
   scale: 1.2;
 }
 
-// As strong as the theme's colour wash: faint on a light theme, gone in
-// high contrast.
+/*
+ * As strong as the theme's colour wash: faint on a light theme, gone in
+ * high contrast.
+ */
 .backdropPicture {
   grid-area: backdrop;
   width: 100%;
@@ -105,8 +121,10 @@
   mask-image: linear-gradient(to bottom, var(--color-stage) 35%, transparent);
 }
 
-// At least a field tall, so its middle lines up with the theme button; the
-// way back keeps clear of the corner itself.
+/*
+ * At least a field tall, so its middle lines up with the theme button; the
+ * way back keeps clear of the corner itself.
+ */
 .top {
   grid-area: top;
   display: grid;
@@ -124,8 +142,10 @@
   gap: calc(var(--space-5) + var(--space-1));
 }
 
-// A still's top lines up with the title's, the library and the line over
-// the title in a row above both: the details share the content's rows.
+/*
+ * A still's top lines up with the title's, the library and the line over
+ * the title in a row above both: the details share the content's rows.
+ */
 .withStill {
   grid-template-columns: var(--still-width) minmax(0, 1fr);
   grid-template-rows: auto auto;
@@ -164,8 +184,10 @@
 .picture {
   grid-area: picture;
   display: grid;
-  // One cell exactly the frame's size, so a picture of another shape is
-  // cropped to it rather than pushing the play button out of sight.
+  /*
+   * One cell exactly the frame's size, so a picture of another shape is
+   * cropped to it rather than pushing the play button out of sight.
+   */
   grid-template: 'picture' minmax(0, 1fr) / minmax(0, 1fr);
   aspect-ratio: 2 / 3;
   overflow: hidden;
@@ -297,9 +319,11 @@
   overflow-wrap: anywhere;
 }
 
-// The logo stands where the title would, held to a title's size, with the
-// shadow the words would want against a bright backdrop. The shadow is the
-// wrapper's, so it adds to the logo's own recolouring filter.
+/*
+ * The logo stands where the title would, held to a title's size, with the
+ * shadow the words would want against a bright backdrop. The shadow is the
+ * wrapper's, so it adds to the logo's own recolouring filter.
+ */
 .logo {
   display: block;
   filter: drop-shadow(var(--shadow-text));
@@ -326,8 +350,10 @@
   line-height: var(--line-relaxed);
 }
 
-// Each part keeps to one line while it fits on one, and wraps inside only
-// when it is longer than a whole line, as a long network's name can be.
+/*
+ * Each part keeps to one line while it fits on one, and wraps inside only
+ * when it is longer than a whole line, as a long network's name can be.
+ */
 .part {
   display: inline-block;
   max-width: 100%;
@@ -382,8 +408,10 @@
   white-space: nowrap;
 }
 
-// Play and its neighbours, then the editors on a row of their own. Every
-// button in it stands tall.
+/*
+ * Play and its neighbours, then the editors on a row of their own. Every
+ * button in it stands tall.
+ */
 .actions {
   --control-size: var(--control-size-tall);
 
@@ -417,7 +445,7 @@
 @media (max-width: 48rem) {
   .hero {
     --backdrop-height: 32.5rem;
-    --hero-drop: var(--space-10);
+    --hero-drop: var(--space-9);
     --poster-width: 9.375rem;
   }
 
@@ -463,10 +491,12 @@
   }
 }
 
-// Where the details are narrow, on a phone or beside a still on a middling
-// screen, each row of actions breaks into even cells. How narrow hangs on the
-// side menu's width as much as the screen's, so the details' own width
-// decides.
+/*
+ * Where the details are narrow, on a phone or beside a still on a middling
+ * screen, each row of actions breaks into even cells. How narrow hangs on the
+ * side menu's width as much as the screen's, so the details' own width
+ * decides.
+ */
 @container (max-width: 27rem) {
   .group {
     @include cells;
@@ -477,10 +507,12 @@
   }
 }
 
-// A wide action (`data-wide`, as Download to Raven is) has a label
-// that neither wraps nor shrinks, so a row of four actions holding one needs
-// about 40rem on one line. Narrower than that, the row breaks into cells, and
-// the wide action takes a row of its own, as no cell holds it.
+/*
+ * A wide action (`data-wide`, as Download to Raven is) has a label
+ * that neither wraps nor shrinks, so a row of four actions holding one needs
+ * about 40rem on one line. Narrower than that, the row breaks into cells, and
+ * the wide action takes a row of its own, as no cell holds it.
+ */
 @container (max-width: 40rem) {
   .group:has(> [data-wide]) {
     @include cells;
@@ -491,16 +523,18 @@
   }
 }
 
-// A fifth action takes a row holding a wide action to about 47rem, and a
-// season's seven (Play, the heart, two Shuffles, Download, Watched, Select)
-// to just under 64rem, so such a row breaks up to 64rem too: into even cells
-// at least as wide as the wide action, which then needs no row of its own. A
-// cell also takes at least a quarter of the row, so no fourth fits beside
-// three: five actions never read four and one left alone. Seven drop that
-// floor, so where four cells fit they read four and three, not three, three
-// and one.
-// A range, not `max-width`: this selector outranks the 40rem block's, so it
-// starts above 40rem to leave the narrower widths to that block.
+/*
+ * A fifth action takes a row holding a wide action to about 47rem, and a
+ * season's seven (Play, the heart, two Shuffles, Download, Watched, Select)
+ * to just under 64rem, so such a row breaks up to 64rem too: into even cells
+ * at least as wide as the wide action, which then needs no row of its own. A
+ * cell also takes at least a quarter of the row, so no fourth fits beside
+ * three: five actions never read four and one left alone. Seven drop that
+ * floor, so where four cells fit they read four and three, not three, three
+ * and one.
+ * A range, not `max-width`: this selector outranks the 40rem block's, so it
+ * starts above 40rem to leave the narrower widths to that block.
+ */
 @container (40rem < width <= 64rem) {
   .group:has(> [data-wide]):has(> :nth-child(5)) {
     grid-auto-flow: row;

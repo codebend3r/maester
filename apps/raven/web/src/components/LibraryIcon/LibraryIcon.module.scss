@@ -8,10 +8,12 @@
   }
 }
 
-// A locked library's icon is cut away round the lock, so its lines stop
-// short of the lock instead of running through it, over whatever is behind:
-// the night, a link's ground or a picture. The cut sits where the lock's
-// centre falls and is as wide as the lock with its 1px of room.
+/*
+ * A locked library's icon is cut away round the lock, so its lines stop
+ * short of the lock instead of running through it, over whatever is behind:
+ * the night, a link's ground or a picture. The cut sits where the lock's
+ * centre falls and is as wide as the lock with its 1px of room.
+ */
 .icon:has(.lock) > svg {
   mask-image: radial-gradient(35% 35% at 86% 86%, transparent 99%, var(--color-stage) 100%);
 }

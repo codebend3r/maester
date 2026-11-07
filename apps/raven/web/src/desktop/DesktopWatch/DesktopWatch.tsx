@@ -199,9 +199,11 @@ const WatchTitle = ({
 }: WatchTitleProps) => {
   const { client, menu } = useDesktop()
   const { search } = useLocation()
-  // Where to start and what follows, read once per title, so a later read of the video (its
-  // position moving, a favourite) never asks main again: the address a play link opened says
-  // them, else the page that opened it.
+  /*
+   * Where to start and what follows, read once per title, so a later read of the video (its
+   * position moving, a favourite) never asks main again: the address a play link opened says
+   * them, else the page that opened it.
+   */
   const [{ at, next }] = useState(() => {
     const asked = readWatchQuery(search)
     return {

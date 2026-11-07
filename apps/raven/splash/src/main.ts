@@ -24,9 +24,11 @@ const IDS = {
 const EVENTS = { click: 'click', keydown: 'keydown' } as const
 const ESCAPE = 'Escape'
 
-// The menu lists the releases page until GitHub answers; the latest release's
-// files replace it, the visitor's platform first and named on the button, and
-// the line under it names the version.
+/*
+ * The menu lists the releases page until GitHub answers; the latest release's
+ * files replace it, the visitor's platform first and named on the button, and
+ * the line under it names the version.
+ */
 const showLatestRelease = async (): Promise<void> => {
   const menu = byId({ id: IDS.menu })
   const note = byId({ id: IDS.note })

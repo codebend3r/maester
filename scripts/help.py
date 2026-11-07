@@ -105,6 +105,7 @@ GROUPS: tuple[Group, ...] = (
             Command(
                 "one-command-per-script", "Fails on a package.json script chained with &&, || or ;."
             ),
+            Command("comment-style", "Fails on stacked // comment lines in TypeScript or SCSS."),
             Command("dead-code", "Finds unused exports, files and dependencies with knip."),
             Command("dead-css", "Finds SCSS module classes no component reads."),
             Command(

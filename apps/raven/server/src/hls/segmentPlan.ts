@@ -10,9 +10,11 @@ const SECOND_MS = 1000
 const SEGMENT_MS = HLS_SEGMENT_SECONDS * SECOND_MS
 const MAX_GAP_MS = HLS_MAX_KEYFRAME_GAP_SECONDS * SECOND_MS
 
-// Plans are computed in whole milliseconds so sums and differences of
-// three-decimal times never drift. A stored keyframe is already truncated to
-// three decimals, so this only undoes the float error of reading it.
+/*
+ * Plans are computed in whole milliseconds so sums and differences of
+ * three-decimal times never drift. A stored keyframe is already truncated to
+ * three decimals, so this only undoes the float error of reading it.
+ */
 const toMs = (seconds: number): number => Math.round(seconds * SECOND_MS)
 const toSeconds = (ms: number): number => ms / SECOND_MS
 

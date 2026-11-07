@@ -641,8 +641,10 @@ describe('the desktop player service against headless libmpv', () => {
         }),
         action: () => sendOk({ type: 'seek', time: 4 }),
       })
-      // Within 250 ms of the last time-pos, which the addon's throttle drops, so only the
-      // read on playback-restart can report it.
+      /*
+       * Within 250 ms of the last time-pos, which the addon's throttle drops, so only the
+       * read on playback-restart can report it.
+       */
       await eventAfter({
         label: 'time near 8',
         matches: where({
@@ -797,8 +799,10 @@ describe('the desktop player service against headless libmpv', () => {
 
   test('a playlist loaded right after a video never plays what it names', async () => {
     await withHarness(async ({ mpv, events, raw, eventAfter, load }) => {
-      // The video's late file-loaded lands around the playlist's loadfile, the window a
-      // stale event once used to slip the playlist's entry past the guard.
+      /*
+       * The video's late file-loaded lands around the playlist's loadfile, the window a
+       * stale event once used to slip the playlist's entry past the guard.
+       */
       await Array.from({ length: 80 }, (_value, index) => (index % 20) * 0.5).reduce(
         async (previous, gap) => {
           await previous
@@ -904,8 +908,10 @@ describe('the desktop player service against headless libmpv', () => {
     await withHarness(async ({ mpv, events, load, waitFor, errorsOf, endingsOf }) => {
       const hasSidecar = async () =>
         (await mpv.read({ name: 'track-list' })).some((track) => track.external === true)
-      // Gaps of a few milliseconds land the first file's file-loaded while the second load
-      // is still waiting on mpv, which once made the second load skip its loadfile.
+      /*
+       * Gaps of a few milliseconds land the first file's file-loaded while the second load
+       * is still waiting on mpv, which once made the second load skip its loadfile.
+       */
       await Array.from({ length: 40 }, (_value, index) => (index % 20) * 0.5).reduce(
         async (previous, gap) => {
           await previous
@@ -1439,8 +1445,10 @@ describe('server titles from a raven fixture server', () => {
           await harness.mpv.read({ name: 'options/demuxer-max-back-bytes' }),
           268_435_456,
         )
-        // mpv's own read-ahead without the cache is a second; the cache holds the whole clip.
-        // Any range heard so far counts, the snapshot's included.
+        /*
+         * mpv's own read-ahead without the cache is a second; the cache holds the whole clip.
+         * Any range heard so far counts, the snapshot's included.
+         */
         await harness.waitFor({
           label: `the cache running from ${paused} to the end of the clip`,
           check: async () =>
@@ -1478,8 +1486,10 @@ describe('a slow raven fixture server', () => {
         fixture,
         jar,
         run: async ({ harness }) => {
-          // The MP4: the track clip's embedded subtitle spans the whole clip, so mpv seeks
-          // back to its first cluster to show it, through the bytes the fixture holds.
+          /*
+           * The MP4: the track clip's embedded subtitle spans the whole clip, so mpv seeks
+           * back to its first cluster to show it, through the bytes the fixture holds.
+           */
           const held = await playingUpToThrottle({
             harness,
             fixture,
@@ -2055,8 +2065,10 @@ describe('account titles through the relay against headless libmpv', () => {
           const failure = await harness.eventAfter({
             label: 'the removed account stopping the title',
             matches: where({ type: PLAYER_EVENTS.error }),
-            // A seek past what mpv holds is the next request the server hears. Near the end,
-            // where mpv runs a refused seek out as if the title had ended.
+            /*
+             * A seek past what mpv holds is the next request the server hears. Near the end,
+             * where mpv runs a refused seek out as if the title had ended.
+             */
             action: () => harness.sendOk({ type: PLAYER_COMMANDS.seek, time: SEEK_TARGETS[0] }),
           })
           assert.deepEqual(failure, {

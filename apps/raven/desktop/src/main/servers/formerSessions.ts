@@ -8,9 +8,11 @@ import { messageOf } from '@/shared/messageOf'
 /** The folder under userData where Electron keeps each `persist:` partition. */
 export const PARTITIONS_DIR = 'Partitions'
 
-// An older Raven kept each server's calls and PIN cookie in a `persist:server:<id>`
-// partition; Electron 44 names its folder by its name past `persist:`, escaped: `server%3A<id>`.
-// Main's calls now carry the page's own unlock, so none of them is read any more.
+/*
+ * An older Raven kept each server's calls and PIN cookie in a `persist:server:<id>`
+ * partition; Electron 44 names its folder by its name past `persist:`, escaped: `server%3A<id>`.
+ * Main's calls now carry the page's own unlock, so none of them is read any more.
+ */
 const PARTITION_FOLDER = /^server%3A(.+)$/u
 
 type FormerPartitionsProps = { names: readonly string[] }

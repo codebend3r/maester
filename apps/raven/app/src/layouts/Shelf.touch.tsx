@@ -142,8 +142,10 @@ const CardsRow = ({ shelf, onOpen }: CardsRowProps) => {
       contentContainerStyle={styles.row}
       decelerationRate="fast"
       horizontal
-      // Under a search box the keyboard may be up: a card's first tap opens it, not only
-      // puts the keyboard away.
+      /*
+       * Under a search box the keyboard may be up: a card's first tap opens it, not only
+       * puts the keyboard away.
+       */
       keyboardShouldPersistTaps="handled"
       showsHorizontalScrollIndicator={false}
       snapToOffsets={snaps}

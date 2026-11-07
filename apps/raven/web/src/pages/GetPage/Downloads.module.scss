@@ -4,7 +4,7 @@
   gap: var(--space-5);
   justify-self: center;
   width: min(100%, 81.25rem);
-  padding: 0 var(--gutter) clamp(var(--space-7), 8vw, var(--space-10));
+  padding: 0 var(--gutter) clamp(var(--space-7), 8vw, var(--space-9));
   scroll-margin-top: calc(var(--field-size) + 2 * var(--space-2));
 }
 
@@ -52,8 +52,10 @@
   background: var(--color-deep);
 }
 
-// The name keeps the whole width, as it cannot wrap; what the system needs
-// wraps beside the badge instead.
+/*
+ * The name keeps the whole width, as it cannot wrap; what the system needs
+ * wraps beside the badge instead.
+ */
 .head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -787,8 +787,10 @@ describe('createServerCalls with the page signed in', () => {
 })
 
 describe('createServerCalls.call refuses a call that slipped past the types', () => {
-  // A guard that passes any value, so a test can hand over what a compromised caller
-  // would without a cast: the calls must refuse it on their own.
+  /*
+   * A guard that passes any value, so a test can hand over what a compromised caller
+   * would without a cast: the calls must refuse it on their own.
+   */
   const passesAnything = (value: unknown): value is AllowedCall => value !== undefined
   type ForgeProps = { fields: Record<string, unknown> }
 

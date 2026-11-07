@@ -2,8 +2,10 @@
   display: grid;
 }
 
-// The number, the poster, the title and facts, the tag, then Play and the
-// menu. The row lights under the pointer.
+/*
+ * The number, the poster, the title and facts, the tag, then Play and the
+ * menu. The row lights under the pointer.
+ */
 .film {
   display: grid;
   grid-template-columns: 3.5rem 5rem minmax(0, 1fr) auto auto;
@@ -77,8 +79,10 @@
   font-size: var(--font-size-sm);
 }
 
-// A favourite's heart before the facts and the score after them, each kept
-// whole within the line.
+/*
+ * A favourite's heart before the facts and the score after them, each kept
+ * whole within the line.
+ */
 .heart,
 .score {
   display: inline-grid;

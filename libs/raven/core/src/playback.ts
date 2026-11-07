@@ -299,9 +299,11 @@ export const planPlayback = ({
     !isAudioContainer(media.container) &&
     policy.transcoding === TRANSCODINGS.on &&
     canStream(streamMimeType({ media, mode: PLAYBACK_MODES.transcode }))
-  // Forced, the original file is sent whatever the check says. Only another
-  // audio track, which the file cannot switch to, goes through a remux
-  // first: the video stays as it is either way.
+  /*
+   * Forced, the original file is sent whatever the check says. Only another
+   * audio track, which the file cannot switch to, goes through a remux
+   * first: the video stays as it is either way.
+   */
   if (policy.directPlay === DIRECT_PLAYS.force) {
     return {
       modes:
@@ -313,8 +315,10 @@ export const planPlayback = ({
   }
   const available: Record<PlaybackMode, boolean> = { direct, remux, transcode }
   const modes = PLAYBACK_ORDER.filter((mode) => available[mode])
-  // Without any way to convert, a file that would play as it is still
-  // plays, on its default audio track.
+  /*
+   * Without any way to convert, a file that would play as it is still
+   * plays, on its default audio track.
+   */
   return {
     modes: modes.length === 0 && check.playable ? [PLAYBACK_MODES.direct] : modes,
     problems: check.problems,

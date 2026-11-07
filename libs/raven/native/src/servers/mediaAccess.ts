@@ -501,8 +501,10 @@ export const mediaAccessFor = ({
     }
   }
 
-  // A jar that cannot be read, or an address the allowlist refuses, is an outcome like any
-  // other refusal, so the player always hears back.
+  /*
+   * A jar that cannot be read, or an address the allowlist refuses, is an outcome like any
+   * other refusal, so the player always hears back.
+   */
   const outcomeOf = (props: SourceForProps): Promise<SourceOutcome> =>
     sourceFor(props).catch(() => accessRefusal({ reason: ACCESS_REFUSALS.unreachable, server }))
 

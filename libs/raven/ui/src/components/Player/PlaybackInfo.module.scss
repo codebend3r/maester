@@ -1,5 +1,7 @@
-// A see-through layer over the stage whose padding parks the panel top
-// left, under the back button and the title, and clear of the control bar.
+/*
+ * A see-through layer over the stage whose padding parks the panel top
+ * left, under the back button and the title, and clear of the control bar.
+ */
 .layer {
   grid-area: stage;
   position: relative;
@@ -8,7 +10,7 @@
   align-items: start;
   justify-items: start;
   padding: calc(var(--space-8) + var(--space-4) + var(--titlebar-inset)) var(--space-4)
-    var(--space-10);
+    var(--space-9);
   pointer-events: none;
 }
 
@@ -24,7 +26,7 @@
   gap: var(--space-2);
   width: min(26rem, 100%);
   max-height: calc(
-    100dvh - var(--space-8) - var(--space-4) - var(--titlebar-inset) - var(--space-10)
+    100dvh - var(--space-8) - var(--space-4) - var(--titlebar-inset) - var(--space-9)
   );
   padding: var(--space-3);
   border: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
@@ -122,12 +124,12 @@
 @media (max-width: 30rem) {
   .layer {
     padding: calc(var(--space-8) + var(--titlebar-inset)) var(--space-3)
-      calc(var(--space-10) + var(--space-7));
+      calc(var(--space-9) + var(--space-7));
   }
 
   .panel {
     max-height: calc(
-      100dvh - var(--space-8) - var(--titlebar-inset) - var(--space-10) - var(--space-7)
+      100dvh - var(--space-8) - var(--titlebar-inset) - var(--space-9) - var(--space-7)
     );
   }
 

@@ -1,5 +1,7 @@
-// Over everything but a dialog's top layer, the player included, and out of
-// the way of clicks between its toasts.
+/*
+ * Over everything but a dialog's top layer, the player included, and out of
+ * the way of clicks between its toasts.
+ */
 .toaster {
   position: fixed;
   inset: calc(var(--space-4) + var(--titlebar-inset)) var(--space-4) auto;

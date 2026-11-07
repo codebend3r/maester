@@ -1,5 +1,7 @@
-// The poster over its words. Raised while pointed at or focused, so a lifted
-// poster and an open menu lie over the cards after it.
+/*
+ * The poster over its words. Raised while pointed at or focused, so a lifted
+ * poster and an open menu lie over the cards after it.
+ */
 .card {
   --poster-letter: var(--font-size-title);
 
@@ -18,8 +20,10 @@
     z-index: 1;
   }
 
-  // In select mode the checkbox shares the poster's top corner with the
-  // resolution, which steps aside for it.
+  /*
+   * In select mode the checkbox shares the poster's top corner with the
+   * resolution, which steps aside for it.
+   */
   &:has(.select)[data-selecting] {
     --select-room: calc(1.5rem + var(--space-1));
   }
@@ -40,14 +44,18 @@
   text-decoration: none;
 }
 
-// The picture, the resume line over its foot and the marks over its corner
-// share one cell.
+/*
+ * The picture, the resume line over its foot and the marks over its corner
+ * share one cell.
+ */
 .frame {
   display: grid;
   grid-template-areas: 'frame';
-  // Its shape sets its height either way, but under the default alignment
-  // Chrome lays a shaped box in nested grids out several times over: 4x
-  // the layout of a library of thousands of cards.
+  /*
+   * Its shape sets its height either way, but under the default alignment
+   * Chrome lays a shaped box in nested grids out several times over: 4x
+   * the layout of a library of thousands of cards.
+   */
   align-self: start;
   aspect-ratio: 2 / 3;
   // One cell the shape sets, which a tall picture cannot stretch.
@@ -78,9 +86,11 @@
   height: 4px;
 }
 
-// The heart and the check in the poster's top corner, over the picture and
-// its hover filter. They give way to the menu's button, which comes to the
-// same corner under the pointer; while selecting there is no menu.
+/*
+ * The heart and the check in the poster's top corner, over the picture and
+ * its hover filter. They give way to the menu's button, which comes to the
+ * same corner under the pointer; while selecting there is no menu.
+ */
 .marks {
   position: relative;
   z-index: 1;
@@ -129,8 +139,10 @@
   }
 }
 
-// The facts read as one line of words, wrapping between facts rather than
-// inside one, a dot apart.
+/*
+ * The facts read as one line of words, wrapping between facts rather than
+ * inside one, a dot apart.
+ */
 .facts {
   color: var(--color-lichen);
   font-size: var(--font-size-xs);
@@ -148,8 +160,10 @@
   padding-inline: var(--space-0);
 }
 
-// The value the listing is sorted by: a line of its own above the facts, so
-// a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
+/*
+ * The value the listing is sorted by: a line of its own above the facts, so
+ * a long one ("Added 3 days ago") never squeezes them, and a shade brighter.
+ */
 .sorted {
   color: var(--color-bark);
   font-size: var(--font-size-xs);
