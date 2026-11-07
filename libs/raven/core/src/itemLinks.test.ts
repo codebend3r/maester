@@ -12,6 +12,7 @@ import {
   queueLink,
   readWatchState,
   sessionOf,
+  titleHomePath,
   watchLink,
   PAGE_PATHS,
   watchPageOf,
@@ -24,6 +25,24 @@ describe('itemPath', () => {
       itemPath(itemSummary({ type: ITEM_TYPES.season, show: { id: 5, title: 'X' }, season: 2 })),
     ).toBe('/shows/5/seasons/2')
     expect(itemPath(itemSummary({ type: ITEM_TYPES.season, show: null, season: 2 }))).toBeNull()
+  })
+})
+
+describe('titleHomePath', () => {
+  it('leads an episode or a season to its show, and anything else to its own page', () => {
+    const show = { id: 5, title: 'Severance' }
+    expect(titleHomePath(itemSummary({ type: ITEM_TYPES.episode, show, season: 1 }))).toBe(
+      '/shows/5',
+    )
+    expect(titleHomePath(itemSummary({ type: ITEM_TYPES.season, show, season: 1 }))).toBe(
+      '/shows/5',
+    )
+    expect(titleHomePath(itemSummary({ id: 40, type: ITEM_TYPES.movie, show: null }))).toBe(
+      '/movies/40',
+    )
+    expect(
+      titleHomePath(itemSummary({ type: ITEM_TYPES.season, show: null, season: 2 })),
+    ).toBeNull()
   })
 })
 

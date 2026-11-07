@@ -255,6 +255,16 @@ describe('Player on Android TV', () => {
     expect(drawnVideo.seek).toHaveBeenCalledTimes(3)
   })
 
+  it('keeps the focus on the scrubber as left and right are pressed, so the system never carries it off to Back', async () => {
+    await playing({ id: BUSBOYS_UNSUBTITLED.id })
+    const guide = (() => {
+      let at = scrubber().parent
+      while (at !== null && at.props.trapFocusLeft === undefined) at = at.parent
+      return at
+    })()
+    expect(guide?.props).toMatchObject({ trapFocusLeft: true, trapFocusRight: true })
+  })
+
   it('moves along the buttons, not the video, once the focus has left the scrubber', async () => {
     await playing({ id: BUSBOYS_UNSUBTITLED.id })
     await fireEvent(scrubber(), NATIVE_EVENTS.focus)
@@ -468,6 +478,15 @@ describe('Player on Android TV', () => {
     await fireEvent.press(next)
     expect(mockReplace).toHaveBeenCalledWith(nextHref)
     expect(mockBack).not.toHaveBeenCalled()
+  })
+
+  it("heads an episode as the web's player does: its name and heart, its season and number, and what plays next in the corner", async () => {
+    await playing({ id: GOOD_NEWS_MP4.id })
+    expect(await screen.findByText(GOOD_NEWS_MP4.item?.title ?? '')).toBeTruthy()
+    expect(screen.getByText(/^S01 · E01/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: PLAYER_COPY.favourite })).toBeTruthy()
+    expect(await screen.findByText(/S01 · E02 · Half Loop$/)).toBeTruthy()
+    expect(screen.getByText(PLAYER_COPY.upNext)).toBeTruthy()
   })
 
   it('plays the next episode by itself once this one ends, while autoplay is on', async () => {

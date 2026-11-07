@@ -24,6 +24,7 @@ import {
   seasonsOf,
   seasonsWatched,
   watchedStateOf,
+  episodeTag,
 } from '@raven/core'
 import {
   useServerItemFavourite,
@@ -38,7 +39,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 
 import type { Pictures } from '@/queries/cards'
-import { episodeMarkOf } from '@/queries/episodeMark'
 import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { type BingeToggle, useBingeToggle } from '@/queries/useBinge'
@@ -281,7 +281,7 @@ const episodeLinksOf = ({ details, show, context }: EpisodeLinksOfProps): ItemAc
           linkOf({
             key: ACTION_KEYS.season,
             title: season.title,
-            text: episodeMarkOf({ season: season.season, episode: null }) ?? season.title,
+            text: episodeTag({ season: season.season, episode: null }) ?? season.title,
             itemId: season.id,
             context,
           }),

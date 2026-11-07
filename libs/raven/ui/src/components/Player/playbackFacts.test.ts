@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test'
-import { type MediaTracks, PLAYBACK_MODES, type SubtitleTrack } from '@raven/core'
+import { ITEM_TYPES, type MediaTracks, PLAYBACK_MODES, type SubtitleTrack } from '@raven/core'
 import {
   aboutLine,
+  headerTitleOf,
+  playingCodec,
   playingRange,
   playingResolution,
   audioPillLabel,
@@ -11,7 +13,7 @@ import {
   stepDownNote,
   subtitlePillLabel,
 } from '@/components/Player/playbackFacts'
-import { mediaItem } from '@/test/fixtures'
+import { itemSummary, mediaItem } from '@/test/fixtures'
 
 const TRACKS: MediaTracks = {
   audio: [
@@ -90,6 +92,58 @@ describe('aboutLine', () => {
       }),
     ).toBe('Downloaded from Vhagar · 2019')
     expect(aboutLine({ media: null, label: 'clip.mp4', context: null })).toBe('')
+  })
+})
+
+const halfLoop = mediaItem({
+  item: itemSummary({
+    type: ITEM_TYPES.episode,
+    title: 'Half Loop',
+    year: 2022,
+    show: { id: 9, title: 'Severance' },
+    season: 1,
+    episode: 2,
+  }),
+})
+
+describe('headerTitleOf', () => {
+  it("heads an episode with its show's name and keeps its own title for the line under it", () => {
+    expect(headerTitleOf({ media: halfLoop, label: 'Severance · S01E02 · Half Loop' })).toEqual({
+      name: 'Severance',
+      episode: 'Half Loop',
+    })
+  })
+
+  it('keeps the label for a film or a local file, with no episode line', () => {
+    expect(headerTitleOf({ media: uhd, label: 'Abominable (2019)' })).toEqual({
+      name: 'Abominable (2019)',
+      episode: null,
+    })
+    expect(headerTitleOf({ media: null, label: 'clip.mp4' })).toEqual({
+      name: 'clip.mp4',
+      episode: null,
+    })
+  })
+})
+
+describe('aboutLine, for an episode', () => {
+  it('gives its season and number, the runtime, then the year', () => {
+    expect(aboutLine({ media: halfLoop, label: 'Severance', duration: 2880 })).toBe(
+      'S01 · E02 · 48m · 2022',
+    )
+  })
+})
+
+describe('playingCodec', () => {
+  it("names the file's codec while the picture reaches the screen as the file has it", () => {
+    expect(playingCodec({ media: mediaItem({ videoCodec: 'hevc' }), mode: 'direct' })).toBe('HEVC')
+    expect(playingCodec({ media: mediaItem({ videoCodec: 'hevc' }), mode: 'remux' })).toBe('HEVC')
+  })
+
+  it('names none for a transcode, an unknown codec, or no file', () => {
+    expect(playingCodec({ media: mediaItem({ videoCodec: 'hevc' }), mode: 'transcode' })).toBeNull()
+    expect(playingCodec({ media: mediaItem({ videoCodec: null }), mode: 'direct' })).toBeNull()
+    expect(playingCodec({ media: null, mode: 'direct' })).toBeNull()
   })
 })
 

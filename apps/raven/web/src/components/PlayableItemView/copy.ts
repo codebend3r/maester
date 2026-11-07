@@ -3,7 +3,6 @@ type NeighbourLabelProps = { direction: string; title: string }
 export const PLAYABLE_ITEM_VIEW_COPY = {
   guestStars: 'Guest stars & crew',
   season: (season: number) => `Season ${season}`,
-  episode: (episode: number) => `Episode ${episode}`,
   neighbours: 'Episodes either side',
   previous: 'Previous',
   next: 'Next',

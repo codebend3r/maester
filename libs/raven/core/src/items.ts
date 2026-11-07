@@ -21,6 +21,29 @@ export const episodeCode = ({ season, episode }: EpisodeCodeProps): string | nul
   return episode == null ? `S${pad(season)}` : `S${pad(season)}E${pad(episode)}`
 }
 
+/** "S01", a season's mark as the player and an episode's page set it apart from the episode's. */
+export const seasonTag = (season: number): string => `S${pad(season)}`
+
+/** "E02", an episode's mark beside its season's. */
+export const episodeNumberTag = (episode: number): string => `E${pad(episode)}`
+
+/** How `episodeTag` names season 0's episodes, which have no number worth padding. */
+const EPISODE_TAG_COPY = {
+  specials: 'Specials',
+  special: (episode: number) => `Special ${episode}`,
+} as const
+
+/**
+ * An episode's place in short, as the player and an episode's page set it apart: "S01 · E02",
+ * "S01" for a season, "Special 5" or "Specials" for season 0; null without a season.
+ */
+export const episodeTag = ({ season, episode }: EpisodeCodeProps): string | null => {
+  if (season == null) return null
+  if (season === 0)
+    return episode == null ? EPISODE_TAG_COPY.specials : EPISODE_TAG_COPY.special(episode)
+  return episode == null ? seasonTag(season) : `${seasonTag(season)} · ${episodeNumberTag(episode)}`
+}
+
 /** "The Matrix (1999)", or "Severance · S01E02 · Half Loop" for an episode. */
 export const itemLabel = (item: ItemSummary): string => {
   if (item.type === ITEM_TYPES.episode || item.type === ITEM_TYPES.season) {

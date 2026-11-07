@@ -140,6 +140,8 @@ export const usePlateStyles = themedStyles((colours) =>
       backgroundColor: colours.quiet,
     },
     focused: { borderColor: colours.text },
+    // A mark that is on, as the heart of a favourite: the primary fill.
+    on: { backgroundColor: colours.accent },
     label: { color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
   }),
 )
@@ -155,6 +157,8 @@ type PlateButtonProps = PlateFace & {
   accessibilityRole?: AccessibilityRole
   isPreferred?: boolean
   isOverPicture?: boolean
+  /** A mark that is on, as a favourite's heart: filled in the primary tone and said as selected. */
+  isOn?: boolean
   onFocused?: () => void
   onPress: () => void
 }
@@ -162,20 +166,24 @@ type PlateButtonProps = PlateFace & {
 /**
  * A button on a plate, the remote's to press: its face is its `text`, its `icon` or both, `label` is
  * what it is called aloud, `isPreferred` asks the remote's focus for it as it appears, `onFocused`
- * hears each time it gets the focus, and `isOverPicture` gives it the player's dark glass in every
- * theme.
+ * hears each time it gets the focus, `isOverPicture` gives it the player's dark glass in every
+ * theme, and `isOn` fills a mark that is on.
  */
 export const PlateButton = ({
   label,
   accessibilityRole = 'button',
   isPreferred = false,
   isOverPicture = false,
+  isOn = false,
   onFocused = NOTHING_ON_FOCUS,
   onPress,
   ...face
 }: PlateButtonProps) => {
   const plateStyles = usePlateStyles({ isOverPicture })
-  const colour = useTheme((theme) => (isOverPicture ? theme.overPicture : theme.palette).text)
+  const colour = useTheme((theme) => {
+    const palette = isOverPicture ? theme.overPicture : theme.palette
+    return isOn ? palette.onAccent : palette.text
+  })
   const view = useRef<ComponentRef<typeof Pressable>>(null)
   const note = useLastFocus((state) => state.note)
   return (
@@ -183,13 +191,18 @@ export const PlateButton = ({
       ref={view}
       accessibilityLabel={label}
       accessibilityRole={accessibilityRole}
+      accessibilityState={{ selected: isOn }}
       hasTVPreferredFocus={isPreferred}
       onFocus={() => {
         note(view.current)
         onFocused()
       }}
       onPress={onPress}
-      style={({ focused }) => [plateStyles.plate, focused && plateStyles.focused]}
+      style={({ focused }) => [
+        plateStyles.plate,
+        isOn && plateStyles.on,
+        focused && plateStyles.focused,
+      ]}
     >
       {({ focused }) => (
         <>

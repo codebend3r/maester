@@ -1,4 +1,5 @@
 import {
+  ITEM_TYPES,
   type MediaItem,
   type MediaTracks,
   PLAYBACK_MODES,
@@ -8,8 +9,11 @@ import {
   type StreamQuality,
   type SubtitleTrack,
   audioLabel,
+  codecLabel,
+  episodeTag,
   formatBitrate,
   formatChannels,
+  formatRuntime,
   rangeLabel,
   resolutionLabel,
   subtitleLabel,
@@ -40,21 +44,48 @@ export const pictureLabel = (media: MediaItem): string | null => {
   return media.hdr ? PLAYBACK_FACTS_COPY.hdr(resolution) : resolution
 }
 
+/** What the player's header calls the title: a show's name over an episode's own, else the host's label. */
+export type HeaderTitle = {
+  /** The heading's words, where the title has no art: the show's for an episode. */
+  name: string
+  /** The episode's own title, on the line under the heading; null for anything but an episode. */
+  episode: string | null
+}
+
+type HeaderTitleOfProps = { media: MediaItem | null; label: string }
+
+/** The header's heading and an episode's own title under it; a film or a local file keeps the label. */
+export const headerTitleOf = ({ media, label }: HeaderTitleOfProps): HeaderTitle => {
+  const item = media?.item
+  if (item?.type !== ITEM_TYPES.episode) return { name: label, episode: null }
+  return { name: item.show?.title ?? label, episode: item.title === '' ? null : item.title }
+}
+
 type AboutLineProps = {
   media: MediaItem | null
   label: string
   context?: string | null
+  /** The video's length in seconds, null while unknown. */
+  duration?: number | null
 }
 
 /**
  * The line under the player's title: where the title came from when the host
- * names it, and the year, unless the title already ends with it. The
- * picture and how it plays have chips of their own at the far end of the bar.
+ * names it, an episode's season and number ("S01 · E02"), the runtime, and
+ * the year, unless the title already ends with it. The picture and how it
+ * plays have chips of their own at the far end of the bar.
  */
-export const aboutLine = ({ media, label, context = null }: AboutLineProps): string => {
-  const year = media?.item?.year ?? media?.year ?? null
+export const aboutLine = ({
+  media,
+  label,
+  context = null,
+  duration = null,
+}: AboutLineProps): string => {
+  const item = media?.item
+  const tag = item?.type === ITEM_TYPES.episode ? episodeTag(item) : null
+  const year = item?.year ?? media?.year ?? null
   const shownYear = year != null && !label.includes(`(${year})`) ? String(year) : null
-  return joined({ parts: [context, shownYear] })
+  return joined({ parts: [context, tag, formatRuntime(duration), shownYear] })
 }
 
 type QualityLabelProps = {
@@ -112,6 +143,16 @@ type PlayingRangeProps = { media: MediaItem | null; mode: PlaybackMode }
 export const playingRange = ({ media, mode }: PlayingRangeProps): string | null => {
   if (media == null || mode === PLAYBACK_MODES.transcode) return null
   return rangeLabel(media)
+}
+
+/**
+ * The file's video codec (`HEVC`) while the picture reaches the screen as
+ * the file has it; null for an unknown file or a transcode, which the
+ * server encodes afresh.
+ */
+export const playingCodec = ({ media, mode }: PlayingRangeProps): string | null => {
+  if (!media?.videoCodec || mode === PLAYBACK_MODES.transcode) return null
+  return codecLabel(media.videoCodec)
 }
 
 /** "24.2 Mbps, 4K HDR" for the original in the quality list; null before the file is probed. */

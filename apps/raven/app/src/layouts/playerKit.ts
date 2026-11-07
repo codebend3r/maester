@@ -24,6 +24,9 @@ export const SKIP_ICONS = {
 /** What plays after the video, an episode's next in its show, and how to play it now. */
 type PlayerNext = { label: string; onPlay: () => void }
 
+/** The playing video's heart: whether it is a favourite, and how to mark or unmark it. */
+type PlayerFavourite = { isOn: boolean; onToggle: () => void }
+
 /** A track picker: what it offers, which is picked, and what to do with a pick; the chrome names it. */
 export type TrackPicker = Omit<PickerProps<string>, 'label' | 'icon'>
 
@@ -83,6 +86,10 @@ export type PlayerChromeProps = {
   previous: PlayerNext | null
   /** How the video plays, for the corner that says so; null while no way has been picked. */
   mode: PlaybackMode | null
+  /** The heart beside an episode's name or under a film's, for a platform that shows it; null while nothing plays. */
+  favourite: PlayerFavourite | null
+  /** What plays next in words, "Lucky · S01 · E02 · Make 'em Dance", for the corner; null with nothing after. */
+  upNext: string | null
   /** Hands the video to Picture in Picture; null where the player cannot. */
   onPictureInPicture: (() => void) | null
   onBack: () => void
@@ -129,6 +136,9 @@ export const PLAYER_COPY = {
   pictureInPicture: 'Picture in Picture',
   showControls: 'Show the controls',
   hideControls: 'Hide the controls',
+  favourite: 'Favourite',
+  upNext: 'Up next',
+  separator: ' · ',
 } as const
 
 /** The actions a screen reader offers on the scrubber: a swipe up or down skips. */

@@ -14,6 +14,7 @@ import {
   resumeAtFor,
   routeState,
   sessionOf,
+  titleHomePath,
   watchLink,
   PLAYER_SOURCE_KINDS,
 } from '@raven/core'
@@ -252,6 +253,7 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
     title: {
       label: mediaLabel(media),
       logo,
+      homeTo: media.item == null ? null : titleHomePath(media.item),
       duration: media.duration,
       resumeAt: resumeAtFor({ at: 0, media }),
       backTo,

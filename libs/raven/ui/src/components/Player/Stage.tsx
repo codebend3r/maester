@@ -34,6 +34,7 @@ import {
   aboutLine,
   audioPillLabel,
   endsAtLabel,
+  headerTitleOf,
   qualityLabel,
   subtitlePillLabel,
 } from '@/components/Player/playbackFacts'
@@ -418,11 +419,13 @@ export const PlayerChrome = ({
   // seen, and so does an intro's first seconds, so Skip intro is.
   const chromeShown = idle.active || upNext.isCardShown || intro.isPrompting
   const chapterStarts = markers?.chapters.map(({ start }) => start) ?? []
+  const heading = headerTitleOf({ media, label })
   // The art spells out only the name, so the line under it gives the year the label would.
   const about = aboutLine({
     media,
     label: logo?.name ?? label,
     context: title.context ?? null,
+    duration,
   })
 
   // The scrubber and the clock keep what they showed while the controls are
@@ -476,36 +479,49 @@ export const PlayerChrome = ({
           className={styles.back}
           onClick={onBack}
         />
-        <TitleHeading label={label} logo={logo} onFail={setFailedLogo} />
-        {!!about && <p className={styles.about}>{about}</p>}
-        {favourite && (
-          <Button
-            tone="ghost"
-            icon="heart"
-            aria-label={STAGE_COPY.favourite}
-            aria-pressed={favourite.isFavourite}
-            className={[styles.favourite, favourite.isFavourite ? styles.favourited : '']
-              .filter(Boolean)
-              .join(' ')}
-            onClick={() => toggleFavourite(favourite)}
+        <div className={styles.heading}>
+          <TitleHeading
+            name={heading.name}
+            logo={logo}
+            homeTo={title.homeTo ?? null}
+            onFail={setFailedLogo}
           />
-        )}
-        {nextLink && (
-          <ButtonLink
-            to={nextLink.to}
-            state={nextLink.state}
-            replace
-            tone="ghost"
-            icon={nextLink.isShuffled ? 'shuffle' : 'next'}
-            className={styles.next}
-            aria-label={STAGE_COPY.upNextLabel(nextLink.label)}
-            title={nextLink.label}
-          >
-            <span className={styles.nextLead}>{STAGE_COPY.upNext}</span>
-            <span className={styles.nextLabel}>{nextLink.label}</span>
-          </ButtonLink>
-        )}
-        <PlayerStatus media={media} mode={mode} quality={quality} />
+          {(heading.episode != null || !!favourite) && (
+            <div className={styles.episodeLine}>
+              {heading.episode != null && <p className={styles.episode}>{heading.episode}</p>}
+              {favourite && (
+                <Button
+                  tone="ghost"
+                  icon="heart"
+                  aria-label={STAGE_COPY.favourite}
+                  aria-pressed={favourite.isFavourite}
+                  className={[styles.favourite, favourite.isFavourite ? styles.favourited : '']
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => toggleFavourite(favourite)}
+                />
+              )}
+            </div>
+          )}
+          {!!about && <p className={styles.about}>{about}</p>}
+        </div>
+        <PlayerStatus media={media} mode={mode} quality={quality}>
+          {nextLink && (
+            <ButtonLink
+              to={nextLink.to}
+              state={nextLink.state}
+              replace
+              tone="ghost"
+              icon={nextLink.isShuffled ? 'shuffle' : 'next'}
+              className={styles.next}
+              aria-label={STAGE_COPY.upNextLabel(nextLink.label)}
+              title={nextLink.label}
+            >
+              <span className={styles.nextLead}>{STAGE_COPY.upNext}</span>
+              <span className={styles.nextLabel}>{nextLink.label}</span>
+            </ButtonLink>
+          )}
+        </PlayerStatus>
         {resumedAt != null && (
           <p className={styles.resumed} aria-live="polite">
             <span>{STAGE_COPY.resumedAt(formatDuration(resumedAt))}</span>

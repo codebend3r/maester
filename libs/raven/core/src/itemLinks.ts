@@ -50,6 +50,13 @@ export const itemPath = (item: ItemSummary): AppPath | null => {
     : null
 }
 
+/**
+ * The page a playing title's name leads back to: an episode's or a season's
+ * show's, else the item's own. Null for an item with no page to go to.
+ */
+export const titleHomePath = (item: ItemSummary): AppPath | null =>
+  item.show == null ? itemPath(item) : showPath(item.show.id)
+
 type InLibraryProps = {
   page: AppPath
   libraryId: number

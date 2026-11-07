@@ -47,14 +47,17 @@ export type TitleLogo = {
   url: string
   /** The name the art spells out, read in its place: a film's, or an episode's show's. */
   name: string
-  /** What the art leaves out, beside it: an episode's "S01E03 · Pilot". */
-  caption: string | null
 }
 
 export type PlayerTitle = {
   label: string
   /** The title's art for the header; null or left out, the label is spelled out. */
   logo?: TitleLogo | null
+  /**
+   * The page the header's title links to: an episode's show's, a film's own.
+   * Null or left out, as for a local file, the title links nowhere.
+   */
+  homeTo?: string | null
   /**
    * Where the title came from, which the line under it names before how it plays:
    * "Downloaded from Vhagar · Direct play". Left out, the line names no source.

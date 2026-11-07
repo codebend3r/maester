@@ -11,7 +11,9 @@ import {
   WATCHED_STATES,
   directedBy,
   episodeBackPath,
+  episodeNumberTag,
   seasonPath,
+  seasonTag,
   showPath,
   episodeFacts,
   formatDuration,
@@ -138,8 +140,9 @@ const PLAYABLE = {
 } as const satisfies Record<'movie' | 'episode', PlayableConfig>
 
 /**
- * An episode's line over its title: its show and its season, each a link to
- * that page, then its number. A part the episode does not know is left out.
+ * An episode's line over its title, "Lucky · S01 · E01": its show and its
+ * season, each a link to that page, then its number. A part the episode does
+ * not know is left out.
  */
 const episodeEyebrow = ({ show, season, episode }: ItemDetails): ReactNode[] =>
   [
@@ -153,12 +156,13 @@ const episodeEyebrow = ({ show, season, episode }: ItemDetails): ReactNode[] =>
         key="season"
         to={seasonPath({ showId: show.id, season })}
         className={styles.eyebrowLink}
+        aria-label={PLAYABLE_ITEM_VIEW_COPY.season(season)}
       >
-        {PLAYABLE_ITEM_VIEW_COPY.season(season)}
+        {seasonTag(season)}
       </Link>
     ),
-    !show && season != null && PLAYABLE_ITEM_VIEW_COPY.season(season),
-    episode != null && PLAYABLE_ITEM_VIEW_COPY.episode(episode),
+    !show && season != null && seasonTag(season),
+    episode != null && episodeNumberTag(episode),
   ].filter((part) => !!part)
 
 /** How much of a video started is left, with its line; nothing for one not started. */
