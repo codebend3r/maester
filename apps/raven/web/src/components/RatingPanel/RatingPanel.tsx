@@ -144,6 +144,25 @@ export const RatingBadge = ({ rating, isBare = false }: RatingBadgeProps) => {
   )
 }
 
+type ScoreFactProps = {
+  ratings: readonly Rating[]
+  source: RatingSource
+  /** The card's own fact class, so the score sits in its line of facts. */
+  className: string | undefined
+}
+
+/** A card's score as one of its facts: `source`'s, else TMDB's, else nothing. */
+export const ScoreFact = ({ ratings, source, className }: ScoreFactProps) => {
+  const score = pickScore({ ratings, source })
+  return (
+    score && (
+      <span className={className}>
+        <RatingBadge rating={score} />
+      </span>
+    )
+  )
+}
+
 type RatingPanelProps = { ratings: readonly Rating[] }
 
 /**

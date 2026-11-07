@@ -5,7 +5,6 @@ import {
   type ShowEntry,
   WATCHED_STATES,
   episodeCode,
-  pickScore,
   showEntryKey,
   showSortFact,
   showYears,
@@ -13,7 +12,7 @@ import {
   watchPageOf,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
-import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
+import { ScoreFact } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { PosterOverlay } from '@/components/PosterOverlay/PosterOverlay'
 import { ItemPoster } from '@/components/PosterImage/PosterImage'
@@ -29,7 +28,6 @@ import { COMMON_COPY } from '@/lib/copy'
 
 type UseShowCardProps = {
   entry: ShowEntry
-  ratingsSource: RatingSource
   sort: MediaSort | undefined
 }
 
@@ -37,14 +35,13 @@ type UseShowCardProps = {
  * What both shapes of a show's card share: its selection, its facts and score,
  * and how its next episode's play button is named.
  */
-const useShowCard = ({ entry, ratingsSource, sort }: UseShowCardProps) => {
+const useShowCard = ({ entry, sort }: UseShowCardProps) => {
   const { show, next } = entry
   const select = useSelectable({ key: showEntryKey(show), title: show.title })
   const code = next?.item ? episodeCode(next.item) : null
   return {
     select,
     code,
-    score: pickScore({ ratings: show.ratings, source: ratingsSource }),
     sorted: sort ? showSortFact({ entry, sort }) : null,
     years: showYears({ year: show.year, endedYear: entry.endedYear }),
     facts: [
@@ -60,22 +57,21 @@ const useShowCard = ({ entry, ratingsSource, sort }: UseShowCardProps) => {
 type ShowFactsProps = {
   entry: ShowEntry
   facts: string[]
-  score: ReturnType<typeof pickScore> | null
+  /** Whose score the facts show; none when null. */
+  ratingsSource: RatingSource | null
   className: string
 }
 
 /** The facts under a show's title, a dot apart, with its score and the words of its count. */
-const ShowFacts = ({ entry, facts, score, className }: ShowFactsProps) => (
+const ShowFacts = ({ entry, facts, ratingsSource, className }: ShowFactsProps) => (
   <span className={className}>
     {facts.map((fact) => (
       <span key={fact} className={styles.fact}>
         {fact}
       </span>
     ))}
-    {score && (
-      <span className={styles.fact}>
-        <RatingBadge rating={score} />
-      </span>
+    {ratingsSource && (
+      <ScoreFact ratings={entry.show.ratings} source={ratingsSource} className={styles.fact} />
     )}
     <WatchedCountWords watched={entry.watchedEpisodes} total={entry.episodes} />
   </span>
@@ -104,7 +100,7 @@ export const ShowCard = ({
   sizes,
 }: ShowCardProps) => {
   const { show, next } = entry
-  const card = useShowCard({ entry, ratingsSource, sort })
+  const card = useShowCard({ entry, sort })
 
   return (
     <li className={styles.card} data-entry={showEntryKey(show)} {...card.select.rootProps}>
@@ -146,7 +142,7 @@ export const ShowCard = ({
         <ShowFacts
           entry={entry}
           facts={[card.years, ...card.facts].filter((fact): fact is string => fact != null)}
-          score={card.score}
+          ratingsSource={ratingsSource}
           className={styles.facts}
         />
       </div>
@@ -171,7 +167,7 @@ type WideShowCardProps = {
  */
 const WideShowCard = ({ entry, sort, note = null }: WideShowCardProps) => {
   const { show, next } = entry
-  const card = useShowCard({ entry, ratingsSource: RATING_SOURCES.tmdb, sort })
+  const card = useShowCard({ entry, sort })
   const wash = posterSources({ item: show, sizes: POSTER_SIZES.showCard })
   const isWatched =
     watchedStateOf({ watched: entry.watchedEpisodes, total: entry.episodes }) ===
@@ -207,7 +203,12 @@ const WideShowCard = ({ entry, sort, note = null }: WideShowCardProps) => {
           {show.title}
         </CardLink>
         {line && <span className={styles.wideSorted}>{line}</span>}
-        <ShowFacts entry={entry} facts={card.facts} score={null} className={styles.wideFacts} />
+        <ShowFacts
+          entry={entry}
+          facts={card.facts}
+          ratingsSource={null}
+          className={styles.wideFacts}
+        />
         {next && !card.select.selecting && (
           <CardLink
             to={watchPageOf(next.id)}

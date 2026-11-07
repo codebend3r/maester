@@ -3,6 +3,7 @@ import {
   type MediaAlbum,
   type MediaItem,
   type MediaSort,
+  type RatingSource,
   cardLink,
   codecLabel,
   formatBytes,
@@ -22,6 +23,7 @@ import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark, FavouriteWords } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
+import { ScoreFact } from '@/components/RatingPanel/RatingPanel'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { WatchedMark, WatchedWords } from '@/components/WatchedMark/WatchedMark'
@@ -88,6 +90,8 @@ type MediaCardProps = {
   matchType?: MatchItemType | null
   /** The order the listing is in, whose value the card shows. */
   sort?: MediaSort
+  /** Whose score the card shows among its facts; none when absent. */
+  ratingsSource?: RatingSource
 }
 
 /**
@@ -101,7 +105,7 @@ type MediaCardProps = {
  * corner, opens the card's menu. Sorted, it shows the value its listing is
  * sorted by above its facts, and says that value nowhere else.
  */
-export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => {
+export const MediaCard = ({ media, matchType = null, sort, ratingsSource }: MediaCardProps) => {
   const menu = useCardMenu({ media, matchType })
   const thumbnail = api.thumbnailUrl(media)
   const label = mediaLabel(media)
@@ -187,6 +191,13 @@ export const MediaCard = ({ media, matchType = null, sort }: MediaCardProps) => 
               <WordFact fact={fact} />
             </span>
           ))}
+          {ratingsSource && (
+            <ScoreFact
+              ratings={media.item?.ratings ?? []}
+              source={ratingsSource}
+              className={styles.fact}
+            />
+          )}
           <FavouriteWords media={media} />
           <PartlyWatched media={media} />
           <WatchedWords watched={media.watched} />

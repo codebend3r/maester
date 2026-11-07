@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { AUTH_ROUTES } from '@raven/core'
 import {
   AUTH_QUERY,
@@ -56,6 +56,20 @@ describe('safeReturnPath', () => {
 
   it('keeps the root', () => {
     expect(safeReturnPath('/')).toBe('/')
+  })
+
+  describe('on a browser without URL.parse', () => {
+    const parse: unknown = Reflect.get(URL, 'parse')
+
+    afterEach(() => {
+      Object.defineProperty(URL, 'parse', { value: parse, configurable: true, writable: true })
+    })
+
+    it('still keeps a same-origin path and refuses an auth route', () => {
+      Reflect.deleteProperty(URL, 'parse')
+      expect(safeReturnPath('/libraries/3?x=1#y')).toBe('/libraries/3?x=1#y')
+      expect(safeReturnPath(AUTH_ROUTES.signIn)).toBe('/')
+    })
   })
 })
 

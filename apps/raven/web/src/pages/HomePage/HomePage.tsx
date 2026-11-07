@@ -6,6 +6,7 @@ import {
   ITEM_TYPES,
   type Library,
   type MediaItem,
+  RATING_SOURCES,
   matchTypeFor,
   withLibraries,
 } from '@raven/core'
@@ -36,6 +37,9 @@ import frames from '@/pages/HomePage/HomeFrames.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
 import { HomeBinge } from '@/pages/BingePage/BingePage'
+
+// Every Home shelf scores alike, whatever each library shows on its own page; `pickScore` falls back to TMDB.
+const HOME_RATINGS_SOURCE = RATING_SOURCES.metacritic
 
 const SHELF_STATES = { empty: 'empty', filled: 'filled' } as const
 type ShelfState = (typeof SHELF_STATES)[keyof typeof SHELF_STATES]
@@ -78,19 +82,23 @@ type CardKind = (typeof CARD_KINDS)[keyof typeof CARD_KINDS]
 type ShelfCardProps = {
   media: MediaItem
   matchType: ReturnType<typeof matchTypeFor>
-  ratingsSource: Library['settings']['ratingsSource']
 }
 
 type PosterShelfCardProps = ShelfCardProps
 
 const PosterShelfCard = ({ media, matchType }: PosterShelfCardProps) => (
-  <PosterCard media={media} matchType={matchType} sizes={POSTER_SIZES.row} />
+  <PosterCard
+    media={media}
+    matchType={matchType}
+    sizes={POSTER_SIZES.row}
+    ratingsSource={HOME_RATINGS_SOURCE}
+  />
 )
 
 type FrameShelfCardProps = ShelfCardProps
 
 const FrameShelfCard = ({ media, matchType }: FrameShelfCardProps) => (
-  <MediaCard media={media} matchType={matchType} />
+  <MediaCard media={media} matchType={matchType} ratingsSource={HOME_RATINGS_SOURCE} />
 )
 
 const SHELF_CARDS = {
@@ -100,7 +108,6 @@ const SHELF_CARDS = {
 
 type ShelfContentProps = {
   title: ReactNode
-  ratingsSource: Library['settings']['ratingsSource']
   matchType: ReturnType<typeof matchTypeFor>
 }
 
@@ -108,13 +115,13 @@ type ShowsShelfProps = ShelfContentProps & {
   shelf: Extract<HomeShelf, { type: typeof HOME_SHELF_TYPES.shows }>
 }
 
-const ShowsShelf = ({ title, ratingsSource, shelf }: ShowsShelfProps) => (
+const ShowsShelf = ({ title, shelf }: ShowsShelfProps) => (
   <Shelf title={title} isEmpty={shelf.shows.length === 0}>
     {shelf.shows.map((entry) => (
       <ShowCard
         key={entry.show.id}
         entry={entry}
-        ratingsSource={ratingsSource}
+        ratingsSource={HOME_RATINGS_SOURCE}
         sizes={POSTER_SIZES.row}
       />
     ))}
@@ -125,12 +132,12 @@ type MediaShelfProps = ShelfContentProps & {
   shelf: Extract<HomeShelf, { type: typeof HOME_SHELF_TYPES.media }>
 }
 
-const MediaShelf = ({ title, ratingsSource, matchType, shelf }: MediaShelfProps) => {
+const MediaShelf = ({ title, matchType, shelf }: MediaShelfProps) => {
   const Card = SHELF_CARDS[matchType === ITEM_TYPES.movie ? CARD_KINDS.poster : CARD_KINDS.frame]
   return (
     <Shelf title={title} isEmpty={shelf.media.length === 0}>
       {shelf.media.map((media) => (
-        <Card key={media.id} media={media} matchType={matchType} ratingsSource={ratingsSource} />
+        <Card key={media.id} media={media} matchType={matchType} />
       ))}
     </Shelf>
   )
@@ -177,8 +184,7 @@ type LibraryShelfProps = {
  * what a search found, so the library lists every match.
  */
 const LibraryShelf = ({ shelf, library, query = '' }: LibraryShelfProps) => {
-  const { kind, ratingsSource } = library.settings
-  const matchType = matchTypeFor(kind)
+  const matchType = matchTypeFor(library.settings.kind)
   const to = query
     ? `/libraries/${library.id}?${new URLSearchParams({ q: query })}`
     : `/libraries/${library.id}`
@@ -190,7 +196,7 @@ const LibraryShelf = ({ shelf, library, query = '' }: LibraryShelfProps) => {
   return (
     <KeyedView<LibraryShelfViewProps>
       views={LIBRARY_SHELVES}
-      view={libraryShelfViewOf({ shelf, title, ratingsSource, matchType })}
+      view={libraryShelfViewOf({ shelf, title, matchType })}
     />
   )
 }

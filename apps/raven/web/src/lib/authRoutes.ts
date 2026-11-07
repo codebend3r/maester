@@ -30,8 +30,9 @@ export const safeReturnPath = (value: string | null): string => {
   if (!value?.startsWith('/') || value.startsWith('//')) return HOME_PATH
   if (value.includes('\\') || hasControlCharacter(value)) return HOME_PATH
   const { origin } = window.location
-  const url = URL.parse(value, origin)
-  if (!url || url.origin !== origin) return HOME_PATH
+  // A single-slash path on the page's own origin always parses, so this never throws.
+  const url = new URL(value, origin)
+  if (url.origin !== origin) return HOME_PATH
   return isAuthPath(url.pathname) ? HOME_PATH : value
 }
 
