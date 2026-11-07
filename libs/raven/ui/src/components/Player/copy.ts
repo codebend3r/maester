@@ -209,3 +209,9 @@ export const PLAYER_ACTIONS_COPY = {
 export const NATIVE_ENGINE_COPY = {
   couldNotPlay: 'Raven could not play this video.',
 } as const
+
+/** What the player says when raven's media origin cannot be reached; nothing falls back to the web host. */
+export const MEDIA_PLANE_COPY = {
+  unreachable: (host: string) =>
+    `Couldn't reach raven at ${host}, so this can't play. Remote Access may be off, or the router no longer forwards its port.`,
+} as const

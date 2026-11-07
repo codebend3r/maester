@@ -76,7 +76,7 @@ const stubPlayerReads = (tracks: MediaTracks = TRACKS) =>
 afterEach(() => {
   cleanup()
   spies.splice(0).forEach((spy) => spy.mockRestore())
-  useMediaOrigin.setState({ pick: null, isProbing: false })
+  useMediaOrigin.setState({ pick: null })
 })
 
 describe('Player escape feedback', () => {
@@ -120,13 +120,6 @@ describe('Player file link on the media plane', () => {
   const lan = { kind: 'lan', url: 'https://raven.home.example' } as const
 
   it('copies a ticketed link on the picked origin and says how long it works', async () => {
-    useMediaOrigin.setState({ pick: { origin: lan, at: Date.now(), remote: null } })
-    spies.push(
-      spyOn(api, 'getMediaOrigins').mockImplementation(async () => ({
-        origins: [lan],
-        remote: { limit: null, isOutside: false },
-      })),
-    )
     spies.push(
       spyOn(api, 'getMediaTicket').mockImplementation(async () => ({
         ticket: 'abc.def',
@@ -138,6 +131,8 @@ describe('Player file link on the media plane', () => {
     renderWithProviders({
       ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
     })
+    // The page sets its own origin as it mounts; this one stands for a proxied page's.
+    act(() => useMediaOrigin.setState({ pick: { origin: lan, at: Date.now() } }))
     // The link is built from the ticket, so the click waits until the page holds one.
     await waitFor(async () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
@@ -154,13 +149,6 @@ describe('Player file link on the media plane', () => {
   })
 
   it("says a link copied with accounts on works for up to an account ticket's five minutes", async () => {
-    useMediaOrigin.setState({ pick: { origin: lan, at: Date.now(), remote: null } })
-    spies.push(
-      spyOn(api, 'getMediaOrigins').mockImplementation(async () => ({
-        origins: [lan],
-        remote: { limit: null, isOutside: false },
-      })),
-    )
     spies.push(
       spyOn(api, 'getMediaTicket').mockImplementation(async () => ({
         ticket: 'account.abc',
@@ -172,6 +160,8 @@ describe('Player file link on the media plane', () => {
       ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
       account: fakeAccount(),
     })
+    // The page sets its own origin as it mounts; this one stands for a proxied page's.
+    act(() => useMediaOrigin.setState({ pick: { origin: lan, at: Date.now() } }))
     await waitFor(async () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
       expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(
@@ -185,19 +175,12 @@ describe('Player file link on the media plane', () => {
     ).toBeInTheDocument()
   })
 
-  it("copies the web host link without a pick, with today's message", async () => {
-    spies.push(
-      spyOn(api, 'getMediaOrigins').mockImplementation(async () => ({
-        origins: [],
-        remote: { limit: null, isOutside: false },
-      })),
-    )
+  it("copies the web host link on a page whose /api is raven itself, with today's message", async () => {
     const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {})
     spies.push(clipboard)
     renderWithProviders({
       ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
     })
-    await waitFor(() => expect(api.getMediaOrigins).toHaveBeenCalled())
     await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
     expect(clipboard).toHaveBeenCalledWith(
       new URL('/api/media/7/file', window.location.origin).href,

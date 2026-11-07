@@ -2,7 +2,6 @@ import type { StateStorage } from 'zustand/middleware'
 
 /** The localStorage keys the shared stores keep their state under. */
 export const STORE_KEYS = {
-  mediaOrigin: 'raven-media-origin',
   pageBackdrop: 'raven-page-backdrop',
   playerServices: 'raven-player-services',
   toasts: 'raven-toasts',

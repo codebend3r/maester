@@ -192,7 +192,6 @@ type GatherDiagnosticsProps = {
   resumeAt: number
   context: ReportContext
   pick: MediaPick | null
-  isProbingOrigins: boolean
   appVersion: string | null
   now?: Date
 }
@@ -207,7 +206,6 @@ export const gatherDiagnostics = ({
   resumeAt,
   context,
   pick,
-  isProbingOrigins,
   appVersion,
   now = new Date(),
 }: GatherDiagnosticsProps): PlaybackDiagnostics =>
@@ -224,7 +222,8 @@ export const gatherDiagnostics = ({
       canStream: browserCanStream,
     }),
     origin: originFacts(pick),
-    isProbingOrigins,
+    // The report's contract keeps the field; no host probes the origins any more.
+    isProbingOrigins: false,
     device: readDevice(),
     app: {
       version: appVersion,

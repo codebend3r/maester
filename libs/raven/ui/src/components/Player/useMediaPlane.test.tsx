@@ -5,7 +5,9 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { useMediaPlane } from '@/components/Player/useMediaPlane'
 import { playerQueriesFor } from '@/lib/playerQueries'
+import { MEDIA_PLANE_COPY } from '@/components/Player/copy'
 import { useMediaOrigin } from '@/stores/mediaOrigin'
+import { useToasts } from '@/stores/toasts'
 import { api } from '@/test/api'
 
 const lan: MediaOrigin = { kind: 'lan', url: 'https://lan.example' }
@@ -27,7 +29,7 @@ const harness = ({ client = new QueryClient() }: HarnessProps = {}) => {
 }
 
 const pickOrigin = (origin: MediaOrigin) =>
-  act(() => useMediaOrigin.getState().setPick({ origin, at: Date.now(), remote: null }))
+  act(() => useMediaOrigin.getState().setPick({ origin, at: Date.now() }))
 
 const flushMicrotasks = () => new Promise<void>((resolve) => queueMicrotask(resolve))
 
@@ -48,14 +50,26 @@ describe('useMediaPlane', () => {
   it('has no access without a pick and never asks for a ticket', async () => {
     const getMediaTicket = mock(async () => ({ ticket: 't1', expiresAt: 0 }))
     const { result } = renderHook(
-      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1, reprobe: () => {} }),
+      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1 }),
       { wrapper: harness() },
     )
     await act(async () => {
       await Promise.resolve()
     })
     expect(result.current.access).toBeNull()
+    expect(result.current.isAwaitingTicket).toBe(false)
     expect(getMediaTicket).not.toHaveBeenCalled()
+  })
+
+  it('awaits the ticket once there is a pick, so nothing plays through the web host meanwhile', () => {
+    const getMediaTicket = mock(() => new Promise<{ ticket: string; expiresAt: number }>(() => {}))
+    const { result } = renderHook(
+      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1 }),
+      { wrapper: harness() },
+    )
+    pickOrigin(publicOrigin)
+    expect(result.current.access).toBeNull()
+    expect(result.current.isAwaitingTicket).toBe(true)
   })
 
   it('has access once the pick and the ticket are in, and keeps its identity until either changes', async () => {
@@ -63,11 +77,12 @@ describe('useMediaPlane', () => {
     const getMediaTicket = mock(async () => ({ ticket: `t${++issued}`, expiresAt: 0 }))
     const client = new QueryClient()
     const { result, rerender } = renderHook(
-      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1, reprobe: () => {} }),
+      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1 }),
       { wrapper: harness({ client }) },
     )
     pickOrigin(lan)
     await waitFor(() => expect(result.current.access).toEqual({ origin: lan, ticket: 't1' }))
+    expect(result.current.isAwaitingTicket).toBe(false)
     expect(getMediaTicket).toHaveBeenCalledWith(1)
     const first = result.current.access
     rerender()
@@ -85,7 +100,7 @@ describe('useMediaPlane', () => {
     let issued = 0
     const getMediaTicket = mock(async () => ({ ticket: `t${++issued}`, expiresAt: 1 }))
     const { result } = renderHook(
-      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1, reprobe: () => {} }),
+      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1 }),
       { wrapper: harness() },
     )
     pickOrigin(lan)
@@ -105,7 +120,11 @@ describe('useMediaPlane', () => {
     const client = new QueryClient()
     const mount = () =>
       renderHook(
-        () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1, reprobe: () => {} }),
+        () =>
+          useMediaPlane({
+            api: apiWithTickets(getMediaTicket),
+            mediaId: 1,
+          }),
         { wrapper: harness({ client }) },
       )
     const elapsedBeforeUnmount = 60_000
@@ -134,7 +153,7 @@ describe('useMediaPlane', () => {
       return { ticket: 'fine', expiresAt: 1 }
     })
     const { result } = renderHook(
-      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1, reprobe: () => {} }),
+      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1 }),
       { wrapper: harness() },
     )
     pickOrigin(lan)
@@ -157,7 +176,7 @@ describe('useMediaPlane', () => {
       return { ticket: 'fine', expiresAt: 1 }
     })
     const { result } = renderHook(
-      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1, reprobe: () => {} }),
+      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1 }),
       { wrapper: harness() },
     )
     pickOrigin(lan)
@@ -179,7 +198,7 @@ describe('useMediaPlane', () => {
       return { ticket: 'fine', expiresAt: 0 }
     })
     const { result } = renderHook(
-      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1, reprobe: () => {} }),
+      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1 }),
       { wrapper: harness() },
     )
     pickOrigin(lan)
@@ -189,13 +208,18 @@ describe('useMediaPlane', () => {
     expect(await result.current.refreshTicket()).toBe(false)
   })
 
-  it('reportUnreachable asks for a new probe', () => {
-    const reprobe = mock(() => {})
-    const { result } = renderHook(() => useMediaPlane({ api, mediaId: 1, reprobe }), {
-      wrapper: harness(),
-    })
-    result.current.reportUnreachable()
-    expect(reprobe).toHaveBeenCalledTimes(1)
+  it('reportUnreachable toasts once, naming the host it could not reach', () => {
+    const getMediaTicket = mock(() => new Promise<{ ticket: string; expiresAt: number }>(() => {}))
+    const { result } = renderHook(
+      () => useMediaPlane({ api: apiWithTickets(getMediaTicket), mediaId: 1 }),
+      { wrapper: harness() },
+    )
+    pickOrigin({ kind: 'public', url: 'https://raven.example:8443' })
+    act(() => result.current.reportUnreachable())
+    act(() => result.current.reportUnreachable())
+    expect(useToasts.getState().toasts.map(({ message }) => message)).toEqual([
+      MEDIA_PLANE_COPY.unreachable('raven.example:8443'),
+    ])
   })
 })
 

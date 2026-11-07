@@ -67,7 +67,7 @@ export const Unplayable = ({
 
   const sendReport = async (reporter: ErrorReporter): Promise<void> => {
     setReportState(REPORT_STATES.sending)
-    const { pick, isProbing } = useMediaOrigin.getState()
+    const { pick } = useMediaOrigin.getState()
     await reporter.send(
       gatherDiagnostics({
         title: title.label,
@@ -75,7 +75,6 @@ export const Unplayable = ({
         resumeAt: title.resumeAt,
         context,
         pick,
-        isProbingOrigins: isProbing,
         appVersion: reporter.appVersion,
       }),
     )

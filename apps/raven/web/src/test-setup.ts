@@ -9,7 +9,6 @@ import { useCardLinks } from '@/stores/cardLinks'
 import { useDesktopBridge } from '@/stores/desktop'
 import { useDownloadAsk } from '@/stores/downloadAsk'
 import { useDragging } from '@/stores/dragging'
-import { useOriginProbe } from '@/stores/originProbe'
 import { useSeasonView } from '@/stores/seasonView'
 import { useSelectionScopes } from '@/stores/selectionScope'
 import { useServerReach } from '@/stores/serverReach'
@@ -32,7 +31,6 @@ const initialPageBackdrop = usePageBackdrop.getInitialState()
 const initialSideMenu = useSideMenu.getInitialState()
 const initialTheme = useTheme.getInitialState()
 const initialCardLinks = useCardLinks.getInitialState()
-const initialOriginProbe = useOriginProbe.getInitialState()
 const initialSelectionScopes = useSelectionScopes.getInitialState()
 const initialDesktopBridge = useDesktopBridge.getInitialState()
 const initialDownloadAsk = useDownloadAsk.getInitialState()
@@ -58,7 +56,6 @@ afterEach(() => {
   useSideMenu.setState(initialSideMenu, true)
   useTheme.setState(initialTheme, true)
   useCardLinks.setState(initialCardLinks, true)
-  useOriginProbe.setState(initialOriginProbe, true)
   useSelectionScopes.setState(initialSelectionScopes, true)
   useDesktopBridge.setState(initialDesktopBridge, true)
   useDownloadAsk.setState(initialDownloadAsk, true)

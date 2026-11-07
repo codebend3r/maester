@@ -104,8 +104,10 @@ export const useMediaSource = ({
   const api = htmlSource.kind === PLAYER_SOURCE_KINDS.server ? htmlSource.api : null
   const knownDuration =
     htmlSource.kind === PLAYER_SOURCE_KINDS.server ? htmlSource.media.duration : null
-  const access =
-    htmlSource.kind === PLAYER_SOURCE_KINDS.server ? (htmlSource.mediaPlane?.access ?? null) : null
+  const plane = htmlSource.kind === PLAYER_SOURCE_KINDS.server ? htmlSource.mediaPlane : undefined
+  const access = plane?.access ?? null
+  // With an origin named, the video waits for its ticket rather than start through the web host.
+  const isAwaitingTicket = !!plane?.isAwaitingTicket
   const accessRef = useRef(access)
   useEffect(() => {
     accessRef.current = access
@@ -192,7 +194,7 @@ export const useMediaSource = ({
 
   useEffect(() => {
     const element = videoRef.current
-    if (!element) return undefined
+    if (!element || isAwaitingTicket) return undefined
     attached.current = wanted
     const videoSource: VideoSource =
       api != null && typeof id === 'number'
@@ -213,5 +215,18 @@ export const useMediaSource = ({
       duration: knownDuration,
       isRemote: originUrl != null,
     })
-  }, [videoRef, id, knownDuration, api, mode, audio, quality, burn, mime, wanted, originUrl])
+  }, [
+    videoRef,
+    id,
+    knownDuration,
+    api,
+    mode,
+    audio,
+    quality,
+    burn,
+    mime,
+    wanted,
+    originUrl,
+    isAwaitingTicket,
+  ])
 }

@@ -96,7 +96,6 @@ describe('Report this error', () => {
       pick: {
         origin: { kind: MEDIA_ORIGIN_KINDS.lan, url: 'https://raven.home.example.com?t=secret' },
         at: Date.UTC(2026, 9, 20),
-        remote: null,
       },
     })
     const { send, report } = reporter(async () => undefined)

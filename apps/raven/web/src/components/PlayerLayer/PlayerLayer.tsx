@@ -1,7 +1,6 @@
 import { AudioHost } from '@raven/ui'
 import type { ComponentType } from 'react'
 import { Outlet } from 'react-router-dom'
-import { useReprobe } from '@/components/MediaOriginProbe/MediaOriginProbe'
 import { NowPlayingBar, useIsBarShown } from '@/components/NowPlayingBar/NowPlayingBar'
 import { DesktopAudioHost } from '@/desktop/audio/DesktopAudioHost'
 import { api } from '@/lib/api'
@@ -31,7 +30,6 @@ const AUDIO_HOSTS = {
  */
 export const PlayerLayer = () => {
   const isDesktop = useIsDesktop()
-  const reprobe = useReprobe()
   const isBarShown = useIsBarShown()
   const Audio = AUDIO_HOSTS[isDesktop ? PLAYER_HOSTS.desktop : PLAYER_HOSTS.browser]
   return (
@@ -42,7 +40,7 @@ export const PlayerLayer = () => {
         <Outlet />
       </div>
       <div className={styles.player}>
-        <Audio api={api} reprobe={reprobe} />
+        <Audio api={api} />
         <NowPlayingBar />
       </div>
     </div>

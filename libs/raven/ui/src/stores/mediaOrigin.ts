@@ -1,78 +1,30 @@
-import {
-  type Infer,
-  PICK_FRESH_MS,
-  isMediaOrigin,
-  isNumber,
-  isRemotePlayback,
-  nullable,
-  object,
-} from '@raven/core'
+import type { MediaOrigin } from '@raven/core'
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
-import { localOrMemoryStorage } from '@/stores/browserStorage'
-import { STORE_KEYS } from '@/stores/storage'
+import { devtools } from 'zustand/middleware'
 
-/**
- * What a probe last found: the origin media plays from (null plays through
- * the web host), when it was chosen (epoch ms), and what the server said of
- * remote play then (null from a server that says nothing).
- */
-const isMediaPick = object({
-  origin: nullable(isMediaOrigin),
-  at: isNumber,
-  remote: nullable(isRemotePlayback),
-})
-
-export type MediaPick = Infer<typeof isMediaPick>
-
-/** The part of the store kept across reloads and tabs. */
-const isPersistedOrigin = object({ pick: isMediaPick })
+/** Where media plays from (null plays through the web host's own address), and when the host set it (epoch ms). */
+export type MediaPick = {
+  origin: MediaOrigin | null
+  at: number
+}
 
 type MediaOriginState = {
-  /** The last probe's pick; null before any probe answered. */
+  /** The host's pick; null until the host sets one. */
   pick: MediaPick | null
-  isProbing: boolean
-  /** Whether a probe has ended since launch; before one, an empty pick says nothing yet. */
-  hasProbed: boolean
   setPick: (pick: MediaPick | null) => void
-  setProbing: (isProbing: boolean) => void
-}
-
-type IsFreshPickProps = { pick: MediaPick | null; now: number }
-
-export const isFreshPick = ({ pick, now }: IsFreshPickProps): boolean => {
-  if (!pick) return false
-  const age = now - pick.at
-  return age >= 0 && age < PICK_FRESH_MS
 }
 
 /**
- * The pick, and the server's word on remote play with it, last across
- * reloads and tabs until the pick goes stale, so a player that starts before
- * the next probe answers already plays from that origin and plans away from
- * home as that probe found.
+ * The media origin the host sets as it starts. Nothing probes or falls
+ * back: a host that names an origin plays every video and track from it,
+ * and one that names none plays through its own address.
  */
 export const useMediaOrigin = create<MediaOriginState>()(
   devtools(
-    persist(
-      (set) => ({
-        pick: null,
-        isProbing: false,
-        hasProbed: false,
-        setPick: (pick) => set({ pick }),
-        setProbing: (isProbing) =>
-          set((state) => ({ isProbing, hasProbed: state.hasProbed || !isProbing })),
-      }),
-      {
-        name: STORE_KEYS.mediaOrigin,
-        storage: createJSONStorage(localOrMemoryStorage),
-        partialize: ({ pick }) => ({ pick }),
-        merge: (persisted, current) => ({
-          ...current,
-          pick: isPersistedOrigin(persisted) ? persisted.pick : null,
-        }),
-      },
-    ),
+    (set) => ({
+      pick: null,
+      setPick: (pick) => set({ pick }),
+    }),
     { name: 'raven/mediaOrigin' },
   ),
 )
