@@ -1,8 +1,8 @@
-// The header, then the hero, the tiles and the rows, a section's gap apart.
+// A small title close above the first section, so Binge starts high; the sections keep their own gap.
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--section-gap);
+  gap: var(--space-4);
 }
 
 // The title, small, under the way back when there is one.
@@ -26,7 +26,7 @@
 .title {
   grid-area: title;
   color: var(--color-lichen);
-  font-size: var(--font-size-hero);
+  font-size: var(--font-size-2xl);
   line-height: var(--line-tight);
   letter-spacing: normal;
 }

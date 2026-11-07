@@ -13,12 +13,7 @@ export const artistToMatch = ({ artist }: ArtistToMatchProps): string | null =>
 
 /** A name as it is found again: lowercased, unaccented, one space between words. */
 export const nameKeyOf = (name: string): string =>
-  name
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim()
+  name.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
 
 type AlbumTypeOfProps = Pick<AudioTags, 'releaseTypes' | 'isCompilation'>
 

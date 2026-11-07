@@ -436,6 +436,11 @@ const listen = async ({ server, port }: ListenProps): Promise<string> => {
   return `http://127.0.0.1:${address.port}`
 }
 
+const sendSidecar = (response: ServerResponse) => {
+  response.writeHead(200, { [HTTP_HEADERS.contentType]: 'text/vtt; charset=utf-8' })
+  response.end(FIXTURE_SIDECAR)
+}
+
 const shut = (server: Server): Promise<void> =>
   new Promise((resolve) => {
     if (!server.listening) return resolve()
@@ -667,11 +672,6 @@ export const startFixtureServer = async ({
       [HTTP_HEADERS.cacheControl]: 'no-store',
     })
     response.end(randomBytes(length))
-  }
-
-  const sendSidecar = (response: ServerResponse) => {
-    response.writeHead(200, { [HTTP_HEADERS.contentType]: 'text/vtt; charset=utf-8' })
-    response.end(FIXTURE_SIDECAR)
   }
 
   type AnswerMediaProps = {

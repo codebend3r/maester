@@ -269,7 +269,7 @@ describe('home hero', () => {
       expect(await heroFor(as({ isAdmin: false, pin: null }))).not.toContain('Vault Thing')
     })
 
-    it('is in progress for the admin alone, even with the PIN entered', async () => {
+    it('is never in progress on home, for the admin with the PIN entered or anyone else', async () => {
       const pin = await unlockCookie()
       const [video = 0] = app().get(MediaIndex).idsForLibrary(state.vault)
       await apiFor({ app: app(), cookie: cookies(state.admin, pin) }).saveProgress({
@@ -284,7 +284,8 @@ describe('home hero', () => {
           ({ media }) => media.id,
         )
 
-      expect(await inProgress(as({ isAdmin: true, pin }))).toContain(video)
+      expect(await inProgress(as({ isAdmin: true, pin }))).not.toContain(video)
+      expect(await inProgress(as({ isAdmin: true, pin: null }))).not.toContain(video)
       expect(await inProgress(as({ isAdmin: false, pin }))).not.toContain(video)
       expect(await inProgress(as({ isAdmin: false, pin: null }))).not.toContain(video)
     })

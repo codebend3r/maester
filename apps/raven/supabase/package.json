@@ -29,9 +29,9 @@
     "format:check": "oxfmt --check ."
   },
   "devDependencies": {
-    "oxfmt": "0.68.0",
-    "oxlint": "1.83.0",
-    "supabase": "2.121.0"
+    "oxfmt": "0.77.0",
+    "oxlint": "1.92.0",
+    "supabase": "3.0.0"
   },
   "nx": {
     "projectType": "application",

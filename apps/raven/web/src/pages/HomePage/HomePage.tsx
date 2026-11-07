@@ -311,8 +311,7 @@ const HOME_BODIES = {
  * is being watched, as wide tiles, then a row for each pinned library with
  * its eight newest releases, in the side menu's order. A search from the
  * shell's bar, which rides in the address as `?q=`, shows what it found in
- * place of all of it. Libraries still locked stay off it until the PIN
- * opens them.
+ * place of all of it. A locked library never shows on it, PIN or not.
  */
 export const HomePage = () => {
   const titleId = useId()

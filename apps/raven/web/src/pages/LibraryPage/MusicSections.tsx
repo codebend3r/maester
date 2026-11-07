@@ -15,7 +15,7 @@ import {
 } from '@raven/core'
 import { Button } from '@raven/ui'
 import { type Search, useAudioQueue } from '@raven/ui/headless'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
@@ -42,6 +42,9 @@ type AlbumsToolbarProps = {
   /** Whether there is anything to play. */
   isPlayable: boolean
 }
+
+/** The year as the section opens: read once, so render stays pure. */
+const useThisYear = (): number => useState(() => new Date().getFullYear())[0]
 
 /** Search, the sort, and Play and Shuffle, which queue the library's tracks in the order shown. */
 const AlbumsToolbar = ({
@@ -134,6 +137,7 @@ type AlbumsSectionProps = { library: Library }
 /** A music library's albums: searched and sorted, with Play and Shuffle. */
 export const AlbumsSection = ({ library }: AlbumsSectionProps) => {
   const cards = useRef<HTMLDivElement>(null)
+  const thisYear = useThisYear()
   const search = useAddressSearch()
   const [address, setAddress] = useSearchParams()
   const decoded = musicListQuery.decode(address.toString())
@@ -167,7 +171,7 @@ export const AlbumsSection = ({ library }: AlbumsSectionProps) => {
     sort,
     direction: order,
     albums: albums.data ?? [],
-    thisYear: new Date().getFullYear(),
+    thisYear,
   })
   return (
     <div
@@ -211,6 +215,7 @@ type UnmatchedAlbumsSectionProps = { library: Library }
 /** Albums whose MusicBrainz match pass found no confident release, alphabetically. */
 export const UnmatchedAlbumsSection = ({ library }: UnmatchedAlbumsSectionProps) => {
   const cards = useRef<HTMLDivElement>(null)
+  const thisYear = useThisYear()
   const queryClient = useQueryClient()
   const list = albumsQuery({
     libraryId: library.id,
@@ -229,7 +234,7 @@ export const UnmatchedAlbumsSection = ({ library }: UnmatchedAlbumsSectionProps)
     sort: MUSIC_SORTS.title,
     direction: SORT_DIRECTIONS.ascending,
     albums: unmatched,
-    thisYear: new Date().getFullYear(),
+    thisYear,
   })
   const smartMatch = useMutation({
     mutationFn: () => api.matchLibrary(library.id),

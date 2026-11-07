@@ -2,18 +2,33 @@ import { Stream } from 'node:stream'
 import { constants } from 'node:zlib'
 import fastifyCompress from '@fastify/compress'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
+import type { FastifyRequest } from 'fastify'
 import { CONTENT_TYPES, HEADERS } from '@/http'
 
-// The plugin's own list adds octet-stream, which on a media server is a video.
-// Anything else it takes from mime-db, which marks no video and neither JPEG
+// Past this list the plugin asks mime-db, which marks no video and neither JPEG
 // nor PNG compressible, and leaves out the HLS playlist, which is text.
 const COMPRESSIBLE = /^text\/(?!event-stream)|[+/](?:json|xml)(?:;|$)/u
 
+const baseTypeOf = (type: string): string => type.split(';', 1)[0]?.trim().toLowerCase() ?? ''
+
 const isCompressible = (type: string): boolean =>
-  COMPRESSIBLE.test(type) || (type.split(';', 1)[0]?.trim() ?? '') === CONTENT_TYPES.m3u8
+  COMPRESSIBLE.test(type) || baseTypeOf(type) === CONTENT_TYPES.m3u8
 
 /** The content codings offered, in order of preference. */
 export const ENCODINGS = { br: 'br', gzip: 'gzip' } as const
+
+/** Why a reply skips the plugin, as its `x-no-compression` value. */
+const SKIP_REASONS = { range: 'range', bytes: 'bytes' } as const
+
+type SkipCompressionProps = {
+  request: FastifyRequest
+  reason: (typeof SKIP_REASONS)[keyof typeof SKIP_REASONS]
+}
+
+// `x-no-compression` on the request is the plugin's way to skip one reply.
+const skipCompression = ({ request, reason }: SkipCompressionProps): void => {
+  request.headers = { ...request.headers, [HEADERS.xNoCompression]: reason }
+}
 
 const isStream = (payload: unknown): payload is Stream | ReadableStream =>
   payload instanceof Stream || payload instanceof ReadableStream
@@ -37,20 +52,26 @@ type CompressResponsesProps = {
  */
 export const compressResponses = async ({ app }: CompressResponsesProps): Promise<void> => {
   const fastify = app.getHttpAdapter().getInstance()
-  // A Range asks for bytes of the uncompressed file, so it is answered as it
-  // always was. `x-no-compression` is the plugin's way to skip one request.
+  // A Range asks for bytes of the uncompressed file, so it is answered as it always was.
   fastify.addHook('onRequest', async (request) => {
     if (request.headers[HEADERS.range] !== undefined) {
-      request.headers = { ...request.headers, [HEADERS.xNoCompression]: 'range' }
+      skipCompression({ request, reason: SKIP_REASONS.range })
     }
   })
   // The plugin compresses a reply with no type as JSON, and Fastify names no
   // type for a stream, so a stream that names none would be packed and lose
   // its length. Called bytes, it goes out as it is. Fastify runs this hook
   // before the plugin's, which it adds to each route.
-  fastify.addHook('onSend', async (_request, reply, payload) => {
+  //
+  // mime-db 1.54 calls octet-stream compressible, and on a media server that
+  // is a video, so bytes are marked for the plugin to skip.
+  fastify.addHook('onSend', async (request, reply, payload) => {
     if (reply.getHeader(HEADERS.contentType) === undefined && isStream(payload)) {
       reply.header(HEADERS.contentType, CONTENT_TYPES.octetStream)
+    }
+    const type = reply.getHeader(HEADERS.contentType)
+    if (typeof type === 'string' && baseTypeOf(type) === CONTENT_TYPES.octetStream) {
+      skipCompression({ request, reason: SKIP_REASONS.bytes })
     }
     return payload
   })

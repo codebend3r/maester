@@ -719,12 +719,13 @@ const toSearchResult = (entry: Record<string, unknown>): SearchResult | null => 
 export const toSearchResults = (body: unknown): SearchResult[] =>
   records(record(body).results).flatMap((entry) => toSearchResult(entry) ?? [])
 
+const idsOf = (results: unknown): string[] =>
+  records(results).flatMap((entry) => idOf(entry.id) ?? [])
+
 /** TMDB's ids among a `/find/{id}` body, by kind. */
 export const toFoundIds = (body: unknown): { movies: string[]; shows: string[] } => {
   const found = record(body)
-  const ids = (results: unknown): string[] =>
-    records(results).flatMap((entry) => idOf(entry.id) ?? [])
-  return { movies: ids(found.movie_results), shows: ids(found.tv_results) }
+  return { movies: idsOf(found.movie_results), shows: idsOf(found.tv_results) }
 }
 
 /** The other titles in an `alternative_titles` body: a movie's come as `titles`, a show's as `results`. */

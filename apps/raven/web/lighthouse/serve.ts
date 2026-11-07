@@ -274,6 +274,11 @@ const listen = ({ site, certificate }: ListenProps): Promise<void> =>
     server.listen(site.port, site.host, resolve)
   })
 
+const isUp = async (): Promise<boolean> =>
+  fetch(`${FIXTURE_ORIGIN}${FIXTURE_SERVER.readyPath}`)
+    .then((answered) => answered.ok)
+    .catch(() => false)
+
 /** Starts the fixture and resolves once it answers, which it does only once its scans are done. */
 const startFixture = async (): Promise<void> => {
   const fixture = spawn('bun', ['run', 'serve:lighthouse'], {
@@ -292,10 +297,6 @@ const startFixture = async (): Promise<void> => {
     console.error(`The Lighthouse fixture stopped (exit ${code})`)
     process.exit(1)
   })
-  const isUp = async (): Promise<boolean> =>
-    fetch(`${FIXTURE_ORIGIN}${FIXTURE_SERVER.readyPath}`)
-      .then((answered) => answered.ok)
-      .catch(() => false)
   const waitUntilUp = async (): Promise<void> => {
     if (await isUp()) return
     await Bun.sleep(FIXTURE_POLL_MS)

@@ -72,5 +72,8 @@
     }
   },
   "analytics": true,
-  "nxCloudId": "6ad04421f895fd4c05aa78ef"
+  "nxCloudId": "6ad04421f895fd4c05aa78ef",
+  "affected": {
+    "legacy": true
+  }
 }

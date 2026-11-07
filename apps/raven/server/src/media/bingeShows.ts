@@ -14,8 +14,9 @@ type BingeShowsDismissTipProps = { account: AccountKey }
 
 /**
  * The shows each account is binging, at most `BINGE_LIMIT`, most recently
- * added first. Only a show a library that is not locked holds can be added;
- * removing always goes through.
+ * added first. Only a show a library that is not locked holds can be added,
+ * and only such a show is listed, so one whose library was locked later stays
+ * off every binge card, PIN or not. Removing always goes through.
  */
 @Injectable()
 export class BingeShows {
@@ -29,15 +30,26 @@ export class BingeShows {
     return this.database.db
   }
 
-  /** `account`'s binge shows and whether it has dismissed the tip. */
-  state({ account }: BingeShowsStateProps): BingeState {
-    const ids = this.db
+  /** Every show on `account`'s list, a locked library's too, as the limit counts them. */
+  private storedIds({ account }: BingeShowsStateProps): number[] {
+    return this.db
       .prepare<ByAccount, { item_id: number }>(
         `SELECT item_id FROM binge_shows WHERE account_id = @account
           ORDER BY added_at DESC, item_id DESC`,
       )
       .all({ account })
       .map((row) => row.item_id)
+  }
+
+  /** Whether a library that is not locked holds `itemId`. */
+  private isOpen(itemId: number): boolean {
+    const locked = this.libraries.lockedIds()
+    return this.metadata.librariesHolding(itemId).some((libraryId) => !locked.has(libraryId))
+  }
+
+  /** `account`'s binge shows a library that is not locked holds, and whether it has dismissed the tip. */
+  state({ account }: BingeShowsStateProps): BingeState {
+    const ids = this.storedIds({ account }).filter((itemId) => this.isOpen(itemId))
     const hasSeenTip = !!this.db
       .prepare<ByAccount, { account_id: string }>(
         'SELECT account_id FROM binge_tips WHERE account_id = @account',
@@ -59,11 +71,8 @@ export class BingeShows {
         return BINGE_OUTCOMES.done
       }
       if (this.metadata.get(itemId)?.type !== ITEM_TYPES.show) return BINGE_OUTCOMES.missing
-      const locked = this.libraries.lockedIds()
-      if (!this.metadata.librariesHolding(itemId).some((libraryId) => !locked.has(libraryId))) {
-        return BINGE_OUTCOMES.locked
-      }
-      const { ids } = this.state({ account })
+      if (!this.isOpen(itemId)) return BINGE_OUTCOMES.locked
+      const ids = this.storedIds({ account })
       if (!ids.includes(itemId) && ids.length >= BINGE_LIMIT) return BINGE_OUTCOMES.full
       this.db
         .prepare(
