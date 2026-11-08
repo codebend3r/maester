@@ -116,6 +116,34 @@ describe('useServerEvents', () => {
     )
   })
 
+  it("reads Continue watching's sources again on another device's viewing change", async () => {
+    const { opened, stale } = setUp()
+    opened[0]!.emit({
+      type: SERVER_STREAM_EVENTS.message,
+      data: JSON.stringify({ type: SERVER_EVENT_TYPES.viewing }),
+    })
+    await waitFor(() =>
+      expect(stale()).toEqual([
+        queryKeys.libraries,
+        queryKeys.library(2),
+        queryKeys.library(3),
+        queryKeys.favourites,
+        queryKeys.item(40),
+        queryKeys.home,
+        queryKeys.mediaItem(7),
+      ]),
+    )
+  })
+
+  it("reads the binge list and Home again on another device's binge change", async () => {
+    const { opened, stale } = setUp()
+    opened[0]!.emit({
+      type: SERVER_STREAM_EVENTS.message,
+      data: JSON.stringify({ type: SERVER_EVENT_TYPES.binge }),
+    })
+    await waitFor(() => expect(stale()).toEqual([queryKeys.home]))
+  })
+
   it('ignores a message that is not a server event', () => {
     const { opened, stale } = setUp()
     opened[0]!.emit({ type: SERVER_STREAM_EVENTS.message, data: 'not json' })

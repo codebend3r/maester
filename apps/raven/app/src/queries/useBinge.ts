@@ -1,10 +1,10 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BINGE_LIMIT, type BingeState } from '@raven/core'
+import { queryKeys } from '@raven/ui/headless'
 
 import { useAccountSession } from '@/account/session'
 import { useAppQueries } from '@/queries/useAppQueries'
 
-const BINGE_STATE_KEY = ['binge-state'] as const
 const SIGNED_OUT = 'signed-out'
 const EMPTY_IDS: readonly number[] = []
 
@@ -12,7 +12,7 @@ type BingeStateQueryProps = { account: string; getBinge: () => Promise<BingeStat
 
 /** The account's binge shows; the account is in the key so the next one never sees the last one's. */
 const bingeStateQuery = ({ account, getBinge }: BingeStateQueryProps) =>
-  queryOptions({ queryKey: [...BINGE_STATE_KEY, account], queryFn: getBinge })
+  queryOptions({ queryKey: [...queryKeys.bingeState, account], queryFn: getBinge })
 
 const useAccountKey = () => useAccountSession((state) => state.session?.userId ?? SIGNED_OUT)
 

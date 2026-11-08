@@ -114,6 +114,8 @@ const TEST_SETTINGS = {
   SDKROOT: 'appletvos',
   SUPPORTED_PLATFORMS: quoted('appletvos appletvsimulator'),
   TARGETED_DEVICE_FAMILY: '3',
+  // The app's own, so the tests run on any Apple TV the app does; unset, it is the newest SDK's.
+  TVOS_DEPLOYMENT_TARGET: '16.4',
   GENERATE_INFOPLIST_FILE: 'YES',
   SWIFT_VERSION: '5.0',
   CODE_SIGN_STYLE: 'Manual',

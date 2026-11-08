@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native'
+import { FOCUS_FRONT } from '@/layouts/focusFront'
 
 import { BODY_FONT } from '@/theme/fonts'
 import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
@@ -72,7 +73,7 @@ const formStylesFor = ({ sizes, colours }: FormStylesForProps) =>
     checkBoxOn: { backgroundColor: colours.accent, borderColor: colours.accent },
     checkTick: { color: colours.onAccent, fontSize: sizes.text, fontWeight: 'bold' },
     checkText: { color: colours.text, fontSize: sizes.text },
-    focused: { borderColor: colours.text },
+    focused: { ...FOCUS_FRONT, borderColor: colours.text },
     disabled: { opacity: OPACITIES.disabled },
     note: { color: colours.muted, fontSize: sizes.text },
     notice: { color: colours.notice, fontSize: sizes.textLg },

@@ -492,9 +492,10 @@ export const PlayerChrome = ({
             homeTo={title.homeTo ?? null}
             onFail={setFailedLogo}
           />
-          {(heading.episode != null || !!favourite) && (
-            <div className={styles.episodeLine}>
-              {heading.episode != null && <p className={styles.episode}>{heading.episode}</p>}
+          {heading.episode != null && <p className={styles.episode}>{heading.episode}</p>}
+          {(!!about || !!favourite) && (
+            <div className={styles.aboutLine}>
+              {!!about && <p className={styles.about}>{about}</p>}
               {favourite && (
                 <Button
                   tone="ghost"
@@ -509,7 +510,6 @@ export const PlayerChrome = ({
               )}
             </div>
           )}
-          {!!about && <p className={styles.about}>{about}</p>}
         </div>
         <PlayerStatus media={media} mode={mode} quality={quality}>
           {nextLink && (

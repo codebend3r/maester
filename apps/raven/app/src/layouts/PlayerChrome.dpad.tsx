@@ -35,6 +35,7 @@ import { FocusFactChips } from '@/layouts/FactChips'
 import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import { CaptionText } from '@/layouts/PlayerCaption'
 import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
+import { ChaptersBand } from '@/layouts/PlayerChapters.dpad'
 import {
   PLAYER_COPY,
   SKIP_DIRECTIONS,
@@ -160,6 +161,7 @@ type ControlsProps = Pick<
   | 'mode'
   | 'favourite'
   | 'upNext'
+  | 'chapters'
   | 'onBack'
 > & {
   /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
@@ -329,8 +331,8 @@ type HeadingLinesProps = Pick<PlayerChromeProps, 'heading' | 'favourite'>
 
 /**
  * The title along the top as lines, as the web player's: the show's art (or a film's) on a row
- * of its own, an episode's own name with the heart beside it, then the line of what it is: its
- * season and number, its length and its year.
+ * of its own, an episode's own name, then the line of what it is (its season and number, its
+ * length and its year) with the heart beside it on the same row.
  */
 const Heading = ({ heading, favourite }: HeadingLinesProps) => {
   const styles = useStyles()
@@ -350,17 +352,17 @@ const Heading = ({ heading, favourite }: HeadingLinesProps) => {
           textStyle={styles.show}
         />
       </View>
+      {episodeName !== null && (
+        <Text variant={TEXT_VARIANTS.display} numberOfLines={2} style={styles.title}>
+          {episodeName}
+        </Text>
+      )}
       <FocusBand>
         <View style={styles.titleRow}>
-          {episodeName !== null && (
-            <Text variant={TEXT_VARIANTS.display} numberOfLines={2} style={styles.title}>
-              {episodeName}
-            </Text>
-          )}
+          {details !== '' && <Text style={styles.details}>{details}</Text>}
           <HeadingFavourite favourite={favourite} />
         </View>
       </FocusBand>
-      {details !== '' && <Text style={styles.details}>{details}</Text>}
     </View>
   )
 }
@@ -385,6 +387,7 @@ const Controls = ({
   mode,
   favourite,
   upNext,
+  chapters,
   onBack,
   onScrubbing,
   onPicking,
@@ -393,6 +396,8 @@ const Controls = ({
 }: ControlsProps) => {
   const scrubber: Focusable = useRef(null)
   const styles = useStyles()
+  // The chapters open as the remote reaches their strip below the buttons, and fold as it goes back up.
+  const [isChaptersOpen, setChaptersOpen] = useState(false)
   /*
    * Brought back while they fade out, the controls are still drawn, and the hidden state's
    * catcher, which had the focus, goes: the line asks again.
@@ -416,7 +421,7 @@ const Controls = ({
         style={styles.bottom}
       >
         {transport !== null && (
-          <View style={styles.timeline}>
+          <View onFocus={() => setChaptersOpen(false)} style={styles.timeline}>
             <Text style={styles.time}>{formatDuration(transport.position)}</Text>
             <View style={styles.scrubberSlot}>
               <Scrubber onScrubbing={onScrubbing} transport={transport} view={scrubber} />
@@ -425,7 +430,7 @@ const Controls = ({
           </View>
         )}
         <FocusBand>
-          <View style={styles.buttons}>
+          <View onFocus={() => setChaptersOpen(false)} style={styles.buttons}>
             {transport !== null && (
               <>
                 <PlateButton
@@ -485,6 +490,19 @@ const Controls = ({
             )}
           </View>
         </FocusBand>
+        {transport !== null && (
+          <ChaptersBand
+            chapters={chapters}
+            isOpen={isChaptersOpen}
+            onChoose={(start) => {
+              transport.onSeek(start)
+              setChaptersOpen(false)
+              requestTVFocus(scrubber.current)
+            }}
+            onOpen={() => setChaptersOpen(true)}
+            position={transport.position}
+          />
+        )}
       </View>
     </View>
   )
@@ -539,6 +557,7 @@ const DpadPlayer = ({
   mode,
   favourite,
   upNext,
+  chapters,
   onBack,
 }: DpadPlayerProps) => {
   // Only the remote's handler reads whether the line has the focus, so it is no render's concern.
@@ -661,6 +680,7 @@ const DpadPlayer = ({
             subtitles={subtitles}
             transport={controlled}
             upNext={upNext}
+            chapters={chapters}
           />
         </Animated.View>
       )}

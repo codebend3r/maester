@@ -117,6 +117,8 @@ export const queryKeys = {
   /** What plays after a video in a session, under the video's key so reading it again reads this again too. */
   nextInSession: ({ id, session }: QueryKeysNextInSessionProps) => ['media', id, 'next', session],
   favourites: ['favourites'],
+  /** The account's binge list, under every host's own account suffix. */
+  bingeState: ['binge-state'],
   favouriteTitles: ['favourites', 'titles'],
   /** The account's favourite albums and artists, under the favourites so whatever reads them again reads these too. */
   favouriteAlbums: ['favourites', 'albums'],

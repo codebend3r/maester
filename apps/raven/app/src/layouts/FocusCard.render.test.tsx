@@ -1,8 +1,10 @@
 import { describe, expect, it, jest } from '@jest/globals'
-import { render, screen } from '@testing-library/react-native'
+import { fireEvent, render, screen } from '@testing-library/react-native'
 import { FocusCard } from '@/layouts/FocusCard'
+import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import { ROUTE_TARGETS } from '@/routes'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import type * as NavigationFocus from '@/test/navigationFocus'
 
 jest.mock(
@@ -52,5 +54,19 @@ describe('FocusCard', () => {
       />,
     )
     expect(screen.getByText('Severance')).toBeTruthy()
+  })
+})
+
+describe('FocusCard focus', () => {
+  it('stands in front of its neighbours while focused, and back among them once it blurs', async () => {
+    await render(
+      <FocusCard card={CARD} isPreferred={false} onPress={() => undefined} width={400} />,
+    )
+    const card = screen.getByRole('button')
+    expect(card).not.toHaveStyle(FOCUS_FRONT)
+    await fireEvent(card, NATIVE_EVENTS.focus)
+    expect(card).toHaveStyle(FOCUS_FRONT)
+    await fireEvent(card, NATIVE_EVENTS.blur)
+    expect(card).not.toHaveStyle(FOCUS_FRONT)
   })
 })

@@ -174,15 +174,17 @@ const bingeLabelOf = ({ isBinging, isFull }: Omit<BingeToggle, 'toggle'>): strin
 }
 
 /**
- * Binge, a show's only: on the account's binge list, which holds `BINGE_LIMIT` shows. While
- * the list is full of others it is drawn faint and its press does nothing, as the web's does.
+ * Binge, a show's only, said as "Binge" or "Binging" beside its icon: on the account's binge
+ * list, which holds `BINGE_LIMIT` shows. While the list is full of others it is drawn faint and
+ * its press does nothing, as the web's does.
  */
 const bingeOf = ({ isBinging, isFull, toggle }: BingeToggle): ItemAction => ({
   kind: ITEM_ACTIONS.toggle,
   key: ACTION_KEYS.binge,
   icon: 'popcorn',
   label: bingeLabelOf({ isBinging, isFull }),
-  text: null,
+  // In words beside the icon, so the remote finds it among the marks.
+  text: isBinging ? ITEM_COPY.binging : ITEM_COPY.binge,
   isOn: isBinging,
   isDisabled: isFull,
   onPress: toggle,

@@ -30,6 +30,7 @@ export const ITEM_COPY = {
   markWatched: 'Mark watched',
   watched: 'Watched',
   favourite: 'Favourite',
+  binge: 'Binge',
   markBinging: 'Mark as binging',
   binging: 'Binging',
   /** What a show's Binge says while three other shows fill the list. */

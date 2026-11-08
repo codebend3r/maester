@@ -11,6 +11,14 @@ import {
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 
+/** How large a TV's library grids draw their cards: the middle by default. */
+export const GRID_SIZES = { small: 'small', medium: 'medium', large: 'large' } as const
+
+export type GridSize = (typeof GRID_SIZES)[keyof typeof GRID_SIZES]
+
+const isGridSize = (value: unknown): value is GridSize =>
+  Object.values(GRID_SIZES).some((size) => size === value)
+
 /** The key the preferences are stored under. */
 export const APP_PREFS_KEY = 'raven-app-prefs'
 
@@ -26,6 +34,10 @@ export type AppPrefsValues = {
    * the heights the server's own cap offers (core's `MAX_HEIGHTS`).
    */
   awayMaxHeight: MaxHeight
+  /** How large a TV's library grids draw their cards. */
+  gridSize: GridSize
+  /** Whether Now Playing on a TV draws the equalizer over the cover; a select on the cover toggles it. */
+  isEqualizerShown: boolean
 }
 
 type AppPrefs = AppPrefsValues & {
@@ -43,6 +55,8 @@ export const DEFAULT_APP_PREFS: AppPrefsValues = {
   shouldPreferDirectPlay: true,
   isTranscodeAllowed: true,
   awayMaxHeight: MAX_HEIGHTS.fullHd,
+  gridSize: GRID_SIZES.medium,
+  isEqualizerShown: true,
 }
 
 /** What was read back, each preference kept only where it is one, the default otherwise. */
@@ -59,6 +73,10 @@ const prefsOf = (saved: unknown): AppPrefsValues => {
     awayMaxHeight: isMaxHeight(kept.awayMaxHeight)
       ? kept.awayMaxHeight
       : DEFAULT_APP_PREFS.awayMaxHeight,
+    gridSize: isGridSize(kept.gridSize) ? kept.gridSize : DEFAULT_APP_PREFS.gridSize,
+    isEqualizerShown: isBoolean(kept.isEqualizerShown)
+      ? kept.isEqualizerShown
+      : DEFAULT_APP_PREFS.isEqualizerShown,
   }
 }
 
@@ -84,11 +102,20 @@ export const useAppPrefs = create<AppPrefs>()(
       name: APP_PREFS_KEY,
       storage: createJSONStorage(() => UNCONFIGURED),
       skipHydration: true,
-      partialize: ({ theme, shouldPreferDirectPlay, isTranscodeAllowed, awayMaxHeight }) => ({
+      partialize: ({
         theme,
         shouldPreferDirectPlay,
         isTranscodeAllowed,
         awayMaxHeight,
+        gridSize,
+        isEqualizerShown,
+      }) => ({
+        theme,
+        shouldPreferDirectPlay,
+        isTranscodeAllowed,
+        awayMaxHeight,
+        gridSize,
+        isEqualizerShown,
       }),
       merge: (saved, current) => ({ ...current, ...prefsOf(saved) }),
     },

@@ -16,11 +16,16 @@ const SHAPE_RATIOS = {
 /** How much of a card the title art may take, at its foot and to the left: wide and short, as title art runs. */
 const LOGO_SHARE = { width: 0.6, height: 0.32 } as const
 
-type PictureHeightOfProps = { shape: CardShape; width: number }
+type PictureHeightOfProps = {
+  shape: CardShape
+  width: number
+  /** The height over the width a layout asks for in place of the shape's own. */
+  ratio?: number
+}
 
 /** How tall a card's picture stands for its width. */
-export const pictureHeightOf = ({ shape, width }: PictureHeightOfProps): number =>
-  width * SHAPE_RATIOS[shape]
+export const pictureHeightOf = ({ shape, width, ratio }: PictureHeightOfProps): number =>
+  width * (ratio ?? SHAPE_RATIOS[shape])
 
 /** Whether a picture is drawn, or a stand-in for it in its place. */
 export const PICTURE_STATES = { shown: 'shown', missing: 'missing' } as const
@@ -76,6 +81,8 @@ const CARD_FACES = {
 type CardPictureProps = {
   card: Pick<ShelfCard, 'title' | 'shape' | 'picture' | 'progress' | 'logo'>
   width: number
+  /** The picture's height over its width where a layout frames it otherwise than its shape. */
+  ratio?: number
   ring?: number
   radius?: number
   /** Hears the title art fail to load, so the card can put its title's words back. */
@@ -91,6 +98,7 @@ type CardPictureProps = {
 export const CardPicture = ({
   card,
   width,
+  ratio,
   ring = 0,
   radius = SIZES.radius,
   onLogoError,
@@ -101,7 +109,7 @@ export const CardPicture = ({
   const styles = useStyles()
   const cardLogo = card.logo ?? null
   const logo = cardLogo === null || cardLogo.uri === failedLogo ? null : cardLogo
-  const height = pictureHeightOf({ shape: card.shape, width })
+  const height = pictureHeightOf({ shape: card.shape, width, ratio })
   const pictureKey = card.picture === null ? null : JSON.stringify(card.picture)
   const picture = pictureKey === failed ? null : card.picture
   const outset = -2 * ring

@@ -8,6 +8,7 @@ import {
   nullable,
   object,
   oneOf,
+  union,
 } from '@/schema'
 
 /** `off` when not configured, `failing` when the last call went wrong. */
@@ -63,16 +64,23 @@ export const isMediaLocation = object({
 
 export type MediaLocation = Infer<typeof isMediaLocation>
 
-export const SERVER_EVENT_TYPES = { library: 'library' } as const
+export const SERVER_EVENT_TYPES = {
+  library: 'library',
+  viewing: 'viewing',
+  binge: 'binge',
+} as const
 
 /**
- * What the server tells a client as it happens: a library's videos changed,
- * so whatever shows them should be read again.
+ * What the server tells a client as it happens, so whatever shows it is read again: a library's
+ * videos changed; the account's viewing changed (a spot saved, a play counted, a mark made) on
+ * any of its devices; or the account's binge list changed. The last two go only to the
+ * account's own streams and name no account.
  */
-export const isServerEvent = object({
-  type: oneOf(Object.values(SERVER_EVENT_TYPES)),
-  libraryId: isNumber,
-})
+export const isServerEvent = union(
+  object({ type: oneOf([SERVER_EVENT_TYPES.library]), libraryId: isNumber }),
+  object({ type: oneOf([SERVER_EVENT_TYPES.viewing]) }),
+  object({ type: oneOf([SERVER_EVENT_TYPES.binge]) }),
+)
 
 export type ServerEvent = Infer<typeof isServerEvent>
 

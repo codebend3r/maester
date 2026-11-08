@@ -1,4 +1,12 @@
-import type { ArtistCredit, PlaylistSummary, RepeatMode } from '@raven/core'
+import {
+  type ArtistCredit,
+  CROSSFADE_SECONDS,
+  type CrossfadeSeconds,
+  type PlaylistSummary,
+  REPEAT_MODES,
+  type RepeatMode,
+} from '@raven/core'
+import type { IconName } from '@raven/ui/iconDrawings'
 import {
   AUDIOBOOK_SPEEDS,
   type AlbumDisc,
@@ -42,6 +50,24 @@ export const speedChooserOf =
     const speed = speedOfKey(key)
     if (speed !== null) onSpeed(speed)
   }
+
+/** The crossfade lengths the picker offers, each keyed by its seconds. */
+export const CROSSFADE_OPTIONS = CROSSFADE_SECONDS.map((seconds) => ({
+  key: String(seconds),
+  label: MUSIC_COPY.crossfadeFor(seconds),
+}))
+
+/** What the crossfade picker does with the key chosen: sets the length it names, and nothing for any other. */
+export const crossfadeChooserOf =
+  (onCrossfade: (seconds: CrossfadeSeconds) => void) =>
+  (key: string): void => {
+    const seconds = CROSSFADE_SECONDS.find((each) => String(each) === key)
+    if (seconds !== undefined) onCrossfade(seconds)
+  }
+
+/** The repeat plate's icon: the loop, with a one inside while one track repeats. */
+export const repeatIconOf = (repeat: RepeatMode): IconName =>
+  repeat === REPEAT_MODES.one ? 'repeatOne' : 'repeat'
 
 /** What the shuffle button says: "Shuffle on" or "Shuffle off". */
 export const shuffleLabelOf = (isShuffled: boolean): string =>

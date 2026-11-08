@@ -1,5 +1,5 @@
 /**
- * How AVPlayer is started on the spot to resume from. `react-native-video` 6.19.3's own
+ * How AVPlayer is started on the spot to resume from, on iPhone, iPad and Apple TV. `react-native-video` 6.19.3's own
  * `startPosition` runs, once the item is ready, `setSeek` (which pauses the player and resumes
  * it only when the seek lands) and then, before it has landed, `applyModifiers`, which asks
  * the player to play again: two plays around a far seek in a large file, and a player that

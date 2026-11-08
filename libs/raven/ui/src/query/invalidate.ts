@@ -90,6 +90,13 @@ export const afterWatched = (queryClient: QueryClient): Promise<unknown> =>
     ],
   })
 
+/** Another of the account's devices changed its binge list: the list, and Home, which leads with it. */
+export const afterBingeEvent = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({
+    queryClient,
+    filters: [{ queryKey: queryKeys.bingeState }, { queryKey: queryKeys.home }],
+  })
+
 /** The admin put a title in the hero or took one out: the picks, and the hero they decide. */
 export const afterHeroPicked = (queryClient: QueryClient): Promise<unknown> =>
   refetch({

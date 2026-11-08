@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it } from 'bun:test'
 import { DEFAULT_THEME, MAX_HEIGHTS, THEMES } from '@raven/core'
 import type { StateStorage } from 'zustand/middleware'
 
-import { APP_PREFS_KEY, DEFAULT_APP_PREFS, configureAppPrefs, useAppPrefs } from '@/stores/appPrefs'
+import {
+  APP_PREFS_KEY,
+  DEFAULT_APP_PREFS,
+  GRID_SIZES,
+  configureAppPrefs,
+  useAppPrefs,
+} from '@/stores/appPrefs'
 
 const memoryStorage = (entries: [string, string][] = []) => {
   const items = new Map(entries)
@@ -22,20 +28,35 @@ const memoryStorage = (entries: [string, string][] = []) => {
 const CONTRAST = THEMES[THEMES.length - 1]?.id ?? DEFAULT_THEME
 
 const prefsOf = () => {
-  const { theme, shouldPreferDirectPlay, isTranscodeAllowed, awayMaxHeight } =
-    useAppPrefs.getState()
-  return { theme, shouldPreferDirectPlay, isTranscodeAllowed, awayMaxHeight }
+  const {
+    theme,
+    shouldPreferDirectPlay,
+    isTranscodeAllowed,
+    awayMaxHeight,
+    gridSize,
+    isEqualizerShown,
+  } = useAppPrefs.getState()
+  return {
+    theme,
+    shouldPreferDirectPlay,
+    isTranscodeAllowed,
+    awayMaxHeight,
+    gridSize,
+    isEqualizerShown,
+  }
 }
 
 describe('useAppPrefs', () => {
   beforeEach(() => useAppPrefs.setState(DEFAULT_APP_PREFS))
 
-  it('starts on the default theme, preferring direct play, transcoding, and 1080p away', () => {
+  it('starts on the default theme, preferring direct play, transcoding, 1080p away and medium grids', () => {
     expect(prefsOf()).toEqual({
       theme: DEFAULT_THEME,
       shouldPreferDirectPlay: true,
       isTranscodeAllowed: true,
       awayMaxHeight: MAX_HEIGHTS.fullHd,
+      gridSize: GRID_SIZES.medium,
+      isEqualizerShown: true,
     })
   })
 
@@ -46,6 +67,7 @@ describe('useAppPrefs', () => {
     change({ theme: CONTRAST })
     change({ isTranscodeAllowed: false, awayMaxHeight: MAX_HEIGHTS.hd })
     change({ shouldPreferDirectPlay: false })
+    change({ gridSize: GRID_SIZES.large, isEqualizerShown: false })
 
     // What the next launch reads is what this one wrote, before anything there changes it.
     const relaunch = memoryStorage([...items])
@@ -56,6 +78,8 @@ describe('useAppPrefs', () => {
       shouldPreferDirectPlay: false,
       isTranscodeAllowed: false,
       awayMaxHeight: MAX_HEIGHTS.hd,
+      gridSize: GRID_SIZES.large,
+      isEqualizerShown: false,
     })
   })
 
@@ -66,6 +90,8 @@ describe('useAppPrefs', () => {
         shouldPreferDirectPlay: 'no',
         isTranscodeAllowed: false,
         awayMaxHeight: 480,
+        gridSize: 'huge',
+        isEqualizerShown: 'yes',
       },
       version: 0,
     }

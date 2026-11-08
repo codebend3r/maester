@@ -55,6 +55,9 @@ const TV = `${TV_FILL}M8.5 3.5l3.5 4 3.5-4`
 const HEART =
   'M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z'
 const PLAY = 'M8 5.6v12.8a1 1 0 0 0 1.5.9l10.2-6.4a1 1 0 0 0 0-1.8L9.5 4.7A1 1 0 0 0 8 5.6z'
+/** Two arrows chasing each other round, for repeat. */
+const REPEAT = 'M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3'
+
 const SPEAKER = 'M4.5 10a1 1 0 0 1 1-1h2.5l4-3.5v13L8 15H5.5a1 1 0 0 1-1-1z'
 const LOCK_BODY = roundRect({ x: 5, y: 10.5, w: 14, h: 10, r: 2.5 })
 const PANEL = roundRect({ x: 3.5, y: 4.5, w: 17, h: 15, r: 2.5 })
@@ -238,6 +241,10 @@ export const DRAWINGS = {
     stroke:
       'M4 16.5h2.6a3 3 0 0 0 2.3-1.1l.6-.7M14.5 9.3l.6-.7a3 3 0 0 1 2.3-1.1H20M4 7.5h2.6a3 3 0 0 1 2.3 1.1l6.2 6.8a3 3 0 0 0 2.3 1.1H20M17.5 5l2.5 2.5-2.5 2.5M17.5 14l2.5 2.5-2.5 2.5',
   },
+  repeat: { stroke: REPEAT },
+  repeatOne: { stroke: `${REPEAT}M11 10l2-1v6` },
+  // Two levels crossing as one fades out and the other in, as a mixing desk's faders draw it.
+  crossfade: { stroke: 'M3 7h7l5 10h6M3 17h7l5-10h6' },
   volume: { stroke: `${SPEAKER}M15.5 9.5a3.5 3.5 0 0 1 0 5M18.3 7a7 7 0 0 1 0 10`, fill: SPEAKER },
   volumeLow: { stroke: `${SPEAKER}M15.5 9.5a3.5 3.5 0 0 1 0 5`, fill: SPEAKER },
   muted: { stroke: `${SPEAKER}M16 10l4 4M20 10l-4 4`, fill: SPEAKER },
