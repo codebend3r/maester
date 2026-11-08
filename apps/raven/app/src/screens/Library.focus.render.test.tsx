@@ -193,9 +193,9 @@ describe('Library on a TV', () => {
       if (typeof face !== 'object' || face === null) throw new Error('No card face')
       return StyleSheet.flatten(face.props.style)?.transform ?? null
     }
-    expect(scaleOf()).toEqual([{ scale: 1 }])
+    expect(scaleOf()).toEqual([{ scale: 1 / 1.08 }])
     await fireEvent(card, NATIVE_EVENTS.focus)
-    expect(scaleOf()).toEqual([{ scale: 1.08 }])
+    expect(scaleOf()).toEqual([{ scale: 1 }])
   })
 
   it("moves focus to the first show under a letter from the jump row, as the web's strip jumps", async () => {

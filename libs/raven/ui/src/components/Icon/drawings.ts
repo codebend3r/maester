@@ -47,6 +47,9 @@ type SmallPlayProps = { x: number; y: number; h: number }
 const smallPlay = ({ x, y, h }: SmallPlayProps) =>
   `M${x} ${y + 0.5}v${h - 1}a.6.6 0 0 0 .9.5l${h * 0.8} -${h / 2 - 0.5}a.6.6 0 0 0 0-1l-${h * 0.8} -${h / 2 - 0.5}a.6.6 0 0 0 -.9.5z`
 
+/** The popcorn bucket: its rim wider than its foot, the kernels heaped over the rim. */
+const POPCORN_BUCKET = 'M4.5 10.5h15l-1.4 10.5H5.9z'
+
 // The frames the film and TV icons share; each variant draws its mark inside one.
 const FILM = `${roundRect({ x: 4, y: 3, w: 16, h: 18, r: 2.5 })}M8 3v18M16 3v18M6 6.5h.01M6 10h.01M6 14h.01M6 17.5h.01M18 6.5h.01M18 10h.01M18 14h.01M18 17.5h.01`
 const FILM_FILL = 'M8 3h8v18H8z'
@@ -271,10 +274,19 @@ export const DRAWINGS = {
     fill: circle({ cx: 12, cy: 12, r: 8.5 }),
     marks: `${smallPlay({ x: 10.2, y: 8.8, h: 6.4 })}${circle({ cx: 20.5, cy: 12, r: 1.3 })}`,
   },
+  // A striped bucket, wider at its rim, with the popped kernels heaped over it as solid puffs.
   popcorn: {
-    stroke:
-      'M3 10h18l-2 9H5zM8 12.5 9 19M12 12.5V19M16 12.5 15 19M3.5 10a3 3 0 1 1 4.3-4.1 3.2 3.2 0 0 1 5.2-.8 3 3 0 0 1 5.2 1.3 2.8 2.8 0 0 1 2.3 3.6',
-    fill: 'M3.5 10a3 3 0 1 1 4.3-4.1 3.2 3.2 0 0 1 5.2-.8 3 3 0 0 1 5.2 1.3 2.8 2.8 0 0 1 2.3 3.6z',
+    stroke: `${POPCORN_BUCKET}M3.5 10.5h17M9 10.5l.8 10.5M12 10.5V21M15 10.5l-.8 10.5`,
+    fill: POPCORN_BUCKET,
+    marks: [
+      circle({ cx: 12, cy: 6.6, r: 2.5 }),
+      circle({ cx: 8, cy: 8.4, r: 2.1 }),
+      circle({ cx: 16, cy: 8.4, r: 2.1 }),
+      circle({ cx: 10.1, cy: 4.7, r: 1.5 }),
+      circle({ cx: 14.1, cy: 4.5, r: 1.6 }),
+      circle({ cx: 5.6, cy: 7.2, r: 1.3 }),
+      circle({ cx: 18.4, cy: 7.2, r: 1.3 }),
+    ].join(''),
   },
   'file-play': {
     stroke: `${PAGE}M14 3.5v4h4`,

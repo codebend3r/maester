@@ -85,7 +85,7 @@ describe('bingeCardOf', () => {
     expect((card.chips ?? []).map(({ text }) => text)).toEqual(['4K', 'HDR', 'HEVC'])
   })
 
-  it('says which episode a show starts on before it is started', () => {
+  it('says which episode a show starts on before it is started, as its code', () => {
     const card = bingeCardOf({
       show: SHOW,
       next: { ...NEXT, position: 0 },
@@ -93,7 +93,7 @@ describe('bingeCardOf', () => {
       api: homeApi(),
       headersFor,
     })
-    expect(card.status).toBe(BINGE_COPY.start({ season: 1, episode: 2 }))
+    expect(card.status).toBe('S01E02')
   })
 
   it('plays the episode the show is on, wide on its backdrop with its title art', () => {

@@ -16,7 +16,7 @@ const jarOf = (values: readonly string[]) => {
 describe('createPageUnlock', () => {
   it("reads the unlock cookie from the page's jar under /api and answers a Cookie header", async () => {
     const { cookies, asked } = jarOf(['1700000000000.account-one.c2ln-bmVk_'])
-    const unlock = createPageUnlock({ cookies, warn: () => undefined })
+    const unlock = createPageUnlock({ cookies: () => cookies, warn: () => undefined })
     expect(await unlock()).toBe(`${SERVER_COOKIES.unlock}=1700000000000.account-one.c2ln-bmVk_`)
     expect(asked).toEqual([{ url: `${PAGE_ORIGIN}/api`, name: SERVER_COOKIES.unlock }])
   })
@@ -24,7 +24,7 @@ describe('createPageUnlock', () => {
   it('reads the jar again on every call, so an unlock or a lock in the page counts at once', async () => {
     const values: string[] = []
     const cookies: PageCookies = { get: async () => values.map((value) => ({ value })) }
-    const unlock = createPageUnlock({ cookies, warn: () => undefined })
+    const unlock = createPageUnlock({ cookies: () => cookies, warn: () => undefined })
     expect(await unlock()).toBeNull()
     values.push('a.b.c')
     expect(await unlock()).toBe(`${SERVER_COOKIES.unlock}=a.b.c`)
@@ -40,7 +40,7 @@ describe('createPageUnlock', () => {
     ['nothing', ''],
   ])('sends nothing for a value holding %s', async (_name, value) => {
     const { cookies } = jarOf([value])
-    expect(await createPageUnlock({ cookies, warn: () => undefined })()).toBeNull()
+    expect(await createPageUnlock({ cookies: () => cookies, warn: () => undefined })()).toBeNull()
   })
 
   it('sends nothing, and warns, when the jar cannot be read', async () => {
@@ -50,7 +50,10 @@ describe('createPageUnlock', () => {
         throw new Error('jar shut')
       },
     }
-    const unlock = createPageUnlock({ cookies, warn: (message) => warnings.push(message) })
+    const unlock = createPageUnlock({
+      cookies: () => cookies,
+      warn: (message) => warnings.push(message),
+    })
     expect(await unlock()).toBeNull()
     expect(warnings).toEqual(["Raven could not read the page's unlock: jar shut"])
   })

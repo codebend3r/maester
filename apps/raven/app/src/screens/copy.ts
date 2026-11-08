@@ -27,8 +27,12 @@ export const ITEM_COPY = {
   shuffle: 'Shuffle',
   /** "Go to Severance": the way up from an episode to its show or season. */
   goTo: (title: string) => `Go to ${title}`,
-  markWatched: 'Mark watched',
-  watched: 'Watched',
+  /** A movie's or an episode's Watched: what pressing it does, then that it is. */
+  videoWatched: { mark: 'Mark watched', marked: 'Watched' },
+  /** A show's Watched, over every episode of every season. */
+  showWatched: { mark: 'Mark show watched', marked: 'Show watched' },
+  /** A season's Watched, over every episode in it. */
+  seasonWatched: { mark: 'Mark season watched', marked: 'Season watched' },
   favourite: 'Favourite',
   binge: 'Binge',
   markBinging: 'Mark as binging',

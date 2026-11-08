@@ -1,0 +1,53 @@
+appId: io.github.codebend3r.raven.app
+name: A movie library, a show library and a music library each open from the side menu on a TV
+tags:
+  - dpad
+---
+- runFlow: signIn.yaml
+- runFlow: steps/healHome.dpad.yaml
+# A pinned movie library opens on its grid, its name over the cards, the film among them.
+- runFlow:
+    file: steps/menuRow.dpad.yaml
+    env:
+      ROW: Films
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Kestrel Point
+    timeout: 30000
+- assertVisible: Sort
+- pressKey: Back
+# A pinned show library opens on its shows.
+- runFlow:
+    file: steps/menuRow.dpad.yaml
+    env:
+      ROW: Series
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Lantern Bay
+    timeout: 30000
+- pressKey: Back
+# The music library is not pinned, so it is reached through Libraries, whose one row names every
+# library in the server's order with the remote on the first, Films; Right is Music. It opens
+# on its albums.
+- runFlow:
+    file: steps/menuRow.dpad.yaml
+    env:
+      ROW: Libraries
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Films
+      focused: true
+    timeout: 30000
+- assertVisible: 3 libraries
+- pressKey: Remote Dpad Right
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Morning Chorus
+    timeout: 30000
+# Back to Libraries, which lists Films too, so Home is known by its hero.
+- pressKey: Back
+- pressKey: Back
+- extendedWaitUntil:
+    visible: Play Kestrel Point
+    timeout: 30000

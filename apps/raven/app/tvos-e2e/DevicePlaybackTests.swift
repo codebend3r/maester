@@ -189,10 +189,20 @@ final class DevicePlaybackTests: XCTestCase {
     return spot.split(separator: ":").reduce(0) { $0 * 60 + (Double($1) ?? 0) }
   }
 
+  /// The screen shrunk to a few grey pixels, and the middle of it, where no control sits once they fade.
+  private enum Sample {
+    static let width = 64
+    static let height = 36
+    static let middleRows = 9..<27
+    static let middleColumns = 16..<48
+    /// A grey level above which a pixel counts as lit: black is 0, any picture far more.
+    static let litAbove: UInt8 = 24
+  }
+
   /// The screen shrunk to 64 by 36 pixels, as grey levels: enough to compare two moments.
   private func screenSample() -> [UInt8] {
-    let width = 64
-    let height = 36
+    let width = Sample.width
+    let height = Sample.height
     guard let image = XCUIScreen.main.screenshot().image.cgImage else { return [] }
     var grey = [UInt8](repeating: 0, count: width * height)
     let drawn = grey.withUnsafeMutableBytes { bytes -> Bool in
@@ -212,10 +222,13 @@ final class DevicePlaybackTests: XCTestCase {
   /// How many pixels in the middle of the screen, where no control sits once they fade, are
   /// lit: none on a black screen, many on any picture.
   private func litShare() -> Int {
-    let sample = screenSample()
-    guard sample.count == 64 * 36 else { return 0 }
-    return (9..<27).flatMap { y in (16..<48).map { x in sample[y * 64 + x] } }
-      .filter { $0 > 24 }.count
+    let sample: [UInt8] = screenSample()
+    guard sample.count == Sample.width * Sample.height else { return 0 }
+    // Spelled out with its types: as one chained expression the compiler gave up type-checking it.
+    let middle: [UInt8] = Sample.middleRows.flatMap { (y: Int) -> [UInt8] in
+      Sample.middleColumns.map { (x: Int) -> UInt8 in sample[y * Sample.width + x] }
+    }
+    return middle.filter { (value: UInt8) -> Bool in value > Sample.litAbove }.count
   }
 
   private func attach(named name: String) {

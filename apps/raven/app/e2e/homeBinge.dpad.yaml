@@ -1,0 +1,100 @@
+appId: io.github.codebend3r.raven.app
+name: On a TV a show marked as binging stands first on Home as a Binge card that plays its next episode, until it is taken off the list
+tags:
+  - dpad
+---
+- runFlow: signIn.yaml
+- runFlow: steps/healHome.dpad.yaml
+# Binge, in the second row of the show's marks, puts the show on the binge list. Back through
+# the library to Home, where the show now stands first as a Binge card, which the remote reaches
+# from the side menu's row along the first row of Home.
+- runFlow:
+    file: steps/openShow.dpad.yaml
+    env:
+      SHOW: Lantern Bay
+- runFlow:
+    file: steps/toggleMark.dpad.yaml
+    env:
+      MARK: Mark as binging
+      MARKED: Binging
+      ROW: second
+- pressKey: Back
+- pressKey: Back
+- extendedWaitUntil:
+    visible: Films
+    timeout: 30000
+- repeat:
+    while:
+      notVisible:
+        text: Lantern Bay
+        focused: true
+    times: 6
+    commands:
+      - pressKey: Remote Dpad Right
+- assertVisible:
+    text: Lantern Bay
+    focused: true
+# The Binge card plays the show's next episode straight away. Paused and skipped ten seconds on,
+# the episode has a spot to save, and Back from the player lands on the card again.
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Show the controls
+    timeout: 60000
+- pressKey: Remote Media Play Pause
+- extendedWaitUntil:
+    visible:
+      text: Position, .*
+      focused: true
+    timeout: 10000
+- pressKey: Remote Dpad Right
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Lantern Bay
+      focused: true
+    timeout: 30000
+# With the episode in progress, the show's library opens on its Continue watching view, the
+# remote on the episode's card, with the way to the library's grid in the toolbar. The card opens
+# the episode's page offering to resume, where a mark and its undoing clear the spot, as the
+# fixture had it; Back then finds the library on its grid, with nothing left to continue.
+- runFlow:
+    file: steps/menuRow.dpad.yaml
+    env:
+      ROW: Series
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Lantern Bay, .*Low Tide
+      focused: true
+    timeout: 30000
+- assertVisible: Show Library
+- runFlow:
+    file: steps/clearSpot.dpad.yaml
+    env:
+      ROW: second
+- extendedWaitUntil:
+    visible: Show Continue watching
+    timeout: 30000
+- assertVisible: Lantern Bay
+# Back to Home, and the show is taken off the binge list on its page again. Opened afresh, Home
+# gives its opening focus to the hero's Play, as it does with no show binged, and nothing is in
+# progress, so the flows after this one find Home as the fixture had it.
+- pressKey: Back
+- runFlow:
+    file: steps/openShow.dpad.yaml
+    env:
+      SHOW: Lantern Bay
+- runFlow:
+    file: steps/toggleMark.dpad.yaml
+    env:
+      MARK: Binging
+      MARKED: Mark as binging
+      ROW: second
+- runFlow: signIn.yaml
+- extendedWaitUntil:
+    visible:
+      text: Play Kestrel Point
+      focused: true
+    timeout: 30000
+- assertNotVisible:
+    id: in-progress

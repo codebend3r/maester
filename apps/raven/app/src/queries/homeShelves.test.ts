@@ -7,7 +7,7 @@ import {
   THUMBNAIL_STATES,
 } from '@raven/core'
 
-import { CARD_SHAPES } from '@/queries/cards'
+import { CARD_SHAPES, CARD_SUBJECTS } from '@/queries/cards'
 import {
   CONTINUE_WATCHING,
   HOME_CONTINUE_COUNT,
@@ -69,6 +69,8 @@ describe('homeShelvesOf', () => {
       shape: CARD_SHAPES.wide,
       picture: { uri: `${NAS.origin}/api/pictures/items/40/backdrop/b40`, headers: COOKIE },
       progress: 0.25,
+      subject: { kind: CARD_SUBJECTS.video, mediaId: 20 },
+      isWatched: false,
       target: { kind: ROUTE_TARGETS.item, itemId: 40, libraryId: FILMS.id, fileId: null },
       logo: null,
       episode: null,
@@ -91,6 +93,8 @@ describe('homeShelvesOf', () => {
       shape: CARD_SHAPES.poster,
       picture: { uri: `${NAS.origin}/api/pictures/items/41/poster/p41`, headers: COOKIE },
       progress: 0,
+      subject: { kind: CARD_SUBJECTS.video, mediaId: 21 },
+      isWatched: false,
       target: { kind: ROUTE_TARGETS.item, itemId: 41, libraryId: FILMS.id, fileId: null },
     })
     expect(series?.cards[0] ?? null).toEqual({
@@ -100,6 +104,8 @@ describe('homeShelvesOf', () => {
       shape: CARD_SHAPES.poster,
       picture: { uri: `${NAS.origin}/api/pictures/items/4/poster/p4`, headers: COOKIE },
       progress: 0,
+      subject: { kind: CARD_SUBJECTS.item, itemId: 4 },
+      isWatched: false,
       target: { kind: ROUTE_TARGETS.item, itemId: 4, libraryId: null, fileId: null },
     })
   })

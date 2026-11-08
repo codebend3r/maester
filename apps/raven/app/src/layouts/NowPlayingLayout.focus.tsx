@@ -5,7 +5,6 @@ import { type ComponentRef, type ComponentType, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { FocusBand } from '@/layouts/FocusBand'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { BUTTON_TONES } from '@/layouts/formKit'
@@ -93,7 +92,7 @@ const useStyles = themedStyles((colours) =>
       borderColor: 'transparent',
       padding: TV_SIZES.space4,
     },
-    lyricsFocused: { ...FOCUS_FRONT, borderColor: colours.text, backgroundColor: colours.raised },
+    lyricsFocused: { borderColor: colours.text, backgroundColor: colours.raised },
   }),
 )
 

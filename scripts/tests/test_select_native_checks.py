@@ -98,3 +98,25 @@ def test_main_passes_explicit_shas_to_nx_and_writes_selection(monkeypatch, tmp_p
     assert "--head=head" in calls[1]
     assert calls[2] == ("git", "diff", "--name-only", "base", "head")
     assert destination.read_text() == "app=false\nmusic=true\ndesktop=false\n"
+
+
+def test_pull_request_base_skips_the_run_lookup(monkeypatch, tmp_path):
+    destination = tmp_path / "outputs"
+    monkeypatch.setenv("GITHUB_SHA", "head")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(destination))
+    monkeypatch.setenv("NATIVE_BASE", "base")
+    calls = []
+
+    def output(*command):
+        calls.append(command)
+        if command[0] == "bunx":
+            return json.dumps(["@raven/app"])
+        return "apps/raven/app/src/screens/Home.tsx"
+
+    monkeypatch.setattr(selector, "output", output)
+    selector.main()
+    assert all(command[0] != "gh" for command in calls)
+    assert "--base=base" in calls[0]
+    assert destination.read_text() == "app=true\nmusic=false\ndesktop=false\n"

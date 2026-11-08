@@ -1,14 +1,29 @@
-import { Children, type ComponentType, useState } from 'react'
-import { type LayoutChangeEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { useRoute } from 'expo-router'
+import {
+  Children,
+  type ComponentRef,
+  type ComponentType,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
+import {
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
 import type { ShelfCard } from '@/queries/cards'
 import type { ShelfView } from '@/queries/homeShelves'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
-import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
+import { useOpeningFocus, useScreenFocusScope, useShelfBand } from '@/layouts/focus'
 import {
   type BingeShelfProps,
   NOTHING_HERE,
@@ -26,8 +41,11 @@ import {
 import { BingeCardFocus } from '@/layouts/BingeCard.focus'
 import { SHELF_LAYOUTS, type ShelfLayout } from '@/queries/homeShelves'
 import { Logo } from '@/layouts/Logo'
+import { type ShelfViewport, scrollTargetOf } from '@/layouts/shelfScroll'
 import { SCROLL_AXES, useScrollWindow } from '@/layouts/useScrollWindow'
 import { SideMenu, useSideMenuRoom } from '@/layouts/SideMenu.focus'
+import { restoreIn, restoringCardOf, useScreenFocus } from '@/stores/screenFocus'
+import { HOME_BANDS, shelfBandOf } from '@/stores/shelfBands'
 import { TV_DESIGN_WIDTH } from '@/theme/tvScale'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
@@ -37,6 +55,44 @@ const SHELF_WINDOW = { first: 3, step: 2 } as const
 
 /** Cards drawn in a row before any scroll, and the cards a scroll toward its end adds. */
 const CARD_WINDOW = { first: 8, step: 4 } as const
+
+/** The room a shelf brought into view keeps from the view's edge: the shelves' own gap. */
+const SHELF_MARGIN = TV_SIZES.space4
+
+/**
+ * Brings the shelf of the card taking the focus back into view as Home returns, before the card
+ * asks: on tvOS the focus engine refuses a view the shelves clip, and gives the remote to the
+ * screen's top left control (the side menu's Search) instead. A Continue watching row added
+ * above while Home was covered can push the card the screen was opened from below the view,
+ * so the shelves scroll as the engine would have for a card in view, as little as it takes. A
+ * layout effect, so it runs before the card's own effect asks in the same commit. Each shelf
+ * says where it stands through `useShelfBand`; the view's height and offset are kept here.
+ */
+const useReturningShelf = () => {
+  const screen = useRoute().key
+  const scroller = useRef<ComponentRef<typeof ScrollView>>(null)
+  const view = useRef<ShelfViewport>({ offset: 0, viewport: 0 })
+  const restore = useScreenFocus((state) => restoreIn({ state, screen }))
+  useLayoutEffect(() => {
+    const shelf = restoringCardOf(restore)?.shelf ?? null
+    if (shelf === null) return
+    const band = shelfBandOf({ screen, shelf })
+    if (band === null) return
+    const target = scrollTargetOf({ band, ...view.current, margin: SHELF_MARGIN })
+    if (target === null) return
+    scroller.current?.scrollTo({ y: target, animated: false })
+    view.current = { ...view.current, offset: target }
+  }, [restore, screen])
+  return {
+    scroller,
+    onLayout: ({ nativeEvent }: LayoutChangeEvent) => {
+      view.current = { ...view.current, viewport: nativeEvent.layout.height }
+    },
+    onScroll: ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+      view.current = { ...view.current, offset: nativeEvent.contentOffset.y }
+    },
+  }
+}
 
 /**
  * Home's shelves under its title, with the side menu beside them. Home draws them only once the
@@ -61,6 +117,7 @@ const Shelves = ({
     total: shelves.length,
     axis: SCROLL_AXES.vertical,
   })
+  const { scroller, onLayout: measureShelves, onScroll: scrollShelves } = useReturningShelf()
   const styles = useStyles()
   const menuRoom = useSideMenuRoom()
   return (
@@ -72,10 +129,17 @@ const Shelves = ({
         onSettings={onSettings}
       />
       <ScrollView
+        ref={scroller}
         contentContainerStyle={styles.shelves}
         onContentSizeChange={shelfWindow.onContentSizeChange}
-        onLayout={shelfWindow.onLayout}
-        onScroll={shelfWindow.onScroll}
+        onLayout={(event) => {
+          shelfWindow.onLayout(event)
+          measureShelves(event)
+        }}
+        onScroll={(event) => {
+          shelfWindow.onScroll(event)
+          scrollShelves(event)
+        }}
         scrollEventThrottle={100}
         style={styles.ground}
       >
@@ -167,6 +231,7 @@ const CardsRow = ({ shelf, onOpen, isFirst = false }: CardsRowProps) => {
             isPreferred={isOpening && isFirst && index === 0}
             onPress={() => onOpen(card)}
             place={placeOf({ shelf, card })}
+            shelf={shelf.key}
             width={focusCardWidthOf(card.shape)}
           />
         ))}
@@ -224,6 +289,7 @@ const CardsGrid = ({ shelf, onOpen, isFirst = false }: CardsRowProps) => {
               isPreferred={isOpening && isFirst && index === 0}
               onPress={() => onOpen(card)}
               place={placeOf({ shelf, card })}
+              shelf={shelf.key}
               ratio={TV_FRAMES.tile}
               width={cardWidth}
             />
@@ -255,6 +321,7 @@ const SHELF_ROWS = {
  */
 const Shelf = (props: ShelfProps) => {
   const styles = useStyles()
+  const band = useShelfBand(props.shelf.key)
   const Row = SHELF_ROWS[shelfStateOf(props.shelf)]
   return (
     /*
@@ -262,7 +329,7 @@ const Shelf = (props: ShelfProps) => {
      * watching, and the remote on a card below can scroll the title off the screen, so the
      * whole shelf carries it.
      */
-    <View style={styles.shelf} testID={props.shelf.key}>
+    <View onLayout={band.onLayout} style={styles.shelf} testID={props.shelf.key}>
       <ShelfTitle
         onOpenContinue={props.onOpenContinue}
         onOpenLibrary={props.onOpenLibrary}
@@ -273,38 +340,43 @@ const Shelf = (props: ShelfProps) => {
   )
 }
 
-const BINGE_KEY = 'binge'
-
 /**
  * The shows the viewer binges, first on Home, right under its title and with no heading of its
  * own, as the web's: one show is a single 32:9 card across the width, two stack, and a third
- * sits beside the second in two columns under the first, every fact inside its card. One band
- * the remote comes into on the first card; nothing is drawn while there are none.
+ * sits beside the second in two columns under the first, every fact inside its card but the
+ * synopsis, which only the first row's card has the room for. One band the remote comes into on
+ * the first card; nothing is drawn while there are none.
  */
 const BingeShelf = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
   const { isOpening } = useOpeningFocus()
   const { width, onLayout } = useMeasuredWidth()
+  const band = useShelfBand(HOME_BANDS.binge)
   const styles = useStyles()
   return (
     cards.length > 0 && (
-      <FocusBand>
-        <View onLayout={onLayout} style={styles.bingeGrid}>
-          {width > 0 &&
-            bingeRowsOf(cards).flatMap((row, rowIndex) =>
-              row.map((card, index) => (
-                <BingeCardFocus
-                  key={card.key}
-                  card={card}
-                  height={width * TV_FRAMES.binge}
-                  isPreferred={isOpening && isFirst && rowIndex === 0 && index === 0}
-                  onPress={() => onOpen(card.target)}
-                  place={`${BINGE_KEY}/${card.key}`}
-                  width={columnWidthOf({ width, columns: row.length })}
-                />
-              )),
-            )}
-        </View>
-      </FocusBand>
+      // Measured outside the band: the guide is a view of its own, which the grid's place would be read against.
+      <View onLayout={band.onLayout}>
+        <FocusBand>
+          <View onLayout={onLayout} style={styles.bingeGrid}>
+            {width > 0 &&
+              bingeRowsOf(cards).flatMap((row, rowIndex) =>
+                row.map((card, index) => (
+                  <BingeCardFocus
+                    key={card.key}
+                    card={card}
+                    hasSynopsis={rowIndex === 0}
+                    height={width * TV_FRAMES.binge}
+                    isPreferred={isOpening && isFirst && rowIndex === 0 && index === 0}
+                    onPress={() => onOpen(card.target)}
+                    place={`${HOME_BANDS.binge}/${card.key}`}
+                    shelf={HOME_BANDS.binge}
+                    width={columnWidthOf({ width, columns: row.length })}
+                  />
+                )),
+              )}
+          </View>
+        </FocusBand>
+      </View>
     )
   )
 }
@@ -344,7 +416,7 @@ const useStyles = themedStyles((colours) =>
       borderWidth: TV_SIZES.tvFocusRing,
       borderColor: 'transparent',
     },
-    focusedLink: { ...FOCUS_FRONT, borderColor: colours.text, backgroundColor: colours.quiet },
+    focusedLink: { borderColor: colours.text, backgroundColor: colours.quiet },
     seeAllLabel: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
     focusedLabel: { color: colours.text },
     row: {

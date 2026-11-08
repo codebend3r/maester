@@ -10,7 +10,7 @@ import {
   movieFacts,
 } from '@raven/core'
 
-import { CARD_SHAPES } from '@/queries/cards'
+import { CARD_SHAPES, CARD_SUBJECTS } from '@/queries/cards'
 import { ART_PLACES, playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { ROUTE_TARGETS } from '@/routes'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
@@ -226,6 +226,8 @@ describe('showPage', () => {
         shape: CARD_SHAPES.poster,
         picture: at('/api/pictures/items/5/poster/p5'),
         progress: 0,
+        subject: { kind: CARD_SUBJECTS.item, itemId: 5 },
+        isWatched: false,
         target: { kind: ROUTE_TARGETS.item, itemId: 5, libraryId: null, fileId: null },
       },
       expect.objectContaining({ key: 'season:7', title: 'Season 2' }),

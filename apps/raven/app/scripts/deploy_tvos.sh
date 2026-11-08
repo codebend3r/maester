@@ -74,5 +74,17 @@ say "Installing"
 xcrun devicectl device install app --device "$UDID" "$APP" --quiet
 
 say "Launching"
-xcrun devicectl device process launch --device "$UDID" "$BUNDLE_ID" --quiet
+# A sleeping Apple TV takes the install but refuses a foreground launch, and nothing here wakes it.
+if ! launch_log="$(xcrun devicectl device process launch --device "$UDID" "$BUNDLE_ID" --quiet 2>&1)"; then
+  case "$launch_log" in
+    *"System is asleep"*)
+      say "raven is installed on the Apple TV, which is asleep: it opens once the TV is woken"
+      exit 0
+      ;;
+    *)
+      printf '%s\n' "$launch_log" >&2
+      exit 1
+      ;;
+  esac
+fi
 say "raven is on the Apple TV"

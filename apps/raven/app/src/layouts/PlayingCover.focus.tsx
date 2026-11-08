@@ -2,7 +2,6 @@ import { type ComponentRef, useRef } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 
 import { MUSIC_COPY } from '@/layouts/copy'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { Equalizer } from '@/layouts/Equalizer.focus'
 import { useOpeningFocus } from '@/layouts/focus'
 import { Cover } from '@/layouts/MusicParts.focus'
@@ -81,7 +80,7 @@ const useStyles = themedStyles((colours) =>
       borderColor: 'transparent',
       overflow: 'hidden',
     },
-    focused: { ...FOCUS_FRONT, borderColor: colours.text },
+    focused: { borderColor: colours.text },
     band: {
       position: 'absolute',
       left: 0,

@@ -45,7 +45,10 @@ describe('Saga on a phone or tablet', () => {
     await renderScreen({ ui: <Saga /> })
 
     expect(await screen.findByRole('header', { name: NIGHT_SAGA.name })).toBeTruthy()
-    expect(screen.getByRole('button', { name: ASHFALL_GATE.item?.title })).toBeTruthy()
+    // Watched, so its card says so with its name, and wears the check on its poster.
+    expect(
+      screen.getByRole('button', { name: `${ASHFALL_GATE.item?.title}, Watched` }),
+    ).toBeTruthy()
     expect(screen.getByRole('button', { name: NIGHT_TRAIN.item?.title })).toBeTruthy()
     expect(screen.getByText('2 movies, 2021 to 2025')).toBeTruthy()
   })

@@ -10,6 +10,7 @@ import {
   type MediaItem,
   type MediaSort,
   type ShowEntry,
+  WATCHED_STATES,
   cardDestination,
   cardTitle,
   formatRuntime,
@@ -21,6 +22,7 @@ import {
   showSortFact,
   showYears,
   sortFact,
+  watchedStateOf,
 } from '@raven/core'
 
 import type { EpisodeWords } from '@/queries/episodeMark'
@@ -33,6 +35,18 @@ export type CardShape = (typeof CARD_SHAPES)[keyof typeof CARD_SHAPES]
 
 /** A picture as React Native's `Image` takes it, with the server's cookies where it needs them. */
 export type Picture = { uri: string; headers: Record<string, string> }
+
+/**
+ * What a card stands for, for the marks a held select offers on a TV: a show or a season by its
+ * item, a movie or an episode by the video it plays, an album by its id. A card with none (a
+ * saga, an artist, a playlist, a library) offers no menu.
+ */
+export const CARD_SUBJECTS = { item: 'item', video: 'video', album: 'album' } as const
+
+export type CardSubject =
+  | { kind: typeof CARD_SUBJECTS.item; itemId: number }
+  | { kind: typeof CARD_SUBJECTS.video; mediaId: number }
+  | { kind: typeof CARD_SUBJECTS.album; albumId: number }
 
 /** One card, on a shelf or in a grid, as both layouts draw it. */
 export type ShelfCard = {
@@ -53,17 +67,35 @@ export type ShelfCard = {
   resume?: { timeLeft: string | null } | null
   /** A library's icon, drawn before a row's words, as the side menu's row wears it. */
   icon?: LibraryIconName | null
+  /** What a held select's menu marks: the card's item, video or album; null offers no menu. */
+  subject: CardSubject | null
+  /** Whether all of it is watched (a video, or every episode of a season or show): a check on its picture. */
+  isWatched: boolean
   /** Where pressing it goes: its item's page, or the player for a file with no page. */
   target: RouteTarget
 }
 
-type CardLabelOfProps = { card: Pick<ShelfCard, 'title' | 'episode'> }
+/** The word the check on a watched title's picture stands for, said with the card's name. */
+const CARD_COPY = { watched: 'Watched' } as const
 
-/** What a screen reader says of a card: its title, and for an episode its place and name. */
+type CardLabelOfProps = { card: Pick<ShelfCard, 'title' | 'episode' | 'isWatched'> }
+
+/** What a screen reader says of a card: its title, for an episode its place and name, and that it is watched. */
 export const cardLabelOf = ({ card }: CardLabelOfProps): string =>
-  [card.title, card.episode?.mark ?? null, card.episode?.name ?? null]
+  [
+    card.title,
+    card.episode?.mark ?? null,
+    card.episode?.name ?? null,
+    card.isWatched ? CARD_COPY.watched : null,
+  ]
     .filter((part): part is string => part !== null)
     .join(', ')
+
+type IsAllWatchedProps = { watched: number; total: number }
+
+/** Whether every one of `total` is among the `watched`: a show's or season's episodes. */
+export const isAllWatched = ({ watched, total }: IsAllWatchedProps): boolean =>
+  watchedStateOf({ watched, total }) === WATCHED_STATES.watched
 
 /** Where a card's picture comes from and what goes with the request for it. */
 export type Pictures = {
@@ -146,6 +178,8 @@ export const videoCard = ({
   shape,
   picture: pictureAt({ uri, headersFor }),
   progress: progressOf(media),
+  subject: { kind: CARD_SUBJECTS.video, mediaId: media.id },
+  isWatched: media.watched,
   target: videoTarget({ media, hasPages }),
 })
 
@@ -221,5 +255,7 @@ export const showCard = ({ entry, api, headersFor, order = null }: ShowCardProps
     headersFor,
   }),
   progress: 0,
+  subject: { kind: CARD_SUBJECTS.item, itemId: entry.show.id },
+  isWatched: isAllWatched({ watched: entry.watchedEpisodes, total: entry.episodes }),
   target: itemTarget(entry.show.id),
 })

@@ -3,9 +3,11 @@ name: 🧪 Pull request checks
 # Every pull request, into any base branch: runs when it opens or reopens and
 # on each push to its branch. Each check runs on the projects the PR affects (a
 # change to this workflow runs every check on every project), then the production
-# images are built and health checked. All native and desktop builds and flows run
-# only on main (main-native-checks.yml), or by hand, never on pull requests.
-# Merges to main are also covered by main-smoke-test.yml.
+# images are built and health checked. Once those pass, the native and desktop
+# builds and flows the PR affects run too (native-checks.yml, shared with
+# main-native-checks.yml) and ✅ Checks waits for them, so a device flow a change
+# breaks is seen on the PR, never first on main. Merges to main are also covered
+# by main-smoke-test.yml.
 on:
   pull_request:
 
@@ -209,11 +211,30 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # The "Protect main" ruleset requires this stable check name. It passes only
-  # when every matrix check and the build passed.
+  # The native builds and flows the PR affects, on its head commit. The shared workflow selects
+  # the groups the PR touches against its base (raven's device app, Wren, the desktop) and runs
+  # those alone. It starts after the cheap checks, so a lint or test failure stops the run before
+  # a macOS runner starts, and so the jobs Nx Cloud counts at once stay within what it includes.
+  # A failing selection or flow cancels the run, as a check does.
+  native:
+    name: 🧱 Native apps
+    needs: checks
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/native-checks.yml
+    with:
+      sha: ${{ github.event.pull_request.head.sha }}
+      base: ${{ github.event.pull_request.base.sha }}
+    secrets: inherit
+
+  # The "Protect main" ruleset requires this stable check name. It passes only when every
+  # matrix check, the build and the native apps passed. Native apps runs on every PR (one that
+  # affects no group passes it with every group skipped), so it is skipped only when the checks
+  # failed, which the line above fails on; skipped never stands in for a passing selection.
   checks-complete:
     name: ✅ Checks
-    needs: [checks, build]
+    needs: [checks, build, native]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -222,11 +243,14 @@ jobs:
         env:
           CHECKS_RESULT: ${{ needs.checks.result }}
           BUILD_RESULT: ${{ needs.build.result }}
+          NATIVE_RESULT: ${{ needs.native.result }}
         run: |
           echo "Checks: $CHECKS_RESULT"
           echo "Build: $BUILD_RESULT"
+          echo "Native: $NATIVE_RESULT"
           test "$CHECKS_RESULT" = success
           test "$BUILD_RESULT" = success
+          test "$NATIVE_RESULT" = success
 
   supabase:
     name: 🗄️ Supabase

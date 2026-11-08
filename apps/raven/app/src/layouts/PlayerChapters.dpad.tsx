@@ -5,7 +5,6 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native'
 
 import { Icon } from '@raven/native'
 import { FocusBand } from '@/layouts/FocusBand'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { useFocusOnMount } from '@/layouts/focus'
 import { PLAYER_COPY } from '@/layouts/playerKit'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
@@ -130,7 +129,7 @@ const usePictureStyles = pictureStyles((colours) =>
       backgroundColor: colours.raised,
     },
     current: { backgroundColor: colours.quiet },
-    focused: { ...FOCUS_FRONT, borderColor: colours.text },
+    focused: { borderColor: colours.text },
     place: { color: colours.muted, fontSize: TV_SIZES.textSm, fontVariant: ['tabular-nums'] },
     name: {
       color: colours.text,

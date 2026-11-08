@@ -452,7 +452,7 @@ const startApp = (): void => {
     })
     const grants = createGrants({ fs: { realpath, stat }, newId: randomUUID })
     // The page enters the library PIN, so main's own calls carry the unlock cookie it holds.
-    const pageUnlock = createPageUnlock({ cookies: session.defaultSession.cookies, warn })
+    const pageUnlock = createPageUnlock({ cookies: () => session.defaultSession.cookies, warn })
     /*
      * The page's sign in: a sign out ends what main holds on the account's behalf (`accessEnds`),
      * and a change of account reaches what keeps data per account (`accountSwitches`).

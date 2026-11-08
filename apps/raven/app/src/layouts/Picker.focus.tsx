@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Icon } from '@raven/native'
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet } from 'react-native'
 
 import {
   type PickerKit,
@@ -10,8 +10,8 @@ import {
   pickerLabelOf,
 } from '@/layouts/gridKit'
 import { PICKER_LIST_COPY } from '@/layouts/copy'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
-import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { Text } from '@/layouts/Text'
+import { TvSheet, useSheetStyles } from '@/layouts/TvSheet.focus'
 import { PlateButton, usePlateStyles } from '@/layouts/tvControls'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles, useTheme } from '@/theme/useTheme'
@@ -25,9 +25,8 @@ type PickerListProps<K extends string> = Pick<
 > & { isOpen: boolean; onClose: () => void }
 
 /**
- * The list a TV picker opens over the screen, focus on the option chosen now. tvOS has no action
- * sheet (React Native's is built out of it), so this is the TV's on both systems. Menu or Back
- * closes it without choosing. Over the video it is the player's dark glass in every theme.
+ * The list a TV picker opens over the screen, a sheet with the focus on the option chosen now.
+ * Menu or Back closes it without choosing; over the video it is the player's dark glass.
  */
 export const PickerList = <K extends string>({
   label,
@@ -39,35 +38,30 @@ export const PickerList = <K extends string>({
   onClose,
 }: PickerListProps<K>) => {
   const styles = useStyles({ isOverPicture })
+  const sheetStyles = useSheetStyles({ isOverPicture })
   const plateStyles = usePlateStyles({ isOverPicture })
   return (
-    <Modal transparent visible={isOpen} onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.shade} />
-        <View accessibilityLabel={label} style={styles.panel}>
-          <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
-            {label}
-          </Text>
-          <ScrollView contentContainerStyle={styles.options}>
-            {options.map((option) => (
-              <Pressable
-                key={option.key}
-                accessibilityLabel={option.label}
-                accessibilityRole="button"
-                accessibilityState={{ selected: option.key === value }}
-                hasTVPreferredFocus={option.key === value}
-                onPress={() => onChoose(option.key)}
-                style={({ focused }) => [styles.option, focused && styles.focused]}
-              >
-                <Text style={[plateStyles.label, option.key === value && styles.chosen]}>
-                  {option.key === value ? PICKER_LIST_COPY.chosen(option.label) : option.label}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+    isOpen && (
+      <TvSheet isOverPicture={isOverPicture} onClose={onClose} title={label}>
+        <ScrollView contentContainerStyle={sheetStyles.options}>
+          {options.map((option) => (
+            <Pressable
+              key={option.key}
+              accessibilityLabel={option.label}
+              accessibilityRole="button"
+              accessibilityState={{ selected: option.key === value }}
+              hasTVPreferredFocus={option.key === value}
+              onPress={() => onChoose(option.key)}
+              style={({ focused }) => [sheetStyles.option, focused && sheetStyles.focused]}
+            >
+              <Text style={[plateStyles.label, option.key === value && styles.chosen]}>
+                {option.key === value ? PICKER_LIST_COPY.chosen(option.label) : option.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </TvSheet>
+    )
   )
 }
 
@@ -162,29 +156,7 @@ export const focusPicker: PickerKit = { Picker, ToolButton }
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
-    focused: { ...FOCUS_FRONT, borderColor: colours.text },
     label: { color: colours.muted, fontSize: TV_SIZES.text },
     chosen: { fontWeight: 'bold' },
-    backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    // The web's `--color-scrim` is a translucent black React Native's tokens cannot carry.
-    shade: { ...StyleSheet.absoluteFill, backgroundColor: colours.deep, opacity: 0.85 },
-    panel: {
-      minWidth: TV_SIZES.measure / 2,
-      maxHeight: '80%',
-      gap: TV_SIZES.space3,
-      padding: TV_SIZES.space5,
-      borderRadius: TV_SIZES.radius,
-      backgroundColor: colours.raised,
-    },
-    title: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-    options: { gap: TV_SIZES.space1 },
-    option: {
-      minHeight: TV_SIZES.controlLarge,
-      justifyContent: 'center',
-      paddingHorizontal: TV_SIZES.space3,
-      borderRadius: TV_SIZES.radius,
-      borderWidth: TV_SIZES.tvFocusRing,
-      borderColor: 'transparent',
-    },
   }),
 )

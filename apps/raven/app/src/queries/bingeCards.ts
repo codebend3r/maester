@@ -5,15 +5,20 @@ import {
   type ItemDetails,
   type MediaItem,
   bingeCardFacts,
+  episodeCode,
   pictureParts,
   progressOf,
 } from '@raven/core'
 
-import { CARD_SHAPES, type Pictures, type ShelfCard, pictureAt } from '@/queries/cards'
+import {
+  CARD_SHAPES,
+  CARD_SUBJECTS,
+  type Pictures,
+  type ShelfCard,
+  pictureAt,
+} from '@/queries/cards'
 import { timeLeftOf } from '@/queries/timeLeft'
 import { ROUTE_TARGETS, type RouteTarget } from '@/routes'
-
-type StartProps = { season: number; episode: number }
 
 export const BINGE_COPY = {
   title: 'Binge',
@@ -21,7 +26,6 @@ export const BINGE_COPY = {
   starring: 'Starring',
   separator: ' · ',
   listSeparator: ', ',
-  start: ({ season, episode }: StartProps) => `Start season ${season} episode ${episode}`,
 } as const
 
 /**
@@ -38,20 +42,20 @@ export type BingeCard = ShelfCard & {
   stars: string | null
   /** The episode's synopsis, else the show's; null when neither has one. */
   synopsis: string | null
-  /** What is left of the episode, or which one it starts on; null with none. */
+  /** What is left of the episode, or the code of the one it starts on; null with none. */
   status: string | null
   /** The show's page, which the title art opens. */
   page: RouteTarget
 }
 
-/** "23m left" once started, else "Start season 1 episode 2" for an episode not yet started. */
+/** "23m left" once started, else the code of the episode it starts on, "S01E02", as a card has room for. */
 const statusWordsOf = (status: BingeStatus | null): string | null => {
   if (status === null) return null
   switch (status.kind) {
     case BINGE_STATUS_KINDS.left:
       return timeLeftOf(status.media)
     case BINGE_STATUS_KINDS.start:
-      return BINGE_COPY.start({ season: status.season, episode: status.episode })
+      return episodeCode({ season: status.season, episode: status.episode })
     default: {
       const unreachable: never = status
       return unreachable
@@ -118,6 +122,9 @@ export const bingeCardOf = ({
     }),
     chips: next === null ? [] : pictureParts(next),
     resume: null,
+    subject: { kind: CARD_SUBJECTS.item, itemId: show.id },
+    // A show being binged has episodes left, so it never wears the check.
+    isWatched: false,
     target: next === null ? page : { kind: ROUTE_TARGETS.play, mediaId: next.id, at: 0 },
     meta: joinedOrNull({ parts: [facts.year, facts.runtime], separator: BINGE_COPY.separator }),
     episodeLine: facts.episodeLine,

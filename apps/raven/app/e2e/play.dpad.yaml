@@ -4,22 +4,14 @@ tags:
   - dpad
 ---
 - runFlow: signIn.yaml
-# Home opens with the remote on the hero's Play, and Down moves it to the first shelf's card.
-- runFlow: steps/heroToFilm.dpad.yaml
 # A run stopped part way can leave the film under Continue watching, so the flow clears it
 # first, and then nothing is being watched.
 # The side menu has a row named Continue watching too, so the shelf is found by its key.
-- runFlow:
-    when:
-      visible:
-        id: in-progress
-    commands:
-      - runFlow: steps/clearSpot.dpad.yaml
-      # The card the page was opened from went with its shelf, so Home gives its opening
-      # focus again, to the hero's Play, and Down goes to the film on its own shelf.
-      - runFlow: steps/heroToFilm.dpad.yaml
+- runFlow: steps/healHome.dpad.yaml
 - assertNotVisible:
     id: in-progress
+# Home opens with the remote on the hero's Play, and Down moves it to the first shelf's card.
+- runFlow: steps/heroToFilm.dpad.yaml
 # Select opens the film's page with the remote on Play.
 - pressKey: Remote Dpad Center
 - extendedWaitUntil:
@@ -78,7 +70,14 @@ tags:
     timeout: 10000
 # Clearing the spot leaves the fixture as it was found, with the remote still on the film's
 # card on its own shelf.
-- runFlow: steps/clearSpot.dpad.yaml
+- runFlow:
+    file: steps/clearSpot.dpad.yaml
+    env:
+      ROW: first
+- extendedWaitUntil:
+    notVisible:
+      id: in-progress
+    timeout: 30000
 - assertVisible:
     text: Kestrel Point
     focused: true

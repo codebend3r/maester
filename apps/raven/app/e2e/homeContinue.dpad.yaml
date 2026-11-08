@@ -1,0 +1,48 @@
+appId: io.github.codebend3r.raven.app
+name: On a TV the hero's Play plays its title, Back leaves it under Continue watching, and a mark on its page clears the spot
+tags:
+  - dpad
+---
+- runFlow: signIn.yaml
+- runFlow: steps/healHome.dpad.yaml
+# The hero's Play plays the title it names. Paused and skipped ten seconds on, it has a spot to
+# save, so Back leaves it under Continue watching on Home, with the remote on the hero again.
+- extendedWaitUntil:
+    visible:
+      text: Play Kestrel Point
+      focused: true
+    timeout: 30000
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Show the controls
+    timeout: 60000
+- pressKey: Remote Media Play Pause
+- extendedWaitUntil:
+    visible:
+      text: Position, .*
+      focused: true
+    timeout: 10000
+- pressKey: Remote Dpad Right
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      id: in-progress
+    timeout: 30000
+# Down from the hero now lands on the Continue watching card, the first card of the first shelf,
+# which opens its title's page offering to resume. There a mark and its undoing clear the spot,
+# as the fixture had it, so the shelf goes and Home gives its opening focus to the hero again.
+- runFlow: steps/heroToFilm.dpad.yaml
+- runFlow:
+    file: steps/clearSpot.dpad.yaml
+    env:
+      ROW: first
+- extendedWaitUntil:
+    notVisible:
+      id: in-progress
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: Play .*
+      focused: true
+    timeout: 30000
+- assertVisible: Kestrel Point

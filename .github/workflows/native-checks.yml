@@ -1,9 +1,10 @@
 name: 🧱 Native app checks
 
 # The builds and end to end flows that take longest: raven's device app on iPhone, iPad,
-# Apple TV and Android TV, Wren on iPhone and Android, and the Windows desktop installer.
-# Called only by main-native-checks.yml for affected job groups, or all groups manually.
-# Pull requests never call this workflow.
+# Apple TV and Android TV, Wren on iPhone and Android, and the macOS and Windows desktop.
+# Called by pull-request-checks.yml for every pull request and by main-native-checks.yml for
+# every push to main; its first job selects the groups the commit affects and the rest run
+# only when theirs was selected. A manual run of main-native-checks.yml runs every group.
 on:
   workflow_call:
     inputs:
@@ -11,21 +12,13 @@ on:
         description: The commit to build, so artifact names match what was built.
         type: string
         required: true
-      app:
-        description: Run raven's device app jobs.
-        type: boolean
-        required: true
-      music:
-        description: Run Wren's jobs.
-        type: boolean
-        required: true
-      windows:
-        description: Run the Windows native and installer jobs.
-        type: boolean
-        required: true
+      base:
+        description: A pull request's base commit, which the selection diffs against. Unset, a push to main diffs against its last green run and a manual run runs every group.
+        type: string
+        required: false
     secrets:
       NX_CLOUD_ACCESS_TOKEN:
-        description: Nx Cloud's remote cache, for the Windows jobs. Unset, Nx caches locally only.
+        description: Nx Cloud's remote cache, for the desktop and Windows jobs. Unset, Nx caches locally only.
         required: false
 
 permissions:
@@ -39,12 +32,60 @@ env:
   APP_NODE_VERSION: 24.21.0
 
 jobs:
+  # Which groups the commit touches: raven's device app, Wren, and the desktop (macOS and
+  # Windows). A pull request diffs against the base it names; a push to main against its last
+  # green run; a manual run, or a push with no green ancestor, selects every group. A change
+  # to a shared file, a workflow or a script selects every group too.
+  select:
+    name: 🔎 Select affected native checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      app: ${{ steps.select.outputs.app }}
+      music: ${{ steps.select.outputs.music }}
+      desktop: ${{ steps.select.outputs.desktop }}
+    steps:
+      # The caller's commit, which the script reads as GITHUB_SHA: a pull request's merge
+      # commit with its base, a push's head. The whole history, so Nx can diff it against the base.
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      # The token is for the lookup of main's last green run; a pull request's base skips it.
+      - name: 🔎 Select the affected groups
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NATIVE_BASE: ${{ inputs.base }}
+          NX_DAEMON: 'false'
+        run: python3 scripts/select_native_checks.py
+
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure() && github.event_name == 'pull_request'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
   # The Windows libmpv is a pinned prebuilt, not a source build: this places it under
   # resources/win32-x64, audits the DLL (x64, self-contained, the exports the addon
   # calls), builds the addon against it with MSVC and runs the headless libmpv tests.
   windows-native:
     name: 🪟 Windows native
-    if: inputs.windows
+    needs: select
+    if: needs.select.outputs.desktop == 'true'
     runs-on: windows-2025
     timeout-minutes: 15
     env:
@@ -123,7 +164,7 @@ jobs:
         shell: bash
     steps:
       # The same head commit the artifact is named for, so the app and its engine match.
-      - name: 📥 Checkout exact PR head
+      - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
@@ -185,13 +226,14 @@ jobs:
   # runner, since the two builds share nothing.
   app-tvos:
     name: 📺 App on Apple TV
-    if: inputs.app
+    needs: select
+    if: needs.select.outputs.app == 'true'
     runs-on: macos-26
     # One Release build of React Native, its compile cached by ccache, and the remote flow.
     timeout-minutes: 60
     steps:
       # The PR's head commit, so the artifact name below matches the commit that was built.
-      - name: 📥 Checkout exact PR head
+      - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
@@ -302,13 +344,14 @@ jobs:
   # the iPhone simulator against a real raven server.
   app-ios:
     name: 📱 App on iPhone and iPad
-    if: inputs.app
+    needs: select
+    if: needs.select.outputs.app == 'true'
     runs-on: macos-26
     # One Release build of React Native, its compile cached by ccache, and the flows.
     timeout-minutes: 60
     steps:
       # The PR's head commit, so the artifact names below match the commit that was built.
-      - name: 📥 Checkout exact PR head
+      - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
@@ -461,14 +504,15 @@ jobs:
   # Maestro flows on an Android TV emulator, driven by the remote's keys.
   app-android-tv:
     name: 📺 App on Android TV
-    if: inputs.app
+    needs: select
+    if: needs.select.outputs.app == 'true'
     runs-on: ubuntu-24.04
     # A Release build of React Native, its compile cached by ccache and Gradle, the
     # emulator's boot and the flows.
     timeout-minutes: 60
     steps:
       # The PR's head commit, so the artifact name below matches the commit that was built.
-      - name: 📥 Checkout exact PR head
+      - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
@@ -587,13 +631,15 @@ jobs:
   # the fixture server's music library, on a simulator of its own, as app-ios runs the app's.
   music-ios:
     name: 🎵 Wren on iPhone
-    if: inputs.music
+    needs: select
+    # Runs only while the repository variable WREN_CHECKS is `true`; Wren's builds are off until then.
+    if: vars.WREN_CHECKS == 'true' && needs.select.outputs.music == 'true'
     runs-on: macos-26
     # One Release build of React Native, its compile cached by ccache, and the flows.
     timeout-minutes: 60
     steps:
       # The PR's head commit, so the artifact names below match the commit that was built.
-      - name: 📥 Checkout exact PR head
+      - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
@@ -721,12 +767,14 @@ jobs:
   # Wren for Android phones, built on Linux beside the Android TV job; it has no flows yet.
   music-android:
     name: 🎵 Wren for Android
-    if: inputs.music
+    needs: select
+    # Runs only while the repository variable WREN_CHECKS is `true`; Wren's builds are off until then.
+    if: vars.WREN_CHECKS == 'true' && needs.select.outputs.music == 'true'
     runs-on: ubuntu-24.04
     # A Release build of React Native, its compile cached by ccache and Gradle.
     timeout-minutes: 60
     steps:
-      - name: 📥 Checkout exact PR head
+      - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
@@ -753,6 +801,208 @@ jobs:
           name: raven-music-android-${{ inputs.sha }}
           path: apps/raven/music/android/app/build/outputs/apk/release
           if-no-files-found: error
+
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure() && github.event_name == 'pull_request'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
+  # One native build feeds packaging and both playback checks through an artifact.
+  desktop-native:
+    name: 🎞️ Desktop native
+    needs: select
+    if: needs.select.outputs.desktop == 'true'
+    # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+    steps:
+      - name: 📥 Checkout exact commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
+
+      # Shared with desktop-release.yml so a release builds as this does.
+      - name: 🔩 Build the native pieces
+        uses: ./.github/actions/raven-desktop-native
+
+      # A tar keeps ffmpeg's execute bit, which an artifact drops.
+      - name: 📦 Pack the playback handoff
+        run: >-
+          tar -cf "$RUNNER_TEMP/raven-native-handoff.tar"
+          libs/raven/mpv/resources/darwin-arm64
+          libs/raven/mpv/native-build/prefix/bin/ffmpeg
+
+      # Only the jobs below read it, so it lives for a day.
+      - name: 📤 Playback handoff
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-native-handoff-${{ inputs.sha }}
+          path: ${{ runner.temp }}/raven-native-handoff.tar
+          if-no-files-found: error
+          retention-days: 1
+          # A re-run of this job replaces the handoff its first attempt left.
+          overwrite: true
+
+      # Both only read the built resources, so Nx runs them at once.
+      - name: 🔎 Audit native resources and run the real headless libmpv tests
+        run: bun run mpv:native
+
+      - name: 📤 Native playback resources
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-native-darwin-arm64-${{ inputs.sha }}
+          path: libs/raven/mpv/resources/darwin-arm64
+          if-no-files-found: error
+
+      # mpv's GPL and FFmpeg's LGPL want the matching source beside the binaries.
+      - name: 📤 Matching native sources
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-native-sources-${{ inputs.sha }}
+          path: libs/raven/mpv/native-build/source-bundle
+          if-no-files-found: error
+
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure() && github.event_name == 'pull_request'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
+  # Forge bundles the addon and libmpv (stage:mpv), so this waits for the native build.
+  desktop-app:
+    name: 📦 Desktop app
+    needs: desktop-native
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+      # Keeps the Xcode version the cached app is keyed on the same as the native job's.
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - name: 📥 Checkout exact commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
+
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      - name: 📥 Native handoff
+        uses: actions/download-artifact@v8
+        with:
+          name: raven-native-handoff-${{ inputs.sha }}
+          path: ${{ runner.temp }}
+
+      # Puts the addon, dylibs and ffmpeg back where the native job built them.
+      - name: 📂 Unpack the native handoff
+        run: tar -xf "$RUNNER_TEMP/raven-native-handoff.tar"
+
+      # Builds the web app first, which the packaged app serves from its resources.
+      - name: 🏗️ Build desktop app
+        run: bun run desktop:build
+
+      - name: 📦 Make the unsigned app
+        run: bun run desktop:make
+
+      # otool, lipo and codesign over every Mach-O file in the app.
+      - name: 🔎 Audit the packaged bundle
+        run: bun run desktop:audit:bundle
+
+      # Launches the packaged app with no test hooks and checks it starts and quits cleanly.
+      - name: 🚬 Smoke the packaged app
+        run: bun run desktop:smoke:packaged
+
+      - name: 📤 Unsigned Raven
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-player-darwin-arm64-${{ inputs.sha }}
+          path: apps/raven/desktop/out/make
+          if-no-files-found: error
+
+      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
+      # A fork's read-only token can't cancel, which is why this never fails the job.
+      - name: 🛑 Cancel the run
+        if: failure() && github.event_name == 'pull_request'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+
+  desktop-playback:
+    name: ${{ matrix.check.name }}
+    needs: desktop-native
+    runs-on: macos-26
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - name: 🧪 Desktop player against headless libmpv
+            target: test:native
+          # Runs `electron .`, never the packaged app, whose fuses turn off the inspector
+          # Playwright needs. The target's `install:electron` step fetches the binary.
+          - name: 🎬 Desktop end to end
+            target: e2e
+            traces: true
+    env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+      # Keeps the Xcode version the cached results are keyed on the same as the native job's.
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      # `-allow_sw 1` falls back to Apple's software H.264 encoder on a VM.
+      RAVEN_E2E_FFMPEG: ${{ github.workspace }}/libs/raven/mpv/native-build/prefix/bin/ffmpeg
+    steps:
+      - name: 📥 Checkout exact commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
+
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      - name: 📥 Playback handoff
+        uses: actions/download-artifact@v8
+        with:
+          name: raven-native-handoff-${{ inputs.sha }}
+          path: ${{ runner.temp }}
+
+      - name: 📂 Unpack the playback handoff
+        run: tar -xf "$RUNNER_TEMP/raven-native-handoff.tar"
+
+      # Cached on the desktop and native sources and the Xcode version.
+      - name: ${{ matrix.check.name }}
+        run: bun run desktop:${{ matrix.check.target }}
+
+      - name: 📤 End to end traces
+        if: failure() && matrix.check.traces
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-desktop-e2e-traces-${{ inputs.sha }}
+          path: apps/raven/desktop/test-results
+          if-no-files-found: ignore
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.
       # A fork's read-only token can't cancel, which is why this never fails the job.

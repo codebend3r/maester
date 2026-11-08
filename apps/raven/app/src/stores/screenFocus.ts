@@ -1,26 +1,48 @@
 import { create } from 'zustand'
 
+/** The phases of taking the focus back to the card a screen was opened from. */
+export const RESTORE_PHASES = {
+  none: 'none',
+  opener: 'opener',
+  returning: 'returning',
+  asked: 'asked',
+} as const
+
+type RestorePhase = (typeof RESTORE_PHASES)[keyof typeof RESTORE_PHASES]
+
+/** The card another screen was opened from: its place on this one, and the shelf it sits on, if any. */
+type RestoredCard = { card: string; shelf: string | null }
+
 /**
- * The card another screen was opened from, by its place on this one, and whether that card is
- * drawn: its shelf can go while the screen is covered. It lasts through the screen being covered
- * once, so the card can take the focus back as the screen returns.
+ * Where a screen stands in taking the focus back, as a TV screen comes back to the front:
+ * - `none`: nothing to take it back to.
+ * - `opener`: a card opened another screen. It lasts through the screen being covered once,
+ *   so the card can take the focus back as the screen returns; `isDrawn` says whether its view
+ *   is still there, since its shelf can go while the screen is covered; `hasTransitionEnded`
+ *   says the transition that brought the screen back ended before any card took it, as a native
+ *   pop (tvOS's Menu) tells the navigator of itself only as its animation ends.
+ * - `returning`: the card took the opener as the screen came to the front, and asks for the
+ *   focus; it asks again when the transition that reveals the screen ends, since the transition
+ *   can take the focus from a view that asked before then: on Android TV always, on tvOS now
+ *   and then, when the remote lands on the screen's first control instead.
+ * - `asked`: the transition has ended, and the card is asked to take the focus again now.
  */
-type Opener = { card: string; isDrawn: boolean; hasBeenCovered: boolean }
+type Restore =
+  | { kind: typeof RESTORE_PHASES.none }
+  | (RestoredCard & {
+      kind: typeof RESTORE_PHASES.opener
+      isDrawn: boolean
+      hasBeenCovered: boolean
+      hasTransitionEnded: boolean
+    })
+  | (RestoredCard & { kind: typeof RESTORE_PHASES.returning })
+  | (RestoredCard & { kind: typeof RESTORE_PHASES.asked })
 
 /** What one screen keeps of the remote's focus, on a TV. */
 type ScreenFocus = {
   /** Whether anything on the screen has had the focus, which spends its opening focus. */
   hasSettled: boolean
-  opener: Opener | null
-  /**
-   * The card that took the opener as the screen came to the front. It asks for the focus once
-   * more when the transition that reveals the screen ends, since the transition can take the
-   * focus from a view that asked before then: on Android TV always, on tvOS now and then, when
-   * the remote lands on the screen's first control instead.
-   */
-  returning: string | null
-  /** The card asked to take the focus again now that the transition has ended. */
-  asked: string | null
+  restore: Restore
 }
 
 type ScreenFocusState = { screens: Readonly<Record<string, ScreenFocus>> }
@@ -31,16 +53,18 @@ type ScreenFocusState = { screens: Readonly<Record<string, ScreenFocus>> }
  */
 export const useScreenFocus = create<ScreenFocusState>()(() => ({ screens: {} }))
 
-const FRESH: ScreenFocus = { hasSettled: false, opener: null, returning: null, asked: null }
+const NOTHING: Restore = { kind: RESTORE_PHASES.none }
+
+const FRESH: ScreenFocus = { hasSettled: false, restore: NOTHING }
 
 type ScreenOfProps = { state: ScreenFocusState; screen: string }
 
 const screenOf = ({ state, screen }: ScreenOfProps): ScreenFocus => state.screens[screen] ?? FRESH
 
-type OpenerOfProps = { screen: string }
+type RestoreOfProps = { screen: string }
 
-const openerOf = ({ screen }: OpenerOfProps): Opener | null =>
-  screenOf({ state: useScreenFocus.getState(), screen }).opener
+const restoreNow = ({ screen }: RestoreOfProps): Restore =>
+  screenOf({ state: useScreenFocus.getState(), screen }).restore
 
 type ChangeProps = { screen: string; to: Partial<ScreenFocus> }
 
@@ -63,13 +87,23 @@ export const settleScreen = ({ screen }: SettleScreenProps): void => {
     change({ screen, to: { hasSettled: true } })
 }
 
-type RememberOpenerProps = { screen: string; card: string }
+type RememberOpenerProps = { screen: string } & RestoredCard
 
 /** The card at `card` opens another screen; it takes the focus back when this one returns. */
-export const rememberOpener = ({ screen, card }: RememberOpenerProps): void =>
+export const rememberOpener = ({ screen, card, shelf }: RememberOpenerProps): void =>
   change({
     screen,
-    to: { hasSettled: true, opener: { card, isDrawn: true, hasBeenCovered: false } },
+    to: {
+      hasSettled: true,
+      restore: {
+        kind: RESTORE_PHASES.opener,
+        card,
+        shelf,
+        isDrawn: true,
+        hasBeenCovered: false,
+        hasTransitionEnded: false,
+      },
+    },
   })
 
 type DrawCardProps = {
@@ -80,18 +114,31 @@ type DrawCardProps = {
 
 /** The card at `card` is drawn, or goes (`isDrawn`); only the opener's own card counts. */
 export const drawCard = ({ screen, card, isDrawn }: DrawCardProps): void => {
-  const opener = openerOf({ screen })
-  if (opener === null || opener.card !== card || opener.isDrawn === isDrawn) return
-  change({ screen, to: { opener: { ...opener, isDrawn } } })
+  const restore = restoreNow({ screen })
+  if (restore.kind !== RESTORE_PHASES.opener || restore.card !== card) return
+  if (restore.isDrawn === isDrawn) return
+  change({ screen, to: { restore: { ...restore, isDrawn } } })
 }
 
 type TakeOpenerProps = { screen: string; card: string }
 
-/** Hands the opener back once, and only to the card it names: true for that card, then never. */
-export const takeOpener = ({ screen, card }: TakeOpenerProps): boolean => {
-  if ((openerOf({ screen })?.card ?? null) !== card) return false
-  change({ screen, to: { opener: null, returning: card } })
-  return true
+/**
+ * Hands the opener to the card it names, once, as the screen comes to the front: the card is
+ * returning until the transition ends, when it is asked again, or asked at once after a
+ * transition that ended before the card took it.
+ */
+export const takeOpener = ({ screen, card }: TakeOpenerProps): void => {
+  const restore = restoreNow({ screen })
+  if (restore.kind !== RESTORE_PHASES.opener || restore.card !== card) return
+  const taken = { card, shelf: restore.shelf }
+  change({
+    screen,
+    to: {
+      restore: restore.hasTransitionEnded
+        ? { kind: RESTORE_PHASES.asked, ...taken }
+        : { kind: RESTORE_PHASES.returning, ...taken },
+    },
+  })
 }
 
 type CoverScreenProps = { screen: string }
@@ -99,46 +146,99 @@ type CoverScreenProps = { screen: string }
 /**
  * Another screen covers this one. The opener just remembered lasts through it; one that has
  * lasted through a cover already, which no card took as the screen came back, goes, so a
- * return from a screen no card opened asks for nothing.
+ * return from a screen no card opened asks for nothing. A card returning or asked is done.
  */
 export const coverScreen = ({ screen }: CoverScreenProps): void => {
-  const { opener, returning, asked } = screenOf({ state: useScreenFocus.getState(), screen })
-  if (opener === null && returning === null && asked === null) return
-  const kept = opener === null || opener.hasBeenCovered ? null : { ...opener, hasBeenCovered: true }
-  change({ screen, to: { opener: kept, returning: null, asked: null } })
+  const restore = restoreNow({ screen })
+  switch (restore.kind) {
+    case RESTORE_PHASES.none:
+      return
+    case RESTORE_PHASES.opener:
+      change({
+        screen,
+        to: {
+          restore: restore.hasBeenCovered
+            ? NOTHING
+            : { ...restore, hasBeenCovered: true, hasTransitionEnded: false },
+        },
+      })
+      return
+    case RESTORE_PHASES.returning:
+    case RESTORE_PHASES.asked:
+      change({ screen, to: { restore: NOTHING } })
+      return
+    default: {
+      const unknown: never = restore
+      return unknown
+    }
+  }
 }
 
 type ReturnScreenProps = { screen: string }
 
 /**
  * The transition that brings the screen back to the front has ended (the navigator's
- * `transitionEnd`, which `AppRoot` hears). An opener whose card is no longer drawn (its shelf
- * went while the screen was covered) has nothing to take the focus back to, so the screen gives
- * its opening focus again rather than leave the remote on nothing, as Android TV would. It waits
- * for the transition's end, since on Android TV the transition takes the focus from anything
- * asked for before then. The card that took the focus back as the screen came to the front
- * asks for it again now, for the same reason.
+ * `transitionEnd`, which `AppRoot` hears). The card returning is asked to take the focus again
+ * now, since on Android TV the transition takes the focus from anything asked for before then.
+ * An opener no card has taken yet keeps that the transition has ended, so the card asks as it
+ * takes it. An opener whose card is no longer drawn (its shelf went while the screen was
+ * covered) has nothing to take the focus back to, so the screen gives its opening focus again
+ * rather than leave the remote on nothing, as Android TV would.
  */
 export const returnScreen = ({ screen }: ReturnScreenProps): void => {
-  const { opener, returning } = screenOf({ state: useScreenFocus.getState(), screen })
-  if (returning !== null) {
-    change({ screen, to: { returning: null, asked: returning } })
-    return
+  const restore = restoreNow({ screen })
+  switch (restore.kind) {
+    case RESTORE_PHASES.none:
+    case RESTORE_PHASES.asked:
+      return
+    case RESTORE_PHASES.returning:
+      change({
+        screen,
+        to: { restore: { kind: RESTORE_PHASES.asked, card: restore.card, shelf: restore.shelf } },
+      })
+      return
+    case RESTORE_PHASES.opener:
+      change({
+        screen,
+        to: restore.isDrawn
+          ? { restore: { ...restore, hasTransitionEnded: true } }
+          : { hasSettled: false, restore: NOTHING },
+      })
+      return
+    default: {
+      const unknown: never = restore
+      return unknown
+    }
   }
-  if (opener === null || opener.isDrawn) return
-  change({ screen, to: { hasSettled: false, opener: null } })
 }
 
-type IsAskedInProps = { state: ScreenFocusState; screen: string; card: string }
+type RestoreInProps = { state: ScreenFocusState; screen: string }
 
-/** Whether the card at `card` is asked to take the focus again. */
-export const isAskedIn = ({ state, screen, card }: IsAskedInProps): boolean =>
-  screenOf({ state, screen }).asked === card
+/** Where the screen stands in taking the focus back. */
+export const restoreIn = ({ state, screen }: RestoreInProps): Restore =>
+  screenOf({ state, screen }).restore
+
+/** The card taking the focus back, from the screen's return until it has asked; null in any other phase. */
+export const restoringCardOf = (restore: Restore): RestoredCard | null =>
+  restore.kind === RESTORE_PHASES.returning || restore.kind === RESTORE_PHASES.asked
+    ? { card: restore.card, shelf: restore.shelf }
+    : null
+
+type IsCardInPhaseProps = RestoreInProps & { card: string; phase: RestorePhase }
+
+/** Whether the card at `card` is the one in the phase `phase` of taking the focus back. */
+export const isCardInPhase = ({ state, screen, card, phase }: IsCardInPhaseProps): boolean => {
+  const restore = restoreIn({ state, screen })
+  return restore.kind === phase && restore.kind !== RESTORE_PHASES.none && restore.card === card
+}
 
 type SpendAskProps = { screen: string }
 
 /** The card asked has asked, so one drawn afresh later does not ask again. */
-export const spendAsk = ({ screen }: SpendAskProps): void => change({ screen, to: { asked: null } })
+export const spendAsk = ({ screen }: SpendAskProps): void => {
+  if (restoreNow({ screen }).kind === RESTORE_PHASES.asked)
+    change({ screen, to: { restore: NOTHING } })
+}
 
 type LeaveScreenProps = { screen: string }
 

@@ -1,4 +1,4 @@
-name: 🧠 sparrow evals
+name: 🧠 Sparrow evals
 
 # Nightly, and on demand from the Actions tab. The evals run sparrow's agent with
 # the real model against fake services, so they take about five minutes and

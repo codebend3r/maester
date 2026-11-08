@@ -12,6 +12,7 @@ import { playlistFactsOf } from '@raven/ui/headless'
 import { MUSIC_COPY } from '@/layouts/copy'
 import {
   CARD_SHAPES,
+  CARD_SUBJECTS,
   type Picture,
   type Pictures,
   type ShelfCard,
@@ -36,6 +37,8 @@ export const albumCard = ({ api, headersFor, album }: AlbumCardProps): ShelfCard
     headersFor,
   }),
   progress: 0,
+  subject: { kind: CARD_SUBJECTS.album, albumId: album.id },
+  isWatched: false,
   target: { kind: ROUTE_TARGETS.album, albumId: album.id },
 })
 
@@ -114,6 +117,8 @@ export const artistCard = ({ artist }: ArtistCardProps): ShelfCard => ({
   shape: CARD_SHAPES.poster,
   picture: null,
   progress: 0,
+  subject: null,
+  isWatched: false,
   target: { kind: ROUTE_TARGETS.artist, artistId: artist.id },
 })
 
@@ -140,6 +145,8 @@ export const playlistCard = ({ playlist }: PlaylistCardProps): ShelfCard => ({
   shape: CARD_SHAPES.poster,
   picture: null,
   progress: 0,
+  subject: null,
+  isWatched: false,
   target: { kind: ROUTE_TARGETS.playlist, playlistId: playlist.id },
 })
 

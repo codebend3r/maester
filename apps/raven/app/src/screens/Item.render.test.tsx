@@ -207,7 +207,7 @@ describe('Item on a phone or tablet', () => {
     await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE.id) })
 
     expect(await screen.findByRole('checkbox', { name: 'Favourite', checked: false })).toBeTruthy()
-    expect(screen.getByRole('checkbox', { name: 'Mark watched' })).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: 'Mark show watched' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Play S01E01' })).toBeNull()
 
     next.release()
@@ -267,7 +267,7 @@ describe('Item on a phone or tablet', () => {
 
   it('offers no Binge on a season', async () => {
     await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE_ONE.id) })
-    await screen.findByRole('checkbox', { name: 'Mark watched' })
+    await screen.findByRole('checkbox', { name: 'Mark season watched' })
     expect(screen.queryByRole('checkbox', { name: 'Mark as binging' })).toBeNull()
   })
 

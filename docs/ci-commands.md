@@ -11,7 +11,7 @@ Each `ci:*` command runs one CI job on this machine, so a check that fails on a 
 | `bun run ci:wren`           | `scripts/ci_wren.sh`            | The macOS half of the 🎵 Wren job: the iPhone simulator, Wren's Release build, the pods check and the Maestro flows.                                          |
 | `bun run ci:desktop:e2e`    | `scripts/ci_desktop_e2e.sh`     | The 🎬 Desktop end to end check from `main-native-checks.yml`: Playwright tests against the unpackaged Raven.                                                 |
 
-The jobs live in `.github/workflows/pull-request-checks.yml`, except the desktop end to end check, which is in `.github/workflows/main-native-checks.yml`.
+The ✅ Checks job lives in `.github/workflows/pull-request-checks.yml`. The native jobs live in `.github/workflows/native-checks.yml`, which both the pull request checks and `main-native-checks.yml` call for the groups a change affects, so a pull request runs them before it merges and main runs them again on the merge commit.
 
 ## Options
 

@@ -4,7 +4,6 @@ import { type ComponentRef, type Ref, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { LIBRARIES_ENTRY } from '@/layouts/copy'
 import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import { Icon } from '@raven/native'
@@ -236,7 +235,7 @@ const useStyles = themedStyles((colours) =>
       paddingHorizontal: TV_SIZES.space2,
       paddingVertical: TV_SIZES.space1,
     },
-    focused: { ...FOCUS_FRONT, borderColor: colours.text, backgroundColor: colours.quiet },
+    focused: { borderColor: colours.text, backgroundColor: colours.quiet },
     label: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
   }),
 )

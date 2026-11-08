@@ -159,7 +159,6 @@ type ControlsProps = Pick<
   | 'next'
   | 'previous'
   | 'mode'
-  | 'favourite'
   | 'upNext'
   | 'chapters'
   | 'onBack'
@@ -221,8 +220,8 @@ const pictureChipsOf = ({ mode, heading }: PictureChipsOfProps): FactPart[] =>
   ].flatMap(({ kind, text }) => (text === null ? [] : [{ kind, text }]))
 
 /**
- * The top right corner, one thing under another: the time of day, the picture's chips and how
- * the video plays, then what plays next, read out together.
+ * The top right corner, one thing under another: the time of day, the picture's chips, how the
+ * video plays on a line of its own, then what plays next, read out together.
  */
 const Corner = ({ mode, heading, upNext }: CornerProps) => {
   const styles = useStyles()
@@ -242,17 +241,19 @@ const Corner = ({ mode, heading, upNext }: CornerProps) => {
       accessible
       style={styles.corner}
     >
-      <Text variant={TEXT_VARIANTS.display} style={styles.clock}>
+      <Text variant={TEXT_VARIANTS.display} numberOfLines={1} style={styles.clock}>
         {clock}
       </Text>
-      <View style={styles.cornerChips}>
-        {chips.length > 0 && <FocusFactChips parts={chips} />}
-        {way !== null && (
-          <View style={styles.chip}>
-            <Text style={styles.chipText}>{way}</Text>
-          </View>
-        )}
-      </View>
+      {chips.length > 0 && (
+        <View style={styles.cornerChips}>
+          <FocusFactChips parts={chips} />
+        </View>
+      )}
+      {way !== null && (
+        <View style={styles.chip}>
+          <Text style={styles.chipText}>{way}</Text>
+        </View>
+      )}
       {upNext !== null && (
         <View style={styles.upNext}>
           <Text style={styles.upNextLead}>{PLAYER_COPY.upNext}</Text>
@@ -313,28 +314,14 @@ const Centre = ({ mark, isFading }: CentreProps) => {
   )
 }
 
-type HeadingFavouriteProps = Pick<PlayerChromeProps, 'favourite'>
-
-/** The playing video's heart, filled while it is a favourite. */
-const HeadingFavourite = ({ favourite }: HeadingFavouriteProps) =>
-  favourite !== null && (
-    <PlateButton
-      icon="heart"
-      isOn={favourite.isOn}
-      isOverPicture
-      label={PLAYER_COPY.favourite}
-      onPress={favourite.onToggle}
-    />
-  )
-
-type HeadingLinesProps = Pick<PlayerChromeProps, 'heading' | 'favourite'>
+type HeadingLinesProps = Pick<PlayerChromeProps, 'heading'>
 
 /**
  * The title along the top as lines, as the web player's: the show's art (or a film's) on a row
  * of its own, an episode's own name, then the line of what it is (its season and number, its
- * length and its year) with the heart beside it on the same row.
+ * length and its year). A title is marked a favourite on its own page, never here.
  */
-const Heading = ({ heading, favourite }: HeadingLinesProps) => {
+const Heading = ({ heading }: HeadingLinesProps) => {
   const styles = useStyles()
   const details = [heading.place, heading.length, heading.year]
     .filter((part): part is string => part !== null)
@@ -357,12 +344,7 @@ const Heading = ({ heading, favourite }: HeadingLinesProps) => {
           {episodeName}
         </Text>
       )}
-      <FocusBand>
-        <View style={styles.titleRow}>
-          {details !== '' && <Text style={styles.details}>{details}</Text>}
-          <HeadingFavourite favourite={favourite} />
-        </View>
-      </FocusBand>
+      {details !== '' && <Text style={styles.details}>{details}</Text>}
     </View>
   )
 }
@@ -385,7 +367,6 @@ const Controls = ({
   next,
   previous,
   mode,
-  favourite,
   upNext,
   chapters,
   onBack,
@@ -412,7 +393,7 @@ const Controls = ({
           <FocusBand>
             <PlateButton icon="back" isOverPicture label={PLAYER_COPY.leave} onPress={onBack} />
           </FocusBand>
-          <Heading heading={heading} favourite={favourite} />
+          <Heading heading={heading} />
         </View>
         <Corner mode={mode} heading={heading} upNext={upNext} />
       </View>
@@ -555,7 +536,6 @@ const DpadPlayer = ({
   next,
   previous,
   mode,
-  favourite,
   upNext,
   chapters,
   onBack,
@@ -664,7 +644,6 @@ const DpadPlayer = ({
           <View pointerEvents="none" style={styles.scrim} />
           <Controls
             audio={audio}
-            favourite={favourite}
             heading={heading}
             mode={mode}
             next={next}
@@ -747,7 +726,13 @@ const useStyles = pictureStyles((colours) =>
       gap: TV_SIZES.space4,
     },
     heading: { gap: TV_SIZES.space2, maxWidth: TV_SIZES.measure },
-    corner: { alignItems: 'flex-end', gap: TV_SIZES.space2, maxWidth: TV_SIZES.measure / 2 },
+    // Never squeezed by the heading beside it, which shrinks instead: the clock stays on one line.
+    corner: {
+      flexShrink: 0,
+      alignItems: 'flex-end',
+      gap: TV_SIZES.space2,
+      maxWidth: TV_SIZES.measure / 2,
+    },
     cornerChips: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space1 },
     // What plays next, on the glass under the chips: a softer "Up next" before its words.
     upNext: {
@@ -762,6 +747,7 @@ const useStyles = pictureStyles((colours) =>
     upNextLead: { color: colours.muted, fontSize: TV_SIZES.text },
     upNextLabel: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.text },
     clock: {
+      flexShrink: 0,
       color: colours.text,
       fontSize: CLOCK_SIZE,
       lineHeight: CLOCK_SIZE * LINE_RATIO,
@@ -774,7 +760,6 @@ const useStyles = pictureStyles((colours) =>
       fontSize: TV_SIZES.textLg,
       fontVariant: ['tabular-nums'],
     },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
     title: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.textXl },
     chip: {
       paddingHorizontal: TV_SIZES.space2,

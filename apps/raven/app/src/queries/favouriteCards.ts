@@ -12,6 +12,7 @@ import {
 import { albumCard, artistCard } from '@/music/musicCards'
 import {
   CARD_SHAPES,
+  CARD_SUBJECTS,
   type Pictures,
   type ShelfCard,
   frameCard,
@@ -50,6 +51,9 @@ const titleCard = ({ item, arts, api, headersFor }: TitleCardProps): ShelfCard =
     title: item.title,
     line: item.show?.title ?? (item.year === null ? null : String(item.year)),
     progress: 0,
+    subject: { kind: CARD_SUBJECTS.item, itemId: item.id },
+    // The favourites list carries no count of what is watched, so no check here.
+    isWatched: false,
     target: itemTarget(item.id),
   }
   if (art !== null && art.backdrop !== null) {

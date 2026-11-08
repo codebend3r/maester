@@ -1,9 +1,10 @@
 import { describe, expect, it, jest } from '@jest/globals'
 import { fireEvent, render, screen } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 import { FocusCard } from '@/layouts/FocusCard'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import { ROUTE_TARGETS } from '@/routes'
+import { useReduceMotion } from '@/stores/reduceMotion'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import type * as NavigationFocus from '@/test/navigationFocus'
 
@@ -23,6 +24,8 @@ const CARD: ShelfCard = {
   shape: CARD_SHAPES.wide,
   picture: null,
   progress: 0.4,
+  subject: null,
+  isWatched: false,
   logo: { uri: 'https://nas.example/api/items/4/images/logo', headers: {} },
   episode: { name: 'Half Loop', mark: 'S1.E2' },
   resume: { timeLeft: '42m left' },
@@ -57,16 +60,45 @@ describe('FocusCard', () => {
   })
 })
 
+describe('FocusCard watched', () => {
+  it('says a watched title is watched, and a title not yet watched nothing more', async () => {
+    const watched = { ...CARD, episode: null, isWatched: true }
+    const { rerender } = await render(
+      <FocusCard card={watched} isPreferred={false} onPress={() => undefined} width={400} />,
+    )
+    expect(screen.getByRole('button', { name: 'Severance, Watched' })).toBeTruthy()
+    await rerender(
+      <FocusCard
+        card={{ ...watched, isWatched: false }}
+        isPreferred={false}
+        onPress={() => undefined}
+        width={400}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Severance' })).toBeTruthy()
+  })
+})
+
 describe('FocusCard focus', () => {
-  it('stands in front of its neighbours while focused, and back among them once it blurs', async () => {
+  it('rests inside its box and grows to fill it while focused, never standing in front by zIndex', async () => {
+    useReduceMotion.setState({ isReduced: true })
     await render(
       <FocusCard card={CARD} isPreferred={false} onPress={() => undefined} width={400} />,
     )
     const card = screen.getByRole('button')
-    expect(card).not.toHaveStyle(FOCUS_FRONT)
+    const scaleOf = () => {
+      const [face] = card.children
+      if (typeof face !== 'object' || face === null) throw new Error('No card face')
+      return StyleSheet.flatten(face.props.style)?.transform ?? null
+    }
+    expect(scaleOf()).toEqual([{ scale: 1 / 1.08 }])
+    expect(StyleSheet.flatten(card.props.style)?.zIndex).toBeUndefined()
+
     await fireEvent(card, NATIVE_EVENTS.focus)
-    expect(card).toHaveStyle(FOCUS_FRONT)
+    expect(scaleOf()).toEqual([{ scale: 1 }])
+    expect(StyleSheet.flatten(card.props.style)?.zIndex).toBeUndefined()
+
     await fireEvent(card, NATIVE_EVENTS.blur)
-    expect(card).not.toHaveStyle(FOCUS_FRONT)
+    expect(scaleOf()).toEqual([{ scale: 1 / 1.08 }])
   })
 })

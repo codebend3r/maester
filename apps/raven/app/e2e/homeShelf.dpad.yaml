@@ -1,0 +1,24 @@
+appId: io.github.codebend3r.raven.app
+name: On a TV a shelf card on Home opens its title's page on Play, and Back lands on the card again
+tags:
+  - dpad
+---
+- runFlow: signIn.yaml
+- runFlow: steps/healHome.dpad.yaml
+# With nothing in progress, Down from the hero lands on the films' shelf card, which opens its
+# title's page with the remote on Play, and Back lands on the card again.
+- runFlow: steps/heroToFilm.dpad.yaml
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Play
+      focused: true
+    timeout: 30000
+- assertVisible: Kestrel Point
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Kestrel Point
+      focused: true
+      below: Films
+    timeout: 30000

@@ -8,12 +8,9 @@ import {
   SHOW_SESSION,
   shuffleSessionOf,
   WATCHED_STATES,
-  WATCH_TARGET_KINDS,
   type WatchedState,
-  canFavouriteIn,
   episodeCode,
   episodesOf,
-  episodesWatched,
   firstEpisodeIn,
   firstSeasonIn,
   formatDuration,
@@ -22,18 +19,9 @@ import {
   routeIdOf,
   routeState,
   seasonsOf,
-  seasonsWatched,
-  watchedStateOf,
   episodeTag,
 } from '@raven/core'
-import {
-  useServerItemFavourite,
-  useServerMediaMutations,
-  useServerWatchedToggle,
-  KeyedView,
-  type ViewOf,
-  type ViewsOf,
-} from '@raven/ui/headless'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
@@ -41,7 +29,8 @@ import type { ComponentType } from 'react'
 import type { Pictures } from '@/queries/cards'
 import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
-import { type BingeToggle, useBingeToggle } from '@/queries/useBinge'
+import type { BingeToggle } from '@/queries/useBinge'
+import { type ItemMarks, useItemMarks, useVideoMarks } from '@/queries/useMarks'
 import { usePictures } from '@/queries/usePictures'
 import { ItemLayout, ItemNotice, Loading } from '@/layouts'
 import {
@@ -149,22 +138,30 @@ const favouriteOf = ({ isOn, onToggle }: FavouriteOfProps): ItemAction => ({
   onPress: () => onToggle(!isOn),
 })
 
+/** What a Watched mark says: what pressing it marks, and that it all is once it is. */
+type WatchedWords = { mark: string; marked: string }
+
 type WatchedOfProps = {
   state: WatchedState
   onToggle: () => void
+  /** The words for what the mark covers: a video, a whole season, a whole show. */
+  words: WatchedWords
 }
 
-/** Watched reads as what pressing it does until everything is: then it says it is. */
-const watchedOf = ({ state, onToggle }: WatchedOfProps): ItemAction => ({
-  kind: ITEM_ACTIONS.toggle,
-  key: ACTION_KEYS.watched,
-  icon: 'check',
-  label: state === WATCHED_STATES.watched ? ITEM_COPY.watched : ITEM_COPY.markWatched,
-  text: null,
-  isOn: WATCHED_CHECKS[state],
-  isDisabled: false,
-  onPress: onToggle,
-})
+/** Watched says what pressing it does until everything is, then that it is, beside its icon as the web's. */
+const watchedOf = ({ state, onToggle, words }: WatchedOfProps): ItemAction => {
+  const label = state === WATCHED_STATES.watched ? words.marked : words.mark
+  return {
+    kind: ITEM_ACTIONS.toggle,
+    key: ACTION_KEYS.watched,
+    icon: 'check',
+    label,
+    text: label,
+    isOn: WATCHED_CHECKS[state],
+    isDisabled: false,
+    onPress: onToggle,
+  }
+}
 
 /** Binge's label: what pressing it does, that it is on, or, while the list is full, why it cannot be. */
 const bingeLabelOf = ({ isBinging, isFull }: Omit<BingeToggle, 'toggle'>): string => {
@@ -292,20 +289,19 @@ const episodeLinksOf = ({ details, show, context }: EpisodeLinksOfProps): ItemAc
 }
 
 type MarksOfProps = {
-  details: ItemDetails
-  favourite: ReturnType<typeof useServerItemFavourite>
-  watched: ReturnType<typeof useServerWatchedToggle>
+  marks: ItemMarks
+  /** What the Watched mark says it covers: the whole show, or the whole season. */
+  words: WatchedWords
 }
 
 /**
- * A show's or a season's marks: Favourite where the server says it can be one, then Watched
- * over every episode under it.
+ * A show's or a season's marks as actions: Favourite where the server says it can be one, then
+ * Watched over every episode under it, saying which, and for a show Binge.
  */
-const marksOf = ({ details, favourite, watched }: MarksOfProps): ItemAction[] => [
-  ...(details.favourite === null
-    ? []
-    : [favouriteOf({ isOn: details.favourite, onToggle: favourite.mutate })]),
-  watchedOf(watched),
+const marksOf = ({ marks, words }: MarksOfProps): ItemAction[] => [
+  ...(marks.favourite === null ? [] : [favouriteOf(marks.favourite)]),
+  watchedOf({ ...marks.watched, words }),
+  ...(marks.binge === null ? [] : [bingeOf(marks.binge)]),
 ]
 
 type PlayableItemProps = {
@@ -333,7 +329,7 @@ const PlayableItem = ({
 }: PlayableItemProps) => {
   const { queries } = session
   const isEpisode = kind === ITEM_TYPES.episode
-  const { favourite, watched } = useServerMediaMutations({ api: session.api, media: primary })
+  const marks = useVideoMarks({ session, media: primary })
   const libraries = useQuery(queries.librariesQuery)
   const tracks = useQuery(queries.tracksQuery(primary.id))
   // An episode sits under its show's backdrop, and its links up name the show's seasons.
@@ -346,10 +342,6 @@ const PlayableItem = ({
     enabled: isEpisode,
   })
   const nextFile = next.data ?? null
-  // A locked library's videos are never marked, but one marked before it locked can be unmarked.
-  const canFavourite =
-    canFavouriteIn({ libraries: libraries.data ?? [], libraryId: primary.libraryId }) ||
-    primary.favourite
   const page = playablePage({
     kind,
     details,
@@ -374,11 +366,8 @@ const PlayableItem = ({
     }),
     ...fromStartOf({ media: primary, context }),
     ...(nextFile === null ? [] : [nextOf({ media: nextFile, context })]),
-    ...(canFavourite ? [favouriteOf({ isOn: primary.favourite, onToggle: favourite.mutate })] : []),
-    watchedOf({
-      state: primary.watched ? WATCHED_STATES.watched : WATCHED_STATES.unwatched,
-      onToggle: () => watched.mutate(!primary.watched),
-    }),
+    ...(marks.favourite === null ? [] : [favouriteOf(marks.favourite)]),
+    watchedOf({ ...marks.watched, words: ITEM_COPY.videoWatched }),
   ]
   return (
     <ItemLayout
@@ -506,18 +495,12 @@ type ShowItemProps = {
 
 /**
  * A show: Play for the episode the server says comes next, once it says, Play all from its first
- * episode, Shuffle, Favourite and Watched over every episode, Binge, then its seasons.
+ * episode, Shuffle, Favourite and Mark show watched over every episode, Binge, then its seasons.
  */
 const ShowItem = ({ details, session, context }: ShowItemProps) => {
   const next = useQuery(session.queries.nextEpisodeQuery(details.id))
-  const favourite = useServerItemFavourite({ api: session.api, item: details })
+  const marks = useItemMarks({ session, details })
   const seasons = seasonsOf(details)
-  const state = watchedStateOf(seasonsWatched(seasons))
-  const toggle = useServerWatchedToggle({
-    api: session.api,
-    state,
-    targets: [{ kind: WATCH_TARGET_KINDS.item, id: details.id, libraryId: null }],
-  })
   // Read for the first episode a fully watched show starts again from.
   const first = useQuery(session.queries.itemQuery(firstSeasonIn(seasons)?.id ?? null))
   const firstFile =
@@ -526,13 +509,17 @@ const ShowItem = ({ details, session, context }: ShowItemProps) => {
   const nextItem = nextFile?.item ?? null
   const nextCode = nextItem === null ? null : episodeCode(nextItem)
   const onShuffle = useShowShuffle({ showId: details.id, session, context })
-  const binge = useBingeToggle(details.id)
   const actions = [
-    ...playNextActionsOf({ next: nextFile, code: nextCode, first: firstFile, state, context }),
+    ...playNextActionsOf({
+      next: nextFile,
+      code: nextCode,
+      first: firstFile,
+      state: marks.watched.state,
+      context,
+    }),
     ...playAllOf({ first: firstFile, context }),
     ...shuffleOf({ onShuffle }),
-    ...marksOf({ details, favourite, watched: toggle }),
-    bingeOf(binge),
+    ...marksOf({ marks, words: ITEM_COPY.showWatched }),
   ]
   return (
     <ItemLayout
@@ -554,18 +541,14 @@ type SeasonItemProps = {
 
 /**
  * A season: Play for its first episode not yet watched, Play all from its first episode on through
- * the show, Shuffle over the whole show, Favourite and Watched, then its episodes.
+ * the show, Shuffle over the whole show, Favourite and Mark season watched over every episode in
+ * it, then its episodes.
  */
 const SeasonItem = ({ details, session, context }: SeasonItemProps) => {
   // A season sits under its show's backdrop, and carries its show's content rating.
   const show = useQuery(session.queries.itemQuery(details.show?.id ?? null))
-  const favourite = useServerItemFavourite({ api: session.api, item: details })
+  const marks = useItemMarks({ session, details })
   const episodes = episodesOf(details)
-  const toggle = useServerWatchedToggle({
-    api: session.api,
-    state: watchedStateOf(episodesWatched(episodes)),
-    targets: [{ kind: WATCH_TARGET_KINDS.item, id: details.id, libraryId: null }],
-  })
   const next = nextEpisodeIn(episodes)
   const nextFile = next?.primary ?? null
   const firstFile = firstEpisodeIn(episodes)?.primary ?? null
@@ -576,12 +559,12 @@ const SeasonItem = ({ details, session, context }: SeasonItemProps) => {
       next: nextFile,
       code: next === undefined ? null : episodeCode(next),
       first: firstFile,
-      state: toggle.state,
+      state: marks.watched.state,
       context,
     }),
     ...playAllOf({ first: firstFile, context }),
     ...shuffleOf({ onShuffle }),
-    ...marksOf({ details, favourite, watched: toggle }),
+    ...marksOf({ marks, words: ITEM_COPY.seasonWatched }),
   ]
   return (
     <ItemLayout

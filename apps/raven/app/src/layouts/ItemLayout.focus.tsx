@@ -4,7 +4,6 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
 import { Icon } from '@raven/native'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import {
@@ -486,7 +485,7 @@ const Person = ({ person }: PersonProps) => {
         setFocused(true)
         settle()
       }}
-      style={[styles.person, isFocused && FOCUS_FRONT]}
+      style={styles.person}
     >
       <View style={[styles.photo, isFocused && styles.focusedPhoto]}>
         <Photo person={person} />
@@ -663,7 +662,7 @@ const useStyles = themedStyles((colours) =>
       borderWidth: TV_SIZES.tvFocusRing,
     },
     actionLabel: { fontSize: TV_SIZES.textLg, fontWeight: 'bold' },
-    focused: { ...FOCUS_FRONT, borderColor: colours.text },
+    focused: { borderColor: colours.text },
     disabled: { opacity: OPACITIES.disabled },
     section: { gap: TV_SIZES.space1 },
     heading: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
