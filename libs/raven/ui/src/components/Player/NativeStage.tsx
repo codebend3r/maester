@@ -30,6 +30,7 @@ export const NativeStage = ({ engine, onBack, onFailure }: NativeStageProps) => 
       selection={native.selection}
       subtitleStatus={native.selection.subtitle ? SUBTITLE_STATUSES.ready : SUBTITLE_STATUSES.off}
       fullscreen={fullscreen}
+      file={engine.file}
     />
   )
 }

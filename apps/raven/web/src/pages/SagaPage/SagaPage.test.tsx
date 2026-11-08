@@ -142,12 +142,65 @@ describe('SagaPage', () => {
       route: '/libraries/2/sagas/119',
     })
     const order = await screen.findByRole('region', { name: 'In order' })
-    const rows = within(order).getAllByRole('listitem')
+    // Each row holds its scores as a list of its own; the rows are the ordered list's items.
+    const rows = within(order)
+      .getAllByRole('listitem')
+      .filter((row) => row.parentElement?.tagName === 'OL')
     expect(rows.map((row) => row.textContent?.slice(0, 2))).toEqual(['01', '02', '03'])
     expect(within(rows[0] ?? order).getByText('Watched')).toBeInTheDocument()
     expect(within(rows[1] ?? order).getByText('Up next')).toBeInTheDocument()
     expect(within(rows[2] ?? order).queryByText(/Watched|Up next/)).toBeNull()
     expect(screen.getByText('1 of 3 watched')).toBeInTheDocument()
+  })
+
+  it("shows every score each movie has on its row, as the movie's own page does", async () => {
+    spies.get.mockImplementation(async () =>
+      library({ id: 2, name: 'Films', settings: { ...library().settings, kind: 'movies' } }),
+    )
+    spies.sagas.mockImplementation(async () => [
+      {
+        ...RINGS,
+        media: [
+          matchedMovie({
+            id: 7,
+            title: 'Minions',
+            item: itemSummary({
+              id: 70,
+              title: 'Minions',
+              year: 2015,
+              ratings: [
+                { source: 'rottenTomatoes', kind: 'critic', value: 5.5, votes: null },
+                { source: 'imdb', kind: 'audience', value: 6.4, votes: 250_000 },
+                { source: 'metacritic', kind: 'critic', value: 5.6, votes: null },
+                { source: 'tmdb', kind: 'audience', value: 6.4, votes: 9_000 },
+              ],
+            }),
+          }),
+        ],
+      },
+    ])
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
+        </Routes>
+      ),
+      route: '/libraries/2/sagas/119',
+    })
+    const order = await screen.findByRole('region', { name: 'In order' })
+    const ratings = within(order).getByRole('list', { name: 'Ratings' })
+    expect(
+      within(ratings)
+        .getAllByRole('listitem')
+        .map((item) => item.getAttribute('aria-label')),
+    ).toEqual([
+      'Rotten Tomatoes: 55%. Critics who reviewed it positively.',
+      'IMDb: 6.4 out of 10. Average user rating.',
+      'Metacritic: 56 out of 100. Weighted critic score.',
+      'TMDB: 6.4 out of 10. Average user rating.',
+    ])
+    expect(within(ratings).getByText('Tomatometer')).toBeInTheDocument()
+    expect(within(ratings).getByText('Metascore')).toBeInTheDocument()
   })
 
   it("fetches each movie's poster no wider than the saga's list shows it", async () => {

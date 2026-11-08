@@ -1,13 +1,11 @@
 import {
   type MediaItem,
-  type RatingSource,
   SESSION_KINDS,
   type ViewingSession,
   cardLink,
   cardTitle,
   formatRuntime,
   mediaEntryKey,
-  pickScore,
   pictureParts,
   watchLink,
 } from '@raven/core'
@@ -19,7 +17,7 @@ import { Dotted } from '@/components/ItemHeader/ItemHeader'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
-import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
+import { PANEL_SIZES, RatingPanel } from '@/components/RatingPanel/RatingPanel'
 import { PartlyWatched } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -64,26 +62,23 @@ type SagaFilmProps = {
   session: ViewingSession
   place: number
   standing: Standing
-  ratingsSource: RatingSource
 }
 
 /**
  * One movie of the saga on a row: its place in the order in large serif
- * figures (dim once watched), its poster, title, facts and score, whether
- * it is watched or up next, and a round button that plays it and then the
- * saga's movies after it, in `session`. The title opens its page; a right click
- * opens its menu; in select mode a click anywhere on the row selects it.
+ * figures (dim once watched), its poster, title and facts, every score it
+ * has in a small panel, whether it is watched or up next, and a round button
+ * that plays it and then the saga's movies after it, in `session`. The title
+ * opens its page; a right click opens its menu; in select mode a click
+ * anywhere on the row selects it.
  */
-const SagaFilm = ({ media, session, place, standing, ratingsSource }: SagaFilmProps) => {
+const SagaFilm = ({ media, session, place, standing }: SagaFilmProps) => {
   const menu = useCardMenu({ media, matchType: 'movie', inline: true })
   const { title } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
   const link = cardLink({ media, hasPages: true })
   const hasPage = link.state == null
   const tag = TAGS[standing]
-  const score = media.item
-    ? pickScore({ ratings: media.item.ratings, source: ratingsSource })
-    : null
   return (
     <li
       className={[styles.film, menu.hostClass, standing === STANDINGS.watched ? styles.seen : '']
@@ -114,7 +109,7 @@ const SagaFilm = ({ media, session, place, standing, ratingsSource }: SagaFilmPr
         >
           {title}
         </CardLink>
-        {/* Words that wrap as text does, the heart and the score among them. */}
+        {/* Words that wrap as text does, the heart among them. */}
         <span className={styles.facts}>
           {media.favourite && (
             <span className={styles.heart}>
@@ -122,13 +117,9 @@ const SagaFilm = ({ media, session, place, standing, ratingsSource }: SagaFilmPr
             </span>
           )}
           <Dotted parts={filmFacts(media)} />
-          {score && (
-            <span className={styles.score}>
-              <RatingBadge rating={score} />
-            </span>
-          )}
           <PartlyWatched media={media} />
         </span>
+        {media.item && <RatingPanel ratings={media.item.ratings} size={PANEL_SIZES.mini} />}
         <PlaybackNote media={media} />
       </span>
       {tag && <span className={`${styles.tag} ${tag.className}`}>{tag.label}</span>}
@@ -152,14 +143,13 @@ type SagaFilmsProps = {
   media: readonly MediaItem[]
   /** The saga's TMDB collection id, the session its films play in. */
   sagaId: string
-  ratingsSource: RatingSource
 }
 
 /**
  * A saga's movies in release order, numbered, each on a row of its own with
- * the score its library goes by.
+ * every score it has.
  */
-export const SagaFilms = ({ media, sagaId, ratingsSource }: SagaFilmsProps) => {
+export const SagaFilms = ({ media, sagaId }: SagaFilmsProps) => {
   const standing = standings(media)
   const session = { kind: SESSION_KINDS.saga, sagaId }
   return (
@@ -171,7 +161,6 @@ export const SagaFilms = ({ media, sagaId, ratingsSource }: SagaFilmsProps) => {
           session={session}
           place={index + 1}
           standing={standing[index] ?? STANDINGS.later}
-          ratingsSource={ratingsSource}
         />
       ))}
     </ol>

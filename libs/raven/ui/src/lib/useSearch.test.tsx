@@ -30,6 +30,20 @@ describe('useSearch', () => {
   it('takes a search set from outside the box at once', () => {
     const { result } = renderHook(() => useSearch({ initial: 'heat' }))
     act(() => result.current.searchFor(''))
-    expect(result.current).toMatchObject({ text: '', query: '' })
+    expect(result.current).toMatchObject({ text: '', query: '', committed: '' })
+  })
+
+  it('commits only what Enter or the page asked for, until the box is emptied', async () => {
+    const { result } = renderHook(() => useSearch())
+    act(() => result.current.setText('heat'))
+    await waitFor(() => expect(result.current.query).toBe('heat'))
+    expect(result.current.committed).toBe('')
+    act(() => result.current.searchNow())
+    expect(result.current.committed).toBe('heat')
+    act(() => result.current.setText('heat 1995'))
+    await waitFor(() => expect(result.current.query).toBe('heat 1995'))
+    expect(result.current.committed).toBe('heat')
+    act(() => result.current.setText(''))
+    await waitFor(() => expect(result.current.committed).toBe(''))
   })
 })

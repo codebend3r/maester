@@ -8,6 +8,7 @@ import {
   type DesktopReply,
   type DesktopRequest,
   ENGINE_STOPPED,
+  ITEM_TYPES,
   MENU_PLAYER_ACTIONS,
   PLAYER_COMMANDS,
   PLAYER_ERROR_REASONS,
@@ -23,7 +24,7 @@ import {
 import { usePlayerPrefs } from '@raven/ui/headless'
 import { afterEach, beforeEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import { useNavigate } from 'react-router-dom'
-import { act, cleanup, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PLAY_TITLE_WAIT_MS, WATCH_COPY } from '@/desktop/DesktopWatch/DesktopWatch'
 import { handled } from '@/desktop/handled'
@@ -152,6 +153,43 @@ describe('WatchPage inside Raven', () => {
     const logo = await screen.findByRole('img', { name: 'Busboys' })
     expect(logo.getAttribute('src') ?? '').toContain('/pictures/items/40/logo/l1')
     expect(screen.getByRole('heading', { level: 1, name: 'Busboys' })).toContainElement(logo)
+    await settled()
+  })
+
+  it("heads an episode on mpv as the browser's player does: the show's art, its title and place, the picture's chips", async () => {
+    const episode = mediaItem({
+      ...MEDIA,
+      title: 'Slow Horses · S02E01 · Last Stop',
+      width: 3840,
+      height: 2160,
+      videoCodec: 'hevc',
+      item: itemSummary({
+        id: 41,
+        type: ITEM_TYPES.episode,
+        title: 'Last Stop',
+        year: 2022,
+        show: { id: 9, title: 'Slow Horses' },
+        season: 2,
+        episode: 1,
+      }),
+    })
+    spy(spyOn(api, 'getMedia').mockImplementation(async () => episode))
+    spy(
+      spyOn(api, 'getItem').mockImplementation(async () =>
+        itemDetails({ id: 9, title: 'Slow Horses', logoVersion: 'l2' }),
+      ),
+    )
+    const fake = fakePlayer()
+    renderPlayers({ client: titleMain(), player: nativeOf(fake), route: WATCH })
+    const logo = await screen.findByRole('img', { name: 'Slow Horses' })
+    expect(logo.getAttribute('src') ?? '').toContain('/pictures/items/9/logo/l2')
+    expect(screen.getByRole('heading', { level: 1, name: 'Slow Horses' })).toContainElement(logo)
+    expect(screen.getByText('Last Stop')).toBeInTheDocument()
+    expect(screen.getByText(/^S02 · E01 · 1h 37m · 2022$/)).toBeInTheDocument()
+    const playingAs = screen.getByRole('list', { name: 'Playing as' })
+    expect(within(playingAs).getByLabelText('Video resolution: 4K')).toHaveTextContent('4K')
+    expect(within(playingAs).getByText('HEVC')).toBeInTheDocument()
+    expect(within(playingAs).getByText('Direct play')).toBeInTheDocument()
     await settled()
   })
 

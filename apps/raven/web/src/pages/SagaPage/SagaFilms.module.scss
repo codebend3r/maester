@@ -57,7 +57,7 @@
 .body {
   grid-area: body;
   display: grid;
-  gap: var(--space-0);
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -79,22 +79,11 @@
   font-size: var(--font-size-sm);
 }
 
-/*
- * A favourite's heart before the facts and the score after them, each kept
- * whole within the line.
- */
-.heart,
-.score {
+// A favourite's heart before the facts, kept whole within the line.
+.heart {
   display: inline-grid;
   vertical-align: middle;
-}
-
-.heart {
   padding-inline-end: var(--space-1);
-}
-
-.score {
-  padding-inline-start: var(--space-1);
 }
 
 .tag {

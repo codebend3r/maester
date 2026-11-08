@@ -136,6 +136,48 @@
 }
 
 /*
+ * The panel cut down for a row, a saga's films: the same cells, bars and
+ * tooltips at the size of the row's line of facts.
+ */
+.mini {
+  grid-auto-columns: minmax(4.75rem, max-content);
+  border-radius: var(--radius-md);
+
+  .item {
+    gap: 2px;
+    padding: var(--space-0) var(--space-2);
+  }
+
+  .item:first-child {
+    border-radius: calc(var(--radius-md) - 1px) 0 0 calc(var(--radius-md) - 1px);
+  }
+
+  .item:last-child {
+    border-radius: 0 calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0;
+  }
+
+  .item:only-child {
+    border-radius: calc(var(--radius-md) - 1px);
+  }
+
+  .value {
+    font-size: var(--font-size-md);
+  }
+
+  .scale {
+    font-size: var(--font-size-2xs);
+  }
+
+  .track {
+    height: 2px;
+  }
+
+  .label {
+    font-size: var(--font-size-2xs);
+  }
+}
+
+/*
  * The panel in one line, for a card's facts or a table's cell: the score
  * and the name side by side, the bar running the frame's width under them.
  */

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import {
+  ITEM_TYPES,
   type MediaTracks,
   PLAYER_COMMANDS,
   type PlayerCommand,
@@ -9,9 +10,11 @@ import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
-import type { NativePlayer } from '@/components/Player/engine'
+import type { NativePlayer, PlaybackFile } from '@/components/Player/engine'
 import { Player } from '@/components/Player/Player'
 import type { PlayerServices } from '@/components/Player/PlayerServices'
+import { api } from '@/test/api'
+import { itemSummary, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
@@ -93,10 +96,10 @@ const servicesFor = (overrides: Partial<PlayerServices> = {}): PlayerServices =>
   ...overrides,
 })
 
-type HostProps = { player: NativePlayer }
+type HostProps = { player: NativePlayer; file?: PlaybackFile | null }
 
 // The engine and its source are rebuilt on every render, as a host's would be.
-const Host = ({ player }: HostProps) => {
+const Host = ({ player, file = null }: HostProps) => {
   const [renders, setRenders] = useState(0)
   const [fileId, setFileId] = useState('f1')
   const [isShown, setIsShown] = useState(true)
@@ -111,7 +114,9 @@ const Host = ({ player }: HostProps) => {
       <button type="button" onClick={() => setIsShown(false)}>
         Leave
       </button>
-      {isShown && <Player engine={{ kind: 'native', player, source: { kind: 'file', fileId } }} />}
+      {isShown && (
+        <Player engine={{ kind: 'native', player, source: { kind: 'file', fileId }, file }} />
+      )}
     </>
   )
 }
@@ -119,13 +124,14 @@ const Host = ({ player }: HostProps) => {
 type RenderNativeProps = {
   player: NativePlayer
   services?: PlayerServices
+  file?: PlaybackFile | null
 }
 
-const renderNative = ({ player, services = servicesFor() }: RenderNativeProps) =>
+const renderNative = ({ player, services = servicesFor(), file = null }: RenderNativeProps) =>
   renderWithProviders({
     ui: (
       <Routes>
-        <Route path="/" element={<Host player={player} />} />
+        <Route path="/" element={<Host player={player} file={file} />} />
         <Route path="/next" element={<p>Next page</p>} />
       </Routes>
     ),
@@ -151,6 +157,46 @@ afterEach(() => {
 })
 
 describe('the native engine', () => {
+  it('heads a library episode as the web does: the show, its title and place, and the picture chips', async () => {
+    const fake = fakePlayer()
+    const episode = mediaItem({
+      title: 'Last Stop',
+      year: 2022,
+      width: 3840,
+      height: 2160,
+      videoCodec: 'hevc',
+      item: itemSummary({
+        type: ITEM_TYPES.episode,
+        title: 'Last Stop',
+        year: 2022,
+        show: { id: 9, title: 'Slow Horses' },
+        season: 2,
+        episode: 1,
+      }),
+    })
+    const services = servicesFor({
+      title: {
+        ...servicesFor().title,
+        label: 'Slow Horses · S02E01 · Last Stop',
+        logo: { url: '/art/slow-horses.png', name: 'Slow Horses' },
+      },
+    })
+    renderNative({ player: fake.player, services, file: { media: episode, api } })
+    await settled()
+    const heading = screen.getByRole('heading', { level: 1, name: 'Slow Horses' })
+    expect(within(heading).getByRole('img', { name: 'Slow Horses' })).toHaveAttribute(
+      'src',
+      '/art/slow-horses.png',
+    )
+    expect(screen.getByText('Last Stop')).toBeInTheDocument()
+    // mpv names the length once the file is open; until then the line has the place and the year.
+    expect(screen.getByText(/^S02 · E01 · 2022$/)).toBeInTheDocument()
+    const playingAs = screen.getByRole('list', { name: 'Playing as' })
+    expect(within(playingAs).getByLabelText('Video resolution: 4K')).toHaveTextContent('4K')
+    expect(within(playingAs).getByText('HEVC')).toBeInTheDocument()
+    expect(within(playingAs).getByText('Direct play')).toBeInTheDocument()
+  })
+
   it('loads the source at the resume point with the stored picks', async () => {
     const fake = fakePlayer()
     const services = servicesFor({

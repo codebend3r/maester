@@ -11,7 +11,7 @@ import {
   readWatchQuery,
   watchPathFor,
 } from '@raven/core'
-import type { NativePlayer, PlayerServices } from '@raven/ui/headless'
+import type { NativePlayer, PlaybackFile, PlayerServices } from '@raven/ui/headless'
 import { type Query, useQuery } from '@tanstack/react-query'
 import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -26,6 +26,7 @@ import { useLeaveSignal } from '@/desktop/player/useLeaveSignal'
 import { useMenuNext } from '@/desktop/player/useMenuNext'
 import { CONNECTION_STATUSES } from '@/desktop/playerConnection'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
+import { api } from '@/lib/api'
 import { mediaQuery } from '@/lib/queries'
 import { useDesktop } from '@/stores/desktop'
 
@@ -143,6 +144,7 @@ const titleMessageOf = ({ isError, isFetching, reply }: TitleMessageOfProps): st
 type TitleViewProps = {
   held: Held | null
   services: PlayerServices
+  file: PlaybackFile
   player: NativePlayer
   message: string | null
   onLost: () => void
@@ -150,13 +152,14 @@ type TitleViewProps = {
 
 type HeldTitleProps = TitleViewProps
 
-const HeldTitle = ({ held, services, player, onLost }: HeldTitleProps) =>
+const HeldTitle = ({ held, services, file, player, onLost }: HeldTitleProps) =>
   held !== null && (
     <NativePlaying
       key={held.load}
       services={services}
       player={player}
       source={held.source}
+      file={file}
       resumeAt={held.resumeAt}
       onLost={onLost}
     />
@@ -305,6 +308,8 @@ const WatchTitle = ({
     <View
       held={held}
       services={played}
+      // The title's own library file, whether it plays from the server or from a download of it.
+      file={{ media, api }}
       player={player}
       message={titleMessageOf({ isError: title.isError, isFetching: title.isFetching, reply })}
       onLost={onLost}
