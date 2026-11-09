@@ -32,6 +32,8 @@ import styles from '@/components/AppShell/AppShell.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
 import { PLAY_HISTORY_ROUTES } from '@/lib/playHistory'
+import { NOTIFICATIONS_PATH } from '@/lib/notifications'
+import { NOTIFICATIONS_COPY } from '@/pages/NotificationsPage/copy'
 import { PLAY_HISTORY_COPY } from '@/pages/PlayHistoryPage/copy'
 import { CONTINUE_WATCHING_PATH } from '@/lib/homeContinue'
 import { CONTINUE_WATCHING_COPY } from '@/pages/ContinueWatchingPage/copy'
@@ -354,6 +356,13 @@ export const AppShell = () => {
                   patterns={[PLAY_HISTORY_ROUTES.own]}
                   icon={<Icon name="history" />}
                   label={PLAY_HISTORY_COPY.title}
+                  isIconsOnly={isIconsOnly}
+                />
+                <NavItem
+                  to={NOTIFICATIONS_PATH}
+                  patterns={[NOTIFICATIONS_PATH]}
+                  icon={<Icon name="bell" />}
+                  label={NOTIFICATIONS_COPY.title}
                   isIconsOnly={isIconsOnly}
                 />
               </>

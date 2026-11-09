@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { LIBRARY_KINDS, MUSIC_LIST_PARAMS, MUSIC_SORTS, SORT_DIRECTIONS } from '@raven/core'
+import { useToasts } from '@raven/ui'
 import { useAudioQueue } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 import {
@@ -180,6 +181,24 @@ describe('UnmatchedAlbumsSection', () => {
     expect(screen.getByRole('button', { name: 'Z' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'O' })).toBeDisabled()
     expect(picker).toBeTruthy()
+  })
+
+  it('starts an AI smart match for the admin and says so in a toast', async () => {
+    spyOn(api, 'listAlbums').mockResolvedValue([
+      album({ id: 9, title: 'Zooropa', sortTitle: 'Zooropa', match: 'unmatched' }),
+    ])
+    const smartMatch = spyOn(api, 'smartMatchAlbums').mockResolvedValue({ albums: 1 })
+    renderWithProviders({
+      ui: <UnmatchedAlbumsSection library={MUSIC} />,
+      route: '/libraries/3/unmatched-albums',
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'AI smart match' }))
+    await waitFor(() => expect(smartMatch).toHaveBeenCalledWith(3))
+    await waitFor(() =>
+      expect(useToasts.getState().toasts.map(({ message }) => message)).toEqual([
+        'Smart match started on 1 unmatched album. Each result shows here as it lands, and stays in Notifications.',
+      ]),
+    )
   })
 })
 

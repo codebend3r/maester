@@ -210,3 +210,8 @@ export const ALBUM_TYPE_LABELS: Record<AlbumType, string> = {
 export const isAlbumMerge = object({ merged: isNumber })
 
 export type AlbumMerge = Infer<typeof isAlbumMerge>
+
+/** What starting a smart match did: how many unmatched albums it will look at. */
+export const isSmartMatchStarted = object({ albums: isNumber })
+
+export type SmartMatchStarted = Infer<typeof isSmartMatchStarted>

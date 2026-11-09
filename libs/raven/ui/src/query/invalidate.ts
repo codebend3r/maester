@@ -97,6 +97,10 @@ export const afterBingeEvent = (queryClient: QueryClient): Promise<unknown> =>
     filters: [{ queryKey: queryKeys.bingeState }, { queryKey: queryKeys.home }],
   })
 
+/** A notification was logged, here or by the server: the account's log. */
+export const afterNotification = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({ queryClient, filters: [{ queryKey: queryKeys.notifications }] })
+
 /** The admin put a title in the hero or took one out: the picks, and the hero they decide. */
 export const afterHeroPicked = (queryClient: QueryClient): Promise<unknown> =>
   refetch({

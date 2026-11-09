@@ -31,7 +31,7 @@ const ARTIST_SEPARATOR =
 type ArtistKeysOfProps = { names: readonly string[] }
 
 /** Each artist named in a credit, folded: "2 Chainz & Lil Wayne" names two. */
-const artistKeysOf = ({ names }: ArtistKeysOfProps): Set<string> =>
+export const artistKeysOf = ({ names }: ArtistKeysOfProps): Set<string> =>
   new Set(
     names
       .flatMap((name) => name.split(ARTIST_SEPARATOR))
@@ -119,7 +119,7 @@ export const mergeSimilarAlbums = ({ db, libraryId }: MergeSimilarAlbumsProps): 
 
 type ParseNamesProps = string | null
 
-const parseNames = (json: ParseNamesProps): string[] => {
+export const parseNames = (json: ParseNamesProps): string[] => {
   const parsed: unknown = json === null ? [] : JSON.parse(json)
   return Array.isArray(parsed)
     ? parsed.filter((name): name is string => typeof name === 'string')
@@ -128,7 +128,8 @@ const parseNames = (json: ParseNamesProps): string[] => {
 
 type FoldIntoProps = { db: Sqlite.Database; keeper: number; other: number }
 
-const foldInto = ({ db, keeper, other }: FoldIntoProps): void => {
+/** Moves `other`'s tracks, favourites and what `keeper` lacks onto `keeper`, and lets `other` go. */
+export const foldInto = ({ db, keeper, other }: FoldIntoProps): void => {
   db.prepare('UPDATE tracks SET album_id = ? WHERE album_id = ?').run(keeper, other)
   db.prepare(
     `UPDATE albums SET

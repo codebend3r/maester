@@ -6,6 +6,7 @@ import {
   type Duplicates,
   type HistoryEntry,
   isAlbumMerge,
+  isSmartMatchStarted,
   isDirectoryListing,
   isDolbyVisionOnlyListing,
   isDuplicates,
@@ -28,6 +29,7 @@ import {
   type LibraryViewChange,
   type MediaItem,
   type PosterEntry,
+  type SmartMatchStarted,
   type Saga,
   type SagaBackdrop,
   type ShowListing,
@@ -175,6 +177,17 @@ export const libraryCalls = ({ send, expect, libraryGet }: Transport) => ({
     expect({
       request: send({ path: `/api/libraries/${id}/albums/merge`, method: 'POST' }),
       guard: isAlbumMerge,
+    }),
+
+  /**
+   * Smart match: a music library's unmatched albums are folded into the album
+   * of their folder where one holds them, and the rest searched again harder,
+   * with Claude's help; each outcome arrives as a notification. How many albums it looks at.
+   */
+  smartMatchAlbums: (id: number): Promise<SmartMatchStarted> =>
+    expect({
+      request: send({ path: `/api/libraries/${id}/albums/smart-match`, method: 'POST' }),
+      guard: isSmartMatchStarted,
     }),
 
   /** `seed` only counts with a random sort: the same seed deals the same order. */

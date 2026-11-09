@@ -10,6 +10,8 @@ import { useServerReach } from '@/stores/serverReach'
 import { COMMON_COPY } from '@/lib/copy'
 import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
 import { PLAY_HISTORY_ROUTES } from '@/lib/playHistory'
+import { NOTIFICATIONS_PATH } from '@/lib/notifications'
+import { NOTIFICATIONS_COPY } from '@/pages/NotificationsPage/copy'
 import { PLAY_HISTORY_COPY } from '@/pages/PlayHistoryPage/copy'
 import { ADMIN_COPY, ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 import { MUSIC_PATHS } from '@/lib/music'
@@ -54,6 +56,13 @@ const HISTORY_TAB = {
   patterns: [PLAY_HISTORY_ROUTES.own, PLAY_HISTORY_ROUTES.everyone],
   icon: 'history',
   label: PLAY_HISTORY_COPY.title,
+} as const satisfies TabTarget
+
+const NOTIFICATIONS_TAB = {
+  to: NOTIFICATIONS_PATH,
+  patterns: [NOTIFICATIONS_PATH],
+  icon: 'bell',
+  label: NOTIFICATIONS_COPY.title,
 } as const satisfies TabTarget
 
 const DOWNLOADS_TAB = {
@@ -122,7 +131,7 @@ const OnlineTabBar = ({ hasMusic }: TabBarProps) => {
   const [fourthTab, ...displaced] = hasMusic
     ? ([MUSIC_TAB, BINGE_TAB] as const)
     : ([BINGE_TAB] as const)
-  const moreTabs = [...displaced, HISTORY_TAB, ...desktopTabs, SETTINGS_TAB]
+  const moreTabs = [...displaced, HISTORY_TAB, NOTIFICATIONS_TAB, ...desktopTabs, SETTINGS_TAB]
   const isMoreCurrent = isAnyOf({
     patterns: [...moreTabs, ...MANAGE_TABS].flatMap((tab) => tab.patterns),
     pathname,
@@ -173,7 +182,7 @@ const TAB_BARS = {
  * of the screen. Home, Libraries (which any library's pages mark),
  * Favourites, Music while a music library exists or else Binge, then More,
  * which opens a sheet of the rest: Binge when Music took its place, Play
- * history, On this Mac and Downloads in Raven, Settings, and for whoever may
+ * history, Notifications, On this Mac and Downloads in Raven, Settings, and for whoever may
  * manage, Admin, Streams and Reports. More is marked while its sheet is open
  * or one of its pages is. The sheet closes on a choice, Escape, a tap on the
  * page or a new page. While Raven cannot reach its server, the bar keeps only

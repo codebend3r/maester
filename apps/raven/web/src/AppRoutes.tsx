@@ -21,6 +21,14 @@ import { SignUpPage } from '@/pages/SignUpPage/SignUpPage'
 import { useIsDesktop } from '@/stores/desktop'
 import { BINGE_PATH } from '@/lib/binge'
 import { CONTINUE_WATCHING_PATH } from '@/lib/homeContinue'
+import { NOTIFICATIONS_PATH } from '@/lib/notifications'
+import { useLogToasts } from '@/lib/useLogToasts'
+
+/** Logs every toast raised here on the server, for the account's Notifications page. */
+const LogToasts = () => {
+  useLogToasts()
+  return null
+}
 
 /*
  * Only the account pages load with the app: a first visit lands on the sign-in page, and every
@@ -44,6 +52,9 @@ const FavouritesPage = lazyPage(() =>
 )
 const HistoryPage = lazyPage(() =>
   import('@/pages/HistoryPage/HistoryPage').then((module) => module.HistoryPage),
+)
+const NotificationsPage = lazyPage(() =>
+  import('@/pages/NotificationsPage/NotificationsPage').then((module) => module.NotificationsPage),
 )
 const HomePage = lazyPage(() =>
   import('@/pages/HomePage/HomePage').then((module) => module.HomePage),
@@ -189,6 +200,7 @@ export const AppRoutes = () => {
                 <Route path={PLAY_HISTORY_ROUTES.everyone} element={<EveryonesHistoryPage />} />
                 <Route path="streams" element={<StreamsPage />} />
                 <Route path="reports" element={<BugReportsPage />} />
+                <Route path={NOTIFICATIONS_PATH} element={<NotificationsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path={ADMIN_PATH} element={<AdminPage />} />
                 <Route path={PAGE_PATHS.shortcuts} element={<ShortcutsPage />} />
@@ -251,6 +263,7 @@ export const AppRoutes = () => {
       {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}
       {/* Toasts outlast the page that raised them, as Report this error's does the player. */}
       <Toaster />
+      <LogToasts />
       {isDesktop && (
         <Suspense>
           <DesktopHost />

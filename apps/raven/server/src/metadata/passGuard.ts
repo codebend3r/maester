@@ -41,16 +41,18 @@ export class PassGuard {
     return this.state.stopped || (this.options.signal?.aborted ?? false)
   }
 
-  async run(task: () => Promise<unknown>): Promise<void> {
-    if (this.isStopped) return
+  /** Runs one task; what it answered, or undefined when the pass had stopped or the task failed. */
+  async run<T>(task: () => Promise<T>): Promise<T | undefined> {
+    if (this.isStopped) return undefined
     try {
-      await task()
+      return await task()
     } catch (error) {
       if (this.stops(error)) {
         this.state = { stopped: true, error }
-        return
+        return undefined
       }
       this.options.logger.warn(`${this.options.failed}: ${errorMessage(error)}`)
+      return undefined
     }
   }
 

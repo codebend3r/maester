@@ -63,7 +63,9 @@ export const LIBRARY_COPY = {
   noAlbums: (name: string) =>
     `No albums in ${name} yet. A scan files each audio file under its album as it reads its tags.`,
   noUnmatchedAlbums: (name: string) => `Every album in ${name} has a MusicBrainz match.`,
-  smartMatchAlbums: 'Smart match unmatched albums',
+  smartMatchAlbums: 'AI smart match',
+  smartMatchStarted: (count: number) =>
+    `Smart match started on ${plural({ n: count, one: 'unmatched album', many: 'unmatched albums' })}. Each result shows here as it lands, and stays in Notifications.`,
   searchArtists: 'Search artists',
   noArtists: (name: string) => `No artists in ${name} yet.`,
   artists: 'Artists',

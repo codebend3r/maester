@@ -162,7 +162,7 @@ describe('AppShell', () => {
     )
   })
 
-  it('leads with the logo, Home and Favourites, then the pinned libraries, with Libraries, Streams, Bug reports, Settings and Shortcuts last', async () => {
+  it('leads with the logo, Home and Favourites, then the pinned libraries, with Libraries, Streams, Bug reports, Notifications, Settings and Shortcuts last', async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
     renderShell({ route: '/' })
     await within(nav()).findByRole('link', { name: 'Movies' })
@@ -183,6 +183,7 @@ describe('AppShell', () => {
       'Bug reports',
       'Everyone’s history',
       'Play history',
+      'Notifications',
       'Settings',
       'Shortcuts',
       'Design',
@@ -591,6 +592,7 @@ describe('AppShell', () => {
       '/reports',
       '/history/everyone',
       '/history',
+      '/notifications',
       DESKTOP_PATHS.local,
       DESKTOP_PATHS.downloads,
       PAGE_PATHS.settings,
@@ -602,7 +604,16 @@ describe('AppShell', () => {
       within(screen.getByRole('dialog', { name: 'More' }))
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Play history', 'This Mac', 'Downloads', 'Settings', 'Admin', 'Streams', 'Reports'])
+    ).toEqual([
+      'Play history',
+      'Notifications',
+      'This Mac',
+      'Downloads',
+      'Settings',
+      'Admin',
+      'Streams',
+      'Reports',
+    ])
   })
 
   it('has no badge with nothing under way, and no Downloads in a browser', async () => {

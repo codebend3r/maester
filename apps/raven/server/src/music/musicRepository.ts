@@ -41,6 +41,8 @@ import { REPLAYGAIN_SOURCES } from '@/music/loudness'
 import type { Release } from '@/music/musicBrainzClient'
 import { reconcileAlbums } from '@/music/reconcileAlbums'
 import { mergeSimilarAlbums } from '@/music/similarAlbums'
+import { type StrayFold, foldStrayAlbums } from '@/music/strayAlbums'
+import { type FolderFacts, folderFactsOf } from '@/music/albumTitles'
 
 /** Where an album's cover comes from: a picture embedded in one of its files, a file in its folder, or the Cover Art Archive. */
 export const COVER_SOURCES = { embedded: 'embedded', file: 'file', coverArtArchive: 'caa' } as const
@@ -85,7 +87,11 @@ export type AlbumToMatch = {
   artist: string | null
   year: number | null
   trackCount: number
+  /** What the album's folder's name says of it, which may be cleaner than its tags. */
+  folder: FolderFacts | null
 }
+
+type MusicRepositoryTrackTitlesOfProps = { id: number; most: number }
 
 type AlbumToMatchRow = {
   id: number
@@ -93,6 +99,7 @@ type AlbumToMatchRow = {
   artist: string | null
   year: number | null
   track_count: number
+  path: string | null
 }
 
 type AlbumDetailsRow = AlbumRow & {
@@ -198,11 +205,12 @@ const SELECT_TRACKS = `SELECT m.id AS media_id, m.library_id, t.album_id, t.titl
                          JOIN albums a ON a.id = t.album_id`
 
 /** An album as a search reads it: its title, first artist, year and how many tracks are on disk. */
-const SELECT_TO_MATCH = `SELECT a.id, a.title, a.year, COUNT(t.media_id) AS track_count,
+const SELECT_TO_MATCH = `SELECT a.id, a.title, a.year, COUNT(t.media_id) AS track_count, MIN(m.path) AS path,
                                 (SELECT ar.name FROM album_artists aa JOIN artists ar ON ar.id = aa.artist_id
                                   WHERE aa.album_id = a.id ORDER BY aa.position LIMIT 1) AS artist
                            FROM albums a
-                           LEFT JOIN tracks t ON t.album_id = a.id`
+                           LEFT JOIN tracks t ON t.album_id = a.id
+                           LEFT JOIN media m ON m.id = t.media_id`
 
 /** The first album artist's sort name, for a listing by artist. */
 const FIRST_ARTIST = `(SELECT ar.sort_name FROM album_artists aa JOIN artists ar ON ar.id = aa.artist_id
@@ -781,6 +789,7 @@ export class MusicRepository implements OnModuleInit {
       artist: row.artist,
       year: row.year,
       trackCount: row.track_count,
+      folder: row.path === null ? null : folderFactsOf(row.path),
     }
   }
 
@@ -898,6 +907,32 @@ export class MusicRepository implements OnModuleInit {
         this.credit({ credits: CREDITS.album, ownerId: id, artists: release.artists })
       }
     })()
+  }
+
+  /** How many of the library's albums no release was found for. */
+  unmatchedCount(libraryId: number): number {
+    return (
+      this.db
+        .prepare<[number, string], { total: number }>(
+          'SELECT COUNT(*) AS total FROM albums WHERE library_id = ? AND match = ?',
+        )
+        .get(libraryId, MATCH_STATES.unmatched)?.total ?? 0
+    )
+  }
+
+  /** An album's track titles in disc and track order, the first `most`, for Claude to read. */
+  trackTitlesOf({ id, most }: MusicRepositoryTrackTitlesOfProps): string[] {
+    return this.db
+      .prepare<[number, number], { title: string }>(
+        'SELECT title FROM tracks WHERE album_id = ? ORDER BY disc, number, media_id LIMIT ?',
+      )
+      .all(id, most)
+      .map(({ title }) => title)
+  }
+
+  /** Folds the library's unmatched albums whose tracks belong to another album by where they sit (`foldStrayAlbums`). */
+  foldStrays(libraryId: number): StrayFold[] {
+    return foldStrayAlbums({ db: this.db, libraryId })
   }
 
   /** The library's albums no release was found for go back to pending; how many. */

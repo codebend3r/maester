@@ -11,6 +11,7 @@ import {
   ITEM_TYPES,
   LIBRARY_KINDS,
   MEMBER_STATUSES,
+  NOTIFICATION_TONES,
   SCROBBLE_SERVICES,
   type MediaItem,
   WATCH_TARGET_KINDS,
@@ -464,6 +465,26 @@ describe('each account sees only its own viewing', () => {
     expect(listenBrainz.submissions.map(({ token }) => token)).toEqual([MEMBER_LB_TOKEN])
   })
 
+  it("keeps each account's notifications to itself, and lets no body name another's", async () => {
+    const member = await clientFor({ id: AUTH_TEST_IDS.friend })
+    const guest = await clientFor({ id: AUTH_TEST_IDS.guest })
+    const logged = await member.logNotification({
+      message: 'Added to the mix',
+      tone: NOTIFICATION_TONES.success,
+    })
+    await guest.logNotification({ message: 'Unplayable', tone: NOTIFICATION_TONES.failure })
+    const messages = async (api: Client) =>
+      (await api.listNotifications()).map(({ message }) => message)
+    expect(await messages(member)).toContain('Added to the mix')
+    expect(await messages(member)).not.toContain('Unplayable')
+    expect(await messages(guest)).toEqual(['Unplayable'])
+    await expect(
+      guest.logNotification({ message: 'Unplayable', tone: NOTIFICATION_TONES.failure }),
+    ).resolves.toMatchObject({ message: 'Unplayable' })
+    expect((await member.listNotifications()).map(({ id }) => id)).toContain(logged.id)
+    expect((await guest.listNotifications()).map(({ id }) => id)).not.toContain(logged.id)
+  })
+
   it('answers per-account reads uncached', async () => {
     const { library, video } = enforced.ids
     const member = await clientFor({ id: AUTH_TEST_IDS.friend })
@@ -494,6 +515,7 @@ describe('each account sees only its own viewing', () => {
       { route: ROUTES.playlists, params: {} },
       { route: ROUTES.playlist, params: { id: mix } },
       { route: ROUTES.scrobbling, params: {} },
+      { route: ROUTES.notifications, params: {} },
     ]
     const writes: { route: Route; params: Record<string, number>; payload?: object }[] = [
       { route: ROUTES.progress, params: { id: video }, payload: { position: SPOT } },
@@ -515,6 +537,11 @@ describe('each account sees only its own viewing', () => {
       { route: ROUTES.renamePlaylist, params: { id: mix }, payload: { name: 'Renamed' } },
       { route: ROUTES.playlistSharing, params: { id: mix }, payload: { isShared: false } },
       { route: ROUTES.copyPlaylist, params: { id: mix } },
+      {
+        route: ROUTES.logNotification,
+        params: {},
+        payload: { message: 'Saved', tone: NOTIFICATION_TONES.success },
+      },
       {
         route: ROUTES.watched,
         params: {},

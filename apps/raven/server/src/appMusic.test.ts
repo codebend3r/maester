@@ -7,6 +7,7 @@ import {
   LIBRARY_KINDS,
   MATCH_STATES,
   MUSIC_SORTS,
+  NOTIFICATION_TONES,
   THUMBNAIL_STATES,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -207,6 +208,25 @@ describe('a music library', () => {
     const served = await app().inject({ method: 'GET', url: cover ?? '' })
     expect(served.statusCode).toBe(200)
     expect(jpegSize(served.rawPayload)).toEqual({ width: 300, height: 300 })
+  })
+
+  it('smart matches the unmatched albums in the background, telling the caller of each as a notification', async () => {
+    const started = await api().smartMatchAlbums(state.library)
+    expect(started).toEqual({ albums: 1 })
+    await app().get(MetadataService).whenIdle()
+    const notices = await api().listNotifications()
+    expect(notices.map(({ message, tone }) => ({ message, tone }))).toEqual([
+      {
+        message: 'Smart match is done: 0 of 1 album matched.',
+        tone: NOTIFICATION_TONES.info,
+      },
+      {
+        message: 'No MusicBrainz release found for "Live 1994". Fix match can set it by hand.',
+        tone: NOTIFICATION_TONES.info,
+      },
+    ])
+    const albums = await api().listAlbums({ libraryId: state.library })
+    expect(albums.find(({ title }) => title === 'Live 1994')?.match).toBe(MATCH_STATES.unmatched)
   })
 
   it('offers Fix match candidates scored against the album, and takes the pick or none', async () => {
