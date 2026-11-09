@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { DEFAULT_SERVER_ORIGIN, URL_PROTOCOLS } from '@raven/core'
+import { DEFAULT_SERVER_ORIGIN, SERVICE_WORKER, URL_PROTOCOLS } from '@raven/core'
 import { type Plugin, defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -197,6 +197,27 @@ const VENDOR_CHUNKS = [
   { name: 'supabase', packages: ['@supabase'] },
 ] as const
 
+/**
+ * The build's two entries: the page, and the service worker (`src/serviceWorker/sw.ts`), which
+ * nothing on the page imports, so it bundles alone into one classic script with no imports.
+ */
+const BUILD_INPUT = {
+  index: fileURLToPath(new URL('./index.html', import.meta.url)),
+  [SERVICE_WORKER.entry]: fileURLToPath(new URL('./src/serviceWorker/sw.ts', import.meta.url)),
+} as const
+
+/** Where Vite writes an entry's script, which it hashes like every other build file. */
+const HASHED_ENTRY = 'assets/[name]-[hash].js'
+
+/**
+ * The worker keeps one fixed name at the site's root, where the page registers it and where its
+ * scope covers every page; the page's own entry stays hashed under assets/.
+ */
+type EntryChunk = { name: string }
+
+const entryFileName = ({ name }: EntryChunk) =>
+  name === SERVICE_WORKER.entry ? SERVICE_WORKER.file : HASHED_ENTRY
+
 /** Above rolldown's own chunking, which decides what is left. */
 const VENDOR_PRIORITY = 10
 
@@ -238,7 +259,9 @@ export default defineConfig(({ mode }) => ({
     rolldownOptions: {
       // The build's time goes to sass over the SCSS modules; rolldown's note about it has nothing to act on.
       checks: { bundlerTimings: false },
+      input: BUILD_INPUT,
       output: {
+        entryFileNames: entryFileName,
         codeSplitting: {
           groups: VENDOR_CHUNKS.map(({ name, packages }) => ({
             name,

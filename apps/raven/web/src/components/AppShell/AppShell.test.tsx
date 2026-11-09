@@ -500,32 +500,21 @@ describe('AppShell', () => {
     expect(useSideMenu.getState().collapsed).toBe(false)
   })
 
-  it('gives a phone Home, Libraries, Favourites, Streams, Reports and Settings in a tab bar', () => {
+  it('gives a phone Home, Libraries, Favourites, Binge and More in a tab bar', () => {
     spies.list.mockImplementation(async () => [])
     renderShell({ route: '/favourites' })
     const links = within(tabs()).getAllByRole('link')
     expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
       ['Home', '/'],
       ['Libraries', '/libraries'],
-      ['Binge', '/binge'],
       ['Favourites', '/favourites'],
-      ['Admin', '/admin'],
-      ['Streams', '/streams'],
-      ['Reports', '/reports'],
-      ['Play history', '/history'],
-      ['Settings', '/settings'],
+      ['Binge', '/binge'],
     ])
-    expect(links.map(iconOf)).toEqual([
-      'home',
-      'libraries',
-      'popcorn',
-      'heart',
-      'settings',
-      'playback',
-      'alert',
-      'history',
-      'settings',
-    ])
+    expect(links.map(iconOf)).toEqual(['home', 'libraries', 'heart', 'popcorn'])
+    expect(within(tabs()).getByRole('button', { name: 'More' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
     expect(within(tabs()).getByRole('link', { name: 'Favourites' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -608,23 +597,12 @@ describe('AppShell', () => {
       PAGE_PATHS.shortcuts,
       DESIGN_PATH,
     ])
+    await userEvent.click(within(tabs()).getByRole('button', { name: 'More' }))
     expect(
-      within(tabs())
+      within(screen.getByRole('dialog', { name: 'More' }))
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual([
-      'Home',
-      'Libraries',
-      'Binge',
-      'Favourites',
-      'Admin',
-      'Streams',
-      'Reports',
-      'Play history',
-      'This Mac',
-      'Downloads',
-      'Settings',
-    ])
+    ).toEqual(['Play history', 'This Mac', 'Downloads', 'Settings', 'Admin', 'Streams', 'Reports'])
   })
 
   it('has no badge with nothing under way, and no Downloads in a browser', async () => {

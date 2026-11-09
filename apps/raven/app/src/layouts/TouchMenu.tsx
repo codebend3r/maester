@@ -1,11 +1,10 @@
 import { Icon } from '@raven/native'
 import type { IconName } from '@raven/ui/iconDrawings'
 import { useQuery } from '@tanstack/react-query'
-import { usePathname, useRouter } from 'expo-router'
+import { usePathname } from 'expo-router'
 import { type ComponentRef, type Ref, useEffect, useMemo, useState } from 'react'
 import {
   Animated,
-  Easing,
   PanResponder,
   Pressable,
   ScrollView,
@@ -16,16 +15,16 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { PINNED_HEADING, SETTINGS_ENTRY } from '@/layouts/shelfKit'
+import { SCRIM_OPACITY, SWIPE_START, slide } from '@/layouts/slide'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { useMenuGo } from '@/layouts/useMenuGo'
 import {
   MENU_EDGE_WIDTH,
-  MENU_SLIDE_MS,
   TOUCH_NAV_COPY,
   hasEdgeSwipe,
   isClosedBy,
   isOpenedBy,
   isPlayerPath,
-  menuMoveOf,
   menuWidthOf,
 } from '@/layouts/touchMenuKit'
 import { pinnedLibrariesOf } from '@/queries/pinnedLibraries'
@@ -35,36 +34,6 @@ import { useReduceMotion } from '@/stores/reduceMotion'
 import { useTouchMenu } from '@/stores/touchMenu'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
-
-/** How dark the page behind the open menu goes. */
-const SCRIM_OPACITY = 0.5
-
-/** How far a sideways drag must go before it is a swipe and not a tap that wandered. */
-const SWIPE_START = 12
-
-type SlideProps = {
-  progress: Animated.Value
-  to: number
-  isReduced: boolean
-  onShut: () => void
-}
-
-/** Slides the menu to `to`, 0 shut or 1 out, at once when the system asks for less motion. */
-const slide = ({ progress, to, isReduced, onShut }: SlideProps) => {
-  if (isReduced) {
-    progress.setValue(to)
-    if (to === 0) onShut()
-    return
-  }
-  Animated.timing(progress, {
-    toValue: to,
-    duration: MENU_SLIDE_MS,
-    easing: Easing.out(Easing.cubic),
-    useNativeDriver: true,
-  }).start(({ finished }) => {
-    if (finished && to === 0) onShut()
-  })
-}
 
 type MenuEntryProps = {
   icon: IconName
@@ -101,8 +70,7 @@ type MenuContentProps = { session: AppQueries }
  * entry shuts the menu and goes there.
  */
 const MenuContent = ({ session: { queries } }: MenuContentProps) => {
-  const router = useRouter()
-  const pathname = usePathname()
+  const goTo = useMenuGo()
   const close = useTouchMenu((menu) => menu.close)
   const libraries = useQuery(queries.librariesQuery)
   const insets = useSafeAreaInsets()
@@ -110,7 +78,7 @@ const MenuContent = ({ session: { queries } }: MenuContentProps) => {
   const pinned = pinnedLibrariesOf(libraries.data ?? [])
   const go = (href: Href) => {
     close()
-    router[menuMoveOf({ pathname })](href)
+    goTo(href)
   }
   return (
     <ScrollView
@@ -123,10 +91,7 @@ const MenuContent = ({ session: { queries } }: MenuContentProps) => {
       <MenuEntry
         icon="home"
         label={TOUCH_NAV_COPY.home}
-        onPress={() => {
-          close()
-          router.dismissTo(APP_ROUTES.home)
-        }}
+        onPress={() => go({ pathname: APP_ROUTES.home, params: {} })}
       />
       <MenuEntry
         icon="heart"

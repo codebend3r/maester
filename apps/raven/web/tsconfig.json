@@ -15,5 +15,7 @@
     "vite.config.ts",
     "playwright.config.ts",
     "../../../tooling/web"
-  ]
+  ],
+  // The service worker compiles against the WebWorker library instead: tsconfig.worker.json.
+  "exclude": ["src/serviceWorker/sw.ts"]
 }

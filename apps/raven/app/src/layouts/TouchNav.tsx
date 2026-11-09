@@ -7,6 +7,8 @@ import { openPickerSheet } from '@/layouts/Picker.touch'
 import { TouchBack } from '@/layouts/TouchBack'
 import { TOUCH_NAV_COPY } from '@/layouts/touchMenuKit'
 import { useGoHome } from '@/layouts/useGoHome'
+import { deviceNavKind } from '@/platform/devicePlatform'
+import { NAV_KINDS } from '@/platform/platform'
 import { useAppPrefs } from '@/stores/appPrefs'
 import { useTouchMenu } from '@/stores/touchMenu'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
@@ -98,7 +100,8 @@ type TouchNavProps = {
 /**
  * The header every touch page opens with, once for all of them: Back, Home and the menu at the
  * left, the theme swap at the right, and the search field under them where a page has one.
- * Home stays out of Home's own header; the player has its own chrome.
+ * Home stays out of Home's own header; the player has its own chrome. An iPhone moves by its
+ * tab bar, so only an iPad's header has the menu button.
  */
 export const TouchNav = ({ onBack, isRaised = false, isHome = false, search }: TouchNavProps) => {
   const styles = useStyles()
@@ -108,7 +111,7 @@ export const TouchNav = ({ onBack, isRaised = false, isHome = false, search }: T
         <View style={styles.side}>
           {onBack !== undefined && <TouchBack isRaised={isRaised} onPress={onBack} />}
           {!isHome && <HomeButton isRaised={isRaised} />}
-          <MenuButton isRaised={isRaised} />
+          {deviceNavKind() === NAV_KINDS.drawer && <MenuButton isRaised={isRaised} />}
         </View>
         <ThemeButton isRaised={isRaised} />
       </View>

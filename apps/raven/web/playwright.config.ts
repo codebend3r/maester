@@ -28,6 +28,8 @@ export default defineConfig({
      */
     channel: 'chrome',
     trace: 'retain-on-failure',
+    // The app's offline worker would answer navigations itself; each test reaches the fixture.
+    serviceWorkers: 'block',
   },
   webServer: {
     command: 'bun run serve:fixture',

@@ -24,7 +24,9 @@
     "test:coverage": "bun ../../../tooling/web/check-coverage.ts --lines 96 --functions 88",
     "test:run": "bun test --dots --parallel --coverage --coverage-reporter=lcov",
     "test:watch": "bun test --dots --watch",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "bun run --sequential typecheck:app typecheck:worker",
+    "typecheck:app": "tsgo --noEmit",
+    "typecheck:worker": "tsgo --noEmit -p tsconfig.worker.json"
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",

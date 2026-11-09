@@ -4,9 +4,12 @@ name: Scroll Home to ${TITLE}'s card on the ${SHELF} shelf
 # The hero above the shelves rotates through the titles, so a title's name alone may be the
 # hero's slide; its card is the one below its shelf's title. On an iPhone the hero fills most
 # of the screen, so Home scrolls down to the card.
+# The iPhone's tab bar covers the foot of the page, and iOS still reports what scrolls under it as
+# on screen, so a scroll brings its target to the middle, clear of the bar, before the tap.
 - scrollUntilVisible:
     element:
       text: ${TITLE}
       below: ${SHELF}
     direction: DOWN
+    centerElement: true
     timeout: 30000

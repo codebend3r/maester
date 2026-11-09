@@ -223,7 +223,9 @@ describe('Search on a phone or tablet', () => {
   it("wears Home's header: the touch navigation, the large field and the page's name", async () => {
     await renderScreen({ ui: <Search /> })
     expect(screen.getByRole('button', { name: 'Home' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Open menu' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Theme' })).toBeTruthy()
+    // An iPhone moves by its tab bar, so its header has no menu button.
+    expect(screen.queryByRole('button', { name: 'Open menu' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Search' })).toBeTruthy()
     expect(screen.getByRole('header', { name: 'Search' })).toBeTruthy()
   })

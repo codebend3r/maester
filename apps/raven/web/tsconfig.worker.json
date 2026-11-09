@@ -1,0 +1,15 @@
+{
+  /*
+   * The service worker runs in a worker, with no DOM: it compiles against the WebWorker library
+   * apart from the page's code, which tsconfig.json leaves it out of.
+   */
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "WebWorker"],
+    "types": [],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/serviceWorker/sw.ts"]
+}

@@ -5,16 +5,19 @@ import { configureStorage, createQueryClient } from '@raven/ui/headless'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { hideAsync, preventAutoHideAsync } from 'expo-splash-screen'
-import { Fragment, useEffect, useState } from 'react'
-import { Appearance, Platform, StatusBar, StyleSheet, View } from 'react-native'
+import { type ComponentType, Fragment, useEffect, useMemo, useState } from 'react'
+import { Appearance, StatusBar, StyleSheet, View } from 'react-native'
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAccountSession } from '@/account/session'
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { TouchMenu } from '@/layouts/TouchMenu'
+import { TouchTabs, useIsTabBarShown } from '@/layouts/TouchTabs'
 import { MusicHost } from '@/music/MusicHost'
 import { NowPlayingBar, useIsBarShown } from '@/music/NowPlayingBar'
+import { deviceNavKind } from '@/platform/devicePlatform'
+import { NAV_KINDS, type NavKind } from '@/platform/platform'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
 import { useActiveServer } from '@/stores/activeServer'
 import { configureAppPrefs } from '@/stores/appPrefs'
@@ -66,6 +69,18 @@ const ServerEvents = ({ session }: ServerEventsProps) => {
  */
 const wearSystemLook = ({ tone }: AppTheme) => Appearance.setColorScheme(tone)
 
+type DeviceNavProps = { session: AppQueries }
+
+/** A TV moves by its remote's focus through each screen's own menus: nothing above the routes. */
+const FocusNav = () => null
+
+/** What each device moves between pages with, above the routes: the iPhone's tabs, the iPad's side menu. */
+const DEVICE_NAVS = {
+  [NAV_KINDS.tabs]: TouchTabs,
+  [NAV_KINDS.drawer]: TouchMenu,
+  [NAV_KINDS.focus]: FocusNav,
+} as const satisfies Record<NavKind, ComponentType<DeviceNavProps>>
+
 /** The routes, once the stores are read: every route but sign-in needs a server. */
 const AppRoutes = () => {
   const session = useAppQueries()
@@ -74,6 +89,12 @@ const AppRoutes = () => {
   const tone = useTheme((theme) => theme.tone)
   const insets = useSafeAreaInsets()
   const isBarShown = useIsBarShown()
+  const hasNav = session !== null && (isSignedIn || IS_SIGN_IN_BYPASSED)
+  const isTabBarShown = useIsTabBarShown() && hasNav
+  const DeviceNav = DEVICE_NAVS[deviceNavKind()]
+  const footless = useMemo(() => ({ ...insets, bottom: 0 }), [insets])
+  const screenInsets = isBarShown || isTabBarShown ? footless : insets
+  const stripInsets = isTabBarShown ? footless : insets
   return (
     <QueryClientProvider client={queryClient}>
       <StatusBar barStyle={tone === THEME_TONES.light ? 'dark-content' : 'light-content'} />
@@ -88,8 +109,8 @@ const AppRoutes = () => {
       {/* A screen's opening focus comes back once the transition that reveals it has ended:
           on Android TV the transition takes the focus from anything asked for before then. */}
       <View style={styles.frame}>
-        {/* The bar keeps the bottom inset for itself, so the screens above it pad none. */}
-        <SafeAreaInsetsContext.Provider value={isBarShown ? { ...insets, bottom: 0 } : insets}>
+        {/* The music strip or the tab bar keeps the bottom inset for itself, so the screens above pad none. */}
+        <SafeAreaInsetsContext.Provider value={screenInsets}>
           <Stack
             screenListeners={{
               transitionEnd: ({ target, data }) => {
@@ -119,12 +140,14 @@ const AppRoutes = () => {
             </Stack.Protected>
           </Stack>
         </SafeAreaInsetsContext.Provider>
-        {/* The bar under the screens while a track plays; Now Playing is a screen of its own. */}
-        {session !== null && <NowPlayingBar session={session} />}
-        {/* The side menu of phones and tablets slides over the routes and the bar; a TV has its own. */}
-        {session !== null && !Platform.isTV && (isSignedIn || IS_SIGN_IN_BYPASSED) && (
-          <TouchMenu key={session.server.id} session={session} />
+        {/* The strip under the screens while a track plays, over the tab bar, which keeps the inset. */}
+        {session !== null && (
+          <SafeAreaInsetsContext.Provider value={stripInsets}>
+            <NowPlayingBar session={session} />
+          </SafeAreaInsetsContext.Provider>
         )}
+        {/* An iPhone's tab bar along the foot, or an iPad's side menu over the routes and the strip. */}
+        {hasNav && <DeviceNav key={session.server.id} session={session} />}
       </View>
     </QueryClientProvider>
   )
