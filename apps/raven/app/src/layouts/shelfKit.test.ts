@@ -12,6 +12,8 @@ const binge = (key: string): BingeCard => ({
   shape: CARD_SHAPES.wide,
   picture: null,
   progress: 0,
+  subject: null,
+  isWatched: false,
   target: { kind: ROUTE_TARGETS.play, mediaId: 1, at: 0 },
   meta: null,
   episodeLine: null,

@@ -1,0 +1,88 @@
+appId: io.github.codebend3r.raven.app
+name: A show leads to its season, back to the show, into the season again, to an episode, and home
+tags:
+  - dpad
+---
+- runFlow: signIn.yaml
+- runFlow: steps/healHome.dpad.yaml
+- runFlow:
+    file: steps/openShow.dpad.yaml
+    env:
+      SHOW: Lantern Bay
+# The show opens on Play, and Down from the actions lands on its first season.
+- assertVisible:
+    text: Play S01E01
+    focused: true
+- assertVisible: Seasons
+- repeat:
+    while:
+      notVisible:
+        text: Season 1
+        focused: true
+    times: 3
+    commands:
+      - pressKey: Remote Dpad Down
+- assertVisible:
+    text: Season 1
+    focused: true
+- pressKey: Remote Dpad Center
+# The season opens on Play, over its episodes.
+- extendedWaitUntil:
+    visible:
+      text: Play S01E01
+      focused: true
+    timeout: 30000
+- assertVisible: Episodes
+# Back lands on the season the show was opened from, and the season opens again from there.
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Season 1
+      focused: true
+    timeout: 30000
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Episodes
+    timeout: 30000
+- repeat:
+    while:
+      notVisible:
+        text: E1 · Low Tide.*
+        focused: true
+    times: 3
+    commands:
+      - pressKey: Remote Dpad Down
+- assertVisible:
+    text: E1 · Low Tide.*
+    focused: true
+- pressKey: Remote Dpad Center
+# The episode's page: its name, its place, and the ways back up to its season and show.
+- extendedWaitUntil:
+    visible: Low Tide
+    timeout: 30000
+- assertVisible: S01 · E01
+- assertVisible: Go to Season 1
+- assertVisible: Go to Lantern Bay
+# Back through the season and the show to the library, then Home, which shows its hero again.
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: E1 · Low Tide.*
+      focused: true
+    timeout: 30000
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Season 1
+      focused: true
+    timeout: 30000
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Lantern Bay
+      focused: true
+    timeout: 30000
+- pressKey: Back
+- extendedWaitUntil:
+    visible: Play Kestrel Point
+    timeout: 30000

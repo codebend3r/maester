@@ -74,7 +74,9 @@ describe('Saga on a TV', () => {
     await renderScreen({ ui: <Saga /> })
     await layOut()
 
-    expect(await screen.findByRole('button', { name: ASHFALL_GATE.item?.title })).toBeTruthy()
+    expect(
+      await screen.findByRole('button', { name: `${ASHFALL_GATE.item?.title}, Watched` }),
+    ).toBeTruthy()
     expect(screen.getByRole('button', { name: NIGHT_TRAIN.item?.title })).toBeTruthy()
     await fireEvent.press(screen.getByRole('button', { name: SAGA_COPY.playAll }))
     expect(mockPush).toHaveBeenCalledWith(

@@ -1,10 +1,11 @@
+import { Icon } from '@raven/native'
 import { type ComponentType, useState } from 'react'
 import { Image, StyleSheet, View } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type Picture, type ShelfCard } from '@/queries/cards'
 import { SIZES } from '@/theme/appTheme'
-import { themedStyles } from '@/theme/useTheme'
+import { themedStyles, useTheme } from '@/theme/useTheme'
 
 /** A picture's height over its width: a poster at 2:3, a wide frame at 16:9, an album's cover square. */
 const SHAPE_RATIOS = {
@@ -15,6 +16,29 @@ const SHAPE_RATIOS = {
 
 /** How much of a card the title art may take, at its foot and to the left: wide and short, as title art runs. */
 const LOGO_SHARE = { width: 0.6, height: 0.32 } as const
+
+/** The check on a watched title's picture: a share of the width, between a thumb's and a hand's, and its share taken by the icon. */
+const WATCHED_BADGE = { share: 0.12, icon: 0.6 } as const
+
+/** How a watched check is sized: the least and most it stands, and its inset from the picture's corner. */
+export type WatchedBadge = { least: number; most: number; inset: number }
+
+/** The steps of a size scale a watched check is sized from: touch's `SIZES`, or a TV's, sized to its screen. */
+type BadgeSizes = Pick<typeof SIZES, 'space2' | 'space5' | 'space6'>
+
+/** The sizes a watched check takes from a scale. */
+export const watchedBadgeOf = (sizes: BadgeSizes): WatchedBadge => ({
+  least: sizes.space5,
+  most: sizes.space6,
+  inset: sizes.space2,
+})
+
+const TOUCH_WATCHED_BADGE = watchedBadgeOf(SIZES)
+
+type WatchedBadgeSizeOfProps = { width: number; badge: WatchedBadge }
+
+const watchedBadgeSizeOf = ({ width, badge }: WatchedBadgeSizeOfProps): number =>
+  Math.min(badge.most, Math.max(badge.least, width * WATCHED_BADGE.share))
 
 type PictureHeightOfProps = {
   shape: CardShape
@@ -79,21 +103,24 @@ const CARD_FACES = {
 } as const satisfies Record<PictureState, ComponentType<CardFaceProps>>
 
 type CardPictureProps = {
-  card: Pick<ShelfCard, 'title' | 'shape' | 'picture' | 'progress' | 'logo'>
+  card: Pick<ShelfCard, 'title' | 'shape' | 'picture' | 'progress' | 'logo' | 'isWatched'>
   width: number
   /** The picture's height over its width where a layout frames it otherwise than its shape. */
   ratio?: number
   ring?: number
   radius?: number
+  /** How the watched check is sized: touch's sizes unless a TV passes its own, as it does for the radius. */
+  badge?: WatchedBadge
   /** Hears the title art fail to load, so the card can put its title's words back. */
   onLogoError?: () => void
 }
 
 /**
  * A card's picture: its poster, backdrop or frame grab, else its title's first letter, with
- * where playback stopped along its foot. `ring` draws the focus ring just outside it, as
- * the web's `:focus-visible` outline does, in the theme's focus colour. `radius` rounds its
- * corners: the web's `--radius-md`, which a TV sizes to its screen.
+ * where playback stopped along its foot and, once all of it is watched, a check in its bottom
+ * right corner. `ring` draws the focus ring just outside it, as the web's `:focus-visible`
+ * outline does, in the theme's focus colour. `radius` rounds its corners: the web's
+ * `--radius-md`, which a TV sizes to its screen.
  */
 export const CardPicture = ({
   card,
@@ -101,12 +128,15 @@ export const CardPicture = ({
   ratio,
   ring = 0,
   radius = SIZES.radius,
+  badge = TOUCH_WATCHED_BADGE,
   onLogoError,
 }: CardPictureProps) => {
   // What failed is the picture with those headers: with new cookies it is asked for again.
   const [failed, setFailed] = useState<string | null>(null)
   const [failedLogo, setFailedLogo] = useState<string | null>(null)
   const styles = useStyles()
+  const onAccent = useTheme((theme) => theme.palette.onAccent)
+  const badgeSize = watchedBadgeSizeOf({ width, badge })
   const cardLogo = card.logo ?? null
   const logo = cardLogo === null || cardLogo.uri === failedLogo ? null : cardLogo
   const height = pictureHeightOf({ shape: card.shape, width, ratio })
@@ -141,6 +171,23 @@ export const CardPicture = ({
         {card.progress > 0 && (
           <View style={styles.track}>
             <View style={[styles.fill, { width: `${card.progress * 100}%` }]} />
+          </View>
+        )}
+        {!!card.isWatched && (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.watched,
+              {
+                width: badgeSize,
+                height: badgeSize,
+                borderRadius: badgeSize / 2,
+                right: badge.inset,
+                bottom: badge.inset,
+              },
+            ]}
+          >
+            <Icon colour={onAccent} name="check" size={badgeSize * WATCHED_BADGE.icon} />
           </View>
         )}
       </View>
@@ -182,6 +229,13 @@ const useStyles = themedStyles((colours) =>
       backgroundColor: colours.track,
     },
     fill: { height: '100%', backgroundColor: colours.accent },
+    // The watched check, in the primary tone a mark that is on wears, clear of the progress line.
+    watched: {
+      position: 'absolute',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colours.accent,
+    },
     ring: { position: 'absolute', borderColor: colours.text },
     // The title art at the card's foot, clear of the progress line, flush left as the art reads.
     logoSlot: {

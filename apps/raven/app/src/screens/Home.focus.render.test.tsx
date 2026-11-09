@@ -6,11 +6,12 @@ import type { AppServer } from '@raven/native/headless'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
+import { KEY_ACTIONS, LONG_PRESS_NAMES } from '@/layouts/remoteKeys'
 import { APP_ROUTES, APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf, itemTarget } from '@/routes'
 import { Home } from '@/screens/Home'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { FILMS, HERO, HOME, NAS, SPARSE, homeApi } from '@/test/homeServer'
+import { FILMS, HERO, HOME, NAS, SEVERANCE_PAGE, SPARSE, homeApi } from '@/test/homeServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import type * as NavigationFocus from '@/test/navigationFocus'
@@ -22,6 +23,8 @@ import {
   returnToTestScreen,
 } from '@/test/navigationFocus'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
+import type * as RemoteModule from '@/test/tvRemote'
+import { holdRemote } from '@/test/tvRemote'
 
 /** What Home's read waits on before it is answered, and what it answers when not the server's. */
 const mockHome: { answer: Promise<void>; home: HomeAnswer | null; hero: Hero | null } = {
@@ -58,6 +61,9 @@ jest.mock('expo-router', () => ({
 jest.mock(
   '@/layouts/tvFocus',
   () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
+)
+jest.mock('react-native/Libraries/Components/TV/TVEventHandler', () =>
+  jest.requireActual<typeof RemoteModule>('@/test/tvRemote').tvEventHandlerMock(),
 )
 jest.mock('@raven/native', () => ({
   ...jest.requireActual<typeof Native>('@raven/native'),
@@ -152,7 +158,7 @@ describe('Home on a TV', () => {
     expect(rest.some((card) => card.props.hasTVPreferredFocus === true)).toBe(false)
   })
 
-  it('grows the focused card and rings it, at once when the system asks for less motion', async () => {
+  it('grows the focused card to its box and rings it, at once when the system asks for less motion', async () => {
     useReduceMotion.setState({ isReduced: true })
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
@@ -163,13 +169,43 @@ describe('Home on a TV', () => {
       if (typeof face !== 'object' || face === null) throw new Error('No card face')
       return StyleSheet.flatten(face.props.style)?.transform ?? null
     }
-    expect(scaleOf()).toEqual([{ scale: 1 }])
+    expect(scaleOf()).toEqual([{ scale: 1 / 1.08 }])
 
     await fireEvent(first, NATIVE_EVENTS.focus)
-    expect(scaleOf()).toEqual([{ scale: 1.08 }])
+    expect(scaleOf()).toEqual([{ scale: 1 }])
 
     await fireEvent(first, NATIVE_EVENTS.blur)
-    expect(scaleOf()).toEqual([{ scale: 1 }])
+    expect(scaleOf()).toEqual([{ scale: 1 / 1.08 }])
+  })
+
+  it("opens a show's marks on a held select of its card, and adds it to Binge", async () => {
+    await renderHome()
+    const show = await screen.findByRole('button', { name: 'Severance' })
+    await fireEvent(show, NATIVE_EVENTS.focus)
+    await holdRemote({ key: LONG_PRESS_NAMES.longSelect, eventKeyAction: KEY_ACTIONS.down })
+
+    expect(await screen.findByRole('header', { name: 'Severance' })).toBeTruthy()
+    const marks = await screen.findByRole('button', { name: 'Mark watched' })
+    expect(marks.props.hasTVPreferredFocus).toBe(true)
+    expect(screen.getByRole('button', { name: 'Add to favourites' })).toBeTruthy()
+    const binge = screen.getByRole('button', { name: 'Add to binge' })
+    // The key coming up names the hold again; the menu, open, hears it as nothing.
+    await holdRemote({ key: LONG_PRESS_NAMES.longSelect, eventKeyAction: KEY_ACTIONS.up })
+    expect(screen.getAllByRole('header', { name: 'Severance' })).toHaveLength(1)
+
+    await fireEvent.press(binge)
+    // The menu closes, and the show joins the Binge section at the top of Home, synopsis and all.
+    expect(screen.queryByRole('button', { name: 'Add to binge' })).toBeNull()
+    expect(await screen.findByText(SEVERANCE_PAGE.summary ?? '')).toBeTruthy()
+    expect(screen.getAllByRole('button')[0]?.props.accessibilityLabel).toBe('Severance')
+    await untilIdle(shown.client)
+  })
+
+  it('opens no menu on a held select while no card has the focus', async () => {
+    await renderHome()
+    await screen.findByRole('button', { name: 'Severance' })
+    await holdRemote({ key: LONG_PRESS_NAMES.longSelect, eventKeyAction: KEY_ACTIONS.down })
+    expect(screen.queryByRole('button', { name: 'Mark watched' })).toBeNull()
   })
 
   it("lets the remote open a library from its shelf's title", async () => {

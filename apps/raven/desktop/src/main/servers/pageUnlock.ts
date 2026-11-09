@@ -30,7 +30,11 @@ const isCookieValue = (value: string): boolean =>
   })
 
 type CreatePageUnlockProps = {
-  cookies: PageCookies
+  /**
+   * The page's cookie jar, asked for on each call: Electron gives its session only once the
+   * app is ready, and main makes this reader before then.
+   */
+  cookies: () => PageCookies
   warn: (message: string) => void
 }
 
@@ -44,7 +48,7 @@ export const createPageUnlock =
   ({ cookies, warn }: CreatePageUnlockProps): (() => Promise<string | null>) =>
   async () => {
     try {
-      const found = await cookies.get({
+      const found = await cookies().get({
         url: `${PAGE_ORIGIN}${UNLOCK_COOKIE_PATH}`,
         name: SERVER_COOKIES.unlock,
       })

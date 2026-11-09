@@ -38,7 +38,6 @@ import {
   useTrackCues,
   useAudioQueue,
   usePlaybackPolicy,
-  useServerMediaMutations,
   usePlayerPrefs,
   videoReducer,
   KeyedView,
@@ -302,7 +301,6 @@ const Playing = ({
   const setSubtitles = usePlayerPrefs((prefs) => prefs.setSubtitles)
   const [resumeAt] = useState(() => (isFromStart ? 0 : resumeAtFor({ at, media })))
   const heading = usePlayerHeading({ media, session })
-  const { favourite } = useServerMediaMutations({ api: session.api, media })
   const [subtitle, setSubtitle] = useState(() =>
     preferredSubtitle({ tracks, subtitles: subtitlePrefs }),
   )
@@ -597,10 +595,6 @@ const Playing = ({
               }
         }
         mode={mode}
-        favourite={{
-          isOn: media.favourite,
-          onToggle: () => favourite.mutate(!media.favourite),
-        }}
         upNext={nextMedia === null ? null : upNextWordsOf(nextMedia)}
         chapters={markers.data?.chapters ?? NO_CHAPTERS}
         next={
@@ -677,7 +671,6 @@ const Waiting = ({ notice, onBack }: WaitingProps) => (
     heading={NO_HEADING}
     isOpening={false}
     mode={null}
-    favourite={null}
     upNext={null}
     chapters={NO_CHAPTERS}
     next={null}

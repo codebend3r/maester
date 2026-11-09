@@ -3,9 +3,8 @@ import { type ComponentRef, useRef, useState } from 'react'
 import { Image, type LayoutRectangle, Pressable, StyleSheet, View } from 'react-native'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
+import { useTvCard } from '@/cardMenu/useTvCard'
 import { FocusFactChips } from '@/layouts/FactChips'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
-import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { BINGE_COPY, type BingeCard } from '@/queries/bingeCards'
@@ -39,40 +38,49 @@ const logoWidthOf = ({ cardWidth, ratio }: LogoWidthOfProps): number => {
 
 const SYNOPSIS_LINES = 3
 
+/** A soft shadow under the synopsis, which sits over the lightest part of the backdrop. */
+const SYNOPSIS_SHADOW = { offset: tvSize(1), radius: tvSize(3) } as const
+
 type BingeCardFocusProps = {
   card: BingeCard
   width: number
   /** The least the card stands; its words make it taller where they need the room. */
   height: number
   place: string
+  /** The shelf the card sits on, Home's binge shelf, for the shelves to bring into view as it takes the focus back. */
+  shelf: string
   isPreferred: boolean
+  /** Whether the synopsis is set to the top right: the card across the width has the room, a half card not. */
+  hasSynopsis: boolean
   onPress: () => void
 }
 
 /**
  * A binged show on a TV as the web's jumbo card: its backdrop under the web's shade, its title
  * art in the top left corner (or its name in the display face) with a few lines of the synopsis
- * set to the top right, and above the foot its year and length with the picture's quality, the
- * episode it is on, and Starring over its stars' names in the display face, then how far along
- * it is with what is left at the right. Focused, it takes the ring and shows Play at its right,
- * as the web's does on hover; pressed, it plays the episode.
+ * set to the top right where the card has the room, and above the foot its year and length with
+ * the picture's quality, the episode it is on, and Starring over its stars' names in the display
+ * face, then how far along it is with what is left at the right. Focused, it takes the ring and
+ * shows Play at its right, as the web's does on hover; pressed, it plays the episode, and
+ * select held down opens the show's menu of marks.
  */
 export const BingeCardFocus = ({
   card,
   width,
   height,
   place,
+  shelf,
   isPreferred,
+  hasSynopsis,
   onPress,
 }: BingeCardFocusProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
-  const { remember } = useOpenerFocus({ place, view: pressable })
-  const { settle } = useOpeningFocus()
-  const [isFocused, setFocused] = useState(false)
   // The shade is drawn at the card's measured size: a percentage left it short of a card its words had grown.
   const [frame, setFrame] = useState<Pick<LayoutRectangle, 'width' | 'height'>>({ width, height })
   // The title art's width over its height, once loaded, so it sits flush left as the web's `object-position: left top`.
   const [logoRatio, setLogoRatio] = useState<number | null>(null)
+  const tvCard = useTvCard({ card, place, shelf, view: pressable, onPress })
+  const { isFocused } = tvCard
   const styles = usePictureStyles()
   const shade = useTheme((theme) => theme.overPicture.ground)
   const ring = useTheme((theme) => theme.palette.text)
@@ -85,17 +93,11 @@ export const BingeCardFocus = ({
       accessibilityLabel={cardLabelOf({ card })}
       accessibilityRole="button"
       hasTVPreferredFocus={isPreferred}
-      onBlur={() => setFocused(false)}
-      onFocus={() => {
-        setFocused(true)
-        settle()
-      }}
-      onPress={() => {
-        remember()
-        onPress()
-      }}
+      onBlur={tvCard.onBlur}
+      onFocus={tvCard.onFocus}
+      onPress={tvCard.onPress}
       onLayout={(event) => setFrame(event.nativeEvent.layout)}
-      style={[styles.card, { width, minHeight: height }, isFocused && FOCUS_FRONT]}
+      style={[styles.card, { width, minHeight: height }]}
     >
       <View style={styles.backdrop}>
         {card.picture !== null && (
@@ -141,7 +143,7 @@ export const BingeCardFocus = ({
             style={[styles.logo, { width: logoWidthOf({ cardWidth: width, ratio: logoRatio }) }]}
           />
         )}
-        {card.synopsis !== null && (
+        {hasSynopsis && card.synopsis !== null && (
           <Text numberOfLines={SYNOPSIS_LINES} style={styles.synopsis}>
             {card.synopsis}
           </Text>
@@ -191,6 +193,7 @@ export const BingeCardFocus = ({
         </View>
       )}
       {isFocused && <View pointerEvents="none" style={[styles.ring, { borderColor: ring }]} />}
+      {tvCard.menu}
     </Pressable>
   )
 }
@@ -212,13 +215,20 @@ const usePictureStyles = pictureStyles((colours) =>
       alignItems: 'flex-start',
       gap: TV_SIZES.space6,
     },
+    /*
+     * Over the backdrop's lightest part, so in the on-picture text colour with a shadow under it.
+     * No line height of its own: Android clips each line to the height set, which cut the shadow
+     * off at the line below.
+     */
     synopsis: {
       flexShrink: 1,
       maxWidth: COPY_WIDTH,
-      color: colours.muted,
+      color: colours.text,
       fontSize: TV_SIZES.text,
-      lineHeight: TV_SIZES.text * LINE_RATIO,
       textAlign: 'right',
+      textShadowColor: colours.ground,
+      textShadowOffset: { width: 0, height: SYNOPSIS_SHADOW.offset },
+      textShadowRadius: SYNOPSIS_SHADOW.radius,
     },
     stars: {
       color: colours.text,

@@ -8,10 +8,11 @@
     "#package": "./package.json"
   },
   "scripts": {
-    "build:android-tv": "./android/gradlew -p android assembleRelease",
+    "build:android-tv": "ANDROID_HOME=${ANDROID_HOME:-$HOME/Library/Android/sdk} JAVA_HOME=\"${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}\" ./android/gradlew -p android assembleRelease",
     "banner:tv": "./scripts/tv_banner.sh",
     "icons:tvos": "./scripts/tv_apple_icons.sh",
     "deploy:tvos": "./scripts/deploy_tvos.sh",
+    "deploy:android-tv": "./scripts/deploy_android_tv.sh",
     "build:android-tv:test-account": "bun --env-file=.env.test-account run build:android-tv",
     "build:ios": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
     "build:tvos": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release -sdk appletvsimulator -destination 'generic/platform=tvOS Simulator' -derivedDataPath build/tvos ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
@@ -143,7 +144,8 @@
       "dev:ios",
       "dev:ipad",
       "dev:tvos",
-      "deploy:tvos"
+      "deploy:tvos",
+      "deploy:android-tv"
     ],
     "targets": {
       "test": {
@@ -418,6 +420,12 @@
       "deploy:tvos": {
         "dependsOn": [
           "^build"
+        ],
+        "cache": false
+      },
+      "deploy:android-tv": {
+        "dependsOn": [
+          "build:android-tv"
         ],
         "cache": false
       }

@@ -11,17 +11,22 @@ import {
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import { Icon } from '@raven/native'
+import { useTvCard } from '@/cardMenu/useTvCard'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
-import { focusCardWidthOf, FocusCard, focusCaptionHeightOf } from '@/layouts/FocusCard'
+import {
+  focusCardWidthOf,
+  FocusCard,
+  focusCaptionHeightOf,
+  TV_WATCHED_BADGE,
+} from '@/layouts/FocusCard'
 import { FocusBand } from '@/layouts/FocusBand'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { GRID_SIZE_COPY } from '@/layouts/copy'
 import { focusPicker } from '@/layouts/Picker.focus'
 import { GRID_SIZES, type GridSize, useAppPrefs } from '@/stores/appPrefs'
-import { useOpenerFocus, useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
+import { useScreenFocusScope } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
   CARD_LAYOUTS,
@@ -152,30 +157,33 @@ type RowCardProps = {
 
 /**
  * A card of the list or tiles view, the remote's to move to: a row of words, ringed while
- * focused. It takes the focus back when the page it opened goes back, as a `FocusCard` does.
+ * focused. It takes the focus back when the page it opened goes back, as a `FocusCard` does,
+ * and select held down opens its menu of marks as on one.
  */
 const RowCard = ({ card, hasPicture, isPreferred, jump, onPress }: RowCardProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
   const styles = useStyles()
   const text = useTheme((theme) => theme.palette.text)
   useJumpFocus({ jump, view: pressable })
-  const { remember } = useOpenerFocus({ place: card.key, view: pressable })
-  const { settle } = useOpeningFocus()
+  const tvCard = useTvCard({ card, place: card.key, view: pressable, onPress })
   return (
     <Pressable
       ref={pressable}
       accessibilityLabel={card.title}
       accessibilityRole="button"
       hasTVPreferredFocus={isPreferred}
-      onFocus={settle}
-      onPress={() => {
-        remember()
-        onPress()
-      }}
+      onBlur={tvCard.onBlur}
+      onFocus={tvCard.onFocus}
+      onPress={tvCard.onPress}
       style={({ focused }) => [styles.rowCard, focused && styles.focused]}
     >
       {hasPicture && (
-        <CardPicture card={card} radius={TV_SIZES.radius} width={TILE_WIDTHS[card.shape]} />
+        <CardPicture
+          badge={TV_WATCHED_BADGE}
+          card={card}
+          radius={TV_SIZES.radius}
+          width={TILE_WIDTHS[card.shape]}
+        />
       )}
       {!!card.icon && <Icon colour={text} name={card.icon} size={TV_SIZES.textXl} />}
       <View style={styles.words}>
@@ -188,6 +196,7 @@ const RowCard = ({ card, hasPicture, isPreferred, jump, onPress }: RowCardProps)
           </Text>
         )}
       </View>
+      {tvCard.menu}
     </Pressable>
   )
 }
@@ -571,7 +580,7 @@ const useStyles = themedStyles((colours) =>
     },
     markLabel: { color: colours.muted, fontSize: TV_SIZES.textLg, fontWeight: '600' },
     markEmpty: { color: colours.line },
-    focused: { ...FOCUS_FRONT, borderColor: colours.text, backgroundColor: colours.quiet },
+    focused: { borderColor: colours.text, backgroundColor: colours.quiet },
     listSlot: { flex: 1 },
     content: { paddingHorizontal: TV_GUTTER, paddingBottom: TV_SIZES.space6 },
     bucketRow: { justifyContent: 'center' },

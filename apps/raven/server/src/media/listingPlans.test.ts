@@ -89,6 +89,15 @@ const BY_ACCOUNT =
 const FIRST_ITEM_BY_KEY = /^SEARCH z USING (COVERING )?INDEX \w+ \(media_id=\?\)$/
 
 /**
+ * A step that reads titles by their type, or every title: `shown_items` as `e`, `s` or `i`,
+ * found by the items' type index or scanned, rather than one title by its id. Next up began
+ * there once, walking every episode in the database for each library.
+ */
+const readsEveryTitle = (detail: string): boolean =>
+  /^SEARCH (e|s|i|pe|ps) USING INDEX \w+ \(type=\?\)/.test(detail) ||
+  /^(SCAN|MATERIALIZE) (items|shown_items|e|s|i|pe|ps)\b/.test(detail)
+
+/**
  * A step that reads every file's items, in place or into a copy, rather than
  * a file's own: `media_items`, or `mi` for the join `FIRST_ITEM` makes, read
  * whole, or its first item `z` read any way but by key. Without an index,
@@ -214,6 +223,18 @@ describe.each([
       expect(viewing.filter((detail) => !BY_ACCOUNT.test(detail))).toEqual([])
     },
   )
+
+  it.each([
+    ['its videos in progress', VIEWING_READS['its videos in progress']],
+    ['its count in progress', VIEWING_READS['its count in progress']],
+  ])('reads %s from the account’s own plays, never from every episode', (_name, read) => {
+    const details = stepsOf(read).map((step) => step.detail)
+
+    expect(details).toContainEqual(
+      expect.stringMatching(/^SEARCH pl USING COVERING INDEX plays_account \(account_id=\?\)/),
+    )
+    expect(details.filter(readsEveryTitle)).toEqual([])
+  })
 
   it.each(Object.entries(READS))(
     'reads %s from the library’s own files, each with its own first item',

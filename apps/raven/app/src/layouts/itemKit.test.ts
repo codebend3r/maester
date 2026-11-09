@@ -12,6 +12,7 @@ const row = (overrides: Partial<EpisodeRow> = {}): EpisodeRow => ({
   shape: CARD_SHAPES.wide,
   picture: null,
   progress: 0,
+  subject: null,
   target: itemTarget(8),
   summary: null,
   isWatched: false,

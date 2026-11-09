@@ -12,6 +12,8 @@ const CARD: ShelfCard = {
   shape: CARD_SHAPES.wide,
   picture: null,
   progress: 0.4,
+  subject: null,
+  isWatched: false,
   logo: { uri: 'https://nas.example/api/items/4/images/logo', headers: {} },
   episode: { name: 'Half Loop', mark: 'S1.E2' },
   resume: { timeLeft: '42m left' },

@@ -1,0 +1,37 @@
+appId: io.github.codebend3r.raven.app
+name: Move the remote into the side menu and onto the row named ROW
+# The side menu stands folded at Home's left edge and opens, labels and all, while the remote is
+# on one of its rows. Its rows keep their names while folded, so what says it is open is the
+# Pinned heading, drawn over the pinned libraries only then. Left from wherever the remote is on
+# Home reaches a row, Up walks to Search at the top, and Down to the row wanted. Home is drawn
+# once its heading is, whatever has the focus: with a Binge card focused, the hero's Play can
+# stand below the fold.
+---
+- extendedWaitUntil:
+    visible: Home
+    timeout: 30000
+- repeat:
+    while:
+      notVisible: Pinned
+    times: 8
+    commands:
+      - pressKey: Remote Dpad Left
+- repeat:
+    while:
+      notVisible:
+        text: Search
+        focused: true
+    times: 10
+    commands:
+      - pressKey: Remote Dpad Up
+- repeat:
+    while:
+      notVisible:
+        text: ${ROW}
+        focused: true
+    times: 14
+    commands:
+      - pressKey: Remote Dpad Down
+- assertVisible:
+    text: ${ROW}
+    focused: true

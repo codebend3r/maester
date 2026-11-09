@@ -1,4 +1,4 @@
-"""Select main's native jobs with Nx, retaining changes since the last green ancestor."""
+"""Select the native jobs a commit affects with Nx: a pull request against its base (`NATIVE_BASE`), a push to main against the last green ancestor."""
 
 import json
 import os
@@ -46,8 +46,9 @@ def select_groups(projects: set[str], files: list[str]) -> dict[str, bool]:
 
 def main() -> None:
     head = os.environ["GITHUB_SHA"]
-    base = None
-    if os.environ["GITHUB_EVENT_NAME"] != "workflow_dispatch":
+    # A pull request names its base; a push to main finds its last green ancestor.
+    base = os.environ.get("NATIVE_BASE") or None
+    if base is None and os.environ["GITHUB_EVENT_NAME"] != "workflow_dispatch":
         repository = os.environ["GITHUB_REPOSITORY"]
         runs = json.loads(
             output(

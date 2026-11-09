@@ -188,6 +188,16 @@ GROUPS: tuple[Group, ...] = (
                 "Xcode",
             ),
             Command(
+                "app:deploy:android-tv",
+                "Builds the Release APK and puts it on the Android TV over adb, found over mDNS.",
+                "Android SDK",
+            ),
+            Command(
+                "app:deploy:tvs",
+                "Puts the checked-out app on the Android TV, then on the Apple TV.",
+                "Xcode",
+            ),
+            Command(
                 "app:e2e",
                 "The Maestro flows on the iPhone simulator, against the fixture server.",
                 "Maestro",

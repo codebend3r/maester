@@ -169,11 +169,13 @@ export const titleLookOf = (logo: ItemHero['logo']): TitleLook =>
 /** The heading's picture as a card draws it: its poster or still, with no progress along it. */
 export const heroPictureOf = (
   hero: ItemHero,
-): Pick<ShelfCard, 'title' | 'shape' | 'picture' | 'progress'> => ({
+): Pick<ShelfCard, 'title' | 'shape' | 'picture' | 'progress' | 'isWatched'> => ({
   title: hero.title,
   shape: hero.poster.shape,
   picture: hero.poster.picture,
   progress: 0,
+  // The page's own Watched mark says it; the poster stays plain.
+  isWatched: false,
 })
 
 /** Hooks for the render tests to find a part of the page by. */

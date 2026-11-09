@@ -1,12 +1,11 @@
-import { type ComponentRef, type ComponentType, useRef, useState } from 'react'
+import { type ComponentRef, type ComponentType, useEffect, useRef, useState } from 'react'
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native'
 
+import { useTvCard } from '@/cardMenu/useTvCard'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { CARD_SHAPES, type CardShape, type ShelfCard, cardLabelOf } from '@/queries/cards'
-import { CardPicture } from '@/layouts/Card'
+import { CardPicture, watchedBadgeOf } from '@/layouts/Card'
 import { FocusFactChips } from '@/layouts/FactChips'
-import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useReduceMotion } from '@/stores/reduceMotion'
@@ -23,8 +22,19 @@ export const FOCUS_CARD_WIDTHS = {
 /** A card's width on this TV: its width on a 1920 point screen, sized to this one. */
 export const focusCardWidthOf = (shape: CardShape): number => tvSize(FOCUS_CARD_WIDTHS[shape])
 
-/** How much the focused card grows. */
+/** The watched check on a TV card, sized to the screen as the card's radius and ring are. */
+export const TV_WATCHED_BADGE = watchedBadgeOf(TV_SIZES)
+
+/**
+ * How much the focused card stands above the rest: the rest are drawn at `REST_SCALE` of their
+ * box and the focused one at its box's full size, so a card grows within its own box and never
+ * over the card beside it. Standing it in front by `zIndex` instead moved it among its siblings,
+ * which Fabric does by taking the view out and putting it back, and tvOS let the focus go to the
+ * screen's first control as it went.
+ */
 const FOCUS_SCALE = 1.08
+
+const REST_SCALE = 1 / FOCUS_SCALE
 
 const GROW_MS = 150
 
@@ -80,6 +90,8 @@ const CAPTION_TITLE_VIEWS = {
 type FocusCardProps = {
   card: ShelfCard
   place?: string
+  /** The shelf the card sits on, for Home's shelves to bring into view as it takes the focus back; none in a grid. */
+  shelf?: string | null
   width: number
   /** The picture's height over its width where the layout frames it otherwise than its shape. */
   ratio?: number
@@ -91,16 +103,18 @@ type FocusCardProps = {
 }
 
 /**
- * A card the remote moves to, on a shelf or in a grid: it grows and takes the ring while
- * focused, smoothly unless the system asks for less motion, when it changes at once.
+ * A card the remote moves to, on a shelf or in a grid: it grows to its box's full size and takes
+ * the ring while focused, smoothly unless the system asks for less motion, when it changes at once.
  * `isPreferred` asks the remote's focus for it as the screen opens; `jump` takes the focus
  * once per jump that lands on it, and coming back to the screen takes it back to the card that
  * was pressed. `place` is where the card sits on its screen, unique there: the card's own key,
  * or more where one title can sit in two places. Taking the focus spends the screen's opening focus.
+ * Select held down opens the card's menu of marks, for a card that stands for something.
  */
 export const FocusCard = ({
   card,
   place = card.key,
+  shelf = null,
   width,
   ratio,
   isPreferred,
@@ -110,17 +124,17 @@ export const FocusCard = ({
 }: FocusCardProps) => {
   const pressable = useRef<ComponentRef<typeof Pressable>>(null)
   useJumpFocus({ jump, view: pressable })
-  const { remember } = useOpenerFocus({ place, view: pressable })
-  const { settle } = useOpeningFocus()
   const isReduced = useReduceMotion((state) => state.isReduced)
-  const [isFocused, setFocused] = useState(false)
-  const [scale] = useState(() => new Animated.Value(1))
+  const [scale] = useState(() => new Animated.Value(REST_SCALE))
+  const tvCard = useTvCard({ card, place, shelf, view: pressable, onPress })
+  const { isFocused } = tvCard
   const styles = useStyles()
   const CaptionTitle = CAPTION_TITLE_VIEWS[captionTitleOf(card)]
   const line = card.episode?.mark ?? card.line
   const chips = card.chips ?? []
 
-  const grow = (toValue: number) => {
+  useEffect(() => {
+    const toValue = isFocused ? 1 : REST_SCALE
     if (isReduced) {
       scale.setValue(toValue)
       return
@@ -131,7 +145,7 @@ export const FocusCard = ({
       easing: EASE_OUT,
       useNativeDriver: true,
     }).start()
-  }
+  }, [isFocused, isReduced, scale])
 
   return (
     <Pressable
@@ -139,23 +153,13 @@ export const FocusCard = ({
       accessibilityLabel={cardLabelOf({ card })}
       accessibilityRole="button"
       hasTVPreferredFocus={isPreferred}
-      onBlur={() => {
-        setFocused(false)
-        grow(1)
-      }}
-      style={isFocused && FOCUS_FRONT}
-      onFocus={() => {
-        setFocused(true)
-        grow(FOCUS_SCALE)
-        settle()
-      }}
-      onPress={() => {
-        remember()
-        onPress()
-      }}
+      onBlur={tvCard.onBlur}
+      onFocus={tvCard.onFocus}
+      onPress={tvCard.onPress}
     >
       <Animated.View style={[styles.card, { width, transform: [{ scale }] }]}>
         <CardPicture
+          badge={TV_WATCHED_BADGE}
           card={card}
           ratio={ratio}
           radius={TV_SIZES.radius}
@@ -174,6 +178,7 @@ export const FocusCard = ({
           </View>
         )}
       </Animated.View>
+      {tvCard.menu}
     </Pressable>
   )
 }

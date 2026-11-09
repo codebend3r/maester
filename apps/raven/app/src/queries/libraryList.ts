@@ -16,6 +16,8 @@ const libraryCard = ({ id, name, settings }: Library): ShelfCard => ({
   picture: null,
   progress: 0,
   icon: libraryIconOf(settings),
+  subject: null,
+  isWatched: false,
   target: { kind: ROUTE_TARGETS.library, libraryId: id, query: '' },
 })
 

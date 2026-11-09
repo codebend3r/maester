@@ -3,7 +3,6 @@ import { type ComponentRef, type ComponentType, type ReactNode, useRef } from 'r
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
 import { useFocusOnMount, useOpeningFocus } from '@/layouts/focus'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
@@ -68,7 +67,7 @@ export const useMusicStyles = themedStyles((colours) =>
       borderWidth: TV_SIZES.tvFocusRing,
     },
     actionLabel: { fontSize: TV_SIZES.textLg, fontWeight: 'bold' },
-    focused: { ...FOCUS_FRONT, borderColor: colours.text },
+    focused: { borderColor: colours.text },
     section: { gap: TV_SIZES.space1 },
     heading: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
     row: {
@@ -81,7 +80,7 @@ export const useMusicStyles = themedStyles((colours) =>
       borderWidth: TV_SIZES.tvFocusRing,
       borderColor: 'transparent',
     },
-    focusedRow: { ...FOCUS_FRONT, borderColor: colours.text, backgroundColor: colours.quiet },
+    focusedRow: { borderColor: colours.text, backgroundColor: colours.quiet },
     number: {
       color: colours.muted,
       fontSize: TV_SIZES.text,

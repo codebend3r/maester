@@ -214,6 +214,21 @@ describe('Item on a TV', () => {
     expect(preferred()).toEqual(['Play S01E01'])
   })
 
+  it('offers to mark the whole season watched, in words beside the icon', async () => {
+    // The mark is held unanswered, so the page shows it as made rather than read again.
+    const write = heldAnswer()
+    mockServer.writes = () => write.answer
+    mockServer.release = write.release
+    await renderItem(SEVERANCE_ONE.id)
+    const watched = await screen.findByRole('checkbox', { name: 'Mark season watched' })
+    expect(within(watched).getByText('Mark season watched')).toBeTruthy()
+
+    await fireEvent.press(watched)
+    expect(
+      await screen.findByRole('checkbox', { name: 'Season watched', checked: true }),
+    ).toBeTruthy()
+  })
+
   it("brings the remote down from a show's actions to its seasons, and up again", async () => {
     await renderItem(SEVERANCE.id)
     const play = await screen.findByRole('button', { name: 'Play S01E01' })
@@ -226,7 +241,7 @@ describe('Item on a TV', () => {
     if (seasons === null || actions === null) throw new Error('No focus guide')
     expect(within(seasons).queryByRole('button', { name: 'Play S01E01' })).toBeNull()
     expect(within(actions).queryByRole('button', { name: 'Season 1' })).toBeNull()
-    expect(within(actions).getByRole('checkbox', { name: 'Mark watched' })).toBeTruthy()
+    expect(within(actions).getByRole('checkbox', { name: 'Mark show watched' })).toBeTruthy()
   })
 
   it('takes the focus back to the season a page was opened from', async () => {

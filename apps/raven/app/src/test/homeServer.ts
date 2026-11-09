@@ -14,6 +14,7 @@ import {
   type Hero,
   type Home,
   ITEM_TYPES,
+  type ItemDetails,
   LIBRARY_KINDS,
   type Library,
   type LibraryKind,
@@ -21,7 +22,7 @@ import {
 } from '@raven/core'
 import type { AppServer } from '@raven/native/headless'
 
-import { NOT_FOUND, STATUSES, responseOf } from '@/test/fixtureFetch'
+import { NOT_FOUND, STATUSES, pathFor, responseOf } from '@/test/fixtureFetch'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 export const NAS: AppServer = {
@@ -90,6 +91,52 @@ const NIGHT_TRAIN = mediaItemFor({
   item: summaryFor({ id: 41, title: 'Night Train', year: 2025 }),
 })
 
+const SEVERANCE_SUMMARY = summaryFor({
+  id: 4,
+  type: ITEM_TYPES.show,
+  title: 'Severance',
+  year: 2022,
+})
+
+/** The show on Home's Series shelf, as its page answers: no favourite, and a season with nothing watched. */
+export const SEVERANCE_PAGE: ItemDetails = {
+  ...SEVERANCE_SUMMARY,
+  tmdbId: '4',
+  imdbId: null,
+  originalTitle: null,
+  tagline: null,
+  summary: 'Mark leads a team of office workers whose memories have been split.',
+  contentRating: null,
+  released: null,
+  ended: null,
+  runtime: null,
+  studio: null,
+  genres: [],
+  logoVersion: null,
+  favourite: false,
+  aiMatch: null,
+  credits: [],
+  reviews: [],
+  versions: [],
+  children: [
+    {
+      ...summaryFor({
+        id: 5,
+        type: ITEM_TYPES.season,
+        title: 'Season 1',
+        year: 2022,
+        show: { id: 4, title: 'Severance' },
+        season: 1,
+      }),
+      type: ITEM_TYPES.season,
+      episodeCount: 9,
+      watchedCount: 0,
+      runtime: null,
+    },
+  ],
+  libraryPictures: [],
+}
+
 /** Continue watching with one movie, then a Films shelf of two and a Series shelf of one show. */
 export const HOME: Home = {
   inProgress: [{ media: BUSBOYS, poster: BUSBOYS.item }],
@@ -100,7 +147,7 @@ export const HOME: Home = {
       type: HOME_SHELF_TYPES.shows,
       shows: [
         {
-          show: summaryFor({ id: 4, type: ITEM_TYPES.show, title: 'Severance', year: 2022 }),
+          show: SEVERANCE_SUMMARY,
           episodes: 9,
           seasons: 1,
           totalEpisodes: 9,
@@ -175,6 +222,16 @@ const SPARSE_HOME: Home = {
 const ANSWERS: Record<string, unknown> = {
   [`${NAS.origin}${APP_CLIENT_CALLS.getHome.path}`]: HOME,
   [`${NAS.origin}${APP_CLIENT_CALLS.listLibraries.path}`]: [FILMS, SERIES],
+  [`${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.getItem.path, id: SEVERANCE_PAGE.id })}`]:
+    SEVERANCE_PAGE,
+  [`${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.nextEpisode.path, id: SEVERANCE_PAGE.id })}`]:
+    null,
+  [`${NAS.origin}${APP_CLIENT_CALLS.getBinge.path}`]: { ids: [], hasSeenTip: true },
+  // A write to the binge list, which the server answers with the list as it then stands.
+  [`${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.setBinge.path, id: SEVERANCE_PAGE.id })}`]: {
+    ids: [SEVERANCE_PAGE.id],
+    hasSeenTip: true,
+  },
   [`${OTHER.origin}${APP_CLIENT_CALLS.getHome.path}`]: OTHER_HOME,
   [`${OTHER.origin}${APP_CLIENT_CALLS.listLibraries.path}`]: [OTHER_SHOWS],
   [`${SPARSE.origin}${APP_CLIENT_CALLS.getHome.path}`]: SPARSE_HOME,
@@ -182,8 +239,9 @@ const ANSWERS: Record<string, unknown> = {
 }
 
 /**
- * A client for `server` as it answers: `NAS` with `HOME` and its two libraries, `OTHER` with
- * its one, `SPARSE` with an empty shelf before Films, each 404 to the rest.
+ * A client for `server` as it answers: `NAS` with `HOME`, its two libraries, Severance's page
+ * and the binge list, `OTHER` with its one library, `SPARSE` with an empty shelf before Films,
+ * each 404 to the rest.
  */
 export const homeApi = (server: AppServer = NAS): ApiClient =>
   createApiClient({

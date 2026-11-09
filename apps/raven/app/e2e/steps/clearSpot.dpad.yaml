@@ -1,38 +1,29 @@
 appId: io.github.codebend3r.raven.app
-name: From Home's focused film, clear its saved spot with a mark and its undoing
+name: From a focused card whose title has a saved spot, clear the spot with a mark and its undoing
+# The card's page opens offering to resume. The spot is cleared by a mark, and taking the mark off
+# again leaves the title as the fixture had it, never started, so Play stands where Resume did
+# and nothing is under Continue watching for it. ROW is the row the marks stand in, first for a
+# film and second for an episode, as toggleMark takes it. Back leaves the page; where it lands
+# is the caller's to wait for.
 ---
-# The spot is cleared by a mark, and taking the mark off again leaves the film as the fixture
-# had it, never started, so Home has nothing under Continue watching again.
 - pressKey: Remote Dpad Center
 - extendedWaitUntil:
     visible:
       text: Resume from .*
       focused: true
     timeout: 30000
-- repeat:
-    while:
-      notVisible:
-        text: Mark watched
-        focused: true
-    times: 4
-    commands:
-      - pressKey: Remote Dpad Right
-- pressKey: Remote Dpad Center
-- extendedWaitUntil:
-    visible:
-      text: Watched
-      focused: true
-    timeout: 10000
-- pressKey: Remote Dpad Center
-- extendedWaitUntil:
-    visible:
-      text: Mark watched
-      focused: true
-    timeout: 10000
+- runFlow:
+    file: toggleMark.dpad.yaml
+    env:
+      MARK: Mark watched
+      MARKED: Watched
+      ROW: ${ROW}
+# The remote is on the mark now, so the undoing walks no row.
+- runFlow:
+    file: toggleMark.dpad.yaml
+    env:
+      MARK: Watched
+      MARKED: Mark watched
+      ROW: first
 - assertVisible: Play
 - pressKey: Back
-- extendedWaitUntil:
-    notVisible:
-      id: in-progress
-    timeout: 30000
-- assertVisible: Kestrel Point

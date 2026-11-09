@@ -1,0 +1,29 @@
+appId: io.github.codebend3r.raven.app
+name: On an item's page, move the remote to the mark named MARK, press it, and wait for it to read MARKED
+# A film's marks stand on the row its Play or Resume opens on, so the remote goes Right along it.
+# A show's and an episode's marks stand in a second row under Play or Resume, so ROW is second
+# and the remote goes Down first. The mark says what pressing it does (Mark watched, Mark as
+# binging) and then that it is (Watched, Binging), so MARKED is what the press leaves it saying.
+---
+- runFlow:
+    when:
+      true: ${ROW == 'second'}
+    commands:
+      - pressKey: Remote Dpad Down
+- repeat:
+    while:
+      notVisible:
+        text: ${MARK}
+        focused: true
+    times: 4
+    commands:
+      - pressKey: Remote Dpad Right
+- assertVisible:
+    text: ${MARK}
+    focused: true
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: ${MARKED}
+      focused: true
+    timeout: 10000

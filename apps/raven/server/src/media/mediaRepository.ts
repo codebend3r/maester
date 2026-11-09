@@ -957,15 +957,35 @@ export class MediaRepository {
    * of, in a library that saves progress, unless an episode of the show is
    * in progress already: it keeps a binge going from the start of the next
    * episode. Each comes with when the show was last watched, and starts from
-   * the beginning.
+   * the beginning. It starts from the account's own plays, the few hundred
+   * rows the watched files are among, never from every episode in the
+   * database: begun there, the walk took seconds a library on a large one.
+   * The shows in progress keep no null, since one would make NOT IN null for
+   * every row; their chain is spelled out again rather than shared in a CTE,
+   * which SQLite planned by the titles' type index without statistics.
    */
   private nextUp({ libraryId, account }: MediaRepositoryNextUpProps): DatedVideo[] {
     const shows = this.db
       .prepare<{ libraryId: number | null; account: AccountKey }, NextUpShowRow>(
-        `SELECT s.parent_id AS show_id, m.library_id,
+        `WITH played AS (
+           SELECT DISTINCT pl.media_id FROM plays pl WHERE pl.account_id = @account
+         ),
+         watching AS (
+           SELECT DISTINCT ps.parent_id AS show_id
+             FROM playback_progress pp
+             JOIN media pm ON pm.id = pp.media_id
+             JOIN libraries pl2 ON pl2.id = pm.library_id
+             JOIN media_items pmi ON pmi.media_id = pp.media_id
+             JOIN shown_items pe ON pe.id = pmi.item_id AND pe.type = 'episode'
+             JOIN shown_items ps ON ps.id = pe.parent_id
+            WHERE pp.account_id = @account AND pl2.save_progress = 1
+              AND ps.parent_id IS NOT NULL
+         )
+         SELECT s.parent_id AS show_id, m.library_id,
                 MAX((SELECT MAX(pl.played_at) FROM plays pl
                       WHERE pl.account_id = @account AND pl.media_id = m.id)) AS last_played_at
-           FROM media m
+           FROM played w
+           JOIN media m ON m.id = w.media_id
            JOIN libraries l ON l.id = m.library_id
            JOIN media_items mi ON mi.media_id = m.id
            JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
@@ -973,15 +993,7 @@ export class MediaRepository {
           WHERE l.save_progress = 1
             AND (@libraryId IS NULL OR m.library_id = @libraryId)
             AND ${fileWatched('m')}
-            AND NOT EXISTS (
-              SELECT 1 FROM playback_progress pp
-                JOIN media_items pmi ON pmi.media_id = pp.media_id
-                JOIN shown_items pe ON pe.id = pmi.item_id AND pe.type = 'episode'
-                JOIN shown_items ps ON ps.id = pe.parent_id
-                JOIN media pm ON pm.id = pp.media_id
-                JOIN libraries pl2 ON pl2.id = pm.library_id
-               WHERE pp.account_id = @account AND pl2.save_progress = 1
-                 AND ps.parent_id = s.parent_id)
+            AND s.parent_id NOT IN (SELECT show_id FROM watching)
           GROUP BY s.parent_id, m.library_id`,
       )
       .all({ libraryId, account })

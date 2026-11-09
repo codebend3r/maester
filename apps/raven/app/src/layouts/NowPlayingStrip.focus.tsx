@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, type TVRemoteEvent, View, useTVEventHandler } fr
 
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
-import { useAskedAgain } from '@/layouts/focus'
+import { useReturnAsks } from '@/layouts/focus'
 import { frontRouteKeyOf } from '@/layouts/frontRoute'
 import { Icon } from '@raven/native'
 import { MUSIC_COPY } from '@/layouts/copy'
@@ -141,11 +141,9 @@ export const NowPlayingStrip = ({
   const { canFocus, front } = useStripFocus()
   // The strip is gone while Now Playing is in front, so it is drawn afresh on the way back.
   useEffect(() => {
-    if (front !== null && takeOpener({ screen: front, card: STRIP_PLACE })) {
-      requestTVFocus(view.current)
-    }
+    if (front !== null) takeOpener({ screen: front, card: STRIP_PLACE })
   }, [front])
-  useAskedAgain({ screen: front, card: STRIP_PLACE, view })
+  useReturnAsks({ screen: front, card: STRIP_PLACE, view })
   // Music started: the remote comes down to the strip, to pause or skip at once.
   const startCount = useMusicStarts((starts) => starts.started)
   const met = useMusicStarts((starts) => starts.met)
@@ -173,7 +171,7 @@ export const NowPlayingStrip = ({
         accessibilityRole="button"
         focusable={canFocus}
         onPress={() => {
-          if (front !== null) rememberOpener({ screen: front, card: STRIP_PLACE })
+          if (front !== null) rememberOpener({ screen: front, card: STRIP_PLACE, shelf: null })
           onOpen()
         }}
         style={({ focused }) => [styles.stripMain, focused && music.focused]}

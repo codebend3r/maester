@@ -36,6 +36,8 @@ import {
 
 import {
   CARD_SHAPES,
+  CARD_SUBJECTS,
+  isAllWatched,
   type CardShape,
   type Picture,
   type Pictures,
@@ -377,6 +379,8 @@ export const showPage = ({ details, ...pictures }: ShowPageProps): ItemPage =>
         headersFor: pictures.headersFor,
       }),
       progress: 0,
+      subject: { kind: CARD_SUBJECTS.item, itemId: season.id },
+      isWatched: isAllWatched({ watched: season.watchedCount, total: season.episodeCount }),
       target: itemTarget(season.id),
     })),
     ...pictures,
@@ -428,6 +432,10 @@ export const seasonPage = ({ season, show, ...pictures }: SeasonPageProps): Item
           headersFor: pictures.headersFor,
         }),
         progress: episode.primary === null ? 0 : progressOf(episode.primary),
+        subject:
+          episode.primary === null
+            ? null
+            : { kind: CARD_SUBJECTS.video, mediaId: episode.primary.id },
         target: {
           kind: ROUTE_TARGETS.item,
           itemId: episode.id,

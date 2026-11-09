@@ -482,11 +482,11 @@ describe('Player on Android TV', () => {
     expect(mockBack).not.toHaveBeenCalled()
   })
 
-  it("heads an episode as the web's player does: its name and heart, its season and number, and what plays next in the corner", async () => {
+  it("heads an episode as the web's player does: its name, its season and number, and what plays next in the corner, with no heart", async () => {
     await playing({ id: GOOD_NEWS_MP4.id })
     expect(await screen.findByText(GOOD_NEWS_MP4.item?.title ?? '')).toBeTruthy()
     expect(screen.getByText(/^S01 · E01/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: PLAYER_COPY.favourite })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Favourite' })).toBeNull()
     expect(await screen.findByText(/S01 · E02 · Half Loop$/)).toBeTruthy()
     expect(screen.getByText(PLAYER_COPY.upNext)).toBeTruthy()
   })
@@ -552,10 +552,13 @@ describe('Player on Android TV', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull())
   })
 
-  it('says the time of day and how the video plays in the top right', async () => {
+  it('says the time of day on one line, and how the video plays, in the top right', async () => {
     await playing({ id: BUSBOYS_UNSUBTITLED.id })
     const corner = screen.getByLabelText(new RegExp(`, ${PLAYBACK_MODE_NAMES.direct}$`, 'u'))
     expect(corner.props.accessibilityLabel).toMatch(/^\d{1,2}:\d{2}/u)
+    const clock = within(corner).getByText(/^\d{1,2}:\d{2}/u)
+    expect(clock.props.numberOfLines).toBe(1)
+    expect(StyleSheet.flatten(corner.props.style)?.flexShrink).toBe(0)
   })
 
   /** What the middle of the picture says now, as it is read out. */

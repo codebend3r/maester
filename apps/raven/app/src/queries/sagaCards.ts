@@ -41,6 +41,8 @@ const sagaCard = ({ saga, libraryId, api, headersFor }: SagaCardProps): ShelfCar
     shape: CARD_SHAPES.poster,
     picture: pictureAt({ uri, headersFor }),
     progress: 0,
+    subject: null,
+    isWatched: false,
     target: { kind: ROUTE_TARGETS.saga, libraryId, sagaId: saga.tmdbId },
   }
 }

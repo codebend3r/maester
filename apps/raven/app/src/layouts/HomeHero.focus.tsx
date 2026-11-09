@@ -13,8 +13,8 @@ import { Animated, Easing, Image, Pressable, StyleSheet, View } from 'react-nati
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 import { FocusBand } from '@/layouts/FocusBand'
-import { FOCUS_FRONT } from '@/layouts/focusFront'
-import { useFocusOnMount, useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
+import { useFocusOnMount, useOpenerFocus, useOpeningFocus, useShelfBand } from '@/layouts/focus'
+import { HOME_BANDS } from '@/stores/shelfBands'
 import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import {
@@ -290,7 +290,7 @@ const HeroButton = ({
   onPress,
 }: HeroButtonProps) => {
   const view = useRef<ComponentRef<typeof Pressable>>(null)
-  const { remember } = useOpenerFocus({ place, view })
+  const { remember } = useOpenerFocus({ place, shelf: HOME_BANDS.hero, view })
   const { settle } = useOpeningFocus()
   const styles = useStyles()
   const toneStyles = useToneStyles()
@@ -353,6 +353,7 @@ const HomeHero = ({ slides, onOpen, isPreferred }: HomeHeroProps) => {
   const isReduced = useReduceMotion((state) => state.isReduced)
   const isInFront = useIsFocused()
   const { isOpening } = useOpeningFocus()
+  const band = useShelfBand(HOME_BANDS.hero)
   const styles = useStyles()
   const at = turn.at % Math.max(count, 1)
   const isHeld = isReduced || isFocusedIn || !isInFront || count < 2
@@ -374,7 +375,7 @@ const HomeHero = ({ slides, onOpen, isPreferred }: HomeHeroProps) => {
   const focus = { onFocused: () => setFocusedIn(true), onBlurred: () => setFocusedIn(false) }
 
   return (
-    <View accessibilityLabel={HERO_COPY.featured} style={styles.hero}>
+    <View accessibilityLabel={HERO_COPY.featured} onLayout={band.onLayout} style={styles.hero}>
       <Wash slides={slides} turn={{ at, from: turn.from }} />
       <View style={styles.column}>
         <Words key={slide.key} slide={slide} />
@@ -496,7 +497,7 @@ const useStyles = themedStyles((colours) =>
       borderRadius: TV_SIZES.radius,
       borderWidth: TV_SIZES.tvFocusRing,
     },
-    focusedButton: { ...FOCUS_FRONT, borderColor: colours.text },
+    focusedButton: { borderColor: colours.text },
     buttonLabel: { fontSize: TV_SIZES.textLg, fontWeight: 'bold' },
     counter: { color: colours.muted, fontSize: TV_SIZES.textLg, paddingLeft: TV_SIZES.space1 },
     fan: { width: FAN_WIDTH, height: FAN_HEIGHT, alignItems: 'center' },
