@@ -13,7 +13,7 @@ import {
   type SortDirection,
   musicListQuery,
 } from '@raven/core'
-import { Button } from '@raven/ui'
+import { Button, useToasts } from '@raven/ui'
 import { type Search, useAudioQueue } from '@raven/ui/headless'
 import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -236,16 +236,21 @@ export const UnmatchedAlbumsSection = ({ library }: UnmatchedAlbumsSectionProps)
     albums: unmatched,
     thisYear,
   })
+  const showToast = useToasts((state) => state.show)
+  // Each outcome arrives as a notification; the list follows the library's events as albums change.
   const smartMatch = useMutation({
-    mutationFn: () => api.matchLibrary(library.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: list.queryKey }),
+    mutationFn: () => api.smartMatchAlbums(library.id),
+    onSuccess: ({ albums: count }) => {
+      showToast(LIBRARY_COPY.smartMatchStarted(count))
+      return queryClient.invalidateQueries({ queryKey: list.queryKey })
+    },
   })
   return (
     <div ref={cards} className={scale ? `${styles.section} ${styles.withJump}` : styles.section}>
       <div className={styles.playlistsToolbar}>
         <AdminOnly>
           <Button
-            icon="search"
+            icon="wand"
             disabled={smartMatch.isPending || unmatched.length === 0}
             onClick={() => smartMatch.mutate()}
           >

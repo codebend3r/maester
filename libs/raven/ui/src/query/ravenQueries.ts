@@ -527,6 +527,12 @@ export const ravenQueriesFor = (api: ApiClient) => {
       queryFn: () => api.listBugReports(),
     }),
 
+    /** The account's notifications, newest first: its own and no one else's. */
+    notificationsQuery: queryOptions({
+      queryKey: queryKeys.notifications,
+      queryFn: () => api.listNotifications(),
+    }),
+
     metadataHealthQuery: queryOptions({
       queryKey: queryKeys.metadataHealth,
       queryFn: () => api.getMetadataHealth(),

@@ -183,6 +183,8 @@ export const queryKeys = {
   liveStreams: ['streams'],
   /** What viewers reported from the player, for the admin. */
   bugReports: ['reports'],
+  /** The account's own notifications: every toast its screens showed. */
+  notifications: ['notifications'],
   displaySettings: ['settings', 'display'],
   /** Remote Access's settings and what the outside check found, for the owner. */
   remoteAccess: ['remote-access'],

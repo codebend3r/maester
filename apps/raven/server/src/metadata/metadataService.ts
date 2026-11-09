@@ -508,7 +508,7 @@ export class MetadataService implements OnApplicationBootstrap {
     const type = kind == null ? null : matchTypeFor(kind)
     // A music library's albums go to MusicBrainz; `type` is null for one, so TMDB is left alone.
     if (kind != null && matcherFor(kind)?.by === MATCH_SOURCES.musicBrainz) {
-      await this.albums.matchLibrary(libraryId)
+      await this.albums.matchLibrary({ libraryId })
     }
     if (library != null && kind != null && type != null && this.tmdb.enabled) {
       this.tmdb.newPass()

@@ -1,17 +1,8 @@
-import type { Anthropic } from '@anthropic-ai/sdk'
 import { Inject, Injectable, Logger } from '@nestjs/common'
-import {
-  type AlbumMatchCandidate,
-  CONFIDENCE_STRONG,
-  MATCH_STATES,
-  foldTitle,
-  isRecord,
-  isString,
-} from '@raven/core'
-import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { type AlbumMatchCandidate, MATCH_STATES } from '@raven/core'
 import { ServerEvents } from '@/events/serverEvents'
-import { AiClient } from '@/metadata/aiClient'
 import { PassGuard } from '@/metadata/passGuard'
+import { AlbumClaude } from '@/music/albumClaude'
 import { artistToMatch } from '@/music/filing'
 import {
   MUSICBRAINZ_ERROR_KINDS,
@@ -20,249 +11,176 @@ import {
   type Release,
 } from '@/music/musicBrainzClient'
 import { type AlbumToMatch, MusicRepository } from '@/music/musicRepository'
+import {
+  type Scored,
+  type SearchTerms,
+  candidatesOf,
+  isSure,
+  mergeScored,
+  scoredOf,
+  searchesFor,
+} from '@/music/releaseScoring'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 import { ScanControl } from '@/scanner/scanControl'
-
-/** What each fact is worth when a release agrees with the album, out of 100. */
-const WEIGHTS = {
-  title: 45,
-  artist: 30,
-  year: 10,
-  yearNear: 5,
-  trackCount: 10,
-  official: 5,
-} as const
-
-type CreditsArtistProps = { album: AlbumToMatch; release: Release }
-
-/** Whether the release credits the album's artist, alone or among others. */
-const creditsArtist = ({ album, release }: CreditsArtistProps): boolean => {
-  const wanted = artistToMatch(album)
-  if (wanted === null) return false
-  const folded = foldTitle(wanted)
-  return (
-    foldTitle(release.artist) === folded ||
-    release.artists.some((artist) => foldTitle(artist.name) === folded)
-  )
-}
-
-/**
- * How sure raven is that `release` is the album, 0 to 100: the title and
- * the artist count most, then the year (one either side half counts, as
- * releases differ by country) and the track count, and an official release
- * edges out a bootleg of the same name. A compilation has no artist to
- * agree on, so its artist's share rides on the title. Every pressing of
- * one release scores alike; the pass takes MusicBrainz's first, since they
- * are the same album.
- */
-type ScoreReleaseProps = { album: AlbumToMatch; release: Release }
-
-/** The year's share for releases `apart` years from the album, nothing when either has no year. */
-const yearPoints = (apart: number | null): number => {
-  if (apart === 0) return WEIGHTS.year
-  return apart === 1 ? WEIGHTS.yearNear : 0
-}
-
-export const scoreRelease = ({ album, release }: ScoreReleaseProps): number => {
-  const isSameTitle = foldTitle(release.title) === foldTitle(album.title)
-  const isSameArtist =
-    artistToMatch(album) === null ? isSameTitle : creditsArtist({ album, release })
-  const apart =
-    album.year === null || release.year === null ? null : Math.abs(album.year - release.year)
-  const score =
-    (isSameTitle ? WEIGHTS.title : 0) +
-    (isSameArtist ? WEIGHTS.artist : 0) +
-    yearPoints(apart) +
-    (release.trackCount !== null && release.trackCount === album.trackCount
-      ? WEIGHTS.trackCount
-      : 0) +
-    (release.isOfficial ? WEIGHTS.official : 0)
-  return Math.min(100, score)
-}
-
-type Scored = { release: Release; confidence: number }
-
-type ScoredOfProps = { album: AlbumToMatch; releases: readonly Release[] }
-
-/** The releases scored against the album, best first; MusicBrainz's own relevance breaks a tie. */
-const scoredOf = ({ album, releases }: ScoredOfProps): Scored[] =>
-  releases
-    .map((release) => ({ release, confidence: scoreRelease({ album, release }) }))
-    .toSorted((a, b) => b.confidence - a.confidence || b.release.score - a.release.score)
-
-type ToCandidateProps = Scored
-
-const toCandidate = ({ release, confidence }: ToCandidateProps): AlbumMatchCandidate => ({
-  mbid: release.mbid,
-  title: release.title,
-  artist: release.artist,
-  year: release.year,
-  trackCount: release.trackCount,
-  type: release.type,
-  country: release.country,
-  confidence,
-})
-
-type CandidatesOfProps = ScoredOfProps
-
-/** Releases as Fix match offers them: scored against the album, best first. */
-export const candidatesOf = (props: CandidatesOfProps): AlbumMatchCandidate[] =>
-  scoredOf(props).map(toCandidate)
 
 /** Whether a MusicBrainz failure means the rest of a pass should wait for the next one. */
 const isMusicBrainzAway = (error: unknown): boolean =>
   error instanceof MusicBrainzError && error.kind === MUSICBRAINZ_ERROR_KINDS.unavailable
 
-type AlbumMatchingSearchScoredProps = {
+/** The most track titles Claude is shown of an album, enough to know it by. */
+const AI_TRACK_TITLES_MOST = 40
+
+type AlbumMatchingSearchProps = {
   album: AlbumToMatch
   /** What to search for instead of the album's own title and artist. */
   query?: string
 }
 
-type AlbumMatchingSearchProps = AlbumMatchingSearchScoredProps
-
 type AlbumMatchingFixProps = { id: number; mbid: string | null }
 
-type AiAlbumChoice = { mbid: string; reason: string }
+type AlbumMatchingSearchInTurnProps = { album: AlbumToMatch; searches: readonly SearchTerms[] }
 
-const AI_ALBUM_TOOL = 'choose_album' as const
-const AI_ALBUM_MAX_TOKENS = 1200
-const AI_ALBUM_PROMPT = `You clean up unmatched albums in a private music library. Infer the album from its existing album title, album artist, year, track count, and the MusicBrainz candidates raven found. Choose only when one candidate is clearly the same release despite damaged tags, spelling, punctuation, a featured artist, or a file naming error. Return null rather than guessing. A chosen MusicBrainz id may cause duplicate rows for the same release to merge automatically.`
+/** How an album was matched, or that it was not. */
+export const ALBUM_OUTCOMES = { matched: 'matched', unmatched: 'unmatched' } as const
 
-const AI_ALBUM_TOOLS: Anthropic.Tool[] = [
-  {
-    name: AI_ALBUM_TOOL,
-    description: 'Choose the one offered MusicBrainz release that is clearly this album, or null.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        mbid: {
-          anyOf: [{ type: 'string' }, { type: 'null' }],
-          description:
-            'An offered MusicBrainz release id, or null when the evidence is not enough.',
-        },
-        reason: { type: 'string', description: 'One short sentence explaining the evidence.' },
-      },
-      required: ['mbid', 'reason'],
-      additionalProperties: false,
-    },
-  },
-]
+/** What one album's search came to. */
+export type AlbumOutcome =
+  | {
+      kind: typeof ALBUM_OUTCOMES.matched
+      album: AlbumToMatch
+      release: Release
+      /** Whether Claude found or chose the release, as no search was sure of it. */
+      isByClaude: boolean
+    }
+  | { kind: typeof ALBUM_OUTCOMES.unmatched; album: AlbumToMatch }
 
-type AiChoiceOfProps = { input: unknown; offered: ReadonlySet<string> }
-type AlbumMatchingAiReleaseProps = { album: AlbumToMatch; scored: readonly Scored[] }
+/** The release an album's searches settled on, and whether Claude had a hand in it. */
+type Settled = { chosen: Scored; isByClaude: boolean }
 
-/** A Claude choice only when it names one of the releases raven offered. */
-export const aiChoiceOf = ({ input, offered }: AiChoiceOfProps): AiAlbumChoice | null => {
-  if (!isRecord(input) || !isString(input.mbid) || !isString(input.reason)) return null
-  return offered.has(input.mbid) ? { mbid: input.mbid, reason: input.reason.slice(0, 500) } : null
+/** Where an album's searches ended: the release settled on, if any, and the best found, for how close they came. */
+type SettleResult = { settled: Settled | null; best?: Scored }
+
+/**
+ * How a pass went: of the `total` albums pending, how many it `searched`
+ * and how many of those it `matched`. The rest failed or met MusicBrainz
+ * away, and stay pending for the next pass.
+ */
+export type MatchTally = { matched: number; searched: number; total: number }
+
+type AlbumMatchingMatchLibraryProps = {
+  libraryId: number
+  /** Told of each album as it is matched or not. */
+  onOutcome?: (outcome: AlbumOutcome) => void
 }
+
+/** A pass with nothing to search. */
+const NOTHING_PENDING: MatchTally = { matched: 0, searched: 0, total: 0 }
 
 /**
  * Matches a music library's albums to MusicBrainz releases. An album whose
  * tags carry a release id is matched already; the rest are searched by
- * album artist and title, and only a sure answer (`CONFIDENCE_STRONG`) is
- * taken, as the films' matching takes only a sure one. A matched album
- * with no cover of its own shows the Cover Art Archive's, by the release
- * id, fetched on first use.
+ * album artist and title, then by the title with its edition taken off and
+ * by what the album's folder names (`searchesFor`), and only a sure answer
+ * (`CONFIDENCE_STRONG`) is taken, as the films' matching takes only a sure
+ * one. With an AI key, Claude picks among the releases found when none is
+ * sure, and suggests a search when that came to nothing (`AlbumClaude`). A
+ * matched album with no cover of its own shows the Cover Art Archive's, by
+ * the release id, fetched on first use.
  */
 @Injectable()
 export class AlbumMatching {
   private readonly logger = new Logger(AlbumMatching.name)
 
   constructor(
-    @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(MusicBrainzClient) private readonly musicBrainz: MusicBrainzClient,
     @Inject(MusicRepository) private readonly music: MusicRepository,
-    @Inject(AiClient) private readonly ai: AiClient,
+    @Inject(AlbumClaude) private readonly claude: AlbumClaude,
     @Inject(ServerEvents) private readonly events: ServerEvents,
     @Inject(ScanControl) private readonly scans: ScanControl,
   ) {}
 
-  /** MusicBrainz's releases for an album, scored against it, best first. */
-  private async searchScored({ album, query }: AlbumMatchingSearchScoredProps): Promise<Scored[]> {
+  /** MusicBrainz's releases for an album's Fix match, scored against it, best first. */
+  async search({ album, query }: AlbumMatchingSearchProps): Promise<AlbumMatchCandidate[]> {
     const releases = await this.musicBrainz.searchReleases(
       query === undefined
         ? { album: album.title, artist: artistToMatch(album) }
         : { album: query, artist: null },
     )
-    return scoredOf({ album, releases })
-  }
-
-  /** MusicBrainz's releases for an album's Fix match, scored against it, best first. */
-  async search(props: AlbumMatchingSearchProps): Promise<AlbumMatchCandidate[]> {
-    return (await this.searchScored(props)).map(toCandidate)
+    return candidatesOf({ album, releases })
   }
 
   /**
-   * One album: the search's best release when it is sure, which holds
-   * everything the album takes from MusicBrainz, so no lookup follows; else
-   * unmatched, with how close the best came. Whether it was sure.
+   * Runs `searches` one after another, as MusicBrainz takes one request a
+   * second, until one finds a release it is sure of; every release found,
+   * best first.
    */
-  private async aiRelease({ album, scored }: AlbumMatchingAiReleaseProps): Promise<Scored | null> {
-    if (scored.length === 0 || !this.ai.take()) return null
-    const offered = new Set(scored.map(({ release }) => release.mbid))
-    const response = await this.ai.send({
-      model: this.config.aiMatchModel,
-      max_tokens: AI_ALBUM_MAX_TOKENS,
-      thinking: { type: 'adaptive' },
-      output_config: { effort: this.config.aiMatchEffort },
-      system: AI_ALBUM_PROMPT,
-      tools: AI_ALBUM_TOOLS,
-      tool_choice: { type: 'tool', name: AI_ALBUM_TOOL },
-      messages: [
-        {
-          role: 'user',
-          content: JSON.stringify({
-            album,
-            candidates: scored.map(({ release, confidence }) => ({
-              mbid: release.mbid,
-              title: release.title,
-              artist: release.artist,
-              year: release.year,
-              trackCount: release.trackCount,
-              country: release.country,
-              isOfficial: release.isOfficial,
-              confidence,
-            })),
-          }),
-        },
-      ],
-    })
-    const choice = response.content.flatMap((block) =>
-      block.type === 'tool_use' && block.name === AI_ALBUM_TOOL ? [block] : [],
-    )[0]
-    if (!choice) return null
-    const picked = aiChoiceOf({ input: choice.input, offered })
-    return picked === null
-      ? null
-      : (scored.find(({ release }) => release.mbid === picked.mbid) ?? null)
+  private async searchInTurn({
+    album,
+    searches,
+  }: AlbumMatchingSearchInTurnProps): Promise<Scored[]> {
+    return searches.reduce<Promise<Scored[]>>(async (sofar, terms) => {
+      const found = await sofar
+      if (isSure(found[0])) return found
+      const releases = await this.musicBrainz.searchReleases(terms)
+      return mergeScored({ found, more: scoredOf({ album, releases }) })
+    }, Promise.resolve([]))
   }
 
-  private async matchOne(album: AlbumToMatch): Promise<boolean> {
-    const scored = await this.searchScored({ album })
-    const [best] = scored
-    const sure = best !== undefined && best.confidence >= CONFIDENCE_STRONG ? best : null
-    const chosen = sure ?? (await this.aiRelease({ album, scored }))
+  /** What a search Claude suggests finds: a sure release, or Claude's pick of what it found. */
+  private async bySuggestion(album: AlbumToMatch): Promise<Scored | null> {
+    const tracks = this.music.trackTitlesOf({ id: album.id, most: AI_TRACK_TITLES_MOST })
+    const suggested = await this.claude.suggest({ album, tracks })
+    if (suggested === null) return null
+    const found = await this.searchInTurn({ album, searches: [suggested] })
+    return isSure(found[0]) ? found[0] : this.claude.pick({ album, scored: found })
+  }
+
+  /**
+   * The release an album is, and the best its searches found for how close
+   * they came: the first sure release they find; else Claude's pick of them;
+   * else what a search Claude suggests comes to.
+   */
+  private async settle(album: AlbumToMatch): Promise<SettleResult> {
+    const found = await this.searchInTurn({ album, searches: searchesFor(album) })
+    const [best] = found
+    if (isSure(best)) return { settled: { chosen: best, isByClaude: false }, best }
+    const chosen =
+      (await this.claude.pick({ album, scored: found })) ?? (await this.bySuggestion(album))
+    return { settled: chosen === null ? null : { chosen, isByClaude: true }, best }
+  }
+
+  /** One album searched and its answer saved: the release it is, or unmatched with how close the best came. */
+  private async matchOne(album: AlbumToMatch): Promise<AlbumOutcome> {
+    const { settled, best } = await this.settle(album)
     this.music.saveMatch({
       id: album.id,
-      release: chosen?.release ?? null,
-      match: chosen === null ? MATCH_STATES.unmatched : MATCH_STATES.matched,
-      confidence: chosen?.confidence ?? best?.confidence ?? 0,
+      release: settled?.chosen.release ?? null,
+      match: settled === null ? MATCH_STATES.unmatched : MATCH_STATES.matched,
+      confidence: settled?.chosen.confidence ?? best?.confidence ?? 0,
     })
-    return chosen !== null
+    if (settled === null) return { kind: ALBUM_OUTCOMES.unmatched, album }
+    return {
+      kind: ALBUM_OUTCOMES.matched,
+      album,
+      release: settled.chosen.release,
+      isByClaude: settled.isByClaude,
+    }
   }
 
   /**
    * Searches for each of the library's albums still pending, one at a
-   * time, since MusicBrainz takes one request a second. MusicBrainz going
-   * away ends the pass with what it matched by then; the rest stay pending
-   * for the next scan.
+   * time, since MusicBrainz takes one request a second, and fills in the
+   * matched albums MusicBrainz has not been read for. MusicBrainz going away
+   * ends the pass with what it matched by then; the rest stay pending for
+   * the next one.
    */
-  async matchLibrary(libraryId: number): Promise<void> {
+  private async matchPending({
+    libraryId,
+    onOutcome = () => undefined,
+  }: AlbumMatchingMatchLibraryProps): Promise<MatchTally> {
     const pending = this.music.albumsToMatch(libraryId)
     const enrichment = this.music.albumsToEnrich(libraryId)
-    if (pending.length === 0 && enrichment.length === 0) return
+    if (pending.length === 0 && enrichment.length === 0) return NOTHING_PENDING
     const guard = new PassGuard({
       logger: this.logger,
       failed: 'Could not match an album',
@@ -273,14 +191,14 @@ export class AlbumMatching {
     const outcomes = await mapWithConcurrency({
       items: pending,
       limit: 1,
-      fn: async (album) => {
-        const done = { isMatched: false }
-        await guard.run(async () => {
-          done.isMatched = await this.matchOne(album)
-        })
-        return done.isMatched
-      },
+      fn: (album) =>
+        guard.run(async () => {
+          const outcome = await this.matchOne(album)
+          onOutcome(outcome)
+          return outcome
+        }),
     })
+    const searched = outcomes.flatMap((outcome) => (outcome === undefined ? [] : [outcome]))
     await mapWithConcurrency({
       items: enrichment,
       limit: 1,
@@ -291,12 +209,23 @@ export class AlbumMatching {
         }),
     })
     guard.reportStop()
-    const matched = outcomes.filter(Boolean).length
-    const merged = this.music.mergeAlbums(libraryId)
-    this.events.libraryChanged(libraryId)
+    return {
+      matched: searched.filter(({ kind }) => kind === ALBUM_OUTCOMES.matched).length,
+      searched: searched.length,
+      total: pending.length,
+    }
+  }
+
+  /** A pass over the library's pending albums, then the duplicates folded; how it went. */
+  async matchLibrary(props: AlbumMatchingMatchLibraryProps): Promise<MatchTally> {
+    const tally = await this.matchPending(props)
+    if (tally.total === 0) return tally
+    const merged = this.music.mergeAlbums(props.libraryId)
+    this.events.libraryChanged(props.libraryId)
     this.logger.log(
-      `Matched ${matched} of ${pending.length} albums of library ${libraryId}; merged ${merged} duplicates`,
+      `Matched ${tally.matched} of ${tally.total} albums of library ${props.libraryId}; merged ${merged} duplicates`,
     )
+    return tally
   }
 
   /** The albums no release was found for are searched again on the next pass. */

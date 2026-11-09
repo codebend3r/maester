@@ -24,7 +24,8 @@ const stepsOf = (rows: readonly PlanRow[]): PlanStep[] => {
  * `ANALYZE` lists it. The viewing tables' counts are as they read under
  * one account, the shape a server has the day it moves to keying them by
  * account. `play_history`'s are made up, not taken: a hundred accounts with
- * 1,200 entries each, a third of them videos, since no real server has kept one yet.
+ * 1,200 entries each, a third of them videos, since no real server has kept one yet;
+ * `notifications`' too, a hundred accounts with the 1,000 each keeps.
  * To take them again, open a copy with the server (or run `ANALYZE` on it),
  * then `SELECT tbl, idx, stat FROM sqlite_stat1 ORDER BY tbl, idx`.
  * `queryPlans.test.ts` fails when the schema gains or loses an index.
@@ -60,6 +61,7 @@ export const PRODUCTION_STATISTICS = [
   ['people', 'sqlite_autoindex_people_1', '171416 1'],
   ['playback_progress', 'playback_progress', '11 11 1'],
   ['playback_progress', 'playback_progress_media', '11 1'],
+  ['notifications', 'notifications_account', '100000 1000 1'],
   ['play_history', 'play_history_account', '120000 1200'],
   ['play_history', 'play_history_media', '120000 30'],
   ['play_history', 'play_history_play', '40000 1'],

@@ -30,6 +30,7 @@ import {
   ITEM_TYPES,
   LIBRARY_KINDS,
   type Library,
+  type SmartMatchStarted,
   type LibraryCounts,
   type LibraryInput,
   MATCH_SOURCES,
@@ -55,6 +56,7 @@ import { Management } from '@/auth/management'
 import { type LibraryRecord, LibrariesRepository, samePaths } from '@/libraries/librariesRepository'
 import { RatingsRefresh } from '@/libraries/ratingsRefresh'
 import { MarkerDetection } from '@/markers/markerDetection'
+import { SmartMatch } from '@/music/smartMatch'
 import { MusicRepository } from '@/music/musicRepository'
 import { ServerEvents } from '@/events/serverEvents'
 import { PrivateBy, Public } from '@/lock/lockGuard'
@@ -145,6 +147,7 @@ export class LibrariesController {
     @Inject(MarkerDetection) private readonly markers: MarkerDetection,
     @Inject(MusicRepository) private readonly music: MusicRepository,
     @Inject(ServerEvents) private readonly events: ServerEvents,
+    @Inject(SmartMatch) private readonly smartMatch: SmartMatch,
   ) {}
 
   /** A library can only be locked behind a PIN that can open it again. */
@@ -447,6 +450,33 @@ export class LibrariesController {
     const merged = this.music.mergeAlbums(id)
     if (merged > 0) this.events.libraryChanged(id)
     return { merged }
+  }
+
+  /**
+   * Smart match, in the background: the library's unmatched albums whose
+   * tracks belong to another album by their folder are folded into it, and
+   * the rest searched again harder. The caller's account is told of each
+   * outcome as a notification. How many albums it looks at.
+   */
+  @AdminOnly()
+  @Post(':id/albums/smart-match')
+  @HttpCode(200)
+  smartMatchAlbums(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): SmartMatchStarted {
+    const record = this.find(id)
+    if (record.settings.kind !== LIBRARY_KINDS.music) {
+      throw new BadRequestException('Only a library of music has albums to match.')
+    }
+    const account = this.accounts.keyOf({ request })
+    // Counted first: the queue may start the match at once, which puts the albums back to pending.
+    const albums = this.music.unmatchedCount(id)
+    this.metadata.schedule({
+      key: `smart-match:${id}`,
+      task: () => this.smartMatch.run({ libraryId: id, account }),
+    })
+    return { albums }
   }
 
   /**

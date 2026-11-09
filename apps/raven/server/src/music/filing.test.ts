@@ -1,7 +1,7 @@
 import { ALBUM_TYPES } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import type { AudioTags } from '@/music/audioReader'
-import { FALLBACK_ARTISTS, albumTypeOf, filingOf, nameKeyOf } from '@/music/filing'
+import { FALLBACK_ARTISTS, albumTypeOf, discOfPath, filingOf, nameKeyOf } from '@/music/filing'
 
 const NO_TAGS: AudioTags = {
   title: null,
@@ -128,6 +128,16 @@ describe('filingOf', () => {
       tags: { ...NO_TAGS, album: 'Album', releaseMbid: 'release-1' },
     })
     expect(deluxe.albumKey).not.toBe(files[0]?.albumKey)
+  })
+
+  it('reads a store\'s "Digital Media 01" folders as discs of the album above them', () => {
+    const discs = ['Digital Media 01', 'Digital Media 02'].map((folder) =>
+      filingOf({ path: `/music/Queen/Live at Wembley/${folder}/01.flac`, tags: NO_TAGS }),
+    )
+    expect(new Set(discs.map(({ albumKey }) => albumKey))).toEqual(
+      new Set(['folder:/music/Queen/Live at Wembley']),
+    )
+    expect(discOfPath('/music/Queen/Live at Wembley/Digital Media 02/01.flac')).toBe(2)
   })
 
   it('pairs ids with names only when the tags list as many of each', () => {

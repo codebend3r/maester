@@ -18,22 +18,41 @@
   gap: var(--space-2);
   align-items: center;
   width: min(var(--measure), 100%);
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
-  border: 1px solid var(--color-line);
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-inline-start: var(--space-0) solid var(--toast-edge);
   border-radius: var(--radius-lg);
   background: var(--color-canopy);
   box-shadow: var(--shadow-popover);
   color: var(--color-bark);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-md);
   line-height: var(--line-body);
   pointer-events: auto;
+}
+
+// Each tone's colour, for its edge and its mark.
+.success {
+  --toast-edge: var(--color-fern);
+}
+
+.info {
+  --toast-edge: var(--color-amber);
+}
+
+.failure {
+  --toast-edge: var(--color-leaf-bright);
+}
+
+.mark {
+  display: grid;
+  color: var(--toast-edge);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   // The fade lasts TOAST_FADE_MS, so the toast is out of sight as it leaves the list.
   .toast {
     animation: toast-in 200ms var(--ease-out);
-    transition: opacity 300ms var(--ease-out);
+    transition: opacity 600ms var(--ease-out);
   }
 }
 

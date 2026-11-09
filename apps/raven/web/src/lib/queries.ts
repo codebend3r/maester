@@ -56,6 +56,7 @@ export const {
   adminLockQuery,
   liveStreamsQuery,
   bugReportsQuery,
+  notificationsQuery,
   metadataHealthQuery,
   playbackSettingsQuery,
   displaySettingsQuery,

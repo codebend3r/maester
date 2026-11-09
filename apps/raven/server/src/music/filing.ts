@@ -75,8 +75,11 @@ const albumArtistsOf = ({
   return [{ name: basename(dirname(folder)) || FALLBACK_ARTISTS.unknown, mbid: null }]
 }
 
-/** Only explicit disc folder names collapse into their parent, never arbitrary numbered albums. */
-const DISC_FOLDER = /^(?:cd|disc|disk)[\s._-]*0*(\d+)(?:\s*[-:]\s*.+)?$/i
+/**
+ * Only explicit disc folder names collapse into their parent, never arbitrary
+ * numbered albums: "CD 1", "Disc 02", and the "Digital Media 01" some stores name them.
+ */
+const DISC_FOLDER = /^(?:cd|disc|disk|digital[\s._-]*media)[\s._-]*0*(\d+)(?:\s*[-:]\s*.+)?$/i
 
 export const albumFolderOf = (path: string): string => {
   const folder = dirname(path)

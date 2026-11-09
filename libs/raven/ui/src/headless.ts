@@ -60,6 +60,7 @@ export {
   afterMatch,
   afterMatchingPass,
   afterMusicFavourites,
+  afterNotification,
   afterPins,
   afterPlaylists,
   afterReconnect,

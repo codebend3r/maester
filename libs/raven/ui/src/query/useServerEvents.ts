@@ -1,9 +1,16 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query'
-import { type ApiClient, SERVER_EVENT_TYPES, type ServerEvent, parseServerEvent } from '@raven/core'
+import {
+  type ApiClient,
+  type Notification,
+  SERVER_EVENT_TYPES,
+  type ServerEvent,
+  parseServerEvent,
+} from '@raven/core'
 import { useEffect } from 'react'
 import {
   afterBingeEvent,
   afterLibraryEvent,
+  afterNotification,
   afterReconnect,
   afterWatched,
 } from '@/query/invalidate'
@@ -39,13 +46,17 @@ export type ServerEventSource = {
  */
 export const EVENTS_RETRY_MS = 5_000
 
+/** What a host does with a notification the server sent: shows it as a toast, already logged. */
+type OnNotification = (notification: Notification) => void
+
 type FollowProps = {
   queryClient: QueryClient
   event: ServerEvent
+  onNotification: OnNotification
 }
 
 /** Reads again what an event says changed. */
-const follow = ({ queryClient, event }: FollowProps): Promise<unknown> => {
+const follow = ({ queryClient, event, onNotification }: FollowProps): Promise<unknown> => {
   switch (event.type) {
     case SERVER_EVENT_TYPES.library:
       return afterLibraryEvent({ queryClient, libraryId: event.libraryId })
@@ -54,6 +65,10 @@ const follow = ({ queryClient, event }: FollowProps): Promise<unknown> => {
       return afterWatched(queryClient)
     case SERVER_EVENT_TYPES.binge:
       return afterBingeEvent(queryClient)
+    // Logged already by the server, so it shows as it is and joins the log on screen.
+    case SERVER_EVENT_TYPES.notification:
+      onNotification(event.notification)
+      return afterNotification(queryClient)
     default: {
       const unknown: never = event
       return Promise.resolve(unknown)
@@ -73,10 +88,14 @@ type AccessTokenChanges = (listener: (token: string | null) => void) => () => vo
 /** A host with no access token, whose stream rides cookies alone. */
 const NO_ACCESS_TOKEN: AccessTokenChanges = () => () => undefined
 
+/** A host that shows no toasts; the notification is still on the account's log. */
+const NO_TOASTS: OnNotification = () => undefined
+
 type ServerEventsForProps = {
   api: ApiClient
   openEvents: (url: string) => ServerEventSource
   onAccessTokenChange?: AccessTokenChanges
+  onNotification?: OnNotification
 }
 
 /**
@@ -89,6 +108,7 @@ export const serverEventsFor = ({
   api,
   openEvents,
   onAccessTokenChange = NO_ACCESS_TOKEN,
+  onNotification = NO_TOASTS,
 }: ServerEventsForProps) => {
   /**
    * Keeps the browsing pages in step with the server as it changes: a
@@ -119,7 +139,7 @@ export const serverEventsFor = ({
         source.addEventListener(SERVER_STREAM_EVENTS.message, ({ data }) => {
           const event = typeof data === 'string' ? parseServerEvent(data) : null
           // A read that fails shows on its own query.
-          if (event) follow({ queryClient, event }).catch(() => undefined)
+          if (event) follow({ queryClient, event, onNotification }).catch(() => undefined)
         })
         source.addEventListener(SERVER_STREAM_EVENTS.error, () => {
           connection.isDropped = true

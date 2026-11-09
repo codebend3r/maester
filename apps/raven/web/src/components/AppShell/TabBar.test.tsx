@@ -92,6 +92,7 @@ describe('TabBar', () => {
     expect(main && linksOf(main)).toEqual([
       ['Binge', '/binge'],
       ['Play history', '/history'],
+      ['Notifications', '/notifications'],
       ['Settings', '/settings'],
     ])
     expect(within(sheet()).getByRole('heading', { name: 'Manage' })).toBeInTheDocument()
@@ -104,6 +105,7 @@ describe('TabBar', () => {
     expect(within(sheet()).getAllByRole('link').map(iconOf)).toEqual([
       'popcorn',
       'history',
+      'bell',
       'settings',
       'settings',
       'playback',
@@ -116,6 +118,7 @@ describe('TabBar', () => {
     await userEvent.click(more())
     expect(linksOf(sheet())).toEqual([
       ['Play history', '/history'],
+      ['Notifications', '/notifications'],
       ['Settings', '/settings'],
       ['Admin', '/admin'],
       ['Streams', '/streams'],
@@ -129,6 +132,7 @@ describe('TabBar', () => {
     expect(within(sheet()).queryByRole('heading', { name: 'Manage' })).toBeNull()
     expect(linksOf(sheet())).toEqual([
       ['Play history', '/history'],
+      ['Notifications', '/notifications'],
       ['Settings', '/settings'],
     ])
   })
@@ -141,6 +145,7 @@ describe('TabBar', () => {
     const [main] = within(sheet()).getAllByRole('list')
     expect(main && linksOf(main)).toEqual([
       ['Play history', '/history'],
+      ['Notifications', '/notifications'],
       ['This Mac', DESKTOP_PATHS.local],
       ['Downloads', DESKTOP_PATHS.downloads],
       ['Settings', '/settings'],

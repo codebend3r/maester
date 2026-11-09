@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, jest } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
 import { act, waitFor } from '@testing-library/react'
-import { SERVER_EVENT_TYPES } from '@raven/core'
+import { NOTIFICATION_TONES, type Notification, SERVER_EVENT_TYPES } from '@raven/core'
 import { queryKeys } from '@/query/queryClient'
 import {
   EVENTS_RETRY_MS,
@@ -77,6 +77,7 @@ type SetUpProps = { tokens?: ReturnType<typeof fakeTokens> }
 const setUp = ({ tokens }: SetUpProps = {}) => {
   const { api } = recordingApi({ body: null })
   const opened: Array<ReturnType<typeof fakeSource>> = []
+  const notified: Notification[] = []
   const { useServerEvents } = serverEventsFor({
     api,
     openEvents: (url) => {
@@ -85,12 +86,13 @@ const setUp = ({ tokens }: SetUpProps = {}) => {
       return fake.source
     },
     onAccessTokenChange: tokens?.onAccessTokenChange,
+    onNotification: (notification) => notified.push(notification),
   })
   const client = new QueryClient()
   HELD.forEach((key) => client.setQueryData(key, []))
   const hook = renderQueryHook({ client, hook: () => useServerEvents() })
   const stale = () => HELD.filter((key) => client.getQueryState(key)?.isInvalidated ?? false)
-  return { api, hook, opened, stale }
+  return { api, hook, opened, stale, notified }
 }
 
 describe('useServerEvents', () => {
@@ -142,6 +144,32 @@ describe('useServerEvents', () => {
       data: JSON.stringify({ type: SERVER_EVENT_TYPES.binge }),
     })
     await waitFor(() => expect(stale()).toEqual([queryKeys.home]))
+  })
+
+  it('hands the host a notification the server sent, to show as a toast', async () => {
+    const { opened, notified } = setUp()
+    opened[0]!.emit({
+      type: SERVER_STREAM_EVENTS.message,
+      data: JSON.stringify({
+        type: SERVER_EVENT_TYPES.notification,
+        notification: {
+          id: 4,
+          message: 'Matched "Wonder (Deluxe)" to Shawn Mendes\'s "Wonder" (2020).',
+          tone: NOTIFICATION_TONES.success,
+          at: '2026-11-08T12:00:00.000Z',
+        },
+      }),
+    })
+    await waitFor(() =>
+      expect(notified).toEqual([
+        {
+          id: 4,
+          message: 'Matched "Wonder (Deluxe)" to Shawn Mendes\'s "Wonder" (2020).',
+          tone: NOTIFICATION_TONES.success,
+          at: '2026-11-08T12:00:00.000Z',
+        },
+      ]),
+    )
   })
 
   it('ignores a message that is not a server event', () => {

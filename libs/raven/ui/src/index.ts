@@ -14,10 +14,10 @@ export { useCanGoBack } from '@/lib/useCanGoBack'
 export { createProgressSaver } from '@/lib/progressSaver'
 export type { ProgressSaver } from '@/lib/progressSaver'
 export { Controls } from '@/components/Player/Controls'
-export { Toaster } from '@/components/Toaster/Toaster'
+export { NOTIFICATION_ICONS, Toaster } from '@/components/Toaster/Toaster'
 export { AudioHost } from '@/components/AudioHost/AudioHost'
 export { watchPageHide } from '@/components/Player/watchPageHide'
-export { useToasts } from '@/stores/toasts'
+export { type Toast, useToasts } from '@/stores/toasts'
 export {
   FactParts,
   FactText,

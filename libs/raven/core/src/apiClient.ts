@@ -8,6 +8,7 @@ import { lockCalls } from '@/apiClient/locks'
 import { matchingCalls } from '@/apiClient/matching'
 import { mediaCalls } from '@/apiClient/media'
 import { mixCalls } from '@/apiClient/mixes'
+import { notificationCalls } from '@/apiClient/notifications'
 import { musicCalls } from '@/apiClient/music'
 import { pictureCalls } from '@/apiClient/pictures'
 import { playlistCalls } from '@/apiClient/playlists'
@@ -85,5 +86,6 @@ export const createApiClient = ({
     ...remoteAccessCalls(transport),
     ...playbackCalls(transport),
     ...reportCalls(transport),
+    ...notificationCalls(transport),
   }
 }

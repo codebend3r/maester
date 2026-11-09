@@ -83,7 +83,9 @@ import { ScoresRepository } from '@/metadata/scoresRepository'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { AlbumCovers } from '@/music/albumCovers'
+import { AlbumClaude } from '@/music/albumClaude'
 import { AlbumMatching } from '@/music/albumMatching'
+import { SmartMatch } from '@/music/smartMatch'
 import { MusicBrainzClient } from '@/music/musicBrainzClient'
 import { LrclibClient } from '@/music/lrclibClient'
 import {
@@ -116,6 +118,9 @@ import { Filmographies } from '@/people/filmographies'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { PlaybackController } from '@/playback/playbackController'
 import { BugReportsController } from '@/reports/bugReportsController'
+import { Notices } from '@/notifications/notices'
+import { NotificationsController } from '@/notifications/notificationsController'
+import { NotificationsRepository } from '@/notifications/notificationsRepository'
 import { PlayHistoryController } from '@/history/playHistoryController'
 import { PlayHistoryRepository } from '@/history/playHistoryRepository'
 import { BugReportsRepository } from '@/reports/bugReportsRepository'
@@ -183,6 +188,7 @@ export const CONTROLLERS = [
   AdminController,
   StreamsController,
   BugReportsController,
+  NotificationsController,
   PlayHistoryController,
   AuthController,
 ] as const
@@ -314,7 +320,9 @@ export class AppModule {
         TranscodeCache,
         LoudnessJobs,
         LoudnessScan,
+        AlbumClaude,
         AlbumMatching,
+        SmartMatch,
         MatchFiles,
         AiDecisions,
         TmdbClient,
@@ -352,6 +360,8 @@ export class AppModule {
         MediaTickets,
         StreamSessions,
         BugReportsRepository,
+        NotificationsRepository,
+        Notices,
         PlayHistoryRepository,
         // First the account gate: with accounts ready, every route but the open ones needs an account.
         { provide: APP_GUARD, useClass: AccountGuard },

@@ -1022,6 +1022,20 @@ export const MIGRATIONS: readonly string[] = [
      WHERE pl.kind <> 'marked'
      ORDER BY pl.played_at, pl.id;
   `,
+  /*
+   * Each account's notifications: every toast its screens showed, logged as
+   * it appears. The id grows as they come, so it is the log's order.
+   */
+  `
+  CREATE TABLE notifications (
+    id INTEGER PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    message TEXT NOT NULL,
+    tone TEXT NOT NULL CHECK (tone IN ('success', 'info', 'failure')),
+    at TEXT NOT NULL
+  );
+  CREATE INDEX notifications_account ON notifications (account_id, id);
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */
