@@ -13,7 +13,9 @@ import { Player, useToasts } from '@raven/ui'
 import {
   ENGINE_KINDS,
   type NativePlayer,
+  type PlaybackFile,
   type PlayerServices,
+  type TitleLogo,
   useHostPlayer,
 } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
@@ -38,6 +40,7 @@ import { type Chosen, useChosenEngine } from '@/desktop/player/useChosenEngine'
 import { useLeaveSignal } from '@/desktop/player/useLeaveSignal'
 import { useMenuNext } from '@/desktop/player/useMenuNext'
 import { CONNECTION_STATUSES } from '@/desktop/playerConnection'
+import { api } from '@/lib/api'
 import { mediaQuery } from '@/lib/queries'
 import { useTitleLogo } from '@/lib/useTitleLogo'
 import { useAuthSession } from '@/stores/authSession'
@@ -77,18 +80,21 @@ const HtmlPlaying = ({ services, fileId }: HtmlPlayingProps) => {
 type EngineViewProps = {
   services: PlayerServices
   file: LocalFile
+  /** The download's media on the server, for the header; null for a plain local file. */
+  playback: PlaybackFile | null
   player: NativePlayer | null
   onLost: (at: number) => void
 }
 
 type NativeFilePlayingProps = EngineViewProps
 
-const NativeFilePlaying = ({ services, file, player, onLost }: NativeFilePlayingProps) =>
+const NativeFilePlaying = ({ services, file, playback, player, onLost }: NativeFilePlayingProps) =>
   player !== null && (
     <NativePlaying
       services={services}
       player={player}
       source={{ kind: PLAYER_SOURCE_KINDS.file, fileId: file.fileId }}
+      file={playback}
       resumeAt={file.resumeAt}
       onLost={onLost}
     />
@@ -107,18 +113,21 @@ const ENGINE_VIEWS = {
   [ENGINE_USES.stopped]: HtmlFilePlaying,
 } as const satisfies Record<EngineUse, ComponentType<EngineViewProps>>
 
-type UseDownloadLogoProps = { mediaId: LocalFile['mediaId'] }
+type UseDownloadMediaProps = { mediaId: LocalFile['mediaId'] }
+
+type DownloadMedia = { logo: TitleLogo | null; playback: PlaybackFile | null }
 
 /**
- * A download's art from its media on the server, as the server's player draws it. Offline,
- * signed out or for a plain local file nothing is asked, and the header spells the title out.
+ * A download's media on the server and its art, so the header heads it as the server's player
+ * does. Offline, signed out or for a plain local file nothing is asked, and the header spells
+ * the title out.
  */
-const useDownloadLogo = ({ mediaId }: UseDownloadLogoProps) => {
+const useDownloadMedia = ({ mediaId }: UseDownloadMediaProps): DownloadMedia => {
   const isOffline = useServerReach((state) => state.isOffline)
   const isSignedIn = useAuthSession((state) => state.session !== null)
   const asked = !isOffline && isSignedIn ? mediaId : null
   const media = useQuery(mediaQuery(asked)).data ?? null
-  return useTitleLogo({ media })
+  return { logo: useTitleLogo({ media }), playback: media === null ? null : { media, api } }
 }
 
 type PlayingProps = {
@@ -151,7 +160,7 @@ const Playing = ({ file, chosen, isOutputFixed, downloadsPage }: PlayingProps) =
     () => fileServicesFor({ file: played, client, menu, engine, downloadsPage }),
     [played, client, menu, engine, downloadsPage],
   )
-  const logo = useDownloadLogo({ mediaId: file.mediaId })
+  const { logo, playback } = useDownloadMedia({ mediaId: file.mediaId })
   /*
    * The output and the art arrive on their own time; folding them in keeps the progress sink,
    * so the player neither remounts nor forgets the length it reported.
@@ -182,7 +191,9 @@ const Playing = ({ file, chosen, isOutputFixed, downloadsPage }: PlayingProps) =
   }, [lostAt, showNotice])
 
   const View = ENGINE_VIEWS[engine]
-  return <View services={services} file={file} player={player} onLost={onLost} />
+  return (
+    <View services={services} file={file} playback={playback} player={player} onLost={onLost} />
+  )
 }
 
 /** Whether the file is ready to play, or the page has a line to show instead. */

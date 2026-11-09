@@ -168,11 +168,7 @@ const ShownSaga = ({ library, saga }: ShownSagaProps) => {
           <SectionHeading id={filmsId} aside={SAGA_COPY.releaseOrder}>
             {SAGA_COPY.inOrder}
           </SectionHeading>
-          <SagaFilms
-            media={saga.media}
-            sagaId={saga.tmdbId}
-            ratingsSource={library.settings.ratingsSource}
-          />
+          <SagaFilms media={saga.media} sagaId={saga.tmdbId} />
         </section>
         <AdminOnly>
           {isEditing && (

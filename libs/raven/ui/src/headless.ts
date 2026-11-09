@@ -13,6 +13,7 @@ export type {
   EngineStats,
   HtmlSource,
   NativePlayer,
+  PlaybackFile,
 } from '@/components/Player/engine'
 export type {
   ErrorReporter,

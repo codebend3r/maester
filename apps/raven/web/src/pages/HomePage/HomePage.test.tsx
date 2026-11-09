@@ -363,12 +363,12 @@ describe('HomePage', () => {
       })
     }
 
-    const searchbox = () => screen.getByRole('searchbox', { name: 'Search every library' })
+    const searchbox = () => screen.getByRole('combobox', { name: 'Search every library' })
 
-    it('searches once typing pauses, never on each keystroke, showing what it found in place of the rows', async () => {
+    it('searches on Enter, never on each keystroke, showing what it found in place of the rows', async () => {
       serve()
       await screen.findByRole('heading', { name: 'Continue watching' })
-      await userEvent.type(searchbox(), 'bus')
+      await userEvent.type(searchbox(), 'bus{Enter}')
       await screen.findByRole('heading', { name: 'Films' })
       expect(spies.search.mock.calls).toEqual([['bus']])
       expect(
@@ -389,14 +389,17 @@ describe('HomePage', () => {
       )
     })
 
-    it('opens on the search the address carries, and writes a new one into it', async () => {
+    it('opens on the search the address carries, and writes a new one into it on Enter', async () => {
       serve({ route: '/?q=bus' })
       expect(searchbox()).toHaveValue('bus')
       await screen.findByRole('heading', { name: 'Films' })
       expect(spies.search.mock.calls).toEqual([['bus']])
       await userEvent.clear(searchbox())
-      await userEvent.type(searchbox(), 'sev')
+      await userEvent.type(searchbox(), 'sev{Enter}')
       await waitFor(() => expect(spies.search.mock.calls.at(-1)).toEqual(['sev']))
+      await waitFor(() =>
+        expect(screen.getByLabelText('Current address')).toHaveTextContent(/^\/\?q=sev$/),
+      )
     })
 
     it('says when nothing matches', async () => {
@@ -410,7 +413,7 @@ describe('HomePage', () => {
 
       const later = held<HomeSearch>()
       spies.search.mockImplementation(() => later.promise)
-      await userEvent.type(searchbox(), 'q')
+      await userEvent.type(searchbox(), 'q{Enter}')
       await waitFor(() => expect(spies.search.mock.calls.at(-1)).toEqual(['zzzq']))
       expect(screen.queryByText(/^Nothing in any library matches/)).not.toBeInTheDocument()
 
@@ -424,7 +427,7 @@ describe('HomePage', () => {
       await userEvent.clear(searchbox())
       expect(await screen.findByRole('heading', { name: 'Continue watching' })).toBeInTheDocument()
 
-      await userEvent.type(searchbox(), 'bus')
+      await userEvent.type(searchbox(), 'bus{Enter}')
       /*
        * The cached results show a render before the deferred query writes the
        * address, so waiting on them alone lets that write land outside act().

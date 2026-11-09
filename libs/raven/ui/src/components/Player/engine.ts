@@ -60,6 +60,9 @@ export type HtmlSource =
     }
   | { kind: typeof PLAYER_SOURCE_KINDS.file; url: string }
 
+/** The library file a server source plays, for the header and Playback info; a local file has none. */
+export type PlaybackFile = { media: MediaItem; api: ApiClient }
+
 /** A player in another process: commands out, each answered once, and events in. */
 export type NativePlayer = {
   send: (command: PlayerCommand) => Promise<void>
@@ -71,7 +74,16 @@ export const ENGINE_KINDS = { html: 'html', native: 'native' } as const
 
 export type Engine =
   | { kind: typeof ENGINE_KINDS.html; source: HtmlSource }
-  | { kind: typeof ENGINE_KINDS.native; player: NativePlayer; source: PlayerSource }
+  | {
+      kind: typeof ENGINE_KINDS.native
+      player: NativePlayer
+      source: PlayerSource
+      /**
+       * The library file the source plays, so the header heads it as the html engine's does:
+       * an episode's show over its title, the picture's chips. Null for a plain local file.
+       */
+      file: PlaybackFile | null
+    }
 
 /** One key per video, so a different source remounts the native stage. */
 export const sourceKey = (source: PlayerSource): string => {

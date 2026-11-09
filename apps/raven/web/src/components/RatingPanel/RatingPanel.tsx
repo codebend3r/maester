@@ -163,20 +163,34 @@ export const ScoreFact = ({ ratings, source, className }: ScoreFactProps) => {
   )
 }
 
-type RatingPanelProps = { ratings: readonly Rating[] }
+/** The panel at an item header's size, or cut down to a row's line of facts. */
+export const PANEL_SIZES = { full: 'full', mini: 'mini' } as const
+
+type PanelSize = (typeof PANEL_SIZES)[keyof typeof PANEL_SIZES]
+
+const PANEL_SIZE_CLASSES = {
+  [PANEL_SIZES.full]: '',
+  [PANEL_SIZES.mini]: styles.mini ?? '',
+} as const satisfies Record<PanelSize, string>
+
+type RatingPanelProps = { ratings: readonly Rating[]; size?: PanelSize }
 
 /**
  * A movie's scores in one framed panel: each source's score over a bar in
  * its colour and its name, with the full name and what the number means in
- * a tooltip on hover or focus. A source with no score is left out.
+ * a tooltip on hover or focus. A source with no score is left out. `mini`
+ * keeps the same cells at a row's size, as a saga's films show theirs.
  */
-export const RatingPanel = ({ ratings }: RatingPanelProps) => {
+export const RatingPanel = ({ ratings, size = PANEL_SIZES.full }: RatingPanelProps) => {
   const scored = SOURCE_ORDER.flatMap(
     (source) => ratings.find((each) => each.source === source) ?? [],
   )
   return (
     scored.length > 0 && (
-      <ul className={styles.panel} aria-label={RATING_PANEL_COPY.ratings}>
+      <ul
+        className={[styles.panel, PANEL_SIZE_CLASSES[size]].filter(Boolean).join(' ')}
+        aria-label={RATING_PANEL_COPY.ratings}
+      >
         {scored.map((rating) => (
           <RatingItem key={rating.source} rating={rating} />
         ))}

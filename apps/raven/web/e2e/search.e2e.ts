@@ -14,7 +14,7 @@ test.describe('Search', () => {
   test('searches every library from Home and keeps the search in the address', async ({ page }) => {
     await page.goto('/')
     const query = show.title.split(' ')[0] ?? show.title
-    await page.getByRole('searchbox', { name: SITE_SEARCH_COPY.searchEveryLibrary }).fill(query)
+    await page.getByRole('combobox', { name: SITE_SEARCH_COPY.searchEveryLibrary }).fill(query)
     await page.keyboard.press('Enter')
 
     const results = page.getByRole('region', { name: HOME_COPY.searchResultsFor(query) })

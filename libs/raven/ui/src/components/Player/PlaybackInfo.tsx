@@ -1,5 +1,4 @@
 import {
-  type ApiClient,
   type MediaItem,
   type MediaTracks,
   PLAYBACK_MODES,
@@ -21,7 +20,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useId, useState } from 'react'
 import { Icon } from '@/components/Icon/Icon'
 import { PLAYBACK_INFO_COPY, PLAYBACK_MODE_NAMES } from '@/components/Player/copy'
-import type { EngineStats } from '@/components/Player/engine'
+import type { EngineStats, PlaybackFile } from '@/components/Player/engine'
 import { stepDownNote } from '@/components/Player/playbackFacts'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/PlaybackInfo.module.scss'
@@ -29,9 +28,6 @@ import { playerQueriesFor } from '@/lib/playerQueries'
 
 /** How often the live figures are read again. */
 const REFRESH_MS = 1000
-
-/** The library file a server source plays; a local file has none. */
-export type PlaybackFile = { media: MediaItem; api: ApiClient }
 
 type Fact = { term: string; value: string | null }
 

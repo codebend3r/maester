@@ -16,7 +16,7 @@ import {
   useState,
 } from 'react'
 import { KeyedView, type ViewOf, type ViewsOf } from '@/components/KeyedView/KeyedView'
-import type { Engine, EngineHandle } from '@/components/Player/engine'
+import type { Engine, EngineHandle, PlaybackFile } from '@/components/Player/engine'
 import type { Handoff, PlayerFavourite, UpNext } from '@/components/Player/PlayerServices'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
 import type { PlayChoices } from '@/components/Player/playChoices'
@@ -39,7 +39,7 @@ import {
   subtitlePillLabel,
 } from '@/components/Player/playbackFacts'
 import styles from '@/components/Player/Player.module.scss'
-import { type PlaybackFile, PlaybackInfo } from '@/components/Player/PlaybackInfo'
+import { PlaybackInfo } from '@/components/Player/PlaybackInfo'
 import { Preloader } from '@/components/Player/Preloader'
 import { playingAudio } from '@/components/Player/selection'
 import { SettingsMenu } from '@/components/Player/SettingsMenu'

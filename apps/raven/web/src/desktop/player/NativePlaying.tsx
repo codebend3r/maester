@@ -3,6 +3,7 @@ import { Player } from '@raven/ui'
 import {
   ENGINE_KINDS,
   type NativePlayer,
+  type PlaybackFile,
   type PlayerServices,
   useHostPlayer,
 } from '@raven/ui/headless'
@@ -13,6 +14,8 @@ type NativePlayingProps = {
   services: PlayerServices
   player: NativePlayer
   source: PlayerSource
+  /** The library file the source plays, for the header; null for a plain local file. */
+  file: PlaybackFile | null
   resumeAt: number
   onLost: (at: number) => void
 }
@@ -26,6 +29,7 @@ export const NativePlaying = ({
   services,
   player,
   source,
+  file,
   resumeAt,
   onLost,
 }: NativePlayingProps) => {
@@ -71,5 +75,7 @@ export const NativePlaying = ({
     [player, onLost],
   )
 
-  return isHosting && <Player engine={{ kind: ENGINE_KINDS.native, player: watched, source }} />
+  return (
+    isHosting && <Player engine={{ kind: ENGINE_KINDS.native, player: watched, source, file }} />
+  )
 }

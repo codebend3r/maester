@@ -550,7 +550,7 @@ describe('AppShell', () => {
     spies.list.mockImplementation(async () => [])
     renderShell({ route: '/libraries' })
     expect(
-      within(screen.getByRole('main')).getByRole('searchbox', { name: 'Search every library' }),
+      within(screen.getByRole('main')).getByRole('combobox', { name: 'Search every library' }),
     ).toHaveAttribute('placeholder', 'Search every library')
   })
 
@@ -670,7 +670,7 @@ describe('AppShell', () => {
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toEqual(['This Mac', 'Downloads', 'Settings'])
-    expect(screen.queryByRole('searchbox')).toBeNull()
+    expect(screen.queryByRole('combobox')).toBeNull()
     expect(
       within(screen.getByRole('main')).getByRole('button', { name: 'Theme' }),
     ).toBeInTheDocument()
