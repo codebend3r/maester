@@ -263,6 +263,17 @@ body {
 }
 
 /*
+ * Installed from the browser (the web app on a home screen or in a window of its own), the page
+ * is the whole app: a touch gets no grey flash, and a quick second tap is a tap, not a zoom.
+ */
+@media (display-mode: standalone) {
+  body {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+}
+
+/*
  * Raven's window has no title bar of its own (macOS `hiddenInset`): the page
  * runs under it, and this clears the traffic lights.
  */

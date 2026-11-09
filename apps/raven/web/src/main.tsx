@@ -1,3 +1,4 @@
+import { isRavenDesktopBridge } from '@raven/core'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -12,6 +13,7 @@ import { startMediaOrigin } from '@/lib/apiOrigin'
 import { applyStylesheets } from '@/lib/applyStylesheets'
 import { CardLinks } from '@/components/CardLink/CardLink'
 import { startDesktop } from '@/desktop/startDesktop'
+import { startServiceWorker } from '@/lib/serviceWorker'
 import { KeepLibraryListings } from '@/lib/keepLibraryListings'
 import { queryClient } from '@/lib/queryClient'
 import { keepAuthConfigSaved, restoreAuthConfig } from '@/lib/savedAuthConfig'
@@ -24,6 +26,11 @@ startMediaOrigin()
 restoreAuthConfig({ storage: window.localStorage, queryClient })
 keepAuthConfigSaved({ storage: window.localStorage, queryClient })
 startDesktop({ bridge: window.ravenDesktop, root: document.documentElement, target: window })
+startServiceWorker({
+  target: window,
+  isProduction: import.meta.env.PROD,
+  isDesktop: isRavenDesktopBridge(window.ravenDesktop),
+})
 await Promise.all([
   configureStorage({ storage: window.localStorage }),
   applyStylesheets({ root: document }),

@@ -1,0 +1,163 @@
+/*
+ * Over the page down to the tab bar's top, so the bar stays in view beneath
+ * the sheet. The scrim fills the room over the sheet; the dialog clips the
+ * sheet as it rises from the bar.
+ */
+.sheet {
+  position: fixed;
+  inset: 0 0 var(--tab-bar-room, 0);
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+
+  &[open] {
+    display: grid;
+    grid-template-rows: minmax(var(--space-6), 1fr) minmax(0, max-content);
+    grid-template-areas:
+      'scrim'
+      'panel';
+  }
+
+  &::backdrop {
+    background: none;
+  }
+}
+
+.scrim {
+  grid-area: scrim;
+  padding: 0;
+  border: 0;
+  background: var(--color-scrim);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: calc(-1 * var(--space-1));
+  }
+}
+
+// The handle, the heading, the tiles, then the Manage group.
+.panel {
+  grid-area: panel;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--color-line);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--color-canopy);
+  box-shadow: var(--shadow-popover);
+}
+
+.handle {
+  justify-self: center;
+  width: var(--space-6);
+  height: var(--space-0);
+  border-radius: var(--radius-pill);
+  background: var(--color-line-strong);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
+.eyebrow {
+  padding-top: var(--space-1);
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.item {
+  display: grid;
+  min-width: 0;
+}
+
+// Its icon over its name, about 84px tall, marked like a current tab.
+.tile {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  min-height: calc(var(--space-8) + var(--space-0));
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy-hi);
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  line-height: var(--line-tight);
+  text-align: center;
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color-bark);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+
+  &[aria-current='page'] {
+    --icon-tint: 0.4;
+
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+}
+
+.label {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .panel {
+    animation: sheet-up 220ms var(--ease-out);
+  }
+
+  .scrim {
+    animation: scrim-in 220ms var(--ease-out);
+  }
+
+  .tile {
+    transition:
+      background-color 150ms var(--ease-out),
+      color 150ms var(--ease-out);
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    translate: 0 100%;
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}

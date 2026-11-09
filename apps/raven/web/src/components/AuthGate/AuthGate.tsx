@@ -1,5 +1,5 @@
-import { useIsFetching, useQueryClient } from '@tanstack/react-query'
-import type { ComponentType } from 'react'
+import { onlineManager, useIsFetching, useQueryClient } from '@tanstack/react-query'
+import { type ComponentType, useSyncExternalStore } from 'react'
 import { Navigate, Outlet, parsePath, useLocation } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { AUTH_ROUTES } from '@raven/core'
@@ -53,6 +53,7 @@ const GATE_VIEWS = {
   loading: 'loading',
   failed: 'failed',
   unavailable: 'unavailable',
+  noNetwork: 'noNetwork',
   signIn: 'signIn',
   pending: 'pending',
 } as const
@@ -70,13 +71,31 @@ const ACCESS_VIEWS = {
   [ACCESS_KINDS.revoked]: GATE_VIEWS.pending,
 } as const satisfies Record<AccessState['kind'], GateView>
 
-type GateViewOfProps = { access: AccessState; isOffline: boolean; pathname: string }
+type GateViewOfProps = {
+  access: AccessState
+  isOffline: boolean
+  /** Whether the device has a network at all; without one the account can not be read. */
+  isDeviceOnline: boolean
+  pathname: string
+}
 
-const gateViewOf = ({ access, isOffline, pathname }: GateViewOfProps): GateView => {
+const gateViewOf = ({ access, isOffline, isDeviceOnline, pathname }: GateViewOfProps): GateView => {
   if (isOffline) return isOfflinePage(pathname) ? GATE_VIEWS.page : GATE_VIEWS.offline
-  if (UNSETTLED.has(access.kind) && isFilePlaying(pathname)) return GATE_VIEWS.page
+  const isUnsettled = UNSETTLED.has(access.kind)
+  if (isUnsettled && isFilePlaying(pathname)) return GATE_VIEWS.page
+  if (isUnsettled && !isDeviceOnline) return GATE_VIEWS.noNetwork
   return ACCESS_VIEWS[access.kind]
 }
+
+const subscribeToNetwork = (onChange: () => void) => onlineManager.subscribe(onChange)
+
+const isNetworkUp = () => onlineManager.isOnline()
+
+/**
+ * Whether the device is online, as TanStack Query sees it: it pauses the account's request while
+ * offline and sends it again on reconnecting, so the gate follows the same signal.
+ */
+const useIsDeviceOnline = () => useSyncExternalStore(subscribeToNetwork, isNetworkUp)
 
 /** The address asked for, which a redirect hands on to come back to. */
 type GateViewProps = { returnTo: string }
@@ -102,6 +121,11 @@ const UnavailableRetry = () => (
   <Retry title={AUTH_GATE_COPY.unavailableTitle} message={AUTH_GATE_COPY.unavailableMessage} />
 )
 
+/** The installed app opened with no network: its shell is kept, the library is not. */
+const NoNetworkRetry = () => (
+  <Retry title={AUTH_GATE_COPY.noNetworkTitle} message={AUTH_GATE_COPY.noNetworkMessage} />
+)
+
 type SignInRedirectProps = GateViewProps
 
 const SignInRedirect = ({ returnTo }: SignInRedirectProps) => (
@@ -116,6 +140,7 @@ const GATE_SCREENS = {
   [GATE_VIEWS.loading]: Loading,
   [GATE_VIEWS.failed]: FailedRetry,
   [GATE_VIEWS.unavailable]: UnavailableRetry,
+  [GATE_VIEWS.noNetwork]: NoNetworkRetry,
   [GATE_VIEWS.signIn]: SignInRedirect,
   [GATE_VIEWS.pending]: PendingRedirect,
 } as const satisfies Record<GateView, ComponentType<GateViewProps>>
@@ -133,7 +158,8 @@ const GATE_SCREENS = {
 export const AuthGate = () => {
   const access = useAccessState()
   const isOffline = useServerReach((state) => state.isOffline)
+  const isDeviceOnline = useIsDeviceOnline()
   const { pathname, search } = useLocation()
-  const Screen = GATE_SCREENS[gateViewOf({ access, isOffline, pathname })]
+  const Screen = GATE_SCREENS[gateViewOf({ access, isOffline, isDeviceOnline, pathname })]
   return <Screen returnTo={`${pathname}${search}`} />
 }

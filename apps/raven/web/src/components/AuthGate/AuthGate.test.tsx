@@ -1,6 +1,6 @@
 import { playPathOf } from '@/desktop/paths'
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
+import { QueryClientProvider, onlineManager, useQueryClient } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -82,6 +82,35 @@ describe('AuthGate', () => {
     renderGate()
     expect(screen.getByRole('status')).toHaveTextContent('Loading')
     expect(screen.queryByText('Library')).toBeNull()
+  })
+
+  describe('with no network', () => {
+    // The gate is still on screen here, so it hears the network come back.
+    afterEach(() => act(() => onlineManager.setOnline(true)))
+
+    it('says the device is offline instead of loading for ever', () => {
+      getMe.mockImplementation(() => new Promise(() => undefined))
+      onlineManager.setOnline(false)
+      renderGate()
+      expect(screen.getByRole('heading', { name: 'You are offline' })).toBeInTheDocument()
+      expect(screen.queryByText('Library')).toBeNull()
+    })
+
+    it('goes back to reading the account once the network returns', async () => {
+      getMe.mockResolvedValue(fakeAccount())
+      onlineManager.setOnline(false)
+      renderGate()
+      act(() => onlineManager.setOnline(true))
+      expect(await screen.findByText('Library')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'You are offline' })).toBeNull()
+    })
+
+    it('keeps a local file or download playing', () => {
+      getMe.mockImplementation(() => new Promise(() => undefined))
+      onlineManager.setOnline(false)
+      renderGate({ route: playPathOf(FILE_ID) })
+      expect(screen.getByText('Library')).toBeInTheDocument()
+    })
   })
 
   it('keeps a local file or download playing while the account is read', () => {

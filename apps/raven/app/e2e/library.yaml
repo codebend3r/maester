@@ -6,9 +6,12 @@ tags:
 - runFlow: signIn.yaml
 # Each library shelf's title has a way into the library beside it, named for the library, and
 # on an iPhone the hero pushes the shelves down the screen.
+# The iPhone's tab bar covers the foot of the page, and iOS still reports what scrolls under it as
+# on screen, so a scroll brings its target to the middle, clear of the bar, before the tap.
 - scrollUntilVisible:
     element: See all in Films
     direction: DOWN
+    centerElement: true
     timeout: 30000
 - tapOn: See all in Films
 - extendedWaitUntil:
@@ -31,6 +34,7 @@ tags:
 - scrollUntilVisible:
     element: See all in Series
     direction: DOWN
+    centerElement: true
     timeout: 30000
 - tapOn: See all in Series
 - extendedWaitUntil:

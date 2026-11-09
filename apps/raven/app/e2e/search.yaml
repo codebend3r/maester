@@ -30,9 +30,12 @@ tags:
     timeout: 30000
 - runFlow: steps/back.yaml
 # A library's own box searches it.
+# The iPhone's tab bar covers the foot of the page, and iOS still reports what scrolls under it as
+# on screen, so a scroll brings its target to the middle, clear of the bar, before the tap.
 - scrollUntilVisible:
     element: See all in Films
     direction: DOWN
+    centerElement: true
     timeout: 30000
 - tapOn: See all in Films
 - extendedWaitUntil:

@@ -45,6 +45,11 @@ export const isOpenedBy = ({ dx, vx }: SwipeProps): boolean => dx > SWIPE_FAR ||
 /** Whether a swipe back across the menu shuts it: far enough, or flicked. */
 export const isClosedBy = ({ dx, vx }: SwipeProps): boolean => -dx > SWIPE_FAR || vx < -FLICK
 
+type DropProps = { dy: number; vy: number }
+
+/** Whether a swipe down across a bottom sheet shuts it: far enough, or flicked. */
+export const isDroppedBy = ({ dy, vy }: DropProps): boolean => dy > SWIPE_FAR || vy > FLICK
+
 /** How a menu entry moves: on top of Home, or in place of the page it is chosen from. */
 export const MENU_MOVES = { push: 'push', replace: 'replace' } as const
 

@@ -9,6 +9,8 @@ import { ActionSheetIOS, StyleSheet } from 'react-native'
 import type { Picture } from '@/queries/cards'
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { TOUCH_NAV_COPY } from '@/layouts/touchMenuKit'
+import type * as DevicePlatform from '@/platform/devicePlatform'
+import { NAV_KINDS, type NavKind } from '@/platform/platform'
 import { APP_ROUTES, APP_ROUTE_PARAMS, searchHrefOf } from '@/routes'
 import { Home } from '@/screens/Home'
 import { useActiveServer } from '@/stores/activeServer'
@@ -36,7 +38,13 @@ const LIGHT_THEME = THEMES.find((theme) => theme.tone !== themeOf(DEFAULT_APP_PR
 const PHONE_WIDTH = 390
 const mockWindowWidth = jest.fn(() => PHONE_WIDTH)
 
+const mockNavKind = jest.fn<() => NavKind>(() => NAV_KINDS.tabs)
+
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }))
+jest.mock('@/platform/devicePlatform', () => ({
+  ...jest.requireActual<typeof DevicePlatform>('@/platform/devicePlatform'),
+  deviceNavKind: () => mockNavKind(),
+}))
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
   default: () => ({ width: mockWindowWidth(), height: 844, scale: 3, fontScale: 1 }),
@@ -63,6 +71,7 @@ describe('Home on a phone or tablet', () => {
     useAppPrefs.setState(DEFAULT_APP_PREFS)
     mockCookies.mockReturnValue({})
     mockWindowWidth.mockReturnValue(PHONE_WIDTH)
+    mockNavKind.mockReturnValue(NAV_KINDS.tabs)
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
 
@@ -128,7 +137,14 @@ describe('Home on a phone or tablet', () => {
     expect(StyleSheet.flatten(field.props.style)?.fontSize).toBe(SIZES.textXl)
   })
 
-  it('opens the side menu from the menu button, with no Home button on Home itself', async () => {
+  it('has no menu button on an iPhone, which moves by its tab bar', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    expect(screen.queryByRole('button', { name: TOUCH_NAV_COPY.menu })).toBeNull()
+  })
+
+  it('opens the side menu from the menu button on an iPad, with no Home button on Home itself', async () => {
+    mockNavKind.mockReturnValue(NAV_KINDS.drawer)
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
     expect(screen.queryByRole('button', { name: TOUCH_NAV_COPY.home })).toBeNull()
