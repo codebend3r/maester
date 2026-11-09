@@ -2,6 +2,7 @@ import { Icon } from '@raven/native'
 import { Image, Pressable, StyleSheet, View } from 'react-native'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
+import { useTouchCard } from '@/cardMenu/useTouchCard'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { LINE_RATIO } from '@/layouts/textHeights'
@@ -40,8 +41,10 @@ type ResumeCardProps = {
  * anchored to its top left over it, then the episode's name in the display face and its place with what is
  * left to watch, a glass play badge at the right and a thick progress line along the bottom.
  * Everything over the picture is in the player's on-picture colours, the same in every theme.
+ * A long press opens its menu.
  */
 export const ResumeCard = ({ card, width, onPress }: ResumeCardProps) => {
+  const { onLongPress, menu } = useTouchCard({ card })
   const styles = usePictureStyles()
   const isReduced = useReduceMotion((state) => state.isReduced)
   const ground = useTheme((theme) => theme.overPicture.ground)
@@ -55,6 +58,7 @@ export const ResumeCard = ({ card, width, onPress }: ResumeCardProps) => {
     <Pressable
       accessibilityLabel={cardLabelOf({ card })}
       accessibilityRole="button"
+      onLongPress={onLongPress}
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
@@ -121,6 +125,7 @@ export const ResumeCard = ({ card, width, onPress }: ResumeCardProps) => {
           <View style={[styles.fill, { width: `${card.progress * 100}%` }]} />
         </View>
       </View>
+      {menu}
     </Pressable>
   )
 }

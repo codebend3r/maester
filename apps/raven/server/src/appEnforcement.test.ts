@@ -161,7 +161,7 @@ const STATE_ROUTES: ReadonlySet<Route> = new Set([ROUTES.lastFmCallback])
 /** The open routes that answer only a nonce a check in flight holds. */
 const NONCE_ROUTES: ReadonlySet<Route> = new Set([ROUTES.remoteAccessEcho])
 
-it("opens only an HLS session's own routes to its capability, and only `file` and `transcode` to a ticket's pass", () => {
+it("opens only an HLS session's own routes to its capability, and only `file`, `transcode` and the device copy to a ticket's pass", () => {
   const marks = routeMarks(CONTROLLERS)
   const kinds = Object.values(PASS_KINDS)
   const opened = kinds.map((kind) =>

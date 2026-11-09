@@ -22,6 +22,7 @@ const SOURCES: MediaSources = {
     source: { uri: `http://nas:8080/${mode}`, headers: {} },
   }),
   trackSource: async () => ({ ok: true, source: { uri: 'http://nas:8080/track', headers: {} } }),
+  copySource: async () => ({ ok: true, source: { uri: 'http://nas:8080/copy', headers: {} } }),
   subtitleAccess: async () => null,
   networkFor: async () => AT_HOME,
   close: () => undefined,

@@ -87,9 +87,11 @@ const HOME_VIEWS = {
 
 type ServerHomeProps = { session: AppQueries }
 
-const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
+const ServerHome = ({ session }: ServerHomeProps) => {
+  const { server, api, queries } = session
   const home = useQuery(queries.homeQuery)
   const hero = useQuery(queries.heroQuery)
+  const albums = useQuery(queries.homeAlbumsQuery)
   const libraries = useQuery(queries.librariesQuery)
   const pictures = usePictures({ server, api })
   const binge = useBingeCards({ queries, pictures })
@@ -99,16 +101,35 @@ const ServerHome = ({ session: { server, api, queries } }: ServerHomeProps) => {
     pictures,
   })
 
+  /*
+   * The shelves wait for the albums too, so a music library's row never flips from its files
+   * to its covers as they land; albums that cannot be read leave each row as its files.
+   */
+  const albumShelves = albums.data ?? (albums.isError ? [] : null)
   const shelves =
-    home.data === undefined || libraries.data === undefined || pictures === null
+    home.data === undefined ||
+    libraries.data === undefined ||
+    albumShelves === null ||
+    pictures === null
       ? []
-      : homeShelvesOf({ home: home.data, libraries: libraries.data, arts, ...pictures })
+      : homeShelvesOf({
+          home: home.data,
+          libraries: libraries.data,
+          albumShelves,
+          arts,
+          ...pictures,
+        })
   const slides =
     hero.data === undefined || libraries.data === undefined || pictures === null
       ? []
       : heroSlidesOf({ hero: hero.data, libraries: libraries.data, ...pictures })
   const failure = home.error ?? libraries.error
-  const isBare = home.isSuccess && libraries.isSuccess && pictures !== null && shelves.length === 0
+  const isBare =
+    home.isSuccess &&
+    libraries.isSuccess &&
+    albumShelves !== null &&
+    pictures !== null &&
+    shelves.length === 0
   // The hero is waited for, so its Play is there to take the opening focus; one that fails is left out.
   const isLoading = failure === null && ((!isBare && shelves.length === 0) || hero.isPending)
   const notice = ((): string | null => {

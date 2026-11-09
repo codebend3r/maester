@@ -37,9 +37,11 @@ import {
   seeAllLabelOf,
   seeAllOf,
   shelfStateOf,
+  type ShelfPageProps,
 } from '@/layouts/shelfKit'
 import { BingeCardFocus } from '@/layouts/BingeCard.focus'
 import { SHELF_LAYOUTS, type ShelfLayout } from '@/queries/homeShelves'
+import { HomePlate } from '@/layouts/HomePlate.focus'
 import { Logo } from '@/layouts/Logo'
 import { type ShelfViewport, scrollTargetOf } from '@/layouts/shelfScroll'
 import { SCROLL_AXES, useScrollWindow } from '@/layouts/useScrollWindow'
@@ -382,14 +384,43 @@ const BingeShelf = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
 }
 
 /**
+ * A page of shelves on a TV other than Home: the Home plate and the page's name at the top,
+ * the shelves below as rows the remote moves along, and a word in Young Serif where there are
+ * none. It holds the screen's focus scope, so the first shelf can take the opening focus.
+ */
+const ShelfPage = ({ title, note, children }: ShelfPageProps) => {
+  useScreenFocusScope()
+  const styles = useStyles()
+  return (
+    <ScrollView contentContainerStyle={styles.pageOfShelves} style={styles.ground}>
+      <View style={styles.pageHeader}>
+        <HomePlate />
+        <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.pageTitle}>
+          {title}
+        </Text>
+        {note !== null && (
+          <Text variant={TEXT_VARIANTS.display} style={styles.pageNote}>
+            {note}
+          </Text>
+        )}
+      </View>
+      {children}
+    </ScrollView>
+  )
+}
+
+/**
  * Home on a TV: shelves down the screen, each a row the remote moves along, never the touch
  * layout made larger. The rows run to the screen's edges, past the title-safe margin the
  * titles keep, and leave room above and below for a card grown by focus.
  */
-export const focusShelf: ShelfKit = { Shelves, Shelf, BingeShelf }
+export const focusShelf: ShelfKit = { Shelves, Shelf, BingeShelf, ShelfPage }
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
+    pageOfShelves: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },
+    pageHeader: { gap: TV_SIZES.space3, paddingHorizontal: TV_GUTTER },
+    pageNote: { color: colours.text, fontSize: TV_SIZES.textLg },
     screen: { flex: 1, flexDirection: 'row', backgroundColor: colours.ground },
     ground: { flex: 1, backgroundColor: colours.ground },
     shelves: { gap: TV_SIZES.space4, paddingVertical: TV_SIZES.space6 },

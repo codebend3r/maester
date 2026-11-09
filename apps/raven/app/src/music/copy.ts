@@ -10,6 +10,8 @@ export const ALBUMS_GRID_COPY = {
   noMatch: (query: string) => `No album matches "${query}".`,
   line: libraryLine,
   shuffle: (library: string) => `Shuffle ${library}`,
+  sort: 'Sort',
+  reverse: (direction: string) => `Order: ${direction}. Reverse it`,
 } as const
 
 export const ARTISTS_GRID_COPY = {
@@ -26,7 +28,6 @@ export const PLAYLISTS_GRID_COPY = {
 } as const
 
 export const MUSIC_PAGES_COPY = {
-  show: (page: string) => `Show ${page}`,
   albums: 'Albums',
   artists: 'Artists',
   playlists: 'Playlists',

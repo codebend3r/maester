@@ -3,6 +3,8 @@ import {
   PLAYBACK_MODES,
   type PlaybackMode,
   type SubtitleTrack,
+  VIDEO_RANGES,
+  type VideoRange,
   subtitleLabel,
 } from '@raven/core'
 import { type SegmentPlan, segmentDurations } from '@/hls/segmentPlan'
@@ -65,8 +67,26 @@ const mediaLine = ({ track, uri, name }: SubtitleRendition & { name: string }): 
     `URI=${quoted(uri)}`,
   ].join(',')
 
+/** RFC 8216's `VIDEO-RANGE` for each range: Dolby Vision and HDR10 are both PQ transfers. */
+const HLS_VIDEO_RANGES = {
+  [VIDEO_RANGES.sdr]: 'SDR',
+  [VIDEO_RANGES.hdr10]: 'PQ',
+  [VIDEO_RANGES.hlg]: 'HLG',
+  [VIDEO_RANGES.dolbyVision]: 'PQ',
+} as const satisfies Record<VideoRange, string>
+
+type HlsVideoRangeProps = { mode: PlaybackMode; videoRange: VideoRange }
+
+/** A transcode is 8-bit H.264 SDR whatever the file is; a remux keeps the file's range. */
+const hlsVideoRange = ({ mode, videoRange }: HlsVideoRangeProps): string =>
+  mode === PLAYBACK_MODES.transcode
+    ? HLS_VIDEO_RANGES[VIDEO_RANGES.sdr]
+    : HLS_VIDEO_RANGES[videoRange]
+
 type MasterPlaylistProps = {
   mode: PlaybackMode
+  /** The file's picture range, which the variant declares as `VIDEO-RANGE` when remuxed. */
+  videoRange: VideoRange
   variantUri: string
   subtitles: readonly SubtitleRendition[]
   codecs: string
@@ -83,6 +103,7 @@ type MasterPlaylistProps = {
  */
 export const masterPlaylist = ({
   mode,
+  videoRange,
   variantUri,
   subtitles,
   codecs,
@@ -95,6 +116,7 @@ export const masterPlaylist = ({
     `#EXT-X-STREAM-INF:BANDWIDTH=${bandwidth}`,
     `CODECS=${quoted(codecs)}`,
     `RESOLUTION=${resolution.width}x${resolution.height}`,
+    `VIDEO-RANGE=${hlsVideoRange({ mode, videoRange })}`,
     ...(renditions.length === 0 ? [] : [`SUBTITLES=${quoted(SUBTITLE_GROUP)}`]),
   ].join(',')
 

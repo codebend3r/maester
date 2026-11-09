@@ -5,7 +5,7 @@ import EventSource from 'react-native-sse'
 import { type AccountSessionStore, accessTokenNow } from '@/account/accountSession'
 import { refreshingFetch } from '@/account/refreshingFetch'
 import { allowlistedFetch } from '@/servers/allowlist'
-import { createCookieJar } from '@/servers/cookieJar'
+import { type KnownCookies, createCookieJar } from '@/servers/cookieJar'
 import {
   APP_STATES,
   APP_STATE_EVENTS,
@@ -16,10 +16,21 @@ import { secretStore } from '@/servers/deviceSecretStore'
 import { serverFetchFor } from '@/servers/serverFetch'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
+import { noteCookies } from '@/stores/cookieSnapshots'
 import { bumpCookieVersion } from '@/stores/cookieVersion'
 
-/** Every server's cookies. */
-export const cookieJar = createCookieJar({ store: secretStore, onChange: bumpCookieVersion })
+/** A change to a server's cookies: the snapshot first, so what the bump wakes reads the new ones. */
+const cookiesChanged = (known: KnownCookies): void => {
+  noteCookies(known)
+  bumpCookieVersion()
+}
+
+/** Every server's cookies, its last word on each kept in `useCookieSnapshots`. */
+export const cookieJar = createCookieJar({
+  store: secretStore,
+  onRead: noteCookies,
+  onChange: cookiesChanged,
+})
 
 export type ApiForProps = {
   server: AppServer

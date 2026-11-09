@@ -139,6 +139,7 @@ describe('the lock marks on routes', () => {
       .toSorted()
     expect(plane).toEqual([
       'GET /api/media-origins/ping',
+      'GET /api/media/:id/device-download/file',
       'GET /api/media/:id/file',
       'GET /api/media/:id/hls/:session/init',
       'GET /api/media/:id/hls/:session/segment/:n',

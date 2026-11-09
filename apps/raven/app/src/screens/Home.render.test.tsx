@@ -6,6 +6,8 @@ import { bumpCookieVersion } from '@raven/native/headless'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
+import { CARD_MENU_COPY } from '@/cardMenu/menuOptions'
+import { DOWNLOAD_COPY } from '@/downloads/copy'
 import type { Picture } from '@/queries/cards'
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { TOUCH_NAV_COPY } from '@/layouts/touchMenuKit'
@@ -96,6 +98,30 @@ describe('Home on a phone or tablet', () => {
       pathname: APP_ROUTES.item,
       params: { [APP_ROUTE_PARAMS.id]: '4' },
     })
+  })
+
+  it("offers a held show its Download, its marks and Binge on the system's sheet", async () => {
+    const offered: { title: string | undefined; options: string[] }[] = []
+    jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((options, done) => {
+      offered.push({ title: options.title, options: options.options })
+      done(options.cancelButtonIndex ?? 0)
+    })
+    await renderHome()
+    await fireEvent(await screen.findByRole('button', { name: 'Severance' }), 'longPress')
+    await waitFor(() => expect(offered).toHaveLength(1))
+    expect(offered).toEqual([
+      {
+        title: 'Severance',
+        options: [
+          DOWNLOAD_COPY.downloadAll('Severance'),
+          CARD_MENU_COPY.markWatched,
+          CARD_MENU_COPY.addFavourite,
+          CARD_MENU_COPY.addBinge,
+          'Cancel',
+        ],
+      },
+    ])
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
   it("opens a library from its shelf's title, as the web's shelf heading links to it", async () => {

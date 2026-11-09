@@ -49,6 +49,7 @@ import { FilePasses } from '@/media/filePasses'
 import { HomeController } from '@/media/homeController'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaController } from '@/media/mediaController'
+import { DeviceDownloadCache } from '@/media/deviceDownloadCache'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MediaOriginsController } from '@/media/mediaOriginsController'
 import { MediaRepository } from '@/media/mediaRepository'
@@ -318,6 +319,7 @@ export class AppModule {
         ScrobbleSender,
         TrackLyrics,
         TranscodeCache,
+        DeviceDownloadCache,
         LoudnessJobs,
         LoudnessScan,
         AlbumClaude,

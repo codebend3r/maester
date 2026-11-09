@@ -26,6 +26,7 @@ describe('activeTabOf', () => {
     expect(activeTabOf({ pathname: APP_ROUTES.home, isMoreOpen: true })).toBe(TOUCH_TABS.more)
     expect(activeTabOf({ pathname: APP_ROUTES.search, isMoreOpen: false })).toBe(TOUCH_TABS.more)
     expect(activeTabOf({ pathname: APP_ROUTES.settings, isMoreOpen: false })).toBe(TOUCH_TABS.more)
+    expect(activeTabOf({ pathname: APP_ROUTES.downloads, isMoreOpen: false })).toBe(TOUCH_TABS.more)
   })
 
   it('lights nothing on a page no tab opens', () => {

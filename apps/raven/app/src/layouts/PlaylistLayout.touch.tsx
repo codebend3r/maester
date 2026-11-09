@@ -3,6 +3,7 @@ import { View } from 'react-native'
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { touchForm } from '@/layouts/Form.touch'
 import { MUSIC_COPY } from '@/layouts/copy'
+import { DownloadChip } from '@/layouts/DownloadChip.touch'
 import { type NewPlaylistButtonProps, type PlaylistLayoutProps } from '@/layouts/musicKit'
 import { ListEntry, TouchPage, useMusicStyles } from '@/layouts/MusicParts.touch'
 import { touchPicker } from '@/layouts/Picker.touch'
@@ -13,9 +14,9 @@ const { FormButton } = touchForm
 const { ToolButton } = touchPicker
 
 /**
- * A playlist under the thumb: its name and facts, Play, Shuffle, Rename and Delete, then its
- * tracks, each pressed to play from it, moved up or taken out where it is. Another account's
- * shared playlist offers only the playing.
+ * A playlist under the thumb: its name and facts, Play, Shuffle, Download, Rename and Delete,
+ * then its tracks, each pressed to play from it, moved up or taken out where it is. Another
+ * account's shared playlist offers only the playing.
  */
 export const PlaylistLayout = ({
   name,
@@ -31,6 +32,7 @@ export const PlaylistLayout = ({
   onDelete,
   onMoveUp,
   onRemove,
+  download,
   onBack,
 }: PlaylistLayoutProps) => {
   const styles = useMusicStyles()
@@ -56,6 +58,7 @@ export const PlaylistLayout = ({
             onPress={onShuffle}
             tone={BUTTON_TONES.quiet}
           />
+          {!isEmpty && <DownloadChip control={download.control} onPress={download.onPress} />}
         </View>
         {isOwn && (
           <View style={styles.controls}>

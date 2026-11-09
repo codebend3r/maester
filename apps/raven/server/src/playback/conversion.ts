@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import {
   type AudioTrack,
+  type DolbyVisionConfig,
   type MediaTracks,
   PLAYBACK_MODES,
   SUBTITLE_SOURCES,
@@ -15,6 +16,7 @@ import {
   type StreamMode,
   type StreamQuality,
   TRANSCODINGS,
+  VIDEO_CODECS,
   isPictureSubtitle,
   isStreamMode,
   isStreamQuality,
@@ -24,6 +26,7 @@ import type { BurnSubtitle } from '@/ffmpeg/args'
 import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
 import type { FfmpegService } from '@/ffmpeg/ffmpegService'
 import type { ProbeResult } from '@/ffmpeg/probe'
+import { parseStreams } from '@/ffmpeg/streams'
 import type { MediaFile } from '@/media/mediaIndex'
 
 /** The mode a converted stream, MSE or HLS, was asked for, or a 400. */
@@ -167,4 +170,27 @@ export const videoEncodingOf = async ({
   if (mode !== PLAYBACK_MODES.transcode) return { tonemap: false, encoder: SOFTWARE }
   const tonemap = file.hdr && playback.tonemap && (await ffmpeg.canTonemap())
   return { tonemap, encoder: await ffmpeg.videoEncoder() }
+}
+
+type RemuxDolbyVisionOfProps = {
+  ffmpeg: Pick<FfmpegService, 'probeJson'>
+  file: MediaFile
+  mode: StreamMode
+}
+
+/**
+ * The Dolby Vision configuration a remux copies the picture under, or null.
+ * The index keeps no record, so the file is probed, but only when the copy
+ * could be one: a remux of HEVC the scan found HDR (a Dolby Vision record
+ * counts as HDR). A transcode re-encodes the picture and needs none.
+ */
+export const remuxDolbyVisionOf = async ({
+  ffmpeg,
+  file,
+  mode,
+}: RemuxDolbyVisionOfProps): Promise<DolbyVisionConfig | null> => {
+  if (mode !== PLAYBACK_MODES.remux || file.videoCodec !== VIDEO_CODECS.hevc || !file.hdr) {
+    return null
+  }
+  return parseStreams(await ffmpeg.probeJson(file.path)).video?.dolbyVision ?? null
 }

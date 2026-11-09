@@ -2,8 +2,12 @@ import { type MediaAccess, type TicketedOrigin, type Transport } from '@/apiClie
 import {
   AUDIO_BITRATE_PARAM,
   type AudioBitrate,
+  DEVICE_DOWNLOAD_PARAMS,
+  DEVICE_DOWNLOAD_PATHS,
+  type DeviceDownload,
   HLS_PARAMS,
   HLS_PATHS,
+  isDeviceDownload,
   isLiveStreamList,
   isMediaOrigins,
   isMediaStreams,
@@ -76,6 +80,33 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
     mediaUrl({
       path: `/api/media/${mediaId}/transcode`,
       query: { [AUDIO_BITRATE_PARAM]: String(kbps) },
+      access,
+    }),
+
+  /**
+   * Where the server's MP4 copy of video `mediaId` stands, for a device whose player cannot
+   * open the original: asking starts the copy when none is cached or running, and a failed
+   * copy is tried again on the ask after the one that says so.
+   */
+  getDeviceDownload: (mediaId: number): Promise<DeviceDownload> =>
+    expect({
+      request: send({
+        path: fillPath({
+          path: DEVICE_DOWNLOAD_PATHS.prepare,
+          params: { [DEVICE_DOWNLOAD_PARAMS.id]: mediaId },
+        }),
+      }),
+      guard: isDeviceDownload,
+    }),
+
+  /** The server's finished MP4 copy of the video, with byte ranges, from `access`'s origin as `fileUrl` is. */
+  deviceDownloadFileUrl: ({ id, access = null }: FileUrlProps): string =>
+    mediaUrl({
+      path: fillPath({
+        path: DEVICE_DOWNLOAD_PATHS.file,
+        params: { [DEVICE_DOWNLOAD_PARAMS.id]: id },
+      }),
+      query: {},
       access,
     }),
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 
-import { steppedVolume, volumeAfterAction, volumeAt, volumeIconOf } from '@/layouts/volumeKit'
+import { steppedVolume, volumeAfterAction, volumeAtY, volumeIconOf } from '@/layouts/volumeKit'
 
 describe('volumeIconOf', () => {
   it('crosses the speaker out when muted or silent', () => {
@@ -14,12 +14,14 @@ describe('volumeIconOf', () => {
   })
 })
 
-describe('volumeAt', () => {
-  it('reads the finger as a share of the slider and holds it inside', () => {
-    expect(volumeAt({ x: 50, width: 200 })).toBe(0.25)
-    expect(volumeAt({ x: -10, width: 200 })).toBe(0)
-    expect(volumeAt({ x: 400, width: 200 })).toBe(1)
-    expect(volumeAt({ x: 10, width: 0 })).toBe(0)
+describe('volumeAtY', () => {
+  it('reads the finger down the slider as full at the top and silent at the foot', () => {
+    expect(volumeAtY({ y: 0, height: 200 })).toBe(1)
+    expect(volumeAtY({ y: 150, height: 200 })).toBe(0.25)
+    expect(volumeAtY({ y: 200, height: 200 })).toBe(0)
+    expect(volumeAtY({ y: -10, height: 200 })).toBe(1)
+    expect(volumeAtY({ y: 400, height: 200 })).toBe(0)
+    expect(volumeAtY({ y: 10, height: 0 })).toBe(0)
   })
 })
 

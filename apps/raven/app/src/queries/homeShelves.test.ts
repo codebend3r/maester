@@ -11,12 +11,15 @@ import { CARD_SHAPES, CARD_SUBJECTS } from '@/queries/cards'
 import {
   CONTINUE_WATCHING,
   HOME_CONTINUE_COUNT,
+  HOME_ROW_TYPES,
   SHELF_LAYOUTS,
+  homeRowsOf,
   homeShelvesOf,
   libraryShelvesOf,
 } from '@/queries/homeShelves'
 import type { ShowArts } from '@/queries/showArt'
 import { FILMS, HOME, NAS, SERIES, homeApi } from '@/test/homeServer'
+import { OK_COMPUTER } from '@/test/musicServer'
 import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 import { ROUTE_TARGETS } from '@/routes'
 
@@ -30,6 +33,7 @@ describe('homeShelvesOf', () => {
   it('puts Continue watching first, then each library shelf under its name', () => {
     const shelves = homeShelvesOf({
       arts: NO_ARTS,
+      albumShelves: [],
       home: HOME,
       libraries: [FILMS, SERIES],
       api: homeApi(),
@@ -46,6 +50,7 @@ describe('homeShelvesOf', () => {
   it('names the library each library shelf opens, and none for Continue watching', () => {
     const shelves = homeShelvesOf({
       arts: NO_ARTS,
+      albumShelves: [],
       home: HOME,
       libraries: [FILMS, SERIES],
       api: homeApi(),
@@ -57,6 +62,7 @@ describe('homeShelvesOf', () => {
   it('shows Continue watching wide, on the backdrop, with how far in it is', () => {
     const [continuing] = homeShelvesOf({
       arts: NO_ARTS,
+      albumShelves: [],
       home: HOME,
       libraries: [FILMS, SERIES],
       api: homeApi(),
@@ -81,6 +87,7 @@ describe('homeShelvesOf', () => {
   it("shows a movie library's and a show library's cards as posters", () => {
     const [, films, series] = homeShelvesOf({
       arts: NO_ARTS,
+      albumShelves: [],
       home: HOME,
       libraries: [FILMS, SERIES],
       api: homeApi(),
@@ -114,6 +121,7 @@ describe('homeShelvesOf', () => {
     const clips = { ...FILMS, id: 3, settings: { ...FILMS.settings, kind: LIBRARY_KINDS.other } }
     const [shelf] = homeShelvesOf({
       arts: NO_ARTS,
+      albumShelves: [],
       home: {
         inProgress: [],
         shelves: [
@@ -190,6 +198,7 @@ describe('homeShelvesOf', () => {
       arts: new Map([[show.id, { logo, backdrop }]]),
       home: { inProgress: [{ media: episode, poster: season }], shelves: [] },
       libraries: [],
+      albumShelves: [],
       api: homeApi(),
       headersFor,
     })
@@ -225,6 +234,7 @@ describe('homeShelvesOf', () => {
     })
     const [shelf] = homeShelvesOf({
       arts: NO_ARTS,
+      albumShelves: [],
       home: { inProgress: [{ media: episode, poster: null }], shelves: [] },
       libraries: [],
       api: homeApi(),
@@ -248,6 +258,7 @@ describe('homeShelvesOf', () => {
     }))
     const shelves = homeShelvesOf({
       arts: NO_ARTS,
+      albumShelves: [],
       home: { ...HOME, inProgress: many },
       libraries: [FILMS, SERIES],
       api: homeApi(),
@@ -265,6 +276,7 @@ describe('homeShelvesOf', () => {
   it('says Continue watching holds no more when it shows them all', () => {
     const [continuing] = homeShelvesOf({
       arts: NO_ARTS,
+      albumShelves: [],
       home: HOME,
       libraries: [FILMS, SERIES],
       api: homeApi(),
@@ -276,6 +288,7 @@ describe('homeShelvesOf', () => {
   it('leaves out a shelf for a library not in the list, and an empty Continue watching', () => {
     const shelves = homeShelvesOf({
       arts: NO_ARTS,
+      albumShelves: [],
       home: { ...HOME, inProgress: [] },
       libraries: [SERIES],
       api: homeApi(),
@@ -285,10 +298,59 @@ describe('homeShelvesOf', () => {
   })
 })
 
+describe('homeRowsOf', () => {
+  it("puts a music library's albums in its row, and leaves every other shelf as it is", () => {
+    const albums = [{ ...OK_COMPUTER, id: 2 }]
+    const rows = homeRowsOf({
+      shelves: [...HOME.shelves, { libraryId: 7, type: HOME_SHELF_TYPES.media, media: [] }],
+      albumShelves: [{ libraryId: 7, albums }],
+    })
+    expect(rows.map(({ libraryId, type }) => ({ libraryId, type }))).toEqual([
+      { libraryId: FILMS.id, type: HOME_ROW_TYPES.media },
+      { libraryId: SERIES.id, type: HOME_ROW_TYPES.shows },
+      { libraryId: 7, type: HOME_ROW_TYPES.albums },
+    ])
+    expect(rows[2]).toEqual({ libraryId: 7, type: HOME_ROW_TYPES.albums, albums })
+  })
+
+  it('keeps a shelf of shows even where albums were read for its library', () => {
+    const rows = homeRowsOf({
+      shelves: HOME.shelves,
+      albumShelves: [{ libraryId: SERIES.id, albums: [OK_COMPUTER] }],
+    })
+    expect(rows.map(({ type }) => type)).toEqual([HOME_ROW_TYPES.media, HOME_ROW_TYPES.shows])
+  })
+})
+
 describe('libraryShelvesOf', () => {
+  it("shows a music library's row as its albums, square covers in the server's order", () => {
+    const [shelf] = libraryShelvesOf({
+      rows: homeRowsOf({
+        shelves: [{ libraryId: FILMS.id, type: HOME_SHELF_TYPES.media, media: [] }],
+        albumShelves: [
+          {
+            libraryId: FILMS.id,
+            albums: [
+              { ...OK_COMPUTER, id: 2, title: 'Newest', coverVersion: 'v1' },
+              { ...OK_COMPUTER, id: 1, title: 'Older' },
+            ],
+          },
+        ],
+      }),
+      libraries: [FILMS],
+      api: homeApi(),
+      headersFor,
+    })
+    expect(shelf?.cards.map(({ key, title, shape }) => ({ key, title, shape }))).toEqual([
+      { key: 'album:2', title: 'Newest', shape: CARD_SHAPES.square },
+      { key: 'album:1', title: 'Older', shape: CARD_SHAPES.square },
+    ])
+    expect(shelf?.cards[0]?.picture?.uri).toContain('/albums/2')
+  })
+
   it('lays out what a search found as library shelves, leaving out a library not listed', () => {
     const shelves = libraryShelvesOf({
-      shelves: [...HOME.shelves, { libraryId: 9, type: HOME_SHELF_TYPES.media, media: [] }],
+      rows: [...HOME.shelves, { libraryId: 9, type: HOME_SHELF_TYPES.media, media: [] }],
       libraries: [FILMS, SERIES],
       api: homeApi(),
       headersFor,

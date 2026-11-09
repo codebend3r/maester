@@ -43,12 +43,14 @@ import { streamSizeFor } from '@/remoteAccess/remoteCap'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
+import { MEDIA_ROUTES } from '@/media/mediaRoutes'
 import { MediaTickets } from '@/media/mediaTickets'
 import {
   audioTrackOf,
   burnSubtitleOf,
   capHeight,
   refuseWhatSettingsTurnOff,
+  remuxDolbyVisionOf,
   sizeOnDisk,
   streamModeOf,
   videoEncodingOf,
@@ -65,7 +67,7 @@ import { StrictlyLimited } from '@/rateLimits/rateTiers'
  * the intro, credits and chapters, subtitles as WebVTT, and a converted stream for files or tracks the
  * browser cannot play directly.
  */
-@Controller('api/media')
+@Controller(MEDIA_ROUTES)
 @PrivateBy('media')
 export class PlaybackController {
   constructor(
@@ -215,6 +217,7 @@ export class PlaybackController {
       mode: streamMode,
       playback,
     })
+    const dolbyVision = await remuxDolbyVisionOf({ ffmpeg: this.ffmpeg, file, mode: streamMode })
 
     const child = this.ffmpeg.stream(
       streamArgs({
@@ -224,6 +227,7 @@ export class PlaybackController {
         audio: chosen?.index ?? null,
         audioOnly: isAudioContainer(file.container),
         videoCodec: file.videoCodec,
+        dolbyVision,
         tonemap,
         streamShift: STREAM_TIME_SHIFT,
         encoder,

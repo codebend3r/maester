@@ -31,10 +31,18 @@ import {
   startingSort,
 } from '@raven/core'
 import type { IconName } from '@raven/ui/iconDrawings'
-import { useSearch, KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
+import {
+  LIBRARY_LOCK_STATES,
+  type LibraryLock,
+  useSearch,
+  KeyedView,
+  type ViewOf,
+  type ViewsOf,
+  lockState,
+} from '@raven/ui/headless'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { type ReactNode, useState } from 'react'
+import { useState } from 'react'
 
 import { MusicPages } from '@/music/MusicPages'
 import { hasSagas } from '@/queries/sagaCards'
@@ -49,6 +57,8 @@ import { usePictures } from '@/queries/usePictures'
 import { Grid, Loading, Picker, SearchField, ToolButton } from '@/layouts'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
 import { LIBRARY_COPY } from '@/screens/copy'
+import { LockedLibrary, type LockedLibraryProps } from '@/screens/LockedLibrary'
+import { type PageFrame, type PageTab, PageTools } from '@/screens/PageTools'
 import { shuffleDeal } from '@/screens/shuffleDeal'
 import { useVideoQueue } from '@/stores/videoQueue'
 import type { LoadingProps } from '@/layouts/loadingKit'
@@ -64,11 +74,12 @@ const LIBRARY_PAGES = { continue: 'continue', library: 'library', sagas: 'sagas'
 
 type LibraryPage = (typeof LIBRARY_PAGES)[keyof typeof LIBRARY_PAGES]
 
-const PAGE_NAMES = {
-  [LIBRARY_PAGES.continue]: CONTINUE_WATCHING,
-  [LIBRARY_PAGES.library]: LIBRARY_COPY.library,
-  [LIBRARY_PAGES.sagas]: LIBRARY_COPY.sagas,
-} as const satisfies Record<LibraryPage, string>
+/** What each page's button says and draws: the web's icons for them. */
+const PAGE_TABS = {
+  [LIBRARY_PAGES.continue]: { name: CONTINUE_WATCHING, icon: 'history' },
+  [LIBRARY_PAGES.library]: { name: LIBRARY_COPY.library, icon: 'libraries' },
+  [LIBRARY_PAGES.sagas]: { name: LIBRARY_COPY.sagas, icon: 'covers' },
+} as const satisfies Record<LibraryPage, PageTab>
 
 /** What each view's chip draws beside its name: the web's icons for the views. */
 const VIEW_ICONS = {
@@ -79,38 +90,11 @@ const VIEW_ICONS = {
   [LIBRARY_VIEWS.grouped]: 'grouped',
 } as const satisfies Record<LibraryView, IconName>
 
-/** What each page's button draws beside its name, the web's icons for them. */
-const PAGE_ICONS = {
-  [LIBRARY_PAGES.continue]: 'history',
-  [LIBRARY_PAGES.library]: 'libraries',
-  [LIBRARY_PAGES.sagas]: 'covers',
-} as const satisfies Record<LibraryPage, IconName>
-
 /** The pages a library has, in the order their buttons stand: Sagas only where files are matched to movies. */
 const pagesOf = (kind: LibraryKind): LibraryPage[] =>
   hasSagas(kind)
     ? [LIBRARY_PAGES.continue, LIBRARY_PAGES.library, LIBRARY_PAGES.sagas]
     : [LIBRARY_PAGES.continue, LIBRARY_PAGES.library]
-
-type PageTogglesProps = {
-  page: LibraryPage
-  pages: readonly LibraryPage[]
-  onChange: (page: LibraryPage) => void
-}
-
-/** A press to each of the other pages, each named for where it goes. */
-const PageToggles = ({ page, pages, onChange }: PageTogglesProps) =>
-  pages
-    .filter((other) => other !== page)
-    .map((other) => (
-      <ToolButton
-        accessibilityLabel={LIBRARY_COPY.showPage(PAGE_NAMES[other])}
-        icon={PAGE_ICONS[other]}
-        key={other}
-        label={PAGE_NAMES[other]}
-        onPress={() => onChange(other)}
-      />
-    ))
 
 type ShuffleButtonProps = { library: LibraryRecord; choices: readonly MediaItem[] }
 
@@ -144,7 +128,8 @@ type LibraryToolbarProps = {
 
 /**
  * Sort, its direction, view and, in the grouped view, the grouping, as the web's toolbar
- * offers them: each the library's type's own, so a sort it cannot use is never offered.
+ * offers them: each the library's type's own, so a sort it cannot use is never offered. Under
+ * the thumb only Sort shows its word and its value; the rest are their icons alone.
  */
 const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
   const parts = sortParts(settings.sort)
@@ -172,6 +157,7 @@ const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
       )}
       <Picker
         icon={VIEW_ICONS[settings.view]}
+        isIconOnly
         label={LIBRARY_COPY.view}
         onChoose={(view) => onChange({ view })}
         options={appViewsFor(settings.kind).map((view) => ({
@@ -183,6 +169,7 @@ const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
       {settings.view === LIBRARY_VIEWS.grouped && (
         <Picker
           icon="grouped"
+          isIconOnly
           label={LIBRARY_COPY.groupBy}
           onChoose={(groupBy) => onChange({ groupBy })}
           options={groupingsFor(settings.kind).map((grouping) => ({
@@ -237,23 +224,22 @@ const useListing = ({ queries, library, settings, search, seed }: UseListingProp
   return { listed, error: query.error, isStandIn: query.isPlaceholderData }
 }
 
+/** What a library's pages share: the page open, the pages, and the library the toolbar frames. */
+type LibraryFrame = PageFrame<LibraryPage>
+
 type ContinueGridProps = {
   session: AppQueries
   library: LibraryRecord
   entries: readonly PosterEntry[]
-  toggle: ReactNode
+  frame: LibraryFrame
 }
 
 /**
  * A library's Continue watching page: its videos with a saved spot, most recently watched
  * first, wide as Home's shelf draws them, under the library's name and the way to its listing.
  */
-const ContinueGrid = ({
-  session: { server, api, queries },
-  library,
-  entries,
-  toggle,
-}: ContinueGridProps) => {
+const ContinueGrid = ({ session, library, entries, frame }: ContinueGridProps) => {
+  const { server, api, queries } = session
   const router = useRouter()
   const pictures = usePictures({ server, api })
   const arts = useShowArts({ queries, ids: showArtIdsOf(entries), pictures })
@@ -270,10 +256,9 @@ const ContinueGrid = ({
       sections={sections}
       title={library.name}
       toolbar={
-        <>
-          {toggle}
+        <PageTools frame={frame}>
           <ShuffleButton choices={entries.map((entry) => entry.media)} library={library} />
-        </>
+        </PageTools>
       }
       view={LIBRARY_VIEWS.grid}
     />
@@ -284,20 +269,15 @@ type LibraryGridProps = {
   session: AppQueries
   library: LibraryRecord
   asked: string
-  /** The way to the Continue watching page, first in the toolbar. */
-  toggle: ReactNode
+  frame: LibraryFrame
 }
 
 /**
  * A library once it is known: its cards, laid out as this device last left it, of those its
  * search finds. The search starts on the one it was opened with.
  */
-const LibraryGrid = ({
-  session: { server, api, queries },
-  library,
-  asked,
-  toggle,
-}: LibraryGridProps) => {
+const LibraryGrid = ({ session, library, asked, frame }: LibraryGridProps) => {
+  const { server, api, queries } = session
   const router = useRouter()
   const view = useLibraryView({ serverId: server.id, library })
   const search = useSearch({ initial: asked })
@@ -357,14 +337,13 @@ const LibraryGrid = ({
       sections={sections}
       title={library.name}
       toolbar={
-        <>
-          {toggle}
+        <PageTools frame={frame}>
           <ShuffleButton
             choices={listed === null ? [] : shuffleChoices(listed)}
             library={library}
           />
           <LibraryToolbar onChange={view.change} settings={settings} />
-        </>
+        </PageTools>
       }
       view={settings.view}
     />
@@ -384,7 +363,7 @@ type LibraryPagesViewProps = {
   [LIBRARY_PAGES_VIEW_KEYS.loading]: LoadingProps
   [LIBRARY_PAGES_VIEW_KEYS.continue]: ContinueGridProps
   [LIBRARY_PAGES_VIEW_KEYS.library]: LibraryGridProps
-  [LIBRARY_PAGES_VIEW_KEYS.sagas]: SagasGridProps
+  [LIBRARY_PAGES_VIEW_KEYS.sagas]: SagasGridProps<LibraryPage>
 }
 
 const LIBRARY_PAGES_VIEWS = {
@@ -395,36 +374,34 @@ const LIBRARY_PAGES_VIEWS = {
 } as const satisfies ViewsOf<LibraryPagesViewProps>
 
 type LibraryPagesViewOfProps = LibraryPagesProps & {
-  page: LibraryPage
+  frame: LibraryFrame
   isWaiting: boolean
   entries: readonly PosterEntry[]
-  toggle: ReactNode
   onBack: () => void
 }
 
 const libraryPagesViewOf = ({
-  page,
+  frame,
   isWaiting,
   entries,
-  toggle,
   onBack,
   ...shown
 }: LibraryPagesViewOfProps): ViewOf<LibraryPagesViewProps> => {
   if (isWaiting) {
     return { key: LIBRARY_PAGES_VIEW_KEYS.loading, props: { label: LIBRARY_COPY.opening, onBack } }
   }
-  switch (page) {
+  switch (frame.page) {
     case LIBRARY_PAGES.continue:
-      return { key: LIBRARY_PAGES_VIEW_KEYS.continue, props: { ...shown, entries, toggle } }
+      return { key: LIBRARY_PAGES_VIEW_KEYS.continue, props: { ...shown, entries, frame } }
     case LIBRARY_PAGES.library:
-      return { key: LIBRARY_PAGES_VIEW_KEYS.library, props: { ...shown, toggle } }
+      return { key: LIBRARY_PAGES_VIEW_KEYS.library, props: { ...shown, frame } }
     case LIBRARY_PAGES.sagas:
       return {
         key: LIBRARY_PAGES_VIEW_KEYS.sagas,
-        props: { session: shown.session, library: shown.library, toggle },
+        props: { session: shown.session, library: shown.library, frame },
       }
     default: {
-      const unknown: never = page
+      const unknown: never = frame.page
       return unknown
     }
   }
@@ -444,12 +421,16 @@ const LibraryPages = (props: LibraryPagesProps) => {
   const page = chosen ?? (isContinuing ? LIBRARY_PAGES.continue : LIBRARY_PAGES.library)
   const view = libraryPagesViewOf({
     ...props,
-    page,
+    frame: {
+      page,
+      pages: pagesOf(props.library.settings.kind),
+      tabs: PAGE_TABS,
+      onChange: setChosen,
+      library: props.library,
+      api: props.session.api,
+    },
     isWaiting: entries === null && inProgress.isPending && chosen === null,
     entries: entries ?? [],
-    toggle: (
-      <PageToggles onChange={setChosen} page={page} pages={pagesOf(props.library.settings.kind)} />
-    ),
     onBack: () => router.back(),
   })
   return <KeyedView<LibraryPagesViewProps> view={view} views={LIBRARY_PAGES_VIEWS} />
@@ -498,6 +479,7 @@ const ReadyMusic = (props: ReadyMusicProps) => <MusicPages key={props.library.id
 const LIBRARY_VIEW_KEYS = {
   notice: 'notice',
   loading: 'loading',
+  locked: 'locked',
   ready: 'ready',
   music: 'music',
 } as const
@@ -505,6 +487,7 @@ const LIBRARY_VIEW_KEYS = {
 type LibraryViewProps = {
   [LIBRARY_VIEW_KEYS.notice]: LibraryNoticeProps
   [LIBRARY_VIEW_KEYS.loading]: LoadingProps
+  [LIBRARY_VIEW_KEYS.locked]: LockedLibraryProps
   [LIBRARY_VIEW_KEYS.ready]: ReadyLibraryProps
   [LIBRARY_VIEW_KEYS.music]: ReadyMusicProps
 }
@@ -512,13 +495,50 @@ type LibraryViewProps = {
 const LIBRARY_PAGE_VIEWS = {
   [LIBRARY_VIEW_KEYS.notice]: LibraryNotice,
   [LIBRARY_VIEW_KEYS.loading]: Loading,
+  [LIBRARY_VIEW_KEYS.locked]: LockedLibrary,
   [LIBRARY_VIEW_KEYS.ready]: ReadyLibrary,
   [LIBRARY_VIEW_KEYS.music]: ReadyMusic,
 } as const satisfies ViewsOf<LibraryViewProps>
 
 type LibraryViewOfProps = Omit<ServerLibraryProps, 'id'> & {
   page: RouteQuery<LibraryRecord>
+  /** Where the library stands with the PIN, once it is known. */
+  lock: LibraryLock
   onBack: () => void
+}
+
+type KnownLibraryViewOfProps = Omit<LibraryViewOfProps, 'page'> & { library: LibraryRecord }
+
+/**
+ * A known library's view: the lock in place of its pages while it is shut here, the mark while
+ * the server has yet to say, and its pages, a music library's its own, once it is open.
+ */
+const knownLibraryViewOf = ({
+  library,
+  lock,
+  session,
+  asked,
+  onBack,
+}: KnownLibraryViewOfProps): ViewOf<LibraryViewProps> => {
+  switch (lock.state) {
+    case LIBRARY_LOCK_STATES.shut:
+      return {
+        key: LIBRARY_VIEW_KEYS.locked,
+        props: { session, library, canUnlock: lock.canUnlock },
+      }
+    case LIBRARY_LOCK_STATES.checking:
+      return { key: LIBRARY_VIEW_KEYS.loading, props: { label: LIBRARY_COPY.opening, onBack } }
+    case LIBRARY_LOCK_STATES.open: {
+      const props = { asked, library, session }
+      return listingFor(library.settings.kind) === LIBRARY_LISTINGS.albums
+        ? { key: LIBRARY_VIEW_KEYS.music, props }
+        : { key: LIBRARY_VIEW_KEYS.ready, props }
+    }
+    default: {
+      const unknown: never = lock
+      return unknown
+    }
+  }
 }
 
 const noticeView = (notice: string): ViewOf<LibraryViewProps> => ({
@@ -528,6 +548,7 @@ const noticeView = (notice: string): ViewOf<LibraryViewProps> => ({
 
 const libraryViewOf = ({
   page,
+  lock,
   session,
   asked,
   onBack,
@@ -539,12 +560,8 @@ const libraryViewOf = ({
       return noticeView(page.message)
     case ROUTE_STATES.loading:
       return { key: LIBRARY_VIEW_KEYS.loading, props: { label: LIBRARY_COPY.opening, onBack } }
-    case ROUTE_STATES.ready: {
-      const props = { asked, library: page.data, session }
-      return listingFor(page.data.settings.kind) === LIBRARY_LISTINGS.albums
-        ? { key: LIBRARY_VIEW_KEYS.music, props }
-        : { key: LIBRARY_VIEW_KEYS.ready, props }
-    }
+    case ROUTE_STATES.ready:
+      return knownLibraryViewOf({ library: page.data, lock, session, asked, onBack })
     default: {
       const unknown: never = page
       return unknown
@@ -564,8 +581,12 @@ const ServerLibrary = ({ session, id, asked }: ServerLibraryProps) => {
         (entry) => entry.id === id,
       ),
   })
+  // The lock is asked for only when the library is locked, as the web's `useLibraryLock` does.
+  const isLocked = library.data?.settings.locked ?? false
+  const lock = useQuery({ ...queries.lockQuery, enabled: isLocked })
   const view = libraryViewOf({
     page: routeState({ id, query: library }),
+    lock: lockState({ isLocked, lock: lock.data }),
     session,
     asked,
     onBack: () => router.back(),

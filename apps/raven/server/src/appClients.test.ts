@@ -28,10 +28,11 @@ const routeOf = ({ method, path }: AppClientCall) =>
 
 /**
  * The spec's writes (progress, plays, watched, the favourites), and the admin lock's
- * unlock, ruled in by Task 17; and the account's playlists and its album and artist favourites,
- * by the audio spec's PR 7; and the account's scrobbling links, a playlist's sharing and its
- * copies, by the music spec's PR 10; and the account's binge list, by the device Home's binge cards;
- * and the owner's own, which only `APP_OWNER_CALLS` lists, by the app's admin settings.
+ * unlock, ruled in by Task 17; the PIN's unlock and lock, by the owner's unlock on the iPad;
+ * and the account's playlists and its album and artist favourites, by the audio spec's PR 7;
+ * and the account's scrobbling links, a playlist's sharing and its copies, by the music spec's
+ * PR 10; and the account's binge list, by the device Home's binge cards; and the owner's own,
+ * which only `APP_OWNER_CALLS` lists, by the app's admin settings.
  */
 const WRITES = [
   APP_CLIENT_CALLS.saveProgress,
@@ -55,6 +56,8 @@ const WRITES = [
   APP_CLIENT_CALLS.startLastFm,
   APP_CLIENT_CALLS.unlinkScrobbling,
   APP_CLIENT_CALLS.unlockAdmin,
+  APP_CLIENT_CALLS.unlock,
+  APP_CLIENT_CALLS.lock,
   APP_OWNER_CALLS.setPlaybackSettings,
   APP_OWNER_CALLS.setDisplaySettings,
   APP_OWNER_CALLS.setRemoteAccess,
@@ -167,6 +170,8 @@ describe('the calls raven’s app may make', () => {
       api.startLastFm({ returnTo: SCROBBLE_RETURNS.wren }),
       api.unlinkScrobbling({ service: SCROBBLE_SERVICES.lastFm }),
       api.unlockAdmin('password'),
+      api.unlock('1234'),
+      api.lock(),
       api.setPlaybackSettings({ transcoding: TRANSCODINGS.remuxOnly }),
       api.setDisplaySettings({ titles: TITLE_DISPLAYS.text }),
       api.setRemoteAccess({}),

@@ -30,9 +30,8 @@ const CONTINUE_VIEWS = {
 
 type ServerContinueWatchingProps = { session: AppQueries }
 
-const ServerContinueWatching = ({
-  session: { server, api, queries },
-}: ServerContinueWatchingProps) => {
+const ServerContinueWatching = ({ session }: ServerContinueWatchingProps) => {
+  const { server, api, queries } = session
   const router = useRouter()
   const home = useQuery(queries.homeQuery)
   const pictures = usePictures({ server, api })

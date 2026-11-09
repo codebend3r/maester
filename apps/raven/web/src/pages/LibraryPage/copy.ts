@@ -1,17 +1,6 @@
-import { MUSIC_SORTS, type MusicSort, SORT_DIRECTIONS, plural } from '@raven/core'
+import { MUSIC_ORDER_LABELS, MUSIC_SORT_LABELS, plural } from '@raven/core'
 
 import { COMMON_COPY } from '@/lib/copy'
-
-const SORT_LABELS = {
-  [MUSIC_SORTS.title]: COMMON_COPY.title,
-  [MUSIC_SORTS.artist]: 'Album Artist',
-  [MUSIC_SORTS.year]: COMMON_COPY.year,
-  [MUSIC_SORTS.added]: 'Date Added',
-  [MUSIC_SORTS.release]: 'Release Date',
-  [MUSIC_SORTS.played]: 'Date Played',
-  [MUSIC_SORTS.plays]: 'Plays',
-  [MUSIC_SORTS.random]: 'Randomly',
-} as const satisfies Record<MusicSort, string>
 
 type FinishedEmptyProps = { name: string; percent: number }
 
@@ -69,12 +58,9 @@ export const LIBRARY_COPY = {
   searchArtists: 'Search artists',
   noArtists: (name: string) => `No artists in ${name} yet.`,
   artists: 'Artists',
-  sortLabels: SORT_LABELS,
+  sortLabels: MUSIC_SORT_LABELS,
   reverseOrder: 'Reverse sort order',
-  directions: {
-    [SORT_DIRECTIONS.ascending]: 'Ascending',
-    [SORT_DIRECTIONS.descending]: 'Descending',
-  },
+  directions: MUSIC_ORDER_LABELS,
   albumCount: (count: number) => plural({ n: count, one: 'album', many: 'albums' }),
   loadingArtists: 'Loading artists',
   sectionLabels: {

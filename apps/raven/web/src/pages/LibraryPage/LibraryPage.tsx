@@ -2,14 +2,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type Library, ROUTE_STATES, type RouteQuery, routeState } from '@raven/core'
 import { useId } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
-import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
+import { KeyedView, LIBRARY_LOCK_STATES, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { LibraryActionErrors, useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { libraryPollDelay } from '@/lib/libraryPolling'
-import { LIBRARY_LOCK_STATES, useLibraryLock } from '@/lib/libraryLock'
+import { useLibraryLock } from '@/lib/libraryLock'
 import { librariesQuery, libraryQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
 import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
@@ -45,7 +45,7 @@ const OpenLibrary = ({ library, section, titleId, lock, actions }: OpenLibraryPr
       <LibraryHeader titleId={titleId} library={library} actions={actions} isShut={isShut} />
 
       {lock.state === LIBRARY_LOCK_STATES.shut && (
-        <LockedLibrary name={library.name} available={lock.available} />
+        <LockedLibrary name={library.name} available={lock.canUnlock} />
       )}
 
       {!isShut && (

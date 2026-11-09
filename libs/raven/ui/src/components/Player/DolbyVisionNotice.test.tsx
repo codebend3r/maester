@@ -16,6 +16,7 @@ const streamsOf = (isDolbyVisionOnly: boolean): MediaStreams => ({
     bitrate: null,
     range: isDolbyVisionOnly ? 'dolbyVision' : 'hdr10',
     isDolbyVisionOnly,
+    dolbyVision: null,
   },
   audio: [],
 })

@@ -329,16 +329,23 @@ describe('Player on a phone or tablet', () => {
     expect(drawnVideo.seek).toHaveBeenLastCalledWith(100)
   })
 
-  it("mutes and unmutes from the speaker, which sits by the volume's slider", async () => {
+  it('mutes and unmutes from the speaker, and holding it stands the volume slider over it', async () => {
     usePlayerPrefs.setState({ volume: 0.6, muted: false })
     await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
     const props = await loadedVideo()
     await start(props)
-    expect(screen.getByRole('adjustable', { name: PLAYER_COPY.volume })).toBeTruthy()
+    expect(screen.queryByRole('adjustable', { name: PLAYER_COPY.volume })).toBeNull()
+    await fireEvent(screen.getByRole('button', { name: PLAYER_COPY.mute }), 'longPress')
+    const slider = screen.getByRole('adjustable', { name: PLAYER_COPY.volume })
+    expect(slider.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 60 })
+    await fireEvent(slider, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } })
+    expect(usePlayerPrefs.getState().volume).toBe(0.7)
     await fireEvent.press(screen.getByRole('button', { name: PLAYER_COPY.mute }))
     expect(usePlayerPrefs.getState().muted).toBe(true)
     expect(await screen.findByRole('button', { name: PLAYER_COPY.unmute })).toBeTruthy()
     expect(drawnVideo.props?.muted).toBe(true)
+    await fireEvent(screen.getByRole('button', { name: PLAYER_COPY.unmute }), 'longPress')
+    expect(screen.queryByRole('adjustable', { name: PLAYER_COPY.volume })).toBeNull()
   })
 
   it('holds the video paused, seeks to the resume spot once loaded, and plays when the seek lands', async () => {
@@ -418,7 +425,6 @@ describe('Player on a phone or tablet', () => {
       PLAYER_COPY.back(SKIP_SECONDS),
       PLAYER_COPY.pause,
       PLAYER_COPY.forward(SKIP_SECONDS),
-      PLAYER_COPY.pictureInPicture,
     ].forEach((name) => {
       expect(screen.getByRole('button', { name })).toBeTruthy()
       expect(screen.queryByText(name)).toBeNull()
@@ -465,7 +471,7 @@ describe('Player on a phone or tablet', () => {
     const chip = screen.getByRole('button', { name: 'Subtitles: English' })
     expect(overPicture.quiet).not.toBe(palette.quiet)
     expect(overPicture.text).not.toBe(palette.text)
-    ;['Subtitles: English', 'Picture in Picture', 'Back'].forEach((name) => {
+    ;['Subtitles: English', 'Back'].forEach((name) => {
       expect(styleOf(screen.getByRole('button', { name }))?.backgroundColor ?? null).toBe(
         overPicture.quiet,
       )

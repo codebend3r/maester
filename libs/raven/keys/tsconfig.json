@@ -1,0 +1,9 @@
+{
+  // A local Expo module the device app bundles from source through Metro.
+  "extends": "../../../tooling/tsconfig/react-native.json",
+  "compilerOptions": {
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["react-native", "bun"]
+  },
+  "include": ["src"]
+}

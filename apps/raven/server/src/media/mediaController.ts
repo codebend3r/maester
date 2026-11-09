@@ -1,4 +1,4 @@
-import { createReadStream } from 'node:fs'
+import { type Stats, createReadStream } from 'node:fs'
 import { stat, unlink } from 'node:fs/promises'
 import {
   BadRequestException,
@@ -24,6 +24,8 @@ import {
 import {
   AUDIO_BITRATE_PARAM,
   AUDIO_BITRATES,
+  DEVICE_DOWNLOAD_PATHS,
+  type DeviceDownload,
   type MediaItem,
   type MediaLocation,
   type PlaybackMode,
@@ -57,12 +59,14 @@ import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
+import { DeviceDownloadCache } from '@/media/deviceDownloadCache'
 import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
 import { FilePasses } from '@/media/filePasses'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MediaRepository } from '@/media/mediaRepository'
+import { MEDIA_ROUTES, routeOf } from '@/media/mediaRoutes'
 import { RANGE_OUTCOMES, RANGE_UNITS, parseRange } from '@/media/range'
 import { ViewingAccounts } from '@/media/viewingAccounts'
 import { ServerEvents } from '@/events/serverEvents'
@@ -103,7 +107,12 @@ const deleteFailure = (error: unknown): string => {
   return `Could not delete the file${code ? ` (${code})` : ''}.`
 }
 
+const MISSING_FILE = 'The file is no longer on disk'
+
 type MediaControllerFindProps = { id: number; account: AccountKey }
+
+/** A media's indexed file and what it is on disk now, which may have changed since the last scan. */
+type MediaSource = { file: MediaFile; source: Stats }
 
 type MediaControllerSendRangesProps = {
   id: number
@@ -114,9 +123,11 @@ type MediaControllerSendRangesProps = {
   purpose: unknown
   request: FastifyRequest
   reply: FastifyReply
+  /** Runs once the response has closed, or at once when it never opens. */
+  onEnd?: () => void
 }
 
-@Controller('api/media')
+@Controller(MEDIA_ROUTES)
 @PrivateBy('media')
 export class MediaController {
   private readonly logger = new Logger(MediaController.name)
@@ -134,7 +145,9 @@ export class MediaController {
     @Inject(ServerEvents) private readonly events: ServerEvents,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
     @Inject(FilePasses) private readonly passes: Pick<FilePasses, 'hold'>,
-    @Inject(TranscodeCache) private readonly transcodes: Pick<TranscodeCache, 'fileFor'>,
+    @Inject(TranscodeCache) private readonly transcodes: Pick<TranscodeCache, 'fileFor' | 'hold'>,
+    @Inject(DeviceDownloadCache)
+    private readonly copies: Pick<DeviceDownloadCache, 'prepare' | 'open'>,
     @Inject(ScrobbleSender) private readonly scrobbles: Pick<ScrobbleSender, 'noteListen'>,
     @Inject(LockService) private readonly lock: LockService,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
@@ -150,6 +163,14 @@ export class MediaController {
     const file = this.index.fileOf(id)
     if (!file) throw new NotFoundException(`No media ${id}`)
     return file
+  }
+
+  /** The file as it is on disk, for what is made of it; 404 when the index names one that is gone. */
+  private async sourceOf(id: number): Promise<MediaSource> {
+    const file = this.fileOf(id)
+    const source = await stat(file.path).catch(() => null)
+    if (source === null || !source.isFile()) throw new NotFoundException(MISSING_FILE)
+    return { file, source }
   }
 
   @Get(':id')
@@ -359,12 +380,10 @@ export class MediaController {
         `${AUDIO_BITRATE_PARAM} must be one of ${Object.values(AUDIO_BITRATES).join(', ')}`,
       )
     }
-    const file = this.fileOf(id)
+    const { file, source } = await this.sourceOf(id)
     if (!isAudioContainer(file.container)) {
       throw new ConflictException('Only a track can be converted to AAC.')
     }
-    const source = await stat(file.path).catch(() => null)
-    if (!source?.isFile()) throw new NotFoundException('The file is no longer on disk')
     const path = await this.transcodes
       .fileFor({
         mediaId: id,
@@ -387,6 +406,66 @@ export class MediaController {
       purpose,
       request,
       reply,
+      onEnd: this.transcodes.hold(path),
+    })
+  }
+
+  /**
+   * Where the MP4 copy of a video stands, for a device whose player cannot open the
+   * original (an MKV on an iPad): asking starts it when none is cached or running, and the
+   * device asks again every few seconds until it is `ready`, then downloads `deviceDownloadFile`.
+   * The copy is of the file on disk, so a file changed since the last scan gets a new one.
+   * This asks `find`, the viewer's own view of the media, since the route is the account's;
+   * `deviceDownloadFile` is on the media plane, where the ticket or pass that opens it
+   * already stands for the account, so it reads the file alone.
+   */
+  @Get(routeOf(DEVICE_DOWNLOAD_PATHS.prepare))
+  async deviceDownload(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): Promise<DeviceDownload> {
+    const media = this.find({ id, account: this.accounts.keyOf({ request }) })
+    const { file, source } = await this.sourceOf(media.id)
+    if (isAudioContainer(file.container)) {
+      throw new ConflictException('Only a video is copied for a device.')
+    }
+    return this.copies.prepare({
+      mediaId: id,
+      path: file.path,
+      mtimeMs: source.mtimeMs,
+      durationSeconds: file.duration,
+      videoCodec: file.videoCodec,
+    })
+  }
+
+  /**
+   * The finished MP4 copy `deviceDownload` made, with byte ranges, tickets and passes as
+   * `file` serves the original, so a long download outlives its ticket and resumes by range.
+   * A copy not made yet, or one being made again, is a 409.
+   */
+  @MediaPlane()
+  @OpenedByPass(PASS_KINDS.ticket)
+  @Get(routeOf(DEVICE_DOWNLOAD_PATHS.file))
+  async deviceDownloadFile(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Query(MEDIA_TICKET_PARAM) ticket: unknown,
+    @Query(MEDIA_PURPOSE_PARAM) purpose: unknown,
+    @Req() request: FastifyRequest,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const { source } = await this.sourceOf(id)
+    const copy = await this.copies.open({ mediaId: id, mtimeMs: source.mtimeMs })
+    if (!copy) throw new ConflictException('The copy for this device is not ready yet.')
+    await this.sendRanges({
+      id,
+      path: copy.path,
+      contentType: RAVEN_CONTENT_TYPES.mp4,
+      mode: PLAYBACK_MODES.remux,
+      ticket,
+      purpose,
+      request,
+      reply,
+      onEnd: copy.release,
     })
   }
 
@@ -403,9 +482,14 @@ export class MediaController {
     purpose,
     request,
     reply,
+    onEnd,
   }: MediaControllerSendRangesProps): Promise<void> {
     const info = await stat(path).catch(() => null)
-    if (!info?.isFile()) throw new NotFoundException('The file is no longer on disk')
+    if (info === null || !info.isFile()) {
+      // No response opens, so nothing would run `onEnd` later.
+      onEnd?.()
+      throw new NotFoundException(MISSING_FILE)
+    }
     const passEnded = this.passes.hold({ request, ticket, mediaId: id })
     const size = info.size
     const range = parseRange({ header: request.headers.range, size })
@@ -422,6 +506,7 @@ export class MediaController {
       from: range == null || range === RANGE_OUTCOMES.unsatisfiable ? 0 : range.start,
       request,
       reply,
+      onEnd,
     })
     reply
       .header(RAVEN_HEADERS.acceptRanges, RANGE_UNITS.bytes)

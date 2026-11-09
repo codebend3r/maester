@@ -1,19 +1,19 @@
 import type { AlbumTrack } from '@raven/ui/headless'
 import { type AccessibilityActionEvent, Pressable, StyleSheet, View } from 'react-native'
 
-import { BUTTON_TONES } from '@/layouts/formKit'
-import { touchForm } from '@/layouts/Form.touch'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type AlbumLayoutProps, ROW_ACTIONS } from '@/layouts/musicKit'
-import { Cover, FavouriteButton, TouchPage, useMusicStyles } from '@/layouts/MusicParts.touch'
-import { touchPicker } from '@/layouts/Picker.touch'
+import {
+  Cover,
+  FavouriteButton,
+  IconPlate,
+  TouchPage,
+  useMusicStyles,
+} from '@/layouts/MusicParts.touch'
 import { openAddToPlaylistSheet } from '@/layouts/playlistSheets'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
-
-const { FormButton } = touchForm
-const { ToolButton } = touchPicker
 
 /** What the screen reader offers on a track row besides playing it. */
 const TRACK_ACTIONS = [{ name: ROW_ACTIONS.addToPlaylist, label: MUSIC_COPY.addToPlaylist }]
@@ -72,7 +72,11 @@ const TrackRow = ({ track, isPlaying, onPress, onAddToPlaylist }: TrackRowProps)
 /** What one Add to playlist sheet is for: a track by its place and title, or the album's whole. */
 type AddFromProps = { index: number | null; name: string }
 
-/** An album under the thumb: one page scrolled, the cover over the actions and the tracks. */
+/**
+ * An album under the thumb: one page scrolled, the cover over one row of round icon plates
+ * (Play filled, Shuffle, Play next, Add to queue, Add to playlist, Favourite, Download) and the
+ * tracks.
+ */
 export const AlbumLayout = ({
   title,
   artists,
@@ -91,6 +95,7 @@ export const AlbumLayout = ({
   playlists,
   onAddToPlaylist,
   note,
+  download,
   onBack,
 }: AlbumLayoutProps) => {
   const styles = useMusicStyles()
@@ -119,29 +124,34 @@ export const AlbumLayout = ({
         ))}
         <Text style={styles.muted}>{facts}</Text>
         <View style={styles.controls}>
-          <FormButton label={MUSIC_COPY.play} onPress={onPlay} tone={BUTTON_TONES.primary} />
-          <FormButton label={MUSIC_COPY.shuffle} onPress={onShuffle} tone={BUTTON_TONES.quiet} />
-        </View>
-        <View style={styles.controls}>
-          <ToolButton
-            accessibilityLabel={MUSIC_COPY.playNext}
+          <IconPlate icon="play" isOn label={MUSIC_COPY.play} onPress={onPlay} />
+          <IconPlate icon="shuffle" isOn={false} label={MUSIC_COPY.shuffle} onPress={onShuffle} />
+          <IconPlate
             icon="skipNext"
+            isOn={false}
             label={MUSIC_COPY.playNext}
             onPress={onPlayNext}
           />
-          <ToolButton
-            accessibilityLabel={MUSIC_COPY.addToQueue}
+          <IconPlate
             icon="plus"
+            isOn={false}
             label={MUSIC_COPY.addToQueue}
             onPress={onAddToQueue}
           />
-          <ToolButton
-            accessibilityLabel={MUSIC_COPY.addToPlaylist}
+          <IconPlate
             icon="list"
+            isOn={false}
             label={MUSIC_COPY.addToPlaylist}
             onPress={() => addFrom({ index: null, name: title })}
           />
           <FavouriteButton isFavourite={isFavourite} onToggle={onFavourite} />
+          <IconPlate
+            icon={download.control.icon}
+            isDisabled={download.control.isDisabled}
+            isOn={download.control.isOn}
+            label={download.control.label}
+            onPress={download.onPress}
+          />
         </View>
         {note !== null && <Text style={styles.muted}>{note}</Text>}
       </View>

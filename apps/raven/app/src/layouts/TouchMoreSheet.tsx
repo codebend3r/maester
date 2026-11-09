@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { PINNED_HEADING, SETTINGS_ENTRY } from '@/layouts/shelfKit'
 import { SCRIM_OPACITY, SWIPE_START, slide } from '@/layouts/slide'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { isDroppedBy } from '@/layouts/touchMenuKit'
+import { TOUCH_NAV_COPY, isDroppedBy } from '@/layouts/touchMenuKit'
 import { MORE_COLUMNS, TOUCH_TABS_COPY } from '@/layouts/touchTabsKit'
 import { useMenuGo } from '@/layouts/useMenuGo'
 import { pinnedLibrariesOf } from '@/queries/pinnedLibraries'
@@ -63,7 +63,7 @@ type TouchMoreSheetProps = {
 
 /**
  * The More sheet, up from the bar over a dimmed scrim that shuts it when pressed: a handle,
- * its heading, Search and Settings, then the pinned libraries. A swipe down, an entry or the
+ * its heading, Search, Binge, Downloads and Settings, then the pinned libraries. A swipe down, an entry or the
  * accessibility escape shuts it too. It is drawn only while up or sliding.
  */
 export const TouchMoreSheet = ({
@@ -165,6 +165,18 @@ export const TouchMoreSheet = ({
                 label={TOUCH_TABS_COPY.search}
                 width={tileWidth}
                 onPress={() => choose(searchHrefOf(''))}
+              />
+              <MoreTile
+                icon="popcorn"
+                label={TOUCH_NAV_COPY.binge}
+                onPress={() => choose({ pathname: APP_ROUTES.binge, params: {} })}
+                width={tileWidth}
+              />
+              <MoreTile
+                icon="download"
+                label={TOUCH_NAV_COPY.downloads}
+                onPress={() => choose({ pathname: APP_ROUTES.downloads, params: {} })}
+                width={tileWidth}
               />
               <MoreTile
                 icon="settings"

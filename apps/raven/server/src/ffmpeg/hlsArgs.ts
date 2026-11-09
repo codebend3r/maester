@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import {
   type AudioTrack,
+  type DolbyVisionConfig,
   HLS_COPY_AUDIO,
   HLS_COPY_AUDIO_CODECS,
   HLS_SEGMENT_SECONDS,
@@ -12,8 +13,11 @@ import {
   type BurnSubtitle,
   QUIET,
   type TranscodeQuality,
+  UNOFFICIAL_COMPLIANCE,
   canvasArgs,
   copyVideo,
+  eac3OrCopyArgs,
+  isDolbyVisionCopy,
   secondsArg,
   transcodeVideo,
 } from '@/ffmpeg/args'
@@ -21,17 +25,6 @@ import type { VideoEncoder } from '@/ffmpeg/encoder'
 import { type HlsDialect, SEGMENT_CLOCKS } from '@/ffmpeg/ffmpegVersion'
 import { SEGMENT_FILE_PATTERN } from '@/hls/segmentFiles'
 import { type SegmentPlan, runSegmentTimes } from '@/hls/segmentPlan'
-
-/** E-AC-3 carries at most 5.1; a 7.1 track is folded down to it. */
-const EAC3_MAX_CHANNELS = 6
-const STEREO = 2
-
-/** E-AC-3's bitrate for a channel count: 5.1, the layouts between stereo and it, and stereo or mono. */
-const eac3Bitrate = (channels: number): string => {
-  if (channels >= EAC3_MAX_CHANNELS) return '640k'
-  if (channels > STEREO) return '448k'
-  return '224k'
-}
 
 const copiedCodec = (track: Pick<AudioTrack, 'codec'>): string | null =>
   HLS_COPY_AUDIO.find((codec) => codec === track.codec) ?? null
@@ -44,18 +37,8 @@ export const hlsAudioCodec = (track: Pick<AudioTrack, 'codec'>): string =>
  * How an HLS stream carries an audio track: copied when Apple's players and
  * ExoPlayer decode it in fMP4, else E-AC-3 keeping the channels it can.
  */
-export const hlsAudioArgs = (track: Pick<AudioTrack, 'codec' | 'channels'>): string[] => {
-  if (copiedCodec(track) != null) return ['-c:a', 'copy']
-  const channels = Math.min(Math.max(track.channels ?? STEREO, 1), EAC3_MAX_CHANNELS)
-  return [
-    '-c:a',
-    HLS_COPY_AUDIO_CODECS.eac3,
-    '-ac',
-    String(channels),
-    '-b:a',
-    eac3Bitrate(channels),
-  ]
-}
+export const hlsAudioArgs = (track: Pick<AudioTrack, 'codec' | 'channels'>): string[] =>
+  eac3OrCopyArgs({ track, copies: HLS_COPY_AUDIO })
 
 /**
  * The segment muxer's MP4 options. Without `frag_discont`, `use_editlist=0`
@@ -67,6 +50,22 @@ export const hlsAudioArgs = (track: Pick<AudioTrack, 'codec' | 'channels'>): str
  */
 const SEGMENT_MP4_OPTIONS =
   'movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont+delay_moov:use_editlist=0:avoid_negative_ts=disabled'
+
+type SegmentMp4OptionsProps = {
+  mode: StreamMode
+  videoCodec: string | null
+  dolbyVision: DolbyVisionConfig | null
+}
+
+/**
+ * The segment muxer hands its MP4 muxer these options but not its own
+ * compliance level, so a Dolby Vision copy's `strict=unofficial`, without
+ * which the init segment gets no `dvcC` box, goes in here as well.
+ */
+const segmentMp4Options = ({ mode, videoCodec, dolbyVision }: SegmentMp4OptionsProps): string =>
+  mode === PLAYBACK_MODES.remux && isDolbyVisionCopy({ videoCodec, dolbyVision })
+    ? `${SEGMENT_MP4_OPTIONS}:strict=${UNOFFICIAL_COMPLIANCE}`
+    : SEGMENT_MP4_OPTIONS
 
 /** How far a remux's cut may sit from its boundary: the truncated keyframe times' error. */
 const REMUX_CUT_TOLERANCE = 0.005
@@ -83,6 +82,8 @@ export type HlsSource = {
   /** The track to play, or null when the file has no audio. */
   audio: AudioTrack | null
   videoCodec: string | null
+  /** The picture's Dolby Vision configuration, which a remux keeps; null for a picture without one. */
+  dolbyVision: DolbyVisionConfig | null
   /** How a transcode encodes; a remux encodes nothing. */
   encoder: VideoEncoder
   maxHeight: number
@@ -306,7 +307,7 @@ export const hlsArgs = ({
   const cut = runCut({ source, from, seekKeyframes, timeBase: dialect.timeBase })
   const video =
     mode === PLAYBACK_MODES.remux
-      ? copyVideo(source.videoCodec)
+      ? copyVideo({ videoCodec: source.videoCodec, dolbyVision: source.dolbyVision })
       : transcodeVideo({
           encoder: source.encoder,
           videoCodec: source.videoCodec,
@@ -345,7 +346,7 @@ export const hlsArgs = ({
     '-segment_format',
     'mp4',
     '-segment_format_options',
-    SEGMENT_MP4_OPTIONS,
+    segmentMp4Options({ mode, videoCodec: source.videoCodec, dolbyVision: source.dolbyVision }),
     '-segment_times',
     times.map(secondsArg).join(','),
     '-segment_time_delta',

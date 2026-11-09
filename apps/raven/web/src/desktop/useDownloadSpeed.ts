@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { freshSpeed } from '@/desktop/downloadSpeed'
+import { freshSpeed } from '@raven/core'
 import { useDownloadSpeeds } from '@/stores/downloadSpeeds'
 
 const TICK_MS = 1000

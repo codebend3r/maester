@@ -6,4 +6,9 @@ import type { MenuLibrary } from '@/layouts/shelfKit'
 export const pinnedLibrariesOf = (libraries: readonly Library[]): MenuLibrary[] =>
   libraries
     .filter((library) => library.settings.pinned)
-    .map(({ id, name, settings }) => ({ id, name, icon: libraryIconOf(settings) }))
+    .map(({ id, name, settings }) => ({
+      id,
+      name,
+      icon: libraryIconOf(settings),
+      isLocked: settings.locked,
+    }))

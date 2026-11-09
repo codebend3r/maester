@@ -1,13 +1,15 @@
 import {
   type AudioTrack,
+  type DolbyVisionConfig,
   HLS_COPY_AUDIO_CODECS,
   PLAYBACK_MODES,
   type StreamMode,
   VIDEO_CODECS,
   audioCodecString,
+  dolbyVisionCodecString,
   videoCodecString,
 } from '@raven/core'
-import { type TranscodeQuality, transcodeBitrate } from '@/ffmpeg/args'
+import { type TranscodeQuality, isDolbyVisionCopy, transcodeBitrate } from '@/ffmpeg/args'
 import { hlsAudioCodec } from '@/ffmpeg/hlsArgs'
 import { type SegmentPlan, playlistLength } from '@/hls/segmentPlan'
 
@@ -26,18 +28,28 @@ type VideoStringOfProps = {
   mode: StreamMode
   videoCodec: string | null
   bitDepth: number | null
+  /** The picture's Dolby Vision configuration, or null for a picture without one. */
+  dolbyVision: DolbyVisionConfig | null
 }
 
-/** A transcode's video is 8-bit H.264 High; a remux's is the file's own, or null when HLS cannot name it. */
+/**
+ * A transcode's video is 8-bit H.264 High; a remux's is the file's own, or
+ * null when HLS cannot name it. A remux of Dolby Vision HEVC is copied under
+ * `dvh1`, so it is named as Dolby Vision, which the device then decodes itself.
+ */
 export const videoStringOf = ({
   mode,
   videoCodec,
   bitDepth,
+  dolbyVision,
 }: VideoStringOfProps): string | null => {
   if (mode === PLAYBACK_MODES.transcode) {
     return videoCodecString({ codec: VIDEO_CODECS.h264, bitDepth: null })
   }
-  return videoCodec == null ? null : videoCodecString({ codec: videoCodec, bitDepth })
+  if (videoCodec == null) return null
+  const copy = { videoCodec, dolbyVision }
+  if (isDolbyVisionCopy(copy)) return dolbyVisionCodecString(copy.dolbyVision)
+  return videoCodecString({ codec: videoCodec, bitDepth })
 }
 
 const audioStringOf = (track: AudioTrack): string | null => {

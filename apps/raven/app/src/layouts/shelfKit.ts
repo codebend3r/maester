@@ -1,13 +1,23 @@
 import type { LibraryIconName } from '@raven/core'
 import type { ReactNode } from 'react'
 
+import { LOCKED_LIBRARY_COPY } from '@/layouts/copy'
 import type { BingeCard } from '@/queries/bingeCards'
 import type { ShelfCard } from '@/queries/cards'
 import type { ShelfView } from '@/queries/homeShelves'
 import type { RouteTarget } from '@/routes'
 
-/** A pinned library as the side menu lists it, with the icon it wears there on the web. */
-export type MenuLibrary = { id: number; name: string; icon: LibraryIconName }
+/**
+ * A pinned library as the side menu lists it, with the icon it wears there on the web, and
+ * whether it is locked behind the PIN, which the web marks with a lock and so does the menu.
+ */
+export type MenuLibrary = { id: number; name: string; icon: LibraryIconName; isLocked: boolean }
+
+type MenuRowLabelOfProps = { label: string; isLocked: boolean }
+
+/** What a side menu's row is called aloud: a locked library's says so, "Films, locked". */
+export const menuRowLabelOf = ({ label, isLocked }: MenuRowLabelOfProps): string =>
+  isLocked ? LOCKED_LIBRARY_COPY.lockedRow(label) : label
 
 export type ShelvesProps = {
   title: string
@@ -43,11 +53,21 @@ export type BingeShelfProps = {
   isFirst: boolean
 }
 
+/** A page of shelves other than Home: its name, the way back, and a word in Young Serif where there is nothing to shelve. */
+export type ShelfPageProps = {
+  title: string
+  onBack: () => void
+  /** Set in Young Serif in place of the shelves while there are none; null while there are some. */
+  note: string | null
+  children: ReactNode
+}
+
 /** Home's pieces, which each platform lays out and drives its own way. */
 export type ShelfKit = {
   Shelves: (props: ShelvesProps) => ReactNode
   Shelf: (props: ShelfProps) => ReactNode
   BingeShelf: (props: BingeShelfProps) => ReactNode
+  ShelfPage: (props: ShelfPageProps) => ReactNode
 }
 
 type SeeAllOfProps = Pick<ShelfProps, 'shelf' | 'onOpenLibrary' | 'onOpenContinue'>

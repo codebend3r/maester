@@ -128,11 +128,16 @@ def test_native_checks_select_their_groups_once():
     }
 
 
+# Wren's jobs also wait on the repository variable WREN_CHECKS, off until its builds are wanted.
+WREN_GATE = "vars.WREN_CHECKS == 'true' && "
+
+
 @pytest.mark.parametrize(("job_name", "group"), sorted(GROUP_JOBS.items()))
 def test_group_jobs_run_only_when_their_group_was_selected(job_name: str, group: str):
     job = load_workflow("native-checks.yml")["jobs"][job_name]
     assert job["needs"] == "select"
-    assert job["if"] == f"needs.select.outputs.{group} == 'true'"
+    gate = WREN_GATE if group == "music" else ""
+    assert job["if"] == f"{gate}needs.select.outputs.{group} == 'true'"
 
 
 @pytest.mark.parametrize(("job_name", "native_job"), sorted(FOLLOW_ON_JOBS.items()))

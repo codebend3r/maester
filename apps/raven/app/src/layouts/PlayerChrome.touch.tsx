@@ -4,9 +4,11 @@ import { usePlayerPrefs } from '@raven/ui/headless'
 import type { IconName } from '@raven/ui/iconDrawings'
 import { type ComponentRef, useRef, useState } from 'react'
 import {
+  type AccessibilityActionInfo,
   Animated,
   type GestureResponderEvent,
   Pressable,
+  type PressableProps,
   StatusBar,
   StyleSheet,
   View,
@@ -29,14 +31,13 @@ import {
   type SkipDirection,
   type TrackPicker,
   type Transport,
-  playedShareOf,
-  scrubberAccessibilityOf,
-  within,
 } from '@/layouts/playerKit'
 import { Text } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
-import { VOLUME_ACTION_LIST, volumeAfterAction, volumeAt, volumeIconOf } from '@/layouts/volumeKit'
+import { useScrub } from '@/layouts/useScrub'
+import { VOLUME_ACTION_LIST, volumeAfterAction, volumeAtY, volumeIconOf } from '@/layouts/volumeKit'
+import { usePlayerKeys } from '@/player/usePlayerKeys'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { pictureStyles, useTheme } from '@/theme/useTheme'
 
@@ -49,8 +50,14 @@ const SCRUBBER_HEIGHT = 44
 /** The web's icon sizes: its transport, its play and its glass pills. */
 const ICON_SIZES = { transport: 24, play: 28, pill: 20, skip: 32 } as const
 
-/** How wide the volume slider is: a thumb's reach, beside its speaker. */
-const VOLUME_WIDTH = 96
+/** The vertical volume slider's track: a field wide, six fields tall, standing over its speaker. */
+const VOLUME_TRACK = { width: SIZES.fieldHeight, height: SIZES.fieldHeight * 6 } as const
+
+/** The screen reader's actions a control may offer; the hint says what each does here. */
+const ACCESSIBILITY_ACTIONS = { longPress: 'longpress' } as const
+
+/** The screen reader's way to what a long press does. */
+const HOLD_ACTIONS: AccessibilityActionInfo[] = [{ name: ACCESSIBILITY_ACTIONS.longPress }]
 
 /** How tall the title art in the corner stands, and the share of the screen's width it may take. */
 const LOGO_HEIGHT = SIZES.space6 * 1.5
@@ -63,30 +70,10 @@ type ScrubberProps = Pick<Transport, 'position' | 'onSeek'> & { duration: number
  * on letting go. VoiceOver reads it as the time of the length, and skips by a swipe.
  */
 const Scrubber = ({ position, duration, onSeek }: ScrubberProps) => {
-  const [width, setWidth] = useState(0)
-  const [dragged, setDragged] = useState<number | null>(null)
   const styles = useStyles()
-  const timeAt = (event: GestureResponderEvent): number =>
-    width <= 0
-      ? position
-      : within({ value: (event.nativeEvent.locationX / width) * duration, length: duration })
-  const shown = dragged ?? position
-  const share = playedShareOf({ at: shown, duration })
+  const { share, lineProps } = useScrub({ position, duration, onSeek, inset: 0, canDrag: true })
   return (
-    <View
-      {...scrubberAccessibilityOf({ position, shown, duration, onSeek })}
-      onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)}
-      onMoveShouldSetResponder={() => true}
-      onResponderGrant={(event) => setDragged(timeAt(event))}
-      onResponderMove={(event) => setDragged(timeAt(event))}
-      onResponderRelease={(event) => {
-        onSeek(timeAt(event))
-        setDragged(null)
-      }}
-      onResponderTerminate={() => setDragged(null)}
-      onStartShouldSetResponder={() => true}
-      style={styles.scrubber}
-    >
+    <View {...lineProps} style={styles.scrubber}>
       <View pointerEvents="none" style={styles.line}>
         <View style={[styles.played, { width: share }]} />
       </View>
@@ -95,20 +82,42 @@ const Scrubber = ({ position, duration, onSeek }: ScrubberProps) => {
   )
 }
 
+/** What a long press on a button does, and how the screen reader is told of it. */
+type Hold = { hint: string; onHold: () => void }
+
+type HoldProps = Pick<
+  PressableProps,
+  'accessibilityActions' | 'accessibilityHint' | 'onAccessibilityAction' | 'onLongPress'
+>
+
+/** The long press and the screen reader's action for it, or nothing for a button with no hold. */
+const holdPropsOf = (hold: Hold | undefined): HoldProps =>
+  hold === undefined
+    ? {}
+    : {
+        accessibilityActions: HOLD_ACTIONS,
+        accessibilityHint: hold.hint,
+        onAccessibilityAction: hold.onHold,
+        onLongPress: hold.onHold,
+      }
+
 type IconButtonProps = {
   icon: IconName
   label: string
   size: number
   isGlass?: boolean
   onPress: () => void
+  /** A second way the button is used, by holding it; the screen reader offers it as an action. */
+  hold?: Hold
 }
 
 /** A round button wearing only the web's icon for it, said aloud by its label; glass where the web's is. */
-const IconButton = ({ icon, label, size, isGlass = false, onPress }: IconButtonProps) => {
+const IconButton = ({ icon, label, size, isGlass = false, onPress, hold }: IconButtonProps) => {
   const styles = useStyles()
   const colour = useTheme((theme) => theme.overPicture.text)
   return (
     <Pressable
+      {...holdPropsOf(hold)}
       accessibilityLabel={label}
       accessibilityRole="button"
       hitSlop={SIZES.space1}
@@ -142,48 +151,84 @@ const SkipButton = ({ direction, label, onPress }: SkipButtonProps) => {
   )
 }
 
-/** The speaker, which mutes, and the slider beside it, as the web's volume. */
-const VolumeControl = () => {
-  const [width, setWidth] = useState(0)
+type VolumeSliderProps = { shown: number; onVolume: (volume: number) => void }
+
+/**
+ * The volume as a line standing up, on a glass plate over its speaker: full at the top, silent at
+ * the foot, set by a finger anywhere on it. VoiceOver reads it as a percentage and moves it by a
+ * swipe.
+ */
+const VolumeSlider = ({ shown, onVolume }: VolumeSliderProps) => {
+  const [height, setHeight] = useState(0)
+  const styles = useStyles()
+  const drag = (event: GestureResponderEvent) =>
+    onVolume(volumeAtY({ y: event.nativeEvent.locationY, height }))
+  const share: `${number}%` = `${shown * 100}%`
+  return (
+    <View
+      accessible
+      accessibilityActions={VOLUME_ACTION_LIST}
+      accessibilityLabel={PLAYER_COPY.volume}
+      accessibilityRole="adjustable"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(shown * 100) }}
+      onAccessibilityAction={({ nativeEvent }) =>
+        onVolume(volumeAfterAction({ volume: shown, name: nativeEvent.actionName }))
+      }
+      onLayout={({ nativeEvent }) => setHeight(nativeEvent.layout.height)}
+      onMoveShouldSetResponder={() => true}
+      onResponderGrant={drag}
+      onResponderMove={drag}
+      onStartShouldSetResponder={() => true}
+      style={styles.volumeSlider}
+    >
+      <View pointerEvents="none" style={styles.upright}>
+        <View style={[styles.filled, { height: share }]} />
+      </View>
+      <View pointerEvents="none" style={[styles.uprightThumb, { bottom: share }]} />
+    </View>
+  )
+}
+
+type VolumeControlProps = {
+  /** Whether the controls are up: the slider goes with them. */
+  isShown: boolean
+}
+
+/**
+ * The speaker, which mutes, in a slot of its own width. Held, it opens the volume slider standing
+ * over it, which a second hold, or the controls going, puts away; so the slider never lies over
+ * the glass icons beside it, as the web's horizontal one did at full volume.
+ */
+const VolumeControl = ({ isShown }: VolumeControlProps) => {
+  const [isOpen, setOpen] = useState(false)
+  const [wasShown, setWasShown] = useState(isShown)
   const styles = useStyles()
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const isMuted = usePlayerPrefs((prefs) => prefs.muted)
   const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
+  // The slider goes with the controls, settled as they change rather than a render later.
+  if (wasShown !== isShown) {
+    setWasShown(isShown)
+    if (!isShown) setOpen(false)
+  }
   const shown = isMuted ? 0 : volume
-  const drag = (event: GestureResponderEvent) =>
-    setVolume({ volume: volumeAt({ x: event.nativeEvent.locationX, width }), muted: false })
   return (
-    <View style={styles.run}>
+    <View style={styles.volumeSlot}>
+      {isOpen && (
+        <View style={styles.volumePlate}>
+          <VolumeSlider
+            onVolume={(next) => setVolume({ volume: next, muted: false })}
+            shown={shown}
+          />
+        </View>
+      )}
       <IconButton
+        hold={{ hint: PLAYER_COPY.volumeHint, onHold: () => setOpen((open) => !open) }}
         icon={volumeIconOf({ volume, isMuted })}
         label={isMuted ? PLAYER_COPY.unmute : PLAYER_COPY.mute}
         onPress={() => setVolume({ volume, muted: !isMuted })}
         size={ICON_SIZES.pill}
       />
-      <View
-        accessible
-        accessibilityActions={VOLUME_ACTION_LIST}
-        accessibilityLabel={PLAYER_COPY.volume}
-        accessibilityRole="adjustable"
-        accessibilityValue={{ min: 0, max: 100, now: Math.round(shown * 100) }}
-        onAccessibilityAction={({ nativeEvent }) =>
-          setVolume({
-            volume: volumeAfterAction({ volume: shown, name: nativeEvent.actionName }),
-            muted: false,
-          })
-        }
-        onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)}
-        onMoveShouldSetResponder={() => true}
-        onResponderGrant={drag}
-        onResponderMove={drag}
-        onStartShouldSetResponder={() => true}
-        style={styles.volumeSlider}
-      >
-        <View pointerEvents="none" style={styles.line}>
-          <View style={[styles.played, { width: `${shown * 100}%` }]} />
-        </View>
-        <View pointerEvents="none" style={[styles.thumb, { left: `${shown * 100}%` }]} />
-      </View>
     </View>
   )
 }
@@ -216,14 +261,15 @@ const PickerButton = ({ icon, label, picker }: PickerButtonProps) => {
 
 type TransportControlsProps = Pick<
   PlayerChromeProps,
-  'audio' | 'subtitles' | 'quality' | 'next' | 'previous' | 'onPictureInPicture'
-> & { transport: Transport }
+  'audio' | 'subtitles' | 'quality' | 'next' | 'previous'
+> & { transport: Transport; isShown: boolean }
 
 /**
  * The web's bar: the time over the line to drag along, then back to the start, back ten
  * seconds, play or pause, forward ten seconds and next, with the glass icons for subtitles,
- * audio, quality and Picture in Picture at the right, wrapping under the transport on a narrow
- * screen.
+ * audio and quality at the right, wrapping under the transport on a narrow screen. iOS plays
+ * full screen and enters Picture in Picture by itself as the app is left, so there is no
+ * button for either.
  */
 const TransportControls = ({
   transport,
@@ -232,7 +278,7 @@ const TransportControls = ({
   quality,
   next,
   previous,
-  onPictureInPicture,
+  isShown,
 }: TransportControlsProps) => {
   const { isPaused, position, duration, onTogglePlay, onSeek } = transport
   const length = duration ?? 0
@@ -280,7 +326,7 @@ const TransportControls = ({
           )}
         </View>
         <View style={styles.run}>
-          <VolumeControl />
+          <VolumeControl isShown={isShown} />
           {subtitles !== null && (
             <PickerButton icon="captions" label={PLAYER_COPY.subtitles} picker={subtitles} />
           )}
@@ -289,15 +335,6 @@ const TransportControls = ({
           )}
           {quality !== null && (
             <PickerButton icon="settings" label={PLAYER_COPY.quality} picker={quality} />
-          )}
-          {onPictureInPicture !== null && (
-            <IconButton
-              icon="resize"
-              isGlass
-              label={PLAYER_COPY.pictureInPicture}
-              onPress={onPictureInPicture}
-              size={ICON_SIZES.pill}
-            />
           )}
         </View>
       </View>
@@ -337,9 +374,10 @@ const PlayerLogo = ({ heading, title }: PlayerLogoProps) => {
  * left with what is playing beside it, and along the bottom the time and the line to drag along, then the transport and the
  * glass icons for subtitles, audio, quality and Picture in Picture, all inside the safe area
  * while the video fills the screen. They fade once the video has played untouched for the
- * viewer's linger, and a tap brings them back; what is playing fades with them. The
- * video plays in Picture in Picture when the app is left, and on AirPlay; the silent switch never
- * mutes it, and leaving the app without Picture in Picture pauses it.
+ * viewer's linger, and a tap brings them back; what is playing fades with them. A hardware
+ * keyboard drives it as it drives the web's player, each key bringing the controls back as a tap
+ * does. The video plays in Picture in Picture when the app is left, and on AirPlay; the silent
+ * switch never mutes it, and leaving the app without Picture in Picture pauses it.
  */
 const PlayerChrome = ({
   title,
@@ -354,7 +392,6 @@ const PlayerChrome = ({
   quality,
   next,
   previous,
-  onPictureInPicture,
   onBack,
 }: PlayerChromeProps) => {
   const insets = useSafeAreaInsets()
@@ -362,7 +399,8 @@ const PlayerChrome = ({
   const isMuted = usePlayerPrefs((prefs) => prefs.muted)
   const styles = useStyles()
   const isPlaying = transport !== null && !transport.isPaused
-  const { isVisible, opacity, stir, toggle } = useControlsLinger({ isPlaying })
+  const { isVisible, opacity, stir, show, toggle } = useControlsLinger({ isPlaying })
+  usePlayerKeys({ transport, subtitles, onBack, onPress: show })
   const sides = {
     paddingTop: insets.top + SIZES.space2,
     paddingBottom: insets.bottom + SIZES.space2,
@@ -434,9 +472,9 @@ const PlayerChrome = ({
           {transport !== null && (
             <TransportControls
               audio={audio}
+              isShown={isVisible}
               next={next}
               previous={previous}
-              onPictureInPicture={onPictureInPicture}
               quality={quality}
               subtitles={subtitles}
               transport={transport}
@@ -511,7 +549,39 @@ const useStyles = pictureStyles((colours) =>
       fontWeight: 'bold',
       marginTop: SIZES.space0,
     },
-    volumeSlider: { width: VOLUME_WIDTH, height: SCRUBBER_HEIGHT, justifyContent: 'center' },
+    // The speaker's slot: one control wide, so the slider over it never lies over a neighbour.
+    volumeSlot: {
+      width: SIZES.controlLarge,
+      height: SIZES.controlLarge,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    // The slider's glass plate, standing over the speaker with a gap between them.
+    volumePlate: {
+      position: 'absolute',
+      bottom: SIZES.controlLarge + SIZES.space2,
+      padding: SIZES.space2,
+      borderRadius: SIZES.space3,
+      backgroundColor: colours.quiet,
+    },
+    volumeSlider: { ...VOLUME_TRACK, alignItems: 'center', justifyContent: 'flex-end' },
+    upright: {
+      width: SIZES.space1,
+      height: '100%',
+      borderRadius: SIZES.space1,
+      backgroundColor: colours.track,
+      overflow: 'hidden',
+      justifyContent: 'flex-end',
+    },
+    filled: { width: '100%', backgroundColor: colours.played },
+    uprightThumb: {
+      position: 'absolute',
+      width: SIZES.space4,
+      height: SIZES.space4,
+      marginBottom: -SIZES.space4 / 2,
+      borderRadius: SIZES.space4,
+      backgroundColor: colours.text,
+    },
     time: { color: colours.text, fontSize: SIZES.textSm, fontVariant: ['tabular-nums'] },
     scrubberSlot: { flex: 1 },
     scrubber: { height: SCRUBBER_HEIGHT, justifyContent: 'center' },

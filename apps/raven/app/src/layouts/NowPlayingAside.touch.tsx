@@ -23,15 +23,23 @@ import { themedStyles } from '@/theme/useTheme'
 const { FormButton } = touchForm
 const { Picker } = touchPicker
 
-/** How tall the synced lyrics' box stands, so the line sung keeps to the middle of it. */
+/** How tall the synced lyrics' box stands on a phone, so the line sung keeps to the middle of it. */
 const LYRICS_HEIGHT = SIZES.cover
+
+/** The lyrics' type in their own column on a wide screen: larger, with room to read, as the TV's. */
+const WIDE_LYRIC_POINTS = SIZES.textXl * 1.25
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     lyricBox: { maxHeight: LYRICS_HEIGHT },
+    // Beside the player the lyrics fill their column's height.
+    wideBox: { flex: 1 },
     lyricLines: { gap: SIZES.space2, paddingVertical: SIZES.space2 },
+    wideLines: { gap: SIZES.space4, paddingVertical: SIZES.space4 },
     lyric: { color: colours.muted, fontSize: SIZES.textLg },
-    lyricOn: { color: colours.text, fontWeight: '600' },
+    wideLyric: { fontSize: WIDE_LYRIC_POINTS, lineHeight: WIDE_LYRIC_POINTS * 1.3 },
+    lyricOn: { color: colours.text },
+    plain: { color: colours.text, fontSize: SIZES.text },
   }),
 )
 
@@ -89,27 +97,28 @@ const Book = ({ book }: BookProps) => {
   )
 }
 
-type SyncedLinesProps = { lyrics: SyncedLyrics }
+type SyncedLinesProps = { lyrics: SyncedLyrics; isWide: boolean }
 
 /** Lines timed to the music in a box of their own, the one sung marked and kept in its middle. */
-const SyncedLines = ({ lyrics }: SyncedLinesProps) => {
+const SyncedLines = ({ lyrics, isWide }: SyncedLinesProps) => {
   const styles = useStyles()
   const { scroll, onBoxLayout, lineLayoutOf } = useLineInView({ current: lyrics.current })
   return (
     <ScrollView
       ref={scroll}
       accessibilityLabel={MUSIC_COPY.lyrics}
-      contentContainerStyle={styles.lyricLines}
+      contentContainerStyle={isWide ? styles.wideLines : styles.lyricLines}
       nestedScrollEnabled
       onLayout={onBoxLayout}
-      style={styles.lyricBox}
+      style={isWide ? styles.wideBox : styles.lyricBox}
     >
       {lyrics.lines.map((line, place) => (
         <Text
           key={line.key}
+          variant={TEXT_VARIANTS.display}
           accessibilityState={{ selected: line.isCurrent }}
           onLayout={lineLayoutOf(place)}
-          style={[styles.lyric, line.isCurrent && styles.lyricOn]}
+          style={[styles.lyric, isWide && styles.wideLyric, line.isCurrent && styles.lyricOn]}
         >
           {line.text}
         </Text>
@@ -118,18 +127,27 @@ const SyncedLines = ({ lyrics }: SyncedLinesProps) => {
   )
 }
 
-type LyricsBodyProps = { lyrics: LyricsView }
+type LyricsBodyProps = { lyrics: LyricsView; isWide: boolean }
 
 type SyncedBodyProps = LyricsBodyProps
 
-const SyncedBody = ({ lyrics }: SyncedBodyProps) =>
-  lyrics.kind === LYRICS_KINDS.synced && <SyncedLines lyrics={lyrics} />
+const SyncedBody = ({ lyrics, isWide }: SyncedBodyProps) =>
+  lyrics.kind === LYRICS_KINDS.synced && <SyncedLines isWide={isWide} lyrics={lyrics} />
 
 type PlainBodyProps = LyricsBodyProps
 
-const PlainBody = ({ lyrics }: PlainBodyProps) => {
-  const styles = useMusicStyles()
-  return lyrics.kind === LYRICS_KINDS.plain && <Text style={styles.rowTitle}>{lyrics.text}</Text>
+/** Untimed words, scrolled in their own column on a wide screen. */
+const PlainBody = ({ lyrics, isWide }: PlainBodyProps) => {
+  const styles = useStyles()
+  return (
+    lyrics.kind === LYRICS_KINDS.plain && (
+      <ScrollView nestedScrollEnabled style={isWide && styles.wideBox}>
+        <Text variant={TEXT_VARIANTS.display} style={[styles.plain, isWide && styles.wideLyric]}>
+          {lyrics.text}
+        </Text>
+      </ScrollView>
+    )
+  )
 }
 
 const NoLyrics = () => {
@@ -145,29 +163,43 @@ const LYRICS_BODIES = {
 } as const satisfies Record<LyricsView['kind'], ComponentType<LyricsBodyProps>>
 
 /** The words themselves: timed lines, plain text, or a quiet word that there are none. */
-const LyricsBody = ({ lyrics }: LyricsBodyProps) => {
+const LyricsBody = ({ lyrics, isWide }: LyricsBodyProps) => {
   const Body = LYRICS_BODIES[lyrics.kind]
-  return <Body lyrics={lyrics} />
+  return <Body isWide={isWide} lyrics={lyrics} />
 }
 
-type NowPlayingAsideProps = { aside: Aside }
+type NowPlayingAsideProps = {
+  aside: Aside
+  /** Whether it stands in its own column beside the player, filling the column's height. */
+  isWide: boolean
+}
 
 type BookAsideProps = NowPlayingAsideProps
 
-const BookAside = ({ aside }: BookAsideProps) =>
-  aside.kind === NOW_PLAYING_ASIDES.book && <Book book={aside.book} />
+/** A book's controls, scrolled in their own column on a wide screen. */
+const BookAside = ({ aside, isWide }: BookAsideProps) => {
+  const own = useStyles()
+  return (
+    aside.kind === NOW_PLAYING_ASIDES.book && (
+      <ScrollView nestedScrollEnabled style={isWide && own.wideBox}>
+        <Book book={aside.book} />
+      </ScrollView>
+    )
+  )
+}
 
 type LyricsAsideProps = NowPlayingAsideProps
 
-const LyricsAside = ({ aside }: LyricsAsideProps) => {
+const LyricsAside = ({ aside, isWide }: LyricsAsideProps) => {
   const styles = useMusicStyles()
+  const own = useStyles()
   return (
     aside.kind === NOW_PLAYING_ASIDES.lyrics && (
-      <View style={styles.section}>
+      <View style={[styles.section, isWide && own.wideBox]}>
         <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
           {MUSIC_COPY.lyrics}
         </Text>
-        <LyricsBody lyrics={aside.lyrics} />
+        <LyricsBody isWide={isWide} lyrics={aside.lyrics} />
       </View>
     )
   )
@@ -182,8 +214,11 @@ const ASIDES = {
   [NOW_PLAYING_ASIDES.none]: NoAside,
 } as const satisfies Record<Aside['kind'], ComponentType<NowPlayingAsideProps>>
 
-/** What sits below Now Playing's controls: a book's controls, or the lyrics under a heading. */
-export const NowPlayingAside = ({ aside }: NowPlayingAsideProps) => {
+/**
+ * A book's controls, or the lyrics under a heading: below Now Playing's controls on a phone,
+ * in their own column beside the player on a wide screen.
+ */
+export const NowPlayingAside = ({ aside, isWide }: NowPlayingAsideProps) => {
   const AsideView = ASIDES[aside.kind]
-  return <AsideView aside={aside} />
+  return <AsideView aside={aside} isWide={isWide} />
 }

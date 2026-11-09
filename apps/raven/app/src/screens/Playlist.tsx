@@ -19,15 +19,19 @@ import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 
+import { playlistTargetOf } from '@/downloads/downloadTargets'
+import { useDownloadButton } from '@/downloads/useDownloadButton'
 import { PlaylistLayout } from '@/layouts'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
+import { useDownloadLibrary } from '@/queries/useDownloadLibrary'
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { PLAYLIST_COPY } from '@/screens/copy'
 import { RouteError, RouteLoading, RouteMissing, type RouteViewProps } from '@/screens/RouteNotices'
 
 type PlaylistPageProps = { session: AppQueries; details: PlaylistDetails }
 
-const PlaylistPage = ({ session: { api }, details }: PlaylistPageProps) => {
+const PlaylistPage = ({ session, details }: PlaylistPageProps) => {
+  const { api } = session
   const router = useRouter()
   const playingId = useAudioQueue((store) => playingTrackOf(store)?.id ?? null)
   const playTracks = useAudioQueue((store) => store.playTracks)
@@ -35,8 +39,16 @@ const PlaylistPage = ({ session: { api }, details }: PlaylistPageProps) => {
   const { playlist, tracks } = details
   const source = { kind: QUEUE_SOURCE_KINDS.playlist, id: playlist.id } as const
   const failure = setTracks.failure ?? rename.failure ?? remove.failure
+  // A playlist is filed under its first track's library; its tracks may come from more than one.
+  const library = useDownloadLibrary({ session, libraryId: tracks[0]?.libraryId ?? null })
+  const download = useDownloadButton({
+    serverId: session.server.id,
+    library,
+    target: playlistTargetOf({ api, playlist, tracks }),
+  })
   return (
     <PlaylistLayout
+      download={download}
       facts={playlistFactsOf({ playlist })}
       isOwn={playlist.isOwn}
       name={playlist.name}

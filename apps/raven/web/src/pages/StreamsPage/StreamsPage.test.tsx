@@ -31,6 +31,7 @@ const PROBE: MediaStreams = {
     bitrate: 38_100_000,
     range: VIDEO_RANGES.hdr10,
     isDolbyVisionOnly: false,
+    dolbyVision: null,
   },
   audio: [
     {

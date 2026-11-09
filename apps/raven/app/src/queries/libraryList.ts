@@ -1,17 +1,23 @@
 import { KINDS, type Library, libraryIconOf } from '@raven/core'
 
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
+import { LIBRARY_LIST_COPY } from '@/queries/copy'
 import type { GridSection } from '@/queries/libraryGrid'
 import { ROUTE_TARGETS } from '@/routes'
 
 /** The one run of rows the Libraries screen lists. */
 const LIBRARIES_SECTION = 'libraries'
 
-/** A library as a row: its icon, its name and its type, opening it as the side menu's row does. */
+/**
+ * A library as a row: its icon, its name and its type, a locked one's marked as the web's
+ * Libraries page marks it, opening it as the side menu's row does.
+ */
 const libraryCard = ({ id, name, settings }: Library): ShelfCard => ({
   key: `library:${id}`,
   title: name,
-  line: KINDS[settings.kind].label,
+  line: settings.locked
+    ? LIBRARY_LIST_COPY.locked(KINDS[settings.kind].label)
+    : KINDS[settings.kind].label,
   shape: CARD_SHAPES.poster,
   picture: null,
   progress: 0,

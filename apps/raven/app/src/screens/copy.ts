@@ -1,4 +1,5 @@
 import { LIBRARIES_ENTRY } from '@/layouts/copy'
+import { BINGE_COPY } from '@/queries/bingeCards'
 import { CONTINUE_WATCHING } from '@/queries/homeShelves'
 
 export const HOME_COPY = {
@@ -21,12 +22,8 @@ export const ITEM_COPY = {
   nextEpisode: 'Next episode',
   /** "Next S01E03": the episode after this one in its show. */
   nextCode: (code: string) => `Next ${code}`,
-  /** "View saga The Lord of the Rings Collection": the way from a movie to its saga. */
-  viewSaga: (name: string) => `View saga ${name}`,
   playAll: 'Play all',
   shuffle: 'Shuffle',
-  /** "Go to Severance": the way up from an episode to its show or season. */
-  goTo: (title: string) => `Go to ${title}`,
   /** A movie's or an episode's Watched: what pressing it does, then that it is. */
   videoWatched: { mark: 'Mark watched', marked: 'Watched' },
   /** A show's Watched, over every episode of every season. */
@@ -66,6 +63,8 @@ export const LIBRARY_COPY = {
   inProgress: { one: 'video in progress', many: 'videos in progress' },
   shuffle: 'Shuffle',
   shuffleLibrary: (library: string) => `Shuffle ${library}`,
+  lock: 'Lock',
+  lockLibrary: (library: string) => `Lock ${library} again: the PIN is asked for it the next time`,
 } as const
 
 export const PLAYER_SCREEN_COPY = {
@@ -92,6 +91,11 @@ export const CONTINUE_WATCHING_COPY = {
   title: CONTINUE_WATCHING,
   gathering: 'Gathering what you were watching',
   none: 'Nothing in progress. Start a video and it waits here.',
+} as const
+
+export const BINGE_PAGE_COPY = {
+  title: BINGE_COPY.title,
+  none: 'You have no shows set to binge. Mark a show as binging on its page and it waits here.',
 } as const
 
 export const LIBRARIES_COPY = {

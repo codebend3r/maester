@@ -2,7 +2,7 @@ import { expect } from '@jest/globals'
 import { createQueryClient } from '@raven/ui/headless'
 import type { QueryClient } from '@tanstack/react-query'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react-native'
+import { act, render, screen, waitFor } from '@testing-library/react-native'
 import type { ReactElement } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
@@ -34,6 +34,18 @@ export const createScreenClient = (): QueryClient => {
  */
 export const untilIdle = async (client: QueryClient): Promise<void> =>
   waitFor(() => expect(client.isFetching() + client.isMutating()).toBe(0))
+
+/**
+ * Waits until `client` is idle and the screen holds what it read: TanStack hands a settled
+ * query to its observers on a zero timeout, so an idle client alone can leave a press acting
+ * on the render before the answer.
+ */
+export const untilSettled = async (client: QueryClient): Promise<void> => {
+  await untilIdle(client)
+  await act(async () => {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  })
+}
 
 type RenderScreenProps = {
   ui: ReactElement

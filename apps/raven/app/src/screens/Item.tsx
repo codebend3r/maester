@@ -3,7 +3,6 @@ import {
   type ItemDetails,
   type MediaItem,
   ROUTE_STATES,
-  type Saga,
   type RouteQuery,
   SHOW_SESSION,
   shuffleSessionOf,
@@ -19,20 +18,26 @@ import {
   routeIdOf,
   routeState,
   seasonsOf,
-  episodeTag,
 } from '@raven/core'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 
+import type { DownloadButton } from '@/downloads/downloadControl'
+import { seasonTargetOf, showTargetOf, videoTargetOf } from '@/downloads/downloadTargets'
+import { useDownloadButton } from '@/downloads/useDownloadButton'
+import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
 import type { Pictures } from '@/queries/cards'
+import { type ItemLink, LINK_ICONS } from '@/queries/itemLinks'
 import { playablePage, seasonPage, showPage } from '@/queries/itemPage'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import type { BingeToggle } from '@/queries/useBinge'
 import { type ItemMarks, useItemMarks, useVideoMarks } from '@/queries/useMarks'
 import { usePictures } from '@/queries/usePictures'
-import { ItemLayout, ItemNotice, Loading } from '@/layouts'
+import { useDownloadLibrary } from '@/queries/useDownloadLibrary'
+import { useVideoLinks } from '@/queries/useVideoLinks'
+import { ItemLayout, ItemNotice, Loading, canDownload } from '@/layouts'
 import {
   type CheckState,
   ITEM_ACTIONS,
@@ -40,7 +45,7 @@ import {
   type ItemNoticeProps,
 } from '@/layouts/itemKit'
 import type { LoadingProps } from '@/layouts/loadingKit'
-import { APP_ROUTE_PARAMS, ROUTE_TARGETS, type RouteTarget, hrefOf, itemTarget } from '@/routes'
+import { APP_ROUTE_PARAMS, ROUTE_TARGETS, type RouteTarget, hrefOf } from '@/routes'
 import { ITEM_COPY } from '@/screens/copy'
 
 const ACTION_KEYS = {
@@ -49,12 +54,10 @@ const ACTION_KEYS = {
   next: 'next',
   favourite: 'favourite',
   watched: 'watched',
-  show: 'show',
-  season: 'season',
-  saga: 'saga',
   playAll: 'playAll',
   shuffle: 'shuffle',
   binge: 'binge',
+  download: 'download',
 } as const
 
 /** A Watched toggle reads as ticked for all of it, half ticked for some, as the web's does. */
@@ -187,6 +190,26 @@ const bingeOf = ({ isBinging, isFull, toggle }: BingeToggle): ItemAction => ({
   onPress: toggle,
 })
 
+/**
+ * Download, a mark of its own: on once all of it is on the device, how far it has come while it
+ * downloads, and faint where this device can take none of it. Only where the layouts download.
+ */
+const downloadOf = ({ control, onPress }: DownloadButton): ItemAction[] =>
+  canDownload
+    ? [
+        {
+          kind: ITEM_ACTIONS.toggle,
+          key: ACTION_KEYS.download,
+          icon: control.icon,
+          label: control.label,
+          text: control.text,
+          isOn: control.isOn,
+          isDisabled: control.isDisabled,
+          onPress,
+        },
+      ]
+    : []
+
 /** "Play S01E02" for the episode a show or season plays next, or plain Play without a number. */
 const playNextLabel = (code: string | null): string =>
   code === null ? ITEM_COPY.play : ITEM_COPY.playEpisode(code)
@@ -206,87 +229,20 @@ const nextOf = ({ media, context }: NextOfProps): ItemAction => {
   }
 }
 
-type LinkOfProps = {
-  key: string
-  title: string
-  /** What stands beside the icon: the show's name, a season's code. */
-  text: string
-  itemId: number
-  context: ItemContext
-}
-
-/** "Go to Severance", "Go to Season 1": the way from an episode back up to its show or season. */
-const linkOf = ({ key, title, text, itemId, context }: LinkOfProps): ItemAction => ({
-  kind: ITEM_ACTIONS.link,
-  key,
-  icon: 'up',
-  label: ITEM_COPY.goTo(title),
-  text,
-  onPress: () => context.onOpen(itemTarget(itemId)),
-})
-
-type SagaLinkOfProps = { saga: Saga; libraryId: number; context: ItemContext }
-
-/** "View saga The Lord of the Rings Collection": the way from a movie to the saga it is part of. */
-const sagaLinkOf = ({ saga, libraryId, context }: SagaLinkOfProps): ItemAction => ({
-  kind: ITEM_ACTIONS.link,
-  key: ACTION_KEYS.saga,
-  icon: 'covers',
-  label: ITEM_COPY.viewSaga(saga.name),
-  text: saga.name,
-  onPress: () => context.onOpen({ kind: ROUTE_TARGETS.saga, libraryId, sagaId: saga.tmdbId }),
-})
-
-type MovieLinksOfProps = {
-  itemId: number
-  libraryId: number
-  /** The library's sagas, once read; the web's `SagaLink` finds the movie's the same way. */
-  sagas: readonly Saga[]
-  context: ItemContext
-}
-
-/** A movie's link to its saga, when it is in one. */
-const movieLinksOf = ({ itemId, libraryId, sagas, context }: MovieLinksOfProps): ItemAction[] => {
-  const saga = sagas.find((each) => each.media.some((media) => media.item?.id === itemId))
-  return saga === undefined ? [] : [sagaLinkOf({ saga, libraryId, context })]
-}
-
-type EpisodeLinksOfProps = {
-  details: ItemDetails
-  /** The episode's show, once read; its seasons name the one this episode is in. */
-  show: ItemDetails | null
-  context: ItemContext
-}
+type LinkActionOfProps = { link: ItemLink; context: ItemContext }
 
 /**
- * An episode's links up: its show, and its season once the show's page has said which item
- * that is, since an episode names its season only by number.
+ * A way up as a button: "Go to Severance", "Go to Season 1" from an episode, "View saga The
+ * Lord of the Rings Collection" from a movie, each its icon with the name beside it.
  */
-const episodeLinksOf = ({ details, show, context }: EpisodeLinksOfProps): ItemAction[] => {
-  if (details.show === null) return []
-  const season =
-    show === null ? undefined : seasonsOf(show).find((each) => each.season === details.season)
-  return [
-    linkOf({
-      key: ACTION_KEYS.show,
-      title: details.show.title,
-      text: details.show.title,
-      itemId: details.show.id,
-      context,
-    }),
-    ...(season === undefined
-      ? []
-      : [
-          linkOf({
-            key: ACTION_KEYS.season,
-            title: season.title,
-            text: episodeTag({ season: season.season, episode: null }) ?? season.title,
-            itemId: season.id,
-            context,
-          }),
-        ]),
-  ]
-}
+const linkActionOf = ({ link, context }: LinkActionOfProps): ItemAction => ({
+  kind: ITEM_ACTIONS.link,
+  key: link.kind,
+  icon: LINK_ICONS[link.kind],
+  label: link.label,
+  text: link.text,
+  onPress: () => context.onOpen(link.target),
+})
 
 type MarksOfProps = {
   marks: ItemMarks
@@ -332,16 +288,26 @@ const PlayableItem = ({
   const marks = useVideoMarks({ session, media: primary })
   const libraries = useQuery(queries.librariesQuery)
   const tracks = useQuery(queries.tracksQuery(primary.id))
-  // An episode sits under its show's backdrop, and its links up name the show's seasons.
-  const show = useQuery(queries.itemQuery(isEpisode ? (details.show?.id ?? null) : null))
-  // A movie's link to its saga reads its library's sagas; an episode asks nothing.
-  const sagas = useQuery(queries.sagasQuery(isEpisode ? null : primary.libraryId))
+  // The ways up read an episode's show, which the page sits under too, and a movie's sagas.
+  const { links, show, isShowPending } = useVideoLinks({ session, media: primary, details })
   // Only an episode has a next; a film asks nothing.
   const next = useQuery({
     ...queries.nextInSessionQuery({ id: primary.id, session: SHOW_SESSION }),
     enabled: isEpisode,
   })
   const nextFile = next.data ?? null
+  const library = useDownloadLibrary({ session, libraryId: primary.libraryId })
+  const download = useDownloadButton({
+    serverId: session.server.id,
+    library,
+    target: videoTargetOf({
+      api: session.api,
+      platform: DEVICE_PLATFORM,
+      media: primary,
+      details,
+      show,
+    }),
+  })
   const page = playablePage({
     kind,
     details,
@@ -349,8 +315,8 @@ const PlayableItem = ({
     everyFile: details.versions,
     libraryNames: new Map((libraries.data ?? []).map(({ id, name }) => [id, name])),
     primary,
-    show: show.data ?? null,
-    isShowPending: details.show !== null && show.isPending,
+    show,
+    isShowPending,
     tracks: tracks.data,
     api: session.api,
     headersFor: context.headersFor,
@@ -368,20 +334,12 @@ const PlayableItem = ({
     ...(nextFile === null ? [] : [nextOf({ media: nextFile, context })]),
     ...(marks.favourite === null ? [] : [favouriteOf(marks.favourite)]),
     watchedOf({ ...marks.watched, words: ITEM_COPY.videoWatched }),
+    ...downloadOf(download),
   ]
   return (
     <ItemLayout
       actions={actions}
-      links={
-        isEpisode
-          ? episodeLinksOf({ details, show: show.data ?? null, context })
-          : movieLinksOf({
-              itemId: details.id,
-              libraryId: primary.libraryId,
-              sagas: sagas.data ?? [],
-              context,
-            })
-      }
+      links={links.map((link) => linkActionOf({ link, context }))}
       isPlayPending={false}
       onBack={context.onBack}
       onOpen={context.onOpen}
@@ -489,6 +447,8 @@ const useShowShuffle = ({ showId, session, context }: UseShowShuffleProps): (() 
 
 type ShowItemProps = {
   details: ItemDetails
+  /** The library the page was opened in, which its downloads are filed under; null when the address named none. */
+  library: number | null
   session: AppQueries
   context: ItemContext
 }
@@ -497,7 +457,7 @@ type ShowItemProps = {
  * A show: Play for the episode the server says comes next, once it says, Play all from its first
  * episode, Shuffle, Favourite and Mark show watched over every episode, Binge, then its seasons.
  */
-const ShowItem = ({ details, session, context }: ShowItemProps) => {
+const ShowItem = ({ details, library: libraryId, session, context }: ShowItemProps) => {
   const next = useQuery(session.queries.nextEpisodeQuery(details.id))
   const marks = useItemMarks({ session, details })
   const seasons = seasonsOf(details)
@@ -509,6 +469,12 @@ const ShowItem = ({ details, session, context }: ShowItemProps) => {
   const nextItem = nextFile?.item ?? null
   const nextCode = nextItem === null ? null : episodeCode(nextItem)
   const onShuffle = useShowShuffle({ showId: details.id, session, context })
+  const library = useDownloadLibrary({ session, libraryId })
+  const download = useDownloadButton({
+    serverId: session.server.id,
+    library,
+    target: showTargetOf({ api: session.api, platform: DEVICE_PLATFORM, show: details }),
+  })
   const actions = [
     ...playNextActionsOf({
       next: nextFile,
@@ -520,6 +486,7 @@ const ShowItem = ({ details, session, context }: ShowItemProps) => {
     ...playAllOf({ first: firstFile, context }),
     ...shuffleOf({ onShuffle }),
     ...marksOf({ marks, words: ITEM_COPY.showWatched }),
+    ...downloadOf(download),
   ]
   return (
     <ItemLayout
@@ -535,6 +502,8 @@ const ShowItem = ({ details, session, context }: ShowItemProps) => {
 
 type SeasonItemProps = {
   details: ItemDetails
+  /** The library the page was opened in, which its downloads are filed under; null when the address named none. */
+  library: number | null
   session: AppQueries
   context: ItemContext
 }
@@ -544,7 +513,7 @@ type SeasonItemProps = {
  * the show, Shuffle over the whole show, Favourite and Mark season watched over every episode in
  * it, then its episodes.
  */
-const SeasonItem = ({ details, session, context }: SeasonItemProps) => {
+const SeasonItem = ({ details, library: libraryId, session, context }: SeasonItemProps) => {
   // A season sits under its show's backdrop, and carries its show's content rating.
   const show = useQuery(session.queries.itemQuery(details.show?.id ?? null))
   const marks = useItemMarks({ session, details })
@@ -554,6 +523,17 @@ const SeasonItem = ({ details, session, context }: SeasonItemProps) => {
   const firstFile = firstEpisodeIn(episodes)?.primary ?? null
   // A season's Shuffle is its show's: every next is drawn from any season.
   const onShuffle = useShowShuffle({ showId: details.show?.id ?? null, session, context })
+  const library = useDownloadLibrary({ session, libraryId })
+  const download = useDownloadButton({
+    serverId: session.server.id,
+    library,
+    target: seasonTargetOf({
+      api: session.api,
+      platform: DEVICE_PLATFORM,
+      season: details,
+      show: show.data ?? null,
+    }),
+  })
   const actions = [
     ...playNextActionsOf({
       next: nextFile,
@@ -565,6 +545,7 @@ const SeasonItem = ({ details, session, context }: SeasonItemProps) => {
     ...playAllOf({ first: firstFile, context }),
     ...shuffleOf({ onShuffle }),
     ...marksOf({ marks, words: ITEM_COPY.seasonWatched }),
+    ...downloadOf(download),
   ]
   return (
     <ItemLayout

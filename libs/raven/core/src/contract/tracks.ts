@@ -73,6 +73,20 @@ export const isVideoRange = oneOf(Object.values(VIDEO_RANGES))
 
 export type VideoRange = Infer<typeof isVideoRange>
 
+/**
+ * The stream's Dolby Vision configuration record, as ffprobe reads it off the
+ * file: the profile (5, 7, 8), the level, and `dv_bl_signal_compatibility_id`,
+ * which says what the base layer is without Dolby Vision's processing (0 for
+ * profile 5's IPTPQc2, which nothing else can show).
+ */
+export const isDolbyVisionConfig = object({
+  profile: isNumber,
+  level: isNumber,
+  blSignalCompatibilityId: isNumber,
+})
+
+export type DolbyVisionConfig = Infer<typeof isDolbyVisionConfig>
+
 /** What ffprobe says of the picture beyond what the index keeps. */
 export const isVideoStream = object({
   /** ffprobe codec name: 'h264', 'hevc', ... */
@@ -88,6 +102,12 @@ export const isVideoStream = object({
    * from an older server.
    */
   isDolbyVisionOnly: optional(isBoolean),
+  /**
+   * The Dolby Vision configuration record, which a copy of the picture is
+   * tagged with so AVPlayer renders it itself; null for a picture without one.
+   * Absent from an older server.
+   */
+  dolbyVision: optional(nullable(isDolbyVisionConfig)),
 })
 
 export type VideoStream = Infer<typeof isVideoStream>

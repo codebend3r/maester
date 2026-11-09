@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
+import { dolbyVisionOf, isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
 
 /** Trimmed from a real ffprobe run on a 4K HDR episode on the NAS. */
 const hdrEpisode = {
@@ -20,6 +20,36 @@ const hdrEpisode = {
   ],
   format: { duration: '2914.720000', bit_rate: '13515263', format_name: 'matroska,webm' },
 }
+
+/** ffprobe's `side_data_list` entry for a Dolby Vision profile 5 stream. */
+const DV5_RECORD = {
+  side_data_type: 'DOVI configuration record',
+  dv_version_major: 1,
+  dv_version_minor: 0,
+  dv_profile: 5,
+  dv_level: 6,
+  rpu_present_flag: 1,
+  el_present_flag: 0,
+  bl_present_flag: 1,
+  dv_bl_signal_compatibility_id: 0,
+} as const
+
+describe('dolbyVisionOf', () => {
+  it('reads the profile, level and base layer compatibility off the record', () => {
+    expect(dolbyVisionOf({ side_data_list: [DV5_RECORD] })).toEqual({
+      profile: 5,
+      level: 6,
+      blSignalCompatibilityId: 0,
+    })
+  })
+
+  it('is null without a record, or for a record missing a field', () => {
+    expect(dolbyVisionOf({})).toBeNull()
+    expect(
+      dolbyVisionOf({ side_data_list: [{ side_data_type: 'DOVI configuration record' }] }),
+    ).toBeNull()
+  })
+})
 
 describe('parseProbe', () => {
   it('keeps what playback and the cards need', () => {
@@ -85,12 +115,7 @@ describe('parseProbe', () => {
           {
             codec_name: 'hevc',
             codec_type: 'video',
-            side_data_list: [
-              {
-                side_data_type: 'DOVI configuration record',
-                dv_bl_signal_compatibility_id: compatibility,
-              },
-            ],
+            side_data_list: [{ ...DV5_RECORD, dv_bl_signal_compatibility_id: compatibility }],
           },
         ],
         format: {},

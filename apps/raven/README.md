@@ -212,6 +212,18 @@ Players without Media Source Extensions, AVPlayer on Apple TV and iPhone and Exo
 - **Timestamps** are the file's own clock plus one second, so a file whose clock does not start at zero, as a broadcast recording's does not, has its subtitle cues moved onto it.
 - **Settings** apply as to `stream`: conversion off refuses both modes with `403`, remux only refuses a transcode. Playlists are compressed; the init and segments never are.
 
+### Device downloads
+
+A device whose player cannot open a video's original (AVPlayer on an iPad, with an MKV) downloads an MP4 copy the server makes instead. Both routes are a video's, held by the PIN lock as `file` is:
+
+| Route | What it answers |
+| --- | --- |
+| `GET /api/media/:id/device-download` | Where the copy of the file as it is on disk stands: `ready` with its `bytes`, `preparing` with its `progress` from 0 to 1, or `failed` with a plain `message`. Asking starts the copy when none is cached or running; a failure is said once, and the ask after it tries again. A track is a `409` |
+| `GET /api/media/:id/device-download/file` | The finished copy, `video/mp4`, with byte ranges, on the media plane: opened by a media ticket and kept open past its five minutes by the ticket's pass, as `file` is. `409` while it is not ready |
+
+- **The copy is a remux.** The picture is copied (HEVC under the `hvc1` tag); an audio track is copied when it is AAC, AC-3, E-AC-3 or MP3, and becomes E-AC-3 otherwise, keeping up to 5.1; text subtitles become `mov_text` and picture ones are left out, and a file whose subtitles will not convert is copied again without them. Languages, titles and chapters are kept, and the index goes first.
+- **Copies are cached** under `DATA_DIR/device-downloads/<mediaId>/<mtimeMs>.mp4`, at most two made at once, up to `DEVICE_DOWNLOAD_CACHE_GB`; past it the least recently served go first, swept at start, every 6 hours and before each new copy, never one being sent. A copy needs the original's size free on the disk to start.
+
 ## Audio tracks and subtitles
 
 The settings button (or `c` for subtitles) lists every audio and subtitle track in the file, read with ffprobe when the player opens it. Picking an audio track other than the file's default plays through a remux. The player remembers the last audio language picked, whether subtitles were on, in which language, and how big.
@@ -645,6 +657,7 @@ raven app imports `@raven/core` and `@raven/ui/headless` and answers the direct-
 | `AI_MATCH_EFFORT`             | `low`                          | How hard it thinks: `low`, `medium`, `high`, `xhigh` or `max` |
 | `AI_DAILY_LIMIT`              | `200`                          | AI lookups a day                             |
 | `TRANSCODE_CACHE_GB`          | `20`                           | GiB of tracks converted to AAC (`/api/media/:id/transcode`) kept under `DATA_DIR/transcodes`; past it the least recently served go first, swept at start and every 6 hours |
+| `DEVICE_DOWNLOAD_CACHE_GB`    | `300`                          | GiB of MP4 copies made for [device downloads](#device-downloads) kept under `DATA_DIR/device-downloads`; past it the least recently served go first |
 | `LOUDNESS_SCAN`               | `on`                           | Measure the loudness (EBU R128) of music tracks whose tags carry no ReplayGain, in the background, giving way to playback, for their track and album gains; `off` stops it |
 | `LASTFM_API_KEY`, `LASTFM_API_SECRET` | unset                | raven's Last.fm API account, for scrobbling; both set turn Last.fm on, either missing leaves it off. Each account links its own Last.fm, and ListenBrainz needs no server key. Never logged |
 | `LIBRARY_PIN`                 | unset                          | The PIN that opens locked libraries          |

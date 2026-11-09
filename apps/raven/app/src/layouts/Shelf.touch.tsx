@@ -14,6 +14,7 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES } from '@/queries/cards'
 import { TouchCard } from '@/layouts/TouchCard'
 import { BREAKPOINTS } from '@/layouts/screenSizes'
+import { LINE_RATIO } from '@/layouts/textHeights'
 import {
   type BingeShelfProps,
   NOTHING_HERE,
@@ -27,6 +28,7 @@ import {
   seeAllLabelOf,
   seeAllOf,
   shelfStateOf,
+  type ShelfPageProps,
 } from '@/layouts/shelfKit'
 import { BINGE_COPY } from '@/queries/bingeCards'
 import { SHELF_LAYOUTS, type ShelfLayout } from '@/queries/homeShelves'
@@ -265,11 +267,32 @@ const bingeRatioOf = ({ isWide, columns }: BingeRatioOfProps): number => {
   return columns === 1 ? BINGE_RATIOS.full : BINGE_RATIOS.half
 }
 
+/** A page of shelves under the thumb, as the search page is laid out, with no search box. */
+const ShelfPage = ({ title, onBack, note, children }: ShelfPageProps) => {
+  const styles = useStyles()
+  return (
+    <TouchShelfPage notice={null} onBack={onBack} search={null} title={title}>
+      {note !== null && (
+        <Text variant={TEXT_VARIANTS.display} style={styles.note}>
+          {note}
+        </Text>
+      )}
+      {children}
+    </TouchShelfPage>
+  )
+}
+
 /** Home on a phone or tablet: Binge, then the shelves stacked down the page, each scrolled sideways. */
-export const touchShelf: ShelfKit = { Shelves, Shelf, BingeShelf }
+export const touchShelf: ShelfKit = { Shelves, Shelf, BingeShelf, ShelfPage }
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
+    note: {
+      color: colours.text,
+      fontSize: SIZES.textLg,
+      lineHeight: SIZES.textLg * LINE_RATIO,
+      paddingHorizontal: SIZES.space3,
+    },
     shelf: { gap: SIZES.space2 },
     titleRow: {
       flexDirection: 'row',

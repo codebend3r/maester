@@ -103,6 +103,11 @@ export type MediaSources = {
   /** Where a track plays or downloads from, by the same origin, ticket and cookie as a video. */
   trackSource: (request: TrackRequest) => Promise<SourceOutcome>
   /**
+   * Where the server's MP4 copy of a video downloads from, once it is ready, by the same origin
+   * and ticket as its picture.
+   */
+  copySource: (mediaId: number) => Promise<SourceOutcome>
+  /**
    * Where a video's subtitles are fetched from and the ticket they carry, as its picture is: a
    * media route takes a ticket, never the account's Bearer. Null where the server hands out no
    * ticket, or refuses one.
@@ -515,6 +520,8 @@ export const mediaAccessFor = ({
         uriOf: (access) => uriFor({ request, access }),
       }),
     trackSource: (request) => outcomeOf({ mediaId: request.mediaId, uriOf: trackUriOf(request) }),
+    copySource: (mediaId) =>
+      outcomeOf({ mediaId, uriOf: (access) => api.deviceDownloadFileUrl({ id: mediaId, access }) }),
     subtitleAccess: (mediaId) => subtitleAccess(mediaId).catch(() => null),
     networkFor: (mediaId) => networkFor(mediaId).catch(() => AT_HOME),
     close: stopWatching,

@@ -42,6 +42,8 @@ export { useClock } from '@/lib/useClock'
 export { PLAYBACK_MODE_NAMES } from '@/components/Player/copy'
 export { playerQueryKeys } from '@/lib/playerQueryKeys'
 export { useSearch } from '@/lib/useSearch'
+export { LIBRARY_LOCK_STATES, lockState } from '@/lib/libraryLock'
+export type { LibraryLock } from '@/lib/libraryLock'
 export type { Search } from '@/lib/useSearch'
 export { LISTING_GC_MS, createQueryClient, mutationKeys, queryKeys } from '@/query/queryClient'
 export {

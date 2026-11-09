@@ -13,7 +13,7 @@ import {
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import { APP_ROUTE_PARAMS, APP_ROUTES } from '@/routes'
@@ -131,6 +131,16 @@ const cardTitles = (titles: readonly string[]): string[] =>
 
 const FILM_TITLES = ['Ashfall Gate', 'Busboys', 'Night Train'] as const
 
+/** How each toolbar chip's spoken label starts. */
+const TOOLBAR_LABEL = /^(Show |Shuffle |Sort: |Order: |View: |Group by: |Lock )/
+
+/** The toolbar's chips by their spoken labels, in the order they stand. */
+const toolbarLabels = (): string[] =>
+  screen
+    .getAllByRole('button')
+    .map((chip) => chip.props.accessibilityLabel)
+    .filter((label) => typeof label === 'string' && TOOLBAR_LABEL.test(label))
+
 type RenderLibraryProps = { id: number | string; query?: string }
 
 const renderLibrary = async ({ id, query }: RenderLibraryProps) => {
@@ -213,18 +223,39 @@ describe('Library on a phone or tablet', () => {
     expect(screen.getByRole('button', { name: `View: ${LIBRARY_VIEW_LABELS.grid}` })).toBeTruthy()
   })
 
-  it('draws an icon beside the text of every toolbar chip', async () => {
+  it('draws an icon on every toolbar chip, with words only on Sort', async () => {
     await renderLibrary({ id: FILMS.id })
     await screen.findByRole('button', { name: 'Night Train' })
 
-    const chips = [
-      screen.getByRole('button', { name: 'Sort: Title' }),
-      screen.getByRole('button', { name: `View: ${LIBRARY_VIEW_LABELS.grid}` }),
+    const sort = screen.getByRole('button', { name: 'Sort: Title' })
+    expect(drawingsIn(sort)).toBe(1)
+    expect(within(sort).getByText('Sort')).toBeTruthy()
+    expect(within(sort).getByText('Title')).toBeTruthy()
+
+    const iconOnly = [
+      screen.getByRole('button', { name: 'Show Continue watching' }),
       screen.getByRole('button', { name: 'Shuffle Films' }),
+      screen.getByRole('button', { name: 'Order: A to Z' }),
+      screen.getByRole('button', { name: `View: ${LIBRARY_VIEW_LABELS.grid}` }),
     ]
-    chips.forEach((chip) => {
+    iconOnly.forEach((chip) => {
       expect(drawingsIn(chip)).toBe(1)
+      expect(within(chip).queryAllByText(/./)).toEqual([])
     })
+  })
+
+  it('stands the toolbar as page toggles, Shuffle, Sort, its direction, then View', async () => {
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+
+    expect(toolbarLabels()).toEqual([
+      'Show Continue watching',
+      'Show Sagas',
+      'Shuffle Films',
+      'Sort: Title',
+      'Order: A to Z',
+      `View: ${LIBRARY_VIEW_LABELS.grid}`,
+    ])
   })
 
   it("opens a card on its item's page, as this library shows it", async () => {

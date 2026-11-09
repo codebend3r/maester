@@ -2,6 +2,7 @@ import { type ReactNode, useRef, useState } from 'react'
 
 import { CardMenu } from '@/cardMenu/CardMenu'
 import { useLongSelect } from '@/cardMenu/useLongSelect'
+import type { CardMenuKit } from '@/layouts/cardMenuKit'
 import type { ShelfCard } from '@/queries/cards'
 
 /**
@@ -10,7 +11,7 @@ import type { ShelfCard } from '@/queries/cards'
  */
 const HELD_PRESS_MS = 1000
 
-type UseCardMenuProps = { card: Pick<ShelfCard, 'title' | 'subject'> }
+type UseCardMenuProps = { card: Pick<ShelfCard, 'title' | 'subject'>; kit: CardMenuKit }
 
 type CardMenuState = {
   /** Whether the remote is on the card, which the card draws its ring and growth from. */
@@ -28,7 +29,7 @@ type CardMenuState = {
  * The menu a card opens on a held select while it has the focus, the focus it keeps for that,
  * and a guard for the card's press. A card with no subject opens none, and hears no held select.
  */
-export const useCardMenu = ({ card }: UseCardMenuProps): CardMenuState => {
+export const useCardMenu = ({ card, kit }: UseCardMenuProps): CardMenuState => {
   const [isFocused, setFocused] = useState(false)
   const [isOpen, setOpen] = useState(false)
   const heldAt = useRef<number | null>(null)
@@ -47,7 +48,7 @@ export const useCardMenu = ({ card }: UseCardMenuProps): CardMenuState => {
     onFocus: () => setFocused(true),
     onBlur: () => setFocused(false),
     menu: isOpen && subject !== null && (
-      <CardMenu onClose={() => setOpen(false)} subject={subject} title={card.title} />
+      <CardMenu kit={kit} onClose={() => setOpen(false)} subject={subject} title={card.title} />
     ),
     guard: (onPress) => () => {
       if (!isHeldTail()) onPress()

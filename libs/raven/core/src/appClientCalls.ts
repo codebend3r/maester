@@ -1,5 +1,6 @@
 import {
   AUTH_PATHS,
+  DEVICE_DOWNLOAD_PATHS,
   DISCOVERY_PATHS,
   HLS_PATHS,
   PICTURE_PATHS,
@@ -44,7 +45,10 @@ export const APP_OWNER_CALLS = {
 /**
  * Every route raven's device app may ask a server for, through PR 10's screens: the
  * `@Public()` and viewer reads, the writes the spec allows (progress, plays, watched, the
- * favourites, the account's playlists, their sharing and copies, scrobbling links and the binge list), the mixes and radio and the admin lock's unlock, the media ticket and the media plane.
+ * favourites, the account's playlists, their sharing and copies, scrobbling links and the binge
+ * list), the mixes and radio, the admin lock's unlock, the PIN's unlock and lock (only the owner
+ * unlocks; the server answers anyone else's PIN with its refusal), the media ticket, the MP4 copy
+ * a download asks for when the device cannot play the original, and the media plane.
  * A call the `ApiClient` makes is named after its method; the rest are the URLs the native
  * players, pictures and the event stream fetch. The only entries the server keeps for the owner
  * (`@AdminOnly()`, or the account gate's owner) are `APP_OWNER_CALLS`'s: the server's
@@ -52,6 +56,8 @@ export const APP_OWNER_CALLS = {
  */
 export const APP_CLIENT_CALLS = {
   getLock: { method: get, path: '/api/lock' },
+  unlock: { method: post, path: '/api/lock/unlock' },
+  lock: { method: post, path: '/api/lock/lock' },
   getAdminLock: { method: get, path: '/api/admin' },
   unlockAdmin: { method: post, path: '/api/admin/unlock' },
 
@@ -59,6 +65,7 @@ export const APP_CLIENT_CALLS = {
 
   getHome: { method: get, path: '/api/home' },
   getHero: { method: get, path: '/api/home/hero' },
+  getHomeAlbums: { method: get, path: '/api/home/albums' },
   searchHome: { method: get, path: '/api/home/search' },
   events: { method: get, path: '/api/events' },
   getPlaybackSettings: { method: get, path: '/api/settings/playback' },
@@ -107,6 +114,7 @@ export const APP_CLIENT_CALLS = {
   getMediaTicket: { method: get, path: '/api/media/:id/ticket' },
   thumbnail: { method: get, path: '/api/media/:id/thumbnail' },
   getMediaOrigins: { method: get, path: '/api/media-origins' },
+  getDeviceDownload: { method: get, path: DEVICE_DOWNLOAD_PATHS.prepare },
 
   saveProgress: { method: put, path: '/api/media/:id/progress' },
   recordPlay: { method: post, path: '/api/media/:id/plays' },
@@ -133,6 +141,7 @@ export const APP_CLIENT_CALLS = {
   ping: { method: get, path: '/api/media-origins/ping' },
   file: { method: get, path: '/api/media/:id/file' },
   transcode: { method: get, path: '/api/media/:id/transcode' },
+  deviceDownloadFile: { method: get, path: DEVICE_DOWNLOAD_PATHS.file },
   stream: { method: get, path: '/api/media/:id/stream' },
   subtitles: { method: get, path: '/api/media/:id/subtitles/:trackId' },
   hlsMaster: { method: get, path: HLS_PATHS.master },

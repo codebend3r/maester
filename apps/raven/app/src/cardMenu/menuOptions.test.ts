@@ -4,11 +4,81 @@ import { WATCHED_STATES } from '@raven/core'
 import {
   CARD_MENU_COPY,
   bingeOptionOf,
+  downloadOptionOf,
   favouriteOptionOf,
   isOptionBlocked,
+  linkOptionOf,
   readingNoteOf,
   watchedOptionOf,
 } from '@/cardMenu/menuOptions'
+import { DOWNLOAD_COPY } from '@/downloads/copy'
+import { DOWNLOAD_ACTIONS, type DownloadControl } from '@/downloads/downloadControl'
+import { type ItemLink, LINK_KINDS } from '@/queries/itemLinks'
+import { itemTarget } from '@/routes'
+
+/** A Download button's face as a fresh title's page draws it. */
+const DOWNLOAD: DownloadControl = {
+  label: DOWNLOAD_COPY.downloadAll('Season 1'),
+  text: DOWNLOAD_COPY.download,
+  icon: 'download',
+  isOn: false,
+  isDisabled: false,
+  action: DOWNLOAD_ACTIONS.download,
+}
+
+describe('linkOptionOf', () => {
+  it('offers a way up by its words and opens it when pressed', () => {
+    const link: ItemLink = {
+      kind: LINK_KINDS.show,
+      label: 'Go to Severance',
+      text: 'Severance',
+      target: itemTarget(4),
+    }
+    const opened: ItemLink[] = []
+    const option = linkOptionOf({ link, onOpen: (each) => opened.push(each) })
+    expect(option.label).toBe('Go to Severance')
+    expect(isOptionBlocked(option)).toBe(false)
+    option.onPress()
+    expect(opened).toEqual([link])
+  })
+})
+
+describe('downloadOptionOf', () => {
+  it("offers Download as the page's button says it, and presses the button", () => {
+    const pressed: string[] = []
+    const [option] = downloadOptionOf({ control: DOWNLOAD, onPress: () => pressed.push('down') })
+    expect(option?.label).toBe(DOWNLOAD_COPY.downloadAll('Season 1'))
+    expect(option?.blockedBy).toBeNull()
+    option?.onPress()
+    expect(pressed).toEqual(['down'])
+  })
+
+  it('offers Cancel download while it is on its way, Retry once it failed, Remove once it is here', () => {
+    const labelOf = (action: DownloadControl['action']) =>
+      downloadOptionOf({ control: { ...DOWNLOAD, action }, onPress: () => undefined })[0]?.label
+    expect(labelOf(DOWNLOAD_ACTIONS.cancel)).toBe(CARD_MENU_COPY.cancelDownload)
+    expect(labelOf(DOWNLOAD_ACTIONS.retry)).toBe(CARD_MENU_COPY.retryDownload)
+    expect(labelOf(DOWNLOAD_ACTIONS.remove)).toBe(CARD_MENU_COPY.removeDownload)
+  })
+
+  it('keeps a faint Download with why under it where this device can take none of it', () => {
+    const blocked: DownloadControl = {
+      ...DOWNLOAD,
+      label: DOWNLOAD_COPY.cantDownload,
+      isDisabled: true,
+      action: DOWNLOAD_ACTIONS.none,
+    }
+    const [option] = downloadOptionOf({ control: blocked, onPress: () => undefined })
+    expect(option?.label).toBe(DOWNLOAD_COPY.download)
+    expect(option?.blockedBy).toBe(DOWNLOAD_COPY.cantDownload)
+    expect(option === undefined ? false : isOptionBlocked(option)).toBe(true)
+  })
+
+  it('offers nothing for a button with nothing to press and nothing to say', () => {
+    const idle: DownloadControl = { ...DOWNLOAD, action: DOWNLOAD_ACTIONS.none }
+    expect(downloadOptionOf({ control: idle, onPress: () => undefined })).toEqual([])
+  })
+})
 
 describe('watchedOptionOf', () => {
   it('offers to mark what is not all watched, and to unmark what is', () => {

@@ -28,6 +28,8 @@ type PersonLabelProps = Pick<PersonCard, 'name' | 'role'>
 export const ITEM_LAYOUT_COPY = {
   /** The mark at the end of a version's row, which plays it. */
   play: '▶',
+  /** The show's title art or name over an episode or a season, pressed to go back to the show's page; apart from the links row's "Go to". */
+  backTo: (name: string) => `Back to ${name}`,
   /** A person as they are read out: "Ana Ruiz, Director". */
   person: ({ name, role }: PersonLabelProps) => `${name}, ${role}`,
   /** A file's fact's values in a list: "English, French". */
@@ -115,4 +117,26 @@ export const MUSIC_COPY = {
   /** A chapter as it is read out: "Opening, 0:00". */
   chapterLabel: ({ title, at }: ChapterLabelProps) => `${title}, ${at}`,
   appearsOn: 'Appears on',
+} as const
+
+/** What stands where a locked library's videos would be, as the web's `LockedLibrary` says it. */
+export const LOCKED_LIBRARY_COPY = {
+  locked: 'Locked',
+  isLocked: (name: string) => `${name} is locked.`,
+  unlock: 'Unlock',
+  /** A locked library's row in a side menu, as it is read out. */
+  lockedRow: (name: string) => `${name}, locked`,
+} as const
+
+/** The PIN pad, in the web's `PinPadDialog`'s words. */
+export const PIN_PAD_COPY = {
+  title: 'Unlock libraries',
+  hint: 'Enter the PIN to open the locked libraries on this device.',
+  pad: 'PIN pad',
+  empty: 'Enter the PIN',
+  dot: '●',
+  entered: (count: number) => (count === 1 ? '1 digit entered' : `${count} digits entered`),
+  backspace: 'Delete the last digit',
+  unlock: 'Unlock',
+  cancel: 'Cancel',
 } as const

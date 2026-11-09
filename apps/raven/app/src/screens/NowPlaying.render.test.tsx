@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { APP_CALL_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import type * as Native from '@raven/native'
 import { useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
-import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { fireEvent, screen } from '@testing-library/react-native'
 
 import { NowPlaying } from '@/screens/NowPlaying'
 import { useActiveServer } from '@/stores/activeServer'
@@ -18,7 +18,7 @@ import {
   musicApi,
 } from '@/test/musicServer'
 import { answerSheet } from '@/test/actionSheet'
-import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
+import { createScreenClient, renderScreen, untilIdle, untilSettled } from '@/test/renderScreen'
 
 const mockHeard: HeardRequest[] = []
 const mockApi = jest.fn(() => musicApi({ hear: (request) => mockHeard.push(request) }))
@@ -110,11 +110,12 @@ describe('Now Playing under the thumb', () => {
   })
 
   it('adds the playing track to a playlist picked from the sheet', async () => {
-    answerSheet({ answer: MIXTAPE.name })
+    const offered = answerSheet({ answer: MIXTAPE.name })
     useAudioQueue.getState().playTracks({ tracks: [AIRBAG] })
     await renderPlayingAt({ at: 0 })
-    await waitFor(() => expect(shown.client.isFetching()).toBe(0))
+    await untilSettled(shown.client)
     await fireEvent.press(screen.getByRole('button', { name: 'Add to playlist' }))
+    expect(offered).toEqual([[MIXTAPE.name, 'New playlist', 'Cancel']])
     expect(await screen.findByText(`Added to ${MIXTAPE.name}.`)).toBeTruthy()
     expect(mockHeard.filter(({ method }) => method !== APP_CALL_METHODS.get)).toEqual([
       {

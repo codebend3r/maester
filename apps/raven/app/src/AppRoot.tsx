@@ -10,6 +10,7 @@ import { Appearance, StatusBar, StyleSheet, View } from 'react-native'
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAccountSession } from '@/account/session'
+import { DOWNLOAD_DEVICE } from '@/downloads/downloadDevice'
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { TouchMenu } from '@/layouts/TouchMenu'
@@ -21,6 +22,7 @@ import { NAV_KINDS, type NavKind } from '@/platform/platform'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
 import { useActiveServer } from '@/stores/activeServer'
 import { configureAppPrefs } from '@/stores/appPrefs'
+import { configureDownloads, useDownloads } from '@/stores/downloads'
 import { configureLibraryViews } from '@/stores/libraryViews'
 import { configureSideMenu } from '@/stores/sideMenu'
 import { followReduceMotion } from '@/stores/reduceMotion'
@@ -49,10 +51,13 @@ const loadStores = async (): Promise<void> => {
     configureLibraryViews({ storage: AsyncStorage }),
     configureAppPrefs({ storage: AsyncStorage }),
     configureSideMenu({ storage: AsyncStorage }),
+    configureDownloads({ storage: AsyncStorage, ...DOWNLOAD_DEVICE }),
     useActiveServer.persist.rehydrate(),
     useAccountSession.persist.rehydrate(),
   ])
   pinRavenServer({ servers: useActiveServer })
+  // What a relaunch stopped starts again once the servers are known, and the splash waits for none of it.
+  useDownloads.getState().resume().catch(SPLASH_IGNORED)
 }
 
 type ServerEventsProps = { session: AppQueries }
@@ -137,6 +142,7 @@ const AppRoutes = () => {
               <Stack.Screen name={APP_SCREENS.continueWatching} />
               <Stack.Screen name={APP_SCREENS.libraries} />
               <Stack.Screen name={APP_SCREENS.settings} />
+              <Stack.Screen name={APP_SCREENS.downloads} />
             </Stack.Protected>
           </Stack>
         </SafeAreaInsetsContext.Provider>

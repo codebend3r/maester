@@ -39,12 +39,12 @@ const ALBUM: AlbumSummary = {
 }
 
 describe('musicCards', () => {
-  it('draws an album as its cover under its artists, opening its page', () => {
+  it('draws an album as its cover under its artists and release date, opening its page', () => {
     const card = albumCard({ api, headersFor, album: ALBUM })
     expect(card).toMatchObject({
       key: 'album:7',
       title: 'OK Computer',
-      line: 'Radiohead, Guest',
+      line: 'Radiohead, Guest · 1997',
       shape: CARD_SHAPES.square,
       target: { kind: ROUTE_TARGETS.album, albumId: 7 },
     })

@@ -21,7 +21,7 @@ export const serverHeadersFor = ({ session, jar }: ServerHeadersForProps) => {
   const useServerHeaders = ({
     server,
   }: UseServerHeadersProps): ((url: string) => Record<string, string>) | null => {
-    const cookies = useServerCookies({ server, jar })
+    const cookies = useServerCookies({ serverId: server.id, jar })
     const accessToken = session((state) => state.session?.accessToken ?? null)
     return cookies === null ? null : cookieHeadersFor({ server, cookies, accessToken })
   }

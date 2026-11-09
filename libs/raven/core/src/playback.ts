@@ -1,5 +1,6 @@
 import {
   DIRECT_PLAYS,
+  type DolbyVisionConfig,
   HLS_COPY_AUDIO_CODECS,
   type MediaItem,
   PLAYBACK_MODES,
@@ -147,6 +148,19 @@ export const videoCodecString = ({ codec, bitDepth }: VideoCodecStringProps): st
   if (!pair) return null
   return pair[deep ? 1 : 0]
 }
+
+type DolbyVisionCodecStringProps = Pick<DolbyVisionConfig, 'profile' | 'level'>
+
+/** Two digits, as the Dolby Vision codec string writes a profile or a level: `05`, `13`. */
+const twoDigits = (value: number): string => String(value).padStart(2, '0')
+
+/**
+ * The RFC 6381 codec string for a Dolby Vision HEVC track in MP4 under the
+ * `dvh1` sample entry, which HLS names to a device that decodes Dolby Vision
+ * itself: `dvh1.05.06` for profile 5 level 6.
+ */
+export const dolbyVisionCodecString = ({ profile, level }: DolbyVisionCodecStringProps): string =>
+  `dvh1.${twoDigits(profile)}.${twoDigits(level)}`
 
 export const audioCodecString = (codec: string): string | null => {
   const strings: Record<string, string> = {

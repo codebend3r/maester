@@ -1,4 +1,4 @@
-import { LYRICS_KINDS, REPEAT_MODES } from '@raven/core'
+import { REPEAT_MODES } from '@raven/core'
 import { usePlayerPrefs } from '@raven/ui/headless'
 import type { QueueRow } from '@raven/ui/headless'
 import { type ComponentRef, type ComponentType, useRef, useState } from 'react'
@@ -17,6 +17,7 @@ import {
   PLAYING_STATES,
   type PlayingState,
   crossfadeChooserOf,
+  isCentredFor,
   playingStateOf,
   repeatIconOf,
   shuffleLabelOf,
@@ -54,11 +55,9 @@ type LayoutOfProps = { aside: Aside; isLyricsLarge: boolean }
  * the remote has opened them; a track with no lyrics puts the player dead centre.
  */
 const layoutOf = ({ aside, isLyricsLarge }: LayoutOfProps): PlayingLayout => {
-  if (aside.kind === NOW_PLAYING_ASIDES.book) return PLAYING_LAYOUTS.columns
-  // While the lyrics are still being read the columns stand, so the player never mounts afresh.
-  if (aside.kind === NOW_PLAYING_ASIDES.none) return PLAYING_LAYOUTS.columns
-  if (aside.lyrics.kind === LYRICS_KINDS.none) return PLAYING_LAYOUTS.centred
-  return isLyricsLarge ? PLAYING_LAYOUTS.lyricsLarge : PLAYING_LAYOUTS.columns
+  if (isCentredFor(aside)) return PLAYING_LAYOUTS.centred
+  const isLyrics = aside.kind === NOW_PLAYING_ASIDES.lyrics
+  return isLyrics && isLyricsLarge ? PLAYING_LAYOUTS.lyricsLarge : PLAYING_LAYOUTS.columns
 }
 
 const useStyles = themedStyles((colours) =>
@@ -177,7 +176,7 @@ const Player = ({
         style={[own.playing, { width: isCentred ? undefined : size }, isCentred && own.centred]}
       >
         <FocusBand>
-          <PlayingCover cover={track.cover} isPlaying={isPlaying} size={size} title={track.title} />
+          <PlayingCover cover={track.cover} size={size} title={track.title} />
         </FocusBand>
         <View style={[own.words, isCentred && own.centredWords]}>
           <Text

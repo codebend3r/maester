@@ -119,6 +119,7 @@ describe("an account's HLS session", () => {
         frameRate: 24,
         audio: null,
         videoCodec: VIDEO_CODECS.h264,
+        dolbyVision: null,
         encoder: SOFTWARE,
         maxHeight: 1080,
         quality: QUALITIES.medium,

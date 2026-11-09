@@ -1,13 +1,12 @@
 import type { Library } from '@raven/core'
-import type { IconName } from '@raven/ui/iconDrawings'
-import { type ComponentType, type ReactNode, useState } from 'react'
+import { type ComponentType, useState } from 'react'
 
-import { ToolButton } from '@/layouts'
 import { MUSIC_PAGES_COPY } from '@/music/copy'
 import { AlbumsGrid } from '@/music/AlbumsGrid'
 import { ArtistsGrid } from '@/music/ArtistsGrid'
 import { PlaylistsGrid } from '@/music/PlaylistsGrid'
 import type { AppQueries } from '@/queries/useAppQueries'
+import { type PageFrame, type PageTab } from '@/screens/PageTools'
 
 /**
  * The pages a music library opens on: its albums as covers, its artists by name, and the
@@ -24,37 +23,19 @@ const PAGE_ORDER: readonly MusicPage[] = [
   MUSIC_PAGES.playlists,
 ]
 
-/** What each page is called, on the button that leads to it. */
-const PAGE_NAMES = {
-  [MUSIC_PAGES.albums]: MUSIC_PAGES_COPY.albums,
-  [MUSIC_PAGES.artists]: MUSIC_PAGES_COPY.artists,
-  [MUSIC_PAGES.playlists]: MUSIC_PAGES_COPY.playlists,
-} as const satisfies Record<MusicPage, string>
-
-type MusicPageToggleProps = { page: MusicPage; onChange: (page: MusicPage) => void }
-
-/** What each page's button draws beside its name. */
-const PAGE_ICONS = {
-  [MUSIC_PAGES.albums]: 'disc',
-  [MUSIC_PAGES.artists]: 'music',
-  [MUSIC_PAGES.playlists]: 'list',
-} as const satisfies Record<MusicPage, IconName>
-
-/** One press from any page to each of the others: each named for where it goes. */
-const MusicPageToggle = ({ page, onChange }: MusicPageToggleProps) =>
-  PAGE_ORDER.filter((other) => other !== page).map((other) => (
-    <ToolButton
-      key={other}
-      accessibilityLabel={MUSIC_PAGES_COPY.show(PAGE_NAMES[other])}
-      icon={PAGE_ICONS[other]}
-      label={PAGE_NAMES[other]}
-      onPress={() => onChange(other)}
-    />
-  ))
+/** What each page's button says and draws. */
+const PAGE_TABS = {
+  [MUSIC_PAGES.albums]: { name: MUSIC_PAGES_COPY.albums, icon: 'disc' },
+  [MUSIC_PAGES.artists]: { name: MUSIC_PAGES_COPY.artists, icon: 'music' },
+  [MUSIC_PAGES.playlists]: { name: MUSIC_PAGES_COPY.playlists, icon: 'list' },
+} as const satisfies Record<MusicPage, PageTab>
 
 type MusicPagesProps = { session: AppQueries; library: Library; asked: string }
 
-type MusicPageViewProps = MusicPagesProps & { toggle: ReactNode }
+/** What a music library's pages share: the page open, the pages, and the library the toolbar frames. */
+export type MusicFrame = PageFrame<MusicPage>
+
+type MusicPageViewProps = MusicPagesProps & { frame: MusicFrame }
 
 /** Each page as the toolbar's choice draws it. */
 const MUSIC_PAGE_VIEWS = {
@@ -71,12 +52,13 @@ const MUSIC_PAGE_VIEWS = {
 export const MusicPages = ({ session, library, asked }: MusicPagesProps) => {
   const [page, setPage] = useState<MusicPage>(MUSIC_PAGES.albums)
   const Page = MUSIC_PAGE_VIEWS[page]
-  return (
-    <Page
-      asked={asked}
-      library={library}
-      session={session}
-      toggle={<MusicPageToggle onChange={setPage} page={page} />}
-    />
-  )
+  const frame: MusicFrame = {
+    page,
+    pages: PAGE_ORDER,
+    tabs: PAGE_TABS,
+    onChange: setPage,
+    library,
+    api: session.api,
+  }
+  return <Page asked={asked} frame={frame} library={library} session={session} />
 }

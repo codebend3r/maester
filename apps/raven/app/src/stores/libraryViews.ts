@@ -4,7 +4,9 @@ import {
   isLibraryView,
   isMediaGroupBy,
   isMediaSort,
+  isMusicSort,
   isRecord,
+  isSortDirection,
   withoutView,
 } from '@raven/core'
 import { create } from 'zustand'
@@ -13,11 +15,16 @@ import { type StateStorage, createJSONStorage, persist } from 'zustand/middlewar
 /** The key the choices are stored under. */
 export const LIBRARY_VIEWS_KEY = 'raven-library-views'
 
-/** How a viewer left one library on this device: its sort, view and grouping, any of them. */
+/**
+ * How a viewer left one library on this device: its sort, view and grouping, any of them, and
+ * for a music library the albums' sort and its direction.
+ */
 const isLibraryChoice = exactPartial({
   sort: isMediaSort,
   view: isLibraryView,
   groupBy: isMediaGroupBy,
+  musicSort: isMusicSort,
+  musicOrder: isSortDirection,
 })
 
 export type LibraryChoice = Infer<typeof isLibraryChoice>

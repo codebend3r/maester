@@ -11,6 +11,7 @@
 
 export * from '@/contract/auth'
 export * from '@/contract/binge'
+export * from '@/contract/deviceDownloads'
 export * from '@/contract/dolbyVision'
 export * from '@/contract/duplicates'
 export * from '@/contract/home'

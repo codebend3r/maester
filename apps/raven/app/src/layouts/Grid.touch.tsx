@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import { Icon } from '@raven/native'
+import { useTouchCard } from '@/cardMenu/useTouchCard'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
@@ -75,14 +76,16 @@ type RowCardProps = {
   onPress: () => void
 }
 
-/** A card of the list or tiles view: a row of words, with its picture in the tiles view. */
+/** A card of the list or tiles view: a row of words, with its picture in the tiles view; a long press opens its menu. */
 const RowCard = ({ card, hasPicture, onPress }: RowCardProps) => {
   const styles = useStyles()
   const text = useTheme((theme) => theme.palette.text)
+  const { onLongPress, menu } = useTouchCard({ card })
   return (
     <Pressable
       accessibilityLabel={card.title}
       accessibilityRole="button"
+      onLongPress={onLongPress}
       onPress={onPress}
       style={({ pressed }) => [styles.rowCard, pressed && styles.pressed]}
     >
@@ -101,6 +104,7 @@ const RowCard = ({ card, hasPicture, onPress }: RowCardProps) => {
           </Text>
         )}
       </View>
+      {menu}
     </Pressable>
   )
 }

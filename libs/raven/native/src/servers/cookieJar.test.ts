@@ -194,19 +194,18 @@ describe('createCookieJar', () => {
     expect(await jar.read(SERVER_ID)).toEqual({})
   })
 
-  it('says which server changed on every write and forget, once each, after memory holds it', async () => {
+  it('says what a server holds once it is read, and on every write and forget, once each, after memory holds it', async () => {
     const { store } = memoryStore()
     const changed: Array<{ serverId: string; cookies: unknown }> = []
+    const read: Array<{ serverId: string; cookies: unknown }> = []
     const jar = createCookieJar({
       store,
-      onChange: (serverId) => {
-        jar.read(serverId).then(
-          (cookies) => changed.push({ serverId, cookies }),
-          () => undefined,
-        )
-      },
+      onRead: (known) => read.push(known),
+      onChange: (known) => changed.push(known),
     })
     await jar.read(SERVER_ID)
+    await jar.read(SERVER_ID)
+    expect(read).toEqual([{ serverId: SERVER_ID, cookies: {} }])
     expect(changed).toEqual([])
     await jar.apply({ serverId: SERVER_ID, changes: { [SERVER_COOKIES.unlock]: set('a') } })
     await jar.apply({ serverId: SERVER_ID, changes: { [SERVER_COOKIES.unlock]: cleared } })

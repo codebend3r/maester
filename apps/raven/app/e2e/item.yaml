@@ -40,14 +40,28 @@ tags:
 - extendedWaitUntil:
     visible: Seasons
     timeout: 30000
+# The actions, Download among them, push the seasons and episodes below the tab bar on a phone.
+- scrollUntilVisible:
+    element: Season 1
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
 - tapOn: Season 1
-- extendedWaitUntil:
-    visible: Episodes
+- scrollUntilVisible:
+    element: Episodes
+    direction: DOWN
+    centerElement: true
     timeout: 30000
 # A row is read out with its line and watched state after its name.
+- scrollUntilVisible:
+    element: E1 · Low Tide.*
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
 - tapOn: E1 · Low Tide.*
+# The episode's place over its title is a link back to its show, read out by where it goes.
 - extendedWaitUntil:
-    visible: S01 · E01
+    visible: Back to Lantern Bay
     timeout: 30000
 - assertVisible: Low Tide
 - assertVisible: Mark watched
