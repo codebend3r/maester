@@ -56,6 +56,7 @@ describe('playablePage', () => {
     expect(hero).toEqual({
       eyebrow: null,
       logo: null,
+      home: null,
       title: 'Busboys',
       byline: 'Directed by Mark Kimball',
       rating: 'R',

@@ -14,7 +14,8 @@ import { FAVOURITES_COPY } from '@/screens/copy'
 
 type ServerFavouritesProps = { session: AppQueries }
 
-const ServerFavourites = ({ session: { server, api, queries } }: ServerFavouritesProps) => {
+const ServerFavourites = ({ session }: ServerFavouritesProps) => {
+  const { server, api, queries } = session
   const router = useRouter()
   const videos = useQuery(queries.favouritesQuery)
   const titles = useQuery(queries.favouriteTitlesQuery)

@@ -94,6 +94,7 @@ const ticketed = ({ origin, path, ticket }: TicketedProps) =>
 
 const filePath = pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS.id })
 const transcodePath = pathFor({ path: APP_CLIENT_CALLS.transcode.path, id: BUSBOYS.id })
+const copyPath = pathFor({ path: APP_CLIENT_CALLS.deviceDownloadFile.path, id: BUSBOYS.id })
 const masterPath = pathFor({ path: HLS_PATHS.master, id: BUSBOYS.id })
 const ticketPath = pathFor({ path: APP_CLIENT_CALLS.getMediaTicket.path, id: BUSBOYS.id })
 
@@ -157,6 +158,14 @@ describe('mediaAccessFor', () => {
     expect(
       sourceOf(await media.trackSource({ mediaId: BUSBOYS.id, kbps: AUDIO_BITRATES.standard })),
     ).toEqual({ uri: `${LAN.url}${transcodePath}?${query}`, headers: {} })
+  })
+
+  it("downloads the server's MP4 copy of a video from the picked origin by ticket", async () => {
+    const { media } = setUp()
+    expect(sourceOf(await media.copySource(BUSBOYS.id))).toEqual({
+      uri: ticketed({ origin: LAN.url, path: copyPath, ticket: TICKETS[0] }),
+      headers: {},
+    })
   })
 
   it("plays a track's transcode from the server's own address by ticket, or by its cookie", async () => {

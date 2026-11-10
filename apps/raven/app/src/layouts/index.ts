@@ -1,5 +1,7 @@
 import { Platform } from 'react-native'
 
+import { focusDownloads } from '@/layouts/Downloads.focus'
+import { touchDownloads } from '@/layouts/Downloads.touch'
 import { focusForm } from '@/layouts/Form.focus'
 import { focusGrid } from '@/layouts/Grid.focus'
 import { focusItem } from '@/layouts/ItemLayout.focus'
@@ -18,6 +20,7 @@ import { focusHero } from '@/layouts/HomeHero.focus'
 import { touchHero } from '@/layouts/HomeHero.touch'
 import { touchForm } from '@/layouts/Form.touch'
 import { focusLoading } from '@/layouts/Loading.focus'
+import { focusLock, touchLock } from '@/layouts/Lock'
 import { focusMusic } from '@/layouts/Music.focus'
 import { touchMusic } from '@/layouts/Music.touch'
 import { touchLoading } from '@/layouts/Loading.touch'
@@ -34,8 +37,20 @@ export const { Loading } = Platform.isTV ? focusLoading : touchLoading
 /** The form a screen asks for: driven by focus on a TV, by touch everywhere else. */
 export const { Form, Field, FormButton, useFormStyles } = Platform.isTV ? focusForm : touchForm
 
+/**
+ * The PIN lock: what stands in place of a locked library's videos, and the pad of digits the
+ * owner unlocks with, keys the remote moves through on a TV and a finger presses elsewhere.
+ */
+export const { LockedNotice, PinPad } = Platform.isTV ? focusLock : touchLock
+
+/**
+ * Downloads, under the thumb only: the page of what is on the device and on its way, and
+ * whether the item pages offer Download. A TV downloads nothing.
+ */
+export const { DownloadsLayout, canDownload } = Platform.isTV ? focusDownloads : touchDownloads
+
 /** Home's shelves: rows the remote moves along on a TV, rows under the thumb everywhere else. */
-export const { Shelves, Shelf, BingeShelf } = Platform.isTV ? focusShelf : touchShelf
+export const { Shelves, Shelf, BingeShelf, ShelfPage } = Platform.isTV ? focusShelf : touchShelf
 
 /** Home's hero over its shelves: the featured titles in turn on a TV, a swiped carousel under the thumb. */
 export const { HomeHero } = Platform.isTV ? focusHero : touchHero

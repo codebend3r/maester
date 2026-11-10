@@ -2,6 +2,7 @@ import { Icon } from '@raven/native'
 import { Image, Pressable, StyleSheet, View } from 'react-native'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
+import { useTouchCard } from '@/cardMenu/useTouchCard'
 import { HERO_COPY, TITLE_SIZES, type TitleSize, titleSizeOf } from '@/layouts/heroKit'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { LINE_RATIO } from '@/layouts/textHeights'
@@ -65,10 +66,12 @@ type HeroSlideViewProps = {
  * One title of the touch hero, edge to edge: its backdrop under a fade to dark at the foot, where
  * it came, its name in the display face, its facts and its synopsis, and Play. The picture and
  * its words are one button that opens the title's page, as the TV's Details does; Play beside
- * it starts it, or opens the page where a show has nothing left to watch. Everything over the
- * picture is in the on-picture colours, the same in every theme.
+ * it starts it, or opens the page where a show has nothing left to watch. A long press on the
+ * picture opens the title's menu. Everything over the picture is in the on-picture colours, the
+ * same in every theme.
  */
 export const HeroSlideView = ({ slide, width, height, isTablet, onOpen }: HeroSlideViewProps) => {
+  const { onLongPress, menu } = useTouchCard({ card: slide })
   const styles = usePictureStyles()
   const ground = useTheme((theme) => theme.overPicture.ground)
   const onAccent = useTheme((theme) => theme.palette.onAccent)
@@ -81,6 +84,7 @@ export const HeroSlideView = ({ slide, width, height, isTablet, onOpen }: HeroSl
       <Pressable
         accessibilityLabel={HERO_COPY.detailsOf(slide.title)}
         accessibilityRole="button"
+        onLongPress={onLongPress}
         onPress={() => onOpen(slide.details)}
         style={StyleSheet.absoluteFill}
       >
@@ -118,6 +122,7 @@ export const HeroSlideView = ({ slide, width, height, isTablet, onOpen }: HeroSl
             </Text>
           )}
         </View>
+        {menu}
       </Pressable>
       <Pressable
         accessibilityLabel={action.label}

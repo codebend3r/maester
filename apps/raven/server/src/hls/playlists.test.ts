@@ -1,4 +1,4 @@
-import { PLAYBACK_MODES, type SubtitleTrack, SUBTITLE_SOURCES } from '@raven/core'
+import { PLAYBACK_MODES, type SubtitleTrack, SUBTITLE_SOURCES, VIDEO_RANGES } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import {
   masterPlaylist,
@@ -26,6 +26,7 @@ const track = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({
 })
 
 const VARIANT = {
+  videoRange: VIDEO_RANGES.sdr,
   variantUri: '/api/media/m1/hls/s1/video.m3u8?t=tk',
   codecs: 'hvc1.2.4.L150.B0,mp4a.40.2',
   resolution: { width: 1920, height: 1080 },
@@ -103,7 +104,7 @@ describe('masterPlaylist', () => {
     expect(playlist).toBe(`#EXTM3U
 #EXT-X-VERSION:7
 #EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English (Forced · File)",LANGUAGE="en",DEFAULT=NO,AUTOSELECT=YES,FORCED=YES,URI="/api/media/m1/hls/s1/subtitles/external-0?t=tk"
-#EXT-X-STREAM-INF:BANDWIDTH=8000000,CODECS="hvc1.2.4.L150.B0,mp4a.40.2",RESOLUTION=1920x1080,SUBTITLES="subs"
+#EXT-X-STREAM-INF:BANDWIDTH=8000000,CODECS="hvc1.2.4.L150.B0,mp4a.40.2",RESOLUTION=1920x1080,VIDEO-RANGE=SDR,SUBTITLES="subs"
 /api/media/m1/hls/s1/video.m3u8?t=tk
 `)
   })
@@ -115,11 +116,36 @@ describe('masterPlaylist', () => {
     expect(transcode).toBe(`#EXTM3U
 #EXT-X-VERSION:7
 #EXT-X-INDEPENDENT-SEGMENTS
-#EXT-X-STREAM-INF:BANDWIDTH=8000000,CODECS="hvc1.2.4.L150.B0,mp4a.40.2",RESOLUTION=1920x1080
+#EXT-X-STREAM-INF:BANDWIDTH=8000000,CODECS="hvc1.2.4.L150.B0,mp4a.40.2",RESOLUTION=1920x1080,VIDEO-RANGE=SDR
 /api/media/m1/hls/s1/video.m3u8?t=tk
 `)
     expect(remux).not.toContain('INDEPENDENT-SEGMENTS')
   })
+
+  it.each([
+    [VIDEO_RANGES.dolbyVision, 'PQ'],
+    [VIDEO_RANGES.hdr10, 'PQ'],
+    [VIDEO_RANGES.hlg, 'HLG'],
+    [VIDEO_RANGES.sdr, 'SDR'],
+  ])(
+    'declares a remux of a %s picture as VIDEO-RANGE=%s, and a transcode as SDR',
+    (range, declared) => {
+      const remux = masterPlaylist({
+        ...VARIANT,
+        videoRange: range,
+        mode: PLAYBACK_MODES.remux,
+        subtitles: [],
+      })
+      const transcode = masterPlaylist({
+        ...VARIANT,
+        videoRange: range,
+        mode: PLAYBACK_MODES.transcode,
+        subtitles: [],
+      })
+      expect(remux).toContain(`,VIDEO-RANGE=${declared}\n`)
+      expect(transcode).toContain(',VIDEO-RANGE=SDR\n')
+    },
+  )
 
   it('names no subtitle group when only picture tracks exist', () => {
     const playlist = masterPlaylist({

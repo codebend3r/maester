@@ -1,7 +1,6 @@
-import { DOWNLOAD_STATUS_KINDS, type DownloadView } from '@raven/core'
+import { DOWNLOAD_STATUS_KINDS, type DownloadView, type SpeedSample, nextSample } from '@raven/core'
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import { nextSample, type SpeedSample } from '@/desktop/downloadSpeed'
 
 type ObserveProps = { downloads: readonly DownloadView[]; now: number }
 

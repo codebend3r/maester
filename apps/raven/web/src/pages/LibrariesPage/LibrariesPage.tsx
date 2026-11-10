@@ -29,12 +29,13 @@ import {
   mutationKeys,
   useOptimisticMutation,
   KeyedView,
+  LIBRARY_LOCK_STATES,
+  lockState,
   type ViewOf,
   type ViewsOf,
 } from '@raven/ui/headless'
 import { foldersByParent } from '@/lib/folders'
 import { libraryPollDelay } from '@/lib/libraryPolling'
-import { LIBRARY_LOCK_STATES, lockState } from '@/lib/libraryLock'
 import { useLibraryOrdering } from '@/lib/useLibraryOrdering'
 import { librariesQuery, lockQuery } from '@/lib/queries'
 import { LIBRARIES_COPY } from '@/pages/LibrariesPage/copy'
@@ -465,7 +466,7 @@ export const LibrariesPage = () => {
               : new Set([...current, id]),
           ),
         isShut: (library) =>
-          lockState({ locked: library.settings.locked, lock: lock.data }).state !==
+          lockState({ isLocked: library.settings.locked, lock: lock.data }).state !==
           LIBRARY_LOCK_STATES.open,
         onAdd,
         dialog,

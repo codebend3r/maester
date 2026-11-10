@@ -77,6 +77,7 @@ describe('mediaPlanePaths', () => {
   it('is the routes marked for the media plane', () => {
     expect(mediaPlanePaths(CONTROLLERS).toSorted()).toEqual([
       '/api/media-origins/ping',
+      '/api/media/:id/device-download/file',
       '/api/media/:id/file',
       '/api/media/:id/hls/:session/init',
       '/api/media/:id/hls/:session/segment/:n',

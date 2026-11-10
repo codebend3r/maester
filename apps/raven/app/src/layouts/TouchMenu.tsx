@@ -14,7 +14,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { PINNED_HEADING, SETTINGS_ENTRY } from '@/layouts/shelfKit'
+import { PINNED_HEADING, SETTINGS_ENTRY, menuRowLabelOf } from '@/layouts/shelfKit'
 import { SCRIM_OPACITY, SWIPE_START, slide } from '@/layouts/slide'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { useMenuGo } from '@/layouts/useMenuGo'
@@ -40,16 +40,18 @@ type MenuEntryProps = {
   label: string
   onPress: () => void
   ref?: Ref<ComponentRef<typeof Pressable>>
+  /** A library locked behind the PIN, which wears a lock after its name, as the web's does. */
+  isLocked?: boolean
 }
 
 /** One row of the menu: its icon and its name, a finger tall. */
-const MenuEntry = ({ icon, label, onPress, ref }: MenuEntryProps) => {
+const MenuEntry = ({ icon, label, onPress, ref, isLocked = false }: MenuEntryProps) => {
   const styles = useStyles()
   const text = useTheme((theme) => theme.palette.text)
   return (
     <Pressable
       ref={ref}
-      accessibilityLabel={label}
+      accessibilityLabel={menuRowLabelOf({ label, isLocked })}
       accessibilityRole="link"
       onPress={onPress}
       style={({ pressed }) => [styles.entry, pressed && styles.pressed]}
@@ -58,6 +60,7 @@ const MenuEntry = ({ icon, label, onPress, ref }: MenuEntryProps) => {
       <Text numberOfLines={1} style={styles.entryLabel}>
         {label}
       </Text>
+      {isLocked && <Icon colour={text} name="lock" size={SIZES.text} />}
     </Pressable>
   )
 }
@@ -65,9 +68,9 @@ const MenuEntry = ({ icon, label, onPress, ref }: MenuEntryProps) => {
 type MenuContentProps = { session: AppQueries }
 
 /**
- * What the menu holds, in the web's side menu's order: Home, Favourites, Continue watching
- * and Libraries, the pinned libraries under their heading, a rule, then Settings. Choosing an
- * entry shuts the menu and goes there.
+ * What the menu holds, in the web's side menu's order: Home, Favourites, Continue watching,
+ * Binge, Downloads (which opens with the server out of reach) and Libraries, the pinned libraries
+ * under their heading, a rule, then Settings. Choosing an entry shuts the menu and goes there.
  */
 const MenuContent = ({ session: { queries } }: MenuContentProps) => {
   const goTo = useMenuGo()
@@ -104,6 +107,16 @@ const MenuContent = ({ session: { queries } }: MenuContentProps) => {
         onPress={() => go({ pathname: APP_ROUTES.continueWatching, params: {} })}
       />
       <MenuEntry
+        icon="popcorn"
+        label={TOUCH_NAV_COPY.binge}
+        onPress={() => go({ pathname: APP_ROUTES.binge, params: {} })}
+      />
+      <MenuEntry
+        icon="download"
+        label={TOUCH_NAV_COPY.downloads}
+        onPress={() => go({ pathname: APP_ROUTES.downloads, params: {} })}
+      />
+      <MenuEntry
         icon="libraries"
         label={TOUCH_NAV_COPY.libraries}
         onPress={() => go({ pathname: APP_ROUTES.libraries, params: {} })}
@@ -117,6 +130,7 @@ const MenuContent = ({ session: { queries } }: MenuContentProps) => {
         <MenuEntry
           key={library.id}
           icon={library.icon}
+          isLocked={library.isLocked}
           label={library.name}
           onPress={() =>
             go(hrefOf({ kind: ROUTE_TARGETS.library, libraryId: library.id, query: '' }))
@@ -244,7 +258,7 @@ type TouchMenuProps = { session: AppQueries }
 /**
  * The side menu of a phone or tablet, mounted once above the routes: out from a menu button in
  * a page's header, or from a swipe in from Home's left edge; the web's side menu's content,
- * Home, Favourites, Continue watching, Libraries, the pinned libraries and, below a rule,
+ * Home, Favourites, Continue watching, Binge, Downloads, Libraries, the pinned libraries and, below a rule,
  * Settings. It
  * stays off the video player, whose screen is its own, and shuts itself when the player opens.
  */

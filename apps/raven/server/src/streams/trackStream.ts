@@ -43,6 +43,8 @@ type TrackStreamProps = {
   from: number
   request: FastifyRequest
   reply: FastifyReply
+  /** Runs once the response has closed, however it ended: what was held open for it lets go. */
+  onEnd?: () => void
 }
 
 /**
@@ -64,6 +66,7 @@ export const trackStream = ({
   from,
   request,
   reply,
+  onEnd,
 }: TrackStreamProps): void => {
   /*
    * A finished response lets go of its socket before it says it closed, so
@@ -88,5 +91,6 @@ export const trackStream = ({
   reply.raw.on(RESPONSE_EVENTS.close, () => {
     release()
     watch.unsubscribe()
+    onEnd?.()
   })
 }

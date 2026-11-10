@@ -87,8 +87,6 @@ export type PlayerChromeProps = {
   upNext: string | null
   /** The file's chapters, in order, for a platform that offers them to jump to; empty while none are known. */
   chapters: readonly Chapter[]
-  /** Hands the video to Picture in Picture; null where the player cannot. */
-  onPictureInPicture: (() => void) | null
   onBack: () => void
 }
 
@@ -125,6 +123,8 @@ export const PLAYER_COPY = {
   mute: 'Mute',
   unmute: 'Unmute',
   volume: 'Volume',
+  /** What holding the speaker does, as the screen reader hints it. */
+  volumeHint: 'Hold to show the volume slider',
   back: (seconds: number) => `Back ${seconds} seconds`,
   forward: (seconds: number) => `Forward ${seconds} seconds`,
   seek: 'Position',
@@ -132,7 +132,6 @@ export const PLAYER_COPY = {
   audio: 'Audio',
   subtitles: 'Subtitles',
   quality: 'Quality',
-  pictureInPicture: 'Picture in Picture',
   showControls: 'Show the controls',
   hideControls: 'Hide the controls',
   upNext: 'Up next',

@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { touchHero } from '@/layouts/HomeHero.touch'
+import { CARD_SUBJECTS } from '@/queries/cards'
 import type { HeroSlide } from '@/queries/heroSlides'
 import { ROUTE_TARGETS, type RouteTarget } from '@/routes'
 
@@ -25,6 +26,7 @@ const FILM: HeroSlide = {
   backdrop: PICTURE,
   play: PLAY,
   details: { kind: ROUTE_TARGETS.item, itemId: 4, libraryId: 1, fileId: null },
+  subject: { kind: CARD_SUBJECTS.video, mediaId: 12 },
 }
 
 const SHOW: HeroSlide = {

@@ -20,6 +20,14 @@ export const MUSIC_ENV = {
   lastFmApiSecret: 'LASTFM_API_SECRET',
 } as const
 
+/** The environment the device downloads read. */
+export const DEVICE_DOWNLOAD_ENV = {
+  cacheGb: 'DEVICE_DOWNLOAD_CACHE_GB',
+} as const
+
+/** GiB of MP4 copies for device downloads kept unless `DEVICE_DOWNLOAD_CACHE_GB` says otherwise. */
+const DEVICE_DOWNLOAD_CACHE_GB = 300
+
 /** raven's Last.fm API account, which signs every call it makes for an account. */
 export type LastFmKeys = { apiKey: string; apiSecret: string }
 
@@ -104,6 +112,11 @@ export type ServerConfig = ListenConfig & {
   aiDailyLimit: number
   /** How many bytes of AAC transcodes of tracks are kept; the least recently served go first past it. */
   transcodeCacheBytes: number
+  /**
+   * How many bytes of MP4 copies made for devices that cannot play a video's original are
+   * kept; the least recently served go first past it.
+   */
+  deviceDownloadCacheBytes: number
   /** Whether the tracks whose tags carry no ReplayGain are measured in the background for their loudness. */
   shouldScanLoudness: boolean
   /** Last.fm's API key and shared secret, for scrobbling; null keeps Last.fm off. Never logged or sent to a client. */
@@ -169,6 +182,8 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   aiMatchEffort: aiEffortFrom(env.AI_MATCH_EFFORT),
   aiDailyLimit: Math.max(1, wholeNumber(env.AI_DAILY_LIMIT) ?? 200),
   transcodeCacheBytes: (wholeNumber(env[MUSIC_ENV.transcodeCacheGb]) ?? 20) * GIB,
+  deviceDownloadCacheBytes:
+    (wholeNumber(env[DEVICE_DOWNLOAD_ENV.cacheGb]) ?? DEVICE_DOWNLOAD_CACHE_GB) * GIB,
   shouldScanLoudness: flag({ value: env[MUSIC_ENV.loudnessScan], fallback: true }),
   lastFm: lastFmKeysFrom(env),
   libraryPin: env.LIBRARY_PIN?.trim() || null,

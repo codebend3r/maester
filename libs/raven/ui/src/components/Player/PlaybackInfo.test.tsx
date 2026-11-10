@@ -32,6 +32,7 @@ const STREAMS: MediaStreams = {
     bitrate: 11_100_000,
     range: 'hdr10',
     isDolbyVisionOnly: false,
+    dolbyVision: null,
   },
   audio: [
     {

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type * as Native from '@raven/native'
 import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { APP_CALL_METHODS, APP_CLIENT_CALLS } from '@raven/core'
-import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { Alert } from 'react-native'
 
 import { APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf } from '@/routes'
@@ -23,7 +23,7 @@ import {
 } from '@/test/musicServer'
 import { answerSheet } from '@/test/actionSheet'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
-import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
+import { createScreenClient, renderScreen, untilIdle, untilSettled } from '@/test/renderScreen'
 
 const mockPush = jest.fn()
 const mockParams = jest.fn((): Record<string, string> => ({
@@ -88,6 +88,32 @@ describe('Album', () => {
     )
   })
 
+  it('draws its actions as one row of icon plates, Play filled and none with words', async () => {
+    await renderScreen({ ui: <Album /> })
+    await screen.findByText(OK_COMPUTER.title)
+
+    const labels = [
+      'Play',
+      'Shuffle',
+      'Play next',
+      'Add to queue',
+      'Add to playlist',
+      'Favourite',
+      `Download ${OK_COMPUTER.title}`,
+    ]
+    const plates = labels.map((label) => screen.getByRole('button', { name: label }))
+    plates.forEach((plate) => {
+      expect(within(plate).queryAllByText(/./)).toEqual([])
+    })
+    expect(plates[0]!.props.accessibilityState).toMatchObject({ selected: true })
+    expect(plates[1]!.props.accessibilityState).toMatchObject({ selected: false })
+    const shown = screen
+      .getAllByRole('button')
+      .map((button) => button.props.accessibilityLabel)
+      .filter((label) => labels.includes(label))
+    expect(shown).toEqual(labels)
+  })
+
   it('marks the album a favourite before the server answers', async () => {
     const { answer, release } = heldAnswer()
     mockServer.writes = () => answer
@@ -113,7 +139,7 @@ describe('Album', () => {
     const client = createScreenClient()
     await renderScreen({ ui: <Album />, client })
     await screen.findByText(OK_COMPUTER.title)
-    await waitFor(() => expect(client.isFetching()).toBe(0))
+    await untilSettled(client)
 
     await fireEvent.press(screen.getByRole('button', { name: 'Add to playlist' }))
     expect(offered).toEqual([[MIXTAPE.name, 'New playlist', 'Cancel']])

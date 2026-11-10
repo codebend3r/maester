@@ -19,6 +19,9 @@ export type FileTracks = {
   frameRate: number | null
 }
 
+/** The subtitle codec an MP4 carries text in, which AVPlayer shows. */
+export const MP4_TEXT_SUBTITLE = 'mov_text'
+
 /**
  * Subtitle codecs ffmpeg turns into WebVTT. Everything else (PGS, VobSub,
  * DVB, XSUB) is a picture of text and would need OCR or burning in.
@@ -29,7 +32,7 @@ const TEXT_SUBTITLES: ReadonlySet<string> = new Set([
   'ass',
   'ssa',
   'webvtt',
-  'mov_text',
+  MP4_TEXT_SUBTITLE,
   'text',
   'subviewer',
   'subviewer1',

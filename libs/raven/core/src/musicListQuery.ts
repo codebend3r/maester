@@ -1,4 +1,4 @@
-import { SORT_DIRECTIONS, type SortDirection } from '@/contract/sorting'
+import { SORT_DIRECTIONS, type SortDirection, isSortDirection } from '@/contract/sorting'
 import { fromQueryString, toQueryString } from '@/query'
 import { type Infer, isString, oneOf } from '@/schema'
 
@@ -21,8 +21,6 @@ export const MUSIC_LIST_PARAMS = {
   byAlbum: 'byAlbum',
 } as const
 
-const isDirection = oneOf(Object.values(SORT_DIRECTIONS))
-
 export const MUSIC_DEFAULT_ORDERS = {
   [MUSIC_SORTS.title]: SORT_DIRECTIONS.ascending,
   [MUSIC_SORTS.artist]: SORT_DIRECTIONS.ascending,
@@ -37,6 +35,24 @@ export const MUSIC_DEFAULT_ORDERS = {
 export const isMusicSort = oneOf(Object.values(MUSIC_SORTS))
 
 export type MusicSort = Infer<typeof isMusicSort>
+
+/** What each order is called in a sort menu, on the web and in the apps alike. */
+export const MUSIC_SORT_LABELS = {
+  [MUSIC_SORTS.title]: 'Title',
+  [MUSIC_SORTS.artist]: 'Album Artist',
+  [MUSIC_SORTS.year]: 'Year',
+  [MUSIC_SORTS.added]: 'Date Added',
+  [MUSIC_SORTS.release]: 'Release Date',
+  [MUSIC_SORTS.played]: 'Date Played',
+  [MUSIC_SORTS.plays]: 'Plays',
+  [MUSIC_SORTS.random]: 'Randomly',
+} as const satisfies Record<MusicSort, string>
+
+/** What each direction of a music sort is called, on the button that reverses it. */
+export const MUSIC_ORDER_LABELS = {
+  [SORT_DIRECTIONS.ascending]: 'Ascending',
+  [SORT_DIRECTIONS.descending]: 'Descending',
+} as const satisfies Record<SortDirection, string>
 
 /** The most tracks one page of a listing holds, and what a page holds when none is asked for. */
 export const MUSIC_PAGE = { most: 500, fallback: 200 } as const
@@ -99,7 +115,7 @@ export const musicListQuery = {
     const seed = wholeNumber(params[MUSIC_LIST_PARAMS.seed])
     return {
       ...(params[MUSIC_LIST_PARAMS.byAlbum] === '1' ? { byAlbum: true } : {}),
-      ...(isDirection(order) ? { order } : {}),
+      ...(isSortDirection(order) ? { order } : {}),
       ...(seed === null ? {} : { seed: Math.min(seed, 1_000_000) }),
       search: isString(params.q) ? params.q : '',
       sort: isMusicSort(params.sort) ? params.sort : MUSIC_SORTS.title,

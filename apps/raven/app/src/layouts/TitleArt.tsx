@@ -15,6 +15,8 @@ type TitleArtProps = {
   maxWidth: number
   /** How the name is set when there is no art, or it fails to load. */
   textStyle: StyleProp<TextStyle>
+  /** One colour to draw every visible pixel of the art in, so it reads on its ground; null keeps its own colours. */
+  tint?: string | null
 }
 
 /**
@@ -23,7 +25,14 @@ type TitleArtProps = {
  * art, never the art's own: on Android an accessible image is one the remote can focus, and the
  * player's title art took the focus from the scrubber on a press of left.
  */
-export const TitleArt = ({ name, logo, height, maxWidth, textStyle }: TitleArtProps) => {
+export const TitleArt = ({
+  name,
+  logo,
+  height,
+  maxWidth,
+  textStyle,
+  tint = null,
+}: TitleArtProps) => {
   const [ratio, setRatio] = useState<number>(LOGO_RATIO)
   const [failed, setFailed] = useState<string | null>(null)
   if (logo === null || failed === logo.uri) {
@@ -42,7 +51,12 @@ export const TitleArt = ({ name, logo, height, maxWidth, textStyle }: TitleArtPr
         }}
         resizeMode="contain"
         source={logo}
-        style={{ height, width: Math.min(maxWidth, height * ratio), maxWidth }}
+        style={{
+          height,
+          width: Math.min(maxWidth, height * ratio),
+          maxWidth,
+          ...(tint === null ? {} : { tintColor: tint }),
+        }}
       />
     </View>
   )

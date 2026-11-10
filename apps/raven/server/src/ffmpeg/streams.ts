@@ -10,6 +10,7 @@ import {
 import {
   CODEC_TYPES,
   COLOR_TRANSFERS,
+  dolbyVisionOf,
   hasDolbyVision,
   isDolbyVisionOnly,
   numeric,
@@ -75,6 +76,7 @@ export const parseStreams = (output: unknown): MediaStreams => {
         bitrate: bitrateOf(picture),
         range: rangeOf(picture),
         isDolbyVisionOnly: isDolbyVisionOnly(picture),
+        dolbyVision: dolbyVisionOf(picture),
       }
     : null
   const audio = streams

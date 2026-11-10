@@ -1,3 +1,5 @@
+import { DOWNLOAD_COPY } from '@/downloads/copy'
+import { BINGE_COPY } from '@/queries/bingeCards'
 import { HOME_NAV_COPY, LIBRARIES_ENTRY } from '@/layouts/copy'
 import { CONTINUE_WATCHING } from '@/queries/homeShelves'
 import { APP_ROUTES } from '@/routes'
@@ -12,6 +14,8 @@ export const TOUCH_NAV_COPY = {
   runSearch: 'Search',
   favourites: 'Favourites',
   continueWatching: CONTINUE_WATCHING,
+  binge: BINGE_COPY.title,
+  downloads: DOWNLOAD_COPY.title,
   libraries: LIBRARIES_ENTRY.label,
 } as const
 

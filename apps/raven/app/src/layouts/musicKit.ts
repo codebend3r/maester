@@ -2,6 +2,7 @@ import {
   type ArtistCredit,
   CROSSFADE_SECONDS,
   type CrossfadeSeconds,
+  LYRICS_KINDS,
   type PlaylistSummary,
   REPEAT_MODES,
   type RepeatMode,
@@ -17,6 +18,7 @@ import {
 import type { ReactNode } from 'react'
 
 import { MUSIC_COPY } from '@/layouts/copy'
+import type { DownloadButton } from '@/downloads/downloadControl'
 import type { ChapterRow, LyricsView } from '@/layouts/musicRows'
 import type { Picture } from '@/queries/cards'
 
@@ -102,6 +104,8 @@ export type AlbumLayoutProps = {
   onAddToPlaylist: (request: AlbumPlaylistRequest) => void
   /** What the last change said, "Added to Mixtape.", or why it failed; null for nothing. */
   note: string | null
+  /** Download, which only a touch screen draws. */
+  download: DownloadButton
   onBack: () => void
 }
 
@@ -131,6 +135,11 @@ export type NowPlayingLayoutProps = {
   error: string | null
   /** "1:02 / 4:44". */
   time: string
+  /** Where the track is, in seconds, for the seek bar. */
+  position: number
+  /** How long the track is, in seconds, or null until the player knows. */
+  duration: number | null
+  onSeek: (seconds: number) => void
   isPlaying: boolean
   isShuffled: boolean
   repeat: RepeatMode
@@ -164,6 +173,14 @@ export type NowPlayingAside =
   | { kind: typeof NOW_PLAYING_ASIDES.lyrics; lyrics: LyricsView }
   | { kind: typeof NOW_PLAYING_ASIDES.none }
 
+/**
+ * Whether Now Playing puts the player dead centre, with no column beside it: only once the
+ * lyrics are known and there are none. A book's controls stand beside it, and while the lyrics
+ * are still being read the columns stand, so the player never jumps.
+ */
+export const isCentredFor = (aside: NowPlayingAside): boolean =>
+  aside.kind === NOW_PLAYING_ASIDES.lyrics && aside.lyrics.kind === LYRICS_KINDS.none
+
 /** What Now Playing offers an audiobook: its chapters, a press between them, and its speed. */
 export type BookControls = {
   chapters: ChapterRow[]
@@ -192,6 +209,8 @@ export type PlaylistLayoutProps = {
   onDelete: () => void
   onMoveUp: (index: number) => void
   onRemove: (index: number) => void
+  /** Download, which only a touch screen draws. */
+  download: DownloadButton
   onBack: () => void
 }
 

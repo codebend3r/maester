@@ -25,7 +25,8 @@ type TextProps = NativeTextProps & { variant?: TextVariant }
 /**
  * React Native's `Text` in the web's body face, Instrument Sans. Headings and titles opt into
  * the display face, Young Serif, with `variant={TEXT_VARIANTS.display}`, as the web sets only
- * its headings and titles in `--font-display`. Never set a block of running text in it.
+ * its headings and titles in `--font-display`. Lyrics are the one running text set in it, on
+ * every device and the web.
  */
 export const Text = ({ style, variant = TEXT_VARIANTS.body, ...props }: TextProps) => (
   <NativeText

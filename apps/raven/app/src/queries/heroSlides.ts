@@ -13,7 +13,15 @@ import {
   showYears,
 } from '@raven/core'
 
-import { type Picture, type Pictures, imageOf, pictureAt, videoTarget } from '@/queries/cards'
+import {
+  CARD_SUBJECTS,
+  type CardSubject,
+  type Picture,
+  type Pictures,
+  imageOf,
+  pictureAt,
+  videoTarget,
+} from '@/queries/cards'
 import { HOME_HERO_COPY } from '@/queries/copy'
 import { ROUTE_TARGETS, type RouteTarget, itemTarget } from '@/routes'
 
@@ -32,6 +40,8 @@ export type HeroSlide = {
   /** What Play starts; null when a show has nothing left to watch. */
   play: RouteTarget | null
   details: RouteTarget
+  /** What a long press on the slide acts on under the thumb: the film, or the show. */
+  subject: CardSubject
 }
 
 type ArtworkOfProps = Pictures & { item: ItemSummary }
@@ -75,6 +85,7 @@ const fromMedia = ({ media, line, library, ...pictures }: FromMediaProps): HeroS
       line,
       play: playOf(media),
       details: videoTarget({ media, hasPages: true }),
+      subject: { kind: CARD_SUBJECTS.video, mediaId: media.id },
     },
   ]
 }
@@ -98,6 +109,7 @@ const fromShow = ({ entry, line, library, ...pictures }: FromShowProps): HeroSli
       line,
       play: next === null ? null : playOf(next),
       details: itemTarget(show.id),
+      subject: { kind: CARD_SUBJECTS.item, itemId: show.id },
     },
   ]
 }

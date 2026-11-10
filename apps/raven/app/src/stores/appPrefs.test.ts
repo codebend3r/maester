@@ -5,6 +5,7 @@ import type { StateStorage } from 'zustand/middleware'
 import {
   APP_PREFS_KEY,
   DEFAULT_APP_PREFS,
+  DOWNLOAD_GROUPINGS,
   GRID_SIZES,
   configureAppPrefs,
   useAppPrefs,
@@ -35,6 +36,7 @@ const prefsOf = () => {
     awayMaxHeight,
     gridSize,
     isEqualizerShown,
+    downloadsGrouping,
   } = useAppPrefs.getState()
   return {
     theme,
@@ -43,13 +45,14 @@ const prefsOf = () => {
     awayMaxHeight,
     gridSize,
     isEqualizerShown,
+    downloadsGrouping,
   }
 }
 
 describe('useAppPrefs', () => {
   beforeEach(() => useAppPrefs.setState(DEFAULT_APP_PREFS))
 
-  it('starts on the default theme, preferring direct play, transcoding, 1080p away and medium grids', () => {
+  it('starts on the default theme, preferring direct play, transcoding, 1080p away, medium grids and every download in one list', () => {
     expect(prefsOf()).toEqual({
       theme: DEFAULT_THEME,
       shouldPreferDirectPlay: true,
@@ -57,6 +60,7 @@ describe('useAppPrefs', () => {
       awayMaxHeight: MAX_HEIGHTS.fullHd,
       gridSize: GRID_SIZES.medium,
       isEqualizerShown: true,
+      downloadsGrouping: DOWNLOAD_GROUPINGS.all,
     })
   })
 
@@ -68,6 +72,7 @@ describe('useAppPrefs', () => {
     change({ isTranscodeAllowed: false, awayMaxHeight: MAX_HEIGHTS.hd })
     change({ shouldPreferDirectPlay: false })
     change({ gridSize: GRID_SIZES.large, isEqualizerShown: false })
+    change({ downloadsGrouping: DOWNLOAD_GROUPINGS.byLibrary })
 
     // What the next launch reads is what this one wrote, before anything there changes it.
     const relaunch = memoryStorage([...items])
@@ -80,6 +85,7 @@ describe('useAppPrefs', () => {
       awayMaxHeight: MAX_HEIGHTS.hd,
       gridSize: GRID_SIZES.large,
       isEqualizerShown: false,
+      downloadsGrouping: DOWNLOAD_GROUPINGS.byLibrary,
     })
   })
 
@@ -92,6 +98,7 @@ describe('useAppPrefs', () => {
         awayMaxHeight: 480,
         gridSize: 'huge',
         isEqualizerShown: 'yes',
+        downloadsGrouping: 'byShelf',
       },
       version: 0,
     }

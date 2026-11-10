@@ -19,6 +19,14 @@ export type GridSize = (typeof GRID_SIZES)[keyof typeof GRID_SIZES]
 const isGridSize = (value: unknown): value is GridSize =>
   Object.values(GRID_SIZES).some((size) => size === value)
 
+/** How Downloads lays out what is on the device: every group in one list, or under each library. */
+export const DOWNLOAD_GROUPINGS = { all: 'all', byLibrary: 'byLibrary' } as const
+
+export type DownloadsGrouping = (typeof DOWNLOAD_GROUPINGS)[keyof typeof DOWNLOAD_GROUPINGS]
+
+const isDownloadsGrouping = (value: unknown): value is DownloadsGrouping =>
+  Object.values(DOWNLOAD_GROUPINGS).some((grouping) => grouping === value)
+
 /** The key the preferences are stored under. */
 export const APP_PREFS_KEY = 'raven-app-prefs'
 
@@ -38,6 +46,8 @@ export type AppPrefsValues = {
   gridSize: GridSize
   /** Whether Now Playing on a TV draws the equalizer over the cover; a select on the cover toggles it. */
   isEqualizerShown: boolean
+  /** How Downloads lays out the finished downloads. */
+  downloadsGrouping: DownloadsGrouping
 }
 
 type AppPrefs = AppPrefsValues & {
@@ -57,6 +67,7 @@ export const DEFAULT_APP_PREFS: AppPrefsValues = {
   awayMaxHeight: MAX_HEIGHTS.fullHd,
   gridSize: GRID_SIZES.medium,
   isEqualizerShown: true,
+  downloadsGrouping: DOWNLOAD_GROUPINGS.all,
 }
 
 /** What was read back, each preference kept only where it is one, the default otherwise. */
@@ -77,6 +88,9 @@ const prefsOf = (saved: unknown): AppPrefsValues => {
     isEqualizerShown: isBoolean(kept.isEqualizerShown)
       ? kept.isEqualizerShown
       : DEFAULT_APP_PREFS.isEqualizerShown,
+    downloadsGrouping: isDownloadsGrouping(kept.downloadsGrouping)
+      ? kept.downloadsGrouping
+      : DEFAULT_APP_PREFS.downloadsGrouping,
   }
 }
 
@@ -109,6 +123,7 @@ export const useAppPrefs = create<AppPrefs>()(
         awayMaxHeight,
         gridSize,
         isEqualizerShown,
+        downloadsGrouping,
       }) => ({
         theme,
         shouldPreferDirectPlay,
@@ -116,6 +131,7 @@ export const useAppPrefs = create<AppPrefs>()(
         awayMaxHeight,
         gridSize,
         isEqualizerShown,
+        downloadsGrouping,
       }),
       merge: (saved, current) => ({ ...current, ...prefsOf(saved) }),
     },

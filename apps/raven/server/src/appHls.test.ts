@@ -281,6 +281,7 @@ describe('the HLS route', () => {
     expect(playlist.match(/#EXT-X-STREAM-INF/g)).toHaveLength(1)
     expect(attributeOf({ playlist, name: 'CODECS' })).toBe('avc1.640028,ac-3')
     expect(attributeOf({ playlist, name: 'RESOLUTION' })).toBe('320x240')
+    expect(attributeOf({ playlist, name: 'VIDEO-RANGE' })).toBe('SDR')
     expect(Number(attributeOf({ playlist, name: 'BANDWIDTH' }))).toBeGreaterThan(0)
     expect(playlist).not.toContain('#EXT-X-INDEPENDENT-SEGMENTS')
     const uris = urisIn(playlist)

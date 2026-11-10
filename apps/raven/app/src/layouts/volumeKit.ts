@@ -12,11 +12,11 @@ export const volumeIconOf = ({ volume, isMuted }: VolumeIconOfProps): IconName =
   return volume < 0.5 ? 'volumeLow' : 'volume'
 }
 
-type VolumeAtProps = { x: number; width: number }
+type VolumeAtYProps = { y: number; height: number }
 
-/** The volume a finger at `x` along a slider `width` wide asks for, from 0 to 1. */
-export const volumeAt = ({ x, width }: VolumeAtProps): number =>
-  width <= 0 ? 0 : Math.min(1, Math.max(0, x / width))
+/** The volume a finger at `y` down a slider `height` tall asks for: full at the top, silent at the foot. */
+export const volumeAtY = ({ y, height }: VolumeAtYProps): number =>
+  height <= 0 ? 0 : Math.min(1, Math.max(0, 1 - y / height))
 
 type SteppedVolumeProps = { volume: number; direction: -1 | 1 }
 

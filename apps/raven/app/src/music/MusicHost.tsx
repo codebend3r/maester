@@ -1,19 +1,37 @@
 import { useNativeAudioHost } from '@raven/native'
-import type { ComponentType } from 'react'
+import { unlockNow } from '@raven/native/headless'
+import { type ComponentType, useMemo } from 'react'
 import { Platform } from 'react-native'
 
+import { trackPlanFor } from '@/downloads/downloadVisibility'
 import { VideoAudioHost } from '@/music/VideoAudioHost'
 import { mediaSourcesFor } from '@/player/mediaSources'
 import type { AppQueries } from '@/queries/useAppQueries'
+import { useDownloads } from '@/stores/downloads'
 
 /** What a music host reads of the active server. */
 type MusicSession = Pick<AppQueries, 'server' | 'api'>
 
 type NativeAudioHostProps = { session: MusicSession }
 
-/** Music on an iPhone or iPad, through `@raven/native`'s host over `@raven/audio`. */
+/**
+ * Music on an iPhone or iPad, through `@raven/native`'s host over `@raven/audio`: a track
+ * downloaded to this device plays from its file, with the cover saved beside it. The plan
+ * reads the downloads and the unlock as each track plays, so neither is ever stale.
+ */
 const NativeAudioHost = ({ session: { server, api } }: NativeAudioHostProps) => {
-  useNativeAudioHost({ api, server, sourcesFor: mediaSourcesFor })
+  const plan = useMemo(
+    () =>
+      trackPlanFor({
+        serverId: server.id,
+        read: () => {
+          const { entries, device } = useDownloads.getState()
+          return { entries, isUnlocked: unlockNow(server.id), uriOf: device.disk.uriOf }
+        },
+      }),
+    [server.id],
+  )
+  useNativeAudioHost({ api, server, sourcesFor: mediaSourcesFor, plan })
   return null
 }
 

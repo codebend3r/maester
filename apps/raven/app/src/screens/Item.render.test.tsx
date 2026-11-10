@@ -340,6 +340,23 @@ describe('Item on a phone or tablet', () => {
     expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
   })
 
+  it("goes back to the show from the show's name over an episode, and from a season's", async () => {
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(GOOD_NEWS_ABOUT_HELL.id) })
+
+    await fireEvent.press(await screen.findByRole('link', { name: 'Back to Severance' }))
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: APP_ROUTES.item,
+      params: { [APP_ROUTE_PARAMS.id]: String(SEVERANCE.id) },
+    })
+  })
+
+  it("offers no way home on a show's own page", async () => {
+    await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE.id) })
+
+    expect(await screen.findByRole('header', { name: 'Severance' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Back to Severance' })).toBeNull()
+  })
+
   it('says a title is not there for an address that names none, and asks nothing', async () => {
     await renderItem({ [APP_ROUTE_PARAMS.id]: '1e3' })
 

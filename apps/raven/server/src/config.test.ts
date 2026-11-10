@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ACCOUNTS_OPT_OUT, AUTH_ENV } from '@/auth/authConfig'
-import { MUSIC_ENV, readServerConfig } from '@/config'
+import { DEVICE_DOWNLOAD_ENV, MUSIC_ENV, readServerConfig } from '@/config'
 import { REQUEST_LOG_ENV } from '@/requestLog'
 import { REMOTE_ACCESS_ENV } from '@/remoteAccess/remoteAccessConfig'
 
@@ -13,6 +13,17 @@ describe('readServerConfig', () => {
     })
     expect(readServerConfig({ [MUSIC_ENV.transcodeCacheGb]: 'lots' })).toMatchObject({
       transcodeCacheBytes: 20 * gib,
+    })
+  })
+
+  it('keeps 300 GiB of device download copies unless DEVICE_DOWNLOAD_CACHE_GB says otherwise', () => {
+    const gib = 1024 ** 3
+    expect(readServerConfig({})).toMatchObject({ deviceDownloadCacheBytes: 300 * gib })
+    expect(readServerConfig({ [DEVICE_DOWNLOAD_ENV.cacheGb]: '50' })).toMatchObject({
+      deviceDownloadCacheBytes: 50 * gib,
+    })
+    expect(readServerConfig({ [DEVICE_DOWNLOAD_ENV.cacheGb]: 'lots' })).toMatchObject({
+      deviceDownloadCacheBytes: 300 * gib,
     })
   })
 

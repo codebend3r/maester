@@ -59,12 +59,21 @@ type ArtPlace = (typeof ART_PLACES)[keyof typeof ART_PLACES]
 /** A page's title art and where it stands. */
 type TitleArtOf = { picture: Picture; place: ArtPlace }
 
+/** The page the title art or the name over an episode or a season leads back to: its show. */
+type HeroHome = { target: RouteTarget; name: string }
+
+/** An episode's or a season's way back to its show; null for one that names no show. */
+const heroHomeOf = (show: ItemDetails['show']): HeroHome | null =>
+  show === null ? null : { target: itemTarget(show.id), name: show.title }
+
 /** What heads an item's page: its pictures, its names and its facts. */
 export type ItemHero = {
   /** The small line over the title: "Show", or an episode's show and place; its show's name is left to `logo` where there is art. */
   eyebrow: string | null
   /** The title art: an episode's or a season's show's over the eyebrow, a show's or a film's own in the title's place. */
   logo: TitleArtOf | null
+  /** Where the art over the eyebrow, or the show's name there, leads: an episode's or a season's show; null on a show's or a film's own page. */
+  home: HeroHome | null
   title: string
   byline: string | null
   /** The content rating, "R". */
@@ -209,6 +218,7 @@ type MovieHeroProps = PlayableHeroProps
 /** A movie's heading: its title art in its name's place, its poster and backdrop, director, rating and facts. */
 const movieHero = ({ details, shown, primary, ...pictures }: MovieHeroProps): ItemHero => ({
   eyebrow: null,
+  home: null,
   title: details.title,
   byline: directedBy(details),
   rating: details.contentRating,
@@ -260,6 +270,7 @@ const episodeHero = ({
         .join(' · '),
     ),
     logo,
+    home: heroHomeOf(details.show),
     title: details.title,
     byline: null,
     rating: null,
@@ -358,6 +369,7 @@ export const showPage = ({ details, ...pictures }: ShowPageProps): ItemPage =>
     hero: {
       eyebrow: ITEM_PAGE_COPY.show,
       logo: logoOf({ details, place: ART_PLACES.title, ...pictures }),
+      home: null,
       title: details.title,
       byline: createdBy(details),
       rating: details.contentRating,
@@ -400,6 +412,7 @@ export const seasonPage = ({ season, show, ...pictures }: SeasonPageProps): Item
     hero: {
       eyebrow: season.show?.title ?? null,
       logo: logoOf({ details: show, place: ART_PLACES.over, ...pictures }),
+      home: heroHomeOf(season.show),
       title: season.title,
       byline: null,
       rating: show?.contentRating ?? null,

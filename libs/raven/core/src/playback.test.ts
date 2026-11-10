@@ -3,6 +3,7 @@ import {
   type PlaybackPolicy,
   checkDirectPlay,
   containerMimeType,
+  dolbyVisionCodecString,
   offeredQualities,
   planPlayback,
   streamMimeType,
@@ -98,6 +99,13 @@ describe('videoCodecString', () => {
     expect(videoCodecString({ codec: 'h264', bitDepth: 8 })).toBe('avc1.640028')
     expect(videoCodecString({ codec: 'h264', bitDepth: 10 })).toBe('avc1.6E0028')
     expect(videoCodecString({ codec: 'mpeg2video', bitDepth: 8 })).toBeNull()
+  })
+})
+
+describe('dolbyVisionCodecString', () => {
+  it('names the dvh1 sample entry with the profile and level as two digits each', () => {
+    expect(dolbyVisionCodecString({ profile: 5, level: 6 })).toBe('dvh1.05.06')
+    expect(dolbyVisionCodecString({ profile: 8, level: 13 })).toBe('dvh1.08.13')
   })
 })
 

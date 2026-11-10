@@ -89,11 +89,14 @@ const NowPlayingPage = ({ session }: NowPlayingPageProps) => {
       onPrevious={previous}
       onRemove={remove}
       onRepeat={cycleRepeat}
+      onSeek={seekTo}
       onShuffle={toggleShuffle}
       onToggle={toggle}
       playlists={playlists}
       queue={queueRowsOf({ queue, tracks })}
       repeat={queue.repeat}
+      duration={duration}
+      position={position}
       time={playTimeOf({ position, duration })}
       track={playing}
     />

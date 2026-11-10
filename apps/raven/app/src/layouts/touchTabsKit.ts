@@ -41,6 +41,7 @@ const TAB_OF_PAGE: ReadonlyMap<string, TouchTab> = new Map([
   [APP_ROUTES.continueWatching, TOUCH_TABS.continueWatching],
   [APP_ROUTES.search, TOUCH_TABS.more],
   [APP_ROUTES.settings, TOUCH_TABS.more],
+  [APP_ROUTES.downloads, TOUCH_TABS.more],
 ])
 
 type ActiveTabOfProps = { pathname: string; isMoreOpen: boolean }

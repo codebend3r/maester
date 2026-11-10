@@ -135,6 +135,7 @@ describe('Player', () => {
         bitrate: null,
         range: 'dolbyVision',
         isDolbyVisionOnly: true,
+        dolbyVision: null,
       },
       audio: [],
     }))

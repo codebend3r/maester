@@ -1,6 +1,7 @@
 import { type ComponentType, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 
+import { useTouchCard } from '@/cardMenu/useTouchCard'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { type ShelfCard, cardLabelOf } from '@/queries/cards'
 import { CardPicture } from '@/layouts/Card'
@@ -30,10 +31,11 @@ export const isCaptionless = (card: Pick<ShelfCard, 'resume'>): boolean => !!car
 /**
  * A card under the thumb, on a shelf or in a grid: its picture, its title and its line. A card
  * with title art wears it on the picture in the title's place, so the words are left out unless
- * the art fails to load; the card is still named for screen readers.
+ * the art fails to load; the card is still named for screen readers. A long press opens its menu.
  */
 const PlainCard = ({ card, width, onPress }: TouchCardProps) => {
   const [failedLogo, setFailedLogo] = useState<string | null>(null)
+  const { onLongPress, menu } = useTouchCard({ card })
   const styles = useStyles()
   const logo = card.logo ?? null
   const hasLogo = logo !== null && logo.uri !== failedLogo
@@ -41,6 +43,7 @@ const PlainCard = ({ card, width, onPress }: TouchCardProps) => {
     <Pressable
       accessibilityLabel={cardLabelOf({ card })}
       accessibilityRole="button"
+      onLongPress={onLongPress}
       onPress={onPress}
       style={({ pressed }) => [styles.card, { width }, pressed && styles.pressed]}
     >
@@ -57,6 +60,7 @@ const PlainCard = ({ card, width, onPress }: TouchCardProps) => {
           </Text>
         )}
       </View>
+      {menu}
     </Pressable>
   )
 }

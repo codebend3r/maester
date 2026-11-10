@@ -1,7 +1,7 @@
 import { HLS_PARAMS, HLS_PATHS, MEDIA_TICKET_PARAM, toQueryString } from '@raven/core'
 import type { HlsSession } from '@/hls/hlsSessions'
 
-export type HlsPath = (typeof HLS_PATHS)[keyof typeof HLS_PATHS]
+type HlsPath = (typeof HLS_PATHS)[keyof typeof HLS_PATHS]
 
 type HlsUriProps = {
   path: HlsPath

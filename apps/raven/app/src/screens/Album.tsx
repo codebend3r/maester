@@ -17,10 +17,13 @@ import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 
+import { albumTargetOf } from '@/downloads/downloadTargets'
+import { useDownloadButton } from '@/downloads/useDownloadButton'
 import { AlbumLayout } from '@/layouts'
 import { usePlaylistAdd } from '@/music/usePlaylistAdd'
 import { pictureAt } from '@/queries/cards'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
+import { useDownloadLibrary } from '@/queries/useDownloadLibrary'
 import { usePictures } from '@/queries/usePictures'
 import { APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf } from '@/routes'
 import { ALBUM_COPY } from '@/screens/copy'
@@ -39,6 +42,12 @@ const AlbumPage = ({ session, details }: AlbumPageProps) => {
   const { album, tracks, discCount, isFavourite } = details
   const favourite = useServerAlbumFavourite({ api, albumId: album.id })
   const { playlists, addToPlaylist, note } = usePlaylistAdd({ session })
+  const library = useDownloadLibrary({ session, libraryId: album.libraryId })
+  const download = useDownloadButton({
+    serverId: session.server.id,
+    library,
+    target: albumTargetOf({ api, album, tracks }),
+  })
   const cover =
     pictures === null
       ? null
@@ -52,6 +61,7 @@ const AlbumPage = ({ session, details }: AlbumPageProps) => {
       artists={album.artists}
       cover={cover}
       discs={albumDiscsOf({ tracks, discCount })}
+      download={download}
       facts={albumFactsOf({ album })}
       isFavourite={isFavourite}
       note={note ?? favourite.failure?.message ?? null}

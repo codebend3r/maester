@@ -68,9 +68,13 @@ describe('streamArgs', () => {
     audio: 2,
     audioOnly: false,
     videoCodec: 'hevc',
+    dolbyVision: null,
     tonemap: false,
     streamShift: 1,
   }
+
+  /** A Dolby Vision profile 5 record, as `dolbyVisionOf` reads one. */
+  const DV5 = { profile: 5, level: 6, blSignalCompatibilityId: 0 }
 
   describe('with a picture subtitle to burn in', () => {
     const burn = { stream: 1, canvas: { width: 1920, height: 1080 } }
@@ -159,6 +163,19 @@ describe('streamArgs', () => {
     expect(args.at(-1)).toBe('pipe:1')
   })
 
+  it('copies Dolby Vision HEVC under dvh1 with its box, which ffmpeg writes only under strict unofficial', () => {
+    const args = streamArgs({ ...base, mode: 'remux', dolbyVision: DV5 })
+    expect(after({ args, flag: '-c:v' })).toBe('copy')
+    expect(args.join(' ')).toContain('-c:v copy -tag:v dvh1 -strict unofficial -c:a aac')
+    expect(args).not.toContain('hvc1')
+  })
+
+  it('tags a Dolby Vision transcode nothing, since its picture is H.264 again', () => {
+    const args = streamArgs({ ...base, mode: 'transcode', dolbyVision: DV5 })
+    expect(args).not.toContain('-tag:v')
+    expect(args).not.toContain('-strict')
+  })
+
   it('scales a transcode to the settings’ height and squeezes to their quality', () => {
     const args = streamArgs({
       input: '/m/a.mkv',
@@ -167,6 +184,7 @@ describe('streamArgs', () => {
       audio: 0,
       audioOnly: false,
       videoCodec: 'hevc',
+      dolbyVision: null,
       tonemap: false,
       streamShift: 1,
       maxHeight: 720,
@@ -181,6 +199,7 @@ describe('streamArgs', () => {
       audio: 0,
       audioOnly: false,
       videoCodec: 'hevc',
+      dolbyVision: null,
       tonemap: false,
       streamShift: 1,
       encoder: { kind: 'videotoolbox' },

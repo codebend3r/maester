@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { parseStreams } from '@/ffmpeg/streams'
 
+/** ffprobe's `side_data_list` entry for a Dolby Vision profile 5 stream. */
+const DV5_RECORD = {
+  side_data_type: 'DOVI configuration record',
+  dv_version_major: 1,
+  dv_version_minor: 0,
+  dv_profile: 5,
+  dv_level: 6,
+  rpu_present_flag: 1,
+  el_present_flag: 0,
+  bl_present_flag: 1,
+  dv_bl_signal_compatibility_id: 0,
+} as const
+
 describe('parseStreams', () => {
   it('reads an MP4 stream bitrate, a Matroska BPS tag and the sample rate', () => {
     const streams = parseStreams({
@@ -43,6 +56,7 @@ describe('parseStreams', () => {
         bitrate: 11_100_000,
         range: 'sdr',
         isDolbyVisionOnly: false,
+        dolbyVision: null,
       },
       audio: [
         {
@@ -96,17 +110,17 @@ describe('parseStreams', () => {
           {
             codec_type: 'video',
             codec_name: 'hevc',
-            side_data_list: [
-              {
-                side_data_type: 'DOVI configuration record',
-                dv_bl_signal_compatibility_id: compatibility,
-              },
-            ],
+            side_data_list: [{ ...DV5_RECORD, dv_bl_signal_compatibility_id: compatibility }],
           },
         ],
       }).video
       expect(video?.range).toBe('dolbyVision')
       expect(video?.isDolbyVisionOnly).toBe(isOnly)
+      expect(video?.dolbyVision).toEqual({
+        profile: 5,
+        level: 6,
+        blSignalCompatibilityId: compatibility,
+      })
     },
   )
 
@@ -125,6 +139,7 @@ describe('parseStreams', () => {
         bitrate: null,
         range: 'sdr',
         isDolbyVisionOnly: false,
+        dolbyVision: null,
       },
       audio: [
         { index: 0, codec: null, profile: null, channels: null, bitrate: null, sampleRate: null },

@@ -24,7 +24,8 @@ import { RouteError, RouteLoading, RouteMissing, type RouteViewProps } from '@/s
 type SagaGridProps = { session: AppQueries; saga: SagaRecord }
 
 /** The saga's movies as posters, oldest first, with Play all, which plays them in the saga's session. */
-const SagaGrid = ({ session: { server, api }, saga }: SagaGridProps) => {
+const SagaGrid = ({ session, saga }: SagaGridProps) => {
+  const { server, api } = session
   const router = useRouter()
   const pictures = usePictures({ server, api })
   const play = sagaPlayTarget({ sagaId: saga.tmdbId, media: saga.media })

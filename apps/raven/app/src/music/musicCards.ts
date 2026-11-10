@@ -4,6 +4,8 @@ import {
   type Artist,
   type PlaylistSummary,
   type Track,
+  albumDateLabel,
+  albumEntryKey,
   artistNames,
   plural,
 } from '@raven/core'
@@ -26,11 +28,13 @@ type AlbumCardProps = Pick<Pictures, 'headersFor'> & {
   album: AlbumSummary
 }
 
-/** An album as a card: its cover, its title, and its artists under it. */
+/** An album as a card: its cover, its title, and its artists and release date under it, as the web's. */
 export const albumCard = ({ api, headersFor, album }: AlbumCardProps): ShelfCard => ({
-  key: `album:${album.id}`,
+  key: albumEntryKey(album),
   title: album.title,
-  line: artistNames(album),
+  line: MUSIC_COPY.facts(
+    [artistNames(album), albumDateLabel(album)].filter((fact): fact is string => fact !== null),
+  ),
   shape: CARD_SHAPES.square,
   picture: pictureAt({
     uri: api.albumCoverUrl({ albumId: album.id, coverVersion: album.coverVersion }),

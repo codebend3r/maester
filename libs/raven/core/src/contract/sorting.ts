@@ -4,6 +4,8 @@ export const SORT_DIRECTIONS = { ascending: 'ascending', descending: 'descending
 
 export type SortDirection = (typeof SORT_DIRECTIONS)[keyof typeof SORT_DIRECTIONS]
 
+export const isSortDirection = oneOf(Object.values(SORT_DIRECTIONS))
+
 /** Every field a library can be sorted on, in the order a menu offers them. */
 export const SORT_FIELD_NAMES = {
   title: 'title',

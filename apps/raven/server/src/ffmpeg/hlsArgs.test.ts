@@ -31,6 +31,7 @@ describe('hlsArgs', () => {
     plan,
     audio: aac,
     videoCodec: VIDEO_CODECS.hevc,
+    dolbyVision: null,
     encoder: SOFTWARE,
     maxHeight: 1080,
     quality: QUALITIES.medium,
@@ -40,6 +41,8 @@ describe('hlsArgs', () => {
     frameRate: 24,
     burn: null,
   } as const
+  /** A Dolby Vision profile 5 record, as `dolbyVisionOf` reads one. */
+  const DV5 = { profile: 5, level: 6, blSignalCompatibilityId: 0 }
   /** A picture subtitle to burn, on a 1080p canvas. */
   const burnOf = (stream: number) => ({ stream, canvas: { width: 1920, height: 1080 } })
 
@@ -270,6 +273,21 @@ describe('hlsArgs', () => {
     expect(args[args.indexOf('-force_key_frames') + 1]?.split(',')[0] ?? null).toBe('2.000')
     expect(args[args.indexOf('-output_ts_offset') + 1]).toBe('22.42')
     expect(args).toContain('1:a:1')
+  })
+
+  it('copies Dolby Vision HEVC under dvh1, telling the segment muxer’s MP4 muxer to write its box too', () => {
+    const args = argsFor({ from: 0, mode: PLAYBACK_MODES.remux, dolbyVision: DV5 })
+    expect(args.join(' ')).toContain('-c:v copy -tag:v dvh1 -strict unofficial -c:a copy')
+    expect(args[args.indexOf('-segment_format_options') + 1]).toBe(
+      'movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont+delay_moov:use_editlist=0:avoid_negative_ts=disabled:strict=unofficial',
+    )
+    expect(args).not.toContain('hvc1')
+  })
+
+  it('writes a Dolby Vision transcode’s segments as any other, since its picture is H.264 again', () => {
+    const args = argsFor({ from: 0, mode: PLAYBACK_MODES.transcode, dolbyVision: DV5 })
+    expect(args).not.toContain('-tag:v')
+    expect(args[args.indexOf('-segment_format_options') + 1]).not.toContain('strict')
   })
 
   it('decodes on the CPU to burn under VAAPI, since the overlay works on frames in memory', () => {

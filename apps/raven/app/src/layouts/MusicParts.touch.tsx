@@ -1,3 +1,6 @@
+import { formatDuration } from '@raven/core'
+import { Icon } from '@raven/native'
+import type { IconName } from '@raven/ui/iconDrawings'
 import type { ComponentType, ReactNode } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -7,9 +10,13 @@ import { MUSIC_COPY } from '@/layouts/copy'
 import { type FavouriteButtonProps } from '@/layouts/musicKit'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TouchNav } from '@/layouts/TouchNav'
+import { useScrub } from '@/layouts/useScrub'
 import type { Picture } from '@/queries/cards'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
-import { themedStyles } from '@/theme/useTheme'
+import { themedStyles, useTheme } from '@/theme/useTheme'
+
+/** The seek bar's height: a finger's, though the line it draws is thin. */
+const SEEK_HEIGHT = 44
 
 /** What the music pages under the thumb share of their look: the page, the words and the rows. */
 export const useMusicStyles = themedStyles((colours) =>
@@ -53,18 +60,114 @@ export const useMusicStyles = themedStyles((colours) =>
     entry: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space3 },
     entryMain: { flex: 1, paddingVertical: SIZES.space2 },
     pressed: { opacity: OPACITIES.pressed },
-    chip: {
-      minHeight: SIZES.fieldHeight,
+    iconPlate: {
+      width: SIZES.controlLarge,
+      height: SIZES.controlLarge,
+      borderRadius: SIZES.radiusPill,
+      alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: SIZES.space2,
-      borderRadius: SIZES.radius,
       backgroundColor: colours.quiet,
     },
-    chipOn: { backgroundColor: colours.accent },
-    chipLabel: { color: colours.text, fontSize: SIZES.textSm, fontWeight: '600' },
-    chipLabelOn: { color: colours.onAccent },
+    iconPlateOn: { backgroundColor: colours.accent },
+    iconPlateDisabled: { opacity: OPACITIES.disabled },
+    seekBar: { alignSelf: 'stretch', gap: SIZES.space1 },
+    seekLine: { height: SEEK_HEIGHT, justifyContent: 'center' },
+    // The line stands in from each end by half the thumb, so the thumb at 0:00 or the end is whole.
+    seekRail: { marginHorizontal: SIZES.space4 / 2, justifyContent: 'center' },
+    seekTrack: {
+      height: SIZES.space1,
+      borderRadius: SIZES.space1,
+      backgroundColor: colours.quiet,
+      overflow: 'hidden',
+    },
+    seekPlayed: { height: '100%', backgroundColor: colours.accent },
+    seekThumb: {
+      position: 'absolute',
+      width: SIZES.space4,
+      height: SIZES.space4,
+      marginLeft: -SIZES.space4 / 2,
+      borderRadius: SIZES.space4,
+      backgroundColor: colours.text,
+    },
+    seekTimes: { flexDirection: 'row', justifyContent: 'space-between' },
+    seekTime: { color: colours.muted, fontSize: SIZES.textSm, fontVariant: ['tabular-nums'] },
   }),
 )
+
+type SeekBarProps = {
+  position: number
+  /** The track's length, or null until the player knows it: the bar stands empty until then. */
+  duration: number | null
+  onSeek: (seconds: number) => void
+}
+
+/**
+ * Where the track is, as a line to drag along with the time played and the length under it, as
+ * the film player's scrubber: the finger's spot shows as it moves and is sought on letting go.
+ */
+export const SeekBar = ({ position, duration, onSeek }: SeekBarProps) => {
+  const styles = useMusicStyles()
+  const length = duration ?? 0
+  // The line stands in by half the thumb at each end, so the thumb at 0:00 or the end is whole.
+  const { shown, share, lineProps } = useScrub({
+    position,
+    duration: length,
+    onSeek,
+    inset: SIZES.space4 / 2,
+    canDrag: length > 0,
+  })
+  return (
+    <View style={styles.seekBar}>
+      <View {...lineProps} style={styles.seekLine}>
+        <View pointerEvents="none" style={styles.seekRail}>
+          <View style={styles.seekTrack}>
+            <View style={[styles.seekPlayed, { width: share }]} />
+          </View>
+          <View style={[styles.seekThumb, { left: share }]} />
+        </View>
+      </View>
+      <View style={styles.seekTimes}>
+        <Text style={styles.seekTime}>{formatDuration(shown)}</Text>
+        <Text style={styles.seekTime}>{formatDuration(duration)}</Text>
+      </View>
+    </View>
+  )
+}
+
+type IconPlateProps = {
+  /** What it says aloud, since it shows no words. */
+  label: string
+  icon: IconName
+  /** Drawn in the accent: Play or Pause, and a mark that is on. */
+  isOn: boolean
+  /** Drawn faint, its press doing nothing: a download on its way. */
+  isDisabled?: boolean
+  onPress: () => void
+}
+
+/** A round control that shows only its icon, as the TV's Now Playing controls do. */
+export const IconPlate = ({ label, icon, isOn, isDisabled = false, onPress }: IconPlateProps) => {
+  const styles = useMusicStyles()
+  const palette = useTheme((theme) => theme.palette)
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isOn, disabled: isDisabled }}
+      disabled={isDisabled}
+      hitSlop={SIZES.space1}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.iconPlate,
+        isOn && styles.iconPlateOn,
+        isDisabled && styles.iconPlateDisabled,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Icon colour={isOn ? palette.onAccent : palette.text} name={icon} size={SIZES.textXl} />
+    </Pressable>
+  )
+}
 
 type TouchPageProps = { onBack: () => void; children: ReactNode }
 
@@ -86,13 +189,22 @@ export const TouchPage = ({ onBack, children }: TouchPageProps) => {
   )
 }
 
-type CoverProps = { cover: Picture | null; title: string }
+type CoverProps = {
+  cover: Picture | null
+  title: string
+  /** How wide the square stands; the shared scale's cover size unless told. */
+  size?: number
+}
 
 type CoverPictureProps = CoverProps
 
-const CoverPicture = ({ cover }: CoverPictureProps) => {
+const CoverPicture = ({ cover, size = SIZES.cover }: CoverPictureProps) => {
   const styles = useMusicStyles()
-  return cover !== null && <Image source={cover} style={styles.coverPicture} />
+  return (
+    cover !== null && (
+      <Image source={cover} style={[styles.coverPicture, { width: size, height: size }]} />
+    )
+  )
 }
 
 type CoverInitialProps = CoverProps
@@ -112,38 +224,21 @@ const COVER_FACES = {
   [PICTURE_STATES.missing]: CoverInitial,
 } as const satisfies Record<PictureState, ComponentType<CoverProps>>
 
-/** The cover at the shared scale's size, or the title's first letter while there is none. */
-export const Cover = ({ cover, title }: CoverProps) => {
+/** The cover, `size` wide or the shared scale's size, or the title's first letter while there is none. */
+export const Cover = ({ cover, title, size = SIZES.cover }: CoverProps) => {
   const styles = useMusicStyles()
   const Face = COVER_FACES[pictureStateOf(cover)]
   return (
-    <View style={styles.cover}>
-      <Face cover={cover} title={title} />
+    <View style={[styles.cover, { width: size, height: size }]}>
+      <Face cover={cover} size={size} title={title} />
     </View>
   )
 }
 
-/** A favourite mark in a toolbar: said as Favourite, and marked selected while it is on. */
-export const FavouriteButton = ({ isFavourite, onToggle }: FavouriteButtonProps) => {
-  const styles = useMusicStyles()
-  return (
-    <Pressable
-      accessibilityLabel={MUSIC_COPY.favourite}
-      accessibilityRole="button"
-      accessibilityState={{ selected: isFavourite }}
-      onPress={onToggle}
-      style={({ pressed }) => [
-        styles.chip,
-        isFavourite && styles.chipOn,
-        pressed && styles.pressed,
-      ]}
-    >
-      <Text style={[styles.chipLabel, isFavourite && styles.chipLabelOn]}>
-        {MUSIC_COPY.favourite}
-      </Text>
-    </Pressable>
-  )
-}
+/** A favourite mark on a plate: the heart, filled in the accent while it is on, said as Favourite. */
+export const FavouriteButton = ({ isFavourite, onToggle }: FavouriteButtonProps) => (
+  <IconPlate icon="heart" isOn={isFavourite} label={MUSIC_COPY.favourite} onPress={onToggle} />
+)
 
 type ListEntryProps = {
   /** What its press is called aloud. */

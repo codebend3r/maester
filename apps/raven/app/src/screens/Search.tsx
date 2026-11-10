@@ -13,7 +13,8 @@ import { SEARCH_COPY } from '@/screens/copy'
 
 type ServerSearchProps = { session: AppQueries; asked: string }
 
-const ServerSearch = ({ session: { server, api, queries }, asked }: ServerSearchProps) => {
+const ServerSearch = ({ session, asked }: ServerSearchProps) => {
+  const { server, api, queries } = session
   const router = useRouter()
   const search = useSearch({ initial: asked })
   const { query } = search
@@ -26,7 +27,7 @@ const ServerSearch = ({ session: { server, api, queries }, asked }: ServerSearch
   const shelves =
     !isAsked || results.data === undefined || libraries.data === undefined || pictures === null
       ? []
-      : libraryShelvesOf({ shelves: results.data, libraries: libraries.data, ...pictures })
+      : libraryShelvesOf({ rows: results.data, libraries: libraries.data, ...pictures })
   const notice = ((): string | null => {
     if (!isAsked) return null
     const failure = results.error ?? libraries.error

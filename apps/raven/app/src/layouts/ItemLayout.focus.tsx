@@ -6,18 +6,13 @@ import { Icon } from '@raven/native'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
-import {
-  ART_PLACES,
-  type ItemHero,
-  type ItemPage,
-  type PersonCard,
-  type VersionRow,
-} from '@/queries/itemPage'
+import { type ItemHero, type ItemPage, type PersonCard, type VersionRow } from '@/queries/itemPage'
 import { CardPicture, PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
 import { ITEM_LAYOUT_COPY } from '@/layouts/copy'
 import { FocusBand } from '@/layouts/FocusBand'
 import { FocusFactChips } from '@/layouts/FactChips'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
+import { HeroHome } from '@/layouts/HeroHome'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import { BUTTON_TONES } from '@/layouts/formKit'
@@ -297,6 +292,7 @@ type HeroProps = {
   actions: ItemAction[] | null
   links: ItemAction[]
   file: ItemPage['file']
+  onOpen: ItemLayoutProps['onOpen']
 }
 
 /**
@@ -304,7 +300,7 @@ type HeroProps = {
  * summary, then the actions in a row, the first taking the remote's focus while the page opens,
  * and the links up on a row of their own below, so neither row runs off the screen.
  */
-const Hero = ({ hero, actions, links, file }: HeroProps) => {
+const Hero = ({ hero, actions, links, file, onOpen }: HeroProps) => {
   const styles = useStyles()
   const facts = heroFactsOf(hero)
   const Title = HERO_TITLES[titleLookOf(hero.logo)]
@@ -316,16 +312,14 @@ const Hero = ({ hero, actions, links, file }: HeroProps) => {
         width={HERO_WIDTHS[hero.poster.shape]}
       />
       <View style={styles.words}>
-        {hero.logo !== null && hero.logo.place === ART_PLACES.over && (
-          <TitleArt
-            height={LOGO_HEIGHT}
-            logo={hero.logo.picture}
-            maxWidth={WORDS_WIDTH}
-            name={hero.eyebrow ?? hero.title}
-            textStyle={styles.eyebrow}
-          />
-        )}
-        {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
+        <HeroHome
+          eyebrowStyle={styles.eyebrow}
+          hero={hero}
+          linkStyle={({ focused }) => [styles.homeLink, focused && styles.focused]}
+          logoHeight={LOGO_HEIGHT}
+          maxWidth={WORDS_WIDTH}
+          onOpen={onOpen}
+        />
         <Title hero={hero} />
         {hero.byline !== null && <Text style={styles.byline}>{hero.byline}</Text>}
         {facts !== '' && <Text style={styles.line}>{facts}</Text>}
@@ -526,6 +520,7 @@ const ItemLayout = ({ page, actions, links, isPlayPending, onOpen }: ItemLayoutP
               file={page.file}
               hero={page.hero}
               links={links}
+              onOpen={onOpen}
             />
           </View>
         </FocusBand>
@@ -663,6 +658,15 @@ const useStyles = themedStyles((colours) =>
     },
     actionLabel: { fontSize: TV_SIZES.textLg, fontWeight: 'bold' },
     focused: { borderColor: colours.text },
+    // The show's art or name over an episode's place, ringed as the actions are while the remote is on it.
+    homeLink: {
+      alignSelf: 'flex-start',
+      gap: TV_SIZES.space1,
+      padding: TV_SIZES.space1,
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: 'transparent',
+    },
     disabled: { opacity: OPACITIES.disabled },
     section: { gap: TV_SIZES.space1 },
     heading: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },

@@ -241,6 +241,7 @@ describe('HlsSessions', () => {
         frameRate,
         audio,
         videoCodec: VIDEO_CODECS.h264,
+        dolbyVision: null,
         encoder: SOFTWARE,
         maxHeight: 1080,
         quality: QUALITIES.medium,

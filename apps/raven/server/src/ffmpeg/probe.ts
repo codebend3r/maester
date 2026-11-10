@@ -1,4 +1,4 @@
-import { isNumber, isRecord, isString } from '@raven/core'
+import { type DolbyVisionConfig, isNumber, isRecord, isString } from '@raven/core'
 
 /** What the index keeps from an ffprobe run: enough to pick a playback mode and label a card. */
 export type ProbeResult = {
@@ -65,6 +65,24 @@ const doviRecordOf = (stream: Stream): Record<string, unknown> | null => {
 /** Whether the stream carries a Dolby Vision configuration record. */
 export const hasDolbyVision = (stream: Stream): boolean => doviRecordOf(stream) !== null
 
+/** ffprobe writes the record's numbers as JSON integers, unlike most of what it prints. */
+const integer = (value: unknown): number | null =>
+  isNumber(value) && Number.isInteger(value) ? value : null
+
+/**
+ * The stream's Dolby Vision configuration, read off its record: null without
+ * one, or for a record ffprobe left a field out of.
+ */
+export const dolbyVisionOf = (stream: Stream): DolbyVisionConfig | null => {
+  const record = doviRecordOf(stream)
+  if (record === null) return null
+  const profile = integer(record.dv_profile)
+  const level = integer(record.dv_level)
+  const blSignalCompatibilityId = integer(record.dv_bl_signal_compatibility_id)
+  if (profile === null || level === null || blSignalCompatibilityId === null) return null
+  return { profile, level, blSignalCompatibilityId }
+}
+
 /** The record's `dv_bl_signal_compatibility_id` when the base layer is something only Dolby Vision can show. */
 const NO_COMPATIBLE_BASE = 0
 
@@ -74,7 +92,7 @@ const NO_COMPATIBLE_BASE = 0
  * Dolby Vision's processing. Profiles 7 and 8 sit on HDR10, HLG or SDR.
  */
 export const isDolbyVisionOnly = (stream: Stream): boolean =>
-  doviRecordOf(stream)?.dv_bl_signal_compatibility_id === NO_COMPATIBLE_BASE
+  dolbyVisionOf(stream)?.blSignalCompatibilityId === NO_COMPATIBLE_BASE
 
 /** PQ or HLG transfer, or a Dolby Vision record (profile 5 carries no HDR10 transfer at all). */
 const isHdr = (stream: Stream): boolean => {

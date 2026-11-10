@@ -1,6 +1,7 @@
 import type { ReactNode, RefObject } from 'react'
 
 import { useCardMenu } from '@/cardMenu/useCardMenu'
+import { focusCardMenu } from '@/layouts/CardMenu.focus'
 import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import type { ShelfCard } from '@/queries/cards'
 
@@ -34,7 +35,7 @@ type TvCard = {
 export const useTvCard = ({ card, place, shelf = null, view, onPress }: UseTvCardProps): TvCard => {
   const { remember } = useOpenerFocus({ place, shelf, view })
   const { settle } = useOpeningFocus()
-  const menu = useCardMenu({ card })
+  const menu = useCardMenu({ card, kit: focusCardMenu })
   return {
     isFocused: menu.isFocused,
     menu: menu.menu,

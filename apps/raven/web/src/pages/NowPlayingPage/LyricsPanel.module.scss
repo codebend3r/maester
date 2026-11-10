@@ -8,6 +8,7 @@
   list-style: none;
   padding: var(--space-4) var(--space-2);
   color: var(--color-lichen);
+  font-family: var(--font-display);
   font-size: var(--font-size-lg);
   line-height: var(--line-tight);
   text-align: center;
@@ -27,7 +28,6 @@
 
 .active {
   color: var(--color-bark);
-  font-weight: 600;
 }
 
 .plain {
@@ -36,6 +36,7 @@
   padding: var(--space-2);
   border-radius: var(--radius-md);
   color: var(--color-bark);
+  font-family: var(--font-display);
   line-height: var(--line-body);
   white-space: pre-line;
   overflow-wrap: anywhere;

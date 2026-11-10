@@ -1,4 +1,12 @@
-import { ENCODER_KINDS, PLAYBACK_MODES, type StreamMode, VIDEO_CODECS } from '@raven/core'
+import {
+  type AudioTrack,
+  type DolbyVisionConfig,
+  ENCODER_KINDS,
+  HLS_COPY_AUDIO_CODECS,
+  PLAYBACK_MODES,
+  type StreamMode,
+  VIDEO_CODECS,
+} from '@raven/core'
 import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
 
 export const QUIET = ['-hide_banner', '-loglevel', 'error', '-nostdin']
@@ -124,10 +132,46 @@ const BURNED_VIDEO = '[vout]'
 /** No video at all, for an audio file. */
 const NO_VIDEO: VideoArgs = { input: [], output: [], map: VIDEO_STREAM }
 
-/** A remux's video, copied. Safari and AVPlayer only play HEVC in MP4 under the hvc1 tag. */
-export const copyVideo = (videoCodec: string | null): VideoArgs => ({
+/** The MP4 sample entries HEVC is copied under: plain, and Dolby Vision with its configuration box. */
+const HEVC_TAGS = { plain: 'hvc1', dolbyVision: 'dvh1' } as const
+
+/**
+ * ffmpeg's relaxed compliance level. The MP4 muxer in Debian 12's ffmpeg 5.1,
+ * which the server image runs (`apps/raven/Dockerfile`), writes a Dolby
+ * Vision configuration box (`dvcC`/`dvvC`) only under it; later releases
+ * take it too.
+ */
+export const UNOFFICIAL_COMPLIANCE = 'unofficial'
+
+const STRICT_UNOFFICIAL = ['-strict', UNOFFICIAL_COMPLIANCE]
+
+type CopyVideoProps = {
+  videoCodec: string | null
+  /** The picture's Dolby Vision configuration, or null for a picture without one. */
+  dolbyVision: DolbyVisionConfig | null
+}
+
+type DolbyVisionCopy = CopyVideoProps & { dolbyVision: DolbyVisionConfig }
+
+/** Whether a copy of the picture is Dolby Vision HEVC, which MP4 carries under `dvh1` with its box. */
+export const isDolbyVisionCopy = (props: CopyVideoProps): props is DolbyVisionCopy =>
+  props.videoCodec === VIDEO_CODECS.hevc && props.dolbyVision !== null
+
+const hevcTagArgs = ({ videoCodec, dolbyVision }: CopyVideoProps): string[] => {
+  if (videoCodec !== VIDEO_CODECS.hevc) return []
+  if (dolbyVision === null) return ['-tag:v', HEVC_TAGS.plain]
+  return ['-tag:v', HEVC_TAGS.dolbyVision, ...STRICT_UNOFFICIAL]
+}
+
+/**
+ * A remux's video, copied. Safari and AVPlayer only play HEVC in MP4 under
+ * the hvc1 tag, and AVPlayer renders Dolby Vision itself (profile 5, which
+ * is purple and green as plain HEVC) only under `dvh1` with the `dvcC` box,
+ * which ffmpeg writes off the stream's own record under `-strict unofficial`.
+ */
+export const copyVideo = (props: CopyVideoProps): VideoArgs => ({
   input: [],
-  output: ['-c:v', 'copy', ...(videoCodec === VIDEO_CODECS.hevc ? ['-tag:v', 'hvc1'] : [])],
+  output: ['-c:v', 'copy', ...hevcTagArgs(props)],
   map: VIDEO_STREAM,
 })
 
@@ -319,6 +363,8 @@ type StreamArgsProps = {
   /** Whether the file is an audio file, whose stream carries its audio alone. */
   audioOnly: boolean
   videoCodec: string | null
+  /** The picture's Dolby Vision configuration, which a remux keeps; null for a picture without one. */
+  dolbyVision: DolbyVisionConfig | null
   tonemap: boolean
   streamShift: number
   /** How a transcode encodes; a remux encodes nothing. */
@@ -352,6 +398,7 @@ export const streamArgs = ({
   audio,
   audioOnly,
   videoCodec,
+  dolbyVision,
   tonemap,
   streamShift,
   encoder = SOFTWARE,
@@ -363,7 +410,7 @@ export const streamArgs = ({
   const video = ((): VideoArgs => {
     if (audioOnly) return NO_VIDEO
     return mode === PLAYBACK_MODES.remux
-      ? copyVideo(videoCodec)
+      ? copyVideo({ videoCodec, dolbyVision })
       : transcodeVideo({
           encoder,
           videoCodec,
@@ -508,6 +555,49 @@ export const imageScaleArgs = ({ input, output, width }: ImageScaleArgsProps): s
   '3',
   output,
 ]
+
+/** E-AC-3 carries at most 5.1; a 7.1 track is folded down to it. */
+const EAC3_MAX_CHANNELS = 6
+const STEREO = 2
+
+/** E-AC-3's bitrate for a channel count: 5.1, the layouts between stereo and it, and stereo or mono. */
+const eac3Bitrate = (channels: number): string => {
+  if (channels >= EAC3_MAX_CHANNELS) return '640k'
+  if (channels > STEREO) return '448k'
+  return '224k'
+}
+
+/** The output streams a run's audio flags name: every audio stream, or the one at `stream` among them. */
+const audioFlagsFor = (stream: number | undefined) =>
+  stream === undefined
+    ? { codec: '-c:a', channels: '-ac', bitrate: '-b:a' }
+    : { codec: `-c:a:${stream}`, channels: `-ac:a:${stream}`, bitrate: `-b:a:${stream}` }
+
+type Eac3OrCopyArgsProps = {
+  track: Pick<AudioTrack, 'codec' | 'channels'>
+  /** ffprobe's names for the codecs the output carries as they are. */
+  copies: readonly string[]
+  /** Which output audio stream the flags name, for a run that carries several; absent for a run with one. */
+  stream?: number
+}
+
+/**
+ * How a run carries an audio track: copied when its codec is one of `copies`, else E-AC-3,
+ * which keeps surround sound, with the channels it can hold and a bitrate by their count.
+ */
+export const eac3OrCopyArgs = ({ track, copies, stream }: Eac3OrCopyArgsProps): string[] => {
+  const flags = audioFlagsFor(stream)
+  if (track.codec !== null && copies.includes(track.codec)) return [flags.codec, 'copy']
+  const channels = Math.min(Math.max(track.channels ?? STEREO, 1), EAC3_MAX_CHANNELS)
+  return [
+    flags.codec,
+    HLS_COPY_AUDIO_CODECS.eac3,
+    flags.channels,
+    String(channels),
+    flags.bitrate,
+    eac3Bitrate(channels),
+  ]
+}
 
 type AudioTranscodeArgsProps = {
   input: string

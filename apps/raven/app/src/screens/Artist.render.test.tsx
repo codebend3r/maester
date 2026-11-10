@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { APP_CALL_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import type * as Native from '@raven/native'
-import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { Artist } from '@/screens/Artist'
@@ -57,8 +57,11 @@ describe('Artist', () => {
     shown.client = createScreenClient()
     await renderScreen({ ui: <Artist />, client: shown.client })
     expect(await screen.findByText(OK_COMPUTER.title)).toBeTruthy()
+    const favourite = screen.getByRole('button', { name: 'Favourite' })
+    // The toolbar's mark is its heart alone: no words, though it is still said as Favourite.
+    expect(within(favourite).queryAllByText(/./)).toEqual([])
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Favourite' }))
+    await fireEvent.press(favourite)
     await waitFor(() =>
       expect(
         screen.getByRole('button', { name: 'Favourite' }).props.accessibilityState,

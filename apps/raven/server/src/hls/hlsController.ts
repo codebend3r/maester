@@ -18,6 +18,7 @@ import {
   MEDIA_TICKET_PARAM,
   PLAYBACK_MODES,
   STREAM_PURPOSES,
+  VIDEO_RANGES,
   type StreamMode,
   type SubtitleTrack,
   isHlsSessionId,
@@ -32,7 +33,8 @@ import { AuthSessions } from '@/auth/authSessions'
 import { TicketAccesses } from '@/auth/ticketAccesses'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
-import { type HlsPath, sessionUris } from '@/hls/hlsUris'
+import { parseStreams } from '@/ffmpeg/streams'
+import { sessionUris } from '@/hls/hlsUris'
 import { type HlsSession, HlsSessions, noSuchSession } from '@/hls/hlsSessions'
 import { KeyframesService } from '@/hls/keyframesService'
 import {
@@ -49,6 +51,7 @@ import { PrivateBy } from '@/lock/lockGuard'
 import { PRIVACIES } from '@/lock/lockService'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
+import { MEDIA_ROUTES, routeOf } from '@/media/mediaRoutes'
 import {
   audioTrackOf,
   burnSubtitleOf,
@@ -64,11 +67,6 @@ import { streamSizeFor } from '@/remoteAccess/remoteCap'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { StreamSessions } from '@/streams/streamSessions'
 import { RESPONSE_EVENTS, trackStream } from '@/streams/trackStream'
-
-const MEDIA_ROUTES = 'api/media'
-
-/** An HLS path as this controller's route: what follows its `api/media` prefix. */
-const routeOf = (path: HlsPath): string => path.slice(`/${MEDIA_ROUTES}/`.length)
 
 /** `?t=` as one value may arrive: absent, or a string. Repeated, it is an array. */
 const isTicketQuery = (value: unknown): value is string | undefined =>
@@ -195,10 +193,13 @@ export class HlsController {
     if (probe === null || probe.width == null || probe.height == null || end == null) {
       throw new UnprocessableEntityException('This file has no picture of a known length to cut')
     }
+    const picture = parseStreams(output).video
+    const dolbyVision = picture?.dolbyVision ?? null
     const videoString = videoStringOf({
       mode: streamMode,
       videoCodec: file.videoCodec,
       bitDepth: probe.videoBitDepth,
+      dolbyVision,
     })
     if (videoString == null) {
       throw new ConflictException("HLS can't carry this video as it is; transcode it")
@@ -228,6 +229,7 @@ export class HlsController {
         frameRate: clock.frameRate,
         audio: audioTrack,
         videoCodec: file.videoCodec,
+        dolbyVision,
         encoder,
         maxHeight,
         quality: playback.quality,
@@ -243,6 +245,7 @@ export class HlsController {
     const uris = sessionUris({ session, key: keyFor({ session, ticket }) })
     const playlist = masterPlaylist({
       mode: streamMode,
+      videoRange: picture?.range ?? VIDEO_RANGES.sdr,
       variantUri: uris.video,
       subtitles: tracks.subtitles.map((track) => ({ track, uri: uris.subtitles(track.id) })),
       ...variantOf({

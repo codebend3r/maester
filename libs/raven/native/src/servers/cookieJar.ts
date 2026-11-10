@@ -108,22 +108,30 @@ const applied = ({ cookies, changes }: AppliedProps) =>
     }),
   )
 
+/** A server's cookies as the jar holds them, handed to whoever listens. */
+export type KnownCookies = { serverId: string; cookies: ServerCookies }
+
 type CreateCookieJarProps = {
   store: SecretStore
-  onChange?: (serverId: string) => void
+  /** Hears a server's cookies once they are first read from the store. */
+  onRead?: (known: KnownCookies) => void
+  /** Hears a server's cookies each time they change, once memory holds the new ones. */
+  onChange?: (known: KnownCookies) => void
 }
 
 /**
  * A jar over `store`, keeping each server's cookies as one JSON value under
  * `raven.cookie.<serverId>`. It reads a server from the store once and keeps it in memory
- * after; a store that fails costs only the cookies' survival across launches. `onChange` hears
- * the server's id each time its cookies change, once memory holds the new ones.
+ * after; a store that fails costs only the cookies' survival across launches. `onRead` and
+ * `onChange` hear each server's cookies as they are read and as they change, so a reader
+ * outside the jar keeps a copy of its own.
  *
  * Changes to one server's cookies take turns: each reads what the one before it left, so two
  * responses landing together never write over each other.
  */
 export const createCookieJar = ({
   store,
+  onRead = () => {},
   onChange = () => {},
 }: CreateCookieJarProps): CookieJar => {
   const known = new Map<string, ServerCookies>()
@@ -149,6 +157,7 @@ export const createCookieJar = ({
     })
     const cookies = storedCookiesOf(stored)
     known.set(serverId, cookies)
+    onRead({ serverId, cookies })
     return cookies
   }
 
@@ -156,7 +165,7 @@ export const createCookieJar = ({
 
   const write = async ({ serverId, cookies }: WriteProps) => {
     known.set(serverId, cookies)
-    onChange(serverId)
+    onChange({ serverId, cookies })
     const key = cookieKeyFor(serverId)
     const work =
       Object.keys(cookies).length === 0

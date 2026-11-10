@@ -15,8 +15,10 @@ export const APP_ROUTES = {
   search: '/search',
   favourites: '/favourites',
   continueWatching: '/continue-watching',
+  binge: '/binge',
   libraries: '/libraries',
   settings: '/settings',
+  downloads: '/downloads',
 } as const
 
 /**
@@ -52,8 +54,10 @@ export const APP_SCREENS = {
   search: 'search',
   favourites: 'favourites',
   continueWatching: 'continue-watching',
+  binge: 'binge',
   libraries: 'libraries',
   settings: 'settings',
+  downloads: 'downloads',
 } as const
 
 /**

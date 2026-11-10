@@ -62,9 +62,16 @@ export type PickerProps<K extends string> = {
   onOpenChange?: (isOpen: boolean) => void
   /** Drawn over the video: the chip, and the sheet or list it opens, are dark in every theme. */
   isOverPicture?: boolean
+  /**
+   * Drawn as its icon alone under the thumb, for a picker whose value is not worth showing
+   * (View, Group by); Sort and Speed keep their word and their value. The spoken label is
+   * unchanged, and the TV ignores it.
+   */
+  isIconOnly?: boolean
 }
 
 export type ToolButtonProps = {
+  /** The words a TV's plate shows; under the thumb the button is its icon alone. */
   label: string
   /** Drawn beside the text, the web's icon for the same control; decorative. */
   icon: IconName

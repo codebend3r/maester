@@ -1,35 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 
 import type { CookieJar, ServerCookies } from '@/servers/cookieJar'
-import type { AppServer } from '@/servers/serverList'
+import { noteCookies, useCookieSnapshots } from '@/stores/cookieSnapshots'
 import { useCookieVersion } from '@/stores/cookieVersion'
 
-type UseServerCookiesProps = { server: AppServer; jar: Pick<CookieJar, 'read'> }
+type UseServerCookiesProps = { serverId: string; jar: Pick<CookieJar, 'read'> }
+
+const IGNORED = (): void => undefined
 
 /**
- * The server's cookies from `jar`, for what an app sends outside `fetch`; null until the jar
- * first answers. They are read again whenever the jar changes, as after an unlock, and the last
- * ones stand meanwhile.
+ * The server's cookies as the jar last held them, for what an app sends outside `fetch`; null
+ * until the jar first answers. They are read again whenever the jar changes, as after an
+ * unlock, and the last ones stand meanwhile.
  */
-export const useServerCookies = ({ server, jar }: UseServerCookiesProps): ServerCookies | null => {
-  const [read, setRead] = useState<{ serverId: string; cookies: ServerCookies } | null>(null)
+export const useServerCookies = ({
+  serverId,
+  jar,
+}: UseServerCookiesProps): ServerCookies | null => {
+  const cookies = useCookieSnapshots((state) => state.byServer[serverId] ?? null)
   useEffect(() => {
-    const status = { isCurrent: true }
+    // The jar reads as empty when its store fails, so a rejection only keeps the last ones.
     const readJar = () => {
-      // The jar reads as empty when its store fails, so a rejection only keeps the last ones.
-      jar.read(server.id).then(
-        (cookies) => {
-          if (status.isCurrent) setRead({ serverId: server.id, cookies })
-        },
-        () => undefined,
-      )
+      jar.read(serverId).then((read) => noteCookies({ serverId, cookies: read }), IGNORED)
     }
     readJar()
-    const stopListening = useCookieVersion.subscribe(readJar)
-    return () => {
-      status.isCurrent = false
-      stopListening()
-    }
-  }, [server, jar])
-  return read !== null && read.serverId === server.id ? read.cookies : null
+    return useCookieVersion.subscribe(readJar)
+  }, [serverId, jar])
+  return cookies
 }

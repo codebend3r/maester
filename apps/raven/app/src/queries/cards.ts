@@ -67,7 +67,7 @@ export type ShelfCard = {
   resume?: { timeLeft: string | null } | null
   /** A library's icon, drawn before a row's words, as the side menu's row wears it. */
   icon?: LibraryIconName | null
-  /** What a held select's menu marks: the card's item, video or album; null offers no menu. */
+  /** What a held select's menu on a TV, or a long press under the thumb, acts on: the card's item, video or album; null offers no menu. */
   subject: CardSubject | null
   /** Whether all of it is watched (a video, or every episode of a season or show): a check on its picture. */
   isWatched: boolean
@@ -99,7 +99,7 @@ export const isAllWatched = ({ watched, total }: IsAllWatchedProps): boolean =>
 
 /** Where a card's picture comes from and what goes with the request for it. */
 export type Pictures = {
-  api: Pick<ApiClient, 'itemImageUrl' | 'thumbnailUrl' | 'photoUrl'>
+  api: Pick<ApiClient, 'itemImageUrl' | 'thumbnailUrl' | 'photoUrl' | 'albumCoverUrl'>
   headersFor: (uri: string) => Record<string, string>
 }
 

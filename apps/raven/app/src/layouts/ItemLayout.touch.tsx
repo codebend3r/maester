@@ -9,7 +9,6 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import {
-  ART_PLACES,
   type EpisodeRow,
   type ItemHero,
   type ItemPage,
@@ -18,11 +17,13 @@ import {
 } from '@/queries/itemPage'
 import { CardPicture, PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
 import { ITEM_LAYOUT_COPY } from '@/layouts/copy'
+import { HeroHome } from '@/layouts/HeroHome'
 import { TouchNav } from '@/layouts/TouchNav'
 import { TouchCard } from '@/layouts/TouchCard'
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import {
+  ITEM_ACTIONS,
   ITEM_HEADINGS,
   ITEM_TEST_IDS,
   WATCHED_MARK,
@@ -114,6 +115,7 @@ const ActionButton = ({ action }: ActionButtonProps) => {
       style={({ pressed }) => [
         styles.action,
         toneStyles[look.tone].button,
+        action.kind === ITEM_ACTIONS.link && styles.outlined,
         look.isDisabled && styles.disabled,
         pressed && styles.pressed,
       ]}
@@ -193,9 +195,9 @@ const Synopsis = ({ hero, isBeside = false }: SynopsisProps) => {
   )
 }
 
-type HeroProps = { hero: ItemHero; actions: ItemAction[]; links: ItemAction[] }
+type HeroProps = { hero: ItemHero; actions: ItemAction[]; links: ItemAction[]; onOpen: Opens }
 
-const Hero = ({ hero, actions, links }: HeroProps) => {
+const Hero = ({ hero, actions, links, onOpen }: HeroProps) => {
   const styles = useStyles()
   const { width, height } = useWindowDimensions()
   const isWide = isTablet({ width, height })
@@ -207,16 +209,14 @@ const Hero = ({ hero, actions, links }: HeroProps) => {
       <View style={styles.headRow}>
         <CardPicture card={heroPictureOf(hero)} width={widths[hero.poster.shape]} />
         <View style={styles.words}>
-          {hero.logo !== null && hero.logo.place === ART_PLACES.over && (
-            <TitleArt
-              height={LOGO_HEIGHT}
-              logo={hero.logo.picture}
-              maxWidth={width}
-              name={hero.eyebrow ?? hero.title}
-              textStyle={styles.eyebrow}
-            />
-          )}
-          {hero.eyebrow !== null && <Text style={styles.eyebrow}>{hero.eyebrow}</Text>}
+          <HeroHome
+            eyebrowStyle={styles.eyebrow}
+            hero={hero}
+            linkStyle={({ pressed }) => [styles.homeLink, pressed && styles.pressed]}
+            logoHeight={LOGO_HEIGHT}
+            maxWidth={width}
+            onOpen={onOpen}
+          />
           <Title hero={hero} maxWidth={width} />
           {hero.byline !== null && <Text style={styles.byline}>{hero.byline}</Text>}
           {facts !== '' && <Text style={styles.small}>{facts}</Text>}
@@ -224,18 +224,20 @@ const Hero = ({ hero, actions, links }: HeroProps) => {
           {isWide && <Synopsis hero={hero} isBeside />}
         </View>
       </View>
-      <View style={styles.actions}>
-        {actions.map((action) => (
-          <ActionButton key={action.key} action={action} />
-        ))}
-      </View>
-      {links.length > 0 && (
+      <View style={styles.actionRow}>
         <View style={styles.actions}>
-          {links.map((action) => (
+          {actions.map((action) => (
             <ActionButton key={action.key} action={action} />
           ))}
         </View>
-      )}
+        {links.length > 0 && (
+          <View style={styles.links}>
+            {links.map((action) => (
+              <ActionButton key={action.key} action={action} />
+            ))}
+          </View>
+        )}
+      </View>
       {!isWide && <Synopsis hero={hero} />}
     </View>
   )
@@ -488,7 +490,7 @@ const ItemLayout = ({ page, actions, links, onOpen, onBack }: ItemLayoutProps) =
       >
         <View style={[styles.head, padded]}>
           <Top onBack={onBack} />
-          <Hero actions={actions} hero={page.hero} links={links} />
+          <Hero actions={actions} hero={page.hero} links={links} onOpen={onOpen} />
         </View>
         {page.file.length > 0 && (
           <View style={padded}>
@@ -559,7 +561,19 @@ const useStyles = themedStyles((colours) =>
     progress: { gap: SIZES.space0, paddingTop: SIZES.space0, maxWidth: SIZES.measure },
     track: { height: SIZES.space0, borderRadius: SIZES.space0, backgroundColor: colours.track },
     fill: { height: '100%', borderRadius: SIZES.space0, backgroundColor: colours.accent },
+    // The actions at the left and the ways up at the right, which keep right on a row of their own.
+    actionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SIZES.space1 },
     actions: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space1 },
+    links: {
+      flexGrow: 1,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+      gap: SIZES.space1,
+    },
+    // A way up keeps its clear ground and takes a thin edge, so it reads as a button.
+    outlined: { borderColor: colours.line },
+    homeLink: { alignSelf: 'flex-start', gap: SIZES.space0 },
     action: {
       minHeight: SIZES.fieldHeight,
       flexDirection: 'row',

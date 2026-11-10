@@ -10,7 +10,7 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common'
-import { type Chapter, ENCODER_KINDS, HW_ACCELS } from '@raven/core'
+import { type Chapter, ENCODER_KINDS, HW_ACCELS, type MediaStreams } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
 import { SettingsRepository } from '@/settings/settingsRepository'
@@ -22,6 +22,7 @@ import { type HlsDialect, hlsDialectOf, toolMismatch } from '@/ffmpeg/ffmpegVers
 import { parseKeyframes } from '@/ffmpeg/keyframes'
 import { type PictureStat, parsePictureStats } from '@/ffmpeg/pictureStats'
 import { type ProbeResult, parseProbe } from '@/ffmpeg/probe'
+import { parseStreams } from '@/ffmpeg/streams'
 import { type FileTracks, parseTracks } from '@/ffmpeg/tracks'
 
 const run = promisify(execFile)
@@ -86,6 +87,9 @@ const PICTURE_FILTERS =
 
 /** The signals raven sends an ffmpeg it started. */
 export const FFMPEG_SIGNALS = { kill: 'SIGKILL' } as const satisfies Record<string, NodeJS.Signals>
+
+/** The events an ffmpeg child process and its output streams raise. */
+export const PROCESS_EVENTS = { data: 'data', error: 'error', close: 'close' } as const
 
 /** A running ffmpeg whose output is read as it is written. */
 export type FfmpegStream = ChildProcessByStdio<null, Readable, Readable>
@@ -284,13 +288,21 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** One ffprobe run, read three ways: what the index keeps, the file's tracks and its chapters. */
-  async probeFile(
-    path: string,
-  ): Promise<{ probe: ProbeResult; tracks: FileTracks; chapters: Chapter[] }> {
+  async probeFile(path: string): Promise<{
+    probe: ProbeResult
+    tracks: FileTracks
+    chapters: Chapter[]
+    streams: MediaStreams
+  }> {
     const output = await this.probeJson(path)
     const probe = parseProbe(output)
     if (!probe) throw new Error('No audio or video streams')
-    return { probe, tracks: parseTracks(output), chapters: parseChapters(output) }
+    return {
+      probe,
+      tracks: parseTracks(output),
+      chapters: parseChapters(output),
+      streams: parseStreams(output),
+    }
   }
 
   /**
@@ -312,15 +324,26 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     return this.spawnTracked({ args, purpose: 'segment run' })
   }
 
+  /**
+   * Starts a conversion that writes a file and reports its `-progress` on stdout, for a
+   * device download's MP4 copy. Its caller ends it, and the server kills what is left when
+   * it stops.
+   */
+  convert(args: string[]): FfmpegStream {
+    return this.spawnTracked({ args, purpose: 'device download' })
+  }
+
   private spawnTracked({ args, purpose }: FfmpegServiceSpawnTrackedProps): FfmpegStream {
     const child = spawn(this.config.ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
     const stderr = { tail: '' }
-    child.stderr.on('data', (chunk: Buffer) => {
+    child.stderr.on(PROCESS_EVENTS.data, (chunk: Buffer) => {
       stderr.tail = (stderr.tail + chunk.toString()).slice(-4096)
     })
-    child.on('error', (error) => this.logger.warn(`ffmpeg did not start: ${error.message}`))
+    child.on(PROCESS_EVENTS.error, (error) =>
+      this.logger.warn(`ffmpeg did not start: ${error.message}`),
+    )
     this.streams.add(child)
-    child.on('close', (code, signal) => {
+    child.on(PROCESS_EVENTS.close, (code, signal) => {
       this.streams.delete(child)
       if (code !== 0 && signal == null) {
         this.logger.warn(`ffmpeg ${purpose} failed (${code}): ${lastLine(stderr.tail)}`)

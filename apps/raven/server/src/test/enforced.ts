@@ -5,6 +5,7 @@ import {
   AUTH_HEADERS,
   AUTH_PATHS,
   BUG_REPORT_PATHS,
+  DEVICE_DOWNLOAD_PATHS,
   type ApiClient,
   HLS_PARAMS,
   HLS_PATHS,
@@ -179,6 +180,8 @@ export const ROUTES = {
   mediaFavourite: { method: PUT, path: '/api/media/:id/favourite', account: approved },
   file: { method: GET, path: '/api/media/:id/file', account: approved },
   transcode: { method: GET, path: '/api/media/:id/transcode', account: approved },
+  deviceDownload: { method: GET, path: DEVICE_DOWNLOAD_PATHS.prepare, account: approved },
+  deviceDownloadFile: { method: GET, path: DEVICE_DOWNLOAD_PATHS.file, account: approved },
   hlsMaster: { method: GET, path: HLS_PATHS.master, account: approved },
   hlsVideo: { method: GET, path: HLS_PATHS.video, account: approved },
   hlsInit: { method: GET, path: HLS_PATHS.init, account: approved },
@@ -232,7 +235,7 @@ export type Route = (typeof ROUTES)[keyof typeof ROUTES]
  * The routes each kind of account pass opens under accounts `ready`: an HLS
  * session's capability, in place of an account ticket, every route that
  * names the session; and the pass an account ticket earns by opening its
- * file, past the ticket's five minutes, that file alone and its transcodes.
+ * file, past the ticket's five minutes, that file alone, its transcodes and its device copy.
  */
 export const PASS_ROUTES = {
   [PASS_KINDS.capability]: [
@@ -242,7 +245,7 @@ export const PASS_ROUTES = {
     ROUTES.hlsSubtitles,
     ROUTES.hlsSubtitleSegment,
   ],
-  [PASS_KINDS.ticket]: [ROUTES.file, ROUTES.transcode],
+  [PASS_KINDS.ticket]: [ROUTES.file, ROUTES.transcode, ROUTES.deviceDownloadFile],
 } as const satisfies Record<PassKind, readonly Route[]>
 
 /**
@@ -263,6 +266,7 @@ export const RATE_ROUTES = {
     ROUTES.file,
     ROUTES.stream,
     ROUTES.transcode,
+    ROUTES.deviceDownloadFile,
     ROUTES.subtitles,
     ROUTES.hlsMaster,
     ROUTES.hlsVideo,

@@ -2,22 +2,23 @@ import { LIBRARY_VIEWS, type Library, libraryIconOf, plural } from '@raven/core'
 import { useServerPlaylistMutations } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
-import type { ReactNode } from 'react'
 
 import { Grid, NewPlaylistButton } from '@/layouts'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { PLAYLISTS_GRID_COPY } from '@/music/copy'
+import type { MusicFrame } from '@/music/MusicPages'
 import { playlistSectionsOf } from '@/music/musicCards'
 import type { ShelfCard } from '@/queries/cards'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { ROUTE_TARGETS, hrefOf } from '@/routes'
+import { PageTools } from '@/screens/PageTools'
 
 type PlaylistsGridProps = {
   session: AppQueries
   /** The music library the page was opened from, whose name and icon it keeps. */
   library: Library
-  /** The ways to the library's other pages, in the toolbar. */
-  toggle: ReactNode
+  /** The library's pages, whose toggles and Lock are the toolbar. */
+  frame: MusicFrame
 }
 
 /**
@@ -28,7 +29,7 @@ type PlaylistsGridProps = {
 export const PlaylistsGrid = ({
   session: { api, queries },
   library,
-  toggle,
+  frame,
 }: PlaylistsGridProps) => {
   const router = useRouter()
   const playlists = useQuery(queries.playlistsQuery)
@@ -55,10 +56,9 @@ export const PlaylistsGrid = ({
       sections={playlistSectionsOf(playlists.data ?? [])}
       title={library.name}
       toolbar={
-        <>
-          {toggle}
+        <PageTools frame={frame}>
           <NewPlaylistButton onCreate={make} />
-        </>
+        </PageTools>
       }
       view={LIBRARY_VIEWS.list}
     />

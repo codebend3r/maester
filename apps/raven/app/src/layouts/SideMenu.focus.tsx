@@ -15,6 +15,7 @@ import {
   SETTINGS_ENTRY,
   type MenuLibrary,
   type ShelvesProps,
+  menuRowLabelOf,
 } from '@/layouts/shelfKit'
 import { CONTINUE_WATCHING } from '@/queries/homeShelves'
 import { APP_ROUTES } from '@/routes'
@@ -55,6 +56,8 @@ type MenuRowProps = {
   icon: IconName
   onPress: () => void
   ref?: Ref<ComponentRef<typeof Pressable>>
+  /** A library locked behind the PIN, which wears a lock after its name, as the web's does. */
+  isLocked?: boolean
 }
 
 /**
@@ -62,7 +65,7 @@ type MenuRowProps = {
  * focus. Folded, the row is its icon alone, and its label is what it is called aloud; open, a long
  * label takes a second line, and the row the remote is on shows its label whole.
  */
-const MenuRow = ({ label, icon, onPress, ref }: MenuRowProps) => {
+const MenuRow = ({ label, icon, onPress, ref, isLocked = false }: MenuRowProps) => {
   const { settle } = useOpeningFocus()
   const isOpen = useSideMenu(isMenuOpen)
   const enter = useSideMenu((menu) => menu.enter)
@@ -72,7 +75,7 @@ const MenuRow = ({ label, icon, onPress, ref }: MenuRowProps) => {
   return (
     <Pressable
       ref={ref}
-      accessibilityLabel={label}
+      accessibilityLabel={menuRowLabelOf({ label, isLocked })}
       accessibilityRole="link"
       onBlur={leave}
       onFocus={() => {
@@ -90,6 +93,7 @@ const MenuRow = ({ label, icon, onPress, ref }: MenuRowProps) => {
               {label}
             </Text>
           )}
+          {isOpen && isLocked && <Icon colour={text} name="lock" size={TV_SIZES.text} />}
         </>
       )}
     </Pressable>
@@ -183,6 +187,7 @@ export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: Sid
         <MenuRow
           key={library.id}
           icon={library.icon}
+          isLocked={library.isLocked}
           label={library.name}
           onPress={() => onOpenLibrary(library.id)}
         />
