@@ -136,6 +136,12 @@
   --shadow-hero: 0 40px 80px rgb(0 0 0 / 45%);
   // A popover over the page: the theme picker.
   --shadow-popover: 0 24px 60px rgb(0 0 0 / 35%);
+  /*
+   * The poster and panel shadows as drop shadow filters. A drop shadow's blur
+   * is a standard deviation, half a box shadow's, so these halve it to match.
+   */
+  --drop-shadow-poster: drop-shadow(0 14px 15px rgb(0 0 0 / 25%));
+  --drop-shadow-panel: drop-shadow(0 12px 16px rgb(0 0 0 / 45%));
   // A hairline that keeps a light mark apart from a light picture.
   --shadow-outline: 0 0 0 2px rgb(0 0 0 / 35%);
   // Lifts subtitle text off a bright frame.

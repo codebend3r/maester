@@ -17,9 +17,11 @@
 }
 
 .bone {
+  position: relative;
   display: block;
   border-radius: var(--radius-sm);
   background-color: var(--color-canopy);
+  overflow: hidden;
 }
 
 /*
@@ -128,13 +130,14 @@
   }
 }
 
+// The band rides a layer of its own, slid by the compositor, so nothing repaints as it sweeps.
 @keyframes shimmer {
   from {
-    background-position: 150% 0;
+    translate: 100% 0;
   }
 
   to {
-    background-position: -50% 0;
+    translate: -100% 0;
   }
 }
 
@@ -143,14 +146,16 @@
     animation: arrive 200ms ease-out 150ms both;
   }
 
-  .bone {
+  .bone::after {
+    position: absolute;
+    inset: 0;
     background-image: linear-gradient(
       100deg,
       transparent 30%,
       var(--color-canopy-hi) 50%,
       transparent 70%
     );
-    background-size: 250% 100%;
+    content: '';
     animation: shimmer 1.6s ease-in-out infinite;
   }
 }

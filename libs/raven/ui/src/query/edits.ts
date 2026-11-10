@@ -87,8 +87,9 @@ export const itemFavouriteEdits = ({ item, favourite }: ItemFavouriteEditsProps)
     queryKey: queryKeys.item(item.id),
     update: (details) => (details.favourite === favourite ? details : { ...details, favourite }),
   }),
-  editKey<ItemSummary[]>({
-    queryKey: queryKeys.favouriteTitles,
+  // Every list of favourite titles, the one across libraries and each library's own.
+  editAll<ItemSummary[]>({
+    filters: { queryKey: queryKeys.favouriteTitles },
     update: (titles) => (favourite ? titles : withoutId({ items: titles, id: item.id })),
   }),
 ]

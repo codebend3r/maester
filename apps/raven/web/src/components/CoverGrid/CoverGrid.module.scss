@@ -93,9 +93,10 @@
   }
 }
 
+// A drop shadow filter, the poster shadow every other picture wears as one.
 .cover:hover .picture,
 .picture:focus-visible {
-  box-shadow: var(--shadow-poster);
+  filter: var(--drop-shadow-poster);
 }
 
 .cover:hover .picture img,
@@ -114,7 +115,7 @@
   .picture {
     transition:
       scale 200ms var(--ease-out),
-      box-shadow 200ms var(--ease-out);
+      filter 200ms var(--ease-out);
   }
 
   .picture img {

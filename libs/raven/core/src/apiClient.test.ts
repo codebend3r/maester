@@ -351,6 +351,10 @@ describe('createApiClient', () => {
     expect([
       await asked({ body: [entry], call: (client) => client.listInProgress(3) }),
       await asked({ body: [entry], call: (client) => client.listLibraryFavourites(3) }),
+      await asked({
+        body: [itemSummary({ id: 4, type: 'show' })],
+        call: (client) => client.listLibraryFavouriteTitles(3),
+      }),
       await asked({ body: [saga], call: (client) => client.listSagas(3) }),
       await asked({
         body: [{ ...mediaItem(), aiSuggestion: null }],
@@ -370,6 +374,7 @@ describe('createApiClient', () => {
     ]).toEqual([
       'http://nas:8484/api/libraries/3/in-progress',
       'http://nas:8484/api/libraries/3/favourites',
+      'http://nas:8484/api/libraries/3/favourites/titles',
       'http://nas:8484/api/libraries/3/sagas',
       'http://nas:8484/api/libraries/3/unmatched',
       'http://nas:8484/api/libraries/3/counts',

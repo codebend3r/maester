@@ -247,10 +247,9 @@ $field: "input:not([type='checkbox'], [type='radio'], [type='range'], [type='col
   background-color: var(--color-canopy);
   color: var(--color-bark);
 
+  // The focus glow comes at once: a field can hold no layer to fade it on.
   @media (prefers-reduced-motion: no-preference) {
-    transition:
-      border-color 150ms ease,
-      box-shadow 150ms ease;
+    transition: border-color 150ms ease;
   }
 
   &:where(:hover:not(:disabled, :focus-visible)) {

@@ -106,6 +106,11 @@ export const ROUTES = {
   joinDuplicates: { method: POST, path: '/api/libraries/:id/duplicates/join', account: owner },
   splitDuplicates: { method: POST, path: '/api/libraries/:id/duplicates/split', account: owner },
   libraryFavourites: { method: GET, path: '/api/libraries/:id/favourites', account: approved },
+  libraryFavouriteTitles: {
+    method: GET,
+    path: '/api/libraries/:id/favourites/titles',
+    account: approved,
+  },
   history: { method: GET, path: '/api/libraries/:id/history', account: approved },
   inProgress: { method: GET, path: '/api/libraries/:id/in-progress', account: approved },
   matchLibrary: { method: POST, path: '/api/libraries/:id/match', account: owner },

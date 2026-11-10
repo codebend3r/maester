@@ -5,8 +5,23 @@
   max-width: 100%;
 }
 
+/*
+ * The ring that invites a first press, on a layer of its own that fades in
+ * and out, so the pulse is the compositor's alone.
+ */
 .highlight {
+  position: relative;
   outline: var(--focus-ring);
+
+  &::after {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 0 var(--space-1) var(--color-track);
+    opacity: 0;
+    content: '';
+    pointer-events: none;
+  }
 }
 
 .tip {
@@ -27,13 +42,13 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .highlight {
+  .highlight::after {
     animation: invite 1.8s ease-in-out 3;
   }
 }
 
 @keyframes invite {
   50% {
-    box-shadow: 0 0 0 var(--space-1) var(--color-track);
+    opacity: 1;
   }
 }

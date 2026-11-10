@@ -28,6 +28,7 @@ import {
   isSagaBackdrop,
   isSplitRequest,
   ITEM_TYPES,
+  type ItemSummary,
   LIBRARY_KINDS,
   type Library,
   type SmartMatchStarted,
@@ -67,6 +68,7 @@ import { MediaRepository } from '@/media/mediaRepository'
 import { DolbyVisionOnly } from '@/media/dolbyVisionOnly'
 import { MovieSplits } from '@/media/movieSplits'
 import { SagaBackdrops } from '@/media/sagaBackdrops'
+import { TitleFavourites } from '@/media/titleFavourites'
 import { ViewingAccounts } from '@/media/viewingAccounts'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { withShowPosters } from '@/media/historyPosters'
@@ -148,6 +150,7 @@ export class LibrariesController {
     @Inject(MusicRepository) private readonly music: MusicRepository,
     @Inject(ServerEvents) private readonly events: ServerEvents,
     @Inject(SmartMatch) private readonly smartMatch: SmartMatch,
+    @Inject(TitleFavourites) private readonly titles: TitleFavourites,
   ) {}
 
   /** A library can only be locked behind a PIN that can open it again. */
@@ -562,7 +565,9 @@ export class LibrariesController {
     const isMovies = isMovieLibrary(record)
     return {
       inProgress: this.media.countInProgress({ libraryId: id, account }),
-      favourites: this.media.countFavourites({ libraryId: id, account }),
+      favourites:
+        this.media.countFavourites({ libraryId: id, account }) +
+        this.titles.count({ account, libraryId: id }),
       sagas: isMovies ? this.media.countSagas({ libraryId: id, account }) : 0,
       duplicates: isMovies ? this.splits.count(id) : 0,
       finished: this.viewing.finishedCount({ libraryId: id, account }),
@@ -592,6 +597,16 @@ export class LibrariesController {
     return this.media.withPosters(
       this.media.listFavourites({ libraryId: id, account: this.accounts.keyOf({ request }) }),
     )
+  }
+
+  /** Its favourite shows and seasons, most recently marked first. */
+  @Get(':id/favourites/titles')
+  listFavouriteTitles(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): ItemSummary[] {
+    this.find(id)
+    return this.titles.list({ account: this.accounts.keyOf({ request }), libraryId: id })
   }
 
   /** Its sagas of two movies or more; none in a library that is not matched to movies. */

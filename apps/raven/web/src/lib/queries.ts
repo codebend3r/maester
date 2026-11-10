@@ -12,6 +12,7 @@ export const {
   libraryCountsQuery,
   inProgressQuery,
   libraryFavouritesQuery,
+  libraryFavouriteTitlesQuery,
   sagasQuery,
   unmatchedQuery,
   duplicatesQuery,

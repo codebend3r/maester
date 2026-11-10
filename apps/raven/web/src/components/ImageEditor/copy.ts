@@ -26,7 +26,6 @@ export const IMAGE_EDITOR_COPY = {
   couldNotChange: (message: string) => `Could not change the picture: ${message}`,
   asking: 'Asking TMDB for pictures',
   pictures: 'Pictures',
-  done: 'Done',
   noLibrary: 'No library you can see holds this title, so it has no pictures to choose.',
   gathering: 'Gathering the pictures',
 } as const

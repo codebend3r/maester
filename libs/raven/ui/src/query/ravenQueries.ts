@@ -170,6 +170,12 @@ export const ravenQueriesFor = (api: ApiClient) => {
         queryFn: () => api.listLibraryFavourites(libraryId),
       }),
 
+    libraryFavouriteTitlesQuery: (libraryId: number) =>
+      queryOptions({
+        queryKey: queryKeys.libraryFavouriteTitles(libraryId),
+        queryFn: () => api.listLibraryFavouriteTitles(libraryId),
+      }),
+
     sagasQuery: (libraryId: number | null) =>
       queryOptions({
         queryKey: queryKeys.sagas(libraryId),

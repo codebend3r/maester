@@ -280,7 +280,7 @@ describe('itemFavouriteEdits', () => {
     expect(client.getQueryData<ItemSummary[]>(queryKeys.favouriteTitles)).toBe(titles)
   })
 
-  it('takes an unmarked item off Favourites', () => {
+  it("takes an unmarked item off Favourites, and off each library's favourites", () => {
     const client = new QueryClient()
     const item = itemDetails({ id: 40, favourite: true })
     client.setQueryData(queryKeys.item(40), item)
@@ -288,11 +288,13 @@ describe('itemFavouriteEdits', () => {
       itemSummary({ id: 40 }),
       itemSummary({ id: 41 }),
     ])
+    client.setQueryData(queryKeys.libraryFavouriteTitles(2), [itemSummary({ id: 40 })])
     apply({ client, edits: itemFavouriteEdits({ item, favourite: false }) })
     expect(client.getQueryData<ItemDetails>(queryKeys.item(40))!.favourite).toBe(false)
     expect(client.getQueryData<ItemSummary[]>(queryKeys.favouriteTitles)).toEqual([
       itemSummary({ id: 41 }),
     ])
+    expect(client.getQueryData<ItemSummary[]>(queryKeys.libraryFavouriteTitles(2))).toEqual([])
   })
 })
 

@@ -39,6 +39,7 @@ describe('LibraryPage select mode', () => {
     shows: spyOn(api, 'listShows'),
     inProgress: spyOn(api, 'listInProgress'),
     favourites: spyOn(api, 'listLibraryFavourites'),
+    favouriteTitles: spyOn(api, 'listLibraryFavouriteTitles'),
     sagas: spyOn(api, 'listSagas'),
     history: spyOn(api, 'listHistory'),
     health: spyOn(api, 'getMetadataHealth'),
@@ -49,6 +50,7 @@ describe('LibraryPage select mode', () => {
   beforeEach(() => {
     spies.inProgress.mockImplementation(async () => [])
     spies.favourites.mockImplementation(async () => [])
+    spies.favouriteTitles.mockImplementation(async () => [])
     spies.sagas.mockImplementation(async () => [])
     spies.history.mockImplementation(async () => [])
     spies.health.mockImplementation(async () => metadataHealth())

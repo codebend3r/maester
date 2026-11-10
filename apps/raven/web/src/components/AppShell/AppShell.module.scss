@@ -42,18 +42,30 @@
   border-right: 1px solid var(--color-line-faint);
 }
 
-// While a card's picture is behind the page, the menu frosts over it.
-.frosted {
+/*
+ * While a card's picture is behind the page, the menu frosts over it. The
+ * frost is a layer under the menu's links with its blur held still, and only
+ * its opacity fades, since blurring by a changing amount redraws every frame.
+ */
+.side::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   background: var(--color-frost-glass);
   backdrop-filter: blur(24px);
+  opacity: 0;
+  content: '';
+  pointer-events: none;
+}
+
+.frosted::before {
+  opacity: 1;
 }
 
 // In step with the picture's own fade.
 @media (prefers-reduced-motion: no-preference) {
-  .side {
-    transition:
-      background-color 450ms ease-out,
-      backdrop-filter 450ms ease-out;
+  .side::before {
+    transition: opacity 450ms ease-out;
   }
 }
 

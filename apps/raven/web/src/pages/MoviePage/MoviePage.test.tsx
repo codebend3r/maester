@@ -311,7 +311,7 @@ describe('MoviePage', () => {
     expect(heading.querySelector('img')).toBeNull()
   })
 
-  it('opens Edit images from the header, and closes it with Done', async () => {
+  it('opens Edit images from the header in a modal, and closes it with the X', async () => {
     const images = spyOn(api, 'getItemImages').mockImplementation(async () => ({
       poster: [],
       backdrop: [],
@@ -321,11 +321,33 @@ describe('MoviePage', () => {
     const button = await screen.findByRole('button', { name: 'Edit images' })
     expect(screen.queryByRole('heading', { name: 'Edit images' })).toBeNull()
     await userEvent.click(button)
-    expect(await screen.findByRole('heading', { name: 'Edit images' })).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog', { name: 'Edit images' })
     expect(images).toHaveBeenCalledWith({ id: 40, libraryId: 2 })
-    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    expect(screen.queryByRole('heading', { name: 'Edit images' })).toBeNull()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Edit images' })).toBeNull()
     images.mockRestore()
+  })
+
+  it('opens one editor at a time, Edit metadata once Edit images is closed', async () => {
+    const images = spyOn(api, 'getItemImages').mockImplementation(async () => ({
+      poster: [],
+      backdrop: [],
+      logo: [],
+    }))
+    const state = spyOn(api, 'getItemMetadata').mockImplementation(async () => ({
+      shown: { title: 'Busboys', year: 2026, tagline: null, summary: null, contentRating: null },
+      original: { title: 'Busboys', year: 2026, tagline: null, summary: null, contentRating: null },
+      overridden: [],
+    }))
+    open({ details: itemDetails() })
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit images' }))
+    const pictures = await screen.findByRole('dialog', { name: 'Edit images' })
+    await userEvent.click(within(pictures).getByRole('button', { name: 'Close' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit metadata' }))
+    expect(await screen.findByRole('dialog', { name: 'Edit metadata' })).toBeInTheDocument()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    images.mockRestore()
+    state.mockRestore()
   })
 
   it("leaves Edit images, Edit metadata and the file's menu out while the admin lock is on", async () => {
@@ -350,7 +372,7 @@ describe('MoviePage', () => {
     }))
     open({ details: itemDetails() })
     await userEvent.click(await screen.findByRole('button', { name: 'Edit metadata' }))
-    expect(await screen.findByRole('heading', { name: 'Edit metadata' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Edit metadata' })).toBeInTheDocument()
     expect(state).toHaveBeenCalledWith(40)
     state.mockRestore()
   })

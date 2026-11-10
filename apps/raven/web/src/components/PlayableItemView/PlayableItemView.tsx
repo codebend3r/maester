@@ -29,14 +29,13 @@ import {
 import { type ComponentType, type ReactNode, useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button, ButtonLink } from '@raven/ui'
+import { ButtonLink } from '@raven/ui'
 import type { BackFallback } from '@/components/BackButton/BackButton'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { HeroToggle } from '@/components/HeroToggle/HeroToggle'
-import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import {
   type HeaderProgress,
   ItemHeader,
@@ -44,7 +43,7 @@ import {
   pictureBackdrop,
 } from '@/components/ItemHeader/ItemHeader'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
-import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
+import { useItemEditors } from '@/components/ItemEditors/ItemEditors'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { EpisodeNeighbours } from '@/components/PlayableItemView/EpisodeNeighbours'
 import { FileFacts } from '@/components/PlayableItemView/FileFacts'
@@ -252,8 +251,6 @@ export const PlayableItemView = ({
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [editingImages, setEditingImages] = useState(false)
-  const [editingMetadata, setEditingMetadata] = useState(false)
   const { favourite, watched } = useMediaMutations({ media: primary })
   // A locked library's videos are never marked, but one marked before it locked can be unmarked.
   const canFavourite = useCanFavourite(primary.libraryId) || primary.favourite
@@ -264,6 +261,10 @@ export const PlayableItemView = ({
   // A logo until Settings says to spell titles out, as a fresh install does.
   const showsLogo = useQuery(displaySettingsQuery).data?.titles !== TITLE_DISPLAYS.text
   const known = libraries.data ?? []
+  const editors = useItemEditors({
+    images: { details: item, libraries: known, libraryId: primary.libraryId },
+    metadata: { details, everyCard, itemKind: ITEM_TYPES.movie },
+  })
   const back = config.back({ details, primary, libraries: known })
   const tagline = config.showsTagline ? details.tagline : null
   const play = watchLink({ media: primary })
@@ -329,24 +330,7 @@ export const PlayableItemView = ({
             })}
         manage={
           <AdminOnly>
-            {config.editable && (
-              <>
-                <Button
-                  icon="edit"
-                  aria-pressed={editingImages}
-                  onClick={() => setEditingImages((editing) => !editing)}
-                >
-                  {COMMON_COPY.editImages}
-                </Button>
-                <Button
-                  icon="edit"
-                  aria-pressed={editingMetadata}
-                  onClick={() => setEditingMetadata((editing) => !editing)}
-                >
-                  {COMMON_COPY.editMetadata}
-                </Button>
-              </>
-            )}
+            {config.editable && editors.buttons}
             {details.type === ITEM_TYPES.movie && <HeroToggle itemId={details.id} />}
             {/* Without its favourite and watched, which the page has beside it, all the menu holds needs the admin lock off. */}
             <MediaMenu
@@ -396,24 +380,7 @@ export const PlayableItemView = ({
 
       {config.showsSaga && <SagaLink itemId={details.id} libraryId={primary.libraryId} />}
 
-      <AdminOnly>
-        {config.editable && editingImages && (
-          <ImageEditor
-            details={item}
-            libraries={known}
-            libraryId={primary.libraryId}
-            onDone={() => setEditingImages(false)}
-          />
-        )}
-        {config.editable && editingMetadata && (
-          <MetadataEditor
-            details={details}
-            everyCard={everyCard}
-            itemKind={ITEM_TYPES.movie}
-            onDone={() => setEditingMetadata(false)}
-          />
-        )}
-      </AdminOnly>
+      <AdminOnly>{config.editable && editors.modal}</AdminOnly>
 
       <About
         details={details}
