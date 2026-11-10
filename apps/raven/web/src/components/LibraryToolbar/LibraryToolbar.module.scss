@@ -159,10 +159,9 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  // The focus glow comes at once, as a field's does.
   .picker {
-    transition:
-      border-color 150ms ease,
-      box-shadow 150ms ease;
+    transition: border-color 150ms ease;
   }
 }
 

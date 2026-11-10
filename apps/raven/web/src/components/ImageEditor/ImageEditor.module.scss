@@ -1,62 +1,3 @@
-/*
- * A panel on the page, or the dialog's whole body from a card's menu: the
- * title and Done over a hairline, then the files and the pictures.
- */
-.editor {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
-  padding: var(--space-4) var(--space-5) var(--space-5);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-xl);
-  background: var(--color-canopy);
-
-  @media (max-width: 30rem) {
-    padding: var(--space-3) var(--space-4) var(--space-4);
-  }
-}
-
-/*
- * From a card's menu the editor is the dialog's own panel, so the dialog
- * itself has no frame. It lets go of the measure elements.scss caps a
- * dialog at, as the pictures want the room.
- */
-.dialog {
-  width: min(60rem, calc(100vw - 2 * var(--space-3)));
-  max-width: none;
-  max-height: calc(100dvh - 2 * var(--space-3));
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.waiting {
-  padding: var(--space-5);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-xl);
-  background: var(--color-canopy);
-  color: var(--color-lichen);
-}
-
-.header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'heading done';
-  align-items: center;
-  gap: var(--space-2);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--color-line);
-
-  > :last-child {
-    grid-area: done;
-  }
-}
-
-.heading {
-  grid-area: heading;
-  font-size: var(--font-size-xl);
-}
-
 .group {
   display: grid;
   gap: var(--space-2);
@@ -216,10 +157,88 @@
   font-size: var(--font-size-xs);
 }
 
+/*
+ * Pointed at, a picture grows to twice its size over its neighbours, from the
+ * side the grid sets (`zoomOriginOf`), so it stays inside the grid. A touch
+ * screen has no pointing, so its pictures stay put. The raised layer drops
+ * only once the shrink ends, or the picture would shrink under the others.
+ */
+.zoomable {
+  position: relative;
+  display: grid;
+
+  &[data-zoom-x='start'] {
+    --zoom-x: left;
+  }
+
+  &[data-zoom-x='end'] {
+    --zoom-x: right;
+  }
+
+  &[data-zoom-y='start'] {
+    --zoom-y: top;
+  }
+
+  &[data-zoom-y='end'] {
+    --zoom-y: bottom;
+  }
+}
+
+// Its shadow is a layer of its own that fades in, so the zoom moves no paint.
+.option::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--shadow-popover);
+  opacity: 0;
+  content: '';
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .option {
+    position: relative;
+    transform-origin: var(--zoom-x, center) var(--zoom-y, center);
+  }
+
+  .zoomable:hover {
+    z-index: 1;
+
+    .option {
+      scale: 2;
+    }
+
+    .option::after {
+      opacity: 1;
+    }
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .option {
     transition:
       border-color 150ms ease,
       background-color 150ms ease;
+  }
+
+  @media (hover: hover) {
+    .zoomable {
+      transition: z-index 0s linear 220ms;
+    }
+
+    .zoomable:hover {
+      transition-delay: 0s;
+    }
+
+    .option {
+      transition:
+        scale 220ms var(--ease-out),
+        border-color 150ms ease,
+        background-color 150ms ease;
+    }
+
+    .option::after {
+      transition: opacity 220ms var(--ease-out);
+    }
   }
 }

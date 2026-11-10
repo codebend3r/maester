@@ -35,6 +35,7 @@ describe('LibraryPage tabs', () => {
     list: spyOn(api, 'listMedia'),
     inProgress: spyOn(api, 'listInProgress'),
     favourites: spyOn(api, 'listLibraryFavourites'),
+    favouriteTitles: spyOn(api, 'listLibraryFavouriteTitles'),
     sagas: spyOn(api, 'listSagas'),
     unmatched: spyOn(api, 'listUnmatched'),
     duplicates: spyOn(api, 'listDuplicates'),
@@ -51,6 +52,7 @@ describe('LibraryPage tabs', () => {
     spies.list.mockImplementation(async () => [mediaItem({ id: 1, title: 'Wide' })])
     spies.inProgress.mockImplementation(async () => [])
     spies.favourites.mockImplementation(async () => [])
+    spies.favouriteTitles.mockImplementation(async () => [])
     spies.sagas.mockImplementation(async () => [])
     spies.unmatched.mockImplementation(async () => [])
     spies.duplicates.mockImplementation(async () => [])
@@ -255,6 +257,22 @@ describe('LibraryPage tabs', () => {
     await screen.findByText(/No favourites in Films yet/)
     expect(spies.list).not.toHaveBeenCalled()
     expect(spies.favourites).toHaveBeenCalledWith(2)
+    expect(spies.favouriteTitles).toHaveBeenCalledWith(2)
+  })
+
+  it('shows a favourite show among the favourites, before the videos', async () => {
+    spies.favouriteTitles.mockImplementation(async () => [
+      itemSummary({ id: 4, type: 'show', title: 'Severance', year: 2022 }),
+    ])
+    spies.favourites.mockImplementation(async () => [
+      { media: movie({ id: 7, title: 'Heat', year: 1995 }), poster: null },
+    ])
+    open({ kind: 'shows', route: '/libraries/2/favourites' })
+    const show = await screen.findByRole('link', { name: /Severance/ })
+    expect(show).toHaveAttribute('href', '/shows/4')
+    const heat = await screen.findByText('Heat')
+    expect(show.compareDocumentPosition(heat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByText(/No favourites in Films yet/)).not.toBeInTheDocument()
   })
 
   it('moves between tabs by their links, back to the listing with All', async () => {

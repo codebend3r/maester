@@ -13,8 +13,8 @@ import {
   languageName,
   versionFacts,
 } from '@raven/core'
-import { type ComponentType, useId, useState } from 'react'
-import { Button, Icon, WordFact } from '@raven/ui'
+import { type ComponentType, type PointerEvent, type ReactNode, useId, useState } from 'react'
+import { Icon, WordFact } from '@raven/ui'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
 import { Tabs } from '@/components/Tabs/Tabs'
 import { api } from '@/lib/api'
@@ -99,6 +99,87 @@ const NoOptions = ({ kind }: NoOptionsProps) => (
   <p className={styles.hint}>{IMAGE_EDITOR_COPY.noOptions(kind)}</p>
 )
 
+/** Which side of the grid a picture sits against, along one axis: where it grows from. */
+const ZOOM_EDGES = { start: 'start', center: 'center', end: 'end' } as const
+
+type ZoomEdge = (typeof ZOOM_EDGES)[keyof typeof ZOOM_EDGES]
+
+/** Where a hovered picture grows from, so at twice its size it stays inside its grid. */
+type ZoomOrigin = { x: ZoomEdge; y: ZoomEdge }
+
+// A pixel or two of rounding still counts as touching the grid's edge.
+const EDGE_SLACK = 2
+
+type EdgeOfProps = { start: number; end: number; gridStart: number; gridEnd: number }
+
+/**
+ * A picture against the grid's start grows away from it, one against its end
+ * grows back from it, and one with neighbours on both sides grows from its
+ * middle, half its size into each, which the gap and a neighbour make room for.
+ */
+const edgeOf = ({ start, end, gridStart, gridEnd }: EdgeOfProps): ZoomEdge => {
+  if (start - gridStart <= EDGE_SLACK) return ZOOM_EDGES.start
+  if (gridEnd - end <= EDGE_SLACK) return ZOOM_EDGES.end
+  return ZOOM_EDGES.center
+}
+
+/** Where `item` grows from in `grid`, read off where each sits on the screen. */
+const zoomOriginOf = (item: Element): ZoomOrigin | null => {
+  const grid = item.parentElement?.getBoundingClientRect() ?? null
+  if (grid === null) return null
+  const own = item.getBoundingClientRect()
+  return {
+    x: edgeOf({ start: own.left, end: own.right, gridStart: grid.left, gridEnd: grid.right }),
+    y: edgeOf({ start: own.top, end: own.bottom, gridStart: grid.top, gridEnd: grid.bottom }),
+  }
+}
+
+type ZoomableOptionProps = {
+  option: ImageOption
+  /** What kind of picture it is, as its label names it. */
+  kindLabel: string
+  isDisabled: boolean
+  onChoose: () => void
+  children: ReactNode
+}
+
+/**
+ * One picture of the grid. It keeps where it grew from, so it shrinks back
+ * the same way after the pointer leaves.
+ */
+const ZoomableOption = ({
+  option,
+  kindLabel,
+  isDisabled,
+  onChoose,
+  children,
+}: ZoomableOptionProps) => {
+  const [origin, setOrigin] = useState<ZoomOrigin | null>(null)
+  const description = describe(option)
+  const aim = (event: PointerEvent<HTMLLIElement>) =>
+    setOrigin(zoomOriginOf(event.currentTarget) ?? origin)
+  return (
+    <li
+      className={styles.zoomable}
+      data-zoom-x={origin?.x ?? ZOOM_EDGES.center}
+      data-zoom-y={origin?.y ?? ZOOM_EDGES.center}
+      onPointerEnter={aim}
+    >
+      <button
+        type="button"
+        className={styles.option}
+        aria-pressed={option.current}
+        aria-label={IMAGE_EDITOR_COPY.optionLabel({ kind: kindLabel, description })}
+        disabled={isDisabled}
+        onClick={onChoose}
+      >
+        {children}
+        <span className={styles.caption}>{description}</span>
+      </button>
+    </li>
+  )
+}
+
 type OptionGridProps = OptionsProps
 
 const OptionGrid = ({ itemId, kind, options, busy, onChoose }: OptionGridProps) => {
@@ -109,22 +190,15 @@ const OptionGrid = ({ itemId, kind, options, busy, onChoose }: OptionGridProps) 
   return (
     <ul className={GRIDS[kind]}>
       {options.map((option) => (
-        <li key={`${option.source}:${option.ref}`}>
-          <button
-            type="button"
-            className={styles.option}
-            aria-pressed={option.current}
-            aria-label={IMAGE_EDITOR_COPY.optionLabel({
-              kind: KIND_LABELS[kind],
-              description: describe(option),
-            })}
-            disabled={busy || option.current}
-            onClick={() => onChoose(option)}
-          >
-            <Picture src={api.imageOptionUrl({ id: itemId, kind, option })} />
-            <span className={styles.caption}>{describe(option)}</span>
-          </button>
-        </li>
+        <ZoomableOption
+          key={`${option.source}:${option.ref}`}
+          option={option}
+          kindLabel={KIND_LABELS[kind]}
+          isDisabled={busy || option.current}
+          onChoose={() => onChoose(option)}
+        >
+          <Picture src={api.imageOptionUrl({ id: itemId, kind, option })} />
+        </ZoomableOption>
       ))}
     </ul>
   )
@@ -149,7 +223,6 @@ type ImageEditorProps = {
   libraryId: number | null
   /** A show's pictures are its own; there are no linked files to list. */
   itemKind?: MatchItemType
-  onDone: () => void
 }
 
 type LibraryImagesProps = {
@@ -286,20 +359,19 @@ const LibraryImages = ({
 }
 
 /**
- * Edit images: every poster, backdrop and logo a movie or show could show,
- * the one its library shows marked, and that library's files of this movie,
- * since they share them. Each library holding the title chooses its own, so
- * a title held by several asks which one, starting on the one it was opened
- * from. A choice takes at once, so the panel has no Save, only Done at its top.
+ * Edit images, the body of its modal: every poster, backdrop and logo a movie
+ * or show could show, the one its library shows marked, and that library's
+ * files of this movie, since they share them. Each library holding the title
+ * chooses its own, so a title held by several asks which one, starting on the
+ * one it was opened from. A choice takes at once, so it has no Save; the
+ * modal's X closes it.
  */
 export const ImageEditor = ({
   details,
   libraries,
   libraryId,
   itemKind = ITEM_TYPES.movie,
-  onDone,
 }: ImageEditorProps) => {
-  const headingId = useId()
   const holders = (details.libraryPictures ?? []).map((pictures) => pictures.libraryId)
   const [picked, setPicked] = useState<number | null>(null)
   const opened = libraryId != null && holders.includes(libraryId) ? libraryId : null
@@ -307,16 +379,7 @@ export const ImageEditor = ({
   const libraryName = (id: number) => libraries.find((library) => library.id === id)?.name ?? null
 
   return (
-    <section className={styles.editor} aria-labelledby={headingId}>
-      <header className={styles.header}>
-        <h2 id={headingId} className={styles.heading}>
-          {COMMON_COPY.editImages}
-        </h2>
-        <Button icon="close" onClick={onDone}>
-          {IMAGE_EDITOR_COPY.done}
-        </Button>
-      </header>
-
+    <>
       {shownIn == null && <p className={styles.hint}>{IMAGE_EDITOR_COPY.noLibrary}</p>}
       {shownIn != null && (
         <LibraryImages
@@ -328,6 +391,6 @@ export const ImageEditor = ({
           libraryName={libraryName}
         />
       )}
-    </section>
+    </>
   )
 }

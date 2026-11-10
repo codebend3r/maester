@@ -2,6 +2,8 @@
 .activity {
   display: grid;
   grid-template-areas: 'bar';
+  border-radius: var(--radius-pill);
+  overflow: hidden;
 }
 
 .gauge {
@@ -9,9 +11,11 @@
   width: 100%;
 }
 
+// A light two fifths of the bar wide, slid by the compositor from off its start to off its end.
 .sweep {
   grid-area: bar;
   align-self: stretch;
+  width: 40%;
   border-radius: var(--radius-pill);
   pointer-events: none;
 
@@ -22,18 +26,16 @@
       color-mix(in srgb, var(--color-bark) 55%, transparent),
       transparent
     );
-    background-repeat: no-repeat;
-    background-size: 40% 100%;
     animation: activity-sweep 1.4s linear infinite;
   }
 }
 
 @keyframes activity-sweep {
   from {
-    background-position: -40% 0;
+    translate: -100% 0;
   }
 
   to {
-    background-position: 140% 0;
+    translate: 250% 0;
   }
 }

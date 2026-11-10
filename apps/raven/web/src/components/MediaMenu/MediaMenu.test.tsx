@@ -141,7 +141,7 @@ describe('MediaMenu', () => {
 
     const openAny = () => userEvent.click(screen.getByRole('button', { name: /^Options for / }))
 
-    it("opens a movie's pictures in a dialog over the page, and closes on Done", async () => {
+    it("opens a movie's pictures in a modal over the page, and closes on its X", async () => {
       serve()
       renderWithProviders({ ui: <Harness media={matchedMovie()} /> })
       await openAny()
@@ -151,7 +151,7 @@ describe('MediaMenu', () => {
         await within(dialog).findByRole('heading', { name: 'Edit images' }),
       ).toBeInTheDocument()
       expect(asked).toEqual([40])
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
       expect(screen.queryByRole('dialog', { name: 'Edit images' })).toBeNull()
     })
 

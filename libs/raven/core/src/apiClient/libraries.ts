@@ -5,11 +5,13 @@ import {
   type DolbyVisionOnlyListing,
   type Duplicates,
   type HistoryEntry,
+  type ItemSummary,
   isAlbumMerge,
   isSmartMatchStarted,
   isDirectoryListing,
   isDolbyVisionOnlyListing,
   isDuplicates,
+  isFavouriteTitles,
   isHistory,
   isLibrary,
   isLibraryCounts,
@@ -222,6 +224,10 @@ export const libraryCalls = ({ send, expect, libraryGet }: Transport) => ({
   /** A library's favourites, most recently marked first, each with its poster. */
   listLibraryFavourites: (libraryId: number): Promise<PosterEntry[]> =>
     libraryGet({ libraryId, path: 'favourites', guard: isPosterEntries }),
+
+  /** A library's favourite shows and seasons, most recently marked first. */
+  listLibraryFavouriteTitles: (libraryId: number): Promise<ItemSummary[]> =>
+    libraryGet({ libraryId, path: 'favourites/titles', guard: isFavouriteTitles }),
 
   /** A movie library's sagas of two movies or more, by name, each oldest first. */
   listSagas: (libraryId: number): Promise<Saga[]> =>

@@ -36,20 +36,23 @@
 
 // While the picture is on its way the letter sits on the skeleton's colour.
 .waiting {
+  position: relative;
   background-color: var(--color-canopy);
+  overflow: hidden;
 
   &::before {
     content: attr(data-initial);
   }
 }
 
+// The skeleton's band, on a layer of its own that the compositor slides across.
 @keyframes shimmer {
   from {
-    background-position: 150% 0;
+    translate: 100% 0;
   }
 
   to {
-    background-position: -50% 0;
+    translate: -100% 0;
   }
 }
 
@@ -58,14 +61,16 @@
     transition: opacity 200ms var(--ease-out);
   }
 
-  .waiting {
+  .waiting::after {
+    position: absolute;
+    inset: 0;
     background-image: linear-gradient(
       100deg,
       transparent 30%,
       var(--color-canopy-hi) 50%,
       transparent 70%
     );
-    background-size: 250% 100%;
+    content: '';
     animation: shimmer 1.6s ease-in-out infinite;
   }
 }

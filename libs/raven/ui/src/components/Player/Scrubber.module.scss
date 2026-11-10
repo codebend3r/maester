@@ -1,6 +1,8 @@
 /*
  * A tall hit area around a thin rail: easy to grab, quiet to look at. The
- * rail thickens on hover, and the playhead is a round thumb.
+ * rail thickens on hover, and the playhead is a round thumb. The rail, the
+ * played stretch and the head all move by transform, so neither playing nor
+ * pointing at it asks for layout.
  */
 .scrubber {
   position: relative;
@@ -22,20 +24,22 @@
   --chapter-gap: var(--space-0);
 
   position: relative;
-  height: 5px;
+  height: 7px;
   overflow: hidden;
   border-radius: var(--radius-pill);
   background: var(--color-bark-faint);
+  // Thin at rest, scaled down from the thick rail it grows back to.
+  scale: 1 calc(5 / 7);
 
   @media (prefers-reduced-motion: no-preference) {
-    transition: height 120ms ease-out;
+    transition: scale 120ms ease-out;
   }
 }
 
 .scrubber:hover .rail,
 .dragging .rail,
 .scrubber:focus-visible .rail {
-  height: 7px;
+  scale: 1 1;
 }
 
 .buffered,
@@ -52,12 +56,21 @@
 // The one colour in the chrome that follows the theme.
 .played {
   left: 0;
+  width: 100%;
   background: var(--color-leaf-bright);
+  transform-origin: left center;
+}
+
+.headTrack {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .head {
   position: absolute;
   top: 50%;
+  left: 0;
   width: var(--space-3);
   height: var(--space-3);
   border-radius: 50%;

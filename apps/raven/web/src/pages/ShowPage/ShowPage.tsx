@@ -31,9 +31,8 @@ import { PlayAllButton } from '@/components/PlayAllButton/PlayAllButton'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
-import { ImageEditor } from '@/components/ImageEditor/ImageEditor'
 import { ItemHeader, ItemHeaderSkeleton, itemBackdrop } from '@/components/ItemHeader/ItemHeader'
-import { MetadataEditor } from '@/components/MetadataEditor/MetadataEditor'
+import { useItemEditors } from '@/components/ItemEditors/ItemEditors'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
@@ -61,14 +60,16 @@ const ShowView = ({ details }: ShowViewProps) => {
   const ids = { title: useId() }
   const navigate = useNavigate()
   const [fixing, setFixing] = useState(false)
-  const [editingImages, setEditingImages] = useState(false)
-  const [editingMetadata, setEditingMetadata] = useState(false)
   const next = useQuery(nextEpisodeQuery(details.id))
   const favourite = useItemFavourite({ item: details })
   // A logo until Settings says to spell titles out, as a fresh install does.
   const showsLogo = useQuery(displaySettingsQuery).data?.titles !== TITLE_DISPLAYS.text
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId ?? null
   const known = useQuery(librariesQuery).data ?? []
+  const editors = useItemEditors({
+    images: { details, libraries: known, libraryId, itemKind: ITEM_TYPES.show },
+    metadata: { details, itemKind: ITEM_TYPES.show },
+  })
   const libraryName = known.find((entry) => entry.id === libraryId)?.name ?? COMMON_COPY.library
   // Each library holding the show can choose its own pictures.
   const pictures = picturesIn({ details, libraryId })
@@ -126,20 +127,7 @@ const ShowView = ({ details }: ShowViewProps) => {
           backdrop={itemBackdrop({ id: details.id, version: pictures.backdropVersion })}
           manage={
             <AdminOnly>
-              <Button
-                icon="edit"
-                aria-pressed={editingImages}
-                onClick={() => setEditingImages((editing) => !editing)}
-              >
-                {COMMON_COPY.editImages}
-              </Button>
-              <Button
-                icon="edit"
-                aria-pressed={editingMetadata}
-                onClick={() => setEditingMetadata((editing) => !editing)}
-              >
-                {COMMON_COPY.editMetadata}
-              </Button>
+              {editors.buttons}
               <Button icon="search" onClick={() => setFixing(true)}>
                 {COMMON_COPY.fixMatch}
               </Button>
@@ -169,24 +157,7 @@ const ShowView = ({ details }: ShowViewProps) => {
 
         {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
 
-        <AdminOnly>
-          {editingImages && (
-            <ImageEditor
-              details={details}
-              libraries={known}
-              libraryId={libraryId}
-              itemKind={ITEM_TYPES.show}
-              onDone={() => setEditingImages(false)}
-            />
-          )}
-          {editingMetadata && (
-            <MetadataEditor
-              details={details}
-              itemKind={ITEM_TYPES.show}
-              onDone={() => setEditingMetadata(false)}
-            />
-          )}
-        </AdminOnly>
+        <AdminOnly>{editors.modal}</AdminOnly>
 
         <Summary tagline={details.tagline} summary={details.summary} />
 

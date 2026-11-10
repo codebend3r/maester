@@ -9,8 +9,6 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 /** A movie or episode is a favourite by its files; a show or season by itself. */
 const FAVOURITE_TITLE_TYPES: ReadonlySet<ItemType> = new Set([ITEM_TYPES.show, ITEM_TYPES.season])
 
-type TitleFavouritesIsOpenProps = { itemId: number; locked: ReadonlySet<number> }
-
 type TitleFavouritesFavouriteOfProps = { itemId: number; account: AccountKey }
 
 type TitleFavouritesSetProps = {
@@ -19,7 +17,14 @@ type TitleFavouritesSetProps = {
   account: AccountKey
 }
 
-type TitleFavouritesListProps = { account: AccountKey }
+/** `libraryId` narrows the list to the one library; null takes every library that is not locked. */
+type TitleFavouritesListProps = { account: AccountKey; libraryId: number | null }
+
+type TitleFavouritesHeldInProps = {
+  itemId: number
+  locked: ReadonlySet<number>
+  libraryId: number | null
+}
 
 /**
  * Shows and seasons each account marked as favourites. A locked library's
@@ -38,9 +43,11 @@ export class TitleFavourites {
     return this.database.db
   }
 
-  /** Whether a library that is not locked holds a file under the item. */
-  private isOpen({ itemId, locked }: TitleFavouritesIsOpenProps): boolean {
-    return this.metadata.librariesHolding(itemId).some((libraryId) => !locked.has(libraryId))
+  /** Whether a library that is not locked, `libraryId` where given, holds a file under the item. */
+  private isHeldIn({ itemId, locked, libraryId }: TitleFavouritesHeldInProps): boolean {
+    return this.metadata
+      .librariesHolding(itemId)
+      .some((held) => !locked.has(held) && (libraryId == null || held === libraryId))
   }
 
   /** Whether the item is a show or season a library that is not locked holds. */
@@ -49,7 +56,7 @@ export class TitleFavourites {
     return (
       type != null &&
       FAVOURITE_TITLE_TYPES.has(type) &&
-      this.isOpen({ itemId, locked: this.libraries.lockedIds() })
+      this.isHeldIn({ itemId, locked: this.libraries.lockedIds(), libraryId: null })
     )
   }
 
@@ -81,7 +88,7 @@ export class TitleFavourites {
           .run({ account }, itemId)
         return FAVOURITE_OUTCOMES.done
       }
-      if (!this.isOpen({ itemId, locked: this.libraries.lockedIds() })) {
+      if (!this.isHeldIn({ itemId, locked: this.libraries.lockedIds(), libraryId: null })) {
         return FAVOURITE_OUTCOMES.locked
       }
       this.db
@@ -94,21 +101,31 @@ export class TitleFavourites {
     })()
   }
 
-  /**
-   * Every show and season `account` favoured that a library that is not
-   * locked holds, most recently marked first.
-   */
-  list({ account }: TitleFavouritesListProps): ItemSummary[] {
+  /** The ids `list` would hand back, newest mark first, read without their summaries. */
+  private ids({ account, libraryId }: TitleFavouritesListProps): number[] {
     const locked = this.libraries.lockedIds()
-    const ids = this.db
+    return this.db
       .prepare<ByAccount, { item_id: number }>(
         `SELECT item_id FROM item_favourites WHERE account_id = @account
           ORDER BY added_at DESC, item_id DESC`,
       )
       .all({ account })
       .map((row) => row.item_id)
-      .filter((itemId) => this.isOpen({ itemId, locked }))
-    const summaries = this.metadata.summaries({ ids, libraryId: null })
+      .filter((itemId) => this.isHeldIn({ itemId, locked, libraryId }))
+  }
+
+  /** How many shows and seasons `list` would hand back, without reading them. */
+  count(props: TitleFavouritesListProps): number {
+    return this.ids(props).length
+  }
+
+  /**
+   * Every show and season `account` favoured that a library that is not
+   * locked holds, or that `libraryId` holds, most recently marked first.
+   */
+  list({ account, libraryId }: TitleFavouritesListProps): ItemSummary[] {
+    const ids = this.ids({ account, libraryId })
+    const summaries = this.metadata.summaries({ ids, libraryId })
     return ids.flatMap((id) => summaries.get(id) ?? [])
   }
 }

@@ -167,16 +167,20 @@ export const Scrubber = ({
             }}
           />
         ))}
+        {/* The rail's whole width, scaled to the played share, so playing moves no layout. */}
         <span
           className={styles.played}
-          style={{ width: percent({ time: shown, duration: total }) }}
+          style={{ transform: `scaleX(${share({ time: shown, duration: total }) / 100})` }}
         />
       </span>
+      {/* As wide as the scrubber, so a percent of its own width carries the head to its spot. */}
       <span
-        className={styles.head}
-        style={{ left: percent({ time: shown, duration: total }) }}
+        className={styles.headTrack}
+        style={{ transform: `translateX(${percent({ time: shown, duration: total })})` }}
         aria-hidden="true"
-      />
+      >
+        <span className={styles.head} />
+      </span>
       <span ref={tipRef} className={styles.tip} aria-hidden="true" hidden />
     </div>
   )

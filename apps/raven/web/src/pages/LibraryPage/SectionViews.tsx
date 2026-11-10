@@ -6,6 +6,7 @@ import {
   finishedNote,
   isScanning,
   ITEM_TYPES,
+  type ItemSummary,
   listsShows,
   jumpScale,
   type Library,
@@ -47,6 +48,7 @@ import { Loading } from '@/components/Skeleton/Skeleton'
 import { UnmatchedAlbumsSection } from '@/pages/LibraryPage/MusicSections'
 import { Spinner } from '@/components/Spinner/Spinner'
 import { SuggestedMovies } from '@/components/SuggestedMovies/SuggestedMovies'
+import { TitleCard } from '@/components/TitleCard/TitleCard'
 import { UnmatchedShows } from '@/components/UnmatchedShows/UnmatchedShows'
 import { cannotManageNote, useManagement } from '@/lib/management'
 import {
@@ -55,6 +57,7 @@ import {
   historyQuery,
   inProgressQuery,
   libraryFavouritesQuery,
+  libraryFavouriteTitlesQuery,
   metadataHealthQuery,
   sagasQuery,
   unmatchedQuery,
@@ -89,8 +92,17 @@ const whenEmpty =
   (list: readonly unknown[]): string | null =>
     list.length === 0 ? message : null
 
+/**
+ * What a tab's body reads off its query, or off several taken as one: a
+ * `UseQueryResult` is one, and `favouritesOf` folds two into one.
+ */
+type QueryState<T> =
+  | { isError: true; error: Error }
+  | { isError: false; isPending: true }
+  | { isError: false; isPending: false; data: T }
+
 type SectionBodyProps<T> = {
-  query: UseQueryResult<T>
+  query: QueryState<T>
   shape: ReactNode
   empty: (data: T) => string | null
   children: (data: T) => ReactNode
@@ -401,16 +413,52 @@ const InProgressSection = ({ library }: InProgressSectionProps) => {
 
 type FavouritesSectionProps = { library: Library }
 
-/** The library's favourites, most recently marked first. */
+type Favourites = { titles: ItemSummary[]; entries: PosterEntry[] }
+
+type FavouritesContentProps = Favourites & { library: Library }
+
+/** The favourite shows and seasons as title cards, then the favourite videos as the library lays them out. */
+const FavouritesContent = ({ library, titles, entries }: FavouritesContentProps) => (
+  <>
+    {titles.length > 0 && (
+      <ul className={styles.titles}>
+        {titles.map((item) => (
+          <TitleCard key={item.id} item={item} />
+        ))}
+      </ul>
+    )}
+    {entries.length > 0 && <EntryGrid library={library} entries={entries} />}
+  </>
+)
+
+type FavouritesQueries = {
+  titles: UseQueryResult<ItemSummary[]>
+  videos: UseQueryResult<PosterEntry[]>
+}
+
+/** Both favourites queries as one: either's failure, pending while either loads, else both lists. */
+const favouritesOf = ({ titles, videos }: FavouritesQueries): QueryState<Favourites> => {
+  if (titles.isError) return titles
+  if (videos.isError) return videos
+  if (titles.isPending || videos.isPending) return { isError: false, isPending: true }
+  return { isError: false, isPending: false, data: { titles: titles.data, entries: videos.data } }
+}
+
+/** The library's favourites, shows and seasons first, then videos, each most recently marked first. */
 const FavouritesSection = ({ library }: FavouritesSectionProps) => {
-  const query = useQuery(libraryFavouritesQuery(library.id))
+  const titles = useQuery(libraryFavouriteTitlesQuery(library.id))
+  const videos = useQuery(libraryFavouritesQuery(library.id))
   return (
     <SectionBody
-      query={query}
+      query={favouritesOf({ titles, videos })}
       shape={<MediaGridSkeleton posters={matchTypeFor(library.settings.kind) != null} />}
-      empty={whenEmpty(LIBRARY_COPY.favouritesEmpty(library.name))}
+      empty={(favourites) =>
+        favourites.titles.length === 0 && favourites.entries.length === 0
+          ? LIBRARY_COPY.favouritesEmpty(library.name)
+          : null
+      }
     >
-      {(entries) => <EntryGrid library={library} entries={entries} />}
+      {(favourites) => <FavouritesContent library={library} {...favourites} />}
     </SectionBody>
   )
 }

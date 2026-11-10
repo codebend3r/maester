@@ -33,8 +33,6 @@ describe('ImageEditor', () => {
     options: spyOn(api, 'getItemImages'),
     choose: spyOn(api, 'chooseItemImage'),
   }
-  const state = { done: 0 }
-
   type OpenProps = {
     overrides?: Parameters<typeof itemDetails>[0]
     itemKind?: MatchItemType
@@ -50,9 +48,6 @@ describe('ImageEditor', () => {
           libraries={[library({ id: 2, name: 'Films' }), library({ id: 3, name: '4K Films' })]}
           libraryId={2}
           itemKind={itemKind}
-          onDone={() => {
-            state.done += 1
-          }}
         />
       ),
     })
@@ -62,7 +57,6 @@ describe('ImageEditor', () => {
     cleanup()
     spies.options.mockReset()
     spies.choose.mockReset()
-    state.done = 0
   })
 
   it('offers every poster and backdrop, marking the current ones', async () => {
@@ -205,7 +199,7 @@ describe('ImageEditor', () => {
     expect(spies.choose.mock.calls[0]?.[0] ?? null).toMatchObject({ id: 40, libraryId: 3 })
   })
 
-  it('lists the linked files that share the pictures, and closes with Done', async () => {
+  it('lists the linked files that share the pictures', async () => {
     open({
       overrides: {
         versions: [
@@ -222,7 +216,27 @@ describe('ImageEditor', () => {
     expect(screen.getByText('Avatar (2009) {edition-Extended} Remux-2160p.mkv')).toBeInTheDocument()
     expect(screen.getByText('Extended')).toBeInTheDocument()
     expect(screen.getByText('Standard')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Done' }))
-    expect(state.done).toBe(1)
+  })
+
+  it('grows a pointed-at picture from the side that keeps it inside the grid', async () => {
+    type Box = { left: number; right: number; top: number; bottom: number }
+
+    const at = ({ left, right, top, bottom }: Box): DOMRect =>
+      DOMRect.fromRect({ x: left, y: top, width: right - left, height: bottom - top })
+    const rects = spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: HTMLElement) {
+        if (this.tagName === 'UL') return at({ left: 0, right: 300, top: 0, bottom: 200 })
+        // The second of three in the top row: neighbours on both sides, none above.
+        return at({ left: 100, right: 200, top: 0, bottom: 100 })
+      },
+    )
+    open()
+    const option = await screen.findByRole('button', { name: /^Poster: TMDB/ })
+    const item = option.closest('li')
+    expect(item).toHaveAttribute('data-zoom-x', 'center')
+    await userEvent.hover(option)
+    expect(item).toHaveAttribute('data-zoom-x', 'center')
+    expect(item).toHaveAttribute('data-zoom-y', 'start')
+    rects.mockRestore()
   })
 })

@@ -63,50 +63,51 @@ describe('MetadataEditor', () => {
     expect(screen.getAllByRole('button', { name: 'Split apart' })).toHaveLength(1)
   })
 
-  it('shows each field with what TMDB says beneath it', async () => {
+  it('shows the title and year with what TMDB says beneath them', async () => {
     open()
     expect(await screen.findByLabelText('Title')).toHaveValue('Heat')
     expect(screen.getByLabelText('Year')).toHaveValue(1995)
-    expect(screen.getByLabelText('Tagline')).toHaveValue('A Los Angeles crime saga')
-    expect(screen.getByText('TMDB: nothing')).toBeInTheDocument()
+    expect(screen.getByText('TMDB: Heat')).toBeInTheDocument()
+    expect(screen.getByText('TMDB: 1995')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Use TMDB’s' })).toBeNull()
   })
 
-  it('puts the file name’s edition after the title with the wand, and sends only what changed', async () => {
+  it('shows the rating, tagline and summary as words, with no box to type in', async () => {
+    open()
+    await screen.findByLabelText('Title')
+    expect(screen.getAllByRole('textbox')).toHaveLength(1)
+    expect(screen.getByRole('spinbutton')).toHaveValue(1995)
+    expect(screen.getByText('Content rating')).toBeInTheDocument()
+    expect(screen.getByText('R')).toBeInTheDocument()
+    expect(screen.getByText('A Los Angeles crime saga')).toBeInTheDocument()
+    expect(screen.getByText('nothing')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Tagline')).toBeNull()
+    expect(screen.queryByText(/^TMDB: A Los Angeles/)).toBeNull()
+  })
+
+  it('puts the file name’s edition after the title with the wand, and sends the title and year alone', async () => {
     open()
     await screen.findByLabelText('Title')
     await userEvent.click(
       screen.getByRole('button', { name: 'Add the edition from the file name: Extended Cut' }),
     )
     expect(screen.getByLabelText('Title')).toHaveValue('Heat (Extended Cut)')
-    await userEvent.clear(screen.getByLabelText('Tagline'))
-    await userEvent.type(screen.getByLabelText('Tagline'), 'Longer.')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(spies.save).toHaveBeenCalledTimes(1))
     expect(spies.save.mock.calls[0]?.[0]).toEqual({
       id: 40,
-      change: {
-        title: 'Heat (Extended Cut)',
-        year: null,
-        contentRating: null,
-        tagline: 'Longer.',
-        summary: null,
-      },
+      change: { title: 'Heat (Extended Cut)', year: null },
     })
     await waitFor(() => expect(done.count).toBe(1))
   })
 
-  it('sends an emptied field as empty, so TMDB’s words do not come back, and keeps an empty one empty', async () => {
+  it('sends an emptied year as 0, so TMDB’s does not come back', async () => {
     open()
     await screen.findByLabelText('Title')
-    await userEvent.clear(screen.getByLabelText('Tagline'))
     await userEvent.clear(screen.getByLabelText('Year'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(spies.save).toHaveBeenCalledTimes(1))
-    expect(spies.save.mock.calls[0]?.[0]).toEqual({
-      id: 40,
-      change: { title: null, year: 0, contentRating: null, tagline: '', summary: null },
-    })
+    expect(spies.save.mock.calls[0]?.[0]).toEqual({ id: 40, change: { title: null, year: 0 } })
   })
 
   it('saves nothing with the title emptied', async () => {

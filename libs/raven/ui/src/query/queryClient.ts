@@ -120,6 +120,8 @@ export const queryKeys = {
   /** The account's binge list, under every host's own account suffix. */
   bingeState: ['binge-state'],
   favouriteTitles: ['favourites', 'titles'],
+  /** One library's favourite shows and seasons, under the titles so one edit and one refetch reach every list. */
+  libraryFavouriteTitles: (libraryId: number) => ['favourites', 'titles', libraryId],
   /** The account's favourite albums and artists, under the favourites so whatever reads them again reads these too. */
   favouriteAlbums: ['favourites', 'albums'],
   favouriteArtists: ['favourites', 'artists'],

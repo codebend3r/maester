@@ -24,6 +24,15 @@
   color: var(--color-birch);
 }
 
+// The bar and its sweep share one cell, the sweep over the bar.
+.track {
+  grid-area: bar;
+  display: grid;
+  grid-template-areas: 'bar';
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
 .bar {
   grid-area: bar;
   width: 100%;
@@ -51,19 +60,10 @@
 
 /*
  * With nothing to measure against, a short stretch of the fill sweeps across,
- * so a long walk still shows it is moving.
+ * so a long walk still shows it is moving. It is a layer over the bar, slid
+ * by the compositor; a progress element can hold no layer of its own.
  */
 .bar:indeterminate {
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--color-leaf-bright) 50%,
-    transparent 100%
-  );
-  background-repeat: no-repeat;
-  background-size: 40% 100%;
-  background-position: 0 0;
-
   &::-webkit-progress-bar {
     background: transparent;
   }
@@ -73,19 +73,37 @@
   }
 }
 
+.sweep {
+  grid-area: bar;
+  width: 40%;
+  border-radius: var(--radius-pill);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-leaf-bright) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+// A bar that measures needs no sweep.
+.bar:not(:indeterminate) + .sweep {
+  display: none;
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  .bar:indeterminate {
+  .sweep {
     animation: sweep 1.4s var(--ease-out) infinite;
   }
 }
 
 @keyframes sweep {
   from {
-    background-position: -40% 0;
+    translate: -100% 0;
   }
 
   to {
-    background-position: 140% 0;
+    translate: 250% 0;
   }
 }
 

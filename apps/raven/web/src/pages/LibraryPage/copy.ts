@@ -37,7 +37,7 @@ export const LIBRARY_COPY = {
   inProgressUnsaved: (name: string) =>
     `${name} does not save where videos stop, so nothing waits here. Edit can turn that on.`,
   favouritesEmpty: (name: string) =>
-    `No favourites in ${name} yet. Open a video's menu, from the button in its corner or a right click, and choose Favourite.`,
+    `No favourites in ${name} yet. Open a video's menu, from the button in its corner or a right click, and choose Favourite, or press the heart on a show's page.`,
   sagasEmpty: (name: string) =>
     `No sagas in ${name} yet. One shows here once two movies or more from the same TMDB collection are in the library.`,
   title: 'title',

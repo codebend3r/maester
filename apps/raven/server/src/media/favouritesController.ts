@@ -31,7 +31,7 @@ export class FavouritesController {
   /** Every favourite show and season. */
   @Get('titles')
   listTitles(@Req() request: FastifyRequest): ItemSummary[] {
-    return this.titles.list({ account: this.accounts.keyOf({ request }) })
+    return this.titles.list({ account: this.accounts.keyOf({ request }), libraryId: null })
   }
 
   /** Every favourite album, most recently marked first. */

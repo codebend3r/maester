@@ -99,12 +99,15 @@ type ScanningProps = ScanViewProps
 const Scanning = ({ note, bar }: ScanningProps) => (
   <div className={styles.scanning}>
     <span className={styles.note}>{note}</span>
-    <progress
-      className={styles.bar}
-      max={bar.max}
-      value={bar.value}
-      aria-label={SCAN_STATUS_COPY.progress}
-    />
+    <span className={styles.track}>
+      <progress
+        className={styles.bar}
+        max={bar.max}
+        value={bar.value}
+        aria-label={SCAN_STATUS_COPY.progress}
+      />
+      <span className={styles.sweep} aria-hidden="true" />
+    </span>
   </div>
 )
 

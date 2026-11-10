@@ -1,0 +1,108 @@
+/*
+ * A dialog at a size of its own: the header over a hairline, then a body that
+ * scrolls on its own, so the X and Full screen never scroll away. It lets go
+ * of the measure elements.scss caps a dialog at, as editors want the room.
+ */
+.modal {
+  width: min(60rem, calc(100vw - 2 * var(--space-3)));
+  max-width: none;
+  max-height: calc(100dvh - 2 * var(--space-3));
+  padding: 0;
+  overflow: hidden;
+
+  &[open] {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'header'
+      'body';
+  }
+}
+
+// Full screen: the whole window, edge to edge, with no frame.
+.full {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.header {
+  grid-area: header;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'close title size';
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.close {
+  grid-area: close;
+}
+
+.title {
+  grid-area: title;
+  font-size: var(--font-size-xl);
+  overflow-wrap: anywhere;
+}
+
+.size {
+  grid-area: size;
+}
+
+.body {
+  grid-area: body;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  @media (max-width: 30rem) {
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
+}
+
+/*
+ * It rises in as it opens, and again as it changes size: the size itself
+ * jumps, and only the compositor's transform and opacity animate.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .modal[open] {
+    animation: modal-in 200ms var(--ease-out);
+  }
+
+  .full[open] {
+    animation: modal-fill 200ms var(--ease-out);
+  }
+
+  .modal[open]::backdrop {
+    animation: scrim-in 200ms var(--ease-out);
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
+@keyframes modal-fill {
+  from {
+    opacity: 0.6;
+    scale: 0.98;
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
