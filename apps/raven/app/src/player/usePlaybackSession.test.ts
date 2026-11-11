@@ -21,10 +21,11 @@ const LADDER: readonly PlaybackMode[] = [direct, remux, transcode]
 const RESUME_AT = 3000
 const MKV_PROBLEM = "The MKV container isn't supported here."
 
-const SOURCED: SourceOutcome = {
+const SOURCED = {
   ok: true,
   source: { uri: 'http://nas:8080/api/media/20/file', headers: {} },
-}
+  sidecars: [],
+} as const satisfies SourceOutcome & { sidecars: readonly [] }
 
 const LOCKED: AccessRefusal = {
   ok: false,

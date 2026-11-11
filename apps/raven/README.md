@@ -593,7 +593,7 @@ xcrun simctl install booted apps/raven/app/build/ios/Build/Products/Release-ipho
 bun run app:e2e
 ```
 
-Maestro's driver installs only on iPhone and iPad simulators, so those flows run on an iPhone, while an XCUITest presses the Siri Remote's buttons on Apple TV (the [app README](app/README.md#end-to-end) has its steps). On Android TV Maestro drives the emulator with the remote's keys (`bun run app:e2e:android-tv`, with steps in the app README). In the PR checks, three jobs run on their own runners: `📺 App on Apple TV` builds the Apple TV simulator app and runs its remote flow against a fixture server, `📱 App on iPhone and iPad` builds the iPhone app and runs its flows against another fixture server, and `📺 App on Android TV` builds the APK and runs the remote flows on an emulator against its own fixture server. All three stand behind `🖥️ Desktop`.
+Maestro's driver installs only on iPhone and iPad simulators, so those flows run on an iPhone, while an XCUITest presses the Siri Remote's buttons on Apple TV (the [app's end to end notes](app/docs/end-to-end.md) have its steps). On Android TV Maestro drives the emulator with the remote's keys (`bun run app:e2e:android-tv`, with steps there). In the PR checks, three jobs run on their own runners: `📺 App on Apple TV` builds the Apple TV simulator app and runs its remote flow against a fixture server, `📱 App on iPhone and iPad` builds the iPhone app and runs its flows against another fixture server, and `📺 App on Android TV` builds the APK and runs the remote flows on an emulator against its own fixture server. All three stand behind `🖥️ Desktop`.
 
 ## Layout
 
@@ -679,4 +679,4 @@ raven app imports `@raven/core` and `@raven/ui/headless` and answers the direct-
 - Raven runs only on Apple Silicon Macs: no Intel Macs, Windows or Linux yet.
 - Raven is signed ad hoc, not with a Developer ID or notarized, so it needs Open Anyway once and cannot update itself.
 - raven app has no TestFlight, App Store or Play Store build: Apple devices install it from Xcode and reinstall it weekly, and Android TV sideloads the APK.
-- raven app's other known gaps are in its [README](app/README.md#known-gaps).
+- raven app's other known gaps are in its [device notes](app/docs/device-checklist.md#known-gaps).

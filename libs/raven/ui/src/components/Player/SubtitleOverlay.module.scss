@@ -1,6 +1,8 @@
 /*
  * Subtitles sit low over the picture and rise clear of the controls when
- * those show, as they do on YouTube.
+ * those show, as they do on YouTube. Every cue is set in the display face,
+ * in the account's colour and size, over dark glass with a dark edge, so
+ * each of the four colours reads over any picture.
  */
 .overlay {
   grid-area: stage;
@@ -28,10 +30,12 @@
   padding: 0.1em 0.45em;
   border-radius: var(--radius-sm);
   background: var(--color-picture-glass);
-  color: var(--color-on-picture);
-  font-family: var(--font-body);
+  color: var(--caption-colour, var(--color-on-picture));
+  font-family: var(--font-display);
   font-size: calc(clamp(1rem, 2.4vw, 2rem) * var(--caption-scale, 1));
-  font-weight: 500;
+  // The display face has one weight, and a faked bold smears its serifs.
+  font-synthesis-weight: none;
+  font-weight: 400;
   line-height: 1.3;
   text-align: center;
   text-shadow: var(--shadow-text);
@@ -41,10 +45,6 @@
 
 .italic {
   font-style: italic;
-}
-
-.bold {
-  font-weight: 700;
 }
 
 .underline {

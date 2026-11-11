@@ -1,3 +1,4 @@
+import { CAPTION_SIZES, type CaptionSize } from '@/contract'
 import { KEYS } from '@/keys'
 
 export const PLAYER_ACTIONS = {
@@ -174,16 +175,16 @@ export const stepSkip = ({ last, direction, at }: StepSkipProps): SkipStep => {
   return { direction, seconds, at }
 }
 
-const CAPTION_SCALES: readonly number[] = [0.75, 1, 1.25, 1.5, 1.75, 2]
+const CAPTION_SIZE_STEPS: readonly CaptionSize[] = Object.values(CAPTION_SIZES)
 
-type StepCaptionScaleProps = {
-  current: number
+type StepCaptionSizeProps = {
+  current: CaptionSize
   direction: 1 | -1
 }
 
-export const stepCaptionScale = ({ current, direction }: StepCaptionScaleProps): number => {
-  const index = CAPTION_SCALES.findIndex((scale) => scale >= current - 0.001)
-  const from = index < 0 ? CAPTION_SCALES.length - 1 : index
-  const next = Math.max(0, Math.min(CAPTION_SCALES.length - 1, from + direction))
-  return CAPTION_SCALES[next] ?? current
+/** The subtitle size one step from `current`, stopping at the smallest and the largest. */
+export const stepCaptionSize = ({ current, direction }: StepCaptionSizeProps): CaptionSize => {
+  const from = CAPTION_SIZE_STEPS.indexOf(current)
+  const next = Math.max(0, Math.min(CAPTION_SIZE_STEPS.length - 1, from + direction))
+  return CAPTION_SIZE_STEPS[next] ?? current
 }

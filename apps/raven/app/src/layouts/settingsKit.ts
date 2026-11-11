@@ -40,6 +40,14 @@ export type SettingsLineProps = {
   isAlert?: boolean
 }
 
+/** A fact read, not set, here: its name at the start and its value at the end. */
+export type SettingsFactProps = {
+  label: string
+  value: string
+  /** Sets the value in the fixed-width face, as an address or a port is read. */
+  isCode?: boolean
+}
+
 /** A setting picked from a list: its row shows the label and what is chosen now. */
 export type SettingsChoiceProps<K extends string> = Pick<
   PickerProps<K>,
@@ -53,5 +61,6 @@ export type SettingsKit = {
   SettingsToggle: (props: SettingsToggleProps) => ReactNode
   SettingsButton: (props: SettingsButtonProps) => ReactNode
   SettingsLine: (props: SettingsLineProps) => ReactNode
+  SettingsFact: (props: SettingsFactProps) => ReactNode
   SettingsChoice: <K extends string>(props: SettingsChoiceProps<K>) => ReactNode
 }

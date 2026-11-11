@@ -1,4 +1,7 @@
 import {
+  CAPTION_COLOURS,
+  CAPTION_SIZES,
+  type CaptionStyle,
   PICTURE_SUBTITLES,
   type PlaybackMode,
   SPEEDS,
@@ -9,7 +12,11 @@ import {
 } from '@raven/core'
 import { type ComponentType, type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
-import { SETTINGS_MENU_COPY } from '@/components/Player/copy'
+import {
+  CAPTION_COLOUR_NAMES,
+  CAPTION_SIZE_NAMES,
+  SETTINGS_MENU_COPY,
+} from '@/components/Player/copy'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { stepDownNote } from '@/components/Player/playbackFacts'
 import { playingAudio } from '@/components/Player/selection'
@@ -56,6 +63,27 @@ const Option = ({ name, checked, disabled, isInline, label, details, onSelect }:
   </label>
 )
 
+type RowChoice = { key: string; label: string; isChecked: boolean; onSelect: () => void }
+
+type ChoiceRowProps = {
+  /** Names the radio group, so the arrow keys move within it. */
+  name: string
+  legend: string
+  choices: readonly RowChoice[]
+}
+
+/** A row of short choices side by side under their legend: the speeds, autoplay, the subtitle look. */
+const ChoiceRow = ({ name, legend, choices }: ChoiceRowProps) => (
+  <fieldset className={styles.group}>
+    <legend className={styles.legend}>{legend}</legend>
+    <div className={styles.choices}>
+      {choices.map(({ key, label, isChecked, onSelect }) => (
+        <Option key={key} name={name} checked={isChecked} label={label} onSelect={onSelect} />
+      ))}
+    </div>
+  </fieldset>
+)
+
 type GroupProps = {
   /** Names the radio group; the menu's heading where the group is the whole menu. */
   labelledBy: string
@@ -64,6 +92,9 @@ type GroupProps = {
   subtitleStatus: SubtitleStatus
   /** The ways the server offers; its `pictures` says whether a picture subtitle can be picked. */
   choices: PlayChoices | null
+  /** How the account's subtitles look, on every video. */
+  captionStyle: CaptionStyle
+  onPickCaption: (change: Partial<CaptionStyle>) => void
 }
 
 const tracksNoteOf = ({ tracksFailed, tracksPending }: TrackSelection): string | null => {
@@ -121,37 +152,79 @@ const AudioGroup = (group: AudioGroupProps) => {
 
 type SubtitleGroupProps = GroupProps
 
-const SubtitleGroup = ({ labelledBy, selection, subtitleStatus, choices }: SubtitleGroupProps) => {
+type CaptionLookProps = Pick<GroupProps, 'labelledBy' | 'captionStyle' | 'onPickCaption'>
+
+/** The account's subtitle size and colour: one look for every video, saved as it is picked. */
+const CaptionLook = ({ labelledBy, captionStyle, onPickCaption }: CaptionLookProps) => (
+  <>
+    <ChoiceRow
+      name={`${labelledBy}-caption-size`}
+      legend={SETTINGS_MENU_COPY.subtitleSize}
+      choices={Object.values(CAPTION_SIZES).map((size) => ({
+        key: size,
+        label: CAPTION_SIZE_NAMES[size],
+        isChecked: size === captionStyle.size,
+        onSelect: () => onPickCaption({ size }),
+      }))}
+    />
+    <ChoiceRow
+      name={`${labelledBy}-caption-colour`}
+      legend={SETTINGS_MENU_COPY.subtitleColour}
+      choices={Object.values(CAPTION_COLOURS).map((colour) => ({
+        key: colour,
+        label: CAPTION_COLOUR_NAMES[colour],
+        isChecked: colour === captionStyle.colour,
+        onSelect: () => onPickCaption({ colour }),
+      }))}
+    />
+  </>
+)
+
+const SubtitleGroup = ({
+  labelledBy,
+  selection,
+  subtitleStatus,
+  choices,
+  captionStyle,
+  onPickCaption,
+}: SubtitleGroupProps) => {
   const { tracks, subtitle, pickSubtitle } = selection
   const pictures = choices?.pictures ?? PICTURE_SUBTITLES.hidden
   const subtitleId = subtitle?.id ?? null
   const tracksNote = tracksNoteOf(selection)
   const subtitleNote = SUBTITLE_STATUS[subtitleStatus]
   return (
-    <fieldset className={styles.group} aria-labelledby={labelledBy}>
-      <Option
-        name={`${labelledBy}-subtitles`}
-        checked={subtitleId == null}
-        label={SETTINGS_MENU_COPY.off}
-        onSelect={() => pickSubtitle(null)}
+    <>
+      <fieldset className={styles.group} aria-labelledby={labelledBy}>
+        <Option
+          name={`${labelledBy}-subtitles`}
+          checked={subtitleId == null}
+          label={SETTINGS_MENU_COPY.off}
+          onSelect={() => pickSubtitle(null)}
+        />
+        {(tracks?.subtitles ?? []).map((track) => {
+          const label = subtitleLabel({ track, pictures })
+          return (
+            <Option
+              key={track.id}
+              name={`${labelledBy}-subtitles`}
+              checked={track.id === subtitleId}
+              disabled={!isShowableSubtitle({ track, pictures })}
+              label={label.name}
+              details={label.details}
+              onSelect={() => pickSubtitle(track.id)}
+            />
+          )
+        })}
+        {!!tracksNote && tracks == null && <p className={styles.note}>{tracksNote}</p>}
+        {!!subtitleNote && <output className={styles.note}>{subtitleNote}</output>}
+      </fieldset>
+      <CaptionLook
+        labelledBy={labelledBy}
+        captionStyle={captionStyle}
+        onPickCaption={onPickCaption}
       />
-      {(tracks?.subtitles ?? []).map((track) => {
-        const label = subtitleLabel({ track, pictures })
-        return (
-          <Option
-            key={track.id}
-            name={`${labelledBy}-subtitles`}
-            checked={track.id === subtitleId}
-            disabled={!isShowableSubtitle({ track, pictures })}
-            label={label.name}
-            details={label.details}
-            onSelect={() => pickSubtitle(track.id)}
-          />
-        )
-      })}
-      {!!tracksNote && tracks == null && <p className={styles.note}>{tracksNote}</p>}
-      {!!subtitleNote && <output className={styles.note}>{subtitleNote}</output>}
-    </fieldset>
+    </>
   )
 }
 
@@ -185,20 +258,16 @@ type SpeedGroupProps = {
 }
 
 const SpeedGroup = ({ name, rate, onPickRate }: SpeedGroupProps) => (
-  <fieldset className={styles.group}>
-    <legend className={styles.legend}>{SETTINGS_MENU_COPY.speed}</legend>
-    <div className={styles.speeds}>
-      {SPEEDS.map((speed) => (
-        <Option
-          key={speed}
-          name={`${name}-speed`}
-          checked={speed === rate}
-          label={speed === 1 ? SETTINGS_MENU_COPY.normalSpeed : SETTINGS_MENU_COPY.rate(speed)}
-          onSelect={() => onPickRate(speed)}
-        />
-      ))}
-    </div>
-  </fieldset>
+  <ChoiceRow
+    name={`${name}-speed`}
+    legend={SETTINGS_MENU_COPY.speed}
+    choices={SPEEDS.map((speed) => ({
+      key: String(speed),
+      label: speed === 1 ? SETTINGS_MENU_COPY.normalSpeed : SETTINGS_MENU_COPY.rate(speed),
+      isChecked: speed === rate,
+      onSelect: () => onPickRate(speed),
+    }))}
+  />
 )
 
 type AutoplayGroupProps = {
@@ -209,23 +278,24 @@ type AutoplayGroupProps = {
 
 /** Whether what is up next starts by itself once the video ends. */
 const AutoplayGroup = ({ name, autoplay, onPickAutoplay }: AutoplayGroupProps) => (
-  <fieldset className={styles.group}>
-    <legend className={styles.legend}>{SETTINGS_MENU_COPY.autoplay}</legend>
-    <div className={styles.speeds}>
-      <Option
-        name={`${name}-autoplay`}
-        checked={autoplay}
-        label={SETTINGS_MENU_COPY.on}
-        onSelect={() => onPickAutoplay(true)}
-      />
-      <Option
-        name={`${name}-autoplay`}
-        checked={!autoplay}
-        label={SETTINGS_MENU_COPY.off}
-        onSelect={() => onPickAutoplay(false)}
-      />
-    </div>
-  </fieldset>
+  <ChoiceRow
+    name={`${name}-autoplay`}
+    legend={SETTINGS_MENU_COPY.autoplay}
+    choices={[
+      {
+        key: SETTINGS_MENU_COPY.on,
+        label: SETTINGS_MENU_COPY.on,
+        isChecked: autoplay,
+        onSelect: () => onPickAutoplay(true),
+      },
+      {
+        key: SETTINGS_MENU_COPY.off,
+        label: SETTINGS_MENU_COPY.off,
+        isChecked: !autoplay,
+        onSelect: () => onPickAutoplay(false),
+      },
+    ]}
+  />
 )
 
 type MenuBodyProps = GroupProps & {
@@ -301,6 +371,8 @@ type SettingsMenuProps = {
   steppedDown?: StepDown | null
   /** The ways the file can play, when the viewer may pick one; a local file has one. */
   choices?: PlayChoices | null
+  captionStyle: CaptionStyle
+  onPickCaption: (change: Partial<CaptionStyle>) => void
   onPickRate: (rate: number) => void
   autoplay: boolean
   onPickAutoplay: (isOn: boolean) => void
@@ -311,8 +383,8 @@ type SettingsMenuProps = {
 }
 
 /**
- * The menu a pill opens over the picture: the audio tracks, the subtitles,
- * or how the file is reaching the browser, with Playback info for the
+ * The menu a pill opens over the picture: the audio tracks, the subtitles
+ * with the account's size and colour for them, or how the file is reaching the browser, with Playback info for the
  * detail, a host's handoff, and the speed and autoplay under them. Each choice is a
  * native radio group, so the arrow keys, the space bar and screen readers
  * all work as they do anywhere else.
@@ -326,6 +398,8 @@ export const SettingsMenu = ({
   mode,
   steppedDown = null,
   choices = null,
+  captionStyle,
+  onPickCaption,
   onPickRate,
   autoplay,
   onPickAutoplay,
@@ -371,6 +445,8 @@ export const SettingsMenu = ({
             rate={rate}
             steppedDown={steppedDown}
             choices={choices}
+            captionStyle={captionStyle}
+            onPickCaption={onPickCaption}
             onPickRate={onPickRate}
             autoplay={autoplay}
             onPickAutoplay={onPickAutoplay}

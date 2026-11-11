@@ -1087,8 +1087,8 @@ describe('createPlayerService', () => {
       await service.handle({ type: 'volume', volume: 0.1234, muted: true })
       await service.handle({ type: 'speed', rate: 9 })
       await service.handle({ type: 'speed', rate: 0.1 })
-      await service.handle({ type: 'subtitleScale', scale: 7 })
-      await service.handle({ type: 'subtitleScale', scale: 0 })
+      await service.handle({ type: 'subtitleStyle', style: { size: 'small', colour: 'white' } })
+      await service.handle({ type: 'subtitleStyle', style: { size: 'largest', colour: 'yellow' } })
       expect(mpv.log).toEqual([
         'set volume 100',
         'set mute false',
@@ -1096,8 +1096,10 @@ describe('createPlayerService', () => {
         'set mute true',
         'set speed 4',
         'set speed 0.25',
-        'set sub-scale 3',
-        'set sub-scale 0.5',
+        'set sub-scale 0.8',
+        'set sub-color #ffffff',
+        'set sub-scale 1.6',
+        'set sub-color #ffe14d',
       ])
     })
 

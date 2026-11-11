@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, jest } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
 import { act, waitFor } from '@testing-library/react'
-import { NOTIFICATION_TONES, type Notification, SERVER_EVENT_TYPES } from '@raven/core'
+import {
+  DEFAULT_CAPTION_STYLE,
+  NOTIFICATION_TONES,
+  type Notification,
+  SERVER_EVENT_TYPES,
+} from '@raven/core'
 import { queryKeys } from '@/query/queryClient'
 import {
   EVENTS_RETRY_MS,
@@ -71,10 +76,10 @@ const fakeTokens = () => {
   return { onAccessTokenChange, change, listeners }
 }
 
-type SetUpProps = { tokens?: ReturnType<typeof fakeTokens> }
+type SetUpProps = { tokens?: ReturnType<typeof fakeTokens>; isWatching?: () => boolean }
 
 /** The hook mounted over a cache holding `HELD`, with every stream it opens kept. */
-const setUp = ({ tokens }: SetUpProps = {}) => {
+const setUp = ({ tokens, isWatching }: SetUpProps = {}) => {
   const { api } = recordingApi({ body: null })
   const opened: Array<ReturnType<typeof fakeSource>> = []
   const notified: Notification[] = []
@@ -87,12 +92,13 @@ const setUp = ({ tokens }: SetUpProps = {}) => {
     },
     onAccessTokenChange: tokens?.onAccessTokenChange,
     onNotification: (notification) => notified.push(notification),
+    isWatching,
   })
   const client = new QueryClient()
   HELD.forEach((key) => client.setQueryData(key, []))
   const hook = renderQueryHook({ client, hook: () => useServerEvents() })
   const stale = () => HELD.filter((key) => client.getQueryState(key)?.isInvalidated ?? false)
-  return { api, hook, opened, stale, notified }
+  return { api, hook, opened, stale, notified, client }
 }
 
 describe('useServerEvents', () => {
@@ -144,6 +150,51 @@ describe('useServerEvents', () => {
       data: JSON.stringify({ type: SERVER_EVENT_TYPES.binge }),
     })
     await waitFor(() => expect(stale()).toEqual([queryKeys.home]))
+  })
+
+  it("reads the account's subtitle look again when another device changes it, and nothing else", async () => {
+    const { opened, stale, client } = setUp()
+    client.setQueryData(queryKeys.captionStyle, DEFAULT_CAPTION_STYLE)
+    opened[0]!.emit({
+      type: SERVER_STREAM_EVENTS.message,
+      data: JSON.stringify({ type: SERVER_EVENT_TYPES.captions }),
+    })
+    await waitFor(() =>
+      expect(client.getQueryState(queryKeys.captionStyle)?.isInvalidated).toBe(true),
+    )
+    expect(stale()).toEqual([])
+  })
+
+  describe('while this device plays a video', () => {
+    it('leaves a viewing change for the player to read again when it closes', async () => {
+      const playing = { isWatching: true }
+      const { opened, stale } = setUp({ isWatching: () => playing.isWatching })
+      const viewing = {
+        type: SERVER_STREAM_EVENTS.message,
+        data: JSON.stringify({ type: SERVER_EVENT_TYPES.viewing }),
+      }
+      opened[0]!.emit(viewing)
+      await act(async () => {})
+      expect(stale()).toEqual([])
+      playing.isWatching = false
+      opened[0]!.emit(viewing)
+      await waitFor(() => expect(stale()).toHaveLength(HELD.length))
+    })
+
+    it('still follows every other event', async () => {
+      const { opened, stale, client } = setUp({ isWatching: () => true })
+      client.setQueryData(queryKeys.captionStyle, DEFAULT_CAPTION_STYLE)
+      opened[0]!.emit({
+        type: SERVER_STREAM_EVENTS.message,
+        data: JSON.stringify({ type: SERVER_EVENT_TYPES.binge }),
+      })
+      opened[0]!.emit({
+        type: SERVER_STREAM_EVENTS.message,
+        data: JSON.stringify({ type: SERVER_EVENT_TYPES.captions }),
+      })
+      await waitFor(() => expect(stale()).toEqual([queryKeys.home]))
+      expect(client.getQueryState(queryKeys.captionStyle)?.isInvalidated).toBe(true)
+    })
   })
 
   it('hands the host a notification the server sent, to show as a toast', async () => {

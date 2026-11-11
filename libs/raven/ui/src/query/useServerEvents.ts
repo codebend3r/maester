@@ -9,6 +9,7 @@ import {
 import { useEffect } from 'react'
 import {
   afterBingeEvent,
+  afterCaptionStyle,
   afterLibraryEvent,
   afterNotification,
   afterReconnect,
@@ -65,6 +66,8 @@ const follow = ({ queryClient, event, onNotification }: FollowProps): Promise<un
       return afterWatched(queryClient)
     case SERVER_EVENT_TYPES.binge:
       return afterBingeEvent(queryClient)
+    case SERVER_EVENT_TYPES.captions:
+      return afterCaptionStyle(queryClient)
     // Logged already by the server, so it shows as it is and joins the log on screen.
     case SERVER_EVENT_TYPES.notification:
       onNotification(event.notification)
@@ -91,31 +94,48 @@ const NO_ACCESS_TOKEN: AccessTokenChanges = () => () => undefined
 /** A host that shows no toasts; the notification is still on the account's log. */
 const NO_TOASTS: OnNotification = () => undefined
 
+/** Whether this device is playing a video right now. */
+type IsWatching = () => boolean
+
+/** A host that never says it is playing, so every viewing change is read again. */
+const NEVER_WATCHING: IsWatching = () => false
+
 type ServerEventsForProps = {
   api: ApiClient
   openEvents: (url: string) => ServerEventSource
   onAccessTokenChange?: AccessTokenChanges
   onNotification?: OnNotification
+  /**
+   * Whether this device is playing a video now. While it is, a `viewing` event is not followed:
+   * its own progress saves come back as that event every few seconds, and reading every listing
+   * again each time stalls a slow device. The player reads them again when it closes.
+   */
+  isWatching?: IsWatching
 }
 
 /**
  * The server-event hook over one server's `api`, listening on what
  * `openEvents` opens at its event address. A host whose stream travels with
  * an access token passes `onAccessTokenChange`, so a new token replaces the
- * open stream and signing out closes it.
+ * open stream and signing out closes it. A host that plays video passes
+ * `isWatching`, so the viewing changes its own player causes are left for the
+ * player's close to read again (`afterWatching`), not followed one by one.
  */
 export const serverEventsFor = ({
   api,
   openEvents,
   onAccessTokenChange = NO_ACCESS_TOKEN,
   onNotification = NO_TOASTS,
+  isWatching = NEVER_WATCHING,
 }: ServerEventsForProps) => {
   /**
    * Keeps the browsing pages in step with the server as it changes: a
    * library whose folders changed is read again, its listings and counts
    * with it, and whatever pages and favourites its videos show on; a spot,
    * play or mark from another of the account's devices reads Continue
-   * watching and the listings again, and a binge change the list and Home. The
+   * watching and the listings again, unless this device is playing a video,
+   * whose own saves those mostly are; a binge change reads the list and Home,
+   * and a change of subtitle look the account's look. The
    * source reconnects on its own when the stream drops, and everything is
    * read again once it is back, for the changes sent while it was down. A
    * stream the source closed is opened again after `EVENTS_RETRY_MS`, and a
@@ -138,8 +158,10 @@ export const serverEventsFor = ({
         connection.source = source
         source.addEventListener(SERVER_STREAM_EVENTS.message, ({ data }) => {
           const event = typeof data === 'string' ? parseServerEvent(data) : null
+          if (event === null) return
+          if (event.type === SERVER_EVENT_TYPES.viewing && isWatching()) return
           // A read that fails shows on its own query.
-          if (event) follow({ queryClient, event, onNotification }).catch(() => undefined)
+          follow({ queryClient, event, onNotification }).catch(() => undefined)
         })
         source.addEventListener(SERVER_STREAM_EVENTS.error, () => {
           connection.isDropped = true

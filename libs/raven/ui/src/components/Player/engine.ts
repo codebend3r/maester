@@ -1,5 +1,6 @@
 import {
   type ApiClient,
+  type CaptionStyle,
   type MediaItem,
   type MediaTracks,
   type PlayerCommand,
@@ -21,7 +22,8 @@ export type EngineActions = {
   setRate: (rate: number) => void
   setAudio: (index: number | null) => void
   setSubtitle: (id: string | null) => void
-  setSubtitleScale: (scale: number) => void
+  /** Saves the account's subtitle size, colour or both. */
+  setCaptionStyle: (change: Partial<CaptionStyle>) => void
   /** Only an engine with a video info overlay has one. */
   toggleStats?: () => void
 }
@@ -44,6 +46,8 @@ export type EngineHandle = {
   duration: number | null
   position: RefObject<number>
   tracks: MediaTracks | null
+  /** How the account's subtitles look, whoever draws them. */
+  captionStyle: CaptionStyle
   actions: EngineActions
   surface: ReactNode
   focusSurface: () => void

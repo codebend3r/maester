@@ -18,6 +18,7 @@ export const NativeStage = ({ engine, onBack, onFailure }: NativeStageProps) => 
   const native = useNativeEngine({
     player: engine.player,
     source: engine.source,
+    api: engine.file?.api ?? null,
     onFailure,
     toggleFullscreen: fullscreen.toggle,
   })

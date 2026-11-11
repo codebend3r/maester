@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
+  CAPTION_COLOUR_VALUES,
+  DEFAULT_CAPTION_STYLE,
   APP_CALL_METHODS,
   APP_CLIENT_CALLS,
   DEFAULT_THEME,
@@ -49,6 +51,7 @@ import {
 } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 import { appThemeOf } from '@/theme/appTheme'
+import { DISPLAY_FONT } from '@/theme/fonts'
 import type * as NavigationFocus from '@/test/navigationFocus'
 import { askedFor, resetTestScreen } from '@/test/navigationFocus'
 import type * as RemoteModule from '@/test/tvRemote'
@@ -311,17 +314,20 @@ describe('Player on Android TV', () => {
     expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
   })
 
-  it('plays a file with a text track as it is and draws its cues itself', async () => {
+  it("plays a file with a text track as it is and hands the track to ExoPlayer to draw in the account's look", async () => {
     usePlayerPrefs.setState({ subtitles: { on: true, language: null } })
     const props = await playing({ id: BUSBOYS_MP4.id })
     expect(sourceUri(props)).toBe(
       `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })}`,
     )
-    expect(props.selectedTextTrack).toEqual({ type: SelectedTrackType.DISABLED })
+    expect(props.selectedTextTrack).toEqual({ type: SelectedTrackType.INDEX, value: 0 })
+    expect(props.subtitleStyle).toMatchObject({
+      color: CAPTION_COLOUR_VALUES[DEFAULT_CAPTION_STYLE.colour],
+      fontFamily: DISPLAY_FONT,
+    })
     expect(screen.getByRole('button', { name: 'Subtitles: English' })).toBeTruthy()
+    // The cues are the player's own, on its own clock: raven draws none over it.
     await moveVideoTo({ props, seconds: 15 })
-    expect(await screen.findByText(CUE_TEXT)).toBeTruthy()
-    await moveVideoTo({ props, seconds: 25 })
     expect(screen.queryByText(CUE_TEXT)).toBeNull()
   })
 
@@ -558,7 +564,9 @@ describe('Player on Android TV', () => {
     expect(corner.props.accessibilityLabel).toMatch(/^\d{1,2}:\d{2}/u)
     const clock = within(corner).getByText(/^\d{1,2}:\d{2}/u)
     expect(clock.props.numberOfLines).toBe(1)
+    // Nothing holds the corner to a width, so the widest time of day is never cut short.
     expect(StyleSheet.flatten(corner.props.style)?.flexShrink).toBe(0)
+    expect(StyleSheet.flatten(corner.props.style)?.maxWidth).toBeUndefined()
   })
 
   /** What the middle of the picture says now, as it is read out. */

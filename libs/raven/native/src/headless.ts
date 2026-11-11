@@ -32,6 +32,7 @@ export {
   ACCOUNT_ACCESS_MESSAGES,
   MEDIA_ACCESS_MESSAGES,
   type MediaSources,
+  type SidecarSource,
   type SourceOutcome,
   type SourceRequest,
   mediaAccessFor,

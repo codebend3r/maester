@@ -69,6 +69,11 @@ type PlayerSource = { uri: string; headers: Record<string, string> }
 
 export type SourceOutcome = { ok: true; source: PlayerSource } | AccessRefusal
 
+/** A sidecar subtitle file beside a video: the track it is, and where its WebVTT is read from. */
+export type SidecarSource = { trackId: string; uri: string }
+
+type SidecarsRequest = { mediaId: number; trackIds: readonly string[] }
+
 /** A video to play and how: direct is the file itself, remux and transcode the HLS master playlist. */
 export type SourceRequest = {
   media: Pick<MediaItem, 'id'>
@@ -100,6 +105,12 @@ type TrackRequest = { mediaId: number; kbps: AudioBitrate | null }
 
 export type MediaSources = {
   source: (request: SourceRequest) => Promise<SourceOutcome>
+  /**
+   * Where a video's sidecar subtitles are read from, whole, by the origin and ticket its picture
+   * is, for a player that loads them beside the file: asked with each source, so their ticket
+   * is as fresh as its. Never rejects: what cannot be addressed is left out.
+   */
+  sidecars: (request: SidecarsRequest) => Promise<readonly SidecarSource[]>
   /** Where a track plays or downloads from, by the same origin, ticket and cookie as a video. */
   trackSource: (request: TrackRequest) => Promise<SourceOutcome>
   /**
@@ -513,12 +524,26 @@ export const mediaAccessFor = ({
   const outcomeOf = (props: SourceForProps): Promise<SourceOutcome> =>
     sourceFor(props).catch(() => accessRefusal({ reason: ACCESS_REFUSALS.unreachable, server }))
 
+  const sidecarsFor = async ({
+    mediaId,
+    trackIds,
+  }: SidecarsRequest): Promise<readonly SidecarSource[]> => {
+    if (trackIds.length === 0) return []
+    const access = await subtitleAccess(mediaId)
+    return trackIds.map((trackId) => {
+      const uri = api.sidecarSubtitlesUrl({ id: mediaId, trackId, access })
+      checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
+      return { trackId, uri }
+    })
+  }
+
   return {
     source: (request) =>
       outcomeOf({
         mediaId: request.media.id,
         uriOf: (access) => uriFor({ request, access }),
       }),
+    sidecars: (request) => sidecarsFor(request).catch(() => []),
     trackSource: (request) => outcomeOf({ mediaId: request.mediaId, uriOf: trackUriOf(request) }),
     copySource: (mediaId) =>
       outcomeOf({ mediaId, uriOf: (access) => api.deviceDownloadFileUrl({ id: mediaId, access }) }),

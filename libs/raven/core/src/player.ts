@@ -1,4 +1,4 @@
-import { isMediaTracks } from '@/contract'
+import { isCaptionStyle, isMediaTracks } from '@/contract'
 import {
   type Infer,
   isBoolean,
@@ -33,7 +33,7 @@ export const PLAYER_COMMANDS = {
   subtitle: 'subtitle',
   volume: 'volume',
   speed: 'speed',
-  subtitleScale: 'subtitleScale',
+  subtitleStyle: 'subtitleStyle',
   stats: 'stats',
   stop: 'stop',
 } as const
@@ -53,7 +53,8 @@ export const isPlayerCommand = union(
   object({ type: oneOf([PLAYER_COMMANDS.subtitle]), id: nullable(isString) }),
   object({ type: oneOf([PLAYER_COMMANDS.volume]), volume: isNumber, muted: isBoolean }),
   object({ type: oneOf([PLAYER_COMMANDS.speed]), rate: isNumber }),
-  object({ type: oneOf([PLAYER_COMMANDS.subtitleScale]), scale: isNumber }),
+  /** How the player draws its subtitles: the account's look, which the player maps to its own. */
+  object({ type: oneOf([PLAYER_COMMANDS.subtitleStyle]), style: isCaptionStyle }),
   object({ type: oneOf([PLAYER_COMMANDS.stats]) }),
   object({ type: oneOf([PLAYER_COMMANDS.stop]) }),
 )

@@ -1,9 +1,18 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CLIENT_CALLS, MAX_HEIGHTS, THEMES, themeOf } from '@raven/core'
+import {
+  APP_CLIENT_CALLS,
+  CAPTION_COLOURS,
+  CAPTION_SIZES,
+  type CaptionStyle,
+  DEFAULT_CAPTION_STYLE,
+  MAX_HEIGHTS,
+  THEMES,
+  themeOf,
+} from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
-import { fireEvent, screen } from '@testing-library/react-native'
+import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet, processColor } from 'react-native'
 
 import { LAUNCH_LOOK, LOGO_TEST_IDS, logoColoursOf } from '@/layouts/Logo'
@@ -21,10 +30,17 @@ const mockBack = jest.fn()
 const mockDismissTo = jest.fn()
 /** The paths each server was asked for, by its origin. */
 const mockAsked: string[] = []
+/** The subtitle looks the account was asked to keep, in order. */
+const mockSavedStyles: CaptionStyle[] = []
 const mockApi = jest.fn((server: AppServer) => {
   const api = homeApi(server)
   return {
     ...api,
+    getCaptionStyle: async () => mockSavedStyles.at(-1) ?? DEFAULT_CAPTION_STYLE,
+    setCaptionStyle: async (style: CaptionStyle) => {
+      mockSavedStyles.push(style)
+      return style
+    },
     getHome: async () => {
       mockAsked.push(`${server.origin}${APP_CLIENT_CALLS.getHome.path}`)
       return api.getHome()
@@ -65,6 +81,7 @@ describe('Settings on a phone or tablet', () => {
     jest.restoreAllMocks()
     jest.clearAllMocks()
     mockAsked.length = 0
+    mockSavedStyles.length = 0
     useActiveServer.setState({ servers: [NAS, OTHER], activeId: NAS.id })
     useAppPrefs.setState(DEFAULT_APP_PREFS)
   })
@@ -151,6 +168,24 @@ describe('Settings on a phone or tablet', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Away from home: 1080p' }))
     expect(asked.map(({ options }) => options)).toEqual([['4K', '1080p', '720p', 'Cancel']])
     expect(useAppPrefs.getState().awayMaxHeight).toBe(MAX_HEIGHTS.hd)
+  })
+
+  it('keeps the subtitle size and colour picked on the account, for every device it signs in on', async () => {
+    const asked = answerSheet('Largest')
+    await renderScreen({ ui: <Settings /> })
+    await fireEvent.press(await screen.findByRole('button', { name: 'Size: Medium' }))
+    expect(asked.map(({ options }) => options)).toEqual([
+      ['Small', 'Medium', 'Large', 'Largest', 'Cancel'],
+    ])
+    expect(await screen.findByRole('button', { name: 'Size: Largest' })).toBeTruthy()
+    answerSheet('Yellow')
+    await fireEvent.press(screen.getByRole('button', { name: 'Colour: White' }))
+    await waitFor(() =>
+      expect(mockSavedStyles.at(-1)).toEqual({
+        size: CAPTION_SIZES.largest,
+        colour: CAPTION_COLOURS.yellow,
+      }),
+    )
   })
 
   it('goes back from its Back', async () => {

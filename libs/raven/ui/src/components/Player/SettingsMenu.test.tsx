@@ -1,5 +1,9 @@
 import { describe, expect, it, jest } from 'bun:test'
 import {
+  CAPTION_COLOURS,
+  CAPTION_SIZES,
+  type CaptionStyle,
+  DEFAULT_CAPTION_STYLE,
   PICTURE_SUBTITLES,
   type PictureSubtitles,
   PLAYBACK_MODES,
@@ -70,6 +74,8 @@ const renderPlayback = ({
       onPickRate={() => {}}
       autoplay
       onPickAutoplay={onPickAutoplay}
+      captionStyle={DEFAULT_CAPTION_STYLE}
+      onPickCaption={() => {}}
       onShowInfo={() => {}}
       onClose={() => {}}
     />,
@@ -188,7 +194,12 @@ describe('SettingsMenu subtitles', () => {
     ...selection,
     tracks: { audio: [], subtitles: [picture], defaultAudio: null, frameRate: null },
   }
-  const renderSubtitles = (pictures: PictureSubtitles) =>
+  type RenderSubtitlesProps = {
+    pictures: PictureSubtitles
+    onPickCaption?: (change: Partial<CaptionStyle>) => void
+  }
+
+  const renderSubtitles = ({ pictures, onPickCaption = () => {} }: RenderSubtitlesProps) =>
     render(
       <SettingsMenu
         section={MENU_SECTIONS.subtitles}
@@ -201,18 +212,39 @@ describe('SettingsMenu subtitles', () => {
         onPickRate={() => {}}
         autoplay
         onPickAutoplay={() => {}}
+        captionStyle={DEFAULT_CAPTION_STYLE}
+        onPickCaption={onPickCaption}
         onShowInfo={() => {}}
         onClose={() => {}}
       />,
     )
 
   it('lets a picture track be picked when the server can burn it in', () => {
-    renderSubtitles(PICTURE_SUBTITLES.burned)
+    renderSubtitles({ pictures: PICTURE_SUBTITLES.burned })
     expect(screen.getByRole('radio', { name: /English/ })).toBeEnabled()
   })
 
   it('keeps a picture track off when nothing can burn it in', () => {
-    renderSubtitles(PICTURE_SUBTITLES.hidden)
+    renderSubtitles({ pictures: PICTURE_SUBTITLES.hidden })
     expect(screen.getByRole('radio', { name: /English/ })).toBeDisabled()
+  })
+
+  it("offers the account's subtitle size and colour, the ones it has checked", async () => {
+    const onPickCaption = jest.fn()
+    renderSubtitles({ pictures: PICTURE_SUBTITLES.hidden, onPickCaption })
+    const sizes = within(screen.getByRole('group', { name: 'Subtitle size' }))
+    expect(sizes.getAllByRole('radio').map((radio) => radio.parentElement?.textContent)).toEqual([
+      'Small',
+      'Medium',
+      'Large',
+      'Largest',
+    ])
+    expect(sizes.getByRole('radio', { name: 'Medium' })).toBeChecked()
+    await userEvent.click(sizes.getByRole('radio', { name: 'Largest' }))
+    expect(onPickCaption).toHaveBeenLastCalledWith({ size: CAPTION_SIZES.largest })
+    const colours = within(screen.getByRole('group', { name: 'Subtitle colour' }))
+    expect(colours.getByRole('radio', { name: 'White' })).toBeChecked()
+    await userEvent.click(colours.getByRole('radio', { name: 'Green' }))
+    expect(onPickCaption).toHaveBeenLastCalledWith({ colour: CAPTION_COLOURS.green })
   })
 })

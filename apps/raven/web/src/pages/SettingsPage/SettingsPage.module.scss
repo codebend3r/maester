@@ -122,8 +122,9 @@
 }
 
 /*
- * A section's settings, held in one fieldset so the admin lock or a reset
- * disables them all at once; spaced as the section around it.
+ * A run of settings, spaced as the section around it: a section's own, held
+ * in one fieldset so the admin lock or a reset disables them all at once,
+ * and the account's subtitle settings under their heading.
  */
 .settings {
   display: grid;

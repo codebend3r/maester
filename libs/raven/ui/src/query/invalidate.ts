@@ -97,6 +97,10 @@ export const afterBingeEvent = (queryClient: QueryClient): Promise<unknown> =>
     filters: [{ queryKey: queryKeys.bingeState }, { queryKey: queryKeys.home }],
   })
 
+/** The account's subtitle size or colour changed, here or on another of its devices: its look. */
+export const afterCaptionStyle = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({ queryClient, filters: [{ queryKey: queryKeys.captionStyle }] })
+
 /** A notification was logged, here or by the server: the account's log. */
 export const afterNotification = (queryClient: QueryClient): Promise<unknown> =>
   refetch({ queryClient, filters: [{ queryKey: queryKeys.notifications }] })

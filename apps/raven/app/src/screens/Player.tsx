@@ -1,6 +1,7 @@
 import {
   AT_HOME,
   type Chapter,
+  DEFAULT_CAPTION_STYLE,
   type ItemDetails,
   type MediaItem,
   type MediaTracks,
@@ -25,7 +26,7 @@ import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useMemo } from 'react'
 
-import { Loading, PlayerChrome, shouldDrawCaptions } from '@/layouts'
+import { Loading, PlayerChrome } from '@/layouts'
 import type { LoadingProps } from '@/layouts/loadingKit'
 import { NO_HEADING } from '@/layouts/playerHeading'
 import { LocalPlayer, type LocalPlayerProps } from '@/player/LocalPlayer'
@@ -58,6 +59,7 @@ const Waiting = ({ notice, onBack }: WaitingProps) => (
     artwork={null}
     audio={null}
     caption={null}
+    captionStyle={DEFAULT_CAPTION_STYLE}
     notice={notice}
     onBack={onBack}
     heading={NO_HEADING}
@@ -148,7 +150,6 @@ const useServerWay = ({
             tracks: tracksKnown,
             policy,
             prefs: { shouldPreferDirectPlay, isTranscodeAllowed },
-            shouldDrawCaptions,
             network: networkKnown,
             sources,
           }),

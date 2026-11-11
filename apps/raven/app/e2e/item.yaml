@@ -10,12 +10,17 @@ tags:
     env:
       TITLE: Kestrel Point
       SHELF: Films
-- tapOn:
-    text: Kestrel Point
-    below: Films
-- extendedWaitUntil:
-    visible: Mark watched
-    timeout: 30000
+# A press that lands as Home is still settling from the scroll opens nothing, and the flow then
+# waits on a page that never comes, so a press that opened nothing is made once more.
+- retry:
+    maxRetries: 1
+    commands:
+      - tapOn:
+          text: Kestrel Point
+          below: Films
+      - extendedWaitUntil:
+          visible: Mark watched
+          timeout: 30000
 - assertVisible: Play
 # Watched shows as soon as it is pressed, and pressing it again takes the mark off, so the
 # fixture is left as it was found.
@@ -34,12 +39,17 @@ tags:
     env:
       TITLE: Lantern Bay
       SHELF: Series
-- tapOn:
-    text: Lantern Bay
-    below: Series
-- extendedWaitUntil:
-    visible: Seasons
-    timeout: 30000
+# A press that lands as Home is still settling from the scroll opens nothing, and the flow then
+# waits on a page that never comes, so a press that opened nothing is made once more.
+- retry:
+    maxRetries: 1
+    commands:
+      - tapOn:
+          text: Lantern Bay
+          below: Series
+      - extendedWaitUntil:
+          visible: Seasons
+          timeout: 30000
 # The actions, Download among them, push the seasons and episodes below the tab bar on a phone.
 - scrollUntilVisible:
     element: Season 1

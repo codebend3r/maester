@@ -40,8 +40,6 @@ type ServerWayOfProps = {
   tracks: MediaTracks | null
   policy: PlaybackPolicy
   prefs: PlaybackPrefs
-  /** Whether this device's chrome draws the subtitle cues itself. */
-  shouldDrawCaptions: boolean
   network: PlayNetwork
   sources: MediaSources
 }
@@ -52,19 +50,10 @@ export const serverWayOf = ({
   tracks,
   policy,
   prefs,
-  shouldDrawCaptions,
   network,
   sources,
 }: ServerWayOfProps): PlayWay => ({
-  plan: planFor({
-    platform: DEVICE_PLATFORM,
-    media,
-    tracks,
-    policy,
-    prefs,
-    shouldDrawCaptions,
-    network,
-  }),
+  plan: planFor({ platform: DEVICE_PLATFORM, media, policy, prefs, network }),
   sources,
   tracks,
   hasQuality: true,

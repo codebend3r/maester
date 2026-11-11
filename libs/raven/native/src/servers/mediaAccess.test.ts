@@ -421,6 +421,17 @@ describe('mediaAccessFor', () => {
     expect(await media.subtitleAccess(BUSBOYS.id)).toEqual({ origin: LAN, ticket: TICKETS[0] })
   })
 
+  it("addresses a file's sidecars whole, by the picked origin and the ticket, and has none to address when asked for none", async () => {
+    const { media } = setUp()
+    expect(await media.sidecars({ mediaId: BUSBOYS.id, trackIds: ['external-0'] })).toEqual([
+      {
+        trackId: 'external-0',
+        uri: `${LAN.url}/api/media/${BUSBOYS.id}/subtitles/external-0?t=${TICKETS[0]}`,
+      },
+    ])
+    expect(await media.sidecars({ mediaId: BUSBOYS.id, trackIds: [] })).toEqual([])
+  })
+
   it("hands subtitles a fresh ticket once an account ticket's five minutes are up, as subtitles turned on mid-film need", async () => {
     const { media, clock } = setUp()
     expect(await media.subtitleAccess(BUSBOYS.id)).toEqual({ origin: LAN, ticket: TICKETS[0] })

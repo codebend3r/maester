@@ -1,4 +1,11 @@
-import { type SubtitleCue, activeCues, cueRuns } from '@raven/core'
+import {
+  CAPTION_COLOUR_VALUES,
+  CAPTION_SIZE_SCALES,
+  type CaptionStyle,
+  type SubtitleCue,
+  activeCues,
+  cueRuns,
+} from '@raven/core'
 import { type RefObject, useEffect, useRef, useState } from 'react'
 import styles from '@/components/Player/SubtitleOverlay.module.scss'
 
@@ -12,7 +19,8 @@ type SubtitleOverlayProps = {
   shift: number
   /** Raised clear of the controls while they show. */
   lifted: boolean
-  scale: number
+  /** The account's size and colour; the face is always the display face. */
+  captionStyle: CaptionStyle
 }
 
 /**
@@ -20,7 +28,13 @@ type SubtitleOverlayProps = {
  * waiting for `timeupdate`, which only fires four times a second, and
  * re-renders only when the set of cues on screen changes.
  */
-export const SubtitleOverlay = ({ cues, video, shift, lifted, scale }: SubtitleOverlayProps) => {
+export const SubtitleOverlay = ({
+  cues,
+  video,
+  shift,
+  lifted,
+  captionStyle,
+}: SubtitleOverlayProps) => {
   const [showing, setShowing] = useState<SubtitleCue[]>([])
   const shown = useRef('')
   const root = useRef<HTMLDivElement>(null)
@@ -41,10 +55,13 @@ export const SubtitleOverlay = ({ cues, video, shift, lifted, scale }: SubtitleO
     return () => window.cancelAnimationFrame(frame.id)
   }, [cues, video, shift])
 
-  // A custom property rather than a font size here, so the stylesheet keeps the clamp.
+  // Custom properties rather than a font size and a colour here, so the stylesheet keeps the clamp.
+  const scale = CAPTION_SIZE_SCALES[captionStyle.size]
+  const colour = CAPTION_COLOUR_VALUES[captionStyle.colour]
   useEffect(() => {
     root.current?.style.setProperty('--caption-scale', String(scale))
-  }, [scale])
+    root.current?.style.setProperty('--caption-colour', colour)
+  }, [scale, colour])
 
   return (
     <div
@@ -59,11 +76,8 @@ export const SubtitleOverlay = ({ cues, video, shift, lifted, scale }: SubtitleO
               // Runs have no identity beyond their order within the cue.
               // oxlint-disable-next-line react/no-array-index-key
               key={index}
-              className={[
-                run.italic ? styles.italic : '',
-                run.bold ? styles.bold : '',
-                run.underline ? styles.underline : '',
-              ]
+              // The display face has one weight, so a bold run reads as the rest does.
+              className={[run.italic ? styles.italic : '', run.underline ? styles.underline : '']
                 .filter(Boolean)
                 .join(' ')}
             >

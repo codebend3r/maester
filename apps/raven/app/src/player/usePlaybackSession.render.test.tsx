@@ -10,6 +10,7 @@ import {
   SESSION_PHASES,
   type SessionState,
   modeOf,
+  sourcedOf,
   usePlaybackSession,
 } from '@/player/usePlaybackSession'
 
@@ -23,10 +24,15 @@ const SOURCES: MediaSources = {
   }),
   trackSource: async () => ({ ok: true, source: { uri: 'http://nas:8080/track', headers: {} } }),
   copySource: async () => ({ ok: true, source: { uri: 'http://nas:8080/copy', headers: {} } }),
+  sidecars: async ({ mediaId, trackIds }) =>
+    trackIds.map((trackId) => ({ trackId, uri: `http://nas:8080/${mediaId}/${trackId}` })),
   subtitleAccess: async () => null,
   networkFor: async () => AT_HOME,
   close: () => undefined,
 }
+
+/** The file's one sidecar, which a player that draws the subtitles itself loads beside it. */
+const SIDECAR_IDS = ['external-0'] as const
 
 const attemptOf = (state: SessionState): number =>
   state.phase === SESSION_PHASES.failed ? -1 : state.attempt
@@ -43,6 +49,7 @@ const renderSession = (modes: readonly PlaybackMode[]) =>
         audio: null,
         problems: [],
         sources: SOURCES,
+        sidecars: SIDECAR_IDS,
         isWaiting,
         clock,
       }),
@@ -59,6 +66,17 @@ describe('usePlaybackSession', () => {
 
   afterEach(() => {
     jest.useRealTimers()
+  })
+
+  it('hands a file played as it is its sidecars with the source, and a stream none', async () => {
+    const file = await renderSession([direct])
+    await settle()
+    expect(sourcedOf(file.result.current.state)?.sidecars).toEqual([
+      { trackId: SIDECAR_IDS[0], uri: `http://nas:8080/20/${SIDECAR_IDS[0]}` },
+    ])
+    const stream = await renderSession([remux])
+    await settle()
+    expect(sourcedOf(stream.result.current.state)?.sidecars).toEqual([])
   })
 
   it('takes no late load for a way it timed out, and times the next way afresh', async () => {

@@ -110,7 +110,9 @@ describe("the owner's settings on a TV", () => {
     mockServer.account = { ...OWNER, isOwner: false }
     await renderScreen({ ui: <Settings />, client })
     await waitFor(() =>
-      expect(mockServer.heard.map(({ path }) => path)).toEqual([APP_CLIENT_CALLS.getMe.path]),
+      expect(mockServer.heard.map(({ path }) => path).toSorted()).toEqual(
+        [APP_CLIENT_CALLS.getMe.path, APP_CLIENT_CALLS.getCaptionStyle.path].toSorted(),
+      ),
     )
     expect(screen.queryByRole('header', { name: 'Admin' })).toBeNull()
   })

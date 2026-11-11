@@ -378,7 +378,7 @@ type DesktopWatchProps = {
 
 /**
  * The browser's watch page inside Raven: the same title, progress, next title,
- * favourite, report and escape, with mpv drawing the picture under the page. Without mpv a
+ * report and escape, with mpv drawing the picture under the page. Without mpv a
  * title from the server does not play, since Raven plays them only there.
  */
 export const DesktopWatch = ({ services, media, upNext }: DesktopWatchProps) => {

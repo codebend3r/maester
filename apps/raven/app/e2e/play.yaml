@@ -9,12 +9,17 @@ tags:
     env:
       TITLE: Kestrel Point
       SHELF: Films
-- tapOn:
-    text: Kestrel Point
-    below: Films
-- extendedWaitUntil:
-    visible: Mark watched
-    timeout: 30000
+# A press that lands as Home is still settling from the scroll opens nothing, and the flow then
+# waits on a page that never comes, so a press that opened nothing is made once more.
+- retry:
+    maxRetries: 1
+    commands:
+      - tapOn:
+          text: Kestrel Point
+          below: Films
+      - extendedWaitUntil:
+          visible: Mark watched
+          timeout: 30000
 - tapOn: Play
 # The film is an MKV, which plays through the server's HLS remux. The controls show while it
 # starts, and a pause keeps them up.

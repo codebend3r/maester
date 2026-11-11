@@ -22,6 +22,7 @@ import { DesktopSettings } from '@/desktop/settings/DesktopSettings'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
 import { AdminLockSection } from '@/pages/SettingsPage/AdminLockSection'
 import { AdvancedSection } from '@/pages/SettingsPage/AdvancedSection'
+import { CaptionSettings } from '@/pages/SettingsPage/CaptionSettings'
 import { RemoteAccessSection } from '@/pages/SettingsPage/RemoteAccessSection'
 import { ScrobblingSection } from '@/pages/SettingsPage/ScrobblingSection'
 import { ServerSection } from '@/pages/SettingsPage/ServerSection'
@@ -444,6 +445,7 @@ const ViewerSettings = () => {
       </header>
       <section className={styles.section} aria-label={SETTINGS_COPY.playback}>
         <h2 className={styles.heading}>{SETTINGS_COPY.playback}</h2>
+        <CaptionSettings />
         <BrowserPlayback isDesktop={isDesktop} />
       </section>
       {access.kind === ACCESS_KINDS.approved && <AccountSection account={access.account} />}

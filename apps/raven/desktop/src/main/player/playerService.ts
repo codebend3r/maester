@@ -48,6 +48,7 @@ import {
 import { type Phase, PLAYER_PHASES, type ShowingPhase } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import { createQuietMpv } from '@/main/player/quietMpv'
+import { subtitleStyleOptions } from '@/main/player/subtitleLook'
 import { createSidecarAdder } from '@/main/player/sidecars'
 import { createThrottle } from '@/main/player/throttle'
 import { aidFor, sidFor, tracksFromMpv } from '@/main/player/tracksFromMpv'
@@ -926,11 +927,8 @@ export const createPlayerService = ({
           value: clamp({ value: command.rate, min: SPEED_RANGE.min, max: SPEED_RANGE.max }),
         })
         return OK
-      case PLAYER_COMMANDS.subtitleScale:
-        await mpv.set({
-          name: MPV_OPTIONS.subScale,
-          value: clamp({ value: command.scale, min: 0.5, max: 3 }),
-        })
+      case PLAYER_COMMANDS.subtitleStyle:
+        await Promise.all(subtitleStyleOptions(command.style).map((option) => mpv.set(option)))
         return OK
       case PLAYER_COMMANDS.stats:
         await mpv.command({ args: [MPV_COMMANDS.scriptBinding, 'stats/display-stats-toggle'] })

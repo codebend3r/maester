@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
+  DEFAULT_CAPTION_STYLE,
   ApiError,
   AUTH_CONFIG_STATES,
   DEFAULT_DISPLAY_SETTINGS,
@@ -24,7 +25,9 @@ import { renderWithProviders } from '@/test/render'
 
 const scanState = spyOn(api, 'getScanControl')
 const remoteAccess = spyOn(api, 'getRemoteAccess')
+const captionStyle = spyOn(api, 'getCaptionStyle')
 beforeEach(() => {
+  captionStyle.mockResolvedValue(DEFAULT_CAPTION_STYLE)
   scanState.mockResolvedValue({ isStopped: false })
   remoteAccess.mockResolvedValue({
     settings: DEFAULT_REMOTE_ACCESS_SETTINGS,
@@ -36,6 +39,7 @@ beforeEach(() => {
 afterEach(() => {
   scanState.mockReset()
   remoteAccess.mockReset()
+  captionStyle.mockReset()
 })
 
 const STATE: PlaybackSettingsState = {

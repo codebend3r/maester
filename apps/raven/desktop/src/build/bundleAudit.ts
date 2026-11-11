@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, sep } from 'node:path'
 import { ADDON_DLLS, importProblems, PE_MACHINES, readPe } from '@raven/mpv'
-import { WEB_DIST } from '@/build/forgeOptions'
+import { FONTS, WEB_DIST } from '@/build/forgeOptions'
 import { MPV_MACH_O, MPV_PE, STAGE_TARGETS, WINDOWS_MPV_FILES } from '@/build/stageMpv'
 
 export const PACKAGED_APP = join('out', 'Raven-darwin-arm64', 'Raven.app')
@@ -9,6 +9,9 @@ export const MPV_IN_APP = join('Contents', 'Resources', 'mpv', STAGE_TARGETS.dar
 /** The web app's build, which the web host serves the window. */
 export const WEB_IN_APP = join('Contents', 'Resources', basename(WEB_DIST))
 const WEB_PAGE = 'index.html'
+/** The face mpv draws subtitles in, which it reads from the app's fonts folder. */
+export const FONTS_IN_APP = join('Contents', 'Resources', basename(FONTS))
+const SUBTITLE_FONT_FILE = 'YoungSerif.ttf'
 
 const ALLOWED_LINK_PREFIXES = [
   '/System/Library/',
@@ -171,7 +174,11 @@ export const bundleProblems = ({
   plistVersion,
   packageVersion,
 }: BundleProblemsProps): string[] => {
-  const missing = [...MPV_MACH_O.map((name) => join(MPV_IN_APP, name)), join(WEB_IN_APP, WEB_PAGE)]
+  const missing = [
+    ...MPV_MACH_O.map((name) => join(MPV_IN_APP, name)),
+    join(WEB_IN_APP, WEB_PAGE),
+    join(FONTS_IN_APP, SUBTITLE_FONT_FILE),
+  ]
     .filter((relative) => !exists(relative))
     .map((relative) => `${relative} is missing from the app`)
   const version =
@@ -289,6 +296,7 @@ export const WINDOWS_APP = join('out', 'Raven-win32-x64')
 export const WINDOWS_EXE = 'Raven.exe'
 export const MPV_IN_WINDOWS_APP = join('resources', 'mpv', STAGE_TARGETS.win32X64)
 const WEB_IN_WINDOWS_APP = join('resources', basename(WEB_DIST))
+const FONTS_IN_WINDOWS_APP = join('resources', basename(FONTS))
 /** The lock that pins the Windows libmpv, from this project's folder. */
 export const WINDOWS_LOCK = join(
   '..',
@@ -373,6 +381,7 @@ export const windowsBundleProblems = ({
     WINDOWS_EXE,
     ...MPV_PE.map((name) => join(MPV_IN_WINDOWS_APP, name)),
     join(WEB_IN_WINDOWS_APP, WEB_PAGE),
+    join(FONTS_IN_WINDOWS_APP, SUBTITLE_FONT_FILE),
   ]
     .filter((relative) => !exists(relative))
     .map((relative) => `${relative} is missing from the app`)

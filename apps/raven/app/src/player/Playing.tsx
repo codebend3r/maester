@@ -5,9 +5,6 @@ import {
   ITEM_TYPES,
   PLAYBACK_MODES,
   type MediaItem,
-  type MediaTracks,
-  type PlaybackMode,
-  type SubtitleTrack,
   type ViewingSession,
   activeCues,
   asksServerForNext,
@@ -24,6 +21,7 @@ import {
   initialVideoState,
   preferredAudio,
   preferredSubtitle,
+  useCaptionStyle,
   useProgressReport,
   useTrackCues,
   usePlayerPrefs,
@@ -38,6 +36,8 @@ import { PlayerChrome, canDrawPictureSubtitles, shouldDrawCaptions } from '@/lay
 import { PLAYER_COPY, type VideoSurface } from '@/layouts/playerKit'
 import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
 import { APP_PLATFORMS } from '@/platform/platform'
+import { captionsFor, sidecarIdsOf, sidecarTracksOf } from '@/player/captions'
+import { playerSubtitleStyleOf } from '@/player/captionLook'
 import { isServerDrop } from '@/player/playerErrors'
 import type { PlayWay } from '@/player/playWay'
 import { progressSinkFor } from '@/player/progressSink'
@@ -61,10 +61,8 @@ import {
   SUBTITLE_CHOICES,
   audioOptionsOf,
   audioPlaceFor,
-  filePlaceFor,
   picturesFor,
   subtitleOptionsOf,
-  subtitlePlaceFor,
 } from '@/player/playerTracks'
 import { pickedQualityOf, qualityKeyOf, qualityOptionsOf } from '@/player/qualityOptions'
 import {
@@ -81,6 +79,7 @@ import { imageOf } from '@/queries/cards'
 import { usePlayerHeading } from '@/queries/usePlayerHeading'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { queueNeighbourOf, useVideoQueue } from '@/stores/videoQueue'
+import { useWatching } from '@/stores/watching'
 
 /** How often the player says where it is, in milliseconds: often enough for a smooth clock. */
 const PROGRESS_EVERY_MS = 250
@@ -132,60 +131,6 @@ const neighboursOf = ({ isQueued, queued, mediaId, serverNext }: NeighboursOfPro
     next: queueNeighbourOf({ items: queued, mediaId, step: 1 }),
     previous: queueNeighbourOf({ items: queued, mediaId, step: -1 }),
     nextLabel: (to) => videoLabelOf({ word: PLAYER_COPY.nextVideo, media: to }),
-  }
-}
-
-/** The subtitles as they are shown: the track raven draws the cues of, and the one the player draws itself. */
-type Captions = {
-  cueTrack: SubtitleTrack | null
-  textTrack: VideoSurface['selectedTextTrack']
-}
-
-type CaptionsForProps = {
-  mode: PlaybackMode | null
-  tracks: MediaTracks | null
-  subtitle: string | null
-  /** Whether the server burns the picked picture subtitle into the picture, which then draws it. */
-  isBurning: boolean
-}
-
-/**
- * Who draws the picked subtitle. Where the chrome draws the cues, raven reads them from
- * `cueTrack`, and the player's own rendition is never picked, so it never draws a second.
- * Elsewhere the player draws the stream's rendition at the track's place (`textTrack`), or with
- * none picked, what it chooses itself (a forced track, the system's settings).
- */
-const captionsFor = ({ mode, tracks, subtitle, isBurning }: CaptionsForProps): Captions => {
-  if (isBurning) return { cueTrack: null, textTrack: { type: SelectedTrackType.DISABLED } }
-  const picked = tracks?.subtitles.find((track) => track.id === subtitle) ?? null
-  // A picture track is the player's to draw, from the file it plays: raven has no text to draw.
-  if (
-    canDrawPictureSubtitles &&
-    mode === PLAYBACK_MODES.direct &&
-    tracks !== null &&
-    picked !== null &&
-    isPictureSubtitle(picked)
-  ) {
-    const place = filePlaceFor({ tracks, subtitle: picked.id })
-    return {
-      cueTrack: null,
-      textTrack:
-        place === null
-          ? { type: SelectedTrackType.DISABLED }
-          : { type: SelectedTrackType.INDEX, value: place },
-    }
-  }
-  if (shouldDrawCaptions) {
-    return {
-      cueTrack: picked !== null && picked.supported ? picked : null,
-      textTrack: { type: SelectedTrackType.DISABLED },
-    }
-  }
-  const place =
-    tracks === null || mode === null ? null : subtitlePlaceFor({ mode, tracks, subtitle })
-  return {
-    cueTrack: null,
-    textTrack: place === null ? undefined : { type: SelectedTrackType.INDEX, value: place },
   }
 }
 
@@ -241,6 +186,11 @@ export const Playing = ({
   onPlayNext,
 }: PlayingProps) => {
   const queryClient = useQueryClient()
+  const setWatching = useWatching((watching) => watching.setWatching)
+  useEffect(() => {
+    setWatching(true)
+    return () => setWatching(false)
+  }, [setWatching])
   const audioLanguage = usePlayerPrefs((prefs) => prefs.audioLanguage)
   const shouldAutoplay = usePlayerPrefs((prefs) => prefs.autoplay)
   // A show's episodes and a saga's films have a next; a video on its own asks nothing.
@@ -282,6 +232,8 @@ export const Playing = ({
   const [isPaused, setPaused] = useState(false)
   const position = useRef(resumeAt)
   const [startState, dispatchStart] = useReducer(startReducer, NOT_LOADED)
+  // Where the player draws the subtitles itself, the file's sidecars load beside it.
+  const sidecarIds = useMemo(() => (shouldDrawCaptions ? [] : sidecarIdsOf(tracks)), [tracks])
   const { state, dispatch } = usePlaybackSession({
     media,
     modes: plan.modes,
@@ -289,6 +241,7 @@ export const Playing = ({
     audio: preferredAudio({ tracks, language: audioLanguage }),
     problems: plan.problems,
     sources,
+    sidecars: sidecarIds,
     /*
      * AVPlayer says it waits at the end of a file too, and the viewer's pause is no stall; a
      * video still held for its resume seek is not stalled either.
@@ -322,7 +275,15 @@ export const Playing = ({
       ? null
       : audioPlaceFor({ mode, tracks, audio: ladder?.audio ?? null })
   const burning = ladder?.burn ?? null
-  const captions = captionsFor({ mode, tracks, subtitle, isBurning: burning !== null })
+  const captions = captionsFor({
+    mode,
+    tracks,
+    subtitle,
+    isBurning: burning !== null,
+    shouldDrawCaptions,
+    canDrawPictureSubtitles,
+  })
+  const { style: captionStyle } = useCaptionStyle(session.api)
   const { cues } = useTrackCues({
     video: {
       api: session.api,
@@ -355,9 +316,13 @@ export const Playing = ({
         : {
             uri: sourced.source.uri,
             headers: sourced.source.headers,
+            // Only a file played as it is comes with sidecars: a stream has its renditions.
+            ...(sourced.sidecars.length > 0
+              ? { textTracks: sidecarTracksOf({ sidecars: sourced.sidecars, tracks }) }
+              : {}),
             ...(IS_SEEKING_TO_RESUME ? {} : { startPosition: startAt * 1000 }),
           },
-    [sourced, startAt],
+    [sourced, tracks, startAt],
   )
 
   /*
@@ -520,6 +485,7 @@ export const Playing = ({
           progressUpdateInterval: PROGRESS_EVERY_MS,
           selectedAudioTrack: audioTrack,
           selectedTextTrack: captions.textTrack,
+          subtitleStyle: shouldDrawCaptions ? undefined : playerSubtitleStyleOf(captionStyle),
           source,
         }
   const artwork =
@@ -532,6 +498,7 @@ export const Playing = ({
       <PlayerChrome
         artwork={artwork}
         caption={showing.length === 0 ? null : showing.map((cue) => cue.text).join('\n')}
+        captionStyle={captionStyle}
         audio={
           tracks === null || tracks.audio.length < 2 || ladder === null
             ? null

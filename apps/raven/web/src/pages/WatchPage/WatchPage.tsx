@@ -45,7 +45,6 @@ import { useLocation } from 'react-router-dom'
 import { authConfigQuery, markersQuery, mediaQuery, nextInSessionQuery } from '@/lib/queries'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { useRouteId } from '@/lib/routeQuery'
-import { useMediaMutations } from '@/lib/useMediaMutations'
 import { useTicketFollowsSession } from '@/lib/useTicketFollowsSession'
 import { useTitleLogo } from '@/lib/useTitleLogo'
 import { ravenVersion } from '@/lib/version'
@@ -204,14 +203,9 @@ type WatchPlayerProps = {
   backTo: string
 }
 
-/**
- * The browser host owns server history, favourites, links and clipboard
- * behavior. A favourite marked here patches the cached video WatchPage
- * reads, so `media` brings the heart its new state before the server answers.
- */
+/** The browser host owns server history, links and clipboard behavior. */
 export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps) => {
   const queryClient = useQueryClient()
-  const { favourite } = useMediaMutations({ media })
   const [copied, setCopied] = useState<string | null>(null)
   const [saver] = useState(() =>
     createProgressSaver({ send: (report) => api.saveProgress({ id: media.id, ...report }) }),
@@ -284,10 +278,6 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
     posterUrl: api.thumbnailUrl(media),
     escape: { label: WATCH_PAGE_COPY.copyFileLink, run: copyLink },
     escapeFeedback: copied,
-    favourite: {
-      isFavourite: media.favourite,
-      toggle: () => favourite.mutate(!media.favourite),
-    },
     report: {
       appVersion: ravenVersion,
       send: (diagnostics) => api.reportPlaybackError(diagnostics),

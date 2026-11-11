@@ -1,4 +1,11 @@
-import { PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
+import {
+  CAPTION_COLOURS,
+  CAPTION_SIZES,
+  type CaptionColour,
+  type CaptionSize,
+  PLAYBACK_MODES,
+  type PlaybackMode,
+} from '@raven/core'
 
 type MenuPillLabelProps = { title: string; value: string }
 
@@ -52,7 +59,25 @@ export const SETTINGS_MENU_COPY = {
   autoplay: 'Autoplay',
   playbackInfo: 'Playback info',
   closeMenu: 'Close menu',
+  subtitleSize: 'Subtitle size',
+  subtitleColour: 'Subtitle colour',
 } as const
+
+/** Each subtitle size by its name, wherever a player or a settings page offers it. */
+export const CAPTION_SIZE_NAMES = {
+  [CAPTION_SIZES.small]: 'Small',
+  [CAPTION_SIZES.medium]: 'Medium',
+  [CAPTION_SIZES.large]: 'Large',
+  [CAPTION_SIZES.largest]: 'Largest',
+} as const satisfies Record<CaptionSize, string>
+
+/** Each subtitle colour by its name. */
+export const CAPTION_COLOUR_NAMES = {
+  [CAPTION_COLOURS.white]: 'White',
+  [CAPTION_COLOURS.yellow]: 'Yellow',
+  [CAPTION_COLOURS.cyan]: 'Cyan',
+  [CAPTION_COLOURS.green]: 'Green',
+} as const satisfies Record<CaptionColour, string>
 
 /** Each way of playing by its one name, wherever a player shows it: the chips, the info panel, the TVs' corner. */
 export const PLAYBACK_MODE_NAMES = {
@@ -112,10 +137,7 @@ export const STAGE_COPY = {
   undoSkip: 'Undo skip',
   skipIntro: 'Skip intro',
   skipCredits: 'Skip credits',
-  removedFromFavourites: 'Removed from favourites',
-  addedToFavourites: 'Added to favourites',
   back: 'Back',
-  favourite: 'Favourite',
   upNextLabel: (label: string) => `Up next: ${label}`,
   upNext: 'Up next',
   resumedAt: (time: string) => `Resumed at ${time}`,
@@ -202,7 +224,7 @@ export const PLAYER_ACTIONS_COPY = {
   play: 'Play',
   pause: 'Pause',
   percent: (percent: number) => `${percent}%`,
-  subtitleSize: (percent: number) => `Subtitles ${percent}%`,
+  subtitleSize: (size: string) => `Subtitle size: ${size}`,
   skip: ({ isBack, seconds }: SkipFlashProps) => `${isBack ? 'Back' : 'Forward'} ${seconds}s`,
 } as const
 

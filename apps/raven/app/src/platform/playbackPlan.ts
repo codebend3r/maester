@@ -1,8 +1,6 @@
 import {
   type CanPlay,
   type MediaItem,
-  type MediaTracks,
-  PLAYBACK_MODES,
   type PlaybackPlan,
   type PlaybackPolicy,
   TRANSCODINGS,
@@ -24,10 +22,8 @@ export const TRANSCODING_OFF_HERE = "Transcoding is off in this device's Setting
 type PlanForProps = {
   platform: AppPlatform
   media: MediaItem
-  tracks: MediaTracks | null
   policy: PlaybackPolicy
   prefs: PlaybackPrefs
-  shouldDrawCaptions: boolean
   /** Where the video plays from, as `mediaAccessFor`'s `networkFor` tells it. */
   network: PlayNetwork
 }
@@ -39,11 +35,8 @@ type PlanForProps = {
  * is planned with its default audio, since direct play switches audio tracks itself. A maybe in
  * the table is tried as it is only while the viewer prefers direct play, or when nothing else
  * is left.
- * `shouldDrawCaptions` is the player chrome's: where raven draws the cues (under the thumb and
- * on Android TV) it reads them from the server's WebVTT in any mode, and where it does not
- * (Apple TV's system transport), the platform's player shows only an HLS stream's renditions,
- * so a file with text subtitles starts at the remux. Direct play stays only as the one way
- * left: when the server converts nothing, or forces the original.
+ * Subtitles never change the plan: every platform shows a file's text subtitles while it plays
+ * the file as it is, raven's own cues on Apple's and the player's own tracks on Android TV.
  * Away from home (`network`), core's `planForNetwork` starts a file over the server's remote
  * limit at the transcode, as Plex does, with the other ways behind it to step down to; at home
  * the plan is as it was.
@@ -53,15 +46,8 @@ export const planFor = ({ network, ...props }: PlanForProps): PlaybackPlan =>
 
 type PlanHereProps = Omit<PlanForProps, 'network'>
 
-/** The plan on this device under its prefs and its chrome, wherever it plays from. */
-const planHere = ({
-  platform,
-  media,
-  tracks,
-  policy,
-  prefs,
-  shouldDrawCaptions,
-}: PlanHereProps): PlaybackPlan => {
+/** The plan on this device under its prefs, wherever it plays from. */
+const planHere = ({ platform, media, policy, prefs }: PlanHereProps): PlaybackPlan => {
   const { canPlay, canPlaySurely, canStream } = canPlayFor(platform)
   const isTranscodeTaken = !prefs.isTranscodeAllowed && policy.transcoding === TRANSCODINGS.on
   const policyHere = isTranscodeTaken ? { ...policy, transcoding: TRANSCODINGS.remuxOnly } : policy
@@ -70,12 +56,7 @@ const planHere = ({
   const generous = planWith(canPlay)
   const sure = prefs.shouldPreferDirectPlay ? generous : planWith(canPlaySurely)
   const chosen = sure.modes.length > 0 ? sure : generous
-  const plan =
-    isTranscodeTaken && chosen.modes.length === 0
-      ? { ...chosen, problems: [...chosen.problems, TRANSCODING_OFF_HERE] }
-      : chosen
-  const hasTextSubtitles = tracks?.subtitles.some((track) => track.supported) ?? false
-  if (shouldDrawCaptions || !hasTextSubtitles) return plan
-  const converted = plan.modes.filter((mode) => mode !== PLAYBACK_MODES.direct)
-  return converted.length === 0 ? plan : { ...plan, modes: converted }
+  return isTranscodeTaken && chosen.modes.length === 0
+    ? { ...chosen, problems: [...chosen.problems, TRANSCODING_OFF_HERE] }
+    : chosen
 }

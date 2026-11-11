@@ -1,8 +1,101 @@
 diff --git a/node_modules/react-native-video/.bun-tag-77250d60e6a5526 b/.bun-tag-77250d60e6a5526
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/react-native-video/.bun-tag-c3ccf060cc8e7d97 b/.bun-tag-c3ccf060cc8e7d97
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/android/src/main/java/com/brentvatne/common/api/SubtitleStyle.kt b/android/src/main/java/com/brentvatne/common/api/SubtitleStyle.kt
+index 1ac0fd03ac0197bf10e54dddb6bb2538a876fd1b..4cb2edeb031c4f77a1d7f30c6757e0dfdbc0ef75 100644
+--- a/android/src/main/java/com/brentvatne/common/api/SubtitleStyle.kt
++++ b/android/src/main/java/com/brentvatne/common/api/SubtitleStyle.kt
+@@ -22,6 +22,12 @@ class SubtitleStyle public constructor() {
+     var subtitlesFollowVideo = true
+         private set
+ 
++    // raven: the text's colour, as "#rrggbb", and its face, by the name React Native knows it.
++    var color: String? = null
++        private set
++    var fontFamily: String? = null
++        private set
++
+     companion object {
+         private const val PROP_FONT_SIZE_TRACK = "fontSize"
+         private const val PROP_PADDING_BOTTOM = "paddingBottom"
+@@ -30,6 +36,8 @@ class SubtitleStyle public constructor() {
+         private const val PROP_PADDING_RIGHT = "paddingRight"
+         private const val PROP_OPACITY = "opacity"
+         private const val PROP_SUBTITLES_FOLLOW_VIDEO = "subtitlesFollowVideo"
++        private const val PROP_COLOR = "color"
++        private const val PROP_FONT_FAMILY = "fontFamily"
+ 
+         @JvmStatic
+         fun parse(src: ReadableMap?): SubtitleStyle {
+@@ -41,6 +49,8 @@ class SubtitleStyle public constructor() {
+             subtitleStyle.paddingRight = ReactBridgeUtils.safeGetInt(src, PROP_PADDING_RIGHT, 0)
+             subtitleStyle.opacity = ReactBridgeUtils.safeGetFloat(src, PROP_OPACITY, 1f)
+             subtitleStyle.subtitlesFollowVideo = ReactBridgeUtils.safeGetBool(src, PROP_SUBTITLES_FOLLOW_VIDEO, true)
++            subtitleStyle.color = ReactBridgeUtils.safeGetString(src, PROP_COLOR)
++            subtitleStyle.fontFamily = ReactBridgeUtils.safeGetString(src, PROP_FONT_FAMILY)
+             return subtitleStyle
+         }
+     }
+diff --git a/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt b/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
+index 75e2307fc6616aff7f0f9d884c907b4bdad14899..84fea8be6ba76a2fa536c58a6407a56fc2d8168d 100644
+--- a/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
++++ b/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
+@@ -2,6 +2,7 @@ package com.brentvatne.exoplayer
+ 
+ import android.content.Context
+ import android.graphics.Color
++import android.graphics.Typeface
+ import android.graphics.drawable.GradientDrawable
+ import android.util.AttributeSet
+ import android.view.View
+@@ -13,10 +14,12 @@ import androidx.media3.common.Timeline
+ import androidx.media3.common.util.UnstableApi
+ import androidx.media3.exoplayer.ExoPlayer
+ import androidx.media3.ui.AspectRatioFrameLayout
++import androidx.media3.ui.CaptionStyleCompat
+ import androidx.media3.ui.DefaultTimeBar
+ import androidx.media3.ui.PlayerView
+ import com.brentvatne.common.api.ResizeMode
+ import com.brentvatne.common.api.SubtitleStyle
++import com.facebook.react.common.assets.ReactFontManager
+ 
+ @UnstableApi
+ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) :
+@@ -113,6 +116,29 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
+             // Reset to defaults
+             subtitleView.setUserDefaultStyle()
+             subtitleView.setUserDefaultTextSize()
++            subtitleView.setApplyEmbeddedStyles(true)
++            subtitleView.setApplyEmbeddedFontSizes(true)
++
++            // raven: with a colour or a face given, every text track is drawn the one way, in
++            // that colour and face behind a dark edge, whatever styles its own file carries.
++            val colour = style.color?.let { runCatching { Color.parseColor(it) }.getOrNull() }
++            val face = style.fontFamily?.let {
++                ReactFontManager.getInstance().getTypeface(it, Typeface.NORMAL, context.assets)
++            }
++            if (colour != null || face != null) {
++                subtitleView.setApplyEmbeddedStyles(false)
++                subtitleView.setApplyEmbeddedFontSizes(false)
++                subtitleView.setStyle(
++                    CaptionStyleCompat(
++                        colour ?: Color.WHITE,
++                        Color.TRANSPARENT,
++                        Color.TRANSPARENT,
++                        CaptionStyleCompat.EDGE_TYPE_OUTLINE,
++                        Color.BLACK,
++                        face
++                    )
++                )
++            }
+ 
+             // Apply custom styling
+             if (style.fontSize > 0) {
 diff --git a/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java b/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
-index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..3af06e3a36b23dfccfc9f6d0ea81d25af7a0a2c8 100644
+index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..c6edc359598134edbe0648c6e54eef19ca0a9150 100644
 --- a/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
 +++ b/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
 @@ -59,6 +59,9 @@ import androidx.media3.datasource.DefaultDataSource;
@@ -41,7 +134,24 @@ index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..3af06e3a36b23dfccfc9f6d0ea81d25a
                          .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
                          .setEnableDecoderFallback(true)
                          .forceEnableMediaCodecAsynchronousQueueing();
-@@ -2235,11 +2254,16 @@ public class ReactExoplayerView extends FrameLayout implements
+@@ -1212,6 +1231,16 @@ public class ReactExoplayerView extends FrameLayout implements
+             }
+         }
+ 
++        // raven: a file played as it is takes its sidecar subtitles as sources of their own.
++        // The factories above ignore the item's subtitle configurations (since 6.16.0), so the
++        // sideloaded tracks never loaded; the default factory merges each one in beside the
++        // file, and the text renderer shows its cues on the player's own clock.
++        if (subtitleConfigurations != null
++                && type == CONTENT_TYPE_OTHER
++                && !"asset".equals(uri.getScheme())) {
++            mediaSourceFactory = new DefaultMediaSourceFactory(mediaDataSourceFactory);
++        }
++
+         if (cmcdConfigurationFactory != null) {
+             mediaSourceFactory = mediaSourceFactory.setCmcdConfigurationFactory(
+                     cmcdConfigurationFactory::createCmcdConfiguration
+@@ -2235,11 +2264,16 @@ public class ReactExoplayerView extends FrameLayout implements
                  if (textRendererIndex != C.INDEX_UNSET) {
                      TrackGroupArray groups = info.getTrackGroups(textRendererIndex);
                      boolean trackFound = false;
@@ -58,7 +168,7 @@ index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..3af06e3a36b23dfccfc9f6d0ea81d25a
                              
                              boolean isMatch = false;
                              if ("language".equals(type) && format.language != null && format.language.equals(value)) {
-@@ -2248,7 +2272,7 @@ public class ReactExoplayerView extends FrameLayout implements
+@@ -2248,7 +2282,7 @@ public class ReactExoplayerView extends FrameLayout implements
                                  isMatch = true;
                              } else if ("index".equals(type)) {
                                  int targetIndex = ReactBridgeUtils.safeParseInt(value, -1);
@@ -67,3 +177,60 @@ index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..3af06e3a36b23dfccfc9f6d0ea81d25a
                                      isMatch = true;
                                  }
                              }
+diff --git a/lib/types/video.d.ts b/lib/types/video.d.ts
+index 9796b236bb4465687aea18a6abf31e4a77f249da..9f082c6627e7cc9e5353df6908629959fd248415 100644
+--- a/lib/types/video.d.ts
++++ b/lib/types/video.d.ts
+@@ -166,6 +166,8 @@ export type SubtitleStyle = {
+     paddingRight?: number;
+     opacity?: number;
+     subtitlesFollowVideo?: boolean;
++    color?: string;
++    fontFamily?: string;
+ };
+ export declare enum TextTrackType {
+     SUBRIP = "application/x-subrip",
+@@ -174,7 +176,7 @@ export declare enum TextTrackType {
+ }
+ export type TextTracks = {
+     title: string;
+-    language: ISO639_1;
++    language: ISO639_1 | (string & {});
+     type: TextTrackType;
+     uri: string;
+ }[];
+diff --git a/src/specs/VideoNativeComponent.ts b/src/specs/VideoNativeComponent.ts
+index 705d86dbcdf7f7100bbf6d0499b9dab0d77a19c2..4fc5270b5f451d462c1d12cf3d0bfe1dd64fff04 100644
+--- a/src/specs/VideoNativeComponent.ts
++++ b/src/specs/VideoNativeComponent.ts
+@@ -152,6 +152,8 @@ type SubtitleStyle = Readonly<{
+   paddingRight?: WithDefault<Float, 0>;
+   opacity?: WithDefault<Float, 1>;
+   subtitlesFollowVideo?: WithDefault<boolean, true>;
++  color?: string;
++  fontFamily?: string;
+ }>;
+ 
+ type OnLoadData = Readonly<{
+diff --git a/src/types/video.ts b/src/types/video.ts
+index 7605bbca6777a5ac0116182dda5c9831b61f7760..8b3aa44a816e013013798a18bbf8a202ef14f335 100644
+--- a/src/types/video.ts
++++ b/src/types/video.ts
+@@ -217,6 +217,8 @@ export type SubtitleStyle = {
+   paddingRight?: number;
+   opacity?: number;
+   subtitlesFollowVideo?: boolean;
++  color?: string;
++  fontFamily?: string;
+ };
+ 
+ export enum TextTrackType {
+@@ -227,7 +229,7 @@ export enum TextTrackType {
+ 
+ export type TextTracks = {
+   title: string;
+-  language: ISO639_1;
++  language: ISO639_1 | (string & {});
+   type: TextTrackType;
+   uri: string;
+ }[];

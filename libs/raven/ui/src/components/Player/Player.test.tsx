@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import {
+  CAPTION_SIZES,
+  DEFAULT_CAPTION_STYLE,
   ITEM_TYPES,
   MARKER_KINDS,
   MARKER_SOURCES,
@@ -9,12 +11,11 @@ import {
   type PlaybackSettingsState,
   type SubtitleTrack,
 } from '@raven/core'
-import { act, fireEvent, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useState } from 'react'
 import { Route, Routes, useNavigationType } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
-import type { PlayerFavourite, PlayerTitle } from '@/components/Player/PlayerServices'
+import type { PlayerTitle } from '@/components/Player/PlayerServices'
 import { api } from '@/test/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
 import { itemSummary, mediaItem } from '@/test/fixtures'
@@ -29,7 +30,6 @@ type TestPlayerProps = {
   markers?: PlayerTitle['markers']
   logo?: PlayerTitle['logo']
   homeTo?: PlayerTitle['homeTo']
-  favourite?: PlayerFavourite
 }
 
 /** A host as the web's is: new services on every render, the player only once they are in the store. */
@@ -40,7 +40,6 @@ const TestPlayer = ({
   markers = null,
   logo = null,
   homeTo = null,
-  favourite,
 }: TestPlayerProps) => {
   const isHosting = useHostPlayer({
     title: {
@@ -56,7 +55,6 @@ const TestPlayer = ({
     posterUrl: null,
     escape: null,
     progress: { started: () => {}, save: () => {}, left: () => {} },
-    ...(favourite && { favourite }),
   })
   return isHosting && <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />
 }
@@ -95,6 +93,7 @@ const TRACKS: MediaTracks = {
 const spies: Array<{ mockRestore: () => void }> = []
 const stubTracks = (tracks: MediaTracks = TRACKS) =>
   spies.push(spyOn(api, 'getTracks').mockImplementation(async () => tracks))
+spies.push(spyOn(api, 'getCaptionStyle').mockImplementation(async () => DEFAULT_CAPTION_STYLE))
 
 afterEach(() => {
   spies.splice(0).forEach((spy) => spy.mockRestore())
@@ -337,8 +336,16 @@ describe('the player controls', () => {
 
     press('c')
     expect(usePlayerPrefs.getState().subtitles.on).toBe(true)
+    const saveCaptions = spyOn(api, 'setCaptionStyle').mockImplementation(async (style) => style)
+    spies.push(saveCaptions)
     press('+')
-    expect(usePlayerPrefs.getState().captionScale).toBe(1.25)
+    expect(screen.getAllByText('Subtitle size: Large').length).toBeGreaterThan(0)
+    await waitFor(() =>
+      expect(saveCaptions).toHaveBeenCalledWith({
+        ...DEFAULT_CAPTION_STYLE,
+        size: CAPTION_SIZES.large,
+      }),
+    )
     press('>')
     expect(video.playbackRate).toBe(1.25)
 
@@ -735,38 +742,6 @@ describe('the player controls', () => {
     expect(screen.getByRole('button', { name: 'Nothing up next' })).toBeDisabled()
   })
 
-  it('favourites the video from the player, and says so', async () => {
-    /** The host keeps the favourite; the player only shows it and asks for the change. */
-    const FavouriteHost = () => {
-      const [isFavourite, setFavourite] = useState(false)
-      return (
-        <TestPlayer
-          media={mediaItem({ container: 'mp4' })}
-          backTo="/libraries/2"
-          favourite={{ isFavourite, toggle: () => setFavourite((marked) => !marked) }}
-        />
-      )
-    }
-    renderWithProviders({ ui: <FavouriteHost /> })
-    const heart = screen.getByRole('button', { name: 'Favourite' })
-    expect(heart).toHaveAttribute('aria-pressed', 'false')
-
-    await userEvent.click(heart)
-    expect(heart).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getAllByText('Added to favourites')).not.toHaveLength(0)
-
-    await userEvent.click(heart)
-    expect(heart).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getAllByText('Removed from favourites')).not.toHaveLength(0)
-  })
-
-  it('offers no heart when the host keeps no favourites', () => {
-    renderWithProviders({
-      ui: <TestPlayer media={mediaItem({ container: 'mp4' })} backTo="/libraries/2" />,
-    })
-    expect(screen.queryByRole('button', { name: 'Favourite' })).toBeNull()
-  })
-
   it('steps down through every conversion before giving up', async () => {
     // Says it can stream, but this pretend browser has no MediaSource to stream into.
     setBrowserSupport((mime) => !mime.includes('mlpa'))
@@ -1029,37 +1004,12 @@ describe('the player chrome', () => {
     expect(screen.queryByRole('dialog', { name: 'Playback' })).toBeNull()
   })
 
-  it('keeps the heart in the top bar beside the title, filled once favourited', () => {
-    renderWithProviders({
-      ui: (
-        <TestPlayer
-          media={uhd}
-          backTo="/libraries/2"
-          favourite={{ isFavourite: true, toggle: () => {} }}
-        />
-      ),
+  it('offers no heart in the top bar, and keeps the line of what the title is', () => {
+    const { container } = renderWithProviders({
+      ui: <TestPlayer media={uhd} backTo="/libraries/2" />,
     })
-    const heart = screen.getByRole('button', { name: 'Favourite' })
-    expect(heart).toHaveAttribute('aria-pressed', 'true')
-    expect(heart).toHaveClass('favourited')
-    expect(heart.closest('header')).toContainElement(
-      screen.getByRole('heading', { level: 1, name: 'Busboys' }),
-    )
-  })
-
-  it('keeps the heart on the same row as the runtime line', () => {
-    renderWithProviders({
-      ui: (
-        <TestPlayer
-          media={uhd}
-          backTo="/libraries/2"
-          favourite={{ isFavourite: false, toggle: () => {} }}
-        />
-      ),
-    })
-    const heart = screen.getByRole('button', { name: 'Favourite' })
-    expect(heart.parentElement).toHaveClass('aboutLine')
-    expect(heart.parentElement?.querySelector('.about')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Favourite' })).toBeNull()
+    expect(container.querySelector('header .about')).not.toBeNull()
   })
 
   it('shows a large play mark while paused, and drops it once the video plays', () => {

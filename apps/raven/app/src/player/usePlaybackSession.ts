@@ -5,7 +5,12 @@ import {
   type PlaybackMode,
   type StreamQuality,
 } from '@raven/core'
-import { type MediaSources, type SourceOutcome, useCookieVersion } from '@raven/native/headless'
+import {
+  type MediaSources,
+  type SidecarSource,
+  type SourceOutcome,
+  useCookieVersion,
+} from '@raven/native/headless'
 import { useEffect, useEffectEvent, useReducer } from 'react'
 
 /** How long a source may take to load before the ladder steps down from it. */
@@ -46,8 +51,14 @@ export const SESSION_EVENTS = {
   retried: 'retried',
 } as const
 
-/** A source the server handed out: what the player loads and the headers it sends. */
-type Sourced = Extract<SourceOutcome, { ok: true }>
+/**
+ * A source the server handed out: what the player loads and the headers it sends, with the
+ * sidecar subtitles a file played as it is loads beside it, addressed by the same ticket.
+ */
+type Sourced = Extract<SourceOutcome, { ok: true }> & { sidecars: readonly SidecarSource[] }
+
+/** A source the server refused, with why. */
+type Refused = Exclude<SourceOutcome, { ok: true }>
 
 /** Where the ladder stands: the plan's ways, the one tried now, and the spot it starts from. */
 type Ladder = {
@@ -81,7 +92,7 @@ export type SessionState =
   | { phase: typeof SESSION_PHASES.failed; problems: readonly string[] }
 
 type SessionEvent =
-  | { type: typeof SESSION_EVENTS.sourced; attempt: number; outcome: SourceOutcome }
+  | { type: typeof SESSION_EVENTS.sourced; attempt: number; outcome: Sourced | Refused }
   | { type: typeof SESSION_EVENTS.loaded; attempt: number }
   | { type: typeof SESSION_EVENTS.failed; attempt: number; at: number }
   | { type: typeof SESSION_EVENTS.dropped; attempt: number; at: number }
@@ -401,6 +412,8 @@ type UsePlaybackSessionProps = {
   audio: number | null
   problems: readonly string[]
   sources: MediaSources
+  /** The sidecar subtitle tracks the player loads beside a file played as it is, by id. */
+  sidecars: readonly string[]
   /** Whether the player is waiting for data, as its buffering says. */
   isWaiting: boolean
   /** Where the video is, in seconds, as the screen draws it: a stall lasts only while it stands still. */
@@ -421,6 +434,7 @@ export const usePlaybackSession = ({
   audio,
   problems,
   sources,
+  sidecars,
   isWaiting,
   clock,
 }: UsePlaybackSessionProps): { state: SessionState; dispatch: (event: SessionEvent) => void } => {
@@ -441,23 +455,28 @@ export const usePlaybackSession = ({
     if (state.phase !== SESSION_PHASES.sourcing || mode === null) return () => undefined
     const { at: from } = state
     const isTranscode = mode === PLAYBACK_MODES.transcode
-    sources
-      .source({
+    // Only a file played as it is takes sidecars beside it: a stream's renditions carry them.
+    const trackIds = mode === PLAYBACK_MODES.direct ? sidecars : []
+    Promise.all([
+      sources.source({
         media,
         mode,
         audio: state.audio,
         burn: isTranscode ? state.burn : null,
         quality: isTranscode ? state.quality : null,
-      })
-      .then(
-        (outcome) => {
-          if (status.isCurrent) dispatch({ type: SESSION_EVENTS.sourced, attempt: asked, outcome })
-        },
-        // `source` answers every request with an outcome; should one still reject, the next way is tried.
-        () => {
-          if (status.isCurrent) dispatch({ type: SESSION_EVENTS.failed, attempt: asked, at: from })
-        },
-      )
+      }),
+      sources.sidecars({ mediaId: media.id, trackIds }),
+    ]).then(
+      ([source, beside]) => {
+        if (!status.isCurrent) return
+        const outcome = source.ok ? { ...source, sidecars: beside } : source
+        dispatch({ type: SESSION_EVENTS.sourced, attempt: asked, outcome })
+      },
+      // `source` answers every request with an outcome; should one still reject, the next way is tried.
+      () => {
+        if (status.isCurrent) dispatch({ type: SESSION_EVENTS.failed, attempt: asked, at: from })
+      },
+    )
     return () => {
       status.isCurrent = false
     }

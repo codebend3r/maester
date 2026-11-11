@@ -6,6 +6,9 @@ import {
   AUTH_CONFIG_STATES,
   AUTH_HEADERS,
   AUTH_REFUSALS,
+  CAPTION_COLOURS,
+  CAPTION_SIZES,
+  DEFAULT_CAPTION_STYLE,
   HOME_SHELF_TYPES,
   type HistoryEntry,
   ITEM_TYPES,
@@ -13,6 +16,7 @@ import {
   MEMBER_STATUSES,
   NOTIFICATION_TONES,
   SCROBBLE_SERVICES,
+  SERVER_EVENT_TYPES,
   type MediaItem,
   WATCH_TARGET_KINDS,
   createApiClient,
@@ -24,6 +28,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { createApp } from '@/app'
 import type { ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
+import { type ServerEventEnvelope, ServerEvents, isForAccount } from '@/events/serverEvents'
 import { RAVEN_HEADERS } from '@/http'
 import { VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
 import type { AdoptedCounts } from '@/media/viewingAdoption'
@@ -485,6 +490,59 @@ describe('each account sees only its own viewing', () => {
     expect((await guest.listNotifications()).map(({ id }) => id)).not.toContain(logged.id)
   })
 
+  it("keeps each account's subtitle look to itself, and tells only that account's streams", async () => {
+    const member = await clientFor({ id: AUTH_TEST_IDS.friend })
+    const guest = await clientFor({ id: AUTH_TEST_IDS.guest })
+    const picked = { size: CAPTION_SIZES.largest, colour: CAPTION_COLOURS.yellow }
+    expect(await member.getCaptionStyle()).toEqual(DEFAULT_CAPTION_STYLE)
+    const heard: ServerEventEnvelope[] = []
+    const listening = enforced.app
+      .get(ServerEvents)
+      .stream()
+      .subscribe((envelope) => heard.push(envelope))
+    expect(await member.setCaptionStyle(picked)).toEqual(picked)
+    listening.unsubscribe()
+    expect(await member.getCaptionStyle()).toEqual(picked)
+    expect(await guest.getCaptionStyle()).toEqual(DEFAULT_CAPTION_STYLE)
+    expect(heard).toEqual([
+      { event: { type: SERVER_EVENT_TYPES.captions }, account: AUTH_TEST_IDS.friend },
+    ])
+    const [envelope] = heard
+    if (!envelope) throw new Error('no captions event was sent')
+    expect(isForAccount({ envelope, account: AUTH_TEST_IDS.friend })).toBe(true)
+    expect(isForAccount({ envelope, account: AUTH_TEST_IDS.guest })).toBe(false)
+  })
+
+  it('refuses a subtitle look the contract does not offer, and keeps the one it had', async () => {
+    const member = await clientFor({ id: AUTH_TEST_IDS.friend })
+    const before = await member.getCaptionStyle()
+    const headers = await headersFor({
+      fixture,
+      caller: CALLER_KINDS.member,
+      via: TOKEN_CARRIERS.bearer,
+    })
+    const heard: ServerEventEnvelope[] = []
+    const listening = enforced.app
+      .get(ServerEvents)
+      .stream()
+      .subscribe((envelope) => heard.push(envelope))
+    const refused = await Promise.all(
+      [{ size: 'enormous', colour: CAPTION_COLOURS.white }, { size: CAPTION_SIZES.small }, {}].map(
+        (payload) =>
+          enforced.app.inject({
+            method: ROUTES.setCaptionStyle.method,
+            url: pathOf({ route: ROUTES.setCaptionStyle }),
+            headers,
+            payload,
+          }),
+      ),
+    )
+    listening.unsubscribe()
+    expect(refused.map(({ statusCode }) => statusCode)).toEqual([400, 400, 400])
+    expect(heard).toEqual([])
+    expect(await member.getCaptionStyle()).toEqual(before)
+  })
+
   it('answers per-account reads uncached', async () => {
     const { library, video } = enforced.ids
     const member = await clientFor({ id: AUTH_TEST_IDS.friend })
@@ -516,6 +574,7 @@ describe('each account sees only its own viewing', () => {
       { route: ROUTES.playlist, params: { id: mix } },
       { route: ROUTES.scrobbling, params: {} },
       { route: ROUTES.notifications, params: {} },
+      { route: ROUTES.captionStyle, params: {} },
     ]
     const writes: { route: Route; params: Record<string, number>; payload?: object }[] = [
       { route: ROUTES.progress, params: { id: video }, payload: { position: SPOT } },
@@ -541,6 +600,11 @@ describe('each account sees only its own viewing', () => {
         route: ROUTES.logNotification,
         params: {},
         payload: { message: 'Saved', tone: NOTIFICATION_TONES.success },
+      },
+      {
+        route: ROUTES.setCaptionStyle,
+        params: {},
+        payload: { size: CAPTION_SIZES.medium, colour: CAPTION_COLOURS.cyan },
       },
       {
         route: ROUTES.watched,

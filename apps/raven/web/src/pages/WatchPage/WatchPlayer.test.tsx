@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import {
   ACCOUNT_TICKET_SECONDS,
+  DEFAULT_CAPTION_STYLE,
   ITEM_TYPES,
-  type MediaItem,
   type MediaMarkers,
   type MediaTracks,
   PLAY_LINK_MAX_NEXT,
@@ -19,7 +19,7 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-libra
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { WatchProbe } from '@/test/watchProbe'
-import { WatchPlayer as Player, WatchPage } from '@/pages/WatchPage/WatchPage'
+import { WatchPlayer as Player } from '@/pages/WatchPage/WatchPage'
 import { api } from '@/lib/api'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { fakeAccount } from '@/test/authClient'
@@ -66,11 +66,12 @@ const TRACKS: MediaTracks = {
 }
 
 const spies: Array<{ mockRestore: () => void }> = []
-/** What the player reads beside the video: its tracks, and its markers, none by default. */
+/** What the player reads beside the video: its tracks, its markers, none by default, and the account's subtitle look. */
 const stubPlayerReads = (tracks: MediaTracks = TRACKS) =>
   spies.push(
     spyOn(api, 'getTracks').mockImplementation(async () => tracks),
     spyOn(api, 'getMarkers').mockImplementation(async () => NO_MARKERS),
+    spyOn(api, 'getCaptionStyle').mockImplementation(async () => DEFAULT_CAPTION_STYLE),
   )
 
 afterEach(() => {
@@ -316,44 +317,6 @@ describe('shared player capability module', () => {
     })
     expect(container.querySelector('video')).toBeNull()
     expect(screen.getByText("This video can't play in this browser.")).toBeInTheDocument()
-  })
-})
-
-describe('WatchPage favourite', () => {
-  beforeEach(() => stubPlayerReads())
-
-  it('favourites the video while it plays, showing the heart before the server answers', async () => {
-    // The server's copy of the video, which a favourite changes and every read returns.
-    let saved: MediaItem = mediaItem({ container: 'mp4', favourite: false })
-    spies.push(spyOn(api, 'getMedia').mockImplementation(async () => saved))
-    const answer = held<MediaItem>()
-    const setFavourite = spyOn(api, 'setFavourite').mockImplementation(({ favourite }) => {
-      saved = { ...saved, favourite }
-      return answer.promise
-    })
-    spies.push(setFavourite)
-    const { client } = renderWithProviders({
-      ui: (
-        <Routes>
-          <Route path="watch/:id" element={<WatchPage />} />
-        </Routes>
-      ),
-      route: '/watch/7',
-    })
-    const heart = await screen.findByRole('button', { name: 'Favourite' })
-    expect(heart).toHaveAttribute('aria-pressed', 'false')
-
-    await userEvent.click(heart)
-    await waitFor(() => expect(heart).toHaveAttribute('aria-pressed', 'true'))
-    expect(setFavourite).toHaveBeenCalledWith({ id: 7, favourite: true })
-
-    await act(async () => answer.answer(saved))
-    // The answer has the video read again; the heart holds once that read is in.
-    await waitFor(() => expect(client.isFetching()).toBe(0))
-    expect(screen.getByRole('button', { name: 'Favourite' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
   })
 })
 

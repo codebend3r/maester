@@ -12,6 +12,7 @@ import {
   adHocApps,
   APP_ICON,
   documentTypes,
+  FONTS,
   FUSES,
   isPackagedPath,
   signingFrom,
@@ -61,9 +62,10 @@ const config: ForgeConfig = {
     /*
      * stage:mpv fills staging/mpv/<target>, so it lands at Contents/Resources/mpv/darwin-arm64 on
      * macOS and resources/mpv/win32-x64 on Windows; the web app's build (a dependency of this
-     * project's build) lands at Contents/Resources/dist or resources/dist.
+     * project's build) lands at Contents/Resources/dist or resources/dist; the subtitle fonts
+     * land at Contents/Resources/fonts or resources/fonts.
      */
-    extraResource: [MPV_STAGING, WEB_DIST],
+    extraResource: [MPV_STAGING, WEB_DIST, FONTS],
     ...signing,
   },
   makers: [

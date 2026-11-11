@@ -10,7 +10,7 @@ import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
-import { ActionSheetIOS } from 'react-native'
+import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import { useAccountSession } from '@/account/session'
 import { Settings } from '@/screens/Settings'
@@ -27,6 +27,7 @@ import {
 import { pathFor } from '@/test/fixtureFetch'
 import { FILMS, NAS } from '@/test/homeServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
+import { CODE_FONT } from '@/theme/fonts'
 
 const mockServer: AdminServerState = { account: OWNER, playback: PLAYBACK, heard: [] }
 const mockApi = jest.fn((server: AppServer) => adminApi(mockServer)(server))
@@ -89,6 +90,17 @@ describe("the owner's settings on a phone or tablet", () => {
     ).toBeTruthy()
   })
 
+  it('shows Remote Access to read only: the addresses in the fixed-width face, and nothing to switch or apply', async () => {
+    await renderScreen({ ui: <Settings />, client })
+    const address = await screen.findByText(/^192\.168\.1\.20:/u)
+    expect(StyleSheet.flatten(address.props.style)?.fontFamily).toBe(CODE_FONT)
+    expect(screen.getByLabelText(/^Private: 192\.168\.1\.20:/u)).toBeTruthy()
+    expect(screen.getByText('Remote access is off.')).toBeTruthy()
+    expect(screen.queryByRole('switch', { name: /remote access/iu })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Check again' })).toBeNull()
+  })
+
   it('saves a playback setting to the server and shows it at once', async () => {
     answerSheet('Remux only')
     await renderScreen({ ui: <Settings />, client })
@@ -141,7 +153,9 @@ describe("the owner's settings on a phone or tablet", () => {
     mockServer.account = { ...OWNER, isOwner: false }
     await renderScreen({ ui: <Settings />, client })
     await waitFor(() =>
-      expect(mockServer.heard.map(({ path }) => path)).toEqual([APP_CLIENT_CALLS.getMe.path]),
+      expect(mockServer.heard.map(({ path }) => path).toSorted()).toEqual(
+        [APP_CLIENT_CALLS.getMe.path, APP_CLIENT_CALLS.getCaptionStyle.path].toSorted(),
+      ),
     )
     expect(screen.queryByRole('header', { name: 'Admin' })).toBeNull()
     expect(screen.queryByRole('header', { name: 'Remote Access' })).toBeNull()

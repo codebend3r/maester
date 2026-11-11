@@ -21,11 +21,10 @@ export const numbersOf = (command: PlayerCommand): number[] => {
       return [command.volume]
     case PLAYER_COMMANDS.speed:
       return [command.rate]
-    case PLAYER_COMMANDS.subtitleScale:
-      return [command.scale]
     case PLAYER_COMMANDS.play:
     case PLAYER_COMMANDS.pause:
     case PLAYER_COMMANDS.subtitle:
+    case PLAYER_COMMANDS.subtitleStyle:
     case PLAYER_COMMANDS.stats:
     case PLAYER_COMMANDS.stop:
       return []

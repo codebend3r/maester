@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test'
-import type { PlayerAction } from '@raven/core'
+import { CAPTION_SIZES, DEFAULT_CAPTION_STYLE, type PlayerAction } from '@raven/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   act,
@@ -57,7 +57,7 @@ const actionsFor = (): EngineActions => ({
   setRate: mock(() => {}),
   setAudio: mock(() => {}),
   setSubtitle: mock(() => {}),
-  setSubtitleScale: mock(() => {}),
+  setCaptionStyle: mock(() => {}),
 })
 
 describe('videoReducer ended', () => {
@@ -177,6 +177,7 @@ describe('PlayerChrome with a fake engine handle', () => {
       duration: 120,
       position: { current: 20 },
       tracks: null,
+      captionStyle: DEFAULT_CAPTION_STYLE,
       actions,
       focusSurface: mock(() => {}),
       surface: <p>Engine picture</p>,
@@ -209,7 +210,7 @@ describe('PlayerChrome with a fake engine handle', () => {
     fireEvent.keyDown(window, { key: '>' })
     expect(actions.setRate).toHaveBeenCalled()
     fireEvent.keyDown(window, { key: '+' })
-    expect(actions.setSubtitleScale).toHaveBeenCalled()
+    expect(actions.setCaptionStyle).toHaveBeenLastCalledWith({ size: CAPTION_SIZES.large })
     await userEvent.click(screen.getByRole('button', { name: 'Start over' }))
     expect(actions.seek).toHaveBeenLastCalledWith(0)
     expect(actions.play).toHaveBeenCalledTimes(2)
@@ -224,6 +225,7 @@ describe('PlayerChrome Playback info', () => {
       duration: 120,
       position: { current: 20 },
       tracks: null,
+      captionStyle: DEFAULT_CAPTION_STYLE,
       actions: actionsFor(),
       focusSurface: mock(() => {}),
       surface: <p>Engine picture</p>,
@@ -269,6 +271,7 @@ describe('PlayerChrome host actions', () => {
       duration: 120,
       position: { current: 20 },
       tracks: null,
+      captionStyle: DEFAULT_CAPTION_STYLE,
       actions,
       focusSurface: mock(() => {}),
       surface: <p>Engine picture</p>,
@@ -345,9 +348,8 @@ describe('the line under a local file’s title', () => {
     renderWithProviders({
       ui: <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:local-clip' } }} />,
     })
-    // The runtime line shares its row with the heart, under the title.
-    const row = screen.getByRole('heading', { level: 1, name: 'Local clip' }).nextElementSibling
-    return row?.querySelector(`.${styles.about ?? ''}`) ?? null
+    // The runtime line sits right under the title.
+    return screen.getByRole('heading', { level: 1, name: 'Local clip' }).nextElementSibling
   }
 
   it('gives the runtime alone when the host names no context', () => {
@@ -461,6 +463,7 @@ describe('PlayerChrome seams for a native host', () => {
       duration: 120,
       position: { current: time },
       tracks: null,
+      captionStyle: DEFAULT_CAPTION_STYLE,
       actions,
       readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
       focusSurface: () => {},
@@ -695,6 +698,7 @@ describe('PlayerChrome handoff in the playback menu', () => {
       duration: 120,
       position: { current: 42.7 },
       tracks: null,
+      captionStyle: DEFAULT_CAPTION_STYLE,
       actions,
       readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
       focusSurface: () => {},
