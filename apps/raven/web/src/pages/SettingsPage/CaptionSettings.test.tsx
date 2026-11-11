@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   CAPTION_COLOURS,
@@ -28,7 +28,11 @@ describe('CaptionSettings', () => {
     })
   })
 
-  afterEach(() => Object.values(spies).forEach((spy) => spy.mockReset()))
+  // Unmounted first, or the page refetches from a spy that now answers undefined.
+  afterEach(() => {
+    cleanup()
+    Object.values(spies).forEach((spy) => spy.mockReset())
+  })
 
   // The client is the app's one, so the next file gets it back as it was.
   afterAll(() => Object.values(spies).forEach((spy) => spy.mockRestore()))

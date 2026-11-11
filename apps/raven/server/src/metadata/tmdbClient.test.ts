@@ -1,7 +1,13 @@
+import { ITEM_TYPES } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { HEADERS } from '@shared/server'
-import { type MetadataFetch, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
+import {
+  DOCUMENTARY_FILTERS,
+  type MetadataFetch,
+  TmdbClient,
+  TmdbError,
+} from '@/metadata/tmdbClient'
 import { mergeCredits, pickLogo, toMovie, toPerson, toSeason, toShow } from '@/metadata/tmdbShapes'
 import { fakeTmdb, keanuReeves, movieBody, personBody, seasonBody, showBody } from '@/test/fakeTmdb'
 
@@ -791,5 +797,136 @@ describe('toPerson and person', () => {
   it('fails as the other calls do for a body it cannot read', async () => {
     const client = new TmdbClient(config(), respond([() => json({ body: { id: 1 } })]))
     await expect(client.person('1')).rejects.toMatchObject({ kind: 'unavailable' })
+  })
+
+  it('asks for the popular movies out from a day on, without documentaries', async () => {
+    const asked: string[] = []
+    const client = new TmdbClient(config(), async ({ url }) => {
+      asked.push(url)
+      return json({
+        body: {
+          results: [
+            {
+              id: 7,
+              title: 'Soon',
+              release_date: '2026-12-25',
+              poster_path: '/soon.jpg',
+              popularity: 12.5,
+            },
+            { id: 8, title: 'Undated', release_date: '' },
+          ],
+        },
+      })
+    })
+    expect(
+      await client.upcoming({
+        type: ITEM_TYPES.movie,
+        from: '2026-11-10',
+        documentaries: DOCUMENTARY_FILTERS.never,
+        page: 2,
+      }),
+    ).toEqual([
+      {
+        tmdbId: '7',
+        title: 'Soon',
+        released: '2026-12-25',
+        poster: '/soon.jpg',
+        popularity: 12.5,
+      },
+    ])
+    const url = new URL(asked[0] ?? '')
+    expect(url.pathname).toBe('/3/discover/movie')
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      'primary_release_date.gte': '2026-11-10',
+      without_genres: '99',
+      sort_by: 'popularity.desc',
+      include_adult: 'false',
+      page: '2',
+    })
+  })
+
+  it('asks for the documentary shows first aired from a day on', async () => {
+    const asked: string[] = []
+    const client = new TmdbClient(config(), async ({ url }) => {
+      asked.push(url)
+      return json({
+        body: { results: [{ id: 9, name: 'Wild', first_air_date: '2027-01-03', popularity: 3 }] },
+      })
+    })
+    const shows = await client.upcoming({
+      type: ITEM_TYPES.show,
+      from: '2026-11-10',
+      documentaries: DOCUMENTARY_FILTERS.only,
+      page: 1,
+    })
+    expect(shows).toMatchObject([{ tmdbId: '9', title: 'Wild', released: '2027-01-03' }])
+    const url = new URL(asked[0] ?? '')
+    expect(url.pathname).toBe('/3/discover/tv')
+    expect(url.searchParams.get('first_air_date.gte')).toBe('2026-11-10')
+    expect(url.searchParams.get('with_genres')).toBe('99')
+  })
+
+  it('asks for the movies out from a day on, the soonest first, each in its place', async () => {
+    const asked: string[] = []
+    const client = new TmdbClient(config(), async ({ url }) => {
+      asked.push(url)
+      return json({
+        body: {
+          total_results: 41,
+          results: [
+            { id: 8, title: 'Undated', release_date: '' },
+            { id: 7, title: 'Soon', release_date: '2026-11-12', poster_path: null },
+          ],
+        },
+      })
+    })
+    expect(
+      await client.soonest({
+        type: ITEM_TYPES.movie,
+        from: '2026-11-10',
+        documentaries: DOCUMENTARY_FILTERS.never,
+        page: 3,
+      }),
+    ).toEqual({
+      titles: [
+        {
+          at: 1,
+          title: {
+            tmdbId: '7',
+            title: 'Soon',
+            released: '2026-11-12',
+            poster: null,
+            popularity: 0,
+          },
+        },
+      ],
+      size: 2,
+      total: 41,
+    })
+    const url = new URL(asked[0] ?? '')
+    expect(url.pathname).toBe('/3/discover/movie')
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      'primary_release_date.gte': '2026-11-10',
+      without_genres: '99',
+      sort_by: 'primary_release_date.asc',
+      page: '3',
+    })
+  })
+
+  it('orders the shows by their first episode', async () => {
+    const asked: string[] = []
+    const client = new TmdbClient(config(), async ({ url }) => {
+      asked.push(url)
+      return json({ body: { results: [] } })
+    })
+    expect(
+      await client.soonest({
+        type: ITEM_TYPES.show,
+        from: '2026-11-10',
+        documentaries: DOCUMENTARY_FILTERS.only,
+        page: 1,
+      }),
+    ).toEqual({ titles: [], size: 0, total: 0 })
+    expect(new URL(asked[0] ?? '').searchParams.get('sort_by')).toBe('first_air_date.asc')
   })
 })

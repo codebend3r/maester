@@ -13,10 +13,24 @@ import {
   isHome,
   isHomeSearch,
   isPosterEntries,
+  isUpcoming,
+  isUpcomingPage,
   type ItemSummary,
   type PosterEntry,
+  type Upcoming,
+  type UpcomingPage,
+  type UpcomingShelf,
+  UPCOMING_PARAMS,
+  UPCOMING_PATH,
+  UPCOMING_SHELF_PATH,
 } from '@/contract'
-import { toQueryString } from '@/query'
+import { fillPath, pathWithQuery, toQueryString } from '@/query'
+
+type UpcomingShelfQuery = {
+  shelf: UpcomingShelf
+  /** The cursor the page before answered as `next`; null for the first page. */
+  after: string | null
+}
 
 /** The home page: what is in progress, each library's shelf, the hero, and the favourites across every library. */
 export const homeCalls = ({ send, expect }: Transport) => ({
@@ -51,6 +65,22 @@ export const homeCalls = ({ send, expect }: Transport) => ({
         body: { itemId, isShown } satisfies HeroPickChange,
       }),
       guard: isHeroPicks,
+    }),
+
+  /** The movies, shows and documentaries TMDB says are still to come, the most popular first. */
+  getUpcoming: (): Promise<Upcoming> =>
+    expect({ request: send({ path: UPCOMING_PATH }), guard: isUpcoming }),
+
+  /** One page of a Coming soon shelf, the soonest out first. */
+  getUpcomingShelf: ({ shelf, after }: UpcomingShelfQuery): Promise<UpcomingPage> =>
+    expect({
+      request: send({
+        path: pathWithQuery({
+          path: fillPath({ path: UPCOMING_SHELF_PATH, params: { [UPCOMING_PARAMS.shelf]: shelf } }),
+          query: after === null ? {} : { [UPCOMING_PARAMS.after]: after },
+        }),
+      }),
+      guard: isUpcomingPage,
     }),
 
   /** Every favourite across every library with the poster its card shows, most recently favourited first. */

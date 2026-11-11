@@ -17,7 +17,7 @@ require_apple_tools tvOS appletvsimulator
 prepare_app
 
 step 'Build for the Apple TV simulator'
-CURL_HOME="$WORK" bunx nx run @raven/app:build:tvos --excludeTaskDependencies
+CURL_HOME="$WORK" bun run ci:app:tvos:build
 
 # `expo prebuild` exits 0 when `pod install` fails, and ios/ is shared with the iPhone
 # build, so this checks it is the TV project with its pods installed.

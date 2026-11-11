@@ -288,6 +288,11 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command("ci:app:tvos", "The 📺 App on Apple TV job.", "macOS + Xcode"),
             Command(
+                "ci:app:tvos:build",
+                "The Apple TV job's Release build for the simulator, with a brief log.",
+                "macOS + Xcode",
+            ),
+            Command(
                 "ci:app:android-tv",
                 "The 📺 App on Android TV job: every ci:app:android-tv step below, in order.",
                 "Android SDK",

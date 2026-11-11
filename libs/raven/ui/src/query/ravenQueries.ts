@@ -19,11 +19,16 @@ import {
   type PlayHistoryPage,
   type PlayHistoryShow,
   type TrackPage,
+  type UpcomingPage,
+  type UpcomingShelf,
   type ViewingSession,
   asksServerForNext,
 } from '@raven/core'
 import { LISTING_GC_MS, queryKeys } from '@/query/queryClient'
 import { playerQueriesFor } from '@/lib/playerQueries'
+
+/** How long Coming soon is taken as read: the server keeps TMDB's answer for hours. */
+const UPCOMING_STALE_MS = 30 * 60_000
 
 /** What a history lists: what was watched by the library's own measure, or everything that played. */
 export const HISTORY_SHOWS = { watched: 'watched', all: 'all' } as const
@@ -39,6 +44,11 @@ const FIRST_SONGS_PAGE: SongsPage = { at: 0, offset: 0 }
 
 /** A history's first page has no cursor before it. */
 const FIRST_HISTORY_PAGE: number | null = null
+
+const FIRST_UPCOMING_PAGE: string | null = null
+
+/** The cursor of the Coming soon page after `last`; undefined after the last. */
+const nextUpcomingPage = (last: UpcomingPage): string | undefined => last.next ?? undefined
 
 /** The cursor of the page after `last`; undefined after the last page, which ends the list. */
 const nextHistoryPage = (last: PlayHistoryPage): number | undefined => last.next ?? undefined
@@ -232,6 +242,23 @@ export const ravenQueriesFor = (api: ApiClient) => {
       queryKey: queryKeys.heroPicks,
       queryFn: () => api.getHeroPicks(),
     }),
+
+    /** What is coming soon, which the server reads from TMDB a few times a day at most. */
+    upcomingQuery: queryOptions({
+      queryKey: queryKeys.upcoming,
+      queryFn: () => api.getUpcoming(),
+      staleTime: UPCOMING_STALE_MS,
+    }),
+
+    /** One Coming soon shelf, a page at a time, the soonest out first; kept as long as the shelves. */
+    upcomingShelfQuery: (shelf: UpcomingShelf) =>
+      infiniteQueryOptions({
+        queryKey: queryKeys.upcomingShelf(shelf),
+        queryFn: ({ pageParam }) => api.getUpcomingShelf({ shelf, after: pageParam }),
+        initialPageParam: FIRST_UPCOMING_PAGE,
+        getNextPageParam: nextUpcomingPage,
+        staleTime: UPCOMING_STALE_MS,
+      }),
 
     /** What a search from home finds in every library; a blank one asks for nothing. */
     homeSearchQuery: (query: string) =>

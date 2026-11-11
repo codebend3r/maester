@@ -26,6 +26,8 @@ export const {
   homeAlbumsQuery,
   heroPicksQuery,
   homeSearchQuery,
+  upcomingQuery,
+  upcomingShelfQuery,
   mediaQuery,
   nextInSessionQuery,
   markersQuery,

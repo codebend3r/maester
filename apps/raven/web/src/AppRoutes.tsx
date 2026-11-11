@@ -1,10 +1,11 @@
 import { Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
-import { AUTH_ROUTES, DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
+import { AUTH_ROUTES, DESKTOP_PATHS, PAGE_PATHS, UPCOMING_SHELVES } from '@raven/core'
 import { Toaster } from '@raven/ui'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
 import { HomeSkeleton } from '@/pages/HomePage/HomeSkeleton'
+import { COMING_SOON_PATH, comingSoonShelfPath } from '@/pages/ComingSoonPage/copy'
 import { DESIGN_PATH } from '@/pages/DesignPage/copy'
 import { ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 import { PendingPage } from '@/pages/PendingPage/PendingPage'
@@ -97,6 +98,12 @@ const ContinueWatchingPage = lazyPage(() =>
   import('@/pages/ContinueWatchingPage/ContinueWatchingPage').then(
     (module) => module.ContinueWatchingPage,
   ),
+)
+const ComingSoonPage = lazyPage(() =>
+  import('@/pages/ComingSoonPage/ComingSoonPage').then((module) => module.ComingSoonPage),
+)
+const UpcomingShelfPage = lazyPage(() =>
+  import('@/pages/ComingSoonPage/UpcomingShelfPage').then((module) => module.UpcomingShelfPage),
 )
 const AlbumPage = lazyPage(() =>
   import('@/pages/AlbumPage/AlbumPage').then((page) => page.AlbumPage),
@@ -195,6 +202,14 @@ export const AppRoutes = () => {
                 <Route path={NOW_PLAYING_PATH} element={<NowPlayingPage />} />
                 <Route path={BINGE_PATH} element={<BingePage />} />
                 <Route path={CONTINUE_WATCHING_PATH} element={<ContinueWatchingPage />} />
+                <Route path={COMING_SOON_PATH} element={<ComingSoonPage />} />
+                {Object.values(UPCOMING_SHELVES).map((shelf) => (
+                  <Route
+                    key={shelf}
+                    path={comingSoonShelfPath(shelf)}
+                    element={<UpcomingShelfPage key={shelf} shelf={shelf} />}
+                  />
+                ))}
                 <Route path="favourites" element={<FavouritesPage />} />
                 <Route path={PLAY_HISTORY_ROUTES.own} element={<PlayHistoryPage />} />
                 <Route path={PLAY_HISTORY_ROUTES.everyone} element={<EveryonesHistoryPage />} />

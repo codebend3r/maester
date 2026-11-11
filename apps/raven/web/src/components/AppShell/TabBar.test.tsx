@@ -83,7 +83,7 @@ describe('TabBar', () => {
     )
   })
 
-  it('opens a sheet of the rest, with Binge first when Music took its slot, and Manage for an admin', async () => {
+  it('opens a sheet of the rest, with Binge first when Music took its slot, then Coming soon, and Manage for an admin', async () => {
     renderBar({ hasMusic: true })
     await userEvent.click(more())
     expect(more()).toHaveAttribute('aria-expanded', 'true')
@@ -91,6 +91,7 @@ describe('TabBar', () => {
     const [main, manage] = within(sheet()).getAllByRole('list')
     expect(main && linksOf(main)).toEqual([
       ['Binge', '/binge'],
+      ['Coming soon', '/coming-soon'],
       ['Play history', '/history'],
       ['Notifications', '/notifications'],
       ['Settings', '/settings'],
@@ -104,6 +105,7 @@ describe('TabBar', () => {
     ])
     expect(within(sheet()).getAllByRole('link').map(iconOf)).toEqual([
       'popcorn',
+      'calendar',
       'history',
       'bell',
       'settings',
@@ -117,6 +119,7 @@ describe('TabBar', () => {
     renderBar()
     await userEvent.click(more())
     expect(linksOf(sheet())).toEqual([
+      ['Coming soon', '/coming-soon'],
       ['Play history', '/history'],
       ['Notifications', '/notifications'],
       ['Settings', '/settings'],
@@ -131,6 +134,7 @@ describe('TabBar', () => {
     await userEvent.click(more())
     expect(within(sheet()).queryByRole('heading', { name: 'Manage' })).toBeNull()
     expect(linksOf(sheet())).toEqual([
+      ['Coming soon', '/coming-soon'],
       ['Play history', '/history'],
       ['Notifications', '/notifications'],
       ['Settings', '/settings'],
@@ -144,6 +148,7 @@ describe('TabBar', () => {
     await userEvent.click(more())
     const [main] = within(sheet()).getAllByRole('list')
     expect(main && linksOf(main)).toEqual([
+      ['Coming soon', '/coming-soon'],
       ['Play history', '/history'],
       ['Notifications', '/notifications'],
       ['This Mac', DESKTOP_PATHS.local],

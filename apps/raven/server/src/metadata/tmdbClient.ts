@@ -14,6 +14,8 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { ERROR_NAMES } from '@/errorMessage'
 import { RAVEN_HEADERS } from '@/http'
 import {
+  type DiscoveredPage,
+  type DiscoveredTitle,
   type FetchedItem,
   type FetchedPerson,
   type MatchFacts,
@@ -23,6 +25,7 @@ import {
   type TmdbImages,
   tmdbRating,
   toAlternativeTitles,
+  toDiscoveredPage,
   toFoundIds,
   toLogo,
   toMatchFacts,
@@ -74,6 +77,24 @@ const itemPath = ({ type, tmdbId }: ItemPathProps): string =>
 
 /** TMDB's search routes, which the client calls and the test fake answers. */
 export const TMDB_SEARCH_ROUTES = { movie: '/search/movie', show: '/search/tv' } as const
+
+/** TMDB's discover routes, the parameter each takes the earliest day out in, and its order by that day. */
+const TMDB_DISCOVER = {
+  movie: {
+    path: '/discover/movie',
+    from: 'primary_release_date.gte',
+    soonest: 'primary_release_date.asc',
+  },
+  show: { path: '/discover/tv', from: 'first_air_date.gte', soonest: 'first_air_date.asc' },
+} as const satisfies Record<MatchItemType, { path: string; from: string; soonest: string }>
+
+/** TMDB's order by popularity, the most popular first. */
+const TMDB_MOST_POPULAR = 'popularity.desc'
+
+/** The discover parameter documentaries go in: the one that lists them alone, or the one that keeps them out. */
+export const DOCUMENTARY_FILTERS = { only: 'with_genres', never: 'without_genres' } as const
+
+export type DocumentaryFilter = (typeof DOCUMENTARY_FILTERS)[keyof typeof DOCUMENTARY_FILTERS]
 
 /** One call may take this long before it counts as TMDB being down. */
 const TIMEOUT_MS = 10_000
@@ -173,6 +194,21 @@ type TmdbClientScoreProps = {
 }
 
 type TmdbClientImagesProps = { type: MatchItemType; tmdbId: string }
+
+type TmdbClientUpcomingProps = {
+  type: MatchItemType
+  /** `YYYY-MM-DD`, the earliest day out. */
+  from: string
+  /** Whether documentaries are all it lists, or kept out of it. */
+  documentaries: DocumentaryFilter
+  /** TMDB's page of twenty, from 1. */
+  page: number
+}
+
+type TmdbClientDiscoverProps = TmdbClientUpcomingProps & {
+  /** TMDB's `sort_by`. */
+  sortBy: string
+}
 
 /**
  * TMDB's API v3, read with a bearer token. Keeps to 20 calls a second with
@@ -369,6 +405,46 @@ export class TmdbClient {
     const season = toSeason(body)
     if (!season) throw unreadable(`season ${seasonNumber} of show ${showTmdbId}`)
     return season
+  }
+
+  /**
+   * A page of the movies or shows first out on `from` or later, the most
+   * popular first: documentaries alone, or everything but them.
+   */
+  async upcoming(props: TmdbClientUpcomingProps): Promise<DiscoveredTitle[]> {
+    const page = await this.discover({ ...props, sortBy: TMDB_MOST_POPULAR })
+    return page.titles.map(({ title }) => title)
+  }
+
+  /**
+   * A page of the movies or shows first out on `from` or later, the soonest
+   * first, each title in its place among TMDB's results, and how many there
+   * are: documentaries alone, or everything but them.
+   */
+  soonest(props: TmdbClientUpcomingProps): Promise<DiscoveredPage> {
+    return this.discover({ ...props, sortBy: TMDB_DISCOVER[props.type].soonest })
+  }
+
+  private async discover({
+    type,
+    from,
+    documentaries,
+    page,
+    sortBy,
+  }: TmdbClientDiscoverProps): Promise<DiscoveredPage> {
+    const route = TMDB_DISCOVER[type]
+    return toDiscoveredPage(
+      await this.get({
+        path: route.path,
+        params: {
+          [route.from]: from,
+          [documentaries]: String(TMDB_GENRES.documentary),
+          sort_by: sortBy,
+          include_adult: 'false',
+          page: String(page),
+        },
+      }),
+    )
   }
 
   /** TMDB's ids for an IMDb or TVDB id, by kind. */

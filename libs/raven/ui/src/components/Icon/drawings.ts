@@ -65,6 +65,7 @@ const SPEAKER = 'M4.5 10a1 1 0 0 1 1-1h2.5l4-3.5v13L8 15H5.5a1 1 0 0 1-1-1z'
 const LOCK_BODY = roundRect({ x: 5, y: 10.5, w: 14, h: 10, r: 2.5 })
 const PANEL = roundRect({ x: 3.5, y: 4.5, w: 17, h: 15, r: 2.5 })
 const SCREEN = roundRect({ x: 3, y: 5.5, w: 18, h: 13, r: 2.5 })
+const CALENDAR = roundRect({ x: 3.5, y: 5.5, w: 17, h: 15, r: 2.5 })
 const BALL = circle({ cx: 12, cy: 12, r: 8.5 })
 const BARS = `${roundRect({ x: 6.5, y: 5, w: 3.5, h: 14, r: 1.2 })}${roundRect({ x: 14, y: 5, w: 3.5, h: 14, r: 1.2 })}`
 const DOUBLE_BACK = 'M11.5 7.5L6.5 12l5 4.5zM18.5 7.5l-5 4.5 5 4.5z'
@@ -296,6 +297,10 @@ export const DRAWINGS = {
     stroke: `${PAGE}M14 3.5v4h4`,
     fill: PAGE,
     marks: smallPlay({ x: 10.3, y: 11, h: 5.4 }),
+  },
+  calendar: {
+    stroke: `${CALENDAR}M3.5 10h17M8 3.5v4M16 3.5v4`,
+    fill: CALENDAR,
   },
   film: { stroke: FILM, fill: FILM_FILL },
   filmSpark: { stroke: FILM, fill: FILM_FILL, marks: spark({ cx: 12, cy: 12, r: 3 }) },

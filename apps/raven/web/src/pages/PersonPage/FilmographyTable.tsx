@@ -14,6 +14,7 @@ import { Bone } from '@/components/Skeleton/Skeleton'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
 import { api } from '@/lib/api'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
+import { tmdbTitleUrl } from '@/lib/tmdbLinks'
 import { useTableSort } from '@/lib/useTableSort'
 import { PERSON_COPY } from '@/pages/PersonPage/copy'
 import styles from '@/pages/PersonPage/FilmographyTable.module.scss'
@@ -50,10 +51,6 @@ const episodesOf = (entry: FilmographyEntry): number | null =>
         : Math.max(most ?? credit.episodes, credit.episodes),
     null,
   )
-
-/** The title's page on TMDB, for one raven does not hold. */
-const tmdbUrl = (entry: FilmographyEntry): string =>
-  `https://www.themoviedb.org/${entry.type === ITEM_TYPES.movie ? 'movie' : 'tv'}/${entry.tmdbId}`
 
 /** A title with no date is still to come, so it sorts as the newest, as the server lists it. */
 const UNDATED = '9999'
@@ -157,7 +154,7 @@ const HeldTitle = ({ entry, page }: HeldTitleProps) => (
 type MissingTitleProps = { entry: FilmographyEntry }
 
 const MissingTitle = ({ entry }: MissingTitleProps) => (
-  <a href={tmdbUrl(entry)} target="_blank" rel="noreferrer" className={styles.title}>
+  <a href={tmdbTitleUrl(entry)} target="_blank" rel="noreferrer" className={styles.title}>
     {entry.title}
     <span className="visually-hidden">{PERSON_COPY.onTmdb}</span>
   </a>

@@ -82,6 +82,8 @@ export const ROUTES = {
   homeHero: { method: GET, path: '/api/home/hero', account: approved },
   homeAlbums: { method: GET, path: '/api/home/albums', account: approved },
   homeSearch: { method: GET, path: '/api/home/search', account: approved },
+  upcoming: { method: GET, path: '/api/upcoming', account: approved },
+  upcomingShelf: { method: GET, path: '/api/upcoming/:shelf', account: approved },
   heroPicks: { method: GET, path: '/api/hero/picks', account: owner },
   setHeroPick: { method: PUT, path: '/api/hero/picks', account: owner },
   cachedImage: { method: GET, path: '/api/images/:use/:file', account: approved },
