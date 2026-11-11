@@ -1,11 +1,14 @@
 import {
   AUDIO_BITRATES,
+  type CaptionStyle,
   type CrossfadeSeconds,
+  DEFAULT_CAPTION_STYLE,
   DEFAULT_LEVELLING_MODE,
   type Equalizer,
   FLAT_EQUALIZER,
   LEVELLING_MODES,
   type LevellingMode,
+  isCaptionStyle,
   isCrossfadeSeconds,
   isEqualizer,
   isRecord,
@@ -61,8 +64,11 @@ type SetSubtitlesProps = { on: boolean; language: string | null }
 type PlayerPrefs = {
   volume: number
   muted: boolean
-  /** Multiplies the subtitle size; `+` and `-` step it. */
-  captionScale: number
+  /**
+   * The account's subtitle size and colour as the server last gave them, so the first frame, a
+   * local file and a server out of reach still draw its look. `useCaptionStyle` keeps it.
+   */
+  captionStyle: CaptionStyle
   /** Whether subtitles were last on, and in which language. */
   subtitles: { on: boolean; language: string | null }
   /** The audio language last picked by hand; null while the file's default has been fine. */
@@ -89,7 +95,7 @@ type PlayerPrefs = {
   crossfade: CrossfadeSeconds
   equalizer: Equalizer
   setVolume: ({ volume, muted }: SetVolumeProps) => void
-  setCaptionScale: (captionScale: number) => void
+  setCaptionStyle: (captionStyle: CaptionStyle) => void
   setSubtitles: (subtitles: SetSubtitlesProps) => void
   setAudioLanguage: (audioLanguage: string | null) => void
   setOpensInRavenPlayer: (isOn: boolean) => void
@@ -105,12 +111,19 @@ type PlayerPrefs = {
   setEqualizer: (equalizer: Equalizer) => void
 }
 
-type SoundPrefs = Pick<PlayerPrefs, 'musicQuality' | 'levelling' | 'crossfade' | 'equalizer'>
+type GuardedPrefs = Pick<
+  PlayerPrefs,
+  'musicQuality' | 'levelling' | 'crossfade' | 'equalizer' | 'captionStyle'
+>
 
-type StoredSoundOfProps = { stored: Record<string, unknown>; current: SoundPrefs }
+type StoredGuardedOfProps = { stored: Record<string, unknown>; current: GuardedPrefs }
 
-/** The sound prefs a stored copy holds, each kept only when it is one this build knows. */
-const storedSoundOf = ({ stored, current }: StoredSoundOfProps): SoundPrefs => ({
+/**
+ * The prefs a stored copy holds that feed the audio graph or the player's stylesheet, each kept
+ * only when it is one this build knows.
+ */
+const storedGuardedOf = ({ stored, current }: StoredGuardedOfProps): GuardedPrefs => ({
+  captionStyle: isCaptionStyle(stored.captionStyle) ? stored.captionStyle : current.captionStyle,
   musicQuality: isMusicQuality(stored.musicQuality) ? stored.musicQuality : current.musicQuality,
   levelling: isLevellingMode(stored.levelling) ? stored.levelling : current.levelling,
   crossfade: isCrossfadeSeconds(stored.crossfade) ? stored.crossfade : current.crossfade,
@@ -118,7 +131,7 @@ const storedSoundOf = ({ stored, current }: StoredSoundOfProps): SoundPrefs => (
 })
 
 /**
- * Volume, subtitles, audio language, how long the controls linger,
+ * Volume, subtitles and the look last read for them, audio language, how long the controls linger,
  * autoplay and its countdown, skipping intros, whether the keyboard tip
  * has shown, how fast audiobooks play and how music sounds carry over from one video to the next, and across visits.
  */
@@ -128,7 +141,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
       (set) => ({
         volume: 1,
         muted: false,
-        captionScale: 1,
+        captionStyle: DEFAULT_CAPTION_STYLE,
         subtitles: { on: false, language: null },
         audioLanguage: null,
         opensInRavenPlayer: false,
@@ -143,7 +156,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         crossfade: 0,
         equalizer: FLAT_EQUALIZER,
         setVolume: ({ volume, muted }) => set({ volume, muted }),
-        setCaptionScale: (captionScale) => set({ captionScale }),
+        setCaptionStyle: (captionStyle) => set({ captionStyle }),
         setSubtitles: (subtitles) => set({ subtitles }),
         setAudioLanguage: (audioLanguage) => set({ audioLanguage }),
         setOpensInRavenPlayer: (isOn) => set({ opensInRavenPlayer: isOn }),
@@ -169,7 +182,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         partialize: ({
           volume,
           muted,
-          captionScale,
+          captionStyle,
           subtitles,
           audioLanguage,
           opensInRavenPlayer,
@@ -186,7 +199,7 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
         }) => ({
           volume,
           muted,
-          captionScale,
+          captionStyle,
           subtitles,
           audioLanguage,
           opensInRavenPlayer,
@@ -201,10 +214,10 @@ export const usePlayerPrefs = create<PlayerPrefs>()(
           crossfade,
           equalizer,
         }),
-        // The sound prefs feed the audio graph, so a stored one this build does not know is dropped.
+        // A stored sound pref or caption style this build does not know is dropped.
         merge: (stored, current) =>
           isRecord(stored)
-            ? { ...current, ...stored, ...storedSoundOf({ stored, current }) }
+            ? { ...current, ...stored, ...storedGuardedOf({ stored, current }) }
             : current,
       },
     ),

@@ -42,6 +42,8 @@ import { LockService } from '@/lock/lockService'
 import { HeroController } from '@/hero/heroController'
 import { HeroRepository } from '@/hero/heroRepository'
 import { HeroSelection } from '@/hero/heroSelection'
+import { CaptionStyleController } from '@/captions/captionStyleController'
+import { CaptionStyles } from '@/captions/captionStyles'
 import { BingeController } from '@/media/bingeController'
 import { BingeShows } from '@/media/bingeShows'
 import { FavouritesController } from '@/media/favouritesController'
@@ -164,6 +166,7 @@ export const CONTROLLERS = [
   PlaybackController,
   HlsController,
   BingeController,
+  CaptionStyleController,
   FavouritesController,
   WatchedController,
   HomeController,
@@ -293,6 +296,7 @@ export class AppModule {
         ViewingRepository,
         TitleFavourites,
         BingeShows,
+        CaptionStyles,
         WatchedCards,
         WatchedRepository,
         MediaIndex,

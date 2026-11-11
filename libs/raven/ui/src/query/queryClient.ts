@@ -119,6 +119,8 @@ export const queryKeys = {
   favourites: ['favourites'],
   /** The account's binge list, under every host's own account suffix. */
   bingeState: ['binge-state'],
+  /** How the account's subtitles look: their size and colour. */
+  captionStyle: ['caption-style'],
   favouriteTitles: ['favourites', 'titles'],
   /** One library's favourite shows and seasons, under the titles so one edit and one refetch reach every list. */
   libraryFavouriteTitles: (libraryId: number) => ['favourites', 'titles', libraryId],
@@ -269,6 +271,8 @@ export const mutationKeys = {
   musicFavourite: ['music-favourite'],
   /** Any rename or change of order of a playlist: the whole order is sent each time, so answers keep their order. */
   playlist: ['playlist'],
+  /** Any change to the account's subtitle size or colour: the whole look is sent each time. */
+  captionStyle: ['caption-style'],
   /** Any mark as watched or unwatched: marks and their answers keep their order. */
   watched: ['watched'],
   /** Any library's pin: they all show in the libraries list and on home. */

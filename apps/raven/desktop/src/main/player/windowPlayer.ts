@@ -39,6 +39,7 @@ import {
   type PlayerService,
 } from '@/main/player/playerService'
 import { createSleepGuard } from '@/main/player/sleepGuard'
+import { fontsDirFor, subtitleLookOptions } from '@/main/player/subtitleLook'
 import { attachWindowEngine, engineMode } from '@/main/player/windowEngine'
 import type { MediaRelay } from '@/main/servers/mediaRelay'
 import type { createServerSources } from '@/main/servers/serverSources'
@@ -183,7 +184,16 @@ export const attachPlayer = ({
       },
     })
     try {
-      await Promise.all(engineOptionsFor({ surface }).map((option) => mpv.set(option)))
+      const fontsDir = fontsDirFor({
+        isPackaged: app.isPackaged,
+        appPath: app.getAppPath(),
+        resourcesPath: process.resourcesPath,
+      })
+      await Promise.all(
+        [...engineOptionsFor({ surface }), ...subtitleLookOptions({ fontsDir })].map((option) =>
+          mpv.set(option),
+        ),
+      )
       // Made before anything can load: it hardens mpv first and refuses loads if that fails.
       const service = createPlayerService({
         mpv,

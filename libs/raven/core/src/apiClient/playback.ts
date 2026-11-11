@@ -48,6 +48,14 @@ type GetSubtitlesProps = {
   access?: TicketedOrigin | null
 }
 
+type SidecarSubtitlesUrlProps = Omit<GetSubtitlesProps, 'window'>
+
+type SubtitlesPathOfProps = Pick<GetSubtitlesProps, 'id' | 'trackId'>
+
+/** The route one subtitle track's WebVTT is read from. */
+const subtitlesPathOf = ({ id, trackId }: SubtitlesPathOfProps): string =>
+  `/api/media/${id}/subtitles/${encodeURIComponent(trackId)}`
+
 type HlsUrlProps = {
   id: number
   mode: StreamMode
@@ -148,12 +156,19 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
     parseWebVtt(
       await sendForText(
         mediaUrl({
-          path: `/api/media/${id}/subtitles/${encodeURIComponent(trackId)}`,
+          path: subtitlesPathOf({ id, trackId }),
           query: { window: String(window) },
           access,
         }),
       ),
     ),
+
+  /**
+   * Where a sidecar subtitle file is, whole, as WebVTT, for a player that reads it itself
+   * beside the file it plays.
+   */
+  sidecarSubtitlesUrl: ({ id, trackId, access = null }: SidecarSubtitlesUrlProps): string =>
+    mediaUrl({ path: subtitlesPathOf({ id, trackId }), query: {}, access }),
 
   /**
    * The HLS master playlist for a converted stream. It mints a session

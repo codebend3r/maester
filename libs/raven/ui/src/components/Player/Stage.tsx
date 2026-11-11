@@ -17,7 +17,7 @@ import {
 } from 'react'
 import { KeyedView, type ViewOf, type ViewsOf } from '@/components/KeyedView/KeyedView'
 import type { Engine, EngineHandle, PlaybackFile } from '@/components/Player/engine'
-import type { Handoff, PlayerFavourite, UpNext } from '@/components/Player/PlayerServices'
+import type { Handoff, UpNext } from '@/components/Player/PlayerServices'
 import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
 import type { PlayChoices } from '@/components/Player/playChoices'
 import type { Rendition } from '@/components/Player/rendition'
@@ -237,7 +237,7 @@ export const PlayerChrome = ({
   notice = null,
 }: PlayerChromeProps) => {
   const { mode, quality } = rendition
-  const { title, hostActions, favourite, chrome, isVolumeFixed, handoff } = useHostServices()
+  const { title, hostActions, chrome, isVolumeFixed, handoff } = useHostServices()
   const media = file?.media ?? null
   const label = title.label
   // A logo that fails to load gives way to the label for the rest of the title.
@@ -409,14 +409,6 @@ export const PlayerChrome = ({
     engine.focusSurface()
   }
 
-  const toggleFavourite = (current: PlayerFavourite) => {
-    current.toggle()
-    flash({
-      icon: 'heart',
-      text: current.isFavourite ? STAGE_COPY.removedFromFavourites : STAGE_COPY.addedToFavourites,
-    })
-  }
-
   /*
    * The up next card keeps the controls up, so it and the ring it fills can be
    * seen, and so does an intro's first seconds, so Skip intro is.
@@ -493,23 +485,7 @@ export const PlayerChrome = ({
             onFail={setFailedLogo}
           />
           {heading.episode != null && <p className={styles.episode}>{heading.episode}</p>}
-          {(!!about || !!favourite) && (
-            <div className={styles.aboutLine}>
-              {!!about && <p className={styles.about}>{about}</p>}
-              {favourite && (
-                <Button
-                  tone="ghost"
-                  icon="heart"
-                  aria-label={STAGE_COPY.favourite}
-                  aria-pressed={favourite.isFavourite}
-                  className={[styles.favourite, favourite.isFavourite ? styles.favourited : '']
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={() => toggleFavourite(favourite)}
-                />
-              )}
-            </div>
-          )}
+          {!!about && <p className={styles.about}>{about}</p>}
         </div>
         <PlayerStatus media={media} mode={mode} quality={quality}>
           {nextLink && (
@@ -619,6 +595,8 @@ export const PlayerChrome = ({
           mode={mode}
           steppedDown={steppedDown}
           choices={choices}
+          captionStyle={engine.captionStyle}
+          onPickCaption={actions.setCaptionStyle}
           onPickRate={controls.changeRate}
           autoplay={upNext.autoplay}
           onPickAutoplay={setAutoplay}

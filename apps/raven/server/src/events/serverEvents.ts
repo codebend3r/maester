@@ -5,7 +5,7 @@ import type { AccountKey } from '@/media/viewingAccountKeys'
 
 /**
  * An event with whom it is for: every stream, or only the streams of one account (its viewing
- * key), so one account's spots and binge list never reach another's screens.
+ * key), so one account's spots, binge list and subtitle look never reach another's screens.
  */
 export type ServerEventEnvelope = { event: ServerEvent; account: AccountKey | null }
 
@@ -35,6 +35,11 @@ export class ServerEvents implements OnModuleDestroy {
   /** The account's binge list changed on one of its devices. */
   bingeChanged(account: AccountKey): void {
     this.subject.next({ event: { type: SERVER_EVENT_TYPES.binge }, account })
+  }
+
+  /** The account's subtitle look changed on one of its devices. */
+  captionsChanged(account: AccountKey): void {
+    this.subject.next({ event: { type: SERVER_EVENT_TYPES.captions }, account })
   }
 
   /** The account was notified of something, logged already, for its screens to show. */

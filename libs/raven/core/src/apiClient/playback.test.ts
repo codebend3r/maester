@@ -148,6 +148,20 @@ describe('playback calls', () => {
     )
   })
 
+  it('addresses a sidecar whole, on the origin and ticket its picture plays by', () => {
+    const { client } = clientReturning(respond({ body: '' }))
+    const access = {
+      origin: { kind: 'public', url: 'https://raven.away.example' },
+      ticket: 'abc.def',
+    } as const satisfies MediaAccess
+    expect(client.sidecarSubtitlesUrl({ id: 7, trackId: 'external-0', access })).toBe(
+      'https://raven.away.example/api/media/7/subtitles/external-0?t=abc.def',
+    )
+    expect(client.sidecarSubtitlesUrl({ id: 7, trackId: 'external-0' })).toMatch(
+      /\/api\/media\/7\/subtitles\/external-0$/,
+    )
+  })
+
   it('builds HLS master URLs on the access origin, and relative ones without', () => {
     const { client } = clientReturning(respond({}))
     const access = {

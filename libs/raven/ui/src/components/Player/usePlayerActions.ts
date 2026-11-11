@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import type { BezelState } from '@/components/Player/Bezel'
-import { PLAYER_ACTIONS_COPY } from '@/components/Player/copy'
+import { CAPTION_SIZE_NAMES, PLAYER_ACTIONS_COPY } from '@/components/Player/copy'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import type { EngineHandle } from '@/components/Player/engine'
 import type { MenuSection } from '@/components/Player/menus'
@@ -12,7 +12,7 @@ import {
   SEEK_EDGES,
   type SkipStep,
   languageName,
-  stepCaptionScale,
+  stepCaptionSize,
   stepSkip,
   stepSpeed,
 } from '@raven/core'
@@ -51,7 +51,7 @@ type UsePlayerActionsProps = {
  * call the rest directly, the play button without the flash.
  */
 export const usePlayerActions = ({
-  engine: { actions, state, position, duration },
+  engine: { actions, state, position, duration, captionStyle },
   selection,
   flash,
   toggleFullscreen,
@@ -61,7 +61,6 @@ export const usePlayerActions = ({
   closeInfo,
   leave,
 }: UsePlayerActionsProps) => {
-  const captionScale = usePlayerPrefs((prefs) => prefs.captionScale)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)
   const subtitles = usePlayerPrefs((prefs) => prefs.subtitles)
@@ -191,9 +190,12 @@ export const usePlayerActions = ({
         changeRate(stepSpeed({ current: state.rate, direction: action.direction }))
         return
       case PLAYER_ACTIONS.stepCaptionSize: {
-        const next = stepCaptionScale({ current: captionScale, direction: action.direction })
-        actions.setSubtitleScale(next)
-        flash({ icon: 'captions', text: PLAYER_ACTIONS_COPY.subtitleSize(Math.round(next * 100)) })
+        const size = stepCaptionSize({ current: captionStyle.size, direction: action.direction })
+        actions.setCaptionStyle({ size })
+        flash({
+          icon: 'captions',
+          text: PLAYER_ACTIONS_COPY.subtitleSize(CAPTION_SIZE_NAMES[size]),
+        })
         return
       }
       case PLAYER_ACTIONS.toggleStats:

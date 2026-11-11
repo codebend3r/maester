@@ -18,11 +18,7 @@ type TabLabelProps = { status: string; count: number }
 
 type NamedProps = { label: string; library: string }
 
-type HopProps = { label: string; address: string }
-
 const albumWordOf = (count: number): string => (count === 1 ? 'album' : 'albums')
-
-type StreamsHintProps = { quality: string; streams: number }
 
 type CouldNotProps = { verb: string; message: string }
 
@@ -134,38 +130,23 @@ export const NOBODY_LABELS = {
   [MEMBER_STATUSES.revoked]: 'No one has been removed.',
 } as const
 
-/** Remote Access's words, the web's, modelled on Plex's settings of that name. */
+/** Remote Access's words, the web's where the app shows the same thing, to read only. */
 export const REMOTE_ACCESS_COPY = {
   heading: 'Remote Access',
-  help: 'How raven is reached from outside your home network: a port your router forwards to the NAS, a hostname with a trusted certificate, and how much of your upload a remote viewer may take.',
+  help: 'How raven is reached from outside your home network. Change it in raven on the web or the desktop.',
   privateLabel: 'Private',
   publicLabel: 'Public',
   unknownAddress: 'Not known yet',
   noPort: 'No port',
-  enable: 'Enable remote access',
-  enableHint: 'Offers the public address below to every app away from home.',
-  hostname: 'Public hostname',
-  publicPort: 'Manually specify public port',
-  privatePort: 'Private port',
-  privatePortPlaceholder: 'Same as public',
-  uploadMbps: 'Internet upload speed (Mbps)',
-  remoteLimit: 'Limit remote stream bitrate',
+  remoteLimit: 'Remote stream limit',
   original: 'Original (No limit)',
-  streamsHint: ({ quality, streams }: StreamsHintProps) =>
-    `Remote transcodes are held to ${quality}; your upload carries ${streams} at once.`,
-  apply: 'Apply',
-  checkAgain: 'Check again',
-  checking: 'Checking from outside your network',
   checkedAt: (at: string) => `Checked ${at}.`,
-  notForwarded:
-    "raven can not see the addresses of viewers away from home, so it can not tell them apart or from home. Add an X-Forwarded-For header to the reverse proxy rule, and name the proxy's address in RAVEN_TRUSTED_PROXIES.",
-  hop: ({ label, address }: HopProps) => `${label}: ${address}`,
 } as const
 
 export const REMOTE_ACCESS_STATUS_COPY = {
   [REMOTE_ACCESS_STATES.disabled]: 'Remote access is off.',
   [REMOTE_ACCESS_STATES.unconfigured]:
-    'Enter a public hostname and port to reach raven outside your network.',
+    'No public hostname and port are set, so raven is not reached from outside your network.',
   [REMOTE_ACCESS_STATES.unchecked]:
     'raven cannot check from outside your network: set RAVEN_WEB_URL and RAVEN_PROXY_SECRET on the server.',
   [REMOTE_ACCESS_STATES.reachable]: 'Fully accessible outside your network',

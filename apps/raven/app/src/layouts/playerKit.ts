@@ -1,4 +1,4 @@
-import { type Chapter, type PlaybackMode, formatDuration } from '@raven/core'
+import { type CaptionStyle, type Chapter, type PlaybackMode, formatDuration } from '@raven/core'
 import type { ComponentProps, ReactNode } from 'react'
 import type { AccessibilityActionEvent, AccessibilityActionInfo } from 'react-native'
 import type Video from 'react-native-video'
@@ -68,6 +68,8 @@ export type PlayerChromeProps = {
   isOpening: boolean
   /** The subtitle cues showing now, as WebVTT text, drawn over the video whether or not the controls are. */
   caption: string | null
+  /** How the account's subtitles look: the size and colour raven draws the cues in, where it draws them. */
+  captionStyle: CaptionStyle
   /** Null while there is nothing to drive: as the source is asked for, or once nothing plays. */
   transport: Transport | null
   audio: TrackPicker | null
@@ -93,7 +95,7 @@ export type PlayerChromeProps = {
 /**
  * The player's controls, which each platform draws and drives its own way. `shouldDrawCaptions`
  * says whether raven draws the subtitle cues over the video; where it does not, the platform's
- * player draws the HLS rendition the screen picks.
+ * player draws the track the screen picks, on its own clock.
  */
 export type PlayerChromeKit = {
   PlayerChrome: (props: PlayerChromeProps) => ReactNode

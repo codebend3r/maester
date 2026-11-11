@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
 import { PE_MACHINES } from '@raven/mpv'
 import {
+  FONTS_IN_APP,
   auditMachO,
   auditPe,
   type AuditedFile,
@@ -251,7 +252,8 @@ describe('fileProblems', () => {
 describe('bundleProblems', () => {
   const everyEngineFile = (relative: string) =>
     MPV_MACH_O.some((name) => relative === join(MPV_IN_APP, name)) ||
-    relative === join(WEB_IN_APP, 'index.html')
+    relative === join(WEB_IN_APP, 'index.html') ||
+    relative === join(FONTS_IN_APP, 'YoungSerif.ttf')
 
   it('passes a whole bundle', () => {
     expect(
@@ -290,6 +292,19 @@ describe('bundleProblems', () => {
         packageVersion: '0.5.4',
       }),
     ).toEqual([`${page} is missing from the app`])
+  })
+
+  it('names a missing subtitle font', () => {
+    const font = join(FONTS_IN_APP, 'YoungSerif.ttf')
+    expect(font).toBe(join('Contents', 'Resources', 'fonts', 'YoungSerif.ttf'))
+    expect(
+      bundleProblems({
+        files: [],
+        exists: (relative) => everyEngineFile(relative) && relative !== font,
+        plistVersion: '0.5.4',
+        packageVersion: '0.5.4',
+      }),
+    ).toEqual([`${font} is missing from the app`])
   })
 
   it('includes every file problem', () => {
@@ -370,7 +385,13 @@ describe('auditMachO', () => {
 const LOCKED_SHA256 = 'a'.repeat(64)
 const ADDON = join(MPV_IN_WINDOWS_APP, 'raven_mpv.node')
 const LIBMPV = join(MPV_IN_WINDOWS_APP, 'libmpv-2.dll')
-const WINDOWS_PRESENT = [WINDOWS_EXE, ADDON, LIBMPV, join('resources', 'dist', 'index.html')]
+const WINDOWS_PRESENT = [
+  WINDOWS_EXE,
+  ADDON,
+  LIBMPV,
+  join('resources', 'dist', 'index.html'),
+  join('resources', 'fonts', 'YoungSerif.ttf'),
+]
 
 const auditedPe = (overrides: Partial<AuditedPe>): AuditedPe => ({
   relative: ADDON,
@@ -413,6 +434,7 @@ describe('windowsBundleProblems', () => {
       `${ADDON} is missing from the app`,
       `${LIBMPV} is missing from the app`,
       `${join('resources', 'dist', 'index.html')} is missing from the app`,
+      `${join('resources', 'fonts', 'YoungSerif.ttf')} is missing from the app`,
     ])
   })
 

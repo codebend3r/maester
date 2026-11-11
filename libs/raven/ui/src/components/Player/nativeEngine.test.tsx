@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import {
+  CAPTION_COLOURS,
+  CAPTION_SIZES,
+  DEFAULT_CAPTION_STYLE,
   ITEM_TYPES,
   type MediaTracks,
   PLAYER_COMMANDS,
   type PlayerCommand,
   type PlayerEvent,
 } from '@raven/core'
-import { act, fireEvent, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
@@ -142,17 +145,21 @@ const settled = () => act(async () => {})
 
 const types = (sent: PlayerCommand[]) => sent.map((command) => command.type)
 
+const spies: Array<{ mockRestore: () => void }> = []
+
 beforeEach(() => {
+  spies.push(spyOn(api, 'getCaptionStyle').mockImplementation(async () => DEFAULT_CAPTION_STYLE))
   usePlayerPrefs.setState({
     volume: 1,
     muted: false,
-    captionScale: 1,
+    captionStyle: DEFAULT_CAPTION_STYLE,
     subtitles: { on: false, language: null },
     audioLanguage: null,
   })
 })
 
 afterEach(() => {
+  spies.splice(0).forEach((spy) => spy.mockRestore())
   delete document.documentElement.dataset.surface
 })
 
@@ -208,7 +215,7 @@ describe('the native engine', () => {
     expect(fake.sent.slice(0, 3)).toEqual([
       { type: 'load', source: SOURCE, start: 20, audio: 1, subtitle: 'embedded-0' },
       { type: 'volume', volume: 1, muted: false },
-      { type: 'subtitleScale', scale: 1 },
+      { type: 'subtitleStyle', style: DEFAULT_CAPTION_STYLE },
     ])
     expect(container.querySelector('video')).toBeNull()
   })
@@ -258,7 +265,7 @@ describe('the native engine', () => {
     renderNative({ player: fake.player })
     await settled()
     await fake.emit({ type: 'tracks', tracks: TRACKS })
-    expect(types(fake.sent)).toEqual(['load', 'volume', 'subtitleScale'])
+    expect(types(fake.sent)).toEqual(['load', 'volume', 'subtitleStyle'])
   })
 
   it('keeps the stored picks when tracks arrive', async () => {
@@ -270,7 +277,7 @@ describe('the native engine', () => {
     renderNative({ player: fake.player, services })
     await settled()
     await fake.emit({ type: 'tracks', tracks: TRACKS })
-    expect(types(fake.sent)).toEqual(['load', 'volume', 'subtitleScale'])
+    expect(types(fake.sent)).toEqual(['load', 'volume', 'subtitleStyle'])
   })
 
   it('sends, remembers and saves a pick by hand', async () => {
@@ -444,8 +451,27 @@ describe('the native engine', () => {
     expect(fake.sent.at(-1)).toMatchObject({ type: 'volume', muted: false })
     expect(usePlayerPrefs.getState().volume).toBeLessThan(1)
     fireEvent.keyDown(window, { key: '+' })
-    expect(fake.sent.at(-1)).toMatchObject({ type: 'subtitleScale' })
-    expect(usePlayerPrefs.getState().captionScale).toBeGreaterThan(1)
+    await waitFor(() =>
+      expect(fake.sent.at(-1)).toEqual({
+        type: 'subtitleStyle',
+        style: { size: CAPTION_SIZES.large, colour: CAPTION_COLOURS.white },
+      }),
+    )
+    expect(usePlayerPrefs.getState().captionStyle.size).toBe(CAPTION_SIZES.large)
+  })
+
+  it("draws a library file's subtitles in the account's look once the server gives it", async () => {
+    const yellow = { size: CAPTION_SIZES.largest, colour: CAPTION_COLOURS.yellow }
+    spies.push(spyOn(api, 'getCaptionStyle').mockImplementation(async () => yellow))
+    const fake = fakePlayer()
+    renderNative({ player: fake.player, file: { media: mediaItem(), api } })
+    await waitFor(() =>
+      expect(fake.sent.at(-1)).toEqual({
+        type: 'subtitleStyle',
+        style: yellow,
+      }),
+    )
+    expect(usePlayerPrefs.getState().captionStyle).toEqual(yellow)
   })
 
   it('never sends volume when it is fixed', async () => {

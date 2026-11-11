@@ -11,6 +11,8 @@ import { runInNewContext } from 'node:vm'
 import {
   AUTH_PARAMS,
   AUTH_PATHS,
+  CAPTION_COLOURS,
+  CAPTION_SIZES,
   desktopPlatformFor,
   isNumber,
   isRecord,
@@ -72,6 +74,7 @@ import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import type { PlayerOutcome } from '@/main/player/outcomes'
 import { createPlayerService } from '@/main/player/playerService'
 import { SIDECAR_BUDGET_MS } from '@/main/player/sidecars'
+import { fontsDirFor, subtitleLookOptions } from '@/main/player/subtitleLook'
 import { tracksFromMpv } from '@/main/player/tracksFromMpv'
 import { createAccountTickets } from '@/main/servers/accountTickets'
 import {
@@ -846,6 +849,23 @@ describe('the desktop player service against headless libmpv', () => {
       assert.deepEqual(await send({ type: 'stats' }), { ok: true })
       const devices = await mpv.read({ name: 'audio-device-list' })
       assert.ok(Array.isArray(devices))
+    })
+  })
+
+  test("takes raven's subtitle look and a style from the page", async () => {
+    await withHarness(async ({ mpv, playing, send, errorsOf }) => {
+      const fontsDir = fontsDirFor({ isPackaged: false, appPath: project, resourcesPath: '' })
+      await stat(join(fontsDir, 'YoungSerif.ttf'))
+      await Promise.all(subtitleLookOptions({ fontsDir }).map((option) => mpv.set(option)))
+      await playing({ fileId: 't1' })
+      assert.deepEqual(
+        await send({
+          type: PLAYER_COMMANDS.subtitleStyle,
+          style: { size: CAPTION_SIZES.large, colour: CAPTION_COLOURS.yellow },
+        }),
+        { ok: true },
+      )
+      assert.deepEqual(errorsOf(), [])
     })
   })
 

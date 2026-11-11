@@ -19,7 +19,6 @@ export type {
   ErrorReporter,
   Handoff,
   HostActions,
-  PlayerFavourite,
   PlayerServices,
   PlayerTitle,
   TitleLogo,
@@ -39,7 +38,11 @@ export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/play
 export { playerQueriesFor } from '@/lib/playerQueries'
 export { useTrackCues } from '@/lib/useTrackCues'
 export { useClock } from '@/lib/useClock'
-export { PLAYBACK_MODE_NAMES } from '@/components/Player/copy'
+export {
+  CAPTION_COLOUR_NAMES,
+  CAPTION_SIZE_NAMES,
+  PLAYBACK_MODE_NAMES,
+} from '@/components/Player/copy'
 export { playerQueryKeys } from '@/lib/playerQueryKeys'
 export { useSearch } from '@/lib/useSearch'
 export { LIBRARY_LOCK_STATES, lockState } from '@/lib/libraryLock'
@@ -118,6 +121,7 @@ export {
 } from '@/music/musicRows'
 export type { AlbumDisc, AlbumTrack, PlaylistTrack, QueueRow } from '@/music/musicRows'
 export { usePlaybackPolicy } from '@/query/usePlaybackPolicy'
+export { useCaptionStyle } from '@/query/useCaptionStyle'
 export {
   EVENTS_RETRY_MS,
   SERVER_STREAM_EVENTS,

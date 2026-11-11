@@ -11,8 +11,8 @@ import { Platform } from 'react-native'
  * (see `Text`).
  */
 const FAMILIES = {
-  android: { body: 'InstrumentSans', display: 'YoungSerif' },
-  apple: { body: 'Instrument Sans', display: 'Young Serif' },
+  android: { body: 'InstrumentSans', display: 'YoungSerif', code: 'monospace' },
+  apple: { body: 'Instrument Sans', display: 'Young Serif', code: 'Menlo' },
 } as const
 
 const families = Platform.OS === 'android' ? FAMILIES.android : FAMILIES.apple
@@ -20,3 +20,10 @@ const families = Platform.OS === 'android' ? FAMILIES.android : FAMILIES.apple
 export const BODY_FONT = families.body
 
 export const DISPLAY_FONT = families.display
+
+/**
+ * The fixed-width face, the web's `--font-mono`, for what is read character by character: an
+ * address, a port, a value copied from a setting. It is the system's own on each platform, as
+ * the web's stack is, so nothing is bundled for it.
+ */
+export const CODE_FONT = families.code

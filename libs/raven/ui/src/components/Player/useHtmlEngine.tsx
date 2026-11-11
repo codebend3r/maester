@@ -17,6 +17,7 @@ import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import { useVideoState } from '@/components/Player/useVideoState'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { useCaptionStyle } from '@/query/useCaptionStyle'
 import { useTrackCues } from '@/lib/useTrackCues'
 
 const ENGINE_NAME = 'HTML video'
@@ -43,8 +44,8 @@ export const useHtmlEngine = ({
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)
   const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
-  const captionScale = usePlayerPrefs((prefs) => prefs.captionScale)
-  const setCaptionScale = usePlayerPrefs((prefs) => prefs.setCaptionScale)
+  // A local file has no server to ask, so it draws the look last read.
+  const captions = useCaptionStyle(source.kind === PLAYER_SOURCE_KINDS.server ? source.api : null)
   const shift = rendition.mode === PLAYBACK_MODES.direct ? 0 : STREAM_TIME_SHIFT
   const playback = useVideoState({
     videoRef,
@@ -143,13 +144,14 @@ export const useHtmlEngine = ({
     },
     setAudio: selection.pickAudio,
     setSubtitle: selection.pickSubtitle,
-    setSubtitleScale: setCaptionScale,
+    setCaptionStyle: captions.change,
   }
   const engine: EngineHandle = {
     state: playback.state,
     duration: playback.duration,
     position,
     tracks: selection.tracks,
+    captionStyle: captions.style,
     actions,
     drawsSubtitles: false,
     readStats,
@@ -180,7 +182,7 @@ export const useHtmlEngine = ({
         video={videoRef}
         shift={shift}
         lifted={lifted}
-        scale={captionScale}
+        captionStyle={captions.style}
       />
     ),
   }

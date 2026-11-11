@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
 import {
+  DEFAULT_CAPTION_STYLE,
   PLAYER_COMMANDS,
   PLAYER_EVENTS,
   PLAYER_REFUSAL_REASONS,
@@ -402,7 +403,10 @@ test.describe.serial('playing a local file through mpv', () => {
             },
           },
           // A command the port knows, so the port still answers after all of the above.
-          { id: 9008, command: { type: PLAYER_COMMANDS.subtitleScale, scale: 1 } },
+          {
+            id: 9008,
+            command: { type: PLAYER_COMMANDS.subtitleStyle, style: DEFAULT_CAPTION_STYLE },
+          },
         ]
         await postOnPort({ page, messages: forgeries })
         await expect.poll(async () => (await trafficOf({ page })).replies.length).toBe(8)

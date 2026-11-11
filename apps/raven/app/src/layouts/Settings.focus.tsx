@@ -9,6 +9,7 @@ import { chosenLabelOf } from '@/layouts/gridKit'
 import type {
   SettingsButtonProps,
   SettingsChoiceProps,
+  SettingsFactProps,
   SettingsKit,
   SettingsLineProps,
   SettingsPageProps,
@@ -17,6 +18,7 @@ import type {
 } from '@/layouts/settingsKit'
 import { usePlateStyles } from '@/layouts/tvControls'
 import { OPACITIES } from '@/theme/appTheme'
+import { CODE_FONT } from '@/theme/fonts'
 import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -125,6 +127,17 @@ const SettingsLine = ({ text, isAlert = false }: SettingsLineProps) => {
   )
 }
 
+/** A fact the remote passes by: laid out as a setting is, with no plate, since nothing opens. */
+const SettingsFact = ({ label, value, isCode = false }: SettingsFactProps) => {
+  const styles = useStyles()
+  return (
+    <View accessibilityLabel={`${label}: ${value}`} accessible style={styles.fact}>
+      <Text style={styles.factLabel}>{label}</Text>
+      <Text style={[styles.factValue, isCode && styles.code]}>{value}</Text>
+    </View>
+  )
+}
+
 /**
  * A setting picked from a list: one plate laid out as a toggle is, the label at the start and
  * what is chosen now at the end, that opens the TV's picker list.
@@ -158,6 +171,7 @@ export const focusSettings: SettingsKit = {
   SettingsToggle,
   SettingsButton,
   SettingsLine,
+  SettingsFact,
   SettingsChoice,
 }
 
@@ -176,6 +190,10 @@ const useStyles = themedStyles((colours) =>
     words: { flexShrink: 1, flexGrow: 1, gap: TV_SIZES.space0 },
     choiceLabel: { flexShrink: 1, flexGrow: 1 },
     line: { color: colours.muted, fontSize: TV_SIZES.text },
+    fact: { flexDirection: 'row', justifyContent: 'space-between', gap: TV_SIZES.space4 },
+    factLabel: { flexShrink: 1, flexGrow: 1, color: colours.muted, fontSize: TV_SIZES.text },
+    factValue: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.text },
+    code: { fontFamily: CODE_FONT },
     setting: {
       flexDirection: 'row',
       justifyContent: 'space-between',

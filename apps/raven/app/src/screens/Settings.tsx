@@ -1,4 +1,12 @@
-import { MAX_HEIGHTS, MEMBER_STATUSES, type MaxHeight, isMaxHeight } from '@raven/core'
+import {
+  CAPTION_COLOURS,
+  CAPTION_SIZES,
+  MAX_HEIGHTS,
+  MEMBER_STATUSES,
+  type MaxHeight,
+  isMaxHeight,
+} from '@raven/core'
+import { CAPTION_COLOUR_NAMES, CAPTION_SIZE_NAMES, useCaptionStyle } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 
@@ -31,6 +39,16 @@ const AWAY_OPTIONS = Object.values(MAX_HEIGHTS).map((height) => ({
   label: AWAY_LABELS[height],
 }))
 
+const SIZE_OPTIONS = Object.values(CAPTION_SIZES).map((size) => ({
+  key: size,
+  label: CAPTION_SIZE_NAMES[size],
+}))
+
+const COLOUR_OPTIONS = Object.values(CAPTION_COLOURS).map((colour) => ({
+  key: colour,
+  label: CAPTION_COLOUR_NAMES[colour],
+}))
+
 type OwnerSettingsProps = { session: AppQueries }
 
 /**
@@ -45,9 +63,10 @@ const OwnerSettings = ({ session }: OwnerSettingsProps) => {
 }
 
 /**
- * `/settings`: the signed-in account, its theme and how it plays, kept on the device, and for
- * the owner the server's own settings, as the web's Admin page has them. Signing out sends the
- * viewer back to sign-in.
+ * `/settings`: the signed-in account, its theme and how it plays, kept on the device, how its
+ * subtitles look, kept on the server for every device it signs in on, and for the owner the
+ * server's own settings, as the web's Admin page has them. Signing out sends the viewer back
+ * to sign-in.
  */
 export const Settings = () => {
   const router = useRouter()
@@ -59,6 +78,7 @@ export const Settings = () => {
   const awayMaxHeight = useAppPrefs((state) => state.awayMaxHeight)
   const change = useAppPrefs((state) => state.change)
   const session = useAppQueries()
+  const captions = useCaptionStyle(session?.api ?? null)
 
   return (
     <SettingsPage onBack={() => router.back()} title={SETTINGS_COPY.title}>
@@ -102,6 +122,20 @@ export const Settings = () => {
           }}
           options={AWAY_OPTIONS}
           value={awayKeyOf(awayMaxHeight)}
+        />
+      </SettingsSection>
+      <SettingsSection note={SETTINGS_COPY.subtitlesNote} title={SETTINGS_COPY.subtitles}>
+        <SettingsChoice
+          label={SETTINGS_COPY.subtitleSize}
+          onChoose={(size) => captions.change({ size })}
+          options={SIZE_OPTIONS}
+          value={captions.style.size}
+        />
+        <SettingsChoice
+          label={SETTINGS_COPY.subtitleColour}
+          onChoose={(colour) => captions.change({ colour })}
+          options={COLOUR_OPTIONS}
+          value={captions.style.colour}
         />
       </SettingsSection>
       {session !== null && <OwnerSettings session={session} />}

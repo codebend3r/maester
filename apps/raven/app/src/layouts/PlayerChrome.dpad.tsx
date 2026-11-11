@@ -9,12 +9,13 @@ import {
 } from 'react'
 import {
   Animated,
+  PixelRatio,
   Pressable,
   StyleSheet,
   TVFocusGuideView,
   type TVRemoteEvent,
-  View,
   useTVEventHandler,
+  View,
 } from 'react-native'
 import Video from 'react-native-video'
 
@@ -50,6 +51,7 @@ import {
   surfaceStateOf,
   playedShareOf,
   scrubberAccessibilityOf,
+  type VideoSurface,
 } from '@/layouts/playerKit'
 import { isSeekingWith, pressedKeyOf, remoteAnswerOf } from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
@@ -58,6 +60,7 @@ import { PLAYBACK_MODE_NAMES, useClock } from '@raven/ui/headless'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
+import { TV_CAPTION_BASE } from '@/player/captionLook'
 import { useHeldSeek } from '@/layouts/useHeldSeek'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
@@ -202,6 +205,24 @@ const LOGO_HEIGHT = TV_SIZES.space8 * 1.5
 
 /** How large the time of day stands in the corner: larger than any line of the page's type. */
 const CLOCK_SIZE = TV_SIZES.textXl * 1.5
+
+type LiftedSubtitleStyleOfProps = {
+  style: VideoSurface['subtitleStyle']
+  /** How far the controls reach up from the bottom of the screen, in points; 0 while hidden. */
+  lift: number
+}
+
+/**
+ * The player's own subtitles, where it draws them, raised clear of the controls while they
+ * show. The player takes its padding in pixels; a platform whose player draws none has no style.
+ */
+const liftedSubtitleStyleOf = ({
+  style,
+  lift,
+}: LiftedSubtitleStyleOfProps): VideoSurface['subtitleStyle'] =>
+  style === undefined
+    ? undefined
+    : { ...style, paddingBottom: PixelRatio.getPixelSizeForLayoutSize(lift) }
 
 type CornerProps = Pick<PlayerChromeProps, 'mode' | 'heading' | 'upNext'>
 
@@ -521,7 +542,8 @@ type DpadPlayerProps = PlayerChromeProps
  * until the key comes up and the video plays on. The middle of the picture says what each press
  * did: a skip's way and a play flash and fade, the pause stays while the video is paused. Hidden, left and right still skip
  * ten seconds, and the remote's play, rewind and fast forward keys work wherever the focus is.
- * The subtitle cues are raven's, over the video whether or not the controls are.
+ * The subtitles stand over the video whether or not the controls are, clear of them while they
+ * show: raven's own cues on Apple TV, the player's on Android TV.
  */
 const DpadPlayer = ({
   heading,
@@ -529,6 +551,7 @@ const DpadPlayer = ({
   notice,
   isOpening,
   caption,
+  captionStyle,
   transport,
   audio,
   subtitles,
@@ -611,11 +634,22 @@ const DpadPlayer = ({
     flash: flash?.mark ?? null,
   })
   const shownKey = shown === null ? null : shownKeyOf({ ...shown, count: flash?.count ?? 0 })
+  // How far the subtitles, raven's cues or the player's own, rise to stand clear of the controls.
+  const lift = isVisible ? bottomHeight + TV_SIZES.space4 : 0
 
   return (
     <View style={styles.root}>
       {surface !== null && (
-        <Video {...surface} controls={false} resizeMode="contain" style={StyleSheet.absoluteFill} />
+        <Video
+          {...surface}
+          controls={false}
+          resizeMode="contain"
+          style={StyleSheet.absoluteFill}
+          subtitleStyle={liftedSubtitleStyleOf({
+            style: surface.subtitleStyle,
+            lift,
+          })}
+        />
       )}
       {isOpening && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -669,12 +703,9 @@ const DpadPlayer = ({
       {caption !== null && (
         <View
           pointerEvents="none"
-          style={[
-            styles.captionSlot,
-            { paddingBottom: isVisible ? TV_GUTTER + bottomHeight + TV_SIZES.space4 : TV_GUTTER },
-          ]}
+          style={[styles.captionSlot, { paddingBottom: TV_GUTTER + lift }]}
         >
-          <CaptionText caption={caption} fontSize={TV_SIZES.textLg} />
+          <CaptionText baseSize={TV_CAPTION_BASE} caption={caption} look={captionStyle} />
         </View>
       )}
     </View>
@@ -692,10 +723,14 @@ const PlayerChrome = (props: PlayerChromeProps) => {
   return <PlayerView {...props} />
 }
 
-/** Android TV's player: raven's controls, which the d-pad drives, with raven's subtitles. */
+/**
+ * Android TV's player: raven's controls, which the d-pad drives. ExoPlayer draws the subtitles
+ * itself, text and picture alike, on its own clock, as Plex's player does, so a busy app never
+ * holds a line back.
+ */
 export const dpadPlayerChrome: PlayerChromeKit = {
   PlayerChrome,
-  shouldDrawCaptions: true,
+  shouldDrawCaptions: false,
   canDrawPictureSubtitles: true,
 }
 
@@ -705,7 +740,8 @@ export const dpadPlayerChrome: PlayerChromeKit = {
  * server there.
  */
 export const tvosPlayerChrome: PlayerChromeKit = {
-  ...dpadPlayerChrome,
+  PlayerChrome,
+  shouldDrawCaptions: true,
   canDrawPictureSubtitles: false,
 }
 
@@ -726,13 +762,11 @@ const useStyles = pictureStyles((colours) =>
       gap: TV_SIZES.space4,
     },
     heading: { gap: TV_SIZES.space2, maxWidth: TV_SIZES.measure },
-    // Never squeezed by the heading beside it, which shrinks instead: the clock stays on one line.
-    corner: {
-      flexShrink: 0,
-      alignItems: 'flex-end',
-      gap: TV_SIZES.space2,
-      maxWidth: TV_SIZES.measure / 2,
-    },
+    /*
+     * Never squeezed by the heading beside it, which shrinks instead, and as wide as the clock
+     * needs: the time is always whole on one line, and only what plays next is held to a width.
+     */
+    corner: { flexShrink: 0, alignItems: 'flex-end', gap: TV_SIZES.space2 },
     cornerChips: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space1 },
     // What plays next, on the glass under the chips: a softer "Up next" before its words.
     upNext: {
@@ -743,6 +777,7 @@ const useStyles = pictureStyles((colours) =>
       paddingVertical: TV_SIZES.space1,
       borderRadius: TV_SIZES.radius,
       backgroundColor: colours.raised,
+      maxWidth: TV_SIZES.measure / 2,
     },
     upNextLead: { color: colours.muted, fontSize: TV_SIZES.text },
     upNextLabel: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.text },

@@ -1,4 +1,11 @@
-import { type MediaTracks, PLAYER_EVENTS, type PlayerEvent, type PlayerSource } from '@raven/core'
+import {
+  type ApiClient,
+  type MediaTracks,
+  PLAYER_COMMANDS,
+  PLAYER_EVENTS,
+  type PlayerEvent,
+  type PlayerSource,
+} from '@raven/core'
 import { useEffect, useEffectEvent, useReducer, useRef, useState } from 'react'
 import { NATIVE_ENGINE_COPY } from '@/components/Player/copy'
 import { type EngineHandle, type NativePlayer, sendQuietly } from '@/components/Player/engine'
@@ -8,6 +15,7 @@ import { useHostServices } from '@/stores/playerServices'
 import { useNativeTrackSelection } from '@/components/Player/useNativeTrackSelection'
 import { type Ranges, initialVideoState, videoReducer } from '@/components/Player/videoState'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { useCaptionStyle } from '@/query/useCaptionStyle'
 
 const ENGINE_NAME = 'mpv'
 const COULD_NOT_OPEN = 'Raven could not open this video.'
@@ -18,6 +26,8 @@ const messageOf = (error: unknown): string =>
 type UseNativeEngineProps = {
   player: NativePlayer
   source: PlayerSource
+  /** The server whose account's subtitle look the player draws; null for a plain local file. */
+  api: ApiClient | null
   onFailure: (message: string) => void
   toggleFullscreen: () => void
 }
@@ -32,6 +42,7 @@ type UseNativeEngineProps = {
 export const useNativeEngine = ({
   player,
   source,
+  api,
   onFailure,
   toggleFullscreen,
 }: UseNativeEngineProps): {
@@ -40,7 +51,9 @@ export const useNativeEngine = ({
 } => {
   const { title, trackPicks, isVolumeFixed = false, onEngineError } = useHostServices()
   const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
-  const setCaptionScale = usePlayerPrefs((prefs) => prefs.setCaptionScale)
+  const captions = useCaptionStyle(api)
+  // Whether main answered this mount's load, after which it takes the subtitle look.
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [state, dispatch] = useReducer(videoReducer, title.resumeAt, initialVideoState)
   const [tracks, setTracks] = useState<MediaTracks | null>(null)
   const position = useRef(title.resumeAt)
@@ -61,6 +74,7 @@ export const useNativeEngine = ({
     picks: trackPicks?.start ?? null,
     isFixed: isVolumeFixed,
   }))
+  const { size, colour } = captions.style
   useEffect(() => {
     // The port is ordered, so what arrives after the answer belongs to this load.
     let isLoaded = false
@@ -101,6 +115,7 @@ export const useNativeEngine = ({
         () => {
           if (!isCurrent) return
           isLoaded = true
+          setHasLoaded(true)
           const prefs = usePlayerPrefs.getState()
           if (!isFixed) {
             sendQuietly({
@@ -108,7 +123,6 @@ export const useNativeEngine = ({
               command: { type: 'volume', volume: prefs.volume, muted: prefs.muted },
             })
           }
-          sendQuietly({ player, command: { type: 'subtitleScale', scale: prefs.captionScale } })
         },
         (error: unknown) => {
           if (isCurrent) fail(messageOf(error))
@@ -116,10 +130,20 @@ export const useNativeEngine = ({
       )
     return () => {
       isCurrent = false
+      setHasLoaded(false)
       unsubscribe()
       sendQuietly({ player, command: { type: 'stop' } })
     }
   }, [player])
+
+  // The account's look, sent once the load is answered and again whenever it changes.
+  useEffect(() => {
+    if (!hasLoaded) return
+    sendQuietly({
+      player,
+      command: { type: PLAYER_COMMANDS.subtitleStyle, style: { size, colour } },
+    })
+  }, [player, hasLoaded, size, colour])
 
   const actions: EngineHandle['actions'] = {
     play: () => sendQuietly({ player, command: { type: 'play' } }),
@@ -137,10 +161,7 @@ export const useNativeEngine = ({
     setRate: (rate) => sendQuietly({ player, command: { type: 'speed', rate } }),
     setAudio: selection.pickAudio,
     setSubtitle: selection.pickSubtitle,
-    setSubtitleScale: (scale) => {
-      sendQuietly({ player, command: { type: 'subtitleScale', scale } })
-      setCaptionScale(scale)
-    },
+    setCaptionStyle: captions.change,
     toggleStats: () => sendQuietly({ player, command: { type: 'stats' } }),
   }
 
@@ -149,6 +170,7 @@ export const useNativeEngine = ({
     duration,
     position,
     tracks,
+    captionStyle: captions.style,
     actions,
     drawsSubtitles: true,
     // The picture's figures stay in mpv; its own overlay (`i`) shows them.

@@ -386,6 +386,7 @@ const PlayerChrome = ({
   notice,
   isOpening,
   caption,
+  captionStyle,
   transport,
   audio,
   subtitles,
@@ -484,7 +485,7 @@ const PlayerChrome = ({
       </Animated.View>
       {caption !== null && (
         <View pointerEvents="none" style={[styles.captionSlot, sides]}>
-          <CaptionText caption={caption} />
+          <CaptionText caption={caption} look={captionStyle} />
         </View>
       )}
     </View>

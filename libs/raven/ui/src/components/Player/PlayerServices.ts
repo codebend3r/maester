@@ -21,12 +21,6 @@ export type HostActions = {
   subscribe: (listener: (action: PlayerAction) => void) => () => void
 }
 
-/** The playing video's favourite, for a host that keeps them; the host owns the change. */
-export type PlayerFavourite = {
-  isFavourite: boolean
-  toggle: () => void
-}
-
 /** What plays after the title, as the header, the Next button and the up next card offer it. */
 export type UpNext = {
   to: string
@@ -96,8 +90,6 @@ export type PlayerServices = {
   /** The host owns feedback from its escape action, including clipboard failures. */
   escapeFeedback?: string | null
   hostActions?: HostActions
-  /** Without it the player shows no heart, as a local file has no favourite. */
-  favourite?: PlayerFavourite
   /** The host remembers picks by hand: where to start, and where to save the next. */
   trackPicks?: { start: TrackChoice | null; save: (choice: TrackChoice) => void }
   /** Told when the controls show and hide (the desktop's traffic lights follow them). */

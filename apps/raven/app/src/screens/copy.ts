@@ -122,6 +122,10 @@ export const SETTINGS_COPY = {
   awayNote: 'The largest picture a transcode is sent at when raven is reached over the internet.',
   /** What the away cap is called, as the web's server settings name the same heights. */
   heights: { uhd: '4K', fullHd: '1080p', hd: '720p' },
+  subtitles: 'Subtitles',
+  subtitlesNote: 'How subtitles look on every video, on every device this account signs in on.',
+  subtitleSize: 'Size',
+  subtitleColour: 'Colour',
 } as const
 
 export const SIGN_IN_COPY = {

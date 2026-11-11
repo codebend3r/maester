@@ -14,6 +14,12 @@ const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, NodeJS.
 export const WEB_DIST = join('..', 'web', 'dist')
 
 /**
+ * The fonts mpv draws subtitles with, from this project's folder. Forge copies the folder into
+ * the app's resources under its own name, and unpackaged mpv reads it from here.
+ */
+export const FONTS = join('resources', 'fonts')
+
+/**
  * The raven logo as the app icon, from this project's folder and without an extension: the
  * packager adds `.icns` on macOS and `.ico` on Windows, and an unpackaged launch puts the
  * `.png` in the Dock. The `.ico` is made from the `.png` with ImageMagick:

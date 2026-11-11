@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'bun:test'
+import { CAPTION_SIZES } from '@/contract'
 import {
   type PlayerAction,
   type SkipStep,
   essentialShortcutRows,
   shortcutFor,
   shortcutRows,
-  stepCaptionScale,
+  stepCaptionSize,
   stepSkip,
   stepSpeed,
 } from '@/shortcuts'
@@ -117,11 +118,20 @@ describe('stepSkip', () => {
   })
 })
 
-describe('stepCaptionScale', () => {
-  it('grows and shrinks within bounds', () => {
-    expect(stepCaptionScale({ current: 1, direction: 1 })).toBe(1.25)
-    expect(stepCaptionScale({ current: 0.75, direction: -1 })).toBe(0.75)
-    expect(stepCaptionScale({ current: 2, direction: 1 })).toBe(2)
+describe('stepCaptionSize', () => {
+  it('steps through the sizes and stops at the smallest and the largest', () => {
+    expect(stepCaptionSize({ current: CAPTION_SIZES.medium, direction: 1 })).toBe(
+      CAPTION_SIZES.large,
+    )
+    expect(stepCaptionSize({ current: CAPTION_SIZES.large, direction: -1 })).toBe(
+      CAPTION_SIZES.medium,
+    )
+    expect(stepCaptionSize({ current: CAPTION_SIZES.small, direction: -1 })).toBe(
+      CAPTION_SIZES.small,
+    )
+    expect(stepCaptionSize({ current: CAPTION_SIZES.largest, direction: 1 })).toBe(
+      CAPTION_SIZES.largest,
+    )
   })
 })
 

@@ -66,7 +66,7 @@
 
 /*
  * The top bar: the way back, then the title on a row of its own, an
- * episode's own title and the heart under it, and the line of what it is;
+ * episode's own title under it, and the line of what it is;
  * at the far end the clock over how it plays and what plays next.
  */
 .chrome {
@@ -135,7 +135,7 @@
   min-height: var(--control-size-tall);
 }
 
-// The title over an episode's own title and the heart, over the line of what it is.
+// The title over an episode's own title, over the line of what it is.
 .heading {
   grid-area: heading;
   display: grid;
@@ -163,16 +163,6 @@
   }
 }
 
-// Its season and number, length and year, with the heart beside them on the same row.
-.aboutLine {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  align-items: center;
-  gap: var(--space-3);
-  max-width: 100%;
-}
-
 .episode {
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
@@ -182,40 +172,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-// The playing video's heart, when the host keeps favourites.
-.favourite {
-  @include glass-button;
-
-  min-width: var(--field-size);
-  min-height: var(--field-size);
-}
-
-/*
- * Filled as well as coloured, so a favourite does not rest on colour alone,
- * and it springs as it fills.
- */
-.favourited {
-  color: var(--color-leaf-bright);
-
-  > svg {
-    fill: currentcolor;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    animation: heart 400ms var(--ease-spring);
-  }
-}
-
-@keyframes heart {
-  30% {
-    transform: scale(0.85);
-  }
-
-  70% {
-    transform: scale(1.12);
-  }
 }
 
 /*

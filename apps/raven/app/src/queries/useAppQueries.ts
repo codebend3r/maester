@@ -5,6 +5,7 @@ import { type RavenQueries, ravenQueriesFor, serverEventsFor } from '@raven/ui/h
 
 import { useAccountSession } from '@/account/session'
 import { useActiveServer } from '@/stores/activeServer'
+import { useWatching } from '@/stores/watching'
 
 /** Everything the screens ask one server through: its client, its queries and its events. */
 export type AppQueries = {
@@ -20,6 +21,7 @@ const appQueriesFor = lastPerServer({
     const { useServerEvents } = serverEventsFor({
       api,
       openEvents: openEventsFor({ server, session: useAccountSession }),
+      isWatching: () => useWatching.getState().isWatching,
     })
     return { server, api, queries: ravenQueriesFor(api), useServerEvents }
   },

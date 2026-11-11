@@ -1,4 +1,12 @@
-import { EQ_PRESETS, EQ_PRESET_NAMES, FLAT_EQUALIZER, LEVELLING_MODES } from '@raven/core'
+import {
+  CAPTION_COLOURS,
+  CAPTION_SIZES,
+  DEFAULT_CAPTION_STYLE,
+  EQ_PRESETS,
+  EQ_PRESET_NAMES,
+  FLAT_EQUALIZER,
+  LEVELLING_MODES,
+} from '@raven/core'
 import { afterAll, describe, expect, test } from 'bun:test'
 import type { StateStorage } from 'zustand/middleware'
 import { configureStorage } from '@/stores/configureStorage'
@@ -74,6 +82,22 @@ describe('configureStorage', () => {
       crossfade: 0,
       equalizer: FLAT_EQUALIZER,
     })
+  })
+
+  test('keeps the stored subtitle look when it is one this build knows, and drops any other', async () => {
+    const version = usePlayerPrefs.persist.getOptions().version ?? 0
+    const stored = (captionStyle: unknown) =>
+      new Map([[PLAYER_PREFS_KEY, JSON.stringify({ state: { captionStyle }, version })]])
+    const largeCyan = { size: CAPTION_SIZES.large, colour: CAPTION_COLOURS.cyan }
+
+    await configureStorage({ storage: mapStorage(stored(largeCyan)) })
+    expect(usePlayerPrefs.getState().captionStyle).toEqual(largeCyan)
+
+    usePlayerPrefs.getState().setCaptionStyle(DEFAULT_CAPTION_STYLE)
+    await configureStorage({
+      storage: mapStorage(stored({ size: 'huge', colour: CAPTION_COLOURS.cyan })),
+    })
+    expect(usePlayerPrefs.getState().captionStyle).toEqual(DEFAULT_CAPTION_STYLE)
   })
 
   test('writes later changes into that storage', async () => {

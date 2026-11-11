@@ -87,6 +87,7 @@ export const {
   SettingsToggle,
   SettingsButton,
   SettingsLine,
+  SettingsFact,
   SettingsChoice,
 } = Platform.isTV ? focusSettings : touchSettings
 

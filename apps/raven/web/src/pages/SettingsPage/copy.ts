@@ -48,6 +48,24 @@ export const SETTINGS_COPY = {
     later:
       'Switching between servers, and adding one, comes in a later update. Until then this is the only server, set when the app was built.',
   },
+  captions: {
+    heading: 'Subtitles',
+    help: 'How subtitles look for this account, on every video and on every device it is signed in on.',
+    size: 'Subtitle size',
+    colour: 'Subtitle colour',
+    sizeHints: {
+      small: 'For a screen close to you.',
+      medium: 'The size subtitles start at.',
+      large: 'Easier to read from the sofa.',
+      largest: 'For a screen across the room.',
+    },
+    colourHints: {
+      white: 'The colour subtitles start in.',
+      yellow: 'Stands apart from white text that is part of the picture.',
+      cyan: 'A cool tone that stays clear on warm scenes.',
+      green: 'A soft tone that is easy on the eyes in the dark.',
+    },
+  },
   sound: {
     heading: 'Music',
     quality: 'Music quality',

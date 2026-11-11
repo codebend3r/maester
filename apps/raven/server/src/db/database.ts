@@ -1036,6 +1036,19 @@ export const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX notifications_account ON notifications (account_id, id);
   `,
+  /*
+   * How each account's subtitles look, one size and one colour, kept here so
+   * every device an account signs in on draws them the same. The values the
+   * two may take are the contract's, not the table's, so a size or colour
+   * added later needs no migration.
+   */
+  `
+  CREATE TABLE caption_styles (
+    account_id TEXT PRIMARY KEY,
+    size TEXT NOT NULL,
+    colour TEXT NOT NULL
+  ) WITHOUT ROWID;
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */

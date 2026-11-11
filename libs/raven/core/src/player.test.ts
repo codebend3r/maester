@@ -28,7 +28,7 @@ const valid = {
     { type: 'subtitle', id: 'embedded-0' },
     { type: 'volume', volume: 0.5, muted: false },
     { type: 'speed', rate: 1.5 },
-    { type: 'subtitleScale', scale: 1.2 },
+    { type: 'subtitleStyle', style: { size: 'large', colour: 'white' } },
     { type: 'stats' },
     { type: 'stop' },
   ],

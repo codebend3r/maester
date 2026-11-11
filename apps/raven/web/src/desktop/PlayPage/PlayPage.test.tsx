@@ -503,7 +503,7 @@ describe('PlayPage over the real connection', () => {
   /** The page sends its subtitle size only once main answered the load. */
   const loaded = (main: ReturnType<typeof handedOver>) =>
     waitFor(() =>
-      expect(main.commands.map(({ type }) => type)).toContain(PLAYER_COMMANDS.subtitleScale),
+      expect(main.commands.map(({ type }) => type)).toContain(PLAYER_COMMANDS.subtitleStyle),
     )
 
   const open = () => {

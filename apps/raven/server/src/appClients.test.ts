@@ -3,6 +3,8 @@ import {
   APP_CLIENT_CALLS,
   APP_OWNER_CALLS,
   type AppClientCall,
+  CAPTION_COLOURS,
+  CAPTION_SIZES,
   type FetchLike,
   SCROBBLE_RETURNS,
   SCROBBLE_SERVICES,
@@ -31,7 +33,8 @@ const routeOf = ({ method, path }: AppClientCall) =>
  * unlock, ruled in by Task 17; the PIN's unlock and lock, by the owner's unlock on the iPad;
  * and the account's playlists and its album and artist favourites, by the audio spec's PR 7;
  * and the account's scrobbling links, a playlist's sharing and its copies, by the music spec's
- * PR 10; and the account's binge list, by the device Home's binge cards; and the owner's own,
+ * PR 10; and the account's binge list, by the device Home's binge cards; and its subtitle look, by
+ * the players' subtitle settings; and the owner's own,
  * which only `APP_OWNER_CALLS` lists, by the app's admin settings.
  */
 const WRITES = [
@@ -45,6 +48,7 @@ const WRITES = [
   APP_CLIENT_CALLS.setAlbumFavourite,
   APP_CLIENT_CALLS.setArtistFavourite,
   APP_CLIENT_CALLS.setBinge,
+  APP_CLIENT_CALLS.setCaptionStyle,
   APP_CLIENT_CALLS.createPlaylist,
   APP_CLIENT_CALLS.renamePlaylist,
   APP_CLIENT_CALLS.deletePlaylist,
@@ -60,7 +64,6 @@ const WRITES = [
   APP_CLIENT_CALLS.lock,
   APP_OWNER_CALLS.setPlaybackSettings,
   APP_OWNER_CALLS.setDisplaySettings,
-  APP_OWNER_CALLS.setRemoteAccess,
   APP_OWNER_CALLS.setMemberStatus,
   APP_OWNER_CALLS.quickScanLibrary,
   APP_OWNER_CALLS.cancelQuickScan,
@@ -159,6 +162,7 @@ describe('the calls raven’s app may make', () => {
       api.setAlbumFavourite({ albumId: 4, favourite: true }),
       api.setArtistFavourite({ artistId: 5, favourite: true }),
       api.setBinge({ id: 8, binge: true }),
+      api.setCaptionStyle({ size: CAPTION_SIZES.large, colour: CAPTION_COLOURS.yellow }),
       api.createPlaylist({ name: 'Mix' }),
       api.renamePlaylist({ id: 6, name: 'Mix' }),
       api.deletePlaylist(6),
@@ -174,7 +178,6 @@ describe('the calls raven’s app may make', () => {
       api.lock(),
       api.setPlaybackSettings({ transcoding: TRANSCODINGS.remuxOnly }),
       api.setDisplaySettings({ titles: TITLE_DISPLAYS.text }),
-      api.setRemoteAccess({}),
       api.setMemberStatus({
         id: '0f8fad5b-d9cb-469f-a165-70867728950e',
         change: { status: MEMBER_STATUSES.approved },

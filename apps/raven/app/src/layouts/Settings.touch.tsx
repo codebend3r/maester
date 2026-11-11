@@ -10,12 +10,14 @@ import type {
   SettingsButtonProps,
   SettingsChoiceProps,
   SettingsKit,
+  SettingsFactProps,
   SettingsLineProps,
   SettingsPageProps,
   SettingsSectionProps,
   SettingsToggleProps,
 } from '@/layouts/settingsKit'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
+import { CODE_FONT } from '@/theme/fonts'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 
 const SettingsPage = ({ title, onBack, children }: SettingsPageProps) => {
@@ -103,6 +105,17 @@ const SettingsLine = ({ text, isAlert = false }: SettingsLineProps) => {
   )
 }
 
+/** A fact read, not set: a row laid out as a setting is, that nothing presses. */
+const SettingsFact = ({ label, value, isCode = false }: SettingsFactProps) => {
+  const styles = useStyles()
+  return (
+    <View accessibilityLabel={`${label}: ${value}`} accessible style={styles.toggle}>
+      <Text style={[styles.name, styles.choiceLabel]}>{label}</Text>
+      <Text style={[styles.factValue, isCode && styles.code]}>{value}</Text>
+    </View>
+  )
+}
+
 /**
  * A setting picked from the system's action sheet: a row laid out as a toggle is, the label at
  * the start and what is chosen now at the end, on an iPad a popover pointing at the row.
@@ -131,6 +144,7 @@ export const touchSettings: SettingsKit = {
   SettingsToggle,
   SettingsButton,
   SettingsLine,
+  SettingsFact,
   SettingsChoice,
 }
 
@@ -147,6 +161,8 @@ const useStyles = themedStyles((colours) =>
     name: { flexShrink: 1, color: colours.text, fontSize: SIZES.text, fontWeight: '600' },
     line: { color: colours.muted, fontSize: SIZES.textSm },
     chipLabel: { color: colours.text, fontSize: SIZES.textSm, fontWeight: '600' },
+    factValue: { flexShrink: 1, color: colours.text, fontSize: SIZES.textSm },
+    code: { fontFamily: CODE_FONT },
     toggle: {
       flexDirection: 'row',
       alignItems: 'center',
