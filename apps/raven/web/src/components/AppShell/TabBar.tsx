@@ -11,6 +11,7 @@ import { COMMON_COPY } from '@/lib/copy'
 import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
 import { PLAY_HISTORY_ROUTES } from '@/lib/playHistory'
 import { NOTIFICATIONS_PATH } from '@/lib/notifications'
+import { COMING_SOON_COPY, COMING_SOON_PATH } from '@/pages/ComingSoonPage/copy'
 import { NOTIFICATIONS_COPY } from '@/pages/NotificationsPage/copy'
 import { PLAY_HISTORY_COPY } from '@/pages/PlayHistoryPage/copy'
 import { ADMIN_COPY, ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
@@ -49,6 +50,13 @@ const BINGE_TAB = {
   patterns: [BINGE_PATH],
   icon: 'popcorn',
   label: BINGE_COPY.title,
+} as const satisfies TabTarget
+
+const COMING_SOON_TAB = {
+  to: COMING_SOON_PATH,
+  patterns: [COMING_SOON_PATH],
+  icon: 'calendar',
+  label: COMING_SOON_COPY.title,
 } as const satisfies TabTarget
 
 const HISTORY_TAB = {
@@ -131,7 +139,14 @@ const OnlineTabBar = ({ hasMusic }: TabBarProps) => {
   const [fourthTab, ...displaced] = hasMusic
     ? ([MUSIC_TAB, BINGE_TAB] as const)
     : ([BINGE_TAB] as const)
-  const moreTabs = [...displaced, HISTORY_TAB, NOTIFICATIONS_TAB, ...desktopTabs, SETTINGS_TAB]
+  const moreTabs = [
+    ...displaced,
+    COMING_SOON_TAB,
+    HISTORY_TAB,
+    NOTIFICATIONS_TAB,
+    ...desktopTabs,
+    SETTINGS_TAB,
+  ]
   const isMoreCurrent = isAnyOf({
     patterns: [...moreTabs, ...MANAGE_TABS].flatMap((tab) => tab.patterns),
     pathname,
@@ -181,7 +196,7 @@ const TAB_BARS = {
  * A phone's way round, in place of the side menu: five tabs along the foot
  * of the screen. Home, Libraries (which any library's pages mark),
  * Favourites, Music while a music library exists or else Binge, then More,
- * which opens a sheet of the rest: Binge when Music took its place, Play
+ * which opens a sheet of the rest: Binge when Music took its place, Coming soon, Play
  * history, Notifications, On this Mac and Downloads in Raven, Settings, and for whoever may
  * manage, Admin, Streams and Reports. More is marked while its sheet is open
  * or one of its pages is. The sheet closes on a choice, Escape, a tap on the

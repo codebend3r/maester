@@ -1,6 +1,9 @@
 import { configure, getConfig } from '@testing-library/react'
 import { unstable_IdlePriority, unstable_scheduleCallback } from 'scheduler'
 
+/** How long a waitFor or findBy keeps trying before it fails the test. */
+const ASYNC_UTIL_TIMEOUT_MS = 5_000
+
 /** Resolves once React's scheduler has run every render and effect queued ahead of it. */
 const reactIdle = (): Promise<void> =>
   new Promise((resolve) => {
@@ -17,6 +20,8 @@ const reactIdle = (): Promise<void> =>
 export const settleAsyncHelpers = (): void => {
   const { asyncWrapper } = getConfig()
   configure({
+    // The default 1s is too tight on a small CI runner shared by --parallel and coverage.
+    asyncUtilTimeout: ASYNC_UTIL_TIMEOUT_MS,
     asyncWrapper: (callback) =>
       asyncWrapper(async () => {
         const result = await callback()

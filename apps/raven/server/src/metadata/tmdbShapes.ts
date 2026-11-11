@@ -719,6 +719,59 @@ const toSearchResult = (entry: Record<string, unknown>): SearchResult | null => 
 export const toSearchResults = (body: unknown): SearchResult[] =>
   records(record(body).results).flatMap((entry) => toSearchResult(entry) ?? [])
 
+/** A movie or show a `/discover` call lists, with the day it comes out. */
+export type DiscoveredTitle = {
+  tmdbId: string
+  title: string
+  /** `YYYY-MM-DD`: a movie's release, or a show's first episode. */
+  released: string
+  poster: string | null
+  popularity: number
+}
+
+const toDiscoveredTitle = (entry: Record<string, unknown>): DiscoveredTitle | null => {
+  const tmdbId = idOf(entry.id)
+  const title = text(entry.title) ?? text(entry.name)
+  const released = text(entry.release_date) ?? text(entry.first_air_date)
+  if (tmdbId == null || title == null || released == null) return null
+  return {
+    tmdbId,
+    title,
+    released,
+    poster: imagePath(entry.poster_path),
+    popularity: number(entry.popularity) ?? 0,
+  }
+}
+
+/** A title of a `/discover` page, at its place among the page's results. */
+type PlacedTitle = {
+  /** Its index in the page's results, counting those left out for want of a name or a day. */
+  at: number
+  title: DiscoveredTitle
+}
+
+/** A page of a `/discover` list, and how long the whole list is. */
+export type DiscoveredPage = {
+  titles: PlacedTitle[]
+  /** How many results the page held, those left out included. */
+  size: number
+  /** How many results the whole list holds. */
+  total: number
+}
+
+/** A `/discover/movie` or `/discover/tv` body as a page: its named and dated titles, each in its place. */
+export const toDiscoveredPage = (body: unknown): DiscoveredPage => {
+  const results = records(record(body).results)
+  return {
+    titles: results.flatMap((entry, at) => {
+      const title = toDiscoveredTitle(entry)
+      return title == null ? [] : { at, title }
+    }),
+    size: results.length,
+    total: number(record(body).total_results) ?? results.length,
+  }
+}
+
 const idsOf = (results: unknown): string[] =>
   records(results).flatMap((entry) => idOf(entry.id) ?? [])
 

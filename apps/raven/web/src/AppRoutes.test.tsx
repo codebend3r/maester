@@ -7,10 +7,12 @@ import {
   AUTH_ROUTES,
   DESKTOP_PATHS,
   DESKTOP_REQUESTS,
+  UPCOMING_SHELVES,
 } from '@raven/core'
 import { queryKeys } from '@raven/ui/headless'
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
+import { comingSoonShelfPath } from '@/pages/ComingSoonPage/copy'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { fakeAuthClient, readyConfig } from '@/test/authClient'
 import { asDesktop, downloadsMain, sentOfType } from '@/test/desktop'
@@ -102,5 +104,41 @@ describe('AppRoutes inside Raven', () => {
       await screen.findByRole('heading', { name: 'Nothing lives at this address' }),
     ).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'On this Mac' })).toBeNull()
+  })
+})
+
+describe('AppRoutes for Coming soon', () => {
+  const list = spyOn(api, 'listLibraries')
+  const getUpcomingShelf = spyOn(api, 'getUpcomingShelf')
+
+  afterEach(() => {
+    cleanup()
+    list.mockReset()
+    getUpcomingShelf.mockReset()
+  })
+
+  it("opens each shelf's own page", async () => {
+    list.mockImplementation(async () => [])
+    getUpcomingShelf.mockImplementation(async () => ({ titles: [], next: null }))
+    renderWithProviders({
+      ui: <AppRoutes />,
+      route: comingSoonShelfPath(UPCOMING_SHELVES.documentaries),
+    })
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Upcoming documentaries' }),
+    ).toBeInTheDocument()
+    expect(getUpcomingShelf).toHaveBeenCalledWith({
+      shelf: UPCOMING_SHELVES.documentaries,
+      after: null,
+    })
+  })
+
+  it('has no page for a shelf there is not', async () => {
+    list.mockImplementation(async () => [])
+    renderWithProviders({ ui: <AppRoutes />, route: '/coming-soon/trailers' })
+    expect(
+      await screen.findByRole('heading', { name: 'Nothing lives at this address' }),
+    ).toBeInTheDocument()
+    expect(getUpcomingShelf).not.toHaveBeenCalled()
   })
 })

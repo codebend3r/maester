@@ -118,6 +118,9 @@ import {
 import { MusicIndexer } from '@/music/musicIndexer'
 import { MusicRepository } from '@/music/musicRepository'
 import { Filmographies } from '@/people/filmographies'
+import { UpcomingController } from '@/upcoming/upcomingController'
+import { UpcomingShelfPages } from '@/upcoming/upcomingShelfPages'
+import { UpcomingTitles } from '@/upcoming/upcomingTitles'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { PlaybackController } from '@/playback/playbackController'
 import { BugReportsController } from '@/reports/bugReportsController'
@@ -171,6 +174,7 @@ export const CONTROLLERS = [
   WatchedController,
   HomeController,
   HeroController,
+  UpcomingController,
   BrowseController,
   HealthController,
   ItemsController,
@@ -334,6 +338,8 @@ export class AppModule {
         TmdbClient,
         MatchFactsCache,
         Filmographies,
+        UpcomingShelfPages,
+        UpcomingTitles,
         OmdbClient,
         MdblistClient,
         AiClient,

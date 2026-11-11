@@ -15,7 +15,7 @@
     "deploy:android-tv": "./scripts/deploy_android_tv.sh",
     "build:android-tv:test-account": "bun --env-file=.env.test-account run build:android-tv",
     "build:ios": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
-    "build:tvos": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release -sdk appletvsimulator -destination 'generic/platform=tvOS Simulator' -derivedDataPath build/tvos ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
+    "build:tvos": "./scripts/build_tvos.sh",
     "dev:ios": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-phone",
     "dev:ipad": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-pad",
     "dev:tvos": "EXPO_TV=1 APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-tv",

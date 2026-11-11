@@ -258,7 +258,7 @@ jobs:
       # target. Pods/ and DerivedData ran Nx Cloud's upload out of open files (EMFILE), so no
       # Apple build was ever stored and every PR compiled from scratch.
       - name: 📺 Build for the Apple TV simulator
-        run: bunx nx run @raven/app:build:tvos --excludeTaskDependencies
+        run: bun run ci:app:tvos:build
 
       # How much of the compile ccache served, to tell a warm cache from a cold one.
       - name: 📊 ccache

@@ -6,6 +6,7 @@ import {
   type MusicListOptions,
   type MixKind,
   type PlayHistoryShow,
+  type UpcomingShelf,
   type ViewingSession,
   ApiError,
 } from '@raven/core'
@@ -138,6 +139,10 @@ export const queryKeys = {
   homeAlbums: ['home', 'albums'],
   /** The movies and shows the admin picked for the hero. */
   heroPicks: ['hero', 'picks'],
+  /** What TMDB says is coming soon. */
+  upcoming: ['upcoming'],
+  /** One Coming soon shelf a page at a time, under Coming soon's key. */
+  upcomingShelf: (shelf: UpcomingShelf) => ['upcoming', shelf],
   history: ({ libraryId, show, limit }: QueryKeysHistoryProps) => [
     'libraries',
     libraryId,

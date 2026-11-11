@@ -123,6 +123,7 @@ Each runs one CI job from pull-request-checks.yml on this machine.
 | `ci:app:ios:install`              | Installs the build on the iPhone simulator.                                        | macOS + Xcode   |
 | `ci:app:ios:e2e`                  | The touch Maestro flows on the iPhone simulator.                                   | macOS + Xcode   |
 | `ci:app:tvos`                     | The 📺 App on Apple TV job.                                                        | macOS + Xcode   |
+| `ci:app:tvos:build`               | The Apple TV job's Release build for the simulator, with a brief log.              | macOS + Xcode   |
 | `ci:app:android-tv`               | The 📺 App on Android TV job: every ci:app:android-tv step below, in order.        | Android SDK     |
 | `ci:app:android-tv:tools`         | Its tools: Android Studio, the SDK, the TV system image and Maestro.               | Android SDK     |
 | `ci:app:android-tv:emulator`      | Starts the raven_tv emulator, making it when there is none.                        | Android SDK     |

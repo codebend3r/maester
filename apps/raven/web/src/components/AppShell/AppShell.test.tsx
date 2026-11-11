@@ -175,6 +175,7 @@ describe('AppShell', () => {
       'Home',
       'Continue watching',
       'Binge',
+      'Coming soon',
       'Favourites',
       'Movies',
       'Libraries',
@@ -585,6 +586,7 @@ describe('AppShell', () => {
       '/',
       '/continue-watching',
       '/binge',
+      '/coming-soon',
       '/favourites',
       '/libraries',
       '/admin',
@@ -605,6 +607,7 @@ describe('AppShell', () => {
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toEqual([
+      'Coming soon',
       'Play history',
       'Notifications',
       'This Mac',

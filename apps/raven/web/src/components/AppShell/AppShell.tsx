@@ -15,6 +15,7 @@ import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { Logo } from '@/components/Logo/Logo'
 import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
+import { COMING_SOON_COPY, COMING_SOON_PATH } from '@/pages/ComingSoonPage/copy'
 import { DESIGN_PATH } from '@/pages/DesignPage/copy'
 import { ADMIN_COPY, ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
@@ -193,7 +194,8 @@ const PINNED_MARKS = {
 
 /**
  * The frame around every browsing page. Beside the page, the side menu
- * holds still as the page scrolls: the logo, Home and Favourites, Music
+ * holds still as the page scrolls: the logo, Home, Continue watching, Binge,
+ * Coming soon (what TMDB says is on its way) and Favourites, Music
  * (the music mode at `/music`) while a music library exists, then under a
  * Pinned heading the pinned libraries, each with its type's icon
  * (with a lock on it for a locked one, whatever its type), an open one
@@ -270,6 +272,13 @@ export const AppShell = () => {
                 patterns={[BINGE_PATH]}
                 icon={<Icon name="popcorn" />}
                 label={BINGE_COPY.title}
+                isIconsOnly={isIconsOnly}
+              />
+              <NavItem
+                to={COMING_SOON_PATH}
+                patterns={[COMING_SOON_PATH]}
+                icon={<Icon name="calendar" />}
+                label={COMING_SOON_COPY.title}
                 isIconsOnly={isIconsOnly}
               />
               <NavItem
