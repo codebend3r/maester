@@ -1,4 +1,10 @@
-import { type CaptionStyle, type Chapter, type PlaybackMode, formatDuration } from '@raven/core'
+import {
+  type CaptionStyle,
+  type Chapter,
+  type Marker,
+  type PlaybackMode,
+  formatDuration,
+} from '@raven/core'
 import type { ComponentProps, ReactNode } from 'react'
 import type { AccessibilityActionEvent, AccessibilityActionInfo } from 'react-native'
 import type Video from 'react-native-video'
@@ -23,6 +29,9 @@ export const SKIP_ICONS = {
 
 /** What plays after the video, an episode's next in its show, and how to play it now. */
 type PlayerNext = { label: string; onPlay: () => void }
+
+/** What plays next, with its words for the card that offers it: "Lucky · S01 · E02 · Make 'em Dance". */
+type PlayerUpNext = PlayerNext & { words: string }
 
 /** A track picker: what it offers, which is picked, and what to do with a pick; the chrome names it. */
 export type TrackPicker = Omit<PickerProps<string>, 'label' | 'icon'>
@@ -77,7 +86,7 @@ export type PlayerChromeProps = {
   /** The original or a size to convert down to, the web's Quality list; null with only one to offer. */
   quality: TrackPicker | null
   /** The next episode, once the server has named one, or the next video in a shuffle; null for a film or the show's last. */
-  next: PlayerNext | null
+  next: PlayerUpNext | null
   /**
    * The video before this one in a shuffle, which the back-to-the-start button plays in place of
    * starting this one again; null where there is none.
@@ -85,8 +94,8 @@ export type PlayerChromeProps = {
   previous: PlayerNext | null
   /** How the video plays, for the corner that says so; null while no way has been picked. */
   mode: PlaybackMode | null
-  /** What plays next in words, "Lucky · S01 · E02 · Make 'em Dance", for the corner; null with nothing after. */
-  upNext: string | null
+  /** The file's credits, where the countdown to what plays next starts; null while none are known. */
+  credits: Marker | null
   /** The file's chapters, in order, for a platform that offers them to jump to; empty while none are known. */
   chapters: readonly Chapter[]
   onBack: () => void
@@ -137,6 +146,11 @@ export const PLAYER_COPY = {
   showControls: 'Show the controls',
   hideControls: 'Hide the controls',
   upNext: 'Up next',
+  playNow: 'Play now',
+  watchCredits: 'Watch credits',
+  /** How long until what is next plays by itself: "Plays in 1 second", "Plays in 12 seconds". */
+  playsIn: (seconds: number) => `Plays in ${seconds} ${seconds === 1 ? 'second' : 'seconds'}`,
+  sceneAfter: 'A scene follows the credits',
   chapters: 'Chapters',
   /** An untitled chapter by its place: "Chapter 3". */
   chapter: (place: number) => `Chapter ${place}`,

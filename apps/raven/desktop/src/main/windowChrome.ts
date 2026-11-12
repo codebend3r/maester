@@ -15,16 +15,19 @@ type ChromeOptionsForProps = {
 }
 
 /**
- * The window options each chrome needs. macOS keeps its traffic lights over a page that runs
- * under the title bar. Windows composites mpv's video under the page only in a transparent
- * window, and a transparent window cannot have a frame, so the page draws the controls.
+ * The window options each chrome needs. Both are transparent from the start: a window made
+ * opaque and cleared later (`setBackgroundColor`) lets mpv's video through, but Chromium then
+ * repaints the page over what it drew before, so anything moving on a see-through part (the
+ * scrubber's head on the controls' fade) leaves a ghost. macOS keeps its traffic lights over
+ * a page that runs under the title bar. On Windows a transparent window cannot have a frame,
+ * so the page draws the controls.
  */
 export const chromeOptionsFor = ({
   chrome,
 }: ChromeOptionsForProps): BrowserWindowConstructorOptions => {
   switch (chrome) {
     case WINDOW_CHROMES.inset:
-      return { titleBarStyle: TITLE_BAR_STYLES.hiddenInset }
+      return { titleBarStyle: TITLE_BAR_STYLES.hiddenInset, transparent: true }
     case WINDOW_CHROMES.drawn:
       return { frame: false, transparent: true }
     default: {

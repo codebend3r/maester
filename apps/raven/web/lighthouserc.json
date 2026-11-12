@@ -45,7 +45,7 @@
               "error",
               {
                 "minScore": 0.9,
-                "aggregationMethod": "median-run"
+                "aggregationMethod": "median"
               }
             ]
           }
@@ -57,7 +57,7 @@
               "error",
               {
                 "minScore": 0.7,
-                "aggregationMethod": "median-run"
+                "aggregationMethod": "median"
               }
             ]
           }

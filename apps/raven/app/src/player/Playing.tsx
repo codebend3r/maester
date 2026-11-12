@@ -97,7 +97,7 @@ const nextLabelOf = (next: MediaItem): string =>
     .filter((part): part is string => part !== null)
     .join(' ')
 
-/** "Lucky · S01 · E02 · Make 'em Dance": what plays next, as the corner shows it. */
+/** "Lucky · S01 · E02 · Make 'em Dance": what plays next, as the up next card shows it. */
 const upNextWordsOf = (next: MediaItem): string => {
   const { item } = next
   if (item === null || item.type !== ITEM_TYPES.episode) return mediaLabel(next)
@@ -509,10 +509,16 @@ export const Playing = ({
               }
         }
         mode={mode}
-        upNext={nextMedia === null ? null : upNextWordsOf(nextMedia)}
         chapters={markers.data?.chapters ?? NO_CHAPTERS}
+        credits={markers.data?.credits ?? null}
         next={
-          nextMedia === null ? null : { label: neighbours.nextLabel(nextMedia), onPlay: playNext }
+          nextMedia === null
+            ? null
+            : {
+                label: neighbours.nextLabel(nextMedia),
+                words: upNextWordsOf(nextMedia),
+                onPlay: playNext,
+              }
         }
         previous={
           previousMedia === null

@@ -15,9 +15,8 @@
   stroke: var(--color-on-picture);
   stroke-width: 2;
   stroke-linecap: round;
-
-  @media (prefers-reduced-motion: no-preference) {
-    // Smooths the steps between the video's time updates.
-    transition: stroke-dashoffset 250ms linear;
-  }
+  /*
+   * It steps with the video's time updates, with no transition between them: a dash offset
+   * animates only on the main thread, which drew the whole window 60 times a second.
+   */
 }

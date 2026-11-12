@@ -110,6 +110,8 @@ export {
 } from '@/query/useAudiobook'
 export { activeLineAt } from '@/lib/lyrics'
 export { chapterAt, nextChapterStart, previousChapterStart } from '@/lib/chapters'
+export type { UpNextMoment } from '@/lib/upNextCountdown'
+export { useUpNextCountdown } from '@/lib/useUpNextCountdown'
 export { movedUp, withoutPlace } from '@/music/playlistOrder'
 export {
   albumDiscsOf,

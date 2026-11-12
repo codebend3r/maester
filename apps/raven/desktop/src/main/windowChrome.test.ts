@@ -8,9 +8,10 @@ import {
 } from '@/main/windowChrome'
 
 describe('chromeOptionsFor', () => {
-  it('keeps the traffic lights inset on macOS', () => {
+  it('keeps the traffic lights inset on macOS, in a window transparent from the start', () => {
     expect(chromeOptionsFor({ chrome: WINDOW_CHROMES.inset })).toEqual({
       titleBarStyle: 'hiddenInset',
+      transparent: true,
     })
   })
 
