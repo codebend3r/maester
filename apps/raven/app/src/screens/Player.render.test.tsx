@@ -96,6 +96,16 @@ const renderPlayer = async (params: Record<string, string>) => {
   return renderScreen({ ui: <Player />, client: shown.client })
 }
 
+/** The picture under the controls, which takes the taps and the holds. */
+const surface = () =>
+  screen.getByRole('button', {
+    name: new RegExp(`^(${PLAYER_COPY.hideControls}|${PLAYER_COPY.showControls})$`),
+  })
+
+/** A touch on each half of the jest window, which is 750 points wide. */
+const RIGHT = { nativeEvent: { pageX: 700 } }
+const LEFT = { nativeEvent: { pageX: 20 } }
+
 /** The props the player was last drawn with. */
 const videoProps = (): ReactVideoProps => {
   const { props } = drawnVideo
@@ -327,6 +337,47 @@ describe('Player on a phone or tablet', () => {
     expect(drawnVideo.seek).toHaveBeenLastCalledWith(110)
     await fireEvent.press(screen.getByRole('button', { name: 'Back 10 seconds' }))
     expect(drawnVideo.seek).toHaveBeenLastCalledWith(100)
+  })
+
+  it('skips 20 and then 30 seconds as the skips come quickly, the buttons and the double taps together', async () => {
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
+    const props = await loadedVideo()
+    await start(props)
+    await moveVideoTo({ props, seconds: 100 })
+    await fireEvent.press(screen.getByRole('button', { name: 'Forward 10 seconds' }))
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(110)
+    // A lone tap on the right only hides the controls; the second of the pair skips.
+    const before = drawnVideo.seek.mock.calls.length
+    await fireEvent.press(surface(), RIGHT)
+    expect(drawnVideo.seek).toHaveBeenCalledTimes(before)
+    await fireEvent.press(surface(), RIGHT)
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(130)
+    await fireEvent.press(surface(), RIGHT)
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(160)
+    expect(screen.getByLabelText(PLAYER_COPY.forward(30))).toBeTruthy()
+    await fireEvent.press(surface(), LEFT)
+    await fireEvent.press(surface(), LEFT)
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(150)
+  })
+
+  it('plays at twice the speed while a finger rests on the right, and holds the picture to run it back on the left', async () => {
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
+    const props = await loadedVideo()
+    await start(props)
+    await moveVideoTo({ props, seconds: 100 })
+    await fireEvent(surface(), 'longPress', RIGHT)
+    expect(videoProps()).toMatchObject({ rate: 2, paused: false })
+    expect(screen.getByLabelText(PLAYER_COPY.holdForward(2))).toBeTruthy()
+    await fireEvent(surface(), 'touchEnd')
+    expect(videoProps()).toMatchObject({ rate: 1, paused: false })
+    await fireEvent(surface(), 'longPress', LEFT)
+    expect(videoProps()).toMatchObject({ rate: 1, paused: true })
+    // The hold steps back on a timer, which a busy run can keep waiting.
+    await waitFor(() => expect(drawnVideo.seek.mock.calls.at(-1)?.[0]).toBeLessThan(100), {
+      timeout: 5000,
+    })
+    await fireEvent(surface(), 'touchEnd')
+    expect(videoProps().paused).toBe(false)
   })
 
   it('mutes and unmutes from the speaker, and holding it stands the volume slider over it', async () => {

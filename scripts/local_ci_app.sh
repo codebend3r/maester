@@ -207,3 +207,10 @@ boot_simulator() {
     open -b com.apple.dt.Devices 2> /dev/null ||
     echo 'Neither Simulator nor DeviceHub opened; the simulator runs without a window.'
 }
+
+# skip_keyboard_tutorial: tells the booted SIM_DEVICE it has shown the keyboard's slide to type
+# tutorial, which a new simulator shows the second time the keyboard comes up, holding the
+# app's main thread long enough to fail a flow that types.
+skip_keyboard_tutorial() {
+  xcrun simctl spawn "$SIM_DEVICE" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
+}

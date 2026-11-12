@@ -40,6 +40,7 @@ cmp apps/raven/music/ios/Podfile.lock apps/raven/music/ios/Pods/Manifest.lock
 
 step 'Install Wren on the iPhone simulator'
 xcrun simctl bootstatus "$SIM_DEVICE" -b
+skip_keyboard_tutorial
 xcrun simctl install "$SIM_DEVICE" "$WREN_APP"
 
 await_fixture

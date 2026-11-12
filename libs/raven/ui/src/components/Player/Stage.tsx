@@ -25,7 +25,7 @@ import type { PlaybackFailure, StepDown } from '@/components/Player/usePlaybackL
 import type { Delivery } from '@/lib/streamSource'
 import type { SubtitleStatus } from '@/lib/useTrackCues'
 import { Button, ButtonLink } from '@/components/Button/Button'
-import { Bezel } from '@/components/Player/Bezel'
+import { Bezel, HOLD_LOOKS, HoldMark } from '@/components/Player/Bezel'
 import { Controls } from '@/components/Player/Controls'
 import { STAGE_COPY } from '@/components/Player/copy'
 import { Icon } from '@/components/Icon/Icon'
@@ -53,6 +53,7 @@ import { UpNextCard } from '@/components/Player/UpNextCard'
 import { PlayerStatus } from '@/components/Player/PlayerStatus'
 import { useShortcutsTip } from '@/components/Player/useShortcutsTip'
 import { useSkipIntro } from '@/components/Player/useSkipIntro'
+import { useTouchGestures } from '@/components/Player/useTouchGestures'
 import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
@@ -339,6 +340,13 @@ export const PlayerChrome = ({
     leave: onBack,
   })
 
+  // A finger's taps climb the same ladder as the keys and the buttons: all three are `act`'s skip.
+  const gestures = useTouchGestures({
+    engine,
+    onSkip: (direction) => controls.act({ type: PLAYER_ACTIONS.skip, direction }),
+    onTap: controls.togglePlay,
+  })
+
   const onKey = useEffectEvent((event: KeyboardEvent) => {
     // A host's dialog over the player keeps its keys, Escape included: they close it, not the player.
     if (isInForeignDialog({ target: event.target, root: root.current })) return
@@ -448,22 +456,30 @@ export const PlayerChrome = ({
     <div
       ref={root}
       className={[styles.stage, chromeShown ? '' : styles.idle].filter(Boolean).join(' ')}
-      onPointerMove={idle.wake}
-      onPointerDown={onStagePointerDown}
+      {...gestures.handlers}
+      onPointerMove={(event) => {
+        idle.wake()
+        gestures.onPointerMove(event)
+      }}
+      onPointerDown={(event) => {
+        onStagePointerDown(event)
+        gestures.onPointerDown(event)
+      }}
     >
       {engine.surface}
       {!engine.drawsSubtitles && (renderSubtitles?.(chromeShown) ?? null)}
       {/* A skip waits for data while its flash shows: one thing at a time in the middle. */}
       {state.waiting && !isFlashing && <Preloader />}
-      {state.paused && !state.waiting && chromeShown && (
+      {state.paused && !state.waiting && chromeShown && gestures.hold === null && (
         // The picture under it takes the click; this only says a click will play.
         <span className={styles.paused} aria-hidden="true">
           <Icon name="play" size={40} />
         </span>
       )}
       {!!bezel && <Bezel key={bezel.id} bezel={bezel} />}
+      {gestures.hold !== null && <HoldMark side={gestures.hold} />}
       <p className="visually-hidden" aria-live="polite">
-        {bezel?.text ?? null}
+        {gestures.hold === null ? (bezel?.text ?? null) : HOLD_LOOKS[gestures.hold].label}
       </p>
       <header
         className={[styles.chrome, chromeShown ? '' : styles.chromeHidden]

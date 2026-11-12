@@ -248,16 +248,20 @@ describe('Player on Android TV', () => {
     expect(scrubber().props.hasTVPreferredFocus).toBe(false)
   })
 
-  it('seeks ten seconds either way as the d-pad presses left and right on the scrubber', async () => {
+  it('seeks ten seconds either way as the d-pad presses left and right on the scrubber, and further when pressed quickly', async () => {
     const props = await playing({ id: BUSBOYS_UNSUBTITLED.id })
     await moveVideoTo({ props, seconds: 100 })
     await fireEvent(scrubber(), NATIVE_EVENTS.focus)
     await pressRemote({ key: REMOTE_KEYS.right })
     expect(drawnVideo.seek).toHaveBeenLastCalledWith(110)
     await pressRemote({ key: REMOTE_KEYS.left })
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(100)
+    // The web's ladder: a second and a third quick press the same way go 20 and then 30.
     await pressRemote({ key: REMOTE_KEYS.left })
-    expect(drawnVideo.seek).toHaveBeenLastCalledWith(90)
-    expect(drawnVideo.seek).toHaveBeenCalledTimes(3)
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(80)
+    await pressRemote({ key: REMOTE_KEYS.left })
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(50)
+    expect(drawnVideo.seek).toHaveBeenCalledTimes(4)
   })
 
   it('keeps the focus on the scrubber as left and right are pressed, so the system never carries it off to Back', async () => {

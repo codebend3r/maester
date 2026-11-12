@@ -65,6 +65,7 @@ step_install() {
   step 'Install the build on the iPhone simulator'
   find_iphone
   xcrun simctl bootstatus "$SIM_DEVICE" -b
+  skip_keyboard_tutorial
   xcrun simctl install "$SIM_DEVICE" "$APP"
 }
 

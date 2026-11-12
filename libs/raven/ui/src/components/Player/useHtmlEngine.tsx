@@ -5,7 +5,12 @@ import {
   isPictureSubtitle,
 } from '@raven/core'
 import { useEffect, useRef } from 'react'
-import type { EngineHandle, EngineStats, HtmlSource } from '@/components/Player/engine'
+import {
+  type EngineHandle,
+  type EngineStats,
+  type HtmlSource,
+  SURFACE_MARK,
+} from '@/components/Player/engine'
 import type { Rendition } from '@/components/Player/rendition'
 import type { PlaybackFailure } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/Player.module.scss'
@@ -160,6 +165,7 @@ export const useHtmlEngine = ({
       // Subtitles use our themed overlay, including for converted streams.
       // oxlint-disable-next-line jsx-a11y/media-has-caption, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
       <video
+        {...SURFACE_MARK}
         ref={videoRef}
         className={styles.video}
         poster={posterUrl ?? undefined}

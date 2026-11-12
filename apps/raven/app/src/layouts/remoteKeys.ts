@@ -1,6 +1,4 @@
-import { oneOf } from '@raven/core'
-
-import { SKIP_SECONDS } from '@/layouts/playerKit'
+import { type SkipStep, oneOf } from '@raven/core'
 
 /** The remote's keys the d-pad player answers, as the fork's `useTVEventHandler` names them. */
 export const REMOTE_KEYS = {
@@ -91,10 +89,10 @@ export const heldSeekOf = ({ eventType, eventKeyAction }: HeldSeekOfProps): Held
     : { direction, isDown: Number(eventKeyAction) === KEY_ACTIONS.down }
 }
 
-/** What a press does beyond bringing the controls back: a seek, in seconds, and a play or pause. */
-type RemoteAnswer = { seekBy: number; shouldTogglePlay: boolean }
+/** What a press does beyond bringing the controls back: a skip one way, and a play or pause. */
+type RemoteAnswer = { skip: SkipStep['direction'] | null; shouldTogglePlay: boolean }
 
-const NO_ANSWER: RemoteAnswer = { seekBy: 0, shouldTogglePlay: false }
+const NO_ANSWER: RemoteAnswer = { skip: null, shouldTogglePlay: false }
 
 type RemoteAnswerOfProps = {
   key: RemoteKey
@@ -132,7 +130,8 @@ export const isSeekingWith = ({ isShown, isScrubbing }: IsSeekingWithProps): boo
   isScrubbing || !isShown
 
 /**
- * What the d-pad player does with a press. Left and right skip ten seconds from the scrubber,
+ * What the d-pad player does with a press. Left and right skip (how far is the chrome's skip
+ * ladder's to say) from the scrubber,
  * or while the controls are hidden, as the press brings them back; on the buttons they move the
  * focus instead. Rewind and fast forward skip wherever the focus is, and the play keys play and
  * pause. Every press brings the controls back, which the chrome does for any key.
@@ -146,13 +145,13 @@ export const remoteAnswerOf = ({
   const isSeeking = isSeekingWith({ isShown, isScrubbing })
   switch (key) {
     case REMOTE_KEYS.left:
-      return isSeeking ? { ...NO_ANSWER, seekBy: -SKIP_SECONDS } : NO_ANSWER
+      return isSeeking ? { ...NO_ANSWER, skip: -1 } : NO_ANSWER
     case REMOTE_KEYS.right:
-      return isSeeking ? { ...NO_ANSWER, seekBy: SKIP_SECONDS } : NO_ANSWER
+      return isSeeking ? { ...NO_ANSWER, skip: 1 } : NO_ANSWER
     case REMOTE_KEYS.rewind:
-      return { ...NO_ANSWER, seekBy: -SKIP_SECONDS }
+      return { ...NO_ANSWER, skip: -1 }
     case REMOTE_KEYS.fastForward:
-      return { ...NO_ANSWER, seekBy: SKIP_SECONDS }
+      return { ...NO_ANSWER, skip: 1 }
     case REMOTE_KEYS.playPause:
       return { ...NO_ANSWER, shouldTogglePlay: true }
     case REMOTE_KEYS.play:

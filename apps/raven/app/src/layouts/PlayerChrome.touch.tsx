@@ -1,4 +1,4 @@
-import { formatDuration } from '@raven/core'
+import { type SkipStep, formatDuration } from '@raven/core'
 import { Icon } from '@raven/native'
 import { usePlayerPrefs } from '@raven/ui/headless'
 import type { IconName } from '@raven/ui/iconDrawings'
@@ -21,6 +21,7 @@ import { pickerLabelOf } from '@/layouts/gridKit'
 import { LoadingMark } from '@/layouts/LoadingMark'
 import { openPickerSheet } from '@/layouts/Picker.touch'
 import { CaptionText } from '@/layouts/PlayerCaption'
+import { HoldMark, SkipMark } from '@/layouts/PlayerMark.touch'
 import {
   PLAYER_COPY,
   type PlayerChromeKit,
@@ -36,6 +37,8 @@ import { Text } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
 import { useScrub } from '@/layouts/useScrub'
+import { useSkipLadder } from '@/layouts/useSkipLadder'
+import { heldPlaybackOf, useSurfaceGestures } from '@/layouts/useSurfaceGestures'
 import { VOLUME_ACTION_LIST, volumeAfterAction, volumeAtY, volumeIconOf } from '@/layouts/volumeKit'
 import { usePlayerKeys } from '@/player/usePlayerKeys'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
@@ -262,11 +265,16 @@ const PickerButton = ({ icon, label, picker }: PickerButtonProps) => {
 type TransportControlsProps = Pick<
   PlayerChromeProps,
   'audio' | 'subtitles' | 'quality' | 'next' | 'previous'
-> & { transport: Transport; isShown: boolean }
+> & {
+  transport: Transport
+  isShown: boolean
+  /** A skip either way, by the chrome's one ladder. */
+  onSkip: (direction: SkipStep['direction']) => void
+}
 
 /**
- * The web's bar: the time over the line to drag along, then back to the start, back ten
- * seconds, play or pause, forward ten seconds and next, with the glass icons for subtitles,
+ * The web's bar: the time over the line to drag along, then back to the start, skip back, play
+ * or pause, skip forward (ten seconds, further when pressed quickly) and next, with the glass icons for subtitles,
  * audio and quality at the right, wrapping under the transport on a narrow screen. iOS plays
  * full screen and enters Picture in Picture by itself as the app is left, so there is no
  * button for either.
@@ -279,6 +287,7 @@ const TransportControls = ({
   next,
   previous,
   isShown,
+  onSkip,
 }: TransportControlsProps) => {
   const { isPaused, position, duration, onTogglePlay, onSeek } = transport
   const length = duration ?? 0
@@ -303,7 +312,7 @@ const TransportControls = ({
           <SkipButton
             direction={SKIP_DIRECTIONS.back}
             label={PLAYER_COPY.back(SKIP_SECONDS)}
-            onPress={() => onSeek(position - SKIP_SECONDS)}
+            onPress={() => onSkip(-1)}
           />
           <IconButton
             icon={isPaused ? 'play' : 'pause'}
@@ -314,7 +323,7 @@ const TransportControls = ({
           <SkipButton
             direction={SKIP_DIRECTIONS.forward}
             label={PLAYER_COPY.forward(SKIP_SECONDS)}
-            onPress={() => onSeek(position + SKIP_SECONDS)}
+            onPress={() => onSkip(1)}
           />
           {next !== null && (
             <IconButton
@@ -374,7 +383,10 @@ const PlayerLogo = ({ heading, title }: PlayerLogoProps) => {
  * left with what is playing beside it, and along the bottom the time and the line to drag along, then the transport and the
  * glass icons for subtitles, audio, quality and Picture in Picture, all inside the safe area
  * while the video fills the screen. They fade once the video has played untouched for the
- * viewer's linger, and a tap brings them back; what is playing fades with them. A hardware
+ * viewer's linger, and a tap brings them back; what is playing fades with them. A double tap on
+ * the picture's right half skips forward and on its left half back, and a finger held there
+ * plays on at twice the speed or runs back at it. Every skip, a button's, a key's or a tap's,
+ * climbs one ladder: 10 seconds, then 20 and 30 when they come quickly. A hardware
  * keyboard drives it as it drives the web's player, each key bringing the controls back as a tap
  * does. The video plays in Picture in Picture when the app is left, and on AirPlay; the silent
  * switch never mutes it, and leaving the app without Picture in Picture pauses it.
@@ -401,7 +413,24 @@ const PlayerChrome = ({
   const styles = useStyles()
   const isPlaying = transport !== null && !transport.isPaused
   const { isVisible, opacity, stir, show, toggle } = useControlsLinger({ isPlaying })
-  usePlayerKeys({ transport, subtitles, onBack, onPress: show })
+  const { width } = useWindowDimensions()
+  const skip = useSkipLadder({ transport })
+  // The last skip's mark, counted so the same one twice starts afresh.
+  const [skipped, setSkipped] = useState<{ step: SkipStep; count: number } | null>(null)
+  const skipBy = (direction: SkipStep['direction']) => {
+    const step = skip(direction)
+    if (step !== null) setSkipped((was) => ({ step, count: (was?.count ?? 0) + 1 }))
+  }
+  const gestures = useSurfaceGestures({
+    transport,
+    width,
+    onSkip: skipBy,
+    // Paused, opening or ended the controls stay up, so a tap has nothing to show or hide.
+    onTap: () => {
+      if (isPlaying) toggle()
+    },
+  })
+  usePlayerKeys({ transport, subtitles, onBack, onSkip: skipBy, onPress: show })
   const sides = {
     paddingTop: insets.top + SIZES.space2,
     paddingBottom: insets.bottom + SIZES.space2,
@@ -419,6 +448,7 @@ const PlayerChrome = ({
           enterPictureInPictureOnLeave
           ignoreSilentSwitch="ignore"
           muted={isMuted}
+          {...heldPlaybackOf({ surface, held: gestures.held })}
           playInBackground={false}
           resizeMode="contain"
           style={StyleSheet.absoluteFill}
@@ -426,10 +456,9 @@ const PlayerChrome = ({
         />
       )}
       <Pressable
+        {...gestures.surfaceProps}
         accessibilityLabel={isVisible ? PLAYER_COPY.hideControls : PLAYER_COPY.showControls}
         accessibilityRole="button"
-        disabled={!isPlaying}
-        onPress={toggle}
         style={StyleSheet.absoluteFill}
       />
       {isOpening && (
@@ -470,19 +499,24 @@ const PlayerChrome = ({
               <PlayerLogo heading={heading} title={title} />
             </View>
           </View>
-          {transport !== null && (
+          {gestures.transport !== null && (
             <TransportControls
               audio={audio}
               isShown={isVisible}
               next={next}
+              onSkip={skipBy}
               previous={previous}
               quality={quality}
               subtitles={subtitles}
-              transport={transport}
+              transport={gestures.transport}
             />
           )}
         </View>
       </Animated.View>
+      {skipped !== null && gestures.held === null && (
+        <SkipMark key={skipped.count} sides={sides} step={skipped.step} />
+      )}
+      {gestures.held !== null && <HoldMark side={gestures.held} sides={sides} />}
       {caption !== null && (
         <View pointerEvents="none" style={[styles.captionSlot, sides]}>
           <CaptionText caption={caption} look={captionStyle} />

@@ -11,6 +11,8 @@ type UsePlayerKeysProps = {
   transport: Transport | null
   subtitles: TrackPicker | null
   onBack: () => void
+  /** A skip either way, by the chrome's one ladder, which the buttons and the taps climb too. */
+  onSkip: (direction: SkipStep['direction']) => void
   /** Hears every key the player answers, before the answer, so the controls can show. */
   onPress: () => void
 }
@@ -18,13 +20,16 @@ type UsePlayerKeysProps = {
 type AnswerProps = UsePlayerKeysProps & { answer: KeyAnswer }
 
 /** Carries a key's answer out as the button for it would. */
-const carryOut = ({ answer, transport, subtitles, onBack }: AnswerProps): void => {
+const carryOut = ({ answer, transport, subtitles, onBack, onSkip }: AnswerProps): void => {
   switch (answer.type) {
     case KEY_ANSWERS.togglePlay:
       transport?.onTogglePlay()
       return
     case KEY_ANSWERS.seek:
       transport?.onSeek(answer.to)
+      return
+    case KEY_ANSWERS.skip:
+      onSkip(answer.direction)
       return
     case KEY_ANSWERS.volume:
       usePlayerPrefs.getState().setVolume({ volume: answer.volume, muted: answer.isMuted })
@@ -53,35 +58,32 @@ export const usePlayerKeys = (props: UsePlayerKeysProps): void => {
   useEffect(() => {
     latest.current = props
   })
-  useEffect(() => {
-    let lastSkip: SkipStep | null = null
-    return watchKeys({
-      keys: PLAYER_KEYS,
-      onKey: ({ key, isShift, isMeta }) => {
-        const { transport, subtitles } = latest.current
-        const { volume, muted } = usePlayerPrefs.getState()
-        const answered = keyAnswerOf({
-          // The native side registers no Ctrl or Alt command, so neither is ever held here.
-          press: {
-            key: isShift ? key.toUpperCase() : key,
-            metaKey: isMeta,
-            ctrlKey: false,
-            altKey: false,
-          },
-          position: transport?.position ?? 0,
-          duration: transport?.duration ?? null,
-          volume,
-          isMuted: muted,
-          subtitles,
-          lastSkip,
-          now: Date.now(),
-        })
-        lastSkip = answered.lastSkip
-        const { answer } = answered
-        if (answer === null) return
-        latest.current.onPress()
-        carryOut({ ...latest.current, answer })
-      },
-    })
-  }, [])
+  useEffect(
+    () =>
+      watchKeys({
+        keys: PLAYER_KEYS,
+        onKey: ({ key, isShift, isMeta }) => {
+          const { transport, subtitles } = latest.current
+          const { volume, muted } = usePlayerPrefs.getState()
+          const answer = keyAnswerOf({
+            // The native side registers no Ctrl or Alt command, so neither is ever held here.
+            press: {
+              key: isShift ? key.toUpperCase() : key,
+              metaKey: isMeta,
+              ctrlKey: false,
+              altKey: false,
+            },
+            position: transport?.position ?? 0,
+            duration: transport?.duration ?? null,
+            volume,
+            isMuted: muted,
+            subtitles,
+          })
+          if (answer === null) return
+          latest.current.onPress()
+          carryOut({ ...latest.current, answer })
+        },
+      }),
+    [],
+  )
 }

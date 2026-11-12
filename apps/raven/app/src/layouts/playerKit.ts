@@ -138,6 +138,12 @@ export const PLAYER_COPY = {
   volumeHint: 'Hold to show the volume slider',
   back: (seconds: number) => `Back ${seconds} seconds`,
   forward: (seconds: number) => `Forward ${seconds} seconds`,
+  /** How far a skip went, beside its icon: "20s". */
+  seconds: (seconds: number) => `${seconds}s`,
+  /** The speed a held finger plays at, beside its icon: "2×". */
+  rate: (rate: number) => `${rate}×`,
+  holdForward: (rate: number) => `Playing at ${rate}× speed`,
+  holdBack: (rate: number) => `Rewinding at ${rate}× speed`,
   seek: 'Position',
   of: ({ at, length }: PLAYER_COPYOfProps) => `${at} of ${length}`,
   audio: 'Audio',

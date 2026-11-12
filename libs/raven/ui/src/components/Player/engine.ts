@@ -64,6 +64,11 @@ export type HtmlSource =
     }
   | { kind: typeof PLAYER_SOURCE_KINDS.file; url: string }
 
+/** Marks the element the picture is drawn in, where the stage reads a finger's taps and holds. */
+export const SURFACE_MARK = { 'data-player-surface': '' } as const
+
+export const SURFACE_SELECTOR = '[data-player-surface]'
+
 /** The library file a server source plays, for the header and Playback info; a local file has none. */
 export type PlaybackFile = { media: MediaItem; api: ApiClient }
 

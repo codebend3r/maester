@@ -1,4 +1,10 @@
-import { FACT_PART_KINDS, type FactPart, PLAYBACK_MODES, formatDuration } from '@raven/core'
+import {
+  FACT_PART_KINDS,
+  type FactPart,
+  PLAYBACK_MODES,
+  type SkipStep,
+  formatDuration,
+} from '@raven/core'
 import {
   type ComponentRef,
   type ComponentType,
@@ -25,9 +31,10 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import {
   CENTRE_MARK_LOOKS,
-  type CentreMark,
+  type Flash,
   type ShownMark,
-  markOfPress,
+  flashOfSkip,
+  flashOfToggle,
   shownMarkOf,
 } from '@/layouts/centreMark'
 import { useFocusOnMount } from '@/layouts/focus'
@@ -69,16 +76,13 @@ import { requestTVFocus } from '@/layouts/tvFocus'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
 import { TV_CAPTION_BASE } from '@/player/captionLook'
 import { useHeldSeek } from '@/layouts/useHeldSeek'
-import { useReduceMotion } from '@/stores/reduceMotion'
+import { useMarkFade } from '@/layouts/useMarkFade'
+import { useSkipLadder } from '@/layouts/useSkipLadder'
 import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { pictureStyles, useTheme } from '@/theme/useTheme'
 
 /** How dark the ground is laid over the picture under the controls. */
 const SCRIM_OPACITY = 0.45
-
-/** How long a flash in the middle stands before it fades, and how long it takes to fade. */
-const FLASH_HOLD_MS = 500
-const FLASH_FADE_MS = 300
 
 /** How large the icon in the middle stands. */
 const CENTRE_ICON = TV_SIZES.textXl * 2
@@ -174,6 +178,8 @@ type ControlsProps = Pick<
 > & {
   /** Whether the remote is the controls': each time it comes to them the line asks for the focus. */
   hasRemote: boolean
+  /** A skip either way, by the chrome's one ladder. */
+  onSkip: (direction: SkipStep['direction']) => void
   onScrubbing: (isScrubbing: boolean) => void
   onPicking: (isPicking: boolean) => void
   onBottomHeight: (height: number) => void
@@ -286,45 +292,27 @@ const Corner = ({ mode, heading }: CornerProps) => {
 type CentreProps = ShownMark
 
 /**
- * What just happened, in the middle of the picture: a skip's way, a play, or the pause, on the
- * player's glass. A flash stands for a moment and fades, or goes at once when the system asks
- * for less motion; a pause or a hold stays until it ends. Said aloud as it appears.
+ * What just happened, in the middle of the picture: a skip's way and how far it went, a play, or
+ * the pause, on the player's glass. A flash stands for a moment and fades, or goes at once when
+ * the system asks for less motion; a pause or a hold stays until it ends. Said aloud as it
+ * appears.
  */
-const Centre = ({ mark, isFading }: CentreProps) => {
+const Centre = ({ mark, seconds, isFading }: CentreProps) => {
   const styles = useStyles()
   const colour = useTheme((theme) => theme.overPicture.text)
-  const isReduced = useReduceMotion((state) => state.isReduced)
-  const [opacity] = useState(() => new Animated.Value(1))
-  const [isGone, setGone] = useState(false)
-  useEffect(() => {
-    if (!isFading) return undefined
-    if (isReduced) {
-      const timer = setTimeout(() => setGone(true), FLASH_HOLD_MS + FLASH_FADE_MS)
-      return () => clearTimeout(timer)
-    }
-    const fade = Animated.timing(opacity, {
-      toValue: 0,
-      delay: FLASH_HOLD_MS,
-      duration: FLASH_FADE_MS,
-      useNativeDriver: true,
-    })
-    fade.start(({ finished }) => {
-      if (finished) setGone(true)
-    })
-    return () => fade.stop()
-  }, [isFading, isReduced, opacity])
+  const { opacity, isGone } = useMarkFade({ isFading })
   const look = CENTRE_MARK_LOOKS[mark]
   return (
     !isGone && (
       <View pointerEvents="none" style={styles.centreSlot}>
         <Animated.View
-          accessibilityLabel={look.label}
+          accessibilityLabel={look.label(seconds)}
           accessibilityLiveRegion="polite"
           accessible
           style={[styles.centre, { opacity }]}
         >
           <Icon colour={colour} name={look.icon} size={CENTRE_ICON} />
-          {look.text !== null && <Text style={styles.centreText}>{look.text}</Text>}
+          {look.text !== null && <Text style={styles.centreText}>{look.text(seconds)}</Text>}
         </Animated.View>
       </View>
     )
@@ -389,6 +377,7 @@ const Controls = ({
   onScrubbing,
   onPicking,
   onBottomHeight,
+  onSkip,
   hasRemote,
 }: ControlsProps) => {
   const scrubber: Focusable = useRef(null)
@@ -442,7 +431,7 @@ const Controls = ({
                     icon={SKIP_ICONS[SKIP_DIRECTIONS.back]}
                     isOverPicture
                     label={PLAYER_COPY.back(SKIP_SECONDS)}
-                    onPress={() => transport.onSeek(transport.position - SKIP_SECONDS)}
+                    onPress={() => onSkip(-1)}
                     text={String(SKIP_SECONDS)}
                   />
                   <PlateButton
@@ -455,7 +444,7 @@ const Controls = ({
                     icon={SKIP_ICONS[SKIP_DIRECTIONS.forward]}
                     isOverPicture
                     label={PLAYER_COPY.forward(SKIP_SECONDS)}
-                    onPress={() => transport.onSeek(transport.position + SKIP_SECONDS)}
+                    onPress={() => onSkip(1)}
                     text={String(SKIP_SECONDS)}
                   />
                 </>
@@ -576,9 +565,15 @@ const DpadPlayer = ({
   const styles = useStyles()
   const isPlaying = transport !== null && !transport.isPaused
   // The last press's flash, counted so the same one twice starts afresh.
-  const [flash, setFlash] = useState<{ mark: CentreMark; count: number } | null>(null)
-  const flashOf = (mark: CentreMark | null) => {
-    if (mark !== null) setFlash((was) => ({ mark, count: (was?.count ?? 0) + 1 }))
+  const [flash, setFlash] = useState<(Flash & { count: number }) | null>(null)
+  const flashOf = (flashed: Flash | null) => {
+    if (flashed !== null) setFlash((was) => ({ ...flashed, count: (was?.count ?? 0) + 1 }))
+  }
+  // Every skip, the remote's keys and the plates alike, climbs one ladder: 10, then 20 and 30.
+  const skip = useSkipLadder({ transport })
+  const skipBy = (direction: SkipStep['direction']) => {
+    const step = skip(direction)
+    if (step !== null) flashOf(flashOfSkip(step))
   }
   // Whether the remote is on drawn buttons, as its handler reads it when a key goes down.
   const isOnButtonsNow = useRef(false)
@@ -611,15 +606,16 @@ const DpadPlayer = ({
     if (key === null) return
     show()
     if (transport === null) return
-    const { seekBy, shouldTogglePlay } = remoteAnswerOf({
+    const { skip: way, shouldTogglePlay } = remoteAnswerOf({
       key,
       isShown: isOnButtons,
       isScrubbing: isScrubbing.current,
       isPaused: transport.isPaused,
     })
-    flashOf(markOfPress({ seekBy, shouldTogglePlay, isPaused: transport.isPaused }))
-    if (seekBy !== 0) transport.onSeek(transport.position + seekBy)
-    if (shouldTogglePlay) transport.onTogglePlay()
+    if (way !== null) skipBy(way)
+    if (!shouldTogglePlay) return
+    flashOf(flashOfToggle(transport.isPaused))
+    transport.onTogglePlay()
   })
 
   // Play and Pause on the plate and a press on the line flash as the remote's keys do.
@@ -629,20 +625,14 @@ const DpadPlayer = ({
       : {
           ...held.transport,
           onTogglePlay: () => {
-            flashOf(
-              markOfPress({
-                seekBy: 0,
-                shouldTogglePlay: true,
-                isPaused: held.transport?.isPaused ?? false,
-              }),
-            )
+            flashOf(flashOfToggle(held.transport?.isPaused ?? false))
             held.transport?.onTogglePlay()
           },
         }
   const shown = shownMarkOf({
     isPaused: transport?.isPaused ?? false,
     held: held.direction,
-    flash: flash?.mark ?? null,
+    flash,
   })
   const shownKey = shown === null ? null : shownKeyOf({ ...shown, count: flash?.count ?? 0 })
   // How far the subtitles, raven's cues or the player's own, rise to stand clear of the controls.
@@ -696,6 +686,7 @@ const DpadPlayer = ({
             onBack={onBack}
             onBottomHeight={setBottomHeight}
             onPicking={setPicking}
+            onSkip={skipBy}
             quality={quality}
             hasRemote={holder === REMOTE_HOLDERS.controls}
             onScrubbing={(isOnLine) => {
@@ -707,9 +698,7 @@ const DpadPlayer = ({
           />
         </Animated.View>
       )}
-      {shown !== null && shownKey !== null && (
-        <Centre key={shownKey} isFading={shown.isFading} mark={shown.mark} />
-      )}
+      {shown !== null && shownKey !== null && <Centre key={shownKey} {...shown} />}
       {offer !== null && <UpNextCard lift={lift} offer={offer} />}
       {caption !== null && (
         <View

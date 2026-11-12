@@ -153,7 +153,7 @@ const SKIP_SECONDS = 10
 const SKIP_MAX_SECONDS = 30
 
 /** A press this soon after the last one in the same direction goes a step further. */
-const SKIP_WINDOW_MS = 1_000
+export const SKIP_WINDOW_MS = 1_000
 
 /** One skip: which way, how far, and when it was pressed, in milliseconds. */
 export type SkipStep = { direction: 1 | -1; seconds: number; at: number }
