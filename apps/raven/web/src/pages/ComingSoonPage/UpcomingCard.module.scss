@@ -3,7 +3,8 @@
   display: grid;
   grid-template-areas:
     'link'
-    'facts';
+    'facts'
+    'status';
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
   min-width: 0;
@@ -73,6 +74,20 @@
   font-size: var(--font-size-xs);
   line-height: var(--line-body);
   font-stretch: 90%;
+}
+
+.status {
+  grid-area: status;
+  justify-self: start;
+  color: var(--color-bark);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  line-height: var(--line-body);
+}
+
+// Nothing found yet reads as a note, not as good news.
+.status[data-status='notDownloadable'] {
+  color: var(--color-amber);
 }
 
 .fact {

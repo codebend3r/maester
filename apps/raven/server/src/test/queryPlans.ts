@@ -25,7 +25,8 @@ const stepsOf = (rows: readonly PlanRow[]): PlanStep[] => {
  * one account, the shape a server has the day it moves to keying them by
  * account. `play_history`'s are made up, not taken: a hundred accounts with
  * 1,200 entries each, a third of them videos, since no real server has kept one yet;
- * `notifications`' too, a hundred accounts with the 1,000 each keeps.
+ * `notifications`' too, a hundred accounts with the 1,000 each keeps, and
+ * `download_requests`', 500 requests from fifty accounts.
  * To take them again, open a copy with the server (or run `ANALYZE` on it),
  * then `SELECT tbl, idx, stat FROM sqlite_stat1 ORDER BY tbl, idx`.
  * `queryPlans.test.ts` fails when the schema gains or loses an index.
@@ -33,6 +34,8 @@ const stepsOf = (rows: readonly PlanRow[]): PlanStep[] => {
 export const PRODUCTION_STATISTICS = [
   ['credits', 'credits_person', '669689 4'],
   ['credits', 'sqlite_autoindex_credits_1', '669689 17 1 1'],
+  ['download_requests', 'download_requests', '500 250 1'],
+  ['download_requests', 'download_requests_account', '500 50 1'],
   ['favourites', 'favourites', '1 1 1'],
   ['favourites', 'favourites_media', '1 1'],
   ['hero_picks', null, '1'],

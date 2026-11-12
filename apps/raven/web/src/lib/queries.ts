@@ -28,6 +28,8 @@ export const {
   homeSearchQuery,
   upcomingQuery,
   upcomingShelfQuery,
+  upcomingDetailsQuery,
+  requestsQuery,
   mediaQuery,
   nextInSessionQuery,
   markersQuery,

@@ -13,7 +13,8 @@ const ALERT_ENV = {
 // Edge Functions refuse outbound SMTP on ports 25 and 587, so this uses implicit TLS on 465.
 const SMTP_PORT = 465
 
-const SETTINGS_PATH = '/settings'
+// raven web's ADMIN_PATH, where the owner's Users section approves and removes members.
+const ADMIN_PATH = '/admin'
 
 const readEnv = (name: (typeof ALERT_ENV)[keyof typeof ALERT_ENV]) => {
   const value = Deno.env.get(name)
@@ -24,7 +25,7 @@ const readEnv = (name: (typeof ALERT_ENV)[keyof typeof ALERT_ENV]) => {
 const secret = readEnv(ALERT_ENV.secret)
 const recipient = readEnv(ALERT_ENV.recipient)
 const sender = readEnv(ALERT_ENV.smtpUser)
-const settingsUrl = new URL(SETTINGS_PATH, readEnv(ALERT_ENV.webUrl)).href
+const adminUrl = new URL(ADMIN_PATH, readEnv(ALERT_ENV.webUrl)).href
 
 const transport = createTransport({
   host: readEnv(ALERT_ENV.smtpHost),
@@ -37,7 +38,7 @@ Deno.serve((request) =>
   handleSignupAlert({
     request,
     secret,
-    settingsUrl,
+    adminUrl,
     send: async ({ subject, text }) => {
       await transport.sendMail({ from: sender, to: recipient, subject, text })
     },

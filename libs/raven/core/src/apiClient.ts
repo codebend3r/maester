@@ -10,6 +10,7 @@ import { matchingCalls } from '@/apiClient/matching'
 import { mediaCalls } from '@/apiClient/media'
 import { mixCalls } from '@/apiClient/mixes'
 import { notificationCalls } from '@/apiClient/notifications'
+import { requestCalls } from '@/apiClient/requests'
 import { musicCalls } from '@/apiClient/music'
 import { pictureCalls } from '@/apiClient/pictures'
 import { playlistCalls } from '@/apiClient/playlists'
@@ -89,5 +90,6 @@ export const createApiClient = ({
     ...playbackCalls(transport),
     ...reportCalls(transport),
     ...notificationCalls(transport),
+    ...requestCalls(transport),
   }
 }
