@@ -18,7 +18,6 @@ import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { api } from '@/lib/api'
 import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
 import { displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
-import { DesktopSettings } from '@/desktop/settings/DesktopSettings'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
 import { AdminLockSection } from '@/pages/SettingsPage/AdminLockSection'
 import { AdvancedSection } from '@/pages/SettingsPage/AdvancedSection'
@@ -36,6 +35,7 @@ import { SoundSettings } from '@/pages/SettingsPage/SoundSettings'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import { UsersSection } from '@/pages/SettingsPage/UsersSection'
+import { HostSettings } from '@/pages/SettingsPage/HostSettings'
 import { useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
@@ -260,7 +260,7 @@ const OfflineSettings = () => {
           {COMMON_COPY.settings}
         </PageTitle>
       </header>
-      <DesktopSettings />
+      <HostSettings />
       <AdvancedSection />
     </section>
   )
@@ -452,7 +452,7 @@ const ViewerSettings = () => {
       {(access.kind === ACCESS_KINDS.approved || access.kind === ACCESS_KINDS.disabled) && (
         <ScrobblingSection />
       )}
-      {isDesktop && <DesktopSettings />}
+      <HostSettings />
       <AdvancedSection />
     </section>
   )

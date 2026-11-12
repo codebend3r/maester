@@ -16,25 +16,14 @@ import {
   type PlaybackStatus,
   usePlaybackLadder,
 } from '@/components/Player/usePlaybackLadder'
-import { type TrackSelection, useTrackSelection } from '@/components/Player/useTrackSelection'
+import { useFileSelection } from '@/components/Player/useFileSelection'
+import { useTrackSelection } from '@/components/Player/useTrackSelection'
 
 const Waiting = () => (
   <div className={styles.stage} aria-busy="true">
     <Preloader />
   </div>
 )
-
-const fileSelection: TrackSelection = {
-  tracks: null,
-  tracksFailed: false,
-  tracksPending: false,
-  audio: null,
-  isDefaultAudio: true,
-  subtitle: null,
-  isWaitingForTracks: false,
-  pickAudio: () => {},
-  pickSubtitle: () => {},
-}
 
 /** Whether the player is still playing, or has failed and shows why. */
 const RUN_STATES = { running: 'running', failed: 'failed' } as const
@@ -170,15 +159,18 @@ type FileRunProps = FilePlayerProps & {
 
 type FileRunningProps = FileRunProps
 
-const FileRunning = ({ source, onBack, onFailure }: FileRunningProps) => (
-  <Stage
-    engine={{ kind: ENGINE_KINDS.html, source }}
-    onBack={onBack}
-    rendition={DIRECT_RENDITION}
-    selection={fileSelection}
-    onFailure={({ message }) => onFailure(message)}
-  />
-)
+const FileRunning = ({ source, onBack, onFailure }: FileRunningProps) => {
+  const selection = useFileSelection(source.subtitles)
+  return (
+    <Stage
+      engine={{ kind: ENGINE_KINDS.html, source }}
+      onBack={onBack}
+      rendition={DIRECT_RENDITION}
+      selection={selection}
+      onFailure={({ message }) => onFailure(message)}
+    />
+  )
+}
 
 const FILE_RUNS = {
   [RUN_STATES.running]: FileRunning,

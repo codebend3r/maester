@@ -20,9 +20,11 @@ import { ravenVersion } from '@/lib/version'
 import { usePageBackdrop } from '@raven/ui/headless'
 import { useAuthSession } from '@/stores/authSession'
 import { useDesktopBridge } from '@/stores/desktop'
+import { useDownloadsHostStore } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 import { useSideMenu } from '@/stores/sideMenu'
 import { fakeAccount } from '@/test/authClient'
+import { asBrowserDownloads, fakeEngine } from '@/test/browserDownloads'
 import { FakeEventSource } from '@/test/eventSource'
 import { asDesktop, DL_2, downloadsMain, viewOf } from '@/test/desktop'
 import { library } from '@/test/fixtures'
@@ -628,8 +630,39 @@ describe('AppShell', () => {
     expect(await within(nav()).findByRole('link', { name: 'Downloads' })).toBeInTheDocument()
     cleanup()
     useDesktopBridge.setState({ desktop: null })
+    useDownloadsHostStore.setState({ host: null })
     renderShell({ route: '/' })
     expect(within(nav()).queryByRole('link', { name: 'Downloads' })).toBeNull()
+  })
+
+  it('offers Downloads, and no On this Mac, in a browser that keeps downloads', async () => {
+    spies.list.mockImplementation(async () => [])
+    const { engine } = await fakeEngine()
+    asBrowserDownloads(engine)
+    renderShell({ route: '/' })
+    expect(await within(nav()).findByRole('link', { name: 'Downloads' })).toHaveAttribute(
+      'href',
+      DESKTOP_PATHS.downloads,
+    )
+    expect(within(nav()).queryByRole('link', { name: 'On this Mac' })).toBeNull()
+    await userEvent.click(within(tabs()).getByRole('button', { name: 'More' }))
+    const sheet = within(screen.getByRole('dialog', { name: 'More' }))
+    expect(sheet.getByRole('link', { name: 'Downloads' })).toBeInTheDocument()
+    expect(sheet.queryByRole('link', { name: 'This Mac' })).toBeNull()
+  })
+
+  it('keeps only Downloads and what needs no server in a browser that cannot reach it', async () => {
+    const { engine } = await fakeEngine()
+    asBrowserDownloads(engine)
+    useServerReach.setState({ isOffline: true })
+    renderShell({ route: '/libraries' })
+    expect(
+      within(tabs())
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Downloads', 'Settings'])
+    expect(within(nav()).getByRole('link', { name: 'Downloads' })).toBeInTheDocument()
+    expect(within(nav()).queryByRole('link', { name: 'Home' })).toBeNull()
   })
 
   it('names the files on this PC on Windows', () => {

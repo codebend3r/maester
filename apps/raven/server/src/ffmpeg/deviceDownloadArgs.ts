@@ -17,6 +17,40 @@ const PROGRESS_TO_STDOUT = 'pipe:1'
 const audioArgs = (track: AudioTrack): string[] =>
   eac3OrCopyArgs({ track, copies: MP4_COPY_AUDIO, stream: track.index })
 
+export type FinishedMp4ArgsProps = {
+  output: string
+  /** The `0:s:N` text subtitle tracks the run mapped, which the file carries as `mov_text`. */
+  textSubtitles: readonly number[]
+}
+
+/** The `-map` of each text subtitle track a download copy carries. */
+export const textSubtitleMaps = (textSubtitles: readonly number[]): string[] =>
+  textSubtitles.flatMap((at) => ['-map', `0:s:${at}`])
+
+/**
+ * How every download copy ends: its text subtitles as `mov_text`, the languages, titles and
+ * chapters kept, the index first so the finished file opens at once, and ffmpeg's progress
+ * on stdout.
+ */
+export const finishedMp4Args = ({ output, textSubtitles }: FinishedMp4ArgsProps): string[] => [
+  ...(textSubtitles.length > 0 ? ['-c:s', MP4_TEXT_SUBTITLE] : []),
+  '-map_metadata',
+  '0',
+  '-map_chapters',
+  '0',
+  // A long film with sparse subtitles queues many packets before the first cue.
+  '-max_muxing_queue_size',
+  '4096',
+  '-movflags',
+  '+faststart',
+  '-progress',
+  PROGRESS_TO_STDOUT,
+  '-nostats',
+  '-f',
+  'mp4',
+  output,
+]
+
 type DeviceDownloadArgsProps = {
   input: string
   output: string
@@ -53,25 +87,10 @@ export const deviceDownloadArgs = ({
     video.map,
     '-map',
     '0:a?',
-    ...textSubtitles.flatMap((at) => ['-map', `0:s:${at}`]),
+    ...textSubtitleMaps(textSubtitles),
     ...video.output,
     ...audio.flatMap(audioArgs),
-    ...(textSubtitles.length > 0 ? ['-c:s', MP4_TEXT_SUBTITLE] : []),
-    '-map_metadata',
-    '0',
-    '-map_chapters',
-    '0',
-    // A remux of a long film with sparse subtitles queues many packets before the first cue.
-    '-max_muxing_queue_size',
-    '4096',
-    '-movflags',
-    '+faststart',
-    '-progress',
-    PROGRESS_TO_STDOUT,
-    '-nostats',
-    '-f',
-    'mp4',
-    output,
+    ...finishedMp4Args({ output, textSubtitles }),
   ]
 }
 

@@ -11,6 +11,7 @@ export type {
   EngineActions,
   EngineHandle,
   EngineStats,
+  FileSubtitles,
   HtmlSource,
   NativePlayer,
   PlaybackFile,

@@ -73,7 +73,8 @@ const answer = ({ status, body = null, headers = {} }: AnswerProps): Response =>
     headers: { ...headers, [HTTP_HEADERS.contentTypeOptions]: 'nosniff' },
   })
 
-const hostOf = (url: string): string | null => {
+/** The host a custom scheme's address names, which is the opaque id it asks for. */
+export const hostOf = (url: string): string | null => {
   try {
     return new URL(url).host
   } catch {

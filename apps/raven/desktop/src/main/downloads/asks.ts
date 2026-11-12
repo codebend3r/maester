@@ -7,11 +7,11 @@ import {
   DOWNLOAD_STATUS_KINDS,
   type DownloadAskStatus,
   type DownloadTarget,
+  factsOf,
   isContainerName,
   isMediaId,
 } from '@raven/core'
 import { type ConfigStore, SERVER_GONE, serverById } from '@/main/desktopConfig'
-import { factsOf } from '@/main/downloads/artwork'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   bytesOf,
@@ -119,6 +119,8 @@ const entryOf = ({
   pending: NO_PENDING,
   createdAt,
   artwork: file.artwork,
+  library: file.library,
+  titleItemId: file.titleItemId,
   facts: factsOf(file.media),
   track: file.track,
 })

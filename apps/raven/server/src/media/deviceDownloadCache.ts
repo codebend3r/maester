@@ -7,11 +7,21 @@ import {
   type OnApplicationBootstrap,
   type OnModuleDestroy,
 } from '@nestjs/common'
-import { DEVICE_DOWNLOAD_STATES, type DeviceDownload } from '@raven/core'
+import {
+  DEVICE_DOWNLOAD_STATES,
+  DEVICE_DOWNLOAD_VARIANTS,
+  type DeviceDownload,
+  type DeviceDownloadVariant,
+} from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { errorMessage } from '@/errorMessage'
-import { deviceDownloadArgs, progressSeconds } from '@/ffmpeg/deviceDownloadArgs'
+import {
+  deviceDownloadArgs,
+  type FinishedMp4ArgsProps,
+  progressSeconds,
+} from '@/ffmpeg/deviceDownloadArgs'
 import { FFMPEG_SIGNALS, FfmpegService, PROCESS_EVENTS } from '@/ffmpeg/ffmpegService'
+import { sdrDownloadArgs, sdrPictureOf } from '@/ffmpeg/sdrDownloadArgs'
 import { MediaIndex } from '@/media/mediaIndex'
 import { type OutputCache, createOutputCache } from '@/media/outputCache'
 import { createOnce } from '@/once'
@@ -28,10 +38,18 @@ const MOST_PROGRESS = 0.99
 
 const EXTENSION = 'mp4'
 
+/** What each copy's file name ends with, after the version: the two sit side by side in the media's folder. */
+const NAME_ENDINGS = {
+  [DEVICE_DOWNLOAD_VARIANTS.copy]: EXTENSION,
+  [DEVICE_DOWNLOAD_VARIANTS.sdr]: `sdr.${EXTENSION}`,
+} as const satisfies Record<DeviceDownloadVariant, string>
+
 /** What a device is told when its copy is not made: plain, and never a path or ffmpeg's own words. */
 export const DEVICE_DOWNLOAD_FAILURES = {
   noRoom: 'The server has no room for a copy of this video right now.',
   failed: 'The server could not make a copy of this video this device can play.',
+  dolbyVision:
+    'This video is Dolby Vision only, and the server cannot convert it for a browser. It plays in the Raven apps.',
 } as const
 
 type Running = { progress: number; done: Promise<void> }
@@ -43,6 +61,8 @@ type DeviceDownloadSource = {
   path: string
   /** The file's mtime as it is on disk, which names the copy made of it. */
   mtimeMs: number
+  /** Which copy: the picture as it is, or encoded again as SDR for a browser. */
+  variant: DeviceDownloadVariant
 }
 
 type DeviceDownloadCachePrepareProps = DeviceDownloadSource & {
@@ -52,7 +72,7 @@ type DeviceDownloadCachePrepareProps = DeviceDownloadSource & {
 }
 
 /** Which version of which video a copy is of. */
-type DeviceDownloadCacheVersionProps = Pick<DeviceDownloadSource, 'mediaId' | 'mtimeMs'>
+type DeviceDownloadCacheVersionProps = Pick<DeviceDownloadSource, 'mediaId' | 'mtimeMs' | 'variant'>
 
 /** A finished copy held open for one response: it is never evicted until `release`. */
 type OpenedCopy = { path: string; release: () => void }
@@ -60,6 +80,16 @@ type OpenedCopy = { path: string; release: () => void }
 type DeviceDownloadCacheStartProps = DeviceDownloadCachePrepareProps & { target: string }
 
 type DeviceDownloadCacheMakeProps = DeviceDownloadCacheStartProps & { job: Running }
+
+type Probed = Awaited<ReturnType<FfmpegService['probeFile']>>
+
+type DeviceDownloadCacheArgsOfProps = Pick<
+  DeviceDownloadCacheMakeProps,
+  'variant' | 'path' | 'videoCodec'
+> & { probed: Probed }
+
+/** One copy's ffmpeg arguments, for the temporary file it writes and the text subtitles it carries. */
+type ArgsFor = (props: FinishedMp4ArgsProps) => string[]
 
 type DeviceDownloadCacheConvertProps = {
   args: string[]
@@ -85,7 +115,9 @@ const versionOf = (mtimeMs: number): string => `${Math.round(mtimeMs)}.`
 
 /**
  * MP4 copies of videos for devices whose player cannot open the original (an MKV on an
- * iPad), on disk as `device-downloads/<mediaId>/<mtimeMs>.mp4`. A copy is made on the first
+ * iPad), on disk as `device-downloads/<mediaId>/<mtimeMs>.mp4`, and their SDR copies for
+ * browsers, which decode neither Dolby Vision nor every codec, beside them as
+ * `<mtimeMs>.sdr.mp4`: one cache and one cap for both. A copy is made on the first
  * `prepare`, in the background, at most two at once, and its progress is answered to every
  * ask until it is done; a failed one is said once, and the ask after that tries again. A file
  * that changes gets a new copy, and the old one goes. Past `deviceDownloadCacheBytes` the
@@ -133,8 +165,8 @@ export class DeviceDownloadCache implements OnApplicationBootstrap, OnModuleDest
     await Promise.allSettled([...this.running.values()].map(({ done }) => done))
   }
 
-  private targetOf({ mediaId, mtimeMs }: DeviceDownloadCacheVersionProps): string {
-    return this.cache.pathOf({ mediaId, name: `${versionOf(mtimeMs)}${EXTENSION}` })
+  private targetOf({ mediaId, mtimeMs, variant }: DeviceDownloadCacheVersionProps): string {
+    return this.cache.pathOf({ mediaId, name: `${versionOf(mtimeMs)}${NAME_ENDINGS[variant]}` })
   }
 
   /**
@@ -200,44 +232,81 @@ export class DeviceDownloadCache implements OnApplicationBootstrap, OnModuleDest
     mtimeMs,
     durationSeconds,
     videoCodec,
+    variant,
     target,
     job,
   }: DeviceDownloadCacheMakeProps): Promise<void> {
+    const probed = await this.ffmpeg.probeFile(path)
+    // Settled before any room is made, so a copy that cannot be made evicts nothing.
+    const argsFor = await this.argsOf({ variant, path, videoCodec, probed })
     const source = await stat(path)
     await this.sweep({ reserve: source.size })
     const room = await statfs(this.cache.root)
     if (room.bavail * room.bsize < source.size * ROOM_MARGIN) {
       throw new DeviceDownloadRefusal(DEVICE_DOWNLOAD_FAILURES.noRoom)
     }
-    const { tracks, streams } = await this.ffmpeg.probeFile(path)
-    const textSubtitles = tracks.subtitles.flatMap((track, at) => (track.supported ? [at] : []))
+    const textSubtitles = probed.tracks.subtitles.flatMap((track, at) =>
+      track.supported ? [at] : [],
+    )
     await this.cache.write({
       target,
       version: versionOf(mtimeMs),
       extension: EXTENSION,
-      run: (temp) => {
-        const argsFor = (subtitles: readonly number[]) =>
-          deviceDownloadArgs({
-            input: path,
-            output: temp,
-            videoCodec,
-            dolbyVision: streams.video?.dolbyVision ?? null,
-            audio: tracks.audio,
-            textSubtitles: subtitles,
-          })
-        return this.conversions.run(async () => {
+      run: (output) =>
+        this.conversions.run(async () => {
           try {
-            await this.convert({ args: argsFor(textSubtitles), durationSeconds, job })
+            await this.convert({ args: argsFor({ output, textSubtitles }), durationSeconds, job })
           } catch (error) {
             // A subtitle track mov_text cannot hold is no reason to give up the picture and sound.
             if (textSubtitles.length === 0) throw error
             this.logger.warn(`Copying media ${mediaId} again without its subtitles`)
             job.progress = 0
-            await this.convert({ args: argsFor([]), durationSeconds, job })
+            await this.convert({
+              args: argsFor({ output, textSubtitles: [] }),
+              durationSeconds,
+              job,
+            })
           }
-        })
-      },
+        }),
     })
+  }
+
+  /**
+   * How the copy asked for is made of this file. An SDR copy picks its filter here, and is
+   * refused, in words for the viewer, when the picture is Dolby Vision profile 5, which no
+   * filter this server runs reads.
+   */
+  private async argsOf({
+    variant,
+    path,
+    videoCodec,
+    probed: { probe, tracks, streams },
+  }: DeviceDownloadCacheArgsOfProps): Promise<ArgsFor> {
+    if (variant === DEVICE_DOWNLOAD_VARIANTS.copy) {
+      return ({ output, textSubtitles }) =>
+        deviceDownloadArgs({
+          input: path,
+          output,
+          videoCodec,
+          dolbyVision: streams.video?.dolbyVision ?? null,
+          audio: tracks.audio,
+          textSubtitles,
+        })
+    }
+    if (probe.isDolbyVisionOnly)
+      throw new DeviceDownloadRefusal(DEVICE_DOWNLOAD_FAILURES.dolbyVision)
+    // The filter is asked about only for a picture that needs one.
+    const canTonemap = probe.hdr && (await this.ffmpeg.canTonemap())
+    const picture = sdrPictureOf({ isHdr: probe.hdr, canTonemap })
+    return ({ output, textSubtitles }) =>
+      sdrDownloadArgs({
+        input: path,
+        output,
+        picture,
+        audio: tracks.audio,
+        defaultAudio: tracks.defaultAudio,
+        textSubtitles,
+      })
   }
 
   /** One ffmpeg run, its progress read into `job` as it goes, given up once it stalls. */

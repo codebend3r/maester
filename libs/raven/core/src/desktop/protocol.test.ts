@@ -9,6 +9,8 @@ import {
   DOWNLOAD_KINDS,
   ENVELOPE_KINDS,
   FILE_SCHEME,
+  PICTURE_SCHEME,
+  pictureUrlFor,
   MAX_ACCESS_TOKEN,
   MAX_SECRET,
   MENU_PLAYER_ACTIONS,
@@ -27,6 +29,8 @@ import {
   isMusicGroup,
   isDownloadKind,
   isDownloadStatus,
+  isDownloadLibrary,
+  isDownloadPictures,
   isDownloadView,
   isInvokeEnvelope,
   isLocalFile,
@@ -89,6 +93,8 @@ const VIEW = {
   deletesAt: null,
   isLocked: false,
   artwork: { kind: 'poster', itemId: 12, version: 'v1' },
+  pictures: { art: null, logo: null },
+  library: null,
   facts: {
     year: 2002,
     score: 8.4,
@@ -150,6 +156,7 @@ describe('the building blocks', () => {
         folder: 'Movies',
         isDownload: false,
         mediaId: null,
+        logo: null,
         resumeAt: 12,
         next: { fileId: other, label: 'next.mkv', queue: [other] },
         tracks: { audio: 1, subtitle: 'embedded-0' },
@@ -162,6 +169,7 @@ describe('the building blocks', () => {
         folder: 'Movies',
         isDownload: true,
         mediaId: 42,
+        logo: { pictureId: id, name: 'Severance' },
         resumeAt: 0,
         next: null,
         tracks: null,
@@ -172,6 +180,7 @@ describe('the building blocks', () => {
       label: 'film.mkv',
       folder: 'Downloaded from raven',
       isDownload: true,
+      logo: null,
       resumeAt: 0,
       next: null,
       tracks: null,
@@ -453,6 +462,7 @@ describe('isDesktopReply', () => {
           folder: 'Movies',
           isDownload: false,
           mediaId: null,
+          logo: null,
           resumeAt: 0,
           next: null,
           tracks: null,
@@ -935,6 +945,55 @@ describe('the download ask and views', () => {
       false,
     )
     expect(isDownloadView({ ...VIEW, facts: { ...VIEW.facts, pixels: 'big' } })).toBe(false)
+  })
+
+  it('carries saved pictures by opaque id alone, never a path, an address or a missing one', () => {
+    const pictureId = '9b2d7c1e-5a40-4f0c-8a11-3c2e1d0f9a77'
+    expect(isDownloadView({ ...VIEW, pictures: { art: pictureId, logo: pictureId } })).toBe(true)
+    expect(isDownloadView({ ...VIEW, pictures: { art: pictureId, logo: null } })).toBe(true)
+    expect(isDownloadPictures({ art: '/data/downloads/pictures/art.jpg', logo: null })).toBe(false)
+    expect(isDownloadPictures({ art: `${PICTURE_SCHEME}://${pictureId}`, logo: null })).toBe(false)
+    expect(isDownloadPictures({ art: 'https://raven.example/poster.jpg', logo: null })).toBe(false)
+    expect(isDownloadPictures({ art: pictureId })).toBe(false)
+    expect(isDownloadView({ ...VIEW, pictures: undefined })).toBe(false)
+  })
+
+  it('addresses a saved picture by its id under the picture scheme', () => {
+    expect(PICTURE_SCHEME).toBe('raven-picture')
+    expect(pictureUrlFor('9b2d7c1e-5a40-4f0c-8a11-3c2e1d0f9a77')).toBe(
+      'raven-picture://9b2d7c1e-5a40-4f0c-8a11-3c2e1d0f9a77',
+    )
+  })
+
+  it('carries the library a download came from, or null, and refuses a partial one', () => {
+    const library = { id: 3, name: 'Movies', isPrivate: true }
+    expect(isDownloadLibrary(library)).toBe(true)
+    expect(isDownloadView({ ...VIEW, library })).toBe(true)
+    expect(isDownloadView({ ...VIEW, library: null })).toBe(true)
+    expect(isDownloadView({ ...VIEW, library: undefined })).toBe(false)
+    expect(isDownloadLibrary({ id: 3, name: 'Movies' })).toBe(false)
+    expect(isDownloadLibrary({ ...library, isPrivate: 'yes' })).toBe(false)
+    expect(isDownloadLibrary({ ...library, id: '3' })).toBe(false)
+  })
+
+  it("carries a download's saved title art for the player, and refuses a path for it", () => {
+    const pictureId = '9b2d7c1e-5a40-4f0c-8a11-3c2e1d0f9a77'
+    const file = {
+      fileId: pictureId,
+      label: 'S01E02 Half Loop',
+      folder: 'Downloaded from Vhagar',
+      isDownload: true,
+      mediaId: 42,
+      resumeAt: 0,
+      next: null,
+      tracks: null,
+    }
+    expect(isLocalFile({ ...file, logo: { pictureId, name: 'Severance' } })).toBe(true)
+    expect(isLocalFile({ ...file, logo: null })).toBe(true)
+    expect(isLocalFile({ ...file, logo: { pictureId: '/logo.png', name: 'Severance' } })).toBe(
+      false,
+    )
+    expect(isLocalFile(file)).toBe(false)
   })
 
   it("carries a track's `Track`, and refuses one that is not a track", () => {

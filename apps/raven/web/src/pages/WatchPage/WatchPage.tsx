@@ -37,6 +37,7 @@ import {
   type ViewOf,
   type ViewsOf,
 } from '@raven/ui/headless'
+import { OfflineWatch } from '@/browserDownloads/OfflineWatch'
 import { DesktopWatch } from '@/desktop/DesktopWatch/DesktopWatch'
 import { PlayerMessage } from '@/desktop/player/PlayerMessage'
 import { api } from '@/lib/api'
@@ -48,7 +49,9 @@ import { useRouteId } from '@/lib/routeQuery'
 import { useTicketFollowsSession } from '@/lib/useTicketFollowsSession'
 import { useTitleLogo } from '@/lib/useTitleLogo'
 import { ravenVersion } from '@/lib/version'
+import { useBrowserDownloads } from '@/stores/browserDownloads'
 import { useIsDesktop } from '@/stores/desktop'
+import { useServerReach } from '@/stores/serverReach'
 import { WATCH_PAGE_COPY } from '@/pages/WatchPage/copy'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
@@ -118,12 +121,15 @@ const messageOf = (page: RoutePending): string | null => {
  * video element gets its src on the very first render and playback starts
  * without a round trip. A direct link or a refresh fetches it instead.
  * The link names the session it plays in; without one the video's own
- * says what follows, so a refreshed episode still rolls on.
+ * says what follows, so a refreshed episode still rolls on. In a browser
+ * that keeps downloads, a server out of reach plays the title's download.
  */
 export const WatchPage = () => {
   const id = useRouteId()
   const { state, search } = useLocation()
   const isDesktop = useIsDesktop()
+  const isOffline = useServerReach((reach) => reach.isOffline)
+  const hasBrowserDownloads = useBrowserDownloads((downloads) => downloads.engine !== null)
   const handed = readWatchState({ state, id })
   const page = routeState({
     id,
@@ -133,7 +139,13 @@ export const WatchPage = () => {
   return (
     <KeyedView<WatchViewProps>
       views={WATCH_VIEWS}
-      view={watchViewOf({ page, isDesktop, search, handed })}
+      view={watchViewOf({
+        page,
+        isDesktop,
+        search,
+        handed,
+        offlineId: isOffline && hasBrowserDownloads ? { mediaId: id } : null,
+      })}
     />
   )
 }
@@ -145,16 +157,25 @@ const Playing = ({ playKey, player }: PlayingProps) => <WatchPlayer key={playKey
 
 type DesktopMessageProps = Parameters<typeof PlayerMessage>[0]
 
-const WATCH_VIEW_KEYS = { playing: 'playing', desktop: 'desktop', browser: 'browser' } as const
+type OfflineWatchProps = Parameters<typeof OfflineWatch>[0]
+
+const WATCH_VIEW_KEYS = {
+  playing: 'playing',
+  offline: 'offline',
+  desktop: 'desktop',
+  browser: 'browser',
+} as const
 
 type WatchViewProps = {
   [WATCH_VIEW_KEYS.playing]: PlayingProps
+  [WATCH_VIEW_KEYS.offline]: OfflineWatchProps
   [WATCH_VIEW_KEYS.desktop]: DesktopMessageProps
   [WATCH_VIEW_KEYS.browser]: WatchMessageProps
 }
 
 const WATCH_VIEWS = {
   [WATCH_VIEW_KEYS.playing]: Playing,
+  [WATCH_VIEW_KEYS.offline]: OfflineWatch,
   [WATCH_VIEW_KEYS.desktop]: PlayerMessage,
   [WATCH_VIEW_KEYS.browser]: WatchMessage,
 } as const satisfies ViewsOf<WatchViewProps>
@@ -164,6 +185,8 @@ type WatchViewOfProps = {
   isDesktop: boolean
   search: string
   handed: ReturnType<typeof readWatchState>
+  /** The title to play from its download: set while a browser that keeps downloads cannot reach the server. */
+  offlineId: OfflineWatchProps | null
 }
 
 /** The video's player once it is in, else the player's place saying why not, Raven's or the browser's. */
@@ -172,7 +195,9 @@ const watchViewOf = ({
   isDesktop,
   search,
   handed,
+  offlineId,
 }: WatchViewOfProps): ViewOf<WatchViewProps> => {
+  if (offlineId !== null) return { key: WATCH_VIEW_KEYS.offline, props: offlineId }
   if (page.state === ROUTE_STATES.ready)
     return {
       key: WATCH_VIEW_KEYS.playing,

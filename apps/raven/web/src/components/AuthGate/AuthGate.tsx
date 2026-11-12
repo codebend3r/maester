@@ -9,6 +9,7 @@ import { signInPath } from '@/lib/authRoutes'
 import { queryKeys } from '@raven/ui/headless'
 import { AUTH_GATE_COPY } from '@/components/AuthGate/copy'
 import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
+import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/components/AuthGate/AuthGate.module.scss'
 
@@ -74,13 +75,24 @@ const ACCESS_VIEWS = {
 type GateViewOfProps = {
   access: AccessState
   isOffline: boolean
+  /** The route patterns the downloads host shows with no server; null where nothing keeps downloads. */
+  offlinePages: readonly string[] | null
   /** Whether the device has a network at all; without one the account can not be read. */
   isDeviceOnline: boolean
   pathname: string
 }
 
-const gateViewOf = ({ access, isOffline, isDeviceOnline, pathname }: GateViewOfProps): GateView => {
-  if (isOffline) return isOfflinePage(pathname) ? GATE_VIEWS.page : GATE_VIEWS.offline
+const gateViewOf = ({
+  access,
+  isOffline,
+  offlinePages,
+  isDeviceOnline,
+  pathname,
+}: GateViewOfProps): GateView => {
+  // With no downloads there is no page to open instead, so a server out of reach shows as itself.
+  if (isOffline && offlinePages !== null) {
+    return isOfflinePage({ pathname, pages: offlinePages }) ? GATE_VIEWS.page : GATE_VIEWS.offline
+  }
   const isUnsettled = UNSETTLED.has(access.kind)
   if (isUnsettled && isFilePlaying(pathname)) return GATE_VIEWS.page
   if (isUnsettled && !isDeviceOnline) return GATE_VIEWS.noNetwork
@@ -149,17 +161,20 @@ const GATE_SCREENS = {
  * The route element in front of every page that needs a signed-in, approved
  * account. With accounts off it lets everything through as raven always
  * has. Accounts that cannot be reached, like a failure to reach the server,
- * show a screen to try again from, and never sign anyone out. Inside raven
- * player, a server out of reach opens the pages that need none instead
- * (Downloads, On this Mac and Settings), and any other page goes to
+ * show a screen to try again from, and never sign anyone out. Where the page
+ * keeps downloads, inside Raven or in a browser that can, a server out of
+ * reach opens the pages that need none instead (the host's `offlinePages`:
+ * Downloads, Settings, and Raven's On this Mac), and any other page goes to
  * Downloads, which goes back to it once the server answers again. A local file or download
  * playing stays on screen while the account is read, or cannot be.
  */
 export const AuthGate = () => {
   const access = useAccessState()
   const isOffline = useServerReach((state) => state.isOffline)
+  const offlinePages = useDownloadsHostOrNone()?.offlinePages ?? null
   const isDeviceOnline = useIsDeviceOnline()
   const { pathname, search } = useLocation()
-  const Screen = GATE_SCREENS[gateViewOf({ access, isOffline, isDeviceOnline, pathname })]
+  const Screen =
+    GATE_SCREENS[gateViewOf({ access, isOffline, offlinePages, isDeviceOnline, pathname })]
   return <Screen returnTo={`${pathname}${search}`} />
 }

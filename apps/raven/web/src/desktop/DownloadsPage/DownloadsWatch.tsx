@@ -19,9 +19,12 @@ import { type ComponentType, useId, useState } from 'react'
 import { DownloadActivity } from '@/desktop/DownloadsPage/DownloadActivity'
 import { DownloadArtwork } from '@/desktop/DownloadsPage/DownloadArtwork'
 import { DOWNLOAD_ROW_COPY, WATCH_COPY } from '@/desktop/DownloadsPage/copy'
+import { LibrarySection } from '@/desktop/DownloadsPage/DownloadsShow'
+import type { DownloadsSection } from '@/desktop/DownloadsPage/libraries'
 import styles from '@/desktop/DownloadsPage/DownloadsWatch.module.scss'
 import { sortDownloads } from '@/desktop/DownloadsPage/sortDownloads'
 import { usePlayDownload } from '@/desktop/DownloadsPage/usePlayDownload'
+import { WaitingText } from '@/desktop/DownloadsPage/WaitingText'
 import { handled } from '@/desktop/handled'
 import { useDownloadSpeed } from '@/desktop/useDownloadSpeed'
 import { POSTER_SIZES } from '@/lib/posters'
@@ -49,6 +52,7 @@ const TileFace = ({ view }: TileFaceProps) => {
       >
         <DownloadArtwork
           artwork={view.artwork}
+          saved={view.pictures.art}
           initial={view.group.title.slice(0, 1)}
           sizes={POSTER_SIZES.grid}
         />
@@ -99,7 +103,7 @@ const DownloadingNote = ({ view }: NoteProps) => {
   )
 }
 
-const WaitingNote = () => <span>{DOWNLOAD_ROW_COPY.waiting}</span>
+const WaitingNote = ({ view }: NoteProps) => <WaitingText downloadId={view.downloadId} />
 
 const PausedNote = ({ view }: NoteProps) =>
   view.status.kind === DOWNLOAD_STATUS_KINDS.paused && (
@@ -204,26 +208,38 @@ const SortBar = ({ sort, onSort, onShuffle }: SortBarProps) => {
   )
 }
 
-type DownloadsWatchProps = { downloads: DownloadView[] }
+type DownloadsWatchProps = {
+  /** The videos to show, in one run or a section a library; each is sorted on its own. */
+  sections: DownloadsSection[]
+}
 
-/** Every download as a poster in a grid, to play or to see how far it is, in any order a library has. */
-export const DownloadsWatch = ({ downloads }: DownloadsWatchProps) => {
+/**
+ * Every download as a poster in a grid, to play or to see how far it is, in any order a library
+ * has: one grid, or one a library under its name, all in the one order.
+ */
+export const DownloadsWatch = ({ sections }: DownloadsWatchProps) => {
   const [sort, setSort] = useState<MediaSort>(MEDIA_SORTS.title)
   const [seed, setSeed] = useState(() => Math.random())
-  const sorted = sortDownloads({ downloads, sort, seed })
   return (
     <div className={styles.watch}>
       <SortBar sort={sort} onSort={setSort} onShuffle={() => setSeed(Math.random())} />
-      <ul className={styles.grid} aria-label={WATCH_COPY.gridLabel}>
-        {sorted.map((view) => {
-          const Tile = TILES[view.status.kind]
-          return (
-            <li key={view.downloadId} className={styles.cell}>
-              <Tile view={view} />
-            </li>
-          )
-        })}
-      </ul>
+      {sections.map(({ key, name, downloads }) => (
+        <LibrarySection key={key} name={name}>
+          <ul
+            className={styles.grid}
+            aria-label={name === null ? WATCH_COPY.gridLabel : WATCH_COPY.gridLabelOf(name)}
+          >
+            {sortDownloads({ downloads, sort, seed }).map((view) => {
+              const Tile = TILES[view.status.kind]
+              return (
+                <li key={view.downloadId} className={styles.cell}>
+                  <Tile view={view} />
+                </li>
+              )
+            })}
+          </ul>
+        </LibrarySection>
+      ))}
     </div>
   )
 }

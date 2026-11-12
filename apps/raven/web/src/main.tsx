@@ -10,8 +10,10 @@ import '@raven/ui/styles.css'
 import { configureStorage } from '@raven/ui/headless'
 import { AppRoutes } from '@/AppRoutes'
 import { startMediaOrigin } from '@/lib/apiOrigin'
+import { api } from '@/lib/api'
 import { applyStylesheets } from '@/lib/applyStylesheets'
 import { CardLinks } from '@/components/CardLink/CardLink'
+import { startBrowserDownloads } from '@/browserDownloads/start'
 import { startDesktop } from '@/desktop/startDesktop'
 import { startServiceWorker } from '@/lib/serviceWorker'
 import { KeepLibraryListings } from '@/lib/keepLibraryListings'
@@ -26,6 +28,11 @@ startMediaOrigin()
 restoreAuthConfig({ storage: window.localStorage, queryClient })
 keepAuthConfigSaved({ storage: window.localStorage, queryClient })
 startDesktop({ bridge: window.ravenDesktop, root: document.documentElement, target: window })
+startBrowserDownloads({
+  target: window,
+  api,
+  isDesktop: isRavenDesktopBridge(window.ravenDesktop),
+})
 startServiceWorker({
   target: window,
   isProduction: import.meta.env.PROD,

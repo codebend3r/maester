@@ -32,6 +32,11 @@ import {
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import type { MediaAccess } from '@/main/downloads/mediaAccess'
 import {
+  createDownloadPictures,
+  type DownloadPictures,
+  type PictureFs,
+} from '@/main/downloads/pictures'
+import {
   createDownloadPlayback,
   type DownloadPlayback,
   type DownloadPlaybackDeps,
@@ -63,6 +68,8 @@ export type DownloadServiceDeps = {
   access: MediaAccess
   fetch: DownloadQueueDeps['fetch']
   fs: QueueFs
+  /** Writes a saved picture's bytes whole; the folders it lists and removes are the queue's `fs`. */
+  writeBytes: PictureFs['writeBytes']
   showItemInFolder: (path: string) => void
   /** Settles once the network can be used (main's `app.whenReady()`); the launch's first kick waits on it. */
   ready: Promise<void>
@@ -91,6 +98,7 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     | 'fromLabelOf'
     | 'labelOf'
     | 'mediaIdOf'
+    | 'logoOf'
     | 'isStaleDownload'
     | 'serverPositionOf'
     | 'noteOpened'
@@ -100,6 +108,8 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     | 'isWatched'
   > & {
     list: () => DesktopReply
+    /** A saved picture's file, for the `raven-picture:` scheme. */
+    pictureOf: DownloadPictures['fileOf']
     readSpace: () => Promise<DesktopReply>
     setDefaults: (input: SetDefaultsProps) => DesktopReply
     views: () => DownloadView[]
@@ -168,6 +178,11 @@ export const viewStatusOf = ({ status, serverName }: ViewStatusOfProps): Downloa
   }
 }
 
+/** A pass over the pictures, or a sweep of them, left to run: each logs its own failure and never rejects. */
+const keepPictures = (work: Promise<void>): void => {
+  work.catch(() => undefined)
+}
+
 /** The reply to a request naming a download the list no longer holds. */
 const UNKNOWN_DOWNLOAD = refused(DOWNLOAD_MESSAGES.unknown)
 
@@ -224,6 +239,11 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
           entry.status.kind === DOWNLOAD_STATUS_KINDS.paused &&
           entry.status.reason === PAUSE_REASONS.relocked,
         artwork: entry.artwork ?? { kind: DOWNLOAD_ARTWORK_KINDS.none },
+        pictures: {
+          art: entry.pictures?.art?.id ?? null,
+          logo: entry.pictures?.logo?.id ?? null,
+        },
+        library: entry.library ?? null,
         facts: entry.facts ?? factsBefore(entry),
         createdAt: entry.createdAt,
         /*
@@ -273,6 +293,20 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     warn: deps.warn,
     retryMs: deps.syncRetryMs,
     accountIdOf: deps.accountIdOf,
+  })
+
+  const pictures = createDownloadPictures({
+    // Through `change`, so the page hears of each picture and library as it is kept.
+    store: { ...store, update: change },
+    calls: deps.calls,
+    fetch: deps.fetch,
+    serverOf: (serverId) => serverById({ config: config.read(), serverId }),
+    isSignedIn: ({ serverId }) => deps.accountIdOf({ serverId }) !== null,
+    fs: { ...deps.fs, writeBytes: deps.writeBytes },
+    userData: deps.userData,
+    timers: deps.timers,
+    newId: deps.newId,
+    warn: deps.warn,
   })
 
   const runSync = (work: Promise<void>): void => {
@@ -329,6 +363,8 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     },
     onRemoved: (entries) => {
       playback.forget(entries)
+      // A title's pictures go with its last download.
+      keepPictures(pictures.sweep())
       entries.forEach(({ downloadId }) => deleteClock.cancel({ downloadId }))
     },
     /*
@@ -366,12 +402,14 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   // Only the page asking for the list sends what is pending; the list that events and replies carry does not.
   const listAndSync: DownloadService['list'] = () => {
     runSync(sync.runAll())
+    keepPictures(pictures.fill())
     return list()
   }
 
   const confirm: DownloadService['confirm'] = async (input) => {
     const reply = await asks.confirm(input)
     queue.kick()
+    keepPictures(pictures.fill())
     return reply
   }
 
@@ -489,6 +527,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     keepLastAccount({ serverId, accountId })
     change((state) => oweOtherAccounts(state, { serverId, accountId }))
     runSync(sync.runAll())
+    keepPictures(pictures.fill())
   }
 
   const dispose = (): void => {
@@ -497,6 +536,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     announcing.timer = undefined
     asks.clear()
     sync.dispose()
+    pictures.dispose()
     deleteClock.dispose()
     queue.dispose()
   }
@@ -525,6 +565,9 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
       store.read().entries.filter(({ status }) => status.kind === DOWNLOAD_STATUS_KINDS.ready),
     )
     queue.retryOutages()
+    // A set-aside list names no picture, so every picture folder waits for a later launch.
+    if (!deps.wasSetAside) keepPictures(pictures.sweep())
+    keepPictures(pictures.fill())
     await Promise.all([startClocks(), sync.runAll()])
   }
   resumeLaunch().catch((error: unknown) => {
@@ -537,6 +580,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     confirm,
     decline: asks.decline,
     list: listAndSync,
+    pictureOf: pictures.fileOf,
     readSpace: readSpaceView,
     setDefaults,
     views,
@@ -561,6 +605,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     fromLabelOf: playback.fromLabelOf,
     labelOf: playback.labelOf,
     mediaIdOf: playback.mediaIdOf,
+    logoOf: playback.logoOf,
     isStaleDownload: playback.isStaleDownload,
     serverPositionOf: playback.serverPositionOf,
     noteOpened: playback.noteOpened,

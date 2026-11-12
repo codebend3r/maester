@@ -24,14 +24,19 @@ import {
 import {
   AUDIO_BITRATE_PARAM,
   AUDIO_BITRATES,
+  DEFAULT_DEVICE_DOWNLOAD_VARIANT,
   DEVICE_DOWNLOAD_PATHS,
+  DEVICE_DOWNLOAD_VARIANT_PARAM,
+  DEVICE_DOWNLOAD_VARIANTS,
   type DeviceDownload,
+  type DeviceDownloadVariant,
   type MediaItem,
   type MediaLocation,
   type PlaybackMode,
   THUMBNAIL_STATES,
   containerMimeType,
   isAudioBitrate,
+  isDeviceDownloadVariant,
   isAudioContainer,
   isFavouriteChange,
   isProgressChange,
@@ -108,6 +113,23 @@ const deleteFailure = (error: unknown): string => {
 }
 
 const MISSING_FILE = 'The file is no longer on disk'
+
+/** What a copy's download is counted as among the streams: the picture copied, or encoded again. */
+const DEVICE_DOWNLOAD_MODES = {
+  [DEVICE_DOWNLOAD_VARIANTS.copy]: PLAYBACK_MODES.remux,
+  [DEVICE_DOWNLOAD_VARIANTS.sdr]: PLAYBACK_MODES.transcode,
+} as const satisfies Record<DeviceDownloadVariant, PlaybackMode>
+
+/** The copy `?variant=` names, the picture's own when it names none, or a 400. */
+const deviceDownloadVariantOf = (asked: unknown): DeviceDownloadVariant => {
+  if (asked === undefined) return DEFAULT_DEVICE_DOWNLOAD_VARIANT
+  if (!isDeviceDownloadVariant(asked)) {
+    throw new BadRequestException(
+      `${DEVICE_DOWNLOAD_VARIANT_PARAM} must be one of ${isDeviceDownloadVariant.values.join(', ')}`,
+    )
+  }
+  return asked
+}
 
 type MediaControllerFindProps = { id: number; account: AccountKey }
 
@@ -414,6 +436,8 @@ export class MediaController {
    * Where the MP4 copy of a video stands, for a device whose player cannot open the
    * original (an MKV on an iPad): asking starts it when none is cached or running, and the
    * device asks again every few seconds until it is `ready`, then downloads `deviceDownloadFile`.
+   * `?variant=sdr` asks for the SDR copy a browser plays instead, an encode of its own; a
+   * variant core does not name is a 400.
    * The copy is of the file on disk, so a file changed since the last scan gets a new one.
    * This asks `find`, the viewer's own view of the media, since the route is the account's;
    * `deviceDownloadFile` is on the media plane, where the ticket or pass that opens it
@@ -422,8 +446,10 @@ export class MediaController {
   @Get(routeOf(DEVICE_DOWNLOAD_PATHS.prepare))
   async deviceDownload(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Query(DEVICE_DOWNLOAD_VARIANT_PARAM) asked: unknown,
     @Req() request: FastifyRequest,
   ): Promise<DeviceDownload> {
+    const variant = deviceDownloadVariantOf(asked)
     const media = this.find({ id, account: this.accounts.keyOf({ request }) })
     const { file, source } = await this.sourceOf(media.id)
     if (isAudioContainer(file.container)) {
@@ -435,6 +461,7 @@ export class MediaController {
       mtimeMs: source.mtimeMs,
       durationSeconds: file.duration,
       videoCodec: file.videoCodec,
+      variant,
     })
   }
 
@@ -448,19 +475,21 @@ export class MediaController {
   @Get(routeOf(DEVICE_DOWNLOAD_PATHS.file))
   async deviceDownloadFile(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Query(DEVICE_DOWNLOAD_VARIANT_PARAM) asked: unknown,
     @Query(MEDIA_TICKET_PARAM) ticket: unknown,
     @Query(MEDIA_PURPOSE_PARAM) purpose: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
+    const variant = deviceDownloadVariantOf(asked)
     const { source } = await this.sourceOf(id)
-    const copy = await this.copies.open({ mediaId: id, mtimeMs: source.mtimeMs })
+    const copy = await this.copies.open({ mediaId: id, mtimeMs: source.mtimeMs, variant })
     if (!copy) throw new ConflictException('The copy for this device is not ready yet.')
     await this.sendRanges({
       id,
       path: copy.path,
       contentType: RAVEN_CONTENT_TYPES.mp4,
-      mode: PLAYBACK_MODES.remux,
+      mode: DEVICE_DOWNLOAD_MODES[variant],
       ticket,
       purpose,
       request,

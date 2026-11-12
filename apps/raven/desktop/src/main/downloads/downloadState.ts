@@ -8,6 +8,8 @@ import {
   isDownloadArtwork,
   isDownloadFacts,
   isDownloadGroup,
+  type DownloadLibrary,
+  isDownloadLibrary,
   isMediaId,
   isNumber,
   isOpaqueId,
@@ -117,16 +119,73 @@ const ENTRY_FIELDS = {
 
 const isEntryBase = object({ ...ENTRY_FIELDS, pending: isPending })
 
-type EntryExtras = { artwork?: DownloadArtwork; facts?: DownloadFacts }
+/** The kinds of picture file a download keeps, by the extension each is saved under. */
+export const PICTURE_EXTENSIONS = { jpg: 'jpg', png: 'png', webp: 'webp', avif: 'avif' } as const
 
-/**
- * What the Downloads page shows of an entry: its picture and the facts its grid sorts on. A file
- * written before they were kept has neither, which is fine, so they are not part of `ENTRY_FIELDS`.
+export const isPictureExtension = oneOf(Object.values(PICTURE_EXTENSIONS))
+
+export type PictureExtension = Infer<typeof isPictureExtension>
+
+/** What a picture folder is named after: the item whose art it holds, or the album whose cover. */
+export const PICTURE_OWNERS = { item: 'item', album: 'album' } as const
+
+export type PictureOwner = (typeof PICTURE_OWNERS)[keyof typeof PICTURE_OWNERS]
+
+const PICTURE_FOLDER = new RegExp(
+  `^(?:${Object.values(PICTURE_OWNERS).join('|')})-[1-9]\\d{0,15}$`,
+  'u',
+)
+
+/** A picture folder's name, `item-<id>` or `album-<id>`, which is all a path is ever built from. */
+export const isPictureFolder = (value: unknown): value is string =>
+  isString(value) && PICTURE_FOLDER.test(value)
+
+/*
+ * A picture on disk: `pictures/<folder>/<id>.<extension>` under its server's downloads. The id is
+ * all the page ever holds of it.
+ */
+const isSavedPicture = object({
+  id: isOpaqueId,
+  folder: isPictureFolder,
+  extension: isPictureExtension,
+})
+
+export type SavedPicture = Infer<typeof isSavedPicture>
+
+/*
+ * The pictures an entry shows from disk, shared by every entry of its title or album. Not
+ * `isComplete` while one could not be fetched, so the next pass asks again; complete with a null
+ * means the server has none.
+ */
+const isEntryPictures = object({
+  art: nullable(isSavedPicture),
+  logo: nullable(isSavedPicture),
+  isComplete: isBoolean,
+})
+
+export type EntryPictures = Infer<typeof isEntryPictures>
+
+type EntryExtras = {
+  artwork?: DownloadArtwork
+  facts?: DownloadFacts
+  library?: DownloadLibrary
+  /** The item whose poster and title art a video wears, its show's for an episode; null for none. */
+  titleItemId?: number | null
+  pictures?: EntryPictures
+}
+
+/*
+ * What the Downloads page shows of an entry: its pictures, its library and the facts its grid
+ * sorts on. A file written before they were kept has none of them, which is fine, so they are not
+ * part of `ENTRY_FIELDS`; `library` and `titleItemId` are filled in together, from the server.
  */
 const isEntryExtras = (value: unknown): value is EntryExtras =>
   isRecord(value) &&
   (value.artwork === undefined || isDownloadArtwork(value.artwork)) &&
-  (value.facts === undefined || isDownloadFacts(value.facts))
+  (value.facts === undefined || isDownloadFacts(value.facts)) &&
+  (value.library === undefined || isDownloadLibrary(value.library)) &&
+  (value.titleItemId === undefined || nullable(isMediaId)(value.titleItemId)) &&
+  (value.pictures === undefined || isEntryPictures(value.pictures))
 
 export type DownloadEntry = Infer<typeof isEntryBase> & EntryExtras
 
@@ -644,6 +703,36 @@ export const setSidecars = (
         ? entry
         : { ...entry, sidecars: [...sidecars] },
   })
+
+type SetLibraryProps = {
+  state: DownloadsState
+  downloadId: string
+  library: DownloadLibrary
+  titleItemId: number | null
+}
+
+/** What the server said of an entry confirmed before its library and its title's item were kept. */
+export const setLibrary = ({
+  state,
+  downloadId,
+  library,
+  titleItemId,
+}: SetLibraryProps): DownloadsState =>
+  changeEntry(state, { downloadId, change: (entry) => ({ ...entry, library, titleItemId }) })
+
+type SetPicturesProps = {
+  state: DownloadsState
+  downloadIds: readonly string[]
+  pictures: EntryPictures
+}
+
+/** The pictures saved for a title or an album, on each of its entries. */
+export const setPictures = ({ state, downloadIds, pictures }: SetPicturesProps): DownloadsState =>
+  downloadIds.reduce(
+    (changed, downloadId) =>
+      changeEntry(changed, { downloadId, change: (entry) => ({ ...entry, pictures }) }),
+    state,
+  )
 
 type SetAutoDeleteProps = { downloadId: string; autoDelete: boolean; at: number }
 

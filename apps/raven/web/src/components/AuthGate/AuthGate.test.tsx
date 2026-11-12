@@ -1,7 +1,7 @@
 import { playPathOf } from '@/desktop/paths'
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { QueryClientProvider, onlineManager, useQueryClient } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import {
@@ -12,7 +12,10 @@ import {
   type AuthConfig,
   DESKTOP_PATHS,
   MEMBER_STATUSES,
+  PAGE_PATHS,
+  watchPageOf,
 } from '@raven/core'
+import { BROWSER_PLAY_PATH, browserPlayPathOf } from '@/browserDownloads/paths'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { api } from '@/lib/api'
 import { queryKeys } from '@raven/ui/headless'
@@ -29,7 +32,8 @@ import {
   SESSION_PAGE,
 } from '@/test/authClient'
 import { Where } from '@/test/authPage'
-import { FILE_ID } from '@/test/desktop'
+import { asBrowserDownloads, fakeEngine } from '@/test/browserDownloads'
+import { asDesktop, FILE_ID } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
 
 type RenderGateProps = {
@@ -304,6 +308,7 @@ describe('AuthGate', () => {
 
 describe('AuthGate inside Raven with its server out of reach', () => {
   const renderOffline = (route: string) => {
+    asDesktop()
     useServerReach.setState({ isOffline: true })
     return renderWithProviders({
       route,
@@ -327,5 +332,59 @@ describe('AuthGate inside Raven with its server out of reach', () => {
     renderOffline('/libraries/3')
     expect(screen.getByText('Downloads page')).toBeInTheDocument()
     expect(screen.queryByText('Library')).toBeNull()
+  })
+})
+
+describe('AuthGate in a browser that keeps downloads, with its server out of reach', () => {
+  const renderOffline = async (route: string) => {
+    const { engine } = await fakeEngine()
+    asBrowserDownloads(engine)
+    useServerReach.setState({ isOffline: true })
+    return renderWithProviders({
+      route,
+      ui: (
+        <Routes>
+          <Route element={<AuthGate />}>
+            <Route path={DESKTOP_PATHS.downloads} element={<p>Downloads page</p>} />
+            <Route path={BROWSER_PLAY_PATH} element={<p>Download playing</p>} />
+            <Route path={`${PAGE_PATHS.watch}/:id`} element={<p>Watch page</p>} />
+            <Route path="*" element={<p>Library</p>} />
+          </Route>
+        </Routes>
+      ),
+    })
+  }
+
+  it('opens Downloads, a download playing and a watch page, which need no server', async () => {
+    await renderOffline(DESKTOP_PATHS.downloads)
+    expect(screen.getByText('Downloads page')).toBeInTheDocument()
+    cleanup()
+    await renderOffline(browserPlayPathOf(FILE_ID))
+    expect(screen.getByText('Download playing')).toBeInTheDocument()
+    cleanup()
+    await renderOffline(watchPageOf(7))
+    expect(screen.getByText('Watch page')).toBeInTheDocument()
+  })
+
+  it('sends any other page to Downloads, with no account read', async () => {
+    await renderOffline('/libraries/3')
+    expect(screen.getByText('Downloads page')).toBeInTheDocument()
+  })
+})
+
+describe('AuthGate in a browser that keeps no downloads', () => {
+  it('has no Downloads to open instead, so a server out of reach shows as itself', () => {
+    useServerReach.setState({ isOffline: true })
+    renderWithProviders({
+      route: '/libraries/3',
+      ui: (
+        <Routes>
+          <Route element={<AuthGate />}>
+            <Route path="*" element={<p>Library</p>} />
+          </Route>
+        </Routes>
+      ),
+    })
+    expect(screen.getByText('Library')).toBeInTheDocument()
   })
 })

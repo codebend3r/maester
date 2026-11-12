@@ -226,6 +226,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         folder: downloadedFrom ?? basename(dirname(file.path)),
         isDownload: downloadedFrom !== null,
         mediaId: deps.downloads.mediaIdOf({ path: file.path }),
+        logo: deps.downloads.logoOf({ path: file.path }),
         resumeAt: resumeFor({
           state: store.read(),
           file,

@@ -1,14 +1,20 @@
-import { DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
+import { DESKTOP_PATHS, PAGE_PATHS, watchPageOf } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import {
   downloadsPageFor,
   isFilePlaying,
+  DESKTOP_OFFLINE_PAGES,
   isOfflinePage,
   isPlaying,
   playOriginFor,
   playPathOf,
 } from '@/desktop/paths'
+import { BROWSER_OFFLINE_PAGES, browserPlayPathOf } from '@/browserDownloads/paths'
+import { MUSIC_PATHS } from '@/lib/music'
 import { FILE_ID } from '@/test/desktop'
+
+const isOffline = (pathname: string): boolean =>
+  isOfflinePage({ pathname, pages: DESKTOP_OFFLINE_PAGES })
 
 describe('desktop paths', () => {
   it('plays a file at its own path', () => {
@@ -16,14 +22,26 @@ describe('desktop paths', () => {
   })
 
   it('knows the pages that need no server', () => {
-    expect(isOfflinePage(DESKTOP_PATHS.downloads)).toBe(true)
-    expect(isOfflinePage(DESKTOP_PATHS.local)).toBe(true)
-    expect(isOfflinePage(PAGE_PATHS.settings)).toBe(true)
-    expect(isOfflinePage(`/play/${FILE_ID}`)).toBe(true)
-    expect(isOfflinePage('/music/downloads')).toBe(true)
-    expect(isOfflinePage('/music/albums/7')).toBe(false)
-    expect(isOfflinePage('/')).toBe(false)
-    expect(isOfflinePage('/libraries/3')).toBe(false)
+    expect(isOffline(DESKTOP_PATHS.downloads)).toBe(true)
+    expect(isOffline(DESKTOP_PATHS.local)).toBe(true)
+    expect(isOffline(PAGE_PATHS.settings)).toBe(true)
+    expect(isOffline(`/play/${FILE_ID}`)).toBe(true)
+    expect(isOffline('/music/downloads')).toBe(true)
+    expect(isOffline('/music/albums/7')).toBe(false)
+    expect(isOffline('/')).toBe(false)
+    expect(isOffline('/libraries/3')).toBe(false)
+  })
+
+  it('opens the pages a browser that keeps downloads shows with no server', () => {
+    const isBrowserOffline = (pathname: string): boolean =>
+      isOfflinePage({ pathname, pages: BROWSER_OFFLINE_PAGES })
+    expect(isBrowserOffline(DESKTOP_PATHS.downloads)).toBe(true)
+    expect(isBrowserOffline(browserPlayPathOf(FILE_ID))).toBe(true)
+    expect(isBrowserOffline(watchPageOf(7))).toBe(true)
+    expect(isBrowserOffline(PAGE_PATHS.settings)).toBe(true)
+    expect(isBrowserOffline(DESKTOP_PATHS.local)).toBe(false)
+    expect(isBrowserOffline(MUSIC_PATHS.downloads)).toBe(false)
+    expect(isFilePlaying(browserPlayPathOf(FILE_ID))).toBe(true)
   })
 
   it('knows when a local file or download is playing', () => {

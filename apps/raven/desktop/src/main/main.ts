@@ -13,6 +13,7 @@ import {
   desktopPlatformFor,
   SYSTEM_NAMES,
   FILE_SCHEME,
+  PICTURE_SCHEME,
   VIDEO_EXTENSIONS,
 } from '@raven/core'
 import { nativeTargetOf } from '@raven/mpv'
@@ -41,6 +42,7 @@ import {
   PRODUCT_NAME,
   secureContents,
   serveFiles,
+  servePictures,
   showWindowButtons,
   startWebHost,
 } from '@/main/appWindow'
@@ -208,6 +210,8 @@ const startApp = (): void => {
        */
       privileges: { standard: true, secure: true, stream: true },
     },
+    // A download's saved pictures, which the CSP names in `img-src`; an `<img>` reads each whole.
+    { scheme: PICTURE_SCHEME, privileges: { standard: true, secure: true } },
   ])
 
   const quitMark = createQuitMark({ isEnabled: true, now: () => performance.now(), write: mark })
@@ -598,6 +602,7 @@ const startApp = (): void => {
         tickets: accountTickets,
       }),
       fetch: fetchDownload,
+      writeBytes: ({ path, bytes }) => writeFile(path, bytes),
       fs: {
         mkdir: makeDir,
         rename: ({ from, to }) => rename(from, to),
@@ -820,6 +825,7 @@ const startApp = (): void => {
     powerMonitor.on('resume', () => downloads.onResume())
     await startWebHost({ serverOrigin: fixedServer.origin, timers, appLog })
     serveFiles({ grants })
+    servePictures({ pictures: { fileOf: downloads.pictureOf } })
     secureContents({ warn })
     answerRequests({ service, grants, appLog })
 

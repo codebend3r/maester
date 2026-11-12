@@ -1,7 +1,6 @@
 import {
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
-  type DesktopRequest,
   DOWNLOAD_STATUS_KINDS,
   type DownloadView,
   type SpaceView,
@@ -15,7 +14,8 @@ import {
 } from '@tanstack/react-query'
 import { refusalText } from '@/desktop/client'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
-import { useDesktop } from '@/stores/desktop'
+import type { DownloadsChange } from '@/downloads/host'
+import { useDownloadsHost } from '@/stores/downloadsHost'
 import { useDownloadSpeeds } from '@/stores/downloadSpeeds'
 
 const NO_DOWNLOADS = 'Raven could not read its downloads.'
@@ -24,13 +24,13 @@ const UNCHANGED = 'Raven could not change its downloads. Try again.'
 
 export type DownloadsData = { downloads: DownloadView[]; shouldAutoDelete: boolean }
 
-/** The downloads Raven keeps, and whether a new one starts out deleting once watched. */
+/** The downloads the host keeps, and whether a new one starts out deleting once watched. */
 export const useDownloads = (): UseQueryResult<DownloadsData> => {
-  const { client } = useDesktop()
+  const host = useDownloadsHost()
   return useQuery({
     queryKey: DESKTOP_QUERY_KEYS.downloads,
     queryFn: async () => {
-      const reply = await client.request({ type: DESKTOP_REQUESTS.listDownloads })
+      const reply = await host.request({ type: DESKTOP_REQUESTS.listDownloads })
       if (reply.type === DESKTOP_REPLIES.downloads) {
         useDownloadSpeeds.getState().observe({ downloads: reply.downloads, now: Date.now() })
         return { downloads: reply.downloads, shouldAutoDelete: reply.shouldAutoDeleteByDefault }
@@ -73,7 +73,7 @@ const finishesAny = ({ before, after }: ListMove): boolean => {
 }
 
 /**
- * What main pushes when a download changes: it replaces what the list holds. The disk is read
+ * What the host pushes when a download changes: it replaces what the list holds. The disk is read
  * again only when a file finished or left, never for progress, which comes four times a second,
  * and the recents only when one left, as one deleted once watched leaves them too.
  */
@@ -90,13 +90,13 @@ export const applyDownloadsEvent = async ({ queryClient, event }: ListChange): P
   ])
 }
 
-/** The disk Raven keeps its downloads on. */
+/** The disk the host keeps its downloads on. */
 export const useSpace = (): UseQueryResult<SpaceView> => {
-  const { client } = useDesktop()
+  const host = useDownloadsHost()
   return useQuery({
     queryKey: DESKTOP_QUERY_KEYS.space,
     queryFn: async () => {
-      const reply = await client.request({ type: DESKTOP_REQUESTS.readSpace })
+      const reply = await host.request({ type: DESKTOP_REQUESTS.readSpace })
       if (reply.type === DESKTOP_REPLIES.space) return reply.space
       throw new Error(refusalText({ reply, fallback: NO_SPACE }))
     },
@@ -115,35 +115,17 @@ export const useInProgressCount = (): number => {
   return (downloads.data?.downloads ?? []).filter(isInProgress).length
 }
 
-/** What the Downloads page and Settings ask main to change. */
-export type DownloadsChange = Extract<
-  DesktopRequest,
-  {
-    type:
-      | typeof DESKTOP_REQUESTS.pauseDownload
-      | typeof DESKTOP_REQUESTS.resumeDownload
-      | typeof DESKTOP_REQUESTS.retryDownload
-      | typeof DESKTOP_REQUESTS.deleteDownload
-      | typeof DESKTOP_REQUESTS.setDownloadAutoDelete
-      | typeof DESKTOP_REQUESTS.pauseAllDownloads
-      | typeof DESKTOP_REQUESTS.resumeAllDownloads
-      | typeof DESKTOP_REQUESTS.deleteAllDownloads
-      | typeof DESKTOP_REQUESTS.setDownloadDefaults
-      | typeof DESKTOP_REQUESTS.showDownloadsFolder
-  }
->
-
 /**
- * Sends a change to main. The list main answers with replaces the query's, and the disk is read
+ * Sends a change to the host. The list it answers with replaces the query's, and the disk is read
  * again, so the space line follows a delete; a refusal is said as a toast. Resolves true once
- * main has made the change.
+ * the host has made the change.
  */
 export const useChangeDownloads = (): ((request: DownloadsChange) => Promise<boolean>) => {
-  const { client } = useDesktop()
+  const host = useDownloadsHost()
   const queryClient = useQueryClient()
   const showNotice = useToasts((state) => state.show)
   return async (request) => {
-    const reply = await client.request(request)
+    const reply = await host.request(request)
     switch (reply.type) {
       case DESKTOP_REPLIES.downloads:
         setDownloads({ queryClient, event: reply })

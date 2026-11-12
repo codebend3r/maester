@@ -13,6 +13,7 @@ import { pipeline } from 'node:stream'
 import {
   extensionOf,
   FILE_SCHEME,
+  PICTURE_SCHEME,
   HTTP_METHODS,
   PAGE_ORIGIN,
   WEB_HOST,
@@ -125,7 +126,7 @@ export const contentSecurityPolicy = ({
     sources({ directive: 'script-src', hashes: inlineHashes.scripts }),
     sources({ directive: 'style-src', hashes: inlineHashes.styles }),
     "font-src 'self'",
-    "img-src 'self' data:",
+    `img-src 'self' data: ${PICTURE_SCHEME}:`,
     `media-src 'self' ${FILE_SCHEME}:`,
     ["connect-src 'self'", SUPABASE_ORIGINS, ...(authOrigin === null ? [] : [authOrigin])].join(
       ' ',

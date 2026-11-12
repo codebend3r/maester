@@ -5,6 +5,7 @@ import {
   DESKTOP_REQUESTS,
   DOWNLOAD_KINDS,
   DOWNLOAD_STATUS_KINDS,
+  pictureUrlFor,
   QUEUE_SOURCE_KINDS,
 } from '@raven/core'
 import { Toaster } from '@raven/ui'
@@ -26,6 +27,8 @@ import {
   sentOfType,
   viewOf,
 } from '@/test/desktop'
+import { api } from '@/lib/api'
+import { DOWNLOADS_SHOWS, useDownloadsShow } from '@/stores/downloadsShow'
 import { useDownloadSpeeds } from '@/stores/downloadSpeeds'
 import { track } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
@@ -46,7 +49,10 @@ const DUNE = viewOf({
   watched: 0.5,
 })
 
-beforeEach(() => useDownloadSpeeds.setState({ samples: {} }))
+beforeEach(() => {
+  useDownloadSpeeds.setState({ samples: {} })
+  useDownloadsShow.setState({ show: DOWNLOADS_SHOWS.everything })
+})
 
 const OK_COMPUTER = {
   kind: DOWNLOAD_KINDS.album,
@@ -563,5 +569,178 @@ describe('DownloadsPage watch tab', () => {
     renderPage(downloadsMain())
     await userEvent.click(await screen.findByRole('tab', { name: /Watch/ }))
     expect(screen.getByText(/Nothing downloaded yet/)).toBeInTheDocument()
+  })
+})
+
+describe('DownloadsPage by library', () => {
+  const MOVIES = { id: 1, name: 'Movies', isPrivate: false }
+  const SHOWS = { id: 2, name: 'Shows', isPrivate: false }
+  const EPISODE = viewOf({ library: SHOWS })
+  const FILM = { ...DUNE, library: MOVIES }
+  const OLD = viewOf({
+    downloadId: '0c000000-0000-4000-8000-000000000001',
+    label: 'Alien (1979)',
+    group: { kind: DOWNLOAD_KINDS.movie, key: 'movie:77', title: 'Alien (1979)', order: 0 },
+    status: { kind: DOWNLOAD_STATUS_KINDS.ready },
+  })
+
+  it('shows everything together until By library is chosen, on both tabs, and remembers it', async () => {
+    renderPage(downloadsMain({ downloads: [EPISODE, FILM, OLD] }))
+    await screen.findByText('Dune (2021)')
+    expect(screen.queryByRole('heading', { name: 'Movies' })).toBeNull()
+    await userEvent.selectOptions(screen.getByLabelText('Show'), 'By library')
+    const headings = screen
+      .getAllByRole('heading', { level: 2 })
+      .map((heading) => heading.textContent)
+      .filter((name) => ['Movies', 'Shows', 'Other'].includes(name ?? ''))
+    expect(headings).toEqual(['Movies', 'Shows', 'Other'])
+    const movies = screen.getByRole('region', { name: 'Movies' })
+    expect(within(movies).getByText('Dune (2021)')).toBeInTheDocument()
+    expect(within(movies).queryByText('Alien (1979)')).toBeNull()
+    expect(
+      within(screen.getByRole('region', { name: 'Other' })).getByText('Alien (1979)'),
+    ).toBeInTheDocument()
+    expect(useDownloadsShow.getState().show).toBe(DOWNLOADS_SHOWS.byLibrary)
+
+    await userEvent.click(screen.getByRole('tab', { name: /Watch/ }))
+    expect(screen.getByLabelText('Show')).toHaveValue(DOWNLOADS_SHOWS.byLibrary)
+    const grid = screen.getByRole('list', { name: 'Downloads to watch from Movies' })
+    expect(within(grid).getAllByRole('listitem')).toHaveLength(1)
+    expect(screen.getByRole('list', { name: 'Downloads to watch from Other' })).toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Show'), 'All')
+    expect(screen.getByRole('list', { name: 'Downloads to watch' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Movies' })).toBeNull()
+  })
+
+  it('offers no Show choice with nothing downloaded', async () => {
+    renderPage(downloadsMain())
+    await screen.findByText(/Nothing downloaded yet/)
+    expect(screen.queryByLabelText('Show')).toBeNull()
+  })
+})
+
+describe('DownloadsPage private libraries', () => {
+  const HOME = { id: 3, name: 'Home videos', isPrivate: true }
+  const SECRET = viewOf({
+    downloadId: '0d000000-0000-4000-8000-000000000001',
+    label: 'Birthday',
+    group: { kind: DOWNLOAD_KINDS.movie, key: 'movie:90', title: 'Birthday', order: 0 },
+    status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: GB },
+    library: HOME,
+  })
+  const HIDDEN_LINE = 'Some downloads are hidden until the library PIN is entered.'
+  type LockAnswer = typeof api.getLock
+  type LockSpy = ReturnType<typeof spyOn<typeof api, 'getLock'>>
+  const spies: LockSpy[] = []
+
+  const lockAnswers = (answer: LockAnswer) => {
+    const spy = spyOn(api, 'getLock').mockImplementation(answer)
+    spies.push(spy)
+    return spy
+  }
+
+  afterEach(() => {
+    spies.splice(0).forEach((made) => made.mockRestore())
+  })
+
+  it('hides them from the lists and the counts while locked, and says some are hidden', async () => {
+    lockAnswers(async () => ({ available: true, unlocked: false }))
+    renderPage(downloadsMain({ downloads: [SECRET, DUNE] }))
+    expect(await screen.findByText(HIDDEN_LINE)).toBeInTheDocument()
+    expect(screen.getByText('Dune (2021)')).toBeInTheDocument()
+    expect(screen.queryByText('Birthday')).toBeNull()
+    expect(screen.queryByText('Home videos')).toBeNull()
+    expect(screen.getByRole('tab', { name: /Manage/ })).toHaveTextContent('1')
+    expect(screen.getByRole('tab', { name: /Watch/ })).toHaveTextContent('1')
+    // Nothing shown is in progress, so there is nothing to pause; the bytes on their way still count.
+    expect(screen.queryByRole('button', { name: 'Pause all' })).toBeNull()
+    expect(screen.getByText('Downloading 1 file')).toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Show'), 'By library')
+    expect(screen.queryByRole('heading', { name: 'Home videos' })).toBeNull()
+    await userEvent.click(screen.getByRole('tab', { name: /Watch/ }))
+    expect(screen.queryByText('Birthday')).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('shows them once the server says the PIN has been entered', async () => {
+    lockAnswers(async () => ({ available: true, unlocked: true }))
+    renderPage(downloadsMain({ downloads: [SECRET, DUNE] }))
+    expect(await screen.findByText('Birthday')).toBeInTheDocument()
+    expect(screen.queryByText(HIDDEN_LINE)).toBeNull()
+    expect(screen.getByRole('tab', { name: /Manage/ })).toHaveTextContent('2')
+    await userEvent.selectOptions(screen.getByLabelText('Show'), 'By library')
+    expect(screen.getByRole('heading', { name: 'Home videos' })).toBeInTheDocument()
+  })
+
+  it('keeps them hidden while the server has yet to answer', async () => {
+    lockAnswers(() => new Promise(() => undefined))
+    renderPage(downloadsMain({ downloads: [SECRET, DUNE] }))
+    expect(await screen.findByText(HIDDEN_LINE)).toBeInTheDocument()
+    expect(screen.queryByText('Birthday')).toBeNull()
+  })
+
+  it('keeps them hidden when the server cannot be reached and never said unlocked', async () => {
+    const lock = lockAnswers(async () => {
+      throw new Error('unreachable')
+    })
+    renderPage(downloadsMain({ downloads: [SECRET, DUNE] }))
+    expect(await screen.findByText(HIDDEN_LINE)).toBeInTheDocument()
+    await waitFor(() => expect(lock).toHaveBeenCalled())
+    expect(screen.queryByText('Birthday')).toBeNull()
+  })
+
+  it('says only that some are hidden when every download is', async () => {
+    lockAnswers(async () => ({ available: true, unlocked: false }))
+    renderPage(downloadsMain({ downloads: [SECRET] }))
+    expect(await screen.findByText(HIDDEN_LINE)).toBeInTheDocument()
+    expect(screen.queryByText(/Nothing downloaded yet/)).toBeNull()
+    expect(screen.queryByLabelText('Show')).toBeNull()
+  })
+
+  it('asks the server about no lock when no download is private', async () => {
+    const lock = lockAnswers(async () => ({ available: true, unlocked: false }))
+    renderPage(downloadsMain({ downloads: [DUNE] }))
+    await screen.findByText('Dune (2021)')
+    expect(lock).not.toHaveBeenCalled()
+    expect(screen.queryByText(HIDDEN_LINE)).toBeNull()
+  })
+})
+
+describe('DownloadsPage saved pictures', () => {
+  const ART = '10000000-0000-4000-8000-000000000001'
+  const LOGO = '10000000-0000-4000-8000-000000000002'
+  const pictures = { art: ART, logo: LOGO }
+
+  it('shows the poster saved with a download from disk, on its row and its tile', async () => {
+    renderPage(downloadsMain({ downloads: [{ ...DUNE, pictures }] }))
+    await screen.findByText('Dune (2021)')
+    const row = rowOf('Dune (2021)')
+    await waitFor(() =>
+      expect(row.querySelector('img')?.getAttribute('src') ?? null).toBe(pictureUrlFor(ART)),
+    )
+    await userEvent.click(screen.getByRole('tab', { name: /Watch/ }))
+    const grid = screen.getByRole('list', { name: 'Downloads to watch' })
+    await waitFor(() =>
+      expect(grid.querySelector('img')?.getAttribute('src') ?? null).toBe(pictureUrlFor(ART)),
+    )
+  })
+
+  it("heads a show's downloads with its saved title art, named by the title", async () => {
+    renderPage(downloadsMain({ downloads: [viewOf({ pictures }), { ...EPISODE_2, pictures }] }))
+    const logo = await screen.findByRole('img', { name: 'Severance' })
+    expect(logo.getAttribute('src')).toBe(pictureUrlFor(LOGO))
+    expect(screen.getByRole('heading', { name: 'Severance' })).toContainElement(logo)
+    expect(screen.getByRole('region', { name: 'Severance' })).toBeInTheDocument()
+  })
+
+  it('spells the title out with no saved art, or when its files do not share one', async () => {
+    renderPage(
+      downloadsMain({
+        downloads: [viewOf({ pictures }), { ...EPISODE_2, pictures: { art: ART, logo: null } }],
+      }),
+    )
+    const heading = await screen.findByRole('heading', { name: 'Severance' })
+    expect(heading).toHaveTextContent('Severance')
+    expect(screen.queryByRole('img', { name: 'Severance' })).toBeNull()
   })
 })

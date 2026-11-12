@@ -21,7 +21,9 @@ import { createMenuHub } from '@/desktop/menuHub'
 import type { AudioConnection, AudioConnections } from '@/desktop/audioConnection'
 import type { PlayerConnection, PlayerConnections } from '@/desktop/playerConnection'
 import type { Connection, Connections } from '@/desktop/portConnection'
+import { desktopDownloadsHost } from '@/downloads/desktopHost'
 import { useDesktopBridge } from '@/stores/desktop'
+import { useDownloadsHostStore } from '@/stores/downloadsHost'
 
 export const GB = 1_000_000_000
 
@@ -51,6 +53,8 @@ export const viewOf = (overrides: Partial<DownloadView> = {}): DownloadView => (
   deletesAt: null,
   isLocked: false,
   artwork: { kind: DOWNLOAD_ARTWORK_KINDS.poster, itemId: 4, version: 'v1' },
+  pictures: { art: null, logo: null },
+  library: null,
   facts: {
     year: 2022,
     score: 8.7,
@@ -148,6 +152,7 @@ export const asPlayingDesktop = ({
 }: AsPlayingDesktopProps) => {
   const menu = createMenuHub()
   useDesktopBridge.setState({ desktop: { client, menu, player, audio } })
+  useDownloadsHostStore.setState({ host: desktopDownloadsHost(client) })
   return { client, menu, player, audio }
 }
 

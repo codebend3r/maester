@@ -1,13 +1,24 @@
 import { formatBytes } from '@raven/core'
+import { DOWNLOADS_HOSTS, type DownloadsHostKind } from '@/downloads/host'
 
 type SpaceProps = { used: number; free: number; computer: string }
+type HelpLine = (computer: string) => string
+type SpaceLine = (props: SpaceProps) => string
 
 export const DOWNLOADS_SECTION_COPY = {
-  help: (computer: string) => `What Raven keeps on this ${computer}.`,
+  help: {
+    [DOWNLOADS_HOSTS.desktop]: (computer: string) => `What Raven keeps on this ${computer}.`,
+    [DOWNLOADS_HOSTS.browser]: () =>
+      'What raven keeps in this browser, to play with no connection.',
+  } as const satisfies Record<DownloadsHostKind, HelpLine>,
   deleteOnceWatchedHint:
     'What a new download starts with. A download set so goes a while after its last minutes play.',
-  space: ({ used, free, computer }: SpaceProps) =>
-    `${formatBytes(used)} of downloads, ${formatBytes(free)} free on this ${computer}.`,
+  space: {
+    [DOWNLOADS_HOSTS.desktop]: ({ used, free, computer }: SpaceProps) =>
+      `${formatBytes(used)} of downloads, ${formatBytes(free)} free on this ${computer}.`,
+    [DOWNLOADS_HOSTS.browser]: ({ used, free }: SpaceProps) =>
+      `${formatBytes(used)} of downloads, ${formatBytes(free)} free in this browser.`,
+  } as const satisfies Record<DownloadsHostKind, SpaceLine>,
   deleteAllQuestion: 'Delete all downloads?',
   deleteAllFreeing: (used: number) => `Delete all downloads? ${formatBytes(used)} will be freed.`,
   deleteAll: 'Delete all',

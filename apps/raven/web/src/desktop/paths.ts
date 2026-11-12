@@ -1,12 +1,13 @@
 import { DESKTOP_PATHS, isPagePath, object, oneOf, PAGE_PATHS } from '@raven/core'
 import { generatePath, matchPath } from 'react-router-dom'
+import { BROWSER_PLAY_PATH } from '@/browserDownloads/paths'
 import { MUSIC_PATHS, isMusicPath } from '@/lib/music'
 
 /** A local file or download playing, by the id main granted for it. */
 export const playPathOf = (fileId: string): string => generatePath(DESKTOP_PATHS.play, { fileId })
 
 /** What Raven shows while its server cannot be reached: nothing that needs the server. */
-const OFFLINE_PAGES = [
+export const DESKTOP_OFFLINE_PAGES = [
   DESKTOP_PATHS.downloads,
   MUSIC_PATHS.downloads,
   DESKTOP_PATHS.local,
@@ -14,12 +15,21 @@ const OFFLINE_PAGES = [
   PAGE_PATHS.settings,
 ] as const
 
-export const isOfflinePage = (pathname: string): boolean =>
-  OFFLINE_PAGES.some((pattern) => matchPath(pattern, pathname) !== null)
+type IsOfflinePageProps = {
+  pathname: string
+  /** The route patterns the downloads host shows with no server. */
+  pages: readonly string[]
+}
+
+export const isOfflinePage = ({ pathname, pages }: IsOfflinePageProps): boolean =>
+  pages.some((pattern) => matchPath(pattern, pathname) !== null)
+
+/** Raven's player of a file, and the browser's of a download. */
+const FILE_PLAYERS = [DESKTOP_PATHS.play, BROWSER_PLAY_PATH] as const
 
 /** Whether a local file or a download is playing: a page that needs neither server nor account. */
 export const isFilePlaying = (pathname: string): boolean =>
-  matchPath(DESKTOP_PATHS.play, pathname) !== null
+  FILE_PLAYERS.some((pattern) => matchPath(pattern, pathname) !== null)
 
 /** Whether a video is on screen, so the next one replaces it in history rather than stacking. */
 export const isPlaying = (pathname: string): boolean =>

@@ -24,11 +24,13 @@ import { DOWNLOAD_ROW_COPY } from '@/desktop/DownloadsPage/copy'
 import { DownloadActivity } from '@/desktop/DownloadsPage/DownloadActivity'
 import { DownloadArtwork } from '@/desktop/DownloadsPage/DownloadArtwork'
 import { usePlayDownload } from '@/desktop/DownloadsPage/usePlayDownload'
+import { WaitingText } from '@/desktop/DownloadsPage/WaitingText'
 import { useDownloadSpeed } from '@/desktop/useDownloadSpeed'
 import { POSTER_SIZES } from '@/lib/posters'
 import { watchedLabel } from '@/desktop/watched'
 import styles from '@/desktop/DownloadsPage/DownloadsPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { useDownloadsHost } from '@/stores/downloadsHost'
 
 /** What a row shows: the download, or the question before it is deleted. */
 const ROW_MODES = { view: 'view', delete: 'delete' } as const
@@ -127,7 +129,9 @@ const DownloadingLine = ({ view, textId }: DownloadingLineProps) => {
   )
 }
 
-const QueuedLine = () => <span>{DOWNLOAD_ROW_COPY.waiting}</span>
+type QueuedLineProps = StatusLineProps
+
+const QueuedLine = ({ view }: QueuedLineProps) => <WaitingText downloadId={view.downloadId} />
 
 type PausedLineProps = StatusLineProps
 
@@ -208,6 +212,8 @@ type RowViewProps = {
   action: RowAction
   /** Whether the row shows its action: a ready track of a server Raven no longer holds has none. */
   hasAction: boolean
+  /** Whether the host deletes a download once watched, so the row offers the switch. */
+  canAutoDelete: boolean
   isDeleting: boolean
   deleteButton: ButtonRef
   cancelButton: ButtonRef
@@ -261,6 +267,7 @@ const ViewingRow = ({
   ids,
   action,
   hasAction,
+  canAutoDelete,
   deleteButton,
   onAct,
   onAsk,
@@ -281,6 +288,7 @@ const ViewingRow = ({
       >
         <DownloadArtwork
           artwork={view.artwork}
+          saved={view.pictures.art}
           initial={view.group.title.slice(0, 1)}
           sizes={POSTER_SIZES.bar}
         />
@@ -304,7 +312,7 @@ const ViewingRow = ({
             {actionButton.label}
           </Button>
         )}
-        {kind.isWatchable && (
+        {kind.isWatchable && canAutoDelete && (
           <label className={styles.auto}>
             <input
               type="checkbox"
@@ -345,6 +353,7 @@ type DownloadRowProps = {
 
 /** One downloaded file: what it is, where it stands, and what can be done with it. */
 export const DownloadRow = ({ view, play, onDeleted }: DownloadRowProps) => {
+  const host = useDownloadsHost()
   const change = useChangeDownloads()
   const playDownload = usePlayDownload()
   const [mode, setMode] = useState<RowMode>(ROW_MODES.view)
@@ -429,6 +438,7 @@ export const DownloadRow = ({ view, play, onDeleted }: DownloadRowProps) => {
         ids={ids}
         action={action}
         hasAction={hasAction}
+        canAutoDelete={host.canAutoDelete}
         isDeleting={isDeleting}
         deleteButton={deleteButton}
         cancelButton={cancelButton}

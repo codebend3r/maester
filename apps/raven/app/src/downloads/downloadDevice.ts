@@ -27,7 +27,7 @@ const serverOf = (serverId: string): DownloadServer | null => {
   const api = apiFor({ server, session: useAccountSession })
   return {
     sources: mediaSourcesFor(server),
-    prepare: (mediaId) => api.getDeviceDownload(mediaId),
+    prepare: (mediaId) => api.getDeviceDownload({ mediaId }),
     tracks: (mediaId) => api.getTracks(mediaId),
     titleArtOf: async (group) =>
       TITLE_ART_GROUPS.has(group.kind)

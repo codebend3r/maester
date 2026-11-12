@@ -6,6 +6,7 @@ import { isAnyOf, libraryPages } from '@/components/AppShell/currentPage'
 import { MoreSheet } from '@/components/AppShell/MoreSheet'
 import { Tab, TabButton, TabStrip, type TabTarget } from '@/components/TabStrip/TabStrip'
 import { useComputerName, useIsDesktop } from '@/stores/desktop'
+import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 import { COMMON_COPY } from '@/lib/copy'
 import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
@@ -93,20 +94,21 @@ const MANAGE_TABS = [
   { to: '/reports', patterns: ['/reports'], icon: 'alert', label: APP_SHELL_COPY.reports },
 ] as const satisfies readonly TabTarget[]
 
-/** Raven's own pages, the files on this computer and the downloads, which need no server. */
-const useDesktopTabs = (): readonly TabTarget[] => {
+/*
+ * The pages that need no server: Raven's files on this computer, and the downloads wherever the
+ * page keeps any, inside Raven or in a browser that can.
+ */
+const useHostTabs = (): readonly TabTarget[] => {
   const isDesktop = useIsDesktop()
+  const hasDownloads = useDownloadsHostOrNone() !== null
   const computer = useComputerName()
-  if (!isDesktop) return []
-  return [
-    {
-      to: DESKTOP_PATHS.local,
-      patterns: [DESKTOP_PATHS.local],
-      icon: 'file-play',
-      label: APP_SHELL_COPY.thisComputer(computer),
-    },
-    DOWNLOADS_TAB,
-  ]
+  const local = {
+    to: DESKTOP_PATHS.local,
+    patterns: [DESKTOP_PATHS.local],
+    icon: 'file-play',
+    label: APP_SHELL_COPY.thisComputer(computer),
+  } as const satisfies TabTarget
+  return [...(isDesktop ? [local] : []), ...(hasDownloads ? [DOWNLOADS_TAB] : [])]
 }
 
 type TabBarProps = {
@@ -116,10 +118,10 @@ type TabBarProps = {
 
 /** While Raven cannot reach its server: the pages that need none, with no More. */
 const OfflineTabBar = () => {
-  const desktopTabs = useDesktopTabs()
+  const hostTabs = useHostTabs()
   return (
     <TabStrip label={APP_SHELL_COPY.tabs}>
-      {[...desktopTabs, SETTINGS_TAB].map((tab) => (
+      {[...hostTabs, SETTINGS_TAB].map((tab) => (
         <Tab key={tab.to} {...tab} />
       ))}
     </TabStrip>
@@ -128,7 +130,7 @@ const OfflineTabBar = () => {
 
 const OnlineTabBar = ({ hasMusic }: TabBarProps) => {
   const { pathname } = useLocation()
-  const desktopTabs = useDesktopTabs()
+  const hostTabs = useHostTabs()
   const moreButton = useRef<HTMLButtonElement>(null)
   const [openedOn, setOpenedOn] = useState<string | null>(null)
   // A new page closes the sheet, whichever way it came.
@@ -144,7 +146,7 @@ const OnlineTabBar = ({ hasMusic }: TabBarProps) => {
     COMING_SOON_TAB,
     HISTORY_TAB,
     NOTIFICATIONS_TAB,
-    ...desktopTabs,
+    ...hostTabs,
     SETTINGS_TAB,
   ]
   const isMoreCurrent = isAnyOf({
@@ -197,10 +199,10 @@ const TAB_BARS = {
  * of the screen. Home, Libraries (which any library's pages mark),
  * Favourites, Music while a music library exists or else Binge, then More,
  * which opens a sheet of the rest: Binge when Music took its place, Coming soon, Play
- * history, Notifications, On this Mac and Downloads in Raven, Settings, and for whoever may
- * manage, Admin, Streams and Reports. More is marked while its sheet is open
+ * history, Notifications, On this Mac in Raven, Downloads wherever the page keeps any, Settings,
+ * and for whoever may manage, Admin, Streams and Reports. More is marked while its sheet is open
  * or one of its pages is. The sheet closes on a choice, Escape, a tap on the
- * page or a new page. While Raven cannot reach its server, the bar keeps only
+ * page or a new page. While the server cannot be reached, the bar keeps only
  * On this Mac, Downloads and Settings, with no More.
  */
 export const TabBar = ({ hasMusic }: TabBarProps) => {

@@ -11,7 +11,7 @@ import { Tab, TabStrip } from '@/components/TabStrip/TabStrip'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
 import { MUSIC_PATHS } from '@/lib/music'
 import { useScrollReset } from '@/lib/useScrollReset'
-import { useIsDesktop } from '@/stores/desktop'
+import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/components/MusicShell/MusicShell.module.scss'
 
@@ -61,12 +61,12 @@ const DOWNLOADS_PLACE = {
   label: MUSIC_SHELL_COPY.downloads,
 } as const satisfies MusicPlace
 
-type PlacesForProps = { isOffline: boolean; isDesktop: boolean }
+type PlacesForProps = { isOffline: boolean; hasMusicDownloads: boolean }
 
-/** The places open now: those that need the server while it is in reach, and Raven's downloads. */
-const placesFor = ({ isOffline, isDesktop }: PlacesForProps): readonly MusicPlace[] => [
+/** The places open now: those that need the server while it is in reach, and the downloads of a host that keeps music. */
+const placesFor = ({ isOffline, hasMusicDownloads }: PlacesForProps): readonly MusicPlace[] => [
   ...(isOffline ? [] : [HOME_PLACE, LIBRARY_PLACE, SEARCH_PLACE]),
-  ...(isDesktop ? [DOWNLOADS_PLACE] : []),
+  ...(hasMusicDownloads ? [DOWNLOADS_PLACE] : []),
 ]
 
 type PlaceLinkProps = { place: MusicPlace }
@@ -91,9 +91,9 @@ const PlaceLink = ({ place }: PlaceLinkProps) => {
  */
 export const MusicShell = () => {
   const { key } = useLocation()
-  const isDesktop = useIsDesktop()
+  const hasMusicDownloads = !!useDownloadsHostOrNone()?.canKeepMusic
   const isOffline = useServerReach((state) => state.isOffline)
-  const places = placesFor({ isOffline, isDesktop })
+  const places = placesFor({ isOffline, hasMusicDownloads })
   useScrollReset()
 
   return (

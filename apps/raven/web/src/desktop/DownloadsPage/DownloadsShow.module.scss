@@ -1,0 +1,37 @@
+// The Show choice, as a muted label before it, like the grid's sort.
+.showBar {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: auto minmax(0, 14rem);
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.showLabel {
+  color: var(--color-lichen);
+}
+
+.select {
+  min-width: 0;
+}
+
+@media (max-width: 40rem) {
+  .showBar {
+    grid-auto-flow: row;
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+  }
+}
+
+// A library's name over its downloads.
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font-size: var(--font-size-xl);
+  overflow-wrap: anywhere;
+}

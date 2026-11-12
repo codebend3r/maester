@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { ApiError, type MediaAccess } from '@/apiClient'
 import {
   DEVICE_DOWNLOAD_STATES,
+  DEVICE_DOWNLOAD_VARIANTS,
   MEDIA_ORIGIN_KINDS,
   MEDIA_PROBE_BYTES,
   type MediaOrigin,
@@ -208,15 +209,23 @@ describe('playback calls', () => {
     expect(client.deviceDownloadFileUrl({ id: 7 })).toBe(
       'http://nas:8484/api/media/7/device-download/file',
     )
+    expect(
+      client.deviceDownloadFileUrl({ id: 7, access, variant: DEVICE_DOWNLOAD_VARIANTS.copy }),
+    ).toBe('https://nas.local:8443/api/media/7/device-download/file?t=abc.def')
+    expect(
+      client.deviceDownloadFileUrl({ id: 7, access, variant: DEVICE_DOWNLOAD_VARIANTS.sdr }),
+    ).toBe('https://nas.local:8443/api/media/7/device-download/file?variant=sdr&t=abc.def')
   })
 
   it('asks where the device download copy stands, and refuses an answer it does not know', async () => {
     const preparing = { state: DEVICE_DOWNLOAD_STATES.preparing, progress: 0.25 }
     const { client, calls } = clientReturning(respond({ body: preparing }))
-    await expect(client.getDeviceDownload(7)).resolves.toEqual(preparing)
+    await expect(client.getDeviceDownload({ mediaId: 7 })).resolves.toEqual(preparing)
     expect(calls[0]?.url).toBe('http://nas:8484/api/media/7/device-download')
+    await client.getDeviceDownload({ mediaId: 7, variant: DEVICE_DOWNLOAD_VARIANTS.sdr })
+    expect(calls[1]?.url ?? null).toBe('http://nas:8484/api/media/7/device-download?variant=sdr')
     const { client: confused } = clientReturning(respond({ body: { state: 'done' } }))
-    await expect(confused.getDeviceDownload(7)).rejects.toThrow()
+    await expect(confused.getDeviceDownload({ mediaId: 7 })).rejects.toThrow()
   })
 
   it('builds stream URLs', () => {

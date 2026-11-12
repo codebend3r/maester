@@ -172,7 +172,7 @@ describe('contentSecurityPolicy', () => {
         authOrigin: null,
       }),
     ).toBe(
-      "default-src 'self'; script-src 'self' 'sha256-abc='; style-src 'self' 'sha256-def='; font-src 'self'; img-src 'self' data:; media-src 'self' raven-file:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+      "default-src 'self'; script-src 'self' 'sha256-abc='; style-src 'self' 'sha256-def='; font-src 'self'; img-src 'self' data: raven-picture:; media-src 'self' raven-file:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
     )
   })
 

@@ -1,12 +1,17 @@
 import {
   AUTH_REFUSALS,
+  coverOf,
   DOWNLOAD_KINDS,
+  DOWNLOAD_MAX_FILES,
   DOWNLOAD_TARGET_KINDS,
   type DownloadArtwork,
   type DownloadGroup,
   type DownloadKind,
+  type DownloadLibrary,
   type DownloadTarget,
-  episodeCode,
+  draftOfItem,
+  draftOfMedia,
+  draftOfSaga,
   type Guard,
   isAlbumDetails,
   isItemDetails,
@@ -14,30 +19,34 @@ import {
   isMediaItem,
   isPlaylistDetails,
   isSagaList,
-  ITEM_TYPES,
   type ItemDetails,
-  itemLabel,
-  type ItemSummary,
+  type Library,
+  libraryOf,
   LOCKED_STATUS,
   type MediaItem,
-  mediaLabel,
+  oncePerFile,
+  artworkOfMedia,
+  seasonIdsOf,
+  type TitleEntry,
+  titleItemIdOf,
   type Track,
 } from '@raven/core'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { artworkOfMedia, coverOf, posterOf } from '@/main/downloads/artwork'
 import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import { ACCOUNT_REFUSAL_STATUSES, refusalAt } from '@/main/servers/authRefusals'
 import { CALL_MESSAGES, isBusyRefusal, type ServerCalls } from '@/main/servers/serverCalls'
 import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
 
-export const DOWNLOAD_MAX_FILES = 500
-
 export type ExpandedFile = {
   media: MediaItem
   label: string
   group: DownloadGroup
   artwork: DownloadArtwork
+  /** The library the file is in, as the server names it now. */
+  library: DownloadLibrary
+  /** The item whose poster and title art the file wears, its show's for an episode; null for none. */
+  titleItemId: number | null
   watchedPercent: number
   /** The track a music file is, which its download keeps; none for a video. */
   track?: Track
@@ -71,7 +80,8 @@ const LOCKED_MESSAGE = (name: string): string => `${name} keeps that behind its 
 
 type Failure = Extract<Expansion, { ok: false }>
 type Read<T> = { ok: true; value: T } | { ok: false; failure: Failure }
-type Entry = { media: MediaItem; label: string; order: number; track?: Track }
+/** One file of a title; a music file also carries the track it is. */
+type Entry = TitleEntry & { track?: Track }
 /** A group before each file takes its place in it. */
 type UnorderedGroup<G = DownloadGroup> = G extends DownloadGroup ? Omit<G, 'order'> : never
 type Draft = {
@@ -82,56 +92,13 @@ type Draft = {
   entries: Entry[]
 }
 type MusicGroup = Extract<UnorderedGroup, { cover: unknown }>
-type Calls = Pick<ServerCalls, 'call'>
-type Server = { calls: Calls; serverId: string; serverName: string }
-
-type EpisodeLabelProps = {
-  season: number | null
-  episode: number | null
-  title: string
-}
-
-export const episodeLabel = ({ season, episode, title }: EpisodeLabelProps): string => {
-  const code = season === null || episode === null ? null : episodeCode({ season, episode })
-  return code === null ? title : `${code} ${title}`
-}
-
-type EpisodeOrderProps = {
-  season: number | null
-  episode: number | null
-}
-
-const episodeOrder = ({ season, episode }: EpisodeOrderProps): number =>
-  (season ?? 0) * 10_000 + (episode ?? 0)
-
-/** An episode, its season and its show share one group, whichever of them was asked for. */
-const showGroupKey = ({ id, type, show }: Pick<ItemSummary, 'id' | 'type' | 'show'>): string => {
-  if (type === ITEM_TYPES.show) return `show:${id}`
-  // The server names no show only for a season or episode it cannot place under one.
-  return show === null ? `item:${id}` : `show:${show.id}`
-}
-
-const movieGroupKey = (media: MediaItem): string => `movie:${media.id}`
-
-type SagaGroupKeyProps = { libraryId: number; tmdbId: string }
-
-const sagaGroupKey = ({ libraryId, tmdbId }: SagaGroupKeyProps): string =>
-  `saga:${libraryId}:${tmdbId}`
 
 const albumGroupKey = (albumId: number): string => `album:${albumId}`
 
 const playlistGroupKey = (playlistId: number): string => `playlist:${playlistId}`
 
-/** Both episodes of a two-episode file name that one file as their `primary`: it is fetched once, as the first. */
-const oncePerFile = (entries: readonly Entry[]): Entry[] => [
-  ...entries
-    .reduce(
-      (byMedia, entry) =>
-        byMedia.has(entry.media.id) ? byMedia : byMedia.set(entry.media.id, entry),
-      new Map<number, Entry>(),
-    )
-    .values(),
-]
+type Calls = Pick<ServerCalls, 'call'>
+type Server = { calls: Calls; serverId: string; serverName: string }
 
 const fail = ({ reason, message }: Pick<Failure, 'reason' | 'message'>): Read<never> => ({
   ok: false,
@@ -204,49 +171,14 @@ const read = async <T>({
     : fail({ reason: EXPAND_REASONS.unreadable, message: EXPAND_MESSAGES.unreadable(serverName) })
 }
 
-const episodesOf = (details: ItemDetails): Entry[] =>
-  details.children.flatMap((child) =>
-    child.type === ITEM_TYPES.episode && child.primary !== null
-      ? [{ media: child.primary, label: episodeLabel(child), order: episodeOrder(child) }]
-      : [],
-  )
-
 const goneFor = (server: Server): Read<never> =>
   fail({ reason: EXPAND_REASONS.gone, message: EXPAND_MESSAGES.gone(server.serverName) })
 
-const draftOfMedia = (media: MediaItem): Draft => {
-  const item = media.item
-  if (item?.type !== ITEM_TYPES.episode) {
-    const title = mediaLabel(media)
-    return {
-      title,
-      group: { kind: DOWNLOAD_KINDS.movie, key: movieGroupKey(media), title },
-      artwork: null,
-      entries: [{ media, label: title, order: 0 }],
-    }
-  }
-  return {
-    title: mediaLabel(media),
-    group: {
-      kind: DOWNLOAD_KINDS.episode,
-      key: showGroupKey(item),
-      title: item.show?.title ?? item.title,
-    },
-    artwork: null,
-    entries: [{ media, label: episodeLabel(item), order: episodeOrder(item) }],
-  }
-}
+type SeasonsOfProps = { server: Server; details: ItemDetails }
 
-type DraftOfShowProps = {
-  server: Server
-  details: ItemDetails
-}
-
-const draftOfShow = async ({ server, details }: DraftOfShowProps): Promise<Read<Draft>> => {
-  const seasonIds = details.children.flatMap((child) =>
-    child.type === ITEM_TYPES.season ? [child.id] : [],
-  )
-  const entries = await seasonIds.reduce<Promise<Read<Entry[]>>>(
+/** A show's seasons, read one after another; the first refusal answers for all. */
+const seasonsOf = ({ server, details }: SeasonsOfProps): Promise<Read<ItemDetails[]>> =>
+  seasonIdsOf(details).reduce<Promise<Read<ItemDetails[]>>>(
     async (previous, itemId) => {
       const soFar = await previous
       if (!soFar.ok) return soFar
@@ -256,82 +188,18 @@ const draftOfShow = async ({ server, details }: DraftOfShowProps): Promise<Read<
         guard: isItemDetails,
       })
       if (!season.ok) return season
-      return { ok: true, value: soFar.value.concat(episodesOf(season.value)) }
+      return { ok: true, value: [...soFar.value, season.value] }
     },
     Promise.resolve({ ok: true, value: [] }),
   )
-  if (!entries.ok) return entries
-  return {
-    ok: true,
-    value: {
-      title: details.title,
-      group: { kind: DOWNLOAD_KINDS.show, key: showGroupKey(details), title: details.title },
-      artwork: posterOf(details),
-      entries: entries.value,
-    },
-  }
-}
 
-type DraftOfItemProps = {
-  server: Server
-  details: ItemDetails
-}
+type DraftOfDetailsProps = { server: Server; details: ItemDetails }
 
-const draftOfItem = async ({ server, details }: DraftOfItemProps): Promise<Read<Draft>> => {
-  const first = details.versions[0]
-  switch (details.type) {
-    case ITEM_TYPES.movie: {
-      if (first === undefined) return goneFor(server)
-      const draft = draftOfMedia(first)
-      return {
-        ok: true,
-        value: {
-          ...draft,
-          group: {
-            kind: DOWNLOAD_KINDS.movie,
-            key: movieGroupKey(first),
-            title: draft.group.title,
-          },
-        },
-      }
-    }
-    case ITEM_TYPES.episode: {
-      if (first === undefined) return goneFor(server)
-      return {
-        ok: true,
-        value: {
-          title: itemLabel(details),
-          group: {
-            kind: DOWNLOAD_KINDS.episode,
-            key: showGroupKey(details),
-            title: details.show?.title ?? details.title,
-          },
-          artwork: null,
-          entries: [{ media: first, label: episodeLabel(details), order: episodeOrder(details) }],
-        },
-      }
-    }
-    case ITEM_TYPES.season:
-      return {
-        ok: true,
-        value: {
-          title: itemLabel(details),
-          group: {
-            kind: DOWNLOAD_KINDS.season,
-            key: showGroupKey(details),
-            title: details.show?.title ?? details.title,
-          },
-          artwork: posterOf(details),
-          entries: episodesOf(details),
-        },
-      }
-    case ITEM_TYPES.show:
-      return draftOfShow({ server, details })
-    default: {
-      const unreachable: never = details.type
-      return unreachable
-    }
-  }
+const draftOfDetails = async ({ server, details }: DraftOfDetailsProps): Promise<Read<Draft>> => {
+  const seasons = await seasonsOf({ server, details })
+  if (!seasons.ok) return seasons
+  const draft = draftOfItem({ details, seasons: seasons.value })
+  return draft === null ? goneFor(server) : { ok: true, value: draft }
 }
 
 /** How many of a music group's files main reads at once, well under `serverCalls`' six reads in flight. */
@@ -432,7 +300,7 @@ const draftOf = async ({ server, target, skip }: DraftOfProps): Promise<Read<Dra
         call: { name: CALL_NAMES.getItem, itemId: target.itemId },
         guard: isItemDetails,
       })
-      return details.ok ? draftOfItem({ server, details: details.value }) : details
+      return details.ok ? draftOfDetails({ server, details: details.value }) : details
     }
     case DOWNLOAD_TARGET_KINDS.saga: {
       const sagas = await read({
@@ -443,15 +311,7 @@ const draftOf = async ({ server, target, skip }: DraftOfProps): Promise<Read<Dra
       if (!sagas.ok) return sagas
       const saga = sagas.value.find(({ tmdbId }) => tmdbId === target.tmdbId)
       if (saga === undefined) return goneFor(server)
-      return {
-        ok: true,
-        value: {
-          title: saga.name,
-          group: { kind: DOWNLOAD_KINDS.saga, key: sagaGroupKey(target), title: saga.name },
-          artwork: null,
-          entries: saga.media.map((media, order) => ({ media, label: mediaLabel(media), order })),
-        },
-      }
+      return { ok: true, value: draftOfSaga({ saga, libraryId: target.libraryId }) }
     }
     case DOWNLOAD_TARGET_KINDS.album: {
       const details = await read({
@@ -507,17 +367,17 @@ const draftOf = async ({ server, target, skip }: DraftOfProps): Promise<Read<Dra
   }
 }
 
-type WatchedPercentsProps = {
+type LibrariesOfProps = {
   server: Server
   libraryIds: number[]
 }
 
-/** Each library's `watchedPercent`, read once however many files it holds. */
-const watchedPercents = ({
+/** Each library, read once however many files it holds. */
+const librariesOf = ({
   server,
   libraryIds,
-}: WatchedPercentsProps): Promise<Read<Record<number, number>>> =>
-  libraryIds.reduce<Promise<Read<Record<number, number>>>>(
+}: LibrariesOfProps): Promise<Read<Record<number, Library>>> =>
+  libraryIds.reduce<Promise<Read<Record<number, Library>>>>(
     async (previous, libraryId) => {
       const soFar = await previous
       if (!soFar.ok) return soFar
@@ -529,7 +389,7 @@ const watchedPercents = ({
       if (!library.ok) return library
       return {
         ok: true,
-        value: { ...soFar.value, [libraryId]: library.value.settings.watchedPercent },
+        value: { ...soFar.value, [libraryId]: library.value },
       }
     },
     Promise.resolve({ ok: true, value: {} }),
@@ -556,19 +416,24 @@ export const expandTarget = async ({
   }
   const kept = entries.filter(({ media }) => !skip(media.id))
   const libraryIds = [...new Set(kept.map(({ media }) => media.libraryId))]
-  const percents = await watchedPercents({ server, libraryIds })
-  if (!percents.ok) return percents.failure
+  const libraries = await librariesOf({ server, libraryIds })
+  if (!libraries.ok) return libraries.failure
   return {
     ok: true,
     kind: group.kind,
     title,
-    files: kept.map(({ media, label, order, track }) => ({
-      media,
-      label,
-      group: { ...group, order },
-      artwork: artwork ?? artworkOfMedia(media),
-      watchedPercent: percents.value[media.libraryId],
-      track,
-    })),
+    files: kept.map(({ media, label, order, track }) => {
+      const library = libraries.value[media.libraryId]
+      return {
+        media,
+        label,
+        group: { ...group, order },
+        artwork: artwork ?? artworkOfMedia(media),
+        library: libraryOf(library),
+        titleItemId: titleItemIdOf(media),
+        watchedPercent: library.settings.watchedPercent,
+        track,
+      }
+    }),
   }
 }

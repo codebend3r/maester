@@ -1,6 +1,12 @@
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Route, Routes } from 'react-router-dom'
-import { AUTH_ROUTES, DESKTOP_PATHS, PAGE_PATHS, UPCOMING_SHELVES } from '@raven/core'
+import {
+  AUTH_ROUTES,
+  DESKTOP_PATHS,
+  type DownloadView,
+  PAGE_PATHS,
+  UPCOMING_SHELVES,
+} from '@raven/core'
 import { Toaster } from '@raven/ui'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
@@ -19,7 +25,12 @@ import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage/ForgotPasswordPag
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage/ResetPasswordPage'
 import { SignInPage } from '@/pages/SignInPage/SignInPage'
 import { SignUpPage } from '@/pages/SignUpPage/SignUpPage'
+import type { BrowserDownloads } from '@/browserDownloads/engine'
+import { keepOfflinePages } from '@/browserDownloads/keepOffline'
+import { BROWSER_PLAY_PATH } from '@/browserDownloads/paths'
+import { useBrowserDownloads } from '@/stores/browserDownloads'
 import { useIsDesktop } from '@/stores/desktop'
+import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { BINGE_PATH } from '@/lib/binge'
 import { CONTINUE_WATCHING_PATH } from '@/lib/homeContinue'
 import { NOTIFICATIONS_PATH } from '@/lib/notifications'
@@ -36,15 +47,15 @@ const LogToasts = () => {
  * page behind the gate, with the shells and the player around them, loads as a chunk of its own
  * the first time a route asks for it, so a visitor who is signed out downloads none of it.
  */
-const AppShell = lazyPage(() =>
-  import('@/components/AppShell/AppShell').then((module) => module.AppShell),
-)
+const loadAppShell = () =>
+  import('@/components/AppShell/AppShell').then((module) => module.AppShell)
+const AppShell = lazyPage(loadAppShell)
 const MusicShell = lazyPage(() =>
   import('@/components/MusicShell/MusicShell').then((module) => module.MusicShell),
 )
-const PlayerLayer = lazyPage(() =>
-  import('@/components/PlayerLayer/PlayerLayer').then((module) => module.PlayerLayer),
-)
+const loadPlayerLayer = () =>
+  import('@/components/PlayerLayer/PlayerLayer').then((module) => module.PlayerLayer)
+const PlayerLayer = lazyPage(loadPlayerLayer)
 const DesktopHost = lazyPage(() =>
   import('@/desktop/DesktopHost').then((module) => module.DesktopHost),
 )
@@ -88,9 +99,8 @@ const PersonPage = lazyPage(() =>
   import('@/pages/PersonPage/PersonPage').then((module) => module.PersonPage),
 )
 const GetPage = lazyPage(() => import('@/pages/GetPage/GetPage').then((module) => module.GetPage))
-const WatchPage = lazyPage(() =>
-  import('@/pages/WatchPage/WatchPage').then((module) => module.WatchPage),
-)
+const loadWatchPage = () => import('@/pages/WatchPage/WatchPage').then((module) => module.WatchPage)
+const WatchPage = lazyPage(loadWatchPage)
 const BingePage = lazyPage(() =>
   import('@/pages/BingePage/BingePage').then((module) => module.BingePage),
 )
@@ -139,9 +149,9 @@ const StreamsPage = lazyPage(() =>
 const BugReportsPage = lazyPage(() =>
   import('@/pages/BugReportsPage/BugReportsPage').then((page) => page.BugReportsPage),
 )
-const SettingsPage = lazyPage(() =>
-  import('@/pages/SettingsPage/SettingsPage').then((page) => page.SettingsPage),
-)
+const loadSettingsPage = () =>
+  import('@/pages/SettingsPage/SettingsPage').then((page) => page.SettingsPage)
+const SettingsPage = lazyPage(loadSettingsPage)
 const AdminPage = lazyPage(() =>
   import('@/pages/SettingsPage/SettingsPage').then((page) => page.AdminPage),
 )
@@ -151,25 +161,71 @@ const ShortcutsPage = lazyPage(() =>
 const DesignPage = lazyPage(() =>
   import('@/pages/DesignPage/DesignPage').then((page) => page.DesignPage),
 )
-const DownloadsPage = lazyPage(() =>
-  import('@/desktop/DownloadsPage/DownloadsPage').then((page) => page.DownloadsPage),
-)
+const loadDownloadsPage = () =>
+  import('@/desktop/DownloadsPage/DownloadsPage').then((page) => page.DownloadsPage)
+const DownloadsPage = lazyPage(loadDownloadsPage)
 const LocalPage = lazyPage(() =>
   import('@/desktop/LocalPage/LocalPage').then((page) => page.LocalPage),
 )
 const PlayRoute = lazyPage(() =>
   import('@/desktop/PlayPage/PlayPage').then((page) => page.PlayRoute),
 )
+const loadBrowserDownloadsHost = () =>
+  import('@/browserDownloads/BrowserDownloadsHost').then((module) => module.BrowserDownloadsHost)
+const BrowserDownloadsHost = lazyPage(loadBrowserDownloadsHost)
+const loadBrowserPlayRoute = () =>
+  import('@/browserDownloads/BrowserPlayPage/BrowserPlayPage').then((page) => page.BrowserPlayRoute)
+const BrowserPlayRoute = lazyPage(loadBrowserPlayRoute)
+
+/*
+ * The chunks a browser that keeps downloads shows with no server: the frame, Downloads, a
+ * download's player, the watch page that falls back to it, and Settings. The installed app has
+ * its service worker keep them, though no visit may have opened them yet.
+ */
+const OFFLINE_PAGES = [
+  loadAppShell,
+  loadPlayerLayer,
+  loadDownloadsPage,
+  loadBrowserDownloadsHost,
+  loadBrowserPlayRoute,
+  loadWatchPage,
+  loadSettingsPage,
+] as const
+
+/*
+ * Has the service worker keep the offline pages, from the first download on. A browser with
+ * nothing downloaded has no page to open with no server, and fetching the player's and the
+ * watch page's chunks on every visit, the sign-in page's included, cost that visit its speed.
+ */
+const useKeepOfflinePages = (engine: BrowserDownloads | null): void => {
+  useEffect(() => {
+    if (engine === null) return undefined
+    const kept = { isAsked: false }
+    const keep = (downloads: readonly DownloadView[]): void => {
+      if (kept.isAsked || downloads.length === 0) return
+      kept.isAsked = true
+      keepOfflinePages({ target: window, pages: OFFLINE_PAGES }).catch(() => undefined)
+    }
+    keep(engine.list())
+    return engine.subscribe(({ downloads }) => keep(downloads))
+  }, [engine])
+}
 
 /**
  * Every page, behind the sign-in gate but the account pages and Get. The
  * browsing pages sit in one of two shells over the one player: raven's own,
  * and the music mode's under `/music`, which shows the same album, artist,
- * playlist and Now Playing pages. Inside Raven the frame adds Downloads and
- * On this Mac, and the app's own part of the page runs over every route.
+ * playlist and Now Playing pages. Where the page keeps downloads, inside
+ * Raven or in a browser that can, the frame adds Downloads and the host's
+ * own part of the page runs over every route; Raven adds On this Mac and
+ * its player of a file, a browser its player of a download.
  */
 export const AppRoutes = () => {
   const isDesktop = useIsDesktop()
+  const host = useDownloadsHostOrNone()
+  const engine = useBrowserDownloads((state) => state.engine)
+
+  useKeepOfflinePages(engine)
   return (
     <>
       {/* While a page's chunk loads, the loader the gate shows while the account is read. */}
@@ -220,12 +276,10 @@ export const AppRoutes = () => {
                 <Route path={ADMIN_PATH} element={<AdminPage />} />
                 <Route path={PAGE_PATHS.shortcuts} element={<ShortcutsPage />} />
                 <Route path={DESIGN_PATH} element={<DesignPage />} />
-                {isDesktop && (
-                  <>
-                    <Route path={DESKTOP_PATHS.downloads} element={<DownloadsPage />} />
-                    <Route path={DESKTOP_PATHS.local} element={<LocalPage />} />
-                  </>
+                {host !== null && (
+                  <Route path={DESKTOP_PATHS.downloads} element={<DownloadsPage />} />
                 )}
+                {isDesktop && <Route path={DESKTOP_PATHS.local} element={<LocalPage />} />}
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
               <Route path={MUSIC_PATHS.root} element={<MusicShell />}>
@@ -256,13 +310,16 @@ export const AppRoutes = () => {
                 <Route path={MUSIC_PATHS.mix} element={<MixPage />} />
                 <Route path={MUSIC_PATHS.nowPlaying} element={<NowPlayingPage />} />
                 <Route path={MUSIC_PATHS.search} element={<MusicSearchPage />} />
-                {isDesktop && <Route path={MUSIC_PATHS.downloads} element={<DownloadsPage />} />}
+                {!!host?.canKeepMusic && (
+                  <Route path={MUSIC_PATHS.downloads} element={<DownloadsPage />} />
+                )}
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
             </Route>
             {/* The player takes the whole screen, outside the browsing frame, as a file Raven plays does. */}
             <Route path={`${PAGE_PATHS.watch}/:id`} element={<WatchPage />} />
             {isDesktop && <Route path={DESKTOP_PATHS.play} element={<PlayRoute />} />}
+            {engine !== null && <Route path={BROWSER_PLAY_PATH} element={<BrowserPlayRoute />} />}
           </Route>
           {/* So do the account pages, which sit outside the gate they serve, and the page to get raven from. */}
           <Route path={AUTH_ROUTES.signIn} element={<SignInPage />} />
@@ -282,6 +339,11 @@ export const AppRoutes = () => {
       {isDesktop && (
         <Suspense>
           <DesktopHost />
+        </Suspense>
+      )}
+      {engine !== null && (
+        <Suspense>
+          <BrowserDownloadsHost engine={engine} />
         </Suspense>
       )}
     </>

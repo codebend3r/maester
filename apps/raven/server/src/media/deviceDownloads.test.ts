@@ -7,13 +7,21 @@ import { promisify } from 'node:util'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   type ApiClient,
+  DEVICE_DOWNLOAD_PARAMS,
+  DEVICE_DOWNLOAD_PATHS,
   DEVICE_DOWNLOAD_STATES,
+  DEVICE_DOWNLOAD_VARIANT_PARAM,
+  DEVICE_DOWNLOAD_VARIANTS,
   type DeviceDownload,
+  type DeviceDownloadVariant,
+  HTTP_METHODS,
   LIBRARY_KINDS,
   MEDIA_ORIGIN_KINDS,
   type MediaAccess,
+  fillPath,
   isRecord,
   isString,
+  pathWithQuery,
 } from '@raven/core'
 import { HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -23,7 +31,7 @@ import { RAVEN_CONTENT_TYPES } from '@/http'
 import { DEVICE_DOWNLOAD_FAILURES, DeviceDownloadCache } from '@/media/deviceDownloadCache'
 import { MediaIndex } from '@/media/mediaIndex'
 import { ScannerService } from '@/scanner/scannerService'
-import { NOT_WATCHING, adminCookie, testConfig } from '@/test/app'
+import { NOT_WATCHING, adminCookie, injectAs, testConfig } from '@/test/app'
 import { encodeRichClip, encodeTrack } from '@/test/clips'
 import { apiFor } from '@/test/server'
 
@@ -141,23 +149,32 @@ describe('device downloads', () => {
   const api = (): ApiClient => apiFor({ app: app(), cookie: state.admin })
   const copies = (): string => join(state.root, 'data', 'device-downloads')
 
+  type CopyOf = { id: number; variant?: DeviceDownloadVariant }
+
   /** Asks until the copy is no longer being made, as the device polls. */
-  const prepared = async (id: number): Promise<DeviceDownload> => {
-    const answer = await api().getDeviceDownload(id)
+  const prepared = async ({ id, variant }: CopyOf): Promise<DeviceDownload> => {
+    const answer = await api().getDeviceDownload({ mediaId: id, variant })
     if (answer.state !== DEVICE_DOWNLOAD_STATES.preparing) return answer
     expect(answer.progress).toBeGreaterThanOrEqual(0)
     expect(answer.progress).toBeLessThan(1)
     await pause(50)
-    return prepared(id)
+    return prepared({ id, variant })
   }
 
-  const fileUrl = async (id: number): Promise<string> => {
+  const fileUrl = async ({ id, variant }: CopyOf): Promise<string> => {
     const { ticket } = await api().getMediaTicket(id)
-    return apiFor({ app: app() }).deviceDownloadFileUrl({ id, access: ownAddress(ticket) })
+    return apiFor({ app: app() }).deviceDownloadFileUrl({
+      id,
+      access: ownAddress(ticket),
+      variant,
+    })
   }
 
-  const download = async (id: number): Promise<Buffer> => {
-    const response = await app().inject({ method: 'GET', url: await fileUrl(id) })
+  const download = async ({ id, variant }: CopyOf): Promise<Buffer> => {
+    const response = await app().inject({
+      method: HTTP_METHODS.get,
+      url: await fileUrl({ id, variant }),
+    })
     expect(response.statusCode).toBe(200)
     return response.rawPayload
   }
@@ -215,17 +232,20 @@ describe('device downloads', () => {
   })
 
   it('answers 409 for the copy before it is made', async () => {
-    const response = await app().inject({ method: 'GET', url: await fileUrl(state.spare) })
+    const response = await app().inject({
+      method: HTTP_METHODS.get,
+      url: await fileUrl({ id: state.spare }),
+    })
     expect(response.statusCode).toBe(409)
   })
 
   it('makes an MP4 of an MKV, converting FLAC to E-AC-3 and SRT to mov_text, and keeps the tags', async () => {
-    const first = await api().getDeviceDownload(state.flac)
+    const first = await api().getDeviceDownload({ mediaId: state.flac })
     expect(first).toEqual({ state: DEVICE_DOWNLOAD_STATES.preparing, progress: expect.any(Number) })
-    const ready = await prepared(state.flac)
+    const ready = await prepared({ id: state.flac })
     expect(ready).toEqual({ state: DEVICE_DOWNLOAD_STATES.ready, bytes: expect.any(Number) })
 
-    const body = await download(state.flac)
+    const body = await download({ id: state.flac })
     expect(body.length).toBe(ready.state === DEVICE_DOWNLOAD_STATES.ready ? ready.bytes : -1)
     const saved = join(state.root, 'flac.mp4')
     await writeFile(saved, body)
@@ -239,9 +259,9 @@ describe('device downloads', () => {
   })
 
   it('copies AC-3 and AAC as they are, and serves the copy with byte ranges, by ticket', async () => {
-    const ready = await prepared(state.rich)
+    const ready = await prepared({ id: state.rich })
     expect(ready.state).toBe(DEVICE_DOWNLOAD_STATES.ready)
-    const url = await fileUrl(state.rich)
+    const url = await fileUrl({ id: state.rich })
     const whole = await app().inject({ method: 'GET', url })
     expect(whole.statusCode).toBe(200)
     expect(whole.headers[HEADERS.contentType]).toBe(RAVEN_CONTENT_TYPES.mp4)
@@ -270,14 +290,14 @@ describe('device downloads', () => {
       .spyOn(app().get(FfmpegService), 'probeFile')
       .mockRejectedValueOnce(new Error('/secret/path/Ran (1985).mkv: Invalid data'))
     try {
-      expect(await prepared(state.spare)).toEqual({
+      expect(await prepared({ id: state.spare })).toEqual({
         state: DEVICE_DOWNLOAD_STATES.failed,
         message: DEVICE_DOWNLOAD_FAILURES.failed,
       })
     } finally {
       probe.mockRestore()
     }
-    expect((await prepared(state.spare)).state).toBe(DEVICE_DOWNLOAD_STATES.ready)
+    expect((await prepared({ id: state.spare })).state).toBe(DEVICE_DOWNLOAD_STATES.ready)
   })
 
   it('runs one remux for asks that overlap', async () => {
@@ -285,10 +305,10 @@ describe('device downloads', () => {
     const remux = vi.spyOn(app().get(FfmpegService), 'convert')
     try {
       await Promise.all([
-        api().getDeviceDownload(state.spare),
-        api().getDeviceDownload(state.spare),
+        api().getDeviceDownload({ mediaId: state.spare }),
+        api().getDeviceDownload({ mediaId: state.spare }),
       ])
-      expect((await prepared(state.spare)).state).toBe(DEVICE_DOWNLOAD_STATES.ready)
+      expect((await prepared({ id: state.spare })).state).toBe(DEVICE_DOWNLOAD_STATES.ready)
       expect(remux).toHaveBeenCalledTimes(1)
     } finally {
       remux.mockRestore()
@@ -297,17 +317,18 @@ describe('device downloads', () => {
 
   it('evicts to the cap, keeping the most recently served copy and any being sent', async () => {
     // Each new copy sweeps first, so the one held is the one a later copy would take.
-    await prepared(state.rich)
+    await prepared({ id: state.rich })
     await pause(20)
-    await prepared(state.flac)
+    await prepared({ id: state.flac })
     const cache = app().get(DeviceDownloadCache)
     const held = await cache.open({
       mediaId: state.flac,
       mtimeMs: app().get(MediaIndex).fileOf(state.flac)?.mtimeMs ?? 0,
+      variant: DEVICE_DOWNLOAD_VARIANTS.copy,
     })
     expect(held).not.toBeNull()
     await pause(20)
-    await prepared(state.spare)
+    await prepared({ id: state.spare })
     const orphan = join(copies(), '987654')
     await mkdir(orphan, { recursive: true })
     await writeFile(join(orphan, '1.mp4'), 'gone')
@@ -325,7 +346,79 @@ describe('device downloads', () => {
     expect(await readdir(join(copies(), String(state.flac)))).toEqual([])
   })
 
+  it('makes an SDR copy beside the first: H.264, every audio track as AAC, the subtitles kept', async () => {
+    const { sdr } = DEVICE_DOWNLOAD_VARIANTS
+    expect(
+      (
+        await app().inject({
+          method: HTTP_METHODS.get,
+          url: await fileUrl({ id: state.rich, variant: sdr }),
+        })
+      ).statusCode,
+    ).toBe(409)
+    const ready = await prepared({ id: state.rich, variant: sdr })
+    expect(ready).toEqual({ state: DEVICE_DOWNLOAD_STATES.ready, bytes: expect.any(Number) })
+    expect(await readdir(join(copies(), String(state.rich)))).toContainEqual(
+      expect.stringMatching(/^\d+\.sdr\.mp4$/),
+    )
+
+    const body = await download({ id: state.rich, variant: sdr })
+    expect(body.length).toBe(ready.state === DEVICE_DOWNLOAD_STATES.ready ? ready.bytes : -1)
+    const saved = join(state.root, 'rich.sdr.mp4')
+    await writeFile(saved, body)
+    const { format, streams } = await probed(saved)
+    expect(format).toContain('mp4')
+    expect(streams).toEqual([
+      expect.objectContaining({ type: 'video', codec: 'h264' }),
+      expect.objectContaining({ type: 'audio', codec: 'aac', language: 'eng' }),
+      expect.objectContaining({
+        type: 'audio',
+        codec: 'aac',
+        language: 'jpn',
+        title: 'Commentary',
+      }),
+      expect.objectContaining({ type: 'subtitle', codec: 'mov_text' }),
+    ])
+  })
+
+  it('refuses an SDR copy of Dolby Vision profile 5, and encodes nothing', async () => {
+    const ffmpeg = app().get(FfmpegService)
+    const probeFile = ffmpeg.probeFile.bind(ffmpeg)
+    const probe = vi.spyOn(ffmpeg, 'probeFile').mockImplementation(async (path) => {
+      const real = await probeFile(path)
+      return { ...real, probe: { ...real.probe, hdr: true, isDolbyVisionOnly: true } }
+    })
+    const encode = vi.spyOn(ffmpeg, 'convert')
+    try {
+      expect(await prepared({ id: state.spare, variant: DEVICE_DOWNLOAD_VARIANTS.sdr })).toEqual({
+        state: DEVICE_DOWNLOAD_STATES.failed,
+        message: DEVICE_DOWNLOAD_FAILURES.dolbyVision,
+      })
+      expect(encode).not.toHaveBeenCalled()
+    } finally {
+      probe.mockRestore()
+      encode.mockRestore()
+    }
+  })
+
+  it('answers 400 for a variant it does not know', async () => {
+    const url = pathWithQuery({
+      path: fillPath({
+        path: DEVICE_DOWNLOAD_PATHS.prepare,
+        params: { [DEVICE_DOWNLOAD_PARAMS.id]: state.rich },
+      }),
+      query: { [DEVICE_DOWNLOAD_VARIANT_PARAM]: 'hdr' },
+    })
+    const response = await injectAs({ app: app(), cookie: state.admin })({
+      method: HTTP_METHODS.get,
+      url,
+    })
+    expect(response.statusCode).toBe(400)
+  })
+
   it('answers 409 for a track', async () => {
-    await expect(api().getDeviceDownload(state.track)).rejects.toMatchObject({ status: 409 })
+    await expect(api().getDeviceDownload({ mediaId: state.track })).rejects.toMatchObject({
+      status: 409,
+    })
   })
 })

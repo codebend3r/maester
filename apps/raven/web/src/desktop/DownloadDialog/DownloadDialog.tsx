@@ -13,7 +13,9 @@ import { handled } from '@/desktop/handled'
 import { useOpenReply } from '@/desktop/openReply'
 import { useModal } from '@/lib/useModal'
 import { signInPath } from '@/lib/authRoutes'
-import { useComputerName, useDesktop } from '@/stores/desktop'
+import type { DownloadsHostKind } from '@/downloads/host'
+import { useComputerName } from '@/stores/desktop'
+import { useDownloadsHost } from '@/stores/downloadsHost'
 import { declineAsk } from '@/stores/downloadAsk'
 import styles from '@/desktop/DesktopDialog.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
@@ -46,18 +48,23 @@ const CONTENTS = { files: 'files', empty: 'empty' } as const
 
 type Contents = (typeof CONTENTS)[keyof typeof CONTENTS]
 
-type QuestionViewProps = { status: ReadyStatus; questionId: string; computer: string }
+type QuestionViewProps = {
+  status: ReadyStatus
+  questionId: string
+  computer: string
+  hostKind: DownloadsHostKind
+}
 
 type FilesQuestionProps = QuestionViewProps
 
-const FilesQuestion = ({ status, questionId, computer }: FilesQuestionProps) => {
+const FilesQuestion = ({ status, questionId, computer, hostKind }: FilesQuestionProps) => {
   const question = DOWNLOAD_DIALOG_COPY.question({
     title: status.title,
     files: filesFor({ kind: status.downloadKind, files: status.files }),
     bytes: status.bytes,
   })
   const room = status.canFit
-    ? DOWNLOAD_DIALOG_COPY.room({ free: status.free, computer })
+    ? DOWNLOAD_DIALOG_COPY.room[hostKind]({ free: status.free, computer })
     : DOWNLOAD_DIALOG_COPY.short({ bytes: status.bytes, free: status.free })
   return (
     <>
@@ -86,7 +93,7 @@ type ReadyDialogProps = {
 
 /** Asks before the title's files are fetched; leaving it any way but Download declines. */
 const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
-  const { client } = useDesktop()
+  const host = useDownloadsHost()
   const computer = useComputerName()
   const openReply = useOpenReply()
   const { dialog, close, keepKeys } = useModal()
@@ -108,7 +115,7 @@ const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
     isConfirmed.current = true
     close()
     openReply(
-      await client.request({
+      await host.request({
         type: DESKTOP_REQUESTS.confirmDownload,
         askId: ask.askId,
         shouldAutoDelete: shouldAutoDelete,
@@ -129,10 +136,15 @@ const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
     >
       <form className={styles.form} onSubmit={(event) => handled(confirm(event))}>
         <h2 id={ids.title} className={styles.title}>
-          {DOWNLOAD_DIALOG_COPY.title}
+          {DOWNLOAD_DIALOG_COPY.title[host.kind]}
         </h2>
-        <Question status={status} questionId={ids.question} computer={computer} />
-        {canDownload && (
+        <Question
+          status={status}
+          questionId={ids.question}
+          computer={computer}
+          hostKind={host.kind}
+        />
+        {canDownload && host.canAutoDelete && (
           <label className={styles.check}>
             <input
               type="checkbox"
@@ -159,6 +171,7 @@ type LockedDialogProps = { ask: DownloadAsk; onClose: () => void }
 
 /** The title sits in a locked library, which no client opens: it says so and is declined. */
 const LockedDialog = ({ ask, onClose }: LockedDialogProps) => {
+  const host = useDownloadsHost()
   const { dialog, close, keepKeys } = useModal()
   const titleId = useId()
 
@@ -177,7 +190,7 @@ const LockedDialog = ({ ask, onClose }: LockedDialogProps) => {
     >
       <div className={styles.form}>
         <h2 id={titleId} className={styles.title}>
-          {DOWNLOAD_DIALOG_COPY.title}
+          {DOWNLOAD_DIALOG_COPY.title[host.kind]}
         </h2>
         <p>{DOWNLOAD_DIALOG_COPY.locked}</p>
         <div className={styles.actions}>
@@ -194,6 +207,7 @@ type AccountDialogProps = { ask: DownloadAsk; onClose: () => void }
 
 /** The page is signed out, so main has no account to download with: the person signs in first. */
 const AccountDialog = ({ ask, onClose }: AccountDialogProps) => {
+  const host = useDownloadsHost()
   const navigate = useNavigate()
   const { pathname, search } = useLocation()
   const { dialog, close, keepKeys } = useModal()
@@ -219,7 +233,7 @@ const AccountDialog = ({ ask, onClose }: AccountDialogProps) => {
     >
       <div className={styles.form}>
         <h2 id={titleId} className={styles.title}>
-          {DOWNLOAD_DIALOG_COPY.title}
+          {DOWNLOAD_DIALOG_COPY.title[host.kind]}
         </h2>
         <p>{DOWNLOAD_DIALOG_COPY.signInFirst}</p>
         <div className={styles.actions}>
@@ -251,7 +265,7 @@ const DIALOGS = {
 
 type DownloadDialogProps = { ask: DownloadAsk; onClose: () => void }
 
-/** What Raven asks before it downloads a title, from a Download button or a link. */
+/** What the downloads host asks before it downloads a title, from a Download button or a link. */
 export const DownloadDialog = ({ ask, onClose }: DownloadDialogProps) => {
   const Dialog = DIALOGS[ask.status.kind]
   return <Dialog ask={ask} onClose={onClose} />
