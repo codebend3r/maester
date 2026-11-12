@@ -37,6 +37,7 @@ import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import { CaptionText } from '@/layouts/PlayerCaption'
 import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import { ChaptersBand } from '@/layouts/PlayerChapters.dpad'
+import { UpNextCard, useUpNextOffer } from '@/layouts/PlayerUpNext.dpad'
 import {
   PLAYER_COPY,
   SKIP_DIRECTIONS,
@@ -53,7 +54,13 @@ import {
   scrubberAccessibilityOf,
   type VideoSurface,
 } from '@/layouts/playerKit'
-import { isSeekingWith, pressedKeyOf, remoteAnswerOf } from '@/layouts/remoteKeys'
+import {
+  REMOTE_HOLDERS,
+  isSeekingWith,
+  pressedKeyOf,
+  remoteAnswerOf,
+  remoteHolderOf,
+} from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
 import type { IconName } from '@raven/ui/iconDrawings'
 import { PLAYBACK_MODE_NAMES, useClock } from '@raven/ui/headless'
@@ -162,12 +169,11 @@ type ControlsProps = Pick<
   | 'next'
   | 'previous'
   | 'mode'
-  | 'upNext'
   | 'chapters'
   | 'onBack'
 > & {
-  /** Whether the controls are showing, not fading out: each time they come back the line asks for the focus. */
-  isVisible: boolean
+  /** Whether the remote is the controls': each time it comes to them the line asks for the focus. */
+  hasRemote: boolean
   onScrubbing: (isScrubbing: boolean) => void
   onPicking: (isPicking: boolean) => void
   onBottomHeight: (height: number) => void
@@ -201,7 +207,10 @@ const TrackButton = ({ icon, label, picker, onPicking }: TrackButtonProps) => {
 }
 
 /** How tall a show's title art stands over the video; its width follows the art's own shape. */
-const LOGO_HEIGHT = TV_SIZES.space8 * 1.5
+const LOGO_HEIGHT = TV_SIZES.space8 * 1.2
+
+/** How much smaller than the page's type the episode's name and its line of facts stand. */
+const HEADING_TYPE_SCALE = 0.6
 
 /** How large the time of day stands in the corner: larger than any line of the page's type. */
 const CLOCK_SIZE = TV_SIZES.textXl * 1.5
@@ -224,7 +233,7 @@ const liftedSubtitleStyleOf = ({
     ? undefined
     : { ...style, paddingBottom: PixelRatio.getPixelSizeForLayoutSize(lift) }
 
-type CornerProps = Pick<PlayerChromeProps, 'mode' | 'heading' | 'upNext'>
+type CornerProps = Pick<PlayerChromeProps, 'mode' | 'heading'>
 
 type PictureChipsOfProps = Pick<CornerProps, 'mode' | 'heading'>
 
@@ -241,22 +250,17 @@ const pictureChipsOf = ({ mode, heading }: PictureChipsOfProps): FactPart[] =>
   ].flatMap(({ kind, text }) => (text === null ? [] : [{ kind, text }]))
 
 /**
- * The top right corner, one thing under another: the time of day, the picture's chips, how the
- * video plays on a line of its own, then what plays next, read out together.
+ * The top right corner, one thing under another: the time of day, the picture's chips, then how
+ * the video plays on a line of its own, read out together.
  */
-const Corner = ({ mode, heading, upNext }: CornerProps) => {
+const Corner = ({ mode, heading }: CornerProps) => {
   const styles = useStyles()
   const clock = useClock()
   const way = mode === null ? null : PLAYBACK_MODE_NAMES[mode]
   const chips = pictureChipsOf({ mode, heading })
   return (
     <View
-      accessibilityLabel={[
-        clock,
-        ...chips.map(({ text }) => text),
-        way,
-        upNext === null ? null : `${PLAYER_COPY.upNext} ${upNext}`,
-      ]
+      accessibilityLabel={[clock, ...chips.map(({ text }) => text), way]
         .filter((part): part is string => part !== null)
         .join(', ')}
       accessible
@@ -273,14 +277,6 @@ const Corner = ({ mode, heading, upNext }: CornerProps) => {
       {way !== null && (
         <View style={styles.chip}>
           <Text style={styles.chipText}>{way}</Text>
-        </View>
-      )}
-      {upNext !== null && (
-        <View style={styles.upNext}>
-          <Text style={styles.upNextLead}>{PLAYER_COPY.upNext}</Text>
-          <Text numberOfLines={1} style={styles.upNextLabel}>
-            {upNext}
-          </Text>
         </View>
       )}
     </View>
@@ -373,11 +369,11 @@ const Heading = ({ heading }: HeadingLinesProps) => {
 /**
  * The controls over the video, dark in every theme as the web's: Back at the top left, then the
  * title; the time and the line along the bottom, over back to the start, skip back, play and
- * pause, skip forward, the next episode or film, and the audio, subtitle and quality pickers, on
- * the player's glass, with the lists they open. The line takes the remote's focus as they
- * appear, so a press of left or right goes on skipping; the buttons are a band, so Down from the
- * line lands on the first of them rather than on the one under the thumb, and Back is a band of
- * its own, so Up from anywhere below reaches it.
+ * pause, skip forward and the next episode or film at the left, and the audio, subtitle and
+ * quality pickers at the right, on the player's glass, with the lists they open. The line takes
+ * the remote's focus as they appear, so a press of left or right goes on skipping; the buttons
+ * are a band, so Down from the line lands on the first of them rather than on the one under the
+ * thumb, and Back is a band of its own, so Up from anywhere below reaches it.
  */
 const Controls = ({
   heading,
@@ -388,13 +384,12 @@ const Controls = ({
   next,
   previous,
   mode,
-  upNext,
   chapters,
   onBack,
   onScrubbing,
   onPicking,
   onBottomHeight,
-  isVisible,
+  hasRemote,
 }: ControlsProps) => {
   const scrubber: Focusable = useRef(null)
   const styles = useStyles()
@@ -402,11 +397,12 @@ const Controls = ({
   const [isChaptersOpen, setChaptersOpen] = useState(false)
   /*
    * Brought back while they fade out, the controls are still drawn, and the hidden state's
-   * catcher, which had the focus, goes: the line asks again.
+   * catcher, which had the focus, goes: the line asks again. While the up next card is offered
+   * its Play now has the remote, and the line takes it back as the card goes.
    */
   useEffect(() => {
-    if (isVisible) requestTVFocus(scrubber.current)
-  }, [isVisible])
+    if (hasRemote) requestTVFocus(scrubber.current)
+  }, [hasRemote])
   return (
     <View style={styles.frame}>
       <View style={styles.top}>
@@ -416,7 +412,7 @@ const Controls = ({
           </FocusBand>
           <Heading heading={heading} />
         </View>
-        <Corner mode={mode} heading={heading} upNext={upNext} />
+        <Corner mode={mode} heading={heading} />
       </View>
       <View
         onLayout={({ nativeEvent }) => onBottomHeight(nativeEvent.layout.height)}
@@ -433,63 +429,72 @@ const Controls = ({
         )}
         <FocusBand>
           <View onFocus={() => setChaptersOpen(false)} style={styles.buttons}>
-            {transport !== null && (
-              <>
+            <View style={styles.buttonGroup}>
+              {transport !== null && (
+                <>
+                  <PlateButton
+                    icon="skipPrevious"
+                    isOverPicture
+                    label={previous?.label ?? PLAYER_COPY.restart}
+                    onPress={previous?.onPlay ?? (() => transport.onSeek(0))}
+                  />
+                  <PlateButton
+                    icon={SKIP_ICONS[SKIP_DIRECTIONS.back]}
+                    isOverPicture
+                    label={PLAYER_COPY.back(SKIP_SECONDS)}
+                    onPress={() => transport.onSeek(transport.position - SKIP_SECONDS)}
+                    text={String(SKIP_SECONDS)}
+                  />
+                  <PlateButton
+                    icon={transport.isPaused ? 'play' : 'pause'}
+                    isOverPicture
+                    label={transport.isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
+                    onPress={transport.onTogglePlay}
+                  />
+                  <PlateButton
+                    icon={SKIP_ICONS[SKIP_DIRECTIONS.forward]}
+                    isOverPicture
+                    label={PLAYER_COPY.forward(SKIP_SECONDS)}
+                    onPress={() => transport.onSeek(transport.position + SKIP_SECONDS)}
+                    text={String(SKIP_SECONDS)}
+                  />
+                </>
+              )}
+              {next !== null && (
                 <PlateButton
-                  icon="skipPrevious"
+                  icon="skipNext"
                   isOverPicture
-                  label={previous?.label ?? PLAYER_COPY.restart}
-                  onPress={previous?.onPlay ?? (() => transport.onSeek(0))}
+                  label={next.label}
+                  onPress={next.onPlay}
                 />
-                <PlateButton
-                  icon={SKIP_ICONS[SKIP_DIRECTIONS.back]}
-                  isOverPicture
-                  label={PLAYER_COPY.back(SKIP_SECONDS)}
-                  onPress={() => transport.onSeek(transport.position - SKIP_SECONDS)}
-                  text={String(SKIP_SECONDS)}
+              )}
+            </View>
+            <View style={styles.buttonGroup}>
+              {audio !== null && (
+                <TrackButton
+                  icon="volume"
+                  label={PLAYER_COPY.audio}
+                  onPicking={onPicking}
+                  picker={audio}
                 />
-                <PlateButton
-                  icon={transport.isPaused ? 'play' : 'pause'}
-                  isOverPicture
-                  label={transport.isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
-                  onPress={transport.onTogglePlay}
+              )}
+              {subtitles !== null && (
+                <TrackButton
+                  icon="captions"
+                  label={PLAYER_COPY.subtitles}
+                  onPicking={onPicking}
+                  picker={subtitles}
                 />
-                <PlateButton
-                  icon={SKIP_ICONS[SKIP_DIRECTIONS.forward]}
-                  isOverPicture
-                  label={PLAYER_COPY.forward(SKIP_SECONDS)}
-                  onPress={() => transport.onSeek(transport.position + SKIP_SECONDS)}
-                  text={String(SKIP_SECONDS)}
+              )}
+              {quality !== null && (
+                <TrackButton
+                  icon="settings"
+                  label={PLAYER_COPY.quality}
+                  onPicking={onPicking}
+                  picker={quality}
                 />
-              </>
-            )}
-            {next !== null && (
-              <PlateButton icon="skipNext" isOverPicture label={next.label} onPress={next.onPlay} />
-            )}
-            {audio !== null && (
-              <TrackButton
-                icon="volume"
-                label={PLAYER_COPY.audio}
-                onPicking={onPicking}
-                picker={audio}
-              />
-            )}
-            {subtitles !== null && (
-              <TrackButton
-                icon="captions"
-                label={PLAYER_COPY.subtitles}
-                onPicking={onPicking}
-                picker={subtitles}
-              />
-            )}
-            {quality !== null && (
-              <TrackButton
-                icon="settings"
-                label={PLAYER_COPY.quality}
-                onPicking={onPicking}
-                picker={quality}
-              />
-            )}
+              )}
+            </View>
           </View>
         </FocusBand>
         {transport !== null && (
@@ -543,7 +548,8 @@ type DpadPlayerProps = PlayerChromeProps
  * did: a skip's way and a play flash and fade, the pause stays while the video is paused. Hidden, left and right still skip
  * ten seconds, and the remote's play, rewind and fast forward keys work wherever the focus is.
  * The subtitles stand over the video whether or not the controls are, clear of them while they
- * show: raven's own cues on Apple TV, the player's on Android TV.
+ * show: raven's own cues on Apple TV, the player's on Android TV. From the credits on, the up
+ * next card stands at the bottom right, hidden controls or not, with the remote on its Play now.
  */
 const DpadPlayer = ({
   heading,
@@ -559,7 +565,7 @@ const DpadPlayer = ({
   next,
   previous,
   mode,
-  upNext,
+  credits,
   chapters,
   onBack,
 }: DpadPlayerProps) => {
@@ -574,22 +580,27 @@ const DpadPlayer = ({
   const flashOf = (mark: CentreMark | null) => {
     if (mark !== null) setFlash((was) => ({ mark, count: (was?.count ?? 0) + 1 }))
   }
-  // Whether the controls are showing, as the remote's handler reads it when a key goes down.
-  const isShown = useRef(false)
+  // Whether the remote is on drawn buttons, as its handler reads it when a key goes down.
+  const isOnButtonsNow = useRef(false)
   const held = useHeldSeek({
     transport,
-    isSeeking: () => isSeekingWith({ isShown: isShown.current, isScrubbing: isScrubbing.current }),
+    isSeeking: () =>
+      isSeekingWith({ isShown: isOnButtonsNow.current, isScrubbing: isScrubbing.current }),
   })
   const { isVisible, isDrawn, opacity, show } = useControlsLinger({
     isPlaying,
     isHeld: isPicking || held.isHolding,
   })
+  const offer = useUpNextOffer({ next, transport, credits })
+  // On the card's buttons, as on the controls', left and right move the focus rather than seek.
+  const holder = remoteHolderOf({ isVisible, isUpNextOffered: offer !== null })
+  const isOnButtons = holder !== REMOTE_HOLDERS.catcher
 
   // The line goes with the controls, and its blur may not be heard as it does.
   useEffect(() => {
-    isShown.current = isVisible
+    isOnButtonsNow.current = isOnButtons
     if (!isVisible) isScrubbing.current = false
-  }, [isVisible])
+  }, [isVisible, isOnButtons])
 
   useRemote((event) => {
     if (held.respond(event)) {
@@ -602,7 +613,7 @@ const DpadPlayer = ({
     if (transport === null) return
     const { seekBy, shouldTogglePlay } = remoteAnswerOf({
       key,
-      isShown: isVisible,
+      isShown: isOnButtons,
       isScrubbing: isScrubbing.current,
       isPaused: transport.isPaused,
     })
@@ -661,7 +672,7 @@ const DpadPlayer = ({
           />
         </View>
       )}
-      {!isVisible && <ControlsCatcher onPress={show} />}
+      {holder === REMOTE_HOLDERS.catcher && <ControlsCatcher onPress={show} />}
       {notice !== null && (
         <View pointerEvents="none" style={styles.noticeSlot}>
           <Text accessibilityLiveRegion="polite" style={styles.notice}>
@@ -686,13 +697,12 @@ const DpadPlayer = ({
             onBottomHeight={setBottomHeight}
             onPicking={setPicking}
             quality={quality}
-            isVisible={isVisible}
+            hasRemote={holder === REMOTE_HOLDERS.controls}
             onScrubbing={(isOnLine) => {
               isScrubbing.current = isOnLine
             }}
             subtitles={subtitles}
             transport={controlled}
-            upNext={upNext}
             chapters={chapters}
           />
         </Animated.View>
@@ -700,6 +710,7 @@ const DpadPlayer = ({
       {shown !== null && shownKey !== null && (
         <Centre key={shownKey} isFading={shown.isFading} mark={shown.mark} />
       )}
+      {offer !== null && <UpNextCard lift={lift} offer={offer} />}
       {caption !== null && (
         <View
           pointerEvents="none"
@@ -764,23 +775,10 @@ const useStyles = pictureStyles((colours) =>
     heading: { gap: TV_SIZES.space2, maxWidth: TV_SIZES.measure },
     /*
      * Never squeezed by the heading beside it, which shrinks instead, and as wide as the clock
-     * needs: the time is always whole on one line, and only what plays next is held to a width.
+     * needs: the time is always whole on one line.
      */
     corner: { flexShrink: 0, alignItems: 'flex-end', gap: TV_SIZES.space2 },
     cornerChips: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space1 },
-    // What plays next, on the glass under the chips: a softer "Up next" before its words.
-    upNext: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: TV_SIZES.space2,
-      paddingHorizontal: TV_SIZES.space3,
-      paddingVertical: TV_SIZES.space1,
-      borderRadius: TV_SIZES.radius,
-      backgroundColor: colours.raised,
-      maxWidth: TV_SIZES.measure / 2,
-    },
-    upNextLead: { color: colours.muted, fontSize: TV_SIZES.text },
-    upNextLabel: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.text },
     clock: {
       flexShrink: 0,
       color: colours.text,
@@ -792,10 +790,14 @@ const useStyles = pictureStyles((colours) =>
     // Its season and number, its length and its year.
     details: {
       color: colours.muted,
-      fontSize: TV_SIZES.textLg,
+      fontSize: TV_SIZES.textLg * HEADING_TYPE_SCALE,
       fontVariant: ['tabular-nums'],
     },
-    title: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.textXl },
+    title: {
+      flexShrink: 1,
+      color: colours.text,
+      fontSize: TV_SIZES.textXl * HEADING_TYPE_SCALE,
+    },
     chip: {
       paddingHorizontal: TV_SIZES.space2,
       paddingVertical: TV_SIZES.space0,
@@ -834,7 +836,9 @@ const useStyles = pictureStyles((colours) =>
       borderWidth: TV_SIZES.tvFocusRing,
       borderColor: colours.played,
     },
-    buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: TV_SIZES.space3 },
+    // The transport at the left, the track pickers at the right.
+    buttons: { flexDirection: 'row', justifyContent: 'space-between', gap: TV_SIZES.space3 },
+    buttonGroup: { flexDirection: 'row', gap: TV_SIZES.space3 },
     captionSlot: {
       ...StyleSheet.absoluteFill,
       alignItems: 'center',

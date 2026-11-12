@@ -6,9 +6,11 @@ import {
   LONG_PRESSES,
   LONG_PRESS_NAMES,
   REMOTE_KEYS,
+  REMOTE_HOLDERS,
   heldSeekOf,
   pressedKeyOf,
   remoteAnswerOf,
+  remoteHolderOf,
 } from '@/layouts/remoteKeys'
 
 /** A key the fork names that the player leaves alone. */
@@ -104,5 +106,21 @@ describe('heldSeekOf', () => {
       heldSeekOf({ eventType: LONG_PRESS_NAMES.longSelect, eventKeyAction: KEY_ACTIONS.down }),
     ).toBeNull()
     expect(heldSeekOf({ eventType: 'toString', eventKeyAction: KEY_ACTIONS.down })).toBeNull()
+  })
+})
+
+describe('remoteHolderOf', () => {
+  it('gives the remote to the controls while they show, and to the catcher once they go', () => {
+    expect(remoteHolderOf({ isVisible: true, isUpNextOffered: false })).toBe(
+      REMOTE_HOLDERS.controls,
+    )
+    expect(remoteHolderOf({ isVisible: false, isUpNextOffered: false })).toBe(
+      REMOTE_HOLDERS.catcher,
+    )
+  })
+
+  it('leaves it with the up next card while that is offered, controls or none', () => {
+    expect(remoteHolderOf({ isVisible: true, isUpNextOffered: true })).toBe(REMOTE_HOLDERS.upNext)
+    expect(remoteHolderOf({ isVisible: false, isUpNextOffered: true })).toBe(REMOTE_HOLDERS.upNext)
   })
 })

@@ -103,6 +103,28 @@ type RemoteAnswerOfProps = {
   isPaused: boolean
 }
 
+/** What on the player the remote's focus is on. */
+export const REMOTE_HOLDERS = {
+  /** Nothing drawn: the hidden state's catcher, where left and right seek. */
+  catcher: 'catcher',
+  controls: 'controls',
+  /** The up next card's buttons, which keep the remote whether or not the controls show. */
+  upNext: 'upNext',
+} as const
+
+export type RemoteHolder = (typeof REMOTE_HOLDERS)[keyof typeof REMOTE_HOLDERS]
+
+type RemoteHolderOfProps = { isVisible: boolean; isUpNextOffered: boolean }
+
+/** Who has the remote: the up next card while it is offered, else the controls while they show. */
+export const remoteHolderOf = ({
+  isVisible,
+  isUpNextOffered,
+}: RemoteHolderOfProps): RemoteHolder => {
+  if (isUpNextOffered) return REMOTE_HOLDERS.upNext
+  return isVisible ? REMOTE_HOLDERS.controls : REMOTE_HOLDERS.catcher
+}
+
 type IsSeekingWithProps = Pick<RemoteAnswerOfProps, 'isShown' | 'isScrubbing'>
 
 /** Whether left and right seek: from the scrubber, or while the controls are hidden. */

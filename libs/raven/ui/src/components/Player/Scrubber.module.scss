@@ -59,12 +59,16 @@
   width: 100%;
   background: var(--color-leaf-bright);
   transform-origin: left center;
+  // A layer of its own, so each tick of the clock moves it without rastering the bar again.
+  will-change: transform;
 }
 
 .headTrack {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  // As the played stretch: the head slides on the compositor.
+  will-change: transform;
 }
 
 .head {

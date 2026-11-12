@@ -156,6 +156,8 @@ type PlateButtonProps = PlateFace & {
   label: string
   accessibilityRole?: AccessibilityRole
   isPreferred?: boolean
+  /** Asks the remote's focus once it is drawn, for a button that appears on a screen already open. */
+  shouldFocusOnMount?: boolean
   isOverPicture?: boolean
   /** A mark that is on, as a favourite's heart: filled in the primary tone and said as selected. */
   isOn?: boolean
@@ -173,6 +175,7 @@ export const PlateButton = ({
   label,
   accessibilityRole = 'button',
   isPreferred = false,
+  shouldFocusOnMount = false,
   isOverPicture = false,
   isOn = false,
   onFocused = NOTHING_ON_FOCUS,
@@ -186,6 +189,7 @@ export const PlateButton = ({
   })
   const view = useRef<ComponentRef<typeof Pressable>>(null)
   const note = useLastFocus((state) => state.note)
+  useFocusOnMount({ view, isAsked: shouldFocusOnMount })
   return (
     <Pressable
       ref={view}

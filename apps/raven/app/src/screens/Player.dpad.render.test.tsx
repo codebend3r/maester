@@ -488,13 +488,58 @@ describe('Player on Android TV', () => {
     expect(mockBack).not.toHaveBeenCalled()
   })
 
-  it("heads an episode as the web's player does: its name, its season and number, and what plays next in the corner, with no heart", async () => {
+  it("heads an episode as the web's player does: its name, its season and number, with no heart and nothing of what plays next until the credits", async () => {
     await playing({ id: GOOD_NEWS_MP4.id })
     expect(await screen.findByText(GOOD_NEWS_MP4.item?.title ?? '')).toBeTruthy()
     expect(screen.getByText(/^S01 · E01/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Favourite' })).toBeNull()
-    expect(await screen.findByText(/S01 · E02 · Half Loop$/)).toBeTruthy()
+    await screen.findByRole('button', { name: `${PLAYER_COPY.next} S01E02 Half Loop` })
+    expect(screen.queryByText(PLAYER_COPY.upNext)).toBeNull()
+  })
+
+  /** Moves the player's clock to `secondsFromEnd` before the video's end. */
+  const playTo = async (secondsFromEnd: number) => {
+    const length = BUSBOYS_MP4.duration ?? 0
+    await act(async () =>
+      videoProps().onProgress?.({
+        currentTime: length - secondsFromEnd,
+        playableDuration: length,
+        seekableDuration: length,
+      }),
+    )
+  }
+
+  it("offers what plays next on a card in the video's last seconds, counting down to it", async () => {
+    await playing({ id: GOOD_NEWS_MP4.id })
+    await screen.findByRole('button', { name: `${PLAYER_COPY.next} S01E02 Half Loop` })
+    await playTo(5)
     expect(screen.getByText(PLAYER_COPY.upNext)).toBeTruthy()
+    expect(screen.getByText(/S01 · E02 · Half Loop$/)).toBeTruthy()
+    expect(screen.getByText(PLAYER_COPY.playsIn(5))).toBeTruthy()
+    expect(mockReplace).not.toHaveBeenCalled()
+    await playTo(0)
+    expect(mockReplace).toHaveBeenCalledTimes(1)
+    expect(mockReplace).toHaveBeenCalledWith(nextHref)
+  })
+
+  it('puts the card away on Watch credits and plays on from Play now', async () => {
+    await playing({ id: GOOD_NEWS_MP4.id })
+    await screen.findByRole('button', { name: `${PLAYER_COPY.next} S01E02 Half Loop` })
+    await playTo(5)
+    await fireEvent.press(screen.getByRole('button', { name: PLAYER_COPY.watchCredits }))
+    expect(screen.queryByText(PLAYER_COPY.upNext)).toBeNull()
+    await playTo(0)
+    expect(mockReplace).not.toHaveBeenCalled()
+  })
+
+  it('waits on the card for a press with autoplay off', async () => {
+    usePlayerPrefs.setState({ autoplay: false })
+    await playing({ id: GOOD_NEWS_MP4.id })
+    await screen.findByRole('button', { name: `${PLAYER_COPY.next} S01E02 Half Loop` })
+    await playTo(0)
+    expect(mockReplace).not.toHaveBeenCalled()
+    await fireEvent.press(screen.getByRole('button', { name: PLAYER_COPY.playNow }))
+    expect(mockReplace).toHaveBeenCalledWith(nextHref)
   })
 
   it('plays the next episode by itself once this one ends, while autoplay is on', async () => {

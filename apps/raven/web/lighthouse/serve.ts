@@ -40,6 +40,11 @@ import {
  * task fourfold. The floor comes from that runner, which scored Home 0.72 to 0.78 when it was set
  * (a Mac, with a faster CPU, scores 0.87 to 0.93). It holds Home where it is; raise it as Home
  * gets faster.
+ *
+ * Both performance floors are held against the median of the five runs' scores (`median`), not
+ * the score of Lighthouse CI's `median-run`: that picks the run nearest the median first paint
+ * and time to interactive, which can be the cold first run, and failed Home at 0.66 while its
+ * other four runs scored 0.81 to 0.84.
  */
 
 const SITES = {
