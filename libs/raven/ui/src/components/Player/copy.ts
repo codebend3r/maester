@@ -226,6 +226,8 @@ export const PLAYER_ACTIONS_COPY = {
   percent: (percent: number) => `${percent}%`,
   subtitleSize: (size: string) => `Subtitle size: ${size}`,
   skip: ({ isBack, seconds }: SkipFlashProps) => `${isBack ? 'Back' : 'Forward'} ${seconds}s`,
+  holdForward: (rate: number) => `Playing at ${rate}× speed`,
+  holdBack: (rate: number) => `Rewinding at ${rate}× speed`,
 } as const
 
 export const NATIVE_ENGINE_COPY = {

@@ -24,6 +24,25 @@
   }
 }
 
+// A hold's mark stays for as long as the finger does, so it has no animation to guard.
+.held {
+  grid-area: stage;
+  place-self: start center;
+  position: relative;
+  inset-block-start: calc(var(--space-5) + var(--titlebar-inset));
+  z-index: 3;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-picture-scrim);
+  color: var(--color-on-picture);
+  backdrop-filter: var(--filter-glass);
+  pointer-events: none;
+}
+
 .text {
   font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;

@@ -6,7 +6,6 @@ import {
   SEEK_EDGES,
   type SkipStep,
   shortcutFor,
-  stepSkip,
 } from '@raven/core'
 
 import { SUBTITLE_CHOICES } from '@/player/playerTracks'
@@ -30,6 +29,7 @@ export const PLAYER_KEYS: readonly string[] = KEY_CANDIDATES.filter(
 
 export const KEY_ANSWERS = {
   seek: 'seek',
+  skip: 'skip',
   togglePlay: 'togglePlay',
   volume: 'volume',
   subtitle: 'subtitle',
@@ -39,6 +39,7 @@ export const KEY_ANSWERS = {
 /** What the touch chrome does for a key: the same as the button for it would. */
 export type KeyAnswer =
   | { type: typeof KEY_ANSWERS.seek; to: number }
+  | { type: typeof KEY_ANSWERS.skip; direction: SkipStep['direction'] }
   | { type: typeof KEY_ANSWERS.togglePlay }
   | { type: typeof KEY_ANSWERS.volume; volume: number; isMuted: boolean }
   | { type: typeof KEY_ANSWERS.subtitle; key: string }
@@ -60,19 +61,13 @@ type KeyAnswerOfProps = {
   isMuted: boolean
   /** Null while the video offers no subtitles to pick. */
   subtitles: SubtitleChoice | null
-  /** The last skip a key made, for the quick presses that go further. */
-  lastSkip: SkipStep | null
-  /** The clock the skips count by, in milliseconds. */
-  now: number
 }
-
-type KeyAnswered = { answer: KeyAnswer | null; lastSkip: SkipStep | null }
 
 type ActionAnswerOfProps = Pick<
   KeyAnswerOfProps,
   'position' | 'duration' | 'volume' | 'isMuted' | 'subtitles'
 > & {
-  /** Every action but a skip, which counts the presses before it and is answered on its own. */
+  /** Every action but a skip, which the chrome's one skip ladder answers. */
   action: Exclude<PlayerAction, { type: typeof PLAYER_ACTIONS.skip }>
 }
 
@@ -87,7 +82,7 @@ const subtitleToggleOf = (subtitles: SubtitleChoice | null): KeyAnswer | null =>
   return first === null ? null : { type: KEY_ANSWERS.subtitle, key: first.key }
 }
 
-/** The chrome's answer to an action that leaves the skips' count as it was. */
+/** The chrome's answer to every action but a skip. */
 const actionAnswerOf = ({
   action,
   position,
@@ -131,26 +126,18 @@ const actionAnswerOf = ({
 }
 
 /**
- * The web player's answer to a key, as the touch chrome can give it: play or pause, the skips
- * (10 seconds, further when pressed quickly, as core's `stepSkip` counts them), a tenth of the
- * video, the start or the end, the volume by the web's step, mute, subtitles on or off, and
- * Escape to leave. Full screen, frame steps, speeds, caption sizes, the stats and the shortcut
- * list are the web's alone: iOS plays full screen, and the chrome offers none of the rest.
+ * The web player's answer to a key, as the touch chrome can give it: play or pause, a skip
+ * either way (how far is the chrome's skip ladder's to say, since the buttons and the double
+ * taps climb it too), a tenth of the video, the start or the end, the volume by the web's step,
+ * mute, subtitles on or off, and Escape to leave. Full screen, frame steps, speeds, caption
+ * sizes, the stats and the shortcut list are the web's alone: iOS plays full screen, and the
+ * chrome offers none of the rest.
  */
-export const keyAnswerOf = ({
-  press,
-  lastSkip,
-  now,
-  ...playing
-}: KeyAnswerOfProps): KeyAnswered => {
+export const keyAnswerOf = ({ press, ...playing }: KeyAnswerOfProps): KeyAnswer | null => {
   const action = shortcutFor(press)
-  if (action === null) return { answer: null, lastSkip }
-  if (action.type !== PLAYER_ACTIONS.skip) {
-    return { answer: actionAnswerOf({ ...playing, action }), lastSkip }
+  if (action === null) return null
+  if (action.type === PLAYER_ACTIONS.skip) {
+    return { type: KEY_ANSWERS.skip, direction: action.direction }
   }
-  const step = stepSkip({ last: lastSkip, direction: action.direction, at: now })
-  return {
-    answer: { type: KEY_ANSWERS.seek, to: playing.position + step.seconds * step.direction },
-    lastSkip: step,
-  }
+  return actionAnswerOf({ ...playing, action })
 }

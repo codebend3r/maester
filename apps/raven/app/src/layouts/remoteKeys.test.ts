@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test'
 
-import { SKIP_SECONDS } from '@/layouts/playerKit'
 import {
   KEY_ACTIONS,
   LONG_PRESSES,
@@ -49,25 +48,25 @@ describe('pressedKeyOf', () => {
 describe('remoteAnswerOf', () => {
   it('seeks ten seconds either way from the scrubber', () => {
     const scrubbing = { ...PLAYING, isScrubbing: true }
-    expect(remoteAnswerOf({ key: REMOTE_KEYS.left, ...scrubbing }).seekBy).toBe(-SKIP_SECONDS)
-    expect(remoteAnswerOf({ key: REMOTE_KEYS.right, ...scrubbing }).seekBy).toBe(SKIP_SECONDS)
+    expect(remoteAnswerOf({ key: REMOTE_KEYS.left, ...scrubbing }).skip).toBe(-1)
+    expect(remoteAnswerOf({ key: REMOTE_KEYS.right, ...scrubbing }).skip).toBe(1)
   })
 
   it('seeks while the controls are hidden, as the press brings them back', () => {
     const hidden = { ...PLAYING, isShown: false }
-    expect(remoteAnswerOf({ key: REMOTE_KEYS.right, ...hidden }).seekBy).toBe(SKIP_SECONDS)
+    expect(remoteAnswerOf({ key: REMOTE_KEYS.right, ...hidden }).skip).toBe(1)
   })
 
   it('leaves left and right to move the focus along the buttons', () => {
     expect(remoteAnswerOf({ key: REMOTE_KEYS.left, ...PLAYING })).toEqual({
-      seekBy: 0,
+      skip: null,
       shouldTogglePlay: false,
     })
   })
 
   it("seeks on the remote's rewind and fast forward wherever the focus is", () => {
-    expect(remoteAnswerOf({ key: REMOTE_KEYS.rewind, ...PLAYING }).seekBy).toBe(-SKIP_SECONDS)
-    expect(remoteAnswerOf({ key: REMOTE_KEYS.fastForward, ...PLAYING }).seekBy).toBe(SKIP_SECONDS)
+    expect(remoteAnswerOf({ key: REMOTE_KEYS.rewind, ...PLAYING }).skip).toBe(-1)
+    expect(remoteAnswerOf({ key: REMOTE_KEYS.fastForward, ...PLAYING }).skip).toBe(1)
   })
 
   it('plays and pauses on the play key, and on play or pause only when it changes something', () => {
@@ -82,7 +81,7 @@ describe('remoteAnswerOf', () => {
   it('does nothing more than bring the controls back for the other keys', () => {
     const others = [REMOTE_KEYS.up, REMOTE_KEYS.down, REMOTE_KEYS.select]
     expect(others.map((key) => remoteAnswerOf({ key, ...PLAYING, isShown: false }))).toEqual(
-      others.map(() => ({ seekBy: 0, shouldTogglePlay: false })),
+      others.map(() => ({ skip: null, shouldTogglePlay: false })),
     )
   })
 })

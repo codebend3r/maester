@@ -8,7 +8,12 @@ import {
 } from '@raven/core'
 import { useEffect, useEffectEvent, useReducer, useRef, useState } from 'react'
 import { NATIVE_ENGINE_COPY } from '@/components/Player/copy'
-import { type EngineHandle, type NativePlayer, sendQuietly } from '@/components/Player/engine'
+import {
+  type EngineHandle,
+  type NativePlayer,
+  SURFACE_MARK,
+  sendQuietly,
+} from '@/components/Player/engine'
 import { fromPlayerEvent, rangesFrom } from '@/components/Player/fromPlayerEvent'
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
@@ -180,6 +185,7 @@ export const useNativeEngine = ({
       // The window-wide shortcuts are the keyboard path, so the surface takes only the pointer.
       // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
       <div
+        {...SURFACE_MARK}
         className={styles.nativeSurface}
         onClick={() => (state.paused ? actions.play() : actions.pause())}
         onDoubleClick={toggleFullscreen}
