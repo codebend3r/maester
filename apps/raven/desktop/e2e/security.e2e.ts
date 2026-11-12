@@ -26,7 +26,7 @@ import {
  * and style by their hashes, which change with every web build, so they are read apart.
  */
 const CONTENT_SECURITY_POLICY =
-  "default-src 'self'; script-src; style-src; font-src 'self'; img-src 'self' data:; media-src 'self' raven-file:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+  "default-src 'self'; script-src; style-src; font-src 'self'; img-src 'self' data: raven-picture:; media-src 'self' raven-file:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 const SCRIPT_SOURCES = /script-src [^;]+/u
 const INLINE_HASH = /^script-src 'self'( 'sha256-[A-Za-z0-9+/=]+')+$/u
 const STYLE_SOURCES = /style-src [^;]+/u

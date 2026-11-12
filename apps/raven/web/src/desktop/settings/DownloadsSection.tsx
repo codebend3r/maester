@@ -14,6 +14,7 @@ import { useChangeDownloads, useDownloads, useSpace } from '@/desktop/downloadsA
 import { DOWNLOADS_SECTION_COPY } from '@/desktop/settings/copy'
 import { Section } from '@/pages/SettingsPage/Section'
 import { useComputerName } from '@/stores/desktop'
+import { useDownloadsHost } from '@/stores/downloadsHost'
 import styles from '@/desktop/settings/DesktopSettings.module.scss'
 import settings from '@/pages/SettingsPage/SettingsPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
@@ -30,6 +31,8 @@ type DeleteAllViewProps = {
   questionId: string
   isDeleting: boolean
   hasDownloads: boolean
+  /** Whether the host's downloads sit in a folder the system can show. */
+  canShowFolder: boolean
   askButton: ButtonRef
   showButton: ButtonRef
   cancelButton: ButtonRef
@@ -77,15 +80,18 @@ type DownloadsButtonsProps = DeleteAllViewProps
 
 const DownloadsButtons = ({
   hasDownloads,
+  canShowFolder,
   askButton,
   showButton,
   onAsk,
   onShow,
 }: DownloadsButtonsProps) => (
   <div className={styles.buttons}>
-    <Button ref={showButton} icon="folder" onClick={onShow}>
-      {DOWNLOADS_SECTION_COPY.showInFinder}
-    </Button>
+    {canShowFolder && (
+      <Button ref={showButton} icon="folder" onClick={onShow}>
+        {DOWNLOADS_SECTION_COPY.showInFinder}
+      </Button>
+    )}
     <Button ref={askButton} tone="danger" icon="trash" disabled={!hasDownloads} onClick={onAsk}>
       {DOWNLOADS_SECTION_COPY.deleteAllDownloads}
     </Button>
@@ -99,6 +105,7 @@ const DELETE_ALL_VIEWS = {
 
 /** What a new download starts with, the room downloads take, where they are, and deleting them all. */
 export const DownloadsSection = () => {
+  const host = useDownloadsHost()
   const downloads = useDownloads()
   const space = useSpace()
   const computer = useComputerName()
@@ -156,14 +163,14 @@ export const DownloadsSection = () => {
     <Section
       icon="download"
       title={COMMON_COPY.downloads}
-      help={DOWNLOADS_SECTION_COPY.help(computer)}
+      help={DOWNLOADS_SECTION_COPY.help[host.kind](computer)}
     >
       {downloads.isError && (
         <p className={settings.error} role="alert">
           {downloads.error.message}
         </p>
       )}
-      {data !== null && (
+      {data !== null && host.canAutoDelete && (
         <label className={settings.choice}>
           <input
             type="checkbox"
@@ -185,7 +192,7 @@ export const DownloadsSection = () => {
       )}
       {space.data !== undefined && (
         <p className={settings.hint}>
-          {DOWNLOADS_SECTION_COPY.space({
+          {DOWNLOADS_SECTION_COPY.space[host.kind]({
             used: space.data.used,
             free: space.data.free,
             computer,
@@ -197,6 +204,7 @@ export const DownloadsSection = () => {
         questionId={questionId}
         isDeleting={isDeleting}
         hasDownloads={hasDownloads}
+        canShowFolder={host.canShowFolder}
         askButton={askButton}
         showButton={showButton}
         cancelButton={cancelButton}

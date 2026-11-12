@@ -5,9 +5,13 @@ import { configureStorage, usePageBackdrop, usePlayerPrefs } from '@raven/ui/hea
 import { useToasts } from '@raven/ui'
 import { queryClient } from '@/lib/queryClient'
 import { useAuthSession } from '@/stores/authSession'
+import { useBrowserDownloads } from '@/stores/browserDownloads'
 import { useCardLinks } from '@/stores/cardLinks'
 import { useDesktopBridge } from '@/stores/desktop'
 import { useDownloadAsk } from '@/stores/downloadAsk'
+import { useDownloadNotes } from '@/stores/downloadNotes'
+import { useDownloadPreparing } from '@/stores/downloadPreparing'
+import { useDownloadsHostStore } from '@/stores/downloadsHost'
 import { useDragging } from '@/stores/dragging'
 import { useSeasonView } from '@/stores/seasonView'
 import { useSelectionScopes } from '@/stores/selectionScope'
@@ -26,6 +30,7 @@ listenForActWarnings()
 await configureStorage({ storage: window.localStorage })
 
 const initialAuthSession = useAuthSession.getInitialState()
+const initialBrowserDownloads = useBrowserDownloads.getInitialState()
 const initialPrefs = usePlayerPrefs.getInitialState()
 const initialPageBackdrop = usePageBackdrop.getInitialState()
 const initialSideMenu = useSideMenu.getInitialState()
@@ -34,6 +39,9 @@ const initialCardLinks = useCardLinks.getInitialState()
 const initialSelectionScopes = useSelectionScopes.getInitialState()
 const initialDesktopBridge = useDesktopBridge.getInitialState()
 const initialDownloadAsk = useDownloadAsk.getInitialState()
+const initialDownloadNotes = useDownloadNotes.getInitialState()
+const initialDownloadPreparing = useDownloadPreparing.getInitialState()
+const initialDownloadsHost = useDownloadsHostStore.getInitialState()
 const initialDragging = useDragging.getInitialState()
 const initialServerReach = useServerReach.getInitialState()
 const initialToasts = useToasts.getInitialState()
@@ -51,6 +59,7 @@ afterEach(() => {
   cleanup()
   queryClient.clear()
   useAuthSession.setState(initialAuthSession, true)
+  useBrowserDownloads.setState(initialBrowserDownloads, true)
   usePlayerPrefs.setState(initialPrefs, true)
   usePageBackdrop.setState(initialPageBackdrop, true)
   useSideMenu.setState(initialSideMenu, true)
@@ -59,6 +68,9 @@ afterEach(() => {
   useSelectionScopes.setState(initialSelectionScopes, true)
   useDesktopBridge.setState(initialDesktopBridge, true)
   useDownloadAsk.setState(initialDownloadAsk, true)
+  useDownloadNotes.setState(initialDownloadNotes, true)
+  useDownloadPreparing.setState(initialDownloadPreparing, true)
+  useDownloadsHostStore.setState(initialDownloadsHost, true)
   useDragging.setState(initialDragging, true)
   useServerReach.setState(initialServerReach, true)
   useToasts.setState(initialToasts, true)

@@ -7,6 +7,8 @@ import {
   type PlayerEvent,
   type PlayerSource,
   PLAYER_SOURCE_KINDS,
+  type SubtitleCue,
+  type SubtitleTrack,
 } from '@raven/core'
 import type { ReactNode, RefObject } from 'react'
 import type { MediaPlane } from '@/components/Player/useMediaPlane'
@@ -55,6 +57,15 @@ export type EngineHandle = {
   readStats: () => EngineStats
 }
 
+/**
+ * The text subtitles a host kept beside a local file, as a download's are: the tracks the menu
+ * lists, and one track's cues, read whole from wherever the host keeps them.
+ */
+export type FileSubtitles = {
+  tracks: readonly SubtitleTrack[]
+  read: (trackId: string) => Promise<SubtitleCue[]>
+}
+
 export type HtmlSource =
   | {
       kind: typeof PLAYER_SOURCE_KINDS.server
@@ -62,7 +73,7 @@ export type HtmlSource =
       api: ApiClient
       mediaPlane?: MediaPlane
     }
-  | { kind: typeof PLAYER_SOURCE_KINDS.file; url: string }
+  | { kind: typeof PLAYER_SOURCE_KINDS.file; url: string; subtitles?: FileSubtitles }
 
 /** Marks the element the picture is drawn in, where the stage reads a finger's taps and holds. */
 export const SURFACE_MARK = { 'data-player-surface': '' } as const

@@ -12,7 +12,7 @@ type AlbumCoverProps = {
 type CoverSourcesProps = AlbumCoverProps
 
 /** The cover's one source, with its widths when the server scales it; none when it has no cover. */
-const coverSources = ({ album, sizes }: CoverSourcesProps) => {
+export const coverSources = ({ album, sizes }: CoverSourcesProps) => {
   const src = api.albumCoverUrl({ albumId: album.id, coverVersion: album.coverVersion })
   const srcSet = api.albumCoverSrcSet({ albumId: album.id, coverVersion: album.coverVersion })
   if (src === null) return []

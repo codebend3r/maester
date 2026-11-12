@@ -36,6 +36,12 @@ export const isOpaqueId = matching(OPAQUE_ID)
 
 export const fileUrlFor = (fileId: string): string => `${FILE_SCHEME}://${fileId}`
 
+/** The scheme a download's saved pictures are read under: `raven-picture://<picture id>`. */
+export const PICTURE_SCHEME = 'raven-picture'
+
+/** Where the page reads a saved picture from: its opaque id under `PICTURE_SCHEME`, never a path. */
+export const pictureUrlFor = (pictureId: string): string => `${PICTURE_SCHEME}://${pictureId}`
+
 export const isPlayTarget = object({ fileId: isOpaqueId, queue: listOf(isOpaqueId) })
 
 export type PlayTarget = Infer<typeof isPlayTarget>
@@ -204,6 +210,27 @@ export const isDownloadArtwork = union(
 export type DownloadArtwork = Infer<typeof isDownloadArtwork>
 
 /**
+ * The pictures a download keeps on disk, each by the opaque id its host serves it under
+ * (`pictureUrlFor`): `art` is the title's poster, a show's for an episode, or an album's cover for
+ * a track, and `logo` the title's art. Null for one not saved yet, or one the title has none of,
+ * where `artwork` is what the page falls back to.
+ */
+export const isDownloadPictures = object({
+  art: nullable(isOpaqueId),
+  logo: nullable(isOpaqueId),
+})
+
+export type DownloadPictures = Infer<typeof isDownloadPictures>
+
+/**
+ * The library a download came from, as it stood when the download was confirmed, so Downloads
+ * groups by it and hides a private one's (one the server keeps behind its PIN) with no server.
+ */
+export const isDownloadLibrary = object({ id: isNumber, name: isString, isPrivate: isBoolean })
+
+export type DownloadLibrary = Infer<typeof isDownloadLibrary>
+
+/**
  * What a library sorts its files on that a download's own fields do not hold, kept from the file
  * when it was confirmed so the Watch grid can sort on every field a library can. `pixels` is
  * width times height, which is how resolution ranks; `score` is out of 10.
@@ -275,6 +302,9 @@ export const isDownloadView = object({
   deletesAt: nullable(isNumber),
   isLocked: isBoolean,
   artwork: isDownloadArtwork,
+  pictures: isDownloadPictures,
+  /** Null for a download confirmed before libraries were kept, until main has asked the server. */
+  library: nullable(isDownloadLibrary),
   facts: isDownloadFacts,
   /** When the download was confirmed, in milliseconds since the epoch. */
   createdAt: isNumber,
@@ -323,6 +353,8 @@ export const isLocalFile = object({
   isDownload: isBoolean,
   /** A download's media on the server, whose art the player's header draws; null for any other file. */
   mediaId: nullable(isMediaId),
+  /** A download's saved title art and the name it spells out, for the player's header; null with none. */
+  logo: nullable(object({ pictureId: isOpaqueId, name: isString })),
   resumeAt: isNumber,
   next: nullable(object({ fileId: isOpaqueId, label: isString, queue: listOf(isOpaqueId) })),
   tracks: nullable(isTrackChoice),

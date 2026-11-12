@@ -1,7 +1,9 @@
 import {
   DESKTOP_REQUESTS,
+  DOWNLOAD_ARTWORK_KINDS,
   DOWNLOAD_KINDS,
   DOWNLOAD_STATUS_KINDS,
+  type DownloadArtwork as Artwork,
   type DownloadCover,
   type DownloadGroup,
   type DownloadKind,
@@ -12,26 +14,30 @@ import {
 import { Button, type IconName } from '@raven/ui'
 import { useAudioQueue } from '@raven/ui/headless'
 import { type ComponentType, useId, useRef, useState } from 'react'
-import {
-  type DownloadsChange,
-  isInProgress,
-  useChangeDownloads,
-  useDownloads,
-  useSpace,
-} from '@/desktop/downloadsApi'
+import { isInProgress, useChangeDownloads, useDownloads, useSpace } from '@/desktop/downloadsApi'
 import { handled } from '@/desktop/handled'
 import { DOWNLOAD_ROW_COPY, DOWNLOADS_PAGE_COPY } from '@/desktop/DownloadsPage/copy'
 import { DownloadActivity } from '@/desktop/DownloadsPage/DownloadActivity'
+import { DownloadArtwork } from '@/desktop/DownloadsPage/DownloadArtwork'
 import { DownloadRow, ROW_PLAYS, type RowPlay } from '@/desktop/DownloadsPage/DownloadRow'
+import { LibrarySection, ShowBar } from '@/desktop/DownloadsPage/DownloadsShow'
 import { DownloadsWatch } from '@/desktop/DownloadsPage/DownloadsWatch'
+import {
+  type DownloadsSection,
+  sectionsOf,
+  visibleDownloadsOf,
+} from '@/desktop/DownloadsPage/libraries'
 import { type MusicQueue, musicQueueOf } from '@/desktop/DownloadsPage/musicQueue'
+import { useDownloadsUnlocked } from '@/desktop/DownloadsPage/useDownloadsUnlocked'
 import { useTotalSpeed } from '@/desktop/useDownloadSpeed'
+import type { DownloadsChange, DownloadsHostKind } from '@/downloads/host'
 import { Tabs } from '@/components/Tabs/Tabs'
 import styles from '@/desktop/DownloadsPage/DownloadsPage.module.scss'
-import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
 import { POSTER_SIZES } from '@/lib/posters'
+import { useDownloadsHost } from '@/stores/downloadsHost'
+import { useDownloadsShow } from '@/stores/downloadsShow'
 
 /** The header's buttons for every download at once. */
 const BULKS = { pauseAll: 'pauseAll', resumeAll: 'resumeAll' } as const
@@ -76,17 +82,45 @@ type GroupHeadProps = {
   headingId: string
   /** The album cover a music group heads with; null for a video group, or a music one with none. */
   cover: DownloadCover | null
+  /** The id of the title art every file of the group shares, saved on disk; null for none. */
+  logo: string | null
   /** Plays the group's downloaded tracks from the first; null for a group with none. */
   onPlay: (() => void) | null
 }
 
 type TitleHeadProps = GroupHeadProps
 
-const TitleHead = ({ grouped, headingId }: TitleHeadProps) => (
-  <h2 id={headingId} className={styles.groupTitle}>
-    {grouped.group.title}
-  </h2>
-)
+/** A title's name, as its own art when that is saved and loads, else spelled out. */
+const TitleHead = ({ grouped, headingId, logo }: TitleHeadProps) => {
+  const host = useDownloadsHost()
+  const [failed, setFailed] = useState<string | null>(null)
+  const shown = logo === null || logo === failed ? null : host.pictureUrl(logo)
+  const { title } = grouped.group
+  return (
+    <h2 id={headingId} className={styles.groupTitle}>
+      {shown !== null && (
+        <img className={styles.groupLogo} src={shown} alt={title} onError={() => setFailed(logo)} />
+      )}
+      {shown === null && title}
+    </h2>
+  )
+}
+
+/** The album cover a music group heads with, as the server addresses it. */
+const coverArtworkOf = (cover: DownloadCover): Artwork =>
+  cover.coverVersion === null
+    ? { kind: DOWNLOAD_ARTWORK_KINDS.none }
+    : { kind: DOWNLOAD_ARTWORK_KINDS.cover, albumId: cover.albumId, version: cover.coverVersion }
+
+/** The cover saved with a group's tracks, which they share; null while none is. */
+const savedArtOf = (views: readonly DownloadView[]): string | null =>
+  views.find((view) => view.pictures.art !== null)?.pictures.art ?? null
+
+/** The title art every file of a group shares; none when they differ, as a saga's films' do. */
+const sharedLogoOf = (views: readonly DownloadView[]): string | null => {
+  const logo = views[0]?.pictures.logo ?? null
+  return views.every((view) => view.pictures.logo === logo) ? logo : null
+}
 
 type MusicHeadProps = GroupHeadProps
 
@@ -97,8 +131,10 @@ const MusicHead = ({ grouped, headingId, cover, onPlay }: MusicHeadProps) => {
     <header className={styles.musicHead}>
       <div className={styles.cover}>
         {cover !== null && (
-          <AlbumCover
-            album={{ id: cover.albumId, title: group.title, coverVersion: cover.coverVersion }}
+          <DownloadArtwork
+            artwork={coverArtworkOf(cover)}
+            saved={savedArtOf(views)}
+            initial={group.title.slice(0, 1)}
             sizes={POSTER_SIZES.download}
           />
         )}
@@ -177,6 +213,7 @@ const Group = ({ grouped, onDeleted }: GroupProps) => {
             grouped={grouped}
             headingId={headingId}
             cover={cover}
+            logo={sharedLogoOf(views)}
             onPlay={queue === null ? null : () => playFrom({ queue, startAt: 0 })}
           />
         )}
@@ -214,22 +251,39 @@ const readStateOf = ({ isRead, isEmpty, isError }: ReadStateOfProps): ReadState 
 
 const Unread = () => null
 
-type ListViewProps = { list: DownloadView[]; error: string | null; onDeleted: () => void }
+type ListViewProps = {
+  /** The downloads a viewer may see, as the Show choice lays them out. */
+  sections: DownloadsSection[]
+  error: string | null
+  /** Who keeps the downloads, which words what an empty page says to do. */
+  hostKind: DownloadsHostKind
+  onDeleted: () => void
+}
 
 type ListFailedProps = ListViewProps
 
 const ListFailed = ({ error }: ListFailedProps) => <p role="alert">{error}</p>
 
-const ListEmpty = () => <p className={styles.empty}>{DOWNLOADS_PAGE_COPY.empty}</p>
+type ListEmptyProps = ListViewProps
+
+const ListEmpty = ({ hostKind }: ListEmptyProps) => (
+  <p className={styles.empty}>{DOWNLOADS_PAGE_COPY.empty[hostKind]}</p>
+)
 
 type ListedProps = ListViewProps
 
-const Listed = ({ list, onDeleted }: ListedProps) => (
-  <ul className={styles.groups}>
-    {groupsOf(list).map((grouped) => (
-      <Group key={grouped.group.key} grouped={grouped} onDeleted={onDeleted} />
+const Listed = ({ sections, onDeleted }: ListedProps) => (
+  <div className={styles.sections}>
+    {sections.map(({ key, name, downloads }) => (
+      <LibrarySection key={key} name={name}>
+        <ul className={styles.groups}>
+          {groupsOf(downloads).map((grouped) => (
+            <Group key={grouped.group.key} grouped={grouped} onDeleted={onDeleted} />
+          ))}
+        </ul>
+      </LibrarySection>
     ))}
-  </ul>
+  </div>
 )
 
 const LIST_VIEWS = {
@@ -245,7 +299,13 @@ type WatchListedProps = ListViewProps
 const videosOf = (downloads: DownloadView[]): DownloadView[] =>
   downloads.filter((view) => !isMusicGroup(view.group))
 
-const WatchListed = ({ list }: WatchListedProps) => <DownloadsWatch downloads={videosOf(list)} />
+const WatchListed = ({ sections }: WatchListedProps) => (
+  <DownloadsWatch
+    sections={sections
+      .map((section) => ({ ...section, downloads: videosOf(section.downloads) }))
+      .filter(({ downloads }) => downloads.length > 0)}
+  />
+)
 
 const WATCH_VIEWS = {
   [READ_STATES.waiting]: Unread,
@@ -328,6 +388,7 @@ const DISK_VIEWS = {
 
 /** Every title Raven has downloaded or is downloading, and the disk they are kept on. */
 export const DownloadsPage = () => {
+  const host = useDownloadsHost()
   const downloads = useDownloads()
   const space = useSpace()
   const change = useChangeDownloads()
@@ -336,7 +397,12 @@ export const DownloadsPage = () => {
 
   const focusTitle = () => title.current?.focus()
 
-  const list = downloads.data?.downloads ?? null
+  const held = downloads.data?.downloads ?? null
+  const isUnlocked = useDownloadsUnlocked(held ?? [])
+  const show = useDownloadsShow((state) => state.show)
+  // A private library's downloads are left out of everything below but the bytes on their way.
+  const list = held === null ? null : visibleDownloadsOf({ downloads: held, isUnlocked })
+  const hasHidden = (held ?? []).length > (list ?? []).length
   const bulks = bulksOf(list ?? [])
   const disk = space.data ?? null
   const [tab, setTab] = useState<PageTab>(PAGE_TABS.manage)
@@ -344,7 +410,7 @@ export const DownloadsPage = () => {
     TAB_VIEWS[tab][
       readStateOf({
         isRead: list !== null,
-        isEmpty: list !== null && list.length === 0,
+        isEmpty: held !== null && held.length === 0,
         isError: downloads.isError,
       })
     ]
@@ -373,14 +439,16 @@ export const DownloadsPage = () => {
               {BULK_BUTTONS[bulk].label}
             </Button>
           ))}
-          <Button
-            icon="folder"
-            onClick={() => handled(change({ type: DESKTOP_REQUESTS.showDownloadsFolder }))}
-          >
-            {DOWNLOADS_PAGE_COPY.showInFinder}
-          </Button>
+          {host.canShowFolder && (
+            <Button
+              icon="folder"
+              onClick={() => handled(change({ type: DESKTOP_REQUESTS.showDownloadsFolder }))}
+            >
+              {DOWNLOADS_PAGE_COPY.showInFinder}
+            </Button>
+          )}
         </div>
-        <Activity downloads={list ?? []} />
+        <Activity downloads={held ?? []} />
         <DiskView disk={disk} error={space.error?.message ?? null} lineId={ids.line} />
       </header>
       <Tabs
@@ -393,11 +461,16 @@ export const DownloadsPage = () => {
         chosen={tab}
         onChoose={setTab}
       >
-        <ListView
-          list={list ?? []}
-          error={downloads.error?.message ?? null}
-          onDeleted={focusTitle}
-        />
+        <div className={styles.panel}>
+          {(list ?? []).length > 0 && <ShowBar />}
+          {hasHidden && <p className={styles.line}>{DOWNLOADS_PAGE_COPY.hidden}</p>}
+          <ListView
+            sections={sectionsOf({ downloads: list ?? [], show })}
+            error={downloads.error?.message ?? null}
+            hostKind={host.kind}
+            onDeleted={focusTitle}
+          />
+        </div>
       </Tabs>
     </section>
   )

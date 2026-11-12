@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'bun:test'
+import { PICTURE_EXTENSIONS } from '@/main/downloads/downloadState'
 import {
   DOWNLOADS_DIR,
   downloadsDirFor,
   entryDirFor,
   fits,
   partPathFor,
+  pictureFolderFor,
+  picturePathFor,
+  picturesDirFor,
   readSpace,
   serverDirFor,
   sidecarPathFor,
@@ -106,5 +110,42 @@ describe('path builders', () => {
   it('refuses a media id that is not a media id', () => {
     expect(() => entryDirFor({ ...part, mediaId: -1 })).toThrow(RangeError)
     expect(() => entryDirFor({ ...part, mediaId: 1.5 })).toThrow(RangeError)
+  })
+
+  it("keeps a title's pictures in one folder beside its server's downloads", () => {
+    const server = { userData: USER_DATA, serverId: SERVER_ID }
+    const picture = {
+      id: '9b2d7c1e-5a40-4f0c-8a11-3c2e1d0f9a77',
+      folder: 'item-12',
+      extension: PICTURE_EXTENSIONS.jpg,
+    } as const
+    expect(picturesDirFor(server)).toBe(`/data/downloads/${SERVER_ID}/pictures`)
+    expect(pictureFolderFor({ ...server, folder: 'album-7' })).toBe(
+      `/data/downloads/${SERVER_ID}/pictures/album-7`,
+    )
+    expect(picturePathFor({ ...server, picture })).toBe(
+      `/data/downloads/${SERVER_ID}/pictures/item-12/9b2d7c1e-5a40-4f0c-8a11-3c2e1d0f9a77.jpg`,
+    )
+  })
+
+  it('refuses a picture folder, id or extension that could name another path', () => {
+    const server = { userData: USER_DATA, serverId: SERVER_ID }
+    const picture = {
+      id: '9b2d7c1e-5a40-4f0c-8a11-3c2e1d0f9a77',
+      folder: 'item-12',
+      extension: PICTURE_EXTENSIONS.jpg,
+    } as const
+    expect(() => pictureFolderFor({ ...server, folder: '../11' })).toThrow(RangeError)
+    expect(() => pictureFolderFor({ ...server, folder: 'item-0' })).toThrow(RangeError)
+    expect(() => pictureFolderFor({ ...server, folder: 'show-4' })).toThrow(RangeError)
+    expect(() => picturePathFor({ ...server, picture: { ...picture, id: '../x' } })).toThrow(
+      RangeError,
+    )
+    expect(() =>
+      picturePathFor({ ...server, picture: { ...picture, folder: 'item-1/..' } }),
+    ).toThrow(RangeError)
+    expect(() => picturePathFor({ userData: USER_DATA, serverId: '..', picture })).toThrow(
+      RangeError,
+    )
   })
 })

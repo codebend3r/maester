@@ -98,6 +98,7 @@ const fakeDownloads = ({ grants, savedPosition, serverPosition, watched }: FakeD
     reached.push({ name, input })
   }
   const downloads: DownloadService = {
+    pictureOf: () => null,
     open: async (input) => {
       note('open', input)
       return PLAY_REPLY
@@ -112,6 +113,7 @@ const fakeDownloads = ({ grants, savedPosition, serverPosition, watched }: FakeD
       path.startsWith(`${DOWNLOADED}/`) ? 'Downloaded from Vhagar' : null,
     labelOf: ({ path }) => DOWNLOAD_LABELS.get(path) ?? null,
     mediaIdOf: ({ path }) => DOWNLOAD_MEDIA.get(path) ?? null,
+    logoOf: () => null,
     isStaleDownload: ({ path }) => path.startsWith(`${DOWNLOADED}/`) && !DOWNLOAD_LABELS.has(path),
     serverPositionOf: () => serverPosition,
     isWatched: ({ path }) => watched.includes(path),

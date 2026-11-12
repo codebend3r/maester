@@ -3,12 +3,20 @@ import { readFile, stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
-import { FILE_SCHEME, PAGE_ORIGIN, PLAYER_SOURCE_KINDS, WEB_HOST_PORT } from '@raven/core'
+import {
+  FILE_SCHEME,
+  PAGE_ORIGIN,
+  PICTURE_SCHEME,
+  PLAYER_SOURCE_KINDS,
+  WEB_HOST_PORT,
+} from '@raven/core'
 import { app, BrowserWindow, dialog, ipcMain, protocol, screen, session, shell } from 'electron'
 import { type DesktopPlatform, WINDOW_CHROMES, windowChromeFor } from '@raven/core'
 import type { AppLog } from '@/main/appLog'
 import type { DesktopService } from '@/main/desktopService'
+import type { DownloadPictures } from '@/main/downloads/pictures'
 import { createFileHandler } from '@/main/fileProtocol'
+import { createPictureHandler } from '@/main/pictureProtocol'
 import type { Grants } from '@/main/grants'
 import { errorText } from '@/main/log/errorText'
 import { describedFileId, openLine } from '@/main/log/opens'
@@ -111,6 +119,16 @@ export const serveFiles = ({ grants }: ServeFilesProps): void => {
         ),
       readRange: ({ path, start, end }) => Readable.toWeb(createReadStream(path, { start, end })),
     }),
+  )
+}
+
+type ServePicturesProps = { pictures: Pick<DownloadPictures, 'fileOf'> }
+
+/** The `raven-picture:` scheme: a download's saved poster, cover or title art, for the page's `<img>`. */
+export const servePictures = ({ pictures }: ServePicturesProps): void => {
+  protocol.handle(
+    PICTURE_SCHEME,
+    createPictureHandler({ pictures, readFile: (path) => readFile(path) }),
   )
 }
 

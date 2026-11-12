@@ -45,6 +45,8 @@ import { mediaQuery } from '@/lib/queries'
 import { useTitleLogo } from '@/lib/useTitleLogo'
 import { useAuthSession } from '@/stores/authSession'
 import { useDesktop } from '@/stores/desktop'
+import type { DownloadsHost } from '@/downloads/host'
+import { useDownloadsHost } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 
 /**
@@ -113,21 +115,36 @@ const ENGINE_VIEWS = {
   [ENGINE_USES.stopped]: HtmlFilePlaying,
 } as const satisfies Record<EngineUse, ComponentType<EngineViewProps>>
 
-type UseDownloadMediaProps = { mediaId: LocalFile['mediaId'] }
+type UseDownloadMediaProps = Pick<LocalFile, 'mediaId' | 'logo'>
+
+type SavedLogoOfProps = {
+  logo: LocalFile['logo']
+  pictureUrl: DownloadsHost['pictureUrl']
+}
+
+/** The title art saved with a download, as the player's header draws it from its host. */
+const savedLogoOf = ({ logo, pictureUrl }: SavedLogoOfProps): TitleLogo | null => {
+  const url = logo === null ? null : pictureUrl(logo.pictureId)
+  return logo === null || url === null ? null : { url, name: logo.name }
+}
 
 type DownloadMedia = { logo: TitleLogo | null; playback: PlaybackFile | null }
 
-/**
+/*
  * A download's media on the server and its art, so the header heads it as the server's player
- * does. Offline, signed out or for a plain local file nothing is asked, and the header spells
- * the title out.
+ * does. The art is the one saved with the download whenever there is one, so it is there with
+ * no server; without one the server's is asked for. Offline, signed out or for a plain local
+ * file nothing is asked, and with no saved art the header spells the title out.
  */
-const useDownloadMedia = ({ mediaId }: UseDownloadMediaProps): DownloadMedia => {
+const useDownloadMedia = ({ mediaId, logo }: UseDownloadMediaProps): DownloadMedia => {
   const isOffline = useServerReach((state) => state.isOffline)
   const isSignedIn = useAuthSession((state) => state.session !== null)
   const asked = !isOffline && isSignedIn ? mediaId : null
   const media = useQuery(mediaQuery(asked)).data ?? null
-  return { logo: useTitleLogo({ media }), playback: media === null ? null : { media, api } }
+  const served = useTitleLogo({ media })
+  const { pictureUrl } = useDownloadsHost()
+  const saved = useMemo(() => savedLogoOf({ logo, pictureUrl }), [logo, pictureUrl])
+  return { logo: saved ?? served, playback: media === null ? null : { media, api } }
 }
 
 type PlayingProps = {
@@ -160,7 +177,7 @@ const Playing = ({ file, chosen, isOutputFixed, downloadsPage }: PlayingProps) =
     () => fileServicesFor({ file: played, client, menu, engine, downloadsPage }),
     [played, client, menu, engine, downloadsPage],
   )
-  const { logo, playback } = useDownloadMedia({ mediaId: file.mediaId })
+  const { logo, playback } = useDownloadMedia({ mediaId: file.mediaId, logo: file.logo })
   /*
    * The output and the art arrive on their own time; folding them in keeps the progress sink,
    * so the player neither remounts nor forgets the length it reported.

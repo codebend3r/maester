@@ -13,6 +13,10 @@ import {
   finish,
   forgetServerPosition,
   isDownloadEntry,
+  isPictureFolder,
+  PICTURE_EXTENSIONS,
+  setLibrary,
+  setPictures,
   isDownloadsState,
   isWaitingOnOutage,
   noteWatched,
@@ -115,6 +119,70 @@ describe('the guards', () => {
     expect(isDownloadEntry(entry({ size: 0 }))).toBe(false)
     expect(isDownloadEntry(entry({ size: 1.5 }))).toBe(false)
     expect(isDownloadEntry(entry({ size: Number.MAX_SAFE_INTEGER + 1 }))).toBe(false)
+  })
+})
+
+describe('the library and pictures an entry keeps', () => {
+  const library = { id: 3, name: 'Movies', isPrivate: true }
+  const art = { id: id(7), folder: 'item-12', extension: PICTURE_EXTENSIONS.jpg } as const
+  const logo = { id: id(8), folder: 'item-12', extension: PICTURE_EXTENSIONS.png } as const
+
+  it('accepts an entry with or without them, as a file from before has none', () => {
+    expect(isDownloadEntry(entry())).toBe(true)
+    expect(
+      isDownloadEntry({
+        ...entry(),
+        library,
+        titleItemId: 12,
+        pictures: { art, logo, isComplete: true },
+      }),
+    ).toBe(true)
+    expect(
+      isDownloadEntry({
+        ...entry(),
+        titleItemId: null,
+        pictures: { art: null, logo: null, isComplete: false },
+      }),
+    ).toBe(true)
+  })
+
+  it('refuses a picture whose folder, id or extension could name another path', () => {
+    const withArt = (changed: object) =>
+      isDownloadEntry({
+        ...entry(),
+        pictures: { art: { ...art, ...changed }, logo: null, isComplete: true },
+      })
+    expect(withArt({})).toBe(true)
+    expect(withArt({ folder: '../11' })).toBe(false)
+    expect(withArt({ folder: 'item-12/x' })).toBe(false)
+    expect(withArt({ folder: 'album-07' })).toBe(false)
+    expect(withArt({ id: 'poster' })).toBe(false)
+    expect(withArt({ extension: 'svg' })).toBe(false)
+    expect(isDownloadEntry({ ...entry(), pictures: { art, logo: null } })).toBe(false)
+    expect(isDownloadEntry({ ...entry(), library: { id: 3, name: 'Movies' } })).toBe(false)
+    expect(isDownloadEntry({ ...entry(), titleItemId: 0 })).toBe(false)
+    expect(isPictureFolder('item-12')).toBe(true)
+    expect(isPictureFolder('album-7')).toBe(true)
+    expect(isPictureFolder(12)).toBe(false)
+  })
+
+  it('files an entry under its library and its title, and no entry for an unknown id', () => {
+    const state = stateOf(entry())
+    const filed = setLibrary({ state, downloadId: ID, library, titleItemId: 12 })
+    expect(entryById(filed, { downloadId: ID })).toMatchObject({ library, titleItemId: 12 })
+    expect(setLibrary({ state, downloadId: id(9), library, titleItemId: 12 })).toBe(state)
+  })
+
+  it("sets a title's pictures on each of its entries and leaves the rest", () => {
+    const state = stateOf(
+      entry(),
+      entry({ downloadId: id(2), mediaId: 2 }),
+      entry({ downloadId: id(3), mediaId: 3 }),
+    )
+    const pictures = { art, logo, isComplete: true }
+    const kept = setPictures({ state, downloadIds: [ID, id(2)], pictures })
+    expect(kept.entries.map((each) => each.pictures)).toEqual([pictures, pictures, undefined])
+    expect(setPictures({ state, downloadIds: [], pictures })).toBe(state)
   })
 })
 

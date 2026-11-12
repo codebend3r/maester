@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { createJSONStorage, devtools, persist } from 'zustand/middleware'
 import { STORE_KEYS } from '@/stores/storage'
 import { handled } from '@/desktop/handled'
-import { useDesktopBridge } from '@/stores/desktop'
+import { useDownloadsHostStore } from '@/stores/downloadsHost'
 
 type DownloadAskState = {
   /** The ask main sent last; `instance` counts the asks shown, so one sent again opens a dialog of its own. */
@@ -12,11 +12,11 @@ type DownloadAskState = {
   close: () => void
 }
 
-/** Tells main the page said no to an ask, or let it go unanswered, so main lets it go too. */
+/** Tells the host the page said no to an ask, or let it go unanswered, so the host lets it go too. */
 export const declineAsk = (ask: DownloadAsk): void => {
-  const client = useDesktopBridge.getState().desktop?.client ?? null
-  if (client === null) return
-  handled(client.request({ type: DESKTOP_REQUESTS.declineDownload, askId: ask.askId }))
+  const { host } = useDownloadsHostStore.getState()
+  if (host === null) return
+  handled(host.request({ type: DESKTOP_REQUESTS.declineDownload, askId: ask.askId }))
 }
 
 /**

@@ -3,6 +3,7 @@ import type { AuthClient } from '@/lib/authClient'
 import { clearAccountState } from '@/lib/clearAccountState'
 import { REFRESH_OUTCOMES, type RefreshOutcome } from '@/lib/refreshingFetch'
 import { useAuthSession } from '@/stores/authSession'
+import { useBrowserDownloads } from '@/stores/browserDownloads'
 
 const SIGN_OUT_SCOPES = { local: 'local' } as const
 
@@ -67,9 +68,11 @@ type SignOutProps = { queryClient: QueryClient }
 /**
  * Ends the session and empties what it left behind. When Supabase cannot be
  * reached its sign out keeps the session, so the local one is ended instead:
- * the cookie goes either way.
+ * the cookie goes either way. The browser's downloads forget the account, which
+ * hides them and keeps their files for when it signs in again.
  */
 export const signOut = async ({ queryClient }: SignOutProps): Promise<void> => {
+  useBrowserDownloads.getState().forget()
   const client = useAuthSession.getState().client
   if (client !== null) {
     const { error } = await client.signOut()

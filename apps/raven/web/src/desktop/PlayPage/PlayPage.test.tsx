@@ -16,6 +16,7 @@ import {
   PLAYER_ERROR_REASONS,
   PLAYER_EVENTS,
   PLAYER_SOURCE_KINDS,
+  pictureUrlFor,
 } from '@raven/core'
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
@@ -51,6 +52,7 @@ const CLIP_A: LocalFile = {
   folder: 'Clips',
   isDownload: false,
   mediaId: null,
+  logo: null,
   resumeAt: 0,
   next: { fileId: B, label: 'Clip 02', queue: [] },
   tracks: null,
@@ -343,6 +345,22 @@ describe('PlayPage title art', () => {
     await screen.findByRole('heading', { level: 1, name: 'Busboys' })
     await videoOf(A)
     expect(screen.queryByRole('img', { name: 'Busboys' })).toBeNull()
+    expect(getMedia).not.toHaveBeenCalled()
+  })
+
+  it('heads a download with the title art saved with it, with no server to ask', async () => {
+    const { getMedia } = stubServer()
+    signIn()
+    useServerReach.setState({ isOffline: true })
+    const pictureId = '10000000-0000-4000-8000-000000000002'
+    const file = { ...DOWNLOAD, label: 'S01E02 Dinner', logo: { pictureId, name: 'Busboys' } }
+    renderPlayers({
+      client: playMain({ describeFile: () => ({ type: DESKTOP_REPLIES.file, file }) }),
+      route: playPathOf(A),
+    })
+    const logo = await screen.findByRole('img', { name: 'Busboys' })
+    expect(logo.getAttribute('src')).toBe(pictureUrlFor(pictureId))
+    await videoOf(A)
     expect(getMedia).not.toHaveBeenCalled()
   })
 

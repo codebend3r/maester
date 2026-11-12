@@ -1,6 +1,6 @@
 import { ApiError } from '@raven/core'
 import { queryKeys } from '@raven/ui/headless'
-import { hashKey, type Query, useQueryClient } from '@tanstack/react-query'
+import { hashKey, onlineManager, type Query, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { isDownloadsPage, offlineReturnIn } from '@/desktop/paths'
@@ -21,12 +21,23 @@ const AUTH_CONFIG_HASH = hashKey(queryKeys.authConfig)
 const isUnreachable = (error: Error): boolean =>
   !(error instanceof ApiError) || error.isServerUnreachable
 
-/**
+type FollowProps = {
+  query: Pick<Query, 'state'> | undefined
+  /** Whether a device with no network at all counts as a server out of reach. */
+  shouldFollowDevice: boolean
+}
+
+/*
  * What the account config's last settled read says of the server. A failed read keeps the data
  * of an earlier one, so the error decides: out of reach, or answering. A read under way with
  * nothing settled yet says nothing new.
  */
-const follow = (query: Pick<Query, 'state'> | undefined): void => {
+const follow = ({ query, shouldFollowDevice }: FollowProps): void => {
+  // A device with no network pauses the read, so nothing fails: the network's own word stands in.
+  if (shouldFollowDevice && !onlineManager.isOnline()) {
+    useServerReach.setState({ isOffline: true })
+    return
+  }
   if (query === undefined) return
   const { data, error } = query.state
   if (error !== null) {
@@ -36,22 +47,32 @@ const follow = (query: Pick<Query, 'state'> | undefined): void => {
   if (data !== undefined) useServerReach.setState({ isOffline: false })
 }
 
+type UseFollowServerReachProps = Pick<FollowProps, 'shouldFollowDevice'>
+
 /**
  * Keeps `useServerReach` in step with the account config's reads, which every page waits on:
  * the first, and any read again later (a retry, a sign out). While the server is out of reach
  * it asks again every `OFFLINE_RETRY_MS`, so the normal app comes back by itself once it answers.
+ * A browser that keeps downloads also follows the device's network, which Raven, whose server
+ * may sit on the same machine, does not.
  */
-export const useFollowServerReach = (): void => {
+export const useFollowServerReach = ({ shouldFollowDevice }: UseFollowServerReachProps): void => {
   const queryClient = useQueryClient()
   const isOffline = useServerReach((state) => state.isOffline)
 
   useEffect(() => {
     const cache = queryClient.getQueryCache()
-    follow(cache.get(AUTH_CONFIG_HASH))
-    return cache.subscribe((event) => {
-      if (event.query.queryHash === AUTH_CONFIG_HASH) follow(event.query)
+    const followNow = () => follow({ query: cache.get(AUTH_CONFIG_HASH), shouldFollowDevice })
+    followNow()
+    const stopCache = cache.subscribe((event) => {
+      if (event.query.queryHash === AUTH_CONFIG_HASH) followNow()
     })
-  }, [queryClient])
+    const stopNetwork = onlineManager.subscribe(followNow)
+    return () => {
+      stopCache()
+      stopNetwork()
+    }
+  }, [queryClient, shouldFollowDevice])
 
   useEffect(() => {
     if (!isOffline) return

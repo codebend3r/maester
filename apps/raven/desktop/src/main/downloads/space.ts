@@ -6,6 +6,11 @@ import {
   isOpaqueId,
   isSidecarTrackId,
 } from '@raven/core'
+import {
+  isPictureExtension,
+  isPictureFolder,
+  type SavedPicture,
+} from '@/main/downloads/downloadState'
 
 /** What a download leaves free on the disk, so the system and Raven keep room to work. */
 export const SPACE_RESERVE_BYTES = 2 * 1024 ** 3
@@ -76,4 +81,27 @@ export const subtitlesDirFor = (parts: EntryParts): string => join(entryDirFor(p
 export const sidecarPathFor = ({ trackId, ...entry }: EntryParts & { trackId: string }): string => {
   if (!isSidecarTrackId(trackId)) throw new RangeError('A subtitle needs an external track id')
   return join(subtitlesDirFor(entry), `${trackId}.vtt`)
+}
+
+/** The folder under a server's downloads that holds every title's and album's saved pictures. */
+const PICTURES_DIR = 'pictures'
+
+export const picturesDirFor = (parts: ServerDirForProps): string =>
+  join(serverDirFor(parts), PICTURES_DIR)
+
+type PictureFolderForProps = ServerDirForProps & { folder: string }
+
+/** One title's or album's pictures, the folder that goes with its last download. */
+export const pictureFolderFor = ({ folder, ...server }: PictureFolderForProps): string => {
+  if (!isPictureFolder(folder)) throw new RangeError('A picture needs an item or album folder')
+  return join(picturesDirFor(server), folder)
+}
+
+type PicturePathForProps = ServerDirForProps & { picture: SavedPicture }
+
+export const picturePathFor = ({ picture, ...server }: PicturePathForProps): string => {
+  const { id, folder, extension } = picture
+  if (!isOpaqueId(id)) throw new RangeError('A picture needs an id')
+  if (!isPictureExtension(extension)) throw new RangeError('A picture needs a known extension')
+  return join(pictureFolderFor({ ...server, folder }), `${id}.${extension}`)
 }

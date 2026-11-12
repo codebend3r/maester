@@ -1,5 +1,12 @@
 import { isAbsolute, relative, sep } from 'node:path'
-import { DESKTOP_REPLIES, type DesktopReply, DOWNLOAD_STATUS_KINDS, isOpaqueId } from '@raven/core'
+import {
+  DESKTOP_REPLIES,
+  type DesktopReply,
+  DOWNLOAD_KINDS,
+  DOWNLOAD_STATUS_KINDS,
+  isOpaqueId,
+  type LocalFile,
+} from '@raven/core'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   entryById,
@@ -127,6 +134,8 @@ export type DownloadPlayback = {
   labelOf: (input: LabelOfProps) => string | null
   /** The server's media id of the download whose video is at `path`, else null. */
   mediaIdOf: (input: LabelOfProps) => number | null
+  /** The saved title art of the download whose video is at `path`, and the name it spells; else null. */
+  logoOf: (input: LabelOfProps) => LocalFile['logo']
   /**
    * Whether `path` lies in the downloads folder but is no download's video: a deleted download
    * that a play queue still holds a grant for, since a grant outlives its download.
@@ -500,6 +509,14 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     fromLabelOf,
     labelOf: ({ path }) => entryAt(path)?.label ?? null,
     mediaIdOf: ({ path }) => entryAt(path)?.mediaId ?? null,
+    logoOf: ({ path }) => {
+      const entry = entryAt(path)
+      const logo = entry?.pictures?.logo ?? null
+      if (entry === null || logo === null) return null
+      // A saga's films each wear their own art, under the saga's name.
+      const name = entry.group.kind === DOWNLOAD_KINDS.saga ? entry.label : entry.group.title
+      return { pictureId: logo.id, name }
+    },
     isStaleDownload,
     serverPositionOf: ({ fileId }) => entryOfFile(fileId)?.serverPosition ?? 0,
     noteOpened,

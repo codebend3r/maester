@@ -26,7 +26,9 @@ import { useScrollReset } from '@/lib/useScrollReset'
 import { ravenVersion } from '@/lib/version'
 import { useInProgressCount } from '@/desktop/downloadsApi'
 import { usePageBackdrop } from '@raven/ui/headless'
+import { BROWSER_PLAY_PATH } from '@/browserDownloads/paths'
 import { useComputerName, useIsDesktop } from '@/stores/desktop'
+import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 import { SIDE_MENU_KEY, useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
@@ -91,30 +93,38 @@ const CountedIcon = ({ icon, count }: CountedIconProps) => (
   </span>
 )
 
-type DesktopNavItemsProps = { isIconsOnly: boolean }
+type HostNavItemProps = { isIconsOnly: boolean }
 
-/** Raven's own rows: the files on this computer, and the downloads with how many are under way. */
-const DesktopNavItems = ({ isIconsOnly }: DesktopNavItemsProps) => {
-  const inProgress = useInProgressCount()
+type LocalNavItemProps = HostNavItemProps
+
+/** Raven's own row: the files on this computer. */
+const LocalNavItem = ({ isIconsOnly }: LocalNavItemProps) => {
   const computer = useComputerName()
   return (
-    <>
-      <NavItem
-        to={DESKTOP_PATHS.local}
-        patterns={[DESKTOP_PATHS.local]}
-        icon={<Icon name="file-play" />}
-        label={APP_SHELL_COPY.onThisComputer(computer)}
-        isIconsOnly={isIconsOnly}
-      />
-      <NavItem
-        to={DESKTOP_PATHS.downloads}
-        patterns={[DESKTOP_PATHS.downloads]}
-        icon={<CountedIcon icon="download" count={inProgress} />}
-        label={COMMON_COPY.downloads}
-        isIconsOnly={isIconsOnly}
-        note={inProgress > 0 ? APP_SHELL_COPY.inProgress(inProgress) : undefined}
-      />
-    </>
+    <NavItem
+      to={DESKTOP_PATHS.local}
+      patterns={[DESKTOP_PATHS.local]}
+      icon={<Icon name="file-play" />}
+      label={APP_SHELL_COPY.onThisComputer(computer)}
+      isIconsOnly={isIconsOnly}
+    />
+  )
+}
+
+type DownloadsNavItemProps = HostNavItemProps
+
+/** The downloads' row, where the page keeps any, with how many are under way. */
+const DownloadsNavItem = ({ isIconsOnly }: DownloadsNavItemProps) => {
+  const inProgress = useInProgressCount()
+  return (
+    <NavItem
+      to={DESKTOP_PATHS.downloads}
+      patterns={[DESKTOP_PATHS.downloads, BROWSER_PLAY_PATH]}
+      icon={<CountedIcon icon="download" count={inProgress} />}
+      label={COMMON_COPY.downloads}
+      isIconsOnly={isIconsOnly}
+      note={inProgress > 0 ? APP_SHELL_COPY.inProgress(inProgress) : undefined}
+    />
   )
 }
 
@@ -223,6 +233,7 @@ export const AppShell = () => {
   const isIconsOnly = collapsed || isMediumScreen
   const isFrosted = usePageBackdrop((state) => state.shown != null)
   const isDesktop = useIsDesktop()
+  const hasDownloads = useDownloadsHostOrNone() !== null
   const isOffline = useServerReach((state) => state.isOffline)
   const libraries = useQuery({ ...librariesQuery, enabled: !isOffline })
   // Kept from before the server went out of reach, they would open pages that need it.
@@ -376,7 +387,8 @@ export const AppShell = () => {
                 />
               </>
             )}
-            {isDesktop && <DesktopNavItems isIconsOnly={isIconsOnly} />}
+            {isDesktop && <LocalNavItem isIconsOnly={isIconsOnly} />}
+            {hasDownloads && <DownloadsNavItem isIconsOnly={isIconsOnly} />}
             <NavItem
               to="/settings"
               patterns={['/settings']}

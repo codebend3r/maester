@@ -364,7 +364,10 @@ export const PlayableItemView = ({
             ? PLAYABLE_ITEM_VIEW_COPY.resumeFrom(formatDuration(primary.position))
             : COMMON_COPY.play}
         </ButtonLink>
-        <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.media, mediaId: primary.id }} />
+        <DownloadButton
+          target={{ kind: DOWNLOAD_TARGET_KINDS.media, mediaId: primary.id }}
+          isDolbyVisionOnly={primary.isDolbyVisionOnly}
+        />
         {canFavourite && (
           <FavouriteButton isFavourite={primary.favourite} onToggle={favourite.mutate} />
         )}

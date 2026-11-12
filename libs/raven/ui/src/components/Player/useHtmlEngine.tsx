@@ -23,6 +23,7 @@ import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import { useVideoState } from '@/components/Player/useVideoState'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useCaptionStyle } from '@/query/useCaptionStyle'
+import { useFileCues } from '@/lib/useFileCues'
 import { useTrackCues } from '@/lib/useTrackCues'
 
 const ENGINE_NAME = 'HTML video'
@@ -117,16 +118,23 @@ export const useHtmlEngine = ({
     },
   })
   useEffect(() => videoRef.current?.focus(), [])
-  const subtitles = useTrackCues({
+  // A picture track is burned into the picture: it has no cues.
+  const textTrack = isPictureSubtitle(selection.subtitle) ? null : selection.subtitle
+  const served = useTrackCues({
     video:
       source.kind === PLAYER_SOURCE_KINDS.server
         ? { api: source.api, mediaId: source.media.id }
         : null,
-    // A picture track is burned into the picture: it has no cues.
-    track: isPictureSubtitle(selection.subtitle) ? null : selection.subtitle,
+    track: textTrack,
     time: playback.state.time,
     duration: playback.duration,
   })
+  // A local file's subtitles are the ones its host kept beside it, read whole.
+  const kept = useFileCues({
+    file: source.kind === PLAYER_SOURCE_KINDS.file ? source : null,
+    track: textTrack,
+  })
+  const subtitles = source.kind === PLAYER_SOURCE_KINDS.file ? kept : served
   const actions: EngineHandle['actions'] = {
     play: () => {
       videoRef.current?.play()?.catch(() => undefined)

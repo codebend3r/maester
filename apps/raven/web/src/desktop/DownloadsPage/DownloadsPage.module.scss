@@ -82,6 +82,20 @@
   color: var(--color-lichen);
 }
 
+// The Show choice and the line about what is hidden, over the chosen tab's downloads.
+.panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+// One run of everything, or a section a library.
+.sections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+}
+
 .groups {
   display: grid;
   gap: var(--space-5);
@@ -99,6 +113,16 @@
 
 .groupTitle {
   font-size: var(--font-size-lg);
+}
+
+// The title's own art in place of its name, a control tall and never wider than the list.
+.groupLogo {
+  display: block;
+  inline-size: auto;
+  max-inline-size: 100%;
+  block-size: var(--control-size-tall);
+  object-fit: contain;
+  object-position: left center;
 }
 
 // An album or playlist: its cover a control tall, beside its name over its track count, then Play.

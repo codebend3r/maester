@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   AUTH_REFUSALS,
+  DOWNLOAD_MAX_FILES,
   DOWNLOAD_TARGET_KINDS,
   ITEM_TYPES,
   LOCKED_STATUS,
@@ -10,9 +11,7 @@ import {
 import {
   BUSY_TRIES,
   BUSY_WAIT_MS,
-  DOWNLOAD_MAX_FILES,
   EXPAND_MESSAGES,
-  episodeLabel,
   expandTarget,
   type Expansion,
   EXPAND_REASONS,
@@ -112,19 +111,6 @@ describe('constants', () => {
   })
 })
 
-describe('episodeLabel', () => {
-  it('leads with the season and episode numbers', () => {
-    expect(episodeLabel({ season: 2, episode: 4, title: 'Trojan Horse' })).toBe(
-      'S02E04 Trojan Horse',
-    )
-  })
-
-  it('is the title alone without both numbers', () => {
-    expect(episodeLabel({ season: null, episode: 4, title: 'Trojan Horse' })).toBe('Trojan Horse')
-    expect(episodeLabel({ season: 2, episode: null, title: 'Trojan Horse' })).toBe('Trojan Horse')
-  })
-})
-
 describe('expandTarget', () => {
   it('reads a media file and its library', async () => {
     const movie = mediaItemFor({
@@ -147,6 +133,8 @@ describe('expandTarget', () => {
         label: 'Fellowship (2001)',
         group: { kind: 'movie', key: 'movie:9', title: 'Fellowship (2001)', order: 0 },
         artwork: { kind: 'poster', itemId: 1, version: 'p1' },
+        library: { id: 1, name: 'Library', isPrivate: false },
+        titleItemId: 1,
         watchedPercent: 90,
       },
     ])

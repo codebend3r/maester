@@ -14,6 +14,8 @@ import { usePlayerPrefs } from '@raven/ui/headless'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { useDownloadAsk } from '@/stores/downloadAsk'
+import { useDownloadNotes } from '@/stores/downloadNotes'
+import { asBrowserDownloads, fakeEngine } from '@/test/browserDownloads'
 import { held } from '@/test/held'
 import { ASK_ID, asDesktop, fakeClient, SERVER_ID } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
@@ -108,5 +110,49 @@ describe('DownloadButton', () => {
     })
     await userEvent.click(screen.getByRole('button', { name: 'Download' }))
     expect(await screen.findByText('Sign in first.')).toBeInTheDocument()
+  })
+})
+
+describe('DownloadButton for a Dolby Vision only video', () => {
+  const NOTE = 'DV5 downloads unsupported'
+
+  const inChrome = async () => {
+    const fake = await fakeEngine({ canPlay: (mimeType) => !mimeType.includes('dvh1') })
+    asBrowserDownloads(fake.engine)
+    const ask = spyOn(fake.engine, 'ask')
+    renderWithProviders({ ui: <DownloadButton target={TARGET} isDolbyVisionOnly /> })
+    return { ask, button: screen.getByRole('button', { name: 'Download' }) }
+  }
+
+  it('is greyed out in a browser that does not play it, and says why the first time', async () => {
+    const { ask, button } = await inChrome()
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('note', { name: NOTE })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Got it' }))
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+    expect(useDownloadNotes.getState().hasSeenDolbyVision).toBe(true)
+    expect(ask).not.toHaveBeenCalled()
+  })
+
+  it('stays closed once it has been answered, and opens again when Download is pressed', async () => {
+    useDownloadNotes.setState({ hasSeenDolbyVision: true })
+    const { ask, button } = await inChrome()
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+    await userEvent.click(button)
+    expect(screen.getByRole('note', { name: NOTE })).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+    expect(ask).not.toHaveBeenCalled()
+  })
+
+  it('downloads as any other video where the host keeps it', async () => {
+    const fake = await fakeEngine()
+    asBrowserDownloads(fake.engine)
+    renderWithProviders({ ui: <DownloadButton target={TARGET} isDolbyVisionOnly /> })
+    expect(screen.getByRole('button', { name: 'Download' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
   })
 })

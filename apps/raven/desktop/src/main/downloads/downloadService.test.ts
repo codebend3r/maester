@@ -35,7 +35,9 @@ import {
   FAIL_REASONS,
   NO_PENDING,
   PAUSE_REASONS,
+  PICTURE_EXTENSIONS,
   type DownloadEntry,
+  type SavedPicture,
   type DownloadsState,
   type EntryStatus,
 } from '@/main/downloads/downloadState'
@@ -194,6 +196,10 @@ const entryFor = (overrides: Partial<DownloadEntry>): DownloadEntry => ({
   pending: NO_PENDING,
   createdAt: NOW - 1000,
   track: undefined,
+  // Filed and settled, so a pass over the pictures has nothing to ask the server for.
+  library: { id: 1, name: 'Library', isPrivate: false },
+  titleItemId: null,
+  pictures: { art: null, logo: null, isComplete: true },
   ...overrides,
 })
 
@@ -319,6 +325,9 @@ const setup = ({
     access: media.access,
     fetch: network.fetch,
     fs: drive.fs,
+    writeBytes: async ({ path, bytes }) => {
+      drive.files.set(path, [bytes])
+    },
     showItemInFolder: (path) => shown.push(path),
     ready: Promise.resolve(),
     wasSetAside: false,
@@ -785,6 +794,8 @@ describe('confirm', () => {
         pending: NO_PENDING,
         createdAt: NOW + 5000,
         artwork: { kind: 'none' },
+        library: { id: 1, name: 'Library', isPrivate: false },
+        titleItemId: null,
         facts: {
           year: null,
           score: null,
@@ -1023,6 +1034,8 @@ describe('list and views', () => {
           deletesAt: null,
           isLocked: false,
           artwork: { kind: 'none' },
+          pictures: { art: null, logo: null },
+          library: { id: 1, name: 'Library', isPrivate: false },
           facts: factsBefore(newer),
           createdAt: newer.createdAt,
           track: null,
@@ -1229,6 +1242,61 @@ describe('the queue', () => {
     const reply = downloadsOf(await world.service.remove({ downloadId: ID }))
     expect(reply.downloads.map(({ downloadId }) => downloadId)).toEqual([OTHER_ID])
     expect(world.drive.removed).toContain(`${DOWNLOADS}/${SERVER_ID}/11`)
+  })
+
+  it("carries each download's saved pictures by id and its library, and serves them by that id", async () => {
+    const art: SavedPicture = {
+      id: '10000000-0000-4000-8000-000000000001',
+      folder: 'item-4',
+      extension: PICTURE_EXTENSIONS.jpg,
+    }
+    const logo: SavedPicture = {
+      id: '10000000-0000-4000-8000-000000000002',
+      folder: 'item-4',
+      extension: PICTURE_EXTENSIONS.png,
+    }
+    const filed = { id: 2, name: 'Home videos', isPrivate: true }
+    const world = setup({
+      initial: holding(
+        entryFor({ library: filed, pictures: { art, logo, isComplete: true } }),
+        entryFor({ downloadId: OTHER_ID, mediaId: 12, library: undefined, pictures: undefined }),
+      ),
+    })
+    const [first, second] = world.service.views()
+    expect(first).toMatchObject({ pictures: { art: art.id, logo: logo.id }, library: filed })
+    expect(second).toMatchObject({ pictures: { art: null, logo: null }, library: null })
+    expect(world.service.pictureOf(logo.id)).toEqual({
+      path: `${DOWNLOADS}/${SERVER_ID}/pictures/item-4/${logo.id}.png`,
+      contentType: 'image/png',
+    })
+    expect(world.service.pictureOf(OTHER_ID)).toBeNull()
+    expect(world.service.logoOf({ path: `${DOWNLOADS}/${SERVER_ID}/11/video.mkv` })).toEqual({
+      pictureId: logo.id,
+      name: 'Severance',
+    })
+    expect(world.service.logoOf({ path: `${DOWNLOADS}/${SERVER_ID}/12/video.mkv` })).toBeNull()
+  })
+
+  it("removes a title's pictures with its last download, and not before", async () => {
+    const art: SavedPicture = {
+      id: '10000000-0000-4000-8000-000000000001',
+      folder: 'item-4',
+      extension: PICTURE_EXTENSIONS.jpg,
+    }
+    const pictures = { art, logo: null, isComplete: true }
+    const folder = `${DOWNLOADS}/${SERVER_ID}/pictures/item-4`
+    const world = setup({
+      initial: holding(
+        entryFor({ titleItemId: 4, pictures }),
+        entryFor({ downloadId: OTHER_ID, mediaId: 12, titleItemId: 4, pictures }),
+      ),
+      disk: { [`${folder}/${art.id}.jpg`]: 3 },
+    })
+    await world.service.remove({ downloadId: ID })
+    await ticks(10)
+    expect(world.drive.removed).not.toContain(folder)
+    await world.service.remove({ downloadId: OTHER_ID })
+    await until(() => world.drive.removed.includes(folder))
   })
 
   it('answers deleteAllDownloads with an empty list and removes the downloads folder', async () => {

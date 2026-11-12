@@ -34,7 +34,7 @@ export const DesktopHost = () => {
   const closeAsk = useDownloadAsk((state) => state.close)
   const [isOpenLinkShown, setIsOpenLinkShown] = useState(false)
 
-  useFollowServerReach()
+  useFollowServerReach({ shouldFollowDevice: false })
   useReturnWhenReached()
   useSendAccountToken(client)
   useFileDrop({ client, onReply: openReply })

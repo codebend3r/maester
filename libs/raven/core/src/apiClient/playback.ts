@@ -2,9 +2,12 @@ import { type MediaAccess, type TicketedOrigin, type Transport } from '@/apiClie
 import {
   AUDIO_BITRATE_PARAM,
   type AudioBitrate,
+  DEFAULT_DEVICE_DOWNLOAD_VARIANT,
   DEVICE_DOWNLOAD_PARAMS,
   DEVICE_DOWNLOAD_PATHS,
+  DEVICE_DOWNLOAD_VARIANT_PARAM,
   type DeviceDownload,
+  type DeviceDownloadVariant,
   HLS_PARAMS,
   HLS_PATHS,
   isDeviceDownload,
@@ -24,10 +27,22 @@ import {
   type SubtitleCue,
 } from '@/contract'
 import { type MediaOriginsAnswer, readMediaOrigins } from '@/mediaOrigins'
-import { fillPath } from '@/query'
+import { fillPath, pathWithQuery } from '@/query'
 import { parseWebVtt } from '@/subtitles'
 
 type FileUrlProps = { id: number; access?: MediaAccess | null }
+
+type GetDeviceDownloadProps = {
+  mediaId: number
+  /** Which copy to ask for; the picture's own, in an MP4, when none is named. */
+  variant?: DeviceDownloadVariant
+}
+
+type DeviceDownloadFileUrlProps = FileUrlProps & Pick<GetDeviceDownloadProps, 'variant'>
+
+/** The query that names a copy: nothing for the default, so a server from before `sdr` reads it the same. */
+const variantQuery = (variant: DeviceDownloadVariant): Record<string, string> =>
+  variant === DEFAULT_DEVICE_DOWNLOAD_VARIANT ? {} : { [DEVICE_DOWNLOAD_VARIANT_PARAM]: variant }
 
 type TranscodeUrlProps = {
   mediaId: number
@@ -93,28 +108,39 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
 
   /**
    * Where the server's MP4 copy of video `mediaId` stands, for a device whose player cannot
-   * open the original: asking starts the copy when none is cached or running, and a failed
-   * copy is tried again on the ask after the one that says so.
+   * open the original, or `variant`'s SDR copy for a browser: asking starts the copy when
+   * none is cached or running, and a failed copy is tried again on the ask after the one
+   * that says so.
    */
-  getDeviceDownload: (mediaId: number): Promise<DeviceDownload> =>
+  getDeviceDownload: ({
+    mediaId,
+    variant = DEFAULT_DEVICE_DOWNLOAD_VARIANT,
+  }: GetDeviceDownloadProps): Promise<DeviceDownload> =>
     expect({
       request: send({
-        path: fillPath({
-          path: DEVICE_DOWNLOAD_PATHS.prepare,
-          params: { [DEVICE_DOWNLOAD_PARAMS.id]: mediaId },
+        path: pathWithQuery({
+          path: fillPath({
+            path: DEVICE_DOWNLOAD_PATHS.prepare,
+            params: { [DEVICE_DOWNLOAD_PARAMS.id]: mediaId },
+          }),
+          query: variantQuery(variant),
         }),
       }),
       guard: isDeviceDownload,
     }),
 
   /** The server's finished MP4 copy of the video, with byte ranges, from `access`'s origin as `fileUrl` is. */
-  deviceDownloadFileUrl: ({ id, access = null }: FileUrlProps): string =>
+  deviceDownloadFileUrl: ({
+    id,
+    access = null,
+    variant = DEFAULT_DEVICE_DOWNLOAD_VARIANT,
+  }: DeviceDownloadFileUrlProps): string =>
     mediaUrl({
       path: fillPath({
         path: DEVICE_DOWNLOAD_PATHS.file,
         params: { [DEVICE_DOWNLOAD_PARAMS.id]: id },
       }),
-      query: {},
+      query: variantQuery(variant),
       access,
     }),
 
