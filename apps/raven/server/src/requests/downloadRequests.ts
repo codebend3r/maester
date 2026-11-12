@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import {
+  type TitleHolding,
   type TitleRequest,
   type TitleRequestAsk,
   type TitleRequests,
@@ -17,6 +18,7 @@ import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
 import { ARR_ERROR_KINDS, ArrClient, ArrError, type ArrTitle } from '@/requests/arrClient'
+import { FreshReads } from '@/requests/freshReads'
 import { letterFolderOf } from '@/requests/letterFolders'
 import { statusOf } from '@/requests/requestStatus'
 
@@ -29,7 +31,10 @@ export const STATUS_FRESH_MS = 30_000
 /** The only resolution a requested title may download at; a profile that allows any other is refused. */
 const REQUEST_RESOLUTION = 1080
 
-/** A request the rules refuse: someone asked for the title already, or the account's budget is spent. */
+/** What a refusal says of a title its arr holds already: it downloads once it can, so nobody needs to ask. */
+const HELD_ALREADY = 'The downloader holds this title already, so it downloads once a copy turns up'
+
+/** A request the rules refuse: someone asked for the title already, its arr holds it, or the account's budget is spent. */
 export class RequestRefusal extends Error {
   constructor(message: string) {
     super(message)
@@ -76,7 +81,10 @@ type ReadStatusProps = { row: KeptRequest; arrId: number }
 
 type KeepStatusProps = { row: KeptRequest; status: RequestStatus }
 
-type ArrIdOfProps = { type: MatchItemType; found: ArrTitle }
+type AddToProps = { type: MatchItemType; found: ArrTitle }
+
+/** The holding of a title its arr does not hold, or whose kind is off. */
+const NOT_HELD = { status: null } as const satisfies TitleHolding
 
 const viewOf = ({ row, account }: ViewOfProps): TitleRequest => ({
   type: row.type,
@@ -96,15 +104,20 @@ const viewOf = ({ row, account }: ViewOfProps): TitleRequest => ({
 @Injectable()
 export class DownloadRequests {
   private readonly log = new Logger(DownloadRequests.name)
-  /** When each request's status was last read from its arr, and the read on its way. */
-  private readonly checks = new Map<string, { at: number; pending: Promise<void> | null }>()
+  /** Each request's status read from its arr, at most once every `STATUS_FRESH_MS`. */
+  private readonly statusReads: FreshReads<void>
+  /** Each title's holding as its arr answered it, at most once every `STATUS_FRESH_MS`. */
+  private readonly holdingReads: FreshReads<TitleHolding>
 
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(ArrClient) private readonly arrs: ArrClient,
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(CLOCK) private readonly clock: Clock,
-  ) {}
+  ) {
+    this.statusReads = new FreshReads({ clock, freshMs: STATUS_FRESH_MS })
+    this.holdingReads = new FreshReads({ clock, freshMs: STATUS_FRESH_MS })
+  }
 
   private get db() {
     return this.database.db
@@ -153,23 +166,17 @@ export class DownloadRequests {
 
   /** Reads a request's status from its arr unless it was read in the last `STATUS_FRESH_MS`; an arr that fails keeps the last one. */
   private refresh(row: KeptRequest): Promise<void> {
-    const key = requestKeyOf({ type: row.type, tmdbId: row.tmdb_id })
-    const check = this.checks.get(key)
-    if (check?.pending) return check.pending
-    const now = this.clock.now()
     if (row.arr_id === null || !this.arrs.isOn(row.type)) return Promise.resolve()
-    if (check && now - check.at < STATUS_FRESH_MS) return Promise.resolve()
     const arrId = row.arr_id
-    const pending = this.readStatus({ row, arrId })
-      .then((status) => this.keepStatus({ row, status }))
-      .catch((error: unknown) => {
-        this.log.warn(`Kept the last status of a request: ${errorText(error)}`)
-      })
-      .finally(() => {
-        this.checks.set(key, { at: this.clock.now(), pending: null })
-      })
-    this.checks.set(key, { at: check?.at ?? 0, pending })
-    return pending
+    return this.statusReads.read({
+      key: requestKeyOf({ type: row.type, tmdbId: row.tmdb_id }),
+      read: () =>
+        this.readStatus({ row, arrId })
+          .then((status) => this.keepStatus({ row, status }))
+          .catch((error: unknown) => {
+            this.log.warn(`Kept the last status of a request: ${errorText(error)}`)
+          }),
+    })
   }
 
   private keepStatus({ row, status }: KeepStatusProps): void {
@@ -188,6 +195,19 @@ export class DownloadRequests {
         : this.arrs.isCommandRunning({ type: row.type, commandId: row.command_id }),
     ])
     return statusOf({ progress, isSearching })
+  }
+
+  /** Whether the title's arr holds it already, and where it stands there; read at most once every `STATUS_FRESH_MS`. */
+  holding(ask: TitleRequestAsk): Promise<TitleHolding> {
+    if (!this.arrs.isOn(ask.type)) return Promise.resolve(NOT_HELD)
+    return this.holdingReads.read({ key: requestKeyOf(ask), read: () => this.readHolding(ask) })
+  }
+
+  private async readHolding(ask: TitleRequestAsk): Promise<TitleHolding> {
+    const found = await this.arrs.lookUp(ask)
+    if (found === null || found.existingId === null) return NOT_HELD
+    const progress = await this.arrs.progress({ type: ask.type, arrId: found.existingId })
+    return { status: statusOf({ progress, isSearching: false }) }
   }
 
   /**
@@ -212,7 +232,8 @@ export class DownloadRequests {
           message: `The ${ask.type} downloader does not know this title`,
         })
       }
-      const arrId = await this.arrIdOf({ type: ask.type, found })
+      if (found.existingId !== null) throw new RequestRefusal(HELD_ALREADY)
+      const arrId = await this.addTo({ type: ask.type, found })
       const commandId = await this.arrs.search({ type: ask.type, arrId })
       this.finish({ ask, title: found.title, arrId, commandId })
     } catch (error) {
@@ -224,22 +245,9 @@ export class DownloadRequests {
     return viewOf({ row, account })
   }
 
-  /**
-   * The arr's id for the title: the one it holds already, or the one it
-   * answers as it adds it. Either way the title downloads through a profile
-   * that allows `REQUEST_RESOLUTION` and nothing else.
-   */
-  private async arrIdOf({ type, found }: ArrIdOfProps): Promise<number> {
+  /** Adds the title under its letter folder, through a profile that allows `REQUEST_RESOLUTION` and nothing else; answers the arr's id. */
+  private async addTo({ type, found }: AddToProps): Promise<number> {
     const profileId = await this.profileIdOf(type)
-    if (found.existingId !== null) {
-      if (found.existingProfileId !== profileId) {
-        throw new ArrError({
-          kind: ARR_ERROR_KINDS.failed,
-          message: `The ${type} downloader holds this title already, under a profile other than ${this.config.requests.qualityProfile}`,
-        })
-      }
-      return found.existingId
-    }
     const rootFolder = letterFolderOf({
       base: this.config.requests.folders[type],
       title: found.title,
@@ -312,7 +320,7 @@ export class DownloadRequests {
           WHERE type = @type AND tmdb_id = @tmdbId`,
       )
       .run({ type: ask.type, tmdbId: ask.tmdbId, title, arrId, commandId })
-    this.checks.set(requestKeyOf(ask), { at: this.clock.now(), pending: null })
+    this.statusReads.mark({ key: requestKeyOf(ask), answer: undefined })
   }
 
   private release(ask: TitleRequestAsk): void {

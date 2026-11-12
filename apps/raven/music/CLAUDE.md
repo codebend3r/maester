@@ -7,6 +7,11 @@
 - The app is named Wren, so the Xcode workspace and scheme are `Wren` and the simulator build is `build/ios/Build/Products/Release-iphonesimulator/Wren.app`.
 - The iOS bundle id and the Android package are both `app.netlify.wren`; the slug and the link scheme are `wren`. Anything hosted lives on Netlify.
 
+## Brand
+
+- **The logo lives in `assets/brand/`,** and its `README.md` says which file goes where: the mark on dark, on light and in one colour, the small cut for 48 px and under, the horizontal and stacked lockups, the wordmark, and the icon sources. Use those files; never redraw the bird, set the name in another face, or centre the mark by its outline (its box is centred on the bird's weight).
+- **The app icons are `assets/images/`'s three PNG files,** named in `app.config.ts`'s `WREN_ICONS` (the iOS icon, Android's adaptive foreground and its themed monochrome layer) and checked by `src/config/appConfig.test.ts`. They are rendered from the brand's SVGs; a new icon needs a fresh prebuild.
+
 ## Shared with the device app
 
 - **The fork and the pins are `@raven/app`'s.** Wren runs on `react-native-tvos` too, since the root `overrides` sets `react-native` for the whole workspace, and every Expo and React Native package is pinned to the version `@raven/app` pins. Read `apps/raven/app/CLAUDE.md`'s "Pins", "Bun's package store" and "Intl and the shared layer": `NODE_PATH` and `REACT_NATIVE_NODE_MODULES_DIR` on the Apple prebuilds, jest letting Babel through `node_modules/.bun`, `^build` before Metro, and `expo.autolinking.exclude` keeping reanimated, worklets and gesture-handler out of the native projects all hold here for the same reasons. A bump moves both apps together.

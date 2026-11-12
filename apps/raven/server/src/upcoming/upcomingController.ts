@@ -8,7 +8,6 @@ import {
   Query,
 } from '@nestjs/common'
 import {
-  isTitleRequestAsk,
   isUpcomingShelf,
   ITEM_TYPES,
   type Upcoming,
@@ -24,6 +23,7 @@ import { TmdbClient } from '@/metadata/tmdbClient'
 import { requireTmdb, tmdbUnavailable } from '@/metadata/tmdbGate'
 import { Public } from '@/lock/lockGuard'
 import { UpcomingShelfPages } from '@/upcoming/upcomingShelfPages'
+import { titleAskOf } from '@/upcoming/titleAsk'
 import { UpcomingTitles } from '@/upcoming/upcomingTitles'
 
 /** What the 503 says Coming soon needs TMDB for. */
@@ -81,8 +81,7 @@ export class UpcomingController {
     @Param(UPCOMING_TITLE_PARAMS.type) type: string,
     @Param(UPCOMING_TITLE_PARAMS.tmdbId) tmdbId: string,
   ): Promise<UpcomingDetails> {
-    const ask = { type, tmdbId }
-    if (!isTitleRequestAsk(ask)) throw new NotFoundException(`No ${type} ${tmdbId}`)
+    const ask = titleAskOf({ type, tmdbId })
     requireTmdb({ tmdb: this.tmdb, toDo: TMDB_TO_DESCRIBE })
     const item = await (
       ask.type === ITEM_TYPES.movie ? this.tmdb.movie(ask.tmdbId) : this.tmdb.show(ask.tmdbId)

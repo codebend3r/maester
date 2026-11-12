@@ -16,7 +16,7 @@ type Sent = { method: string; url: string; body: unknown }
 
 type FakeArrState = {
   /** What each lookup finds, by TMDB id. */
-  movies: Record<string, { title: string; id?: number; qualityProfileId?: number }>
+  movies: Record<string, { title: string; id?: number }>
   shows: Record<string, { title: string; id?: number }>
   rootFolders: string[]
   /** The resolutions the HD-1080p profile allows. */
@@ -32,8 +32,8 @@ type FakeArrState = {
 const freshState = (): FakeArrState => ({
   movies: {
     '1': { title: 'A Beautiful Mind' },
-    '2': { title: 'Sinners', id: 77, qualityProfileId: 4 },
-    '3': { title: 'Superman', id: 78, qualityProfileId: 5 },
+    '2': { title: 'Sinners', id: 77 },
+    '4': { title: 'Barbarian' },
   },
   shows: { '10': { title: 'The Bear' } },
   rootFolders: ['/Meleys/Movies/B', '/Meleys/Movies/S', '/Vermithor/TV/B'],
@@ -166,16 +166,45 @@ describe('download requests', () => {
     expect(search?.body).toEqual({ name: 'SeriesSearch', seriesId: 500 })
   })
 
-  it('searches a title the arr already holds without adding it again', async () => {
-    await requests().request({
-      account: TEST_ACCOUNTS.a,
-      ask: { type: ITEM_TYPES.movie, tmdbId: '2' },
+  it('refuses a title the arr already holds, sends it nothing, and spends nothing', async () => {
+    const ask = { type: ITEM_TYPES.movie, tmdbId: '2' } as const
+    await expect(requests().request({ account: TEST_ACCOUNTS.a, ask })).rejects.toThrow(
+      'holds this title already',
+    )
+    expect(state.arr.sent.some((sent) => sent.method === 'POST')).toBe(false)
+    const after = await requests().list({ account: TEST_ACCOUNTS.a })
+    expect(after.requests).toHaveLength(0)
+    expect(after.budget.left).toBe(2)
+  })
+
+  it('says where a title the arr holds stands, and null for one it does not', async () => {
+    state.arr.queue = [{ status: 'queued' }]
+    const service = requests()
+    expect(await service.holding({ type: ITEM_TYPES.movie, tmdbId: '2' })).toEqual({
+      status: REQUEST_STATUSES.willDownload,
     })
-    expect(
-      state.arr.sent.some((sent) => sent.method === 'POST' && sent.url.endsWith('/movie')),
-    ).toBe(false)
-    const search = state.arr.sent.find((sent) => sent.url.endsWith('/command'))
-    expect(search?.body).toEqual({ name: 'MoviesSearch', movieIds: [77] })
+    expect(await service.holding({ type: ITEM_TYPES.movie, tmdbId: '1' })).toEqual({
+      status: null,
+    })
+    expect(await service.holding({ type: ITEM_TYPES.show, tmdbId: '10' })).toEqual({
+      status: null,
+    })
+  })
+
+  it('reads a holding from the arr at most once in a while, and again after a failure', async () => {
+    const service = requests()
+    const ask = { type: ITEM_TYPES.movie, tmdbId: '2' } as const
+    const lookups = () =>
+      state.arr.sent.filter((sent) => sent.url.includes('/movie/lookup/tmdb')).length
+    state.arr.failing = ['/api/v3/movie/lookup/tmdb']
+    await expect(service.holding(ask)).rejects.toThrow('500')
+    state.arr.failing = []
+    expect((await service.holding(ask)).status).toBe(REQUEST_STATUSES.notDownloadable)
+    await service.holding(ask)
+    expect(lookups()).toBe(2)
+    time.advance(STATUS_FRESH_MS)
+    await service.holding(ask)
+    expect(lookups()).toBe(3)
   })
 
   it('takes one request a title, for everyone', async () => {
@@ -208,7 +237,7 @@ describe('download requests', () => {
     time.advance(1000)
     await service.request({
       account: TEST_ACCOUNTS.a,
-      ask: { type: ITEM_TYPES.movie, tmdbId: '2' },
+      ask: { type: ITEM_TYPES.movie, tmdbId: '4' },
     })
     const spent = await service.list({ account: TEST_ACCOUNTS.a })
     expect(spent.budget).toMatchObject({ limit: 2, left: 0 })
@@ -238,16 +267,6 @@ describe('download requests', () => {
     )
     expect(state.arr.sent.some((sent) => sent.method === 'POST')).toBe(false)
     expect((await requests().list({ account: TEST_ACCOUNTS.a })).budget.left).toBe(2)
-  })
-
-  it('refuses a title the arr already holds under another profile', async () => {
-    await expect(
-      requests().request({
-        account: TEST_ACCOUNTS.a,
-        ask: { type: ITEM_TYPES.movie, tmdbId: '3' },
-      }),
-    ).rejects.toThrow('profile other than HD-1080p')
-    expect(state.arr.sent.some((sent) => sent.method === 'POST')).toBe(false)
   })
 
   it('refuses a title whose letter folder the arr does not list', async () => {

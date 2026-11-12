@@ -17,6 +17,9 @@ export const REQUEST_PATHS = { requests: '/api/requests' } as const
 /** The parameters of an upcoming title's own page on the server. */
 export const UPCOMING_TITLE_PARAMS = { type: 'type', tmdbId: 'tmdbId' } as const
 
+/** Where the server answers whether a title's Sonarr or Radarr holds it already, and where it stands there. */
+export const REQUEST_HOLDING_PATH = `${REQUEST_PATHS.requests}/:${UPCOMING_TITLE_PARAMS.type}/:${UPCOMING_TITLE_PARAMS.tmdbId}`
+
 /** Where the server answers with one upcoming title's details from TMDB. */
 export const UPCOMING_TITLE_PATH = `/api/upcoming/:${UPCOMING_TITLE_PARAMS.type}/:${UPCOMING_TITLE_PARAMS.tmdbId}`
 
@@ -78,6 +81,18 @@ export const isTitleRequests = object({
 })
 
 export type TitleRequests = Infer<typeof isTitleRequests>
+
+/**
+ * `GET` on `REQUEST_HOLDING_PATH`: whether the title's Sonarr or Radarr
+ * holds it already, so it downloads once it can and nobody needs to request
+ * it. `status` is where it stands there, or null while the arr does not hold
+ * it (or its kind is off).
+ */
+export const isTitleHolding = object({
+  status: nullable(isRequestStatus),
+})
+
+export type TitleHolding = Infer<typeof isTitleHolding>
 
 /** An upcoming movie or show as its own page shows it, from TMDB. */
 export const isUpcomingDetails = object({

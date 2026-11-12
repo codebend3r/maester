@@ -269,6 +269,14 @@ export const ravenQueriesFor = (api: ApiClient) => {
       refetchInterval: REQUESTS_REFETCH_MS,
     }),
 
+    /** Whether one title's Sonarr or Radarr holds it already, and where it stands there. */
+    requestHoldingQuery: (title: TitleRequestAsk) =>
+      queryOptions({
+        queryKey: queryKeys.requestHolding(title),
+        queryFn: () => api.getRequestHolding(title),
+        refetchInterval: REQUESTS_REFETCH_MS,
+      }),
+
     /** One Coming soon shelf, a page at a time, the soonest out first; kept as long as the shelves. */
     upcomingShelfQuery: (shelf: UpcomingShelf) =>
       infiniteQueryOptions({

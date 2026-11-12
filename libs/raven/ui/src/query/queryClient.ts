@@ -148,6 +148,8 @@ export const queryKeys = {
   upcomingTitle: ({ type, tmdbId }: TitleRequestAsk) => ['upcoming', type, tmdbId],
   /** Coming soon's requests, and the account's budget. */
   requests: ['requests'],
+  /** Whether one title's arr holds it already, under the requests' key so a new request reads it again. */
+  requestHolding: ({ type, tmdbId }: TitleRequestAsk) => ['requests', type, tmdbId],
   history: ({ libraryId, show, limit }: QueryKeysHistoryProps) => [
     'libraries',
     libraryId,

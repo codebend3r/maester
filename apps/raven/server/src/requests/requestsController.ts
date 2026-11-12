@@ -6,23 +6,29 @@ import {
   Get,
   Header,
   Inject,
+  Param,
   Post,
   Req,
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
+  type TitleHolding,
   type TitleRequest,
   type TitleRequests,
   isTitleRequestAsk,
+  REQUEST_HOLDING_PATH,
   REQUEST_PATHS,
+  UPCOMING_TITLE_PARAMS,
 } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import type { FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
+import { Public } from '@/lock/lockGuard'
 import { ViewingAccounts } from '@/media/viewingAccounts'
 import { parseBody } from '@/parseBody'
 import { ARR_ERROR_KINDS, ArrError } from '@/requests/arrClient'
 import { DownloadRequests, RequestRefusal } from '@/requests/downloadRequests'
+import { titleAskOf } from '@/upcoming/titleAsk'
 
 /** An arr's failure or a refused request as the route answers it; anything else is thrown on. */
 const answerOf = (error: unknown): never => {
@@ -49,7 +55,22 @@ export class RequestsController {
     return this.requests.list({ account: this.accounts.keyOf({ request }) })
   }
 
-  /** Asks for `{ type, tmdbId }` to be downloaded; 409 once someone has, or while the caller's budget is spent. */
+  /**
+   * Whether the title's arr holds it already, so the page says it is
+   * requested instead of offering the button. Public to the PIN lock: no
+   * library holds it.
+   */
+  @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
+  @Get(REQUEST_HOLDING_PATH)
+  @Public()
+  holding(
+    @Param(UPCOMING_TITLE_PARAMS.type) type: string,
+    @Param(UPCOMING_TITLE_PARAMS.tmdbId) tmdbId: string,
+  ): Promise<TitleHolding> {
+    return this.requests.holding(titleAskOf({ type, tmdbId })).catch(answerOf)
+  }
+
+  /** Asks for `{ type, tmdbId }` to be downloaded; 409 once someone has or its arr holds it already, or while the caller's budget is spent. */
   @ForViewers()
   @Post(REQUEST_PATHS.requests)
   async create(@Req() request: FastifyRequest, @Body() body: unknown): Promise<TitleRequest> {
