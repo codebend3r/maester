@@ -1,4 +1,11 @@
-import { ITEM_TYPES, type MatchItemType, UPCOMING_SHELVES, type UpcomingShelf } from '@raven/core'
+import {
+  ITEM_TYPES,
+  type MatchItemType,
+  type TitleRequestAsk,
+  UPCOMING_SHELVES,
+  UPCOMING_TITLE_PARAMS,
+  type UpcomingShelf,
+} from '@raven/core'
 
 /** The page that shelves what TMDB says is still to come. */
 export const COMING_SOON_PATH = '/coming-soon'
@@ -6,13 +13,22 @@ export const COMING_SOON_PATH = '/coming-soon'
 /** Where a shelf's own page is. */
 export const comingSoonShelfPath = (shelf: UpcomingShelf): string => `${COMING_SOON_PATH}/${shelf}`
 
+/** The route of an upcoming title's own page. */
+export const COMING_SOON_TITLE_ROUTE = `${COMING_SOON_PATH}/:${UPCOMING_TITLE_PARAMS.type}/:${UPCOMING_TITLE_PARAMS.tmdbId}`
+
+/** Where an upcoming title's own page is: `/coming-soon/movie/123`. */
+export const comingSoonTitlePath = ({ type, tmdbId }: TitleRequestAsk): string =>
+  `${COMING_SOON_PATH}/${type}/${tmdbId}`
+
 export const COMING_SOON_COPY = {
   title: 'Coming soon',
   intro: 'Movies and TV shows on their way, the most anticipated first.',
   loading: 'Finding what is coming soon',
   loadingMore: 'Finding more',
   empty: 'Nothing announced yet.',
-  onTmdb: (title: string) => `${title} on TMDB`,
+  viewOnTmdb: 'View on TMDB',
+  notFound: 'This title could not be found.',
+  minutes: (minutes: number) => `${minutes} min`,
   kinds: {
     [ITEM_TYPES.movie]: 'Movie',
     [ITEM_TYPES.show]: 'TV show',

@@ -39,7 +39,7 @@ const open = (shelf: UpcomingShelf) =>
 const cardNames = (): string[] =>
   within(screen.getByRole('list'))
     .getAllByRole('link')
-    .map((link) => link.getAttribute('aria-label') ?? '')
+    .map((link) => link.textContent ?? '')
 
 describe('UpcomingShelfPage', () => {
   afterEach(() => {
@@ -48,15 +48,14 @@ describe('UpcomingShelfPage', () => {
     startOnScreen(true)
   })
 
-  it('shows the shelf, each card opening TMDB in a new tab', async () => {
+  it('shows the shelf, each card opening its own page', async () => {
     answer({ first: { titles: [title({ type: ITEM_TYPES.movie, id: 1 })], next: null } })
     open(UPCOMING_SHELVES.movies)
     expect(
       await screen.findByRole('heading', { name: 'Upcoming movies', level: 1 }),
     ).toBeInTheDocument()
-    const card = await screen.findByRole('link', { name: 'Title 1 on TMDB' })
-    expect(card).toHaveAttribute('href', 'https://www.themoviedb.org/movie/1')
-    expect(card).toHaveAttribute('target', '_blank')
+    const card = await screen.findByRole('link', { name: 'Title 1' })
+    expect(card).toHaveAttribute('href', '/coming-soon/movie/1')
     expect(getUpcomingShelf).toHaveBeenCalledWith({ shelf: UPCOMING_SHELVES.movies, after: null })
   })
 
@@ -70,13 +69,13 @@ describe('UpcomingShelfPage', () => {
       },
     })
     const { container } = open(UPCOMING_SHELVES.shows)
-    await screen.findByRole('link', { name: 'Title 1 on TMDB' })
+    await screen.findByRole('link', { name: 'Title 1' })
     expect(getUpcomingShelf).toHaveBeenCalledTimes(1)
     const end = container.querySelector('[aria-hidden="true"]:empty')
     if (end === null) throw new Error('No end of the list to watch')
     moveOnScreen({ target: end, isOnScreen: true })
-    await screen.findByRole('link', { name: 'Title 2 on TMDB' })
-    expect(cardNames()).toEqual(['Title 1 on TMDB', 'Title 2 on TMDB'])
+    await screen.findByRole('link', { name: 'Title 2' })
+    expect(cardNames()).toEqual(['Title 1', 'Title 2'])
     expect(getUpcomingShelf).toHaveBeenLastCalledWith({
       shelf: UPCOMING_SHELVES.shows,
       after: 'second',
@@ -89,7 +88,7 @@ describe('UpcomingShelfPage', () => {
       second: { titles: [title({ type: ITEM_TYPES.movie, id: 5 })], next: null },
     })
     open(UPCOMING_SHELVES.movies)
-    await screen.findByRole('link', { name: 'Title 5 on TMDB' })
+    await screen.findByRole('link', { name: 'Title 5' })
     await waitFor(() => expect(getUpcomingShelf).toHaveBeenCalledTimes(2))
   })
 
@@ -101,7 +100,7 @@ describe('UpcomingShelfPage', () => {
       },
     })
     open(UPCOMING_SHELVES.documentaries)
-    await screen.findByRole('link', { name: 'Title 2 on TMDB' })
+    await screen.findByRole('link', { name: 'Title 2' })
     expect(screen.getByText('Movie')).toBeInTheDocument()
     expect(screen.getByText('TV show')).toBeInTheDocument()
   })

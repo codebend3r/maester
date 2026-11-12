@@ -265,6 +265,9 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
       }
     },
 
+    /** A TMDB backdrop path through the server's image cache, so the browser never talks to TMDB. */
+    tmdbBackdropUrl: (backdrop: string): string => url(`/api/images/backdrop${backdrop}`),
+
     /** A picture Edit images offers, through the server's cache (TMDB's) or scaled (a local one). */
     imageOptionUrl: ({ id, kind, option }: ImageOptionUrlProps): string =>
       option.source === IMAGE_SOURCES.local

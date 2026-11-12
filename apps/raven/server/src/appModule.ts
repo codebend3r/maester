@@ -118,6 +118,9 @@ import {
 import { MusicIndexer } from '@/music/musicIndexer'
 import { MusicRepository } from '@/music/musicRepository'
 import { Filmographies } from '@/people/filmographies'
+import { ArrClient } from '@/requests/arrClient'
+import { DownloadRequests } from '@/requests/downloadRequests'
+import { RequestsController } from '@/requests/requestsController'
 import { UpcomingController } from '@/upcoming/upcomingController'
 import { UpcomingShelfPages } from '@/upcoming/upcomingShelfPages'
 import { UpcomingTitles } from '@/upcoming/upcomingTitles'
@@ -170,6 +173,7 @@ export const CONTROLLERS = [
   HlsController,
   BingeController,
   CaptionStyleController,
+  RequestsController,
   FavouritesController,
   WatchedController,
   HomeController,
@@ -301,6 +305,8 @@ export class AppModule {
         TitleFavourites,
         BingeShows,
         CaptionStyles,
+        ArrClient,
+        DownloadRequests,
         WatchedCards,
         WatchedRepository,
         MediaIndex,

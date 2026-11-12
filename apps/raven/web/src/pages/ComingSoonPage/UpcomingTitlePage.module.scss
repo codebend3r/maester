@@ -1,0 +1,130 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.back {
+  justify-self: start;
+}
+
+// The wide picture over the poster and everything said of the title beside it.
+.title {
+  display: grid;
+  grid-template-areas:
+    'backdrop backdrop'
+    'poster details';
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.backdrop {
+  grid-area: backdrop;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  max-height: 22rem;
+  object-fit: cover;
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+  box-shadow: var(--shadow-hero);
+}
+
+.poster {
+  grid-area: poster;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-canopy);
+  box-shadow: var(--shadow-poster);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.details {
+  grid-area: details;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
+  gap: var(--space-3);
+}
+
+.heading {
+  font-size: var(--font-size-hero);
+  line-height: var(--line-display);
+  overflow-wrap: anywhere;
+}
+
+.tagline {
+  color: var(--color-lichen);
+  font-style: italic;
+}
+
+// The facts as one run of text that wraps: the date, the kind, the length and the genres.
+.facts {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  list-style: none;
+}
+
+.fact {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.fact:has(+ .fact)::after {
+  content: '·' / '';
+  padding-inline: var(--space-1);
+}
+
+.summary {
+  max-width: var(--measure);
+  line-height: var(--line-relaxed);
+}
+
+.tmdb {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--space-0);
+    border-radius: var(--radius-sm);
+  }
+}
+
+.message {
+  color: var(--color-lichen);
+}
+
+// The page's shape while TMDB's answer is on its way.
+.standIn {
+  display: block;
+  aspect-ratio: 3 / 1;
+  border-radius: var(--radius-xl);
+  background: var(--color-canopy);
+}
+
+@media (max-width: 40rem) {
+  .title {
+    grid-template-areas:
+      'backdrop'
+      'poster'
+      'details';
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .poster {
+    width: 8rem;
+  }
+
+  .heading {
+    font-size: var(--font-size-2xl);
+  }
+}

@@ -1,12 +1,19 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, within } from '@testing-library/react'
-import { ITEM_TYPES, type MatchItemType, type Upcoming, type UpcomingTitle } from '@raven/core'
+import {
+  ITEM_TYPES,
+  type MatchItemType,
+  REQUEST_STATUSES,
+  type Upcoming,
+  type UpcomingTitle,
+} from '@raven/core'
 import { api } from '@/lib/api'
 import { ComingSoonPage } from '@/pages/ComingSoonPage/ComingSoonPage'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 
 const getUpcoming = spyOn(api, 'getUpcoming')
+const listRequests = spyOn(api, 'listRequests')
 
 type TitleProps = { type: MatchItemType; id: number; name: string }
 
@@ -29,9 +36,10 @@ describe('ComingSoonPage', () => {
   afterEach(() => {
     cleanup()
     getUpcoming.mockReset()
+    listRequests.mockReset()
   })
 
-  it('shelves the movies, the shows and the documentaries, each card opening TMDB', async () => {
+  it('shelves the movies, the shows and the documentaries, each card opening its own page', async () => {
     open({
       movies: [
         title({ type: ITEM_TYPES.movie, id: 1, name: 'Dune: Part Three' }),
@@ -48,16 +56,15 @@ describe('ComingSoonPage', () => {
     ).toBeInTheDocument()
     const movies = within(await screen.findByRole('region', { name: 'Upcoming movies' }))
     expect(movies.getAllByRole('listitem')).toHaveLength(2)
-    const dune = movies.getByRole('link', { name: 'Dune: Part Three on TMDB' })
-    expect(dune).toHaveAttribute('href', 'https://www.themoviedb.org/movie/1')
-    expect(dune).toHaveAttribute('target', '_blank')
+    const dune = movies.getByRole('link', { name: 'Dune: Part Three' })
+    expect(dune).toHaveAttribute('href', '/coming-soon/movie/1')
     expect(dune.querySelector('img')).toHaveAttribute(
       'src',
       api.tmdbPosterSources('/poster1.jpg').src,
     )
     expect(
-      within(shelf('Upcoming TV shows')).getByRole('link', { name: 'Blade Runner 2099 on TMDB' }),
-    ).toHaveAttribute('href', 'https://www.themoviedb.org/tv/3')
+      within(shelf('Upcoming TV shows')).getByRole('link', { name: 'Blade Runner 2099' }),
+    ).toHaveAttribute('href', '/coming-soon/show/3')
   })
 
   it("links each shelf's heading to the shelf's own page", async () => {
@@ -104,5 +111,35 @@ describe('ComingSoonPage', () => {
     renderWithProviders({ ui: <ComingSoonPage /> })
     expect(await screen.findByRole('alert')).toHaveTextContent('Set TMDB_API_TOKEN')
     expect(screen.queryByRole('region', { name: 'Upcoming movies' })).toBeNull()
+  })
+
+  it("shows where a title's request stands on its card", async () => {
+    listRequests.mockImplementation(async () => ({
+      requests: [
+        {
+          type: ITEM_TYPES.movie,
+          tmdbId: '1',
+          title: 'Dune: Part Three',
+          status: REQUEST_STATUSES.willDownload,
+          requestedAt: '2026-11-12T10:00:00.000Z',
+          isMine: false,
+        },
+      ],
+      budget: { limit: 10, left: 10, nextAt: null },
+      kinds: { movie: true, show: true },
+    }))
+    open({
+      movies: [
+        title({ type: ITEM_TYPES.movie, id: 1, name: 'Dune: Part Three' }),
+        title({ type: ITEM_TYPES.movie, id: 2, name: 'The Batman Part II' }),
+      ],
+      shows: [],
+      documentaries: [],
+    })
+    const [dune, batman] = within(
+      await screen.findByRole('region', { name: 'Upcoming movies' }),
+    ).getAllByRole('listitem')
+    expect(await within(dune!).findByText('Will download soon')).toBeInTheDocument()
+    expect(within(batman!).queryByText('Will download soon')).toBeNull()
   })
 })

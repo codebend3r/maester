@@ -20,6 +20,7 @@ import {
   type PlayHistoryShow,
   type TrackPage,
   type UpcomingPage,
+  type TitleRequestAsk,
   type UpcomingShelf,
   type ViewingSession,
   asksServerForNext,
@@ -29,6 +30,9 @@ import { playerQueriesFor } from '@/lib/playerQueries'
 
 /** How long Coming soon is taken as read: the server keeps TMDB's answer for hours. */
 const UPCOMING_STALE_MS = 30 * 60_000
+
+/** How often a page that shows requests asks again where they stand: the server reads each arr as often. */
+const REQUESTS_REFETCH_MS = 30_000
 
 /** What a history lists: what was watched by the library's own measure, or everything that played. */
 export const HISTORY_SHOWS = { watched: 'watched', all: 'all' } as const
@@ -248,6 +252,21 @@ export const ravenQueriesFor = (api: ApiClient) => {
       queryKey: queryKeys.upcoming,
       queryFn: () => api.getUpcoming(),
       staleTime: UPCOMING_STALE_MS,
+    }),
+
+    /** One upcoming movie or show as TMDB describes it; kept as long as the shelves. */
+    upcomingDetailsQuery: (title: TitleRequestAsk) =>
+      queryOptions({
+        queryKey: queryKeys.upcomingTitle(title),
+        queryFn: () => api.getUpcomingDetails(title),
+        staleTime: UPCOMING_STALE_MS,
+      }),
+
+    /** Every request and where it stands, asked again while a page shows it. */
+    requestsQuery: queryOptions({
+      queryKey: queryKeys.requests,
+      queryFn: () => api.listRequests(),
+      refetchInterval: REQUESTS_REFETCH_MS,
     }),
 
     /** One Coming soon shelf, a page at a time, the soonest out first; kept as long as the shelves. */

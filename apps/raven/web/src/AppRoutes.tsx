@@ -11,7 +11,11 @@ import { Toaster } from '@raven/ui'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
 import { HomeSkeleton } from '@/pages/HomePage/HomeSkeleton'
-import { COMING_SOON_PATH, comingSoonShelfPath } from '@/pages/ComingSoonPage/copy'
+import {
+  COMING_SOON_PATH,
+  COMING_SOON_TITLE_ROUTE,
+  comingSoonShelfPath,
+} from '@/pages/ComingSoonPage/copy'
 import { DESIGN_PATH } from '@/pages/DesignPage/copy'
 import { ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 import { PendingPage } from '@/pages/PendingPage/PendingPage'
@@ -114,6 +118,9 @@ const ComingSoonPage = lazyPage(() =>
 )
 const UpcomingShelfPage = lazyPage(() =>
   import('@/pages/ComingSoonPage/UpcomingShelfPage').then((module) => module.UpcomingShelfPage),
+)
+const UpcomingTitlePage = lazyPage(() =>
+  import('@/pages/ComingSoonPage/UpcomingTitlePage').then((module) => module.UpcomingTitlePage),
 )
 const AlbumPage = lazyPage(() =>
   import('@/pages/AlbumPage/AlbumPage').then((page) => page.AlbumPage),
@@ -266,6 +273,7 @@ export const AppRoutes = () => {
                     element={<UpcomingShelfPage key={shelf} shelf={shelf} />}
                   />
                 ))}
+                <Route path={COMING_SOON_TITLE_ROUTE} element={<UpcomingTitlePage />} />
                 <Route path="favourites" element={<FavouritesPage />} />
                 <Route path={PLAY_HISTORY_ROUTES.own} element={<PlayHistoryPage />} />
                 <Route path={PLAY_HISTORY_ROUTES.everyone} element={<EveryonesHistoryPage />} />

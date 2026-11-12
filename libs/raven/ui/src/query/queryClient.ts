@@ -6,6 +6,7 @@ import {
   type MusicListOptions,
   type MixKind,
   type PlayHistoryShow,
+  type TitleRequestAsk,
   type UpcomingShelf,
   type ViewingSession,
   ApiError,
@@ -143,6 +144,10 @@ export const queryKeys = {
   upcoming: ['upcoming'],
   /** One Coming soon shelf a page at a time, under Coming soon's key. */
   upcomingShelf: (shelf: UpcomingShelf) => ['upcoming', shelf],
+  /** One upcoming title's own page, under Coming soon's key. */
+  upcomingTitle: ({ type, tmdbId }: TitleRequestAsk) => ['upcoming', type, tmdbId],
+  /** Coming soon's requests, and the account's budget. */
+  requests: ['requests'],
   history: ({ libraryId, show, limit }: QueryKeysHistoryProps) => [
     'libraries',
     libraryId,

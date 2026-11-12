@@ -32,20 +32,20 @@ const isSameSecret = ({ given, expected }: IsSameSecretProps) =>
 
 type ComposeAlertProps = {
   alert: SignupAlert
-  settingsUrl: string
+  adminUrl: string
 }
 
-const composeAlert = ({ alert, settingsUrl }: ComposeAlertProps): AlertMessage => {
+const composeAlert = ({ alert, adminUrl }: ComposeAlertProps): AlertMessage => {
   switch (alert.status) {
     case ENROLMENT_STATUSES.approved:
       return {
-        subject: `raven: ${alert.email} signed up and was approved`,
-        text: `${alert.email} confirmed their email and was approved automatically.\n\nTo remove their access, open Users in raven's settings: ${settingsUrl}\n`,
+        subject: `raven: ${alert.email} signed up and is now a member`,
+        text: `${alert.email} signed up for raven, confirmed their email and wants to become a member. They signed up before the approval window closed, so raven approved them automatically.\n\nTo remove their access, sign in as the owner and open Users on raven's Admin page: ${adminUrl}\n`,
       }
     case ENROLMENT_STATUSES.pending:
       return {
-        subject: `raven: ${alert.email} is waiting for approval`,
-        text: `${alert.email} confirmed their email and is waiting for you.\n\nTo approve or remove them, open Users in raven's settings: ${settingsUrl}\n`,
+        subject: `raven: ${alert.email} signed up and wants to become a member`,
+        text: `${alert.email} signed up for raven, confirmed their email and wants to become a member. They cannot use raven until you approve them.\n\nTo approve them, sign in as the owner and open Users on raven's Admin page: ${adminUrl}\n`,
       }
     default: {
       const unhandled: never = alert.status
@@ -67,14 +67,14 @@ const readBody = async ({ request }: ReadBodyProps): Promise<unknown> => {
 type HandleSignupAlertProps = {
   request: Request
   secret: string
-  settingsUrl: string
+  adminUrl: string
   send: (message: AlertMessage) => Promise<void>
 }
 
 export const handleSignupAlert = async ({
   request,
   secret,
-  settingsUrl,
+  adminUrl,
   send,
 }: HandleSignupAlertProps) => {
   if (request.method !== HTTP_METHODS.post) return new Response(null, { status: 405 })
@@ -82,6 +82,6 @@ export const handleSignupAlert = async ({
   if (!isSameSecret({ given, expected: secret })) return new Response(null, { status: 401 })
   const body = await readBody({ request })
   if (!isSignupAlert(body)) return new Response(null, { status: 400 })
-  await send(composeAlert({ alert: body, settingsUrl }))
+  await send(composeAlert({ alert: body, adminUrl }))
   return new Response(null, { status: 204 })
 }
