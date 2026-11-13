@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ROUTES, TIERS } from '@/lib/api'
 import { browser } from '@/lib/browser'
+import { ENTRY_KINDS } from '@/lib/entries'
+import { CHAT_EVENTS, NOTICE_KINDS } from '@/lib/events'
 import { ChatPage } from '@/pages/ChatPage/ChatPage'
 import { CHAT_STORAGE_KEY, useChat } from '@/stores/chat'
 import { eventStream, renderWithQueries } from '@/test/render'
@@ -33,7 +36,7 @@ const SANDBOX = {
   ],
 }
 
-const FRIEND = { user: { id: 'eval-user', display_name: 'Sandbox friend' }, tier: 'friend' }
+const FRIEND = { user: { id: 'eval-user', display_name: 'Sandbox friend' }, tier: TIERS.friend }
 
 const urlOf = (input: RequestInfo | URL): string => {
   if (typeof input === 'string') return input
@@ -54,8 +57,8 @@ const serve = (routes: Record<string, () => Response>) => {
 }
 
 const sandboxRoutes = (extra: Record<string, () => Response> = {}) => ({
-  '/api/me': () => json(FRIEND),
-  '/api/sandbox': () => json(SANDBOX),
+  [ROUTES.me]: () => json(FRIEND),
+  [ROUTES.sandbox]: () => json(SANDBOX),
   ...extra,
 })
 
@@ -68,23 +71,25 @@ describe('ChatPage', () => {
   it('sends a case message and shows the reply, its tools and the verdict', async () => {
     const sent = serve(
       sandboxRoutes({
-        '/api/chat': () =>
+        [ROUTES.chat]: () =>
           new Response(
             eventStream([
-              ['tool', { name: 'search_media', input: { query: 'Dune' }, ok: true, result: '[]' }],
               [
-                'tool',
+                CHAT_EVENTS.tool,
+                { name: 'search_media', input: { query: 'Dune' }, ok: true, result: '[]' },
+              ],
+              [
+                CHAT_EVENTS.tool,
                 { name: 'request_media', input: { tmdb_id: 438631 }, ok: true, result: 'ok' },
               ],
               [
-                'titles',
+                CHAT_EVENTS.titles,
                 {
                   titles: [
                     {
                       key: 'raven:movie:277',
                       title: 'Dune',
                       year: 2021,
-                      logo_url: 'http://localhost:5174/api/items/277/images/logo',
                       links: [
                         {
                           label: '4K Movies 4K HDR',
@@ -97,12 +102,12 @@ describe('ChatPage', () => {
                 },
               ],
               [
-                'text',
+                CHAT_EVENTS.text,
                 {
                   text: 'Requested Dune (2021) in 1080p. [Watch it in raven](http://localhost:5174/movies/277?library=6)',
                 },
               ],
-              ['done', {}],
+              [CHAT_EVENTS.done, {}],
             ]),
           ),
       }),
@@ -129,7 +134,7 @@ describe('ChatPage', () => {
     ).toEqual(['4K Movies 4K HDR'])
     expect(screen.getByRole('region', { name: 'Verdict' })).toHaveTextContent('Meets the case')
     expect(sent).toEqual([
-      { url: '/api/chat', body: { text: 'can you get Dune (2021) in 1080p?' } },
+      { url: ROUTES.chat, body: { text: 'can you get Dune (2021) in 1080p?' } },
     ])
   })
 
@@ -137,18 +142,18 @@ describe('ChatPage', () => {
     const used = [15_750]
     const sent = serve(
       sandboxRoutes({
-        '/api/chat/usage': () =>
+        [ROUTES.usage]: () =>
           json({ model: 'claude-sonnet-5-5', tokens_used: used[0], token_budget: 200_000 }),
-        '/api/chat': () => {
+        [ROUTES.chat]: () => {
           used[0] = 190_000
           return new Response(
             eventStream([
-              ['text', { text: 'Hello.' }],
-              ['done', {}],
+              [CHAT_EVENTS.text, { text: 'Hello.' }],
+              [CHAT_EVENTS.done, {}],
             ]),
           )
         },
-        '/api/chat/forget': () => json({ text: 'Forgotten.' }),
+        [ROUTES.forget]: () => json({ text: 'Forgotten.' }),
       }),
     )
     renderWithQueries(<ChatPage />)
@@ -163,30 +168,33 @@ describe('ChatPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'New chat' }))
     expect(await screen.findByText('How can I help?')).toBeInTheDocument()
-    expect(sent.at(-1)).toEqual({ url: '/api/chat/forget', body: {} })
+    expect(sent.at(-1)).toEqual({ url: ROUTES.forget, body: {} })
   })
 
   it('presses a confirmation once and picks a choice as the next message', async () => {
     const sent = serve(
       sandboxRoutes({
-        '/api/chat': () =>
+        [ROUTES.chat]: () =>
           new Response(
             eventStream([
-              ['text', { text: 'Which one?' }],
-              ['confirm', { pending_id: 5, summary: 'Replace Dune?', action: 'replace_media' }],
+              [CHAT_EVENTS.text, { text: 'Which one?' }],
+              [
+                CHAT_EVENTS.confirm,
+                { pending_id: 5, summary: 'Replace Dune?', action: 'replace_media' },
+              ],
               [
                 'choices',
                 { choices: [{ label: 'Dune', value: '841', year: 1984, display: 'Dune (1984)' }] },
               ],
-              ['done', {}],
+              [CHAT_EVENTS.done, {}],
             ]),
           ),
-        '/api/chat/decide': () => json({ text: 'Done: replaced', settled: true, notices: [] }),
-        '/api/chat/pick': () =>
+        [ROUTES.decide]: () => json({ text: 'Done: replaced', settled: true, notices: [] }),
+        [ROUTES.pick]: () =>
           new Response(
             eventStream([
-              ['text', { text: 'Got it.' }],
-              ['done', {}],
+              [CHAT_EVENTS.text, { text: 'Got it.' }],
+              [CHAT_EVENTS.done, {}],
             ]),
           ),
       }),
@@ -202,41 +210,42 @@ describe('ChatPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Dune (1984)' }))
     expect(await screen.findByText('Got it.')).toBeInTheDocument()
     expect(sent.map(({ url, body }) => [url, body])).toEqual([
-      ['/api/chat', { text: 'replace dune' }],
-      ['/api/chat/decide', { pending_id: 5, approve: true }],
-      ['/api/chat/pick', { label: 'Dune', value: '841', year: 1984 }],
+      [ROUTES.chat, { text: 'replace dune' }],
+      [ROUTES.decide, { pending_id: 5, approve: true }],
+      [ROUTES.pick, { label: 'Dune', value: '841', year: 1984 }],
     ])
   })
 
-  it('shows an approval for the admin with its buttons, and the tier can change', async () => {
+  it('shows a note for the admin, with no buttons, and the tier can change', async () => {
     const sent = serve(
       sandboxRoutes({
-        '/api/chat': () =>
+        [ROUTES.chat]: () =>
           new Response(
             eventStream([
-              ['notice', { kind: 'approval', text: 'Trusty wants Dune in 4K', pending_id: 8 }],
-              ['text', { text: 'Asked the admin.' }],
-              ['done', {}],
+              [CHAT_EVENTS.notice, { kind: NOTICE_KINDS.adminPost, text: 'Trusty reported Dune' }],
+              [CHAT_EVENTS.text, { text: 'Told the admin.' }],
+              [CHAT_EVENTS.done, {}],
             ]),
           ),
-        '/api/sandbox/tier': () => json({ tier: 'admin' }),
+        [ROUTES.sandboxTier]: () => json({ tier: TIERS.admin }),
       }),
     )
     renderWithQueries(<ChatPage />)
-    await userEvent.type(await screen.findByLabelText('Message sparrow'), 'dune in 4k{Enter}')
+    await userEvent.type(await screen.findByLabelText('Message sparrow'), 'dune skips{Enter}')
 
     const notices = await screen.findByRole('list', { name: 'Notices' })
-    expect(notices).toHaveTextContent('Approval for the admin')
-    expect(within(notices).getByRole('button', { name: 'Approve' })).toBeEnabled()
+    expect(notices).toHaveTextContent('To the admin')
+    expect(notices).toHaveTextContent('Trusty reported Dune')
+    expect(within(notices).queryByRole('button')).not.toBeInTheDocument()
 
     await userEvent.selectOptions(screen.getByLabelText('Tier'), 'admin')
-    expect(sent.at(-1)).toEqual({ url: '/api/sandbox/tier', body: { tier: 'admin' } })
+    expect(sent.at(-1)).toEqual({ url: ROUTES.sandboxTier, body: { tier: TIERS.admin } })
   })
 
   it('says so when the turn cannot reach sparrow or breaks on its side', async () => {
     serve(
       sandboxRoutes({
-        '/api/chat': () => new Response(eventStream([['error', { ref: 'abc123' }]])),
+        [ROUTES.chat]: () => new Response(eventStream([[CHAT_EVENTS.error, { ref: 'abc123' }]])),
       }),
     )
     renderWithQueries(<ChatPage />)
@@ -247,12 +256,12 @@ describe('ChatPage', () => {
   it('shows why a turn broke when the sandbox says', async () => {
     serve(
       sandboxRoutes({
-        '/api/chat': () =>
+        [ROUTES.chat]: () =>
           new Response(
             eventStream([
-              ['failure', { detail: 'AuthenticationError: invalid x-api-key' }],
-              ['text', { text: 'Sorry, something went wrong on my end (ref `c469d5`).' }],
-              ['done', {}],
+              [CHAT_EVENTS.failure, { detail: 'AuthenticationError: invalid x-api-key' }],
+              [CHAT_EVENTS.text, { text: 'Sorry, something went wrong on my end (ref `c469d5`).' }],
+              [CHAT_EVENTS.done, {}],
             ]),
           ),
       }),
@@ -267,11 +276,11 @@ describe('ChatPage', () => {
   it("keeps the chat across a reload while the world is the same, and drops another world's", async () => {
     serve(
       sandboxRoutes({
-        '/api/chat': () =>
+        [ROUTES.chat]: () =>
           new Response(
             eventStream([
-              ['text', { text: 'Hello.' }],
-              ['done', {}],
+              [CHAT_EVENTS.text, { text: 'Hello.' }],
+              [CHAT_EVENTS.done, {}],
             ]),
           ),
       }),
@@ -297,7 +306,7 @@ describe('ChatPage', () => {
       JSON.stringify({
         state: {
           owner: 'old-world',
-          entries: [{ kind: 'said', id: 0, text: 'from before' }],
+          entries: [{ kind: ENTRY_KINDS.said, id: 0, text: 'from before' }],
           settled: [],
         },
         version: 0,
@@ -310,10 +319,68 @@ describe('ChatPage', () => {
     expect(screen.queryByText('from before')).not.toBeInTheDocument()
   })
 
+  it('starts fresh from a chat saved before replies kept their events', async () => {
+    // The chat raw as the page saved it before replies kept their events.
+    window.localStorage.setItem(
+      CHAT_STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          owner: 'w1',
+          entries: [
+            { kind: 'said', id: 0, text: 'from before' },
+            {
+              kind: 'reply',
+              id: 1,
+              state: 'done',
+              chunks: ['an old answer'],
+              tools: [],
+              confirmations: [],
+              choices: [],
+              notices: [{ kind: 'approval', text: 'Dune in 4K?', pendingId: 3, to: null }],
+              titles: [],
+              failure: null,
+              cause: null,
+              expected: null,
+            },
+          ],
+          settled: [3],
+        },
+        version: 0,
+      }),
+    )
+    await useChat.persist.rehydrate()
+    expect(useChat.getState().entries).toEqual([])
+    serve(sandboxRoutes())
+    renderWithQueries(<ChatPage />)
+    expect(await screen.findByText('How can I help?')).toBeInTheDocument()
+    expect(screen.queryByText('an old answer')).not.toBeInTheDocument()
+  })
+
+  it('keeps the conversation when sparrow does not answer Start over', async () => {
+    serve(
+      sandboxRoutes({
+        [ROUTES.chat]: () =>
+          new Response(
+            eventStream([
+              [CHAT_EVENTS.text, { text: 'Hello.' }],
+              [CHAT_EVENTS.done, {}],
+            ]),
+          ),
+        [ROUTES.forget]: () => json({ detail: 'down' }, 503),
+      }),
+    )
+    renderWithQueries(<ChatPage />)
+    await userEvent.type(await screen.findByLabelText('Message sparrow'), 'hi{Enter}')
+    expect(await screen.findByText('Hello.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Start over' }))
+    expect(await screen.findByText(/Couldn't start over/)).toBeInTheDocument()
+    expect(screen.getByText('Hello.')).toBeInTheDocument()
+  })
+
   it('sends anyone signed out to rookery, coming back here after', async () => {
     const goTo = spyOn(browser, 'goTo').mockImplementation(() => undefined)
     serve({
-      '/api/me': () => json({ reason: 'signed_out', sign_in: 'https://rookery.test/login' }, 401),
+      [ROUTES.me]: () => json({ reason: 'signed_out', sign_in: 'https://rookery.test/login' }, 401),
     })
     renderWithQueries(<ChatPage />)
     expect(await screen.findByText('Sending you to sign in…')).toBeInTheDocument()
@@ -323,7 +390,7 @@ describe('ChatPage', () => {
   })
 
   it('has no sandbox controls on the real server, and tells an unlinked user whom to ask', async () => {
-    serve({ '/api/me': () => json({ ...FRIEND, tier: 'unlinked' }) })
+    serve({ [ROUTES.me]: () => json({ ...FRIEND, tier: TIERS.unlinked }) })
     renderWithQueries(<ChatPage />)
     expect(await screen.findByText(/doesn't have access to this server yet/)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Sandbox' })).not.toBeInTheDocument()

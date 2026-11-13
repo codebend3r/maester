@@ -16,7 +16,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from sparrow.agent.tools import Choice, Choices, Refused, Result, Tier, ToolContext, tool
+from sparrow.agent.tools import Choice, Ok, Refused, Result, Tier, ToolContext, offer, tool
 from sparrow.clients.seerr import Collection, RequestRefused, RequestStatus, SearchResult
 from sparrow.tools.requests import explain
 from sparrow.tools.search import as_choice, availability
@@ -37,7 +37,7 @@ def missing(collection: Collection) -> list[SearchResult]:
 async def find_collection(
     ctx: ToolContext,
     tmdb_id: Annotated[int, Field(description="TMDB id of any movie in it.")],
-) -> dict[str, Any] | Choices:
+) -> dict[str, Any] | Ok:
     seerr = ctx.services.seerr
     movie = await seerr.media_details("movie", tmdb_id)
     if movie.collection_id is None:
@@ -55,13 +55,13 @@ async def find_collection(
         }
     entries = [as_choice(p) for p in collection.parts]
     if len(gaps) == 1:
-        return Choices(entries)
+        return offer(entries)
     everything = Choice(
         label=f"All {len(gaps)} missing from {collection.name}",
         value=f"collection:{collection.id}",
         detail="One request per missing entry: " + ", ".join(p.title for p in gaps),
     )
-    return Choices([everything, *entries])
+    return offer([everything, *entries])
 
 
 @tool(
@@ -70,7 +70,6 @@ async def find_collection(
     "Seerr request each, as the user. Checks the user's movie quota first and requests "
     "nothing when the collection needs more than is left.",
     tier=Tier.FRIEND,
-    held_in_maintenance=True,
 )
 async def request_collection(
     ctx: ToolContext,

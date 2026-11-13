@@ -2,19 +2,15 @@
 
 `request_media` asks for the standard (1080p) copy. `request_media_4k` is a
 trusted-tier tool the friend tier never sees. When Seerr leaves either
-request pending, it goes to the admin with Approve/Deny buttons
-(`sparrow/approvals.py`, shared with Seerr's MEDIA_PENDING webhook so each
-request is asked about once), and the press runs `decide_request`, a
-button-only admin tool that approves or declines it in Seerr and tells the
-requester. For shows, seasons already on the server or already requested
-are left out and reported, counted the way Seerr counts them.
+request pending, it waits there for the admin, who decides it in Seerr. For
+shows, seasons already on the server or already requested are left out and
+reported, counted the way Seerr counts them.
 
-A 4K request is held back when the volume Seerr's 4K server puts it on is
+A 4K request is refused when the volume Seerr's 4K server puts it on is
 past `STORAGE_PAUSE_4K_PERCENT` full, or its space can't be read: nothing
-goes to Seerr, the friend is told why, and the admin's Approve runs
-`decide_4k_over_storage`, which requests it as the friend, approved. When nothing is requested
+goes to Seerr, and the friend is told why. When nothing is requested
 (Seerr's refusals: quota, permission, duplicates; or nothing left to ask
-for), the tool refuses (`Result.refusal`) with one sentence to relay.
+for), the tool refuses (`Refused`) with one sentence to relay.
 
 A friend who wants an English dub gets the configured dub tag added to the
 request (Seerr stores it on the request and hands it to Sonarr or Radarr,
@@ -35,17 +31,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from sparrow.agent.tools import (
-    Approval,
-    NeedsApproval,
-    Ok,
-    Refused,
-    Result,
-    Tier,
-    ToolContext,
-    tool,
-)
-from sparrow.approvals import decision_dm, request_approval, request_subject
+from sparrow.agent.tools import Refused, Result, Tier, ToolContext, tool
 from sparrow.clients import ClientError, Services
 from sparrow.clients.seerr import (
     ArrServer,
@@ -62,10 +48,9 @@ from sparrow.config import Settings
 from sparrow.kinds import KINDS
 from sparrow.library import Library, NotLocated, OwnerUnknown, show_owner_on
 from sparrow.media import MediaType, version_label
-from sparrow.notify import DirectMessage
 from sparrow.storage import Space, volumes_of
 from sparrow.store import LinkedUser
-from sparrow.tools.args import FriendId, TmdbId
+from sparrow.tools.args import TmdbId
 
 # A 4K copy runs roughly four to six times the size of a 1080p encode.
 UHD_SIZE_FACTOR = (4, 6)
@@ -94,10 +79,6 @@ EnglishDub = Annotated[
 ]
 
 
-class NotRequested(Exception):
-    """Nothing was sent to Seerr; the message says why, in words to relay."""
-
-
 @dataclass(frozen=True)
 class SeasonPlan:
     request: list[int]
@@ -107,10 +88,10 @@ class SeasonPlan:
 
 def plan_seasons(
     details: MediaDetails, asked: list[int] | None, latest: bool, is_4k: bool
-) -> SeasonPlan:
+) -> SeasonPlan | Refused:
     """Which asked-for seasons to request: those Seerr would not already count as present."""
     if asked is not None and latest:
-        raise NotRequested("pass seasons or latest_season, not both")
+        return Refused("pass seasons or latest_season, not both")
     known = {s.number: s for s in details.seasons}
     if latest:
         wanted = [max(known)] if known else []
@@ -119,7 +100,7 @@ def plan_seasons(
     else:
         missing = sorted(set(asked) - set(known))
         if missing:
-            raise NotRequested(f"{details.display} has no season {missing}; it has {sorted(known)}")
+            return Refused(f"{details.display} has no season {missing}; it has {sorted(known)}")
         wanted = sorted(set(asked))
     statuses = {n: known[n].status_for(is_4k) for n in wanted}
     return SeasonPlan(
@@ -168,13 +149,15 @@ class Planned:
 
 def plan_request(
     details: MediaDetails, seasons: list[int] | None, latest_season: bool, *, is_4k: bool
-) -> Planned:
-    """What to request, leaving out what is already there; `NotRequested` when nothing is left."""
+) -> Planned | Refused:
+    """What to request, leaving out what is already there; refused when nothing is left."""
     version = version_label(is_4k)
     reply: dict[str, Any] = {"title": details.display, "version": version}
     nothing = f"Nothing was requested for {details.display} in {version}"
     if details.media_type == "tv":
         plan = plan_seasons(details, seasons, latest_season, is_4k)
+        if isinstance(plan, Refused):
+            return plan
         if plan.left_out:
             reply["left_out"] = [{"season": n, "status": s} for n, s in plan.left_out.items()]
         if not plan.request:
@@ -184,12 +167,12 @@ def plan_request(
                 if there
                 else "no seasons were asked for."
             )
-            raise NotRequested(f"{nothing}: {why}")
+            return Refused(f"{nothing}: {why}")
         return Planned(plan.request, reply)
     if seasons is not None or latest_season:
-        raise NotRequested("seasons are for TV shows only")
+        return Refused("seasons are for TV shows only")
     if not (status := details.status_for(is_4k)).requestable:
-        raise NotRequested(f"{nothing}: it's {status.label}.")
+        return Refused(f"{nothing}: it's {status.label}.")
     return Planned(None, reply)
 
 
@@ -200,13 +183,10 @@ async def submit(
     *,
     is_4k: bool,
     english_dub: bool = False,
-    user: LinkedUser | None = None,
-) -> Submitted:
-    """Request what's planned in Seerr as `user` (the caller, unless named).
-
-    `NotRequested` says why Seerr didn't take it.
-    """
-    user = user or ctx.linked_user()
+) -> Submitted | Refused:
+    """Request what's planned in Seerr as the caller; refused, saying why, when Seerr
+    didn't take it."""
+    user = ctx.linked_user()
     seerr = ctx.services.seerr
     reply = dict(planned.reply)
     routing = None
@@ -224,9 +204,7 @@ async def submit(
         )
     except RequestRefused as refused:
         reason = await explain(seerr, user, refused, details.media_type)
-        raise NotRequested(
-            f"Seerr didn't take the request for {details.display}: {reason}"
-        ) from refused
+        return Refused(f"Seerr didn't take the request for {details.display}: {reason}")
     return Submitted(
         request,
         {
@@ -283,7 +261,6 @@ async def size_tradeoff(services: Services, details: MediaDetails) -> dict[str, 
     "english_dub when they want English audio. Returns the Seerr request id and whether it "
     "was approved automatically; when nothing was requested, it refuses and says why.",
     tier=Tier.FRIEND,
-    held_in_maintenance=True,
 )
 async def request_media(
     ctx: ToolContext,
@@ -294,40 +271,37 @@ async def request_media(
     english_dub: EnglishDub = False,
 ) -> dict[str, Any] | Result:
     details = await ctx.services.seerr.media_details(media_type, tmdb_id)
-    try:
-        planned = plan_request(details, seasons, latest_season, is_4k=False)
-        submitted = await submit(ctx, details, planned, is_4k=False, english_dub=english_dub)
-    except NotRequested as why:
-        return Refused(str(why))
-    return awaiting_admin(ctx, submitted, details)
+    planned = plan_request(details, seasons, latest_season, is_4k=False)
+    if isinstance(planned, Refused):
+        return planned
+    submitted = await submit(ctx, details, planned, is_4k=False, english_dub=english_dub)
+    if isinstance(submitted, Refused):
+        return submitted
+    return answer(submitted)
 
 
-def awaiting_admin(
-    ctx: ToolContext, submitted: Submitted, details: MediaDetails, note: str = ""
-) -> dict[str, Any] | Result:
-    """The reply; when Seerr left the request pending, the admin is asked too."""
+# What the model is told about a request Seerr left pending.
+WAITS_IN_SEERR = (
+    "Seerr left this request pending: it waits there for the admin to approve. Tell the user "
+    "it now waits on the admin."
+)
+
+
+def answer(submitted: Submitted) -> dict[str, Any]:
+    """The reply; one Seerr left pending says it waits on the admin there."""
     if submitted.request.status != RequestStatus.PENDING:
         return submitted.reply
-    approval = request_approval(
-        submitted.request,
-        details.display,
-        requester=ctx.user_id,
-        who=ctx.linked_user().name,
-        note=note,
-    )
-    return NeedsApproval(submitted.reply, approval=approval)
+    return {**submitted.reply, "pending": WAITS_IN_SEERR}
 
 
 @tool(
     "request_media_4k",
     "Request the 4K version of a movie or show through Seerr, as the user. Seerr sends it to "
     "its 4K server; unless Seerr approves it automatically, it then waits for the admin. "
-    "When the 4K storage is nearly full it isn't sent yet and waits for the admin; the "
-    "result's storage says why. "
+    "When the 4K storage is nearly full it isn't sent, and the refusal says why. "
     "When a 1080p copy is already on the server the result gives its size and the 4K "
     "estimate, so you can explain the storage trade-off.",
     tier=Tier.TRUSTED,
-    held_in_maintenance=True,
 )
 async def request_media_4k(
     ctx: ToolContext,
@@ -338,24 +312,28 @@ async def request_media_4k(
     english_dub: EnglishDub = False,
 ) -> dict[str, Any] | Result:
     seerr = ctx.services.seerr
-    uhd = [s for s in await seerr.servers(KINDS[media_type].service) if s.is_4k]
+    servers, details = await asyncio.gather(
+        seerr.servers(KINDS[media_type].service), seerr.media_details(media_type, tmdb_id)
+    )
+    uhd = [s for s in servers if s.is_4k]
     if not uhd:
         return Refused("4K requests aren't set up on this server.")
-    details = await seerr.media_details(media_type, tmdb_id)
-    try:
-        planned = plan_request(details, seasons, latest_season, is_4k=True)
-    except NotRequested as why:
-        return Refused(str(why))
+    planned = plan_request(details, seasons, latest_season, is_4k=True)
+    if isinstance(planned, Refused):
+        return planned
     # Measured before the request exists, so a failed lookup cannot orphan it.
-    tradeoff = await size_tradeoff(ctx.services, details)
-    if full := await no_room_for_4k(ctx, details, uhd):
-        return held_for_room(ctx, details, planned, tradeoff, full, english_dub)
-    try:
-        submitted = await submit(ctx, details, planned, is_4k=True, english_dub=english_dub)
-    except NotRequested as why:
-        return Refused(str(why))
-    submitted = replace(submitted, reply={**submitted.reply, **tradeoff})
-    return awaiting_admin(ctx, submitted, details, size_note(tradeoff))
+    tradeoff, full = await asyncio.gather(
+        size_tradeoff(ctx.services, details), no_room_for_4k(ctx, details, uhd)
+    )
+    if full:
+        return Refused(
+            f"Nothing was requested for {details.display} in 4K: {full}, so 4K requests are "
+            f"paused for now; ask the admin. {size_note(tradeoff)}".strip()
+        )
+    submitted = await submit(ctx, details, planned, is_4k=True, english_dub=english_dub)
+    if isinstance(submitted, Refused):
+        return submitted
+    return answer(replace(submitted, reply={**submitted.reply, **tradeoff}))
 
 
 def size_note(tradeoff: dict[str, Any]) -> str:
@@ -370,7 +348,7 @@ def size_note(tradeoff: dict[str, Any]) -> str:
 async def no_room_for_4k(
     ctx: ToolContext, details: MediaDetails, uhd: list[ArrServer]
 ) -> str | None:
-    """Why a 4K request must wait for the admin because of space; None when there's room.
+    """Why a 4K request can't go ahead because of space; None when there's room.
 
     The volume is the one Seerr's 4K server puts requests on (its root folder,
     or the arr's only one). Space that can't be read counts as no room: a
@@ -399,108 +377,6 @@ async def no_room_for_4k(
     )
 
 
-def room_subject(requester: str, details: MediaDetails) -> str:
-    return f"4k-room:{requester}:{details.media_type}:{details.tmdb_id}"
-
-
-def held_for_room(
-    ctx: ToolContext,
-    details: MediaDetails,
-    planned: Planned,
-    tradeoff: dict[str, Any],
-    full: str,
-    english_dub: bool,
-) -> Result:
-    """Nothing goes to Seerr yet: the admin decides, and Approve requests it as the friend."""
-    who = ctx.linked_user().name
-    reply = {
-        **planned.reply,
-        **tradeoff,
-        "requested": False,
-        "storage": f"{full[0].upper()}{full[1:]}, so 4K requests wait for the admin's approval "
-        "for now; it's requested once they approve.",
-    }
-    notice = (
-        f"{who} asks for {details.display} in 4K, but {full}. Approve to request it anyway. "
-        f"{size_note(tradeoff)}"
-    ).strip()
-    return NeedsApproval(
-        reply,
-        approval=Approval(
-            notice=notice,
-            summary=f"4K {details.display} for {who}, over the storage limit",
-            decide=decide_4k_over_storage,
-            args={
-                "tmdb_id": details.tmdb_id,
-                "media_type": details.media_type,
-                "seasons": planned.seasons,
-                "english_dub": english_dub,
-                "title": details.display,
-                "requester": ctx.user_id,
-            },
-            subject=room_subject(ctx.user_id, details),
-        ),
-    )
-
-
-@tool(
-    "decide_4k_over_storage",
-    "The admin's decision on a 4K request held because its volume is nearly full.",
-    tier=Tier.ADMIN,
-    button_only=True,
-)
-async def decide_4k_over_storage(
-    ctx: ToolContext,
-    tmdb_id: int,
-    media_type: MediaType,
-    english_dub: bool,
-    title: str,
-    requester: FriendId,
-    approved: bool,
-    seasons: list[int] | None = None,
-) -> Result:
-    """Request it in Seerr as the friend, approved, or tell them it's held off.
-
-    Safe to run again: a request an earlier press made but couldn't approve is
-    found among the friend's pending ones and approved, not asked for twice.
-    """
-    if not approved:
-        dm = (
-            f"The admin held off on {title} in 4K for now: the server's 4K storage is nearly "
-            "full. You can still ask for the regular version."
-        )
-        return Ok(f"Held off on {title} in 4K.", (DirectMessage(requester, dm),))
-    user = ctx.link_of(requester)
-    seerr = ctx.services.seerr
-    details = await seerr.media_details(media_type, tmdb_id)
-    # An earlier press may have made the request and failed to approve it: finish that one.
-    earlier = await seerr.list_requests(user_id=user.seerr_user_id, take=50, filter="pending")
-    request = next(
-        (r for r in earlier if (r.media_type, r.tmdb_id, r.is_4k) == (media_type, tmdb_id, True)),
-        None,
-    )
-    if request is None:
-        try:
-            # The seasons still missing now: something may have landed while it waited.
-            planned = plan_request(details, seasons, False, is_4k=True)
-            submitted = await submit(
-                ctx, details, planned, is_4k=True, english_dub=english_dub, user=user
-            )
-        except NotRequested as why:
-            return Refused(str(why))
-        request = submitted.request
-    if request.status == RequestStatus.PENDING:  # the admin just approved it here
-        await seerr.approve_request(request.id)
-    # Seerr's webhook may have asked about the new request meanwhile; this settles it.
-    if raised := ctx.store.pending_about(request_subject(request.id)):
-        ctx.store.decide_pending(raised.id, "approved", ctx.user_id)
-    dm = decision_dm(title, "4K", approved=True)
-    return Ok(
-        f"Requested {title} in 4K for {user.name} and approved it in Seerr (request #{request.id}).",
-        (DirectMessage(requester, dm),),
-    )
-
-
 @tool(
     "follow_show",
     "Monitor a show in the Sonarr that owns it so future seasons download as they air "
@@ -508,7 +384,6 @@ async def decide_4k_over_storage(
     "reports; the show must already be in Sonarr, which happens once a request is approved.",
     tier=Tier.FRIEND,
     host_param="host",
-    held_in_maintenance=True,
 )
 async def follow_show(
     ctx: ToolContext,

@@ -3,6 +3,7 @@
  * (`sparrow/web/chat.py`) are snake case; past the guards everything is the
  * shapes below.
  */
+import { isRecord } from '@shared/http'
 import type { RawEvent } from '@/lib/sse'
 
 export const CHAT_EVENTS = {
@@ -19,8 +20,6 @@ export const CHAT_EVENTS = {
 
 export const NOTICE_KINDS = {
   adminPost: 'admin_post',
-  approval: 'approval',
-  announcement: 'announcement',
   directMessage: 'direct_message',
 } as const
 
@@ -43,7 +42,7 @@ export type TitleCard = {
   year: number | null
   links: TitleLink[]
 }
-export type Notice = { kind: NoticeKind; text: string; pendingId: number | null; to: string | null }
+export type Notice = { kind: NoticeKind; text: string; to: string | null }
 
 export type ChatEvent =
   | { name: typeof CHAT_EVENTS.tool; tool: ToolCall }
@@ -56,10 +55,7 @@ export type ChatEvent =
   | { name: typeof CHAT_EVENTS.done }
   | { name: typeof CHAT_EVENTS.error; ref: string }
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value != null && !Array.isArray(value)
-
-export const isNoticeKind = (value: unknown): value is NoticeKind =>
+const isNoticeKind = (value: unknown): value is NoticeKind =>
   Object.values(NOTICE_KINDS).some((kind) => kind === value)
 
 const toTool = (data: Record<string, unknown>): ToolCall | null =>
@@ -95,7 +91,7 @@ const toChoice = (value: unknown): Choice | null => {
 }
 
 /** Whether `value` is an address the page may load or open: http or https only. */
-export const isWebAddress = (value: unknown): value is string =>
+const isWebAddress = (value: unknown): value is string =>
   typeof value === 'string' && /^https?:\/\//.test(value)
 
 const toTitleLink = (value: unknown): TitleLink | null =>
@@ -125,7 +121,6 @@ export const toNotice = (value: unknown): Notice | null => {
   return {
     kind: value.kind,
     text: value.text,
-    pendingId: typeof value.pending_id === 'number' ? value.pending_id : null,
     to: typeof value.to === 'string' ? value.to : null,
   }
 }

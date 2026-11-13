@@ -8,16 +8,8 @@ from sparrow.clients.arr import RootFolder
 from sparrow.clients.arr_library import ArrLibraryClient, CustomFilter, FakeArrLibrary, HistoryRow
 from sparrow.config import Settings
 from sparrow.memo import Memo
-from sparrow.tools.arrs import (
-    Pick,
-    UnreadableRule,
-    arr_history,
-    arr_move,
-    arr_overview,
-    arr_titles,
-    holds,
-    letter_folder,
-)
+from sparrow.tools.arr_filters import Pick, UnreadableRule, holds
+from sparrow.tools.arrs import arr_history, arr_move, arr_overview, arr_titles, letter_folder
 
 BASE = "http://radarr.test"
 REQUESTED = CustomFilter(

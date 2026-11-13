@@ -12,7 +12,6 @@ import any module.
 from __future__ import annotations
 
 import os
-import re
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field, fields, is_dataclass
 from datetime import time, timedelta
@@ -177,15 +176,6 @@ def _weekday(env: Mapping[str, str], name: str, default: int) -> int:
     return WEEKDAYS.index(raw)
 
 
-def _pattern(env: Mapping[str, str], name: str, default: str) -> str:
-    raw = env.get(name, "").strip() or default
-    try:
-        re.compile(raw)
-    except re.error as exc:
-        raise ValueError(f"{name}: {raw!r} isn't a regular expression ({exc})") from None
-    return raw
-
-
 def _days(env: Mapping[str, str], name: str, default: tuple[int, ...]) -> tuple[int, ...]:
     """Whole days, "7,1"; most first."""
     raw = _list(env, name)
@@ -250,34 +240,22 @@ class Jobs:
         return ZoneInfo(self.timezone)
 
 
+# The model sparrow answers with unless `SPARROW_MODEL` names another.
+DEFAULT_MODEL = "claude-sonnet-5-5"
+
 EXPIRY_REMINDER = "Heads up: your Plex access ends {when} ({date}). {renew}"
 
 
 @dataclass(frozen=True)
 class Access:
-    """How invites and access changes are scoped, and how friends hear their access is ending."""
+    """How friends hear their access is ending."""
 
-    # How long an invite link works.
-    invite_expires_days: int = setting(7, "INVITE_EXPIRES_DAYS", _int)
-    # Where friends open an invite link (`<this>/j/<code>`): Wizarr's public address.
-    public_url: str = setting("", "WIZARR_PUBLIC_URL", _url)
-    # Wizarr server names an invite shares from; empty for every server.
-    servers: tuple[str, ...] = setting((), "INVITE_SERVERS", _list)
-    # How long access lasts once joined; 0 for no end.
-    access_days: int = setting(35, "INVITE_ACCESS_DAYS", _int)
-    # Library names an invite shares; empty for every library that isn't 4K or private.
-    libraries: tuple[str, ...] = setting((), "INVITE_LIBRARIES", _list)
-    # Library names never shared, whatever is asked (wizteros' "9X." libraries).
-    private_pattern: str = setting(r"^9\d\.", "PRIVATE_LIBRARIES", _pattern)
     # Where a friend keeps their access going, named in the expiry reminder.
     contribution_url: str = setting("", "CONTRIBUTION_URL", _url)
     # The reminder DM: {when} ("in 7 days", "tomorrow", "today"), {date}, and {renew}.
     reminder: str = setting(EXPIRY_REMINDER, "EXPIRY_REMINDER", _reminder)
     # How many days before access ends a reminder goes out, each once.
     remind_days: tuple[int, ...] = setting((7, 1), "EXPIRY_REMIND_DAYS", _days)
-
-    def is_private(self, library: str) -> bool:
-        return re.search(self.private_pattern, library) is not None
 
 
 @dataclass(frozen=True)
@@ -291,7 +269,7 @@ class Guardrails:
 @dataclass(frozen=True)
 class Settings:
     anthropic_api_key: str = setting("", "ANTHROPIC_API_KEY", _raw, required=True)
-    model: str = setting("claude-sonnet-5-5", "SPARROW_MODEL")
+    model: str = setting(DEFAULT_MODEL, "SPARROW_MODEL")
     effort: str = setting("medium", "SPARROW_EFFORT")  # low | medium | high | xhigh | max
 
     seerr_url: str = setting("", "SEERR_URL", _url, required=True)
@@ -301,7 +279,7 @@ class Settings:
     plex_token: str = setting("", "PLEX_TOKEN", _raw)
     wizarr_url: str = setting("", "WIZARR_URL", _url)
     wizarr_api_key: str = setting("", "WIZARR_API_KEY", _raw)
-    # plex.tv, where friends' library shares live; the account is `PLEX_TOKEN`'s.
+    # plex.tv, which says whose account `PLEX_TOKEN` is: the owner's, the admin's.
     plex_tv_url: str = setting("https://plex.tv", "PLEX_TV_URL", _url)
     # raven, the suite's own library: searched for what is on the server, and the address
     # its links open, so it must be one friends' browsers reach too. Empty for none.

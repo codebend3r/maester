@@ -2,21 +2,42 @@
 
 from __future__ import annotations
 
+import enum
 import json
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 from sparrow.store.base import Database, now, stamp
 
 
+class Role(enum.StrEnum):
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+@dataclass(frozen=True)
+class StoredMessage:
+    """One Messages API message as it is kept: who said it, its content, its rough tokens."""
+
+    role: Role
+    content: Any
+    tokens: int = 0
+
+
 class Conversations(Database):
-    def append_message(self, user_id: str, role: str, content: Any, tokens: int = 0) -> int:
+    def append_messages(self, user_id: str, messages: Sequence[StoredMessage]) -> None:
+        """Keep `messages` together or not at all: a tool call and its result are one step."""
         with self.transaction() as conn:
-            cur = conn.execute(
-                "INSERT INTO conversations (user_id, role, content, tokens, created_at) VALUES (?, ?, ?, ?, ?)",
-                (user_id, role, json.dumps(content, default=str), tokens, now()),
+            conn.executemany(
+                "INSERT INTO conversations (user_id, role, content, tokens, created_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                [
+                    (user_id, m.role, json.dumps(m.content, default=str), m.tokens, now())
+                    for m in messages
+                ],
             )
-            return int(cur.lastrowid)
 
     def recent_messages(
         self, user_id: str, *, max_tokens: int, since: datetime | None = None
@@ -43,7 +64,7 @@ class Conversations(Database):
                 break
             kept.append({"role": r["role"], "content": json.loads(r["content"])})
         kept.reverse()
-        while kept and not (kept[0]["role"] == "user" and isinstance(kept[0]["content"], str)):
+        while kept and not (kept[0]["role"] == Role.USER and isinstance(kept[0]["content"], str)):
             kept.pop(0)
         return kept
 

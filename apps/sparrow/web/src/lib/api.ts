@@ -3,15 +3,9 @@
  * proxies to it, whether the real server or the sandbox is listening. Writes
  * are JSON, which the server requires.
  */
-import {
-  type ChatEvent,
-  type Notice,
-  isPresent,
-  isRecord,
-  toChatEvent,
-  toNotice,
-} from '@/lib/events'
-import { readEvents } from '@/lib/sse'
+import { CONTENT_TYPES, HEADERS, HTTP_METHODS, isRecord } from '@shared/http'
+import { CHAT_EVENTS, isPresent, toChatEvent, toNotice } from '@/lib/events'
+import { type RawEvent, readEvents } from '@/lib/sse'
 
 export const ROUTES = {
   me: '/api/me',
@@ -25,7 +19,13 @@ export const ROUTES = {
   usage: '/api/chat/usage',
 } as const
 
-export type ChatRoute = typeof ROUTES.chat | typeof ROUTES.pick
+/** A picker's choice, sent back as the user's next message. */
+type PickBody = { label: string; value: string; year: number | null }
+
+/** A turn's route and the body it takes: a message, or a picker's choice. */
+export type Turn =
+  | { route: typeof ROUTES.chat; body: { text: string } }
+  | { route: typeof ROUTES.pick; body: PickBody }
 
 export const TIERS = {
   unlinked: 'unlinked',
@@ -74,7 +74,8 @@ export type SandboxState = {
   cases: SandboxCase[]
 }
 
-export type Decision = { text: string; isSettled: boolean; notices: Notice[] }
+/** A press's answer, with the notices it sent as notice events, each already checked. */
+export type Decision = { text: string; isSettled: boolean; events: RawEvent[] }
 
 /** Today's tokens against the daily budget, null where the server keeps no budget. */
 type Budget = { used: number; total: number }
@@ -87,10 +88,6 @@ class ApiError extends Error {
     super(`sparrow answered ${status}`)
   }
 }
-
-const HTTP_METHODS = { post: 'POST' } as const
-const HEADERS = { contentType: 'content-type' } as const
-const CONTENT_TYPES = { json: 'application/json' } as const
 
 type PostProps = { url: string; body: unknown }
 
@@ -194,23 +191,29 @@ export const setSandboxTier = async ({ tier }: SetSandboxTierProps): Promise<voi
 }
 
 type StreamTurnProps = {
-  route: ChatRoute
-  body: Record<string, unknown>
-  onEvent: (event: ChatEvent) => void
+  turn: Turn
+  onEvent: (event: RawEvent) => void
 }
 
-/** Runs one turn, handing each event to `onEvent` as the stream delivers it. */
-export const streamTurn = async ({ route, body, onEvent }: StreamTurnProps): Promise<void> => {
-  const response = await post({ url: route, body })
+/**
+ * Runs one turn, handing each event this page can read to `onEvent` as the
+ * stream delivers it, as it came, so the page can keep it.
+ */
+export const streamTurn = async ({ turn, onEvent }: StreamTurnProps): Promise<void> => {
+  const response = await post({ url: turn.route, body: turn.body })
   if (!response.body) throw new ApiError(response.status)
   await readEvents({
     body: response.body,
     onEvent: (raw) => {
-      const event = toChatEvent(raw)
-      if (event) onEvent(event)
+      if (toChatEvent(raw)) onEvent(raw)
     },
   })
 }
+
+const toNoticeEvent = (notice: unknown): RawEvent => ({
+  name: CHAT_EVENTS.notice,
+  data: JSON.stringify(notice),
+})
 
 type DecideProps = {
   pendingId: number
@@ -224,8 +227,9 @@ export const decide = async ({ pendingId, approve }: DecideProps): Promise<Decis
   if (!isRecord(body) || typeof body.text !== 'string' || typeof body.settled !== 'boolean') {
     throw new ApiError(502)
   }
-  const notices = Array.isArray(body.notices) ? body.notices.map(toNotice) : []
-  return { text: body.text, isSettled: body.settled, notices: notices.filter(isPresent) }
+  const notices = Array.isArray(body.notices) ? body.notices : []
+  const events = notices.filter((notice) => toNotice(notice) !== null).map(toNoticeEvent)
+  return { text: body.text, isSettled: body.settled, events }
 }
 
 const isCount = (value: unknown): value is number =>

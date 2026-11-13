@@ -17,20 +17,18 @@ problem, not the release's) is not stuck. A download is timed per sweep in
 `queue_watch`, so a restart doesn't reset the clock, and one missing from a
 single queue read keeps its row for `WATCH_GRACE` before it's forgotten.
 
-The kill switch stops removals (a stalled download waits until it's off),
-and a maintenance window pauses the sweep: services restarting look stuck.
 Every removal and surfacing is audited as `sweep_stalled` and kept in
 `stalls`, which the digest reports.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
-from sparrow.agent.limits import KillSwitch
 from sparrow.clients import ClientError, Services
 from sparrow.clients.arr import Arr, QueueItem
 from sparrow.clients.base import Answers, gather_each
@@ -39,7 +37,7 @@ from sparrow.formatting import humanized
 from sparrow.kinds import KINDS, Kind
 from sparrow.media import MediaType
 from sparrow.notify import AdminPost, Notice
-from sparrow.store import MAINTENANCE, StallAction, Store, Watched
+from sparrow.store import StallAction, Store, Watched
 from sparrow.store.base import stamp
 
 log = logging.getLogger("sparrow.jobs")
@@ -147,26 +145,24 @@ def stuck_since(download: Download, before: Watched | None, now: str) -> str | N
 
 
 class Sweeper:
-    def __init__(
-        self, services: Services, store: Store, settings: Settings, kill_switch: KillSwitch
-    ):
+    def __init__(self, services: Services, store: Store, settings: Settings):
         self.services = services
         self.store = store
         self.stalled_after = settings.jobs.stalled_after
-        self.kill_switch = kill_switch
 
     async def __call__(self) -> list[Notice]:
-        """One sweep of every host's queues; the notices are titles surfaced to the admin."""
-        if self.store.flag(MAINTENANCE):
-            return []
+        """One sweep of every host's queues, each host's at once; the notices are titles
+        surfaced to the admin."""
         queues = await read_queues(self.services)
         for (kind, host), why in queues.unreachable.items():
             log.warning("sweep: %s on %s didn't answer: %s", kind.arr_name, host, why)
-        notices: list[Notice] = []
-        for (kind, host), queue in queues.answered.items():
-            arr = kind.arrs(self.services)[host]
-            notices += await self.sweep(host, kind.media_type, arr, queue)
-        return notices
+        swept = await asyncio.gather(
+            *(
+                self.sweep(host, kind.media_type, kind.arrs(self.services)[host], queue)
+                for (kind, host), queue in queues.answered.items()
+            )
+        )
+        return [notice for notices in swept for notice in notices]
 
     async def sweep(
         self, host: str, kind: MediaType, arr: Arr, queue: Sequence[QueueItem]
@@ -203,8 +199,6 @@ class Sweeper:
             )
             self._record(download, reason, StallAction.SURFACED, text, ok=True)
             return True, [AdminPost(text)]
-        if self.kill_switch.enabled:
-            return False, []  # removing is destructive; it waits for the switch
         try:
             await arr.remove_from_queue(download.first.id, blocklist=True)
         except ClientError as exc:

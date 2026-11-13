@@ -15,12 +15,13 @@ could not be delivered, so a later delivery can try again.
 
 from __future__ import annotations
 
+import enum
 import hmac
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
 
+import pydantic
 from fastapi import APIRouter, Header, HTTPException
 
 from sparrow.notify import Notifier
@@ -30,6 +31,15 @@ from sparrow.store import Store
 log = logging.getLogger("sparrow.web")
 
 SOURCE = "seerr"
+
+
+class Received(enum.StrEnum):
+    """What became of one delivery."""
+
+    IGNORED = "ignored"
+    DUPLICATE = "duplicate"
+    UNDELIVERED = "undelivered"
+    HANDLED = "handled"
 
 
 @dataclass(frozen=True)
@@ -42,15 +52,15 @@ class SeerrWebhook:
     def authorized(self, header: str) -> bool:
         return bool(self.secret) and hmac.compare_digest(header.encode(), self.secret.encode())
 
-    async def receive(self, notification: SeerrNotification) -> str:
+    async def receive(self, notification: SeerrNotification) -> Received:
         """Handle one delivery; returns what became of it."""
         route = self.routes.get(notification.type)
         if route is None:
-            return "ignored"
+            return Received.IGNORED
         key = notification.event_key
         claimed = route.dedupe is not None
         if claimed and not self.store.claim(SOURCE, key, window=route.dedupe):
-            return "duplicate"
+            return Received.DUPLICATE
         try:
             notices = await route.handle(notification)
         except Exception:
@@ -61,21 +71,21 @@ class SeerrWebhook:
         if await self.notifier.deliver(notices):
             if claimed:
                 self.store.release(SOURCE, key)
-            return "undelivered"
-        return "handled"
+            return Received.UNDELIVERED
+        return Received.HANDLED
 
     def router(self) -> APIRouter:
         router = APIRouter()
 
         @router.post("/webhooks/seerr")
         async def seerr_webhook(
-            payload: dict[str, Any], authorization: str = Header(default="")
+            payload: dict[str, object], authorization: str = Header(default="")
         ) -> dict[str, str]:
             if not self.authorized(authorization):
                 raise HTTPException(status_code=401, detail="bad or missing webhook secret")
             try:
                 notification = SeerrNotification.from_webhook(payload)
-            except (KeyError, TypeError, ValueError) as exc:
+            except pydantic.ValidationError as exc:
                 raise HTTPException(422, f"not a Seerr notification: {exc}") from exc
             return {"status": await self.receive(notification)}
 

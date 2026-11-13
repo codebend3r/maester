@@ -1,4 +1,4 @@
-import { type FormEvent, type KeyboardEvent, useRef, useState } from 'react'
+import { type FormEvent, type KeyboardEvent, useId, useRef, useState } from 'react'
 import { Button, BUTTON_TONES } from '@/components/Button/Button'
 import { COMPOSER_COPY } from '@/components/Composer/copy'
 import styles from '@/components/Composer/Composer.module.scss'
@@ -16,6 +16,7 @@ const fit = (field: HTMLTextAreaElement) => {
 /** Where you write to sparrow: Enter sends, Shift+Enter starts a new line. */
 export const Composer = () => {
   const [text, setText] = useState('')
+  const messageId = useId()
   const input = useRef<HTMLTextAreaElement>(null)
   const send = useChat((state) => state.send)
   const isBusy = useChat((state) => state.isBusy)
@@ -42,12 +43,12 @@ export const Composer = () => {
   return (
     <form className={styles.composer} onSubmit={onSubmit}>
       <div className={styles.box}>
-        <label className="visually-hidden" htmlFor="composer-message">
+        <label className="visually-hidden" htmlFor={messageId}>
           {COMPOSER_COPY.label}
         </label>
         <textarea
           ref={input}
-          id="composer-message"
+          id={messageId}
           className={styles.input}
           rows={1}
           value={text}

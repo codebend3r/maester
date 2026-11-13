@@ -119,6 +119,5 @@ class ReportStatus(enum.StrEnum):
     """Where a report's replacement stands; it moves (`playback/reports.py`), never jumps."""
 
     OPEN = "open"
-    ESCALATED = "escalated"  # over the daily cap, waiting on the admin
     REPLACED = "replaced"
     DECLINED = "declined"  # the admin said no to this report's replacement

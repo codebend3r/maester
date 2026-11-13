@@ -2,7 +2,6 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from sparrow.agent.limits import KillSwitch
 from sparrow.clients.arr import DiskSpace, QueueItem
 from sparrow.clients.sabnzbd import Download
 from sparrow.clients.seerr import Issue, MediaDetails, MediaRequest, MediaStatus, RequestStatus
@@ -23,7 +22,7 @@ def digest(services, store):
     store.upsert_user("d1", seerr_user_id=4, plex_username="dany")
     services.seerr.details.update({("movie", 438631): DUNE, ("tv", 136315): BEAR})
     settings = Settings(guardrails=Guardrails(storage_pause_4k_percent=90))
-    return Digest(services, store, settings, KillSwitch(store))
+    return Digest(services, store, settings)
 
 
 def sections(text: str) -> dict[str, list[str]]:
@@ -42,11 +41,6 @@ async def test_a_quiet_day_says_so_and_leaves_empty_sections_out(digest, service
 
 
 async def test_every_section_says_what_happened_in_the_last_day(digest, services, store):
-    store.raise_flag("maintenance", "new drives")
-    store.create_pending(
-        kind="approve", action="decide_request", requester="d1", payload={},
-        summary="4K Dune (2021) for dany", ttl=timedelta(days=7),
-    )  # fmt: skip
     services.seerr.requests = [
         MediaRequest(1, RequestStatus.PENDING, "movie", 438631, True, 4,
                      created_at=(NOW - timedelta(hours=2)).isoformat()),
@@ -88,10 +82,7 @@ async def test_every_section_says_what_happened_in_the_last_day(digest, services
     text = await digest.compose(NOW)
     assert text.startswith("**Daily digest, Sun Sep 27**")
     found = sections(text)
-    (window,) = found["Switched on"]
-    assert window.startswith("Maintenance has been on since ")
-    assert window.endswith(" (new drives): requests and replacements are held.")
-    assert found["Waiting on you (1)"][0].startswith("4K Dune (2021) for dany (asked")
+    assert "Switched on" not in found and not any(h.startswith("Waiting") for h in found)
     assert found["New requests"] == [
         "Dune (2021) in 4K for dany: waiting for approval",
         "The Bear (2022) in 1080p for Grandpa: requested, downloading",
@@ -148,18 +139,6 @@ async def test_the_forecast_and_a_bad_release_group_come_along_when_they_matter(
 async def test_the_digest_is_one_admin_post(digest):
     (post,) = await digest()
     assert isinstance(post, AdminPost) and post.text.startswith("**Daily digest")
-
-
-async def test_a_replacement_the_admin_declined_isnt_listed_as_replaced(digest, store):
-    report = store.add_report(
-        user_id="d1", kind=ReportKind.WONT_PLAY, copy=Copy("movie", 438631, True),
-        title="Dune (2021)", rating_key=None, host="vermithor", file_id=55, file_path="",
-        release_group=None, health="corrupt", diagnosis={}, description="",
-        decision=Decision.REPLACEABLE,
-    )  # fmt: skip
-    args = {"report_id": report.id, "host": "vermithor", "requester": "d1", "approved": False}
-    store.audit(user_id="a1", tool="decide_replacement", args=args, result="", ok=True)
-    assert "Replaced" not in sections(await digest.compose(NOW))
 
 
 async def test_a_title_both_requested_and_raised_as_an_issue_is_asked_of_seerr_once(

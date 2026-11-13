@@ -17,12 +17,12 @@ from __future__ import annotations
 import enum
 import inspect
 import typing
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Annotated, Any
 
 import pydantic
-from pydantic import BaseModel, ConfigDict, Strict
+from pydantic import BaseModel, ConfigDict, JsonValue, Strict
 
 from sparrow.config import Settings
 from sparrow.memo import Memo
@@ -51,6 +51,12 @@ class Tier(enum.IntEnum):
             raise ValueError(f"unknown tier {name!r}") from None
 
 
+# The tiers an admin (or the sandbox) can give someone, by their lowercase names.
+AssignableTier = enum.StrEnum(
+    "AssignableTier", {t.name: t.name.lower() for t in Tier if t > Tier.UNLINKED}
+)
+
+
 @dataclass(frozen=True)
 class ToolContext:
     """What a tool handler gets besides its arguments.
@@ -76,13 +82,9 @@ class ToolContext:
         quotas and permissions apply. Someone whose Plex account matches no
         Seerr user has none, and the tool refuses.
         """
-        return self.link_of(self.user_id)
-
-    def link_of(self, user_id: str) -> LinkedUser:
-        """Someone's link, for a tool acting on their behalf (an admin's decision)."""
-        link = self.store.active_link(user_id)
+        link = self.store.active_link(self.user_id)
         if link is None:
-            raise NotLinked(f"User {user_id} isn't linked to a Plex account")
+            raise NotLinked(f"User {self.user_id} isn't linked to a Plex account")
         return link
 
     def name_of(self, user_id: str) -> str:
@@ -102,7 +104,6 @@ class Choice:
     label: str
     value: str
     year: int | None = None
-    poster_url: str | None = None
     # A line under the title: availability, a short overview.
     detail: str = ""
 
@@ -114,43 +115,6 @@ class Choice:
 
 
 @dataclass(frozen=True)
-class Choices:
-    """Return this from a handler to offer the user a pick instead of a plain result.
-
-    At most `MAX_CHOICES` become buttons; the model is told which were left
-    off, so it never promises a button that isn't there. `notes` tell the
-    model what else it should know (what couldn't be looked up).
-    """
-
-    items: list[Choice]
-    notes: tuple[str, ...] = ()
-
-    @property
-    def shown(self) -> list[Choice]:
-        return self.items[:MAX_CHOICES]
-
-    def as_content(self) -> dict[str, Any]:
-        content: dict[str, Any] = {
-            "choices": [
-                {
-                    "label": c.label,
-                    "value": c.value,
-                    "year": c.year,
-                    "poster_url": c.poster_url,
-                    "detail": c.detail,
-                }
-                for c in self.shown
-            ],
-            "note": "Shown to the user as numbered buttons; wait for their pick.",
-        }
-        if left_off := self.items[MAX_CHOICES:]:
-            content["not_shown"] = [f"{c.display} ({c.value})" for c in left_off]
-        if self.notes:
-            content["notes"] = list(self.notes)
-        return content
-
-
-@dataclass(frozen=True)
 class TitleLink:
     label: str
     url: str
@@ -158,7 +122,7 @@ class TitleLink:
 
 @dataclass(frozen=True)
 class Title:
-    """A title a tool found, for the chat to show beside the reply: its logo and where it opens.
+    """A title a tool found, for the chat to show beside the reply, and where it opens.
 
     `key` names the title across calls, so one found twice is shown once.
     """
@@ -166,51 +130,38 @@ class Title:
     key: str
     title: str
     year: int | None
-    logo_url: str | None
     links: tuple[TitleLink, ...]
 
 
 @dataclass(frozen=True)
-class Shown:
-    """Return this to answer the model with `content` and show the user `titles` with the reply."""
-
-    content: Any
-    titles: tuple[Title, ...]
-
-
-@dataclass(frozen=True)
-class Approval:
-    """Ask the admin: `notice` goes up with Approve/Deny buttons, and the press runs `decide`.
-
-    `decide` is a button-only admin tool's handler; `args` are its arguments
-    except `approved`, which the press supplies. They are checked against that
-    tool's signature before anything is stored (`open_approval` in
-    `sparrow/agent/runner.py`), and on the press the tool runs through the same
-    checks and audit as any call. With a `subject` (the Seerr request it
-    decides), an approval already open about it is reused rather than posted
-    twice, whoever raised it first.
-    """
-
-    notice: str
-    summary: str
-    decide: Handler
-    args: dict[str, Any]
-    subject: str | None = None
-
-    def decide_spec(self) -> ToolSpec:
-        """The admin tool the press runs; `LookupError` when `decide` isn't a button-only tool."""
-        spec = spec_of(self.decide)
-        if not spec.button_only:
-            raise LookupError(f"{spec.name!r} is not a registered admin decision tool")
-        return spec
-
-
-@dataclass(frozen=True)
 class Ok:
-    """The tool did it: the model sees `content`, and `notices` are posted or DMed."""
+    """The tool did it: the model sees `content`; `notices` are posted or DMed, `titles` are
+    shown with the reply, and `choices` are offered as buttons (`offer` builds those)."""
 
     content: Any
     notices: tuple[Notice, ...] = ()
+    titles: tuple[Title, ...] = ()
+    choices: tuple[Choice, ...] = ()
+
+
+def offer(items: Sequence[Choice], notes: Sequence[str] = ()) -> Ok:
+    """Offer the user a pick instead of a plain result.
+
+    At most `MAX_CHOICES` become buttons; the model is told which were left
+    off, so it never promises a button that isn't there. `notes` tell the
+    model what else it should know (what couldn't be looked up).
+    """
+    shown = tuple(items[:MAX_CHOICES])
+    left_off = items[MAX_CHOICES:]
+    content: dict[str, Any] = {
+        "choices": [
+            {"label": c.label, "value": c.value, "year": c.year, "detail": c.detail} for c in shown
+        ],
+        "note": "Shown to the user as numbered buttons; wait for their pick.",
+        **({"not_shown": [f"{c.display} ({c.value})" for c in left_off]} if left_off else {}),
+        **({"notes": list(notes)} if notes else {}),
+    }
+    return Ok(content, choices=shown)
 
 
 @dataclass(frozen=True)
@@ -236,21 +187,14 @@ class Failed:
     retryable: bool = False
 
 
-@dataclass(frozen=True)
-class NeedsApproval:
-    """The admin is asked (`approval`), and the model is told the action now waits on them."""
-
-    content: Any
-    approval: Approval
-    notices: tuple[Notice, ...] = ()
+# What a handler returns besides a plain JSON answer: exactly one of these, so a result
+# can't both succeed and fail, or be retried without having failed.
+Result = Ok | Refused | Failed
+# A handler's answer: a `Result`, or plain JSON the model reads as it is.
+Answer = Result | JsonValue
 
 
-# What a handler returns besides a plain answer or `Choices`: exactly one of these, so a
-# result can't both ask the admin and fail, or be retried without having failed.
-Result = Ok | Refused | Failed | NeedsApproval
-
-
-Handler = Callable[..., Awaitable[Any]]
+Handler = Callable[..., Awaitable[Answer]]
 
 
 class ValidationError(ValueError):
@@ -335,13 +279,6 @@ class ToolSpec:
     # Name of the argument that carries the arr host, so the audit row and
     # the confirmation summary can say which stack is being touched.
     host_param: str | None = None
-    # Runs only from an admin's decision button, never from the model: it
-    # applies an `Approval` another tool raised, and must be safe to run
-    # again, since a failed run reopens the buttons.
-    button_only: bool = False
-    # Changes something the stack must be up for (a request, a replacement): during a
-    # maintenance window the call is saved and runs when it ends.
-    held_in_maintenance: bool = False
     # Built from the handler's signature: the check every call goes through, and the
     # schema the model sees.
     args_model: type[BaseModel] = field(init=False, repr=False, compare=False)
@@ -352,24 +289,20 @@ class ToolSpec:
         object.__setattr__(self, "args_model", model)
         object.__setattr__(self, "input_schema", schema_of(model))
 
-    def validate(self, data: Any) -> dict[str, Any]:
-        """`data` as stored and audited, once it fits the handler's signature."""
-        try:
-            self.args_model.model_validate(data)
-        except pydantic.ValidationError as exc:
-            raise ValidationError(_explain(exc)) from None
-        return dict(data)
-
-    def parse(self, data: dict[str, Any]) -> BaseModel:
-        """Validated arguments, typed, for code that reads a stored call (an approval's payload)."""
+    def _parse(self, data: object) -> BaseModel:
         try:
             return self.args_model.model_validate(data)
         except pydantic.ValidationError as exc:
             raise ValidationError(_explain(exc)) from None
 
-    async def call(self, ctx: ToolContext, args: dict[str, Any]) -> Any:
+    def validate(self, data: object) -> dict[str, Any]:
+        """`data` as stored and audited, once it fits the handler's signature."""
+        self._parse(data)
+        return dict(data) if isinstance(data, dict) else {}
+
+    async def call(self, ctx: ToolContext, args: dict[str, Any]) -> Answer:
         """Run the handler with `args` as its signature takes them (an enum as its member)."""
-        parsed = self.parse(args)
+        parsed = self._parse(args)
         return await self.handler(ctx, **{k: getattr(parsed, k) for k in parsed.model_fields_set})
 
     def definition(self) -> dict[str, Any]:
@@ -382,20 +315,6 @@ class ToolSpec:
         }
 
 
-# Every registered tool by its handler, so an `Approval` can name its decide tool by the
-# function itself rather than by a string that a rename would silently break.
-_SPECS: dict[Handler, ToolSpec] = {}
-
-
-def spec_of(handler: Handler) -> ToolSpec:
-    """The tool a handler was registered as; `LookupError` when it never was."""
-    spec = _SPECS.get(handler)
-    if spec is None:
-        name = getattr(handler, "__name__", repr(handler))
-        raise LookupError(f"{name!r} is not a registered tool")
-    return spec
-
-
 class ToolRegistry:
     def __init__(self) -> None:
         self._specs: dict[str, ToolSpec] = {}
@@ -403,10 +322,7 @@ class ToolRegistry:
     def register(self, spec: ToolSpec) -> ToolSpec:
         if spec.name in self._specs:
             raise ValueError(f"tool {spec.name!r} is already registered")
-        if spec.button_only and spec.tier != Tier.ADMIN:
-            raise ValueError(f"button-only tool {spec.name!r} must be admin tier")
         self._specs[spec.name] = spec
-        _SPECS[spec.handler] = spec
         return spec
 
     def get(self, name: str) -> ToolSpec | None:
@@ -417,11 +333,7 @@ class ToolRegistry:
 
     def for_tier(self, tier: Tier) -> list[ToolSpec]:
         """Tools the model may call for this tier, in a stable order so the prompt caches."""
-        return [
-            spec
-            for spec in (self._specs[n] for n in sorted(self._specs))
-            if spec.tier <= tier and not spec.button_only
-        ]
+        return [spec for spec in (self._specs[n] for n in sorted(self._specs)) if spec.tier <= tier]
 
     def definitions(self, tier: Tier) -> list[dict[str, Any]]:
         defs = [s.definition() for s in self.for_tier(tier)]
@@ -439,8 +351,6 @@ class ToolRegistry:
         tier: Tier = Tier.FRIEND,
         destructive: bool = False,
         host_param: str | None = None,
-        button_only: bool = False,
-        held_in_maintenance: bool = False,
     ) -> Callable[[Handler], Handler]:
         def decorate(fn: Handler) -> Handler:
             self.register(
@@ -451,8 +361,6 @@ class ToolRegistry:
                     tier=tier,
                     destructive=destructive,
                     host_param=host_param,
-                    button_only=button_only,
-                    held_in_maintenance=held_in_maintenance,
                 )
             )
             return fn

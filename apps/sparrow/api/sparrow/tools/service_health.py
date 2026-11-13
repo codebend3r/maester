@@ -5,8 +5,7 @@ the service is up (and, where the route needs it, that sparrow's key still
 works). Every service is pinged at once, each under its own `PING_TIMEOUT`,
 so one that hangs can't hold up the answer or hide the others. The answer
 is kept for `HEALTH_TTL` in the memo, so friends asking together at
-midnight ping each service once. A maintenance window the admin opened is
-named first: services down during one are expected to be.
+midnight ping each service once.
 """
 
 from __future__ import annotations
@@ -21,7 +20,6 @@ from sparrow.agent.tools import Tier, ToolContext, tool
 from sparrow.clients import ClientError, Services
 from sparrow.formatting import ago
 from sparrow.memo import Key
-from sparrow.store import MAINTENANCE
 
 # How long one service may take to answer before it counts as down.
 PING_TIMEOUT = 5.0
@@ -83,22 +81,14 @@ HEALTH: Key[tuple[Check, ...]] = Key("service_health")
     "Whether each service behind the server answers right now: Plex, Seerr, Wizarr, and "
     "Sonarr, Radarr, SABnzbd and Tautulli on every host. Lists what is up and what is down, "
     "and why. Use it for 'is Plex down?' or when another tool says a service didn't answer. "
-    "Checked at most once a minute; `checked` says how long ago. `maintenance` says when the "
-    "admin has the server down on purpose, and why.",
+    "Checked at most once a minute; `checked` says how long ago.",
     tier=Tier.FRIEND,
 )
 async def service_health(ctx: ToolContext) -> dict[str, Any]:
     kept = await ctx.memo.fresh(HEALTH, HEALTH_TTL, lambda: check_all(ctx.services))
     checks = kept.value
     down = [{"service": c.service, "why": c.down} for c in checks if c.down]
-    health: dict[str, Any] = {}
-    if window := ctx.store.flag(MAINTENANCE):
-        health["maintenance"] = {
-            "since": window.set_at,
-            "message": window.message or "the admin is working on the server",
-        }
     return {
-        **health,
         "all_up": not down,
         "up": [c.service for c in checks if not c.down],
         "down": down,
