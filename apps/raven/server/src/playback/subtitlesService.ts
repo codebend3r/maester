@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs'
-import { mkdir, readFile, readdir, rename, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common'
 import { SUBTITLE_SOURCES, subtitleWindowRange } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
@@ -22,20 +22,21 @@ type SubtitlesServiceExtractProps = {
   folder: string
   path: string
   version: string
+  /** The names this one replaces under the same media version: a sidecar's older copies. */
+  supersedes: string | null
   args: (output: string) => string[][]
 }
 
-type SubtitlesServiceClearOtherVersionsProps = {
-  folder: string
-  version: string
-}
+type SubtitlesServiceClearStaleProps = Omit<SubtitlesServiceExtractProps, 'args'>
 
 /**
  * Subtitles as WebVTT, cached on disk under `<data>/subtitles/<id>/`.
  * Embedded tracks are extracted one window at a time (see
  * `subtitleWindowRange`), so the first cues arrive after reading minutes
  * of the file rather than all of it; sidecar files are converted whole.
- * Cache names carry the file's mtime, and a new version clears the old.
+ * Cache names carry the file's mtime, and a new version clears the old. A
+ * sidecar's also carry its own, so a sidecar retimed or replaced beside an
+ * unchanged video is converted again rather than served as it was.
  */
 @Injectable()
 export class SubtitlesService {
@@ -66,9 +67,10 @@ export class SubtitlesService {
     }
     const number = Number(trackId.split('-')[1])
     const sidecar = track.source === SUBTITLE_SOURCES.external ? sidecars[number] : undefined
-    const part = sidecar ? 'all' : String(window)
     const folder = join(this.dir, String(file.id))
-    const path = join(folder, `${file.mtimeMs}-${trackId}-${part}.vtt`)
+    const trackName = `${file.mtimeMs}-${trackId}-`
+    const part = sidecar ? `all.${Math.floor((await stat(sidecar.path)).mtimeMs)}` : String(window)
+    const path = join(folder, `${trackName}${part}.vtt`)
 
     const cached = await readFile(path, 'utf8').catch(() => null)
     if (cached != null) return cached
@@ -79,6 +81,7 @@ export class SubtitlesService {
       folder,
       path,
       version: String(file.mtimeMs),
+      supersedes: sidecar ? `${trackName}all` : null,
       args: (output) =>
         sidecar
           ? [
@@ -113,10 +116,11 @@ export class SubtitlesService {
     folder,
     path,
     version,
+    supersedes,
     args,
   }: SubtitlesServiceExtractProps): Promise<string> {
     await mkdir(folder, { recursive: true })
-    await this.clearOtherVersions({ folder, version })
+    await this.clearStale({ folder, path, version, supersedes })
     // ffmpeg picks the muxer from the extension too, so the temp file keeps .vtt.
     const temp = `${path}.${process.pid}-${Math.random().toString(36).slice(2)}.vtt`
     const attempts = args(temp)
@@ -141,15 +145,17 @@ export class SubtitlesService {
     }
   }
 
-  private async clearOtherVersions({
+  private async clearStale({
     folder,
+    path,
     version,
-  }: SubtitlesServiceClearOtherVersionsProps): Promise<void> {
+    supersedes,
+  }: SubtitlesServiceClearStaleProps): Promise<void> {
     const names = await readdir(folder).catch(() => [])
-    await Promise.all(
-      names
-        .filter((name) => !name.startsWith(`${version}-`))
-        .map((name) => rm(join(folder, name), { force: true })),
-    )
+    const kept = basename(path)
+    const isStale = (name: string) =>
+      !name.startsWith(`${version}-`) ||
+      (supersedes !== null && name.startsWith(supersedes) && !name.startsWith(kept))
+    await Promise.all(names.filter(isStale).map((name) => rm(join(folder, name), { force: true })))
   }
 }

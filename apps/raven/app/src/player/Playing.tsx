@@ -38,6 +38,7 @@ import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
 import { APP_PLATFORMS } from '@/platform/platform'
 import { captionsFor, sidecarIdsOf, sidecarTracksOf } from '@/player/captions'
 import { playerSubtitleStyleOf } from '@/player/captionLook'
+import { PLAYER_BUFFER } from '@/player/playerBuffer'
 import { isServerDrop } from '@/player/playerErrors'
 import type { PlayWay } from '@/player/playWay'
 import { progressSinkFor } from '@/player/progressSink'
@@ -316,6 +317,7 @@ export const Playing = ({
         : {
             uri: sourced.source.uri,
             headers: sourced.source.headers,
+            bufferConfig: PLAYER_BUFFER,
             // Only a file played as it is comes with sidecars: a stream has its renditions.
             ...(sourced.sidecars.length > 0
               ? { textTracks: sidecarTracksOf({ sidecars: sourced.sidecars, tracks }) }

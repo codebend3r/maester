@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -206,6 +206,20 @@ describe('playback', () => {
     expect(await api().getSubtitles({ id: movieId(), trackId: 'external-0' })).toEqual([
       { start: 5, end: 6, text: 'Café forced' },
     ])
+  })
+
+  it('converts a sidecar again once it is retimed beside the same video', async () => {
+    const path = join(state.root, 'media', 'Rich (2026).en.forced.srt')
+    const read = () => api().getSubtitles({ id: movieId(), trackId: 'external-0' })
+    expect(await read()).toEqual([{ start: 5, end: 6, text: 'Café forced' }])
+    const retimed = ['1', '00:00:07,500 --> 00:00:08,500', 'Café forced', ''].join('\n')
+    await writeFile(path, Buffer.from(retimed, 'latin1'))
+    const later = new Date(Date.now() + 60_000)
+    await utimes(path, later, later)
+    expect(await read()).toEqual([{ start: 7.5, end: 8.5, text: 'Café forced' }])
+    await writeFile(path, Buffer.from(SIDECAR, 'latin1'))
+    await utimes(path, new Date(), new Date(Date.now() + 120_000))
+    expect(await read()).toEqual([{ start: 5, end: 6, text: 'Café forced' }])
   })
 
   it('refuses unsafe subtitle cache names before looking up tracks', async () => {
