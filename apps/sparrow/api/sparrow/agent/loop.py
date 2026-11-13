@@ -1,19 +1,25 @@
-"""One turn of conversation: stream the model, run tools, loop, remember.
+"""One turn of conversation: call the model, run tools, loop, remember.
 
 The model client is injected so tests and evals can script it; in the app it
 is `anthropic.AsyncAnthropic()`. The loop follows the Messages API manual
-pattern: stream a response, execute every `tool_use` block, send all results
+pattern: get a response, execute every `tool_use` block, send all results
 back in one user message, repeat until `end_turn`, a refusal, or the
-iteration cap.
+iteration cap. A step that called tools is remembered only together with
+its results, so the stored conversation never holds a `tool_use` without
+the `tool_result` that answers it (the API rejects that on replay).
 """
 
 from __future__ import annotations
 
+import enum
 import logging
 from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Protocol
+
+from anthropic.types import Message, TextBlock, ToolUseBlock
 
 from sparrow.agent.limits import LimitExceeded, RateLimiter
 from sparrow.agent.prompts import SYSTEM_PROMPT
@@ -23,7 +29,8 @@ from sparrow.clients import Services
 from sparrow.config import Settings
 from sparrow.memo import Memo
 from sparrow.notify import Notice
-from sparrow.store import HeldCall, PendingAction, Store
+from sparrow.store import PendingAction, Store
+from sparrow.store.conversations import Role, StoredMessage
 
 log = logging.getLogger("sparrow.agent")
 
@@ -34,37 +41,45 @@ HISTORY_TOKEN_BUDGET = 12_000
 # the full result this turn, and later turns only need to know it happened.
 STORED_RESULT_MAX_CHARS = 600
 IDLE_RESET = timedelta(hours=6)
+# How often a turn is re-issued when the SDK can't parse what eager streaming handed it.
+JSON_RETRIES = 2
 
 REFUSAL_REPLY = "I can't help with that one."
 LIMIT_REPLY = "You've hit the {what} limit for now; {hint}."
 TRUNCATED_REPLY = "That reply got too long and was cut off; ask me again more narrowly."
+OUT_OF_STEPS_REPLY = "I ran out of steps on that one; try asking for a smaller piece."
 # Sent once when the model ends a turn with no text, so the user still gets an answer.
 CONTINUE_PROMPT = "Please continue."
-# What leads a held call in the caller's conversation when it finally runs.
-HELD_LEAD = "(What I asked for while the server was down for maintenance, run now that it's back.)"
 
 
-def estimate_tokens(content: Any) -> int:
+class StopReason(enum.StrEnum):
+    """The Messages API stop reasons the loop acts on."""
+
+    END_TURN = "end_turn"
+    TOOL_USE = "tool_use"
+    MAX_TOKENS = "max_tokens"
+    REFUSAL = "refusal"
+
+
+class MessageStream(Protocol):
+    async def get_final_message(self) -> Message: ...
+
+
+class MessagesApi(Protocol):
+    def stream(self, **params: Any) -> AbstractAsyncContextManager[MessageStream]: ...
+
+
+class ModelClient(Protocol):
+    """What the loop needs of `anthropic.AsyncAnthropic` (or `ClaudeCodeModel`)."""
+
+    @property
+    def messages(self) -> MessagesApi: ...
+
+
+def estimate_tokens(content: object) -> int:
     """Cheap and stable: the budget only needs to be roughly right."""
     text = content if isinstance(content, str) else str(content)
     return max(1, len(text) // 4)
-
-
-@dataclass
-class AgentReply:
-    text: str
-    tool_calls: list[dict[str, Any]] = field(default_factory=list)
-    pending_ids: list[int] = field(default_factory=list)
-    # Options a tool offered the user, rendered as buttons by the chat layer.
-    choices: list[Choice] = field(default_factory=list)
-    # What tools asked to post outside the reply: admin notices and approvals.
-    notices: list[Notice] = field(default_factory=list)
-    # Titles tools found, shown with the reply (a logo, links); each once.
-    titles: list[Title] = field(default_factory=list)
-    input_tokens: int = 0
-    output_tokens: int = 0
-    cache_read_tokens: int = 0
-    iterations: int = 0
 
 
 @dataclass(frozen=True)
@@ -75,6 +90,23 @@ class ToolTrace:
     input: dict[str, Any]
     ok: bool
     result: str
+
+
+@dataclass
+class AgentReply:
+    text: str
+    tool_calls: list[ToolTrace] = field(default_factory=list)
+    pending_ids: list[int] = field(default_factory=list)
+    # Options a tool offered the user, rendered as buttons by the chat layer.
+    choices: list[Choice] = field(default_factory=list)
+    # What tools asked to post outside the reply: notes for the admin, DMs.
+    notices: list[Notice] = field(default_factory=list)
+    # Titles tools found, shown with the reply (links); each once.
+    titles: list[Title] = field(default_factory=list)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    iterations: int = 0
 
 
 class TurnFailed(Exception):
@@ -90,11 +122,14 @@ class TurnFailed(Exception):
         super().__init__("the turn failed partway through")
 
 
+OnTool = Callable[[ToolTrace], object]
+
+
 class Agent:
     def __init__(
         self,
         *,
-        model_client: Any,
+        model_client: ModelClient,
         model: str,
         runner: ToolRunner,
         store: Store,
@@ -134,68 +169,32 @@ class Agent:
     async def run_decision(
         self, pending: PendingAction, user_id: str, tier: Tier, approved: bool
     ) -> ToolOutcome:
-        """Run what a button press decided, as the presser, and remember a confirmation.
+        """Run what a Confirm or Cancel press decided, as the presser, and remember it.
 
-        A confirmed call's model only got "waiting for confirmation", so the
+        The confirmed call's model only got "waiting for confirmation", so the
         real outcome goes into the requester's conversation as a fresh
-        tool_use/tool_result pair; their next turn sees it like any tool. An
-        approval's decide tool is the admin's, and its requester hears
-        through the DM it sends, not through their conversation.
+        tool_use/tool_result pair; their next turn sees it like any tool.
         """
         outcome = await self.runner.run_decision(self._context(user_id, tier), pending, approved)
-        if pending.kind == "confirm":
-            self._remember(
-                pending.requester,
-                f"toolu_button_{pending.id}",
-                pending.action,
-                pending.payload,
-                outcome,
-            )
-        return outcome
-
-    async def run_held(self, held: HeldCall, tier: Tier) -> ToolOutcome:
-        """Run a call held for maintenance as its caller, and remember it.
-
-        A window can outlast the conversation's idle reset, so the call is led
-        by a plain message saying what it was; history read back starts at one,
-        and the call stays in view for the turn that tells them how it went.
-        """
-        outcome = await self.runner.run_held(self._context(held.user_id, tier), held)
-        self._remember(
-            held.user_id,
-            f"toolu_held_{held.id}",
-            held.tool,
-            held.args,
-            outcome,
-            lead=HELD_LEAD,
+        call_id = f"toolu_button_{pending.id}"
+        tool_use = {
+            "type": "tool_use",
+            "id": call_id,
+            "name": pending.action,
+            "input": pending.payload,
+        }
+        results = self._stub_results([outcome.as_result_block(call_id)])
+        self.store.append_messages(
+            pending.requester,
+            [
+                StoredMessage(Role.ASSISTANT, [tool_use], estimate_tokens(tool_use)),
+                StoredMessage(Role.USER, results, estimate_tokens(results)),
+            ],
         )
         return outcome
 
-    def _remember(
-        self,
-        user_id: str,
-        call_id: str,
-        name: str,
-        args: dict[str, Any],
-        outcome: ToolOutcome,
-        lead: str | None = None,
-    ) -> None:
-        """A call made outside a turn, put in the user's conversation so their next turn sees it."""
-        if lead:
-            self.store.append_message(user_id, "user", lead, estimate_tokens(lead))
-        tool_use = {"type": "tool_use", "id": call_id, "name": name, "input": args}
-        results = self._stub_results([outcome.as_result_block(call_id)])
-        self.store.append_message(user_id, "assistant", [tool_use], estimate_tokens(tool_use))
-        self.store.append_message(user_id, "user", results, estimate_tokens(results))
-
     async def respond(
-        self,
-        user_id: str,
-        tier: Tier,
-        text: str,
-        *,
-        on_text: Callable[[str], Any] | None = None,
-        on_tool: Callable[[ToolTrace], Any] | None = None,
+        self, user_id: str, tier: Tier, text: str, *, on_tool: OnTool | None = None
     ) -> AgentReply:
         if self.limiter:
             try:
@@ -206,7 +205,7 @@ class Agent:
 
         reply = AgentReply(text="")
         try:
-            await self._turn(user_id, tier, text, reply, on_text, on_tool)
+            await self._turn(user_id, tier, text, reply, on_tool)
         except Exception as exc:
             raise TurnFailed(reply) from exc
         finally:
@@ -215,102 +214,100 @@ class Agent:
         return reply
 
     async def _turn(
-        self,
-        user_id: str,
-        tier: Tier,
-        text: str,
-        reply: AgentReply,
-        on_text: Callable[[str], Any] | None,
-        on_tool: Callable[[ToolTrace], Any] | None,
+        self, user_id: str, tier: Tier, text: str, reply: AgentReply, on_tool: OnTool | None
     ) -> None:
         """Run one turn, recording into `reply` as it goes."""
         ctx = self._context(user_id, tier)
         history = self.store.recent_messages(
             user_id, max_tokens=HISTORY_TOKEN_BUDGET, since=self.now() - IDLE_RESET
         )
-        user_message = {"role": "user", "content": text}
-        messages = [*history, user_message]
-        self.store.append_message(user_id, "user", text, estimate_tokens(text))
+        messages = [*history, {"role": Role.USER, "content": text}]
+        self.store.append_messages(user_id, [StoredMessage(Role.USER, text, estimate_tokens(text))])
 
         tools = self.runner.registry.definitions(tier)
-        json_retries = 0
         is_nudged = False
 
         for _ in range(MAX_TOOL_ITERATIONS + 1):
-            try:
-                response = await self._stream_turn(messages, tools, on_text)
-            except ValueError:
-                # Eager streaming handed the SDK JSON it could not parse at
-                # all; nothing to answer, so re-issue the turn, bounded.
-                json_retries += 1
-                if json_retries > 2:
-                    raise
-                continue
+            response = await self._call_model(messages, tools)
             reply.iterations += 1
             reply.input_tokens += response.usage.input_tokens
             reply.output_tokens += response.usage.output_tokens
-            reply.cache_read_tokens += getattr(response.usage, "cache_read_input_tokens", 0) or 0
+            reply.cache_read_tokens += response.usage.cache_read_input_tokens or 0
 
-            tool_uses = [b for b in response.content if b.type == "tool_use"]
-            if (
-                response.stop_reason == "end_turn"
-                and not tool_uses
-                and not self._text_of(response.content)
-            ):
+            tool_uses = [b for b in response.content if isinstance(b, ToolUseBlock)]
+            said = self._text_of(response)
+            if response.stop_reason == StopReason.END_TURN and not tool_uses and not said:
                 # Right after tool results the model can end its turn with nothing
                 # to say. The API rejects an empty assistant message on replay, so
                 # it is never kept; the model is asked once to carry on instead.
                 if is_nudged:
-                    break
+                    return
                 is_nudged = True
-                messages.append({"role": "user", "content": CONTINUE_PROMPT})
+                messages.append({"role": Role.USER, "content": CONTINUE_PROMPT})
                 continue
 
-            content = [b.to_dict() for b in response.content]
-            assistant_message = {"role": "assistant", "content": content}
-            messages.append(assistant_message)
-            self.store.append_message(user_id, "assistant", content, response.usage.output_tokens)
-
-            if response.stop_reason == "pause_turn":
-                continue
-            if response.stop_reason == "refusal":
-                reply.text = REFUSAL_REPLY
-                break
+            assistant = StoredMessage(
+                Role.ASSISTANT,
+                [b.to_dict() for b in response.content],
+                response.usage.output_tokens,
+            )
             if not tool_uses:
-                reply.text = self._text_of(response.content) or reply.text
-                break
-            if response.stop_reason == "max_tokens":
-                # A truncated tool input parses as a valid partial object.
-                reply.text = TRUNCATED_REPLY
-                break
+                self.store.append_messages(user_id, [assistant])
+                is_refused = response.stop_reason == StopReason.REFUSAL
+                reply.text = REFUSAL_REPLY if is_refused else (said or reply.text)
+                return
+            if response.stop_reason in (StopReason.MAX_TOKENS, StopReason.REFUSAL):
+                # A truncated tool input parses as a valid partial object, so nothing runs,
+                # and the step isn't remembered: its tool_use would have no result.
+                is_cut = response.stop_reason == StopReason.MAX_TOKENS
+                reply.text = TRUNCATED_REPLY if is_cut else REFUSAL_REPLY
+                return
 
             results = await self._run_tools(ctx, tool_uses, reply, on_tool)
-            messages.append({"role": "user", "content": results})
-            self.store.append_message(
-                user_id, "user", self._stub_results(results), estimate_tokens(results)
+            answered = StoredMessage(
+                Role.USER, self._stub_results(results), estimate_tokens(results)
             )
-        else:
-            reply.text = (
-                reply.text or "I ran out of steps on that one; try asking for a smaller piece."
-            )
+            messages += [
+                {"role": Role.ASSISTANT, "content": assistant.content},
+                {"role": Role.USER, "content": results},
+            ]
+            self.store.append_messages(user_id, [assistant, answered])
+        reply.text = reply.text or OUT_OF_STEPS_REPLY
+
+    async def _call_model(
+        self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]
+    ) -> Message:
+        """The model's next step. Eager streaming can hand the SDK JSON it cannot parse at
+        all (`ValueError`); there is nothing to answer then, so the call is re-issued."""
+        attempts_left = JSON_RETRIES
+        while True:
+            try:
+                return await self._stream(messages, tools)
+            except ValueError:
+                if attempts_left == 0:
+                    raise
+                attempts_left -= 1
 
     async def _run_tools(
         self,
         ctx: ToolContext,
-        tool_uses: list[Any],
+        tool_uses: list[ToolUseBlock],
         reply: AgentReply,
-        on_tool: Callable[[ToolTrace], Any] | None,
+        on_tool: OnTool | None,
     ) -> list[dict[str, Any]]:
         """Run the model's tool calls in order, recording what each did into `reply`; the
-        result blocks to send back."""
+        result blocks to send back.
+
+        In order, not at once: two requests in one step count against the quota the
+        next one sees, and a picker the model asked for last is the one shown.
+        """
         results = []
         for block in tool_uses:
             outcome = await self.runner.run(ctx, block.name, block.input)
-            reply.tool_calls.append(
-                {"name": block.name, "input": block.input, "ok": not outcome.is_error}
-            )
+            trace = ToolTrace(block.name, dict(block.input), not outcome.is_error, outcome.text)
+            reply.tool_calls.append(trace)
             if on_tool:
-                on_tool(ToolTrace(block.name, block.input, not outcome.is_error, outcome.text))
+                on_tool(trace)
             if isinstance(outcome.status, AwaitingConfirmation):
                 reply.pending_ids.append(outcome.status.pending_id)
             if outcome.choices:  # the latest picker wins
@@ -321,12 +318,7 @@ class Agent:
             results.append(outcome.as_result_block(block.id))
         return results
 
-    async def _stream_turn(
-        self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]],
-        on_text: Callable[[str], Any] | None,
-    ) -> Any:
+    async def _stream(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Message:
         params: dict[str, Any] = {
             "model": self.model,
             "max_tokens": MAX_TOKENS,
@@ -335,25 +327,24 @@ class Agent:
             ],
             "messages": list(messages),
             "output_config": {"effort": self.effort},
+            **({"tools": tools} if tools else {}),
         }
-        if tools:
-            params["tools"] = tools
         async with self.client.messages.stream(**params) as stream:
-            async for event in stream:
-                if on_text and event.type == "text":
-                    on_text(event.text)
             return await stream.get_final_message()
 
     @staticmethod
-    def _text_of(content: list[Any]) -> str:
-        return "".join(b.text for b in content if b.type == "text").strip()
+    def _text_of(response: Message) -> str:
+        return "".join(b.text for b in response.content if isinstance(b, TextBlock)).strip()
 
     @staticmethod
     def _stub_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        stubbed = []
-        for r in results:
-            content = r.get("content", "")
+        def stub(result: dict[str, Any]) -> dict[str, Any]:
+            content = result.get("content", "")
             if isinstance(content, str) and len(content) > STORED_RESULT_MAX_CHARS:
-                r = {**r, "content": content[:STORED_RESULT_MAX_CHARS] + " …[truncated in memory]"}
-            stubbed.append(r)
-        return stubbed
+                return {
+                    **result,
+                    "content": content[:STORED_RESULT_MAX_CHARS] + " …[truncated in memory]",
+                }
+            return result
+
+        return [stub(r) for r in results]

@@ -10,6 +10,7 @@ from sparrow.clients.seerr.models import (
     ArrServer,
     Collection,
     Issue,
+    IssueType,
     MediaDetails,
     MediaRequest,
     Quota,
@@ -50,7 +51,7 @@ class Seerr(Protocol):
     async def create_issue(
         self,
         media_id: int,
-        issue_type: int,
+        issue_type: IssueType,
         message: str,
         *,
         as_user: int,
@@ -152,7 +153,7 @@ class SeerrClient(HttpClient):
     async def create_issue(
         self,
         media_id: int,
-        issue_type: int,
+        issue_type: IssueType,
         message: str,
         *,
         as_user: int,

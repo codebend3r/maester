@@ -1,8 +1,7 @@
 import pytest
 
 from sparrow.agent.tools import Tier, registry
-from sparrow.chat.identity import IdentityService
-from sparrow.chat.service import UNLINKED_HELP, ChatService
+from sparrow.chat.service import UNLINKED_HELP
 from sparrow.guides import DEVICES, GUIDES_DIR, guide
 from sparrow.tools.guides import setup_guide
 
@@ -27,8 +26,5 @@ async def test_the_model_gets_the_guide_to_answer_from(ctx):
     assert registry.get("setup_guide").tier == Tier.FRIEND
 
 
-def test_anyone_can_read_a_guide_and_newcomers_are_pointed_at_it(services, store):
-    chat = ChatService(agent=None, identity=IdentityService(store, services), store=store)
-    chunks = chat.setup_guide("apple_tv")
-    assert "".join(chunks).startswith("# Apple TV") and all(len(c) <= 2000 for c in chunks)
+def test_newcomers_are_pointed_at_the_guides():
     assert "setup guide" in UNLINKED_HELP

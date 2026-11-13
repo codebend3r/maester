@@ -3,11 +3,17 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from sparrow.agent.limits import RateLimiter
-from sparrow.agent.loop import CONTINUE_PROMPT, MAX_TOOL_ITERATIONS, Agent, AgentReply
+from sparrow.agent.loop import (
+    CONTINUE_PROMPT,
+    MAX_TOOL_ITERATIONS,
+    Agent,
+    AgentReply,
+    TurnFailed,
+)
 from sparrow.agent.runner import ToolRunner
 from sparrow.agent.tools import Tier, ToolRegistry
 from sparrow.config import Settings
-from sparrow.store import Store
+from sparrow.store import Decision, Store
 from tests.fake_model import FakeModel, text_message, tool_message
 
 
@@ -43,12 +49,11 @@ def world():
     store.close()
 
 
-async def test_plain_reply_streams_text_and_is_remembered(world):
+async def test_plain_reply_is_remembered(world):
     make, store = world
     agent, model = make(text_message("Hello there."))
-    chunks = []
-    reply = await agent.respond("u1", Tier.FRIEND, "hi", on_text=chunks.append)
-    assert reply.text == "Hello there." and chunks == ["Hello there."]
+    reply = await agent.respond("u1", Tier.FRIEND, "hi")
+    assert reply.text == "Hello there."
     assert reply.iterations == 1 and reply.tool_calls == []
     params = model.messages.calls[0]
     assert params["model"] == "fake"
@@ -68,7 +73,9 @@ async def test_tool_call_round_trip(world):
     traces = []
     reply = await agent.respond("u1", Tier.FRIEND, "get dune", on_tool=traces.append)
     assert reply.text.startswith("There are two")
-    assert reply.tool_calls == [{"name": "search_media", "input": {"query": "dune"}, "ok": True}]
+    assert [(c.name, c.input, c.ok) for c in reply.tool_calls] == [
+        ("search_media", {"query": "dune"}, True)
+    ]
     (trace,) = traces
     assert trace.name == "search_media" and trace.input == {"query": "dune"} and trace.ok
     assert "1984" in trace.result
@@ -141,7 +148,7 @@ async def test_destructive_call_surfaces_pending_id_and_model_is_told_to_stop(wo
     assert len(reply.pending_ids) == 1
     result = model.messages.calls[1]["messages"][-1]["content"][0]["content"]
     assert "awaiting_confirmation" in result
-    assert store.open_pending("confirm")[0].action == "replace_media"
+    assert store.get_pending(reply.pending_ids[0]).action == "replace_media"
 
 
 async def test_a_confirmed_call_runs_and_is_remembered_like_any_call(world):
@@ -150,7 +157,7 @@ async def test_a_confirmed_call_runs_and_is_remembered_like_any_call(world):
         tool_message([("replace_media", {"query": "dune"})]), text_message("Confirm below.")
     )
     (pending_id,) = (await agent.respond("u1", Tier.TRUSTED, "replace dune")).pending_ids
-    pending = store.decide_pending(pending_id, "approved", "u1")
+    pending = store.decide_pending(pending_id, Decision.APPROVED, "u1")
     outcome = await agent.run_decision(pending, "u1", Tier.TRUSTED, approved=True)
     assert outcome.text.startswith("replaced") and not outcome.is_error
     *_, tool_use, result = store.recent_messages("u1", max_tokens=10_000)
@@ -166,7 +173,7 @@ async def test_a_cancel_is_remembered_without_running(world):
         tool_message([("replace_media", {"query": "dune"})]), text_message("Confirm below.")
     )
     (pending_id,) = (await agent.respond("u1", Tier.TRUSTED, "replace dune")).pending_ids
-    pending = store.decide_pending(pending_id, "denied", "u1")
+    pending = store.decide_pending(pending_id, Decision.DENIED, "u1")
     outcome = await agent.run_decision(pending, "u1", Tier.TRUSTED, approved=False)
     assert "nothing was done" in outcome.text
     assert store.recent_messages("u1", max_tokens=10_000)[-1]["content"][0]["content"] == (
@@ -181,7 +188,7 @@ async def test_friend_tier_never_sees_trusted_tools_and_call_is_refused(world):
     )
     reply = await agent.respond("u1", Tier.FRIEND, "replace dune")
     assert [t["name"] for t in model.messages.calls[0]["tools"]] == ["search_media"]
-    assert reply.tool_calls[0]["ok"] is False
+    assert reply.tool_calls[0].ok is False
     assert "not available" in model.messages.calls[1]["messages"][-1]["content"][0]["content"]
 
 
@@ -203,6 +210,53 @@ async def test_refusal_and_truncation_are_handled(world):
     agent, _ = make(tool_message([("search_media", {"query": "x"})], stop_reason="max_tokens"))
     reply = await agent.respond("u1", Tier.FRIEND, "y")
     assert "cut off" in reply.text and reply.tool_calls == []
+
+
+def answered_tool_uses(messages):
+    """Whether every tool_use in `messages` is answered by a tool_result in the next one,
+    as the API demands on replay."""
+
+    def ids(message, kind):
+        content = message["content"]
+        blocks = content if isinstance(content, list) else []
+        key = "id" if kind == "tool_use" else "tool_use_id"
+        return {b[key] for b in blocks if b["type"] == kind}
+
+    return all(
+        ids(message, "tool_use")
+        <= (ids(messages[i + 1], "tool_result") if i + 1 < len(messages) else set())
+        for i, message in enumerate(messages)
+        if message["role"] == "assistant"
+    )
+
+
+async def test_a_turn_after_a_truncated_tool_call_replays_a_valid_conversation(world):
+    make, store = world
+    agent, model = make(
+        tool_message([("search_media", {"query": "x"})], stop_reason="max_tokens"),
+        tool_message([("search_media", {"query": "dune"})]),
+        text_message("Found it."),
+    )
+    assert "cut off" in (await agent.respond("u1", Tier.FRIEND, "first")).text
+    assert answered_tool_uses(store.recent_messages("u1", max_tokens=10_000))
+    reply = await agent.respond("u1", Tier.FRIEND, "second")
+    assert reply.text == "Found it."
+    for call in model.messages.calls:
+        assert answered_tool_uses(call["messages"])
+    assert answered_tool_uses(store.recent_messages("u1", max_tokens=10_000))
+
+
+async def test_a_tool_step_that_breaks_is_not_remembered_half_done(world):
+    make, store = world
+    agent, _ = make(tool_message([("search_media", {"query": "x"})]))
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("store hiccup")
+
+    agent.runner.run = broken
+    with pytest.raises(TurnFailed):
+        await agent.respond("u1", Tier.FRIEND, "first")
+    assert [m["role"] for m in store.recent_messages("u1", max_tokens=10_000)] == ["user"]
 
 
 async def test_rate_limits_reply_without_calling_the_model(world):

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { toChatEvent, toNotice } from '@/lib/events'
+import { NOTICE_KINDS, toChatEvent, toNotice } from '@/lib/events'
 
 const raw = (name: string, data: unknown) => ({ name, data: JSON.stringify(data) })
 
@@ -42,13 +42,16 @@ describe('toChatEvent', () => {
 })
 
 describe('toNotice', () => {
-  it('reads an approval with its pending action, and refuses an unknown kind', () => {
-    expect(toNotice({ kind: 'approval', text: 'Dune in 4K?', pending_id: 9 })).toEqual({
-      kind: 'approval',
-      text: 'Dune in 4K?',
-      pendingId: 9,
-      to: null,
-    })
+  it('reads a direct message with whom it is to, and refuses an unknown kind', () => {
+    expect(toNotice({ kind: NOTICE_KINDS.directMessage, text: 'Dune is here.', to: 'u1' })).toEqual(
+      {
+        kind: NOTICE_KINDS.directMessage,
+        text: 'Dune is here.',
+        to: 'u1',
+      },
+    )
+    // A kind no notice reads.
+    expect(toNotice({ kind: 'approval', text: 'Dune in 4K?', pending_id: 9 })).toBeNull()
     expect(toNotice({ kind: 'smoke_signal', text: 'hi' })).toBeNull()
   })
 })

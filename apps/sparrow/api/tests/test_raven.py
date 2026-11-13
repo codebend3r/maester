@@ -119,7 +119,6 @@ async def test_search_library_answers_with_each_copy_and_its_link(services):
         key="raven:movie:277",
         title="Dune",
         year=2021,
-        logo_url="http://raven.test/api/items/277/images/logo",
         links=(
             TitleLink("4K HDR", "http://raven.test/movies/277?library=4"),
             TitleLink("1080p", "http://raven.test/movies/277?library=6"),

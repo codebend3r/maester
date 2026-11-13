@@ -78,7 +78,6 @@ def note(found: Gaps) -> str:
     "owning Sonarr host that check_availability reports; season narrows it to one season.",
     tier=Tier.FRIEND,
     host_param="host",
-    held_in_maintenance=True,
 )
 async def find_gaps(
     ctx: ToolContext,

@@ -94,12 +94,6 @@ class RavenTitle:
             return None
         return f"{base_url}/{PAGES[self.kind]}/{self.item_id}?library={self.library_id}"
 
-    def logo_url(self, base_url: str) -> str | None:
-        """The title's logo (its name as the poster sets it), as raven serves it."""
-        if self.item_id is None:
-            return None
-        return f"{base_url}/api/items/{self.item_id}/images/logo"
-
     @classmethod
     def from_movie(cls, raw: dict[str, Any], library: str) -> RavenTitle:
         item = raw.get("item") or {}
@@ -164,11 +158,6 @@ class Work:
         if self.item_id is None:
             return None
         return f"{base_url}/{PAGES[self.kind]}/{self.item_id}"
-
-    def logo_url(self, base_url: str) -> str | None:
-        if self.item_id is None:
-            return None
-        return f"{base_url}/api/items/{self.item_id}/images/logo"
 
 
 @dataclass(frozen=True)

@@ -7,27 +7,32 @@ job. A route opts into deduplication when a repeat would reach a person
 twice: Seerr can send the same event again within minutes (a library
 rescan), while a later repeat is news (a replaced file ready again) and
 must get through. MEDIA_AVAILABLE DMs the friend whose request is ready;
-MEDIA_PENDING asks the admin about a request Seerr left pending, once per
-request whoever asked first (`sparrow/approvals.py`), and MEDIA_APPROVED and
-MEDIA_DECLINED close that approval when the admin decided in Seerr itself;
+MEDIA_APPROVED and MEDIA_DECLINED tell them the admin's decision in Seerr;
 ISSUE_RESOLVED and ISSUE_REOPENED follow a playback report's issue into
 its report row, idempotently, and tell the reporter once when theirs is
 resolved. Types without a route are ignored.
+
+The payload is Seerr's default JSON template, checked at the boundary
+(`SeerrPayload`): the template renders every value as a string and leaves
+the `media`, `request` and `issue` blocks null when the event has none.
+Fields sparrow doesn't read are ignored rather than refused, since Seerr's
+template carries more than this reads and an admin may extend it.
 """
 
 from __future__ import annotations
 
+import enum
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
-from typing import Any
+from typing import Annotated
 
-from sparrow.agent.tools import spec_of
-from sparrow.approvals import ask_about_request, decide_request, decision_dm, request_subject
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+
 from sparrow.clients import ClientError, Services
-from sparrow.clients.seerr import MediaRequest, RequestStatus, int_or_none
+from sparrow.clients.seerr import MediaRequest, int_or_none
 from sparrow.media import Copy, Titled, version_label
 from sparrow.notify import DirectMessage, Notice
 from sparrow.store import Store
@@ -35,13 +40,51 @@ from sparrow.store import Store
 log = logging.getLogger("sparrow.seerr")
 
 
+class NotificationType(enum.StrEnum):
+    """The Seerr notification types sparrow acts on."""
+
+    MEDIA_AVAILABLE = "MEDIA_AVAILABLE"
+    MEDIA_APPROVED = "MEDIA_APPROVED"
+    MEDIA_DECLINED = "MEDIA_DECLINED"
+    ISSUE_RESOLVED = "ISSUE_RESOLVED"
+    ISSUE_REOPENED = "ISSUE_REOPENED"
+
+
+_BLOCK = ConfigDict(extra="ignore", frozen=True)
+# An id the template may leave out or render as "".
+SeerrId = Annotated[int | None, BeforeValidator(int_or_none)]
+
+
+class _Media(BaseModel):
+    model_config = _BLOCK
+    media_type: str | None = None
+    tmdb_id: SeerrId = Field(None, alias="tmdbId")
+
+
+class _Request(BaseModel):
+    model_config = _BLOCK
+    request_id: SeerrId = None
+
+
+class _Issue(BaseModel):
+    model_config = _BLOCK
+    issue_id: SeerrId = None
+
+
+class SeerrPayload(BaseModel):
+    """What the webhook reads of Seerr's default JSON template."""
+
+    model_config = _BLOCK
+    notification_type: str
+    subject: Annotated[str, BeforeValidator(lambda value: value or "")] = ""
+    media: _Media | None = None
+    request: _Request | None = None
+    issue: _Issue | None = None
+
+
 @dataclass(frozen=True)
 class SeerrNotification:
-    """One webhook delivery, read from Seerr's default JSON payload template.
-
-    The template renders every value as a string and leaves the `media`,
-    `request` and `issue` blocks null when the event has none.
-    """
+    """One webhook delivery, as the handlers read it."""
 
     type: str  # notification_type, e.g. "MEDIA_AVAILABLE"
     subject: str  # for media events, "<title> (<year>)"
@@ -62,18 +105,21 @@ class SeerrNotification:
         return f"{self.type}:{about}"
 
     @classmethod
-    def from_webhook(cls, raw: dict[str, Any]) -> SeerrNotification:
-        media = raw.get("media") or {}
-        request = raw.get("request") or {}
-        issue = raw.get("issue") or {}
+    def of(cls, payload: SeerrPayload) -> SeerrNotification:
+        media = payload.media or _Media()
         return cls(
-            type=str(raw["notification_type"]),
-            subject=raw.get("subject") or "",
-            media_type=media.get("media_type") or None,
-            tmdb_id=int_or_none(media.get("tmdbId")),
-            request_id=int_or_none(request.get("request_id")),
-            issue_id=int_or_none(issue.get("issue_id")),
+            type=payload.notification_type,
+            subject=payload.subject,
+            media_type=media.media_type or None,
+            tmdb_id=media.tmdb_id,
+            request_id=payload.request.request_id if payload.request else None,
+            issue_id=payload.issue.issue_id if payload.issue else None,
         )
+
+    @classmethod
+    def from_webhook(cls, raw: object) -> SeerrNotification:
+        """`pydantic.ValidationError` when `raw` isn't a Seerr notification."""
+        return cls.of(SeerrPayload.model_validate(raw))
 
 
 SeerrHandler = Callable[[SeerrNotification], Awaitable[Sequence[Notice]]]
@@ -91,57 +137,45 @@ class SeerrRoute:
 
 def seerr_routes(services: Services, store: Store) -> dict[str, SeerrRoute]:
     return {
-        "MEDIA_AVAILABLE": SeerrRoute(partial(ready_to_watch, services, store), RESCAN_REPEAT),
-        # One approval per request, and one decision per approval: repeats do nothing twice.
-        "MEDIA_PENDING": SeerrRoute(partial(pending_request, services, store)),
-        "MEDIA_APPROVED": SeerrRoute(partial(decided_in_seerr, store, True)),
-        "MEDIA_DECLINED": SeerrRoute(partial(decided_in_seerr, store, False)),
+        NotificationType.MEDIA_AVAILABLE: SeerrRoute(
+            partial(ready_to_watch, services, store), RESCAN_REPEAT
+        ),
+        NotificationType.MEDIA_APPROVED: SeerrRoute(
+            partial(decided_in_seerr, services, store, True), RESCAN_REPEAT
+        ),
+        NotificationType.MEDIA_DECLINED: SeerrRoute(
+            partial(decided_in_seerr, services, store, False), RESCAN_REPEAT
+        ),
         # Only a change of state acts, so a repeated delivery does nothing twice.
-        "ISSUE_RESOLVED": SeerrRoute(partial(issue_status, store, True)),
-        "ISSUE_REOPENED": SeerrRoute(partial(issue_status, store, False)),
+        NotificationType.ISSUE_RESOLVED: SeerrRoute(partial(issue_status, store, True)),
+        NotificationType.ISSUE_REOPENED: SeerrRoute(partial(issue_status, store, False)),
     }
 
 
-# Who decided a request the admin approved or declined in Seerr's own page.
-DECIDED_IN_SEERR = "seerr"
-
-
-async def pending_request(
-    services: Services, store: Store, notification: SeerrNotification
-) -> list[Notice]:
-    """Ask the admin about a request Seerr left pending, unless they already were."""
-    if notification.request_id is None:
-        return []
-    request = await services.seerr.get_request(notification.request_id)
-    if request.status != RequestStatus.PENDING:
-        return []
-    _, post = await ask_about_request(services, store, request)
-    if post is None:
-        return []
-    # Decided while this was raised (the admin's Approve on a held 4K request makes it and
-    # approves it at once): close it rather than post buttons for a settled request.
-    now = await services.seerr.get_request(request.id)
-    if now.status != RequestStatus.PENDING:
-        verdict = "approved" if now.status == RequestStatus.APPROVED else "denied"
-        store.decide_pending(post.pending_id, verdict, DECIDED_IN_SEERR)
-        return []
-    return [post]
+def decision_dm(title: str, version: str, approved: bool) -> str:
+    """What the requester is told once the admin decides their request in Seerr."""
+    if approved:
+        return (
+            f"The admin approved {title} in {version}. It's on its way; I'll message you when "
+            "it's ready."
+        )
+    if version == "4K":
+        return f"The admin declined {title} in 4K. You can still ask for the regular version."
+    return f"The admin declined {title} in {version}."
 
 
 async def decided_in_seerr(
-    store: Store, approved: bool, notification: SeerrNotification
+    services: Services, store: Store, approved: bool, notification: SeerrNotification
 ) -> list[Notice]:
-    """The admin decided a request in Seerr: close its approval here, and tell the friend."""
+    """The admin decided a request in Seerr: tell the friend who asked, when linked here."""
     if notification.request_id is None:
         return []
-    pending = store.pending_about(request_subject(notification.request_id))
-    verdict = "approved" if approved else "denied"
-    if pending is None or store.decide_pending(pending.id, verdict, DECIDED_IN_SEERR) is None:
+    request = await services.seerr.get_request(notification.request_id)
+    user = store.active_link_by_seerr_id(request.requested_by_id)
+    if user is None:
         return []
-    decided = spec_of(decide_request).parse({**pending.payload, "approved": approved})
-    if not decided.requester:
-        return []
-    return [DirectMessage(decided.requester, decision_dm(decided.title, decided.version, approved))]
+    text = decision_dm(notification.subject, version_label(request.is_4k), approved)
+    return [DirectMessage(user.user_id, text)]
 
 
 async def issue_status(

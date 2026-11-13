@@ -4,26 +4,13 @@ import pytest
 
 from sparrow.agent.loop import Agent
 from sparrow.agent.runner import ToolRunner
-from sparrow.agent.tools import (
-    Approval,
-    Choice,
-    Choices,
-    NeedsApproval,
-    Ok,
-    Tier,
-    ToolRegistry,
-)
-from sparrow.agent.tools import registry as app_registry
+from sparrow.agent.tools import Choice, Tier, ToolRegistry, offer
 from sparrow.chat.identity import IdentityService
 from sparrow.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
-from sparrow.clients.seerr import MediaDetails, MediaStatus, RequestStatus, SeerrUser
+from sparrow.clients.seerr import SeerrUser
 from sparrow.config import Settings
-from sparrow.notify import AdminPost, ApprovalPost, DirectMessage
-from tests.factories import seerr_server
+from sparrow.notify import AdminPost
 from tests.fake_model import FakeModel, text_message, tool_message
-
-# Importing the tools package registers the real tools into `app_registry`.
-import sparrow.tools  # noqa: F401  isort: skip
 
 FRIEND = ChatUser("f1", "Friend")
 TRUSTED = ChatUser("t1", "Trusty")
@@ -45,44 +32,20 @@ def service(registry, services, store, *script) -> ChatService:
 
 @pytest.fixture
 def world(services, store):
-    """Three stand-in tools: a picker, a destructive call, and an admin's button-only decision."""
+    """Two stand-in tools: a picker and a destructive call."""
     reg = ToolRegistry()
     calls = []
 
     @reg.tool("search_media", "search")
     async def search(ctx, query: str = ""):
-        return Choices(
-            [
-                Choice("Dune", "438631", 2021, "https://image.tmdb.org/t/p/w92/dune.jpg"),
-                Choice("Dune", "841", 1984),
-            ]
-        )
+        return offer([Choice("Dune", "438631", 2021, "A film"), Choice("Dune", "841", 1984)])
 
-    @reg.tool(
-        "replace_media",
-        "replace",
-        tier=Tier.TRUSTED,
-        destructive=True,
-        held_in_maintenance=True,
-    )
+    @reg.tool("replace_media", "replace", tier=Tier.TRUSTED, destructive=True)
     async def replace(ctx, file_id: int = 0):
         calls.append(("replace", file_id))
-        if file_id == 99:  # over the day's cap: the admin decides
-            approval = Approval("Trusty wants 99 gone", "replace 99", allow_replace, {
-                "user_id": "t1", "file_id": 99})  # fmt: skip
-            return NeedsApproval("over the cap", approval)
+        if file_id < 0:
+            raise ConnectionError("arr down")
         return f"replaced file {file_id}"
-
-    @reg.tool(
-        "allow_replace",
-        "the admin's decision on a replacement over the cap",
-        tier=Tier.ADMIN,
-        button_only=True,
-    )
-    async def allow_replace(ctx, user_id: str = "", file_id: int = 0, approved: bool = False):
-        calls.append(("allow", file_id, approved))
-        verdict = "Allowed" if approved else "Denied"
-        return Ok(f"{verdict} replacing {file_id}.", (DirectMessage(user_id, verdict),))
 
     for seerr_id, u in enumerate((FRIEND, TRUSTED), 2):
         store.upsert_user(u.id, seerr_user_id=seerr_id)
@@ -109,7 +72,7 @@ async def test_message_runs_agent_and_offers_choices(world):
     response = await svc.handle_message(FRIEND, "get dune")
     assert response.text == "Which Dune?"
     assert response.choices == [
-        Choice("Dune", "438631", 2021, "https://image.tmdb.org/t/p/w92/dune.jpg"),
+        Choice("Dune", "438631", 2021, "A film"),
         Choice("Dune", "841", 1984),
     ]
     assert response.choices[0].display == "Dune (2021)"
@@ -155,16 +118,13 @@ async def test_confirmation_round_trip(world):
     assert result_block["content"] == "replaced file 7"
 
 
-async def test_a_confirmation_that_goes_to_the_admin_says_so_plainly(world):
+async def test_a_failed_press_stays_open_to_press_again(world):
     make, store, _ = world
-    svc = make(tool_message([("replace_media", {"file_id": 99})]), text_message("Confirm below."))
+    svc = make(tool_message([("replace_media", {"file_id": -1})]), text_message("Confirm below."))
     (pending,) = (await svc.handle_message(TRUSTED, "replace it")).confirmations
     decision = await svc.decide(pending.id, TRUSTED, approve=True)
-    assert (
-        decision.text == "That needs the admin's approval now; you'll hear back once they decide."
-    )
-    (post,) = decision.notices
-    assert isinstance(post, ApprovalPost) and store.get_pending(post.pending_id).kind == "approve"
+    assert not decision.settled and "still open" in decision.text
+    assert store.get_pending(pending.id).decision is None
 
 
 async def test_confirmed_result_reaches_the_model_on_the_next_turn(world):
@@ -232,42 +192,6 @@ async def test_a_turn_that_fails_after_a_tool_acted_keeps_what_it_raised(world):
     assert pending.action == "replace_media"
 
 
-def approval(store, file_id=99):
-    return store.create_pending(
-        kind="approve",
-        action="allow_replace",
-        requester=TRUSTED.id,
-        payload={"user_id": TRUSTED.id, "file_id": file_id},
-        summary=f"Trusty wants {file_id} gone",
-        ttl=timedelta(days=1),
-    )
-
-
-async def test_only_the_admin_decides_an_approval_and_the_requester_hears(world):
-    make, store, calls = world
-    svc = make()
-    pending = approval(store)
-    assert await svc.decide(pending.id, FRIEND, approve=True) == Decision(
-        "Only the admin can approve this.", settled=False
-    )
-    approved = await svc.decide(pending.id, ADMIN, approve=True)
-    assert approved.text == "Allowed replacing 99." and calls == [("allow", 99, True)]
-    (dm,) = approved.notices
-    assert isinstance(dm, DirectMessage) and dm.to == TRUSTED.id
-    assert svc.is_admin(ADMIN) and not svc.is_admin(FRIEND)
-
-
-async def test_the_admin_denies_and_a_second_press_is_stale(world):
-    make, store, calls = world
-    svc = make()
-    pending = approval(store)
-    denied = await svc.decide(pending.id, ADMIN, approve=False)
-    assert denied.text == "Denied replacing 99." and calls == [("allow", 99, False)]
-    assert await svc.decide(pending.id, ADMIN, approve=True) == Decision(
-        "That request is no longer open."
-    )
-
-
 async def test_forget(world):
     make, *_ = world
     svc = make(text_message("A"))
@@ -279,91 +203,12 @@ async def test_forget(world):
 async def test_a_decision_whose_action_is_gone_is_closed_not_reopened(world):
     make, store, _ = world
     pending = store.create_pending(
-        kind="approve",
         action="renamed_since",
         requester=FRIEND.id,
         payload={},
-        summary="an old approval",
+        summary="an old confirmation",
         ttl=timedelta(days=1),
     )
-    decision = await make().decide(pending.id, ADMIN, approve=True)
-    assert decision.settled and "no longer exists" in decision.text
+    decision = await make().decide(pending.id, FRIEND, approve=True)
+    assert decision.settled and "not available" in decision.text
     assert store.get_pending(pending.id).decision == "approved"
-
-
-DUNE = MediaDetails(438631, "movie", "Dune", 2021, "", MediaStatus.AVAILABLE, MediaStatus.UNKNOWN)
-
-
-async def test_a_trusted_4k_request_is_approved_by_the_admin_end_to_end(services, store):
-    """The real tools: a trusted friend asks for 4K, the admin approves, Seerr and the friend hear."""
-    store.upsert_user(
-        TRUSTED.id,
-        seerr_user_id=7,
-        plex_username="trusty",
-        tier_override="trusted",
-    )
-    store.upsert_user(ADMIN.id, tier_override="admin")
-    seerr = services.seerr
-    seerr.details[("movie", 438631)] = DUNE
-    seerr.arr_servers["radarr"] = [seerr_server(1, "movie", "vermithor", is_4k=True)]
-    svc = service(
-        app_registry,
-        services,
-        store,
-        tool_message([("request_media_4k", {"tmdb_id": 438631, "media_type": "movie"})]),
-        text_message("I've asked the admin."),
-    )
-    response = await svc.handle_message(TRUSTED, "Dune in 4K please")
-    assert response.text == "I've asked the admin."
-    (post,) = response.notices
-    assert isinstance(post, ApprovalPost) and post.text.startswith("trusty asks for Dune (2021)")
-    (request,) = seerr.requests
-    assert request.is_4k and request.requested_by_id == 7
-
-    seerr.down = True  # the first press fails in Seerr and stays open
-    failed = await svc.decide(post.pending_id, ADMIN, approve=True)
-    assert not failed.settled and "still open" in failed.text
-    seerr.down = False
-    approved = await svc.decide(post.pending_id, ADMIN, approve=True)
-    assert approved.text == "Approved Dune (2021) in 4K in Seerr (request #1)."
-    (dm,) = approved.notices
-    assert dm.to == TRUSTED.id and "approved Dune (2021) in 4K" in dm.text
-    assert seerr.requests[0].status == RequestStatus.APPROVED
-
-
-async def test_a_failed_press_that_cant_reopen_points_at_the_newer_approval(
-    services, store, monkeypatch
-):
-    store.upsert_user(
-        TRUSTED.id,
-        seerr_user_id=7,
-        plex_username="trusty",
-        tier_override="trusted",
-    )
-    store.upsert_user(ADMIN.id, tier_override="admin")
-    services.seerr.details[("movie", 438631)] = DUNE
-    services.seerr.arr_servers["radarr"] = [seerr_server(1, "movie", "vermithor", is_4k=True)]
-    svc = service(
-        app_registry,
-        services,
-        store,
-        tool_message([("request_media_4k", {"tmdb_id": 438631, "media_type": "movie"})]),
-        text_message("Asked."),
-    )
-    (post,) = (await svc.handle_message(TRUSTED, "Dune in 4K")).notices
-    services.seerr.down = True
-    # Seerr's webhook raised a fresh approval for the request while this press ran.
-    monkeypatch.setattr(store, "reopen_pending", lambda pending_id: False)
-    failed = await svc.decide(post.pending_id, ADMIN, approve=True)
-    assert failed.settled and "newer approval" in failed.text
-
-
-async def test_a_confirm_pressed_during_maintenance_is_saved_for_later(world):
-    make, store, calls = world
-    svc = make(tool_message([("replace_media", {"file_id": 3})]), text_message("Press Confirm."))
-    confirmation = (await svc.handle_message(TRUSTED, "replace it")).confirmations[0]
-    store.raise_flag("maintenance", "drives")
-    decision = await svc.decide(confirmation.id, TRUSTED, approve=True)
-    assert decision.text.startswith("The server is down for maintenance") and calls == []
-    (held,) = store.held_calls()
-    assert held.tool == "replace_media" and held.args == {"file_id": 3}

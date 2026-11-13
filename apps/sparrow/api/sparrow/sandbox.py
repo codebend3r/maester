@@ -26,9 +26,9 @@ import os
 import secrets
 import shutil
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 import uvicorn
 from fastapi import APIRouter, Depends, FastAPI, Request
@@ -36,7 +36,7 @@ from pydantic import BaseModel
 
 from sparrow.agent.claude_code import BINARY, ClaudeCodeModel
 from sparrow.agent.limits import RateLimiter
-from sparrow.agent.tools import Tier
+from sparrow.agent.tools import AssignableTier, Tier
 from sparrow.chat.identity import IdentityService
 from sparrow.chat.service import ChatService
 from sparrow.clients import RavenClient
@@ -48,8 +48,8 @@ from sparrow.clients.arr_library import (
     arr_libraries,
 )
 from sparrow.clients.curl import CurlTransport
-from sparrow.config import Settings, load_env_file, load_settings
-from sparrow.evals import CASES_DIR, Case, build_agent
+from sparrow.config import DEFAULT_MODEL, Settings, load_env_file, load_settings
+from sparrow.evals import CASES_DIR, FAKE_MODEL, Case, build_agent
 from sparrow.evals.world import EVAL_USER, build_world
 from sparrow.notify import LogNotifier
 from sparrow.registry import instances_from_env
@@ -68,11 +68,9 @@ CHOICES = {
     "case": "SPARROW_SANDBOX_CASE",
     "raven": "SPARROW_SANDBOX_RAVEN",
 }
-MODEL = "claude-sonnet-5-5"
 # raven's web dev server on this machine, which proxies its API: where the sandbox looks
 # when `RAVEN_URL` is unset.
 LOCAL_RAVEN = "http://localhost:5174"
-FAKE_MODEL = "fake"
 SANDBOX_NAME = "Sandbox user"
 HOST = "127.0.0.1"
 
@@ -97,7 +95,7 @@ class CasePick(BaseModel):
 
 
 class TierPick(BaseModel):
-    tier: Literal["friend", "trusted", "admin"]
+    tier: AssignableTier
 
 
 class SandboxAuth(Auth):
@@ -173,7 +171,7 @@ class Sandbox:
             "case": {
                 "id": self.world.case_id,
                 "name": case.name,
-                "turns": [asdict(turn) for turn in case.turns],
+                "turns": [turn.model_dump() for turn in case.turns],
             },
             "cases": [
                 {"id": BLANK, "name": "Blank world"},
@@ -203,8 +201,8 @@ class Sandbox:
 
         @router.post("/sandbox/tier", dependencies=[Depends(require_json)])
         async def set_tier(pick: TierPick) -> dict[str, str]:
-            self.world.chat.identity.set_tier_override(EVAL_USER, pick.tier)
-            return {"tier": pick.tier}
+            self.world.chat.identity.set_tier_override(EVAL_USER, pick.tier.value)
+            return {"tier": pick.tier.value}
 
         return router
 
@@ -234,7 +232,9 @@ def main(argv: list[str] | None = None) -> int:
         description="Chat with sparrow's agent against an eval case's fake services."
     )
     parser.add_argument(
-        "--model", default=MODEL, help=f"model id (default {MODEL}), or 'fake' for scripted replies"
+        "--model",
+        default=DEFAULT_MODEL,
+        help=f"model id (default {DEFAULT_MODEL}), or 'fake' for scripted replies",
     )
     parser.add_argument("--case", default=BLANK, help="the case to open first, by its file's stem")
     args = parser.parse_args(argv)

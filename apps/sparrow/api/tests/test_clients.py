@@ -10,7 +10,6 @@ from sparrow.clients import (
     ClientError,
     FakeSeerrClient,
     FakeSonarrClient,
-    FakeWizarrClient,
     FleetMonitorClient,
     PlexClient,
     PlexTvClient,
@@ -20,7 +19,6 @@ from sparrow.clients import (
     SeerrClient,
     SonarrClient,
     TautulliClient,
-    WizarrClient,
 )
 from sparrow.clients.base import gather_each
 from sparrow.clients.seerr import (
@@ -34,7 +32,6 @@ from sparrow.clients.seerr import (
     SearchResult,
 )
 from sparrow.clients.sonarr import Episode
-from sparrow.clients.wizarr import Invite, WizarrUser, honored_expiry_days, redeemer
 
 BASE = "http://svc.test"
 
@@ -372,35 +369,10 @@ async def test_plex_seasons_count_episodes_in_the_library(fixture):
 
 
 @respx.mock
-async def test_wizarr_create_invite_snaps_expiry_up(fixture):
-    respx.get(f"{BASE}/api/servers").respond(json={"servers": [{"id": 1}]})
-    route = respx.post(f"{BASE}/api/invitations").respond(
-        json={"invitation": {"id": 9, "code": "X", "url": "u"}}
-    )
-    inv = await WizarrClient(BASE, "k").create_invite(expires_in_days=10, duration="35")
-    assert json.loads(route.calls.last.request.content)["expires_in_days"] == 30
-    assert inv.code == "X"
-
-
-@respx.mock
-async def test_wizarr_redeemer_resolves_the_user_repr(fixture):
-    respx.get(f"{BASE}/api/invitations").respond(json=fixture("wizarr_invitations"))
-    (inv,) = await WizarrClient(BASE, "k").list_invites()
-    users = [WizarrUser(281, "dany", "dany@example.com", None, "Meleys")]
-    assert redeemer(inv, users).username == "dany"
-    assert redeemer(Invite(1, "c", "u", used_by="DANY"), users).id == 281
-    assert redeemer(Invite(1, "c", "u"), users) is None
-
-
-@respx.mock
 async def test_http_errors_become_client_errors():
     respx.get(f"{BASE}/api/v3/rootfolder").respond(status_code=401, text="Unauthorized")
     with pytest.raises(ClientError, match=r"sonarr GET /api/v3/rootfolder failed \(401\)"):
         await SonarrClient("meleys", BASE, "k").root_folders()
-
-
-def test_honored_expiry_days():
-    assert [honored_expiry_days(d) for d in (1, 2, 7, 8, 30, 90)] == [1, 7, 7, 30, 30, 30]
 
 
 async def test_fake_seerr_round_trip():
@@ -424,12 +396,6 @@ async def test_fake_sonarr_tracks_destructive_calls():
     await sonarr.mark_failed(99)
     await sonarr.search([1])
     assert sonarr.failed == [99] and sonarr.searched == [[1]]
-
-
-async def test_fake_wizarr_invite():
-    wizarr = FakeWizarrClient()
-    inv = await wizarr.create_invite(expires_in_days=7, duration="35")
-    assert inv.code == "FAKE001" and (await wizarr.list_invites()) == [inv]
 
 
 @respx.mock
@@ -545,68 +511,14 @@ async def test_the_fleet_view_names_each_hosts_state_temperatures_and_containers
     assert not caraxes.collected and caraxes.status == "unknown" and caraxes.stale is None
 
 
-@respx.mock
-async def test_wizarr_libraries_and_an_invite_scoped_to_their_servers():
-    respx.get(f"{BASE}/api/libraries").respond(
-        json={"libraries": [{"id": 5, "name": "07. Anime", "server_id": 2,
-                             "server_name": "Vermithor", "enabled": True}]}
-    )  # fmt: skip
-    route = respx.post(f"{BASE}/api/invitations").respond(
-        json={"invitation": {"id": 9, "code": "X", "url": "u"}}
-    )
-    client = WizarrClient(BASE, "k")
-    (anime,) = await client.libraries()
-    assert (anime.id, anime.server_name) == (5, "Vermithor")
-    await client.create_invite(expires_in_days=7, duration="35", library_ids=[5], server_ids=[2])
-    sent = json.loads(route.calls.last.request.content)
-    assert (sent["server_ids"], sent["library_ids"]) == ([2], [5])  # no /api/servers read
-
-
 PLEX_TV = "https://plex.test"
-
-
-@respx.mock
-async def test_plex_tv_reads_servers_libraries_and_friends_shares_and_writes_one():
-    respx.get(f"{PLEX_TV}/api/servers").respond(
-        text='<MediaContainer><Server name="Meleys" machineIdentifier="m-1"/>'
-        '<Server name="Old"/></MediaContainer>'
-    )
-    respx.get(f"{PLEX_TV}/api/servers/m-1").respond(
-        text='<MediaContainer><Server name="Meleys"><Section id="101" key="1" title="01. Movies"/>'
-        '<Section id="104" key="4" title="04. Anime"/></Server></MediaContainer>'
-    )
-    respx.get(f"{PLEX_TV}/api/servers/m-1/shared_servers").respond(
-        text='<MediaContainer><SharedServer id="7" username="dany" email="dany@example.com" '
-        'allLibraries="0"><Section id="101" title="01. Movies" shared="1"/>'
-        '<Section id="104" title="04. Anime" shared="0"/></SharedServer></MediaContainer>'
-    )
-    write = respx.put(f"{PLEX_TV}/api/servers/m-1/shared_servers/7").respond(
-        text='<MediaContainer><SharedServer id="7"/></MediaContainer>'
-    )
-    client = PlexTvClient(PLEX_TV, "owner-token")
-    (meleys,) = await client.servers()
-    assert meleys.machine_id == "m-1"
-    assert [(s.id, s.title) for s in await client.sections("m-1")] == [
-        (101, "01. Movies"),
-        (104, "04. Anime"),
-    ]
-    (share,) = await client.shares("m-1")
-    assert share.section_ids == {101} and share.is_for("DANY@example.com")
-    assert not share.is_for(None) and not share.is_for("dany")
-    await client.set_sections(share, [104, 101])
-    request = write.calls.last.request
-    assert request.headers["X-Plex-Token"] == "owner-token"
-    assert json.loads(request.content) == {
-        "server_id": "m-1",
-        "shared_server": {"library_section_ids": [101, 104]},
-    }
 
 
 @respx.mock
 async def test_plex_tv_sees_the_suite_name_in_its_client_headers():
     # plex.tv tells clients apart by these headers; they carry the suite's name.
-    route = respx.get(f"{PLEX_TV}/api/servers").respond(text="<MediaContainer/>")
-    await PlexTvClient(PLEX_TV, "owner-token").servers()
+    route = respx.get(f"{PLEX_TV}/api/v2/user").respond(json={"id": 1})
+    await PlexTvClient(PLEX_TV, "owner-token").account()
     sent = route.calls.last.request.headers
     assert sent["X-Plex-Product"] == sent["X-Plex-Client-Identifier"] == "maester"
 

@@ -1,4 +1,4 @@
-"""Scheduled jobs: what the admin console does on its own, on the app's loop.
+"""Scheduled jobs: what sparrow does for the admin on its own, on the app's loop.
 
 - `schedule.py`   when a job runs: at a time of day, or every so often
 - `scheduler.py`  runs each job on time and delivers its notices
@@ -15,7 +15,6 @@ from __future__ import annotations
 from datetime import time
 from functools import partial
 
-from sparrow.agent.limits import KillSwitch
 from sparrow.clients import Services
 from sparrow.config import Settings
 from sparrow.jobs.digest import Digest
@@ -32,21 +31,17 @@ from sparrow.store import Store
 SPACE_SAMPLE_AT = time(3, 0)
 
 
-def scheduled(
-    services: Services, store: Store, settings: Settings, kill_switch: KillSwitch
-) -> list[Job]:
+def scheduled(services: Services, store: Store, settings: Settings) -> list[Job]:
     """Every job the app runs, on the schedule its settings give."""
     jobs = settings.jobs
     return [
-        Job("sweep", Every(jobs.sweep_every), Sweeper(services, store, settings, kill_switch)),
+        Job("sweep", Every(jobs.sweep_every), Sweeper(services, store, settings)),
         Job(
             "space_sample",
             At(SPACE_SAMPLE_AT, jobs.zone),
             partial(sample_space, services, store, settings),
         ),
-        Job(
-            "digest", At(jobs.digest_at, jobs.zone), Digest(services, store, settings, kill_switch)
-        ),
+        Job("digest", At(jobs.digest_at, jobs.zone), Digest(services, store, settings)),
         Job("landed", Every(CHECK_EVERY), partial(tell_landed, services, store)),
         Job(
             "expiry_reminders",

@@ -7,7 +7,7 @@ import { ToolTrace } from '@/components/ToolTrace/ToolTrace'
 import { REPLY_CARD_COPY, VERDICT_COPY } from '@/components/ReplyCard/copy'
 import type { CaseTurn } from '@/lib/api'
 import { checkTurn } from '@/lib/expectations'
-import { REPLY_STATES, type Reply } from '@/lib/entries'
+import { REPLY_STATES, type Reply } from '@/lib/reply'
 import { useChat } from '@/stores/chat'
 
 type VerdictProps = { reply: Reply; expected: CaseTurn }

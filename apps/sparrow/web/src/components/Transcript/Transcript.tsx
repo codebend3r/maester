@@ -1,42 +1,54 @@
-import { type ComponentType, type RefObject, useEffect, useRef } from 'react'
+import { type ComponentType, type RefObject, createElement, useEffect, useRef } from 'react'
 import { NoticeList } from '@/components/NoticeList/NoticeList'
 import { ReplyCard } from '@/components/ReplyCard/ReplyCard'
 import { SPARROW_SIZES, SparrowMark } from '@/components/SparrowMark/SparrowMark'
 import { DECISION_COPY, TRANSCRIPT_COPY } from '@/components/Transcript/copy'
 import styles from '@/components/Transcript/Transcript.module.scss'
 import type { Tier } from '@/lib/api'
-import { ENTRY_KINDS, type Entry } from '@/lib/entries'
+import { ENTRY_KINDS, type Entry, type EntryKind } from '@/lib/entries'
+import { noticesOf, toReply } from '@/lib/reply'
 import { useChat } from '@/stores/chat'
 
-type EntryKind = Entry['kind']
+type EntryOf<K extends EntryKind> = Extract<Entry, { kind: K }>
 
-type EntryViewProps = { entry: Entry }
+type EntryViewProps<K extends EntryKind> = { entry: EntryOf<K> }
 
-type SaidViewProps = EntryViewProps
+type EntryViews = { [K in EntryKind]: ComponentType<EntryViewProps<K>> }
 
-const SaidView = ({ entry }: SaidViewProps) =>
-  entry.kind === ENTRY_KINDS.said && <p className={styles.said}>{entry.text}</p>
+type SaidViewProps = EntryViewProps<typeof ENTRY_KINDS.said>
 
-type ReplyViewProps = EntryViewProps
+const SaidView = ({ entry }: SaidViewProps) => <p className={styles.said}>{entry.text}</p>
 
-const ReplyView = ({ entry }: ReplyViewProps) =>
-  entry.kind === ENTRY_KINDS.reply && <ReplyCard reply={entry} />
+type ReplyViewProps = EntryViewProps<typeof ENTRY_KINDS.reply>
 
-type DecisionViewProps = EntryViewProps
+const ReplyView = ({ entry }: ReplyViewProps) => <ReplyCard reply={toReply({ entry })} />
 
-const DecisionView = ({ entry }: DecisionViewProps) =>
-  entry.kind === ENTRY_KINDS.decision && (
+type DecisionViewProps = EntryViewProps<typeof ENTRY_KINDS.decision>
+
+const DecisionView = ({ entry }: DecisionViewProps) => {
+  const notices = noticesOf(entry.events)
+  return (
     <section className={styles.decision} aria-label={DECISION_COPY.label}>
       <p>{entry.text}</p>
-      {entry.notices.length > 0 && <NoticeList notices={entry.notices} />}
+      {notices.length > 0 && <NoticeList notices={notices} />}
     </section>
   )
+}
 
 const ENTRY_VIEWS = {
   [ENTRY_KINDS.said]: SaidView,
   [ENTRY_KINDS.reply]: ReplyView,
   [ENTRY_KINDS.decision]: DecisionView,
-} as const satisfies Record<EntryKind, ComponentType<EntryViewProps>>
+} as const satisfies EntryViews
+
+// Read through the mapped type, so a kind's view is looked up with that kind's entry.
+const entryViews: EntryViews = ENTRY_VIEWS
+
+type EntryViewOfProps<K extends EntryKind> = { kind: K; entry: EntryOf<K> }
+
+/** The view for an entry's kind, handed that entry; `createElement`, since JSX can't check it. */
+const EntryView = <K extends EntryKind>({ kind, entry }: EntryViewOfProps<K>) =>
+  createElement(entryViews[kind], { entry })
 
 type AvatarProps = { tier: Tier }
 
@@ -68,12 +80,11 @@ type EntryRowProps = { entry: Entry; tier: Tier }
 /** One message: who sent it, then what it says. */
 const EntryRow = ({ entry, tier }: EntryRowProps) => {
   const Avatar = ENTRY_AVATARS[entry.kind]
-  const View = ENTRY_VIEWS[entry.kind]
   return (
     <li className={styles.row}>
       <Avatar tier={tier} />
       <div className={styles.body}>
-        <View entry={entry} />
+        <EntryView kind={entry.kind} entry={entry} />
       </div>
     </li>
   )
@@ -123,7 +134,7 @@ export const Transcript = ({ tier }: TranscriptProps) => {
   const end = useRef<HTMLLIElement>(null)
   // Every render is a change to `entries`, the one thing this reads, so each one scrolls.
   useEffect(() => {
-    end.current?.scrollIntoView?.({ block: 'end' })
+    if (end.current) end.current.scrollIntoView({ block: 'end' })
   })
 
   const View =

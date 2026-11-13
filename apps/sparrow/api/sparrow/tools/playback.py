@@ -22,7 +22,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from sparrow.agent.tools import Choice, Choices, Ok, Refused, Result, Tier, ToolContext, tool
+from sparrow.agent.tools import Choice, Ok, Refused, Result, Tier, ToolContext, offer, tool
 from sparrow.clients.seerr import MediaDetails
 from sparrow.formatting import humanized
 from sparrow.library import NotLocated
@@ -72,7 +72,7 @@ def play_choice(play: Play, details: MediaDetails, is_4k: bool | None, now: floa
     "it finds nothing, ask which title and use search_media.",
     tier=Tier.FRIEND,
 )
-async def recent_sessions(ctx: ToolContext) -> dict[str, Any] | Choices | Result:
+async def recent_sessions(ctx: ToolContext) -> dict[str, Any] | Result:
     link = ctx.linked_user()
     if link.tautulli_user_id is None:
         return Refused(
@@ -95,7 +95,7 @@ async def recent_sessions(ctx: ToolContext) -> dict[str, Any] | Choices | Result
             case BaseException():
                 notes.append(f"couldn't tell what {play.title} is: {title}")
     if choices:
-        return Choices(choices, tuple(notes))
+        return offer(choices, notes)
     if notes:
         return {
             "sessions": [],

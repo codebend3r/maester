@@ -1,8 +1,7 @@
 """Setting up a TV, stick, phone or browser: answered from sparrow's own guides.
 
 The guides (`sparrow/guides/`) are the source, so the model relays them
-instead of recalling menus from memory; anyone, linked or not, reads the
-same text through `ChatService.setup_guide`.
+instead of recalling menus from memory.
 """
 
 from __future__ import annotations
