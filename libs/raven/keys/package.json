@@ -1,6 +1,6 @@
 {
   "name": "@raven/keys",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "private": true,
   "description": "raven's hardware keyboard for iPhones and iPads: the player's keys as UIKeyCommands, each press an event the app hears",
   "type": "module",
