@@ -4,20 +4,13 @@ import {
   type AudioBitrate,
   DEFAULT_DEVICE_DOWNLOAD_VARIANT,
   DEVICE_DOWNLOAD_PARAMS,
-  DEVICE_DOWNLOAD_PATHS,
   DEVICE_DOWNLOAD_VARIANT_PARAM,
   type DeviceDownload,
   type DeviceDownloadVariant,
   HLS_PARAMS,
-  HLS_PATHS,
-  isDeviceDownload,
-  isLiveStreamList,
-  isMediaOrigins,
-  isMediaStreams,
-  isMediaTicket,
-  isMediaTracks,
   type LiveStream,
   MEDIA_PROBE_BYTES,
+  PING_BYTES_PARAM,
   type MediaOrigin,
   type MediaStreams,
   type MediaTicket,
@@ -27,7 +20,8 @@ import {
   type SubtitleCue,
 } from '@/contract'
 import { type MediaOriginsAnswer, readMediaOrigins } from '@/mediaOrigins'
-import { fillPath, pathWithQuery } from '@/query'
+import { toQueryString } from '@/query'
+import { ROUTES, pathFor } from '@/routes'
 import { parseWebVtt } from '@/subtitles'
 
 type FileUrlProps = { id: number; access?: MediaAccess | null }
@@ -69,7 +63,7 @@ type SubtitlesPathOfProps = Pick<GetSubtitlesProps, 'id' | 'trackId'>
 
 /** The route one subtitle track's WebVTT is read from. */
 const subtitlesPathOf = ({ id, trackId }: SubtitlesPathOfProps): string =>
-  `/api/media/${id}/subtitles/${encodeURIComponent(trackId)}`
+  pathFor({ path: ROUTES.subtitles.path, params: { id, trackId } })
 
 type HlsUrlProps = {
   id: number
@@ -93,15 +87,15 @@ type StreamUrlProps = {
 }
 
 /** What a player loads: the file, its tracks and streams, the origins and tickets that open them, and the admin's view of who is streaming. */
-export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Transport) => ({
+export const playbackCalls = ({ url, mediaUrl, sendForText, ask, tell }: Transport) => ({
   /** The original file, served with byte ranges: what a player loads for direct play. */
   fileUrl: ({ id, access = null }: FileUrlProps): string =>
-    mediaUrl({ path: `/api/media/${id}/file`, query: {}, access }),
+    mediaUrl({ path: pathFor({ path: ROUTES.file.path, params: { id } }), query: {}, access }),
 
   /** A track converted to AAC at `kbps`, served with byte ranges like the original, from `access`'s origin as `fileUrl` is. */
   transcodeUrl: ({ mediaId, kbps, access = null }: TranscodeUrlProps): string =>
     mediaUrl({
-      path: `/api/media/${mediaId}/transcode`,
+      path: pathFor({ path: ROUTES.transcode.path, params: { id: mediaId } }),
       query: { [AUDIO_BITRATE_PARAM]: String(kbps) },
       access,
     }),
@@ -116,17 +110,10 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
     mediaId,
     variant = DEFAULT_DEVICE_DOWNLOAD_VARIANT,
   }: GetDeviceDownloadProps): Promise<DeviceDownload> =>
-    expect({
-      request: send({
-        path: pathWithQuery({
-          path: fillPath({
-            path: DEVICE_DOWNLOAD_PATHS.prepare,
-            params: { [DEVICE_DOWNLOAD_PARAMS.id]: mediaId },
-          }),
-          query: variantQuery(variant),
-        }),
-      }),
-      guard: isDeviceDownload,
+    ask({
+      route: ROUTES.getDeviceDownload,
+      params: { [DEVICE_DOWNLOAD_PARAMS.id]: mediaId },
+      query: variantQuery(variant),
     }),
 
   /** The server's finished MP4 copy of the video, with byte ranges, from `access`'s origin as `fileUrl` is. */
@@ -136,8 +123,8 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
     variant = DEFAULT_DEVICE_DOWNLOAD_VARIANT,
   }: DeviceDownloadFileUrlProps): string =>
     mediaUrl({
-      path: fillPath({
-        path: DEVICE_DOWNLOAD_PATHS.file,
+      path: pathFor({
+        path: ROUTES.deviceDownloadFile.path,
         params: { [DEVICE_DOWNLOAD_PARAMS.id]: id },
       }),
       query: variantQuery(variant),
@@ -145,29 +132,26 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
     }),
 
   /** The server's event stream: `ServerEvent`s, read with `parseServerEvent`. */
-  eventsUrl: (): string => url('/api/events'),
+  eventsUrl: (): string => url(ROUTES.events.path),
 
   /** The audio and subtitle tracks a player can choose between. */
-  getTracks: (id: number): Promise<MediaTracks> =>
-    expect({ request: send({ path: `/api/media/${id}/tracks` }), guard: isMediaTracks }),
+  getTracks: (id: number): Promise<MediaTracks> => ask({ route: ROUTES.getTracks, params: { id } }),
 
   /** The file's picture and sound in detail, probed afresh each time: profiles, bitrates, sample rates. */
   getStreams: (id: number): Promise<MediaStreams> =>
-    expect({ request: send({ path: `/api/media/${id}/streams` }), guard: isMediaStreams }),
+    ask({ route: ROUTES.getStreams, params: { id } }),
 
   /** The origins a browser may fetch media from directly, best first; none while tickets are off. */
   getMediaOrigins: async (): Promise<MediaOriginsAnswer> =>
-    readMediaOrigins(
-      await expect({ request: send({ path: '/api/media-origins' }), guard: isMediaOrigins }),
-    ),
+    readMediaOrigins(await ask({ route: ROUTES.getMediaOrigins })),
 
   /** A short-lived ticket that stands in for the cookie on this video's media requests to another origin. */
   getMediaTicket: (id: number): Promise<MediaTicket> =>
-    expect({ request: send({ path: `/api/media/${id}/ticket` }), guard: isMediaTicket }),
+    ask({ route: ROUTES.getMediaTicket, params: { id } }),
 
   /** The address of `origin`'s speed probe: `bytes` of noise, never from disk. */
   pingUrl: ({ origin, bytes = MEDIA_PROBE_BYTES }: PingUrlProps): string =>
-    `${origin.url}/api/media-origins/ping?bytes=${bytes}`,
+    `${origin.url}${ROUTES.ping.path}?${toQueryString({ [PING_BYTES_PARAM]: String(bytes) })}`,
 
   /**
    * One subtitle track's cues. Embedded tracks come a window at a time
@@ -203,7 +187,7 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
    */
   hlsUrl: ({ id, mode, audio, quality, access, burn = null }: HlsUrlProps): string =>
     mediaUrl({
-      path: fillPath({ path: HLS_PATHS.master, params: { [HLS_PARAMS.id]: id } }),
+      path: pathFor({ path: ROUTES.hlsMaster.path, params: { [HLS_PARAMS.id]: id } }),
       query: {
         [HLS_PARAMS.mode]: mode,
         ...(audio == null ? {} : { [HLS_PARAMS.audio]: String(audio) }),
@@ -229,7 +213,7 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
     burn = null,
   }: StreamUrlProps): string =>
     mediaUrl({
-      path: `/api/media/${id}/stream`,
+      path: pathFor({ path: ROUTES.stream.path, params: { id } }),
       query: {
         mode,
         start: String(Math.max(0, Math.round(start * 1000) / 1000)),
@@ -241,11 +225,10 @@ export const playbackCalls = ({ url, mediaUrl, send, sendForText, expect }: Tran
     }),
 
   /** What the server is sending to whom right now. Admin only. */
-  listLiveStreams: (): Promise<LiveStream[]> =>
-    expect({ request: send({ path: '/api/streams' }), guard: isLiveStreamList }),
+  listLiveStreams: (): Promise<LiveStream[]> => ask({ route: ROUTES.listLiveStreams }),
 
   /** Ends one stream's connections; the player may ask again. Admin only. */
   stopStream: async (id: string): Promise<void> => {
-    await send({ path: `/api/streams/${encodeURIComponent(id)}/stop`, method: 'POST' })
+    await tell({ route: ROUTES.stopStream, params: { id } })
   },
 })

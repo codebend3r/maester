@@ -1,5 +1,7 @@
 import { type EventSubscription, requireNativeModule } from 'expo-modules-core'
 
+import { isRecord } from '@raven/core'
+
 import { type KeyDown, isKeyDown } from '@/contract'
 
 /** The native module's name, and the one event it emits: a key going down. */
@@ -19,9 +21,19 @@ type NativeKeysModule = {
  * The native module, or null where the build carries none (a TV, a test), so a screen that asks
  * for the keys there hears nothing rather than failing.
  */
+const isFunction = (value: unknown): boolean => typeof value === 'function'
+
+/** Whether the module Expo handed over has the calls this one makes. */
+const isNativeKeysModule = (value: unknown): value is NativeKeysModule =>
+  isRecord(value) &&
+  isFunction(value.start) &&
+  isFunction(value.stop) &&
+  isFunction(value.addListener)
+
 const nativeOrNull = (): NativeKeysModule | null => {
   try {
-    return requireNativeModule<NativeKeysModule>(NATIVE.module)
+    const native: unknown = requireNativeModule(NATIVE.module)
+    return isNativeKeysModule(native) ? native : null
   } catch {
     return null
   }

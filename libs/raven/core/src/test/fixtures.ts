@@ -12,6 +12,7 @@ import type {
   Review,
   SeasonSummary,
   ShowEntry,
+  Track,
 } from '@/contract'
 
 export const library = (overrides: Partial<Library> = {}): Library => ({
@@ -318,5 +319,27 @@ export const bugReport = (overrides: Partial<BugReport> = {}): BugReport => ({
   summary: "The MKV container isn't supported here.",
   mediaId: 7,
   diagnostics: playbackDiagnostics(),
+  ...overrides,
+})
+
+export const track = (overrides: Partial<Track> = {}): Track => ({
+  id: 101,
+  libraryId: 3,
+  albumId: 7,
+  title: 'Airbag',
+  disc: 1,
+  number: 1,
+  duration: 200,
+  artists: [{ id: 1, name: 'Radiohead' }],
+  container: 'flac',
+  codec: 'flac',
+  bitrate: 900000,
+  sampleRate: 44100,
+  bitDepth: 16,
+  isLossless: true,
+  mbid: null,
+  addedAt: '2026-01-01T00:00:00Z',
+  album: { title: 'OK Computer', coverVersion: 'v1' },
+  gain: { track: null, album: null, trackPeak: null, albumPeak: null },
   ...overrides,
 })

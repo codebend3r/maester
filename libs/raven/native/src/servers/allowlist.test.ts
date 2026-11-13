@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { APP_CALL_METHODS, type FetchLike, createApiClient } from '@raven/core'
+import { HTTP_METHODS, type FetchLike, createApiClient } from '@raven/core'
 
 import { allowlistedFetch } from '@/servers/allowlist'
 
@@ -9,7 +9,7 @@ const ORIGIN = 'http://nas.local:8484'
 const answering = () => {
   const asked: string[] = []
   const fetch: FetchLike = async (url, init = {}) => {
-    asked.push(`${init.method ?? APP_CALL_METHODS.get} ${url}`)
+    asked.push(`${init.method ?? HTTP_METHODS.get} ${url}`)
     return {
       ok: true,
       status: 204,
@@ -28,8 +28,8 @@ describe('allowlistedFetch', () => {
     await api.recordPlay(3)
     await api.saveProgress({ id: 3, position: 40, audio: null })
     expect(asked).toEqual([
-      `${APP_CALL_METHODS.post} ${ORIGIN}/api/media/3/plays`,
-      `${APP_CALL_METHODS.put} ${ORIGIN}/api/media/3/progress`,
+      `${HTTP_METHODS.post} ${ORIGIN}/api/media/3/plays`,
+      `${HTTP_METHODS.put} ${ORIGIN}/api/media/3/progress`,
     ])
   })
 
@@ -50,7 +50,7 @@ describe('allowlistedFetch', () => {
   it('throws on a listed path asked for with the wrong method', async () => {
     const { asked, fetch } = answering()
     await expect(
-      allowlistedFetch({ fetch })(`${ORIGIN}/api/home`, { method: APP_CALL_METHODS.post }),
+      allowlistedFetch({ fetch })(`${ORIGIN}/api/home`, { method: HTTP_METHODS.post }),
     ).rejects.toThrow("raven's app does not call POST")
     expect(asked).toEqual([])
   })

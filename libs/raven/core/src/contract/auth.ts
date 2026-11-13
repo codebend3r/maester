@@ -1,5 +1,15 @@
-import { HTTP_METHODS } from '@/contract/http'
-import { type Infer, isBoolean, isString, listOf, matching, object, oneOf, union } from '@/schema'
+import { AUTH_SCHEMES, HEADERS, HTTP_METHODS } from '@shared/http'
+import {
+  type Infer,
+  isBoolean,
+  isString,
+  listOf,
+  matching,
+  object,
+  oneOf,
+  union,
+  literal,
+} from '@/schema'
 
 export const MEMBER_STATUSES = {
   pending: 'pending',
@@ -18,11 +28,11 @@ export const AUTH_COOKIE = 'maester-auth'
 export const SERVER_COOKIES = { unlock: 'raven_unlock', admin: 'raven_admin' } as const
 export const UNLOCK_COOKIE_PATH = '/api'
 export const AUTH_HEADERS = {
-  authorization: 'authorization',
-  cookie: 'cookie',
+  authorization: HEADERS.authorization,
+  cookie: HEADERS.cookie,
   apiKey: 'apikey',
 } as const
-export const AUTH_SCHEME = 'Bearer'
+export const AUTH_SCHEME = AUTH_SCHEMES.bearer
 export const AUTH_API_PREFIX = '/api/'
 export const AUTH_METHODS = {
   get: HTTP_METHODS.get,
@@ -59,7 +69,7 @@ export const isAccountId = matching(
 export const isAuthConfig = union(
   object({ state: oneOf([AUTH_CONFIG_STATES.off, AUTH_CONFIG_STATES.unavailable]) }),
   object({
-    state: oneOf([AUTH_CONFIG_STATES.ready]),
+    state: literal(AUTH_CONFIG_STATES.ready),
     supabaseUrl: isString,
     publishableKey: isString,
     webUrl: isString,

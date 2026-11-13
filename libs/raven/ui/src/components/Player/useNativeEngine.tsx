@@ -18,15 +18,23 @@ import { fromPlayerEvent, rangesFrom } from '@/components/Player/fromPlayerEvent
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
 import { useNativeTrackSelection } from '@/components/Player/useNativeTrackSelection'
-import { type Ranges, initialVideoState, videoReducer } from '@/components/Player/videoState'
+import {
+  type Ranges,
+  VIDEO_EVENTS,
+  initialVideoState,
+  videoReducer,
+} from '@/components/Player/videoState'
+import { SUBTITLE_STATUSES } from '@/lib/useTrackCues'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useCaptionStyle } from '@/query/useCaptionStyle'
 
-const ENGINE_NAME = 'mpv'
-const COULD_NOT_OPEN = 'Raven could not open this video.'
+/** Where a seek stops short of the end, so the player never seeks past its last frame. */
+const END_MARGIN_SECONDS = 0.5
 
 const messageOf = (error: unknown): string =>
-  error instanceof Error && error.message !== '' ? error.message : COULD_NOT_OPEN
+  error instanceof Error && error.message !== '' ? error.message : NATIVE_ENGINE_COPY.couldNotOpen
+
+type PlayerErrorEvent = Extract<PlayerEvent, { type: typeof PLAYER_EVENTS.error }>
 
 type UseNativeEngineProps = {
   player: NativePlayer
@@ -50,11 +58,11 @@ export const useNativeEngine = ({
   api,
   onFailure,
   toggleFullscreen,
-}: UseNativeEngineProps): {
-  engine: EngineHandle
-  selection: ReturnType<typeof useNativeTrackSelection>
-} => {
-  const { title, trackPicks, isVolumeFixed = false, onEngineError } = useHostServices()
+}: UseNativeEngineProps): EngineHandle => {
+  const title = useHostServices((services) => services.title)
+  const trackPicks = useHostServices((services) => services.trackPicks)
+  const isVolumeFixed = useHostServices((services) => services.isVolumeFixed)
+  const onEngineError = useHostServices((services) => services.onEngineError)
   const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
   const captions = useCaptionStyle(api)
   // Whether main answered this mount's load, after which it takes the subtitle look.
@@ -67,12 +75,10 @@ export const useNativeEngine = ({
   const selection = useNativeTrackSelection({ tracks, player })
 
   const fail = useEffectEvent(onFailure)
-  const tellHost = useEffectEvent(
-    ({ reason, message }: Extract<PlayerEvent, { type: typeof PLAYER_EVENTS.error }>) => {
-      if (onEngineError === undefined) return
-      onEngineError({ reason, message })
-    },
-  )
+  const tellHost = useEffectEvent(({ reason, message }: PlayerErrorEvent) => {
+    if (onEngineError === null) return
+    onEngineError({ reason, message })
+  })
   const current = useEffectEvent(() => ({
     source,
     resumeAt: title.resumeAt,
@@ -110,7 +116,7 @@ export const useNativeEngine = ({
     })
     player
       .send({
-        type: 'load',
+        type: PLAYER_COMMANDS.load,
         source: loading,
         start: resumeAt,
         audio: picks?.audio ?? null,
@@ -125,7 +131,7 @@ export const useNativeEngine = ({
           if (!isFixed) {
             sendQuietly({
               player,
-              command: { type: 'volume', volume: prefs.volume, muted: prefs.muted },
+              command: { type: PLAYER_COMMANDS.volume, volume: prefs.volume, muted: prefs.muted },
             })
           }
         },
@@ -137,7 +143,7 @@ export const useNativeEngine = ({
       isCurrent = false
       setHasLoaded(false)
       unsubscribe()
-      sendQuietly({ player, command: { type: 'stop' } })
+      sendQuietly({ player, command: { type: PLAYER_COMMANDS.stop } })
     }
   }, [player])
 
@@ -151,23 +157,26 @@ export const useNativeEngine = ({
   }, [player, hasLoaded, size, colour])
 
   const actions: EngineHandle['actions'] = {
-    play: () => sendQuietly({ player, command: { type: 'play' } }),
-    pause: () => sendQuietly({ player, command: { type: 'pause' } }),
+    play: () => sendQuietly({ player, command: { type: PLAYER_COMMANDS.play } }),
+    pause: () => sendQuietly({ player, command: { type: PLAYER_COMMANDS.pause } }),
     seek: (target) => {
-      const to = Math.min(Math.max(0, (duration ?? Infinity) - 0.5), Math.max(0, target))
+      const to = Math.min(
+        Math.max(0, (duration ?? Infinity) - END_MARGIN_SECONDS),
+        Math.max(0, target),
+      )
       position.current = to
-      dispatch({ type: 'sought', time: to })
-      sendQuietly({ player, command: { type: 'seek', time: to } })
+      dispatch({ type: VIDEO_EVENTS.sought, time: to })
+      sendQuietly({ player, command: { type: PLAYER_COMMANDS.seek, time: to } })
     },
     setVolume: (level) => {
-      sendQuietly({ player, command: { type: 'volume', ...level } })
+      sendQuietly({ player, command: { type: PLAYER_COMMANDS.volume, ...level } })
       setVolume(level)
     },
-    setRate: (rate) => sendQuietly({ player, command: { type: 'speed', rate } }),
+    setRate: (rate) => sendQuietly({ player, command: { type: PLAYER_COMMANDS.speed, rate } }),
     setAudio: selection.pickAudio,
     setSubtitle: selection.pickSubtitle,
     setCaptionStyle: captions.change,
-    toggleStats: () => sendQuietly({ player, command: { type: 'stats' } }),
+    toggleStats: () => sendQuietly({ player, command: { type: PLAYER_COMMANDS.stats } }),
   }
 
   const engine: EngineHandle = {
@@ -177,9 +186,19 @@ export const useNativeEngine = ({
     tracks,
     captionStyle: captions.style,
     actions,
-    drawsSubtitles: true,
+    selection,
+    // mpv draws the subtitles itself, so they are ready as soon as one is picked.
+    subtitles: {
+      status: selection.subtitle ? SUBTITLE_STATUSES.ready : SUBTITLE_STATUSES.off,
+      overlay: null,
+    },
     // The picture's figures stay in mpv; its own overlay (`i`) shows them.
-    readStats: () => ({ engine: ENGINE_NAME, viewport: null, frame: null, frames: null }),
+    readStats: () => ({
+      engine: NATIVE_ENGINE_COPY.engineName,
+      viewport: null,
+      frame: null,
+      frames: null,
+    }),
     focusSurface: () => {},
     surface: (
       // The window-wide shortcuts are the keyboard path, so the surface takes only the pointer.
@@ -192,5 +211,5 @@ export const useNativeEngine = ({
       />
     ),
   }
-  return { engine, selection }
+  return engine
 }

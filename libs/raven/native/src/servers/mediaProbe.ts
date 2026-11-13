@@ -1,4 +1,4 @@
-import { APP_CALL_METHODS } from '@raven/core'
+import { HTTP_METHODS } from '@raven/core'
 
 import { checkAppCall } from '@/servers/allowlist'
 import type { ProbeFetch } from '@/servers/mediaAccess'
@@ -28,7 +28,7 @@ type ProbeFetchOfProps = { fetch: PingFetch; clock: () => number }
 export const probeFetchOf =
   ({ fetch, clock }: ProbeFetchOfProps): ProbeFetch =>
   async ({ url, timeoutMs }) => {
-    checkAppCall({ method: APP_CALL_METHODS.get, url })
+    checkAppCall({ method: HTTP_METHODS.get, url })
     const controller = new AbortController()
     // A fetch that ignores its signal would otherwise hold the probe past its time.
     const timedOut = new Promise<never>((_, reject) =>

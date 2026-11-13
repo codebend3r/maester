@@ -1,6 +1,7 @@
 import {
   type LibraryInput,
   type LibrarySettings,
+  isLibraryInput,
   isLibrarySettings,
   isLibrarySettingsChange,
 } from '@/contract'
@@ -85,13 +86,11 @@ export const validateLibraryInput = (input: unknown): LibraryInputResult => {
     ...settings.errors,
   ]
 
-  if (errors.length > 0) return { ok: false, errors }
-  return {
-    ok: true,
-    value: {
-      name,
-      paths,
-      ...(input.settings === undefined ? {} : { settings: settings.settings }),
-    },
+  const value = {
+    name,
+    paths,
+    ...(input.settings === undefined ? {} : { settings: settings.settings }),
   }
+  if (errors.length > 0 || !isLibraryInput(value)) return { ok: false, errors }
+  return { ok: true, value }
 }

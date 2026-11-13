@@ -7,9 +7,10 @@ import {
   listOf,
   nullable,
   object,
-  oneOf,
   optional,
   union,
+  wholeNumberIn,
+  literal,
 } from '@/schema'
 import { MAX_WATCH_TARGETS } from '@/watched'
 
@@ -48,8 +49,7 @@ export const isProgressChange = object({
 export type ProgressChange = Infer<typeof isProgressChange>
 
 /** An audio track's place among the file's, as ffmpeg's `0:a:N` counts them: a whole number, 0 or more. */
-export const isTrackIndex = (value: unknown): value is number =>
-  isNumber(value) && Number.isInteger(value) && value >= 0
+export const isTrackIndex = wholeNumberIn({ min: 0 })
 
 /**
  * The same route from a player that names what it plays: the position, and
@@ -78,9 +78,9 @@ export const WATCH_TARGET_KINDS = { media: 'media', item: 'item' } as const
  * library the viewer may see when `libraryId` is null.
  */
 export const isWatchTarget = union(
-  object({ kind: oneOf([WATCH_TARGET_KINDS.media]), id: isNumber }),
+  object({ kind: literal(WATCH_TARGET_KINDS.media), id: isNumber }),
   object({
-    kind: oneOf([WATCH_TARGET_KINDS.item]),
+    kind: literal(WATCH_TARGET_KINDS.item),
     id: isNumber,
     libraryId: nullable(isNumber),
   }),

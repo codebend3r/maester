@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./fixtureServer": {
+      "types": "./dist/fixtureServer.d.ts",
+      "default": "./dist/fixtureServer.js"
     }
   },
   "scripts": {
@@ -22,6 +26,9 @@
     "test": "bun test --dots",
     "test:watch": "bun test --dots --watch",
     "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@shared/http": "workspace:*"
   },
   "devDependencies": {
     "@typescript/native-preview": "7.0.0-dev.20260707.2",

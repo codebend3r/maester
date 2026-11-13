@@ -43,6 +43,6 @@ export const initialsOf = (name: string): string =>
   name
     .split(/\s+/)
     .filter(Boolean)
-    .map((part) => part.slice(0, 1))
     .slice(0, 2)
+    .map((part) => part.slice(0, 1).toUpperCase())
     .join('')

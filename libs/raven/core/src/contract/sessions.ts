@@ -1,4 +1,4 @@
-import { type Infer, matching, object, oneOf, union } from '@/schema'
+import { type Infer, matching, object, oneOf, union, literal } from '@/schema'
 
 /**
  * What the viewer chose to watch, which says what plays next: nothing after
@@ -36,8 +36,8 @@ export const isViewingSession = union(
       SESSION_KINDS.queue,
     ]),
   }),
-  object({ kind: oneOf([SESSION_KINDS.saga]), sagaId: isSagaId }),
-  object({ kind: oneOf([SESSION_KINDS.shuffle]), showId: isShowScope }),
+  object({ kind: literal(SESSION_KINDS.saga), sagaId: isSagaId }),
+  object({ kind: literal(SESSION_KINDS.shuffle), showId: isShowScope }),
 )
 
 export type ViewingSession = Infer<typeof isViewingSession>

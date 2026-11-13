@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { flag, LISTEN_ENV_VARS, readListenConfig, wholeNumber } from '@/env'
+import { atLeast, flag, LISTEN_ENV_VARS, readListenConfig, text, wholeNumber } from '@/env'
 
 describe('wholeNumber', () => {
   it('reads a whole number at or above zero', () => {
@@ -17,6 +17,25 @@ describe('wholeNumber', () => {
       null,
       null,
     ])
+  })
+})
+
+describe('text', () => {
+  it('trims the value, and takes the fallback for one missing or blank', () => {
+    expect(text({ value: ' ffmpeg ', fallback: 'x' })).toBe('ffmpeg')
+    expect([undefined, '', '   '].map((value) => text({ value, fallback: null }))).toEqual([
+      null,
+      null,
+      null,
+    ])
+  })
+})
+
+describe('atLeast', () => {
+  it('reads a whole number, falls back, and never goes below the floor', () => {
+    expect(atLeast({ value: '8', min: 1, fallback: 4 })).toBe(8)
+    expect(atLeast({ value: 'eight', min: 1, fallback: 4 })).toBe(4)
+    expect(atLeast({ value: '0', min: 1, fallback: 4 })).toBe(1)
   })
 })
 

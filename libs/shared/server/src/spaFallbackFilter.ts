@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { type ArgumentsHost, Catch, type ExceptionFilter, NotFoundException } from '@nestjs/common'
 import type { FastifyReply, FastifyRequest } from 'fastify'
-import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@/http'
+import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@shared/http'
 
 type SpaFallbackFilterProps = {
   indexPath: string | null

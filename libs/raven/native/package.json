@@ -16,6 +16,10 @@
     "./polyfills": {
       "types": "./dist/polyfills.d.ts",
       "default": "./dist/polyfills.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
     }
   },
   "scripts": {
@@ -40,6 +44,8 @@
     "@raven/core": "workspace:*",
     "@raven/ui": "workspace:*",
     "@react-native-community/netinfo": "12.0.1",
+    "@shared/http": "workspace:*",
+    "expo-file-system": "58.0.13",
     "expo-secure-store": "58.0.2",
     "react-native-sse": "1.2.1",
     "react-native-svg": "15.16.1"

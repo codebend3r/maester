@@ -1,6 +1,6 @@
 import {
   ACCESS_REFUSALS,
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   type AudioBitrate,
   AUTH_REFUSALS,
   type AuthRefusal,
@@ -32,6 +32,7 @@ import {
   ticketRenewAt,
   toQueryString,
 } from '@raven/core'
+import { HTTP_STATUSES, isServerErrorStatus } from '@shared/http'
 
 import { checkAppCall } from '@/servers/allowlist'
 import type { ServerCookies } from '@/servers/cookieJar'
@@ -172,11 +173,6 @@ export const MEDIA_ACCESS_MESSAGES = {
   account: ACCOUNT_ACCESS_MESSAGES.signInAgain,
 } as const satisfies Record<AccessRefusalReason, (name: string) => string>
 
-const UNAUTHORIZED_STATUS = 401
-const FORBIDDEN_STATUS = 403
-const NOT_FOUND_STATUS = 404
-const SERVER_ERROR_STATUS = 500
-
 const TICKET_READS = { issued: 'issued', off: 'off', refused: 'refused' } as const
 
 type HeldTicket = { ticket: string; renewAt: number }
@@ -220,7 +216,7 @@ type AccountRefusalOfProps = { error: ApiError; server: AppServer }
 const accountRefusalOf = ({ error, server }: AccountRefusalOfProps): TicketRead => {
   const reason =
     error.refusal?.reason ??
-    (error.status === UNAUTHORIZED_STATUS ? AUTH_REFUSALS.signedOut : AUTH_REFUSALS.revoked)
+    (error.status === HTTP_STATUSES.unauthorized ? AUTH_REFUSALS.signedOut : AUTH_REFUSALS.revoked)
   const message = accountAccessMessageOf({ reason, name: server.name })
   return {
     kind: TICKET_READS.refused,
@@ -241,13 +237,13 @@ const refusalOf = ({ error, server }: RefusalOfProps): TicketRead => {
   // Anything but the server's own answer, a failed network above all, is an outage.
   if (!(error instanceof ApiError)) return refused(ACCESS_REFUSALS.unreachable)
   if (error.status === TICKETS_OFF_STATUS) return { kind: TICKET_READS.off }
-  if (error.status === UNAUTHORIZED_STATUS || error.status === FORBIDDEN_STATUS) {
+  if (error.status === HTTP_STATUSES.unauthorized || error.status === HTTP_STATUSES.forbidden) {
     return accountRefusalOf({ error, server })
   }
   if (error.status === LOCKED_STATUS) return refused(ACCESS_REFUSALS.locked)
-  if (error.status === NOT_FOUND_STATUS) return refused(ACCESS_REFUSALS.gone)
+  if (error.status === HTTP_STATUSES.notFound) return refused(ACCESS_REFUSALS.gone)
   // A proxy in front of a restarting server answers 502 or 504.
-  if (error.status >= SERVER_ERROR_STATUS) return refused(ACCESS_REFUSALS.unreachable)
+  if (isServerErrorStatus(error.status)) return refused(ACCESS_REFUSALS.unreachable)
   return refused(ACCESS_REFUSALS.unreadable)
 }
 
@@ -255,7 +251,7 @@ type TicketedSourceProps = { uri: string }
 
 /** A source that carries its ticket in its address: no header, and only a call the app may make. */
 const ticketedSource = ({ uri }: TicketedSourceProps): SourceOutcome => {
-  checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
+  checkAppCall({ method: HTTP_METHODS.get, url: uri })
   return { ok: true, source: { uri, headers: {} } }
 }
 
@@ -532,7 +528,7 @@ export const mediaAccessFor = ({
     const access = await subtitleAccess(mediaId)
     return trackIds.map((trackId) => {
       const uri = api.sidecarSubtitlesUrl({ id: mediaId, trackId, access })
-      checkAppCall({ method: APP_CALL_METHODS.get, url: uri })
+      checkAppCall({ method: HTTP_METHODS.get, url: uri })
       return { trackId, uri }
     })
   }

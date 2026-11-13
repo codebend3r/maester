@@ -12,7 +12,9 @@ import {
 } from '@raven/core'
 import type { ReactNode, RefObject } from 'react'
 import type { MediaPlane } from '@/components/Player/useMediaPlane'
+import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import type { VideoState } from '@/components/Player/videoState'
+import type { SubtitleStatus } from '@/lib/useTrackCues'
 
 type SetVolumeProps = { volume: number; muted: boolean }
 
@@ -26,8 +28,8 @@ export type EngineActions = {
   setSubtitle: (id: string | null) => void
   /** Saves the account's subtitle size, colour or both. */
   setCaptionStyle: (change: Partial<CaptionStyle>) => void
-  /** Only an engine with a video info overlay has one. */
-  toggleStats?: () => void
+  /** Shows or hides the engine's own video info overlay; null for an engine with none. */
+  toggleStats: (() => void) | null
 }
 
 /** What the picture is doing right now, for Playback info; null where the engine cannot tell. */
@@ -51,10 +53,19 @@ export type EngineHandle = {
   /** How the account's subtitles look, whoever draws them. */
   captionStyle: CaptionStyle
   actions: EngineActions
+  /** The tracks playing and the picks between them, which the menus show and change. */
+  selection: TrackSelection
+  subtitles: EngineSubtitles
   surface: ReactNode
   focusSurface: () => void
-  drawsSubtitles: boolean
   readStats: () => EngineStats
+}
+
+/** Whether the subtitles are ready, and who draws them. */
+type EngineSubtitles = {
+  status: SubtitleStatus
+  /** The page's own overlay, lifted over the controls while they show; null where the engine draws them itself. */
+  overlay: ((isLifted: boolean) => ReactNode) | null
 }
 
 /**
@@ -104,6 +115,9 @@ export type Engine =
        */
       file: PlaybackFile | null
     }
+
+/** The engine of one kind. */
+export type EngineOf<K extends Engine['kind']> = Extract<Engine, { kind: K }>
 
 /** One key per video, so a different source remounts the native stage. */
 export const sourceKey = (source: PlayerSource): string => {

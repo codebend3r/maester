@@ -12,6 +12,8 @@ import {
   oneOf,
   optional,
   union,
+  wholeNumberIn,
+  literal,
 } from '@/schema'
 
 /**
@@ -190,8 +192,7 @@ export const isLibraryPathLayout = object({
 export type LibraryPathLayout = Infer<typeof isLibraryPathLayout>
 
 /** A whole percentage from 1 to 100. */
-export const isWatchedPercent = (value: unknown): value is number =>
-  isNumber(value) && Number.isInteger(value) && value >= 1 && value <= 100
+export const isWatchedPercent = wholeNumberIn({ min: 1, max: 100 })
 
 /** How a library behaves, each one set per library. */
 export const isLibrarySettings = object({
@@ -260,8 +261,8 @@ export const LIBRARY_BACKDROP_TYPES = { item: 'item', thumbnail: 'thumbnail' } a
  * thumbnail. `item` names the movie or show, `thumbnail` the video.
  */
 export const isLibraryBackdrop = union(
-  object({ type: oneOf([LIBRARY_BACKDROP_TYPES.item]), id: isNumber, version: isString }),
-  object({ type: oneOf([LIBRARY_BACKDROP_TYPES.thumbnail]), id: isNumber, version: isNumber }),
+  object({ type: literal(LIBRARY_BACKDROP_TYPES.item), id: isNumber, version: isString }),
+  object({ type: literal(LIBRARY_BACKDROP_TYPES.thumbnail), id: isNumber, version: isNumber }),
 )
 
 export type LibraryBackdrop = Infer<typeof isLibraryBackdrop>
@@ -279,15 +280,15 @@ export const RATINGS_REFRESH_STATES = {
 } as const
 
 export const isRatingsRefresh = union(
-  object({ state: oneOf([RATINGS_REFRESH_STATES.idle]), finishedAt: nullable(isString) }),
+  object({ state: literal(RATINGS_REFRESH_STATES.idle), finishedAt: nullable(isString) }),
   object({
-    state: oneOf([RATINGS_REFRESH_STATES.running]),
+    state: literal(RATINGS_REFRESH_STATES.running),
     done: isNumber,
     total: isNumber,
     startedAt: isString,
   }),
   object({
-    state: oneOf([RATINGS_REFRESH_STATES.waiting]),
+    state: literal(RATINGS_REFRESH_STATES.waiting),
     done: isNumber,
     total: isNumber,
     startedAt: isString,
@@ -352,10 +353,13 @@ export type LibraryCounts = Infer<typeof isLibraryCounts>
  * What a client sends to create a library or replace its name and paths.
  * Settings left out keep their defaults on create and their current values
  * on update, so a client can change one without knowing the rest.
- * `validateLibraryInput` checks it, with a reason for each problem.
+ * `validateLibraryInput` tidies it and says what is wrong with it, a reason
+ * for each problem, before this guard has the last word.
  */
-export type LibraryInput = {
-  name: string
-  paths: string[]
-  settings?: Partial<LibrarySettings>
-}
+export const isLibraryInput = object({
+  name: isString,
+  paths: isStringArray,
+  settings: optional(isLibrarySettingsChange),
+})
+
+export type LibraryInput = Infer<typeof isLibraryInput>

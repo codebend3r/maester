@@ -9,6 +9,7 @@ import {
   describeMode,
   isShowableSubtitle,
   subtitleLabel,
+  playingAudio,
 } from '@raven/core'
 import { type ComponentType, type RefObject, useEffect, useId, useRef } from 'react'
 import { Icon } from '@/components/Icon/Icon'
@@ -19,12 +20,12 @@ import {
 } from '@/components/Player/copy'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { stepDownNote } from '@/components/Player/playbackFacts'
-import { playingAudio } from '@/components/Player/selection'
 import type { ChoiceGroup as Group, PlayChoices } from '@/components/Player/playChoices'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/SettingsMenu.module.scss'
 import type { SubtitleStatus } from '@/lib/useTrackCues'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
+import { classNames } from '@/lib/classNames'
 
 const SUBTITLE_STATUS = {
   off: null,
@@ -46,9 +47,11 @@ type OptionProps = {
 
 const Option = ({ name, checked, disabled, isInline, label, details, onSelect }: OptionProps) => (
   <label
-    className={[styles.option, disabled ? styles.disabled : '', isInline ? styles.inline : '']
-      .filter(Boolean)
-      .join(' ')}
+    className={classNames([
+      styles.option,
+      disabled ? styles.disabled : '',
+      isInline ? styles.inline : '',
+    ])}
   >
     <input
       className={styles.radio}
@@ -110,8 +113,8 @@ type AudioList = (typeof AUDIO_LISTS)[keyof typeof AUDIO_LISTS]
 type AudioTracksProps = GroupProps
 
 const AudioTracks = ({ labelledBy, selection, mode }: AudioTracksProps) => {
-  const { tracks, audio, playsPickedAudio, pickAudio } = selection
-  const playing = playingAudio({ mode, tracks, audio, playsPickedAudio })
+  const { tracks, audio, shouldPlayPickedAudio, pickAudio } = selection
+  const playing = playingAudio({ mode, tracks, audio, shouldPlayPickedAudio })
   return (tracks?.audio ?? []).map((track) => {
     const label = audioLabel(track)
     return (

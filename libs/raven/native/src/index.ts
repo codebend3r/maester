@@ -7,6 +7,7 @@ export {
   accessTokenNow,
   createAccountSession,
 } from '@/account/accountSession'
+export { DISK_TRANSFERS, deviceDiskFor } from '@/downloads/deviceDisk'
 export { secretStore } from '@/servers/deviceSecretStore'
 export { isOnCellular, watchNetwork } from '@/servers/networkChanges'
 export { type ApiForProps, apiFor, cookieJar, openEventsFor } from '@/servers/serverClient'

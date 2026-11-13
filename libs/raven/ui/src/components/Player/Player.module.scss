@@ -327,7 +327,7 @@
   gap: var(--space-3);
   width: min(var(--measure), 100%);
   padding: var(--space-5);
-  border: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+  border: 1px solid var(--color-on-picture-hairline);
   border-radius: var(--radius-xl);
   background: var(--color-picture-glass);
   box-shadow: var(--shadow-panel);

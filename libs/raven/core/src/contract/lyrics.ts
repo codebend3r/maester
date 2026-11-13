@@ -1,4 +1,4 @@
-import { type Infer, isNumber, isString, listOf, object, oneOf, union } from '@/schema'
+import { type Infer, isNumber, isString, listOf, object, oneOf, union, literal } from '@/schema'
 
 /** What a track's lyrics are: lines timed to the music, text with no times, or nothing known. */
 export const LYRICS_KINDS = { synced: 'synced', plain: 'plain', none: 'none' } as const
@@ -21,12 +21,12 @@ export type LyricLine = Infer<typeof isLyricLine>
 /** `GET /api/tracks/:id/lyrics`: synced lines in time order, plain text, or none. */
 export const isLyrics = union(
   object({
-    kind: oneOf([LYRICS_KINDS.synced]),
+    kind: literal(LYRICS_KINDS.synced),
     source: isLyricsSource,
     lines: listOf(isLyricLine),
   }),
-  object({ kind: oneOf([LYRICS_KINDS.plain]), source: isLyricsSource, text: isString }),
-  object({ kind: oneOf([LYRICS_KINDS.none]) }),
+  object({ kind: literal(LYRICS_KINDS.plain), source: isLyricsSource, text: isString }),
+  object({ kind: literal(LYRICS_KINDS.none) }),
 )
 
 export type Lyrics = Infer<typeof isLyrics>

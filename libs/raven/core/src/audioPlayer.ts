@@ -1,8 +1,18 @@
 import { isAudioBitrate } from '@/contract/streaming'
 import { isEqGains } from '@/equalizer'
-import { isMediaId } from '@/playLink'
+import { isMediaId } from '@/contract/ids'
 import { isPlayerErrorReason, PLAYER_ERROR_REASONS, type PlayerEvent } from '@/player'
-import { type Infer, isBoolean, isNumber, isString, nullable, object, oneOf, union } from '@/schema'
+import {
+  type Infer,
+  isBoolean,
+  isNumber,
+  isString,
+  nullable,
+  object,
+  oneOf,
+  union,
+  literal,
+} from '@/schema'
 
 /**
  * What the page asks of the desktop's music engine. The queue stays on the page, in
@@ -57,7 +67,7 @@ export const isAudioCommand = union(
    * `next` ready to follow it.
    */
   object({
-    type: oneOf([AUDIO_COMMANDS.load]),
+    type: literal(AUDIO_COMMANDS.load),
     mediaId: isMediaId,
     level: isLevel,
     next: nullable(isQueuedTrack),
@@ -65,25 +75,25 @@ export const isAudioCommand = union(
     kbps: nullable(isAudioBitrate),
   }),
   // Changes only what follows the playing track, or the level or bitrate it is queued at.
-  object({ type: oneOf([AUDIO_COMMANDS.queueNext]), next: nullable(isQueuedTrack) }),
-  object({ type: oneOf([AUDIO_COMMANDS.play]) }),
-  object({ type: oneOf([AUDIO_COMMANDS.pause]) }),
-  object({ type: oneOf([AUDIO_COMMANDS.seek]), time: isNumber }),
-  object({ type: oneOf([AUDIO_COMMANDS.volume]), volume: isNumber, muted: isBoolean }),
+  object({ type: literal(AUDIO_COMMANDS.queueNext), next: nullable(isQueuedTrack) }),
+  object({ type: literal(AUDIO_COMMANDS.play) }),
+  object({ type: literal(AUDIO_COMMANDS.pause) }),
+  object({ type: literal(AUDIO_COMMANDS.seek), time: isNumber }),
+  object({ type: literal(AUDIO_COMMANDS.volume), volume: isNumber, muted: isBoolean }),
   // How fast it plays: an audiobook's chosen speed, 1 for music; the pitch stays as it was.
-  object({ type: oneOf([AUDIO_COMMANDS.speed]), rate: isNumber }),
-  object({ type: oneOf([AUDIO_COMMANDS.nowPlaying]), info: isNowPlayingInfo }),
+  object({ type: literal(AUDIO_COMMANDS.speed), rate: isNumber }),
+  object({ type: literal(AUDIO_COMMANDS.nowPlaying), info: isNowPlayingInfo }),
   /*
    * How music sounds: the playing track's levelling factor, the queued one's (null for none),
    * and the equalizer's gains, from 32 Hz up.
    */
   object({
-    type: oneOf([AUDIO_COMMANDS.sound]),
+    type: literal(AUDIO_COMMANDS.sound),
     level: isLevel,
     nextLevel: nullable(isLevel),
     eq: isEqGains,
   }),
-  object({ type: oneOf([AUDIO_COMMANDS.stop]) }),
+  object({ type: literal(AUDIO_COMMANDS.stop) }),
 )
 
 export type AudioCommand = Infer<typeof isAudioCommand>
@@ -110,7 +120,7 @@ export const isRemoteCommand = union(
       REMOTE_COMMANDS.stop,
     ]),
   }),
-  object({ kind: oneOf([REMOTE_COMMANDS.seek]), time: isNumber }),
+  object({ kind: literal(REMOTE_COMMANDS.seek), time: isNumber }),
 )
 
 export type RemoteCommand = Infer<typeof isRemoteCommand>
@@ -127,20 +137,20 @@ export const AUDIO_EVENTS = {
 } as const
 
 export const isAudioEvent = union(
-  object({ type: oneOf([AUDIO_EVENTS.time]), time: isNumber }),
-  object({ type: oneOf([AUDIO_EVENTS.duration]), duration: nullable(isNumber) }),
-  object({ type: oneOf([AUDIO_EVENTS.paused]), paused: isBoolean }),
-  object({ type: oneOf([AUDIO_EVENTS.waiting]), waiting: isBoolean }),
+  object({ type: literal(AUDIO_EVENTS.time), time: isNumber }),
+  object({ type: literal(AUDIO_EVENTS.duration), duration: nullable(isNumber) }),
+  object({ type: literal(AUDIO_EVENTS.paused), paused: isBoolean }),
+  object({ type: literal(AUDIO_EVENTS.waiting), waiting: isBoolean }),
   // mpv went on to the queued track by itself, with no gap.
-  object({ type: oneOf([AUDIO_EVENTS.advanced]) }),
+  object({ type: literal(AUDIO_EVENTS.advanced) }),
   // The track ended with nothing queued after it.
-  object({ type: oneOf([AUDIO_EVENTS.ended]) }),
+  object({ type: literal(AUDIO_EVENTS.ended) }),
   object({
-    type: oneOf([AUDIO_EVENTS.error]),
+    type: literal(AUDIO_EVENTS.error),
     reason: isPlayerErrorReason,
     message: isString,
   }),
-  object({ type: oneOf([AUDIO_EVENTS.remote]), command: isRemoteCommand }),
+  object({ type: literal(AUDIO_EVENTS.remote), command: isRemoteCommand }),
 )
 
 export type AudioEvent = Infer<typeof isAudioEvent>

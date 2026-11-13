@@ -20,6 +20,7 @@ import { api } from '@/test/api'
 import { itemSummary, mediaItem } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
+import { NO_TITLE_EXTRAS, NO_HOST_EXTRAS } from '@/components/Player/PlayerServices'
 
 type FakePlayerProps = {
   deferLoad?: boolean
@@ -86,14 +87,16 @@ const SOURCE = { kind: 'file', fileId: 'f1' } as const
 
 const servicesFor = (overrides: Partial<PlayerServices> = {}): PlayerServices => ({
   title: {
+    ...NO_TITLE_EXTRAS,
     label: 'Local clip',
     duration: null,
     resumeAt: 0,
     backTo: '/',
     next: { to: '/next', state: null, label: 'Next clip' },
   },
-  progress: { started: () => {}, save: () => {}, left: () => {} },
+  progress: { started: () => {}, save: () => {}, left: () => {}, duration: null },
   posterUrl: null,
+  ...NO_HOST_EXTRAS,
   escape: null,
   unplayableNote: 'Raven could not play this video.',
   ...overrides,

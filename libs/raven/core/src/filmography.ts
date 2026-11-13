@@ -2,7 +2,21 @@ import { type FilmographyEntry, type FilmographyDepartment } from '@/contract'
 import { type Infer, oneOf } from '@/schema'
 
 /** The tabs a filmography table offers, in order; `crew` credits show on `all` only. */
-export const FILMOGRAPHY_TABS = ['all', 'acting', 'directing', 'writing', 'producing'] as const
+export const FILMOGRAPHY_TAB_NAMES = {
+  all: 'all',
+  acting: 'acting',
+  directing: 'directing',
+  writing: 'writing',
+  producing: 'producing',
+} as const
+
+export const FILMOGRAPHY_TABS = [
+  FILMOGRAPHY_TAB_NAMES.all,
+  FILMOGRAPHY_TAB_NAMES.acting,
+  FILMOGRAPHY_TAB_NAMES.directing,
+  FILMOGRAPHY_TAB_NAMES.writing,
+  FILMOGRAPHY_TAB_NAMES.producing,
+] as const
 
 export const isFilmographyTab = oneOf(FILMOGRAPHY_TABS)
 
@@ -13,7 +27,8 @@ type IsOnTabProps = {
   tab: FilmographyTab
 }
 
-const isOnTab = ({ department, tab }: IsOnTabProps): boolean => tab === 'all' || department === tab
+const isOnTab = ({ department, tab }: IsOnTabProps): boolean =>
+  tab === FILMOGRAPHY_TAB_NAMES.all || department === tab
 
 type EntriesOnProps = {
   entries: readonly FilmographyEntry[]
@@ -45,7 +60,7 @@ export const tabCounts = ({
   entries,
   isSelfShown,
 }: TabCountsProps): Record<FilmographyTab, number> => ({
-  all: entriesOn({ entries, tab: 'all', isSelfShown }).length,
+  all: entriesOn({ entries, tab: FILMOGRAPHY_TAB_NAMES.all, isSelfShown }).length,
   acting: entriesOn({ entries, tab: 'acting', isSelfShown }).length,
   directing: entriesOn({ entries, tab: 'directing', isSelfShown }).length,
   writing: entriesOn({ entries, tab: 'writing', isSelfShown }).length,
@@ -65,7 +80,9 @@ export const hasSelfCredits = (entries: readonly FilmographyEntry[]): boolean =>
 
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/
 
-const partsOf = (date: string | null): { year: number; month: number; day: number } | null => {
+type DateParts = { year: number; month: number; day: number }
+
+const partsOf = (date: string | null): DateParts | null => {
   const match = date == null ? null : DATE.exec(date)
   if (!match) return null
   return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) }

@@ -19,7 +19,7 @@ export const isUpcomingShelf = oneOf(Object.values(UPCOMING_SHELVES))
 export const UPCOMING_PARAMS = { shelf: 'shelf', after: 'after' } as const
 
 /** Where the server answers with one shelf a page at a time, the soonest out first. */
-export const UPCOMING_SHELF_PATH = `${UPCOMING_PATH}/:${UPCOMING_PARAMS.shelf}`
+export const UPCOMING_SHELF_PATH = `${UPCOMING_PATH}/:${UPCOMING_PARAMS.shelf}` as const
 
 /** How many titles the server sends for each of Coming soon's shelves: two rows of eight, or one. */
 export const UPCOMING_SHELF_SIZES = {

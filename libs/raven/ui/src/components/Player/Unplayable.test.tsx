@@ -20,6 +20,7 @@ import { renderWithProviders } from '@/test/render'
 import { useMediaOrigin } from '@/stores/mediaOrigin'
 import { useHostPlayer } from '@/stores/playerServices'
 import { useToasts } from '@/stores/toasts'
+import { NO_TITLE_EXTRAS, NO_HOST_EXTRAS } from '@/components/Player/PlayerServices'
 
 const TRACKS: MediaTracks = {
   audio: [
@@ -35,10 +36,18 @@ type ReportingPlayerProps = { media: MediaItem; report?: ErrorReporter }
 
 const ReportingPlayer = ({ media, report }: ReportingPlayerProps) => {
   const isHosting = useHostPlayer({
-    title: { label: media.title, duration: media.duration, resumeAt: 42, backTo: '/', next: null },
+    title: {
+      ...NO_TITLE_EXTRAS,
+      label: media.title,
+      duration: media.duration,
+      resumeAt: 42,
+      backTo: '/',
+      next: null,
+    },
     posterUrl: null,
+    ...NO_HOST_EXTRAS,
     escape: null,
-    progress: { started: () => {}, save: () => {}, left: () => {} },
+    progress: { started: () => {}, save: () => {}, left: () => {}, duration: null },
     ...(report && { report }),
   })
   return isHosting && <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />

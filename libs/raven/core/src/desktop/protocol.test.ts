@@ -49,6 +49,9 @@ import {
   isUpdateStatus,
   readWatchQuery,
   watchPathFor,
+  DOWNLOAD_GROUP_PREFIXES,
+  downloadGroupKey,
+  isReplyTo,
 } from '@/desktop/protocol'
 import { PAGE_PATHS } from '@/itemLinks'
 import { DOWNLOAD_TARGET_KINDS, PLAY_LINK_MAX_NEXT } from '@/playLink'
@@ -1030,5 +1033,26 @@ describe('the download ask and views', () => {
   it('accepts the space line and refuses one with a string', () => {
     expect(isSpaceView({ free: 1, total: 2, used: 0 })).toBe(true)
     expect(isSpaceView({ free: '1', total: 2, used: 0 })).toBe(false)
+  })
+})
+
+describe('isReplyTo', () => {
+  it('takes the replies main gives a request, and a refusal, and nothing else', () => {
+    const isSpaceReply = isReplyTo(DESKTOP_REQUESTS.readSpace)
+    expect(
+      isSpaceReply({ type: DESKTOP_REPLIES.space, space: { free: 1, total: 2, used: 1 } }),
+    ).toBeTrue()
+    expect(isSpaceReply({ type: DESKTOP_REPLIES.refused, message: 'No disk.' })).toBeTrue()
+    expect(isSpaceReply({ type: DESKTOP_REPLIES.done })).toBeFalse()
+    expect(isSpaceReply({ type: DESKTOP_REPLIES.space })).toBeFalse()
+  })
+})
+
+describe('downloadGroupKey', () => {
+  it('writes the prefix and the ids that name the group', () => {
+    expect(downloadGroupKey({ prefix: DOWNLOAD_GROUP_PREFIXES.show, ids: [4] })).toBe('show:4')
+    expect(downloadGroupKey({ prefix: DOWNLOAD_GROUP_PREFIXES.saga, ids: [2, '1241'] })).toBe(
+      'saga:2:1241',
+    )
   })
 })

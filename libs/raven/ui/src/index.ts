@@ -1,6 +1,7 @@
 // Primitive styles must precede the player's equal-specificity overrides in the CSS bundle.
-export { Button, ButtonLink } from '@/components/Button/Button'
+export { BUTTON_TONES, Button, ButtonLink } from '@/components/Button/Button'
 export type { ButtonTone, ButtonSize } from '@/components/Button/Button'
+export { classNames } from '@/lib/classNames'
 export { Player } from '@/components/Player/Player'
 export { ICON_NAMES, Icon } from '@/components/Icon/Icon'
 export type { IconSize } from '@/components/Icon/Icon'

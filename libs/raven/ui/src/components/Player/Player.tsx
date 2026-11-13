@@ -1,6 +1,12 @@
 import { type ComponentType, useState } from 'react'
 import { PLAYER_SOURCE_KINDS, isPictureSubtitle } from '@raven/core'
-import { ENGINE_KINDS, type Engine, type HtmlSource, sourceKey } from '@/components/Player/engine'
+import {
+  ENGINE_KINDS,
+  type Engine,
+  type EngineOf,
+  type HtmlSource,
+  sourceKey,
+} from '@/components/Player/engine'
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
 import { KeyedView, type ViewOf, type ViewsOf } from '@/components/KeyedView/KeyedView'
@@ -30,8 +36,12 @@ const RUN_STATES = { running: 'running', failed: 'failed' } as const
 
 type RunState = (typeof RUN_STATES)[keyof typeof RUN_STATES]
 
-const runStateOf = (problems: readonly string[]): RunState =>
-  problems.length > 0 ? RUN_STATES.failed : RUN_STATES.running
+/** A player that fails once shows why, and stays failed: the one problem, and how to report it. */
+const useRunFailure = () => {
+  const [problem, setProblem] = useState<string | null>(null)
+  const runState: RunState = problem === null ? RUN_STATES.running : RUN_STATES.failed
+  return { runState, problems: problem === null ? [] : [problem], fail: setProblem }
+}
 
 type FailedViewProps = { problems: string[]; onBack: () => void }
 
@@ -40,8 +50,6 @@ const FailedView = ({ problems, onBack }: FailedViewProps) => (
 )
 
 type EngineKind = Engine['kind']
-
-type EngineOf<K extends EngineKind> = Extract<Engine, { kind: K }>
 
 type EngineScreenProps<K extends EngineKind> = { engine: EngineOf<K>; onBack: () => void }
 
@@ -63,8 +71,8 @@ const engineViewOf = <K extends EngineKind>({
 type PlayerProps = { engine: Engine }
 
 export const Player = ({ engine }: PlayerProps) => {
-  const { title } = useHostServices()
-  const leave = useLeave(title.backTo)
+  const backTo = useHostServices((services) => services.title.backTo)
+  const leave = useLeave(backTo)
   return (
     <KeyedView<EngineViewsProps>
       views={ENGINE_VIEWS}
@@ -83,9 +91,7 @@ type NativeRunProps = NativeViewProps & {
   onFailure: (message: string) => void
 }
 
-type NativeRunningProps = NativeRunProps
-
-const NativeRunning = ({ engine, onBack, onFailure }: NativeRunningProps) => (
+const NativeRunning = ({ engine, onBack, onFailure }: NativeRunProps) => (
   <NativeStage
     key={sourceKey(engine.source)}
     engine={engine}
@@ -100,16 +106,9 @@ const NATIVE_RUNS = {
 } as const satisfies Record<RunState, ComponentType<NativeRunProps>>
 
 const NativeView = ({ engine, onBack }: NativeViewProps) => {
-  const [problems, setProblems] = useState<string[]>([])
-  const Run = NATIVE_RUNS[runStateOf(problems)]
-  return (
-    <Run
-      engine={engine}
-      onBack={onBack}
-      problems={problems}
-      onFailure={(message) => setProblems([message])}
-    />
-  )
+  const { runState, problems, fail } = useRunFailure()
+  const Run = NATIVE_RUNS[runState]
+  return <Run engine={engine} onBack={onBack} problems={problems} onFailure={fail} />
 }
 
 type HtmlSourceKind = HtmlSource['kind']
@@ -157,9 +156,7 @@ type FileRunProps = FilePlayerProps & {
   onFailure: (message: string) => void
 }
 
-type FileRunningProps = FileRunProps
-
-const FileRunning = ({ source, onBack, onFailure }: FileRunningProps) => {
+const FileRunning = ({ source, onBack, onFailure }: FileRunProps) => {
   const selection = useFileSelection(source.subtitles)
   return (
     <Stage
@@ -168,6 +165,10 @@ const FileRunning = ({ source, onBack, onFailure }: FileRunningProps) => {
       rendition={DIRECT_RENDITION}
       selection={selection}
       onFailure={({ message }) => onFailure(message)}
+      onSlow={null}
+      steppedDown={null}
+      choices={null}
+      notice={null}
     />
   )
 }
@@ -178,16 +179,9 @@ const FILE_RUNS = {
 } as const satisfies Record<RunState, ComponentType<FileRunProps>>
 
 const FilePlayer = ({ source, onBack }: FilePlayerProps) => {
-  const [problems, setProblems] = useState<string[]>([])
-  const Run = FILE_RUNS[runStateOf(problems)]
-  return (
-    <Run
-      source={source}
-      onBack={onBack}
-      problems={problems}
-      onFailure={(message) => setProblems([message])}
-    />
-  )
+  const { runState, problems, fail } = useRunFailure()
+  const Run = FILE_RUNS[runState]
+  return <Run source={source} onBack={onBack} problems={problems} onFailure={fail} />
 }
 
 type ServerPlayerProps = {
@@ -233,16 +227,14 @@ type TrackState = (typeof TRACK_STATES)[keyof typeof TRACK_STATES]
 
 type PlayingProps = PlaybackViewProps<typeof PLAYBACK_STATUSES.playing>
 
-type PlayingStageProps = PlayingProps
-
-const PlayingStage = ({ source, onBack, playback, selection }: PlayingStageProps) => (
+const PlayingStage = ({ source, onBack, playback, selection }: PlayingProps) => (
   <Stage
     engine={{ kind: ENGINE_KINDS.html, source }}
     onBack={onBack}
     rendition={playback.rendition}
     selection={selection}
     onFailure={playback.fail}
-    onSlow={playback.slow ?? undefined}
+    onSlow={playback.slow}
     steppedDown={playback.steppedDown}
     choices={playback.choices}
     // A browser has no Dolby Vision processing, so profile 5 needs saying here.
@@ -255,9 +247,7 @@ const PLAYING_VIEWS = {
   [TRACK_STATES.ready]: PlayingStage,
 } as const satisfies Record<TrackState, ComponentType<PlayingProps>>
 
-type PlayingViewProps = PlayingProps
-
-const PlayingView = (props: PlayingViewProps) => {
+const PlayingView = (props: PlayingProps) => {
   const View =
     PLAYING_VIEWS[props.selection.isWaitingForTracks ? TRACK_STATES.waiting : TRACK_STATES.ready]
   return <View {...props} />

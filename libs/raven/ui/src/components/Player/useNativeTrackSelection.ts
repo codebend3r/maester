@@ -1,8 +1,7 @@
-import type { MediaTracks } from '@raven/core'
+import { type MediaTracks, PLAYER_COMMANDS, preferredAudio, preferredSubtitle } from '@raven/core'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { type NativePlayer, sendQuietly } from '@/components/Player/engine'
 import { useHostServices } from '@/stores/playerServices'
-import { preferredAudio, preferredSubtitle } from '@/components/Player/selection'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
@@ -20,7 +19,7 @@ export const useNativeTrackSelection = ({
   tracks,
   player,
 }: UseNativeTrackSelectionProps): TrackSelection => {
-  const { trackPicks } = useHostServices()
+  const trackPicks = useHostServices((services) => services.trackPicks)
   const audioLanguage = usePlayerPrefs((prefs) => prefs.audioLanguage)
   const subtitlePrefs = usePlayerPrefs((prefs) => prefs.subtitles)
   const setAudioLanguage = usePlayerPrefs((prefs) => prefs.setAudioLanguage)
@@ -32,14 +31,18 @@ export const useNativeTrackSelection = ({
   const applyPreferences = useEffectEvent((available: MediaTracks) => {
     if ((trackPicks?.start ?? null) !== null) return
     const audioPick = preferredAudio({ tracks: available, language: audioLanguage })
-    const subtitlePick = preferredSubtitle({ tracks: available, subtitles: subtitlePrefs })
+    const subtitlePick = preferredSubtitle({
+      tracks: available,
+      isOn: subtitlePrefs.on,
+      language: subtitlePrefs.language,
+    })
     if (audioPick != null) {
       setAudio(audioPick)
-      sendQuietly({ player, command: { type: 'audio', index: audioPick } })
+      sendQuietly({ player, command: { type: PLAYER_COMMANDS.audio, index: audioPick } })
     }
     if (subtitlePick != null) {
       setSubtitleId(subtitlePick)
-      sendQuietly({ player, command: { type: 'subtitle', id: subtitlePick } })
+      sendQuietly({ player, command: { type: PLAYER_COMMANDS.subtitle, id: subtitlePick } })
     }
   })
   useEffect(() => {
@@ -54,10 +57,10 @@ export const useNativeTrackSelection = ({
     setAudio(index)
     sendQuietly({
       player,
-      command: { type: 'audio', index },
+      command: { type: PLAYER_COMMANDS.audio, index },
       onAccepted: () => {
         setAudioLanguage(tracks?.audio.find((track) => track.index === index)?.language ?? null)
-        if (trackPicks) trackPicks.save({ audio: index, subtitle: subtitleId })
+        trackPicks?.save({ audio: index, subtitle: subtitleId })
       },
       onRefused: () => setAudio((shown) => (shown === index ? previous : shown)),
     })
@@ -68,14 +71,14 @@ export const useNativeTrackSelection = ({
     setSubtitleId(id)
     sendQuietly({
       player,
-      command: { type: 'subtitle', id },
+      command: { type: PLAYER_COMMANDS.subtitle, id },
       onAccepted: () => {
         const track = tracks?.subtitles.find((candidate) => candidate.id === id) ?? null
         setSubtitles({
           on: id != null,
           language: track === null ? subtitlePrefs.language : track.language,
         })
-        if (trackPicks) trackPicks.save({ audio, subtitle: id })
+        trackPicks?.save({ audio, subtitle: id })
       },
       onRefused: () => setSubtitleId((shown) => (shown === id ? previous : shown)),
     })
@@ -89,7 +92,7 @@ export const useNativeTrackSelection = ({
     isDefaultAudio: audio == null || audio === (tracks?.defaultAudio ?? null),
     subtitle: tracks?.subtitles.find((track) => track.id === subtitleId) ?? null,
     isWaitingForTracks: false,
-    playsPickedAudio: true,
+    shouldPlayPickedAudio: true,
     pickAudio,
     pickSubtitle,
   }

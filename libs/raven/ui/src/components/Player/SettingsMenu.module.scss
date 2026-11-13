@@ -26,7 +26,7 @@
   width: min(24rem, 100%);
   max-height: min(32rem, calc(100dvh - 10rem));
   padding: var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+  border: 1px solid var(--color-on-picture-hairline);
   border-radius: var(--radius-lg);
   background: var(--color-picture-glass);
   color: var(--color-on-picture);
@@ -60,7 +60,7 @@
   cursor: pointer;
 
   &:hover {
-    background: color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+    background: var(--color-on-picture-hairline);
     color: var(--color-on-picture);
   }
 }
@@ -74,7 +74,7 @@
 
 .group {
   display: grid;
-  gap: 2px;
+  gap: var(--space-hair);
   min-width: 0;
   padding: 0;
   border: 0;
@@ -163,7 +163,7 @@
 .choices {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
-  gap: 2px;
+  gap: var(--space-hair);
 }
 
 .note {
@@ -181,7 +181,7 @@
   display: grid;
   gap: var(--space-0);
   padding-bottom: var(--space-2);
-  border-bottom: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+  border-bottom: 1px solid var(--color-on-picture-hairline);
 }
 
 .mode {
