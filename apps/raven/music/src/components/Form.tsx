@@ -1,7 +1,7 @@
+import { BUTTON_TONES, type ButtonTone, keyboardFor } from '@raven/native/headless'
 import type { ReactNode } from 'react'
 import {
   KeyboardAvoidingView,
-  type KeyboardTypeOptions,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,11 +11,6 @@ import {
 } from 'react-native'
 
 import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
-
-/** The web's `Button` tones: the one action a step is for, another way on, and a way out. */
-export const BUTTON_TONES = { primary: 'primary', quiet: 'quiet', ghost: 'ghost' } as const
-
-type ButtonTone = (typeof BUTTON_TONES)[keyof typeof BUTTON_TONES]
 
 type FormProps = { title: string; note?: string; children: ReactNode }
 
@@ -44,12 +39,6 @@ const autoCompleteFor = ({ isSecret, isEmail }: AutoCompleteForProps) => {
   return isSecret ? 'password' : 'off'
 }
 
-type KeyboardForProps = Pick<FieldKindProps, 'isEmail'>
-
-/** The keyboard a field brings up: the email one, else the default. */
-const keyboardFor = ({ isEmail }: KeyboardForProps): KeyboardTypeOptions =>
-  isEmail ? 'email-address' : 'default'
-
 type FieldProps = {
   label: string
   value: string
@@ -75,7 +64,7 @@ export function Field({
         autoCapitalize="none"
         autoComplete={autoCompleteFor({ isSecret, isEmail })}
         autoCorrect={false}
-        keyboardType={keyboardFor({ isEmail })}
+        keyboardType={keyboardFor({ isSecret, isEmail, isNumber: false })}
         onChangeText={onChangeText}
         onSubmitEditing={onSubmit}
         returnKeyType="go"
