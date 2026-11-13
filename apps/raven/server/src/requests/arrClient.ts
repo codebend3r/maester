@@ -118,6 +118,10 @@ const isLookedUp = object({
   id: optional(nullable(isNumber)),
 })
 
+/** An arr's id, or null for the none (absent, null or 0) a lookup answers for a title it does not hold. */
+const idOf = (id: number | null | undefined): number | null =>
+  id !== null && id !== undefined && id > 0 ? id : null
+
 /** A title as the arr's lookup found it: its record to add, and its id when the arr already holds it. */
 export type ArrTitle = {
   title: string
@@ -223,18 +227,39 @@ export class ArrClient {
     return new ArrError({ kind: ARR_ERROR_KINDS.failed, message: `Could not read ${what}` })
   }
 
-  /** The arr's record of a TMDB title, or null when it knows none. */
+  /** The arr's record of a TMDB title, and its id when the arr holds it already; null when it knows none. */
   async lookUp({ type, tmdbId }: LookUpProps): Promise<ArrTitle | null> {
     const path =
       type === ITEM_TYPES.movie
         ? `${API}/movie/lookup/tmdb?${toQueryString({ tmdbId })}`
         : `${API}/series/lookup?${toQueryString({ term: `tmdb:${tmdbId}` })}`
-    const answer = await this.call({ type, path })
+    const [answer, heldId] = await Promise.all([
+      this.call({ type, path }),
+      type === ITEM_TYPES.movie ? this.heldMovieId(tmdbId) : Promise.resolve(null),
+    ])
     const found = Array.isArray(answer) ? answer[0] : answer
     if (found === null || found === undefined) return null
     if (!isLookedUp(found) || !isRecord(found)) throw this.unreadable(`the ${type} lookup`)
-    const id = found.id ?? null
-    return { title: found.title, existingId: id !== null && id > 0 ? id : null, record: found }
+    return { title: found.title, existingId: heldId ?? idOf(found.id), record: found }
+  }
+
+  /**
+   * The arr's id for a TMDB title it holds, or null. Radarr's TMDB lookup
+   * answers fresh metadata with no id even for a movie it holds, so a movie
+   * is found in its library instead; Sonarr's lookup carries the id.
+   */
+  async heldId({ type, tmdbId }: LookUpProps): Promise<number | null> {
+    if (type === ITEM_TYPES.movie) return this.heldMovieId(tmdbId)
+    const found = await this.lookUp({ type, tmdbId })
+    return found?.existingId ?? null
+  }
+
+  private async heldMovieId(tmdbId: string): Promise<number | null> {
+    const type = ITEM_TYPES.movie
+    const answer = await this.call({ type, path: `${API}/movie?${toQueryString({ tmdbId })}` })
+    if (answer === null) return null
+    if (!listOf(isIdentified)(answer)) throw this.unreadable('the movie library')
+    return idOf(answer[0]?.id)
   }
 
   /** The arr's root folders' paths. */

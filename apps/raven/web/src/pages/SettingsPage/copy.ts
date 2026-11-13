@@ -141,6 +141,25 @@ export const SETTINGS_COPY = {
     offHint:
       'Off in this browser until it is turned back on, through refreshes, restarts and redeploys. Turned on, it waits a moment first, so a slip costs no password.',
   },
+  tabs: {
+    label: 'Settings',
+    preferences: 'Preferences',
+    requests: 'Requests',
+  },
+  requests: {
+    heading: 'Your requests',
+    help: 'The movies and TV shows you asked Coming soon to download, and where each one stands.',
+    reading: 'Reading your requests',
+    failed: 'Could not read your requests: ',
+    none: 'You have not requested anything yet. Ask for a title on its Coming soon page.',
+    table: 'Your requests',
+    columns: {
+      title: 'Title',
+      kind: 'Kind',
+      requested: 'Requested',
+      status: 'Status',
+    },
+  },
   users: {
     heading: 'Users',
     help: 'Who may use this raven. Each new account waits here until you approve it.',

@@ -15,7 +15,7 @@ const RADARR = 'http://radarr.test'
 type Sent = { method: string; url: string; body: unknown }
 
 type FakeArrState = {
-  /** What each lookup finds, by TMDB id. */
+  /** What each lookup finds, by TMDB id, and the arr's id for a title it holds. */
   movies: Record<string, { title: string; id?: number }>
   shows: Record<string, { title: string; id?: number }>
   rootFolders: string[]
@@ -35,7 +35,7 @@ const freshState = (): FakeArrState => ({
     '2': { title: 'Sinners', id: 77 },
     '4': { title: 'Barbarian' },
   },
-  shows: { '10': { title: 'The Bear' } },
+  shows: { '10': { title: 'The Bear' }, '11': { title: 'Severance', id: 88 } },
   rootFolders: ['/Meleys/Movies/B', '/Meleys/Movies/S', '/Vermithor/TV/B'],
   resolutions: [1080, 1080],
   queue: [],
@@ -76,9 +76,16 @@ const fakeArrs =
         { id: 5, name: 'Ultra-HD', items: [{ allowed: true, quality: { resolution: 2160 } }] },
       ])
     }
+    // Radarr's TMDB lookup answers fresh metadata, with no id even for a movie it holds.
     if (path === '/api/v3/movie/lookup/tmdb') {
       const found = state.movies[parsed.searchParams.get('tmdbId') ?? '']
-      return found ? json({ ...found, tmdbId: 1 }) : json({ message: 'not found' }, 404)
+      return found
+        ? json({ title: found.title, id: null, tmdbId: 1 })
+        : json({ message: 'not found' }, 404)
+    }
+    if (method === 'GET' && path === '/api/v3/movie') {
+      const held = state.movies[parsed.searchParams.get('tmdbId') ?? '']?.id
+      return json(held === undefined ? [] : [{ id: held, title: 'held' }])
     }
     if (path === '/api/v3/series/lookup') {
       const found = state.shows[(parsed.searchParams.get('term') ?? '').replace('tmdb:', '')]
@@ -189,14 +196,25 @@ describe('download requests', () => {
     expect(await service.holding({ type: ITEM_TYPES.show, tmdbId: '10' })).toEqual({
       status: null,
     })
+    expect(await service.holding({ type: ITEM_TYPES.show, tmdbId: '11' })).toEqual({
+      status: REQUEST_STATUSES.willDownload,
+    })
+  })
+
+  it('refuses a show the arr already holds, and sends it nothing', async () => {
+    const ask = { type: ITEM_TYPES.show, tmdbId: '11' } as const
+    await expect(requests().request({ account: TEST_ACCOUNTS.a, ask })).rejects.toThrow(
+      'holds this title already',
+    )
+    expect(state.arr.sent.some((sent) => sent.method === 'POST')).toBe(false)
   })
 
   it('reads a holding from the arr at most once in a while, and again after a failure', async () => {
     const service = requests()
     const ask = { type: ITEM_TYPES.movie, tmdbId: '2' } as const
     const lookups = () =>
-      state.arr.sent.filter((sent) => sent.url.includes('/movie/lookup/tmdb')).length
-    state.arr.failing = ['/api/v3/movie/lookup/tmdb']
+      state.arr.sent.filter((sent) => sent.url.startsWith(`${RADARR}/api/v3/movie?`)).length
+    state.arr.failing = ['/api/v3/movie']
     await expect(service.holding(ask)).rejects.toThrow('500')
     state.arr.failing = []
     expect((await service.holding(ask)).status).toBe(REQUEST_STATUSES.notDownloadable)

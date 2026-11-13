@@ -8,7 +8,8 @@ const origin = `http://${FIXTURE_SERVER.host}:${FIXTURE_SERVER.webPort}`
  * raven's web app in a real browser, against `@raven/server`'s fixture: a real accountless server
  * with a film, a series and an album, serving this project's build beside its API as raven's
  * image does. Every file shares the one server, so they run one at a time and each test leaves
- * the fixture as it found it.
+ * the fixture as it found it, but for the one Coming soon request `comingSoon.e2e.ts` makes,
+ * which nothing else reads.
  */
 export default defineConfig({
   testDir: 'e2e',

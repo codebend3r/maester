@@ -6,6 +6,7 @@ import {
   PLAYBACK_CHOICES,
   type PlaybackSettings,
 } from '@raven/core'
+import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useId, useState } from 'react'
 import { Button } from '@raven/ui'
 import {
@@ -14,15 +15,17 @@ import {
   useServerSettingsSaves,
 } from '@raven/ui/headless'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
+import { Tabs } from '@/components/Tabs/Tabs'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { api } from '@/lib/api'
 import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
-import { displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
+import { displaySettingsQuery, playbackSettingsQuery, requestsQuery } from '@/lib/queries'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
 import { AdminLockSection } from '@/pages/SettingsPage/AdminLockSection'
 import { AdvancedSection } from '@/pages/SettingsPage/AdvancedSection'
 import { CaptionSettings } from '@/pages/SettingsPage/CaptionSettings'
 import { RemoteAccessSection } from '@/pages/SettingsPage/RemoteAccessSection'
+import { mineOf, RequestsTab } from '@/pages/SettingsPage/RequestsTab'
 import { ScrobblingSection } from '@/pages/SettingsPage/ScrobblingSection'
 import { ServerSection } from '@/pages/SettingsPage/ServerSection'
 import {
@@ -431,18 +434,12 @@ const ServerSettings = () => {
   )
 }
 
-const ViewerSettings = () => {
-  const titleId = useId()
+/** The viewer's own preferences: playback, the account, scrobbling, this host and the advanced. */
+const ViewerPreferences = () => {
   const isDesktop = useIsDesktop()
   const access = useAccessState()
   return (
-    <section className={styles.page} aria-labelledby={titleId}>
-      <header className={styles.header}>
-        <BackButton fallback={HOME} className={styles.back} />
-        <PageTitle id={titleId} icon="settings" className={styles.title}>
-          {COMMON_COPY.settings}
-        </PageTitle>
-      </header>
+    <div className={styles.panel}>
       <section className={styles.section} aria-label={SETTINGS_COPY.playback}>
         <h2 className={styles.heading}>{SETTINGS_COPY.playback}</h2>
         <CaptionSettings />
@@ -454,6 +451,47 @@ const ViewerSettings = () => {
       )}
       <HostSettings />
       <AdvancedSection />
+    </div>
+  )
+}
+
+/** Settings' tabs: the viewer's preferences, and the titles they asked Coming soon for. */
+const SETTINGS_TABS = { preferences: 'preferences', requests: 'requests' } as const
+type SettingsTab = (typeof SETTINGS_TABS)[keyof typeof SETTINGS_TABS]
+
+const SETTINGS_PANELS = {
+  [SETTINGS_TABS.preferences]: ViewerPreferences,
+  [SETTINGS_TABS.requests]: RequestsTab,
+} as const satisfies Record<SettingsTab, ComponentType>
+
+const ViewerSettings = () => {
+  const titleId = useId()
+  const [tab, setTab] = useState<SettingsTab>(SETTINGS_TABS.preferences)
+  const { data: requests } = useQuery(requestsQuery)
+  const Panel = SETTINGS_PANELS[tab]
+  return (
+    <section className={styles.page} aria-labelledby={titleId}>
+      <header className={styles.header}>
+        <BackButton fallback={HOME} className={styles.back} />
+        <PageTitle id={titleId} icon="settings" className={styles.title}>
+          {COMMON_COPY.settings}
+        </PageTitle>
+      </header>
+      <Tabs
+        label={SETTINGS_COPY.tabs.label}
+        tabs={[
+          { value: SETTINGS_TABS.preferences, label: SETTINGS_COPY.tabs.preferences },
+          {
+            value: SETTINGS_TABS.requests,
+            label: SETTINGS_COPY.tabs.requests,
+            ...(requests === undefined ? {} : { count: mineOf(requests).length }),
+          },
+        ]}
+        chosen={tab}
+        onChoose={setTab}
+      >
+        <Panel />
+      </Tabs>
     </section>
   )
 }

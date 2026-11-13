@@ -78,6 +78,13 @@
   gap: var(--space-4);
 }
 
+// The Preferences tab's sections, spaced as the page spaced them before it had tabs.
+.panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+}
+
 /*
  * A section's title in the large serif and a line of help, ruled off from
  * its settings.
