@@ -26,3 +26,5 @@ trak = "trak"
 udid = "udid"
 # tasklist's `/FO` (format) flag, which the Windows packaged smoke passes.
 fo = "fo"
+# The Google TV Streamer's Dolby Vision decoder `c2.mtk.dvav.ser.decoder`, named in the player patch.
+ser = "ser"

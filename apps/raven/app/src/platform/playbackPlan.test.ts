@@ -119,17 +119,17 @@ describe("planFor narrowed by this device's settings", () => {
   it('tries a maybe as it is first only while this device prefers direct play', () => {
     expect(modesOn({ ...IPHONE, media: HEVC_MP4 })).toEqual(EVERY_WAY)
     expect(modesOn({ ...IPHONE, media: HEVC_MP4, prefs: NO_MAYBES })).toEqual(CONVERTED)
+  })
+
+  it('plays what it surely can as it is whether or not direct play is preferred', () => {
+    expect(modesOn({ ...IPHONE, prefs: NO_MAYBES })).toEqual(EVERY_WAY)
     const trueHd = mediaItemFor({
       container: CONTAINERS.mkv,
       videoCodec: VIDEO_CODECS.hevc,
       videoBitDepth: 10,
       audioCodec: AUDIO_CODECS.truehd,
     })
-    expect(modesOn({ ...ANDROID_TV, media: trueHd, prefs: NO_MAYBES })).toEqual(CONVERTED)
-  })
-
-  it('plays what it surely can as it is whether or not direct play is preferred', () => {
-    expect(modesOn({ ...IPHONE, prefs: NO_MAYBES })).toEqual(EVERY_WAY)
+    expect(modesOn({ ...ANDROID_TV, media: trueHd, prefs: NO_MAYBES })).toEqual(EVERY_WAY)
   })
 
   it('still tries a maybe as it is when nothing else is left', () => {

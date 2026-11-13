@@ -4,7 +4,6 @@ import {
   type LiveDownload,
   type LiveStream,
   type MediaItem,
-  PICTURE_RANGES,
   PLAYBACK_MODES,
   type PlaybackMode,
   STREAM_PURPOSES,
@@ -15,6 +14,7 @@ import {
   audioLabel,
   codecLabel,
   codecWithProfile,
+  dolbyVisionRange,
   formatBitrate,
   formatByteRate,
   formatBytes,
@@ -59,11 +59,15 @@ const hasValue = ({ value }: Fact): boolean => value != null && value !== false
 
 type PictureRangeProps = { video: VideoStream | null; media: MediaItem }
 
-/** The picture's range as the probe read it (profile 5 as `DV5`), else as the scan saw it, else none. */
+/** The picture's range as the probe read it (profiles 5 and 7 as `DV5`, `DV7`), else as the scan saw it. */
 const pictureRange = ({ video, media }: PictureRangeProps): string | null => {
   if (video == null) return rangeLabel(media)
-  if (!!video.isDolbyVisionOnly) return PICTURE_RANGES.dolbyVisionOnly
-  return VIDEO_RANGE_LABELS[video.range]
+  return (
+    dolbyVisionRange({
+      isDolbyVisionOnly: video.isDolbyVisionOnly,
+      dolbyVisionProfile: video.dolbyVision?.profile ?? null,
+    }) ?? VIDEO_RANGE_LABELS[video.range]
+  )
 }
 
 type PictureTagsProps = { media: MediaItem }

@@ -1,6 +1,7 @@
 import type { ApiClient } from '@/apiClient'
 import {
   CREDIT_JOBS,
+  DOLBY_VISION_PROFILES,
   type EpisodeSummary,
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
@@ -166,17 +167,33 @@ const audioFact = ({ codec, channels, language }: AudioFactProps): string => {
 
 /**
  * How the facts name a file's high range of light from what the scan keeps:
- * Dolby Vision profile 5, which a browser cannot show, or any other HDR.
+ * Dolby Vision profile 5, which a browser cannot show, profile 7, a 4K
+ * Blu-ray's, or any other HDR.
  */
-export const PICTURE_RANGES = { hdr: 'HDR', dolbyVisionOnly: 'DV5' } as const
+export const PICTURE_RANGES = {
+  hdr: 'HDR',
+  dolbyVisionOnly: 'DV5',
+  dolbyVisionDualLayer: 'DV7',
+} as const
 
-type RangeLabelProps = Pick<MediaItem, 'hdr' | 'isDolbyVisionOnly'>
+type DolbyVisionRangeProps = Pick<MediaItem, 'isDolbyVisionOnly' | 'dolbyVisionProfile'>
 
-/** A file's range as its facts name it (`DV5`, `HDR`), or null for SDR. */
-export const rangeLabel = ({ hdr, isDolbyVisionOnly }: RangeLabelProps): string | null => {
+/** A file's Dolby Vision as a chip names it (`DV5`, `DV7`), or null for any other picture. */
+export const dolbyVisionRange = ({
+  isDolbyVisionOnly,
+  dolbyVisionProfile,
+}: DolbyVisionRangeProps): string | null => {
   if (!!isDolbyVisionOnly) return PICTURE_RANGES.dolbyVisionOnly
-  return hdr ? PICTURE_RANGES.hdr : null
+  return dolbyVisionProfile === DOLBY_VISION_PROFILES.dualLayer
+    ? PICTURE_RANGES.dolbyVisionDualLayer
+    : null
 }
+
+type RangeLabelProps = DolbyVisionRangeProps & Pick<MediaItem, 'hdr'>
+
+/** A file's range as its facts name it (`DV5`, `DV7`, `HDR`), or null for SDR. */
+export const rangeLabel = (media: RangeLabelProps): string | null =>
+  dolbyVisionRange(media) ?? (media.hdr ? PICTURE_RANGES.hdr : null)
 
 /** Every name a high range of light goes by in the facts: the scan's, and the probe's own. */
 const HDR_RANGES: ReadonlySet<string> = new Set([
@@ -268,7 +285,7 @@ export const factParts = (fact: string): FactPart[] => {
 
 type PicturePartsProps = Pick<
   MediaItem,
-  'width' | 'height' | 'hdr' | 'isDolbyVisionOnly' | 'videoCodec'
+  'width' | 'height' | 'hdr' | 'isDolbyVisionOnly' | 'dolbyVisionProfile' | 'videoCodec'
 >
 
 /** A file's picture as chips: its resolution, its range, then its video codec; none before it is probed. */
@@ -388,13 +405,13 @@ export const episodesWatched = (
 /**
  * An episode row's air date and length, the file's own where it has been
  * probed, and `DV5` where its file is Dolby Vision profile 5, which a browser
- * plays purple and green.
+ * plays purple and green, or `DV7` where it is a 4K Blu-ray's profile 7.
  */
 export const episodeRowFacts = (episode: EpisodeSummary): string[] =>
   present([
     formatAirDate(episode.released),
     runtimeFact({ file: episode.primary ?? undefined, runtime: episode.runtime }),
-    !!episode.primary?.isDolbyVisionOnly ? PICTURE_RANGES.dolbyVisionOnly : null,
+    episode.primary ? dolbyVisionRange(episode.primary) : null,
   ])
 
 type EpisodeStillUrlProps = {

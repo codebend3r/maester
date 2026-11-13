@@ -31,7 +31,8 @@
 .uhd8k,
 .hevc,
 .hdr,
-.dolbyVisionOnly {
+.dolbyVisionOnly,
+.dolbyVisionDualLayer {
   box-shadow: var(--shadow-outline);
   color: var(--color-resolution-ink);
 }
@@ -71,6 +72,10 @@
 
 .dolbyVisionOnly {
   background: var(--color-range-dv5);
+}
+
+.dolbyVisionDualLayer {
+  background: var(--color-range-dv7);
 }
 
 // A fact led by its resolution: the chip, then the rest of it on its line.

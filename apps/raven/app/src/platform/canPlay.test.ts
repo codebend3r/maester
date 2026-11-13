@@ -184,7 +184,7 @@ describe('canPlayFor on Android TV', () => {
     expect(planOnTv(media)).toEqual({ modes: EVERY_WAY, problems: [] })
   })
 
-  it('tries TrueHD and DTS as they are, a maybe the device answers, with the remux after them', () => {
+  it('plays TrueHD and DTS as they are, which FFmpeg decodes, with the remux after them', () => {
     const plays = (audioCodec: string) =>
       planOnTv(
         mediaItemFor({
@@ -334,7 +334,7 @@ describe('canPlaySurely, for a viewer who would rather not try a maybe', () => {
     expect(sureOn({ platform: APP_PLATFORMS.ios, media: h264 })[0]).toBe(PLAYBACK_MODES.direct)
   })
 
-  it('leaves TrueHD and DTS to the remux on Android TV, and keeps what ExoPlayer surely plays', () => {
+  it('plays TrueHD and DTS as they are on Android TV, which FFmpeg surely decodes', () => {
     const mkvWith = (audioCodec: string) =>
       mediaItemFor({
         container: CONTAINERS.mkv,
@@ -342,16 +342,11 @@ describe('canPlaySurely, for a viewer who would rather not try a maybe', () => {
         videoBitDepth: 10,
         audioCodec,
       })
-    const converted = [PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode]
-    expect(
-      sureOn({ platform: APP_PLATFORMS.androidTv, media: mkvWith(AUDIO_CODECS.truehd) }),
-    ).toEqual(converted)
-    expect(sureOn({ platform: APP_PLATFORMS.androidTv, media: mkvWith(AUDIO_CODECS.dts) })).toEqual(
-      converted,
-    )
-    expect(
-      sureOn({ platform: APP_PLATFORMS.androidTv, media: mkvWith(HLS_COPY_AUDIO_CODECS.eac3) })[0],
-    ).toBe(PLAYBACK_MODES.direct)
+    const sureFirst = (audioCodec: string) =>
+      sureOn({ platform: APP_PLATFORMS.androidTv, media: mkvWith(audioCodec) })[0]
+    expect(sureFirst(AUDIO_CODECS.truehd)).toBe(PLAYBACK_MODES.direct)
+    expect(sureFirst(AUDIO_CODECS.dts)).toBe(PLAYBACK_MODES.direct)
+    expect(sureFirst(HLS_COPY_AUDIO_CODECS.eac3)).toBe(PLAYBACK_MODES.direct)
   })
 
   it('answers every stream as canStream does, since a remux re-tags HEVC and carries AAC', () => {

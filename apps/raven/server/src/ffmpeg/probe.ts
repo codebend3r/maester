@@ -10,6 +10,8 @@ export type ProbeResult = {
   hdr: boolean
   /** Dolby Vision profile 5: no base layer anything but Dolby Vision can show. */
   isDolbyVisionOnly: boolean
+  /** The Dolby Vision profile (5, 7, 8), or null for a picture without Dolby Vision. */
+  dolbyVisionProfile: number | null
   audioCodec: string | null
   audioChannels: number | null
   bitrate: number | null
@@ -209,6 +211,7 @@ export const parseProbe = (output: unknown): ProbeResult | null => {
     videoBitDepth: video ? bitDepthOf(video) : null,
     hdr: video ? isHdr(video) : false,
     isDolbyVisionOnly: video ? isDolbyVisionOnly(video) : false,
+    dolbyVisionProfile: video ? (dolbyVisionOf(video)?.profile ?? null) : null,
     audioCodec: audio && isString(audio.codec_name) ? audio.codec_name : null,
     audioChannels: numeric(audio?.channels),
     bitrate: numeric(format.bit_rate),

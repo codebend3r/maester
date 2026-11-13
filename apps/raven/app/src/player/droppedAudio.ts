@@ -28,8 +28,8 @@ type IsAudioDroppedProps = {
  * Whether the original file is playing without the audio track asked for. ExoPlayer selects no
  * track it can neither decode nor pass through, and reports no error: it plays the picture
  * alone, or another of the file's tracks (a commentary in the wrong language). That is how a
- * maybe in Android TV's table (DTS, TrueHD) refuses, and the player then steps down to the
- * remux, whose audio the server makes E-AC-3. Apple's players are never asked: their table
+ * track no decoder on the TV takes (FFmpeg's included) refuses, and the player then steps down
+ * to the remux, whose audio the server makes E-AC-3. Apple's players are never asked: their table
  * names only audio they decode. Nor is a stream, which carries only the track the session asked
  * the server for.
  */

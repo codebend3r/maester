@@ -126,6 +126,11 @@ export const isMediaItem = object({
    * browser plays it purple and green. Absent from an older server.
    */
   isDolbyVisionOnly: optional(isBoolean),
+  /**
+   * The Dolby Vision profile (5, 7, 8), or null without Dolby Vision. Absent
+   * from an older server, and null until a scan has probed the file again.
+   */
+  dolbyVisionProfile: optional(nullable(isNumber)),
   /** ffprobe codec names: 'aac', 'ac3', 'eac3', 'opus', 'truehd', ... */
   audioCodec: nullable(isString),
   audioChannels: nullable(isNumber),

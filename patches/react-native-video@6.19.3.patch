@@ -1,9 +1,18 @@
-diff --git a/node_modules/react-native-video/.bun-tag-77250d60e6a5526 b/.bun-tag-77250d60e6a5526
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
-diff --git a/node_modules/react-native-video/.bun-tag-c3ccf060cc8e7d97 b/.bun-tag-c3ccf060cc8e7d97
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/android/build.gradle b/android/build.gradle
+index 748b799554aa0f3432432a73ea93435d60a581dc..5c5c5380a60bfd40a5a76789eec14f8d449b92d2 100644
+--- a/android/build.gradle
++++ b/android/build.gradle
+@@ -240,6 +240,10 @@ dependencies {
+         implementation "androidx.media3:media3-exoplayer:$media3_version"
+     }
+ 
++    // raven: Jellyfin's build of Media3's FFmpeg decoder, made for Media3 1.8.0 like the player,
++    // decodes TrueHD and DTS, which the TVs' own decoders do not.
++    implementation "org.jellyfin.media3:media3-ffmpeg-decoder:1.8.0+1"
++
+     if (ExoplayerDependencies["useExoplayerSmoothStreaming"]) {
+         // For Smooth Streaming playback support with ExoPlayer
+         if (media3_buildFromSource) {
 diff --git a/android/src/main/java/com/brentvatne/common/api/SubtitleStyle.kt b/android/src/main/java/com/brentvatne/common/api/SubtitleStyle.kt
 index 1ac0fd03ac0197bf10e54dddb6bb2538a876fd1b..4cb2edeb031c4f77a1d7f30c6757e0dfdbc0ef75 100644
 --- a/android/src/main/java/com/brentvatne/common/api/SubtitleStyle.kt
@@ -39,6 +48,102 @@ index 1ac0fd03ac0197bf10e54dddb6bb2538a876fd1b..4cb2edeb031c4f77a1d7f30c6757e0df
              return subtitleStyle
          }
      }
+diff --git a/android/src/main/java/com/brentvatne/exoplayer/BaseLayerVideoRenderer.java b/android/src/main/java/com/brentvatne/exoplayer/BaseLayerVideoRenderer.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..450ff1f6cf5208d0f14b9659720938f9f627b2d9
+--- /dev/null
++++ b/android/src/main/java/com/brentvatne/exoplayer/BaseLayerVideoRenderer.java
+@@ -0,0 +1,90 @@
++package com.brentvatne.exoplayer;
++
++import android.media.MediaCodecInfo.CodecProfileLevel;
++import android.util.Pair;
++
++import androidx.annotation.Nullable;
++import androidx.media3.common.Format;
++import androidx.media3.common.MimeTypes;
++import androidx.media3.common.util.UnstableApi;
++import androidx.media3.exoplayer.DecoderReuseEvaluation;
++import androidx.media3.exoplayer.ExoPlaybackException;
++import androidx.media3.exoplayer.FormatHolder;
++import androidx.media3.exoplayer.mediacodec.MediaCodecInfo;
++import androidx.media3.exoplayer.mediacodec.MediaCodecSelector;
++import androidx.media3.exoplayer.mediacodec.MediaCodecUtil;
++import androidx.media3.exoplayer.video.MediaCodecVideoRenderer;
++
++import java.util.List;
++
++/**
++ * raven: plays a Dolby Vision profile 7 track on a device with no decoder for that profile as
++ * its HDR10 base layer, on the plain HEVC decoder, as Plex's and Kodi's players do. Profile 7
++ * (UHD Blu-ray remuxes, dual layer) always carries an HDR10 base layer, and an HEVC decoder
++ * skips the enhancement layer and the RPU, which ride in NAL unit types the HEVC spec leaves
++ * unspecified. Media3 already falls back to HEVC for profiles 4 and 8, but not 7: it opens a
++ * Dolby Vision decoder that refuses the profile, and on the Google TV Streamer
++ * (c2.mtk.dvav.ser.decoder) that decoder fails on the first frame. A device that does decode
++ * profile 7 keeps Dolby Vision.
++ */
++@UnstableApi
++final class BaseLayerVideoRenderer extends MediaCodecVideoRenderer {
++
++    private final MediaCodecSelector mediaCodecSelector;
++
++    BaseLayerVideoRenderer(MediaCodecVideoRenderer.Builder builder, MediaCodecSelector mediaCodecSelector) {
++        super(builder.setMediaCodecSelector(mediaCodecSelector));
++        this.mediaCodecSelector = mediaCodecSelector;
++    }
++
++    @Override
++    protected int supportsFormat(MediaCodecSelector mediaCodecSelector, Format format)
++            throws MediaCodecUtil.DecoderQueryException {
++        return super.supportsFormat(mediaCodecSelector, baseLayerOf(mediaCodecSelector, format));
++    }
++
++    @Override
++    protected List<MediaCodecInfo> getDecoderInfos(
++            MediaCodecSelector mediaCodecSelector, Format format, boolean requiresSecureDecoder)
++            throws MediaCodecUtil.DecoderQueryException {
++        return super.getDecoderInfos(
++                mediaCodecSelector, baseLayerOf(mediaCodecSelector, format), requiresSecureDecoder);
++    }
++
++    @Override
++    @Nullable
++    protected DecoderReuseEvaluation onInputFormatChanged(FormatHolder formatHolder)
++            throws ExoPlaybackException {
++        @Nullable Format format = formatHolder.format;
++        if (format != null) {
++            try {
++                formatHolder.format = baseLayerOf(mediaCodecSelector, format);
++            } catch (MediaCodecUtil.DecoderQueryException e) {
++                // Left as it is: the decoder query failing here fails the same way in super.
++            }
++        }
++        return super.onInputFormatChanged(formatHolder);
++    }
++
++    /** The format as the HEVC base layer when it is profile 7 and no Dolby Vision decoder takes it. */
++    private static Format baseLayerOf(MediaCodecSelector mediaCodecSelector, Format format)
++            throws MediaCodecUtil.DecoderQueryException {
++        if (!MimeTypes.VIDEO_DOLBY_VISION.equals(format.sampleMimeType)) return format;
++        @Nullable Pair<Integer, Integer> profileAndLevel = MediaCodecUtil.getCodecProfileAndLevel(format);
++        if (profileAndLevel == null || profileAndLevel.first != CodecProfileLevel.DolbyVisionProfileDvheDtb) {
++            return format;
++        }
++        if (isDecodedAsDolbyVision(mediaCodecSelector, format)) return format;
++        return format.buildUpon().setSampleMimeType(MimeTypes.VIDEO_H265).setCodecs(null).build();
++    }
++
++    private static boolean isDecodedAsDolbyVision(MediaCodecSelector mediaCodecSelector, Format format)
++            throws MediaCodecUtil.DecoderQueryException {
++        List<MediaCodecInfo> decoders =
++                mediaCodecSelector.getDecoderInfos(MimeTypes.VIDEO_DOLBY_VISION, false, false);
++        for (MediaCodecInfo decoder : decoders) {
++            if (decoder.isFormatSupported(format)) return true;
++        }
++        return false;
++    }
++}
 diff --git a/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt b/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
 index 75e2307fc6616aff7f0f9d884c907b4bdad14899..84fea8be6ba76a2fa536c58a6407a56fc2d8168d 100644
 --- a/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
@@ -95,10 +200,10 @@ index 75e2307fc6616aff7f0f9d884c907b4bdad14899..84fea8be6ba76a2fa536c58a6407a56f
              // Apply custom styling
              if (style.fontSize > 0) {
 diff --git a/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java b/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
-index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..c6edc359598134edbe0648c6e54eef19ca0a9150 100644
+index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..24d689af4bae0acaff3776f45c7b5fd621a3a000 100644
 --- a/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
 +++ b/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
-@@ -59,6 +59,9 @@ import androidx.media3.datasource.DefaultDataSource;
+@@ -59,8 +59,12 @@ import androidx.media3.datasource.DefaultDataSource;
  import androidx.media3.datasource.HttpDataSource;
  import androidx.media3.exoplayer.DefaultLoadControl;
  import androidx.media3.exoplayer.DefaultRenderersFactory;
@@ -107,8 +212,28 @@ index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..c6edc359598134edbe0648c6e54eef19
 +import androidx.media3.exoplayer.audio.DefaultAudioSink;
  import androidx.media3.exoplayer.ExoPlayer;
  import androidx.media3.exoplayer.LoadControl;
++import androidx.media3.exoplayer.Renderer;
  import androidx.media3.exoplayer.analytics.PlayerId;
-@@ -819,8 +822,24 @@ public class ReactExoplayerView extends FrameLayout implements
+ import androidx.media3.exoplayer.dash.DashMediaSource;
+ import androidx.media3.exoplayer.dash.DashUtil;
+@@ -82,6 +86,7 @@ import androidx.media3.exoplayer.ima.ImaAdsLoader;
+ import androidx.media3.exoplayer.ima.ImaServerSideAdInsertionMediaSource;
+ import androidx.media3.exoplayer.ima.ImaServerSideAdInsertionUriBuilder;
+ import androidx.media3.exoplayer.mediacodec.MediaCodecInfo;
++import androidx.media3.exoplayer.mediacodec.MediaCodecSelector;
+ import androidx.media3.exoplayer.mediacodec.MediaCodecUtil;
+ import androidx.media3.exoplayer.rtsp.RtspMediaSource;
+ import androidx.media3.exoplayer.smoothstreaming.DefaultSsChunkSource;
+@@ -105,6 +110,8 @@ import androidx.media3.exoplayer.upstream.CmcdConfiguration;
+ import androidx.media3.exoplayer.upstream.DefaultAllocator;
+ import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter;
+ import androidx.media3.exoplayer.util.EventLogger;
++import androidx.media3.exoplayer.video.MediaCodecVideoRenderer;
++import androidx.media3.exoplayer.video.VideoRendererEventListener;
+ import androidx.media3.extractor.metadata.emsg.EventMessage;
+ import androidx.media3.extractor.metadata.id3.Id3Frame;
+ import androidx.media3.extractor.metadata.id3.TextInformationFrame;
+@@ -819,9 +826,50 @@ public class ReactExoplayerView extends FrameLayout implements
              this.bandwidthMeter = config.getBandwidthMeter();
          }
  
@@ -118,6 +243,7 @@ index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..c6edc359598134edbe0648c6e54eef19
 +        // sound. A sink without a context keeps these PCM-only capabilities for good.
          DefaultRenderersFactory renderersFactory =
 -                new DefaultRenderersFactory(getContext())
+-                        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
 +                new DefaultRenderersFactory(getContext()) {
 +                    @Override
 +                    protected AudioSink buildAudioSink(
@@ -130,11 +256,37 @@ index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..c6edc359598134edbe0648c6e54eef19
 +                                .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
 +                                .build();
 +                    }
++
++                    // raven: the platform's video renderer alone, with Dolby Vision profile 7 falling
++                    // back to its HDR10 base layer where no decoder takes the profile. FFmpeg's
++                    // experimental video renderer, the one extension here, refuses every format.
++                    @Override
++                    protected void buildVideoRenderers(
++                            Context context,
++                            int extensionRendererMode,
++                            MediaCodecSelector mediaCodecSelector,
++                            boolean enableDecoderFallback,
++                            Handler eventHandler,
++                            VideoRendererEventListener eventListener,
++                            long allowedVideoJoiningTimeMs,
++                            ArrayList<Renderer> out) {
++                        MediaCodecVideoRenderer.Builder builder = new MediaCodecVideoRenderer.Builder(context)
++                                .setCodecAdapterFactory(getCodecAdapterFactory())
++                                .setAllowedJoiningTimeMs(allowedVideoJoiningTimeMs)
++                                .setEnableDecoderFallback(enableDecoderFallback)
++                                .setEventHandler(eventHandler)
++                                .setEventListener(eventListener)
++                                .setMaxDroppedFramesToNotify(MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY);
++                        out.add(new BaseLayerVideoRenderer(builder, mediaCodecSelector));
++                    }
 +                }
-                         .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
++                        // raven: FFmpeg (Jellyfin's Media3 build) decodes to PCM what no platform
++                        // decoder does, TrueHD and DTS among them, so those files play as they are.
++                        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
                          .setEnableDecoderFallback(true)
                          .forceEnableMediaCodecAsynchronousQueueing();
-@@ -1212,6 +1231,16 @@ public class ReactExoplayerView extends FrameLayout implements
+ 
+@@ -1212,6 +1260,16 @@ public class ReactExoplayerView extends FrameLayout implements
              }
          }
  
@@ -151,7 +303,74 @@ index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..c6edc359598134edbe0648c6e54eef19
          if (cmcdConfigurationFactory != null) {
              mediaSourceFactory = mediaSourceFactory.setCmcdConfigurationFactory(
                      cmcdConfigurationFactory::createCmcdConfiguration
-@@ -2235,11 +2264,16 @@ public class ReactExoplayerView extends FrameLayout implements
+@@ -1627,38 +1685,42 @@ public class ReactExoplayerView extends FrameLayout implements
+                 && selection.indexOf( trackIndex ) != C.INDEX_UNSET;
+     }
+ 
+-    private ArrayList<Track> getAudioTrackInfo() {
+-        ArrayList<Track> audioTracks = new ArrayList<>();
+-        if (trackSelector == null) {
+-            return audioTracks;
++    // raven: every audio track group in the file's order, whichever audio renderer Media3 mapped it
++    // to. With FFmpeg's renderer beside the platform's, TrueHD and DTS map to one and the rest to
++    // the other, so one renderer's groups would leave tracks out and number the rest wrongly.
++    private List<Tracks.Group> audioTrackGroups() {
++        List<Tracks.Group> groups = new ArrayList<>();
++        for (Tracks.Group group : player.getCurrentTracks().getGroups()) {
++            if (group.getType() == C.TRACK_TYPE_AUDIO) groups.add(group);
+         }
++        return groups;
++    }
+ 
+-        MappingTrackSelector.MappedTrackInfo info = trackSelector.getCurrentMappedTrackInfo();
+-        int index = getTrackRendererIndex(C.TRACK_TYPE_AUDIO);
+-        if (info == null || index == C.INDEX_UNSET) {
+-            return audioTracks;
++    private TrackGroupArray audioTrackGroupArray() {
++        List<Tracks.Group> groups = audioTrackGroups();
++        TrackGroup[] mediaGroups = new TrackGroup[groups.size()];
++        for (int index = 0; index < mediaGroups.length; index++) {
++            mediaGroups[index] = groups.get(index).getMediaTrackGroup();
+         }
+-        TrackGroupArray groups = info.getTrackGroups(index);
+-        TrackSelectionArray selectionArray = player.getCurrentTrackSelections();
+-        TrackSelection selection = selectionArray.get(C.TRACK_TYPE_AUDIO);
++        return new TrackGroupArray(mediaGroups);
++    }
+ 
++    private ArrayList<Track> getAudioTrackInfo() {
++        ArrayList<Track> audioTracks = new ArrayList<>();
++        if (trackSelector == null || player == null) {
++            return audioTracks;
++        }
+ 
+-        for (int groupIndex = 0; groupIndex < groups.length; ++groupIndex) {
+-            TrackGroup group = groups.get(groupIndex);
+-            Format format = group.getFormat(0);
+-            
+-            // Check if this specific group is the currently selected one
+-            boolean isSelected = false;
+-            if (selection != null && selection.getTrackGroup() == group) {
+-                isSelected = true;
+-            }
+-            
+-            Track audioTrack = exoplayerTrackToGenericTrack(format, groupIndex, selection, group);
++        List<Tracks.Group> groups = audioTrackGroups();
++        for (int groupIndex = 0; groupIndex < groups.size(); ++groupIndex) {
++            Tracks.Group group = groups.get(groupIndex);
++            Format format = group.getTrackFormat(0);
++            Track audioTrack = exoplayerTrackToGenericTrack(format, groupIndex, null, group.getMediaTrackGroup());
+             audioTrack.setBitrate(format.bitrate == Format.NO_VALUE ? 0 : format.bitrate);
+-            audioTrack.setSelected(isSelected);
++            audioTrack.setSelected(group.isSelected());
+             audioTracks.add(audioTrack);
+         }
+-        
++
+         return audioTracks;
+     }
+ 
+@@ -2235,11 +2297,16 @@ public class ReactExoplayerView extends FrameLayout implements
                  if (textRendererIndex != C.INDEX_UNSET) {
                      TrackGroupArray groups = info.getTrackGroups(textRendererIndex);
                      boolean trackFound = false;
@@ -168,7 +387,7 @@ index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..c6edc359598134edbe0648c6e54eef19
                              
                              boolean isMatch = false;
                              if ("language".equals(type) && format.language != null && format.language.equals(value)) {
-@@ -2248,7 +2282,7 @@ public class ReactExoplayerView extends FrameLayout implements
+@@ -2248,7 +2315,7 @@ public class ReactExoplayerView extends FrameLayout implements
                                  isMatch = true;
                              } else if ("index".equals(type)) {
                                  int targetIndex = ReactBridgeUtils.safeParseInt(value, -1);
@@ -177,6 +396,30 @@ index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..c6edc359598134edbe0648c6e54eef19
                                      isMatch = true;
                                  }
                              }
+@@ -2303,7 +2370,7 @@ public class ReactExoplayerView extends FrameLayout implements
+             return;
+         }
+ 
+-        TrackGroupArray groups = info.getTrackGroups(rendererIndex);
++        TrackGroupArray groups = trackType == C.TRACK_TYPE_AUDIO ? audioTrackGroupArray() : info.getTrackGroups(rendererIndex);
+         int groupIndex = C.INDEX_UNSET;
+         List<Integer> tracks = new ArrayList<>();
+         tracks.add(0);
+@@ -2451,6 +2518,14 @@ public class ReactExoplayerView extends FrameLayout implements
+                     .setExceedRendererCapabilitiesIfNecessary(true)
+                     .setExceedVideoConstraintsIfNecessary(true)
+                     .setRendererDisabled(rendererIndex, false);
++            // raven: the track picked may be FFmpeg's renderer's, not the first audio renderer's.
++            if (trackType == C.TRACK_TYPE_AUDIO) {
++                for (int index = 0; index < player.getRendererCount(); index++) {
++                    if (player.getRendererType(index) == C.TRACK_TYPE_AUDIO) {
++                        selectionParameters.setRendererDisabled(index, false);
++                    }
++                }
++            }
+ 
+             // Clear existing overrides for this track type to avoid conflicts  
+             // But be careful with audio tracks - don't clear unless explicitly selecting a different track
 diff --git a/lib/types/video.d.ts b/lib/types/video.d.ts
 index 9796b236bb4465687aea18a6abf31e4a77f249da..9f082c6627e7cc9e5353df6908629959fd248415 100644
 --- a/lib/types/video.d.ts

@@ -81,13 +81,18 @@ const RANGE_LOOKS: Readonly<Record<string, RangeLook>> = {
     className: styles.dolbyVisionOnly,
     label: RESOLUTION_CHIP_COPY.dolbyVisionOnly,
   },
+  [PICTURE_RANGES.dolbyVisionDualLayer]: {
+    className: styles.dolbyVisionDualLayer,
+    label: RESOLUTION_CHIP_COPY.dolbyVisionDualLayer,
+  },
 }
 
 type RangeChipProps = { range: string }
 
 /**
  * A picture's high range of light (`HDR`, `Dolby Vision`) as a chip of its
- * own colour; `DV5`, which a browser cannot show, in a warning's.
+ * own colour; `DV5`, which a browser cannot show, in a warning's, and `DV7`,
+ * a 4K Blu-ray's, in one of its own.
  */
 export const RangeChip = ({ range }: RangeChipProps) => {
   const look = RANGE_LOOKS[range]

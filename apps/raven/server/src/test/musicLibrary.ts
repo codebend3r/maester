@@ -83,6 +83,7 @@ export const musicLibrary = (database: DatabaseService) => {
         videoBitDepth: null,
         hdr: false,
         isDolbyVisionOnly: false,
+        dolbyVisionProfile: null,
         audioCodec: 'flac',
         audioChannels: 2,
         bitrate: 900000,

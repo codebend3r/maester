@@ -17,6 +17,12 @@ import { STREAM_TIME_SHIFT } from '@raven/core'
  * stream as fast as it plays is reported once, so the player can step
  * down to a lighter one instead of stalling every few seconds.
  *
+ * A response cut off partway, by a proxy, a dropped connection or the
+ * server ending what it holds open, picks up again from the end of what
+ * is buffered, on a fresh request with the newest ticket, and keeps what
+ * is buffered. Only cuts that deliver nothing in between add up to a
+ * failure.
+ *
  * The browser objects are described structurally so tests can stand in for
  * them; the real ones satisfy these types.
  */
@@ -116,6 +122,8 @@ type SessionState = {
   meter: Meter | null
   /** A slow stream is reported once a session. */
   reportedSlow: boolean
+  /** Cuts in a row with nothing delivered since the last one. */
+  cuts: number
 }
 
 /** Stop reading while this much is buffered ahead of the playhead. */
@@ -147,6 +155,16 @@ const SLOW_PACE = 1
  * timed a fragment short, from costing the picture.
  */
 const SLOW_AHEAD_SECONDS = 10
+/** Cuts in a row, each delivering nothing, after which a stream has failed. */
+const MAX_CUTS = 3
+
+/** A response body that broke off partway, rather than ending or being aborted. */
+class StreamCut extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : 'The converted video stopped.', { cause })
+    this.name = 'StreamCut'
+  }
+}
 
 const rangesOf = (ranges: Ranges): Array<[number, number]> =>
   Array.from({ length: ranges.length }, (_, index): [number, number] => [
@@ -275,6 +293,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
     detach: () => {},
     meter: null,
     reportedSlow: false,
+    cuts: 0,
   }
   const source = environment.createMediaSource()
 
@@ -423,7 +442,9 @@ export const createStreamSession = <S extends MediaSourceLike>({
       await reader.cancel().catch(() => undefined)
       return
     }
-    const { done, value } = await reader.read()
+    const { done, value } = await reader.read().catch((error: unknown) => {
+      throw isAbort(error) ? error : new StreamCut(error)
+    })
     if (!current(generation)) {
       await reader.cancel().catch(() => undefined)
       return
@@ -436,12 +457,21 @@ export const createStreamSession = <S extends MediaSourceLike>({
       return
     }
     await append({ buffer, chunk: value, generation })
-    if (current(generation)) measure({ buffer, bytes: value.byteLength })
+    if (!current(generation)) return
+    state.cuts = 0
+    measure({ buffer, bytes: value.byteLength })
     return pump({ reader, buffer, generation })
   }
 
-  /** Throws away what is buffered and streams from `from` (file time) onwards. */
-  const load = async (from: number): Promise<void> => {
+  type LoadProps = {
+    /** File time to stream from. */
+    from: number
+    /** Keep what is buffered, as picking a cut stream up again does, instead of throwing it away. */
+    isResuming?: boolean
+  }
+
+  /** Streams from `from` onwards, by default throwing away what is buffered. */
+  const load = async ({ from, isResuming = false }: LoadProps): Promise<void> => {
     const buffer = state.buffer
     if (!buffer || state.destroyed) return
     state.generation += 1
@@ -459,7 +489,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
        * it throws once the stream has ended, which leaves nothing held.
        */
       if (source?.readyState === MEDIA_SOURCE_STATES.open) buffer.abort()
-      if (buffer.buffered.length > 0) {
+      if (!isResuming && buffer.buffered.length > 0) {
         buffer.remove(0, Infinity)
         await updateEnd(buffer)
       }
@@ -477,6 +507,13 @@ export const createStreamSession = <S extends MediaSourceLike>({
       }
       await pump({ reader: response.body.getReader(), buffer, generation })
     } catch (error) {
+      if (current(generation) && error instanceof StreamCut && state.cuts < MAX_CUTS) {
+        state.cuts += 1
+        await settle(buffer)
+        if (!current(generation)) return
+        void load({ from: deliveredEdge(buffer) - STREAM_TIME_SHIFT, isResuming: true })
+        return
+      }
       if (current(generation) && !isAbort(error)) {
         fail(error instanceof Error ? error.message : 'The converted video stopped.')
       }
@@ -500,7 +537,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
     if (!buffer || rangeAt({ ranges: buffer.buffered, time: video.currentTime })) return
     const time = video.currentTime - STREAM_TIME_SHIFT
     if (reachable({ buffer, time })) return
-    void load(time)
+    void load({ from: time })
   }
 
   const onOpen = () => {
@@ -515,7 +552,7 @@ export const createStreamSession = <S extends MediaSourceLike>({
     if (duration != null && duration > 0) source.duration = duration + STREAM_TIME_SHIFT
     video.currentTime = start + STREAM_TIME_SHIFT
     video.addEventListener(STREAM_EVENTS.seeking, onSeeking)
-    void load(start)
+    void load({ from: start })
   }
 
   if (!source) {

@@ -54,6 +54,7 @@ type MediaRow = {
   video_bit_depth: number | null
   hdr: number
   dolby_vision_only: number
+  dolby_vision_profile: number | null
   audio_codec: string | null
   audio_channels: number | null
   bitrate: number | null
@@ -148,6 +149,7 @@ const toItem = (row: MediaRow): MediaItem => ({
   videoBitDepth: row.video_bit_depth,
   hdr: row.hdr === 1,
   isDolbyVisionOnly: row.dolby_vision_only === 1,
+  dolbyVisionProfile: row.dolby_vision_profile,
   audioCodec: row.audio_codec,
   audioChannels: row.audio_channels,
   bitrate: row.bitrate,

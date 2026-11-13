@@ -451,19 +451,26 @@ jobs:
 
       # Every flow in `apps/raven/app/e2e`, each signing in with the PIN and the admin password
       # first. A fresh runner can start Maestro's XCTest driver slower than it waits by default,
-      # so it waits five minutes (in milliseconds).
+      # so it waits five minutes (in milliseconds). A busy macOS runner can still miss even
+      # that, before any flow runs, so a driver that never came up is retried once as a dead
+      # screenshot service is.
       - name: 🎬 App end to end
         env:
           MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
         run: |
-          if bun run app:e2e; then
+          set -o pipefail
+          first="$RUNNER_TEMP/app-e2e-first.log"
+          if bun run app:e2e 2>&1 | tee "$first"; then
             exit 0
           fi
           # Maestro's XCTest server dies on a screenshot timeout (upstream #3538).
-          if ! grep -R -F -q 'Failed to get screenshot: Timed out while requesting screenshot.' "$HOME/.maestro/tests"; then
+          if grep -R -F -q 'Failed to get screenshot: Timed out while requesting screenshot.' "$HOME/.maestro/tests"; then
+            echo '::warning::Maestro screenshot service timed out; rebooting the simulator and retrying once'
+          elif grep -F -q 'iOS driver not ready in time' "$first"; then
+            echo "::warning::Maestro's iOS driver did not start in time; rebooting the simulator and retrying once"
+          else
             exit 1
           fi
-          echo '::warning::Maestro screenshot service timed out; rebooting the simulator and retrying once'
           xcrun simctl shutdown raven-phone
           xcrun simctl boot raven-phone
           xcrun simctl bootstatus raven-phone -b

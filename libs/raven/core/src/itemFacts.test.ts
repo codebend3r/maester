@@ -103,10 +103,10 @@ describe('versionFacts', () => {
 describe('rangeLabel', () => {
   it('names profile 5 DV5 over HDR, any other HDR HDR, SDR nothing, and an older server by HDR alone', () => {
     expect([
-      rangeLabel({ hdr: true, isDolbyVisionOnly: true }),
-      rangeLabel({ hdr: true, isDolbyVisionOnly: false }),
-      rangeLabel({ hdr: false, isDolbyVisionOnly: false }),
-      rangeLabel({ hdr: true, isDolbyVisionOnly: undefined }),
+      rangeLabel({ hdr: true, isDolbyVisionOnly: true, dolbyVisionProfile: null }),
+      rangeLabel({ hdr: true, isDolbyVisionOnly: false, dolbyVisionProfile: null }),
+      rangeLabel({ hdr: false, isDolbyVisionOnly: false, dolbyVisionProfile: null }),
+      rangeLabel({ hdr: true, isDolbyVisionOnly: undefined, dolbyVisionProfile: undefined }),
     ]).toEqual(['DV5', 'HDR', null, 'HDR'])
   })
 
@@ -114,6 +114,13 @@ describe('rangeLabel', () => {
     const media = mediaItem({ width: 3840, height: 2160, hdr: true, isDolbyVisionOnly: true })
     expect(versionFacts(media)).toContain('DV5')
     expect(splitPictureRest('(HEVC) DV5')).toEqual({ codec: 'HEVC', range: 'DV5', words: null })
+  })
+
+  it('names profile 7 DV7 over HDR, and reads it back as a range', () => {
+    expect(rangeLabel({ hdr: true, isDolbyVisionOnly: false, dolbyVisionProfile: 7 })).toBe('DV7')
+    const media = mediaItem({ width: 3840, height: 2160, hdr: true, dolbyVisionProfile: 7 })
+    expect(versionFacts(media)).toContain('DV7')
+    expect(wordPart('DV7')).toEqual({ kind: FACT_PART_KINDS.range, text: 'DV7' })
   })
 })
 
@@ -300,6 +307,14 @@ describe('seasons and episodes', () => {
     expect(episodeRowFacts(episodeSummary({ released: null, runtime: 54, primary }))).toEqual([
       '55m',
       'DV5',
+    ])
+  })
+
+  it('marks an episode row whose file is Dolby Vision profile 7', () => {
+    const primary = mediaItem({ duration: 3300, hdr: true, dolbyVisionProfile: 7 })
+    expect(episodeRowFacts(episodeSummary({ released: null, runtime: 54, primary }))).toEqual([
+      '55m',
+      'DV7',
     ])
   })
 })

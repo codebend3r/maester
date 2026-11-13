@@ -61,6 +61,7 @@ describe('parseProbe', () => {
       videoBitDepth: 10,
       hdr: true,
       isDolbyVisionOnly: false,
+      dolbyVisionProfile: null,
       audioCodec: 'eac3',
       audioChannels: 6,
       bitrate: 13515263,
@@ -124,6 +125,31 @@ describe('parseProbe', () => {
       true,
       false,
     ])
+  })
+
+  it('keeps the Dolby Vision profile, and none for a picture without Dolby Vision', () => {
+    type ProfileOfProps = { profile: number; compatibility: number }
+    const profileOf = ({ profile, compatibility }: ProfileOfProps) =>
+      parseProbe({
+        streams: [
+          {
+            codec_name: 'hevc',
+            codec_type: 'video',
+            side_data_list: [
+              { ...DV5_RECORD, dv_profile: profile, dv_bl_signal_compatibility_id: compatibility },
+            ],
+          },
+        ],
+        format: {},
+      })?.dolbyVisionProfile ?? null
+    expect(
+      [
+        { profile: 5, compatibility: 0 },
+        { profile: 7, compatibility: 6 },
+        { profile: 8, compatibility: 1 },
+      ].map((record) => profileOf(record)),
+    ).toEqual([5, 7, 8])
+    expect(parseProbe(hdrEpisode)?.dolbyVisionProfile ?? null).toBeNull()
   })
 
   it('returns null for a file with nothing playable', () => {

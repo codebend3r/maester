@@ -39,6 +39,7 @@ export const CHIP_COLOURS = {
   hevc: fixed(CHIP_TOKENS.hevc),
   hdr: fixed(CHIP_TOKENS.hdr),
   dolbyVisionOnly: fixed(CHIP_TOKENS.dolbyVisionOnly),
+  dolbyVisionDualLayer: fixed(CHIP_TOKENS.dolbyVisionDualLayer),
 } as const satisfies Record<keyof typeof CHIP_TOKENS, string>
 
 /**

@@ -1070,6 +1070,14 @@ export const MIGRATIONS: readonly string[] = [
   ) WITHOUT ROWID;
   CREATE INDEX download_requests_account ON download_requests (account_id, requested_at);
   `,
+  /*
+   * The Dolby Vision profile, so profile 7, a 4K Blu-ray's, wears a chip of its own. Only an HDR
+   * file can be Dolby Vision, so those alone are probed again by the next scan someone starts.
+   */
+  `
+  ALTER TABLE media ADD COLUMN dolby_vision_profile INTEGER;
+  UPDATE media SET probed = 0 WHERE hdr = 1;
+  `,
 ]
 
 /** The index's file in the data folder. Before raven was renamed it was `weirwood.db`. */
