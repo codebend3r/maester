@@ -10,7 +10,7 @@ import {
   refusalBody,
   setupRelay,
 } from '@/main/test/relayFakes'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS } from '@shared/http'
 
 afterEach(closeRelayServers)
 
@@ -50,13 +50,13 @@ describe('a relayed HLS transcode', () => {
 
   const playlist = (body: string): Answer => ({
     status: 200,
-    headers: { [HTTP_HEADERS.contentType]: PLAYLIST_TYPE },
+    headers: { [HEADERS.contentType]: PLAYLIST_TYPE },
     body,
   })
 
   const segment: Answer = {
     status: 200,
-    headers: { [HTTP_HEADERS.contentType]: 'video/iso.segment', [HTTP_HEADERS.contentLength]: '3' },
+    headers: { [HEADERS.contentType]: 'video/iso.segment', [HEADERS.contentLength]: '3' },
     body: 'seg',
   }
 
@@ -90,7 +90,7 @@ describe('a relayed HLS transcode', () => {
     expect(opened.sidecarUrls).toEqual([`${opened.base}/subtitles/external-0`])
     const response = await fetch(opened.fileUrl)
     expect(response.status).toBe(200)
-    expect(response.headers.get(HTTP_HEADERS.contentType)).toBe(PLAYLIST_TYPE)
+    expect(response.headers.get(HEADERS.contentType)).toBe(PLAYLIST_TYPE)
     const text = await response.text()
     expect(text).toBe(
       [
@@ -101,7 +101,7 @@ describe('a relayed HLS transcode', () => {
         '',
       ].join('\n'),
     )
-    expect(response.headers.get(HTTP_HEADERS.contentLength)).toBe(String(text.length))
+    expect(response.headers.get(HEADERS.contentLength)).toBe(String(text.length))
     expect(heard.map(({ url }) => url)).toEqual([
       'https://raven.example/api/media/7/hls/master.m3u8?mode=transcode&quality=high720&t=account.t1',
     ])
@@ -127,7 +127,7 @@ describe('a relayed HLS transcode', () => {
     expect(video).not.toContain('cap-')
     expect((await fetch(`${base}/hls/init.mp4`)).status).toBe(200)
     const piece = await fetch(`${base}/hls/segment/0.m4s`, {
-      headers: { [HTTP_HEADERS.range]: 'bytes=0-2' },
+      headers: { [HEADERS.range]: 'bytes=0-2' },
     })
     expect(await piece.text()).toBe('seg')
     const session = `https://raven.example/api/media/7/hls/${SESSION_A}`
@@ -136,7 +136,7 @@ describe('a relayed HLS transcode', () => {
       { url: `${session}/init?t=cap-${SESSION_A}`, headers: {} },
       {
         url: `${session}/segment/0?t=cap-${SESSION_A}`,
-        headers: { [HTTP_HEADERS.range]: 'bytes=0-2' },
+        headers: { [HEADERS.range]: 'bytes=0-2' },
       },
     ])
     // The session's key opens its parts: no ticket is minted past the master's.
@@ -147,7 +147,7 @@ describe('a relayed HLS transcode', () => {
     const { answer } = hlsServer()
     const { relay, heard } = setupRelay({ answer })
     const { fileUrl } = await relay.open(HLS_OPEN)
-    const response = await fetch(fileUrl, { headers: { [HTTP_HEADERS.range]: 'bytes=0-' } })
+    const response = await fetch(fileUrl, { headers: { [HEADERS.range]: 'bytes=0-' } })
     expect(response.status).toBe(200)
     expect(heard.map(({ headers }) => headers)).toEqual([{}])
   })
@@ -217,7 +217,7 @@ describe('a relayed HLS transcode', () => {
     const response = await fetch(fileUrl)
     expect(response.status).toBe(502)
     expect(await response.text()).toBe('')
-    expect(warnings).toEqual(['Vhagar sent a playlist the relay does not pass on'])
+    expect(warnings).toEqual(['raven sent a playlist the relay does not pass on'])
   })
 
   test('HEAD of a playlist answers its type and no body', async () => {
@@ -226,7 +226,7 @@ describe('a relayed HLS transcode', () => {
     const { fileUrl } = await relay.open(HLS_OPEN)
     const response = await fetch(fileUrl, { method: HTTP_METHODS.head })
     expect(response.status).toBe(200)
-    expect(response.headers.get(HTTP_HEADERS.contentType)).toBe(PLAYLIST_TYPE)
+    expect(response.headers.get(HEADERS.contentType)).toBe(PLAYLIST_TYPE)
     expect(heard.map(({ method }) => method)).toEqual([HTTP_METHODS.head])
   })
 

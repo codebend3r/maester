@@ -66,6 +66,7 @@
       "dependencies": {
         "@raven/core": "workspace:*",
         "@raven/mpv": "workspace:*",
+        "@shared/http": "workspace:*",
       },
       "devDependencies": {
         "@electron-forge/cli": "8.0.1",

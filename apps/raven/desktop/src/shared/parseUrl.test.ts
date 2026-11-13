@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'bun:test'
-import { type DownloadRequest, type PlayRequest, downloadLinkFor, playLinkFor } from '@raven/core'
-import { MAX_LINK_LENGTH, readDownloadLink, readPlayLink } from '@/shared/playLink'
+import {
+  type DownloadRequest,
+  MAX_LINK_LENGTH,
+  type PlayRequest,
+  downloadLinkFor,
+  playLinkFor,
+  readDownloadLink as readDownloadWith,
+  readPlayLink as readPlayWith,
+} from '@raven/core'
+import { parseUrl } from '@/shared/parseUrl'
+
+// Core's readers as main runs them, over WHATWG's parse.
+const readPlayLink = (link: string) => readPlayWith({ link, parse: parseUrl })
+const readDownloadLink = (link: string) => readDownloadWith({ link, parse: parseUrl })
 
 describe('readPlayLink', () => {
   const server = 'server=https%3A%2F%2Fraven.example'

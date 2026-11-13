@@ -1,7 +1,7 @@
 import { isBoolean, isString, listOf, object } from '@raven/core'
 import { NATIVE_TARGETS, type NativeTarget } from '@raven/mpv'
 import { parseJson } from '@/main/parseJson'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS, HTTP_STATUSES } from '@shared/http'
 
 export const RELEASES_URL = 'https://api.github.com/repos/codebend3r/maester/releases?per_page=100'
 const GITHUB_API_ORIGIN = 'https://api.github.com'
@@ -221,7 +221,7 @@ type LinkOfProps = { get: (name: string) => string | null }
 /** The header GitHub names the next page of the list in. */
 const linkOf = (headers: LinkOfProps): string | null => {
   try {
-    return headers.get(HTTP_HEADERS.link)
+    return headers.get(HEADERS.link)
   } catch {
     return null
   }
@@ -246,11 +246,15 @@ const readPage = async ({
   const response = await Promise.resolve()
     .then(() => fetch({ url, init }))
     .catch(() => null)
-  if (!response) return { ok: false, problem: UPDATE_PROBLEMS.unreachable }
-  if (response.status === 403 || response.status === 429) {
+  if (response === null) return { ok: false, problem: UPDATE_PROBLEMS.unreachable }
+  if (
+    response.status === HTTP_STATUSES.forbidden ||
+    response.status === HTTP_STATUSES.tooManyRequests
+  ) {
     return { ok: false, problem: UPDATE_PROBLEMS.busy }
   }
-  if (response.status !== 200) return { ok: false, problem: UPDATE_PROBLEMS.unreadable }
+  if (response.status !== HTTP_STATUSES.ok)
+    return { ok: false, problem: UPDATE_PROBLEMS.unreadable }
   const text = await Promise.resolve()
     .then(() => response.text())
     .catch(() => null)
@@ -327,8 +331,8 @@ export const checkForUpdates = async ({
   // One deadline for every page, so the whole check is bounded, not each request.
   const init = {
     headers: {
-      [HTTP_HEADERS.accept]: 'application/vnd.github+json',
-      [HTTP_HEADERS.userAgent]: `raven-player/${current}`,
+      [HEADERS.accept]: 'application/vnd.github+json',
+      [HEADERS.userAgent]: `raven-player/${current}`,
     },
     signal: AbortSignal.timeout(UPDATE_TIMEOUT_MS),
   }

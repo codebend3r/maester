@@ -4,7 +4,6 @@ import {
   AUDIO_BITRATE_PARAM,
   type AudioBitrate,
   AUTH_REFUSALS,
-  type AuthRefusal,
   isMediaId,
   isSidecarTrackId,
   LOCKED_STATUS,
@@ -12,7 +11,7 @@ import {
   type StreamQuality,
   toQueryString,
 } from '@raven/core'
-import type { ServerEntry } from '@/main/desktopConfig'
+import { SERVER_NAME } from '@/main/desktopConfig'
 import { quietly } from '@/main/log/quietly'
 import {
   HLS_MASTER_PATH,
@@ -37,7 +36,7 @@ import {
   MEDIA_TRANSCODE_PATH,
   subtitlePathOf,
 } from '@/main/servers/allowlist'
-import { accountRefusalOf, readShort } from '@/main/servers/authRefusals'
+import { accountRefusalOf, type AccountRefusal, readShort } from '@/main/servers/authRefusals'
 import {
   discard,
   type Fetched,
@@ -49,10 +48,8 @@ import {
   type Upstream,
   type UpstreamFetch,
 } from '@/main/servers/relayUpstream'
-import { loggable } from '@/main/servers/serverCalls'
-import type { Timers } from '@/main/stateStore'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
+import type { Timers } from '@/main/timers'
+import { HEADERS, HTTP_STATUSES, isSuccessStatus } from '@shared/http'
 
 /** The relay listens here alone, so nothing off this Mac can reach it. */
 export const RELAY_HOST = '127.0.0.1'
@@ -73,10 +70,10 @@ const STREAM_EVENTS = { close: 'close', drain: 'drain', error: 'error' } as cons
 
 /** The upstream headers mpv hears back; nothing else the server sends crosses the relay. */
 const PASSED_HEADERS = [
-  HTTP_HEADERS.contentType,
-  HTTP_HEADERS.contentLength,
-  HTTP_HEADERS.contentRange,
-  HTTP_HEADERS.acceptRanges,
+  HEADERS.contentType,
+  HEADERS.contentLength,
+  HEADERS.contentRange,
+  HEADERS.acceptRanges,
 ] as const
 
 type RelayHandler = (request: IncomingMessage, response: ServerResponse) => void
@@ -142,7 +139,6 @@ export type RelayedMedia =
   | { kind: typeof RELAYED_MEDIA_KINDS.transcode; quality: StreamQuality }
 
 type OpenProps = {
-  server: Pick<ServerEntry, 'id' | 'origin' | 'name'>
   /** Where the title's bytes are fetched from: the media origin picked, or the server's own address. */
   origin: string
   mediaId: number
@@ -154,14 +150,15 @@ export type MediaRelay = {
   /** Retires the oldest secrets past its capacity: the relay serves the newest loads alone. */
   open: (input: OpenProps) => Promise<RelayedLoad>
   close: (loadId: string) => void
-  closeServer: (serverId: string) => void
+  /** The page's sign-in ended: every load retires, and reads as signed out. */
+  accessEnded: () => void
   closeAll: () => void
   /**
    * Why the load's account was refused: the server's last `403` or `401` after a fresh ticket for
    * the file, unless the file has been served since, or signed out when its access ended in main
-   * (`closeServer`).
+   * (`accessEnded`).
    */
-  refusalOf: (loadId: string) => AuthRefusal['reason'] | null
+  refusalOf: (loadId: string) => AccountRefusal | null
 }
 
 const ROUTE_KINDS = { ticketed: 'ticketed', session: 'session' } as const
@@ -192,10 +189,8 @@ type TicketedRoute = Extract<Route, { kind: typeof ROUTE_KINDS.ticketed }>
 /** What a load is before its routes: what each of its requests is fetched by. */
 type LoadBase = {
   loadId: string
-  serverId: string
   /** Where requests go, the first that answers: the origin picked, then the server's own address. */
   origins: readonly string[]
-  name: string
   mediaId: number
   /** `/<secret>/`, which every path of the load begins with. */
   prefix: string
@@ -256,7 +251,7 @@ const mediaRouteOf = ({ mediaId, media, hlsFor }: MediaRouteOfProps): MediaRoute
 
 type Request = { loadId: string; controller: AbortController }
 
-const statusForRefusal = (reason: AuthRefusal['reason']): number =>
+const statusForRefusal = (reason: AccountRefusal): number =>
   reason === AUTH_REFUSALS.signedOut ? HTTP_STATUSES.unauthorized : HTTP_STATUSES.forbidden
 
 /** The status mpv hears for a ticket main could not mint. */
@@ -284,7 +279,7 @@ const answer = ({ response, status }: AnswerProps): void => {
     response.destroy()
     return
   }
-  response.writeHead(status, { [HTTP_HEADERS.contentLength]: '0' })
+  response.writeHead(status, { [HEADERS.contentLength]: '0' })
   response.end()
 }
 
@@ -322,6 +317,8 @@ const passedHeaders = (upstream: Upstream): Record<string, string> =>
   )
 
 type CreateMediaRelayProps = {
+  /** The server's own address, which every load falls back to. */
+  serverOrigin: string
   listen: RelayListen
   fetchUpstream: UpstreamFetch
   tickets: Pick<AccountTickets, 'ticketFor'>
@@ -355,6 +352,7 @@ const REFUSALS_KEPT = 8
  * sends nothing upstream.
  */
 export const createMediaRelay = ({
+  serverOrigin,
   listen,
   fetchUpstream,
   tickets,
@@ -366,7 +364,7 @@ export const createMediaRelay = ({
 }: CreateMediaRelayProps): MediaRelay => {
   // Oldest first, never more than `capacity`.
   let loads: readonly Load[] = []
-  let refusals: readonly { loadId: string; reason: AuthRefusal['reason'] }[] = []
+  let refusals: readonly { loadId: string; reason: AccountRefusal }[] = []
   let requests: readonly Request[] = []
   let listening: Promise<{ port: number }> | null = null
   let opened = 0
@@ -386,7 +384,7 @@ export const createMediaRelay = ({
 
   const isCurrent = (load: LoadBase): boolean => loads.some((live) => live.loadId === load.loadId)
 
-  type RememberProps = { loadId: string; reason: AuthRefusal['reason'] }
+  type RememberProps = { loadId: string; reason: AccountRefusal }
 
   const remember = ({ loadId, reason }: RememberProps): void => {
     refusals = [...refusals.filter((known) => known.loadId !== loadId), { loadId, reason }].slice(
@@ -400,7 +398,8 @@ export const createMediaRelay = ({
   type RecordProps = {
     load: LoadBase
     route: Route
-    reason: AuthRefusal['reason']
+    /** Null for a refusal that was no account's: accounts that are down. */
+    reason: AccountRefusal | null
   }
 
   /**
@@ -409,9 +408,9 @@ export const createMediaRelay = ({
    */
   const record = ({ load, route, reason }: RecordProps): void => {
     // A request of a load already retired answers late; the newer load's record stands.
-    if (!isCurrent(load)) return
+    if (reason === null || !isCurrent(load)) return
     if (route.isMedia) remember({ loadId: load.loadId, reason })
-    safeWarn(`${loggable(load.name)} refused a relayed request: ${reason}`)
+    safeWarn(`${SERVER_NAME} refused a relayed request: ${reason}`)
   }
 
   type FallBackProps = { load: LoadBase; origin: string }
@@ -430,10 +429,8 @@ export const createMediaRelay = ({
         ? { ...live, origins: live.origins.filter((known) => known !== origin) }
         : live,
     )
-    picks.forget(load.serverId)
-    safeWarn(
-      `${loggable(load.name)}'s media origin did not answer; the relay goes to its own address`,
-    )
+    picks.forget()
+    safeWarn(`${SERVER_NAME}'s media origin did not answer; the relay goes to its own address`)
   }
 
   type FetchFromProps = Parameters<UpstreamFetch>[0] & { hasFallback: boolean }
@@ -506,11 +503,7 @@ export const createMediaRelay = ({
     signal,
     isFresh,
   }: TicketedProps): Promise<Fetched> => {
-    const outcome = await tickets.ticketFor({
-      serverId: load.serverId,
-      mediaId: load.mediaId,
-      isFresh,
-    })
+    const outcome = await tickets.ticketFor({ mediaId: load.mediaId, isFresh })
     if (outcome.kind !== TICKET_OUTCOMES.ticket) return outcome
     const query = toQueryString({ ...request.query, [MEDIA_TICKET_PARAM]: outcome.ticket })
     const upstream = await fetchFirst({
@@ -544,7 +537,6 @@ export const createMediaRelay = ({
     (master: ServerRequest): HlsSessions =>
       createHlsSessions({
         mediaId: load.mediaId,
-        name: load.name,
         fetchMaster: (signal) =>
           fetchTicketed({ load, request: master, method: RELAY_METHODS.get, headers: {}, signal }),
         fetchPath: (request) => fetchFirst({ load, origins: originsOf(load), ...request }),
@@ -568,14 +560,14 @@ export const createMediaRelay = ({
       answer({ response, status })
       return
     }
-    const typed: Record<string, string> = type === null ? {} : { [HTTP_HEADERS.contentType]: type }
+    const typed: Record<string, string> = type === null ? {} : { [HEADERS.contentType]: type }
     if (method === RELAY_METHODS.head || text === '') {
       response.writeHead(status, typed)
       response.end()
       return
     }
     const body = new TextEncoder().encode(text)
-    response.writeHead(status, { ...typed, [HTTP_HEADERS.contentLength]: String(body.length) })
+    response.writeHead(status, { ...typed, [HEADERS.contentLength]: String(body.length) })
     response.end(body)
   }
 
@@ -598,7 +590,7 @@ export const createMediaRelay = ({
   }: RelayProps): Promise<void> => {
     // A playlist is read whole to be rewritten, so it is never asked for in part.
     const headers: Record<string, string> =
-      range === null || route.playlist !== null ? {} : { [HTTP_HEADERS.range]: range }
+      range === null || route.playlist !== null ? {} : { [HEADERS.range]: range }
     const outcome: SessionFetched =
       route.kind === ROUTE_KINDS.session
         ? await route.hls.fetchPart({ part: route.part, method, headers, signal })
@@ -709,7 +701,7 @@ export const createMediaRelay = ({
       })
     } catch {
       if (!entry.controller.signal.aborted) {
-        safeWarn(`the media relay could not reach ${loggable(load.name)}`)
+        safeWarn(`the media relay could not reach ${SERVER_NAME}`)
       }
       answer({ response, status: HTTP_STATUSES.badGateway })
     }
@@ -732,7 +724,7 @@ export const createMediaRelay = ({
   }
 
   return {
-    open: async ({ server, origin, mediaId, sidecarTrackIds, media }) => {
+    open: async ({ origin, mediaId, sidecarTrackIds, media }) => {
       if (!isMediaId(mediaId)) throw new RangeError('The relay needs a media id.')
       const { port } = await portOf()
       const secret = newSecret(RELAY_SECRET_BYTES)
@@ -747,12 +739,10 @@ export const createMediaRelay = ({
       const sidecars = sidecarTrackIds.filter(isSidecarTrackId)
       const prefix = `/${secret}/`
       // The server's own address is the fallback, so a media origin that goes away mid-title is passed over.
-      const origins = [...new Set([origin, server.origin])]
+      const origins = [...new Set([origin, serverOrigin])]
       const loadBase: LoadBase = {
         loadId,
-        serverId: server.id,
         origins,
-        name: server.name,
         mediaId,
         prefix,
         retired: new AbortController(),
@@ -786,9 +776,9 @@ export const createMediaRelay = ({
      * Access ends on a sign out, a removed server or a moved sign-in host: the title playing
      * stops at the end of what mpv holds, and that is read as an account to sign in to again.
      */
-    closeServer: (serverId) => {
-      const ended = loads.filter((load) => load.serverId === serverId)
-      retire((load) => load.serverId === serverId)
+    accessEnded: () => {
+      const ended = loads
+      retire(() => true)
       ended
         .filter((load) => !refusals.some((known) => known.loadId === load.loadId))
         .forEach((load) => remember({ loadId: load.loadId, reason: AUTH_REFUSALS.signedOut }))

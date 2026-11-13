@@ -14,8 +14,6 @@ import {
   loadConfig,
   namesServer,
   pickOutput,
-  serverById,
-  serverOf,
   setLastAccount,
   setOutput,
   setUpdates,
@@ -362,13 +360,9 @@ describe('upgradeConfig', () => {
   })
 })
 
-describe('serverOf and serverById', () => {
-  it('names the server raven, and finds it by its id alone', () => {
-    const server = { id: idFor({ n: 1 }), origin: ORIGIN, name: SERVER_NAME }
+describe('SERVER_NAME', () => {
+  it('names the server raven', () => {
     expect(SERVER_NAME).toBe('raven')
-    expect(serverOf(CONFIG)).toEqual(server)
-    expect(serverById({ config: CONFIG, serverId: idFor({ n: 1 }) })).toEqual(server)
-    expect(serverById({ config: CONFIG, serverId: idFor({ n: 2 }) })).toBeNull()
   })
 })
 

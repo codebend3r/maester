@@ -9,6 +9,8 @@ export const PLAYER_MESSAGES = {
   engineStopped: ENGINE_STOPPED,
   noTrack: 'That track is not in this video.',
   failed: 'Raven could not do that.',
+  unknownCommand: 'Raven does not understand that command.',
+  busy: 'Raven is busy. Try again.',
   /** A server title's failure when the server could not say why; the source names the server when it can. */
   lost: 'Raven lost its connection to the server. Where you stopped last is saved there.',
 } as const

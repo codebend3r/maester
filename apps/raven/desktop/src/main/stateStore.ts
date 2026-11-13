@@ -1,4 +1,5 @@
 import { parseJson } from '@/main/parseJson'
+import type { Timers } from '@/main/timers'
 import {
   EMPTY_STATE,
   isStoredPlayerState,
@@ -16,16 +17,6 @@ export type StateFs = {
   rename: (input: RenameProps) => Promise<void>
 }
 
-type SetProps = { run: () => void; ms: number }
-
-export type Timers = {
-  set: (input: SetProps) => unknown
-  clear: (handle: unknown) => void
-}
-
-/** Node runs a longer delay at once, so no timer is ever armed for more. */
-export const TIMER_MAX_MS = 2 ** 31 - 1
-
 export type JsonStore<T> = {
   read: () => T
   update: (change: (value: T) => T) => void
@@ -42,6 +33,8 @@ export type JsonStoreOptions<T> = {
   timers: Timers
   debounceMs: number
   onError: (error: unknown) => void
+  /** `initial` is not what the file holds (an upgrade read it), so the next flush writes it. */
+  isInitialUnsaved?: boolean
 }
 
 /** The `code` of the Node system errors Raven tells apart. */
@@ -59,7 +52,6 @@ export const errorCodeOf = (error: unknown): string | null =>
 
 export const isMissingFile = (error: unknown): boolean => errorCodeOf(error) === ERROR_CODES.enoent
 
-/** Never throws: whatever cannot be read as a `T` is kept aside and the app starts with `empty`. */
 /** What a JSON file held: nothing, a value its guard accepts, or something else, now set aside. */
 export const JSON_READ_KINDS = { missing: 'missing', read: 'read', setAside: 'setAside' } as const
 
@@ -116,10 +108,11 @@ export const createJsonStore = <T>({
   timers,
   debounceMs,
   onError,
+  isInitialUnsaved = false,
 }: JsonStoreOptions<T>): JsonStore<T> => {
   const tmp = `${file}.tmp`
   let value = initial
-  let version = 0
+  let version = isInitialUnsaved ? 1 : 0
   let savedVersion = 0
   let timer: unknown
   let queue = Promise.resolve()

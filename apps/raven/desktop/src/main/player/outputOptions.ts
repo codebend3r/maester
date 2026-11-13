@@ -106,12 +106,13 @@ type ReadProps = {
   name: typeof MPV_PROPERTIES.audioDeviceList
 }
 
+type DeviceList = MpvPropertyValue<typeof MPV_PROPERTIES.audioDeviceList>
+
+/** What `readDevices` needs of an mpv: the one read that lists its devices. */
+type DeviceReader = { read: (input: ReadProps) => Promise<DeviceList> }
+
 /** The engine's audio devices, or none without an engine or when it cannot list them. */
-export const readDevices = async (
-  mpv: {
-    read: (input: ReadProps) => Promise<MpvPropertyValue<typeof MPV_PROPERTIES.audioDeviceList>>
-  } | null,
-): Promise<AudioDevice[]> => {
+export const readDevices = async (mpv: DeviceReader | null): Promise<AudioDevice[]> => {
   if (mpv === null) return []
   try {
     const listed = await mpv.read({ name: MPV_PROPERTIES.audioDeviceList })

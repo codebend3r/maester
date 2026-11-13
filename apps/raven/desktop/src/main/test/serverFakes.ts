@@ -16,26 +16,26 @@ import { requestFor, type AllowedCall } from '@/main/servers/allowlist'
 import type { OriginPicks } from '@/main/servers/originPicks'
 import type { ServerCalls } from '@/main/servers/serverCalls'
 
-type FixedPicksProps = { origin?: MediaOrigin; remote?: RemotePlayback }
+type FixedPicksProps = { serverOrigin: string; origin?: MediaOrigin; remote?: RemotePlayback }
 
 /**
- * Picks that answer `origin` for every server, or each server's own address when none is given,
- * with what `remote` says of remote play, keeping which servers were let go of.
+ * Picks that answer `origin`, or the server's own address when none is given, with what `remote`
+ * says of remote play, counting how often the pick was let go of.
  */
-export const fixedPicks = ({ origin, remote }: FixedPicksProps = {}) => {
-  const forgotten: string[] = []
+export const fixedPicks = ({ serverOrigin, origin, remote }: FixedPicksProps) => {
+  const forgets = { count: 0 }
   const picks: OriginPicks = {
-    originOf: async (server) => origin?.url ?? server.origin,
-    placeOf: async (server) => ({
-      url: origin?.url ?? server.origin,
+    originOf: async () => origin?.url ?? serverOrigin,
+    placeOf: async () => ({
+      url: origin?.url ?? serverOrigin,
       origin: origin ?? null,
       remote: remote ?? null,
     }),
-    forget: (serverId) => {
-      forgotten.push(serverId)
+    forget: () => {
+      forgets.count += 1
     },
   }
-  return { picks, forgotten }
+  return { picks, forgets }
 }
 
 /** What the fake server answers one call: a status and a body, or no answer at all. */

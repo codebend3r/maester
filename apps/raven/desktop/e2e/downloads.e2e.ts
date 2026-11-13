@@ -44,6 +44,7 @@ import {
 } from '@/main/desktopConfig'
 import {
   DOWNLOADS_FILE,
+  DOWNLOADS_VERSION,
   type DownloadsState,
   isDownloadsState,
 } from '@/main/downloads/downloadState'
@@ -536,7 +537,7 @@ test('deletes at launch a download watched eleven minutes ago, and says so', asy
     lastAccountId: null,
   }
   const seeded: DownloadsState = {
-    version: 2,
+    version: DOWNLOADS_VERSION,
     entries: [
       {
         downloadId: randomUUID(),

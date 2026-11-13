@@ -21,7 +21,7 @@ import {
 } from './src/build/forgeOptions'
 import { type RunCommand, signAdHoc } from './src/build/machO'
 import { MPV_STAGING } from './src/build/stageMpv'
-import { LINK_SCHEME } from './src/shared/playLink'
+import { LINK_SCHEME } from '@raven/core'
 
 const APP_NAME = 'Raven'
 const AUTHOR = 'CJ Rivas'

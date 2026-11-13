@@ -87,6 +87,7 @@ export const setupSync = ({
   const asked: (string | null)[] = []
   const sync = createSync({
     store,
+    serverId: SERVER_ID,
     calls: {
       call: async ({ call, accountId: askedAs = null }) => {
         log.push(call)
@@ -108,7 +109,7 @@ export const setupSync = ({
   /** Records a play and a position for a download, as playback does, then touches it. */
   const note = ({ downloadId = ID, play = false, position }: NoteProps): void => {
     store.update((state) =>
-      notePending(state, { downloadId, play, position, at: NOW, accountId: signedIn.accountId }),
+      notePending({ state, downloadId, play, position, at: NOW, accountId: signedIn.accountId }),
     )
     sync.touch({ downloadId })
   }

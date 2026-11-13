@@ -1,12 +1,13 @@
-import { AUTH_REFUSALS, type AuthRefusal, DOWNLOAD_KINDS, type DownloadKind } from '@raven/core'
-import { SERVER_GONE } from '@/main/desktopConfig'
+import { AUTH_REFUSALS, DOWNLOAD_KINDS, type DownloadKind } from '@raven/core'
+import { SERVER_NAME } from '@/main/desktopConfig'
 import {
   FAIL_REASONS,
+  type Failure,
   PAUSE_REASONS,
-  type FailReason,
   type PauseReason,
 } from '@/main/downloads/downloadState'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
+import type { AccountRefusal } from '@/main/servers/authRefusals'
 
 /** What the files of an ask of each kind are called, many at a time. */
 const FILE_NOUNS = {
@@ -23,10 +24,7 @@ type QueuedProps = {
   files: number
   kind: DownloadKind
   label: string
-  serverName: string
 }
-
-type AnsweredProps = { serverName: string; status: number }
 
 type FailedProps = { label: string; why: string }
 
@@ -35,112 +33,59 @@ export const DOWNLOAD_MESSAGES = {
     'That download request has expired. Open the title in raven on the web and choose Download to Raven again.',
   unknown: 'That download is no longer in Raven.',
   fileGone: "That download's file could not be found.",
-  /** With no name, the server is no longer in Raven, and its folder would name a media id. */
-  downloadedFrom: (serverName: string): string =>
-    serverName === '' ? 'Downloaded' : `Downloaded from ${serverName}`,
-  queued: ({ files, kind, label, serverName }: QueuedProps): string =>
+  downloadedFrom: `Downloaded from ${SERVER_NAME}`,
+  /** A download of a server an older Raven kept besides: its folder would name a media id. */
+  downloadedElsewhere: 'Downloaded',
+  queued: ({ files, kind, label }: QueuedProps): string =>
     files === 1
-      ? `Downloading ${label} from ${serverName}`
-      : `Downloading ${files} ${FILE_NOUNS[kind]} from ${serverName}`,
+      ? `Downloading ${label} from ${SERVER_NAME}`
+      : `Downloading ${files} ${FILE_NOUNS[kind]} from ${SERVER_NAME}`,
   noSpace: 'Not enough space',
   changed: 'The file changed on the server',
-  answered: ({ serverName, status }: AnsweredProps): string => `${serverName} answered ${status}`,
-  relocked: (name: string): string => `${name} locked this library again`,
-  signInAgain: (name: string): string => `Sign in to ${name} again`,
-  waiting: (name: string): string => `Your account on ${name} is waiting for approval`,
-  removed: (name: string): string => `Your access to ${name} was removed`,
-  unreachable: (name: string): string => `${name} could not be reached`,
+  answered: (status: number): string => `${SERVER_NAME} answered ${status}`,
+  relocked: `${SERVER_NAME} locked this library again`,
+  signInAgain: `Sign in to ${SERVER_NAME} again`,
+  waiting: `Your account on ${SERVER_NAME} is waiting for approval`,
+  removed: `Your access to ${SERVER_NAME} was removed`,
+  unreachable: `${SERVER_NAME} could not be reached`,
   downloaded: (label: string): string => `Downloaded ${label}`,
   failed: ({ label, why }: FailedProps): string => `Could not download ${label}: ${why}`,
   deletedAfterWatching: (label: string): string => `Deleted ${label} after watching`,
 } as const
 
-/** A refusal of the account itself; `unavailable` is the server's outage, not the account's. */
-export type AccountRefusal = Exclude<AuthRefusal['reason'], typeof AUTH_REFUSALS.unavailable>
-
-type AccountRefusedMessageProps = {
-  reason: AccountRefusal
-  serverName: string
-}
-
 /** What a download refused for its account says, by why the server refused it. */
-export const accountRefusedMessage = ({
-  reason,
-  serverName,
-}: AccountRefusedMessageProps): string => {
-  switch (reason) {
-    case AUTH_REFUSALS.signedOut:
-      return DOWNLOAD_MESSAGES.signInAgain(serverName)
-    case AUTH_REFUSALS.pending:
-      return DOWNLOAD_MESSAGES.waiting(serverName)
-    case AUTH_REFUSALS.revoked:
-    case AUTH_REFUSALS.notOwner:
-      return DOWNLOAD_MESSAGES.removed(serverName)
-    default: {
-      const unreachable: never = reason
-      return unreachable
-    }
-  }
-}
+const ACCOUNT_REFUSED_MESSAGES = {
+  [AUTH_REFUSALS.signedOut]: DOWNLOAD_MESSAGES.signInAgain,
+  [AUTH_REFUSALS.pending]: DOWNLOAD_MESSAGES.waiting,
+  [AUTH_REFUSALS.revoked]: DOWNLOAD_MESSAGES.removed,
+  [AUTH_REFUSALS.notOwner]: DOWNLOAD_MESSAGES.removed,
+} as const satisfies Record<AccountRefusal, string>
 
-type NamingProps = {
-  serverName: string
-  words: (name: string) => string
-}
+/** What a paused row says, by its reason; null for the viewer's own pause. */
+export const PAUSED_MESSAGES = {
+  [PAUSE_REASONS.viewer]: null,
+  [PAUSE_REASONS.noSpace]: DOWNLOAD_MESSAGES.noSpace,
+  [PAUSE_REASONS.relocked]: DOWNLOAD_MESSAGES.relocked,
+  [PAUSE_REASONS.unreachable]: DOWNLOAD_MESSAGES.unreachable,
+} as const satisfies Record<PauseReason, string | null>
 
-/** Words that name the server; with no name, the server is no longer in Raven. */
-const naming = ({ serverName, words }: NamingProps): string =>
-  serverName === '' ? SERVER_GONE : words(serverName)
-
-type PausedMessageProps = {
-  reason: PauseReason
-  serverName: string
-}
-
-/** What a paused row says, by its reason and its server's name now; null for the viewer's own pause. */
-export const pausedMessage = ({ reason, serverName }: PausedMessageProps): string | null => {
-  switch (reason) {
-    case PAUSE_REASONS.viewer:
-      return null
-    case PAUSE_REASONS.noSpace:
-      return DOWNLOAD_MESSAGES.noSpace
-    case PAUSE_REASONS.relocked:
-      return naming({ serverName, words: DOWNLOAD_MESSAGES.relocked })
-    case PAUSE_REASONS.unreachable:
-      return naming({ serverName, words: DOWNLOAD_MESSAGES.unreachable })
-    default: {
-      const unreachable: never = reason
-      return unreachable
-    }
-  }
-}
-
-type FailedMessageProps = {
-  reason: FailReason
-  message: string
-  serverName: string
-}
-
-/** What a failed row says, by its reason and its server's name now; `other` says its own words. */
-export const failedMessage = ({ reason, message, serverName }: FailedMessageProps): string => {
-  switch (reason) {
+/** What a failed row says, by its reason; `account` by why, and `other` says its own words. */
+export const failedMessage = (failure: Failure): string => {
+  switch (failure.reason) {
     case FAIL_REASONS.noSpace:
       return DOWNLOAD_MESSAGES.noSpace
     case FAIL_REASONS.changed:
       return DOWNLOAD_MESSAGES.changed
-    case FAIL_REASONS.unauthorized:
-      return naming({
-        serverName,
-        words: (name) => DOWNLOAD_MESSAGES.answered({ serverName: name, status: 401 }),
-      })
     case FAIL_REASONS.unreachable:
-      return naming({ serverName, words: DOWNLOAD_MESSAGES.unreachable })
+      return DOWNLOAD_MESSAGES.unreachable
     case FAIL_REASONS.gone:
-      return naming({ serverName, words: EXPAND_MESSAGES.gone })
+      return EXPAND_MESSAGES.gone
+    case FAIL_REASONS.account:
+      return ACCOUNT_REFUSED_MESSAGES[failure.refusal]
     case FAIL_REASONS.other:
-      return message
+      return failure.message
     default: {
-      const unreachable: never = reason
+      const unreachable: never = failure
       return unreachable
     }
   }

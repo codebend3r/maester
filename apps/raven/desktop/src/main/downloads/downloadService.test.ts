@@ -14,12 +14,7 @@ import {
   DOWNLOAD_KINDS,
 } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
-import {
-  type ConfigStore,
-  type DesktopConfig,
-  SERVER_GONE,
-  SERVER_NAME,
-} from '@/main/desktopConfig'
+import { type ConfigStore, type DesktopConfig, SERVER_NAME } from '@/main/desktopConfig'
 import { ASK_TTL_MS } from '@/main/downloads/asks'
 import { factsBefore } from '@/main/downloads/artwork'
 import { AUTO_DELETE_DELAY_MS } from '@/main/downloads/autoDelete'
@@ -28,7 +23,6 @@ import {
   createDownloadService,
   DOWNLOADS_EVENT_MS,
   SYNC_DELETE_WAIT_MS,
-  viewStatusOf,
 } from '@/main/downloads/downloadService'
 import {
   EMPTY_DOWNLOADS,
@@ -41,7 +35,7 @@ import {
   type DownloadsState,
   type EntryStatus,
 } from '@/main/downloads/downloadState'
-import { RESUME_SETTLE_MS } from '@/main/downloads/downloadQueue'
+import { RESUME_SETTLE_MS } from '@/main/downloads/queueSchedule'
 import { DOWNLOADS_DEBOUNCE_MS } from '@/main/downloads/downloadStore'
 import { SYNC_DEBOUNCE_MS, SYNC_RETRY_MS } from '@/main/downloads/sync'
 import { EXPAND_MESSAGES } from '@/main/downloads/expand'
@@ -91,7 +85,7 @@ const NOW = 1_700_000_000_000
 const GIB = 1024 ** 3
 const BLOCK = 4096
 
-const SERVER = { id: SERVER_ID, origin: 'https://vhagar.example', name: SERVER_NAME }
+const SERVER = { id: SERVER_ID, origin: 'https://vhagar.example' }
 /** The account the page is signed in with, unless a test signs it out or in as another. */
 const ACCOUNT = '30000000-0000-4000-8000-00000000000c'
 
@@ -253,7 +247,7 @@ const setup = ({
       const token = signedIn.accountId === null ? null : tokenFor({ accountId: signedIn.accountId })
       // As main's calls do: a call made for an account goes only under that account's token.
       const isAs = (input.accountId ?? null) === null || input.accountId === signedIn.accountId
-      if (!isAs) return { ok: false, message: CALL_MESSAGES.otherAccount(SERVER.name) }
+      if (!isAs) return { ok: false, message: CALL_MESSAGES.otherAccount }
       heard.push({ call: keyOf(input.call), token })
       return answering.call(input)
     },
@@ -309,6 +303,7 @@ const setup = ({
   const service = createDownloadService({
     store,
     config,
+    server: SERVER,
     calls,
     userData: USER_DATA,
     space: {
@@ -372,7 +367,7 @@ type World = ReturnType<typeof setup>
 type AskForProps = { world: World; target: DownloadTarget }
 
 const askFor = async ({ world, target }: AskForProps) => {
-  const reply = await world.service.ask({ serverId: SERVER_ID, target })
+  const reply = await world.service.ask({ target })
   if (reply.type !== 'downloadAsk') throw new Error(`expected an ask, got ${reply.type}`)
   return reply.ask
 }
@@ -403,7 +398,6 @@ describe('constants', () => {
         files: 3,
         kind: DOWNLOAD_KINDS.saga,
         label: 'x',
-        serverName: SERVER_NAME,
       }),
     ).toBe('Downloading 3 movies from raven')
     expect(
@@ -411,7 +405,6 @@ describe('constants', () => {
         files: 2,
         kind: DOWNLOAD_KINDS.movie,
         label: 'x',
-        serverName: SERVER_NAME,
       }),
     ).toBe('Downloading 2 movies from raven')
     expect(
@@ -419,7 +412,6 @@ describe('constants', () => {
         files: 10,
         kind: DOWNLOAD_KINDS.show,
         label: 'x',
-        serverName: SERVER_NAME,
       }),
     ).toBe('Downloading 10 episodes from raven')
     expect(
@@ -427,16 +419,13 @@ describe('constants', () => {
         files: 1,
         kind: 'season',
         label: 'S01E02 Half Loop',
-        serverName: SERVER_NAME,
       }),
     ).toBe('Downloading S01E02 Half Loop from raven')
     expect(DOWNLOAD_MESSAGES.noSpace).toBe('Not enough space')
     expect(DOWNLOAD_MESSAGES.changed).toBe('The file changed on the server')
-    expect(DOWNLOAD_MESSAGES.answered({ serverName: SERVER_NAME, status: 401 })).toBe(
-      'raven answered 401',
-    )
-    expect(DOWNLOAD_MESSAGES.relocked(SERVER_NAME)).toBe('raven locked this library again')
-    expect(DOWNLOAD_MESSAGES.unreachable(SERVER_NAME)).toBe('raven could not be reached')
+    expect(DOWNLOAD_MESSAGES.answered(401)).toBe('raven answered 401')
+    expect(DOWNLOAD_MESSAGES.relocked).toBe('raven locked this library again')
+    expect(DOWNLOAD_MESSAGES.unreachable).toBe('raven could not be reached')
     expect(DOWNLOAD_MESSAGES.downloaded('Dune')).toBe('Downloaded Dune')
     expect(DOWNLOAD_MESSAGES.failed({ label: 'Dune', why: 'Not enough space' })).toBe(
       'Could not download Dune: Not enough space',
@@ -450,7 +439,6 @@ describe('ask', () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
     expect(
       await world.service.ask({
-        serverId: SERVER_ID,
         target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
       }),
     ).toEqual({
@@ -552,18 +540,21 @@ describe('ask', () => {
   })
 
   it.each([
-    ['gone', {}, EXPAND_MESSAGES.gone(SERVER_NAME)],
+    ['gone', {}, EXPAND_MESSAGES.gone],
     [
       'unreachable',
       { [itemCall(5)]: { unreachable: 'Raven could not reach raven.' } },
       'Raven could not reach raven.',
     ],
-    ['unreadable', { [itemCall(5)]: ok({ id: 5 }) }, EXPAND_MESSAGES.unreadable(SERVER_NAME)],
+    ['unreadable', { [itemCall(5)]: ok({ id: 5 }) }, EXPAND_MESSAGES.unreadable],
   ])('refuses an expansion that is %s with its message', async (_name, replies, message) => {
     const world = setup({ replies })
     expect(
-      await world.service.ask({ serverId: SERVER_ID, target: { kind: 'item', itemId: 5 } }),
-    ).toEqual({ type: 'refused', message })
+      await world.service.ask({ target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 5 } }),
+    ).toEqual({
+      type: DESKTOP_REPLIES.refused,
+      message,
+    })
   })
 
   it('refuses more files than one ask takes', async () => {
@@ -574,7 +565,6 @@ describe('ask', () => {
     const world = setup({ replies: { [sagasCall]: ok(sagas) } })
     expect(
       await world.service.ask({
-        serverId: SERVER_ID,
         target: { kind: 'saga', libraryId: 1, tmdbId: '119' },
       }),
     ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.tooMany })
@@ -586,10 +576,9 @@ describe('ask', () => {
     })
     expect(
       await world.service.ask({
-        serverId: SERVER_ID,
         target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
       }),
-    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.unreadable(SERVER_NAME) })
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.unreadable })
     expect(world.warnings.join('\n')).toContain('Fellowship (2001)')
     expect(world.warnings.join('\n')).not.toContain('../../x')
   })
@@ -602,22 +591,10 @@ describe('ask', () => {
     const world = setup({ replies: { [mediaCall(9)]: ok({ ...MOVIE, size }) } })
     expect(
       await world.service.ask({
-        serverId: SERVER_ID,
         target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
       }),
-    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.unreadable(SERVER_NAME) })
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.unreadable })
     expect(world.warnings.join('\n')).toContain('Fellowship (2001)')
-  })
-
-  it('refuses a server Raven no longer keeps, and calls nothing', async () => {
-    const world = setup()
-    expect(
-      await world.service.ask({
-        serverId: OTHER_SERVER_ID,
-        target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
-      }),
-    ).toEqual({ type: 'refused', message: SERVER_GONE })
-    expect(world.log).toEqual([])
   })
 })
 
@@ -650,7 +627,7 @@ describe('retryAsk', () => {
     world.table[itemCall(5)] = { status: 404, body: '' }
     expect(await world.service.retryAsk({ askId: locked.askId })).toEqual({
       type: 'refused',
-      message: EXPAND_MESSAGES.gone(SERVER_NAME),
+      message: EXPAND_MESSAGES.gone,
     })
     expect(await world.service.retryAsk({ askId: locked.askId })).toEqual(askGone)
   })
@@ -661,7 +638,6 @@ describe('an account ask', () => {
     const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) }, accountId: null })
     expect(
       await world.service.ask({
-        serverId: SERVER_ID,
         target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
       }),
     ).toEqual({
@@ -695,7 +671,7 @@ describe('an account ask', () => {
     const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
     expect(await world.service.confirm({ askId: ask.askId, autoDelete: false })).toEqual({
       type: DESKTOP_REPLIES.refused,
-      message: EXPAND_MESSAGES.account(SERVER_NAME),
+      message: EXPAND_MESSAGES.account,
     })
     expect(world.store.read().entries).toEqual([])
   })
@@ -704,10 +680,9 @@ describe('an account ask', () => {
     const world = setup()
     expect(
       await world.service.ask({
-        serverId: SERVER_ID,
         target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 5 },
       }),
-    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.gone(SERVER_NAME) })
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.gone })
   })
 
   it.each([
@@ -717,10 +692,9 @@ describe('an account ask', () => {
     const world = setup({ replies: { [mediaCall(9)]: refusal } })
     expect(
       await world.service.ask({
-        serverId: SERVER_ID,
         target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 },
       }),
-    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.account(SERVER_NAME) })
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: EXPAND_MESSAGES.account })
   })
 })
 
@@ -737,7 +711,7 @@ describe('downloads with an account ticket', () => {
       access: async () => ({
         ok: false,
         reason: ACCESS_REFUSALS.account,
-        message: DOWNLOAD_MESSAGES.removed(SERVER_NAME),
+        refusal: AUTH_REFUSALS.revoked,
       }),
     })
     await until(() => world.sent.some(({ type }) => type === DESKTOP_EVENTS.notice))
@@ -745,7 +719,7 @@ describe('downloads with an account ticket', () => {
       type: DESKTOP_EVENTS.notice,
       message: DOWNLOAD_MESSAGES.failed({
         label: 'S01E01 Good News',
-        why: DOWNLOAD_MESSAGES.removed(SERVER_NAME),
+        why: DOWNLOAD_MESSAGES.removed,
       }),
     })
   })
@@ -754,7 +728,7 @@ describe('downloads with an account ticket', () => {
     const world = setup({ initial: queued(), access: async () => accountTicket() })
     world.network.answers.file = serving({ size: 8, sent: 4, isEnding: false })
     await until(() => world.network.fileRequests().length === 1)
-    world.service.accessEnded({ serverId: SERVER_ID })
+    world.service.accessEnded()
     await until(
       () =>
         (world.store.read().entries.find((entry) => entry.downloadId === ID)?.status.kind ??
@@ -940,20 +914,6 @@ describe('confirm', () => {
     })
     world.table[itemCall(5)] = ok(SEASON)
     expect((await world.service.retryAsk({ askId: locked.askId })).type).toBe('downloadAsk')
-  })
-
-  it('refuses once the server is not the one Raven plays from, and queues nothing', async () => {
-    const world = setup({ replies: { [mediaCall(9)]: ok(MOVIE) } })
-    const ask = await askFor({ world, target: { kind: DOWNLOAD_TARGET_KINDS.media, mediaId: 9 } })
-    world.config.update((current) => ({
-      ...current,
-      server: { ...current.server, id: OTHER_SERVER_ID },
-    }))
-    expect(await world.service.confirm({ askId: ask.askId, autoDelete: false })).toEqual({
-      type: 'refused',
-      message: SERVER_GONE,
-    })
-    expect(world.store.read().entries).toEqual([])
   })
 
   it('says nothing when every file was queued meanwhile', async () => {
@@ -1144,7 +1104,7 @@ describe('the queue', () => {
     })
     world.network.answers.file = serving({ size: 8192, sent: 0, isEnding: false })
     await until(() => world.network.fileRequests().length === 1)
-    expect(world.network.fileRequests()[0]?.headers).toEqual({ Range: 'bytes=4096-' })
+    expect(world.network.fileRequests()[0]?.headers).toEqual({ range: 'bytes=4096-' })
   })
 
   it('removes at launch the folders no download names, and keeps every download', async () => {
@@ -1337,7 +1297,7 @@ describe('the queue', () => {
     await until(() => statusOf(world)?.kind === 'failed')
     expect(world.sent).toContainEqual({
       type: 'notice',
-      message: `Could not download S01E01 Good News: ${EXPAND_MESSAGES.gone(SERVER_NAME)}`,
+      message: `Could not download S01E01 Good News: ${EXPAND_MESSAGES.gone}`,
     })
   })
 
@@ -1367,7 +1327,7 @@ describe('the queue', () => {
     expect(relocked?.status).toEqual({
       kind: 'paused',
       bytes: 0,
-      message: DOWNLOAD_MESSAGES.relocked(SERVER_NAME),
+      message: DOWNLOAD_MESSAGES.relocked,
     })
   })
 
@@ -1392,31 +1352,27 @@ describe('the queue', () => {
           kind: DOWNLOAD_STATUS_KINDS.failed,
           bytes: 4,
           reason: FAIL_REASONS.noSpace,
-          message: '',
         }),
         stopped(5, {
           kind: DOWNLOAD_STATUS_KINDS.failed,
           bytes: 5,
           reason: FAIL_REASONS.changed,
-          message: '',
         }),
         stopped(6, {
           kind: DOWNLOAD_STATUS_KINDS.failed,
           bytes: 6,
-          reason: FAIL_REASONS.unauthorized,
-          message: '',
+          reason: FAIL_REASONS.account,
+          refusal: AUTH_REFUSALS.pending,
         }),
         stopped(7, {
           kind: DOWNLOAD_STATUS_KINDS.failed,
           bytes: 7,
           reason: FAIL_REASONS.unreachable,
-          message: '',
         }),
         stopped(8, {
           kind: DOWNLOAD_STATUS_KINDS.failed,
           bytes: 8,
           reason: FAIL_REASONS.gone,
-          message: '',
         }),
         stopped(9, {
           kind: DOWNLOAD_STATUS_KINDS.failed,
@@ -1432,37 +1388,15 @@ describe('the queue', () => {
       { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 3, message: 'raven could not be reached' },
       { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 4, message: 'Not enough space' },
       { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 5, message: 'The file changed on the server' },
-      { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 6, message: 'raven answered 401' },
+      {
+        kind: DOWNLOAD_STATUS_KINDS.failed,
+        bytes: 6,
+        message: 'Your account on raven is waiting for approval',
+      },
       { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 7, message: 'raven could not be reached' },
-      { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 8, message: EXPAND_MESSAGES.gone(SERVER_NAME) },
+      { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 8, message: EXPAND_MESSAGES.gone },
       { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 9, message: 'write EIO' },
     ])
-  })
-
-  it('says the server is gone for a reason that names a server Raven no longer keeps', () => {
-    expect(
-      viewStatusOf({
-        status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, reason: PAUSE_REASONS.relocked },
-        serverName: '',
-      }),
-    ).toEqual({ kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, message: SERVER_GONE })
-    expect(
-      viewStatusOf({
-        status: {
-          kind: DOWNLOAD_STATUS_KINDS.failed,
-          bytes: 0,
-          reason: FAIL_REASONS.gone,
-          message: '',
-        },
-        serverName: '',
-      }),
-    ).toEqual({ kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 0, message: SERVER_GONE })
-    expect(
-      viewStatusOf({
-        status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, reason: PAUSE_REASONS.noSpace },
-        serverName: '',
-      }),
-    ).toEqual({ kind: DOWNLOAD_STATUS_KINDS.paused, bytes: 0, message: 'Not enough space' })
   })
 
   it('requeues at launch what an outage stopped', async () => {
@@ -1735,23 +1669,23 @@ describe('reaching the server', () => {
 
     world.signedIn.accountId = null
     // A session Auth refused and the sign out that follows it each tell of the same change.
-    world.service.accountSwitched({ serverId: SERVER_ID })
-    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.accountSwitched()
+    world.service.accountSwitched()
     expect(entries(world)[0]?.pending ?? null).toEqual(NO_PENDING)
     expect(world.store.read().owed).toEqual([
       { serverId: SERVER_ID, mediaId: 11, pending: { ...PLAYED, accountId: ACCOUNT_A } },
     ])
     world.signedIn.accountId = ACCOUNT_B
-    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.accountSwitched()
     await ticks(10)
     fireAfter(world, SYNC_DEBOUNCE_MS)
     await ticks(10)
     expect(world.heard.slice(offline)).toEqual([])
 
     world.signedIn.accountId = ACCOUNT_A
-    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.accountSwitched()
     await until(() => world.store.read().owed.length === 0)
-    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.accountSwitched()
     await ticks(10)
     const tokenOfA = tokenFor({ accountId: ACCOUNT_A })
     expect(world.heard.slice(offline)).toEqual([
@@ -1770,10 +1704,10 @@ describe('reaching the server', () => {
       accountId: ACCOUNT_A,
     })
     expect(world.config.read().lastAccountId).toBeNull()
-    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.accountSwitched()
     expect(world.config.read().lastAccountId).toBe(ACCOUNT_A)
     world.signedIn.accountId = null
-    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.accountSwitched()
     expect(world.config.read().lastAccountId).toBe(ACCOUNT_A)
     await ticks(10)
     const before = world.heard.length
@@ -1786,7 +1720,7 @@ describe('reaching the server', () => {
       { serverId: SERVER_ID, mediaId: 11, pending: { ...PLAYED, accountId: ACCOUNT_A } },
     ])
     world.signedIn.accountId = ACCOUNT_B
-    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.accountSwitched()
     expect(world.config.read().lastAccountId).toBe(ACCOUNT_B)
     await ticks(10)
     fireAfter(world, SYNC_DEBOUNCE_MS)
@@ -1794,7 +1728,7 @@ describe('reaching the server', () => {
     expect(world.heard.slice(before)).toEqual([])
 
     world.signedIn.accountId = ACCOUNT_A
-    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.accountSwitched()
     await until(() => world.store.read().owed.length === 0)
     const tokenOfA = tokenFor({ accountId: ACCOUNT_A })
     expect(world.heard.slice(before)).toEqual([
@@ -1823,7 +1757,7 @@ describe('reaching the server', () => {
     const offline = world.heard.length
 
     world.signedIn.accountId = ACCOUNT_B
-    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.accountSwitched()
     world.service.notePosition({ fileId: granted.file.fileId, position: 900, duration: 3000 })
     world.service.notePosition({ fileId: granted.file.fileId, position: 1000, duration: 3000 })
     expect(entries(world)[0]?.pending ?? null).toEqual(NO_PENDING)
@@ -1840,7 +1774,7 @@ describe('reaching the server', () => {
     expect(world.heard.slice(offline)).toEqual([])
 
     world.signedIn.accountId = ACCOUNT_A
-    world.service.accountSwitched({ serverId: SERVER_ID })
+    world.service.accountSwitched()
     await until(() => world.store.read().owed.length === 0)
     const tokenOfA = tokenFor({ accountId: ACCOUNT_A })
     expect(world.heard.slice(offline)).toEqual([

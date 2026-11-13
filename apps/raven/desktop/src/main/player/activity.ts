@@ -3,6 +3,9 @@ import type { PlayerActivity } from '@/main/player/playerService'
 /** Electron reads `#AARRGGBB`; zero alpha lets the video under the page show through. */
 export const CLEAR = '#00000000'
 
+/** What the service's activity reports go through. */
+type Activity = { report: (activity: PlayerActivity) => void; hide: () => void }
+
 type CreateActivityProps = {
   onPlaying: (isPlaying: boolean) => void
   onShowing: (isShowing: boolean) => void
@@ -14,10 +17,7 @@ type CreateActivityProps = {
  * `hide` forces the window back for a page with no video: a new or crashed page shows none,
  * even when the service, already idle or dead, has nothing to report.
  */
-export const createActivity = ({
-  onPlaying,
-  onShowing,
-}: CreateActivityProps): { report: (activity: PlayerActivity) => void; hide: () => void } => {
+export const createActivity = ({ onPlaying, onShowing }: CreateActivityProps): Activity => {
   let isShowing = false
   return {
     report: (activity) => {

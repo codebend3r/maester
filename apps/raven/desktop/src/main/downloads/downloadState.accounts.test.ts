@@ -21,7 +21,8 @@ describe('pending by account', () => {
   const keyOfA = { serverId: SERVER_A, mediaId: 1, accountId: ACCOUNT_A }
 
   it('notePending tags what it notes with the account signed in', () => {
-    const next = notePending(stateOf(entry()), {
+    const next = notePending({
+      state: stateOf(entry()),
       downloadId: ID,
       play: true,
       position: 42,
@@ -38,7 +39,8 @@ describe('pending by account', () => {
   })
 
   it("notePending for another account moves the first account's pending to owed, never folding them", () => {
-    const next = notePending(stateOf(entry({ pending: asA })), {
+    const next = notePending({
+      state: stateOf(entry({ pending: asA })),
       downloadId: ID,
       play: false,
       position: 20,
@@ -64,41 +66,47 @@ describe('pending by account', () => {
       entry({ downloadId: id(3), mediaId: 3, pending: shared }),
       entry({ downloadId: id(4), mediaId: 4, serverId: SERVER_B, pending: asA }),
     )
-    const next = oweOtherAccounts(state, { serverId: SERVER_A, accountId: ACCOUNT_B })
+    const next = oweOtherAccounts({ state, serverId: SERVER_A, accountId: ACCOUNT_B })
     expect(next.entries.map(({ pending }) => pending)).toEqual([NO_PENDING, asB, shared, asA])
     expect(next.owed).toEqual([{ serverId: SERVER_A, mediaId: 1, pending: asA }])
   })
 
   it('oweOtherAccounts on a sign out owes every account, and changes nothing when nothing is tagged', () => {
     const state = stateOf(entry({ pending: asA }))
-    expect(oweOtherAccounts(state, { serverId: SERVER_A, accountId: null }).owed).toEqual([
+    expect(oweOtherAccounts({ state, serverId: SERVER_A, accountId: null }).owed).toEqual([
       { serverId: SERVER_A, mediaId: 1, pending: asA },
     ])
     const untagged = stateOf(
       entry({ pending: { ...asA, accountId: null } }),
       entry({ downloadId: id(2) }),
     )
-    expect(oweOtherAccounts(untagged, { serverId: SERVER_A, accountId: null })).toBe(untagged)
+    expect(oweOtherAccounts({ state: untagged, serverId: SERVER_A, accountId: null })).toBe(
+      untagged,
+    )
   })
 
   it("keeps one owed item per title and account, and clears and drops only the account's own", () => {
     const asB: Pending = { ...asA, position: 30, furthest: 30, accountId: ACCOUNT_B }
-    const owedA = remove(stateOf(entry({ pending: asA })), { downloadId: ID })
-    const both = remove(queue(owedA, { entries: [entry({ downloadId: id(2), pending: asB })] }), {
+    const owedA = remove({ state: stateOf(entry({ pending: asA })), downloadId: ID })
+    const both = remove({
+      state: queue({ state: owedA, entries: [entry({ downloadId: id(2), pending: asB })] }),
       downloadId: id(2),
     })
     expect(both.owed).toEqual([
       { serverId: SERVER_A, mediaId: 1, pending: asA },
       { serverId: SERVER_A, mediaId: 1, pending: asB },
     ])
-    expect(owedOf(both, keyOfA)?.pending ?? null).toEqual(asA)
-    const cleared = clearOwed(both, {
+    expect(owedOf({ state: both, ...keyOfA })?.pending ?? null).toEqual(asA)
+    const cleared = clearOwed({
+      state: both,
       ...keyOfA,
       sentPlay: true,
       sentPosition: 180,
       sentFurthest: 190,
     })
     expect(cleared.owed).toEqual([{ serverId: SERVER_A, mediaId: 1, pending: asB }])
-    expect(dropOwed(both, keyOfA).owed).toEqual([{ serverId: SERVER_A, mediaId: 1, pending: asB }])
+    expect(dropOwed({ state: both, ...keyOfA }).owed).toEqual([
+      { serverId: SERVER_A, mediaId: 1, pending: asB },
+    ])
   })
 })

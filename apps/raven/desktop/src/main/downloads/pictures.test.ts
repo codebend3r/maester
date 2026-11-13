@@ -24,8 +24,8 @@ import {
   type Reply,
   summary,
 } from '@/main/test/serverFakes'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { mediaItemFor } from '@/shared/test/mediaItem'
+import { HEADERS } from '@shared/http'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
 const SERVER = { id: SERVER_ID, origin: 'https://raven.example', name: 'Vhagar' }
@@ -158,7 +158,7 @@ const setup = ({
       fetched.push(url)
       const picture = pictures[url.replace(SERVER.origin, '')] ?? { status: 404 }
       const named = new Map<string, string>(
-        picture.type === undefined ? [] : [[HTTP_HEADERS.contentType, picture.type]],
+        picture.type === undefined ? [] : [[HEADERS.contentType, picture.type]],
       )
       return {
         status: picture.status,
@@ -166,7 +166,7 @@ const setup = ({
         body: picture.bytes === undefined ? null : whole([picture.bytes]),
       }
     },
-    serverOf: (serverId) => (serverId === SERVER_ID ? SERVER : null),
+    server: SERVER,
     isSignedIn: () => account.isSignedIn,
     fs: {
       mkdir: drive.fs.mkdir,

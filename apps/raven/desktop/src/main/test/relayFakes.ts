@@ -5,14 +5,12 @@ import { createMediaRelay, listenOnLoopback, RELAYED_MEDIA_KINDS } from '@/main/
 import type { UpstreamFetch } from '@/main/servers/relayUpstream'
 import { fakeTimers } from '@/main/test/playerFakes'
 import { fixedPicks } from '@/main/test/serverFakes'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS } from '@shared/http'
 
 export const SERVER: ServerEntry = {
   id: '00000000-0000-4000-8000-000000000001',
   origin: 'https://raven.example',
-  name: 'Vhagar',
 }
-export const OTHER: ServerEntry = { ...SERVER, id: '00000000-0000-4000-8000-000000000002' }
 
 type Heard = {
   url: string
@@ -64,12 +62,12 @@ export const setupRelay = ({
   answer = () => ({
     status: 206,
     headers: {
-      [HTTP_HEADERS.contentType]: 'video/x-matroska',
-      [HTTP_HEADERS.contentLength]: '4',
-      [HTTP_HEADERS.contentRange]: 'bytes 0-3/100',
-      [HTTP_HEADERS.acceptRanges]: 'bytes',
-      [HTTP_HEADERS.setCookie]: 'a=b',
-      [HTTP_HEADERS.etag]: 'x',
+      [HEADERS.contentType]: 'video/x-matroska',
+      [HEADERS.contentLength]: '4',
+      [HEADERS.contentRange]: 'bytes 0-3/100',
+      [HEADERS.acceptRanges]: 'bytes',
+      [HEADERS.setCookie]: 'a=b',
+      [HEADERS.etag]: 'x',
     },
     body: 'abcd',
   }),
@@ -77,11 +75,11 @@ export const setupRelay = ({
   capacity = 1,
 }: SetupProps = {}) => {
   const heard: Heard[] = []
-  const asked: { serverId: string; mediaId: number; isFresh: boolean }[] = []
+  const asked: { mediaId: number; isFresh: boolean }[] = []
   const warnings: string[] = []
   const secrets: number[] = []
   const listens = { count: 0 }
-  const { picks, forgotten } = fixedPicks()
+  const { picks, forgets } = fixedPicks({ serverOrigin: SERVER.origin })
   const { timers, pending } = fakeTimers()
   const fetchUpstream: UpstreamFetch = async (input) => {
     heard.push(input)
@@ -104,6 +102,7 @@ export const setupRelay = ({
     warn: () => undefined,
   })
   const relay = createMediaRelay({
+    serverOrigin: SERVER.origin,
     listen,
     fetchUpstream,
     tickets: {
@@ -128,11 +127,10 @@ export const setupRelay = ({
       warnings.push(message)
     },
   })
-  return { relay, heard, asked, warnings, secrets, listens, forgotten, pending }
+  return { relay, heard, asked, warnings, secrets, listens, forgets, pending }
 }
 
 export const OPEN = {
-  server: SERVER,
   origin: SERVER.origin,
   mediaId: 7,
   sidecarTrackIds: ['external-0', 'external-3'],

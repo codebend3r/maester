@@ -10,12 +10,12 @@ import {
   readMediaOrigins,
   toQueryString,
 } from '@raven/core'
-import type { ServerEntry } from '@/main/desktopConfig'
+import { SERVER_NAME, type ServerEntry } from '@/main/desktopConfig'
 import { quietly } from '@/main/log/quietly'
 import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES } from '@/main/servers/allowlist'
-import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
-import { HTTP_STATUSES } from '@/shared/httpStatuses'
+import type { ServerCalls } from '@/main/servers/serverCalls'
+import { HTTP_STATUSES } from '@shared/http'
 
 type ProbeFetchProps = {
   url: string
@@ -106,14 +106,15 @@ export type MediaPlace = Pick<PlayNetwork, 'remote'> & {
 
 export type OriginPicks = {
   /** The origin a server's media is fetched from: the pick, or the server's own address when none answers. */
-  originOf: (server: ServerEntry) => Promise<string>
+  originOf: () => Promise<string>
   /** The same pick as `originOf`, with the origin it is and the server's word on remote play. */
-  placeOf: (server: ServerEntry) => Promise<MediaPlace>
+  placeOf: () => Promise<MediaPlace>
   /** Lets go of the server's pick, so the next ask probes again: its origin went away, or the network moved. */
-  forget: (serverId: string) => void
+  forget: () => void
 }
 
 type CreateOriginPicksProps = {
+  server: ServerEntry
   calls: Pick<ServerCalls, 'call'>
   probe: ProbeFetch
   /** Times the probes in monotonic milliseconds, so a wall clock that jumps never skews one. */
@@ -140,26 +141,25 @@ type Held = { pick: Promise<Picked>; at: number }
  * by the next ask. No ticket is minted here: the ping is open.
  */
 export const createOriginPicks = ({
+  server,
   calls,
   probe,
   probeClock,
   now,
   warn,
 }: CreateOriginPicksProps): OriginPicks => {
-  let held: ReadonlyMap<string, Held> = new Map()
+  let held: Held | null = null
 
   /** A log line never fails a pick. */
   const safeWarn = quietly(warn)
 
   /** Never rejects: a pick is shared, so a rejected one would fail every ask that shares it. */
-  const pickFor = async (server: ServerEntry): Promise<Picked> => {
-    const reply = await calls
-      .call({ serverId: server.id, call: { name: CALL_NAMES.getMediaOrigins } })
-      .catch(() => null)
+  const pickFor = async (): Promise<Picked> => {
+    const reply = await calls.call({ call: { name: CALL_NAMES.getMediaOrigins } }).catch(() => null)
     const body =
       reply !== null && reply.ok && reply.status === HTTP_STATUSES.ok ? parseJson(reply.body) : null
     if (!isMediaOrigins(body)) {
-      safeWarn(`${loggable(server.name)} did not list media origins Raven can read`)
+      safeWarn(`${SERVER_NAME} did not list media origins Raven can read`)
       return { origin: null, isListed: false, remote: null }
     }
     const { origins, remote } = readMediaOrigins(body)
@@ -169,9 +169,7 @@ export const createOriginPicks = ({
     }))
     const refused = checked.filter((entry) => entry.trusted === null).map((entry) => entry.kind)
     if (refused.length > 0) {
-      safeWarn(
-        `${loggable(server.name)} listed media origins Raven does not trust: ${refused.join(', ')}`,
-      )
+      safeWarn(`${SERVER_NAME} listed media origins Raven does not trust: ${refused.join(', ')}`)
     }
     const trusted = checked.flatMap((entry) => (entry.trusted === null ? [] : [entry.trusted]))
     const settled = await Promise.allSettled(
@@ -190,32 +188,31 @@ export const createOriginPicks = ({
     return age >= 0 && age < PICK_FRESH_MS
   }
 
-  const forget = (serverId: string): void => {
-    held = new Map([...held].filter(([id]) => id !== serverId))
+  const forget = (): void => {
+    held = null
   }
 
-  const pickOf = (server: ServerEntry): Promise<Picked> => {
-    const kept = held.get(server.id)
-    if (kept !== undefined && isFresh(kept)) return kept.pick
+  const pickOf = (): Promise<Picked> => {
+    if (held !== null && isFresh(held)) return held.pick
     const at = now()
     // Every ask shares this one promise, so they settle in the order they asked.
-    const pick: Promise<Picked> = pickFor(server).then((picked) => {
+    const pick: Promise<Picked> = pickFor().then((picked) => {
       // Origins listed and none answering: asks that came meanwhile shared it, the next probes again.
       const isNoneAnswering = picked.origin === null && picked.isListed
-      if (isNoneAnswering && held.get(server.id)?.pick === pick) forget(server.id)
+      if (isNoneAnswering && held !== null && held.pick === pick) forget()
       return picked
     })
-    held = new Map([...held, [server.id, { pick, at }]])
+    held = { pick, at }
     return pick
   }
 
-  const placeOf: OriginPicks['placeOf'] = async (server) => {
-    const { origin, remote } = await pickOf(server)
+  const placeOf: OriginPicks['placeOf'] = async () => {
+    const { origin, remote } = await pickOf()
     return { url: origin?.url ?? server.origin, origin, remote }
   }
 
   return {
-    originOf: async (server) => (await placeOf(server)).url,
+    originOf: async () => (await placeOf()).url,
     placeOf,
     forget,
   }

@@ -23,7 +23,8 @@ import { describedFileId, openLine } from '@/main/log/opens'
 import { setWindowBounds } from '@/main/playerState'
 import { createRequestHandler } from '@/main/requestHandler'
 import { isPermissionAllowed, isTrustedSender, navigationFor, windowOpenFor } from '@/main/security'
-import type { StateStore, Timers } from '@/main/stateStore'
+import type { StateStore } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 import {
   createWebHostHandler,
   listenWebHost,

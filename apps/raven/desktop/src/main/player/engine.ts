@@ -1,10 +1,10 @@
 import { join } from 'node:path'
 import {
+  MPV_OPTIONS,
   MPV_SURFACE_KINDS,
+  type MpvOption,
   type MpvSurface,
   type NativeTarget,
-  type MpvOption,
-  MPV_OPTIONS,
 } from '@raven/mpv'
 import { messageOf } from '@/shared/messageOf'
 

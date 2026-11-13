@@ -112,7 +112,6 @@ export const setup = ({
   })
   const clock = { now: NOW }
   const warnings: string[] = []
-  const names = new Map([[SERVER_ID, 'Vhagar']])
   const statted: string[] = []
   const told = { lists: 0 }
   const noted: string[] = []
@@ -129,7 +128,7 @@ export const setup = ({
     },
     now: () => clock.now,
     warn: (message) => warnings.push(message),
-    serverNameOf: (serverId) => names.get(serverId) ?? '',
+    serverId: SERVER_ID,
     change: (apply) => store.update(apply),
     announce: () => {
       told.lists += 1
@@ -152,7 +151,6 @@ export const setup = ({
     shelf,
     clock,
     warnings,
-    names,
     statted,
     told,
     noted,

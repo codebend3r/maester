@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { NO_PENDING, remove, type Owed, type Pending } from '@/main/downloads/downloadState'
 import { settleWithin, SYNC_DEBOUNCE_MS, SYNC_RETRY_MS } from '@/main/downloads/sync'
+import { CALL_NAMES } from '@/main/servers/allowlist'
 import type { ServerCallResult } from '@/main/servers/serverCalls'
 import { ticks } from '@/main/test/downloadFakes'
 import { fakeTimers } from '@/main/test/playerFakes'
@@ -27,8 +28,8 @@ describe('touch', () => {
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
     expect(world.log).toEqual([
-      { name: 'recordPlay', mediaId: 11 },
-      { name: 'saveProgress', mediaId: 11, position: 300, audio: null },
+      { name: CALL_NAMES.recordPlay, mediaId: 11 },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
     ])
   })
 
@@ -39,8 +40,8 @@ describe('touch', () => {
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
     expect(world.log).toEqual([
-      { name: 'recordPlay', mediaId: 11 },
-      { name: 'saveProgress', mediaId: 11, position: 450, audio: null },
+      { name: CALL_NAMES.recordPlay, mediaId: 11 },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 450, audio: null },
     ])
     expect(world.pending.size).toBe(1)
   })
@@ -50,7 +51,9 @@ describe('touch', () => {
     world.note({ position: 300 })
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
-    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300, audio: null }])
+    expect(world.log).toEqual([
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
+    ])
   })
 
   it('clears both the play and the position once the server answers 2xx', async () => {
@@ -94,7 +97,7 @@ describe('touch', () => {
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
     expect(world.log.slice(2)).toEqual([
-      { name: 'saveProgress', mediaId: 11, position: 360, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 360, audio: null },
     ])
     expect(world.pendingOf()).toEqual({
       play: false,
@@ -112,7 +115,9 @@ describe('touch', () => {
     world.note({ position: 300 })
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(3)
-    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300, audio: null }])
+    expect(world.log).toEqual([
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
+    ])
     world.note({ play: true, position: 360 })
     held.open(NO_CONTENT)
     await ticks(5)
@@ -127,8 +132,8 @@ describe('touch', () => {
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
     expect(world.log.slice(1)).toEqual([
-      { name: 'recordPlay', mediaId: 11 },
-      { name: 'saveProgress', mediaId: 11, position: 360, audio: null },
+      { name: CALL_NAMES.recordPlay, mediaId: 11 },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 360, audio: null },
     ])
     expect(world.pendingOf()).toEqual({
       play: false,
@@ -149,7 +154,7 @@ describe('touch', () => {
     world.note({ position: 360 })
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(3)
-    expect(world.log).toEqual([{ name: 'recordPlay', mediaId: 11 }])
+    expect(world.log).toEqual([{ name: CALL_NAMES.recordPlay, mediaId: 11 }])
     held.open(UNREACHABLE)
     await ticks(5)
     expect(world.log).toHaveLength(1)
@@ -164,8 +169,8 @@ describe('touch', () => {
     world.fireAt(SYNC_RETRY_MS)
     await ticks(8)
     expect(world.log.slice(1)).toEqual([
-      { name: 'recordPlay', mediaId: 11 },
-      { name: 'saveProgress', mediaId: 11, position: 360, audio: null },
+      { name: CALL_NAMES.recordPlay, mediaId: 11 },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 360, audio: null },
     ])
   })
 
@@ -176,7 +181,7 @@ describe('touch', () => {
     world.note({ play: true, position: 300 })
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
-    expect(world.log).toEqual([{ name: 'recordPlay', mediaId: 11 }])
+    expect(world.log).toEqual([{ name: CALL_NAMES.recordPlay, mediaId: 11 }])
     expect(world.pendingOf()).toEqual({
       play: true,
       position: 300,
@@ -204,7 +209,7 @@ describe('touch', () => {
     world.fireAt(SYNC_RETRY_MS)
     await ticks(5)
     expect(world.log.slice(2)).toEqual([
-      { name: 'saveProgress', mediaId: 11, position: 300, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
     ])
   })
 })
@@ -217,9 +222,9 @@ describe('a scrub back', () => {
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(8)
     expect(world.log).toEqual([
-      { name: 'recordPlay', mediaId: 11 },
-      { name: 'saveProgress', mediaId: 11, position: 2850, audio: null },
-      { name: 'saveProgress', mediaId: 11, position: 2100, audio: null },
+      { name: CALL_NAMES.recordPlay, mediaId: 11 },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 2850, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 2100, audio: null },
     ])
     expect(world.pendingOf()).toEqual({
       play: false,
@@ -235,7 +240,9 @@ describe('a scrub back', () => {
     world.note({ position: 2100 })
     world.note({ position: 2850 })
     await world.sync.runAll()
-    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 2850, audio: null }])
+    expect(world.log).toEqual([
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 2850, audio: null },
+    ])
     expect(world.pendingOf()).toEqual({
       play: false,
       position: null,
@@ -270,8 +277,8 @@ describe('a scrub back', () => {
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(8)
     expect(world.log.slice(2)).toEqual([
-      { name: 'saveProgress', mediaId: 11, position: 2950, audio: null },
-      { name: 'saveProgress', mediaId: 11, position: 2200, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 2950, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 2200, audio: null },
     ])
     expect(world.pendingOf()).toEqual({
       play: false,
@@ -290,8 +297,8 @@ describe('a scrub back', () => {
     world.note({ position: 2100 })
     await world.sync.runAll()
     expect(world.log).toEqual([
-      { name: 'recordPlay', mediaId: 11 },
-      { name: 'saveProgress', mediaId: 11, position: 2850, audio: null },
+      { name: CALL_NAMES.recordPlay, mediaId: 11 },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 2850, audio: null },
     ])
     expect(world.pendingOf()).toEqual({
       play: false,
@@ -323,8 +330,8 @@ describe('an answer that is no success', () => {
     world.fireAt(SYNC_RETRY_MS)
     await ticks(5)
     expect(world.log.slice(1)).toEqual([
-      { name: 'recordPlay', mediaId: 11 },
-      { name: 'saveProgress', mediaId: 11, position: 300, audio: null },
+      { name: CALL_NAMES.recordPlay, mediaId: 11 },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
     ])
     expect(world.pendingOf()).toEqual({
       play: false,
@@ -346,8 +353,8 @@ describe('an answer that is no success', () => {
     world.fireAt(7000)
     await ticks(5)
     expect(world.log.slice(1)).toEqual([
-      { name: 'recordPlay', mediaId: 11 },
-      { name: 'saveProgress', mediaId: 11, position: 300, audio: null },
+      { name: CALL_NAMES.recordPlay, mediaId: 11 },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
     ])
     expect(world.pendingOf()).toEqual({
       play: false,
@@ -469,29 +476,25 @@ describe('after an unreachable answer', () => {
     world.fireAt(SYNC_RETRY_MS)
     await ticks(8)
     expect(world.log.slice(1)).toEqual([
-      { name: 'recordPlay', mediaId: 11 },
-      { name: 'saveProgress', mediaId: 11, position: 320, audio: null },
+      { name: CALL_NAMES.recordPlay, mediaId: 11 },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 320, audio: null },
     ])
     world.note({ position: 330 })
     expect([...world.pending.values()].map(({ ms }) => ms)).toContain(SYNC_DEBOUNCE_MS)
   })
 
-  it("holds every download of that server, and none of another server's", async () => {
+  it('holds every download until the retry', async () => {
     const other = entryFor({ downloadId: OTHER_ID, mediaId: 12 })
-    const elsewhere = entryFor({ downloadId: THIRD_ID, serverId: OTHER_SERVER_ID, mediaId: 13 })
-    const world = setupSync({ entries: [entryFor(), other, elsewhere] })
+    const world = setupSync({ entries: [entryFor(), other] })
     world.server.answer = async () => UNREACHABLE
     world.note({ position: 300 })
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
     world.server.answer = async () => NO_CONTENT
     world.note({ downloadId: OTHER_ID, position: 40 })
-    world.note({ downloadId: THIRD_ID, position: 50 })
     world.fireAt(SYNC_DEBOUNCE_MS)
     await ticks(5)
-    expect(world.log.slice(1)).toEqual([
-      { name: 'saveProgress', mediaId: 13, position: 50, audio: null },
-    ])
+    expect(world.log.slice(1)).toEqual([])
   })
 })
 
@@ -506,7 +509,7 @@ describe('the launch and retry runs', () => {
     accountId: null,
   })
 
-  it('send one download at a time per server, oldest first, with servers side by side', async () => {
+  it('send one download at a time, oldest first, and never what another server is owed', async () => {
     const newer = entryFor({ pending: pendingAt({ at: NOW + 2, position: 300 }) })
     const older = entryFor({
       downloadId: OTHER_ID,
@@ -528,17 +531,16 @@ describe('the launch and retry runs', () => {
     const running = world.sync.runAll()
     await ticks(5)
     expect(world.log).toEqual([
-      { name: 'saveProgress', mediaId: 12, position: 40, audio: null },
-      { name: 'saveProgress', mediaId: 13, position: 50, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 12, position: 40, audio: null },
     ])
     held.open(NO_CONTENT)
     await running
-    expect(world.log.slice(2)).toEqual([
-      { name: 'saveProgress', mediaId: 11, position: 300, audio: null },
+    expect(world.log.slice(1)).toEqual([
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
     ])
   })
 
-  it("end a server's round at its first unreachable answer, and the retry sends the rest in order", async () => {
+  it('end the round at its first unreachable answer, and the retry sends the rest in order', async () => {
     const newer = entryFor({ pending: pendingAt({ at: NOW + 2, position: 300 }) })
     const older = entryFor({
       downloadId: OTHER_ID,
@@ -548,13 +550,15 @@ describe('the launch and retry runs', () => {
     const world = setupSync({ entries: [newer, older] })
     world.server.answer = async () => UNREACHABLE
     await world.sync.runAll()
-    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 12, position: 40, audio: null }])
+    expect(world.log).toEqual([
+      { name: CALL_NAMES.saveProgress, mediaId: 12, position: 40, audio: null },
+    ])
     world.server.answer = async () => NO_CONTENT
     world.fireAt(SYNC_RETRY_MS)
     await ticks(10)
     expect(world.log.slice(1)).toEqual([
-      { name: 'saveProgress', mediaId: 12, position: 40, audio: null },
-      { name: 'saveProgress', mediaId: 11, position: 300, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 12, position: 40, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
     ])
   })
 })
@@ -565,7 +569,9 @@ describe('runAll', () => {
     const world = setupSync({ entries: [entryFor(), other] })
     world.note({ position: 300 })
     await world.sync.runAll()
-    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300, audio: null }])
+    expect(world.log).toEqual([
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
+    ])
     expect(world.pendingOf()).toEqual({
       play: false,
       position: null,
@@ -612,7 +618,9 @@ describe('runAll', () => {
     world.note({ position: 300 })
     world.note({ downloadId: OTHER_ID, position: 40 })
     await world.sync.runFor({ downloadIds: [OTHER_ID] })
-    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 12, position: 40, audio: null }])
+    expect(world.log).toEqual([
+      { name: CALL_NAMES.saveProgress, mediaId: 12, position: 40, audio: null },
+    ])
   })
 
   it('sends nothing for a download deleted before its debounce ran', async () => {
@@ -638,9 +646,9 @@ describe('what removed downloads owe', () => {
     const world = setupSync({ entries: [], owed: [owedFor()] })
     await world.sync.runAll()
     expect(world.log).toEqual([
-      { name: 'recordPlay', mediaId: 11 },
-      { name: 'saveProgress', mediaId: 11, position: 2900, audio: null },
-      { name: 'saveProgress', mediaId: 11, position: 300, audio: null },
+      { name: CALL_NAMES.recordPlay, mediaId: 11 },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 2900, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
     ])
     expect(world.store.read().owed).toEqual([])
   })
@@ -682,7 +690,7 @@ describe('what removed downloads owe', () => {
       await world.sync.runAll()
       expect(world.store.read().owed).toEqual([])
       expect(world.log.filter((call) => 'mediaId' in call && call.mediaId === 11)).toEqual([
-        { name: 'recordPlay', mediaId: 11 },
+        { name: CALL_NAMES.recordPlay, mediaId: 11 },
       ])
       expect(world.warnings).toHaveLength(1)
       expect(world.warnings[0]).toContain(String(status))
@@ -716,9 +724,9 @@ describe('what removed downloads owe', () => {
     })
     await world.sync.runAll()
     expect(world.log).toEqual([
-      { name: 'saveProgress', mediaId: 11, position: 30, audio: null },
-      { name: 'saveProgress', mediaId: 12, position: 40, audio: null },
-      { name: 'saveProgress', mediaId: 13, position: 50, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 30, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 12, position: 40, audio: null },
+      { name: CALL_NAMES.saveProgress, mediaId: 13, position: 50, audio: null },
     ])
   })
 
@@ -730,7 +738,7 @@ describe('what removed downloads owe', () => {
     world.note({ play: true, position: 300 })
     const running = world.sync.runFor({ downloadIds: [ID] })
     await ticks(3)
-    world.store.update((state) => remove(state, { downloadId: ID }))
+    world.store.update((state) => remove({ state, downloadId: ID }))
     expect(world.store.read().owed).toHaveLength(1)
     held.open(NO_CONTENT)
     await running
@@ -747,7 +755,9 @@ describe('what removed downloads owe', () => {
     const world = setupSync({ owed: [owedFor({ mediaId: 12 })] })
     world.note({ position: 300 })
     await world.sync.runFor({ downloadIds: [ID] })
-    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300, audio: null }])
+    expect(world.log).toEqual([
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
+    ])
     expect(world.store.read().owed).toHaveLength(1)
   })
 })
@@ -783,11 +793,15 @@ describe('dispose', () => {
     world.server.answer = () => held.answer
     const running = world.sync.runAll()
     await ticks(3)
-    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300, audio: null }])
+    expect(world.log).toEqual([
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
+    ])
     world.sync.dispose()
     held.open(NO_CONTENT)
     await running
-    expect(world.log).toEqual([{ name: 'saveProgress', mediaId: 11, position: 300, audio: null }])
+    expect(world.log).toEqual([
+      { name: CALL_NAMES.saveProgress, mediaId: 11, position: 300, audio: null },
+    ])
     expect(world.pendingOf()?.position).toBeNull()
     expect(world.pendingOf(OTHER_ID)?.position).toBe(300)
   })

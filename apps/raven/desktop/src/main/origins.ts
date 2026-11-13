@@ -1,10 +1,10 @@
-import { DESKTOP_ENV } from '@/shared/platform'
 import {
   DEFAULT_LINK_ORIGINS,
   DEFAULT_SERVER_ORIGIN,
   isServerOrigin,
   serverOriginOf,
 } from '@raven/core'
+import { DESKTOP_ENV } from '@/shared/platform'
 import type { FixedServer } from '@/main/desktopConfig'
 
 /**

@@ -1,6 +1,6 @@
-import { MPV_OPTIONS, type MpvOption } from '@raven/mpv'
 import { expect, test } from 'bun:test'
 import { DESKTOP_PLATFORMS, type OutputSettings } from '@raven/core'
+import { MPV_OPTIONS, type MpvOption } from '@raven/mpv'
 import { isVolumeFixedFor, outputOptions, readDevices } from '@/main/player/outputOptions'
 
 const MAC = DESKTOP_PLATFORMS.mac

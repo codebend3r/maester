@@ -18,9 +18,8 @@ import {
   type TicketFailure,
   type Upstream,
 } from '@/main/servers/relayUpstream'
-import { loggable } from '@/main/servers/serverCalls'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
+import { SERVER_NAME } from '@/main/desktopConfig'
+import { HEADERS, HTTP_STATUSES, isSuccessStatus } from '@shared/http'
 
 /** The most of a playlist the relay reads: a VOD playlist of a long film is a few hundred KB. */
 const PLAYLIST_MAX_CHARS = 8 * 1024 * 1024
@@ -82,8 +81,6 @@ export type HlsSessions = {
 
 type CreateHlsSessionsProps = {
   mediaId: number
-  /** The server's name, for the warnings. */
-  name: string
   /** The load's master playlist, asked with a ticket. */
   fetchMaster: (signal: AbortSignal) => Promise<Fetched>
   /** A path asked of the load's origins as they stand. */
@@ -99,7 +96,6 @@ type CreateHlsSessionsProps = {
  */
 export const createHlsSessions = ({
   mediaId,
-  name,
   fetchMaster,
   fetchPath,
   retired,
@@ -132,13 +128,13 @@ export const createHlsSessions = ({
       return {
         kind: SESSION_ANSWERS.answered,
         status: upstream.status,
-        type: upstream.headers.get(HTTP_HEADERS.contentType),
+        type: upstream.headers.get(HEADERS.contentType),
         text: await readShort(upstream.body),
       }
     }
     const read = await readPlaylist(upstream)
     if (read === null || read.session === null) {
-      warn(`${loggable(name)} sent a master playlist the relay does not pass on`)
+      warn(`${SERVER_NAME} sent a master playlist the relay does not pass on`)
       return {
         kind: SESSION_ANSWERS.answered,
         status: HTTP_STATUSES.badGateway,
@@ -186,9 +182,8 @@ export const createHlsSessions = ({
       return fromSession({ ...request, opened: again.session })
     },
     playlistOf: async ({ upstream, method }) => {
-      const type = upstream.headers.get(HTTP_HEADERS.contentType)
-      const typed: Record<string, string> =
-        type === null ? {} : { [HTTP_HEADERS.contentType]: type }
+      const type = upstream.headers.get(HEADERS.contentType)
+      const typed: Record<string, string> = type === null ? {} : { [HEADERS.contentType]: type }
       if (method === RELAY_METHODS.head) {
         await discard(upstream)
         return {
@@ -200,14 +195,14 @@ export const createHlsSessions = ({
       }
       const read = await readPlaylist(upstream)
       if (read === null) {
-        warn(`${loggable(name)} sent a playlist the relay does not pass on`)
+        warn(`${SERVER_NAME} sent a playlist the relay does not pass on`)
         return { kind: PLAYLIST_ANSWERS.refused }
       }
       const body = new TextEncoder().encode(read.text)
       return {
         kind: PLAYLIST_ANSWERS.passed,
         status: upstream.status,
-        headers: { ...typed, [HTTP_HEADERS.contentLength]: String(body.length) },
+        headers: { ...typed, [HEADERS.contentLength]: String(body.length) },
         body,
       }
     },
