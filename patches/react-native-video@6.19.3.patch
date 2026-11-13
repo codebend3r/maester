@@ -50,19 +50,20 @@ index 1ac0fd03ac0197bf10e54dddb6bb2538a876fd1b..4cb2edeb031c4f77a1d7f30c6757e0df
      }
 diff --git a/android/src/main/java/com/brentvatne/exoplayer/BaseLayerVideoRenderer.java b/android/src/main/java/com/brentvatne/exoplayer/BaseLayerVideoRenderer.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..450ff1f6cf5208d0f14b9659720938f9f627b2d9
 --- /dev/null
 +++ b/android/src/main/java/com/brentvatne/exoplayer/BaseLayerVideoRenderer.java
-@@ -0,0 +1,90 @@
+@@ -0,0 +1,154 @@
 +package com.brentvatne.exoplayer;
 +
 +import android.media.MediaCodecInfo.CodecProfileLevel;
++import android.util.Log;
 +import android.util.Pair;
 +
 +import androidx.annotation.Nullable;
 +import androidx.media3.common.Format;
 +import androidx.media3.common.MimeTypes;
 +import androidx.media3.common.util.UnstableApi;
++import androidx.media3.decoder.DecoderInputBuffer;
 +import androidx.media3.exoplayer.DecoderReuseEvaluation;
 +import androidx.media3.exoplayer.ExoPlaybackException;
 +import androidx.media3.exoplayer.FormatHolder;
@@ -71,22 +72,34 @@ index 0000000000000000000000000000000000000000..450ff1f6cf5208d0f14b9659720938f9
 +import androidx.media3.exoplayer.mediacodec.MediaCodecUtil;
 +import androidx.media3.exoplayer.video.MediaCodecVideoRenderer;
 +
++import java.nio.ByteBuffer;
 +import java.util.List;
 +
 +/**
 + * raven: plays a Dolby Vision profile 7 track on a device with no decoder for that profile as
 + * its HDR10 base layer, on the plain HEVC decoder, as Plex's and Kodi's players do. Profile 7
-+ * (UHD Blu-ray remuxes, dual layer) always carries an HDR10 base layer, and an HEVC decoder
-+ * skips the enhancement layer and the RPU, which ride in NAL unit types the HEVC spec leaves
-+ * unspecified. Media3 already falls back to HEVC for profiles 4 and 8, but not 7: it opens a
-+ * Dolby Vision decoder that refuses the profile, and on the Google TV Streamer
-+ * (c2.mtk.dvav.ser.decoder) that decoder fails on the first frame. A device that does decode
-+ * profile 7 keeps Dolby Vision.
++ * (UHD Blu-ray remuxes, dual layer) always carries an HDR10 base layer. Media3 already falls back
++ * to HEVC for profiles 4 and 8, but not 7: it opens a Dolby Vision decoder that refuses the
++ * profile, and on the Google TV Streamer (c2.mtk.dvav.ser.decoder) that decoder fails on the
++ * first frame. A device that does decode profile 7 keeps Dolby Vision.
++ *
++ * The base layer's samples still hold the Dolby Vision RPU (NAL unit type 62) and the
++ * enhancement layer (type 63). MediaTek's HEVC decoder does not skip them: the Streamer then
++ * sent a solid pink picture to the TV. So every sample loses those units before it is queued,
++ * and the decoder sees the plain HDR10 stream a file without Dolby Vision has.
 + */
 +@UnstableApi
 +final class BaseLayerVideoRenderer extends MediaCodecVideoRenderer {
 +
++    private static final String TAG = "BaseLayerVideoRenderer";
++    private static final int NAL_UNIT_TYPE_RPU = 62;
++    private static final int NAL_UNIT_TYPE_ENHANCEMENT_LAYER = 63;
++
 +    private final MediaCodecSelector mediaCodecSelector;
++    private boolean isBaseLayerOnly;
++    // A 4K remux's samples run to hundreds of kilobytes 24 times a second, so each is read in bulk
++    // into this array, kept and grown between samples, and scanned there, never byte by byte.
++    private byte[] sample = new byte[0];
 +
 +    BaseLayerVideoRenderer(MediaCodecVideoRenderer.Builder builder, MediaCodecSelector mediaCodecSelector) {
 +        super(builder.setMediaCodecSelector(mediaCodecSelector));
@@ -114,12 +127,23 @@ index 0000000000000000000000000000000000000000..450ff1f6cf5208d0f14b9659720938f9
 +        @Nullable Format format = formatHolder.format;
 +        if (format != null) {
 +            try {
-+                formatHolder.format = baseLayerOf(mediaCodecSelector, format);
++                Format played = baseLayerOf(mediaCodecSelector, format);
++                isBaseLayerOnly = played != format;
++                if (isBaseLayerOnly) Log.i(TAG, "Dolby Vision profile 7 plays as its HDR10 base layer");
++                formatHolder.format = played;
 +            } catch (MediaCodecUtil.DecoderQueryException e) {
 +                // Left as it is: the decoder query failing here fails the same way in super.
 +            }
 +        }
 +        return super.onInputFormatChanged(formatHolder);
++    }
++
++    @Override
++    protected void onQueueInputBuffer(DecoderInputBuffer buffer) throws ExoPlaybackException {
++        super.onQueueInputBuffer(buffer);
++        if (!isBaseLayerOnly || buffer.data == null) return;
++        if (sample.length < buffer.data.remaining()) sample = new byte[buffer.data.remaining()];
++        dropDolbyVisionUnits(buffer.data, sample);
 +    }
 +
 +    /** The format as the HEVC base layer when it is profile 7 and no Dolby Vision decoder takes it. */
@@ -142,6 +166,45 @@ index 0000000000000000000000000000000000000000..450ff1f6cf5208d0f14b9659720938f9
 +            if (decoder.isFormatSupported(format)) return true;
 +        }
 +        return false;
++    }
++
++    /**
++     * Drops the RPU and enhancement layer units from an Annex B sample (the extractors write each
++     * NAL unit behind a start code), reading it into `bytes`, which holds at least its remaining
++     * bytes, and writing the kept units back in place. A start code can not occur inside a unit,
++     * since the encoder's emulation prevention keeps 00 00 01 out of its payload.
++     */
++    static void dropDolbyVisionUnits(ByteBuffer data, byte[] bytes) {
++        int from = data.position();
++        int size = data.remaining();
++        data.get(bytes, 0, size);
++        int read = nextStartCode(bytes, 0, size);
++        int write = from + read;
++        while (read < size) {
++            int payload = read + (bytes[read + 2] == 0 ? 4 : 3);
++            int next = payload < size ? nextStartCode(bytes, payload, size) : size;
++            int type = payload < size ? (bytes[payload] >> 1) & 0x3F : -1;
++            if (type != NAL_UNIT_TYPE_RPU && type != NAL_UNIT_TYPE_ENHANCEMENT_LAYER) {
++                data.position(write);
++                data.put(bytes, read, next - read);
++                write += next - read;
++            }
++            read = next;
++        }
++        data.position(from);
++        data.limit(write);
++    }
++
++    /** Where the next start code (00 00 01, or 00 00 00 01) begins, or `end` when there is none. */
++    private static int nextStartCode(byte[] bytes, int from, int end) {
++        for (int i = from; i + 2 < end; i++) {
++            if ((bytes[i + 2] & 0xFF) > 1) {
++                i += 2;
++            } else if (bytes[i] == 0 && bytes[i + 1] == 0 && bytes[i + 2] == 1) {
++                return i > from && bytes[i - 1] == 0 ? i - 1 : i;
++            }
++        }
++        return end;
 +    }
 +}
 diff --git a/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt b/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt

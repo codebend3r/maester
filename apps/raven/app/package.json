@@ -16,6 +16,7 @@
     "build:android-tv:test-account": "bun --env-file=.env.test-account run build:android-tv",
     "build:ios": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
     "build:tvos": "./scripts/build_tvos.sh",
+    "check:patches": "./scripts/check_patches.sh",
     "dev:ios": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-phone",
     "dev:ipad": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-pad",
     "dev:tvos": "EXPO_TV=1 APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device raven-tv",
@@ -127,6 +128,7 @@
     ],
     "includedScripts": [
       "start",
+      "check:patches",
       "prebuild:ios",
       "prebuild:tvos",
       "prebuild:android-tv",
@@ -261,7 +263,8 @@
       },
       "prebuild:ios": {
         "dependsOn": [
-          "^build"
+          "^build",
+          "check:patches"
         ],
         "inputs": [
           "default",
@@ -288,7 +291,8 @@
       },
       "prebuild:tvos": {
         "dependsOn": [
-          "^build"
+          "^build",
+          "check:patches"
         ],
         "inputs": [
           "default",
@@ -315,7 +319,8 @@
       },
       "prebuild:android-tv": {
         "dependsOn": [
-          "^build"
+          "^build",
+          "check:patches"
         ],
         "inputs": [
           "default",
@@ -429,6 +434,9 @@
         "dependsOn": [
           "build:android-tv"
         ],
+        "cache": false
+      },
+      "check:patches": {
         "cache": false
       }
     }
