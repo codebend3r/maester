@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { CONTAINERS, VIDEO_CODECS, createApiClient } from '@raven/core'
+import { mediaItemFor } from '@raven/native/testing'
 
 import { DOWNLOAD_COPY } from '@/downloads/copy'
 import {
@@ -27,7 +28,6 @@ import {
   SEVERANCE,
   SEVERANCE_ONE,
 } from '@/test/itemServer'
-import { mediaItemFor } from '@/test/mediaItem'
 
 const api = createApiClient({
   baseUrl: 'https://nas.example',

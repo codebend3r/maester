@@ -11,13 +11,13 @@ import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
+import { type HeardRequest, pathWithId } from '@raven/native/testing'
 
 import { ITEM_TEST_IDS } from '@/layouts/itemKit'
 import { CHIP_COLOURS } from '@/theme/appTheme'
 import { APP_ROUTES, APP_ROUTE_PARAMS, PLAY_FROM } from '@/routes'
 import { Item } from '@/screens/Item'
 import { useActiveServer } from '@/stores/activeServer'
-import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
 import { NAS, SERIES } from '@/test/homeServer'
 import {
   BUSBOYS,
@@ -202,7 +202,7 @@ describe('Item on a phone or tablet', () => {
 
   it("offers a show's marks while its next episode is read, and Play once it is, as the web does", async () => {
     const next = heldAnswer()
-    const nextPath = pathFor({ path: APP_CLIENT_CALLS.nextEpisode.path, id: SEVERANCE.id })
+    const nextPath = pathWithId({ path: APP_CLIENT_CALLS.nextEpisode.path, id: SEVERANCE.id })
     mockServer.reads = (path) => (path === nextPath ? next.answer : Promise.resolve())
     await renderItem({ [APP_ROUTE_PARAMS.id]: String(SEVERANCE.id) })
 
@@ -227,7 +227,7 @@ describe('Item on a phone or tablet', () => {
     expect(writes()).toEqual([
       {
         method: HTTP_METHODS.put,
-        path: pathFor({ path: setItemFavourite.path, id: SEVERANCE.id }),
+        path: pathWithId({ path: setItemFavourite.path, id: SEVERANCE.id }),
         body: { favourite: true },
       },
     ])
@@ -245,7 +245,7 @@ describe('Item on a phone or tablet', () => {
     expect(
       await screen.findByRole('checkbox', { name: 'Mark as binging', checked: false }),
     ).toBeTruthy()
-    const bingePath = pathFor({ path: setBinge.path, id: SEVERANCE.id })
+    const bingePath = pathWithId({ path: setBinge.path, id: SEVERANCE.id })
     expect(writes()).toEqual([
       { method: HTTP_METHODS.put, path: bingePath, body: { binge: true } },
       { method: HTTP_METHODS.put, path: bingePath, body: { binge: false } },
@@ -362,7 +362,7 @@ describe('Item on a phone or tablet', () => {
 
     expect(await screen.findByText('This title is not on the server.')).toBeTruthy()
     expect(mockServer.heard.map(({ path }) => path)).not.toContain(
-      pathFor({ path: APP_CLIENT_CALLS.getItem.path, id: 1000 }),
+      pathWithId({ path: APP_CLIENT_CALLS.getItem.path, id: 1000 }),
     )
   })
 

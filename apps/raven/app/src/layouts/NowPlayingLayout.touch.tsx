@@ -31,6 +31,7 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TouchNav } from '@/layouts/TouchNav'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /**
  * How much of the screen the cover takes in each layout, as the TV sizes it: beside the lyrics,
@@ -142,20 +143,25 @@ const Player = ({
         <SeekBar duration={duration} onSeek={onSeek} position={position} />
         <View style={[own.controls, isCentred && own.centredControls]}>
           <IconPlate
-            icon="skipPrevious"
+            icon={APP_ICONS.skipPrevious}
             isOn={false}
             label={MUSIC_COPY.previous}
             onPress={onPrevious}
           />
           <IconPlate
-            icon={isPlaying ? 'pause' : 'play'}
+            icon={isPlaying ? APP_ICONS.pause : APP_ICONS.play}
             isOn
             label={toggleLabelOf(isPlaying)}
             onPress={onToggle}
           />
-          <IconPlate icon="skipNext" isOn={false} label={MUSIC_COPY.next} onPress={onNext} />
           <IconPlate
-            icon="shuffle"
+            icon={APP_ICONS.skipNext}
+            isOn={false}
+            label={MUSIC_COPY.next}
+            onPress={onNext}
+          />
+          <IconPlate
+            icon={APP_ICONS.shuffle}
             isOn={isShuffled}
             label={shuffleLabelOf(isShuffled)}
             onPress={onShuffle}
@@ -167,7 +173,7 @@ const Player = ({
             onPress={onRepeat}
           />
           <IconPlate
-            icon="list"
+            icon={APP_ICONS.list}
             isOn={false}
             label={MUSIC_COPY.addToPlaylist}
             onPress={() =>
@@ -209,7 +215,12 @@ const Queue = ({ queue, onClear, onJump, onRemove }: QueueProps) => {
           <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
             {MUSIC_COPY.upNext}
           </Text>
-          <Chip icon="close" label={MUSIC_COPY.clear} onPress={onClear} text={MUSIC_COPY.clear} />
+          <Chip
+            icon={APP_ICONS.close}
+            label={MUSIC_COPY.clear}
+            onPress={onClear}
+            text={MUSIC_COPY.clear}
+          />
         </View>
         {queue.map((row) => (
           <ListEntry
@@ -221,7 +232,7 @@ const Queue = ({ queue, onClear, onJump, onRemove }: QueueProps) => {
             title={row.title}
           >
             <Chip
-              icon="close"
+              icon={APP_ICONS.close}
               label={MUSIC_COPY.removeTrack(row.title)}
               onPress={() => onRemove(row.place)}
               text={MUSIC_COPY.remove}

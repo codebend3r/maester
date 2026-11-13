@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import type * as Native from '@raven/native'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
+import { type HeardRequest, pathWithId } from '@raven/native/testing'
 
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { Artist } from '@/screens/Artist'
 import { useActiveServer } from '@/stores/activeServer'
-import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
 import { heldAnswer } from '@/test/heldAnswer'
 import { NAS } from '@/test/homeServer'
 import { OK_COMPUTER, RADIOHEAD, musicApi } from '@/test/musicServer'
@@ -70,7 +70,7 @@ describe('Artist', () => {
     expect(mockHeard.filter(({ method }) => method !== HTTP_METHODS.get)).toEqual([
       {
         method: HTTP_METHODS.put,
-        path: pathFor({ path: APP_CLIENT_CALLS.setArtistFavourite.path, id: RADIOHEAD.id }),
+        path: pathWithId({ path: APP_CLIENT_CALLS.setArtistFavourite.path, id: RADIOHEAD.id }),
         body: { favourite: true },
       },
     ])

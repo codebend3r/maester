@@ -15,8 +15,14 @@ import {
   isPlaybackSettingsChange,
 } from '@raven/core'
 import type { AppServer } from '@raven/native/headless'
+import {
+  type HeardRequest,
+  NOT_FOUND,
+  STATUSES,
+  pathWithId,
+  responseOf,
+} from '@raven/native/testing'
 
-import { type HeardRequest, NOT_FOUND, STATUSES, pathFor, responseOf } from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 
 /** The account signed in on the device in these tests. */
@@ -99,7 +105,7 @@ export const adminApi =
           [`${get} ${APP_CLIENT_CALLS.getDisplaySettings.path}`]: DEFAULT_DISPLAY_SETTINGS,
           [`${get} ${APP_CLIENT_CALLS.getRemoteAccess.path}`]: REMOTE_ACCESS,
           [`${get} ${APP_CLIENT_CALLS.listLibraries.path}`]: [FILMS, SERIES],
-          [`${post} ${pathFor({ path: APP_CLIENT_CALLS.quickScanLibrary.path, id: FILMS.id })}`]:
+          [`${post} ${pathWithId({ path: APP_CLIENT_CALLS.quickScanLibrary.path, id: FILMS.id })}`]:
             FILMS,
           [`${get} ${APP_CLIENT_CALLS.listMembers.path}?pageSize=100&pageOffset=0`]: [
             OWNER,

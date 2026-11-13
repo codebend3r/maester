@@ -6,6 +6,7 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { PlateButton } from '@/layouts/tvControls'
 import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { pictureStyles } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** What plays next, as the card offers it: its words, the countdown to it, and its two answers. */
 type UpNextOffer = Pick<UpNextMoment, 'secondsLeft' | 'hasSceneAfter'> & {
@@ -69,7 +70,7 @@ export const UpNextCard = ({ offer, lift }: UpNextCardProps) => {
         {hasSceneAfter && <Text style={styles.line}>{PLAYER_COPY.sceneAfter}</Text>}
         <View style={styles.actions}>
           <PlateButton
-            icon="play"
+            icon={APP_ICONS.play}
             isOverPicture
             label={PLAYER_COPY.playNow}
             onPress={onPlay}

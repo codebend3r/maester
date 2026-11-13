@@ -5,6 +5,7 @@ import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
+import { pathWithId } from '@raven/native/testing'
 
 import { useAccountSession } from '@/account/session'
 import { Settings } from '@/screens/Settings'
@@ -18,7 +19,6 @@ import {
   WAITING,
   adminApi,
 } from '@/test/adminServer'
-import { pathFor } from '@/test/fixtureFetch'
 import { FILMS, NAS } from '@/test/homeServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 import { CODE_FONT } from '@/theme/fonts'
@@ -122,7 +122,7 @@ describe("the owner's settings on a phone or tablet", () => {
       expect(writes()).toEqual([
         {
           method: HTTP_METHODS.post,
-          path: pathFor({ path: APP_CLIENT_CALLS.quickScanLibrary.path, id: FILMS.id }),
+          path: pathWithId({ path: APP_CLIENT_CALLS.quickScanLibrary.path, id: FILMS.id }),
           body: undefined,
         },
       ]),

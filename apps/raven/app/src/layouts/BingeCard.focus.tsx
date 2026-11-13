@@ -11,6 +11,7 @@ import { BINGE_COPY, type BingeCard } from '@/queries/bingeCards'
 import { cardLabelOf } from '@/queries/cards'
 import { TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { pictureStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** The web card's `--color-shade`, black at 45%, laid on twice where its two gradients meet. */
 const SHADE = 0.45
@@ -188,7 +189,7 @@ export const BingeCardFocus = ({
       {isFocused && (
         <View pointerEvents="none" style={styles.markSlot}>
           <View style={styles.mark}>
-            <Icon colour={onAccent} name="play" size={PLAY_SIZE} />
+            <Icon colour={onAccent} name={APP_ICONS.play} size={PLAY_SIZE} />
           </View>
         </View>
       )}

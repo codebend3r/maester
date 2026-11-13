@@ -16,7 +16,7 @@ import {
   AT_HOME,
   type PlayNetwork,
 } from '@raven/core'
-import { mediaItemFor } from '@/test/mediaItem'
+import { mediaItemFor } from '@raven/native/testing'
 
 import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 import { type PlaybackPrefs, TRANSCODING_OFF_HERE, planFor } from '@/platform/playbackPlan'

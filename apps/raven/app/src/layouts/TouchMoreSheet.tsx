@@ -25,6 +25,7 @@ import { APP_ROUTES, type Href, ROUTE_TARGETS, hrefOf, searchHrefOf } from '@/ro
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** The sheet's tallest, as a share of the room above the bar. */
 const SHEET_MAX_SHARE = '85%'
@@ -161,25 +162,25 @@ export const TouchMoreSheet = ({
           <ScrollView contentContainerStyle={styles.sheetContent} style={styles.sheetScroll}>
             <View style={styles.tiles}>
               <MoreTile
-                icon="search"
+                icon={APP_ICONS.search}
                 label={TOUCH_TABS_COPY.search}
                 width={tileWidth}
                 onPress={() => choose(searchHrefOf(''))}
               />
               <MoreTile
-                icon="popcorn"
+                icon={APP_ICONS.popcorn}
                 label={TOUCH_NAV_COPY.binge}
                 onPress={() => choose({ pathname: APP_ROUTES.binge, params: {} })}
                 width={tileWidth}
               />
               <MoreTile
-                icon="download"
+                icon={APP_ICONS.download}
                 label={TOUCH_NAV_COPY.downloads}
                 onPress={() => choose({ pathname: APP_ROUTES.downloads, params: {} })}
                 width={tileWidth}
               />
               <MoreTile
-                icon="settings"
+                icon={APP_ICONS.settings}
                 label={SETTINGS_ENTRY.label}
                 width={tileWidth}
                 onPress={() => choose({ pathname: APP_ROUTES.settings, params: {} })}

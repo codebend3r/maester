@@ -18,10 +18,16 @@ import {
   mediaListQuery,
 } from '@raven/core'
 import { allowlistedFetch } from '@raven/native/headless'
+import {
+  NOT_FOUND,
+  STATUSES,
+  pathWithId,
+  responseOf,
+  mediaItemFor,
+  summaryFor,
+} from '@raven/native/testing'
 
-import { NOT_FOUND, STATUSES, pathFor, responseOf } from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 type MovieForProps = {
   id: number
@@ -94,7 +100,7 @@ type LibraryPathProps = {
 
 /** A library route's path for `library`, with the listing's query when it has a sort. */
 export const libraryPath = ({ call, library, sort, search }: LibraryPathProps): string => {
-  const path = pathFor({ path: call.path, id: library.id })
+  const path = pathWithId({ path: call.path, id: library.id })
   return sort === undefined ? path : `${path}?${mediaListQuery.encode({ sort, search })}`
 }
 

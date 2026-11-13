@@ -1,6 +1,6 @@
 import { PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
 
-import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
+import { type AppPlatform, PLATFORM_TRAITS } from '@/platform/platform'
 
 /** The player's audio tracks as it reports them, each saying whether it was picked. */
 type ReportedAudio = readonly { index: number; selected?: boolean }[]
@@ -34,7 +34,7 @@ type IsAudioDroppedProps = {
  * the server for.
  */
 export const isAudioDropped = ({ platform, mode, place, reported }: IsAudioDroppedProps): boolean =>
-  platform === APP_PLATFORMS.androidTv &&
+  PLATFORM_TRAITS[platform].shouldJudgeDroppedAudio &&
   mode === PLAYBACK_MODES.direct &&
   reported.length > 0 &&
   !isAskedPicked({ place, reported })

@@ -4,12 +4,12 @@ import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { Alert } from 'react-native'
+import { type HeardRequest, pathWithId } from '@raven/native/testing'
 
 import { APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf } from '@/routes'
 import { Album } from '@/screens/Album'
 import { useActiveServer } from '@/stores/activeServer'
 import { NAS } from '@/test/homeServer'
-import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
 import { heldAnswer } from '@/test/heldAnswer'
 import {
   AIRBAG,
@@ -128,7 +128,7 @@ describe('Album', () => {
         screen.getByRole('button', { name: 'Favourite' }).props.accessibilityState,
       ).toMatchObject({ selected: true }),
     )
-    const path = pathFor({ path: APP_CLIENT_CALLS.setAlbumFavourite.path, id: OK_COMPUTER.id })
+    const path = pathWithId({ path: APP_CLIENT_CALLS.setAlbumFavourite.path, id: OK_COMPUTER.id })
     expect(writes()).toEqual([{ method: HTTP_METHODS.put, path, body: { favourite: true } }])
     release()
     await untilIdle(client)
@@ -147,7 +147,7 @@ describe('Album', () => {
     expect(writes()).toEqual([
       {
         method: HTTP_METHODS.post,
-        path: pathFor({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: MIXTAPE.id }),
+        path: pathWithId({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: MIXTAPE.id }),
         body: { mediaIds: [AIRBAG.id, PARANOID.id, LUCKY.id] },
       },
     ])
@@ -174,7 +174,7 @@ describe('Album', () => {
       },
       {
         method: HTTP_METHODS.post,
-        path: pathFor({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: NEW_PLAYLIST_ID }),
+        path: pathWithId({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: NEW_PLAYLIST_ID }),
         body: { mediaIds: [PARANOID.id] },
       },
     ])

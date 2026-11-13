@@ -1,3 +1,4 @@
+import type { DownloadReading } from '@raven/native/headless'
 import type { IconName } from '@raven/ui/iconDrawings'
 
 import { DOWNLOAD_COPY } from '@/downloads/copy'
@@ -9,7 +10,7 @@ import {
   keyOfEntry,
 } from '@/downloads/downloadEntries'
 import { underwayTextOf } from '@/downloads/downloadStatusText'
-import type { DownloadReading } from '@/stores/downloadProgress'
+import { APP_ICONS } from '@/theme/icons'
 
 /** What pressing a Download button does. */
 export const DOWNLOAD_ACTIONS = {
@@ -67,7 +68,7 @@ export const downloadControlOf = ({
   const download: DownloadControl = {
     label: wanted > 1 ? DOWNLOAD_COPY.downloadAll(name) : DOWNLOAD_COPY.download,
     text: DOWNLOAD_COPY.download,
-    icon: 'download',
+    icon: APP_ICONS.download,
     isOn: false,
     isDisabled: false,
     action: DOWNLOAD_ACTIONS.download,
@@ -82,7 +83,7 @@ export const downloadControlOf = ({
       ...download,
       label: `${text}. ${DOWNLOAD_COPY.cancelDownload(name)}`,
       text,
-      icon: 'close',
+      icon: APP_ICONS.close,
       action: DOWNLOAD_ACTIONS.cancel,
     }
   }
@@ -103,7 +104,7 @@ export const downloadControlOf = ({
       ...download,
       label: `${DOWNLOAD_COPY.downloaded}. ${DOWNLOAD_COPY.deleteDownload}`,
       text: DOWNLOAD_COPY.downloaded,
-      icon: 'check',
+      icon: APP_ICONS.check,
       isOn: true,
       action: DOWNLOAD_ACTIONS.remove,
     }

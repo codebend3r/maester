@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { CONTAINERS, HLS_COPY_AUDIO_CODECS, PLAYBACK_MODES, VIDEO_CODECS } from '@raven/core'
-import { mediaItemFor } from '@/test/mediaItem'
+import { mediaItemFor } from '@raven/native/testing'
 
 import {
   QUALITY_CHOICES,

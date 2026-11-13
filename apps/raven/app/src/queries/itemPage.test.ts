@@ -9,6 +9,7 @@ import {
   codecLabel,
   movieFacts,
 } from '@raven/core'
+import { mediaItemFor } from '@raven/native/testing'
 
 import { CARD_SHAPES, CARD_SUBJECTS } from '@/queries/cards'
 import { ART_PLACES, playablePage, seasonPage, showPage } from '@/queries/itemPage'
@@ -22,7 +23,6 @@ import {
   SEVERANCE_ONE,
   itemApi,
 } from '@/test/itemServer'
-import { mediaItemFor } from '@/test/mediaItem'
 
 const COOKIE = { [AUTH_HEADERS.cookie]: 'raven_unlock=u.1' }
 const pictures = { api: itemApi(), headersFor: () => COOKIE }

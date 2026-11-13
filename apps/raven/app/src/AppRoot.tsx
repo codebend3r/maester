@@ -1,11 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { THEME_TONES } from '@raven/core'
-import { IS_SIGN_IN_BYPASSED, pinRavenServer, tokenRenewalFor } from '@raven/native/headless'
+import {
+  IGNORED,
+  IS_SIGN_IN_BYPASSED,
+  accountIdOf,
+  forgetOnAccountChange,
+  pinRavenServer,
+  tokenRenewalFor,
+  useStoresLoaded,
+} from '@raven/native/headless'
 import { configureStorage, createQueryClient } from '@raven/ui/headless'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { hideAsync, preventAutoHideAsync } from 'expo-splash-screen'
-import { type ComponentType, Fragment, useEffect, useMemo, useState } from 'react'
+import { type ComponentType, Fragment, useEffect, useMemo } from 'react'
 import { Appearance, StatusBar, StyleSheet, View } from 'react-native'
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -32,14 +40,11 @@ import { returnScreen } from '@/stores/screenFocus'
 import type { AppTheme } from '@/theme/appTheme'
 import { followTheme, useTheme } from '@/theme/useTheme'
 
-/** One cache for the app's life, emptied whenever the active server changes. */
+/** One cache for the app's life, emptied whenever the active server or the signed-in account changes. */
 const queryClient = createQueryClient()
 
-/** A splash the system cannot hold or hide leaves the app as it is: the next frame is raven's. */
-const SPLASH_IGNORED = (): void => undefined
-
-// The splash stays up until the stores are read, so the theme picked is the first thing drawn.
-preventAutoHideAsync().catch(SPLASH_IGNORED)
+// The splash stays up until the stores are read, so the theme picked is the first thing drawn; one the system cannot hold leaves the app as it is.
+preventAutoHideAsync().catch(IGNORED)
 
 const useTokenRenewal = tokenRenewalFor({ session: useAccountSession })
 
@@ -58,9 +63,30 @@ const loadStores = async (): Promise<void> => {
     useAccountSession.persist.rehydrate(),
   ])
   pinRavenServer({ servers: useActiveServer })
-  // What a relaunch stopped starts again once the servers are known, and the splash waits for none of it.
-  useDownloads.getState().resume().catch(SPLASH_IGNORED)
+  /*
+   * The account read back may not be the downloads' owner; downloads kept before they had
+   * owners are claimed by it here. What a relaunch stopped then starts again once the servers
+   * are known, and the splash waits for none of it.
+   */
+  const downloads = useDownloads.getState()
+  await downloads.keepFor({ accountId: accountIdOf(useAccountSession.getState()) }).catch(IGNORED)
+  downloads.resume().catch(IGNORED)
 }
+
+/**
+ * Forgets the last account's answers and queue on every change of account. The downloads are
+ * their owner's: another account signing in removes them, files and all; a sign-out and the
+ * same account signing back in keep them, out of reach behind sign-in meanwhile. Hands back the
+ * way to stop.
+ */
+const forgetAccount = (): (() => void) =>
+  forgetOnAccountChange({
+    session: useAccountSession,
+    cache: queryClient,
+    alsoForget: ({ accountId }) => {
+      useDownloads.getState().keepFor({ accountId }).catch(IGNORED)
+    },
+  })
 
 type ServerEventsProps = { session: AppQueries }
 
@@ -175,18 +201,15 @@ const styles = StyleSheet.create({ frame: { flex: 1 } })
  * drawn, and after that a theme picked in Settings repaints everything at once.
  */
 export const AppRoot = () => {
-  const [isLoaded, setLoaded] = useState(false)
+  const isLoaded = useStoresLoaded({ load: loadStores })
   useTokenRenewal()
 
-  useEffect(() => {
-    const show = () => setLoaded(true)
-    loadStores().then(show, show)
-  }, [])
+  useEffect(forgetAccount, [])
   useEffect(() => clearOnServerSwitch({ client: queryClient, store: useActiveServer }), [])
   useEffect(() => followReduceMotion(), [])
   useEffect(() => (isLoaded ? followTheme({ apply: wearSystemLook }) : undefined), [isLoaded])
   useEffect(() => {
-    if (isLoaded) hideAsync().catch(SPLASH_IGNORED)
+    if (isLoaded) hideAsync().catch(IGNORED)
   }, [isLoaded])
 
   return isLoaded && <AppRoutes />

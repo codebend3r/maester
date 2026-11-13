@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { AUDIO_BITRATES, AUDIO_CODECS, CONTAINERS, type Track } from '@raven/core'
+import { mediaItemFor } from '@raven/native/testing'
 
 import {
   DOWNLOAD_KINDS,
@@ -14,7 +15,6 @@ import {
   SEASON_GROUP,
   videoEntryOf,
 } from '@/test/downloadFixtures'
-import { mediaItemFor } from '@/test/mediaItem'
 import { AIRBAG } from '@/test/musicServer'
 
 describe('entriesOf', () => {

@@ -11,14 +11,20 @@ import type {
   SettingsChoiceProps,
   SettingsKit,
   SettingsFactProps,
-  SettingsLineProps,
   SettingsPageProps,
-  SettingsSectionProps,
   SettingsToggleProps,
 } from '@/layouts/settingsKit'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { CODE_FONT } from '@/theme/fonts'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { type SettingsPartStyles, settingsPartsFor } from '@/layouts/settingsParts'
+
+const usePartStyles = (): SettingsPartStyles => {
+  const styles = useStyles()
+  return { section: styles.section, heading: styles.heading, note: styles.note, line: styles.line }
+}
+
+const { SettingsSection, SettingsLine } = settingsPartsFor({ useStyles: usePartStyles })
 
 const SettingsPage = ({ title, onBack, children }: SettingsPageProps) => {
   const insets = useSafeAreaInsets()
@@ -42,19 +48,6 @@ const SettingsPage = ({ title, onBack, children }: SettingsPageProps) => {
       </Text>
       {children}
     </ScrollView>
-  )
-}
-
-const SettingsSection = ({ title, note, children }: SettingsSectionProps) => {
-  const styles = useStyles()
-  return (
-    <View style={styles.section}>
-      <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
-        {title}
-      </Text>
-      {children}
-      {note !== null && <Text style={styles.note}>{note}</Text>}
-    </View>
   )
 }
 
@@ -93,15 +86,6 @@ const SettingsButton = ({ text, isDisabled, onPress, name = text }: SettingsButt
     >
       <Text style={styles.chipLabel}>{text}</Text>
     </Pressable>
-  )
-}
-
-const SettingsLine = ({ text, isAlert = false }: SettingsLineProps) => {
-  const styles = useStyles()
-  return (
-    <Text accessibilityRole={isAlert ? 'alert' : 'text'} style={styles.line}>
-      {text}
-    </Text>
   )
 }
 

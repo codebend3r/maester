@@ -16,6 +16,7 @@ import type { AppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTES, type Href } from '@/routes'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** Whether the tab bar shows: on an iPhone, anywhere but the video player. */
 export const useIsTabBarShown = (): boolean => {
@@ -65,25 +66,25 @@ type PageTabEntry = { icon: IconName; label: string; spoken: string; href: Href 
 /** The four tabs that open a page, in the bar's order. */
 const PAGE_TABS = {
   [TOUCH_TABS.home]: {
-    icon: 'home',
+    icon: APP_ICONS.home,
     label: TOUCH_TABS_COPY.home,
     spoken: TOUCH_TABS_COPY.home,
     href: { pathname: APP_ROUTES.home, params: {} },
   },
   [TOUCH_TABS.libraries]: {
-    icon: 'libraries',
+    icon: APP_ICONS.libraries,
     label: TOUCH_TABS_COPY.libraries,
     spoken: TOUCH_TABS_COPY.libraries,
     href: { pathname: APP_ROUTES.libraries, params: {} },
   },
   [TOUCH_TABS.favourites]: {
-    icon: 'heart',
+    icon: APP_ICONS.heart,
     label: TOUCH_TABS_COPY.favourites,
     spoken: TOUCH_TABS_COPY.favourites,
     href: { pathname: APP_ROUTES.favourites, params: {} },
   },
   [TOUCH_TABS.continueWatching]: {
-    icon: 'continue',
+    icon: APP_ICONS.continue,
     label: TOUCH_TABS_COPY.continueShort,
     spoken: TOUCH_TABS_COPY.continueWatching,
     href: { pathname: APP_ROUTES.continueWatching, params: {} },
@@ -152,7 +153,7 @@ export const TouchTabs = ({ session }: TouchTabsProps) => {
             />
           ))}
           <TabButton
-            icon="more"
+            icon={APP_ICONS.more}
             isExpanded={isMoreOpen}
             isSelected={active === TOUCH_TABS.more}
             label={TOUCH_TABS_COPY.more}

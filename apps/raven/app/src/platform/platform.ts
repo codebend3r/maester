@@ -38,3 +38,61 @@ export const navKindOf = ({ isTV, isPad }: NavKindOfProps): NavKind => {
   if (isTV) return NAV_KINDS.focus
   return isPad ? NAV_KINDS.drawer : NAV_KINDS.tabs
 }
+
+/** How a device is driven: the remote's focus on a TV, a finger everywhere else. */
+export const INPUT_KINDS = { focus: 'focus', touch: 'touch' } as const
+
+export type InputKind = (typeof INPUT_KINDS)[keyof typeof INPUT_KINDS]
+
+/** Whose fonts a platform names: Android's by file, Apple's by family. */
+export const FONT_SYSTEMS = { android: 'android', apple: 'apple' } as const
+
+export type FontSystem = (typeof FONT_SYSTEMS)[keyof typeof FONT_SYSTEMS]
+
+/** What sets one build apart from the others, read once wherever the platform matters. */
+type PlatformTraits = {
+  /** How it is driven, which picks every layout kit. */
+  input: InputKind
+  fonts: FontSystem
+  /**
+   * Whether the player resumes by a seek of ours once loaded rather than by the library's
+   * `startPosition`: AVPlayer, on iPhone, iPad and Apple TV alike (see `startUp.ts`). The library
+   * applies a `startPosition` of 0 too, so on Apple TV every start sat on the opening mark.
+   */
+  shouldSeekToResume: boolean
+  /**
+   * Whether a direct play is watched for a missing picture: Apple's players play a file whose
+   * video they cannot decode as sound alone, where ExoPlayer reports what it cannot decode.
+   */
+  shouldWatchMissingPicture: boolean
+  /**
+   * Whether a direct play is judged for a dropped audio track: ExoPlayer selects no track it can
+   * neither decode nor pass through and says nothing, where Apple's tables name only what decodes.
+   */
+  shouldJudgeDroppedAudio: boolean
+}
+
+/** Each build's traits. */
+export const PLATFORM_TRAITS = {
+  [APP_PLATFORMS.ios]: {
+    input: INPUT_KINDS.touch,
+    fonts: FONT_SYSTEMS.apple,
+    shouldSeekToResume: true,
+    shouldWatchMissingPicture: true,
+    shouldJudgeDroppedAudio: false,
+  },
+  [APP_PLATFORMS.tvos]: {
+    input: INPUT_KINDS.focus,
+    fonts: FONT_SYSTEMS.apple,
+    shouldSeekToResume: true,
+    shouldWatchMissingPicture: true,
+    shouldJudgeDroppedAudio: false,
+  },
+  [APP_PLATFORMS.androidTv]: {
+    input: INPUT_KINDS.focus,
+    fonts: FONT_SYSTEMS.android,
+    shouldSeekToResume: false,
+    shouldWatchMissingPicture: false,
+    shouldJudgeDroppedAudio: true,
+  },
+} as const satisfies Record<AppPlatform, PlatformTraits>

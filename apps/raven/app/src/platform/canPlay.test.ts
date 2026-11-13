@@ -15,7 +15,7 @@ import {
   streamMimeType,
   videoCodecString,
 } from '@raven/core'
-import { mediaItemFor } from '@/test/mediaItem'
+import { mediaItemFor } from '@raven/native/testing'
 
 import { canPlayFor } from '@/platform/canPlay'
 import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'

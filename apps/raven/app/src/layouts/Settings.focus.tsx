@@ -11,9 +11,7 @@ import type {
   SettingsChoiceProps,
   SettingsFactProps,
   SettingsKit,
-  SettingsLineProps,
   SettingsPageProps,
-  SettingsSectionProps,
   SettingsToggleProps,
 } from '@/layouts/settingsKit'
 import { usePlateStyles } from '@/layouts/tvControls'
@@ -21,6 +19,14 @@ import { OPACITIES } from '@/theme/appTheme'
 import { CODE_FONT } from '@/theme/fonts'
 import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
+import { type SettingsPartStyles, settingsPartsFor } from '@/layouts/settingsParts'
+
+const usePartStyles = (): SettingsPartStyles => {
+  const styles = useStyles()
+  return { section: styles.section, heading: styles.heading, note: styles.note, line: styles.line }
+}
+
+const { SettingsSection, SettingsLine } = settingsPartsFor({ useStyles: usePartStyles })
 
 /** What a TV toggle says it is set to. */
 const TOGGLE_STATES = { on: 'On', off: 'Off' } as const
@@ -41,19 +47,6 @@ const SettingsPage = ({ title, children }: SettingsPageProps) => {
       </Text>
       {children}
     </ScrollView>
-  )
-}
-
-const SettingsSection = ({ title, note, children }: SettingsSectionProps) => {
-  const styles = useStyles()
-  return (
-    <View style={styles.section}>
-      <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
-        {title}
-      </Text>
-      {children}
-      {note !== null && <Text style={styles.note}>{note}</Text>}
-    </View>
   )
 }
 
@@ -115,15 +108,6 @@ const SettingsButton = ({
         <Text style={plateStyles.label}>{text}</Text>
       </Pressable>
     </FocusBand>
-  )
-}
-
-const SettingsLine = ({ text, isAlert = false }: SettingsLineProps) => {
-  const styles = useStyles()
-  return (
-    <Text accessibilityRole={isAlert ? 'alert' : 'text'} style={styles.line}>
-      {text}
-    </Text>
   )
 }
 

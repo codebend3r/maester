@@ -13,11 +13,11 @@ import {
 } from 'react'
 import { Animated, Easing, Image, Pressable, StyleSheet, View } from 'react-native'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
+import { BUTTON_TONES, type ButtonTone } from '@raven/native/headless'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { useFocusOnMount, useOpenerFocus, useOpeningFocus, useShelfBand } from '@/layouts/focus'
 import { HOME_BANDS } from '@/stores/shelfBands'
-import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import {
   FAN_PLACES,
@@ -42,6 +42,7 @@ import type { HeroSlide } from '@/queries/heroSlides'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** The web's motion: the backdrop fades over 800 ms, the words over 400, the posters move over 600. */
 const MOTION_MS = { wash: 800, words: 400, fan: 600 } as const
@@ -386,7 +387,7 @@ const HomeHeroBody = ({ slides, onOpen, isPreferred }: HomeHeroProps) => {
             {play !== null && (
               <HeroButton
                 {...focus}
-                icon="play"
+                icon={APP_ICONS.play}
                 isPreferred={isOpening && isPreferred}
                 label={HERO_COPY.playTitle(slide.title)}
                 onPress={() => onOpen(play)}
@@ -409,7 +410,7 @@ const HomeHeroBody = ({ slides, onOpen, isPreferred }: HomeHeroProps) => {
               <View style={styles.steps}>
                 <HeroButton
                   {...focus}
-                  icon="back"
+                  icon={APP_ICONS.back}
                   label={HERO_COPY.previous}
                   onPress={() => step(-1)}
                   place="hero/previous"
@@ -418,7 +419,7 @@ const HomeHeroBody = ({ slides, onOpen, isPreferred }: HomeHeroProps) => {
                 />
                 <HeroButton
                   {...focus}
-                  icon="next"
+                  icon={APP_ICONS.next}
                   label={HERO_COPY.next}
                   onPress={() => step(1)}
                   place="hero/next"

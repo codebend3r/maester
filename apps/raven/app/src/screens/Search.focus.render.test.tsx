@@ -4,10 +4,10 @@ import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
 import { act, fireEvent, screen } from '@testing-library/react-native'
+import type { HeardRequest } from '@raven/native/testing'
 
 import { Search } from '@/screens/Search'
 import { useActiveServer } from '@/stores/activeServer'
-import type { HeardRequest } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import type * as NavigationFocus from '@/test/navigationFocus'
 import {

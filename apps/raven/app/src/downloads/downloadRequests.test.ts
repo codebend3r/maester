@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import { AUDIO_CODECS, CONTAINERS, VIDEO_CODECS, createApiClient } from '@raven/core'
+import { mediaItemFor } from '@raven/native/testing'
 
 import { DOWNLOAD_KINDS, DOWNLOAD_WAYS, GROUP_KINDS } from '@/downloads/downloadEntries'
 import { fileAskOf } from '@/downloads/downloadRequests'
 import { APP_PLATFORMS } from '@/platform/platform'
-import { mediaItemFor } from '@/test/mediaItem'
 
 const ORIGIN = 'https://nas.example'
 

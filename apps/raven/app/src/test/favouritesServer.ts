@@ -10,10 +10,16 @@ import {
   createApiClient,
 } from '@raven/core'
 import { allowlistedFetch } from '@raven/native/headless'
+import {
+  type Answer,
+  NOT_FOUND,
+  STATUSES,
+  responseOf,
+  mediaItemFor,
+  summaryFor,
+} from '@raven/native/testing'
 
-import { type Answer, NOT_FOUND, STATUSES, responseOf } from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 import { OK_COMPUTER, RADIOHEAD } from '@/test/musicServer'
 
 const SEVERANCE: ItemSummary = summaryFor({
