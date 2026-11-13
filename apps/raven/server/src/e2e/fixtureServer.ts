@@ -2,6 +2,12 @@ import { writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { FIXTURE_SERVER, LIBRARY_KINDS } from '@raven/core'
 import { wholeNumber } from '@shared/server'
+import {
+  FIXTURE_REQUESTS,
+  fixtureRequestsFetch,
+  UPCOMING_MOVIES,
+  UPCOMING_SHOWS,
+} from '@/e2e/fixtureRequests'
 import { runFixture } from '@/e2e/fixtureRun'
 import { encodeClip, encodeRichClip, encodeTrack } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
@@ -16,6 +22,8 @@ import { fakeTmdb } from '@/test/fakeTmdb'
  * library is neither pinned nor in the hero, so the device app's Home is as it was without it.
  * It listens on a fixed port (`runFixture`). The web's browser suite starts it on a port of its
  * own with the built web app's folder, which it then serves beside its API, as raven's image does.
+ * Coming soon reads the same fake TMDB's `/discover`, and its requests go to a fake Radarr and
+ * Sonarr that the one fetch answers for (`fixtureRequests.ts`), so a request is made end to end.
  */
 const FIXTURE = {
   movie: { folder: 'Kestrel Point (2024)', file: 'Kestrel Point (2024).mkv' },
@@ -39,7 +47,10 @@ const FIXTURE = {
 } as const
 
 const tmdb = fakeTmdb({
-  movies: [{ id: 9001, title: FIXTURE_SERVER.movie.title, released: '2024-03-08' }],
+  movies: [
+    { id: 9001, title: FIXTURE_SERVER.movie.title, released: '2024-03-08' },
+    ...UPCOMING_MOVIES,
+  ],
   shows: [
     {
       id: 9002,
@@ -52,6 +63,7 @@ const tmdb = fakeTmdb({
         ],
       },
     },
+    ...UPCOMING_SHOWS,
   ],
 })
 
@@ -66,7 +78,8 @@ await runFixture({
   name: 'fixture server',
   port: wholeNumber(process.env[FIXTURE_SERVER.env.port]) ?? FIXTURE_SERVER.appPort,
   webDir: fixtureWebDir === '' ? null : resolve(fixtureWebDir),
-  metadataFetchFor: () => tmdb.fetch,
+  metadataFetchFor: () => fixtureRequestsFetch({ tmdb: tmdb.fetch }),
+  requests: FIXTURE_REQUESTS,
   prepare: async ({ media }) => {
     const movies = join(media, 'movies')
     const shows = join(media, 'shows')

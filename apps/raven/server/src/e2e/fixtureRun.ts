@@ -5,6 +5,7 @@ import { constants, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { type ApiClient, FIXTURE_SERVER, type LibraryInput } from '@raven/core'
 import { createApp } from '@/app'
+import type { RequestsConfig } from '@/requests/requestsConfig'
 import { MetadataService } from '@/metadata/metadataService'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
 import { ScannerService } from '@/scanner/scannerService'
@@ -29,6 +30,8 @@ type RunFixtureProps = {
   prepare: (folders: FixtureFolders) => Promise<LibraryInput[]>
   /** What to do as the admin once every library is scanned and matched, before the ready line. */
   settle?: (api: ApiClient) => Promise<void>
+  /** Coming soon's requests, the Sonarr and Radarr `metadataFetchFor` answers for; off when absent. */
+  requests?: RequestsConfig
 }
 
 /**
@@ -46,6 +49,7 @@ export const runFixture = async ({
   metadataFetchFor,
   prepare,
   settle = async () => undefined,
+  requests,
 }: RunFixtureProps): Promise<void> => {
   const root = await mkdtemp(join(tmpdir(), `raven-${name.toLowerCase().replaceAll(' ', '-')}-`))
   const removeRoot = () => rmSync(root, { recursive: true, force: true, maxRetries: 5 })
@@ -72,6 +76,7 @@ export const runFixture = async ({
         host: FIXTURE_SERVER.host,
         port,
         tmdbApiToken: 'fixture-token',
+        ...(requests === undefined ? {} : { requests }),
         mediaPlane: {
           origins: [],
           webOrigins: [],

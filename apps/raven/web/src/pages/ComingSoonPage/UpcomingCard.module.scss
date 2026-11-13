@@ -27,10 +27,11 @@
   }
 }
 
-// A poster's shape, held while its picture loads.
+// A poster's shape, held while its picture loads, with its marks over it.
 .frame {
   grid-area: poster;
   display: grid;
+  grid-template-areas: 'picture';
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   aspect-ratio: 2 / 3;
@@ -40,9 +41,34 @@
   box-shadow: var(--shadow-poster);
 
   img {
+    grid-area: picture;
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+}
+
+// The marks' corner of the poster: the bottom right, in from its edges.
+.marks {
+  grid-area: picture;
+  display: grid;
+  place-items: end;
+  padding: var(--space-2);
+  pointer-events: none;
+}
+
+// Requested, or held by its arr already: a green check, as a watched title has its own.
+.requested {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-picture-requested);
+  color: var(--color-on-picture);
+
+  @media (forced-colors: active) {
+    border: 1px solid currentcolor;
   }
 }
 

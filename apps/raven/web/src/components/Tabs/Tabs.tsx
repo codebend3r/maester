@@ -2,7 +2,8 @@ import { type ReactNode, useId } from 'react'
 import { KEYS } from '@raven/core'
 import styles from '@/components/Tabs/Tabs.module.scss'
 
-type Tab<T extends string> = { value: T; label: string; count: number }
+/** A tab: its value, its label and, where it lists things, how many it holds. */
+type Tab<T extends string> = { value: T; label: string; count?: number }
 
 type TabsProps<T extends string> = {
   label: string
@@ -13,7 +14,7 @@ type TabsProps<T extends string> = {
 }
 
 /**
- * A row of tabs, each with how many it holds, over the chosen tab's panel,
+ * A row of tabs, each with how many it holds where it counts, over the chosen tab's panel,
  * `children`. Only the chosen tab is in the tab order; the arrow keys move
  * between the tabs, choosing as they go, and wrap round at either end.
  */
@@ -58,7 +59,7 @@ export const Tabs = <T extends string>({
             }}
           >
             {tab.label}
-            <span className={styles.count}>{tab.count}</span>
+            {tab.count !== undefined && <span className={styles.count}>{tab.count}</span>}
           </button>
         ))}
       </div>

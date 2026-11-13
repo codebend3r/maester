@@ -43,6 +43,9 @@ export const REQUEST_COPY = {
   requestedByYou: 'You requested this. Everyone can watch it once it arrives.',
   requestedBySomeone: 'Someone has requested this. Everyone can watch it once it arrives.',
   requestedAlready: 'This is requested already. Everyone can watch it once it arrives.',
+  requested: 'Requested',
+  /** What the green check on a requested title's poster says to a screen reader. */
+  requestedMark: 'Requested',
   left: ({ left, limit }: Pick<RequestBudget, 'left' | 'limit'>) =>
     `${left} of ${limit} requests left today`,
   spent: (limit: number) => `You have used all ${limit} of today's requests.`,

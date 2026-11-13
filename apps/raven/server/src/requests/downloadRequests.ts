@@ -204,9 +204,9 @@ export class DownloadRequests {
   }
 
   private async readHolding(ask: TitleRequestAsk): Promise<TitleHolding> {
-    const found = await this.arrs.lookUp(ask)
-    if (found === null || found.existingId === null) return NOT_HELD
-    const progress = await this.arrs.progress({ type: ask.type, arrId: found.existingId })
+    const arrId = await this.arrs.heldId(ask)
+    if (arrId === null) return NOT_HELD
+    const progress = await this.arrs.progress({ type: ask.type, arrId })
     return { status: statusOf({ progress, isSearching: false }) }
   }
 

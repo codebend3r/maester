@@ -67,9 +67,13 @@ jobs:
             target: test:screens
             node: true
           # raven's web app in Google Chrome, which the runner image has, against the server's
-          # fixture, which encodes its clips with ffmpeg.
+          # fixture, which encodes its clips with ffmpeg. Run on every PR, not only where
+          # `@raven/web` is affected: the suite drives the server too, which the web does not
+          # depend on in the project graph, and the target's inputs name the server's sources,
+          # so Nx restores it from the cache when neither changed.
           - name: 🌐 Web end to end
             target: e2e:browser
+            everywhere: true
             ffmpeg: true
             traces: apps/raven/web/test-results
             artifact: e2e-traces
@@ -145,8 +149,9 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           TARGET: ${{ matrix.check.target }}
+          EVERYWHERE: ${{ matrix.check.everywhere == true }}
         run: |
-          if git diff --quiet "$BASE" HEAD -- .github/workflows/pull-request-checks.yml; then
+          if [ "$EVERYWHERE" != true ] && git diff --quiet "$BASE" HEAD -- .github/workflows/pull-request-checks.yml; then
             bunx nx affected --outputStyle=static --base="$BASE" --head=HEAD -t "$TARGET"
           else
             bunx nx run-many --outputStyle=static -t "$TARGET"

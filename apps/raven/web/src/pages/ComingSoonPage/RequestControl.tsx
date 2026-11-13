@@ -69,11 +69,18 @@ const Off = ({ ask }: RequestViewProps) => (
   <p className={styles.note}>{REQUEST_COPY.off[ask.type]}</p>
 )
 
-/** Where the title stands, and whose ask put it there. */
+/**
+ * Where the title stands, and whose ask put it there, under the button
+ * greyed out: a title asked for once, or that its arr holds, is never asked
+ * for again, so the button can not send it.
+ */
 const StandingNote = ({ status, whose }: Standing) => {
   const copy = REQUEST_STATUS_COPY[status]
   return (
     <>
+      <Button tone="primary" size="large" icon="check" disabled>
+        {REQUEST_COPY.requested}
+      </Button>
       <output className={styles.status} data-status={status}>
         {copy.label}
       </output>

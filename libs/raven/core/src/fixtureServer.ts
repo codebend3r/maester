@@ -31,4 +31,13 @@ export const FIXTURE_SERVER = {
     artist: 'The Fixture Birds',
     tracks: ['First Light', 'Dawn Song', 'Open Sky'],
   },
+  /**
+   * Coming soon's titles, from the fixture's fake TMDB, and what its fake Radarr and Sonarr hold:
+   * `held` is in Radarr already, so it is never requested; `open` and `show` are free to request.
+   */
+  upcoming: {
+    held: { tmdbId: '9101', title: 'Harbour Lights' },
+    open: { tmdbId: '9102', title: 'Quiet Meridian' },
+    show: { tmdbId: '9103', title: 'The Long Thaw' },
+  },
 } as const

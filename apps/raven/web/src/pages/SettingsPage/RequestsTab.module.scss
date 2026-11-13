@@ -1,0 +1,87 @@
+/*
+ * The table's room is the tab's to give: the kind drops when the room is
+ * narrow, and anything still too wide scrolls inside it, never the page.
+ */
+.room {
+  container-type: inline-size;
+  overflow-x: auto;
+}
+
+/*
+ * The element defaults draw the table; this sets its rhythm: eyebrow
+ * headers, faint rules between rows and a tint under the pointer.
+ */
+.table {
+  width: 100%;
+
+  thead th {
+    padding-block: var(--space-2);
+  }
+
+  tbody tr:hover {
+    background: var(--color-hover);
+  }
+
+  th,
+  td {
+    padding-inline: var(--space-1);
+    text-align: start;
+    vertical-align: middle;
+  }
+}
+
+.title {
+  font-weight: 500;
+
+  a {
+    color: inherit;
+    text-underline-offset: 0.2em;
+  }
+}
+
+.when {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-lichen);
+}
+
+.kind {
+  color: var(--color-lichen);
+  white-space: nowrap;
+}
+
+// Where it stands, as a pill: the leaf fill once a copy is found, amber while none is.
+.status {
+  display: inline-grid;
+  padding: var(--space-0) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-moss);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  line-height: var(--line-tight);
+  white-space: nowrap;
+}
+
+.status[data-status='willDownload'],
+.status[data-status='downloading'],
+.status[data-status='downloaded'] {
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+}
+
+.status[data-status='notDownloadable'] {
+  background: var(--color-amber);
+  color: var(--color-night);
+}
+
+// Narrow, the kind goes and the time and the status wrap, so the table fits a phone.
+@container (max-width: 30rem) {
+  .kind {
+    display: none;
+  }
+
+  .when,
+  .status {
+    white-space: normal;
+  }
+}

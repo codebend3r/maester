@@ -119,6 +119,7 @@ describe('UpcomingTitlePage', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Currently downloading')
     expect(screen.getByText(/Someone has requested this/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Request download' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Requested' })).toBeDisabled()
   })
 
   it('says a title its downloader holds already is requested, with no button', async () => {
@@ -126,7 +127,9 @@ describe('UpcomingTitlePage', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Not downloadable')
     expect(screen.getByText(/requested already/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Request download' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Requested' })).toBeDisabled()
     expect(getRequestHolding).toHaveBeenCalledWith({ type: ITEM_TYPES.movie, tmdbId: '1' })
+    expect(requestDownload).not.toHaveBeenCalled()
   })
 
   it('says a search found nothing as not downloadable', async () => {

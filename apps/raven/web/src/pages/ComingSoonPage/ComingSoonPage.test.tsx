@@ -14,6 +14,7 @@ import { renderWithProviders } from '@/test/render'
 
 const getUpcoming = spyOn(api, 'getUpcoming')
 const listRequests = spyOn(api, 'listRequests')
+const getRequestHolding = spyOn(api, 'getRequestHolding')
 
 type TitleProps = { type: MatchItemType; id: number; name: string }
 
@@ -37,6 +38,7 @@ describe('ComingSoonPage', () => {
     cleanup()
     getUpcoming.mockReset()
     listRequests.mockReset()
+    getRequestHolding.mockReset()
   })
 
   it('shelves the movies, the shows and the documentaries, each card opening its own page', async () => {
@@ -141,5 +143,25 @@ describe('ComingSoonPage', () => {
     ).getAllByRole('listitem')
     expect(await within(dune!).findByText('Will download soon')).toBeInTheDocument()
     expect(within(batman!).queryByText('Will download soon')).toBeNull()
+    expect(within(dune!).getByText('Requested')).toBeInTheDocument()
+  })
+
+  it('puts a green check on a title its downloader holds already, and none on the rest', async () => {
+    getRequestHolding.mockImplementation(async ({ tmdbId }) => ({
+      status: tmdbId === '2' ? REQUEST_STATUSES.willDownload : null,
+    }))
+    open({
+      movies: [
+        title({ type: ITEM_TYPES.movie, id: 1, name: 'Dune: Part Three' }),
+        title({ type: ITEM_TYPES.movie, id: 2, name: 'Focker-in-Law' }),
+      ],
+      shows: [],
+      documentaries: [],
+    })
+    const [dune, focker] = within(
+      await screen.findByRole('region', { name: 'Upcoming movies' }),
+    ).getAllByRole('listitem')
+    expect(await within(focker!).findByText('Requested')).toBeInTheDocument()
+    expect(within(dune!).queryByText('Requested')).toBeNull()
   })
 })
