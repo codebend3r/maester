@@ -3,13 +3,13 @@ import { ApiError, type Home, type MediaTicket, SERVERS_CAP } from '@raven/core'
 import type * as Native from '@raven/native'
 import { AUTH_OUTCOMES, type AuthOutcome, RAVEN_SERVER } from '@raven/native/headless'
 import { fireEvent, render, screen } from '@testing-library/react-native'
+import { mediaItemFor } from '@raven/native/testing'
 
 import { useAccountSession } from '@/account/session'
 import { APP_ROUTES } from '@/routes'
 import { SIGN_IN_COPY } from '@/screens/copy'
 import { SignIn } from '@/screens/SignIn'
 import { useActiveServer } from '@/stores/activeServer'
-import { mediaItemFor } from '@/test/mediaItem'
 
 const HOME: Home = { inProgress: [{ media: mediaItemFor({ id: 7 }), poster: null }], shelves: [] }
 const SESSION = {

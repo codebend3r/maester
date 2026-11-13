@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import { ITEM_TYPES } from '@raven/core'
+import { mediaItemFor, summaryFor } from '@raven/native/testing'
 
 import { cardMarkOf, episodeWordsOf } from '@/queries/episodeMark'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 describe('cardMarkOf', () => {
   it('writes the season, a dot and the episode, unpadded, on one line', () => {

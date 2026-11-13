@@ -1,14 +1,15 @@
-import type { PlaylistTrack } from '@raven/ui/headless'
+import { type PlaylistTrack } from '@raven/core'
 import type { ComponentType } from 'react'
 import { StyleSheet, View } from 'react-native'
+import { BUTTON_TONES } from '@raven/native/headless'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { useScreenFocusScope } from '@/layouts/focus'
-import { BUTTON_TONES } from '@/layouts/formKit'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type PlaylistLayoutProps } from '@/layouts/musicKit'
 import { ActionPlate, FocusPage, FocusRow, useMusicStyles } from '@/layouts/MusicParts.focus'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { APP_ICONS } from '@/theme/icons'
 
 const styles = StyleSheet.create({ entryWords: { flex: 1 } })
 
@@ -109,7 +110,7 @@ export const PlaylistLayout = ({
           <Text style={music.muted}>{facts}</Text>
           <View style={music.actions}>
             <ActionPlate
-              icon="play"
+              icon={APP_ICONS.play}
               isPreferred={isOpening}
               label={MUSIC_COPY.play}
               onPress={onPlay}
@@ -117,7 +118,7 @@ export const PlaylistLayout = ({
               tone={BUTTON_TONES.primary}
             />
             <ActionPlate
-              icon="shuffle"
+              icon={APP_ICONS.shuffle}
               isPreferred={false}
               label={MUSIC_COPY.shuffle}
               onPress={onShuffle}

@@ -10,8 +10,9 @@ import {
   type Track,
   isRecord,
 } from '@raven/core'
-import type { SourceRequest } from '@raven/native/headless'
+import { type DownloadDisk, type SourceRequest, folderOf } from '@raven/native/headless'
 import { type StateStorage, createJSONStorage } from 'zustand/middleware'
+import { mediaItemFor } from '@raven/native/testing'
 
 import { DOWNLOAD_COPY } from '@/downloads/copy'
 import {
@@ -23,17 +24,15 @@ import {
   GROUP_KINDS,
   type TrackRequest,
   type VideoRequest,
-  folderOf,
   groupKeyOf,
 } from '@/downloads/downloadEntries'
-import type { DownloadDisk, DownloadServer } from '@/downloads/downloadRun'
+import type { DownloadServer } from '@/downloads/downloadRun'
 import {
   ALBUM_GROUP,
   DOWNLOADS_SERVER_ID,
   SEASON_GROUP,
   downloadKeyFor,
 } from '@/test/downloadFixtures'
-import { mediaItemFor } from '@/test/mediaItem'
 import { AIRBAG, PARANOID } from '@/test/musicServer'
 import { useDownloadProgress } from '@/stores/downloadProgress'
 import { DOWNLOADS_KEY, configureDownloads, useDownloads } from '@/stores/downloads'
@@ -105,12 +104,12 @@ const memoryDisk = () => {
   const disk: DownloadDisk = {
     fetch: async ({ source, path, signal, onProgress }) => {
       fetched = [...fetched, source.uri]
-      onProgress({ bytes: 50, total: 100 })
-      const aborted = new Promise<void>((resolve) =>
-        signal.addEventListener('abort', () => resolve()),
-      )
+      if (onProgress !== null) onProgress({ bytes: 50, total: 100 })
+      const aborted = new Promise<void>((resolve) => {
+        if (signal !== null) signal.addEventListener('abort', () => resolve())
+      })
       await Promise.race([gates.get(source.uri)?.promise, aborted])
-      if (signal.aborted) throw new Error('aborted')
+      if (!!signal?.aborted) throw new Error('aborted')
       if (source.uri.includes('broken')) throw new Error('cut')
       const bytes = source.uri === POSTER ? 10 : 100
       files = new Map([...files, [path, bytes]])
@@ -224,6 +223,7 @@ const setUp = async ({
 describe('the downloads store', () => {
   beforeEach(() => {
     useDownloads.setState({
+      ownerId: null,
       entries: {},
       isRunning: false,
       stamps: 0,
@@ -640,6 +640,54 @@ describe('the downloads store', () => {
     expect(entry?.logoPath).toBe(
       `${folderOf({ serverId: DOWNLOADS_SERVER_ID, mediaId: MOVIE.id })}/logo.png`,
     )
+  })
+
+  it('keeps downloads saved before they had an owner, and lets the first account to sign in claim them', async () => {
+    const first = await setUp()
+    await useDownloads.getState().download({
+      serverId: DOWNLOADS_SERVER_ID,
+      library: null,
+      group: MOVIE_GROUP,
+      artUri: null,
+      logoUri: null,
+      items: [videoOf({ media: MOVIE })],
+    })
+    const saved: unknown = JSON.parse(first.storage.read() ?? '{}')
+    const entries = isRecord(saved) && isRecord(saved.state) ? saved.state.entries : null
+    // What an older version wrote: the entries and no owner.
+    const unowned = JSON.stringify({ state: { entries }, version: 0 })
+    useDownloads.setState({ ownerId: 'stale', entries: {}, isRunning: false })
+    const relaunched = await setUp({ saved: unowned, initial: [...first.files().keys()] })
+    expect(useDownloads.getState().ownerId).toBeNull()
+    expect(statusOf(MOVIE.id)).toEqual({ state: DOWNLOAD_STATES.done, bytes: 100 })
+
+    expect(await useDownloads.getState().keepFor({ accountId: 'ana' })).toBe(false)
+    expect(useDownloads.getState().ownerId).toBe('ana')
+    expect(statusOf(MOVIE.id)).toEqual({ state: DOWNLOAD_STATES.done, bytes: 100 })
+    const kept: unknown = JSON.parse(relaunched.storage.read() ?? '{}')
+    expect(isRecord(kept) && isRecord(kept.state) ? kept.state.ownerId : null).toBe('ana')
+  })
+
+  it("keeps the downloads through a sign-out and their owner's return, and removes them for another account", async () => {
+    const { files } = await setUp()
+    const { keepFor } = useDownloads.getState()
+    expect(await keepFor({ accountId: 'ana' })).toBe(false)
+    await useDownloads.getState().download({
+      serverId: DOWNLOADS_SERVER_ID,
+      library: null,
+      group: MOVIE_GROUP,
+      artUri: null,
+      logoUri: null,
+      items: [videoOf({ media: MOVIE })],
+    })
+    expect(await keepFor({ accountId: null })).toBe(false)
+    expect(await keepFor({ accountId: 'ana' })).toBe(false)
+    expect(Object.keys(useDownloads.getState().entries)).toEqual([downloadKeyFor(MOVIE.id)])
+
+    expect(await keepFor({ accountId: 'ben' })).toBe(true)
+    expect(useDownloads.getState().entries).toEqual({})
+    expect(useDownloads.getState().ownerId).toBe('ben')
+    expect(files().size).toBe(0)
   })
 
   it('stores itself under its own key', async () => {

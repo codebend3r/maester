@@ -1,6 +1,6 @@
 import { PLAYBACK_MODES, type PlaybackMode } from '@raven/core'
 
-import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
+import { type AppPlatform, PLATFORM_TRAITS } from '@/platform/platform'
 
 /**
  * AVPlayer, given HEVC under the `hev1` tag in an MP4, plays its sound and never draws its
@@ -30,8 +30,6 @@ type WatchPictureProps = {
 
 type WatchedPicture = { watch: PictureWatch; isMissing: boolean }
 
-const APPLE_PLATFORMS: ReadonlySet<AppPlatform> = new Set([APP_PLATFORMS.ios, APP_PLATFORMS.tvos])
-
 /**
  * Hears the player for the attempt it plays and says when its picture is missing: a direct play
  * on Apple whose clock has run `NO_PICTURE_SECONDS` with no picture drawn. Each attempt is
@@ -52,7 +50,8 @@ export const watchPicture = ({
     return { watch: { ...own, hasPicture: true }, isMissing: false }
   }
   const from = own.from ?? hearing.clock
-  const isWatched = APPLE_PLATFORMS.has(platform) && mode === PLAYBACK_MODES.direct
+  const isWatched =
+    PLATFORM_TRAITS[platform].shouldWatchMissingPicture && mode === PLAYBACK_MODES.direct
   return {
     watch: { ...own, from },
     isMissing: isWatched && !own.hasPicture && hearing.clock - from >= NO_PICTURE_SECONDS,

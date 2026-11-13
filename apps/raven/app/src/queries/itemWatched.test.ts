@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import { ITEM_TYPES, WATCHED_STATES, type ItemDetails } from '@raven/core'
+import { mediaItemFor, summaryFor } from '@raven/native/testing'
 
 import { itemWatchedStateOf } from '@/queries/itemWatched'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 const detailsFor = (overrides: Partial<ItemDetails>): ItemDetails => ({
   ...summaryFor({ id: 1, title: 'Busboys' }),

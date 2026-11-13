@@ -4,6 +4,7 @@ import { HOME_NAV_COPY } from '@/layouts/copy'
 import { FocusBand } from '@/layouts/FocusBand'
 import { PlateButton } from '@/layouts/tvControls'
 import { useGoHome } from '@/layouts/useGoHome'
+import { APP_ICONS } from '@/theme/icons'
 
 /**
  * The way back to Home at a TV screen's top left, on every screen but Home, sign-in and the
@@ -18,7 +19,7 @@ export const HomePlate = () => {
   return (
     <FocusBand>
       <View style={styles.row}>
-        <PlateButton icon="home" label={HOME_NAV_COPY.home} onPress={goHome} />
+        <PlateButton icon={APP_ICONS.home} label={HOME_NAV_COPY.home} onPress={goHome} />
       </View>
     </FocusBand>
   )

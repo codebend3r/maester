@@ -1,5 +1,5 @@
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type AlbumSummary,
   type ApiClient,
@@ -10,10 +10,16 @@ import {
   createApiClient,
 } from '@raven/core'
 import { allowlistedFetch } from '@raven/native/headless'
+import {
+  type Answer,
+  NOT_FOUND,
+  STATUSES,
+  responseOf,
+  mediaItemFor,
+  summaryFor,
+} from '@raven/native/testing'
 
-import { type Answer, NOT_FOUND, STATUSES, responseOf } from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 import { OK_COMPUTER, RADIOHEAD } from '@/test/musicServer'
 
 const SEVERANCE: ItemSummary = summaryFor({
@@ -93,7 +99,7 @@ export const favouritesApi = ({ read }: FavouritesApiProps): ApiClient => {
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const [path = ''] = url.slice(NAS.origin.length).split('?')
-        return init.method === undefined || init.method === APP_CALL_METHODS.get
+        return init.method === undefined || init.method === HTTP_METHODS.get
           ? responseOf(answerFor(path))
           : responseOf(NOT_FOUND)
       },

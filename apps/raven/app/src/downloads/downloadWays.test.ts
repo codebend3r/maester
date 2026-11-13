@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import { AUDIO_CODECS, CONTAINERS, VIDEO_CODECS } from '@raven/core'
+import { mediaItemFor } from '@raven/native/testing'
 
 import { DOWNLOAD_COPY } from '@/downloads/copy'
 import { DOWNLOAD_WAYS } from '@/downloads/downloadEntries'
 import { trackWayOf, videoWayOf } from '@/downloads/downloadWays'
 import { APP_PLATFORMS } from '@/platform/platform'
-import { mediaItemFor } from '@/test/mediaItem'
 
 const ios = APP_PLATFORMS.ios
 

@@ -13,19 +13,14 @@ import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { Icon } from '@raven/native'
 import { useTvCard } from '@/cardMenu/useTvCard'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
+import { type CardShape, type ShelfCard } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
-import {
-  focusCardWidthOf,
-  FocusCard,
-  focusCaptionHeightOf,
-  TV_WATCHED_BADGE,
-} from '@/layouts/FocusCard'
+import { FocusCard, focusCaptionHeightOf, TV_WATCHED_BADGE } from '@/layouts/FocusCard'
 import { FocusBand } from '@/layouts/FocusBand'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { GRID_SIZE_COPY } from '@/layouts/copy'
 import { focusPicker } from '@/layouts/Picker.focus'
-import { GRID_SIZES, type GridSize, useAppPrefs } from '@/stores/appPrefs'
+import { useAppPrefs } from '@/stores/appPrefs'
 import { useScreenFocusScope } from '@/layouts/focus'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
@@ -47,100 +42,22 @@ import {
 } from '@/layouts/gridRows'
 import { type JumpFocus, useJumpFocus } from '@/layouts/useJumpFocus'
 import { useGrid } from '@/layouts/useGrid'
-import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
+import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles, useTheme } from '@/theme/useTheme'
-
-/** How wide the library's icon stands beside its name: the name's own size, larger. */
-const TITLE_ICON = TV_SIZES.textXl * 1.25
-
-const GAP = TV_SIZES.space5
-
-/** A row of the list and tiles views is at least this wide, so a TV holds three. */
-const LEAST_ROW_WIDTH = tvSize(480)
-
-const TILE_WIDTHS = {
-  [CARD_SHAPES.poster]: tvSize(72),
-  [CARD_SHAPES.wide]: tvSize(144),
-  [CARD_SHAPES.square]: tvSize(72),
-} as const
-
-/** Room above and below each row for a card grown by focus, as Home's rows leave it. */
-const GROWTH_ROOM = TV_SIZES.space4
-
-/** How tall a bucket's heading row stands: the remote's control, or its title at the viewer's size. */
-const headerHeightOf = (fontScale: number): number =>
-  Math.max(
-    TV_SIZES.controlLarge,
-    linesHeightOf({ sizes: [TV_SIZES.textXl], fontScale }) + 2 * TV_SIZES.tvFocusRing,
-  ) + TV_SIZES.space3
-
-/**
- * What each grid size fits: the rows of cards the list's height holds whole at the least, and the
- * widest a card may stand as a share of a shelf's. Small is three rows no wider than a shelf's
- * cards, as the sofa reads them; medium, the default, two rows of larger cards, and large one row
- * of cards larger again, each step half as wide again as the last.
- */
-const GRID_SIZE_FITS = {
-  [GRID_SIZES.small]: { rows: 3, widest: 1 },
-  [GRID_SIZES.medium]: { rows: 2, widest: 1.5 },
-  [GRID_SIZES.large]: { rows: 1, widest: 2.25 },
-} as const satisfies Record<GridSize, { rows: number; widest: number }>
-
-const GRID_SIZE_OPTIONS = Object.values(GRID_SIZES).map((size) => ({
-  key: size,
-  label: GRID_SIZE_COPY.sizes[size],
-}))
-
-/**
- * Room left for a glimpse of the next row, a share of a row. The grid also widens each card a
- * little to fill its row, which makes the rows taller than planned, and this keeps them in view.
- */
-const NEXT_ROW_GLIMPSE = 0.25
-
-/**
- * Whether a grid card of `shape` wears its caption. A poster (a show's or a film's) is the
- * picture alone, its title said aloud, so more fit; an episode's still or an album's cover keeps
- * its words, which the picture does not carry.
- */
-const hasCaptionOf = (shape: CardShape): boolean => shape !== CARD_SHAPES.poster
-
-type CaptionHeightOfProps = { shape: CardShape; captionHeight: number }
-
-/** How tall a grid card's caption stands: none for a poster. */
-const captionHeightOf = ({ shape, captionHeight }: CaptionHeightOfProps): number =>
-  hasCaptionOf(shape) ? captionHeight : 0
-
-type CardWidthForRowsProps = {
-  shape: CardShape
-  listHeight: number
-  captionHeight: number
-  size: GridSize
-}
-
-/**
- * The widest a card of `shape` may stand for the size's rows of it and a glimpse of the next,
- * caption and room to grow included, to fit the list's height; the size's share of a shelf's
- * width where that is narrower already, or before the list is measured.
- */
-const cardWidthForRows = ({
-  shape,
-  listHeight,
-  captionHeight,
-  size,
-}: CardWidthForRowsProps): number => {
-  const fit = GRID_SIZE_FITS[size]
-  const shelfWidth = focusCardWidthOf(shape) * fit.widest
-  if (listHeight <= 0) return shelfWidth
-  const pictureHeight =
-    listHeight / (fit.rows + NEXT_ROW_GLIMPSE) -
-    captionHeightOf({ shape, captionHeight }) -
-    2 * GROWTH_ROOM
-  const perWidth = pictureHeightOf({ shape, width: 1 })
-  return Math.max(tvSize(1), Math.min(shelfWidth, pictureHeight / perWidth))
-}
-
-/** Rows drawn at once: a screen's worth of the smallest posters, with one more coming into view. */
-const GRID_ROWS_AT_ONCE = 4
+import { APP_ICONS } from '@/theme/icons'
+import {
+  TITLE_ICON,
+  GAP,
+  LEAST_ROW_WIDTH,
+  TILE_WIDTHS,
+  GROWTH_ROOM,
+  headerHeightOf,
+  GRID_SIZE_OPTIONS,
+  hasCaptionOf,
+  captionHeightOf,
+  cardWidthForRows,
+  GRID_ROWS_AT_ONCE,
+} from '@/layouts/gridSizes.focus'
 
 const SizePicker = focusPicker.Picker
 
@@ -473,7 +390,7 @@ const Grid = ({ title, icon, line, notice, toolbar, sections, view, jump, onOpen
                 {toolbar}
                 {!isRows && (
                   <SizePicker
-                    icon="grid"
+                    icon={APP_ICONS.grid}
                     label={GRID_SIZE_COPY.label}
                     onChoose={(gridSize) => changePrefs({ gridSize })}
                     options={GRID_SIZE_OPTIONS}

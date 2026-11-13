@@ -9,12 +9,12 @@ import {
   MEDIA_SORTS,
   type LibrarySettings,
 } from '@raven/core'
+import { mediaItemFor } from '@raven/native/testing'
 
 import { CARD_SHAPES } from '@/queries/cards'
 import { librarySectionsOf } from '@/queries/libraryGrid'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { ASHFALL_GATE, BUSBOYS, NIGHT_TRAIN, libraryApi } from '@/test/libraryServer'
-import { mediaItemFor } from '@/test/mediaItem'
 import { ROUTE_TARGETS } from '@/routes'
 
 const COOKIE = { [AUTH_HEADERS.cookie]: 'raven_unlock=u.1' }

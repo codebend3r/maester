@@ -135,3 +135,6 @@ export type Sizes = Record<keyof typeof SIZES, number>
 
 /** How faint a control is drawn while a finger holds it, and while it is turned off. */
 export const OPACITIES = { pressed: 0.6, disabled: 0.5 } as const
+
+/** A seek line's height under the thumb: a finger's, iOS's least target, though the line it draws is thin. */
+export const SEEK_LINE_HEIGHT = 44

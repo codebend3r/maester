@@ -1,5 +1,4 @@
-import type { Chapter } from '@raven/core'
-import { chapterAt } from '@raven/ui/headless'
+import { type Chapter, chapterAt } from '@raven/core'
 
 import { playedShareOf } from '@/layouts/playerKit'
 

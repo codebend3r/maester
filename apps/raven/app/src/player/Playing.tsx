@@ -14,13 +14,13 @@ import {
   resumeAtFor,
   SESSION_KINDS,
   episodeTag,
+  preferredAudio,
+  preferredSubtitle,
 } from '@raven/core'
 import { watchAppHide } from '@raven/native'
 import {
   VIDEO_EVENTS,
   initialVideoState,
-  preferredAudio,
-  preferredSubtitle,
   useCaptionStyle,
   useProgressReport,
   useTrackCues,
@@ -34,8 +34,7 @@ import { SelectedTrackType, type VideoRef } from 'react-native-video'
 
 import { PlayerChrome, canDrawPictureSubtitles, shouldDrawCaptions } from '@/layouts'
 import { PLAYER_COPY, type VideoSurface } from '@/layouts/playerKit'
-import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
-import { APP_PLATFORMS } from '@/platform/platform'
+import { DEVICE_PLATFORM, DEVICE_TRAITS } from '@/platform/devicePlatform'
 import { captionsFor, sidecarIdsOf, sidecarTracksOf } from '@/player/captions'
 import { playerSubtitleStyleOf } from '@/player/captionLook'
 import { PLAYER_BUFFER } from '@/player/playerBuffer'
@@ -135,13 +134,8 @@ const neighboursOf = ({ isQueued, queued, mediaId, serverNext }: NeighboursOfPro
   }
 }
 
-/**
- * AVPlayer, on iPhone, iPad and Apple TV alike, resumes by a seek of ours once loaded, not by the
- * library's `startPosition`; see `startUp.ts`. The library applies a `startPosition` of 0 too, so
- * on Apple TV every start, from the beginning as well, sat on the opening mark for good.
- */
-const IS_SEEKING_TO_RESUME =
-  DEVICE_PLATFORM === APP_PLATFORMS.ios || DEVICE_PLATFORM === APP_PLATFORMS.tvos
+/** Whether this device's player resumes by a seek of ours once loaded; see `PLATFORM_TRAITS`. */
+const IS_SEEKING_TO_RESUME = DEVICE_TRAITS.shouldSeekToResume
 
 /** What the player saying it buffers, or not, tells the video state. */
 const bufferEventOf = (isBuffering: boolean) =>
@@ -222,7 +216,7 @@ export const Playing = ({
   const [resumeAt] = useState(() => (isFromStart ? 0 : resumeAtFor({ at, media })))
   const heading = usePlayerHeading({ media, session })
   const [subtitle, setSubtitle] = useState(() =>
-    preferredSubtitle({ tracks, subtitles: subtitlePrefs }),
+    preferredSubtitle({ tracks, isOn: subtitlePrefs.on, language: subtitlePrefs.language }),
   )
   // The same query the policy is read from, already answered: its height caps the sizes offered.
   const settings = useQuery(session.queries.playbackSettingsQuery)

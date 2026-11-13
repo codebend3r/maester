@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import { ITEM_TYPES } from '@raven/core'
+import { mediaItemFor, summaryFor } from '@raven/native/testing'
 
 import { favouriteSectionsOf } from '@/queries/favouriteCards'
 import type { ShowArts } from '@/queries/showArt'
 import { homeApi } from '@/test/homeServer'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 const headersFor = () => ({})
 

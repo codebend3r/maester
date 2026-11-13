@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CALL_METHODS, APP_CLIENT_CALLS } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import type * as Native from '@raven/native'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { Alert } from 'react-native'
+import type { HeardRequest } from '@raven/native/testing'
 
 import { APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf } from '@/routes'
 import { Library } from '@/screens/Library'
 import { useActiveServer } from '@/stores/activeServer'
 import { NAS } from '@/test/homeServer'
-import type { HeardRequest } from '@/test/fixtureFetch'
 import {
   MIXTAPE,
   MUSIC,
@@ -101,9 +101,9 @@ describe('a music library', () => {
         hrefOf({ kind: ROUTE_TARGETS.playlist, playlistId: NEW_PLAYLIST_ID }),
       ),
     )
-    expect(mockHeard.filter(({ method }) => method !== APP_CALL_METHODS.get)).toEqual([
+    expect(mockHeard.filter(({ method }) => method !== HTTP_METHODS.get)).toEqual([
       {
-        method: APP_CALL_METHODS.post,
+        method: HTTP_METHODS.post,
         path: APP_CLIENT_CALLS.createPlaylist.path,
         body: { name: 'Road trip' },
       },

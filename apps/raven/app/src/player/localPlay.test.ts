@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import { type MediaItem, ROUTE_STATES, type RouteQuery } from '@raven/core'
+import { mediaItemFor } from '@raven/native/testing'
 
 import { PLAY_ORIGINS, playOriginOf } from '@/player/localPlay'
 import type { LocalCopy } from '@/player/playWay'
-import { mediaItemFor } from '@/test/mediaItem'
 
 const kept = mediaItemFor({ id: 7, title: 'Kept' })
 const fresh = mediaItemFor({ id: 7, title: 'Fresh' })

@@ -35,9 +35,10 @@ const SECTION_KEYS = {
 
 type TitleCardProps = Pictures & { item: ItemSummary; arts: ShowArts }
 
+type TitleArtsProps = Pick<TitleCardProps, 'item' | 'arts'>
+
 /** The art of the show or film `item` wears: an episode or season wears its show's. */
-const artOfItem = ({ item, arts }: Pick<TitleCardProps, 'item' | 'arts'>) =>
-  arts.get(artItemIdOf(item)) ?? null
+const artOfItem = ({ item, arts }: TitleArtsProps) => arts.get(artItemIdOf(item)) ?? null
 
 /**
  * A favourite show or season: where its show has a backdrop, a wide card with the logo over it,
@@ -77,7 +78,7 @@ const titleCard = ({ item, arts, api, headersFor }: TitleCardProps): ShelfCard =
 }
 
 /** Whether a favourite title is drawn wide: its show has a backdrop. */
-const isWideTitle = ({ item, arts }: Pick<TitleCardProps, 'item' | 'arts'>): boolean =>
+const isWideTitle = ({ item, arts }: TitleArtsProps): boolean =>
   (artOfItem({ item, arts })?.backdrop ?? null) !== null
 
 type WithLogoProps = { card: ShelfCard; entry: PosterEntry; arts: ShowArts }
@@ -87,7 +88,8 @@ const withLogo = ({ card, entry, arts }: WithLogoProps): ShelfCard => ({
   logo: logoOf({ entry, arts }),
 })
 
-const isEpisode = ({ media }: PosterEntry): boolean => media.item?.type === ITEM_TYPES.episode
+const isEpisode = ({ media }: PosterEntry): boolean =>
+  (media.item?.type ?? null) === ITEM_TYPES.episode
 
 const hasPoster = ({ poster }: PosterEntry): boolean => poster !== null
 

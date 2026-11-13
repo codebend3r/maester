@@ -9,6 +9,8 @@ import {
   isSortDirection,
   withoutView,
 } from '@raven/core'
+import { loadPersisted } from '@raven/native/headless'
+import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 
@@ -72,13 +74,6 @@ const choicesOf = (saved: unknown): Choices => {
 const withoutViews = (choices: Choices): Choices =>
   Object.fromEntries(Object.entries(choices).map(([key, choice]) => [key, withoutView(choice)]))
 
-/** Holds the place of the storage until `configureLibraryViews`, as the player prefs do. */
-const UNCONFIGURED: StateStorage = {
-  getItem: () => null,
-  setItem: () => undefined,
-  removeItem: () => undefined,
-}
-
 /**
  * How each library is sorted, laid out and grouped on this device. The web saves such a
  * change to the server (`PUT /api/libraries/:id/view`, `@ForViewers()`), for every viewer;
@@ -99,7 +94,7 @@ export const useLibraryViews = create<LibraryViews>()(
     }),
     {
       name: LIBRARY_VIEWS_KEY,
-      storage: createJSONStorage(() => UNCONFIGURED),
+      storage: createJSONStorage(() => UNCONFIGURED_STORAGE),
       skipHydration: true,
       partialize: ({ choices }) => ({ choices: withoutViews(choices) }),
       merge: (saved, current) => ({ ...current, choices: withoutViews(choicesOf(saved)) }),
@@ -111,6 +106,5 @@ type ConfigureLibraryViewsProps = { storage: StateStorage }
 
 /** Gives the choices their storage, AsyncStorage in the app, and reads them back from it. */
 export const configureLibraryViews = async ({ storage }: ConfigureLibraryViewsProps) => {
-  useLibraryViews.persist.setOptions({ storage: createJSONStorage(() => storage) })
-  await useLibraryViews.persist.rehydrate()
+  await loadPersisted({ store: useLibraryViews, storage })
 }

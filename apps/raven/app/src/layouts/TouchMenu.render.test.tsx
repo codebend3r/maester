@@ -15,7 +15,7 @@ import { renderScreen } from '@/test/renderScreen'
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
 const mockDismissTo = jest.fn()
-let mockPathname = APP_ROUTES.home as string
+let mockPathname: string = APP_ROUTES.home
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace, dismissTo: mockDismissTo }),

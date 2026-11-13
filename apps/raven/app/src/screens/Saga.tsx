@@ -20,6 +20,7 @@ import { usePictures } from '@/queries/usePictures'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
 import { SAGA_COPY } from '@/screens/copy'
 import { RouteError, RouteLoading, RouteMissing, type RouteViewProps } from '@/screens/RouteNotices'
+import { APP_ICONS } from '@/theme/icons'
 
 type SagaGridProps = { session: AppQueries; saga: SagaRecord }
 
@@ -46,7 +47,7 @@ const SagaGrid = ({ session, saga }: SagaGridProps) => {
         play !== null && (
           <ToolButton
             accessibilityLabel={SAGA_COPY.playAll}
-            icon="play"
+            icon={APP_ICONS.play}
             label={SAGA_COPY.playAll}
             onPress={() => router.push(hrefOf(play))}
           />
@@ -64,15 +65,30 @@ type ServerSagaViewProps = RouteViewProps<SagaRecord[]> & {
 
 type SagaReadyProps = ServerSagaViewProps
 
+type SagaFoundProps = SagaReadyProps & { saga: SagaRecord | null }
+
+const SagaFound = ({ saga, session }: SagaFoundProps) =>
+  saga !== null && <SagaGrid saga={saga} session={session} />
+
+/** Whether the saga the address names is in the library's list. */
+const SAGA_FINDS = { found: 'found', missing: 'missing' } as const
+
+type SagaFind = (typeof SAGA_FINDS)[keyof typeof SAGA_FINDS]
+
+const SAGA_FIND_VIEWS = {
+  [SAGA_FINDS.found]: SagaFound,
+  [SAGA_FINDS.missing]: RouteMissing,
+} as const satisfies Record<SagaFind, ComponentType<SagaFoundProps>>
+
 /** A saga the library no longer lists is as missing as one the address misnames. */
-const SagaReady = ({ page, session, sagaId, copy, onBack }: SagaReadyProps) => {
+const SagaReady = (props: SagaReadyProps) => {
+  const { page, sagaId } = props
   const saga =
-    page.state === ROUTE_STATES.ready ? page.data.find((each) => each.tmdbId === sagaId) : undefined
-  return saga === undefined ? (
-    <RouteMissing copy={copy} onBack={onBack} page={page} />
-  ) : (
-    <SagaGrid saga={saga} session={session} />
-  )
+    (page.state === ROUTE_STATES.ready
+      ? page.data.find((each) => each.tmdbId === sagaId)
+      : undefined) ?? null
+  const View = SAGA_FIND_VIEWS[saga === null ? SAGA_FINDS.missing : SAGA_FINDS.found]
+  return <View {...props} saga={saga} />
 }
 
 const SERVER_SAGA_VIEWS = {

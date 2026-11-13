@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   DEFAULT_THEME,
   HLS_PARAMS,
@@ -20,6 +20,7 @@ import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 import type { ReactVideoProps } from 'react-native-video'
 import { SelectedTrackType } from 'react-native-video'
+import { type HeardRequest, STATUSES, pathWithId } from '@raven/native/testing'
 
 import { useAccountSession } from '@/account/session'
 import { PLAYER_COPY, SKIP_SECONDS } from '@/layouts/playerKit'
@@ -29,7 +30,6 @@ import { APP_ROUTES, APP_ROUTE_PARAMS, PLAY_FROM } from '@/routes'
 import { Player } from '@/screens/Player'
 import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
-import { type HeardRequest, STATUSES, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import {
   BUSBOYS_MP4,
@@ -130,22 +130,20 @@ const SIGNED_IN = {
   email: 'viewer@example.com',
 } as const
 
-const progressPath = pathFor({ path: APP_CLIENT_CALLS.saveProgress.path, id: BUSBOYS_MP4.id })
-const playsPath = pathFor({ path: APP_CLIENT_CALLS.recordPlay.path, id: BUSBOYS_MP4.id })
+const progressPath = pathWithId({ path: APP_CLIENT_CALLS.saveProgress.path, id: BUSBOYS_MP4.id })
+const playsPath = pathWithId({ path: APP_CLIENT_CALLS.recordPlay.path, id: BUSBOYS_MP4.id })
 
-/** Each spot the server was told to save, in order. */
 /** The audio track every save names: the file's only one. */
 const AUDIO_PLAYED = 0
 
 const savedSpots = (): unknown[] =>
   mockServer.heard
-    .filter(({ method, path }) => method === APP_CALL_METHODS.put && path === progressPath)
+    .filter(({ method, path }) => method === HTTP_METHODS.put && path === progressPath)
     .map(({ body }) => body)
 
 const playsRecorded = (): number =>
-  mockServer.heard.filter(
-    ({ method, path }) => method === APP_CALL_METHODS.post && path === playsPath,
-  ).length
+  mockServer.heard.filter(({ method, path }) => method === HTTP_METHODS.post && path === playsPath)
+    .length
 
 /** A light theme, whose page colours would vanish over a bright picture. */
 const PATINA = THEMES.find((theme) => theme.name === 'Patina')?.id ?? DEFAULT_THEME
@@ -188,7 +186,7 @@ describe('Player on a phone or tablet', () => {
     })
     const props = await loadedVideo()
     expect(props.source!.uri).toBe(
-      `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })}`,
+      `${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })}`,
     )
     expect(props.source!.startPosition ?? null).toBeNull()
     expect(screen.getByText(mediaLabel(BUSBOYS_MP4))).toBeTruthy()
@@ -253,7 +251,7 @@ describe('Player on a phone or tablet', () => {
     await act(async () => {
       props.onError!({ error: { code: -11828, localizedDescription: 'Cannot Open' } })
     })
-    const master = pathFor({ path: HLS_PATHS.master, id: BUSBOYS_MP4.id })
+    const master = pathWithId({ path: HLS_PATHS.master, id: BUSBOYS_MP4.id })
     await screen.findByRole('button', { name: 'Pause' })
     expect(videoProps().source!.uri).toBe(
       `${NAS.origin}${master}?${HLS_PARAMS.mode}=${PLAYBACK_MODES.remux}`,
@@ -263,8 +261,8 @@ describe('Player on a phone or tablet', () => {
   })
 
   describe('under an account', () => {
-    const file = pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })
-    const master = pathFor({ path: HLS_PATHS.master, id: BUSBOYS_MP4.id })
+    const file = pathWithId({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })
+    const master = pathWithId({ path: HLS_PATHS.master, id: BUSBOYS_MP4.id })
     const ticketQuery = toQueryString({ [MEDIA_TICKET_PARAM]: PLAYER_TICKET })
     const remuxQuery = toQueryString({
       [HLS_PARAMS.mode]: PLAYBACK_MODES.remux,

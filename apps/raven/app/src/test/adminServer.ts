@@ -1,6 +1,6 @@
 import {
   type Account,
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type ApiClient,
   DEFAULT_DISPLAY_SETTINGS,
@@ -15,8 +15,14 @@ import {
   isPlaybackSettingsChange,
 } from '@raven/core'
 import type { AppServer } from '@raven/native/headless'
+import {
+  type HeardRequest,
+  NOT_FOUND,
+  STATUSES,
+  pathWithId,
+  responseOf,
+} from '@raven/native/testing'
 
-import { type HeardRequest, NOT_FOUND, STATUSES, pathFor, responseOf } from '@/test/fixtureFetch'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 
 /** The account signed in on the device in these tests. */
@@ -57,7 +63,7 @@ const REMOTE_ACCESS: RemoteAccessState = {
   status: { state: REMOTE_ACCESS_STATES.disabled },
 }
 
-const { get, put, post } = APP_CALL_METHODS
+const { get, put, post } = HTTP_METHODS
 
 /** What the test server holds, read at each request, so a test can change it as it goes. */
 export type AdminServerState = {
@@ -99,7 +105,7 @@ export const adminApi =
           [`${get} ${APP_CLIENT_CALLS.getDisplaySettings.path}`]: DEFAULT_DISPLAY_SETTINGS,
           [`${get} ${APP_CLIENT_CALLS.getRemoteAccess.path}`]: REMOTE_ACCESS,
           [`${get} ${APP_CLIENT_CALLS.listLibraries.path}`]: [FILMS, SERIES],
-          [`${post} ${pathFor({ path: APP_CLIENT_CALLS.quickScanLibrary.path, id: FILMS.id })}`]:
+          [`${post} ${pathWithId({ path: APP_CLIENT_CALLS.quickScanLibrary.path, id: FILMS.id })}`]:
             FILMS,
           [`${get} ${APP_CLIENT_CALLS.listMembers.path}?pageSize=100&pageOffset=0`]: [
             OWNER,

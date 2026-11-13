@@ -1,5 +1,5 @@
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type ApiClient,
   HOME_SHELF_TYPES,
@@ -10,16 +10,17 @@ import {
   toQueryString,
 } from '@raven/core'
 import { allowlistedFetch } from '@raven/native/headless'
-
 import {
   type Answer,
   type HeardRequest,
   NOT_FOUND,
   STATUSES,
   responseOf,
-} from '@/test/fixtureFetch'
+  mediaItemFor,
+  summaryFor,
+} from '@raven/native/testing'
+
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 export const DUNE = mediaItemFor({
   id: 50,
@@ -101,7 +102,7 @@ export const searchApi = ({
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const path = url.slice(NAS.origin.length)
-        hear({ method: init.method ?? APP_CALL_METHODS.get, path, body: null })
+        hear({ method: init.method ?? HTTP_METHODS.get, path, body: null })
         await reads(path)
         return responseOf(answerFor(path))
       },

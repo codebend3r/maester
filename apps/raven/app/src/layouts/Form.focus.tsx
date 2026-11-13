@@ -1,12 +1,12 @@
 import { type ComponentRef, useRef, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
+import { keyboardFor } from '@raven/native/headless'
 
 import {
   type FieldProps,
   type FormButtonProps,
   type FormKit,
   type FormProps,
-  keyboardFor,
 } from '@/layouts/formKit'
 import { FIELD_COPY } from '@/layouts/copy'
 import { Text } from '@/layouts/Text'

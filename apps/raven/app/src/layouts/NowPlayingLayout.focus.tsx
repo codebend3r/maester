@@ -1,13 +1,12 @@
-import { REPEAT_MODES } from '@raven/core'
+import { REPEAT_MODES, type QueueRow } from '@raven/core'
 import { usePlayerPrefs } from '@raven/ui/headless'
-import type { QueueRow } from '@raven/ui/headless'
 import { type ComponentRef, type ComponentType, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { BUTTON_TONES } from '@raven/native/headless'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
-import { BUTTON_TONES } from '@/layouts/formKit'
 import { MUSIC_COPY } from '@/layouts/copy'
 import {
   CROSSFADE_OPTIONS,
@@ -31,6 +30,7 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { useLastFocus } from '@/stores/lastFocus'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /**
  * How wide the cover stands, and with it the column under it, in each layout: beside the
@@ -128,7 +128,7 @@ const CrossfadePlate = () => {
   return (
     <>
       <ActionPlate
-        icon="crossfade"
+        icon={APP_ICONS.crossfade}
         isOn={crossfade > 0}
         isPreferred={false}
         label={label}
@@ -198,7 +198,7 @@ const Player = ({
         <FocusBand>
           <View style={styles.actions}>
             <ActionPlate
-              icon="skipPrevious"
+              icon={APP_ICONS.skipPrevious}
               isPreferred={false}
               label={MUSIC_COPY.previous}
               onPress={onPrevious}
@@ -206,7 +206,7 @@ const Player = ({
               tone={BUTTON_TONES.quiet}
             />
             <ActionPlate
-              icon={isPlaying ? 'pause' : 'play'}
+              icon={isPlaying ? APP_ICONS.pause : APP_ICONS.play}
               isPreferred={isOpening}
               label={toggleLabelOf(isPlaying)}
               onPress={onToggle}
@@ -214,7 +214,7 @@ const Player = ({
               tone={BUTTON_TONES.primary}
             />
             <ActionPlate
-              icon="skipNext"
+              icon={APP_ICONS.skipNext}
               isPreferred={false}
               label={MUSIC_COPY.next}
               onPress={onNext}
@@ -222,7 +222,7 @@ const Player = ({
               tone={BUTTON_TONES.quiet}
             />
             <ActionPlate
-              icon="shuffle"
+              icon={APP_ICONS.shuffle}
               isOn={isShuffled}
               isPreferred={false}
               label={shuffleLabelOf(isShuffled)}

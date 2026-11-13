@@ -123,7 +123,8 @@ export const AdminUsers = ({ session: { api, queries }, ownerId }: AdminUsersPro
   const [tab, setTab] = useState<MemberStatus>(MEMBER_STATUSES.pending)
   const [asking, setAsking] = useState<string | null>(null)
   const isRefused =
-    members.error instanceof ApiError && members.error.refusal?.reason === AUTH_REFUSALS.notOwner
+    members.error instanceof ApiError &&
+    (members.error.refusal?.reason ?? null) === AUTH_REFUSALS.notOwner
   const withStatus = (status: MemberStatus) =>
     members.data?.filter((member) => member.status === status) ?? []
   const shown = withStatus(tab)

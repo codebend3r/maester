@@ -1,6 +1,6 @@
 import { View } from 'react-native'
+import { BUTTON_TONES } from '@raven/native/headless'
 
-import { BUTTON_TONES } from '@/layouts/formKit'
 import { touchForm } from '@/layouts/Form.touch'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { DownloadChip } from '@/layouts/DownloadChip.touch'
@@ -9,6 +9,7 @@ import { ListEntry, TouchPage, useMusicStyles } from '@/layouts/MusicParts.touch
 import { touchPicker } from '@/layouts/Picker.touch'
 import { askPlaylistName, confirmDeletePlaylist } from '@/layouts/playlistSheets'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { APP_ICONS } from '@/theme/icons'
 
 const { FormButton } = touchForm
 const { ToolButton } = touchPicker
@@ -64,7 +65,7 @@ export const PlaylistLayout = ({
           <View style={styles.controls}>
             <ToolButton
               accessibilityLabel={MUSIC_COPY.renamePlaylist}
-              icon="edit"
+              icon={APP_ICONS.edit}
               label={MUSIC_COPY.rename}
               onPress={() =>
                 askPlaylistName({
@@ -77,7 +78,7 @@ export const PlaylistLayout = ({
             />
             <ToolButton
               accessibilityLabel={MUSIC_COPY.delete}
-              icon="trash"
+              icon={APP_ICONS.trash}
               label={MUSIC_COPY.delete}
               onPress={() => confirmDeletePlaylist({ name, onDelete })}
             />
@@ -99,7 +100,7 @@ export const PlaylistLayout = ({
             {isOwn && track.index > 0 && (
               <ToolButton
                 accessibilityLabel={MUSIC_COPY.moveUp(track.title)}
-                icon="up"
+                icon={APP_ICONS.up}
                 label={MUSIC_COPY.up}
                 onPress={() => onMoveUp(track.index)}
               />
@@ -107,7 +108,7 @@ export const PlaylistLayout = ({
             {isOwn && (
               <ToolButton
                 accessibilityLabel={MUSIC_COPY.removeFrom(track.title)}
-                icon="close"
+                icon={APP_ICONS.close}
                 label={MUSIC_COPY.remove}
                 onPress={() => onRemove(track.index)}
               />
@@ -123,7 +124,7 @@ export const PlaylistLayout = ({
 export const NewPlaylistButton = ({ onCreate }: NewPlaylistButtonProps) => (
   <ToolButton
     accessibilityLabel={MUSIC_COPY.newPlaylist}
-    icon="plus"
+    icon={APP_ICONS.plus}
     label={MUSIC_COPY.newPlaylist}
     onPress={() =>
       askPlaylistName({

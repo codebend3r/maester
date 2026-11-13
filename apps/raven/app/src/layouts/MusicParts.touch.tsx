@@ -12,11 +12,9 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TouchNav } from '@/layouts/TouchNav'
 import { useScrub } from '@/layouts/useScrub'
 import type { Picture } from '@/queries/cards'
-import { OPACITIES, SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES, SEEK_LINE_HEIGHT } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
-
-/** The seek bar's height: a finger's, though the line it draws is thin. */
-const SEEK_HEIGHT = 44
+import { APP_ICONS } from '@/theme/icons'
 
 /** What the music pages under the thumb share of their look: the page, the words and the rows. */
 export const useMusicStyles = themedStyles((colours) =>
@@ -71,7 +69,7 @@ export const useMusicStyles = themedStyles((colours) =>
     iconPlateOn: { backgroundColor: colours.accent },
     iconPlateDisabled: { opacity: OPACITIES.disabled },
     seekBar: { alignSelf: 'stretch', gap: SIZES.space1 },
-    seekLine: { height: SEEK_HEIGHT, justifyContent: 'center' },
+    seekLine: { height: SEEK_LINE_HEIGHT, justifyContent: 'center' },
     // The line stands in from each end by half the thumb, so the thumb at 0:00 or the end is whole.
     seekRail: { marginHorizontal: SIZES.space4 / 2, justifyContent: 'center' },
     seekTrack: {
@@ -237,7 +235,12 @@ export const Cover = ({ cover, title, size = SIZES.cover }: CoverProps) => {
 
 /** A favourite mark on a plate: the heart, filled in the accent while it is on, said as Favourite. */
 export const FavouriteButton = ({ isFavourite, onToggle }: FavouriteButtonProps) => (
-  <IconPlate icon="heart" isOn={isFavourite} label={MUSIC_COPY.favourite} onPress={onToggle} />
+  <IconPlate
+    icon={APP_ICONS.heart}
+    isOn={isFavourite}
+    label={MUSIC_COPY.favourite}
+    onPress={onToggle}
+  />
 )
 
 type ListEntryProps = {

@@ -10,7 +10,7 @@ type UseSeekGraceProps = {
 
 /** Lets a video play `SEEK_GRACE_MS` after its resume seek was asked, for a seek never reported. */
 export const useSeekGrace = ({ state, onLanded }: UseSeekGraceProps): void => {
-  const attempt = state?.phase === START_PHASES.seeking ? state.attempt : null
+  const attempt = (state?.phase ?? null) === START_PHASES.seeking ? (state?.attempt ?? null) : null
   const land = useEffectEvent(onLanded)
   useEffect(() => {
     if (attempt === null) return undefined

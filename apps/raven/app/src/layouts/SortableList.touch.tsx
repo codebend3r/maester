@@ -22,6 +22,7 @@ import {
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** How long a finger rests on the handle before the row lifts. */
 const LIFT_MS = 350
@@ -155,7 +156,7 @@ const SortableRow = ({
           style={styles.handle}
           testID={`${SORTABLE_TEST_ID}-${index}`}
         >
-          <Icon colour={text} name="grip" size={SIZES.textLg} />
+          <Icon colour={text} name={APP_ICONS.grip} size={SIZES.textLg} />
         </View>
       )}
     </Animated.View>
