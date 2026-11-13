@@ -1,5 +1,5 @@
 import { mkdirSync } from 'node:fs'
-import { mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common'
 import { SUBTITLE_SOURCES, subtitleWindowRange } from '@raven/core'
@@ -8,6 +8,7 @@ import { subtitleFileArgs, subtitleWindowArgs } from '@/ffmpeg/args'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import type { MediaFile } from '@/media/mediaIndex'
 import { TracksService } from '@/playback/tracksService'
+import { removeFiles } from '@/fileSweep'
 
 /** Most sidecars that are not UTF-8 are Windows Latin-1, from the DVD-rip years. */
 const FALLBACK_CHARSET = 'CP1252'
@@ -151,11 +152,10 @@ export class SubtitlesService {
     version,
     supersedes,
   }: SubtitlesServiceClearStaleProps): Promise<void> {
-    const names = await readdir(folder).catch(() => [])
     const kept = basename(path)
     const isStale = (name: string) =>
       !name.startsWith(`${version}-`) ||
       (supersedes !== null && name.startsWith(supersedes) && !name.startsWith(kept))
-    await Promise.all(names.filter(isStale).map((name) => rm(join(folder, name), { force: true })))
+    await removeFiles({ dir: folder, isGone: isStale })
   }
 }

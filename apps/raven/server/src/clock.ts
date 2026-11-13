@@ -19,3 +19,6 @@ export const SYSTEM_CLOCK: Clock = {
     return () => clearTimeout(timer)
   },
 }
+
+/** The calendar day `at` falls on, in UTC, as `YYYY-MM-DD`: the same for every viewer and every server zone. */
+export const utcDayOf = (at: number): string => new Date(at).toISOString().slice(0, 10)

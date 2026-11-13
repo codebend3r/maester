@@ -28,9 +28,10 @@ import type { FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { AuthSessions, accountOf } from '@/auth/authSessions'
 import { Public } from '@/lock/lockGuard'
-import { ViewingAccounts } from '@/media/viewingAccounts'
 import { parseBody } from '@/parseBody'
 import { BugReportsRepository } from '@/reports/bugReportsRepository'
+import { ViewingAccount } from '@/media/viewingAccountParam'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 
 /** How many reports one account may send in `REPORT_WINDOW_MS`, so a stuck player cannot fill the disk. */
 export const MAX_REPORTS_PER_WINDOW = 20
@@ -42,14 +43,17 @@ const REPORT_WINDOW_MS = 3_600_000
 export class BugReportsController {
   constructor(
     @Inject(BugReportsRepository) private readonly reports: BugReportsRepository,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(AuthSessions) private readonly sessions: Pick<AuthSessions, 'callerOf'>,
   ) {}
 
   /** Keeps what the player gathered, under the account asking: never one the body names. */
   @ForViewers()
   @Post(BUG_REPORT_PATHS.reports)
-  report(@Req() request: FastifyRequest, @Body() body: unknown): BugReport {
+  report(
+    @Req() request: FastifyRequest,
+    @Body() body: unknown,
+    @ViewingAccount() account: AccountKey,
+  ): BugReport {
     if (Buffer.byteLength(JSON.stringify(body ?? null)) > MAX_BUG_REPORT_BYTES) {
       throw new PayloadTooLargeException('The report is too large to keep.')
     }
@@ -58,7 +62,6 @@ export class BugReportsController {
       body,
       message: 'The report is missing what the player knew about the error.',
     })
-    const account = this.accounts.keyOf({ request })
     const now = new Date()
     const sent = this.reports.countSince({
       account,

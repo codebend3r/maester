@@ -75,6 +75,27 @@ export const createGate = ({ limit }: CreateGateProps): Gate => {
   }
 }
 
+/** What a background task is for, the first part of its key in a task queue. */
+export const QUEUE_KEYS = {
+  library: 'library',
+  kind: 'kind',
+  preference: 'prefer',
+  layout: 'layout',
+  smartMatch: 'smart-match',
+  season: 'season',
+  media: 'media',
+  album: 'album',
+} as const
+
+type QueueKeyOfProps = {
+  kind: (typeof QUEUE_KEYS)[keyof typeof QUEUE_KEYS]
+  parts: ReadonlyArray<string | number | null>
+}
+
+/** A task's key: what it is for, then what it is about, so two asks for the same work share one. */
+export const queueKeyOf = ({ kind, parts }: QueueKeyOfProps): string =>
+  [kind, ...parts.map(String)].join(':')
+
 type PushProps = { key: string; task: (signal: AbortSignal) => Promise<void> }
 
 type AgainProps = PushProps

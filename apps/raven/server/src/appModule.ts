@@ -34,6 +34,10 @@ import { ItemPictureFiles } from '@/items/itemPictureFiles'
 import { PicturesController } from '@/items/picturesController'
 import { ReviewsController } from '@/items/reviewsController'
 import { LibrariesController } from '@/libraries/librariesController'
+import { LibraryCurationController } from '@/libraries/libraryCurationController'
+import { LibraryJobsController } from '@/libraries/libraryJobsController'
+import { LibraryListingsController } from '@/libraries/libraryListingsController'
+import { LibraryViews } from '@/libraries/libraryViews'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { RatingsRefresh } from '@/libraries/ratingsRefresh'
 import { LockController } from '@/lock/lockController'
@@ -116,6 +120,8 @@ import {
   TracksController,
 } from '@/music/musicController'
 import { MusicIndexer } from '@/music/musicIndexer'
+import { MusicCoverStore } from '@/music/musicCoverStore'
+import { MusicMatchStore } from '@/music/musicMatchStore'
 import { MusicRepository } from '@/music/musicRepository'
 import { Filmographies } from '@/people/filmographies'
 import { ArrClient } from '@/requests/arrClient'
@@ -137,6 +143,7 @@ import { SubtitlesService } from '@/playback/subtitlesService'
 import { StreamsController } from '@/streams/streamsController'
 import { StreamSessions } from '@/streams/streamSessions'
 import { TracksService } from '@/playback/tracksService'
+import { ConversionRequests } from '@/playback/conversionRequests'
 import { MarkersService } from '@/markers/markersService'
 import { MarkerJobs } from '@/markers/markerJobs'
 import { MarkerDetection } from '@/markers/markerDetection'
@@ -164,9 +171,13 @@ import { SettingsController } from '@/settings/settingsController'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { STARTUP_HELD, StartupWork } from '@/startupWork'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
+import { WatchNext } from '@/media/watchNext'
 
 export const CONTROLLERS = [
   LibrariesController,
+  LibraryJobsController,
+  LibraryListingsController,
+  LibraryCurationController,
   MediaController,
   MediaOriginsController,
   PlaybackController,
@@ -285,6 +296,7 @@ export class AppModule {
         DatabaseService,
         ServerEvents,
         LibrariesRepository,
+        LibraryViews,
         SettingsRepository,
         PictureVersions,
         ItemImagesRepository,
@@ -295,6 +307,7 @@ export class AppModule {
         ItemOverrides,
         SagaBackdrops,
         MediaRepository,
+        WatchNext,
         HeroRepository,
         HeroSelection,
         MovieSplits,
@@ -314,6 +327,8 @@ export class AppModule {
         AudioReader,
         AlbumCovers,
         MusicIndexer,
+        MusicCoverStore,
+        MusicMatchStore,
         MusicBrainzClient,
         LrclibClient,
         MusicFavourites,
@@ -359,6 +374,7 @@ export class AppModule {
         FfmpegService,
         ThumbnailService,
         TracksService,
+        ConversionRequests,
         MarkersService,
         MarkerJobs,
         MarkerDetection,

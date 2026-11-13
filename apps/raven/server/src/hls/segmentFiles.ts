@@ -56,13 +56,16 @@ const boxesFrom = ({ bytes, view, offset }: Reading): Box[] => {
   return [box, ...boxesFrom({ bytes, view, offset: box.end })]
 }
 
+/** A segment file split into its init and its media. */
+type SplitSegment = { init: Uint8Array; media: Uint8Array }
+
 /**
  * Splits one file of a segment run into the init every segment shares
  * (`ftyp moov`) and the segment itself (everything after the `moov`).
  * Every top-level box must end inside the file, so a file ffmpeg is still
  * writing is refused rather than served cut short.
  */
-export const splitSegmentFile = (bytes: Uint8Array): { init: Uint8Array; media: Uint8Array } => {
+export const splitSegmentFile = (bytes: Uint8Array): SplitSegment => {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const movie = boxesFrom({ bytes, view, offset: 0 }).find((box) => box.type === MP4_BOXES.movie)
   if (!movie) throw new Error('The segment file has no moov box')

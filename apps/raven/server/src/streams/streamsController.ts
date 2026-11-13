@@ -7,18 +7,18 @@ import {
   NotFoundException,
   Param,
   Post,
-  Req,
 } from '@nestjs/common'
 import { type LiveStream, STREAM_PURPOSES } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
-import type { FastifyRequest } from 'fastify'
 import { AdminOnly } from '@/admin/adminGuard'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { Public } from '@/lock/lockGuard'
 import { MediaRepository } from '@/media/mediaRepository'
-import { ViewingAccounts } from '@/media/viewingAccounts'
 import { describeClient } from '@/streams/clientInfo'
 import { StreamSessions } from '@/streams/streamSessions'
+import { ROUTE_PARAMS } from '@/requestParts'
+import { ViewingAccount } from '@/media/viewingAccountParam'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 
 /** Who is streaming what, for the admin to see and to stop. */
 @Controller('api/streams')
@@ -28,14 +28,12 @@ export class StreamsController {
     @Inject(StreamSessions) private readonly sessions: StreamSessions,
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
   /** Live as of this request, so never cached; each video as the owner asking sees it. */
   @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
   @Get()
-  list(@Req() request: FastifyRequest): LiveStream[] {
-    const account = this.accounts.keyOf({ request })
+  list(@ViewingAccount() account: AccountKey): LiveStream[] {
     return this.sessions.list().flatMap((session): LiveStream[] => {
       const media = this.media.get({ id: session.mediaId, account })
       if (media == null) return []
@@ -73,7 +71,7 @@ export class StreamsController {
   @Public()
   @Post(':id/stop')
   @HttpCode(204)
-  stop(@Param('id') id: string): void {
+  stop(@Param(ROUTE_PARAMS.id) id: string): void {
     if (!this.sessions.stop(id)) throw new NotFoundException('That stream is not live any more')
   }
 }

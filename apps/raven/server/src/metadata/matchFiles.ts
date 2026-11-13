@@ -178,12 +178,18 @@ export class MatchFiles {
 
   /** A library's files waiting to be matched, by place so a folder's files come together. */
   pending(libraryId: number): MatchFile[] {
-    return this.files({ where: `m.library_id = ? AND m.match = 'pending'`, params: [libraryId] })
+    return this.files({
+      where: `m.library_id = ? AND m.match = '${MATCH_STATES.pending}'`,
+      params: [libraryId],
+    })
   }
 
   /** A library's files no movie or show was found for, by place so a folder's files come together. */
   unmatched(libraryId: number): MatchFile[] {
-    return this.files({ where: `m.library_id = ? AND m.match = 'unmatched'`, params: [libraryId] })
+    return this.files({
+      where: `m.library_id = ? AND m.match = '${MATCH_STATES.unmatched}'`,
+      params: [libraryId],
+    })
   }
 
   /**
@@ -191,7 +197,10 @@ export class MatchFiles {
    * by a Fix match, by place as `pending` gives them.
    */
   matched(libraryId: number): MatchFile[] {
-    return this.files({ where: `m.library_id = ? AND m.match = 'matched'`, params: [libraryId] })
+    return this.files({
+      where: `m.library_id = ? AND m.match = '${MATCH_STATES.matched}'`,
+      params: [libraryId],
+    })
   }
 
   /** A library's files in `folder`, with their names, for the files sharing a place. */
@@ -240,7 +249,7 @@ export class MatchFiles {
       this.db
         .prepare<[string], { count: number }>(
           `SELECT COUNT(*) AS count FROM media m JOIN libraries l ON l.id = m.library_id
-            WHERE m.match = 'pending' AND l.kind IN (SELECT value FROM json_each(?))`,
+            WHERE m.match = '${MATCH_STATES.pending}' AND l.kind IN (SELECT value FROM json_each(?))`,
         )
         .get(JSON.stringify(kinds))?.count ?? 0
     )
@@ -320,7 +329,7 @@ export class MatchFiles {
     return Number(
       this.db
         .prepare<[number]>(
-          `UPDATE media SET match = 'pending' WHERE library_id = ? AND match = 'unmatched'`,
+          `UPDATE media SET match = '${MATCH_STATES.pending}' WHERE library_id = ? AND match = '${MATCH_STATES.unmatched}'`,
         )
         .run(libraryId).changes,
     )

@@ -4,6 +4,7 @@ import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 import { RAVEN_USER_AGENT } from '@/music/userAgent'
 import { type RateLimit, createRateLimit } from '@/scanner/concurrency'
+import { errorMessage } from '@/errorMessage'
 
 const API = 'https://lrclib.net/api/get'
 
@@ -80,9 +81,7 @@ export class LrclibClient {
         }),
       )
       .catch((error: unknown) => {
-        throw new LrclibError(
-          `LRCLIB did not answer: ${error instanceof Error ? error.message : String(error)}`,
-        )
+        throw new LrclibError(`LRCLIB did not answer: ${errorMessage(error)}`)
       })
     if (response.status === 404) return null
     if (!response.ok) throw new LrclibError(`LRCLIB answered ${response.status}.`)

@@ -55,6 +55,11 @@ import { TmdbClient } from '@/metadata/tmdbClient'
 import { requireTmdb, tmdbUnavailable } from '@/metadata/tmdbGate'
 import { TMDB_IMAGE_PATH } from '@/metadata/tmdbShapes'
 import { ROUTE_PARAMS } from '@/requestParts'
+import { WatchNext } from '@/media/watchNext'
+import { QUERY_PARAMS, queryText } from '@/queryValues'
+import { PRIVACIES } from '@/lock/lockService'
+import { ViewingAccount } from '@/media/viewingAccountParam'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 
 type ItemsControllerDetailsProps = { id: number; request: FastifyRequest }
 
@@ -62,11 +67,12 @@ type ItemsControllerRequireHolderProps = { id: number; libraryId: number | undef
 
 /** Movies, shows, seasons and episodes: their pages, their pictures, and fetching them again. */
 @Controller('api/items')
-@PrivateBy('item')
+@PrivateBy(PRIVACIES.item)
 export class ItemsController {
   constructor(
     @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(WatchNext) private readonly watchNext: WatchNext,
     @Inject(MetadataService) private readonly service: MetadataService,
     @Inject(ItemRefresher) private readonly refresher: ItemRefresher,
     @Inject(ItemOverrides) private readonly overrides: ItemOverrides,
@@ -134,7 +140,7 @@ export class ItemsController {
   @AdminOnly()
   @Put(':id/match')
   async setMatch(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
   ): Promise<ItemDetails> {
@@ -156,15 +162,16 @@ export class ItemsController {
   @ForViewers()
   @Put(':id/favourite')
   setFavourite(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): ItemDetails {
     if (!isFavouriteChange(body)) throw new BadRequestException('favourite must be true or false')
     const outcome = this.titleFavourites.set({
       itemId: id,
       favourite: body.favourite,
-      account: this.accounts.keyOf({ request }),
+      account,
     })
     switch (outcome) {
       case FAVOURITE_OUTCOMES.done:
@@ -196,6 +203,7 @@ export class ItemsController {
   next(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): MediaItem | null {
     this.requireItem(id)
     const viewer = this.lock.viewer({ request })
@@ -203,7 +211,7 @@ export class ItemsController {
     return this.media.nextEpisode({
       showId: id,
       libraryIds,
-      account: this.accounts.keyOf({ request }),
+      account,
     })
   }
 
@@ -216,14 +224,15 @@ export class ItemsController {
   shuffle(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): MediaItem[] {
     this.requireItem(id)
     const viewer = this.lock.viewer({ request })
     const libraryIds = this.libraries.ids().filter((libraryId) => viewer.seesLibrary(libraryId))
-    return this.media.shuffledEpisodes({
+    return this.watchNext.shuffledEpisodes({
       itemId: id,
       libraryIds,
-      account: this.accounts.keyOf({ request }),
+      account,
     })
   }
 
@@ -232,7 +241,7 @@ export class ItemsController {
   @Post(':id/refresh')
   @HttpCode(200)
   async refresh(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Req() request: FastifyRequest,
   ): Promise<ItemDetails> {
     this.requireItem(id)
@@ -245,7 +254,7 @@ export class ItemsController {
   /** Edit metadata: what the page shows, what TMDB says, and which fields were written over. */
   @AdminOnly()
   @Get(':id/metadata')
-  getMetadata(@Param('id', ParseIntPipe) id: number): ItemMetadataState {
+  getMetadata(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number): ItemMetadataState {
     const state = this.overrides.state(id)
     if (!state) throw new NotFoundException(`No item ${id}`)
     return state
@@ -258,7 +267,7 @@ export class ItemsController {
   @AdminOnly()
   @Put(':id/metadata')
   setMetadata(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
   ): ItemDetails {
@@ -286,7 +295,7 @@ export class ItemsController {
   @AdminOnly()
   @Get(':id/images')
   async imageOptions(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Query(ITEM_QUERY_PARAMS.library, new ParseIntPipe({ optional: true }))
     library: number | undefined,
   ): Promise<ItemImageOptions> {
@@ -312,8 +321,8 @@ export class ItemsController {
   @AdminOnly()
   @Put(':id/images/:kind')
   async chooseImage(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('kind') kind: string,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.kind) kind: string,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
   ): Promise<ItemDetails> {
@@ -340,8 +349,8 @@ export class ItemsController {
   /** The picture beside the media, scaled, whatever the item shows: Edit images previews it. */
   @Get(':id/images/:kind/local')
   async localImage(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('kind') kind: string,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.kind) kind: string,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
@@ -360,10 +369,10 @@ export class ItemsController {
    */
   @Get(':id/images/:kind')
   async image(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('kind') kind: string,
-    @Query('v') version: string | undefined,
-    @Query('w') asked: unknown,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.kind) kind: string,
+    @Query(QUERY_PARAMS.version) version: unknown,
+    @Query(QUERY_PARAMS.width) asked: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isItemImageKind(kind)) throw new NotFoundException(`No ${kind} pictures`)
@@ -374,6 +383,10 @@ export class ItemsController {
       width,
       image: this.stored.image({ itemId: id, kind, libraryId: null }),
     })
-    await sendImage({ reply, path, version })
+    await sendImage({
+      reply,
+      path,
+      version: queryText({ value: version, name: QUERY_PARAMS.version }),
+    })
   }
 }

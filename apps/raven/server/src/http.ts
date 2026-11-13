@@ -1,15 +1,7 @@
-import { AUTH_HEADERS } from '@raven/core'
-
 /** Header names raven uses beyond `@shared/server`'s `HEADERS`, in lower case as Node hands incoming ones over. */
 export const RAVEN_HEADERS = {
-  acceptRanges: 'accept-ranges',
   /** nginx's own: `no` passes a response on as it comes. */
   accelBuffering: 'x-accel-buffering',
-  authorization: AUTH_HEADERS.authorization,
-  cookie: AUTH_HEADERS.cookie,
-  forwardedFor: 'x-forwarded-for',
-  referer: 'referer',
-  userAgent: 'user-agent',
 } as const
 
 /** A request header as one string: its values joined as one header would list them, trimmed, and empty when absent. */

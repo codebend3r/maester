@@ -12,7 +12,7 @@ import { givePlaybackWay } from '@/ffmpeg/playbackYield'
 import { ebur128Args, parseEbur128, trackGainOf } from '@/music/loudness'
 import { type LoudTrack, LoudnessJobs } from '@/music/loudnessJobs'
 import { transcodeTimeoutSeconds } from '@/music/transcodeCache'
-import { createTaskQueue } from '@/scanner/concurrency'
+import { createTaskQueue, QUEUE_KEYS, queueKeyOf } from '@/scanner/concurrency'
 
 type LoudnessScanScanTrackProps = LoudTrack
 
@@ -54,11 +54,12 @@ export class LoudnessScan implements OnApplicationBootstrap, OnModuleDestroy {
    */
   kick(): void {
     if (!this.config.shouldScanLoudness) return
-    this.jobs
-      .albumsDue()
-      .forEach((albumId) =>
-        this.queue.again({ key: `album:${albumId}`, task: () => this.scanAlbum(albumId) }),
-      )
+    this.jobs.albumsDue().forEach((albumId) =>
+      this.queue.again({
+        key: queueKeyOf({ kind: QUEUE_KEYS.album, parts: [albumId] }),
+        task: () => this.scanAlbum(albumId),
+      }),
+    )
   }
 
   whenIdle(): Promise<void> {

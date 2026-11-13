@@ -18,6 +18,7 @@ import {
   type ScoreTitle,
 } from '@/metadata/scoreSources'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
+import { DailyBudget } from '@/metadata/dailyBudget'
 
 const API = 'https://www.omdbapi.com/'
 
@@ -47,9 +48,6 @@ export const parseOmdbRatings = (body: unknown): ExternalScore[] => {
   })
 }
 
-/** Today in UTC, which is when OMDb's daily count resets. */
-const today = (): string => new Date().toISOString().slice(0, 10)
-
 /**
  * OMDb, for IMDb, Rotten Tomatoes and Metacritic scores by IMDb id. A free
  * key allows a thousand calls a day, so the client counts its own and stops
@@ -59,7 +57,7 @@ const today = (): string => new Date().toISOString().slice(0, 10)
 @Injectable()
 export class OmdbClient implements ScoreSource {
   readonly provider = SCORE_PROVIDERS.omdb
-  private readonly budget = { day: today(), used: 0 }
+  private readonly budget: DailyBudget
   private readonly status: { error: string | null; refused: boolean } = {
     error: null,
     refused: false,
@@ -68,19 +66,13 @@ export class OmdbClient implements ScoreSource {
   constructor(
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(METADATA_FETCH) private readonly fetch: MetadataFetch,
-  ) {}
-
-  private usedToday(): number {
-    if (this.budget.day !== today()) {
-      this.budget.day = today()
-      this.budget.used = 0
-    }
-    return this.budget.used
+  ) {
+    this.budget = new DailyBudget({ limit: config.omdbDailyLimit })
   }
 
   /** Whether there is a key, it has not been refused, and today's calls are not spent. */
   enabled(): boolean {
-    return this.hasUsableKey() && this.usedToday() < this.config.omdbDailyLimit
+    return this.hasUsableKey() && this.budget.left() > 0
   }
 
   /** Whether there is a key it has not had refused, whether or not today's calls are spent. */
@@ -90,7 +82,7 @@ export class OmdbClient implements ScoreSource {
 
   /** How many calls are left today. */
   remaining(): number {
-    return Math.max(0, this.config.omdbDailyLimit - this.usedToday())
+    return this.budget.left()
   }
 
   state(): MetadataServiceState {
@@ -108,8 +100,7 @@ export class OmdbClient implements ScoreSource {
   async ratings(imdbId: string): Promise<ExternalScore[]> {
     const key = this.config.omdbApiKey
     if (key == null || !this.enabled()) throw new Error('OMDb is not available right now.')
-    this.usedToday()
-    this.budget.used += 1
+    this.budget.spend()
     const query = new URLSearchParams({ i: imdbId, apikey: key })
     const response = await this.fetch({
       url: `${API}?${query.toString()}`,
@@ -157,7 +148,7 @@ export class OmdbClient implements ScoreSource {
 
   /** Counts today as used up once OMDb says so, so calls wait for midnight UTC. */
   private spend(reason: string): never {
-    this.budget.used = this.config.omdbDailyLimit
+    this.budget.exhaust()
     this.status.error = `OMDb's daily limit is spent: ${reason}`
     throw new Error(this.status.error)
   }

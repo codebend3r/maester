@@ -9,7 +9,9 @@ import {
 import { describe, expect, it } from 'vitest'
 import { SOFTWARE } from '@/ffmpeg/encoder'
 import { DEMUX_TIME_BASES, type HlsDialect, SEGMENT_CLOCKS } from '@/ffmpeg/ffmpegVersion'
+import type { CopyPlan, TranscodePlan } from '@/ffmpeg/args'
 import { type HlsSource, hlsArgs, hlsAudioArgs, hlsAudioCodec } from '@/ffmpeg/hlsArgs'
+import { copyOf, transcodeOf } from '@/test/videoPlans'
 import { transcodePlan } from '@/hls/segmentPlan'
 
 describe('hlsArgs', () => {
@@ -30,6 +32,10 @@ describe('hlsArgs', () => {
     input: '/m/clip.mkv',
     plan,
     audio: aac,
+    startTime: 0,
+    frameRate: 24,
+  } as const
+  const picture = {
     videoCodec: VIDEO_CODECS.hevc,
     dolbyVision: null,
     encoder: SOFTWARE,
@@ -37,8 +43,6 @@ describe('hlsArgs', () => {
     quality: QUALITIES.medium,
     bitrate: null,
     tonemap: false,
-    startTime: 0,
-    frameRate: 24,
     burn: null,
   } as const
   /** A Dolby Vision profile 5 record, as `dolbyVisionOf` reads one. */
@@ -51,20 +55,39 @@ describe('hlsArgs', () => {
   const DIALECT = { segmentClock: SEGMENT_CLOCKS.run, timeBase: DEMUX_TIME_BASES.named } as const
 
   /** The run from `from` of the spike's clip, with what the test sets apart. */
+  type ArgsForProps = Partial<Omit<HlsSource, 'video'>> &
+    Partial<Omit<TranscodePlan, 'kind'>> &
+    Partial<Omit<CopyPlan, 'kind'>> & {
+      from: number
+      mode: StreamMode
+      seekKeyframes?: readonly number[] | null
+      dialect?: Partial<HlsDialect>
+    }
+
   const argsFor = ({
     from,
     mode,
     seekKeyframes = null,
     dialect = {},
+    videoCodec = picture.videoCodec,
+    dolbyVision = picture.dolbyVision,
+    encoder = picture.encoder,
+    maxHeight = picture.maxHeight,
+    quality = picture.quality,
+    bitrate = picture.bitrate,
+    tonemap = picture.tonemap,
+    burn = picture.burn,
     ...rest
-  }: Partial<HlsSource> & {
-    from: number
-    mode: StreamMode
-    seekKeyframes?: readonly number[] | null
-    dialect?: Partial<HlsDialect>
-  }): string[] =>
+  }: ArgsForProps): string[] =>
     hlsArgs({
-      source: { ...source, mode, ...rest },
+      source: {
+        ...source,
+        ...rest,
+        video:
+          mode === PLAYBACK_MODES.remux
+            ? copyOf({ videoCodec, dolbyVision })
+            : transcodeOf({ videoCodec, encoder, maxHeight, quality, bitrate, tonemap, burn }),
+      },
       from,
       folder: '/d/hls/abc',
       seekKeyframes,

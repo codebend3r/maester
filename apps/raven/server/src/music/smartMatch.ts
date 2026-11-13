@@ -4,7 +4,7 @@ import { errorMessage } from '@/errorMessage'
 import { ServerEvents } from '@/events/serverEvents'
 import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ALBUM_OUTCOMES, type AlbumOutcome, AlbumMatching } from '@/music/albumMatching'
-import { MusicRepository } from '@/music/musicRepository'
+import { MusicMatchStore } from '@/music/musicMatchStore'
 import { SMART_MATCH_COPY } from '@/music/smartMatchCopy'
 import { Notices } from '@/notifications/notices'
 
@@ -47,7 +47,7 @@ export class SmartMatch {
   private readonly logger = new Logger(SmartMatch.name)
 
   constructor(
-    @Inject(MusicRepository) private readonly music: MusicRepository,
+    @Inject(MusicMatchStore) private readonly matches: MusicMatchStore,
     @Inject(AlbumMatching) private readonly matching: Pick<AlbumMatching, 'matchLibrary' | 'retry'>,
     @Inject(Notices) private readonly notices: Notices,
     @Inject(ServerEvents) private readonly events: ServerEvents,
@@ -58,7 +58,7 @@ export class SmartMatch {
       this.notices.notify({ account, ...notice })
     }
     try {
-      const folds = this.music.foldStrays(libraryId)
+      const folds = this.matches.foldStrays(libraryId)
       folds.forEach((fold) =>
         notify({ message: SMART_MATCH_COPY.folded(fold), tone: NOTIFICATION_TONES.success }),
       )

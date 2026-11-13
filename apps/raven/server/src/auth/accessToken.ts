@@ -1,4 +1,5 @@
-import { AUTH_COOKIE, AUTH_METHODS, AUTH_SCHEME, isRecord, isString } from '@raven/core'
+import { AUTH_COOKIE, AUTH_METHODS, isRecord, isString } from '@raven/core'
+import { bearerToken, parseCookies } from '@shared/server'
 
 const BASE64_PREFIX = 'base64-'
 export const AUTH_ENCODINGS = { base64url: 'base64url', utf8: 'utf8' } as const
@@ -6,10 +7,7 @@ const MAX_COOKIE_BYTES = 32_768
 
 const cookieToken = (header: string): string | null => {
   if (header.length > MAX_COOKIE_BYTES) return null
-  const entries = header.split(';').map((entry) => {
-    const separator = entry.indexOf('=')
-    return { name: entry.slice(0, separator).trim(), value: entry.slice(separator + 1).trim() }
-  })
+  const entries = parseCookies({ header })
   const whole = entries.filter(({ name }) => name === AUTH_COOKIE)
   const chunks = entries.filter(({ name }) => name.startsWith(`${AUTH_COOKIE}.`))
   if (whole.length > 1 || (whole.length > 0 && chunks.length > 0)) return null
@@ -48,15 +46,7 @@ export const accessTokenOf = ({
   cookie,
 }: AccessTokenOfProps): string | null => {
   // An explicitly supplied bad Bearer must not fall back to another account's cookie.
-  if (authorization !== undefined) {
-    const [scheme, token, extra] = authorization.split(' ')
-    return (scheme?.toLowerCase() ?? '') === AUTH_SCHEME.toLowerCase() &&
-      isString(token) &&
-      token !== '' &&
-      extra === undefined
-      ? token
-      : null
-  }
+  if (authorization !== undefined) return bearerToken({ header: authorization })
   if (method !== AUTH_METHODS.get && method !== AUTH_METHODS.head) return null
   return cookie === undefined ? null : cookieToken(cookie)
 }

@@ -3,9 +3,9 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { PLAYBACK_MODES } from '@raven/core'
 import { expect, it } from 'vitest'
-import { streamArgs } from '@/ffmpeg/args'
+import { VIDEO_PLAN_KINDS, streamArgs } from '@/ffmpeg/args'
+import { copyOf } from '@/test/videoPlans'
 
 const run = promisify(execFile)
 const BOX_TYPES = { fragment: 'moof' } as const
@@ -57,12 +57,8 @@ it('delivers one-second remux fragments even when the source keyframes are six s
       streamArgs({
         input,
         start: 0,
-        mode: PLAYBACK_MODES.remux,
         audio: 0,
-        audioOnly: false,
-        videoCodec: 'h264',
-        dolbyVision: null,
-        tonemap: false,
+        video: copyOf(),
         streamShift: 1,
       }),
       { encoding: 'buffer', maxBuffer: 8 * 1024 * 1024 },
@@ -133,12 +129,8 @@ it('streams an audio file with cover art as one-second fragments of its audio al
       streamArgs({
         input,
         start: 0,
-        mode: PLAYBACK_MODES.remux,
         audio: 0,
-        audioOnly: true,
-        videoCodec: null,
-        dolbyVision: null,
-        tonemap: false,
+        video: { kind: VIDEO_PLAN_KINDS.none },
         streamShift: 1,
       }),
       { encoding: 'buffer', maxBuffer: 8 * 1024 * 1024 },

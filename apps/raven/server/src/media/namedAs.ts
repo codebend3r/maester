@@ -16,17 +16,16 @@ type NamedAsProps = {
   folder: string
 }
 
-/** What a name says a file is, by its library's type. Extras and libraries that are not matched keep the tidied name. */
-export const namedAs = ({
-  kind,
-  fileName,
-  folder,
-}: NamedAsProps): {
+/** What a file's name says it is, and how far that goes as a match. */
+type NamedTitle = {
   title: string
   year: number | null
   edition: string | null
   match: MatchState
-} => {
+}
+
+/** What a name says a file is, by its library's type. Extras and libraries that are not matched keep the tidied name. */
+export const namedAs = ({ kind, fileName, folder }: NamedAsProps): NamedTitle => {
   const type = matchTypeFor(kind)
   if (type == null || isExtra({ fileName, folder })) {
     return {

@@ -6,7 +6,6 @@ import { HLS_PARAMS } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
-import { RAVEN_HEADERS } from '@/http'
 import { TOO_MANY_REQUESTS } from '@/rateLimits/limitRequests'
 import { RATE_LIMITS, RATE_TIERS } from '@/rateLimits/rateTiers'
 import {
@@ -187,7 +186,7 @@ describe('rate limits', () => {
       options: {
         url: lockState,
         remoteAddress: PROXY,
-        headers: { [RAVEN_HEADERS.forwardedFor]: HOME },
+        headers: { [HEADERS.forwardedFor]: HOME },
       },
       times: STANDARD + 10,
     })
@@ -204,7 +203,7 @@ describe('rate limits', () => {
     const forged = (claimed: string): InjectOptions => ({
       url: pathOf({ route: ROUTES.lockState }),
       remoteAddress: UNTRUSTED,
-      headers: { [RAVEN_HEADERS.forwardedFor]: claimed },
+      headers: { [HEADERS.forwardedFor]: claimed },
     })
     const answered = await allStatuses({ options: forged(HOME), times: STANDARD })
     expect(answered.filter((status) => status === TOO_MANY_REQUESTS)).toEqual([])
@@ -215,7 +214,7 @@ describe('rate limits', () => {
     const through = (client: string): InjectOptions => ({
       url: ECHO,
       remoteAddress: PROXY,
-      headers: { [RAVEN_HEADERS.forwardedFor]: `${HOME}, ${client}` },
+      headers: { [HEADERS.forwardedFor]: `${HOME}, ${client}` },
     })
     await statuses({ options: through(away(40)), times: STRICT })
     expect((await app().inject(through(away(40)))).statusCode).toBe(TOO_MANY_REQUESTS)
@@ -228,7 +227,7 @@ describe('rate limits', () => {
         const response = await app().inject({
           url: ECHO,
           remoteAddress: away(50),
-          headers: { [RAVEN_HEADERS.forwardedFor]: n % 2 === 0 ? HOME : away(100 + n) },
+          headers: { [HEADERS.forwardedFor]: n % 2 === 0 ? HOME : away(100 + n) },
         })
         return response.statusCode
       }),

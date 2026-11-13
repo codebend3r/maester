@@ -46,7 +46,7 @@ describe('folder browser containment', () => {
 
   it('still browses the root itself', async () => {
     const canonical = await realpath(root())
-    expect(await controller().browse()).toMatchObject({ path: canonical, parent: null })
+    expect(await controller().browse(undefined)).toMatchObject({ path: canonical, parent: null })
     expect(await controller().browse(root())).toMatchObject({ path: canonical, parent: null })
     expect(await controller().browse(canonical)).toMatchObject({ path: canonical, parent: null })
   })

@@ -2,7 +2,7 @@ import { type AlbumMatchCandidate, CONFIDENCE_STRONG, foldTitle } from '@raven/c
 import { plainAlbumTitle } from '@/music/albumTitles'
 import { artistToMatch } from '@/music/filing'
 import type { Release } from '@/music/musicBrainzClient'
-import type { AlbumToMatch } from '@/music/musicRepository'
+import type { AlbumToMatch } from '@/music/musicMatchStore'
 
 /** What each fact is worth when a release agrees with the album, out of 100. */
 const WEIGHTS = {

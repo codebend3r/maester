@@ -9,7 +9,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { MediaIndex } from '@/media/mediaIndex'
 import type { AudioFormat, AudioTags } from '@/music/audioReader'
-import { COVER_SOURCES, MusicRepository } from '@/music/musicRepository'
+import { COVER_SOURCES, MusicCoverStore } from '@/music/musicCoverStore'
+import { MusicRepository } from '@/music/musicRepository'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, pictureVersionsOf, repositories } from '@/test/repositories'
 
@@ -45,6 +46,7 @@ describe('MusicRepository', () => {
   const database = testDatabase('raven-music-')
   const state = { library: 0, other: 0, ids: new Map<string, number>() }
   const repository = () => new MusicRepository(database.get(), pictureVersionsOf(database.get()))
+  const coverStore = () => new MusicCoverStore(database.get(), pictureVersionsOf(database.get()))
 
   type AddFileProps = { libraryId?: number; path: string; tags: Partial<AudioTags>; at?: Date }
 
@@ -235,20 +237,20 @@ describe('MusicRepository', () => {
       .find(({ mbid }) => mbid === 'artist-radiohead')
     expect(radiohead?.photoVersion).not.toBeNull()
     expect(
-      repository().artistPicture({
+      coverStore().artistPicture({
         id: radiohead?.id ?? 0,
         version: radiohead?.photoVersion ?? '',
       }),
     ).toEqual({ mbid: 'artist-radiohead', picture: null, isFetched: false })
     const picture = 'https://commons.wikimedia.org/radiohead.jpg'
-    repository().setArtistPicture({ id: radiohead?.id ?? 0, picture })
+    coverStore().setArtistPicture({ id: radiohead?.id ?? 0, picture })
     expect(
-      repository().artistPicture({
+      coverStore().artistPicture({
         id: radiohead?.id ?? 0,
         version: radiohead?.photoVersion ?? '',
       }),
     ).toEqual({ mbid: 'artist-radiohead', picture, isFetched: true })
-    expect(repository().artistPicture({ id: radiohead?.id ?? 0, version: 'wrong' })).toBeNull()
+    expect(coverStore().artistPicture({ id: radiohead?.id ?? 0, version: 'wrong' })).toBeNull()
   })
 
   it('pages the tracks in the order asked, with the whole count', () => {
@@ -356,11 +358,11 @@ describe('MusicRepository', () => {
       .listAlbums({ libraryId: state.library, ...LIST })
       .find(({ title }) => title === 'OK Computer')
     const version = okComputer?.coverVersion ?? ''
-    expect(repository().cover({ id: okComputer?.id ?? 0, version })).toEqual({
+    expect(coverStore().cover({ id: okComputer?.id ?? 0, version })).toEqual({
       source: COVER_SOURCES.embedded,
       ref: String(state.ids.get('/music/Radiohead/OK Computer/01 Airbag.flac')),
     })
-    expect(repository().cover({ id: okComputer?.id ?? 0, version: 'stale' })).toBeNull()
+    expect(coverStore().cover({ id: okComputer?.id ?? 0, version: 'stale' })).toBeNull()
     expect(repository().libraryOfAlbum(okComputer?.id ?? 0)).toBe(state.library)
     expect(repository().libraryOfAlbum(999)).toBeNull()
   })
@@ -384,7 +386,7 @@ describe('MusicRepository', () => {
         .listAlbums({ libraryId: state.library, ...LIST })
         .find(({ title }) => title === 'Demo Tape')
     const version = demo()?.coverVersion ?? ''
-    expect(repository().cover({ id: demo()?.id ?? 0, version })).toEqual({
+    expect(coverStore().cover({ id: demo()?.id ?? 0, version })).toEqual({
       source: COVER_SOURCES.file,
       ref: folderCover,
     })
@@ -558,7 +560,7 @@ describe('MusicRepository', () => {
     // The embedded cover went with the file; the album keeps its tags' release id, so the archive's stands in.
     expect(okComputer).toMatchObject({ trackCount: 1 })
     expect(
-      repository().cover({ id: okComputer?.id ?? 0, version: okComputer?.coverVersion ?? '' }),
+      coverStore().cover({ id: okComputer?.id ?? 0, version: okComputer?.coverVersion ?? '' }),
     ).toEqual({ source: COVER_SOURCES.coverArtArchive, ref: 'rel-ok' })
     const paranoid = state.ids.get('/music/Radiohead/OK Computer/02 Paranoid Android.flac') ?? 0
     new MediaIndex(database.get()).remove([paranoid])
@@ -568,7 +570,7 @@ describe('MusicRepository', () => {
         .listAlbums({ libraryId: state.library, ...LIST })
         .map(({ title }) => title),
     ).not.toContain('OK Computer')
-    expect(repository().keptCovers().albumIds.size).toBe(
+    expect(coverStore().keptCovers().albumIds.size).toBe(
       repository().listAlbums({ libraryId: state.library, ...LIST }).length +
         repository().listAlbums({ libraryId: state.other, ...LIST }).length,
     )

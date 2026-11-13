@@ -10,6 +10,7 @@ import {
   isLibrarySettings,
   isPathLayout,
   keyOf,
+  MATCH_STATES,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { LOCAL } from '@/metadata/localItems'
@@ -207,7 +208,7 @@ export class LibrariesRepository {
       .prepare<[number | null, number | null], LibraryRow>(
         `SELECT l.id, l.name, l.created_at, ${SETTING_COLUMNS.map((column) => `l.${column}`).join(', ')},
                 (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id) AS item_count,
-                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.match = 'unmatched')
+                (SELECT COUNT(*) FROM media m WHERE m.library_id = l.id AND m.match = '${MATCH_STATES.unmatched}')
                   AS unmatched_count,
                 (SELECT 2 * COUNT(*) FILTER (WHERE ${IS_4K}) > COUNT(*)
                    FROM media m WHERE m.library_id = l.id AND m.width IS NOT NULL) AS is_4k

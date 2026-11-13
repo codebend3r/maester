@@ -2,9 +2,10 @@ import type { PlaybackMode, StreamPurpose, StreamQuality } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import { type AuthSessions, accountOf } from '@/auth/authSessions'
-import { RAVEN_HEADERS, headerOf } from '@/http'
+import { headerOf } from '@/http'
 import { clientAddressOf } from '@/remoteAccess/clientNetwork'
 import type { StreamClient, StreamSessions } from '@/streams/streamSessions'
+import { HEADERS } from '@shared/server'
 
 /** The events of a Node response that raven listens for. */
 export const RESPONSE_EVENTS = { close: 'close' } as const
@@ -24,7 +25,7 @@ export const clientOf = ({ request, auth }: ClientOfProps): StreamClient => {
   const account = accountOf(auth.callerOf({ request }))
   return {
     address: clientAddressOf({ request }),
-    userAgent: headerOf(request.headers[RAVEN_HEADERS.userAgent]),
+    userAgent: headerOf(request.headers[HEADERS.userAgent]),
     viewer: account == null ? null : { id: account.id, email: account.email },
   }
 }

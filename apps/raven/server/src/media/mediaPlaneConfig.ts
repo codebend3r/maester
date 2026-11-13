@@ -44,10 +44,11 @@ const splitList = (value: string | undefined): string[] =>
     .map((entry) => entry.trim())
     .filter((entry) => entry !== '')
 
+/** An origin's scheme, host and port, as written. */
+type OriginParts = { scheme: Scheme; host: string; port: string | null }
+
 /** `scheme`, `host` (lower case) and `port` (null for the scheme's default) of an origin with no path, or null. */
-const splitOrigin = (
-  value: string,
-): { scheme: Scheme; host: string; port: string | null } | null => {
+const splitOrigin = (value: string): OriginParts | null => {
   const match = /^(https?):\/\/([^/?#:@\s]+)(?::(\d{1,5}))?$/i.exec(value.replace(/\/+$/, ''))
   const scheme = match?.[1]?.toLowerCase()
   const host = match?.[2]?.toLowerCase()
@@ -76,9 +77,10 @@ const normalisedOrigin = (value: string): string | null => {
 const originProblem = (entry: string): string =>
   `${MEDIA_PLANE_ENV.origins} entry "${entry}" is not an https origin with no path, query or fragment (http is for localhost only).`
 
-const parseMediaOrigin = (
-  entry: string,
-): { origin: MediaOrigin | null; problem: string | null } => {
+/** An origin read from the environment, or why it could not be. */
+type OriginReading = { origin: MediaOrigin | null; problem: string | null }
+
+const parseMediaOrigin = (entry: string): OriginReading => {
   const colon = entry.indexOf(':')
   const kind = colon < 0 ? '' : entry.slice(0, colon).trim()
   const url = colon < 0 ? '' : entry.slice(colon + 1).trim()
@@ -93,10 +95,11 @@ const parseMediaOrigin = (
   return { origin: { kind, url: origin }, problem: null }
 }
 
+/** The media origins the environment names, and what was wrong with the rest. */
+type OriginsReading = { origins: MediaOrigin[]; problems: string[] }
+
 /** `kind:url` entries, comma separated and best first; an entry that is not valid is dropped and named. */
-export const parseMediaOrigins = (
-  value: string | undefined,
-): { origins: MediaOrigin[]; problems: string[] } => {
+export const parseMediaOrigins = (value: string | undefined): OriginsReading => {
   const parsed = splitList(value).map(parseMediaOrigin)
   return {
     origins: parsed.flatMap(({ origin }) => (origin ? [origin] : [])),
@@ -124,10 +127,11 @@ const parseWebOrigin = (entry: string): string | null => {
   return `${parts.scheme}://${parts.host}${parts.port ? `:${parts.port}` : ''}`
 }
 
+/** The web origins the environment names, and what was wrong with the rest. */
+type WebOriginsReading = { origins: string[]; problems: string[] }
+
 /** Exact https origins, `http://localhost`, and https hosts whose first label holds a `*`. */
-export const parseWebOrigins = (
-  value: string | undefined,
-): { origins: string[]; problems: string[] } => {
+export const parseWebOrigins = (value: string | undefined): WebOriginsReading => {
   const parsed = splitList(value).map((entry) => ({ entry, origin: parseWebOrigin(entry) }))
   return {
     origins: parsed.flatMap(({ origin }) => (origin === null ? [] : [origin])),
@@ -174,10 +178,11 @@ export const isAllowedWebOrigin = ({ origin, allowed }: IsAllowedWebOriginProps)
 const toBase64 = (value: string): string =>
   value.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '')
 
+/** The proxy secret the environment holds, and what was wrong with it. */
+type SecretReading = { secret: Buffer | null; problems: string[] }
+
 /** Standard or url-safe base64 of 32 bytes or more; the problem never holds the value. */
-export const readMediaSecret = (
-  value: string | undefined,
-): { secret: Buffer | null; problems: string[] } => {
+export const readMediaSecret = (value: string | undefined): SecretReading => {
   const trimmed = value?.trim() ?? ''
   if (trimmed === '') {
     return { secret: null, problems: [`${MEDIA_PLANE_ENV.secret} is not set.`] }

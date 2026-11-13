@@ -26,7 +26,6 @@ import type { FastifyReply } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { type AdminChange, AdminService } from '@/admin/adminService'
 import { Management } from '@/auth/management'
-import { RAVEN_HEADERS } from '@/http'
 import { parseBody } from '@/parseBody'
 import { StrictlyLimited } from '@/rateLimits/rateTiers'
 
@@ -82,7 +81,7 @@ export class AdminController {
   /** The lock in this browser; a session still open gets its cookie renewed, so it never runs out while in use. */
   @Get()
   state(
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Headers(HEADERS.cookie) cookie: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): AdminLock {
     this.requireLegacy()
@@ -113,7 +112,7 @@ export class AdminController {
   @Post('lock')
   @HttpCode(200)
   lock(
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Headers(HEADERS.cookie) cookie: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): AdminLock {
     this.requireLegacy()
@@ -126,7 +125,7 @@ export class AdminController {
   @Post('keep-unlocked')
   @HttpCode(200)
   keepUnlocked(
-    @Headers(RAVEN_HEADERS.cookie) cookie: string | undefined,
+    @Headers(HEADERS.cookie) cookie: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): AdminLock {
     this.requireLegacy()

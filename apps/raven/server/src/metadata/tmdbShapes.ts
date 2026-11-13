@@ -364,9 +364,10 @@ export const mergeCredits = (credits: readonly FetchedCredit[]): FetchedCredit[]
   return ordered.filter((credit) => !dropped.has(credit))
 }
 
-const person = (
-  entry: Record<string, unknown>,
-): { tmdbId: string; name: string; photo: string | null } | null => {
+/** A person as a TMDB search lists them. */
+type FoundPerson = { tmdbId: string; name: string; photo: string | null }
+
+const person = (entry: Record<string, unknown>): FoundPerson | null => {
   const tmdbId = idOf(entry.id)
   const name = text(entry.name)
   return tmdbId != null && name != null
@@ -396,6 +397,9 @@ const crewCredits = (crew: unknown): FetchedCredit[] =>
     return found && job ? [{ ...found, job, role }] : []
   })
 
+/** A movie's content rating and release date in the country asked for. */
+type Certification = { rating: string | null; released: string | null }
+
 type MovieCertificationProps = {
   releaseDates: unknown
   country: string
@@ -405,10 +409,7 @@ type MovieCertificationProps = {
  * The content rating for `country`, then for the US: the theatrical
  * release's certification first, any other after.
  */
-const movieCertification = ({
-  releaseDates,
-  country,
-}: MovieCertificationProps): { rating: string | null; released: string | null } => {
+const movieCertification = ({ releaseDates, country }: MovieCertificationProps): Certification => {
   const forCountry = (code: string) => {
     const dates = records(
       records(record(releaseDates).results).find((entry) => entry.iso_3166_1 === code)
@@ -540,10 +541,11 @@ const toEpisode = (entry: Record<string, unknown>): FetchedItem | null => {
   }
 }
 
+/** A season and its episodes, as TMDB lists them. */
+export type FetchedSeason = { season: FetchedItem; episodes: FetchedItem[] }
+
 /** A season with its episodes, from `/tv/{id}/season/{n}`. */
-export const toSeason = (
-  body: unknown,
-): { season: FetchedItem; episodes: FetchedItem[] } | null => {
+export const toSeason = (body: unknown): FetchedSeason | null => {
   const season = record(body)
   const tmdbId = idOf(season.id)
   const seasonNumber = number(season.season_number)
@@ -659,6 +661,16 @@ const toPersonCredit = ({
   }
 }
 
+/** The departments and jobs TMDB names on a credit that a filmography folds by. */
+export const TMDB_DEPARTMENTS = {
+  acting: 'Acting',
+  directing: 'Directing',
+  writing: 'Writing',
+  creator: 'Creator',
+  producer: 'Producer',
+  crew: 'Crew',
+} as const
+
 /**
  * A person with their `combined_credits` and `external_ids` appended, cast
  * before crew. A credit TMDB lists twice keeps its first place.
@@ -671,12 +683,12 @@ export const toPerson = (body: unknown): FetchedPerson | null => {
   const listed = [
     ...records(combined.cast).map((entry) => ({
       entry,
-      department: 'Acting',
+      department: TMDB_DEPARTMENTS.acting,
       role: text(entry.character),
     })),
     ...records(combined.crew).map((entry) => ({
       entry,
-      department: text(entry.department) ?? 'Crew',
+      department: text(entry.department) ?? TMDB_DEPARTMENTS.crew,
       role: text(entry.job),
     })),
   ]
@@ -775,8 +787,11 @@ export const toDiscoveredPage = (body: unknown): DiscoveredPage => {
 const idsOf = (results: unknown): string[] =>
   records(results).flatMap((entry) => idOf(entry.id) ?? [])
 
+/** The TMDB ids an outside id finds, movies and shows. */
+export type FoundIds = { movies: string[]; shows: string[] }
+
 /** TMDB's ids among a `/find/{id}` body, by kind. */
-export const toFoundIds = (body: unknown): { movies: string[]; shows: string[] } => {
+export const toFoundIds = (body: unknown): FoundIds => {
   const found = record(body)
   return { movies: idsOf(found.movie_results), shows: idsOf(found.tv_results) }
 }

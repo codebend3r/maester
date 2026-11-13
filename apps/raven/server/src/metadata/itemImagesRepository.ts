@@ -94,6 +94,9 @@ type ItemImagesRepositoryVersionsProps = {
 
 type ItemImagesRepositoryBackdropForProps = { itemId: number; libraryId: number | null }
 
+/** The item whose backdrop is shown, and the version its address carries. */
+type BackdropPick = { id: number; version: string }
+
 /**
  * The pictures each item holds, from TMDB, from beside the media and from
  * Edit images, and which of them it shows. TMDB's own are stored with the
@@ -245,10 +248,7 @@ export class ItemImagesRepository {
    * it with one, so an episode shows its show's, as `libraryId` shows it.
    * null when there is none up the line.
    */
-  backdropFor({
-    itemId,
-    libraryId,
-  }: ItemImagesRepositoryBackdropForProps): { id: number; version: string } | null {
+  backdropFor({ itemId, libraryId }: ItemImagesRepositoryBackdropForProps): BackdropPick | null {
     const ids = this.lines([itemId]).flatMap(lineOf)
     const versions = this.versions({ ids, kind: ITEM_IMAGE_KINDS.backdrop, libraryId })
     const found = ids.flatMap((id) => {

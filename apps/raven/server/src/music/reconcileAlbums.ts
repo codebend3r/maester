@@ -124,7 +124,7 @@ export const reconcileAlbums = ({ db }: ReconcileAlbumsProps): void => {
         .prepare<[string], Album>(
           `SELECT id, album_key, match, mbid, added_at FROM albums
           WHERE id IN (SELECT value FROM json_each(?))
-          ORDER BY CASE WHEN match = 'manual' THEN 0 ELSE 1 END, added_at, id`,
+          ORDER BY CASE WHEN match = '${MATCH_STATES.manual}' THEN 0 ELSE 1 END, added_at, id`,
         )
         .all(JSON.stringify(ids))
       const manual = albums.filter((album) => album.match === MATCH_STATES.manual)
