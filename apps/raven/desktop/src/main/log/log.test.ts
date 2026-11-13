@@ -20,7 +20,8 @@ import {
   rotationMoves,
   type LogFs,
 } from '@/main/log/log'
-import { ERROR_CODES, isMissingFile, type Timers } from '@/main/stateStore'
+import { ERROR_CODES, isMissingFile } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 
 const DIR = '/logs'
 const FILE = `${DIR}/${LOG_FILE}`

@@ -1,6 +1,6 @@
 import { AUTH_HEADERS, AUTH_SCHEME, SERVER_METHODS } from '@raven/core'
 import { accountIdOfToken } from '@/main/accounts/tokenAccount'
-import { SERVER_GONE, type ServerEntry } from '@/main/desktopConfig'
+import { SERVER_NAME, type ServerEntry } from '@/main/desktopConfig'
 import { quietly } from '@/main/log/quietly'
 import {
   CALL_NAMES,
@@ -11,7 +11,7 @@ import {
   type ServerMethod,
 } from '@/main/servers/allowlist'
 import { OVERFLOWS, readCapped } from '@/main/servers/cappedBody'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS, CONTENT_TYPES } from '@shared/http'
 
 export const CALL_TIMEOUT_MS = 10_000
 export const MAX_REPLY_CHARS = 1_048_576
@@ -30,12 +30,11 @@ export const MAX_IN_FLIGHT = 6
 export const WRITE_RESERVE = 2
 
 export const CALL_MESSAGES = {
-  unknownServer: SERVER_GONE,
   offList: 'Raven does not make that call.',
-  unreachable: (name: string) => `Raven could not reach ${name}.`,
-  tooBig: (name: string) => `${name} sent more than Raven reads.`,
-  busy: (name: string) => `Raven is still waiting on ${name}.`,
-  otherAccount: (name: string) => `Raven is signed in to ${name} as someone else now.`,
+  unreachable: `Raven could not reach ${SERVER_NAME}.`,
+  tooBig: `${SERVER_NAME} sent more than Raven reads.`,
+  busy: `Raven is still waiting on ${SERVER_NAME}.`,
+  otherAccount: `Raven is signed in to ${SERVER_NAME} as someone else now.`,
 } as const
 
 type ServerFetchProps = {
@@ -64,7 +63,6 @@ export const isBusyRefusal = (result: ServerCallResult): result is BusyRefusal =
   !result.ok && 'isBusy' in result && result.isBusy
 
 type CallProps = {
-  serverId: string
   call: AllowedCall
   accountId?: string | null
 }
@@ -111,8 +109,8 @@ type HeadersForProps = {
 }
 
 const headersFor = ({ body, token, unlock }: HeadersForProps): Record<string, string> => ({
-  [HTTP_HEADERS.accept]: 'application/json',
-  ...(body === null ? {} : { [HTTP_HEADERS.contentType]: 'application/json' }),
+  [HEADERS.accept]: CONTENT_TYPES.json,
+  ...(body === null ? {} : { [HEADERS.contentType]: CONTENT_TYPES.json }),
   ...(token === null ? {} : { [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}` }),
   ...(unlock === null ? {} : { [AUTH_HEADERS.cookie]: unlock }),
 })
@@ -146,17 +144,13 @@ const rematch = (call: AllowedCall): AllowedCall | null => {
   }
 }
 
-type AuthorizeProps = { serverId: string }
-
-type UnlockOfProps = { serverId: string }
-
 type CreateServerCallsProps = {
-  serverOf: (serverId: string) => ServerEntry | null
+  server: ServerEntry
   fetch: ServerFetch
   /** The access token to send to the server: the page's, or null while it is signed out. */
-  authorize: (input: AuthorizeProps) => string | null
+  authorize: () => string | null
   /** The `Cookie` header with the page's unlock for the server, or null when it holds none. */
-  unlockOf: (input: UnlockOfProps) => Promise<string | null>
+  unlockOf: () => Promise<string | null>
   warn: (message: string) => void
 }
 
@@ -169,7 +163,7 @@ const slotsFor = (call: AllowedCall): number =>
  * and the page's library PIN unlock as its cookie when the page holds one.
  */
 export const createServerCalls = ({
-  serverOf,
+  server,
   fetch,
   authorize,
   unlockOf,
@@ -178,51 +172,30 @@ export const createServerCalls = ({
   /** A log line never fails a call: the call has already been answered or refused. */
   const safeWarn = quietly(warn)
 
-  let inFlight: ReadonlyMap<string, number> = new Map()
+  let inFlight = 0
   let writes: ReadonlySet<Promise<void>> = new Set()
 
-  const countOf = (serverId: string): number => inFlight.get(serverId) ?? 0
-
-  type AdjustProps = { serverId: string; by: number }
-
-  const adjust = ({ serverId, by }: AdjustProps): void => {
-    inFlight = new Map([...inFlight, [serverId, countOf(serverId) + by]])
-  }
-
-  type IsBusyProps = { server: ServerEntry; call: AllowedCall }
-
-  const isBusy = ({ server, call }: IsBusyProps): boolean => countOf(server.id) >= slotsFor(call)
-
-  type AttemptProps = {
-    server: ServerEntry
-    call: AllowedCall
-    token: string | null
-  }
-
   /** One request to the server, in one of its slots. */
-  const attempt = async ({ server, call, token }: AttemptProps): Promise<ServerCallResult> => {
-    if (isBusy({ server, call })) {
-      return { ok: false, message: CALL_MESSAGES.busy(server.name), isBusy: true }
-    }
-    adjust({ serverId: server.id, by: 1 })
+  const attempt = async ({ call, token }: RequestProps): Promise<ServerCallResult> => {
+    if (inFlight >= slotsFor(call)) return { ok: false, message: CALL_MESSAGES.busy, isBusy: true }
+    inFlight += 1
     try {
-      return await request({ server, call, token })
+      return await request({ call, token })
     } finally {
-      adjust({ serverId: server.id, by: -1 })
+      inFlight -= 1
     }
   }
 
   type RequestProps = {
-    server: ServerEntry
     call: AllowedCall
     token: string | null
   }
 
-  const request = async ({ server, call, token }: RequestProps): Promise<ServerCallResult> => {
+  const request = async ({ call, token }: RequestProps): Promise<ServerCallResult> => {
     const { method, path, body } = requestFor(call)
     const maxChars = replyCapFor(call)
     try {
-      const unlock = await unlockOf({ serverId: server.id })
+      const unlock = await unlockOf()
       const reply = await fetch({
         url: `${server.origin}${path}`,
         method,
@@ -232,18 +205,17 @@ export const createServerCalls = ({
       })
       const text = await reply.text({ maxChars })
       if (text.length > maxChars) {
-        safeWarn(`${loggable(server.name)} sent too much for ${method} ${path}`)
-        return { ok: false, message: CALL_MESSAGES.tooBig(server.name) }
+        safeWarn(`${SERVER_NAME} sent too much for ${method} ${path}`)
+        return { ok: false, message: CALL_MESSAGES.tooBig }
       }
       return { ok: true, status: reply.status, body: text }
     } catch (error) {
-      safeWarn(`${method} ${path} to ${loggable(server.name)} failed: ${loggable(reasonOf(error))}`)
-      return { ok: false, message: CALL_MESSAGES.unreachable(server.name) }
+      safeWarn(`${method} ${path} to ${SERVER_NAME} failed: ${loggable(reasonOf(error))}`)
+      return { ok: false, message: CALL_MESSAGES.unreachable }
     }
   }
 
   type SendProps = {
-    server: ServerEntry
     call: AllowedCall
     accountId: string | null
   }
@@ -252,13 +224,11 @@ export const createServerCalls = ({
    * Checked against the token's own account, so a call that belongs to one account never goes
    * out under another's token, or under none.
    */
-  const send = ({ server, call, accountId }: SendProps): Promise<ServerCallResult> => {
-    const token = authorize({ serverId: server.id })
+  const send = ({ call, accountId }: SendProps): Promise<ServerCallResult> => {
+    const token = authorize()
     const isAs = accountId === null || (token !== null && accountIdOfToken(token) === accountId)
-    if (!isAs) {
-      return Promise.resolve({ ok: false, message: CALL_MESSAGES.otherAccount(server.name) })
-    }
-    return attempt({ server, call, token })
+    if (!isAs) return Promise.resolve({ ok: false, message: CALL_MESSAGES.otherAccount })
+    return attempt({ call, token })
   }
 
   type TrackedProps = {
@@ -282,15 +252,13 @@ export const createServerCalls = ({
    * Main's own calls, from fields it narrowed itself. The call is still matched again, so a
    * value that slipped past the types (a string `mediaId`) never reaches a path.
    */
-  const call: ServerCalls['call'] = async ({ serverId, call: given, accountId = null }) => {
+  const call: ServerCalls['call'] = async ({ call: given, accountId = null }) => {
     const allowed = rematch(given)
     if (allowed === null) {
       safeWarn('refused a call main built off the allowlist')
       return { ok: false, message: CALL_MESSAGES.offList }
     }
-    const server = serverOf(serverId)
-    if (server === null) return { ok: false, message: CALL_MESSAGES.unknownServer }
-    const task = send({ server, call: allowed, accountId })
+    const task = send({ call: allowed, accountId })
     return isWrite(allowed) ? tracked({ task }) : task
   }
 

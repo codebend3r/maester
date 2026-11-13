@@ -1,7 +1,7 @@
 import { HTTP_METHODS, PICTURE_SCHEME, pictureUrlFor } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { createPictureHandler } from '@/main/pictureProtocol'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS } from '@shared/http'
 
 const PICTURE_ID = '9b2d7c1e-5a40-4f0c-8a11-3c2e1d0f9a77'
 const OTHER_ID = '0f8fad5b-d9cb-469f-a165-70867728950e'
@@ -34,9 +34,9 @@ describe('createPictureHandler', () => {
     const world = setup()
     const response = await world.handler(new Request(pictureUrlFor(PICTURE_ID)))
     expect(response.status).toBe(200)
-    expect(response.headers.get(HTTP_HEADERS.contentType)).toBe('image/jpeg')
-    expect(response.headers.get(HTTP_HEADERS.contentLength)).toBe('4')
-    expect(response.headers.get(HTTP_HEADERS.contentTypeOptions)).toBe('nosniff')
+    expect(response.headers.get(HEADERS.contentType)).toBe('image/jpeg')
+    expect(response.headers.get(HEADERS.contentLength)).toBe('4')
+    expect(response.headers.get(HEADERS.contentTypeOptions)).toBe('nosniff')
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(BYTES)
     expect(world.lookups).toEqual([PICTURE_ID])
     expect(world.reads).toEqual([PATH])
@@ -48,7 +48,7 @@ describe('createPictureHandler', () => {
       new Request(pictureUrlFor(PICTURE_ID), { method: HTTP_METHODS.head }),
     )
     expect(response.status).toBe(200)
-    expect(response.headers.get(HTTP_HEADERS.contentLength)).toBe('4')
+    expect(response.headers.get(HEADERS.contentLength)).toBe('4')
     expect((await response.arrayBuffer()).byteLength).toBe(0)
   })
 

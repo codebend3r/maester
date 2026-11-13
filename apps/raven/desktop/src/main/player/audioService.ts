@@ -9,7 +9,6 @@ import {
   type EqGains,
   EQ_PRESETS,
   isFlatEq,
-  isNumber,
   type NowPlayingInfo,
   PLAYER_ERROR_REASONS,
   PLAYER_SOURCE_KINDS,
@@ -17,10 +16,12 @@ import {
   type RemoteCommand,
 } from '@raven/core'
 import {
+  MPV_CHOICES,
   MPV_COMMANDS,
   MPV_END_FILE_REASONS,
   MPV_EVENTS,
   MPV_LOADFILE_MODES,
+  MPV_OPTIONS,
   MPV_PLAYLIST_END,
   MPV_PROPERTIES,
   MPV_SEEK_MODES,
@@ -42,16 +43,19 @@ import {
   withoutTarget,
 } from '@/main/player/loadTarget'
 import { ENGINE_GONE, OK, type PlayerOutcome, refuse } from '@/main/player/outcomes'
-import {
-  type ApplyOutputProps,
-  isVolumeFixedFor,
-  MPV_OPTIONS,
-  outputOptions,
-} from '@/main/player/outputOptions'
+import { type ApplyOutputProps, isVolumeFixedFor, outputOptions } from '@/main/player/outputOptions'
 import { type Phase, PLAYER_PHASES } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import type { MusicResolveProps } from '@/main/player/musicSource'
 import { createQuietMpv } from '@/main/player/quietMpv'
+import {
+  applyOutputOptions,
+  createCommandHandler,
+  createListeners,
+  reporting,
+  setVolume,
+} from '@/main/player/serviceKit'
+import { quietly } from '@/main/log/quietly'
 import { messageOf } from '@/shared/messageOf'
 
 /** The properties the music engine follows. */
@@ -147,9 +151,6 @@ const numbersOf = (command: AudioCommand): number[] => {
   }
 }
 
-/** mpv's replaygain off: the page's levelling factor stands in its place. */
-const REPLAYGAIN_OFF = 'no'
-
 type SoundFilterOfProps = { level: number; eq: EqGains }
 
 /**
@@ -208,32 +209,12 @@ export const createAudioService = ({
   let soundFilter = ''
   // The `af` a `sound` asked for while a file loaded, set once it has.
   let pendingFilter: string | null = null
-  const listeners = new Set<(listener: AudioEvent) => void>()
-
   // These run inside the wrapper's event drain, so nothing they throw may escape.
-  const warn = (message: string) => {
-    try {
-      reportWarning(withoutTarget({ target: playing?.target ?? null, message }))
-    } catch {
-      // A warning that cannot be written has nowhere left to go.
-    }
-  }
-  const onPlaying = (isPlaying: boolean) => {
-    try {
-      reportPlaying(isPlaying)
-    } catch (error) {
-      warn(`music activity failed: ${messageOf(error)}`)
-    }
-  }
-  const emit = (event: AudioEvent) => {
-    Array.from(listeners).forEach((listener) => {
-      try {
-        listener(event)
-      } catch (error) {
-        warn(`music listener failed: ${messageOf(error)}`)
-      }
-    })
-  }
+  const warn = quietly((message) =>
+    reportWarning(withoutTarget({ target: playing?.target ?? null, message })),
+  )
+  const onPlaying = reporting({ report: reportPlaying, warn, what: 'music activity' })
+  const { emit, subscribe } = createListeners<AudioEvent>({ warn, what: 'music listener' })
 
   const mpv = guardedMpv(unguarded)
   const { setEach, harden } = createQuietMpv({ mpv, warn })
@@ -462,7 +443,7 @@ export const createAudioService = ({
         MPV_PLAYLIST_END,
         [
           loadfileOptionsFor({ target, start }),
-          `${MPV_OPTIONS.replaygain}=${REPLAYGAIN_OFF}`,
+          `${MPV_OPTIONS.replaygain}=${MPV_CHOICES.no}`,
           `${MPV_OPTIONS.af}=${quoted(filter)}`,
         ].join(','),
       ],
@@ -610,13 +591,10 @@ export const createAudioService = ({
         showNowPlaying()
         return OK
       }
-      case AUDIO_COMMANDS.volume: {
+      case AUDIO_COMMANDS.volume:
         if (isVolumeFixed) return OK
-        const volume = clamp({ value: command.volume, min: 0, max: 1 })
-        await mpv.set({ name: MPV_OPTIONS.volume, value: Math.round(volume * 1000) / 10 })
-        await mpv.set({ name: MPV_OPTIONS.mute, value: command.muted })
+        await setVolume({ mpv, volume: command.volume, isMuted: command.muted })
         return OK
-      }
       // mpv keeps the pitch at any speed, as its audio-pitch-correction is on by default.
       case AUDIO_COMMANDS.speed: {
         const value = clamp({ value: command.rate, min: SPEED_RANGE.min, max: SPEED_RANGE.max })
@@ -643,17 +621,7 @@ export const createAudioService = ({
     }
   }
 
-  const handle = async (command: AudioCommand): Promise<PlayerOutcome> => {
-    if (isDead()) return ENGINE_GONE
-    if (!numbersOf(command).every(isNumber)) return refuse(PLAYER_MESSAGES.failed)
-    try {
-      return await run(command)
-    } catch (error) {
-      warn(`mpv ${command.type} failed: ${messageOf(error)}`)
-      // The wrapper rejects what is in flight just before it reports a shutdown.
-      return isDead() ? ENGINE_GONE : refuse(PLAYER_MESSAGES.failed)
-    }
-  }
+  const handle = createCommandHandler({ isDead, numbersOf, run, warn })
 
   /*
    * Sent before anything else, so mpv applies it before any loadfile. It fails closed:
@@ -667,12 +635,7 @@ export const createAudioService = ({
     handle,
     receive,
     isDead,
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
+    subscribe,
     reset: async () => {
       if (phase === PLAYER_PHASES.idle || isDead()) return
       await handle({ type: AUDIO_COMMANDS.stop })
@@ -686,13 +649,13 @@ export const createAudioService = ({
     applyOutput: async ({ output, devices }) => {
       if (isDead()) return
       isVolumeFixed = isVolumeFixedFor(output)
-      await setEach(outputOptions({ output, devices, canChooseAo, platform }))
-      if (phase !== PLAYER_PHASES.loaded) return
-      try {
-        await mpv.command({ args: [MPV_COMMANDS.aoReload] })
-      } catch (error) {
-        warn(`mpv ao-reload failed: ${messageOf(error)}`)
-      }
+      await applyOutputOptions({
+        mpv,
+        setEach,
+        options: outputOptions({ output, devices, canChooseAo, platform }),
+        isLoaded: () => phase === PLAYER_PHASES.loaded,
+        warn,
+      })
     },
   }
 }

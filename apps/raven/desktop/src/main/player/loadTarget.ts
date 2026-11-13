@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import { PLAYER_SOURCE_KINDS, type PlayerErrorReason, type PlayerSource } from '@raven/core'
-import { MPV_COMMANDS } from '@raven/mpv'
+import { MPV_CHOICES, MPV_COMMANDS } from '@raven/mpv'
 import type { Grants } from '@/main/grants'
 import type { ShowingPhase } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
@@ -21,7 +21,6 @@ const SERVER_LOAD_OPTIONS = {
 
 export type ServerTarget = {
   kind: typeof PLAYER_SOURCE_KINDS.server
-  serverId: string
   mediaId: number
   url: string
   sidecars: readonly { url: string; title: string; language: string }[]
@@ -163,7 +162,7 @@ export const sidecarsOfTarget = (target: LoadTarget): readonly Sidecar[] => {
 export const subAddArgs = ({ location, title, language }: Sidecar): string[] => [
   MPV_COMMANDS.subAdd,
   location,
-  'auto',
+  MPV_CHOICES.auto,
   title,
   language,
 ]

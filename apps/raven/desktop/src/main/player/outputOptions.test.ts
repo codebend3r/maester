@@ -1,11 +1,7 @@
 import { expect, test } from 'bun:test'
 import { DESKTOP_PLATFORMS, type OutputSettings } from '@raven/core'
-import {
-  isVolumeFixedFor,
-  MPV_OPTIONS,
-  outputOptions,
-  readDevices,
-} from '@/main/player/outputOptions'
+import { MPV_OPTIONS, type MpvOption } from '@raven/mpv'
+import { isVolumeFixedFor, outputOptions, readDevices } from '@/main/player/outputOptions'
 
 const MAC = DESKTOP_PLATFORMS.mac
 
@@ -21,7 +17,7 @@ const base: OutputSettings = {
   spatial: false,
 }
 
-const pcm = [
+const pcm: MpvOption[] = [
   { name: 'audio-device', value: 'auto' },
   { name: 'audio-spdif', value: '' },
   { name: 'audio-channels', value: 'auto-safe' },

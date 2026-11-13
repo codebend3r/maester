@@ -1,5 +1,4 @@
 import { DESKTOP_REPLIES, type DesktopReply, PLAYER_SOURCE_KINDS } from '@raven/core'
-import type { ServerEntry } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import { type AccountTickets, TICKET_OUTCOMES } from '@/main/servers/accountTickets'
 import { startRefusalOf } from '@/main/servers/serverSources'
@@ -29,8 +28,8 @@ const titleReply = ({ source, at, next }: TitleReplyProps): DesktopReply => ({
 })
 
 type CreateServerTitlesProps = {
-  /** The one server, read at each call. */
-  server: () => ServerEntry
+  /** The id the page's player names a title of the server by. */
+  serverId: string
   downloads: Pick<DownloadService, 'openTitle'>
   tickets: Pick<AccountTickets, 'ticketFor'>
 }
@@ -41,19 +40,18 @@ type CreateServerTitlesProps = {
  * load that follows plays on that same ticket.
  */
 export const createServerTitles = ({
-  server,
+  serverId,
   downloads,
   tickets,
 }: CreateServerTitlesProps): ServerTitles => {
   const play: ServerTitles['play'] = async ({ mediaId, at, next }) => {
-    const { id: serverId, name } = server()
-    const fileId = await downloads.openTitle({ serverId, mediaId })
+    const fileId = await downloads.openTitle({ mediaId })
     if (fileId !== null) {
       return titleReply({ source: { kind: PLAYER_SOURCE_KINDS.file, fileId }, at, next })
     }
-    const outcome = await tickets.ticketFor({ serverId, mediaId, isFresh: false })
+    const outcome = await tickets.ticketFor({ mediaId, isFresh: false })
     if (outcome.kind !== TICKET_OUTCOMES.ticket) {
-      return { type: DESKTOP_REPLIES.titleRefused, ...startRefusalOf({ outcome, name }) }
+      return { type: DESKTOP_REPLIES.titleRefused, ...startRefusalOf(outcome) }
     }
     return titleReply({ source: { kind: PLAYER_SOURCE_KINDS.server, serverId, mediaId }, at, next })
   }

@@ -1,9 +1,8 @@
-import { AUTH_REFUSALS, LOCKED_STATUS } from '@raven/core'
-import type { AccountRefusal } from '@/main/downloads/downloadMessages'
-import { ACCOUNT_REFUSAL_STATUSES, readShort, refusalAt } from '@/main/servers/authRefusals'
-import { ERROR_CODES, errorCodeOf, type Timers } from '@/main/stateStore'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
+import { LOCKED_STATUS } from '@raven/core'
+import { accountRefusalOf, type AccountRefusal, readShort } from '@/main/servers/authRefusals'
+import { ERROR_CODES, errorCodeOf } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
+import { HEADERS, HTTP_STATUSES, isSuccessStatus } from '@shared/http'
 
 export const PROGRESS_STEP_BYTES = 8 * 1024 ** 2
 export const PROGRESS_STEP_MS = 1000
@@ -36,33 +35,45 @@ export const FETCH_REASONS = {
   stalled: 'stalled',
   changed: 'changed',
   locked: 'locked',
+  /** A `401`: the ticket was refused. */
   unauthorized: 'unauthorized',
+  /** A `403`: the account was refused. */
+  forbidden: 'forbidden',
   space: 'space',
+  /** Any other status the fetch cannot use. */
   status: 'status',
 } as const
 
-/** `refusal` is why a `401` or `403` body says it refused the account, or null. */
+type FetchReason = (typeof FETCH_REASONS)[keyof typeof FETCH_REASONS]
+
+type RefusedReason = typeof FETCH_REASONS.unauthorized | typeof FETCH_REASONS.forbidden
+
+type PlainReason = Exclude<FetchReason, RefusedReason | typeof FETCH_REASONS.status>
+
+/**
+ * How a fetch ended, and the bytes its part holds then. A `401` or `403` carries why its body
+ * says the account was refused, or the refusal its status stands for; null when the server's
+ * accounts are down, which is an outage. Any other unusable status carries the status.
+ */
 export type FetchOutcome =
   | { ok: true; bytes: number }
-  | {
-      ok: false
-      reason: (typeof FETCH_REASONS)[keyof typeof FETCH_REASONS]
-      status: number | null
-      refusal: AccountRefusal | null
-      bytes: number
-    }
+  | { ok: false; reason: PlainReason; bytes: number }
+  | { ok: false; reason: RefusedReason; refusal: AccountRefusal | null; bytes: number }
+  | { ok: false; reason: typeof FETCH_REASONS.status; status: number; bytes: number }
 
-const UNSATISFIABLE_RANGE_STATUS = 416
+type Failure = Extract<FetchOutcome, { ok: false }>
 
-type FailureReason = Extract<FetchOutcome, { ok: false }>['reason']
-
-type CutReasonOfProps = { isAborted: boolean; isStalled: boolean; fallback: FailureReason }
+type CutReasonOfProps = { isAborted: boolean; isStalled: boolean; fallback: PlainReason }
 
 /** Why a fetch that failed stopped: aborted, else stalled, else `fallback`. */
-const cutReasonOf = ({ isAborted, isStalled, fallback }: CutReasonOfProps): FailureReason => {
+const cutReasonOf = ({ isAborted, isStalled, fallback }: CutReasonOfProps): PlainReason => {
   if (isAborted) return FETCH_REASONS.aborted
   return isStalled ? FETCH_REASONS.stalled : fallback
 }
+
+type PlainFailureProps = { reason: PlainReason; bytes: number }
+
+const failure = ({ reason, bytes }: PlainFailureProps): Failure => ({ ok: false, reason, bytes })
 
 type FetchInput = {
   fetch: StreamFetch
@@ -72,9 +83,22 @@ type FetchInput = {
   signal: AbortSignal
   timers: Timers
   now: () => number
-  stallMs?: number
+  stallMs: number
   onProgress: (bytes: number) => void
 }
+
+export type FetchToFileProps = Omit<FetchInput, 'stallMs'> & {
+  /** `DOWNLOAD_STALL_MS` unless a test needs it short. */
+  stallMs?: number
+}
+
+type StreamToPartProps = Omit<FetchInput, 'fetch' | 'url'> & {
+  body: Answer['body']
+  from: number
+  promised: number | null
+}
+
+type DownloadProps = FetchInput & { canRestart: boolean }
 
 type Answer = Awaited<ReturnType<StreamFetch>>
 
@@ -94,21 +118,6 @@ const PLANS = {
 } as const
 
 type Plan = (typeof PLANS)[keyof typeof PLANS]
-
-type FailureProps = {
-  reason: FailureReason
-  status?: number | null
-  refusal?: AccountRefusal | null
-  bytes: number
-}
-
-const failure = ({ reason, status = null, refusal = null, bytes }: FailureProps): FetchOutcome => ({
-  ok: false,
-  reason,
-  status,
-  refusal,
-  bytes,
-})
 
 const isAbortError = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
@@ -133,24 +142,10 @@ type PromisedSizeProps = {
  * its `Content-Length`, else past the last byte of its `Content-Range`; `null` when it promised neither.
  */
 const promisedSize = ({ from, headers }: PromisedSizeProps): number | null => {
-  const length = /^\d+$/u.exec(headers.get(HTTP_HEADERS.contentLength) ?? '')?.[0] ?? null
+  const length = /^\d+$/u.exec(headers.get(HEADERS.contentLength) ?? '')?.[0] ?? null
   if (length !== null) return from + Number(length)
-  const last = CONTENT_RANGE.exec(headers.get(HTTP_HEADERS.contentRange) ?? '')?.[2] ?? null
+  const last = CONTENT_RANGE.exec(headers.get(HEADERS.contentRange) ?? '')?.[2] ?? null
   return last === null ? null : Number(last) + 1
-}
-
-const refusalFor = (status: number): { reason: FailureReason; status: number } | null => {
-  if (isSuccessStatus(status)) return null
-  switch (status) {
-    case HTTP_STATUSES.unauthorized:
-      return { reason: FETCH_REASONS.unauthorized, status }
-    case LOCKED_STATUS:
-      return { reason: FETCH_REASONS.locked, status }
-    case UNSATISFIABLE_RANGE_STATUS:
-      return { reason: FETCH_REASONS.changed, status }
-    default:
-      return { reason: FETCH_REASONS.status, status }
-  }
 }
 
 type PlanForProps = {
@@ -172,24 +167,32 @@ const discard = async (body: Answer['body']): Promise<void> => {
   await body?.cancel().catch(() => undefined)
 }
 
-type RefusalInProps = {
-  status: number
-  body: Answer['body']
-}
+/** The statuses a fetch is refused with, by the reason each stands for. */
+const REFUSED_REASONS: ReadonlyMap<number, RefusedReason> = new Map([
+  [HTTP_STATUSES.unauthorized, FETCH_REASONS.unauthorized],
+  [HTTP_STATUSES.forbidden, FETCH_REASONS.forbidden],
+])
 
-/** The account refusal a `401` or `403` body names; any other refused body is only let go of. */
-const refusalIn = async ({ status, body }: RefusalInProps): Promise<AccountRefusal | null> => {
-  if (status !== HTTP_STATUSES.unauthorized && status !== HTTP_STATUSES.forbidden) {
-    await discard(body)
-    return null
+type RefusedOfProps = { status: number; body: Answer['body']; from: number }
+
+/**
+ * How an answer that is not a success ends the fetch, its body read for an account refusal or let
+ * go of. Null for a success, which the fetch reads on.
+ */
+const refusedOf = async ({ status, body, from }: RefusedOfProps): Promise<Failure | null> => {
+  if (isSuccessStatus(status)) return null
+  const refused = REFUSED_REASONS.get(status)
+  if (refused !== undefined) {
+    const refusal = accountRefusalOf({ status, body: await readShort(body) })
+    return { ok: false, reason: refused, refusal, bytes: from }
   }
-  const reason = refusalAt({
-    status,
-    body: await readShort(body),
-    statuses: ACCOUNT_REFUSAL_STATUSES,
-  })
-  // Accounts that are down are the server's outage, not a refusal of this account.
-  return reason === AUTH_REFUSALS.unavailable ? null : reason
+  await discard(body)
+  if (status === LOCKED_STATUS) return failure({ reason: FETCH_REASONS.locked, bytes: from })
+  if (status === HTTP_STATUSES.rangeNotSatisfiable) {
+    // The server's file is now shorter than the bytes on disk; keeping them would earn the same 416 on every retry.
+    return failure({ reason: FETCH_REASONS.changed, bytes: 0 })
+  }
+  return { ok: false, reason: FETCH_REASONS.status, status, bytes: from }
 }
 
 const streamToPart = async ({
@@ -203,12 +206,7 @@ const streamToPart = async ({
   now,
   stallMs,
   onProgress,
-}: Omit<FetchInput, 'fetch' | 'url'> & {
-  body: Answer['body']
-  from: number
-  promised: number | null
-  stallMs: number
-}): Promise<FetchOutcome> => {
+}: StreamToPartProps): Promise<FetchOutcome> => {
   const progress = { bytes: from, reportedBytes: from, reportedAt: now() }
   const stop: { value: Stop | null } = { value: null }
   const stall: { isStalled: boolean; handle: unknown } = { isStalled: false, handle: null }
@@ -291,10 +289,7 @@ const streamToPart = async ({
   return { ok: true, bytes: progress.bytes }
 }
 
-const download = async ({
-  canRestart,
-  ...input
-}: FetchInput & { canRestart: boolean }): Promise<FetchOutcome> => {
+const download = async ({ canRestart, ...input }: DownloadProps): Promise<FetchOutcome> => {
   const { fetch, url, part, signal, timers, stallMs, expectedSize, onProgress } = input
   const from = await part.size()
   if (from === expectedSize) {
@@ -314,11 +309,11 @@ const download = async ({
       wait.isStalled = true
       late.abort()
     },
-    ms: stallMs ?? DOWNLOAD_STALL_MS,
+    ms: stallMs,
   })
   const answer = await fetch({
     url,
-    headers: from > 0 ? { Range: `bytes=${from}-` } : {},
+    headers: from > 0 ? { [HEADERS.range]: `bytes=${from}-` } : {},
     signal: AbortSignal.any([signal, late.signal]),
   })
     .then(
@@ -336,20 +331,15 @@ const download = async ({
     return failure({ reason, bytes: from })
   }
   const { response } = answer
-  const refusal = refusalFor(response.status)
-  if (refusal !== null) {
-    const reason = await refusalIn({ status: response.status, body: response.body })
-    if (refusal.status === UNSATISFIABLE_RANGE_STATUS) {
-      // The server's file is now shorter than the bytes on disk; keeping them would earn the same 416 on every retry.
-      await part.truncate()
-      return failure({ ...refusal, bytes: 0 })
-    }
-    return failure({ ...refusal, refusal: reason, bytes: from })
+  const refused = await refusedOf({ status: response.status, body: response.body, from })
+  if (refused !== null) {
+    if (response.status === HTTP_STATUSES.rangeNotSatisfiable) await part.truncate()
+    return refused
   }
   const plan = planFor({
     status: response.status,
     from,
-    rangeStart: contentRangeStart(response.headers.get(HTTP_HEADERS.contentRange)),
+    rangeStart: contentRangeStart(response.headers.get(HEADERS.contentRange)),
   })
   switch (plan) {
     case PLANS.append:
@@ -358,7 +348,6 @@ const download = async ({
         body: response.body,
         from,
         promised: promisedSize({ from, headers: response.headers }),
-        stallMs: stallMs ?? DOWNLOAD_STALL_MS,
       })
     case PLANS.restart:
       await discard(response.body)
@@ -370,7 +359,7 @@ const download = async ({
       return failure({ reason: FETCH_REASONS.changed, bytes: from })
     case PLANS.unexpected:
       await discard(response.body)
-      return failure({ reason: FETCH_REASONS.status, status: response.status, bytes: from })
+      return { ok: false, reason: FETCH_REASONS.status, status: response.status, bytes: from }
     default: {
       const unreachable: never = plan
       throw new Error(`Unknown plan ${String(unreachable)}`)
@@ -382,9 +371,12 @@ const download = async ({
  * Fetches one file into its `.part`, resuming from the bytes already on disk. It answers an
  * outcome and never logs; the caller decides what each one means.
  */
-export const fetchToFile = async (input: FetchInput): Promise<FetchOutcome> => {
+export const fetchToFile = async ({
+  stallMs = DOWNLOAD_STALL_MS,
+  ...input
+}: FetchToFileProps): Promise<FetchOutcome> => {
   try {
-    return await download({ ...input, canRestart: true })
+    return await download({ ...input, stallMs, canRestart: true })
   } finally {
     // A file that will not close changes nothing the outcome says: the next resume reads the size from disk.
     await input.part.close().catch(() => undefined)

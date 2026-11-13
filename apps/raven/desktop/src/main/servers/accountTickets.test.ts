@@ -8,9 +8,6 @@ import {
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import type { ServerCallResult } from '@/main/servers/serverCalls'
 
-const SERVER_ID = '00000000-0000-4000-8000-000000000001'
-const OTHER_ID = '00000000-0000-4000-8000-000000000002'
-
 type MintedProps = { count: number }
 
 const minted = ({ count }: MintedProps): ServerCallResult => ({
@@ -28,17 +25,17 @@ type SetupProps = {
 
 const setup = ({ answer = minted, isSignedIn = true }: SetupProps = {}) => {
   const clock = { now: 1_000_000 }
-  const made: { serverId: string; call: AllowedCall }[] = []
-  const asked: string[] = []
+  const made: AllowedCall[] = []
+  const asked: boolean[] = []
   const tickets = createAccountTickets({
     calls: {
-      call: async ({ serverId, call }) => {
-        made.push({ serverId, call })
+      call: async ({ call }) => {
+        made.push(call)
         return answer({ count: made.length })
       },
     },
-    isSignedIn: ({ serverId }) => {
-      asked.push(serverId)
+    isSignedIn: () => {
+      asked.push(isSignedIn)
       return isSignedIn
     },
     now: () => clock.now,
@@ -46,7 +43,7 @@ const setup = ({ answer = minted, isSignedIn = true }: SetupProps = {}) => {
   return { tickets, made, asked, clock }
 }
 
-const TITLE = { serverId: SERVER_ID, mediaId: 7, isFresh: false } as const
+const TITLE = { mediaId: 7, isFresh: false } as const
 
 type RefusalProps = { status: number; reason: string }
 
@@ -63,10 +60,8 @@ describe('ticketFor', () => {
       kind: TICKET_OUTCOMES.ticket,
       ticket: 'account.t1',
     })
-    expect(asked).toEqual([SERVER_ID])
-    expect(made).toEqual([
-      { serverId: SERVER_ID, call: { name: CALL_NAMES.getAccountTicket, mediaId: 7 } },
-    ])
+    expect(asked).toEqual([true])
+    expect(made).toEqual([{ name: CALL_NAMES.getAccountTicket, mediaId: 7 }])
   })
 
   test('reuses the ticket inside the window, by Raven clock', async () => {
@@ -121,18 +116,14 @@ describe('ticketFor', () => {
     expect(made.length).toBe(2)
   })
 
-  test('each title and each server holds its own ticket', async () => {
+  test('each title holds its own ticket', async () => {
     const { tickets, made } = setup()
     await tickets.ticketFor(TITLE)
     expect(await tickets.ticketFor({ ...TITLE, mediaId: 8 })).toEqual({
       kind: TICKET_OUTCOMES.ticket,
       ticket: 'account.t2',
     })
-    expect(await tickets.ticketFor({ ...TITLE, serverId: OTHER_ID })).toEqual({
-      kind: TICKET_OUTCOMES.ticket,
-      ticket: 'account.t3',
-    })
-    expect(made.length).toBe(3)
+    expect(made.length).toBe(2)
   })
 
   test('never more than one mint in flight per title, fresh or not', async () => {
@@ -196,6 +187,11 @@ describe('ticketFor', () => {
       { ok: true, status: 403, body: '' },
       { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.revoked },
     ],
+    [
+      'a 401 saying accounts are down',
+      refusal({ status: 401, reason: AUTH_REFUSALS.unavailable }),
+      { kind: TICKET_OUTCOMES.unreachable },
+    ],
     ['a 423', { ok: true, status: 423, body: '{}' }, { kind: TICKET_OUTCOMES.locked }],
     ['a 404', { ok: true, status: 404, body: '{}' }, { kind: TICKET_OUTCOMES.gone }],
     [
@@ -228,22 +224,17 @@ describe('ticketFor', () => {
 })
 
 describe('forget', () => {
-  test("drops the server's tickets, and only its own", async () => {
+  test('drops every ticket held', async () => {
     const { tickets } = setup()
     await tickets.ticketFor(TITLE)
-    await tickets.ticketFor({ ...TITLE, serverId: OTHER_ID })
-    tickets.forget(SERVER_ID)
+    tickets.forget()
     expect(await tickets.ticketFor(TITLE)).toEqual({
-      kind: TICKET_OUTCOMES.ticket,
-      ticket: 'account.t3',
-    })
-    expect(await tickets.ticketFor({ ...TITLE, serverId: OTHER_ID })).toEqual({
       kind: TICKET_OUTCOMES.ticket,
       ticket: 'account.t2',
     })
   })
 
-  test('a mint in flight as the server is forgotten is not kept', async () => {
+  test('a mint in flight as the tickets are forgotten is not kept', async () => {
     const held: { release: () => void } = { release: () => undefined }
     const gate = new Promise<void>((resolve) => {
       held.release = resolve
@@ -256,7 +247,7 @@ describe('forget', () => {
     })
     const first = tickets.ticketFor(TITLE)
     await Promise.resolve()
-    tickets.forget(SERVER_ID)
+    tickets.forget()
     held.release()
     await first
     expect(await tickets.ticketFor(TITLE)).toEqual({

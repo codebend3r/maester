@@ -1,6 +1,5 @@
 import { isAudioContainer, isMediaTracks, type SubtitleTrack } from '@raven/core'
 import { unlessStopped } from '@/main/bounded'
-import type { ServerEntry } from '@/main/desktopConfig'
 import type { QueueFs } from '@/main/downloads/downloadQueue'
 import type { DownloadEntry, Sidecar } from '@/main/downloads/downloadState'
 import { DOWNLOAD_STALL_MS, type StreamFetch } from '@/main/downloads/fetchFile'
@@ -10,8 +9,8 @@ import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES } from '@/main/servers/allowlist'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { sidecarTracksOf } from '@/main/servers/sidecarTracks'
-import type { Timers } from '@/main/stateStore'
-import { HTTP_STATUSES } from '@/shared/httpStatuses'
+import type { Timers } from '@/main/timers'
+import { HTTP_STATUSES } from '@shared/http'
 
 /** The most of a subtitle kept; a larger one is skipped rather than read whole into memory. */
 export const SIDECAR_MAX_BYTES = 16 * 1024 ** 2
@@ -60,7 +59,7 @@ const textUpTo = async ({
 }
 
 /** The file whose subtitles are fetched, and the signal that stops its run. */
-type SidecarJob = { entry: DownloadEntry; server: ServerEntry; signal: AbortSignal }
+type SidecarJob = { entry: DownloadEntry; signal: AbortSignal }
 
 type CreateSidecarDownloadProps = {
   calls: Pick<ServerCalls, 'call'>
@@ -71,7 +70,10 @@ type CreateSidecarDownloadProps = {
   warn: (message: string) => void
 }
 
-type CreateSidecarDownloadCallbackProps = { job: SidecarJob; access: Access }
+type SidecarDownloadProps = { job: SidecarJob; access: Access }
+
+/** Fetches a download's subtitles beside its video, answering the ones it kept. */
+export type SidecarDownload = (input: SidecarDownloadProps) => Promise<Sidecar[]>
 
 /**
  * A download's subtitles: the server's track list, then each sidecar fetched whole beside the
@@ -84,9 +86,7 @@ export const createSidecarDownload = ({
   userData,
   timers,
   warn,
-}: CreateSidecarDownloadProps): ((
-  input: CreateSidecarDownloadCallbackProps,
-) => Promise<Sidecar[]>) => {
+}: CreateSidecarDownloadProps): SidecarDownload => {
   const partsOf = (entry: DownloadEntry) => ({
     userData,
     serverId: entry.serverId,
@@ -96,10 +96,7 @@ export const createSidecarDownload = ({
   const tracksOf = async ({ entry, signal }: SidecarJob): Promise<SubtitleTrack[]> => {
     const reply = await unlessStopped({
       task: calls
-        .call({
-          serverId: entry.serverId,
-          call: { name: CALL_NAMES.getTracks, mediaId: entry.mediaId },
-        })
+        .call({ call: { name: CALL_NAMES.getTracks, mediaId: entry.mediaId } })
         .catch(() => null),
       signal,
     })

@@ -39,7 +39,7 @@ import {
   startFixtureServer,
 } from '@/e2e/fixtureServer'
 import { FIXTURE_MEDIA } from '@/e2e/fixtureLibrary'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS } from '@shared/http'
 
 const PIN = '3001'
 const TICKET_MS = 60_000
@@ -50,7 +50,7 @@ const READY = {
   ticketMs: TICKET_MS,
   jwtSeconds: JWT_SECONDS,
 } as const satisfies FixtureAccounts
-const JSON_HEADERS = { [HTTP_HEADERS.contentType]: 'application/json' }
+const JSON_HEADERS = { [HEADERS.contentType]: 'application/json' }
 
 let folder = ''
 let clock = 1_800_000_000_000
@@ -118,7 +118,7 @@ const unlockCookie = async (server: FixtureServer) => {
     headers: JSON_HEADERS,
     body: JSON.stringify({ pin: PIN }),
   })
-  return (response.headers.get(HTTP_HEADERS.setCookie) ?? '').split(';')[0] ?? ''
+  return (response.headers.get(HEADERS.setCookie) ?? '').split(';')[0] ?? ''
 }
 
 type MintProps = { server: FixtureServer; access: string }

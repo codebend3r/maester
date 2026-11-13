@@ -1,11 +1,12 @@
 import {
-  desktopPlatformFor,
   ENVELOPE_KINDS,
   type InvokeEnvelope,
   PAGE_ORIGIN,
+  RAVEN_DESKTOP_BRIDGE_KEY,
   type RavenDesktopBridge,
   WINDOW_MESSAGE_TYPES,
 } from '@raven/core'
+import { desktopPlatformFor } from '@/shared/platform'
 import { contextBridge, type IpcRendererEvent, ipcRenderer, webUtils } from 'electron'
 import { dropPaths } from '@/preload/dropPaths'
 import { forwardPlayerPort } from '@/preload/playerPort'
@@ -42,31 +43,31 @@ const bridge = {
   platform: desktopPlatformFor({ platform: process.platform }),
 } satisfies RavenDesktopBridge
 
+/** Each port main hands the page, by its channel and the window message the page takes it in. */
+const PORT_CHANNELS = [
+  [IPC_CHANNELS.player, WINDOW_MESSAGE_TYPES.playerPort],
+  [IPC_CHANNELS.audio, WINDOW_MESSAGE_TYPES.audioPort],
+] as const
+
 /*
  * Only the web host's page gets the bridge. Main refuses any other frame too, and the window
  * never navigates away, so this is a second lock rather than the only one.
  */
 if (window.location.origin === PAGE_ORIGIN) {
-  contextBridge.exposeInMainWorld('ravenDesktop', bridge)
+  contextBridge.exposeInMainWorld(RAVEN_DESKTOP_BRIDGE_KEY, bridge)
 
   /*
    * The player's port cannot cross `contextBridge`, so it reaches the page as a window message
    * on the page's origin, which the page checks before taking the port.
    */
-  ipcRenderer.on(IPC_CHANNELS.player, (event, payload: unknown) =>
-    forwardPlayerPort({
-      payload,
-      ports: event.ports,
-      type: WINDOW_MESSAGE_TYPES.playerPort,
-      post: ({ message, transfer }) => window.postMessage(message, PAGE_ORIGIN, transfer),
-    }),
-  )
-  ipcRenderer.on(IPC_CHANNELS.audio, (event, payload: unknown) =>
-    forwardPlayerPort({
-      payload,
-      ports: event.ports,
-      type: WINDOW_MESSAGE_TYPES.audioPort,
-      post: ({ message, transfer }) => window.postMessage(message, PAGE_ORIGIN, transfer),
-    }),
+  PORT_CHANNELS.forEach(([channel, type]) =>
+    ipcRenderer.on(channel, (event, payload: unknown) =>
+      forwardPlayerPort({
+        payload,
+        ports: event.ports,
+        type,
+        post: ({ message, transfer }) => window.postMessage(message, PAGE_ORIGIN, transfer),
+      }),
+    ),
   )
 }

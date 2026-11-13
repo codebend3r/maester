@@ -1,7 +1,8 @@
 import {
   AUTH_PARAMS,
-  AUTH_PATHS,
+  ROUTES,
   isMediaId,
+  pathFor,
   isProgressChange,
   isProgressReport,
   SERVER_METHODS,
@@ -46,9 +47,21 @@ export type AllowedCall =
 
 /** The fixed paths among the calls; the numbered calls' paths carry an id. */
 export const API_PATHS = {
-  mediaOrigins: '/api/media-origins',
+  mediaOrigins: ROUTES.getMediaOrigins.path,
   media: '/api/media',
 } as const
+
+/** A request main sends: its method, its path and its JSON body, if any. */
+export type AllowedRequest = { method: ServerMethod; path: string; body: string | null }
+
+type BareRequestProps = { route: { method: ServerMethod; path: string }; id: number }
+
+/** A call by id alone, with no body. */
+const bareRequest = ({ route, id }: BareRequestProps): AllowedRequest => ({
+  method: route.method,
+  path: pathFor({ path: route.path, params: { [AUTH_PARAMS.id]: id } }),
+  body: null,
+})
 
 /** A title's bytes under `${API_PATHS.media}/<id>/`, read with a ticket or a cookie. */
 export const MEDIA_FILE_PATH = 'file'
@@ -96,11 +109,6 @@ const readBody = (body: string | null): Body => {
 
 const ID_PARAM = `:${AUTH_PARAMS.id}`
 
-type WithIdProps = { path: string; id: string }
-
-/** An account route's path with its `:id` filled in. */
-const withId = ({ path, id }: WithIdProps): string => path.replace(ID_PARAM, id)
-
 type BareCallbackProps = { body: Body }
 
 /** Only for the calls that take no body: anything sent along refuses the call. */
@@ -109,80 +117,81 @@ const bare =
   ({ body }: BareCallbackProps): AllowedCall | null =>
     body.kind === BODY_KINDS.none ? call : null
 
-/*
- * Matched on the whole string, digits only, so no query, fragment, dot segment,
- * escape, extra slash or absolute URL can match; `$` without the `m` flag ends the input.
+/** One placeholder's worth of a whole id: digits only, no leading zero, at most 16 of them. */
+const ID_PATTERN = '([1-9]\\d{0,15})'
+
+const ESCAPED = /[.*+?^${}()|[\]\\]/gu
+
+/**
+ * A route's path as a pattern that matches it whole, its one `:id` as digits. Matched on the
+ * whole string, digits only, so no query, fragment, dot segment, escape, extra slash or absolute
+ * URL can match; `$` without the `m` flag ends the input.
  */
-const ROUTES: readonly Route[] = [
-  {
-    kind: ROUTE_KINDS.numbered,
-    method: SERVER_METHODS.get,
-    pattern: /^\/api\/media\/([1-9]\d{0,15})$/u,
+const numberedPattern = (path: string): RegExp =>
+  new RegExp(`^${path.replace(ESCAPED, '\\$&').replace(ID_PARAM, ID_PATTERN)}$`, 'u')
+
+type NumberedRouteProps = {
+  route: { method: ServerMethod; path: string }
+  read: (input: ReadProps) => AllowedCall | null
+}
+
+const numbered = ({ route, read }: NumberedRouteProps): Route => ({
+  kind: ROUTE_KINDS.numbered,
+  method: route.method,
+  pattern: numberedPattern(route.path),
+  read,
+})
+
+const ALLOWED_ROUTES: readonly Route[] = [
+  numbered({
+    route: ROUTES.getMedia,
     read: ({ id, body }) => bare({ name: CALL_NAMES.getMedia, mediaId: id })({ body }),
-  },
-  {
-    kind: ROUTE_KINDS.numbered,
-    method: SERVER_METHODS.get,
-    pattern: /^\/api\/media\/([1-9]\d{0,15})\/tracks$/u,
+  }),
+  numbered({
+    route: ROUTES.getTracks,
     read: ({ id, body }) => bare({ name: CALL_NAMES.getTracks, mediaId: id })({ body }),
-  },
-  {
-    kind: ROUTE_KINDS.numbered,
-    method: SERVER_METHODS.put,
-    pattern: /^\/api\/media\/([1-9]\d{0,15})\/progress$/u,
+  }),
+  numbered({
+    route: ROUTES.saveProgress,
     read: ({ id, body }) => {
       if (body.kind !== BODY_KINDS.json || !isProgressChange(body.value)) return null
       // An older page names no audio track; null tells the server it cannot tell.
       const audio = isProgressReport(body.value) ? body.value.audio : null
       return { name: CALL_NAMES.saveProgress, mediaId: id, position: body.value.position, audio }
     },
-  },
-  {
-    kind: ROUTE_KINDS.numbered,
-    method: SERVER_METHODS.post,
-    pattern: /^\/api\/media\/([1-9]\d{0,15})\/plays$/u,
+  }),
+  numbered({
+    route: ROUTES.recordPlay,
     read: ({ id, body }) => bare({ name: CALL_NAMES.recordPlay, mediaId: id })({ body }),
-  },
-  {
-    kind: ROUTE_KINDS.numbered,
-    method: SERVER_METHODS.get,
-    pattern: /^\/api\/items\/([1-9]\d{0,15})$/u,
+  }),
+  numbered({
+    route: ROUTES.getItem,
     read: ({ id, body }) => bare({ name: CALL_NAMES.getItem, itemId: id })({ body }),
-  },
-  {
-    kind: ROUTE_KINDS.numbered,
-    method: SERVER_METHODS.get,
-    pattern: /^\/api\/libraries\/([1-9]\d{0,15})$/u,
+  }),
+  numbered({
+    route: ROUTES.getLibrary,
     read: ({ id, body }) => bare({ name: CALL_NAMES.getLibrary, libraryId: id })({ body }),
-  },
-  {
-    kind: ROUTE_KINDS.numbered,
-    method: SERVER_METHODS.get,
-    pattern: /^\/api\/libraries\/([1-9]\d{0,15})\/sagas$/u,
+  }),
+  numbered({
+    route: ROUTES.listSagas,
     read: ({ id, body }) => bare({ name: CALL_NAMES.getSagas, libraryId: id })({ body }),
-  },
-  {
-    kind: ROUTE_KINDS.numbered,
-    method: SERVER_METHODS.get,
-    pattern: /^\/api\/albums\/([1-9]\d{0,15})$/u,
+  }),
+  numbered({
+    route: ROUTES.getAlbum,
     read: ({ id, body }) => bare({ name: CALL_NAMES.getAlbum, albumId: id })({ body }),
-  },
-  {
-    kind: ROUTE_KINDS.numbered,
-    method: SERVER_METHODS.get,
-    pattern: /^\/api\/playlists\/([1-9]\d{0,15})$/u,
+  }),
+  numbered({
+    route: ROUTES.getPlaylist,
     read: ({ id, body }) => bare({ name: CALL_NAMES.getPlaylist, playlistId: id })({ body }),
-  },
-  {
-    kind: ROUTE_KINDS.numbered,
-    method: SERVER_METHODS.post,
-    pattern: new RegExp(`^${withId({ path: AUTH_PATHS.ticket, id: '([1-9]\\d{0,15})' })}$`, 'u'),
+  }),
+  numbered({
+    route: ROUTES.getAccountMediaTicket,
     read: ({ id, body }) => bare({ name: CALL_NAMES.getAccountTicket, mediaId: id })({ body }),
-  },
+  }),
   {
     kind: ROUTE_KINDS.fixed,
-    method: SERVER_METHODS.get,
-    path: API_PATHS.mediaOrigins,
+    method: ROUTES.getMediaOrigins.method,
+    path: ROUTES.getMediaOrigins.path,
     read: bare({ name: CALL_NAMES.getMediaOrigins }),
   },
 ]
@@ -231,7 +240,7 @@ type MatchCallProps = {
 export const matchCall = ({ method, path, body }: MatchCallProps): AllowedCall | null => {
   const read = readBody(body)
   if (read.kind === BODY_KINDS.bad) return null
-  return ROUTES.reduce<AllowedCall | null>(
+  return ALLOWED_ROUTES.reduce<AllowedCall | null>(
     (found, route) =>
       found ?? (route.method === method ? matchRoute({ route, path, body: read }) : null),
     null,
@@ -239,44 +248,41 @@ export const matchCall = ({ method, path, body }: MatchCallProps): AllowedCall |
 }
 
 /** The request main sends for a call, built from its fields alone. */
-export const requestFor = (
-  call: AllowedCall,
-): { method: ServerMethod; path: string; body: string | null } => {
+export const requestFor = (call: AllowedCall): AllowedRequest => {
   switch (call.name) {
     case CALL_NAMES.getMedia:
-      return { method: SERVER_METHODS.get, path: `/api/media/${call.mediaId}`, body: null }
+      return bareRequest({ route: ROUTES.getMedia, id: call.mediaId })
     case CALL_NAMES.getTracks:
-      return { method: SERVER_METHODS.get, path: `/api/media/${call.mediaId}/tracks`, body: null }
+      return bareRequest({ route: ROUTES.getTracks, id: call.mediaId })
     case CALL_NAMES.saveProgress:
       return {
-        method: SERVER_METHODS.put,
-        path: `/api/media/${call.mediaId}/progress`,
+        method: ROUTES.saveProgress.method,
+        path: pathFor({
+          path: ROUTES.saveProgress.path,
+          params: { [AUTH_PARAMS.id]: call.mediaId },
+        }),
         body: JSON.stringify({ position: call.position, audio: call.audio }),
       }
     case CALL_NAMES.recordPlay:
-      return { method: SERVER_METHODS.post, path: `/api/media/${call.mediaId}/plays`, body: null }
+      return bareRequest({ route: ROUTES.recordPlay, id: call.mediaId })
     case CALL_NAMES.getItem:
-      return { method: SERVER_METHODS.get, path: `/api/items/${call.itemId}`, body: null }
+      return bareRequest({ route: ROUTES.getItem, id: call.itemId })
     case CALL_NAMES.getLibrary:
-      return { method: SERVER_METHODS.get, path: `/api/libraries/${call.libraryId}`, body: null }
+      return bareRequest({ route: ROUTES.getLibrary, id: call.libraryId })
     case CALL_NAMES.getSagas:
-      return {
-        method: SERVER_METHODS.get,
-        path: `/api/libraries/${call.libraryId}/sagas`,
-        body: null,
-      }
+      return bareRequest({ route: ROUTES.listSagas, id: call.libraryId })
     case CALL_NAMES.getAlbum:
-      return { method: SERVER_METHODS.get, path: `/api/albums/${call.albumId}`, body: null }
+      return bareRequest({ route: ROUTES.getAlbum, id: call.albumId })
     case CALL_NAMES.getPlaylist:
-      return { method: SERVER_METHODS.get, path: `/api/playlists/${call.playlistId}`, body: null }
+      return bareRequest({ route: ROUTES.getPlaylist, id: call.playlistId })
     case CALL_NAMES.getMediaOrigins:
-      return { method: SERVER_METHODS.get, path: API_PATHS.mediaOrigins, body: null }
-    case CALL_NAMES.getAccountTicket:
       return {
-        method: SERVER_METHODS.post,
-        path: withId({ path: AUTH_PATHS.ticket, id: String(call.mediaId) }),
+        method: ROUTES.getMediaOrigins.method,
+        path: ROUTES.getMediaOrigins.path,
         body: null,
       }
+    case CALL_NAMES.getAccountTicket:
+      return bareRequest({ route: ROUTES.getAccountMediaTicket, id: call.mediaId })
     default: {
       const unreachable: never = call
       return unreachable

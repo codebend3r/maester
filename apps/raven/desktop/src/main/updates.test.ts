@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test'
 import { NATIVE_TARGETS } from '@raven/mpv'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import {
   CHECK_INTERVAL_MS,
   MAX_RELEASE_PAGES,
@@ -19,6 +18,7 @@ import {
   type UpdateCheck,
   type UpdateFetch,
 } from '@/main/updates'
+import { HEADERS } from '@shared/http'
 
 type ReleaseProps = {
   tag: string
@@ -356,7 +356,7 @@ const serving = (pages: Record<string, Reply>) => {
     const { status, text, link = null } = pages[url] ?? { status: 404, text: '' }
     return {
       status,
-      headers: { get: (name: string) => (name.toLowerCase() === HTTP_HEADERS.link ? link : null) },
+      headers: { get: (name: string) => (name.toLowerCase() === HEADERS.link ? link : null) },
       text: async () => text,
     }
   }

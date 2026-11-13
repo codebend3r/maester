@@ -1,7 +1,7 @@
 import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import type { MpvControl } from '@/main/player/guardedMpv'
 import { type LoadTarget, type Sidecar, subAddArgs } from '@/main/player/loadTarget'
-import type { Timers } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 import { messageOf } from '@/shared/messageOf'
 
 /** How long a server title's first snapshot waits for its sidecars before it goes on. */

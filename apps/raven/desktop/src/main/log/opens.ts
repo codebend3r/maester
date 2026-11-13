@@ -7,15 +7,16 @@ import {
   isInvokeEnvelope,
   PLAYER_SOURCE_KINDS,
 } from '@raven/core'
+import { SERVER_NAME } from '@/main/desktopConfig'
 
 export type OpenedTitle =
   | { kind: typeof PLAYER_SOURCE_KINDS.file; path: string }
-  | { kind: typeof PLAYER_SOURCE_KINDS.server; serverName: string; mediaId: number }
+  | { kind: typeof PLAYER_SOURCE_KINDS.server; mediaId: number }
 
 // Anything else after the last dot is part of a name, which the log never holds.
 const EXTENSION = /^\.[a-z0-9]{1,8}$/
 
-/** `open file .mkv`, `open file (no extension)`, `open server title 7 on Vhagar`: never a path or a file name. */
+/** `open file .mkv`, `open file (no extension)`, `open server title 7 on raven`: never a path or a file name. */
 export const openLine = (opened: OpenedTitle): string => {
   switch (opened.kind) {
     case PLAYER_SOURCE_KINDS.file: {
@@ -23,7 +24,7 @@ export const openLine = (opened: OpenedTitle): string => {
       return `open file ${EXTENSION.test(extension) ? extension : '(no extension)'}`
     }
     case PLAYER_SOURCE_KINDS.server:
-      return `open server title ${opened.mediaId} on ${opened.serverName}`
+      return `open server title ${opened.mediaId} on ${SERVER_NAME}`
     default: {
       const unreachable: never = opened
       return unreachable

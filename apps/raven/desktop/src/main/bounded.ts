@@ -1,4 +1,4 @@
-import type { Timers } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 import { createNodeTimers } from '@/main/timers'
 
 export const BOUNDED_OUTCOMES = { answered: 'answered', late: 'late', failed: 'failed' } as const

@@ -13,7 +13,6 @@ import {
   AUTH_PATHS,
   CAPTION_COLOURS,
   CAPTION_SIZES,
-  desktopPlatformFor,
   isNumber,
   isRecord,
   isString,
@@ -30,6 +29,7 @@ import {
   SERVER_METHODS,
   SERVER_COOKIES,
 } from '@raven/core'
+import { desktopPlatformFor } from '@/shared/platform'
 import {
   MPV_END_FILE_REASONS,
   MPV_EVENTS,
@@ -58,10 +58,9 @@ import {
   startFixtureServer,
 } from '@/e2e/fixtureServer'
 import { FIXTURE_MEDIA } from '@/e2e/fixtureLibrary'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { createPageAccount, type PageAccount } from '@/main/accounts/pageAccount'
 import { accountIdOfToken } from '@/main/accounts/tokenAccount'
-import type { ServerEntry } from '@/main/desktopConfig'
+import { SERVER_NAME, type ServerEntry } from '@/main/desktopConfig'
 import { addonPathFor } from '@/main/player/engine'
 import {
   type AccountRefusalReader,
@@ -92,6 +91,7 @@ import {
 import { NO_SERVERS, noExplanation, noRefusedAccount } from '@/main/test/playerFakes'
 import { fixedPicks } from '@/main/test/serverFakes'
 import { createNodeTimers } from '@/main/timers'
+import { HEADERS } from '@shared/http'
 
 /** The id the server gives a title's first sidecar (Ruling 18). */
 const SIDECAR_ID = 'external-0'
@@ -1343,7 +1343,7 @@ describe('server titles from a raven fixture server', () => {
         assert.deepEqual(outcome, {
           ok: false,
           reason: PLAYER_REFUSAL_REASONS.refused,
-          message: SOURCE_MESSAGES.relocked(FIXTURE_SERVER.name),
+          message: SOURCE_MESSAGES.relocked,
         })
         assert.deepEqual(asked, [])
         assert.deepEqual(
@@ -1352,7 +1352,7 @@ describe('server titles from a raven fixture server', () => {
         )
         assert.deepEqual(
           sourceWarnings.filter((warning) => warning.includes('its tracks answered 423')),
-          [`no sidecars from ${FIXTURE_SERVER.name}: its tracks answered 423`],
+          [`no sidecars from ${SERVER_NAME}: its tracks answered 423`],
         )
         assert.deepEqual(
           harness.raw.filter((event) => event.type === MPV_EVENTS.fileLoaded),
@@ -1374,7 +1374,7 @@ describe('server titles from a raven fixture server', () => {
         assert.deepEqual(outcome, {
           ok: false,
           reason: PLAYER_REFUSAL_REASONS.refused,
-          message: SOURCE_MESSAGES.gone(FIXTURE_SERVER.name),
+          message: SOURCE_MESSAGES.gone,
         })
         assert.deepEqual(asked, [])
       },
@@ -1396,7 +1396,7 @@ describe('server titles from a raven fixture server', () => {
         assert.deepEqual(failure, {
           type: 'error',
           reason: 'open',
-          message: SOURCE_MESSAGES.cannotOpen(FIXTURE_SERVER.name),
+          message: SOURCE_MESSAGES.cannotOpen,
         })
         assert.deepEqual(
           asked.map(({ phase }) => phase),
@@ -1428,7 +1428,7 @@ describe('server titles from a raven fixture server', () => {
         assert.deepEqual(failure, {
           type: 'error',
           reason: 'open',
-          message: SOURCE_MESSAGES.cannotOpen(FIXTURE_SERVER.name),
+          message: SOURCE_MESSAGES.cannotOpen,
         })
         assert.deepEqual(
           asked.map(({ phase }) => phase),
@@ -1566,7 +1566,7 @@ describe('a slow raven fixture server', () => {
           )
           assert.ok(
             sourceWarnings.includes(
-              `no sidecars from ${FIXTURE_SERVER.name}: its tracks did not answer in time`,
+              `no sidecars from ${SERVER_NAME}: its tracks did not answer in time`,
             ),
             JSON.stringify(sourceWarnings),
           )
@@ -1726,7 +1726,7 @@ const pageSessionFor = async ({ fixture, account, now }: PageSessionForProps) =>
   const ask = async ({ grant, body }: AskProps) => {
     const response = await fetch(`${fixture.origin}${AUTH_V1.token}?${GRANT_PARAM}=${grant}`, {
       method: SERVER_METHODS.post,
-      headers: { [HTTP_HEADERS.contentType]: 'application/json' },
+      headers: { [HEADERS.contentType]: 'application/json' },
       body: JSON.stringify(body),
     })
     const session: unknown = await response.json()
@@ -1775,11 +1775,10 @@ const accountPartsFor = async ({
   }
   const now = () => Date.now() + clock.skewMs
   const entry: ServerEntry = { ...named, origin: fixture.origin }
-  const serverOf = (serverId: string) => (serverId === entry.id ? entry : null)
   const account = createPageAccount({ onSwitched: () => undefined, onEnded: () => undefined })
   const unlock = jar.find(({ name }) => name === SERVER_COOKIES.unlock) ?? null
   const calls = createServerCalls({
-    serverOf,
+    server: entry,
     fetch: fetchThrough(fetch),
     authorize: () => account.accessToken(),
     unlockOf: async () => (unlock === null ? null : `${SERVER_COOKIES.unlock}=${unlock.value}`),
@@ -1791,11 +1790,12 @@ const accountPartsFor = async ({
     now,
   })
   // The fixture server lists no media origin, so every title is relayed from its own address.
-  const { picks } = fixedPicks()
+  const { picks } = fixedPicks({ serverOrigin: entry.origin })
   // Every request the relay heard, as mpv sent it, and the listener, to close after.
   const heard: string[] = []
   const listeners: Server[] = []
   const relay = createMediaRelay({
+    serverOrigin: entry.origin,
     listen: listenOnLoopback({
       createServer: (handler) => {
         const listener = createServer((request, response) => {
@@ -1817,7 +1817,7 @@ const accountPartsFor = async ({
     warn,
   })
   const sources = createServerSources({
-    serverOf,
+    server: entry,
     calls,
     tickets,
     relay,
@@ -2094,7 +2094,7 @@ describe('account titles through the relay against headless libmpv', () => {
           assert.deepEqual(failure, {
             type: PLAYER_EVENTS.error,
             reason: PLAYER_ERROR_REASONS.account,
-            message: SOURCE_MESSAGES.removed(ACCOUNT_SERVER.name),
+            message: SOURCE_MESSAGES.removed,
           })
           await sleep(SETTLE_MS)
           const asked = fixture.requests.length
@@ -2144,7 +2144,7 @@ describe('account titles through the relay against headless libmpv', () => {
           assert.deepEqual(await ending, {
             type: PLAYER_EVENTS.error,
             reason: PLAYER_ERROR_REASONS.account,
-            message: SOURCE_MESSAGES.removed(ACCOUNT_SERVER.name),
+            message: SOURCE_MESSAGES.removed,
           })
         },
       })
@@ -2209,7 +2209,7 @@ describe('a raven fixture server under the admin lock', () => {
           assert.deepEqual(outcome, {
             ok: false,
             reason: PLAYER_REFUSAL_REASONS.refused,
-            message: SOURCE_MESSAGES.gone(ACCOUNT_SERVER.name),
+            message: SOURCE_MESSAGES.gone,
           })
           assert.deepEqual(
             fixture.requests.filter(({ path }) => path.startsWith(FIXTURE_LOCK_PATHS.admin)),
@@ -2286,7 +2286,7 @@ describe('a raven fixture server that goes away mid-film', () => {
           assert.deepEqual(failure, {
             type: 'error',
             reason: 'network',
-            message: SOURCE_MESSAGES.lost(FIXTURE_SERVER.name),
+            message: SOURCE_MESSAGES.lost,
           })
           assert.deepEqual(
             asked.map(({ phase }) => phase),

@@ -1,19 +1,16 @@
 import {
   DOWNLOAD_STATUS_KINDS,
+  type DownloadLibrary,
   type Infer,
   isBoolean,
   isContainerName,
-  type DownloadArtwork,
-  type DownloadFacts,
   isDownloadArtwork,
   isDownloadFacts,
   isDownloadGroup,
-  type DownloadLibrary,
   isDownloadLibrary,
   isMediaId,
   isNumber,
   isOpaqueId,
-  isRecord,
   isSidecarTrackId,
   isString,
   isTrack,
@@ -25,8 +22,12 @@ import {
   optional,
   union,
 } from '@raven/core'
+import { isAccountRefusal } from '@/main/servers/authRefusals'
 
 export const DOWNLOADS_FILE = 'downloads.json'
+
+/** The version `downloads.json` is written at. */
+export const DOWNLOADS_VERSION = 3
 
 /** A subtitle file kept beside the video: `trackId` is the server's `external-<n>`. */
 const isSidecar = object({ trackId: isSidecarTrackId, title: isString, language: isString })
@@ -35,15 +36,12 @@ const isSidecar = object({ trackId: isSidecarTrackId, title: isString, language:
 export const isFileSize = (value: unknown): value is number =>
   isNumber(value) && Number.isSafeInteger(value) && value > 0
 
-const PENDING_FIELDS = {
+export const PENDING_FIELDS = {
   play: isBoolean,
   position: nullable(isNumber),
   furthest: nullable(isNumber),
   at: isNumber,
 }
-
-/** What version 1 kept pending, before a play belonged to an account. */
-const isPendingV1 = object(PENDING_FIELDS)
 
 /**
  * What the server has not heard yet: a play to record, the last position to report, and the
@@ -52,7 +50,7 @@ const isPendingV1 = object(PENDING_FIELDS)
  * signed in to the server when it was noted, sent only under that account; null for what was
  * noted before plays belonged to an account, which goes to whoever is signed in.
  */
-const isPending = object({ ...PENDING_FIELDS, accountId: nullable(isString) })
+export const isPending = object({ ...PENDING_FIELDS, accountId: nullable(isString) })
 
 /** Why a download waits paused: the viewer paused it, or the queue did for the disk, a relock or an outage. */
 export const PAUSE_REASONS = {
@@ -64,60 +62,67 @@ export const PAUSE_REASONS = {
 
 const isPauseReason = oneOf(Object.values(PAUSE_REASONS))
 
-/** Why a download failed. Only `other` has words of its own, kept in the status's `message`. */
+/**
+ * Why a download failed. `account` keeps why the server refused the account and `other` its own
+ * words; every other reason says it all.
+ */
 export const FAIL_REASONS = {
   noSpace: 'noSpace',
   changed: 'changed',
-  unauthorized: 'unauthorized',
   unreachable: 'unreachable',
   gone: 'gone',
+  account: 'account',
   other: 'other',
 } as const
 
-const isFailReason = oneOf(Object.values(FAIL_REASONS))
+/** The failures that need nothing besides their reason. */
+const isPlainFailReason = oneOf([
+  FAIL_REASONS.noSpace,
+  FAIL_REASONS.changed,
+  FAIL_REASONS.unreachable,
+  FAIL_REASONS.gone,
+])
+
+export const QUEUED = object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.queued]) })
+export const DOWNLOADING = object({
+  kind: oneOf([DOWNLOAD_STATUS_KINDS.downloading]),
+  bytes: isNumber,
+})
+export const PAUSED = object({
+  kind: oneOf([DOWNLOAD_STATUS_KINDS.paused]),
+  bytes: isNumber,
+  reason: isPauseReason,
+})
+export const READY = object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.ready]) })
+
+const PLAIN_FAILURE = object({ reason: isPlainFailReason })
+const ACCOUNT_FAILURE = object({
+  reason: oneOf([FAIL_REASONS.account]),
+  refusal: isAccountRefusal,
+})
+const OTHER_FAILURE = object({ reason: oneOf([FAIL_REASONS.other]), message: isString })
+
+/** Why a download failed, as an entry keeps it: the reason, and what that reason needs. */
+const isFailure = union(PLAIN_FAILURE, ACCOUNT_FAILURE, OTHER_FAILURE)
+
+/** What every failed status keeps besides why: the kind, and the bytes already on disk. */
+const FAILED_FIELDS = { kind: oneOf([DOWNLOAD_STATUS_KINDS.failed]), bytes: isNumber }
+
+export type Failure = Infer<typeof isFailure>
 
 /**
  * A download's status as `downloads.json` keeps it: why it stopped is a reason, and the page's
- * words are built from it when the page reads it, so renaming a server changes no reason.
+ * words are built from it when the page reads it.
  */
 const isEntryStatus = union(
-  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.queued]) }),
-  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.downloading]), bytes: isNumber }),
-  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.paused]), bytes: isNumber, reason: isPauseReason }),
-  object({
-    kind: oneOf([DOWNLOAD_STATUS_KINDS.failed]),
-    bytes: isNumber,
-    reason: isFailReason,
-    message: isString,
-  }),
-  object({ kind: oneOf([DOWNLOAD_STATUS_KINDS.ready]) }),
+  QUEUED,
+  DOWNLOADING,
+  PAUSED,
+  object({ ...FAILED_FIELDS, ...PLAIN_FAILURE.shape }),
+  object({ ...FAILED_FIELDS, ...ACCOUNT_FAILURE.shape }),
+  object({ ...FAILED_FIELDS, ...OTHER_FAILURE.shape }),
+  READY,
 )
-
-const ENTRY_FIELDS = {
-  downloadId: isOpaqueId,
-  serverId: isOpaqueId,
-  mediaId: isMediaId,
-  label: isString,
-  group: isDownloadGroup,
-  container: isContainerName,
-  size: isFileSize,
-  duration: nullable(isNumber),
-  watchedPercent: isWatchedPercent,
-  sidecars: listOf(isSidecar),
-  status: isEntryStatus,
-  autoDelete: isBoolean,
-  watchedAt: nullable(isNumber),
-  /**
-   * Where the server had playback when the download was confirmed, so a title streamed partway
-   * opens there; 0 once a position is noted here, after which the local resume spot decides.
-   */
-  serverPosition: isNumber,
-  createdAt: isNumber,
-  /** A track's `Track`, kept so Downloads queues it with no server; none for a video. */
-  track: optional(isTrack),
-}
-
-const isEntryBase = object({ ...ENTRY_FIELDS, pending: isPending })
 
 /** The kinds of picture file a download keeps, by the extension each is saved under. */
 export const PICTURE_EXTENSIONS = { jpg: 'jpg', png: 'png', webp: 'webp', avif: 'avif' } as const
@@ -165,62 +170,65 @@ const isEntryPictures = object({
 
 export type EntryPictures = Infer<typeof isEntryPictures>
 
-type EntryExtras = {
-  artwork?: DownloadArtwork
-  facts?: DownloadFacts
-  library?: DownloadLibrary
+/**
+ * What the Downloads page shows of an entry besides: its pictures, its library and the facts its
+ * grid sorts on. A file written before they were kept has none of them, which is fine, so each is
+ * optional; `library` and `titleItemId` are filled in together, from the server.
+ */
+export const ENTRY_FIELDS = {
+  downloadId: isOpaqueId,
+  serverId: isOpaqueId,
+  mediaId: isMediaId,
+  label: isString,
+  group: isDownloadGroup,
+  container: isContainerName,
+  size: isFileSize,
+  duration: nullable(isNumber),
+  watchedPercent: isWatchedPercent,
+  sidecars: listOf(isSidecar),
+  autoDelete: isBoolean,
+  watchedAt: nullable(isNumber),
+  /**
+   * Where the server had playback when the download was confirmed, so a title streamed partway
+   * opens there; 0 once a position is noted here, after which the local resume spot decides.
+   */
+  serverPosition: isNumber,
+  createdAt: isNumber,
+  /** A track's `Track`, kept so Downloads queues it with no server; none for a video. */
+  track: optional(isTrack),
+  artwork: optional(isDownloadArtwork),
+  facts: optional(isDownloadFacts),
+  library: optional(isDownloadLibrary),
   /** The item whose poster and title art a video wears, its show's for an episode; null for none. */
-  titleItemId?: number | null
-  pictures?: EntryPictures
+  titleItemId: optional(nullable(isMediaId)),
+  pictures: optional(isEntryPictures),
 }
 
-/*
- * What the Downloads page shows of an entry: its pictures, its library and the facts its grid
- * sorts on. A file written before they were kept has none of them, which is fine, so they are not
- * part of `ENTRY_FIELDS`; `library` and `titleItemId` are filled in together, from the server.
- */
-const isEntryExtras = (value: unknown): value is EntryExtras =>
-  isRecord(value) &&
-  (value.artwork === undefined || isDownloadArtwork(value.artwork)) &&
-  (value.facts === undefined || isDownloadFacts(value.facts)) &&
-  (value.library === undefined || isDownloadLibrary(value.library)) &&
-  (value.titleItemId === undefined || nullable(isMediaId)(value.titleItemId)) &&
-  (value.pictures === undefined || isEntryPictures(value.pictures))
+export const isDownloadEntry = object({
+  ...ENTRY_FIELDS,
+  status: isEntryStatus,
+  pending: isPending,
+})
 
-export type DownloadEntry = Infer<typeof isEntryBase> & EntryExtras
-
-export const isDownloadEntry = (value: unknown): value is DownloadEntry =>
-  isEntryBase(value) && isEntryExtras(value)
+export type DownloadEntry = Infer<typeof isDownloadEntry>
 
 /**
  * What a removed download still owed its server, kept until the server hears it: removing a
  * download offline, as its auto-delete does, must not lose what was watched. What an account
  * watched waits here too once another signs in. One item per title and account.
  */
-const OWED_FIELDS = { serverId: isOpaqueId, mediaId: isMediaId }
+export const OWED_FIELDS = { serverId: isOpaqueId, mediaId: isMediaId }
 
-const isOwed = object({ ...OWED_FIELDS, pending: isPending })
+export const isOwed = object({ ...OWED_FIELDS, pending: isPending })
 
 export const isDownloadsState = object({
-  version: oneOf([2]),
+  version: oneOf([DOWNLOADS_VERSION]),
   entries: listOf(isDownloadEntry),
   autoDeleteDefault: isBoolean,
   owed: listOf(isOwed),
 })
 
-/** What `downloads.json` may hold: this version, or the one before plays belonged to an account. */
-export const isStoredDownloads = union(
-  object({
-    version: oneOf([1]),
-    entries: listOf(object({ ...ENTRY_FIELDS, pending: isPendingV1 })),
-    autoDeleteDefault: isBoolean,
-    owed: listOf(object({ ...OWED_FIELDS, pending: isPendingV1 })),
-  }),
-  isDownloadsState,
-)
-
 export type PauseReason = Infer<typeof isPauseReason>
-export type FailReason = Infer<typeof isFailReason>
 export type EntryStatus = Infer<typeof isEntryStatus>
 export type Sidecar = Infer<typeof isSidecar>
 export type Pending = Infer<typeof isPending>
@@ -228,7 +236,7 @@ export type Owed = Infer<typeof isOwed>
 export type DownloadsState = Infer<typeof isDownloadsState>
 
 export const EMPTY_DOWNLOADS: DownloadsState = {
-  version: 2,
+  version: DOWNLOADS_VERSION,
   entries: [],
   autoDeleteDefault: false,
   owed: [],
@@ -242,49 +250,21 @@ export const NO_PENDING: Pending = {
   accountId: null,
 }
 
-/** Version 1 noted no account, so what it kept pending goes to whoever is signed in, as it did. */
-const sharedPending = ({ play, position, furthest, at }: Infer<typeof isPendingV1>): Pending => ({
-  play,
-  position,
-  furthest,
-  at,
-  accountId: null,
-})
+/** A reducer's input: the state, and what it changes. */
+type WithState<P> = P & { state: DownloadsState }
 
-export const upgradeDownloads = (stored: Infer<typeof isStoredDownloads>): DownloadsState => {
-  switch (stored.version) {
-    case 1:
-      return {
-        version: 2,
-        entries: stored.entries.map((entry) => ({
-          ...entry,
-          pending: sharedPending(entry.pending),
-        })),
-        autoDeleteDefault: stored.autoDeleteDefault,
-        owed: stored.owed.map((item) => ({ ...item, pending: sharedPending(item.pending) })),
-      }
-    case 2:
-      return stored
-    default: {
-      const unreachable: never = stored
-      return unreachable
-    }
-  }
-}
+type EntryByIdProps = WithState<{ downloadId: string }>
 
-type EntryByIdProps = { downloadId: string }
+export const entryById = ({ state, downloadId }: EntryByIdProps): DownloadEntry | null =>
+  state.entries.find((entry) => entry.downloadId === downloadId) ?? null
 
-export const entryById = (
-  state: DownloadsState,
-  { downloadId }: EntryByIdProps,
-): DownloadEntry | null => state.entries.find((entry) => entry.downloadId === downloadId) ?? null
+type EntryByMediaProps = WithState<{ serverId: string; mediaId: number }>
 
-type EntryByMediaProps = { serverId: string; mediaId: number }
-
-export const entryByMedia = (
-  state: DownloadsState,
-  { serverId, mediaId }: EntryByMediaProps,
-): DownloadEntry | null =>
+export const entryByMedia = ({
+  state,
+  serverId,
+  mediaId,
+}: EntryByMediaProps): DownloadEntry | null =>
   state.entries.find((entry) => entry.serverId === serverId && entry.mediaId === mediaId) ?? null
 
 /** What is on disk: the whole size when ready, else what the status says it has. */
@@ -306,18 +286,18 @@ export const bytesOf = (entry: DownloadEntry): number => {
   }
 }
 
-type ChangeEntryProps = { downloadId: string; change: (entry: DownloadEntry) => DownloadEntry }
+type ChangeEntryProps = WithState<{
+  downloadId: string
+  change: (entry: DownloadEntry) => DownloadEntry
+}>
 
 /**
  * Applies `change` to one entry. An unknown id, or a `change` that hands the entry back,
  * returns `state` itself, so `JsonStore.update` sees no change and writes nothing.
  */
-const changeEntry = (
-  state: DownloadsState,
-  { downloadId, change }: ChangeEntryProps,
-): DownloadsState => {
-  const current = entryById(state, { downloadId })
-  if (!current) return state
+const changeEntry = ({ state, downloadId, change }: ChangeEntryProps): DownloadsState => {
+  const current = entryById({ state, downloadId })
+  if (current === null) return state
   const next = change(current)
   if (next === current) return state
   return {
@@ -326,16 +306,23 @@ const changeEntry = (
   }
 }
 
-type WithStatusProps = { status: EntryStatus }
+type ChangeEachProps = WithState<{
+  isTouched: (entry: DownloadEntry) => boolean
+  change: (entry: DownloadEntry) => DownloadEntry
+}>
 
-const withStatus = (entry: DownloadEntry, { status }: WithStatusProps): DownloadEntry => ({
-  ...entry,
-  status,
-})
+/** Applies `change` to every entry `isTouched` picks; the same state when it picks none. */
+const changeEach = ({ state, isTouched, change }: ChangeEachProps): DownloadsState => {
+  if (!state.entries.some(isTouched)) return state
+  return {
+    ...state,
+    entries: state.entries.map((entry) => (isTouched(entry) ? change(entry) : entry)),
+  }
+}
 
-type QueueProps = { entries: readonly DownloadEntry[] }
+type QueueProps = WithState<{ entries: readonly DownloadEntry[] }>
 
-export const queue = (state: DownloadsState, { entries }: QueueProps): DownloadsState => {
+export const queue = ({ state, entries }: QueueProps): DownloadsState => {
   const added = entries.reduce<DownloadEntry[]>((kept, entry) => {
     const isKnown = [...state.entries, ...kept].some(
       (known) => known.serverId === entry.serverId && known.mediaId === entry.mediaId,
@@ -346,148 +333,119 @@ export const queue = (state: DownloadsState, { entries }: QueueProps): Downloads
   return { ...state, entries: [...state.entries, ...added] }
 }
 
-type StartProps = { downloadId: string }
+type StartProps = WithState<{ downloadId: string }>
 
 /**
  * Only a queued file starts: a run begins for one, and a pause or a failure that came while it
  * read its ticket must stand.
  */
-export const start = (state: DownloadsState, { downloadId }: StartProps): DownloadsState =>
-  changeEntry(state, {
-    downloadId,
-    change: (entry) => {
-      switch (entry.status.kind) {
-        case DOWNLOAD_STATUS_KINDS.queued:
-          return withStatus(entry, {
-            status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 },
-          })
-        case DOWNLOAD_STATUS_KINDS.paused:
-        case DOWNLOAD_STATUS_KINDS.failed:
-        case DOWNLOAD_STATUS_KINDS.downloading:
-        case DOWNLOAD_STATUS_KINDS.ready:
-          return entry
-        default: {
-          const unreachable: never = entry.status
-          return unreachable
-        }
-      }
-    },
-  })
-
-type AdvanceProps = { downloadId: string; bytes: number }
-
-export const advance = (
-  state: DownloadsState,
-  { downloadId, bytes }: AdvanceProps,
-): DownloadsState =>
-  changeEntry(state, {
+export const start = ({ state, downloadId }: StartProps): DownloadsState =>
+  changeEntry({
+    state,
     downloadId,
     change: (entry) =>
-      entry.status.kind === DOWNLOAD_STATUS_KINDS.downloading && entry.status.bytes !== bytes
-        ? withStatus(entry, { status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes } })
+      entry.status.kind === DOWNLOAD_STATUS_KINDS.queued
+        ? { ...entry, status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes: 0 } }
         : entry,
   })
 
-const isPausable = (entry: DownloadEntry): boolean =>
-  entry.status.kind === DOWNLOAD_STATUS_KINDS.queued ||
-  entry.status.kind === DOWNLOAD_STATUS_KINDS.downloading
+type AdvanceProps = WithState<{ downloadId: string; bytes: number }>
 
-type PausedProps = { reason: PauseReason }
+export const advance = ({ state, downloadId, bytes }: AdvanceProps): DownloadsState =>
+  changeEntry({
+    state,
+    downloadId,
+    change: (entry) =>
+      entry.status.kind === DOWNLOAD_STATUS_KINDS.downloading && entry.status.bytes !== bytes
+        ? { ...entry, status: { kind: DOWNLOAD_STATUS_KINDS.downloading, bytes } }
+        : entry,
+  })
 
-const paused = (entry: DownloadEntry, { reason }: PausedProps): DownloadEntry =>
-  isPausable(entry)
-    ? withStatus(entry, {
-        status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: bytesOf(entry), reason },
-      })
-    : entry
+/** Whether a file waits to start or is fetching: what the queue still has to do. */
+export const isUnderWay = ({ status }: DownloadEntry): boolean =>
+  status.kind === DOWNLOAD_STATUS_KINDS.queued || status.kind === DOWNLOAD_STATUS_KINDS.downloading
 
-type PauseProps = { downloadId: string; reason: PauseReason }
+type PausedProps = { entry: DownloadEntry; reason: PauseReason }
 
-export const pause = (state: DownloadsState, { downloadId, reason }: PauseProps): DownloadsState =>
-  changeEntry(state, { downloadId, change: (entry) => paused(entry, { reason }) })
+const paused = ({ entry, reason }: PausedProps): DownloadEntry => ({
+  ...entry,
+  status: { kind: DOWNLOAD_STATUS_KINDS.paused, bytes: bytesOf(entry), reason },
+})
 
-type PauseServerProps = { serverId: string; reason: PauseReason }
+type PauseProps = WithState<{ downloadId: string; reason: PauseReason }>
 
-export const pauseServer = (
-  state: DownloadsState,
-  { serverId, reason }: PauseServerProps,
-): DownloadsState => {
-  const isTouched = (entry: DownloadEntry): boolean =>
-    entry.serverId === serverId && isPausable(entry)
-  if (!state.entries.some(isTouched)) return state
-  return {
-    ...state,
-    entries: state.entries.map((entry) => (isTouched(entry) ? paused(entry, { reason }) : entry)),
-  }
-}
+export const pause = ({ state, downloadId, reason }: PauseProps): DownloadsState =>
+  changeEntry({
+    state,
+    downloadId,
+    change: (entry) => (isUnderWay(entry) ? paused({ entry, reason }) : entry),
+  })
+
+type PauseUnderWayProps = WithState<{ reason: PauseReason }>
+
+/** Every file still under way waits paused for `reason`. */
+export const pauseUnderWay = ({ state, reason }: PauseUnderWayProps): DownloadsState =>
+  changeEach({ state, isTouched: isUnderWay, change: (entry) => paused({ entry, reason }) })
 
 /** Whether a file waits on an outage, which the queue tries again on its own. */
 export const isWaitingOnOutage = ({ status }: DownloadEntry): boolean =>
   (status.kind === DOWNLOAD_STATUS_KINDS.paused && status.reason === PAUSE_REASONS.unreachable) ||
   (status.kind === DOWNLOAD_STATUS_KINDS.failed && status.reason === FAIL_REASONS.unreachable)
 
-const isTouched = (entry: DownloadEntry): boolean => isPausable(entry) || isWaitingOnOutage(entry)
+/** Whether a file waits paused because its server locked its library again. */
+export const isRelocked = ({ status }: DownloadEntry): boolean =>
+  status.kind === DOWNLOAD_STATUS_KINDS.paused && status.reason === PAUSE_REASONS.relocked
 
 /**
  * The viewer's Pause all: what runs or waits pauses, and so does what waits on an outage, or
  * the outage retry would start it again. A relocked file keeps its reason, so it still unlocks.
  */
-export const pauseEverything = (state: DownloadsState): DownloadsState => {
-  if (!state.entries.some(isTouched)) return state
-  return {
-    ...state,
-    entries: state.entries.map((entry) =>
-      isTouched(entry)
-        ? withStatus(entry, {
-            status: {
-              kind: DOWNLOAD_STATUS_KINDS.paused,
-              bytes: bytesOf(entry),
-              reason: PAUSE_REASONS.viewer,
-            },
-          })
-        : entry,
-    ),
-  }
-}
+export const pauseEverything = (state: DownloadsState): DownloadsState =>
+  changeEach({
+    state,
+    isTouched: (entry) => isUnderWay(entry) || isWaitingOnOutage(entry),
+    change: (entry) => paused({ entry, reason: PAUSE_REASONS.viewer }),
+  })
 
-type ResumeProps = { downloadId: string }
+type ResumeProps = WithState<{ downloadId: string }>
 
-export const resume = (state: DownloadsState, { downloadId }: ResumeProps): DownloadsState =>
-  changeEntry(state, {
+export const resume = ({ state, downloadId }: ResumeProps): DownloadsState =>
+  changeEntry({
+    state,
     downloadId,
     change: (entry) =>
       entry.status.kind === DOWNLOAD_STATUS_KINDS.paused ||
       entry.status.kind === DOWNLOAD_STATUS_KINDS.failed
-        ? withStatus(entry, { status: { kind: DOWNLOAD_STATUS_KINDS.queued } })
+        ? { ...entry, status: { kind: DOWNLOAD_STATUS_KINDS.queued } }
         : entry,
   })
 
-type FailProps = { downloadId: string; reason: FailReason; message?: string }
+type FailProps = WithState<{ downloadId: string; failure: Failure }>
 
-/** `message` is the words of an `other` failure; every other reason says it all and keeps none. */
-export const fail = (
-  state: DownloadsState,
-  { downloadId, reason, message = '' }: FailProps,
-): DownloadsState =>
-  changeEntry(state, {
+/** A ready file stays ready: its video is in place whatever came after. */
+export const fail = ({ state, downloadId, failure }: FailProps): DownloadsState =>
+  changeEntry({
+    state,
     downloadId,
     change: (entry) =>
       entry.status.kind === DOWNLOAD_STATUS_KINDS.ready
         ? entry
-        : withStatus(entry, {
-            status: { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: bytesOf(entry), reason, message },
-          }),
+        : {
+            ...entry,
+            status: { ...failure, kind: DOWNLOAD_STATUS_KINDS.failed, bytes: bytesOf(entry) },
+          },
   })
 
-type FinishProps = { downloadId: string }
+type FinishProps = WithState<{ downloadId: string }>
 
-export const finish = (state: DownloadsState, { downloadId }: FinishProps): DownloadsState =>
-  changeEntry(state, {
+export const finish = ({ state, downloadId }: FinishProps): DownloadsState =>
+  changeEntry({
+    state,
     downloadId,
     change: (entry) =>
       entry.status.kind === DOWNLOAD_STATUS_KINDS.ready
         ? entry
-        : withStatus(entry, { status: { kind: DOWNLOAD_STATUS_KINDS.ready } }),
+        : { ...entry, status: { kind: DOWNLOAD_STATUS_KINDS.ready } },
   })
 
 type HasPendingProps = { pending: Pending }
@@ -499,8 +457,10 @@ export const hasPending = ({ pending }: HasPendingProps): boolean =>
 /** What one round of a sync sent: the play, if it went, and the positions it carried. */
 type Sent = { sentPlay: boolean; sentPosition: number | null; sentFurthest: number | null }
 
+type ClearedOfProps = Sent & { pending: Pending }
+
 /** `pending` less what a sync sent; the same object when the send cleared nothing. */
-const clearedOf = (pending: Pending, { sentPlay, sentPosition, sentFurthest }: Sent): Pending => {
+const clearedOf = ({ pending, sentPlay, sentPosition, sentFurthest }: ClearedOfProps): Pending => {
   const position = pending.position === sentPosition ? null : pending.position
   const furthest = pending.furthest === sentFurthest ? null : pending.furthest
   const play = sentPlay ? false : pending.play
@@ -518,11 +478,15 @@ const isOwedAs =
   (item: Owed): boolean =>
     item.serverId === serverId && item.mediaId === mediaId && item.pending.accountId === accountId
 
-export const owedOf = (state: DownloadsState, key: OwedKey): Owed | null =>
+type OwedOfProps = WithState<OwedKey>
+
+export const owedOf = ({ state, ...key }: OwedOfProps): Owed | null =>
   state.owed.find(isOwedAs(key)) ?? null
 
+type FurthestOfProps = { a: number | null; b: number | null }
+
 /** The higher of two positions, either of which may be none. */
-const furthestOf = (a: number | null, b: number | null): number | null =>
+const furthestOf = ({ a, b }: FurthestOfProps): number | null =>
   a === null ? b : Math.max(a, b ?? a)
 
 type MergePendingProps = { a: Pending; b: Pending }
@@ -535,7 +499,7 @@ type MergePendingProps = { a: Pending; b: Pending }
 const mergePending = ({ a, b }: MergePendingProps): Pending => {
   const [older, newer] = a.at <= b.at ? [a, b] : [b, a]
   const position = newer.position ?? older.position
-  const furthest = furthestOf(a.furthest, b.furthest)
+  const furthest = furthestOf({ a: a.furthest, b: b.furthest })
   return {
     play: a.play || b.play,
     position,
@@ -545,31 +509,44 @@ const mergePending = ({ a, b }: MergePendingProps): Pending => {
   }
 }
 
-type OweProps = { entries: readonly DownloadEntry[] }
+type OweInProps = { owed: readonly Owed[]; item: Owed }
+
+/** `owed` with `item` folded in: merged into the item of its title and account, else added. */
+const oweIn = ({ owed, item }: OweInProps): Owed[] => {
+  const { serverId, mediaId, pending } = item
+  const known = owed.find(isOwedAs({ serverId, mediaId, accountId: pending.accountId }))
+  if (known === undefined) return [...owed, item]
+  const merged = { ...known, pending: mergePending({ a: known.pending, b: pending }) }
+  return owed.map((each) => (each === known ? merged : each))
+}
+
+type OweProps = WithState<{ entries: readonly DownloadEntry[] }>
 
 /**
  * `owed` with what these entries still owe their servers folded in, one item per title and
  * account: what one account watched never folds into another's.
  */
-const owe = (state: DownloadsState, { entries }: OweProps): Owed[] =>
-  entries.filter(hasPending).reduce<Owed[]>((owed, { serverId, mediaId, pending }) => {
-    const known = owed.find(isOwedAs({ serverId, mediaId, accountId: pending.accountId }))
-    if (known === undefined) return [...owed, { serverId, mediaId, pending }]
-    const merged = { ...known, pending: mergePending({ a: known.pending, b: pending }) }
-    return owed.map((item) => (item === known ? merged : item))
-  }, state.owed)
+const owe = ({ state, entries }: OweProps): Owed[] =>
+  entries
+    .filter(hasPending)
+    .reduce<Owed[]>(
+      (owed, { serverId, mediaId, pending }) =>
+        oweIn({ owed, item: { serverId, mediaId, pending } }),
+      state.owed,
+    )
 
-type OweOtherAccountsProps = { serverId: string; accountId: string | null }
+type OweOtherAccountsProps = WithState<{ serverId: string; accountId: string | null }>
 
 /**
  * The account signed in to a server changed: what its downloads hold pending for any other
  * account moves to `owed` under that account, where it waits until that account signs in to the
  * server again. What was noted for no account stays, for whoever is signed in.
  */
-export const oweOtherAccounts = (
-  state: DownloadsState,
-  { serverId, accountId }: OweOtherAccountsProps,
-): DownloadsState => {
+export const oweOtherAccounts = ({
+  state,
+  serverId,
+  accountId,
+}: OweOtherAccountsProps): DownloadsState => {
   const isOwing = (entry: DownloadEntry): boolean =>
     entry.serverId === serverId &&
     hasPending(entry) &&
@@ -582,20 +559,20 @@ export const oweOtherAccounts = (
     entries: state.entries.map((entry) =>
       isOwing(entry) ? { ...entry, pending: NO_PENDING } : entry,
     ),
-    owed: owe(state, { entries: owing }),
+    owed: owe({ state, entries: owing }),
   }
 }
 
-type RemoveProps = { downloadId: string }
+type RemoveProps = WithState<{ downloadId: string }>
 
 /** Drops one entry; what the server has not heard of it moves to `owed` in the same change. */
-export const remove = (state: DownloadsState, { downloadId }: RemoveProps): DownloadsState => {
-  const removed = entryById(state, { downloadId })
+export const remove = ({ state, downloadId }: RemoveProps): DownloadsState => {
+  const removed = entryById({ state, downloadId })
   if (removed === null) return state
   return {
     ...state,
     entries: state.entries.filter((entry) => entry !== removed),
-    owed: owe(state, { entries: [removed] }),
+    owed: owe({ state, entries: [removed] }),
   }
 }
 
@@ -603,19 +580,18 @@ export const remove = (state: DownloadsState, { downloadId }: RemoveProps): Down
 export const removeAll = (state: DownloadsState): DownloadsState =>
   state.entries.length === 0
     ? state
-    : { ...state, entries: [], owed: owe(state, { entries: state.entries }) }
+    : { ...state, entries: [], owed: owe({ state, entries: state.entries }) }
 
 type IsSameListProps<T> = { left: readonly T[]; right: readonly T[] }
 
 const isSameList = <T>({ left, right }: IsSameListProps<T>): boolean =>
   left.length === right.length && left.every((item, index) => item === right[index])
 
-type KeepOneServerProps = {
-  state: DownloadsState
+type KeepOneServerProps = WithState<{
   serverId: string
   adopted: readonly string[]
   moved: ReadonlySet<string>
-}
+}>
 
 /**
  * Files every download under the one server Raven plays from. The downloads in `moved`,
@@ -649,31 +625,35 @@ export const keepOneServer = ({
         !moved.has(entry.downloadId),
     )
     .map((entry) => ({ ...entry, serverId }))
-  const carried = state.owed.reduce<Owed[]>((kept, item) => {
-    if (item.serverId !== serverId && !adopted.includes(item.serverId)) return kept
-    const filed = item.serverId === serverId ? item : { ...item, serverId }
-    const known = kept.find(
-      isOwedAs({ serverId, mediaId: filed.mediaId, accountId: filed.pending.accountId }),
+  const carried = state.owed
+    .filter((item) => item.serverId === serverId || adopted.includes(item.serverId))
+    .reduce<Owed[]>(
+      (kept, item) =>
+        oweIn({ owed: kept, item: item.serverId === serverId ? item : { ...item, serverId } }),
+      [],
     )
-    if (known === undefined) return [...kept, filed]
-    const merged = { ...known, pending: mergePending({ a: known.pending, b: filed.pending }) }
-    return kept.map((each) => (each === known ? merged : each))
-  }, [])
-  const owed = owe({ ...state, owed: carried }, { entries: unmoved })
+  const owed = owe({ state: { ...state, owed: carried }, entries: unmoved })
   return isSameList({ left: entries, right: state.entries }) &&
     isSameList({ left: owed, right: state.owed })
     ? state
     : { ...state, entries, owed }
 }
 
+type ClearOwedProps = WithState<OwedKey & Sent>
+
 /** What the server took is no longer owed; an item it took all of goes. */
-export const clearOwed = (
-  state: DownloadsState,
-  { serverId, mediaId, accountId, sentPlay, sentPosition, sentFurthest }: OwedKey & Sent,
-): DownloadsState => {
-  const current = owedOf(state, { serverId, mediaId, accountId })
+export const clearOwed = ({
+  state,
+  serverId,
+  mediaId,
+  accountId,
+  sentPlay,
+  sentPosition,
+  sentFurthest,
+}: ClearOwedProps): DownloadsState => {
+  const current = owedOf({ state, serverId, mediaId, accountId })
   if (current === null) return state
-  const pending = clearedOf(current.pending, { sentPlay, sentPosition, sentFurthest })
+  const pending = clearedOf({ pending: current.pending, sentPlay, sentPosition, sentFurthest })
   if (pending === current.pending) return state
   const owed = hasPending({ pending })
     ? state.owed.map((item) => (item === current ? { ...item, pending } : item))
@@ -681,22 +661,22 @@ export const clearOwed = (
   return { ...state, owed }
 }
 
+type DropOwedProps = WithState<OwedKey>
+
 /** The server will never take this owed item (a 403 or a 404), so it goes. */
-export const dropOwed = (state: DownloadsState, key: OwedKey): DownloadsState => {
-  const current = owedOf(state, key)
+export const dropOwed = ({ state, ...key }: DropOwedProps): DownloadsState => {
+  const current = owedOf({ state, ...key })
   return current === null
     ? state
     : { ...state, owed: state.owed.filter((item) => item !== current) }
 }
 
-type SetSidecarsProps = { downloadId: string; sidecars: readonly Sidecar[] }
+type SetSidecarsProps = WithState<{ downloadId: string; sidecars: readonly Sidecar[] }>
 
 /** The subtitles a finished download keeps beside its video. */
-export const setSidecars = (
-  state: DownloadsState,
-  { downloadId, sidecars }: SetSidecarsProps,
-): DownloadsState =>
-  changeEntry(state, {
+export const setSidecars = ({ state, downloadId, sidecars }: SetSidecarsProps): DownloadsState =>
+  changeEntry({
+    state,
     downloadId,
     change: (entry) =>
       entry.sidecars.length === 0 && sidecars.length === 0
@@ -704,12 +684,11 @@ export const setSidecars = (
         : { ...entry, sidecars: [...sidecars] },
   })
 
-type SetLibraryProps = {
-  state: DownloadsState
+type SetLibraryProps = WithState<{
   downloadId: string
   library: DownloadLibrary
   titleItemId: number | null
-}
+}>
 
 /** What the server said of an entry confirmed before its library and its title's item were kept. */
 export const setLibrary = ({
@@ -718,34 +697,36 @@ export const setLibrary = ({
   library,
   titleItemId,
 }: SetLibraryProps): DownloadsState =>
-  changeEntry(state, { downloadId, change: (entry) => ({ ...entry, library, titleItemId }) })
+  changeEntry({ state, downloadId, change: (entry) => ({ ...entry, library, titleItemId }) })
 
-type SetPicturesProps = {
-  state: DownloadsState
+type SetPicturesProps = WithState<{
   downloadIds: readonly string[]
   pictures: EntryPictures
-}
+}>
 
 /** The pictures saved for a title or an album, on each of its entries. */
 export const setPictures = ({ state, downloadIds, pictures }: SetPicturesProps): DownloadsState =>
   downloadIds.reduce(
     (changed, downloadId) =>
-      changeEntry(changed, { downloadId, change: (entry) => ({ ...entry, pictures }) }),
+      changeEntry({ state: changed, downloadId, change: (entry) => ({ ...entry, pictures }) }),
     state,
   )
 
-type SetAutoDeleteProps = { downloadId: string; autoDelete: boolean; at: number }
+type SetAutoDeleteProps = WithState<{ downloadId: string; autoDelete: boolean; at: number }>
 
 /**
  * Switching the option on for a title already watched moves an older `watchedAt` up to `at`:
  * from then on it says when the ten-minute clock counts from, so the switch never deletes at
  * once, not even at the next launch. Nothing else reads it as a time, only against null.
  */
-export const setAutoDelete = (
-  state: DownloadsState,
-  { downloadId, autoDelete, at }: SetAutoDeleteProps,
-): DownloadsState =>
-  changeEntry(state, {
+export const setAutoDelete = ({
+  state,
+  downloadId,
+  autoDelete,
+  at,
+}: SetAutoDeleteProps): DownloadsState =>
+  changeEntry({
+    state,
     downloadId,
     change: (entry) => {
       if (entry.autoDelete === autoDelete) return entry
@@ -755,27 +736,31 @@ export const setAutoDelete = (
     },
   })
 
-type SetAutoDeleteDefaultProps = { autoDelete: boolean }
+type SetAutoDeleteDefaultProps = WithState<{ autoDelete: boolean }>
 
-export const setAutoDeleteDefault = (
-  state: DownloadsState,
-  { autoDelete }: SetAutoDeleteDefaultProps,
-): DownloadsState =>
+export const setAutoDeleteDefault = ({
+  state,
+  autoDelete,
+}: SetAutoDeleteDefaultProps): DownloadsState =>
   state.autoDeleteDefault === autoDelete ? state : { ...state, autoDeleteDefault: autoDelete }
 
-type NoteWatchedProps = {
+type NoteWatchedProps = WithState<{
   downloadId: string
   position: number
   duration: number | null
   at: number
-}
+}>
 
 /** Marks the first time playback reaches the library's Watched at; a later report never moves it. */
-export const noteWatched = (
-  state: DownloadsState,
-  { downloadId, position, duration, at }: NoteWatchedProps,
-): DownloadsState =>
-  changeEntry(state, {
+export const noteWatched = ({
+  state,
+  downloadId,
+  position,
+  duration,
+  at,
+}: NoteWatchedProps): DownloadsState =>
+  changeEntry({
+    state,
     downloadId,
     change: (entry) => {
       const total = duration ?? entry.duration
@@ -784,71 +769,80 @@ export const noteWatched = (
     },
   })
 
-type ForgetServerPositionProps = { downloadId: string }
+type ForgetServerPositionProps = WithState<{ downloadId: string }>
 
 /** A position was noted here, so the server's resume spot no longer says where the file starts. */
-export const forgetServerPosition = (
-  state: DownloadsState,
-  { downloadId }: ForgetServerPositionProps,
-): DownloadsState =>
-  changeEntry(state, {
+export const forgetServerPosition = ({
+  state,
+  downloadId,
+}: ForgetServerPositionProps): DownloadsState =>
+  changeEntry({
+    state,
     downloadId,
     change: (entry) => (entry.serverPosition === 0 ? entry : { ...entry, serverPosition: 0 }),
   })
 
-type NotePendingProps = {
+type NotePendingProps = WithState<{
   downloadId: string
   play: boolean
   position: number
   at: number
   accountId: string | null
-}
+}>
 
 /**
  * `play` is sticky: a position report must not erase a play the server has not heard. `furthest`
  * only rises until a send clears it. What the entry held for another account moves to `owed`
  * first, so one account's report never folds into another's.
  */
-export const notePending = (
-  state: DownloadsState,
-  { downloadId, play, position, at, accountId }: NotePendingProps,
-): DownloadsState => {
-  const current = entryById(state, { downloadId })
+export const notePending = ({
+  state,
+  downloadId,
+  play,
+  position,
+  at,
+  accountId,
+}: NotePendingProps): DownloadsState => {
+  const current = entryById({ state, downloadId })
   if (current === null) return state
   const isOtherAccount = hasPending(current) && current.pending.accountId !== accountId
-  const owed = isOtherAccount ? owe(state, { entries: [current] }) : state.owed
+  const owed = isOtherAccount ? owe({ state, entries: [current] }) : state.owed
   const before = isOtherAccount ? NO_PENDING : current.pending
-  return changeEntry(
-    { ...state, owed },
-    {
-      downloadId,
-      change: (entry) => ({
-        ...entry,
-        pending: {
-          play: before.play || play,
-          position,
-          furthest: Math.max(before.furthest ?? position, position),
-          at,
-          accountId,
-        },
-      }),
-    },
-  )
+  return changeEntry({
+    state: { ...state, owed },
+    downloadId,
+    change: (entry) => ({
+      ...entry,
+      pending: {
+        play: before.play || play,
+        position,
+        furthest: Math.max(before.furthest ?? position, position),
+        at,
+        accountId,
+      },
+    }),
+  })
 }
+
+type ClearPendingProps = WithState<Sent & { downloadId: string }>
 
 /**
  * Clears what a sync sent. A position saved during the call differs from `sentPosition` and
  * stays, as a furthest raised during it differs from `sentFurthest`; a play is cleared only when
  * `sentPlay`, so one flagged by an open during a call that did not carry it stays too.
  */
-export const clearPending = (
-  state: DownloadsState,
-  { downloadId, sentPlay, sentPosition, sentFurthest }: { downloadId: string } & Sent,
-): DownloadsState =>
-  changeEntry(state, {
+export const clearPending = ({
+  state,
+  downloadId,
+  sentPlay,
+  sentPosition,
+  sentFurthest,
+}: ClearPendingProps): DownloadsState =>
+  changeEntry({
+    state,
     downloadId,
     change: (entry) => {
-      const pending = clearedOf(entry.pending, { sentPlay, sentPosition, sentFurthest })
+      const pending = clearedOf({ pending: entry.pending, sentPlay, sentPosition, sentFurthest })
       return pending === entry.pending ? entry : { ...entry, pending }
     },
   })

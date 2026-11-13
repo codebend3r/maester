@@ -14,7 +14,6 @@ import { createServerTitles } from '@/main/servers/serverTitles'
 const SERVER: ServerEntry = {
   id: '00000000-0000-4000-8000-000000000001',
   origin: 'https://raven.example',
-  name: 'raven',
 }
 const FILE_ID = '20000000-0000-4000-8000-000000000001'
 const TICKET: TicketOutcome = { kind: TICKET_OUTCOMES.ticket, ticket: 'account.t1' }
@@ -25,10 +24,10 @@ type SetupProps = {
 }
 
 const setup = ({ download = null, ticket = TICKET }: SetupProps = {}) => {
-  const opened: { serverId: string; mediaId: number }[] = []
-  const minted: { serverId: string; mediaId: number; isFresh: boolean }[] = []
+  const opened: { mediaId: number }[] = []
+  const minted: { mediaId: number; isFresh: boolean }[] = []
   const titles = createServerTitles({
-    server: () => SERVER,
+    serverId: SERVER.id,
     downloads: {
       openTitle: async (input) => {
         opened.push(input)
@@ -56,7 +55,7 @@ describe('play', () => {
       next: [8],
     })
     expect(isDesktopReply(reply)).toBe(true)
-    expect(opened).toEqual([{ serverId: SERVER.id, mediaId: 7 }])
+    expect(opened).toEqual([{ mediaId: 7 }])
     expect(minted).toEqual([])
   })
 
@@ -68,7 +67,7 @@ describe('play', () => {
       resumeAt: 0,
       next: [],
     })
-    expect(minted).toEqual([{ serverId: SERVER.id, mediaId: 7, isFresh: false }])
+    expect(minted).toEqual([{ mediaId: 7, isFresh: false }])
   })
 
   it.each([
@@ -76,44 +75,33 @@ describe('play', () => {
       'signed out',
       { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.signedOut },
       TITLE_REFUSALS.signedOut,
-      SOURCE_MESSAGES.signIn('raven'),
+      SOURCE_MESSAGES.signIn,
     ],
     [
       'waiting for approval',
       { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.pending },
       TITLE_REFUSALS.denied,
-      SOURCE_MESSAGES.pending('raven'),
+      SOURCE_MESSAGES.pending,
     ],
     [
       'removed',
       { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.revoked },
       TITLE_REFUSALS.denied,
-      SOURCE_MESSAGES.removed('raven'),
+      SOURCE_MESSAGES.removed,
     ],
     [
       'not the owner',
       { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.notOwner },
       TITLE_REFUSALS.denied,
-      SOURCE_MESSAGES.removed('raven'),
+      SOURCE_MESSAGES.removed,
     ],
-    [
-      'with accounts down',
-      { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.unavailable },
-      TITLE_REFUSALS.unreachable,
-      SOURCE_MESSAGES.lost('raven'),
-    ],
-    [
-      'locked',
-      { kind: TICKET_OUTCOMES.locked },
-      TITLE_REFUSALS.locked,
-      SOURCE_MESSAGES.relocked('raven'),
-    ],
-    ['gone', { kind: TICKET_OUTCOMES.gone }, TITLE_REFUSALS.gone, SOURCE_MESSAGES.gone('raven')],
+    ['locked', { kind: TICKET_OUTCOMES.locked }, TITLE_REFUSALS.locked, SOURCE_MESSAGES.relocked],
+    ['gone', { kind: TICKET_OUTCOMES.gone }, TITLE_REFUSALS.gone, SOURCE_MESSAGES.gone],
     [
       'out of reach',
       { kind: TICKET_OUTCOMES.unreachable },
       TITLE_REFUSALS.unreachable,
-      SOURCE_MESSAGES.lost('raven'),
+      SOURCE_MESSAGES.lost,
     ],
   ] as const)(
     'refuses a title %s with a reason the page acts on',

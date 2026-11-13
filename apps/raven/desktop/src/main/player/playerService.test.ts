@@ -8,19 +8,9 @@ import {
   PLAYER_SOURCE_KINDS,
   PLAYER_ERROR_REASONS,
 } from '@raven/core'
-import {
-  MPV_COMMANDS,
-  MPV_END_FILE_REASONS,
-  MPV_EVENTS,
-  type MpvEvent,
-  type MpvProperty,
-  type MpvPropertyValue,
-  type MpvReply,
-  type MpvTrack,
-  propertyGuards,
-} from '@raven/mpv'
+import { MPV_COMMANDS, MPV_END_FILE_REASONS, MPV_EVENTS, type MpvTrack } from '@raven/mpv'
 import { engineOptionsFor, HARDENED_OPTIONS } from '@/main/player/engine'
-import { guardedMpv, type MpvControl, PER_FILE_OPTIONS } from '@/main/player/guardedMpv'
+import { guardedMpv, PER_FILE_OPTIONS } from '@/main/player/guardedMpv'
 import {
   type AccountRefusalReader,
   type FailureExplainer,
@@ -31,17 +21,18 @@ import {
 } from '@/main/player/loadTarget'
 import { PLAYER_PHASES } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
+import { BUFFERED_MS } from '@/main/player/bufferedRanges'
 import {
-  BUFFERED_MS,
   createPlayerService,
   OBSERVED,
   type PlayerActivity,
   type PlayerService,
   SERVER_STALL_MS,
-  TIME_MS,
 } from '@/main/player/playerService'
+import { TIME_MS } from '@/main/player/timeReader'
 import { SIDECAR_BUDGET_MS } from '@/main/player/sidecars'
-import type { Timers } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
+import { createFakeMpv, fakeTimers } from '@/main/test/playerFakes'
 
 const mpvTrack = (fields: Pick<MpvTrack, 'id' | 'type'> & Partial<MpvTrack>): MpvTrack => ({
   selected: undefined,
@@ -87,7 +78,6 @@ const SIDECAR_URLS = [
 
 const SERVER_TARGET: ServerTarget = {
   kind: 'server',
-  serverId: SERVER_ID,
   mediaId: 7,
   url: SERVER_URL,
   sidecars: [
@@ -99,7 +89,6 @@ const SERVER_TARGET: ServerTarget = {
 
 const OTHER_TARGET: ServerTarget = {
   kind: 'server',
-  serverId: OTHER_SERVER_ID,
   mediaId: 9,
   url: 'https://other.example/api/media/9/file',
   sidecars: [],
@@ -111,7 +100,6 @@ const RELAY_BASE = `http://127.0.0.1:41234/${RELAY_SECRET}`
 
 const RELAYED_TARGET: ServerTarget = {
   kind: PLAYER_SOURCE_KINDS.server,
-  serverId: RELAYED_SERVER_ID,
   mediaId: 5,
   url: `${RELAY_BASE}/file`,
   sidecars: [{ url: `${RELAY_BASE}/subtitles/external-0`, title: '', language: '' }],
@@ -215,175 +203,17 @@ const PASSTHROUGH: OutputSettings = { ...PCM, profile: 'passthrough', passthroug
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-const isValueOf =
-  <K extends MpvProperty>(name: K) =>
-  (value: unknown): value is MpvPropertyValue<K> =>
-    propertyGuards[name](value)
+/** The values a fresh video reads as, before a test changes one. */
+const VIDEO_VALUES = new Map<string, unknown>([
+  ['track-list', LIST],
+  ['container-fps', 23.976],
+  ['pause', false],
+  ['duration', 120],
+  ['speed', 1],
+  ['time-pos', null],
+])
 
-type Held = {
-  entry: string
-  resolve: () => void
-  reject: (error: Error) => void
-  onReply: (reply: MpvReply) => void
-}
-
-const ignoreReply = () => {}
-
-/**
- * A scripted mpv: every call answers asynchronously, can be held until released,
- * failed by prefix, or rejected the way the wrapper rejects on destroy and shutdown.
- */
-const createFakeMpv = () => {
-  const log: string[] = []
-  const reads: string[] = []
-  // Every command's arguments as sent, and every call in the order it was made, reads too.
-  const commands: (readonly string[])[] = []
-  const timeline: string[] = []
-  const observed: string[] = []
-  const values = new Map<string, unknown>([
-    ['track-list', LIST],
-    ['container-fps', 23.976],
-    ['pause', false],
-    ['duration', 120],
-    ['speed', 1],
-    ['time-pos', null],
-  ])
-  const held: Held[] = []
-  const failing = new Set<string>()
-  const flags: { holding: string | null; isDestroyed: boolean } = {
-    holding: null,
-    isDestroyed: false,
-  }
-  const sink: { receive: (event: MpvEvent) => void } = { receive: () => {} }
-
-  // Like the wrapper: `onReply` runs as the reply arrives, told whether mpv accepted it.
-  const answer = ({ entry, resolve, reject, onReply }: Held) => {
-    const isFailing = [...failing].some((prefix) => entry.startsWith(prefix))
-    onReply({ isOk: !isFailing })
-    if (isFailing) {
-      reject(new Error('mpv request failed (-12)'))
-      return
-    }
-    resolve()
-  }
-  type ReplyProps = {
-    entry: string
-    onReply?: (reply: MpvReply) => void
-  }
-
-  const reply = ({ entry, onReply = ignoreReply }: ReplyProps) =>
-    new Promise<void>((resolve, reject) => {
-      if (flags.isDestroyed) {
-        reject(new Error('mpv is destroyed'))
-        return
-      }
-      if (flags.holding !== null && entry.startsWith(flags.holding)) {
-        held.push({ entry, resolve, reject, onReply })
-        return
-      }
-      answer({ entry, resolve, reject, onReply })
-    })
-  const rejectHeld = (message: string) => {
-    held.splice(0).forEach((request) => request.reject(new Error(message)))
-  }
-
-  type ControlReadProps<K extends MpvProperty> = { name: K }
-
-  const control: MpvControl = {
-    command: async ({ args, onReply }) => {
-      const entry = args.join(' ')
-      log.push(entry)
-      commands.push(args)
-      timeline.push(entry)
-      await reply({ entry, onReply })
-    },
-    set: async ({ name, value }) => {
-      const entry = `set ${name} ${String(value)}`
-      log.push(entry)
-      timeline.push(entry)
-      await reply({ entry })
-    },
-    read: async <K extends MpvProperty>({ name }: ControlReadProps<K>) => {
-      reads.push(name)
-      timeline.push(`read ${name}`)
-      await reply({ entry: `read ${name}` })
-      const value = values.get(name)
-      if (!isValueOf(name)(value)) throw new Error('mpv request failed (-10)')
-      return value
-    },
-    observe: ({ name }) => {
-      observed.push(name)
-    },
-  }
-
-  return {
-    control,
-    log,
-    reads,
-    commands,
-    timeline,
-    observed,
-    values,
-    connect: (receive: (event: MpvEvent) => void) => {
-      sink.receive = receive
-    },
-    /** Holds the replies to calls starting with `prefix`, or to every call. */
-    hold: (prefix = '') => {
-      flags.holding = prefix
-    },
-    release: () => {
-      flags.holding = null
-      held.splice(0).forEach(answer)
-    },
-    /** Answers only what is held for calls starting with `prefix`, and goes on holding. */
-    releaseOnly: (prefix: string) => {
-      const due = held.filter(({ entry }) => entry.startsWith(prefix))
-      const kept = held.filter(({ entry }) => !entry.startsWith(prefix))
-      held.splice(0, held.length, ...kept)
-      due.forEach(answer)
-    },
-    /** Answers what is held newest first, as no ordered stream would. */
-    releaseNewestFirst: () => {
-      flags.holding = null
-      held.splice(0).toReversed().forEach(answer)
-    },
-    failOn: (prefix: string) => {
-      failing.add(prefix)
-    },
-    /** The wrapper's destroy rejects what is in flight and then hears nothing more. */
-    destroy: () => {
-      flags.isDestroyed = true
-      rejectHeld('mpv is destroyed')
-    },
-    /** The wrapper's shutdown rejects what is in flight, then passes the event on. */
-    shutdown: () => {
-      rejectHeld('mpv shutdown')
-      sink.receive({ type: 'shutdown' })
-    },
-  }
-}
-
-const createFakeTimers = () => {
-  const pending = new Map<number, { run: () => void; ms: number }>()
-  const counter = { next: 1 }
-  const timers: Timers = {
-    set: ({ run, ms }) => {
-      const handle = counter.next
-      counter.next += 1
-      pending.set(handle, { run, ms })
-      return handle
-    },
-    clear: (handle) => {
-      if (typeof handle === 'number') pending.delete(handle)
-    },
-  }
-  const fire = () => {
-    const due = [...pending.values()]
-    pending.clear()
-    due.forEach((timer) => timer.run())
-  }
-  return { timers, fire, pending }
-}
+const videoMpv = () => createFakeMpv({ values: VIDEO_VALUES })
 
 /** Timers on a clock that moves only by `advance`, which runs what fell due in the order set. */
 const createTimedTimers = () => {
@@ -426,8 +256,8 @@ type SetupProps = {
 }
 
 const setup = ({ timers, sidecarsOf = () => [], refusedAccount = () => null }: SetupProps = {}) => {
-  const mpv = createFakeMpv()
-  const clock = createFakeTimers()
+  const mpv = videoMpv()
+  const clock = fakeTimers()
   const servers = fakeServers()
   const explainer = fakeExplain()
   const events: PlayerEvent[] = []
@@ -498,7 +328,7 @@ const setup = ({ timers, sidecarsOf = () => [], refusedAccount = () => null }: S
 
 describe('hardening', () => {
   test('creation sets the hardened options before anything else', () => {
-    const mpv = createFakeMpv()
+    const mpv = videoMpv()
     createPlayerService({
       mpv: mpv.control,
       resolveSource: resolveSourceWith({
@@ -510,7 +340,7 @@ describe('hardening', () => {
       refusedAccount: () => null,
       canChooseAo: false,
       platform: DESKTOP_PLATFORMS.mac,
-      timers: createFakeTimers().timers,
+      timers: fakeTimers().timers,
       onActivity: () => {},
       onFirstFrame: () => {},
       warn: () => {},
@@ -519,7 +349,7 @@ describe('hardening', () => {
   })
 
   test('a load is refused, and mpv untouched, when the hardening could not be set', async () => {
-    const mpv = createFakeMpv()
+    const mpv = videoMpv()
     mpv.failOn('set access-references')
     const warnings: string[] = []
     const service = createPlayerService({
@@ -533,7 +363,7 @@ describe('hardening', () => {
       refusedAccount: () => null,
       canChooseAo: false,
       platform: DESKTOP_PLATFORMS.mac,
-      timers: createFakeTimers().timers,
+      timers: fakeTimers().timers,
       onActivity: () => {},
       onFirstFrame: () => {},
       warn: (message) => {
@@ -1533,7 +1363,7 @@ describe('createPlayerService', () => {
     })
 
     test('callbacks that throw never break the events after them', async () => {
-      const mpv = createFakeMpv()
+      const mpv = videoMpv()
       const events: PlayerEvent[] = []
       const service = createPlayerService({
         mpv: mpv.control,
@@ -1546,7 +1376,7 @@ describe('createPlayerService', () => {
         refusedAccount: () => null,
         canChooseAo: false,
         platform: DESKTOP_PLATFORMS.mac,
-        timers: createFakeTimers().timers,
+        timers: fakeTimers().timers,
         onActivity: () => {
           throw new Error('activity')
         },
@@ -2380,7 +2210,7 @@ describe('createPlayerService', () => {
     })
 
     test('the guard refuses a per-file option by any name or command, and passes the rest', async () => {
-      const mpv = createFakeMpv()
+      const mpv = videoMpv()
       const guarded = guardedMpv(mpv.control)
       const names = PER_FILE_OPTIONS.flatMap((name) => [
         name,
@@ -2392,6 +2222,7 @@ describe('createPlayerService', () => {
       ])
       await Promise.all(
         names.map((name) =>
+          // @ts-expect-error A per-file option is no settable name; the guard still refuses one at run time.
           expect(guarded.set({ name, value: 'Cookie: raven_unlock=a.b' })).rejects.toThrow(
             'is set per file, never globally',
           ),
@@ -2426,7 +2257,7 @@ describe('createPlayerService', () => {
     })
 
     test('the guard reads every argument of a command but loadfile', async () => {
-      const mpv = createFakeMpv()
+      const mpv = videoMpv()
       const guarded = guardedMpv(mpv.control)
       await Promise.all(
         PER_FILE_OPTIONS.flatMap((name) => [

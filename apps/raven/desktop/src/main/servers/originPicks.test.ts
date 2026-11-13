@@ -5,7 +5,7 @@ import {
   PICK_FRESH_MS,
 } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
-import type { ServerEntry } from '@/main/desktopConfig'
+import { SERVER_NAME, type ServerEntry } from '@/main/desktopConfig'
 import { CALL_NAMES } from '@/main/servers/allowlist'
 import { createOriginPicks } from '@/main/servers/originPicks'
 import { pingNetwork, type PingAnswer } from '@/main/test/pingNetwork'
@@ -14,7 +14,6 @@ import { fakeCalls, keyOf, ok, type Reply } from '@/main/test/serverFakes'
 const SERVER: ServerEntry = {
   id: '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11',
   origin: 'https://raven.example',
-  name: 'Vhagar',
 }
 
 const MB = 1_000_000
@@ -39,6 +38,7 @@ const run = ({ replies, answers }: RunProps) => {
   const warnings: string[] = []
   const clock = { now: 0 }
   const picks = createOriginPicks({
+    server: SERVER,
     calls,
     probe: network.probe,
     probeClock: network.clock,
@@ -60,7 +60,7 @@ type PickedFromProps = {
 }
 
 const pickedFrom = ({ origins, answers }: PickedFromProps): Promise<string> =>
-  run({ replies: withOrigins(origins), answers }).picks.originOf(SERVER)
+  run({ replies: withOrigins(origins), answers }).picks.originOf()
 
 describe('the pick', () => {
   it('takes a public origin over a lan one far slower than it', async () => {
@@ -148,8 +148,8 @@ describe('the pick', () => {
 describe('createOriginPicks', () => {
   it("uses the server's own origin, without probing, when no origin is listed, and holds that", async () => {
     const { picks, log, asked } = run({ replies: withOrigins([]), answers: {} })
-    expect(await picks.originOf(SERVER)).toBe(SERVER.origin)
-    expect(await picks.originOf(SERVER)).toBe(SERVER.origin)
+    expect(await picks.originOf()).toBe(SERVER.origin)
+    expect(await picks.originOf()).toBe(SERVER.origin)
     expect(asked).toEqual([])
     expect(log).toEqual([originsCall])
   })
@@ -159,7 +159,7 @@ describe('createOriginPicks', () => {
       replies: withOrigins([PUBLIC, LAN]),
       answers: { [PUBLIC.url]: { firstByteMs: 10 }, [LAN.url]: { firstByteMs: 12 } },
     })
-    expect(await picks.originOf(SERVER)).toBe(LAN.url)
+    expect(await picks.originOf()).toBe(LAN.url)
     expect(asked).toEqual([
       { url: pingOf(PUBLIC), timeoutMs: MEDIA_PROBE_TIMEOUT_MS, at: 0 },
       { url: pingOf(LAN), timeoutMs: MEDIA_PROBE_TIMEOUT_MS, at: 0 },
@@ -168,8 +168,8 @@ describe('createOriginPicks', () => {
 
   it('reads the origins once for asks that come together, and probes once', async () => {
     const { picks, log, asked } = run({ replies: withOrigins([LAN]), answers: { [LAN.url]: {} } })
-    await Promise.all([picks.originOf(SERVER), picks.originOf(SERVER)])
-    await picks.originOf(SERVER)
+    await Promise.all([picks.originOf(), picks.originOf()])
+    await picks.originOf()
     expect(log.filter((key) => key === originsCall)).toHaveLength(1)
     expect(asked).toHaveLength(1)
   })
@@ -177,11 +177,11 @@ describe('createOriginPicks', () => {
   it('holds the pick until forget, then reads the origins and probes them again', async () => {
     const answers: Record<string, PingAnswer> = { [LAN.url]: {}, [AWAY.url]: {} }
     const { picks, log, asked } = run({ replies: withOrigins([LAN, AWAY]), answers })
-    expect(await picks.originOf(SERVER)).toBe(LAN.url)
+    expect(await picks.originOf()).toBe(LAN.url)
     answers[LAN.url] = { status: 503 }
-    expect(await picks.originOf(SERVER)).toBe(LAN.url)
-    picks.forget(SERVER.id)
-    expect(await picks.originOf(SERVER)).toBe(AWAY.url)
+    expect(await picks.originOf()).toBe(LAN.url)
+    picks.forget()
+    expect(await picks.originOf()).toBe(AWAY.url)
     expect(log.filter((key) => key === originsCall)).toHaveLength(2)
     expect(asked).toHaveLength(4)
   })
@@ -189,13 +189,13 @@ describe('createOriginPicks', () => {
   it('holds the pick for PICK_FRESH_MS, then probes again', async () => {
     const answers: Record<string, PingAnswer> = { [LAN.url]: {}, [PUBLIC.url]: {} }
     const { picks, asked, clock } = run({ replies: withOrigins([LAN, PUBLIC]), answers })
-    expect(await picks.originOf(SERVER)).toBe(LAN.url)
+    expect(await picks.originOf()).toBe(LAN.url)
     answers[LAN.url] = { status: 503 }
     clock.now = PICK_FRESH_MS - 1
-    expect(await picks.originOf(SERVER)).toBe(LAN.url)
+    expect(await picks.originOf()).toBe(LAN.url)
     expect(asked).toHaveLength(2)
     clock.now = PICK_FRESH_MS
-    expect(await picks.originOf(SERVER)).toBe(PUBLIC.url)
+    expect(await picks.originOf()).toBe(PUBLIC.url)
     expect(asked).toHaveLength(4)
   })
 
@@ -205,30 +205,19 @@ describe('createOriginPicks', () => {
       answers: { [LAN.url]: {} },
     })
     clock.now = 10_000
-    await picks.originOf(SERVER)
+    await picks.originOf()
     clock.now = 0
-    await picks.originOf(SERVER)
+    await picks.originOf()
     expect(asked).toHaveLength(2)
   })
 
   it("falls back to the server's own origin while a listed lan origin is unreachable, and takes it once it answers", async () => {
     const answers: Record<string, PingAnswer> = {}
     const { picks, log } = run({ replies: withOrigins([LAN]), answers })
-    expect(await picks.originOf(SERVER)).toBe(SERVER.origin)
+    expect(await picks.originOf()).toBe(SERVER.origin)
     answers[LAN.url] = {}
-    expect(await picks.originOf(SERVER)).toBe(LAN.url)
+    expect(await picks.originOf()).toBe(LAN.url)
     expect(log.filter((key) => key === originsCall)).toHaveLength(2)
-  })
-
-  it('lets go of the pick of one server alone', async () => {
-    const other: ServerEntry = { ...SERVER, id: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }
-    const { picks, log } = run({ replies: withOrigins([LAN]), answers: { [LAN.url]: {} } })
-    await picks.originOf(SERVER)
-    await picks.originOf(other)
-    picks.forget(other.id)
-    await picks.originOf(SERVER)
-    await picks.originOf(other)
-    expect(log.filter((key) => key === originsCall)).toHaveLength(3)
   })
 
   it('uses the server origin, naming no URL in the log, on a bad origins body', async () => {
@@ -238,10 +227,10 @@ describe('createOriginPicks', () => {
       },
       answers: {},
     })
-    expect(await picks.originOf(SERVER)).toBe(SERVER.origin)
+    expect(await picks.originOf()).toBe(SERVER.origin)
     expect(asked).toEqual([])
     expect(warnings).toHaveLength(1)
-    expect(warnings[0]).toContain('Vhagar')
+    expect(warnings[0]).toContain(SERVER_NAME)
     expect(warnings.join(' ')).not.toContain('secret.example')
   })
 
@@ -250,8 +239,8 @@ describe('createOriginPicks', () => {
       replies: { [originsCall]: { unreachable: 'http://10.0.0.1 refused' } },
       answers: {},
     })
-    expect(await picks.originOf(SERVER)).toBe(SERVER.origin)
-    expect(await picks.originOf(SERVER)).toBe(SERVER.origin)
+    expect(await picks.originOf()).toBe(SERVER.origin)
+    expect(await picks.originOf()).toBe(SERVER.origin)
     expect(warnings).toHaveLength(1)
     expect(warnings[0]).not.toContain('10.0.0.1')
   })
@@ -264,10 +253,10 @@ describe('createOriginPicks', () => {
       { kind: 'lan', url: 'http://user:pass@192.168.1.9:3000' },
     ]
     const { picks, warnings, asked } = run({ replies: withOrigins(hostile), answers: {} })
-    expect(await picks.originOf(SERVER)).toBe(SERVER.origin)
+    expect(await picks.originOf()).toBe(SERVER.origin)
     expect(asked).toEqual([])
     expect(warnings).toHaveLength(1)
-    expect(warnings[0]).toContain('Vhagar')
+    expect(warnings[0]).toContain(SERVER_NAME)
     expect(warnings[0]).toContain('lan, public, public, lan')
     expect(warnings.join(' ')).not.toMatch(/etc|relative|javascript|pass/u)
   })
@@ -277,7 +266,7 @@ describe('createOriginPicks', () => {
       replies: withOrigins([{ kind: 'lan', url: 'file:///etc/hosts?' }, LAN]),
       answers: { [LAN.url]: {} },
     })
-    expect(await picks.originOf(SERVER)).toBe(LAN.url)
+    expect(await picks.originOf()).toBe(LAN.url)
     expect(asked).toHaveLength(1)
   })
 
@@ -286,7 +275,7 @@ describe('createOriginPicks', () => {
       replies: withOrigins([{ kind: 'lan', url: `${LAN.url}/base/?x=1#h` }]),
       answers: { [LAN.url]: {} },
     })
-    expect(await picks.originOf(SERVER)).toBe(LAN.url)
+    expect(await picks.originOf()).toBe(LAN.url)
     expect(asked.map((entry) => entry.url)).toEqual([pingOf(LAN)])
   })
 
@@ -294,6 +283,7 @@ describe('createOriginPicks', () => {
     const network = pingNetwork({})
     const warnings: string[] = []
     const picks = createOriginPicks({
+      server: SERVER,
       calls: {
         call: async () => {
           throw new Error('boom http://10.0.0.1')
@@ -306,14 +296,15 @@ describe('createOriginPicks', () => {
         warnings.push(message)
       },
     })
-    expect(await picks.originOf(SERVER)).toBe(SERVER.origin)
-    expect(await picks.originOf(SERVER)).toBe(SERVER.origin)
+    expect(await picks.originOf()).toBe(SERVER.origin)
+    expect(await picks.originOf()).toBe(SERVER.origin)
     expect(warnings).toHaveLength(1)
     expect(warnings[0]).not.toContain('10.0.0.1')
   })
 
   it('a warn that throws never fails a pick', async () => {
     const picks = createOriginPicks({
+      server: SERVER,
       calls: fakeCalls({}).calls,
       probe: pingNetwork({}).probe,
       probeClock: () => 0,
@@ -322,7 +313,7 @@ describe('createOriginPicks', () => {
         throw new Error('the log is closed')
       },
     })
-    expect(await picks.originOf(SERVER)).toBe(SERVER.origin)
+    expect(await picks.originOf()).toBe(SERVER.origin)
   })
 })
 
@@ -334,8 +325,8 @@ describe('placeOf', () => {
       replies: { [originsCall]: ok({ origins: [AWAY], remote: REMOTE }) },
       answers: { [AWAY.url]: { firstByteMs: 5 } },
     })
-    expect(await picks.placeOf(SERVER)).toEqual({ url: AWAY.url, origin: AWAY, remote: REMOTE })
-    expect(await picks.originOf(SERVER)).toBe(AWAY.url)
+    expect(await picks.placeOf()).toEqual({ url: AWAY.url, origin: AWAY, remote: REMOTE })
+    expect(await picks.originOf()).toBe(AWAY.url)
     expect(log).toEqual([originsCall])
   })
 
@@ -344,7 +335,7 @@ describe('placeOf', () => {
       replies: { [originsCall]: ok({ origins: [], remote: REMOTE }) },
       answers: {},
     })
-    expect(await picks.placeOf(SERVER)).toEqual({
+    expect(await picks.placeOf()).toEqual({
       url: SERVER.origin,
       origin: null,
       remote: REMOTE,
@@ -353,9 +344,9 @@ describe('placeOf', () => {
 
   it('says nothing of remote play for an older server, or one whose list cannot be read', async () => {
     const older = run({ replies: withOrigins([]), answers: {} })
-    expect((await older.picks.placeOf(SERVER)).remote).toBeNull()
+    expect((await older.picks.placeOf()).remote).toBeNull()
     const unreadable = run({ replies: { [originsCall]: ok({ nope: true }) }, answers: {} })
-    expect(await unreadable.picks.placeOf(SERVER)).toEqual({
+    expect(await unreadable.picks.placeOf()).toEqual({
       url: SERVER.origin,
       origin: null,
       remote: null,

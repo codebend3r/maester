@@ -8,11 +8,20 @@ import {
   type DownloadStatus,
   type DownloadView,
 } from '@raven/core'
-import { type ConfigStore, serverById, serverOf, setLastAccount } from '@/main/desktopConfig'
+import {
+  type ConfigStore,
+  SERVER_NAME,
+  type ServerEntry,
+  setLastAccount,
+} from '@/main/desktopConfig'
 import { createDownloadAsks, type DownloadAsks } from '@/main/downloads/asks'
 import { factsBefore } from '@/main/downloads/artwork'
 import { createAutoDelete, isDueForDeletion } from '@/main/downloads/autoDelete'
-import { DOWNLOAD_MESSAGES, failedMessage, pausedMessage } from '@/main/downloads/downloadMessages'
+import {
+  DOWNLOAD_MESSAGES,
+  failedMessage,
+  PAUSED_MESSAGES,
+} from '@/main/downloads/downloadMessages'
 import {
   createDownloadQueue,
   type DownloadQueueDeps,
@@ -21,7 +30,8 @@ import {
 import {
   bytesOf,
   entryById,
-  PAUSE_REASONS,
+  isRelocked,
+  type DownloadEntry,
   oweOtherAccounts,
   setAutoDelete,
   setAutoDeleteDefault,
@@ -46,7 +56,7 @@ import { createSync, settleWithin } from '@/main/downloads/sync'
 import { errorText } from '@/main/log/errorText'
 import { DONE, refused } from '@/main/replies'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
-import type { Timers } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 
 /** The `downloads` event goes out at most once in this long, so progress cannot flood the page. */
 export const DOWNLOADS_EVENT_MS = 250
@@ -57,6 +67,8 @@ export const SYNC_DELETE_WAIT_MS = 2000
 export type DownloadServiceDeps = {
   store: DownloadsStore
   config: ConfigStore
+  /** The server Raven plays from, fixed for the run: the downloads filed under its id are its. */
+  server: ServerEntry
   calls: Pick<ServerCalls, 'call'>
   userData: string
   space: SpaceFs
@@ -82,10 +94,6 @@ export type DownloadServiceDeps = {
 type ById = { downloadId: string }
 
 type SetDefaultsProps = { autoDelete: boolean }
-
-type AccessEndedProps = { serverId: string }
-
-type AccountSwitchedProps = { serverId: string }
 
 export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' | 'decline'> &
   Pick<
@@ -132,14 +140,14 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     onSuspend: () => void
     /** Main's `powerMonitor` `resume`: files start again once the network has had a moment. */
     onResume: () => void
-    /** A server's sign-in ended in main: its downloads fetched with an account ticket fail. */
-    accessEnded: (input: AccessEndedProps) => void
+    /** The page's sign-in ended in main: the downloads fetched with an account ticket fail. */
+    accessEnded: () => void
     /**
-     * The account signed in to a server changed: what its downloads hold for any other account
+     * The account signed in changed: what the downloads hold for any other account
      * waits in `owed` for that account, and what the one signed in now is owed goes out. An
      * account signed in is kept in the config as the last one, which a play while none is waits for.
      */
-    accountSwitched: (input: AccountSwitchedProps) => void
+    accountSwitched: () => void
     /** Stops the events and every fetch; after it the page hears nothing more. */
     dispose: () => void
   }
@@ -147,13 +155,8 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
 /** The list as both the `downloads` reply and the `downloads` event carry it. */
 type DownloadsList = Extract<DesktopEvent, { type: typeof DESKTOP_EVENTS.downloads }>
 
-type ViewStatusOfProps = {
-  status: EntryStatus
-  serverName: string
-}
-
-/** A stored status as the page reads it: its reason in words, named by the server's name now. */
-export const viewStatusOf = ({ status, serverName }: ViewStatusOfProps): DownloadStatus => {
+/** A stored status as the page reads it: its reason in words. */
+const viewStatusOf = (status: EntryStatus): DownloadStatus => {
   switch (status.kind) {
     case DOWNLOAD_STATUS_KINDS.queued:
     case DOWNLOAD_STATUS_KINDS.downloading:
@@ -163,13 +166,13 @@ export const viewStatusOf = ({ status, serverName }: ViewStatusOfProps): Downloa
       return {
         kind: DOWNLOAD_STATUS_KINDS.paused,
         bytes: status.bytes,
-        message: pausedMessage({ reason: status.reason, serverName }),
+        message: PAUSED_MESSAGES[status.reason],
       }
     case DOWNLOAD_STATUS_KINDS.failed:
       return {
         kind: DOWNLOAD_STATUS_KINDS.failed,
         bytes: status.bytes,
-        message: failedMessage({ reason: status.reason, message: status.message, serverName }),
+        message: failedMessage(status),
       }
     default: {
       const unreachable: never = status
@@ -218,12 +221,15 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     warn: deps.warn,
   })
 
-  const serverNameOf = (serverId: string): string =>
-    serverById({ config: config.read(), serverId })?.name ?? ''
+  const { server } = deps
+
+  /** Whether a download is of the server Raven plays from, not one an older Raven kept besides. */
+  const isOwn = (entry: DownloadEntry): boolean => entry.serverId === server.id
 
   const views = (): DownloadView[] =>
     sortDownloads(store.read().entries).map((entry) => {
-      const serverName = serverNameOf(entry.serverId)
+      // A server an older Raven kept besides has no name: its folder would name a media id.
+      const serverName = isOwn(entry) ? SERVER_NAME : ''
       return {
         downloadId: entry.downloadId,
         serverId: entry.serverId,
@@ -231,13 +237,11 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
         group: entry.group,
         serverName,
         size: entry.size,
-        status: viewStatusOf({ status: entry.status, serverName }),
+        status: viewStatusOf(entry.status),
         shouldAutoDelete: entry.autoDelete,
         watched: playback.watchedOf(entry),
         deletesAt: deleteClock.deletesAt({ downloadId: entry.downloadId }),
-        isLocked:
-          entry.status.kind === DOWNLOAD_STATUS_KINDS.paused &&
-          entry.status.reason === PAUSE_REASONS.relocked,
+        isLocked: isRelocked(entry),
         artwork: entry.artwork ?? { kind: DOWNLOAD_ARTWORK_KINDS.none },
         pictures: {
           art: entry.pictures?.art?.id ?? null,
@@ -250,10 +254,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
          * The music engine plays the current server's downloads alone, so another server's
          * tracks have nothing to queue them by.
          */
-        track:
-          serverById({ config: config.read(), serverId: entry.serverId }) === null
-            ? null
-            : (entry.track ?? null),
+        track: isOwn(entry) ? (entry.track ?? null) : null,
       }
     })
 
@@ -292,6 +293,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     timers: deps.timers,
     warn: deps.warn,
     retryMs: deps.syncRetryMs,
+    serverId: server.id,
     accountIdOf: deps.accountIdOf,
   })
 
@@ -300,8 +302,8 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     store: { ...store, update: change },
     calls: deps.calls,
     fetch: deps.fetch,
-    serverOf: (serverId) => serverById({ config: config.read(), serverId }),
-    isSignedIn: ({ serverId }) => deps.accountIdOf({ serverId }) !== null,
+    server,
+    isSignedIn: () => deps.accountIdOf() !== null,
     fs: { ...deps.fs, writeBytes: deps.writeBytes },
     userData: deps.userData,
     timers: deps.timers,
@@ -326,7 +328,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     stat: deps.stat,
     now: deps.now,
     warn: deps.warn,
-    serverNameOf,
+    serverId: server.id,
     change,
     announce,
     /*
@@ -339,15 +341,13 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     },
     onLeft: () => deleteClock.playbackLeft(),
     accountIdOf: deps.accountIdOf,
-    lastAccountIdOf: ({ serverId }) =>
-      serverById({ config: config.read(), serverId }) === null ? null : config.read().lastAccountId,
+    lastAccountIdOf: () => config.read().lastAccountId,
   })
 
   const queue = createDownloadQueue({
     // The queue's changes go through `change` too, so its progress reaches the page.
     store: { ...store, update: change },
-    serverOf: (serverId) => serverById({ config: config.read(), serverId }),
-    servers: () => [serverOf(config.read())],
+    serverId: server.id,
     access: deps.access,
     fetch: deps.fetch,
     calls: deps.calls,
@@ -375,18 +375,14 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     onFailed: (entry) => {
       const { status } = entry
       if (status.kind !== DOWNLOAD_STATUS_KINDS.failed) return
-      const why = failedMessage({
-        reason: status.reason,
-        message: status.message,
-        serverName: serverNameOf(entry.serverId),
-      })
+      const why = failedMessage(status)
       notice(DOWNLOAD_MESSAGES.failed({ label: entry.label, why }))
     },
   })
 
   const asks = createDownloadAsks({
     store,
-    config,
+    serverId: server.id,
     calls: deps.calls,
     userData: deps.userData,
     space: deps.space,
@@ -396,7 +392,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     warn: deps.warn,
     change,
     list,
-    isSignedIn: ({ serverId }) => deps.accountIdOf({ serverId }) !== null,
+    isSignedIn: () => deps.accountIdOf() !== null,
   })
 
   // Only the page asking for the list sends what is pending; the list that events and replies carry does not.
@@ -413,7 +409,8 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     return reply
   }
 
-  const isKnown = (downloadId: string): boolean => entryById(store.read(), { downloadId }) !== null
+  const isKnown = (downloadId: string): boolean =>
+    entryById({ state: store.read(), downloadId }) !== null
 
   const pause: DownloadService['pause'] = async ({ downloadId }) => {
     if (!isKnown(downloadId)) return UNKNOWN_DOWNLOAD
@@ -453,7 +450,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   }
 
   const isKeptAfterAll = (downloadId: string): boolean =>
-    !isDueForDeletion({ entry: entryById(store.read(), { downloadId }), now: deps.now() }) ||
+    !isDueForDeletion({ entry: entryById({ state: store.read(), downloadId }), now: deps.now() }) ||
     playback.isPlaying(downloadId) ||
     playback.isMidTitle(downloadId)
 
@@ -467,7 +464,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   const setAutoDeleteOf: DownloadService['setAutoDelete'] = ({ downloadId, autoDelete }) => {
     if (!isKnown(downloadId)) return UNKNOWN_DOWNLOAD
     const at = deps.now()
-    change((state) => setAutoDelete(state, { downloadId, autoDelete, at }))
+    change((state) => setAutoDelete({ state, downloadId, autoDelete, at }))
     if (autoDelete) deleteClock.schedule({ downloadId })
     else deleteClock.cancel({ downloadId })
     return list()
@@ -499,7 +496,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   }
 
   const setDefaults: DownloadService['setDefaults'] = ({ autoDelete }) => {
-    change((state) => setAutoDeleteDefault(state, { autoDelete }))
+    change((state) => setAutoDeleteDefault({ state, autoDelete }))
     return list()
   }
 
@@ -510,22 +507,15 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     return DONE
   }
 
-  type KeepLastAccountProps = {
-    serverId: string
-    accountId: string | null
-  }
-
-  const keepLastAccount = ({ serverId, accountId }: KeepLastAccountProps): void => {
-    const current = config.read()
-    if (accountId === null || current.lastAccountId === accountId) return
-    if (serverById({ config: current, serverId }) === null) return
+  const keepLastAccount = (accountId: string | null): void => {
+    if (accountId === null || config.read().lastAccountId === accountId) return
     config.update((latest) => setLastAccount({ config: latest, accountId }))
   }
 
-  const accountSwitched: DownloadService['accountSwitched'] = ({ serverId }) => {
-    const accountId = deps.accountIdOf({ serverId })
-    keepLastAccount({ serverId, accountId })
-    change((state) => oweOtherAccounts(state, { serverId, accountId }))
+  const accountSwitched: DownloadService['accountSwitched'] = () => {
+    const accountId = deps.accountIdOf()
+    keepLastAccount(accountId)
+    change((state) => oweOtherAccounts({ state, serverId: server.id, accountId }))
     runSync(sync.runAll())
     keepPictures(pictures.fill())
   }

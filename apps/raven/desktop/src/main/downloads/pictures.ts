@@ -42,9 +42,8 @@ import { errorText } from '@/main/log/errorText'
 import { parseJson } from '@/main/parseJson'
 import { type AllowedCall, CALL_NAMES } from '@/main/servers/allowlist'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
-import type { Timers } from '@/main/stateStore'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
+import type { Timers } from '@/main/timers'
+import { HEADERS, HTTP_STATUSES, isSuccessStatus } from '@shared/http'
 
 /** The most of a picture kept; a larger one is skipped rather than read whole into memory. */
 export const PICTURE_MAX_BYTES = 16 * 1024 ** 2
@@ -72,17 +71,16 @@ export type PictureFs = {
   rm: (path: string) => Promise<void>
 }
 
-type IsSignedInProps = { serverId: string }
-
 export type DownloadPicturesDeps = {
   /** Its `update` is the service's `change`, so the page hears of each picture and library. */
   store: DownloadsStore
   calls: Pick<ServerCalls, 'call'>
   /** A bare fetch with no cookie: a picture's address names its version, which is its only key. */
   fetch: StreamFetch
-  serverOf: (serverId: string) => ServerEntry | null
-  /** Whether the page is signed in to the server, so main has an account to ask with. */
-  isSignedIn: (input: IsSignedInProps) => boolean
+  /** The server Raven plays from: the downloads filed under its id are the ones it is asked about. */
+  server: ServerEntry
+  /** Whether the page is signed in, so main has an account to ask with. */
+  isSignedIn: () => boolean
   fs: PictureFs
   userData: string
   timers: Timers
@@ -249,10 +247,10 @@ export const createDownloadPictures = (deps: DownloadPicturesDeps): DownloadPict
     return turns.last
   }
 
-  type AskProps<T> = { serverId: string; call: AllowedCall; guard: Guard<T> }
+  type AskProps<T> = { call: AllowedCall; guard: Guard<T> }
 
-  const ask = async <T>({ serverId, call, guard }: AskProps<T>): Promise<Answer<T>> => {
-    const result = await deps.calls.call({ serverId, call }).catch(() => null)
+  const ask = async <T>({ call, guard }: AskProps<T>): Promise<Answer<T>> => {
+    const result = await deps.calls.call({ call }).catch(() => null)
     if (result === null || !result.ok || stop.signal.aborted) {
       return { kind: ANSWER_KINDS.unreachable }
     }
@@ -271,9 +269,8 @@ export const createDownloadPictures = (deps: DownloadPicturesDeps): DownloadPict
 
   /** Files an entry from before under its library and its title; false when the server is out of reach. */
   const fileLibrary = async ({ entry, libraries }: FileLibraryProps): Promise<boolean> => {
-    const { serverId, downloadId, mediaId } = entry
+    const { downloadId, mediaId } = entry
     const media = await ask({
-      serverId,
       call: { name: CALL_NAMES.getMedia, mediaId },
       guard: isMediaItem,
     })
@@ -281,7 +278,7 @@ export const createDownloadPictures = (deps: DownloadPicturesDeps): DownloadPict
     const { libraryId } = media.value
     const asked =
       libraries.get(libraryId) ??
-      ask({ serverId, call: { name: CALL_NAMES.getLibrary, libraryId }, guard: isLibrary })
+      ask({ call: { name: CALL_NAMES.getLibrary, libraryId }, guard: isLibrary })
     libraries.set(libraryId, asked)
     const library = await asked
     if (library.kind !== ANSWER_KINDS.value) return library.kind !== ANSWER_KINDS.unreachable
@@ -296,10 +293,9 @@ export const createDownloadPictures = (deps: DownloadPicturesDeps): DownloadPict
     return true
   }
 
-  const pathsOf = async ({ serverId, key }: Want): Promise<Answer<PicturePaths>> => {
+  const pathsOf = async ({ key }: Want): Promise<Answer<PicturePaths>> => {
     if (key.owner === PICTURE_OWNERS.album) {
       const details = await ask({
-        serverId,
         call: { name: CALL_NAMES.getAlbum, albumId: key.id },
         guard: isAlbumDetails,
       })
@@ -311,7 +307,6 @@ export const createDownloadPictures = (deps: DownloadPicturesDeps): DownloadPict
       }
     }
     const details = await ask({
-      serverId,
       call: { name: CALL_NAMES.getItem, itemId: key.id },
       guard: isItemDetails,
     })
@@ -331,14 +326,17 @@ export const createDownloadPictures = (deps: DownloadPicturesDeps): DownloadPict
   /** Fetches one picture whole and writes it; a failure is logged and left for the next pass. */
   const save = async ({ want, path }: SaveProps): Promise<Saved> => {
     if (path === null) return { picture: null, isSettled: true }
-    const server = deps.serverOf(want.serverId)
-    if (server === null) return NOT_SAVED
+    if (want.serverId !== deps.server.id) return NOT_SAVED
     const late = new AbortController()
     const timer = deps.timers.set({ run: () => late.abort(), ms: DOWNLOAD_STALL_MS })
     const signal = AbortSignal.any([stop.signal, late.signal])
     try {
-      const response = await deps.fetch({ url: `${server.origin}${path}`, headers: {}, signal })
-      const extension = extensionOf(response.headers.get(HTTP_HEADERS.contentType))
+      const response = await deps.fetch({
+        url: `${deps.server.origin}${path}`,
+        headers: {},
+        signal,
+      })
+      const extension = extensionOf(response.headers.get(HEADERS.contentType))
       if (response.status !== HTTP_STATUSES.ok || extension === null) {
         if (response.body !== null) await response.body.cancel().catch(() => undefined)
         warn(`Raven kept no picture for ${want.folder}: the server answered ${response.status}`)
@@ -412,11 +410,7 @@ export const createDownloadPictures = (deps: DownloadPicturesDeps): DownloadPict
 
   /** The entries main can ask the server about now: its server is held and the page is signed in. */
   const askable = (): DownloadEntry[] =>
-    store
-      .read()
-      .entries.filter(
-        ({ serverId }) => deps.serverOf(serverId) !== null && deps.isSignedIn({ serverId }),
-      )
+    store.read().entries.filter(({ serverId }) => serverId === deps.server.id && deps.isSignedIn())
 
   const fillAll = async (): Promise<void> => {
     if (stop.signal.aborted) return

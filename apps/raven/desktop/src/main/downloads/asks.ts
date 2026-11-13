@@ -11,12 +11,13 @@ import {
   isContainerName,
   isMediaId,
 } from '@raven/core'
-import { type ConfigStore, SERVER_GONE, serverById } from '@/main/desktopConfig'
+import { SERVER_NAME } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
   bytesOf,
   entryByMedia,
   isFileSize,
+  isUnderWay,
   NO_PENDING,
   queue,
   setAutoDeleteDefault,
@@ -38,11 +39,10 @@ import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 /** How long main holds an expanded link for the page to answer. */
 export const ASK_TTL_MS = 600_000
 
-type IsSignedInProps = { serverId: string }
-
 type DownloadAsksDeps = {
   store: DownloadsStore
-  config: ConfigStore
+  /** The id the server's downloads are filed under. */
+  serverId: string
   calls: Pick<ServerCalls, 'call'>
   userData: string
   space: SpaceFs
@@ -55,10 +55,10 @@ type DownloadAsksDeps = {
   /** The downloads as the page reads them, which a confirmation answers. */
   list: () => DesktopReply
   /** Whether the page is signed in to the server, so main has an account to ask with. */
-  isSignedIn: (input: IsSignedInProps) => boolean
+  isSignedIn: () => boolean
 }
 
-type AskProps = { serverId: string; target: DownloadTarget }
+type AskProps = { target: DownloadTarget }
 
 type RetryAskProps = { askId: string }
 
@@ -76,9 +76,11 @@ export type DownloadAsks = {
 }
 
 /** A link main has expanded, waiting on the page's answer. */
-type HeldAsk = { serverId: string; target: DownloadTarget; expansion: Expansion; at: number }
+type HeldAsk = { target: DownloadTarget; expansion: Expansion; at: number }
 
-type Server = { serverId: string; serverName: string }
+type ReadyExpansion = Extract<Expansion, { ok: true }>
+
+type AskStatus = { ok: true; status: DownloadAskStatus } | { ok: false; message: string }
 
 /**
  * Each file becomes `<mediaId>/video.<container>` or `<mediaId>/media.<container>` on disk, so both must be safe to name a file
@@ -127,13 +129,8 @@ const entryOf = ({
 
 /** The asks a download link raises: expanded, held for the page's answer, then queued or dropped. */
 export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
-  const { store, config, now, change } = deps
+  const { store, serverId, now, change } = deps
   const asks = new Map<string, HeldAsk>()
-
-  const serverOf = (serverId: string): Server | null => {
-    const server = serverById({ config: config.read(), serverId })
-    return server === null ? null : { serverId, serverName: server.name }
-  }
 
   const dropExpired = (): void => {
     const oldest = now() - ASK_TTL_MS
@@ -142,9 +139,7 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     })
   }
 
-  const readyStatus = async (
-    expansion: Extract<Expansion, { ok: true }>,
-  ): Promise<DownloadAskStatus> => {
+  const readyStatus = async (expansion: ReadyExpansion): Promise<DownloadAskStatus> => {
     const bytes = expansion.files.reduce((sum, file) => sum + file.media.size, 0)
     const { free } = await readSpace({
       fs: deps.space,
@@ -153,11 +148,7 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     // The files already on their way take their room first; the dialog names only the new ones.
     const owed = store
       .read()
-      .entries.filter(
-        ({ status }) =>
-          status.kind === DOWNLOAD_STATUS_KINDS.queued ||
-          status.kind === DOWNLOAD_STATUS_KINDS.downloading,
-      )
+      .entries.filter(isUnderWay)
       .reduce((sum, entry) => sum + Math.max(entry.size - bytesOf(entry), 0), 0)
     return {
       kind: DOWNLOAD_ASK_KINDS.ready,
@@ -170,25 +161,13 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     }
   }
 
-  type StatusOfProps = {
-    expansion: Expansion
-    serverName: string
-  }
-
   /** The ask's status, or why there is no ask to hold. */
-  const statusOf = async ({
-    expansion,
-    serverName,
-  }: StatusOfProps): Promise<
-    { ok: true; status: DownloadAskStatus } | { ok: false; message: string }
-  > => {
+  const statusOf = async (expansion: Expansion): Promise<AskStatus> => {
     if (expansion.ok) {
       const unstorable = expansion.files.find((file) => !isStorable(file))
       if (unstorable !== undefined) {
-        deps.warn(
-          `${loggable(serverName)} named an unusable file for ${loggable(unstorable.label)}`,
-        )
-        return { ok: false, message: EXPAND_MESSAGES.unreadable(serverName) }
+        deps.warn(`${SERVER_NAME} named an unusable file for ${loggable(unstorable.label)}`)
+        return { ok: false, message: EXPAND_MESSAGES.unreadable }
       }
       return { ok: true, status: await readyStatus(expansion) }
     }
@@ -211,16 +190,15 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
 
   type AskReplyProps = {
     askId: string
-    server: Server
     status: DownloadAskStatus
   }
 
-  const askReply = ({ askId, server, status }: AskReplyProps): DesktopReply => ({
+  const askReply = ({ askId, status }: AskReplyProps): DesktopReply => ({
     type: DESKTOP_REPLIES.downloadAsk,
     ask: {
       askId,
-      serverId: server.serverId,
-      serverName: server.serverName,
+      serverId,
+      serverName: SERVER_NAME,
       shouldAutoDelete: store.read().autoDeleteDefault,
       status,
     },
@@ -228,69 +206,53 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
 
   type HoldForAccountProps = {
     askId: string
-    server: Server
     target: DownloadTarget
   }
 
   /** Holds the ask until the page signs in; a confirmation meanwhile is refused with why. */
-  const holdForAccount = ({ askId, server, target }: HoldForAccountProps): DesktopReply => {
+  const holdForAccount = ({ askId, target }: HoldForAccountProps): DesktopReply => {
     const expansion: Expansion = {
       ok: false,
       reason: EXPAND_REASONS.account,
-      message: EXPAND_MESSAGES.account(server.serverName),
+      message: EXPAND_MESSAGES.account,
     }
-    asks.set(askId, { serverId: server.serverId, target, expansion, at: now() })
-    return askReply({ askId, server, status: { kind: DOWNLOAD_ASK_KINDS.account } })
+    asks.set(askId, { target, expansion, at: now() })
+    return askReply({ askId, status: { kind: DOWNLOAD_ASK_KINDS.account } })
   }
 
   type ExpandUnderProps = {
     askId: string
-    server: Server
     target: DownloadTarget
   }
 
   /** Expands `target` and holds it under `askId`; a refusal holds nothing, so a retry of it is gone. */
-  const expandUnder = async ({
-    askId,
-    server,
-    target,
-  }: ExpandUnderProps): Promise<DesktopReply> => {
-    const { serverId, serverName } = server
+  const expandUnder = async ({ askId, target }: ExpandUnderProps): Promise<DesktopReply> => {
     // Main lists the files with the page's account, so a page signed out signs in first.
-    if (!deps.isSignedIn({ serverId })) return holdForAccount({ askId, server, target })
+    if (!deps.isSignedIn()) return holdForAccount({ askId, target })
     const expansion = await expandTarget({
       calls: deps.calls,
-      serverId,
-      serverName,
       target,
-      skip: (mediaId) => entryByMedia(store.read(), { serverId, mediaId }) !== null,
+      skip: (mediaId) => entryByMedia({ state: store.read(), serverId, mediaId }) !== null,
     })
-    const outcome = await statusOf({ expansion, serverName })
+    const outcome = await statusOf(expansion)
     if (!outcome.ok) {
       asks.delete(askId)
       return refused(outcome.message)
     }
-    asks.set(askId, { serverId, target, expansion, at: now() })
-    return askReply({ askId, server, status: outcome.status })
+    asks.set(askId, { target, expansion, at: now() })
+    return askReply({ askId, status: outcome.status })
   }
 
-  const ask: DownloadAsks['ask'] = async ({ serverId, target }) => {
+  const ask: DownloadAsks['ask'] = async ({ target }) => {
     dropExpired()
-    const server = serverOf(serverId)
-    if (server === null) return refused(SERVER_GONE)
-    return expandUnder({ askId: deps.newId(), server, target })
+    return expandUnder({ askId: deps.newId(), target })
   }
 
   const retryAsk: DownloadAsks['retryAsk'] = async ({ askId }) => {
     dropExpired()
     const held = asks.get(askId)
     if (held === undefined) return refused(DOWNLOAD_MESSAGES.askGone)
-    const server = serverOf(held.serverId)
-    if (server === null) {
-      asks.delete(askId)
-      return refused(SERVER_GONE)
-    }
-    return expandUnder({ askId, server, target: held.target })
+    return expandUnder({ askId, target: held.target })
   }
 
   const confirm: DownloadAsks['confirm'] = async ({ askId, autoDelete }) => {
@@ -300,20 +262,17 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     const { expansion } = held
     // A locked ask, or one waiting on its account, waits for its retry; the page offers no Download until then.
     if (!expansion.ok) return refused(expansion.message)
-    const server = serverOf(held.serverId)
     asks.delete(askId)
-    if (server === null) return refused(SERVER_GONE)
-    const { serverId } = server
     // A file queued since the ask, by another ask or another link, is not queued twice.
     const fresh = expansion.files.filter(
-      (file) => entryByMedia(store.read(), { serverId, mediaId: file.media.id }) === null,
+      (file) => entryByMedia({ state: store.read(), serverId, mediaId: file.media.id }) === null,
     )
     const createdAt = now()
     const entries = fresh.map((file) =>
       entryOf({ file, downloadId: deps.newId(), serverId, autoDelete, createdAt }),
     )
     // The dialog's checkbox starts from the last choice made, so the choice becomes the default.
-    change((state) => setAutoDeleteDefault(queue(state, { entries }), { autoDelete }))
+    change((state) => setAutoDeleteDefault({ state: queue({ state, entries }), autoDelete }))
     const [first] = fresh
     if (first !== undefined) {
       deps.send({
@@ -322,7 +281,6 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
           files: fresh.length,
           kind: expansion.kind,
           label: first.label,
-          serverName: server.serverName,
         }),
       })
     }

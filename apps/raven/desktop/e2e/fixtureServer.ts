@@ -5,8 +5,6 @@ import { basename, extname } from 'node:path'
 import {
   type Account,
   ADMIN_LOCK_STATES,
-  AUTH_PARAMS,
-  AUTH_PATHS,
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
   isMediaTracks,
@@ -22,6 +20,9 @@ import {
   SERVER_METHODS,
   STREAM_PURPOSES,
   SUBTITLE_SOURCES,
+  ROUTES,
+  pathFor,
+  PING_BYTES_PARAM,
 } from '@raven/core'
 import {
   ACCOUNT_TICKET_PREFIX,
@@ -49,37 +50,39 @@ import {
   FIXTURE_TITLES,
 } from '@/e2e/fixtureLibrary'
 import { API_PATHS } from '@/main/servers/allowlist'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { mediaItemFor } from '@/shared/test/mediaItem'
+import { HEADERS } from '@shared/http'
 
 /** The lock routes the fixture answers. */
 export const FIXTURE_LOCK_PATHS = {
-  lock: '/api/lock',
-  unlock: '/api/lock/unlock',
-  admin: '/api/admin',
-  adminUnlock: '/api/admin/unlock',
+  lock: ROUTES.getLock.path,
+  unlock: ROUTES.unlock.path,
+  admin: ROUTES.getAdminLock.path,
+  adminUnlock: ROUTES.unlockAdmin.path,
 } as const
 
 /** `METHOD path` for the lock routes, as `answer` reads a request. */
 const API_ROUTES = {
-  lock: `${SERVER_METHODS.get} ${FIXTURE_LOCK_PATHS.lock}`,
-  unlock: `${SERVER_METHODS.post} ${FIXTURE_LOCK_PATHS.unlock}`,
-  admin: `${SERVER_METHODS.get} ${FIXTURE_LOCK_PATHS.admin}`,
-  adminUnlock: `${SERVER_METHODS.post} ${FIXTURE_LOCK_PATHS.adminUnlock}`,
+  lock: `${ROUTES.getLock.method} ${ROUTES.getLock.path}`,
+  unlock: `${ROUTES.unlock.method} ${ROUTES.unlock.path}`,
+  admin: `${ROUTES.getAdminLock.method} ${ROUTES.getAdminLock.path}`,
+  adminUnlock: `${ROUTES.unlockAdmin.method} ${ROUTES.unlockAdmin.path}`,
 } as const
+
+const byId = (path: string) => (id: number) => pathFor({ path, params: { id } })
 
 /** The path of one of a title's routes, as a request to the server carries it. */
 export const MEDIA_PATHS = {
-  item: (mediaId: number) => `/api/media/${mediaId}`,
-  file: (mediaId: number) => `/api/media/${mediaId}/file`,
+  item: byId(ROUTES.getMedia.path),
+  file: byId(ROUTES.file.path),
   download: (mediaId: number) =>
-    `/api/media/${mediaId}/file?${MEDIA_PURPOSE_PARAM}=${STREAM_PURPOSES.download}`,
-  sidecar: (mediaId: number) => `/api/media/${mediaId}/subtitles/external-0`,
-  ticket: (mediaId: number) => `/api/media/${mediaId}/ticket`,
-  progress: (mediaId: number) => `/api/media/${mediaId}/progress`,
-  plays: (mediaId: number) => `/api/media/${mediaId}/plays`,
-  accountTicket: (mediaId: number) =>
-    AUTH_PATHS.ticket.replace(`:${AUTH_PARAMS.id}`, String(mediaId)),
+    `${byId(ROUTES.file.path)(mediaId)}?${MEDIA_PURPOSE_PARAM}=${STREAM_PURPOSES.download}`,
+  sidecar: (mediaId: number) =>
+    pathFor({ path: ROUTES.subtitles.path, params: { id: mediaId, trackId: SIDECAR_TRACK } }),
+  ticket: byId(ROUTES.getMediaTicket.path),
+  progress: byId(ROUTES.saveProgress.path),
+  plays: byId(ROUTES.recordPlay.path),
+  accountTicket: byId(ROUTES.getAccountMediaTicket.path),
 } as const
 
 /** `METHOD rest` for a title's routes, `rest` being what follows `/api/media/<id>`. */
@@ -257,23 +260,26 @@ const TRICKLE_MS = 100
 
 const LOCKED_MESSAGE = 'This library is locked.'
 const PROBE_MAX_BYTES = 1_048_576
-const PROBE_BYTES_PARAM = 'bytes'
+const PROBE_BYTES_PARAM = PING_BYTES_PARAM
+
+/** The one sidecar a fixture title has. */
+const SIDECAR_TRACK = 'external-0'
 
 const MEDIA_ROUTE = /^\/api\/media\/(\d+)(\/.*)?$/u
 const MP4_EXTENSION = '.mp4'
 const RANGE_OUTCOMES = { unsatisfiable: 'unsatisfiable' } as const
 const ITEM_ROUTE = /^\/api\/items\/(\d+)$/u
-const PING_PATH = '/api/media-origins/ping'
+const PING_PATH = ROUTES.ping.path
 const LIBRARY_ROUTE = /^\/api\/libraries\/(\d+)$/u
-const SAGAS_PATH = `/api/libraries/${FIXTURE_ITEMS.library}/sagas`
+const SAGAS_PATH = byId(ROUTES.listSagas.path)(FIXTURE_ITEMS.library)
 /** The web's reads beside the library's: the list, Home, its playback settings and its events. */
 const WEB_PATHS = {
-  libraries: '/api/libraries',
-  home: '/api/home',
-  playback: '/api/settings/playback',
-  display: '/api/settings/display',
-  events: '/api/events',
-  showNext: `/api/items/${FIXTURE_ITEMS.show}/next`,
+  libraries: ROUTES.listLibraries.path,
+  home: ROUTES.getHome.path,
+  playback: ROUTES.getPlaybackSettings.path,
+  display: ROUTES.getDisplaySettings.path,
+  events: ROUTES.events.path,
+  showNext: byId(ROUTES.nextEpisode.path)(FIXTURE_ITEMS.show),
 } as const
 // What a media origin serves for a ticket: a title's file and its sidecar.
 const MEDIA_PLANE_ROUTE = /^\/api\/media\/(\d+)\/(file|subtitles\/external-0)$/u
@@ -281,7 +287,7 @@ const MEDIA_PLANE_ROUTE = /^\/api\/media\/(\d+)\/(file|subtitles\/external-0)$/u
 /** What `MEDIA_PLANE_ROUTE` captures for a title's file; anything else it matches is the sidecar. */
 const MEDIA_PLANE_FILE = 'file'
 
-const fileOf = (mediaId: number) => `/api/media/${mediaId}/file`
+const fileOf = byId(ROUTES.file.path)
 
 /** The ticket the fixture issues for a title, and the only one its media origin takes for it. */
 const ticketFor = (mediaId: number) => `fixture-ticket-${mediaId}`
@@ -437,7 +443,7 @@ const listen = async ({ server, port }: ListenProps): Promise<string> => {
 }
 
 const sendSidecar = (response: ServerResponse) => {
-  response.writeHead(200, { [HTTP_HEADERS.contentType]: 'text/vtt; charset=utf-8' })
+  response.writeHead(200, { [HEADERS.contentType]: 'text/vtt; charset=utf-8' })
   response.end(FIXTURE_SIDECAR)
 }
 
@@ -564,11 +570,11 @@ export const startFixtureServer = async ({
   const sendFile = ({ request, response, path, bytes }: SendFileProps) => {
     const range = rangeOf({ header: request.headers.range, size: bytes.length })
     const common = {
-      [HTTP_HEADERS.acceptRanges]: 'bytes',
-      [HTTP_HEADERS.contentType]: contentTypeOf(path),
+      [HEADERS.acceptRanges]: 'bytes',
+      [HEADERS.contentType]: contentTypeOf(path),
     }
     if (range === RANGE_OUTCOMES.unsatisfiable) {
-      response.writeHead(416, { ...common, [HTTP_HEADERS.contentRange]: `bytes */${bytes.length}` })
+      response.writeHead(416, { ...common, [HEADERS.contentRange]: `bytes */${bytes.length}` })
       response.end()
       return
     }
@@ -577,8 +583,8 @@ export const startFixtureServer = async ({
       ...common,
       ...(range === null
         ? {}
-        : { [HTTP_HEADERS.contentRange]: `bytes ${start}-${end}/${bytes.length}` }),
-      [HTTP_HEADERS.contentLength]: end - start + 1,
+        : { [HEADERS.contentRange]: `bytes ${start}-${end}/${bytes.length}` }),
+      [HEADERS.contentLength]: end - start + 1,
     })
     if (isFileStalled) {
       response.flushHeaders()
@@ -667,9 +673,9 @@ export const startFixtureServer = async ({
   const sendPing = ({ response, query }: SendPingProps) => {
     const length = probeLengthOf(query)
     response.writeHead(200, {
-      [HTTP_HEADERS.contentType]: 'application/octet-stream',
-      [HTTP_HEADERS.contentLength]: length,
-      [HTTP_HEADERS.cacheControl]: 'no-store',
+      [HEADERS.contentType]: 'application/octet-stream',
+      [HEADERS.contentLength]: length,
+      [HEADERS.cacheControl]: 'no-store',
     })
     response.end(randomBytes(length))
   }
@@ -717,7 +723,7 @@ export const startFixtureServer = async ({
           return
         }
         if (mediaId === FIXTURE_MEDIA.page) {
-          response.writeHead(200, { [HTTP_HEADERS.contentType]: 'text/html; charset=utf-8' })
+          response.writeHead(200, { [HEADERS.contentType]: 'text/html; charset=utf-8' })
           response.end(FIXTURE_PAGE)
           return
         }
@@ -812,8 +818,8 @@ export const startFixtureServer = async ({
       case WEB_PATHS.events:
         return () => {
           response.writeHead(200, {
-            [HTTP_HEADERS.contentType]: 'text/event-stream',
-            [HTTP_HEADERS.cacheControl]: 'no-store',
+            [HEADERS.contentType]: 'text/event-stream',
+            [HEADERS.cacheControl]: 'no-store',
           })
           response.flushHeaders()
         }
