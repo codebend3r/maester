@@ -1,6 +1,6 @@
 [project]
 name = "sparrow"
-version = "0.8.7"
+version = "0.8.8"
 description = "AI concierge for a private Plex server"
 requires-python = ">=3.12,<3.13"
 dependencies = [
