@@ -2,16 +2,12 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { audioPlayer } from '@raven/audio'
 import { AUDIO_BITRATES } from '@raven/core'
 import type * as Native from '@raven/native'
+import type { DownloadDisk } from '@raven/native/headless'
 import { queryKeys, useAudioQueue } from '@raven/ui/headless'
 import { router } from 'expo-router'
 import { act, renderRouter, screen, waitFor } from 'expo-router/testing-library'
 
-import {
-  DOWNLOAD_STATUSES,
-  type DownloadDisk,
-  downloadKeyOf,
-  useDownloads,
-} from '@/downloads/downloadStore'
+import { DOWNLOAD_STATUSES, downloadKeyOf, useDownloads } from '@/downloads/downloadStore'
 import { queryClient } from '@/queryClient'
 import { WREN_ROUTES } from '@/routes'
 import { useWrenAccount } from '@/session'
@@ -116,6 +112,7 @@ describe('WrenRoot', () => {
           .filter((path) => path.startsWith(`${removed}/`))
           .forEach((path) => files.delete(path)),
       removeAll: async () => files.clear(),
+      freeBytes: () => null,
     }
     const entry = {
       mediaId: AIRBAG.id,

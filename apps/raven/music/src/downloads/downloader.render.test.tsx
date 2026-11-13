@@ -43,7 +43,12 @@ it('waits for server preparation before starting the native download', async () 
     return new Response(null, { status: 200 })
   })
 
-  const downloading = deviceDisk.fetch({ source: SOURCE, path: PATH })
+  const downloading = deviceDisk.fetch({
+    source: SOURCE,
+    path: PATH,
+    signal: null,
+    onProgress: null,
+  })
 
   expect(fetch).toHaveBeenCalledWith(SOURCE.uri, {
     method: HTTP_METHODS.head,
@@ -62,17 +67,17 @@ it('waits for server preparation before starting the native download', async () 
 it('does not download an error response', async () => {
   jest.mocked(fetch).mockResolvedValue(new Response(null, { status: 403 }))
 
-  await expect(deviceDisk.fetch({ source: SOURCE, path: PATH })).rejects.toThrow(
-    'Could not prepare download (403)',
-  )
+  await expect(
+    deviceDisk.fetch({ source: SOURCE, path: PATH, signal: null, onProgress: null }),
+  ).rejects.toThrow('Could not prepare download (403)')
   expect(File.downloadFileAsync).not.toHaveBeenCalled()
 })
 
 it('preserves preparation failures without starting a native download', async () => {
   jest.mocked(fetch).mockRejectedValue(new Error('Server unreachable'))
 
-  await expect(deviceDisk.fetch({ source: SOURCE, path: PATH })).rejects.toThrow(
-    'Server unreachable',
-  )
+  await expect(
+    deviceDisk.fetch({ source: SOURCE, path: PATH, signal: null, onProgress: null }),
+  ).rejects.toThrow('Server unreachable')
   expect(File.downloadFileAsync).not.toHaveBeenCalled()
 })
