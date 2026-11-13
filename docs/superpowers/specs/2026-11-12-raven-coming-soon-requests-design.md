@@ -39,6 +39,7 @@ flowchart TB
   card[Coming soon card] --> page[Title page<br/>/coming-soon/:type/:tmdbId]
   page -->|GET /api/upcoming/:type/:tmdbId| details[UpcomingController<br/>TMDB details]
   page -->|POST /api/requests| ctrl[RequestsController]
+  page -->|GET /api/requests/:type/:tmdbId| ctrl
   card -->|GET /api/requests| ctrl
   ctrl --> service[DownloadRequests]
   service --> db[(download_requests<br/>SQLite)]
@@ -53,14 +54,14 @@ flowchart TB
 - `requests/requestsConfig.ts` reads `SONARR_VERMITHOR_URL`, `SONARR_VERMITHOR_API_KEY`, `RADARR_VERMITHOR_URL` and `RADARR_VERMITHOR_API_KEY`, the names raven's `.env` already uses, plus `REQUEST_MOVIE_FOLDER` (default `/Meleys/Movies`), `REQUEST_SHOW_FOLDER` (default `/Vermithor/TV`), `REQUEST_QUALITY_PROFILE` (default `HD-1080p`) and `REQUEST_DAILY_LIMIT` (default 10). An arr missing its address or key is off, and requests of its type answer 503.
 - `requests/arrClient.ts` is a small client for both arrs' v3 API over the injected `METADATA_FETCH`, so tests answer for them as they do for TMDB. It looks a title up by TMDB id (`series/lookup?term=tmdb:<id>`, `movie/lookup/tmdb?tmdbId=<id>`), adds it, starts a search command, and reads the command, the title and its `queue/details`.
 - `requests/downloadRequests.ts` owns the table, the budget and the status. A request is taken in one synchronous better-sqlite3 transaction (budget count, then insert on the `(type, tmdb_id)` primary key), so two members pressing at once get one request and one 409. Both refusals are 409s rather than a 429, which the client would read as the rate limiter. If the arr then fails, the row is deleted again and the member gets a 502 with nothing spent.
-- `requests/requestsController.ts`: `GET /api/requests` and `POST /api/requests` (`@ForViewers()`).
+- `requests/requestsController.ts`: `GET /api/requests`, `GET /api/requests/:type/:tmdbId` and `POST /api/requests` (`@ForViewers()`).
 - `GET /api/upcoming/:type/:tmdbId` joins `UpcomingController`: TMDB's details through `TmdbClient.movie` or `.show`, the same for every viewer.
 
 > [!TIP]
-> Add with `rootFolderPath`, never `path`. Each arr then names the folder itself by its own naming format (`{Movie CleanTitleThe} ({Release Year})` in Radarr), so raven only has to pick the letter. A title already in the arr is not added again: raven records the request and starts a search for the existing entry.
+> Add with `rootFolderPath`, never `path`. Each arr then names the folder itself by its own naming format (`{Movie CleanTitleThe} ({Release Year})` in Radarr), so raven only has to pick the letter. A title already in the arr is not added again, and it cannot be requested: the arr already monitors it and downloads it once a copy turns up. The title's page asks `GET /api/requests/:type/:tmdbId`, which looks the title up in its arr and answers where it stands there, so the page says it is requested already, with that status, instead of offering the button. A `POST` for it is a 409 with nothing spent.
 
 > [!TIP]
-> Requests download at 1080p only. Before anything is added or searched, raven reads the `REQUEST_QUALITY_PROFILE` profile from the arr and refuses (502, nothing spent) if any quality it allows is not 1080p, so a profile edited to take 4K or 720p stops requests instead of downloading them. A title the arr already holds under another profile is refused too, rather than searched at that profile's quality. Radarr is always the one on Vermithor (`RADARR_VERMITHOR_*`), never Meleys'.
+> Requests download at 1080p only. Before anything is added or searched, raven reads the `REQUEST_QUALITY_PROFILE` profile from the arr and refuses (502, nothing spent) if any quality it allows is not 1080p, so a profile edited to take 4K or 720p stops requests instead of downloading them. Radarr is always the one on Vermithor (`RADARR_VERMITHOR_*`), never Meleys'.
 
 ### Letter folders
 
@@ -94,7 +95,8 @@ The row is shared, not per viewer: one request covers everyone. `account_id` onl
 | --- | --- | --- |
 | `GET /api/upcoming/:type/:tmdbId` | approved | `UpcomingDetails`: title, released, poster, backdrop, summary, tagline, genres, runtime |
 | `GET /api/requests` | approved | `TitleRequests`: every request with its status, the caller's budget, which arrs are on |
-| `POST /api/requests` `{ type, tmdbId }` | approved, `@ForViewers()` | the new `TitleRequest`; 409 already requested or budget spent, 503 arr off, 502 arr failed |
+| `GET /api/requests/:type/:tmdbId` | approved, `@Public()` to the PIN lock | `TitleHolding`: where the title stands in its arr, or `status: null` while the arr does not hold it or its kind is off; read at most every 30 seconds |
+| `POST /api/requests` `{ type, tmdbId }` | approved, `@ForViewers()` | the new `TitleRequest`; 409 already requested, held by the arr already or budget spent, 503 arr off, 502 arr failed |
 
 Each shape is a guard in `libs/raven/core/src/contract/requests.ts`, read by the server's body check and the client's calls alike.
 
@@ -136,7 +138,7 @@ stateDiagram-v2
 ## Testing
 
 - `letterFolderOf`: articles, digits, punctuation, accents.
-- `DownloadRequests` on a test database and a fake arr: a request adds with the letter root and the profile, a second for the same title is a 409, one past the budget is a 409, a failed add spends nothing, and each status the table above lists is read from the arr's answers.
+- `DownloadRequests` on a test database and a fake arr: a request adds with the letter root and the profile, a second for the same title is a 409, one the arr already holds is a 409 and its holding answers the arr's status, one past the budget is a 409, a failed add spends nothing, and each status the table above lists is read from the arr's answers.
 - The route inventory (`ROUTES` in `src/test/enforced.ts`) lists the three routes as approved.
 - Web: the card links to its page and shows a status; the page's control in each of its states.
 

@@ -16,6 +16,13 @@ import { withCleartextTraffic } from './plugins/withCleartextTraffic.ts'
 
 const APP_ID = 'app.netlify.wren'
 
+/** The app icon files, rendered at 1024 px from the brand's SVGs in `assets/brand`. */
+export const WREN_ICONS = {
+  app: './assets/images/icon.png',
+  adaptive: './assets/images/adaptive-icon.png',
+  monochrome: './assets/images/adaptive-icon-monochrome.png',
+} as const
+
 const buildNumber = buildNumberOf({ runNumber: process.env[BUILD_ENV.runNumber] })
 const isDevelopment = isDevelopmentVariant({ variant: process.env[BUILD_ENV.appVariant] })
 const isCarPlay = process.env[CARPLAY_FLAG.name] === CARPLAY_FLAG.on
@@ -43,6 +50,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     scheme: 'wren',
     version: packageJson.version,
     orientation: 'default',
+    // The brand's files and when each is used: assets/brand/README.md.
+    icon: WREN_ICONS.app,
     ios: {
       bundleIdentifier: APP_ID,
       buildNumber: String(buildNumber),
@@ -66,6 +75,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       versionCode: buildNumber,
       // Android 14 starts a media playback foreground service only with this permission.
       permissions: ['android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK'],
+      /*
+       * The mark sits inside the middle two thirds, which every launcher's mask leaves whole;
+       * the monochrome layer is what Android 13's themed icons tint.
+       */
+      adaptiveIcon: {
+        foregroundImage: WREN_ICONS.adaptive,
+        monochromeImage: WREN_ICONS.monochrome,
+        backgroundColor: ground,
+      },
       /*
        * The window's own colour, under the app. iOS reads its counterpart only through
        * expo-system-ui; there the splash covers the window until Wren draws.

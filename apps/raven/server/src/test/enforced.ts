@@ -87,6 +87,7 @@ export const ROUTES = {
   upcomingTitle: { method: GET, path: '/api/upcoming/:type/:tmdbId', account: approved },
   requests: { method: GET, path: '/api/requests', account: approved },
   makeRequest: { method: POST, path: '/api/requests', account: approved },
+  requestHolding: { method: GET, path: '/api/requests/:type/:tmdbId', account: approved },
   heroPicks: { method: GET, path: '/api/hero/picks', account: owner },
   setHeroPick: { method: PUT, path: '/api/hero/picks', account: owner },
   cachedImage: { method: GET, path: '/api/images/:use/:file', account: approved },

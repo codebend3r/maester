@@ -1,5 +1,8 @@
 import type { Transport } from '@/apiClient/transport'
 import {
+  isTitleHolding,
+  REQUEST_HOLDING_PATH,
+  type TitleHolding,
   type TitleRequest,
   type TitleRequestAsk,
   type TitleRequests,
@@ -30,6 +33,18 @@ export const requestCalls = ({ send, expect }: Transport) => ({
   /** Every request with where it stands, and how many the caller has left. */
   listRequests: (): Promise<TitleRequests> =>
     expect({ request: send({ path: REQUEST_PATHS.requests }), guard: isTitleRequests }),
+
+  /** Whether the title's Sonarr or Radarr holds it already, and where it stands there. */
+  getRequestHolding: ({ type, tmdbId }: TitleRequestAsk): Promise<TitleHolding> =>
+    expect({
+      request: send({
+        path: fillPath({
+          path: REQUEST_HOLDING_PATH,
+          params: { [UPCOMING_TITLE_PARAMS.type]: type, [UPCOMING_TITLE_PARAMS.tmdbId]: tmdbId },
+        }),
+      }),
+      guard: isTitleHolding,
+    }),
 
   /** Asks for a movie or show to be downloaded for everyone; spends one of the caller's requests. */
   requestDownload: (ask: TitleRequestAsk): Promise<TitleRequest> =>

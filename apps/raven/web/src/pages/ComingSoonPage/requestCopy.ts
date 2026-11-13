@@ -42,6 +42,7 @@ export const REQUEST_COPY = {
   requesting: 'Requesting',
   requestedByYou: 'You requested this. Everyone can watch it once it arrives.',
   requestedBySomeone: 'Someone has requested this. Everyone can watch it once it arrives.',
+  requestedAlready: 'This is requested already. Everyone can watch it once it arrives.',
   left: ({ left, limit }: Pick<RequestBudget, 'left' | 'limit'>) =>
     `${left} of ${limit} requests left today`,
   spent: (limit: number) => `You have used all ${limit} of today's requests.`,

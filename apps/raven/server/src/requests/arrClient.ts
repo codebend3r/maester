@@ -116,15 +116,12 @@ const isSeries = object({
 const isLookedUp = object({
   title: isString,
   id: optional(nullable(isNumber)),
-  qualityProfileId: optional(nullable(isNumber)),
 })
 
 /** A title as the arr's lookup found it: its record to add, and its id when the arr already holds it. */
 export type ArrTitle = {
   title: string
   existingId: number | null
-  /** The quality profile the arr holds the title under, when it holds it. */
-  existingProfileId: number | null
   record: Record<string, unknown>
 }
 
@@ -237,13 +234,7 @@ export class ArrClient {
     if (found === null || found === undefined) return null
     if (!isLookedUp(found) || !isRecord(found)) throw this.unreadable(`the ${type} lookup`)
     const id = found.id ?? null
-    const isHeld = id !== null && id > 0
-    return {
-      title: found.title,
-      existingId: isHeld ? id : null,
-      existingProfileId: isHeld ? (found.qualityProfileId ?? null) : null,
-      record: found,
-    }
+    return { title: found.title, existingId: id !== null && id > 0 ? id : null, record: found }
   }
 
   /** The arr's root folders' paths. */

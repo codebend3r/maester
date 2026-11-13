@@ -30,6 +30,7 @@ export const {
   upcomingShelfQuery,
   upcomingDetailsQuery,
   requestsQuery,
+  requestHoldingQuery,
   mediaQuery,
   nextInSessionQuery,
   markersQuery,
