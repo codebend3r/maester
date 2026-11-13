@@ -5,7 +5,32 @@ Both ``docs/roadmap.md`` and the GitHub issues are rendered from this file by
 Edit here, then re-run the sync.
 """
 
-MILESTONES = [
+from typing import TypedDict
+
+# A milestone: key, title, summary. The keys, sizes, priorities and areas a story or
+# epic may name are the keys of `MILESTONES`, `SIZES`, `PRIORITIES` and `AREA_LABELS`.
+Milestone = tuple[str, str, str]
+
+
+class Story(TypedDict):
+    key: str
+    title: str
+    size: str
+    priority: str
+    story: str
+    criteria: list[str]
+
+
+class Epic(TypedDict):
+    key: str
+    title: str
+    milestone: str
+    area: str
+    summary: str
+    stories: list[Story]
+
+
+MILESTONES: list[Milestone] = [
     (
         "M1",
         "Walking skeleton",
@@ -25,7 +50,7 @@ MILESTONES = [
 # Each story: key, title, size, priority, user story, acceptance criteria.
 # A story's key is its issue's `[E0.1]` title prefix, so it never changes once the
 # issue exists: a story added mid-epic takes the next free number, not its position.
-EPICS = [
+EPICS: list[Epic] = [
     {
         "key": "E0",
         "title": "Foundation",
@@ -898,19 +923,19 @@ EPICS = [
     },
 ]
 
-SIZES = {
+SIZES: dict[str, str] = {
     "S": "Under half a day",
     "M": "A day or two",
     "L": "Several days, consider splitting",
 }
 
-PRIORITIES = {
+PRIORITIES: dict[str, str] = {
     "P0": "Must have for the milestone",
     "P1": "Should have",
     "P2": "Nice to have",
 }
 
-AREA_LABELS = {
+AREA_LABELS: dict[str, str] = {
     "agent": "The Claude tool-use loop, registry and guardrails",
     "chat": "sparrow's chat surface and identity",
     "requests": "Requesting and finding media",

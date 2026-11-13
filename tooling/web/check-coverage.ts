@@ -8,11 +8,19 @@ import { parseArgs } from 'node:util'
  * entirely, so such a file neither raises nor lowers the total.
  */
 
-type Counter = 'LF' | 'LH' | 'FNF' | 'FNH'
+/** The lcov records the totals read: lines found and hit, functions found and hit. */
+const COUNTERS = {
+  linesFound: 'LF',
+  linesHit: 'LH',
+  functionsFound: 'FNF',
+  functionsHit: 'FNH',
+} as const
+
+type Counter = (typeof COUNTERS)[keyof typeof COUNTERS]
 
 const METRICS = [
-  { name: 'lines', hit: 'LH', found: 'LF' },
-  { name: 'functions', hit: 'FNH', found: 'FNF' },
+  { name: 'lines', hit: COUNTERS.linesHit, found: COUNTERS.linesFound },
+  { name: 'functions', hit: COUNTERS.functionsHit, found: COUNTERS.functionsFound },
 ] as const satisfies ReadonlyArray<{ name: string; hit: Counter; found: Counter }>
 
 type ReadFloorProps = { name: string; value: string | undefined }

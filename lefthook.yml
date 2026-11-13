@@ -5,46 +5,14 @@ pre-commit:
     - name: 🧹 lint-staged
       run: bun run lint-staged
 
-# The checks `bun run verify` runs, in parallel.
-# All but dead-code and dead-css, which the PR checks run instead.
+# The checks `bun run verify` runs but dead-code and dead-css, which the PR checks run instead,
+# as one Nx run (`verify:push`), so its tasks share one daemon and one lock instead of a dozen
+# racing for them, beside the repository-rule audit.
 pre-push:
   parallel: true
   jobs:
-    - name: ✨ format check
-      run: bun run format:check
-
-    - name: 🔎 typecheck
-      run: bun run typecheck
-
-    - name: 🟦 TypeScript only
-      run: bun run typescript-only
-
-    - name: 🐍 lint python
-      run: bun run lint:py
-
-    - name: 🚧 lint typescript
-      run: bun run lint:ts
-
-    - name: 🎨 lint css
-      run: bun run lint:css
-
-    - name: 📝 spellcheck
-      run: bun run spellcheck
-
-    - name: 🧩 One command per script
-      run: bun run one-command-per-script
-
-    - name: 💬 Comment style
-      run: bun run comment-style
-
-    - name: 🧪 test
-      run: bun run test
-
-    - name: 📱 test screens
-      run: bun run test:screens
-
-    - name: 📦 build
-      run: bun run build
+    - name: ✅ verify:push
+      run: bun run verify:push
 
     # Claude Code reads the commits being pushed against CLAUDE.md for the rules no linter checks.
     - name: 🧭 CLAUDE.md audit

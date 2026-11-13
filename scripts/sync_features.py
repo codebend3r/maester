@@ -16,43 +16,80 @@ PROJECTS_TOKEN secret in CI.
 """
 
 import argparse
-import json
 import re
-import subprocess
+from collections.abc import Callable
 from datetime import date, timedelta
+from typing import TypedDict
 
-from features import FEATURES
+from features import FEATURES, DraftStory, Feature, Status
+from tracker import OWNER, REPO, RateLimited, gh, gh_json
 
-OWNER = "codebend3r"
-REPO = f"{OWNER}/maester"
 PR_FIELDS = "number,title,url,body,state,headRefName,mergedAt,projectItems"
 FEATURE_LINE = re.compile(r"^Feature:\s*(.+?)\s*$", re.M | re.I)
 TITLE_PREFIX = re.compile(r"^MAE:\s*")
-OPEN = "In Progress"
-MERGED = "Done"
+OPEN: Status = "In Progress"
+MERGED: Status = "Done"
 
 
-class RateLimited(RuntimeError):
-    """GitHub's API budget, shared by everything signed in as this user, is used up."""
+class ProjectItemRef(TypedDict):
+    title: str
 
 
-def gh(*args: str) -> str:
-    r = subprocess.run(["gh", *args], capture_output=True, text=True)
-    if r.returncode != 0:
-        error = RateLimited if "rate limit" in r.stderr.lower() else RuntimeError
-        raise error(f"gh {' '.join(args)}\n{r.stderr}")
-    return r.stdout.strip()
+class PullRequest(TypedDict):
+    """A pull request as `gh pr list --json` returns `PR_FIELDS`."""
+
+    number: int
+    title: str
+    url: str
+    body: str | None
+    state: str
+    headRefName: str
+    mergedAt: str | None
+    projectItems: list[ProjectItemRef]
 
 
-def gh_json(*args: str):
-    return json.loads(gh(*args))
+class Project(TypedDict, total=False):
+    """A project as `gh project list` returns it, or one a dry run only plans (`planned`)."""
+
+    number: int
+    id: str
+    title: str
+    closed: bool
+    planned: bool
 
 
-def project_json(*args: str):
+class ItemContent(TypedDict, total=False):
+    url: str
+    title: str
+
+
+class ProjectItem(TypedDict, total=False):
+    id: str
+    title: str
+    status: Status
+    content: ItemContent
+
+
+class StatusField(TypedDict):
+    id: str
+    name: str
+    options: list[dict[str, str]]
+
+
+class ProjectDetail(TypedDict):
+    status: StatusField
+    options: dict[str, str]
+    items: dict[str, ProjectItem]
+
+
+AddItem = Callable[[], ProjectItem]
+
+
+def project_json(*args: str):  # the JSON's shape is the caller's to name
     return gh_json("project", *args, "--format", "json")
 
 
-def feature_for(pr: dict) -> dict:
+def feature_for(pr: PullRequest) -> Feature:
     """The feature a pull request belongs to: named in its body, else by branch, else its own."""
     if named := FEATURE_LINE.search(pr["body"] or ""):
         wanted = named[1].casefold()
@@ -73,14 +110,14 @@ def feature_for(pr: dict) -> dict:
     }
 
 
-def status_for(pr: dict) -> str | None:
+def status_for(pr: PullRequest) -> Status | None:
     """In Progress while open, Done once merged, nothing for a PR closed without merging."""
     if pr["state"] == "OPEN":
         return OPEN
     return MERGED if pr["mergedAt"] else None
 
 
-def recent_prs(days: int) -> list[dict]:
+def recent_prs(days: int) -> list[PullRequest]:
     since = (date.today() - timedelta(days=days)).isoformat()
     common = ("pr", "list", "-R", REPO, "--limit", "200", "--json", PR_FIELDS)
     opened = gh_json(*common, "--state", "open")
@@ -94,10 +131,10 @@ class Projects:
     def __init__(self, dry_run: bool):
         self.dry_run = dry_run
         listed = project_json("list", "--owner", OWNER, "--closed", "--limit", "200")
-        self.by_title = {p["title"]: p for p in listed["projects"]}
-        self.details: dict[int, dict] = {}
+        self.by_title: dict[str, Project] = {p["title"]: p for p in listed["projects"]}
+        self.details: dict[int, ProjectDetail] = {}
 
-    def holder_of(self, pr: dict) -> dict | None:
+    def holder_of(self, pr: PullRequest) -> Project | None:
         """The project already holding `pr`: its own project under an earlier title.
 
         Read from the PR's `projectItems`, never by listing every project's items, which costs
@@ -113,7 +150,7 @@ class Projects:
             None,
         )
 
-    def rename(self, project: dict, title: str) -> dict:
+    def rename(self, project: Project, title: str) -> Project:
         print(f"~ project {project['title']!r} → {title!r}")
         if not self.dry_run:
             gh("project", "edit", str(project["number"]), "--owner", OWNER, "--title", title)
@@ -121,7 +158,7 @@ class Projects:
         self.by_title[title] = project | {"title": title}
         return self.by_title[title]
 
-    def ensure(self, feature: dict, pr: dict | None = None) -> dict | None:
+    def ensure(self, feature: Feature, pr: PullRequest | None = None) -> Project | None:
         """The feature's project, made or reopened if need be. None on a dry run that would make it.
 
         A pull request's own project is named after its title, so when the title changes the
@@ -151,7 +188,7 @@ class Projects:
             project["closed"] = False
         return project
 
-    def detail(self, number: int) -> dict:
+    def detail(self, number: int) -> ProjectDetail:
         if number not in self.details:
             fields = project_json("field-list", str(number), "--owner", OWNER)["fields"]
             status = next(f for f in fields if f["name"] == "Status")
@@ -164,11 +201,11 @@ class Projects:
         return self.details[number]
 
     @staticmethod
-    def item_key(item: dict) -> str:
+    def item_key(item: ProjectItem) -> str:
         content = item.get("content") or {}
         return content.get("url") or f"draft:{item.get('title') or content.get('title')}"
 
-    def place(self, project: dict, key: str, label: str, status: str, add) -> None:
+    def place(self, project: Project, key: str, label: str, status: Status, add: AddItem) -> None:
         """Put one item on the project with the given Status, adding it with `add` if missing."""
         number = project["number"]
         info = self.detail(number)
@@ -185,7 +222,7 @@ class Projects:
            "--single-select-option-id", info["options"][status])  # fmt: skip
 
 
-def sync_pr(projects: Projects, pr: dict) -> None:
+def sync_pr(projects: Projects, pr: PullRequest) -> None:
     status = status_for(pr)
     if status is None:
         return
@@ -195,7 +232,7 @@ def sync_pr(projects: Projects, pr: dict) -> None:
         print(f"+ {feature['name']}: #{pr['number']} → {status}")
         return
 
-    def add() -> dict:
+    def add() -> ProjectItem:
         return project_json("item-add", str(project["number"]), "--owner", OWNER,
                        "--url", pr["url"])  # fmt: skip
 
@@ -213,7 +250,7 @@ def sync_stories(projects: Projects) -> None:
             if key in projects.detail(project["number"])["items"]:
                 continue
 
-            def add(story=story, project=project) -> dict:
+            def add(story: DraftStory = story, project: Project = project) -> ProjectItem:
                 return project_json("item-create", str(project["number"]), "--owner", OWNER,
                                "--title", story["title"], "--body", story["body"])  # fmt: skip
 

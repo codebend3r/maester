@@ -1,14 +1,17 @@
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
+import { SERVER_PATHS, WRITE_ERRORS } from '@rookery/core'
 import {
+  CACHE_POLICIES,
   CONTENT_TYPES,
   HEADERS,
   HTTP_METHODS,
+  HTTP_STATUSES,
   compressResponses,
   serveWebApp,
-  CACHE_POLICIES,
 } from '@shared/server'
 import { AppModule } from '@/appModule'
+import { DEFAULT_PIN_CHECK, type PinCheck } from '@/auth/signInService'
 import { type Clock, systemClock } from '@/clock'
 import type { ServerConfig } from '@/config'
 import { HttpPlexTv, type PlexTv } from '@/plex/plexTv'
@@ -20,20 +23,16 @@ const READ_METHODS = {
   options: HTTP_METHODS.options,
 } as const
 const READS = new Set<string>(Object.values(READ_METHODS))
-/*
- * Where the server's own routes live: never cached, and a miss under one is a
- * JSON 404 rather than the web app.
- */
-const SERVER_PREFIXES = ['/api/', '/internal/', '/auth/']
 
-/** Why a write was refused before reaching its route. */
-export const WRITE_ERRORS = { jsonRequired: 'json_required' } as const
+/** Nest's log levels the server prints when it is not quiet. */
+const LOG_LEVELS = { log: 'log', warn: 'warn', error: 'error' } as const
 
 type CreateAppProps = {
   config: ServerConfig
   plexTv?: PlexTv
   clock?: Clock
-  quiet?: boolean
+  pinCheck?: PinCheck
+  isQuiet?: boolean
 }
 
 /**
@@ -44,12 +43,13 @@ export const createApp = async ({
   config,
   plexTv = new HttpPlexTv(),
   clock = systemClock,
-  quiet = false,
+  pinCheck = DEFAULT_PIN_CHECK,
+  isQuiet = false,
 }: CreateAppProps): Promise<NestFastifyApplication> => {
   const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule.register({ config, plexTv, clock }),
+    AppModule.register({ config, plexTv, clock, pinCheck }),
     new FastifyAdapter(),
-    { logger: quiet ? false : ['log', 'warn', 'error'] },
+    { logger: isQuiet ? false : Object.values(LOG_LEVELS) },
   )
 
   const fastify = app.getHttpAdapter().getInstance()
@@ -59,13 +59,15 @@ export const createApp = async ({
    * answers, so this is its CSRF protection along with SameSite=Lax.
    */
   fastify.addHook('onRequest', async (request, reply) => {
-    if (SERVER_PREFIXES.some((prefix) => request.url.startsWith(prefix))) {
+    if (SERVER_PATHS.some((path) => request.url.startsWith(path))) {
       reply.header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
     }
     const type = request.headers[HEADERS.contentType]?.toLowerCase() ?? ''
     // Returning the reply ends the request here instead of running the route.
     if (!READS.has(request.method) && !type.startsWith(CONTENT_TYPES.json)) {
-      return reply.code(415).send({ reason: WRITE_ERRORS.jsonRequired })
+      return reply
+        .code(HTTP_STATUSES.unsupportedMediaType)
+        .send({ reason: WRITE_ERRORS.jsonRequired })
     }
     return undefined
   })
@@ -75,7 +77,7 @@ export const createApp = async ({
    * In Docker the server hands out the built web app too, so there is one
    * port. In development Vite serves it and proxies the server's routes here.
    */
-  await serveWebApp({ app, webDir: config.webDir, serverPrefixes: SERVER_PREFIXES })
+  await serveWebApp({ app, webDir: config.webDir, serverPrefixes: SERVER_PATHS })
   app.enableShutdownHooks()
   return app
 }

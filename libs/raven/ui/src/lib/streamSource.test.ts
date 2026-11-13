@@ -755,6 +755,42 @@ describe('createStreamSession', () => {
     expect(errors).toEqual(["This browser can't play converted video."])
   })
 
+  it('reports a browser that refuses the stream type', async () => {
+    const { environment, fetched } = setup()
+    const source = environment.createMediaSource()
+    if (!source) throw new Error('No media source')
+    const refusing: MediaSourceLike = {
+      get readyState() {
+        return source.readyState
+      },
+      get duration() {
+        return source.duration
+      },
+      set duration(value: number) {
+        source.duration = value
+      },
+      addSourceBuffer: () => {
+        throw new Error('unsupported')
+      },
+      endOfStream: () => source.endOfStream(),
+      addEventListener: source.addEventListener,
+      removeEventListener: source.removeEventListener,
+    }
+    const errors: string[] = []
+    createStreamSession({
+      video: fakeVideo(),
+      mime: 'video/mp4',
+      duration: null,
+      start: 0,
+      url: () => 'x',
+      onError: (message) => errors.push(message),
+      environment: { ...environment, createMediaSource: () => refusing },
+    })
+    await settle()
+    expect(errors).toEqual(["This browser can't play the converted video."])
+    expect(fetched).toEqual([])
+  })
+
   it('stops and stays quiet once destroyed', async () => {
     const video = fakeVideo()
     const { environment, fetched } = setup({ ok: false })

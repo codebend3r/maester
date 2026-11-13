@@ -1,6 +1,6 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import { screen } from '@testing-library/react'
-import { ROUTES } from '@/lib/routes'
+import { PAGE_PATHS } from '@rookery/core'
 import { HomePage } from '@/pages/HomePage/HomePage'
 import { renderAt } from '@/test/render'
 
@@ -15,7 +15,10 @@ describe('HomePage', () => {
     renderAt({ ui: <HomePage /> })
 
     expect(await screen.findByRole('heading', { name: 'Signed in as alice' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Sign out' })).toHaveAttribute('href', ROUTES.logout)
+    expect(screen.getByRole('link', { name: 'Sign out' })).toHaveAttribute(
+      'href',
+      PAGE_PATHS.logout,
+    )
   })
 
   it('sends anyone without a session to /login', async () => {

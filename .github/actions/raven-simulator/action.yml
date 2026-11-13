@@ -1,0 +1,51 @@
+name: 📱 Boot a simulator
+description: >-
+  A fresh simulator on the runtime of the selected Xcode's SDK, booted, with an app installed.
+  A runner with no such runtime fails here rather than testing on another.
+
+inputs:
+  sdk:
+    description: The simulator SDK, `iphonesimulator` or `appletvsimulator`
+    required: true
+  runtime:
+    description: The runtime family simctl lists, `iOS` or `tvOS`
+    required: true
+  name:
+    description: The simulator's name, which later steps address it by
+    required: true
+  device-type:
+    description: The CoreSimulator device type identifier
+    required: true
+  app:
+    description: The .app to install
+    required: true
+  skip-keyboard-intro:
+    description: >-
+      Mark the swipe-typing intro as shown, since it held the app's main thread for 30 s under
+      the search flow
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: 📱 Boot the simulator
+      shell: bash
+      env:
+        SDK: ${{ inputs.sdk }}
+        RUNTIME: ${{ inputs.runtime }}
+        NAME: ${{ inputs.name }}
+        DEVICE_TYPE: ${{ inputs.device-type }}
+        APP: ${{ inputs.app }}
+        SKIP_KEYBOARD_INTRO: ${{ inputs.skip-keyboard-intro }}
+      run: |
+        set -euo pipefail
+        sdk="$(xcrun --sdk "$SDK" --show-sdk-version)"
+        runtime="$(xcrun simctl list -j runtimes "$RUNTIME" | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
+        device="$(xcrun simctl create "$NAME" "$DEVICE_TYPE" "$runtime")"
+        xcrun simctl boot "$device"
+        xcrun simctl bootstatus "$device" -b
+        if [ "$SKIP_KEYBOARD_INTRO" = true ]; then
+          xcrun simctl spawn "$device" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
+        fi
+        xcrun simctl install "$device" "$APP"

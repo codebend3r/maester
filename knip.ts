@@ -25,10 +25,11 @@ export default {
       /*
        * knip's Expo plugin expects expo-updates unless the config turns updates
        * off; the app ships no over-the-air updates and does not install it.
-       * `@raven/audio` is imported only through `@raven/native`'s host, but Expo
-       * autolinks a native module only from the app's own dependencies.
+       * `@raven/audio` and `expo-file-system` are imported only through
+       * `@raven/native` (its music host, its downloads' disk), but Expo autolinks a
+       * native module only from the app's own dependencies.
        */
-      ignoreDependencies: ['expo-updates', '@raven/audio'],
+      ignoreDependencies: ['expo-updates', '@raven/audio', 'expo-file-system'],
     },
     'apps/raven/music': {
       /*
@@ -49,11 +50,8 @@ export default {
       ignoreBinaries: ['openssl'],
     },
     'apps/raven/desktop': {
-      /*
-       * Electron's main and preload bundles and the Forge config are entry
-       * points no import names.
-       */
-      entry: ['src/main/main.ts', 'src/preload/preload.ts', 'forge.config.ts'],
+      // Electron's main and preload bundles are entry points no import names; knip's Forge plugin finds its config.
+      entry: ['src/main/main.ts', 'src/preload/preload.ts'],
     },
     'apps/raven/supabase': {
       /*

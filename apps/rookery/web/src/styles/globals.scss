@@ -39,10 +39,18 @@
   --font-size-lg: 1.25rem;
   --font-size-xl: 2rem;
 
+  --font-weight-regular: 400;
+  --font-weight-bold: 600;
+
   --line-tight: 1.1;
   --line-body: 1.5;
 
   --measure: 26rem;
+  --size-avatar: 3rem;
+  --radius-round: 50%;
+  --duration-quick: 120ms;
+  --opacity-disabled: 0.7;
+  --focus-offset: 3px;
   --focus-ring: 2px solid var(--color-parchment);
 
   color-scheme: dark;
@@ -83,7 +91,7 @@ a {
 
 :focus-visible {
   outline: var(--focus-ring);
-  outline-offset: 3px;
+  outline-offset: var(--focus-offset);
 }
 
 img {
@@ -95,7 +103,8 @@ img {
   *,
   *::before,
   *::after {
-    transition-duration: 0.01ms;
     animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
   }
 }

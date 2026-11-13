@@ -1,6 +1,7 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor } from '@testing-library/react'
-import { API_ROUTES, HTTP_METHODS } from '@/lib/api'
+import { ROUTES } from '@rookery/core'
+import { HTTP_METHODS } from '@shared/http'
 import { browser } from '@/lib/browser'
 import { LogoutPage } from '@/pages/LogoutPage/LogoutPage'
 import { renderAt } from '@/test/render'
@@ -15,7 +16,7 @@ describe('LogoutPage', () => {
 
     await waitFor(() => expect(goTo).toHaveBeenCalledWith('https://sparrow.example.com/'))
     const [url, init = {}] = fetch.mock.calls[0] ?? []
-    expect(url).toBe(API_ROUTES.logout)
+    expect(url).toBe(ROUTES.logout)
     expect(init.method).toBe(HTTP_METHODS.post)
     expect(init.body).toBe(JSON.stringify({ return_to: 'https://sparrow.example.com/' }))
   })

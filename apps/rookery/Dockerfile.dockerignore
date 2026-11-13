@@ -13,6 +13,7 @@
 !patches
 !libs/shared/http
 !libs/shared/server
+!libs/rookery/core
 !apps/rookery/server
 !apps/rookery/web
 **/node_modules

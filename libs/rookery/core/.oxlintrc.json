@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // No `browser` or `node` env on purpose: rookery's server and web app both import this library.
+  "extends": ["../../../tooling/oxlint/base.json"],
+  "rules": {
+    "no-console": "error"
+  },
+  "ignorePatterns": ["dist"],
+  "overrides": [
+    {
+      "files": ["src/**/*.test.ts"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

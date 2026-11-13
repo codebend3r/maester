@@ -5,8 +5,27 @@
     "node": true
   },
   "rules": {
-    // Nest declares a module as a decorated class that is empty or holds only
-    // a static factory; an undecorated one is still a finding.
+    /*
+     * Nest declares a module as a decorated class that is empty or holds only
+     * a static factory; an undecorated one is still a finding.
+     */
     "typescript/no-extraneous-class": ["error", { "allowWithDecorator": true }]
-  }
+  },
+  "overrides": [
+    {
+      // Vitest reads its config from a default export.
+      "files": ["vitest.config.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      "files": ["src/**/*.test.ts", "src/test/**", "src/e2e/**"],
+      "rules": {
+        "no-console": "off",
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
 }
