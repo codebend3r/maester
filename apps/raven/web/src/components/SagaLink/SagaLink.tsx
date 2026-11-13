@@ -14,7 +14,7 @@ const FANNED = 3
 type SagaCardProps = { itemId: number; libraryId: number; saga: Saga }
 
 const SagaCard = ({ itemId, libraryId, saga }: SagaCardProps) => {
-  const part = saga.media.findIndex((media) => media.item?.id === itemId) + 1
+  const part = saga.media.findIndex((media) => (media.item?.id ?? null) === itemId) + 1
   return (
     <Link to={sagaPath({ libraryId, saga })} className={styles.card}>
       <span className={styles.fan} aria-hidden="true">
@@ -48,6 +48,8 @@ type SagaLinkProps = { itemId: number; libraryId: number }
  */
 export const SagaLink = ({ itemId, libraryId }: SagaLinkProps) => {
   const sagas = useQuery(sagasQuery(libraryId))
-  const saga = sagas.data?.find((entry) => entry.media.some((media) => media.item?.id === itemId))
+  const saga = sagas.data?.find((entry) =>
+    entry.media.some((media) => (media.item?.id ?? null) === itemId),
+  )
   return saga !== undefined && <SagaCard itemId={itemId} libraryId={libraryId} saga={saga} />
 }

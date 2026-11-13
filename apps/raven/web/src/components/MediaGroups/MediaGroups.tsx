@@ -10,11 +10,12 @@ import { MediaGrid } from '@/components/MediaGrid/MediaGrid'
 import { FactText } from '@raven/ui'
 import styles from '@/components/MediaGroups/MediaGroups.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { CARD_PICTURES, type CardPicture } from '@/lib/cardPictures'
 
 type MediaGroupsProps = {
   items: MediaItem[]
   by: MediaGroupBy
-  posters?: boolean
+  picture?: CardPicture
   matchType?: MatchItemType | null
   sort?: MediaSort
 }
@@ -23,7 +24,7 @@ type MediaGroupsProps = {
 export const MediaGroups = ({
   items,
   by,
-  posters = false,
+  picture = CARD_PICTURES.frame,
   matchType = null,
   sort,
 }: MediaGroupsProps) => (
@@ -34,7 +35,7 @@ export const MediaGroups = ({
         label={<FactText fact={group.label} />}
         count={COMMON_COPY.videos(group.items.length)}
       >
-        <MediaGrid items={group.items} posters={posters} matchType={matchType} sort={sort} />
+        <MediaGrid items={group.items} picture={picture} matchType={matchType} sort={sort} />
       </Bucket>
     ))}
   </div>

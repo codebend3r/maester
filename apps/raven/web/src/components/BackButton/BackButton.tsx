@@ -1,15 +1,16 @@
 import type { ComponentType } from 'react'
-import { Button, ButtonLink, useCanGoBack } from '@raven/ui'
+import { BUTTON_TONES, Button, ButtonLink, useCanGoBack } from '@raven/ui'
 import { useNavigate } from 'react-router-dom'
 import { BACK_BUTTON_COPY } from '@/components/BackButton/copy'
 import styles from '@/components/BackButton/BackButton.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { APP_PATHS } from '@/lib/appPaths'
 
 /** Where a page goes back to when nothing of the app is behind it, and what it is called. */
 export type BackFallback = { to: string; label: string }
 
 /** The way back for a page that hangs off the home page. */
-export const HOME = { to: '/', label: COMMON_COPY.home } as const satisfies BackFallback
+export const HOME = { to: APP_PATHS.home, label: COMMON_COPY.home } as const satisfies BackFallback
 
 /** Which way back there is: the app's own history, the fallback, or none. */
 const BACK_WAYS = { history: 'history', fallback: 'fallback', none: 'none' } as const
@@ -23,7 +24,12 @@ type HistoryBackProps = BackWayProps
 const HistoryBack = ({ classes }: HistoryBackProps) => {
   const navigate = useNavigate()
   return (
-    <Button tone="pill" icon="back" className={classes} onClick={() => void navigate(-1)}>
+    <Button
+      tone={BUTTON_TONES.pill}
+      icon="back"
+      className={classes}
+      onClick={() => void navigate(-1)}
+    >
       <span className={styles.backLabel}>{BACK_BUTTON_COPY.back}</span>
     </Button>
   )
@@ -33,7 +39,7 @@ type FallbackBackProps = BackWayProps
 
 const FallbackBack = ({ fallback, classes }: FallbackBackProps) =>
   fallback !== null && (
-    <ButtonLink tone="pill" to={fallback.to} icon="back" className={classes}>
+    <ButtonLink tone={BUTTON_TONES.pill} to={fallback.to} icon="back" className={classes}>
       <span className={styles.backLabel}>{fallback.label}</span>
     </ButtonLink>
   )

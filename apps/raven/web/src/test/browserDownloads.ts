@@ -19,13 +19,13 @@ import type { DownloadClock } from '@/browserDownloads/clock'
 import { DiskFullError, type DiskPath, type DownloadDisk } from '@/browserDownloads/disk'
 import { type BrowserDownloads, createBrowserDownloads } from '@/browserDownloads/engine'
 import { browserDownloadsHost } from '@/browserDownloads/host'
-import { HEADERS } from '@/browserDownloads/fetchBytes'
-import { HTTP } from '@/browserDownloads/outcomes'
+import { HTTP_STATUSES } from '@shared/http'
 import type { BytesAnswer, DownloadServer } from '@/browserDownloads/server'
 import { browserTabs, type DownloadTabs, type TabMessage } from '@/browserDownloads/tabs'
 import { useBrowserDownloads } from '@/stores/browserDownloads'
 import { useDownloadsHostStore } from '@/stores/downloadsHost'
 import { library as libraryFixture } from '@/test/fixtures'
+import { HEADERS } from '@shared/http'
 
 export const ACCOUNT = '11111111-1111-4111-8111-111111111111'
 export const OTHER_ACCOUNT = '22222222-2222-4222-8222-222222222222'
@@ -208,7 +208,7 @@ export const rangedAnswer = ({ bytes, from }: RangedProps): BytesAnswer => {
       : [[HEADERS.contentLength, String(bytes.byteLength)]],
   )
   return {
-    status: from > 0 ? HTTP.partial : HTTP.ok,
+    status: from > 0 ? HTTP_STATUSES.partialContent : HTTP_STATUSES.ok,
     headers: { get: (name) => headers.get(name) ?? null },
     body: new ReadableStream<Uint8Array>({
       start: (controller) => {
@@ -231,7 +231,7 @@ export const stuckAnswer = (first: Uint8Array) => {
     controller: null,
   }
   const answer: BytesAnswer = {
-    status: HTTP.ok,
+    status: HTTP_STATUSES.ok,
     headers: { get: () => null },
     body: new ReadableStream<Uint8Array>({
       start: (controller) => {
@@ -332,7 +332,9 @@ export const fakeServer = ({
       if (next instanceof Error) throw next
       if (next !== undefined) return next
       const bytes = files[mediaId]
-      return bytes === undefined ? statusAnswer(HTTP.notFound) : rangedAnswer({ bytes, from })
+      return bytes === undefined
+        ? statusAnswer(HTTP_STATUSES.notFound)
+        : rangedAnswer({ bytes, from })
     },
     picture: mock(async ({ itemId, kind }: PictureAsk) => {
       const picture = pictures[`${itemId}:${kind}`]

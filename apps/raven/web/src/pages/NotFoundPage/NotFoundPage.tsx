@@ -1,18 +1,17 @@
 import { themeOf } from '@raven/core'
-import { ButtonLink } from '@raven/ui'
+import { BUTTON_TONES, ButtonLink } from '@raven/ui'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { useMusicLinks } from '@/lib/useMusicLinks'
 import { useTheme } from '@/stores/theme'
 import { NOT_FOUND_COPY } from '@/pages/NotFoundPage/copy'
 import styles from '@/pages/NotFoundPage/NotFoundPage.module.scss'
+import { APP_PATHS } from '@/lib/appPaths'
 
 /** The mark drawn for each ground, as the side menu's logo picks it. */
 const MARKS = {
   dark: '/brand/raven-mark-on-dark.svg',
   light: '/brand/raven-mark-on-light.svg',
 } as const
-
-const LIBRARIES_PATH = '/libraries'
 
 /**
  * What an address that names nothing shows: a 4, an empty poster holding
@@ -37,7 +36,7 @@ export const NotFoundPage = () => {
         <h1 className={styles.title}>{NOT_FOUND_COPY.title}</h1>
         <p className={styles.copy}>{NOT_FOUND_COPY.body}</p>
         <nav className={styles.actions} aria-label={NOT_FOUND_COPY.waysBack}>
-          <ButtonLink to={LIBRARIES_PATH} tone="primary" size="large">
+          <ButtonLink to={APP_PATHS.libraries} tone={BUTTON_TONES.primary} size="large">
             {NOT_FOUND_COPY.backToLibraries}
           </ButtonLink>
           <ButtonLink to={home.to} size="large">

@@ -8,7 +8,7 @@ import {
   isMixKind,
   routeState,
 } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { KeyedView, type ViewOf, type ViewsOf, useAudioQueue } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useId } from 'react'
@@ -62,7 +62,7 @@ const MixView = ({ details }: MixViewProps) => {
           <p className={styles.facts}>{MIX_PAGE_COPY.note}</p>
           <div className={styles.actions}>
             <Button
-              tone="primary"
+              tone={BUTTON_TONES.primary}
               icon="play"
               disabled={tracks.length === 0}
               onClick={() => playTracks({ tracks, source })}

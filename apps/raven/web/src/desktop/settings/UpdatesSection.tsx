@@ -5,17 +5,18 @@ import {
   UPDATE_WORDS,
   type UpdateStatus,
 } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useId, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { refusalText } from '@/desktop/client'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { UPDATES_SECTION_COPY } from '@/desktop/settings/copy'
 import { Section } from '@/pages/SettingsPage/Section'
 import { useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/settings/DesktopSettings.module.scss'
 import settings from '@/pages/SettingsPage/SettingsPage.module.scss'
+import { ToggleChoice } from '@/pages/SettingsPage/ToggleChoice'
 
 type CheckedLineProps = Pick<UpdateStatus, 'current' | 'checkedAt'>
 
@@ -52,7 +53,6 @@ type UpdateRequest = Extract<
 export const UpdatesSection = () => {
   const { client } = useDesktop()
   const queryClient = useQueryClient()
-  const hintId = useId()
   const isCheckingNow = useRef(false)
   const [isChecking, setIsChecking] = useState(false)
   // Bumped on each answer, so the results remount and the live region speaks them again.
@@ -134,18 +134,12 @@ export const UpdatesSection = () => {
         </p>
       )}
       {status !== null && (
-        <label className={settings.choice}>
-          <input
-            type="checkbox"
-            checked={picked ?? status.isEnabled}
-            aria-describedby={hintId}
-            onChange={(event) => handled(setEnabled(event.target.checked))}
-          />
-          <span className={settings.choiceLabel}>{UPDATES_SECTION_COPY.checkDaily}</span>
-          <span id={hintId} className={settings.choiceHint}>
-            {checkedLine(status)}
-          </span>
-        </label>
+        <ToggleChoice
+          label={UPDATES_SECTION_COPY.checkDaily}
+          hint={checkedLine(status)}
+          isChecked={picked ?? status.isEnabled}
+          onChange={(isEnabled) => handled(setEnabled(isEnabled))}
+        />
       )}
       {/* Always mounted: a live region is announced when its text changes, not when it appears. */}
       <output className={styles.said}>
@@ -164,7 +158,7 @@ export const UpdatesSection = () => {
             {UPDATES_SECTION_COPY.checkNow}
           </Button>
           {status.latest !== null && (
-            <Button tone="primary" onClick={() => handled(openRelease())}>
+            <Button tone={BUTTON_TONES.primary} onClick={() => handled(openRelease())}>
               {UPDATES_SECTION_COPY.whatsNew}
             </Button>
           )}

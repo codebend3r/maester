@@ -8,12 +8,13 @@ import {
 } from '@raven/core'
 import { useSearchParams } from 'react-router-dom'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
-import { ItemHeaderSkeleton } from '@/components/ItemHeader/ItemHeader'
+import { ItemHeaderSkeleton, PICTURE_SHAPES } from '@/components/ItemHeader/ItemHeader'
 import { PlayableItemView } from '@/components/PlayableItemView/PlayableItemView'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { useRouteItem } from '@/lib/routeQuery'
 import { EPISODE_COPY } from '@/pages/EpisodePage/copy'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
+import { PAGE_PARAMS } from '@/lib/appPaths'
 
 const EPISODE_VIEW_KEYS = { pending: 'pending', missing: 'missing', ready: 'ready' } as const
 
@@ -54,7 +55,7 @@ const episodeViewOf = ({ page, library }: EpisodeViewOfProps): ViewOf<EpisodeVie
       props: {
         state: page,
         noun: EPISODE_COPY.noun,
-        shape: <ItemHeaderSkeleton picture="still" />,
+        shape: <ItemHeaderSkeleton picture={PICTURE_SHAPES.still} />,
       },
     }
   const shown = libraryFiles({ versions: page.data.versions, library, file: null })
@@ -74,7 +75,7 @@ export const EpisodePage = () => {
   return (
     <KeyedView<EpisodeViewProps>
       views={EPISODE_VIEWS}
-      view={episodeViewOf({ page, library: queryId(params.get('library')) })}
+      view={episodeViewOf({ page, library: queryId(params.get(PAGE_PARAMS.library)) })}
     />
   )
 }

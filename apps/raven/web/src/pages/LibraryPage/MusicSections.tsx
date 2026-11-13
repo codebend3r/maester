@@ -13,7 +13,7 @@ import {
   type SortDirection,
   musicListQuery,
 } from '@raven/core'
-import { Button, useToasts } from '@raven/ui'
+import { BUTTON_TONES, Button, useToasts } from '@raven/ui'
 import { type Search, useAudioQueue } from '@raven/ui/headless'
 import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -107,7 +107,7 @@ const AlbumsToolbar = ({
         {LIBRARY_COPY.directions[order]}
       </Button>
       <Button
-        tone="primary"
+        tone={BUTTON_TONES.primary}
         icon="play"
         className={styles.musicPlay}
         disabled={play.isPending || !isPlayable}

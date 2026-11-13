@@ -21,6 +21,7 @@ import {
 } from '@/desktop/player/playerServices'
 import { DL_1, DL_2, fakeClient, FILE_ID, sentOfType, settled } from '@/test/desktop'
 import { useWindowChrome } from '@/stores/windowChrome'
+import { NO_TITLE_EXTRAS } from '@raven/ui/headless'
 
 const FILE: LocalFile = {
   fileId: FILE_ID,
@@ -67,6 +68,7 @@ describe('playerActionFor', () => {
 describe('fileServicesFor', () => {
   it('describes a local file, going back to On this Mac', () => {
     expect(setup().services.title).toEqual({
+      ...NO_TITLE_EXTRAS,
       label: 'Clip 01',
       context: null,
       duration: null,

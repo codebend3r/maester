@@ -5,6 +5,7 @@ import {
   cardTitle,
   mediaEntryKey,
   showEntryKey,
+  showPath,
 } from '@raven/core'
 import type { ComponentProps, ReactNode } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
@@ -15,6 +16,8 @@ import { POSTER_SIZES } from '@/lib/posters'
 import { pageItemOf } from '@/lib/prefetchItem'
 import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/CoverGrid/CoverGrid.module.scss'
+import { CARD_PICTURES, type CardPicture } from '@/lib/cardPictures'
+import { classNames } from '@raven/ui'
 
 type CoverProps = {
   entry: string
@@ -45,22 +48,27 @@ const Cover = ({ entry, title, link, children }: CoverProps) => {
   )
 }
 
-type CoverListProps = { posters: boolean; children: ReactNode }
+const COVER_CLASSES = {
+  [CARD_PICTURES.poster]: classNames([styles.grid, styles.posters]),
+  [CARD_PICTURES.frame]: styles.grid,
+} as const satisfies Record<CardPicture, string>
+
+type CoverListProps = { picture: CardPicture; children: ReactNode }
 
 /** The grid of covers, posters or frame grabs, side by side with little between. */
-const CoverList = ({ posters, children }: CoverListProps) => (
-  <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>{children}</ul>
+const CoverList = ({ picture, children }: CoverListProps) => (
+  <ul className={COVER_CLASSES[picture]}>{children}</ul>
 )
 
-type MediaCoversProps = { items: MediaItem[]; posters: boolean }
+type MediaCoversProps = { items: MediaItem[]; picture: CardPicture }
 
 /**
  * A library's videos as nothing but their covers, each opening the video's
  * page, or the player for one with no page: posters for a library that is
  * matched, frame grabs for one that is not.
  */
-export const MediaCovers = ({ items, posters }: MediaCoversProps) => (
-  <CoverList posters={posters}>
+export const MediaCovers = ({ items, picture }: MediaCoversProps) => (
+  <CoverList picture={picture}>
     {items.map((media) => (
       <Cover
         key={media.id}
@@ -78,13 +86,13 @@ type ShowCoversProps = { shows: ShowEntry[] }
 
 /** A TV library's shows as nothing but their posters, each opening the show's page. */
 export const ShowCovers = ({ shows }: ShowCoversProps) => (
-  <CoverList posters>
+  <CoverList picture={CARD_PICTURES.poster}>
     {shows.map(({ show }) => (
       <Cover
         key={show.id}
         entry={showEntryKey(show)}
         title={show.title}
-        link={{ to: `/shows/${show.id}`, prefetchItem: show.id }}
+        link={{ to: showPath(show.id), prefetchItem: show.id }}
       >
         <ItemPoster item={show} sizes={POSTER_SIZES.cover} />
       </Cover>
@@ -95,14 +103,14 @@ export const ShowCovers = ({ shows }: ShowCoversProps) => (
 /** How many blank covers stand in: a screen's worth at 1440 wide. */
 const SKELETON_COUNT = 24
 
-type CoverGridSkeletonProps = { posters: boolean }
+type CoverGridSkeletonProps = { picture: CardPicture }
 
 /** The covers while they are on their way: blank pictures in their places. */
-export const CoverGridSkeleton = ({ posters }: CoverGridSkeletonProps) => (
-  <CoverList posters={posters}>
+export const CoverGridSkeleton = ({ picture }: CoverGridSkeletonProps) => (
+  <CoverList picture={picture}>
     {Array.from({ length: SKELETON_COUNT }, (_, index) => (
       <li key={index} className={styles.cover}>
-        <Bone shape={posters ? 'poster' : 'frame'} />
+        <Bone shape={picture} />
       </li>
     ))}
   </CoverList>

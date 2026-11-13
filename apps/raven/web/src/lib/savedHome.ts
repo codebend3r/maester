@@ -37,7 +37,9 @@ type SavedEntryProps = { queryClient: QueryClient; queryKey: readonly unknown[] 
 
 const savedEntryOf = ({ queryClient, queryKey }: SavedEntryProps) => {
   const state = queryClient.getQueryState(queryKey)
-  return state?.data === undefined ? null : { updatedAt: state.dataUpdatedAt, data: state.data }
+  return state == null || state.data === undefined
+    ? null
+    : { updatedAt: state.dataUpdatedAt, data: state.data }
 }
 
 type SaveHomeProps = {

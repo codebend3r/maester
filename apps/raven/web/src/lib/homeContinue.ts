@@ -1,6 +1,3 @@
-/** The page that lists every video in progress, which home's Continue watching links to. */
-export const CONTINUE_WATCHING_PATH = '/continue-watching'
-
 /** Tiles the home page shows when the build names no count: three rows of two. */
 const DEFAULT_COUNT = 6
 

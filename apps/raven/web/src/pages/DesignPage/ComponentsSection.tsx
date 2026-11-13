@@ -1,8 +1,8 @@
-import { DEFAULT_LIBRARY_SETTINGS, type LibrarySettings } from '@raven/core'
+import { DEFAULT_LIBRARY_SETTINGS, type LibrarySettings, ITEM_TYPES } from '@raven/core'
 import { useRef, useState } from 'react'
-import { Button, ButtonLink, Controls } from '@raven/ui'
+import { BUTTON_TONES, Button, ButtonLink, Controls } from '@raven/ui'
 import { CastRow } from '@/components/CastRow/CastRow'
-import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
+import { ItemHeader, PICTURE_SHAPES } from '@/components/ItemHeader/ItemHeader'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { MediaGrid, MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
@@ -37,6 +37,8 @@ import {
   SAMPLE_SHOWS,
 } from '@/pages/DesignPage/samples'
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
+import { CARD_PICTURES } from '@/lib/cardPictures'
+import { APP_PATHS } from '@/lib/appPaths'
 
 const COPY = DESIGN_COPY.components
 
@@ -110,24 +112,24 @@ export const ComponentsSection = () => (
   <DesignSection id={SECTION_IDS.components} intro={COPY.intro}>
     <Specimen name={COPY.button} note={COPY.buttonNote}>
       <div className={styles.row}>
-        <Button tone="primary" size="large" icon="play">
+        <Button tone={BUTTON_TONES.primary} size="large" icon="play">
           {COPY.playAll}
         </Button>
-        <Button tone="primary" icon="plus">
+        <Button tone={BUTTON_TONES.primary} icon="plus">
           {COPY.addLibrary}
         </Button>
         <Button icon="edit">{COPY.edit}</Button>
-        <Button tone="danger" icon="trash">
+        <Button tone={BUTTON_TONES.danger} icon="trash">
           {COPY.deleteForGood}
         </Button>
-        <Button tone="ghost" icon="history">
+        <Button tone={BUTTON_TONES.ghost} icon="history">
           {COPY.history}
         </Button>
         <Button icon="close" aria-label={COPY.close} />
         <Button disabled icon="rescan">
           {COPY.fullScan}
         </Button>
-        <ButtonLink tone="pill" to="/" icon="back">
+        <ButtonLink tone={BUTTON_TONES.pill} to={APP_PATHS.home} icon="back">
           {COPY.libraries}
         </ButtonLink>
       </div>
@@ -177,7 +179,11 @@ export const ComponentsSection = () => (
     </Specimen>
 
     <Specimen name={COPY.posterCard} note={COPY.posterCardNote}>
-      <MediaGrid items={SAMPLE_MOVIES} posters matchType="movie" />
+      <MediaGrid
+        items={SAMPLE_MOVIES}
+        picture={CARD_PICTURES.poster}
+        matchType={ITEM_TYPES.movie}
+      />
     </Specimen>
 
     <Specimen name={COPY.showCard} note={COPY.showCardNote}>
@@ -186,17 +192,17 @@ export const ComponentsSection = () => (
 
     <Specimen name={COPY.itemHeader} isWide note={COPY.itemHeaderNote}>
       <ItemHeader
-        back={{ to: '/', label: COPY.itemHeaderBack }}
+        back={{ to: APP_PATHS.home, label: COPY.itemHeaderBack }}
         titleId="design-item-header"
         title={COPY.itemHeaderTitle}
         byline={COPY.itemHeaderByline}
         contentRating={COPY.itemHeaderRating}
         facts={COPY.itemHeaderFacts}
         ratings={SAMPLE_RATINGS}
-        picture={{ shape: 'poster', url: null }}
+        picture={{ shape: PICTURE_SHAPES.poster, url: null }}
         backdrop={null}
       >
-        <Button tone="primary" icon="play">
+        <Button tone={BUTTON_TONES.primary} icon="play">
           {COPY.resume}
         </Button>
         <Button icon="heart" aria-label={COPY.favourite} aria-pressed />
@@ -260,7 +266,7 @@ export const ComponentsSection = () => (
 
     <Specimen name={COPY.skeleton} note={COPY.skeletonNote}>
       <Loading label={COPY.skeletonLabel}>
-        <MediaGridSkeleton posters count={4} />
+        <MediaGridSkeleton picture={CARD_PICTURES.poster} count={4} />
         <MediaTilesSkeleton />
       </Loading>
     </Specimen>

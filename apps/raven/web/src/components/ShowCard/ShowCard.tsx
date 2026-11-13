@@ -10,6 +10,7 @@ import {
   showYears,
   watchedStateOf,
   watchPageOf,
+  showPath,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { ScoreFact } from '@/components/RatingPanel/RatingPanel'
@@ -106,7 +107,7 @@ export const ShowCard = ({
     <li className={styles.card} data-entry={showEntryKey(show)} {...card.select.rootProps}>
       <div className={styles.poster}>
         <CardLink
-          to={`/shows/${show.id}`}
+          to={showPath(show.id)}
           className={styles.picture}
           tabIndex={-1}
           aria-hidden="true"
@@ -132,7 +133,7 @@ export const ShowCard = ({
       </div>
       <div className={styles.words}>
         <CardLink
-          to={`/shows/${show.id}`}
+          to={showPath(show.id)}
           className={styles.title}
           tabIndex={card.select.linkTabIndex}
         >
@@ -179,7 +180,7 @@ const WideShowCard = ({ entry, sort, note = null }: WideShowCardProps) => {
   return (
     <li className={styles.wide} data-entry={showEntryKey(show)} {...card.select.rootProps}>
       <CardLink
-        to={`/shows/${show.id}`}
+        to={showPath(show.id)}
         className={styles.widePicture}
         tabIndex={-1}
         aria-hidden="true"
@@ -196,7 +197,7 @@ const WideShowCard = ({ entry, sort, note = null }: WideShowCardProps) => {
       <SelectCheckbox select={card.select} className={styles.wideSelect} />
       <div className={styles.body}>
         <CardLink
-          to={`/shows/${show.id}`}
+          to={showPath(show.id)}
           className={styles.wideTitle}
           tabIndex={card.select.linkTabIndex}
         >

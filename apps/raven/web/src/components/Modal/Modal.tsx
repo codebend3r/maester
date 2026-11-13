@@ -1,5 +1,5 @@
 import { type ReactNode, useId, useState } from 'react'
-import { Button, type IconName } from '@raven/ui'
+import { BUTTON_TONES, Button, type IconName } from '@raven/ui'
 import { MODAL_COPY } from '@/components/Modal/copy'
 import styles from '@/components/Modal/Modal.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
@@ -67,7 +67,7 @@ export const Modal = ({ title, onClose, children }: ModalProps) => {
     >
       <header className={styles.header}>
         <Button
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           icon="close"
           className={styles.close}
           aria-label={COMMON_COPY.close}
@@ -77,7 +77,7 @@ export const Modal = ({ title, onClose, children }: ModalProps) => {
           {title}
         </h2>
         <Button
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           icon={look.icon}
           className={styles.size}
           aria-label={look.label}

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { FIXTURE_SERVER } from '@raven/core'
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { SITE_SEARCH_COPY } from '@/components/SiteSearch/copy'
 import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import { HOME_COPY } from '@/pages/HomePage/copy'

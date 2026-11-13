@@ -11,7 +11,7 @@ import {
   tileWords,
   watchLink,
 } from '@raven/core'
-import { ButtonLink, Icon, FactParts } from '@raven/ui'
+import { BUTTON_TONES, ButtonLink, Icon, FactParts } from '@raven/ui'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useId } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
@@ -19,11 +19,12 @@ import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
-import { CONTINUE_WATCHING_PATH, HOME_CONTINUE_COUNT } from '@/lib/homeContinue'
+import { HOME_CONTINUE_COUNT } from '@/lib/homeContinue'
 import { itemQuery } from '@/lib/queries'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import styles from '@/pages/HomePage/ContinueWatching.module.scss'
 import frames from '@/pages/HomePage/HomeFrames.module.scss'
+import { APP_PATHS } from '@/lib/appPaths'
 
 /** "23m left", "1h 12m left"; null until the video's length is known. */
 export const timeLeft = (media: MediaItem): string | null => {
@@ -227,8 +228,8 @@ export const ContinueWatching = ({ entries }: ContinueWatchingProps) => {
         aside={
           hasMore && (
             <ButtonLink
-              tone="ghost"
-              to={CONTINUE_WATCHING_PATH}
+              tone={BUTTON_TONES.ghost}
+              to={APP_PATHS.continueWatching}
               aria-label={HOME_COPY.seeAllLabel(entries.length)}
             >
               {HOME_COPY.seeAll(entries.length)}

@@ -17,24 +17,19 @@ import {
   isString,
   readReachabilityQuery,
 } from '@raven/core'
+import { CACHE_POLICIES, HEADERS, HTTP_METHODS, HTTP_STATUSES } from '@shared/http'
 
 /** The site's environment variables the function reads, scoped to Runtime. */
 const ENV = { proxySecret: 'RAVEN_PROXY_SECRET' } as const
 
-const HEADERS = { cacheControl: 'cache-control' } as const
-
-const CACHE_POLICIES = { none: 'no-store' } as const
-
 /** How raven signs a check's nonce, with the secret the site's /api proxy signs with too. */
 const SIGNATURE = { algorithm: 'sha256', encoding: 'hex' } as const
-
-const HTTP_METHODS = { get: 'GET' } as const
 
 /** The events of Node's outgoing request the check listens for. */
 const REQUEST_EVENTS = { response: 'response', error: 'error' } as const
 
 /** What raven's echo answers a nonce a check in flight holds. */
-const ECHO_ANSWERED = 204
+const ECHO_ANSWERED = HTTP_STATUSES.noContent
 
 /** The `name` the check's own deadline fails with, as `AbortSignal.timeout`'s does. */
 const TIMEOUT_ERROR = 'TimeoutError'
@@ -73,7 +68,7 @@ type Answer = ReachabilityReport | { error: string }
 type AnswerProps = { body: Answer; status?: number }
 
 const answer = ({ body, status = 200 }: AnswerProps): Response =>
-  Response.json(body, { status, headers: { [HEADERS.cacheControl]: CACHE_POLICIES.none } })
+  Response.json(body, { status, headers: { [HEADERS.cacheControl]: CACHE_POLICIES.noStore } })
 
 type IsSignedProps = { query: ReachabilityQuery; secret: string | null }
 

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
-import { FIXTURE_SERVER, SORT_FIELD_LABELS } from '@raven/core'
+import { SORT_FIELD_LABELS } from '@raven/core'
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { COMMON_COPY } from '@/lib/copy'
 import { sideLink } from '@/e2e/shell'
 

@@ -1,6 +1,6 @@
 import { type QueryStatus, type UseQueryResult, useQuery } from '@tanstack/react-query'
-import { LYRICS_KINDS, type LyricLine, type Lyrics } from '@raven/core'
-import { activeLineAt, useAudioQueue } from '@raven/ui/headless'
+import { LYRICS_KINDS, type LyricLine, type Lyrics, activeLineAt } from '@raven/core'
+import { useAudioQueue } from '@raven/ui/headless'
 import type { ComponentType } from 'react'
 import { lyricsQuery } from '@/lib/queries'
 import { NOW_PLAYING_COPY } from '@/pages/NowPlayingPage/copy'

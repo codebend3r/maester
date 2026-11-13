@@ -4,7 +4,8 @@ import '@/styles/globals.scss'
 import '@/styles/page.scss'
 import '@/styles/landing.scss'
 
-import { byId, el, link } from '@/dom'
+import { SPLASH_COPY } from '@/copy'
+import { el, link } from '@/dom'
 import { fileItem } from '@/fileItem'
 import {
   PATHS,
@@ -30,9 +31,9 @@ const ESCAPE = 'Escape'
  * the line under it names the version.
  */
 const showLatestRelease = async (): Promise<void> => {
-  const menu = byId({ id: IDS.menu })
-  const note = byId({ id: IDS.note })
-  const title = byId({ id: IDS.title })
+  const menu = document.getElementById(IDS.menu)
+  const note = document.getElementById(IDS.note)
+  const title = document.getElementById(IDS.title)
   if (menu === null || note === null || title === null) return
   const [latest] = await fetchReleases()
   if (latest === undefined) return
@@ -45,15 +46,19 @@ const showLatestRelease = async (): Promise<void> => {
   note.replaceChildren(
     el({
       tag: 'span',
-      text: `Version ${latest.version} for ${platformList({ release: latest })}, released ${formatDate({ date: latest.date })}. `,
+      text: SPLASH_COPY.versionLine({
+        version: latest.version,
+        platforms: platformList({ release: latest }),
+        date: formatDate({ date: latest.date }),
+      }),
     }),
-    link({ href: PATHS.versions, text: 'Every version' }),
+    link({ href: PATHS.versions, text: SPLASH_COPY.everyVersion }),
   )
 }
 
 // A click outside the open menu, or Escape, closes it.
 const closeMenuFromOutside = (): void => {
-  const download = byId({ id: IDS.download })
+  const download = document.getElementById(IDS.download)
   if (!(download instanceof HTMLDetailsElement)) return
   document.addEventListener(EVENTS.click, (event) => {
     if (download.open && event.target instanceof Node && !download.contains(event.target)) {

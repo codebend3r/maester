@@ -1,7 +1,8 @@
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   QUEUE_SOURCE_KINDS,
   RADIO_SEED_KINDS,
+  type AlbumSummary,
   type ArtistDetails,
   ROUTE_STATES,
   type RouteQuery,
@@ -27,6 +28,12 @@ import { COMMON_COPY, MUSIC_COPY } from '@/lib/copy'
 
 type ArtistViewProps = { details: ArtistDetails }
 
+type PlayAlbumsProps = { albums: readonly AlbumSummary[]; isShuffled: boolean }
+
+/** Albums with a track to play between them. */
+const hasTracks = (albums: readonly AlbumSummary[]): boolean =>
+  albums.some((album) => album.trackCount > 0)
+
 /** The page once its artist is known: the name and counts, their albums, and the albums of others they appear on. */
 const ArtistView = ({ details }: ArtistViewProps) => {
   const titleId = useId()
@@ -35,17 +42,18 @@ const ArtistView = ({ details }: ArtistViewProps) => {
   const { artist, albums, appearsOn } = details
   const favourite = useArtistFavourite({ artistId: artist.id })
   const links = useMusicLinks()
+  const queryClient = useQueryClient()
   const playTracks = useAudioQueue((store) => store.playTracks)
-  const albumQueries = useQueries({ queries: albums.map(({ id }) => albumQuery(id)) })
-  const featureQueries = useQueries({ queries: appearsOn.map(({ id }) => albumQuery(id)) })
-  const albumTracks = albumQueries.flatMap((query) => query.data?.tracks ?? [])
-  const featureTracks = featureQueries.flatMap((query) => query.data?.tracks ?? [])
   const source = { kind: QUEUE_SOURCE_KINDS.artist, id: artist.id }
-  const isAlbumTrackListReady =
-    albums.length === 0 || albumQueries.every((query) => query.isSuccess)
-  const isFeatureTrackListReady =
-    appearsOn.length === 0 || featureQueries.every((query) => query.isSuccess)
-  const allTracks = [...albumTracks, ...featureTracks]
+  // The albums' tracks are read only when one of the buttons asks for them, in the albums' order.
+  const play = useMutation({
+    mutationFn: async ({ albums: chosen, isShuffled }: PlayAlbumsProps) => {
+      const read = await Promise.all(chosen.map(({ id }) => queryClient.fetchQuery(albumQuery(id))))
+      const tracks = read.flatMap((album) => album.tracks)
+      playTracks(isShuffled ? { tracks, source, isShuffled } : { tracks, source })
+    },
+  })
+  const all = [...albums, ...appearsOn]
   return (
     <article className={styles.page} aria-labelledby={titleId}>
       <BackButton fallback={links.home} className={styles.back} />
@@ -66,33 +74,38 @@ const ArtistView = ({ details }: ArtistViewProps) => {
         <div className={styles.actions}>
           <Button
             icon="play"
-            disabled={!isAlbumTrackListReady || albumTracks.length === 0}
-            onClick={() => playTracks({ tracks: albumTracks, source })}
+            disabled={play.isPending || !hasTracks(albums)}
+            onClick={() => play.mutate({ albums, isShuffled: false })}
           >
             {ARTIST_COPY.playAlbums}
           </Button>
           <Button
             icon="shuffle"
-            disabled={!isAlbumTrackListReady || albumTracks.length === 0}
-            onClick={() => playTracks({ tracks: albumTracks, source, isShuffled: true })}
+            disabled={play.isPending || !hasTracks(albums)}
+            onClick={() => play.mutate({ albums, isShuffled: true })}
           >
             {ARTIST_COPY.shuffleAlbums}
           </Button>
           <Button
             icon="shuffle"
-            disabled={!isFeatureTrackListReady || featureTracks.length === 0}
-            onClick={() => playTracks({ tracks: featureTracks, source, isShuffled: true })}
+            disabled={play.isPending || !hasTracks(appearsOn)}
+            onClick={() => play.mutate({ albums: appearsOn, isShuffled: true })}
           >
             {ARTIST_COPY.shuffleAppearsOn}
           </Button>
           <Button
             icon="shuffle"
-            disabled={!isAlbumTrackListReady || !isFeatureTrackListReady || allTracks.length === 0}
-            onClick={() => playTracks({ tracks: allTracks, source, isShuffled: true })}
+            disabled={play.isPending || !hasTracks(all)}
+            onClick={() => play.mutate({ albums: all, isShuffled: true })}
           >
             {ARTIST_COPY.shuffleAll}
           </Button>
         </div>
+        {play.isError && (
+          <p className={styles.error} role="alert">
+            {play.error.message}
+          </p>
+        )}
       </header>
       {albums.length > 0 && (
         <section className={styles.section} aria-labelledby={albumsId}>

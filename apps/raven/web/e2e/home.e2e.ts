@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { FIXTURE_SERVER } from '@raven/core'
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import { sideLink } from '@/e2e/shell'
 

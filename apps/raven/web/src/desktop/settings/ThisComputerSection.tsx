@@ -19,6 +19,7 @@ import { Section } from '@/pages/SettingsPage/Section'
 import { useComputerName, useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/settings/DesktopSettings.module.scss'
 import settings from '@/pages/SettingsPage/SettingsPage.module.scss'
+import { ToggleChoice } from '@/pages/SettingsPage/ToggleChoice'
 
 type ProfilesForProps = { computer: string }
 
@@ -62,14 +63,12 @@ const PassthroughFormats = ({ shown, onToggleFormat }: PassthroughFormatsProps) 
     <legend className={settings.legend}>{THIS_COMPUTER_COPY.formats}</legend>
     <div className={settings.choices}>
       {CARRIED_FORMATS.map((format) => (
-        <label key={format} className={settings.choice}>
-          <input
-            type="checkbox"
-            checked={shown.passthrough.includes(format)}
-            onChange={(event) => onToggleFormat({ format, isOn: event.target.checked })}
-          />
-          <span className={settings.choiceLabel}>{FORMAT_LABELS[format]}</span>
-        </label>
+        <ToggleChoice
+          key={format}
+          label={FORMAT_LABELS[format]}
+          isChecked={shown.passthrough.includes(format)}
+          onChange={(isOn) => onToggleFormat({ format, isOn })}
+        />
       ))}
     </div>
     <p className={settings.hint}>
@@ -84,14 +83,7 @@ const PassthroughFormats = ({ shown, onToggleFormat }: PassthroughFormatsProps) 
 type SpatialChoiceProps = ProfileViewProps
 
 const SpatialChoice = ({ shown, onSpatial }: SpatialChoiceProps) => (
-  <label className={settings.choice}>
-    <input
-      type="checkbox"
-      checked={shown.spatial}
-      onChange={(event) => onSpatial(event.target.checked)}
-    />
-    <span className={settings.choiceLabel}>{THIS_COMPUTER_COPY.spatial}</span>
-  </label>
+  <ToggleChoice label={THIS_COMPUTER_COPY.spatial} isChecked={shown.spatial} onChange={onSpatial} />
 )
 
 /** What each sound output adds beneath the choice. */

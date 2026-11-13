@@ -1,6 +1,6 @@
 import { MAX_WATCH_TARGETS } from '@raven/core'
 import { useRef, useState } from 'react'
-import { Button, useKeyShortcut } from '@raven/ui'
+import { BUTTON_TONES, Button, useKeyShortcut } from '@raven/ui'
 import {
   useSelectButtonRef,
   useSelection,
@@ -57,7 +57,7 @@ const SelectingBar = ({ scope }: SelectingBarProps) => {
   }
 
   // What was said of one selection does not outlast a change to it.
-  const outcome = result?.keys === keys ? result.outcome : null
+  const outcome = result != null && result.keys === keys ? result.outcome : null
   const isEmpty = keys.size === 0
   const { selectAll, clear, end } = store.getState()
 
@@ -66,14 +66,14 @@ const SelectingBar = ({ scope }: SelectingBarProps) => {
       <div className={styles.status}>
         <output className={styles.count}>
           <span>{SELECTION_BAR_COPY.selected(keys.size)}</span>
-          {outcome?.type === OUTCOME_TYPES.marked && (
+          {outcome != null && outcome.type === OUTCOME_TYPES.marked && (
             <span className={styles.outcome}>
               <span className="visually-hidden">{SELECTION_BAR_COPY.pause}</span>
               {SELECTION_BAR_COPY.marked(outcome)}
             </span>
           )}
         </output>
-        {outcome?.type === OUTCOME_TYPES.failed && (
+        {outcome != null && outcome.type === OUTCOME_TYPES.failed && (
           <p className={styles.failure} role="alert">
             {SELECTION_BAR_COPY.failed}
           </p>
@@ -100,7 +100,7 @@ const SelectingBar = ({ scope }: SelectingBarProps) => {
         <Button className={styles.button} disabled={isEmpty} onClick={clear}>
           {SELECTION_BAR_COPY.clear}
         </Button>
-        <Button className={styles.button} tone="primary" onClick={end}>
+        <Button className={styles.button} tone={BUTTON_TONES.primary} onClick={end}>
           {SELECTION_BAR_COPY.done}
         </Button>
       </div>

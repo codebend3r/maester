@@ -1,3 +1,4 @@
+import { BUG_REPORT_STATUSES, PLAYBACK_MODES } from '@raven/core'
 type SummaryProps = { reports: string; fresh: number }
 
 type ReportedByProps = { reporter: string; accountId: string }
@@ -36,4 +37,19 @@ export const BUG_REPORTS_COPY = {
     mediaId: (mediaId: number | null) => `Media id: ${mediaId ?? 'none'}`,
     diagnostics: 'Diagnostics:',
   },
+} as const
+
+/** What each status of a report is called. */
+export const BUG_REPORT_STATUS_COPY = {
+  [BUG_REPORT_STATUSES.new]: 'New',
+  [BUG_REPORT_STATUSES.investigating]: 'Investigating',
+  [BUG_REPORT_STATUSES.fixed]: 'Fixed',
+  [BUG_REPORT_STATUSES.wontFix]: "Won't fix",
+} as const
+
+/** What each way of playing a file is called in a report. */
+export const BUG_REPORT_MODE_COPY = {
+  [PLAYBACK_MODES.direct]: 'Direct play',
+  [PLAYBACK_MODES.remux]: 'Remux',
+  [PLAYBACK_MODES.transcode]: 'Transcode',
 } as const

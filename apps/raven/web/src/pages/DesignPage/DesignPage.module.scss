@@ -395,7 +395,7 @@
 }
 
 .dialog {
-  width: min(28.75rem, calc(100vw - 2 * var(--space-3)));
+  width: min(var(--measure-question), calc(100vw - 2 * var(--space-3)));
 }
 
 .dialogBody {

@@ -23,3 +23,22 @@ export const GET_COPY = {
   downloadsLead:
     'The desktop app and the web app are the same raven. Pick whichever suits the screen.',
 } as const
+
+/** What raven does, a column each. */
+export const GET_FEATURES_COPY = [
+  {
+    icon: 'play',
+    title: 'Plays what you have',
+    text: 'The original file plays as it is when your device can take it. When it cannot, your server converts it on the way.',
+  },
+  {
+    icon: 'history',
+    title: 'Picks up where you stopped',
+    text: 'Continue watching, next episodes and history follow you from the desktop app to the browser and back.',
+  },
+  {
+    icon: 'libraries',
+    title: 'Kept in order',
+    text: 'Films are matched to TMDB, grouped into sagas, and sorted the way you left them. Locked libraries stay behind a PIN.',
+  },
+] as const

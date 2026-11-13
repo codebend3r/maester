@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { FIXTURE_SERVER } from '@raven/core'
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { DOWNLOAD_DIALOG_COPY } from '@/desktop/DownloadDialog/copy'
 import { DOWNLOAD_ROW_COPY, DOWNLOADS_PAGE_COPY } from '@/desktop/DownloadsPage/copy'
 import { markWatchedAndBack, openFromShelf, sideLink } from '@/e2e/shell'

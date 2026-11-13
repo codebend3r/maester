@@ -20,7 +20,8 @@ export const api = createApiClient({
   // Unset and '' alike mean no CDN.
   pictureCdn: import.meta.env.VITE_PICTURE_CDN || null,
   fetch: refreshingFetch({
-    fetch: (url, init) => window.fetch(url, { ...init, keepalive: init?.method === METHODS.put }),
+    fetch: (url, init) =>
+      window.fetch(url, { ...init, keepalive: (init?.method ?? null) === METHODS.put }),
     accessToken,
     refresh: refreshSession,
     signOut: () => signOut({ queryClient }),

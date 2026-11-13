@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { afterAiLookups } from '@raven/ui/headless'
 import { metadataHealthQuery } from '@/lib/queries'
 import { POLL_MS, anyPending } from '@/pages/LibraryPage/useMatchingPassDone'
+import { handled } from '@/lib/handled'
 
 /**
  * Whether the server, by its last health read, still has lookups to run or
@@ -44,7 +45,7 @@ export const useAiLookupsDone = ({ libraryId, files }: UseAiLookupsDoneProps): v
   const isWorking = isBusy(health.data)
   const wasWorking = useRef(false)
   useEffect(() => {
-    if (wasWorking.current && !isWorking) void afterAiLookups({ queryClient, libraryId })
+    if (wasWorking.current && !isWorking) handled(afterAiLookups({ queryClient, libraryId }))
     wasWorking.current = isWorking
   }, [isWorking, libraryId, queryClient])
 }

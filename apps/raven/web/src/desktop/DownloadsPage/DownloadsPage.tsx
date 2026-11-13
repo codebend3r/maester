@@ -11,11 +11,11 @@ import {
   isMusicGroup,
   type SpaceView,
 } from '@raven/core'
-import { Button, type IconName } from '@raven/ui'
-import { useAudioQueue } from '@raven/ui/headless'
+import { BUTTON_TONES, Button, type IconName } from '@raven/ui'
+import { useAudioQueue, QueryView, keptRead } from '@raven/ui/headless'
 import { type ComponentType, useId, useRef, useState } from 'react'
 import { isInProgress, useChangeDownloads, useDownloads, useSpace } from '@/desktop/downloadsApi'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import { DOWNLOAD_ROW_COPY, DOWNLOADS_PAGE_COPY } from '@/desktop/DownloadsPage/copy'
 import { DownloadActivity } from '@/desktop/DownloadsPage/DownloadActivity'
 import { DownloadArtwork } from '@/desktop/DownloadsPage/DownloadArtwork'
@@ -30,7 +30,7 @@ import {
 import { type MusicQueue, musicQueueOf } from '@/desktop/DownloadsPage/musicQueue'
 import { useDownloadsUnlocked } from '@/desktop/DownloadsPage/useDownloadsUnlocked'
 import { useTotalSpeed } from '@/desktop/useDownloadSpeed'
-import type { DownloadsChange, DownloadsHostKind } from '@/downloads/host'
+import type { DownloadsChange } from '@/downloads/host'
 import { Tabs } from '@/components/Tabs/Tabs'
 import styles from '@/desktop/DownloadsPage/DownloadsPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
@@ -146,7 +146,7 @@ const MusicHead = ({ grouped, headingId, cover, onPlay }: MusicHeadProps) => {
       {onPlay !== null && (
         <Button
           className={styles.headPlay}
-          tone="primary"
+          tone={BUTTON_TONES.primary}
           icon="play"
           aria-label={DOWNLOAD_ROW_COPY.actionLabel({
             action: COMMON_COPY.play,
@@ -232,45 +232,11 @@ const Group = ({ grouped, onDeleted }: GroupProps) => {
   )
 }
 
-/** Where a query the page reads stands: on its way, refused, or answered (empty or not). */
-const READ_STATES = {
-  waiting: 'waiting',
-  failed: 'failed',
-  empty: 'empty',
-  listed: 'listed',
-} as const
-
-type ReadState = (typeof READ_STATES)[keyof typeof READ_STATES]
-
-type ReadStateOfProps = { isRead: boolean; isEmpty: boolean; isError: boolean }
-
-const readStateOf = ({ isRead, isEmpty, isError }: ReadStateOfProps): ReadState => {
-  if (!isRead) return isError ? READ_STATES.failed : READ_STATES.waiting
-  return isEmpty ? READ_STATES.empty : READ_STATES.listed
-}
-
-const Unread = () => null
-
-type ListViewProps = {
+type ListedProps = {
   /** The downloads a viewer may see, as the Show choice lays them out. */
   sections: DownloadsSection[]
-  error: string | null
-  /** Who keeps the downloads, which words what an empty page says to do. */
-  hostKind: DownloadsHostKind
   onDeleted: () => void
 }
-
-type ListFailedProps = ListViewProps
-
-const ListFailed = ({ error }: ListFailedProps) => <p role="alert">{error}</p>
-
-type ListEmptyProps = ListViewProps
-
-const ListEmpty = ({ hostKind }: ListEmptyProps) => (
-  <p className={styles.empty}>{DOWNLOADS_PAGE_COPY.empty[hostKind]}</p>
-)
-
-type ListedProps = ListViewProps
 
 const Listed = ({ sections, onDeleted }: ListedProps) => (
   <div className={styles.sections}>
@@ -286,14 +252,7 @@ const Listed = ({ sections, onDeleted }: ListedProps) => (
   </div>
 )
 
-const LIST_VIEWS = {
-  [READ_STATES.waiting]: Unread,
-  [READ_STATES.failed]: ListFailed,
-  [READ_STATES.empty]: ListEmpty,
-  [READ_STATES.listed]: Listed,
-} as const satisfies Record<ReadState, ComponentType<ListViewProps>>
-
-type WatchListedProps = ListViewProps
+type WatchListedProps = ListedProps
 
 /** Tracks play in the music queue, not from a poster, so the grid holds the videos alone. */
 const videosOf = (downloads: DownloadView[]): DownloadView[] =>
@@ -307,22 +266,15 @@ const WatchListed = ({ sections }: WatchListedProps) => (
   />
 )
 
-const WATCH_VIEWS = {
-  [READ_STATES.waiting]: Unread,
-  [READ_STATES.failed]: ListFailed,
-  [READ_STATES.empty]: ListEmpty,
-  [READ_STATES.listed]: WatchListed,
-} as const satisfies Record<ReadState, ComponentType<ListViewProps>>
-
 /** The page's two views of the same downloads: the list to manage them, and the grid to watch. */
 const PAGE_TABS = { manage: 'manage', watch: 'watch' } as const
 
 type PageTab = (typeof PAGE_TABS)[keyof typeof PAGE_TABS]
 
 const TAB_VIEWS = {
-  [PAGE_TABS.manage]: LIST_VIEWS,
-  [PAGE_TABS.watch]: WATCH_VIEWS,
-} as const satisfies Record<PageTab, Record<ReadState, ComponentType<ListViewProps>>>
+  [PAGE_TABS.manage]: Listed,
+  [PAGE_TABS.watch]: WatchListed,
+} as const satisfies Record<PageTab, ComponentType<ListedProps>>
 
 const TAB_LABELS = {
   [PAGE_TABS.manage]: DOWNLOADS_PAGE_COPY.manage,
@@ -353,38 +305,26 @@ const Activity = ({ downloads }: ActivityProps) => {
   )
 }
 
-type DiskViewProps = { disk: SpaceView | null; error: string | null; lineId: string }
+type DiskProps = { disk: SpaceView; lineId: string }
 
-type DiskFailedProps = DiskViewProps
+const Disk = ({ disk, lineId }: DiskProps) => (
+  <div className={styles.disk}>
+    <p id={lineId} className={styles.line}>
+      {DOWNLOADS_PAGE_COPY.space(disk)}
+    </p>
+    <meter
+      className={styles.meter}
+      min={0}
+      max={disk.total}
+      value={disk.used}
+      aria-label={DOWNLOADS_PAGE_COPY.disk}
+      aria-describedby={lineId}
+    />
+  </div>
+)
 
-const DiskFailed = ({ error }: DiskFailedProps) => <p className={styles.line}>{error}</p>
-
-type DiskProps = DiskViewProps
-
-const Disk = ({ disk, lineId }: DiskProps) =>
-  disk !== null && (
-    <div className={styles.disk}>
-      <p id={lineId} className={styles.line}>
-        {DOWNLOADS_PAGE_COPY.space(disk)}
-      </p>
-      <meter
-        className={styles.meter}
-        min={0}
-        max={disk.total}
-        value={disk.used}
-        aria-label={DOWNLOADS_PAGE_COPY.disk}
-        aria-describedby={lineId}
-      />
-    </div>
-  )
-
-/** A disk is never empty: once read, it is shown. */
-const DISK_VIEWS = {
-  [READ_STATES.waiting]: Unread,
-  [READ_STATES.failed]: DiskFailed,
-  [READ_STATES.empty]: Disk,
-  [READ_STATES.listed]: Disk,
-} as const satisfies Record<ReadState, ComponentType<DiskViewProps>>
+/** What the list is read from: every download held, and those the viewer may see. */
+type HeldDownloads = { held: DownloadView[]; list: DownloadView[] }
 
 /** Every title Raven has downloaded or is downloading, and the disk they are kept on. */
 export const DownloadsPage = () => {
@@ -404,18 +344,12 @@ export const DownloadsPage = () => {
   const list = held === null ? null : visibleDownloadsOf({ downloads: held, isUnlocked })
   const hasHidden = (held ?? []).length > (list ?? []).length
   const bulks = bulksOf(list ?? [])
-  const disk = space.data ?? null
   const [tab, setTab] = useState<PageTab>(PAGE_TABS.manage)
-  const ListView =
-    TAB_VIEWS[tab][
-      readStateOf({
-        isRead: list !== null,
-        isEmpty: held !== null && held.length === 0,
-        isError: downloads.isError,
-      })
-    ]
-  const DiskView =
-    DISK_VIEWS[readStateOf({ isRead: disk !== null, isEmpty: false, isError: space.isError })]
+  const ListView = TAB_VIEWS[tab]
+  const read = keptRead<HeldDownloads>({
+    data: held === null || list === null ? undefined : { held, list },
+    error: downloads.error,
+  })
 
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
@@ -449,7 +383,13 @@ export const DownloadsPage = () => {
           )}
         </div>
         <Activity downloads={held ?? []} />
-        <DiskView disk={disk} error={space.error?.message ?? null} lineId={ids.line} />
+        <QueryView
+          query={keptRead(space)}
+          pending={null}
+          renderFailed={(error) => <p className={styles.line}>{error.message}</p>}
+        >
+          {(disk) => <Disk disk={disk} lineId={ids.line} />}
+        </QueryView>
       </header>
       <Tabs
         label={DOWNLOADS_PAGE_COPY.tabs}
@@ -464,12 +404,19 @@ export const DownloadsPage = () => {
         <div className={styles.panel}>
           {(list ?? []).length > 0 && <ShowBar />}
           {hasHidden && <p className={styles.line}>{DOWNLOADS_PAGE_COPY.hidden}</p>}
-          <ListView
-            sections={sectionsOf({ downloads: list ?? [], show })}
-            error={downloads.error?.message ?? null}
-            hostKind={host.kind}
-            onDeleted={focusTitle}
-          />
+          <QueryView
+            query={read}
+            pending={null}
+            renderFailed={(error) => <p role="alert">{error.message}</p>}
+            empty={{
+              isEmpty: ({ held: all }) => all.length === 0,
+              shown: <p className={styles.empty}>{DOWNLOADS_PAGE_COPY.empty[host.kind]}</p>,
+            }}
+          >
+            {({ list: shown }) => (
+              <ListView sections={sectionsOf({ downloads: shown, show })} onDeleted={focusTitle} />
+            )}
+          </QueryView>
         </div>
       </Tabs>
     </section>

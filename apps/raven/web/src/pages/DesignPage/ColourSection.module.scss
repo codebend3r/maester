@@ -28,7 +28,7 @@
 
 .groundLabel {
   display: grid;
-  gap: 2px;
+  gap: var(--space-hair);
 }
 
 .groundName {
@@ -77,7 +77,7 @@
 
 .swatchText {
   display: grid;
-  gap: 2px;
+  gap: var(--space-hair);
   padding: 0 var(--space-0);
 }
 
@@ -117,7 +117,7 @@
   display: grid;
   grid-auto-flow: column;
   gap: var(--space-0);
-  padding: 2px var(--space-1);
+  padding: var(--space-hair) var(--space-1);
   border-radius: var(--radius-pill);
   font-size: var(--font-size-xs);
   white-space: nowrap;
@@ -256,7 +256,7 @@
 
 .worn {
   justify-self: start;
-  padding: 2px var(--space-1);
+  padding: var(--space-hair) var(--space-1);
   border-radius: var(--radius-pill);
   background: var(--color-moss);
   color: var(--color-bark);

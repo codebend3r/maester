@@ -27,7 +27,7 @@
 
 .value {
   display: grid;
-  gap: 2px;
+  gap: var(--space-hair);
   color: var(--color-lichen);
   font-size: var(--font-size-xs);
 

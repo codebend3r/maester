@@ -24,6 +24,6 @@
   align-self: end;
   justify-self: end;
   display: grid;
-  padding: 1px;
+  padding: var(--space-px);
   translate: 30% 30%;
 }

@@ -4,6 +4,7 @@ import { HOME_CONTINUE_COUNT } from '@/lib/homeContinue'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import frames from '@/pages/HomePage/HomeFrames.module.scss'
 import styles from '@/pages/HomePage/HomeSkeleton.module.scss'
+import { CARD_PICTURES } from '@/lib/cardPictures'
 
 /** How many library rows stand in before home says which are pinned. */
 const SHELF_COUNT = 2
@@ -65,7 +66,7 @@ const ShelfShapes = ({ count }: ShelfShapesProps) =>
     <section key={index} className={frames.section}>
       <Bone shape="heading" width="short" />
       <ul className={frames.row}>
-        <SkeletonCards picture="poster" count={8} />
+        <SkeletonCards picture={CARD_PICTURES.poster} count={8} />
       </ul>
     </section>
   ))

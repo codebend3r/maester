@@ -1,3 +1,4 @@
+import { HTTP_STATUSES } from '@shared/http'
 import { ApiError, LOCKED_STATUS } from '@raven/core'
 import { BROWSER_DOWNLOAD_COPY } from '@/browserDownloads/copy'
 import { DiskFullError } from '@/browserDownloads/disk'
@@ -28,22 +29,12 @@ export const DISK_FULL = {
   message: BROWSER_DOWNLOAD_COPY.full,
 } as const satisfies Outcome
 
-export const HTTP = {
-  ok: 200,
-  partial: 206,
-  unauthorized: 401,
-  forbidden: 403,
-  notFound: 404,
-  unsatisfiable: 416,
-  serverError: 500,
-} as const
-
 /** Why the server would not send a file, as the row says it; null for an answer with bytes. */
 export const refusalOf = (status: number): string | null => {
-  if (status === HTTP.ok || status === HTTP.partial) return null
-  if (status === HTTP.unauthorized || status === HTTP.forbidden)
+  if (status === HTTP_STATUSES.ok || status === HTTP_STATUSES.partialContent) return null
+  if (status === HTTP_STATUSES.unauthorized || status === HTTP_STATUSES.forbidden)
     return BROWSER_DOWNLOAD_COPY.account
-  if (status === HTTP.notFound) return BROWSER_DOWNLOAD_COPY.gone
+  if (status === HTTP_STATUSES.notFound) return BROWSER_DOWNLOAD_COPY.gone
   if (status === LOCKED_STATUS) return BROWSER_DOWNLOAD_COPY.locked
   return BROWSER_DOWNLOAD_COPY.answered(status)
 }
@@ -52,6 +43,8 @@ export const refusalOf = (status: number): string | null => {
 export const outcomeOfError = (error: unknown): Outcome => {
   if (error instanceof DiskFullError) return DISK_FULL
   const isRefusal =
-    error instanceof ApiError && !error.isServerUnreachable && error.status < HTTP.serverError
+    error instanceof ApiError &&
+    !error.isServerUnreachable &&
+    error.status < HTTP_STATUSES.internalServerError
   return isRefusal ? { kind: OUTCOMES.failed, message: error.message } : STALLED
 }

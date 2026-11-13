@@ -9,11 +9,11 @@ import {
   mediaServerFor,
   MINT_WINDOW_MS,
   MINTS_PER_WINDOW,
-  RANGE_HEADER,
   TICKET_REUSE_MS,
 } from '@/browserDownloads/server'
 import { DOWNLOAD_WAYS } from '@/browserDownloads/ways'
 import { fakeClock } from '@/test/browserDownloads'
+import { HEADERS } from '@shared/http'
 
 const ORIGIN: MediaOrigin = { kind: MEDIA_ORIGIN_KINDS.public, url: 'https://media.example' }
 
@@ -63,7 +63,7 @@ describe('mediaServerFor', () => {
   it('asks for the rest of a file with a range', async () => {
     const { server, fetched, signal } = served()
     await server.bytes({ mediaId: 7, way: DOWNLOAD_WAYS.file, from: 512, signal, isFresh: false })
-    expect(fetched()[0]?.headers ?? null).toEqual({ [RANGE_HEADER]: 'bytes=512-' })
+    expect(fetched()[0]?.headers ?? null).toEqual({ [HEADERS.range]: 'bytes=512-' })
   })
 
   it("fetches a copy from the server's copy route, naming the SDR one", async () => {

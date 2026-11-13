@@ -10,7 +10,7 @@ import {
 } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
-import { COMING_SOON_TITLE_ROUTE } from '@/pages/ComingSoonPage/copy'
+import { APP_PATHS } from '@/lib/appPaths'
 import { UpcomingTitlePage } from '@/pages/ComingSoonPage/UpcomingTitlePage'
 import { renderWithProviders } from '@/test/render'
 
@@ -65,7 +65,7 @@ const open = ({ requests, holding = NOT_HELD, route = '/coming-soon/movie/1' }: 
   renderWithProviders({
     ui: (
       <Routes>
-        <Route path={COMING_SOON_TITLE_ROUTE} element={<UpcomingTitlePage />} />
+        <Route path={APP_PATHS.comingSoonTitle} element={<UpcomingTitlePage />} />
       </Routes>
     ),
     route,

@@ -8,12 +8,13 @@ import {
 } from '@raven/core'
 import { useSearchParams } from 'react-router-dom'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
-import { ItemHeaderSkeleton } from '@/components/ItemHeader/ItemHeader'
+import { ItemHeaderSkeleton, PICTURE_SHAPES } from '@/components/ItemHeader/ItemHeader'
 import { PlayableItemView } from '@/components/PlayableItemView/PlayableItemView'
 import { RouteState } from '@/components/RouteState/RouteState'
 import { useRouteItem } from '@/lib/routeQuery'
 import { MOVIE_COPY } from '@/pages/MoviePage/copy'
 import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
+import { PAGE_PARAMS } from '@/lib/appPaths'
 
 const MOVIE_VIEW_KEYS = { pending: 'pending', missing: 'missing', ready: 'ready' } as const
 
@@ -58,7 +59,7 @@ const movieViewOf = ({ page, library, file }: MovieViewOfProps): ViewOf<MovieVie
       props: {
         state: page,
         noun: MOVIE_COPY.noun,
-        shape: <ItemHeaderSkeleton picture="poster" />,
+        shape: <ItemHeaderSkeleton picture={PICTURE_SHAPES.poster} />,
       },
     }
   const shown = libraryFiles({ versions: page.data.versions, library, file })
@@ -82,8 +83,8 @@ export const MoviePage = () => {
       views={MOVIE_VIEWS}
       view={movieViewOf({
         page,
-        library: queryId(params.get('library')),
-        file: queryId(params.get('file')),
+        library: queryId(params.get(PAGE_PARAMS.library)),
+        file: queryId(params.get(PAGE_PARAMS.file)),
       })}
     />
   )

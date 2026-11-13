@@ -1,3 +1,6 @@
+import { MEMBER_STATUSES } from '@raven/core'
+import { EQ_PRESET_NAMES, LEVELLING_MODES } from '@raven/core'
+import { MUSIC_QUALITIES } from '@raven/ui/headless'
 type RangeHintProps = { min: number; max: number }
 
 export const SETTINGS_COPY = {
@@ -172,4 +175,70 @@ export const SETTINGS_COPY = {
     yesRemoveFor: (email: string) => `Yes, remove access for ${email}`,
     cancelRemovingFor: (email: string) => `Cancel removing ${email}`,
   },
+} as const
+
+/** The equalizer's cards: each preset, and Custom, which the equalizer is once a band is moved by hand. */
+export const EQ_CHOICE_NAMES = { ...EQ_PRESET_NAMES, custom: 'custom' } as const
+
+/** The words of Sound's choices: the music quality, levelling and the equalizer's presets. */
+export const SOUND_CHOICES_COPY = {
+  qualities: {
+    [MUSIC_QUALITIES.original]: {
+      label: 'Original',
+      hint: 'The file as it is, lossless where it was ripped so.',
+    },
+    [MUSIC_QUALITIES.low]: {
+      label: `${MUSIC_QUALITIES.low} kbps`,
+      hint: 'AAC at its smallest, for a slow or metered network.',
+    },
+    [MUSIC_QUALITIES.standard]: {
+      label: `${MUSIC_QUALITIES.standard} kbps`,
+      hint: 'AAC that few ears tell from the file.',
+    },
+    [MUSIC_QUALITIES.high]: {
+      label: `${MUSIC_QUALITIES.high} kbps`,
+      hint: 'AAC at its best.',
+    },
+  },
+
+  levelling: {
+    [LEVELLING_MODES.off]: {
+      label: 'Off',
+      hint: 'Every track plays as loud as it was mastered.',
+    },
+    [LEVELLING_MODES.track]: {
+      label: 'Track',
+      hint: 'Every track is brought to the same loudness, for a shuffle or a playlist.',
+    },
+    [LEVELLING_MODES.album]: {
+      label: 'Album',
+      hint: 'Every album is brought to the same loudness, its quiet and loud songs kept as they were.',
+    },
+  },
+  presets: {
+    [EQ_PRESET_NAMES.flat]: { label: 'Flat', hint: 'Every band as it was recorded.' },
+    [EQ_PRESET_NAMES.bassBoost]: { label: 'Bass boost', hint: 'Lifts the lows.' },
+    [EQ_PRESET_NAMES.trebleBoost]: { label: 'Treble boost', hint: 'Lifts the highs.' },
+    [EQ_PRESET_NAMES.vocal]: { label: 'Vocal', hint: 'Brings voices forward.' },
+    [EQ_PRESET_NAMES.loudness]: {
+      label: 'Loudness',
+      hint: 'Lifts the lows and the highs, for listening quietly.',
+    },
+    [EQ_CHOICE_NAMES.custom]: { label: 'Custom', hint: 'The bands as set by hand below.' },
+  },
+} as const
+
+/** What each tab of Accounts says when it lists no one. */
+export const USERS_NOBODY_COPY = {
+  [MEMBER_STATUSES.pending]: 'No one is waiting for approval.',
+  [MEMBER_STATUSES.approved]: 'No one is approved yet.',
+  [MEMBER_STATUSES.revoked]: 'No one has been removed.',
+} as const
+
+/** What Accounts' two actions say, and how a screen reader names each among many rows. */
+export const USERS_ACTION_COPY = {
+  approve: 'Approve',
+  approveFor: (email: string) => `Approve ${email}`,
+  remove: 'Remove access',
+  removeFor: (email: string) => `Remove access for ${email}`,
 } as const

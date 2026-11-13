@@ -1,4 +1,4 @@
-import { Button, Icon } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import type { Track } from '@raven/core'
 import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import type { ComponentType, ReactNode } from 'react'
@@ -82,7 +82,7 @@ const TrackRow = ({
         <Lead number={number} />
       </span>
       <Button
-        tone="ghost"
+        tone={BUTTON_TONES.ghost}
         className={styles.play}
         icon={isPlaying ? 'pause' : 'play'}
         aria-label={

@@ -9,12 +9,13 @@ import { usePlayerPrefs } from '@raven/ui/headless'
 import { type ComponentType, useRef, useState } from 'react'
 import { DOWNLOAD_BUTTON_COPY } from '@/components/DownloadButton/copy'
 import { UnsupportedDownloadButton } from '@/components/DownloadButton/DolbyVisionNote'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import { useOpenReply } from '@/desktop/openReply'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import type { DownloadsHost } from '@/downloads/host'
 import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { COMMON_COPY } from '@/lib/copy'
+import { askMain } from '@/desktop/client'
 
 /** Where the button hands the title: the page's own downloads, Raven beside the browser, or nowhere; `unsupported` is a title the host keeps none of. */
 const DOWNLOAD_WAYS = {
@@ -41,7 +42,10 @@ const HostDownloadButton = ({ target }: HostDownloadButtonProps) => {
     if (isAskingNow.current || host === null) return
     isAskingNow.current = true
     setIsAsking(true)
-    const reply = await host.request({ type: DESKTOP_REQUESTS.askDownload, target })
+    const reply = await askMain({
+      client: host,
+      request: { type: DESKTOP_REQUESTS.askDownload, target },
+    })
     isAskingNow.current = false
     setIsAsking(false)
     openReply(reply)

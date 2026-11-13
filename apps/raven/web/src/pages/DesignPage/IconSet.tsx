@@ -4,6 +4,7 @@ import { ICON_NAMES, Icon, type IconName } from '@raven/ui'
 import { copyText } from '@/lib/clipboard'
 import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import styles from '@/pages/DesignPage/IconSet.module.scss'
+import { handled } from '@/lib/handled'
 
 /** The player's own icons, grouped apart from the app's. */
 const PLAYBACK = [
@@ -77,7 +78,7 @@ export const IconSet = () => {
                   className={styles.icon}
                   aria-label={COPY.copy(name)}
                   onClick={() => {
-                    void copy(name)
+                    handled(copy(name))
                   }}
                 >
                   <Icon name={name} size={28} />

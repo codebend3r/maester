@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
-import type { ArtistDetails } from '@raven/core'
+import { type ArtistDetails, QUEUE_SOURCE_KINDS } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
 import { useAudioQueue } from '@raven/ui/headless'
 import { api } from '@/lib/api'
@@ -51,36 +51,56 @@ describe('ArtistPage', () => {
     expect(screen.getByRole('link', { name: 'Now 40' })).toHaveAttribute('href', '/albums/8')
   })
 
-  it('plays albums in order and shuffles albums, features, or both', async () => {
+  it('reads the albums when asked, then plays them in order or shuffles albums, features, or both', async () => {
     const spy = spyOn(useAudioQueue.getState(), 'playTracks')
+    const getAlbum = spyOn(api, 'getAlbum')
     renderPage()
     await screen.findByRole('heading', { level: 1, name: 'Radiohead' })
+    expect(getAlbum).not.toHaveBeenCalled()
+    const press = async (name: string) => {
+      const button = screen.getByRole('button', { name })
+      await waitFor(() => expect(button).not.toBeDisabled())
+      fireEvent.click(button)
+    }
+    await press('Play albums')
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Shuffle all' })).not.toBeDisabled(),
+      expect(spy).toHaveBeenCalledWith({
+        tracks: [expect.objectContaining({ id: 700 })],
+        source: { kind: QUEUE_SOURCE_KINDS.artist, id: 1 },
+      }),
     )
+    await press('Shuffle albums')
+    await waitFor(() =>
+      expect(spy).toHaveBeenLastCalledWith({
+        tracks: [expect.objectContaining({ id: 700 })],
+        source: { kind: QUEUE_SOURCE_KINDS.artist, id: 1 },
+        isShuffled: true,
+      }),
+    )
+    await press('Shuffle appears on')
+    await waitFor(() =>
+      expect(spy).toHaveBeenLastCalledWith({
+        tracks: [expect.objectContaining({ id: 800 })],
+        source: { kind: QUEUE_SOURCE_KINDS.artist, id: 1 },
+        isShuffled: true,
+      }),
+    )
+    await press('Shuffle all')
+    await waitFor(() =>
+      expect(spy).toHaveBeenLastCalledWith({
+        tracks: [expect.objectContaining({ id: 700 }), expect.objectContaining({ id: 800 })],
+        source: { kind: QUEUE_SOURCE_KINDS.artist, id: 1 },
+        isShuffled: true,
+      }),
+    )
+  })
+
+  it('says why the albums could not be read', async () => {
+    spyOn(api, 'getAlbum').mockRejectedValue(new Error('The server is away.'))
+    renderPage()
+    await screen.findByRole('heading', { level: 1, name: 'Radiohead' })
     fireEvent.click(screen.getByRole('button', { name: 'Play albums' }))
-    expect(spy).toHaveBeenCalledWith({
-      tracks: [expect.objectContaining({ id: 700 })],
-      source: { kind: 'artist', id: 1 },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Shuffle albums' }))
-    expect(spy).toHaveBeenLastCalledWith({
-      tracks: [expect.objectContaining({ id: 700 })],
-      source: { kind: 'artist', id: 1 },
-      isShuffled: true,
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Shuffle appears on' }))
-    expect(spy).toHaveBeenLastCalledWith({
-      tracks: [expect.objectContaining({ id: 800 })],
-      source: { kind: 'artist', id: 1 },
-      isShuffled: true,
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Shuffle all' }))
-    expect(spy).toHaveBeenLastCalledWith({
-      tracks: [expect.objectContaining({ id: 700 }), expect.objectContaining({ id: 800 })],
-      source: { kind: 'artist', id: 1 },
-      isShuffled: true,
-    })
+    expect((await screen.findByRole('alert')).textContent).toBe('The server is away.')
   })
 
   it('says when nothing of theirs can be seen', async () => {

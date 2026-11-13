@@ -1,25 +1,11 @@
 import { Suspense, useEffect } from 'react'
 import { Route, Routes } from 'react-router-dom'
-import {
-  AUTH_ROUTES,
-  DESKTOP_PATHS,
-  type DownloadView,
-  PAGE_PATHS,
-  UPCOMING_SHELVES,
-} from '@raven/core'
+import { AUTH_ROUTES, DESKTOP_PATHS, type DownloadView, UPCOMING_SHELVES } from '@raven/core'
 import { Toaster } from '@raven/ui'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
 import { HomeSkeleton } from '@/pages/HomePage/HomeSkeleton'
-import {
-  COMING_SOON_PATH,
-  COMING_SOON_TITLE_ROUTE,
-  comingSoonShelfPath,
-} from '@/pages/ComingSoonPage/copy'
-import { DESIGN_PATH } from '@/pages/DesignPage/copy'
-import { ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 import { PendingPage } from '@/pages/PendingPage/PendingPage'
-import { PLAY_HISTORY_ROUTES } from '@/lib/playHistory'
 import { lazyPage } from '@/lib/lazyPage'
 import { MUSIC_PATHS, NOW_PLAYING_PATH, PLAYLIST_ROUTE } from '@/lib/music'
 import { MUSIC_LIBRARY_SECTIONS } from '@/pages/MusicLibraryPage/sections'
@@ -35,10 +21,20 @@ import { BROWSER_PLAY_PATH } from '@/browserDownloads/paths'
 import { useBrowserDownloads } from '@/stores/browserDownloads'
 import { useIsDesktop } from '@/stores/desktop'
 import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
-import { BINGE_PATH } from '@/lib/binge'
-import { CONTINUE_WATCHING_PATH } from '@/lib/homeContinue'
-import { NOTIFICATIONS_PATH } from '@/lib/notifications'
 import { useLogToasts } from '@/lib/useLogToasts'
+import { APP_PATHS, comingSoonShelfPath } from '@/lib/appPaths'
+
+/** What react-router matches when no other route of a frame does. */
+const NOT_FOUND_ROUTE = '*'
+
+/** The music library's five lists, each at its own address. */
+const MUSIC_LIBRARY_ROUTES = [
+  { path: MUSIC_PATHS.albums, section: MUSIC_LIBRARY_SECTIONS.albums },
+  { path: MUSIC_PATHS.artists, section: MUSIC_LIBRARY_SECTIONS.artists },
+  { path: MUSIC_PATHS.noArtwork, section: MUSIC_LIBRARY_SECTIONS.noArtwork },
+  { path: MUSIC_PATHS.songs, section: MUSIC_LIBRARY_SECTIONS.songs },
+  { path: MUSIC_PATHS.playlists, section: MUSIC_LIBRARY_SECTIONS.playlists },
+] as const
 
 /** Logs every toast raised here on the server, for the account's Notifications page. */
 const LogToasts = () => {
@@ -160,7 +156,7 @@ const loadSettingsPage = () =>
   import('@/pages/SettingsPage/SettingsPage').then((page) => page.SettingsPage)
 const SettingsPage = lazyPage(loadSettingsPage)
 const AdminPage = lazyPage(() =>
-  import('@/pages/SettingsPage/SettingsPage').then((page) => page.AdminPage),
+  import('@/pages/SettingsPage/AdminPage').then((page) => page.AdminPage),
 )
 const ShortcutsPage = lazyPage(() =>
   import('@/pages/ShortcutsPage/ShortcutsPage').then((page) => page.ShortcutsPage),
@@ -249,23 +245,23 @@ export const AppRoutes = () => {
                     </Suspense>
                   }
                 />
-                <Route path="libraries" element={<LibrariesPage />} />
-                <Route path="libraries/:id" element={<LibraryPage />} />
-                <Route path="libraries/:id/history" element={<HistoryPage />} />
-                <Route path="libraries/:id/:section" element={<LibraryPage />} />
-                <Route path="libraries/:id/sagas/:sagaId" element={<SagaPage />} />
-                <Route path="movies/:id" element={<MoviePage />} />
-                <Route path="shows/:id" element={<ShowPage />} />
-                <Route path="shows/:id/seasons/:number" element={<SeasonPage />} />
-                <Route path="episodes/:id" element={<EpisodePage />} />
-                <Route path="people/:id" element={<PersonPage />} />
-                <Route path="albums/:id" element={<AlbumPage />} />
-                <Route path="artists/:id" element={<ArtistPage />} />
+                <Route path={APP_PATHS.libraries} element={<LibrariesPage />} />
+                <Route path={APP_PATHS.library} element={<LibraryPage />} />
+                <Route path={APP_PATHS.libraryHistory} element={<HistoryPage />} />
+                <Route path={APP_PATHS.librarySection} element={<LibraryPage />} />
+                <Route path={APP_PATHS.saga} element={<SagaPage />} />
+                <Route path={APP_PATHS.movie} element={<MoviePage />} />
+                <Route path={APP_PATHS.show} element={<ShowPage />} />
+                <Route path={APP_PATHS.season} element={<SeasonPage />} />
+                <Route path={APP_PATHS.episode} element={<EpisodePage />} />
+                <Route path={APP_PATHS.person} element={<PersonPage />} />
+                <Route path={APP_PATHS.album} element={<AlbumPage />} />
+                <Route path={APP_PATHS.artist} element={<ArtistPage />} />
                 <Route path={PLAYLIST_ROUTE} element={<PlaylistPage />} />
                 <Route path={NOW_PLAYING_PATH} element={<NowPlayingPage />} />
-                <Route path={BINGE_PATH} element={<BingePage />} />
-                <Route path={CONTINUE_WATCHING_PATH} element={<ContinueWatchingPage />} />
-                <Route path={COMING_SOON_PATH} element={<ComingSoonPage />} />
+                <Route path={APP_PATHS.binge} element={<BingePage />} />
+                <Route path={APP_PATHS.continueWatching} element={<ContinueWatchingPage />} />
+                <Route path={APP_PATHS.comingSoon} element={<ComingSoonPage />} />
                 {Object.values(UPCOMING_SHELVES).map((shelf) => (
                   <Route
                     key={shelf}
@@ -273,45 +269,32 @@ export const AppRoutes = () => {
                     element={<UpcomingShelfPage key={shelf} shelf={shelf} />}
                   />
                 ))}
-                <Route path={COMING_SOON_TITLE_ROUTE} element={<UpcomingTitlePage />} />
-                <Route path="favourites" element={<FavouritesPage />} />
-                <Route path={PLAY_HISTORY_ROUTES.own} element={<PlayHistoryPage />} />
-                <Route path={PLAY_HISTORY_ROUTES.everyone} element={<EveryonesHistoryPage />} />
-                <Route path="streams" element={<StreamsPage />} />
-                <Route path="reports" element={<BugReportsPage />} />
-                <Route path={NOTIFICATIONS_PATH} element={<NotificationsPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path={ADMIN_PATH} element={<AdminPage />} />
-                <Route path={PAGE_PATHS.shortcuts} element={<ShortcutsPage />} />
-                <Route path={DESIGN_PATH} element={<DesignPage />} />
+                <Route path={APP_PATHS.comingSoonTitle} element={<UpcomingTitlePage />} />
+                <Route path={APP_PATHS.favourites} element={<FavouritesPage />} />
+                <Route path={APP_PATHS.history} element={<PlayHistoryPage />} />
+                <Route path={APP_PATHS.everyonesHistory} element={<EveryonesHistoryPage />} />
+                <Route path={APP_PATHS.streams} element={<StreamsPage />} />
+                <Route path={APP_PATHS.reports} element={<BugReportsPage />} />
+                <Route path={APP_PATHS.notifications} element={<NotificationsPage />} />
+                <Route path={APP_PATHS.settings} element={<SettingsPage />} />
+                <Route path={APP_PATHS.admin} element={<AdminPage />} />
+                <Route path={APP_PATHS.shortcuts} element={<ShortcutsPage />} />
+                <Route path={APP_PATHS.design} element={<DesignPage />} />
                 {host !== null && (
                   <Route path={DESKTOP_PATHS.downloads} element={<DownloadsPage />} />
                 )}
                 {isDesktop && <Route path={DESKTOP_PATHS.local} element={<LocalPage />} />}
-                <Route path="*" element={<NotFoundPage />} />
+                <Route path={NOT_FOUND_ROUTE} element={<NotFoundPage />} />
               </Route>
               <Route path={MUSIC_PATHS.root} element={<MusicShell />}>
                 <Route index element={<MusicHomePage />} />
-                <Route
-                  path={MUSIC_PATHS.albums}
-                  element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.albums} />}
-                />
-                <Route
-                  path={MUSIC_PATHS.artists}
-                  element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.artists} />}
-                />
-                <Route
-                  path={MUSIC_PATHS.noArtwork}
-                  element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.noArtwork} />}
-                />
-                <Route
-                  path={MUSIC_PATHS.songs}
-                  element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.songs} />}
-                />
-                <Route
-                  path={MUSIC_PATHS.playlists}
-                  element={<MusicLibraryPage section={MUSIC_LIBRARY_SECTIONS.playlists} />}
-                />
+                {MUSIC_LIBRARY_ROUTES.map(({ path, section }) => (
+                  <Route
+                    key={section}
+                    path={path}
+                    element={<MusicLibraryPage section={section} />}
+                  />
+                ))}
                 <Route path={MUSIC_PATHS.album} element={<AlbumPage />} />
                 <Route path={MUSIC_PATHS.artist} element={<ArtistPage />} />
                 <Route path={MUSIC_PATHS.playlist} element={<PlaylistPage />} />
@@ -321,11 +304,11 @@ export const AppRoutes = () => {
                 {!!host?.canKeepMusic && (
                   <Route path={MUSIC_PATHS.downloads} element={<DownloadsPage />} />
                 )}
-                <Route path="*" element={<NotFoundPage />} />
+                <Route path={NOT_FOUND_ROUTE} element={<NotFoundPage />} />
               </Route>
             </Route>
             {/* The player takes the whole screen, outside the browsing frame, as a file Raven plays does. */}
-            <Route path={`${PAGE_PATHS.watch}/:id`} element={<WatchPage />} />
+            <Route path={APP_PATHS.watch} element={<WatchPage />} />
             {isDesktop && <Route path={DESKTOP_PATHS.play} element={<PlayRoute />} />}
             {engine !== null && <Route path={BROWSER_PLAY_PATH} element={<BrowserPlayRoute />} />}
           </Route>
@@ -337,7 +320,7 @@ export const AppRoutes = () => {
           <Route path={AUTH_ROUTES.forgot} element={<ForgotPasswordPage />} />
           <Route path={AUTH_ROUTES.reset} element={<ResetPasswordPage />} />
           <Route path={AUTH_ROUTES.pending} element={<PendingPage />} />
-          <Route path="get" element={<GetPage />} />
+          <Route path={APP_PATHS.get} element={<GetPage />} />
         </Routes>
       </Suspense>
       {/* Over any page, the player too: whatever sits in a locked library asks for the PIN. */}

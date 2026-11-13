@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { ApiError, AUTH_REFUSALS } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { Address, AuthCard, Lead } from '@/components/AuthScreen/AuthCard'
 import { AUDIENCES, AuthScreen } from '@/components/AuthScreen/AuthScreen'
 import { ACCESS_KINDS, useAccessState, useAccount } from '@/lib/accessState'
@@ -54,7 +54,7 @@ export const PendingPage = () => {
           }
         >
           <div className={styles.actions}>
-            <Button tone="primary" disabled={isBusy} onClick={() => check.mutate()}>
+            <Button tone={BUTTON_TONES.primary} disabled={isBusy} onClick={() => check.mutate()}>
               {check.isPending ? PENDING_COPY.checking : PENDING_COPY.checkAgain}
             </Button>
             <Button disabled={isBusy} onClick={() => end.mutate()}>

@@ -26,6 +26,10 @@ const HTTP_CACHE_MODES = { reload: 'reload' } as const
 // Past the HTTP cache, so the kept shell is the server's current page.
 const SHELL_REQUEST: RequestInit = { cache: HTTP_CACHE_MODES.reload }
 
+/*
+ * Its own copy of @shared/http's two names: the page imports that module too, so the build would
+ * split it into a chunk the worker imports, and a classic worker script cannot import.
+ */
 const HEADERS = { contentType: 'content-type', range: 'range' } as const
 
 /** Keeps the app's index for offline; a failure leaves it for the next navigation to store. */

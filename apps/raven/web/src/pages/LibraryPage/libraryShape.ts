@@ -15,14 +15,6 @@ import { type SeasonEntry, seasonNext } from '@/pages/LibraryPage/seasons'
  */
 export type Listing = { shows: ShowEntry[]; seasons: SeasonEntry[]; files: MediaItem[] }
 
-export const LISTING_STATES = { pending: 'pending', failed: 'failed', listed: 'listed' } as const
-
-/** Where a listing stands: on its way, failed with nothing to show, or read. */
-export type ListingState =
-  | { state: typeof LISTING_STATES.pending }
-  | { state: typeof LISTING_STATES.failed; error: Error }
-  | ({ state: typeof LISTING_STATES.listed } & Listing)
-
 /** What Play, Shuffle and the jump strip see while nothing is listed yet. */
 export const NOTHING_LISTED: Listing = { shows: [], seasons: [], files: [] }
 

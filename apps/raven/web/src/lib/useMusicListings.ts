@@ -1,6 +1,12 @@
-import { type AlbumSummary, type Artist, type Library, MUSIC_SORTS, type Track } from '@raven/core'
+import {
+  type AlbumSummary,
+  type Artist,
+  type Library,
+  MUSIC_SORTS,
+  type Track,
+  musicLibrariesOf,
+} from '@raven/core'
 import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query'
-import { musicLibrariesOf } from '@/lib/music'
 import { albumsQuery, artistsQuery, librariesQuery, songsQuery } from '@/lib/queries'
 
 const NO_LIBRARIES: readonly Library[] = []

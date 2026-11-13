@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { BINGE_LIMIT, type ItemSummary } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { BINGE_COPY } from '@/lib/binge'
 import { useBingeProfile, useDismissBingeTip, useSetBinge } from '@/lib/useBinge'
 import styles from '@/components/BingeButton/BingeButton.module.scss'
@@ -39,7 +39,7 @@ export const BingeButton = ({ item }: BingeButtonProps) => {
         <span className={styles.tip} role="note">
           <span id={tipId}>{BINGE_COPY.tip}</span>
           <Button
-            tone="ghost"
+            tone={BUTTON_TONES.ghost}
             onClick={() => {
               window.localStorage.setItem(STORE_KEYS.bingeTip, 'true')
               dismissTip.mutate()

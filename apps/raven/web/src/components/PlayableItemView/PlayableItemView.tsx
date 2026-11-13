@@ -25,11 +25,12 @@ import {
   progressOf,
   watchLink,
   ITEM_IMAGE_KINDS,
+  libraryPath,
 } from '@raven/core'
 import { type ComponentType, type ReactNode, useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { ButtonLink } from '@raven/ui'
+import { BUTTON_TONES, ButtonLink } from '@raven/ui'
 import type { BackFallback } from '@/components/BackButton/BackButton'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { CastRow } from '@/components/CastRow/CastRow'
@@ -37,10 +38,13 @@ import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { HeroToggle } from '@/components/HeroToggle/HeroToggle'
 import {
+  type HeaderBackdrop,
   type HeaderProgress,
   ItemHeader,
   itemBackdrop,
   pictureBackdrop,
+  PICTURE_SHAPES,
+  ITEM_HEADER_VARIANTS,
 } from '@/components/ItemHeader/ItemHeader'
 import { MediaMenu } from '@/components/MediaMenu/MediaMenu'
 import { useItemEditors } from '@/components/ItemEditors/ItemEditors'
@@ -61,82 +65,56 @@ import { useMediaMutations } from '@/lib/useMediaMutations'
 import { PLAYABLE_ITEM_VIEW_COPY } from '@/components/PlayableItemView/copy'
 import styles from '@/components/PlayableItemView/PlayableItemView.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { handled } from '@/lib/handled'
 
 type Facts = { details: ItemDetails; primary: MediaItem }
 
-/**
- * A movie has a poster and a backdrop. An episode has its still, else the
- * file's frame grab, under its season's backdrop, which is its show's.
- */
-const PAGE_PICTURES = { posterAndBackdrop: 'poster and backdrop', still: 'still' } as const
+/** What a page's header shows of its pictures, as its config draws them. */
+type HeaderPictures = Pick<Parameters<typeof ItemHeader>[0], 'picture' | 'backdrop' | 'variant'>
+
+type HeaderPicturesProps = {
+  details: ItemDetails
+  /** The episode's still, else the file's frame grab. */
+  still: string | null
+  /** The show's backdrop under an episode, the still standing in for none. */
+  episodeBackdrop: HeaderBackdrop | null
+  play: NonNullable<HeaderPictures['picture']>['play']
+}
+
+type BackProps = Facts & { libraries: readonly Library[] }
+
+type SagaSlotProps = { itemId: number; libraryId: number }
+
+type ReviewsSlotProps = { reviews: ItemDetails['reviews'] }
+
+/** What a page leaves out where the other kind shows something. */
+const Nothing = () => null
 
 /** How a movie's page and an episode's page differ; everything else they share. */
 type PlayableConfig = {
   matchType: MatchItemType
-  back: (facts: Facts & { libraries: readonly Library[] }) => BackFallback
+  back: (facts: BackProps) => BackFallback
+  /** The library linked above the title, where the way back does not already name it. */
+  library: (back: BackFallback) => BackFallback | undefined
   /** The small line over the title: an episode's show and number. */
   eyebrow: (details: ItemDetails) => ReactNode[]
   byline: (details: ItemDetails) => string | null
   facts: (facts: Facts) => string[]
-  pictures: (typeof PAGE_PICTURES)[keyof typeof PAGE_PICTURES]
+  tagline: (details: ItemDetails) => string | null
+  contentRating: (details: ItemDetails) => string | null
+  /** How far through the video the viewer is, where the header says so. */
+  progress: (media: MediaItem) => HeaderProgress | undefined
+  /** A movie has a poster and a backdrop; an episode its still under its show's backdrop. */
+  pictures: (props: HeaderPicturesProps) => HeaderPictures
   /** Whether the page offers Edit images and Edit metadata, once the admin lock is off. */
   editable: boolean
-  showsTagline: boolean
-  showsContentRating: boolean
-  showsReviews: boolean
-  /** Whether a link to the saga the movie is in sits under the header. */
-  showsSaga: boolean
-  /** Whether the header links the library above the title: where back names the library itself. */
-  linksLibrary: boolean
-  /** Whether the header says how long is left of a video started, with its line. */
-  showsTimeLeft: boolean
-  /** Whether the episodes either side follow the file. */
-  showsNeighbours: boolean
+  /** What follows the header: the file's facts, with the episodes either side for an episode. */
+  About: ComponentType<AboutProps>
+  /** The saga a movie is in, linked under the header. */
+  Saga: ComponentType<SagaSlotProps>
+  Reviews: ComponentType<ReviewsSlotProps>
   castTitle: string | undefined
 }
-
-const PLAYABLE = {
-  movie: {
-    matchType: ITEM_TYPES.movie,
-    back: ({ primary, libraries }) => ({
-      to: `/libraries/${primary.libraryId}`,
-      label: libraries.find((entry) => entry.id === primary.libraryId)?.name ?? COMMON_COPY.library,
-    }),
-    eyebrow: () => [],
-    byline: directedBy,
-    facts: movieFacts,
-    pictures: PAGE_PICTURES.posterAndBackdrop,
-    editable: true,
-    showsTagline: true,
-    showsContentRating: true,
-    showsReviews: true,
-    showsSaga: true,
-    linksLibrary: true,
-    showsTimeLeft: false,
-    showsNeighbours: false,
-    castTitle: undefined,
-  },
-  episode: {
-    matchType: ITEM_TYPES.show,
-    back: ({ details, primary }) => ({
-      to: episodeBackPath({ item: details, libraryId: primary.libraryId }),
-      label: details.show?.title ?? COMMON_COPY.library,
-    }),
-    eyebrow: (details) => episodeEyebrow(details),
-    byline: () => null,
-    facts: episodeFacts,
-    pictures: PAGE_PICTURES.still,
-    editable: false,
-    showsTagline: false,
-    showsContentRating: false,
-    showsReviews: false,
-    showsSaga: false,
-    linksLibrary: false,
-    showsTimeLeft: true,
-    showsNeighbours: true,
-    castTitle: PLAYABLE_ITEM_VIEW_COPY.guestStars,
-  },
-} as const satisfies Record<'movie' | 'episode', PlayableConfig>
 
 /**
  * An episode's line over its title, "Lucky · S01 · E01": its show and its
@@ -204,18 +182,64 @@ const AboutAlone = ({ details, primary, tracks, tagline, hasSummary }: AboutAlon
   </div>
 )
 
-/** What follows the header: the file's facts with the episodes either side, or on their own. */
-const ABOUT_LAYOUTS = {
-  withNeighbours: 'withNeighbours',
-  alone: 'alone',
-} as const
-
-type AboutLayout = (typeof ABOUT_LAYOUTS)[keyof typeof ABOUT_LAYOUTS]
-
-const ABOUT_VIEWS = {
-  [ABOUT_LAYOUTS.withNeighbours]: AboutWithNeighbours,
-  [ABOUT_LAYOUTS.alone]: AboutAlone,
-} as const satisfies Record<AboutLayout, ComponentType<AboutProps>>
+const PLAYABLE = {
+  [ITEM_TYPES.movie]: {
+    matchType: ITEM_TYPES.movie,
+    back: ({ primary, libraries }) => ({
+      to: libraryPath(primary.libraryId),
+      label: libraries.find((entry) => entry.id === primary.libraryId)?.name ?? COMMON_COPY.library,
+    }),
+    library: (back) => back,
+    eyebrow: () => [],
+    byline: directedBy,
+    facts: movieFacts,
+    tagline: (details) => details.tagline,
+    contentRating: (details) => details.contentRating,
+    progress: () => undefined,
+    pictures: ({ details, play }) => ({
+      picture: {
+        shape: PICTURE_SHAPES.poster,
+        url: api.itemImageUrl({
+          id: details.id,
+          kind: ITEM_IMAGE_KINDS.poster,
+          version: details.posterVersion,
+        }),
+        play,
+      },
+      backdrop: itemBackdrop({ id: details.id, version: details.backdropVersion }),
+      variant: ITEM_HEADER_VARIANTS.pulledUp,
+    }),
+    editable: true,
+    About: AboutAlone,
+    Saga: SagaLink,
+    Reviews: ReviewCards,
+    castTitle: undefined,
+  },
+  [ITEM_TYPES.episode]: {
+    matchType: ITEM_TYPES.show,
+    back: ({ details, primary }) => ({
+      to: episodeBackPath({ item: details, libraryId: primary.libraryId }),
+      label: details.show?.title ?? COMMON_COPY.library,
+    }),
+    library: () => undefined,
+    eyebrow: (details) => episodeEyebrow(details),
+    byline: () => null,
+    facts: episodeFacts,
+    tagline: () => null,
+    contentRating: () => null,
+    progress: (media) => timeLeft(media),
+    pictures: ({ still, episodeBackdrop, play }) => ({
+      picture: { shape: PICTURE_SHAPES.still, url: still, play },
+      backdrop: episodeBackdrop,
+      variant: ITEM_HEADER_VARIANTS.standard,
+    }),
+    editable: false,
+    About: AboutWithNeighbours,
+    Saga: Nothing,
+    Reviews: Nothing,
+    castTitle: PLAYABLE_ITEM_VIEW_COPY.guestStars,
+  },
+} as const satisfies Record<typeof ITEM_TYPES.movie | typeof ITEM_TYPES.episode, PlayableConfig>
 
 type PlayableItemViewProps = {
   kind: keyof typeof PLAYABLE
@@ -259,14 +283,14 @@ export const PlayableItemView = ({
   // The neighbours read the show too, so the backdrop costs no request of its own.
   const show = useQuery(itemQuery(item.show?.id ?? null))
   // A logo until Settings says to spell titles out, as a fresh install does.
-  const showsLogo = useQuery(displaySettingsQuery).data?.titles !== TITLE_DISPLAYS.text
+  const showsLogo = (useQuery(displaySettingsQuery).data?.titles ?? null) !== TITLE_DISPLAYS.text
   const known = libraries.data ?? []
   const editors = useItemEditors({
     images: { details: item, libraries: known, libraryId: primary.libraryId },
     metadata: { details, everyCard, itemKind: ITEM_TYPES.movie },
   })
   const back = config.back({ details, primary, libraries: known })
-  const tagline = config.showsTagline ? details.tagline : null
+  const tagline = config.tagline(details)
   const play = watchLink({ media: primary })
   const playPicture = { ...play, label: PLAYABLE_ITEM_VIEW_COPY.playTitle(details.title) }
   const still =
@@ -285,23 +309,21 @@ export const PlayableItemView = ({
   const episodeBackdrop =
     item.show && show.isPending ? null : (showBackdrop ?? pictureBackdrop(still))
   const hasSummary = !!tagline || !!details.summary
-  const About =
-    ABOUT_VIEWS[config.showsNeighbours ? ABOUT_LAYOUTS.withNeighbours : ABOUT_LAYOUTS.alone]
+  const { About, Saga, Reviews } = config
 
   return (
     <article className={styles.page} aria-labelledby={titleId}>
       <ItemHeader
         back={back}
-        library={config.linksLibrary ? back : undefined}
+        library={config.library(back)}
         titleId={titleId}
         eyebrow={config.eyebrow(details)}
         title={details.title}
         byline={config.byline(details)}
-        contentRating={config.showsContentRating ? details.contentRating : null}
+        contentRating={config.contentRating(details)}
         facts={config.facts({ details, primary })}
         ratings={details.ratings}
-        progress={config.showsTimeLeft ? timeLeft(primary) : undefined}
-        pullUp={config.pictures === PAGE_PICTURES.posterAndBackdrop}
+        progress={config.progress(primary)}
         logo={
           showsLogo
             ? api.itemImageUrl({
@@ -311,23 +333,7 @@ export const PlayableItemView = ({
               })
             : null
         }
-        {...(config.pictures === PAGE_PICTURES.posterAndBackdrop
-          ? {
-              picture: {
-                shape: 'poster',
-                url: api.itemImageUrl({
-                  id: details.id,
-                  kind: ITEM_IMAGE_KINDS.poster,
-                  version: details.posterVersion,
-                }),
-                play: playPicture,
-              },
-              backdrop: itemBackdrop({ id: details.id, version: details.backdropVersion }),
-            }
-          : {
-              picture: { shape: 'still', url: still, play: playPicture },
-              backdrop: episodeBackdrop,
-            })}
+        {...config.pictures({ details, still, episodeBackdrop, play: playPicture })}
         manage={
           <AdminOnly>
             {config.editable && editors.buttons}
@@ -346,20 +352,21 @@ export const PlayableItemView = ({
                 const page = updated.item ? itemPath(updated.item) : null
                 navigate(
                   page == null
-                    ? `/libraries/${updated.libraryId}`
+                    ? libraryPath(updated.libraryId)
                     : inLibrary({ page, libraryId: updated.libraryId }),
                   { replace: true },
                 )
               }}
               onDeleted={() => {
                 if (details.versions.length <= 1) navigate(back.to)
-                else void queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) })
+                else
+                  handled(queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) }))
               }}
             />
           </AdminOnly>
         }
       >
-        <ButtonLink tone="primary" icon="play" to={play.to} state={play.state}>
+        <ButtonLink tone={BUTTON_TONES.primary} icon="play" to={play.to} state={play.state}>
           {primary.position > 0
             ? PLAYABLE_ITEM_VIEW_COPY.resumeFrom(formatDuration(primary.position))
             : COMMON_COPY.play}
@@ -381,7 +388,7 @@ export const PlayableItemView = ({
 
       {details.aiMatch && <AiMatchNote aiMatch={details.aiMatch} />}
 
-      {config.showsSaga && <SagaLink itemId={details.id} libraryId={primary.libraryId} />}
+      <Saga itemId={details.id} libraryId={primary.libraryId} />
 
       <AdminOnly>{config.editable && editors.modal}</AdminOnly>
 
@@ -395,7 +402,7 @@ export const PlayableItemView = ({
 
       <Versions versions={details.versions} libraries={known} />
       <CastRow credits={details.credits} title={config.castTitle} />
-      {config.showsReviews && <ReviewCards reviews={details.reviews} />}
+      <Reviews reviews={details.reviews} />
       <TmdbCredit />
     </article>
   )

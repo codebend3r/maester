@@ -1,14 +1,8 @@
 import { generatePath, useLocation } from 'react-router-dom'
 import { type BackFallback, HOME } from '@/components/BackButton/BackButton'
 import { COMMON_COPY } from '@/lib/copy'
-import {
-  MUSIC_PATHS,
-  NOW_PLAYING_PATH,
-  albumPath,
-  artistPath,
-  isMusicPath,
-  playlistPath,
-} from '@/lib/music'
+import { MUSIC_PATHS, NOW_PLAYING_PATH, isMusicPath } from '@/lib/music'
+import { libraryPath, albumPath, artistPath, playlistPath } from '@raven/core'
 
 /** Which shell the page is open in: raven's own, or the music mode under `/music`. */
 const MUSIC_MODES = { raven: 'raven', music: 'music' } as const
@@ -36,7 +30,7 @@ const MODE_LINKS = {
     playlist: playlistPath,
     nowPlaying: NOW_PLAYING_PATH,
     home: HOME,
-    library: ({ libraryId, name }) => ({ to: `/libraries/${libraryId}`, label: name }),
+    library: ({ libraryId, name }) => ({ to: libraryPath(libraryId), label: name }),
   },
   [MUSIC_MODES.music]: {
     album: (albumId) => generatePath(MUSIC_PATHS.album, { id: String(albumId) }),

@@ -1,6 +1,6 @@
 import type { Library } from '@raven/core'
 import { type DragEvent, useState } from 'react'
-import { Button, Icon } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import type { useLibraryOrdering } from '@/lib/useLibraryOrdering'
 import { LIBRARIES_COPY } from '@/pages/LibrariesPage/copy'
@@ -45,14 +45,14 @@ const ThinLibraryRow = ({ library, place, isDragging, drag }: ThinLibraryRowProp
     <span className={styles.moves}>
       <Button
         icon="up"
-        tone="ghost"
+        tone={BUTTON_TONES.ghost}
         aria-label={LIBRARIES_COPY.moveUp(library.name)}
         disabled={place.isFirst}
         onClick={() => place.onMove(-1)}
       />
       <Button
         icon="down"
-        tone="ghost"
+        tone={BUTTON_TONES.ghost}
         aria-label={LIBRARIES_COPY.moveDown(library.name)}
         disabled={place.isLast}
         onClick={() => place.onMove(1)}
