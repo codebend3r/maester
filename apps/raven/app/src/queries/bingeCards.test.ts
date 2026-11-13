@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import { CREDIT_JOBS, ITEM_TYPES, type ItemDetails } from '@raven/core'
+import { mediaItemFor, summaryFor } from '@raven/native/testing'
 
 import { BINGE_COPY, bingeArtLabelOf, bingeCardOf } from '@/queries/bingeCards'
 import { CARD_SHAPES } from '@/queries/cards'
 import { ROUTE_TARGETS } from '@/routes'
 import { NAS, homeApi } from '@/test/homeServer'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 const headersFor = () => ({})
 

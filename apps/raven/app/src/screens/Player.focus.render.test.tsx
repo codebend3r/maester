@@ -6,11 +6,11 @@ import type { AppServer } from '@raven/native/headless'
 import { usePlayerPrefs } from '@raven/ui/headless'
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { type ReactVideoProps, SelectedTrackType } from 'react-native-video'
+import { type HeardRequest, pathWithId } from '@raven/native/testing'
 
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { Player } from '@/screens/Player'
 import { useActiveServer } from '@/stores/activeServer'
-import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import { BUSBOYS_MP4, BUSBOYS_UNSUBTITLED, CUE_TEXT, playerApi } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
@@ -81,7 +81,7 @@ const loadedVideo = async (): Promise<ReactVideoProps> =>
     return props
   })
 
-const progressPath = pathFor({
+const progressPath = pathWithId({
   path: APP_CLIENT_CALLS.saveProgress.path,
   id: BUSBOYS_UNSUBTITLED.id,
 })
@@ -126,7 +126,7 @@ describe('Player on a TV', () => {
     const props = await loadedVideo()
     expect(props.controls).toBeFalsy()
     expect(props.source!.uri).toBe(
-      `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_UNSUBTITLED.id })}`,
+      `${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_UNSUBTITLED.id })}`,
     )
     expect(props.source!.metadata).toBeUndefined()
     // Raven draws the transport, with the skips either side of play and pause.
@@ -140,7 +140,7 @@ describe('Player on a TV', () => {
     await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
     const props = await loadedVideo()
     expect(props.source!.uri).toBe(
-      `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })}`,
+      `${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })}`,
     )
     expect(props.selectedTextTrack).toEqual({ type: SelectedTrackType.DISABLED })
     await start(props)

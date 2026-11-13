@@ -10,6 +10,7 @@ import type { HeroSlide } from '@/queries/heroSlides'
 import type { RouteTarget } from '@/routes'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { pictureStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /**
  * The slide's gradient: a little dark at the top under the status bar, clear through the
@@ -134,7 +135,7 @@ export const HeroSlideView = ({ slide, width, height, isTablet, onOpen }: HeroSl
           pressed && styles.pressed,
         ]}
       >
-        {action.isPlay && <Icon colour={onAccent} name="play" size={PLAY_ICON_SIZE} />}
+        {action.isPlay && <Icon colour={onAccent} name={APP_ICONS.play} size={PLAY_ICON_SIZE} />}
         <Text style={[styles.buttonLabel, { color: action.isPlay ? onAccent : text }]}>
           {action.text}
         </Text>

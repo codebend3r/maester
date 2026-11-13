@@ -8,6 +8,8 @@ import {
   isRecord,
   isThemeId,
 } from '@raven/core'
+import { loadPersisted } from '@raven/native/headless'
+import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 
@@ -94,13 +96,6 @@ const prefsOf = (saved: unknown): AppPrefsValues => {
   }
 }
 
-/** Holds the place of the storage until `configureAppPrefs`, as the player prefs do. */
-const UNCONFIGURED: StateStorage = {
-  getItem: () => null,
-  setItem: () => undefined,
-  removeItem: () => undefined,
-}
-
 /**
  * The theme and the playback choices Settings makes, for this device alone, persisted to
  * AsyncStorage and guarded when read. The player narrows the server's policy by them; they
@@ -114,7 +109,7 @@ export const useAppPrefs = create<AppPrefs>()(
     }),
     {
       name: APP_PREFS_KEY,
-      storage: createJSONStorage(() => UNCONFIGURED),
+      storage: createJSONStorage(() => UNCONFIGURED_STORAGE),
       skipHydration: true,
       partialize: ({
         theme,
@@ -142,6 +137,5 @@ type ConfigureAppPrefsProps = { storage: StateStorage }
 
 /** Gives the preferences their storage, AsyncStorage in the app, and reads them back from it. */
 export const configureAppPrefs = async ({ storage }: ConfigureAppPrefsProps) => {
-  useAppPrefs.persist.setOptions({ storage: createJSONStorage(() => storage) })
-  await useAppPrefs.persist.rehydrate()
+  await loadPersisted({ store: useAppPrefs, storage })
 }

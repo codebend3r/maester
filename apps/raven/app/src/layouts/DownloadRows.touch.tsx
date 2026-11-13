@@ -19,6 +19,7 @@ import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import { TitleArt } from '@/layouts/TitleArt'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** How wide a group's picture stands beside its name. */
 const ART_WIDTH = SIZES.fieldHeight * 1.5
@@ -239,13 +240,13 @@ export const UnderwayEntry = ({ row, height, onCancel, onRetry }: UnderwayEntryP
         </View>
         {row.phase === UNDERWAY_PHASES.failed && (
           <IconPress
-            icon="reset"
+            icon={APP_ICONS.reset}
             label={DOWNLOAD_COPY.retryDownload}
             onPress={() => onRetry(row)}
           />
         )}
         <IconPress
-          icon="close"
+          icon={APP_ICONS.close}
           label={DOWNLOAD_COPY.cancelDownload(row.title)}
           onPress={() => onCancel(row)}
         />
@@ -293,7 +294,7 @@ const FinishedEntry = ({ group, row, onPlay, onDelete }: FinishedEntryProps) => 
         </Text>
       </Pressable>
       <IconPress
-        icon="trash"
+        icon={APP_ICONS.trash}
         label={DOWNLOAD_COPY.deleteTitle(row.title)}
         onPress={() => onDelete(row)}
       />
@@ -360,12 +361,12 @@ export const FinishedGroupView = ({
           </Pressable>
           <View style={styles.groupButtons}>
             <IconPress
-              icon="play"
+              icon={APP_ICONS.play}
               label={DOWNLOAD_COPY.playTitle(group.title)}
               onPress={() => onPlayGroup(group)}
             />
             <IconPress
-              icon="trash"
+              icon={APP_ICONS.trash}
               label={DOWNLOAD_COPY.deleteTitle(group.title)}
               onPress={() => onDeleteGroup(group)}
             />

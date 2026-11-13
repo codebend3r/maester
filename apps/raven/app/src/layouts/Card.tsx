@@ -6,6 +6,7 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type Picture, type ShelfCard } from '@/queries/cards'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** A picture's height over its width: a poster at 2:3, a wide frame at 16:9, an album's cover square. */
 const SHAPE_RATIOS = {
@@ -187,7 +188,7 @@ export const CardPicture = ({
               },
             ]}
           >
-            <Icon colour={onAccent} name="check" size={badgeSize * WATCHED_BADGE.icon} />
+            <Icon colour={onAccent} name={APP_ICONS.check} size={badgeSize * WATCHED_BADGE.icon} />
           </View>
         )}
       </View>

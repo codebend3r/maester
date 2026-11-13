@@ -14,6 +14,7 @@ import { Grid, LockedNotice, PinPad, ToolButton } from '@/layouts'
 import { type PadDigit, pinWith, pinWithoutLast } from '@/layouts/lockKit'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { LIBRARY_COPY } from '@/screens/copy'
+import { APP_ICONS } from '@/theme/icons'
 
 /**
  * What the PIN's unlock and Lock both do with the server's answer: keep it as the lock's, and
@@ -127,7 +128,7 @@ export const RelockButton = ({ api, library }: RelockButtonProps) => {
   return (
     <ToolButton
       accessibilityLabel={LIBRARY_COPY.lockLibrary(library.name)}
-      icon="lock"
+      icon={APP_ICONS.lock}
       label={LIBRARY_COPY.lock}
       onPress={() => {
         if (!relock.isPending) relock.mutate()

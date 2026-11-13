@@ -1,8 +1,8 @@
 import { LYRICS_KINDS } from '@raven/core'
 import type { ComponentType } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { BUTTON_TONES } from '@raven/native/headless'
 
-import { BUTTON_TONES } from '@/layouts/formKit'
 import { touchForm } from '@/layouts/Form.touch'
 import { MUSIC_COPY } from '@/layouts/copy'
 import {
@@ -19,6 +19,7 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { useLineInView } from '@/layouts/useLineInView'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 const { FormButton } = touchForm
 const { Picker } = touchPicker
@@ -64,7 +65,7 @@ const Book = ({ book }: BookProps) => {
           tone={BUTTON_TONES.quiet}
         />
         <Picker
-          icon="gauge"
+          icon={APP_ICONS.gauge}
           label={MUSIC_COPY.speed}
           onChoose={speedChooserOf(book.onSpeed)}
           options={SPEED_OPTIONS}

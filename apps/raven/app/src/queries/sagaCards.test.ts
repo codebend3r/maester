@@ -7,11 +7,11 @@ import {
   RATING_SOURCES,
   SESSION_KINDS,
 } from '@raven/core'
+import { mediaItemFor, summaryFor } from '@raven/native/testing'
 
 import { hasSagas, sagaFilmsSectionsOf, sagaPlayTarget } from '@/queries/sagaCards'
 import { ROUTE_TARGETS } from '@/routes'
 import { homeApi } from '@/test/homeServer'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 describe('hasSagas', () => {
   it('is for the libraries whose files are matched to movies alone', () => {

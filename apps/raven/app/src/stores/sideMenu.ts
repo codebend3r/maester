@@ -1,4 +1,6 @@
 import { isBoolean, isRecord } from '@raven/core'
+import { loadPersisted } from '@raven/native/headless'
+import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 
@@ -21,13 +23,6 @@ type SideMenu = {
   enter: () => void
   /** The remote left a row; the menu folds unless it lands on another within `LEAVE_MS`. */
   leave: () => void
-}
-
-/** Holds the place of the storage until `configureSideMenu`, as the player prefs do. */
-const UNCONFIGURED: StateStorage = {
-  getItem: () => null,
-  setItem: () => undefined,
-  removeItem: () => undefined,
 }
 
 /** Whether what was read back pins the menu open, folded when it says nothing a menu can use. */
@@ -66,7 +61,7 @@ export const useSideMenu = create<SideMenu>()(
     }),
     {
       name: SIDE_MENU_KEY,
-      storage: createJSONStorage(() => UNCONFIGURED),
+      storage: createJSONStorage(() => UNCONFIGURED_STORAGE),
       skipHydration: true,
       partialize: ({ isPinned }) => ({ isPinned }),
       merge: (saved, current) => ({ ...current, isPinned: isPinnedIn(saved) }),
@@ -83,6 +78,5 @@ type ConfigureSideMenuProps = { storage: StateStorage }
 
 /** Gives the menu's state its storage, AsyncStorage in the app, and reads it back from it. */
 export const configureSideMenu = async ({ storage }: ConfigureSideMenuProps) => {
-  useSideMenu.persist.setOptions({ storage: createJSONStorage(() => storage) })
-  await useSideMenu.persist.rehydrate()
+  await loadPersisted({ store: useSideMenu, storage })
 }

@@ -21,9 +21,14 @@ import {
   createApiClient,
 } from '@raven/core'
 import type { AppServer } from '@raven/native/headless'
-
-import { NOT_FOUND, STATUSES, pathFor, responseOf } from '@/test/fixtureFetch'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
+import {
+  NOT_FOUND,
+  STATUSES,
+  pathWithId,
+  responseOf,
+  mediaItemFor,
+  summaryFor,
+} from '@raven/native/testing'
 
 export const NAS: AppServer = {
   id: '0f8fad5b-d9cb-469f-a165-70867728950e',
@@ -222,13 +227,13 @@ const SPARSE_HOME: Home = {
 const ANSWERS: Record<string, unknown> = {
   [`${NAS.origin}${APP_CLIENT_CALLS.getHome.path}`]: HOME,
   [`${NAS.origin}${APP_CLIENT_CALLS.listLibraries.path}`]: [FILMS, SERIES],
-  [`${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.getItem.path, id: SEVERANCE_PAGE.id })}`]:
+  [`${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.getItem.path, id: SEVERANCE_PAGE.id })}`]:
     SEVERANCE_PAGE,
-  [`${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.nextEpisode.path, id: SEVERANCE_PAGE.id })}`]:
+  [`${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.nextEpisode.path, id: SEVERANCE_PAGE.id })}`]:
     null,
   [`${NAS.origin}${APP_CLIENT_CALLS.getBinge.path}`]: { ids: [], hasSeenTip: true },
   // A write to the binge list, which the server answers with the list as it then stands.
-  [`${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.setBinge.path, id: SEVERANCE_PAGE.id })}`]: {
+  [`${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.setBinge.path, id: SEVERANCE_PAGE.id })}`]: {
     ids: [SEVERANCE_PAGE.id],
     hasSeenTip: true,
   },

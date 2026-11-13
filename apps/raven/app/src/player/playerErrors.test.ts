@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import type { OnVideoErrorData } from 'react-native-video'
+import { STATUSES } from '@raven/native/testing'
 
 import {
   APPLE_ERROR_DOMAINS,
@@ -9,7 +10,6 @@ import {
   httpStatusOf,
   isServerDrop,
 } from '@/player/playerErrors'
-import { STATUSES } from '@/test/fixtureFetch'
 
 const CORE_MEDIA = APPLE_ERROR_DOMAINS.coreMedia
 

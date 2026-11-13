@@ -2,35 +2,22 @@ import {
   type Library as LibraryRecord,
   type LibraryKind,
   type LibrarySettings,
-  type LibraryView,
-  type MediaItem,
   type PosterEntry,
-  LIBRARY_LISTINGS,
   LIBRARY_VIEWS,
-  GROUPING_LABELS,
-  LIBRARY_VIEW_LABELS,
   ROUTE_STATES,
   type RouteQuery,
-  SORT_DIRECTION_LABELS,
-  SORT_FIELD_LABELS,
   emptyListingMessage,
-  groupingsFor,
   isScanning,
   isString,
   jumpScale,
   libraryIconOf,
-  listingFor,
   listsShows,
   plural,
-  reversedSort,
   routeIdOf,
   routeState,
   shuffleChoices,
-  sortFieldsFor,
-  sortParts,
-  startingSort,
+  isMusicLibrary,
 } from '@raven/core'
-import type { IconName } from '@raven/ui/iconDrawings'
 import {
   LIBRARY_LOCK_STATES,
   type LibraryLock,
@@ -54,16 +41,15 @@ import { useShowArts } from '@/queries/useShowArts'
 import { type Listing, continueSectionsOf, librarySectionsOf } from '@/queries/libraryGrid'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
-import { Grid, Loading, Picker, SearchField, ToolButton } from '@/layouts'
+import { Grid, Loading, SearchField } from '@/layouts'
 import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
 import { LIBRARY_COPY } from '@/screens/copy'
+import { LibraryToolbar, ShuffleButton } from '@/screens/LibraryToolbar'
 import { LockedLibrary, type LockedLibraryProps } from '@/screens/LockedLibrary'
 import { type PageFrame, type PageTab, PageTools } from '@/screens/PageTools'
-import { shuffleDeal } from '@/screens/shuffleDeal'
-import { useVideoQueue } from '@/stores/videoQueue'
 import type { LoadingProps } from '@/layouts/loadingKit'
-import { appViewsFor, useLibraryView } from '@/screens/useLibraryView'
-import type { LibraryChoice } from '@/stores/libraryViews'
+import { useLibraryView } from '@/screens/useLibraryView'
+import { APP_ICONS } from '@/theme/icons'
 
 /**
  * The pages a library opens on: what is being watched in it, for picking up where one left
@@ -76,112 +62,16 @@ type LibraryPage = (typeof LIBRARY_PAGES)[keyof typeof LIBRARY_PAGES]
 
 /** What each page's button says and draws: the web's icons for them. */
 const PAGE_TABS = {
-  [LIBRARY_PAGES.continue]: { name: CONTINUE_WATCHING, icon: 'history' },
-  [LIBRARY_PAGES.library]: { name: LIBRARY_COPY.library, icon: 'libraries' },
-  [LIBRARY_PAGES.sagas]: { name: LIBRARY_COPY.sagas, icon: 'covers' },
+  [LIBRARY_PAGES.continue]: { name: CONTINUE_WATCHING, icon: APP_ICONS.history },
+  [LIBRARY_PAGES.library]: { name: LIBRARY_COPY.library, icon: APP_ICONS.libraries },
+  [LIBRARY_PAGES.sagas]: { name: LIBRARY_COPY.sagas, icon: APP_ICONS.covers },
 } as const satisfies Record<LibraryPage, PageTab>
-
-/** What each view's chip draws beside its name: the web's icons for the views. */
-const VIEW_ICONS = {
-  [LIBRARY_VIEWS.grid]: 'grid',
-  [LIBRARY_VIEWS.covers]: 'covers',
-  [LIBRARY_VIEWS.list]: 'list',
-  [LIBRARY_VIEWS.tiles]: 'tiles',
-  [LIBRARY_VIEWS.grouped]: 'grouped',
-} as const satisfies Record<LibraryView, IconName>
 
 /** The pages a library has, in the order their buttons stand: Sagas only where files are matched to movies. */
 const pagesOf = (kind: LibraryKind): LibraryPage[] =>
   hasSagas(kind)
     ? [LIBRARY_PAGES.continue, LIBRARY_PAGES.library, LIBRARY_PAGES.sagas]
     : [LIBRARY_PAGES.continue, LIBRARY_PAGES.library]
-
-type ShuffleButtonProps = { library: LibraryRecord; choices: readonly MediaItem[] }
-
-/**
- * Shuffle, first after the way to the other page: `choices` dealt into the device's video queue
- * and the first of them played from where it was left, the player's Next and back walking the
- * rest of the deal.
- */
-const ShuffleButton = ({ library, choices }: ShuffleButtonProps) => {
-  const router = useRouter()
-  const start = useVideoQueue((queue) => queue.start)
-  return (
-    <ToolButton
-      accessibilityLabel={LIBRARY_COPY.shuffleLibrary(library.name)}
-      icon="shuffle"
-      label={LIBRARY_COPY.shuffle}
-      onPress={() => {
-        const { queue, target } = shuffleDeal({ choices })
-        if (target === null) return
-        start(queue)
-        router.push(hrefOf(target))
-      }}
-    />
-  )
-}
-
-type LibraryToolbarProps = {
-  settings: LibrarySettings
-  onChange: (change: LibraryChoice) => void
-}
-
-/**
- * Sort, its direction, view and, in the grouped view, the grouping, as the web's toolbar
- * offers them: each the library's type's own, so a sort it cannot use is never offered. Under
- * the thumb only Sort shows its word and its value; the rest are their icons alone.
- */
-const LibraryToolbar = ({ settings, onChange }: LibraryToolbarProps) => {
-  const parts = sortParts(settings.sort)
-  return (
-    <>
-      <Picker
-        icon="ascending"
-        label={LIBRARY_COPY.sort}
-        onChoose={(field) => onChange({ sort: startingSort(field) })}
-        options={sortFieldsFor(settings.kind).map((field) => ({
-          key: field,
-          label: SORT_FIELD_LABELS[field],
-        }))}
-        value={parts.field}
-      />
-      {parts.direction !== null && (
-        <ToolButton
-          accessibilityLabel={LIBRARY_COPY.order(
-            SORT_DIRECTION_LABELS[parts.field][parts.direction],
-          )}
-          icon={parts.direction}
-          label={SORT_DIRECTION_LABELS[parts.field][parts.direction]}
-          onPress={() => onChange({ sort: reversedSort(settings.sort) })}
-        />
-      )}
-      <Picker
-        icon={VIEW_ICONS[settings.view]}
-        isIconOnly
-        label={LIBRARY_COPY.view}
-        onChoose={(view) => onChange({ view })}
-        options={appViewsFor(settings.kind).map((view) => ({
-          key: view,
-          label: LIBRARY_VIEW_LABELS[view],
-        }))}
-        value={settings.view}
-      />
-      {settings.view === LIBRARY_VIEWS.grouped && (
-        <Picker
-          icon="grouped"
-          isIconOnly
-          label={LIBRARY_COPY.groupBy}
-          onChoose={(groupBy) => onChange({ groupBy })}
-          options={groupingsFor(settings.kind).map((grouping) => ({
-            key: grouping,
-            label: GROUPING_LABELS[grouping],
-          }))}
-          value={settings.groupBy}
-        />
-      )}
-    </>
-  )
-}
 
 type LineOfProps = { settings: LibrarySettings; library: LibraryRecord; listed: Listing | null }
 
@@ -530,7 +420,7 @@ const knownLibraryViewOf = ({
       return { key: LIBRARY_VIEW_KEYS.loading, props: { label: LIBRARY_COPY.opening, onBack } }
     case LIBRARY_LOCK_STATES.open: {
       const props = { asked, library, session }
-      return listingFor(library.settings.kind) === LIBRARY_LISTINGS.albums
+      return isMusicLibrary(library)
         ? { key: LIBRARY_VIEW_KEYS.music, props }
         : { key: LIBRARY_VIEW_KEYS.ready, props }
     }

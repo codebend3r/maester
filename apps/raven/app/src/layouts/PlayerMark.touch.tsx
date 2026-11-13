@@ -8,6 +8,7 @@ import { Text } from '@/layouts/Text'
 import { useMarkFade } from '@/layouts/useMarkFade'
 import { SIZES } from '@/theme/appTheme'
 import { pictureStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 const MARK_ICON = 24
 
@@ -28,13 +29,13 @@ type SideLook = {
 /** Each side of the picture as its marks show it: back on the left, forward on the right. */
 const SIDE_LOOKS = {
   [-1]: {
-    icon: 'rewind',
+    icon: APP_ICONS.rewind,
     place: MARK_PLACES.left,
     skipped: PLAYER_COPY.back,
     held: PLAYER_COPY.holdBack,
   },
   [1]: {
-    icon: 'forward',
+    icon: APP_ICONS.forward,
     place: MARK_PLACES.right,
     skipped: PLAYER_COPY.forward,
     held: PLAYER_COPY.holdForward,

@@ -7,6 +7,7 @@ import { ArtistsGrid } from '@/music/ArtistsGrid'
 import { PlaylistsGrid } from '@/music/PlaylistsGrid'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { type PageFrame, type PageTab } from '@/screens/PageTools'
+import { APP_ICONS } from '@/theme/icons'
 
 /**
  * The pages a music library opens on: its albums as covers, its artists by name, and the
@@ -25,9 +26,9 @@ const PAGE_ORDER: readonly MusicPage[] = [
 
 /** What each page's button says and draws. */
 const PAGE_TABS = {
-  [MUSIC_PAGES.albums]: { name: MUSIC_PAGES_COPY.albums, icon: 'disc' },
-  [MUSIC_PAGES.artists]: { name: MUSIC_PAGES_COPY.artists, icon: 'music' },
-  [MUSIC_PAGES.playlists]: { name: MUSIC_PAGES_COPY.playlists, icon: 'list' },
+  [MUSIC_PAGES.albums]: { name: MUSIC_PAGES_COPY.albums, icon: APP_ICONS.disc },
+  [MUSIC_PAGES.artists]: { name: MUSIC_PAGES_COPY.artists, icon: APP_ICONS.music },
+  [MUSIC_PAGES.playlists]: { name: MUSIC_PAGES_COPY.playlists, icon: APP_ICONS.list },
 } as const satisfies Record<MusicPage, PageTab>
 
 type MusicPagesProps = { session: AppQueries; library: Library; asked: string }

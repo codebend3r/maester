@@ -11,13 +11,19 @@ import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import { allowlistedFetch } from '@raven/native/headless'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
+import {
+  type HeardRequest,
+  NOT_FOUND,
+  STATUSES,
+  pathWithId,
+  responseOf,
+} from '@raven/native/testing'
 
 import { LOCKED_LIBRARY_COPY, PIN_PAD_COPY } from '@/layouts/copy'
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { Library } from '@/screens/Library'
 import { LIBRARY_COPY } from '@/screens/copy'
 import { useActiveServer } from '@/stores/activeServer'
-import { type HeardRequest, NOT_FOUND, STATUSES, pathFor, responseOf } from '@/test/fixtureFetch'
 import { FILMS, NAS } from '@/test/homeServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 
@@ -65,10 +71,10 @@ const mockLockedServer = (): ApiClient =>
           return responseOf({ status: STATUSES.ok, body: mockServer.lock })
         }
         if (path === getLock.path) return responseOf({ status: STATUSES.ok, body: mockServer.lock })
-        if (path === pathFor({ path: getLibrary.path, id: FILMS.id })) {
+        if (path === pathWithId({ path: getLibrary.path, id: FILMS.id })) {
           return responseOf({ status: STATUSES.ok, body: LOCKED_FILMS })
         }
-        if (path === pathFor({ path: listInProgress.path, id: FILMS.id })) {
+        if (path === pathWithId({ path: listInProgress.path, id: FILMS.id })) {
           return responseOf({ status: STATUSES.ok, body: [] })
         }
         return responseOf(NOT_FOUND)
@@ -121,7 +127,7 @@ describe('a locked library on a phone or tablet', () => {
     await renderScreen({ ui: <Library />, client })
     expect(await screen.findByText(LOCKED_MESSAGE)).toBeTruthy()
     expect(screen.queryByText(PIN_PAD_COPY.title)).toBeNull()
-    expect(heardPaths()).not.toContain(pathFor({ path: listInProgress.path, id: FILMS.id }))
+    expect(heardPaths()).not.toContain(pathWithId({ path: listInProgress.path, id: FILMS.id }))
     await untilIdle(client)
   })
 
@@ -166,9 +172,9 @@ describe('a locked library on a phone or tablet', () => {
     await waitFor(() => expect(screen.queryByText(LOCKED_MESSAGE)).toBeNull())
     expect(screen.queryByText(PIN_PAD_COPY.title)).toBeNull()
     await waitFor(() =>
-      expect(heardPaths()).toContain(pathFor({ path: getLibrary.path, id: FILMS.id })),
+      expect(heardPaths()).toContain(pathWithId({ path: getLibrary.path, id: FILMS.id })),
     )
-    expect(heardPaths()).toContain(pathFor({ path: listInProgress.path, id: FILMS.id }))
+    expect(heardPaths()).toContain(pathWithId({ path: listInProgress.path, id: FILMS.id }))
 
     await fireEvent.press(
       await screen.findByRole('button', { name: LIBRARY_COPY.lockLibrary(FILMS.name) }),

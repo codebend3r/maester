@@ -5,6 +5,7 @@ import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
 import { fireEvent, screen, within } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
+import { pathWithId } from '@raven/native/testing'
 
 import { APP_ROUTES, APP_ROUTE_PARAMS, PLAY_FROM } from '@/routes'
 import { Item } from '@/screens/Item'
@@ -12,7 +13,6 @@ import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { CHIP_COLOURS } from '@/theme/appTheme'
 import { NAS } from '@/test/homeServer'
-import { pathFor } from '@/test/fixtureFetch'
 import {
   BUSBOYS,
   BUSBOYS_FILE,
@@ -164,7 +164,7 @@ describe('Item on a TV', () => {
 
   it("waits for a show's next episode before drawing anything the remote could take first", async () => {
     const next = heldAnswer()
-    const nextPath = pathFor({ path: APP_CLIENT_CALLS.nextEpisode.path, id: SEVERANCE.id })
+    const nextPath = pathWithId({ path: APP_CLIENT_CALLS.nextEpisode.path, id: SEVERANCE.id })
     mockServer.reads = (path) => (path === nextPath ? next.answer : Promise.resolve())
     await renderItem(SEVERANCE.id)
     await screen.findByRole('header', { name: 'Severance' })

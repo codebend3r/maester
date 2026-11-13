@@ -1,4 +1,5 @@
 import { LOCKED_STATUS } from '@raven/core'
+import { HTTP_STATUSES } from '@shared/http'
 import type { OnVideoErrorData } from 'react-native-video'
 
 /** The error domains AVPlayer names its HTTP failures in: the URL loader's and CoreMedia's. */
@@ -28,8 +29,6 @@ export const CORE_MEDIA_HTTP_CODES = {
 /** ExoPlayer's `ERROR_CODE_IO_BAD_HTTP_STATUS` (2004), as `react-native-video` prefixes it with a 2. */
 export const EXO_ERROR_CODES = { badHttpStatus: '22004' } as const
 
-const HTTP_STATUSES = { unauthorized: 401, forbidden: 403, notFound: 404 } as const
-
 /** The HTTP status each Apple code stands for, by its domain. */
 const APPLE_HTTP_STATUSES: ReadonlyMap<string, ReadonlyMap<number, number>> = new Map([
   [
@@ -54,7 +53,9 @@ const APPLE_HTTP_STATUSES: ReadonlyMap<string, ReadonlyMap<number, number>> = ne
  * Each is the source's to hand out afresh, where the server says why if it will not.
  */
 const LET_GO_STATUSES: ReadonlySet<number> = new Set([
-  ...Object.values(HTTP_STATUSES),
+  HTTP_STATUSES.unauthorized,
+  HTTP_STATUSES.forbidden,
+  HTTP_STATUSES.notFound,
   LOCKED_STATUS,
 ])
 

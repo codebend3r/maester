@@ -1,11 +1,11 @@
 import type { IconName } from '@raven/ui/iconDrawings'
 import { type ComponentRef, type ComponentType, type ReactNode, useRef } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { BUTTON_TONES, type ButtonTone } from '@raven/native/headless'
 
 import { PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
 import { useFocusOnMount, useOpeningFocus } from '@/layouts/focus'
 import { HomePlate } from '@/layouts/HomePlate.focus'
-import { BUTTON_TONES, type ButtonTone } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import { Icon } from '@raven/native'
 import { MUSIC_COPY } from '@/layouts/copy'
@@ -16,6 +16,7 @@ import type { Picture } from '@/queries/cards'
 import { useLastFocus } from '@/stores/lastFocus'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** How wide the words beside a cover run. */
 const WORDS_WIDTH = tvSize(1040)
@@ -208,7 +209,7 @@ export const ActionPlate = ({
 /** A favourite mark on a plate: the heart, filled in the primary tone while it is on. */
 export const FavouriteButton = ({ isFavourite, onToggle }: FavouriteButtonProps) => (
   <ActionPlate
-    icon="heart"
+    icon={APP_ICONS.heart}
     isOn={isFavourite}
     isPreferred={false}
     label={MUSIC_COPY.favourite}

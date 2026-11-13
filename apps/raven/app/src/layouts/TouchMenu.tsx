@@ -34,6 +34,7 @@ import { useReduceMotion } from '@/stores/reduceMotion'
 import { useTouchMenu } from '@/stores/touchMenu'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 type MenuEntryProps = {
   icon: IconName
@@ -60,7 +61,7 @@ const MenuEntry = ({ icon, label, onPress, ref, isLocked = false }: MenuEntryPro
       <Text numberOfLines={1} style={styles.entryLabel}>
         {label}
       </Text>
-      {isLocked && <Icon colour={text} name="lock" size={SIZES.text} />}
+      {isLocked && <Icon colour={text} name={APP_ICONS.lock} size={SIZES.text} />}
     </Pressable>
   )
 }
@@ -92,32 +93,32 @@ const MenuContent = ({ session: { queries } }: MenuContentProps) => {
       keyboardShouldPersistTaps="handled"
     >
       <MenuEntry
-        icon="home"
+        icon={APP_ICONS.home}
         label={TOUCH_NAV_COPY.home}
         onPress={() => go({ pathname: APP_ROUTES.home, params: {} })}
       />
       <MenuEntry
-        icon="heart"
+        icon={APP_ICONS.heart}
         label={TOUCH_NAV_COPY.favourites}
         onPress={() => go({ pathname: APP_ROUTES.favourites, params: {} })}
       />
       <MenuEntry
-        icon="continue"
+        icon={APP_ICONS.continue}
         label={TOUCH_NAV_COPY.continueWatching}
         onPress={() => go({ pathname: APP_ROUTES.continueWatching, params: {} })}
       />
       <MenuEntry
-        icon="popcorn"
+        icon={APP_ICONS.popcorn}
         label={TOUCH_NAV_COPY.binge}
         onPress={() => go({ pathname: APP_ROUTES.binge, params: {} })}
       />
       <MenuEntry
-        icon="download"
+        icon={APP_ICONS.download}
         label={TOUCH_NAV_COPY.downloads}
         onPress={() => go({ pathname: APP_ROUTES.downloads, params: {} })}
       />
       <MenuEntry
-        icon="libraries"
+        icon={APP_ICONS.libraries}
         label={TOUCH_NAV_COPY.libraries}
         onPress={() => go({ pathname: APP_ROUTES.libraries, params: {} })}
       />
@@ -139,7 +140,7 @@ const MenuContent = ({ session: { queries } }: MenuContentProps) => {
       ))}
       <View accessibilityElementsHidden importantForAccessibility="no" style={styles.divider} />
       <MenuEntry
-        icon="settings"
+        icon={APP_ICONS.settings}
         label={SETTINGS_ENTRY.label}
         onPress={() => go({ pathname: APP_ROUTES.settings, params: {} })}
       />

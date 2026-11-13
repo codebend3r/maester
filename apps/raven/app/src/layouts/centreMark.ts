@@ -3,6 +3,7 @@ import type { IconName } from '@raven/ui/iconDrawings'
 
 import { PLAYER_COPY, SKIP_SECONDS } from '@/layouts/playerKit'
 import type { HeldSeek } from '@/layouts/remoteKeys'
+import { APP_ICONS } from '@/theme/icons'
 
 /** What the middle of the picture says just happened: a skip either way, a play, a pause. */
 export const CENTRE_MARKS = {
@@ -24,14 +25,18 @@ type CentreLook = {
 
 /** Each mark's icon, the few words beside it, and what it is called aloud. */
 export const CENTRE_MARK_LOOKS = {
-  [CENTRE_MARKS.back]: { icon: 'rewind', text: PLAYER_COPY.seconds, label: PLAYER_COPY.back },
+  [CENTRE_MARKS.back]: {
+    icon: APP_ICONS.rewind,
+    text: PLAYER_COPY.seconds,
+    label: PLAYER_COPY.back,
+  },
   [CENTRE_MARKS.forward]: {
-    icon: 'forward',
+    icon: APP_ICONS.forward,
     text: PLAYER_COPY.seconds,
     label: PLAYER_COPY.forward,
   },
-  [CENTRE_MARKS.play]: { icon: 'play', text: null, label: () => PLAYER_COPY.play },
-  [CENTRE_MARKS.pause]: { icon: 'pause', text: null, label: () => PLAYER_COPY.paused },
+  [CENTRE_MARKS.play]: { icon: APP_ICONS.play, text: null, label: () => PLAYER_COPY.play },
+  [CENTRE_MARKS.pause]: { icon: APP_ICONS.pause, text: null, label: () => PLAYER_COPY.paused },
 } as const satisfies Record<CentreMark, CentreLook>
 
 /** A press's flash: its mark, and how far it went when it was a skip. */

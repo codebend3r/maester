@@ -1,10 +1,10 @@
 import { SESSION_KINDS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
+import { mediaItemFor } from '@raven/native/testing'
 
 import { ROUTE_TARGETS } from '@/routes'
 import { shuffleDeal } from '@/screens/shuffleDeal'
 import { queueNeighbourOf } from '@/stores/videoQueue'
-import { mediaItemFor } from '@/test/mediaItem'
 
 describe('shuffleDeal', () => {
   it('deals every choice into the queue and plays the first in the queue session', () => {

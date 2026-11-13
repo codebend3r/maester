@@ -31,6 +31,7 @@ import { usePictures } from '@/queries/usePictures'
 import { hrefOf } from '@/routes'
 import { PageTools } from '@/screens/PageTools'
 import { libraryChoiceOf, useLibraryViews } from '@/stores/libraryViews'
+import { APP_ICONS } from '@/theme/icons'
 
 type AlbumsGridProps = {
   session: AppQueries
@@ -89,7 +90,7 @@ type AlbumsSortProps = { listed: AlbumOrder; onChange: (listed: AlbumOrder) => v
 const AlbumsSort = ({ listed, onChange }: AlbumsSortProps) => (
   <>
     <Picker
-      icon="ascending"
+      icon={APP_ICONS.ascending}
       label={ALBUMS_GRID_COPY.sort}
       onChoose={(sort) => onChange(orderFor(sort))}
       options={Object.values(MUSIC_SORTS).map((sort) => ({
@@ -192,7 +193,7 @@ export const AlbumsGrid = ({
         <PageTools frame={frame}>
           <ToolButton
             accessibilityLabel={ALBUMS_GRID_COPY.shuffle(library.name)}
-            icon="shuffle"
+            icon={APP_ICONS.shuffle}
             label={MUSIC_COPY.shuffle}
             onPress={() => void shuffle()}
           />

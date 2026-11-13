@@ -3,10 +3,10 @@ import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import type * as Native from '@raven/native'
 import { useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
 import { fireEvent, screen } from '@testing-library/react-native'
+import { type HeardRequest, pathWithId } from '@raven/native/testing'
 
 import { NowPlaying } from '@/screens/NowPlaying'
 import { useActiveServer } from '@/stores/activeServer'
-import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import {
   AIRBAG,
@@ -120,7 +120,7 @@ describe('Now Playing under the thumb', () => {
     expect(mockHeard.filter(({ method }) => method !== HTTP_METHODS.get)).toEqual([
       {
         method: HTTP_METHODS.post,
-        path: pathFor({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: MIXTAPE.id }),
+        path: pathWithId({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: MIXTAPE.id }),
         body: { mediaIds: [AIRBAG.id] },
       },
     ])

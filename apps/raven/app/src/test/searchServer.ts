@@ -10,16 +10,17 @@ import {
   toQueryString,
 } from '@raven/core'
 import { allowlistedFetch } from '@raven/native/headless'
-
 import {
   type Answer,
   type HeardRequest,
   NOT_FOUND,
   STATUSES,
   responseOf,
-} from '@/test/fixtureFetch'
+  mediaItemFor,
+  summaryFor,
+} from '@raven/native/testing'
+
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 export const DUNE = mediaItemFor({
   id: 50,

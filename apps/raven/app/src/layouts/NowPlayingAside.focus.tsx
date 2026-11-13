@@ -1,6 +1,7 @@
 import { LYRICS_KINDS } from '@raven/core'
 import type { ComponentType } from 'react'
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { BUTTON_TONES } from '@raven/native/headless'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { MUSIC_COPY } from '@/layouts/copy'
@@ -16,10 +17,10 @@ import type { LyricsView, SyncedLyrics } from '@/layouts/musicRows'
 import { focusPicker } from '@/layouts/Picker.focus'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { useLineInView } from '@/layouts/useLineInView'
-import { BUTTON_TONES } from '@/layouts/formKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 const { Picker } = focusPicker
 
@@ -70,7 +71,7 @@ const Book = ({ book }: BookProps) => {
       <FocusBand>
         <View style={styles.actions}>
           <ActionPlate
-            icon="rewind"
+            icon={APP_ICONS.rewind}
             isPreferred={false}
             label={MUSIC_COPY.previousChapter}
             onPress={book.onPreviousChapter}
@@ -79,7 +80,7 @@ const Book = ({ book }: BookProps) => {
           />
           {onNextChapter !== null && (
             <ActionPlate
-              icon="forward"
+              icon={APP_ICONS.forward}
               isPreferred={false}
               label={MUSIC_COPY.nextChapter}
               onPress={onNextChapter}
@@ -88,7 +89,7 @@ const Book = ({ book }: BookProps) => {
             />
           )}
           <Picker
-            icon="gauge"
+            icon={APP_ICONS.gauge}
             label={MUSIC_COPY.speed}
             onChoose={speedChooserOf(book.onSpeed)}
             options={SPEED_OPTIONS}

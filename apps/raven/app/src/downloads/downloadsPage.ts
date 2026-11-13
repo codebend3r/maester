@@ -10,6 +10,7 @@ import {
   speedLabelOf,
   totalSpeed,
 } from '@raven/core'
+import type { DownloadReading } from '@raven/native/headless'
 
 import { DOWNLOAD_COPY } from '@/downloads/copy'
 import {
@@ -33,7 +34,6 @@ import {
 } from '@/downloads/downloadEntries'
 import { underwayTextOf } from '@/downloads/downloadStatusText'
 import { type Entries, visibleEntriesOf } from '@/downloads/downloadVisibility'
-import type { DownloadReading } from '@/stores/downloadProgress'
 
 type Readings = Readonly<Record<string, DownloadReading>>
 

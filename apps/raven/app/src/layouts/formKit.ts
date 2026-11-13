@@ -1,5 +1,5 @@
+import type { ButtonTone } from '@raven/native/headless'
 import type { ReactNode } from 'react'
-import type { KeyboardTypeOptions } from 'react-native'
 
 import type { FormStyles } from '@/layouts/formStyles'
 
@@ -22,14 +22,6 @@ export type FieldProps = {
   isFirst?: boolean
 }
 
-/**
- * How much a button asks for, as the web's `Button` tones: `primary` is the one action a step
- * is for, `quiet` a moss fill for another way on, and `ghost` no fill at all, for a way out.
- */
-export const BUTTON_TONES = { primary: 'primary', quiet: 'quiet', ghost: 'ghost' } as const
-
-export type ButtonTone = (typeof BUTTON_TONES)[keyof typeof BUTTON_TONES]
-
 export type FormButtonProps = {
   label: string
   onPress: () => void
@@ -49,17 +41,4 @@ export type FormKit = {
   Field: (props: FieldProps) => ReactNode
   FormButton: (props: FormButtonProps) => ReactNode
   useFormStyles: () => FormStyles
-}
-
-type KeyboardForProps = Pick<FieldProps, 'isSecret' | 'isEmail' | 'isNumber'>
-
-/** The keyboard a field opens: digits for a number, plain for a password, a web address's otherwise. */
-export const keyboardFor = ({
-  isSecret = false,
-  isEmail = false,
-  isNumber = false,
-}: KeyboardForProps): KeyboardTypeOptions => {
-  if (isNumber) return 'decimal-pad'
-  if (isEmail) return 'email-address'
-  return isSecret ? 'default' : 'url'
 }

@@ -18,19 +18,15 @@ import {
   optional,
   union,
 } from '@raven/core'
+import { folderOf, inFolder } from '@raven/native/headless'
 
 import { trackWayOf } from '@/downloads/downloadWays'
-
-/** The folder under the app's documents every download lives in, one folder per server inside it. */
-export const DOWNLOADS_FOLDER = 'downloads'
 
 /** The picture a download wears in Downloads, saved beside its file so it shows offline. */
 export const ART_FILE = 'art.jpg'
 
 /** The show's or movie's title art, saved beside its file so Downloads names it offline. */
 export const LOGO_FILE = 'logo.png'
-
-const PATH_SEPARATOR = '/'
 
 const KEY_SEPARATOR = ':'
 
@@ -221,19 +217,8 @@ export const groupKeyOf = ({ serverId, group }: GroupKeyOfProps): string =>
 export const groupKeyOfEntry = (entry: DownloadEntry): string =>
   groupKeyOf({ serverId: entry.serverId, group: entry.group })
 
-type FolderOfProps = { serverId: string; mediaId: number }
-
-/** The folder a download's files sit in, `downloads/<serverId>/<mediaId>`. */
-export const folderOf = ({ serverId, mediaId }: FolderOfProps): string =>
-  [DOWNLOADS_FOLDER, serverId, String(mediaId)].join(PATH_SEPARATOR)
-
 export const folderOfEntry = (entry: DownloadEntry): string =>
   folderOf({ serverId: entry.serverId, mediaId: entry.mediaId })
-
-type InFolderProps = { folder: string; file: string }
-
-export const inFolder = ({ folder, file }: InFolderProps): string =>
-  [folder, file].join(PATH_SEPARATOR)
 
 /** Only letters and digits name a file, so nothing a server says can climb out of its folder. */
 const SAFE_EXTENSION = /^[a-z0-9]{1,8}$/

@@ -1,4 +1,5 @@
-import { Platform } from 'react-native'
+import { DEVICE_TRAITS } from '@/platform/devicePlatform'
+import { FONT_SYSTEMS, type FontSystem } from '@/platform/platform'
 
 /**
  * The web's two faces, as `--font-display` and `--font-body` set them: Young Serif for display
@@ -11,11 +12,11 @@ import { Platform } from 'react-native'
  * (see `Text`).
  */
 const FAMILIES = {
-  android: { body: 'InstrumentSans', display: 'YoungSerif', code: 'monospace' },
-  apple: { body: 'Instrument Sans', display: 'Young Serif', code: 'Menlo' },
-} as const
+  [FONT_SYSTEMS.android]: { body: 'InstrumentSans', display: 'YoungSerif', code: 'monospace' },
+  [FONT_SYSTEMS.apple]: { body: 'Instrument Sans', display: 'Young Serif', code: 'Menlo' },
+} as const satisfies Record<FontSystem, Record<string, string>>
 
-const families = Platform.OS === 'android' ? FAMILIES.android : FAMILIES.apple
+const families = FAMILIES[DEVICE_TRAITS.fonts]
 
 export const BODY_FONT = families.body
 

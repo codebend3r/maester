@@ -1,6 +1,7 @@
+import type { DownloadReading } from '@raven/native/headless'
+
 import { DOWNLOAD_COPY } from '@/downloads/copy'
 import { DOWNLOAD_STATES, type UnderwayStatus } from '@/downloads/downloadEntries'
-import type { DownloadReading } from '@/stores/downloadProgress'
 
 type PercentOfProps = { done: number; total: number }
 

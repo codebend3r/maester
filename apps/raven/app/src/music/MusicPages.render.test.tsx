@@ -3,12 +3,12 @@ import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import type * as Native from '@raven/native'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { Alert } from 'react-native'
+import type { HeardRequest } from '@raven/native/testing'
 
 import { APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf } from '@/routes'
 import { Library } from '@/screens/Library'
 import { useActiveServer } from '@/stores/activeServer'
 import { NAS } from '@/test/homeServer'
-import type { HeardRequest } from '@/test/fixtureFetch'
 import {
   MIXTAPE,
   MUSIC,
