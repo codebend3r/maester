@@ -4,7 +4,6 @@ import {
   Get,
   Header,
   Inject,
-  NotFoundException,
   Param,
   ParseIntPipe,
   Query,
@@ -14,7 +13,6 @@ import {
 } from '@nestjs/common'
 import {
   AUTH_CONFIG_STATES,
-  HLS_PARAMS,
   type AuthConfig,
   type MediaMarkers,
   type MediaStreams,
@@ -31,36 +29,27 @@ import { AccessRechecks } from '@/auth/accessRechecks'
 import { AccountTickets } from '@/auth/accountTickets'
 import { AuthSessions } from '@/auth/authSessions'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
-import { streamArgs } from '@/ffmpeg/args'
+import { VIDEO_PLAN_KINDS, streamArgs } from '@/ffmpeg/args'
 import { FFMPEG_SIGNALS, FfmpegService } from '@/ffmpeg/ffmpegService'
-import { parseProbe } from '@/ffmpeg/probe'
 import { parseStreams } from '@/ffmpeg/streams'
 import { KeyframesService } from '@/hls/keyframesService'
 import { MarkersService } from '@/markers/markersService'
 import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { PrivateBy } from '@/lock/lockGuard'
-import { streamSizeFor } from '@/remoteAccess/remoteCap'
+import { QUERY_PARAMS, queryText } from '@/queryValues'
 import { SettingsRepository } from '@/settings/settingsRepository'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MEDIA_ROUTES } from '@/media/mediaRoutes'
 import { MediaTickets } from '@/media/mediaTickets'
-import {
-  audioTrackOf,
-  burnSubtitleOf,
-  capHeight,
-  refuseWhatSettingsTurnOff,
-  remuxDolbyVisionOf,
-  sizeOnDisk,
-  streamModeOf,
-  videoEncodingOf,
-} from '@/playback/conversion'
+import { ConversionRequests } from '@/playback/conversionRequests'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 import { StreamSessions } from '@/streams/streamSessions'
 import { RESPONSE_EVENTS, trackStream } from '@/streams/trackStream'
 import { ROUTE_PARAMS } from '@/requestParts'
 import { StrictlyLimited } from '@/rateLimits/rateTiers'
+import { PRIVACIES } from '@/lock/lockService'
 
 /**
  * What a player needs beyond the file itself: the tracks to choose from,
@@ -68,7 +57,7 @@ import { StrictlyLimited } from '@/rateLimits/rateTiers'
  * browser cannot play directly.
  */
 @Controller(MEDIA_ROUTES)
-@PrivateBy('media')
+@PrivateBy(PRIVACIES.media)
 export class PlaybackController {
   constructor(
     @Inject(SettingsRepository) private readonly settings: SettingsRepository,
@@ -84,13 +73,8 @@ export class PlaybackController {
     @Inject(AuthSessions) private readonly callers: AuthSessions,
     @Inject(KeyframesService) private readonly keyframes: KeyframesService,
     @Inject(MarkersService) private readonly markers: MarkersService,
+    @Inject(ConversionRequests) private readonly conversions: ConversionRequests,
   ) {}
-
-  private fileOf(id: number): MediaFile {
-    const file = this.index.fileOf(id)
-    if (!file) throw new NotFoundException(`No media ${id}`)
-    return file
-  }
 
   /**
    * Stands in for the cookie on this video's media requests to another
@@ -105,7 +89,7 @@ export class PlaybackController {
     @Req() request: FastifyRequest,
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
   ): MediaTicket {
-    this.fileOf(id)
+    this.index.requireFile(id)
     if (this.auth.state !== AUTH_CONFIG_STATES.off)
       return this.accountTickets.issue({ id, request })
     if (!this.tickets.isOn) {
@@ -115,8 +99,8 @@ export class PlaybackController {
   }
 
   @Get(':id/tracks')
-  async listTracks(@Param('id', ParseIntPipe) id: number): Promise<MediaTracks> {
-    const file = this.fileOf(id)
+  async listTracks(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number): Promise<MediaTracks> {
+    const file = this.index.requireFile(id)
     const { tracks } = await this.tracks.tracksFor(file)
     this.warmKeyframes(file)
     return tracks
@@ -125,7 +109,7 @@ export class PlaybackController {
   /** The intro, credits and chapters the player skips and rolls on by. */
   @Get(':id/markers')
   listMarkers(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number): Promise<MediaMarkers> {
-    return this.markers.markersFor(this.fileOf(id))
+    return this.markers.markersFor(this.index.requireFile(id))
   }
 
   /**
@@ -145,22 +129,27 @@ export class PlaybackController {
    * index keeps what playback itself needs.
    */
   @Get(':id/streams')
-  async listStreams(@Param('id', ParseIntPipe) id: number): Promise<MediaStreams> {
-    return parseStreams(await this.ffmpeg.probeJson(this.fileOf(id).path))
+  async listStreams(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number): Promise<MediaStreams> {
+    return parseStreams(await this.ffmpeg.probeJson(this.index.requireFile(id).path))
   }
 
   /** WebVTT for one track; `window` picks the stretch of an embedded one. */
   @MediaPlane()
   @Get(':id/subtitles/:trackId')
   async subtitle(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('trackId') trackId: string,
-    @Query('window') window: string | undefined,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.trackId) trackId: string,
+    @Query(QUERY_PARAMS.window) window: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const part = window == null ? 0 : wholeNumber(window)
+    const asked = queryText({ value: window, name: QUERY_PARAMS.window })
+    const part = asked == null ? 0 : wholeNumber(asked)
     if (part == null) throw new BadRequestException('window must be a whole number')
-    const vtt = await this.subtitles.vtt({ file: this.fileOf(id), trackId, window: part })
+    const vtt = await this.subtitles.vtt({
+      file: this.index.requireFile(id),
+      trackId,
+      window: part,
+    })
     await reply
       .header(HEADERS.contentType, CONTENT_TYPES.vtt)
       .header(HEADERS.cacheControl, RAVEN_CACHE_POLICIES.privateFiveMinutes)
@@ -176,65 +165,40 @@ export class PlaybackController {
   @MediaPlane()
   @Get(':id/stream')
   async stream(
-    @Param('id', ParseIntPipe) id: number,
-    @Query('mode') mode: string | undefined,
-    @Query('start') start: string | undefined,
-    @Query('audio') audio: string | undefined,
-    @Query('quality') quality: string | undefined,
-    @Query(HLS_PARAMS.burn) burn: string | undefined,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Query(QUERY_PARAMS.mode) mode: unknown,
+    @Query(QUERY_PARAMS.start) start: unknown,
+    @Query(QUERY_PARAMS.audio) audio: unknown,
+    @Query(QUERY_PARAMS.quality) quality: unknown,
+    @Query(QUERY_PARAMS.burn) burn: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const streamMode = streamModeOf(mode)
-    const playback = this.settings.playback()
-    refuseWhatSettingsTurnOff({ playback, mode: streamMode })
-    const sized = streamSizeFor({
-      quality,
-      mode: streamMode,
-      request,
-      remote: this.settings.remoteAccess(),
-      playback,
-    })
-    const size = sized?.size ?? null
-    const from = start == null ? 0 : Number(start)
+    const startText = queryText({ value: start, name: QUERY_PARAMS.start })
+    const from = startText == null ? 0 : Number(startText)
     if (!Number.isFinite(from) || from < 0) {
       throw new BadRequestException('start must be a number of seconds')
     }
-    const file = this.fileOf(id)
-    await sizeOnDisk(file)
-
-    const { tracks } = await this.tracks.tracksFor(file)
-    const chosen = audioTrackOf({ tracks, audio })
-    const burnWith = await burnSubtitleOf({
-      tracks,
-      burn,
-      mode: streamMode,
-      probe: async () => parseProbe(await this.ffmpeg.probeJson(file.path)),
+    const conversion = await this.conversions.open({
+      id,
+      ask: {
+        mode: queryText({ value: mode, name: QUERY_PARAMS.mode }),
+        audio: queryText({ value: audio, name: QUERY_PARAMS.audio }),
+        quality: queryText({ value: quality, name: QUERY_PARAMS.quality }),
+        burn: queryText({ value: burn, name: QUERY_PARAMS.burn }),
+      },
+      request,
     })
-    const { tonemap, encoder } = await videoEncodingOf({
-      ffmpeg: this.ffmpeg,
-      file,
-      mode: streamMode,
-      playback,
-    })
-    const dolbyVision = await remuxDolbyVisionOf({ ffmpeg: this.ffmpeg, file, mode: streamMode })
-
+    const { file, sized } = conversion
     const child = this.ffmpeg.stream(
       streamArgs({
         input: file.path,
         start: from,
-        mode: streamMode,
-        audio: chosen?.index ?? null,
-        audioOnly: isAudioContainer(file.container),
-        videoCodec: file.videoCodec,
-        dolbyVision,
-        tonemap,
+        audio: conversion.audio?.index ?? null,
+        video: isAudioContainer(file.container)
+          ? { kind: VIDEO_PLAN_KINDS.none }
+          : conversion.video,
         streamShift: STREAM_TIME_SHIFT,
-        encoder,
-        maxHeight: capHeight({ size, maxHeight: playback.maxHeight }),
-        quality: playback.quality,
-        bitrate: size?.bitrate ?? null,
-        burn: burnWith,
       }),
     )
     /*
@@ -248,9 +212,9 @@ export class PlaybackController {
       auth: this.callers,
       purpose: STREAM_PURPOSES.play,
       mediaId: id,
-      mode: streamMode,
+      mode: conversion.mode,
       quality: sized?.key ?? null,
-      audio: chosen?.index ?? null,
+      audio: conversion.audio?.index ?? null,
       from: 0,
       request,
       reply,

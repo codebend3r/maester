@@ -20,7 +20,8 @@ import {
   type ScoreTitle,
 } from '@/metadata/scoreSources'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
-import { createRateLimit } from '@/scanner/concurrency'
+import { createRateLimit, sleep } from '@/scanner/concurrency'
+import { DailyBudget } from '@/metadata/dailyBudget'
 
 const API = 'https://api.mdblist.com'
 
@@ -85,11 +86,6 @@ export const parseMdblistRatings = (body: unknown): ExternalScore[] =>
     ]
   })
 
-/** Today in UTC, which is when MDBList's daily count resets. */
-const today = (): string => new Date().toISOString().slice(0, 10)
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-
 /** A header's whole number of zero or more, or null when it is missing or reads otherwise. */
 const wholeHeader = (header: string | null): number | null => {
   // Number(null) and Number('') are 0, which would read as a real count.
@@ -115,6 +111,9 @@ const isDaySpent = ({ body, headers }: IsDaySpentProps): boolean =>
 
 type MdblistClientNoteReportedProps = { headers: Headers; atCall: number }
 
+/** The calls left MDBList last reported on `day`, as of the call numbered `atCall`. */
+type ReportedLeft = { day: string; left: number; atCall: number }
+
 /**
  * MDBList, for IMDb, Rotten Tomatoes and Metacritic scores by TMDB id, which
  * it has for shows where OMDb has none. A free key allows a thousand calls a
@@ -129,15 +128,9 @@ type MdblistClientNoteReportedProps = { headers: Headers; atCall: number }
 export class MdblistClient implements ScoreSource {
   readonly provider = SCORE_PROVIDERS.mdblist
   private readonly limit = createRateLimit({ perSecond: 3, inFlight: 2 })
-  /**
-   * Today's calls, and the calls left MDBList last reported: as of the call
-   * numbered `atCall`, so the calls made since are taken off it.
-   */
-  private readonly budget: {
-    day: string
-    used: number
-    reported: { left: number; atCall: number } | null
-  } = { day: today(), used: 0, reported: null }
+  private readonly budget: DailyBudget
+  /** The calls left MDBList last reported, so the calls made since are taken off it. */
+  private reported: ReportedLeft | null = null
   private readonly status: { error: string | null; refused: boolean } = {
     error: null,
     refused: false,
@@ -146,15 +139,14 @@ export class MdblistClient implements ScoreSource {
   constructor(
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(METADATA_FETCH) private readonly fetch: MetadataFetch,
-  ) {}
+  ) {
+    this.budget = new DailyBudget({ limit: config.mdblistDailyLimit })
+  }
 
-  private usedToday(): number {
-    if (this.budget.day !== today()) {
-      this.budget.day = today()
-      this.budget.used = 0
-      this.budget.reported = null
-    }
-    return this.budget.used
+  /** What MDBList last reported, while it is of today. */
+  private reportedToday(): ReportedLeft | null {
+    const { reported } = this
+    return reported !== null && reported.day === this.budget.day() ? reported : null
   }
 
   enabled(): boolean {
@@ -167,9 +159,9 @@ export class MdblistClient implements ScoreSource {
 
   /** Today's calls left: the configured limit's, or fewer when MDBList last said so. */
   remaining(): number {
-    const used = this.usedToday()
-    const { reported } = this.budget
-    const byLimit = this.config.mdblistDailyLimit - used
+    const used = this.budget.used()
+    const reported = this.reportedToday()
+    const byLimit = this.budget.left()
     const byMdblist = reported == null ? byLimit : reported.left - (used - reported.atCall)
     return Math.max(0, Math.min(byLimit, byMdblist))
   }
@@ -177,9 +169,9 @@ export class MdblistClient implements ScoreSource {
   /** Notes the calls left that an answer to call `atCall` reports, unless a later call's is known. */
   private noteReported({ headers, atCall }: MdblistClientNoteReportedProps): void {
     const left = wholeHeader(headers.get(MDBLIST_HEADERS.remaining))
-    const { reported } = this.budget
+    const reported = this.reportedToday()
     if (left == null || (reported != null && reported.atCall > atCall)) return
-    this.budget.reported = { left, atCall }
+    this.reported = { day: this.budget.day(), left, atCall }
   }
 
   state(): MetadataServiceState {
@@ -191,9 +183,8 @@ export class MdblistClient implements ScoreSource {
   async lookUp({ type, tmdbId }: ScoreTitle): Promise<ScoreAnswer> {
     const key = this.config.mdblistApiKey
     if (key == null || !this.enabled()) throw new Error('MDBList is not available right now.')
-    this.budget.used += 1
-    const day = this.budget.day
-    const atCall = this.budget.used
+    const atCall = this.budget.spend()
+    const day = this.budget.day()
     const url = mdblistUrl({ type, tmdbId, key })
 
     const attempt = async (retriesLeft: number): Promise<ScoreAnswer> => {
@@ -222,7 +213,7 @@ export class MdblistClient implements ScoreSource {
       if (response.status === 429) {
         const body: unknown = await response.json().catch(() => null)
         if (isDaySpent({ body, headers: response.headers })) {
-          this.budget.used = this.config.mdblistDailyLimit
+          this.budget.exhaust()
           this.status.error = "MDBList's daily limit is spent."
           throw new Error(this.status.error)
         }
@@ -239,7 +230,7 @@ export class MdblistClient implements ScoreSource {
         this.status.error = `MDBList answered ${response.status}.`
         throw new Error(this.status.error)
       }
-      if (this.budget.day === day) this.noteReported({ headers: response.headers, atCall })
+      if (this.budget.day() === day) this.noteReported({ headers: response.headers, atCall })
       const body: unknown = await response.json().catch(() => null)
       if (ratingsIn(body) == null) {
         this.status.error = 'MDBList answered without ratings.'

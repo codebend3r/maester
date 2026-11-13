@@ -10,7 +10,8 @@ import {
   MusicBrainzError,
   type Release,
 } from '@/music/musicBrainzClient'
-import { type AlbumToMatch, MusicRepository } from '@/music/musicRepository'
+import { type AlbumToMatch, MusicMatchStore } from '@/music/musicMatchStore'
+import { MusicRepository } from '@/music/musicRepository'
 import {
   type Scored,
   type SearchTerms,
@@ -94,6 +95,7 @@ export class AlbumMatching {
   constructor(
     @Inject(MusicBrainzClient) private readonly musicBrainz: MusicBrainzClient,
     @Inject(MusicRepository) private readonly music: MusicRepository,
+    @Inject(MusicMatchStore) private readonly matches: MusicMatchStore,
     @Inject(AlbumClaude) private readonly claude: AlbumClaude,
     @Inject(ServerEvents) private readonly events: ServerEvents,
     @Inject(ScanControl) private readonly scans: ScanControl,
@@ -128,7 +130,7 @@ export class AlbumMatching {
 
   /** What a search Claude suggests finds: a sure release, or Claude's pick of what it found. */
   private async bySuggestion(album: AlbumToMatch): Promise<Scored | null> {
-    const tracks = this.music.trackTitlesOf({ id: album.id, most: AI_TRACK_TITLES_MOST })
+    const tracks = this.matches.trackTitlesOf({ id: album.id, most: AI_TRACK_TITLES_MOST })
     const suggested = await this.claude.suggest({ album, tracks })
     if (suggested === null) return null
     const found = await this.searchInTurn({ album, searches: [suggested] })
@@ -152,7 +154,7 @@ export class AlbumMatching {
   /** One album searched and its answer saved: the release it is, or unmatched with how close the best came. */
   private async matchOne(album: AlbumToMatch): Promise<AlbumOutcome> {
     const { settled, best } = await this.settle(album)
-    this.music.saveMatch({
+    this.matches.saveMatch({
       id: album.id,
       release: settled?.chosen.release ?? null,
       match: settled === null ? MATCH_STATES.unmatched : MATCH_STATES.matched,
@@ -178,8 +180,8 @@ export class AlbumMatching {
     libraryId,
     onOutcome = () => undefined,
   }: AlbumMatchingMatchLibraryProps): Promise<MatchTally> {
-    const pending = this.music.albumsToMatch(libraryId)
-    const enrichment = this.music.albumsToEnrich(libraryId)
+    const pending = this.matches.albumsToMatch(libraryId)
+    const enrichment = this.matches.albumsToEnrich(libraryId)
     if (pending.length === 0 && enrichment.length === 0) return NOTHING_PENDING
     const guard = new PassGuard({
       logger: this.logger,
@@ -205,7 +207,7 @@ export class AlbumMatching {
       fn: async ({ id, mbid }) =>
         guard.run(async () => {
           const release = await this.musicBrainz.release(mbid)
-          this.music.enrich({ id, release })
+          this.matches.enrich({ id, release })
         }),
     })
     guard.reportStop()
@@ -220,7 +222,7 @@ export class AlbumMatching {
   async matchLibrary(props: AlbumMatchingMatchLibraryProps): Promise<MatchTally> {
     const tally = await this.matchPending(props)
     if (tally.total === 0) return tally
-    const merged = this.music.mergeAlbums(props.libraryId)
+    const merged = this.matches.mergeAlbums(props.libraryId)
     this.events.libraryChanged(props.libraryId)
     this.logger.log(
       `Matched ${tally.matched} of ${tally.total} albums of library ${props.libraryId}; merged ${merged} duplicates`,
@@ -230,7 +232,7 @@ export class AlbumMatching {
 
   /** The albums no release was found for are searched again on the next pass. */
   retry(libraryId: number): number {
-    return this.music.resetUnmatched(libraryId)
+    return this.matches.resetUnmatched(libraryId)
   }
 
   /**
@@ -242,7 +244,7 @@ export class AlbumMatching {
     const libraryId = this.music.libraryOfAlbum(id)
     if (libraryId === null) return false
     const release = mbid === null ? null : await this.musicBrainz.release(mbid)
-    this.music.saveMatch({ id, release, match: MATCH_STATES.manual, confidence: null })
+    this.matches.saveMatch({ id, release, match: MATCH_STATES.manual, confidence: null })
     this.events.libraryChanged(libraryId)
     return true
   }

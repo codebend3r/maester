@@ -1,7 +1,7 @@
 import { createHmac, scryptSync } from 'node:crypto'
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common'
-import { type AdminLock, SERVER_COOKIES } from '@raven/core'
-import { readCookie, sameSecret } from '@shared/server'
+import { type AdminLock, SERVER_COOKIES, UNLOCK_COOKIE_PATH } from '@raven/core'
+import { SAME_SITE, readCookie, sameSecret, serializeCookie } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { WrongTries } from '@/lock/wrongTries'
 import { SettingsRepository } from '@/settings/settingsRepository'
@@ -144,7 +144,15 @@ export class AdminService implements OnModuleInit {
   /** Scoped to the API, out of reach of scripts, never sent from another site, and kept when the browser closes. */
   private cookieOf({ since, locksAt }: Session): string {
     const value = `${since}.${locksAt ?? ''}`
-    return `${SERVER_COOKIES.admin}=${value}.${this.sign(value)}; Path=/api; HttpOnly; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE_S}`
+    return serializeCookie({
+      name: SERVER_COOKIES.admin,
+      value: `${value}.${this.sign(value)}`,
+      path: UNLOCK_COOKIE_PATH,
+      maxAgeSeconds: COOKIE_MAX_AGE_S,
+      domain: null,
+      sameSite: SAME_SITE.strict,
+      isSecure: false,
+    })
   }
 
   private sign(value: string): string {

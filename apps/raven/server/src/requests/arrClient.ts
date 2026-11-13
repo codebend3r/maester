@@ -13,8 +13,15 @@ import {
   optional,
   toQueryString,
 } from '@raven/core'
-import { CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@shared/server'
+import {
+  CONTENT_TYPES,
+  HEADERS,
+  HTTP_METHODS,
+  HTTP_STATUSES,
+  type HttpMethod,
+} from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { errorMessage } from '@/errorMessage'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 import type { ArrServer } from '@/requests/requestsConfig'
 
@@ -141,7 +148,7 @@ export type ArrProgress = {
 type CallProps = {
   type: MatchItemType
   path: string
-  method?: string
+  method?: HttpMethod
   body?: unknown
 }
 
@@ -159,9 +166,6 @@ type ByTitleProps = { type: MatchItemType; arrId: number }
 type CommandProps = { type: MatchItemType; commandId: number }
 
 type QualityProfileProps = { type: MatchItemType; name: string }
-
-/** Whether a call answered a record that is not there: a command the arr has since forgotten. */
-const NOT_FOUND = 404
 
 /**
  * Sonarr for shows and Radarr for movies, over their v3 API. Every answer is
@@ -205,10 +209,11 @@ export class ArrClient {
     }).catch((error: unknown) => {
       throw new ArrError({
         kind: ARR_ERROR_KINDS.failed,
-        message: `Could not reach the ${type} downloader: ${error instanceof Error ? error.message : String(error)}`,
+        message: `Could not reach the ${type} downloader: ${errorMessage(error)}`,
       })
     })
-    if (response.status === NOT_FOUND) return null
+    // A 404 is a record that is not there: a command the arr has since forgotten.
+    if (response.status === HTTP_STATUSES.notFound) return null
     if (!response.ok) {
       throw new ArrError({
         kind: ARR_ERROR_KINDS.failed,

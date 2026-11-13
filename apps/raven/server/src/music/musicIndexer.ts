@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { Inject, Injectable } from '@nestjs/common'
 import { THUMBNAIL_STATES } from '@raven/core'
+import { DatabaseService } from '@/db/database'
 import { MediaIndex } from '@/media/mediaIndex'
 import { AlbumCovers } from '@/music/albumCovers'
 import { AudioReader } from '@/music/audioReader'
@@ -34,23 +35,37 @@ export class MusicIndexer {
     @Inject(MediaIndex) private readonly mediaIndex: MediaIndex,
     @Inject(MusicRepository) private readonly music: MusicRepository,
     @Inject(AlbumCovers) private readonly covers: AlbumCovers,
+    @Inject(DatabaseService) private readonly database: DatabaseService,
   ) {}
 
   resetFolderCovers(): void {
     this.folderCovers.clear()
   }
 
+  /**
+   * The file's tags and its folder's cover are read together, and what they
+   * say is written in one transaction, so a file is never half filed. The
+   * albums and artists it leaves empty are dropped by `MusicRepository.prune`, once a scan's
+   * files are all read.
+   */
   async index({ id, libraryId, path }: MusicIndexerIndexProps): Promise<void> {
-    const { probe, tracks, tags, format, chapters } = await this.reader.read(path)
-    const folderCover =
-      (await this.folderCover(albumFolderOf(path))) ?? (await this.folderCover(dirname(path)))
-    const source = folderCover ?? path
-    const info = await stat(source).catch(() => null)
+    const [{ probe, tracks, tags, format, chapters }, folderCover] = await Promise.all([
+      this.reader.read(path),
+      this.coverBeside(path),
+    ])
+    const info = await stat(folderCover ?? path).catch(() => null)
     const coverStamp = info === null ? '' : `${info.mtimeMs}:${info.size}`
-    this.mediaIndex.saveProbe({ id, probe, tracks, chapters })
-    this.music.record({ mediaId: id, libraryId, path, tags, format, folderCover, coverStamp })
-    // No thumbnail will come, so nothing waits for one.
-    this.mediaIndex.setThumbnail({ id, state: THUMBNAIL_STATES.failed })
+    this.database.db.transaction(() => {
+      this.mediaIndex.saveProbe({ id, probe, tracks, chapters })
+      this.music.record({ mediaId: id, libraryId, path, tags, format, folderCover, coverStamp })
+      // No thumbnail will come, so nothing waits for one.
+      this.mediaIndex.setThumbnail({ id, state: THUMBNAIL_STATES.failed })
+    })()
+  }
+
+  /** The cover of the file's album folder, else of the folder it sits in, else none. */
+  private async coverBeside(path: string): Promise<string | null> {
+    return (await this.folderCover(albumFolderOf(path))) ?? (await this.folderCover(dirname(path)))
   }
 
   private folderCover(folder: string): Promise<string | null> {

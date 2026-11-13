@@ -1,6 +1,7 @@
 import { isPrivateAddress } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
-import { RAVEN_HEADERS, headerOf } from '@/http'
+import { headerOf } from '@/http'
+import { HEADERS } from '@shared/server'
 
 /**
  * What raven reads of a request to tell where it came from: Fastify's
@@ -30,7 +31,7 @@ export const isAddressForwarded = ({ request }: ClientRequestProps): boolean =>
   (request.ips?.length ?? 0) > 1
 
 const hasForwardedHeader = ({ request }: ClientRequestProps): boolean =>
-  headerOf(request.headers[RAVEN_HEADERS.forwardedFor])
+  headerOf(request.headers[HEADERS.forwardedFor])
     .split(',')
     .some((entry) => entry.trim() !== '')
 

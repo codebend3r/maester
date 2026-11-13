@@ -31,7 +31,7 @@ import { OpenedByPass, PASS_KINDS } from '@/auth/accountPasses'
 import { authFailure } from '@/auth/authFailure'
 import { AuthSessions } from '@/auth/authSessions'
 import { TicketAccesses } from '@/auth/ticketAccesses'
-import { FfmpegService } from '@/ffmpeg/ffmpegService'
+import { PICTURE_MODES, VIDEO_PLAN_KINDS } from '@/ffmpeg/args'
 import { type MediaClock, isTransportStream, mediaClockOf, parseProbe } from '@/ffmpeg/probe'
 import { parseStreams } from '@/ffmpeg/streams'
 import { sessionUris } from '@/hls/hlsUris'
@@ -52,19 +52,10 @@ import { PRIVACIES } from '@/lock/lockService'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
 import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MEDIA_ROUTES, routeOf } from '@/media/mediaRoutes'
-import {
-  audioTrackOf,
-  burnSubtitleOf,
-  capHeight,
-  refuseWhatSettingsTurnOff,
-  sizeOnDisk,
-  streamModeOf,
-  videoEncodingOf,
-} from '@/playback/conversion'
+import { ConversionRequests } from '@/playback/conversionRequests'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
-import { streamSizeFor } from '@/remoteAccess/remoteCap'
-import { SettingsRepository } from '@/settings/settingsRepository'
+import { QUERY_PARAMS, queryText } from '@/queryValues'
 import { StreamSessions } from '@/streams/streamSessions'
 import { RESPONSE_EVENTS, trackStream } from '@/streams/trackStream'
 
@@ -131,17 +122,16 @@ type HlsControllerSendMediaProps = {
 @PrivateBy(PRIVACIES.media)
 export class HlsController {
   constructor(
-    @Inject(SettingsRepository) private readonly settings: SettingsRepository,
     @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(TracksService) private readonly tracks: TracksService,
     @Inject(SubtitlesService) private readonly subtitles: SubtitlesService,
-    @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(KeyframesService) private readonly keyframes: KeyframesService,
     @Inject(HlsSessions) private readonly sessions: HlsSessions,
     @Inject(StreamSessions) private readonly streams: StreamSessions,
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
     @Inject(TicketAccesses) private readonly accesses: Pick<TicketAccesses, 'accessOf'>,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
+    @Inject(ConversionRequests) private readonly conversions: ConversionRequests,
   ) {}
 
   /**
@@ -156,86 +146,58 @@ export class HlsController {
   @Get(routeOf(HLS_PATHS.master))
   async master(
     @Param(HLS_PARAMS.id, ParseIntPipe) id: number,
-    @Query(HLS_PARAMS.mode) mode: string | undefined,
-    @Query(HLS_PARAMS.audio) audio: string | undefined,
-    @Query(HLS_PARAMS.quality) quality: string | undefined,
-    @Query(HLS_PARAMS.burn) burn: string | undefined,
+    @Query(QUERY_PARAMS.mode) mode: unknown,
+    @Query(QUERY_PARAMS.audio) audio: unknown,
+    @Query(QUERY_PARAMS.quality) quality: unknown,
+    @Query(QUERY_PARAMS.burn) burn: unknown,
     @Query(MEDIA_TICKET_PARAM) query: unknown,
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const ticket = ticketIn(query)
-    const streamMode = streamModeOf(mode)
-    const playback = this.settings.playback()
-    refuseWhatSettingsTurnOff({ playback, mode: streamMode })
-    const sized = streamSizeFor({
-      quality,
-      mode: streamMode,
+    const conversion = await this.conversions.open({
+      id,
+      ask: {
+        mode: queryText({ value: mode, name: QUERY_PARAMS.mode }),
+        audio: queryText({ value: audio, name: QUERY_PARAMS.audio }),
+        quality: queryText({ value: quality, name: QUERY_PARAMS.quality }),
+        burn: queryText({ value: burn, name: QUERY_PARAMS.burn }),
+      },
       request,
-      remote: this.settings.remoteAccess(),
-      playback,
     })
-    const size = sized?.size ?? null
-    const file = this.fileOf(id)
-    const bytes = await sizeOnDisk(file)
-    const { tracks } = await this.tracks.tracksFor(file)
-    const audioTrack = audioTrackOf({ tracks, audio })
-    const output = await this.ffmpeg.probeJson(file.path)
+    const { mode: streamMode, file, video } = conversion
+    const output = await conversion.probe()
     const probe = parseProbe(output)
-    const burnWith = await burnSubtitleOf({
-      tracks,
-      burn,
-      mode: streamMode,
-      probe: async () => probe,
-    })
     const clock = mediaClockOf(output)
     const end = clock.end ?? (file.duration == null ? null : clock.start + file.duration)
     if (probe === null || probe.width == null || probe.height == null || end == null) {
       throw new UnprocessableEntityException('This file has no picture of a known length to cut')
     }
     const picture = parseStreams(output).video
-    const dolbyVision = picture?.dolbyVision ?? null
     const videoString = videoStringOf({
       mode: streamMode,
       videoCodec: file.videoCodec,
       bitDepth: probe.videoBitDepth,
-      dolbyVision,
+      dolbyVision: video.kind === VIDEO_PLAN_KINDS.copy ? video.dolbyVision : null,
     })
     if (videoString == null) {
       throw new ConflictException("HLS can't carry this video as it is; transcode it")
     }
     const plan = await this.planOf({ mode: streamMode, file, clock, end })
-
     const keyframesFor =
       streamMode === PLAYBACK_MODES.transcode && isTransportStream(output)
         ? this.transportKeyframes(file)
         : null
-    const { tonemap, encoder } = await videoEncodingOf({
-      ffmpeg: this.ffmpeg,
-      file,
-      mode: streamMode,
-      playback,
-    })
-    const maxHeight = capHeight({ size, maxHeight: playback.maxHeight })
-    const bitrate = size?.bitrate ?? null
     const session = this.sessions.mint({
       mediaId: id,
-      asked: sized?.key ?? null,
+      asked: conversion.sized?.key ?? null,
       source: {
         input: file.path,
-        mode: streamMode,
         plan,
         startTime: clock.start,
         frameRate: clock.frameRate,
-        audio: audioTrack,
-        videoCodec: file.videoCodec,
-        dolbyVision,
-        encoder,
-        maxHeight,
-        quality: playback.quality,
-        bitrate,
-        tonemap,
-        burn: burnWith,
+        audio: conversion.audio,
+        video,
       },
       keyframesFor,
       // Only an account ticket's session has a pass; any other caller's needs no capability.
@@ -247,18 +209,21 @@ export class HlsController {
       mode: streamMode,
       videoRange: picture?.range ?? VIDEO_RANGES.sdr,
       variantUri: uris.video,
-      subtitles: tracks.subtitles.map((track) => ({ track, uri: uris.subtitles(track.id) })),
+      subtitles: conversion.tracks.subtitles.map((track) => ({
+        track,
+        uri: uris.subtitles(track.id),
+      })),
       ...variantOf({
         mode: streamMode,
         videoString,
-        audio: audioTrack,
+        audio: conversion.audio,
         frame: { width: probe.width, height: probe.height },
         plan,
         fileBitrate: probe.bitrate,
-        bytes,
-        maxHeight,
-        quality: playback.quality,
-        bitrate,
+        bytes: conversion.bytes,
+        maxHeight: conversion.maxHeight,
+        quality: conversion.playback.quality,
+        bitrate: conversion.bitrate,
       }),
     })
     await this.sendPlaylist({ reply, playlist })
@@ -339,7 +304,7 @@ export class HlsController {
   ): Promise<void> {
     const ticket = ticketIn(query)
     const opened = this.sessionOf({ id, session, key: ticket })
-    await this.textTrackOf({ file: this.fileOf(id), trackId })
+    await this.textTrackOf({ file: this.index.requireFile(id), trackId })
     const uris = sessionUris({ session: opened, key: keyFor({ session: opened, ticket }) })
     await this.sendPlaylist({
       reply,
@@ -368,7 +333,7 @@ export class HlsController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const opened = this.sessionOf({ id, session, key: ticketIn(query) })
-    const file = this.fileOf(id)
+    const file = this.index.requireFile(id)
     const track = await this.textTrackOf({ file, trackId })
     const number = wholeNumber(n)
     if (number == null || number >= subtitleSegmentCount(playlistLength(opened.plan))) {
@@ -410,12 +375,6 @@ export class HlsController {
   private transportKeyframes(file: MediaFile): () => readonly number[] | null {
     this.keyframes.warm({ id: file.id, path: file.path })
     return () => this.index.storedKeyframes(file.id)
-  }
-
-  private fileOf(id: number): MediaFile {
-    const file = this.index.fileOf(id)
-    if (!file) throw new NotFoundException(`No media ${id}`)
-    return file
   }
 
   /** The session `key` opens: any key for one without a capability, only its capability for one with. */
@@ -471,7 +430,7 @@ export class HlsController {
       auth: this.callers,
       purpose: STREAM_PURPOSES.play,
       mediaId: session.mediaId,
-      mode: session.mode,
+      mode: PICTURE_MODES[session.video.kind],
       quality: session.asked,
       audio: session.audio?.index ?? null,
       from: 0,

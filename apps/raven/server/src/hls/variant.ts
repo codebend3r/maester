@@ -70,6 +70,9 @@ type VariantOfProps = {
   bitrate: number | null
 }
 
+/** The variant's `CODECS`, `RESOLUTION` and `BANDWIDTH`. */
+type VariantFacts = { codecs: string; resolution: Frame; bandwidth: number }
+
 /**
  * The master playlist's `CODECS`, `RESOLUTION` and `BANDWIDTH` for the one
  * variant: a remux keeps the file's frame and bitrate, or its size over the
@@ -87,7 +90,7 @@ export const variantOf = ({
   maxHeight,
   quality,
   bitrate,
-}: VariantOfProps): { codecs: string; resolution: Frame; bandwidth: number } => {
+}: VariantOfProps): VariantFacts => {
   const audioString = audio ? audioStringOf(audio) : null
   const codecs = [videoString, ...(audioString == null ? [] : [audioString])].join(',')
   if (mode === PLAYBACK_MODES.remux) {

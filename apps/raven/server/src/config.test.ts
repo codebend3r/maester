@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ACCOUNTS_OPT_OUT, AUTH_ENV } from '@/auth/authConfig'
-import { DEVICE_DOWNLOAD_ENV, MUSIC_ENV, readServerConfig } from '@/config'
+import { RAVEN_ENV, readServerConfig } from '@/config'
 import { REQUEST_LOG_ENV } from '@/requestLog'
 import { REMOTE_ACCESS_ENV } from '@/remoteAccess/remoteAccessConfig'
 
@@ -8,10 +8,10 @@ describe('readServerConfig', () => {
   it('keeps 20 GiB of track transcodes unless TRANSCODE_CACHE_GB says otherwise', () => {
     const gib = 1024 ** 3
     expect(readServerConfig({})).toMatchObject({ transcodeCacheBytes: 20 * gib })
-    expect(readServerConfig({ [MUSIC_ENV.transcodeCacheGb]: '5' })).toMatchObject({
+    expect(readServerConfig({ [RAVEN_ENV.transcodeCacheGb]: '5' })).toMatchObject({
       transcodeCacheBytes: 5 * gib,
     })
-    expect(readServerConfig({ [MUSIC_ENV.transcodeCacheGb]: 'lots' })).toMatchObject({
+    expect(readServerConfig({ [RAVEN_ENV.transcodeCacheGb]: 'lots' })).toMatchObject({
       transcodeCacheBytes: 20 * gib,
     })
   })
@@ -19,30 +19,30 @@ describe('readServerConfig', () => {
   it('keeps 300 GiB of device download copies unless DEVICE_DOWNLOAD_CACHE_GB says otherwise', () => {
     const gib = 1024 ** 3
     expect(readServerConfig({})).toMatchObject({ deviceDownloadCacheBytes: 300 * gib })
-    expect(readServerConfig({ [DEVICE_DOWNLOAD_ENV.cacheGb]: '50' })).toMatchObject({
+    expect(readServerConfig({ [RAVEN_ENV.deviceDownloadCacheGb]: '50' })).toMatchObject({
       deviceDownloadCacheBytes: 50 * gib,
     })
-    expect(readServerConfig({ [DEVICE_DOWNLOAD_ENV.cacheGb]: 'lots' })).toMatchObject({
+    expect(readServerConfig({ [RAVEN_ENV.deviceDownloadCacheGb]: 'lots' })).toMatchObject({
       deviceDownloadCacheBytes: 300 * gib,
     })
   })
 
   it('measures loudness unless LOUDNESS_SCAN turns it off', () => {
     expect(readServerConfig({})).toMatchObject({ shouldScanLoudness: true })
-    expect(readServerConfig({ [MUSIC_ENV.loudnessScan]: 'off' })).toMatchObject({
+    expect(readServerConfig({ [RAVEN_ENV.loudnessScan]: 'off' })).toMatchObject({
       shouldScanLoudness: false,
     })
   })
 
   it('leaves Last.fm off until both its key and its secret are set', () => {
     expect(readServerConfig({}).lastFm).toBeNull()
-    expect(readServerConfig({ [MUSIC_ENV.lastFmApiKey]: 'key' }).lastFm).toBeNull()
+    expect(readServerConfig({ [RAVEN_ENV.lastFmApiKey]: 'key' }).lastFm).toBeNull()
     expect(
-      readServerConfig({ [MUSIC_ENV.lastFmApiKey]: 'key', [MUSIC_ENV.lastFmApiSecret]: '  ' })
+      readServerConfig({ [RAVEN_ENV.lastFmApiKey]: 'key', [RAVEN_ENV.lastFmApiSecret]: '  ' })
         .lastFm,
     ).toBeNull()
     expect(
-      readServerConfig({ [MUSIC_ENV.lastFmApiKey]: ' key ', [MUSIC_ENV.lastFmApiSecret]: 'secret' })
+      readServerConfig({ [RAVEN_ENV.lastFmApiKey]: ' key ', [RAVEN_ENV.lastFmApiSecret]: 'secret' })
         .lastFm,
     ).toEqual({ apiKey: 'key', apiSecret: 'secret' })
   })

@@ -156,6 +156,9 @@ type ScoreSweepListDueProps = {
   limit: number
 }
 
+/** How many titles a run answered, and the ids that failed. */
+type SweepRun = { answered: number; failedIds: number[] }
+
 /**
  * Tops up the scores that are missing or a month old, and those a library's
  * Refresh asked for, on a queue of its own so a top-up waiting days on a
@@ -517,7 +520,7 @@ export class ScoreSweep implements OnApplicationBootstrap, OnModuleDestroy {
   private async run({
     round: { due, isDue, isCurrent, isSpent, fetch },
     signal,
-  }: ScoreSweepRunProps): Promise<{ answered: number; failedIds: number[] }> {
+  }: ScoreSweepRunProps): Promise<SweepRun> {
     const streak = { failedInARow: 0 }
     const outcomes = await mapWithConcurrency({
       items: due,

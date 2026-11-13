@@ -37,6 +37,9 @@ type FilmographiesFetchProps = { personId: number; tmdbId: string }
 
 type FilmographiesLoadProps = { personId: number; tmdbId: string }
 
+/** Whether the ask was turned away, as when TMDB is not configured. */
+type FilmographyEnsured = { isTurnedAway: boolean }
+
 /**
  * Each person's whole filmography from TMDB, fetched when their page is
  * first asked for and again once it is two weeks old. One fetch per person
@@ -60,7 +63,7 @@ export class Filmographies {
    * the deadline, or behind the stored one when that is stale. Never throws.
    * `isTurnedAway` says a first fetch was wanted but the line was full.
    */
-  async ensure({ personId }: FilmographiesEnsureProps): Promise<{ isTurnedAway: boolean }> {
+  async ensure({ personId }: FilmographiesEnsureProps): Promise<FilmographyEnsured> {
     const stored = this.people.profile(personId)
     if (!stored) return { isTurnedAway: false }
     const { tmdbId, fetchedAt } = stored

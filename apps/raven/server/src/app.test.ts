@@ -288,7 +288,7 @@ describe('the media server', () => {
         expect(response.statusCode).toBe(206)
         expect(response.headers[HEADERS.contentType]).toBe('video/mp4')
         expect(response.headers[HEADERS.contentEncoding]).toBeUndefined()
-        expect(response.headers[RAVEN_HEADERS.acceptRanges]).toBe(RANGE_UNITS.bytes)
+        expect(response.headers[HEADERS.acceptRanges]).toBe(RANGE_UNITS.bytes)
         expect(response.headers[HEADERS.contentRange]).toBe(`bytes 0-99/${movie?.size}`)
         expect(response.rawPayload).toHaveLength(100)
         const onDisk = await readFile(join(state.media, 'Movies', 'Big.Buck.Test.2008.mp4'))

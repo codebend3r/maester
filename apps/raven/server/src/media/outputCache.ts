@@ -5,6 +5,7 @@ import type { Logger } from '@nestjs/common'
 import { errorMessage } from '@/errorMessage'
 import { temporary } from '@/fileNames'
 import type { MediaIndex } from '@/media/mediaIndex'
+import { removeFiles } from '@/fileSweep'
 
 const SWEEP_MS = 6 * 60 * 60 * 1000
 
@@ -152,14 +153,11 @@ export const createOutputCache = ({
         await rm(temp, { force: true })
         throw error
       }
-      const files = await readdir(dir).catch((): string[] => [])
-      await Promise.all(
-        files
-          .filter((file) => !file.startsWith('.') && !file.startsWith(version))
-          .map((file) => join(dir, file))
-          .filter((file) => !held.has(file))
-          .map((file) => rm(file, { force: true })),
-      )
+      await removeFiles({
+        dir,
+        isGone: (file) =>
+          !file.startsWith('.') && !file.startsWith(version) && !held.has(join(dir, file)),
+      })
     },
     touch: async (path) => {
       const info = await stat(path)

@@ -4,10 +4,11 @@ import type { FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { LockService } from '@/lock/lockService'
 import { ServerEvents } from '@/events/serverEvents'
-import { ViewingAccounts } from '@/media/viewingAccounts'
 import { WatchedCards } from '@/media/watchedCards'
 import { WatchedRepository } from '@/media/watchedRepository'
 import { parseBody } from '@/parseBody'
+import { ViewingAccount } from '@/media/viewingAccountParam'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 
 /**
  * Marking cuts across libraries, so it hangs off its own root, like
@@ -21,7 +22,6 @@ export class WatchedController {
     @Inject(LockService) private readonly lock: LockService,
     @Inject(WatchedCards) private readonly cards: WatchedCards,
     @Inject(WatchedRepository) private readonly watched: WatchedRepository,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(ServerEvents) private readonly events: ServerEvents,
   ) {}
 
@@ -29,13 +29,16 @@ export class WatchedController {
   @ForViewers()
   @Put()
   @HttpCode(204)
-  set(@Body() body: unknown, @Req() request: FastifyRequest): void {
+  set(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
+  ): void {
     const change = parseBody({
       guard: isWatchedChange,
       body,
       message: `Send { watched, targets }: 1 to ${MAX_WATCH_TARGETS} targets, each a file or an item.`,
     })
-    const account = this.accounts.keyOf({ request })
     this.watched.set({
       cards: this.cards.resolve({
         targets: change.targets,

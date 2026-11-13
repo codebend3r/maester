@@ -6,9 +6,6 @@ import {
   AUTH_REFUSALS,
   DEFAULT_PLAYBACK_SETTINGS,
   MEMBER_STATUSES,
-  PLAYBACK_MODES,
-  QUALITIES,
-  VIDEO_CODECS,
   type Account,
 } from '@raven/core'
 import { decodeJwt } from 'jose'
@@ -20,7 +17,6 @@ import { AuthSessions, REMEMBERED_ACCOUNTS } from '@/auth/authSessions'
 import { MEMBERSHIP_TTL_MS, MembershipLookups } from '@/auth/membershipLookups'
 import { TicketAccesses } from '@/auth/ticketAccesses'
 import type { createTokenVerifier } from '@/auth/tokenVerifier'
-import { SOFTWARE } from '@/ffmpeg/encoder'
 import { ScanControl } from '@/scanner/scanControl'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import type { HlsSource } from '@/ffmpeg/hlsArgs'
@@ -29,6 +25,7 @@ import { FilePasses } from '@/media/filePasses'
 import { testConfig } from '@/test/app'
 import { AUTH_TEST_CONFIG, AUTH_TEST_FAILURES, AUTH_TEST_IDS, authFixture } from '@/test/auth'
 import { STILL_CLOCK } from '@/test/clock'
+import { copyOf } from '@/test/videoPlans'
 
 const RECHECK_MS = 60_000
 /** Longer than one recheck, so a test sees a recheck pass before the token runs out. */
@@ -274,19 +271,11 @@ describe('the freshest token per account', () => {
 describe('an HLS session opened with an account ticket', () => {
   const SOURCE: HlsSource = {
     input: join(tmpdir(), 'raven-rechecks-clip.mkv'),
-    mode: PLAYBACK_MODES.remux,
     plan: { boundaries: [0], duration: 6 },
     startTime: 0,
     frameRate: 24,
     audio: null,
-    videoCodec: VIDEO_CODECS.h264,
-    dolbyVision: null,
-    encoder: SOFTWARE,
-    maxHeight: 1080,
-    quality: QUALITIES.medium,
-    bitrate: null,
-    tonemap: false,
-    burn: null,
+    video: copyOf(),
   }
   /** Each test's sessions and data folder, let go once it is done. */
   const made: { sessions: HlsSessions[]; dirs: string[] } = { sessions: [], dirs: [] }

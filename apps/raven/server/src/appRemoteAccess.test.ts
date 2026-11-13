@@ -22,7 +22,6 @@ import { CACHE_POLICIES, HEADERS } from '@shared/server'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { AUTH_ENV } from '@/auth/authConfig'
-import { RAVEN_HEADERS } from '@/http'
 import { MediaIndex } from '@/media/mediaIndex'
 import { MEDIA_PLANE_ENV, readMediaPlaneConfig } from '@/media/mediaPlaneConfig'
 import type { ReachabilityFetch } from '@/remoteAccess/reachability'
@@ -78,7 +77,7 @@ describe('Remote Access', () => {
         values: { nonce: query[REACHABILITY_PARAMS.nonce] ?? '' },
       }),
       remoteAddress: OUTSIDE.remoteAddress,
-      headers: { [RAVEN_HEADERS.forwardedFor]: `10.0.0.5, ${OUTSIDE.forwardedFor}` },
+      headers: { [HEADERS.forwardedFor]: `10.0.0.5, ${OUTSIDE.forwardedFor}` },
     })
     const seen = { publicAddress: HOME_WAN, resolved: [HOME_WAN] }
     const report =

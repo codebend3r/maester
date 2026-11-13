@@ -4,11 +4,13 @@ import {
   type DolbyVisionConfig,
   ENCODER_KINDS,
   HLS_COPY_AUDIO_CODECS,
+  MAX_HEIGHTS,
   PLAYBACK_MODES,
+  QUALITIES,
   type StreamMode,
   VIDEO_CODECS,
 } from '@raven/core'
-import { SOFTWARE, type VideoEncoder } from '@/ffmpeg/encoder'
+import type { VideoEncoder } from '@/ffmpeg/encoder'
 
 export const QUIET = ['-hide_banner', '-loglevel', 'error', '-nostdin']
 
@@ -88,17 +90,20 @@ export const secondsArg = (seconds: number): string => seconds.toFixed(3)
 /** The scale filter that caps a transcode at `maxHeight` lines without ever upscaling. */
 const scaleTo = (maxHeight: number): string => `w=-2:h='min(${maxHeight},ih)'`
 
-export type TranscodeQuality = 'low' | 'medium' | 'high'
+/** How hard a transcode squeezes: one of the playback settings' `QUALITIES`. */
+export type TranscodeQuality = (typeof QUALITIES)[keyof typeof QUALITIES]
 
 /**
  * How hard each encoder squeezes at each quality: a CRF or QP, and a
  * bitrate in bits per second for VideoToolbox.
  */
-const QUALITY: Record<TranscodeQuality, { crf: string; qp: string; bitrate: number }> = {
-  low: { crf: '28', qp: '28', bitrate: 4_000_000 },
-  medium: { crf: '23', qp: '23', bitrate: 8_000_000 },
-  high: { crf: '18', qp: '18', bitrate: 16_000_000 },
-}
+type Squeeze = { crf: string; qp: string; bitrate: number }
+
+const QUALITY = {
+  [QUALITIES.low]: { crf: '28', qp: '28', bitrate: 4_000_000 },
+  [QUALITIES.medium]: { crf: '23', qp: '23', bitrate: 8_000_000 },
+  [QUALITIES.high]: { crf: '18', qp: '18', bitrate: 16_000_000 },
+} as const satisfies Record<TranscodeQuality, Squeeze>
 
 type TranscodeBitrateProps = {
   quality: TranscodeQuality
@@ -123,7 +128,6 @@ const GPU_DECODES: ReadonlySet<string> = new Set([VIDEO_CODECS.h264, VIDEO_CODEC
 const ceiling = (bitrate: number | null): string[] =>
   bitrate == null ? [] : ['-maxrate', String(bitrate), '-bufsize', String(bitrate * 2)]
 
-/** Video flags: those before `-i`, and the encoding after it. */
 /** A video's flags before `-i` and after it, and the stream or filter output its `-map` takes. */
 type VideoArgs = { input: string[]; output: string[]; map: string }
 
@@ -132,6 +136,9 @@ const BURNED_VIDEO = '[vout]'
 
 /** No video at all, for an audio file. */
 const NO_VIDEO: VideoArgs = { input: [], output: [], map: VIDEO_STREAM }
+
+/** What a converted stream does with the picture: nothing (an audio file), copy it, or encode it again. */
+export const VIDEO_PLAN_KINDS = { none: 'none', copy: 'copy', transcode: 'transcode' } as const
 
 /** The MP4 sample entries HEVC is copied under: plain, and Dolby Vision with its configuration box. */
 const HEVC_TAGS = { plain: 'hvc1', dolbyVision: 'dvh1' } as const
@@ -210,6 +217,62 @@ export const copyVideo = (props: CopyVideoProps): VideoArgs => ({
   map: VIDEO_STREAM,
 })
 
+/** A remux's picture, copied as it is. */
+export type CopyPlan = CopyVideoProps & { kind: typeof VIDEO_PLAN_KINDS.copy }
+
+/** A transcode's picture: encoded again to H.264, scaled, squeezed and perhaps tone mapped or burned. */
+export type TranscodePlan = {
+  kind: typeof VIDEO_PLAN_KINDS.transcode
+  encoder: VideoEncoder
+  videoCodec: string | null
+  tonemap: boolean
+  /** The frame it is scaled down to, and how hard it is squeezed: the playback settings. */
+  maxHeight: number
+  quality: TranscodeQuality
+  /** A ceiling on the video bitrate in bits per second, when the viewer asked for a size. */
+  bitrate: number | null
+  /** The `0:s:N` picture subtitle burned into the picture, and the canvas it is drawn on. */
+  burn: BurnSubtitle | null
+}
+
+/** A picture a converted stream carries: copied or encoded again, as HLS always has one. */
+export type PicturePlan = CopyPlan | TranscodePlan
+
+/** The playback mode each picture plan is: a copy is a remux. */
+export const PICTURE_MODES = {
+  [VIDEO_PLAN_KINDS.copy]: PLAYBACK_MODES.remux,
+  [VIDEO_PLAN_KINDS.transcode]: PLAYBACK_MODES.transcode,
+} as const satisfies Record<PicturePlan['kind'], StreamMode>
+
+/** What a converted stream does with the picture. */
+type VideoPlan = { kind: typeof VIDEO_PLAN_KINDS.none } | PicturePlan
+
+type VideoArgsOfProps = {
+  video: VideoPlan
+  /** Drops a transcode's frames before this time, on the file's clock, before any other filter. */
+  trimFrom: number | null
+}
+
+/** The flags `video` adds to a run. */
+export const videoArgsOf = ({ video, trimFrom }: VideoArgsOfProps): VideoArgs => {
+  switch (video.kind) {
+    case VIDEO_PLAN_KINDS.none:
+      return NO_VIDEO
+    case VIDEO_PLAN_KINDS.copy:
+      return copyVideo(video)
+    case VIDEO_PLAN_KINDS.transcode:
+      return transcodeVideo({ ...video, trimFrom, burn: video.burn?.stream ?? null })
+    default: {
+      const unknown: never = video
+      return unknown
+    }
+  }
+}
+
+/** The picture subtitle a plan burns in, or null: only a transcode burns one. */
+const burnOf = (video: VideoPlan): BurnSubtitle | null =>
+  video.kind === VIDEO_PLAN_KINDS.transcode ? video.burn : null
+
 type FiltersOfProps = {
   /** Applied to the file's frames before anything is laid over them: the trim. */
   before: readonly string[]
@@ -219,12 +282,15 @@ type FiltersOfProps = {
   burn: number | null
 }
 
+/** A video's filter flags, and the stream or filter output its `-map` takes. */
+type FilterArgs = { output: string[]; map: string }
+
 /**
  * A video's filters: a plain `-vf` chain, or with a picture subtitle to burn in, a filter graph
  * that lays the subtitle over the frame before it is scaled, so the subtitle scales with it, and
  * whose output `-map` takes. Only a graph can read a second stream.
  */
-const filtersOf = ({ before, after, burn }: FiltersOfProps): { output: string[]; map: string } => {
+const filtersOf = ({ before, after, burn }: FiltersOfProps): FilterArgs => {
   if (burn === null) return { output: ['-vf', [...before, ...after].join(',')], map: VIDEO_STREAM }
   const overlay = [`overlay=eof_action=pass`, ...after].join(',')
   const subtitle = `[0:s:${burn}]`
@@ -235,17 +301,11 @@ const filtersOf = ({ before, after, burn }: FiltersOfProps): { output: string[];
   return { output: ['-filter_complex', graph], map: BURNED_VIDEO }
 }
 
-type TranscodeVideoProps = {
-  encoder: VideoEncoder
-  videoCodec: string | null
-  tonemap: boolean
-  maxHeight: number
-  quality: TranscodeQuality
-  bitrate: number | null
+type TranscodeVideoProps = Omit<TranscodePlan, 'kind' | 'burn'> & {
   /** Drops the frames before this time, on the file's clock, before any other filter. */
-  trimFrom?: number | null
+  trimFrom: number | null
   /** The `0:s:N` picture subtitle to burn into the picture, or null for none. */
-  burn?: number | null
+  burn: number | null
 }
 
 /**
@@ -260,15 +320,15 @@ type TranscodeVideoProps = {
  *   what phones record, is made to look right on SDR screens without it.
  *   Anything else decodes on the CPU and is uploaded for the encoder.
  */
-export const transcodeVideo = ({
+const transcodeVideo = ({
   encoder,
   videoCodec,
   tonemap,
   maxHeight,
   quality,
   bitrate,
-  trimFrom = null,
-  burn = null,
+  trimFrom,
+  burn,
 }: TranscodeVideoProps): VideoArgs => {
   const scale = scaleTo(maxHeight)
   const squeeze = QUALITY[quality]
@@ -359,9 +419,11 @@ export const encoderTestArgs = (encoder: VideoEncoder): string[] => {
     encoder,
     videoCodec: null,
     tonemap: false,
-    maxHeight: 1080,
-    quality: 'medium',
+    maxHeight: MAX_HEIGHTS.fullHd,
+    quality: QUALITIES.medium,
     bitrate: null,
+    trimFrom: null,
+    burn: null,
   })
   return [
     ...QUIET,
@@ -392,25 +454,11 @@ export const canvasArgs = ({ canvas }: BurnSubtitle): string[] => [
 type StreamArgsProps = {
   input: string
   start: number
-  mode: StreamMode
   /** The `0:a:N` track to play, or null when the file has no audio. */
   audio: number | null
-  /** Whether the file is an audio file, whose stream carries its audio alone. */
-  audioOnly: boolean
-  videoCodec: string | null
-  /** The picture's Dolby Vision configuration, which a remux keeps; null for a picture without one. */
-  dolbyVision: DolbyVisionConfig | null
-  tonemap: boolean
+  /** The picture: none for an audio file, whose stream carries its audio alone. */
+  video: VideoPlan
   streamShift: number
-  /** How a transcode encodes; a remux encodes nothing. */
-  encoder?: VideoEncoder
-  /** The frame a transcode is scaled down to, and how hard it is squeezed: the playback settings. */
-  maxHeight?: number
-  quality?: TranscodeQuality
-  /** A ceiling on the transcode's video bitrate in bits per second, when the viewer asked for a size. */
-  bitrate?: number | null
-  /** The `0:s:N` picture subtitle a transcode burns into the picture, and the canvas it is drawn on. */
-  burn?: BurnSubtitle | null
 }
 
 /**
@@ -420,42 +468,22 @@ type StreamArgsProps = {
  * `streamShift` so no timestamp goes negative, which lets the player put
  * every fragment where it belongs whatever point the stream started from.
  *
- * `remux` copies the video and converts only the audio, which costs little
- * more than reading the file. `transcode` re-encodes the video to H.264 as
- * well, at most 1080p, tone mapped when the source is HDR and ffmpeg can.
- * An audio file's stream is its audio alone, converted, in fragments cut by
- * time, since every audio frame is a keyframe.
+ * A copy converts only the audio, which costs little more than reading the
+ * file. A transcode re-encodes the video to H.264 as well, at most 1080p,
+ * tone mapped when the source is HDR and ffmpeg can. An audio file's stream
+ * is its audio alone, converted, in fragments cut by time, since every audio
+ * frame is a keyframe.
  */
 export const streamArgs = ({
   input,
   start,
-  mode,
   audio,
-  audioOnly,
-  videoCodec,
-  dolbyVision,
-  tonemap,
+  video,
   streamShift,
-  encoder = SOFTWARE,
-  maxHeight = 1080,
-  quality = 'medium',
-  bitrate = null,
-  burn = null,
 }: StreamArgsProps): string[] => {
-  const video = ((): VideoArgs => {
-    if (audioOnly) return NO_VIDEO
-    return mode === PLAYBACK_MODES.remux
-      ? copyVideo({ videoCodec, dolbyVision })
-      : transcodeVideo({
-          encoder,
-          videoCodec,
-          tonemap,
-          maxHeight,
-          quality,
-          bitrate,
-          burn: burn?.stream ?? null,
-        })
-  })()
+  const args = videoArgsOf({ video, trimFrom: null })
+  const burn = burnOf(video)
+  const hasPicture = video.kind !== VIDEO_PLAN_KINDS.none
   /*
    * ffmpeg 5.1 lays a picture subtitle over nothing after a seek on the file's clock, so a burn
    * reads on a clock that starts at the seek and moves its output back onto the file's.
@@ -466,14 +494,14 @@ export const streamArgs = ({
       : { input: canvasArgs(burn), shift: streamShift + start }
   return [
     ...QUIET,
-    ...video.input,
+    ...args.input,
     ...(start > 0 ? ['-ss', String(start)] : []),
     ...clock.input,
     '-i',
     input,
-    ...(audioOnly ? [] : ['-map', video.map]),
+    ...(hasPicture ? ['-map', args.map] : []),
     ...(audio == null ? [] : ['-map', `0:a:${audio}`]),
-    ...video.output,
+    ...args.output,
     ...(audio == null ? [] : ['-c:a', 'aac', '-ac', '2', '-b:a', '192k']),
     '-sn',
     '-dn',
@@ -492,9 +520,9 @@ export const streamArgs = ({
     '-f',
     'mp4',
     '-movflags',
-    audioOnly
-      ? 'empty_moov+default_base_moof+frag_discont'
-      : 'frag_keyframe+empty_moov+default_base_moof+frag_discont',
+    hasPicture
+      ? 'frag_keyframe+empty_moov+default_base_moof+frag_discont'
+      : 'empty_moov+default_base_moof+frag_discont',
     /*
      * A remux cannot shorten the source GOP. Flush at least every second
      * even between keyframes so slow reads do not hold several seconds of A/V.
@@ -514,10 +542,6 @@ type SubtitleWindowArgsProps = {
   output: string
 }
 
-/**
- * One window of an embedded subtitle track as WebVTT. Reads only the
- * window's stretch of the file and keeps cue times as file times.
- */
 /**
  * One window of an embedded track as WebVTT. `-ss` before the input seeks
  * through the container index; `-copyts` keeps the cues on the file's

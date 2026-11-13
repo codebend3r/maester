@@ -1,27 +1,23 @@
 import { join } from 'node:path'
 import {
   type AudioTrack,
-  type DolbyVisionConfig,
   HLS_COPY_AUDIO,
   HLS_COPY_AUDIO_CODECS,
   HLS_SEGMENT_SECONDS,
-  PLAYBACK_MODES,
   STREAM_TIME_SHIFT,
-  type StreamMode,
 } from '@raven/core'
 import {
   type BurnSubtitle,
+  type PicturePlan,
   QUIET,
-  type TranscodeQuality,
   UNOFFICIAL_COMPLIANCE,
+  VIDEO_PLAN_KINDS,
   canvasArgs,
-  copyVideo,
   eac3OrCopyArgs,
   isDolbyVisionCopy,
   secondsArg,
-  transcodeVideo,
+  videoArgsOf,
 } from '@/ffmpeg/args'
-import type { VideoEncoder } from '@/ffmpeg/encoder'
 import { type HlsDialect, SEGMENT_CLOCKS } from '@/ffmpeg/ffmpegVersion'
 import { SEGMENT_FILE_PATTERN } from '@/hls/segmentFiles'
 import { type SegmentPlan, runSegmentTimes } from '@/hls/segmentPlan'
@@ -51,19 +47,13 @@ export const hlsAudioArgs = (track: Pick<AudioTrack, 'codec' | 'channels'>): str
 const SEGMENT_MP4_OPTIONS =
   'movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont+delay_moov:use_editlist=0:avoid_negative_ts=disabled'
 
-type SegmentMp4OptionsProps = {
-  mode: StreamMode
-  videoCodec: string | null
-  dolbyVision: DolbyVisionConfig | null
-}
-
 /**
  * The segment muxer hands its MP4 muxer these options but not its own
  * compliance level, so a Dolby Vision copy's `strict=unofficial`, without
  * which the init segment gets no `dvcC` box, goes in here as well.
  */
-const segmentMp4Options = ({ mode, videoCodec, dolbyVision }: SegmentMp4OptionsProps): string =>
-  mode === PLAYBACK_MODES.remux && isDolbyVisionCopy({ videoCodec, dolbyVision })
+const segmentMp4Options = (video: PicturePlan): string =>
+  video.kind === VIDEO_PLAN_KINDS.copy && isDolbyVisionCopy(video)
     ? `${SEGMENT_MP4_OPTIONS}:strict=${UNOFFICIAL_COMPLIANCE}`
     : SEGMENT_MP4_OPTIONS
 
@@ -73,7 +63,6 @@ const REMUX_CUT_TOLERANCE = 0.005
 /** What every run of an HLS session reads and makes of it: the file, its plan, and how it is converted. */
 export type HlsSource = {
   input: string
-  mode: StreamMode
   plan: SegmentPlan
   /** Where the file's clock begins, `format.start_time`, which a transcode seeks from. */
   startTime: number
@@ -81,18 +70,8 @@ export type HlsSource = {
   frameRate: number | null
   /** The track to play, or null when the file has no audio. */
   audio: AudioTrack | null
-  videoCodec: string | null
-  /** The picture's Dolby Vision configuration, which a remux keeps; null for a picture without one. */
-  dolbyVision: DolbyVisionConfig | null
-  /** How a transcode encodes; a remux encodes nothing. */
-  encoder: VideoEncoder
-  maxHeight: number
-  quality: TranscodeQuality
-  /** A ceiling on the transcode's video bitrate, when the viewer asked for a size. */
-  bitrate: number | null
-  tonemap: boolean
-  /** The picture subtitle a transcode burns into the picture, or null for none. */
-  burn: BurnSubtitle | null
+  /** The picture: copied for a remux, encoded again for a transcode. */
+  video: PicturePlan
 }
 
 /** How a run reads its file: the inputs, which one the audio comes from, and how it cuts. */
@@ -146,10 +125,10 @@ type RunCutProps = {
  *   onto the video's with `-itsoffset`.
  */
 const runCut = ({ source, from, seekKeyframes, timeBase }: RunCutProps): RunCut => {
-  const { input, mode, plan, startTime, frameRate } = source
+  const { input, plan, startTime, frameRate, video: picture } = source
   const start = plan.boundaries[from] ?? 0
   const read = (seek: string[]): string[] => [...seek, '-copyts', '-i', input]
-  if (mode === PLAYBACK_MODES.remux) {
+  if (picture.kind === VIDEO_PLAN_KINDS.copy) {
     return {
       inputs: read(start > 0 ? ['-seek_timestamp', '1', '-ss', secondsArg(start)] : []),
       audioInput: 0,
@@ -166,8 +145,8 @@ const runCut = ({ source, from, seekKeyframes, timeBase }: RunCutProps): RunCut 
    */
   const fromStart = (time: number): string[] =>
     time - startTime > 0 ? ['-ss', secondsArg(time - startTime)] : []
-  if (source.burn !== null) {
-    return burnCut({ source, burn: source.burn, from, seekKeyframes, timeBase, tolerance })
+  if (picture.burn !== null) {
+    return burnCut({ source, burn: picture.burn, from, seekKeyframes, timeBase, tolerance })
   }
   const exact = fromStart(start - tolerance)
   const video = [
@@ -197,6 +176,9 @@ const runCut = ({ source, from, seekKeyframes, timeBase }: RunCutProps): RunCut 
 
 type BurnCutProps = RunCutProps & { burn: BurnSubtitle; tolerance: number }
 
+/** Where a burn seeks to, on the file's clock, and the flags that seek there. */
+type BurnSeek = { at: number; seek: string[] }
+
 /** A burn's cut, on a clock from the point it sought to: see `runCut`. */
 const burnCut = ({
   source: { input, plan, startTime },
@@ -209,7 +191,7 @@ const burnCut = ({
   const start = plan.boundaries[from] ?? 0
   const canvas = canvasArgs(burn)
   // The seek counts from the file's start time, and a point before it is the start itself.
-  const seekTo = (time: number): { at: number; seek: string[] } =>
+  const seekTo = (time: number): BurnSeek =>
     time - startTime > 0
       ? { at: time, seek: ['-ss', secondsArg(time - startTime)] }
       : { at: startTime, seek: [] }
@@ -296,7 +278,7 @@ export const hlsArgs = ({
   seekKeyframes,
   dialect,
 }: HlsArgsProps): string[] => {
-  const { plan, mode, audio } = source
+  const { plan, audio } = source
   const start = plan.boundaries[from] ?? 0
   const offsets = runSegmentTimes({ plan, from })
   const past = offsets.length > 0 ? offsets : [plan.duration + HLS_SEGMENT_SECONDS]
@@ -305,19 +287,7 @@ export const hlsArgs = ({
       ? past
       : past.map((offset) => start + offset + STREAM_TIME_SHIFT)
   const cut = runCut({ source, from, seekKeyframes, timeBase: dialect.timeBase })
-  const video =
-    mode === PLAYBACK_MODES.remux
-      ? copyVideo({ videoCodec: source.videoCodec, dolbyVision: source.dolbyVision })
-      : transcodeVideo({
-          encoder: source.encoder,
-          videoCodec: source.videoCodec,
-          tonemap: source.tonemap,
-          maxHeight: source.maxHeight,
-          quality: source.quality,
-          bitrate: source.bitrate,
-          trimFrom: cut.trimFrom,
-          burn: source.burn?.stream ?? null,
-        })
+  const video = videoArgsOf({ video: source.video, trimFrom: cut.trimFrom })
   return [
     ...QUIET,
     ...video.input,
@@ -346,7 +316,7 @@ export const hlsArgs = ({
     '-segment_format',
     'mp4',
     '-segment_format_options',
-    segmentMp4Options({ mode, videoCodec: source.videoCodec, dolbyVision: source.dolbyVision }),
+    segmentMp4Options(source.video),
     '-segment_times',
     times.map(secondsArg).join(','),
     '-segment_time_delta',

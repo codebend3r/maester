@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { RAVEN_HEADERS } from '@/http'
 import { clientAddressOf, isAddressForwarded, isLanRequest } from '@/remoteAccess/clientNetwork'
 import { TRUSTED_PROXY } from '@/test/app'
+import { HEADERS } from '@shared/server'
 
 /** DSM's reverse proxy on raven's Docker network, the one proxy these requests trust. */
 const PROXY = TRUSTED_PROXY
@@ -12,7 +12,7 @@ type RequestProps = { ip: string; ips?: string[]; forwardedFor?: string | string
 const request = ({ ip, ips = [ip], forwardedFor }: RequestProps) => ({
   ip,
   ips,
-  headers: forwardedFor === undefined ? {} : { [RAVEN_HEADERS.forwardedFor]: forwardedFor },
+  headers: forwardedFor === undefined ? {} : { [HEADERS.forwardedFor]: forwardedFor },
 })
 
 describe('clientAddressOf', () => {

@@ -28,11 +28,12 @@ import { ForViewers } from '@/admin/adminGuard'
 import { Management } from '@/auth/management'
 import { Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
-import { ViewingAccounts } from '@/media/viewingAccounts'
 import { ListenerScopes } from '@/music/listenerScope'
 import { MusicRepository } from '@/music/musicRepository'
 import { Playlists } from '@/music/playlists'
 import { ROUTE_PARAMS } from '@/requestParts'
+import { ViewingAccount } from '@/media/viewingAccountParam'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 
 const NAME_REFUSAL = `name must hold something besides spaces, up to ${PLAYLIST_LIMITS.name} characters`
 
@@ -66,7 +67,6 @@ export class PlaylistsController {
     @Inject(MusicRepository) private readonly music: MusicRepository,
     @Inject(LockService) private readonly lock: LockService,
     @Inject(Management) private readonly management: Management,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(ListenerScopes) private readonly scopes: ListenerScopes,
   ) {}
 
@@ -122,11 +122,15 @@ export class PlaylistsController {
 
   @ForViewers()
   @Post()
-  create(@Body() body: unknown, @Req() request: FastifyRequest): PlaylistDetails {
+  create(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
+  ): PlaylistDetails {
     if (!isPlaylistInput(body)) throw new BadRequestException(NAME_REFUSAL)
     const id = this.playlists.create({
       name: body.name.trim(),
-      account: this.accounts.keyOf({ request }),
+      account,
     })
     return this.find({ id, request })
   }
@@ -145,12 +149,13 @@ export class PlaylistsController {
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): PlaylistDetails {
     if (!isPlaylistInput(body)) throw new BadRequestException(NAME_REFUSAL)
     const isRenamed = this.playlists.rename({
       id,
       name: body.name.trim(),
-      account: this.accounts.keyOf({ request }),
+      account,
     })
     if (!isRenamed) throw new NotFoundException(`No playlist ${id}`)
     return this.find({ id, request })
@@ -159,8 +164,11 @@ export class PlaylistsController {
   @ForViewers()
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number, @Req() request: FastifyRequest): void {
-    if (!this.playlists.remove({ id, account: this.accounts.keyOf({ request }) })) {
+  remove(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @ViewingAccount() account: AccountKey,
+  ): void {
+    if (!this.playlists.remove({ id, account })) {
       throw new NotFoundException(`No playlist ${id}`)
     }
   }
@@ -196,12 +204,13 @@ export class PlaylistsController {
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): PlaylistDetails {
     if (!isPlaylistSharing(body)) throw new BadRequestException(SHARING_REFUSAL)
     const isChanged = this.playlists.share({
       id,
       isShared: body.isShared,
-      account: this.accounts.keyOf({ request }),
+      account,
     })
     if (!isChanged) throw new NotFoundException(`No playlist ${id}`)
     return this.find({ id, request })

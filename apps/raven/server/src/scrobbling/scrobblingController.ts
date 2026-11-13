@@ -13,7 +13,6 @@ import {
   Post,
   Put,
   Query,
-  Req,
   Res,
 } from '@nestjs/common'
 import {
@@ -36,7 +35,7 @@ import {
   isString,
 } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
-import type { FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyReply } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { OpenToAnyone } from '@/auth/accountGuard'
 import { isAccountOutage } from '@/auth/accessRechecks'
@@ -47,12 +46,12 @@ import { CLOCK, type Clock } from '@/clock'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { Public } from '@/lock/lockGuard'
 import type { AccountKey } from '@/media/viewingAccountKeys'
-import { ViewingAccounts } from '@/media/viewingAccounts'
 import { LastFmScrobbler } from '@/scrobbling/lastFmScrobbler'
 import { LastFmSignIns } from '@/scrobbling/lastFmSignIns'
 import { ListenBrainzScrobbler } from '@/scrobbling/listenBrainzScrobbler'
 import { ScrobbleLinks } from '@/scrobbling/scrobbleLinks'
 import { ROUTE_PARAMS } from '@/requestParts'
+import { ViewingAccount } from '@/media/viewingAccountParam'
 
 type PublicOriginOfProps = { auth: AuthConfig; config: ServerConfig }
 
@@ -110,7 +109,6 @@ export class ScrobblingController {
     @Inject(ListenBrainzScrobbler) private readonly listenBrainz: ListenBrainzScrobbler,
     @Inject(LastFmScrobbler) private readonly lastFm: LastFmScrobbler,
     @Inject(LastFmSignIns) private readonly signIns: LastFmSignIns,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(AuthSessions)
     private readonly sessions: Pick<AuthSessions, 'freshestFor' | 'authenticate'>,
@@ -181,8 +179,8 @@ export class ScrobblingController {
   }
 
   @Get(SCROBBLING_PATHS.root)
-  status(@Req() request: FastifyRequest): ScrobbleStatus[] {
-    return this.statusOf({ account: this.accounts.keyOf({ request }) })
+  status(@ViewingAccount() account: AccountKey): ScrobbleStatus[] {
+    return this.statusOf({ account })
   }
 
   /** Links ListenBrainz with the account's user token, once ListenBrainz says it is good. */
@@ -190,10 +188,9 @@ export class ScrobblingController {
   @Put(SCROBBLING_PATHS.listenBrainz)
   async linkListenBrainz(
     @Body() body: unknown,
-    @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): Promise<ScrobbleStatus[]> {
     if (!isListenBrainzLink(body)) throw new BadRequestException(SCROBBLING_COPY.badToken)
-    const account = this.accounts.keyOf({ request })
     const linked = await this.listenBrainz.validate({ token: body.token }).catch(() => {
       throw new BadGatewayException(SCROBBLING_COPY.listenBrainzAway)
     })
@@ -212,14 +209,14 @@ export class ScrobblingController {
   @ForViewers()
   @Post(SCROBBLING_PATHS.lastFmStart)
   @HttpCode(200)
-  startLastFm(@Body() body: unknown, @Req() request: FastifyRequest): LastFmAuthPage {
+  startLastFm(@Body() body: unknown, @ViewingAccount() account: AccountKey): LastFmAuthPage {
     const origin = this.lastFmOrigin()
     if (origin === null) throw new ConflictException(SCROBBLING_COPY.lastFmOff)
     if (!isLastFmStart(body) || this.addressOf(body.returnTo) === null) {
       throw new BadRequestException(SCROBBLING_COPY.badReturn)
     }
     const state = this.signIns.start({
-      account: this.accounts.keyOf({ request }),
+      account,
       returnTo: body.returnTo,
     })
     const callback = `${origin}${SCROBBLING_PATHS.lastFmCallback}?${new URLSearchParams({ [SCROBBLE_PARAMS.state]: state }).toString()}`
@@ -270,10 +267,9 @@ export class ScrobblingController {
   @Delete(SCROBBLING_PATHS.service)
   unlink(
     @Param(ROUTE_PARAMS.service) service: string,
-    @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): ScrobbleStatus[] {
     if (!isScrobbleService(service)) throw new NotFoundException(`No service ${service}`)
-    const account = this.accounts.keyOf({ request })
     this.links.remove({ account, service })
     return this.statusOf({ account })
   }

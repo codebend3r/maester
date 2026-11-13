@@ -1,0 +1,4 @@
+export const MIGRATION_003 = `
+  ALTER TABLE libraries ADD COLUMN save_progress INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE libraries ADD COLUMN pinned INTEGER NOT NULL DEFAULT 1;
+  `

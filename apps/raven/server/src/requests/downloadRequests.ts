@@ -16,6 +16,7 @@ import {
 import { CLOCK, type Clock } from '@/clock'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
+import { errorMessage } from '@/errorMessage'
 import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
 import { ARR_ERROR_KINDS, ArrClient, ArrError, type ArrTitle } from '@/requests/arrClient'
 import { FreshReads } from '@/requests/freshReads'
@@ -86,6 +87,21 @@ type AddToProps = { type: MatchItemType; found: ArrTitle }
 /** The holding of a title its arr does not hold, or whose kind is off. */
 const NOT_HELD = { status: null } as const satisfies TitleHolding
 
+/** The statement parameters naming one request: its title's type and TMDB id. */
+type TitleKeyParams = { type: string; tmdbId: string }
+
+type StatusParams = TitleKeyParams & { status: string }
+
+type SinceParams = ByAccount & { since: string }
+
+type RequestedAtRow = { requested_at: string }
+
+type TakenRow = { tmdb_id: string }
+
+type InsertParams = ByAccount & TitleKeyParams & { at: string; status: string }
+
+type FinishParams = TitleKeyParams & { title: string; arrId: number; commandId: number }
+
 const viewOf = ({ row, account }: ViewOfProps): TitleRequest => ({
   type: row.type,
   tmdbId: row.tmdb_id,
@@ -134,7 +150,7 @@ export class DownloadRequests {
   private budgetOf({ account, now }: BudgetOfProps): RequestBudget {
     const since = new Date(now - BUDGET_WINDOW_MS).toISOString()
     const times = this.db
-      .prepare<ByAccount & { since: string }, { requested_at: string }>(
+      .prepare<SinceParams, RequestedAtRow>(
         `SELECT requested_at FROM download_requests
           WHERE account_id = @account AND requested_at > @since
           ORDER BY requested_at`,
@@ -174,14 +190,14 @@ export class DownloadRequests {
         this.readStatus({ row, arrId })
           .then((status) => this.keepStatus({ row, status }))
           .catch((error: unknown) => {
-            this.log.warn(`Kept the last status of a request: ${errorText(error)}`)
+            this.log.warn(`Kept the last status of a request: ${errorMessage(error)}`)
           }),
     })
   }
 
   private keepStatus({ row, status }: KeepStatusProps): void {
     this.db
-      .prepare<{ type: string; tmdbId: string; status: string }>(
+      .prepare<StatusParams>(
         'UPDATE download_requests SET status = @status WHERE type = @type AND tmdb_id = @tmdbId',
       )
       .run({ type: row.type, tmdbId: row.tmdb_id, status })
@@ -287,7 +303,7 @@ export class DownloadRequests {
   private reserve({ account, ask, now }: ReserveProps): void {
     this.db.transaction(() => {
       const taken = this.db
-        .prepare<{ type: string; tmdbId: string }, { tmdb_id: string }>(
+        .prepare<TitleKeyParams, TakenRow>(
           'SELECT tmdb_id FROM download_requests WHERE type = @type AND tmdb_id = @tmdbId',
         )
         .get({ type: ask.type, tmdbId: ask.tmdbId })
@@ -299,7 +315,7 @@ export class DownloadRequests {
         throw new RequestRefusal(`Every one of the ${budget.limit} requests a day is spent`)
       }
       this.db
-        .prepare<ByAccount & { type: string; tmdbId: string; at: string; status: string }>(
+        .prepare<InsertParams>(
           `INSERT INTO download_requests (type, tmdb_id, account_id, title, requested_at, status)
            VALUES (@type, @tmdbId, @account, '', @at, @status)`,
         )
@@ -315,7 +331,7 @@ export class DownloadRequests {
 
   private finish({ ask, title, arrId, commandId }: FinishProps): void {
     this.db
-      .prepare<{ type: string; tmdbId: string; title: string; arrId: number; commandId: number }>(
+      .prepare<FinishParams>(
         `UPDATE download_requests SET title = @title, arr_id = @arrId, command_id = @commandId
           WHERE type = @type AND tmdb_id = @tmdbId`,
       )
@@ -325,12 +341,9 @@ export class DownloadRequests {
 
   private release(ask: TitleRequestAsk): void {
     this.db
-      .prepare<{ type: string; tmdbId: string }>(
+      .prepare<TitleKeyParams>(
         'DELETE FROM download_requests WHERE type = @type AND tmdb_id = @tmdbId',
       )
       .run({ type: ask.type, tmdbId: ask.tmdbId })
   }
 }
-
-const errorText = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error)

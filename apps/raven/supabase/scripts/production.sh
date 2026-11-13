@@ -16,6 +16,10 @@ if [[ ! "$RAVEN_AUTH_SITE_URL" =~ ^https://[a-zA-Z0-9.-]+(:[0-9]+)?$ ]]; then
   echo 'Use an HTTPS origin without a trailing slash' >&2
   exit 1
 fi
+if [ ! -f .temp/project-ref ]; then
+  echo 'No linked project: run bun run db:link first' >&2
+  exit 1
+fi
 if [ "$(<.temp/project-ref)" != "$SUPABASE_PROJECT_REF" ]; then
   echo 'The linked project does not match SUPABASE_PROJECT_REF' >&2
   exit 1

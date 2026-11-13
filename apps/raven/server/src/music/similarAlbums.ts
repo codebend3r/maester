@@ -1,5 +1,6 @@
-import { MATCH_STATES, foldTitle } from '@raven/core'
+import { MATCH_STATES, foldTitle, isStringArray } from '@raven/core'
 import type Sqlite from 'better-sqlite3'
+import { parseJsonAs } from '@/db/json'
 
 type MergeSimilarAlbumsProps = { db: Sqlite.Database; libraryId: number }
 
@@ -117,14 +118,9 @@ export const mergeSimilarAlbums = ({ db, libraryId }: MergeSimilarAlbumsProps): 
     return clusters.reduce((count, cluster) => count + cluster.length - 1, 0)
   })()
 
-type ParseNamesProps = string | null
-
-export const parseNames = (json: ParseNamesProps): string[] => {
-  const parsed: unknown = json === null ? [] : JSON.parse(json)
-  return Array.isArray(parsed)
-    ? parsed.filter((name): name is string => typeof name === 'string')
-    : []
-}
+/** The names in a `json_group_array` column; none for a null or unreadable one. */
+export const parseNames = (json: string | null): string[] =>
+  json === null ? [] : (parseJsonAs({ json, guard: isStringArray }) ?? [])
 
 type FoldIntoProps = { db: Sqlite.Database; keeper: number; other: number }
 

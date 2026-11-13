@@ -13,7 +13,8 @@ import { firstImage, listFolder } from '@/metadata/localAssets'
 import { MediaIndex } from '@/media/mediaIndex'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 import { albumFolderOf } from '@/music/filing'
-import { COVER_SOURCES, type AlbumCover, MusicRepository } from '@/music/musicRepository'
+import { COVER_SOURCES, type AlbumCover, MusicCoverStore } from '@/music/musicCoverStore'
+import { MusicRepository } from '@/music/musicRepository'
 
 /** Files tried for a picture of their own when an album's cover failed: each read is a probe over the network share, and an album's files embed one picture or none. */
 const EMBEDDED_RETRIES = 3
@@ -36,6 +37,7 @@ export class AlbumCovers implements OnApplicationBootstrap, OnModuleDestroy {
 
   constructor(
     @Inject(MusicRepository) private readonly music: MusicRepository,
+    @Inject(MusicCoverStore) private readonly covers: MusicCoverStore,
     @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(ImageCache) private readonly images: ImageCache,
   ) {}
@@ -59,7 +61,7 @@ export class AlbumCovers implements OnApplicationBootstrap, OnModuleDestroy {
    * is left for the request that wants it. How many albums were warmed.
    */
   async warm(): Promise<number> {
-    const albums = this.music.coverVersions()
+    const albums = this.covers.coverVersions()
     const done = await mapWithConcurrency({
       items: albums,
       limit: WARM_CONCURRENCY,
@@ -96,7 +98,7 @@ export class AlbumCovers implements OnApplicationBootstrap, OnModuleDestroy {
       case COVER_SOURCES.file:
         return this.images.album({ albumId: id, source: cover.ref, width })
       case COVER_SOURCES.coverArtArchive: {
-        const group = this.music.releaseGroupOf(id)
+        const group = this.covers.releaseGroupOf(id)
         const fetched =
           (await this.images.coverArt(cover.ref)) ??
           (group === null ? null : await this.images.releaseGroupCoverArt(group))
@@ -121,18 +123,18 @@ export class AlbumCovers implements OnApplicationBootstrap, OnModuleDestroy {
           : (this.index.fileOf(Number(cover.ref))?.path ?? '')
       const info = await stat(source).catch(() => null)
       const stamp = info === null ? '' : `${info.mtimeMs}:${info.size}`
-      this.music.setCover({ id, cover: { ...cover, stamp } })
+      this.covers.setCover({ id, cover: { ...cover, stamp } })
     }
     return result
   }
 
   /** A failed local image must not hide healthy artwork elsewhere in the album. */
   async pathOf({ id, version, width }: AlbumCoversPathOfProps): Promise<string | null> {
-    const cover = this.music.cover({ id, version })
+    const cover = this.covers.cover({ id, version })
     if (cover === null) return null
     const selected = await this.read({ id, cover, width })
     if (selected !== null) return selected
-    const files = this.music.coverFiles(id)
+    const files = this.covers.coverFiles(id)
     const folders = [...new Set(files.flatMap(({ path }) => [albumFolderOf(path), dirname(path)]))]
     const local = (
       await Promise.all(folders.map((folder) => this.inFolderCandidates(folder)))

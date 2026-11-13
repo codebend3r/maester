@@ -8,7 +8,6 @@ import {
   Inject,
   Param,
   Post,
-  Req,
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
@@ -21,10 +20,10 @@ import {
   UPCOMING_TITLE_PARAMS,
 } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
-import type { FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { Public } from '@/lock/lockGuard'
-import { ViewingAccounts } from '@/media/viewingAccounts'
+import type { AccountKey } from '@/media/viewingAccountKeys'
+import { ViewingAccount } from '@/media/viewingAccountParam'
 import { parseBody } from '@/parseBody'
 import { ARR_ERROR_KINDS, ArrError } from '@/requests/arrClient'
 import { DownloadRequests, RequestRefusal } from '@/requests/downloadRequests'
@@ -43,16 +42,13 @@ const answerOf = (error: unknown): never => {
 /** Coming soon's requests: members ask for a title to be downloaded for everyone. */
 @Controller()
 export class RequestsController {
-  constructor(
-    @Inject(DownloadRequests) private readonly requests: DownloadRequests,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
-  ) {}
+  constructor(@Inject(DownloadRequests) private readonly requests: DownloadRequests) {}
 
   /** Every request and where it stands, and the caller's own budget. No library holds any of it. */
   @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
   @Get(REQUEST_PATHS.requests)
-  list(@Req() request: FastifyRequest): Promise<TitleRequests> {
-    return this.requests.list({ account: this.accounts.keyOf({ request }) })
+  list(@ViewingAccount() account: AccountKey): Promise<TitleRequests> {
+    return this.requests.list({ account })
   }
 
   /**
@@ -73,12 +69,15 @@ export class RequestsController {
   /** Asks for `{ type, tmdbId }` to be downloaded; 409 once someone has or its arr holds it already, or while the caller's budget is spent. */
   @ForViewers()
   @Post(REQUEST_PATHS.requests)
-  async create(@Req() request: FastifyRequest, @Body() body: unknown): Promise<TitleRequest> {
+  async create(
+    @ViewingAccount() account: AccountKey,
+    @Body() body: unknown,
+  ): Promise<TitleRequest> {
     const ask = parseBody({
       guard: isTitleRequestAsk,
       body,
       message: 'Send { type, tmdbId }: a movie or show and its TMDB id.',
     })
-    return this.requests.request({ account: this.accounts.keyOf({ request }), ask }).catch(answerOf)
+    return this.requests.request({ account, ask }).catch(answerOf)
   }
 }

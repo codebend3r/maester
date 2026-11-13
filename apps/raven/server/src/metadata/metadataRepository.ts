@@ -149,6 +149,36 @@ type MetadataRepositoryPicturesProps = {
 
 type MetadataRepositoryLibraryPicturesProps = { id: number; libraryIds: readonly number[] }
 
+/** A stored item's id, and when TMDB was last read for it. */
+type StoredFetch = { id: number; fetchedAt: string }
+
+/** What an episode's row says of it beyond its title. */
+type EpisodeFacts = {
+  summary: string | null
+  released: string | null
+  runtime: number | null
+  stillVersion: string | null
+}
+
+/** A stored child item, its TMDB id and when TMDB was last read for it. */
+type StoredChild = { id: number; tmdbId: string; fetchedAt: string }
+
+/** A saved season, its number, and its episodes' ids by number. */
+type SavedSeason = {
+  id: number
+  number: number
+  episodes: Map<number, number>
+}
+
+/** An item whose saga or title art is still to be asked of TMDB. */
+type ExtrasDue = { id: number; type: MatchItemType; tmdbId: string }
+
+/** An item TMDB is due to be read again for. */
+type StaleItem = { id: number; tmdbId: string }
+
+/** What the clear-up left: the TMDB pictures still used and the items still held. */
+type ClearedUp = { tmdbPaths: Set<string>; itemIds: Set<number> }
+
 /** Movies, shows, seasons and episodes as TMDB describes them, with their people and pictures; their scores are `ScoresRepository`'s. */
 @Injectable()
 export class MetadataRepository {
@@ -164,7 +194,7 @@ export class MetadataRepository {
   }
 
   /** The stored item for a TMDB id, and when it was fetched. */
-  find({ type, tmdbId }: MetadataRepositoryFindProps): { id: number; fetchedAt: string } | null {
+  find({ type, tmdbId }: MetadataRepositoryFindProps): StoredFetch | null {
     const row = this.db
       .prepare<[string, string], { id: number; fetched_at: string }>(
         'SELECT id, fetched_at FROM items WHERE type = ? AND tmdb_id = ?',
@@ -220,7 +250,7 @@ export class MetadataRepository {
       .prepare<[string], { season_id: number; episode_id: number }>(
         `SELECT DISTINCT e.parent_id AS season_id, e.id AS episode_id
            FROM items e JOIN media_items mi ON mi.item_id = e.id
-          WHERE e.type = 'episode' AND e.parent_id IN (SELECT value FROM json_each(?))
+          WHERE e.type = '${ITEM_TYPES.episode}' AND e.parent_id IN (SELECT value FROM json_each(?))
           ORDER BY e.number IS NULL, e.number, e.id`,
       )
       .all(JSON.stringify(seasonIds))
@@ -246,15 +276,7 @@ export class MetadataRepository {
   }
 
   /** What an episode's row on its season's page shows beside its card, for each episode, in two reads. */
-  episodeRows(ids: readonly number[]): Map<
-    number,
-    {
-      summary: string | null
-      released: string | null
-      runtime: number | null
-      stillVersion: string | null
-    }
-  > {
+  episodeRows(ids: readonly number[]): Map<number, EpisodeFacts> {
     if (ids.length === 0) return new Map()
     const stills = this.images.versions({ ids, kind: ITEM_IMAGE_KINDS.still, libraryId: null })
     return new Map(
@@ -280,10 +302,7 @@ export class MetadataRepository {
   }
 
   /** The child of `parentId` with `number`: a show's season, or a season's episode. */
-  child({
-    parentId,
-    number,
-  }: MetadataRepositoryChildProps): { id: number; tmdbId: string; fetchedAt: string } | null {
+  child({ parentId, number }: MetadataRepositoryChildProps): StoredChild | null {
     const row = this.db
       .prepare<[number, number], { id: number; tmdb_id: string; fetched_at: string }>(
         'SELECT id, tmdb_id, fetched_at FROM items WHERE parent_id = ? AND number = ? ORDER BY id LIMIT 1',
@@ -444,11 +463,7 @@ export class MetadataRepository {
    * one transaction, and answers with the season and every episode under it
    * by number, those raven made up before included.
    */
-  saveSeason({ showId, number, season, episodes }: MetadataRepositorySaveSeasonProps): {
-    id: number
-    number: number
-    episodes: Map<number, number>
-  } {
+  saveSeason({ showId, number, season, episodes }: MetadataRepositorySaveSeasonProps): SavedSeason {
     return this.db.transaction(() => {
       const id = this.save({ item: season, parentId: showId })
       episodes.forEach((episode) => this.save({ item: episode, parentId: id }))
@@ -565,12 +580,12 @@ export class MetadataRepository {
    * it kept logos, which have yet to learn them. Items raven made up are
    * never fetched, so none of them is listed.
    */
-  extrasUnchecked(): Array<{ id: number; type: MatchItemType; tmdbId: string }> {
+  extrasUnchecked(): ExtrasDue[] {
     return this.db
       .prepare<[string], { id: number; type: string; tmdb_id: string }>(
         `SELECT id, type, tmdb_id FROM items
-          WHERE ((type = 'movie' AND (saga_checked = 0 OR logo_checked = 0))
-                 OR (type = 'show' AND logo_checked = 0))
+          WHERE ((type = '${ITEM_TYPES.movie}' AND (saga_checked = 0 OR logo_checked = 0))
+                 OR (type = '${ITEM_TYPES.show}' AND logo_checked = 0))
             AND tmdb_id NOT GLOB ?
           ORDER BY id`,
       )
@@ -846,17 +861,12 @@ export class MetadataRepository {
    * Items of `type` fetched before `before`, or before `recentBefore` when
    * released after `releasedAfter` or, for a show, while it still airs.
    */
-  stale({
-    type,
-    before,
-    recentBefore,
-    releasedAfter,
-  }: MetadataRepositoryStaleProps): Array<{ id: number; tmdbId: string }> {
+  stale({ type, before, recentBefore, releasedAfter }: MetadataRepositoryStaleProps): StaleItem[] {
     return this.db
       .prepare<[string, string, string, string], { id: number; tmdb_id: string }>(
         `SELECT id, tmdb_id FROM items
           WHERE type = ? AND (fetched_at < ?
-                              OR (fetched_at < ? AND (released >= ? OR (type = 'show' AND ended IS NULL))))
+                              OR (fetched_at < ? AND (released >= ? OR (type = '${ITEM_TYPES.show}' AND ended IS NULL))))
           ORDER BY fetched_at`,
       )
       .all(type, before, recentBefore, releasedAfter)
@@ -900,15 +910,15 @@ export class MetadataRepository {
    * fetched in the last 180 days, so a person someone looked at keeps their
    * page. Returns what is still stored, for the image cache's sweep.
    */
-  clearUp(): { tmdbPaths: Set<string>; itemIds: Set<number> } {
+  clearUp(): ClearedUp {
     this.db.transaction(() => {
       this.db.exec(`
         DELETE FROM items WHERE type IN ('movie', 'episode')
           AND id NOT IN (SELECT item_id FROM media_items);
-        DELETE FROM items WHERE type = 'season'
+        DELETE FROM items WHERE type = '${ITEM_TYPES.season}'
           AND id NOT IN (SELECT parent_id FROM items WHERE parent_id IS NOT NULL)
           AND id NOT IN (SELECT item_id FROM media_items);
-        DELETE FROM items WHERE type = 'show'
+        DELETE FROM items WHERE type = '${ITEM_TYPES.show}'
           AND id NOT IN (SELECT parent_id FROM items WHERE parent_id IS NOT NULL)
           AND id NOT IN (SELECT item_id FROM media_items);
       `)

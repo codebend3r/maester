@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { aiChoiceOf, aiSearchOf } from '@/music/albumClaude'
 import { FALLBACK_ARTISTS } from '@/music/filing'
 import type { Release } from '@/music/musicBrainzClient'
-import type { AlbumToMatch } from '@/music/musicRepository'
+import type { AlbumToMatch } from '@/music/musicMatchStore'
 import { candidatesOf, scoreRelease, searchesFor } from '@/music/releaseScoring'
 
 const OK_COMPUTER: AlbumToMatch = {

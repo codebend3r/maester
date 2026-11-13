@@ -5,10 +5,12 @@ import {
   ITEM_TYPES,
   type ItemType,
   type LibraryKind,
+  type LibrarySettings,
   MATCH_SOURCES,
   MATCH_STATES,
   MATCHED_KINDS,
   matcherFor,
+  matchesAlike,
   type MatchItemType,
   matchTypeFor,
   type MediaItem,
@@ -49,7 +51,7 @@ import { filePlace, groupPlaceOf, showPlace } from '@/metadata/places'
 import { Scores } from '@/metadata/scores'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import { TmdbClient } from '@/metadata/tmdbClient'
-import { createTaskQueue, mapWithConcurrency } from '@/scanner/concurrency'
+import { createTaskQueue, mapWithConcurrency, QUEUE_KEYS, queueKeyOf } from '@/scanner/concurrency'
 import { type LayoutRow, indexedLayoutsOf, planRelayout } from '@/scanner/layout'
 import { StartupWork } from '@/startupWork'
 
@@ -72,6 +74,34 @@ const decisionPlacesOf = ({ type, file }: DecisionPlacesOfProps): DecisionPlace[
 }
 
 type MetadataServiceScheduleProps = { key: string; task: () => Promise<void> }
+
+/** How a library's settings changed, as matching sees it. */
+const LIBRARY_CHANGES = {
+  kind: 'kind',
+  preference: 'preference',
+  layout: 'layout',
+  none: 'none',
+} as const
+
+type LibraryChange = (typeof LIBRARY_CHANGES)[keyof typeof LIBRARY_CHANGES]
+
+/** The settings a change of library is read from. */
+type MatchedSettings = Pick<LibrarySettings, 'kind' | 'folderLayout'>
+
+type LibraryChangeOfProps = { before: MatchedSettings; after: MatchedSettings }
+
+/**
+ * A type that reads files another way changes the kind; one that only prefers other results
+ * changes the preference; else a new folder layout changes the layout. Nothing else is matching's.
+ */
+const libraryChangeOf = ({ before, after }: LibraryChangeOfProps): LibraryChange => {
+  if (matchTypeFor(before.kind) !== matchTypeFor(after.kind)) return LIBRARY_CHANGES.kind
+  if (!matchesAlike({ before: before.kind, after: after.kind })) return LIBRARY_CHANGES.preference
+  if (before.folderLayout !== after.folderLayout) return LIBRARY_CHANGES.layout
+  return LIBRARY_CHANGES.none
+}
+
+type MetadataServiceSettingsChangedProps = LibraryChangeOfProps & { libraryId: number }
 
 type MetadataServiceChangeKindProps = { libraryId: number; kind: LibraryKind }
 
@@ -239,7 +269,10 @@ export class MetadataService implements OnApplicationBootstrap {
    * minutes), so another follows it.
    */
   enqueue(libraryId: number): void {
-    this.queue.again({ key: `library:${libraryId}`, task: () => this.pass(libraryId) })
+    this.queue.again({
+      key: queueKeyOf({ kind: QUEUE_KEYS.library, parts: [libraryId] }),
+      task: () => this.pass(libraryId),
+    })
   }
 
   /** Queues other metadata work, so it never runs beside a pass. */
@@ -267,8 +300,25 @@ export class MetadataService implements OnApplicationBootstrap {
     // Names are read again first, so a parser that now reads the name right gets its say.
     this.files.retitle({ libraryId, kind })
     // A pass already running has tried these files, so another follows it.
-    this.queue.again({ key: `library:${libraryId}`, task: () => this.pass(libraryId) })
+    this.queue.again({
+      key: queueKeyOf({ kind: QUEUE_KEYS.library, parts: [libraryId] }),
+      task: () => this.pass(libraryId),
+    })
     return count
+  }
+
+  /**
+   * A library's settings were saved: matching reads it again as far as the change asks, and a
+   * rename or another setting, the lock included, leaves the index as it is.
+   */
+  settingsChanged({ libraryId, before, after }: MetadataServiceSettingsChangedProps): void {
+    const reactions = {
+      [LIBRARY_CHANGES.kind]: () => this.changeKind({ libraryId, kind: after.kind }),
+      [LIBRARY_CHANGES.preference]: () => this.changePreference({ libraryId, kind: after.kind }),
+      [LIBRARY_CHANGES.layout]: () => this.changeLayout({ libraryId }),
+      [LIBRARY_CHANGES.none]: () => undefined,
+    } as const satisfies Record<LibraryChange, () => void>
+    reactions[libraryChangeOf({ before, after })]()
   }
 
   /**
@@ -276,9 +326,9 @@ export class MetadataService implements OnApplicationBootstrap {
    * file's name is read again for the new type and matched from scratch, or
    * left off for a type that is not matched. Fix match choices stay.
    */
-  changeKind({ libraryId, kind }: MetadataServiceChangeKindProps): void {
+  private changeKind({ libraryId, kind }: MetadataServiceChangeKindProps): void {
     this.queue.again({
-      key: `kind:${libraryId}:${kind}`,
+      key: queueKeyOf({ kind: QUEUE_KEYS.kind, parts: [libraryId, kind] }),
       task: this.logged({
         what: `type change of library ${libraryId}`,
         task: async () => {
@@ -300,9 +350,9 @@ export class MetadataService implements OnApplicationBootstrap {
    * for are searched again, and Fix match choices stay. The AI lookup's sure
    * picks stay too; where it was unsure or chose nothing, it is asked again.
    */
-  changePreference({ libraryId, kind }: MetadataServiceChangePreferenceProps): void {
+  private changePreference({ libraryId, kind }: MetadataServiceChangePreferenceProps): void {
     this.queue.again({
-      key: `prefer:${libraryId}:${kind}`,
+      key: queueKeyOf({ kind: QUEUE_KEYS.preference, parts: [libraryId, kind] }),
       task: this.logged({
         what: `type change of library ${libraryId}`,
         task: async () => {
@@ -378,9 +428,9 @@ export class MetadataService implements OnApplicationBootstrap {
    * where they regrouped. A change made while one is read runs again after
    * it, which reads the settings as they are then.
    */
-  changeLayout({ libraryId }: MetadataServiceChangeLayoutProps): void {
+  private changeLayout({ libraryId }: MetadataServiceChangeLayoutProps): void {
     this.queue.again({
-      key: `layout:${libraryId}`,
+      key: queueKeyOf({ kind: QUEUE_KEYS.layout, parts: [libraryId] }),
       task: this.logged({
         what: `layout change of library ${libraryId}`,
         task: async () => {

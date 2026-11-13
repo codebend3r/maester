@@ -26,15 +26,25 @@ import { apiFor } from '@/test/server'
 const PIN = '3001'
 
 /** As a browser with the admin lock on, which is who marks: the route is for viewers. */
+type WatchedState = {
+  root: string
+  admin: string
+  open: number
+  private: number
+  ids: Map<string, number>
+  items: Map<string, number>
+  app: NestFastifyApplication | null
+}
+
 describe('marking videos watched', () => {
-  const state = {
+  const state: WatchedState = {
     root: '',
     admin: '',
     open: 0,
     private: 0,
     ids: new Map<string, number>(),
     items: new Map<string, number>(),
-    app: null as NestFastifyApplication | null,
+    app: null,
   }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')

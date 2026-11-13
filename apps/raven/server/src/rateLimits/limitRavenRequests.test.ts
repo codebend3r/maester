@@ -1,9 +1,9 @@
 import { SignJWT } from 'jose'
 import { describe, expect, it } from 'vitest'
-import { RAVEN_HEADERS } from '@/http'
 import { rateKeyOf } from '@/rateLimits/limitRavenRequests'
 import { NETLIFY_HEADERS } from '@/rateLimits/netlifyClient'
 import { RATE_TIERS } from '@/rateLimits/rateTiers'
+import { HEADERS } from '@shared/server'
 
 const SECRET = new TextEncoder().encode('a-proxy-secret-of-at-least-32-characters')
 const OTHER = new TextEncoder().encode('another-secret-of-at-least-32-characters')
@@ -35,7 +35,7 @@ describe('rateKeyOf', () => {
     await expect(
       keyOf({
         ip: '2001:db8:9:9::7',
-        headers: { [RAVEN_HEADERS.forwardedFor]: '10.0.0.5, 198.51.100.1' },
+        headers: { [HEADERS.forwardedFor]: '10.0.0.5, 198.51.100.1' },
       }),
     ).resolves.toBe('2001:db8:9:9::/64')
   })
@@ -48,7 +48,7 @@ describe('rateKeyOf', () => {
         headers: {
           [NETLIFY_HEADERS.sign]: sign,
           [NETLIFY_HEADERS.clientAddress]: '203.0.113.7',
-          [RAVEN_HEADERS.forwardedFor]: `203.0.113.7, ${NETLIFY}`,
+          [HEADERS.forwardedFor]: `203.0.113.7, ${NETLIFY}`,
         },
       }),
     ).resolves.toBe('203.0.113.7')
@@ -61,7 +61,7 @@ describe('rateKeyOf', () => {
         ip: NETLIFY,
         headers: {
           [NETLIFY_HEADERS.sign]: sign,
-          [RAVEN_HEADERS.forwardedFor]: `198.51.100.1, 203.0.113.8, ${NETLIFY}`,
+          [HEADERS.forwardedFor]: `198.51.100.1, 203.0.113.8, ${NETLIFY}`,
         },
       }),
     ).resolves.toBe(NETLIFY)
@@ -70,7 +70,7 @@ describe('rateKeyOf', () => {
   it("believes no visitor address without Netlify's valid, unexpired signature", async () => {
     const forged = {
       [NETLIFY_HEADERS.clientAddress]: '203.0.113.7',
-      [RAVEN_HEADERS.forwardedFor]: `203.0.113.7, ${NETLIFY}`,
+      [HEADERS.forwardedFor]: `203.0.113.7, ${NETLIFY}`,
     }
     const cases = await Promise.all([
       keyOf({ ip: NETLIFY, headers: forged }),

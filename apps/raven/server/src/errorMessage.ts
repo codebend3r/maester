@@ -1,3 +1,5 @@
+import { isRecord, isString } from '@raven/core'
+
 /** The `code` of the Node system errors raven tells apart. */
 export const ERROR_CODES = {
   eacces: 'EACCES',
@@ -14,3 +16,7 @@ export const ERROR_NAMES = { timeoutError: 'TimeoutError' } as const
 /** What went wrong, as text: an error's message, or whatever was thrown. */
 export const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
+
+/** A Node system error's `code`, such as `ENOENT`, or null for anything else thrown. */
+export const errorCode = (error: unknown): string | null =>
+  isRecord(error) && isString(error.code) ? error.code : null

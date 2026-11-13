@@ -1,7 +1,6 @@
 import type { Type } from '@nestjs/common'
 import { HEADERS, HTTP_METHODS } from '@shared/server'
 import type { FastifyInstance } from 'fastify'
-import { RAVEN_HEADERS } from '@/http'
 import { routeMarks } from '@/routeMarks'
 
 /** The CORS headers the media plane reads and sends, in lower case as Node hands incoming ones over. */
@@ -57,7 +56,7 @@ export const responseHeaders = (origin: string): Record<string, string> => ({
   [CORS_HEADERS.exposeHeaders]: [
     HEADERS.contentLength,
     HEADERS.contentRange,
-    RAVEN_HEADERS.acceptRanges,
+    HEADERS.acceptRanges,
   ].join(', '),
 })
 
@@ -124,7 +123,7 @@ export const registerMediaPlaneHook = ({
     if (!isMediaPlaneMethod(request.method) || !isMediaPlanePath(request.url)) return
     const { origin } = request.headers
     if (origin === undefined) {
-      const webOrigin = refererOrigin(request.headers[RAVEN_HEADERS.referer])
+      const webOrigin = refererOrigin(request.headers[HEADERS.referer])
       if (webOrigin !== null && isAllowedOrigin(webOrigin)) onProxied(webOrigin)
       return
     }
