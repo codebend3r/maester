@@ -1,7 +1,8 @@
+// The text every page's card shares: its heading, its lede and an error line.
 .title {
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
-  font-weight: 400;
+  font-weight: var(--font-weight-regular);
   line-height: var(--line-tight);
 }
 

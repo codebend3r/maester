@@ -12,6 +12,7 @@ What to run before a push; the pre-push hook runs the same checks.
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
 | `verify`          | Every check at once: spelling, TypeScript only, one command per script, dead code and CSS, lint, format, typecheck, unit and screen tests, and every build. |       |
 | `verify:uncached` | verify, ignoring Nx's cache, after a toolchain change.                                                                                                      |       |
+| `verify:push`     | What the pre-push hook runs: verify without dead code and dead CSS, in one Nx run.                                                                          |       |
 | `affected`        | The repo-wide checks, then lint, format, typecheck, tests and builds only for the projects your branch changed.                                             |       |
 | `affected:tasks`  | The per-project half of affected, without the repo-wide checks.                                                                                             |       |
 | `build`           | Builds every project.                                                                                                                                       |       |

@@ -273,27 +273,18 @@ jobs:
           cmp Podfile.lock Pods/Manifest.lock
 
       - name: 🗄️ Wait for the fixture server
-        run: |
-          for _ in $(seq 1 90); do
-            if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
-              grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
-              exit 0
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/fixture.log"
-          exit 1
+        uses: ./.github/actions/raven-fixture-ready
 
       # A fresh Apple TV 4K on the tvOS runtime of the selected Xcode's SDK, booted, with the
       # build on it. A runner with no such runtime fails here rather than testing on another.
       - name: 📺 Boot the Apple TV simulator
-        run: |
-          sdk="$(xcrun --sdk appletvsimulator --show-sdk-version)"
-          runtime="$(xcrun simctl list -j runtimes tvOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
-          device="$(xcrun simctl create raven-tv com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K "$runtime")"
-          xcrun simctl boot "$device"
-          xcrun simctl bootstatus "$device" -b
-          xcrun simctl install "$device" apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app
+        uses: ./.github/actions/raven-simulator
+        with:
+          sdk: appletvsimulator
+          runtime: tvOS
+          name: raven-tv
+          device-type: com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K
+          app: apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app
 
       # The XCUITest the tvOS prebuild added (`tvos-e2e/`) signs in, plays the film from
       # Home and returns with the Siri Remote. The screen it ends on goes up with the app.
@@ -376,20 +367,9 @@ jobs:
       # checksum. It runs on the runner's Java. The download runs in the background and
       # leaves `maestro.ok` or `maestro.failed` for the wait step.
       - name: 🎭 Install Maestro
-        env:
-          MAESTRO_VERSION: 2.11.0
-          MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
-        run: |
-          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
-          {
-            if curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip" &&
-              echo "$MAESTRO_SHA256  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c - &&
-              unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"; then
-              touch "$RUNNER_TEMP/maestro.ok"
-            else
-              touch "$RUNNER_TEMP/maestro.failed"
-            fi
-          } > "$RUNNER_TEMP/maestro.log" 2>&1 &
+        uses: ./.github/actions/raven-maestro
+        with:
+          background: true
 
       # Runs `prebuild:ios` first (bun runs it before `build:ios`), which regenerates ios/
       # and installs the pods, so the pods are checked right after. Nx caches only the app
@@ -413,28 +393,19 @@ jobs:
       # comes up, and it held the app's main thread for 30 s under the search flow, so the
       # simulator is told it has shown it.
       - name: 📱 Boot the iPhone simulator
-        run: |
-          sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)"
-          runtime="$(xcrun simctl list -j runtimes iOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
-          device="$(xcrun simctl create raven-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
-          xcrun simctl boot "$device"
-          xcrun simctl bootstatus "$device" -b
-          xcrun simctl spawn "$device" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
-          xcrun simctl install "$device" apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app
+        uses: ./.github/actions/raven-simulator
+        with:
+          sdk: iphonesimulator
+          runtime: iOS
+          name: raven-phone
+          device-type: com.apple.CoreSimulator.SimDeviceType.iPhone-16
+          app: apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app
+          skip-keyboard-intro: true
 
       # A real raven server with a locked film library and an open series library, started
       # above for the flows.
       - name: 🗄️ Wait for the fixture server
-        run: |
-          for _ in $(seq 1 90); do
-            if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
-              grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
-              exit 0
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/fixture.log"
-          exit 1
+        uses: ./.github/actions/raven-fixture-ready
 
       - name: 🎭 Wait for Maestro
         run: |
@@ -566,29 +537,15 @@ jobs:
       # A real raven server with a locked film library and an open series library, in the
       # background for the flows. It prints its ready line once its libraries are scanned.
       - name: 🗄️ Start the fixture server
-        run: |
-          bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
-          for _ in $(seq 1 90); do
-            if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
-              grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
-              exit 0
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/fixture.log"
-          exit 1
+        run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
+
+      - name: 🗄️ Wait for the fixture server
+        uses: ./.github/actions/raven-fixture-ready
 
       # Maestro's own release, the zip its Homebrew formula installs, pinned by version and
       # checksum, as the Apple job installs it.
       - name: 🎭 Install Maestro
-        env:
-          MAESTRO_VERSION: 2.11.0
-          MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
-        run: |
-          curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip"
-          echo "$MAESTRO_SHA256  $RUNNER_TEMP/maestro.zip" | sha256sum -c -
-          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
+        uses: ./.github/actions/raven-maestro
 
       # Boots the AVD from its snapshot, installs the APK and runs the flows the remote drives
       # (`e2e:android-tv`, every flow but the touch ones), which first point the emulator's
@@ -669,20 +626,9 @@ jobs:
 
       # Maestro's own release, pinned by version and checksum, as app-ios installs it.
       - name: 🎭 Install Maestro
-        env:
-          MAESTRO_VERSION: 2.11.0
-          MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
-        run: |
-          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
-          {
-            if curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip" &&
-              echo "$MAESTRO_SHA256  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c - &&
-              unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"; then
-              touch "$RUNNER_TEMP/maestro.ok"
-            else
-              touch "$RUNNER_TEMP/maestro.failed"
-            fi
-          } > "$RUNNER_TEMP/maestro.log" 2>&1 &
+        uses: ./.github/actions/raven-maestro
+        with:
+          background: true
 
       # Runs `prebuild:ios` first, which regenerates ios/ and installs the pods.
       - name: 🎵 Build Wren for the iPhone simulator
@@ -699,26 +645,17 @@ jobs:
       # A fresh iPhone 16 named wren-phone, as `ci:wren` makes one, on the iOS runtime of the
       # selected Xcode's SDK, booted after the build, with Wren on it.
       - name: 📱 Boot the iPhone simulator
-        run: |
-          sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)"
-          runtime="$(xcrun simctl list -j runtimes iOS | jq -er --arg sdk "$sdk" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier')"
-          device="$(xcrun simctl create wren-phone com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$runtime")"
-          xcrun simctl boot "$device"
-          xcrun simctl bootstatus "$device" -b
-          xcrun simctl spawn "$device" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
-          xcrun simctl install "$device" apps/raven/music/build/ios/Build/Products/Release-iphonesimulator/Wren.app
+        uses: ./.github/actions/raven-simulator
+        with:
+          sdk: iphonesimulator
+          runtime: iOS
+          name: wren-phone
+          device-type: com.apple.CoreSimulator.SimDeviceType.iPhone-16
+          app: apps/raven/music/build/ios/Build/Products/Release-iphonesimulator/Wren.app
+          skip-keyboard-intro: true
 
       - name: 🗄️ Wait for the fixture server
-        run: |
-          for _ in $(seq 1 90); do
-            if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
-              grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
-              exit 0
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/fixture.log"
-          exit 1
+        uses: ./.github/actions/raven-fixture-ready
 
       - name: 🎭 Wait for Maestro
         run: |

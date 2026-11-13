@@ -231,6 +231,7 @@
         "@nestjs/common": "12.4.0",
         "@nestjs/core": "12.4.0",
         "@nestjs/platform-fastify": "12.4.0",
+        "@rookery/core": "workspace:*",
         "@shared/server": "workspace:*",
         "better-sqlite3": "13.0.3",
         "fastify": "5.12.8",
@@ -255,6 +256,8 @@
       "dependencies": {
         "@fontsource-variable/instrument-sans": "5.3.0",
         "@fontsource/young-serif": "5.3.0",
+        "@rookery/core": "workspace:*",
+        "@shared/http": "workspace:*",
         "react": "19.3.0",
         "react-dom": "19.3.0",
         "react-router-dom": "7.18.5",
@@ -446,6 +449,21 @@
         "react-dom": "19.3.0",
         "react-router-dom": "7.18.5",
         "zustand": "5.1.0",
+      },
+    },
+    "libs/rookery/core": {
+      "name": "@rookery/core",
+      "version": "0.8.8",
+      "dependencies": {
+        "@shared/http": "workspace:*",
+      },
+      "devDependencies": {
+        "@typescript/native-preview": "7.0.0-dev.20260707.2",
+        "bun-types": "1.4.4",
+        "oxfmt": "0.77.0",
+        "oxlint": "1.92.0",
+        "tsc-alias": "1.9.10",
+        "typescript": "6.0.3",
       },
     },
     "libs/shared/http": {
@@ -1400,6 +1418,8 @@
     "@rolldown/binding-win32-x64-msvc": ["@rolldown/binding-win32-x64-msvc@1.2.16", "", { "os": "win32", "cpu": "x64" }, "sha512-1lv1KvX0Z871zfk7vw+dnXMMnHNyDwMzWG8Kv3HxDXMOhzCX4SHc7HK319fInP0i+0p9D8brkfzL7pJOaGl+tw=="],
 
     "@rolldown/pluginutils": ["@rolldown/pluginutils@1.0.1", "", {}, "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw=="],
+
+    "@rookery/core": ["@rookery/core@workspace:libs/rookery/core"],
 
     "@rookery/server": ["@rookery/server@workspace:apps/rookery/server"],
 

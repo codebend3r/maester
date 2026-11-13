@@ -15,22 +15,25 @@ Needs `gh` authenticated with the `repo` scope.
 
 import json
 import sys
+from typing import TypedDict
 
-from catalog import AREA_LABELS, EPICS, MILESTONES, PRIORITIES, SIZES
+from catalog import AREA_LABELS, EPICS, MILESTONES, PRIORITIES, SIZES, Epic, Story
 from tracker import (
     REPO,
     ROADMAP_PATH,
     ROOT,
+    Issue,
     by_key,
     epic_body,
     gh,
+    gh_json,
     is_closed,
     list_issues,
     render_roadmap,
 )
 
-PRIORITY_COLORS = {"P0": "B60205", "P1": "D93F0B", "P2": "FBCA04"}
-SIZE_COLORS = {"S": "C5DEF5", "M": "7FB3E8", "L": "2E6BB8"}
+PRIORITY_COLORS: dict[str, str] = {"P0": "B60205", "P1": "D93F0B", "P2": "FBCA04"}
+SIZE_COLORS: dict[str, str] = {"S": "C5DEF5", "M": "7FB3E8", "L": "2E6BB8"}
 
 LABELS = {
     "epic": ("5319E7", "A parent issue grouping stories"),
@@ -57,12 +60,12 @@ def label_changes(current: set[str], wanted: list[str]) -> tuple[list[str], list
     return add, remove
 
 
-def api(path: str, method: str = "GET", **fields) -> object:
+def api(path: str, method: str = "GET", **fields: str | int):  # GitHub's JSON
+    """A REST call through `gh api`, each field sent raw (`-f`) or typed (`-F`)."""
     args = ["api", path, "-X", method]
     for k, v in fields.items():
         args += ["-f" if isinstance(v, str) else "-F", f"{k}={v}"]
-    out = gh(*args)
-    return json.loads(out) if out else None
+    return gh_json(*args)
 
 
 def sync_labels() -> None:
@@ -92,7 +95,7 @@ def sync_milestones() -> dict[str, str]:
     return numbers
 
 
-def story_body(epic: dict, story: dict) -> str:
+def story_body(epic: Epic, story: Story) -> str:
     lines = [
         f"**Epic:** {epic['key']} {epic['title']}",
         "",
@@ -107,7 +110,7 @@ def story_body(epic: dict, story: dict) -> str:
     return "\n".join(lines)
 
 
-def edit_args(issue: dict, title: str, body: str, labels: list[str], milestone: str) -> list[str]:
+def edit_args(issue: Issue, title: str, body: str, labels: list[str], milestone: str) -> list[str]:
     """The `gh issue edit` arguments that bring an issue in line, or none when it already is."""
     add, remove = label_changes({label["name"] for label in issue["labels"]}, labels)
     current_milestone = (issue["milestone"] or {}).get("title")
@@ -124,9 +127,17 @@ def edit_args(issue: dict, title: str, body: str, labels: list[str], milestone: 
     return args
 
 
+class Upserted(TypedDict):
+    """What the sync reads back of an issue it made or found."""
+
+    number: int
+    id: str
+    title: str
+
+
 def upsert_issue(
-    key: str, title: str, body: str, labels: list[str], milestone: str, found: dict
-) -> dict:
+    key: str, title: str, body: str, labels: list[str], milestone: str, found: dict[str, Issue]
+) -> Issue | Upserted:
     full_title = f"[{key}] {title}"
     if issue := found.get(key):
         if args := edit_args(issue, full_title, body, labels, milestone):

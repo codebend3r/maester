@@ -3,18 +3,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliDecompressSync } from 'node:zlib'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
+import { PAGE_PATHS, ROUTES, SESSION_ERRORS, SIGN_IN_ERRORS, WRITE_ERRORS } from '@rookery/core'
 import { CONTENT_TYPES, ENCODINGS, HEADERS, CACHE_POLICIES } from '@shared/server'
 import { afterEach, describe, expect, it } from 'vitest'
-import { WRITE_ERRORS, createApp } from '@/app'
-import { SESSION_ERRORS } from '@/auth/authController'
+import { createApp } from '@/app'
 import { PIN_COOKIE, SESSION_COOKIE } from '@/auth/cookies'
-import { PAGE_PATHS, SIGN_IN_ERRORS } from '@/auth/signInService'
+import { DEFAULT_PIN_CHECK } from '@/auth/signInService'
 import { addMs } from '@/clock'
 import { ENV_VARS, type ServerConfig, readServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { HEALTH_STATUSES } from '@/health/healthController'
 import type { PlexAccount, PlexPin } from '@/plex/plexTv'
-import { ROUTES } from '@/routes'
 import { SESSION_KINDS, hashToken } from '@/sessions/sessionsRepository'
 import { FakePlexTv } from '@/test/fakePlexTv'
 
@@ -73,11 +72,16 @@ const boot = async ({
     webDir,
     cookieDomain,
     appOrigins: [SPARROW],
-    pinCheckDelayMs: 0,
   }
   const plex = new FakePlexTv()
   const clock = { now: START }
-  const app = await createApp({ config, plexTv: plex, clock: () => clock.now, quiet: true })
+  const app = await createApp({
+    config,
+    plexTv: plex,
+    clock: () => clock.now,
+    pinCheck: { ...DEFAULT_PIN_CHECK, delayMs: 0 },
+    isQuiet: true,
+  })
   await app.init()
   await app.getHttpAdapter().getInstance().ready()
   const harness = { app, plex, clock, root }
@@ -300,6 +304,20 @@ describe('the Plex callback', () => {
     )
     expect(pin && harness.plex.checksOf(pin)).toBe(5)
     expect(setCookies(done).some((cookie) => cookie.startsWith(`${SESSION_COOKIE}=`))).toBe(false)
+  })
+
+  it('takes the sign-in before asking Plex, so a callback that comes again finds it expired', async () => {
+    const harness = await boot()
+    const { response, pin } = await start({ harness })
+    if (!pin) throw new Error('no PIN created')
+    const pinCookie = valueOf(cookieNamed({ response, name: PIN_COOKIE }))
+    const first = await callback({ harness, pinCookie })
+    expect(first.headers.location).toContain(`error=${SIGN_IN_ERRORS.notApproved}`)
+    expect(count({ harness, table: 'pending_sign_ins' })).toBe(0)
+    harness.plex.approve({ pin, account: alice, afterChecks: 0 })
+    const again = await callback({ harness, pinCookie })
+    expect(again.headers.location).toBe(`${PAGE_PATHS.login}?error=${SIGN_IN_ERRORS.expired}`)
+    expect(setCookies(again).some((cookie) => cookie.startsWith(`${SESSION_COOKIE}=`))).toBe(false)
   })
 
   it('calls a missing or stale sign-in expired', async () => {

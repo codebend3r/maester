@@ -1,3 +1,5 @@
+import { SAME_SITE, serializeCookie } from '@shared/server'
+import { ROUTE_PREFIXES } from '@rookery/core'
 import type { ServerConfig } from '@/config'
 import { SESSION_MS } from '@/sessions/sessionsRepository'
 import { PENDING_MS } from '@/auth/pendingSignIns'
@@ -6,77 +8,59 @@ import { PENDING_MS } from '@/auth/pendingSignIns'
 export const SESSION_COOKIE = 'maester_session'
 /** Ties a sign-in under way to the browser that started it; rookery's host only. */
 export const PIN_COOKIE = 'rookery_pin'
-/** The pin cookie only needs to reach the callback. */
-const PIN_PATH = '/auth/plex'
+/** The pin cookie only needs to reach the callback, which lives in this folder. */
+const PIN_PATH = `${ROUTE_PREFIXES.auth}plex`
 const SESSION_PATH = '/'
-
-type SerializeProps = {
-  name: string
-  value: string
-  path: string
-  maxAgeSeconds: number
-  domain: string | null
-  secure: boolean
-}
-
-const serialize = ({ name, value, path, maxAgeSeconds, domain, secure }: SerializeProps): string =>
-  [
-    `${name}=${value}`,
-    `Path=${path}`,
-    `Max-Age=${maxAgeSeconds}`,
-    ...(domain ? [`Domain=${domain}`] : []),
-    'HttpOnly',
-    'SameSite=Lax',
-    ...(secure ? ['Secure'] : []),
-  ].join('; ')
 
 const seconds = (ms: number): number => Math.floor(ms / 1000)
 
 type SessionCookieProps = { token: string; config: ServerConfig }
 
-export const sessionCookie = ({ token, config }: SessionCookieProps) =>
-  serialize({
+export const sessionCookie = ({ token, config }: SessionCookieProps): string =>
+  serializeCookie({
     name: SESSION_COOKIE,
     value: token,
     path: SESSION_PATH,
     maxAgeSeconds: seconds(SESSION_MS),
     domain: config.cookieDomain,
-    secure: config.secureCookies,
+    sameSite: SAME_SITE.lax,
+    isSecure: config.secureCookies,
   })
 
-type ClearedSessionCookieProps = { config: ServerConfig }
+type CookieConfigProps = { config: ServerConfig }
 
 /** Clears the session cookie; the `Domain` must match the one it was set with. */
-export const clearedSessionCookie = ({ config }: ClearedSessionCookieProps) =>
-  serialize({
+export const clearedSessionCookie = ({ config }: CookieConfigProps): string =>
+  serializeCookie({
     name: SESSION_COOKIE,
     value: '',
     path: SESSION_PATH,
     maxAgeSeconds: 0,
     domain: config.cookieDomain,
-    secure: config.secureCookies,
+    sameSite: SAME_SITE.lax,
+    isSecure: config.secureCookies,
   })
 
 type PinCookieProps = { id: string; config: ServerConfig }
 
-export const pinCookie = ({ id, config }: PinCookieProps) =>
-  serialize({
+export const pinCookie = ({ id, config }: PinCookieProps): string =>
+  serializeCookie({
     name: PIN_COOKIE,
     value: id,
     path: PIN_PATH,
     maxAgeSeconds: seconds(PENDING_MS),
     domain: null,
-    secure: config.secureCookies,
+    sameSite: SAME_SITE.lax,
+    isSecure: config.secureCookies,
   })
 
-type ClearedPinCookieProps = { config: ServerConfig }
-
-export const clearedPinCookie = ({ config }: ClearedPinCookieProps) =>
-  serialize({
+export const clearedPinCookie = ({ config }: CookieConfigProps): string =>
+  serializeCookie({
     name: PIN_COOKIE,
     value: '',
     path: PIN_PATH,
     maxAgeSeconds: 0,
     domain: null,
-    secure: config.secureCookies,
+    sameSite: SAME_SITE.lax,
+    isSecure: config.secureCookies,
   })

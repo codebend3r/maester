@@ -9,19 +9,15 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common'
-import { sameSecret } from '@shared/server'
+import { type PublicUser, ROUTES } from '@rookery/core'
+import { HEADERS, HTTP_STATUSES, bearerToken, isRecord, sameSecret } from '@shared/server'
 import type { FastifyRequest } from 'fastify'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
-import { isRecord } from '@/guards'
-import { ROUTES } from '@/routes'
-import { AccountService, type PublicUser, toPublicUser } from '@/sessions/accountService'
+import { AccountService, toPublicUser } from '@/sessions/accountService'
 import { SESSION_KINDS } from '@/sessions/sessionsRepository'
 
 /** Why `/internal/session` refused before looking the token up. */
 const INTERNAL_ERRORS = { serviceToken: 'service_token', tokenRequired: 'token_required' } as const
-
-/** The `Authorization` scheme apps present the service token under, with its trailing space. */
-const BEARER = 'Bearer '
 
 /** What an app learns about the person behind a session cookie. */
 export type SessionInfo = {
@@ -44,11 +40,10 @@ export class InternalController {
   ) {}
 
   @Post(ROUTES.session)
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   session(@Req() request: FastifyRequest, @Body() body: unknown): SessionInfo {
-    const header = request.headers.authorization ?? ''
-    const given = header.startsWith(BEARER) ? header.slice(BEARER.length) : ''
-    if (!given || !sameSecret({ given, expected: this.config.serviceToken })) {
+    const given = bearerToken({ header: request.headers[HEADERS.authorization] }) ?? ''
+    if (!sameSecret({ given, expected: this.config.serviceToken })) {
       throw new UnauthorizedException({ reason: INTERNAL_ERRORS.serviceToken })
     }
     const token = isRecord(body) && typeof body.token === 'string' ? body.token : null

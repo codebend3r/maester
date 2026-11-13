@@ -19,6 +19,11 @@
     "typescript/no-explicit-any": "error",
     "typescript/consistent-type-definitions": ["error", "type"],
     "typescript/no-non-null-assertion": "error",
+    // Never cast; `as const` is not a cast, and the rule lets it through.
+    "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }],
+    "typescript/ban-ts-comment": "error",
+    "no-nested-ternary": "error",
+    "no-throw-literal": "error",
     "no-var": "error",
     "prefer-const": "error",
     "eqeqeq": ["error", "always", { "null": "ignore" }],
