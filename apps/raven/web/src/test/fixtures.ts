@@ -96,6 +96,7 @@ export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   videoBitDepth: 10,
   hdr: false,
   isDolbyVisionOnly: false,
+  dolbyVisionProfile: null,
   audioCodec: 'aac',
   audioChannels: 6,
   bitrate: 2_215_000,

@@ -38,6 +38,7 @@ const CODEC_FILLS: Readonly<Record<string, string>> = {
 /** The ranges with a fill of their own; every other high range wears HDR's. */
 const RANGE_FILLS: Readonly<Record<string, string>> = {
   [PICTURE_RANGES.dolbyVisionOnly]: CHIP_COLOURS.dolbyVisionOnly,
+  [PICTURE_RANGES.dolbyVisionDualLayer]: CHIP_COLOURS.dolbyVisionDualLayer,
 }
 
 type FillOf = (text: string) => string | null

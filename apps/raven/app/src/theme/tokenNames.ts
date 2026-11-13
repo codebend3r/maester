@@ -51,4 +51,5 @@ export const CHIP_TOKENS = {
   hevc: '--color-codec-hevc',
   hdr: '--color-range-hdr',
   dolbyVisionOnly: '--color-range-dv5',
+  dolbyVisionDualLayer: '--color-range-dv7',
 } as const

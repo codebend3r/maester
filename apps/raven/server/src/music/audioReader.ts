@@ -193,6 +193,7 @@ export const audioProbeOf = (format: IFormat): ProbeResult => {
     videoBitDepth: null,
     hdr: false,
     isDolbyVisionOnly: false,
+    dolbyVisionProfile: null,
     audioCodec: codecNameOf(format.codec),
     audioChannels: whole(format.numberOfChannels),
     bitrate: bitrate === null ? null : Math.round(bitrate),

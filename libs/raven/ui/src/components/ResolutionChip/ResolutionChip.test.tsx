@@ -103,6 +103,22 @@ describe('ResolutionChip', () => {
     expect(container).toHaveTextContent('DV54K HEVC DV5')
   })
 
+  it('wears DV7 in a colour of its own, apart from DV5 and HDR', () => {
+    const { container } = render(
+      <>
+        <RangeChip range="DV7" />
+        <PictureFact resolution="4K" rest="(HEVC) DV7" />
+      </>,
+    )
+    const chips = screen.getAllByLabelText(
+      "Dolby Vision profile 7: a 4K Blu-ray's, over an HDR10 base layer",
+    )
+    expect(chips).toHaveLength(2)
+    chips.forEach((chip) => expect(chip).toHaveClass(styles.dolbyVisionDualLayer ?? ''))
+    chips.forEach((chip) => expect(chip).not.toHaveClass(styles.dolbyVisionOnly ?? ''))
+    expect(container).toHaveTextContent('DV74K HEVC DV7')
+  })
+
   it('marks a range of light alone as its chip, a word of a list or a fact', () => {
     render(
       <>

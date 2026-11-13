@@ -87,6 +87,9 @@ export const isDolbyVisionConfig = object({
 
 export type DolbyVisionConfig = Infer<typeof isDolbyVisionConfig>
 
+/** The Dolby Vision profiles raven names apart: profile 7, a 4K Blu-ray's, is a second layer over HDR10. */
+export const DOLBY_VISION_PROFILES = { dualLayer: 7 } as const
+
 /** What ffprobe says of the picture beyond what the index keeps. */
 export const isVideoStream = object({
   /** ffprobe codec name: 'h264', 'hevc', ... */

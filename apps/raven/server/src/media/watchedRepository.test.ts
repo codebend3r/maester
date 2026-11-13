@@ -66,6 +66,7 @@ describe('marking cards watched', () => {
           videoBitDepth: 8,
           hdr: false,
           isDolbyVisionOnly: false,
+          dolbyVisionProfile: null,
           audioCodec: 'aac',
           audioChannels: 2,
           bitrate: 5_000_000,

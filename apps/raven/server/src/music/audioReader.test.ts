@@ -177,6 +177,7 @@ describe('audioProbeOf and audioTracksOf', () => {
       videoBitDepth: null,
       hdr: false,
       isDolbyVisionOnly: false,
+      dolbyVisionProfile: null,
       audioCodec: 'flac',
       audioChannels: 2,
       bitrate: 912346,

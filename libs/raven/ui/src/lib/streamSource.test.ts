@@ -642,6 +642,83 @@ describe('createStreamSession', () => {
     expect(calls).toEqual(['error: network error'])
   })
 
+  /** A body that delivers `chunks`, then breaks off with a network error. */
+  const cutBody = (chunks: Array<[number, number]>) => {
+    // Erroring a stream drops what it queued, so each chunk is handed over only when read.
+    const left = { chunks }
+    return new ReadableStream<Uint8Array<ArrayBuffer>>(
+      {
+        pull: (controller) => {
+          const [next, ...rest] = left.chunks
+          if (!next) {
+            controller.error(new TypeError('network error'))
+            return
+          }
+          left.chunks = rest
+          controller.enqueue(new Uint8Array(next))
+        },
+      },
+      { highWaterMark: 0 },
+    )
+  }
+
+  it('picks a cut stream up again from its buffered edge and keeps what is buffered', async () => {
+    const base = setup({ streams: { 'from-4': [[5, 7]] } })
+    const errors: string[] = []
+    createStreamSession({
+      video: fakeVideo(),
+      mime: 'video/mp4',
+      duration: 600,
+      start: 0,
+      url: streamUrl,
+      onError: (message) => errors.push(message),
+      environment: {
+        ...base.environment,
+        fetch: async (url, init) => {
+          const response = await base.environment.fetch(url, init)
+          if (url !== streamUrl(0)) return response
+          return {
+            ...response,
+            body: cutBody([
+              [1, 3],
+              [3, 5],
+            ]),
+          }
+        },
+      },
+    })
+    await settle()
+    await settle()
+    expect(base.fetched).toEqual(['from-0', 'from-4'])
+    expect(base.bufferState.ranges).toEqual([[1, 7]])
+    expect(base.sourceState.ended).toBe(1)
+    expect(errors).toEqual([])
+  })
+
+  it('fails once a stream is cut again and again with nothing delivered in between', async () => {
+    const base = setup()
+    const errors: string[] = []
+    createStreamSession({
+      video: fakeVideo(),
+      mime: 'video/mp4',
+      duration: 600,
+      start: 0,
+      url: streamUrl,
+      onError: (message) => errors.push(message),
+      environment: {
+        ...base.environment,
+        fetch: async (url, init) => {
+          const response = await base.environment.fetch(url, init)
+          return { ...response, body: cutBody(url === streamUrl(0) ? [[1, 3]] : []) }
+        },
+      },
+    })
+    await settle()
+    await settle()
+    expect(base.fetched).toEqual(['from-0', 'from-2', 'from-2', 'from-2'])
+    expect(errors).toEqual(['network error'])
+  })
+
   it('ignores an aborted fetch', async () => {
     const calls: string[] = []
     createStreamSession({

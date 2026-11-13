@@ -18,6 +18,7 @@ const PROBE = {
   videoBitDepth: 8,
   hdr: false,
   isDolbyVisionOnly: false,
+  dolbyVisionProfile: null,
   audioCodec: 'aac',
   audioChannels: 2,
   bitrate: 500_000,
