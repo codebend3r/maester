@@ -1,6 +1,7 @@
 import type { Track } from '@raven/core'
 import { describe, expect, it } from 'vitest'
-import { dayShuffle, interleaved, utcDayOf } from '@/music/mixOrder'
+import { utcDayOf } from '@/clock'
+import { dayShuffle, interleaved } from '@/music/mixOrder'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 

@@ -1,7 +1,7 @@
 import { HEADERS } from '@shared/server'
 import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
-import { readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import {
@@ -21,6 +21,7 @@ import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 import { TMDB_IMAGE_PATH } from '@/metadata/tmdbShapes'
 import { createOnce } from '@/once'
 import { type Gate, createGate } from '@/scanner/concurrency'
+import { removeFiles } from '@/fileSweep'
 
 /** What a picture is for: an item's, or a person's photo. */
 export type ImageUse = ItemImageKind | 'photo'
@@ -108,6 +109,9 @@ const ownerOf = (file: string): number => Number(file.split('-')[0])
 
 /** The folder under `images/` that holds the Cover Art Archive's covers as fetched, named by release id. */
 const COVER_ART_DIR = 'cover-art'
+
+/** Where TMDB's pictures are kept, a folder for each width. */
+const TMDB_DIR = 'tmdb'
 const ARTIST_DIR = 'artists'
 
 /**
@@ -138,7 +142,7 @@ export class ImageCache {
   ) {
     this.root = join(config.dataDir, 'images')
     KEPT_WIDTHS.forEach((width) =>
-      mkdirSync(join(this.root, 'tmdb', `w${width}`), { recursive: true }),
+      mkdirSync(join(this.root, TMDB_DIR, `w${width}`), { recursive: true }),
     )
     const scaled: readonly string[] = [...Object.values(SCALED_DIRS), COVER_ART_DIR, ARTIST_DIR]
     scaled.forEach((dir) => mkdirSync(join(this.root, dir), { recursive: true }))
@@ -160,7 +164,7 @@ export class ImageCache {
     if (!TMDB_IMAGE_PATH.test(path)) return Promise.resolve(null)
     const size = `w${width}`
     return this.downloaded({
-      target: join(this.root, 'tmdb', size, path.slice(1)),
+      target: join(this.root, TMDB_DIR, size, path.slice(1)),
       url: `https://image.tmdb.org/t/p/${size}${path}`,
       what: `${size}${path}`,
     })
@@ -301,12 +305,10 @@ export class ImageCache {
           return null
         }
         // Scales of the picture before it changed, at any width, and any named before widths were.
-        const files = await readdir(dir).catch((): string[] => [])
-        await Promise.all(
-          files
-            .filter((file) => file.startsWith(prefix) && !file.startsWith(current))
-            .map((file) => rm(join(dir, file), { force: true })),
-        )
+        await removeFiles({
+          dir,
+          isGone: (file) => file.startsWith(prefix) && !file.startsWith(current),
+        })
         return target
       },
     })
@@ -317,34 +319,28 @@ export class ImageCache {
    * or person uses, and scales of items and albums that are gone.
    */
   async sweep({ tmdbPaths, itemIds, albumIds, coverArtIds }: ImageCacheSweepProps): Promise<void> {
+    const tmdb = KEPT_WIDTHS.map((width) => ({
+      dir: join(this.root, TMDB_DIR, `w${width}`),
+      isKept: (name: string) => tmdbPaths.has(`/${name}`),
+    }))
+    const scaled = [
+      {
+        dir: join(this.root, SCALED_DIRS.local),
+        isKept: (file: string) => itemIds.has(ownerOf(file)),
+      },
+      {
+        dir: join(this.root, SCALED_DIRS.albums),
+        isKept: (file: string) => albumIds.has(ownerOf(file)),
+      },
+      {
+        dir: join(this.root, COVER_ART_DIR),
+        isKept: (file: string) => coverArtIds.has(file.replace(/\.jpg$/, '')),
+      },
+    ]
     await Promise.all(
-      KEPT_WIDTHS.map(async (width) => {
-        const dir = join(this.root, 'tmdb', `w${width}`)
-        const names = await readdir(dir).catch((): string[] => [])
-        await Promise.all(
-          names
-            .filter((name) => !name.startsWith('.') && !tmdbPaths.has(`/${name}`))
-            .map((name) => rm(join(dir, name), { force: true })),
-        )
-      }),
-    )
-    await Promise.all(
-      [
-        { dir: SCALED_DIRS.local, isKept: (file: string) => itemIds.has(ownerOf(file)) },
-        { dir: SCALED_DIRS.albums, isKept: (file: string) => albumIds.has(ownerOf(file)) },
-        {
-          dir: COVER_ART_DIR,
-          isKept: (file: string) => coverArtIds.has(file.replace(/\.jpg$/, '')),
-        },
-      ].map(async ({ dir: name, isKept }) => {
-        const dir = join(this.root, name)
-        const names = await readdir(dir).catch((): string[] => [])
-        await Promise.all(
-          names
-            .filter((file) => !file.startsWith('.') && !isKept(file))
-            .map((file) => rm(join(dir, file), { force: true })),
-        )
-      }),
+      [...tmdb, ...scaled].map(({ dir, isKept }) =>
+        removeFiles({ dir, isGone: (file) => !file.startsWith('.') && !isKept(file) }),
+      ),
     )
   }
 }

@@ -103,11 +103,11 @@ export const forgetDetectedMarkers = ({ db, mediaId }: ForgetDetectedMarkersProp
 
 type ReadMarkersProps = { db: Sqlite.Database; mediaId: number }
 
+/** A file's stored intro and credits, each null when none was found. */
+export type StoredMarkers = { intro: Marker | null; credits: Marker | null }
+
 /** The file's intro and credits, each null when none is stored or the stored one no longer reads. */
-export const readMarkers = ({
-  db,
-  mediaId,
-}: ReadMarkersProps): { intro: Marker | null; credits: Marker | null } => {
+export const readMarkers = ({ db, mediaId }: ReadMarkersProps): StoredMarkers => {
   const markers = db
     .prepare<[number], MarkerRow>(
       'SELECT kind, start_s, end_s, source, confidence FROM media_markers WHERE media_id = ?',

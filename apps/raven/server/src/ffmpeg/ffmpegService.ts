@@ -63,7 +63,7 @@ const failureText = (error: unknown): string => {
   ) {
     return lastLine(error.stderr)
   }
-  return error instanceof Error ? error.message : String(error)
+  return errorMessage(error)
 }
 
 /** `nice`'s lowest priority. */
@@ -95,6 +95,17 @@ export const PROCESS_EVENTS = { data: 'data', error: 'error', close: 'close' } a
 export type FfmpegStream = ChildProcessByStdio<null, Readable, Readable>
 
 type FfmpegServiceSpawnTrackedProps = { args: string[]; purpose: string }
+
+/** What an analysis run printed. */
+type AnalysisOutput = { stdout: Buffer; stderr: Buffer }
+
+/** What one probe of a file reads: its facts, tracks, chapters and streams. */
+type ProbedFile = {
+  probe: ProbeResult
+  tracks: FileTracks
+  chapters: Chapter[]
+  streams: MediaStreams
+}
 
 /** Everything that shells out to ffmpeg or ffprobe goes through here. */
 @Injectable()
@@ -255,7 +266,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
   private runAnalysis({
     args,
     timeoutSeconds,
-  }: FfmpegServiceRunAnalysisProps): Promise<{ stdout: Buffer; stderr: Buffer }> {
+  }: FfmpegServiceRunAnalysisProps): Promise<AnalysisOutput> {
     return new Promise((resolve, reject) => {
       const child = execFile(
         this.config.ffmpegPath,
@@ -288,12 +299,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** One ffprobe run, read three ways: what the index keeps, the file's tracks and its chapters. */
-  async probeFile(path: string): Promise<{
-    probe: ProbeResult
-    tracks: FileTracks
-    chapters: Chapter[]
-    streams: MediaStreams
-  }> {
+  async probeFile(path: string): Promise<ProbedFile> {
     const output = await this.probeJson(path)
     const probe = parseProbe(output)
     if (!probe) throw new Error('No audio or video streams')

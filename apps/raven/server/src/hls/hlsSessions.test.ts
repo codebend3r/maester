@@ -12,13 +12,10 @@ import {
   HLS_KEPT_SEGMENTS,
   MEDIA_TICKET_SECONDS,
   PLAYBACK_MODES,
-  QUALITIES,
   STREAM_TIME_SHIFT,
   type StreamMode,
-  VIDEO_CODECS,
 } from '@raven/core'
 import { type MockInstance, afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { SOFTWARE } from '@/ffmpeg/encoder'
 import { ScanControl } from '@/scanner/scanControl'
 import { type FfmpegStream, FfmpegService } from '@/ffmpeg/ffmpegService'
 import { type MediaClock, mediaClockOf } from '@/ffmpeg/probe'
@@ -36,6 +33,7 @@ import { eventually, testConfig } from '@/test/app'
 import { manualClock } from '@/test/clock'
 import { encodeClip, encodeRichClip } from '@/test/clips'
 import { mdatOf, videoTfdt } from '@/test/mp4'
+import { pictureFor } from '@/test/videoPlans'
 
 const run = promisify(execFile)
 
@@ -235,19 +233,11 @@ describe('HlsSessions', () => {
       asked: null,
       source: {
         input,
-        mode,
         plan,
         startTime,
         frameRate,
         audio,
-        videoCodec: VIDEO_CODECS.h264,
-        dolbyVision: null,
-        encoder: SOFTWARE,
-        maxHeight: 1080,
-        quality: QUALITIES.medium,
-        bitrate: null,
-        tonemap: false,
-        burn: null,
+        video: pictureFor(mode),
       },
       keyframesFor,
       access: null,

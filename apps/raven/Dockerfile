@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 # One image: the media server, which also serves the built web app, so there
 # is a single port and no CORS. Built from the repo root because the server
-# and the web app depend on libs/raven/core, and the server on libs/shared/server,
-# both on libs/shared/http, through the bun workspace.
+# and the web app depend on libs/raven/core and libs/shared/http, and the server
+# on libs/shared/server, through the bun workspace.
 #
 # Bun installs and builds; Node runs, since that is the runtime NestJS
 # supports. Bun is installed at the version the root package.json pins in

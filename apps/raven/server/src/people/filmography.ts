@@ -8,7 +8,7 @@ import {
 } from '@raven/core'
 import { groupBy } from '@/groupBy'
 import type { LocalCredit } from '@/metadata/metadataRepository'
-import { yearOf } from '@/metadata/tmdbShapes'
+import { TMDB_DEPARTMENTS, yearOf } from '@/metadata/tmdbShapes'
 import type { FilmographyRow } from '@/people/peopleRepository'
 
 /** Crew jobs that are no work on the title: a thank-you in the credits, a dedication. */
@@ -21,14 +21,23 @@ const SELF_ROLE =
 /** Talk and News, where everyone on screen is themselves. */
 const SELF_GENRES = [10767, 10763] as const
 
+/** The departments a filmography tabs its credits by, core's `isFilmographyDepartment` values. */
+const DEPARTMENTS = {
+  acting: 'acting',
+  directing: 'directing',
+  writing: 'writing',
+  producing: 'producing',
+  crew: 'crew',
+} as const satisfies Record<FilmographyDepartment, FilmographyDepartment>
+
 /** The department a filmography tabs a local credit under. */
 const LOCAL_DEPARTMENTS = {
-  cast: 'acting',
-  guest: 'acting',
-  director: 'directing',
-  writer: 'writing',
-  creator: 'writing',
-  producer: 'producing',
+  cast: DEPARTMENTS.acting,
+  guest: DEPARTMENTS.acting,
+  director: DEPARTMENTS.directing,
+  writer: DEPARTMENTS.writing,
+  creator: DEPARTMENTS.writing,
+  producer: DEPARTMENTS.producing,
 } as const satisfies Record<CreditJob, FilmographyDepartment>
 
 type DepartmentOfProps = {
@@ -41,11 +50,15 @@ type DepartmentOfProps = {
  * one by the job, whatever department TMDB files it under.
  */
 export const departmentOf = ({ department, role }: DepartmentOfProps): FilmographyDepartment => {
-  if (department === 'Acting') return 'acting'
-  if (role?.includes('Producer') ?? false) return 'producing'
-  if (department === 'Directing') return 'directing'
-  if (department === 'Writing' || department === 'Creator' || role === 'Creator') return 'writing'
-  return 'crew'
+  if (department === TMDB_DEPARTMENTS.acting) return DEPARTMENTS.acting
+  if (role?.includes(TMDB_DEPARTMENTS.producer) ?? false) return DEPARTMENTS.producing
+  if (department === TMDB_DEPARTMENTS.directing) return DEPARTMENTS.directing
+  const isWriting =
+    department === TMDB_DEPARTMENTS.writing ||
+    department === TMDB_DEPARTMENTS.creator ||
+    role === TMDB_DEPARTMENTS.creator
+  if (isWriting) return DEPARTMENTS.writing
+  return DEPARTMENTS.crew
 }
 
 type IsSelfAppearanceProps = {
@@ -56,14 +69,17 @@ type IsSelfAppearanceProps = {
 
 /** Whether an acting credit is as themselves: on a talk or news show, or by the role. */
 export const isSelfAppearance = ({ department, role, genreIds }: IsSelfAppearanceProps): boolean =>
-  department === 'Acting' &&
+  department === TMDB_DEPARTMENTS.acting &&
   (SELF_GENRES.some((genre) => genreIds.includes(genre)) || SELF_ROLE.test(role ?? ''))
 
 const isIgnored = ({ department, role }: FilmographyRow): boolean =>
-  department !== 'Acting' && IGNORED_JOBS.some((job) => job === role)
+  department !== TMDB_DEPARTMENTS.acting && IGNORED_JOBS.some((job) => job === role)
 
 const actingFirst = (credits: readonly FilmographyCredit[]): FilmographyCredit[] =>
-  credits.toSorted((a, b) => Number(b.department === 'acting') - Number(a.department === 'acting'))
+  credits.toSorted(
+    (a, b) =>
+      Number(b.department === DEPARTMENTS.acting) - Number(a.department === DEPARTMENTS.acting),
+  )
 
 type UnlistedOfProps = {
   listed: readonly FilmographyCredit[]
@@ -80,7 +96,7 @@ const unlistedOf = ({ listed, local }: UnlistedOfProps): FilmographyCredit[] =>
         role: credit.role,
         episodes: null,
         // raven's own credits carry no genres, so only the role can say.
-        isSelf: department === 'acting' && SELF_ROLE.test(credit.role ?? ''),
+        isSelf: department === DEPARTMENTS.acting && SELF_ROLE.test(credit.role ?? ''),
       }
     })
     .filter((credit) => !listed.some((known) => known.department === credit.department))

@@ -13,12 +13,15 @@ const RECHECKS = { allowed: 'allowed', ended: 'ended', unanswered: 'unanswered' 
 
 type Recheck = (typeof RECHECKS)[keyof typeof RECHECKS]
 
+/** How a recheck reads a failure, and why. */
+type RecheckOutcome = { recheck: Recheck; reason: string }
+
 /**
  * What a failed recheck means for the response. Only an outage keeps it,
  * since the response was already authorized; a refusal, an integrity
  * failure or any other error ends it.
  */
-const recheckOf = (error: unknown): { recheck: Recheck; reason: string } => {
+const recheckOf = (error: unknown): RecheckOutcome => {
   if (error instanceof IntegrityFailure) return { recheck: RECHECKS.ended, reason: error.failure }
   if (!(error instanceof HttpException)) {
     return { recheck: RECHECKS.ended, reason: error instanceof Error ? error.name : typeof error }

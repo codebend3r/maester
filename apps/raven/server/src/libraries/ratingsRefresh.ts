@@ -4,6 +4,7 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import { ScoresRepository } from '@/metadata/scoresRepository'
 import { ScannerService } from '@/scanner/scannerService'
+import { errorMessage } from '@/errorMessage'
 
 type RatingsRefreshStartProps = { libraryId: number; since?: string }
 
@@ -66,7 +67,7 @@ export class RatingsRefresh {
     this.quickScans.set(libraryId, job)
     this.scanner.quickScanNow(libraryId)
     this.afterQuickScan({ libraryId, since, job }).catch((error: unknown) =>
-      this.logger.warn(error instanceof Error ? error.message : String(error)),
+      this.logger.warn(errorMessage(error)),
     )
   }
 

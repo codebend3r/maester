@@ -2,6 +2,7 @@ import type { Dirent } from 'node:fs'
 import { lstat, readdir, stat } from 'node:fs/promises'
 import { basename, join, relative, sep } from 'node:path'
 import { extensionOf } from '@raven/core'
+import { errorCode } from '@/errorMessage'
 import { type Gate, createGate, mapWithConcurrency } from '@/scanner/concurrency'
 
 /**
@@ -97,7 +98,7 @@ type Listing = { dirs: string[]; files: string[]; error: string | null }
 
 const reason = (error: unknown): string => {
   if (!(error instanceof Error)) return String(error)
-  return 'code' in error && typeof error.code === 'string' ? error.code : error.message
+  return errorCode(error) ?? error.message
 }
 
 type ClassifyProps = {

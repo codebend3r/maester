@@ -1,8 +1,10 @@
-import { QUALITIES } from '@raven/core'
+import { ENCODER_KINDS, QUALITIES } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import type { VideoEncoder } from '@/ffmpeg/encoder'
+import { copyOf, transcodeOf } from '@/test/videoPlans'
 import {
   TONEMAP_FILTER,
+  VIDEO_PLAN_KINDS,
   VIDEO_STREAM,
   streamArgs,
   subtitleFileArgs,
@@ -62,16 +64,11 @@ describe('thumbnailArgs', () => {
 })
 
 describe('streamArgs', () => {
-  const base = {
-    input: '/m/a.mkv',
-    start: 61.5,
-    audio: 2,
-    audioOnly: false,
-    videoCodec: 'hevc',
-    dolbyVision: null,
-    tonemap: false,
-    streamShift: 1,
-  }
+  const base = { input: '/m/a.mkv', start: 61.5, audio: 2, streamShift: 1 }
+  const copyHevc = (over: Parameters<typeof copyOf>[0] = {}) =>
+    copyOf({ videoCodec: 'hevc', ...over })
+  const transcodeHevc = (over: Parameters<typeof transcodeOf>[0] = {}) =>
+    transcodeOf({ videoCodec: 'hevc', ...over })
 
   /** A Dolby Vision profile 5 record, as `dolbyVisionOf` reads one. */
   const DV5 = { profile: 5, level: 6, blSignalCompatibilityId: 0 }
@@ -81,7 +78,7 @@ describe('streamArgs', () => {
 
   describe('with a picture subtitle to burn in', () => {
     const burn = { stream: 1, canvas: { width: 1920, height: 1080 } }
-    const args = streamArgs({ ...base, mode: 'transcode', burn })
+    const args = streamArgs({ ...base, video: transcodeHevc({ burn }) })
 
     it('lays the subtitle over the picture and maps the result', () => {
       expect(args).toContain('-filter_complex')
@@ -100,11 +97,11 @@ describe('streamArgs', () => {
   })
 
   describe('on a GPU', () => {
-    const vaapi: VideoEncoder = { kind: 'vaapi', device: '/dev/dri/renderD128' }
+    const vaapi: VideoEncoder = { kind: ENCODER_KINDS.vaapi, device: '/dev/dri/renderD128' }
     const beforeInput = (args: string[]) => args.slice(0, args.indexOf('-i'))
 
     it('keeps an H.264 or HEVC transcode on the GPU from decode to encode', () => {
-      const args = streamArgs({ ...base, mode: 'transcode', encoder: vaapi })
+      const args = streamArgs({ ...base, video: transcodeHevc({ encoder: vaapi }) })
       expect(beforeInput(args)).toEqual(
         expect.arrayContaining(['-hwaccel', 'vaapi', '-hwaccel_output_format', 'vaapi']),
       )
@@ -115,7 +112,7 @@ describe('streamArgs', () => {
     })
 
     it('keeps HDR on the GPU too, converting its colours to BT.709 rather than tone mapping on the CPU', () => {
-      const args = streamArgs({ ...base, mode: 'transcode', tonemap: true, encoder: vaapi })
+      const args = streamArgs({ ...base, video: transcodeHevc({ tonemap: true, encoder: vaapi }) })
       expect(beforeInput(args)).toEqual(expect.arrayContaining(['-hwaccel_output_format', 'vaapi']))
       expect(after({ args, flag: '-vf' })).toBe(
         "scale_vaapi=w=-2:h='min(1080,ih)':format=nv12:out_color_matrix=bt709:out_color_primaries=bt709:out_color_transfer=bt709:out_range=tv",
@@ -124,7 +121,10 @@ describe('streamArgs', () => {
     })
 
     it('decodes a codec the GPU may not know on the CPU, then uploads it to encode', () => {
-      const args = streamArgs({ ...base, mode: 'transcode', videoCodec: 'mpeg4', encoder: vaapi })
+      const args = streamArgs({
+        ...base,
+        video: transcodeHevc({ videoCodec: 'mpeg4', encoder: vaapi }),
+      })
       expect(beforeInput(args)).not.toContain('-hwaccel')
       expect(after({ args, flag: '-filter_hw_device' })).toBe('va')
       expect(after({ args, flag: '-vf' })).toBe("scale=w=-2:h='min(1080,ih)',format=nv12,hwupload")
@@ -134,8 +134,7 @@ describe('streamArgs', () => {
     it('decodes and encodes on the Apple media engine with VideoToolbox', () => {
       const args = streamArgs({
         ...base,
-        mode: 'transcode',
-        encoder: { kind: 'videotoolbox' },
+        video: transcodeHevc({ encoder: { kind: ENCODER_KINDS.videotoolbox } }),
       })
       expect(after({ args: beforeInput(args), flag: '-hwaccel' })).toBe('videotoolbox')
       expect(after({ args, flag: '-c:v' })).toBe('h264_videotoolbox')
@@ -143,7 +142,7 @@ describe('streamArgs', () => {
     })
 
     it('leaves a remux alone, since nothing is encoded', () => {
-      const args = streamArgs({ ...base, mode: 'remux', encoder: vaapi })
+      const args = streamArgs({ ...base, video: copyHevc() })
       expect(args).not.toContain('-hwaccel')
       expect(args).not.toContain('-init_hw_device')
       expect(after({ args, flag: '-c:v' })).toBe('copy')
@@ -151,7 +150,7 @@ describe('streamArgs', () => {
   })
 
   it('copies the video, keeps the file clock and converts the chosen audio', () => {
-    const args = streamArgs({ ...base, mode: 'remux' })
+    const args = streamArgs({ ...base, video: copyHevc() })
     expect(args.indexOf('-ss')).toBeLessThan(args.indexOf('-i'))
     expect(after({ args, flag: '-ss' })).toBe('61.5')
     expect(args).toContain('-copyts')
@@ -167,85 +166,76 @@ describe('streamArgs', () => {
   })
 
   it('copies Dolby Vision HEVC under dvh1 with its box, which ffmpeg writes only under strict unofficial', () => {
-    const args = streamArgs({ ...base, mode: 'remux', dolbyVision: DV5 })
+    const args = streamArgs({ ...base, video: copyHevc({ dolbyVision: DV5 }) })
     expect(after({ args, flag: '-c:v' })).toBe('copy')
     expect(args.join(' ')).toContain('-c:v copy -tag:v dvh1 -strict unofficial -c:a aac')
     expect(args).not.toContain('hvc1')
   })
 
   it('copies Dolby Vision profile 7 as its HDR10 base layer, which a browser decodes', () => {
-    const args = streamArgs({ ...base, mode: 'remux', dolbyVision: DV7 })
+    const args = streamArgs({ ...base, video: copyHevc({ dolbyVision: DV7 }) })
     expect(args.join(' ')).toContain('-c:v copy -tag:v hvc1 -bsf:v filter_units=remove_types=62|63')
     expect(args).not.toContain('dvh1')
     expect(args).not.toContain('-strict')
   })
 
   it('tags a Dolby Vision transcode nothing, since its picture is H.264 again', () => {
-    const args = streamArgs({ ...base, mode: 'transcode', dolbyVision: DV5 })
+    const args = streamArgs({ ...base, video: transcodeHevc() })
     expect(args).not.toContain('-tag:v')
     expect(args).not.toContain('-strict')
   })
 
   it('scales a transcode to the settings’ height and squeezes to their quality', () => {
     const args = streamArgs({
-      input: '/m/a.mkv',
+      ...base,
       start: 0,
-      mode: 'transcode',
       audio: 0,
-      audioOnly: false,
-      videoCodec: 'hevc',
-      dolbyVision: null,
-      tonemap: false,
-      streamShift: 1,
-      maxHeight: 720,
-      quality: 'high',
+      video: transcodeHevc({ maxHeight: 720, quality: QUALITIES.high }),
     })
     expect(after({ args, flag: '-vf' })).toBe("scale=w=-2:h='min(720,ih)'")
     expect(after({ args, flag: '-crf' })).toBe('18')
     const low = streamArgs({
-      input: '/m/a.mkv',
+      ...base,
       start: 0,
-      mode: 'transcode',
       audio: 0,
-      audioOnly: false,
-      videoCodec: 'hevc',
-      dolbyVision: null,
-      tonemap: false,
-      streamShift: 1,
-      encoder: { kind: 'videotoolbox' },
-      maxHeight: 2160,
-      quality: 'low',
+      video: transcodeHevc({
+        encoder: { kind: ENCODER_KINDS.videotoolbox },
+        maxHeight: 2160,
+        quality: QUALITIES.low,
+      }),
     })
     expect(after({ args: low, flag: '-b:v' })).toBe('4000000')
     expect(after({ args: low, flag: '-vf' })).toBe("scale=w=-2:h='min(2160,ih)'")
   })
 
   it('holds a transcode under the bitrate a viewer asked for', () => {
-    const software = streamArgs({ ...base, mode: 'transcode', maxHeight: 720, bitrate: 3_000_000 })
+    const software = streamArgs({
+      ...base,
+      video: transcodeHevc({ maxHeight: 720, bitrate: 3_000_000 }),
+    })
     expect(after({ args: software, flag: '-maxrate' })).toBe('3000000')
     expect(after({ args: software, flag: '-bufsize' })).toBe('6000000')
     const vaapi = streamArgs({
       ...base,
-      mode: 'transcode',
-      encoder: { kind: 'vaapi', device: '/dev/dri/renderD128' },
-      bitrate: 3_000_000,
+      video: transcodeHevc({
+        encoder: { kind: ENCODER_KINDS.vaapi, device: '/dev/dri/renderD128' },
+        bitrate: 3_000_000,
+      }),
     })
     expect(after({ args: vaapi, flag: '-b:v' })).toBe('3000000')
     expect(vaapi).not.toContain('-qp')
     const toolbox = streamArgs({
       ...base,
-      mode: 'transcode',
-      encoder: { kind: 'videotoolbox' },
-      bitrate: 3_000_000,
+      video: transcodeHevc({ encoder: { kind: ENCODER_KINDS.videotoolbox }, bitrate: 3_000_000 }),
     })
     expect(after({ args: toolbox, flag: '-b:v' })).toBe('3000000')
     expect(after({ args: toolbox, flag: '-maxrate' })).toBe('3000000')
     expect(after({ args: vaapi, flag: '-bufsize' })).toBe('6000000')
-    expect(streamArgs({ ...base, mode: 'transcode' })).not.toContain('-maxrate')
+    expect(streamArgs({ ...base, video: transcodeHevc() })).not.toContain('-maxrate')
   })
 
   it('re-encodes the video for a transcode, tone mapping HDR', () => {
-    const args = streamArgs({ ...base, mode: 'transcode', start: 0, tonemap: true })
+    const args = streamArgs({ ...base, start: 0, video: transcodeHevc({ tonemap: true }) })
     expect(args).not.toContain('-ss')
     expect(after({ args, flag: '-c:v' })).toBe('libx264')
     expect(after({ args, flag: '-vf' })).toBe(`scale=w=-2:h='min(1080,ih)',${TONEMAP_FILTER}`)
@@ -254,26 +244,23 @@ describe('streamArgs', () => {
   })
 
   it('maps no audio for a silent file', () => {
-    const args = streamArgs({ ...base, mode: 'remux', audio: null, videoCodec: 'h264' })
+    const args = streamArgs({ ...base, audio: null, video: copyOf() })
     expect(args).not.toContain('-c:a')
     expect(args.filter((arg) => arg === '-map')).toHaveLength(1)
     expect(args).not.toContain('-tag:v')
   })
 
-  it.each(['remux', 'transcode'] as const)(
-    'streams an audio file as its audio alone, fragmented by time, on a %s',
-    (mode) => {
-      const args = streamArgs({ ...base, mode, audio: 0, audioOnly: true, videoCodec: null })
-      expect(args).not.toContain(VIDEO_STREAM)
-      expect(args).not.toContain('-c:v')
-      expect(args).not.toContain('-vf')
-      expect(args.filter((arg) => arg === '-map')).toHaveLength(1)
-      expect(after({ args, flag: '-map' })).toBe('0:a:0')
-      expect(after({ args, flag: '-c:a' })).toBe('aac')
-      expect(after({ args, flag: '-movflags' })).not.toContain('frag_keyframe')
-      expect(after({ args, flag: '-frag_duration' })).toBe('1000000')
-    },
-  )
+  it('streams an audio file as its audio alone, fragmented by time', () => {
+    const args = streamArgs({ ...base, audio: 0, video: { kind: VIDEO_PLAN_KINDS.none } })
+    expect(args).not.toContain(VIDEO_STREAM)
+    expect(args).not.toContain('-c:v')
+    expect(args).not.toContain('-vf')
+    expect(args.filter((arg) => arg === '-map')).toHaveLength(1)
+    expect(after({ args, flag: '-map' })).toBe('0:a:0')
+    expect(after({ args, flag: '-c:a' })).toBe('aac')
+    expect(after({ args, flag: '-movflags' })).not.toContain('frag_keyframe')
+    expect(after({ args, flag: '-frag_duration' })).toBe('1000000')
+  })
 })
 
 describe('transcodeBitrate', () => {

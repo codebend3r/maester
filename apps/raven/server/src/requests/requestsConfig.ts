@@ -1,5 +1,5 @@
 import { ITEM_TYPES, type MatchItemType } from '@raven/core'
-import { wholeNumber } from '@shared/server'
+import { atLeast, text } from '@shared/server'
 
 /**
  * The environment Coming soon's requests read. The arr names are the ones
@@ -71,6 +71,13 @@ export const readRequestsConfig = (env: NodeJS.ProcessEnv): RequestsConfig => ({
       folderOf(env[REQUESTS_ENV.movieFolder]) ?? DEFAULT_FOLDERS[ITEM_TYPES.movie],
     [ITEM_TYPES.show]: folderOf(env[REQUESTS_ENV.showFolder]) ?? DEFAULT_FOLDERS[ITEM_TYPES.show],
   },
-  qualityProfile: env[REQUESTS_ENV.qualityProfile]?.trim() || DEFAULT_QUALITY_PROFILE,
-  dailyLimit: Math.max(1, wholeNumber(env[REQUESTS_ENV.dailyLimit]) ?? DEFAULT_DAILY_LIMIT),
+  qualityProfile: text({
+    value: env[REQUESTS_ENV.qualityProfile],
+    fallback: DEFAULT_QUALITY_PROFILE,
+  }),
+  dailyLimit: atLeast({
+    value: env[REQUESTS_ENV.dailyLimit],
+    min: 1,
+    fallback: DEFAULT_DAILY_LIMIT,
+  }),
 })

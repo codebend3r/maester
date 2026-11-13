@@ -1,10 +1,10 @@
-import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { ServiceUnavailableException } from '@nestjs/common'
 import { FFMPEG_SIGNALS, type FfmpegStream } from '@/ffmpeg/ffmpegService'
 import type { Clock } from '@/clock'
 import { segmentNumberOf } from '@/hls/segmentFiles'
+import { removeFiles } from '@/fileSweep'
 
 /** How many segments a run may finish past the furthest one asked for before it is paused. */
 const HLS_RUN_AHEAD = 10
@@ -178,12 +178,13 @@ export class SegmentRun {
     ;[...this.waiters].forEach((waiter) => waiter.settle(reason))
     this.child.kill(RUN_SIGNALS.kill)
     await this.closed
-    const names = await readdir(this.folder).catch(() => [])
-    const unfinished = names.filter((name) => {
-      const n = segmentNumberOf(name)
-      return n != null && n >= this.next
+    await removeFiles({
+      dir: this.folder,
+      isGone: (name) => {
+        const n = segmentNumberOf(name)
+        return n != null && n >= this.next
+      },
     })
-    await Promise.all(unfinished.map((name) => rm(join(this.folder, name), { force: true })))
   }
 
   private finished(name: string): void {

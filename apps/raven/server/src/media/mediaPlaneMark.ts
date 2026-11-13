@@ -16,4 +16,4 @@ const decorators = new Reflector()
 
 /** Whether a route, or else its controller, is marked `MediaPlane`, read the same by the guard and the route inventory. */
 export const isMediaPlaneRoute = (targets: MarkTargets): boolean =>
-  decorators.getAllAndOverride(MEDIA_PLANE, targets) === true
+  !!decorators.getAllAndOverride(MEDIA_PLANE, targets)

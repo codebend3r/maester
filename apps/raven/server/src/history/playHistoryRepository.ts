@@ -13,7 +13,8 @@ import {
 import { DatabaseService } from '@/db/database'
 import { PLAY_HISTORY_KINDS } from '@/history/playHistorySql'
 import { MediaRepository } from '@/media/mediaRepository'
-import { TRACK_ARTISTS, creditsOf } from '@/music/musicRepository'
+import { creditsOf } from '@/music/musicCredits'
+import { TRACK_ARTISTS } from '@/music/musicRepository'
 import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
 import type { ListenerScope } from '@/music/listenerScope'
 

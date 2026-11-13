@@ -70,13 +70,13 @@ export class WatchedRepository {
         if (!best) return
         const ids = JSON.stringify(card.files.map((file) => file.id))
         if (!!isWatched.get(bound, ids) === watched) return
+        clearSpots.run(bound, ids)
         if (watched) {
           mark.run(bound, best.id, at.toISOString(), best.duration ?? 0, PLAY_KINDS.marked)
-        } else {
-          dropMarks.run(bound, PLAY_KINDS.marked, ids)
-          setAside.run(bound, PLAY_KINDS.cleared, PLAY_KINDS.played, ids)
+          return
         }
-        clearSpots.run(bound, ids)
+        dropMarks.run(bound, PLAY_KINDS.marked, ids)
+        setAside.run(bound, PLAY_KINDS.cleared, PLAY_KINDS.played, ids)
       })
     })()
   }

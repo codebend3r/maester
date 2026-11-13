@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { isRecord, isString } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { AiClient } from '@/metadata/aiClient'
-import type { AlbumToMatch } from '@/music/musicRepository'
+import type { AlbumToMatch } from '@/music/musicMatchStore'
 import type { Scored, SearchTerms } from '@/music/releaseScoring'
 
 type AiAlbumChoice = { mbid: string; reason: string }

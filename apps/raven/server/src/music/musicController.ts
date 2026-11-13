@@ -38,8 +38,13 @@ import { ViewingAccounts } from '@/media/viewingAccounts'
 import { AlbumMatching } from '@/music/albumMatching'
 import { MUSICBRAINZ_ERROR_KINDS, MusicBrainzError } from '@/music/musicBrainzClient'
 import { MusicFavourites } from '@/music/musicFavourites'
+import { MusicMatchStore } from '@/music/musicMatchStore'
 import { MusicRepository } from '@/music/musicRepository'
 import { TrackLyrics } from '@/music/trackLyrics'
+import { ROUTE_PARAMS } from '@/requestParts'
+import { QUERY_PARAMS } from '@/queryValues'
+import { ViewingAccount } from '@/media/viewingAccountParam'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 
 /** A MusicBrainz failure as a route answers it: 404 for an id it does not have, 503 when it is away. */
 const musicBrainzFailed = (error: unknown): never => {
@@ -79,7 +84,6 @@ export class LibraryMusicController {
   constructor(
     @Inject(LibrariesRepository) private readonly libraries: LibrariesRepository,
     @Inject(MusicRepository) private readonly music: MusicRepository,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
   private find(id: number): void {
@@ -88,7 +92,7 @@ export class LibraryMusicController {
 
   /** The artists credited in the library, by name. */
   @Get(':id/artists')
-  listArtists(@Param('id', ParseIntPipe) id: number, @Query() query: unknown): Artist[] {
+  listArtists(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number, @Query() query: unknown): Artist[] {
     this.find(id)
     return this.music.listArtists({ libraryId: id, ...listParams(query) })
   }
@@ -96,30 +100,30 @@ export class LibraryMusicController {
   /** The library's albums in the order asked; search matches titles and artists. */
   @Get(':id/albums')
   listAlbums(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Query() query: unknown,
-    @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): AlbumSummary[] {
     this.find(id)
     return this.music.listAlbums({
       libraryId: id,
       ...listParams(query),
-      account: this.accounts.keyOf({ request }),
+      account,
     })
   }
 
   /** One page of the library's tracks, since a music library holds tens of thousands. */
   @Get(':id/tracks')
   listTracks(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Query() query: unknown,
-    @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): TrackPage {
     this.find(id)
     return this.music.listTracks({
       libraryId: id,
       ...listParams(query),
-      account: this.accounts.keyOf({ request }),
+      account,
     })
   }
 }
@@ -132,6 +136,7 @@ type AlbumsControllerFindProps = { id: number; request: FastifyRequest }
 export class AlbumsController {
   constructor(
     @Inject(MusicRepository) private readonly music: MusicRepository,
+    @Inject(MusicMatchStore) private readonly matches: MusicMatchStore,
     @Inject(AlbumMatching) private readonly matching: AlbumMatching,
     @Inject(MusicFavourites) private readonly favourites: MusicFavourites,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
@@ -146,7 +151,10 @@ export class AlbumsController {
   }
 
   @Get(':id')
-  get(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): AlbumDetails {
+  get(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): AlbumDetails {
     return this.find({ id, request })
   }
 
@@ -154,16 +162,17 @@ export class AlbumsController {
   @ForViewers()
   @Put(':id/favourite')
   setFavourite(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): AlbumDetails {
     if (!isFavouriteChange(body)) throw new BadRequestException('favourite must be true or false')
     favouriteAnswered({
       outcome: this.favourites.setAlbum({
         albumId: id,
         favourite: body.favourite,
-        account: this.accounts.keyOf({ request }),
+        account,
       }),
       missing: `No album ${id}`,
       locked: 'A locked library’s albums cannot be favourites.',
@@ -175,10 +184,10 @@ export class AlbumsController {
   @AdminOnly()
   @Get(':id/match/search')
   async searchMatches(
-    @Param('id', ParseIntPipe) id: number,
-    @Query('query') query: unknown,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Query(QUERY_PARAMS.query) query: unknown,
   ): Promise<AlbumMatchCandidate[]> {
-    const album = this.music.albumToMatch(id)
+    const album = this.matches.albumToMatch(id)
     if (!album) throw new NotFoundException(`No album ${id}`)
     const typed = isString(query) ? query.trim() : ''
     return this.matching
@@ -190,7 +199,7 @@ export class AlbumsController {
   @AdminOnly()
   @Put(':id/match')
   async setMatch(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
   ): Promise<AlbumDetails> {
@@ -226,7 +235,10 @@ export class ArtistsController {
   }
 
   @Get(':id')
-  get(@Param('id', ParseIntPipe) id: number, @Req() request: FastifyRequest): ArtistDetails {
+  get(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): ArtistDetails {
     return this.find({ id, request })
   }
 
@@ -234,16 +246,17 @@ export class ArtistsController {
   @ForViewers()
   @Put(':id/favourite')
   setFavourite(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): ArtistDetails {
     if (!isFavouriteChange(body)) throw new BadRequestException('favourite must be true or false')
     favouriteAnswered({
       outcome: this.favourites.setArtist({
         artistId: id,
         favourite: body.favourite,
-        account: this.accounts.keyOf({ request }),
+        account,
       }),
       missing: `No artist ${id}`,
       locked: 'An artist only locked libraries hold cannot be a favourite.',
@@ -260,7 +273,7 @@ export class TracksController {
 
   /** The track's lyrics: from its tags, a sidecar `.lrc`, or LRCLIB, else none. */
   @Get(':id/lyrics')
-  async getLyrics(@Param('id', ParseIntPipe) id: number): Promise<Lyrics> {
+  async getLyrics(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number): Promise<Lyrics> {
     const lyrics = await this.lyrics.of(id)
     if (lyrics === null) throw new NotFoundException(`No track ${id}`)
     return lyrics

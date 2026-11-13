@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
+  FOLDER_LAYOUTS,
+  LIBRARY_KINDS,
   MATCH_STATES,
   type MediaItem,
   isItemDetails,
@@ -437,7 +439,11 @@ describe('matching by library type', () => {
       })
     app()
       .get(MetadataService)
-      .changePreference({ libraryId: state.animeFilmLibrary, kind: 'animeMovies' })
+      .settingsChanged({
+        libraryId: state.animeFilmLibrary,
+        before: { kind: LIBRARY_KINDS.movies, folderLayout: FOLDER_LAYOUTS.auto },
+        after: { kind: LIBRARY_KINDS.animeMovies, folderLayout: FOLDER_LAYOUTS.auto },
+      })
     await settle()
     expect(await folders()).toEqual(['Alien (1979)'])
   })

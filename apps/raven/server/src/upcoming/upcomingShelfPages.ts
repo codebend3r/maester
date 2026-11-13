@@ -7,10 +7,10 @@ import {
   type UpcomingTitle,
   uniqueUpcomingTitles,
 } from '@raven/core'
-import { CLOCK, type Clock } from '@/clock'
+import { CLOCK, type Clock, utcDayOf } from '@/clock'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import type { DiscoveredPage, DiscoveredTitle } from '@/metadata/tmdbShapes'
-import { dayOf, FreshReads } from '@/upcoming/freshReads'
+import { FreshReads } from '@/upcoming/freshReads'
 import { SHELF_STREAMS, type ShelfStream } from '@/upcoming/shelfStreams'
 
 /** How many results a page of TMDB's discover holds, its last page aside. */
@@ -144,7 +144,7 @@ export class UpcomingShelfPages {
     const streams = SHELF_STREAMS[shelf]
     const cursor =
       after === null
-        ? { from: dayOf(this.clock.now()), offsets: streams.map(() => 0) }
+        ? { from: utcDayOf(this.clock.now()), offsets: streams.map(() => 0) }
         : cursorOf({ after, streams: streams.length })
     if (cursor === null) return null
     const windows = await Promise.all(

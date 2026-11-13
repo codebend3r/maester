@@ -50,13 +50,11 @@ type LayoutsOfProps = {
   layout: FolderLayout
 }
 
+/** What one of a library's paths is, by its files. */
+type FoundLayout = { path: string; layout: PathLayout; groups: number }
+
 /** What each library path is, from files rooted at their library paths: the walk's, or the index's. */
-export const layoutsOf = ({
-  roots,
-  files,
-  kind,
-  layout,
-}: LayoutsOfProps): Array<{ path: string; layout: PathLayout; groups: number }> =>
+export const layoutsOf = ({ roots, files, kind, layout }: LayoutsOfProps): FoundLayout[] =>
   roots.map((root) => {
     const groups = files
       .filter((file) => file.root === root)
@@ -83,7 +81,7 @@ export const indexedLayoutsOf = ({
   roots,
   kind,
   layout,
-}: IndexedLayoutsOfProps): Array<{ path: string; layout: PathLayout; groups: number }> => {
+}: IndexedLayoutsOfProps): FoundLayout[] => {
   const files = rows.flatMap((row) => {
     const root = roots.find((candidate) => isUnder({ path: row.path, root: candidate }))
     return root == null ? [] : [{ path: row.path, root }]

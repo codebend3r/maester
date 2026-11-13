@@ -6,14 +6,10 @@ import {
   DEFAULT_PLAYBACK_SETTINGS,
   MEDIA_TICKET_SECONDS,
   MEMBER_STATUSES,
-  PLAYBACK_MODES,
-  QUALITIES,
-  VIDEO_CODECS,
 } from '@raven/core'
 import { NEVER, Subject } from 'rxjs'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { ACCOUNT_PASS_MS, type PassAccess } from '@/auth/accountPasses'
-import { SOFTWARE } from '@/ffmpeg/encoder'
 import { ScanControl } from '@/scanner/scanControl'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { HLS_CAPABILITY_PREFIX, isHlsCapability } from '@/hls/hlsCapability'
@@ -23,6 +19,7 @@ import { testConfig } from '@/test/app'
 import { AUTH_TEST_IDS } from '@/test/auth'
 import { manualClock } from '@/test/clock'
 import { encodeClip } from '@/test/clips'
+import { copyOf } from '@/test/videoPlans'
 
 const FRIEND: Account = {
   id: AUTH_TEST_IDS.friend,
@@ -113,19 +110,11 @@ describe("an account's HLS session", () => {
       asked: null,
       source: {
         input: state.clip,
-        mode: PLAYBACK_MODES.remux,
         plan: state.plan,
         startTime: 0,
         frameRate: 24,
         audio: null,
-        videoCodec: VIDEO_CODECS.h264,
-        dolbyVision: null,
-        encoder: SOFTWARE,
-        maxHeight: 1080,
-        quality: QUALITIES.medium,
-        bitrate: null,
-        tonemap: false,
-        burn: null,
+        video: copyOf(),
       },
       keyframesFor: null,
       access,

@@ -14,8 +14,9 @@ import { AdminOnly } from '@/admin/adminGuard'
 import { HeroRepository } from '@/hero/heroRepository'
 import { HeroSelection } from '@/hero/heroSelection'
 import { LockService } from '@/lock/lockService'
-import { ViewingAccounts } from '@/media/viewingAccounts'
 import { parseBody } from '@/parseBody'
+import { ViewingAccount } from '@/media/viewingAccountParam'
+import type { AccountKey } from '@/media/viewingAccountKeys'
 
 /** Which movies and shows the admin put in home's hero. */
 @Controller('api/hero')
@@ -24,7 +25,6 @@ export class HeroController {
     @Inject(HeroRepository) private readonly picks: HeroRepository,
     @Inject(HeroSelection) private readonly selection: HeroSelection,
     @Inject(LockService) private readonly lock: LockService,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
 
   private state(): HeroPicks {
@@ -44,7 +44,11 @@ export class HeroController {
    */
   @AdminOnly()
   @Put('picks')
-  set(@Body() body: unknown, @Req() request: FastifyRequest): HeroPicks {
+  set(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
+  ): HeroPicks {
     const { itemId, isShown } = parseBody({
       guard: isHeroPickChange,
       body,
@@ -57,7 +61,7 @@ export class HeroController {
     const canPick = this.selection.canPick({
       itemId,
       viewer: this.lock.viewer({ request }),
-      account: this.accounts.keyOf({ request }),
+      account,
     })
     if (!canPick) {
       throw new BadRequestException(

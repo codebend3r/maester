@@ -16,6 +16,7 @@ import { PLAY_KINDS, WatchedRepository } from '@/media/watchedRepository'
 import { BLANK_ITEM, type FetchedItem, type FetchedSaga } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
+import { WatchNext } from '@/media/watchNext'
 
 type Seed = {
   name: string
@@ -349,7 +350,7 @@ describe("listing a TV library's shows", () => {
       const playing = media().get({ id: state.ids.get(name) ?? -1, account: TEST_ACCOUNTS.a })
       if (!playing) throw new Error(`no ${name}`)
       return fileName(
-        media().nextInSession({
+        new WatchNext(database.get(), media()).nextInSession({
           media: playing,
           session,
           libraryIds: [state.libraryId],
@@ -386,7 +387,7 @@ describe("listing a TV library's shows", () => {
       const playing = media().get({ id: state.ids.get(name) ?? -1, account: TEST_ACCOUNTS.a })
       if (!playing) throw new Error(`no ${name}`)
       return fileName(
-        media().nextInSession({
+        new WatchNext(database.get(), media()).nextInSession({
           media: playing,
           session: { kind: SESSION_KINDS.shuffle, showId: String(showId) },
           libraryIds,
@@ -448,7 +449,7 @@ describe("listing a TV library's shows", () => {
   it('deals every episode of a show, watched or not, as the die falls', () => {
     const libraryIds = [state.libraryId]
     const deal = (roll: number) =>
-      media()
+      new WatchNext(database.get(), media())
         .shuffledEpisodes({
           itemId: state.aired,
           libraryIds,
@@ -470,7 +471,7 @@ describe("listing a TV library's shows", () => {
         .get(state.special)?.id ?? -1
     const libraryIds = [state.libraryId]
     const deal = (roll: number) =>
-      media()
+      new WatchNext(database.get(), media())
         .shuffledEpisodes({
           itemId: seasonId,
           libraryIds,
@@ -489,10 +490,14 @@ describe("listing a TV library's shows", () => {
         .db.prepare<[], { id: number }>("SELECT id FROM items WHERE type = 'episode' LIMIT 1")
         .get()?.id ?? -1
     expect(
-      media().shuffledEpisodes({ itemId: state.aired, libraryIds: [], account: TEST_ACCOUNTS.a }),
+      new WatchNext(database.get(), media()).shuffledEpisodes({
+        itemId: state.aired,
+        libraryIds: [],
+        account: TEST_ACCOUNTS.a,
+      }),
     ).toEqual([])
     expect(
-      media().shuffledEpisodes({
+      new WatchNext(database.get(), media()).shuffledEpisodes({
         itemId: episodeId,
         libraryIds: [state.libraryId],
         account: TEST_ACCOUNTS.a,
@@ -808,7 +813,7 @@ describe('what is watched, card by card', () => {
     const second = filesOf({ episodeId: episodeIds[1] ?? -1, heights: [1080] })
     const libraryIds = [state.libraryId]
     const deal = (roll: number) =>
-      media()
+      new WatchNext(database.get(), media())
         .shuffledEpisodes({
           itemId: showId,
           libraryIds,
@@ -824,7 +829,7 @@ describe('what is watched, card by card', () => {
     const { showId, episodeIds } = addShow({ title: 'Long', count: SHUFFLE_LENGTH + 1 })
     episodeIds.forEach((episodeId) => filesOf({ episodeId, heights: [1080] }))
     expect(
-      media().shuffledEpisodes({
+      new WatchNext(database.get(), media()).shuffledEpisodes({
         itemId: showId,
         libraryIds: [state.libraryId],
         account: TEST_ACCOUNTS.a,

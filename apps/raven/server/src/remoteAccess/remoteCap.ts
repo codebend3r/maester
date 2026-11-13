@@ -4,16 +4,11 @@ import {
   type RemoteAccessSettings,
   STREAM_QUALITIES,
   type StreamMode,
-  type StreamQuality,
   remoteQualityFor,
 } from '@raven/core'
 import { transcodeBitrate } from '@/ffmpeg/args'
-import { streamSizeOf } from '@/playback/conversion'
+import { type SizedStream, streamSizeOf } from '@/playback/conversion'
 import { type ClientRequest, isLanRequest } from '@/remoteAccess/clientNetwork'
-
-type StreamSize = (typeof STREAM_QUALITIES)[StreamQuality]
-
-type SizedStream = { key: StreamQuality; size: StreamSize }
 
 type RemoteLimits = Pick<RemoteAccessSettings, 'remoteLimit' | 'uploadMbps'>
 

@@ -2,7 +2,6 @@ import { STOP_REASONS } from '@/metadata/aiMatcher'
 import type { Anthropic } from '@anthropic-ai/sdk'
 import { AUTH_SCHEME, type MatchItemType, isRecord, isString } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
-import { RAVEN_HEADERS } from '@/http'
 import type { AiFetch } from '@/metadata/aiClient'
 import { type AiConfidence } from '@/metadata/aiDecisions'
 import { AI_TOOL_NAMES } from '@/metadata/aiTools'
@@ -26,7 +25,7 @@ const CLAUDE_HEADERS = { shouldRetry: 'x-should-retry' } as const
 
 /** The key a request carried: the SDK sends an API key as `Authorization: Bearer <key>`. */
 const keyOf = (headers: Headers): string | null =>
-  headers.get(RAVEN_HEADERS.authorization)?.replace(`${AUTH_SCHEME} `, '') ?? null
+  headers.get(HEADERS.authorization)?.replace(`${AUTH_SCHEME} `, '') ?? null
 
 /** One reply Claude gives in a lookup, in turn: a tool call, a refusal, or words and no tool. */
 export type FakeReply =

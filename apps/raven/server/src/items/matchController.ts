@@ -32,6 +32,7 @@ import {
   ITEM_TYPES,
   MATCH_STATES,
   MATCH_SUBJECT_KINDS,
+  ITEM_IMAGE_KINDS,
 } from '@raven/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AdminOnly } from '@/admin/adminGuard'
@@ -51,6 +52,10 @@ import { MetadataService } from '@/metadata/metadataService'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { requireTmdb, tmdbUnavailable } from '@/metadata/tmdbGate'
 import { type SearchResult, TMDB_IMAGE_PATH } from '@/metadata/tmdbShapes'
+import { ROUTE_PARAMS } from '@/requestParts'
+import { QUERY_PARAMS, queryText } from '@/queryValues'
+import { PRIVACIES } from '@/lock/lockService'
+import { ViewingAccount } from '@/media/viewingAccountParam'
 
 /** A file a search's subject stands for, as its score reads it. */
 type SubjectFile = Pick<
@@ -120,6 +125,12 @@ type MatchControllerSubjectFilesProps = {
   account: AccountKey
 }
 
+/** What a subject has on disk, and the country its folder names. */
+type SubjectOnDisk = {
+  onDisk: OnDisk | null
+  country: string | null
+}
+
 /** Fix match: searching TMDB from a page, and pointing a file at what the viewer picks. */
 @Controller('api')
 export class MatchController {
@@ -146,21 +157,30 @@ export class MatchController {
   @AdminOnly()
   @Get('match/search')
   async search(
-    @Query('type') type: string | undefined,
-    @Query('query') query: string | undefined,
-    @Query('year') year: string | undefined,
-    @Query('libraryId') libraryId: string | undefined,
-    @Query('mediaId') mediaId: string | undefined,
-    @Query('itemId') itemId: string | undefined,
+    @Query(QUERY_PARAMS.type) type: unknown,
+    @Query(QUERY_PARAMS.query) query: unknown,
+    @Query(QUERY_PARAMS.year) year: unknown,
+    @Query(QUERY_PARAMS.libraryId) libraryId: unknown,
+    @Query(QUERY_PARAMS.mediaId) mediaId: unknown,
+    @Query(QUERY_PARAMS.itemId) itemId: unknown,
     @Req() request: FastifyRequest,
   ): Promise<MatchCandidate[]> {
     if (!isMatchItemType(type)) throw new BadRequestException('type must be movie or show')
-    const typed = splitCountry(query?.trim() ?? '')
+    const typed = splitCountry(queryText({ value: query, name: QUERY_PARAMS.query })?.trim() ?? '')
     if (!typed.title) throw new BadRequestException('Search for a title.')
-    const preferred = this.preferredBy({ libraryId, request })
-    const subject = subjectFrom({ mediaId, itemId })
+    const preferred = this.preferredBy({
+      libraryId: queryText({ value: libraryId, name: QUERY_PARAMS.libraryId }),
+      request,
+    })
+    const subject = subjectFrom({
+      mediaId: queryText({ value: mediaId, name: QUERY_PARAMS.mediaId }),
+      itemId: queryText({ value: itemId, name: QUERY_PARAMS.itemId }),
+    })
     requireTmdb({ tmdb: this.tmdb, toDo: 'search TMDB' })
-    const parsedYear = Number.parseInt(year ?? '', 10)
+    const parsedYear = Number.parseInt(
+      queryText({ value: year, name: QUERY_PARAMS.year }) ?? '',
+      10,
+    )
     const asked = { query: typed.title, year: Number.isInteger(parsedYear) ? parsedYear : null }
     const results = await (
       type === ITEM_TYPES.movie ? this.tmdb.searchMovies(asked) : this.tmdb.searchShows(asked)
@@ -219,10 +239,7 @@ export class MatchController {
    * nothing for no subject, one raven no longer has, or one in a library
    * the lock keeps from this caller, so the scores never tell it is there.
    */
-  private onDiskOf({ type, subject, request }: MatchControllerOnDiskOfProps): {
-    onDisk: OnDisk | null
-    country: string | null
-  } {
+  private onDiskOf({ type, subject, request }: MatchControllerOnDiskOfProps): SubjectOnDisk {
     if (subject == null) return NOTHING_ON_DISK
     const viewer = this.lock.viewer({ request })
     // An extra is never matched (`off`), so a trailer's numbers say nothing of the show.
@@ -304,9 +321,9 @@ export class MatchController {
   @Public()
   @Get('images/:use/:file')
   async candidate(
-    @Param('use') use: string,
-    @Param('file') file: string,
-    @Query('w') asked: unknown,
+    @Param(ROUTE_PARAMS.use) use: string,
+    @Param(ROUTE_PARAMS.file) file: string,
+    @Query(QUERY_PARAMS.width) asked: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const path = `/${file}`
@@ -314,7 +331,7 @@ export class MatchController {
       throw new NotFoundException('No such picture')
     }
     const posterWidth = asked === undefined ? undefined : posterWidthFrom(asked)
-    if (posterWidth === null || (posterWidth !== undefined && use !== 'poster')) {
+    if (posterWidth === null || (posterWidth !== undefined && use !== ITEM_IMAGE_KINDS.poster)) {
       throw new BadRequestException(`w must be one of ${POSTER_WIDTHS.join(', ')}, for a poster`)
     }
     await sendImage({
@@ -329,15 +346,14 @@ export class MatchController {
    * that holds one movie or show) at a TMDB movie or show; `{ tmdbId: null }`
    * says it is not one. Kept through renames, and never replaced by matching.
    */
-  @PrivateBy('media')
+  @PrivateBy(PRIVACIES.media)
   @AdminOnly()
   @Put('media/:id/match')
   async setMatch(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
-    @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): Promise<MediaItem> {
-    const account = this.accounts.keyOf({ request })
     const record = this.media.get({ id, account })
     if (!record) throw new NotFoundException(`No media ${id}`)
     if (!isMatchChoice(body)) throw new BadRequestException('tmdbId must be a TMDB id or null')

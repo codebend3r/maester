@@ -3,9 +3,6 @@ import type { Clock } from '@/clock'
 /** How long one of Coming soon's reads of TMDB is served before TMDB is asked again. */
 export const UPCOMING_FRESH_MS = 6 * 60 * 60 * 1000
 
-/** The day `at` falls on, as TMDB's `YYYY-MM-DD`. */
-export const dayOf = (at: number): string => new Date(at).toISOString().slice(0, 10)
-
 type FreshReadsProps = {
   clock: Clock
   /** How many reads are kept before the oldest go. */

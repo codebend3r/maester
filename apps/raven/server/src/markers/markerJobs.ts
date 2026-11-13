@@ -99,7 +99,7 @@ export class MarkerJobs {
         `SELECT DISTINCT e.parent_id AS season_id
            FROM media m
            JOIN media_items mi ON mi.media_id = m.id
-           JOIN items e ON e.id = mi.item_id AND e.type = 'episode'
+           JOIN items e ON e.id = mi.item_id AND e.type = '${ITEM_TYPES.episode}'
           WHERE m.probed = 1 AND m.probe_error IS NULL AND m.duration > 0
             AND e.parent_id IS NOT NULL
             AND (m.markers = ? OR m.markers_version < ?)
@@ -139,7 +139,7 @@ export class MarkerJobs {
            FROM items e
            JOIN media_items mi ON mi.item_id = e.id
            JOIN media m ON m.id = mi.media_id
-          WHERE e.parent_id = ? AND e.type = 'episode'
+          WHERE e.parent_id = ? AND e.type = '${ITEM_TYPES.episode}'
             AND m.probed = 1 AND m.probe_error IS NULL AND m.duration > 0
             AND (? IS NULL OR m.library_id = ?)
           GROUP BY m.id

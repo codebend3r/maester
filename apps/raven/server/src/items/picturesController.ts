@@ -21,7 +21,8 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import { AlbumCovers } from '@/music/albumCovers'
 import { MusicBrainzClient } from '@/music/musicBrainzClient'
-import { MusicRepository } from '@/music/musicRepository'
+import { MusicCoverStore } from '@/music/musicCoverStore'
+import { QUERY_PARAMS } from '@/queryValues'
 
 type IsCurrentProps = { given: string; current: string | null | undefined }
 
@@ -54,7 +55,7 @@ export class PicturesController {
     @Inject(ImageCache) private readonly images: ImageCache,
     @Inject(PictureVersions) private readonly versions: PictureVersions,
     @Inject(AlbumCovers) private readonly covers: AlbumCovers,
-    @Inject(MusicRepository) private readonly music: MusicRepository,
+    @Inject(MusicCoverStore) private readonly coverStore: MusicCoverStore,
     @Inject(MusicBrainzClient) private readonly musicBrainz: MusicBrainzClient,
   ) {}
 
@@ -65,7 +66,7 @@ export class PicturesController {
     @Param(PICTURE_PARAMS.id, ParseIntPipe) id: number,
     @Param(PICTURE_PARAMS.kind) kind: string,
     @Param(PICTURE_PARAMS.version) version: string,
-    @Query('w') asked: unknown,
+    @Query(QUERY_PARAMS.width) asked: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     if (!isItemImageKind(kind)) throw new NotFoundException('No picture')
@@ -85,7 +86,7 @@ export class PicturesController {
   async album(
     @Param(PICTURE_PARAMS.id, ParseIntPipe) id: number,
     @Param(PICTURE_PARAMS.version) version: string,
-    @Query('w') asked: unknown,
+    @Query(QUERY_PARAMS.width) asked: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const width = pictureWidth({ kind: ITEM_IMAGE_KINDS.poster, asked })
@@ -101,11 +102,11 @@ export class PicturesController {
     @Param(PICTURE_PARAMS.version) version: string,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const artist = this.music.artistPicture({ id, version })
+    const artist = this.coverStore.artistPicture({ id, version })
     if (artist === null) throw new NotFoundException('No picture')
     const picture =
       artist.picture ?? (!artist.isFetched ? await this.musicBrainz.artistPhoto(artist.mbid) : null)
-    if (!artist.isFetched) this.music.setArtistPicture({ id, picture })
+    if (!artist.isFetched) this.coverStore.setArtistPicture({ id, picture })
     if (picture === null) throw new NotFoundException('No picture')
     const path = await this.images.artist({ artistId: id, source: picture })
     await sendImage({ reply, path, version, audience: IMAGE_AUDIENCES.everyone })
