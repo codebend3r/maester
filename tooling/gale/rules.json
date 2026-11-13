@@ -23,6 +23,12 @@
       {
         "severity": "warning"
       }
-    ]
+    ],
+    "declaration-property-value-disallowed-list": {
+      "display": ["flex", "inline-flex"]
+    },
+    "declaration-property-value-allowed-list": {
+      "/^margin/": ["0"]
+    }
   }
 }

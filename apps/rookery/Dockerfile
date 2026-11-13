@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # One image: the sign-in server, which also serves the built web app, so
 # there is a single port. Built from the repo root because the bun workspace,
-# its lockfile, libs/shared/server and libs/shared/http live there.
+# its lockfile, libs/shared and libs/rookery/core live there.
 #
 # Bun installs and builds; Node runs, since that is the runtime NestJS
 # supports. Bun is installed at the version the root package.json pins in
@@ -24,6 +24,7 @@ COPY nx.json tsconfig.base.json ./
 COPY tooling/ tooling/
 COPY libs/shared/http/ libs/shared/http/
 COPY libs/shared/server/ libs/shared/server/
+COPY libs/rookery/core/ libs/rookery/core/
 COPY apps/rookery/server/ apps/rookery/server/
 COPY apps/rookery/web/ apps/rookery/web/
 # Nx runs each project's own `build`, in the order the workspace graph gives.
@@ -42,6 +43,7 @@ WORKDIR /repo
 COPY --from=deps /repo ./
 COPY --from=build /repo/libs/shared/http/dist libs/shared/http/dist
 COPY --from=build /repo/libs/shared/server/dist libs/shared/server/dist
+COPY --from=build /repo/libs/rookery/core/dist libs/rookery/core/dist
 COPY --from=build /repo/apps/rookery/server/dist apps/rookery/server/dist
 COPY --from=build /repo/apps/rookery/web/dist /app/web
 WORKDIR /repo/apps/rookery/server

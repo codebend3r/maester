@@ -42,13 +42,15 @@ export class SessionsRepository {
   create({ userId, now }: SessionsRepositoryCreateProps): string {
     const token = randomBytes(32).toString('base64url')
     const at = now.toISOString()
-    this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(at)
-    this.db
-      .prepare(
-        `INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_seen_at)
-         VALUES (?, ?, ?, ?, ?)`,
-      )
-      .run(hashToken(token), userId, at, addMs({ date: now, ms: SESSION_MS }).toISOString(), at)
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(at)
+      this.db
+        .prepare(
+          `INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_seen_at)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(hashToken(token), userId, at, addMs({ date: now, ms: SESSION_MS }).toISOString(), at)
+    })()
     return token
   }
 

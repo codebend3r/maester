@@ -64,6 +64,10 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command("verify:uncached", "verify, ignoring Nx's cache, after a toolchain change."),
             Command(
+                "verify:push",
+                "What the pre-push hook runs: verify without dead code and dead CSS, in one Nx run.",
+            ),
+            Command(
                 "affected",
                 "The repo-wide checks, then lint, format, typecheck, tests and builds only for "
                 "the projects your branch changed.",

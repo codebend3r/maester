@@ -1,9 +1,12 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { API_ROUTES, AUTH_ERRORS, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@/lib/api'
+import { ROUTES } from '@rookery/core'
+import { CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@shared/http'
+import { AUTH_ERRORS } from '@/lib/api'
 import { browser } from '@/lib/browser'
-import { ERROR_MESSAGES, LoginPage } from '@/pages/LoginPage/LoginPage'
+import { LoginPage } from '@/pages/LoginPage/LoginPage'
+import { ERROR_MESSAGES } from '@/pages/LoginPage/copy'
 import { renderAt } from '@/test/render'
 
 type JsonProps = { body: unknown; status?: number }
@@ -41,7 +44,7 @@ describe('LoginPage', () => {
 
     await waitFor(() => expect(goTo).toHaveBeenCalledWith('https://app.plex.tv/auth#?code=abc'))
     const [url, init = {}] = fetch.mock.calls[0] ?? []
-    expect(url).toBe(API_ROUTES.start)
+    expect(url).toBe(ROUTES.start)
     expect(init.method).toBe(HTTP_METHODS.post)
     expect(new Headers(init.headers).get(HEADERS.contentType)).toBe(CONTENT_TYPES.json)
     expect(init.body).toBe(JSON.stringify({ return_to: 'https://sparrow.example.com/' }))

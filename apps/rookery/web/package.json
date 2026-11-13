@@ -20,6 +20,8 @@
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",
     "@fontsource/young-serif": "5.3.0",
+    "@rookery/core": "workspace:*",
+    "@shared/http": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router-dom": "7.18.5"

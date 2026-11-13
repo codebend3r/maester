@@ -93,6 +93,7 @@
     "typecheck": "nx run-many -t typecheck",
     "typescript-only": "nx run maester:typescript-only",
     "verify": "nx run-many -t spellcheck typescript-only one-command-per-script comment-style dead-code dead-css lint:py lint:ts lint:css format:check typecheck test test:screens build",
+    "verify:push": "nx run-many -t spellcheck typescript-only one-command-per-script comment-style lint:py lint:ts lint:css format:check typecheck test test:screens build",
     "verify:uncached": "bun run verify --skip-nx-cache",
     "web:build": "nx run @raven/web:build",
     "web:e2e": "nx run @raven/web:e2e:browser"
@@ -160,7 +161,8 @@
             "projects": [
               "@raven/core",
               "@raven/ui",
-              "@raven/native"
+              "@raven/native",
+              "@rookery/core"
             ],
             "target": "build"
           }

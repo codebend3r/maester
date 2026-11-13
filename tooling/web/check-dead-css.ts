@@ -14,6 +14,9 @@ import ts from 'typescript'
 
 type Use = { className: string; file: string; line: number }
 type Problem = { file: string; line?: number; message: string }
+/** The module classes a piece of a component reads, and the reads that cannot be checked. */
+type Found = { uses: Use[]; problems: Problem[] }
+type Position = Pick<Use, 'file' | 'line'>
 
 const root = process.cwd()
 
@@ -109,16 +112,11 @@ type UsesInProps = {
 }
 
 // Every `styles.x` and `styles[key]` whose `styles` is the given import.
-const usesIn = ({
-  node,
-  file,
-  symbol,
-  checker,
-}: UsesInProps): { uses: Use[]; problems: Problem[] } => {
+const usesIn = ({ node, file, symbol, checker }: UsesInProps): Found => {
   const nested = childrenOf(node).map((child) => usesIn({ node: child, file, symbol, checker }))
   const uses = nested.flatMap((result) => result.uses)
   const problems = nested.flatMap((result) => result.problems)
-  const at = (target: ts.Node) => ({
+  const at = (target: ts.Node): Position => ({
     file: file.fileName,
     line: file.getLineAndCharacterOfPosition(target.getStart(file)).line + 1,
   })

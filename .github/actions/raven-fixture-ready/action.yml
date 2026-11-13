@@ -1,0 +1,21 @@
+name: 🗄️ Wait for the fixture server
+description: >-
+  Waits up to three minutes for raven's fixture server, started in the background with its
+  output in $RUNNER_TEMP/fixture.log, to print its ready line; prints the log and fails if it
+  never does.
+
+runs:
+  using: composite
+  steps:
+    - name: 🗄️ Wait for the fixture server
+      shell: bash
+      run: |
+        for _ in $(seq 1 90); do
+          if grep -q 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"; then
+            grep 'raven fixture server ready' "$RUNNER_TEMP/fixture.log"
+            exit 0
+          fi
+          sleep 2
+        done
+        cat "$RUNNER_TEMP/fixture.log"
+        exit 1

@@ -1,7 +1,7 @@
 """What the tracker scripts share: the repo, `gh`, the issues, and what the catalog renders.
 
-`sync_tracker.py` pushes the catalog to the issues and `sync_board.py` keeps the board in
-line with them. Both read the issues through `list_issues`, find a catalog entry's issue by
+`sync_tracker.py` pushes the catalog to the issues, `sync_board.py` keeps the board in
+line with them, and `sync_features.py` shares the repo and `gh`. Both read the issues through `list_issues`, find a catalog entry's issue by
 the `[E0.1]` key in its title, and render epic bodies and the roadmap with the functions
 here, so the two scripts never disagree about what an issue or a checklist should say.
 """
@@ -11,8 +11,9 @@ import re
 import subprocess
 from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import TypedDict
 
-from catalog import EPICS, MILESTONES, PRIORITIES, SIZES
+from catalog import EPICS, MILESTONES, PRIORITIES, SIZES, Epic
 
 OWNER = "codebend3r"
 REPO = f"{OWNER}/maester"
@@ -25,14 +26,47 @@ KEY = re.compile(r"^\[([^\]]+)\]")
 TICK = re.compile(r"^- \[[ xX]\] ", re.M)
 
 
+class Label(TypedDict):
+    name: str
+
+
+class MilestoneRef(TypedDict):
+    title: str
+
+
+class Issue(TypedDict):
+    """An issue as `list_issues` reads it (`ISSUE_FIELDS`)."""
+
+    number: int
+    title: str
+    id: str
+    url: str
+    body: str
+    state: str
+    stateReason: str | None
+    labels: list[Label]
+    milestone: MilestoneRef | None
+
+
+class RateLimited(RuntimeError):
+    """GitHub's API budget, shared by everything signed in as this user, is used up."""
+
+
 def gh(*args: str, input: str | None = None) -> str:
     r = subprocess.run(["gh", *args], capture_output=True, text=True, input=input)
     if r.returncode != 0:
-        raise RuntimeError(f"gh {' '.join(args)}\n{r.stderr}")
+        error = RateLimited if "rate limit" in r.stderr.lower() else RuntimeError
+        raise error(f"gh {' '.join(args)}\n{r.stderr}")
     return r.stdout.strip()
 
 
-def list_issues() -> list[dict]:
+def gh_json(*args: str):  # the JSON's shape is the caller's to name
+    """`gh` with JSON output, parsed; None when it printed nothing."""
+    out = gh(*args)
+    return json.loads(out) if out else None
+
+
+def list_issues() -> list[Issue]:
     """Every issue in the repo, open and closed, with what both scripts read from it."""
     out = gh(
         "issue", "list", "-R", REPO, "--state", "all", "--limit", "500", "--json", ISSUE_FIELDS
@@ -46,17 +80,17 @@ def issue_key(title: str) -> str | None:
     return match[1] if match else None
 
 
-def by_key(issues: Iterable[dict]) -> dict[str, dict]:
+def by_key[T: Mapping[str, object]](issues: Iterable[T]) -> dict[str, T]:
     """Issues keyed by their catalog key; an issue without one is left out."""
-    return {key: issue for issue in issues if (key := issue_key(issue["title"]))}
+    return {key: issue for issue in issues if (key := issue_key(str(issue["title"])))}
 
 
-def is_closed(issue: Mapping) -> bool:
+def is_closed(issue: Mapping[str, object]) -> bool:
     """Closed for any reason. A story ticks in its epic's checklist once it is closed."""
     return issue["state"] == "CLOSED"
 
 
-def is_done(issue: Mapping) -> bool:
+def is_done(issue: Mapping[str, object]) -> bool:
     """Closed as completed. An issue closed as not planned is not done."""
     return is_closed(issue) and issue.get("stateReason") in (None, "", "COMPLETED")
 
@@ -71,7 +105,7 @@ def field_options() -> dict[str, list[str]]:
     }
 
 
-def epic_body(epic: dict, closed: set[str]) -> str:
+def epic_body(epic: Epic, closed: set[str]) -> str:
     """An epic's issue body, with each story ticked whose key is in `closed`."""
     lines = [epic["summary"], "", f"**Milestone:** {epic['milestone']}", "", "## Stories", ""]
     lines += [
@@ -90,7 +124,7 @@ def unticked(body: str) -> str:
     return TICK.sub("- [ ] ", body.replace("\r\n", "\n"))
 
 
-def render_roadmap(issues: list[dict], also_done: Iterable[int] = ()) -> str:
+def render_roadmap(issues: list[Issue], also_done: Iterable[int] = ()) -> str:
     """The roadmap doc, linking each entry to its issue and ticking each one done.
 
     `also_done` counts issue numbers as done ahead of time: the board audit passes the

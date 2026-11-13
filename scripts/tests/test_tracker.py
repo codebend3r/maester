@@ -191,7 +191,7 @@ class TestBoardPlan:
     def test_a_missing_board_is_created_first(self):
         board = {"number": None, "id": None, "fields": {}, "items": [], "issues": []}
         steps, flags = sync_board.plan(board)
-        assert [s["kind"] for s in steps] == ["board"]
+        assert [s.kind for s in steps] == [sync_board.StepKind.BOARD]
         assert flags == []
 
     def test_a_missing_field_is_created_with_the_catalog_options(self, roadmap):
@@ -202,9 +202,9 @@ class TestBoardPlan:
         board = full_board([board_item(content(2, title), Status="Todo")], issues)
         del board["fields"]["Epic"]
         steps, _ = sync_board.plan(board)
-        create = [s for s in steps if s["kind"] == "create-field"]
-        assert [(s["field"], s["to"]) for s in create] == [("Epic", field_options()["Epic"])]
-        assert not [s for s in steps if s.get("field") == "Epic" and s["kind"] == "field"]
+        create = [s for s in steps if s.kind == sync_board.StepKind.CREATE_FIELD]
+        assert [(s.field, s.to) for s in create] == [("Epic", field_options()["Epic"])]
+        assert not [s for s in steps if s.field == "Epic" and s.kind == sync_board.StepKind.FIELD]
 
     def test_an_option_the_board_lacks_is_flagged_instead_of_crashing(self, roadmap):
         story = EPIC["stories"][0]
@@ -214,9 +214,9 @@ class TestBoardPlan:
         item = board_item(content(2, title, labels=["P0"]), Status="Todo")
         board = full_board([item], issues, Priority=["P1", "P2"])
         steps, flags = sync_board.plan(board)
-        assert not [s for s in steps if s.get("field") == "Priority"]
-        assert {"issue": None, "title": "Priority field",
-                "why": "no P0 option: add it on the board, then audit again"} in flags  # fmt: skip
+        assert not [s for s in steps if s.field == "Priority"]
+        why = "no P0 option: add it on the board, then audit again"
+        assert sync_board.Flag(None, "Priority field", why) in flags
 
     def test_an_epic_checklist_is_rendered_ticked_from_its_closed_stories(self, roadmap):
         first, second = EPIC["stories"][:2]
@@ -234,8 +234,8 @@ class TestBoardPlan:
         epic = content(1, epic_title, body=epic_body(EPIC, set()), subs=subs)
         board = full_board([board_item(epic, Status="In Progress", Epic=EPIC["key"])], issues)
         steps, flags = sync_board.plan(board)
-        ticks = [s for s in steps if s["kind"] == "tick"]
-        assert [s["to"] for s in ticks] == [epic_body(EPIC, {first["key"]})]
+        ticks = [s for s in steps if s.kind == sync_board.StepKind.TICK]
+        assert [s.to for s in ticks] == [epic_body(EPIC, {first["key"]})]
         assert flags == []
 
     def test_an_epic_body_that_drifted_from_the_catalog_is_flagged_not_ticked(self, roadmap):
@@ -247,8 +247,8 @@ class TestBoardPlan:
         epic = content(1, epic_title, body="Edited by hand", subs=subs)
         board = full_board([board_item(epic, Status="In Progress", Epic=EPIC["key"])], issues)
         steps, flags = sync_board.plan(board)
-        assert not [s for s in steps if s["kind"] == "tick"]
-        assert [f["why"] for f in flags] == [
+        assert not [s for s in steps if s.kind == sync_board.StepKind.TICK]
+        assert [f.why for f in flags] == [
             "body differs from the catalog: run scripts/sync_tracker.py"
         ]
 
@@ -259,4 +259,31 @@ class TestBoardPlan:
         issues = [issue(2, title, "CLOSED", "COMPLETED")]
         item = board_item(content(2, title, state="CLOSED", stateReason="COMPLETED"), Status="Done")
         steps, _ = sync_board.plan(full_board([item], issues))
-        assert steps[-1]["kind"] == "roadmap"
+        assert steps[-1].kind == sync_board.StepKind.ROADMAP
+
+
+class TestSavedPlan:
+    def test_a_plan_round_trips_through_its_json(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(sync_board, "PLAN_PATH", tmp_path / "plan.json")
+        steps = [
+            sync_board.Step(issue=None, title="Epic field", kind=sync_board.StepKind.CREATE_FIELD,
+                            why="missing", to=["E0", "E1"], field="Epic"),
+            sync_board.Step(issue=3, title="[E0] Foundation", kind=sync_board.StepKind.STATUS,
+                            why="Todo → Done", to="Done", field="Status", item="PVTI_3"),
+            sync_board.Step(issue=None, title="docs/roadmap.md", kind=sync_board.StepKind.ROADMAP,
+                            why="stale"),
+        ]  # fmt: skip
+        sync_board.save_plan(steps)
+        assert sync_board.load_plan() == steps
+
+    def test_a_plan_with_an_unknown_kind_is_refused(self, tmp_path, monkeypatch):
+        path = tmp_path / "plan.json"
+        monkeypatch.setattr(sync_board, "PLAN_PATH", path)
+        path.write_text('[{"issue": 1, "title": "x", "kind": "explode", "why": "y"}]')
+        with pytest.raises(SystemExit):
+            sync_board.load_plan()
+
+    def test_every_kind_is_ordered_runnable_and_described(self):
+        assert sync_board.KIND_ORDER[-1] == sync_board.StepKind.ROADMAP
+        assert set(sync_board.RUNS) == set(sync_board.StepKind)
+        assert set(sync_board.DESCRIPTIONS) == set(sync_board.StepKind)

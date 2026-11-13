@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  // No DOM and no Node types: rookery's server and its web app both import this, so a slip fails the typecheck.
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "types": []
+  },
+  "include": ["src"]
+}
