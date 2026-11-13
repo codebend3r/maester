@@ -1,6 +1,6 @@
 import pytest
 
-from sparrow.agent.tools import Choices, Refused
+from sparrow.agent.tools import Ok, Refused
 from sparrow.clients.seerr import (
     Collection,
     MediaDetails,
@@ -46,8 +46,8 @@ def seerr(ctx):
 
 async def test_the_picker_shows_every_entry_led_by_all_missing(ctx, seerr):
     out = await find_collection(ctx, 954)
-    assert isinstance(out, Choices)
-    everything, *entries = out.items
+    assert isinstance(out, Ok) and out.choices
+    everything, *entries = out.choices
     assert everything.label == "All 3 missing from Mission: Impossible Collection"
     assert everything.value == "collection:87359"
     assert [e.value for e in entries] == [f"movie:{p.tmdb_id}" for p in MI.parts]

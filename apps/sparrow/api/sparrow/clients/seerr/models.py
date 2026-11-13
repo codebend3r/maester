@@ -11,8 +11,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-# Issue types.
-ISSUE_VIDEO, ISSUE_AUDIO, ISSUE_SUBTITLE, ISSUE_OTHER = 1, 2, 3, 4
 # TMDB's "anime" keyword, the id Seerr itself uses to route anime to Sonarr's
 # anime settings, and TMDB's Animation genre.
 ANIME_KEYWORD, ANIMATION_GENRE = 210024, 16
@@ -451,11 +449,30 @@ class SeerrUser:
         )
 
 
-ISSUE_KINDS = {
-    ISSUE_VIDEO: "video",
-    ISSUE_AUDIO: "audio",
-    ISSUE_SUBTITLE: "subtitles",
-    ISSUE_OTHER: "other",
+class IssueType(enum.IntEnum):
+    """Seerr's issue types, and how the digest names each."""
+
+    VIDEO = 1
+    AUDIO = 2
+    SUBTITLE = 3
+    OTHER = 4
+
+    @property
+    def label(self) -> str:
+        return _ISSUE_LABELS[self]
+
+    @classmethod
+    def of(cls, raw: object) -> IssueType:
+        """The type Seerr names; one it adds later reads as other."""
+        number = int_or_none(raw)
+        return cls(number) if number in {t.value for t in cls} else cls.OTHER
+
+
+_ISSUE_LABELS = {
+    IssueType.VIDEO: "video",
+    IssueType.AUDIO: "audio",
+    IssueType.SUBTITLE: "subtitles",
+    IssueType.OTHER: "other",
 }
 
 
@@ -477,7 +494,7 @@ class Issue:
         media = raw.get("media") or {}
         return cls(
             id=int(raw["id"]),
-            kind=ISSUE_KINDS.get(int(raw.get("issueType") or ISSUE_OTHER), "other"),
+            kind=IssueType.of(raw.get("issueType")).label,
             media_type=media.get("mediaType") or "",
             tmdb_id=int(media.get("tmdbId") or 0),
             reporter=_user_name(raw.get("createdBy") or {}),

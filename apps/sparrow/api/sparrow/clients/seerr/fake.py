@@ -12,6 +12,7 @@ from sparrow.clients.seerr.models import (
     ArrServer,
     Collection,
     Issue,
+    IssueType,
     MediaDetails,
     MediaRequest,
     MediaStatus,
@@ -150,7 +151,7 @@ class FakeSeerrClient(Downable):
     async def create_issue(
         self,
         media_id: int,
-        issue_type: int,
+        issue_type: IssueType,
         message: str,
         *,
         as_user: int,

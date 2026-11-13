@@ -3,7 +3,7 @@ from dataclasses import replace
 
 import pytest
 
-from sparrow.agent.tools import Choices, Refused
+from sparrow.agent.tools import Ok, Refused
 from sparrow.clients import ClientError, FakeTautulliClient
 from sparrow.library import NotLocated
 from sparrow.media import Copy
@@ -57,19 +57,18 @@ def watching(library):
 async def test_recent_sessions_offers_each_play_as_its_copy_and_episode(watching):
     watching.services.tautulli["vermithor"] = Down()
     picker = await recent_sessions(watching)
-    assert isinstance(picker, Choices)
-    dune, bear = picker.items
+    assert isinstance(picker, Ok) and picker.choices
+    dune, bear = picker.choices
     assert (dune.label, dune.value) == ("Dune (2021)", "movie:438631:4K")
     assert dune.detail == "4K · playing now · Plex for Roku on Living Room"
     assert (bear.label, bear.value) == ("The Bear (2022) S02E07", "tv:136315:1080p:S02E07")
     assert bear.detail == "1080p · about 2 h ago · Plex Web on Chrome"
     # What couldn't be looked up is said, not hidden behind "nothing recent".
-    assert picker.notes == (
+    assert picker.content["notes"] == [
         "couldn't reach Tautulli on vermithor: tautulli GET /api/v2?cmd=get_activity failed "
         "(None): connection refused",
         "couldn't tell what Gone is: the Plex server on meleys has no TMDB id for Gone",
-    )
-    assert picker.as_content()["notes"] == list(picker.notes)
+    ]
 
 
 async def test_recent_sessions_without_plays_or_a_tautulli_match_points_to_search(watching):
@@ -125,7 +124,7 @@ async def test_a_play_on_another_hosts_plex_server_is_matched_by_title_not_by_ke
     # Whichever copy it was, it's the friend's play of Dune.
     assert found.play_of(DUNE, Copy("movie", 438631, False)) is dune
     picker = await recent_sessions(watching)
-    first = picker.items[0]
+    first = picker.choices[0]
     assert (first.value, first.detail.split(" · ")[0]) == (
         "movie:438631:?", "copy unclear: ask 1080p or 4K",
     )  # fmt: skip

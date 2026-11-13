@@ -1,4 +1,4 @@
-"""Replacing a broken copy, guarded: evidence, a Confirm button, a daily cap, a kill switch.
+"""Replacing a broken copy, guarded: evidence, a Confirm button and a daily cap.
 
 `replace_media` is destructive, so the model's call only puts Confirm and
 Cancel in front of the friend; nothing happens until they press Confirm.
@@ -9,59 +9,28 @@ from (`MAY_REPLACE`), only on the host that owns the copy, and only while
 the file is still the one reported.
 
 A day holds at most `REPLACE_DAILY_CAP` replacements that friends confirm,
-counted from the audit log. Past it, the report escalates and the admin's
-Approve runs `decide_replacement`, a button-only admin tool; what the admin
-approves is their own call, so it doesn't count toward the cap. Their Deny
-declines that report only. Both tools are destructive: the runner runs
-them one at a time, checking the kill switch as each one's turn comes, so
-counting and acting can't interleave. Each replacement sends the admin one
-notice with the path, size and reason.
+counted from the audit log; past it, the call refuses until the day is
+over. The tool is destructive: the runner runs confirmed replacements one at
+a time, so counting and acting can't interleave. Each replacement sends the
+admin one notice with the path, size and reason.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from pydantic import Field
 
-from sparrow.agent.tools import (
-    Approval,
-    Failed,
-    NeedsApproval,
-    Ok,
-    Refused,
-    Result,
-    Tier,
-    ToolContext,
-    tool,
-)
-from sparrow.formatting import gigabytes
+from sparrow.agent.tools import Failed, Ok, Refused, Result, Tier, ToolContext, tool
 from sparrow.library import NotLocated
-from sparrow.media import ReportStatus
-from sparrow.notify import DirectMessage
 from sparrow.playback.items import LocatedFile, locate
 from sparrow.playback.replace import admin_notice, replace_copy
-from sparrow.playback.reports import (
-    DECLINE,
-    ESCALATE,
-    MAY_REPLACE,
-    NOT_NOW,
-    POLICIES,
-    REOPEN,
-    Actor,
-    Evidence,
-    move,
-)
+from sparrow.playback.reports import MAY_REPLACE, NOT_NOW, Evidence
 from sparrow.store import ReportRow
-from sparrow.tools.args import FriendId
 
 CAP_WINDOW = timedelta(days=1)
-
-
-class NotReady(Exception):
-    """The replacement can't go ahead; the message says why."""
 
 
 @dataclass(frozen=True)
@@ -73,32 +42,24 @@ class Ready:
     evidence: Evidence
 
 
-def waiting_on_admin(ctx: ToolContext, report: ReportRow) -> bool:
-    """An escalated report whose approval is still open (they expire)."""
-    return any(
-        p.payload.get("report_id") == report.id
-        for p in ctx.store.open_pending("approve", action="decide_replacement")
-    )
-
-
-async def ready(ctx: ToolContext, report: ReportRow, host: str, actor: Actor) -> Ready:
+async def ready(ctx: ToolContext, report: ReportRow, host: str) -> Ready | Refused:
     """The report's file, still there on `host` and proven broken by stored evidence."""
-    if report.status not in MAY_REPLACE[actor]:
-        raise NotReady(f"Report {report.id} can't be acted on: {NOT_NOW[report.status]}.")
+    if report.status not in MAY_REPLACE:
+        return Refused(f"Report {report.id} can't be acted on: {NOT_NOW[report.status]}.")
     if host.lower() != report.host:
-        raise NotReady(f"{report.title} in {report.copy.version} is on {report.host}, not {host}.")
+        return Refused(f"{report.title} in {report.copy.version} is on {report.host}, not {host}.")
     try:
         located = await locate(ctx.services, report.copy)
     except NotLocated as exc:
-        raise NotReady(f"There's nothing to replace: {exc}.") from exc
+        return Refused(f"There's nothing to replace: {exc}.")
     if located.owner.host != report.host or located.file.id != report.file_id:
-        raise NotReady(
+        return Refused(
             f"The file reported in report {report.id} is no longer there; it was replaced or "
             "changed since. If the new one is broken too, report it again."
         )
     evidence = Evidence.for_file(ctx.store, report.host, report.copy.media_type, report.file_id)
     if not evidence.proven:
-        raise NotReady(
+        return Refused(
             f"Not replacing {located.label}: {evidence.describe()}. It can be replaced once a "
             "file check fails or a second person reports the same copy."
         )
@@ -110,9 +71,6 @@ async def carry_out(ctx: ToolContext, go: Ready) -> Result:
     replacement = await replace_copy(ctx.services, ctx.store, go.report, go.located)
     reporters = [ctx.name_of(d) for d in go.evidence.reporters]
     notice = admin_notice(replacement, go.report, go.evidence, reporters)
-    if not replacement.deleted and not replacement.retryable:
-        # It stopped for good (no grab to blocklist): no approval should wait on it.
-        move(ctx.store, go.report, REOPEN)
     if replacement.deleted:
         return Ok(replacement.text, (notice,))
     return Failed(replacement.text, (notice,), retryable=replacement.retryable)
@@ -125,31 +83,6 @@ def over_cap(ctx: ToolContext) -> bool:
     return ctx.store.audit_count_since("replace_media", since) >= cap
 
 
-def ask_admin(ctx: ToolContext, go: Ready) -> Result:
-    """Over the cap: the report escalates, and the admin decides with the same facts."""
-    if move(ctx.store, go.report, ESCALATE) is None:
-        return Refused(f"Report {go.report.id} is no longer open.")
-    located, cap = go.located, ctx.settings.guardrails.replace_daily_cap
-    who = ctx.name_of(ctx.user_id)
-    where = f"{located.label} on {located.owner.host}"
-    label = POLICIES[go.report.kind].label
-    notice = (
-        f"{who} asks to replace {where} ({label}; {go.evidence.describe()}). The daily cap "
-        f"of {cap} replacements is used up, so it's your call. File: {located.file.path} "
-        f"({gigabytes(located.file.size_bytes)})."
-    )
-    return NeedsApproval(
-        f"The daily cap of {cap} replacements is used up, so the admin decides on "
-        f"replacing {where}.",
-        approval=Approval(
-            notice=notice,
-            summary=f"Replace {where} for {who}",
-            decide=decide_replacement,
-            args={"report_id": go.report.id, "host": go.report.host, "requester": ctx.user_id},
-        ),
-    )
-
-
 # The report a replacement is about, and the host report_problem named for its copy.
 ReportId = Annotated[int, Field(description="The report_id report_problem gave.")]
 ReportHost = Annotated[str, Field(description="The host report_problem named.")]
@@ -160,54 +93,22 @@ ReportHost = Annotated[str, Field(description="The host report_problem named.")]
     "Replace a broken copy the user reported: blocklist its release, delete the file and "
     "search for a new copy, on the host that owns it. Only when report_problem offered it; "
     "the user must press Confirm, and it still runs only if a file check failed or two "
-    "people reported the same copy. Over the daily cap it goes to the admin instead.",
+    "people reported the same copy, and not past the daily cap.",
     tier=Tier.FRIEND,
     destructive=True,
     host_param="host",
-    held_in_maintenance=True,
 )
 async def replace_media(ctx: ToolContext, report_id: ReportId, host: ReportHost) -> Result:
     report = ctx.store.get_report(report_id)
     if report is None or (report.user_id != ctx.user_id and ctx.tier < Tier.ADMIN):
         return Refused(f"There's no report {report_id} of yours to act on.")
-    if report.status is ReportStatus.ESCALATED and not waiting_on_admin(ctx, report):
-        report = move(ctx.store, report, REOPEN) or report  # its approval lapsed: open again
-    try:
-        go = await ready(ctx, report, host, Actor.FRIEND)
-    except NotReady as why:
-        return Refused(str(why))
+    go = await ready(ctx, report, host)
+    if isinstance(go, Refused):
+        return go
     if over_cap(ctx):
-        return ask_admin(ctx, go)
-    return await carry_out(ctx, go)
-
-
-@tool(
-    "decide_replacement",
-    "The admin's decision on a replacement over the daily cap.",
-    tier=Tier.ADMIN,
-    destructive=True,
-    host_param="host",
-    button_only=True,
-)
-async def decide_replacement(
-    ctx: ToolContext, report_id: ReportId, host: ReportHost, requester: FriendId, approved: bool
-) -> Result:
-    """Replace the file, or decline this report's replacement, and tell the friend."""
-    report = ctx.store.get_report(report_id)
-    if report is None:
-        return Refused(f"Report {report_id} no longer exists.")
-    if not approved:
-        if move(ctx.store, report, DECLINE) is None:
-            return Refused(f"Report {report.id} isn't waiting on you: {NOT_NOW[report.status]}.")
-        dm = (
-            f"The admin decided not to replace {report.title} in {report.copy.version} for "
-            "now; your report stays open in Seerr."
+        cap = ctx.settings.guardrails.replace_daily_cap
+        return Refused(
+            f"The daily cap of {cap} replacements is used up, so {go.located.label} isn't "
+            "replaced today; ask again tomorrow, or ask the admin."
         )
-        left = f"Left {report.title} in {report.copy.version} as it is."
-        return Ok(left, (DirectMessage(requester, dm),))
-    try:
-        go = await ready(ctx, report, host, Actor.ADMIN)
-    except NotReady as why:
-        return Refused(str(why))
-    result = await carry_out(ctx, go)
-    return replace(result, notices=(*result.notices, DirectMessage(requester, result.content)))
+    return await carry_out(ctx, go)

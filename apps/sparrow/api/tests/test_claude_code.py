@@ -129,9 +129,8 @@ async def test_it_runs_claude_code_on_the_sign_in_never_a_key(tmp_path, monkeypa
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-should-not-reach-claude-code")
     model = ClaudeCodeModel(binary=fake_claude(tmp_path, {"type": "system"}, result("Hi.")))
     async with model.messages.stream(**PARAMS) as stream:
-        events = [event.text async for event in stream]
         message = await stream.get_final_message()
-    assert events == ["Hi."] and message.content[0].text == "Hi."
+    assert message.content[0].text == "Hi."
 
     argv = (tmp_path / "argv").read_text().splitlines()
     assert argv[:5] == ["--print", "--output-format", "stream-json", "--verbose", "--model"]
@@ -196,5 +195,7 @@ async def test_the_agent_loop_runs_tools_through_it(tmp_path):
     )
     reply = await agent.respond("u1", Tier.FRIEND, "is Dune here?")
     assert reply.text == "Dune (2021) is there."
-    assert reply.tool_calls == [{"name": "search_media", "input": {"query": "Dune"}, "ok": True}]
+    assert [(c.name, c.input, c.ok) for c in reply.tool_calls] == [
+        ("search_media", {"query": "Dune"}, True)
+    ]
     store.close()

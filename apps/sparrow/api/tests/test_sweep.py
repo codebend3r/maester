@@ -2,7 +2,6 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from sparrow.agent.limits import KillSwitch
 from sparrow.clients import ClientError
 from sparrow.clients.arr import QueueItem
 from sparrow.config import Settings
@@ -25,7 +24,7 @@ def queued(qid, download_id, left, *, status="downloading", tracked="ok", episod
 
 @pytest.fixture
 def sweeper(services, store):
-    return Sweeper(services, store, Settings(), KillSwitch(store))
+    return Sweeper(services, store, Settings())
 
 
 def age(store, host, kind, download_id, hours):
@@ -121,25 +120,6 @@ async def test_a_title_that_stalls_again_is_surfaced_once_instead(sweeper, servi
     )
     assert "left in Radarr's queue for you" in post.text and radarr.removed == []
     assert await sweeper() == []  # surfaced once, not every sweep
-
-
-async def test_the_kill_switch_holds_removals_and_maintenance_pauses_the_sweep(
-    sweeper, services, store
-):
-    radarr = services.radarr["meleys"]
-    radarr.queue_items = [queued(1, "nzo_a", 6 * GB, tracked="warning")]
-    await sweeper()
-    age(store, "meleys", "movie", "nzo_a", hours=7)
-    sweeper.kill_switch.on("bad grabs")
-    await sweeper()
-    assert radarr.removed == [] and store.watched("meleys", "movie")["nzo_a"].acted_at is None
-    sweeper.kill_switch.off()
-    store.raise_flag("maintenance", "restarting the stack")
-    await sweeper()
-    assert radarr.removed == []
-    store.lower_flag("maintenance")
-    await sweeper()
-    assert radarr.removed == [1]
 
 
 async def test_an_arr_that_cant_answer_is_skipped_and_the_rest_still_swept(

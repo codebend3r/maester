@@ -19,7 +19,7 @@ def test_build_wires_everything_with_injected_pieces():
         cfg, services=SimpleNamespace(), model_client=object(), tools=ToolRegistry(), store=store
     )
     assert app.agent.model == "claude-sonnet-5-5" and app.agent.effort == "medium"
-    assert app.console.chat is app.chat and not hasattr(app, "bot")
+    assert app.console.store is app.store and not hasattr(app, "bot")
     assert app.web.title == "sparrow"
     # Mounted and gated: without the secret, Seerr's route refuses rather than 404s.
     assert TestClient(app.web).post("/webhooks/seerr", json={}).status_code == 401

@@ -58,7 +58,8 @@ def test_a_turn_streams_from_the_fake_model(client):
     assert sandbox.chat.chat is sandbox.world.chat is not first
     r = web.post("/api/chat", json={"text": "can you get Dune?"})
     blocks = [b.splitlines() for b in r.text.strip().split("\n\n")]
-    assert blocks[0] == ["event: text", f"data: {json.dumps({'text': '(fake reply)'})}"]
+    assert blocks[0][0] == "event: text"
+    assert json.loads(blocks[0][1].removeprefix("data: ")) == {"text": "(fake reply)"}
     assert blocks[-1][0] == "event: done"
 
 

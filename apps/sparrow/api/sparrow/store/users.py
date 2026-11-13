@@ -62,15 +62,17 @@ class Users(Database):
         unknown = set(fields) - _FIELDS
         if unknown:
             raise ValueError(f"unknown user fields: {sorted(unknown)}")
+        assignments = "".join(f", {k} = ?" for k in fields)
         with self.transaction() as conn:
             conn.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
-            if fields:
-                assignments = ", ".join(f"{k} = ?" for k in fields)
-                conn.execute(
-                    f"UPDATE users SET {assignments} WHERE user_id = ?",
-                    (*fields.values(), user_id),
-                )
-        return self.get_user(user_id)  # type: ignore[return-value]
+            row = conn.execute(
+                f"UPDATE users SET user_id = user_id{assignments} WHERE user_id = ? RETURNING *",
+                (*fields.values(), user_id),
+            ).fetchone()
+        user = self._user(row)
+        if user is None:
+            raise LookupError(f"user {user_id} vanished while being saved")
+        return user
 
     def get_user(self, user_id: str) -> UserRow | None:
         with self._lock:

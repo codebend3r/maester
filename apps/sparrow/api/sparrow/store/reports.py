@@ -2,7 +2,7 @@
 
 A report's `decision` is written once, when it is filed. Its `status` only
 moves through `move_report`, a compare-and-set: the move happens only from
-the statuses it names, so two presses can't both escalate one report and a
+the statuses it names, so two presses can't both replace one report and a
 stale read can't undo a newer move. Which moves exist is the playback
 flow's (`sparrow/playback/reports.py`).
 """
@@ -62,11 +62,11 @@ class Reports(Database):
         decision: Decision,
     ) -> ReportRow:
         with self.transaction() as conn:
-            cur = conn.execute(
+            row = conn.execute(
                 "INSERT INTO reports (ts, user_id, kind, title, media_type, tmdb_id, is_4k,"
                 " season, episode, rating_key, host, file_id, file_path, release_group,"
                 " health, diagnosis, description, decision)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
                 (
                     now(),
                     user_id,
@@ -87,8 +87,8 @@ class Reports(Database):
                     description,
                     decision,
                 ),
-            )
-            return self.get_report(int(cur.lastrowid))  # type: ignore[return-value]
+            ).fetchone()
+        return self._report(row)
 
     def get_report(self, report_id: int) -> ReportRow | None:
         with self._lock:
@@ -98,10 +98,13 @@ class Reports(Database):
     def set_report_issue(self, report_id: int, seerr_issue_id: int) -> ReportRow:
         """The Seerr issue a report opened."""
         with self.transaction() as conn:
-            conn.execute(
-                "UPDATE reports SET seerr_issue_id = ? WHERE id = ?", (seerr_issue_id, report_id)
-            )
-            return self.get_report(report_id)  # type: ignore[return-value]
+            row = conn.execute(
+                "UPDATE reports SET seerr_issue_id = ? WHERE id = ? RETURNING *",
+                (seerr_issue_id, report_id),
+            ).fetchone()
+        if row is None:
+            raise LookupError(f"no report {report_id}")
+        return self._report(row)
 
     def move_report(
         self, report_id: int, from_: Iterable[ReportStatus], to: ReportStatus
@@ -111,10 +114,10 @@ class Reports(Database):
         marks = ", ".join("?" for _ in start)
         with self.transaction() as conn:
             moved = conn.execute(
-                f"UPDATE reports SET status = ? WHERE id = ? AND status IN ({marks}) RETURNING id",
+                f"UPDATE reports SET status = ? WHERE id = ? AND status IN ({marks}) RETURNING *",
                 (to, report_id, *start),
             ).fetchone()
-            return self.get_report(report_id) if moved else None
+        return self._report(moved) if moved else None
 
     def reports_for_file(self, host: str, media_type: str, file_id: int) -> list[ReportRow]:
         """Every report about one file, oldest first: the evidence a replacement needs."""
@@ -140,10 +143,10 @@ class Reports(Database):
         with self.transaction() as conn:
             changed = conn.execute(
                 "UPDATE reports SET resolved_at = ?"
-                " WHERE seerr_issue_id = ? AND (resolved_at IS NULL) = ? RETURNING id",
+                " WHERE seerr_issue_id = ? AND (resolved_at IS NULL) = ? RETURNING *",
                 (now() if resolved else None, seerr_issue_id, int(resolved)),
             ).fetchall()
-            return [self.get_report(r["id"]) for r in changed]  # type: ignore[misc]
+        return [self._report(r) for r in changed]
 
     @staticmethod
     def _report(r: sqlite3.Row) -> ReportRow:

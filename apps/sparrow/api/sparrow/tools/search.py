@@ -14,7 +14,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from sparrow.agent.tools import Choice, Choices, Tier, ToolContext, tool
+from sparrow.agent.tools import Choice, Ok, Tier, ToolContext, offer, tool
 from sparrow.clients.seerr import MediaStatus, SearchResult
 from sparrow.media import MediaType
 
@@ -61,7 +61,6 @@ def as_choice(result: SearchResult) -> Choice:
         label=result.title,
         value=f"{result.media_type}:{result.tmdb_id}",
         year=result.year,
-        poster_url=result.poster_url,
         detail=f"{kind} · {availability(result)}" + (f"\n{overview}" if overview else ""),
     )
 
@@ -82,7 +81,7 @@ async def search_media(
         MediaType | None, Field(description="Only movies or only shows, when the user said which.")
     ] = None,
     year: Annotated[int | None, Field(description="Release year, when the user gave one.")] = None,
-) -> dict[str, Any] | Choices:
+) -> dict[str, Any] | Ok:
     results = [
         r
         for r in await ctx.services.seerr.search(query)
@@ -93,4 +92,4 @@ async def search_media(
     candidates = plausible(query, results)
     if len(candidates) == 1:
         return {"match": describe(candidates[0])}
-    return Choices([as_choice(r) for r in candidates[:SEARCH_PICKS]])
+    return offer([as_choice(r) for r in candidates[:SEARCH_PICKS]])

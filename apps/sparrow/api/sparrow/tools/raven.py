@@ -7,8 +7,8 @@ everyone credited on its titles with their TMDB filmography, answer "what's
 the latest with Bob Odenkirk?" and "which of Nolan's films do we have?".
 Each match is one library's copy (Movies, 4K Movies, TV Shows...), with its
 quality and a raven_link that opens that library's page for it. The chat
-shows each matched title once beside the reply, as its logo with a link to
-every library's copy.
+shows each matched title once beside the reply, with a link to every
+library's copy.
 """
 
 from __future__ import annotations
@@ -21,9 +21,9 @@ from pydantic import Field
 
 from sparrow.agent.tools import (
     Failed,
+    Ok,
     Refused,
     Result,
-    Shown,
     Tier,
     Title,
     TitleLink,
@@ -85,7 +85,6 @@ def shown_titles(found: list[RavenTitle], base_url: str) -> tuple[Title, ...]:
             key=f"raven:{kind}:{item_id}",
             title=held[0].title,
             year=held[0].year,
-            logo_url=held[0].logo_url(base_url),
             links=tuple(TitleLink(copy_label(c), c.link(base_url) or base_url) for c in held),
         )
         for (kind, item_id), held in copies.items()
@@ -105,7 +104,7 @@ def shown_titles(found: list[RavenTitle], base_url: str) -> tuple[Title, ...]:
 async def search_library(
     ctx: ToolContext,
     title: Annotated[str, Field(description="The title, or a word from it.", min_length=1)],
-) -> Shown | Result:
+) -> Result:
     raven = ctx.services.raven
     if raven is None:
         return Refused("raven isn't set up on this server (RAVEN_URL).")
@@ -139,7 +138,7 @@ async def search_library(
         reply["note"] = f"{len(found) - MAX_MATCHES} more matches left out; search more narrowly."
     exact = [t for t in found if closeness(t, title) == 0]
     cards = shown_titles(exact or found[:MAX_MATCHES], raven.base_url)
-    return Shown(reply, cards if exact else cards[:MAX_CARDS])
+    return Ok(reply, titles=cards if exact else cards[:MAX_CARDS])
 
 
 def unreachable(base_url: str, detail: str, name: str) -> Failed:
@@ -178,7 +177,7 @@ async def newest_in_library(
     count: Annotated[
         int, Field(description="How many titles to list.", ge=1, le=MAX_NEWEST)
     ] = NEWEST_COUNT,
-) -> Shown | Result:
+) -> Result:
     raven = ctx.services.raven
     if raven is None:
         return Refused("raven isn't set up on this server (RAVEN_URL).")
@@ -203,7 +202,7 @@ async def newest_in_library(
     if not titles:
         reply["note"] = f"raven has no released {kind}s with a release date."
     shown = [copy for held in newest for copy in held]
-    return Shown(reply, shown_titles(shown, raven.base_url))
+    return Ok(reply, titles=shown_titles(shown, raven.base_url))
 
 
 def _counts(work: Work, job: Department | None) -> bool:
@@ -236,7 +235,6 @@ def _held_title(work: Work, base_url: str) -> Title:
         key=f"raven:{work.kind}:{work.item_id}",
         title=work.title,
         year=work.year,
-        logo_url=work.logo_url(base_url),
         links=(TitleLink("raven", link),),
     )
 
@@ -270,14 +268,14 @@ async def search_people(
     count: Annotated[
         int, Field(description="How many of their latest titles to list.", ge=1, le=MAX_NEWEST)
     ] = NEWEST_COUNT,
-) -> Shown | Result:
+) -> Result:
     raven = ctx.services.raven
     if raven is None:
         return Refused("raven isn't set up on this server (RAVEN_URL).")
     try:
         matches = await raven.people(name)
         if not matches:
-            return Shown(
+            return Ok(
                 {
                     "query": name,
                     "people": [],
@@ -286,8 +284,7 @@ async def search_people(
                         "raven knows nothing of their work. Check the spelling (accents "
                         "count); otherwise say none of their titles are on the server."
                     ),
-                },
-                (),
+                }
             )
         person = await _read_person(raven, matches[0].id)
     except ClientError as exc:
@@ -324,4 +321,4 @@ async def search_people(
             notes.append("Several people match; if they may have meant another, ask which.")
     if notes:
         reply["note"] = " ".join(notes)
-    return Shown(reply, tuple(_held_title(w, raven.base_url) for w in held[:MAX_CARDS]))
+    return Ok(reply, titles=tuple(_held_title(w, raven.base_url) for w in held[:MAX_CARDS]))

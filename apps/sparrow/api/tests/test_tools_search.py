@@ -1,4 +1,4 @@
-from sparrow.agent.tools import Choices
+from sparrow.agent.tools import Ok
 from sparrow.clients.seerr import MediaStatus, SearchResult
 from sparrow.tools.search import SEARCH_PICKS, search_media
 
@@ -19,17 +19,16 @@ async def test_several_exact_matches_become_a_labeled_picker(ctx):
         result(90228, "Dune", 2000, media_type="tv"),
     ]
     out = await search_media(ctx, "dune")
-    assert isinstance(out, Choices)
-    assert [(c.label, c.value, c.year) for c in out.items] == [
+    assert isinstance(out, Ok) and out.choices
+    assert [(c.label, c.value, c.year) for c in out.choices] == [
         ("Dune", "movie:438631", 2021),
         ("Dune", "movie:841", 1984),
         ("Dune", "tv:90228", 2000),
     ]
-    assert out.items[0].detail.startswith("Movie · on the server")
-    assert out.items[1].detail.startswith("Movie · requested, waiting for approval")
-    assert out.items[2].detail.startswith("TV show · not on the server")
-    assert out.items[0].poster_url == "https://image.tmdb.org/t/p/w185/p.jpg"
-    assert "About Dune" in out.as_content()["choices"][0]["detail"]
+    assert out.choices[0].detail.startswith("Movie · on the server")
+    assert out.choices[1].detail.startswith("Movie · requested, waiting for approval")
+    assert out.choices[2].detail.startswith("TV show · not on the server")
+    assert "About Dune" in out.content["choices"][0]["detail"]
 
 
 async def test_one_plausible_match_comes_back_as_data(ctx):
@@ -49,7 +48,7 @@ async def test_one_plausible_match_comes_back_as_data(ctx):
 async def test_no_exact_match_offers_what_search_found(ctx):
     ctx.services.seerr.results = [result(i, f"Heist {i}", 2000 + i) for i in range(8)]
     out = await search_media(ctx, "heist")
-    assert isinstance(out, Choices) and len(out.items) == SEARCH_PICKS
+    assert isinstance(out, Ok) and out.choices and len(out.choices) == SEARCH_PICKS
 
 
 async def test_filters_and_nothing_found(ctx):

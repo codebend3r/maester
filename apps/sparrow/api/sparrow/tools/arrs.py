@@ -13,25 +13,22 @@ Whatever the arr's own UI shows, the admin can ask sparrow instead, on any host:
   its letter folder ("Late Quartet, A (2012)" to `/Meleys/Movies/L`), and
   the arr moves their files. Destructive: the admin presses Confirm first.
 
-A saved custom filter is read the way the UI reads it: every rule must hold,
-each one checked against the title's record (its `statistics` included, for
-Sonarr's and Lidarr's sizes). A rule this can't read (a date window, a field
-the record lacks) is refused, never guessed.
+A saved custom filter is read the way the UI reads it (`arr_filters.py`).
 """
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
 from sparrow.agent.tools import Failed, Ok, Refused, Result, Tier, ToolContext, tool
 from sparrow.clients import ClientError
-from sparrow.clients.arr_library import ArrLibrary, ArrService, ArrTitle, CustomFilter, HistoryRow
+from sparrow.clients.arr_library import ArrLibrary, ArrService, ArrTitle, HistoryRow
 from sparrow.clients.base import Answers, every_host
+from sparrow.tools.arr_filters import Pick, UnreadableRule, rule_text, text_of
 
 GIB = 2**30
 TITLES_SHOWN = 50
@@ -99,117 +96,6 @@ EVENTS: dict[Event, frozenset[str]] = {
 }
 
 
-class UnreadableRule(ValueError):
-    """A custom filter rule this can't apply the way the arr's UI would."""
-
-
-def _view(record: dict[str, Any]) -> dict[str, Any]:
-    return {**(record.get("statistics") or {}), **record}
-
-
-def _number(value: Any, rule: dict[str, Any]) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        raise UnreadableRule(f"{rule} compares {value!r} as a number") from None
-
-
-def _text(value: Any) -> str:
-    return str(value).lower()
-
-
-def _same(actual: Any, wanted: Any) -> bool:
-    if isinstance(actual, bool):
-        return actual == (wanted is True or _text(wanted) == "true")
-    if isinstance(actual, int | float) and not isinstance(wanted, bool):
-        try:
-            return float(actual) == float(wanted)
-        except (TypeError, ValueError):
-            return False
-    return _text(actual) == _text(wanted)
-
-
-def _test(rule: dict[str, Any], kind: str) -> Callable[[Any, Any], bool]:
-    tests: dict[str, Callable[[Any, Any], bool]] = {
-        "equal": _same,
-        "contains": lambda a, v: _text(v) in _text(a),
-        "startsWith": lambda a, v: _text(a).startswith(_text(v)),
-        "endsWith": lambda a, v: _text(a).endswith(_text(v)),
-        "lessThan": lambda a, v: _number(a, rule) < _number(v, rule),
-        "lessThanOrEqual": lambda a, v: _number(a, rule) <= _number(v, rule),
-        "greaterThan": lambda a, v: _number(a, rule) > _number(v, rule),
-        "greaterThanOrEqual": lambda a, v: _number(a, rule) >= _number(v, rule),
-    }
-    if kind not in tests:
-        raise UnreadableRule(f"{rule} is a {kind!r} rule, which sparrow can't apply")
-    return tests[kind]
-
-
-NEGATED = {
-    "notEqual": "equal",
-    "notContains": "contains",
-    "notStartsWith": "startsWith",
-    "notEndsWith": "endsWith",
-}
-
-
-def holds(rule: dict[str, Any], record: dict[str, Any]) -> bool:
-    """Whether a title's record passes one rule: any of the rule's values matching any of
-    the field's (a list field such as tags has several), or none, for a negated rule."""
-    view = _view(record)
-    key = rule.get("key") or ""
-    if key not in view:
-        raise UnreadableRule(f"{rule} reads {key!r}, which these records don't have")
-    actual = view[key]
-    values = rule.get("value")
-    kind = rule.get("type") or ""
-    test = _test(rule, NEGATED.get(kind, kind))
-    hit = any(
-        test(a, v)
-        for a in (actual if isinstance(actual, list) else [actual])
-        for v in (values if isinstance(values, list) else [values])
-    )
-    return not hit if kind in NEGATED else hit
-
-
-def rule_text(rule: dict[str, Any]) -> str:
-    """A rule as the admin would say it: "path contains /Meleys/Movies/Requests/"."""
-    values = rule.get("value")
-    shown = ", ".join(map(str, values)) if isinstance(values, list) else str(values)
-    return f"{rule.get('key')} {rule.get('type')} {shown}"
-
-
-@dataclass(frozen=True)
-class Pick:
-    """Which titles: every one of these that is set must hold."""
-
-    custom_filter: str = ""
-    title: str = ""
-    path: str = ""
-
-    def chosen(self, titles: list[ArrTitle], filters: tuple[CustomFilter, ...]) -> list[ArrTitle]:
-        """The titles picked; `LookupError` for a filter the arr hasn't, `UnreadableRule` for
-        one that can't be applied."""
-        rules: tuple[dict[str, Any], ...] = ()
-        if self.custom_filter:
-            saved = next(
-                (f for f in filters if _text(f.label) == _text(self.custom_filter.strip())), None
-            )
-            if saved is None:
-                raise LookupError(
-                    f"no custom filter called {self.custom_filter!r}; the saved ones are "
-                    + ", ".join(f.label for f in filters)
-                )
-            rules = saved.rules
-        return [
-            t
-            for t in titles
-            if all(holds(rule, t.raw) for rule in rules)
-            and _text(self.title.strip()) in _text(t.title)
-            and _text(self.path.strip()) in _text(t.path)
-        ]
-
-
 def _hosts(ctx: ToolContext, service: ArrService, host: str) -> dict[str, ArrLibrary] | Refused:
     configured = ctx.services.arr_libraries.get(service) or {}
     if not configured:
@@ -267,7 +153,7 @@ MONITORED: dict[Monitored, Callable[[ArrTitle], bool]] = {
 }
 # Each sort's key, and whether it runs newest or biggest first.
 SORTS: dict[Sort, tuple[Callable[[ArrTitle], Any], bool]] = {
-    "title": (lambda t: _text(t.title), False),
+    "title": (lambda t: text_of(t.title), False),
     "added": (lambda t: t.added or "", True),
     "release": (lambda t: t.release or "", True),
     "year": (lambda t: t.year or 0, True),

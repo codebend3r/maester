@@ -22,6 +22,7 @@ from sparrow.evals import (
     run_case_and_close,
     summary_bar,
 )
+from sparrow.evals.seed import Seed
 from sparrow.evals.world import EVAL_USER, build_services, build_world
 from sparrow.memo import Memo
 from sparrow.store import Store
@@ -39,7 +40,7 @@ def test_all_case_files_load():
 
 def test_world_seeds_fake_seerr():
     services = build_services(
-        {"seerr": {"results": [{"tmdb_id": 1, "title": "Dune", "year": 2021}]}}
+        Seed.model_validate({"seerr": {"results": [{"tmdb_id": 1, "title": "Dune", "year": 2021}]}})
     )
     assert services.seerr.results[0].title == "Dune"
     assert set(services.sonarr) == {"meleys", "vermithor"}
@@ -133,7 +134,7 @@ async def test_case_worlds_answer_the_tools_their_cases_expect(case_file, call):
         settings=Settings(),
     )
     reply = await agent.respond(EVAL_USER, case.tier, case.turns[0].user)
-    assert reply.tool_calls == [{"name": call[0], "input": call[1], "ok": True}]
+    assert [(c.name, c.input, c.ok) for c in reply.tool_calls] == [(call[0], call[1], True)]
     store.close()
 
 

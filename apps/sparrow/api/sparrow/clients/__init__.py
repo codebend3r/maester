@@ -7,7 +7,7 @@ the same methods over in-memory data, so tools and evals run without a stack.
 `Services` is the bag of clients the app hands every tool, real or fake;
 `probe` reads the media files themselves, with ffprobe on the read-only mount.
 `speedtest` measures the internet connection from the container's own host.
-`plextv` reads and changes friends' library shares as the server owner.
+`plextv` says who owns the server, so the owner is the admin.
 `raven` is the suite's own library, searched the way friends browse it.
 `arr_libraries` is each Radarr, Sonarr and Lidarr as a whole, by service and host,
 for the admin's questions about them and the moves they ask for.

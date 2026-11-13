@@ -3,21 +3,12 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from sparrow.agent.tools import (
-    Approval,
-    Choice,
-    Choices,
-    NeedsApproval,
-    Shown,
-    Tier,
-    Title,
-    TitleLink,
-    ToolRegistry,
-)
+from sparrow.agent.tools import Choice, Ok, Title, TitleLink, ToolRegistry, offer
 from sparrow.app import build
 from sparrow.clients import FakeRookery
 from sparrow.clients.seerr import SeerrUser
 from sparrow.config import load_settings
+from sparrow.notify import AdminPost, DirectMessage
 from sparrow.web import create_app
 from sparrow.web.auth import COOKIE, Auth, SessionVerifier
 from sparrow.web.chat import ChatApi
@@ -50,26 +41,22 @@ def chat(services, store):
 
     @reg.tool("search_media", "search")
     async def search(ctx, query: str = ""):
-        return Choices([Choice("Dune", "438631", 2021), Choice("Dune", "841", 1984)])
+        return offer([Choice("Dune", "438631", 2021), Choice("Dune", "841", 1984)])
 
     @reg.tool("find_title", "find a title to show")
     async def find_title(ctx, query: str = ""):
-        dune = Title("raven:movie:277", "Dune", 2021, "http://raven.test/logo", (
+        dune = Title("raven:movie:277", "Dune", 2021, (
             TitleLink("4K Movies 4K", "http://raven.test/movies/277?library=4"),))  # fmt: skip
-        return Shown({"found": "Dune"}, (dune,))
+        return Ok({"found": "Dune"}, titles=(dune,))
 
     @reg.tool("replace_media", "replace", destructive=True)
     async def replace(ctx, file_id: int = 0):
         return f"replaced file {file_id}"
 
-    @reg.tool("request_media_4k", "4K")
-    async def request_4k(ctx, tmdb_id: int = 0):
-        approval = Approval("Dany wants Dune in 4K", "4k 438631", decide_4k, {"tmdb_id": tmdb_id})
-        return NeedsApproval("waiting on the admin", approval)
-
-    @reg.tool("decide_4k", "the admin's 4K decision", tier=Tier.ADMIN, button_only=True)
-    async def decide_4k(ctx, tmdb_id: int = 0, approved: bool = False):
-        return "approved" if approved else "denied"
+    @reg.tool("report_problem", "tells the admin and the requester")
+    async def report(ctx, tmdb_id: int = 0):
+        notices = (AdminPost("Dany reports Dune"), DirectMessage("d1", "noted"))
+        return Ok("reported", notices)
 
     rookery = FakeRookery(sessions={"t-boss": BOSS, "t-dany": DANY, "t-x": STRANGER})
     services.seerr.user_list = [SeerrUser(4, "dany@example.com", "Dany", "dany_t")]
@@ -141,7 +128,6 @@ def test_titles_a_tool_found_are_shown_once_with_the_reply(chat):
                 "key": "raven:movie:277",
                 "title": "Dune",
                 "year": 2021,
-                "logo_url": "http://raven.test/logo",
                 "links": [
                     {"label": "4K Movies 4K", "url": "http://raven.test/movies/277?library=4"}
                 ],
@@ -178,19 +164,17 @@ def test_a_confirmation_is_pressed_through_decide(chat):
 def test_notices_are_delivered_and_shown_with_the_trace(chat):
     make, outbox = chat
     client, _ = make(
-        tool_message([("request_media_4k", {"tmdb_id": 438631})]),
-        text_message("Asked the admin."),
+        tool_message([("report_problem", {"tmdb_id": 438631})]),
+        text_message("Reported."),
         trace=True,
     )
-    notice = dict(events(client.post("/api/chat", json={"text": "dune in 4k"})))["notice"]
-    assert notice["kind"] == "approval" and "4K" in notice["text"]
-    assert [n.pending_id for n in outbox.sent] == [notice["pending_id"]]
-
-    press = {"pending_id": notice["pending_id"], "approve": True}
-    refused = client.post("/api/chat/decide", json=press).json()
-    assert refused["settled"] is False and "admin" in refused["text"]
-    client.cookies.set(COOKIE, "t-boss")
-    assert client.post("/api/chat/decide", json=press).json()["text"] == "approved"
+    shown = [d for name, d in events(client.post("/api/chat", json={"text": "dune is broken"}))
+             if name == "notice"]  # fmt: skip
+    assert shown == [
+        {"kind": "admin_post", "text": "Dany reports Dune", "to": None},
+        {"kind": "direct_message", "text": "noted", "to": "d1"},
+    ]
+    assert outbox.sent == [AdminPost("Dany reports Dune"), DirectMessage("d1", "noted")]
 
 
 def test_a_turn_that_breaks_outside_the_agent_streams_an_error(chat, caplog):
