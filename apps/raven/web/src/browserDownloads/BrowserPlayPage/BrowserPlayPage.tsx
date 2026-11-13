@@ -1,4 +1,3 @@
-import { NO_HOST_EXTRAS, NO_TITLE_EXTRAS } from '@raven/ui/headless'
 import {
   DESKTOP_PATHS,
   DOWNLOAD_STATUS_KINDS,
@@ -13,6 +12,8 @@ import {
   type FileSubtitles,
   type PlayerServices,
   useHostPlayer,
+  NO_HOST_EXTRAS,
+  NO_TITLE_EXTRAS,
 } from '@raven/ui/headless'
 import { type ComponentType, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'

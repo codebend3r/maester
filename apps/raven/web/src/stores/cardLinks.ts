@@ -1,7 +1,6 @@
 import type { AppPath } from '@raven/core'
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
-import { STORE_KEYS } from '@/stores/storage'
+import { devtools } from 'zustand/middleware'
 
 type FollowProps = { to: AppPath; state: unknown }
 
@@ -14,12 +13,5 @@ type CardLinksState = {
 
 /** How every card link in the app follows its address, set by the one `CardLinks` near the root. */
 export const useCardLinks = create<CardLinksState>()(
-  devtools(
-    persist((): CardLinksState => ({ follow: null }), {
-      name: STORE_KEYS.cardLinks,
-      storage: createJSONStorage(() => window.localStorage),
-      partialize: () => ({}),
-    }),
-    { name: 'raven/cardLinks' },
-  ),
+  devtools((): CardLinksState => ({ follow: null }), { name: 'raven/cardLinks' }),
 )

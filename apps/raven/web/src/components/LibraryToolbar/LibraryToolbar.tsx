@@ -18,7 +18,7 @@ import {
   viewsFor,
 } from '@raven/core'
 import { type ReactNode, useId } from 'react'
-import { Button, Icon } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import type { IconName } from '@raven/ui'
 import { PlayButtons } from '@/components/PlayButtons/PlayButtons'
 import { SearchField } from '@/components/SearchField/SearchField'
@@ -47,7 +47,7 @@ const DirectionButtonShown = ({ sort, parts, onChange }: DirectionButtonShownPro
   const labels = SORT_DIRECTION_LABELS[field]
   return (
     <Button
-      tone="ghost"
+      tone={BUTTON_TONES.ghost}
       icon={direction}
       className={styles.direction}
       title={LIBRARY_TOOLBAR_COPY.sortInstead(labels[reversedDirection(direction)])}
@@ -213,7 +213,7 @@ export const LibraryToolbar = ({
           {viewsFor(settings.kind).map((view) => (
             <Button
               key={view}
-              tone="ghost"
+              tone={BUTTON_TONES.ghost}
               icon={VIEW_ICONS[view]}
               className={styles.view}
               aria-label={LIBRARY_VIEW_LABELS[view]}

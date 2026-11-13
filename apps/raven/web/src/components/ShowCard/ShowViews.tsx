@@ -13,6 +13,7 @@ import {
   sortTitle,
   watchedStateOf,
   watchPageOf,
+  showPath,
 } from '@raven/core'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@raven/ui'
@@ -55,7 +56,7 @@ type SmallPosterProps = { entry: ShowEntry; inRow?: boolean }
  */
 const SmallPoster = ({ entry, inRow = false }: SmallPosterProps) => (
   <CardLink
-    to={`/shows/${entry.show.id}`}
+    to={showPath(entry.show.id)}
     className={inRow ? `${styles.frame} ${styles.rowFrame}` : styles.frame}
     tabIndex={-1}
     aria-hidden="true"
@@ -122,7 +123,7 @@ const ShowRow = ({ entry }: ShowRowProps) => {
           <SelectCheckbox select={select} />
           <SmallPoster entry={entry} inRow />
           <CardLink
-            to={`/shows/${entry.show.id}`}
+            to={showPath(entry.show.id)}
             className={styles.title}
             tabIndex={select.linkTabIndex}
           >
@@ -225,7 +226,7 @@ const ShowTile = ({ entry, sort }: ShowTileProps) => {
       <SmallPoster entry={entry} />
       <div className={styles.body}>
         <CardLink
-          to={`/shows/${entry.show.id}`}
+          to={showPath(entry.show.id)}
           className={styles.title}
           tabIndex={select.linkTabIndex}
         >

@@ -23,6 +23,7 @@ import { POSTER_SIZES } from '@/lib/posters'
 import { homeSearchQuery, librariesQuery } from '@/lib/queries'
 import { useAddressSearch } from '@/lib/useSearch'
 import styles from '@/components/SiteSearch/SiteSearch.module.scss'
+import { handled } from '@/lib/handled'
 
 /** How many letters, spaces aside, the box waits for before it suggests. */
 const SUGGEST_AFTER_LETTERS = 3
@@ -190,7 +191,7 @@ export const SiteSearch = ({ className }: SiteSearchProps) => {
     { kind: ROW_KINDS.all },
   ]
   const isShown = isFocused && asked !== '' && dismissed === null
-  const picked = pick?.asked === asked ? pick.index : null
+  const picked = pick != null && pick.asked === asked ? pick.index : null
   const note = noteOf({ isPending: results.isPending, count: found.length })
 
   const dismiss = () => {
@@ -204,7 +205,7 @@ export const SiteSearch = ({ className }: SiteSearchProps) => {
       search.searchNow()
       return
     }
-    void navigate(row.suggestion.to, { state: row.suggestion.state })
+    handled(Promise.resolve(navigate(row.suggestion.to, { state: row.suggestion.state })))
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {

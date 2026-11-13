@@ -1,7 +1,5 @@
 import { COMMON_COPY } from '@/lib/copy'
 
-export const DESIGN_PATH = '/design'
-
 export const DESIGN_COPY = {
   page: {
     eyebrow: 'Design system',

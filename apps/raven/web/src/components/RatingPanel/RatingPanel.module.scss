@@ -144,7 +144,7 @@
   border-radius: var(--radius-md);
 
   .item {
-    gap: 2px;
+    gap: var(--space-hair);
     padding: var(--space-0) var(--space-2);
   }
 
@@ -216,8 +216,8 @@
   display: grid;
   grid-auto-flow: column;
   align-items: baseline;
-  gap: 1px;
-  padding: 2px 0 2px var(--space-0);
+  gap: var(--space-px);
+  padding: var(--space-hair) 0 var(--space-hair) var(--space-0);
 }
 
 .badgeValue {
@@ -391,7 +391,7 @@
     'site score'
     'track track';
   align-items: baseline;
-  gap: 2px var(--space-3);
+  gap: var(--space-hair) var(--space-3);
 }
 
 .popoverSite {
@@ -409,7 +409,7 @@
   display: grid;
   grid-auto-flow: column;
   align-items: baseline;
-  gap: 1px;
+  gap: var(--space-px);
 }
 
 .popoverTrack {

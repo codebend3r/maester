@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { ItemHeader } from '@/components/ItemHeader/ItemHeader'
+import { ItemHeader, ITEM_HEADER_VARIANTS } from '@/components/ItemHeader/ItemHeader'
 import styles from '@/components/ItemHeader/ItemHeader.module.scss'
 
-const header = (logo: string | null, pullUp = false) => (
+const header = (logo: string | null, isPulledUp = false) => (
   <MemoryRouter>
     <ItemHeader
       titleId="title"
@@ -15,7 +15,7 @@ const header = (logo: string | null, pullUp = false) => (
       ratings={[]}
       backdrop={null}
       logo={logo}
-      pullUp={pullUp}
+      variant={isPulledUp ? ITEM_HEADER_VARIANTS.pulledUp : ITEM_HEADER_VARIANTS.standard}
       back={{ to: '/libraries/4', label: '4k Movies' }}
     />
   </MemoryRouter>

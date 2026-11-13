@@ -1,5 +1,5 @@
 import { KEYS } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { type KeyboardEvent, useId, useState } from 'react'
 import { DOWNLOAD_BUTTON_COPY } from '@/components/DownloadButton/copy'
 import { COMMON_COPY } from '@/lib/copy'
@@ -47,7 +47,7 @@ export const UnsupportedDownloadButton = () => {
         <span id={ids.note} className={styles.note} role="note" aria-labelledby={ids.title}>
           <strong id={ids.title}>{DOWNLOAD_BUTTON_COPY.dolbyVision.title}</strong>
           <span>{DOWNLOAD_BUTTON_COPY.dolbyVision.why}</span>
-          <Button tone="ghost" onClick={close} onKeyDown={onKeyDown}>
+          <Button tone={BUTTON_TONES.ghost} onClick={close} onKeyDown={onKeyDown}>
             {DOWNLOAD_BUTTON_COPY.dolbyVision.dismiss}
           </Button>
         </span>

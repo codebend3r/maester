@@ -4,13 +4,14 @@ import {
   MATCH_STATES,
   type MediaItem,
   type ShowListing,
-  METADATA_SERVICE_STATES,
   THUMBNAIL_STATES,
   listsShows,
   matchTypeFor,
 } from '@raven/core'
-import { mediaListQuery, metadataHealthQuery, showListQuery } from '@/lib/queries'
-import { LISTING_STATES, type Listing, type ListingState } from '@/pages/LibraryPage/libraryShape'
+import { mediaListQuery, showListQuery } from '@/lib/queries'
+import { useCanMatch } from '@/lib/useCanMatch'
+import type { QueryRead } from '@raven/ui/headless'
+import type { Listing } from '@/pages/LibraryPage/libraryShape'
 import { seasonsOf } from '@/pages/LibraryPage/seasons'
 import { SHOW_LEVELS, type ShowLevel } from '@/lib/showLevels'
 import { POLL_MS, anyPending, useMatchingPassDone } from '@/pages/LibraryPage/useMatchingPassDone'
@@ -41,7 +42,7 @@ type UseLibraryListingProps = {
   level: ShowLevel
   search: string
   seed: number
-  scanning: boolean
+  isScanning: boolean
 }
 
 /**
@@ -56,17 +57,13 @@ export const useLibraryListing = ({
   level: chosen,
   search,
   seed,
-  scanning,
-}: UseLibraryListingProps): ListingState => {
+  isScanning,
+}: UseLibraryListingProps): QueryRead<Listing> => {
   const level = listsShows(settings.kind) ? chosen : SHOW_LEVELS.episodes
   const readsShows = level !== SHOW_LEVELS.episodes
   const readsFiles = level !== SHOW_LEVELS.shows
   // Files only leave pending while TMDB answers; without it they wait for good.
-  const metadata = useQuery({
-    ...metadataHealthQuery,
-    enabled: matchTypeFor(settings.kind) != null,
-  })
-  const canMatch = metadata.data?.tmdb === METADATA_SERVICE_STATES.ok
+  const canMatch = useCanMatch({ isEnabled: matchTypeFor(settings.kind) != null })
   const listing = { libraryId, search, sort: settings.sort, seed }
   // Seasons go by their shows' search and order, so their episodes are read whole.
   const fileListing = level === SHOW_LEVELS.seasons ? { ...listing, search: '' } : listing
@@ -75,13 +72,13 @@ export const useLibraryListing = ({
     ...showListQuery(listing),
     enabled: readsShows,
     refetchInterval: (current) =>
-      scanning || (canMatch && anyPending(current.state.data?.unmatched ?? [])) ? POLL_MS : false,
+      isScanning || (canMatch && anyPending(current.state.data?.unmatched ?? [])) ? POLL_MS : false,
   })
   const files = useQuery({
     ...mediaListQuery(fileListing),
     enabled: readsFiles,
     refetchInterval: (current) =>
-      scanning ||
+      isScanning ||
       (current.state.data ?? []).some(
         (item) =>
           item.thumbnail === THUMBNAIL_STATES.pending ||
@@ -96,11 +93,11 @@ export const useLibraryListing = ({
   useMatchingPassDone({ libraryId, files: listed?.files ?? [] })
 
   // A failed read again keeps what was read before.
-  if (listed) return { state: LISTING_STATES.listed, ...listed }
+  if (listed) return { isError: false, isPending: false, data: listed }
   // Only a read this level makes can fail it; another level's may hold an old failure.
   const error = [readsShows && shows.error, readsFiles && files.error].find(
     (failure) => failure instanceof Error,
   )
-  if (error) return { state: LISTING_STATES.failed, error }
-  return { state: LISTING_STATES.pending }
+  if (error) return { isError: true, error }
+  return { isError: false, isPending: true }
 }

@@ -8,6 +8,7 @@ import styles from '@/components/PinPadDialog/PinPadDialog.module.scss'
 import { api } from '@/lib/api'
 import { COMMON_COPY } from '@/lib/copy'
 import { useModal } from '@/lib/useModal'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 /** The pad's three rows of digits; zero sits under them, between Backspace and Unlock. */
 const PAD_ROW_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const
@@ -37,7 +38,7 @@ type PinPadDialogProps = { onClose: () => void }
  * opens, it closes and every page reads again with the unlock.
  */
 export const PinPadDialog = ({ onClose }: PinPadDialogProps) => {
-  const { dialog, close, keepKeys } = useModal()
+  const { dialog, keepKeys, close } = useModal()
   const titleId = useId()
   const queryClient = useQueryClient()
   const [pin, setPin] = useState('')
@@ -79,10 +80,10 @@ export const PinPadDialog = ({ onClose }: PinPadDialogProps) => {
   }
 
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={titleId}
+    <DialogFrame
+      dialog={dialog}
+      width={DIALOG_WIDTHS.narrow}
+      labelledBy={titleId}
       onClose={onClose}
       onKeyDown={pressKey}
     >
@@ -130,6 +131,6 @@ export const PinPadDialog = ({ onClose }: PinPadDialogProps) => {
           <Button onClick={close}>{COMMON_COPY.cancel}</Button>
         </div>
       </div>
-    </dialog>
+    </DialogFrame>
   )
 }

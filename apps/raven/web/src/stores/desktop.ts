@@ -1,7 +1,6 @@
 import { COMPUTER_NAMES, DESKTOP_PLATFORMS } from '@raven/core'
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
-import { STORE_KEYS } from '@/stores/storage'
+import { devtools } from 'zustand/middleware'
 import type { DesktopClient } from '@/desktop/client'
 import type { MenuHub } from '@/desktop/menuHub'
 import type { AudioConnections } from '@/desktop/audioConnection'
@@ -22,14 +21,7 @@ type DesktopBridge = {
 
 /** The page's bridge to Raven, which only the desktop app's own page has. */
 export const useDesktopBridge = create<DesktopBridge>()(
-  devtools(
-    persist((): DesktopBridge => ({ desktop: null }), {
-      name: STORE_KEYS.desktop,
-      storage: createJSONStorage(() => window.localStorage),
-      partialize: () => ({}),
-    }),
-    { name: 'raven/desktop' },
-  ),
+  devtools((): DesktopBridge => ({ desktop: null }), { name: 'raven/desktop' }),
 )
 
 /** Whether the page runs inside Raven. */

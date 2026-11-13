@@ -19,6 +19,7 @@ import { useModal } from '@/lib/useModal'
 import { FIX_MATCH_DIALOG_COPY } from '@/components/FixMatchDialog/copy'
 import styles from '@/components/FixMatchDialog/FixMatchDialog.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 const NOT_A = FIX_MATCH_DIALOG_COPY.notA satisfies Record<MatchItemType, string>
 
@@ -142,7 +143,7 @@ export const FixMatchDialog = <T,>({
   onClose,
   onMatched,
 }: FixMatchDialogProps<T>) => {
-  const { dialog } = useModal()
+  const { dialog, keepKeys } = useModal()
   const ids = { title: useId(), note: useId(), query: useId(), year: useId(), results: useId() }
   const queryClient = useQueryClient()
   // The year is half the search, so it settles as the title does.
@@ -178,11 +179,12 @@ export const FixMatchDialog = <T,>({
   }
 
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={ids.title}
-      aria-describedby={aiMatch ? ids.note : undefined}
+    <DialogFrame
+      dialog={dialog}
+      onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.wideForm}
+      labelledBy={ids.title}
+      describedBy={aiMatch ? ids.note : undefined}
       onClose={onClose}
     >
       <div className={styles.body}>
@@ -270,6 +272,6 @@ export const FixMatchDialog = <T,>({
           {COMMON_COPY.cancel}
         </Button>
       </footer>
-    </dialog>
+    </DialogFrame>
   )
 }

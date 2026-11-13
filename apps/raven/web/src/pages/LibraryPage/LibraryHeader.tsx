@@ -10,6 +10,7 @@ import { api } from '@/lib/api'
 import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { APP_PATHS } from '@/lib/appPaths'
 
 const count = new Intl.NumberFormat()
 
@@ -39,7 +40,7 @@ export const LibraryHeader = ({ titleId, library, actions, isShut }: LibraryHead
   return (
     <header className={styles.header}>
       <BackButton
-        fallback={{ to: '/libraries', label: COMMON_COPY.libraries }}
+        fallback={{ to: APP_PATHS.libraries, label: COMMON_COPY.libraries }}
         className={styles.back}
       />
       <div className={styles.heading}>

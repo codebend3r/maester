@@ -12,13 +12,13 @@ import {
 import { queryKeys } from '@raven/ui/headless'
 import { AppRoutes } from '@/AppRoutes'
 import { api } from '@/lib/api'
-import { comingSoonShelfPath } from '@/pages/ComingSoonPage/copy'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { fakeAuthClient, readyConfig } from '@/test/authClient'
 import { asDesktop, downloadsMain, sentOfType } from '@/test/desktop'
 import { albumDetails, musicLibrary } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 import { useServerReach } from '@/stores/serverReach'
+import { comingSoonShelfPath } from '@/lib/appPaths'
 
 describe('AppRoutes signed out', () => {
   const fetch = spyOn(window, 'fetch')

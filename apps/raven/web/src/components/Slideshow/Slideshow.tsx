@@ -1,6 +1,7 @@
 import type { SlideshowMotion } from '@raven/core'
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import styles from '@/components/Slideshow/Slideshow.module.scss'
+import { useAsksForLessMotion } from '@/lib/motion'
 
 /** How long each picture holds before the next comes in; the stylesheet reads it as `--slide-ms`. */
 export const SLIDE_MS = 8000
@@ -52,14 +53,6 @@ export const slideRoles = <T,>({
   })
 }
 
-export const LESS_MOTION = '(prefers-reduced-motion: reduce)'
-
-const followLessMotion = (onChange: () => void) => {
-  const query = window.matchMedia(LESS_MOTION)
-  query.addEventListener('change', onChange)
-  return () => query.removeEventListener('change', onChange)
-}
-
 /**
  * Counts the changes of picture, one every `SLIDE_MS` while there is more
  * than one to show. While the browser asks for less motion it holds the
@@ -67,10 +60,7 @@ const followLessMotion = (onChange: () => void) => {
  */
 const useStep = (count: number): number => {
   const [step, setStep] = useState(0)
-  const isStill = useSyncExternalStore(
-    followLessMotion,
-    () => window.matchMedia(LESS_MOTION).matches,
-  )
+  const isStill = useAsksForLessMotion()
   useEffect(() => {
     if (isStill || count < 2) return undefined
     const timer = window.setInterval(() => setStep((now) => now + 1), SLIDE_MS)

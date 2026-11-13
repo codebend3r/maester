@@ -28,14 +28,14 @@ import {
   resolutionLabel,
   wordPart,
 } from '@raven/core'
-import { Button, FactParts } from '@raven/ui'
+import { BUTTON_TONES, Button, FactParts } from '@raven/ui'
 import { type ComponentType, type ReactNode, useId, useState } from 'react'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { useManagement } from '@/lib/management'
-import { STREAMS_COPY } from '@/pages/StreamsPage/copy'
+import { STREAMS_COPY, STREAMS_MODE_COPY } from '@/pages/StreamsPage/copy'
 import { api } from '@/lib/api'
 import { liveStreamsQuery, mediaStreamsQuery, tracksQuery } from '@/lib/queries'
 import { queryKeys } from '@raven/ui/headless'
@@ -43,14 +43,7 @@ import styles from '@/pages/StreamsPage/StreamsPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
 
-const MODE_LABELS = {
-  [PLAYBACK_MODES.direct]: 'Direct play',
-  [PLAYBACK_MODES.remux]: 'Remuxing',
-  [PLAYBACK_MODES.transcode]: 'Transcoding',
-} as const satisfies Record<PlaybackMode, string>
-
-/** Every converted stream's audio, whatever the track was. */
-const CONVERTED_AUDIO = 'AAC stereo'
+const MODE_LABELS = STREAMS_MODE_COPY satisfies Record<PlaybackMode, string>
 
 type Fact = { term: string; value: ReactNode }
 
@@ -132,7 +125,7 @@ type SentAudioProps = { mode: PlaybackMode; track: AudioTrack }
 const sentAudio = ({ mode, track }: SentAudioProps): string =>
   mode === PLAYBACK_MODES.direct
     ? joined([codecLabel(track.codec), formatChannels(track.channels)])
-    : CONVERTED_AUDIO
+    : STREAMS_COPY.convertedAudio
 
 type FactsProps = { title: string; facts: readonly Fact[] }
 
@@ -338,7 +331,7 @@ const StreamRow = ({ stream }: StreamRowProps) => {
         </div>
         <div className={styles.actions}>
           <Button
-            tone="danger"
+            tone={BUTTON_TONES.danger}
             icon="close"
             disabled={stop.isPending}
             onClick={() => stop.mutate()}
@@ -404,7 +397,7 @@ const DownloadRow = ({ stream }: DownloadRowProps) => {
         </div>
         <div className={styles.actions}>
           <Button
-            tone="danger"
+            tone={BUTTON_TONES.danger}
             icon="close"
             disabled={stop.isPending}
             onClick={() => stop.mutate()}

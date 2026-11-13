@@ -1,7 +1,7 @@
-import { Button, useCanGoBack, useKeyShortcut } from '@raven/ui'
+import { BUTTON_TONES, Button, useCanGoBack, useKeyShortcut } from '@raven/ui'
 import { type ComponentType, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import { PLAYER_MESSAGE_COPY } from '@/desktop/player/copy'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
@@ -48,7 +48,7 @@ export const PlayerMessage = ({ message, fallback }: PlayerMessageProps) => {
   return (
     <main className={styles.page} aria-busy={isWaiting}>
       <Line message={message} />
-      <Button tone="pill" icon="back" className={styles.back} onClick={leave}>
+      <Button tone={BUTTON_TONES.pill} icon="back" className={styles.back} onClick={leave}>
         {PLAYER_MESSAGE_COPY.back}
       </Button>
     </main>

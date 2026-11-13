@@ -3,6 +3,7 @@ import { ADMIN_LOCK_STATES, type AdminLock } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { adminLockQuery } from '@/lib/queries'
+import { handled } from '@/lib/handled'
 
 /** Whether the admin lock holds: on, or not yet known, as the server then treats this browser too. */
 export const isAdminLocked = (lock: AdminLock | undefined): boolean =>
@@ -33,6 +34,6 @@ export const useFollowAdminLock = (): void => {
     const before = seen.current
     seen.current = isLocked
     if (before == null || isLocked == null || before === isLocked) return
-    void queryClient.invalidateQueries()
+    handled(queryClient.invalidateQueries())
   }, [isLocked, queryClient])
 }

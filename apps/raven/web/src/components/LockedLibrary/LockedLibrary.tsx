@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Icon } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import { LOCKED_LIBRARY_COPY } from '@/components/LockedLibrary/copy'
 import styles from '@/components/LockedLibrary/LockedLibrary.module.scss'
 import { PinPadDialog } from '@/components/PinPadDialog/PinPadDialog'
@@ -20,7 +20,7 @@ export const LockedLibrary = ({ name, available }: LockedLibraryProps) => {
       </span>
       <p className={styles.message}>{LOCKED_LIBRARY_COPY.isLocked(name)}</p>
       {available && (
-        <Button tone="primary" icon="unlock" onClick={() => setAsking(true)}>
+        <Button tone={BUTTON_TONES.primary} icon="unlock" onClick={() => setAsking(true)}>
           {LOCKED_LIBRARY_COPY.unlock}
         </Button>
       )}

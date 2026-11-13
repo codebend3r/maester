@@ -1,7 +1,8 @@
-import type { DesktopReply } from '@raven/core'
+import type { OpenReply } from '@raven/core'
 import { useEffect, useEffectEvent, useRef } from 'react'
 import type { DesktopClient } from '@/desktop/client'
 import { useDragging } from '@/stores/dragging'
+import { openReplyOf } from '@/desktop/client'
 
 /** `DataTransfer.types` names a drag of files this way; the DOM types it as a plain string. */
 const DRAG_TYPES = { files: 'Files' } as const
@@ -10,7 +11,7 @@ const setIsDragging = (isDragging: boolean) => useDragging.setState({ isDragging
 
 type UseFileDropProps = {
   client: DesktopClient
-  onReply: (reply: DesktopReply) => void
+  onReply: (reply: OpenReply) => void
 }
 
 /**
@@ -59,7 +60,7 @@ export const useFileDrop = ({ client, onReply }: UseFileDropProps) => {
       const files = [...(event.dataTransfer?.files ?? [])]
       client
         .dropFiles(files)
-        .then(reply)
+        .then((answer) => reply(openReplyOf(answer)))
         .catch(() => undefined)
     }
     window.addEventListener('dragenter', enter)

@@ -28,6 +28,8 @@ import { FAVOURITES_COPY } from '@/pages/FavouritesPage/copy'
 import styles from '@/pages/FavouritesPage/FavouritesPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
+import { PAGE_PARAMS } from '@/lib/appPaths'
+import { CARD_PICTURES } from '@/lib/cardPictures'
 
 /** What a favourite can be, in the order the filter offers them. */
 const KINDS = {
@@ -44,15 +46,10 @@ type Kind = (typeof KINDS)[keyof typeof KINDS]
 
 const KIND_ORDER: readonly Kind[] = Object.values(KINDS)
 
-const KIND_LABELS = {
-  [KINDS.shows]: 'Shows',
-  [KINDS.seasons]: 'Seasons',
-  [KINDS.movies]: 'Movies',
-  [KINDS.episodes]: 'Episodes',
-  [KINDS.other]: 'Other videos',
-  [KINDS.albums]: 'Albums',
-  [KINDS.artists]: 'Artists',
-} as const satisfies Record<Kind, string>
+const KIND_LABELS = FAVOURITES_COPY.kinds satisfies Record<Kind, string>
+
+/** The filter's first choice, every kind, keyed apart from the kinds themselves. */
+const ALL_KINDS_KEY = 'all'
 
 const isKind = (value: string | null): value is Kind => KIND_ORDER.some((kind) => kind === value)
 
@@ -123,7 +120,7 @@ export const FavouritesPage = () => {
     albums: allAlbums,
     artists: allArtists,
   })
-  const asked = searchParams.get('kind')
+  const asked = searchParams.get(PAGE_PARAMS.kind)
   const kind = isKind(asked) && kinds.includes(asked) ? asked : null
   const items = kind ? all.filter(({ media }) => kindOf(media) === kind) : all
   const titles = kind ? allTitles.filter((item) => titleKindOf(item) === kind) : allTitles
@@ -156,11 +153,13 @@ export const FavouritesPage = () => {
           <legend className="visually-hidden">{FAVOURITES_COPY.show}</legend>
           {[null, ...kinds].map((option) => (
             <button
-              key={option ?? 'all'}
+              key={option ?? ALL_KINDS_KEY}
               type="button"
               className={styles.kind}
               aria-pressed={kind === option}
-              onClick={() => setSearchParams(option ? { kind: option } : {}, { replace: true })}
+              onClick={() =>
+                setSearchParams(option ? { [PAGE_PARAMS.kind]: option } : {}, { replace: true })
+              }
             >
               {option ? KIND_LABELS[option] : COMMON_COPY.all}
             </button>
@@ -176,7 +175,7 @@ export const FavouritesPage = () => {
       {isPending && !error && (
         <Loading label={FAVOURITES_COPY.loading}>
           <ul className={styles.grid}>
-            <SkeletonCards picture="poster" />
+            <SkeletonCards picture={CARD_PICTURES.poster} />
           </ul>
         </Loading>
       )}

@@ -5,11 +5,8 @@ import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/MediaGrid/MediaGrid.module.scss'
-
-/** How the grid draws each card: as a poster, or as a frame grab. */
-const CARD_KINDS = { poster: 'poster', frame: 'frame' } as const
-
-type CardKind = (typeof CARD_KINDS)[keyof typeof CARD_KINDS]
+import { CARD_PICTURES, type CardPicture } from '@/lib/cardPictures'
+import { classNames } from '@raven/ui'
 
 type GridCardProps = {
   media: MediaItem
@@ -36,19 +33,21 @@ const GridFrameCard = ({ media, matchType, sort }: GridFrameCardProps) => (
   <MediaCard media={media} matchType={matchType} sort={sort} />
 )
 
+/** How the grid draws each card: as a poster, or as a frame grab. */
 const GRID_CARDS = {
-  [CARD_KINDS.poster]: GridPosterCard,
-  [CARD_KINDS.frame]: GridFrameCard,
-} as const satisfies Record<CardKind, ComponentType<GridCardProps>>
+  [CARD_PICTURES.poster]: GridPosterCard,
+  [CARD_PICTURES.frame]: GridFrameCard,
+} as const satisfies Record<CardPicture, ComponentType<GridCardProps>>
 
-type CardKindOfProps = { hasPosters: boolean }
-
-const cardKindOf = ({ hasPosters }: CardKindOfProps): CardKind =>
-  hasPosters ? CARD_KINDS.poster : CARD_KINDS.frame
+/** The grid's own look for each picture. */
+const GRID_CLASSES = {
+  [CARD_PICTURES.poster]: classNames([styles.grid, styles.posters]),
+  [CARD_PICTURES.frame]: styles.grid,
+} as const satisfies Record<CardPicture, string>
 
 type MediaGridProps = {
   items: MediaItem[]
-  posters?: boolean
+  picture?: CardPicture
   matchType?: MatchItemType | null
   sort?: MediaSort
   /** The item whose poster a card shows, when not the video's own: an episode's season. */
@@ -56,20 +55,20 @@ type MediaGridProps = {
 }
 
 /**
- * The card grid a library and the favourites share; `posters` lays a Movies
+ * The card grid a library and the favourites share; `picture` lays a Movies
  * library out as posters, and `sort` has each card show the value it is in
  * order by.
  */
 export const MediaGrid = ({
   items,
-  posters = false,
+  picture = CARD_PICTURES.frame,
   matchType = null,
   sort,
   posterOf,
 }: MediaGridProps) => {
-  const Card: ComponentType<GridCardProps> = GRID_CARDS[cardKindOf({ hasPosters: posters })]
+  const Card: ComponentType<GridCardProps> = GRID_CARDS[picture]
   return (
-    <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>
+    <ul className={GRID_CLASSES[picture]}>
       {items.map((item) => (
         <Card key={item.id} media={item} matchType={matchType} sort={sort} posterOf={posterOf} />
       ))}
@@ -78,13 +77,16 @@ export const MediaGrid = ({
 }
 
 type MediaGridSkeletonProps = {
-  posters?: boolean
+  picture?: CardPicture
   count?: number
 }
 
 /** The grid while its cards are on their way: stand-ins shaped as its cards, posters or frame grabs. */
-export const MediaGridSkeleton = ({ posters = false, count }: MediaGridSkeletonProps) => (
-  <ul className={posters ? `${styles.grid} ${styles.posters}` : styles.grid}>
-    <SkeletonCards picture={cardKindOf({ hasPosters: posters })} count={count} />
+export const MediaGridSkeleton = ({
+  picture = CARD_PICTURES.frame,
+  count,
+}: MediaGridSkeletonProps) => (
+  <ul className={GRID_CLASSES[picture]}>
+    <SkeletonCards picture={picture} count={count} />
   </ul>
 )

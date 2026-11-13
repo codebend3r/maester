@@ -1,34 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import type { DirectoryListing } from '@raven/core'
-import { type ComponentType, useState } from 'react'
-import { Button, Icon } from '@raven/ui'
+import { useState } from 'react'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import { FOLDER_BROWSER_COPY } from '@/components/FolderBrowser/copy'
 import { browseQuery } from '@/lib/queries'
 import styles from '@/components/FolderBrowser/FolderBrowser.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { QueryView } from '@raven/ui/headless'
 
-/** What the browser shows under where it is: the failure, word of no folders, or the folders. */
-const LISTING_STATES = { failed: 'failed', empty: 'empty', folders: 'folders' } as const
-
-type ListingState = (typeof LISTING_STATES)[keyof typeof LISTING_STATES]
-
-type ListingViewProps = {
-  error: Error | null
+type ListingFoldersProps = {
   directories: DirectoryListing['directories']
   onOpen: (path: string) => void
 }
-
-type ListingFailedProps = ListingViewProps
-
-const ListingFailed = ({ error }: ListingFailedProps) => (
-  <p className={styles.message} role="alert">
-    {error?.message ?? ''}
-  </p>
-)
-
-const ListingEmpty = () => <p className={styles.message}>{FOLDER_BROWSER_COPY.noFolders}</p>
-
-type ListingFoldersProps = ListingViewProps
 
 const ListingFolders = ({ directories, onOpen }: ListingFoldersProps) => (
   <ul className={styles.list}>
@@ -43,19 +26,8 @@ const ListingFolders = ({ directories, onOpen }: ListingFoldersProps) => (
   </ul>
 )
 
-const LISTING_VIEWS = {
-  [LISTING_STATES.failed]: ListingFailed,
-  [LISTING_STATES.empty]: ListingEmpty,
-  [LISTING_STATES.folders]: ListingFolders,
-} as const satisfies Record<ListingState, ComponentType<ListingViewProps>>
-
-type ListingStateOfProps = { isError: boolean; data: DirectoryListing | undefined }
-
-const listingStateOf = ({ isError, data }: ListingStateOfProps): ListingState => {
-  if (isError) return LISTING_STATES.failed
-  if (data?.directories.length === 0) return LISTING_STATES.empty
-  return LISTING_STATES.folders
-}
+/** Whether a folder holds no folders. */
+const hasNoFolders = ({ directories }: DirectoryListing): boolean => directories.length === 0
 
 type FolderBrowserProps = {
   onChoose: (path: string) => void
@@ -72,7 +44,6 @@ export const FolderBrowser = ({ onChoose, exclude }: FolderBrowserProps) => {
   const listing = useQuery(browseQuery(path))
   const current = listing.data?.path ?? path ?? ''
   const alreadyAdded = exclude.includes(current)
-  const Listing: ComponentType<ListingViewProps> = LISTING_VIEWS[listingStateOf(listing)]
 
   return (
     <section className={styles.browser} aria-label={FOLDER_BROWSER_COPY.chooseAFolder}>
@@ -83,17 +54,27 @@ export const FolderBrowser = ({ onChoose, exclude }: FolderBrowserProps) => {
           disabled={listing.data?.parent == null}
           onClick={() => setPath(listing.data?.parent ?? null)}
         />
-        <span className={styles.path}>{current || COMMON_COPY.loading}</span>
+        <span className={styles.path}>{current === '' ? COMMON_COPY.loading : current}</span>
       </div>
 
-      <Listing
-        error={listing.error}
-        directories={listing.data?.directories ?? []}
-        onOpen={setPath}
-      />
+      <QueryView
+        query={listing}
+        pending={<ListingFolders directories={[]} onOpen={setPath} />}
+        renderFailed={(error) => (
+          <p className={styles.message} role="alert">
+            {error.message}
+          </p>
+        )}
+        empty={{
+          isEmpty: hasNoFolders,
+          shown: <p className={styles.message}>{FOLDER_BROWSER_COPY.noFolders}</p>,
+        }}
+      >
+        {({ directories }) => <ListingFolders directories={directories} onOpen={setPath} />}
+      </QueryView>
 
       <Button
-        tone="primary"
+        tone={BUTTON_TONES.primary}
         className={styles.use}
         disabled={!listing.data || alreadyAdded}
         onClick={() => listing.data && onChoose(listing.data.path)}

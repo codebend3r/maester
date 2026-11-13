@@ -1,24 +1,17 @@
 import { DEFAULT_SERVER_ORIGIN } from '@raven/core'
+import { CACHE_POLICIES, CONTENT_TYPES, HEADERS } from '@shared/http'
 
-const HEADERS = {
-  cacheControl: 'cache-control',
-  contentType: 'content-type',
-  netlifyCacheId: 'netlify-cache-id',
-  netlifyCdnCacheControl: 'netlify-cdn-cache-control',
+/** Netlify's own headers, beside the shared `HEADERS`. */
+const NETLIFY_HEADERS = {
+  cacheId: 'netlify-cache-id',
+  cdnCacheControl: 'netlify-cdn-cache-control',
 } as const
 
-const CACHE_POLICIES = {
-  /** Kept by the browser for good, raven's own policy for a capability picture. */
-  browser: 'public, max-age=31536000, immutable',
-  /** Kept by every Netlify edge node through the shared durable cache. */
-  durable: 'public, durable, max-age=31536000, immutable',
-  none: 'no-store',
-} as const
+/** Kept by every Netlify edge node through the shared durable cache. */
+const DURABLE_POLICY = 'public, durable, max-age=31536000, immutable'
 
 /** Opts the pictures out of the purge every deploy runs, since an address never changes what it names. */
 const CACHE_ID = 'raven-pictures'
-
-const FALLBACK_TYPE = 'application/octet-stream'
 
 type UpstreamInit = { method: string }
 
@@ -52,17 +45,17 @@ export const proxyPicture = async ({
     return new Response(upstream.body, {
       status: upstream.status,
       headers: {
-        [HEADERS.cacheControl]: CACHE_POLICIES.none,
-        [HEADERS.netlifyCdnCacheControl]: CACHE_POLICIES.none,
+        [HEADERS.cacheControl]: CACHE_POLICIES.noStore,
+        [NETLIFY_HEADERS.cdnCacheControl]: CACHE_POLICIES.noStore,
       },
     })
   }
   return new Response(upstream.body, {
     headers: {
-      [HEADERS.contentType]: upstream.headers.get(HEADERS.contentType) ?? FALLBACK_TYPE,
-      [HEADERS.cacheControl]: CACHE_POLICIES.browser,
-      [HEADERS.netlifyCdnCacheControl]: CACHE_POLICIES.durable,
-      [HEADERS.netlifyCacheId]: CACHE_ID,
+      [HEADERS.contentType]: upstream.headers.get(HEADERS.contentType) ?? CONTENT_TYPES.octetStream,
+      [HEADERS.cacheControl]: CACHE_POLICIES.immutable,
+      [NETLIFY_HEADERS.cdnCacheControl]: DURABLE_POLICY,
+      [NETLIFY_HEADERS.cacheId]: CACHE_ID,
     },
   })
 }

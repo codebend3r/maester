@@ -55,7 +55,7 @@ describe('applyDownloadsEvent', () => {
 })
 
 describe('useChangeDownloads', () => {
-  it('says an answer it cannot use, and that the change was not made', async () => {
+  it('reads an answer it cannot use as a refusal, and says the change was not made', async () => {
     asDesktop(fakeClient({ request: async () => ({ type: DESKTOP_REPLIES.recents, recents: [] }) }))
     type WrapperProps = { children: ReactNode }
 
@@ -65,7 +65,7 @@ describe('useChangeDownloads', () => {
     const { result } = renderHook(() => useChangeDownloads(), { wrapper })
     expect(await result.current({ type: DESKTOP_REQUESTS.pauseAllDownloads })).toBe(false)
     expect(useToasts.getState().toasts.map((toast) => toast.message)).toEqual([
-      'Raven could not change its downloads. Try again.',
+      'Raven could not read its own reply.',
     ])
   })
 })

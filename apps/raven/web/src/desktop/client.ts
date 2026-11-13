@@ -6,7 +6,11 @@ import {
   isDesktopEvent,
   isDesktopReply,
   type DesktopPlatform,
+  type OpenReply,
+  type RepliesFor,
+  isOpenReply,
   isRavenDesktopBridge,
+  isReplyTo,
 } from '@raven/core'
 
 /** The page's one door to main, with every reply and event checked on the way in. */
@@ -59,3 +63,29 @@ export const clientFor = (bridge: unknown): DesktopClient | null => {
       }),
   }
 }
+
+/** Main's refusal: what any request may get, its own or the page's for a reply it could not read. */
+type Refusal = Extract<DesktopReply, { type: typeof DESKTOP_REPLIES.refused }>
+
+type AskMainProps<R extends DesktopRequest> = {
+  /** The page's client, or a host that speaks the same protocol for some of its requests. */
+  client: { request: (request: R) => Promise<DesktopReply> }
+  request: R
+}
+
+/**
+ * Main's answer to `request`, of the kinds main gives it, so a caller handles only those; a
+ * reply of any other kind reads as a refusal.
+ */
+export const askMain = async <R extends DesktopRequest>({
+  client,
+  request,
+}: AskMainProps<R>): Promise<RepliesFor<R['type']> | Refusal> => {
+  const reply = await client.request(request)
+  const type: R['type'] = request.type
+  return isReplyTo<R['type']>(type)(reply) ? reply : UNREADABLE
+}
+
+/** A reply to a way of opening something, as `useOpenReply` takes it; any other reads as a refusal. */
+export const openReplyOf = (reply: DesktopReply): OpenReply | Refusal =>
+  isOpenReply(reply) ? reply : UNREADABLE

@@ -1,110 +1,25 @@
-import {
-  DEFAULT_DISPLAY_SETTINGS,
-  DEFAULT_PLAYBACK_SETTINGS,
-  DISPLAY_CHOICES,
-  type DisplaySettings,
-  PLAYBACK_CHOICES,
-  type PlaybackSettings,
-} from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useId, useState } from 'react'
-import { Button } from '@raven/ui'
-import {
-  AUTOPLAY_COUNTDOWN_SECONDS,
-  usePlayerPrefs,
-  useServerSettingsSaves,
-} from '@raven/ui/headless'
+import { AUTOPLAY_COUNTDOWN_SECONDS, usePlayerPrefs } from '@raven/ui/headless'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { Tabs } from '@/components/Tabs/Tabs'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
-import { api } from '@/lib/api'
-import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
-import { displaySettingsQuery, playbackSettingsQuery, requestsQuery } from '@/lib/queries'
+import { requestsQuery } from '@/lib/queries'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
-import { AdminLockSection } from '@/pages/SettingsPage/AdminLockSection'
 import { AdvancedSection } from '@/pages/SettingsPage/AdvancedSection'
 import { CaptionSettings } from '@/pages/SettingsPage/CaptionSettings'
-import { RemoteAccessSection } from '@/pages/SettingsPage/RemoteAccessSection'
 import { mineOf, RequestsTab } from '@/pages/SettingsPage/RequestsTab'
 import { ScrobblingSection } from '@/pages/SettingsPage/ScrobblingSection'
-import { ServerSection } from '@/pages/SettingsPage/ServerSection'
-import {
-  type Choices,
-  Setting,
-  SettingsSection,
-  SettingsSkeleton,
-} from '@/pages/SettingsPage/Setting'
 import { SoundSettings } from '@/pages/SettingsPage/SoundSettings'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
-import { UsersSection } from '@/pages/SettingsPage/UsersSection'
 import { HostSettings } from '@/pages/SettingsPage/HostSettings'
 import { useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
-import { ADMIN_COPY } from '@/pages/SettingsPage/adminCopy'
-import { ScanSwitch } from '@/pages/SettingsPage/ScanSwitch'
-
-const TITLES: Choices<DisplaySettings['titles']> = {
-  logo: {
-    label: 'Logo',
-    hint: 'A movie’s or show’s page shows its title as TMDB’s logo art where it has one, else in words.',
-  },
-  text: { label: 'Text', hint: 'Every movie’s and show’s page spells its title out in type.' },
-}
-
-const DIRECT_PLAY: Choices<PlaybackSettings['directPlay']> = {
-  auto: {
-    label: 'When the browser can',
-    hint: 'The original file plays as it is when the browser takes it; otherwise the server converts it.',
-  },
-  force: {
-    label: 'Always',
-    hint: 'The original file is always sent, whatever the check says, unless another audio track is picked and the server can remux for it. For a browser the check underrates; a file it cannot decode will not play.',
-  },
-}
-
-const TRANSCODING: Choices<PlaybackSettings['transcoding']> = {
-  on: {
-    label: 'Remux and transcode',
-    hint: 'Video is repackaged when the browser can decode it and re-encoded when it cannot.',
-  },
-  remuxOnly: {
-    label: 'Remux only',
-    hint: 'Video is never re-encoded; a file the browser cannot decode will not play. Easy on the CPU.',
-  },
-  off: {
-    label: 'Off',
-    hint: 'Nothing is converted; only files the browser plays as they are play.',
-  },
-}
-
-const MAX_HEIGHT: Choices<PlaybackSettings['maxHeight']> = {
-  2160: { label: '4K', hint: 'Transcodes keep the full frame.' },
-  1080: { label: '1080p', hint: 'A 4K file is scaled to 1080p; a smaller one is left alone.' },
-  720: { label: '720p', hint: 'For a slow network or a small screen.' },
-}
-
-const QUALITY: Choices<PlaybackSettings['quality']> = {
-  low: { label: 'Low', hint: 'Smallest stream; fine on a phone.' },
-  medium: { label: 'Medium', hint: 'A good picture at a moderate bitrate.' },
-  high: { label: 'High', hint: 'Near the source; needs a fast network.' },
-}
-
-const HW_ACCEL: Choices<PlaybackSettings['hwAccel']> = {
-  auto: { label: 'Auto', hint: 'The GPU this machine has, after a test encode; else the CPU.' },
-  none: { label: 'CPU only', hint: 'libx264 on the CPU, whatever the machine has.' },
-  vaapi: { label: 'VAAPI', hint: 'An Intel or AMD GPU on Linux, through its render node.' },
-  videotoolbox: { label: 'VideoToolbox', hint: 'The media engine in a Mac.' },
-}
-
-const ENCODER_NAMES = {
-  software: 'libx264 on the CPU',
-  vaapi: 'VAAPI',
-  videotoolbox: 'VideoToolbox',
-} as const
+import { ToggleChoice } from '@/pages/SettingsPage/ToggleChoice'
 
 type BrowserPlaybackProps = { isDesktop: boolean }
 
@@ -135,15 +50,12 @@ const BrowserPlayback = ({ isDesktop }: BrowserPlaybackProps) => {
           {isDesktop ? SETTINGS_COPY.thisApp : SETTINGS_COPY.thisBrowser}
         </Titled>
       </h3>
-      <label className={styles.choice}>
-        <input
-          type="checkbox"
-          checked={autoplay}
-          onChange={(event) => setAutoplay(event.target.checked)}
-        />
-        <span className={styles.choiceLabel}>{SETTINGS_COPY.autoplay}</span>
-        <span className={styles.choiceHint}>{SETTINGS_COPY.autoplayHint}</span>
-      </label>
+      <ToggleChoice
+        label={SETTINGS_COPY.autoplay}
+        hint={SETTINGS_COPY.autoplayHint}
+        isChecked={autoplay}
+        onChange={setAutoplay}
+      />
       <label htmlFor={countdownId} className={styles.legend}>
         <Titled icon="playback">{SETTINGS_COPY.countdown}</Titled>
       </label>
@@ -170,84 +82,23 @@ const BrowserPlayback = ({ isDesktop }: BrowserPlaybackProps) => {
           max: AUTOPLAY_COUNTDOWN_SECONDS.max,
         })}
       </p>
-      <label className={styles.choice}>
-        <input
-          type="checkbox"
-          checked={autoSkipIntro}
-          onChange={(event) => setAutoSkipIntro(event.target.checked)}
-        />
-        <span className={styles.choiceLabel}>{SETTINGS_COPY.skipIntros}</span>
-        <span className={styles.choiceHint}>{SETTINGS_COPY.skipIntrosHint}</span>
-      </label>
+      <ToggleChoice
+        label={SETTINGS_COPY.skipIntros}
+        hint={SETTINGS_COPY.skipIntrosHint}
+        isChecked={autoSkipIntro}
+        onChange={setAutoSkipIntro}
+      />
       {!isDesktop && (
-        <label className={styles.choice}>
-          <input
-            type="checkbox"
-            checked={opensInRavenPlayer}
-            onChange={(event) => setOpensInRavenPlayer(event.target.checked)}
-          />
-          <span className={styles.choiceLabel}>{SETTINGS_COPY.openInRaven}</span>
-          <span className={styles.choiceHint}>{SETTINGS_COPY.openInRavenHint}</span>
-        </label>
+        <ToggleChoice
+          label={SETTINGS_COPY.openInRaven}
+          hint={SETTINGS_COPY.openInRavenHint}
+          isChecked={opensInRavenPlayer}
+          onChange={setOpensInRavenPlayer}
+        />
       )}
       <SoundSettings isDesktop={isDesktop} />
     </section>
   )
-}
-
-type ResetControlProps = {
-  isConfirming: boolean
-  isBusy: boolean
-  isAllAtDefaults: boolean
-  onReset: () => void
-  onConfirming: (isConfirming: boolean) => void
-}
-
-type ResetConfirmProps = ResetControlProps
-
-const ResetConfirm = ({ isBusy, onReset, onConfirming }: ResetConfirmProps) => (
-  <div className={styles.asking}>
-    <p className={styles.confirm}>{SETTINGS_COPY.resetConfirm}</p>
-    <Button
-      tone="primary"
-      icon="reset"
-      className={styles.resetAll}
-      disabled={isBusy}
-      onClick={onReset}
-    >
-      {SETTINGS_COPY.resetAll}
-    </Button>
-    <Button className={styles.cancel} onClick={() => onConfirming(false)}>
-      {COMMON_COPY.cancel}
-    </Button>
-  </div>
-)
-
-type ResetAskProps = ResetControlProps
-
-const ResetAsk = ({ isBusy, isAllAtDefaults, onConfirming }: ResetAskProps) => (
-  <Button
-    icon="reset"
-    className={styles.reset}
-    disabled={isBusy || isAllAtDefaults}
-    onClick={() => onConfirming(true)}
-  >
-    {SETTINGS_COPY.resetToDefaults}
-  </Button>
-)
-
-const RESET_STATES = { confirming: 'confirming', idle: 'idle' } as const
-type ResetState = (typeof RESET_STATES)[keyof typeof RESET_STATES]
-
-const RESET_VIEWS = {
-  [RESET_STATES.confirming]: ResetConfirm,
-  [RESET_STATES.idle]: ResetAsk,
-} as const satisfies Record<ResetState, ComponentType<ResetControlProps>>
-
-/** Reset to defaults, and once clicked, the second click that makes sure. */
-const ResetControl = (props: ResetControlProps) => {
-  const View = RESET_VIEWS[props.isConfirming ? RESET_STATES.confirming : RESET_STATES.idle]
-  return <View {...props} />
 }
 
 /**
@@ -265,171 +116,6 @@ const OfflineSettings = () => {
       </header>
       <HostSettings />
       <AdvancedSection />
-    </section>
-  )
-}
-
-/**
- * Server-wide settings and management, mounted only for an authorized admin.
- * Changes save optimistically; Reset asks for confirmation before restoring defaults.
- */
-const ServerSettings = () => {
-  const titleId = useId()
-  const isDesktop = useIsDesktop()
-  const [isConfirming, setConfirming] = useState(false)
-  // Accounts show only to an approved viewer; the other states have a screen of their own.
-  const access = useAccessState()
-  const { mode } = useManagement()
-  const { playback, display, save, saveDisplay, reset, isBusy, isAllAtDefaults } =
-    useServerSettingsSaves({
-      api,
-      queries: { playbackSettingsQuery, displaySettingsQuery },
-      onReset: () => setConfirming(false),
-    })
-  const settings = playback.data?.settings
-
-  return (
-    <section className={styles.page} aria-labelledby={titleId}>
-      <header className={styles.header}>
-        <BackButton fallback={HOME} className={styles.back} />
-        <PageTitle id={titleId} icon="settings" className={styles.title}>
-          {ADMIN_COPY.heading}
-        </PageTitle>
-        {settings && (
-          <ResetControl
-            isConfirming={isConfirming}
-            isBusy={isBusy}
-            isAllAtDefaults={isAllAtDefaults}
-            onReset={() => reset.mutate()}
-            onConfirming={setConfirming}
-          />
-        )}
-      </header>
-      <output className={styles.status}>
-        {reset.isSuccess && !!settings && isAllAtDefaults ? SETTINGS_COPY.resetDone : ''}
-      </output>
-      {reset.isError && (
-        <p className={styles.error} role="alert">
-          {SETTINGS_COPY.resetFailed}
-          {reset.error.message}
-        </p>
-      )}
-      {!isDesktop && <ServerSection />}
-      <SettingsSection
-        icon="playback"
-        title={SETTINGS_COPY.playback}
-        hint={SETTINGS_COPY.playbackHint}
-        isResetting={reset.isPending}
-        query={playback}
-        shape={<SettingsSkeleton count={Object.keys(DEFAULT_PLAYBACK_SETTINGS).length} />}
-        saveError={save.failure}
-      >
-        {({ settings: current, effective }) => (
-          <>
-            <Setting
-              values={PLAYBACK_CHOICES.directPlay}
-              icon="file-play"
-              label={SETTINGS_COPY.directPlay}
-              choices={DIRECT_PLAY}
-              value={current.directPlay}
-              onChange={(directPlay) => save.mutate({ directPlay })}
-            />
-            <Setting
-              values={PLAYBACK_CHOICES.transcoding}
-              icon="convert"
-              label={SETTINGS_COPY.transcoding}
-              choices={TRANSCODING}
-              value={current.transcoding}
-              onChange={(transcoding) => save.mutate({ transcoding })}
-            />
-            <Setting
-              values={PLAYBACK_CHOICES.maxHeight}
-              icon="resize"
-              label={SETTINGS_COPY.maxHeight}
-              choices={MAX_HEIGHT}
-              value={current.maxHeight}
-              onChange={(maxHeight) => save.mutate({ maxHeight })}
-            />
-            <Setting
-              values={PLAYBACK_CHOICES.quality}
-              icon="gauge"
-              label={SETTINGS_COPY.quality}
-              choices={QUALITY}
-              value={current.quality}
-              onChange={(quality) => save.mutate({ quality })}
-            />
-            <Setting
-              values={PLAYBACK_CHOICES.hwAccel}
-              icon="chip"
-              label={SETTINGS_COPY.hwAccel}
-              choices={HW_ACCEL}
-              value={current.hwAccel}
-              onChange={(hwAccel) => save.mutate({ hwAccel })}
-            />
-            <p className={styles.hint}>
-              {SETTINGS_COPY.encodesWith(ENCODER_NAMES[effective.encoder])}
-            </p>
-            <fieldset className={styles.setting}>
-              <legend className={styles.legend}>
-                <Titled icon="sun">{COMMON_COPY.hdr}</Titled>
-              </legend>
-              <label className={styles.choice}>
-                <input
-                  type="checkbox"
-                  checked={current.tonemap}
-                  onChange={(event) => save.mutate({ tonemap: event.target.checked })}
-                />
-                <span className={styles.choiceLabel}>{SETTINGS_COPY.tonemap}</span>
-                <span className={styles.choiceHint}>
-                  {effective.tonemapAvailable
-                    ? SETTINGS_COPY.tonemapHint
-                    : SETTINGS_COPY.tonemapUnavailable}
-                </span>
-              </label>
-            </fieldset>
-            <fieldset className={styles.setting}>
-              <legend className={styles.legend}>
-                <Titled icon="skipNext">{SETTINGS_COPY.markers}</Titled>
-              </legend>
-              <label className={styles.choice}>
-                <input
-                  type="checkbox"
-                  checked={current.detectMarkers}
-                  onChange={(event) => save.mutate({ detectMarkers: event.target.checked })}
-                />
-                <span className={styles.choiceLabel}>{SETTINGS_COPY.detectMarkers}</span>
-                <span className={styles.choiceHint}>{SETTINGS_COPY.detectMarkersHint}</span>
-              </label>
-            </fieldset>
-          </>
-        )}
-      </SettingsSection>
-      <SettingsSection
-        icon="image"
-        title={SETTINGS_COPY.display}
-        hint={SETTINGS_COPY.displayHint}
-        isResetting={reset.isPending}
-        query={display}
-        shape={<SettingsSkeleton count={Object.keys(DEFAULT_DISPLAY_SETTINGS).length} />}
-        saveError={saveDisplay.failure}
-      >
-        {(shown) => (
-          <Setting
-            icon="film"
-            label={SETTINGS_COPY.movieTitles}
-            values={DISPLAY_CHOICES.titles}
-            choices={TITLES}
-            value={shown.titles}
-            onChange={(titles) => saveDisplay.mutate({ titles })}
-          />
-        )}
-      </SettingsSection>
-      <RemoteAccessSection />
-      <ScanSwitch />
-      {access.kind === ACCESS_KINDS.approved && access.account.isOwner && (
-        <UsersSection key={access.account.id} userId={access.account.id} />
-      )}
-      {mode === MANAGEMENT_MODES.adminLock && <AdminLockSection />}
     </section>
   )
 }
@@ -493,16 +179,6 @@ const ViewerSettings = () => {
         <Panel />
       </Tabs>
     </section>
-  )
-}
-
-export const AdminPage = () => {
-  const { mode, canManage } = useManagement()
-  return (
-    <>
-      {canManage && <ServerSettings />}
-      {!canManage && mode === MANAGEMENT_MODES.adminLock && <AdminLockSection />}
-    </>
   )
 }
 

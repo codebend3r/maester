@@ -1,10 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { KINDS, LIBRARY_BACKDROP_TYPES, type Library, type LibraryBackdrop } from '@raven/core'
+import {
+  KINDS,
+  LIBRARY_BACKDROP_TYPES,
+  type Library,
+  type LibraryBackdrop,
+  libraryPath,
+} from '@raven/core'
 import { type ComponentType, type ReactNode, useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import {
   LibraryActionErrors,
   LibraryActions,
@@ -33,6 +39,8 @@ import {
   lockState,
   type ViewOf,
   type ViewsOf,
+  QueryView,
+  isNone,
 } from '@raven/ui/headless'
 import { foldersByParent } from '@/lib/folders'
 import { libraryPollDelay } from '@/lib/libraryPolling'
@@ -43,6 +51,7 @@ import { OrderedLibraries } from '@/pages/LibrariesPage/OrderedLibraries'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
+import { handled } from '@/lib/handled'
 
 /** How many libraries there are and how many videos they hold between them. */
 const summaryOf = (libraries: readonly Library[]): string =>
@@ -174,7 +183,7 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
         <span className={styles.well}>
           <LibraryIcon settings={library.settings} size={26} />
         </span>
-        <Link to={`/libraries/${library.id}`} className={styles.name}>
+        <Link to={libraryPath(library.id)} className={styles.name}>
           {library.name}
         </Link>
         <span className={styles.count}>
@@ -186,7 +195,7 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
         </span>
         <Button
           icon="expand"
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           className={styles.toggle}
           aria-expanded={isOpen}
           aria-controls={detailsId}
@@ -248,7 +257,7 @@ const RowsSkeleton = () => (
 type AddLibraryButtonProps = { onAdd: () => void }
 
 const AddLibraryButton = ({ onAdd }: AddLibraryButtonProps) => (
-  <Button tone="primary" icon="plus" title={LIBRARIES_COPY.addTitle} onClick={onAdd}>
+  <Button tone={BUTTON_TONES.primary} icon="plus" title={LIBRARIES_COPY.addTitle} onClick={onAdd}>
     {COMMON_COPY.addLibrary}
   </Button>
 )
@@ -370,7 +379,7 @@ const LibrariesListed = ({ libraries, onAdd, dialog, ...list }: LibrariesListedP
           <span className={styles.headerActions}>
             {(libraries?.length ?? 0) > 1 && (
               <Button
-                tone={ordering.isEditing ? 'primary' : 'quiet'}
+                tone={ordering.isEditing ? BUTTON_TONES.primary : BUTTON_TONES.quiet}
                 icon={ordering.isEditing ? 'check' : 'edit'}
                 title={
                   ordering.isEditing ? LIBRARIES_COPY.saveOrderTitle : LIBRARIES_COPY.editOrderTitle
@@ -394,20 +403,6 @@ const LibrariesListed = ({ libraries, onAdd, dialog, ...list }: LibrariesListedP
     </section>
   )
 }
-
-const LIBRARIES_VIEW_KEYS = { failed: 'failed', empty: 'empty', listed: 'listed' } as const
-
-type LibrariesViewProps = {
-  [LIBRARIES_VIEW_KEYS.failed]: LibrariesFailedProps
-  [LIBRARIES_VIEW_KEYS.empty]: LibrariesEmptyProps
-  [LIBRARIES_VIEW_KEYS.listed]: LibrariesListedProps
-}
-
-const LIBRARIES_VIEWS = {
-  [LIBRARIES_VIEW_KEYS.failed]: LibrariesFailed,
-  [LIBRARIES_VIEW_KEYS.empty]: LibrariesEmpty,
-  [LIBRARIES_VIEW_KEYS.listed]: LibrariesListed,
-} as const satisfies ViewsOf<LibrariesViewProps>
 
 /**
  * `/libraries`: every library as a card, in the order the server keeps
@@ -444,35 +439,35 @@ export const LibrariesPage = () => {
     <AdminOnly>{adding && <LibraryDialog onClose={() => setAdding(false)} />}</AdminOnly>
   )
   const onAdd = () => setAdding(true)
-  const view = ((): ViewOf<LibrariesViewProps> => {
-    if (libraries.isError)
-      return {
-        key: LIBRARIES_VIEW_KEYS.failed,
-        props: { message: libraries.error.message, onRetry: () => libraries.refetch() },
-      }
-    if (libraries.data?.length === 0)
-      return { key: LIBRARIES_VIEW_KEYS.empty, props: { canManage, mode, onAdd, dialog } }
-    return {
-      key: LIBRARIES_VIEW_KEYS.listed,
-      props: {
-        libraries: libraries.data,
-        isPending: libraries.isPending,
-        ordering,
-        openIds,
-        onToggle: (id) =>
-          setOpenIds((current) =>
-            current.has(id)
-              ? new Set([...current].filter((open) => open !== id))
-              : new Set([...current, id]),
-          ),
-        isShut: (library) =>
-          lockState({ isLocked: library.settings.locked, lock: lock.data }).state !==
-          LIBRARY_LOCK_STATES.open,
-        onAdd,
-        dialog,
-      },
-    }
-  })()
+  const listed = {
+    ordering,
+    openIds,
+    onToggle: (id: number) =>
+      setOpenIds((current) =>
+        current.has(id)
+          ? new Set([...current].filter((open) => open !== id))
+          : new Set([...current, id]),
+      ),
+    isShut: (library: Library) =>
+      lockState({ isLocked: library.settings.locked, lock: lock.data }).state !==
+      LIBRARY_LOCK_STATES.open,
+    onAdd,
+    dialog,
+  }
 
-  return <KeyedView<LibrariesViewProps> views={LIBRARIES_VIEWS} view={view} />
+  return (
+    <QueryView
+      query={libraries}
+      pending={<LibrariesListed libraries={undefined} isPending {...listed} />}
+      renderFailed={(error) => (
+        <LibrariesFailed message={error.message} onRetry={() => handled(libraries.refetch())} />
+      )}
+      empty={{
+        isEmpty: isNone,
+        shown: <LibrariesEmpty canManage={canManage} mode={mode} onAdd={onAdd} dialog={dialog} />,
+      }}
+    >
+      {(read) => <LibrariesListed libraries={read} isPending={false} {...listed} />}
+    </QueryView>
+  )
 }

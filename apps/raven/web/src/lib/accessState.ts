@@ -112,7 +112,7 @@ export const accessStateOf = ({ config, session, account }: AccessStateOfProps):
 export const useAccount = () => {
   const config = useQuery(authConfigQuery)
   const session = useAuthSession((state) => state.session)
-  const isReady = config.data?.state === AUTH_CONFIG_STATES.ready
+  const isReady = (config.data?.state ?? null) === AUTH_CONFIG_STATES.ready
   return useQuery(accountQuery(isReady ? (session?.userId ?? null) : null))
 }
 

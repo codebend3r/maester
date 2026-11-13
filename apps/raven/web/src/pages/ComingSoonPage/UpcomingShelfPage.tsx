@@ -8,9 +8,11 @@ import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { upcomingShelfQuery } from '@/lib/queries'
 import { POSTER_SIZES } from '@/lib/posters'
 import { useOnScreen } from '@/lib/useOnScreen'
-import { COMING_SOON_COPY, COMING_SOON_PATH } from '@/pages/ComingSoonPage/copy'
+import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
 import styles from '@/pages/ComingSoonPage/UpcomingShelfPage.module.scss'
 import { UpcomingCard } from '@/pages/ComingSoonPage/UpcomingCard'
+import { APP_PATHS } from '@/lib/appPaths'
+import { CARD_PICTURES } from '@/lib/cardPictures'
 
 /** How far below the screen the end of the list is when the next page is asked for. */
 const READ_AHEAD = '800px'
@@ -18,7 +20,7 @@ const READ_AHEAD = '800px'
 /** How many stand-ins hold the place of the first page. */
 const FIRST_PAGE_STAND_INS = 16
 
-const BACK_TO_COMING_SOON = { to: COMING_SOON_PATH, label: COMING_SOON_COPY.title } as const
+const BACK_TO_COMING_SOON = { to: APP_PATHS.comingSoon, label: COMING_SOON_COPY.title } as const
 
 type ShelfTitlesProps = { shelf: UpcomingShelf }
 
@@ -44,7 +46,7 @@ const ShelfTitles = ({ shelf }: ShelfTitlesProps) => {
       {titles.isPending && (
         <Loading label={COMING_SOON_COPY.loading}>
           <ul className={styles.grid}>
-            <SkeletonCards picture="poster" count={FIRST_PAGE_STAND_INS} />
+            <SkeletonCards picture={CARD_PICTURES.poster} count={FIRST_PAGE_STAND_INS} />
           </ul>
         </Loading>
       )}
@@ -66,7 +68,7 @@ const ShelfTitles = ({ shelf }: ShelfTitlesProps) => {
       {isFetchingNextPage && (
         <Loading label={COMING_SOON_COPY.loadingMore}>
           <ul className={styles.grid}>
-            <SkeletonCards picture="poster" count={FIRST_PAGE_STAND_INS} />
+            <SkeletonCards picture={CARD_PICTURES.poster} count={FIRST_PAGE_STAND_INS} />
           </ul>
         </Loading>
       )}

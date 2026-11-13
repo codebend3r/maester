@@ -1,4 +1,4 @@
-import { Icon, type IconName } from '@raven/ui'
+import { Icon, classNames } from '@raven/ui'
 import { Link, useLocation } from 'react-router-dom'
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { ShellOutlet } from '@/components/ShellOutlet/ShellOutlet'
@@ -7,7 +7,7 @@ import { useIsCurrent } from '@/components/AppShell/currentPage'
 import { HOME } from '@/components/BackButton/BackButton'
 import { Logo } from '@/components/Logo/Logo'
 import { MUSIC_SHELL_COPY } from '@/components/MusicShell/copy'
-import { Tab, TabStrip } from '@/components/TabStrip/TabStrip'
+import { Tab, TabStrip, type TabTarget } from '@/components/TabStrip/TabStrip'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
 import { MUSIC_PATHS } from '@/lib/music'
 import { useScrollReset } from '@/lib/useScrollReset'
@@ -15,21 +15,12 @@ import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/components/MusicShell/MusicShell.module.scss'
 
-/** One of the music mode's places, in the side menu and the tab bar alike. */
-type MusicPlace = {
-  to: string
-  /** The pages that mark it as current. */
-  patterns: readonly string[]
-  icon: IconName
-  label: string
-}
-
 const HOME_PLACE = {
   to: MUSIC_PATHS.root,
   patterns: [MUSIC_PATHS.root, MUSIC_PATHS.mix, MUSIC_PATHS.nowPlaying],
   icon: 'home',
   label: MUSIC_SHELL_COPY.home,
-} as const satisfies MusicPlace
+} as const satisfies TabTarget
 
 const LIBRARY_PLACE = {
   to: MUSIC_PATHS.albums,
@@ -45,31 +36,31 @@ const LIBRARY_PLACE = {
   ],
   icon: 'libraries',
   label: MUSIC_SHELL_COPY.library,
-} as const satisfies MusicPlace
+} as const satisfies TabTarget
 
 const SEARCH_PLACE = {
   to: MUSIC_PATHS.search,
   patterns: [MUSIC_PATHS.search],
   icon: 'search',
   label: MUSIC_SHELL_COPY.search,
-} as const satisfies MusicPlace
+} as const satisfies TabTarget
 
 const DOWNLOADS_PLACE = {
   to: MUSIC_PATHS.downloads,
   patterns: [MUSIC_PATHS.downloads],
   icon: 'download',
   label: MUSIC_SHELL_COPY.downloads,
-} as const satisfies MusicPlace
+} as const satisfies TabTarget
 
 type PlacesForProps = { isOffline: boolean; hasMusicDownloads: boolean }
 
 /** The places open now: those that need the server while it is in reach, and the downloads of a host that keeps music. */
-const placesFor = ({ isOffline, hasMusicDownloads }: PlacesForProps): readonly MusicPlace[] => [
+const placesFor = ({ isOffline, hasMusicDownloads }: PlacesForProps): readonly TabTarget[] => [
   ...(isOffline ? [] : [HOME_PLACE, LIBRARY_PLACE, SEARCH_PLACE]),
   ...(hasMusicDownloads ? [DOWNLOADS_PLACE] : []),
 ]
 
-type PlaceLinkProps = { place: MusicPlace }
+type PlaceLinkProps = { place: TabTarget }
 
 /** A place's link in the side menu: its icon and name, marked as current on any of its pages. */
 const PlaceLink = ({ place }: PlaceLinkProps) => {
@@ -117,7 +108,7 @@ export const MusicShell = () => {
             </li>
           ))}
         </ul>
-        <Link to={HOME.to} className={`${styles.navLink} ${styles.back}`}>
+        <Link to={HOME.to} className={classNames([styles.navLink, styles.back])}>
           <Icon name="back" />
           <span className={styles.label}>{MUSIC_SHELL_COPY.backToRaven}</span>
         </Link>
@@ -133,13 +124,7 @@ export const MusicShell = () => {
       </main>
       <TabStrip label={MUSIC_SHELL_COPY.tabs}>
         {places.map((place) => (
-          <Tab
-            key={place.to}
-            to={place.to}
-            patterns={place.patterns}
-            icon={place.icon}
-            label={place.label}
-          />
+          <Tab key={place.to} {...place} />
         ))}
         <Tab
           to={HOME.to}

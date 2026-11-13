@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ADMIN_LOCK_STATES, type AdminLock, plural } from '@raven/core'
 import { type ComponentType, type FormEvent, useEffect, useId, useRef, useState } from 'react'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { queryKeys, KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
@@ -133,7 +133,7 @@ export const AdminLockSection = () => {
   })
   const busy = unlock.isPending || turnOn.isPending || keepOff.isPending
   const failure = turnOn.error ?? keepOff.error
-  const isAskingNow = isAsking && current?.state === ADMIN_LOCK_STATES.on
+  const isAskingNow = isAsking && (current?.state ?? null) === ADMIN_LOCK_STATES.on
 
   useEffect(() => {
     if (isAskingNow) passwordInput.current?.focus()
@@ -227,7 +227,7 @@ export const AdminLockSection = () => {
             <Button onClick={() => setAsking(false)}>{COMMON_COPY.cancel}</Button>
             <Button
               type="submit"
-              tone="primary"
+              tone={BUTTON_TONES.primary}
               icon="unlock"
               disabled={password === '' || unlock.isPending}
             >

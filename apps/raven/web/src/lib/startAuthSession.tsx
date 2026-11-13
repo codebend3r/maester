@@ -16,7 +16,7 @@ export const StartAuthSession = ({ children }: StartAuthSessionProps) => {
   const config = useQuery(authConfigQuery).data
   const start = useAuthSession((state) => state.start)
   useEffect(() => {
-    if (config?.state !== AUTH_CONFIG_STATES.ready) return
+    if (config == null || config.state !== AUTH_CONFIG_STATES.ready) return
     start({ config })
   }, [config, start])
   return children

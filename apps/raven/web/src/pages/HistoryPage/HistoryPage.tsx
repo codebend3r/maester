@@ -7,6 +7,7 @@ import {
   historyDays,
   historyNote,
   routeState,
+  libraryPath,
 } from '@raven/core'
 import { useId, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -90,7 +91,7 @@ const HistoryView = ({ library }: HistoryViewProps) => {
 
   return (
     <section className={styles.page} aria-labelledby={ids.title}>
-      <BackButton fallback={{ to: `/libraries/${id}`, label: name }} />
+      <BackButton fallback={{ to: libraryPath(id), label: name }} />
 
       <header className={styles.header}>
         <h1 id={ids.title}>{COMMON_COPY.history}</h1>

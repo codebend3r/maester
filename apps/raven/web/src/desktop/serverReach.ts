@@ -5,7 +5,7 @@ import { useEffect, useEffectEvent, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { isDownloadsPage, offlineReturnIn } from '@/desktop/paths'
 import { useServerReach } from '@/stores/serverReach'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 
 /** How often Raven asks again while its server cannot be reached. */
 export const OFFLINE_RETRY_MS = 5_000

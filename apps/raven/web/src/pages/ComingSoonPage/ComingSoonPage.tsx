@@ -14,8 +14,10 @@ import { Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { upcomingQuery } from '@/lib/queries'
 import styles from '@/pages/ComingSoonPage/ComingSoonPage.module.scss'
-import { COMING_SOON_COPY, comingSoonShelfPath } from '@/pages/ComingSoonPage/copy'
+import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
 import { UpcomingCard } from '@/pages/ComingSoonPage/UpcomingCard'
+import { comingSoonShelfPath } from '@/lib/appPaths'
+import { CARD_PICTURES } from '@/lib/cardPictures'
 
 /** How many rows of posters a shelf holds, however many fit across. */
 const SHELF_ROWS = { one: 'one', two: 'two' } as const
@@ -65,11 +67,11 @@ const Shelf = ({ plan, titles }: ShelfProps) => {
       {titles === undefined && (
         <Loading label={COMING_SOON_COPY.loading}>
           <ul className={shelfClass}>
-            <SkeletonCards picture="poster" count={UPCOMING_SHELF_SIZES[name]} />
+            <SkeletonCards picture={CARD_PICTURES.poster} count={UPCOMING_SHELF_SIZES[name]} />
           </ul>
         </Loading>
       )}
-      {titles?.length === 0 && <p className={styles.message}>{COMING_SOON_COPY.empty}</p>}
+      {(titles?.length ?? null) === 0 && <p className={styles.message}>{COMING_SOON_COPY.empty}</p>}
       {!!titles?.length && (
         <ul className={shelfClass}>
           {titles.map((title) => (

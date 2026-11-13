@@ -1,11 +1,12 @@
 import { type MediaItem, mediaLabel } from '@raven/core'
 import { useId } from 'react'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { CONFIRM_DELETE_COPY } from '@/components/ConfirmDelete/copy'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import { useModal } from '@/lib/useModal'
 import styles from '@/components/ConfirmDelete/ConfirmDelete.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 type ConfirmDeleteProps = {
   media: MediaItem
@@ -19,12 +20,18 @@ type ConfirmDeleteProps = {
  * held here, so a list of files holds one only while its dialog is open.
  */
 export const ConfirmDelete = ({ media, onClose, onDeleted }: ConfirmDeleteProps) => {
-  const { dialog } = useModal()
+  const { dialog, keepKeys } = useModal()
   const { remove } = useMediaMutations({ media })
   const id = useId()
 
   return (
-    <dialog ref={dialog} className={styles.dialog} aria-labelledby={id} onClose={onClose}>
+    <DialogFrame
+      dialog={dialog}
+      onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.prose}
+      labelledBy={id}
+      onClose={onClose}
+    >
       <div className={styles.body}>
         <h2 id={id} className={styles.title}>
           {CONFIRM_DELETE_COPY.title(mediaLabel(media))}
@@ -39,7 +46,7 @@ export const ConfirmDelete = ({ media, onClose, onDeleted }: ConfirmDeleteProps)
         <div className={styles.actions}>
           <Button onClick={onClose}>{COMMON_COPY.cancel}</Button>
           <Button
-            tone="danger"
+            tone={BUTTON_TONES.danger}
             icon="trash"
             disabled={remove.isPending}
             onClick={() =>
@@ -55,6 +62,6 @@ export const ConfirmDelete = ({ media, onClose, onDeleted }: ConfirmDeleteProps)
           </Button>
         </div>
       </div>
-    </dialog>
+    </DialogFrame>
   )
 }

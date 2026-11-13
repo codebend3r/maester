@@ -9,7 +9,7 @@ import {
 import type { ComponentType, ReactNode } from 'react'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, type IconName } from '@raven/ui'
+import { BUTTON_TONES, Button, type IconName } from '@raven/ui'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
@@ -184,7 +184,7 @@ const SeasonViewToggle = () => {
       {Object.values(SEASON_VIEWS).map((option) => (
         <Button
           key={option}
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           icon={SEASON_VIEW_ICONS[option]}
           className={styles.view}
           aria-label={SHOW_SEASONS_COPY.views[option]}

@@ -11,7 +11,7 @@ command = "bash apps/raven/netlify-build.sh"
 publish = "apps/raven/web/dist"
 # Production builds only on release, through the build hook release.yml calls;
 # previews only when something the site bundles changed (netlify-ignore.sh).
-ignore = "bash apps/raven/netlify-ignore.sh apps/raven/web apps/raven/netlify-build.sh libs/raven/core libs/raven/ui scripts/bump_version.sh"
+ignore = "bash apps/raven/netlify-ignore.sh apps/raven/web apps/raven/netlify-build.sh libs/raven/core libs/raven/ui libs/shared/http scripts/bump_version.sh"
 
 # The functions, bundled by Netlify after the build: each is the file named after its
 # folder, so a test beside it is never bundled. The reachability function checks Remote

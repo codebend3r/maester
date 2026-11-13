@@ -7,6 +7,7 @@ import {
   episodesOf,
   inLibrary,
   seasonsOf,
+  episodePath,
 } from '@raven/core'
 import type { ComponentType } from 'react'
 import { Link } from 'react-router-dom'
@@ -75,7 +76,7 @@ const NeighbourList = ({ neighbours, libraryId, className }: NeighbourListProps)
         return (
           <li key={neighbour.id}>
             <Link
-              to={inLibrary({ page: `/episodes/${neighbour.id}`, libraryId })}
+              to={inLibrary({ page: episodePath(neighbour.id), libraryId })}
               className={styles.card}
               aria-label={PLAYABLE_ITEM_VIEW_COPY.neighbourLabel({
                 direction: DIRECTION_LABELS[direction],

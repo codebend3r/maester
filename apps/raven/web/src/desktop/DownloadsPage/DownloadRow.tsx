@@ -8,7 +8,7 @@ import {
   isMusicGroup,
   KEYS,
 } from '@raven/core'
-import { Button, type IconName } from '@raven/ui'
+import { BUTTON_TONES, Button, type IconName } from '@raven/ui'
 import {
   type ComponentType,
   type KeyboardEvent,
@@ -18,7 +18,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import { useChangeDownloads } from '@/desktop/downloadsApi'
 import { DOWNLOAD_ROW_COPY } from '@/desktop/DownloadsPage/copy'
 import { DownloadActivity } from '@/desktop/DownloadsPage/DownloadActivity'
@@ -44,29 +44,29 @@ type RowAction = (typeof ROW_ACTIONS)[keyof typeof ROW_ACTIONS]
 
 /** Each action's button: its words and its icon. */
 const ACTION_BUTTONS = {
-  play: { label: COMMON_COPY.play, icon: 'play' },
-  pause: { label: COMMON_COPY.pause, icon: 'pause' },
-  resume: { label: DOWNLOAD_ROW_COPY.resume, icon: 'download' },
-  retry: { label: DOWNLOAD_ROW_COPY.retry, icon: 'rescan' },
+  [ROW_ACTIONS.play]: { label: COMMON_COPY.play, icon: 'play' },
+  [ROW_ACTIONS.pause]: { label: COMMON_COPY.pause, icon: 'pause' },
+  [ROW_ACTIONS.resume]: { label: DOWNLOAD_ROW_COPY.resume, icon: 'download' },
+  [ROW_ACTIONS.retry]: { label: DOWNLOAD_ROW_COPY.retry, icon: 'rescan' },
 } as const satisfies Record<RowAction, { label: string; icon: IconName }>
 
-const actionOf = (status: DownloadStatus): RowAction => {
-  switch (status.kind) {
-    case DOWNLOAD_STATUS_KINDS.ready:
-      return ROW_ACTIONS.play
-    case DOWNLOAD_STATUS_KINDS.queued:
-    case DOWNLOAD_STATUS_KINDS.downloading:
-      return ROW_ACTIONS.pause
-    case DOWNLOAD_STATUS_KINDS.paused:
-      return ROW_ACTIONS.resume
-    case DOWNLOAD_STATUS_KINDS.failed:
-      return ROW_ACTIONS.retry
-    default: {
-      const unreachable: never = status
-      return unreachable
-    }
-  }
-}
+/** The action each status allows: Play once ready, Pause while it waits or runs, then Resume or Retry. */
+const STATUS_ACTIONS = {
+  [DOWNLOAD_STATUS_KINDS.ready]: ROW_ACTIONS.play,
+  [DOWNLOAD_STATUS_KINDS.queued]: ROW_ACTIONS.pause,
+  [DOWNLOAD_STATUS_KINDS.downloading]: ROW_ACTIONS.pause,
+  [DOWNLOAD_STATUS_KINDS.paused]: ROW_ACTIONS.resume,
+  [DOWNLOAD_STATUS_KINDS.failed]: ROW_ACTIONS.retry,
+} as const satisfies Record<DownloadStatus['kind'], RowAction>
+
+const actionOf = (status: DownloadStatus): RowAction => STATUS_ACTIONS[status.kind]
+
+/** The request each action but Play sends main. */
+const ACTION_REQUESTS = {
+  [ROW_ACTIONS.pause]: DESKTOP_REQUESTS.pauseDownload,
+  [ROW_ACTIONS.resume]: DESKTOP_REQUESTS.resumeDownload,
+  [ROW_ACTIONS.retry]: DESKTOP_REQUESTS.retryDownload,
+} as const satisfies Record<Exclude<RowAction, typeof ROW_ACTIONS.play>, string>
 
 /** What deleting the row frees: the whole file once ready, else what its status says is on disk. */
 const bytesOnDisk = ({ status, size }: DownloadView): number => {
@@ -244,7 +244,7 @@ const AskingRow = ({
     <div className={styles.confirm}>
       {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}
       <Button
-        tone="danger"
+        tone={BUTTON_TONES.danger}
         aria-describedby={ids.question}
         aria-disabled={isDeleting}
         onClick={onRemove}
@@ -304,7 +304,7 @@ const ViewingRow = ({
         {hasAction && (
           <Button
             className={styles.act}
-            tone={action === ROW_ACTIONS.play ? 'primary' : 'quiet'}
+            tone={action === ROW_ACTIONS.play ? BUTTON_TONES.primary : BUTTON_TONES.quiet}
             icon={actionButton.icon}
             aria-label={DOWNLOAD_ROW_COPY.actionLabel({ action: actionButton.label, label })}
             onClick={onAct}
@@ -328,7 +328,7 @@ const ViewingRow = ({
         <Button
           ref={deleteButton}
           className={styles.remove}
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           icon="trash"
           aria-label={DOWNLOAD_ROW_COPY.deleteLabel(label)}
           onClick={onAsk}
@@ -397,22 +397,8 @@ export const DownloadRow = ({ view, play, onDeleted }: DownloadRowProps) => {
     }
   }
 
-  const act = async (): Promise<unknown> => {
-    switch (action) {
-      case ROW_ACTIONS.play:
-        return playRow()
-      case ROW_ACTIONS.pause:
-        return change({ type: DESKTOP_REQUESTS.pauseDownload, downloadId })
-      case ROW_ACTIONS.resume:
-        return change({ type: DESKTOP_REQUESTS.resumeDownload, downloadId })
-      case ROW_ACTIONS.retry:
-        return change({ type: DESKTOP_REQUESTS.retryDownload, downloadId })
-      default: {
-        const unreachable: never = action
-        return unreachable
-      }
-    }
-  }
+  const act = async (): Promise<unknown> =>
+    action === ROW_ACTIONS.play ? playRow() : change({ type: ACTION_REQUESTS[action], downloadId })
 
   const remove = async () => {
     if (isDeletingNow.current) return

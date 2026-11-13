@@ -1,4 +1,3 @@
-import { NO_HOST_EXTRAS } from '@raven/ui/headless'
 import {
   AUTH_CONFIG_STATES,
   type MediaItem,
@@ -18,9 +17,11 @@ import {
   titleHomePath,
   watchLink,
   PLAYER_SOURCE_KINDS,
+  libraryPath,
 } from '@raven/core'
 import { type ComponentType, useState } from 'react'
 import {
+  BUTTON_TONES,
   ButtonLink,
   type MediaPlane,
   Player,
@@ -37,6 +38,7 @@ import {
   KeyedView,
   type ViewOf,
   type ViewsOf,
+  NO_HOST_EXTRAS,
 } from '@raven/ui/headless'
 import { OfflineWatch } from '@/browserDownloads/OfflineWatch'
 import { DesktopWatch } from '@/desktop/DesktopWatch/DesktopWatch'
@@ -56,9 +58,7 @@ import { useServerReach } from '@/stores/serverReach'
 import { WATCH_PAGE_COPY } from '@/pages/WatchPage/copy'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
-
-/** Where a video that cannot play goes back to. */
-const LIBRARIES_PATH = '/libraries'
+import { APP_PATHS } from '@/lib/appPaths'
 
 const WaitingLine = () => <p aria-live="polite">{COMMON_COPY.loading}</p>
 
@@ -67,7 +67,12 @@ type RefusedLineProps = { message: string }
 const RefusedLine = ({ message }: RefusedLineProps) => (
   <>
     <p role="alert">{message}</p>
-    <ButtonLink to={LIBRARIES_PATH} tone="pill" icon="back" className={styles.back}>
+    <ButtonLink
+      to={APP_PATHS.libraries}
+      tone={BUTTON_TONES.pill}
+      icon="back"
+      className={styles.back}
+    >
       {WATCH_PAGE_COPY.backToLibraries}
     </ButtonLink>
   </>
@@ -208,7 +213,7 @@ const watchViewOf = ({
           media: page.data,
           session: handed?.session ?? sessionOf(page.data),
           upNext: handed?.upNext ?? [],
-          backTo: `/libraries/${page.data.libraryId}`,
+          backTo: libraryPath(page.data.libraryId),
         },
       },
     }
@@ -216,7 +221,7 @@ const watchViewOf = ({
   if (isDesktop)
     return {
       key: WATCH_VIEW_KEYS.desktop,
-      props: { message: messageOf(page), fallback: LIBRARIES_PATH },
+      props: { message: messageOf(page), fallback: APP_PATHS.libraries },
     }
   return { key: WATCH_VIEW_KEYS.browser, props: { message: messageOf(page) } }
 }
@@ -272,8 +277,8 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
     ...NO_HOST_EXTRAS,
     title: {
       label: mediaLabel(media),
-      logo,
       context: null,
+      logo,
       homeTo: media.item == null ? null : titleHomePath(media.item),
       duration: media.duration,
       resumeAt: resumeAtFor({ at: 0, media }),

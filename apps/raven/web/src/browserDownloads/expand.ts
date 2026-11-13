@@ -25,7 +25,7 @@ import {
   titleItemIdOf,
 } from '@raven/core'
 import { BROWSER_DOWNLOAD_COPY } from '@/browserDownloads/copy'
-import { HTTP } from '@/browserDownloads/outcomes'
+import { HTTP_STATUSES } from '@shared/http'
 
 /** The server calls an expansion makes, so a test answers them from a table. */
 export type ExpandApi = Pick<ApiClient, 'getMedia' | 'getItem' | 'listSagas' | 'getLibrary'>
@@ -95,8 +95,9 @@ const failureOf = (error: unknown): Expansion => {
     return { ok: false, reason: EXPAND_REASONS.locked, message: BROWSER_DOWNLOAD_COPY.locked }
   }
   if (!(error instanceof ApiError)) return refusal(BROWSER_DOWNLOAD_COPY.unreachable)
-  if (error.status === HTTP.notFound) return refusal(BROWSER_DOWNLOAD_COPY.gone)
-  const isAccount = error.status === HTTP.unauthorized || error.status === HTTP.forbidden
+  if (error.status === HTTP_STATUSES.notFound) return refusal(BROWSER_DOWNLOAD_COPY.gone)
+  const isAccount =
+    error.status === HTTP_STATUSES.unauthorized || error.status === HTTP_STATUSES.forbidden
   return refusal(isAccount ? BROWSER_DOWNLOAD_COPY.account : BROWSER_DOWNLOAD_COPY.unreachable)
 }
 

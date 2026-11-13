@@ -1,5 +1,5 @@
 import { DESKTOP_REQUESTS, KEYS } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import {
   type ComponentType,
   type KeyboardEvent,
@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import { useChangeDownloads, useDownloads, useSpace } from '@/desktop/downloadsApi'
 import { DOWNLOADS_SECTION_COPY } from '@/desktop/settings/copy'
 import { Section } from '@/pages/SettingsPage/Section'
@@ -18,6 +18,7 @@ import { useDownloadsHost } from '@/stores/downloadsHost'
 import styles from '@/desktop/settings/DesktopSettings.module.scss'
 import settings from '@/pages/SettingsPage/SettingsPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { ToggleChoice } from '@/pages/SettingsPage/ToggleChoice'
 
 /** Whether the section asks before deleting every download, or offers to. */
 const ASK_STATES = { idle: 'idle', asking: 'asking' } as const
@@ -61,7 +62,7 @@ const DeleteAllQuestion = ({
     <div className={`${styles.buttons} ${styles.answers}`}>
       {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}
       <Button
-        tone="danger"
+        tone={BUTTON_TONES.danger}
         aria-describedby={questionId}
         aria-disabled={isDeleting}
         onClick={onDeleteAll}
@@ -92,7 +93,13 @@ const DownloadsButtons = ({
         {DOWNLOADS_SECTION_COPY.showInFinder}
       </Button>
     )}
-    <Button ref={askButton} tone="danger" icon="trash" disabled={!hasDownloads} onClick={onAsk}>
+    <Button
+      ref={askButton}
+      tone={BUTTON_TONES.danger}
+      icon="trash"
+      disabled={!hasDownloads}
+      onClick={onAsk}
+    >
       {DOWNLOADS_SECTION_COPY.deleteAllDownloads}
     </Button>
   </div>
@@ -171,24 +178,14 @@ export const DownloadsSection = () => {
         </p>
       )}
       {data !== null && host.canAutoDelete && (
-        <label className={settings.choice}>
-          <input
-            type="checkbox"
-            checked={data.shouldAutoDelete}
-            onChange={(event) =>
-              handled(
-                change({
-                  type: DESKTOP_REQUESTS.setDownloadDefaults,
-                  shouldAutoDelete: event.target.checked,
-                }),
-              )
-            }
-          />
-          <span className={settings.choiceLabel}>{COMMON_COPY.deleteOnceWatched}</span>
-          <span className={settings.choiceHint}>
-            {DOWNLOADS_SECTION_COPY.deleteOnceWatchedHint}
-          </span>
-        </label>
+        <ToggleChoice
+          label={COMMON_COPY.deleteOnceWatched}
+          hint={DOWNLOADS_SECTION_COPY.deleteOnceWatchedHint}
+          isChecked={data.shouldAutoDelete}
+          onChange={(shouldAutoDelete) =>
+            handled(change({ type: DESKTOP_REQUESTS.setDownloadDefaults, shouldAutoDelete }))
+          }
+        />
       )}
       {space.data !== undefined && (
         <p className={settings.hint}>

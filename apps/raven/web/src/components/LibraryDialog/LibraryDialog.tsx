@@ -17,10 +17,11 @@ import {
   matchTypeFor,
   validateLibraryInput,
   withLibraryKind,
+  libraryPath,
 } from '@raven/core'
 import { type ComponentType, type FormEvent, type ReactNode, useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Icon } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import { FolderBrowser } from '@/components/FolderBrowser/FolderBrowser'
 import { IconPicker } from '@/components/LibraryDialog/IconPicker'
 import { api } from '@/lib/api'
@@ -31,6 +32,8 @@ import { useModal } from '@/lib/useModal'
 import { LIBRARY_DIALOG_COPY } from '@/components/LibraryDialog/copy'
 import styles from '@/components/LibraryDialog/LibraryDialog.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { APP_PATHS } from '@/lib/appPaths'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 type PathLayoutLabelProps = {
   layout: PathLayout | null
@@ -154,7 +157,7 @@ type LibraryDialogProps = { library?: Library; onClose: () => void }
  * Escape; closing hands focus back to whatever opened it.
  */
 export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
-  const { dialog } = useModal()
+  const { dialog, keepKeys } = useModal()
   const ids = {
     name: useId(),
     errors: useId(),
@@ -175,13 +178,15 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const metadata = useQuery(metadataHealthQuery)
   // `off` is exactly "no key": a key that fails is the health check's to report.
-  const isAiOff = metadata.data?.ai === METADATA_SERVICE_STATES.off
+  const isAiOff = (metadata.data?.ai ?? null) === METADATA_SERVICE_STATES.off
   const lock = useQuery(lockQuery)
   const lockable = !!lock.data?.available
   const isMatched = matchTypeFor(settings.kind) != null
   const TmdbHint =
     TMDB_HINTS[
-      metadata.data?.tmdb === METADATA_SERVICE_STATES.off ? SERVICE_STATES.off : SERVICE_STATES.on
+      (metadata.data?.tmdb ?? null) === METADATA_SERVICE_STATES.off
+        ? SERVICE_STATES.off
+        : SERVICE_STATES.on
     ]
   const LockHint = LOCK_HINTS[lockable ? SERVICE_STATES.on : SERVICE_STATES.off]
 
@@ -193,7 +198,7 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
     onSuccess: async (saved) => {
       await refresh()
       onClose()
-      if (!library) navigate(`/libraries/${saved.id}`)
+      if (!library) navigate(libraryPath(saved.id))
     },
     onError: (error) => setErrors([error.message]),
   })
@@ -204,7 +209,7 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
     onSuccess: (_answer, id) => {
       afterLibraryDeleted({ queryClient, id }).catch(() => undefined)
       onClose()
-      navigate('/libraries')
+      navigate(APP_PATHS.libraries)
     },
     onError: (error) => setErrors([error.message]),
   })
@@ -236,10 +241,11 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
   }
 
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={`${ids.name}-title`}
+    <DialogFrame
+      dialog={dialog}
+      onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.form}
+      labelledBy={`${ids.name}-title`}
       onClose={onClose}
     >
       <form className={styles.form} onSubmit={submit} noValidate>
@@ -481,7 +487,7 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
         <div className={styles.actions}>
           {!!library && (
             <Button
-              tone="danger"
+              tone={BUTTON_TONES.danger}
               icon="trash"
               className={styles.delete}
               disabled={remove.isPending}
@@ -493,11 +499,11 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
             </Button>
           )}
           <Button onClick={() => dialog.current?.close()}>{COMMON_COPY.cancel}</Button>
-          <Button type="submit" tone="primary" disabled={save.isPending}>
+          <Button type="submit" tone={BUTTON_TONES.primary} disabled={save.isPending}>
             {library ? LIBRARY_DIALOG_COPY.saveChanges : COMMON_COPY.addLibrary}
           </Button>
         </div>
       </form>
-    </dialog>
+    </DialogFrame>
   )
 }

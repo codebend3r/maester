@@ -1,7 +1,7 @@
 import { DESKTOP_REQUESTS } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import type { DesktopClient } from '@/desktop/client'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 
 type UseLeaveSignalProps = {
   client: DesktopClient

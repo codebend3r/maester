@@ -10,6 +10,7 @@ import {
 import type { DownloadClock } from '@/browserDownloads/clock'
 import type { ExpandApi } from '@/browserDownloads/expand'
 import { type DownloadWay, VARIANT_OF } from '@/browserDownloads/ways'
+import { HEADERS } from '@shared/http'
 
 /** The part of a `Response` the engine reads a file's bytes from. */
 export type BytesAnswer = {
@@ -47,8 +48,6 @@ export const TICKET_REUSE_MS = 240_000
 /** At most this many tickets are minted in any five minutes, so a queue never uses up the account's. */
 export const MINTS_PER_WINDOW = 16
 export const MINT_WINDOW_MS = 300_000
-
-export const RANGE_HEADER = 'range'
 
 /** Names the request a download, so the server's Streams page lists it apart from what is watched. */
 const asDownload = (url: string): string =>
@@ -114,7 +113,7 @@ export const mediaServerFor = ({ api, fetch, origin, clock }: MediaServerProps):
           ? api.fileUrl({ id: mediaId, access })
           : api.deviceDownloadFileUrl({ id: mediaId, access, variant })
       return fetch(asDownload(url), {
-        headers: from > 0 ? { [RANGE_HEADER]: `bytes=${from}-` } : {},
+        headers: from > 0 ? { [HEADERS.range]: `bytes=${from}-` } : {},
         signal,
       })
     },
