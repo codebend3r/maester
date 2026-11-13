@@ -107,7 +107,7 @@ const entryOf = (world: World, downloadId = ID) =>
 const removing = (world: World, downloadId = ID): void => {
   const entry = entryOf(world, downloadId)
   if (entry === null) throw new Error('no such download')
-  world.store.update((state) => remove(state, { downloadId }))
+  world.store.update((state) => remove({ state, downloadId }))
   world.playback.forget([entry])
 }
 
@@ -181,7 +181,7 @@ describe('open', () => {
 describe('openTitle', () => {
   it("grants a server title's ready download, the page on it and its next position a play", async () => {
     const world = setup({ entries: [entryFor({})], videos: { [VIDEO]: FILE } })
-    const fileId = await world.playback.openTitle({ serverId: SERVER_ID, mediaId: 11 })
+    const fileId = await world.playback.openTitle({ mediaId: 11 })
     if (fileId === null) throw new Error('expected the download')
     expect(world.grants.fileOf(fileId)?.path ?? null).toBe(VIDEO)
     expect(world.playback.isPlaying(ID)).toBe(true)
@@ -195,19 +195,18 @@ describe('openTitle', () => {
     })
   })
 
-  it('opens nothing for a title with no download, or one not ready, or on another server', async () => {
+  it('opens nothing for a title with no download, or one not ready', async () => {
     const world = setup({
       entries: [entryFor({}), episodeOf(2, { status: { kind: DOWNLOAD_STATUS_KINDS.queued } })],
       videos: { [VIDEO]: FILE },
     })
-    expect(await world.playback.openTitle({ serverId: SERVER_ID, mediaId: 99 })).toBeNull()
-    expect(await world.playback.openTitle({ serverId: SERVER_ID, mediaId: 12 })).toBeNull()
-    expect(await world.playback.openTitle({ serverId: OTHER_SERVER_ID, mediaId: 11 })).toBeNull()
+    expect(await world.playback.openTitle({ mediaId: 99 })).toBeNull()
+    expect(await world.playback.openTitle({ mediaId: 12 })).toBeNull()
   })
 
   it('opens nothing, with a warning, for a download whose file has gone', async () => {
     const world = setup({ entries: [entryFor({})] })
-    expect(await world.playback.openTitle({ serverId: SERVER_ID, mediaId: 11 })).toBeNull()
+    expect(await world.playback.openTitle({ mediaId: 11 })).toBeNull()
     expect(world.warnings).toEqual(['Raven could not open the file of S01E01 Good News'])
   })
 })
@@ -280,14 +279,12 @@ describe('what names a download', () => {
     expect(world.playback.sidecarsOf(UNKNOWN_ID)).toEqual([])
   })
 
-  it("says a download came from its server by the server's name now, and nothing for another file", () => {
+  it('says a download came from its server, and nothing for another file', () => {
     const world = setup({ entries: [entryFor({})] })
-    expect(world.playback.fromLabelOf({ path: VIDEO })).toBe('Downloaded from Vhagar')
+    expect(world.playback.fromLabelOf({ path: VIDEO })).toBe('Downloaded from raven')
     expect(world.playback.fromLabelOf({ path: MOVIE_PATH })).toBeNull()
     expect(world.playback.fromLabelOf({ path: `${DOWNLOADS}/../Movies/x.mkv` })).toBeNull()
     expect(world.playback.fromLabelOf({ path: `${DOWNLOADS}/x.mkv` })).toBeNull()
-    world.names.set(SERVER_ID, 'Caraxes')
-    expect(world.playback.fromLabelOf({ path: VIDEO })).toBe('Downloaded from Caraxes')
   })
 
   it('says only "Downloaded" for a download of a server Raven no longer keeps, never its folder', () => {
@@ -336,12 +333,7 @@ describe('notePosition', () => {
     })
     // What a sync sent is cleared, so a second play would show.
     world.store.update((state) =>
-      clearPending(state, {
-        downloadId: ID,
-        sentPlay: true,
-        sentPosition: 100,
-        sentFurthest: 100,
-      }),
+      clearPending({ state, downloadId: ID, sentPlay: true, sentPosition: 100, sentFurthest: 100 }),
     )
     world.clock.now = NOW + 2
     world.playback.notePosition({ fileId, position: 200, duration: 3000 })

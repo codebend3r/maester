@@ -19,14 +19,14 @@ import {
   WEB_HOST,
   WEB_HOST_ERRORS,
   WEB_HOST_PORT,
+  URL_PROTOCOLS,
 } from '@raven/core'
 import { WEB_DIST } from '@/build/forgeOptions'
 import { errorText } from '@/main/log/errorText'
 import { quietly } from '@/main/log/quietly'
-import { ERROR_CODES, errorCodeOf, type Timers } from '@/main/stateStore'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { HTTP_STATUSES } from '@/shared/httpStatuses'
-import { URL_PROTOCOLS } from '@/shared/playLink'
+import { ERROR_CODES, errorCodeOf } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
+import { HEADERS, HTTP_STATUSES, CONTENT_TYPES } from '@shared/http'
 
 /** The log line the packaged smoke waits for: the page has somewhere to load from. */
 export const WEB_HOST_READY = 'web host ready'
@@ -51,16 +51,14 @@ const CACHE_POLICIES = {
   never: 'no-store',
 } as const
 
-const HTML_TYPE = 'text/html; charset=utf-8'
-const JSON_TYPE = 'application/json'
-
-const CONTENT_TYPES = new Map(
+/** The content type of each file extension the build serves. */
+const TYPES_BY_EXTENSION = new Map(
   Object.entries({
-    html: HTML_TYPE,
+    html: CONTENT_TYPES.html,
     js: 'text/javascript; charset=utf-8',
     css: 'text/css; charset=utf-8',
     svg: 'image/svg+xml',
-    json: JSON_TYPE,
+    json: CONTENT_TYPES.json,
     png: 'image/png',
     ico: 'image/x-icon',
     woff2: 'font/woff2',
@@ -79,16 +77,16 @@ const HTTP_EVENTS = {
 
 /** Headers that belong to one connection, not to the request or answer it carries. */
 const HOP_BY_HOP = new Set<string>([
-  HTTP_HEADERS.connection,
-  HTTP_HEADERS.keepAlive,
-  HTTP_HEADERS.proxyAuthenticate,
-  HTTP_HEADERS.proxyAuthorization,
-  HTTP_HEADERS.te,
-  HTTP_HEADERS.trailer,
-  HTTP_HEADERS.transferEncoding,
-  HTTP_HEADERS.upgrade,
+  HEADERS.connection,
+  HEADERS.keepAlive,
+  HEADERS.proxyAuthenticate,
+  HEADERS.proxyAuthorization,
+  HEADERS.te,
+  HEADERS.trailer,
+  HEADERS.transferEncoding,
+  HEADERS.upgrade,
   // The request names the server it goes to instead.
-  HTTP_HEADERS.host,
+  HEADERS.host,
 ])
 
 // The web signs in with Supabase Auth directly: the one origin the page calls besides its own.
@@ -261,8 +259,8 @@ export const createWebHostHandler = ({
   const reach = { isReachable: true }
 
   const guarded = (inlineHashes: InlineHashes = NO_INLINE_HASHES): OutgoingHttpHeaders => ({
-    [HTTP_HEADERS.contentSecurityPolicy]: contentSecurityPolicy({ inlineHashes, authOrigin }),
-    [HTTP_HEADERS.contentTypeOptions]: 'nosniff',
+    [HEADERS.contentSecurityPolicy]: contentSecurityPolicy({ inlineHashes, authOrigin }),
+    [HEADERS.contentTypeOptions]: 'nosniff',
   })
 
   const read = (path: string) =>
@@ -282,7 +280,7 @@ export const createWebHostHandler = ({
       answer({
         response,
         status: HTTP_STATUSES.methodNotAllowed,
-        headers: { ...guarded(), [HTTP_HEADERS.allow]: ALLOWED_METHODS },
+        headers: { ...guarded(), [HEADERS.allow]: ALLOWED_METHODS },
       })
       return
     }
@@ -310,17 +308,20 @@ export const createWebHostHandler = ({
       answer({ response, status: HTTP_STATUSES.notFound, headers: guarded() })
       return
     }
-    const type = CONTENT_TYPES.get(extensionOf(basename(file.path))) ?? 'application/octet-stream'
+    const type =
+      TYPES_BY_EXTENSION.get(extensionOf(basename(file.path))) ?? 'application/octet-stream'
     const inlineHashes =
-      type === HTML_TYPE ? inlineHashesOf(new TextDecoder().decode(file.bytes)) : NO_INLINE_HASHES
+      type === CONTENT_TYPES.html
+        ? inlineHashesOf(new TextDecoder().decode(file.bytes))
+        : NO_INLINE_HASHES
     answer({
       response,
       status: HTTP_STATUSES.ok,
       headers: {
         ...guarded(inlineHashes),
-        [HTTP_HEADERS.contentType]: type,
-        [HTTP_HEADERS.contentLength]: `${file.bytes.byteLength}`,
-        [HTTP_HEADERS.cacheControl]:
+        [HEADERS.contentType]: type,
+        [HEADERS.contentLength]: `${file.bytes.byteLength}`,
+        [HEADERS.cacheControl]:
           isAsset && found !== null ? CACHE_POLICIES.immutable : CACHE_POLICIES.revalidate,
       },
       body: request.method === HTTP_METHODS.head ? undefined : file.bytes,
@@ -338,8 +339,8 @@ export const createWebHostHandler = ({
       response,
       status: HTTP_STATUSES.badGateway,
       headers: {
-        [HTTP_HEADERS.contentType]: JSON_TYPE,
-        [HTTP_HEADERS.cacheControl]: CACHE_POLICIES.never,
+        [HEADERS.contentType]: CONTENT_TYPES.json,
+        [HEADERS.cacheControl]: CACHE_POLICIES.never,
       },
       body: JSON.stringify({ error: WEB_HOST_ERRORS.serverUnreachable }),
     })

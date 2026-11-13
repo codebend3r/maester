@@ -7,7 +7,7 @@ import {
   linksFromArgv,
   pathsFromArgv,
 } from '@/main/openBatch'
-import type { Timers } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 import { MAX_QUEUE } from '@/shared/hostNames'
 
 const FILM = '00000000-0000-4000-8000-000000000001'

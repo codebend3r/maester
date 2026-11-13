@@ -1,7 +1,7 @@
-import { AUTH_REFUSALS, isAuthRefusal, type AuthRefusal } from '@raven/core'
+import { AUTH_REFUSALS, type AuthRefusal, type Infer, isAuthRefusal, oneOf } from '@raven/core'
 import { parseJson } from '@/main/parseJson'
 import { OVERFLOWS, readCapped } from '@/main/servers/cappedBody'
-import { HTTP_STATUSES } from '@/shared/httpStatuses'
+import { HTTP_STATUSES } from '@shared/http'
 
 /** What a refused request's body is read up to, for the reason it carries. */
 const REFUSAL_MAX_CHARS = 4096
@@ -10,38 +10,39 @@ const REFUSAL_MAX_CHARS = 4096
 export const readShort = (body: ReadableStream<Uint8Array> | null): Promise<string> =>
   readCapped({ body, maxChars: REFUSAL_MAX_CHARS, onOverflow: OVERFLOWS.truncate }).catch(() => '')
 
-/** The reason a refused answer's body gives, or null when the body is no auth refusal. */
-const refusalIn = (body: string): AuthRefusal['reason'] | null => {
-  const parsed = parseJson(body)
-  return isAuthRefusal(parsed) ? parsed.reason : null
-}
+/** A refusal of the account itself; `unavailable` is the server's outage, not the account's. */
+export const isAccountRefusal = oneOf([
+  AUTH_REFUSALS.signedOut,
+  AUTH_REFUSALS.pending,
+  AUTH_REFUSALS.revoked,
+  AUTH_REFUSALS.notOwner,
+] as const satisfies readonly Exclude<AuthRefusal['reason'], typeof AUTH_REFUSALS.unavailable>[])
 
-/** The `401` and `403` a server refuses an account with. */
-export const ACCOUNT_REFUSAL_STATUSES = [
-  HTTP_STATUSES.unauthorized,
-  HTTP_STATUSES.forbidden,
-] as const
+export type AccountRefusal = Infer<typeof isAccountRefusal>
 
-type RefusalAtProps = {
-  status: number
-  body: string
-  statuses: readonly number[]
-}
-
-/** The reason a reply gives when its status is one of `statuses`; null for any other reply. */
-export const refusalAt = ({
-  status,
-  body,
-  statuses,
-}: RefusalAtProps): AuthRefusal['reason'] | null =>
-  statuses.includes(status) ? refusalIn(body) : null
+/** What a `401` or `403` with no reason of its own stands for. */
+const REFUSAL_BY_STATUS: ReadonlyMap<number, AccountRefusal> = new Map([
+  [HTTP_STATUSES.unauthorized, AUTH_REFUSALS.signedOut],
+  [HTTP_STATUSES.forbidden, AUTH_REFUSALS.revoked],
+])
 
 type AccountRefusalOfProps = {
   status: number
   body: string
 }
 
-/** Why a `401` or `403` refused the account: the reason its body gives, or the one its status stands for. */
-export const accountRefusalOf = ({ status, body }: AccountRefusalOfProps): AuthRefusal['reason'] =>
-  refusalIn(body) ??
-  (status === HTTP_STATUSES.unauthorized ? AUTH_REFUSALS.signedOut : AUTH_REFUSALS.revoked)
+/**
+ * Why a `401` or `403` refused the account: the reason its body gives, or the one its status
+ * stands for. Null for any other status, and for accounts that are down, which are the server's
+ * outage rather than a refusal of this account.
+ */
+export const accountRefusalOf = ({
+  status,
+  body,
+}: AccountRefusalOfProps): AccountRefusal | null => {
+  const byStatus = REFUSAL_BY_STATUS.get(status)
+  if (byStatus === undefined) return null
+  const parsed = parseJson(body)
+  if (!isAuthRefusal(parsed)) return byStatus
+  return isAccountRefusal(parsed.reason) ? parsed.reason : null
+}

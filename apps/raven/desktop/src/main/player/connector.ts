@@ -3,11 +3,12 @@ import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import { ENGINE_STATUSES, type OpenedEngine } from '@/main/player/engine'
 import {
   connectPort,
+  type PortConnection,
   type PortLike,
   type PortRequest,
   type PortService,
 } from '@/main/player/playerPort'
-import type { Timers } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 import { messageOf } from '@/shared/messageOf'
 
 /**
@@ -17,6 +18,9 @@ import { messageOf } from '@/shared/messageOf'
 export const OPEN_MS = 5000
 
 type PostProps<R> = { connection: PlayerConnectionStatus; ports: R[] }
+
+/** Hands the page its port to an engine, and takes it back. */
+type Connector = { connect: () => Promise<void>; disconnect: () => void }
 
 type CreateConnectorProps<
   C extends { type: string },
@@ -52,12 +56,12 @@ export const createConnector = <
   unavailable,
   warn,
   timers,
-}: CreateConnectorProps<C, E, T, R>): { connect: () => Promise<void>; disconnect: () => void } => {
+}: CreateConnectorProps<C, E, T, R>): Connector => {
   const UNAVAILABLE = {
     status: ENGINE_STATUSES.unavailable,
     message: unavailable,
   } as const satisfies OpenedEngine<never>
-  let current: { close: () => void } | null = null
+  let current: PortConnection | null = null
   // Bumped by every connect and disconnect, so an engine that opens late hands over nothing.
   let generation = 0
 

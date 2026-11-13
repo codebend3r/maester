@@ -2,7 +2,8 @@ import { join } from 'node:path'
 import { isOpaqueId } from '@raven/core'
 import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
 import { loggable } from '@/main/servers/serverCalls'
-import { isMissingFile, type Timers } from '@/main/stateStore'
+import { isMissingFile } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 import { messageOf } from '@/shared/messageOf'
 
 /** The folder under userData where Electron keeps each `persist:` partition. */

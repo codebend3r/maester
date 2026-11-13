@@ -1,5 +1,4 @@
-import { PAGE_ORIGIN } from '@raven/core'
-import { URL_PROTOCOLS } from '@/shared/playLink'
+import { PAGE_ORIGIN, URL_PROTOCOLS } from '@raven/core'
 
 /** The permissions the page may have; Electron names permissions as plain strings. */
 export const PERMISSIONS = {
@@ -26,8 +25,13 @@ export const isExternalLink = (url: string): boolean => {
 
 const isElsewhere = (url: string): boolean => isExternalLink(url) && !isPageUrl(url)
 
-export const windowOpenFor = (url: string): { action: 'deny'; shouldOpenExternally: boolean } => ({
-  action: 'deny',
+/** What Electron's `setWindowOpenHandler` is answered: no new window, ever. */
+const WINDOW_OPEN_ACTIONS = { deny: 'deny' } as const
+
+type WindowOpen = { action: typeof WINDOW_OPEN_ACTIONS.deny; shouldOpenExternally: boolean }
+
+export const windowOpenFor = (url: string): WindowOpen => ({
+  action: WINDOW_OPEN_ACTIONS.deny,
   shouldOpenExternally: isElsewhere(url),
 })
 

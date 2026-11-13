@@ -1,4 +1,3 @@
-import { desktopPlatformFor } from '@/shared/platform'
 import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
@@ -6,6 +5,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { DESKTOP_PLATFORMS, type DesktopPlatform } from '@raven/core'
+import { desktopPlatformFor } from '@/shared/platform'
 import { WINDOWS_EXE } from '@/build/bundleAudit'
 import { versionOf } from '@/build/dmgMaker'
 import {

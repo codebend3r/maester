@@ -35,7 +35,6 @@ const setup = () => {
   const asks: AskInput[] = []
   const opener = createLinkOpener({
     isServerOrigin: (origin) => origin === ORIGIN || origin === ALIAS,
-    serverId: () => SERVER_ID,
     downloads: {
       ask: async (input) => {
         asks.push(input)
@@ -81,7 +80,7 @@ describe('createLinkOpener', () => {
   ] as const)('answers %j with the download ask for the server', async (link, target) => {
     const world = setup()
     expect(await world.opener.open({ link })).toEqual(ASK_REPLY)
-    expect(world.asks).toEqual([{ serverId: SERVER_ID, target }])
+    expect(world.asks).toEqual([{ target }])
   })
 
   it.each([
@@ -139,7 +138,6 @@ describe('createLinkOpener', () => {
     const server = fixedServerFrom({ origin: DEFAULT_SERVER_ORIGIN, linkOrigins: [] })
     const opener = createLinkOpener({
       isServerOrigin: (origin) => namesServer({ server, origin }),
-      serverId: () => SERVER_ID,
       downloads: { ask: async () => ASK_REPLY },
       warn: () => undefined,
     })

@@ -15,7 +15,7 @@ import {
 } from '@raven/core'
 import type { PageAccount } from '@/main/accounts/pageAccount'
 import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
-import { type ConfigStore, pickOutput, serverOf } from '@/main/desktopConfig'
+import { pickOutput } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import { grantNext } from '@/main/folder'
 import { GRANT_REFUSALS, type GrantedFile, type GrantRefusal, type Grants } from '@/main/grants'
@@ -37,7 +37,8 @@ import {
 import { DONE, refused } from '@/main/replies'
 import type { LinkOpener } from '@/main/servers/linkOpener'
 import type { ServerTitles } from '@/main/servers/serverTitles'
-import type { StateStore, Timers } from '@/main/stateStore'
+import type { StateStore } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 import { UPDATE_COPY, type UpdateService } from '@/main/updateService'
 import { MAX_QUEUE } from '@/shared/hostNames'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
@@ -78,7 +79,6 @@ export type DesktopServiceDeps = {
   controlWindow: (action: WindowAction) => void
   startWindowResize: (start: WindowResizeStart) => void
   moveWindowResize: (move: WindowResizeMove) => void
-  config: ConfigStore
   links: LinkOpener
   updates: UpdateService
   downloads: DownloadService
@@ -110,7 +110,7 @@ const messageFor = (reason: GrantRefusal): string => {
 }
 
 export const createDesktopService = (deps: DesktopServiceDeps): DesktopService => {
-  const { grants, store, readdir, now, config } = deps
+  const { grants, store, readdir, now } = deps
   // Session ids for recents, keyed by `recentKey`, so the page never holds a path or a server's address.
   const idByKey = new Map<string, string>()
   const entryById = new Map<string, RecentEntry>()
@@ -467,7 +467,7 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
       case DESKTOP_REQUESTS.accountToken:
         return deps.account.set(request.session) ? DONE : refused(MESSAGES.badSession)
       case DESKTOP_REQUESTS.askDownload:
-        return deps.downloads.ask({ serverId: serverOf(config.read()).id, target: request.target })
+        return deps.downloads.ask({ target: request.target })
       case DESKTOP_REQUESTS.playTitle:
         return deps.titles.play({ mediaId: request.mediaId, at: request.at, next: request.next })
       default: {

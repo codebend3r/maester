@@ -11,8 +11,8 @@ import {
   readJsonFile,
   loadState,
   type StateFs,
-  type Timers,
 } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 
 const EMPTY_CONFIG = configFor(SERVER)
 const FILE = '/data/player-state.json'
@@ -199,6 +199,23 @@ describe('createStateStore', () => {
     const { store } = setup()
     expect(store.read()).toEqual(EMPTY_STATE)
     expect(store.isDirty()).toBe(false)
+  })
+
+  it('writes an initial value the file does not hold yet on the first flush', async () => {
+    const fake = createFakeFs({})
+    const store = createStateStore({
+      fs: fake.fs,
+      file: FILE,
+      initial: named('/upgraded'),
+      timers: createFakeTimers().timers,
+      debounceMs: 2000,
+      onError: () => undefined,
+      isInitialUnsaved: true,
+    })
+    expect(store.isDirty()).toBe(true)
+    await store.flush()
+    expect(store.isDirty()).toBe(false)
+    expect(fake.files.get(FILE)).toBe(JSON.stringify(named('/upgraded')))
   })
 
   it('an update that changes nothing marks nothing dirty and writes nothing', async () => {

@@ -81,7 +81,7 @@ describe('what an account watched', () => {
     expect(world.pending.size).toBe(0)
     world.server.answer = async () => NO_CONTENT
     world.store.update((state) =>
-      oweOtherAccounts(state, { serverId: SERVER_ID, accountId: ACCOUNT_B }),
+      oweOtherAccounts({ state, serverId: SERVER_ID, accountId: ACCOUNT_B }),
     )
     world.note({ position: 40 })
     world.fireAt(SYNC_DEBOUNCE_MS)
@@ -100,7 +100,7 @@ describe('what an account watched', () => {
     await ticks(3)
     world.signedIn.accountId = ACCOUNT_B
     world.store.update((state) =>
-      oweOtherAccounts(state, { serverId: SERVER_ID, accountId: ACCOUNT_B }),
+      oweOtherAccounts({ state, serverId: SERVER_ID, accountId: ACCOUNT_B }),
     )
     world.note({ play: true, position: 40 })
     held.open(NO_CONTENT)

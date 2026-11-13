@@ -1,4 +1,3 @@
-import { desktopPlatformFor } from '@/shared/platform'
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdtemp, readdir, readFile, rm, symlink } from 'node:fs/promises'
@@ -6,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { promisify } from 'node:util'
 import { DESKTOP_PLATFORMS } from '@raven/core'
+import { desktopPlatformFor } from '@/shared/platform'
 import { isPrebuilt } from '@raven/mpv'
 import {
   auditMachO,

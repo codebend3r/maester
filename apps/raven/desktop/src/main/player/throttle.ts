@@ -1,4 +1,4 @@
-import type { Timers } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 
 type CreateThrottleProps<T> = {
   timers: Timers

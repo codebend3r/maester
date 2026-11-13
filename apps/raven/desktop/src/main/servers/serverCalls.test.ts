@@ -1,10 +1,8 @@
 import { AUTH_HEADERS, AUTH_REFUSALS, AUTH_SCHEME, SERVER_METHODS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
-import { SERVER_GONE, type ServerEntry } from '@/main/desktopConfig'
+import { SERVER_NAME, type ServerEntry } from '@/main/desktopConfig'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
-import { SOURCE_MESSAGES } from '@/main/servers/serverSources'
 import { tokenFor } from '@/main/test/accountTokens'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import {
   CALL_MESSAGES,
   CALL_TIMEOUT_MS,
@@ -19,6 +17,7 @@ import {
   type ServerCallResult,
   type ServerFetch,
 } from '@/main/servers/serverCalls'
+import { HEADERS } from '@shared/http'
 
 type Sent = Parameters<ServerFetch>[0]
 const ANSWER_KINDS = {
@@ -37,13 +36,6 @@ type Answer =
 const SERVER: ServerEntry = {
   id: '00000000-0000-4000-8000-000000000001',
   origin: 'https://raven.example',
-  name: 'raven.example',
-}
-
-const OTHER: ServerEntry = {
-  id: '00000000-0000-4000-8000-000000000002',
-  origin: 'https://other.example',
-  name: 'other.example',
 }
 
 type ReplyProps = { status?: number; text?: string }
@@ -100,21 +92,15 @@ const fakeFetch = ({ answer = () => reply() }: FakeFetchProps = {}) => {
   return { fetch, sent, release, releaseAll }
 }
 
-type SetupPropsAuthorizeProps = { serverId: string }
-
-type UnlockOfProps = { serverId: string }
-
 type SetupProps = {
   answer?: (sent: Sent) => Answer
-  servers?: readonly ServerEntry[]
   isWarnBroken?: boolean
-  authorize?: (input: SetupPropsAuthorizeProps) => string | null
-  unlockOf?: (input: UnlockOfProps) => Promise<string | null>
+  authorize?: () => string | null
+  unlockOf?: () => Promise<string | null>
 }
 
 const setup = ({
   answer,
-  servers = [SERVER, OTHER],
   isWarnBroken = false,
   authorize = () => null,
   unlockOf = async () => null,
@@ -122,7 +108,7 @@ const setup = ({
   const fake = fakeFetch({ answer })
   const warnings: string[] = []
   const calls = createServerCalls({
-    serverOf: (serverId) => servers.find((server) => server.id === serverId) ?? null,
+    server: SERVER,
     fetch: fake.fetch,
     authorize,
     unlockOf,
@@ -136,14 +122,6 @@ const setup = ({
 
 const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
 
-describe('SERVER_GONE', () => {
-  it("is main's one message for a server it no longer reaches, written out here", () => {
-    expect(SERVER_GONE).toBe('Raven no longer plays from that server.')
-    expect(CALL_MESSAGES.unknownServer).toBe(SERVER_GONE)
-    expect(SOURCE_MESSAGES.unknownServer).toBe(SERVER_GONE)
-  })
-})
-
 describe('the call values', () => {
   it('has the timeout, the reply cap, the in-flight cap and the messages', () => {
     expect(CALL_TIMEOUT_MS).toBe(10_000)
@@ -152,12 +130,10 @@ describe('the call values', () => {
     expect(MAX_IN_FLIGHT).toBe(6)
     expect(WRITE_RESERVE).toBe(2)
     expect(CALL_MESSAGES.offList).toBe('Raven does not make that call.')
-    expect(CALL_MESSAGES.unreachable('raven.example')).toBe('Raven could not reach raven.example.')
-    expect(CALL_MESSAGES.tooBig('raven.example')).toBe('raven.example sent more than Raven reads.')
-    expect(CALL_MESSAGES.busy('raven.example')).toBe('Raven is still waiting on raven.example.')
-    expect(CALL_MESSAGES.otherAccount('raven.example')).toBe(
-      'Raven is signed in to raven.example as someone else now.',
-    )
+    expect(CALL_MESSAGES.unreachable).toBe('Raven could not reach raven.')
+    expect(CALL_MESSAGES.tooBig).toBe('raven sent more than Raven reads.')
+    expect(CALL_MESSAGES.busy).toBe('Raven is still waiting on raven.')
+    expect(CALL_MESSAGES.otherAccount).toBe('Raven is signed in to raven as someone else now.')
   })
 })
 
@@ -348,7 +324,6 @@ describe('createServerCalls.call', () => {
       answer: () => reply({ text: '{"id":7}' }),
     })
     const result = await calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.getMedia, mediaId: 7 },
     })
     expect(result).toEqual({ ok: true, status: 200, body: '{"id":7}' })
@@ -364,19 +339,13 @@ describe('createServerCalls.call', () => {
   })
 
   it("sends the page's unlock as the cookie, read for the server on every call", async () => {
-    const asked: string[] = []
-    const { calls, sent } = setup({
-      unlockOf: async ({ serverId }) => {
-        asked.push(serverId)
-        return serverId === SERVER.id ? 'raven_unlock=a.b.c' : null
-      },
-    })
+    const unlocks = ['raven_unlock=a.b.c', null]
+    const { calls, sent } = setup({ unlockOf: async () => unlocks.shift() ?? null })
     await calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.getAccountTicket, mediaId: 7 },
     })
-    await calls.call({ serverId: OTHER.id, call: { name: CALL_NAMES.getMedia, mediaId: 7 } })
-    expect(asked).toEqual([SERVER.id, OTHER.id])
+    await calls.call({ call: { name: CALL_NAMES.getMedia, mediaId: 7 } })
+    expect(unlocks).toEqual([])
     expect(sent.map(({ headers }) => headers)).toEqual([
       { accept: 'application/json', cookie: 'raven_unlock=a.b.c' },
       { accept: 'application/json' },
@@ -387,9 +356,10 @@ describe('createServerCalls.call', () => {
     const { calls, sent, warnings } = setup({
       unlockOf: () => Promise.reject(new Error('jar shut')),
     })
-    expect(
-      await calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMediaOrigins } }),
-    ).toEqual({ ok: false, message: CALL_MESSAGES.unreachable('raven.example') })
+    expect(await calls.call({ call: { name: CALL_NAMES.getMediaOrigins } })).toEqual({
+      ok: false,
+      message: CALL_MESSAGES.unreachable,
+    })
     expect(sent).toEqual([])
     expect(warnings).toHaveLength(1)
   })
@@ -397,7 +367,6 @@ describe('createServerCalls.call', () => {
   it('sends a content type and the rebuilt body with a saveProgress', async () => {
     const { calls, sent } = setup({ answer: () => reply({ status: 204, text: '' }) })
     const result = await calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.saveProgress, mediaId: 7, position: 40, audio: null },
     })
     expect(result).toEqual({ ok: true, status: 204, body: '' })
@@ -412,16 +381,6 @@ describe('createServerCalls.call', () => {
     ])
   })
 
-  it('answers unknownServer for a server it does not hold, and never fetches', async () => {
-    const { calls, sent } = setup()
-    const result = await calls.call({
-      serverId: 'gone',
-      call: { name: CALL_NAMES.getMediaOrigins },
-    })
-    expect(result).toEqual({ ok: false, message: CALL_MESSAGES.unknownServer })
-    expect(sent).toEqual([])
-  })
-
   it('answers unreachable and warns when the fetch rejects, without the token or the unlock', async () => {
     const { calls, warnings } = setup({
       answer: () => ({ kind: ANSWER_KINDS.reject }),
@@ -429,12 +388,11 @@ describe('createServerCalls.call', () => {
       unlockOf: async () => 'raven_unlock=very-secret-unlock',
     })
     const result = await calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.recordPlay, mediaId: 7 },
     })
-    expect(result).toEqual({ ok: false, message: CALL_MESSAGES.unreachable('raven.example') })
+    expect(result).toEqual({ ok: false, message: CALL_MESSAGES.unreachable })
     expect(warnings).toHaveLength(1)
-    expect(warnings[0]).toContain('raven.example')
+    expect(warnings[0]).toContain(SERVER_NAME)
     expect(warnings[0]).toContain('POST /api/media/7/plays')
     expect(warnings[0]).not.toContain('very-secret')
   })
@@ -442,17 +400,16 @@ describe('createServerCalls.call', () => {
   it('answers unreachable when reading the reply fails', async () => {
     const { calls, warnings } = setup({ answer: () => ({ kind: ANSWER_KINDS.failText }) })
     const result = await calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.getMediaOrigins },
     })
-    expect(result).toEqual({ ok: false, message: CALL_MESSAGES.unreachable('raven.example') })
+    expect(result).toEqual({ ok: false, message: CALL_MESSAGES.unreachable })
     expect(warnings).toHaveLength(1)
   })
 
   it('answers unreachable when the fetch throws at once', async () => {
     const warnings: string[] = []
     const calls = createServerCalls({
-      serverOf: () => SERVER,
+      server: SERVER,
       fetch: () => {
         throw new Error('no network')
       },
@@ -463,24 +420,20 @@ describe('createServerCalls.call', () => {
       },
     })
     const result = await calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.getMediaOrigins },
     })
-    expect(result).toEqual({ ok: false, message: CALL_MESSAGES.unreachable('raven.example') })
+    expect(result).toEqual({ ok: false, message: CALL_MESSAGES.unreachable })
     expect(warnings).toHaveLength(1)
   })
 
   it('answers tooBig for a 2 MB reply, and passes one of exactly MAX_REPLY_CHARS', async () => {
     const big = setup({ answer: () => reply({ text: 'x'.repeat(2 * 1024 * 1024) }) })
-    expect(
-      await big.calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMediaOrigins } }),
-    ).toEqual({
+    expect(await big.calls.call({ call: { name: CALL_NAMES.getMediaOrigins } })).toEqual({
       ok: false,
-      message: CALL_MESSAGES.tooBig('raven.example'),
+      message: CALL_MESSAGES.tooBig,
     })
     const edge = setup({ answer: () => reply({ text: 'x'.repeat(MAX_REPLY_CHARS) }) })
     const result = await edge.calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.getMediaOrigins },
     })
     expect(result.ok).toBe(true)
@@ -494,7 +447,7 @@ describe('createServerCalls.call', () => {
     /** Server calls over `fetchThrough`, so the cap is the one the real stream read keeps. */
     const streaming = ({ text }: StreamingProps) =>
       createServerCalls({
-        serverOf: () => SERVER,
+        server: SERVER,
         fetch: fetchThrough(() => Promise.resolve(new Response(text))),
         authorize: () => null,
         unlockOf: async () => null,
@@ -516,7 +469,6 @@ describe('createServerCalls.call', () => {
       const calls = streaming({ text: PAST_ONE_MIB })
       expect(
         await calls.call({
-          serverId: SERVER.id,
           call: { name: CALL_NAMES.getSagas, libraryId: 3 },
         }),
       ).toEqual({ ok: true, status: 200, body: PAST_ONE_MIB })
@@ -526,10 +478,9 @@ describe('createServerCalls.call', () => {
       const calls = streaming({ text: PAST_ONE_MIB })
       expect(
         await calls.call({
-          serverId: SERVER.id,
           call: { name: CALL_NAMES.getLibrary, libraryId: 3 },
         }),
-      ).toEqual({ ok: false, message: CALL_MESSAGES.tooBig('raven.example') })
+      ).toEqual({ ok: false, message: CALL_MESSAGES.tooBig })
     })
 
     it('answers tooBig for a getSagas reply past MAX_LONG_REPLY_CHARS', async () => {
@@ -538,32 +489,31 @@ describe('createServerCalls.call', () => {
       })
       expect(
         await calls.call({
-          serverId: SERVER.id,
           call: { name: CALL_NAMES.getSagas, libraryId: 3 },
         }),
-      ).toEqual({ ok: false, message: CALL_MESSAGES.tooBig('raven.example') })
+      ).toEqual({ ok: false, message: CALL_MESSAGES.tooBig })
     })
   })
 
   it('passes an error status and its body on for the page to read', async () => {
     const { calls } = setup({ answer: () => reply({ status: 500, text: '<html>' }) })
-    expect(
-      await calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMedia, mediaId: 1 } }),
-    ).toEqual({ ok: true, status: 500, body: '<html>' })
+    expect(await calls.call({ call: { name: CALL_NAMES.getMedia, mediaId: 1 } })).toEqual({
+      ok: true,
+      status: 500,
+      body: '<html>',
+    })
   })
 
   it('passes a 423 and a 404 on as they are', async () => {
     const locked = setup({ answer: () => reply({ status: 423, text: '{"message":"Locked"}' }) })
     expect(
       await locked.calls.call({
-        serverId: SERVER.id,
         call: { name: CALL_NAMES.getMedia, mediaId: 1 },
       }),
     ).toEqual({ ok: true, status: 423, body: '{"message":"Locked"}' })
     const gone = setup({ answer: () => reply({ status: 404, text: '{}' }) })
     expect(
       await gone.calls.call({
-        serverId: SERVER.id,
         call: { name: CALL_NAMES.getMedia, mediaId: 1 },
       }),
     ).toEqual({ ok: true, status: 404, body: '{}' })
@@ -574,15 +524,14 @@ describe('createServerCalls.call', () => {
       answer: () => ({ kind: ANSWER_KINDS.hold, status: 200, text: '{}' }),
     })
     const held = Array.from({ length: MAX_IN_FLIGHT }, (_, n) =>
-      calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMedia, mediaId: n + 1 } }),
+      calls.call({ call: { name: CALL_NAMES.getMedia, mediaId: n + 1 } }),
     )
     const seventh = await calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.getMediaOrigins },
     })
     expect(seventh).toEqual({
       ok: false,
-      message: CALL_MESSAGES.busy('raven.example'),
+      message: CALL_MESSAGES.busy,
       isBusy: true,
     })
     expect(isBusyRefusal(seventh)).toBe(true)
@@ -599,14 +548,12 @@ describe('createServerCalls.call', () => {
       answer: () => ({ kind: ANSWER_KINDS.hold, status: 204, text: '' }),
     })
     const reads = Array.from({ length: MAX_IN_FLIGHT }, (_, n) =>
-      calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMedia, mediaId: n + 1 } }),
+      calls.call({ call: { name: CALL_NAMES.getMedia, mediaId: n + 1 } }),
     )
     const save = calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     const ticket = calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.getAccountTicket, mediaId: 1 },
     })
     await flush()
@@ -615,9 +562,11 @@ describe('createServerCalls.call', () => {
       SERVER_METHODS.put,
       SERVER_METHODS.post,
     ])
-    expect(
-      await calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.recordPlay, mediaId: 1 } }),
-    ).toEqual({ ok: false, message: CALL_MESSAGES.busy('raven.example'), isBusy: true })
+    expect(await calls.call({ call: { name: CALL_NAMES.recordPlay, mediaId: 1 } })).toEqual({
+      ok: false,
+      message: CALL_MESSAGES.busy,
+      isBusy: true,
+    })
     await flush()
     expect(sent).toHaveLength(MAX_IN_FLIGHT + WRITE_RESERVE)
     releaseAll()
@@ -630,17 +579,14 @@ describe('createServerCalls.call', () => {
       answer: () => ({ kind: ANSWER_KINDS.hold, status: 204, text: '' }),
     })
     const writes = Array.from({ length: MAX_IN_FLIGHT }, (_, n) =>
-      calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.recordPlay, mediaId: n + 1 } }),
+      calls.call({ call: { name: CALL_NAMES.recordPlay, mediaId: n + 1 } }),
     )
-    expect(
-      await calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMediaOrigins } }),
-    ).toEqual({
+    expect(await calls.call({ call: { name: CALL_NAMES.getMediaOrigins } })).toEqual({
       ok: false,
-      message: CALL_MESSAGES.busy('raven.example'),
+      message: CALL_MESSAGES.busy,
       isBusy: true,
     })
     const save = calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     await flush()
@@ -649,30 +595,21 @@ describe('createServerCalls.call', () => {
     await Promise.all([...writes, save])
   })
 
-  it('counts calls in flight per server and frees a slot once a call settles', async () => {
+  it('frees a slot once a call settles', async () => {
     const { calls, sent, release } = setup({
-      answer: (input) =>
-        input.url.startsWith(SERVER.origin)
-          ? { kind: ANSWER_KINDS.hold, status: 200, text: '{}' }
-          : reply(),
+      answer: () => ({ kind: ANSWER_KINDS.hold, status: 200, text: '{}' }),
     })
     const held = Array.from({ length: MAX_IN_FLIGHT }, () =>
-      calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMediaOrigins } }),
+      calls.call({ call: { name: CALL_NAMES.getMediaOrigins } }),
     )
-    expect(
-      await calls.call({ serverId: OTHER.id, call: { name: CALL_NAMES.getMediaOrigins } }),
-    ).toEqual({
-      ok: true,
-      status: 200,
-      body: '{}',
-    })
+    expect(isBusyRefusal(await calls.call({ call: { name: CALL_NAMES.getMediaOrigins } }))).toBe(
+      true,
+    )
     release({ index: 0 })
     await held[0]
-    const next = calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMediaOrigins } })
+    const next = calls.call({ call: { name: CALL_NAMES.getMediaOrigins } })
     await flush()
-    expect(sent.filter((input) => input.url.startsWith(SERVER.origin))).toHaveLength(
-      MAX_IN_FLIGHT + 1,
-    )
+    expect(sent).toHaveLength(MAX_IN_FLIGHT + 1)
     release({ index: MAX_IN_FLIGHT })
     expect((await next).ok).toBe(true)
   })
@@ -681,10 +618,10 @@ describe('createServerCalls.call', () => {
     const { calls, sent } = setup({ answer: () => ({ kind: ANSWER_KINDS.reject }) })
     await Promise.all(
       Array.from({ length: MAX_IN_FLIGHT }, () =>
-        calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMediaOrigins } }),
+        calls.call({ call: { name: CALL_NAMES.getMediaOrigins } }),
       ),
     )
-    await calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMediaOrigins } })
+    await calls.call({ call: { name: CALL_NAMES.getMediaOrigins } })
     expect(sent).toHaveLength(MAX_IN_FLIGHT + 1)
   })
 })
@@ -697,14 +634,12 @@ describe('createServerCalls with the page signed in', () => {
 
   type TokensOfProps = { tokens: readonly (string | null)[] }
 
-  /** Hands out `tokens` in order, one per call, and notes which server each was for. */
+  /** Hands out `tokens` in order, one per call, and notes each ask. */
   const tokensOf = ({ tokens }: TokensOfProps) => {
     const asked: string[] = []
     const queue = [...tokens]
-    type AuthorizeProps = { serverId: string }
-
-    const authorize = ({ serverId }: AuthorizeProps): string | null => {
-      asked.push(serverId)
+    const authorize = (): string | null => {
+      asked.push(SERVER.id)
       return queue.shift() ?? null
     }
     return { authorize, asked }
@@ -716,18 +651,17 @@ describe('createServerCalls with the page signed in', () => {
   it('sends no header while the page is signed out', async () => {
     const { authorize, asked } = tokensOf({ tokens: [null] })
     const { calls, sent } = setup({ authorize })
-    await calls.call({ serverId: SERVER.id, call: ORIGINS })
+    await calls.call({ call: ORIGINS })
     expect(asked).toEqual([SERVER.id])
     expect(sent.map(authorizationOf)).toEqual([undefined])
-    expect(Object.keys(sent[0]?.headers ?? {})).toEqual([HTTP_HEADERS.accept])
+    expect(Object.keys(sent[0]?.headers ?? {})).toEqual([HEADERS.accept])
   })
 
   it("sends Authorization: Bearer <the page's token> on every call", async () => {
     const { authorize } = tokensOf({ tokens: [TOKEN, TOKEN] })
     const { calls, sent } = setup({ authorize })
-    await calls.call({ serverId: SERVER.id, call: ORIGINS })
+    await calls.call({ call: ORIGINS })
     await calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.saveProgress, mediaId: 7, position: 3, audio: null },
     })
     expect(sent.map(authorizationOf)).toEqual([
@@ -742,23 +676,15 @@ describe('createServerCalls with the page signed in', () => {
     const { authorize } = tokensOf({ tokens: [asA, asB, null] })
     const { calls, sent } = setup({ authorize })
     const PLAY = { name: CALL_NAMES.recordPlay, mediaId: 7 } as const
-    const forA = { serverId: SERVER.id, call: PLAY, accountId: ACCOUNT_A }
+    const forA = { call: PLAY, accountId: ACCOUNT_A }
     expect((await calls.call(forA)).ok).toBe(true)
     const refused: ServerCallResult = {
       ok: false,
-      message: CALL_MESSAGES.otherAccount(SERVER.name),
+      message: CALL_MESSAGES.otherAccount,
     }
     expect(await calls.call(forA)).toEqual(refused)
     expect(await calls.call(forA)).toEqual(refused)
     expect(sent.map(authorizationOf)).toEqual([`${AUTH_SCHEME} ${asA}`])
-  })
-
-  it('does not ask for a token for a server it does not hold', async () => {
-    const { authorize, asked } = tokensOf({ tokens: [TOKEN] })
-    const { calls, sent } = setup({ authorize })
-    await calls.call({ serverId: '00000000-0000-4000-8000-0000000000ff', call: ORIGINS })
-    expect(asked).toEqual([])
-    expect(sent).toEqual([])
   })
 
   it('passes a 401 on as it came, since the page renews its own session', async () => {
@@ -768,7 +694,7 @@ describe('createServerCalls with the page signed in', () => {
       authorize,
       answer: () => reply({ status: 401, text: signedOut }),
     })
-    expect(await calls.call({ serverId: SERVER.id, call: ORIGINS })).toEqual({
+    expect(await calls.call({ call: ORIGINS })).toEqual({
       ok: true,
       status: 401,
       body: signedOut,
@@ -781,7 +707,7 @@ describe('createServerCalls with the page signed in', () => {
       authorize: () => TOKEN,
       answer: () => ({ kind: ANSWER_KINDS.reject }),
     })
-    await calls.call({ serverId: SERVER.id, call: ORIGINS })
+    await calls.call({ call: ORIGINS })
     expect(warnings.join('\n')).not.toContain(TOKEN)
   })
 })
@@ -803,7 +729,7 @@ describe('createServerCalls.call refuses a call that slipped past the types', ()
 
   const refused = async ({ forged }: RefusedProps): Promise<void> => {
     const { calls, sent, warnings } = setup()
-    expect(await calls.call({ serverId: SERVER.id, call: forged })).toEqual({
+    expect(await calls.call({ call: forged })).toEqual({
       ok: false,
       message: CALL_MESSAGES.offList,
     })
@@ -838,49 +764,25 @@ describe('createServerCalls.call refuses a call that slipped past the types', ()
 })
 
 describe('createServerCalls log lines', () => {
-  const HIDDEN = '\u202e\u200b\u2028\u2029\ufeff\r\n'
-
-  it('escapes the server name it logs', async () => {
-    const odd: ServerEntry = { ...SERVER, name: `raven${HIDDEN}FORGED` }
-    const { calls, warnings } = setup({
-      servers: [odd],
-      answer: () => ({ kind: ANSWER_KINDS.reject }),
-    })
-    await calls.call({ serverId: odd.id, call: { name: CALL_NAMES.getMediaOrigins } })
-    const big = setup({
-      servers: [odd],
-      answer: () => reply({ text: 'x'.repeat(MAX_REPLY_CHARS + 1) }),
-    })
-    await big.calls.call({ serverId: odd.id, call: { name: CALL_NAMES.getMediaOrigins } })
-    const lines = [...warnings, ...big.warnings]
-    expect(lines).toHaveLength(2)
-    expect(lines.every((line) => !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(line))).toBe(true)
-  })
-
   it('answers every call when the log throws', async () => {
     const down = setup({ answer: () => ({ kind: ANSWER_KINDS.reject }), isWarnBroken: true })
-    expect(
-      await down.calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMediaOrigins } }),
-    ).toEqual({
+    expect(await down.calls.call({ call: { name: CALL_NAMES.getMediaOrigins } })).toEqual({
       ok: false,
-      message: CALL_MESSAGES.unreachable('raven.example'),
+      message: CALL_MESSAGES.unreachable,
     })
     const save = down.calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     await down.calls.settleWrites()
-    expect(await save).toEqual({ ok: false, message: CALL_MESSAGES.unreachable('raven.example') })
+    expect(await save).toEqual({ ok: false, message: CALL_MESSAGES.unreachable })
     expect(down.calls.hasPendingWrites()).toBe(false)
     const big = setup({
       answer: () => reply({ text: 'x'.repeat(MAX_REPLY_CHARS + 1) }),
       isWarnBroken: true,
     })
-    expect(
-      await big.calls.call({ serverId: SERVER.id, call: { name: CALL_NAMES.getMediaOrigins } }),
-    ).toEqual({
+    expect(await big.calls.call({ call: { name: CALL_NAMES.getMediaOrigins } })).toEqual({
       ok: false,
-      message: CALL_MESSAGES.tooBig('raven.example'),
+      message: CALL_MESSAGES.tooBig,
     })
     expect(down.warnings.length).toBeGreaterThan(0)
   })
@@ -893,7 +795,6 @@ describe('pending writes', () => {
     })
     expect(calls.hasPendingWrites()).toBe(false)
     const save = calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     expect(calls.hasPendingWrites()).toBe(true)
@@ -913,7 +814,6 @@ describe('pending writes', () => {
       answer: () => ({ kind: ANSWER_KINDS.hold, status: 200, text: '{}' }),
     })
     const read = calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.getMedia, mediaId: 1 },
     })
     expect(calls.hasPendingWrites()).toBe(false)
@@ -927,7 +827,6 @@ describe('pending writes', () => {
       answer: () => ({ kind: ANSWER_KINDS.hold, status: 204, text: '' }),
     })
     const play = calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.recordPlay, mediaId: 1 },
     })
     expect(calls.hasPendingWrites()).toBe(true)
@@ -942,12 +841,10 @@ describe('pending writes', () => {
       answer: () => ({ kind: ANSWER_KINDS.hold, status: 204, text: '' }),
     })
     const first = calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     const settled = calls.settleWrites()
     const second = calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.recordPlay, mediaId: 1 },
     })
     await flush()
@@ -962,7 +859,6 @@ describe('pending writes', () => {
   it('settles a write that failed', async () => {
     const { calls } = setup({ answer: () => ({ kind: ANSWER_KINDS.reject }) })
     const save = calls.call({
-      serverId: SERVER.id,
       call: { name: CALL_NAMES.saveProgress, mediaId: 1, position: 5, audio: null },
     })
     await calls.settleWrites()

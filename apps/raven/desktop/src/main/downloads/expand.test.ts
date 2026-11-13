@@ -35,9 +35,6 @@ import { CALL_NAMES } from '@/main/servers/allowlist'
 import { CALL_MESSAGES, type ServerCalls } from '@/main/servers/serverCalls'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 
-const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
-const SERVER_NAME = 'Vhagar'
-
 type FileProps = { id: number; libraryId?: number }
 
 const file = ({ id, libraryId = 1 }: FileProps): MediaItem =>
@@ -88,8 +85,6 @@ const run = ({ replies, target, skip = () => false }: RunProps) => {
     log,
     expansion: expandTarget({
       calls,
-      serverId: SERVER_ID,
-      serverName: SERVER_NAME,
       target,
       skip,
     }),
@@ -103,11 +98,10 @@ describe('constants', () => {
 
   it('words the refusals', () => {
     expect(EXPAND_MESSAGES.tooMany).toBe('That is more than Raven downloads at once.')
-    expect(EXPAND_MESSAGES.gone('Vhagar')).toBe('That title is not on Vhagar any more.')
-    expect(EXPAND_MESSAGES.unreadable('Vhagar')).toBe(
-      'Vhagar answered with something Raven could not read.',
-    )
-    expect(EXPAND_MESSAGES.account('Vhagar')).toBe('Vhagar did not let your account download that.')
+    expect(EXPAND_MESSAGES.gone).toBe('That title is not on raven any more.')
+    expect(EXPAND_MESSAGES.unreadable).toBe('raven answered with something Raven could not read.')
+    expect(EXPAND_MESSAGES.account).toBe('raven did not let your account download that.')
+    expect(EXPAND_MESSAGES.locked).toBe('raven keeps that behind its PIN.')
   })
 })
 
@@ -416,7 +410,7 @@ describe('expandTarget', () => {
     })
     const result = failed(await expansion)
     expect(result.reason).toBe('gone')
-    expect(result.message).toBe(EXPAND_MESSAGES.gone(SERVER_NAME))
+    expect(result.message).toBe(EXPAND_MESSAGES.gone)
   })
 
   it('picks the saga by its tmdb id and orders its movies', async () => {
@@ -460,7 +454,7 @@ describe('expandTarget', () => {
     })
     const result = failed(await expansion)
     expect(result.reason).toBe('gone')
-    expect(result.message).toBe('That title is not on Vhagar any more.')
+    expect(result.message).toBe(EXPAND_MESSAGES.gone)
   })
 
   it('leaves a skipped file out but counts it', async () => {
@@ -650,15 +644,13 @@ describe('expandTarget', () => {
       call: async (input) => {
         if (input.call.name !== CALL_NAMES.getMedia || busy.left === 0) return answering.call(input)
         busy.left -= 1
-        return { ok: false, message: CALL_MESSAGES.busy(SERVER_NAME), isBusy: true }
+        return { ok: false, message: CALL_MESSAGES.busy, isBusy: true }
       },
     }
     const started = Date.now()
     const result = succeeded(
       await expandTarget({
         calls,
-        serverId: SERVER_ID,
-        serverName: SERVER_NAME,
         target: { kind: 'album', albumId: 7 },
         skip: () => false,
       }),
@@ -673,20 +665,18 @@ describe('expandTarget', () => {
     const calls: Pick<ServerCalls, 'call'> = {
       call: async () => {
         tries.count += 1
-        return { ok: false, message: CALL_MESSAGES.busy(SERVER_NAME), isBusy: true }
+        return { ok: false, message: CALL_MESSAGES.busy, isBusy: true }
       },
     }
     const result = failed(
       await expandTarget({
         calls,
-        serverId: SERVER_ID,
-        serverName: SERVER_NAME,
         target: { kind: 'album', albumId: 7 },
         skip: () => false,
       }),
     )
     expect(result.reason).toBe('unreachable')
-    expect(result.message).toBe('Raven is still waiting on Vhagar.')
+    expect(result.message).toBe('Raven is still waiting on raven.')
     expect(tries.count).toBe(BUSY_TRIES)
   })
 
@@ -799,7 +789,7 @@ describe('expandTarget', () => {
     })
     const result = failed(await expansion)
     expect(result.reason).toBe(EXPAND_REASONS.gone)
-    expect(result.message).toBe(EXPAND_MESSAGES.gone(SERVER_NAME))
+    expect(result.message).toBe(EXPAND_MESSAGES.gone)
     expect(log).toEqual([itemCall(5)])
   })
 
@@ -843,16 +833,16 @@ describe('expandTarget', () => {
     expect(failed(await expansion)).toEqual({
       ok: false,
       reason: EXPAND_REASONS.account,
-      message: EXPAND_MESSAGES.account(SERVER_NAME),
+      message: EXPAND_MESSAGES.account,
     })
   })
 
-  it('answers unreachable for a 401 or 403 that names no account refusal', async () => {
+  it('reads a bare 401 as the account signed out, and accounts that are down as unreachable', async () => {
     const bare = run({
       replies: { [itemCall(5)]: { status: 401, body: '' } },
       target: { kind: DOWNLOAD_TARGET_KINDS.item, itemId: 5 },
     })
-    expect(failed(await bare.expansion).reason).toBe(EXPAND_REASONS.unreachable)
+    expect(failed(await bare.expansion).reason).toBe(EXPAND_REASONS.account)
     const down = run({
       replies: {
         [itemCall(5)]: { status: 403, body: { reason: AUTH_REFUSALS.unavailable, message: 'x' } },
@@ -877,7 +867,7 @@ describe('expandTarget', () => {
     })
     const result = failed(await expansion)
     expect(result.reason).toBe('unreadable')
-    expect(result.message).toBe(EXPAND_MESSAGES.unreadable(SERVER_NAME))
+    expect(result.message).toBe(EXPAND_MESSAGES.unreadable)
   })
 
   it('answers unreadable for a body that is not JSON', async () => {
@@ -896,8 +886,6 @@ describe('expandTarget', () => {
     const result = failed(
       await expandTarget({
         calls,
-        serverId: SERVER_ID,
-        serverName: SERVER_NAME,
         target: { kind: 'media', mediaId: 9 },
         skip: () => false,
       }),

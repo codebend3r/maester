@@ -21,13 +21,12 @@ import {
   closeRelayServers,
   loopbackServer,
   OPEN,
-  OTHER,
   refusalBody,
   SERVER,
   setupRelay,
 } from '@/main/test/relayFakes'
 import { fixedPicks } from '@/main/test/serverFakes'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS } from '@shared/http'
 
 afterEach(closeRelayServers)
 
@@ -41,7 +40,7 @@ const until = async (isDone: () => boolean): Promise<void> => {
   return until(isDone)
 }
 
-const rangeOf = (url: string) => fetch(url, { headers: { [HTTP_HEADERS.range]: 'bytes=0-3' } })
+const rangeOf = (url: string) => fetch(url, { headers: { [HEADERS.range]: 'bytes=0-3' } })
 
 describe('open', () => {
   test('answers loopback URLs under a fresh secret, listening once', async () => {
@@ -77,7 +76,7 @@ describe('open', () => {
     const { relay } = setupRelay({ capacity: 2 })
     const first = await relay.open(OPEN)
     const second = await relay.open({ ...OPEN, mediaId: 8 })
-    relay.closeServer(SERVER.id)
+    relay.accessEnded()
     expect((await rangeOf(first.fileUrl)).status).toBe(404)
     expect((await rangeOf(second.fileUrl)).status).toBe(404)
     expect(relay.refusalOf(first.loadId)).toBe(AUTH_REFUSALS.signedOut)
@@ -96,6 +95,7 @@ describe('open', () => {
   test('a listen that fails is tried again on the next open', async () => {
     const attempts = { count: 0 }
     const relay = createMediaRelay({
+      serverOrigin: SERVER.origin,
       listen: async () => {
         attempts.count += 1
         if (attempts.count === 1) throw new Error('no socket')
@@ -105,7 +105,7 @@ describe('open', () => {
       tickets: { ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.unreachable }) },
       newSecret: () => 'x'.repeat(43),
       capacity: 1,
-      picks: fixedPicks().picks,
+      picks: fixedPicks({ serverOrigin: SERVER.origin }).picks,
       timers: fakeTimers().timers,
       warn: () => undefined,
     })
@@ -115,12 +115,13 @@ describe('open', () => {
 
   test('a secret that is not 32 random bytes in base64url is refused', async () => {
     const relay = createMediaRelay({
+      serverOrigin: SERVER.origin,
       listen: async () => ({ port: 4000 }),
       fetchUpstream: () => Promise.reject(new Error('unused')),
       tickets: { ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.unreachable }) },
       newSecret: () => 'short/../',
       capacity: 1,
-      picks: fixedPicks().picks,
+      picks: fixedPicks({ serverOrigin: SERVER.origin }).picks,
       timers: fakeTimers().timers,
       warn: () => undefined,
     })
@@ -192,27 +193,27 @@ describe('a relayed request', () => {
     const { fileUrl } = await relay.open(OPEN)
     const response = await fetch(fileUrl, {
       headers: {
-        [HTTP_HEADERS.range]: 'bytes=0-3',
-        [HTTP_HEADERS.cookie]: 'raven_unlock=a.b',
-        [HTTP_HEADERS.authorization]: 'Bearer x',
+        [HEADERS.range]: 'bytes=0-3',
+        [HEADERS.cookie]: 'raven_unlock=a.b',
+        [HEADERS.authorization]: 'Bearer x',
       },
     })
     expect(response.status).toBe(206)
     expect(await response.text()).toBe('abcd')
-    expect(response.headers.get(HTTP_HEADERS.contentType)).toBe('video/x-matroska')
-    expect(response.headers.get(HTTP_HEADERS.contentLength)).toBe('4')
-    expect(response.headers.get(HTTP_HEADERS.contentRange)).toBe('bytes 0-3/100')
-    expect(response.headers.get(HTTP_HEADERS.acceptRanges)).toBe('bytes')
-    expect(response.headers.get(HTTP_HEADERS.setCookie)).toBeNull()
-    expect(response.headers.get(HTTP_HEADERS.etag)).toBeNull()
+    expect(response.headers.get(HEADERS.contentType)).toBe('video/x-matroska')
+    expect(response.headers.get(HEADERS.contentLength)).toBe('4')
+    expect(response.headers.get(HEADERS.contentRange)).toBe('bytes 0-3/100')
+    expect(response.headers.get(HEADERS.acceptRanges)).toBe('bytes')
+    expect(response.headers.get(HEADERS.setCookie)).toBeNull()
+    expect(response.headers.get(HEADERS.etag)).toBeNull()
     expect(heard.map(({ url, method, headers }) => ({ url, method, headers }))).toEqual([
       {
         url: 'https://raven.example/api/media/7/file?t=account.t1',
         method: HTTP_METHODS.get,
-        headers: { [HTTP_HEADERS.range]: 'bytes=0-3' },
+        headers: { [HEADERS.range]: 'bytes=0-3' },
       },
     ])
-    expect(asked).toEqual([{ serverId: SERVER.id, mediaId: 7, isFresh: false }])
+    expect(asked).toEqual([{ mediaId: 7, isFresh: false }])
   })
 
   test('goes to the media origin the load was opened with, sidecars too', async () => {
@@ -229,7 +230,7 @@ describe('a relayed request', () => {
   })
 
   test("a media origin that fails to connect gives way to the server's own address for good", async () => {
-    const { relay, heard, warnings, forgotten } = setupRelay({
+    const { relay, heard, warnings, forgets } = setupRelay({
       answer: ({ heard: { url } }) => {
         if (url.startsWith(LAN)) throw new Error(`connect EHOSTUNREACH ${LAN}`)
         return { status: 206, body: 'abcd' }
@@ -243,14 +244,14 @@ describe('a relayed request', () => {
       'https://raven.example/api/media/7/file?t=account.t1',
       'https://raven.example/api/media/7/file?t=account.t2',
     ])
-    expect(forgotten).toEqual([SERVER.id])
+    expect(forgets.count).toBe(1)
     expect(warnings).toEqual([
-      "Vhagar's media origin did not answer; the relay goes to its own address",
+      "raven's media origin did not answer; the relay goes to its own address",
     ])
   })
 
   test("a media origin that does not answer in time gives way to the server's own address", async () => {
-    const { relay, heard, pending, forgotten } = setupRelay({
+    const { relay, heard, pending, forgets } = setupRelay({
       answer: ({ heard: { url, signal } }) =>
         url.startsWith(LAN)
           ? new Promise<Answer>((_resolve, reject) => {
@@ -268,12 +269,12 @@ describe('a relayed request', () => {
       `${LAN}/api/media/7/file?t=account.t1`,
       'https://raven.example/api/media/7/file?t=account.t1',
     ])
-    expect(forgotten).toEqual([SERVER.id])
+    expect(forgets.count).toBe(1)
     expect(ORIGIN_ANSWER_MS).toBe(5000)
   })
 
   test("the server's own address has no deadline and nothing to fall back on", async () => {
-    const { relay, heard, pending, forgotten } = setupRelay({
+    const { relay, heard, pending, forgets } = setupRelay({
       answer: () => {
         throw new Error('connect ECONNREFUSED')
       },
@@ -282,11 +283,11 @@ describe('a relayed request', () => {
     expect((await rangeOf(fileUrl)).status).toBe(502)
     expect(heard).toHaveLength(1)
     expect(pending.size).toBe(0)
-    expect(forgotten).toEqual([])
+    expect(forgets.count).toBe(0)
   })
 
   test('a request mpv let go of while the media origin was silent tries no other', async () => {
-    const { relay, heard, forgotten } = setupRelay({
+    const { relay, heard, forgets } = setupRelay({
       answer: ({ heard: { signal } }) =>
         new Promise<Answer>((_resolve, reject) => {
           signal.addEventListener(SIGNAL_EVENTS.abort, () => reject(new Error('aborted')))
@@ -300,7 +301,7 @@ describe('a relayed request', () => {
     await asking
     await until(() => heard[0]?.signal.aborted ?? false)
     expect(heard).toHaveLength(1)
-    expect(forgotten).toEqual([])
+    expect(forgets.count).toBe(0)
   })
 
   test('a track opened at a bitrate is its transcode, behind the same /file path', async () => {
@@ -362,7 +363,7 @@ describe('a relayed request', () => {
     relay.close(closed.loadId)
     expect((await rangeOf(closed.fileUrl)).status).toBe(404)
     const ofServer = await relay.open(OPEN)
-    relay.closeServer(SERVER.id)
+    relay.accessEnded()
     expect((await rangeOf(ofServer.fileUrl)).status).toBe(404)
     const all = await relay.open(OPEN)
     relay.closeAll()
@@ -370,12 +371,11 @@ describe('a relayed request', () => {
     expect(heard).toEqual([])
   })
 
-  test("closing another server or an older load leaves the current load's secret alone", async () => {
+  test("closing an older load leaves the current load's secret alone", async () => {
     const { relay, heard } = setupRelay()
     const old = await relay.open(OPEN)
     const current = await relay.open(OPEN)
     relay.close(old.loadId)
-    relay.closeServer(OTHER.id)
     expect((await rangeOf(current.fileUrl)).status).toBe(206)
     expect(heard.length).toBe(1)
   })
@@ -387,7 +387,7 @@ describe('a relayed request', () => {
           ? { status: 401, body: refusalBody(AUTH_REFUSALS.signedOut) }
           : {
               status: 206,
-              headers: { [HTTP_HEADERS.contentRange]: 'bytes 0-3/100' },
+              headers: { [HEADERS.contentRange]: 'bytes 0-3/100' },
               body: 'abcd',
             },
     })
@@ -400,7 +400,7 @@ describe('a relayed request', () => {
       'https://raven.example/api/media/7/file?t=account.t1',
       'https://raven.example/api/media/7/file?t=account.t2',
     ])
-    expect(heard[1]?.headers ?? null).toEqual({ [HTTP_HEADERS.range]: 'bytes=0-3' })
+    expect(heard[1]?.headers ?? null).toEqual({ [HEADERS.range]: 'bytes=0-3' })
     expect(relay.refusalOf(loadId)).toBeNull()
   })
 
@@ -475,6 +475,7 @@ describe('a relayed request', () => {
     const held: { release: (outcome: TicketOutcome) => void } = { release: () => undefined }
     const asked = Promise.withResolvers<void>()
     const relay = createMediaRelay({
+      serverOrigin: SERVER.origin,
       listen: listenOnLoopback({
         createServer: loopbackServer,
         warn: () => undefined,
@@ -489,7 +490,7 @@ describe('a relayed request', () => {
       },
       newSecret: () => 'r'.repeat(43),
       capacity: 1,
-      picks: fixedPicks().picks,
+      picks: fixedPicks({ serverOrigin: SERVER.origin }).picks,
       timers: fakeTimers().timers,
       warn: () => undefined,
     })
@@ -503,19 +504,18 @@ describe('a relayed request', () => {
     expect(relay.refusalOf(next.loadId)).toBeNull()
   })
 
-  test("a load whose server's access ended is read as signed out, unless the server said more", async () => {
+  test('a load whose access ended is read as signed out, unless the server said more', async () => {
     const { relay } = setupRelay()
     const ended = await relay.open(OPEN)
-    relay.closeServer(OTHER.id)
     expect(relay.refusalOf(ended.loadId)).toBeNull()
-    relay.closeServer(SERVER.id)
+    relay.accessEnded()
     expect(relay.refusalOf(ended.loadId)).toBe(AUTH_REFUSALS.signedOut)
     const refused = setupRelay({
       answer: () => ({ status: 403, body: refusalBody(AUTH_REFUSALS.revoked) }),
     })
     const removed = await refused.relay.open(OPEN)
     await rangeOf(removed.fileUrl)
-    refused.relay.closeServer(SERVER.id)
+    refused.relay.accessEnded()
     expect(refused.relay.refusalOf(removed.loadId)).toBe(AUTH_REFUSALS.revoked)
   })
 
@@ -558,13 +558,14 @@ describe('a relayed request', () => {
     await rangeOf(fileUrl)
     expect(relay.refusalOf(loadId)).toBe(AUTH_REFUSALS.signedOut)
     const ended = await relay.open(OPEN)
-    relay.closeServer(SERVER.id)
+    relay.accessEnded()
     expect(relay.refusalOf(ended.loadId)).toBe(AUTH_REFUSALS.signedOut)
   })
 
   test('a refusal is warned without a secret', async () => {
     const warnings: string[] = []
     const relay = createMediaRelay({
+      serverOrigin: SERVER.origin,
       listen: listenOnLoopback({
         createServer: loopbackServer,
         warn: () => undefined,
@@ -578,7 +579,7 @@ describe('a relayed request', () => {
       },
       newSecret: () => 'w'.repeat(43),
       capacity: 1,
-      picks: fixedPicks().picks,
+      picks: fixedPicks({ serverOrigin: SERVER.origin }).picks,
       timers: fakeTimers().timers,
       warn: (message) => {
         warnings.push(message)
@@ -587,13 +588,14 @@ describe('a relayed request', () => {
     const { fileUrl } = await relay.open(OPEN)
     await rangeOf(fileUrl)
     await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(warnings).toEqual(['Vhagar refused a relayed request: revoked'])
+    expect(warnings).toEqual(['raven refused a relayed request: revoked'])
   })
 
   test('seeks past many ticket lifetimes keep playing, one mint per window', async () => {
     const clock = { now: 0 }
     const mintedAt = new Map<string, number>()
     const relay = createMediaRelay({
+      serverOrigin: SERVER.origin,
       listen: listenOnLoopback({
         createServer: loopbackServer,
         warn: () => undefined,
@@ -605,7 +607,7 @@ describe('a relayed request', () => {
         const response = isLive
           ? new Response('abcd', {
               status: 206,
-              headers: { [HTTP_HEADERS.contentRange]: 'bytes 0-3/100' },
+              headers: { [HEADERS.contentRange]: 'bytes 0-3/100' },
             })
           : new Response(refusalBody(AUTH_REFUSALS.signedOut), { status: 401 })
         return { status: response.status, headers: response.headers, body: response.body }
@@ -623,7 +625,7 @@ describe('a relayed request', () => {
       }),
       newSecret: () => 'v'.repeat(43),
       capacity: 1,
-      picks: fixedPicks().picks,
+      picks: fixedPicks({ serverOrigin: SERVER.origin }).picks,
       timers: fakeTimers().timers,
       warn: () => undefined,
     })
@@ -643,6 +645,7 @@ describe('a relayed request', () => {
   test('an upstream that fails is a 502', async () => {
     const warnings: string[] = []
     const relay = createMediaRelay({
+      serverOrigin: SERVER.origin,
       listen: listenOnLoopback({
         createServer: loopbackServer,
         warn: () => undefined,
@@ -654,7 +657,7 @@ describe('a relayed request', () => {
       },
       newSecret: () => 'q'.repeat(43),
       capacity: 1,
-      picks: fixedPicks().picks,
+      picks: fixedPicks({ serverOrigin: SERVER.origin }).picks,
       timers: fakeTimers().timers,
       warn: (message) => {
         warnings.push(message)
@@ -662,7 +665,7 @@ describe('a relayed request', () => {
     })
     const { fileUrl } = await relay.open(OPEN)
     expect((await rangeOf(fileUrl)).status).toBe(502)
-    expect(warnings).toEqual(['the media relay could not reach Vhagar'])
+    expect(warnings).toEqual(['the media relay could not reach raven'])
   })
 
   test('closing the downstream aborts the upstream fetch', async () => {
@@ -672,7 +675,7 @@ describe('a relayed request', () => {
         aborted.signal = signal
         return {
           status: 206,
-          headers: { [HTTP_HEADERS.contentRange]: 'bytes 0-99/100' },
+          headers: { [HEADERS.contentRange]: 'bytes 0-99/100' },
           body: new ReadableStream<Uint8Array>({
             start: (controller) => controller.enqueue(new Uint8Array([1, 2, 3])),
           }),
@@ -711,7 +714,7 @@ describe('a relayed request', () => {
     const response = await fetch(fileUrl)
     if (response.body === null) throw new Error('the relay sent no body')
     await response.body.getReader().read()
-    relay.closeServer(SERVER.id)
+    relay.accessEnded()
     expect(aborted.signal?.aborted ?? false).toBe(true)
   })
 

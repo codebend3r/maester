@@ -1,5 +1,4 @@
 import {
-  AUTH_REFUSALS,
   coverOf,
   DOWNLOAD_KINDS,
   DOWNLOAD_MAX_FILES,
@@ -30,13 +29,16 @@ import {
   type TitleEntry,
   titleItemIdOf,
   type Track,
+  DOWNLOAD_GROUP_PREFIXES,
+  downloadGroupKey,
 } from '@raven/core'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
-import { ACCOUNT_REFUSAL_STATUSES, refusalAt } from '@/main/servers/authRefusals'
+import { SERVER_NAME } from '@/main/desktopConfig'
+import { accountRefusalOf } from '@/main/servers/authRefusals'
 import { CALL_MESSAGES, isBusyRefusal, type ServerCalls } from '@/main/servers/serverCalls'
-import { HTTP_STATUSES, isSuccessStatus } from '@/shared/httpStatuses'
+import { HTTP_STATUSES, isSuccessStatus } from '@shared/http'
 
 export type ExpandedFile = {
   media: MediaItem
@@ -71,12 +73,11 @@ export type Expansion =
 
 export const EXPAND_MESSAGES = {
   tooMany: 'That is more than Raven downloads at once.',
-  gone: (name: string) => `That title is not on ${name} any more.`,
-  unreadable: (name: string) => `${name} answered with something Raven could not read.`,
-  account: (name: string) => `${name} did not let your account download that.`,
+  gone: `That title is not on ${SERVER_NAME} any more.`,
+  unreadable: `${SERVER_NAME} answered with something Raven could not read.`,
+  account: `${SERVER_NAME} did not let your account download that.`,
+  locked: `${SERVER_NAME} keeps that behind its PIN.`,
 } as const
-
-const LOCKED_MESSAGE = (name: string): string => `${name} keeps that behind its PIN.`
 
 type Failure = Extract<Expansion, { ok: false }>
 type Read<T> = { ok: true; value: T } | { ok: false; failure: Failure }
@@ -93,25 +94,19 @@ type Draft = {
 }
 type MusicGroup = Extract<UnorderedGroup, { cover: unknown }>
 
-const albumGroupKey = (albumId: number): string => `album:${albumId}`
+const albumGroupKey = (albumId: number): string =>
+  downloadGroupKey({ prefix: DOWNLOAD_GROUP_PREFIXES.album, ids: [albumId] })
 
-const playlistGroupKey = (playlistId: number): string => `playlist:${playlistId}`
+const playlistGroupKey = (playlistId: number): string =>
+  downloadGroupKey({ prefix: DOWNLOAD_GROUP_PREFIXES.playlist, ids: [playlistId] })
 
 type Calls = Pick<ServerCalls, 'call'>
-type Server = { calls: Calls; serverId: string; serverName: string }
+type Server = { calls: Calls }
 
 const fail = ({ reason, message }: Pick<Failure, 'reason' | 'message'>): Read<never> => ({
   ok: false,
   failure: { ok: false, reason, message },
 })
-
-type IsAccountRefusedProps = { status: number; body: string }
-
-/** Whether a 401 or 403 is the account refused, rather than the server's accounts being down. */
-const isAccountRefused = (result: IsAccountRefusedProps): boolean => {
-  const reason = refusalAt({ ...result, statuses: ACCOUNT_REFUSAL_STATUSES })
-  return reason !== null && reason !== AUTH_REFUSALS.unavailable
-}
 
 /** How often a call the server is too busy for is asked again, and how long apart. */
 export const BUSY_TRIES = 4
@@ -119,7 +114,6 @@ export const BUSY_WAIT_MS = 250
 
 type CallUnlessBusyProps = {
   calls: Calls
-  serverId: string
   call: AllowedCall
   triesLeft: number
 }
@@ -130,49 +124,41 @@ type CallUnlessBusyProps = {
  */
 const callUnlessBusy = async ({
   calls,
-  serverId,
   call,
   triesLeft,
 }: CallUnlessBusyProps): ReturnType<Calls['call']> => {
-  const result = await calls.call({ serverId, call })
+  const result = await calls.call({ call })
   if (!isBusyRefusal(result) || triesLeft <= 1) return result
   await sleep(BUSY_WAIT_MS)
-  return callUnlessBusy({ calls, serverId, call, triesLeft: triesLeft - 1 })
+  return callUnlessBusy({ calls, call, triesLeft: triesLeft - 1 })
 }
 
-const read = async <T>({
-  calls,
-  serverId,
-  serverName,
-  call,
-  guard,
-}: Server & { call: AllowedCall; guard: Guard<T> }): Promise<Read<T>> => {
-  const result = await callUnlessBusy({ calls, serverId, call, triesLeft: BUSY_TRIES })
+type ReadProps<T> = Server & { call: AllowedCall; guard: Guard<T> }
+
+const read = async <T>({ calls, call, guard }: ReadProps<T>): Promise<Read<T>> => {
+  const result = await callUnlessBusy({ calls, call, triesLeft: BUSY_TRIES })
   if (!result.ok) return fail({ reason: EXPAND_REASONS.unreachable, message: result.message })
   if (result.status === LOCKED_STATUS) {
-    return fail({ reason: EXPAND_REASONS.locked, message: LOCKED_MESSAGE(serverName) })
+    return fail({ reason: EXPAND_REASONS.locked, message: EXPAND_MESSAGES.locked })
   }
-  if (isAccountRefused(result)) {
-    return fail({ reason: EXPAND_REASONS.account, message: EXPAND_MESSAGES.account(serverName) })
+  // A refusal of the account, rather than the server's accounts being down.
+  if (accountRefusalOf(result) !== null) {
+    return fail({ reason: EXPAND_REASONS.account, message: EXPAND_MESSAGES.account })
   }
   // With accounts, a title the account may not see is a 404 too, as the server answers anyone.
   if (result.status === HTTP_STATUSES.notFound) {
-    return fail({ reason: EXPAND_REASONS.gone, message: EXPAND_MESSAGES.gone(serverName) })
+    return fail({ reason: EXPAND_REASONS.gone, message: EXPAND_MESSAGES.gone })
   }
   if (!isSuccessStatus(result.status)) {
-    return fail({
-      reason: EXPAND_REASONS.unreachable,
-      message: CALL_MESSAGES.unreachable(serverName),
-    })
+    return fail({ reason: EXPAND_REASONS.unreachable, message: CALL_MESSAGES.unreachable })
   }
   const value = parseJson(result.body)
   return guard(value)
     ? { ok: true, value }
-    : fail({ reason: EXPAND_REASONS.unreadable, message: EXPAND_MESSAGES.unreadable(serverName) })
+    : fail({ reason: EXPAND_REASONS.unreadable, message: EXPAND_MESSAGES.unreadable })
 }
 
-const goneFor = (server: Server): Read<never> =>
-  fail({ reason: EXPAND_REASONS.gone, message: EXPAND_MESSAGES.gone(server.serverName) })
+const GONE: Read<never> = fail({ reason: EXPAND_REASONS.gone, message: EXPAND_MESSAGES.gone })
 
 type SeasonsOfProps = { server: Server; details: ItemDetails }
 
@@ -199,7 +185,7 @@ const draftOfDetails = async ({ server, details }: DraftOfDetailsProps): Promise
   const seasons = await seasonsOf({ server, details })
   if (!seasons.ok) return seasons
   const draft = draftOfItem({ details, seasons: seasons.value })
-  return draft === null ? goneFor(server) : { ok: true, value: draft }
+  return draft === null ? GONE : { ok: true, value: draft }
 }
 
 /** How many of a music group's files main reads at once, well under `serverCalls`' six reads in flight. */
@@ -310,7 +296,7 @@ const draftOf = async ({ server, target, skip }: DraftOfProps): Promise<Read<Dra
       })
       if (!sagas.ok) return sagas
       const saga = sagas.value.find(({ tmdbId }) => tmdbId === target.tmdbId)
-      if (saga === undefined) return goneFor(server)
+      if (saga === undefined) return GONE
       return { ok: true, value: draftOfSaga({ saga, libraryId: target.libraryId }) }
     }
     case DOWNLOAD_TARGET_KINDS.album: {
@@ -396,17 +382,17 @@ const librariesOf = ({
   )
 
 /** Turns a download link's target into the media files to fetch, through the allowlisted server calls. */
-export const expandTarget = async ({
-  calls,
-  serverId,
-  serverName,
-  target,
-  skip,
-}: Server & {
+type ExpandTargetProps = Server & {
   target: DownloadTarget
   skip: (mediaId: number) => boolean
-}): Promise<Expansion> => {
-  const server = { calls, serverId, serverName }
+}
+
+export const expandTarget = async ({
+  calls,
+  target,
+  skip,
+}: ExpandTargetProps): Promise<Expansion> => {
+  const server = { calls }
   const draft = await draftOf({ server, target, skip })
   if (!draft.ok) return draft.failure
   const { title, group, artwork } = draft.value

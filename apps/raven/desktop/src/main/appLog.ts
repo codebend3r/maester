@@ -1,7 +1,7 @@
 import { appendFile, mkdir, rename, rm, stat } from 'node:fs/promises'
 import { errorText } from '@/main/log/errorText'
 import { createLog, type Log, logFsFrom, SILENT_LOG } from '@/main/log/log'
-import type { Timers } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 
 type ReportErrorProps = { text: string; error: unknown }
 

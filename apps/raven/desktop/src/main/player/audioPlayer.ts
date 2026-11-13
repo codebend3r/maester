@@ -22,8 +22,8 @@ import { readDevices } from '@/main/player/outputOptions'
 import { createSleepGuard } from '@/main/player/sleepGuard'
 import { attachWindowEngine, engineMode } from '@/main/player/windowEngine'
 import type { MediaRelay } from '@/main/servers/mediaRelay'
-import type { createServerSources } from '@/main/servers/serverSources'
-import type { Timers } from '@/main/stateStore'
+import type { ServerSources } from '@/main/servers/serverSources'
+import type { Timers } from '@/main/timers'
 import { IPC_CHANNELS } from '@/shared/hostNames'
 
 type MusicEngine = { mpv: Mpv; service: AudioService }
@@ -33,11 +33,10 @@ type AttachMusicPlayerProps = {
   window: BrowserWindow
   config: ConfigStore
   /** The music relay's sources: a track's resolve and the words for its failure. */
-  sources: Pick<ReturnType<typeof createServerSources>, 'resolveTrack' | 'explain'>
+  sources: Pick<ServerSources, 'resolveTrack' | 'explain'>
   relay: Pick<MediaRelay, 'close'>
   /** A track's ready download plays from its file, with no server. */
   downloads: Pick<DownloadService, 'trackPathOf'>
-  serverId: () => string
   timers: Timers
   platform: DesktopPlatform
   nativeTarget: NativeTarget | null
@@ -56,7 +55,6 @@ export const attachMusicPlayer = ({
   sources,
   relay,
   downloads,
-  serverId,
   timers,
   platform,
   nativeTarget,
@@ -87,7 +85,7 @@ export const attachMusicPlayer = ({
       await Promise.all(engineOptionsFor({ surface }).map((option) => mpv.set(option)))
       const service = createAudioService({
         mpv,
-        resolve: createMusicResolve({ sources, downloads, serverId }),
+        resolve: createMusicResolve({ sources, downloads }),
         explain: sources.explain,
         closeLoad: (target) => relay.close(target.relay.loadId),
         canChooseAo: mode === ENGINE_MODES.window,

@@ -1,6 +1,6 @@
-import { type MpvOption, MPV_OPTIONS } from '@raven/mpv'
 import { basename, join } from 'node:path'
 import { CAPTION_COLOUR_VALUES, CAPTION_SIZE_SCALES, type CaptionStyle } from '@raven/core'
+import { MPV_OPTIONS, type MpvOption } from '@raven/mpv'
 import { FONTS } from '@/build/forgeOptions'
 
 /** The family name inside `resources/fonts/YoungSerif.ttf`, which is what libass matches on. */

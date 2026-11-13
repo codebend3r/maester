@@ -1,6 +1,6 @@
-import { DOWNLOAD_KINDS, DOWNLOAD_STATUS_KINDS } from '@raven/core'
+import { AUTH_REFUSALS, DOWNLOAD_KINDS, DOWNLOAD_STATUS_KINDS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
-import { EMPTY_DOWNLOADS, NO_PENDING, queue } from '@/main/downloads/downloadState'
+import { EMPTY_DOWNLOADS, FAIL_REASONS, NO_PENDING, queue } from '@/main/downloads/downloadState'
 import { DOWNLOADS_DEBOUNCE_MS, loadDownloads } from '@/main/downloads/downloadStore'
 import type { StateFs } from '@/main/stateStore'
 import { entry } from '@/main/test/downloadEntries'
@@ -61,7 +61,8 @@ describe('loadDownloads', () => {
   })
 
   it('loads a valid file as written', async () => {
-    const written = queue(EMPTY_DOWNLOADS, {
+    const written = queue({
+      state: EMPTY_DOWNLOADS,
       entries: [
         {
           downloadId: '00000000-0000-4000-8000-000000000001',
@@ -169,7 +170,72 @@ describe('loadDownloads', () => {
       },
       wasSetAside: false,
     })
-    expect(EMPTY_DOWNLOADS.version).toBe(2)
+    expect(EMPTY_DOWNLOADS.version).toBe(3)
     expect(files.get(FILE)).toBe(text)
+  })
+
+  it('upgrades a version 2 file, keeping of each failure only what its reason needs', async () => {
+    const failed = (fields: Record<string, string>) => ({
+      ...entry(),
+      status: { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 4, ...fields },
+    })
+    const queued = entry()
+    // The raw failures as a version 2 file wrote them, each with a message whatever its reason.
+    const V2_FAILURES = {
+      changed: { reason: 'changed', message: '' },
+      unauthorized: { reason: 'unauthorized', message: '' },
+      other: { reason: 'other', message: 'Sign in to raven again' },
+    }
+    const changed = failed(V2_FAILURES.changed)
+    const unauthorized = failed(V2_FAILURES.unauthorized)
+    const other = failed(V2_FAILURES.other)
+    const text = JSON.stringify({
+      version: 2,
+      entries: [queued, changed, unauthorized, other],
+      autoDeleteDefault: false,
+      owed: [],
+    })
+    const { fs, files } = createFakeFs({ [FILE]: text })
+    const loaded = await load(fs)
+    expect(loaded.wasSetAside).toBe(false)
+    expect(loaded.state.version).toBe(3)
+    expect(loaded.state.entries.map(({ status }) => status)).toEqual([
+      queued.status,
+      { kind: DOWNLOAD_STATUS_KINDS.failed, bytes: 4, reason: FAIL_REASONS.changed },
+      {
+        kind: DOWNLOAD_STATUS_KINDS.failed,
+        bytes: 4,
+        reason: FAIL_REASONS.account,
+        refusal: AUTH_REFUSALS.signedOut,
+      },
+      {
+        kind: DOWNLOAD_STATUS_KINDS.failed,
+        bytes: 4,
+        reason: FAIL_REASONS.other,
+        message: 'Sign in to raven again',
+      },
+    ])
+    // The file is written in the new shape only with the next change.
+    expect(files.get(FILE)).toBe(text)
+  })
+
+  it('reads a version 3 file as it is, and sets aside one whose failure lacks what it needs', async () => {
+    const refused = {
+      ...entry(),
+      status: {
+        kind: DOWNLOAD_STATUS_KINDS.failed,
+        bytes: 0,
+        reason: FAIL_REASONS.account,
+        refusal: AUTH_REFUSALS.pending,
+      },
+    }
+    const kept = { ...EMPTY_DOWNLOADS, entries: [refused] }
+    expect((await load(createFakeFs({ [FILE]: JSON.stringify(kept) }).fs)).state).toEqual(kept)
+    const outage = { ...refused, status: { ...refused.status, refusal: AUTH_REFUSALS.unavailable } }
+    const text = JSON.stringify({ ...EMPTY_DOWNLOADS, entries: [outage] })
+    expect(await load(createFakeFs({ [FILE]: text }).fs)).toEqual({
+      state: EMPTY_DOWNLOADS,
+      wasSetAside: true,
+    })
   })
 })

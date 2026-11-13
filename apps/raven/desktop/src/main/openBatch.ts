@@ -1,8 +1,13 @@
 import { isAbsolute } from 'node:path'
-import { DESKTOP_EVENTS, DESKTOP_REPLIES, type DesktopEvent, type DesktopReply } from '@raven/core'
-import type { Timers } from '@/main/stateStore'
+import {
+  DESKTOP_EVENTS,
+  DESKTOP_REPLIES,
+  type DesktopEvent,
+  type DesktopReply,
+  URL_PROTOCOLS,
+} from '@raven/core'
+import type { Timers } from '@/main/timers'
 import { MAX_QUEUE } from '@/shared/hostNames'
-import { URL_PROTOCOLS } from '@/shared/playLink'
 
 // The first item plays and the rest queue, so a batch past this has nowhere to go.
 const BATCH_CAP = MAX_QUEUE + 1

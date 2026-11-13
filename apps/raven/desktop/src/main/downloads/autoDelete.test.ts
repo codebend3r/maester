@@ -84,7 +84,7 @@ const setup = ({ entries = [entryFor()] }: SetupProps = {}) => {
         playing.has(downloadId) ||
         midTitle.has(downloadId)
       if (isKept) return false
-      store.update((state) => remove(state, { downloadId }))
+      store.update((state) => remove({ state, downloadId }))
       return true
     },
     onDeleted: (entry) => deleted.push(entry.label),
@@ -182,7 +182,7 @@ describe('the clock', () => {
     world.autoDelete.rebuild()
     expect(world.pending.size).toBe(0)
     world.store.update((state) =>
-      setAutoDelete(state, { downloadId: ID, autoDelete: true, at: NOW }),
+      setAutoDelete({ state, downloadId: ID, autoDelete: true, at: NOW }),
     )
     world.autoDelete.schedule({ downloadId: ID })
     expect(world.removed).toEqual([])
@@ -193,7 +193,7 @@ describe('the clock', () => {
   it('counts from the switch after a relaunch too, not from when the title was watched', () => {
     const world = setup({ entries: [entryFor({ autoDelete: false, watchedAt: NOW - DAY })] })
     world.store.update((state) =>
-      setAutoDelete(state, { downloadId: ID, autoDelete: true, at: NOW }),
+      setAutoDelete({ state, downloadId: ID, autoDelete: true, at: NOW }),
     )
     world.clock.now = NOW + 5 * MINUTE
     world.autoDelete.rebuild()
@@ -230,7 +230,7 @@ describe('the clock', () => {
     const world = setup()
     world.autoDelete.schedule({ downloadId: ID })
     world.store.update((state) =>
-      setAutoDelete(state, { downloadId: ID, autoDelete: false, at: NOW }),
+      setAutoDelete({ state, downloadId: ID, autoDelete: false, at: NOW }),
     )
     world.autoDelete.schedule({ downloadId: ID })
     expect(world.pending.size).toBe(0)
@@ -239,7 +239,7 @@ describe('the clock', () => {
   it('removes nothing for a download that went another way before its time came', async () => {
     const world = setup()
     world.autoDelete.schedule({ downloadId: ID })
-    world.store.update((state) => remove(state, { downloadId: ID }))
+    world.store.update((state) => remove({ state, downloadId: ID }))
     world.after(AUTO_DELETE_DELAY_MS)
     await ticks(3)
     expect(world.removed).toEqual([])
@@ -379,7 +379,7 @@ describe('a deletion that waits', () => {
     world.autoDelete.schedule({ downloadId: ID })
     world.after(AUTO_DELETE_DELAY_MS)
     world.store.update((state) =>
-      setAutoDelete(state, { downloadId: ID, autoDelete: false, at: NOW }),
+      setAutoDelete({ state, downloadId: ID, autoDelete: false, at: NOW }),
     )
     world.autoDelete.cancel({ downloadId: ID })
     held.resolve()

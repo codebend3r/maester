@@ -8,7 +8,6 @@ const TRACK = `/data/downloads/${SERVER_A}/7/media.flac`
 
 const serverTarget = (mediaId: number): ServerTarget => ({
   kind: PLAYER_SOURCE_KINDS.server,
-  serverId: SERVER_A,
   mediaId,
   url: `http://127.0.0.1:41234/secret-${mediaId}/file`,
   sidecars: [],
@@ -19,7 +18,7 @@ type SetupProps = { downloaded: Readonly<Record<number, string>> }
 
 const setup = ({ downloaded }: SetupProps) => {
   const asked: { mediaId: number; kbps: number | null }[] = []
-  const looked: { serverId: string; mediaId: number }[] = []
+  const looked: { mediaId: number }[] = []
   const resolve = createMusicResolve({
     sources: {
       resolveTrack: async ({ mediaId, kbps }) => {
@@ -33,7 +32,6 @@ const setup = ({ downloaded }: SetupProps) => {
         return downloaded[input.mediaId] ?? null
       },
     },
-    serverId: () => SERVER_A,
   })
   return { resolve, asked, looked }
 }
@@ -45,7 +43,7 @@ describe('createMusicResolve', () => {
       ok: true,
       target: { kind: PLAYER_SOURCE_KINDS.file, path: TRACK, sidecars: [] },
     })
-    expect(looked).toEqual([{ serverId: SERVER_A, mediaId: 7 }])
+    expect(looked).toEqual([{ mediaId: 7 }])
     expect(asked).toEqual([])
   })
 

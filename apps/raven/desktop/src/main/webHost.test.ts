@@ -12,7 +12,8 @@ import { createServer as createNetServer } from 'node:net'
 import { join } from 'node:path'
 import { text } from 'node:stream/consumers'
 import { HTTP_METHODS, WEB_HOST, AUTH_PATHS, WEB_HOST_ERRORS } from '@raven/core'
-import { ERROR_CODES, type Timers } from '@/main/stateStore'
+import { ERROR_CODES } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 import {
   contentSecurityPolicy,
   createWebHostHandler,
@@ -22,7 +23,7 @@ import {
   webHostFailureText,
   webRootFor,
 } from '@/main/webHost'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS } from '@shared/http'
 
 const ROOT = '/opt/raven/web'
 const THEME_SCRIPT = "\n      document.documentElement.dataset.theme = 'dusk'\n    "
@@ -87,7 +88,7 @@ const ask = ({ port, path, method = HTTP_METHODS.get, headers = {}, body = '' }:
         port,
         path,
         method,
-        headers: { [HTTP_HEADERS.host]: WEB_HOST, ...headers },
+        headers: { [HEADERS.host]: WEB_HOST, ...headers },
       },
       (response) => {
         text(response).then(
@@ -108,7 +109,7 @@ type AnswerProps = { heard: Heard; response: ServerResponse }
 /** A stand-in for raven's server: keeps each request it hears and answers with `answer`. */
 const upstream = async (
   answer: (input: AnswerProps) => void = ({ response }) => {
-    response.writeHead(200, { [HTTP_HEADERS.contentType]: 'application/json' })
+    response.writeHead(200, { [HEADERS.contentType]: 'application/json' })
     response.end('{"ok":true}')
   },
 ) => {
@@ -229,7 +230,7 @@ describe('the web host: Host check', () => {
     'localhost:47484.evil.example',
   ])('answers 421 to Host %p and reads nothing', async (name) => {
     const { port, reads } = await host()
-    const reply = await ask({ port, path: '/', headers: { [HTTP_HEADERS.host]: name } })
+    const reply = await ask({ port, path: '/', headers: { [HEADERS.host]: name } })
     expect(reply.status).toBe(421)
     expect(reads).toEqual([])
   })
@@ -240,7 +241,7 @@ describe('the web host: Host check', () => {
     const reply = await ask({
       port,
       path: AUTH_PATHS.me,
-      headers: { [HTTP_HEADERS.host]: 'evil.example:47484' },
+      headers: { [HEADERS.host]: 'evil.example:47484' },
     })
     expect(reply.status).toBe(421)
     expect(server.heard).toEqual([])
@@ -251,7 +252,7 @@ describe('the web host: Host check', () => {
     const reply = await ask({
       port,
       path: '/',
-      headers: { [HTTP_HEADERS.host]: 'LocalHost:47484' },
+      headers: { [HEADERS.host]: 'LocalHost:47484' },
     })
     expect(reply.status).toBe(200)
   })
@@ -263,18 +264,18 @@ describe('the web host: the web app', () => {
     const reply = await ask({ port, path: '/' })
     expect(reply.status).toBe(200)
     expect(reply.body).toBe(INDEX)
-    expect(reply.headers[HTTP_HEADERS.contentType]).toBe('text/html; charset=utf-8')
-    expect(reply.headers[HTTP_HEADERS.contentSecurityPolicy]).toBe(
+    expect(reply.headers[HEADERS.contentType]).toBe('text/html; charset=utf-8')
+    expect(reply.headers[HEADERS.contentSecurityPolicy]).toBe(
       contentSecurityPolicy({ inlineHashes: INDEX_HASHES, authOrigin: null }),
     )
-    expect(reply.headers[HTTP_HEADERS.contentTypeOptions]).toBe('nosniff')
-    expect(reply.headers[HTTP_HEADERS.cacheControl]).toBe('no-cache')
+    expect(reply.headers[HEADERS.contentTypeOptions]).toBe('nosniff')
+    expect(reply.headers[HEADERS.cacheControl]).toBe('no-cache')
   })
 
   it("names the test hook's Auth origin in the page's policy", async () => {
     const { port } = await host({ authOrigin: 'http://127.0.0.1:9000' })
     const reply = await ask({ port, path: '/' })
-    expect(reply.headers[HTTP_HEADERS.contentSecurityPolicy]).toBe(
+    expect(reply.headers[HEADERS.contentSecurityPolicy]).toBe(
       contentSecurityPolicy({ inlineHashes: INDEX_HASHES, authOrigin: 'http://127.0.0.1:9000' }),
     )
   })
@@ -287,9 +288,9 @@ describe('the web host: the web app', () => {
     const { port } = await host()
     const reply = await ask({ port, path })
     expect(reply.status).toBe(200)
-    expect(reply.headers[HTTP_HEADERS.contentType]).toBe(type)
-    expect(reply.headers[HTTP_HEADERS.cacheControl]).toBe('public, max-age=31536000, immutable')
-    expect(reply.headers[HTTP_HEADERS.contentSecurityPolicy]).toBe(
+    expect(reply.headers[HEADERS.contentType]).toBe(type)
+    expect(reply.headers[HEADERS.cacheControl]).toBe('public, max-age=31536000, immutable')
+    expect(reply.headers[HEADERS.contentSecurityPolicy]).toBe(
       contentSecurityPolicy({ inlineHashes: NO_HASHES, authOrigin: null }),
     )
   })
@@ -303,8 +304,8 @@ describe('the web host: the web app', () => {
     const { port } = await host()
     const reply = await ask({ port, path })
     expect(reply.status).toBe(200)
-    expect(reply.headers[HTTP_HEADERS.contentType]).toBe(type)
-    expect(reply.headers[HTTP_HEADERS.cacheControl]).toBe('no-cache')
+    expect(reply.headers[HEADERS.contentType]).toBe(type)
+    expect(reply.headers[HEADERS.cacheControl]).toBe('no-cache')
   })
 
   it.each(['/library/3', '/watch/12?at=30', '/settings/'])(
@@ -314,7 +315,7 @@ describe('the web host: the web app', () => {
       const reply = await ask({ port, path })
       expect(reply.status).toBe(200)
       expect(reply.body).toBe(INDEX)
-      expect(reply.headers[HTTP_HEADERS.contentType]).toBe('text/html; charset=utf-8')
+      expect(reply.headers[HEADERS.contentType]).toBe('text/html; charset=utf-8')
     },
   )
 
@@ -337,7 +338,7 @@ describe('the web host: the web app', () => {
     const { port } = await host()
     const reply = await ask({ port, path: '/assets/app-1a2b.js', method: HTTP_METHODS.head })
     expect(reply.status).toBe(200)
-    expect(reply.headers[HTTP_HEADERS.contentLength]).toBe('14')
+    expect(reply.headers[HEADERS.contentLength]).toBe('14')
     expect(reply.body).toBe('')
   })
 
@@ -347,7 +348,7 @@ describe('the web host: the web app', () => {
       const { port, reads } = await host()
       const reply = await ask({ port, path: '/index.html', method })
       expect(reply.status).toBe(405)
-      expect(reply.headers[HTTP_HEADERS.allow]).toBe('GET, HEAD')
+      expect(reply.headers[HEADERS.allow]).toBe('GET, HEAD')
       expect(reads).toEqual([])
     },
   )
@@ -399,8 +400,8 @@ describe('the web host: /api', () => {
       port,
       path: '/api/media/3?fields=tracks',
       headers: {
-        [HTTP_HEADERS.cookie]: 'raven-auth=abc; raven_unlock=1',
-        [HTTP_HEADERS.accept]: 'application/json',
+        [HEADERS.cookie]: 'raven-auth=abc; raven_unlock=1',
+        [HEADERS.accept]: 'application/json',
       },
     })
     expect(reply.status).toBe(200)
@@ -409,8 +410,8 @@ describe('the web host: /api', () => {
     const [heard] = server.heard
     expect(heard?.method).toBe(HTTP_METHODS.get)
     expect(heard?.url).toBe('/api/media/3?fields=tracks')
-    expect(heard?.headers[HTTP_HEADERS.cookie]).toBe('raven-auth=abc; raven_unlock=1')
-    expect(heard?.headers[HTTP_HEADERS.accept]).toBe('application/json')
+    expect(heard?.headers[HEADERS.cookie]).toBe('raven-auth=abc; raven_unlock=1')
+    expect(heard?.headers[HEADERS.accept]).toBe('application/json')
     expect(heard?.headers.host).toBe(new URL(server.origin).host)
   })
 
@@ -428,7 +429,7 @@ describe('the web host: /api', () => {
       port,
       path: '/api/progress',
       method: HTTP_METHODS.post,
-      headers: { [HTTP_HEADERS.contentType]: 'application/json' },
+      headers: { [HEADERS.contentType]: 'application/json' },
       body: '{"position":12}',
     })
     expect(server.heard[0]?.method).toBe(HTTP_METHODS.post)
@@ -438,32 +439,32 @@ describe('the web host: /api', () => {
   it("passes the server's status and headers back untouched, every Set-Cookie included", async () => {
     const server = await upstream(({ response }) => {
       response.writeHead(201, {
-        [HTTP_HEADERS.contentType]: 'application/json',
-        [HTTP_HEADERS.setCookie]: [
+        [HEADERS.contentType]: 'application/json',
+        [HEADERS.setCookie]: [
           'raven_unlock=1; Path=/; HttpOnly; SameSite=Lax',
           'raven_admin=2; Path=/api; HttpOnly',
         ],
-        [HTTP_HEADERS.cacheControl]: 'private, max-age=60',
+        [HEADERS.cacheControl]: 'private, max-age=60',
       })
       response.end('{}')
     })
     const { port } = await host({ serverOrigin: server.origin })
     const reply = await ask({ port, path: '/api/lock/unlock', method: HTTP_METHODS.post })
     expect(reply.status).toBe(201)
-    expect(reply.headers[HTTP_HEADERS.setCookie]).toEqual([
+    expect(reply.headers[HEADERS.setCookie]).toEqual([
       'raven_unlock=1; Path=/; HttpOnly; SameSite=Lax',
       'raven_admin=2; Path=/api; HttpOnly',
     ])
-    expect(reply.headers[HTTP_HEADERS.cacheControl]).toBe('private, max-age=60')
-    expect(reply.headers[HTTP_HEADERS.contentSecurityPolicy]).toBeUndefined()
+    expect(reply.headers[HEADERS.cacheControl]).toBe('private, max-age=60')
+    expect(reply.headers[HEADERS.contentSecurityPolicy]).toBeUndefined()
   })
 
   it('passes a range and its partial answer through', async () => {
     const server = await upstream(({ response }) => {
       response.writeHead(206, {
-        [HTTP_HEADERS.contentRange]: 'bytes 0-3/100',
-        [HTTP_HEADERS.acceptRanges]: 'bytes',
-        [HTTP_HEADERS.contentLength]: '4',
+        [HEADERS.contentRange]: 'bytes 0-3/100',
+        [HEADERS.acceptRanges]: 'bytes',
+        [HEADERS.contentLength]: '4',
       })
       response.end('abcd')
     })
@@ -471,18 +472,18 @@ describe('the web host: /api', () => {
     const reply = await ask({
       port,
       path: '/api/media/3/stream',
-      headers: { [HTTP_HEADERS.range]: 'bytes=0-3' },
+      headers: { [HEADERS.range]: 'bytes=0-3' },
     })
     expect(server.heard[0]?.headers.range).toBe('bytes=0-3')
     expect(reply.status).toBe(206)
-    expect(reply.headers[HTTP_HEADERS.contentRange]).toBe('bytes 0-3/100')
+    expect(reply.headers[HEADERS.contentRange]).toBe('bytes 0-3/100')
     expect(reply.body).toBe('abcd')
   })
 
   it('streams server-sent events as they come, and lets go of the server when the page does', async () => {
     const closed = Promise.withResolvers<void>()
     const server = await upstream(({ response }) => {
-      response.writeHead(200, { [HTTP_HEADERS.contentType]: 'text/event-stream' })
+      response.writeHead(200, { [HEADERS.contentType]: 'text/event-stream' })
       response.write('data: first\n\n')
       response.once('close', () => closed.resolve())
     })
@@ -493,7 +494,7 @@ describe('the web host: /api', () => {
           host: '127.0.0.1',
           port,
           path: '/api/events',
-          headers: { [HTTP_HEADERS.host]: WEB_HOST },
+          headers: { [HEADERS.host]: WEB_HOST },
         },
         (response) => {
           response.once('data', (chunk: Buffer) => {
@@ -514,7 +515,7 @@ describe('the web host: /api', () => {
     // Raw bytes, since Bun's own server on Linux drops a destroyed answer before its headers.
     const cutting = createNetServer((socket) => {
       socket.once('data', () => {
-        socket.end(`HTTP/1.1 200 OK\r\n${HTTP_HEADERS.contentLength}: 100\r\n\r\nabcd`)
+        socket.end(`HTTP/1.1 200 OK\r\n${HEADERS.contentLength}: 100\r\n\r\nabcd`)
         socket.destroySoon()
       })
     })
@@ -532,7 +533,7 @@ describe('the web host: /api', () => {
           host: '127.0.0.1',
           port,
           path: '/api/media/3/file',
-          headers: { [HTTP_HEADERS.host]: WEB_HOST },
+          headers: { [HEADERS.host]: WEB_HOST },
         },
         (response) => {
           const status = response.statusCode ?? 0
@@ -561,7 +562,7 @@ describe('the web host: /api', () => {
       port,
       path: '/api/reports',
       method: HTTP_METHODS.post,
-      headers: { [HTTP_HEADERS.host]: WEB_HOST, [HTTP_HEADERS.contentLength]: '100' },
+      headers: { [HEADERS.host]: WEB_HOST, [HEADERS.contentLength]: '100' },
     })
     outgoing.on('error', () => {})
     outgoing.write('{"part":')
@@ -576,7 +577,7 @@ describe('the web host: /api', () => {
     await ask({
       port,
       path: AUTH_PATHS.me,
-      headers: { [HTTP_HEADERS.connection]: 'x-hop, keep-alive', 'x-hop': 'one', 'x-end': 'two' },
+      headers: { [HEADERS.connection]: 'x-hop, keep-alive', 'x-hop': 'one', 'x-end': 'two' },
     })
     expect(server.heard[0]?.headers['x-hop']).toBeUndefined()
     expect(server.heard[0]?.headers['x-end']).toBe('two')
@@ -586,7 +587,7 @@ describe('the web host: /api', () => {
     const { port, warnings } = await host({ serverOrigin: 'http://127.0.0.1:1' })
     const reply = await ask({ port, path: AUTH_PATHS.config })
     expect(reply.status).toBe(502)
-    expect(reply.headers[HTTP_HEADERS.contentType]).toBe('application/json')
+    expect(reply.headers[HEADERS.contentType]).toBe('application/json')
     expect(JSON.parse(reply.body)).toEqual({ error: WEB_HOST_ERRORS.serverUnreachable })
     expect(warnings).toEqual(['Raven could not reach its server: ECONNREFUSED'])
   })
