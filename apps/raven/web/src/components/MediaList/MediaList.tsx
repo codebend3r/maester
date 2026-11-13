@@ -31,17 +31,13 @@ import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import { MEDIA_LIST_COPY } from '@/components/MediaList/copy'
 import styles from '@/components/MediaList/MediaList.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { CARD_PICTURES, type CardPicture } from '@/lib/cardPictures'
 
 const day = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
   month: 'short',
   year: 'numeric',
 })
-
-/** The picture before a row's title: a movie's poster, or a frame grab of any other video. */
-const ROW_PICTURES = { poster: 'poster', frame: 'frame' } as const
-
-type RowPicture = (typeof ROW_PICTURES)[keyof typeof ROW_PICTURES]
 
 type RowPictureProps = { media: MediaItem }
 
@@ -59,9 +55,9 @@ const FramePicture = ({ media }: FramePictureProps) => {
 }
 
 const ROW_PICTURE_VIEWS = {
-  [ROW_PICTURES.poster]: PosterPicture,
-  [ROW_PICTURES.frame]: FramePicture,
-} as const satisfies Record<RowPicture, ComponentType<RowPictureProps>>
+  [CARD_PICTURES.poster]: PosterPicture,
+  [CARD_PICTURES.frame]: FramePicture,
+} as const satisfies Record<CardPicture, ComponentType<RowPictureProps>>
 
 type MediaRowProps = {
   media: MediaItem
@@ -80,7 +76,7 @@ const MediaRow = ({ media, movies, matchType }: MediaRowProps) => {
   const { title, date } = cardTitle(media)
   const select = useSelectable({ key: mediaEntryKey(media), title })
   const link = cardLink({ media, hasPages: movies })
-  const RowPictureView = ROW_PICTURE_VIEWS[movies ? ROW_PICTURES.poster : ROW_PICTURES.frame]
+  const RowPictureView = ROW_PICTURE_VIEWS[movies ? CARD_PICTURES.poster : CARD_PICTURES.frame]
   return (
     <tr className={menu.hostClass} data-entry={mediaEntryKey(media)} {...select.rootProps}>
       <th scope="row" className={styles.titleHeader}>

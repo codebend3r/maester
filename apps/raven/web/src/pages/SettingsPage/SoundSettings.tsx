@@ -2,7 +2,6 @@ import {
   CROSSFADE_SECONDS,
   EQ_BANDS,
   EQ_GAIN_DB,
-  EQ_PRESET_NAMES,
   EQ_PRESETS,
   LEVELLING_MODES,
   type LevellingMode,
@@ -13,65 +12,19 @@ import { type AudioConnection, useAudioConnection } from '@/desktop/audioConnect
 import { CONNECTION_STATUSES } from '@/desktop/portConnection'
 import { type Choices, Setting } from '@/pages/SettingsPage/Setting'
 import { Titled } from '@/pages/SettingsPage/Titled'
-import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
+import { EQ_CHOICE_NAMES, SETTINGS_COPY, SOUND_CHOICES_COPY } from '@/pages/SettingsPage/copy'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import soundStyles from '@/pages/SettingsPage/SoundSettings.module.scss'
 
 const COPY = SETTINGS_COPY.sound
 
-const QUALITIES: Choices<MusicQuality> = {
-  [MUSIC_QUALITIES.original]: {
-    label: 'Original',
-    hint: 'The file as it is, lossless where it was ripped so.',
-  },
-  [MUSIC_QUALITIES.low]: {
-    label: `${MUSIC_QUALITIES.low} kbps`,
-    hint: 'AAC at its smallest, for a slow or metered network.',
-  },
-  [MUSIC_QUALITIES.standard]: {
-    label: `${MUSIC_QUALITIES.standard} kbps`,
-    hint: 'AAC that few ears tell from the file.',
-  },
-  [MUSIC_QUALITIES.high]: {
-    label: `${MUSIC_QUALITIES.high} kbps`,
-    hint: 'AAC at its best.',
-  },
-}
+const QUALITIES: Choices<MusicQuality> = SOUND_CHOICES_COPY.qualities
 
-const LEVELLING: Choices<LevellingMode> = {
-  [LEVELLING_MODES.off]: {
-    label: 'Off',
-    hint: 'Every track plays as loud as it was mastered.',
-  },
-  [LEVELLING_MODES.track]: {
-    label: 'Track',
-    hint: 'Every track is brought to the same loudness, for a shuffle or a playlist.',
-  },
-  [LEVELLING_MODES.album]: {
-    label: 'Album',
-    hint: 'Every album is brought to the same loudness, its quiet and loud songs kept as they were.',
-  },
-}
+const LEVELLING: Choices<LevellingMode> = SOUND_CHOICES_COPY.levelling
 
-/**
- * The equalizer's cards: each preset, and Custom, which the equalizer is
- * once a band is moved by hand; the store keeps that as no preset.
- */
-const EQ_CHOICES = { ...EQ_PRESET_NAMES, custom: 'custom' } as const
+type EqChoice = (typeof EQ_CHOICE_NAMES)[keyof typeof EQ_CHOICE_NAMES]
 
-type EqChoice = (typeof EQ_CHOICES)[keyof typeof EQ_CHOICES]
-
-const PRESETS: Choices<EqChoice> = {
-  [EQ_PRESET_NAMES.flat]: { label: 'Flat', hint: 'Every band as it was recorded.' },
-  [EQ_PRESET_NAMES.bassBoost]: { label: 'Bass boost', hint: 'Lifts the lows.' },
-  [EQ_PRESET_NAMES.trebleBoost]: { label: 'Treble boost', hint: 'Lifts the highs.' },
-  [EQ_PRESET_NAMES.vocal]: { label: 'Vocal', hint: 'Brings voices forward.' },
-  [EQ_PRESET_NAMES.loudness]: {
-    label: 'Loudness',
-    hint: 'Lifts the lows and the highs, for listening quietly.',
-  },
-  [EQ_CHOICES.custom]: { label: 'Custom', hint: 'The bands as set by hand below.' },
-}
+const PRESETS: Choices<EqChoice> = SOUND_CHOICES_COPY.presets
 
 /** Crossfade as a slider over its steps, off at the left. */
 const CrossfadeSlider = () => {
@@ -151,12 +104,12 @@ const Equalizer = () => {
     <Setting
       icon="split"
       label={COPY.equalizer}
-      values={Object.values(EQ_CHOICES)}
+      values={Object.values(EQ_CHOICE_NAMES)}
       choices={PRESETS}
-      value={equalizer.preset ?? EQ_CHOICES.custom}
+      value={equalizer.preset ?? EQ_CHOICE_NAMES.custom}
       onChange={(choice) =>
         setEqualizer(
-          choice === EQ_CHOICES.custom
+          choice === EQ_CHOICE_NAMES.custom
             ? { preset: null, gains: equalizer.gains }
             : { preset: choice, gains: EQ_PRESETS[choice] },
         )

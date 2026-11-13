@@ -65,7 +65,7 @@
   left: 0;
   z-index: 3;
   display: grid;
-  gap: 2px;
+  gap: var(--space-hair);
   padding: var(--space-1);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-lg);

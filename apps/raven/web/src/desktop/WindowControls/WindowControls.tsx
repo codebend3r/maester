@@ -9,7 +9,7 @@ import {
 import { Icon, type IconName } from '@raven/ui'
 import type { ComponentType } from 'react'
 import { WINDOW_CONTROLS_COPY } from '@/desktop/WindowControls/copy'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import { useDesktop } from '@/stores/desktop'
 import { useWindowChrome } from '@/stores/windowChrome'
 import styles from '@/desktop/WindowControls/WindowControls.module.scss'

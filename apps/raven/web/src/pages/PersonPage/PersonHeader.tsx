@@ -1,5 +1,5 @@
-import { type PersonDetails, type PersonProfile, ageOn } from '@raven/core'
-import { Button, ButtonLink } from '@raven/ui'
+import { type PersonDetails, type PersonProfile, ageOn, initialsOf } from '@raven/core'
+import { BUTTON_TONES, Button, ButtonLink } from '@raven/ui'
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
@@ -7,15 +7,6 @@ import { api } from '@/lib/api'
 import { PERSON_COPY } from '@/pages/PersonPage/copy'
 import styles from '@/pages/PersonPage/PersonPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
-
-/** The first letters of a name's first two words, for a person with no photo: "Rebecca Ferguson" is RF. */
-export const initialsOf = (name: string): string =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word.slice(0, 1).toUpperCase())
-    .join('')
 
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/
 
@@ -100,7 +91,7 @@ const Biography = ({ text }: BiographyProps) => {
       </p>
       {isClipped && (
         <Button
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           className={styles.more}
           aria-expanded={isExpanded}
           aria-controls={id}

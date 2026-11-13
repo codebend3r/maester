@@ -14,7 +14,7 @@ import {
   formatBytes,
   DOWNLOAD_ARTWORK_KINDS,
 } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { type ComponentType, useId, useState } from 'react'
 import { DownloadActivity } from '@/desktop/DownloadsPage/DownloadActivity'
 import { DownloadArtwork } from '@/desktop/DownloadsPage/DownloadArtwork'
@@ -25,7 +25,7 @@ import styles from '@/desktop/DownloadsPage/DownloadsWatch.module.scss'
 import { sortDownloads } from '@/desktop/DownloadsPage/sortDownloads'
 import { usePlayDownload } from '@/desktop/DownloadsPage/usePlayDownload'
 import { WaitingText } from '@/desktop/DownloadsPage/WaitingText'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import { useDownloadSpeed } from '@/desktop/useDownloadSpeed'
 import { POSTER_SIZES } from '@/lib/posters'
 import { COMMON_COPY } from '@/lib/copy'
@@ -161,7 +161,7 @@ const Direction = ({ sort, onSort }: DirectionProps) => {
   return (
     direction !== null && (
       <Button
-        tone="ghost"
+        tone={BUTTON_TONES.ghost}
         icon={direction}
         title={WATCH_COPY.sortInstead(SORT_DIRECTION_LABELS[field][reversedDirection(direction)])}
         onClick={() => onSort(reversedSort(sort))}
@@ -200,7 +200,7 @@ const SortBar = ({ sort, onSort, onShuffle }: SortBarProps) => {
       </select>
       <Direction sort={sort} onSort={onSort} />
       {sort === MEDIA_SORTS.random && (
-        <Button tone="ghost" icon="shuffle" onClick={onShuffle}>
+        <Button tone={BUTTON_TONES.ghost} icon="shuffle" onClick={onShuffle}>
           {WATCH_COPY.shuffle}
         </Button>
       )}

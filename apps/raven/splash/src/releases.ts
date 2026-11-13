@@ -1,3 +1,6 @@
+import { isRecord } from '@shared/http'
+import { SPLASH_COPY } from '@/copy'
+
 const REPO_URL = 'https://github.com/codebend3r/maester'
 
 /** The splash's own pages. */
@@ -45,9 +48,6 @@ export type Release = {
   files: readonly ReleaseFile[]
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
-
 const fileOf = (asset: unknown): ReleaseFile | null => {
   if (!isRecord(asset)) return null
   const { name, browser_download_url: url, size } = asset
@@ -61,7 +61,7 @@ const releaseOf = (release: unknown): Release | null => {
   if (!isRecord(release)) return null
   const { tag_name: tag, published_at: date, assets, draft, prerelease } = release
   if (typeof tag !== 'string' || typeof date !== 'string' || !Array.isArray(assets)) return null
-  if (draft === true || prerelease === true) return null
+  if (!!draft || !!prerelease) return null
   const files = assets.map(fileOf).filter((file) => file !== null)
   if (files.length === 0) return null
   return {
@@ -106,6 +106,9 @@ type PlatformOfProps = {
 export const platformOf = ({ userAgent }: PlatformOfProps): Platform =>
   userAgent.includes(WINDOWS_USER_AGENT) ? PLATFORMS.windows : PLATFORMS.mac
 
+/** The download button's title and the files under it. */
+type DownloadMenu = { title: string; files: readonly ReleaseFile[] }
+
 type DownloadMenuProps = {
   release: Release
   platform: Platform
@@ -115,16 +118,16 @@ type DownloadMenuProps = {
  * The button's title and the release's files, the visitor's own first. A release with no
  * file for the visitor's platform offers the platform it does have.
  */
-export const downloadMenu = ({ release, platform }: DownloadMenuProps) => {
+export const downloadMenu = ({ release, platform }: DownloadMenuProps): DownloadMenu => {
   const offered = release.files.some((file) => file.platform === platform)
     ? platform
     : (release.files[0]?.platform ?? platform)
   return {
-    title: `Download for ${PLATFORM_COPY[offered].name}`,
+    title: SPLASH_COPY.downloadFor(PLATFORM_COPY[offered].name),
     files: release.files.toSorted(
       (a, b) => Number(b.platform === offered) - Number(a.platform === offered),
     ),
-  } as const
+  }
 }
 
 type PlatformListProps = {
@@ -136,7 +139,7 @@ export const platformList = ({ release }: PlatformListProps): string =>
   Object.values(PLATFORMS)
     .filter((platform) => release.files.some((file) => file.platform === platform))
     .map((platform) => PLATFORM_COPY[platform].computers)
-    .join(' and ')
+    .join(SPLASH_COPY.platformsJoiner)
 
 /** Reads the releases from GitHub; no network, an outage or a rate limit answers an empty list. */
 export const fetchReleases = async (): Promise<readonly Release[]> => {

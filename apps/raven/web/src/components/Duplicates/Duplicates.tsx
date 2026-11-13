@@ -13,6 +13,7 @@ import {
   inLibrary,
   plural,
   versionFacts,
+  moviePath,
 } from '@raven/core'
 import { type ComponentType, useId, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -203,7 +204,7 @@ const MovieDuplicate = ({ movie, own, busy, onSplit, onJoin }: MovieDuplicatePro
           <h3 id={headingId} className={styles.title}>
             <Link
               to={inLibrary({
-                page: `/movies/${movie.itemId}`,
+                page: moviePath(movie.itemId),
                 libraryId: own.entry.media.libraryId,
               })}
             >

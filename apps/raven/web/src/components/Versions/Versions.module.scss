@@ -27,7 +27,7 @@
 }
 
 .chip {
-  padding: 2px var(--space-2);
+  padding: var(--space-hair) var(--space-2);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--color-bark) 7%, transparent);
   font-size: var(--font-size-xs);

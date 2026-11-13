@@ -1,12 +1,13 @@
 import { type Review, timeAgo } from '@raven/core'
 import { type ComponentType, useId, useState } from 'react'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { REVIEW_CARDS_COPY } from '@/components/ReviewCards/copy'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { api } from '@/lib/api'
 import { useModal } from '@/lib/useModal'
 import styles from '@/components/ReviewCards/ReviewCards.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 /** How many reviews a page shows. */
 const SHOWN = 10
@@ -75,10 +76,16 @@ type ReviewDialogProps = { review: Review; onClose: () => void }
 
 /** The whole review, as paragraphs, with a link to it on TMDB. Never rendered as HTML. */
 const ReviewDialog = ({ review, onClose }: ReviewDialogProps) => {
-  const { dialog } = useModal()
+  const { dialog, keepKeys } = useModal()
   const id = useId()
   return (
-    <dialog ref={dialog} className={styles.dialog} aria-labelledby={id} onClose={onClose}>
+    <DialogFrame
+      dialog={dialog}
+      onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.prose}
+      labelledBy={id}
+      onClose={onClose}
+    >
       <div className={styles.dialogBody}>
         <header className={styles.head}>
           <Avatar review={review} />
@@ -96,7 +103,7 @@ const ReviewDialog = ({ review, onClose }: ReviewDialogProps) => {
           <Button onClick={onClose}>{COMMON_COPY.close}</Button>
         </footer>
       </div>
-    </dialog>
+    </DialogFrame>
   )
 }
 
@@ -113,7 +120,7 @@ const ReviewCard = ({ review }: ReviewCardProps) => {
         {review.rating != null && <Score rating={review.rating} />}
       </span>
       <p className={styles.text}>{review.content}</p>
-      <Button tone="ghost" className={styles.read} onClick={() => setOpen(true)}>
+      <Button tone={BUTTON_TONES.ghost} className={styles.read} onClick={() => setOpen(true)}>
         {REVIEW_CARDS_COPY.read}
       </Button>
       {open && <ReviewDialog review={review} onClose={() => setOpen(false)} />}

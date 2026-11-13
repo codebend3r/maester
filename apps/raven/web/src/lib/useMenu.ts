@@ -3,6 +3,16 @@ import { type KeyboardEvent, type RefObject, useEffect, useRef, useState } from 
 
 const ITEMS = '[role^="menuitem"]'
 
+type KeyAction = (event: KeyboardEvent<HTMLUListElement>) => void
+
+type MenuItems = { items: HTMLElement[]; index: number }
+
+/** The list's items, and where the focus is among them: -1 for none. */
+const itemsOf = (list: HTMLUListElement | null): MenuItems => {
+  const items = Array.from(list?.querySelectorAll<HTMLElement>(ITEMS) ?? [])
+  return { items, index: items.findIndex((item) => item === document.activeElement) }
+}
+
 type UseMenuListProps = {
   isOpen: boolean
   setOpen: (isOpen: boolean) => void
@@ -44,21 +54,28 @@ export const useMenuList = ({ isOpen, setOpen, root, trigger }: UseMenuListProps
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [isOpen, setOpen, root])
 
-  const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
-    const items = Array.from(list.current?.querySelectorAll<HTMLElement>(ITEMS) ?? [])
-    const index = items.findIndex((item) => item === document.activeElement)
-    if (event.key === KEYS.escape) {
+  // What each key the list answers does; any other key is the browser's.
+  const keyActions: Readonly<Record<string, KeyAction>> = {
+    [KEYS.escape]: (event) => {
       event.preventDefault()
       close({ refocus: true })
-    } else if (event.key === KEYS.arrowDown) {
+    },
+    [KEYS.arrowDown]: (event) => {
       event.preventDefault()
+      const { items, index } = itemsOf(list.current)
       items[(index + 1) % items.length]?.focus()
-    } else if (event.key === KEYS.arrowUp) {
+    },
+    [KEYS.arrowUp]: (event) => {
       event.preventDefault()
+      const { items, index } = itemsOf(list.current)
       items[index <= 0 ? items.length - 1 : index - 1]?.focus()
-    } else if (event.key === KEYS.tab) {
-      setOpen(false)
-    }
+    },
+    [KEYS.tab]: () => setOpen(false),
+  }
+
+  const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
+    const action = keyActions[event.key]
+    if (action) action(event)
   }
 
   return { list, close, onKeyDown }

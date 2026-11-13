@@ -7,7 +7,7 @@ import {
   type WindowEdge,
   windowChromeFor,
 } from '@raven/core'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import { useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/WindowEdges/WindowEdges.module.scss'
 

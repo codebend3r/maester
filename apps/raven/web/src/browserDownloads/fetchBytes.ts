@@ -4,7 +4,6 @@ import { type BrowserEntry, mediaPathOf } from '@/browserDownloads/entries'
 import {
   ABORTED,
   DISK_FULL,
-  HTTP,
   OUTCOMES,
   type Outcome,
   READY,
@@ -12,6 +11,7 @@ import {
   STALLED,
 } from '@/browserDownloads/outcomes'
 import type { BytesAnswer, DownloadServer } from '@/browserDownloads/server'
+import { HEADERS, HTTP_STATUSES } from '@shared/http'
 
 /*
  * A writable's bytes join the file only when it closes, and opening it again copies the file so
@@ -22,8 +22,6 @@ const COMMIT_MIN_BYTES = 64 * 1024 ** 2
 
 /** How long a response may send nothing, its first byte included, before it is given up: Raven's own wait. */
 export const STALL_MS = 30_000
-
-export const HEADERS = { contentLength: 'content-length', contentRange: 'content-range' } as const
 
 const CONTENT_RANGE = /^bytes (\d+)-\d+\/(\d+)$/u
 
@@ -110,11 +108,11 @@ const attempt = async ({
     isFresh: isRetry,
   })
   watch.heard()
-  if (answer.status === HTTP.unauthorized && !isRetry) {
+  if (answer.status === HTTP_STATUSES.unauthorized && !isRetry) {
     await answer.body?.cancel().catch(() => undefined)
     return again
   }
-  if (answer.status === HTTP.unsatisfiable && !isRetry) {
+  if (answer.status === HTTP_STATUSES.rangeNotSatisfiable && !isRetry) {
     await answer.body?.cancel().catch(() => undefined)
     await disk.remove(path)
     return again
@@ -126,7 +124,7 @@ const attempt = async ({
   }
   if (answer.body === null) return STALLED
   // A server that ignores the range sends the whole file, which starts the one on disk over.
-  const start = answer.status === HTTP.partial ? from : 0
+  const start = answer.status === HTTP_STATUSES.partialContent ? from : 0
   const total = totalOf({ answer, from: start }) ?? entry.size
   if (total !== entry.size) onSize(total)
   const writer = await disk.open({ path, from: start })

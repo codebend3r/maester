@@ -2,8 +2,6 @@ import {
   ALBUM_TYPE_LABELS,
   type AlbumSummary,
   type AppPath,
-  LIBRARY_LISTINGS,
-  type Library,
   MUSIC_PAGE,
   type MixKind,
   type MixSummary,
@@ -13,20 +11,10 @@ import {
   formatDuration,
   albumDateLabel,
   type MusicListOptions,
-  listingFor,
 } from '@raven/core'
 import { generatePath, matchPath } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { COMMON_COPY, MUSIC_COPY } from '@/lib/copy'
-
-/** An album's page: `/albums/:id`. */
-export const albumPath = (albumId: number): AppPath => `/albums/${albumId}`
-
-/** An artist's page: `/artists/:id`. */
-export const artistPath = (artistId: number): AppPath => `/artists/${artistId}`
-
-/** A playlist's page: `/playlists/:id`. */
-export const playlistPath = (playlistId: number): AppPath => `/playlists/${playlistId}`
 
 /** Now Playing, the full page over the bar. */
 export const NOW_PLAYING_PATH: AppPath = '/now-playing'
@@ -61,10 +49,6 @@ export const mixPath = (kind: MixKind): string => generatePath(MUSIC_PATHS.mix, 
 /** Whether `pathname` is one of the music mode's pages, under `/music`. */
 export const isMusicPath = (pathname: string): boolean =>
   matchPath({ path: MUSIC_PATHS.root, end: false }, pathname) !== null
-
-/** The server's music libraries, the ones it lists by album, in its order. */
-export const musicLibrariesOf = (libraries: readonly Library[]): Library[] =>
-  libraries.filter((library) => listingFor(library.settings.kind) === LIBRARY_LISTINGS.albums)
 
 /** "4:03", or "1:02:03" past an hour; "" for an unknown length. */
 export const trackLength = (seconds: number | null): string =>
@@ -107,12 +91,11 @@ export const libraryTracks = async (options: LibraryTracksProps): Promise<Track[
   const listing = { ...options, byAlbum: true, limit: MUSIC_PAGE.most }
   const page = await api.listTracks(listing)
   const pages = Math.ceil(page.total / MUSIC_PAGE.most)
-  return Array.from({ length: Math.max(0, pages - 1) }, (_, index) => index + 1).reduce(
-    async (previous, next) => {
-      const tracks = await previous
-      const more = await api.listTracks({ ...listing, offset: next * MUSIC_PAGE.most })
-      return [...tracks, ...more.tracks]
-    },
-    Promise.resolve(page.tracks),
+  // The total is known from the first page, so the rest are asked for together and kept in order.
+  const rest = await Promise.all(
+    Array.from({ length: Math.max(0, pages - 1) }, (_, index) =>
+      api.listTracks({ ...listing, offset: (index + 1) * MUSIC_PAGE.most }),
+    ),
   )
+  return [...page.tracks, ...rest.flatMap((more) => more.tracks)]
 }

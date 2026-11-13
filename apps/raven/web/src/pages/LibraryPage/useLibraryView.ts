@@ -20,6 +20,7 @@ import {
   useOptimisticMutation,
 } from '@raven/ui/headless'
 import { useAddressSearch } from '@/lib/useSearch'
+import { PAGE_PARAMS } from '@/lib/appPaths'
 
 /** A fresh deal for a random sort; the order holds while the page is open. */
 const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
@@ -31,9 +32,9 @@ const dealSeed = (): number => Math.floor(Math.random() * 2 ** 31)
  * first, with the library's saved grouping.
  */
 const viewFromUrl = (params: URLSearchParams): LibraryViewChange => {
-  const sort = params.get('sort')
-  const view = params.get('view')
-  const group = params.get('group')
+  const sort = params.get(PAGE_PARAMS.sort)
+  const view = params.get(PAGE_PARAMS.view)
+  const group = params.get(PAGE_PARAMS.group)
   return {
     ...(isMediaSort(sort) ? { sort } : {}),
     ...(isLibraryView(view) ? { view } : {}),
@@ -49,9 +50,9 @@ type WriteViewProps = {
 /** The address with `change` written into it. */
 const writeView = ({ params, change }: WriteViewProps): URLSearchParams => {
   const next = new URLSearchParams(params)
-  if (change.sort != null) next.set('sort', change.sort)
-  if (change.view != null) next.set('view', change.view)
-  if (change.groupBy != null) next.set('group', change.groupBy)
+  if (change.sort != null) next.set(PAGE_PARAMS.sort, change.sort)
+  if (change.view != null) next.set(PAGE_PARAMS.view, change.view)
+  if (change.groupBy != null) next.set(PAGE_PARAMS.group, change.groupBy)
   return next
 }
 
@@ -75,7 +76,7 @@ export const useLibraryView = ({ library }: UseLibraryViewProps) => {
     change: LibraryViewChange
     against: URLSearchParams
   } | null>(null)
-  const asked = request?.against === address ? request.change : null
+  const asked = request != null && request.against === address ? request.change : null
   // The address may ask for what the library's type cannot show; that is settled here, once.
   const settings = useMemo(
     () => coherentSettings({ ...openingSettings(library.settings), ...viewFromUrl(address) }),

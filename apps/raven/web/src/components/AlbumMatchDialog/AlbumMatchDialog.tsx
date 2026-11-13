@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { type AlbumMatchCandidate, type AlbumSummary, artistNames } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { useSearch } from '@raven/ui/headless'
 import { useId } from 'react'
 import { MatchTier, hasBestMatch } from '@/components/MatchTier/MatchTier'
@@ -11,6 +11,7 @@ import { useModal } from '@/lib/useModal'
 import { ALBUM_MATCH_DIALOG_COPY } from '@/components/AlbumMatchDialog/copy'
 import styles from '@/components/AlbumMatchDialog/AlbumMatchDialog.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 type CandidateProps = {
   candidate: AlbumMatchCandidate
@@ -63,7 +64,7 @@ type AlbumMatchDialogProps = {
  * points the album at a release, and "Not on MusicBrainz" at none.
  */
 export const AlbumMatchDialog = ({ album, onClose, onMatched }: AlbumMatchDialogProps) => {
-  const { dialog, close, keepKeys } = useModal()
+  const { dialog, keepKeys, close } = useModal()
   const titleId = useId()
   const search = useSearch({ initial: '' })
   const candidates = useQuery(albumMatchSearchQuery({ albumId: album.id, query: search.query }))
@@ -76,12 +77,12 @@ export const AlbumMatchDialog = ({ album, onClose, onMatched }: AlbumMatchDialog
     return candidate === (found[0] ?? null) && hasBestMatch({ candidates: found })
   }
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={titleId}
-      onClose={onClose}
+    <DialogFrame
+      dialog={dialog}
       onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.form}
+      labelledBy={titleId}
+      onClose={onClose}
     >
       <div className={styles.body}>
         <header className={styles.header}>
@@ -130,11 +131,11 @@ export const AlbumMatchDialog = ({ album, onClose, onMatched }: AlbumMatchDialog
           <Button disabled={choose.isPending} onClick={() => choose.mutate(null)}>
             {ALBUM_MATCH_DIALOG_COPY.notOnMusicBrainz}
           </Button>
-          <Button tone="quiet" onClick={close}>
+          <Button tone={BUTTON_TONES.quiet} onClick={close}>
             {COMMON_COPY.cancel}
           </Button>
         </footer>
       </div>
-    </dialog>
+    </DialogFrame>
   )
 }

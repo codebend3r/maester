@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { COMMON_COPY } from '@/lib/copy'
 import styles from '@/components/Skeleton/Skeleton.module.scss'
+import { CARD_PICTURES, type CardPicture } from '@/lib/cardPictures'
 
 /** What a stand-in stands in for: a picture, a line of type at one size, or a button. */
 const SHAPES = {
@@ -39,7 +40,7 @@ export const Bone = ({ shape, width }: BoneProps) => (
   />
 )
 
-type SkeletonCardProps = { picture: 'poster' | 'frame' }
+type SkeletonCardProps = { picture: CardPicture }
 
 /** A card on its way: its picture, a line for its title and one for its facts. */
 const SkeletonCard = ({ picture }: SkeletonCardProps) => (
@@ -51,7 +52,7 @@ const SkeletonCard = ({ picture }: SkeletonCardProps) => (
 )
 
 type SkeletonCardsProps = {
-  picture: 'poster' | 'frame'
+  picture: CardPicture
   count?: number
 }
 
@@ -103,7 +104,7 @@ export const PageSkeleton = () => (
       <Bone shape="button" />
       <Bone shape="hero" width="half" />
       <ul className={styles.grid}>
-        <SkeletonCards picture="poster" />
+        <SkeletonCards picture={CARD_PICTURES.poster} />
       </ul>
     </div>
   </Loading>

@@ -1,15 +1,24 @@
-import { Button, ButtonLink, FactParts } from '@raven/ui'
-import { Fragment, type KeyboardEvent, useEffect, useState, useSyncExternalStore } from 'react'
+import { BUTTON_TONES, Button, ButtonLink, FactParts, classNames } from '@raven/ui'
+import { Fragment, type KeyboardEvent, useEffect, useState } from 'react'
 import type { Featured } from '@/pages/HomePage/featured'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import styles from '@/pages/HomePage/HomeHero.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { useAsksForLessMotion } from '@/lib/motion'
 
 /** How long each arrival holds before the next takes its place. */
 export const HERO_MS = 7000
 
 /** The sizes a title is set at, from the hero's own down. */
-const TITLE_SIZES = { display: undefined, long: styles.long, longest: styles.longest } as const
+const TITLE_SIZE_NAMES = { display: 'display', long: 'long', longest: 'longest' } as const
+
+type TitleSize = (typeof TITLE_SIZE_NAMES)[keyof typeof TITLE_SIZE_NAMES]
+
+const TITLE_SIZES = {
+  [TITLE_SIZE_NAMES.display]: undefined,
+  [TITLE_SIZE_NAMES.long]: styles.long,
+  [TITLE_SIZE_NAMES.longest]: styles.longest,
+} as const satisfies Record<TitleSize, string | undefined>
 
 /**
  * How big a title is set: as big as it goes while it is short, a size down
@@ -18,38 +27,34 @@ const TITLE_SIZES = { display: undefined, long: styles.long, longest: styles.lon
  * column whole. The arrivals change in place, so their titles keep near
  * one height.
  */
-export const titleSize = (title: string): keyof typeof TITLE_SIZES => {
-  if (title.length > 36) return 'longest'
-  return title.length > 16 || title.split(' ').some((word) => word.length > 9) ? 'long' : 'display'
+export const titleSize = (title: string): TitleSize => {
+  if (title.length > 36) return TITLE_SIZE_NAMES.longest
+  return title.length > 16 || title.split(' ').some((word) => word.length > 9)
+    ? TITLE_SIZE_NAMES.long
+    : TITLE_SIZE_NAMES.display
 }
-
-export const LESS_MOTION = '(prefers-reduced-motion: reduce)'
-
-const followLessMotion = (onChange: () => void) => {
-  const query = window.matchMedia(LESS_MOTION)
-  query.addEventListener('change', onChange)
-  return () => query.removeEventListener('change', onChange)
-}
-
-const asksForLessMotion = () => window.matchMedia(LESS_MOTION).matches
 
 /** A poster's place in the fan: on top, tilted out to either side, or tucked away behind. */
+const FAN_PLACES = { front: 'front', next: 'next', previous: 'previous', away: 'away' } as const
+
+type FanPlace = (typeof FAN_PLACES)[keyof typeof FAN_PLACES]
+
 const FAN = {
-  front: styles.front,
-  next: styles.next,
-  previous: styles.previous,
-  away: styles.away,
-} as const
+  [FAN_PLACES.front]: styles.front,
+  [FAN_PLACES.next]: styles.next,
+  [FAN_PLACES.previous]: styles.previous,
+  [FAN_PLACES.away]: styles.away,
+} as const satisfies Record<FanPlace, string | undefined>
 
 /** How far past the front a poster is still fetched: the next, and the one after it. */
 const FAN_LOADED = 2
 
 type FanPlaceProps = { offset: number; count: number }
 
-const fanPlace = ({ offset, count }: FanPlaceProps): keyof typeof FAN => {
-  if (offset === 0) return 'front'
-  if (offset === 1) return 'next'
-  return offset === count - 1 ? 'previous' : 'away'
+const fanPlace = ({ offset, count }: FanPlaceProps): FanPlace => {
+  if (offset === 0) return FAN_PLACES.front
+  if (offset === 1) return FAN_PLACES.next
+  return offset === count - 1 ? FAN_PLACES.previous : FAN_PLACES.away
 }
 
 type IsInWashProps = {
@@ -128,7 +133,7 @@ const Slide = ({ entry, place, isCurrent }: SlideProps) => (
     inert={!isCurrent}
   >
     <p className={styles.eyebrow}>{entry.eyebrow}</p>
-    <h2 className={[styles.title, TITLE_SIZES[titleSize(entry.title)]].filter(Boolean).join(' ')}>
+    <h2 className={classNames([styles.title, TITLE_SIZES[titleSize(entry.title)]])}>
       {entry.title}
     </h2>
     <p className={styles.line}>{entry.line}</p>
@@ -136,7 +141,7 @@ const Slide = ({ entry, place, isCurrent }: SlideProps) => (
       <div className={styles.buttons}>
         {entry.play && (
           <ButtonLink
-            tone="primary"
+            tone={BUTTON_TONES.primary}
             size="large"
             icon="play"
             to={entry.play.to}
@@ -186,7 +191,7 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
   })
   const [node, setNode] = useState<HTMLElement | null>(null)
   const isAttendedTo = useAttention(node)
-  const isStill = useSyncExternalStore(followLessMotion, asksForLessMotion)
+  const isStill = useAsksForLessMotion()
   const at = turn.index % count
   const isHeld = isStill || isAttendedTo || count < 2
 
@@ -245,14 +250,14 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
       {count > 1 && (
         <div className={styles.controls}>
           <Button
-            tone="pill"
+            tone={BUTTON_TONES.pill}
             icon="back"
             aria-label={HOME_COPY.previous}
             onClick={() => step(-1)}
             onKeyDown={onKeyDown}
           />
           <Button
-            tone="pill"
+            tone={BUTTON_TONES.pill}
             icon="next"
             aria-label={HOME_COPY.next}
             onClick={() => step(1)}
@@ -276,7 +281,7 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
             .map(({ entry: { key, poster }, offset }) => (
               <img
                 key={key}
-                className={`${styles.poster} ${FAN[fanPlace({ offset, count })]}`}
+                className={classNames([styles.poster, FAN[fanPlace({ offset, count })]])}
                 src={poster}
                 alt=""
                 decoding="async"

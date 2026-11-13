@@ -1,4 +1,4 @@
-import { FILMOGRAPHY_TABS, type FilmographyTab } from '@raven/core'
+import { FILMOGRAPHY_TABS, type FilmographyTab, FILMOGRAPHY_TAB_NAMES } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { useId } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -6,6 +6,7 @@ import { SearchField } from '@/components/SearchField/SearchField'
 import type { Search } from '@raven/ui/headless'
 import { PERSON_COPY } from '@/pages/PersonPage/copy'
 import styles from '@/pages/PersonPage/FilmographyToolbar.module.scss'
+import { PAGE_PARAMS } from '@/lib/appPaths'
 
 const TAB_LABELS: Record<FilmographyTab, string> = PERSON_COPY.tabs
 
@@ -16,8 +17,8 @@ type TabSearchProps = { address: URLSearchParams; tab: FilmographyTab }
 /** The address of tab `tab`, the rest of `address` kept: All's is the page's own, with no `?credits=`. */
 const tabSearch = ({ address, tab }: TabSearchProps): string => {
   const next = new URLSearchParams(address)
-  if (tab === 'all') next.delete('credits')
-  else next.set('credits', tab)
+  if (tab === FILMOGRAPHY_TAB_NAMES.all) next.delete(PAGE_PARAMS.credits)
+  else next.set(PAGE_PARAMS.credits, tab)
   const query = next.toString()
   return query === '' ? '' : `?${query}`
 }
@@ -78,7 +79,9 @@ export const FilmographyToolbar = ({
       </search>
       <nav aria-label={PERSON_COPY.credits} className={styles.tabsNav}>
         <ul className={styles.tabs}>
-          {FILMOGRAPHY_TABS.filter((each) => each === 'all' || counts[each] > 0).map((each) => (
+          {FILMOGRAPHY_TABS.filter(
+            (each) => each === FILMOGRAPHY_TAB_NAMES.all || counts[each] > 0,
+          ).map((each) => (
             <li key={each} className={styles.tabItem}>
               <Link
                 to={{ search: tabSearch({ address, tab: each }) }}

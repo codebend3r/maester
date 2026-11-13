@@ -22,10 +22,11 @@ import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { type ManagementMode, useManagement } from '@/lib/management'
 import { everyonesHistoryQuery, membersQuery, playHistoryQuery } from '@/lib/queries'
-import { PLAY_HISTORY_ROUTES, PLAY_HISTORY_SEARCH } from '@/lib/playHistory'
+import { PLAY_HISTORY_SEARCH } from '@/lib/playHistory'
 import { PLAY_HISTORY_COPY } from '@/pages/PlayHistoryPage/copy'
 import { type AccountName, PlayHistoryTable } from '@/pages/PlayHistoryPage/PlayHistoryTable'
 import styles from '@/pages/PlayHistoryPage/PlayHistoryPage.module.scss'
+import { APP_PATHS } from '@/lib/appPaths'
 
 type HistoryQuery = UseInfiniteQueryResult<InfiniteData<HistoryPage>>
 
@@ -173,7 +174,7 @@ export const PlayHistoryPage = () => {
         intro={PLAY_HISTORY_COPY.intro}
         action={
           canManage && (
-            <Link className={styles.everyone} to={PLAY_HISTORY_ROUTES.everyone}>
+            <Link className={styles.everyone} to={APP_PATHS.everyonesHistory}>
               {PLAY_HISTORY_COPY.seeEveryone}
             </Link>
           )

@@ -2,7 +2,7 @@ import { MENU_PLAYER_ACTIONS, type MenuPlayerAction } from '@raven/core'
 import type { PlayerServices } from '@raven/ui/headless'
 import { useEffect, useEffectEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import type { MenuHub } from '@/desktop/menuHub'
 
 type UseMenuNextProps = {

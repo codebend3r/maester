@@ -1,5 +1,5 @@
 import { artistNames, formatDuration, type Track } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
@@ -54,24 +54,29 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
       <div className={styles.controls}>
         <Equalizer isPlaying={state === AUDIO_STATES.playing} />
         <Button
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           icon="skipPrevious"
           aria-label={NOW_PLAYING_BAR_COPY.previousTrack}
           onClick={skipPrevious}
         />
         <Button
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           icon={isPlaying ? 'pause' : 'play'}
           aria-label={isPlaying ? COMMON_COPY.pause : COMMON_COPY.play}
           onClick={toggle}
         />
         <Button
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           icon="skipNext"
           aria-label={NOW_PLAYING_BAR_COPY.nextTrack}
           onClick={skipNext}
         />
-        <Button tone="ghost" icon="close" aria-label={NOW_PLAYING_BAR_COPY.close} onClick={clear} />
+        <Button
+          tone={BUTTON_TONES.ghost}
+          icon="close"
+          aria-label={NOW_PLAYING_BAR_COPY.close}
+          onClick={clear}
+        />
       </div>
       <div className={styles.progress}>
         <span

@@ -27,6 +27,7 @@ import type { Listing } from '@/pages/LibraryPage/libraryShape'
 import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { cardPictureOf, type CardPicture } from '@/lib/cardPictures'
 
 type ShowsViewProps = { settings: LibrarySettings; shows: ShowEntry[] }
 
@@ -59,6 +60,10 @@ const isMovieLibrary = (settings: LibrarySettings): boolean =>
 
 type MediaViewProps = { settings: LibrarySettings; items: MediaItem[] }
 
+/** A Movies library's cards wear posters; any other's, frame grabs. */
+const movieCardPicture = (settings: LibrarySettings): CardPicture =>
+  cardPictureOf({ hasPosters: isMovieLibrary(settings) })
+
 /** The library's videos for each view setting, a Movies library's as posters. */
 const MEDIA_VIEWS = {
   [LIBRARY_VIEWS.list]: ({ settings, items }: MediaViewProps) => (
@@ -69,7 +74,7 @@ const MEDIA_VIEWS = {
     />
   ),
   [LIBRARY_VIEWS.covers]: ({ settings, items }: MediaViewProps) => (
-    <MediaCovers items={items} posters={isMovieLibrary(settings)} />
+    <MediaCovers items={items} picture={movieCardPicture(settings)} />
   ),
   [LIBRARY_VIEWS.tiles]: ({ settings, items }: MediaViewProps) => (
     <MediaTiles
@@ -83,7 +88,7 @@ const MEDIA_VIEWS = {
     <MediaGroups
       items={items}
       by={settings.groupBy}
-      posters={isMovieLibrary(settings)}
+      picture={movieCardPicture(settings)}
       matchType={matchTypeFor(settings.kind)}
       sort={settings.sort}
     />
@@ -91,7 +96,7 @@ const MEDIA_VIEWS = {
   [LIBRARY_VIEWS.grid]: ({ settings, items }: MediaViewProps) => (
     <MediaGrid
       items={items}
-      posters={isMovieLibrary(settings)}
+      picture={movieCardPicture(settings)}
       matchType={matchTypeFor(settings.kind)}
       sort={settings.sort}
     />
@@ -199,7 +204,7 @@ type GridBonesKey = (typeof GRID_BONES)[keyof typeof GRID_BONES]
 const GRID_BONES_VIEWS = {
   [GRID_BONES.shows]: () => <ShowGridSkeleton />,
   [GRID_BONES.media]: ({ settings }: ListingBonesProps) => (
-    <MediaGridSkeleton posters={isMovieLibrary(settings)} />
+    <MediaGridSkeleton picture={movieCardPicture(settings)} />
   ),
 } as const satisfies Record<GridBonesKey, ComponentType<ListingBonesProps>>
 
@@ -214,7 +219,9 @@ const GridBones = ({ settings }: GridBonesProps) => {
 /** Stand-ins shaped as each view lays the listing out: covers, rows, or cards. */
 const LISTING_BONES = {
   [LIBRARY_VIEWS.covers]: ({ settings }: ListingBonesProps) => (
-    <CoverGridSkeleton posters={matchTypeFor(settings.kind) != null} />
+    <CoverGridSkeleton
+      picture={cardPictureOf({ hasPosters: matchTypeFor(settings.kind) != null })}
+    />
   ),
   [LIBRARY_VIEWS.list]: () => <MediaTilesSkeleton />,
   [LIBRARY_VIEWS.tiles]: () => <MediaTilesSkeleton />,

@@ -1,3 +1,4 @@
+import { PLAYBACK_MODES } from '@raven/core'
 type ProgressProps = { position: string; duration: string }
 
 type WatcherProps = { viewer: string; device: string }
@@ -12,7 +13,16 @@ type DetailsToggleProps = { isOpen: boolean; title: string }
 
 type ReceivedProps = { received: string; size: string }
 
+/** What each way of sending a stream is called. */
+export const STREAMS_MODE_COPY = {
+  [PLAYBACK_MODES.direct]: 'Direct play',
+  [PLAYBACK_MODES.remux]: 'Remuxing',
+  [PLAYBACK_MODES.transcode]: 'Transcoding',
+} as const
+
 export const STREAMS_COPY = {
+  /** Every converted stream's audio, whatever the track was. */
+  convertedAudio: 'AAC stereo',
   title: 'Streams',
   starting: 'Starting',
   progress: ({ position, duration }: ProgressProps) => `${position} of ${duration}`,

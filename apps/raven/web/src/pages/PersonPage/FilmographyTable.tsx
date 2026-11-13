@@ -6,6 +6,7 @@ import {
   ITEM_TYPES,
   itemPath,
   sortTitle,
+  FILMOGRAPHY_TAB_NAMES,
 } from '@raven/core'
 import { memo, useState } from 'react'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
@@ -258,7 +259,7 @@ export const FilmographyTable = memo(function FilmographyTable({
   isHidden,
 }: FilmographyTableProps) {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: entries, columns: COLUMNS })
-  const hasDepartment = tab === 'all'
+  const hasDepartment = tab === FILMOGRAPHY_TAB_NAMES.all
   type HeaderProps = {
     column: Column
     label: string

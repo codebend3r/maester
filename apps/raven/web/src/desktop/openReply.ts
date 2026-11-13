@@ -1,12 +1,12 @@
-import { DESKTOP_REPLIES, type DesktopReply } from '@raven/core'
+import { DESKTOP_REPLIES, type OpenReply } from '@raven/core'
 import { useToasts } from '@raven/ui'
 import { type NavigateFunction, useLocation, useNavigate } from 'react-router-dom'
 import { isPlaying, playOriginFor, playPathOf } from '@/desktop/paths'
 import { useDownloadAsk } from '@/stores/downloadAsk'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 
 type ApplyReplyProps = {
-  reply: DesktopReply
+  reply: OpenReply
   navigate: NavigateFunction
   pathname: string
   /** The opening page's route state, which carries a playing file's way back on to the next. */
@@ -35,15 +35,7 @@ const applyReply = ({ reply, navigate, pathname, state, showNotice }: ApplyReply
       return useDownloadAsk.getState().show(reply.ask)
     case DESKTOP_REPLIES.refused:
       return showNotice(reply.message)
-    case DESKTOP_REPLIES.file:
-    case DESKTOP_REPLIES.recents:
-    case DESKTOP_REPLIES.output:
     case DESKTOP_REPLIES.done:
-    case DESKTOP_REPLIES.title:
-    case DESKTOP_REPLIES.titleRefused:
-    case DESKTOP_REPLIES.updates:
-    case DESKTOP_REPLIES.downloads:
-    case DESKTOP_REPLIES.space:
       return
     default: {
       const unreachable: never = reply
@@ -53,7 +45,7 @@ const applyReply = ({ reply, navigate, pathname, state, showNotice }: ApplyReply
 }
 
 /** `applyReply` bound to this page's router and toasts. */
-export const useOpenReply = (): ((reply: DesktopReply) => void) => {
+export const useOpenReply = (): ((reply: OpenReply) => void) => {
   const navigate = useNavigate()
   const { pathname, state } = useLocation()
   const showNotice = useToasts((toasts) => toasts.show)

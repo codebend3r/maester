@@ -1,8 +1,7 @@
 import type { WatchTarget } from '@raven/core'
 import type { RefObject } from 'react'
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
-import { STORE_KEYS } from '@/stores/storage'
+import { devtools } from 'zustand/middleware'
 import type { SelectionStore } from '@raven/ui/headless'
 
 /** What a section or page tells its scope about its cards. */
@@ -30,24 +29,17 @@ type SelectionScopes = {
 }
 
 export const useSelectionScopes = create<SelectionScopes>()(
-  devtools(
-    persist((): SelectionScopes => ({ scopes: [] }), {
-      name: STORE_KEYS.selectionScopes,
-      storage: createJSONStorage(() => window.localStorage),
-      partialize: () => ({}),
-    }),
-    {
-      name: 'raven/selectionScopes',
-      /*
-       * A scope holds the Select button's element, and React's fiber on it
-       * would have devtools serialize the whole tree.
-       */
-      serialize: {
-        replacer: (_key: string, value: unknown) =>
-          value instanceof Element ? `<${value.localName}>` : value,
-      },
+  devtools((): SelectionScopes => ({ scopes: [] }), {
+    name: 'raven/selectionScopes',
+    /*
+     * A scope holds the Select button's element, and React's fiber on it
+     * would have devtools serialize the whole tree.
+     */
+    serialize: {
+      replacer: (_key: string, value: unknown) =>
+        value instanceof Element ? `<${value.localName}>` : value,
     },
-  ),
+  }),
 )
 
 /** The scope whose cards can be selected now, or null where none can. */

@@ -6,10 +6,11 @@ import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { BingeCard, BingeCardSkeleton } from '@/components/BingeCard/BingeCard'
 import { Loading } from '@/components/Skeleton/Skeleton'
-import { BINGE_BROWSE_PATH, BINGE_COPY } from '@/lib/binge'
+import { BINGE_COPY } from '@/lib/binge'
 import { bingeQuery } from '@/lib/bingeQuery'
 import { useBingeProfile, useSetBinge } from '@/lib/useBinge'
 import styles from '@/pages/BingePage/BingePage.module.scss'
+import { APP_PATHS } from '@/lib/appPaths'
 
 /** How many cards stand in on the Binge page before the list says how many it holds. */
 const UNKNOWN_SKELETON_COUNT = 2
@@ -109,7 +110,7 @@ const BingeList = () => {
           <h2>{BINGE_COPY.emptyTitle}</h2>
           <p>{BINGE_COPY.emptyBody}</p>
           <p>{BINGE_COPY.emptyHelp}</p>
-          <ButtonLink to={BINGE_BROWSE_PATH} icon="libraries">
+          <ButtonLink to={APP_PATHS.libraries} icon="libraries">
             {BINGE_COPY.browse}
           </ButtonLink>
         </section>

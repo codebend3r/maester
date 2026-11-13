@@ -15,7 +15,6 @@ import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
 import { api } from '@/lib/api'
-import { DESIGN_PATH } from '@/pages/DesignPage/copy'
 import { ravenVersion } from '@/lib/version'
 import { usePageBackdrop } from '@raven/ui/headless'
 import { useAuthSession } from '@/stores/authSession'
@@ -31,6 +30,7 @@ import { library } from '@/test/fixtures'
 import { musicLibrary } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 import { MEDIUM_SCREEN } from '@/components/AppShell/useIsMediumScreen'
+import { APP_PATHS } from '@/lib/appPaths'
 
 type RenderShellProps = {
   route: string
@@ -601,7 +601,7 @@ describe('AppShell', () => {
       DESKTOP_PATHS.downloads,
       PAGE_PATHS.settings,
       PAGE_PATHS.shortcuts,
-      DESIGN_PATH,
+      APP_PATHS.design,
     ])
     await userEvent.click(within(tabs()).getByRole('button', { name: 'More' }))
     expect(

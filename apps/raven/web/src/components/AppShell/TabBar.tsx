@@ -1,97 +1,26 @@
-import { DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
+import { DESKTOP_PATHS } from '@raven/core'
 import { type ComponentType, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
-import { isAnyOf, libraryPages } from '@/components/AppShell/currentPage'
+import { isAnyOf } from '@/components/AppShell/currentPage'
 import { MoreSheet } from '@/components/AppShell/MoreSheet'
+import { NAV_PLACES } from '@/components/AppShell/navPlaces'
 import { Tab, TabButton, TabStrip, type TabTarget } from '@/components/TabStrip/TabStrip'
+import { APP_PATHS } from '@/lib/appPaths'
 import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
-import { COMMON_COPY } from '@/lib/copy'
-import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
-import { PLAY_HISTORY_ROUTES } from '@/lib/playHistory'
-import { NOTIFICATIONS_PATH } from '@/lib/notifications'
-import { COMING_SOON_COPY, COMING_SOON_PATH } from '@/pages/ComingSoonPage/copy'
-import { NOTIFICATIONS_COPY } from '@/pages/NotificationsPage/copy'
-import { PLAY_HISTORY_COPY } from '@/pages/PlayHistoryPage/copy'
-import { ADMIN_COPY, ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
-import { MUSIC_PATHS } from '@/lib/music'
 
-const HOME_TAB = {
-  to: '/',
-  patterns: ['/'],
-  icon: 'home',
-  label: COMMON_COPY.home,
-} as const satisfies TabTarget
-
-const LIBRARIES_TAB = {
-  to: '/libraries',
-  patterns: ['/libraries', ...libraryPages(':id')],
-  icon: 'libraries',
-  label: COMMON_COPY.libraries,
-} as const satisfies TabTarget
-
-const FAVOURITES_TAB = {
-  to: '/favourites',
-  patterns: ['/favourites'],
-  icon: 'heart',
-  label: COMMON_COPY.favourites,
-} as const satisfies TabTarget
-
-const MUSIC_TAB = {
-  to: MUSIC_PATHS.root,
-  patterns: [MUSIC_PATHS.root],
-  icon: 'music',
-  label: APP_SHELL_COPY.music,
-} as const satisfies TabTarget
-
-const BINGE_TAB = {
-  to: BINGE_PATH,
-  patterns: [BINGE_PATH],
-  icon: 'popcorn',
-  label: BINGE_COPY.title,
-} as const satisfies TabTarget
-
-const COMING_SOON_TAB = {
-  to: COMING_SOON_PATH,
-  patterns: [COMING_SOON_PATH],
-  icon: 'calendar',
-  label: COMING_SOON_COPY.title,
-} as const satisfies TabTarget
-
+/** History marks both its pages here, since everyone's has no tab of its own. */
 const HISTORY_TAB = {
-  to: PLAY_HISTORY_ROUTES.own,
-  patterns: [PLAY_HISTORY_ROUTES.own, PLAY_HISTORY_ROUTES.everyone],
-  icon: 'history',
-  label: PLAY_HISTORY_COPY.title,
-} as const satisfies TabTarget
-
-const NOTIFICATIONS_TAB = {
-  to: NOTIFICATIONS_PATH,
-  patterns: [NOTIFICATIONS_PATH],
-  icon: 'bell',
-  label: NOTIFICATIONS_COPY.title,
-} as const satisfies TabTarget
-
-const DOWNLOADS_TAB = {
-  to: DESKTOP_PATHS.downloads,
-  patterns: [DESKTOP_PATHS.downloads],
-  icon: 'download',
-  label: COMMON_COPY.downloads,
-} as const satisfies TabTarget
-
-const SETTINGS_TAB = {
-  to: PAGE_PATHS.settings,
-  patterns: [PAGE_PATHS.settings],
-  icon: 'settings',
-  label: COMMON_COPY.settings,
+  ...NAV_PLACES.history,
+  patterns: [APP_PATHS.history, APP_PATHS.everyonesHistory],
 } as const satisfies TabTarget
 
 const MANAGE_TABS = [
-  { to: ADMIN_PATH, patterns: [ADMIN_PATH], icon: 'settings', label: ADMIN_COPY.heading },
-  { to: '/streams', patterns: ['/streams'], icon: 'playback', label: APP_SHELL_COPY.streams },
-  { to: '/reports', patterns: ['/reports'], icon: 'alert', label: APP_SHELL_COPY.reports },
+  NAV_PLACES.admin,
+  NAV_PLACES.streams,
+  { ...NAV_PLACES.reports, label: APP_SHELL_COPY.reports },
 ] as const satisfies readonly TabTarget[]
 
 /*
@@ -108,7 +37,7 @@ const useHostTabs = (): readonly TabTarget[] => {
     icon: 'file-play',
     label: APP_SHELL_COPY.thisComputer(computer),
   } as const satisfies TabTarget
-  return [...(isDesktop ? [local] : []), ...(hasDownloads ? [DOWNLOADS_TAB] : [])]
+  return [...(isDesktop ? [local] : []), ...(hasDownloads ? [NAV_PLACES.downloads] : [])]
 }
 
 type TabBarProps = {
@@ -121,7 +50,7 @@ const OfflineTabBar = () => {
   const hostTabs = useHostTabs()
   return (
     <TabStrip label={APP_SHELL_COPY.tabs}>
-      {[...hostTabs, SETTINGS_TAB].map((tab) => (
+      {[...hostTabs, NAV_PLACES.settings].map((tab) => (
         <Tab key={tab.to} {...tab} />
       ))}
     </TabStrip>
@@ -139,15 +68,15 @@ const OnlineTabBar = ({ hasMusic }: TabBarProps) => {
 
   // Music takes Binge's slot while a music library exists, and Binge moves into More.
   const [fourthTab, ...displaced] = hasMusic
-    ? ([MUSIC_TAB, BINGE_TAB] as const)
-    : ([BINGE_TAB] as const)
+    ? ([NAV_PLACES.music, NAV_PLACES.binge] as const)
+    : ([NAV_PLACES.binge] as const)
   const moreTabs = [
     ...displaced,
-    COMING_SOON_TAB,
+    NAV_PLACES.comingSoon,
     HISTORY_TAB,
-    NOTIFICATIONS_TAB,
+    NAV_PLACES.notifications,
     ...hostTabs,
-    SETTINGS_TAB,
+    NAV_PLACES.settings,
   ]
   const isMoreCurrent = isAnyOf({
     patterns: [...moreTabs, ...MANAGE_TABS].flatMap((tab) => tab.patterns),
@@ -162,7 +91,7 @@ const OnlineTabBar = ({ hasMusic }: TabBarProps) => {
   return (
     <>
       <TabStrip label={APP_SHELL_COPY.tabs}>
-        {[HOME_TAB, LIBRARIES_TAB, FAVOURITES_TAB, fourthTab].map((tab) => (
+        {[NAV_PLACES.home, NAV_PLACES.libraries, NAV_PLACES.favourites, fourthTab].map((tab) => (
           <Tab key={tab.to} {...tab} />
         ))}
         <TabButton

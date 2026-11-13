@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { SUMMARY_COPY } from '@/components/Summary/copy'
 import styles from '@/components/Summary/Summary.module.scss'
 
@@ -39,7 +39,7 @@ export const Summary = ({ tagline, summary, className }: SummaryProps) => {
         )}
         {long && (
           <Button
-            tone="ghost"
+            tone={BUTTON_TONES.ghost}
             className={styles.more}
             aria-expanded={expanded}
             aria-controls={id}

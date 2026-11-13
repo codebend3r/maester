@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { PlaylistSummary } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { useId, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PlaylistNameDialog } from '@/components/PlaylistNameDialog/PlaylistNameDialog'
@@ -51,7 +51,7 @@ export const PlaylistsSection = () => {
   return (
     <div className={styles.section}>
       <div className={styles.playlistsToolbar}>
-        <Button tone="primary" icon="plus" onClick={() => setNaming(true)}>
+        <Button tone={BUTTON_TONES.primary} icon="plus" onClick={() => setNaming(true)}>
           {PLAYLISTS_COPY.newPlaylist}
         </Button>
       </div>

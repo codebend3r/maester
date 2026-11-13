@@ -1,4 +1,3 @@
-import { NO_TITLE_EXTRAS } from '@raven/ui/headless'
 import {
   DESKTOP_PATHS,
   DESKTOP_REQUESTS,
@@ -22,6 +21,7 @@ import {
 } from '@/desktop/player/playerServices'
 import { DL_1, DL_2, fakeClient, FILE_ID, sentOfType, settled } from '@/test/desktop'
 import { useWindowChrome } from '@/stores/windowChrome'
+import { NO_TITLE_EXTRAS } from '@raven/ui/headless'
 
 const FILE: LocalFile = {
   fileId: FILE_ID,

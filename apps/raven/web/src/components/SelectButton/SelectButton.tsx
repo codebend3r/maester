@@ -1,4 +1,4 @@
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import {
   useSelectButtonRef,
   useSelection,
@@ -23,7 +23,7 @@ export const SelectButton = ({ className }: SelectButtonProps) => {
     scope !== null && (
       <Button
         ref={ref}
-        tone="ghost"
+        tone={BUTTON_TONES.ghost}
         icon="check"
         className={className ? `${styles.select} ${className}` : styles.select}
         aria-pressed={selecting}

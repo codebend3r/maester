@@ -1,5 +1,5 @@
 import { type ReactNode, useId, useState } from 'react'
-import { Button, Icon } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import { AUTH_SCREEN_COPY } from '@/components/AuthScreen/copy'
 import styles from '@/components/AuthScreen/AuthScreen.module.scss'
 
@@ -94,7 +94,7 @@ export const PasswordField = ({
           onChange={(event) => onChange(event.target.value)}
         />
         <Button
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           className={styles.reveal}
           aria-controls={alsoReveals === undefined ? ids.input : `${ids.input} ${alsoReveals}`}
           onClick={onToggleShown}

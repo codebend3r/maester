@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { MATCH_STATES, type MediaItem } from '@raven/core'
 import { useEffect, useRef } from 'react'
 import { afterMatchingPass } from '@raven/ui/headless'
+import { handled } from '@/lib/handled'
 
 /** How often a listing reads again while something in it is still on its way. */
 export const POLL_MS = 3000
@@ -25,7 +26,7 @@ export const useMatchingPassDone = ({ libraryId, files }: UseMatchingPassDonePro
   const isMatching = anyPending(files)
   const wasMatching = useRef(false)
   useEffect(() => {
-    if (wasMatching.current && !isMatching) void afterMatchingPass({ queryClient, libraryId })
+    if (wasMatching.current && !isMatching) handled(afterMatchingPass({ queryClient, libraryId }))
     wasMatching.current = isMatching
   }, [isMatching, libraryId, queryClient])
 }

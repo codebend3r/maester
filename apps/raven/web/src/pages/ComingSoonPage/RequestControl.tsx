@@ -5,7 +5,7 @@ import type {
   TitleRequestAsk,
   TitleRequests,
 } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { queryKeys } from '@raven/ui/headless'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ComponentType } from 'react'
@@ -78,7 +78,7 @@ const StandingNote = ({ status, whose }: Standing) => {
   const copy = REQUEST_STATUS_COPY[status]
   return (
     <>
-      <Button tone="primary" size="large" icon="check" disabled>
+      <Button tone={BUTTON_TONES.primary} size="large" icon="check" disabled>
         {REQUEST_COPY.requested}
       </Button>
       <output className={styles.status} data-status={status}>
@@ -95,7 +95,7 @@ const Requested = ({ standing }: RequestViewProps) =>
 
 const Spent = ({ list }: RequestViewProps) => (
   <>
-    <Button tone="primary" size="large" icon="download" disabled>
+    <Button tone={BUTTON_TONES.primary} size="large" icon="download" disabled>
       {REQUEST_COPY.request}
     </Button>
     {list !== undefined && (
@@ -116,7 +116,7 @@ const Open = ({ ask, list }: RequestViewProps) => {
   return (
     <>
       <Button
-        tone="primary"
+        tone={BUTTON_TONES.primary}
         size="large"
         icon="download"
         disabled={request.isPending}

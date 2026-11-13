@@ -1,6 +1,8 @@
 import { type Search, useSearch } from '@raven/ui/headless'
 import { useDeferredValue, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { PAGE_PARAMS } from '@/lib/appPaths'
+import { handled } from '@/lib/handled'
 
 type UseAddressSearchProps = {
   page?: string
@@ -27,7 +29,7 @@ export const useAddressSearch = ({
   const navigate = useNavigate()
   const { key, pathname } = useLocation()
   const away = page != null && pathname !== page ? page : null
-  const asked = away == null ? (address.get('q') ?? '') : ''
+  const asked = away == null ? (address.get(PAGE_PARAMS.search) ?? '') : ''
   const search = useSearch({ initial: asked })
   const { query, committed, searchFor } = search
   const followed = shouldWaitForEnter ? committed : query
@@ -37,14 +39,18 @@ export const useAddressSearch = ({
   useEffect(() => {
     if (deferredQuery !== followed || deferredQuery === asked) return
     if (away != null) {
-      void navigate(`${away}?${new URLSearchParams({ q: deferredQuery })}`)
+      handled(
+        Promise.resolve(
+          navigate(`${away}?${new URLSearchParams({ [PAGE_PARAMS.search]: deferredQuery })}`),
+        ),
+      )
       return
     }
     setAddress(
       (current) => {
         const next = new URLSearchParams(current)
-        if (deferredQuery) next.set('q', deferredQuery)
-        else next.delete('q')
+        if (deferredQuery) next.set(PAGE_PARAMS.search, deferredQuery)
+        else next.delete(PAGE_PARAMS.search)
         return next
       },
       { replace: true },

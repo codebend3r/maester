@@ -7,6 +7,9 @@ import { authConfigQuery } from '@/lib/queries'
 export const useConfirmUrl = (): string => {
   const config = useQuery(authConfigQuery).data
   return confirmUrl({
-    webUrl: config?.state === AUTH_CONFIG_STATES.ready ? config.webUrl : window.location.origin,
+    webUrl:
+      config != null && config.state === AUTH_CONFIG_STATES.ready
+        ? config.webUrl
+        : window.location.origin,
   })
 }
