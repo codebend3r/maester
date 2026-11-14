@@ -1,5 +1,5 @@
 import { AlbumLayout } from '@/layouts/AlbumLayout.focus'
-import type { MusicKit } from '@/layouts/musicKit'
+import { type MusicKit, STRIP_EDGES } from '@/layouts/musicKit'
 import { FavouriteButton } from '@/layouts/MusicParts.focus'
 import { NowPlayingLayout } from '@/layouts/NowPlayingLayout.focus'
 import { NowPlayingStrip } from '@/layouts/NowPlayingStrip.focus'
@@ -10,6 +10,7 @@ export const focusMusic: MusicKit = {
   AlbumLayout,
   NowPlayingLayout,
   NowPlayingStrip,
+  stripEdge: STRIP_EDGES.top,
   PlaylistLayout,
   NewPlaylistButton,
   FavouriteButton,

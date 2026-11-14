@@ -13,6 +13,8 @@ import { useAccountSession } from '@/account/session'
 import { DOWNLOAD_DEVICE } from '@/downloads/downloadDevice'
 import { clearOnServerSwitch } from '@/queries/serverCache'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
+import { stripEdge } from '@/layouts'
+import { STRIP_EDGES } from '@/layouts/musicKit'
 import { TouchMenu } from '@/layouts/TouchMenu'
 import { TouchTabs, useIsTabBarShown } from '@/layouts/TouchTabs'
 import { MusicHost } from '@/music/MusicHost'
@@ -93,13 +95,19 @@ const AppRoutes = () => {
   const ground = useTheme((theme) => theme.palette.ground)
   const tone = useTheme((theme) => theme.tone)
   const insets = useSafeAreaInsets()
-  const isBarShown = useIsBarShown()
+  // A strip across the top of a TV takes no inset from the screens, which keep the foot.
+  const isBarShown = useIsBarShown() && stripEdge === STRIP_EDGES.bottom
   const hasNav = session !== null && (isSignedIn || IS_SIGN_IN_BYPASSED)
   const isTabBarShown = useIsTabBarShown() && hasNav
   const DeviceNav = DEVICE_NAVS[deviceNavKind()]
   const footless = useMemo(() => ({ ...insets, bottom: 0 }), [insets])
   const screenInsets = isBarShown || isTabBarShown ? footless : insets
   const stripInsets = isTabBarShown ? footless : insets
+  const strip = session !== null && (
+    <SafeAreaInsetsContext.Provider value={stripInsets}>
+      <NowPlayingBar session={session} />
+    </SafeAreaInsetsContext.Provider>
+  )
   return (
     <QueryClientProvider client={queryClient}>
       <StatusBar barStyle={tone === THEME_TONES.light ? 'dark-content' : 'light-content'} />
@@ -114,6 +122,8 @@ const AppRoutes = () => {
       {/* A screen's opening focus comes back once the transition that reveals it has ended:
           on Android TV the transition takes the focus from anything asked for before then. */}
       <View style={styles.frame}>
+        {/* A TV's music strip stands across the top, outside every screen, so no page scrolls it away. */}
+        {stripEdge === STRIP_EDGES.top && strip}
         {/* The music strip or the tab bar keeps the bottom inset for itself, so the screens above pad none. */}
         <SafeAreaInsetsContext.Provider value={screenInsets}>
           <Stack
@@ -146,12 +156,8 @@ const AppRoutes = () => {
             </Stack.Protected>
           </Stack>
         </SafeAreaInsetsContext.Provider>
-        {/* The strip under the screens while a track plays, over the tab bar, which keeps the inset. */}
-        {session !== null && (
-          <SafeAreaInsetsContext.Provider value={stripInsets}>
-            <NowPlayingBar session={session} />
-          </SafeAreaInsetsContext.Provider>
-        )}
+        {/* Under the thumb the strip sits under the screens while a track plays, over the tab bar, which keeps the inset. */}
+        {stripEdge === STRIP_EDGES.bottom && strip}
         {/* An iPhone's tab bar along the foot, or an iPad's side menu over the routes and the strip. */}
         {hasNav && <DeviceNav key={session.server.id} session={session} />}
       </View>

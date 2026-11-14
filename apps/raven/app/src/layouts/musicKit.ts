@@ -228,14 +228,24 @@ export type NowPlayingStripProps = {
   onNext: () => void
 }
 
+/** Which edge of the screen the music strip keeps to while a track plays. */
+export const STRIP_EDGES = { top: 'top', bottom: 'bottom' } as const
+
+type StripEdge = (typeof STRIP_EDGES)[keyof typeof STRIP_EDGES]
+
 /** The music pages, which each platform lays out and drives its own way. */
 export type MusicKit = {
   /** An album's page: its cover, Play and Shuffle, and its tracks, each playing the album from it. */
   AlbumLayout: (props: AlbumLayoutProps) => ReactNode
   /** Now Playing: the cover large, the controls, and the queue. */
   NowPlayingLayout: (props: NowPlayingLayoutProps) => ReactNode
-  /** The strip under the screens while a track plays, which opens Now Playing. */
+  /** The strip beside the screens while a track plays, which opens Now Playing. */
   NowPlayingStrip: (props: NowPlayingStripProps) => ReactNode
+  /**
+   * Where the strip stands: under the screens, by the thumb, or across the top on a TV, fixed
+   * however far down a page the remote goes, and reached by going all the way up or all the way left.
+   */
+  stripEdge: StripEdge
   /** A playlist's page: Play and Shuffle, its tracks, and under the thumb its edits. */
   PlaylistLayout: (props: PlaylistLayoutProps) => ReactNode
   /** The toolbar's way to a new playlist, named as it is made; under the thumb only. */

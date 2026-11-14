@@ -311,7 +311,7 @@ const LyricsPlate = ({ aside, size, onToggle }: AsideColumnProps) => {
   const own = useStyles()
   const isLarge = size === LYRIC_SIZES.large
   return (
-    <FocusBand>
+    <FocusBand isFilling>
       <Pressable
         ref={view}
         accessibilityLabel={isLarge ? MUSIC_COPY.lyricsShrink : MUSIC_COPY.lyricsEnlarge}

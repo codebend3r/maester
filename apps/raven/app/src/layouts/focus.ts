@@ -1,4 +1,4 @@
-import { useIsFocused, useRoute } from 'expo-router'
+import { useNavigation, useRoute } from 'expo-router'
 import { type RefObject, useEffect, useRef } from 'react'
 import type { LayoutChangeEvent } from 'react-native'
 
@@ -18,20 +18,38 @@ import {
 } from '@/stores/screenFocus'
 import { forgetShelf, placeShelf } from '@/stores/shelfBands'
 
+/** The navigator's events for its screen coming to the front and going behind another. */
+const SCREEN_EVENTS = { focus: 'focus', blur: 'blur' } as const
+
 type UseScreenTurnProps = { isToFront: boolean; onTurn: () => void }
 
 /**
  * Calls `onTurn` each time the screen turns to the front (`isToFront`), once another on top of it
  * has gone, or away from it, as another covers it: never as it mounts, and never while it stays
- * where it is.
+ * where it is. It listens to the navigator's events rather than reading `useIsFocused`, which
+ * drew every card on the screen again on every push and every pop, Home's hundreds among them,
+ * just as the remote's press wanted the screen to move.
  */
 const useScreenTurn = ({ isToFront, onTurn }: UseScreenTurnProps): void => {
-  const isFocused = useIsFocused()
-  const isFocusedBefore = useRef(isFocused)
+  const navigation = useNavigation()
+  const latest = useRef(onTurn)
   useEffect(() => {
-    if (isFocused === isToFront && isFocusedBefore.current !== isToFront) onTurn()
-    isFocusedBefore.current = isFocused
-  }, [isFocused, isToFront, onTurn])
+    latest.current = onTurn
+  })
+  useEffect(() => {
+    // The navigator says `focus` once more as a screen first shows, which is no turn.
+    let wasInFront = navigation.isFocused()
+    const turn = (isInFront: boolean) => () => {
+      if (wasInFront !== isInFront && isInFront === isToFront) latest.current()
+      wasInFront = isInFront
+    }
+    const stopFocus = navigation.addListener(SCREEN_EVENTS.focus, turn(true))
+    const stopBlur = navigation.addListener(SCREEN_EVENTS.blur, turn(false))
+    return () => {
+      stopFocus()
+      stopBlur()
+    }
+  }, [navigation, isToFront])
 }
 
 type UseFocusOnMountProps = {

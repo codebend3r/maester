@@ -1,3 +1,4 @@
+import { isSameDrawing } from '@/layouts/sameDrawing'
 import type { IconName } from '@raven/ui/iconDrawings'
 import { Icon } from '@raven/native'
 import { useIsFocused } from 'expo-router'
@@ -5,6 +6,7 @@ import {
   type ComponentRef,
   type ReactNode,
   type RefObject,
+  memo,
   useEffect,
   useRef,
   useState,
@@ -346,7 +348,7 @@ const HeroButton = ({
  * front, and holds still while the remote is on it, or when the system asks for less motion;
  * Previous and Next step through by hand. Play takes the remote's focus as Home opens.
  */
-const HomeHero = ({ slides, onOpen, isPreferred }: HomeHeroProps) => {
+const HomeHeroBody = ({ slides, onOpen, isPreferred }: HomeHeroProps) => {
   const count = slides.length
   const [turn, setTurn] = useState<HeroTurn>({ at: 0, from: null })
   const [isFocusedIn, setFocusedIn] = useState(false)
@@ -433,6 +435,8 @@ const HomeHero = ({ slides, onOpen, isPreferred }: HomeHeroProps) => {
     </View>
   )
 }
+
+const HomeHero = memo(HomeHeroBody, isSameDrawing<HomeHeroProps>)
 
 export const focusHero: HeroKit = { HomeHero }
 

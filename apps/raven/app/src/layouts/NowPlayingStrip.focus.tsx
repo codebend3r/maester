@@ -1,7 +1,14 @@
 import type { IconName } from '@raven/ui/iconDrawings'
 import { useRootNavigationState } from 'expo-router'
 import { type ComponentRef, useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, type TVRemoteEvent, View, useTVEventHandler } from 'react-native'
+import {
+  Pressable,
+  StyleSheet,
+  TVFocusGuideView,
+  type TVRemoteEvent,
+  View,
+  useTVEventHandler,
+} from 'react-native'
 
 import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
@@ -29,17 +36,17 @@ const STRIP_PLACE = 'now-playing-strip'
 type StripRemoteProps = { isOn: () => boolean }
 
 /**
- * Up while the remote is on the strip goes back to where it was before the strip took it, the
+ * Down while the remote is on the strip goes back to where it was before the strip took it, the
  * control that started the music; with none noted, the platform moves it as it would. One
  * listener for the strip's life, as the player's chrome keeps.
  */
-const useBackUp = ({ isOn }: StripRemoteProps) => {
+const useBackDown = ({ isOn }: StripRemoteProps) => {
   const latest = useRef(isOn)
   useEffect(() => {
     latest.current = isOn
   })
   const [listener] = useState(() => (event: TVRemoteEvent) => {
-    if (!latest.current() || pressedKeyOf(event) !== REMOTE_KEYS.up) return
+    if (!latest.current() || pressedKeyOf(event) !== REMOTE_KEYS.down) return
     const back = useLastFocus.getState().view
     if (back !== null) requestTVFocus(back)
   })
@@ -67,6 +74,11 @@ const useStyles = themedStyles((colours) =>
       borderColor: 'transparent',
     },
     stripWords: { flex: 1 },
+    /*
+     * A sliver down the screen's left edge, left of every control, that hands the remote to the
+     * strip: Left from the leftmost control on any screen finds it and lands on the strip.
+     */
+    leftEdge: { position: 'absolute', top: 0, bottom: 0, left: 0, width: 1 },
     stripTitle: { color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
   }),
 )
@@ -120,9 +132,11 @@ const StripButton = ({ label, icon, canFocus, onPress, onFocus, onBlur }: StripB
 }
 
 /**
- * The strip under the screens on a TV while a track plays: the cover, the title and artists,
- * pressed to open Now Playing, beside Play or Pause and Next. Back from Now Playing lands on it
- * again, as a card's screen lands on the card.
+ * The strip across the top of a TV while a track plays, outside every screen, so it stays put
+ * however far down a page the remote goes: the cover, the title and artists, pressed to open Now
+ * Playing, beside Play or Pause and Next. Up from a screen's top row reaches it, and so does Left
+ * from a screen's leftmost control. Back from Now Playing lands on it again, as a card's screen
+ * lands on the card.
  */
 export const NowPlayingStrip = ({
   title,
@@ -139,12 +153,17 @@ export const NowPlayingStrip = ({
   const music = useMusicStyles()
   const styles = useStyles()
   const { canFocus, front } = useStripFocus()
+  // The left edge's guide sends the remote to the strip's main plate once that is drawn.
+  const [destinations, setDestinations] = useState<ComponentRef<typeof Pressable>[]>([])
+  useEffect(() => {
+    if (view.current !== null) setDestinations([view.current])
+  }, [])
   // The strip is gone while Now Playing is in front, so it is drawn afresh on the way back.
   useEffect(() => {
     if (front !== null) takeOpener({ screen: front, card: STRIP_PLACE })
   }, [front])
   useReturnAsks({ screen: front, card: STRIP_PLACE, view })
-  // Music started: the remote comes down to the strip, to pause or skip at once.
+  // Music started: the remote goes up to the strip, to pause or skip at once.
   const startCount = useMusicStarts((starts) => starts.started)
   const met = useMusicStarts((starts) => starts.met)
   const meet = useMusicStarts((starts) => starts.meet)
@@ -153,7 +172,7 @@ export const NowPlayingStrip = ({
     meet(startCount)
     requestTVFocus(view.current)
   }, [startCount, met, meet, canFocus])
-  useBackUp({ isOn: () => focusedOn.current > 0 })
+  useBackDown({ isOn: () => focusedOn.current > 0 })
   const heard = {
     onFocus: () => {
       focusedOn.current += 1
@@ -163,43 +182,50 @@ export const NowPlayingStrip = ({
     },
   }
   return (
-    <View style={styles.strip}>
-      <Pressable
-        ref={view}
-        {...heard}
-        accessibilityLabel={MUSIC_COPY.openNowPlaying}
-        accessibilityRole="button"
-        focusable={canFocus}
-        onPress={() => {
-          if (front !== null) rememberOpener({ screen: front, card: STRIP_PLACE, shelf: null })
-          onOpen()
-        }}
-        style={({ focused }) => [styles.stripMain, focused && music.focused]}
-      >
-        <Cover cover={cover} size={STRIP_COVER} title={title} />
-        <View style={styles.stripWords}>
-          <Text numberOfLines={1} style={styles.stripTitle}>
-            {title}
-          </Text>
-          <Text numberOfLines={1} style={music.muted}>
-            {artists}
-          </Text>
-        </View>
-      </Pressable>
-      <StripButton
-        {...heard}
-        canFocus={canFocus}
-        icon={isPlaying ? 'pause' : 'play'}
-        label={toggleLabelOf(isPlaying)}
-        onPress={onToggle}
+    <>
+      <TVFocusGuideView
+        destinations={destinations}
+        enabled={canFocus && destinations.length > 0}
+        style={styles.leftEdge}
       />
-      <StripButton
-        {...heard}
-        canFocus={canFocus}
-        icon="skipNext"
-        label={MUSIC_COPY.next}
-        onPress={onNext}
-      />
-    </View>
+      <View style={styles.strip}>
+        <Pressable
+          ref={view}
+          {...heard}
+          accessibilityLabel={MUSIC_COPY.openNowPlaying}
+          accessibilityRole="button"
+          focusable={canFocus}
+          onPress={() => {
+            if (front !== null) rememberOpener({ screen: front, card: STRIP_PLACE, shelf: null })
+            onOpen()
+          }}
+          style={({ focused }) => [styles.stripMain, focused && music.focused]}
+        >
+          <Cover cover={cover} size={STRIP_COVER} title={title} />
+          <View style={styles.stripWords}>
+            <Text numberOfLines={1} style={styles.stripTitle}>
+              {title}
+            </Text>
+            <Text numberOfLines={1} style={music.muted}>
+              {artists}
+            </Text>
+          </View>
+        </Pressable>
+        <StripButton
+          {...heard}
+          canFocus={canFocus}
+          icon={isPlaying ? 'pause' : 'play'}
+          label={toggleLabelOf(isPlaying)}
+          onPress={onToggle}
+        />
+        <StripButton
+          {...heard}
+          canFocus={canFocus}
+          icon="skipNext"
+          label={MUSIC_COPY.next}
+          onPress={onNext}
+        />
+      </View>
+    </>
   )
 }

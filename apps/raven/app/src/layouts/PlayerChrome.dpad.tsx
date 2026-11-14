@@ -44,6 +44,7 @@ import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import { CaptionText } from '@/layouts/PlayerCaption'
 import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import { ChaptersBand } from '@/layouts/PlayerChapters.dpad'
+import { chapterMarksOf } from '@/layouts/chapterMarks'
 import { UpNextCard, useUpNextOffer } from '@/layouts/PlayerUpNext.dpad'
 import {
   PLAYER_COPY,
@@ -78,7 +79,7 @@ import { TV_CAPTION_BASE } from '@/player/captionLook'
 import { useHeldSeek } from '@/layouts/useHeldSeek'
 import { useMarkFade } from '@/layouts/useMarkFade'
 import { useSkipLadder } from '@/layouts/useSkipLadder'
-import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
+import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { pictureStyles, useTheme } from '@/theme/useTheme'
 
 /** How dark the ground is laid over the picture under the controls. */
@@ -90,6 +91,12 @@ const CENTRE_ICON = TV_SIZES.textXl * 2
 /** The thumb on the line, and how much it grows while the remote is on it. */
 const THUMB = TV_SIZES.space4
 const THUMB_FOCUSED = TV_SIZES.space6
+
+/** How wide the cut in the line is where a chapter begins: a hairline, two points on a 1920 point screen. */
+const CHAPTER_NOTCH = tvSize(2)
+
+/** How much the chapter playing lightens the track under it: enough to see, never to compete with the played line. */
+const CHAPTER_SPAN_OPACITY = 0.22
 
 type Focusable = RefObject<ComponentRef<typeof Pressable> | null>
 
@@ -109,6 +116,8 @@ const useRemote = (respond: (event: TVRemoteEvent) => void) => {
 type ScrubberProps = {
   view: Focusable
   transport: Transport
+  /** The file's chapters, notched along the line, the one playing a shade lighter than the rest. */
+  chapters: PlayerChromeProps['chapters']
   onScrubbing: (isScrubbing: boolean) => void
 }
 
@@ -119,12 +128,13 @@ type ScrubberProps = {
  * still sliding in, when only the preferred focus, set with the view, takes. TalkBack reads it as
  * the time of the length and skips by its own gesture.
  */
-const Scrubber = ({ view, transport, onScrubbing }: ScrubberProps) => {
+const Scrubber = ({ view, transport, chapters, onScrubbing }: ScrubberProps) => {
   const [isOpening, setOpening] = useState(true)
   const { position, onSeek, onTogglePlay } = transport
   const styles = useStyles()
   const duration = transport.duration ?? 0
   const share = playedShareOf({ at: position, duration })
+  const marks = chapterMarksOf({ chapters, duration, at: position })
   return (
     /*
      * Left and right are the scrubber's own: they seek, and a hold runs the playhead. Without the
@@ -147,7 +157,11 @@ const Scrubber = ({ view, transport, onScrubbing }: ScrubberProps) => {
         {({ focused }) => (
           <>
             <View style={[styles.line, focused && styles.lineFocused]}>
+              {marks.current !== null && <View style={[styles.chapterSpan, marks.current]} />}
               <View style={[styles.played, { width: share }]} />
+              {marks.notches.map((notch) => (
+                <View key={notch.key} style={[styles.chapterNotch, { left: notch.left }]} />
+              ))}
             </View>
             <View
               style={[
@@ -411,7 +425,12 @@ const Controls = ({
           <View onFocus={() => setChaptersOpen(false)} style={styles.timeline}>
             <Text style={styles.time}>{formatDuration(transport.position)}</Text>
             <View style={styles.scrubberSlot}>
-              <Scrubber onScrubbing={onScrubbing} transport={transport} view={scrubber} />
+              <Scrubber
+                chapters={chapters}
+                onScrubbing={onScrubbing}
+                transport={transport}
+                view={scrubber}
+              />
             </View>
             <Text style={styles.time}>{formatDuration(transport.duration)}</Text>
           </View>
@@ -811,6 +830,23 @@ const useStyles = pictureStyles((colours) =>
     },
     lineFocused: { height: TV_SIZES.space2 },
     played: { height: '100%', backgroundColor: colours.played },
+    // The chapter playing, a shade over the track, so its length reads at a glance.
+    chapterSpan: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      backgroundColor: colours.text,
+      opacity: CHAPTER_SPAN_OPACITY,
+    },
+    // A slim cut in the line where a chapter begins, in the stage's dark.
+    chapterNotch: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      width: CHAPTER_NOTCH,
+      marginLeft: -CHAPTER_NOTCH / 2,
+      backgroundColor: colours.ground,
+    },
     thumb: {
       position: 'absolute',
       width: THUMB,

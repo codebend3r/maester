@@ -1,4 +1,5 @@
-import { type ComponentRef, type ComponentType, useEffect, useRef, useState } from 'react'
+import { isSameDrawing } from '@/layouts/sameDrawing'
+import { type ComponentRef, type ComponentType, memo, useEffect, useRef, useState } from 'react'
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native'
 
 import { useTvCard } from '@/cardMenu/useTvCard'
@@ -111,7 +112,7 @@ type FocusCardProps = {
  * or more where one title can sit in two places. Taking the focus spends the screen's opening focus.
  * Select held down opens the card's menu of marks, for a card that stands for something.
  */
-export const FocusCard = ({
+const FocusCardBody = ({
   card,
   place = card.key,
   shelf = null,
@@ -182,6 +183,8 @@ export const FocusCard = ({
     </Pressable>
   )
 }
+
+export const FocusCard = memo(FocusCardBody, isSameDrawing<FocusCardProps>)
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
