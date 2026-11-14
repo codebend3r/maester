@@ -2,9 +2,7 @@ import {
   DEFAULT_DISPLAY_SETTINGS,
   DEFAULT_PLAYBACK_SETTINGS,
   DISPLAY_CHOICES,
-  type DisplaySettings,
   PLAYBACK_CHOICES,
-  type PlaybackSettings,
 } from '@raven/core'
 import { type ComponentType, useId, useState } from 'react'
 import { BUTTON_TONES, Button } from '@raven/ui'
@@ -17,12 +15,7 @@ import { displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
 import { AdminLockSection } from '@/pages/SettingsPage/AdminLockSection'
 import { RemoteAccessSection } from '@/pages/SettingsPage/RemoteAccessSection'
 import { ServerSection } from '@/pages/SettingsPage/ServerSection'
-import {
-  type Choices,
-  Setting,
-  SettingsSection,
-  SettingsSkeleton,
-} from '@/pages/SettingsPage/Setting'
+import { Setting, SettingsSection, SettingsSkeleton } from '@/pages/SettingsPage/Setting'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import { UsersSection } from '@/pages/SettingsPage/UsersSection'
@@ -33,14 +26,6 @@ import { COMMON_COPY } from '@/lib/copy'
 import { ADMIN_CHOICES_COPY, ADMIN_COPY } from '@/pages/SettingsPage/adminCopy'
 import { ScanSwitch } from '@/pages/SettingsPage/ScanSwitch'
 import { ToggleChoice } from '@/pages/SettingsPage/ToggleChoice'
-
-const TITLES: Choices<DisplaySettings['titles']> = ADMIN_CHOICES_COPY.titles
-const DIRECT_PLAY: Choices<PlaybackSettings['directPlay']> = ADMIN_CHOICES_COPY.directPlay
-const TRANSCODING: Choices<PlaybackSettings['transcoding']> = ADMIN_CHOICES_COPY.transcoding
-const MAX_HEIGHT: Choices<PlaybackSettings['maxHeight']> = ADMIN_CHOICES_COPY.maxHeight
-const QUALITY: Choices<PlaybackSettings['quality']> = ADMIN_CHOICES_COPY.quality
-const HW_ACCEL: Choices<PlaybackSettings['hwAccel']> = ADMIN_CHOICES_COPY.hwAccel
-const ENCODER_NAMES = ADMIN_CHOICES_COPY.encoders
 
 type ResetControlProps = {
   isConfirming: boolean
@@ -114,7 +99,7 @@ const ServerSettings = () => {
       queries: { playbackSettingsQuery, displaySettingsQuery },
       onReset: () => setConfirming(false),
     })
-  const settings = playback.data?.settings
+  const hasSettings = playback.data !== undefined
 
   return (
     <section className={styles.page} aria-labelledby={titleId}>
@@ -123,7 +108,7 @@ const ServerSettings = () => {
         <PageTitle id={titleId} icon="settings" className={styles.title}>
           {ADMIN_COPY.heading}
         </PageTitle>
-        {settings && (
+        {hasSettings && (
           <ResetControl
             isConfirming={isConfirming}
             isBusy={isBusy}
@@ -134,7 +119,7 @@ const ServerSettings = () => {
         )}
       </header>
       <output className={styles.status}>
-        {reset.isSuccess && !!settings && isAllAtDefaults ? SETTINGS_COPY.resetDone : ''}
+        {reset.isSuccess && hasSettings && isAllAtDefaults ? SETTINGS_COPY.resetDone : ''}
       </output>
       {reset.isError && (
         <p className={styles.error} role="alert">
@@ -158,7 +143,7 @@ const ServerSettings = () => {
               values={PLAYBACK_CHOICES.directPlay}
               icon="file-play"
               label={SETTINGS_COPY.directPlay}
-              choices={DIRECT_PLAY}
+              choices={ADMIN_CHOICES_COPY.directPlay}
               value={current.directPlay}
               onChange={(directPlay) => save.mutate({ directPlay })}
             />
@@ -166,7 +151,7 @@ const ServerSettings = () => {
               values={PLAYBACK_CHOICES.transcoding}
               icon="convert"
               label={SETTINGS_COPY.transcoding}
-              choices={TRANSCODING}
+              choices={ADMIN_CHOICES_COPY.transcoding}
               value={current.transcoding}
               onChange={(transcoding) => save.mutate({ transcoding })}
             />
@@ -174,7 +159,7 @@ const ServerSettings = () => {
               values={PLAYBACK_CHOICES.maxHeight}
               icon="resize"
               label={SETTINGS_COPY.maxHeight}
-              choices={MAX_HEIGHT}
+              choices={ADMIN_CHOICES_COPY.maxHeight}
               value={current.maxHeight}
               onChange={(maxHeight) => save.mutate({ maxHeight })}
             />
@@ -182,7 +167,7 @@ const ServerSettings = () => {
               values={PLAYBACK_CHOICES.quality}
               icon="gauge"
               label={SETTINGS_COPY.quality}
-              choices={QUALITY}
+              choices={ADMIN_CHOICES_COPY.quality}
               value={current.quality}
               onChange={(quality) => save.mutate({ quality })}
             />
@@ -190,12 +175,12 @@ const ServerSettings = () => {
               values={PLAYBACK_CHOICES.hwAccel}
               icon="chip"
               label={SETTINGS_COPY.hwAccel}
-              choices={HW_ACCEL}
+              choices={ADMIN_CHOICES_COPY.hwAccel}
               value={current.hwAccel}
               onChange={(hwAccel) => save.mutate({ hwAccel })}
             />
             <p className={styles.hint}>
-              {SETTINGS_COPY.encodesWith(ENCODER_NAMES[effective.encoder])}
+              {SETTINGS_COPY.encodesWith(ADMIN_CHOICES_COPY.encoders[effective.encoder])}
             </p>
             <fieldset className={styles.setting}>
               <legend className={styles.legend}>
@@ -240,7 +225,7 @@ const ServerSettings = () => {
             icon="film"
             label={SETTINGS_COPY.movieTitles}
             values={DISPLAY_CHOICES.titles}
-            choices={TITLES}
+            choices={ADMIN_CHOICES_COPY.titles}
             value={shown.titles}
             onChange={(titles) => saveDisplay.mutate({ titles })}
           />

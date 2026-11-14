@@ -30,6 +30,7 @@ import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
 import { QUERY_FLAGS, QUERY_PARAMS, pageLimit } from '@/queryValues'
 import { ROUTE_PARAMS } from '@/requestParts'
+import { LIBRARY_ROUTES } from '@/libraries/libraryRoutes'
 
 /** A listing's search, sort and seed, read as the client's `mediaListQuery.encode` wrote them. */
 const listParams = (query: unknown): MediaListParams =>
@@ -39,7 +40,7 @@ const listParams = (query: unknown): MediaListParams =>
 const HISTORY_LIMIT = { fallback: 100, most: 500 } as const
 
 /** What each library holds for the caller: its videos, shows, history, favourites, sagas and unmatched files. */
-@Controller('api/libraries')
+@Controller(LIBRARY_ROUTES)
 @PrivateBy(PRIVACIES.library)
 export class LibraryListingsController {
   constructor(

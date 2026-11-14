@@ -615,10 +615,12 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
 
   /** Lists a segment a run has written whole, and its run's first file as the init's source. */
   private record({ entry, n, path, isFirst }: HlsSessionsRecordProps): void {
-    // Another run's copy is whole and may be being read, so a second one is spare.
-    const isSpare = entry.written.has(n)
-    if (isSpare) rm(path, { force: true }).catch(() => undefined)
-    if (!isSpare) entry.written.set(n, path)
+    if (entry.written.has(n)) {
+      // Another run's copy is whole and may be being read; this one is spare.
+      rm(path, { force: true }).catch(() => undefined)
+    } else {
+      entry.written.set(n, path)
+    }
     if (isFirst && !entry.init) entry.initSource = entry.written.get(n) ?? null
   }
 

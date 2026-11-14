@@ -1,4 +1,4 @@
-import { DOWNLOAD_STATUS_KINDS } from '@raven/core'
+import { AUTH_REFUSALS, DOWNLOAD_STATUS_KINDS } from '@raven/core'
 import { SERVER_NAME } from '@/main/desktopConfig'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
@@ -46,10 +46,8 @@ type CreateQueueFailuresProps = {
 
 export type QueueFailures = {
   failEntry: (input: FailEntryProps) => void
-  /** Fails each of `downloadIds` for the account, its bytes kept, and stops the ones that run. */
-  failRuns: (input: FailRunsProps) => void
-  /** Tells the page of a file that failed, unless it failed again of an outage it was told of. */
-  told: (downloadId: string) => void
+  /** The sign-in ended under each of `downloadIds`: each fails, its bytes kept, and the page hears of it. */
+  failSignedOut: (downloadIds: readonly string[]) => void
   /** Fails or pauses the file for why its access could not be read. */
   settleAccess: (input: SettleAccessProps) => void
   /** Fails or pauses the file for why its fetch stopped short. */
@@ -80,7 +78,8 @@ export const createQueueFailures = ({
   onFailed,
   warn,
 }: CreateQueueFailuresProps): QueueFailures => {
-  const told: QueueFailures['told'] = (downloadId) => {
+  /** Tells the page of a file that failed, unless it failed again of an outage it was told of. */
+  const told = (downloadId: string): void => {
     const entry = entryById({ state: store.read(), downloadId })
     const isRetried = retried.delete(downloadId)
     if (entry === null || entry.status.kind !== DOWNLOAD_STATUS_KINDS.failed) return
@@ -149,7 +148,8 @@ export const createQueueFailures = ({
     warn(`Raven could not reach ${SERVER_NAME} for ${loggable(entry.label)}`)
   }
 
-  const failRuns: QueueFailures['failRuns'] = ({ downloadIds, refusal }) => {
+  /** Fails each of `downloadIds` for the account, its bytes kept, and stops the ones that run. */
+  const failRuns = ({ downloadIds, refusal }: FailRunsProps): void => {
     const isPicked: RunPick = ({ downloadId }) => downloadIds.includes(downloadId)
     runs.saveBytes(isPicked)
     store.update((state) =>
@@ -159,6 +159,11 @@ export const createQueueFailures = ({
       ),
     )
     runs.stop(isPicked).catch(() => undefined)
+  }
+
+  const failSignedOut: QueueFailures['failSignedOut'] = (downloadIds) => {
+    failRuns({ downloadIds, refusal: AUTH_REFUSALS.signedOut })
+    downloadIds.forEach(told)
   }
 
   type FailAccountProps = { entry: DownloadEntry; refusal: AccountRefusal }
@@ -257,5 +262,5 @@ export const createQueueFailures = ({
     }
   }
 
-  return { failEntry, failRuns, told, settleAccess, settleFetch, failForSpace }
+  return { failEntry, failSignedOut, settleAccess, settleFetch, failForSpace }
 }

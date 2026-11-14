@@ -51,16 +51,17 @@ export type ItemContext = Pick<Pictures, 'headersFor'> & {
 type PlayOfProps = {
   media: MediaItem
   label: string
+  /** The words beside the icon: null for Play alone, the spot for Resume, the episode's code for a show's Play. */
+  text: string | null
   context: ItemContext
 }
 
-export const playOf = ({ media, label, context }: PlayOfProps): ItemAction => ({
+export const playOf = ({ media, label, text, context }: PlayOfProps): ItemAction => ({
   kind: ITEM_ACTIONS.play,
   key: ACTION_KEYS.play,
   icon: APP_ICONS.play,
   label,
-  // Play alone is its icon; Resume shows the spot, and a show's Play the episode's code.
-  text: label === ITEM_COPY.play ? null : label.replace(ITEM_COPY.playEpisode(''), ''),
+  text,
   onPress: () =>
     context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id, at: media.position }),
 })
@@ -69,7 +70,7 @@ type RewatchOfProps = { media: MediaItem; context: ItemContext }
 
 /** Rewatch, in Play's place once all of a show or season is watched: its first episode, from the start. */
 const rewatchOf = ({ media, context }: RewatchOfProps): ItemAction => ({
-  ...playOf({ media, label: ITEM_COPY.rewatch, context }),
+  ...playOf({ media, label: ITEM_COPY.rewatch, text: ITEM_COPY.rewatch, context }),
   onPress: () =>
     context.onOpen({ kind: ROUTE_TARGETS.play, mediaId: media.id, at: 0, isFromStart: true }),
 })
@@ -187,10 +188,6 @@ export const downloadOf = ({ control, onPress }: DownloadButton): ItemAction[] =
       ]
     : []
 
-/** "Play S01E02" for the episode a show or season plays next, or plain Play without a number. */
-const playNextLabel = (code: string | null): string =>
-  code === null ? ITEM_COPY.play : ITEM_COPY.playEpisode(code)
-
 type NextOfProps = { media: MediaItem; context: ItemContext }
 
 /** "Next S01E03": the episode after this one in its show, played from where the server saved. */
@@ -240,7 +237,7 @@ export const marksOf = ({ marks, words }: MarksOfProps): ItemAction[] => [
 type PlayNextActionsOfProps = {
   next: MediaItem | null
   code: string | null
-  first: MediaItem | null | undefined
+  first: MediaItem | null
   state: WatchedState
   context: ItemContext
 }
@@ -258,10 +255,16 @@ export const playNextActionsOf = ({
 }: PlayNextActionsOfProps): ItemAction[] => {
   if (next !== null)
     return [
-      playOf({ media: next, label: playNextLabel(code), context }),
+      // "Play S01E02" for the episode it plays next, or plain Play without a number.
+      playOf({
+        media: next,
+        label: code === null ? ITEM_COPY.play : ITEM_COPY.playEpisode(code),
+        text: code,
+        context,
+      }),
       ...fromStartOf({ media: next, context }),
     ]
-  if (state === WATCHED_STATES.watched && first != null)
+  if (state === WATCHED_STATES.watched && first !== null)
     return [rewatchOf({ media: first, context })]
   return []
 }

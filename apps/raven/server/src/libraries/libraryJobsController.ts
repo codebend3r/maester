@@ -34,11 +34,12 @@ import { SmartMatch } from '@/music/smartMatch'
 import { ROUTE_PARAMS } from '@/requestParts'
 import { QUEUE_KEYS, queueKeyOf } from '@/scanner/concurrency'
 import { ScannerService } from '@/scanner/scannerService'
+import { LIBRARY_ROUTES } from '@/libraries/libraryRoutes'
 
 type LibraryJobsControllerCommandedProps = { library: LibraryRecord; act: (id: number) => void }
 
 /** What an admin starts or stops on a library: scans, ratings, intros, matching and album clean-ups. */
-@Controller('api/libraries')
+@Controller(LIBRARY_ROUTES)
 @PrivateBy(PRIVACIES.library)
 export class LibraryJobsController {
   constructor(

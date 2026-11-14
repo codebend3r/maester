@@ -6,6 +6,7 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common'
 import { ITEM_TYPES } from '@raven/core'
+import { utcDayOf } from '@/clock'
 import { FolderReader } from '@/metadata/folderReader'
 import { ItemPictures } from '@/metadata/itemPictures'
 import { isLocal } from '@/metadata/localItems'
@@ -161,7 +162,7 @@ export class ItemRefresher implements OnApplicationBootstrap, OnModuleDestroy {
     const window = {
       before: new Date(now - 30 * DAY_MS).toISOString(),
       recentBefore: new Date(now - 7 * DAY_MS).toISOString(),
-      releasedAfter: new Date(now - 90 * DAY_MS).toISOString().slice(0, 10),
+      releasedAfter: utcDayOf(now - 90 * DAY_MS),
     }
     const stale = [
       ...this.metadata.stale({ type: ITEM_TYPES.movie, ...window }),

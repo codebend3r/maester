@@ -36,7 +36,7 @@ export const runOf =
 const stopping = (): DOMException => new DOMException('The download was stopped', 'AbortError')
 
 export type QueueRuns = {
-  /** Starts tracking a run; it is dropped once `work` settles. */
+  /** Starts tracking a run, until `drop` lets it go. */
   track: (input: TrackProps) => Run
   drop: (downloadId: string) => void
   isRunning: (downloadId: string) => boolean

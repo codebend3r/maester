@@ -15,7 +15,7 @@ import {
   seasonIdsOf,
   titleItemIdOf,
 } from '@/desktop/downloadTitles'
-import { DOWNLOAD_ARTWORK_KINDS, DOWNLOAD_KINDS } from '@/desktop/protocol'
+import { DOWNLOAD_ARTWORK_KINDS, DOWNLOAD_KINDS } from '@/desktop/downloads'
 import {
   episodeSummary,
   itemDetails,

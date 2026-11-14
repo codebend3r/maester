@@ -1,30 +1,15 @@
-import {
-  CROSSFADE_SECONDS,
-  EQ_BANDS,
-  EQ_GAIN_DB,
-  EQ_PRESETS,
-  LEVELLING_MODES,
-  type LevellingMode,
-} from '@raven/core'
-import { MUSIC_QUALITIES, type MusicQuality, usePlayerPrefs } from '@raven/ui/headless'
+import { CROSSFADE_SECONDS, EQ_BANDS, EQ_GAIN_DB, EQ_PRESETS, LEVELLING_MODES } from '@raven/core'
+import { MUSIC_QUALITIES, usePlayerPrefs } from '@raven/ui/headless'
 import { type ComponentType, useId } from 'react'
 import { type AudioConnection, useAudioConnection } from '@/desktop/audioConnection'
 import { CONNECTION_STATUSES } from '@/desktop/portConnection'
-import { type Choices, Setting } from '@/pages/SettingsPage/Setting'
+import { Setting } from '@/pages/SettingsPage/Setting'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { EQ_CHOICE_NAMES, SETTINGS_COPY, SOUND_CHOICES_COPY } from '@/pages/SettingsPage/copy'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import soundStyles from '@/pages/SettingsPage/SoundSettings.module.scss'
 
 const COPY = SETTINGS_COPY.sound
-
-const QUALITIES: Choices<MusicQuality> = SOUND_CHOICES_COPY.qualities
-
-const LEVELLING: Choices<LevellingMode> = SOUND_CHOICES_COPY.levelling
-
-type EqChoice = (typeof EQ_CHOICE_NAMES)[keyof typeof EQ_CHOICE_NAMES]
-
-const PRESETS: Choices<EqChoice> = SOUND_CHOICES_COPY.presets
 
 /** Crossfade as a slider over its steps, off at the left. */
 const CrossfadeSlider = () => {
@@ -105,7 +90,7 @@ const Equalizer = () => {
       icon="split"
       label={COPY.equalizer}
       values={Object.values(EQ_CHOICE_NAMES)}
-      choices={PRESETS}
+      choices={SOUND_CHOICES_COPY.presets}
       value={equalizer.preset ?? EQ_CHOICE_NAMES.custom}
       onChange={(choice) =>
         setEqualizer(
@@ -175,7 +160,7 @@ export const SoundSettings = ({ isDesktop }: SoundSettingsProps) => {
         icon="headphones"
         label={COPY.quality}
         values={Object.values(MUSIC_QUALITIES)}
-        choices={QUALITIES}
+        choices={SOUND_CHOICES_COPY.qualities}
         value={musicQuality}
         onChange={setMusicQuality}
       />
@@ -183,7 +168,7 @@ export const SoundSettings = ({ isDesktop }: SoundSettingsProps) => {
         icon="volume"
         label={COPY.levelling}
         values={Object.values(LEVELLING_MODES)}
-        choices={LEVELLING}
+        choices={SOUND_CHOICES_COPY.levelling}
         value={levelling}
         onChange={setLevelling}
       />

@@ -6,9 +6,9 @@
  * untrusted (another version of the page, a hand edit), so what fails the
  * check is dropped, never trusted.
  */
+import { isRecord } from '@shared/http'
 import { type CaseTurn, isStrings } from '@/lib/api'
 import { CHAT_COPY } from '@/lib/copy'
-import { isRecord } from '@shared/http'
 import { CHAT_EVENTS } from '@/lib/events'
 import type { RawEvent } from '@/lib/sse'
 

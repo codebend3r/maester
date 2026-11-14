@@ -45,6 +45,7 @@ import { ROUTE_PARAMS } from '@/requestParts'
 import { QUERY_PARAMS } from '@/queryValues'
 import { ViewingAccount } from '@/media/viewingAccountParam'
 import type { AccountKey } from '@/media/viewingAccountKeys'
+import { LIBRARY_ROUTES } from '@/libraries/libraryRoutes'
 
 /** A MusicBrainz failure as a route answers it: 404 for an id it does not have, 503 when it is away. */
 const musicBrainzFailed = (error: unknown): never => {
@@ -78,7 +79,7 @@ const listParams = (query: unknown): MusicListParams =>
   musicListQuery.decode(isRecord(query) ? query : {})
 
 /** A music library's artists, albums and tracks; each route is held by the library's lock. */
-@Controller('api/libraries')
+@Controller(LIBRARY_ROUTES)
 @PrivateBy(PRIVACIES.library)
 export class LibraryMusicController {
   constructor(
