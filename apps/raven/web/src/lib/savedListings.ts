@@ -92,7 +92,7 @@ export const restoreListings = async ({
   const current = new Map(libraries.filter(isCacheable).map((library) => [library.id, library]))
   record.listings.forEach(({ libraryId, sort, updatedAt, data }) => {
     const library = current.get(libraryId)
-    if (library?.settings.sort !== sort) return
+    if (library == null || library.settings.sort !== sort) return
     if (isShowListing(data) !== listsShows(library.settings.kind)) return
     seedListing({ queryClient, library, data, updatedAt })
   })

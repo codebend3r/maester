@@ -2,7 +2,7 @@ import type { MediaTracks, SubtitleTrack } from '@raven/core'
 import type { QueueFs } from '@/main/downloads/downloadQueue'
 import type { PartFile, StreamFetch } from '@/main/downloads/fetchFile'
 import { type AccessOutcome, type MediaAccess } from '@/main/downloads/mediaAccess'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS } from '@shared/http'
 
 export const ORIGIN = 'http://192.168.1.5:3000'
 export const MINUTE = 60_000
@@ -181,7 +181,7 @@ export const brokenBody = (chunks: Uint8Array[]): ReadableStream<Uint8Array> => 
 }
 
 const rangeStartOf = (headers: Record<string, string>): number =>
-  Number(/^bytes=(\d+)-$/u.exec(headers.Range ?? '')?.[1] ?? 0)
+  Number(/^bytes=(\d+)-$/u.exec(headers[HEADERS.range] ?? '')?.[1] ?? 0)
 
 type AnswerFromProps = {
   request: FetchRequest
@@ -199,12 +199,12 @@ const answerFrom = ({ request, size, sent, bodyOf }: AnswerFromProps): Answer =>
   const from = rangeStartOf(request.headers)
   const length = Math.min(sent, size - from)
   const body = bodyOf(length > 0 ? [new Uint8Array(length)] : [])
-  const promised = { [HTTP_HEADERS.contentLength]: String(size - from) }
+  const promised = { [HEADERS.contentLength]: String(size - from) }
   return from === 0
     ? { status: 200, headers: promised, body }
     : {
         status: 206,
-        headers: { ...promised, [HTTP_HEADERS.contentRange]: `bytes ${from}-${size - 1}/${size}` },
+        headers: { ...promised, [HEADERS.contentRange]: `bytes ${from}-${size - 1}/${size}` },
         body,
       }
 }
@@ -280,18 +280,18 @@ export const accountTicket = (ticket = 'account.one'): AccessOutcome => ({
 
 /** Media access answered by `answer`; every read and every forget is recorded. */
 export const fakeAccess = (answer: MediaAccess['accessFor']) => {
-  const asked: { serverId: string; mediaId: number }[] = []
-  const forgotten: string[] = []
+  const asked: { mediaId: number }[] = []
+  const forgets = { count: 0 }
   const access: MediaAccess = {
     accessFor: async (input) => {
-      asked.push({ serverId: input.serverId, mediaId: input.mediaId })
+      asked.push({ mediaId: input.mediaId })
       return answer(input)
     },
-    forget: (serverId) => {
-      forgotten.push(serverId)
+    forget: () => {
+      forgets.count += 1
     },
   }
-  return { access, asked, forgotten }
+  return { access, asked, forgets }
 }
 
 export const subtitleTrack = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({

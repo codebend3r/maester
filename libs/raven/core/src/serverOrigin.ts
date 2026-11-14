@@ -124,8 +124,10 @@ const ipv6PiecesFrom = (address: string): number[] | null => {
   return gap < 1 ? null : [...front, ...Array.from({ length: gap }, () => 0), ...back]
 }
 
+type ZeroRun = { start: number; length: number }
+
 /** Where the longest run of two or more zero pieces starts and how long it is; the first such run on a tie. */
-const longestZeroRun = (pieces: readonly number[]): { start: number; length: number } | null => {
+const longestZeroRun = (pieces: readonly number[]): ZeroRun | null => {
   const runs = pieces.reduce<{ start: number; length: number }[]>((found, piece, index) => {
     if (piece !== 0) return found
     const previous = found.at(-1)
@@ -291,8 +293,10 @@ const hostOf = (raw: string): string | null => {
   return domain
 }
 
+type Authority = { host: string | null; port: string }
+
 /** The host and port as written in the authority, or null when they do not split cleanly. */
-const splitAuthority = (authority: string): { host: string | null; port: string } | null => {
+const splitAuthority = (authority: string): Authority | null => {
   const bracketed = BRACKETED.exec(authority)
   if (bracketed !== null) return { host: ipv6Of(bracketed[1] ?? ''), port: bracketed[2] ?? '' }
   const colon = authority.lastIndexOf(':')

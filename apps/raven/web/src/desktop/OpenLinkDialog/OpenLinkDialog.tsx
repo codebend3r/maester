@@ -1,40 +1,34 @@
-import { DESKTOP_REPLIES, DESKTOP_REQUESTS, type DesktopReply } from '@raven/core'
-import { Button, Icon } from '@raven/ui'
+import { DESKTOP_REPLIES, DESKTOP_REQUESTS, type OpenReply, type RepliesFor } from '@raven/core'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
-import { handled } from '@/desktop/handled'
+import { askMain } from '@/desktop/client'
+import { handled } from '@/lib/handled'
 import { OPEN_LINK_COPY } from '@/desktop/OpenLinkDialog/copy'
 import { useOpenReply } from '@/desktop/openReply'
 import { useModal } from '@/lib/useModal'
 import { useDesktop } from '@/stores/desktop'
 import styles from '@/desktop/DesktopDialog.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 const OUTCOME_KINDS = { open: 'open', stay: 'stay' } as const
 
 /** What the dialog does with main's answer: leave and open it, or stay and say why not. */
 type Outcome =
-  | { kind: typeof OUTCOME_KINDS.open; reply: DesktopReply }
+  | { kind: typeof OUTCOME_KINDS.open; reply: OpenReply }
   | { kind: typeof OUTCOME_KINDS.stay; message: string }
 
-const outcomeOf = (reply: DesktopReply): Outcome => {
+/** What main answers a pasted link with. */
+type LinkReply = RepliesFor<typeof DESKTOP_REQUESTS.openLink>
+
+const outcomeOf = (reply: LinkReply): Outcome => {
   switch (reply.type) {
-    case DESKTOP_REPLIES.play:
     case DESKTOP_REPLIES.navigate:
     // A download link leaves for the download dialog, which applying the reply opens.
     case DESKTOP_REPLIES.downloadAsk:
       return { kind: OUTCOME_KINDS.open, reply }
     case DESKTOP_REPLIES.refused:
       return { kind: OUTCOME_KINDS.stay, message: reply.message }
-    case DESKTOP_REPLIES.done:
-    case DESKTOP_REPLIES.file:
-    case DESKTOP_REPLIES.recents:
-    case DESKTOP_REPLIES.output:
-    case DESKTOP_REPLIES.title:
-    case DESKTOP_REPLIES.titleRefused:
-    case DESKTOP_REPLIES.updates:
-    case DESKTOP_REPLIES.downloads:
-    case DESKTOP_REPLIES.space:
-      return { kind: OUTCOME_KINDS.stay, message: OPEN_LINK_COPY.unopened }
     default: {
       const unreachable: never = reply
       return unreachable
@@ -48,7 +42,7 @@ type OpenLinkDialogProps = { onClose: () => void }
 export const OpenLinkDialog = ({ onClose }: OpenLinkDialogProps) => {
   const { client } = useDesktop()
   const openReply = useOpenReply()
-  const { dialog, close, keepKeys } = useModal()
+  const { dialog, keepKeys, close } = useModal()
   const field = useRef<HTMLInputElement>(null)
   // A reply that lands after the dialog closed is dropped, so it opens nothing.
   const isClosed = useRef(false)
@@ -78,7 +72,10 @@ export const OpenLinkDialog = ({ onClose }: OpenLinkDialogProps) => {
     isAsking.current = true
     setRefusal('')
     setIsPending(true)
-    const reply = await client.request({ type: DESKTOP_REQUESTS.openLink, link: pasted })
+    const reply = await askMain({
+      client,
+      request: { type: DESKTOP_REQUESTS.openLink, link: pasted },
+    })
     isAsking.current = false
     if (isClosed.current) return
     setIsPending(false)
@@ -99,13 +96,13 @@ export const OpenLinkDialog = ({ onClose }: OpenLinkDialogProps) => {
   }
 
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={ids.title}
-      aria-describedby={ids.hint}
-      onClose={closed}
+    <DialogFrame
+      dialog={dialog}
       onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.question}
+      labelledBy={ids.title}
+      describedBy={ids.hint}
+      onClose={closed}
     >
       <form className={styles.form} onSubmit={(event) => handled(submit(event))}>
         <h2 id={ids.title} className={styles.title}>
@@ -137,11 +134,11 @@ export const OpenLinkDialog = ({ onClose }: OpenLinkDialogProps) => {
         <div className={styles.actions}>
           <Button onClick={close}>{COMMON_COPY.cancel}</Button>
           {/* aria-disabled, not disabled: disabling the focused button would drop focus to the page. */}
-          <Button type="submit" tone="primary" aria-disabled={isPending}>
+          <Button type="submit" tone={BUTTON_TONES.primary} aria-disabled={isPending}>
             {OPEN_LINK_COPY.open}
           </Button>
         </div>
       </form>
-    </dialog>
+    </DialogFrame>
   )
 }

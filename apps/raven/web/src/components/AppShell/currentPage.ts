@@ -1,11 +1,11 @@
 import { matchPath, useLocation } from 'react-router-dom'
+import { APP_PATHS } from '@/lib/appPaths'
 
-/** A library's own pages: its videos, its other tabs, its history and its sagas. */
-export const libraryPages = (id: number | string): string[] => [
-  `/libraries/${id}`,
-  `/libraries/${id}/:page`,
-  `/libraries/${id}/sagas/:saga`,
-]
+/** A library's own pages, `:id` for any library's: its videos, its other tabs, its history and its sagas. */
+export const libraryPages = (id: number | string): string[] => {
+  const library = `${APP_PATHS.libraries}/${id}`
+  return [library, `${library}/:page`, `${library}/sagas/:saga`]
+}
 
 type IsAnyOfProps = {
   patterns: readonly string[]

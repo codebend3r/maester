@@ -1,4 +1,4 @@
-import { type Library, isScanning } from '@raven/core'
+import { type Library, isScanning, RATINGS_REFRESH_STATES } from '@raven/core'
 
 /** While a scan counts files, so the counts climb live. */
 export const SCAN_POLL_MS = 1500
@@ -21,11 +21,11 @@ const delayOf = ({ library, now }: DelayOfProps): number | false => {
   if (isScanning(library.scan)) return SCAN_POLL_MS
   const { ratingsRefresh } = library
   switch (ratingsRefresh.state) {
-    case 'idle':
+    case RATINGS_REFRESH_STATES.idle:
       return false
-    case 'running':
+    case RATINGS_REFRESH_STATES.running:
       return RATINGS_POLL_MS
-    case 'waiting': {
+    case RATINGS_REFRESH_STATES.waiting: {
       // Nothing moves until it resumes, so it is read once then, not on a clock.
       const until = Date.parse(ratingsRefresh.resumesAt) - now
       if (Number.isNaN(until)) return RATINGS_POLL_MS

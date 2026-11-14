@@ -1,3 +1,4 @@
+import { REPEAT_MODES } from '@raven/core'
 export const NOW_PLAYING_COPY = {
   moveUp: 'Move up',
   removeFromQueue: 'Remove from queue',
@@ -23,4 +24,11 @@ export const NOW_PLAYING_COPY = {
   lyricsFailed: 'Could not read the lyrics.',
   noChapters: 'This book names no chapters.',
   chapter: (number: number) => `Chapter ${number}`,
+} as const
+
+/** What the repeat button says in each of its modes. */
+export const REPEAT_COPY = {
+  [REPEAT_MODES.off]: 'Repeat off',
+  [REPEAT_MODES.all]: 'Repeat all',
+  [REPEAT_MODES.one]: 'Repeat one',
 } as const

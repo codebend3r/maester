@@ -63,14 +63,15 @@ export const OpenToAnyone = () => RequireAccount(ACCOUNT_REQUIREMENTS.anyone)
 
 const decorators = new Reflector()
 
+/** What a route asks of its caller, and whether it says so itself. */
+type RouteRequirement = { requirement: AccountRequirement; isExplicit: boolean }
+
 /**
  * What a route asks of an account: its own `RequireAccount` mark, else its
  * controller's; failing both, the owner for `@AdminOnly()` and an approved
  * account for everything else, so a route nobody marked is never open.
  */
-export const accountRuleOf = (
-  targets: MarkTargets,
-): { requirement: AccountRequirement; isExplicit: boolean } => {
+export const accountRuleOf = (targets: MarkTargets): RouteRequirement => {
   const marked: unknown = decorators.getAllAndOverride(ACCOUNT_ACCESS, targets)
   if (isAccountRequirement(marked)) return { requirement: marked, isExplicit: true }
   return {

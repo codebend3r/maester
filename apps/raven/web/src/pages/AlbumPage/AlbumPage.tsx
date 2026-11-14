@@ -9,7 +9,7 @@ import {
   type RouteQuery,
   routeState,
 } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import {
   afterAlbumMatch,
   useAudioQueue,
@@ -39,6 +39,7 @@ import { useAlbumFavourite } from '@/lib/useMusicFavourite'
 import { ALBUM_COPY } from '@/pages/AlbumPage/copy'
 import styles from '@/pages/AlbumPage/AlbumPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { handled } from '@/lib/handled'
 
 type AlbumTrackControlsProps = TrailProps
 
@@ -53,7 +54,7 @@ const AlbumTrackControls = ({ track }: AlbumTrackControlsProps) => {
         look={START_RADIO_LOOKS.icon}
       />
       <Button
-        tone="ghost"
+        tone={BUTTON_TONES.ghost}
         icon="list"
         aria-label={ALBUM_COPY.addTrackToPlaylist(track.title)}
         onClick={() => setAdding(true)}
@@ -120,7 +121,7 @@ const AlbumView = ({ details }: AlbumViewProps) => {
           {details.label !== null && <p className={styles.label}>{details.label}</p>}
           <div className={styles.actions}>
             <Button
-              tone="primary"
+              tone={BUTTON_TONES.primary}
               icon="play"
               disabled={tracks.length === 0}
               onClick={() => play(0)}
@@ -178,7 +179,7 @@ const AlbumView = ({ details }: AlbumViewProps) => {
           onClose={() => setFixing(false)}
           onMatched={() => {
             setFixing(false)
-            void afterAlbumMatch({ queryClient, libraryId: album.libraryId })
+            handled(afterAlbumMatch({ queryClient, libraryId: album.libraryId }))
           }}
         />
       )}

@@ -1,12 +1,11 @@
 import { useEffect } from 'react'
 
+import { IGNORED } from '@/lib/ignore'
 import type { CookieJar, ServerCookies } from '@/servers/cookieJar'
 import { noteCookies, useCookieSnapshots } from '@/stores/cookieSnapshots'
 import { useCookieVersion } from '@/stores/cookieVersion'
 
 type UseServerCookiesProps = { serverId: string; jar: Pick<CookieJar, 'read'> }
-
-const IGNORED = (): void => undefined
 
 /**
  * The server's cookies as the jar last held them, for what an app sends outside `fetch`; null

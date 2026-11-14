@@ -6,6 +6,7 @@ import { MovieSplits } from '@/media/movieSplits'
 import { BLANK_ITEM, type FetchedSaga } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
+import { WatchNext } from '@/media/watchNext'
 
 const PROBE = {
   duration: 60,
@@ -99,7 +100,7 @@ describe("a library's sagas", () => {
       const playing = media().get({ id: id(name), account: TEST_ACCOUNTS.a })
       if (!playing) throw new Error(`no ${name}`)
       return (
-        media().nextInSession({
+        new WatchNext(database.get(), media()).nextInSession({
           media: playing,
           session,
           libraryIds: [state.libraryId],
@@ -119,7 +120,7 @@ describe("a library's sagas", () => {
     const playing = media().get({ id: id('Fellowship.mkv'), account: TEST_ACCOUNTS.a })
     if (!playing) throw new Error('no Fellowship')
     expect(
-      media().nextInSession({
+      new WatchNext(database.get(), media()).nextInSession({
         media: playing,
         session: { kind: SESSION_KINDS.saga, sagaId: '1241' },
         libraryIds: [state.libraryId],

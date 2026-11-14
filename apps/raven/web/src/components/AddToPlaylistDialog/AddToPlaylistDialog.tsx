@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { PLAYLIST_LIMITS, type PlaylistSummary, type Track, isPlaylistName } from '@raven/core'
 import { Button, useToasts } from '@raven/ui'
-import { type ComponentType, type FormEvent, useId, useState } from 'react'
+import { type FormEvent, useId, useState } from 'react'
 import { playlistFacts } from '@/lib/music'
 import { ownPlaylistsQuery } from '@/lib/queries'
 import { useModal } from '@/lib/useModal'
@@ -9,6 +9,8 @@ import { usePlaylistMutations } from '@/lib/usePlaylistMutations'
 import { ADD_TO_PLAYLIST_COPY } from '@/components/AddToPlaylistDialog/copy'
 import styles from '@/components/AddToPlaylistDialog/AddToPlaylistDialog.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { QueryView, keptRead, isNone } from '@raven/ui/headless'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 type WhatOfProps = { tracks: readonly Track[] }
 
@@ -18,31 +20,13 @@ const whatOf = ({ tracks }: WhatOfProps): string => {
   return tracks.length === 1 && only !== undefined ? only.title : COMMON_COPY.tracks(tracks.length)
 }
 
-/** What the dialog shows of the account's playlists: being read, failed to read, none yet, or the list. */
-const CHOICE_KEYS = {
-  reading: 'reading',
-  failed: 'failed',
-  none: 'none',
-  listed: 'listed',
-} as const
-type ChoiceKey = (typeof CHOICE_KEYS)[keyof typeof CHOICE_KEYS]
-
 type PlaylistChoicesProps = {
   playlists: readonly PlaylistSummary[]
   isPending: boolean
   onPick: (playlist: PlaylistSummary) => void
 }
 
-const ReadingPlaylists = () => <p className={styles.hint}>{ADD_TO_PLAYLIST_COPY.reading}</p>
-
-// Why the read failed shows with the dialog's other failures, below the form.
-const UnreadPlaylists = () => null
-
-const NoPlaylists = () => <p className={styles.hint}>{ADD_TO_PLAYLIST_COPY.none}</p>
-
-type ListedPlaylistsProps = PlaylistChoicesProps
-
-const ListedPlaylists = ({ playlists, isPending, onPick }: ListedPlaylistsProps) => (
+const PlaylistChoices = ({ playlists, isPending, onPick }: PlaylistChoicesProps) => (
   <ul className={styles.playlists} aria-label={ADD_TO_PLAYLIST_COPY.yourPlaylists}>
     {playlists.map((playlist) => (
       <li key={playlist.id}>
@@ -62,20 +46,8 @@ const ListedPlaylists = ({ playlists, isPending, onPick }: ListedPlaylistsProps)
   </ul>
 )
 
-const PLAYLIST_CHOICES = {
-  [CHOICE_KEYS.reading]: ReadingPlaylists,
-  [CHOICE_KEYS.failed]: UnreadPlaylists,
-  [CHOICE_KEYS.none]: NoPlaylists,
-  [CHOICE_KEYS.listed]: ListedPlaylists,
-} as const satisfies Record<ChoiceKey, ComponentType<PlaylistChoicesProps>>
-
-type ChoiceOfProps = { playlists: readonly PlaylistSummary[] | undefined; isError: boolean }
-
-const choiceOf = ({ playlists, isError }: ChoiceOfProps): ChoiceKey => {
-  if (playlists === undefined) return isError ? CHOICE_KEYS.failed : CHOICE_KEYS.reading
-  if (playlists.length === 0) return CHOICE_KEYS.none
-  return CHOICE_KEYS.listed
-}
+// Why the read failed shows with the dialog's other failures, below the form.
+const unshown = (): null => null
 
 type AddToPlaylistDialogProps = {
   tracks: readonly Track[]
@@ -87,7 +59,7 @@ type AddToPlaylistDialogProps = {
  * one named here. It closes once they are in, with a note saying where.
  */
 export const AddToPlaylistDialog = ({ tracks, onClose }: AddToPlaylistDialogProps) => {
-  const { dialog, close, keepKeys } = useModal()
+  const { dialog, keepKeys, close } = useModal()
   const titleId = useId()
   const fieldId = useId()
   const playlists = useQuery(ownPlaylistsQuery)
@@ -118,23 +90,30 @@ export const AddToPlaylistDialog = ({ tracks, onClose }: AddToPlaylistDialogProp
     create.mutate(name.trim(), { onSuccess: (details) => addTo(details.playlist) })
   }
 
-  const Choices: ComponentType<PlaylistChoicesProps> =
-    PLAYLIST_CHOICES[choiceOf({ playlists: playlists.data, isError: playlists.isError })]
-
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={titleId}
-      onClose={onClose}
+    <DialogFrame
+      dialog={dialog}
       onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.prose}
+      labelledBy={titleId}
+      onClose={onClose}
     >
       <div className={styles.body}>
         <h2 id={titleId} className={styles.title}>
           {COMMON_COPY.addToPlaylist}
         </h2>
         <p className={styles.what}>{what}</p>
-        <Choices playlists={playlists.data ?? []} isPending={isPending} onPick={addTo} />
+        <QueryView
+          query={keptRead(playlists)}
+          pending={<p className={styles.hint}>{ADD_TO_PLAYLIST_COPY.reading}</p>}
+          renderFailed={unshown}
+          empty={{
+            isEmpty: isNone,
+            shown: <p className={styles.hint}>{ADD_TO_PLAYLIST_COPY.none}</p>,
+          }}
+        >
+          {(read) => <PlaylistChoices playlists={read} isPending={isPending} onPick={addTo} />}
+        </QueryView>
         <form className={styles.form} onSubmit={makeAndAdd}>
           <label htmlFor={fieldId} className={styles.label}>
             {ADD_TO_PLAYLIST_COPY.newPlaylist}
@@ -166,6 +145,6 @@ export const AddToPlaylistDialog = ({ tracks, onClose }: AddToPlaylistDialogProp
           <Button onClick={close}>{COMMON_COPY.cancel}</Button>
         </div>
       </div>
-    </dialog>
+    </DialogFrame>
   )
 }

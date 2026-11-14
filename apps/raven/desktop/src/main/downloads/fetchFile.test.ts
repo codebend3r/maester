@@ -13,7 +13,7 @@ import {
 } from '@/main/downloads/fetchFile'
 import { brokenBody } from '@/main/test/downloadFakes'
 import { fakeTimers } from '@/main/test/playerFakes'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS } from '@shared/http'
 
 type Reply = {
   status: number
@@ -248,8 +248,6 @@ describe('a whole file', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.changed,
-      status: null,
-      refusal: null,
       bytes: 0,
     })
     expect(flags.closes).toBe(1)
@@ -270,7 +268,7 @@ describe('a resume', () => {
     const { part, chunks, flags } = fakePart({ disk: [bytesOf(4096)] })
     const outcome = await run({ fetch, part, expectedSize: 8192 })
     expect(outcome).toEqual({ ok: true, bytes: 8192 })
-    expect(calls).toEqual([{ url: URL_OF_FILE, headers: { Range: 'bytes=4096-' } }])
+    expect(calls).toEqual([{ url: URL_OF_FILE, headers: { range: 'bytes=4096-' } }])
     expect(sizeOf(chunks)).toBe(8192)
     expect(flags.truncates).toBe(0)
   })
@@ -285,7 +283,7 @@ describe('a resume', () => {
     const { part, chunks, flags } = fakePart({ disk: [bytesOf(4096)] })
     const outcome = await run({ fetch, part, expectedSize: 8192 })
     expect(outcome).toEqual({ ok: true, bytes: 8192 })
-    expect(calls.map((call) => call.headers)).toEqual([{ Range: 'bytes=4096-' }, {}])
+    expect(calls.map((call) => call.headers)).toEqual([{ range: 'bytes=4096-' }, {}])
     expect(flags.truncates).toBe(1)
     expect(sizeOf(chunks)).toBe(8192)
   })
@@ -304,7 +302,7 @@ describe('a resume', () => {
     const { part, chunks, flags } = fakePart({ disk: [bytesOf(4096)] })
     const outcome = await run({ fetch, part, expectedSize: 8192 })
     expect(outcome).toEqual({ ok: true, bytes: 8192 })
-    expect(calls.map((call) => call.headers)).toEqual([{ Range: 'bytes=4096-' }, {}])
+    expect(calls.map((call) => call.headers)).toEqual([{ range: 'bytes=4096-' }, {}])
     expect(flags.truncates).toBe(1)
     expect(sizeOf(chunks)).toBe(8192)
   })
@@ -338,8 +336,6 @@ describe('a resume', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.changed,
-      status: null,
-      refusal: null,
       bytes: 0,
     })
     expect(calls).toHaveLength(2)
@@ -361,8 +357,6 @@ describe('a resume', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.changed,
-      status: null,
-      refusal: null,
       bytes: 0,
     })
     expect(sizeOf(chunks)).toBe(0)
@@ -408,8 +402,6 @@ describe('a part that is already whole', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.changed,
-      status: null,
-      refusal: null,
       bytes: 0,
     })
     expect(calls).toHaveLength(0)
@@ -426,8 +418,6 @@ describe('the size', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.changed,
-      status: null,
-      refusal: null,
       bytes: 0,
     })
     expect(sizeOf(chunks)).toBe(0)
@@ -444,8 +434,6 @@ describe('the size', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.changed,
-      status: null,
-      refusal: null,
       bytes: 0,
     })
     expect(sizeOf(chunks)).toBe(0)
@@ -468,8 +456,6 @@ describe('a stall', () => {
     expect(await pending).toEqual({
       ok: false,
       reason: FETCH_REASONS.stalled,
-      status: null,
-      refusal: null,
       bytes: 5,
     })
     expect(sizeOf(chunks)).toBe(5)
@@ -488,8 +474,6 @@ describe('a stall', () => {
     expect(await pending).toEqual({
       ok: false,
       reason: FETCH_REASONS.stalled,
-      status: null,
-      refusal: null,
       bytes: 0,
     })
   })
@@ -520,8 +504,6 @@ describe('a full disk', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.space,
-      status: null,
-      refusal: null,
       bytes: 2,
     })
     expect(flags.truncates).toBe(0)
@@ -552,8 +534,7 @@ describe('a refusal', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.unauthorized,
-      status: 401,
-      refusal: null,
+      refusal: AUTH_REFUSALS.signedOut,
       bytes: 0,
     })
     expect(flags.closes).toBe(1)
@@ -564,8 +545,6 @@ describe('a refusal', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.locked,
-      status: 423,
-      refusal: null,
       bytes: 0,
     })
     expect(flags.closes).toBe(1)
@@ -576,8 +555,6 @@ describe('a refusal', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.changed,
-      status: 416,
-      refusal: null,
       bytes: 0,
     })
     expect(flags.truncates).toBe(1)
@@ -591,7 +568,6 @@ describe('a refusal', () => {
       ok: false,
       reason: FETCH_REASONS.status,
       status: 500,
-      refusal: null,
       bytes: 0,
     })
     expect(flags.closes).toBe(1)
@@ -599,7 +575,6 @@ describe('a refusal', () => {
       ok: false,
       reason: FETCH_REASONS.status,
       status: 404,
-      refusal: null,
       bytes: 0,
     })
   })
@@ -617,8 +592,7 @@ describe('a refusal', () => {
     const outcome = await run({ fetch, part: fakePart({}).part, expectedSize: 10 })
     expect(outcome).toEqual({
       ok: false,
-      reason: status === 401 ? FETCH_REASONS.unauthorized : FETCH_REASONS.status,
-      status,
+      reason: status === 401 ? FETCH_REASONS.unauthorized : FETCH_REASONS.forbidden,
       refusal: reason,
       bytes: 0,
     })
@@ -630,8 +604,7 @@ describe('a refusal', () => {
     const outcome = await run({ fetch, part: fakePart({}).part, expectedSize: 10 })
     expect(outcome).toEqual({
       ok: false,
-      reason: FETCH_REASONS.status,
-      status: 403,
+      reason: FETCH_REASONS.forbidden,
       refusal: null,
       bytes: 0,
     })
@@ -642,8 +615,7 @@ describe('a refusal', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.unauthorized,
-      status: 401,
-      refusal: null,
+      refusal: AUTH_REFUSALS.signedOut,
       bytes: 6,
     })
     expect(sizeOf(chunks)).toBe(6)
@@ -658,8 +630,6 @@ describe('the network', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.unreachable,
-      status: null,
-      refusal: null,
       bytes: 3,
     })
     expect(flags.closes).toBe(1)
@@ -676,8 +646,6 @@ describe('a cut', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.cut,
-      status: null,
-      refusal: null,
       bytes: 4,
     })
     expect(sizeOf(chunks)).toBe(4)
@@ -690,7 +658,7 @@ describe('a cut', () => {
       replies: [
         reply({
           status: 200,
-          headers: { [HTTP_HEADERS.contentLength]: '10' },
+          headers: { [HEADERS.contentLength]: '10' },
           body: bodyOf([bytesOf(6)]),
         }),
       ],
@@ -706,8 +674,6 @@ describe('a cut', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.cut,
-      status: null,
-      refusal: null,
       bytes: 6,
     })
     expect(sizeOf(chunks)).toBe(6)
@@ -720,7 +686,7 @@ describe('a cut', () => {
       replies: [
         reply({
           status: 206,
-          headers: { [HTTP_HEADERS.contentRange]: 'bytes 4-9/10' },
+          headers: { [HEADERS.contentRange]: 'bytes 4-9/10' },
           body: bodyOf([bytesOf(2)]),
         }),
       ],
@@ -730,8 +696,6 @@ describe('a cut', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.cut,
-      status: null,
-      refusal: null,
       bytes: 6,
     })
     expect(sizeOf(chunks)).toBe(6)
@@ -743,7 +707,7 @@ describe('a cut', () => {
       replies: [
         reply({
           status: 200,
-          headers: { [HTTP_HEADERS.contentLength]: '6' },
+          headers: { [HEADERS.contentLength]: '6' },
           body: bodyOf([bytesOf(6)]),
         }),
       ],
@@ -753,8 +717,6 @@ describe('a cut', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.changed,
-      status: null,
-      refusal: null,
       bytes: 0,
     })
     expect(sizeOf(chunks)).toBe(0)
@@ -767,8 +729,8 @@ describe('a cut', () => {
         reply({
           status: 206,
           headers: {
-            [HTTP_HEADERS.contentRange]: 'bytes 4-9/10',
-            [HTTP_HEADERS.contentLength]: '6',
+            [HEADERS.contentRange]: 'bytes 4-9/10',
+            [HEADERS.contentLength]: '6',
           },
           body: bodyOf([bytesOf(6)]),
         }),
@@ -793,8 +755,6 @@ describe('an abort', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.aborted,
-      status: null,
-      refusal: null,
       bytes: 3,
     })
     expect(flags.closes).toBe(1)
@@ -810,8 +770,6 @@ describe('an abort', () => {
     expect(outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.unreachable,
-      status: null,
-      refusal: null,
       bytes: 0,
     })
   })
@@ -835,8 +793,6 @@ describe('an abort', () => {
     expect(await pending).toEqual({
       ok: false,
       reason: FETCH_REASONS.aborted,
-      status: null,
-      refusal: null,
       bytes: 5,
     })
     expect(sizeOf(chunks)).toBe(5)
@@ -864,8 +820,6 @@ describe('a server that never answers', () => {
     expect(await outcome).toEqual({
       ok: false,
       reason: FETCH_REASONS.stalled,
-      status: null,
-      refusal: null,
       bytes: 0,
     })
     expect(seen.signal?.aborted).toBe(true)

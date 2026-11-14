@@ -1,5 +1,4 @@
-import { type Chapter, formatDuration } from '@raven/core'
-import { chapterAt } from '@raven/ui/headless'
+import { type Chapter, formatDuration, chapterAt } from '@raven/core'
 import { type ComponentRef, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
 
@@ -11,6 +10,7 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { pictureStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** How wide a chapter's tile stands in the row. */
 const TILE_WIDTH = tvSize(320)
@@ -107,7 +107,7 @@ export const ChaptersBand = ({
             onPress={onOpen}
             style={styles.strip}
           >
-            <Icon colour={text} name="down" size={TV_SIZES.text} />
+            <Icon colour={text} name={APP_ICONS.down} size={TV_SIZES.text} />
             <Text style={styles.stripLabel}>{PLAYER_COPY.chapters}</Text>
           </Pressable>
         )}

@@ -236,6 +236,9 @@ type HlsSessionsRecordProps = {
 
 type HlsSessionsPruneProps = { entry: Entry; n: number }
 
+/** A session a key opens, and the pass it grants, if any. */
+type OpenedSession = { entry: Entry; grant: PassGrant | null }
+
 /**
  * The HLS streams being played: each a session whose segments one ffmpeg
  * run at a time writes into `<dataDir>/hls/<session>/`, started only when
@@ -389,11 +392,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   /** The kept session of this media that `key` opens, and what its pass grants (null for a session with none). */
-  private openedBy({
-    mediaId,
-    session,
-    key,
-  }: HlsSessionsOpenedByProps): { entry: Entry; grant: PassGrant | null } | null {
+  private openedBy({ mediaId, session, key }: HlsSessionsOpenedByProps): OpenedSession | null {
     const entry = this.entries.get(session)
     if (!entry || entry.session.mediaId !== mediaId) return null
     if (entry.pass === null) return { entry, grant: null }
@@ -659,7 +658,7 @@ export class HlsSessions implements OnModuleInit, OnModuleDestroy {
     if (!this.isKept(entry)) return
     this.entries.delete(entry.session.id)
     entry.cancelTimers()
-    if (entry.pass !== null) entry.pass.end()
+    entry.pass?.end()
     this.release(entry)
     const cleanup: Promise<void> = this.stopRun({ entry, reason: sessionEnded() })
       .then(() => rm(entry.folder, { recursive: true, force: true }))

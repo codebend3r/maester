@@ -1,4 +1,13 @@
-import type { Timers } from '@/main/stateStore'
+type SetProps = { run: () => void; ms: number }
+
+/** The timers every part of main is handed, so a test can run them by hand. */
+export type Timers = {
+  set: (input: SetProps) => unknown
+  clear: (handle: unknown) => void
+}
+
+/** Node runs a longer delay at once, so no timer is ever armed for more. */
+export const TIMER_MAX_MS = 2 ** 31 - 1
 
 /**
  * Node's timers behind the `Timers` seam. Handles are plain numbers kept in a map,

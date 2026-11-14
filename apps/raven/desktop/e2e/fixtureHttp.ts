@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import type { ServerResponse } from 'node:http'
 import { isRecord, isString } from '@raven/core'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS } from '@shared/http'
 
 // Only parses a request's own path and query; nothing is ever fetched from it.
 export const URL_BASE = 'http://fixture.invalid'
@@ -68,8 +68,8 @@ type SendJsonProps = {
 
 export const sendJson = ({ response, status, body, cookie = null }: SendJsonProps) => {
   response.writeHead(status, {
-    [HTTP_HEADERS.contentType]: 'application/json; charset=utf-8',
-    ...(cookie === null ? {} : { [HTTP_HEADERS.setCookie]: cookie }),
+    [HEADERS.contentType]: 'application/json; charset=utf-8',
+    ...(cookie === null ? {} : { [HEADERS.setCookie]: cookie }),
   })
   response.end(JSON.stringify(body))
 }

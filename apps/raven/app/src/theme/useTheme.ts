@@ -27,10 +27,16 @@ export const themedStyles = <T>(build: (palette: Palette) => T): ((ground?: Grou
       [theme.palette, theme.overPicture].map((palette) => [palette, build(palette)] as const),
     ),
   )
-  const useThemedStyles = ({ isOverPicture = false }: Ground = {}): T => {
-    const palette = useTheme((theme) => (isOverPicture ? theme.overPicture : theme.palette))
-    return sheets.get(palette) ?? build(palette)
+  // A palette outside the themes' (none today) is built once and kept, never rebuilt each render.
+  const sheetOf = (palette: Palette): T => {
+    const kept = sheets.get(palette)
+    if (kept !== undefined) return kept
+    const built = build(palette)
+    sheets.set(palette, built)
+    return built
   }
+  const useThemedStyles = ({ isOverPicture = false }: Ground = {}): T =>
+    sheetOf(useTheme((theme) => (isOverPicture ? theme.overPicture : theme.palette)))
   return useThemedStyles
 }
 

@@ -32,10 +32,8 @@ export const SERVER_GONE = 'Raven no longer plays from that server.'
  */
 const isServerRecord = object({ id: isOpaqueId, origin: isServerOrigin })
 
-type ServerRecord = Infer<typeof isServerRecord>
-
-/** The server as the rest of main reads it: its record, and the name Raven says. */
-export type ServerEntry = ServerRecord & { name: string }
+/** The server as the rest of main reads it: the id its downloads are filed under, and its origin. */
+export type ServerEntry = Infer<typeof isServerRecord>
 
 /** Whether the release check runs at launch, and when it last answered. */
 const isUpdateSettings = object({ isEnabled: isBoolean, checkedAt: nullable(isNumber) })
@@ -97,21 +95,6 @@ type NamesServerProps = { server: FixedServer; origin: string }
 export const namesServer = ({ server, origin }: NamesServerProps): boolean =>
   origin === server.origin || server.aliases.includes(origin)
 
-/** The server as main reads it, with the name Raven says. */
-export const serverOf = (config: DesktopConfig): ServerEntry => ({
-  ...config.server,
-  name: SERVER_NAME,
-})
-
-type ServerByIdProps = {
-  config: DesktopConfig
-  serverId: string
-}
-
-/** The server when `serverId` is its id; null for any other, such as a server an older version kept. */
-export const serverById = ({ config, serverId }: ServerByIdProps): ServerEntry | null =>
-  config.server.id === serverId ? serverOf(config) : null
-
 type SetOutputProps = {
   config: DesktopConfig
   output: OutputSettings
@@ -159,7 +142,7 @@ export const pickOutput = (output: OutputSettings): OutputSettings => ({
 export type UpgradedConfig = { config: DesktopConfig; adopted: string[]; isChanged: boolean }
 
 type FromListProps = {
-  servers: readonly ServerRecord[]
+  servers: readonly ServerEntry[]
   server: FixedServer
   newId: () => string
 }

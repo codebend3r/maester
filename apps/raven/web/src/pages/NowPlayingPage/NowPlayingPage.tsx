@@ -1,11 +1,17 @@
-import { type Chapter, REPEAT_MODES, type Track, formatDuration, orderedOf } from '@raven/core'
-import { Button } from '@raven/ui'
+import {
+  type Chapter,
+  REPEAT_MODES,
+  type Track,
+  formatDuration,
+  orderedOf,
+  nextChapterStart,
+  previousChapterStart,
+} from '@raven/core'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import {
   AUDIOBOOK_SPEEDS,
   AUDIO_STATES,
-  nextChapterStart,
   playingTrackOf,
-  previousChapterStart,
   useAudioQueue,
   useAudiobookChapters,
   usePlayerPrefs,
@@ -26,15 +32,11 @@ import { useMusicLinks } from '@/lib/useMusicLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import { ChaptersPanel } from '@/pages/NowPlayingPage/ChaptersPanel'
 import { LyricsPanel } from '@/pages/NowPlayingPage/LyricsPanel'
-import { NOW_PLAYING_COPY } from '@/pages/NowPlayingPage/copy'
+import { NOW_PLAYING_COPY, REPEAT_COPY } from '@/pages/NowPlayingPage/copy'
 import styles from '@/pages/NowPlayingPage/NowPlayingPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 
-const REPEAT_LABELS = {
-  [REPEAT_MODES.off]: 'Repeat off',
-  [REPEAT_MODES.all]: 'Repeat all',
-  [REPEAT_MODES.one]: 'Repeat one',
-} as const
+const REPEAT_LABELS = REPEAT_COPY
 
 type QueueControlsProps = TrailProps
 
@@ -45,14 +47,14 @@ const QueueControls = ({ index }: QueueControlsProps) => {
   return (
     <>
       <Button
-        tone="ghost"
+        tone={BUTTON_TONES.ghost}
         icon="up"
         aria-label={NOW_PLAYING_COPY.moveUp}
         disabled={index === 0}
         onClick={() => move({ from: index, to: index - 1 })}
       />
       <Button
-        tone="ghost"
+        tone={BUTTON_TONES.ghost}
         icon="close"
         aria-label={NOW_PLAYING_COPY.removeFromQueue}
         onClick={() => remove(index)}
@@ -80,14 +82,14 @@ const BookControls = ({ chapters }: BookControlsProps) => {
   return (
     <div className={styles.book}>
       <Button
-        tone="ghost"
+        tone={BUTTON_TONES.ghost}
         icon="rewind"
         aria-label={NOW_PLAYING_COPY.previousChapter}
         disabled={!hasChapters}
         onClick={() => seekTo(previousChapterStart({ chapters, at: positionNow() }))}
       />
       <Button
-        tone="ghost"
+        tone={BUTTON_TONES.ghost}
         icon="forward"
         aria-label={NOW_PLAYING_COPY.nextChapter}
         disabled={!hasChapters}
@@ -246,33 +248,33 @@ const Playing = ({ track }: PlayingProps) => {
         </div>
         <div className={styles.controls}>
           <Button
-            tone="ghost"
+            tone={BUTTON_TONES.ghost}
             icon="shuffle"
             aria-label={queue.isShuffled ? NOW_PLAYING_COPY.shuffleOn : NOW_PLAYING_COPY.shuffleOff}
             aria-pressed={queue.isShuffled}
             onClick={toggleShuffle}
           />
           <Button
-            tone="ghost"
+            tone={BUTTON_TONES.ghost}
             icon="skipPrevious"
             aria-label={NOW_PLAYING_COPY.previousTrack}
             onClick={skipPrevious}
           />
           <Button
-            tone="primary"
+            tone={BUTTON_TONES.primary}
             size="large"
             icon={isPlaying ? 'pause' : 'play'}
             aria-label={isPlaying ? COMMON_COPY.pause : COMMON_COPY.play}
             onClick={toggle}
           />
           <Button
-            tone="ghost"
+            tone={BUTTON_TONES.ghost}
             icon="skipNext"
             aria-label={NOW_PLAYING_COPY.nextTrack}
             onClick={skipNext}
           />
           <Button
-            tone="ghost"
+            tone={BUTTON_TONES.ghost}
             icon="reset"
             aria-label={REPEAT_LABELS[queue.repeat]}
             aria-pressed={queue.repeat !== REPEAT_MODES.off}
@@ -281,7 +283,7 @@ const Playing = ({ track }: PlayingProps) => {
             {queue.repeat === REPEAT_MODES.one ? NOW_PLAYING_COPY.repeatOne : undefined}
           </Button>
           <Button
-            tone="ghost"
+            tone={BUTTON_TONES.ghost}
             icon="list"
             aria-label={COMMON_COPY.addToPlaylist}
             onClick={() => setAdding(true)}
@@ -297,7 +299,7 @@ const Playing = ({ track }: PlayingProps) => {
         <SectionHeading
           id={queueId}
           aside={
-            <Button tone="quiet" icon="close" onClick={clear}>
+            <Button tone={BUTTON_TONES.quiet} icon="close" onClick={clear}>
               {NOW_PLAYING_COPY.clear}
             </Button>
           }

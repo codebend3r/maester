@@ -30,18 +30,16 @@ type UseTrackCuesProps = {
   duration: number | null
 }
 
+/** A track's cues around now, and whether they are ready. */
+export type TrackCues = { cues: SubtitleCue[]; status: SubtitleStatus }
+
 /**
  * The cues around `time` for one track of a server's video, from its WebVTT route. An embedded
  * track is fetched a window at a time, the one playing plus the next as it draws near; a sidecar
  * file comes whole. Windows already fetched stay in the query cache, so seeking back is instant.
  * No video (a local file) or no track asks for nothing.
  */
-export const useTrackCues = ({
-  video,
-  track,
-  time,
-  duration,
-}: UseTrackCuesProps): { cues: SubtitleCue[]; status: SubtitleStatus } => {
+export const useTrackCues = ({ video, track, time, duration }: UseTrackCuesProps): TrackCues => {
   const queries = (() => {
     if (track == null || video == null) return []
     const windows =

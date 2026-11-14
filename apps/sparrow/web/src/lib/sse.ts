@@ -10,12 +10,14 @@ const FIELDS = { event: 'event: ', data: 'data: ' } as const
 
 const parseBlock = (block: string): RawEvent => {
   const lines = block.split('\n')
-  const name = lines.find((line) => line.startsWith(FIELDS.event))?.slice(FIELDS.event.length)
+  // A block with no name line reads as one named '', which no guard accepts.
+  const nameLine = lines.find((line) => line.startsWith(FIELDS.event)) ?? FIELDS.event
+  const name = nameLine.slice(FIELDS.event.length)
   const data = lines
     .filter((line) => line.startsWith(FIELDS.data))
     .map((line) => line.slice(FIELDS.data.length))
     .join('\n')
-  return { name: name ?? '', data }
+  return { name, data }
 }
 
 type PumpProps = {

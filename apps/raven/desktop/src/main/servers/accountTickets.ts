@@ -1,9 +1,9 @@
-import { AUTH_REFUSALS, isMediaTicket, LOCKED_STATUS, type AuthRefusal } from '@raven/core'
+import { AUTH_REFUSALS, isMediaTicket, LOCKED_STATUS } from '@raven/core'
 import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES } from '@/main/servers/allowlist'
-import { accountRefusalOf } from '@/main/servers/authRefusals'
+import { accountRefusalOf, type AccountRefusal } from '@/main/servers/authRefusals'
 import type { ServerCallResult, ServerCalls } from '@/main/servers/serverCalls'
-import { HTTP_STATUSES } from '@/shared/httpStatuses'
+import { HTTP_STATUSES } from '@shared/http'
 
 /**
  * How long a minted account ticket is used before another is minted: a minute short of the
@@ -21,13 +21,12 @@ export const TICKET_OUTCOMES = {
 
 export type TicketOutcome =
   | { kind: typeof TICKET_OUTCOMES.ticket; ticket: string }
-  | { kind: typeof TICKET_OUTCOMES.refused; reason: AuthRefusal['reason'] }
+  | { kind: typeof TICKET_OUTCOMES.refused; reason: AccountRefusal }
   | { kind: typeof TICKET_OUTCOMES.locked }
   | { kind: typeof TICKET_OUTCOMES.gone }
   | { kind: typeof TICKET_OUTCOMES.unreachable }
 
 type TicketForProps = {
-  serverId: string
   mediaId: number
   isFresh: boolean
 }
@@ -35,8 +34,8 @@ type TicketForProps = {
 export type AccountTickets = {
   /** `isFresh` mints another even inside the window: the one held was just refused. */
   ticketFor: (input: TicketForProps) => Promise<TicketOutcome>
-  /** Drops what is held for a server whose access ended. */
-  forget: (serverId: string) => void
+  /** Drops what is held, as the account it was minted for is no longer signed in. */
+  forget: () => void
 }
 
 const UNREACHABLE: TicketOutcome = { kind: TICKET_OUTCOMES.unreachable }
@@ -51,8 +50,11 @@ const outcomeOf = (reply: ServerCallResult): TicketOutcome => {
         : UNREACHABLE
     }
     case HTTP_STATUSES.unauthorized:
-    case HTTP_STATUSES.forbidden:
-      return { kind: TICKET_OUTCOMES.refused, reason: accountRefusalOf(reply) }
+    case HTTP_STATUSES.forbidden: {
+      // Accounts that are down are an outage, not a refusal of this account.
+      const reason = accountRefusalOf(reply)
+      return reason === null ? UNREACHABLE : { kind: TICKET_OUTCOMES.refused, reason }
+    }
     case LOCKED_STATUS:
       return { kind: TICKET_OUTCOMES.locked }
     case HTTP_STATUSES.notFound:
@@ -63,19 +65,12 @@ const outcomeOf = (reply: ServerCallResult): TicketOutcome => {
   }
 }
 
-type Held = { serverId: string; ticket: string; renewAt: number }
-type Minting = { serverId: string; outcome: Promise<TicketOutcome> }
-
-type KeyOfProps = { serverId: string; mediaId: number }
-
-const keyOf = ({ serverId, mediaId }: KeyOfProps): string => `${serverId}/${mediaId}`
-
-type IsSignedInProps = { serverId: string }
+type Held = { ticket: string; renewAt: number }
 
 type CreateAccountTicketsProps = {
   calls: Pick<ServerCalls, 'call'>
-  /** Whether the page is signed in to the server, so a mint has a token to go out with. */
-  isSignedIn: (input: IsSignedInProps) => boolean
+  /** Whether the page is signed in, so a mint has a token to go out with. */
+  isSignedIn: () => boolean
   now: () => number
 }
 
@@ -89,46 +84,30 @@ export const createAccountTickets = ({
   isSignedIn,
   now,
 }: CreateAccountTicketsProps): AccountTickets => {
-  let held: ReadonlyMap<string, Held> = new Map()
-  let minting: ReadonlyMap<string, Minting> = new Map()
+  let held: ReadonlyMap<number, Held> = new Map()
+  let minting: ReadonlyMap<number, Promise<TicketOutcome>> = new Map()
 
-  type MintProps = {
-    serverId: string
-    mediaId: number
-  }
-
-  const mint = async ({ serverId, mediaId }: MintProps): Promise<TicketOutcome> => {
+  const mint = async (mediaId: number): Promise<TicketOutcome> => {
     // Signed out, the server would refuse the mint as signed out too, so main does not ask it.
-    if (!isSignedIn({ serverId })) {
-      return { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.signedOut }
-    }
-    return outcomeOf(
-      await calls.call({ serverId, call: { name: CALL_NAMES.getAccountTicket, mediaId } }),
-    )
+    if (!isSignedIn()) return { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.signedOut }
+    return outcomeOf(await calls.call({ call: { name: CALL_NAMES.getAccountTicket, mediaId } }))
   }
 
-  type StartProps = { serverId: string; mediaId: number }
-
-  const start = ({ serverId, mediaId }: StartProps) => {
-    const key = keyOf({ serverId, mediaId })
+  const start = (mediaId: number): Promise<TicketOutcome> => {
     const startedAt = now()
-    const outcome = mint({ serverId, mediaId }).catch(() => UNREACHABLE)
-    const entry: Minting = { serverId, outcome }
-    minting = new Map([...minting, [key, entry]])
+    const outcome = mint(mediaId).catch(() => UNREACHABLE)
+    minting = new Map([...minting, [mediaId, outcome]])
     return outcome.then((settled) => {
-      // A server forgotten while this was out keeps nothing from it.
-      if (minting.get(key) !== entry) return settled
-      minting = new Map([...minting].filter(([known]) => known !== key))
+      // Forgotten while this was out, it keeps nothing.
+      if (minting.get(mediaId) !== outcome) return settled
+      minting = new Map([...minting].filter(([known]) => known !== mediaId))
       const time = now()
-      const live = [...held].filter(([known, ticket]) => known !== key && ticket.renewAt > time)
+      const live = [...held].filter(([known, ticket]) => known !== mediaId && ticket.renewAt > time)
       held = new Map(
         settled.kind === TICKET_OUTCOMES.ticket
           ? [
               ...live,
-              [
-                key,
-                { serverId, ticket: settled.ticket, renewAt: startedAt + ACCOUNT_TICKET_RENEW_MS },
-              ],
+              [mediaId, { ticket: settled.ticket, renewAt: startedAt + ACCOUNT_TICKET_RENEW_MS }],
             ]
           : live,
       )
@@ -137,19 +116,18 @@ export const createAccountTickets = ({
   }
 
   return {
-    ticketFor: ({ serverId, mediaId, isFresh }) => {
-      const key = keyOf({ serverId, mediaId })
-      const inFlight = minting.get(key)
-      if (inFlight !== undefined) return inFlight.outcome
-      const kept = held.get(key)
+    ticketFor: ({ mediaId, isFresh }) => {
+      const inFlight = minting.get(mediaId)
+      if (inFlight !== undefined) return inFlight
+      const kept = held.get(mediaId)
       if (!isFresh && kept !== undefined && now() < kept.renewAt) {
         return Promise.resolve({ kind: TICKET_OUTCOMES.ticket, ticket: kept.ticket })
       }
-      return start({ serverId, mediaId })
+      return start(mediaId)
     },
-    forget: (serverId) => {
-      held = new Map([...held].filter(([, ticket]) => ticket.serverId !== serverId))
-      minting = new Map([...minting].filter(([, entry]) => entry.serverId !== serverId))
+    forget: () => {
+      held = new Map()
+      minting = new Map()
     },
   }
 }

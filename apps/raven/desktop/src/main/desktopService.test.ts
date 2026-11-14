@@ -12,7 +12,8 @@ import {
 import { describe, expect, it } from 'bun:test'
 import { dirname, basename } from 'node:path'
 import { createGrants, type Grants } from '@/main/grants'
-import { createStateStore, type StateFs, type Timers } from '@/main/stateStore'
+import { createStateStore, type StateFs } from '@/main/stateStore'
+import type { Timers } from '@/main/timers'
 import { EMPTY_STATE } from '@/main/playerState'
 import { createDesktopService, MESSAGES } from '@/main/desktopService'
 import type { DownloadService } from '@/main/downloads/downloadService'
@@ -384,7 +385,6 @@ const setup = ({
   const service = createDesktopService({
     updates,
     downloads,
-    config,
     account: {
       set: (session) => {
         server.sessions.push(session)
@@ -1435,7 +1435,7 @@ describe('the server', () => {
     expect(await ask({ service, request: { type: DESKTOP_REQUESTS.askDownload, target } })).toEqual(
       { type: DESKTOP_REPLIES.done },
     )
-    expect(reached).toEqual([{ name: 'ask', input: { serverId: SERVER, target } }])
+    expect(reached).toEqual([{ name: 'ask', input: { target } }])
   })
 
   it('plays a title through the server titles, and answers what the player needs', async () => {

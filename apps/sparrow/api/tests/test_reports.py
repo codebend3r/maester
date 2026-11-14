@@ -3,7 +3,7 @@ from dataclasses import replace
 import pytest
 
 from sparrow.agent.tools import Refused, Result, Tier
-from sparrow.clients.seerr import ISSUE_AUDIO, ISSUE_OTHER, ISSUE_VIDEO
+from sparrow.clients.seerr import IssueType
 from sparrow.clients.tautulli import StreamData
 from sparrow.media import Decision, ReportKind, ReportStatus
 from sparrow.notify import AdminPost, DirectMessage
@@ -50,7 +50,7 @@ async def test_a_player_limit_is_the_answer_and_the_file_is_left_alone(library):
     )  # fmt: skip
     assert out["next"].startswith("Give them the player fix")
     (issue,) = library.services.seerr.issues
-    assert (issue["mediaId"], issue["issueType"], issue["as_user"]) == (12, ISSUE_VIDEO, 4)
+    assert (issue["mediaId"], issue["issueType"], issue["as_user"]) == (12, IssueType.VIDEO, 4)
     assert issue["message"].startswith("purple picture\n\nReported through sparrow by dany")
     assert "Decision: a player limit explains it" in issue["message"]
     assert filed.report.seerr_issue_id == 1 and out["seerr_issue"] == 1
@@ -119,17 +119,17 @@ async def test_wrong_file_reports_take_the_friends_word_and_keep_the_release_gro
     cam = await report(library, DUNE_4K_ITEM, ReportKind.CAM, "it's a cam, people's heads")
     assert cam.report.decision is Decision.RECORDED and cam.diagnosis == TheirWord()
     assert cam.report.release_group == "FraMeSToR" and library.services.probe.decoded == []
-    assert library.services.seerr.issues[0]["issueType"] == ISSUE_VIDEO
+    assert library.services.seerr.issues[0]["issueType"] == IssueType.VIDEO
     wrong = await report(library, DUNE_4K_ITEM, ReportKind.WRONG_TITLE, "it's Dune 1984", user="d2")
     assert wrong.report.decision is Decision.REPLACEABLE  # two people, one file
-    assert library.services.seerr.issues[1]["issueType"] == ISSUE_OTHER
+    assert library.services.seerr.issues[1]["issueType"] == IssueType.OTHER
 
 
 async def test_track_problems_list_the_tracks_and_ask_the_admin(library):
     filed = await report(library, DUNE_4K_ITEM, ReportKind.AUDIO, "no English dub")
     assert filed.report.decision is Decision.FOR_ADMIN
     (issue,) = library.services.seerr.issues
-    assert issue["issueType"] == ISSUE_AUDIO
+    assert issue["issueType"] == IssueType.AUDIO
     assert 'Tracks:\n- audio: eng truehd 8ch "TrueHD Atmos 7.1" (default)' in issue["message"]
     assert "- subtitle: es srt (forced, file)" in issue["message"]
     assert "Decision: recorded for the admin" in issue["message"]

@@ -21,7 +21,8 @@ const showNamed = ({ tmdbId, title }: ShowNamedProps): FetchedItem => ({
 
 describe('binge shows', () => {
   const database = testDatabase('raven-binge-shows-')
-  const state = { open: [] as number[], hidden: 0, episode: 0, later: 0, laterLibrary: 0 }
+  const openIds: number[] = []
+  const state = { open: openIds, hidden: 0, episode: 0, later: 0, laterLibrary: 0 }
   const binge = () => {
     const { metadata } = repositories(database.get())
     return new BingeShows(database.get(), metadata, new LibrariesRepository(database.get()))

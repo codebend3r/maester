@@ -16,7 +16,7 @@ import { WindowControls } from '@/desktop/WindowControls/WindowControls'
 import { WindowEdges } from '@/desktop/WindowEdges/WindowEdges'
 import { useDesktop } from '@/stores/desktop'
 import { useDownloadAsk } from '@/stores/downloadAsk'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 
 /**
  * Raven's part of the page, mounted once over every route: it hears main's events and
@@ -55,11 +55,9 @@ export const DesktopHost = () => {
       case DESKTOP_EVENTS.updateAvailable:
         showToast(DESKTOP_HOST_COPY.newerRelease(event.version))
         // Settings reads main's status again, so an open Updates section shows the release too.
-        return void queryClient
-          .invalidateQueries({ queryKey: DESKTOP_QUERY_KEYS.updates })
-          .catch(() => undefined)
+        return handled(queryClient.invalidateQueries({ queryKey: DESKTOP_QUERY_KEYS.updates }))
       case DESKTOP_EVENTS.downloads:
-        return void applyDownloadsEvent({ queryClient, event }).catch(() => undefined)
+        return handled(applyDownloadsEvent({ queryClient, event }))
       default: {
         const unreachable: never = event
         return unreachable

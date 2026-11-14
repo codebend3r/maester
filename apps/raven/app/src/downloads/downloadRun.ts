@@ -4,7 +4,12 @@ import {
   type MediaTracks,
   PLAYBACK_MODES,
 } from '@raven/core'
-import type { MediaSources, SourceOutcome } from '@raven/native/headless'
+import {
+  type DownloadDisk,
+  type MediaSources,
+  type SourceOutcome,
+  inFolder,
+} from '@raven/native/headless'
 
 import { DOWNLOAD_COPY } from '@/downloads/copy'
 import {
@@ -19,41 +24,12 @@ import {
   type SettledStatus,
   failedWith,
   folderOfEntry,
-  inFolder,
   keyOfEntry,
 } from '@/downloads/downloadEntries'
-import { IGNORED } from '@/lib/ignore'
-import type { DownloadProgressActions, DownloadReading } from '@/stores/downloadProgress'
+import type { DownloadProgressActions } from '@/stores/downloadProgress'
 
 /** How often a video the server is still copying is asked about again. */
 const PREPARE_POLL_MS = 2000
-
-/** What the player or a download fetches: the address and the headers it sends. */
-type FetchSource = Extract<SourceOutcome, { ok: true }>['source']
-
-type DiskFetchProps = {
-  source: FetchSource
-  path: string
-  /** Aborted when the download is cancelled. */
-  signal: AbortSignal
-  onProgress: (reading: DownloadReading) => void
-}
-
-/** Where the bytes go: `expo-file-system` on the device, memory in the tests. */
-export type DownloadDisk = {
-  /** Fetches `source` into a `.part` beside `path`, then moves it there; resolves its bytes. Leaves no file when it fails. */
-  fetch: (props: DiskFetchProps) => Promise<number>
-  /** The `file://` address `path` is at now. */
-  uriOf: (path: string) => string
-  exists: (path: string) => boolean
-  /** Every download's folder on disk, `downloads/<serverId>/<mediaId>`. */
-  folders: () => string[]
-  /** Deletes a download's folder and all in it. */
-  remove: (folder: string) => Promise<void>
-  removeAll: () => Promise<void>
-  /** The bytes free on the device; null where it cannot say. */
-  freeBytes: () => number | null
-}
 
 /** What a download asks of the server it is from. */
 export type DownloadServer = {
@@ -141,8 +117,8 @@ const fetchPicture = async ({
     await device.disk.fetch({
       source: { uri, headers },
       path,
-      signal: new AbortController().signal,
-      onProgress: IGNORED,
+      signal: null,
+      onProgress: null,
     })
     return path
   } catch {

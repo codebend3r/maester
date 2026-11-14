@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # A comment that spans lines is one /* */ block, never stacked // lines (CLAUDE.md).
 # Lint directives (oxlint-, eslint-, @ts-, triple-slash) are not prose and never count.
-# Runs as the root project's `comment-style` target, so in `verify` and `affected`.
+# Runs as the root project's `comment-style` target, so in `verify`, `affected` and the PR checks.
 set -euo pipefail
 
 stacked="$(git ls-files -z '*.ts' '*.tsx' '*.scss' | xargs -0 awk '

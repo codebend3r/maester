@@ -1,9 +1,10 @@
 import { type ComponentType, type ReactNode, useState } from 'react'
-import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { Icon } from '@raven/native'
-import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { BUTTON_TONES } from '@raven/native/headless'
+
+import { Text } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import { type ItemHero, type ItemPage, type PersonCard, type VersionRow } from '@/queries/itemPage'
@@ -15,7 +16,6 @@ import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
 import { HeroHome } from '@/layouts/HeroHome'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
-import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import {
   ITEM_HEADINGS,
@@ -37,6 +37,25 @@ import { OPACITIES } from '@/theme/appTheme'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { translucent } from '@/theme/translucent'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { type ItemPartStyles, itemPartsFor } from '@/layouts/itemParts'
+import { Backdrop } from '@/layouts/ItemBackdrop.focus'
+
+const usePartStyles = (): ItemPartStyles => {
+  const styles = useStyles()
+  return {
+    heading: styles.heading,
+    title: styles.title,
+    initials: styles.initials,
+    progress: styles.progress,
+    track: styles.track,
+    fill: styles.fill,
+    progressLabel: styles.line,
+  }
+}
+
+const { Heading, HeroTitleWords, ProgressLine, PersonPicture, PersonInitials } = itemPartsFor({
+  useStyles: usePartStyles,
+})
 
 /** How tall a show's title art stands over an episode's name: larger than the player's. */
 const LOGO_HEIGHT = tvSize(150)
@@ -59,70 +78,7 @@ const PHOTO_SIZE = tvSize(120)
 /** A person's column: their photo, with room either side for a name under it. */
 const PERSON_WIDTH = tvSize(176)
 
-/**
- * The backdrop is drawn across the screen's whole width at its own 16:9, its top at the page's,
- * in a box `BACKDROP_HEIGHT` tall that crops its foot, dimmed so the words over it read.
- */
-const BACKDROP_RATIO = 9 / 16
-const BACKDROP_OPACITY = 0.3
-const BACKDROP_HEIGHT = tvSize(700)
-
-/** Where down the backdrop it starts to fade into the page's ground, which it reaches at its foot. */
-const BACKDROP_FADE_FROM = 0.45
-
-const BACKDROP_GRADIENT_ID = 'tv-item-backdrop-fade'
-
-type BackdropProps = { backdrop: NonNullable<ItemPage['hero']['backdrop']> }
-
-/**
- * The item's backdrop across the top of the page: the picture from one edge of the screen to the
- * other, its top at the page's, dimmed and fading into the theme's ground toward the foot, so the
- * page below is the theme's own colour.
- */
-const Backdrop = ({ backdrop }: BackdropProps) => {
-  const styles = useStyles()
-  const ground = useTheme((theme) => theme.palette.ground)
-  const { width } = useWindowDimensions()
-  return (
-    <View pointerEvents="none" style={[styles.backdropBox, { height: BACKDROP_HEIGHT }]}>
-      <Image
-        accessibilityElementsHidden
-        resizeMode="cover"
-        source={backdrop}
-        style={[styles.backdrop, { width, height: width * BACKDROP_RATIO }]}
-      />
-      <Svg height={BACKDROP_HEIGHT} style={StyleSheet.absoluteFill} width={width}>
-        <Defs>
-          <LinearGradient id={BACKDROP_GRADIENT_ID} x1="0" x2="0" y1="0" y2="1">
-            <Stop offset={0} stopColor={ground} stopOpacity={0} />
-            <Stop offset={BACKDROP_FADE_FROM} stopColor={ground} stopOpacity={0} />
-            <Stop offset={1} stopColor={ground} stopOpacity={1} />
-          </LinearGradient>
-        </Defs>
-        <Rect
-          fill={`url(#${BACKDROP_GRADIENT_ID})`}
-          height={BACKDROP_HEIGHT}
-          width={width}
-          x={0}
-          y={0}
-        />
-      </Svg>
-    </View>
-  )
-}
-
 type Opens = ItemLayoutProps['onOpen']
-
-type HeadingProps = { title: string }
-
-const Heading = ({ title }: HeadingProps) => {
-  const styles = useStyles()
-  return (
-    <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
-      {title}
-    </Text>
-  )
-}
 
 type ActionButtonProps = { action: ItemAction; isFirst: boolean }
 
@@ -166,20 +122,6 @@ const ActionButton = ({ action, isFirst }: ActionButtonProps) => {
   )
 }
 
-type ProgressLineProps = { progress: NonNullable<ItemHero['progress']> }
-
-const ProgressLine = ({ progress }: ProgressLineProps) => {
-  const styles = useStyles()
-  return (
-    <View style={styles.progress}>
-      <View style={styles.track}>
-        <View style={[styles.fill, { width: `${progress.fraction * 100}%` }]} />
-      </View>
-      <Text style={styles.line}>{progress.label}</Text>
-    </View>
-  )
-}
-
 type ActionRowProps = { actions: ItemAction[]; isFirstRow: boolean }
 
 /** A row of actions; on the first row the first action takes the opening focus. */
@@ -211,18 +153,6 @@ const HeroTitleArt = ({ hero }: HeroTitleArtProps) => {
         textStyle={styles.title}
       />
     </View>
-  )
-}
-
-type HeroTitleWordsProps = HeroTitleProps
-
-/** The title in type. */
-const HeroTitleWords = ({ hero }: HeroTitleWordsProps) => {
-  const styles = useStyles()
-  return (
-    <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
-      {hero.title}
-    </Text>
   )
 }
 
@@ -421,24 +351,6 @@ const Versions = ({ versions, onOpen }: VersionsProps) => {
 
 type PersonProps = { person: PersonCard }
 
-type PersonPictureProps = PersonProps
-
-const PersonPicture = ({ person }: PersonPictureProps) =>
-  person.picture !== null && (
-    <Image resizeMode="cover" source={person.picture} style={StyleSheet.absoluteFill} />
-  )
-
-type PersonInitialsProps = PersonProps
-
-const PersonInitials = ({ person }: PersonInitialsProps) => {
-  const styles = useStyles()
-  return (
-    <Text variant={TEXT_VARIANTS.display} style={styles.initials}>
-      {person.initials}
-    </Text>
-  )
-}
-
 /** A person's photo, else their initials. */
 const PERSON_PHOTOS = {
   [PICTURE_STATES.shown]: PersonPicture,
@@ -553,8 +465,6 @@ export const focusItem: ItemKit = { ItemLayout, ItemNotice }
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     ground: { flex: 1, backgroundColor: colours.ground },
-    backdropBox: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden' },
-    backdrop: { opacity: BACKDROP_OPACITY },
     scroll: { flex: 1 },
     page: { gap: TV_SIZES.space5, paddingTop: TV_SIZES.space6, paddingBottom: TV_SIZES.space6 },
     padded: { paddingHorizontal: TV_GUTTER },

@@ -1,6 +1,5 @@
-import type { MpvProperty, MpvPropertyValue } from '@raven/mpv'
+import type { MpvOption, MpvProperty, MpvPropertyValue } from '@raven/mpv'
 import type { MpvControl } from '@/main/player/guardedMpv'
-import type { MpvOption } from '@/main/player/outputOptions'
 import { messageOf } from '@/shared/messageOf'
 
 type CreateQuietMpvProps = {

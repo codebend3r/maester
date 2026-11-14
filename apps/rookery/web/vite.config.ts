@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { SERVER_PATHS } from '@rookery/core'
 
 /*
  * The server's routes, proxied in development so the browser sees one
@@ -22,10 +23,6 @@ export default defineConfig({
      */
     port: 5180,
     strictPort: true,
-    proxy: {
-      '/api': server,
-      '/auth': server,
-      '/health': server,
-    },
+    proxy: Object.fromEntries(SERVER_PATHS.map((path) => [path.replace(/\/$/, ''), server])),
   },
 })

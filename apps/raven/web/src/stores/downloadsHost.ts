@@ -1,7 +1,6 @@
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
+import { devtools } from 'zustand/middleware'
 import type { DownloadsHost } from '@/downloads/host'
-import { STORE_KEYS } from '@/stores/storage'
 
 type DownloadsHostState = {
   /** Set once before the first render: Raven's, the browser's, or null where neither keeps downloads. */
@@ -10,14 +9,7 @@ type DownloadsHostState = {
 
 /** Who keeps this page's downloads. */
 export const useDownloadsHostStore = create<DownloadsHostState>()(
-  devtools(
-    persist((): DownloadsHostState => ({ host: null }), {
-      name: STORE_KEYS.downloadsHost,
-      storage: createJSONStorage(() => window.localStorage),
-      partialize: () => ({}),
-    }),
-    { name: 'raven/downloadsHost' },
-  ),
+  devtools((): DownloadsHostState => ({ host: null }), { name: 'raven/downloadsHost' }),
 )
 
 /** The host, or null where this page keeps no downloads. */

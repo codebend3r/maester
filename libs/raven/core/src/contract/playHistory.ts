@@ -10,6 +10,7 @@ import {
   oneOf,
   optional,
   union,
+  literal,
 } from '@/schema'
 
 /*
@@ -51,7 +52,7 @@ export type PlayHistoryShow = Infer<typeof isPlayHistoryShow>
 export const PLAYED_KINDS = { video: 'video', episode: 'episode', track: 'track' } as const
 
 const isPlayedVideo = object({
-  kind: oneOf([PLAYED_KINDS.video]),
+  kind: literal(PLAYED_KINDS.video),
   title: isString,
   year: nullable(isNumber),
   /** The movie it was matched to, for its page; null for a file with none, absent from an older server. */
@@ -59,7 +60,7 @@ const isPlayedVideo = object({
 })
 
 const isPlayedEpisode = object({
-  kind: oneOf([PLAYED_KINDS.episode]),
+  kind: literal(PLAYED_KINDS.episode),
   show: isString,
   season: nullable(isNumber),
   episode: nullable(isNumber),
@@ -70,7 +71,7 @@ const isPlayedEpisode = object({
 })
 
 const isPlayedTrack = object({
-  kind: oneOf([PLAYED_KINDS.track]),
+  kind: literal(PLAYED_KINDS.track),
   title: isString,
   /** Every artist credited on the track, in order; null when its tags name none. */
   artist: nullable(isString),

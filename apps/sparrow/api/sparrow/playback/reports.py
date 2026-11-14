@@ -15,10 +15,10 @@ Seerr issue was resolved or whose replacement the admin declined. How each
 decision reads, to the Seerr issue and to the model, is data (`WORDING`).
 
 A report's replacement then moves through statuses (`ReportStatus`) by the
-moves defined here (`ESCALATE`, `DECLINE`, `REOPEN`, `REPLACE`), each a
-compare-and-set in the store, and who may start a replacement from which
-status is `MAY_REPLACE`. The admin's no covers that
-one report: a later report of the same file stands on its own evidence.
+one move defined here (`REPLACE`), a compare-and-set in the store, and the
+statuses a replacement may start from are `MAY_REPLACE`. A report the
+admin once declined stays declined: a later report of the same file stands
+on its own evidence.
 
 Every report opens a Seerr issue as the friend, with the diagnosis and the
 decision, so the admin's trail is in a tool they already use. Resolving the
@@ -27,13 +27,12 @@ issue in Seerr marks the report resolved (`seerr_events.py`).
 
 from __future__ import annotations
 
-import enum
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import Any
 
 from sparrow.clients import ClientError, Services
-from sparrow.clients.seerr import ISSUE_AUDIO, ISSUE_OTHER, ISSUE_SUBTITLE, ISSUE_VIDEO
+from sparrow.clients.seerr import IssueType
 from sparrow.media import Decision, ReportKind, ReportStatus
 from sparrow.notify import AdminPost, Notice
 from sparrow.playback.diagnosis import (
@@ -58,7 +57,7 @@ REPORTERS_TO_REPLACE = 2
 @dataclass(frozen=True)
 class KindPolicy:
     label: str  # how the problem reads to people
-    issue_type: int  # Seerr's issue type
+    issue_type: IssueType
     diagnose: Diagnose
     # A new copy fixes it, so it goes through the replace flow; otherwise the
     # admin is asked, since nothing fixes it automatically.
@@ -68,7 +67,7 @@ class KindPolicy:
 
 def _kind(
     label: str,
-    issue_type: int,
+    issue_type: IssueType,
     diagnose: Diagnose,
     replaceable: bool,
     after_advice: Diagnose | None = None,
@@ -77,20 +76,20 @@ def _kind(
 
 
 POLICIES: dict[ReportKind, KindPolicy] = {
-    ReportKind.WONT_PLAY: _kind("won't play", ISSUE_VIDEO, player_then_file, True, file_only),
-    ReportKind.WRONG_TITLE: _kind("the wrong movie or show", ISSUE_OTHER, by_their_word, True),
-    ReportKind.WRONG_EPISODE: _kind("the wrong episode", ISSUE_OTHER, by_their_word, True),
-    ReportKind.CAM: _kind("a cam or screener copy", ISSUE_VIDEO, by_their_word, True),
+    ReportKind.WONT_PLAY: _kind("won't play", IssueType.VIDEO, player_then_file, True, file_only),
+    ReportKind.WRONG_TITLE: _kind("the wrong movie or show", IssueType.OTHER, by_their_word, True),
+    ReportKind.WRONG_EPISODE: _kind("the wrong episode", IssueType.OTHER, by_their_word, True),
+    ReportKind.CAM: _kind("a cam or screener copy", IssueType.VIDEO, by_their_word, True),
     ReportKind.HARDCODED_SUBS: _kind(
-        "hardcoded foreign subtitles", ISSUE_SUBTITLE, by_their_word, True
+        "hardcoded foreign subtitles", IssueType.SUBTITLE, by_their_word, True
     ),
     ReportKind.SUBTITLES: _kind(
-        "subtitles missing or out of sync", ISSUE_SUBTITLE, track_listing, False
+        "subtitles missing or out of sync", IssueType.SUBTITLE, track_listing, False
     ),
     ReportKind.AUDIO: _kind(
-        "audio out of sync or a missing dub", ISSUE_AUDIO, track_listing, False
+        "audio out of sync or a missing dub", IssueType.AUDIO, track_listing, False
     ),
-    ReportKind.OTHER: _kind("another problem", ISSUE_OTHER, by_their_word, True),
+    ReportKind.OTHER: _kind("another problem", IssueType.OTHER, by_their_word, True),
 }
 
 
@@ -203,11 +202,6 @@ WORDING: dict[Decision, Wording] = {
 }
 
 
-class Actor(enum.StrEnum):
-    FRIEND = "friend"  # confirms a replacement of their own report
-    ADMIN = "admin"  # approves one over the daily cap
-
-
 @dataclass(frozen=True)
 class Move:
     """One step a report's status may take, from the statuses it may start in."""
@@ -218,18 +212,11 @@ class Move:
 
 S = ReportStatus
 # Every move a report makes. Nothing else changes a report's status.
-ESCALATE = Move(frozenset({S.OPEN}), S.ESCALATED)  # over the cap: the admin decides
-DECLINE = Move(frozenset({S.ESCALATED}), S.DECLINED)  # the admin's no, for this report
-REOPEN = Move(frozenset({S.ESCALATED}), S.OPEN)  # its approval can't lead anywhere now
-REPLACE = Move(frozenset({S.OPEN, S.ESCALATED}), S.REPLACED)  # the file was deleted
-# Who may start a replacement from which status, and why no one else may.
-MAY_REPLACE: dict[Actor, frozenset[ReportStatus]] = {
-    Actor.FRIEND: frozenset({S.OPEN}),
-    Actor.ADMIN: frozenset({S.ESCALATED}),
-}
+REPLACE = Move(frozenset({S.OPEN}), S.REPLACED)  # the file was deleted
+# The statuses a friend's confirmed replacement may start from, and why no other may.
+MAY_REPLACE: frozenset[ReportStatus] = frozenset({S.OPEN})
 NOT_NOW: dict[ReportStatus, str] = {
-    S.OPEN: "it isn't waiting on the admin",
-    S.ESCALATED: "it's already waiting on the admin",
+    S.OPEN: "it is still open",
     S.REPLACED: "it was already replaced",
     S.DECLINED: "the admin decided not to replace it",
 }

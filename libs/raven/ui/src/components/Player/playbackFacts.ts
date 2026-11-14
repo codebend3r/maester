@@ -17,9 +17,9 @@ import {
   rangeLabel,
   resolutionLabel,
   subtitleLabel,
+  playingAudio,
 } from '@raven/core'
 import { PLAYBACK_FACTS_COPY, PLAYBACK_MODE_NAMES } from '@/components/Player/copy'
-import { playingAudio } from '@/components/Player/selection'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
 
 /** Each mode as the subject of a sentence. */
@@ -168,7 +168,7 @@ type AudioPillLabelProps = {
   mode: PlaybackMode
   tracks: MediaTracks | null
   audio: number | null
-  playsPickedAudio?: boolean
+  shouldPlayPickedAudio: boolean
 }
 
 /** "English 5.1" for the audio pill; null until the tracks are read. */
@@ -176,9 +176,9 @@ export const audioPillLabel = ({
   mode,
   tracks,
   audio,
-  playsPickedAudio,
+  shouldPlayPickedAudio,
 }: AudioPillLabelProps): string | null => {
-  const index = playingAudio({ mode, tracks, audio, playsPickedAudio })
+  const index = playingAudio({ mode, tracks, audio, shouldPlayPickedAudio })
   const track = tracks?.audio.find((candidate) => candidate.index === index) ?? null
   if (!track) return null
   return joined({ parts: [audioLabel(track).name, formatChannels(track.channels)], separator: ' ' })

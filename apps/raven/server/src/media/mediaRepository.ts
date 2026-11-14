@@ -11,15 +11,12 @@ import {
   type PosterEntry,
   type Saga,
   type ShowEntry,
-  SESSION_KINDS,
-  SHUFFLE_LENGTH,
   THUMBNAIL_STATES,
-  type ViewingSession,
   isMatchState,
   isThumbnailState,
   readCut,
   readRelease,
-  shuffled,
+  MATCH_STATES,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import {
@@ -94,7 +91,7 @@ const SELECT_COLUMNS = `
          COALESCE(i.year, a.year) AS item_year,
          COALESCE(i.released, a.release_date) AS item_released, t.title AS item_tmdb_title,
          t.original_title AS item_tmdb_original_title,
-         CASE WHEN i.type = 'movie'
+         CASE WHEN i.type = '${ITEM_TYPES.movie}'
               THEN (SELECT COUNT(*) FROM media_items x CROSS JOIN media y ON y.id = x.media_id
                      WHERE x.item_id = i.id AND y.library_id = m.library_id
                        AND y.split IS m.split)
@@ -219,7 +216,7 @@ const EPISODE_FILES = `
     FROM media m
     JOIN libraries l ON l.id = m.library_id
     JOIN media_items mi ON mi.media_id = m.id
-    JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+    JOIN shown_items e ON e.id = mi.item_id AND e.type = '${ITEM_TYPES.episode}'
     JOIN shown_items s ON s.id = e.parent_id
    WHERE m.library_id = ?
      AND (? IS NULL OR s.parent_id IN (SELECT value FROM json_each(?)))`
@@ -346,43 +343,6 @@ type MediaRepositoryNextEpisodeProps = {
   account: AccountKey
 }
 
-type MediaRepositoryNextInSessionProps = {
-  media: MediaItem
-  session: ViewingSession
-  /** The libraries the viewer may see, where a shuffle draws its episodes from. */
-  libraryIds: readonly number[]
-  roll?: () => number
-  account: AccountKey
-}
-
-type MediaRepositoryNextInShowProps = {
-  mediaId: number
-  libraryId: number
-  isSeasonOnly: boolean
-  account: AccountKey
-}
-
-type MediaRepositoryNextShuffledProps = {
-  mediaId: number
-  showId: number
-  libraryIds: readonly number[]
-  roll: () => number
-  account: AccountKey
-}
-
-type MediaRepositoryNextInSagaProps = {
-  media: MediaItem
-  sagaId: string
-  account: AccountKey
-}
-
-type MediaRepositoryShuffledEpisodesProps = {
-  itemId: number
-  libraryIds: readonly number[]
-  roll?: () => number
-  account: AccountKey
-}
-
 type MediaRepositoryWatchedEpisodesProps = {
   ids: readonly number[]
   account: AccountKey
@@ -433,6 +393,9 @@ type MediaRepositorySagaGroupsProps = { libraryId: number; account: AccountKey }
 
 /** A saga as its movies make it, before the library's pick of backdrop is put on it. */
 type SagaGroup = Omit<Saga, 'backdrop'>
+
+/** A watched episode, once for each library that holds one of its files. */
+type WatchedEpisode = { episodeId: number; libraryId: number }
 
 /**
  * The videos as a client sees them: listings, a show's next episode, an
@@ -516,7 +479,7 @@ export class MediaRepository {
         `WITH listed AS (
            ${SELECT_COLUMNS},
                   ROW_NUMBER() OVER (
-                    PARTITION BY CASE WHEN i.type = 'movie' THEN i.id || '|' || COALESCE(m.split, '')
+                    PARTITION BY CASE WHEN i.type = '${ITEM_TYPES.movie}' THEN i.id || '|' || COALESCE(m.split, '')
                                       ELSE -m.id END
                     ORDER BY ${BEST_FIRST}) AS version_rank
            ${FROM_MEDIA}
@@ -555,7 +518,7 @@ export class MediaRepository {
              FROM media m
              JOIN libraries l ON l.id = m.library_id
              JOIN media_items mi ON mi.media_id = m.id
-             JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+             JOIN shown_items e ON e.id = mi.item_id AND e.type = '${ITEM_TYPES.episode}'
              JOIN shown_items s ON s.id = e.parent_id
             WHERE s.parent_id IN (SELECT value FROM json_each(?))
               AND m.library_id IN (SELECT value FROM json_each(?))),
@@ -596,9 +559,9 @@ export class MediaRepository {
       .prepare<[ByAccount, number, string | null, string | null, string, string, number], ShowRow>(
         `WITH files AS (${EPISODE_FILES})
          SELECT sh.id, sh.ended, COUNT(DISTINCT f.episode_id) AS episodes,
-                (SELECT COUNT(*) FROM items s WHERE s.parent_id = sh.id AND s.type = 'season') AS seasons,
+                (SELECT COUNT(*) FROM items s WHERE s.parent_id = sh.id AND s.type = '${ITEM_TYPES.season}') AS seasons,
                 (SELECT COUNT(*) FROM items e JOIN items s ON s.id = e.parent_id
-                  WHERE s.parent_id = sh.id AND s.type = 'season' AND e.type = 'episode') AS total_episodes,
+                  WHERE s.parent_id = sh.id AND s.type = '${ITEM_TYPES.season}' AND e.type = '${ITEM_TYPES.episode}') AS total_episodes,
                 COUNT(DISTINCT CASE WHEN f.watched = 1 THEN f.episode_id END) AS watched_episodes,
                 MAX(f.added_at) AS added_at,
                 MAX(f.changed_at) AS changed_at, AVG(f.bitrate) AS bitrate,
@@ -654,7 +617,7 @@ export class MediaRepository {
         : `SELECT s.parent_id AS id
              FROM media m
              JOIN media_items mi ON mi.media_id = m.id
-             JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+             JOIN shown_items e ON e.id = mi.item_id AND e.type = '${ITEM_TYPES.episode}'
              JOIN shown_items s ON s.id = e.parent_id
             WHERE m.library_id = ?`
     return this.db
@@ -683,188 +646,11 @@ export class MediaRepository {
   }
 
   /**
-   * What plays after `media` in `session`, from the same library: the next
-   * episode of its season or its show, or the next film of its saga; a
-   * shuffle draws from every library in `libraryIds` with `roll`. Null at
-   * the session's end, and for a session whose next is not the server's.
-   */
-  nextInSession({
-    media,
-    session,
-    libraryIds,
-    roll = Math.random,
-    account,
-  }: MediaRepositoryNextInSessionProps): MediaItem | null {
-    switch (session.kind) {
-      case SESSION_KINDS.season:
-      case SESSION_KINDS.show:
-        return this.nextInShow({
-          mediaId: media.id,
-          libraryId: media.libraryId,
-          isSeasonOnly: session.kind === SESSION_KINDS.season,
-          account,
-        })
-      case SESSION_KINDS.saga:
-        return this.nextInSaga({ media, sagaId: session.sagaId, account })
-      case SESSION_KINDS.shuffle:
-        return this.nextShuffled({
-          mediaId: media.id,
-          showId: Number(session.showId),
-          libraryIds,
-          roll,
-          account,
-        })
-      case SESSION_KINDS.single:
-      case SESSION_KINDS.queue:
-        return null
-      default: {
-        const unknown: never = session
-        return unknown
-      }
-    }
-  }
-
-  /**
-   * The best file in `libraryId` of the episode after `mediaId`'s, in show
-   * order: specials last, then by season and episode. A file of several
-   * episodes counts as its last. `isSeasonOnly` stops at its season's end.
-   */
-  private nextInShow({
-    mediaId,
-    libraryId,
-    isSeasonOnly,
-    account,
-  }: MediaRepositoryNextInShowProps): MediaItem | null {
-    const row = this.db
-      .prepare<{ mediaId: number; libraryId: number; isSeasonOnly: number }, { media_id: number }>(
-        `WITH current AS (
-           SELECT s.id AS season_id, s.parent_id AS show_id,
-                  s.number AS season_number, e.number AS episode_number
-             FROM media_items mi
-             JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
-             JOIN shown_items s ON s.id = e.parent_id
-            WHERE mi.media_id = @mediaId
-            ORDER BY s.number = 0 DESC, s.number DESC, e.number DESC
-            LIMIT 1),
-         files AS (
-           SELECT m.id AS media_id, s.number AS season_number, e.number AS episode_number,
-                  COALESCE(m.width * m.height, 0) AS pixels
-             FROM current c
-             JOIN shown_items s ON s.parent_id = c.show_id
-                               AND (@isSeasonOnly = 0 OR s.id = c.season_id)
-             JOIN shown_items e ON e.parent_id = s.id AND e.type = 'episode'
-             JOIN media_items mi ON mi.item_id = e.id
-             JOIN media m ON m.id = mi.media_id
-            WHERE m.library_id = @libraryId)
-         SELECT f.media_id
-           FROM files f, current c
-          WHERE (f.season_number = 0, f.season_number, f.episode_number)
-                > (c.season_number = 0, c.season_number, c.episode_number)
-          ORDER BY f.season_number = 0, f.season_number, f.episode_number, f.pixels DESC, f.media_id
-          LIMIT 1`,
-      )
-      .get({ mediaId, libraryId, isSeasonOnly: isSeasonOnly ? 1 : 0 })
-    return row ? this.get({ id: row.media_id, account }) : null
-  }
-
-  /**
-   * A random episode of show `showId`, any season, specials too, for a
-   * shuffle that never ends: never an episode the file `mediaId` holds, and
-   * one `account` has not watched while any such remain, else any of the
-   * rest. Each episode is as likely as the next, however many files it has,
-   * and the best of its files in `libraryIds` is the one, as
-   * `shuffledEpisodes` chooses. Null when the show has no other episode.
-   */
-  private nextShuffled({
-    mediaId,
-    showId,
-    libraryIds,
-    roll,
-    account,
-  }: MediaRepositoryNextShuffledProps): MediaItem | null {
-    const rows = this.db
-      .prepare<[ByAccount, number, string, number], { media_id: number; watched: number }>(
-        `WITH files AS (
-           SELECT m.id AS media_id, e.id AS episode_id,
-                  COALESCE(m.width * m.height, 0) AS pixels,
-                  ${fileWatched('m')} AS watched
-             FROM media m
-             JOIN libraries l ON l.id = m.library_id
-             JOIN media_items mi ON mi.media_id = m.id
-             JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
-             JOIN shown_items s ON s.id = e.parent_id
-            WHERE s.parent_id = ?
-              AND m.library_id IN (SELECT value FROM json_each(?))
-              AND e.id NOT IN (SELECT item_id FROM media_items WHERE media_id = ?)),
-         ranked AS (
-           SELECT media_id,
-                  MAX(watched) OVER (PARTITION BY episode_id) AS watched,
-                  ROW_NUMBER() OVER (PARTITION BY episode_id ORDER BY pixels DESC, media_id) AS rank
-             FROM files)
-         SELECT media_id, watched FROM ranked WHERE rank = 1 ORDER BY media_id`,
-      )
-      .all({ account }, showId, JSON.stringify(libraryIds), mediaId)
-    const unwatched = rows.filter((row) => row.watched === 0)
-    const pool = unwatched.length > 0 ? unwatched : rows
-    const drawn = pool[Math.floor(roll() * pool.length)]
-    return drawn ? this.get({ id: drawn.media_id, account }) : null
-  }
-
-  /** The film after `media`'s in saga `sagaId` of its library, oldest first, as the saga's page lists them. */
-  private nextInSaga({ media, sagaId, account }: MediaRepositoryNextInSagaProps): MediaItem | null {
-    const films =
-      this.sagaGroups({ libraryId: media.libraryId, account }).find(
-        (saga) => saga.tmdbId === sagaId,
-      )?.media ?? []
-    const at = films.findIndex(
-      (film) => film.item != null && film.item.id === (media.item?.id ?? null),
-    )
-    return at < 0 ? null : (films[at + 1] ?? null)
-  }
-
-  /**
-   * The episodes on disk under `itemId`, a show or a season, in a random
-   * order, `SHUFFLE_LENGTH` at most: every episode is as likely as the next,
-   * however many files it has, and the best of its files in `libraryIds` is
-   * the one. Empty with no episode there to play. `roll` is the die, 0 up to
-   * 1, so a test can load it.
-   */
-  shuffledEpisodes({
-    itemId,
-    libraryIds,
-    roll = Math.random,
-    account,
-  }: MediaRepositoryShuffledEpisodesProps): MediaItem[] {
-    const rows = this.db
-      .prepare<[number, number, string], { media_id: number }>(
-        `WITH files AS (
-           SELECT m.id AS media_id, e.id AS episode_id, COALESCE(m.width * m.height, 0) AS pixels
-             FROM media m
-             JOIN media_items mi ON mi.media_id = m.id
-             JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
-             JOIN shown_items s ON s.id = e.parent_id
-            WHERE (s.id = ? OR s.parent_id = ?)
-              AND m.library_id IN (SELECT value FROM json_each(?))),
-         ranked AS (
-           SELECT episode_id, media_id,
-                  ROW_NUMBER() OVER (PARTITION BY episode_id ORDER BY pixels DESC, media_id) AS rank
-             FROM files)
-         SELECT media_id FROM ranked WHERE rank = 1 ORDER BY episode_id`,
-      )
-      .all(itemId, itemId, JSON.stringify(libraryIds))
-    const dealt = shuffled({ items: rows.map((row) => row.media_id), roll })
-    return this.getMany({ ids: dealt.slice(0, SHUFFLE_LENGTH), account })
-  }
-
-  /**
    * The episodes among `ids` that `account` watched, each once for every
    * library where one of its files is: a page counts only the libraries it
    * may show.
    */
-  watchedEpisodes({
-    ids,
-    account,
-  }: MediaRepositoryWatchedEpisodesProps): { episodeId: number; libraryId: number }[] {
+  watchedEpisodes({ ids, account }: MediaRepositoryWatchedEpisodesProps): WatchedEpisode[] {
     if (ids.length === 0) return []
     return this.db
       .prepare<[ByAccount, string], { episode_id: number; library_id: number }>(
@@ -888,7 +674,7 @@ export class MediaRepository {
       this.db
         .prepare<[ByAccount, number, string], MediaRow>(
           `${SELECT_MEDIA}
-            WHERE m.library_id = ? AND m.match IN ('pending', 'unmatched')
+            WHERE m.library_id = ? AND m.match IN ('${MATCH_STATES.pending}', '${MATCH_STATES.unmatched}')
               AND m.title LIKE ? ESCAPE '\\'
             ORDER BY m.title COLLATE NOCASE, m.id`,
         )
@@ -978,7 +764,7 @@ export class MediaRepository {
              JOIN media pm ON pm.id = pp.media_id
              JOIN libraries pl2 ON pl2.id = pm.library_id
              JOIN media_items pmi ON pmi.media_id = pp.media_id
-             JOIN shown_items pe ON pe.id = pmi.item_id AND pe.type = 'episode'
+             JOIN shown_items pe ON pe.id = pmi.item_id AND pe.type = '${ITEM_TYPES.episode}'
              JOIN shown_items ps ON ps.id = pe.parent_id
             WHERE pp.account_id = @account AND pl2.save_progress = 1
               AND ps.parent_id IS NOT NULL
@@ -990,7 +776,7 @@ export class MediaRepository {
            JOIN media m ON m.id = w.media_id
            JOIN libraries l ON l.id = m.library_id
            JOIN media_items mi ON mi.media_id = m.id
-           JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+           JOIN shown_items e ON e.id = mi.item_id AND e.type = '${ITEM_TYPES.episode}'
            JOIN shown_items s ON s.id = e.parent_id
           WHERE l.save_progress = 1
             AND (@libraryId IS NULL OR m.library_id = @libraryId)
@@ -1112,7 +898,7 @@ export class MediaRepository {
    * onto several cards is still one movie, so a single movie of a
    * collection is no saga yet, however many cards it has.
    */
-  private sagaGroups({ libraryId, account }: MediaRepositorySagaGroupsProps): SagaGroup[] {
+  sagaGroups({ libraryId, account }: MediaRepositorySagaGroupsProps): SagaGroup[] {
     const movies = this.items(
       this.db
         .prepare<[ByAccount, number], MediaRow>(
@@ -1120,7 +906,7 @@ export class MediaRepository {
              ${SELECT_COLUMNS},
                     ROW_NUMBER() OVER (PARTITION BY i.id ORDER BY ${BEST_FIRST}) AS version_rank
              ${FROM_MEDIA}
-              WHERE m.library_id = ? AND i.type = 'movie' AND t.saga_tmdb_id IS NOT NULL)
+              WHERE m.library_id = ? AND i.type = '${ITEM_TYPES.movie}' AND t.saga_tmdb_id IS NOT NULL)
            SELECT * FROM ranked WHERE version_rank = 1 ORDER BY ${ORDER_BY['year-old']}`,
         )
         .all({ account }, libraryId),

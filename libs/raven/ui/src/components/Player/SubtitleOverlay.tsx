@@ -8,6 +8,7 @@ import {
 } from '@raven/core'
 import { type RefObject, useEffect, useRef, useState } from 'react'
 import styles from '@/components/Player/SubtitleOverlay.module.scss'
+import { classNames } from '@/lib/classNames'
 
 const keyOf = (cues: readonly SubtitleCue[]): string =>
   cues.map((cue) => `${cue.start}|${cue.text}`).join('\n')
@@ -66,7 +67,7 @@ export const SubtitleOverlay = ({
   return (
     <div
       ref={root}
-      className={[styles.overlay, lifted ? styles.lifted : ''].filter(Boolean).join(' ')}
+      className={classNames([styles.overlay, lifted ? styles.lifted : ''])}
       aria-live="off"
     >
       {showing.map((cue) => (
@@ -77,9 +78,10 @@ export const SubtitleOverlay = ({
               // oxlint-disable-next-line react/no-array-index-key
               key={index}
               // The display face has one weight, so a bold run reads as the rest does.
-              className={[run.italic ? styles.italic : '', run.underline ? styles.underline : '']
-                .filter(Boolean)
-                .join(' ')}
+              className={classNames([
+                run.italic ? styles.italic : '',
+                run.underline ? styles.underline : '',
+              ])}
             >
               {run.text}
             </span>

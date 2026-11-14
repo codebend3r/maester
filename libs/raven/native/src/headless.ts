@@ -2,6 +2,7 @@
  * What imports no React Native or Expo module, so bun's tests load it as the device does. What
  * reaches the device itself is in `index.ts`.
  */
+export { accountIdOf, forgetOnAccountChange } from '@/account/accountChange'
 export { SIGN_IN_STEPS, type SignInStep } from '@/account/signInSteps'
 export { AUTH_OUTCOMES, type AccountSession, type AuthOutcome } from '@/account/supabaseAuth'
 export { signInFlowFor } from '@/account/signInFlow'
@@ -9,6 +10,26 @@ export { tokenRenewalFor } from '@/account/tokenRenewal'
 export { useSubmit } from '@/account/useSubmit'
 export { isDevelopmentVariant } from '@/config/appVariant'
 export { BUILD_ENV, buildNumberOf } from '@/config/buildNumber'
+export { byteCountOf } from '@/downloads/byteCount'
+export {
+  type DiskFetchProps,
+  type DiskSource,
+  type DownloadDisk,
+  type DownloadReading,
+  UNCONFIGURED_DISK,
+  keepReconciled,
+  reconcileDownloads,
+} from '@/downloads/downloadDisk'
+export { keepForOwner, savedOwnerOf } from '@/downloads/downloadOwner'
+export {
+  DOWNLOADS_FOLDER,
+  PART_SUFFIX,
+  folderOf,
+  folderOfPath,
+  inFolder,
+} from '@/downloads/downloadPaths'
+export { BUTTON_TONES, type ButtonTone, keyboardFor } from '@/form/formFields'
+export { IGNORED } from '@/lib/ignore'
 export {
   BROWSE_KINDS,
   type BrowseApi,
@@ -22,7 +43,6 @@ export {
 } from '@/music/browseTree'
 export type { TrackPlan } from '@/music/audioItem'
 export type { BrowseRequest, CarBrowse, PlayRequest } from '@/music/carBrowse'
-export { musicLibrariesOf } from '@/music/musicLibraries'
 export { nativePlayerOf } from '@/music/nativePlayer'
 export { createActiveServerStore } from '@/servers/activeServerStore'
 export { allowlistedFetch } from '@/servers/allowlist'
@@ -46,5 +66,7 @@ export { serverHeadersFor } from '@/servers/serverHeadersHook'
 export { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
 export { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'
 export { unlockNow } from '@/stores/cookieSnapshots'
+export { loadPersisted } from '@/stores/persistedStore'
+export { useStoresLoaded } from '@/stores/storesLoaded'
 export { bumpCookieVersion, useCookieVersion } from '@/stores/cookieVersion'
 export { nativeTokens } from '@/theme/nativeTokens'

@@ -4,13 +4,14 @@ import {
   DOWNLOAD_KINDS,
   type DownloadAsk,
   type DownloadKind,
+  DESKTOP_REPLIES,
 } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button, useToasts } from '@raven/ui'
 import { type ComponentType, type FormEvent, useId, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { DOWNLOAD_DIALOG_COPY } from '@/desktop/DownloadDialog/copy'
-import { handled } from '@/desktop/handled'
-import { useOpenReply } from '@/desktop/openReply'
+import { handled } from '@/lib/handled'
+import { askMain } from '@/desktop/client'
 import { useModal } from '@/lib/useModal'
 import { signInPath } from '@/lib/authRoutes'
 import type { DownloadsHostKind } from '@/downloads/host'
@@ -19,6 +20,7 @@ import { useDownloadsHost } from '@/stores/downloadsHost'
 import { declineAsk } from '@/stores/downloadAsk'
 import styles from '@/desktop/DesktopDialog.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 type ReadyStatus = Extract<DownloadAsk['status'], { kind: typeof DOWNLOAD_ASK_KINDS.ready }>
 
@@ -95,8 +97,8 @@ type ReadyDialogProps = {
 const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
   const host = useDownloadsHost()
   const computer = useComputerName()
-  const openReply = useOpenReply()
-  const { dialog, close, keepKeys } = useModal()
+  const showNotice = useToasts((toasts) => toasts.show)
+  const { dialog, keepKeys, close } = useModal()
   const isConfirmed = useRef(false)
   const ids = { title: useId(), question: useId() }
   const [shouldAutoDelete, setShouldAutoDelete] = useState(ask.shouldAutoDelete)
@@ -114,25 +116,23 @@ const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
     if (!canDownload || isConfirmed.current) return
     isConfirmed.current = true
     close()
-    openReply(
-      await host.request({
-        type: DESKTOP_REQUESTS.confirmDownload,
-        askId: ask.askId,
-        shouldAutoDelete: shouldAutoDelete,
-      }),
-    )
+    const reply = await askMain({
+      client: host,
+      request: { type: DESKTOP_REQUESTS.confirmDownload, askId: ask.askId, shouldAutoDelete },
+    })
+    if (reply.type === DESKTOP_REPLIES.refused) showNotice(reply.message)
   }
 
   const Question = QUESTIONS[isEmpty ? CONTENTS.empty : CONTENTS.files]
 
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={ids.title}
-      aria-describedby={ids.question}
-      onClose={closed}
+    <DialogFrame
+      dialog={dialog}
       onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.question}
+      labelledBy={ids.title}
+      describedBy={ids.question}
+      onClose={closed}
     >
       <form className={styles.form} onSubmit={(event) => handled(confirm(event))}>
         <h2 id={ids.title} className={styles.title}>
@@ -157,13 +157,13 @@ const ReadyDialog = ({ ask, status, onClose }: ReadyDialogProps) => {
         <div className={styles.actions}>
           <Button onClick={close}>{COMMON_COPY.cancel}</Button>
           {canDownload && (
-            <Button type="submit" tone="primary" icon="download">
+            <Button type="submit" tone={BUTTON_TONES.primary} icon="download">
               {COMMON_COPY.download}
             </Button>
           )}
         </div>
       </form>
-    </dialog>
+    </DialogFrame>
   )
 }
 
@@ -172,7 +172,7 @@ type LockedDialogProps = { ask: DownloadAsk; onClose: () => void }
 /** The title sits in a locked library, which no client opens: it says so and is declined. */
 const LockedDialog = ({ ask, onClose }: LockedDialogProps) => {
   const host = useDownloadsHost()
-  const { dialog, close, keepKeys } = useModal()
+  const { dialog, keepKeys, close } = useModal()
   const titleId = useId()
 
   const closed = () => {
@@ -181,12 +181,12 @@ const LockedDialog = ({ ask, onClose }: LockedDialogProps) => {
   }
 
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={titleId}
-      onClose={closed}
+    <DialogFrame
+      dialog={dialog}
       onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.question}
+      labelledBy={titleId}
+      onClose={closed}
     >
       <div className={styles.form}>
         <h2 id={titleId} className={styles.title}>
@@ -194,12 +194,12 @@ const LockedDialog = ({ ask, onClose }: LockedDialogProps) => {
         </h2>
         <p>{DOWNLOAD_DIALOG_COPY.locked}</p>
         <div className={styles.actions}>
-          <Button tone="primary" onClick={close}>
+          <Button tone={BUTTON_TONES.primary} onClick={close}>
             {COMMON_COPY.close}
           </Button>
         </div>
       </div>
-    </dialog>
+    </DialogFrame>
   )
 }
 
@@ -210,7 +210,7 @@ const AccountDialog = ({ ask, onClose }: AccountDialogProps) => {
   const host = useDownloadsHost()
   const navigate = useNavigate()
   const { pathname, search } = useLocation()
-  const { dialog, close, keepKeys } = useModal()
+  const { dialog, keepKeys, close } = useModal()
   const titleId = useId()
 
   const closed = () => {
@@ -224,12 +224,12 @@ const AccountDialog = ({ ask, onClose }: AccountDialogProps) => {
   }
 
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={titleId}
-      onClose={closed}
+    <DialogFrame
+      dialog={dialog}
       onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.question}
+      labelledBy={titleId}
+      onClose={closed}
     >
       <div className={styles.form}>
         <h2 id={titleId} className={styles.title}>
@@ -238,12 +238,12 @@ const AccountDialog = ({ ask, onClose }: AccountDialogProps) => {
         <p>{DOWNLOAD_DIALOG_COPY.signInFirst}</p>
         <div className={styles.actions}>
           <Button onClick={close}>{COMMON_COPY.cancel}</Button>
-          <Button tone="primary" onClick={signIn}>
+          <Button tone={BUTTON_TONES.primary} onClick={signIn}>
             {COMMON_COPY.signIn}
           </Button>
         </div>
       </div>
-    </dialog>
+    </DialogFrame>
   )
 }
 

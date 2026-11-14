@@ -6,7 +6,9 @@ import { plugin } from 'bun'
  * `styles.foo` would read a property off a String. Tests get an identity
  * map instead: `styles.stage` is the string "stage".
  */
-const classNames: Record<string, string> = new Proxy(Object.create(null), {
+const NO_CLASSES: Record<string, string> = {}
+
+const classNames = new Proxy(NO_CLASSES, {
   get: (_target, key) => (typeof key === 'string' ? key : undefined),
 })
 

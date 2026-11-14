@@ -1,11 +1,12 @@
 import type { PlaylistSummary } from '@raven/core'
-import { Button, useToasts } from '@raven/ui'
+import { BUTTON_TONES, Button, useToasts } from '@raven/ui'
 import { useId } from 'react'
 import { useModal } from '@/lib/useModal'
 import { usePlaylistMutations } from '@/lib/usePlaylistMutations'
 import { DELETE_PLAYLIST_COPY } from '@/pages/PlaylistPage/copy'
 import styles from '@/pages/PlaylistPage/DeletePlaylistDialog.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 type DeletePlaylistDialogProps = {
   playlist: PlaylistSummary
@@ -23,17 +24,17 @@ export const DeletePlaylistDialog = ({
   onClose,
   onDeleted,
 }: DeletePlaylistDialogProps) => {
-  const { dialog, close, keepKeys } = useModal()
+  const { dialog, keepKeys, close } = useModal()
   const { remove } = usePlaylistMutations()
   const show = useToasts((state) => state.show)
   const titleId = useId()
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={titleId}
-      onClose={onClose}
+    <DialogFrame
+      dialog={dialog}
       onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.prose}
+      labelledBy={titleId}
+      onClose={onClose}
     >
       <div className={styles.body}>
         <h2 id={titleId} className={styles.title}>
@@ -43,7 +44,7 @@ export const DeletePlaylistDialog = ({
         <div className={styles.actions}>
           <Button onClick={close}>{COMMON_COPY.cancel}</Button>
           <Button
-            tone="danger"
+            tone={BUTTON_TONES.danger}
             icon="trash"
             onClick={() => {
               remove.attempt({
@@ -60,6 +61,6 @@ export const DeletePlaylistDialog = ({
           </Button>
         </div>
       </div>
-    </dialog>
+    </DialogFrame>
   )
 }

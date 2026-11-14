@@ -5,10 +5,10 @@ import {
   QUEUE_SOURCE_KINDS,
   ROUTE_STATES,
   type RouteQuery,
-  type Track,
   routeState,
+  movedUp,
 } from '@raven/core'
-import { Button, useCanGoBack } from '@raven/ui'
+import { BUTTON_TONES, Button, useCanGoBack } from '@raven/ui'
 import { useAudioQueue } from '@raven/ui/headless'
 import { type ComponentProps, type ComponentType, useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -33,16 +33,6 @@ const OPEN_DIALOGS = { none: 'none', rename: 'rename', remove: 'remove' } as con
 
 type OpenDialog = (typeof OPEN_DIALOGS)[keyof typeof OPEN_DIALOGS]
 
-type MovedUpProps = { tracks: readonly Track[]; index: number }
-
-/** `tracks` with the one at `index` a place higher; the very same list for the first. */
-const movedUp = ({ tracks, index }: MovedUpProps): readonly Track[] => {
-  const moving = tracks[index]
-  const above = tracks[index - 1]
-  if (moving === undefined || above === undefined) return tracks
-  return tracks.with(index - 1, moving).with(index, above)
-}
-
 type PlaylistTrackControlsProps = TrailProps
 
 /** A playlist row's controls: up one place, and out of the playlist. Each sends the whole new order. */
@@ -55,14 +45,14 @@ const PlaylistTrackControls = ({ track, index }: PlaylistTrackControlsProps) => 
     id !== null && (
       <>
         <Button
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           icon="up"
           aria-label={PLAYLIST_PAGE_COPY.moveUp(track.title)}
           disabled={index === 0}
           onClick={() => setTracks.mutate({ id, tracks: movedUp({ tracks, index }) })}
         />
         <Button
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           icon="close"
           aria-label={PLAYLIST_PAGE_COPY.takeOut(track.title)}
           onClick={() =>
@@ -265,7 +255,7 @@ const PlaylistView = ({ details }: PlaylistViewProps) => {
         <p className={styles.facts}>{playlistFacts({ playlist }).join(COMMON_COPY.separator)}</p>
         <div className={styles.actions}>
           <Button
-            tone="primary"
+            tone={BUTTON_TONES.primary}
             icon="play"
             disabled={tracks.length === 0}
             onClick={() => playTracks({ tracks, source })}

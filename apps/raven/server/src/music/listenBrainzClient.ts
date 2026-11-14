@@ -5,6 +5,7 @@ import { CLOCK, type Clock } from '@/clock'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 import { RAVEN_USER_AGENT } from '@/music/userAgent'
 import { type RateLimit, createRateLimit, sleep } from '@/scanner/concurrency'
+import { errorMessage } from '@/errorMessage'
 
 /** ListenBrainz's labs API, where its similarity datasets are served. */
 export const LISTENBRAINZ_LABS = 'https://labs.api.listenbrainz.org'
@@ -96,7 +97,7 @@ export class ListenBrainzClient {
     const attempt = async (retriesLeft: number): Promise<unknown> => {
       const response = await ask().catch((error: unknown) => {
         if (this.isAway) throw error
-        throw this.away(error instanceof Error ? error.message : String(error))
+        throw this.away(errorMessage(error))
       })
       if (response.status === 503 && retriesLeft > 0) {
         await sleep(1000)

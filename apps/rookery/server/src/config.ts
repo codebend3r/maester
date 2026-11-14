@@ -14,9 +14,6 @@ export type ServerConfig = ListenConfig & {
   cookieDomain: string | null
   /** Cookies are Secure whenever rookery is served over https. */
   secureCookies: boolean
-  /** How many times the callback asks plex.tv for the PIN's token, since it can trail the redirect. */
-  pinCheckAttempts: number
-  pinCheckDelayMs: number
 }
 
 /** The DI token the config is provided under. */
@@ -46,6 +43,12 @@ const originOf = (value: string): string | null => {
   }
 }
 
+/** A cookie domain without a leading dot, or null when it is unset or blank. */
+const cookieDomainOf = (value: string | undefined): string | null => {
+  const domain = value?.trim().replace(/^\./, '') ?? ''
+  return domain === '' ? null : domain
+}
+
 const list = (value: string | undefined): string[] =>
   (value ?? '')
     .split(',')
@@ -73,10 +76,8 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
     publicUrl,
     serviceToken: (env[ENV_VARS.serviceToken] ?? '').trim(),
     appOrigins: appOrigins.flatMap((origin) => originOf(origin) ?? []),
-    cookieDomain: env[ENV_VARS.cookieDomain]?.trim().replace(/^\./, '') || null,
+    cookieDomain: cookieDomainOf(env[ENV_VARS.cookieDomain]),
     secureCookies: publicUrl.startsWith(PROTOCOLS.https),
-    pinCheckAttempts: 5,
-    pinCheckDelayMs: 1000,
   }
 }
 

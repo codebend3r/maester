@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { FIXTURE_SERVER } from '@raven/core'
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { COMMON_COPY } from '@/lib/copy'
 import { FAVOURITES_COPY } from '@/pages/FavouritesPage/copy'
 import { openFromShelf, sideLink } from '@/e2e/shell'

@@ -9,7 +9,28 @@ Windows stack sits on top of the splash page, which sits on top of a review bran
 branch. A draft is added once, by title, and left alone after that.
 """
 
-FEATURES = [
+from typing import Literal, NotRequired, TypedDict
+
+# A project item's Status, as the feature projects name it.
+Status = Literal["Todo", "In Progress", "Done"]
+
+
+class DraftStory(TypedDict):
+    title: str
+    body: str
+    status: Status
+
+
+class Feature(TypedDict):
+    name: str
+    summary: str
+    branches: tuple[str, ...]
+    stories: list[DraftStory]
+    # Set on a pull request's own feature, named after its title.
+    own: NotRequired[bool]
+
+
+FEATURES: list[Feature] = [
     {
         "name": "Windows desktop app",
         "summary": "Raven's desktop app on Windows: libmpv, the addon's Windows surface, the window.",

@@ -8,34 +8,7 @@ import {
   type DesktopPlatform,
   type OutputSettings,
 } from '@raven/core'
-import { MPV_PROPERTIES, type MpvPropertyValue } from '@raven/mpv'
-
-/** The mpv options Raven sets that `@raven/mpv` does not read back as properties. */
-export const MPV_OPTIONS = {
-  volume: 'volume',
-  mute: 'mute',
-  subScale: 'sub-scale',
-  subColor: 'sub-color',
-  subFont: 'sub-font',
-  subFontsDir: 'sub-fonts-dir',
-  subAssOverride: 'sub-ass-override',
-  subBorderStyle: 'sub-border-style',
-  subOutlineColor: 'sub-outline-color',
-  subOutlineSize: 'sub-outline-size',
-  subShadowOffset: 'sub-shadow-offset',
-  audioDevice: 'audio-device',
-  audioSpdif: 'audio-spdif',
-  audioChannels: 'audio-channels',
-  audioExclusive: 'audio-exclusive',
-  audioNormalizeDownmix: 'audio-normalize-downmix',
-  ao: 'ao',
-  accessReferences: 'access-references',
-  voNullFps: 'vo-null-fps',
-  af: 'af',
-  replaygain: 'replaygain',
-} as const
-
-export type MpvOption = { name: string; value: string | number | boolean }
+import { MPV_OPTIONS, MPV_PROPERTIES, type MpvOption, type MpvPropertyValue } from '@raven/mpv'
 
 /** What a service applies when the output settings change: the settings, and the devices mpv lists. */
 export type ApplyOutputProps = { output: OutputSettings; devices: readonly AudioDevice[] }
@@ -133,12 +106,13 @@ type ReadProps = {
   name: typeof MPV_PROPERTIES.audioDeviceList
 }
 
+type DeviceList = MpvPropertyValue<typeof MPV_PROPERTIES.audioDeviceList>
+
+/** What `readDevices` needs of an mpv: the one read that lists its devices. */
+type DeviceReader = { read: (input: ReadProps) => Promise<DeviceList> }
+
 /** The engine's audio devices, or none without an engine or when it cannot list them. */
-export const readDevices = async (
-  mpv: {
-    read: (input: ReadProps) => Promise<MpvPropertyValue<typeof MPV_PROPERTIES.audioDeviceList>>
-  } | null,
-): Promise<AudioDevice[]> => {
+export const readDevices = async (mpv: DeviceReader | null): Promise<AudioDevice[]> => {
   if (mpv === null) return []
   try {
     const listed = await mpv.read({ name: MPV_PROPERTIES.audioDeviceList })

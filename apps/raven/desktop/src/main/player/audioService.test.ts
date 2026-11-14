@@ -13,31 +13,17 @@ import {
   PLAYER_SOURCE_KINDS,
   REMOTE_COMMANDS,
 } from '@raven/core'
-import {
-  MPV_COMMANDS,
-  MPV_END_FILE_REASONS,
-  MPV_EVENTS,
-  MPV_PROPERTIES,
-  type MpvEvent,
-  type MpvProperty,
-  type NowPlaying,
-} from '@raven/mpv'
-import {
-  AUDIO_OBSERVED,
-  type AudioMpv,
-  createAudioService,
-  soundFilterOf,
-} from '@/main/player/audioService'
+import { MPV_COMMANDS, MPV_END_FILE_REASONS, MPV_EVENTS, MPV_PROPERTIES } from '@raven/mpv'
+import { AUDIO_OBSERVED, createAudioService, soundFilterOf } from '@/main/player/audioService'
 import { HARDENED_OPTIONS } from '@/main/player/engine'
 import type { FailureExplainer, ResolvedSource, ServerTarget } from '@/main/player/loadTarget'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
+import { createFakeMpv } from '@/main/test/playerFakes'
 
-const SERVER_ID = '00000000-0000-4000-8000-000000000001'
 const BASE = 'http://127.0.0.1:41234'
 
 const targetOf = (mediaId: number): ServerTarget => ({
   kind: PLAYER_SOURCE_KINDS.server,
-  serverId: SERVER_ID,
   mediaId,
   url: `${BASE}/secret-${mediaId}/file`,
   sidecars: [],
@@ -53,69 +39,10 @@ const PCM: OutputSettings = { profile: 'pcm', device: 'auto', passthrough: [], s
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-type FakeReadProps<K extends MpvProperty> = { name: K }
-
-/**
- * A scripted mpv: every call is logged and answers at once, unless its prefix is set to fail,
- * or held until `hold`'s release.
- */
-const fakeMpv = () => {
-  const log: string[] = []
-  const shown: (NowPlaying | null)[] = []
-  const observed: string[] = []
-  const failing = new Set<string>()
-  const holds = new Map<string, Promise<void>>()
-  const sink: { receive: (event: MpvEvent) => void } = { receive: () => {} }
-  const hold = (prefix: string) => {
-    const { promise, resolve } = Promise.withResolvers<void>()
-    holds.set(prefix, promise)
-    return () => {
-      holds.delete(prefix)
-      resolve()
-    }
-  }
-  const reply = async (entry: string) => {
-    log.push(entry)
-    const held = [...holds].find(([prefix]) => entry.startsWith(prefix))
-    if (held !== undefined) await held[1]
-    if ([...failing].some((prefix) => entry.startsWith(prefix))) {
-      throw new Error('mpv request failed (-12)')
-    }
-  }
-  const mpv: AudioMpv = {
-    command: ({ args }) => reply(args.join(' ')),
-    set: ({ name, value }) => reply(`set ${name} ${String(value)}`),
-    read: async <K extends MpvProperty>({ name }: FakeReadProps<K>) => {
-      throw new Error(`unexpected read of ${name}`)
-    },
-    observe: ({ name }) => {
-      observed.push(name)
-    },
-    nowPlaying: (info) => {
-      shown.push(info)
-    },
-    clearNowPlaying: () => {
-      shown.push(null)
-    },
-  }
-  return {
-    mpv,
-    log,
-    shown,
-    observed,
-    failing,
-    hold,
-    connect: (receive: (event: MpvEvent) => void) => {
-      sink.receive = receive
-    },
-    emit: (event: MpvEvent) => sink.receive(event),
-  }
-}
-
 type SetupProps = { explain?: FailureExplainer; downloaded?: readonly number[] }
 
 const setup = ({ explain = async () => LOCKED, downloaded = [] }: SetupProps = {}) => {
-  const fake = fakeMpv()
+  const fake = createFakeMpv()
   const resolved: number[] = []
   const bitrates: (number | null)[] = []
   const closed: string[] = []
@@ -123,7 +50,7 @@ const setup = ({ explain = async () => LOCKED, downloaded = [] }: SetupProps = {
   const warnings: string[] = []
   const events: AudioEvent[] = []
   const service = createAudioService({
-    mpv: fake.mpv,
+    mpv: fake.control,
     resolve: async ({ mediaId, kbps }): Promise<ResolvedSource> => {
       resolved.push(mediaId)
       bitrates.push(kbps)
@@ -241,10 +168,10 @@ describe('loading', () => {
   })
 
   test('a failed hardening refuses every load', async () => {
-    const fake = fakeMpv()
+    const fake = createFakeMpv()
     fake.failing.add(`set ${HARDENED_OPTIONS[0].name}`)
     const service = createAudioService({
-      mpv: fake.mpv,
+      mpv: fake.control,
       resolve: async ({ mediaId }) => ({ ok: true, target: targetOf(mediaId) }),
       explain: async () => LOCKED,
       closeLoad: () => {},

@@ -19,19 +19,27 @@ import {
   MATCH_SUBJECT_KINDS,
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
+  libraryPath,
+  showPath,
 } from '@raven/core'
 import { useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
-import { Button, ButtonLink } from '@raven/ui'
+import { BUTTON_TONES, Button, ButtonLink } from '@raven/ui'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { PlayAllButton } from '@/components/PlayAllButton/PlayAllButton'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
-import { ItemHeader, ItemHeaderSkeleton, itemBackdrop } from '@/components/ItemHeader/ItemHeader'
+import {
+  ItemHeader,
+  ItemHeaderSkeleton,
+  itemBackdrop,
+  PICTURE_SHAPES,
+  ITEM_HEADER_VARIANTS,
+} from '@/components/ItemHeader/ItemHeader'
 import { useItemEditors } from '@/components/ItemEditors/ItemEditors'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
 import { RouteState } from '@/components/RouteState/RouteState'
@@ -53,6 +61,7 @@ import styles from '@/pages/ShowPage/ShowPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { BingeButton } from '@/components/BingeButton/BingeButton'
 import { ShowSeasons } from '@/components/ShowSeasons/ShowSeasons'
+import { APP_PATHS } from '@/lib/appPaths'
 
 type ShowViewProps = { details: ItemDetails }
 
@@ -63,7 +72,7 @@ const ShowView = ({ details }: ShowViewProps) => {
   const next = useQuery(nextEpisodeQuery(details.id))
   const favourite = useItemFavourite({ item: details })
   // A logo until Settings says to spell titles out, as a fresh install does.
-  const showsLogo = useQuery(displaySettingsQuery).data?.titles !== TITLE_DISPLAYS.text
+  const showsLogo = (useQuery(displaySettingsQuery).data?.titles ?? null) !== TITLE_DISPLAYS.text
   const libraryId = next.data?.libraryId ?? details.versions[0]?.libraryId ?? null
   const known = useQuery(librariesQuery).data ?? []
   const editors = useItemEditors({
@@ -74,7 +83,7 @@ const ShowView = ({ details }: ShowViewProps) => {
   // Each library holding the show can choose its own pictures.
   const pictures = picturesIn({ details, libraryId })
   const library = {
-    to: libraryId == null ? '/libraries' : `/libraries/${libraryId}`,
+    to: libraryId == null ? APP_PATHS.libraries : libraryPath(libraryId),
     label: libraryName,
   }
   const code = next.data?.item ? episodeCode(next.data.item) : null
@@ -99,7 +108,7 @@ const ShowView = ({ details }: ShowViewProps) => {
         <ItemHeader
           back={library}
           library={library}
-          pullUp
+          variant={ITEM_HEADER_VARIANTS.pulledUp}
           titleId={ids.title}
           eyebrow={[SHOW_COPY.eyebrow]}
           title={details.title}
@@ -117,7 +126,7 @@ const ShowView = ({ details }: ShowViewProps) => {
           facts={showFacts(details)}
           ratings={details.ratings}
           picture={{
-            shape: 'poster',
+            shape: PICTURE_SHAPES.poster,
             url: api.itemImageUrl({
               id: details.id,
               kind: ITEM_IMAGE_KINDS.poster,
@@ -136,7 +145,11 @@ const ShowView = ({ details }: ShowViewProps) => {
           }
         >
           {next.data && (
-            <ButtonLink tone="primary" icon="play" {...watchLink({ media: next.data })}>
+            <ButtonLink
+              tone={BUTTON_TONES.primary}
+              icon="play"
+              {...watchLink({ media: next.data })}
+            >
               {SHOW_COPY.play(code)}
             </ButtonLink>
           )}
@@ -184,7 +197,7 @@ const ShowView = ({ details }: ShowViewProps) => {
                   ? Promise.reject(new Error('Pick a show.'))
                   : api.setItemMatch({ itemId: details.id, tmdbId })
               }
-              onMatched={(moved) => navigate(`/shows/${moved.id}`, { replace: true })}
+              onMatched={(moved) => navigate(showPath(moved.id), { replace: true })}
               onClose={() => setFixing(false)}
             />
           )}
@@ -213,7 +226,11 @@ const showPageView = ({ page }: ShowPageViewProps): ViewOf<ShowViewsProps> => {
   if (page.state !== ROUTE_STATES.ready)
     return {
       key: SHOW_VIEW_KEYS.pending,
-      props: { state: page, noun: SHOW_COPY.noun, shape: <ItemHeaderSkeleton picture="poster" /> },
+      props: {
+        state: page,
+        noun: SHOW_COPY.noun,
+        shape: <ItemHeaderSkeleton picture={PICTURE_SHAPES.poster} />,
+      },
     }
   return { key: SHOW_VIEW_KEYS.ready, props: { details: page.data } }
 }

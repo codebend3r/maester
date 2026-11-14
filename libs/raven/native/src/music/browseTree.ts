@@ -10,9 +10,8 @@ import {
   artistNames,
   isLockedError,
   isMediaId,
+  musicLibrariesOf,
 } from '@raven/core'
-
-import { musicLibrariesOf } from '@/music/musicLibraries'
 
 /** What a browse id names: an album, a playlist or one track. */
 export const BROWSE_KINDS = { album: 'album', playlist: 'playlist', track: 'track' } as const

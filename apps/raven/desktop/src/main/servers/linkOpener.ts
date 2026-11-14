@@ -1,9 +1,15 @@
-import { DESKTOP_REPLIES, type DesktopReply, watchPathFor } from '@raven/core'
+import {
+  DESKTOP_REPLIES,
+  type DesktopReply,
+  watchPathFor,
+  readDownloadLink,
+  readPlayLink,
+} from '@raven/core'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import { quietly } from '@/main/log/quietly'
 import { DONE, refused } from '@/main/replies'
 import { loggable } from '@/main/servers/serverCalls'
-import { readDownloadLink, readPlayLink } from '@/shared/playLink'
+import { parseUrl } from '@/shared/parseUrl'
 
 export const LINK_MESSAGES = {
   unreadable:
@@ -25,8 +31,6 @@ export type LinkOpener = {
 type CreateLinkOpenerProps = {
   /** Whether a link's `server` names the one server. */
   isServerOrigin: (origin: string) => boolean
-  /** The one server's id, read at each link. */
-  serverId: () => string
   downloads: Pick<DownloadService, 'ask'>
   warn: (message: string) => void
 }
@@ -38,7 +42,6 @@ type CreateLinkOpenerProps = {
  */
 export const createLinkOpener = ({
   isServerOrigin,
-  serverId,
   downloads,
   warn,
 }: CreateLinkOpenerProps): LinkOpener => {
@@ -50,15 +53,15 @@ export const createLinkOpener = ({
   }
 
   const open: LinkOpener['open'] = async ({ link }) => {
-    const request = readPlayLink(link)
+    const request = readPlayLink({ link, parse: parseUrl })
     if (request !== null) {
       if (!isServerOrigin(request.origin)) return otherServer()
       return { type: DESKTOP_REPLIES.navigate, to: watchPathFor(request) }
     }
-    const download = readDownloadLink(link)
+    const download = readDownloadLink({ link, parse: parseUrl })
     if (download !== null) {
       if (!isServerOrigin(download.origin)) return otherServer()
-      return downloads.ask({ serverId: serverId(), target: download.target })
+      return downloads.ask({ target: download.target })
     }
     safeWarn(`Raven could not read a link: ${loggable(link.slice(0, LINK_LOG_MAX))}`)
     return refused(LINK_MESSAGES.unreadable)

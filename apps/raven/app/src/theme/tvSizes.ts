@@ -1,5 +1,7 @@
-import { Dimensions, Platform } from 'react-native'
+import { Dimensions } from 'react-native'
 
+import { DEVICE_INPUT } from '@/platform/devicePlatform'
+import { INPUT_KINDS } from '@/platform/platform'
 import { SIZES, type Sizes } from '@/theme/appTheme'
 import { tvScaleOf } from '@/theme/tvScale'
 
@@ -7,7 +9,7 @@ import { tvScaleOf } from '@/theme/tvScale'
  * The TV layouts' scale on this device: 1 on Apple TV, a half on a 1080p Android TV, 1 under
  * the thumb, whose layouts never read it. A TV's window keeps its size, so it is read once.
  */
-const TV_SCALE = Platform.isTV ? tvScaleOf(Dimensions.get('window')) : 1
+const TV_SCALE = DEVICE_INPUT === INPUT_KINDS.focus ? tvScaleOf(Dimensions.get('window')) : 1
 
 /** `points`, a length drawn for a 1920 point TV, on this one. */
 export const tvSize = (points: number): number => points * TV_SCALE

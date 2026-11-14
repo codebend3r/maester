@@ -12,7 +12,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query'
-import { refusalText } from '@/desktop/client'
+import { askMain, refusalText } from '@/desktop/client'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import type { DownloadsChange } from '@/downloads/host'
 import { useDownloadsHost } from '@/stores/downloadsHost'
@@ -20,7 +20,6 @@ import { useDownloadSpeeds } from '@/stores/downloadSpeeds'
 
 const NO_DOWNLOADS = 'Raven could not read its downloads.'
 const NO_SPACE = 'Raven could not read its disk space.'
-const UNCHANGED = 'Raven could not change its downloads. Try again.'
 
 export type DownloadsData = { downloads: DownloadView[]; shouldAutoDelete: boolean }
 
@@ -125,7 +124,7 @@ export const useChangeDownloads = (): ((request: DownloadsChange) => Promise<boo
   const queryClient = useQueryClient()
   const showNotice = useToasts((state) => state.show)
   return async (request) => {
-    const reply = await host.request(request)
+    const reply = await askMain({ client: host, request })
     switch (reply.type) {
       case DESKTOP_REPLIES.downloads:
         setDownloads({ queryClient, event: reply })
@@ -136,18 +135,6 @@ export const useChangeDownloads = (): ((request: DownloadsChange) => Promise<boo
         return true
       case DESKTOP_REPLIES.refused:
         showNotice(reply.message)
-        return false
-      case DESKTOP_REPLIES.play:
-      case DESKTOP_REPLIES.file:
-      case DESKTOP_REPLIES.recents:
-      case DESKTOP_REPLIES.output:
-      case DESKTOP_REPLIES.navigate:
-      case DESKTOP_REPLIES.title:
-      case DESKTOP_REPLIES.titleRefused:
-      case DESKTOP_REPLIES.updates:
-      case DESKTOP_REPLIES.downloadAsk:
-      case DESKTOP_REPLIES.space:
-        showNotice(UNCHANGED)
         return false
       default: {
         const unreachable: never = reply

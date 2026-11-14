@@ -24,6 +24,7 @@ import { isMenuOpen, useSideMenu } from '@/stores/sideMenu'
 import { THEME_PICKER } from '@/theme/themeOptions'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** Where the entries that open a screen sit on Home, places no shelf's card shares. */
 const MENU_PLACES = {
@@ -93,7 +94,7 @@ const MenuRow = ({ label, icon, onPress, ref, isLocked = false }: MenuRowProps) 
               {label}
             </Text>
           )}
-          {isOpen && isLocked && <Icon colour={text} name="lock" size={TV_SIZES.text} />}
+          {isOpen && isLocked && <Icon colour={text} name={APP_ICONS.lock} size={TV_SIZES.text} />}
         </>
       )}
     </Pressable>
@@ -138,7 +139,7 @@ const ThemeChoice = () => {
   })
   return (
     <>
-      <MenuRow icon="sun" label={label} onPress={open} />
+      <MenuRow icon={APP_ICONS.sun} label={label} onPress={open} />
       <PickerList {...list} />
     </>
   )
@@ -165,15 +166,15 @@ export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: Sid
       contentContainerStyle={styles.content}
       style={[styles.menu, !isOpen && styles.folded]}
     >
-      <MenuRow icon="search" label={SEARCH_EVERY_LIBRARY.text} onPress={onSearch} />
+      <MenuRow icon={APP_ICONS.search} label={SEARCH_EVERY_LIBRARY.text} onPress={onSearch} />
       <OpenerRow
-        icon="continue"
+        icon={APP_ICONS.continue}
         label={CONTINUE_WATCHING}
         onPress={() => router.push(APP_ROUTES.continueWatching)}
         place={MENU_PLACES.continueWatching}
       />
       <OpenerRow
-        icon="libraries"
+        icon={APP_ICONS.libraries}
         label={LIBRARIES_ENTRY.label}
         onPress={() => router.push(APP_ROUTES.libraries)}
         place={MENU_PLACES.libraries}
@@ -193,13 +194,17 @@ export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: Sid
         />
       ))}
       <OpenerRow
-        icon="settings"
+        icon={APP_ICONS.settings}
         label={SETTINGS_ENTRY.label}
         onPress={onSettings}
         place={MENU_PLACES.settings}
       />
       <ThemeChoice />
-      <MenuRow icon="sidebar" label={isPinned ? MENU_FOOT.unpin : MENU_FOOT.pin} onPress={toggle} />
+      <MenuRow
+        icon={APP_ICONS.sidebar}
+        label={isPinned ? MENU_FOOT.unpin : MENU_FOOT.pin}
+        onPress={toggle}
+      />
     </ScrollView>
   )
 }

@@ -1,7 +1,7 @@
 import { extensionOf, HTTP_METHODS } from '@raven/core'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
 import { ALLOWED_METHODS } from '@/main/webHost'
 import type { Grants } from '@/main/grants'
+import { CACHE_POLICIES, HEADERS, HTTP_STATUSES } from '@shared/http'
 
 const BYTE_RANGE_KINDS = {
   all: 'all',
@@ -70,7 +70,7 @@ type AnswerProps = {
 const answer = ({ status, body = null, headers = {} }: AnswerProps): Response =>
   new Response(body, {
     status,
-    headers: { ...headers, [HTTP_HEADERS.contentTypeOptions]: 'nosniff' },
+    headers: { ...headers, [HEADERS.contentTypeOptions]: 'nosniff' },
   })
 
 /** The host a custom scheme's address names, which is the opaque id it asks for. */
@@ -97,35 +97,41 @@ export const createFileHandler = ({
 }: CreateFileHandlerProps): ((request: Request) => Promise<Response>) => {
   return async (request) => {
     if (request.method !== HTTP_METHODS.get && request.method !== HTTP_METHODS.head) {
-      return answer({ status: 405, headers: { [HTTP_HEADERS.allow]: ALLOWED_METHODS } })
+      return answer({
+        status: HTTP_STATUSES.methodNotAllowed,
+        headers: { [HEADERS.allow]: ALLOWED_METHODS },
+      })
     }
     const host = hostOf(request.url)
     const file = host === null ? null : grants.fileOf(host)
-    if (file === null) return answer({ status: 404 })
+    if (file === null) return answer({ status: HTTP_STATUSES.notFound })
     // The file may have changed since the grant, so its size is read for each request.
     const stats = await stat(file.path).catch(() => null)
-    if (stats === null) return answer({ status: 404 })
+    if (stats === null) return answer({ status: HTTP_STATUSES.notFound })
 
     const { size } = stats
     const isHead = request.method === HTTP_METHODS.head
     const common = {
-      [HTTP_HEADERS.acceptRanges]: 'bytes',
-      [HTTP_HEADERS.contentType]: contentTypeFor(file.name),
-      [HTTP_HEADERS.cacheControl]: 'no-store',
+      [HEADERS.acceptRanges]: 'bytes',
+      [HEADERS.contentType]: contentTypeFor(file.name),
+      [HEADERS.cacheControl]: CACHE_POLICIES.noStore,
     }
 
     if (size === 0) {
-      return answer({ status: 200, headers: { ...common, [HTTP_HEADERS.contentLength]: '0' } })
+      return answer({
+        status: HTTP_STATUSES.ok,
+        headers: { ...common, [HEADERS.contentLength]: '0' },
+      })
     }
 
-    const range = parseRange({ header: request.headers.get(HTTP_HEADERS.range), size })
+    const range = parseRange({ header: request.headers.get(HEADERS.range), size })
     if (range.kind === BYTE_RANGE_KINDS.unsatisfiable) {
       return answer({
-        status: 416,
+        status: HTTP_STATUSES.rangeNotSatisfiable,
         headers: {
           ...common,
-          [HTTP_HEADERS.contentLength]: '0',
-          [HTTP_HEADERS.contentRange]: `bytes */${size}`,
+          [HEADERS.contentLength]: '0',
+          [HEADERS.contentRange]: `bytes */${size}`,
         },
       })
     }
@@ -134,17 +140,18 @@ export const createFileHandler = ({
       range.kind === BYTE_RANGE_KINDS.range ? range : { start: 0, end: size - 1 }
     const headers = {
       ...common,
-      [HTTP_HEADERS.contentLength]: `${end - start + 1}`,
+      [HEADERS.contentLength]: `${end - start + 1}`,
       ...(range.kind === BYTE_RANGE_KINDS.range && {
-        [HTTP_HEADERS.contentRange]: `bytes ${start}-${end}/${size}`,
+        [HEADERS.contentRange]: `bytes ${start}-${end}/${size}`,
       }),
     }
-    const status = range.kind === BYTE_RANGE_KINDS.range ? 206 : 200
+    const status =
+      range.kind === BYTE_RANGE_KINDS.range ? HTTP_STATUSES.partialContent : HTTP_STATUSES.ok
     if (isHead) return answer({ status, headers })
     try {
       return answer({ status, headers, body: readRange({ path: file.path, start, end }) })
     } catch {
-      return answer({ status: 500 })
+      return answer({ status: HTTP_STATUSES.internalServerError })
     }
   }
 }

@@ -5,7 +5,9 @@ export {
   MPV_PLAYLIST_END,
   MPV_SEEK_MODES,
   MPV_EVENTS,
+  MPV_SCRIPT_BINDINGS,
   MPV_SURFACE_KINDS,
+  MPV_TIME_THROTTLE_MS,
   openMpv,
   type Mpv,
   type MpvEvent,
@@ -22,6 +24,13 @@ export {
   type MpvPropertyValue,
   type MpvTrack,
 } from '@/properties'
+export {
+  MPV_OPTIONS,
+  type MpvOption,
+  type MpvOptionName,
+  type MpvSettable,
+  type MpvValue,
+} from '@/options'
 export { NATIVE_TARGETS, nativeTargetOf, type NativeTarget } from '@/target'
 export { PE_MACHINES, readPe } from '@/pe'
 export { ADDON_DLLS, importProblems, isPrebuilt } from '@/windows'

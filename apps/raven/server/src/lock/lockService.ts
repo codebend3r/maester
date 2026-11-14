@@ -7,7 +7,7 @@ import {
   SERVER_COOKIES,
   UNLOCK_COOKIE_PATH,
 } from '@raven/core'
-import { readCookie, sameSecret } from '@shared/server'
+import { SAME_SITE, readCookie, sameSecret, serializeCookie } from '@shared/server'
 import type { FastifyRequest } from 'fastify'
 import { type Observable, Subject } from 'rxjs'
 import { authFailure } from '@/auth/authFailure'
@@ -83,6 +83,8 @@ type LockServiceIsUnlockedProps = { request: Request }
 
 type LockServiceCookieUntilProps = { request: Request }
 
+type LockServiceCookieOfProps = { value: string; maxAgeSeconds: number | null }
+
 type LockServiceRelockProps = { request: Request }
 
 /**
@@ -146,7 +148,7 @@ export class LockService {
     const payload = `${Date.now() + SESSION_MS}.${this.accountIdOf({ request })}`
     return {
       ok: true,
-      cookie: `${SERVER_COOKIES.unlock}=${payload}.${this.sign(payload)}; ${this.attributes()}`,
+      cookie: this.cookieOf({ value: `${payload}.${this.sign(payload)}`, maxAgeSeconds: null }),
     }
   }
 
@@ -157,7 +159,7 @@ export class LockService {
   relock({ request }: LockServiceRelockProps): string {
     const accountId = this.accountIdOf({ request })
     if (accountId !== NO_ACCOUNT) this.relocked.next(accountId)
-    return `${SERVER_COOKIES.unlock}=; Max-Age=0; ${this.attributes()}`
+    return this.cookieOf({ value: '', maxAgeSeconds: 0 })
   }
 
   /**
@@ -208,9 +210,17 @@ export class LockService {
     return { listsLibrary, seesLibrary, seesItem, sees }
   }
 
-  /** Scoped to the API, out of reach of scripts, and never sent from another site. */
-  private attributes(): string {
-    return `Path=${UNLOCK_COOKIE_PATH}; HttpOnly; SameSite=Strict`
+  /** The unlock cookie: scoped to the API, out of reach of scripts, and never sent from another site. */
+  private cookieOf({ value, maxAgeSeconds }: LockServiceCookieOfProps): string {
+    return serializeCookie({
+      name: SERVER_COOKIES.unlock,
+      value,
+      path: UNLOCK_COOKIE_PATH,
+      maxAgeSeconds,
+      domain: null,
+      sameSite: SAME_SITE.strict,
+      isSecure: false,
+    })
   }
 
   private sign(payload: string): string {

@@ -27,7 +27,7 @@
 
 .cue {
   max-width: min(46rem, 100%);
-  padding: 0.1em 0.45em;
+  padding: var(--space-text-y) var(--space-text-x);
   border-radius: var(--radius-sm);
   background: var(--color-picture-glass);
   color: var(--caption-colour, var(--color-on-picture));

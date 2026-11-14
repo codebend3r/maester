@@ -1,7 +1,7 @@
 import { onlineManager, useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { type ComponentType, useSyncExternalStore } from 'react'
 import { Navigate, Outlet, parsePath, useLocation } from 'react-router-dom'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { AUTH_ROUTES } from '@raven/core'
 import { downloadsPageFor, isFilePlaying, isOfflinePage, offlineReturnOf } from '@/desktop/paths'
 import { ACCESS_KINDS, type AccessState, useAccessState } from '@/lib/accessState'
@@ -26,7 +26,7 @@ const Retry = ({ title, message }: RetryProps) => {
         <h1 className={styles.title}>{title}</h1>
         <p className={styles.copy}>{message}</p>
         <Button
-          tone="primary"
+          tone={BUTTON_TONES.primary}
           disabled={isRetrying}
           onClick={() => queryClient.refetchQueries({ queryKey: queryKeys.auth })}
         >

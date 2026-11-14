@@ -1,8 +1,7 @@
 import { type FSWatcher, type WatchEventType, type WatchListener, statSync, watch } from 'node:fs'
 import { statfs } from 'node:fs/promises'
 import { join } from 'node:path'
-import { isRecord } from '@raven/core'
-import { ERROR_CODES } from '@/errorMessage'
+import { ERROR_CODES, errorCode } from '@/errorMessage'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 import { foldersUnder, isUnder } from '@/scanner/walk'
 
@@ -34,7 +33,7 @@ export type WatchFolder = (args: WatchFolderProps) => Watching
 
 /** The system has no watches left to give, which no later folder will fix. */
 const isOutOfWatches = (error: unknown): boolean =>
-  isRecord(error) && (error.code === ERROR_CODES.enospc || error.code === ERROR_CODES.emfile)
+  errorCode(error) === ERROR_CODES.enospc || errorCode(error) === ERROR_CODES.emfile
 
 /** macOS and Windows watch a whole tree with one native watch. */
 export const watchTree: WatchFolder = ({ root, onChange, onError }) => {

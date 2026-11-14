@@ -15,62 +15,60 @@ import asyncio
 import os
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Annotated
 
 import yaml
+from pydantic import BaseModel, BeforeValidator, ConfigDict
 
-from sparrow.agent.loop import Agent
+from sparrow.agent.loop import Agent, ModelClient
 from sparrow.agent.runner import ToolRunner
 from sparrow.agent.tools import Tier, ToolRegistry
+from sparrow.clients import Services
 from sparrow.config import Settings
+from sparrow.evals.seed import Seed
 from sparrow.evals.world import EVAL_USER
+from sparrow.store import Store
 
 API_DIR = Path(__file__).resolve().parent.parent.parent
 CASES_DIR = API_DIR / "evals" / "cases"
 REPORT_PATH = API_DIR.parent / "docs" / "evals.md"
 REASON_LIMIT = 120
+# The scripted model `--model fake` runs the cases against, without an API key.
+FAKE_MODEL = "fake"
 
 
-@dataclass
-class Turn:
+class Turn(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
     user: str
-    expect_tools: list[str] = field(default_factory=list)
-    forbid_tools: list[str] = field(default_factory=list)
+    expect_tools: list[str] = []
+    forbid_tools: list[str] = []
     reply_matches: str | None = None
     reply_not_matches: str | None = None
 
 
-@dataclass
-class Case:
+class Case(BaseModel):
+    """One case file, checked as it loads: an unknown key anywhere fails the case."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
     name: str
-    tier: Tier
+    tier: Annotated[
+        Tier, BeforeValidator(lambda name: Tier.parse(name) if isinstance(name, str) else name)
+    ] = Tier.FRIEND
     turns: list[Turn]
-    services: dict[str, Any] = field(default_factory=dict)
+    services: Seed = Seed()
     path: Path | None = None
 
     @classmethod
     def load(cls, path: Path) -> Case:
         raw = yaml.safe_load(path.read_text())
-        turns = [
-            Turn(
-                user=t["user"],
-                expect_tools=list(t.get("expect_tools", [])),
-                forbid_tools=list(t.get("forbid_tools", [])),
-                reply_matches=t.get("reply_matches"),
-                reply_not_matches=t.get("reply_not_matches"),
-            )
-            for t in raw["turns"]
-        ]
-        return cls(
-            name=raw.get("name", path.stem),
-            tier=Tier.parse(raw.get("tier", "friend")),
-            turns=turns,
-            services=raw.get("services", {}),
-            path=path,
-        )
+        if not isinstance(raw, dict):
+            raise ValueError(f"{path} isn't a case: expected a mapping")
+        return cls.model_validate({"name": path.stem, **raw, "path": path})
 
 
 @dataclass
@@ -96,7 +94,7 @@ async def run_case(case: Case, agent: Agent, user_id: str = EVAL_USER) -> CaseRe
     results = []
     for turn in case.turns:
         reply = await agent.respond(user_id, case.tier, turn.user)
-        called = [c["name"] for c in reply.tool_calls]
+        called = [c.name for c in reply.tool_calls]
         failures = []
         for name in turn.expect_tools:
             if name not in called:
@@ -219,26 +217,31 @@ def publish_report(
     if summary:
         with open(summary, "a") as handle:
             handle.write(markdown)
-    if not is_full_run or model == "fake":
+    if not is_full_run or model == FAKE_MODEL:
         return False
     report_path.write_text(markdown)
     return True
 
 
-def build_agent(
-    model_name: str, registry: ToolRegistry, services: Any, store: Any, model_client: Any = None
-) -> Agent:
-    """An agent over the case's world; `model_client` replaces the API client when given."""
-    if model_client is not None:
-        client: Any = model_client
-    elif model_name == "fake":
+def _client(model_name: str) -> ModelClient:
+    if model_name == FAKE_MODEL:
         from tests.fake_model import FakeModel, text_message
 
-        client: Any = FakeModel.scripted(*[text_message("(fake reply)") for _ in range(200)])
-    else:
-        import anthropic
+        return FakeModel.scripted(*[text_message("(fake reply)") for _ in range(200)])
+    import anthropic
 
-        client = anthropic.AsyncAnthropic()
+    return anthropic.AsyncAnthropic()
+
+
+def build_agent(
+    model_name: str,
+    registry: ToolRegistry,
+    services: Services,
+    store: Store,
+    model_client: ModelClient | None = None,
+) -> Agent:
+    """An agent over the case's world; `model_client` replaces the API client when given."""
+    client = model_client if model_client is not None else _client(model_name)
     return Agent(
         model_client=client,
         model=model_name,

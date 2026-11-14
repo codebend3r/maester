@@ -1,10 +1,11 @@
-import { type PlaylistDetails, QUEUE_SOURCE_KINDS, routeIdOf } from '@raven/core'
 import {
-  playingTrackOf,
+  type PlaylistDetails,
+  QUEUE_SOURCE_KINDS,
+  routeIdOf,
   playlistFactsOf,
   playlistTracksOf,
-  useAudioQueue,
-} from '@raven/ui/headless'
+} from '@raven/core'
+import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'

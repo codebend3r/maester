@@ -1,10 +1,10 @@
-import type { AlbumTrack } from '@raven/ui/headless'
+import { type AlbumTrack } from '@raven/core'
 import { type ComponentRef, useRef } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
+import { BUTTON_TONES } from '@raven/native/headless'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { useOpenerFocus, useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
-import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type AlbumLayoutProps } from '@/layouts/musicKit'
@@ -19,6 +19,7 @@ import {
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** An album's cover on its page, beside the words. */
 const ALBUM_COVER = tvSize(420)
@@ -107,7 +108,7 @@ export const AlbumLayout = ({
             <Text style={styles.muted}>{facts}</Text>
             <View style={styles.actions}>
               <ActionPlate
-                icon="play"
+                icon={APP_ICONS.play}
                 isPreferred={isOpening}
                 label={MUSIC_COPY.play}
                 onPress={onPlay}
@@ -115,7 +116,7 @@ export const AlbumLayout = ({
                 tone={BUTTON_TONES.primary}
               />
               <ActionPlate
-                icon="shuffle"
+                icon={APP_ICONS.shuffle}
                 isPreferred={false}
                 label={MUSIC_COPY.shuffle}
                 onPress={onShuffle}

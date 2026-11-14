@@ -30,7 +30,6 @@ import {
 const SERVER: ServerEntry = {
   id: '00000000-0000-4000-8000-000000000001',
   origin: 'https://raven.example',
-  name: 'Vhagar',
 }
 const OTHER_ID = '00000000-0000-4000-8000-000000000002'
 
@@ -70,12 +69,12 @@ type FakeCallsProps = { answer: (call: AllowedCall) => ServerCallResult | null }
 
 /** Calls answered by `answer`, or held until the test settles them when it gives null. */
 const fakeCalls = ({ answer }: FakeCallsProps) => {
-  const made: { serverId: string; call: AllowedCall }[] = []
-  type CallsCallProps = { serverId: string; call: AllowedCall }
+  const made: { call: AllowedCall }[] = []
+  type CallsCallProps = { call: AllowedCall }
 
   const calls = {
-    call: ({ serverId, call }: CallsCallProps) => {
-      made.push({ serverId, call })
+    call: ({ call }: CallsCallProps) => {
+      made.push({ call })
       const answered = answer(call)
       if (answered === null) return new Promise<ServerCallResult>(() => {})
       return Promise.resolve(answered)
@@ -120,7 +119,6 @@ const fakeRelay = ({ refusal = null, isOpenFailing = false }: FakeRelayProps) =>
 
 type SetupProps = {
   answer?: (call: AllowedCall) => ServerCallResult | null
-  servers?: readonly ServerEntry[]
   ticket?: TicketOutcome
   refusal?: ReturnType<MediaRelay['refusalOf']>
   isOpenFailing?: boolean
@@ -132,7 +130,6 @@ type SetupProps = {
 
 const setup = ({
   answer = () => reply({ status: 200, body: JSON.stringify(TRACKS) }),
-  servers = [SERVER],
   ticket = { kind: TICKET_OUTCOMES.ticket, ticket: 'account.t1' },
   refusal = null,
   isOpenFailing = false,
@@ -140,13 +137,13 @@ const setup = ({
   remote,
 }: SetupProps = {}) => {
   const { calls, made } = fakeCalls({ answer })
-  const { picks, forgotten } = fixedPicks({ origin, remote })
+  const { picks, forgets } = fixedPicks({ serverOrigin: SERVER.origin, origin, remote })
   const warnings: string[] = []
-  const minted: { serverId: string; mediaId: number; isFresh: boolean }[] = []
+  const minted: { mediaId: number; isFresh: boolean }[] = []
   const order: string[] = []
   const relayed = fakeRelay({ refusal, isOpenFailing })
   const sources = createServerSources({
-    serverOf: (serverId) => servers.find((server) => server.id === serverId) ?? null,
+    server: SERVER,
     calls,
     tickets: {
       ticketFor: async (input) => {
@@ -167,12 +164,11 @@ const setup = ({
       warnings.push(message)
     },
   })
-  return { sources, made, warnings, minted, order, forgotten, ...relayed }
+  return { sources, made, warnings, minted, order, forgets, ...relayed }
 }
 
 const RELAYED_TARGET: ServerTarget = {
   kind: PLAYER_SOURCE_KINDS.server,
-  serverId: SERVER.id,
   mediaId: 7,
   url: `${RELAY_BASE}/file`,
   sidecars: [],
@@ -188,7 +184,6 @@ describe('resolve', () => {
       ok: true,
       target: {
         kind: PLAYER_SOURCE_KINDS.server,
-        serverId: SERVER.id,
         mediaId: 7,
         url: `${RELAY_BASE}/file`,
         relay: { loadId: '1', base: RELAY_BASE },
@@ -198,13 +193,10 @@ describe('resolve', () => {
         ],
       },
     })
-    expect(made).toEqual([
-      { serverId: SERVER.id, call: { name: CALL_NAMES.getTracks, mediaId: 7 } },
-    ])
-    expect(minted).toEqual([{ serverId: SERVER.id, mediaId: 7, isFresh: false }])
+    expect(made).toEqual([{ call: { name: CALL_NAMES.getTracks, mediaId: 7 } }])
+    expect(minted).toEqual([{ mediaId: 7, isFresh: false }])
     expect(opened).toEqual([
       {
-        server: SERVER,
         origin: SERVER.origin,
         mediaId: 7,
         sidecarTrackIds: ['external-0', 'external-1'],
@@ -219,15 +211,14 @@ describe('resolve', () => {
     const lan = { kind: MEDIA_ORIGIN_KINDS.lan, url: 'https://192-168-50-6.vhagar.example' }
     const { sources, opened, minted } = setup({ origin: lan })
     await sources.resolve(SOURCE)
-    await sources.resolveTrack({ serverId: SERVER.id, mediaId: 8, kbps: 256 })
+    await sources.resolveTrack({ mediaId: 8, kbps: 256 })
     expect(opened.map(({ origin }) => origin)).toEqual([lan.url, lan.url])
-    expect(opened.map(({ server }) => server)).toEqual([SERVER, SERVER])
     expect(minted).toHaveLength(2)
   })
 
   test('a track asks for no sidecars, and opens its transcode at the bitrate asked', async () => {
     const { sources, made, opened } = setup()
-    const track = { serverId: SERVER.id, mediaId: 7 }
+    const track = { mediaId: 7 }
     expect(await sources.resolveTrack({ ...track, kbps: 256 })).toEqual({
       ok: true,
       target: RELAYED_TARGET,
@@ -236,21 +227,19 @@ describe('resolve', () => {
     expect(made).toEqual([])
     expect(opened).toEqual([
       {
-        server: SERVER,
         origin: SERVER.origin,
         mediaId: 7,
         sidecarTrackIds: [],
         media: { kind: RELAYED_MEDIA_KINDS.audio, kbps: 256 },
       },
       {
-        server: SERVER,
         origin: SERVER.origin,
         mediaId: 7,
         sidecarTrackIds: [],
         media: { kind: RELAYED_MEDIA_KINDS.file },
       },
     ])
-    expect(await sources.resolveTrack({ ...track, serverId: 'vhagar', kbps: null })).toEqual({
+    expect(await sources.resolveTrack({ mediaId: 7.5, kbps: null })).toEqual({
       ok: false,
       message: SOURCE_MESSAGES.badTitle,
     })
@@ -289,7 +278,7 @@ describe('resolve', () => {
         throw new Error('expected a server')
       expect(resolved.target.url).toBe(`${RELAY_BASE}/file`)
       expect(resolved.target.sidecars).toEqual([])
-      expect(warnings).toEqual(['no sidecars from Vhagar: its tracks did not answer in time'])
+      expect(warnings).toEqual(['no sidecars from raven: its tracks did not answer in time'])
       expect(TRACKS_TIMEOUT_MS).toBe(3000)
     } finally {
       jest.useRealTimers()
@@ -300,7 +289,7 @@ describe('resolve', () => {
     ['a 500', reply({ status: 500, body: '{"message":"boom"}' })],
     ['an HTML page', reply({ status: 200, body: '<html>' })],
     ['a body that is not tracks', reply({ status: 200, body: '{"audio":3}' })],
-    ['an unreachable server', { ok: false, message: 'Raven could not reach Vhagar.' }],
+    ['an unreachable server', { ok: false, message: 'Raven could not reach raven.' }],
   ] as const)('tracks answering %s give no sidecars and a warning', async (_label, answered) => {
     const { sources, warnings } = setup({ answer: () => answered })
     const resolved = await sources.resolve(SOURCE)
@@ -316,11 +305,11 @@ describe('resolve', () => {
     const warnings: string[] = []
     const { relay } = fakeRelay({})
     const sources = createServerSources({
-      serverOf: () => SERVER,
+      server: SERVER,
       calls: { call: () => Promise.reject(new Error('gone')) },
       tickets: { ticketFor: async () => ({ kind: TICKET_OUTCOMES.ticket, ticket: 't' }) },
       relay,
-      picks: fixedPicks().picks,
+      picks: fixedPicks({ serverOrigin: SERVER.origin }).picks,
       warn: (message) => {
         warnings.push(message)
       },
@@ -329,7 +318,7 @@ describe('resolve', () => {
     if (!resolved.ok || resolved.target.kind !== PLAYER_SOURCE_KINDS.server)
       throw new Error('expected a server')
     expect(resolved.target.sidecars).toEqual([])
-    expect(warnings).toEqual(['no sidecars from Vhagar: its tracks failed: gone'])
+    expect(warnings).toEqual(['no sidecars from raven: its tracks failed: gone'])
   })
 
   test('a server id that is not opaque and a media id that is not whole are bad titles that call nothing', async () => {
@@ -346,11 +335,11 @@ describe('resolve', () => {
     expect(minted).toEqual([])
   })
 
-  test('an unknown server is refused and calls nothing', async () => {
+  test('another server is refused and calls nothing', async () => {
     const { sources, made, minted } = setup()
     expect(await sources.resolve({ ...SOURCE, serverId: OTHER_ID })).toEqual({
       ok: false,
-      message: SOURCE_MESSAGES.unknownServer,
+      message: SOURCE_MESSAGES.otherServer,
     })
     expect(made).toEqual([])
     expect(minted).toEqual([])
@@ -360,21 +349,21 @@ describe('resolve', () => {
     [
       'signed out',
       { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.signedOut },
-      SOURCE_MESSAGES.signIn('Vhagar'),
+      SOURCE_MESSAGES.signIn,
     ],
     [
       'removed',
       { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.revoked },
-      SOURCE_MESSAGES.removed('Vhagar'),
+      SOURCE_MESSAGES.removed,
     ],
     [
       'awaiting approval',
       { kind: TICKET_OUTCOMES.refused, reason: AUTH_REFUSALS.pending },
-      SOURCE_MESSAGES.pending('Vhagar'),
+      SOURCE_MESSAGES.pending,
     ],
-    ['locked', { kind: TICKET_OUTCOMES.locked }, SOURCE_MESSAGES.relocked('Vhagar')],
-    ['gone', { kind: TICKET_OUTCOMES.gone }, SOURCE_MESSAGES.gone('Vhagar')],
-    ['unreachable', { kind: TICKET_OUTCOMES.unreachable }, SOURCE_MESSAGES.lost('Vhagar')],
+    ['locked', { kind: TICKET_OUTCOMES.locked }, SOURCE_MESSAGES.relocked],
+    ['gone', { kind: TICKET_OUTCOMES.gone }, SOURCE_MESSAGES.gone],
+    ['unreachable', { kind: TICKET_OUTCOMES.unreachable }, SOURCE_MESSAGES.lost],
   ] as const)(
     'a title whose ticket is %s is refused before mpv opens anything',
     async (_label, ticket, message) => {
@@ -388,9 +377,9 @@ describe('resolve', () => {
     const { sources, warnings } = setup({ isOpenFailing: true })
     expect(await sources.resolve(SOURCE)).toEqual({
       ok: false,
-      message: SOURCE_MESSAGES.cannotOpen('Vhagar'),
+      message: SOURCE_MESSAGES.cannotOpen,
     })
-    expect(warnings).toEqual(['Raven could not relay a title from Vhagar'])
+    expect(warnings).toEqual(['Raven could not relay a title from raven'])
   })
 })
 
@@ -399,20 +388,14 @@ describe('refusedAccount', () => {
     const { sources, closed, made } = setup({ refusal: AUTH_REFUSALS.revoked })
     expect(sources.refusedAccount(RELAYED_TARGET)).toEqual({
       reason: PLAYER_ERROR_REASONS.account,
-      message: SOURCE_MESSAGES.removed('Vhagar'),
+      message: SOURCE_MESSAGES.removed,
     })
     expect(closed).toEqual([])
     expect(made).toEqual([])
   })
 
-  test('is null for a load with no refusal and a server gone from the config', () => {
+  test('is null for a load with no refusal', () => {
     expect(setup().sources.refusedAccount(RELAYED_TARGET)).toBeNull()
-    expect(
-      setup({ refusal: AUTH_REFUSALS.revoked, servers: [] }).sources.refusedAccount(RELAYED_TARGET),
-    ).toBeNull()
-    expect(
-      setup({ refusal: AUTH_REFUSALS.unavailable }).sources.refusedAccount(RELAYED_TARGET),
-    ).toBeNull()
   })
 })
 
@@ -424,16 +407,16 @@ describe('explain', () => {
   test('asks the server for the title once', async () => {
     const { sources, made } = setup({ answer: () => reply({ status: 200, body: '{}' }) })
     await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })
-    expect(made).toEqual([{ serverId: SERVER.id, call: { name: CALL_NAMES.getMedia, mediaId: 7 } }])
+    expect(made).toEqual([{ call: { name: CALL_NAMES.getMedia, mediaId: 7 } }])
   })
 
   test('an unreachable server lost the connection', async () => {
     const { sources } = setup({
-      answer: () => ({ ok: false, message: 'Raven could not reach Vhagar.' }),
+      answer: () => ({ ok: false, message: 'Raven could not reach raven.' }),
     })
     expect(await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })).toEqual({
       reason: 'network',
-      message: SOURCE_MESSAGES.lost('Vhagar'),
+      message: SOURCE_MESSAGES.lost,
     })
   })
 
@@ -442,7 +425,10 @@ describe('explain', () => {
     const { sources } = setup({ answer: () => null })
     const explained = sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loading })
     jest.advanceTimersByTime(EXPLAIN_TIMEOUT_MS)
-    expect(await explained).toEqual({ reason: 'network', message: SOURCE_MESSAGES.lost('Vhagar') })
+    expect(await explained).toEqual({
+      reason: PLAYER_ERROR_REASONS.network,
+      message: SOURCE_MESSAGES.lost,
+    })
     expect(EXPLAIN_TIMEOUT_MS).toBe(5000)
   })
 
@@ -450,7 +436,7 @@ describe('explain', () => {
     const { sources } = setup({ answer: () => reply({ status: 423, body: '{}' }) })
     expect(await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })).toEqual({
       reason: PLAYER_ERROR_REASONS.locked,
-      message: 'Vhagar locked this library again.',
+      message: 'raven locked this library again.',
     })
   })
 
@@ -459,7 +445,7 @@ describe('explain', () => {
     expect(await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loading })).toEqual(
       {
         reason: PLAYER_ERROR_REASONS.open,
-        message: SOURCE_MESSAGES.gone('Vhagar'),
+        message: SOURCE_MESSAGES.gone,
       },
     )
   })
@@ -469,7 +455,7 @@ describe('explain', () => {
     expect(await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loading })).toEqual(
       {
         reason: PLAYER_ERROR_REASONS.open,
-        message: SOURCE_MESSAGES.cannotOpen('Vhagar'),
+        message: SOURCE_MESSAGES.cannotOpen,
       },
     )
     expect(await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })).toEqual({
@@ -478,26 +464,13 @@ describe('explain', () => {
     })
   })
 
-  test('a server gone from the config lost the connection to the server, without a call', async () => {
-    const { sources, made } = setup({ servers: [] })
-    expect(await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })).toEqual({
-      reason: 'network',
-      message: SOURCE_MESSAGES.lost('the server'),
-    })
-    expect(made).toEqual([])
-  })
-
-  test("the player's own messages say what the source would", () => {
-    expect<string>(PLAYER_MESSAGES.lost).toBe(SOURCE_MESSAGES.lost('the server'))
-  })
-
   test('a relayed load the server refused is read off the relay as removed access', async () => {
     const { sources, made, refusalsAsked, closed } = setup({
       refusal: AUTH_REFUSALS.revoked,
     })
     expect(await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })).toEqual({
       reason: PLAYER_ERROR_REASONS.account,
-      message: 'Your access to Vhagar was removed.',
+      message: 'Your access to raven was removed.',
     })
     expect(refusalsAsked).toEqual(['1'])
     expect(closed).toEqual(['1'])
@@ -512,7 +485,7 @@ describe('explain', () => {
         await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded }),
       ).toEqual({
         reason: PLAYER_ERROR_REASONS.account,
-        message: SOURCE_MESSAGES.removed('Vhagar'),
+        message: SOURCE_MESSAGES.removed,
       })
     },
   )
@@ -522,7 +495,7 @@ describe('explain', () => {
     expect(await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loading })).toEqual(
       {
         reason: PLAYER_ERROR_REASONS.account,
-        message: 'Sign in to Vhagar again.',
+        message: 'Sign in to raven again.',
       },
     )
   })
@@ -533,22 +506,22 @@ describe('explain', () => {
     })
     expect(await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })).toEqual({
       reason: PLAYER_ERROR_REASONS.locked,
-      message: 'Vhagar locked this library again.',
+      message: 'raven locked this library again.',
     })
-    expect(made).toEqual([{ serverId: SERVER.id, call: { name: CALL_NAMES.getMedia, mediaId: 7 } }])
+    expect(made).toEqual([{ call: { name: CALL_NAMES.getMedia, mediaId: 7 } }])
     expect(closed).toEqual(['1'])
   })
 
   test('lets go of the origin picked, so the next title probes again', async () => {
-    const { sources, forgotten } = setup({ answer: () => reply({ status: 200, body: '{}' }) })
+    const { sources, forgets } = setup({ answer: () => reply({ status: 200, body: '{}' }) })
     await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })
-    expect(forgotten).toEqual([SERVER.id])
+    expect(forgets.count).toBe(1)
   })
 
   test('keeps the origin picked for a title the account was refused', async () => {
-    const { sources, forgotten } = setup({ refusal: AUTH_REFUSALS.revoked })
+    const { sources, forgets } = setup({ refusal: AUTH_REFUSALS.revoked })
     await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })
-    expect(forgotten).toEqual([])
+    expect(forgets.count).toBe(0)
   })
 
   test("the server's own account refusal of the title is the account's", async () => {
@@ -561,7 +534,7 @@ describe('explain', () => {
     })
     expect(await sources.explain({ target: RELAYED_TARGET, phase: PLAYER_PHASES.loaded })).toEqual({
       reason: PLAYER_ERROR_REASONS.account,
-      message: SOURCE_MESSAGES.signInAgain('Vhagar'),
+      message: SOURCE_MESSAGES.signInAgain,
     })
   })
 })
@@ -647,7 +620,7 @@ describe('resolve away from home', () => {
     })
     await sources.resolve(SOURCE)
     expect(opened.map(({ media }) => media)).toEqual([FILE])
-    expect(warnings).toEqual(["Vhagar did not say a title's bitrate, so it plays its file"])
+    expect(warnings).toEqual(["raven did not say a title's bitrate, so it plays its file"])
   })
 
   test('a bitrate that does not come in time plays the file', async () => {
@@ -677,8 +650,8 @@ describe('resolve away from home', () => {
 
   test('a track away from home stays its file or its own transcode', async () => {
     const { sources, opened, made } = setup({ answer: OVER, origin: PUBLIC, remote: HELD })
-    await sources.resolveTrack({ serverId: SERVER.id, mediaId: 8, kbps: null })
-    await sources.resolveTrack({ serverId: SERVER.id, mediaId: 8, kbps: 256 })
+    await sources.resolveTrack({ mediaId: 8, kbps: null })
+    await sources.resolveTrack({ mediaId: 8, kbps: 256 })
     expect(opened.map(({ media }) => media)).toEqual([
       FILE,
       { kind: RELAYED_MEDIA_KINDS.audio, kbps: 256 },

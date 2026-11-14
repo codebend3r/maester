@@ -1,5 +1,3 @@
-import { Platform } from 'react-native'
-
 import { focusDownloads } from '@/layouts/Downloads.focus'
 import { touchDownloads } from '@/layouts/Downloads.touch'
 import { focusForm } from '@/layouts/Form.focus'
@@ -26,56 +24,86 @@ import { touchMusic } from '@/layouts/Music.touch'
 import { touchLoading } from '@/layouts/Loading.touch'
 import { touchPlayerChrome } from '@/layouts/PlayerChrome.touch'
 import type { PlayerChromeKit } from '@/layouts/playerKit'
-import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
-import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
+import { DEVICE_INPUT, DEVICE_PLATFORM } from '@/platform/devicePlatform'
+import { APP_PLATFORMS, type AppPlatform, INPUT_KINDS, type InputKind } from '@/platform/platform'
 
-export { BUTTON_TONES } from '@/layouts/formKit'
+export { BUTTON_TONES } from '@raven/native/headless'
+
+/** This device's kit of a pair: the one the remote's focus drives on a TV, the touch one elsewhere. */
+const byInput = <K>(kits: Record<InputKind, K>): K => kits[DEVICE_INPUT]
 
 /** What a page shows while it loads: the mark and a spinner, with the way back under the thumb. */
-export const { Loading } = Platform.isTV ? focusLoading : touchLoading
+export const { Loading } = byInput({
+  [INPUT_KINDS.focus]: focusLoading,
+  [INPUT_KINDS.touch]: touchLoading,
+})
 
 /** The form a screen asks for: driven by focus on a TV, by touch everywhere else. */
-export const { Form, Field, FormButton, useFormStyles } = Platform.isTV ? focusForm : touchForm
+export const { Form, Field, FormButton, useFormStyles } = byInput({
+  [INPUT_KINDS.focus]: focusForm,
+  [INPUT_KINDS.touch]: touchForm,
+})
 
 /**
  * The PIN lock: what stands in place of a locked library's videos, and the pad of digits the
  * owner unlocks with, keys the remote moves through on a TV and a finger presses elsewhere.
  */
-export const { LockedNotice, PinPad } = Platform.isTV ? focusLock : touchLock
+export const { LockedNotice, PinPad } = byInput({
+  [INPUT_KINDS.focus]: focusLock,
+  [INPUT_KINDS.touch]: touchLock,
+})
 
 /**
  * Downloads, under the thumb only: the page of what is on the device and on its way, and
  * whether the item pages offer Download. A TV downloads nothing.
  */
-export const { DownloadsLayout, canDownload } = Platform.isTV ? focusDownloads : touchDownloads
+export const { DownloadsLayout, canDownload } = byInput({
+  [INPUT_KINDS.focus]: focusDownloads,
+  [INPUT_KINDS.touch]: touchDownloads,
+})
 
 /** Home's shelves: rows the remote moves along on a TV, rows under the thumb everywhere else. */
-export const { Shelves, Shelf, BingeShelf, ShelfPage } = Platform.isTV ? focusShelf : touchShelf
+export const { Shelves, Shelf, BingeShelf, ShelfPage } = byInput({
+  [INPUT_KINDS.focus]: focusShelf,
+  [INPUT_KINDS.touch]: touchShelf,
+})
 
 /** Home's hero over its shelves: the featured titles in turn on a TV, a swiped carousel under the thumb. */
-export const { HomeHero } = Platform.isTV ? focusHero : touchHero
+export const { HomeHero } = byInput({
+  [INPUT_KINDS.focus]: focusHero,
+  [INPUT_KINDS.touch]: touchHero,
+})
 
 /** A library's grid: rows the remote moves through on a TV, columns under the thumb elsewhere. */
-export const { Grid } = Platform.isTV ? focusGrid : touchGrid
+export const { Grid } = byInput({ [INPUT_KINDS.focus]: focusGrid, [INPUT_KINDS.touch]: touchGrid })
 
 /**
  * The toolbar's pickers: a list the remote moves through on a TV, where tvOS has no action
  * sheet, and the system's action sheet on the only touch screens the app runs on, iPhones
  * and iPads.
  */
-export const { Picker, ToolButton } = Platform.isTV ? focusPicker : touchPicker
+export const { Picker, ToolButton } = byInput({
+  [INPUT_KINDS.focus]: focusPicker,
+  [INPUT_KINDS.touch]: touchPicker,
+})
 
 /**
  * An item's page: a heading over the backdrop the remote opens on, with rows to move along,
  * on a TV; one page scrolled under the thumb everywhere else.
  */
-export const { ItemLayout, ItemNotice } = Platform.isTV ? focusItem : touchItem
+export const { ItemLayout, ItemNotice } = byInput({
+  [INPUT_KINDS.focus]: focusItem,
+  [INPUT_KINDS.touch]: touchItem,
+})
 
 /**
  * A search box and the search screen: the platform's own keyboard, opened from a field the
  * remote selects, on a TV; a field over results under the thumb everywhere else.
  */
-export const { SearchField, SearchLayout } = Platform.isTV ? focusSearch : touchSearch
+export const { SearchField, SearchLayout } = byInput({
+  [INPUT_KINDS.focus]: focusSearch,
+  [INPUT_KINDS.touch]: touchSearch,
+})
 
 /**
  * Settings: plates the remote moves down through and the TV's picker lists on a TV, a rename in
@@ -89,7 +117,7 @@ export const {
   SettingsLine,
   SettingsFact,
   SettingsChoice,
-} = Platform.isTV ? focusSettings : touchSettings
+} = byInput({ [INPUT_KINDS.focus]: focusSettings, [INPUT_KINDS.touch]: touchSettings })
 
 /**
  * The music pages: an album's, a playlist's and Now Playing, rows and plates the remote moves
@@ -106,7 +134,7 @@ export const {
   PlaylistLayout,
   NewPlaylistButton,
   FavouriteButton,
-} = Platform.isTV ? focusMusic : touchMusic
+} = byInput({ [INPUT_KINDS.focus]: focusMusic, [INPUT_KINDS.touch]: touchMusic })
 
 /**
  * Each platform's player controls: raven's own on every one, under the thumb on iPhones and iPads

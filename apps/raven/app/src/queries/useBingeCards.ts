@@ -9,7 +9,7 @@ import type { AppQueries } from '@/queries/useAppQueries'
 type UseBingeCardsProps = { queries: AppQueries['queries']; pictures: Pictures | null }
 
 const isShow = (details: ItemDetails | undefined): details is ItemDetails =>
-  details?.type === ITEM_TYPES.show
+  (details?.type ?? null) === ITEM_TYPES.show
 
 /**
  * The account's binged shows as Home's Binge cards, in the list's order: each show's page, the

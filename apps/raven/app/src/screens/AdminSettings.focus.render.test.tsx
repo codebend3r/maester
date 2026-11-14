@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CALL_METHODS, APP_CLIENT_CALLS, QUALITIES, themeOf } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS, QUALITIES, themeOf } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
@@ -84,9 +84,9 @@ describe("the owner's settings on a TV", () => {
       within(screen.getByLabelText('Transcode quality')).getByRole('button', { name: 'High' }),
     )
     await waitFor(() =>
-      expect(mockServer.heard.filter(({ method }) => method !== APP_CALL_METHODS.get)).toEqual([
+      expect(mockServer.heard.filter(({ method }) => method !== HTTP_METHODS.get)).toEqual([
         {
-          method: APP_CALL_METHODS.put,
+          method: HTTP_METHODS.put,
           path: APP_CLIENT_CALLS.setPlaybackSettings.path,
           body: { quality: QUALITIES.high },
         },

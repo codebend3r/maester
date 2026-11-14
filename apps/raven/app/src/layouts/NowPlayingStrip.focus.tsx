@@ -9,8 +9,8 @@ import {
   View,
   useTVEventHandler,
 } from 'react-native'
+import { BUTTON_TONES } from '@raven/native/headless'
 
-import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import { useReturnAsks } from '@/layouts/focus'
 import { frontRouteKeyOf } from '@/layouts/frontRoute'
@@ -26,6 +26,7 @@ import { useMusicStarts } from '@/stores/musicStarts'
 import { isOpeningIn, rememberOpener, takeOpener, useScreenFocus } from '@/stores/screenFocus'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** The cover in the strip under the screens. */
 const STRIP_COVER = tvSize(88)
@@ -214,14 +215,14 @@ export const NowPlayingStrip = ({
         <StripButton
           {...heard}
           canFocus={canFocus}
-          icon={isPlaying ? 'pause' : 'play'}
+          icon={isPlaying ? APP_ICONS.pause : APP_ICONS.play}
           label={toggleLabelOf(isPlaying)}
           onPress={onToggle}
         />
         <StripButton
           {...heard}
           canFocus={canFocus}
-          icon="skipNext"
+          icon={APP_ICONS.skipNext}
           label={MUSIC_COPY.next}
           onPress={onNext}
         />

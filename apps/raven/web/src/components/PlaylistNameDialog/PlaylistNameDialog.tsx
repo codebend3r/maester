@@ -1,9 +1,10 @@
 import { PLAYLIST_LIMITS, isPlaylistName } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { type FormEvent, useId, useState } from 'react'
 import { useModal } from '@/lib/useModal'
 import styles from '@/components/PlaylistNameDialog/PlaylistNameDialog.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 type PlaylistNameDialogProps = {
   /** The dialog's heading: "New playlist", "Rename playlist". */
@@ -29,7 +30,7 @@ export const PlaylistNameDialog = ({
   onSubmit,
   onClose,
 }: PlaylistNameDialogProps) => {
-  const { dialog, close, keepKeys } = useModal()
+  const { dialog, keepKeys, close } = useModal()
   const titleId = useId()
   const fieldId = useId()
   const [name, setName] = useState(initialName)
@@ -39,12 +40,12 @@ export const PlaylistNameDialog = ({
     if (isValid) onSubmit(name.trim())
   }
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={titleId}
-      onClose={onClose}
+    <DialogFrame
+      dialog={dialog}
       onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.prose}
+      labelledBy={titleId}
+      onClose={onClose}
     >
       <form className={styles.body} onSubmit={submit}>
         <h2 id={titleId} className={styles.title}>
@@ -67,11 +68,11 @@ export const PlaylistNameDialog = ({
         )}
         <div className={styles.actions}>
           <Button onClick={close}>{COMMON_COPY.cancel}</Button>
-          <Button tone="primary" type="submit" disabled={!isValid || isPending}>
+          <Button tone={BUTTON_TONES.primary} type="submit" disabled={!isValid || isPending}>
             {submitLabel}
           </Button>
         </div>
       </form>
-    </dialog>
+    </DialogFrame>
   )
 }

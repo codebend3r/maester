@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process'
-import { randomBytes, randomUUID } from 'node:crypto'
-import { mkdir, readdir, realpath, rename, stat, statfs, writeFile } from 'node:fs/promises'
-import { createServer } from 'node:http'
+import { randomUUID } from 'node:crypto'
+import { mkdir, readdir, realpath, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -10,12 +9,12 @@ import {
   DESKTOP_PLATFORMS,
   type DesktopEvent,
   type DesktopReply,
-  desktopPlatformFor,
-  SYSTEM_NAMES,
   FILE_SCHEME,
   PICTURE_SCHEME,
   VIDEO_EXTENSIONS,
+  LINK_SCHEME,
 } from '@raven/core'
+import { desktopPlatformFor, SYSTEM_NAMES } from '@/shared/platform'
 import { nativeTargetOf } from '@raven/mpv'
 import {
   app,
@@ -24,7 +23,6 @@ import {
   crashReporter,
   dialog,
   Menu,
-  net,
   type OpenDialogOptions,
   powerMonitor,
   protocol,
@@ -34,8 +32,10 @@ import {
 } from 'electron'
 import { APP_ICON } from '@/build/forgeOptions'
 import { createPageAccount } from '@/main/accounts/pageAccount'
-import { createServerSignal } from '@/main/accounts/serverSignal'
+import { createAccountSignal } from '@/main/accounts/accountSignal'
+import { openAppDownloads } from '@/main/appDownloads'
 import { createAppLog } from '@/main/appLog'
+import { openAppStores } from '@/main/appStores'
 import {
   answerRequests,
   openWindow,
@@ -51,31 +51,17 @@ import {
   budgetWindowFrom,
   createBudgets,
   PLAYING_SAMPLE_MS,
-  syncRetryFrom,
 } from '@/main/budgets'
-import {
-  CONFIG_FILE,
-  loadConfig,
-  namesServer,
-  serverById,
-  serverOf,
-  setOutput,
-} from '@/main/desktopConfig'
+import { namesServer, setOutput } from '@/main/desktopConfig'
 import { createDesktopService, type DesktopService } from '@/main/desktopService'
 import { diagnosticsText, readEngineDiagnostics, unavailableReason } from '@/main/diagnostics'
-import { settleDownloads } from '@/main/downloads/adopt'
-import { createDownloadService } from '@/main/downloads/downloadService'
-import { DOWNLOADS_FILE } from '@/main/downloads/downloadState'
-import { DOWNLOADS_DEBOUNCE_MS, loadDownloads } from '@/main/downloads/downloadStore'
-import { createMediaAccess } from '@/main/downloads/mediaAccess'
-import { SYNC_RETRY_MS } from '@/main/downloads/sync'
 import { createGrants } from '@/main/grants'
 import { createHelpActions } from '@/main/help'
 import { errorText } from '@/main/log/errorText'
 import { logsDirFor } from '@/main/log/opens'
 import { menuTemplate } from '@/main/menu'
-import { fetchDownload, fetchProbe, fetchRelayed, fetchReleases } from '@/main/netFetches'
-import { exists, makeDir, openPart, removeTree, sizeOf, TEXT_FS } from '@/main/nodeFs'
+import { fetchReleases } from '@/main/netFetches'
+import { removeTree } from '@/main/nodeFs'
 import { createOpenBatch, eventForOpen, launchPaths, linksFromArgv } from '@/main/openBatch'
 import { ENGINE_STATUSES } from '@/main/player/engine'
 import { createMarks } from '@/main/player/marks'
@@ -91,14 +77,10 @@ import { attachPlayer, type NativeEngine, type WindowPlayer } from '@/main/playe
 import { engineMode } from '@/main/player/windowEngine'
 import { createQuitGate } from '@/main/quitGate'
 import { createQuitMark } from '@/main/quitMark'
-import { createAccountTickets } from '@/main/servers/accountTickets'
 import { createLinkOpener } from '@/main/servers/linkOpener'
-import { createMediaRelay, listenOnLoopback } from '@/main/servers/mediaRelay'
-import { createOriginPicks } from '@/main/servers/originPicks'
-import { createServerCalls, fetchThrough } from '@/main/servers/serverCalls'
 import { clearFormerPartitions, PARTITIONS_DIR } from '@/main/servers/formerSessions'
 import { createPageUnlock } from '@/main/servers/pageUnlock'
-import { createServerSources } from '@/main/servers/serverSources'
+import { createServerPlumbing } from '@/main/servers/serverPlumbing'
 import { createServerTitles } from '@/main/servers/serverTitles'
 import {
   createShutdown,
@@ -108,14 +90,12 @@ import {
   QUIT_FLUSH_MS,
 } from '@/main/shutdown'
 import { squirrelStepFor, takeSquirrelStep } from '@/main/squirrel'
-import { createJsonStore, createStateStore, loadState } from '@/main/stateStore'
 import { createNodeTimers } from '@/main/timers'
 import { createMenuCheck, createUpdateService, updateSourceFrom } from '@/main/updateService'
 import { checkForUpdates } from '@/main/updates'
 import { fixedServerFrom, linkOriginsFrom, serverOriginFrom } from '@/main/origins'
 import { controlWindow, createWindowResizer } from '@/main/windowChrome'
 import { IPC_CHANNELS } from '@/shared/hostNames'
-import { LINK_SCHEME } from '@/shared/playLink'
 
 const launchedAt = performance.now()
 
@@ -123,14 +103,8 @@ const USER_DATA_HOOK = 'RAVEN_DESKTOP_USER_DATA'
 /** Where an older Raven kept its own sign-ins, encrypted: the page signs in now. */
 const FORMER_ACCOUNTS_DIR = 'accounts'
 
-const STORE_NOTICES = {
-  state: 'Raven could not save your recent videos.',
-  config: 'Raven could not save its settings.',
-  downloads: 'Raven could not save its downloads.',
-} as const
 // Finder sends one `open-file` per file; this gathers a multi-file open into one batch.
 const OPEN_BATCH_MS = 100
-const STATE_DEBOUNCE_MS = 2000
 
 const platform = desktopPlatformFor({ platform: process.platform })
 /*
@@ -231,7 +205,7 @@ const startApp = (): void => {
     histogram: () => monitorEventLoopDelay({ resolution: 10 }),
   })
   // A file opened before the window is ready is a cold "Open With", timed to its first frame.
-  const launch = { isWindowReady: false }
+  let isWindowReady = false
 
   /*
    * The server this build plays from, and the other origins its links may name it by. Each is
@@ -252,24 +226,24 @@ const startApp = (): void => {
     }),
   })
 
-  const windows: { current: BrowserWindow | null } = { current: null }
-  const players: { current: WindowPlayer | null } = { current: null }
-  const musics: { current: MusicPlayer | null } = { current: null }
+  let currentWindow: BrowserWindow | null = null
+  let windowPlayer: WindowPlayer | null = null
+  let musicPlayer: MusicPlayer | null = null
   /** The window's engines as they stand: the video player's and the music engine's. */
   const engines = (): ClosableEngine[] => {
     const attached: (ClosableEngine | null)[] = [
-      players.current?.engine ?? null,
-      musics.current?.engine ?? null,
+      windowPlayer?.engine ?? null,
+      musicPlayer?.engine ?? null,
     ]
     return attached.filter((engine): engine is ClosableEngine => engine !== null)
   }
   const currentEngine = (): NativeEngine | null => {
-    const player = players.current
+    const player = windowPlayer
     return player === null ? null : player.engine.current()
   }
   // Timer callbacks (the open batches) call this too, so a closing window must not throw.
   const send = (event: DesktopEvent): void => {
-    const window = windows.current
+    const window = currentWindow
     if (window === null || window.isDestroyed() || window.webContents.isDestroyed()) return
     try {
       window.webContents.send(IPC_CHANNELS.event, event)
@@ -279,7 +253,7 @@ const startApp = (): void => {
   }
   const resizer = createWindowResizer()
   const liveWindow = (): BrowserWindow | null => {
-    const window = windows.current
+    const window = currentWindow
     if (window === null || window.isDestroyed()) return null
     return window
   }
@@ -298,7 +272,7 @@ const startApp = (): void => {
     // Read before mpv is asked anything: the window may close while its reads are out.
     const displayHz =
       window === null ? null : screen.getDisplayMatching(window.getBounds()).displayFrequency
-    const player = players.current
+    const player = windowPlayer
     const engine = currentEngine()
     return diagnosticsText({
       app: { version: app.getVersion(), isPackaged: app.isPackaged, arch: process.arch },
@@ -337,9 +311,9 @@ const startApp = (): void => {
    * Resolves once the window is open. The batches deliver only after the page's `ready`,
    * which the window's page sends, so by then it has resolved.
    */
-  const services: { ready: Promise<DesktopService> | null } = { ready: null }
+  let serviceReady: Promise<DesktopService> | null = null
   const openFromMain = async (paths: readonly string[]): Promise<void> => {
-    const service = await services.ready
+    const service = await serviceReady
     if (service === null) return
     announce(await service.openPaths(paths))
     reveal()
@@ -356,11 +330,10 @@ const startApp = (): void => {
   })
   // Shown first, so the page that answers a link is on a window the person can see.
   const openLinksFromMain = async (links: readonly string[]): Promise<void> => {
-    const service = await services.ready
+    const service = await serviceReady
     if (service === null) return
     reveal()
     announce(await service.openLinks(links))
-    reveal()
   }
 
   // The opener acts on the first link of a burst and asks about one server at a time.
@@ -391,7 +364,7 @@ const startApp = (): void => {
   app.on('will-finish-launching', () => {
     app.on('open-file', (event, path) => {
       event.preventDefault()
-      if (!launch.isWindowReady) marks.opened()
+      if (!isWindowReady) marks.opened()
       fileBatch.push(path)
     })
     app.on('open-url', (event, url) => {
@@ -402,52 +375,30 @@ const startApp = (): void => {
   launchPaths({ argv: process.argv, isDefaultApp: process.defaultApp }).forEach(fileBatch.push)
   linksFromArgv(process.argv).forEach(linkBatch.push)
 
-  const stateFile = join(userData, 'player-state.json')
-
   const createService = async (): Promise<DesktopService> => {
-    const store = createStateStore({
-      fs: TEXT_FS,
-      file: stateFile,
-      initial: await loadState({ fs: TEXT_FS, file: stateFile, now: Date.now }),
-      timers,
-      debounceMs: STATE_DEBOUNCE_MS,
-      onError: (error) => {
-        reportError({ text: 'Raven could not save its state.', error })
-        send({ type: DESKTOP_EVENTS.notice, message: STORE_NOTICES.state })
-      },
-    })
-    const configFile = join(userData, CONFIG_FILE)
-    const loadedConfig = await loadConfig({
-      fs: TEXT_FS,
-      file: configFile,
-      now: Date.now,
-      server: fixedServer,
-      newId: randomUUID,
-    })
-    // Written on the next tick after a change.
-    const config = createJsonStore({
-      fs: TEXT_FS,
-      file: configFile,
-      initial: loadedConfig.config,
-      timers,
-      debounceMs: 0,
-      onError: (error) => {
-        reportError({ text: 'Raven could not save its settings.', error })
-        send({ type: DESKTOP_EVENTS.notice, message: STORE_NOTICES.config })
-      },
-    })
-    const theServer = () => serverOf(config.read())
-    const serverOfId = (serverId: string) => serverById({ config: config.read(), serverId })
     /*
-     * Nothing opens an older Raven's server sessions any more, so none of the folders
-     * it removes is open; the removals go on while the window opens.
+     * Nothing opens an older Raven's server sessions any more, so none of the folders it removes
+     * is open; their removal runs beside the stores' reads, and goes on while the window opens.
      */
-    const formerSessions = await clearFormerPartitions({
-      dir: join(userData, PARTITIONS_DIR),
-      fs: { readdir: (path) => readdir(path), remove: removeTree },
-      timers,
-      warn,
-    })
+    const [stores, formerSessions] = await Promise.all([
+      openAppStores({
+        userData,
+        fixedServer,
+        timers,
+        onSaveFailed: ({ text, notice, error }) => {
+          reportError({ text, error })
+          send({ type: DESKTOP_EVENTS.notice, message: notice })
+        },
+        warn,
+      }),
+      clearFormerPartitions({
+        dir: join(userData, PARTITIONS_DIR),
+        fs: { readdir: (path) => readdir(path), remove: removeTree },
+        timers,
+        warn,
+      }),
+    ])
+    const { store, config, downloadsStore, server } = stores
     formerSessions.removing.catch((error: unknown) => {
       warn(`Raven could not clear its old server sessions: ${errorText(error)}`)
     })
@@ -455,184 +406,40 @@ const startApp = (): void => {
       warn(`Raven could not clear its old sign-ins: ${errorText(error)}`)
     })
     const grants = createGrants({ fs: { realpath, stat }, newId: randomUUID })
-    // The page enters the library PIN, so main's own calls carry the unlock cookie it holds.
-    const pageUnlock = createPageUnlock({ cookies: () => session.defaultSession.cookies, warn })
     /*
      * The page's sign in: a sign out ends what main holds on the account's behalf (`accessEnds`),
      * and a change of account reaches what keeps data per account (`accountSwitches`).
      */
-    const accessEnds = createServerSignal()
-    const accountSwitches = createServerSignal()
+    const accessEnds = createAccountSignal()
+    const accountSwitches = createAccountSignal()
     const account = createPageAccount({
       onSwitched: () => {
         log.info(account.accountId() === null ? 'signed out of raven' : 'signed in to raven')
-        accountSwitches.notify({ serverId: theServer().id })
+        accountSwitches.notify()
       },
-      onEnded: () => accessEnds.notify({ serverId: theServer().id }),
+      onEnded: () => accessEnds.notify(),
     })
-    type AccountIdOfProps = { serverId: string }
-
-    const accountIdOf = ({ serverId }: AccountIdOfProps): string | null =>
-      serverId === theServer().id ? account.accountId() : null
-    const serverCalls = createServerCalls({
-      serverOf: serverOfId,
-      fetch: fetchThrough((url, init) => net.fetch(url, init)),
-      authorize: ({ serverId }) => (serverId === theServer().id ? account.accessToken() : null),
-      unlockOf: ({ serverId }) =>
-        serverId === theServer().id ? pageUnlock() : Promise.resolve(null),
-      warn,
-    })
-    const accountTickets = createAccountTickets({
-      calls: serverCalls,
-      isSignedIn: (input) => accountIdOf(input) !== null,
-      now: Date.now,
-    })
-    // Where media is fetched from, for the relays and the downloads alike: one probe serves both.
-    const originPicks = createOriginPicks({
-      calls: serverCalls,
-      probe: fetchProbe,
-      probeClock: () => performance.now(),
-      now: Date.now,
-      warn,
-    })
-    const relay = createMediaRelay({
-      listen: listenOnLoopback({ createServer: (handler) => createServer(handler), warn }),
-      fetchUpstream: fetchRelayed,
-      tickets: accountTickets,
-      newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
-      // One load at a time: a new title retires the last one's secret.
-      capacity: 1,
-      picks: originPicks,
+    const plumbing = createServerPlumbing({
+      server,
+      account,
+      // The page enters the library PIN, so main's own calls carry the unlock cookie it holds.
+      unlockOf: createPageUnlock({ cookies: () => session.defaultSession.cookies, warn }),
+      accessEnds,
+      accountSwitches,
       timers,
       warn,
     })
-    /*
-     * A sign out: the title stops being relayed. A ticket is the account's that minted it, so
-     * another account mints its own.
-     */
-    accessEnds.listen(({ serverId }) => relay.closeServer(serverId))
-    accountSwitches.listen(({ serverId }) => accountTickets.forget(serverId))
-    // Signed in, the origins are probed at once, so the first title does not wait on the probe.
-    accountSwitches.listen(({ serverId }) => {
-      const server = serverOfId(serverId)
-      if (server === null || accountIdOf({ serverId }) === null) return
-      originPicks.originOf(server).catch(() => undefined)
-    })
-    const sources = createServerSources({
-      serverOf: serverOfId,
-      calls: serverCalls,
-      tickets: accountTickets,
-      relay,
-      picks: originPicks,
-      warn,
-    })
-    /*
-     * Music has a relay of its own, so a video and a track never retire each other's
-     * secrets, and it keeps two loads: the track playing and the one mpv opens after it.
-     */
-    const musicRelay = createMediaRelay({
-      listen: listenOnLoopback({ createServer: (handler) => createServer(handler), warn }),
-      fetchUpstream: fetchRelayed,
-      tickets: accountTickets,
-      newSecret: (bytes) => randomBytes(bytes).toString('base64url'),
-      capacity: 2,
-      picks: originPicks,
+    const downloads = openAppDownloads({
+      stores,
+      plumbing,
+      grants,
+      accountIdOf: () => account.accountId(),
+      accessEnds,
+      accountSwitches,
       timers,
-      warn,
-    })
-    accessEnds.listen(({ serverId }) => musicRelay.closeServer(serverId))
-    const musicSources = createServerSources({
-      serverOf: serverOfId,
-      calls: serverCalls,
-      tickets: accountTickets,
-      relay: musicRelay,
-      picks: originPicks,
-      warn,
-    })
-    /*
-     * Grants hold real paths, so the downloads are named from the real folder too: a profile
-     * reached through a link (a temporary folder on macOS) would otherwise match none of them.
-     */
-    const downloadsUserData = await realpath(userData).catch(() => userData)
-    const downloadsFile = join(userData, DOWNLOADS_FILE)
-    const loadedDownloads = await loadDownloads({ fs: TEXT_FS, file: downloadsFile, now: Date.now })
-    const downloadsStore = createJsonStore({
-      fs: TEXT_FS,
-      file: downloadsFile,
-      initial: loadedDownloads.state,
-      timers,
-      debounceMs: DOWNLOADS_DEBOUNCE_MS,
-      onError: (error) => {
-        reportError({ text: 'Raven could not save its downloads.', error })
-        send({ type: DESKTOP_EVENTS.notice, message: STORE_NOTICES.downloads })
-      },
-    })
-    /*
-     * Every download filed under the one server, its folders moved first, and saved before the
-     * config that says which servers were adopted, so a launch cut short does it all again.
-     */
-    const settled = await settleDownloads({
-      state: loadedDownloads.state,
-      serverId: theServer().id,
-      adopted: loadedConfig.adopted,
-      userData: downloadsUserData,
-      fs: { mkdir: makeDir, rename: ({ from, to }) => rename(from, to), exists },
-      warn,
-    })
-    downloadsStore.update(() => settled)
-    await downloadsStore.flush()
-    // The server keeps its id from launch to launch only once the config holding it is saved.
-    if (loadedConfig.isChanged) config.update((current) => ({ ...current }))
-    const downloads = createDownloadService({
-      store: downloadsStore,
-      config,
-      calls: serverCalls,
-      userData: downloadsUserData,
-      space: { mkdir: makeDir, statfs: (path) => statfs(path) },
-      timers,
-      now: Date.now,
-      newId: randomUUID,
       send,
       warn,
-      access: createMediaAccess({
-        serverOf: serverOfId,
-        picks: originPicks,
-        now: Date.now,
-        timers,
-        tickets: accountTickets,
-      }),
-      fetch: fetchDownload,
-      writeBytes: ({ path, bytes }) => writeFile(path, bytes),
-      fs: {
-        mkdir: makeDir,
-        rename: ({ from, to }) => rename(from, to),
-        rm: removeTree,
-        readdir: (path) => readdir(path),
-        openPart,
-        writeFile: ({ path, text }) => writeFile(path, text, 'utf8'),
-        size: sizeOf,
-      },
-      showItemInFolder: (path) => shell.showItemInFolder(path),
-      ready: app.whenReady(),
-      wasSetAside: loadedDownloads.wasSetAside,
-      // A test hook shortens the five minutes; a packaged app never reads it.
-      syncRetryMs: syncRetryFrom({ isPackaged: app.isPackaged, env: process.env }) ?? SYNC_RETRY_MS,
-      grants,
-      state: store,
-      stat: (path) => stat(path),
-      accountIdOf,
     })
-    /*
-     * Before the quit gate's own `before-quit`: each running file's bytes on disk are saved
-     * while it is still downloading, then every fetch is aborted, so the gate's first flush
-     * keeps them for the next launch. A run already renaming its finished video still marks
-     * it ready, which the gate's second flush writes.
-     */
-    app.once('before-quit', () => downloads.dispose())
-    // A sign out: the downloads fetched with the account's ticket stop too.
-    accessEnds.listen(({ serverId }) => downloads.accessEnded({ serverId }))
-    // Another account signed in, or none: what the last one watched stays with it.
-    accountSwitches.listen(({ serverId }) => downloads.accountSwitched({ serverId }))
 
     const updateSource = updateSourceFrom({ isPackaged: app.isPackaged, env: process.env })
     const updates = createUpdateService({
@@ -651,10 +458,10 @@ const startApp = (): void => {
       warn,
     })
     // Once, on the first page's `ready`, so the page is listening for the announcement.
-    const launchCheck = { isPending: updateSource.isLaunchCheckAllowed }
+    let isLaunchCheckPending = updateSource.isLaunchCheckAllowed
     const checkAtLaunch = (): void => {
-      if (!launchCheck.isPending) return
-      launchCheck.isPending = false
+      if (!isLaunchCheckPending) return
+      isLaunchCheckPending = false
       updates.atLaunch().catch((error: unknown) => {
         warn(`Raven could not check for updates: ${errorText(error)}`)
       })
@@ -665,7 +472,7 @@ const startApp = (): void => {
         filters: [{ name: 'Videos', extensions: [...VIDEO_EXTENSIONS] }],
         properties: ['openFile', 'multiSelections'],
       } satisfies OpenDialogOptions
-      const window = windows.current
+      const window = currentWindow
       const result =
         window === null
           ? await dialog.showOpenDialog(options)
@@ -690,13 +497,13 @@ const startApp = (): void => {
         fileBatch.ready()
         linkBatch.ready()
         checkAtLaunch()
-        const player = players.current
+        const player = windowPlayer
         if (player !== null) {
           player.connect().catch((error: unknown) => {
             warn(`Raven could not hand the page its player: ${errorText(error)}`)
           })
         }
-        const music = musics.current
+        const music = musicPlayer
         if (music === null) return
         music.connect().catch((error: unknown) => {
           warn(`Raven could not hand the page its music engine: ${errorText(error)}`)
@@ -719,11 +526,13 @@ const startApp = (): void => {
         write: async (output) => {
           config.update((current) => setOutput({ config: current, output }))
           const engine = currentEngine()
+          const applyVideo = async (): Promise<void> => {
+            if (engine === null) return
+            await engine.service.applyOutput({ output, devices: await readDevices(engine.mpv) })
+          }
           await Promise.all([
-            engine === null
-              ? Promise.resolve()
-              : engine.service.applyOutput({ output, devices: await readDevices(engine.mpv) }),
-            musics.current === null ? Promise.resolve() : musics.current.applyOutput(),
+            applyVideo(),
+            musicPlayer === null ? Promise.resolve() : musicPlayer.applyOutput(),
           ])
         },
       },
@@ -747,21 +556,15 @@ const startApp = (): void => {
         if (window === null) return
         resizer.move({ window, to })
       },
-      config,
       links: createLinkOpener({
         isServerOrigin: (origin) => namesServer({ server: fixedServer, origin }),
-        serverId: () => theServer().id,
         downloads,
         warn,
       }),
       updates,
       downloads,
       account,
-      titles: createServerTitles({
-        server: theServer,
-        downloads,
-        tickets: accountTickets,
-      }),
+      titles: createServerTitles({ serverId: server.id, downloads, tickets: plumbing.tickets }),
     })
 
     // mpv stops before the stores flush and before Electron tears the window down.
@@ -771,7 +574,7 @@ const startApp = (): void => {
         destroy: () => destroyEngines(engines()),
       },
       stores: [store, config, downloadsStore],
-      writes: { hasPending: serverCalls.hasPendingWrites, settle: serverCalls.settleWrites },
+      writes: { hasPending: plumbing.calls.hasPendingWrites, settle: plumbing.calls.settleWrites },
       log,
       warn,
       wait: (ms) => sleep(ms),
@@ -889,9 +692,9 @@ const startApp = (): void => {
 
     const window = openWindow({ store, launchedAt, appLog, platform })
     window.once('ready-to-show', () => {
-      launch.isWindowReady = true
+      isWindowReady = true
     })
-    windows.current = window
+    currentWindow = window
     // A test hook shortens both periods; a packaged app never reads it (Ruling 13).
     const budgetWindow = budgetWindowFrom({ isPackaged: app.isPackaged, env: process.env })
     const budgets = createBudgets({
@@ -904,46 +707,44 @@ const startApp = (): void => {
     const music = attachMusicPlayer({
       window,
       config,
-      sources: musicSources,
-      relay: musicRelay,
+      sources: plumbing.music.sources,
+      relay: plumbing.music.relay,
       downloads,
-      serverId: () => theServer().id,
       timers,
       platform,
       nativeTarget,
       info: (message) => log.info(message),
       warn,
     })
-    musics.current = music
-    players.current = attachPlayer({
+    musicPlayer = music
+    windowPlayer = attachPlayer({
       window,
       grants,
       config,
-      sources,
-      relay,
+      sources: plumbing.video.sources,
+      relay: plumbing.video.relay,
       marks,
       budgets,
       downloads,
-      serverOfId,
       timers,
       platform,
       nativeTarget,
       info: (message) => log.info(message),
       warn,
     })
-    closeWindowAfterEngines({ window, engines: [players.current.engine, music.engine] })
+    closeWindowAfterEngines({ window, engines: [windowPlayer.engine, music.engine] })
     // A quit holds the window open while it flushes, so no budget timer may fire meanwhile.
     app.once('before-quit', () => budgets.dispose())
     window.on('closed', () => {
-      windows.current = null
-      musics.current = null
+      currentWindow = null
+      musicPlayer = null
       budgets.dispose()
     })
     return service
   }
 
-  services.ready = createService()
-  services.ready.catch((error: unknown) => {
+  serviceReady = createService()
+  serviceReady.catch((error: unknown) => {
     reportError({ text: 'Raven could not start.', error })
     endAfterLog({ log, wait: (ms) => sleep(ms), end: () => app.exit(1) }).catch(reportEndFailure)
   })

@@ -18,6 +18,8 @@ import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { Filmographies } from '@/people/filmographies'
 import { PeopleRepository } from '@/people/peopleRepository'
+import { ROUTE_PARAMS } from '@/requestParts'
+import { QUERY_PARAMS, queryText } from '@/queryValues'
 
 /** How many people a name search weighs before it drops those with no title the caller sees. */
 const SEARCH_CANDIDATES = 40
@@ -44,7 +46,7 @@ export class PeopleController {
    * and a blank search finds no one.
    */
   @Get()
-  search(@Query('q') q: unknown, @Req() request: FastifyRequest): PersonMatch[] {
+  search(@Query(QUERY_PARAMS.search) q: unknown, @Req() request: FastifyRequest): PersonMatch[] {
     const search = isString(q) ? q.trim() : ''
     if (!search) return []
     const viewer = this.lock.viewer({ request })
@@ -75,7 +77,7 @@ export class PeopleController {
    */
   @Get(':id')
   async get(
-    @Param('id', ParseIntPipe) id: number,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Req() request: FastifyRequest,
   ): Promise<PersonDetails> {
     const person = this.metadata.person(id)
@@ -107,13 +109,17 @@ export class PeopleController {
   /** A person's photo from TMDB, fetched and cached on first use. */
   @Get(':id/photo')
   async photo(
-    @Param('id', ParseIntPipe) id: number,
-    @Query('v') version: string | undefined,
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Query(QUERY_PARAMS.version) version: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const photo = this.metadata.photo(id)
     const path =
       photo == null ? null : await this.images.tmdb({ path: photo, width: IMAGE_WIDTHS.photo })
-    await sendImage({ reply, path, version })
+    await sendImage({
+      reply,
+      path,
+      version: queryText({ value: version, name: QUERY_PARAMS.version }),
+    })
   }
 }

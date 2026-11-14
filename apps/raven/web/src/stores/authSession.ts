@@ -12,6 +12,7 @@ import {
 import { clearAccountState } from '@/lib/clearAccountState'
 import { queryKeys } from '@raven/ui/headless'
 import { queryClient } from '@/lib/queryClient'
+import { handled } from '@/lib/handled'
 
 export const AUTH_SESSION_STATUSES = { booting: 'booting', ready: 'ready' } as const
 export type AuthSessionStatus = (typeof AUTH_SESSION_STATUSES)[keyof typeof AUTH_SESSION_STATUSES]
@@ -96,7 +97,7 @@ type FollowAccountProps = {
  * left to the queries that show it.
  */
 const followAccount = ({ previous, next }: FollowAccountProps): void => {
-  if (previous?.userId === next?.userId) return
+  if ((previous?.userId ?? null) === (next?.userId ?? null)) return
   if (previous !== null) {
     clearAccountState({ queryClient }).catch(() => undefined)
     return
@@ -138,7 +139,7 @@ export const useAuthSession = create<AuthSessionState>()(
                 isRecovery:
                   next !== null &&
                   (event === AUTH_EVENTS.passwordRecovery ||
-                    (get().isRecovery && previous?.userId === next.userId)),
+                    (get().isRecovery && (previous?.userId ?? null) === next.userId)),
               })
               followAccount({ previous, next })
             })
@@ -149,7 +150,7 @@ export const useAuthSession = create<AuthSessionState>()(
           }
           // Supabase's code failing to load leaves nobody signed in, as a session that fails to read does.
           const build = () => {
-            void createClient({ config }).then(follow, () => settle(null))
+            handled(createClient({ config }).then(follow, () => settle(null)))
           }
           /*
            * Signed out, the sign-in page draws first and its form waits for the client, so the client

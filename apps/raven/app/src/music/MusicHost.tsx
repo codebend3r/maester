@@ -1,10 +1,11 @@
 import { useNativeAudioHost } from '@raven/native'
 import { unlockNow } from '@raven/native/headless'
 import { type ComponentType, useMemo } from 'react'
-import { Platform } from 'react-native'
 
 import { trackPlanFor } from '@/downloads/downloadVisibility'
 import { VideoAudioHost } from '@/music/VideoAudioHost'
+import { DEVICE_INPUT } from '@/platform/devicePlatform'
+import { INPUT_KINDS, type InputKind } from '@/platform/platform'
 import { mediaSourcesFor } from '@/player/mediaSources'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { useDownloads } from '@/stores/downloads'
@@ -37,16 +38,11 @@ const NativeAudioHost = ({ session: { server, api } }: NativeAudioHostProps) => 
 
 type MusicHostProps = { session: MusicSession }
 
-/** The devices music plays differently on: a TV, or a touch screen. */
-const HOST_KINDS = { tv: 'tv', touch: 'touch' } as const
-
-type HostKind = (typeof HOST_KINDS)[keyof typeof HOST_KINDS]
-
-/** The player each kind of device plays music through. */
+/** The player each kind of device plays music through: the video player on a TV, `@raven/audio` under the thumb. */
 const MUSIC_HOSTS = {
-  [HOST_KINDS.tv]: VideoAudioHost,
-  [HOST_KINDS.touch]: NativeAudioHost,
-} as const satisfies Record<HostKind, ComponentType<MusicHostProps>>
+  [INPUT_KINDS.focus]: VideoAudioHost,
+  [INPUT_KINDS.touch]: NativeAudioHost,
+} as const satisfies Record<InputKind, ComponentType<MusicHostProps>>
 
 /**
  * The one place music plays from, mounted above the routes so leaving a screen stops nothing:
@@ -54,6 +50,6 @@ const MUSIC_HOSTS = {
  * video player out of sight on a TV.
  */
 export const MusicHost = ({ session }: MusicHostProps) => {
-  const Host = MUSIC_HOSTS[Platform.isTV ? HOST_KINDS.tv : HOST_KINDS.touch]
+  const Host = MUSIC_HOSTS[DEVICE_INPUT]
   return <Host session={session} />
 }

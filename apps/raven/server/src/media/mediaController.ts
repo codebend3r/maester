@@ -41,7 +41,6 @@ import {
   isFavouriteChange,
   isProgressChange,
   isProgressReport,
-  isRecord,
   isStreamPurpose,
   isString,
   MEDIA_PURPOSE_PARAM,
@@ -58,8 +57,8 @@ import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { AccessRechecks } from '@/auth/accessRechecks'
 import { OpenedByPass, PASS_KINDS } from '@/auth/accountPasses'
 import { AuthSessions } from '@/auth/authSessions'
-import { ERROR_CODES, errorMessage } from '@/errorMessage'
-import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES, RAVEN_HEADERS } from '@/http'
+import { ERROR_CODES, errorCode, errorMessage } from '@/errorMessage'
+import { RAVEN_CACHE_POLICIES, RAVEN_CONTENT_TYPES } from '@/http'
 import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy } from '@/lock/lockGuard'
@@ -73,7 +72,6 @@ import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MediaRepository } from '@/media/mediaRepository'
 import { MEDIA_ROUTES, routeOf } from '@/media/mediaRoutes'
 import { RANGE_OUTCOMES, RANGE_UNITS, parseRange } from '@/media/range'
-import { ViewingAccounts } from '@/media/viewingAccounts'
 import { ServerEvents } from '@/events/serverEvents'
 import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ViewingRepository } from '@/media/viewingRepository'
@@ -85,9 +83,10 @@ import { clientOf, trackStream } from '@/streams/trackStream'
 import { StreamSessions } from '@/streams/streamSessions'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 import { ROUTE_PARAMS } from '@/requestParts'
-
-const errorCode = (error: unknown): string =>
-  isRecord(error) && isString(error.code) ? error.code : ''
+import { WatchNext } from '@/media/watchNext'
+import { QUERY_PARAMS, queryText } from '@/queryValues'
+import { PRIVACIES } from '@/lock/lockService'
+import { ViewingAccount } from '@/media/viewingAccountParam'
 
 /**
  * Video bytes come off the share in 1 MiB reads rather than Node's default
@@ -150,12 +149,13 @@ type MediaControllerSendRangesProps = {
 }
 
 @Controller(MEDIA_ROUTES)
-@PrivateBy('media')
+@PrivateBy(PRIVACIES.media)
 export class MediaController {
   private readonly logger = new Logger(MediaController.name)
 
   constructor(
     @Inject(MediaRepository) private readonly media: MediaRepository,
+    @Inject(WatchNext) private readonly watchNext: WatchNext,
     @Inject(ViewingRepository) private readonly viewing: ViewingRepository,
     @Inject(MediaIndex) private readonly index: MediaIndex,
     @Inject(MediaArtifacts) private readonly artifacts: MediaArtifacts,
@@ -163,7 +163,6 @@ export class MediaController {
     @Inject(ScannerService) private readonly scanner: ScannerService,
     @Inject(StreamSessions) private readonly streams: StreamSessions,
     @Inject(AccessRechecks) private readonly rechecks: AccessRechecks,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(ServerEvents) private readonly events: ServerEvents,
     @Inject(AuthSessions) private readonly callers: AuthSessions,
     @Inject(FilePasses) private readonly passes: Pick<FilePasses, 'hold'>,
@@ -181,23 +180,20 @@ export class MediaController {
     return item
   }
 
-  private fileOf(id: number): MediaFile {
-    const file = this.index.fileOf(id)
-    if (!file) throw new NotFoundException(`No media ${id}`)
-    return file
-  }
-
   /** The file as it is on disk, for what is made of it; 404 when the index names one that is gone. */
   private async sourceOf(id: number): Promise<MediaSource> {
-    const file = this.fileOf(id)
+    const file = this.index.requireFile(id)
     const source = await stat(file.path).catch(() => null)
     if (source === null || !source.isFile()) throw new NotFoundException(MISSING_FILE)
     return { file, source }
   }
 
   @Get(':id')
-  get(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number, @Req() request: FastifyRequest): MediaItem {
-    return this.find({ id, account: this.accounts.keyOf({ request }) })
+  get(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @ViewingAccount() account: AccountKey,
+  ): MediaItem {
+    return this.find({ id, account })
   }
 
   /**
@@ -211,12 +207,12 @@ export class MediaController {
     @Query(SESSION_PARAMS.session) session: unknown,
     @Query(SESSION_PARAMS.scope) scope: unknown,
     @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): MediaItem | null {
     const viewing = readSessionQuery({ session, scope })
     if (!viewing) throw new BadRequestException('session must name a viewing session')
-    const account = this.accounts.keyOf({ request })
     const viewer = this.lock.viewer({ request })
-    return this.media.nextInSession({
+    return this.watchNext.nextInSession({
       media: this.find({ id, account }),
       session: viewing,
       libraryIds: this.libraries.ids().filter((libraryId) => viewer.seesLibrary(libraryId)),
@@ -228,7 +224,7 @@ export class MediaController {
   @AdminOnly()
   @Get(':id/location')
   location(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number): MediaLocation {
-    return { path: this.fileOf(id).path }
+    return { path: this.index.requireFile(id).path }
   }
 
   @ForViewers()
@@ -238,6 +234,7 @@ export class MediaController {
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
     @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): void {
     const { position } = parseBody({
       guard: isProgressChange,
@@ -252,7 +249,6 @@ export class MediaController {
       position,
       audio,
     })
-    const account = this.accounts.keyOf({ request })
     if (!this.viewing.report({ id, position, account })) {
       throw new NotFoundException(`No media ${id}`)
     }
@@ -268,9 +264,8 @@ export class MediaController {
   @HttpCode(204)
   recordPlay(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
-    @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): void {
-    const account = this.accounts.keyOf({ request })
     if (!this.viewing.recordPlay({ id, account })) throw new NotFoundException(`No media ${id}`)
     this.events.viewingChanged(account)
     try {
@@ -286,14 +281,13 @@ export class MediaController {
   setFavourite(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
-    @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): MediaItem {
     const { favourite } = parseBody({
       guard: isFavouriteChange,
       body,
       message: 'favourite must be true or false',
     })
-    const account = this.accounts.keyOf({ request })
     const outcome = this.viewing.setFavourite({ id, favourite, account })
     switch (outcome) {
       case FAVOURITE_OUTCOMES.done:
@@ -320,7 +314,7 @@ export class MediaController {
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number): Promise<void> {
-    const file = this.fileOf(id)
+    const file = this.index.requireFile(id)
     await this.scanner.whenIdle(file.libraryId)
     try {
       await unlink(file.path)
@@ -337,12 +331,16 @@ export class MediaController {
   @Get(':id/thumbnail')
   async thumbnail(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
-    @Query('v') version: string | undefined,
+    @Query(QUERY_PARAMS.version) version: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const file = this.fileOf(id)
+    const file = this.index.requireFile(id)
     const path = file.thumbnail === THUMBNAIL_STATES.ready ? this.thumbnails.pathFor(id) : null
-    await sendImage({ reply, path, version })
+    await sendImage({
+      reply,
+      path,
+      version: queryText({ value: version, name: QUERY_PARAMS.version }),
+    })
   }
 
   /**
@@ -366,7 +364,7 @@ export class MediaController {
     @Req() request: FastifyRequest,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const file = this.fileOf(id)
+    const file = this.index.requireFile(id)
     await this.sendRanges({
       id,
       path: file.path,
@@ -447,10 +445,10 @@ export class MediaController {
   async deviceDownload(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Query(DEVICE_DOWNLOAD_VARIANT_PARAM) asked: unknown,
-    @Req() request: FastifyRequest,
+    @ViewingAccount() account: AccountKey,
   ): Promise<DeviceDownload> {
     const variant = deviceDownloadVariantOf(asked)
-    const media = this.find({ id, account: this.accounts.keyOf({ request }) })
+    const media = this.find({ id, account })
     const { file, source } = await this.sourceOf(media.id)
     if (isAudioContainer(file.container)) {
       throw new ConflictException('Only a video is copied for a device.')
@@ -538,7 +536,7 @@ export class MediaController {
       onEnd,
     })
     reply
-      .header(RAVEN_HEADERS.acceptRanges, RANGE_UNITS.bytes)
+      .header(HEADERS.acceptRanges, RANGE_UNITS.bytes)
       .header(HEADERS.contentType, contentType)
       .header(HEADERS.cacheControl, RAVEN_CACHE_POLICIES.privateRevalidate)
 

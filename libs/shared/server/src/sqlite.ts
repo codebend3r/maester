@@ -15,7 +15,7 @@ type MigrateProps = {
  * database at the version before it. Append new migrations; never edit a
  * shipped one, since existing databases have already run it.
  */
-export const migrate = ({ db, migrations }: MigrateProps): void => {
+const migrate = ({ db, migrations }: MigrateProps): void => {
   const current = Number(db.pragma('user_version', { simple: true }))
   migrations.slice(current).forEach((sql, offset) => {
     db.transaction(() => {

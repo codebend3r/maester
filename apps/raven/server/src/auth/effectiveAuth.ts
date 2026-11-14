@@ -8,9 +8,12 @@ import { SettingsRepository } from '@/settings/settingsRepository'
 export const AUTH_STATE = Symbol('AUTH_STATE')
 
 export const ENFORCEMENT_RECORDS = { keep: 'keep', mark: 'mark', forget: 'forget' } as const
-export type EnforcementRecord = (typeof ENFORCEMENT_RECORDS)[keyof typeof ENFORCEMENT_RECORDS]
+type EnforcementRecord = (typeof ENFORCEMENT_RECORDS)[keyof typeof ENFORCEMENT_RECORDS]
 
 const UNAVAILABLE: AuthConfig = { state: AUTH_CONFIG_STATES.unavailable }
+
+/** The auth state the server runs in, and the enforcement record it was read with. */
+type EffectiveAuth = { auth: AuthConfig; record: EnforcementRecord }
 
 type EffectiveAuthProps = {
   configured: AuthConfig
@@ -27,7 +30,7 @@ export const effectiveAuth = ({
   configured,
   hasEnforced,
   isOptedOut,
-}: EffectiveAuthProps): { auth: AuthConfig; record: EnforcementRecord } => {
+}: EffectiveAuthProps): EffectiveAuth => {
   const failClosed = { auth: UNAVAILABLE, record: ENFORCEMENT_RECORDS.keep }
   switch (configured.state) {
     case AUTH_CONFIG_STATES.ready:

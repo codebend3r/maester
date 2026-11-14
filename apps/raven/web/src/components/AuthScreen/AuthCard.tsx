@@ -1,5 +1,5 @@
 import type { FormEvent, ReactNode } from 'react'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { Logo } from '@/components/Logo/Logo'
 import styles from '@/components/AuthScreen/AuthScreen.module.scss'
 
@@ -44,7 +44,7 @@ type SubmitButtonProps = {
 }
 
 export const SubmitButton = ({ isDisabled, children }: SubmitButtonProps) => (
-  <Button type="submit" tone="primary" className={styles.submit} disabled={isDisabled}>
+  <Button type="submit" tone={BUTTON_TONES.primary} className={styles.submit} disabled={isDisabled}>
     {children}
   </Button>
 )

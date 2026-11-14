@@ -1,8 +1,9 @@
 import { Icon } from '@raven/native'
 import type { ReactNode } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { BUTTON_TONES } from '@raven/native/headless'
 
-import { BUTTON_TONES, type FormKit } from '@/layouts/formKit'
+import { type FormKit } from '@/layouts/formKit'
 import { focusForm } from '@/layouts/Form.focus'
 import { touchForm } from '@/layouts/Form.touch'
 import { LOCKED_LIBRARY_COPY, PIN_PAD_COPY } from '@/layouts/copy'
@@ -20,6 +21,7 @@ import { BODY_FONT } from '@/theme/fonts'
 import { OPACITIES, SIZES, type Sizes } from '@/theme/appTheme'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 type LockKitForProps = {
   sizes: Sizes
@@ -119,7 +121,7 @@ const lockKitFor = ({ sizes, ring, form: { FormButton } }: LockKitForProps): Loc
     return (
       <View accessibilityLabel={LOCKED_LIBRARY_COPY.locked} style={styles.locked}>
         <View style={styles.lockMark}>
-          <Icon colour={text} name="lock" size={sizes.textXl} />
+          <Icon colour={text} name={APP_ICONS.lock} size={sizes.textXl} />
         </View>
         <Text style={styles.message}>{LOCKED_LIBRARY_COPY.isLocked(name)}</Text>
         {canUnlock && (
@@ -227,7 +229,7 @@ const lockKitFor = ({ sizes, ring, form: { FormButton } }: LockKitForProps): Loc
                 ))}
                 <View style={styles.padRow}>
                   <PadKey isDisabled={isEmpty} label={PIN_PAD_COPY.backspace} onPress={onBackspace}>
-                    <Icon colour={palette.text} name="backspace" size={sizes.textXl} />
+                    <Icon colour={palette.text} name={APP_ICONS.backspace} size={sizes.textXl} />
                   </PadKey>
                   <DigitKey digit={PAD_ZERO} onDigit={onDigit} />
                   <PadKey
@@ -236,7 +238,7 @@ const lockKitFor = ({ sizes, ring, form: { FormButton } }: LockKitForProps): Loc
                     label={PIN_PAD_COPY.unlock}
                     onPress={onUnlock}
                   >
-                    <Icon colour={palette.onAccent} name="unlock" size={sizes.textXl} />
+                    <Icon colour={palette.onAccent} name={APP_ICONS.unlock} size={sizes.textXl} />
                   </PadKey>
                 </View>
               </View>

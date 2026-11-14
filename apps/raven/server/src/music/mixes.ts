@@ -7,10 +7,10 @@ import {
   type RecentAlbums,
   type Track,
 } from '@raven/core'
-import { CLOCK, type Clock } from '@/clock'
+import { CLOCK, type Clock, utcDayOf } from '@/clock'
 import { DatabaseService } from '@/db/database'
 import { LISTENABLE, type ListenerScope, listenerParams } from '@/music/listenerScope'
-import { dayShuffle, interleaved, utcDayOf } from '@/music/mixOrder'
+import { dayShuffle, interleaved } from '@/music/mixOrder'
 import { MusicRepository } from '@/music/musicRepository'
 
 const DAY_MS = 24 * 60 * 60 * 1000

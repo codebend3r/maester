@@ -1,17 +1,13 @@
 import {
   type DesktopPlatform,
-  isNumber,
-  isTrackIndex,
   PLAYER_COMMANDS,
   PLAYER_ERROR_REASONS,
   PLAYER_EVENTS,
   PLAYER_SOURCE_KINDS,
   type PlayerCommand,
-  type PlayerErrorReason,
   type PlayerEvent,
 } from '@raven/core'
 import {
-  MPV_CHOICES,
   MPV_COMMANDS,
   MPV_END_FILE_REASONS,
   MPV_EVENTS,
@@ -21,10 +17,13 @@ import {
   MPV_SEEK_MODES,
   type MpvEvent,
   type MpvProperty,
-  type MpvTrack,
 } from '@raven/mpv'
-import { SPEED_RANGE, clamp, numbersOf } from '@/main/player/commandNumbers'
+import { quietly } from '@/main/log/quietly'
+import { createBufferedRanges } from '@/main/player/bufferedRanges'
+import { createEndingReports, LOST } from '@/main/player/endingReports'
+import { clamp, numbersOf } from '@/main/player/commandNumbers'
 import { displayOptions } from '@/main/player/displayOptions'
+import { EOF_SHORT_S, ENDINGS, endingOf, type Failure } from '@/main/player/endings'
 import { HARDENED_OPTIONS } from '@/main/player/engine'
 import { guardedMpv, type MpvControl } from '@/main/player/guardedMpv'
 import {
@@ -34,34 +33,43 @@ import {
   loadfileOptionsFor,
   locationOf,
   type ResolveSource,
-  type ServerTarget,
   sidecarsOfTarget,
   withoutTarget,
 } from '@/main/player/loadTarget'
 import { ENGINE_GONE, OK, type PlayerOutcome, refuse } from '@/main/player/outcomes'
-import {
-  type ApplyOutputProps,
-  isVolumeFixedFor,
-  MPV_OPTIONS,
-  outputOptions,
-} from '@/main/player/outputOptions'
-import { type Phase, PLAYER_PHASES, type ShowingPhase } from '@/main/player/phases'
+import { type ApplyOutputProps, isVolumeFixedFor, outputOptions } from '@/main/player/outputOptions'
+import { PLAYER_PHASES } from '@/main/player/phases'
+import { type CommandOf, createCommandRouter } from '@/main/player/playerCommands'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import { createQuietMpv } from '@/main/player/quietMpv'
-import { subtitleStyleOptions } from '@/main/player/subtitleLook'
+import {
+  applyOutputOptions,
+  createCommandHandler,
+  createListeners,
+  reporting,
+} from '@/main/player/serviceKit'
 import { createSidecarAdder } from '@/main/player/sidecars'
-import { createThrottle } from '@/main/player/throttle'
-import { aidFor, sidFor, tracksFromMpv } from '@/main/player/tracksFromMpv'
-import type { Timers } from '@/main/stateStore'
+import { createStallBudget } from '@/main/player/stallBudget'
+import { createTimeReader } from '@/main/player/timeReader'
+import { createTrackPicks } from '@/main/player/trackPicks'
+import {
+  DEAD,
+  type FileState,
+  freshFile,
+  IDLE,
+  isLoaded,
+  isShowing,
+  type PlayerState,
+  type Title,
+  titleOf,
+} from '@/main/player/titleState'
+import { sidFor, tracksFromMpv } from '@/main/player/tracksFromMpv'
+import type { Timers } from '@/main/timers'
 import { messageOf } from '@/shared/messageOf'
 
 export type PlayerActivity = { isPlaying: boolean; isShowing: boolean }
 
-/**
- * How long a server title may wait on its server without the clock moving or bytes arriving
- * before the service gives up on it. lavf's own timeouts and reconnects let a server that accepts
- * and then sends nothing hold the page for about two minutes.
- */
+/** How long a server title may wait on its server without the clock moving or bytes arriving. */
 export const SERVER_STALL_MS = 30_000
 
 export const OBSERVED = [
@@ -76,15 +84,9 @@ export const OBSERVED = [
   MPV_PROPERTIES.demuxerCacheState,
 ] as const satisfies readonly MpvProperty[]
 
-export const BUFFERED_MS = 1000
-/** The quiet page hears `time` at most four times a second, whichever path sends it. */
-export const TIME_MS = 250
-const EOF_SHORT_S = 5
-
-/** How far a buffered range edge must move before the page hears of it. */
-const BUFFERED_STEP_S = 0.5
-
 type ApplyDisplayProps = { refreshRate: number; edrHeadroom: number }
+
+type MpvEndReason = (typeof MPV_END_FILE_REASONS)[keyof typeof MPV_END_FILE_REASONS]
 
 export type PlayerService = {
   handle: (command: PlayerCommand) => Promise<PlayerOutcome>
@@ -102,23 +104,6 @@ export type PlayerService = {
   applyDisplay: (input: ApplyDisplayProps) => Promise<void>
 }
 
-type Range = { start: number; end: number }
-type Wanted = { audio: number | null; subtitle: string | null }
-
-type HasMovedProps = { shown: readonly Range[] | null; next: readonly Range[] }
-
-const hasMoved = ({ shown, next }: HasMovedProps) =>
-  shown === null ||
-  shown.length !== next.length ||
-  next.some((range, position) => {
-    const before = shown[position]
-    if (before === undefined) return true
-    return (
-      Math.abs(range.start - before.start) >= BUFFERED_STEP_S ||
-      Math.abs(range.end - before.end) >= BUFFERED_STEP_S
-    )
-  })
-
 type CreatePlayerServiceProps = {
   mpv: MpvControl
   resolveSource: ResolveSource
@@ -135,6 +120,11 @@ type CreatePlayerServiceProps = {
   warn: (message: string) => void
 }
 
+/** What the page is told while a title opens and once it has closed: shown, not playing. */
+const SHOWING_STILL: PlayerActivity = { isPlaying: false, isShowing: true }
+
+const NOTHING_SHOWN: PlayerActivity = { isPlaying: false, isShowing: false }
+
 export const createPlayerService = ({
   mpv: unguarded,
   resolveSource,
@@ -148,190 +138,63 @@ export const createPlayerService = ({
   onFirstFrame: reportFirstFrame,
   warn: reportWarning,
 }: CreatePlayerServiceProps): PlayerService => {
+  let state: PlayerState = IDLE
   /*
-   * What the newest load opened, and its ticket, which an ending explains and a server's
-   * removal stops.
-   */
-  let opened: LoadTarget | null = null
-  // These run inside the wrapper's event drain, so nothing they throw may escape.
-  const warn = (message: string) => {
-    try {
-      reportWarning(withoutTarget({ target: opened, message }))
-    } catch {
-      // A warning that cannot be written has nowhere left to go.
-    }
-  }
-  const onActivity = (activity: PlayerActivity) => {
-    try {
-      reportActivity(activity)
-    } catch (error) {
-      warn(`player activity failed: ${messageOf(error)}`)
-    }
-  }
-  const onFirstFrame = () => {
-    try {
-      reportFirstFrame()
-    } catch (error) {
-      warn(`player first frame failed: ${messageOf(error)}`)
-    }
-  }
-
-  const mpv = guardedMpv(unguarded)
-
-  const listeners = new Set<(event: PlayerEvent) => void>()
-  // A function, so the check after an await reads the phase as it is then.
-  const isDead = () => phase === PLAYER_PHASES.dead
-  /** What a command overtaken during an await answers: the engine stopping is a failure. */
-  const overtaken = () => (isDead() ? ENGINE_GONE : OK)
-  let phase: Phase = PLAYER_PHASES.idle
-  /*
-   * Bumped by every load, file-loaded, stop, ending and engine stop, so an async step
-   * started for one of them notices it was overtaken and goes no further.
+   * Bumped by every change of phase (a load, a file-loaded, a stop, an ending, an engine stop),
+   * so an async step started for one of them notices it was overtaken and goes no further.
    */
   let epoch = 0
+  // Counted up by each load: the newest title's generation.
+  let generations = 0
   /*
-   * Bumped by every load, stop, ending and engine stop but never by file-loaded: a
-   * replaced file's file-loaded can land while a load waits on mpv, and must not make
-   * that load think it was overtaken and skip its loadfile.
-   */
-  let generation = 0
-  /*
-   * The newest generation whose loadfile mpv accepted, marked in stream order by the
-   * wrapper's `onReply`. Events are ordered with replies, so a file-loaded, end-file or
-   * redirect that comes before it belongs to the file this load replaces, and one after
-   * a refused loadfile belongs to no load at all.
+   * The newest generation whose loadfile mpv accepted, marked in stream order by the wrapper's
+   * `onReply`. Events are ordered with replies, so a file-loaded, end-file or redirect that comes
+   * before it belongs to the file this load replaces, and one after a refused loadfile belongs to
+   * no load at all.
    */
   let answeredGeneration = -1
-  /*
-   * Bumped by every load and stop, so a load still resolving its source notices it was
-   * overtaken before it touches anything.
-   */
+  // Bumped by every load and stop, so a load still resolving its source notices it was overtaken.
   let loadTicket = 0
-  let openedTicket = 0
   // Loads the stall budget ended while they waited on mpv: they answer a lost connection.
   let stalledTickets: ReadonlySet<number> = new Set()
-  /*
-   * Bumped as each subtitle pick starts, before mpv hears it, so a late sidecar's
-   * selection can tell a pick still on its way.
-   */
-  let subtitlePicks = 0
-  let wanted: Wanted = { audio: null, subtitle: null }
-  let pendingSeek: number | null = null
-  let loadStart = 0
-  let isAwaitingFirstFrame = false
   let isVolumeFixed = false
-  let lastTime: number | null = null
-  let duration: number | null = null
-  let trackList: readonly MpvTrack[] = []
-  let frameRate: number | null = null
-  let isPausedForCache = false
-  let isSeeking = false
-  let isWaiting = false
-  let bufferedShown: readonly Range[] | null = null
-  let stallTimer: unknown = null
-  /*
-   * The newest time handed to the page, sent or held, and a count of the seeks sent, so
-   * a time read that answers late cannot step the clock back unless a seek moved it.
-   */
-  let shownTime: number | null = null
-  let seeks = 0
-  let isReadingTime = false
-  let isTimeReadWanted = false
+  // What the newest load opened, kept past its end so its late warnings are redacted too.
+  let lastTarget: LoadTarget | null = null
 
-  const emit = (event: PlayerEvent) => {
-    Array.from(listeners).forEach((listener) => {
-      try {
-        listener(event)
-      } catch (error) {
-        warn(`player listener failed: ${messageOf(error)}`)
-      }
-    })
+  // These run inside the wrapper's event drain, so nothing they throw may escape.
+  const warn = quietly((message) => reportWarning(withoutTarget({ target: lastTarget, message })))
+  const onActivity = reporting({ report: reportActivity, warn, what: 'player activity' })
+  const onFirstFrame = reporting({ report: reportFirstFrame, warn, what: 'player first frame' })
+  const { emit, subscribe } = createListeners<PlayerEvent>({ warn, what: 'player listener' })
+
+  const mpv = guardedMpv(unguarded)
+  const { set: setQuietly, setEach, readOr, harden } = createQuietMpv({ mpv, warn })
+
+  const isDead = () => state.phase === PLAYER_PHASES.dead
+  /** What a command overtaken during an await answers: the engine stopping is a failure. */
+  const overtaken = () => (isDead() ? ENGINE_GONE : OK)
+  const isCurrent = (token: number) => token === epoch
+
+  const fileOf = (): FileState | null => (isLoaded(state) ? state.file : null)
+
+  const updateFile = (change: Partial<FileState>): void => {
+    if (!isLoaded(state)) return
+    state = { ...state, file: { ...state.file, ...change } }
   }
 
-  const emitTracks = () => {
-    emit({ type: PLAYER_EVENTS.tracks, tracks: tracksFromMpv({ list: trackList, frameRate }) })
+  const updateTitle = (change: Partial<Title>): void => {
+    if (!isShowing(state)) return
+    state = { ...state, title: { ...state.title, ...change } }
   }
 
-  const buffered = createThrottle<readonly Range[]>({
-    timers,
-    ms: BUFFERED_MS,
-    show: (ranges) => {
-      if (!hasMoved({ shown: bufferedShown, next: ranges })) return false
-      bufferedShown = ranges
-      emit({
-        type: PLAYER_EVENTS.buffered,
-        ranges: ranges.map(({ start, end }) => ({ start, end })),
-      })
-      return true
-    },
-  })
-
-  const clearBuffered = () => {
-    buffered.clear()
-    bufferedShown = null
+  const isOwed = (): boolean => {
+    if (!isShowing(state) || state.title.target.kind !== PLAYER_SOURCE_KINDS.server) return false
+    return state.phase === PLAYER_PHASES.loading || state.file.isWaiting
   }
 
-  /** What the newest load opened, when it is a server title. */
-  const serverOpened = (): ServerTarget | null =>
-    opened !== null && opened.kind === PLAYER_SOURCE_KINDS.server ? opened : null
-
-  const clearStall = () => {
-    if (stallTimer !== null) timers.clear(stallTimer)
-    stallTimer = null
-  }
-
-  const time = createThrottle<number>({
-    timers,
-    ms: TIME_MS,
-    show: (value) => {
-      emit({ type: PLAYER_EVENTS.time, time: value })
-      return true
-    },
-  })
-
-  const clearTime = () => {
-    time.clear()
-    shownTime = null
-  }
-
-  const showTime = (value: number) => {
-    shownTime = value
-    time.push(value)
-  }
-
-  const resetFile = () => {
-    clearTime()
-    lastTime = null
-    duration = null
-    trackList = []
-    frameRate = null
-    isPausedForCache = false
-    isSeeking = false
-    isWaiting = false
-    clearStall()
-    clearBuffered()
-  }
-
-  const settleTo = (next: typeof PLAYER_PHASES.idle | typeof PLAYER_PHASES.dead) => {
-    phase = next
-    epoch += 1
-    generation += 1
-    pendingSeek = null
-    isAwaitingFirstFrame = false
-    clearBuffered()
-    clearTime()
-    clearStall()
-  }
-
-  /** Whether the server owes the title something: still opening, or loaded and waiting. */
-  const isOwed = () =>
-    serverOpened() !== null &&
-    (phase === PLAYER_PHASES.loading || (phase === PLAYER_PHASES.loaded && isWaiting))
-
-  /** The account failure the relay saw for the open server title, or null. */
-  const accountRefusal = (): ReturnType<AccountRefusalReader> => {
-    const target = serverOpened()
-    if (target === null) return null
+  /** The account failure the relay saw for a server title, or null. */
+  const accountRefusalOf = (target: LoadTarget): Failure | null => {
+    if (target.kind !== PLAYER_SOURCE_KINDS.server) return null
     try {
       return refusedAccount(target)
     } catch (error) {
@@ -340,137 +203,164 @@ export const createPlayerService = ({
     }
   }
 
-  /**
-   * The server has kept a title opening, or loaded and waiting with its clock still, for
-   * `serverStallMs`: the load ends as a lost connection, as a file that stops does, unless the
-   * relay saw its account refused. The load itself was answered once mpv took its loadfile, so
-   * the page hears it here.
-   */
-  const onServerStalled = (token: number) => {
-    stallTimer = null
-    if (token !== epoch || !isOwed()) return
-    stalledTickets = new Set([...stalledTickets, openedTicket])
-    settleTo(PLAYER_PHASES.idle)
-    warn(`a server title waited ${serverStallMs} ms on its server, so it stops`)
-    const failure = accountRefusal() ?? {
-      reason: PLAYER_ERROR_REASONS.network,
-      message: PLAYER_MESSAGES.lost,
-    }
-    emit({ type: PLAYER_EVENTS.error, ...failure })
-    onActivity({ isPlaying: false, isShowing: true })
+  const stopQuietly = () => {
     mpv.command({ args: [MPV_COMMANDS.stop] }).catch((error: unknown) => {
       warn(`mpv stop failed: ${messageOf(error)}`)
     })
   }
 
-  /** Starts the stall budget over while the server owes the title something; clears it otherwise. */
-  const restartStall = () => {
-    clearStall()
-    if (!isOwed()) return
-    const token = epoch
-    stallTimer = timers.set({ run: () => onServerStalled(token), ms: serverStallMs })
+  /*
+   * The server has kept a title opening, or loaded and waiting with its clock still, for the
+   * budget: the load ends as a lost connection, as a file that stops does, unless the relay saw
+   * its account refused. The load itself was answered once mpv took its loadfile, so the page
+   * hears it here.
+   */
+  const onServerStalled = () => {
+    const title = titleOf(state)
+    if (title === null) return
+    stalledTickets = new Set([...stalledTickets, title.ticket])
+    enter(IDLE)
+    warn(`a server title waited ${serverStallMs} ms on its server, so it stops`)
+    emit({ type: PLAYER_EVENTS.error, ...(accountRefusalOf(title.target) ?? LOST) })
+    onActivity(SHOWING_STILL)
+    stopQuietly()
+  }
+
+  const stall = createStallBudget({
+    timers,
+    ms: serverStallMs,
+    epoch: () => epoch,
+    isOwed,
+    onStalled: onServerStalled,
+  })
+
+  const clock = createTimeReader({
+    timers,
+    show: (time) => emit({ type: PLAYER_EVENTS.time, time }),
+    read: () => readOr({ name: MPV_PROPERTIES.timePos, fallback: null }),
+    epoch: () => epoch,
+    isLoaded: () => isLoaded(state),
+    onRead: (time) => noteTime(time),
+    warn,
+  })
+
+  const { finish } = createEndingReports({ emit, warn, explain, epoch: () => epoch })
+
+  const buffered = createBufferedRanges({
+    timers,
+    show: (ranges) => emit({ type: PLAYER_EVENTS.buffered, ranges }),
+  })
+
+  /** Every change of phase: what the last one timed or held is dropped with it. */
+  const enter = (next: PlayerState) => {
+    state = next
+    epoch += 1
+    clock.clear()
+    stall.clear()
+    buffered.clear()
+  }
+
+  /** A time mpv gave: a clock that moved starts the stall budget over. */
+  const noteTime = (time: number) => {
+    if (time !== (fileOf()?.lastTime ?? null)) stall.touch()
+    updateFile({ lastTime: time })
+    clock.show(time)
+  }
+
+  const emitTracks = () => {
+    const file = fileOf()
+    if (file === null) return
+    emit({
+      type: PLAYER_EVENTS.tracks,
+      tracks: tracksFromMpv({ list: file.trackList, frameRate: file.frameRate }),
+    })
   }
 
   const updateWaiting = () => {
-    const next = isPausedForCache || isSeeking
-    if (next === isWaiting) return
-    isWaiting = next
-    restartStall()
+    const file = fileOf()
+    if (file === null) return
+    const next = file.isPausedForCache || file.isSeeking
+    if (next === file.isWaiting) return
+    updateFile({ isWaiting: next })
+    stall.restart()
     emit({ type: PLAYER_EVENTS.waiting, waiting: next })
   }
 
-  const { set: setQuietly, setEach, readOr, harden } = createQuietMpv({ mpv, warn })
-
-  const aidOf = (index: number | null) => {
-    if (index === null || !isTrackIndex(index)) return MPV_CHOICES.auto
-    return aidFor({ list: trackList, index }) ?? MPV_CHOICES.auto
-  }
-
-  const sidOf = (id: string | null) => {
-    if (id === null) return 'no'
-    return sidFor({ list: trackList, id }) ?? 'no'
-  }
-
   const seekTarget = (value: number) =>
-    clamp({ value, min: 0, max: duration ?? Number.POSITIVE_INFINITY })
+    clamp({ value, min: 0, max: fileOf()?.duration ?? Number.POSITIVE_INFINITY })
 
   /**
-   * The target counts as the time from the moment it is sent, since the eof a seek to the
-   * end causes can beat its reply, and a time held from before it is dropped so the
-   * scrubber cannot jump back while a slow seek lands. A refused seek puts the time back.
+   * The target counts as the time from the moment it is sent, since the eof a seek to the end
+   * causes can beat its reply, and a time held from before it is dropped so the scrubber cannot
+   * jump back while a slow seek lands. A refused seek puts the time back.
    */
   const sendSeek = async (target: number) => {
-    const previous = lastTime
+    const previous = fileOf()?.lastTime ?? null
     const token = epoch
-    lastTime = target
-    time.drop()
-    shownTime = null
-    seeks += 1
+    updateFile({ lastTime: target })
+    clock.seeking()
     try {
       await mpv.command({ args: [MPV_COMMANDS.seek, String(target), MPV_SEEK_MODES.absolute] })
     } catch (error) {
-      if (token === epoch && lastTime === target) lastTime = previous
+      if (isCurrent(token) && (fileOf()?.lastTime ?? null) === target)
+        updateFile({ lastTime: previous })
       throw error
     }
   }
 
-  const sidecarAdder = createSidecarAdder({
+  const sidecarAdder = createSidecarAdder({ mpv, timers, warn, isCurrent })
+
+  const { aidOf, sidOf, audio, subtitle, selectLateSubtitle } = createTrackPicks({
     mpv,
-    timers,
-    warn,
-    isCurrent: (token) => token === epoch,
+    quiet: { readOr, set: setQuietly },
+    trackList: () => fileOf()?.trackList ?? [],
+    title: () => titleOf(state),
+    isLoading: () => state.phase === PLAYER_PHASES.loading,
+    keep: (wanted) => {
+      const title = titleOf(state)
+      if (title !== null) updateTitle({ wanted: { ...title.wanted, ...wanted } })
+    },
+    epoch: () => epoch,
+    overtaken,
   })
 
-  type SelectLateSubtitleProps = {
-    pending: Promise<boolean>
-    token: number
-    id: string
-  }
-
-  /**
-   * The subtitle the load asked for may be a sidecar that came after the budget: once the
-   * late sidecars are in, it is selected, unless the file changed or the page picked
-   * another meanwhile, even one mpv has not answered yet.
-   */
-  const selectLateSubtitle = async ({ pending, token, id }: SelectLateSubtitleProps) => {
-    const picks = subtitlePicks
-    const isWanted = () => token === epoch && subtitlePicks === picks && wanted.subtitle === id
-    const isCurrent = await pending
-    if (!isCurrent || !isWanted()) return
-    const list = await readOr({ name: MPV_PROPERTIES.trackList, fallback: [] })
-    if (!isWanted()) return
-    const sid = sidFor({ list, id })
-    if (sid === null) return
-    await setQuietly({ name: MPV_PROPERTIES.sid, value: sid })
-  }
-
+  /** The newly loaded file's tracks, the page's picks applied, and everything the page shows. */
   const snapshot = async (token: number) => {
-    const toAdd = opened === null ? [] : sidecarsOfTarget(opened)
+    const target = titleOf(state)?.target ?? null
+    const toAdd = target === null ? [] : sidecarsOfTarget(target)
     // With nothing to add there is nothing to wait for, so no budget timer is armed.
     const sidecars =
-      opened === null || toAdd.length === 0
+      target === null || toAdd.length === 0
         ? { isCurrent: true, pending: null }
-        : await sidecarAdder.addWithinBudget({ sidecars: toAdd, kind: opened.kind, token })
+        : await sidecarAdder.addWithinBudget({ sidecars: toAdd, kind: target.kind, token })
     if (!sidecars.isCurrent) return
-    const list = await readOr({ name: MPV_PROPERTIES.trackList, fallback: [] })
-    const fps = await readOr({ name: MPV_PROPERTIES.containerFps, fallback: null })
-    const length = await readOr({ name: MPV_PROPERTIES.duration, fallback: null })
-    if (token !== epoch) return
-    trackList = list
-    frameRate = fps
-    duration = length
-    await setQuietly({ name: MPV_PROPERTIES.aid, value: aidOf(wanted.audio) })
-    if (token !== epoch) return
-    await setQuietly({ name: MPV_PROPERTIES.sid, value: sidOf(wanted.subtitle) })
-    if (token !== epoch) return
-    const missing = wanted.subtitle
-    if (sidecars.pending !== null && missing !== null && sidFor({ list, id: missing }) === null) {
+    const [trackList, frameRate, duration] = await Promise.all([
+      readOr({ name: MPV_PROPERTIES.trackList, fallback: [] }),
+      readOr({ name: MPV_PROPERTIES.containerFps, fallback: null }),
+      readOr({ name: MPV_PROPERTIES.duration, fallback: null }),
+    ])
+    if (!isCurrent(token)) return
+    updateFile({ trackList, frameRate, duration })
+    await setQuietly({
+      name: MPV_PROPERTIES.aid,
+      value: aidOf(titleOf(state)?.wanted.audio ?? null),
+    })
+    if (!isCurrent(token)) return
+    await setQuietly({
+      name: MPV_PROPERTIES.sid,
+      value: sidOf(titleOf(state)?.wanted.subtitle ?? null),
+    })
+    if (!isCurrent(token)) return
+    const missing = titleOf(state)?.wanted.subtitle ?? null
+    const isMissing = missing !== null && sidFor({ list: trackList, id: missing }) === null
+    if (sidecars.pending !== null && isMissing) {
       selectLateSubtitle({ pending: sidecars.pending, token, id: missing }).catch(
         (error: unknown) => {
           warn(`player could not select a late subtitle: ${messageOf(error)}`)
         },
       )
     }
+    const pendingSeek = titleOf(state)?.pendingSeek ?? null
     if (pendingSeek !== null) {
       try {
         await sendSeek(seekTarget(pendingSeek))
@@ -478,217 +368,105 @@ export const createPlayerService = ({
         warn(`mpv seek failed: ${messageOf(error)}`)
       }
     }
-    const paused = await readOr({ name: MPV_PROPERTIES.pause, fallback: false })
-    const rate = await readOr({ name: MPV_PROPERTIES.speed, fallback: 1 })
-    if (token !== epoch) return
+    const [paused, rate] = await Promise.all([
+      readOr({ name: MPV_PROPERTIES.pause, fallback: false }),
+      readOr({ name: MPV_PROPERTIES.speed, fallback: 1 }),
+    ])
+    const file = fileOf()
+    if (!isCurrent(token) || file === null) return
     emit({ type: PLAYER_EVENTS.paused, paused })
-    emit({ type: PLAYER_EVENTS.duration, duration })
+    emit({ type: PLAYER_EVENTS.duration, duration: file.duration })
     emit({ type: PLAYER_EVENTS.rate, rate })
     // The cache may have run dry while the sidecars were added; the budget goes on then.
-    isWaiting = isPausedForCache || isSeeking
-    restartStall()
+    const isWaiting = file.isPausedForCache || file.isSeeking
+    updateFile({ isWaiting })
+    stall.restart()
     emit({ type: PLAYER_EVENTS.waiting, waiting: isWaiting })
     emitTracks()
     onActivity({ isPlaying: !paused, isShowing: true })
   }
 
+  /*
+   * A file-loaded while loaded can only be the newer file arriving after one it replaced already
+   * reported, so it takes over with a fresh snapshot.
+   */
   const onFileLoaded = () => {
-    /*
-     * A file-loaded while loaded can only be the newer file arriving after one it
-     * replaced already reported, so it takes over with a fresh snapshot.
-     */
-    if (phase !== PLAYER_PHASES.loading && phase !== PLAYER_PHASES.loaded) return
-    if (answeredGeneration !== generation) return
-    phase = PLAYER_PHASES.loaded
-    epoch += 1
-    resetFile()
-    /*
-     * The addon's time-pos throttle can drop every update before an early eof, so the
-     * short-eof check starts from where the file was asked to start.
-     */
-    lastTime = loadStart
-    isAwaitingFirstFrame = true
+    if (!isShowing(state) || answeredGeneration !== state.title.generation) return
+    const { title } = state
+    enter({ phase: PLAYER_PHASES.loaded, title, file: freshFile(title) })
     snapshot(epoch).catch((error: unknown) => {
       warn(`player snapshot failed: ${messageOf(error)}`)
     })
   }
 
   /**
-   * mpv reports `redirect` when the file it opened was a playlist, even one named like a
-   * video. It would go on to open what the playlist names, which was never granted, or
-   * sit idle forever when it names nothing, so this load ends as a file that cannot open.
-   * `access-references=no` should stop mpv getting here at all; this is the second line.
+   * mpv reports `redirect` when the file it opened was a playlist, even one named like a video.
+   * It would go on to open what the playlist names, which was never granted, or sit idle forever
+   * when it names nothing, so this load ends as a file that cannot open. `access-references=no`
+   * should stop mpv getting here at all; this is the second line.
    */
   const onRedirect = () => {
-    if (phase !== PLAYER_PHASES.loading && phase !== PLAYER_PHASES.loaded) return
-    settleTo(PLAYER_PHASES.idle)
+    enter(IDLE)
     warn('mpv opened a playlist, which Raven does not follow')
     emit({
       type: PLAYER_EVENTS.error,
       reason: PLAYER_ERROR_REASONS.open,
       message: PLAYER_MESSAGES.cannotOpen,
     })
-    onActivity({ isPlaying: false, isShowing: true })
-    mpv.command({ args: [MPV_COMMANDS.stop] }).catch((error: unknown) => {
-      warn(`mpv stop failed: ${messageOf(error)}`)
-    })
+    onActivity(SHOWING_STILL)
+    stopQuietly()
   }
 
-  type EmitFailureProps = {
-    failure: { reason: PlayerErrorReason; message: string }
-    during: ShowingPhase
-  }
-
-  /**
-   * An error the page hears: as it is for a file, or as the server explains it for a
-   * server title, unless something newer overtook the ending while the server answered.
-   */
-  const emitFailure = ({ failure, during }: EmitFailureProps) => {
-    const asked = serverOpened()
-    if (asked === null) {
-      emit({ type: PLAYER_EVENTS.error, ...failure })
-      return
-    }
-    const token = epoch
-    const explainSafely = async () => {
-      try {
-        return await explain({ target: asked, phase: during })
-      } catch (error) {
-        warn(`player could not explain a server failure: ${messageOf(error)}`)
-        return { reason: PLAYER_ERROR_REASONS.network, message: PLAYER_MESSAGES.lost } as const
-      }
-    }
-    const report = async () => {
-      const explained = await explainSafely()
-      if (token !== epoch) return
-      emit({ type: PLAYER_EVENTS.error, reason: explained.reason, message: explained.message })
-    }
-    report().catch((error: unknown) => {
-      warn(`player could not report a server failure: ${messageOf(error)}`)
-    })
-  }
-
-  type OnEndFileProps = { reason: string; error: number }
+  type OnEndFileProps = { reason: MpvEndReason; error: number }
 
   const onEndFile = ({ reason, error }: OnEndFileProps) => {
-    if (answeredGeneration !== generation) return
+    if (!isShowing(state) || answeredGeneration !== state.title.generation) return
     if (reason === MPV_END_FILE_REASONS.redirect) {
       onRedirect()
       return
     }
-    /*
-     * mpv reports `stop` for a file replaced by a load or ended by our own stop, which
-     * belongs to a file this service already left.
-     */
-    if (
-      reason !== MPV_END_FILE_REASONS.eof &&
-      reason !== MPV_END_FILE_REASONS.error &&
-      reason !== MPV_END_FILE_REASONS.quit
-    )
-      return
-    if (phase === PLAYER_PHASES.loading) {
-      // mpv ends a stream the server refused as if it ran out; only the relay can tell.
-      const refused = reason === MPV_END_FILE_REASONS.eof ? accountRefusal() : null
-      if (reason === MPV_END_FILE_REASONS.eof && refused === null) return
-      settleTo(PLAYER_PHASES.idle)
-      if (refused !== null) {
-        warn('mpv ended a server title its account was refused while it opened')
-        emitFailure({ failure: refused, during: PLAYER_PHASES.loading })
-      } else if (reason === MPV_END_FILE_REASONS.error) {
-        warn(`mpv could not open the file (${error})`)
-        emitFailure({
-          failure: { reason: PLAYER_ERROR_REASONS.open, message: PLAYER_MESSAGES.cannotOpen },
-          during: PLAYER_PHASES.loading,
-        })
-      }
-      onActivity({ isPlaying: false, isShowing: true })
-      return
-    }
-    if (phase !== PLAYER_PHASES.loaded) return
+    const { target } = state.title
+    const file = fileOf()
     const isShort =
       reason === MPV_END_FILE_REASONS.eof &&
-      duration !== null &&
-      duration - (lastTime ?? 0) > EOF_SHORT_S
-    // A seek near the end that the server refused runs out like the end itself.
-    const refused = reason === MPV_END_FILE_REASONS.eof ? accountRefusal() : null
-    settleTo(PLAYER_PHASES.idle)
-    if (refused !== null) {
-      warn('mpv ended a server title its account was refused while it played')
-      emitFailure({ failure: refused, during: PLAYER_PHASES.loaded })
-    } else if (reason === MPV_END_FILE_REASONS.error || isShort) {
-      warn(`mpv stopped playing the file (${reason} ${error})`)
-      emitFailure({
-        failure: { reason: PLAYER_ERROR_REASONS.decode, message: PLAYER_MESSAGES.stopped },
-        during: PLAYER_PHASES.loaded,
-      })
-    } else if (reason === MPV_END_FILE_REASONS.eof) {
-      emit({ type: PLAYER_EVENTS.ended })
-    }
-    onActivity({ isPlaying: false, isShowing: true })
+      file !== null &&
+      file.duration !== null &&
+      file.duration - (file.lastTime ?? 0) > EOF_SHORT_S
+    const refused = reason === MPV_END_FILE_REASONS.eof ? accountRefusalOf(target) : null
+    const during = state.phase
+    const ending = endingOf({ phase: during, reason, facts: { refused, isShort } })
+    if (ending.kind === ENDINGS.stays) return
+    enter(IDLE)
+    finish({ ending, during, target, reason, error })
+    onActivity(SHOWING_STILL)
   }
 
   const onEngineStopped = () => {
-    if (phase === PLAYER_PHASES.dead) return
-    const wasShowing = phase === PLAYER_PHASES.loading || phase === PLAYER_PHASES.loaded
-    settleTo(PLAYER_PHASES.dead)
+    if (isDead()) return
+    const wasShowing = isShowing(state)
+    enter(DEAD)
     emit({
       type: PLAYER_EVENTS.error,
       reason: PLAYER_ERROR_REASONS.engine,
       message: PLAYER_MESSAGES.engineStopped,
     })
-    if (wasShowing) onActivity({ isPlaying: false, isShowing: true })
-  }
-
-  /**
-   * The addon's throttle sends no trailing time-pos, so a seek or pause reads where it
-   * landed. One read is in flight at a time; asks meanwhile become one read after it.
-   */
-  const showTimeNow = () => {
-    if (isReadingTime) {
-      isTimeReadWanted = true
-      return
-    }
-    isReadingTime = true
-    const token = epoch
-    const seeksBefore = seeks
-    const show = async () => {
-      const read = await readOr({ name: MPV_PROPERTIES.timePos, fallback: null })
-      if (token !== epoch || read === null) return
-      // A seek sent during the read makes it stale; that seek's playback-restart reads again.
-      if (seeks !== seeksBefore) return
-      if (shownTime !== null && read < shownTime) return
-      if (stallTimer !== null && read !== lastTime) restartStall()
-      lastTime = read
-      showTime(read)
-    }
-    show()
-      .catch((error: unknown) => {
-        warn(`player time read failed: ${messageOf(error)}`)
-      })
-      .finally(() => {
-        isReadingTime = false
-        if (!isTimeReadWanted) return
-        isTimeReadWanted = false
-        if (phase === PLAYER_PHASES.loaded) showTimeNow()
-      })
+    if (wasShowing) onActivity(SHOWING_STILL)
   }
 
   const onProperty = (event: Extract<MpvEvent, { type: typeof MPV_EVENTS.property }>) => {
-    if (phase !== PLAYER_PHASES.loaded) return
+    if (!isLoaded(state)) return
     switch (event.name) {
       case MPV_PROPERTIES.timePos:
         if (event.data === null) return
-        if (stallTimer !== null && event.data !== lastTime) restartStall()
-        lastTime = event.data
-        showTime(event.data)
+        noteTime(event.data)
         return
       /*
-       * mpv clears the duration, the track list and the frame rate as a file closes, and
-       * can report that before its end-file, so those emptied values are not the file's.
+       * mpv clears the duration, the track list and the frame rate as a file closes, and can
+       * report that before its end-file, so those emptied values are not the file's.
        */
       case MPV_PROPERTIES.duration:
         if (event.data === null) return
-        duration = event.data
+        updateFile({ duration: event.data })
         emit({ type: PLAYER_EVENTS.duration, duration: event.data })
         return
       case MPV_PROPERTIES.speed:
@@ -697,24 +475,24 @@ export const createPlayerService = ({
       case MPV_PROPERTIES.pause:
         emit({ type: PLAYER_EVENTS.paused, paused: event.data })
         onActivity({ isPlaying: !event.data, isShowing: true })
-        if (event.data) showTimeNow()
+        if (event.data) clock.readNow()
         return
       case MPV_PROPERTIES.pausedForCache:
-        isPausedForCache = event.data ?? false
+        updateFile({ isPausedForCache: event.data ?? false })
         updateWaiting()
         return
       case MPV_PROPERTIES.seeking:
-        isSeeking = event.data ?? false
+        updateFile({ isSeeking: event.data ?? false })
         updateWaiting()
         return
       case MPV_PROPERTIES.trackList:
         if (event.data.length === 0) return
-        trackList = event.data
+        updateFile({ trackList: event.data })
         emitTracks()
         return
       case MPV_PROPERTIES.containerFps:
         if (event.data === null) return
-        frameRate = event.data
+        updateFile({ frameRate: event.data })
         emitTracks()
         return
       case MPV_PROPERTIES.demuxerCacheState:
@@ -723,7 +501,7 @@ export const createPlayerService = ({
          * A slow link fills the cache for longer than the budget while the clock stands still;
          * bytes still arriving mean the server is there, so only a quiet one runs the budget out.
          */
-        if (stallTimer !== null && (event.data?.['raw-input-rate'] ?? 0) > 0) restartStall()
+        if ((event.data?.['raw-input-rate'] ?? 0) > 0) stall.touch()
         return
       default:
         return
@@ -731,16 +509,17 @@ export const createPlayerService = ({
   }
 
   const onPlaybackRestart = () => {
-    if (phase !== PLAYER_PHASES.loaded) return
-    if (isAwaitingFirstFrame) {
-      isAwaitingFirstFrame = false
+    const file = fileOf()
+    if (file === null) return
+    if (file.isAwaitingFirstFrame) {
+      updateFile({ isAwaitingFirstFrame: false })
       onFirstFrame()
     }
-    showTimeNow()
+    clock.readNow()
   }
 
   const receive = (event: MpvEvent) => {
-    if (phase === PLAYER_PHASES.dead) return
+    if (isDead()) return
     switch (event.type) {
       case MPV_EVENTS.property:
         onProperty(event)
@@ -776,13 +555,13 @@ export const createPlayerService = ({
     }
   }
 
-  const load = async (command: Extract<PlayerCommand, { type: typeof PLAYER_COMMANDS.load }>) => {
+  const load = async (command: CommandOf<typeof PLAYER_COMMANDS.load>) => {
     loadTicket += 1
     const ticket = loadTicket
     /*
-     * What a load overtaken while it waits answers: its stall budget running out is a
-     * refusal the page can show, since nothing will play; an engine stop is a failure, and
-     * a newer load or a stop is no failure of this one.
+     * What a load overtaken while it waits answers: its stall budget running out is a refusal
+     * the page can show, since nothing will play; an engine stop is a failure, and a newer load
+     * or a stop is no failure of this one.
      */
     const bail = () => {
       if (isDead()) return ENGINE_GONE
@@ -796,172 +575,95 @@ export const createPlayerService = ({
      */
     if (ticket !== loadTicket || isDead()) return bail()
     if (!resolved.ok) return refuse(resolved.message)
-    opened = resolved.target
-    openedTicket = ticket
-    phase = PLAYER_PHASES.loading
-    epoch += 1
-    generation += 1
-    const token = generation
-    wanted = { audio: command.audio, subtitle: command.subtitle }
-    pendingSeek = null
-    loadStart = Math.max(0, command.start)
-    isAwaitingFirstFrame = true
-    resetFile()
+    generations += 1
+    const title: Title = {
+      ticket,
+      generation: generations,
+      target: resolved.target,
+      loadStart: Math.max(0, command.start),
+      wanted: { audio: command.audio, subtitle: command.subtitle },
+      pendingSeek: null,
+    }
+    lastTarget = title.target
+    enter({ phase: PLAYER_PHASES.loading, title })
     // A server that sends its headers and then nothing would hold mpv's probe for minutes.
-    restartStall()
-    onActivity({ isPlaying: false, isShowing: true })
+    stall.restart()
+    onActivity(SHOWING_STILL)
+    /*
+     * A stop, reset or newer load overtook this one: sending loadfile now would play a file no
+     * page shows. A newer load or a stop is not a failure of this load, so it answers ok; an
+     * engine that stopped meanwhile is, so the page can fall back.
+     */
+    const isMine = () => (titleOf(state)?.generation ?? null) === title.generation
     try {
       const isHardened = await hardening
-      if (token !== generation) return bail()
+      if (!isMine()) return bail()
       if (!isHardened) {
-        settleTo(PLAYER_PHASES.idle)
-        onActivity({ isPlaying: false, isShowing: false })
+        enter(IDLE)
+        onActivity(NOTHING_SHOWN)
         return refuse(PLAYER_MESSAGES.failed)
       }
       await mpv.set({ name: MPV_PROPERTIES.pause, value: false })
-      /*
-       * A stop, reset or newer load overtook this one: sending loadfile now would play
-       * a file no page shows. A newer load or a stop is not a failure of this load, so
-       * it answers ok; an engine that stopped meanwhile is, so the page can fall back.
-       */
-      if (token !== generation) return bail()
+      if (!isMine()) return bail()
       await mpv.command({
         args: [
           MPV_COMMANDS.loadfile,
-          locationOf(resolved.target),
+          locationOf(title.target),
           MPV_LOADFILE_MODES.replace,
           MPV_PLAYLIST_END,
-          loadfileOptionsFor({ target: resolved.target, start: loadStart }),
+          loadfileOptionsFor({ target: title.target, start: title.loadStart }),
         ],
         onReply: ({ isOk }) => {
-          if (isOk) answeredGeneration = Math.max(answeredGeneration, token)
+          if (isOk) answeredGeneration = Math.max(answeredGeneration, title.generation)
         },
       })
       return bail()
     } catch (error) {
-      if (token === generation) {
-        settleTo(PLAYER_PHASES.idle)
-        onActivity({ isPlaying: false, isShowing: false })
+      if (isMine()) {
+        enter(IDLE)
+        onActivity(NOTHING_SHOWN)
       }
       throw error
     }
   }
 
   const seek = async (value: number) => {
-    if (phase === PLAYER_PHASES.loading) {
-      pendingSeek = Math.max(0, value)
+    if (state.phase === PLAYER_PHASES.loading) {
+      updateTitle({ pendingSeek: Math.max(0, value) })
       return OK
     }
-    if (phase !== PLAYER_PHASES.loaded) return OK
-    pendingSeek = null
+    if (!isLoaded(state)) return OK
+    updateTitle({ pendingSeek: null })
     await sendSeek(seekTarget(value))
-    return OK
-  }
-
-  const audio = async (index: number | null) => {
-    if (index !== null && !isTrackIndex(index)) return refuse(PLAYER_MESSAGES.noTrack)
-    if (phase === PLAYER_PHASES.loading) {
-      wanted = { ...wanted, audio: index }
-      return OK
-    }
-    if (phase !== PLAYER_PHASES.loaded) return refuse(PLAYER_MESSAGES.noTrack)
-    const aid = index === null ? MPV_CHOICES.auto : aidFor({ list: trackList, index })
-    if (aid === null) return refuse(PLAYER_MESSAGES.noTrack)
-    const token = epoch
-    await mpv.set({ name: MPV_PROPERTIES.aid, value: aid })
-    if (token !== epoch) return overtaken()
-    wanted = { ...wanted, audio: index }
-    return OK
-  }
-
-  const subtitle = async (id: string | null) => {
-    subtitlePicks += 1
-    if (phase === PLAYER_PHASES.loading) {
-      wanted = { ...wanted, subtitle: id }
-      return OK
-    }
-    if (phase !== PLAYER_PHASES.loaded) return refuse(PLAYER_MESSAGES.noTrack)
-    const sid = id === null ? 'no' : sidFor({ list: trackList, id })
-    if (sid === null) return refuse(PLAYER_MESSAGES.noTrack)
-    const token = epoch
-    await mpv.set({ name: MPV_PROPERTIES.sid, value: sid })
-    if (token !== epoch) return overtaken()
-    wanted = { ...wanted, subtitle: id }
     return OK
   }
 
   const stop = async () => {
     loadTicket += 1
-    settleTo(PLAYER_PHASES.idle)
-    onActivity({ isPlaying: false, isShowing: false })
+    enter(IDLE)
+    onActivity(NOTHING_SHOWN)
     await mpv.command({ args: [MPV_COMMANDS.stop] })
     return OK
   }
 
-  const run = async (command: PlayerCommand): Promise<PlayerOutcome> => {
-    switch (command.type) {
-      case PLAYER_COMMANDS.load:
-        return load(command)
-      case PLAYER_COMMANDS.play:
-        await mpv.set({ name: MPV_PROPERTIES.pause, value: false })
-        return OK
-      case PLAYER_COMMANDS.pause:
-        await mpv.set({ name: MPV_PROPERTIES.pause, value: true })
-        return OK
-      case PLAYER_COMMANDS.seek:
-        return seek(command.time)
-      case PLAYER_COMMANDS.audio:
-        return audio(command.index)
-      case PLAYER_COMMANDS.subtitle:
-        return subtitle(command.id)
-      case PLAYER_COMMANDS.volume: {
-        if (isVolumeFixed) return OK
-        const volume = clamp({ value: command.volume, min: 0, max: 1 })
-        await mpv.set({ name: MPV_OPTIONS.volume, value: Math.round(volume * 1000) / 10 })
-        await mpv.set({ name: MPV_OPTIONS.mute, value: command.muted })
-        return OK
-      }
-      case PLAYER_COMMANDS.speed:
-        await mpv.set({
-          name: MPV_PROPERTIES.speed,
-          value: clamp({ value: command.rate, min: SPEED_RANGE.min, max: SPEED_RANGE.max }),
-        })
-        return OK
-      case PLAYER_COMMANDS.subtitleStyle:
-        await Promise.all(subtitleStyleOptions(command.style).map((option) => mpv.set(option)))
-        return OK
-      case PLAYER_COMMANDS.stats:
-        await mpv.command({ args: [MPV_COMMANDS.scriptBinding, 'stats/display-stats-toggle'] })
-        return OK
-      case PLAYER_COMMANDS.stop:
-        return stop()
-      default: {
-        const unreachable: never = command
-        return unreachable
-      }
-    }
-  }
-
-  const handle = async (command: PlayerCommand): Promise<PlayerOutcome> => {
-    if (isDead()) return ENGINE_GONE
-    if (!numbersOf(command).every(isNumber)) return refuse(PLAYER_MESSAGES.failed)
-    try {
-      return await run(command)
-    } catch (error) {
-      warn(`mpv ${command.type} failed: ${messageOf(error)}`)
-      // The wrapper rejects what is in flight just before it reports a shutdown.
-      return isDead() ? ENGINE_GONE : refuse(PLAYER_MESSAGES.failed)
-    }
-  }
-
-  const reset = async () => {
-    if (phase === PLAYER_PHASES.idle || phase === PLAYER_PHASES.dead) return
-    await handle({ type: PLAYER_COMMANDS.stop })
-  }
+  const handle = createCommandHandler({
+    isDead,
+    numbersOf,
+    run: createCommandRouter({
+      mpv,
+      isVolumeFixed: () => isVolumeFixed,
+      load,
+      seek,
+      audio,
+      subtitle,
+      stop,
+    }),
+    warn,
+  })
 
   /*
-   * Sent before anything else, so mpv applies it before any loadfile. It fails closed:
-   * a failed set refuses every load.
+   * Sent before anything else, so mpv applies it before any loadfile. It fails closed: a failed
+   * set refuses every load.
    */
   const hardening = harden(HARDENED_OPTIONS)
 
@@ -971,32 +673,30 @@ export const createPlayerService = ({
     handle,
     receive,
     isDead,
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
+    subscribe,
+    reset: async () => {
+      if (!isShowing(state)) return
+      await handle({ type: PLAYER_COMMANDS.stop })
     },
-    reset,
     // Latches as dead: the mpv behind it is destroyed, so no later load may arm a timer.
     dispose: () => {
-      if (phase === PLAYER_PHASES.dead) return
+      if (isDead()) return
       loadTicket += 1
-      settleTo(PLAYER_PHASES.dead)
+      enter(DEAD)
     },
     applyOutput: async ({ output, devices }) => {
-      if (phase === PLAYER_PHASES.dead) return
+      if (isDead()) return
       isVolumeFixed = isVolumeFixedFor(output)
-      await setEach(outputOptions({ output, devices, canChooseAo, platform }))
-      if (phase !== PLAYER_PHASES.loaded) return
-      try {
-        await mpv.command({ args: [MPV_COMMANDS.aoReload] })
-      } catch (error) {
-        warn(`mpv ao-reload failed: ${messageOf(error)}`)
-      }
+      await applyOutputOptions({
+        mpv,
+        setEach,
+        options: outputOptions({ output, devices, canChooseAo, platform }),
+        isLoaded: () => isLoaded(state),
+        warn,
+      })
     },
     applyDisplay: async ({ refreshRate, edrHeadroom }) => {
-      if (phase === PLAYER_PHASES.dead) return
+      if (isDead()) return
       await setEach(displayOptions({ refreshRate, edrHeadroom }))
     },
   }

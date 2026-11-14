@@ -151,6 +151,8 @@ export const UNPLAYABLE_COPY = {
   cannotPlay: "This video can't play in this browser.",
   tryAnyway: 'Try playing anyway',
   report: 'Report this error',
+  playerHint:
+    'The file is served untouched, so a player that handles every format, like VLC or IINA, can open the same link.',
 } as const
 
 export const SCRUBBER_COPY = {
@@ -230,8 +232,22 @@ export const PLAYER_ACTIONS_COPY = {
   holdBack: (rate: number) => `Rewinding at ${rate}× speed`,
 } as const
 
+/** What a browser's media error means to the viewer. */
+export const MEDIA_FAILURE_COPY = {
+  network: 'The connection to the server dropped.',
+  decode: "The browser couldn't decode this file.",
+  unsupported: "The browser couldn't open this file.",
+  stopped: 'Playback stopped unexpectedly.',
+} as const
+
+/** What Playback info names as playing the picture in a browser. */
+export const HTML_ENGINE_COPY = { engineName: 'HTML video' } as const
+
 export const NATIVE_ENGINE_COPY = {
   couldNotPlay: 'Raven could not play this video.',
+  couldNotOpen: 'Raven could not open this video.',
+  /** What Playback info names as playing the picture. */
+  engineName: 'mpv',
 } as const
 
 /** What the player says when raven's media origin cannot be reached; nothing falls back to the web host. */

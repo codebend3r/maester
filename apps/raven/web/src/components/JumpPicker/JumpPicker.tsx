@@ -2,6 +2,7 @@ import type { RefObject } from 'react'
 import { JUMP_SCALE_LABELS, type JumpScale } from '@raven/core'
 import { holdInPlace } from '@/lib/holdInPlace'
 import styles from '@/components/JumpPicker/JumpPicker.module.scss'
+import { scrollBehavior, asksForLessMotion } from '@/lib/motion'
 
 /** A link the keyboard reaches: not a picture link hidden from it and from screen readers. */
 const FOCUSABLE_LINK = 'a[href]:not([aria-hidden="true"]):not([tabindex="-1"])'
@@ -26,10 +27,10 @@ const jumpTo = ({ scope, keys }: JumpToProps): void => {
   if (!entry) return
   const bucket = entry.closest('details')
   if (bucket) bucket.open = true
-  const smooth = window.matchMedia('(prefers-reduced-motion: no-preference)').matches
-  entry.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' })
+  const behavior = scrollBehavior()
+  entry.scrollIntoView({ behavior, block: 'start' })
   entry.querySelector<HTMLElement>(FOCUSABLE_LINK)?.focus({ preventScroll: true })
-  holdInPlace({ card: entry, top: 0, afterScroll: smooth })
+  holdInPlace({ card: entry, top: 0, afterScroll: !asksForLessMotion() })
 }
 
 type JumpPickerProps = {

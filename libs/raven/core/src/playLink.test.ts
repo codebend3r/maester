@@ -4,9 +4,9 @@ import {
   PLAY_LINK_MAX_NEXT,
   downloadLinkFor,
   isDownloadTarget,
-  isMediaId,
   playLinkFor,
 } from '@/playLink'
+import { isMediaId } from '@/contract/ids'
 
 describe('isMediaId', () => {
   it.each([1, 7, 9007199254740991])('accepts %p', (value) => {

@@ -1,11 +1,12 @@
-import { type Credit, castMembers, initialsOf } from '@raven/core'
+import { type Credit, castMembers, initialsOf, personPath } from '@raven/core'
 import { type ComponentType, useId, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { CAST_ROW_COPY } from '@/components/CastRow/copy'
 import { api } from '@/lib/api'
 import styles from '@/components/CastRow/CastRow.module.scss'
+import { scrollBehavior } from '@/lib/motion'
 
 /** Whether a person shows their photo, or their initials where TMDB has none. */
 const PHOTO_KINDS = { photo: 'photo', initials: 'initials' } as const
@@ -40,7 +41,7 @@ const CastList = ({ members, title }: CastListProps) => {
   const page = (direction: 1 | -1) => {
     const row = list.current
     if (!row) return
-    row.scrollBy({ left: direction * row.clientWidth * 0.9, behavior: 'smooth' })
+    row.scrollBy({ left: direction * row.clientWidth * 0.9, behavior: scrollBehavior() })
   }
 
   return (
@@ -50,14 +51,14 @@ const CastList = ({ members, title }: CastListProps) => {
         aside={
           <>
             <Button
-              tone="ghost"
+              tone={BUTTON_TONES.ghost}
               icon="back"
               aria-label={CAST_ROW_COPY.earlier}
               className={styles.scroll}
               onClick={() => page(-1)}
             />
             <Button
-              tone="ghost"
+              tone={BUTTON_TONES.ghost}
               icon="next"
               aria-label={CAST_ROW_COPY.later}
               className={styles.scroll}
@@ -75,7 +76,7 @@ const CastList = ({ members, title }: CastListProps) => {
           const PersonPhoto = PERSON_PHOTOS[photo ? PHOTO_KINDS.photo : PHOTO_KINDS.initials]
           return (
             <li key={member.personId} className={styles.person}>
-              <Link to={`/people/${member.personId}`} className={styles.personLink}>
+              <Link to={personPath(member.personId)} className={styles.personLink}>
                 <span className={styles.photo}>
                   <PersonPhoto photo={photo} name={member.name} />
                 </span>

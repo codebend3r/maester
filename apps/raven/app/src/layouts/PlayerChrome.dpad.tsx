@@ -1,30 +1,18 @@
 import { type SkipStep, formatDuration } from '@raven/core'
-import {
-  type ComponentRef,
-  type ComponentType,
-  type RefObject,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
+import { type ComponentType, useEffect, useRef, useState } from 'react'
 import {
   Animated,
   PixelRatio,
   Pressable,
   StyleSheet,
-  TVFocusGuideView,
   type TVRemoteEvent,
   useTVEventHandler,
   View,
 } from 'react-native'
 import Video from 'react-native-video'
 
-import { Icon } from '@raven/native'
-import { LoadingMark } from '@/layouts/LoadingMark'
-import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { TitleArt } from '@/layouts/TitleArt'
+import { Text } from '@/layouts/Text'
 import {
-  CENTRE_MARK_LOOKS,
   type Flash,
   type ShownMark,
   flashOfSkip,
@@ -33,12 +21,9 @@ import {
 } from '@/layouts/centreMark'
 import { useFocusOnMount } from '@/layouts/focus'
 import { FocusBand } from '@/layouts/FocusBand'
-import { FocusFactChips } from '@/layouts/FactChips'
-import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import { CaptionText } from '@/layouts/PlayerCaption'
-import { PlayerNotice } from '@/layouts/PlayerNotice.focus'
+import { OpeningMark, PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import { ChaptersBand } from '@/layouts/PlayerChapters.dpad'
-import { chapterMarksOf } from '@/layouts/chapterMarks'
 import { UpNextCard, useUpNextOffer } from '@/layouts/PlayerUpNext.dpad'
 import {
   PLAYER_COPY,
@@ -49,12 +34,7 @@ import {
   type PlayerChromeKit,
   type PlayerChromeProps,
   type SurfaceState,
-  type Transport,
-  type TrackPicker,
   surfaceStateOf,
-  cornerFactsOf,
-  playedShareOf,
-  scrubberAccessibilityOf,
   type VideoSurface,
 } from '@/layouts/playerKit'
 import {
@@ -65,111 +45,37 @@ import {
   remoteHolderOf,
 } from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
-import type { IconName } from '@raven/ui/iconDrawings'
-import { useClock } from '@raven/ui/headless'
-import { LINE_RATIO } from '@/layouts/textHeights'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
 import { TV_CAPTION_BASE } from '@/player/captionLook'
 import { useHeldSeek } from '@/layouts/useHeldSeek'
-import { useMarkFade } from '@/layouts/useMarkFade'
 import { useSkipLadder } from '@/layouts/useSkipLadder'
-import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
-import { pictureStyles, useTheme } from '@/theme/useTheme'
+import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
+import { APP_ICONS } from '@/theme/icons'
+import { useDpadChromeStyles } from '@/layouts/PlayerChromeStyles.dpad'
+import {
+  type Focusable,
+  Scrubber,
+  TrackButton,
+  Corner,
+  Centre,
+  Heading,
+} from '@/layouts/PlayerParts.dpad'
 
-/** How dark the ground is laid over the picture under the controls. */
-const SCRIM_OPACITY = 0.45
-
-/** How large the icon in the middle stands. */
-const CENTRE_ICON = TV_SIZES.textXl * 2
-
-/** The thumb on the line, and how much it grows while the remote is on it. */
-const THUMB = TV_SIZES.space4
-const THUMB_FOCUSED = TV_SIZES.space6
-
-/** How wide the cut in the line is where a chapter begins: a hairline, two points on a 1920 point screen. */
-const CHAPTER_NOTCH = tvSize(2)
-
-/** How much the chapter playing lightens the track under it: enough to see, never to compete with the played line. */
-const CHAPTER_SPAN_OPACITY = 0.22
-
-type Focusable = RefObject<ComponentRef<typeof Pressable> | null>
+/** What hears each of the remote's presses. */
+type RemoteResponder = (event: TVRemoteEvent) => void
 
 /**
  * Hears the remote through the fork's `useTVEventHandler`, which subscribes again whenever its
  * listener changes; one listener for the chrome's life reads the latest answer instead.
  */
-const useRemote = (respond: (event: TVRemoteEvent) => void) => {
+const useRemote = (respond: RemoteResponder) => {
   const latest = useRef(respond)
   useEffect(() => {
     latest.current = respond
   })
   const [listener] = useState(() => (event: TVRemoteEvent) => latest.current(event))
   useTVEventHandler(listener)
-}
-
-type ScrubberProps = {
-  view: Focusable
-  transport: Transport
-  /** The file's chapters, notched along the line, the one playing a shade lighter than the rest. */
-  chapters: PlayerChromeProps['chapters']
-  onScrubbing: (isScrubbing: boolean) => void
-}
-
-/**
- * Where the video is, as a line the remote stands on: while it has the focus, left and right
- * skip ten seconds (the chrome hears them) and a press plays or pauses. It asks for the focus as
- * it appears and lets go once it has had it; on the player's first appearance the screen is
- * still sliding in, when only the preferred focus, set with the view, takes. TalkBack reads it as
- * the time of the length and skips by its own gesture.
- */
-const Scrubber = ({ view, transport, chapters, onScrubbing }: ScrubberProps) => {
-  const [isOpening, setOpening] = useState(true)
-  const { position, onSeek, onTogglePlay } = transport
-  const styles = useStyles()
-  const duration = transport.duration ?? 0
-  const share = playedShareOf({ at: position, duration })
-  const marks = chapterMarksOf({ chapters, duration, at: position })
-  return (
-    /*
-     * Left and right are the scrubber's own: they seek, and a hold runs the playhead. Without the
-     * trap the system moves the focus on the key going down, before the press reaches the player,
-     * and left carried it off to Back, up and to the left, so it never skipped back.
-     */
-    <TVFocusGuideView trapFocusLeft trapFocusRight>
-      <Pressable
-        ref={view}
-        {...scrubberAccessibilityOf({ position, shown: position, duration, onSeek })}
-        hasTVPreferredFocus={isOpening}
-        onBlur={() => onScrubbing(false)}
-        onFocus={() => {
-          setOpening(false)
-          onScrubbing(true)
-        }}
-        onPress={onTogglePlay}
-        style={styles.scrubber}
-      >
-        {({ focused }) => (
-          <>
-            <View style={[styles.line, focused && styles.lineFocused]}>
-              {marks.current !== null && <View style={[styles.chapterSpan, marks.current]} />}
-              <View style={[styles.played, { width: share }]} />
-              {marks.notches.map((notch) => (
-                <View key={notch.key} style={[styles.chapterNotch, { left: notch.left }]} />
-              ))}
-            </View>
-            <View
-              style={[
-                styles.thumb,
-                focused && styles.thumbFocused,
-                { left: share, marginLeft: -(focused ? THUMB_FOCUSED : THUMB) / 2 },
-              ]}
-            />
-          </>
-        )}
-      </Pressable>
-    </TVFocusGuideView>
-  )
 }
 
 type ControlsProps = Pick<
@@ -194,42 +100,6 @@ type ControlsProps = Pick<
   onBottomHeight: (height: number) => void
 }
 
-type TrackButtonProps = {
-  icon: IconName
-  label: string
-  picker: TrackPicker
-  onPicking: (isPicking: boolean) => void
-}
-
-/** A track picker as an icon on the player's glass, said with its choice, opening its list over the video. */
-const TrackButton = ({ icon, label, picker, onPicking }: TrackButtonProps) => {
-  const {
-    open,
-    label: said,
-    list,
-  } = usePickerList({
-    ...picker,
-    label,
-    isOverPicture: true,
-    onOpenChange: onPicking,
-  })
-  return (
-    <>
-      <PlateButton icon={icon} isOverPicture label={said} onPress={open} />
-      <PickerList {...list} />
-    </>
-  )
-}
-
-/** How tall a show's title art stands over the video; its width follows the art's own shape. */
-const LOGO_HEIGHT = TV_SIZES.space8 * 1.2
-
-/** How much smaller than the page's type the episode's name and its line of facts stand. */
-const HEADING_TYPE_SCALE = 0.6
-
-/** How large the time of day stands in the corner: larger than any line of the page's type. */
-const CLOCK_SIZE = TV_SIZES.textXl * 1.5
-
 type LiftedSubtitleStyleOfProps = {
   style: VideoSurface['subtitleStyle']
   /** How far the controls reach up from the bottom of the screen, in points; 0 while hidden. */
@@ -247,99 +117,6 @@ const liftedSubtitleStyleOf = ({
   style === undefined
     ? undefined
     : { ...style, paddingBottom: PixelRatio.getPixelSizeForLayoutSize(lift) }
-
-type CornerProps = Pick<PlayerChromeProps, 'mode' | 'heading'>
-
-/**
- * The top right corner, one thing under another: the time of day, the picture's chips, then how
- * the video plays on a line of its own, read out together.
- */
-const Corner = ({ mode, heading }: CornerProps) => {
-  const styles = useStyles()
-  const { clock, chips, way, label } = cornerFactsOf({ mode, heading, clock: useClock() })
-  return (
-    <View accessibilityLabel={label} accessible style={styles.corner}>
-      <Text variant={TEXT_VARIANTS.display} numberOfLines={1} style={styles.clock}>
-        {clock}
-      </Text>
-      {chips.length > 0 && (
-        <View style={styles.cornerChips}>
-          <FocusFactChips parts={chips} />
-        </View>
-      )}
-      {way !== null && (
-        <View style={styles.chip}>
-          <Text style={styles.chipText}>{way}</Text>
-        </View>
-      )}
-    </View>
-  )
-}
-
-type CentreProps = ShownMark
-
-/**
- * What just happened, in the middle of the picture: a skip's way and how far it went, a play, or
- * the pause, on the player's glass. A flash stands for a moment and fades, or goes at once when
- * the system asks for less motion; a pause or a hold stays until it ends. Said aloud as it
- * appears.
- */
-const Centre = ({ mark, seconds, isFading }: CentreProps) => {
-  const styles = useStyles()
-  const colour = useTheme((theme) => theme.overPicture.text)
-  const { opacity, isGone } = useMarkFade({ isFading })
-  const look = CENTRE_MARK_LOOKS[mark]
-  return (
-    !isGone && (
-      <View pointerEvents="none" style={styles.centreSlot}>
-        <Animated.View
-          accessibilityLabel={look.label(seconds)}
-          accessibilityLiveRegion="polite"
-          accessible
-          style={[styles.centre, { opacity }]}
-        >
-          <Icon colour={colour} name={look.icon} size={CENTRE_ICON} />
-          {look.text !== null && <Text style={styles.centreText}>{look.text(seconds)}</Text>}
-        </Animated.View>
-      </View>
-    )
-  )
-}
-
-type HeadingLinesProps = Pick<PlayerChromeProps, 'heading'>
-
-/**
- * The title along the top as lines, as the web player's: the show's art (or a film's) on a row
- * of its own, an episode's own name, then the line of what it is (its season and number, its
- * length and its year). A title is marked a favourite on its own page, never here.
- */
-const Heading = ({ heading }: HeadingLinesProps) => {
-  const styles = useStyles()
-  const details = [heading.place, heading.length, heading.year]
-    .filter((part): part is string => part !== null)
-    .join(PLAYER_COPY.separator)
-  // A film's art is its own name; an episode's is its show's, with its own name under it.
-  const episodeName = heading.show === null ? null : heading.title
-  return (
-    <View style={styles.heading}>
-      <View accessibilityRole="header">
-        <TitleArt
-          height={LOGO_HEIGHT}
-          logo={heading.logo}
-          maxWidth={TV_SIZES.measure}
-          name={heading.show ?? heading.title}
-          textStyle={styles.show}
-        />
-      </View>
-      {episodeName !== null && (
-        <Text variant={TEXT_VARIANTS.display} numberOfLines={2} style={styles.title}>
-          {episodeName}
-        </Text>
-      )}
-      {details !== '' && <Text style={styles.details}>{details}</Text>}
-    </View>
-  )
-}
 
 /**
  * The controls over the video, dark in every theme as the web's: Back at the top left, then the
@@ -368,7 +145,7 @@ const Controls = ({
   hasRemote,
 }: ControlsProps) => {
   const scrubber: Focusable = useRef(null)
-  const styles = useStyles()
+  const styles = useDpadChromeStyles()
   // The chapters open as the remote reaches their strip below the buttons, and fold as it goes back up.
   const [isChaptersOpen, setChaptersOpen] = useState(false)
   /*
@@ -384,7 +161,12 @@ const Controls = ({
       <View style={styles.top}>
         <View style={styles.topStart}>
           <FocusBand>
-            <PlateButton icon="back" isOverPicture label={PLAYER_COPY.leave} onPress={onBack} />
+            <PlateButton
+              icon={APP_ICONS.back}
+              isOverPicture
+              label={PLAYER_COPY.leave}
+              onPress={onBack}
+            />
           </FocusBand>
           <Heading heading={heading} />
         </View>
@@ -414,7 +196,7 @@ const Controls = ({
               {transport !== null && (
                 <>
                   <PlateButton
-                    icon="skipPrevious"
+                    icon={APP_ICONS.skipPrevious}
                     isOverPicture
                     label={previous?.label ?? PLAYER_COPY.restart}
                     onPress={previous?.onPlay ?? (() => transport.onSeek(0))}
@@ -427,7 +209,7 @@ const Controls = ({
                     text={String(SKIP_SECONDS)}
                   />
                   <PlateButton
-                    icon={transport.isPaused ? 'play' : 'pause'}
+                    icon={transport.isPaused ? APP_ICONS.play : APP_ICONS.pause}
                     isOverPicture
                     label={transport.isPaused ? PLAYER_COPY.play : PLAYER_COPY.pause}
                     onPress={transport.onTogglePlay}
@@ -443,7 +225,7 @@ const Controls = ({
               )}
               {next !== null && (
                 <PlateButton
-                  icon="skipNext"
+                  icon={APP_ICONS.skipNext}
                   isOverPicture
                   label={next.label}
                   onPress={next.onPlay}
@@ -453,7 +235,7 @@ const Controls = ({
             <View style={styles.buttonGroup}>
               {audio !== null && (
                 <TrackButton
-                  icon="volume"
+                  icon={APP_ICONS.volume}
                   label={PLAYER_COPY.audio}
                   onPicking={onPicking}
                   picker={audio}
@@ -461,7 +243,7 @@ const Controls = ({
               )}
               {subtitles !== null && (
                 <TrackButton
-                  icon="captions"
+                  icon={APP_ICONS.captions}
                   label={PLAYER_COPY.subtitles}
                   onPicking={onPicking}
                   picker={subtitles}
@@ -469,7 +251,7 @@ const Controls = ({
               )}
               {quality !== null && (
                 <TrackButton
-                  icon="settings"
+                  icon={APP_ICONS.settings}
                   label={PLAYER_COPY.quality}
                   onPicking={onPicking}
                   picker={quality}
@@ -521,6 +303,9 @@ const shownKeyOf = ({ mark, isFading, count }: ShownKeyOfProps): string =>
 
 type DpadPlayerProps = PlayerChromeProps
 
+/** The last press's flash in the middle, counted so the same one twice starts afresh. */
+type CountedFlash = Flash & { count: number }
+
 /**
  * raven's own controls over ExoPlayer, driven by the d-pad. They fade once the video has played
  * untouched for the viewer's linger, and any key brings them back; they stay up while it is
@@ -554,10 +339,10 @@ const DpadPlayer = ({
   const isScrubbing = useRef(false)
   const [isPicking, setPicking] = useState(false)
   const [bottomHeight, setBottomHeight] = useState(0)
-  const styles = useStyles()
+  const styles = useDpadChromeStyles()
   const isPlaying = transport !== null && !transport.isPaused
   // The last press's flash, counted so the same one twice starts afresh.
-  const [flash, setFlash] = useState<(Flash & { count: number }) | null>(null)
+  const [flash, setFlash] = useState<CountedFlash | null>(null)
   const flashOf = (flashed: Flash | null) => {
     if (flashed !== null) setFlash((was) => ({ ...flashed, count: (was?.count ?? 0) + 1 }))
   }
@@ -646,12 +431,7 @@ const DpadPlayer = ({
       )}
       {isOpening && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <LoadingMark
-            gap={TV_SIZES.space5}
-            isOverPicture
-            label={PLAYER_COPY.opening}
-            markWidth={TV_SIZES.space8 * 2}
-          />
+          <OpeningMark />
         </View>
       )}
       {holder === REMOTE_HOLDERS.catcher && <ControlsCatcher onPress={show} />}
@@ -736,135 +516,3 @@ export const tvosPlayerChrome: PlayerChromeKit = {
   shouldDrawCaptions: true,
   canDrawPictureSubtitles: false,
 }
-
-const useStyles = pictureStyles((colours) =>
-  StyleSheet.create({
-    root: { flex: 1, backgroundColor: colours.ground },
-    scrim: {
-      ...StyleSheet.absoluteFill,
-      backgroundColor: colours.ground,
-      opacity: SCRIM_OPACITY,
-    },
-    frame: { flex: 1, justifyContent: 'space-between', padding: TV_GUTTER },
-    top: { flexDirection: 'row', justifyContent: 'space-between', gap: TV_SIZES.space4 },
-    topStart: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      flexShrink: 1,
-      gap: TV_SIZES.space4,
-    },
-    heading: { gap: TV_SIZES.space2, maxWidth: TV_SIZES.measure },
-    /*
-     * Never squeezed by the heading beside it, which shrinks instead, and as wide as the clock
-     * needs: the time is always whole on one line.
-     */
-    corner: { flexShrink: 0, alignItems: 'flex-end', gap: TV_SIZES.space2 },
-    cornerChips: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space1 },
-    clock: {
-      flexShrink: 0,
-      color: colours.text,
-      fontSize: CLOCK_SIZE,
-      lineHeight: CLOCK_SIZE * LINE_RATIO,
-      fontVariant: ['tabular-nums'],
-    },
-    show: { color: colours.text, fontSize: TV_SIZES.textXl, fontWeight: 'bold' },
-    // Its season and number, its length and its year.
-    details: {
-      color: colours.muted,
-      fontSize: TV_SIZES.textLg * HEADING_TYPE_SCALE,
-      fontVariant: ['tabular-nums'],
-    },
-    title: {
-      flexShrink: 1,
-      color: colours.text,
-      fontSize: TV_SIZES.textXl * HEADING_TYPE_SCALE,
-    },
-    chip: {
-      paddingHorizontal: TV_SIZES.space2,
-      paddingVertical: TV_SIZES.space0,
-      borderRadius: TV_SIZES.radius,
-      backgroundColor: colours.quiet,
-    },
-    chipText: { color: colours.text, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },
-    bottom: { gap: TV_SIZES.space3 },
-    timeline: { flexDirection: 'row', alignItems: 'center', gap: TV_SIZES.space3 },
-    time: { color: colours.text, fontSize: TV_SIZES.text, fontVariant: ['tabular-nums'] },
-    /*
-     * Room at each end for the focused thumb, which is centred on the line's end and would
-     * otherwise sit over the time beside it.
-     */
-    scrubberSlot: { flex: 1, paddingHorizontal: THUMB_FOCUSED / 2 },
-    scrubber: { height: TV_SIZES.controlLarge, justifyContent: 'center' },
-    line: {
-      height: TV_SIZES.space1,
-      borderRadius: TV_SIZES.space1,
-      backgroundColor: colours.track,
-      overflow: 'hidden',
-    },
-    lineFocused: { height: TV_SIZES.space2 },
-    played: { height: '100%', backgroundColor: colours.played },
-    // The chapter playing, a shade over the track, so its length reads at a glance.
-    chapterSpan: {
-      position: 'absolute',
-      top: 0,
-      bottom: 0,
-      backgroundColor: colours.text,
-      opacity: CHAPTER_SPAN_OPACITY,
-    },
-    // A slim cut in the line where a chapter begins, in the stage's dark.
-    chapterNotch: {
-      position: 'absolute',
-      top: 0,
-      bottom: 0,
-      width: CHAPTER_NOTCH,
-      marginLeft: -CHAPTER_NOTCH / 2,
-      backgroundColor: colours.ground,
-    },
-    thumb: {
-      position: 'absolute',
-      width: THUMB,
-      height: THUMB,
-      borderRadius: THUMB,
-      backgroundColor: colours.text,
-    },
-    thumbFocused: {
-      width: THUMB_FOCUSED,
-      height: THUMB_FOCUSED,
-      borderRadius: THUMB_FOCUSED,
-      borderWidth: TV_SIZES.tvFocusRing,
-      borderColor: colours.played,
-    },
-    // The transport at the left, the track pickers at the right.
-    buttons: { flexDirection: 'row', justifyContent: 'space-between', gap: TV_SIZES.space3 },
-    buttonGroup: { flexDirection: 'row', gap: TV_SIZES.space3 },
-    captionSlot: {
-      ...StyleSheet.absoluteFill,
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      paddingHorizontal: TV_GUTTER,
-    },
-    noticeSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-    centreSlot: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-    centre: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: TV_SIZES.space2,
-      paddingVertical: TV_SIZES.space4,
-      paddingHorizontal: TV_SIZES.space5,
-      borderRadius: TV_SIZES.radius * 3,
-      backgroundColor: colours.raised,
-    },
-    centreText: {
-      color: colours.text,
-      fontSize: TV_SIZES.textXl,
-      fontWeight: 'bold',
-      fontVariant: ['tabular-nums'],
-    },
-    notice: {
-      maxWidth: TV_SIZES.measure,
-      color: colours.text,
-      fontSize: TV_SIZES.textLg,
-      textAlign: 'center',
-    },
-  }),
-)

@@ -1,5 +1,12 @@
-import { CONTENT_TYPES, HTTP_METHODS, HEADERS } from '@shared/server'
-import { isRecord } from '@/guards'
+import {
+  CONTENT_TYPES,
+  HEADERS,
+  HTTP_METHODS,
+  HTTP_STATUSES,
+  type HttpMethod,
+  isRecord,
+  isSuccessStatus,
+} from '@shared/server'
 
 /**
  * Plex's PIN sign-in, as plex.tv documents it for third-party apps: create a
@@ -22,7 +29,20 @@ const PLEX_HEADERS = {
   token: 'X-Plex-Token',
 } as const
 
-type HttpMethod = (typeof HTTP_METHODS)[keyof typeof HTTP_METHODS]
+/** plex.tv's API paths rookery calls. */
+const PLEX_PATHS = {
+  pins: '/api/v2/pins',
+  user: '/api/v2/user',
+} as const
+
+/** The query keys plex.tv's PIN API and auth app read. */
+const PLEX_QUERY = {
+  clientId: 'clientID',
+  code: 'code',
+  product: 'context[device][product]',
+  forwardUrl: 'forwardUrl',
+  strong: 'strong',
+} as const
 
 export type PlexPin = { id: string; code: string }
 
@@ -51,10 +71,10 @@ type PlexAuthUrlProps = { code: string; forwardUrl: string }
 /** Where the browser goes to approve `code`; Plex sends it on to `forwardUrl` afterwards. */
 export const plexAuthUrl = ({ code, forwardUrl }: PlexAuthUrlProps): string =>
   `${PLEX_AUTH_APP}#?${new URLSearchParams({
-    clientID: PLEX_CLIENT_ID,
-    code,
-    'context[device][product]': PLEX_PRODUCT,
-    forwardUrl,
+    [PLEX_QUERY.clientId]: PLEX_CLIENT_ID,
+    [PLEX_QUERY.code]: code,
+    [PLEX_QUERY.product]: PLEX_PRODUCT,
+    [PLEX_QUERY.forwardUrl]: forwardUrl,
   }).toString()}`
 
 const text = (value: unknown): string | null =>
@@ -69,12 +89,15 @@ type HttpPlexTvRequestProps = {
   token?: string
 }
 
+/** What plex.tv answered: its status, and its JSON body or null. */
+type PlexAnswer = { status: number; body: unknown }
+
 export class HttpPlexTv implements PlexTv {
   private async request({
     method = HTTP_METHODS.get,
     path,
     token,
-  }: HttpPlexTvRequestProps): Promise<{ status: number; body: unknown }> {
+  }: HttpPlexTvRequestProps): Promise<PlexAnswer> {
     try {
       const response = await fetch(`${PLEX_TV}${path}`, {
         method,
@@ -96,11 +119,11 @@ export class HttpPlexTv implements PlexTv {
   async createPin(): Promise<PlexPin> {
     const { status, body } = await this.request({
       method: HTTP_METHODS.post,
-      path: '/api/v2/pins?strong=true',
+      path: `${PLEX_PATHS.pins}?${new URLSearchParams({ [PLEX_QUERY.strong]: String(true) }).toString()}`,
     })
     const id = isRecord(body) ? idText(body.id) : null
     const code = isRecord(body) ? text(body.code) : null
-    if (status >= 300 || id == null || code == null) {
+    if (!isSuccessStatus(status) || id == null || code == null) {
       throw new PlexUnavailable(`plex.tv created no PIN (${status})`)
     }
     return { id, code }
@@ -108,18 +131,20 @@ export class HttpPlexTv implements PlexTv {
 
   async checkPin(pin: PlexPin): Promise<string | null> {
     const { status, body } = await this.request({
-      path: `/api/v2/pins/${encodeURIComponent(pin.id)}?code=${encodeURIComponent(pin.code)}`,
+      path: `${PLEX_PATHS.pins}/${encodeURIComponent(pin.id)}?${new URLSearchParams({ [PLEX_QUERY.code]: pin.code }).toString()}`,
     })
     // An expired PIN is gone from plex.tv; to the friend that is the same as not approving it.
-    if (status === 404) return null
-    if (status >= 300 || !isRecord(body)) throw new PlexUnavailable(`plex.tv PIN check (${status})`)
+    if (status === HTTP_STATUSES.notFound) return null
+    if (!isSuccessStatus(status) || !isRecord(body)) {
+      throw new PlexUnavailable(`plex.tv PIN check (${status})`)
+    }
     return text(body.authToken)
   }
 
   async account(token: string): Promise<PlexAccount> {
-    const { status, body } = await this.request({ path: '/api/v2/user', token })
+    const { status, body } = await this.request({ path: PLEX_PATHS.user, token })
     const id = isRecord(body) ? idText(body.id) : null
-    if (status >= 300 || !isRecord(body) || id == null) {
+    if (!isSuccessStatus(status) || !isRecord(body) || id == null) {
       throw new PlexUnavailable(`plex.tv returned no account (${status})`)
     }
     return {

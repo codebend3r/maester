@@ -3,7 +3,7 @@ import type { AiSuggestion } from '@raven/core'
 import { type ComponentType, type Ref, useId } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AI_SUGGESTION_CARD_COPY } from '@/components/AiSuggestionCard/copy'
-import { Button, Icon } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import { api } from '@/lib/api'
 import { afterMatch } from '@raven/ui/headless'
 import styles from '@/components/AiSuggestionCard/AiSuggestionCard.module.scss'
@@ -96,7 +96,7 @@ export const AiSuggestionCard = ({
             {COMMON_COPY.fixMatch}
           </Button>
           <Button
-            tone="primary"
+            tone={BUTTON_TONES.primary}
             disabled={accepting.isPending}
             aria-label={AI_SUGGESTION_CARD_COPY.acceptFor({ name, subject })}
             onClick={() => accepting.mutate()}

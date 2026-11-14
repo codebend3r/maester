@@ -15,7 +15,7 @@ import {
 } from '@raven/mpv'
 import { app, BrowserWindow, powerSaveBlocker, screen } from 'electron'
 import { NIGHT, showWindowButtons } from '@/main/appWindow'
-import type { ConfigStore, ServerEntry } from '@/main/desktopConfig'
+import type { ConfigStore } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import type { Grants } from '@/main/grants'
 import { errorText } from '@/main/log/errorText'
@@ -42,8 +42,8 @@ import { createSleepGuard } from '@/main/player/sleepGuard'
 import { fontsDirFor, subtitleLookOptions } from '@/main/player/subtitleLook'
 import { attachWindowEngine, engineMode } from '@/main/player/windowEngine'
 import type { MediaRelay } from '@/main/servers/mediaRelay'
-import type { createServerSources } from '@/main/servers/serverSources'
-import type { Timers } from '@/main/stateStore'
+import type { ServerSources } from '@/main/servers/serverSources'
+import type { Timers } from '@/main/timers'
 import type { createBudgets } from '@/main/budgets'
 import { IPC_CHANNELS } from '@/shared/hostNames'
 
@@ -76,8 +76,7 @@ type AttachPlayerProps = {
   window: BrowserWindow
   grants: Grants
   config: ConfigStore
-  sources: ReturnType<typeof createServerSources>
-  serverOfId: (serverId: string) => ServerEntry | null
+  sources: ServerSources
   relay: Pick<MediaRelay, 'closeAll'>
   marks: ReturnType<typeof createMarks>
   budgets: ReturnType<typeof createBudgets>
@@ -103,7 +102,6 @@ export const attachPlayer = ({
   marks,
   budgets,
   downloads,
-  serverOfId,
   timers,
   platform,
   nativeTarget,
@@ -114,18 +112,9 @@ export const attachPlayer = ({
   // mpv's events arrive from the moment it opens; the service exists a moment later.
   const sink: { service: PlayerService | null } = { service: null }
   const servers = {
-    resolve: async (source: Parameters<typeof sources.resolve>[0]) => {
+    resolve: async (source: Parameters<ServerSources['resolve']>[0]) => {
       const resolved = await sources.resolve(source)
-      const server = serverOfId(source.serverId)
-      if (resolved.ok && server !== null) {
-        info(
-          openLine({
-            kind: PLAYER_SOURCE_KINDS.server,
-            serverName: server.name,
-            mediaId: source.mediaId,
-          }),
-        )
-      }
+      if (resolved.ok) info(openLine({ kind: PLAYER_SOURCE_KINDS.server, mediaId: source.mediaId }))
       return resolved
     },
   }

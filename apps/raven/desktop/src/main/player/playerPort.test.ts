@@ -1,6 +1,12 @@
 import { describe, expect, mock, test } from 'bun:test'
-import { isPlayerReply, isPlayerRequest, PLAYER_COMMANDS } from '@raven/core'
-import { connectPort, MAX_PENDING, UNKNOWN_COMMAND } from '@/main/player/playerPort'
+import {
+  isPlayerReply,
+  isPlayerRequest,
+  PLAYER_COMMANDS,
+  PLAYER_REFUSAL_REASONS,
+} from '@raven/core'
+import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
+import { connectPort, MAX_PENDING } from '@/main/player/playerPort'
 import { fakePort, fakeService } from '@/main/test/playerFakes'
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -38,25 +44,36 @@ describe('connectPort', () => {
 
   test('answers a refusal with its message, as a reply the page can read', async () => {
     const service = fakeService({
-      outcome: () => ({ ok: false, reason: 'refused', message: 'That video is no longer open.' }),
+      outcome: () => ({
+        ok: false,
+        reason: PLAYER_REFUSAL_REASONS.refused,
+        message: 'That video is no longer open.',
+      }),
     })
     const { port } = connect({ service })
     port.send({ id: 7, command: { type: 'play' } })
     await settle()
     expect(port.posted).toEqual([
-      { id: 7, ok: false, reason: 'refused', message: 'That video is no longer open.' },
+      {
+        id: 7,
+        ok: false,
+        reason: PLAYER_REFUSAL_REASONS.refused,
+        message: 'That video is no longer open.',
+      },
     ])
     expect(port.posted.every(isPlayerReply)).toBe(true)
   })
 
   test('passes on that the engine stopped as the reason, not only the words', async () => {
     const service = fakeService({
-      outcome: () => ({ ok: false, reason: 'engine', message: 'Stopped.' }),
+      outcome: () => ({ ok: false, reason: PLAYER_REFUSAL_REASONS.engine, message: 'Stopped.' }),
     })
     const { port } = connect({ service })
     port.send({ id: 3, command: { type: 'play' } })
     await settle()
-    expect(port.posted).toEqual([{ id: 3, ok: false, reason: 'engine', message: 'Stopped.' }])
+    expect(port.posted).toEqual([
+      { id: 3, ok: false, reason: PLAYER_REFUSAL_REASONS.engine, message: 'Stopped.' },
+    ])
     expect(port.posted.every(isPlayerReply)).toBe(true)
   })
 
@@ -77,9 +94,24 @@ describe('connectPort', () => {
     await settle()
     expect(service.handled).toEqual([])
     expect(port.posted).toEqual([
-      { id: 2, ok: false, reason: 'refused', message: UNKNOWN_COMMAND },
-      { id: 3, ok: false, reason: 'refused', message: UNKNOWN_COMMAND },
-      { id: 4, ok: false, reason: 'refused', message: UNKNOWN_COMMAND },
+      {
+        id: 2,
+        ok: false,
+        reason: PLAYER_REFUSAL_REASONS.refused,
+        message: PLAYER_MESSAGES.unknownCommand,
+      },
+      {
+        id: 3,
+        ok: false,
+        reason: PLAYER_REFUSAL_REASONS.refused,
+        message: PLAYER_MESSAGES.unknownCommand,
+      },
+      {
+        id: 4,
+        ok: false,
+        reason: PLAYER_REFUSAL_REASONS.refused,
+        message: PLAYER_MESSAGES.unknownCommand,
+      },
     ])
     expect(warn).toHaveBeenCalledTimes(1)
   })
@@ -142,7 +174,12 @@ describe('connectPort', () => {
     port.send({ id: 2, command: { type: 'play' } })
     await settle()
     expect(port.posted).toEqual([
-      { id: 1, ok: false, reason: 'refused', message: 'Raven could not do that.' },
+      {
+        id: 1,
+        ok: false,
+        reason: PLAYER_REFUSAL_REASONS.refused,
+        message: 'Raven could not do that.',
+      },
       { id: 2, ok: true },
     ])
     expect(warn).toHaveBeenCalledTimes(1)
@@ -160,14 +197,14 @@ describe('connectPort', () => {
       {
         id: MAX_PENDING + 1,
         ok: false,
-        reason: 'refused',
-        message: 'Raven is busy. Try again.',
+        reason: PLAYER_REFUSAL_REASONS.refused,
+        message: PLAYER_MESSAGES.busy,
       },
       {
         id: MAX_PENDING + 2,
         ok: false,
-        reason: 'refused',
-        message: 'Raven is busy. Try again.',
+        reason: PLAYER_REFUSAL_REASONS.refused,
+        message: PLAYER_MESSAGES.busy,
       },
     ])
     expect(warn).toHaveBeenCalledTimes(1)

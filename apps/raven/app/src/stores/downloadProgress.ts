@@ -1,8 +1,6 @@
 import { type SpeedSample, nextSample } from '@raven/core'
+import type { DownloadReading } from '@raven/native/headless'
 import { create } from 'zustand'
-
-/** How far one running download has come: its bytes, of the whole when the server said it. */
-export type DownloadReading = { bytes: number; total: number }
 
 type ReadProps = { key: string; bytes: number; total: number; now: number }
 

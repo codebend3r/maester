@@ -3,10 +3,9 @@ import { AUTH_HEADERS, type FetchInit, type FetchLike, type FetchResponse } from
 import { type CookieJar, cookieHeaderOf, readServerCookies } from '@/servers/cookieJar'
 import { isServerApi } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
+import { HEADERS } from '@shared/http'
 
 export const FETCH_CREDENTIALS = { omit: 'omit' } as const
-
-export const RESPONSE_HEADERS = { setCookie: 'set-cookie' } as const
 
 /** What the app hands React Native's `fetch`: a request told to leave cookies alone. */
 type NativeFetchProps = FetchInit & { credentials: typeof FETCH_CREDENTIALS.omit }
@@ -51,7 +50,7 @@ export const serverFetchFor = ({ server, jar, fetch }: ServerFetchForProps): Fet
     })
     const landedAt = response.url === '' ? url : response.url
     if (!isOwnApi(url) || !isOwnApi(landedAt)) return response
-    const changes = readServerCookies(response.headers.get(RESPONSE_HEADERS.setCookie))
+    const changes = readServerCookies(response.headers.get(HEADERS.setCookie))
     if (Object.keys(changes).length > 0) await jar.apply({ serverId: server.id, changes })
     return response
   }

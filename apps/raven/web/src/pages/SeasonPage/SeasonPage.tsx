@@ -25,10 +25,12 @@ import {
   WATCH_TARGET_KINDS,
   ITEM_IMAGE_KINDS,
   WATCHED_STATES,
+  episodePath,
+  showPath,
 } from '@raven/core'
 import { type ReactNode, useId } from 'react'
 import { Link } from 'react-router-dom'
-import { ButtonLink, Icon, FactText } from '@raven/ui'
+import { BUTTON_TONES, ButtonLink, Icon, FactText } from '@raven/ui'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { PLAY_ALL_COPY } from '@/components/PlayAllButton/copy'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
@@ -38,6 +40,7 @@ import {
   ItemHeader,
   ItemHeaderSkeleton,
   itemBackdrop,
+  PICTURE_SHAPES,
 } from '@/components/ItemHeader/ItemHeader'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { RouteState } from '@/components/RouteState/RouteState'
@@ -116,12 +119,7 @@ const EpisodeRow = ({ episode }: EpisodeRowProps) => {
   return (
     <li className={styles.episode} data-entry={episodeEntryKey(episode)} {...select.rootProps}>
       <SelectCheckbox select={select} className={styles.select} />
-      <Link
-        to={`/episodes/${episode.id}`}
-        className={styles.still}
-        tabIndex={-1}
-        aria-hidden="true"
-      >
+      <Link to={episodePath(episode.id)} className={styles.still} tabIndex={-1} aria-hidden="true">
         <KeyedView<StillProps> views={STILLS} view={stillOf({ episode })} />
         <span className={styles.overlay}>
           <WatchedMark decorative watched={episode.watched} className={styles.watched} />
@@ -134,7 +132,7 @@ const EpisodeRow = ({ episode }: EpisodeRowProps) => {
             <span className={styles.code}>{SEASON_COPY.episodeNumber(episode.episode)}</span>
           )}
           <Link
-            to={`/episodes/${episode.id}`}
+            to={episodePath(episode.id)}
             className={styles.title}
             tabIndex={select.linkTabIndex}
           >
@@ -203,7 +201,7 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
     >
       <article className={styles.page} aria-labelledby={ids.title}>
         <ItemHeader
-          back={{ to: `/shows/${show.id}`, label: show.title }}
+          back={{ to: showPath(show.id), label: show.title }}
           titleId={ids.title}
           eyebrow={[show.title]}
           title={season.title}
@@ -213,7 +211,7 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
           ratings={[]}
           progress={count > 0 ? { fraction: watchedCount / count, label: watchedWords } : undefined}
           picture={{
-            shape: 'poster',
+            shape: PICTURE_SHAPES.poster,
             url: api.itemImageUrl({
               id: season.id,
               kind: ITEM_IMAGE_KINDS.poster,
@@ -224,7 +222,7 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
         >
           {nextFile && (
             <ButtonLink
-              tone="primary"
+              tone={BUTTON_TONES.primary}
               icon="play"
               {...watchLink({ media: nextFile, session: SEASON_SESSION })}
             >
@@ -291,7 +289,11 @@ type PendingSeasonProps = { state: RoutePending }
 
 const pendingSeason = ({ state }: PendingSeasonProps): ViewOf<SeasonViewsProps> => ({
   key: SEASON_VIEW_KEYS.pending,
-  props: { state, noun: SEASON_COPY.noun, shape: <ItemHeaderSkeleton picture="poster" /> },
+  props: {
+    state,
+    noun: SEASON_COPY.noun,
+    shape: <ItemHeaderSkeleton picture={PICTURE_SHAPES.poster} />,
+  },
 })
 
 type SeasonPageViewProps = {

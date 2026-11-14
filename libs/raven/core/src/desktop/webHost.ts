@@ -1,4 +1,4 @@
-import { object, oneOf } from '@/schema'
+import { object, oneOf, literal } from '@/schema'
 
 /**
  * Raven serves the web app's build from this loopback port and proxies `/api` to its
@@ -18,7 +18,7 @@ export const WEB_HOST_ERRORS = { serverUnreachable: 'server_unreachable' } as co
 
 /** The body of the web host's 502 when it could not reach the server. */
 const isServerUnreachableBody = object({
-  error: oneOf([WEB_HOST_ERRORS.serverUnreachable]),
+  error: literal(WEB_HOST_ERRORS.serverUnreachable),
 })
 
 /** What a proxy in front of the server answers when it cannot reach it. */
@@ -43,14 +43,6 @@ export const DESKTOP_PATHS = {
   downloads: '/downloads',
   local: '/local',
   play: '/play/:fileId',
-} as const
-
-/** The environment variables a Raven build reads. */
-export const DESKTOP_ENV = {
-  /** The server `/api` goes to, an http or https origin with no path. */
-  serverOrigin: 'RAVEN_DESKTOP_SERVER_ORIGIN',
-  /** Comma separated origins whose `raven://` links name the same server. */
-  linkOrigins: 'RAVEN_DESKTOP_LINK_ORIGINS',
 } as const
 
 /**

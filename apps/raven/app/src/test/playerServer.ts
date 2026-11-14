@@ -1,6 +1,6 @@
 import {
   DEFAULT_CAPTION_STYLE,
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type ApiClient,
   CONTAINERS,
@@ -16,18 +16,19 @@ import {
   createApiClient,
 } from '@raven/core'
 import { allowlistedFetch } from '@raven/native/headless'
-
 import {
   type Answer,
   type HeardRequest,
   NOT_FOUND,
   STATUSES,
-  pathFor,
+  pathWithId,
   responseOf,
-} from '@/test/fixtureFetch'
+  mediaItemFor,
+  summaryFor,
+} from '@raven/native/testing'
+
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import { BUSBOYS, GOOD_NEWS, GOOD_NEWS_ABOUT_HELL, HALF_LOOP, SEVERANCE } from '@/test/itemServer'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 import { SUBTITLE_CODECS } from '@/test/subtitleCodecs'
 
 /** The film library, which counts a video watched at 90%. */
@@ -156,7 +157,7 @@ export const CUE_TEXT = 'The tide is turning.'
 const VTT = ['WEBVTT', '', '00:00:10.000 --> 00:00:20.000', CUE_TEXT, ''].join('\n')
 
 /** A route's path for the MP4. */
-const busboysPath = (path: string): string => pathFor({ path, id: BUSBOYS_MP4.id })
+const busboysPath = (path: string): string => pathWithId({ path, id: BUSBOYS_MP4.id })
 
 /** Each file the server holds, with its tracks. */
 const FILES = [
@@ -187,21 +188,21 @@ type FilePathsProps = { path: string }
 
 /** A route's path for each file. */
 const filePaths = ({ path }: FilePathsProps): string[] =>
-  FILES.map(({ media }) => pathFor({ path, id: media.id }))
+  FILES.map(({ media }) => pathWithId({ path, id: media.id }))
 
 const READS: Record<string, unknown> = {
   ...Object.fromEntries(
     FILES.flatMap(({ media, tracks }) => [
-      [pathFor({ path: getMedia.path, id: media.id }), media],
-      [pathFor({ path: getTracks.path, id: media.id }), tracks],
+      [pathWithId({ path: getMedia.path, id: media.id }), media],
+      [pathWithId({ path: getTracks.path, id: media.id }), tracks],
     ]),
   ),
-  [pathFor({ path: getItem.path, id: BUSBOYS.id })]: BUSBOYS,
-  [pathFor({ path: getItem.path, id: GOOD_NEWS_ABOUT_HELL.id })]: GOOD_NEWS_ABOUT_HELL,
-  [pathFor({ path: getItem.path, id: HALF_LOOP.id })]: HALF_LOOP,
-  [pathFor({ path: getItem.path, id: SEVERANCE.id })]: SEVERANCE,
-  [pathFor({ path: nextInSession.path, id: GOOD_NEWS_MP4.id })]: HALF_LOOP_MP4,
-  [pathFor({ path: nextInSession.path, id: HALF_LOOP_MP4.id })]: null,
+  [pathWithId({ path: getItem.path, id: BUSBOYS.id })]: BUSBOYS,
+  [pathWithId({ path: getItem.path, id: GOOD_NEWS_ABOUT_HELL.id })]: GOOD_NEWS_ABOUT_HELL,
+  [pathWithId({ path: getItem.path, id: HALF_LOOP.id })]: HALF_LOOP,
+  [pathWithId({ path: getItem.path, id: SEVERANCE.id })]: SEVERANCE,
+  [pathWithId({ path: nextInSession.path, id: GOOD_NEWS_MP4.id })]: HALF_LOOP_MP4,
+  [pathWithId({ path: nextInSession.path, id: HALF_LOOP_MP4.id })]: null,
   [getMediaOrigins.path]: { origins: [] },
   [getCaptionStyle.path]: DEFAULT_CAPTION_STYLE,
   [listLibraries.path]: [WATCHED_AT_90, SERIES],
@@ -241,7 +242,7 @@ export const playerApi = ({
   type AnswerForProps = { method: string; path: string }
 
   const answerFor = ({ method, path }: AnswerForProps): Answer => {
-    if (method !== APP_CALL_METHODS.get) {
+    if (method !== HTTP_METHODS.get) {
       return WRITES.has(path) ? { status: STATUSES.noContent, body: null } : NOT_FOUND
     }
     if (path === getPlaybackSettings.path) {
@@ -266,7 +267,7 @@ export const playerApi = ({
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const path = url.slice(NAS.origin.length)
-        const method = init.method ?? APP_CALL_METHODS.get
+        const method = init.method ?? HTTP_METHODS.get
         hear({ method, path, body: bodyOf(init.body) })
         return responseOf(answerFor({ method, path: pathOnly(path) }))
       },

@@ -8,13 +8,14 @@ import {
   sagaPictures,
 } from '@raven/core'
 import { type FormEvent, useId, useState } from 'react'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { api } from '@/lib/api'
 import { useModal } from '@/lib/useModal'
 import { afterSagaBackdrop } from '@raven/ui/headless'
 import { SAGA_COPY } from '@/pages/SagaPage/copy'
 import styles from '@/pages/SagaPage/SagaBackdropDialog.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
 
 /** A way for the slideshow to go, or `off` for the cover held still. */
 const CHOICES = { ...SLIDESHOW_MOTIONS, off: 'off' } as const
@@ -41,7 +42,7 @@ type SagaBackdropDialogProps = {
  * is. A native modal <dialog> traps focus and closes on Escape.
  */
 export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDialogProps) => {
-  const { dialog } = useModal()
+  const { dialog, keepKeys } = useModal()
   const ids = { title: useId(), choice: useId(), cover: useId() }
   const queryClient = useQueryClient()
   const [choice, setChoice] = useState<Choice>(
@@ -77,7 +78,14 @@ export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDia
   }
 
   return (
-    <dialog ref={dialog} className={styles.dialog} aria-labelledby={ids.title} onClose={onClose}>
+    <DialogFrame
+      dialog={dialog}
+      onKeyDown={keepKeys}
+      width={DIALOG_WIDTHS.prose}
+      labelledBy={ids.title}
+      onClose={onClose}
+      className={styles.dialog}
+    >
       <form className={styles.form} onSubmit={submit}>
         <h2 id={ids.title} className={styles.title}>
           {SAGA_COPY.editBackdrop}
@@ -144,11 +152,11 @@ export const SagaBackdropDialog = ({ libraryId, saga, onClose }: SagaBackdropDia
 
         <div className={styles.actions}>
           <Button onClick={() => dialog.current?.close()}>{COMMON_COPY.cancel}</Button>
-          <Button type="submit" tone="primary" disabled={save.isPending || !chosen()}>
+          <Button type="submit" tone={BUTTON_TONES.primary} disabled={save.isPending || !chosen()}>
             {SAGA_COPY.save}
           </Button>
         </div>
       </form>
-    </dialog>
+    </DialogFrame>
   )
 }

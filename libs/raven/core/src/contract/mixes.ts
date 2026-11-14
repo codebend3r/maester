@@ -1,3 +1,4 @@
+import { isMediaId } from '@/contract/ids'
 import { isAlbumSummary, isTrack } from '@/contract/music'
 import { type Infer, isNumber, isString, listOf, object, oneOf } from '@/schema'
 
@@ -43,10 +44,7 @@ export const RADIO_SEED_KINDS = { track: 'track', artist: 'artist', album: 'albu
 
 export const isRadioSeedKind = oneOf(Object.values(RADIO_SEED_KINDS))
 
-const isWholeId = (value: unknown): value is number =>
-  isNumber(value) && Number.isInteger(value) && value >= 1
-
-export const isRadioSeed = object({ kind: isRadioSeedKind, id: isWholeId })
+export const isRadioSeed = object({ kind: isRadioSeedKind, id: isMediaId })
 
 export type RadioSeed = Infer<typeof isRadioSeed>
 

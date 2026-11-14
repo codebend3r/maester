@@ -51,5 +51,6 @@ jest.mock('@/downloads/downloader', () => ({
     folders: () => [],
     remove: async () => undefined,
     removeAll: async () => undefined,
+    freeBytes: () => null,
   },
 }))

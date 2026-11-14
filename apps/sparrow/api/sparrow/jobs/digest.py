@@ -3,8 +3,6 @@
 Sent to the admin at `DIGEST_TIME`. A section is there only when
 it has something to say, in this order:
 
-- switches left on: the kill switch, a maintenance window
-- waiting on you: every open approval, oldest first, and how long it's waited
 - new requests: the last day's Seerr requests, whose, and where each stands
 - open issues: Seerr's open issues, newest first
 - replacements: the files replaced in the last day, and why
@@ -23,12 +21,11 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from sparrow.agent.limits import KillSwitch
 from sparrow.clients import ClientError, Services
 from sparrow.clients.base import every_host
 from sparrow.clients.seerr import MediaRequest, RequestStatus
 from sparrow.config import Settings
-from sparrow.formatting import ago, local_time
+from sparrow.formatting import ago
 from sparrow.jobs.sweep import downloads as queued_downloads
 from sparrow.jobs.sweep import read_queues
 from sparrow.media import episode_code, version_label
@@ -36,7 +33,7 @@ from sparrow.notify import AdminPost, Notice
 from sparrow.playback.reports import POLICIES
 from sparrow.releases import new_bad_releases
 from sparrow.storage import FORECAST_WINDOW, forecasts, read_space
-from sparrow.store import MAINTENANCE, StallAction, Store
+from sparrow.store import StallAction, Store
 
 DAY = timedelta(days=1)
 # A volume that fills sooner than this gets its forecast in the digest.
@@ -71,13 +68,10 @@ class Checked:
 
 
 class Digest:
-    def __init__(
-        self, services: Services, store: Store, settings: Settings, kill_switch: KillSwitch
-    ):
+    def __init__(self, services: Services, store: Store, settings: Settings):
         self.services = services
         self.store = store
         self.settings = settings
-        self.kill_switch = kill_switch
         self.zone = settings.jobs.zone
 
     async def __call__(self) -> list[Notice]:
@@ -96,8 +90,6 @@ class Digest:
             "Couldn't check", [m for c in (requests, issues, downloads, space) for m in c.missed]
         )
         sections = [
-            self.switches(),
-            self.waiting(now),
             *requests.sections,
             *issues.sections,
             self.replacements(now),
@@ -109,26 +101,6 @@ class Digest:
         head = f"**Daily digest, {now.astimezone(self.zone):%a %b %d}**"
         said = [s.render() for s in sections if s.lines]
         return "\n\n".join([head, *said]) if said else f"{head}\nNothing to report."
-
-    def switches(self) -> Section:
-        section = Section("Switched on")
-        if flag := self.kill_switch.flag:
-            why = f" ({flag.message})" if flag.message else ""
-            section.lines.append(f"The kill switch is on{why}: destructive tools refuse.")
-        if window := self.store.flag(MAINTENANCE):
-            why = f" ({window.message})" if window.message else ""
-            since = local_time(datetime.fromisoformat(window.set_at), self.zone)
-            section.lines.append(
-                f"Maintenance has been on since {since}{why}: requests and replacements are held."
-            )
-        return section
-
-    def waiting(self, now: datetime) -> Section:
-        waiting = self.store.open_pending("approve")
-        return Section(
-            f"Waiting on you ({len(waiting)})",
-            [f"{p.summary} (asked {ago(now - datetime.fromisoformat(p.ts))})" for p in waiting],
-        )
 
     async def new_requests(self, now: datetime, titles: Titles) -> Checked:
         section = Section("New requests")
@@ -177,9 +149,7 @@ class Digest:
 
     def replacements(self, now: datetime) -> Section:
         section = Section("Replaced")
-        for row in self.store.acted_since(("replace_media", "decide_replacement"), now - DAY):
-            if row.args.get("approved") is False:  # the admin's Deny: nothing was replaced
-                continue
+        for row in self.store.acted_since(("replace_media",), now - DAY):
             report = self.store.get_report(int(row.args.get("report_id", 0)))
             if report is not None:
                 section.lines.append(

@@ -16,7 +16,7 @@ import { type Query, useQuery } from '@tanstack/react-query'
 import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { DesktopClient } from '@/desktop/client'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import { useIsOutputFixed } from '@/desktop/output'
 import { NativePlaying } from '@/desktop/player/NativePlaying'
 import { PlayerMessage } from '@/desktop/player/PlayerMessage'
@@ -387,7 +387,8 @@ export const DesktopWatch = ({ services, media, upNext }: DesktopWatchProps) => 
   const isOutputFixed = useIsOutputFixed()
   const [isLost, setIsLost] = useState(false)
   const onLost = useCallback(() => setIsLost(true), [])
-  const player = !isLost && chosen?.status === CONNECTION_STATUSES.native ? chosen.player : null
+  const player =
+    !isLost && chosen != null && chosen.status === CONNECTION_STATUSES.native ? chosen.player : null
   const View = WATCH_VIEWS[player === null ? VIEW_KINDS.message : VIEW_KINDS.playing]
   return (
     <View

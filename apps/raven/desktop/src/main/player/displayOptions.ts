@@ -1,5 +1,4 @@
-import { MPV_PROPERTIES } from '@raven/mpv'
-import type { MpvOption } from '@/main/player/outputOptions'
+import { MPV_CHOICES, MPV_PROPERTIES, type MpvOption } from '@raven/mpv'
 
 type DisplayOptionsProps = {
   refreshRate: number
@@ -10,12 +9,18 @@ export const displayOptions = ({ refreshRate, edrHeadroom }: DisplayOptionsProps
   ...(Number.isFinite(refreshRate) && refreshRate > 0
     ? [{ name: MPV_PROPERTIES.displayFpsOverride, value: refreshRate }]
     : []),
-  { name: MPV_PROPERTIES.targetColorspaceHint, value: edrHeadroom > 1 ? 'yes' : 'no' },
+  {
+    name: MPV_PROPERTIES.targetColorspaceHint,
+    value: edrHeadroom > 1 ? MPV_CHOICES.yes : MPV_CHOICES.no,
+  },
 ]
+
+/** What a display reads as: its refresh rate and its EDR headroom. */
+type DisplayReading = { refreshRate: number; edrHeadroom: number }
 
 type DisplayReadingProps = {
   frequency: number
-  display: () => { refreshRate: number; edrHeadroom: number }
+  display: () => DisplayReading
 }
 
 /**
@@ -26,7 +31,7 @@ type DisplayReadingProps = {
 export const displayReading = ({
   frequency,
   display,
-}: DisplayReadingProps): { refreshRate: number; edrHeadroom: number } | null => {
+}: DisplayReadingProps): DisplayReading | null => {
   try {
     const { refreshRate, edrHeadroom } = display()
     const isKnown = Number.isFinite(frequency) && frequency > 0

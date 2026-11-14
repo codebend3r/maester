@@ -62,3 +62,16 @@ export const lyricsOfText = ({ text, source }: LyricsOfTextProps): Lyrics => {
   const plain = text.trim()
   return plain === '' ? NO_LYRICS : { kind: LYRICS_KINDS.plain, source, text: plain }
 }
+
+type ActiveLineAtProps = {
+  /** Synced lines in time order, as the server sends them. */
+  lines: readonly LyricLine[]
+  /** Seconds into the track. */
+  at: number
+}
+
+/** The place of the line being sung at `at`: the last to have started, or null before the first. */
+export const activeLineAt = ({ lines, at }: ActiveLineAtProps): number | null => {
+  const place = lines.findLastIndex((line) => line.at <= at)
+  return place === -1 ? null : place
+}

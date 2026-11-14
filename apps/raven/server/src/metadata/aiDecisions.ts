@@ -169,7 +169,7 @@ export class AiDecisions {
         }
       >(
         `SELECT d.place, d.tmdb_id, d.title, d.year, d.poster, d.reason FROM ai_decisions d
-          WHERE d.library_id = ? AND d.confidence = 'low' AND d.tmdb_id IS NOT NULL
+          WHERE d.library_id = ? AND d.confidence = '${AI_CONFIDENCES.low}' AND d.tmdb_id IS NOT NULL
             AND d.place IN (SELECT value FROM json_each(?))
             AND NOT EXISTS (
               SELECT 1 FROM match_overrides o WHERE o.library_id = d.library_id AND o.place = d.place
@@ -237,7 +237,7 @@ export class AiDecisions {
   forgetUnsure(libraryId: number): void {
     this.db
       .prepare(
-        `DELETE FROM ai_decisions WHERE library_id = ? AND (tmdb_id IS NULL OR confidence = 'low')`,
+        `DELETE FROM ai_decisions WHERE library_id = ? AND (tmdb_id IS NULL OR confidence = '${AI_CONFIDENCES.low}')`,
       )
       .run(libraryId)
   }

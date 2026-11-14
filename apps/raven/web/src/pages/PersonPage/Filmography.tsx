@@ -4,6 +4,7 @@ import {
   hasSelfCredits,
   isFilmographyTab,
   tabCounts,
+  FILMOGRAPHY_TAB_NAMES,
 } from '@raven/core'
 import { type ComponentType, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -13,6 +14,7 @@ import { FilmographyBones, FilmographyTable, rolesOf } from '@/pages/PersonPage/
 import { FilmographyToolbar } from '@/pages/PersonPage/FilmographyToolbar'
 import { PERSON_COPY } from '@/pages/PersonPage/copy'
 import styles from '@/pages/PersonPage/PersonPage.module.scss'
+import { PAGE_PARAMS } from '@/lib/appPaths'
 
 /** Text as a search compares it: no case, and no accents, so "amelie" finds Amélie. */
 const fold = (text: string): string =>
@@ -50,7 +52,7 @@ const isOnlySelf = (entries: readonly FilmographyEntry[]): boolean =>
  * matches the On raven marks under it.
  */
 export const heldOnOpening = (entries: readonly FilmographyEntry[]): number =>
-  entriesOn({ entries, tab: 'all', isSelfShown: isOnlySelf(entries) }).filter(
+  entriesOn({ entries, tab: FILMOGRAPHY_TAB_NAMES.all, isSelfShown: isOnlySelf(entries) }).filter(
     (entry) => entry.item != null,
   ).length
 
@@ -88,8 +90,8 @@ const ListedFilmography = ({ name, entries }: ListedFilmographyProps) => {
   const hasOnlySelf = useMemo(() => isOnlySelf(entries), [entries])
   const isSelfShown = isSelfAsked || hasOnlySelf
   const counts = useMemo(() => tabCounts({ entries, isSelfShown }), [entries, isSelfShown])
-  const asked = address.get('credits')
-  const tab = isFilmographyTab(asked) && counts[asked] > 0 ? asked : 'all'
+  const asked = address.get(PAGE_PARAMS.credits)
+  const tab = isFilmographyTab(asked) && counts[asked] > 0 ? asked : FILMOGRAPHY_TAB_NAMES.all
   /*
    * Each keystroke draws the page again, but the rows, and so the table,
    * change only once the query the search settles on does.

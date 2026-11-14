@@ -79,7 +79,7 @@
   }
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+    background: var(--color-on-picture-hairline);
   }
 
   // As `elements.scss` dims a disabled field.
@@ -147,7 +147,7 @@
   }
 
   &:hover {
-    background: color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+    background: var(--color-on-picture-hairline);
   }
 }
 

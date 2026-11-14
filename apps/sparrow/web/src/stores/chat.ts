@@ -1,18 +1,28 @@
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, devtools, persist } from 'zustand/middleware'
-import { type CaseTurn, type ChatRoute, ROUTES, decide, forget, streamTurn } from '@/lib/api'
+import {
+  type CaseTurn,
+  type Decision,
+  ROUTES,
+  type Turn,
+  decide,
+  forget,
+  streamTurn,
+} from '@/lib/api'
+import { CHAT_COPY } from '@/lib/copy'
 import {
   ENTRY_KINDS,
   type Entry,
-  REPLY_STATES,
-  type Reply,
+  type ReplyEntry,
+  SAVED_CHAT_VERSION,
   type SavedChat,
+  dropOlderSave,
+  isFinished,
   toSavedChat,
 } from '@/lib/entries'
-import { CHAT_EVENTS, type ChatEvent, type Choice } from '@/lib/events'
-import { CHAT_COPY } from '@/stores/copy'
+import type { Choice } from '@/lib/events'
 
-/** Keep the pre-sparrow key so existing browser conversations survive the rebrand. */
+/** The pre-sparrow key, kept from the rebrand; a save older than `SAVED_CHAT_VERSION` is dropped, not read. */
 export const CHAT_STORAGE_KEY = 'luwin-chat'
 
 /** The browser's storage, or nothing when it is refused (a locked-down private window). */
@@ -40,42 +50,6 @@ const quietStorage: StateStorage = {
   },
 }
 
-const UNREACHABLE = "Couldn't reach sparrow; check that its server or the sandbox is running."
-
-type ApplyEventProps = { reply: Reply; event: ChatEvent }
-
-/** `reply` with one more of its stream's events applied. */
-const applyEvent = ({ reply, event }: ApplyEventProps): Reply => {
-  switch (event.name) {
-    case CHAT_EVENTS.tool:
-      return { ...reply, tools: [...reply.tools, event.tool] }
-    case CHAT_EVENTS.text:
-      return { ...reply, chunks: [...reply.chunks, event.text] }
-    case CHAT_EVENTS.confirm:
-      return { ...reply, confirmations: [...reply.confirmations, event.confirmation] }
-    case CHAT_EVENTS.choices:
-      return { ...reply, choices: event.choices }
-    case CHAT_EVENTS.titles:
-      return { ...reply, titles: [...reply.titles, ...event.titles] }
-    case CHAT_EVENTS.notice:
-      return { ...reply, notices: [...reply.notices, event.notice] }
-    case CHAT_EVENTS.failure:
-      return { ...reply, cause: event.detail }
-    case CHAT_EVENTS.done:
-      return { ...reply, state: REPLY_STATES.done }
-    case CHAT_EVENTS.error:
-      return {
-        ...reply,
-        state: REPLY_STATES.failed,
-        failure: CHAT_COPY.broke(event.ref),
-      }
-    default: {
-      const unknown: never = event
-      return unknown
-    }
-  }
-}
-
 type SendProps = { text: string; expected?: CaseTurn }
 
 type PressProps = { pendingId: number; approve: boolean }
@@ -90,7 +64,7 @@ type ChatState = {
   send: (message: SendProps) => Promise<void>
   pick: (choice: Choice) => Promise<void>
   press: (press: PressProps) => Promise<void>
-  /** Forgets the conversation on the server, then clears the page. */
+  /** Forgets the conversation on the server, then clears the page; keeps it when that fails. */
   startOver: () => Promise<void>
   /**
    * Takes up `owner`'s conversation: the saved one when it is theirs, else a fresh page,
@@ -98,6 +72,17 @@ type ChatState = {
    */
   adopt: (owner: string) => void
 }
+
+type WithDecisionProps = { entries: Entry[]; decision: Decision }
+
+/** `entries` with a press's answer appended, or the page's own word when nothing answered. */
+const withDecision = ({ entries, decision }: WithDecisionProps): Entry[] => [
+  ...entries,
+  { kind: ENTRY_KINDS.decision, id: entries.length, text: decision.text, events: decision.events },
+]
+
+/** The page's own answer to a press or a start over sparrow didn't take: it sent nothing. */
+const pageNote = (text: string): Decision => ({ text, isSettled: false, events: [] })
 
 /**
  * The conversation on this page, kept across reloads. Entry ids are their indexes:
@@ -107,37 +92,24 @@ export const useChat = create<ChatState>()(
   devtools(
     persist(
       (set, get) => {
-        type UpdateReplyProps = { id: number; change: (reply: Reply) => Reply }
+        type UpdateReplyProps = { id: number; change: (reply: ReplyEntry) => ReplyEntry }
 
         const updateReply = ({ id, change }: UpdateReplyProps) =>
-          set(({ entries }) => {
-            const entry = entries[id]
-            return entry?.kind === ENTRY_KINDS.reply
-              ? { entries: entries.with(id, change(entry)) }
-              : {}
-          })
+          set(({ entries }) => ({
+            entries: entries.map((entry) =>
+              entry.id === id && entry.kind === ENTRY_KINDS.reply ? change(entry) : entry,
+            ),
+          }))
 
-        type RunTurnProps = {
-          said: string
-          route: ChatRoute
-          body: Record<string, unknown>
-          expected: CaseTurn | null
-        }
+        type RunTurnProps = { said: string; turn: Turn; expected: CaseTurn | null }
 
-        const runTurn = async ({ said, route, body, expected }: RunTurnProps) => {
+        const runTurn = async ({ said, turn, expected }: RunTurnProps) => {
           const start = get().entries.length
-          const reply: Reply = {
+          const reply: ReplyEntry = {
             kind: ENTRY_KINDS.reply,
             id: start + 1,
-            state: REPLY_STATES.running,
-            chunks: [],
-            tools: [],
-            confirmations: [],
-            choices: [],
-            notices: [],
-            titles: [],
+            events: [],
             failure: null,
-            cause: null,
             expected,
           }
           set(({ entries }) => ({
@@ -146,23 +118,25 @@ export const useChat = create<ChatState>()(
           }))
           try {
             await streamTurn({
-              route,
-              body,
+              turn,
               onEvent: (event) =>
-                updateReply({ id: reply.id, change: (r) => applyEvent({ reply: r, event }) }),
+                updateReply({
+                  id: reply.id,
+                  change: (r) => ({ ...r, events: [...r.events, event] }),
+                }),
             })
           } catch {
             updateReply({
               id: reply.id,
-              change: (r) => ({ ...r, state: REPLY_STATES.failed, failure: UNREACHABLE }),
+              change: (r) => ({ ...r, failure: CHAT_COPY.unreachable }),
             })
           } finally {
             // A stream that ended without `done` or `error` was cut off.
             updateReply({
               id: reply.id,
               change: (r) =>
-                r.state === REPLY_STATES.running
-                  ? { ...r, state: REPLY_STATES.failed, failure: CHAT_COPY.cutOff }
+                r.failure === null && !isFinished(r.events)
+                  ? { ...r, failure: CHAT_COPY.cutOff }
                   : r,
             })
             set({ isBusy: false })
@@ -175,35 +149,45 @@ export const useChat = create<ChatState>()(
           settled: [],
           isBusy: false,
           send: ({ text, expected }) =>
-            runTurn({ said: text, route: ROUTES.chat, body: { text }, expected: expected ?? null }),
+            runTurn({
+              said: text,
+              turn: { route: ROUTES.chat, body: { text } },
+              expected: expected ?? null,
+            }),
           pick: (choice) =>
             runTurn({
               said: choice.display,
-              route: ROUTES.pick,
-              body: { label: choice.label, value: choice.value, year: choice.year },
+              turn: {
+                route: ROUTES.pick,
+                body: { label: choice.label, value: choice.value, year: choice.year },
+              },
               expected: null,
             }),
           press: async ({ pendingId, approve }) => {
             set({ isBusy: true })
-            const decision = await decide({ pendingId, approve }).catch(() => null)
+            const decision = await decide({ pendingId, approve }).catch(() =>
+              pageNote(CHAT_COPY.unreachable),
+            )
             set(({ entries, settled }) => ({
               isBusy: false,
-              settled: decision?.isSettled ? [...settled, pendingId] : settled,
-              entries: [
-                ...entries,
-                {
-                  kind: ENTRY_KINDS.decision,
-                  id: entries.length,
-                  text: decision?.text ?? UNREACHABLE,
-                  notices: decision?.notices ?? [],
-                },
-              ],
+              settled: decision.isSettled ? [...settled, pendingId] : settled,
+              entries: withDecision({ entries, decision }),
             }))
           },
           startOver: async () => {
             set({ isBusy: true })
-            await forget().catch(() => null)
-            set({ entries: [], settled: [], isBusy: false })
+            const isForgotten = await forget().then(
+              () => true,
+              () => false,
+            )
+            if (isForgotten) {
+              set({ entries: [], settled: [], isBusy: false })
+              return
+            }
+            set(({ entries }) => ({
+              isBusy: false,
+              entries: withDecision({ entries, decision: pageNote(CHAT_COPY.notForgotten) }),
+            }))
           },
           adopt: (owner) => {
             if (get().owner === owner) return
@@ -213,12 +197,14 @@ export const useChat = create<ChatState>()(
       },
       {
         name: CHAT_STORAGE_KEY,
+        version: SAVED_CHAT_VERSION,
         storage: createJSONStorage(() => quietStorage),
         partialize: ({ owner, entries, settled }): Partial<SavedChat> => ({
-          ...(owner == null ? {} : { owner }),
+          ...(owner === null ? {} : { owner }),
           entries,
           settled,
         }),
+        migrate: dropOlderSave,
         merge: (saved, current) => ({ ...current, ...toSavedChat(saved) }),
       },
     ),

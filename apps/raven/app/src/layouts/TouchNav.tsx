@@ -14,6 +14,7 @@ import { useTouchMenu } from '@/stores/touchMenu'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { THEME_PICKER } from '@/theme/themeOptions'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 type NavButtonProps = {
   icon: IconName
@@ -48,7 +49,14 @@ type HomeButtonProps = NavPartProps
 /** Back to Home, taking the screens above it off the stack rather than stacking another. */
 const HomeButton = ({ isRaised }: HomeButtonProps) => {
   const goHome = useGoHome()
-  return <NavButton icon="home" isRaised={isRaised} label={TOUCH_NAV_COPY.home} onPress={goHome} />
+  return (
+    <NavButton
+      icon={APP_ICONS.home}
+      isRaised={isRaised}
+      label={TOUCH_NAV_COPY.home}
+      onPress={goHome}
+    />
+  )
 }
 
 type MenuButtonProps = NavPartProps
@@ -56,7 +64,14 @@ type MenuButtonProps = NavPartProps
 /** Slides the side menu out over the page. */
 const MenuButton = ({ isRaised }: MenuButtonProps) => {
   const open = useTouchMenu((menu) => menu.open)
-  return <NavButton icon="sidebar" isRaised={isRaised} label={TOUCH_NAV_COPY.menu} onPress={open} />
+  return (
+    <NavButton
+      icon={APP_ICONS.sidebar}
+      isRaised={isRaised}
+      label={TOUCH_NAV_COPY.menu}
+      onPress={open}
+    />
+  )
 }
 
 type ThemeButtonProps = NavPartProps
@@ -71,7 +86,7 @@ const ThemeButton = ({ isRaised }: ThemeButtonProps) => {
   return (
     <NavButton
       ref={button}
-      icon="sun"
+      icon={APP_ICONS.sun}
       isRaised={isRaised}
       label={TOUCH_NAV_COPY.theme}
       onPress={() =>

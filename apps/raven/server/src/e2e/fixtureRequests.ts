@@ -1,4 +1,5 @@
-import { FIXTURE_SERVER, ITEM_TYPES, type MatchItemType } from '@raven/core'
+import { ITEM_TYPES, type MatchItemType } from '@raven/core'
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@shared/server'
 import { DOCUMENTARY_FILTERS, type MetadataFetch } from '@/metadata/tmdbClient'
 import type { RequestsConfig } from '@/requests/requestsConfig'

@@ -1,7 +1,7 @@
 import { type Rating, type SlideshowMotion, type watchLink, ITEM_IMAGE_KINDS } from '@raven/core'
 import { type ComponentType, Fragment, type ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Icon, FactText } from '@raven/ui'
+import { Icon, FactText, classNames } from '@raven/ui'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { type BackFallback, BackButton } from '@/components/BackButton/BackButton'
 import { LogoImage } from '@/components/LogoImage/LogoImage'
@@ -13,7 +13,7 @@ import { ITEM_HEADER_COPY } from '@/components/ItemHeader/copy'
 import styles from '@/components/ItemHeader/ItemHeader.module.scss'
 
 /** What sits beside the title: a poster, an episode's still, or no picture at all. */
-const PICTURE_SHAPES = { poster: 'poster', still: 'still', none: 'none' } as const
+export const PICTURE_SHAPES = { poster: 'poster', still: 'still', none: 'none' } as const
 
 type PictureShape = (typeof PICTURE_SHAPES)[keyof typeof PICTURE_SHAPES]
 
@@ -164,15 +164,15 @@ const Backdrop = ({ backdrop }: BackdropProps) => (
 
 /** The content's columns for each kind of picture, or for none. */
 const LAYOUTS = {
-  poster: styles.content,
-  still: `${styles.content} ${styles.withStill}`,
-  none: `${styles.content} ${styles.noPicture}`,
+  [PICTURE_SHAPES.poster]: styles.content,
+  [PICTURE_SHAPES.still]: classNames([styles.content, styles.withStill]),
+  [PICTURE_SHAPES.none]: classNames([styles.content, styles.noPicture]),
 } as const satisfies Record<PictureShape, string | undefined>
 
 /** Each picture's frame: a poster's, or the wider one of a still. */
 const PICTURES = {
-  poster: styles.picture,
-  still: `${styles.picture} ${styles.still}`,
+  [PICTURE_SHAPES.poster]: styles.picture,
+  [PICTURE_SHAPES.still]: classNames([styles.picture, styles.still]),
 } as const satisfies Record<HeaderPicture['shape'], string | undefined>
 
 /** What fills a picture's frame: the picture itself, or the title's first letter while it has none. */
@@ -305,6 +305,16 @@ export const Dotted = ({ parts }: DottedProps) =>
 
 const NO_EYEBROW: readonly ReactNode[] = []
 
+/** How a header sits under the way back: as it falls, or pulled up close to it. */
+export const ITEM_HEADER_VARIANTS = { standard: 'standard', pulledUp: 'pulledUp' } as const
+
+type ItemHeaderVariant = (typeof ITEM_HEADER_VARIANTS)[keyof typeof ITEM_HEADER_VARIANTS]
+
+const VARIANTS = {
+  [ITEM_HEADER_VARIANTS.standard]: undefined,
+  [ITEM_HEADER_VARIANTS.pulledUp]: styles.pullUp,
+} as const satisfies Record<ItemHeaderVariant, string | undefined>
+
 type ItemHeaderProps = {
   titleId: string
   title: string
@@ -326,8 +336,8 @@ type ItemHeaderProps = {
   library?: BackFallback
   /** A line of how far through the item the viewer is, where the page has one. */
   progress?: HeaderProgress
-  /** Pull a movie or show's picture and title closer to the way back. */
-  pullUp?: boolean
+  /** How the header sits under the way back; a movie's or show's pulls its poster and title closer. */
+  variant?: ItemHeaderVariant
   /**
    * The page's own actions: Play, favourite, Watched, Select. One whose label
    * cannot shrink marks itself `data-wide`, and the row makes room for it.
@@ -362,12 +372,12 @@ export const ItemHeader = ({
   back,
   library,
   progress,
-  pullUp = false,
+  variant = ITEM_HEADER_VARIANTS.standard,
   children,
   manage,
 }: ItemHeaderProps) => (
   <header
-    className={`${styles.hero}${backdrop ? ` ${styles.withBackdrop}` : ''}${pullUp ? ` ${styles.pullUp}` : ''}`}
+    className={classNames([styles.hero, !!backdrop && styles.withBackdrop, VARIANTS[variant]])}
   >
     {backdrop && <Backdrop backdrop={backdrop} />}
     <div className={styles.top}>

@@ -1,21 +1,12 @@
+import { QUERY_PARAMS } from '@rookery/core'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Frame } from '@/components/Frame/Frame'
 import { AUTH_ERRORS, AuthError, type AuthErrorCode, isAuthErrorCode, startSignIn } from '@/lib/api'
 import { browser } from '@/lib/browser'
-import { QUERY_PARAMS } from '@/lib/routes'
 import styles from '@/pages/LoginPage/LoginPage.module.scss'
-import { LOGIN_PAGE_COPY } from '@/pages/LoginPage/copy'
-
-/** What went wrong, keyed by the `error` the server puts on `/login`, or by `AuthError.code`. */
-export const ERROR_MESSAGES = {
-  [AUTH_ERRORS.notApproved]:
-    'Plex did not confirm the sign-in. Try again, and approve it on the Plex page.',
-  [AUTH_ERRORS.expired]:
-    'That sign-in ran out of time, or was started in another browser. Try again.',
-  [AUTH_ERRORS.plexUnavailable]: 'Plex is not answering right now. Try again in a minute.',
-  [AUTH_ERRORS.unreachable]: 'rookery could not start the sign-in. Try again.',
-} as const satisfies Record<AuthErrorCode, string>
+import { ERROR_MESSAGES, LOGIN_PAGE_COPY } from '@/pages/LoginPage/copy'
+import text from '@/styles/text.module.scss'
 
 /** The `error` on `/login`, which anyone can type; a code rookery does not know reads as `unreachable`. */
 const errorIn = (value: string | null): AuthErrorCode | null => {
@@ -50,10 +41,10 @@ export const LoginPage = () => {
 
   return (
     <Frame>
-      <h1 className={styles.title}>{LOGIN_PAGE_COPY.title}</h1>
-      <p className={styles.lede}>{LOGIN_PAGE_COPY.lede}</p>
+      <h1 className={text.title}>{LOGIN_PAGE_COPY.title}</h1>
+      <p className={text.lede}>{LOGIN_PAGE_COPY.lede}</p>
       {!!message && (
-        <p role="alert" className={styles.error}>
+        <p role="alert" className={`${text.error} ${styles.errorBox}`}>
           {message}
         </p>
       )}

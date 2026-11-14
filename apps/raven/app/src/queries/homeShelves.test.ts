@@ -6,6 +6,7 @@ import {
   LIBRARY_KINDS,
   THUMBNAIL_STATES,
 } from '@raven/core'
+import { mediaItemFor, summaryFor } from '@raven/native/testing'
 
 import { CARD_SHAPES, CARD_SUBJECTS } from '@/queries/cards'
 import {
@@ -20,7 +21,6 @@ import {
 import type { ShowArts } from '@/queries/showArt'
 import { FILMS, HOME, NAS, SERIES, homeApi } from '@/test/homeServer'
 import { OK_COMPUTER } from '@/test/musicServer'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 import { ROUTE_TARGETS } from '@/routes'
 
 const COOKIE = { [AUTH_HEADERS.cookie]: 'raven_unlock=u.1' }

@@ -32,5 +32,6 @@ export const progressSinkFor = ({
     left: () => {
       lastSave.then(() => afterWatching({ queryClient, libraryId })).catch(() => undefined)
     },
+    duration: null,
   }
 }

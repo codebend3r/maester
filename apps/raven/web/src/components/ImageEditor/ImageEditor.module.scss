@@ -55,7 +55,7 @@
 
 .version {
   display: grid;
-  gap: 2px;
+  gap: var(--space-hair);
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-line-faint);
 }

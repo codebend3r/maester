@@ -1,5 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
-import { type Library, LIBRARY_KINDS, METADATA_SERVICE_STATES, matchTypeFor } from '@raven/core'
+import { type Library, LIBRARY_KINDS, matchTypeFor } from '@raven/core'
 import { type ReactNode, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { Button, ButtonLink, type IconName, useToasts } from '@raven/ui'
@@ -10,8 +9,9 @@ import { LIBRARY_ACTIONS_COPY } from '@/components/LibraryActions/copy'
 import { Spinner } from '@/components/Spinner/Spinner'
 import { api } from '@/lib/api'
 import { useServerLibraryActions } from '@raven/ui/headless'
-import { metadataHealthQuery } from '@/lib/queries'
+import { useCanMatch } from '@/lib/useCanMatch'
 import { COMMON_COPY } from '@/lib/copy'
+import { libraryHistoryPath } from '@/lib/appPaths'
 
 /**
  * Quick scan, Full scan, Update ratings and Match again for a library, each
@@ -170,8 +170,7 @@ export const LibraryActions = ({
   const [isEditing, setEditing] = useState(false)
   const matchType = matchTypeFor(library.settings.kind)
   // Files only leave pending while TMDB answers, so Match again waits on it.
-  const metadata = useQuery({ ...metadataHealthQuery, enabled: matchType != null })
-  const canMatch = metadata.data?.tmdb === METADATA_SERVICE_STATES.ok
+  const canMatch = useCanMatch({ isEnabled: matchType != null })
   const whose = <span className="visually-hidden"> {library.name}</span>
   const canMergeAlbums = library.settings.kind === LIBRARY_KINDS.music
 
@@ -181,7 +180,7 @@ export const LibraryActions = ({
         {lead}
         <ButtonLink
           icon="history"
-          to={`/libraries/${library.id}/history`}
+          to={libraryHistoryPath(library.id)}
           title={LIBRARY_ACTIONS_COPY.historyTitle}
         >
           {COMMON_COPY.history}

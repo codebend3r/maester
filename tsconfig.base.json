@@ -1,7 +1,9 @@
 {
-  // What every TypeScript project compiles with. A project extends this, or a
-  // preset in tooling/tsconfig that does, and names its own `paths` and
-  // `include`: those resolve beside the file that names them.
+  /*
+   * What every TypeScript project compiles with. A project extends this, or a
+   * preset in tooling/tsconfig that does, and names its own `paths` and
+   * `include`: those resolve beside the file that names them.
+   */
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],

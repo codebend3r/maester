@@ -3,7 +3,6 @@ from dataclasses import replace
 import pytest
 
 from sparrow.agent.tools import Refused, Result, Tier, registry
-from sparrow.approvals import decide_request
 from sparrow.clients import ClientError
 from sparrow.clients.arr import DiskSpace, MediaFile, RootFolder
 from sparrow.clients.radarr import Movie
@@ -16,16 +15,13 @@ from sparrow.clients.seerr import (
     Quotas,
     Refusal,
     RequestRefused,
-    RequestStatus,
     Season,
     ServerOptions,
 )
 from sparrow.clients.sonarr import Series
-from sparrow.notify import DirectMessage
 from sparrow.store import NotLinked
 from sparrow.tools.requests import (
-    NotRequested,
-    decide_4k_over_storage,
+    WAITS_IN_SEERR,
     follow_show,
     plan_seasons,
     request_media,
@@ -57,7 +53,7 @@ def seed(ctx, *details):
 
 
 def reply(out):
-    """What the model reads back, whether or not the admin was asked too."""
+    """What the model reads back: a plain answer, or a refusal's words."""
     return out.content if isinstance(out, Result) else out
 
 
@@ -67,31 +63,26 @@ def four_k_servers(ctx, kind="radarr"):
     ctx.services.seerr.arr_servers[kind] = [seerr_server(1, media, "vermithor", is_4k=True)]
 
 
-async def test_movie_request_is_made_as_the_linked_friend_and_a_pending_one_asks_the_admin(ctx):
+async def test_movie_request_is_made_as_the_linked_friend_and_a_pending_one_waits_in_seerr(ctx):
     seed(ctx, DUNE)
     out = await request_media(ctx, 438631, "movie")
-    assert out.content == {
+    assert out == {
         "title": "Dune (2021)",
         "version": "1080p",
         "requested": True,
         "request_id": 1,
         "auto_approved": False,
+        "pending": WAITS_IN_SEERR,
     }
     (req,) = ctx.services.seerr.requests
     assert req.requested_by_id == 4 and not req.is_4k
-    approval = out.approval
-    assert approval.notice == "dany asks for Dune (2021) in 1080p (Seerr request #1)."
-    assert approval.decide is decide_request and approval.subject == "seerr-request:1"
-    assert approval.args == {
-        "request_id": 1, "title": "Dune (2021)", "version": "1080p", "requester": "d1"
-    }  # fmt: skip
 
 
 async def test_auto_approval_is_reported(ctx):
     seed(ctx, DUNE)
     ctx.services.seerr.auto_approve = True
     out = await request_media(ctx, 438631, "movie")
-    assert out["auto_approved"] is True  # nothing for the admin: a plain reply
+    assert out["auto_approved"] is True and "pending" not in out
 
 
 async def test_a_movie_already_there_is_not_requested_again(ctx):
@@ -147,10 +138,11 @@ def test_season_plans():
     assert plan_seasons(BEAR, None, latest=True, is_4k=False).request == [3]
     assert plan_seasons(BEAR, [3, 3], latest=False, is_4k=False).request == [3]
     assert plan_seasons(BEAR, None, latest=False, is_4k=True).request == [1, 2, 3]
-    with pytest.raises(NotRequested, match="no season \\[7\\]"):
-        plan_seasons(BEAR, [7], latest=False, is_4k=False)
-    with pytest.raises(NotRequested, match="not both"):
-        plan_seasons(BEAR, [3], latest=True, is_4k=False)
+    unknown = plan_seasons(BEAR, [7], latest=False, is_4k=False)
+    assert isinstance(unknown, Refused) and "no season [7]" in unknown.content
+    assert plan_seasons(BEAR, [3], latest=True, is_4k=False) == Refused(
+        "pass seasons or latest_season, not both"
+    )
 
 
 async def test_seasons_are_refused_for_movies_and_unknown_seasons_for_shows(ctx):
@@ -162,7 +154,7 @@ async def test_seasons_are_refused_for_movies_and_unknown_seasons_for_shows(ctx)
     assert isinstance(out, Refused) and "has no season [7]" in out.content
 
 
-async def test_4k_goes_to_the_admin_with_the_size_tradeoff(ctx):
+async def test_4k_is_requested_with_the_size_tradeoff(ctx):
     seed(ctx, replace(DUNE, status=S.AVAILABLE))
     four_k_servers(ctx)
     radarr = ctx.services.radarr["meleys"]
@@ -175,16 +167,9 @@ async def test_4k_goes_to_the_admin_with_the_size_tradeoff(ctx):
         )
     ]
     out = await request_media_4k(ctx, 438631, "movie")
-    assert isinstance(out, Result)
-    assert out.content["requested"] is True and out.content["version"] == "4K"
-    assert out.content["standard_copy_gb"] == 12.3 and out.content["estimated_4k_gb"] == "49-74"
-    approval = out.approval
-    assert approval.notice.startswith("dany asks for Dune (2021) in 4K (Seerr request #1).")
-    assert "12.3 GB" in approval.notice and approval.decide is decide_request
-    assert approval.args == {
-        "request_id": 1, "title": "Dune (2021)", "version": "4K", "requester": "d1"
-    }  # fmt: skip
-    assert approval.summary == "4K Dune (2021) for dany"
+    assert out["requested"] is True and out["version"] == "4K"
+    assert out["standard_copy_gb"] == 12.3 and out["estimated_4k_gb"] == "49-74"
+    assert out["pending"] == WAITS_IN_SEERR
     assert ctx.services.seerr.requests[0].is_4k
 
 
@@ -196,42 +181,6 @@ async def test_4k_without_a_4k_server_or_already_approved_needs_no_admin(ctx):
     ctx.services.seerr.auto_approve = True
     out = await request_media_4k(ctx, 438631, "movie")
     assert out["requested"] is True and out["auto_approved"] is True and "standard_copy" not in out
-
-
-async def test_decide_request_approves_or_declines_in_seerr_and_tells_the_requester(ctx):
-    seed(ctx, DUNE)
-    four_k_servers(ctx)
-    await request_media_4k(ctx, 438631, "movie")
-    await request_media_4k(ctx, 438631, "movie")
-    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
-    first = {"request_id": 1, "title": "Dune (2021)", "version": "4K", "requester": "d1"}
-
-    approved = await decide_request(admin, approved=True, **first)
-    assert approved.content == "Approved Dune (2021) in 4K in Seerr (request #1)."
-    assert approved.notices == (
-        DirectMessage("d1", "The admin approved Dune (2021) in 4K. It's on its way; I'll message you when it's ready."),
-    )  # fmt: skip
-    assert ctx.services.seerr.requests[0].status == RequestStatus.APPROVED
-
-    # Pressed again after Seerr already applied it: same answer, and the friend still hears.
-    assert await decide_request(admin, approved=True, **first) == approved
-    # Seerr went the other way in the meantime: say so, and tell nobody anything wrong.
-    other_way = await decide_request(admin, approved=False, **first)
-    assert isinstance(other_way, Refused) and "already approved in Seerr" in other_way.content
-    assert other_way.notices == ()
-
-    declined = await decide_request(admin, approved=False, **{**first, "request_id": 2})
-    assert declined.content.startswith("Declined") and "regular version" in declined.notices[0].text
-    assert ctx.services.seerr.requests[1].status == RequestStatus.DECLINED
-
-
-async def test_a_request_from_someone_not_linked_here_is_decided_without_a_dm(ctx):
-    seed(ctx, DUNE)
-    await request_media(ctx, 438631, "movie")
-    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
-    args = {"request_id": 1, "title": "Dune (2021)", "version": "1080p", "requester": ""}
-    out = await decide_request(admin, approved=False, **args)
-    assert out.content.startswith("Declined Dune (2021) in 1080p") and out.notices == ()
 
 
 def bear_in(ctx, *hosts):
@@ -264,8 +213,6 @@ def test_4k_is_a_trusted_tool_the_friend_tier_never_sees():
     trusted = {s.name for s in registry.for_tier(Tier.TRUSTED)}
     assert {"search_media", "request_media", "follow_show"} <= friend
     assert "request_media_4k" not in friend and "request_media_4k" in trusted
-    decide = registry.get("decide_request")
-    assert decide.button_only and decide.tier == Tier.ADMIN
     assert registry.get("follow_show").host_param == "host"
 
 
@@ -319,8 +266,8 @@ async def test_a_size_that_cannot_be_measured_does_not_block_4k(ctx):
 
     ctx.services.radarr["meleys"] = Down()
     out = await request_media_4k(ctx, 438631, "movie")
-    assert isinstance(out, Result) and out.content["requested"] is True
-    assert out.content["standard_copy_size"].startswith("unknown (couldn't ask the movie arr")
+    assert out["requested"] is True
+    assert out["standard_copy_size"].startswith("unknown (couldn't ask the movie arr")
 
 
 def uhd_volume(ctx, free_tb, total_tb=16, host="vermithor", roots=("/Movies",)):
@@ -330,96 +277,29 @@ def uhd_volume(ctx, free_tb, total_tb=16, host="vermithor", roots=("/Movies",)):
     radarr.disks = [DiskSpace("/Movies", int(free_tb * 1e12), int(total_tb * 1e12))]
 
 
-async def test_a_nearly_full_4k_volume_holds_the_request_for_the_admin(ctx):
+async def test_a_nearly_full_4k_volume_refuses_the_request(ctx):
     seed(ctx, DUNE)
     four_k_servers(ctx)
     uhd_volume(ctx, free_tb=0.8)  # 95% used; the limit is 90%
     out = await request_media_4k(ctx, 438631, "movie")
-    assert ctx.services.seerr.requests == []  # nothing goes to Seerr yet
-    assert out.content["requested"] is False
-    assert out.content["storage"] == (
-        "/Movies on vermithor, where 4K movies go, is 95% full (the limit is 90%), so 4K "
-        "requests wait for the admin's approval for now; it's requested once they approve."
+    assert ctx.services.seerr.requests == []  # nothing goes to Seerr
+    assert out == Refused(
+        "Nothing was requested for Dune (2021) in 4K: /Movies on vermithor, where 4K movies go, "
+        "is 95% full (the limit is 90%), so 4K requests are paused for now; ask the admin."
     )
-    approval = out.approval
-    assert approval.decide is decide_4k_over_storage
-    assert approval.notice.startswith("dany asks for Dune (2021) in 4K, but /Movies on vermithor")
-    assert approval.args == {
-        "tmdb_id": 438631, "media_type": "movie", "seasons": None, "english_dub": False,
-        "title": "Dune (2021)", "requester": "d1",
-    }  # fmt: skip
-    assert approval.subject == "4k-room:d1:movie:438631"
 
 
-async def test_4k_space_that_cant_be_told_holds_the_request_too(ctx):
+async def test_4k_space_that_cant_be_told_refuses_the_request_too(ctx):
     seed(ctx, DUNE)
     four_k_servers(ctx)
     ctx.services.radarr["vermithor"].down = True
     out = await request_media_4k(ctx, 438631, "movie")
-    assert "couldn't be read" in out.content["storage"] and not ctx.services.seerr.requests
+    assert "couldn't be read" in out.content and not ctx.services.seerr.requests
     ctx.services.radarr["vermithor"].down = False
     uhd_volume(ctx, free_tb=8, roots=("/Movies", "/Movies/UHD"))  # which one? Seerr doesn't say
     out = await request_media_4k(ctx, 438631, "movie")
-    assert "names no root folder" in out.content["storage"]
+    assert "names no root folder" in out.content
     server = ctx.services.seerr.arr_servers["radarr"][0]
     ctx.services.seerr.arr_servers["radarr"] = [replace(server, root_folder="/Movies/UHD")]
     out = await request_media_4k(ctx, 438631, "movie")
-    assert out.content["requested"] is True and out.approval.decide is decide_request
-
-
-async def test_the_admin_approves_a_held_4k_request_and_it_goes_to_seerr_approved(ctx):
-    seed(ctx, DUNE)
-    four_k_servers(ctx)
-    uhd_volume(ctx, free_tb=0.8)
-    held = (await request_media_4k(ctx, 438631, "movie")).approval.args
-    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
-    decide = registry.get("decide_4k_over_storage").handler
-    out = await decide(admin, approved=True, **held)
-    assert out.content == (
-        "Requested Dune (2021) in 4K for dany and approved it in Seerr (request #1)."
-    )
-    (req,) = ctx.services.seerr.requests
-    assert req.is_4k and req.requested_by_id == 4 and req.status == RequestStatus.APPROVED
-    assert out.notices[0].to == "d1" and "approved Dune (2021) in 4K" in out.notices[0].text
-    # A second press finds it requested already, and asks nothing twice.
-    seed(ctx, replace(DUNE, status_4k=S.PROCESSING))
-    again = await decide(admin, approved=True, **held)
-    assert isinstance(again, Refused) and "requested, downloading" in again.content
-    assert len(ctx.services.seerr.requests) == 1
-
-
-async def test_the_admin_holds_off_a_4k_request_and_the_friend_hears_why(ctx):
-    seed(ctx, DUNE)
-    four_k_servers(ctx)
-    uhd_volume(ctx, free_tb=0.8)
-    held = (await request_media_4k(ctx, 438631, "movie")).approval.args
-    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
-    out = await registry.get("decide_4k_over_storage").handler(admin, approved=False, **held)
-    assert out.content == "Held off on Dune (2021) in 4K." and not ctx.services.seerr.requests
-    assert "storage is nearly full" in out.notices[0].text
-
-
-async def test_a_request_deleted_in_seerr_closes_its_approval_for_good(ctx):
-    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
-    args = {"request_id": 99, "title": "Dune (2021)", "version": "4K", "requester": "d1"}
-    out = await decide_request(admin, approved=True, **args)
-    assert isinstance(out, Refused) and "no longer exists" in out.content
-
-
-async def test_a_second_press_approves_the_request_the_first_made_but_couldnt_approve(ctx):
-    seed(ctx, DUNE)
-    four_k_servers(ctx)
-    uhd_volume(ctx, free_tb=0.8)
-    held = (await request_media_4k(ctx, 438631, "movie")).approval.args
-    admin = replace(ctx, user_id="boss", tier=Tier.ADMIN)
-    seerr = ctx.services.seerr
-    seerr.down = True  # the request goes in, the approval doesn't
-    decide = registry.get("decide_4k_over_storage").handler
-    with pytest.raises(ClientError):
-        await decide(admin, approved=True, **held)
-    (made,) = seerr.requests
-    assert made.status == RequestStatus.PENDING
-    seerr.down = False
-    out = await decide(admin, approved=True, **held)
-    assert out.content.endswith("(request #1).") and len(seerr.requests) == 1
-    assert seerr.requests[0].status == RequestStatus.APPROVED
+    assert out["requested"] is True and out["pending"] == WAITS_IN_SEERR

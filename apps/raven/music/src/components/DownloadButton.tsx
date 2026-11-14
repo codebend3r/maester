@@ -1,4 +1,5 @@
 import type { Track } from '@raven/core'
+import { IGNORED } from '@raven/native/headless'
 import type { IconName } from '@raven/ui/iconDrawings'
 
 import { ActionButton } from '@/components/Controls'
@@ -8,8 +9,6 @@ import { DOWNLOAD_BUTTON_COPY } from '@/screens/copy'
 import { WREN_ICONS } from '@/theme/icons'
 
 type DownloadAction = { label: string; icon: IconName; onPress: () => void; isDisabled: boolean }
-
-const IGNORED = (): void => undefined
 
 type DownloadButtonProps = {
   serverId: string

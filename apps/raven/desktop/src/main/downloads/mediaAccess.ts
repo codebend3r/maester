@@ -1,5 +1,4 @@
 import {
-  AUTH_REFUSALS,
   isMediaId,
   isSidecarTrackId,
   MEDIA_PURPOSE_PARAM,
@@ -8,9 +7,7 @@ import {
   toQueryString,
 } from '@raven/core'
 import { SIGNAL_EVENTS } from '@/main/bounded'
-import { SERVER_GONE, type ServerEntry } from '@/main/desktopConfig'
-import { accountRefusedMessage, DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
-import { EXPAND_MESSAGES } from '@/main/downloads/expand'
+import type { AccountRefusal } from '@/main/servers/authRefusals'
 import {
   type AccountTickets,
   TICKET_OUTCOMES,
@@ -18,8 +15,7 @@ import {
 } from '@/main/servers/accountTickets'
 import { API_PATHS, MEDIA_FILE_PATH, subtitlePathOf } from '@/main/servers/allowlist'
 import type { OriginPicks } from '@/main/servers/originPicks'
-import { CALL_MESSAGES } from '@/main/servers/serverCalls'
-import { TIMER_MAX_MS, type Timers } from '@/main/stateStore'
+import { TIMER_MAX_MS, type Timers } from '@/main/timers'
 
 /**
  * The most account tickets a server's downloads mint in any `windowMs`, a ticket's life on the
@@ -43,10 +39,16 @@ export const ACCESS_REFUSALS = {
 
 export type AccessOutcome =
   | { ok: true; access: Access }
-  | { ok: false; reason: (typeof ACCESS_REFUSALS)[keyof typeof ACCESS_REFUSALS]; message: string }
+  | {
+      ok: false
+      reason: Exclude<
+        (typeof ACCESS_REFUSALS)[keyof typeof ACCESS_REFUSALS],
+        typeof ACCESS_REFUSALS.account
+      >
+    }
+  | { ok: false; reason: typeof ACCESS_REFUSALS.account; refusal: AccountRefusal }
 
 type AccessForProps = {
-  serverId: string
   mediaId: number
   signal: AbortSignal
 }
@@ -54,7 +56,7 @@ type AccessForProps = {
 export type MediaAccess = {
   /** `signal` is the run's: a run stopped while it waits on the mint budget mints nothing. */
   accessFor: (input: AccessForProps) => Promise<AccessOutcome>
-  forget: (serverId: string) => void
+  forget: () => void
 }
 
 type MediaUrlForProps = {
@@ -91,42 +93,21 @@ export const sidecarUrlFor = ({ access, mediaId, trackId }: SidecarUrlForProps):
   return mediaUrlFor({ access, mediaId, path: subtitlePathOf(trackId) })
 }
 
-type MintRefusalOfProps = {
-  outcome: Exclude<TicketOutcome, { kind: typeof TICKET_OUTCOMES.ticket }>
-  server: ServerEntry
-}
+const UNREACHABLE: AccessOutcome = { ok: false, reason: ACCESS_REFUSALS.unreachable }
+
+type Refusal = Exclude<TicketOutcome, { kind: typeof TICKET_OUTCOMES.ticket }>
 
 /** What a mint that gave no ticket comes to, in the refusals the queue already knows. */
-const mintRefusalOf = ({ outcome, server }: MintRefusalOfProps): AccessOutcome => {
+const mintRefusalOf = (outcome: Refusal): AccessOutcome => {
   switch (outcome.kind) {
     case TICKET_OUTCOMES.refused:
-      // Accounts that are down, or a server at its ticket cap, is an outage the retry outlasts.
-      if (outcome.reason === AUTH_REFUSALS.unavailable) {
-        return {
-          ok: false,
-          reason: ACCESS_REFUSALS.unreachable,
-          message: CALL_MESSAGES.unreachable(server.name),
-        }
-      }
-      return {
-        ok: false,
-        reason: ACCESS_REFUSALS.account,
-        message: accountRefusedMessage({ reason: outcome.reason, serverName: server.name }),
-      }
+      return { ok: false, reason: ACCESS_REFUSALS.account, refusal: outcome.reason }
     case TICKET_OUTCOMES.locked:
-      return {
-        ok: false,
-        reason: ACCESS_REFUSALS.locked,
-        message: DOWNLOAD_MESSAGES.relocked(server.name),
-      }
+      return { ok: false, reason: ACCESS_REFUSALS.locked }
     case TICKET_OUTCOMES.gone:
-      return { ok: false, reason: ACCESS_REFUSALS.gone, message: EXPAND_MESSAGES.gone(server.name) }
+      return { ok: false, reason: ACCESS_REFUSALS.gone }
     case TICKET_OUTCOMES.unreachable:
-      return {
-        ok: false,
-        reason: ACCESS_REFUSALS.unreachable,
-        message: CALL_MESSAGES.unreachable(server.name),
-      }
+      return UNREACHABLE
     default: {
       const unreachable: never = outcome
       return unreachable
@@ -135,7 +116,6 @@ const mintRefusalOf = ({ outcome, server }: MintRefusalOfProps): AccessOutcome =
 }
 
 type CreateMediaAccessProps = {
-  serverOf: (serverId: string) => ServerEntry | null
   picks: OriginPicks
   now: () => number
   timers: Timers
@@ -144,17 +124,16 @@ type CreateMediaAccessProps = {
 
 /**
  * Each run reaches the server with an account ticket minted for it, on the media origin `picks`
- * holds for the server (shared with the relay); `now` is the wall clock the mint budget is kept by.
+ * holds (shared with the relay); `now` is the wall clock the mint budget is kept by.
  */
 export const createMediaAccess = ({
-  serverOf,
   picks,
   now,
   timers,
   tickets,
 }: CreateMediaAccessProps): MediaAccess => {
-  /** When each server's downloads minted, by Raven's clock, inside the last window. */
-  let minted: ReadonlyMap<string, readonly number[]> = new Map()
+  /** When the downloads minted, by Raven's clock, inside the last window. */
+  let minted: readonly number[] = []
 
   type WaitForProps = { ms: number; signal: AbortSignal }
 
@@ -176,23 +155,16 @@ export const createMediaAccess = ({
       signal.addEventListener(SIGNAL_EVENTS.abort, onAbort, { once: true })
     })
 
-  type TakeMintProps = {
-    serverId: string
-    signal: AbortSignal
-  }
-
   /**
-   * Takes one of the server's mints, waiting while the window's are spent until the oldest ages
-   * out. False when the run stopped first, and nothing was taken.
+   * Takes one of the mints, waiting while the window's are spent until the oldest ages out.
+   * False when the run stopped first, and nothing was taken.
    */
-  const takeMint = async ({ serverId, signal }: TakeMintProps): Promise<boolean> => {
+  const takeMint = async (signal: AbortSignal): Promise<boolean> => {
     if (signal.aborted) return false
     const time = now()
-    const recent = (minted.get(serverId) ?? []).filter(
-      (at) => at > time - DOWNLOAD_MINTS.windowMs && at <= time,
-    )
+    const recent = minted.filter((at) => at > time - DOWNLOAD_MINTS.windowMs && at <= time)
     if (recent.length < DOWNLOAD_MINTS.budget) {
-      minted = new Map([...minted, [serverId, [...recent, time]]])
+      minted = [...recent, time]
       return true
     }
     // A clock set back never waits longer than one window.
@@ -200,43 +172,20 @@ export const createMediaAccess = ({
       Math.max(Math.min(...recent) + DOWNLOAD_MINTS.windowMs - time, 1),
       DOWNLOAD_MINTS.windowMs,
     )
-    return (await waitFor({ ms, signal })) && takeMint({ serverId, signal })
-  }
-
-  type AccountAccessProps = {
-    server: ServerEntry
-    mediaId: number
-    signal: AbortSignal
-  }
-
-  /** The picked origin, or the server's own when none answers, with a ticket minted fresh. */
-  const accountAccess = async ({
-    server,
-    mediaId,
-    signal,
-  }: AccountAccessProps): Promise<AccessOutcome> => {
-    // The queue has already let go of a stopped run, so what this answers is never read.
-    if (!(await takeMint({ serverId: server.id, signal }))) {
-      return {
-        ok: false,
-        reason: ACCESS_REFUSALS.unreachable,
-        message: CALL_MESSAGES.unreachable(server.name),
-      }
-    }
-    const [url, outcome] = await Promise.all([
-      picks.originOf(server),
-      tickets.ticketFor({ serverId: server.id, mediaId, isFresh: true }),
-    ])
-    if (outcome.kind !== TICKET_OUTCOMES.ticket) return mintRefusalOf({ outcome, server })
-    return { ok: true, access: { url, ticket: outcome.ticket } }
+    return (await waitFor({ ms, signal })) && takeMint(signal)
   }
 
   return {
-    accessFor: async ({ serverId, mediaId, signal }) => {
-      const server = serverOf(serverId)
-      if (server === null)
-        return { ok: false, reason: ACCESS_REFUSALS.unreachable, message: SERVER_GONE }
-      return accountAccess({ server, mediaId, signal })
+    /** The picked origin, or the server's own when none answers, with a ticket minted fresh. */
+    accessFor: async ({ mediaId, signal }) => {
+      // The queue has already let go of a stopped run, so what this answers is never read.
+      if (!(await takeMint(signal))) return UNREACHABLE
+      const [url, outcome] = await Promise.all([
+        picks.originOf(),
+        tickets.ticketFor({ mediaId, isFresh: true }),
+      ])
+      if (outcome.kind !== TICKET_OUTCOMES.ticket) return mintRefusalOf(outcome)
+      return { ok: true, access: { url, ticket: outcome.ticket } }
     },
     forget: picks.forget,
   }

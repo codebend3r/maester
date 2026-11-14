@@ -9,7 +9,8 @@ import {
   watchLink,
 } from '@raven/core'
 import { type Featured } from '@/pages/HomePage/featured'
-import { HERO_MS, HomeHero, LESS_MOTION, WASH_SIZES, titleSize } from '@/pages/HomePage/HomeHero'
+import { HERO_MS, HomeHero, WASH_SIZES, titleSize } from '@/pages/HomePage/HomeHero'
+import { LESS_MOTION } from '@/lib/motion'
 import { matchedMovie } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 

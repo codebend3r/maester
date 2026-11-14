@@ -2,8 +2,7 @@ import { HTTP_METHODS } from '@raven/core'
 import type { DownloadPictures } from '@/main/downloads/pictures'
 import { hostOf } from '@/main/fileProtocol'
 import { ALLOWED_METHODS } from '@/main/webHost'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
-import { HTTP_STATUSES } from '@/shared/httpStatuses'
+import { HEADERS, HTTP_STATUSES } from '@shared/http'
 
 type AnswerProps = {
   status: number
@@ -14,7 +13,7 @@ type AnswerProps = {
 const answer = ({ status, body = null, headers = {} }: AnswerProps): Response =>
   new Response(body, {
     status,
-    headers: { ...headers, [HTTP_HEADERS.contentTypeOptions]: 'nosniff' },
+    headers: { ...headers, [HEADERS.contentTypeOptions]: 'nosniff' },
   })
 
 type PictureHandler = (request: Request) => Promise<Response>
@@ -37,7 +36,7 @@ export const createPictureHandler = ({
     if (request.method !== HTTP_METHODS.get && request.method !== HTTP_METHODS.head) {
       return answer({
         status: HTTP_STATUSES.methodNotAllowed,
-        headers: { [HTTP_HEADERS.allow]: ALLOWED_METHODS },
+        headers: { [HEADERS.allow]: ALLOWED_METHODS },
       })
     }
     const host = hostOf(request.url)
@@ -46,10 +45,10 @@ export const createPictureHandler = ({
     const bytes = await readFile(file.path).catch(() => null)
     if (bytes === null) return answer({ status: HTTP_STATUSES.notFound })
     const headers = {
-      [HTTP_HEADERS.contentType]: file.contentType,
-      [HTTP_HEADERS.contentLength]: `${bytes.length}`,
+      [HEADERS.contentType]: file.contentType,
+      [HEADERS.contentLength]: `${bytes.length}`,
       // A picture's id names one file for good, so the page never needs to ask twice.
-      [HTTP_HEADERS.cacheControl]: 'private, max-age=31536000, immutable',
+      [HEADERS.cacheControl]: 'private, max-age=31536000, immutable',
     }
     return answer({
       status: HTTP_STATUSES.ok,

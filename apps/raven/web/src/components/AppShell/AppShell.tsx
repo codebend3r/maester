@@ -1,8 +1,8 @@
-import { DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
+import { DESKTOP_PATHS, musicLibrariesOf, libraryPath } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, type ReactNode, useId } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Button, Icon, type IconName, useKeyShortcut } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon, type IconName, useKeyShortcut } from '@raven/ui'
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { ShellOutlet } from '@/components/ShellOutlet/ShellOutlet'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
@@ -15,12 +15,8 @@ import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { Logo } from '@/components/Logo/Logo'
 import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { COMING_SOON_COPY, COMING_SOON_PATH } from '@/pages/ComingSoonPage/copy'
-import { DESIGN_PATH } from '@/pages/DesignPage/copy'
-import { ADMIN_COPY, ADMIN_PATH } from '@/pages/SettingsPage/adminCopy'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
-import { MUSIC_PATHS, musicLibrariesOf } from '@/lib/music'
 import { librariesQuery } from '@/lib/queries'
 import { useScrollReset } from '@/lib/useScrollReset'
 import { ravenVersion } from '@/lib/version'
@@ -32,14 +28,9 @@ import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 import { SIDE_MENU_KEY, useSideMenu } from '@/stores/sideMenu'
 import styles from '@/components/AppShell/AppShell.module.scss'
-import { COMMON_COPY } from '@/lib/copy'
-import { BINGE_COPY, BINGE_PATH } from '@/lib/binge'
-import { PLAY_HISTORY_ROUTES } from '@/lib/playHistory'
-import { NOTIFICATIONS_PATH } from '@/lib/notifications'
-import { NOTIFICATIONS_COPY } from '@/pages/NotificationsPage/copy'
-import { PLAY_HISTORY_COPY } from '@/pages/PlayHistoryPage/copy'
-import { CONTINUE_WATCHING_PATH } from '@/lib/homeContinue'
-import { CONTINUE_WATCHING_COPY } from '@/pages/ContinueWatchingPage/copy'
+import { NAV_PLACES } from '@/components/AppShell/navPlaces'
+import type { TabTarget } from '@/components/TabStrip/TabStrip'
+import { APP_PATHS } from '@/lib/appPaths'
 
 type NavItemProps = {
   to: string
@@ -78,6 +69,56 @@ const NavItem = ({ to, patterns, icon, label, isIconsOnly, note }: NavItemProps)
     </NavTip>
   )
 }
+
+type NavItemsProps = { places: readonly TabTarget[]; isIconsOnly: boolean }
+
+/** Rows of the side menu, one for each place, in the order given. */
+const NavItems = ({ places, isIconsOnly }: NavItemsProps) =>
+  places.map((place) => (
+    <NavItem
+      key={place.to}
+      to={place.to}
+      patterns={place.patterns}
+      icon={<Icon name={place.icon} />}
+      label={place.label}
+      isIconsOnly={isIconsOnly}
+    />
+  ))
+
+/** The browsing places at the side menu's head, while the server is in reach. */
+const BROWSE_PLACES = [
+  NAV_PLACES.home,
+  NAV_PLACES.continueWatching,
+  NAV_PLACES.binge,
+  NAV_PLACES.comingSoon,
+  NAV_PLACES.favourites,
+] as const satisfies readonly TabTarget[]
+
+/** Libraries while a pinned library is open, which that library's own row marks instead. */
+const PINNED_LIBRARIES = {
+  ...NAV_PLACES.libraries,
+  patterns: [NAV_PLACES.libraries.to],
+} as const satisfies TabTarget
+
+/** What only whoever may manage sees, under Libraries. */
+const MANAGE_PLACES = [
+  NAV_PLACES.admin,
+  NAV_PLACES.streams,
+  NAV_PLACES.reports,
+  NAV_PLACES.everyonesHistory,
+] as const satisfies readonly TabTarget[]
+
+/** The account's own pages that need the server. */
+const ACCOUNT_PLACES = [
+  NAV_PLACES.history,
+  NAV_PLACES.notifications,
+] as const satisfies readonly TabTarget[]
+
+/** What every frame keeps, the server in reach or not. */
+const APP_PLACES = [
+  NAV_PLACES.settings,
+  NAV_PLACES.shortcuts,
+] as const satisfies readonly TabTarget[]
 
 type CountedIconProps = { icon: IconName; count: number }
 
@@ -118,10 +159,10 @@ const DownloadsNavItem = ({ isIconsOnly }: DownloadsNavItemProps) => {
   const inProgress = useInProgressCount()
   return (
     <NavItem
-      to={DESKTOP_PATHS.downloads}
-      patterns={[DESKTOP_PATHS.downloads, BROWSER_PLAY_PATH]}
-      icon={<CountedIcon icon="download" count={inProgress} />}
-      label={COMMON_COPY.downloads}
+      to={NAV_PLACES.downloads.to}
+      patterns={[NAV_PLACES.downloads.to, BROWSER_PLAY_PATH]}
+      icon={<CountedIcon icon={NAV_PLACES.downloads.icon} count={inProgress} />}
+      label={NAV_PLACES.downloads.label}
       isIconsOnly={isIconsOnly}
       note={inProgress > 0 ? APP_SHELL_COPY.inProgress(inProgress) : undefined}
     />
@@ -258,58 +299,12 @@ export const AppShell = () => {
         className={isFrosted ? `${styles.side} ${styles.frosted}` : styles.side}
         aria-label={APP_SHELL_COPY.main}
       >
-        <Link to="/" className={styles.home}>
+        <Link to={APP_PATHS.home} className={styles.home}>
           <Logo isMarkOnly={isIconsOnly} />
         </Link>
         <div className={styles.links}>
-          {!isOffline && (
-            <>
-              <NavItem
-                to="/"
-                patterns={['/']}
-                icon={<Icon name="home" />}
-                label={COMMON_COPY.home}
-                isIconsOnly={isIconsOnly}
-              />
-              <NavItem
-                to={CONTINUE_WATCHING_PATH}
-                patterns={[CONTINUE_WATCHING_PATH]}
-                icon={<Icon name="continue" />}
-                label={CONTINUE_WATCHING_COPY.title}
-                isIconsOnly={isIconsOnly}
-              />
-              <NavItem
-                to={BINGE_PATH}
-                patterns={[BINGE_PATH]}
-                icon={<Icon name="popcorn" />}
-                label={BINGE_COPY.title}
-                isIconsOnly={isIconsOnly}
-              />
-              <NavItem
-                to={COMING_SOON_PATH}
-                patterns={[COMING_SOON_PATH]}
-                icon={<Icon name="calendar" />}
-                label={COMING_SOON_COPY.title}
-                isIconsOnly={isIconsOnly}
-              />
-              <NavItem
-                to="/favourites"
-                patterns={['/favourites']}
-                icon={<Icon name="heart" />}
-                label={COMMON_COPY.favourites}
-                isIconsOnly={isIconsOnly}
-              />
-            </>
-          )}
-          {hasMusic && (
-            <NavItem
-              to={MUSIC_PATHS.root}
-              patterns={[MUSIC_PATHS.root]}
-              icon={<Icon name="music" />}
-              label={APP_SHELL_COPY.music}
-              isIconsOnly={isIconsOnly}
-            />
-          )}
+          {!isOffline && <NavItems places={BROWSE_PLACES} isIconsOnly={isIconsOnly} />}
+          {hasMusic && <NavItems places={[NAV_PLACES.music]} isIconsOnly={isIconsOnly} />}
           {pinned.length > 0 && (
             <>
               <PinnedMark />
@@ -317,7 +312,7 @@ export const AppShell = () => {
                 {pinned.map((library) => (
                   <li key={library.id} className={styles.pinnedItem}>
                     <NavItem
-                      to={`/libraries/${library.id}`}
+                      to={libraryPath(library.id)}
                       patterns={libraryPages(library.id)}
                       icon={<LibraryIcon settings={library.settings} />}
                       label={library.name}
@@ -334,90 +329,28 @@ export const AppShell = () => {
           <ManageGroup isIconsOnly={isIconsOnly}>
             {!isOffline && (
               <>
-                <NavItem
-                  to="/libraries"
-                  patterns={isPinnedOpen ? ['/libraries'] : ['/libraries', ...libraryPages(':id')]}
-                  icon={<Icon name="libraries" />}
-                  label={COMMON_COPY.libraries}
+                <NavItems
+                  places={[isPinnedOpen ? PINNED_LIBRARIES : NAV_PLACES.libraries]}
                   isIconsOnly={isIconsOnly}
                 />
                 <AdminOnly>
-                  <NavItem
-                    to={ADMIN_PATH}
-                    patterns={[ADMIN_PATH]}
-                    icon={<Icon name="settings" />}
-                    label={ADMIN_COPY.heading}
-                    isIconsOnly={isIconsOnly}
-                  />
-                  <NavItem
-                    to="/streams"
-                    patterns={['/streams']}
-                    icon={<Icon name="playback" />}
-                    label={APP_SHELL_COPY.streams}
-                    isIconsOnly={isIconsOnly}
-                  />
-                  <NavItem
-                    to="/reports"
-                    patterns={['/reports']}
-                    icon={<Icon name="alert" />}
-                    label={APP_SHELL_COPY.bugReports}
-                    isIconsOnly={isIconsOnly}
-                  />
-                  <NavItem
-                    to={PLAY_HISTORY_ROUTES.everyone}
-                    patterns={[PLAY_HISTORY_ROUTES.everyone]}
-                    icon={<Icon name="list" />}
-                    label={PLAY_HISTORY_COPY.everyoneTitle}
-                    isIconsOnly={isIconsOnly}
-                  />
+                  <NavItems places={MANAGE_PLACES} isIconsOnly={isIconsOnly} />
                 </AdminOnly>
-                <NavItem
-                  to={PLAY_HISTORY_ROUTES.own}
-                  patterns={[PLAY_HISTORY_ROUTES.own]}
-                  icon={<Icon name="history" />}
-                  label={PLAY_HISTORY_COPY.title}
-                  isIconsOnly={isIconsOnly}
-                />
-                <NavItem
-                  to={NOTIFICATIONS_PATH}
-                  patterns={[NOTIFICATIONS_PATH]}
-                  icon={<Icon name="bell" />}
-                  label={NOTIFICATIONS_COPY.title}
-                  isIconsOnly={isIconsOnly}
-                />
+                <NavItems places={ACCOUNT_PLACES} isIconsOnly={isIconsOnly} />
               </>
             )}
             {isDesktop && <LocalNavItem isIconsOnly={isIconsOnly} />}
             {hasDownloads && <DownloadsNavItem isIconsOnly={isIconsOnly} />}
-            <NavItem
-              to="/settings"
-              patterns={['/settings']}
-              icon={<Icon name="settings" />}
-              label={COMMON_COPY.settings}
-              isIconsOnly={isIconsOnly}
-            />
-            <NavItem
-              to={PAGE_PATHS.shortcuts}
-              patterns={[PAGE_PATHS.shortcuts]}
-              icon={<Icon name="keyboard" />}
-              label={APP_SHELL_COPY.shortcuts}
-              isIconsOnly={isIconsOnly}
-            />
+            <NavItems places={APP_PLACES} isIconsOnly={isIconsOnly} />
             <AdminOnly>
-              <NavItem
-                to={DESIGN_PATH}
-                patterns={[DESIGN_PATH]}
-                icon={<Icon name="wand" />}
-                label={APP_SHELL_COPY.design}
-                isIconsOnly={isIconsOnly}
-              />
+              <NavItems places={[NAV_PLACES.design]} isIconsOnly={isIconsOnly} />
             </AdminOnly>
           </ManageGroup>
           {!isMediumScreen && (
             <div className={styles.foot}>
               <div className={styles.toggle}>
                 <Button
-                  tone="ghost"
+                  tone={BUTTON_TONES.ghost}
                   icon="sidebar"
                   className={styles.toggleButton}
                   aria-label={APP_SHELL_COPY.sideMenu}

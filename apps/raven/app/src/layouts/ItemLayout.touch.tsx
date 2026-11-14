@@ -4,8 +4,10 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Icon } from '@raven/native'
+import { BUTTON_TONES } from '@raven/native/headless'
+
 import { TouchFactChips } from '@/layouts/FactChips'
-import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { Text } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import {
@@ -20,7 +22,6 @@ import { ITEM_LAYOUT_COPY } from '@/layouts/copy'
 import { HeroHome } from '@/layouts/HeroHome'
 import { TouchNav } from '@/layouts/TouchNav'
 import { TouchCard } from '@/layouts/TouchCard'
-import { BUTTON_TONES } from '@/layouts/formKit'
 import { useToneStyles } from '@/layouts/formStyles'
 import {
   ITEM_ACTIONS,
@@ -46,6 +47,24 @@ import { LINE_RATIO } from '@/layouts/textHeights'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { translucent } from '@/theme/translucent'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { type ItemPartStyles, itemPartsFor } from '@/layouts/itemParts'
+
+const usePartStyles = (): ItemPartStyles => {
+  const styles = useStyles()
+  return {
+    heading: styles.heading,
+    title: styles.title,
+    initials: styles.initials,
+    progress: styles.progress,
+    track: styles.track,
+    fill: styles.fill,
+    progressLabel: styles.small,
+  }
+}
+
+const { Heading, HeroTitleWords, ProgressLine, PersonPicture, PersonInitials } = itemPartsFor({
+  useStyles: usePartStyles,
+})
 
 /** How tall a show's title art stands over an episode's name. */
 const LOGO_HEIGHT = 56
@@ -86,17 +105,6 @@ const useGutters = () => {
   return { left: SIZES.space3 + insets.left, right: SIZES.space3 + insets.right }
 }
 
-type HeadingProps = { title: string }
-
-const Heading = ({ title }: HeadingProps) => {
-  const styles = useStyles()
-  return (
-    <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
-      {title}
-    </Text>
-  )
-}
-
 type ActionButtonProps = { action: ItemAction }
 
 /** Play, filled as the one action the page is for, a mark, filled while it is on, or a link up: its icon with its few words. */
@@ -128,21 +136,6 @@ const ActionButton = ({ action }: ActionButtonProps) => {
   )
 }
 
-type ProgressLineProps = { progress: NonNullable<ItemHero['progress']> }
-
-/** Where playback stopped, or how much is watched, as a line with its words. */
-const ProgressLine = ({ progress }: ProgressLineProps) => {
-  const styles = useStyles()
-  return (
-    <View style={styles.progress}>
-      <View style={styles.track}>
-        <View style={[styles.fill, { width: `${progress.fraction * 100}%` }]} />
-      </View>
-      <Text style={styles.small}>{progress.label}</Text>
-    </View>
-  )
-}
-
 type HeroTitleProps = { hero: ItemHero; maxWidth: number }
 
 type HeroTitleArtProps = HeroTitleProps
@@ -160,18 +153,6 @@ const HeroTitleArt = ({ hero, maxWidth }: HeroTitleArtProps) => {
         textStyle={styles.title}
       />
     </View>
-  )
-}
-
-type HeroTitleWordsProps = HeroTitleProps
-
-/** The title in type. */
-const HeroTitleWords = ({ hero }: HeroTitleWordsProps) => {
-  const styles = useStyles()
-  return (
-    <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
-      {hero.title}
-    </Text>
   )
 }
 
@@ -375,24 +356,6 @@ const Episodes = ({ episodes, onOpen }: EpisodesProps) => {
 }
 
 type PersonProps = { person: PersonCard }
-
-type PersonPictureProps = PersonProps
-
-const PersonPicture = ({ person }: PersonPictureProps) =>
-  person.picture !== null && (
-    <Image resizeMode="cover" source={person.picture} style={StyleSheet.absoluteFill} />
-  )
-
-type PersonInitialsProps = PersonProps
-
-const PersonInitials = ({ person }: PersonInitialsProps) => {
-  const styles = useStyles()
-  return (
-    <Text variant={TEXT_VARIANTS.display} style={styles.initials}>
-      {person.initials}
-    </Text>
-  )
-}
 
 /** A person's photo, else their initials. */
 const PERSON_PHOTOS = {

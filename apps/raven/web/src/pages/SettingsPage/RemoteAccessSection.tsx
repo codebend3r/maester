@@ -21,7 +21,7 @@ import {
   remoteQualityFor,
   remoteStreamsAt,
 } from '@raven/core'
-import { Button } from '@raven/ui'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { useServerRemoteAccess } from '@raven/ui/headless'
 import { type FormEvent, type InputHTMLAttributes, type ReactNode, useId, useState } from 'react'
 import { api } from '@/lib/api'
@@ -33,6 +33,7 @@ import {
 } from '@/pages/SettingsPage/remoteAccessCopy'
 import pageStyles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import styles from '@/pages/SettingsPage/RemoteAccessSection.module.scss'
+import { ToggleChoice } from '@/pages/SettingsPage/ToggleChoice'
 
 /** How the status line reads: good once reachable, a problem once not, plain otherwise. */
 const STATUS_TONES = {
@@ -189,15 +190,12 @@ const RemoteAccessForm = ({ settings, onApply }: FormProps) => {
 
   return (
     <form className={styles.form} onSubmit={apply}>
-      <label className={pageStyles.choice}>
-        <input
-          type="checkbox"
-          checked={draft.isEnabled}
-          onChange={(event) => edit({ isEnabled: event.target.checked })}
-        />
-        <span className={pageStyles.choiceLabel}>{REMOTE_ACCESS_COPY.enable}</span>
-        <span className={pageStyles.choiceHint}>{REMOTE_ACCESS_COPY.enableHint}</span>
-      </label>
+      <ToggleChoice
+        label={REMOTE_ACCESS_COPY.enable}
+        hint={REMOTE_ACCESS_COPY.enableHint}
+        isChecked={draft.isEnabled}
+        onChange={(isEnabled) => edit({ isEnabled })}
+      />
       {REMOTE_ACCESS_TEXT_FIELDS.map((name) => {
         const field: TextFieldSpec = TEXT_FIELDS[name]
         return (
@@ -245,7 +243,7 @@ const RemoteAccessForm = ({ settings, onApply }: FormProps) => {
         </p>
       )}
       <div className={styles.actions}>
-        <Button type="submit" tone="primary">
+        <Button type="submit" tone={BUTTON_TONES.primary}>
           {REMOTE_ACCESS_COPY.apply}
         </Button>
         <Button type="button" onClick={() => onApply({})}>

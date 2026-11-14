@@ -1,5 +1,5 @@
 import { type FormEvent, useId, useRef, useState } from 'react'
-import { ButtonLink, Icon } from '@raven/ui'
+import { BUTTON_TONES, ButtonLink, Icon } from '@raven/ui'
 import { LATEST_RELEASE, webAppAddress } from '@/pages/GetPage/links'
 import { type OperatingSystem, PLATFORMS } from '@/pages/GetPage/platforms'
 import { GET_COPY } from '@/pages/GetPage/copy'
@@ -34,7 +34,7 @@ const PlatformCard = ({ platform, isYours }: PlatformCardProps) => {
           <li key={file.label} className={styles.fileItem}>
             <ButtonLink
               to={LATEST_RELEASE}
-              tone={isYours && index === 0 ? 'primary' : 'quiet'}
+              tone={isYours && index === 0 ? BUTTON_TONES.primary : BUTTON_TONES.quiet}
               className={styles.file}
             >
               <Icon name="download" size={18} />
@@ -91,7 +91,7 @@ const WebCard = () => {
       <ButtonLink
         ref={open}
         to={webAppAddress({ typed: server, origin: window.location.origin })}
-        tone="primary"
+        tone={BUTTON_TONES.primary}
         className={styles.open}
       >
         {GET_COPY.openWebApp}

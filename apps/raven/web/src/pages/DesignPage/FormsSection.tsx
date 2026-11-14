@@ -1,9 +1,10 @@
 import { type ReactNode, useId } from 'react'
-import { Button, Icon } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import { SECTION_IDS } from '@/pages/DesignPage/contents'
 import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
+import { SAMPLE_TEXT_INPUTS } from '@/pages/DesignPage/samples'
 
 type FieldProps = {
   label: string
@@ -38,19 +39,6 @@ const Field = ({ label, error, aside, isDisabled = false, children, id }: FieldP
 
 const COPY = DESIGN_COPY.forms
 
-type TextInput = { type: string; label: string; placeholder?: string; value?: string }
-
-const TEXT_INPUTS: readonly TextInput[] = [
-  { type: 'text', label: 'Text', placeholder: 'Movies' },
-  { type: 'search', label: 'Search', placeholder: 'Search Movies' },
-  { type: 'email', label: 'Email', placeholder: 'you@example.com' },
-  { type: 'password', label: 'Password', value: 'hunter2hunter2' },
-  { type: 'number', label: 'Number', value: '24' },
-  { type: 'url', label: 'URL', placeholder: 'http://nas:8484' },
-  { type: 'date', label: 'Date', value: '2026-10-09' },
-  { type: 'time', label: 'Time', value: '20:30' },
-]
-
 export const FormsSection = () => {
   const id = useId()
   return (
@@ -58,7 +46,7 @@ export const FormsSection = () => {
       <form className={styles.form} onSubmit={(event) => event.preventDefault()}>
         <Specimen name={COPY.textFields}>
           <div className={styles.fields}>
-            {TEXT_INPUTS.map((input) => (
+            {SAMPLE_TEXT_INPUTS.map((input) => (
               <Field key={input.type} id={`${id}-${input.type}`} label={input.label}>
                 <input
                   id={`${id}-${input.type}`}
@@ -179,11 +167,11 @@ export const FormsSection = () => {
 
         <Specimen name={COPY.buttons} note={COPY.buttonsNote}>
           <div className={styles.row}>
-            <Button tone="primary" icon="plus" type="submit">
+            <Button tone={BUTTON_TONES.primary} icon="plus" type="submit">
               {COPY.addLibrary}
             </Button>
             <Button icon="rescan">{COPY.fullScan}</Button>
-            <Button tone="danger" icon="trash">
+            <Button tone={BUTTON_TONES.danger} icon="trash">
               {COPY.deleteLibrary}
             </Button>
             <Button disabled>{COPY.disabled}</Button>

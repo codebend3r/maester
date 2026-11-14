@@ -1,5 +1,5 @@
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type ApiClient,
   CREDIT_JOBS,
@@ -16,17 +16,18 @@ import {
   type Saga,
 } from '@raven/core'
 import { allowlistedFetch } from '@raven/native/headless'
-
 import {
   type Answer,
   type HeardRequest,
   NOT_FOUND,
   STATUSES,
-  pathFor,
+  pathWithId,
   responseOf,
-} from '@/test/fixtureFetch'
+  mediaItemFor,
+  summaryFor,
+} from '@raven/native/testing'
+
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 type DetailsForProps = {
   summary: ItemSummary
@@ -227,16 +228,16 @@ export const BUSBOYS_SAGA: Saga = {
 
 const READS: Record<string, unknown> = {
   [listLibraries.path]: [FILMS, SERIES],
-  [pathFor({ path: getItem.path, id: BUSBOYS.id })]: BUSBOYS,
-  [pathFor({ path: getItem.path, id: SEVERANCE.id })]: SEVERANCE,
-  [pathFor({ path: getItem.path, id: SEVERANCE_ONE.id })]: SEVERANCE_ONE,
-  [pathFor({ path: getItem.path, id: GOOD_NEWS_ABOUT_HELL.id })]: GOOD_NEWS_ABOUT_HELL,
-  [pathFor({ path: nextEpisode.path, id: SEVERANCE.id })]: GOOD_NEWS.primary,
-  [pathFor({ path: nextInSession.path, id: 12 })]: HALF_LOOP.primary,
-  [pathFor({ path: getTracks.path, id: BUSBOYS_FILE.id })]: TRACKS,
-  [pathFor({ path: getTracks.path, id: 12 })]: TRACKS,
-  [pathFor({ path: listSagas.path, id: FILMS.id })]: [BUSBOYS_SAGA],
-  [pathFor({ path: shuffleEpisodes.path, id: SEVERANCE.id })]: [
+  [pathWithId({ path: getItem.path, id: BUSBOYS.id })]: BUSBOYS,
+  [pathWithId({ path: getItem.path, id: SEVERANCE.id })]: SEVERANCE,
+  [pathWithId({ path: getItem.path, id: SEVERANCE_ONE.id })]: SEVERANCE_ONE,
+  [pathWithId({ path: getItem.path, id: GOOD_NEWS_ABOUT_HELL.id })]: GOOD_NEWS_ABOUT_HELL,
+  [pathWithId({ path: nextEpisode.path, id: SEVERANCE.id })]: GOOD_NEWS.primary,
+  [pathWithId({ path: nextInSession.path, id: 12 })]: HALF_LOOP.primary,
+  [pathWithId({ path: getTracks.path, id: BUSBOYS_FILE.id })]: TRACKS,
+  [pathWithId({ path: getTracks.path, id: 12 })]: TRACKS,
+  [pathWithId({ path: listSagas.path, id: FILMS.id })]: [BUSBOYS_SAGA],
+  [pathWithId({ path: shuffleEpisodes.path, id: SEVERANCE.id })]: [
     GOOD_NEWS.primary,
     HALF_LOOP.primary,
   ],
@@ -250,11 +251,11 @@ const NO_CONTENT: Answer = { status: STATUSES.noContent, body: null }
 
 const WRITES: Record<string, (body: unknown) => Answer> = {
   [setWatched.path]: () => NO_CONTENT,
-  [pathFor({ path: setFavourite.path, id: BUSBOYS_FILE.id })]: (body) => ({
+  [pathWithId({ path: setFavourite.path, id: BUSBOYS_FILE.id })]: (body) => ({
     status: STATUSES.ok,
     body: { ...BUSBOYS_FILE, favourite: isMarked(body) },
   }),
-  [pathFor({ path: setItemFavourite.path, id: SEVERANCE.id })]: (body) => ({
+  [pathWithId({ path: setItemFavourite.path, id: SEVERANCE.id })]: (body) => ({
     status: STATUSES.ok,
     body: { ...SEVERANCE, favourite: isMarked(body) },
   }),
@@ -270,7 +271,7 @@ type BingeAfterProps = {
 /** The binge list once a write adds Severance to it or takes it off; null for any other call. */
 const bingeAfter = ({ method, path, body, ids }: BingeAfterProps): readonly number[] | null => {
   const isSevering =
-    method === APP_CALL_METHODS.put && path === pathFor({ path: setBinge.path, id: SEVERANCE.id })
+    method === HTTP_METHODS.put && path === pathWithId({ path: setBinge.path, id: SEVERANCE.id })
   if (!isSevering) return null
   const others = ids.filter((id) => id !== SEVERANCE.id)
   return isRecord(body) && body.binge === true ? [SEVERANCE.id, ...others] : others
@@ -280,8 +281,8 @@ type IsBingeCallProps = { method: string; path: string }
 
 /** Whether a call reads or writes the binge list, which the server answers with the list. */
 const isBingeCall = ({ method, path }: IsBingeCallProps): boolean =>
-  (method === APP_CALL_METHODS.get && path === getBinge.path) ||
-  (method === APP_CALL_METHODS.put && path === pathFor({ path: setBinge.path, id: SEVERANCE.id }))
+  (method === HTTP_METHODS.get && path === getBinge.path) ||
+  (method === HTTP_METHODS.put && path === pathWithId({ path: setBinge.path, id: SEVERANCE.id }))
 
 type AnswerForProps = {
   method: string
@@ -291,7 +292,7 @@ type AnswerForProps = {
 
 /** What the server answers `method` at `path` with, sent `body`. */
 const answerFor = ({ method, path, body }: AnswerForProps): Answer => {
-  if (method !== APP_CALL_METHODS.get) return WRITES[path]?.(body) ?? NOT_FOUND
+  if (method !== HTTP_METHODS.get) return WRITES[path]?.(body) ?? NOT_FOUND
   const read = READS[path]
   return read === undefined ? NOT_FOUND : { status: STATUSES.ok, body: read }
 }
@@ -341,10 +342,10 @@ export const itemApi = ({
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const path = pathOnly(url.slice(NAS.origin.length))
-        const method = init.method ?? APP_CALL_METHODS.get
+        const method = init.method ?? HTTP_METHODS.get
         const sent = bodyOf(init.body)
         hear({ method, path, body: sent })
-        await (method === APP_CALL_METHODS.get ? reads(path) : writes())
+        await (method === HTTP_METHODS.get ? reads(path) : writes())
         binge.write(bingeAfter({ method, path, body: sent, ids: binge.read() }) ?? binge.read())
         return responseOf(
           isBingeCall({ method, path })

@@ -30,7 +30,6 @@ import sys
 import tempfile
 import uuid
 from asyncio.subprocess import PIPE
-from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -66,12 +65,6 @@ make sense, or answer the user."""
 
 class ClaudeCodeFailed(RuntimeError):
     """Claude Code exited with an error, or ended without a reply or a tool call."""
-
-
-@dataclass(frozen=True)
-class TextEvent:
-    type: str
-    text: str
 
 
 def _system_text(system: Any) -> str:
@@ -171,14 +164,6 @@ class _Stream:
 
     async def __aexit__(self, *exc: Any) -> None:
         return None
-
-    def __aiter__(self) -> AsyncIterator[TextEvent]:
-        async def events() -> AsyncIterator[TextEvent]:
-            for block in self._message.content if self._message else []:
-                if block.type == "text":
-                    yield TextEvent("text", block.text)
-
-        return events()
 
     async def get_final_message(self) -> Message:
         if self._message is None:

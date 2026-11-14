@@ -12,7 +12,6 @@ import {
 import { HEADERS } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
-import { RAVEN_HEADERS } from '@/http'
 import { ScannerService } from '@/scanner/scannerService'
 import { TRUSTED_PROXY, adminCookie, testConfig } from '@/test/app'
 import { encodeClip } from '@/test/clips'
@@ -41,8 +40,8 @@ describe('who is streaming', () => {
   /** As the viewer's browser sends it, to the media plane, through the reverse proxy. */
   const asViewer = {
     [HEADERS.range]: 'bytes=0-99',
-    [RAVEN_HEADERS.userAgent]: CHROME_MAC,
-    [RAVEN_HEADERS.forwardedFor]: `10.0.0.1, ${ADDRESS}`,
+    [HEADERS.userAgent]: CHROME_MAC,
+    [HEADERS.forwardedFor]: `10.0.0.1, ${ADDRESS}`,
   }
   const play = () =>
     app().inject({

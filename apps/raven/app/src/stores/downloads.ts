@@ -1,3 +1,12 @@
+import {
+  IGNORED,
+  UNCONFIGURED_DISK,
+  keepForOwner,
+  keepReconciled,
+  loadPersisted,
+  savedOwnerOf,
+} from '@raven/native/headless'
+import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 
@@ -29,7 +38,6 @@ import {
 import { type DownloadDevice, fetchOne } from '@/downloads/downloadRun'
 import { prepareAhead } from '@/downloads/prepareAhead'
 import { reconcileDisk } from '@/downloads/reconcileDisk'
-import { IGNORED } from '@/lib/ignore'
 import { useDownloadProgress } from '@/stores/downloadProgress'
 
 /** The key the downloads are stored under in AsyncStorage. */
@@ -61,7 +69,14 @@ type LockRefresh = { libraryId: number; isLocked: boolean }
 
 type RefreshLocksProps = { serverId: string; locks: readonly LockRefresh[] }
 
+type KeepForProps = { accountId: string | null }
+
 type DownloadsState = {
+  /**
+   * The account the downloads belong to, claimed as it signs in; null until one has. Downloads
+   * kept before they had owners read back with none, and the first account to sign in claims them.
+   */
+  ownerId: string | null
   /** Each download by `downloadKeyOf`. */
   entries: Record<string, DownloadEntry>
   device: DownloadDevice
@@ -96,29 +111,18 @@ type DownloadsState = {
   move: (props: MoveProps) => void
   /** Writes each library's lock as the server now lists it onto the downloads filed under it. */
   refreshLocks: (props: RefreshLocksProps) => void
+  /**
+   * Claims the downloads for `accountId`, signed in, when they have no owner; removes them all
+   * when it is not their owner, makes it the owner, and answers true; keeps them otherwise.
+   */
+  keepFor: (props: KeepForProps) => Promise<boolean>
 }
 
 const UNCONFIGURED_DEVICE: DownloadDevice = {
-  disk: {
-    fetch: async () => {
-      throw new Error('Downloads are not configured.')
-    },
-    uriOf: (path) => path,
-    exists: () => false,
-    folders: () => [],
-    remove: async () => undefined,
-    removeAll: async () => undefined,
-    freeBytes: () => null,
-  },
+  disk: UNCONFIGURED_DISK,
   serverOf: () => null,
   now: Date.now,
   wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-}
-
-const UNCONFIGURED_STORAGE: StateStorage = {
-  getItem: () => null,
-  setItem: () => undefined,
-  removeItem: () => undefined,
 }
 
 const DOWNLOADING: DownloadStatus = { state: DOWNLOAD_STATES.downloading }
@@ -267,6 +271,7 @@ export const useDownloads = create<DownloadsState>()(
       }
 
       return {
+        ownerId: null,
         entries: {},
         device: UNCONFIGURED_DEVICE,
         isRunning: false,
@@ -365,16 +370,25 @@ export const useDownloads = create<DownloadsState>()(
           set({ entries: {} })
           await get().device.disk.removeAll()
         },
+        keepFor: ({ accountId }) =>
+          keepForOwner({
+            ownerId: get().ownerId,
+            accountId,
+            removeAll: get().removeAll,
+            own: (ownerId) => set({ ownerId }),
+          }),
       }
     },
     {
       name: DOWNLOADS_KEY,
       storage: createJSONStorage(() => UNCONFIGURED_STORAGE),
       skipHydration: true,
-      partialize: ({ entries }) => ({ entries }),
+      partialize: ({ ownerId, entries }) => ({ ownerId, entries }),
       // Nothing saved yet keeps what is held: a download asked for before the read lands.
       merge: (saved, current) =>
-        saved === undefined ? current : { ...current, entries: entriesOf(saved) },
+        saved === undefined
+          ? current
+          : { ...current, ownerId: savedOwnerOf(saved), entries: entriesOf(saved) },
     },
   ),
 )
@@ -387,11 +401,10 @@ type ConfigureDownloadsProps = { storage: StateStorage } & DownloadDevice
  */
 export const configureDownloads = async ({ storage, ...device }: ConfigureDownloadsProps) => {
   useDownloads.setState({ device })
-  useDownloads.persist.setOptions({ storage: createJSONStorage(() => storage) })
-  await useDownloads.persist.rehydrate()
-  const entries = await reconcileDisk({
-    entries: useDownloads.getState().entries,
-    disk: device.disk,
-  })
-  useDownloads.setState({ entries })
+  await loadPersisted({ store: useDownloads, storage })
+  const read = useDownloads.getState().entries
+  const checked = await reconcileDisk({ entries: read, disk: device.disk })
+  useDownloads.setState((state) => ({
+    entries: keepReconciled({ read, checked, now: state.entries }),
+  }))
 }

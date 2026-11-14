@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { defineConfig } from '@playwright/test'
-import { FIXTURE_SERVER } from '@raven/core'
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 
 const origin = `http://${FIXTURE_SERVER.host}:${FIXTURE_SERVER.webPort}`
 

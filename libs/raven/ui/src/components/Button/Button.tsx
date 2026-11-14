@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom'
 import { Icon, type IconSize } from '@/components/Icon/Icon'
 import type { IconName } from '@/components/Icon/drawings'
 import styles from '@/components/Button/Button.module.scss'
+import { classNames } from '@/lib/classNames'
 
 /**
  * `quiet`, the default, is a moss fill; `primary` is the one action a screen
  * is for; `danger` undoes something for good; `pill` is a way back, glass over
  * whatever is behind it; `ghost` has no fill until it is pointed at.
  */
-const BUTTON_TONES = {
+export const BUTTON_TONES = {
   primary: 'primary',
   quiet: 'quiet',
   danger: 'danger',
@@ -36,15 +37,13 @@ type ClassesProps = {
 
 /** A caller's className adds placement (grid area, alignment) on top of the button's own look. */
 const classes = ({ tone, size, iconOnly, extra }: ClassesProps): string =>
-  [
+  classNames([
     styles.button,
     styles[tone],
     size === BUTTON_SIZES.large ? styles.large : '',
     iconOnly ? styles.iconOnly : '',
-    extra ?? '',
-  ]
-    .filter(Boolean)
-    .join(' ')
+    extra,
+  ])
 
 type Shared = {
   tone?: ButtonTone

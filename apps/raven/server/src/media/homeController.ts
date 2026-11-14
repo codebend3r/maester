@@ -8,12 +8,11 @@ import {
   type HomeShelf,
   MEDIA_SORTS,
   type MediaSort,
-  LIBRARY_LISTINGS,
   SORT_DIRECTIONS,
   MUSIC_SORTS,
   isString,
-  listingFor,
   listsShows,
+  isMusicLibrary,
 } from '@raven/core'
 import type { FastifyRequest } from 'fastify'
 import { HeroSelection } from '@/hero/heroSelection'
@@ -21,8 +20,9 @@ import { type LibraryRecord, LibrariesRepository } from '@/libraries/librariesRe
 import { LockService, type Viewer } from '@/lock/lockService'
 import { MediaRepository } from '@/media/mediaRepository'
 import { MusicRepository } from '@/music/musicRepository'
-import { ViewingAccounts } from '@/media/viewingAccounts'
 import type { AccountKey } from '@/media/viewingAccountKeys'
+import { QUERY_PARAMS } from '@/queryValues'
+import { ViewingAccount } from '@/media/viewingAccountParam'
 
 /** How many of a pinned library's newest releases its shelf on the home page holds. */
 const SHELF_SIZE = 8
@@ -46,7 +46,6 @@ export class HomeController {
     @Inject(MediaRepository) private readonly media: MediaRepository,
     @Inject(MusicRepository) private readonly music: MusicRepository,
     @Inject(LockService) private readonly lock: LockService,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(HeroSelection) private readonly hero: HeroSelection,
   ) {}
 
@@ -76,8 +75,7 @@ export class HomeController {
 
   /** Every video in progress with the poster its card shows, then each pinned library's newest releases. */
   @Get()
-  home(@Req() request: FastifyRequest): Home {
-    const account = this.accounts.keyOf({ request })
+  home(@Req() request: FastifyRequest, @ViewingAccount() account: AccountKey): Home {
     const libraries = this.onHome(this.lock.viewer({ request }))
     const shown = new Set(libraries.map(({ id }) => id))
     return {
@@ -103,13 +101,9 @@ export class HomeController {
    * first, read apart from the shelves.
    */
   @Get('albums')
-  albums(@Req() request: FastifyRequest): AlbumShelf[] {
-    const account = this.accounts.keyOf({ request })
+  albums(@Req() request: FastifyRequest, @ViewingAccount() account: AccountKey): AlbumShelf[] {
     return this.onHome(this.lock.viewer({ request }))
-      .filter(
-        (library) =>
-          library.settings.pinned && listingFor(library.settings.kind) === LIBRARY_LISTINGS.albums,
-      )
+      .filter((library) => library.settings.pinned && isMusicLibrary(library))
       .map((library) => ({
         libraryId: library.id,
         albums: this.music
@@ -129,10 +123,10 @@ export class HomeController {
    * neither waits for the other; libraries still locked stay out.
    */
   @Get('hero')
-  heroEntries(@Req() request: FastifyRequest): Hero {
+  heroEntries(@Req() request: FastifyRequest, @ViewingAccount() account: AccountKey): Hero {
     return this.hero.entries({
       viewer: this.lock.viewer({ request }),
-      account: this.accounts.keyOf({ request }),
+      account,
     })
   }
 
@@ -142,10 +136,12 @@ export class HomeController {
    * libraries stay out, whether or not the PIN is entered.
    */
   @Get('search')
-  search(@Query('q') q: unknown, @Req() request: FastifyRequest): HomeSearch {
+  search(
+    @Query(QUERY_PARAMS.search) q: unknown,
+    @ViewingAccount() account: AccountKey,
+  ): HomeSearch {
     const search = isString(q) ? q.trim() : ''
     if (!search) return []
-    const account = this.accounts.keyOf({ request })
     return this.libraries
       .list()
       .filter((library) => !library.settings.locked)

@@ -1,5 +1,5 @@
-import { type Chapter, formatDuration } from '@raven/core'
-import { chapterAt, useAudioQueue } from '@raven/ui/headless'
+import { type Chapter, formatDuration, chapterAt } from '@raven/core'
+import { useAudioQueue } from '@raven/ui/headless'
 import type { ComponentType } from 'react'
 import { NOW_PLAYING_COPY } from '@/pages/NowPlayingPage/copy'
 import styles from '@/pages/NowPlayingPage/ChaptersPanel.module.scss'

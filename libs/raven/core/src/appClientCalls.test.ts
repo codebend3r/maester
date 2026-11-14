@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'bun:test'
-import {
-  APP_CALL_METHODS,
-  APP_CLIENT_CALLS,
-  APP_OWNER_CALLS,
-  appClientCallOf,
-} from '@/appClientCalls'
+import { HTTP_METHODS } from '@/contract'
+import { APP_CLIENT_CALLS, APP_OWNER_CALLS, appClientCallOf } from '@/appClientCalls'
 
-const { get, put, post, delete: remove } = APP_CALL_METHODS
+const { get, put, post, delete: remove } = HTTP_METHODS
 
 type CallOfProps = { method: string; url: string }
 

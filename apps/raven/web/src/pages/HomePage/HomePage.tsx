@@ -9,6 +9,7 @@ import {
   RATING_SOURCES,
   matchTypeFor,
   withLibraries,
+  libraryPath,
 } from '@raven/core'
 import { type ComponentType, type ReactNode, useId } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -37,6 +38,8 @@ import frames from '@/pages/HomePage/HomeFrames.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
 import { HomeBinge } from '@/pages/BingePage/BingePage'
+import { PAGE_PARAMS, librarySearchPath } from '@/lib/appPaths'
+import { CARD_PICTURES, type CardPicture } from '@/lib/cardPictures'
 
 // Every Home shelf scores alike, whatever each library shows on its own page; `pickScore` falls back to TMDB.
 const HOME_RATINGS_SOURCE = RATING_SOURCES.metacritic
@@ -76,9 +79,6 @@ const Shelf = ({ title, isEmpty, children }: ShelfProps) => {
   )
 }
 
-const CARD_KINDS = { poster: 'poster', frame: 'frame' } as const
-type CardKind = (typeof CARD_KINDS)[keyof typeof CARD_KINDS]
-
 type ShelfCardProps = {
   media: MediaItem
   matchType: ReturnType<typeof matchTypeFor>
@@ -102,9 +102,9 @@ const FrameShelfCard = ({ media, matchType }: FrameShelfCardProps) => (
 )
 
 const SHELF_CARDS = {
-  [CARD_KINDS.poster]: PosterShelfCard,
-  [CARD_KINDS.frame]: FrameShelfCard,
-} as const satisfies Record<CardKind, ComponentType<ShelfCardProps>>
+  [CARD_PICTURES.poster]: PosterShelfCard,
+  [CARD_PICTURES.frame]: FrameShelfCard,
+} as const satisfies Record<CardPicture, ComponentType<ShelfCardProps>>
 
 type ShelfContentProps = {
   title: ReactNode
@@ -133,7 +133,8 @@ type MediaShelfProps = ShelfContentProps & {
 }
 
 const MediaShelf = ({ title, matchType, shelf }: MediaShelfProps) => {
-  const Card = SHELF_CARDS[matchType === ITEM_TYPES.movie ? CARD_KINDS.poster : CARD_KINDS.frame]
+  const Card =
+    SHELF_CARDS[matchType === ITEM_TYPES.movie ? CARD_PICTURES.poster : CARD_PICTURES.frame]
   return (
     <Shelf title={title} isEmpty={shelf.media.length === 0}>
       {shelf.media.map((media) => (
@@ -185,9 +186,7 @@ type LibraryShelfProps = {
  */
 const LibraryShelf = ({ shelf, library, query = '' }: LibraryShelfProps) => {
   const matchType = matchTypeFor(library.settings.kind)
-  const to = query
-    ? `/libraries/${library.id}?${new URLSearchParams({ q: query })}`
-    : `/libraries/${library.id}`
+  const to = librarySearchPath({ libraryId: library.id, query })
   const title = (
     <Link to={to} className={styles.headingLink}>
       {library.name}
@@ -207,7 +206,7 @@ type AlbumsShelfProps = { shelf: AlbumShelf; library: Library }
 const AlbumsShelf = ({ shelf, library }: AlbumsShelfProps) => (
   <Shelf
     title={
-      <Link to={`/libraries/${library.id}`} className={styles.headingLink}>
+      <Link to={libraryPath(library.id)} className={styles.headingLink}>
         {library.name}
       </Link>
     }
@@ -322,7 +321,7 @@ const HOME_BODIES = {
 export const HomePage = () => {
   const titleId = useId()
   const [address] = useSearchParams()
-  const query = (address.get('q') ?? '').trim()
+  const query = (address.get(PAGE_PARAMS.search) ?? '').trim()
   const libraries = useQuery(librariesQuery)
   const known = libraries.data ?? []
   const Body = HOME_BODIES[query ? HOME_VIEWS.search : HOME_VIEWS.shelves]

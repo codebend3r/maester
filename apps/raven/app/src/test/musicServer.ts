@@ -1,6 +1,6 @@
 import {
   ALBUM_TYPES,
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type AlbumDetails,
   type AlbumSummary,
@@ -24,15 +24,15 @@ import {
   isPlaylistTracksChange,
 } from '@raven/core'
 import { allowlistedFetch } from '@raven/native/headless'
-
 import {
   type Answer,
   type HeardRequest,
   NOT_FOUND,
   STATUSES,
-  pathFor,
+  pathWithId,
   responseOf,
-} from '@/test/fixtureFetch'
+} from '@raven/native/testing'
+
 import { FILMS, NAS } from '@/test/homeServer'
 
 /** A music library on the test server. */
@@ -206,17 +206,17 @@ const TRACKS: readonly Track[] = [AIRBAG, PARANOID, LUCKY, DUNE_BOOK]
 const ANSWERS: Record<string, unknown> = {
   [APP_CLIENT_CALLS.listLibraries.path]: [MUSIC, BOOKS],
   [APP_CLIENT_CALLS.listPlaylists.path]: [MIXTAPE, THEIR_MIX],
-  [pathFor({ path: APP_CLIENT_CALLS.getPlaylist.path, id: MIXTAPE.id })]: MIXTAPE_PAGE,
-  [pathFor({ path: APP_CLIENT_CALLS.getPlaylist.path, id: THEIR_MIX.id })]: THEIR_MIX_PAGE,
-  [pathFor({ path: APP_CLIENT_CALLS.getLyrics.path, id: AIRBAG.id })]: AIRBAG_LYRICS,
-  [pathFor({ path: APP_CLIENT_CALLS.getLyrics.path, id: PARANOID.id })]: PARANOID_LYRICS,
-  [pathFor({ path: APP_CLIENT_CALLS.getLyrics.path, id: LUCKY.id })]: NO_LYRICS,
-  [pathFor({ path: APP_CLIENT_CALLS.getMarkers.path, id: DUNE_BOOK.id })]: DUNE_MARKERS,
-  [pathFor({ path: APP_CLIENT_CALLS.getLibrary.path, id: MUSIC.id })]: MUSIC,
-  [pathFor({ path: APP_CLIENT_CALLS.listAlbums.path, id: MUSIC.id })]: [OK_COMPUTER],
-  [pathFor({ path: APP_CLIENT_CALLS.listArtists.path, id: MUSIC.id })]: [PORTISHEAD, RADIOHEAD],
-  [pathFor({ path: APP_CLIENT_CALLS.getAlbum.path, id: OK_COMPUTER.id })]: OK_COMPUTER_PAGE,
-  [pathFor({ path: APP_CLIENT_CALLS.getArtist.path, id: RADIOHEAD.id })]: RADIOHEAD_PAGE,
+  [pathWithId({ path: APP_CLIENT_CALLS.getPlaylist.path, id: MIXTAPE.id })]: MIXTAPE_PAGE,
+  [pathWithId({ path: APP_CLIENT_CALLS.getPlaylist.path, id: THEIR_MIX.id })]: THEIR_MIX_PAGE,
+  [pathWithId({ path: APP_CLIENT_CALLS.getLyrics.path, id: AIRBAG.id })]: AIRBAG_LYRICS,
+  [pathWithId({ path: APP_CLIENT_CALLS.getLyrics.path, id: PARANOID.id })]: PARANOID_LYRICS,
+  [pathWithId({ path: APP_CLIENT_CALLS.getLyrics.path, id: LUCKY.id })]: NO_LYRICS,
+  [pathWithId({ path: APP_CLIENT_CALLS.getMarkers.path, id: DUNE_BOOK.id })]: DUNE_MARKERS,
+  [pathWithId({ path: APP_CLIENT_CALLS.getLibrary.path, id: MUSIC.id })]: MUSIC,
+  [pathWithId({ path: APP_CLIENT_CALLS.listAlbums.path, id: MUSIC.id })]: [OK_COMPUTER],
+  [pathWithId({ path: APP_CLIENT_CALLS.listArtists.path, id: MUSIC.id })]: [PORTISHEAD, RADIOHEAD],
+  [pathWithId({ path: APP_CLIENT_CALLS.getAlbum.path, id: OK_COMPUTER.id })]: OK_COMPUTER_PAGE,
+  [pathWithId({ path: APP_CLIENT_CALLS.getArtist.path, id: RADIOHEAD.id })]: RADIOHEAD_PAGE,
 }
 
 type WriteKeyOfProps = { method: string; path: string }
@@ -233,17 +233,17 @@ const mixtapeWith = (body: unknown): Answer => {
   return ok({ playlist: { ...MIXTAPE, trackCount: tracks.length }, tracks })
 }
 
-const { put, post, delete: remove } = APP_CALL_METHODS
+const { put, post, delete: remove } = HTTP_METHODS
 
 const WRITES: Record<string, (body: unknown) => Answer> = {
   [writeKeyOf({
     method: put,
-    path: pathFor({ path: APP_CLIENT_CALLS.setAlbumFavourite.path, id: OK_COMPUTER.id }),
+    path: pathWithId({ path: APP_CLIENT_CALLS.setAlbumFavourite.path, id: OK_COMPUTER.id }),
   })]: (body) =>
     ok({ ...OK_COMPUTER_PAGE, isFavourite: isFavouriteChange(body) && body.favourite }),
   [writeKeyOf({
     method: put,
-    path: pathFor({ path: APP_CLIENT_CALLS.setArtistFavourite.path, id: RADIOHEAD.id }),
+    path: pathWithId({ path: APP_CLIENT_CALLS.setArtistFavourite.path, id: RADIOHEAD.id }),
   })]: (body) => ok({ ...RADIOHEAD_PAGE, isFavourite: isFavouriteChange(body) && body.favourite }),
   [writeKeyOf({ method: post, path: APP_CLIENT_CALLS.createPlaylist.path })]: (body) =>
     isPlaylistInput(body)
@@ -260,25 +260,25 @@ const WRITES: Record<string, (body: unknown) => Answer> = {
       : NOT_FOUND,
   [writeKeyOf({
     method: put,
-    path: pathFor({ path: APP_CLIENT_CALLS.renamePlaylist.path, id: MIXTAPE.id }),
+    path: pathWithId({ path: APP_CLIENT_CALLS.renamePlaylist.path, id: MIXTAPE.id }),
   })]: (body) =>
     isPlaylistInput(body)
       ? ok({ ...MIXTAPE_PAGE, playlist: { ...MIXTAPE, name: body.name } })
       : NOT_FOUND,
   [writeKeyOf({
     method: remove,
-    path: pathFor({ path: APP_CLIENT_CALLS.deletePlaylist.path, id: MIXTAPE.id }),
+    path: pathWithId({ path: APP_CLIENT_CALLS.deletePlaylist.path, id: MIXTAPE.id }),
   })]: () => ({
     status: STATUSES.noContent,
     body: null,
   }),
   [writeKeyOf({
     method: put,
-    path: pathFor({ path: APP_CLIENT_CALLS.replacePlaylistTracks.path, id: MIXTAPE.id }),
+    path: pathWithId({ path: APP_CLIENT_CALLS.replacePlaylistTracks.path, id: MIXTAPE.id }),
   })]: mixtapeWith,
   [writeKeyOf({
     method: post,
-    path: pathFor({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: MIXTAPE.id }),
+    path: pathWithId({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: MIXTAPE.id }),
   })]: (body) =>
     isPlaylistTracksChange(body)
       ? mixtapeWith({
@@ -287,7 +287,7 @@ const WRITES: Record<string, (body: unknown) => Answer> = {
       : NOT_FOUND,
   [writeKeyOf({
     method: post,
-    path: pathFor({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: NEW_PLAYLIST_ID }),
+    path: pathWithId({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: NEW_PLAYLIST_ID }),
   })]: (body) =>
     isPlaylistTracksChange(body)
       ? ok({
@@ -306,8 +306,7 @@ type AnswerForProps = { method: string; path: string; body: unknown }
 
 /** What the server answers `method` at `path` with, sent `body`. */
 const answerFor = ({ method, path, body }: AnswerForProps): Answer => {
-  if (method !== APP_CALL_METHODS.get)
-    return WRITES[writeKeyOf({ method, path })]?.(body) ?? NOT_FOUND
+  if (method !== HTTP_METHODS.get) return WRITES[writeKeyOf({ method, path })]?.(body) ?? NOT_FOUND
   const read = ANSWERS[path]
   return read === undefined ? NOT_FOUND : ok(read)
 }
@@ -336,10 +335,10 @@ export const musicApi = ({
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const [path = ''] = url.slice(NAS.origin.length).split('?')
-        const method = init.method ?? APP_CALL_METHODS.get
+        const method = init.method ?? HTTP_METHODS.get
         const body = bodyOf(init.body)
         hear({ method, path, body })
-        if (method !== APP_CALL_METHODS.get) await writes()
+        if (method !== HTTP_METHODS.get) await writes()
         return responseOf(answerFor({ method, path, body }))
       },
     }),

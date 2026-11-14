@@ -1,5 +1,5 @@
-import { useRef } from 'react'
-import { Button } from '@raven/ui'
+import { useId, useRef } from 'react'
+import { BUTTON_TONES, Button } from '@raven/ui'
 import { SECTION_IDS } from '@/pages/DesignPage/contents'
 import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
@@ -9,6 +9,7 @@ import styles from '@/pages/DesignPage/DesignPage.module.scss'
 
 export const ContentSection = () => {
   const dialog = useRef<HTMLDialogElement>(null)
+  const dialogTitleId = useId()
   return (
     <DesignSection id={SECTION_IDS.content}>
       <Specimen name={COPY.table}>
@@ -64,14 +65,14 @@ export const ContentSection = () => {
         <div className={styles.row}>
           <Button onClick={() => dialog.current?.showModal()}>{COPY.openDialog}</Button>
         </div>
-        <dialog ref={dialog} className={styles.dialog} aria-labelledby="design-dialog-title">
+        <dialog ref={dialog} className={styles.dialog} aria-labelledby={dialogTitleId}>
           <div className={styles.dialogBody}>
-            <h2 id="design-dialog-title" className={styles.dialogTitle}>
+            <h2 id={dialogTitleId} className={styles.dialogTitle}>
               {COPY.dialogTitle}
             </h2>
             <p className={styles.dialogText}>{COPY.dialogText}</p>
             <div className={styles.dialogActions}>
-              <Button tone="primary" onClick={() => dialog.current?.close()}>
+              <Button tone={BUTTON_TONES.primary} onClick={() => dialog.current?.close()}>
                 {COPY.close}
               </Button>
             </div>

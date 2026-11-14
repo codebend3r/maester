@@ -20,6 +20,7 @@ import { DOWNLOAD_GROUPINGS, type DownloadsGrouping } from '@/stores/appPrefs'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 import { CAN_DOWNLOAD } from '@/layouts/downloadKind'
+import { APP_ICONS } from '@/theme/icons'
 
 /** The two ways the finished downloads are shown, as the picker offers them. */
 const GROUPING_OPTIONS = [
@@ -175,7 +176,7 @@ const DownloadsLayout = ({
               {DOWNLOAD_COPY.finished}
             </Text>
             <Picker
-              icon="libraries"
+              icon={APP_ICONS.libraries}
               isIconOnly
               label={DOWNLOAD_COPY.show}
               onChoose={onGrouping}

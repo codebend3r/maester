@@ -2,14 +2,17 @@ import {
   AUTH_API_PREFIX,
   AUTH_HEADERS,
   AUTH_SCHEME,
+  HTTP_METHODS,
   type AuthRefusal,
   isAuthRefusal,
   MEDIA_TICKET_PARAM,
   type MediaOrigin,
 } from '@/contract'
 import { isUnreachableAnswer } from '@/desktop/webHost'
-import { toQueryString } from '@/query'
+import { fillPath, pathWithQuery, toQueryString } from '@/query'
+import { type PathParamName, type PathParams, type RouteMethod } from '@/routes'
 import { type Guard, isRecord, isString, isStringArray } from '@/schema'
+import { CONTENT_TYPES, HEADERS, HTTP_STATUSES } from '@shared/http'
 
 /**
  * The slice of `fetch` the client uses, spelled out structurally so this
@@ -61,7 +64,7 @@ export class ApiError extends Error {
 }
 
 /** HTTP's Locked: what the server answers for a locked library's videos until its PIN is entered. */
-export const LOCKED_STATUS = 423
+export const LOCKED_STATUS = HTTP_STATUSES.locked
 
 /** A call refused because what it asked for sits in a locked library. */
 export const isLockedError = (error: unknown): error is ApiError =>
@@ -86,6 +89,19 @@ const readJson = async (response: FetchResponse): Promise<unknown> => {
 }
 
 export type Transport = ReturnType<typeof createTransport>
+
+/** A route's placeholders' values, which a route with none leaves out. */
+type RouteParams<P extends string> = [PathParamName<P>] extends [never]
+  ? { params?: undefined }
+  : { params: PathParams<P> }
+
+const CALL_KINDS = { api: 'api', media: 'media' } as const
+
+const ACCEPTS = { json: CONTENT_TYPES.json, vtt: 'text/vtt' } as const
+
+const REQUEST_FAILED = 'Request failed'
+
+const NOT_UNDERSTOOD = 'The server sent a response this client does not understand.'
 
 type CreateTransportProps = {
   baseUrl: string
@@ -116,32 +132,35 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
     return `${access === null ? root : access.origin.url}${path}${queryString === '' ? '' : `?${queryString}`}`
   }
 
-  type CallProps = {
-    path: string
-    /** A full address, for the media origins; `path` is then unused. */
-    href?: string
-    method?: string
-    accept?: string
-    body?: unknown
-  }
+  /*
+   * The server's own API, addressed by path under `baseUrl`, or a media address on
+   * whatever origin it names, read as text.
+   */
+  type CallProps =
+    | {
+        kind: typeof CALL_KINDS.api
+        path: string
+        method: RouteMethod
+        body: unknown
+      }
+    | { kind: typeof CALL_KINDS.media; href: string }
 
   /** Calls the server, failing with its own message when it says no. */
-  const call = async ({
-    path,
-    href = url(path),
-    method = 'GET',
-    accept = 'application/json',
-    body,
-  }: CallProps): Promise<FetchResponse> => {
+  const call = async (props: CallProps): Promise<FetchResponse> => {
     /*
      * Absolute media URLs are a separate trust boundary, even when their origin
      * happens to match the server. Only the generated API URL receives credentials.
      */
-    const token = href === url(path) && path.startsWith(AUTH_API_PREFIX) ? accessToken() : null
+    const isApi = props.kind === CALL_KINDS.api
+    const href = isApi ? url(props.path) : props.href
+    const body = isApi ? props.body : undefined
+    const token = isApi && props.path.startsWith(AUTH_API_PREFIX) ? accessToken() : null
+    const accept = isApi ? ACCEPTS.json : ACCEPTS.vtt
     const response = await fetch(href, {
-      method,
+      method: isApi ? props.method : HTTP_METHODS.get,
       headers: {
-        ...(body === undefined ? { accept } : { accept, 'content-type': 'application/json' }),
+        [HEADERS.accept]: accept,
+        ...(body === undefined ? {} : { [HEADERS.contentType]: ACCEPTS.json }),
         ...(token === null ? {} : { [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}` }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -152,7 +171,7 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
         status: response.status,
         message: errorMessage({
           body: responseBody,
-          fallback: response.statusText || 'Request failed',
+          fallback: response.statusText === '' ? REQUEST_FAILED : response.statusText,
         }),
         refusal: isAuthRefusal(responseBody) ? responseBody : null,
         isServerUnreachable: isUnreachableAnswer({ status: response.status, body: responseBody }),
@@ -163,18 +182,18 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
 
   type SendProps = {
     path: string
-    method?: string
+    method?: RouteMethod
     body?: unknown
   }
 
-  const send = async (request: SendProps): Promise<unknown> => {
-    const response = await call(request)
-    return response.status === 204 ? null : readJson(response)
+  const send = async ({ path, method = HTTP_METHODS.get, body }: SendProps): Promise<unknown> => {
+    const response = await call({ kind: CALL_KINDS.api, path, method, body })
+    return response.status === HTTP_STATUSES.noContent ? null : readJson(response)
   }
 
   /** A plain-text body, such as WebVTT. */
   const sendForText = async (href: string): Promise<string> =>
-    (await call({ path: '', href, accept: 'text/vtt' })).text()
+    (await call({ kind: CALL_KINDS.media, href })).text()
 
   type ExpectProps<T> = {
     request: Promise<unknown>
@@ -184,23 +203,45 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
   const expect = async <T>({ request, guard }: ExpectProps<T>): Promise<T> => {
     const value = await request
     if (!guard(value)) {
-      throw new ApiError({
-        status: 502,
-        message: 'The server sent a response this client does not understand.',
-      })
+      throw new ApiError({ status: HTTP_STATUSES.badGateway, message: NOT_UNDERSTOOD })
     }
     return value
   }
 
-  type LibraryGetProps<T> = {
-    libraryId: number
-    path: string
-    guard: Guard<T>
+  type RouteCallProps<P extends string> = {
+    query?: Record<string, string>
+    body?: unknown
+  } & RouteParams<P>
+
+  type AskProps<T, P extends string> = RouteCallProps<P> & {
+    route: { method: RouteMethod; path: P; reply: Guard<T> }
   }
 
-  /** One of a library's lists, read at `path` under it. */
-  const libraryGet = <T>({ libraryId, path, guard }: LibraryGetProps<T>): Promise<T> =>
-    expect({ request: send({ path: `/api/libraries/${libraryId}/${path}` }), guard })
+  type SendRouteProps<P extends string> = RouteCallProps<P> & {
+    route: { method: RouteMethod; path: P }
+  }
 
-  return { url, mediaUrl, send, sendForText, expect, libraryGet }
+  /** Calls `route` with its placeholders filled and `query` after them. */
+  const sendRoute = <P extends string>({
+    route,
+    params,
+    query = {},
+    body,
+  }: SendRouteProps<P>): Promise<unknown> =>
+    send({
+      path: pathWithQuery({ path: fillPath({ path: route.path, params: params ?? {} }), query }),
+      method: route.method,
+      body,
+    })
+
+  /** Calls `route` and answers what it replied, once its guard says it is what the route sends. */
+  const ask = <T, P extends string>(props: AskProps<T, P>): Promise<T> =>
+    expect({ request: sendRoute(props), guard: props.route.reply })
+
+  /** Calls `route` for what it does, not what it answers. */
+  const tell = async <P extends string>(props: SendRouteProps<P>): Promise<void> => {
+    await sendRoute(props)
+  }
+
+  return { url, mediaUrl, sendForText, ask, tell }
 }

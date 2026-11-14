@@ -1,6 +1,11 @@
 import { join } from 'node:path'
-import { MPV_SURFACE_KINDS, type MpvSurface, type NativeTarget } from '@raven/mpv'
-import { MPV_OPTIONS, type MpvOption } from '@/main/player/outputOptions'
+import {
+  MPV_OPTIONS,
+  MPV_SURFACE_KINDS,
+  type MpvOption,
+  type MpvSurface,
+  type NativeTarget,
+} from '@raven/mpv'
 import { messageOf } from '@/shared/messageOf'
 
 /** A surface's kind, or `off` for the test hook's run with no native engine at all. */

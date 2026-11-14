@@ -87,25 +87,29 @@ const wholeNumber = (value: unknown): number | null => {
  * listed by: written by the client and read back by the server, so the two
  * agree on it.
  */
+const musicListParams = ({
+  search = '',
+  sort = MUSIC_SORTS.title,
+  limit,
+  offset,
+  order,
+  seed,
+  byAlbum,
+}: MusicListOptions): Record<string, string> => ({
+  sort,
+  ...(byAlbum === undefined ? {} : { [MUSIC_LIST_PARAMS.byAlbum]: String(Number(byAlbum)) }),
+  ...(order === undefined ? {} : { [MUSIC_LIST_PARAMS.order]: order }),
+  ...(seed === undefined ? {} : { [MUSIC_LIST_PARAMS.seed]: String(seed) }),
+  ...(limit === undefined ? {} : { limit: String(limit) }),
+  ...(offset === undefined || offset === 0 ? {} : { offset: String(offset) }),
+  ...(search.trim() ? { q: search.trim() } : {}),
+})
+
 export const musicListQuery = {
-  encode: ({
-    search = '',
-    sort = MUSIC_SORTS.title,
-    limit,
-    offset,
-    order,
-    seed,
-    byAlbum,
-  }: MusicListOptions): string =>
-    toQueryString({
-      sort,
-      ...(byAlbum === undefined ? {} : { [MUSIC_LIST_PARAMS.byAlbum]: String(Number(byAlbum)) }),
-      ...(order === undefined ? {} : { [MUSIC_LIST_PARAMS.order]: order }),
-      ...(seed === undefined ? {} : { [MUSIC_LIST_PARAMS.seed]: String(seed) }),
-      ...(limit === undefined ? {} : { limit: String(limit) }),
-      ...(offset === undefined || offset === 0 ? {} : { offset: String(offset) }),
-      ...(search.trim() ? { q: search.trim() } : {}),
-    }),
+  /** The query's parameters, before they are written out. */
+  params: musicListParams,
+
+  encode: (options: MusicListOptions): string => toQueryString(musicListParams(options)),
 
   /** Takes a query string, or the record a server framework parsed it into. */
   decode: (query: string | Record<string, unknown>): MusicListParams => {

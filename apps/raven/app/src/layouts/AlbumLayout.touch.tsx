@@ -1,4 +1,4 @@
-import type { AlbumTrack } from '@raven/ui/headless'
+import { type AlbumTrack } from '@raven/core'
 import { type AccessibilityActionEvent, Pressable, StyleSheet, View } from 'react-native'
 
 import { MUSIC_COPY } from '@/layouts/copy'
@@ -14,6 +14,7 @@ import { openAddToPlaylistSheet } from '@/layouts/playlistSheets'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** What the screen reader offers on a track row besides playing it. */
 const TRACK_ACTIONS = [{ name: ROW_ACTIONS.addToPlaylist, label: MUSIC_COPY.addToPlaylist }]
@@ -124,22 +125,27 @@ export const AlbumLayout = ({
         ))}
         <Text style={styles.muted}>{facts}</Text>
         <View style={styles.controls}>
-          <IconPlate icon="play" isOn label={MUSIC_COPY.play} onPress={onPlay} />
-          <IconPlate icon="shuffle" isOn={false} label={MUSIC_COPY.shuffle} onPress={onShuffle} />
+          <IconPlate icon={APP_ICONS.play} isOn label={MUSIC_COPY.play} onPress={onPlay} />
           <IconPlate
-            icon="skipNext"
+            icon={APP_ICONS.shuffle}
+            isOn={false}
+            label={MUSIC_COPY.shuffle}
+            onPress={onShuffle}
+          />
+          <IconPlate
+            icon={APP_ICONS.skipNext}
             isOn={false}
             label={MUSIC_COPY.playNext}
             onPress={onPlayNext}
           />
           <IconPlate
-            icon="plus"
+            icon={APP_ICONS.plus}
             isOn={false}
             label={MUSIC_COPY.addToQueue}
             onPress={onAddToQueue}
           />
           <IconPlate
-            icon="list"
+            icon={APP_ICONS.list}
             isOn={false}
             label={MUSIC_COPY.addToPlaylist}
             onPress={() => addFrom({ index: null, name: title })}

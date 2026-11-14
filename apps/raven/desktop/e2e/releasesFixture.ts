@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { SERVER_METHODS } from '@raven/core'
-import { HTTP_HEADERS } from '@/shared/httpHeaders'
+import { HEADERS } from '@shared/http'
 
 const RELEASES_PATH = '/releases'
 
@@ -49,10 +49,8 @@ export const startReleasesFixture = async ({
     }
     counted.releases += 1
     const link =
-      page < bodies.length
-        ? { [HTTP_HEADERS.link]: `<${served.url}?page=${page + 1}>; rel="next"` }
-        : {}
-    response.writeHead(200, { [HTTP_HEADERS.contentType]: 'application/json', ...link }).end(body)
+      page < bodies.length ? { [HEADERS.link]: `<${served.url}?page=${page + 1}>; rel="next"` } : {}
+    response.writeHead(200, { [HEADERS.contentType]: 'application/json', ...link }).end(body)
   })
   await new Promise<void>((resolve) => {
     server.listen(0, '127.0.0.1', () => resolve())

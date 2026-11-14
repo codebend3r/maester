@@ -29,11 +29,21 @@ import { renderWithProviders } from '@/test/render'
 import { PLAYER_PREFS_KEY, usePlayerPrefs } from '@/stores/playerPrefs'
 import { usePlayerServices } from '@/stores/playerServices'
 import styles from '@/components/Player/Player.module.scss'
+import { NO_TITLE_EXTRAS, NO_HOST_EXTRAS } from '@/components/Player/PlayerServices'
+import { SUBTITLE_STATUSES } from '@/lib/useTrackCues'
 
 const servicesFor = (): PlayerServices => ({
-  title: { label: 'Local clip', duration: 120, resumeAt: 20, backTo: '/', next: null },
-  progress: { started: mock(() => {}), save: mock(() => {}), left: mock(() => {}) },
+  title: {
+    ...NO_TITLE_EXTRAS,
+    label: 'Local clip',
+    duration: 120,
+    resumeAt: 20,
+    backTo: '/',
+    next: null,
+  },
+  progress: { started: mock(() => {}), save: mock(() => {}), left: mock(() => {}), duration: null },
   posterUrl: null,
+  ...NO_HOST_EXTRAS,
   escape: null,
 })
 
@@ -45,6 +55,7 @@ const selection: TrackSelection = {
   isDefaultAudio: true,
   subtitle: null,
   isWaitingForTracks: false,
+  shouldPlayPickedAudio: false,
   pickAudio: () => {},
   pickSubtitle: () => {},
 }
@@ -58,6 +69,7 @@ const actionsFor = (): EngineActions => ({
   setAudio: mock(() => {}),
   setSubtitle: mock(() => {}),
   setCaptionStyle: mock(() => {}),
+  toggleStats: null,
 })
 
 describe('videoReducer ended', () => {
@@ -181,7 +193,8 @@ describe('PlayerChrome with a fake engine handle', () => {
       actions,
       focusSurface: mock(() => {}),
       surface: <p>Engine picture</p>,
-      drawsSubtitles: true,
+      selection,
+      subtitles: { status: SUBTITLE_STATUSES.off, overlay: null },
       readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
     }
     const { container } = renderWithProviders({
@@ -190,8 +203,10 @@ describe('PlayerChrome with a fake engine handle', () => {
           engine={engine}
           onBack={() => {}}
           rendition={DIRECT_RENDITION}
-          selection={selection}
-          subtitleStatus="off"
+          file={null}
+          steppedDown={null}
+          choices={null}
+          notice={null}
           fullscreen={{ fullscreen: false, toggle: () => {} }}
         />
       ),
@@ -229,7 +244,8 @@ describe('PlayerChrome Playback info', () => {
       actions: actionsFor(),
       focusSurface: mock(() => {}),
       surface: <p>Engine picture</p>,
-      drawsSubtitles: true,
+      selection,
+      subtitles: { status: SUBTITLE_STATUSES.off, overlay: null },
       readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
     }
     renderWithProviders({
@@ -238,8 +254,10 @@ describe('PlayerChrome Playback info', () => {
           engine={engine}
           onBack={() => {}}
           rendition={DIRECT_RENDITION}
-          selection={selection}
-          subtitleStatus="off"
+          file={null}
+          steppedDown={null}
+          choices={null}
+          notice={null}
           fullscreen={{ fullscreen: false, toggle: () => {} }}
         />
       ),
@@ -275,7 +293,8 @@ describe('PlayerChrome host actions', () => {
       actions,
       focusSurface: mock(() => {}),
       surface: <p>Engine picture</p>,
-      drawsSubtitles: true,
+      selection,
+      subtitles: { status: SUBTITLE_STATUSES.off, overlay: null },
       readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
     }
     const { unmount } = renderWithProviders({
@@ -284,8 +303,10 @@ describe('PlayerChrome host actions', () => {
           engine={engine}
           onBack={() => {}}
           rendition={DIRECT_RENDITION}
-          selection={selection}
-          subtitleStatus="off"
+          file={null}
+          steppedDown={null}
+          choices={null}
+          notice={null}
           fullscreen={{ fullscreen: false, toggle: () => {} }}
         />
       ),
@@ -370,11 +391,12 @@ describe('HTML engine surface focus', () => {
   it('is safe before the surface exists and after it unmounts', () => {
     const handles: EngineHandle[] = []
     const Probe = () => {
-      const { engine } = useHtmlEngine({
+      const engine = useHtmlEngine({
         source: { kind: 'file', url: 'blob:local-clip' },
         rendition: DIRECT_RENDITION,
         selection,
         onFailure: () => {},
+        onSlow: null,
         toggleFullscreen: () => {},
       })
       useEffect(() => {
@@ -396,11 +418,12 @@ describe('HTML engine stats', () => {
   it('reads the picture from the video element, and nothing once it is gone', () => {
     const handles: EngineHandle[] = []
     const Probe = () => {
-      const { engine } = useHtmlEngine({
+      const engine = useHtmlEngine({
         source: { kind: 'file', url: 'blob:local-clip' },
         rendition: DIRECT_RENDITION,
         selection,
         onFailure: () => {},
+        onSlow: null,
         toggleFullscreen: () => {},
       })
       useEffect(() => {
@@ -468,7 +491,8 @@ describe('PlayerChrome seams for a native host', () => {
       readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
       focusSurface: () => {},
       surface: <p>Engine picture</p>,
-      drawsSubtitles: true,
+      selection,
+      subtitles: { status: SUBTITLE_STATUSES.off, overlay: null },
     }
     // Set before the render this element goes to, as a host does.
     usePlayerServices.setState({ services })
@@ -477,8 +501,10 @@ describe('PlayerChrome seams for a native host', () => {
         engine={engine}
         onBack={() => {}}
         rendition={DIRECT_RENDITION}
-        selection={selection}
-        subtitleStatus="off"
+        file={null}
+        steppedDown={null}
+        choices={null}
+        notice={null}
         fullscreen={{ fullscreen: false, toggle: () => {} }}
       />
     )
@@ -570,7 +596,7 @@ describe('PlayerChrome seams for a native host', () => {
 })
 
 describe('Player shows the host note on Unplayable', () => {
-  const failing = (note: string | undefined) => {
+  const failing = (note: string | null) => {
     const services: PlayerServices = { ...servicesFor(), unplayableNote: note }
     const { container } = renderWithProviders({
       ui: <Player engine={{ kind: 'html', source: { kind: 'file', url: 'blob:broken' } }} />,
@@ -588,7 +614,7 @@ describe('Player shows the host note on Unplayable', () => {
   })
 
   it('keeps the browser wording without a note', () => {
-    failing(undefined)
+    failing(null)
     expect(screen.getByText("This video can't play in this browser.")).toBeInTheDocument()
   })
 })
@@ -619,7 +645,7 @@ describe('Player hands a title off to another player', () => {
     failing({
       ...servicesFor(),
       handoff: { label: 'Open in Raven', run },
-      escape: { label: 'Copy file link', run: copy },
+      escape: { label: 'Copy file link', run: copy, icon: 'copy' },
     })
     expect(panelButtons()).toEqual(['Back', 'Open in Raven', 'Copy file link'])
     const handoff = screen.getByRole('button', { name: 'Open in Raven' })
@@ -632,43 +658,11 @@ describe('Player hands a title off to another player', () => {
   })
 
   it('keeps Unplayable as it was without a handoff', () => {
-    failing({ ...servicesFor(), escape: { label: 'Copy file link', run: () => {} } })
+    failing({ ...servicesFor(), escape: { label: 'Copy file link', run: () => {}, icon: 'copy' } })
     expect(panelButtons()).toEqual(['Back', 'Copy file link'])
     const copy = screen.getByRole('button', { name: 'Copy file link' })
     expect(copy.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'copy')
     expect(screen.getByText(VLC_HINT)).toBeInTheDocument()
-    cleanup()
-
-    failing({
-      ...servicesFor(),
-      escape: { label: 'Open in browser', run: () => {}, icon: 'globe' },
-      escapeHint: null,
-    })
-    const browser = screen.getByRole('button', { name: 'Open in browser' })
-    expect(browser.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'globe')
-    expect(screen.queryByText(VLC_HINT)).toBeNull()
-    cleanup()
-
-    failing({
-      ...servicesFor(),
-      escape: { label: 'Open in browser', run: () => {} },
-      escapeHint: 'The browser can play it.',
-    })
-    expect(screen.getByText('The browser can play it.')).toBeInTheDocument()
-    expect(screen.queryByText(VLC_HINT)).toBeNull()
-  })
-
-  it('writes no hint paragraph for an empty hint', () => {
-    const { container } = failing({
-      ...servicesFor(),
-      escape: { label: 'Open in browser', run: () => {} },
-      escapeHint: '',
-    })
-    expect(screen.queryByText(VLC_HINT)).toBeNull()
-    const hints = [...container.querySelectorAll('p')].filter(
-      (paragraph) => paragraph.getAttribute('aria-live') === null && paragraph.textContent === '',
-    )
-    expect(hints).toEqual([])
   })
 
   it('drops Try playing anyway from primary only while a handoff is offered', () => {
@@ -703,7 +697,8 @@ describe('PlayerChrome handoff in the playback menu', () => {
       readStats: () => ({ engine: 'Test engine', viewport: null, frame: null, frames: null }),
       focusSurface: () => {},
       surface: <p>Engine picture</p>,
-      drawsSubtitles: true,
+      selection,
+      subtitles: { status: SUBTITLE_STATUSES.off, overlay: null },
     }
     return renderWithProviders({
       ui: (
@@ -711,8 +706,10 @@ describe('PlayerChrome handoff in the playback menu', () => {
           engine={engine}
           onBack={() => {}}
           rendition={DIRECT_RENDITION}
-          selection={selection}
-          subtitleStatus="off"
+          file={null}
+          steppedDown={null}
+          choices={null}
+          notice={null}
           fullscreen={{ fullscreen: false, toggle: () => {} }}
         />
       ),

@@ -1,5 +1,4 @@
-import { MUSIC_SORTS } from '@raven/core'
-import { playlistFactsOf } from '@raven/ui/headless'
+import { MUSIC_SORTS, playlistFactsOf } from '@raven/core'
 import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType, ReactElement } from 'react'

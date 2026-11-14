@@ -29,7 +29,7 @@
     100dvh - var(--space-8) - var(--space-4) - var(--titlebar-inset) - var(--space-9)
   );
   padding: var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+  border: 1px solid var(--color-on-picture-hairline);
   border-radius: var(--radius-lg);
   background: var(--color-picture-glass);
   color: var(--color-on-picture);
@@ -63,7 +63,7 @@
   cursor: pointer;
 
   &:hover {
-    background: color-mix(in srgb, var(--color-on-picture) 12%, transparent);
+    background: var(--color-on-picture-hairline);
     color: var(--color-on-picture);
   }
 }
@@ -93,7 +93,7 @@
 
 .facts {
   display: grid;
-  gap: 2px;
+  gap: var(--space-hair);
 }
 
 // The terms share one column, so the values line up down the panel.

@@ -11,17 +11,18 @@ ADMIN tier, enforced here whatever the page shows. Writes take JSON only.
 # No `from __future__ import annotations`: FastAPI reads each route's
 # `Annotated[..., Depends(auth...)]` at definition, where `auth` is in scope.
 from dataclasses import dataclass
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from sparrow.agent.tools import AssignableTier
 from sparrow.chat.admin import AdminConsole
 from sparrow.web.auth import Auth, Refused, Viewer, require_json
 
 
 class TierChange(BaseModel):
-    tier: Literal["friend", "trusted", "admin"] | None
+    tier: AssignableTier | None
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,7 @@ class Api:
         ) -> dict[str, Any]:
             if store.get_user(user_id) is None:
                 raise Refused(404, {"reason": "unknown_user"})
-            console.set_tier(admin.chat_user, user_id, change.tier)
+            console.set_tier(admin.chat_user, user_id, change.tier.value if change.tier else None)
             user = store.get_user(user_id)
             return {
                 "user_id": user_id,

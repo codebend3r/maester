@@ -1,8 +1,7 @@
 """Messages sparrow sends outside a reply, and the one interface that delivers them.
 
 Tools, decisions, webhooks and scheduled jobs all produce notices: a note for
-the admin, the same with Approve/Deny choices for one pending action, an
-announcement every friend sees, or a direct message to one user. Everything
+the admin, or a direct message to one user. Everything
 hands them to a `Notifier`, so `agent/`, `tools/` and `web/` never know how a
 notice reaches anyone. Until sparrow's own app delivers them, `LogNotifier`
 writes them to the log.
@@ -31,28 +30,13 @@ class AdminPost:
 
 
 @dataclass(frozen=True)
-class ApprovalPost:
-    """A note for the admin whose Approve/Deny choices settle one pending action."""
-
-    text: str
-    pending_id: int
-
-
-@dataclass(frozen=True)
-class Announcement:
-    """A notice every friend sees (a maintenance window)."""
-
-    text: str
-
-
-@dataclass(frozen=True)
 class DirectMessage:
     to: str  # a user id
     text: str
     about: Titled | None = None
 
 
-Notice = AdminPost | ApprovalPost | Announcement | DirectMessage
+Notice = AdminPost | DirectMessage
 
 
 class Notifier(Protocol):

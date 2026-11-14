@@ -19,6 +19,7 @@ import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { MediaIndex, type ProbeTarget } from '@/media/mediaIndex'
 import { MetadataService } from '@/metadata/metadataService'
 import { MusicIndexer } from '@/music/musicIndexer'
+import { MusicRepository } from '@/music/musicRepository'
 import { mapWithConcurrency } from '@/scanner/concurrency'
 import { layoutsOf, withTitleRoots } from '@/scanner/layout'
 import { type Reconciled, changesAnything, reconcile } from '@/scanner/reconcile'
@@ -211,6 +212,15 @@ type ScannerServiceProbeOneProps = {
   path: string
 }
 
+/** What a reindex found and filed. */
+type Reindexed = {
+  walk: WalkResult
+  changes: Reconciled
+  toProbe: ProbeTarget[]
+  /** What the library's files are, as its type says at the moment they are filed. */
+  media: MediaType
+}
+
 /**
  * Indexes a library: walks its paths, adds new files, follows renamed and
  * moved ones, re-probes replaced ones, drops deleted ones, hands every
@@ -244,6 +254,7 @@ export class ScannerService implements OnApplicationBootstrap {
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(StartupWork) private readonly startup: StartupWork,
     @Inject(ScanControl) private readonly scans: ScanControl,
+    @Inject(MusicRepository) private readonly albums: MusicRepository,
   ) {}
 
   /** The scans on boot are steps of the work on boot, a library each, so the server listens first. */
@@ -606,13 +617,12 @@ export class ScannerService implements OnApplicationBootstrap {
    * so a failed write leaves no row pointing at a thumbnail that was
    * already deleted.
    */
-  private async reindex({ library, scope, signal, onFound }: ScannerServiceReindexProps): Promise<{
-    walk: WalkResult
-    changes: Reconciled
-    toProbe: ProbeTarget[]
-    /** What the library's files are, as its type says at the moment they are filed. */
-    media: MediaType
-  }> {
+  private async reindex({
+    library,
+    scope,
+    signal,
+    onFound,
+  }: ScannerServiceReindexProps): Promise<Reindexed> {
     const indexed = this.index.forLibrary(library.id)
     const walk = await walkVideos({
       roots: library.paths,
@@ -711,6 +721,8 @@ export class ScannerService implements OnApplicationBootstrap {
         return this.probe(props)
       case MEDIA_TYPES.audio:
         await this.probe(props)
+        // The albums the files moved out of go once all are read, cancelled or not.
+        this.albums.prune()
         // A cancelled scan leaves its albums pending for the next one.
         if (!props.signal.aborted) this.metadata.enqueue(props.libraryId)
         return

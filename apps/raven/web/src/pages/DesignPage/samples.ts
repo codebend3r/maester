@@ -289,3 +289,34 @@ export const SAMPLE_CREDITS: Credit[] = [
   { personId: -4, name: 'Jeyne Pool', job: 'writer', role: 'Screenplay', photoVersion: null },
   { personId: -5, name: 'Osha Vale', job: 'producer', role: 'Producer', photoVersion: null },
 ]
+
+/** The text types of `<input>` the forms specimen shows. */
+const TEXT_INPUT_TYPES = {
+  text: 'text',
+  search: 'search',
+  email: 'email',
+  password: 'password',
+  number: 'number',
+  url: 'url',
+  date: 'date',
+  time: 'time',
+} as const
+
+type SampleTextInput = {
+  type: (typeof TEXT_INPUT_TYPES)[keyof typeof TEXT_INPUT_TYPES]
+  label: string
+  placeholder?: string
+  value?: string
+}
+
+/** A field of each text type, as the forms specimen lays them out. */
+export const SAMPLE_TEXT_INPUTS: readonly SampleTextInput[] = [
+  { type: TEXT_INPUT_TYPES.text, label: 'Text', placeholder: 'Movies' },
+  { type: TEXT_INPUT_TYPES.search, label: 'Search', placeholder: 'Search Movies' },
+  { type: TEXT_INPUT_TYPES.email, label: 'Email', placeholder: 'you@example.com' },
+  { type: TEXT_INPUT_TYPES.password, label: 'Password', value: 'hunter2hunter2' },
+  { type: TEXT_INPUT_TYPES.number, label: 'Number', value: '24' },
+  { type: TEXT_INPUT_TYPES.url, label: 'URL', placeholder: 'http://nas:8484' },
+  { type: TEXT_INPUT_TYPES.date, label: 'Date', value: '2026-10-09' },
+  { type: TEXT_INPUT_TYPES.time, label: 'Time', value: '20:30' },
+]

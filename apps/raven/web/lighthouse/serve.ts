@@ -9,9 +9,10 @@ import {
   AUTH_COOKIE,
   AUTH_PATHS,
   type AuthConfig,
-  FIXTURE_SERVER,
   HTTP_METHODS,
 } from '@raven/core'
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
+import { HEADERS } from '@shared/http'
 
 /**
  * The production build as Netlify serves it, for Lighthouse CI: over HTTP/2, Brotli for every
@@ -59,26 +60,16 @@ const FIXTURE_ORIGIN = `http://${FIXTURE_SERVER.host}:${FIXTURE_SERVER.lighthous
 /** How often to ask the fixture whether it is up; `startServerReadyTimeout` gives up on it. */
 const FIXTURE_POLL_MS = 500
 
-/** The headers this server reads and writes; `@shared/server` has the same, behind Nest and SQLite. */
-const HEADERS = {
-  acceptEncoding: 'accept-encoding',
-  cacheControl: 'cache-control',
-  contentEncoding: 'content-encoding',
-  contentType: 'content-type',
-  host: 'host',
-  vary: 'vary',
-} as const
-
 /**
  * HTTP/1.1's connection headers, which the fixture sends and HTTP/2 forbids: Chrome fails a
  * response that carries one with `ERR_HTTP2_PROTOCOL_ERROR`, so they stop here, as at any proxy.
  */
 const CONNECTION_HEADER_NAMES = [
-  'connection',
-  'keep-alive',
+  HEADERS.connection,
+  HEADERS.keepAlive,
   'proxy-connection',
-  'transfer-encoding',
-  'upgrade',
+  HEADERS.transferEncoding,
+  HEADERS.upgrade,
 ] as const
 
 const CONNECTION_HEADERS = new Set<string>(CONNECTION_HEADER_NAMES)

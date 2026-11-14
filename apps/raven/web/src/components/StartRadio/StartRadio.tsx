@@ -1,5 +1,5 @@
 import { QUEUE_SOURCE_KINDS, type RadioSeed } from '@raven/core'
-import { Button, useToasts } from '@raven/ui'
+import { BUTTON_TONES, Button, useToasts } from '@raven/ui'
 import { useAudioQueue } from '@raven/ui/headless'
 import { useMutation } from '@tanstack/react-query'
 import { START_RADIO_COPY } from '@/components/StartRadio/copy'
@@ -45,7 +45,7 @@ export const StartRadio = ({ seed, title, look = START_RADIO_LOOKS.words }: Star
   const isIconOnly = look === START_RADIO_LOOKS.icon
   return (
     <Button
-      tone={isIconOnly ? 'ghost' : 'quiet'}
+      tone={isIconOnly ? BUTTON_TONES.ghost : BUTTON_TONES.quiet}
       icon="headphones"
       aria-label={isIconOnly ? START_RADIO_COPY.startRadioFrom(title) : undefined}
       disabled={radio.isPending}

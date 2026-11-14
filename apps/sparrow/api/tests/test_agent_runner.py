@@ -2,33 +2,23 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from sparrow.agent.limits import KillSwitch
-from sparrow.agent.runner import (
-    AwaitingApproval,
-    Cancelled,
-    Done,
-    Errored,
-    HeldForMaintenance,
-    ToolRunner,
-)
+from sparrow.agent.runner import Cancelled, Done, Errored, ToolRunner
 from sparrow.agent.tools import (
     MAX_CHOICES,
-    Approval,
     Choice,
-    Choices,
     Failed,
-    NeedsApproval,
     Ok,
     Refused,
     Tier,
     ToolContext,
     ToolRegistry,
     ToolSpec,
+    offer,
 )
 from sparrow.config import Settings
 from sparrow.memo import Memo
-from sparrow.notify import AdminPost, ApprovalPost, DirectMessage
-from sparrow.store import LinkedUser, NotLinked, Store
+from sparrow.notify import AdminPost
+from sparrow.store import Decision, LinkedUser, NotLinked, Store
 
 DAY = timedelta(days=1)
 
@@ -45,7 +35,7 @@ def setup():
 
     @reg.tool("pick", "offers options")
     async def pick(ctx):
-        return Choices([Choice("Dune", "438631", 2021)])
+        return offer([Choice("Dune", "438631", 2021)])
 
     @reg.tool("boom", "fails")
     async def boom(ctx):
@@ -56,72 +46,35 @@ def setup():
         calls.append(("delete_file", file_id, host))
         if file_id == 9:
             return Ok("deleted 9", (AdminPost("deleted /x/9.mkv, 4 GB, corrupt"),))
+        if file_id < 0:
+            raise ConnectionError("arr down")
         return "deleted"
 
     @reg.tool("refuse", "explains its own failure")
     async def refuse(ctx, n: int):
         return Refused(f"not doing {n}", (AdminPost("tried and refused"),))
 
-    @reg.tool("escalate", "confirmed, then asks the admin", tier=Tier.TRUSTED, destructive=True)
-    async def escalate(ctx, file_id: int, host: str):
-        approval = Approval("u1 wants a delete", "delete", decide_n, {"n": file_id})
-        return NeedsApproval({"asked": file_id}, approval)
-
     @reg.tool("tell_admin", "admin should know")
     async def tell_admin(ctx, n: int):
         return Ok({"done": n}, (AdminPost(f"heads up: {n}"),))
 
-    @reg.tool("ask_admin", "needs the admin")
-    async def ask_admin(ctx, n: int):
-        approval = Approval(f"u1 wants {n}", f"let u1 have {n}", decide_n, {"n": n})
-        return NeedsApproval({"n": n}, approval)
-
-    @reg.tool("order", "asks a service for something", held_in_maintenance=True)
-    async def order(ctx, n: int):
-        calls.append(("order", n))
-        return {"ordered": n}
-
-    @reg.tool(
-        "swap_file",
-        "destructive, and held in maintenance",
-        tier=Tier.TRUSTED,
-        destructive=True,
-        host_param="host",
-        held_in_maintenance=True,
-    )
-    async def swap_file(ctx, file_id: int, host: str):
-        calls.append(("swap_file", file_id))
-        return "swapped"
-
-    @reg.tool("ask_about", "asks the admin about one subject")
-    async def ask_about(ctx, n: int):
-        approval = Approval(f"u1 wants {n}", f"{n} for u1", decide_n, {"n": n}, f"thing:{n}")
-        return NeedsApproval({"n": n}, approval)
-
-    @reg.tool("ask_badly", "names no decide tool")
-    async def ask_badly(ctx, n: int):
-        return NeedsApproval({}, Approval("u1 wants it", "?", echo, {"n": n}))
-
-    @reg.tool("decide_n", "the admin decides", tier=Tier.ADMIN, button_only=True)
-    async def decide_n(ctx, n: int, approved: bool):
-        if n < 0:
-            raise ConnectionError("seerr down")
-        calls.append(("decide_n", ctx.user_id, n, approved))
-        return Ok(f"decided {approved}", (DirectMessage("u1", "told you"),))
-
     store = Store(":memory:")
-    kill = KillSwitch()
-    runner = ToolRunner(reg, kill_switch=kill)
+    runner = ToolRunner(reg)
 
     def as_user(user_id, tier=Tier.TRUSTED):
         return ToolContext(user_id, tier, None, store, Settings(), Memo())
 
-    yield runner, as_user, store, calls, kill
+    yield runner, as_user, store, calls
     store.close()
 
 
+async def confirmed(runner, as_user, store, user_id="u1", file_id=7, decision=Decision.APPROVED):
+    out = await runner.run(as_user(user_id), "delete_file", {"file_id": file_id, "host": "meleys"})
+    return store.decide_pending(out.status.pending_id, decision, user_id)
+
+
 async def test_runs_and_audits_a_plain_tool(setup):
-    runner, as_user, store, *_ = setup
+    runner, as_user, store, _ = setup
     out = await runner.run(as_user("u1"), "echo", {"x": "hi"})
     assert out.content == {"echoed": "hi"} and not out.is_error
     row = store.audit_recent(1)[0]
@@ -142,22 +95,19 @@ async def test_choices_result_is_typed_for_the_chat_and_serialized_for_the_model
 
 
 def test_choices_past_the_button_cap_are_named_to_the_model():
-    many = Choices([Choice(f"Part {n}", str(n)) for n in range(MAX_CHOICES + 2)])
-    assert len(many.shown) == MAX_CHOICES
-    content = many.as_content()
-    assert len(content["choices"]) == MAX_CHOICES
-    assert content["not_shown"] == ["Part 10 (10)", "Part 11 (11)"]
+    many = offer([Choice(f"Part {n}", str(n)) for n in range(MAX_CHOICES + 2)], ["one is off"])
+    assert len(many.choices) == MAX_CHOICES
+    assert len(many.content["choices"]) == MAX_CHOICES
+    assert many.content["not_shown"] == ["Part 10 (10)", "Part 11 (11)"]
+    assert many.content["notes"] == ["one is off"]
 
 
-async def test_out_of_tier_unknown_and_button_only_tools_are_refused_and_audited(setup):
-    runner, as_user, store, calls, _ = setup
+async def test_out_of_tier_and_unknown_tools_are_refused_and_audited(setup):
+    runner, as_user, store, calls = setup
     out = await runner.run(as_user("u2", Tier.FRIEND), "delete_file", {"file_id": 1, "host": "m"})
     assert out.is_error and "not available" in out.content
     assert (await runner.run(as_user("u1"), "nope", {})).is_error
-    # Even the admin's model cannot call a button-only tool.
-    out = await runner.run(as_user("boss", Tier.ADMIN), "decide_n", {"n": 1, "approved": True})
-    assert out.is_error and "not available" in out.content
-    assert [r.ok for r in store.audit_recent(5)] == [False, False, False]
+    assert [r.ok for r in store.audit_recent(5)] == [False, False]
     assert calls == []
 
 
@@ -171,98 +121,26 @@ async def test_invalid_input_is_returned_as_invalid_json(setup):
 
 
 async def test_tool_exceptions_become_retryable_error_results(setup):
-    runner, as_user, store, *_ = setup
+    runner, as_user, store, _ = setup
     out = await runner.run(as_user("u1"), "boom", {})
     assert out.status == Errored(retryable=True) and "kaput" in out.content
     assert store.audit_recent(1)[0].ok is False
 
 
 async def test_a_result_carries_its_notices(setup):
-    runner, as_user, store, *_ = setup
+    runner, as_user, *_ = setup
     out = await runner.run(as_user("u1"), "tell_admin", {"n": 3})
     assert out.content == {"done": 3} and out.notices == (AdminPost("heads up: 3"),)
-    assert store.open_pending() == []
-
-
-async def test_an_approval_is_stored_as_a_pending_call_of_its_decide_tool(setup):
-    runner, as_user, store, *_ = setup
-    out = await runner.run(as_user("u1"), "ask_admin", {"n": 3})
-    assert out.content["status"] == "awaiting_admin_approval" and out.content["result"] == {"n": 3}
-    (post,) = out.notices
-    assert post == ApprovalPost("u1 wants 3", out.status.pending_id)
-    pending = store.get_pending(post.pending_id)
-    assert (pending.kind, pending.action, pending.requester) == ("approve", "decide_n", "u1")
-    assert pending.payload == {"n": 3} and pending.summary == "let u1 have 3"
-    # The call asked rather than acted, and its audit row says so.
-    assert store.audit_recent(1)[0].pending_id == pending.id
-
-
-async def test_an_approval_that_cannot_be_decided_reaches_the_admin_anyway(setup):
-    runner, as_user, store, *_ = setup
-    out = await runner.run(as_user("u1"), "ask_badly", {"n": 1})
-    assert out.is_error and "could not be asked" in out.content
-    (post,) = out.notices
-    assert isinstance(post, AdminPost) and post.text.startswith("u1 wants it")
-    assert store.open_pending() == []
-
-
-async def decided(store, runner, as_user, n=3, verdict="approved", by="boss"):
-    out = await runner.run(as_user("u1"), "ask_admin", {"n": n})
-    return store.decide_pending(out.status.pending_id, verdict, by)
-
-
-async def test_an_admin_press_runs_the_decide_tool_as_the_admin(setup):
-    runner, as_user, store, calls, _ = setup
-    pending = await decided(store, runner, as_user)
-    out = await runner.run_decision(as_user("boss", Tier.ADMIN), pending, True)
-    assert out.content == "decided True" and out.notices == (DirectMessage("u1", "told you"),)
-    assert calls == [("decide_n", "boss", 3, True)]
-    row = store.audit_recent(1)[0]
-    assert (row.tool, row.user_id, row.args) == ("decide_n", "boss", {"n": 3, "approved": True})
-
-    denied = await decided(store, runner, as_user, verdict="denied")
-    await runner.run_decision(as_user("boss", Tier.ADMIN), denied, False)
-    assert calls[-1] == ("decide_n", "boss", 3, False)
-
-
-async def test_only_the_admin_who_decided_runs_it_and_only_their_way(setup):
-    runner, as_user, store, calls, _ = setup
-    pending = await decided(store, runner, as_user)
-    for ctx, approved in [
-        (as_user("boss", Tier.ADMIN), False),  # not the recorded decision
-        (as_user("other", Tier.ADMIN), True),  # not who decided
-        (as_user("boss", Tier.TRUSTED), True),  # not an admin
-    ]:
-        out = await runner.run_decision(ctx, pending, approved)
-        assert out.status == Errored()
-    open_one = store.get_pending(
-        (await runner.run(as_user("u1"), "ask_admin", {"n": 4})).status.pending_id
-    )
-    assert (await runner.run_decision(as_user("boss", Tier.ADMIN), open_one, True)).is_error
-    assert calls == []
-
-
-async def test_a_failed_decide_is_retryable_and_a_vanished_tool_is_not(setup):
-    runner, as_user, store, *_ = setup
-    failing = await decided(store, runner, as_user, n=-1)
-    out = await runner.run_decision(as_user("boss", Tier.ADMIN), failing, True)
-    assert out.status == Errored(retryable=True) and "seerr down" in out.content
-    gone = store.create_pending(
-        kind="approve", action="renamed_since", requester="u1", payload={}, summary="?", ttl=DAY
-    )
-    gone = store.decide_pending(gone.id, "approved", "boss")
-    out = await runner.run_decision(as_user("boss", Tier.ADMIN), gone, True)
-    assert out.status == Errored() and "no longer exists" in out.content
 
 
 async def test_destructive_tool_needs_confirmation_then_runs_on_the_press(setup):
-    runner, as_user, store, calls, _ = setup
+    runner, as_user, store, calls = setup
     out = await runner.run(as_user("u1"), "delete_file", {"file_id": 7, "host": "meleys"})
     assert out.content["status"] == "awaiting_confirmation" and out.status.pending_id
     assert "on meleys" in out.content["summary"]
     assert calls == [] and store.audit_recent(5) == []  # nothing ran, so nothing audited
 
-    pending = store.decide_pending(out.status.pending_id, "approved", "u1")
+    pending = store.decide_pending(out.status.pending_id, Decision.APPROVED, "u1")
     done = await runner.run_decision(as_user("u1"), pending, True)
     assert done.content == "deleted" and calls == [("delete_file", 7, "meleys")]
     assert store.audit_recent(1)[0].host == "meleys"
@@ -271,20 +149,35 @@ async def test_destructive_tool_needs_confirmation_then_runs_on_the_press(setup)
 
 
 async def test_a_confirmed_tool_that_posts_its_own_notice_is_not_announced_twice(setup):
-    runner, as_user, store, *_ = setup
+    runner, as_user, store, _ = setup
     store.upsert_user("u1", seerr_user_id=4, plex_username="trusty")
-    out = await runner.run(as_user("u1"), "delete_file", {"file_id": 9, "host": "meleys"})
-    pending = store.decide_pending(out.status.pending_id, "approved", "u1")
+    pending = await confirmed(runner, as_user, store, file_id=9)
     done = await runner.run_decision(as_user("u1"), pending, True)
     assert done.notices == (AdminPost("deleted /x/9.mkv, 4 GB, corrupt"),)
-    out = await runner.run(as_user("u1"), "delete_file", {"file_id": 7, "host": "meleys"})
-    pending = store.decide_pending(out.status.pending_id, "approved", "u1")
+    pending = await confirmed(runner, as_user, store)
     (generic,) = (await runner.run_decision(as_user("u1"), pending, True)).notices
     assert generic.text.startswith("trusty confirmed")
 
 
+async def test_a_failed_press_is_retryable(setup):
+    runner, as_user, store, _ = setup
+    pending = await confirmed(runner, as_user, store, file_id=-1)
+    out = await runner.run_decision(as_user("u1"), pending, True)
+    assert out.status == Errored(retryable=True) and "arr down" in out.content
+
+
+async def test_a_press_for_a_tool_that_no_longer_exists_is_refused(setup):
+    runner, as_user, store, _ = setup
+    gone = store.create_pending(
+        action="renamed_since", requester="u1", payload={}, summary="?", ttl=DAY
+    )
+    gone = store.decide_pending(gone.id, Decision.APPROVED, "u1")
+    out = await runner.run_decision(as_user("u1"), gone, True)
+    assert out.status == Errored() and "not available" in out.content
+
+
 async def test_a_tool_can_fail_on_its_own_terms_and_is_audited_as_not_ok(setup):
-    runner, as_user, store, *_ = setup
+    runner, as_user, store, _ = setup
     out = await runner.run(as_user("u1"), "refuse", {"n": 3})
     assert out.status == Errored() and out.content == "not doing 3"
     assert out.notices == (AdminPost("tried and refused"),)
@@ -292,43 +185,33 @@ async def test_a_tool_can_fail_on_its_own_terms_and_is_audited_as_not_ok(setup):
     assert store.audit_count_since("refuse", datetime.now(UTC) - DAY) == 0
 
 
-async def test_a_confirmed_call_that_asks_the_admin_is_announced_by_its_approval_alone(setup):
-    runner, as_user, store, *_ = setup
-    out = await runner.run(as_user("u1"), "escalate", {"file_id": 4, "host": "meleys"})
-    pending = store.decide_pending(out.status.pending_id, "approved", "u1")
-    asked = await runner.run_decision(as_user("u1"), pending, True)
-    (post,) = asked.notices
-    assert isinstance(post, ApprovalPost) and post.pending_id == asked.status.pending_id
-
-
 async def test_a_cancel_runs_nothing_and_a_confirmation_is_the_requesters_own(setup):
-    runner, as_user, store, calls, _ = setup
-    out = await runner.run(as_user("u1"), "delete_file", {"file_id": 7, "host": "meleys"})
-    cancelled = store.decide_pending(out.status.pending_id, "denied", "u1")
+    runner, as_user, store, calls = setup
+    cancelled = await confirmed(runner, as_user, store, decision=Decision.DENIED)
     assert (await runner.run_decision(as_user("u1"), cancelled, False)).status == Cancelled()
 
-    other = await runner.run(as_user("u9"), "delete_file", {"file_id": 7, "host": "meleys"})
-    theirs = store.decide_pending(other.status.pending_id, "approved", "u9")
+    theirs = await confirmed(runner, as_user, store, user_id="u9")
     assert (await runner.run_decision(as_user("u1"), theirs, True)).is_error
+    undecided = store.create_pending(
+        action="delete_file", requester="u1", payload={"file_id": 1, "host": "m"}, summary="?",
+        ttl=DAY,
+    )  # fmt: skip
+    assert (await runner.run_decision(as_user("u1"), undecided, True)).is_error
     assert calls == []
 
 
-async def test_kill_switch_blocks_destructive_tools_only(setup):
-    runner, as_user, store, _, kill = setup
-    kill.on("maintenance")
-    out = await runner.run(as_user("u1"), "delete_file", {"file_id": 7, "host": "meleys"})
-    assert out.status == Errored(retryable=True) and "maintenance" in out.content
-    assert not (await runner.run(as_user("u1"), "echo", {"x": "still fine"})).is_error
-    kill.off()
-    out = await runner.run(as_user("u1"), "delete_file", {"file_id": 7, "host": "meleys"})
-    pending = store.decide_pending(out.status.pending_id, "approved", "u1")
-    kill.on("maintenance")
-    held = await runner.run_decision(as_user("u1"), pending, True)
-    assert held.status == Errored(retryable=True)
+async def test_only_a_destructive_tool_runs_from_a_press(setup):
+    runner, as_user, store, calls = setup
+    plain = store.create_pending(
+        action="echo", requester="u1", payload={"x": "hi"}, summary="?", ttl=DAY
+    )
+    plain = store.decide_pending(plain.id, Decision.APPROVED, "u1")
+    assert (await runner.run_decision(as_user("u1"), plain, True)).is_error
+    assert calls == []
 
 
 def test_linked_user_is_the_active_seerr_link_or_a_refusal(setup):
-    _, as_user, store, *_ = setup
+    _, as_user, store, _ = setup
     ctx = as_user("u1")
     with pytest.raises(NotLinked):
         ctx.linked_user()
@@ -338,19 +221,7 @@ def test_linked_user_is_the_active_seerr_link_or_a_refusal(setup):
     store.upsert_user("u1", seerr_user_id=4)
     assert ctx.linked_user() == LinkedUser("u1", 4, None, "u1")
     store.upsert_user("u1", plex_email="u1@example.com")
-    assert ctx.link_of("u1").name == "u1@example.com"
-
-
-def test_button_only_tools_are_admin_tools_hidden_from_every_tier():
-    reg = ToolRegistry()
-
-    @reg.tool("decide", "d", tier=Tier.ADMIN, button_only=True)
-    async def decide(ctx, n: int, approved: bool):
-        return None
-
-    assert reg.for_tier(Tier.ADMIN) == [] and reg.get("decide").button_only
-    with pytest.raises(ValueError, match="must be admin tier"):
-        reg.tool("friendly", "f", button_only=True)(decide)
+    assert ctx.linked_user().name == "u1@example.com"
 
 
 async def test_each_kind_of_result_becomes_its_own_status(setup):
@@ -359,8 +230,6 @@ async def test_each_kind_of_result_becomes_its_own_status(setup):
     assert (await runner.run(as_user("u1"), "tell_admin", {"n": 1})).status == Done()
     assert (await runner.run(as_user("u1"), "refuse", {"n": 1})).status == Errored()
     assert (await runner.run(as_user("u1"), "flaky", {})).status == Errored(retryable=True)
-    asked = await runner.run(as_user("u1"), "ask_admin", {"n": 1})
-    assert isinstance(asked.status, AwaitingApproval) and not asked.is_error
 
 
 async def flaky(ctx):
@@ -368,7 +237,7 @@ async def flaky(ctx):
 
 
 async def test_a_caller_with_no_link_is_refused_like_any_refusal(setup):
-    runner, as_user, store, *_ = setup
+    runner, as_user, store, _ = setup
     runner.registry.register(ToolSpec("acts", "acts as the caller", acts))
     out = await runner.run(as_user("nobody"), "acts", {})
     assert out.status == Errored() and "isn't linked" in out.content
@@ -377,61 +246,3 @@ async def test_a_caller_with_no_link_is_refused_like_any_refusal(setup):
 
 async def acts(ctx):
     return {"as": ctx.linked_user().seerr_user_id}
-
-
-async def test_an_approval_about_a_subject_already_open_is_not_posted_twice(setup):
-    runner, as_user, *_ = setup
-    first = await runner.run(as_user("u1"), "ask_about", {"n": 5})
-    (post,) = first.notices
-    again = await runner.run(as_user("u2"), "ask_about", {"n": 5})
-    assert again.status.pending_id == first.status.pending_id == post.pending_id
-    assert again.notices == () and again.content["status"] == "awaiting_admin_approval"
-    other = await runner.run(as_user("u1"), "ask_about", {"n": 6})
-    assert (
-        isinstance(other.notices[0], ApprovalPost)
-        and other.status.pending_id != first.status.pending_id
-    )
-
-
-async def test_maintenance_holds_a_call_and_it_runs_as_its_caller_afterwards(setup):
-    runner, as_user, store, calls, _ = setup
-    store.raise_flag("maintenance", "new drives")
-    out = await runner.run(as_user("u1"), "order", {"n": 3})
-    assert out.content["status"] == "held_for_maintenance" and isinstance(
-        out.status, HeldForMaintenance
-    )
-    assert out.content["maintenance"] == "new drives" and calls == []
-    assert not (await runner.run(as_user("u1"), "echo", {"x": "still answers"})).is_error
-    (held,) = store.held_calls()
-    assert store.audit_count_since("order", datetime.now(UTC) - DAY) == 0  # held, not done
-    store.lower_flag("maintenance")
-    done = await runner.run_held(as_user("u1"), held)
-    assert done.content == {"ordered": 3} and calls[-1] == ("order", 3)
-    assert store.audit_count_since("order", datetime.now(UTC) - DAY) == 1
-
-
-async def test_a_destructive_call_is_confirmed_first_and_held_on_the_press(setup):
-    runner, as_user, store, calls, kill = setup
-    store.raise_flag("maintenance")
-    asked = await runner.run(as_user("u1"), "swap_file", {"file_id": 7, "host": "meleys"})
-    assert asked.status.pending_id is not None  # the friend still confirms it
-    pending = store.decide_pending(asked.status.pending_id, "approved", "u1")
-    held = await runner.run_decision(as_user("u1"), pending, True)
-    assert isinstance(held.status, HeldForMaintenance) and held.notices == () and calls == []
-    store.lower_flag("maintenance")
-    (call,) = store.held_calls()
-    kill.on("not now")
-    stopped = await runner.run_held(as_user("u1"), call)
-    assert stopped.is_error and "not now" in stopped.content and calls == []
-    kill.off()
-    assert (await runner.run_held(as_user("u1"), call)).content == "swapped"
-
-
-async def test_a_held_call_that_no_longer_fits_its_caller_is_refused(setup):
-    runner, as_user, store, calls, _ = setup
-    store.raise_flag("maintenance")
-    await runner.run(as_user("u1"), "order", {"n": 1})
-    (held,) = store.held_calls()
-    store.lower_flag("maintenance")
-    out = await runner.run_held(as_user("u1", Tier.UNLINKED), held)
-    assert out.is_error and "no longer available" in out.content and calls == []

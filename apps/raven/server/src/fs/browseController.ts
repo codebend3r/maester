@@ -12,11 +12,10 @@ import {
 import type { DirectoryEntry, DirectoryListing } from '@raven/core'
 import { AdminOnly } from '@/admin/adminGuard'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
-import { ERROR_CODES } from '@/errorMessage'
+import { ERROR_CODES, errorCode } from '@/errorMessage'
 import { SKIPPED_FOLDERS } from '@/scanner/walk'
-
-const errorCode = (error: unknown): string | null =>
-  error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : null
+import { QUERY_PARAMS, queryText } from '@/queryValues'
+import { text } from '@shared/server'
 
 /**
  * Lists folders for the library path picker. Only folders are shown, hidden
@@ -29,10 +28,11 @@ export class BrowseController {
 
   @AdminOnly()
   @Get('browse')
-  async browse(@Query('path') requested?: string): Promise<DirectoryListing> {
+  async browse(@Query(QUERY_PARAMS.path) requested: unknown): Promise<DirectoryListing> {
     const configuredRoot = resolve(this.config.browseRoot)
     const root = await realpath(configuredRoot).catch(() => configuredRoot)
-    const resolved = resolve(requested?.trim() || root)
+    const asked = queryText({ value: requested, name: QUERY_PARAMS.path })
+    const resolved = resolve(text({ value: asked, fallback: root }))
     const prefix = root.endsWith(sep) ? root : `${root}${sep}`
     const configuredPrefix = configuredRoot.endsWith(sep)
       ? configuredRoot

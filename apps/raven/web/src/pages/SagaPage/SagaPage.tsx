@@ -19,7 +19,7 @@ import {
 import { useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
-import { Button, ButtonLink } from '@raven/ui'
+import { BUTTON_TONES, Button, ButtonLink } from '@raven/ui'
 import {
   KeyedView,
   LIBRARY_LOCK_STATES,
@@ -32,6 +32,7 @@ import {
   itemBackdrop,
   ItemHeader,
   ItemHeaderSkeleton,
+  PICTURE_SHAPES,
 } from '@/components/ItemHeader/ItemHeader'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
@@ -53,12 +54,13 @@ import { SagaBackdropDialog } from '@/pages/SagaPage/SagaBackdropDialog'
 import { SagaFilms } from '@/pages/SagaPage/SagaFilms'
 import { SAGA_COPY } from '@/pages/SagaPage/copy'
 import styles from '@/pages/SagaPage/SagaPage.module.scss'
+import { CARD_PICTURES } from '@/lib/cardPictures'
 
 /** A saga on its way: its title and facts over stand-ins for its movies. */
 const SagaSkeleton = () => (
   <>
-    <ItemHeaderSkeleton picture="none" />
-    <MediaGridSkeleton posters count={6} />
+    <ItemHeaderSkeleton picture={PICTURE_SHAPES.none} />
+    <MediaGridSkeleton picture={CARD_PICTURES.poster} count={6} />
   </>
 )
 
@@ -150,7 +152,7 @@ const ShownSaga = ({ library, saga }: ShownSagaProps) => {
         >
           {first && (
             <ButtonLink
-              tone="primary"
+              tone={BUTTON_TONES.primary}
               icon="play"
               {...watchLink({
                 media: first,

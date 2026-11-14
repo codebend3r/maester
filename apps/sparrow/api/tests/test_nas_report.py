@@ -1,6 +1,5 @@
 from dataclasses import replace
 
-from sparrow.agent.limits import KillSwitch
 from sparrow.clients.arr import DiskSpace
 from sparrow.clients.fleet import HostHealth
 from sparrow.config import Settings
@@ -60,7 +59,7 @@ async def test_without_the_fleet_monitor_the_volumes_are_still_reported(services
 
 
 def test_every_job_is_scheduled_from_the_settings(services, store):
-    jobs = {j.name: j.when for j in scheduled(services, store, Settings(), KillSwitch(store))}
+    jobs = {j.name: j.when for j in scheduled(services, store, Settings())}
     assert set(jobs) == {
         "sweep",
         "space_sample",

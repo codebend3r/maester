@@ -18,8 +18,8 @@ import anthropic
 import uvicorn
 from fastapi import FastAPI
 
-from sparrow.agent.limits import KillSwitch, RateLimiter
-from sparrow.agent.loop import Agent
+from sparrow.agent.limits import RateLimiter
+from sparrow.agent.loop import Agent, ModelClient
 from sparrow.agent.runner import ToolRunner
 from sparrow.agent.tools import ToolRegistry
 from sparrow.agent.tools import registry as app_registry
@@ -99,7 +99,6 @@ class App:
     chat: ChatService
     console: AdminConsole
     web: FastAPI
-    kill_switch: KillSwitch
     scheduler: Scheduler
 
 
@@ -107,7 +106,7 @@ def build(
     cfg: Settings | None = None,
     *,
     services: Services | None = None,
-    model_client: Any = None,
+    model_client: ModelClient | None = None,
     tools: ToolRegistry | None = None,
     store: Store | None = None,
     rookery: Rookery | None = None,
@@ -115,8 +114,7 @@ def build(
     cfg = cfg or settings()
     store = store or Store(cfg.db_path)
     services = services or build_services(cfg, instances_from_env(os.environ))
-    kill = KillSwitch(store)
-    runner = ToolRunner(tools or app_registry, kill_switch=kill)
+    runner = ToolRunner(tools or app_registry)
     agent = Agent(
         model_client=model_client
         or anthropic.AsyncAnthropic(api_key=cfg.anthropic_api_key or None),
@@ -132,22 +130,15 @@ def build(
     )
     identity = IdentityService(store, services)
     chat = ChatService(agent=agent, identity=identity, store=store)
-    console = AdminConsole(
-        identity=identity,
-        chat=chat,
-        store=store,
-        services=services,
-        settings=cfg,
-        kill_switch=kill,
-    )
+    console = AdminConsole(identity=identity, store=store)
     # Until sparrow's own app delivers notices, they go to the log.
     notifier = LogNotifier()
     seerr = SeerrWebhook(cfg.seerr_webhook_secret, seerr_routes(services, store), store, notifier)
-    scheduler = Scheduler(scheduled(services, store, cfg, kill), store=store, notifier=notifier)
+    scheduler = Scheduler(scheduled(services, store, cfg), store=store, notifier=notifier)
     rookery = rookery or RookeryClient(cfg.rookery_url, cfg.rookery_service_token)
     auth = Auth(SessionVerifier(rookery), identity, sign_in=f"{cfg.rookery_public_url}/login")
     web = create_app(seerr=seerr, api=Api(auth, console), chat=ChatApi(auth, chat, notifier))
-    return App(cfg, store, services, agent, chat, console, web, kill, scheduler)
+    return App(cfg, store, services, agent, chat, console, web, scheduler)
 
 
 async def serve(app: App) -> None:

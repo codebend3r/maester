@@ -9,6 +9,7 @@ import { TOUCH_NAV_COPY } from '@/layouts/touchMenuKit'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { BODY_FONT } from '@/theme/fonts'
 import { themedStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 type TouchSearchBarProps = {
   /** The box's state, from headless `useSearch`, so a page that searches as it is typed waits for a pause. */
@@ -68,7 +69,7 @@ export const TouchSearchBar = ({
         onPress={onRun}
         style={({ pressed }) => [styles.action, pressed && styles.pressed]}
       >
-        <Icon colour={colours.text} name="search" size={SIZES.textXl} />
+        <Icon colour={colours.text} name={APP_ICONS.search} size={SIZES.textXl} />
       </Pressable>
     </View>
   )

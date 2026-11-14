@@ -86,6 +86,14 @@ jobs:
             ffmpeg: true
             traces: apps/raven/web/.lighthouseci
             artifact: lighthouse-reports
+          # The repository rules a linter cannot hold, which lefthook's pre-push runs too; here
+          # so a push without the hooks, or an edit on GitHub, meets them.
+          - name: 🟦 TypeScript only
+            target: typescript-only
+          - name: 🧩 One command per script
+            target: one-command-per-script
+          - name: 💬 Comment style
+            target: comment-style
           - name: 🧹 Dead code
             target: dead-code
           - name: 🧼 Dead CSS

@@ -12,10 +12,11 @@ import {
 } from '@raven/core'
 import type { PlayerServices, ProgressSink } from '@raven/ui/headless'
 import type { DesktopClient } from '@/desktop/client'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import type { MenuHub } from '@/desktop/menuHub'
 import { type DownloadsPage, playPathOf } from '@/desktop/paths'
 import { useWindowChrome } from '@/stores/windowChrome'
+import { NO_HOST_EXTRAS, NO_TITLE_EXTRAS } from '@raven/ui/headless'
 
 /** What the page leaves in `location.state` when it opens a file: the files to play after it. */
 export const isPlayState = object({ queue: listOf(isOpaqueId) })
@@ -143,7 +144,9 @@ export const fileServicesFor = ({
   engine,
   downloadsPage,
 }: FileServicesForProps): PlayerServices => ({
+  ...NO_HOST_EXTRAS,
   title: {
+    ...NO_TITLE_EXTRAS,
     label: file.label,
     // Only a download's folder says where it came from; any other file's is just its folder.
     context: file.isDownload ? file.folder : null,

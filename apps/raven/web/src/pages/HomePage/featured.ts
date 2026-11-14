@@ -16,6 +16,7 @@ import {
   showYears,
   watchLink,
   ITEM_IMAGE_KINDS,
+  showPath,
 } from '@raven/core'
 import { api } from '@/lib/api'
 import { HOME_COPY } from '@/pages/HomePage/copy'
@@ -119,7 +120,7 @@ const fromShow = ({ entry, line, library }: FromShowProps): Featured[] => {
       picture: [],
       line,
       play: next ? watchLink({ media: next }) : null,
-      details: `/shows/${show.id}`,
+      details: showPath(show.id),
     },
   ]
 }

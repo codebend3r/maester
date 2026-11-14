@@ -29,7 +29,6 @@ import { createApp } from '@/app'
 import type { ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { type ServerEventEnvelope, ServerEvents, isForAccount } from '@/events/serverEvents'
-import { RAVEN_HEADERS } from '@/http'
 import { VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
 import type { AdoptedCounts } from '@/media/viewingAdoption'
 import { MetadataService } from '@/metadata/metadataService'
@@ -766,7 +765,7 @@ type Past = {
 describe("the owner's Streams page", () => {
   it('names the account watching, and the audio track its player reports', async () => {
     const token = await fixture.mint({ id: AUTH_TEST_IDS.friend })
-    const browser = { [RAVEN_HEADERS.userAgent]: 'Friend Browser' }
+    const browser = { [HEADERS.userAgent]: 'Friend Browser' }
     const minted: unknown = (
       await enforced.app.inject({
         method: ROUTES.accountTicket.method,

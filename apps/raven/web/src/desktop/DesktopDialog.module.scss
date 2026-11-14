@@ -1,14 +1,3 @@
-/*
- * Raven's own dialogs, drawn as the shared UnlockDialog is: the frame,
- * corners and shadow are elements.scss's, the padding the form's, so the
- * footer's hairline runs edge to edge.
- */
-.dialog {
-  width: min(28rem, calc(100vw - 2 * var(--space-3)));
-  max-width: none;
-  padding: 0;
-}
-
 .form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

@@ -8,8 +8,10 @@ import {
   canSplitByCut,
   readCut,
   sortTitle,
+  ITEM_TYPES,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
+import { groupBy } from '@/groupBy'
 import { MediaRepository } from '@/media/mediaRepository'
 import { BEST_FIRST, FIRST_ITEM } from '@/media/mediaSql'
 import type { AccountKey } from '@/media/viewingAccountKeys'
@@ -28,15 +30,6 @@ const cardOf = (row: FileRow): string => `${row.item_id}|${row.entry}`
 
 const cutOf = (row: FileRow) =>
   readCut({ fileName: row.file_name, titles: [row.title, row.original_title] })
-
-type GroupByProps<T> = { rows: readonly T[]; key: (row: T) => string }
-
-/** Rows gathered by `key`, each group keeping the rows' order. */
-const groupBy = <T>({ rows, key }: GroupByProps<T>) =>
-  rows.reduce(
-    (groups, row) => groups.set(key(row), [...(groups.get(key(row)) ?? []), row]),
-    new Map<string, T[]>(),
-  )
 
 type TitleOfProps = { cards: readonly DuplicateCard[] }
 
@@ -92,7 +85,7 @@ export class MovieSplits {
                 t.title, t.original_title
            FROM media m
            JOIN ${FIRST_ITEM}
-           JOIN items t ON t.id = mi.item_id AND t.type = 'movie'
+           JOIN items t ON t.id = mi.item_id AND t.type = '${ITEM_TYPES.movie}'
           WHERE m.library_id = ?
           ORDER BY ${BEST_FIRST}`,
       )
@@ -102,7 +95,7 @@ export class MovieSplits {
   /** The library's movie files, a list per movie, only the movies holding more than one. */
   private duplicated(libraryId: number): FileRow[][] {
     return [
-      ...groupBy({ rows: this.files(libraryId), key: (row) => String(row.item_id) }).values(),
+      ...groupBy({ items: this.files(libraryId), key: (row) => String(row.item_id) }).values(),
     ].filter((files) => files.length > 1)
   }
 
@@ -122,7 +115,7 @@ export class MovieSplits {
     const movies = this.duplicated(libraryId).flatMap((files) => {
       const [first] = files
       if (!first) return []
-      const cards = [...groupBy({ rows: files, key: cardOf }).values()].toSorted(
+      const cards = [...groupBy({ items: files, key: cardOf }).values()].toSorted(
         (a, b) => Number(a[0]?.entry !== '') - Number(b[0]?.entry !== ''),
       )
       return [{ itemId: first.item_id, cards }]
@@ -186,7 +179,7 @@ export class MovieSplits {
       )
     }
     // Each cut's card is named by the first of its files, so copies named two ways share it.
-    const byCut = groupBy({ rows: files, key: ({ cut }) => cut?.key ?? '' })
+    const byCut = groupBy({ items: files, key: ({ cut }) => cut?.key ?? '' })
     this.db.transaction(() =>
       [...byCut.values()].forEach((group) => {
         const named = group[0]?.cut

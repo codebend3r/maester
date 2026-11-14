@@ -1,37 +1,26 @@
 import { useId } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ButtonLink, Icon, type IconName } from '@raven/ui'
+import { BUTTON_TONES, ButtonLink, Icon, type IconName } from '@raven/ui'
 import { Logo } from '@/components/Logo/Logo'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
 import { AppPreview } from '@/pages/GetPage/AppPreview'
 import { Downloads } from '@/pages/GetPage/Downloads'
 import { LATEST_RELEASE, RELEASES, REPOSITORY } from '@/pages/GetPage/links'
 import { PLATFORMS, detectSystem } from '@/pages/GetPage/platforms'
-import { GET_COPY } from '@/pages/GetPage/copy'
+import { GET_COPY, GET_FEATURES_COPY } from '@/pages/GetPage/copy'
 import styles from '@/pages/GetPage/GetPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { PAGE_PARAMS, APP_PATHS } from '@/lib/appPaths'
 
 /** Where the downloads start, for the links that jump there. */
 const DOWNLOADS_ID = 'download'
 
 /** What raven does, a column each. */
-const FEATURES = [
-  {
-    icon: 'play',
-    title: 'Plays what you have',
-    text: 'The original file plays as it is when your device can take it. When it cannot, your server converts it on the way.',
-  },
-  {
-    icon: 'history',
-    title: 'Picks up where you stopped',
-    text: 'Continue watching, next episodes and history follow you from the desktop app to the browser and back.',
-  },
-  {
-    icon: 'libraries',
-    title: 'Kept in order',
-    text: 'Films are matched to TMDB, grouped into sagas, and sorted the way you left them. Locked libraries stay behind a PIN.',
-  },
-] as const satisfies readonly { icon: IconName; title: string; text: string }[]
+const FEATURES = GET_FEATURES_COPY satisfies readonly {
+  icon: IconName
+  title: string
+  text: string
+}[]
 
 /**
  * `/get`, the whole screen: where raven is got. A glass header that stays
@@ -46,7 +35,10 @@ const FEATURES = [
 export const GetPage = () => {
   const titleId = useId()
   const [params] = useSearchParams()
-  const system = detectSystem({ query: params.get('os'), userAgent: window.navigator.userAgent })
+  const system = detectSystem({
+    query: params.get(PAGE_PARAMS.os),
+    userAgent: window.navigator.userAgent,
+  })
   const platform = PLATFORMS.find((each) => each.system === system)
 
   return (
@@ -59,7 +51,7 @@ export const GetPage = () => {
           <a href={`#${DOWNLOADS_ID}`} className={styles.jump}>
             {COMMON_COPY.download}
           </a>
-          <ButtonLink to="/" className={styles.openApp}>
+          <ButtonLink to={APP_PATHS.home} className={styles.openApp}>
             {GET_COPY.openWebApp}
           </ButtonLink>
         </nav>
@@ -73,11 +65,11 @@ export const GetPage = () => {
             </h1>
             <p className={styles.pitch}>{GET_COPY.pitch}</p>
             <div className={styles.actions}>
-              <ButtonLink to={LATEST_RELEASE} tone="primary" size="large">
+              <ButtonLink to={LATEST_RELEASE} tone={BUTTON_TONES.primary} size="large">
                 <Icon name="download" size="1.15em" />
                 {platform ? GET_COPY.downloadFor(platform.name) : COMMON_COPY.download}
               </ButtonLink>
-              <ButtonLink to="/" size="large" icon="globe">
+              <ButtonLink to={APP_PATHS.home} size="large" icon="globe">
                 {GET_COPY.openInBrowser}
               </ButtonLink>
             </div>
@@ -114,7 +106,7 @@ export const GetPage = () => {
             <a href={RELEASES}>{GET_COPY.releaseNotes}</a>
           </li>
           <li>
-            <Link to="/">{GET_COPY.openWebApp}</Link>
+            <Link to={APP_PATHS.home}>{GET_COPY.openWebApp}</Link>
           </li>
         </ul>
       </footer>

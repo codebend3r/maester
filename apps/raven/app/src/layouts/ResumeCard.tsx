@@ -10,6 +10,7 @@ import { type ShelfCard, cardLabelOf } from '@/queries/cards'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { pictureStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 /** A pressed card settles to this scale, where the system allows motion. */
 const PRESSED_SCALE = 0.98
@@ -119,7 +120,7 @@ export const ResumeCard = ({ card, width, onPress }: ResumeCardProps) => {
           </View>
         </View>
         <View pointerEvents="none" style={styles.badge}>
-          <Icon colour={text} name="play" size={PLAY_SIZE} />
+          <Icon colour={text} name={APP_ICONS.play} size={PLAY_SIZE} />
         </View>
         <View pointerEvents="none" style={styles.track}>
           <View style={[styles.fill, { width: `${card.progress * 100}%` }]} />

@@ -13,6 +13,7 @@ import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 import { RAVEN_USER_AGENT } from '@/music/userAgent'
 import { type RateLimit, createRateLimit, sleep } from '@/scanner/concurrency'
+import { errorMessage } from '@/errorMessage'
 
 const API = 'https://musicbrainz.org/ws/2'
 const WIKIDATA_ENTITY = 'https://www.wikidata.org/wiki/Special:EntityData'
@@ -133,9 +134,10 @@ const typeOf = (group: Record<string, unknown>): AlbumType => {
   return words.find(isAlbumType) ?? ALBUM_TYPES.album
 }
 
-const artistsOf = (
-  release: Record<string, unknown>,
-): { names: string; list: { name: string; mbid: string }[] } => {
+/** A credit's names as one line, and each named artist. */
+type CreditNames = { names: string; list: { name: string; mbid: string }[] }
+
+const artistsOf = (release: Record<string, unknown>): CreditNames => {
   const parts = listAt({ record: release, key: MB_FIELDS.artistCredit }).filter(isRecord)
   const list = parts.flatMap((part) => {
     const artist = recordAt({ record: part, key: MB_FIELDS.artist })
@@ -258,7 +260,7 @@ export class MusicBrainzClient {
         .catch((error: unknown) => {
           throw new MusicBrainzError({
             kind: MUSICBRAINZ_ERROR_KINDS.unavailable,
-            message: `MusicBrainz did not answer: ${error instanceof Error ? error.message : String(error)}`,
+            message: `MusicBrainz did not answer: ${errorMessage(error)}`,
           })
         })
       if (response.status === 404) {

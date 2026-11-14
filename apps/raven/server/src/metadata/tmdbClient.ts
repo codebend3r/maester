@@ -12,7 +12,6 @@ import {
 import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { ERROR_NAMES } from '@/errorMessage'
-import { RAVEN_HEADERS } from '@/http'
 import {
   type DiscoveredPage,
   type DiscoveredTitle,
@@ -36,6 +35,8 @@ import {
   toSeason,
   toShow,
   toTmdbImages,
+  type FetchedSeason,
+  type FoundIds,
 } from '@/metadata/tmdbShapes'
 import { type RateLimit, createRateLimit, sleep } from '@/scanner/concurrency'
 
@@ -282,7 +283,7 @@ export class TmdbClient {
       ? { [HEADERS.accept]: CONTENT_TYPES.json }
       : {
           [HEADERS.accept]: CONTENT_TYPES.json,
-          [RAVEN_HEADERS.authorization]: `Bearer ${token}`,
+          [HEADERS.authorization]: `Bearer ${token}`,
         }
 
     const attempt = async (retriesLeft: number): Promise<unknown> => {
@@ -395,7 +396,7 @@ export class TmdbClient {
   async season({
     showTmdbId,
     number: seasonNumber,
-  }: TmdbClientSeasonProps): Promise<{ season: FetchedItem; episodes: FetchedItem[] }> {
+  }: TmdbClientSeasonProps): Promise<FetchedSeason> {
     const body = await this.get({
       path: `${itemPath({ type: ITEM_TYPES.show, tmdbId: showTmdbId })}/season/${seasonNumber}`,
       params: {
@@ -448,7 +449,7 @@ export class TmdbClient {
   }
 
   /** TMDB's ids for an IMDb or TVDB id, by kind. */
-  async find({ id, source }: TmdbClientFindProps): Promise<{ movies: string[]; shows: string[] }> {
+  async find({ id, source }: TmdbClientFindProps): Promise<FoundIds> {
     return toFoundIds(
       await this.get({
         path: `/find/${encodeURIComponent(id)}`,

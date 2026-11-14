@@ -1,14 +1,12 @@
 import { type AudioBitrate, PLAYER_SOURCE_KINDS } from '@raven/core'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import type { ResolvedSource } from '@/main/player/loadTarget'
-import type { createServerSources } from '@/main/servers/serverSources'
+import type { ServerSources } from '@/main/servers/serverSources'
 
 type CreateMusicResolveProps = {
   /** The music relay's sources, which mint the track's first ticket. */
-  sources: Pick<ReturnType<typeof createServerSources>, 'resolveTrack'>
+  sources: Pick<ServerSources, 'resolveTrack'>
   downloads: Pick<DownloadService, 'trackPathOf'>
-  /** The one server, read at each call. */
-  serverId: () => string
 }
 
 export type MusicResolveProps = {
@@ -23,12 +21,11 @@ export type MusicResolveProps = {
  * track through the relay, as its file or its transcode at `kbps`.
  */
 export const createMusicResolve =
-  ({ sources, downloads, serverId }: CreateMusicResolveProps) =>
+  ({ sources, downloads }: CreateMusicResolveProps) =>
   async ({ mediaId, kbps }: MusicResolveProps): Promise<ResolvedSource> => {
-    const server = serverId()
-    const path = await downloads.trackPathOf({ serverId: server, mediaId })
+    const path = await downloads.trackPathOf({ mediaId })
     if (path !== null) {
       return { ok: true, target: { kind: PLAYER_SOURCE_KINDS.file, path, sidecars: [] } }
     }
-    return sources.resolveTrack({ serverId: server, mediaId, kbps })
+    return sources.resolveTrack({ mediaId, kbps })
   }

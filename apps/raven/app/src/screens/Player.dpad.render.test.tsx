@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import {
   CAPTION_COLOUR_VALUES,
   DEFAULT_CAPTION_STYLE,
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   DEFAULT_THEME,
   DIRECT_PLAYS,
@@ -23,6 +23,7 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-libra
 import { StyleSheet } from 'react-native'
 import type { ReactVideoProps } from 'react-native-video'
 import { SelectedTrackType } from 'react-native-video'
+import { type HeardRequest, pathWithId } from '@raven/native/testing'
 
 import { PLAYER_COPY, SKIP_SECONDS } from '@/layouts/playerKit'
 import { APP_ROUTES, PLAY_FROM } from '@/routes'
@@ -35,7 +36,6 @@ import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { AUDIO_SETTLE_SECONDS } from '@/player/droppedAudio'
 import { SESSION_COPY } from '@/player/usePlaybackSession'
-import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import {
   BUSBOYS_DUAL,
@@ -82,10 +82,16 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
   Object.defineProperty(platform.default, 'isTV', { get: () => true })
   return platform
 })
-jest.mock('@/platform/devicePlatform', () => ({
-  DEVICE_PLATFORM:
-    jest.requireActual<typeof PlatformModule>('@/platform/platform').APP_PLATFORMS.androidTv,
-}))
+jest.mock('@/platform/devicePlatform', () => {
+  const { APP_PLATFORMS, NAV_KINDS, PLATFORM_TRAITS } =
+    jest.requireActual<typeof PlatformModule>('@/platform/platform')
+  return {
+    DEVICE_PLATFORM: APP_PLATFORMS.androidTv,
+    DEVICE_TRAITS: PLATFORM_TRAITS[APP_PLATFORMS.androidTv],
+    DEVICE_INPUT: PLATFORM_TRAITS[APP_PLATFORMS.androidTv].input,
+    deviceNavKind: () => NAV_KINDS.focus,
+  }
+})
 jest.mock('react-native/Libraries/Components/TV/TVEventHandler', () =>
   jest.requireActual<typeof RemoteModule>('@/test/tvRemote').tvEventHandlerMock(),
 )
@@ -197,14 +203,14 @@ const styleOf = (node: ReturnType<typeof screen.getByRole>) => StyleSheet.flatte
 /** The fixture's one audio track, which every save names as the one playing. */
 const AUDIO_PLAYED = 0
 
-const progressPath = pathFor({
+const progressPath = pathWithId({
   path: APP_CLIENT_CALLS.saveProgress.path,
   id: BUSBOYS_UNSUBTITLED.id,
 })
 
 const savedSpots = (): unknown[] =>
   mockServer.heard
-    .filter(({ method, path }) => method === APP_CALL_METHODS.put && path === progressPath)
+    .filter(({ method, path }) => method === HTTP_METHODS.put && path === progressPath)
     .map(({ body }) => body)
 
 describe('Player on Android TV', () => {
@@ -235,7 +241,7 @@ describe('Player on Android TV', () => {
     const props = await playing({ id: BUSBOYS_UNSUBTITLED.id })
     expect(props.controls).toBe(false)
     expect(sourceUri(props)).toBe(
-      `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_UNSUBTITLED.id })}`,
+      `${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_UNSUBTITLED.id })}`,
     )
     expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
     expect(scrubber()).toBeTruthy()
@@ -322,7 +328,7 @@ describe('Player on Android TV', () => {
     usePlayerPrefs.setState({ subtitles: { on: true, language: null } })
     const props = await playing({ id: BUSBOYS_MP4.id })
     expect(sourceUri(props)).toBe(
-      `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })}`,
+      `${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_MP4.id })}`,
     )
     expect(props.selectedTextTrack).toEqual({ type: SelectedTrackType.INDEX, value: 0 })
     expect(props.subtitleStyle).toMatchObject({
@@ -370,7 +376,7 @@ describe('Player on Android TV', () => {
     await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_UNSUBTITLED.id) })
     await loadWith({ audioTracks: audioPicked({ count: 1, picked: null }) })
     await moveVideoTo({ props: videoProps(), seconds: 1 })
-    const master = pathFor({ path: HLS_PATHS.master, id: BUSBOYS_UNSUBTITLED.id })
+    const master = pathWithId({ path: HLS_PATHS.master, id: BUSBOYS_UNSUBTITLED.id })
     await waitFor(() =>
       expect(sourceUri(videoProps())).toBe(
         `${NAS.origin}${master}?${HLS_PARAMS.mode}=${PLAYBACK_MODES.remux}`,
@@ -395,7 +401,7 @@ describe('Player on Android TV', () => {
     await moveVideoTo({ props: videoProps(), seconds: 1 })
     await moveVideoTo({ props: videoProps(), seconds: 2 })
     expect(sourceUri(videoProps())).toBe(
-      `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_DUAL.id })}`,
+      `${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_DUAL.id })}`,
     )
   })
 
@@ -412,7 +418,7 @@ describe('Player on Android TV', () => {
     })
     await moveVideoTo({ props: videoProps(), seconds: 1.5 })
     expect(sourceUri(videoProps())).toBe(
-      `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_DUAL.id })}`,
+      `${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_DUAL.id })}`,
     )
   })
 
@@ -421,7 +427,7 @@ describe('Player on Android TV', () => {
     await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_DUAL.id) })
     await loadWith({ audioTracks: audioPicked({ count: 2, picked: 0 }) })
     await moveVideoTo({ props: videoProps(), seconds: 1 })
-    const file = `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_DUAL.id })}`
+    const file = `${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_DUAL.id })}`
     expect(sourceUri(videoProps())).toBe(file)
     await moveVideoTo({ props: videoProps(), seconds: 1 + AUDIO_SETTLE_SECONDS })
     await waitFor(() => expect(sourceUri(videoProps())).not.toBe(file))
@@ -433,7 +439,7 @@ describe('Player on Android TV', () => {
     await loadWith({ audioTracks: audioPicked({ count: 1, picked: null }) })
     await moveVideoTo({ props: videoProps(), seconds: 1 })
     expect(sourceUri(videoProps())).toBe(
-      `${NAS.origin}${pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_UNSUBTITLED.id })}`,
+      `${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS_UNSUBTITLED.id })}`,
     )
     expect(screen.queryByText(SESSION_COPY.exhausted)).toBeNull()
   })
@@ -571,7 +577,7 @@ describe('Player on Android TV', () => {
     expect(
       mockServer.heard.some(({ path }) =>
         path.startsWith(
-          pathFor({ path: APP_CLIENT_CALLS.nextInSession.path, id: HALF_LOOP_MP4.id }),
+          pathWithId({ path: APP_CLIENT_CALLS.nextInSession.path, id: HALF_LOOP_MP4.id }),
         ),
       ),
     ).toBe(true)
@@ -583,7 +589,7 @@ describe('Player on Android TV', () => {
     expect(
       mockServer.heard.some(({ path }) =>
         path.startsWith(
-          pathFor({ path: APP_CLIENT_CALLS.nextInSession.path, id: BUSBOYS_UNSUBTITLED.id }),
+          pathWithId({ path: APP_CLIENT_CALLS.nextInSession.path, id: BUSBOYS_UNSUBTITLED.id }),
         ),
       ),
     ).toBe(false)

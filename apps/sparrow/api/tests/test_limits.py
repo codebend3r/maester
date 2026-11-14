@@ -1,7 +1,6 @@
 import pytest
 
-from sparrow.agent.limits import KillSwitch, LimitExceeded, RateLimiter
-from sparrow.store import Store
+from sparrow.agent.limits import LimitExceeded, RateLimiter
 
 
 def test_message_window_slides():
@@ -34,25 +33,3 @@ def test_a_meter_that_does_not_enforce_counts_but_never_refuses():
     lim.check_message("u")
     lim.check_message("u")
     assert lim.used_today("u") == 25 and lim.used_today("other") == 0
-
-
-def test_kill_switch():
-    k = KillSwitch()
-    assert not k.enabled
-    k.on("disk swap")
-    assert k.enabled and k.reason == "disk swap"
-    k.off()
-    assert not k.enabled and k.reason == ""
-
-
-def test_the_kill_switch_outlives_a_restart_when_kept_in_the_store(tmp_path):
-    path = tmp_path / "m.db"
-    first = Store(path)
-    KillSwitch(first).on("bad grabs", by="a1")
-    first.close()
-    again = Store(path)
-    kill = KillSwitch(again)
-    assert kill.enabled and kill.reason == "bad grabs" and kill.flag.set_by == "a1"
-    kill.off()
-    assert not KillSwitch(again).enabled
-    again.close()

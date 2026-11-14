@@ -2,14 +2,10 @@ import { describe, expect, it } from 'bun:test'
 import { ADMIN_LOCK_STATES, AUTH_HEADERS, SERVER_COOKIES, createApiClient } from '@raven/core'
 
 import { type CookieJar, cookieKeyFor, createCookieJar } from '@/servers/cookieJar'
-import {
-  FETCH_CREDENTIALS,
-  type NativeFetch,
-  RESPONSE_HEADERS,
-  serverFetchFor,
-} from '@/servers/serverFetch'
+import { FETCH_CREDENTIALS, type NativeFetch, serverFetchFor } from '@/servers/serverFetch'
 import type { AppServer } from '@/servers/serverList'
 import { memoryStore } from '@/test/memoryStore'
+import { HEADERS } from '@shared/http'
 
 const SERVER: AppServer = {
   id: '0f8fad5b-d9cb-469f-a165-70867728950e',
@@ -41,7 +37,7 @@ const recordingFetch = ({
       url: landedAt ?? url,
       json: async () => body,
       text: async () => JSON.stringify(body),
-      headers: { get: (name) => (name === RESPONSE_HEADERS.setCookie ? setCookie : null) },
+      headers: { get: (name) => (name === HEADERS.setCookie ? setCookie : null) },
     }
   }
   return { fetch, sent }

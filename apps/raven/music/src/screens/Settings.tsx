@@ -1,9 +1,10 @@
 import { AUDIO_BITRATES, formatBytes } from '@raven/core'
+import { IGNORED, BUTTON_TONES } from '@raven/native/headless'
 import type { ReactNode } from 'react'
 import { Alert, StyleSheet, Text, View } from 'react-native'
 
 import packageJson from '#package'
-import { BUTTON_TONES, FormButton } from '@/components/Form'
+import { FormButton } from '@/components/Form'
 import { type SegmentKey, Segments } from '@/components/Segments'
 import { TabPage } from '@/components/TabPage'
 import { usedBytesOf, useDownloads } from '@/downloads/downloadStore'
@@ -60,8 +61,6 @@ function ChoiceRow<K extends SegmentKey>({
     </View>
   )
 }
-
-const IGNORED = (): void => undefined
 
 type ConfirmRemoveAllProps = { onRemove: () => void }
 

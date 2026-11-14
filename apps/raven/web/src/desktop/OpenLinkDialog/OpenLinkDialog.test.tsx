@@ -41,7 +41,7 @@ describe('OpenLinkDialog', () => {
     ])
   })
 
-  it("stays open with main's refusal, or its own words for an answer it cannot use", async () => {
+  it("stays open with main's refusal, or a refusal for an answer it cannot use", async () => {
     const replies = [
       {
         type: DESKTOP_REPLIES.refused,
@@ -60,9 +60,7 @@ describe('OpenLinkDialog', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: 'Open' }))
     await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Raven could not open that link. Try again.',
-      ),
+      expect(screen.getByRole('alert')).toHaveTextContent('Raven could not read its own reply.'),
     )
   })
 

@@ -3,7 +3,6 @@ import {
   BUG_REPORT_STATUSES,
   type BugReport,
   type BugReportStatus,
-  PLAYBACK_MODES,
   type PlaybackMode,
   isBugReportStatus,
   isPlaybackDiagnostics,
@@ -18,17 +17,16 @@ import { copyText } from '@/lib/clipboard'
 import { useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
 import { bugReportsQuery } from '@/lib/queries'
-import { BUG_REPORTS_COPY } from '@/pages/BugReportsPage/copy'
+import {
+  BUG_REPORTS_COPY,
+  BUG_REPORT_STATUS_COPY,
+  BUG_REPORT_MODE_COPY,
+} from '@/pages/BugReportsPage/copy'
 import styles from '@/pages/BugReportsPage/BugReportsPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
 
-const STATUS_LABELS = {
-  [BUG_REPORT_STATUSES.new]: 'New',
-  [BUG_REPORT_STATUSES.investigating]: 'Investigating',
-  [BUG_REPORT_STATUSES.fixed]: 'Fixed',
-  [BUG_REPORT_STATUSES.wontFix]: "Won't fix",
-} as const satisfies Record<BugReportStatus, string>
+const STATUS_LABELS = BUG_REPORT_STATUS_COPY satisfies Record<BugReportStatus, string>
 
 const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -52,11 +50,7 @@ const debugText = (report: BugReport): string =>
     JSON.stringify(report.diagnostics, null, 2),
   ].join('\n')
 
-const MODE_LABELS = {
-  [PLAYBACK_MODES.direct]: 'Direct play',
-  [PLAYBACK_MODES.remux]: 'Remux',
-  [PLAYBACK_MODES.transcode]: 'Transcode',
-} as const satisfies Record<PlaybackMode, string>
+const MODE_LABELS = BUG_REPORT_MODE_COPY satisfies Record<PlaybackMode, string>
 
 /** The ways that were tried and failed, in order; null when none got as far as starting. */
 const triedWords = (modes: readonly PlaybackMode[]): string | null =>

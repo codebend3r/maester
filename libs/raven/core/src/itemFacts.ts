@@ -376,16 +376,17 @@ export const seasonFacts = (season: ItemDetails): string[] =>
     plural({ n: episodesOf(season).length, one: 'episode', many: 'episodes' }),
   ])
 
-type WatchedCountLabelProps = { watched: number; total: number }
+/** How many of some episodes are watched, of how many. */
+type WatchedCount = { watched: number; total: number }
+
+type WatchedCountLabelProps = WatchedCount
 
 /** "3 of 8 watched". */
 export const watchedCountLabel = ({ watched, total }: WatchedCountLabelProps): string =>
   `${watched} of ${total} watched`
 
 /** How many of a show's episodes on disk are watched, across its seasons. */
-export const seasonsWatched = (
-  seasons: readonly SeasonSummary[],
-): { watched: number; total: number } =>
+export const seasonsWatched = (seasons: readonly SeasonSummary[]): WatchedCount =>
   seasons.reduce(
     (sum, season) => ({
       watched: sum.watched + season.watchedCount,
@@ -395,9 +396,7 @@ export const seasonsWatched = (
   )
 
 /** How many of a season's episodes on disk are watched. */
-export const episodesWatched = (
-  episodes: readonly EpisodeSummary[],
-): { watched: number; total: number } => ({
+export const episodesWatched = (episodes: readonly EpisodeSummary[]): WatchedCount => ({
   watched: episodes.filter((episode) => episode.watched).length,
   total: episodes.length,
 })

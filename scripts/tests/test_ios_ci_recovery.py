@@ -48,7 +48,12 @@ def test_ios_retry_only_recovers_screenshot_driver_crash(
         command.chmod(0o755)
     result = subprocess.run(
         ["bash", "-e", "-c", textwrap.dedent(block)],
-        env={**os.environ, "HOME": str(tmp_path), "PATH": f"{bin_dir}:/usr/bin:/bin"},
+        env={
+            **os.environ,
+            "HOME": str(tmp_path),
+            "RUNNER_TEMP": str(tmp_path),
+            "PATH": f"{bin_dir}:/usr/bin:/bin",
+        },
         capture_output=True,
         text=True,
     )

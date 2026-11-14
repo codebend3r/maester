@@ -8,7 +8,7 @@ import {
   type MediaItem,
 } from '@raven/core'
 import { type ComponentType, type FormEvent, useId, useState } from 'react'
-import { Button, Icon } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import { MovieFiles } from '@/components/MovieFiles/MovieFiles'
 import { api } from '@/lib/api'
 import { EDITED_PARTS, afterItemEdited } from '@raven/ui/headless'
@@ -263,7 +263,7 @@ export const MetadataEditor = ({
           })}
           {state.data && <ShownFacts shown={state.data.shown} />}
           <div className={styles.actions}>
-            <Button tone="primary" type="submit" disabled={save.isPending}>
+            <Button tone={BUTTON_TONES.primary} type="submit" disabled={save.isPending}>
               {METADATA_EDITOR_COPY.save}
             </Button>
           </div>

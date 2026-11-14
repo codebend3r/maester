@@ -1,0 +1,40 @@
+name: 🎭 Install Maestro
+description: >-
+  Maestro's own release, the zip its Homebrew formula installs, pinned by version and checksum,
+  onto the PATH. In the background it leaves `maestro.ok` or `maestro.failed` in $RUNNER_TEMP
+  for a later step to wait on.
+
+inputs:
+  background:
+    description: Download in the background while the build runs, instead of before it
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: 🎭 Install Maestro
+      shell: bash
+      env:
+        MAESTRO_VERSION: 2.11.0
+        MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
+        BACKGROUND: ${{ inputs.background }}
+      run: |
+        set -euo pipefail
+        echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
+        install() {
+          curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip" &&
+            echo "$MAESTRO_SHA256  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c - &&
+            unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP"
+        }
+        if [ "$BACKGROUND" != true ]; then
+          install
+          exit 0
+        fi
+        {
+          if install; then
+            touch "$RUNNER_TEMP/maestro.ok"
+          else
+            touch "$RUNNER_TEMP/maestro.failed"
+          fi
+        } > "$RUNNER_TEMP/maestro.log" 2>&1 &

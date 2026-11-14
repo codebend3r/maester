@@ -1,5 +1,5 @@
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   AUTH_REFUSALS,
   type ApiClient,
@@ -82,7 +82,7 @@ export const mediaServer = ({
     return { status, body: { ticket, expiresAt: 0 } }
   }
   const answer = (url: string): Answer => {
-    const name = appClientCallOf({ method: APP_CALL_METHODS.get, url })
+    const name = appClientCallOf({ method: HTTP_METHODS.get, url })
     const call = name === null ? null : APP_CLIENT_CALLS[name]
     if (call === APP_CLIENT_CALLS.getMediaTicket) return ticketAnswer()
     if (call !== APP_CLIENT_CALLS.getMediaOrigins) return NOT_FOUND

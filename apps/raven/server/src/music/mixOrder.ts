@@ -1,8 +1,6 @@
 import type { Track } from '@raven/core'
 import { shuffle } from '@/media/shuffle'
-
-/** The calendar day `now` falls on, in UTC, as `YYYY-MM-DD`: the same for every viewer and every server zone. */
-export const utcDayOf = (now: number): string => new Date(now).toISOString().slice(0, 10)
+import { utcDayOf } from '@/clock'
 
 type DayShuffleProps<T> = { items: readonly T[]; now: number; key: string }
 

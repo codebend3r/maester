@@ -2,6 +2,7 @@ import {
   type Guard,
   type Infer,
   isNumber,
+  isRecord,
   isPlayerReply,
   PLAYER_REFUSAL_REASONS,
 } from '@raven/core'
@@ -17,9 +18,6 @@ export type PortLike = {
   start: () => void
   close: () => void
 }
-
-export const UNKNOWN_COMMAND = 'Raven does not understand that command.'
-const BUSY = 'Raven is busy. Try again.'
 
 /** Requests waiting or in flight before the port refuses more; the page never needs this many. */
 export const MAX_PENDING = 100
@@ -44,10 +42,11 @@ const refusal = ({ id, message }: RefusalProps): PlayerReply => ({
   message,
 })
 
-const idOf = (data: unknown): number | null => {
-  if (typeof data !== 'object' || data === null || !('id' in data)) return null
-  return isNumber(data.id) ? data.id : null
-}
+const idOf = (data: unknown): number | null =>
+  isRecord(data) && isNumber(data.id) ? data.id : null
+
+/** A page's port as the window holds it: closed when the page goes. */
+export type PortConnection = { close: () => void }
 
 type ConnectPortProps<C extends { type: string }, E> = {
   port: PortLike
@@ -66,7 +65,7 @@ export const connectPort = <C extends { type: string }, E>({
   service,
   isRequest,
   warn,
-}: ConnectPortProps<C, E>): { close: () => void } => {
+}: ConnectPortProps<C, E>): PortConnection => {
   /*
    * `isRefusing` quiets the warnings for a run of messages it cannot use, as
    * `isOverflowing` does for a run of commands past `MAX_PENDING`: one warning per run.
@@ -109,7 +108,7 @@ export const connectPort = <C extends { type: string }, E>({
     if (state.pending >= MAX_PENDING) {
       if (!state.isOverflowing) warn(`Raven refused commands past ${MAX_PENDING} waiting.`)
       state.isOverflowing = true
-      post(refusal({ id: request.id, message: BUSY }))
+      post(refusal({ id: request.id, message: PLAYER_MESSAGES.busy }))
       return
     }
     state.pending += 1
@@ -144,7 +143,7 @@ export const connectPort = <C extends { type: string }, E>({
       return
     }
     warnRefusing(`Raven refused player request ${id}: it is not a command it knows.`)
-    post(refusal({ id, message: UNKNOWN_COMMAND }))
+    post(refusal({ id, message: PLAYER_MESSAGES.unknownCommand }))
   })
   port.onClose(close)
   port.start()

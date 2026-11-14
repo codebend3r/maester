@@ -2,7 +2,7 @@ import { DESKTOP_REQUESTS, type DownloadAsk } from '@raven/core'
 import { create } from 'zustand'
 import { createJSONStorage, devtools, persist } from 'zustand/middleware'
 import { STORE_KEYS } from '@/stores/storage'
-import { handled } from '@/desktop/handled'
+import { handled } from '@/lib/handled'
 import { useDownloadsHostStore } from '@/stores/downloadsHost'
 
 type DownloadAskState = {

@@ -1,29 +1,67 @@
 import { resolve } from 'node:path'
 import type { Anthropic } from '@anthropic-ai/sdk'
-import { type AuthConfig, type HwAccel, isHwAccel, oneOf } from '@raven/core'
+import { type AuthConfig, HW_ACCELS, type HwAccel, isHwAccel, oneOf } from '@raven/core'
 import { ACCOUNTS_OPT_OUT, AUTH_ENV, readAuthConfig } from '@/auth/authConfig'
 import { readMediaPlaneConfig, type MediaPlaneConfig } from '@/media/mediaPlaneConfig'
 import { REQUEST_LOG_ENV } from '@/requestLog'
 import { readRequestsConfig, type RequestsConfig } from '@/requests/requestsConfig'
 import { readRemoteAccessConfig, type RemoteAccessConfig } from '@/remoteAccess/remoteAccessConfig'
-import { flag, type ListenConfig, readListenConfig, wholeNumber } from '@shared/server'
+import {
+  atLeast,
+  flag,
+  type ListenConfig,
+  readListenConfig,
+  text,
+  wholeNumber,
+} from '@shared/server'
 
 /** The effort levels the AI lookup can ask for, as `output_config.effort` takes them. */
-const AI_MATCH_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const satisfies ReadonlyArray<
-  NonNullable<Anthropic.OutputConfig['effort']>
->
+const AI_MATCH_EFFORT_LEVELS = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  xhigh: 'xhigh',
+  max: 'max',
+} as const satisfies Record<string, NonNullable<Anthropic.OutputConfig['effort']>>
 
-/** The environment the music features read. */
-export const MUSIC_ENV = {
+const AI_MATCH_EFFORTS = Object.values(AI_MATCH_EFFORT_LEVELS)
+
+/** Every environment variable raven's own config reads; listening, auth, the media plane, remote access and request logs name theirs beside their readers. */
+export const RAVEN_ENV = {
+  browseRoot: 'BROWSE_ROOT',
+  ffmpegPath: 'FFMPEG_PATH',
+  ffprobePath: 'FFPROBE_PATH',
+  probeConcurrency: 'PROBE_CONCURRENCY',
+  thumbnailConcurrency: 'THUMBNAIL_CONCURRENCY',
+  ffmpegTimeoutSeconds: 'FFMPEG_TIMEOUT_SECONDS',
+  keyframeProbeTimeoutSeconds: 'KEYFRAME_PROBE_TIMEOUT_SECONDS',
+  thumbnailWidth: 'THUMBNAIL_WIDTH',
+  markerDetection: 'MARKER_DETECTION',
+  markerConcurrency: 'MARKER_CONCURRENCY',
+  markerTimeoutSeconds: 'MARKER_TIMEOUT_SECONDS',
+  scanOnStart: 'SCAN_ON_START',
+  quickScanIntervalMinutes: 'QUICK_SCAN_INTERVAL_MINUTES',
+  heroCount: 'HERO_COUNT',
+  hwAccel: 'HW_ACCEL',
+  vaapiDevice: 'VAAPI_DEVICE',
+  tmdbApiToken: 'TMDB_API_TOKEN',
+  metadataLanguage: 'METADATA_LANGUAGE',
+  metadataCountry: 'METADATA_COUNTRY',
+  omdbApiKey: 'OMDB_API_KEY',
+  omdbDailyLimit: 'OMDB_DAILY_LIMIT',
+  mdblistApiKey: 'MDBLIST_API_KEY',
+  mdblistDailyLimit: 'MDBLIST_DAILY_LIMIT',
+  anthropicApiKey: 'ANTHROPIC_API_KEY',
+  aiMatchModel: 'AI_MATCH_MODEL',
+  aiMatchEffort: 'AI_MATCH_EFFORT',
+  aiDailyLimit: 'AI_DAILY_LIMIT',
   transcodeCacheGb: 'TRANSCODE_CACHE_GB',
+  deviceDownloadCacheGb: 'DEVICE_DOWNLOAD_CACHE_GB',
   loudnessScan: 'LOUDNESS_SCAN',
   lastFmApiKey: 'LASTFM_API_KEY',
   lastFmApiSecret: 'LASTFM_API_SECRET',
-} as const
-
-/** The environment the device downloads read. */
-export const DEVICE_DOWNLOAD_ENV = {
-  cacheGb: 'DEVICE_DOWNLOAD_CACHE_GB',
+  libraryPin: 'LIBRARY_PIN',
+  adminPassword: 'ADMIN_PASSWORD',
 } as const
 
 /** GiB of MP4 copies for device downloads kept unless `DEVICE_DOWNLOAD_CACHE_GB` says otherwise. */
@@ -34,16 +72,16 @@ export type LastFmKeys = { apiKey: string; apiSecret: string }
 
 /** Both Last.fm keys, or null while either is missing, which leaves Last.fm off. */
 const lastFmKeysFrom = (env: NodeJS.ProcessEnv): LastFmKeys | null => {
-  const apiKey = env[MUSIC_ENV.lastFmApiKey]?.trim() ?? ''
-  const apiSecret = env[MUSIC_ENV.lastFmApiSecret]?.trim() ?? ''
-  return apiKey === '' || apiSecret === '' ? null : { apiKey, apiSecret }
+  const apiKey = text({ value: env[RAVEN_ENV.lastFmApiKey], fallback: null })
+  const apiSecret = text({ value: env[RAVEN_ENV.lastFmApiSecret], fallback: null })
+  return apiKey === null || apiSecret === null ? null : { apiKey, apiSecret }
 }
 
 const GIB = 1024 ** 3
 
 const isAiMatchEffort = oneOf(AI_MATCH_EFFORTS)
 
-export type AiMatchEffort = (typeof AI_MATCH_EFFORTS)[number]
+export type AiMatchEffort = (typeof AI_MATCH_EFFORT_LEVELS)[keyof typeof AI_MATCH_EFFORT_LEVELS]
 
 /**
  * Everything the server reads from its environment, resolved once at start.
@@ -146,51 +184,67 @@ export const SERVER_CONFIG = Symbol('SERVER_CONFIG')
 /** An unknown or missing HW_ACCEL means `auto`. */
 const hwAccelFrom = (value: string | undefined): HwAccel => {
   const trimmed = value?.trim() ?? ''
-  return isHwAccel(trimmed) ? trimmed : 'auto'
+  return isHwAccel(trimmed) ? trimmed : HW_ACCELS.auto
 }
 
 /** An unknown or missing AI_MATCH_EFFORT means `low`. */
 const aiEffortFrom = (value: string | undefined): AiMatchEffort => {
   const trimmed = value?.trim() ?? ''
-  return isAiMatchEffort(trimmed) ? trimmed : 'low'
+  return isAiMatchEffort(trimmed) ? trimmed : AI_MATCH_EFFORT_LEVELS.low
 }
 
 export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig => ({
   ...readListenConfig({ env, defaultPort: 8484 }),
-  browseRoot: resolve(env.BROWSE_ROOT?.trim() || '/'),
-  ffmpegPath: env.FFMPEG_PATH?.trim() || 'ffmpeg',
-  ffprobePath: env.FFPROBE_PATH?.trim() || 'ffprobe',
-  probeConcurrency: Math.max(1, wholeNumber(env.PROBE_CONCURRENCY) ?? 4),
-  thumbnailConcurrency: Math.max(1, wholeNumber(env.THUMBNAIL_CONCURRENCY) ?? 2),
-  ffmpegTimeoutSeconds: Math.max(1, wholeNumber(env.FFMPEG_TIMEOUT_SECONDS) ?? 90),
-  keyframeProbeTimeoutSeconds: Math.max(1, wholeNumber(env.KEYFRAME_PROBE_TIMEOUT_SECONDS) ?? 1800),
-  thumbnailWidth: Math.max(160, wholeNumber(env.THUMBNAIL_WIDTH) ?? 480),
-  markerDetection: flag({ value: env.MARKER_DETECTION, fallback: true }),
-  markerConcurrency: Math.max(1, wholeNumber(env.MARKER_CONCURRENCY) ?? 1),
-  markerTimeoutSeconds: Math.max(1, wholeNumber(env.MARKER_TIMEOUT_SECONDS) ?? 900),
-  scanOnStart: flag({ value: env.SCAN_ON_START, fallback: true }),
-  quickScanIntervalMinutes: wholeNumber(env.QUICK_SCAN_INTERVAL_MINUTES) ?? 10,
-  heroCount: Math.max(1, wholeNumber(env.HERO_COUNT) ?? 10),
-  hwAccel: hwAccelFrom(env.HW_ACCEL),
-  vaapiDevice: env.VAAPI_DEVICE?.trim() || '/dev/dri/renderD128',
-  tmdbApiToken: env.TMDB_API_TOKEN?.trim() || null,
-  metadataLanguage: env.METADATA_LANGUAGE?.trim() || 'en-US',
-  metadataCountry: (env.METADATA_COUNTRY?.trim() || 'US').toUpperCase(),
-  omdbApiKey: env.OMDB_API_KEY?.trim() || null,
-  omdbDailyLimit: Math.max(1, wholeNumber(env.OMDB_DAILY_LIMIT) ?? 1000),
-  mdblistApiKey: env.MDBLIST_API_KEY?.trim() || null,
-  mdblistDailyLimit: Math.max(1, wholeNumber(env.MDBLIST_DAILY_LIMIT) ?? 1000),
-  anthropicApiKey: env.ANTHROPIC_API_KEY?.trim() || null,
-  aiMatchModel: env.AI_MATCH_MODEL?.trim() || 'claude-haiku-5-5',
-  aiMatchEffort: aiEffortFrom(env.AI_MATCH_EFFORT),
-  aiDailyLimit: Math.max(1, wholeNumber(env.AI_DAILY_LIMIT) ?? 200),
-  transcodeCacheBytes: (wholeNumber(env[MUSIC_ENV.transcodeCacheGb]) ?? 20) * GIB,
+  browseRoot: resolve(text({ value: env[RAVEN_ENV.browseRoot], fallback: '/' })),
+  ffmpegPath: text({ value: env[RAVEN_ENV.ffmpegPath], fallback: 'ffmpeg' }),
+  ffprobePath: text({ value: env[RAVEN_ENV.ffprobePath], fallback: 'ffprobe' }),
+  probeConcurrency: atLeast({ value: env[RAVEN_ENV.probeConcurrency], min: 1, fallback: 4 }),
+  thumbnailConcurrency: atLeast({
+    value: env[RAVEN_ENV.thumbnailConcurrency],
+    min: 1,
+    fallback: 2,
+  }),
+  ffmpegTimeoutSeconds: atLeast({
+    value: env[RAVEN_ENV.ffmpegTimeoutSeconds],
+    min: 1,
+    fallback: 90,
+  }),
+  keyframeProbeTimeoutSeconds: atLeast({
+    value: env[RAVEN_ENV.keyframeProbeTimeoutSeconds],
+    min: 1,
+    fallback: 1800,
+  }),
+  thumbnailWidth: atLeast({ value: env[RAVEN_ENV.thumbnailWidth], min: 160, fallback: 480 }),
+  markerDetection: flag({ value: env[RAVEN_ENV.markerDetection], fallback: true }),
+  markerConcurrency: atLeast({ value: env[RAVEN_ENV.markerConcurrency], min: 1, fallback: 1 }),
+  markerTimeoutSeconds: atLeast({
+    value: env[RAVEN_ENV.markerTimeoutSeconds],
+    min: 1,
+    fallback: 900,
+  }),
+  scanOnStart: flag({ value: env[RAVEN_ENV.scanOnStart], fallback: true }),
+  quickScanIntervalMinutes: wholeNumber(env[RAVEN_ENV.quickScanIntervalMinutes]) ?? 10,
+  heroCount: atLeast({ value: env[RAVEN_ENV.heroCount], min: 1, fallback: 10 }),
+  hwAccel: hwAccelFrom(env[RAVEN_ENV.hwAccel]),
+  vaapiDevice: text({ value: env[RAVEN_ENV.vaapiDevice], fallback: '/dev/dri/renderD128' }),
+  tmdbApiToken: text({ value: env[RAVEN_ENV.tmdbApiToken], fallback: null }),
+  metadataLanguage: text({ value: env[RAVEN_ENV.metadataLanguage], fallback: 'en-US' }),
+  metadataCountry: text({ value: env[RAVEN_ENV.metadataCountry], fallback: 'US' }).toUpperCase(),
+  omdbApiKey: text({ value: env[RAVEN_ENV.omdbApiKey], fallback: null }),
+  omdbDailyLimit: atLeast({ value: env[RAVEN_ENV.omdbDailyLimit], min: 1, fallback: 1000 }),
+  mdblistApiKey: text({ value: env[RAVEN_ENV.mdblistApiKey], fallback: null }),
+  mdblistDailyLimit: atLeast({ value: env[RAVEN_ENV.mdblistDailyLimit], min: 1, fallback: 1000 }),
+  anthropicApiKey: text({ value: env[RAVEN_ENV.anthropicApiKey], fallback: null }),
+  aiMatchModel: text({ value: env[RAVEN_ENV.aiMatchModel], fallback: 'claude-haiku-5-5' }),
+  aiMatchEffort: aiEffortFrom(env[RAVEN_ENV.aiMatchEffort]),
+  aiDailyLimit: atLeast({ value: env[RAVEN_ENV.aiDailyLimit], min: 1, fallback: 200 }),
+  transcodeCacheBytes: (wholeNumber(env[RAVEN_ENV.transcodeCacheGb]) ?? 20) * GIB,
   deviceDownloadCacheBytes:
-    (wholeNumber(env[DEVICE_DOWNLOAD_ENV.cacheGb]) ?? DEVICE_DOWNLOAD_CACHE_GB) * GIB,
-  shouldScanLoudness: flag({ value: env[MUSIC_ENV.loudnessScan], fallback: true }),
+    (wholeNumber(env[RAVEN_ENV.deviceDownloadCacheGb]) ?? DEVICE_DOWNLOAD_CACHE_GB) * GIB,
+  shouldScanLoudness: flag({ value: env[RAVEN_ENV.loudnessScan], fallback: true }),
   lastFm: lastFmKeysFrom(env),
-  libraryPin: env.LIBRARY_PIN?.trim() || null,
-  adminPassword: env.ADMIN_PASSWORD?.trim() || null,
+  libraryPin: text({ value: env[RAVEN_ENV.libraryPin], fallback: null }),
+  adminPassword: text({ value: env[RAVEN_ENV.adminPassword], fallback: null }),
   mediaPlane: readMediaPlaneConfig(env),
   remoteAccess: readRemoteAccessConfig(env),
   requests: readRequestsConfig(env),

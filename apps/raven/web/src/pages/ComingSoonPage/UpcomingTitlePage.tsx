@@ -5,6 +5,7 @@ import {
   UPCOMING_TITLE_PARAMS,
   type UpcomingDetails,
 } from '@raven/core'
+import { QueryView } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useId } from 'react'
 import { useParams } from 'react-router-dom'
@@ -15,11 +16,12 @@ import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { upcomingDetailsQuery } from '@/lib/queries'
 import { tmdbTitleUrl } from '@/lib/tmdbLinks'
-import { COMING_SOON_COPY, COMING_SOON_PATH } from '@/pages/ComingSoonPage/copy'
+import { APP_PATHS } from '@/lib/appPaths'
+import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
 import { RequestControl } from '@/pages/ComingSoonPage/RequestControl'
 import styles from '@/pages/ComingSoonPage/UpcomingTitlePage.module.scss'
 
-const BACK_TO_COMING_SOON = { to: COMING_SOON_PATH, label: COMING_SOON_COPY.title } as const
+const BACK_TO_COMING_SOON = { to: APP_PATHS.comingSoon, label: COMING_SOON_COPY.title } as const
 
 type TitleDetailsProps = {
   /** The title as the address names it, which is all a request sends. */
@@ -83,19 +85,21 @@ type UpcomingTitleProps = { ask: TitleRequestAsk }
 const UpcomingTitle = ({ ask }: UpcomingTitleProps) => {
   const details = useQuery(upcomingDetailsQuery(ask))
   return (
-    <>
-      {details.isPending && (
+    <QueryView
+      query={details}
+      pending={
         <Loading label={COMING_SOON_COPY.loading}>
           <span className={styles.standIn} />
         </Loading>
-      )}
-      {details.isError && (
+      }
+      renderFailed={(error) => (
         <p className={styles.message} role="alert">
-          {details.error.message}
+          {error.message}
         </p>
       )}
-      {details.isSuccess && <TitleDetails ask={ask} details={details.data} />}
-    </>
+    >
+      {(data) => <TitleDetails ask={ask} details={data} />}
+    </QueryView>
   )
 }
 

@@ -8,10 +8,10 @@ import {
   type UpcomingTitle,
   uniqueUpcomingTitles,
 } from '@raven/core'
-import { CLOCK, type Clock } from '@/clock'
+import { CLOCK, type Clock, utcDayOf } from '@/clock'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import type { DiscoveredTitle } from '@/metadata/tmdbShapes'
-import { dayOf, FreshReads } from '@/upcoming/freshReads'
+import { FreshReads } from '@/upcoming/freshReads'
 import { SHELF_STREAMS } from '@/upcoming/shelfStreams'
 
 /** TMDB's pages of twenty each shelf reads of each list: two for two rows, so titles with no poster yet leave it full. */
@@ -63,7 +63,7 @@ export class UpcomingTitles {
   }
 
   private async load(): Promise<Upcoming> {
-    const from = dayOf(this.clock.now())
+    const from = utcDayOf(this.clock.now())
     const [movies, shows, documentaries] = await Promise.all([
       this.shelf({ shelf: UPCOMING_SHELVES.movies, from }),
       this.shelf({ shelf: UPCOMING_SHELVES.shows, from }),

@@ -6,25 +6,21 @@ import {
   AUTH_REFUSALS,
   MEMBER_STATUSES,
 } from '@raven/core'
-import { Button, type ButtonTone } from '@raven/ui'
+import { BUTTON_TONES, Button, type ButtonTone } from '@raven/ui'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { Tabs } from '@/components/Tabs/Tabs'
 import { useMembers } from '@/lib/useMembers'
 import { useReturnFocus } from '@/lib/useReturnFocus'
 import { type MemberStatus, STATUS_NAMES } from '@/pages/SettingsPage/memberStatus'
 import { Titled } from '@/pages/SettingsPage/Titled'
-import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
+import { SETTINGS_COPY, USERS_ACTION_COPY, USERS_NOBODY_COPY } from '@/pages/SettingsPage/copy'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import usersStyles from '@/pages/SettingsPage/UsersSection.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 
 const TABS: readonly MemberStatus[] = Object.values(MEMBER_STATUSES)
 
-const NOBODY = {
-  [MEMBER_STATUSES.pending]: 'No one is waiting for approval.',
-  [MEMBER_STATUSES.approved]: 'No one is approved yet.',
-  [MEMBER_STATUSES.revoked]: 'No one has been removed.',
-} as const satisfies Record<MemberStatus, string>
+const NOBODY = USERS_NOBODY_COPY satisfies Record<MemberStatus, string>
 
 const ACTION_KEYS = { approve: 'approve', remove: 'remove' } as const
 type ActionKey = (typeof ACTION_KEYS)[keyof typeof ACTION_KEYS]
@@ -32,16 +28,16 @@ type ActionKey = (typeof ACTION_KEYS)[keyof typeof ACTION_KEYS]
 /** What each action says and how it looks, which status it leaves the account in, and how a screen reader names it among many rows. */
 const ACTIONS = {
   [ACTION_KEYS.approve]: {
-    label: 'Approve',
-    tone: 'primary',
+    label: USERS_ACTION_COPY.approve,
+    tone: BUTTON_TONES.primary,
     status: MEMBER_STATUSES.approved,
-    nameFor: (email: string) => `Approve ${email}`,
+    nameFor: USERS_ACTION_COPY.approveFor,
   },
   [ACTION_KEYS.remove]: {
-    label: 'Remove access',
-    tone: 'quiet',
+    label: USERS_ACTION_COPY.remove,
+    tone: BUTTON_TONES.quiet,
     status: MEMBER_STATUSES.revoked,
-    nameFor: (email: string) => `Remove access for ${email}`,
+    nameFor: USERS_ACTION_COPY.removeFor,
   },
 } as const satisfies Record<
   ActionKey,
@@ -76,7 +72,7 @@ const AskingActions = ({ member, cancelButton, onAct, onCancel }: AskingActionsP
   <>
     <p className={usersStyles.aside}>{SETTINGS_COPY.users.confirmRemove}</p>
     <Button
-      tone="danger"
+      tone={BUTTON_TONES.danger}
       aria-label={SETTINGS_COPY.users.yesRemoveFor(member.email)}
       onClick={() => onAct(ACTION_KEYS.remove)}
     >
@@ -181,7 +177,8 @@ export const UsersSection = ({ userId }: UsersSectionProps) => {
   const [asking, setAsking] = useState<string | null>(null)
 
   const isRefused =
-    members.error instanceof ApiError && members.error.refusal?.reason === AUTH_REFUSALS.notOwner
+    members.error instanceof ApiError &&
+    (members.error.refusal?.reason ?? null) === AUTH_REFUSALS.notOwner
 
   const withStatus = (status: MemberStatus) =>
     members.data?.filter((member) => member.status === status) ?? []

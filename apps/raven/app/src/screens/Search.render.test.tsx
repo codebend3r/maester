@@ -4,11 +4,11 @@ import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
 import { act, fireEvent, screen } from '@testing-library/react-native'
+import type { HeardRequest } from '@raven/native/testing'
 
 import { APP_ROUTE_PARAMS, APP_ROUTES, ROUTE_TARGETS, hrefOf } from '@/routes'
 import { Search } from '@/screens/Search'
 import { useActiveServer } from '@/stores/activeServer'
-import type { HeardRequest } from '@/test/fixtureFetch'
 import { FILMS, NAS } from '@/test/homeServer'
 import {
   DUNE,

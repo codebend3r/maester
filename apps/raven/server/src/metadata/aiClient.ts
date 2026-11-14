@@ -10,6 +10,7 @@ import {
 import { Inject, Injectable } from '@nestjs/common'
 import { isRecord, isString, type MetadataServiceState } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
+import { DailyBudget } from '@/metadata/dailyBudget'
 
 /**
  * The slice of `fetch` the Anthropic client takes, injected so tests answer
@@ -35,9 +36,6 @@ export class AiError extends Error {
 
 export type AiState = { state: MetadataServiceState; error: string | null }
 
-/** Today in UTC, when the day's count starts again, as OMDb's does. */
-const today = (): string => new Date().toISOString().slice(0, 10)
-
 type SaidProps = { status: number; body: unknown }
 
 /** A failed answer's status, and Anthropic's own words for it when its error body has some. */
@@ -57,16 +55,14 @@ const said = ({ status, body }: SaidProps): string => {
 @Injectable()
 export class AiClient {
   private readonly client: Anthropic | null
-  private readonly budget = { day: today(), used: 0 }
+  private readonly budget: DailyBudget
   private readonly status: { error: string | null; isRefused: boolean } = {
     error: null,
     isRefused: false,
   }
 
-  constructor(
-    @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
-    @Inject(AI_FETCH) fetch: AiFetch,
-  ) {
+  constructor(@Inject(SERVER_CONFIG) config: ServerConfig, @Inject(AI_FETCH) fetch: AiFetch) {
+    this.budget = new DailyBudget({ limit: config.aiDailyLimit })
     const apiKey = config.anthropicApiKey
     this.client =
       apiKey == null
@@ -81,32 +77,20 @@ export class AiClient {
           })
   }
 
-  private usedToday(): number {
-    if (this.budget.day !== today()) {
-      this.budget.day = today()
-      this.budget.used = 0
-    }
-    return this.budget.used
-  }
-
   /** Whether there is a key, it was not refused, and today's lookups are not spent. */
   get enabled(): boolean {
-    return (
-      this.client != null && !this.status.isRefused && this.usedToday() < this.config.aiDailyLimit
-    )
+    return this.client != null && !this.status.isRefused && this.budget.left() > 0
   }
 
   /** Lookups left today; none while the lookup is off or its key was refused. */
   remaining(): number {
-    return this.client == null || this.status.isRefused
-      ? 0
-      : Math.max(0, this.config.aiDailyLimit - this.usedToday())
+    return this.client == null || this.status.isRefused ? 0 : this.budget.left()
   }
 
   /** Books one of today's lookups; false once they are spent, or while the lookup is off. */
   take(): boolean {
     if (!this.enabled) return false
-    this.budget.used += 1
+    this.budget.spend()
     return true
   }
 

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { FIXTURE_SERVER } from '@raven/core'
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
 import { NOW_PLAYING_BAR_COPY } from '@/components/NowPlayingBar/copy'
 import { TRACK_LIST_COPY } from '@/components/TrackList/copy'

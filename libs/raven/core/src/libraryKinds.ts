@@ -5,6 +5,7 @@ import {
   LIBRARY_KINDS,
   LIBRARY_LISTINGS,
   LIBRARY_VIEWS,
+  type Library,
   type LibraryIconName,
   type LibraryKind,
   type LibraryListing,
@@ -211,6 +212,20 @@ export const MATCHED_KINDS: readonly LibraryKind[] = isLibraryKind.values.filter
 
 /** What a library of `kind` lists on its page. */
 export const listingFor = (kind: LibraryKind): LibraryListing => KIND_RULES[kind].listing
+
+/** Whether the library lists albums: a music library. */
+export const listsAlbums = (kind: LibraryKind): boolean =>
+  listingFor(kind) === LIBRARY_LISTINGS.albums
+
+type MusicLibraryProps = Pick<Library, 'settings'>
+
+/** Whether a library is a music library, listed by album. */
+export const isMusicLibrary = (library: MusicLibraryProps): boolean =>
+  listsAlbums(library.settings.kind)
+
+/** The server's music libraries, in its order. */
+export const musicLibrariesOf = (libraries: readonly Library[]): Library[] =>
+  libraries.filter(isMusicLibrary)
 
 /** Whether the library's cards are its shows, with its files no show was found for listed apart. */
 export const listsShows = (kind: LibraryKind): boolean =>

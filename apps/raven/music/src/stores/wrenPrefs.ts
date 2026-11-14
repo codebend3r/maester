@@ -1,4 +1,6 @@
 import { AUDIO_BITRATES, type AudioBitrate, isAudioBitrate, isRecord } from '@raven/core'
+import { loadPersisted } from '@raven/native/headless'
+import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 
@@ -55,13 +57,6 @@ const prefsOf = (saved: unknown): WrenPrefsValues => {
   }
 }
 
-/** Holds the place of the storage until `configureWrenPrefs`. */
-const UNCONFIGURED: StateStorage = {
-  getItem: () => null,
-  setItem: () => undefined,
-  removeItem: () => undefined,
-}
-
 /** Settings' download and streaming choices, persisted to AsyncStorage and guarded when read. */
 export const useWrenPrefs = create<WrenPrefs>()(
   persist(
@@ -71,7 +66,7 @@ export const useWrenPrefs = create<WrenPrefs>()(
     }),
     {
       name: WREN_PREFS_KEY,
-      storage: createJSONStorage(() => UNCONFIGURED),
+      storage: createJSONStorage(() => UNCONFIGURED_STORAGE),
       skipHydration: true,
       partialize: ({ downloadKbps, cellularKbps, storageLimitGb }) => ({
         downloadKbps,
@@ -87,6 +82,5 @@ type ConfigureWrenPrefsProps = { storage: StateStorage }
 
 /** Gives the preferences their storage, AsyncStorage in the app, and reads them back from it. */
 export const configureWrenPrefs = async ({ storage }: ConfigureWrenPrefsProps) => {
-  useWrenPrefs.persist.setOptions({ storage: createJSONStorage(() => storage) })
-  await useWrenPrefs.persist.rehydrate()
+  await loadPersisted({ store: useWrenPrefs, storage })
 }

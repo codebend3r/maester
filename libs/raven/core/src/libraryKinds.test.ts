@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { TIER_SETS } from '@/candidateTiers'
-import { type LibrarySettings, isLibraryKind } from '@/contract'
+import { library } from '@/test/fixtures'
+import { LIBRARY_KINDS, type LibrarySettings, isLibraryKind } from '@/contract'
 import {
   coherentSettings,
   DEFAULT_LIBRARY_SETTINGS,
@@ -20,6 +21,7 @@ import {
   tiersFor,
   viewsFor,
   withLibraryKind,
+  isMusicLibrary,
 } from '@/libraryKinds'
 
 describe('defaultLibrarySettings', () => {
@@ -308,5 +310,16 @@ describe('the rules for an audio library', () => {
     expect(settings.groupBy).toBe('month')
     expect(groupingsFor('music')).toEqual(['codec', 'month'])
     expect(KIND_RULES.music.matcher).toEqual({ by: MATCH_SOURCES.musicBrainz })
+  })
+})
+
+describe('isMusicLibrary', () => {
+  it('is a library listed by album', () => {
+    expect(
+      isMusicLibrary(library({ settings: { ...library().settings, kind: LIBRARY_KINDS.music } })),
+    ).toBeTrue()
+    expect(
+      isMusicLibrary(library({ settings: { ...library().settings, kind: LIBRARY_KINDS.movies } })),
+    ).toBeFalse()
   })
 })

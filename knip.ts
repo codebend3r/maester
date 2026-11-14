@@ -25,10 +25,11 @@ export default {
       /*
        * knip's Expo plugin expects expo-updates unless the config turns updates
        * off; the app ships no over-the-air updates and does not install it.
-       * `@raven/audio` is imported only through `@raven/native`'s host, but Expo
-       * autolinks a native module only from the app's own dependencies.
+       * `@raven/audio` and `expo-file-system` are imported only through
+       * `@raven/native` (its music host, its downloads' disk), but Expo autolinks a
+       * native module only from the app's own dependencies.
        */
-      ignoreDependencies: ['expo-updates', '@raven/audio'],
+      ignoreDependencies: ['expo-updates', '@raven/audio', 'expo-file-system'],
     },
     'apps/raven/music': {
       /*
@@ -49,11 +50,8 @@ export default {
       ignoreBinaries: ['openssl'],
     },
     'apps/raven/desktop': {
-      /*
-       * Electron's main and preload bundles and the Forge config are entry
-       * points no import names.
-       */
-      entry: ['src/main/main.ts', 'src/preload/preload.ts', 'forge.config.ts'],
+      // Electron's main and preload bundles are entry points no import names; knip's Forge plugin finds its config.
+      entry: ['src/main/main.ts', 'src/preload/preload.ts'],
     },
     'apps/raven/supabase': {
       /*
@@ -64,12 +62,16 @@ export default {
       paths: { '@/alert': ['functions/signup-alert/alert.ts'] },
       ignoreDependencies: ['nodemailer'],
     },
+    'libs/raven/core': {
+      // The package's two entries: the library, and the fixture server's facts its e2e suites share.
+      entry: ['src/index.ts', 'src/fixtureServer.ts'],
+    },
     'libs/raven/native': {
       /*
-       * The package's three entries. Its exports name them in dist, and knip's default finds
-       * only src/index.ts.
+       * The package's four entries, the apps' test fixtures among them. Its exports name them in
+       * dist, and knip's default finds only src/index.ts.
        */
-      entry: ['src/index.ts', 'src/headless.ts', 'src/polyfills.ts'],
+      entry: ['src/index.ts', 'src/headless.ts', 'src/polyfills.ts', 'src/testing.ts'],
     },
     'libs/raven/mpv': {
       /*

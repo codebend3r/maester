@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CALL_METHODS, APP_CLIENT_CALLS } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import type * as Native from '@raven/native'
 import { useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
 import { fireEvent, screen } from '@testing-library/react-native'
+import { type HeardRequest, pathWithId } from '@raven/native/testing'
 
 import { NowPlaying } from '@/screens/NowPlaying'
 import { useActiveServer } from '@/stores/activeServer'
-import { type HeardRequest, pathFor } from '@/test/fixtureFetch'
 import { NAS } from '@/test/homeServer'
 import {
   AIRBAG,
@@ -117,10 +117,10 @@ describe('Now Playing under the thumb', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Add to playlist' }))
     expect(offered).toEqual([[MIXTAPE.name, 'New playlist', 'Cancel']])
     expect(await screen.findByText(`Added to ${MIXTAPE.name}.`)).toBeTruthy()
-    expect(mockHeard.filter(({ method }) => method !== APP_CALL_METHODS.get)).toEqual([
+    expect(mockHeard.filter(({ method }) => method !== HTTP_METHODS.get)).toEqual([
       {
-        method: APP_CALL_METHODS.post,
-        path: pathFor({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: MIXTAPE.id }),
+        method: HTTP_METHODS.post,
+        path: pathWithId({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: MIXTAPE.id }),
         body: { mediaIds: [AIRBAG.id] },
       },
     ])

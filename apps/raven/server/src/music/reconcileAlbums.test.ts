@@ -7,6 +7,7 @@ import { Playlists } from '@/music/playlists'
 import { reconcileAlbums } from '@/music/reconcileAlbums'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, pictureVersionsOf } from '@/test/repositories'
+import { MusicMatchStore } from '@/music/musicMatchStore'
 
 describe('repairing existing album folders', () => {
   const database = testDatabase('raven-album-folders-')
@@ -189,12 +190,12 @@ describe('repairing existing album folders', () => {
         number: at + 1,
       })
     })
-    expect(music().mergeAlbums(state.library)).toBe(1)
+    expect(new MusicMatchStore(database.get()).mergeAlbums(state.library)).toBe(1)
     const merged = albums()
     expect(merged).toHaveLength(1)
     expect(merged[0]).toMatchObject({ id: solo, trackCount: 2 })
     expect(music().album(solo)?.tracks).toHaveLength(2)
-    expect(music().mergeAlbums(state.library)).toBe(0)
+    expect(new MusicMatchStore(database.get()).mergeAlbums(state.library)).toBe(0)
     expect(albums()).toEqual(merged)
   })
 

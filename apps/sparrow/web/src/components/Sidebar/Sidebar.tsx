@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useId } from 'react'
 import { Button } from '@/components/Button/Button'
 import { SIDEBAR_COPY } from '@/components/Sidebar/copy'
 import styles from '@/components/Sidebar/Sidebar.module.scss'
@@ -10,6 +11,7 @@ import {
   openCase,
   setSandboxTier,
 } from '@/lib/api'
+import { hostOf } from '@/lib/address'
 import { QUERY_KEYS } from '@/lib/queryKeys'
 import { useChat } from '@/stores/chat'
 
@@ -35,6 +37,7 @@ const SandboxControls = ({ world, tier }: SandboxControlsProps) => {
   })
   const isLocked = isBusy || caseChange.isPending || tierChange.isPending
   const turns = world.case.turns
+  const headingId = useId()
 
   return (
     <>
@@ -79,8 +82,8 @@ const SandboxControls = ({ world, tier }: SandboxControlsProps) => {
         )}
       </div>
       {turns.length > 0 && (
-        <section className={styles.turns} aria-labelledby="case-messages-heading">
-          <h2 id="case-messages-heading" className={styles.heading}>
+        <section className={styles.turns} aria-labelledby={headingId}>
+          <h2 id={headingId} className={styles.heading}>
             {SIDEBAR_COPY.caseMessages}
           </h2>
           <ol className={styles.list}>
@@ -117,7 +120,11 @@ export const Sidebar = ({ world, tier }: SidebarProps) => {
         {world && (
           <p className={styles.environment}>
             <span className={styles.sandbox}>{SIDEBAR_COPY.sandbox}</span>
-            <span>{SIDEBAR_COPY.environment({ raven: world.raven })}</span>
+            <span>
+              {SIDEBAR_COPY.environment({
+                host: world.raven === null ? null : hostOf(world.raven),
+              })}
+            </span>
           </p>
         )}
         <Button className={styles.startOver} disabled={isBusy} onClick={() => void startOver()}>

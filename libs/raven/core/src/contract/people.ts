@@ -9,6 +9,7 @@ import {
   object,
   oneOf,
   union,
+  literal,
 } from '@/schema'
 
 /** What TMDB says of a person; every field is null when it has nothing. */
@@ -77,12 +78,12 @@ export const FILMOGRAPHY_STATES = {
 
 export const isPersonFilmography = union(
   object({
-    state: oneOf([FILMOGRAPHY_STATES.ready]),
+    state: literal(FILMOGRAPHY_STATES.ready),
     fetchedAt: isString,
     entries: listOf(isFilmographyEntry),
   }),
-  object({ state: oneOf([FILMOGRAPHY_STATES.pending]) }),
-  object({ state: oneOf([FILMOGRAPHY_STATES.unavailable]) }),
+  object({ state: literal(FILMOGRAPHY_STATES.pending) }),
+  object({ state: literal(FILMOGRAPHY_STATES.unavailable) }),
 )
 
 export type PersonFilmography = Infer<typeof isPersonFilmography>

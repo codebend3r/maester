@@ -4,6 +4,7 @@ import { act, fireEvent, render } from '@testing-library/react'
 import { type EngineHandle, SURFACE_MARK } from '@/components/Player/engine'
 import { useTouchGestures } from '@/components/Player/useTouchGestures'
 import { initialVideoState } from '@/components/Player/videoState'
+import { SUBTITLE_STATUSES } from '@/lib/useTrackCues'
 
 const WIDTH = 400
 
@@ -26,10 +27,23 @@ const engineOf = ({ calls, isPaused = false }: HarnessProps): EngineHandle => ({
     setAudio: () => {},
     setSubtitle: () => {},
     setCaptionStyle: () => {},
+    toggleStats: null,
   },
   surface: null,
   focusSurface: () => {},
-  drawsSubtitles: false,
+  selection: {
+    tracks: null,
+    tracksFailed: false,
+    tracksPending: false,
+    audio: null,
+    isDefaultAudio: true,
+    subtitle: null,
+    isWaitingForTracks: false,
+    shouldPlayPickedAudio: false,
+    pickAudio: () => {},
+    pickSubtitle: () => {},
+  },
+  subtitles: { status: SUBTITLE_STATUSES.off, overlay: null },
   readStats: () => ({ engine: 'test', viewport: null, frame: null, frames: null }),
 })
 

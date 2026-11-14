@@ -1,9 +1,8 @@
 import { basename, dirname, relative } from 'node:path'
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, NotFoundException } from '@nestjs/common'
 import {
   type Chapter,
   type LibraryKind,
-  type Marker,
   type MediaTracks,
   type ThumbnailState,
   containerOf,
@@ -12,6 +11,8 @@ import {
   isNumber,
   isThumbnailState,
   listOf,
+  MATCH_STATES,
+  THUMBNAIL_STATES,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
@@ -22,6 +23,7 @@ import {
   forgetDetectedMarkers,
   offerMarkers,
   readMarkers,
+  type StoredMarkers,
 } from '@/markers/markerRows'
 import { namedAs } from '@/media/namedAs'
 import type { IndexedFile, Reconciled } from '@/scanner/reconcile'
@@ -65,8 +67,11 @@ const isKeyframes = listOf(isNumber)
 
 const isChapters = listOf(isChapter)
 
+/** Where a found file sits: its name and the folder it is in. */
+type FilePlace = { fileName: string; folder: string }
+
 /** Its name, and the folder it sits in under the folder its titles sit in (a library path, or a letter or group folder). */
-const placeOf = (file: FoundFile): { fileName: string; folder: string } => ({
+const placeOf = (file: FoundFile): FilePlace => ({
   fileName: basename(file.path),
   folder: relative(file.root, dirname(file.path)),
 })
@@ -126,6 +131,13 @@ export class MediaIndex {
 
   private get db() {
     return this.database.db
+  }
+
+  /** The file behind a video, or a 404 when there is no such video. */
+  requireFile(id: number): MediaFile {
+    const file = this.fileOf(id)
+    if (!file) throw new NotFoundException(`No media ${id}`)
+    return file
   }
 
   /** The file behind a video, or null when there is no such video. */
@@ -229,7 +241,7 @@ export class MediaIndex {
   markChanged({ id, size, mtimeMs, at = new Date() }: MediaIndexMarkChangedProps): void {
     this.db
       .prepare(
-        `UPDATE media SET size = ?, mtime_ms = ?, probed = 0, probe_error = NULL, thumbnail = 'pending',
+        `UPDATE media SET size = ?, mtime_ms = ?, probed = 0, probe_error = NULL, thumbnail = '${THUMBNAIL_STATES.pending}',
                 tracks = NULL, keyframes = NULL, chapters = NULL, markers = ?, changed_at = ?
           WHERE id = ?`,
       )
@@ -250,7 +262,7 @@ export class MediaIndex {
       .prepare(
         `UPDATE media SET path = ?, file_name = ?, folder = ?, title = ?, year = ?, edition = ?,
                 container = ?, changed_at = ?,
-                match = CASE WHEN match = 'unmatched' THEN ? ELSE match END
+                match = CASE WHEN match = '${MATCH_STATES.unmatched}' THEN ? ELSE match END
           WHERE id = ?`,
       )
       .run(
@@ -323,7 +335,9 @@ export class MediaIndex {
 
   saveProbeError({ id, error }: MediaIndexSaveProbeErrorProps): void {
     this.db
-      .prepare(`UPDATE media SET probed = 1, probe_error = ?, thumbnail = 'failed' WHERE id = ?`)
+      .prepare(
+        `UPDATE media SET probed = 1, probe_error = ?, thumbnail = '${THUMBNAIL_STATES.failed}' WHERE id = ?`,
+      )
       .run(error, id)
   }
 
@@ -357,7 +371,7 @@ export class MediaIndex {
   }
 
   /** The intro and credits stored for the file, each null when it has none. */
-  storedMarkers(id: number): { intro: Marker | null; credits: Marker | null } {
+  storedMarkers(id: number): StoredMarkers {
     return readMarkers({ db: this.db, mediaId: id })
   }
 
@@ -385,7 +399,7 @@ export class MediaIndex {
   pendingThumbnailIds(): number[] {
     return this.db
       .prepare<[], { id: number }>(
-        `SELECT id FROM media WHERE thumbnail = 'pending' AND probed = 1 ORDER BY id`,
+        `SELECT id FROM media WHERE thumbnail = '${THUMBNAIL_STATES.pending}' AND probed = 1 ORDER BY id`,
       )
       .all()
       .map((row) => row.id)

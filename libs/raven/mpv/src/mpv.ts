@@ -10,6 +10,7 @@ import {
   REMOTE_COMMANDS,
   union,
 } from '@raven/core'
+import type { MpvOption, MpvValue } from '@/options'
 import {
   MPV_PROPERTIES,
   propertyGuards,
@@ -32,6 +33,15 @@ export const MPV_EVENTS = {
 
 /** What the addon sends that is not an event: the answer to one request. */
 export const NATIVE_MESSAGES = { reply: 'reply' } as const
+
+/**
+ * The addon sends `time-pos` at most once in this long, and sends no trailing value after a
+ * quiet spell; `native/addon.cpp` holds the same number, which a test keeps in step.
+ */
+export const MPV_TIME_THROTTLE_MS = 250
+
+/** The script bindings raven calls through `script-binding`. */
+export const MPV_SCRIPT_BINDINGS = { statsToggle: 'stats/display-stats-toggle' } as const
 
 /** Why a file ended, as the addon names mpv's reasons. */
 export const MPV_END_FILE_REASONS = {
@@ -146,16 +156,31 @@ export type NowPlaying = {
   artwork: Buffer | null
 }
 
-type NativeHandle = {
+/** Every method the addon's handle has, which `isNativeHandle` checks for. */
+const NATIVE_HANDLE_METHODS = [
+  'command',
+  'get',
+  'set',
+  'observe',
+  'destroy',
+  'display',
+  'nowPlaying',
+  'clearNowPlaying',
+] as const
+
+// Positional arguments are the N-API addon's ABI, which `NativePlayer` in `native/addon.cpp` reads.
+type NativeSignatures = {
   command: (id: number, args: string[]) => void
   get: (id: number, name: string) => void
-  set: (id: number, name: string, value: string | number | boolean) => void
+  set: (id: number, name: string, value: MpvValue) => void
   observe: (name: string) => void
   destroy: () => Promise<void>
   display: () => unknown
   nowPlaying: (info: NowPlaying) => void
   clearNowPlaying: () => void
 }
+
+type NativeHandle = { [K in (typeof NATIVE_HANDLE_METHODS)[number]]: NativeSignatures[K] }
 type NativeAddon = {
   apiVersion: number
   create: (surface: MpvSurface, receive: (event: unknown) => void) => NativeHandle
@@ -165,18 +190,35 @@ const isFunction = (value: unknown): value is (...args: unknown[]) => unknown =>
 const isNativeAddon = (value: unknown): value is NativeAddon =>
   isRecord(value) && isNumber(value.apiVersion) && isFunction(value.create)
 const isNativeHandle = (value: unknown): value is NativeHandle =>
-  isRecord(value) &&
-  ['command', 'get', 'set', 'observe', 'destroy', 'display', 'nowPlaying', 'clearNowPlaying'].every(
-    (key) => isFunction(value[key]),
-  )
+  isRecord(value) && NATIVE_HANDLE_METHODS.every((key) => isFunction(value[key]))
 
 const isPropertyName = (name: string): name is MpvProperty => Object.hasOwn(propertyGuards, name)
 const isMpvPropertyEvent = (value: unknown): value is MpvPropertyEvent =>
   isProperty(value) && isPropertyName(value.name) && propertyGuards[value.name](value.data)
-const supportsVersion = (version: string) => {
+/** The oldest mpv raven runs on, 0.40: any later major, or 0.40 and up. */
+const MPV_MIN_MINOR = 40
+
+const supportsVersion = (version: string): boolean => {
   const match = /^mpv v?(\d+)\.(\d+)\./.exec(version)
-  return !!match && (Number(match[1]) > 0 || Number(match[2]) >= 40)
+  if (match === null) return false
+  return Number(match[1]) > 0 || Number(match[2]) >= MPV_MIN_MINOR
 }
+
+/** libmpv packs its client API version as major times 65536 plus minor; raven needs 2.3 or a later 2.x. */
+const CLIENT_API = { split: 65_536, major: 2, minMinor: 3 } as const
+
+const supportsClientApi = (apiVersion: number): boolean =>
+  Number.isSafeInteger(apiVersion) &&
+  Math.floor(apiVersion / CLIENT_API.split) === CLIENT_API.major &&
+  apiVersion % CLIENT_API.split >= CLIENT_API.minMinor
+
+/** How long a request waits for mpv's reply before it fails. */
+const REQUEST_TIMEOUT_MS = 10_000
+
+const MPV_ERRORS = {
+  destroyed: 'mpv is destroyed',
+  invalidEvent: 'Invalid native mpv event',
+} as const
 
 type Pending = {
   resolve: (value: unknown) => void
@@ -208,15 +250,13 @@ export const openMpv = async ({
 }: OpenMpvProps) => {
   const addon: unknown = loadAddon()
   if (!isNativeAddon(addon)) throw new Error('Invalid raven mpv addon')
-  const major = Math.floor(addon.apiVersion / 65536)
-  const minor = addon.apiVersion % 65536
-  if (!Number.isSafeInteger(addon.apiVersion) || major !== 2 || minor < 3)
+  if (!supportsClientApi(addon.apiVersion))
     throw new Error('libmpv client API 2.3 or newer is required')
 
   const pending = new Map<number, Pending>()
   let nextId = 0
   let isDestroyed = false
-  let destruction: Promise<void> | undefined
+  let destruction: Promise<void> | null = null
   const rejectPending = (error: Error) => {
     pending.forEach((request) => {
       clearTimeout(request.timer)
@@ -228,7 +268,7 @@ export const openMpv = async ({
     if (isDestroyed) return
     if (isReply(value)) {
       const request = pending.get(value.id)
-      if (!request) return
+      if (request === undefined) return
       pending.delete(value.id)
       clearTimeout(request.timer)
       try {
@@ -241,19 +281,19 @@ export const openMpv = async ({
       else request.resolve(value.data)
       return
     }
-    if (isProperty(value)) {
-      if (isMpvPropertyEvent(value)) {
-        onEvent(value)
-        return
-      }
-    } else if (isOtherEvent(value)) {
+    if (isMpvPropertyEvent(value)) {
+      onEvent(value)
+      return
+    }
+    // A property event never passes `isOtherEvent`, so one with a bad value is invalid below.
+    if (isOtherEvent(value)) {
       if (value.type === MPV_EVENTS.overflow || value.type === MPV_EVENTS.shutdown)
         rejectPending(new Error(`mpv ${value.type}`))
       onEvent(value)
       return
     }
-    rejectPending(new Error('Invalid native mpv event'))
-    onEvent({ type: MPV_EVENTS.error, message: 'Invalid native mpv event' })
+    rejectPending(new Error(MPV_ERRORS.invalidEvent))
+    onEvent({ type: MPV_EVENTS.error, message: MPV_ERRORS.invalidEvent })
   }
   const native: unknown = addon.create(surface, receive)
   if (!isNativeHandle(native)) throw new Error('Invalid raven mpv handle')
@@ -266,14 +306,14 @@ export const openMpv = async ({
   const request = ({ send, onReply = ignoreReply }: RequestProps) =>
     new Promise<unknown>((resolve, reject) => {
       if (isDestroyed) {
-        reject(new Error('mpv is destroyed'))
+        reject(new Error(MPV_ERRORS.destroyed))
         return
       }
       const id = ++nextId
       const timer = setTimeout(() => {
         pending.delete(id)
         reject(new Error('mpv request timed out'))
-      }, 10000)
+      }, REQUEST_TIMEOUT_MS)
       pending.set(id, { resolve, reject, timer, onReply })
       try {
         send(id)
@@ -296,9 +336,9 @@ export const openMpv = async ({
     return value
   }
   const destroy = () => {
-    if (destruction) return destruction
+    if (destruction !== null) return destruction
     isDestroyed = true
-    rejectPending(new Error('mpv is destroyed'))
+    rejectPending(new Error(MPV_ERRORS.destroyed))
     destruction = native.destroy()
     return destruction
   }
@@ -309,8 +349,6 @@ export const openMpv = async ({
       args: string[]
       onReply?: (reply: MpvReply) => void
     }
-
-    type OpenMpvSetProps = { name: string; value: string | number | boolean }
 
     type OpenMpvObserveProps = { name: MpvProperty }
 
@@ -325,24 +363,24 @@ export const openMpv = async ({
       command: async ({ args, onReply }: OpenMpvCommandProps) => {
         await request({ send: (id) => native.command(id, args), onReply })
       },
-      set: async ({ name, value }: OpenMpvSetProps) => {
+      set: async ({ name, value }: MpvOption) => {
         if (!(isString(value) || isNumber(value) || isBoolean(value)))
           throw new Error('Invalid mpv property value')
         await request({ send: (id) => native.set(id, name, value) })
       },
       observe: ({ name }: OpenMpvObserveProps) => {
-        if (isDestroyed) throw new Error('mpv is destroyed')
+        if (isDestroyed) throw new Error(MPV_ERRORS.destroyed)
         native.observe(name)
       },
       display: () => {
-        if (isDestroyed) throw new Error('mpv is destroyed')
+        if (isDestroyed) throw new Error(MPV_ERRORS.destroyed)
         const info: unknown = native.display()
         if (!isDisplayInfo(info)) throw new Error('Invalid native display information')
         return info
       },
       /** Tells the system what plays; nothing shows for a surface that is not `audio`. */
       nowPlaying: (info: NowPlaying) => {
-        if (isDestroyed) throw new Error('mpv is destroyed')
+        if (isDestroyed) throw new Error(MPV_ERRORS.destroyed)
         native.nowPlaying(info)
       },
       clearNowPlaying: () => {

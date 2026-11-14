@@ -1,9 +1,9 @@
 import { DESKTOP_REPLIES, DESKTOP_REQUESTS, type RecentView } from '@raven/core'
-import { Button, useToasts } from '@raven/ui'
+import { BUTTON_TONES, Button, useToasts } from '@raven/ui'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type ComponentType, useId } from 'react'
-import { refusalText } from '@/desktop/client'
-import { handled } from '@/desktop/handled'
+import { refusalText, askMain } from '@/desktop/client'
+import { handled } from '@/lib/handled'
 import { useOpenReply } from '@/desktop/openReply'
 import { LOCAL_PAGE_COPY } from '@/desktop/LocalPage/copy'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
@@ -64,7 +64,7 @@ const RecentsList = ({ list, onOpen, onRemove }: RecentsListProps) => (
           />
         </button>
         <Button
-          tone="ghost"
+          tone={BUTTON_TONES.ghost}
           icon="close"
           aria-label={LOCAL_PAGE_COPY.removeRecent(recent.label)}
           onClick={() => onRemove(recent)}
@@ -96,16 +96,23 @@ export const LocalPage = () => {
 
   const readAgain = () => queryClient.invalidateQueries({ queryKey: DESKTOP_QUERY_KEYS.recents })
 
-  const choose = async () => openReply(await client.request({ type: DESKTOP_REQUESTS.openDialog }))
+  const choose = async () =>
+    openReply(await askMain({ client, request: { type: DESKTOP_REQUESTS.openDialog } }))
 
   const open = async (recent: RecentView) =>
     openReply(
-      await client.request({ type: DESKTOP_REQUESTS.openRecent, recentId: recent.recentId }),
+      await askMain({
+        client,
+        request: { type: DESKTOP_REQUESTS.openRecent, recentId: recent.recentId },
+      }),
     )
 
   const remove = async (recent: RecentView) => {
     openReply(
-      await client.request({ type: DESKTOP_REQUESTS.removeRecent, recentId: recent.recentId }),
+      await askMain({
+        client,
+        request: { type: DESKTOP_REQUESTS.removeRecent, recentId: recent.recentId },
+      }),
     )
     await readAgain()
   }
@@ -135,7 +142,7 @@ export const LocalPage = () => {
         <h2 id={ids.open} className={styles.dropTitle}>
           {isDragging ? LOCAL_PAGE_COPY.dropToPlay : LOCAL_PAGE_COPY.dropAnywhere}
         </h2>
-        <Button tone="primary" icon="file-play" onClick={() => handled(choose())}>
+        <Button tone={BUTTON_TONES.primary} icon="file-play" onClick={() => handled(choose())}>
           {LOCAL_PAGE_COPY.chooseVideo}
         </Button>
       </section>
@@ -146,7 +153,7 @@ export const LocalPage = () => {
           </h2>
           {list !== null && list.length > 0 && (
             <Button
-              tone="ghost"
+              tone={BUTTON_TONES.ghost}
               icon="trash"
               className={styles.clear}
               onClick={() => handled(clear())}

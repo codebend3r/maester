@@ -1,8 +1,8 @@
 import { ITEM_TYPES } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
+import { mediaItemFor, summaryFor } from '@raven/native/testing'
 
 import { playerHeadingOf } from '@/layouts/playerHeading'
-import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 const LOGO = { uri: 'https://nas.example/api/items/1/images/logo?v=1', headers: {} }
 

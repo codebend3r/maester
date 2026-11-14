@@ -33,10 +33,11 @@ import { PlayHistoryRepository } from '@/history/playHistoryRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { PRIVACIES } from '@/lock/lockService'
 import { type AccountKey, VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
-import { ViewingAccounts } from '@/media/viewingAccounts'
 import { type ListenerScope, ListenerScopes } from '@/music/listenerScope'
 import { parseBody } from '@/parseBody'
 import { ROUTE_PARAMS } from '@/requestParts'
+import { pageLimit } from '@/queryValues'
+import { ViewingAccount } from '@/media/viewingAccountParam'
 
 /** What a page's query asks, as the routes read it off the address. */
 type PageQuery = {
@@ -48,13 +49,6 @@ type PageQuery = {
 type ReadPageProps = PageQuery & {
   scope: ListenerScope
   whose: AccountKey | null
-}
-
-const limitOf = (asked: unknown): number => {
-  const limit = isString(asked) ? Number.parseInt(asked, 10) : Number.NaN
-  return Number.isInteger(limit)
-    ? Math.min(Math.max(limit, 1), PLAY_HISTORY_PAGE.most)
-    : PLAY_HISTORY_PAGE.size
 }
 
 const showOf = (asked: unknown): PlayHistoryShow => {
@@ -88,7 +82,6 @@ const accountOf = (asked: unknown): AccountKey | null => {
 export class PlayHistoryController {
   constructor(
     @Inject(PlayHistoryRepository) private readonly history: PlayHistoryRepository,
-    @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
     @Inject(ListenerScopes) private readonly scopes: ListenerScopes,
   ) {}
 
@@ -98,7 +91,11 @@ export class PlayHistoryController {
       whose,
       before: cursorOf(before),
       show: showOf(show),
-      limit: limitOf(limit),
+      limit: pageLimit({
+        asked: limit,
+        fallback: PLAY_HISTORY_PAGE.size,
+        most: PLAY_HISTORY_PAGE.most,
+      }),
       scope,
     })
   }
@@ -145,8 +142,8 @@ export class PlayHistoryController {
   @HttpCode(200)
   startListen(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
-    @Req() request: FastifyRequest,
     @Body() body: unknown,
+    @ViewingAccount() account: AccountKey,
   ): ListenStarted {
     const { position } = parseBody({
       guard: isListenStart,
@@ -154,7 +151,7 @@ export class PlayHistoryController {
       message: 'position must be a number of seconds',
     })
     const started = this.history.startListen({
-      account: this.accounts.keyOf({ request }),
+      account,
       mediaId: id,
       position,
     })
@@ -169,15 +166,15 @@ export class PlayHistoryController {
   @HttpCode(204)
   reportListen(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
-    @Req() request: FastifyRequest,
     @Body() body: unknown,
+    @ViewingAccount() account: AccountKey,
   ): void {
     const { position } = parseBody({
       guard: isListenReport,
       body,
       message: 'position must be a number of seconds',
     })
-    if (!this.history.reportListen({ account: this.accounts.keyOf({ request }), id, position })) {
+    if (!this.history.reportListen({ account, id, position })) {
       throw new NotFoundException(`No listen ${id}`)
     }
   }

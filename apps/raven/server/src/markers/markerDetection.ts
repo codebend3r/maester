@@ -15,7 +15,7 @@ import type { KeptFingerprint } from '@/markers/fingerprintMatch'
 import { type EpisodeFile, type FilmFile, MarkerJobs } from '@/markers/markerJobs'
 import { REGIONS, type Region } from '@/markers/seasonListen'
 import { type FoundMarkers, detectSeasonMarkers } from '@/markers/seasonMarkers'
-import { createTaskQueue } from '@/scanner/concurrency'
+import { createTaskQueue, QUEUE_KEYS, queueKeyOf } from '@/scanner/concurrency'
 import { ScanControl } from '@/scanner/scanControl'
 import { SettingsRepository } from '@/settings/settingsRepository'
 
@@ -98,7 +98,7 @@ export class MarkerDetection implements OnApplicationBootstrap, OnModuleDestroy 
     if (this.scans.isStopped || !this.config.markerDetection || (!isManual && !this.isOn())) return
     this.jobs.seasonsDue(libraryId).forEach((seasonId) =>
       this.queue.push({
-        key: `season:${libraryId}:${seasonId}`,
+        key: queueKeyOf({ kind: QUEUE_KEYS.season, parts: [libraryId, seasonId] }),
         task: (signal) =>
           this.runJob({
             label: `season ${seasonId}`,
@@ -111,7 +111,7 @@ export class MarkerDetection implements OnApplicationBootstrap, OnModuleDestroy 
     )
     this.jobs.filmsDue(libraryId).forEach((film) =>
       this.queue.push({
-        key: `media:${film.id}`,
+        key: queueKeyOf({ kind: QUEUE_KEYS.media, parts: [film.id] }),
         task: (signal) =>
           this.runJob({
             label: film.path,

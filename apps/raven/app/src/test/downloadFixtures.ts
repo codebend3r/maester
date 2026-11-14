@@ -1,3 +1,5 @@
+import { mediaItemFor } from '@raven/native/testing'
+
 import {
   DOWNLOAD_KINDS,
   DOWNLOAD_STATES,
@@ -10,7 +12,6 @@ import {
   downloadKeyOf,
   keyOfEntry,
 } from '@/downloads/downloadEntries'
-import { mediaItemFor } from '@/test/mediaItem'
 import { AIRBAG, OK_COMPUTER } from '@/test/musicServer'
 
 /** The server every fixture download is from. */

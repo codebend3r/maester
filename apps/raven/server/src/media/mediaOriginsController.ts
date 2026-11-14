@@ -21,6 +21,7 @@ import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MediaTickets } from '@/media/mediaTickets'
 import { type ClientRequest, isLanRequest } from '@/remoteAccess/clientNetwork'
 import { SettingsRepository } from '@/settings/settingsRepository'
+import { QUERY_PARAMS, queryText } from '@/queryValues'
 
 const MAX_PROBE_BYTES = 1_048_576
 
@@ -82,8 +83,9 @@ export class MediaOriginsController {
   @Public()
   @MediaPlane()
   @Get('ping')
-  async ping(@Query('bytes') bytes: string | undefined, @Res() reply: FastifyReply): Promise<void> {
-    const asked = wholeNumber(bytes) ?? MEDIA_PROBE_BYTES
+  async ping(@Query(QUERY_PARAMS.bytes) bytes: unknown, @Res() reply: FastifyReply): Promise<void> {
+    const asked =
+      wholeNumber(queryText({ value: bytes, name: QUERY_PARAMS.bytes })) ?? MEDIA_PROBE_BYTES
     const length = Math.min(Math.max(asked, 1), MAX_PROBE_BYTES)
     await reply
       .header(HEADERS.contentType, CONTENT_TYPES.octetStream)

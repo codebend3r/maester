@@ -1,11 +1,12 @@
 import {
   ITEM_TYPES,
-  LIBRARY_LISTINGS,
   type Library,
   type LibraryCounts,
   type LibraryKind,
-  listingFor,
   matchTypeFor,
+  listsAlbums,
+  libraryPath,
+  libraryTabPath,
 } from '@raven/core'
 import type { IconName } from '@raven/ui'
 import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
@@ -40,9 +41,7 @@ const matchedToMovies = (kind: LibraryKind): boolean => matchTypeFor(kind) === I
 const matchedFiles = (kind: LibraryKind): boolean =>
   matchTypeFor(kind) != null && !listsAlbums(kind)
 
-/** A music library lists albums, and has its artists on a tab of their own; every other lists its files or shows. */
-const listsAlbums = (kind: LibraryKind): boolean => listingFor(kind) === LIBRARY_LISTINGS.albums
-
+/** Every library but music lists its files or shows; music lists albums, with its artists on a tab of their own. */
 const listsFiles = (kind: LibraryKind): boolean => !listsAlbums(kind)
 
 /**
@@ -226,7 +225,9 @@ const isOpening = (section: LibrarySection): boolean =>
 
 /** A tab's address; the opening tab is the library's own. */
 export const sectionPath = ({ libraryId, section }: SectionPathProps): string =>
-  isOpening(section) ? `/libraries/${libraryId}` : `/libraries/${libraryId}/${section}`
+  isOpening(section)
+    ? libraryPath(libraryId)
+    : libraryTabPath({ libraryId: libraryId, tab: section })
 
 type SectionFromProps = { param: string | undefined; kind: LibraryKind }
 

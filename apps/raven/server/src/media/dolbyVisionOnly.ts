@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { type DolbyVisionOnlyListing, type MediaItem, sortTitle } from '@raven/core'
+import { type DolbyVisionOnlyListing, type MediaItem, sortTitle, ITEM_TYPES } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { MediaRepository } from '@/media/mediaRepository'
 import type { AccountKey } from '@/media/viewingAccountKeys'
@@ -9,7 +9,7 @@ const DOLBY_VISION_ONLY_FILES = `
   SELECT m.id AS media_id, s.parent_id AS show_id, e.id AS episode_id
     FROM media m
     LEFT JOIN media_items mi ON mi.media_id = m.id
-    LEFT JOIN shown_items e ON e.id = mi.item_id AND e.type = 'episode'
+    LEFT JOIN shown_items e ON e.id = mi.item_id AND e.type = '${ITEM_TYPES.episode}'
     LEFT JOIN shown_items s ON s.id = e.parent_id
    WHERE m.library_id = ? AND m.dolby_vision_only = 1`
 

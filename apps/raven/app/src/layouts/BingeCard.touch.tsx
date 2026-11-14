@@ -11,6 +11,7 @@ import type { RouteTarget } from '@/routes'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { pictureStyles, useTheme } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
 
 const PRESSED_SCALE = 0.98
 
@@ -139,7 +140,7 @@ export const BingeCardView = ({ card, width, height, onOpen }: BingeCardViewProp
           )}
         </View>
         <View pointerEvents="none" style={styles.badge}>
-          <Icon colour={text} name="play" size={PLAY_SIZE} />
+          <Icon colour={text} name={APP_ICONS.play} size={PLAY_SIZE} />
         </View>
       </View>
     </Pressable>

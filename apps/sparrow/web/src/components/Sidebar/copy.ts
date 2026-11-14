@@ -1,12 +1,5 @@
-type EnvironmentProps = { raven: string | null }
-
-const hostOf = (address: string): string => {
-  try {
-    return new URL(address).host
-  } catch {
-    return address
-  }
-}
+/** The raven the sandbox searches, by its host; null for the case's fake. */
+type EnvironmentProps = { host: string | null }
 
 export const SIDEBAR_COPY = {
   label: 'Controls',
@@ -15,8 +8,7 @@ export const SIDEBAR_COPY = {
   tier: 'Tier',
   caseMessages: 'Case messages',
   sandbox: '● Sandbox',
-  environment: ({ raven }: EnvironmentProps) =>
-    `raven · ${raven === null ? "the case's fake" : hostOf(raven)}`,
+  environment: ({ host }: EnvironmentProps) => `raven · ${host ?? "the case's fake"}`,
   startOver: 'Start over',
   failed: "The sandbox didn't take that; is it still running?",
 } as const
