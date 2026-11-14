@@ -43,6 +43,8 @@ describe('hlsArgs', () => {
   } as const
   /** A Dolby Vision profile 5 record, as `dolbyVisionOf` reads one. */
   const DV5 = { profile: 5, level: 6, blSignalCompatibilityId: 0 }
+  /** A Dolby Vision profile 7 record, a 4K Blu-ray's: a second layer over HDR10. */
+  const DV7 = { profile: 7, level: 6, blSignalCompatibilityId: 6 }
   /** A picture subtitle to burn, on a 1080p canvas. */
   const burnOf = (stream: number) => ({ stream, canvas: { width: 1920, height: 1080 } })
 
@@ -282,6 +284,13 @@ describe('hlsArgs', () => {
       'movflags=frag_keyframe+empty_moov+default_base_moof+frag_discont+delay_moov:use_editlist=0:avoid_negative_ts=disabled:strict=unofficial',
     )
     expect(args).not.toContain('hvc1')
+  })
+
+  it('copies Dolby Vision profile 7 as its HDR10 base layer under hvc1, its RPU and enhancement layer taken out', () => {
+    const args = argsFor({ from: 0, mode: PLAYBACK_MODES.remux, dolbyVision: DV7 })
+    expect(args.join(' ')).toContain('-c:v copy -tag:v hvc1 -bsf:v filter_units=remove_types=62|63')
+    expect(args).not.toContain('dvh1')
+    expect(args[args.indexOf('-segment_format_options') + 1]).not.toContain('strict')
   })
 
   it('writes a Dolby Vision transcode’s segments as any other, since its picture is H.264 again', () => {

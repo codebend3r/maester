@@ -76,6 +76,9 @@ describe('streamArgs', () => {
   /** A Dolby Vision profile 5 record, as `dolbyVisionOf` reads one. */
   const DV5 = { profile: 5, level: 6, blSignalCompatibilityId: 0 }
 
+  /** A Dolby Vision profile 7 record, a 4K Blu-ray's: a second layer over HDR10. */
+  const DV7 = { profile: 7, level: 6, blSignalCompatibilityId: 6 }
+
   describe('with a picture subtitle to burn in', () => {
     const burn = { stream: 1, canvas: { width: 1920, height: 1080 } }
     const args = streamArgs({ ...base, mode: 'transcode', burn })
@@ -168,6 +171,13 @@ describe('streamArgs', () => {
     expect(after({ args, flag: '-c:v' })).toBe('copy')
     expect(args.join(' ')).toContain('-c:v copy -tag:v dvh1 -strict unofficial -c:a aac')
     expect(args).not.toContain('hvc1')
+  })
+
+  it('copies Dolby Vision profile 7 as its HDR10 base layer, which a browser decodes', () => {
+    const args = streamArgs({ ...base, mode: 'remux', dolbyVision: DV7 })
+    expect(args.join(' ')).toContain('-c:v copy -tag:v hvc1 -bsf:v filter_units=remove_types=62|63')
+    expect(args).not.toContain('dvh1')
+    expect(args).not.toContain('-strict')
   })
 
   it('tags a Dolby Vision transcode nothing, since its picture is H.264 again', () => {

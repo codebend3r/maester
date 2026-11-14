@@ -1,10 +1,4 @@
-import {
-  FACT_PART_KINDS,
-  type FactPart,
-  PLAYBACK_MODES,
-  type SkipStep,
-  formatDuration,
-} from '@raven/core'
+import { type SkipStep, formatDuration } from '@raven/core'
 import {
   type ComponentRef,
   type ComponentType,
@@ -57,6 +51,7 @@ import {
   type Transport,
   type TrackPicker,
   surfaceStateOf,
+  cornerFactsOf,
   playedShareOf,
   scrubberAccessibilityOf,
   type VideoSurface,
@@ -70,7 +65,7 @@ import {
 } from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
 import type { IconName } from '@raven/ui/iconDrawings'
-import { PLAYBACK_MODE_NAMES, useClock } from '@raven/ui/headless'
+import { useClock } from '@raven/ui/headless'
 import { LINE_RATIO } from '@/layouts/textHeights'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
@@ -241,37 +236,15 @@ const liftedSubtitleStyleOf = ({
 
 type CornerProps = Pick<PlayerChromeProps, 'mode' | 'heading'>
 
-type PictureChipsOfProps = Pick<CornerProps, 'mode' | 'heading'>
-
-/** The picture's chips: its size, then, while it reaches the screen as the file has it, its codec and range. */
-const pictureChipsOf = ({ mode, heading }: PictureChipsOfProps): FactPart[] =>
-  [
-    { kind: FACT_PART_KINDS.resolution, text: heading.quality },
-    ...(mode === PLAYBACK_MODES.transcode
-      ? []
-      : [
-          { kind: FACT_PART_KINDS.codec, text: heading.codec },
-          { kind: FACT_PART_KINDS.range, text: heading.range },
-        ]),
-  ].flatMap(({ kind, text }) => (text === null ? [] : [{ kind, text }]))
-
 /**
  * The top right corner, one thing under another: the time of day, the picture's chips, then how
  * the video plays on a line of its own, read out together.
  */
 const Corner = ({ mode, heading }: CornerProps) => {
   const styles = useStyles()
-  const clock = useClock()
-  const way = mode === null ? null : PLAYBACK_MODE_NAMES[mode]
-  const chips = pictureChipsOf({ mode, heading })
+  const { clock, chips, way, label } = cornerFactsOf({ mode, heading, clock: useClock() })
   return (
-    <View
-      accessibilityLabel={[clock, ...chips.map(({ text }) => text), way]
-        .filter((part): part is string => part !== null)
-        .join(', ')}
-      accessible
-      style={styles.corner}
-    >
+    <View accessibilityLabel={label} accessible style={styles.corner}>
       <Text variant={TEXT_VARIANTS.display} numberOfLines={1} style={styles.clock}>
         {clock}
       </Text>

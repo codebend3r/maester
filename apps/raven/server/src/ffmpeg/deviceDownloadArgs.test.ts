@@ -44,6 +44,17 @@ describe('deviceDownloadArgs', () => {
     expect(args).not.toContain('hvc1')
   })
 
+  it('copies Dolby Vision profile 7 as its HDR10 base layer, since AVPlayer decodes no profile 7', () => {
+    const args = deviceDownloadArgs({
+      ...base,
+      videoCodec: VIDEO_CODECS.hevc,
+      dolbyVision: { profile: 7, level: 6, blSignalCompatibilityId: 6 },
+      audio: [],
+    })
+    expect(args.join(' ')).toContain('-c:v copy -tag:v hvc1 -bsf:v filter_units=remove_types=62|63')
+    expect(args).not.toContain('dvh1')
+  })
+
   it('copies the audio AVPlayer plays and converts the rest to E-AC-3 of at most 5.1', () => {
     const args = deviceDownloadArgs({
       ...base,

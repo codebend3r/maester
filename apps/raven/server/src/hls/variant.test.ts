@@ -38,6 +38,17 @@ describe('videoStringOf', () => {
     ).toBe('dvh1.05.06')
   })
 
+  it('names a remux of Dolby Vision profile 7 as its HDR10 base layer, which every device decodes', () => {
+    expect(
+      videoStringOf({
+        mode: PLAYBACK_MODES.remux,
+        videoCodec: VIDEO_CODECS.hevc,
+        bitDepth: 10,
+        dolbyVision: { profile: 7, level: 6, blSignalCompatibilityId: 6 },
+      }),
+    ).toBe('hvc1.2.4.L153.B0')
+  })
+
   it('cannot name a remux of a codec HLS has no string for', () => {
     expect(
       videoStringOf({
