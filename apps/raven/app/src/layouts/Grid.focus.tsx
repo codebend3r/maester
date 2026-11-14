@@ -13,7 +13,7 @@ import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { Icon } from '@raven/native'
 import { useTvCard } from '@/cardMenu/useTvCard'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
+import { CARD_SHAPES, type CardShape, type ShelfCard, cardLabelOf } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import {
   focusCardWidthOf,
@@ -22,6 +22,7 @@ import {
   TV_WATCHED_BADGE,
 } from '@/layouts/FocusCard'
 import { FocusBand } from '@/layouts/FocusBand'
+import { RowRatings, rowRatingsHeightOf } from '@/layouts/RatingPanel'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { GRID_SIZE_COPY } from '@/layouts/copy'
 import { focusPicker } from '@/layouts/Picker.focus'
@@ -169,7 +170,7 @@ const RowCard = ({ card, hasPicture, isPreferred, jump, onPress }: RowCardProps)
   return (
     <Pressable
       ref={pressable}
-      accessibilityLabel={card.title}
+      accessibilityLabel={cardLabelOf({ card })}
       accessibilityRole="button"
       hasTVPreferredFocus={isPreferred}
       onBlur={tvCard.onBlur}
@@ -195,6 +196,7 @@ const RowCard = ({ card, hasPicture, isPreferred, jump, onPress }: RowCardProps)
             {card.line}
           </Text>
         )}
+        <RowRatings card={card} sizes={TV_SIZES} />
       </View>
       {tvCard.menu}
     </Pressable>
@@ -399,8 +401,11 @@ const Grid = ({ title, icon, line, notice, toolbar, sections, view, jump, onOpen
     if (row.kind === GRID_ROWS.header) return headerHeightOf(screen.fontScale)
     if (isRows) {
       const picture = pictureHeightOf({ shape: row.shape, width: TILE_WIDTHS[row.shape] })
+      const words =
+        wordsHeight +
+        rowRatingsHeightOf({ cards: row.cards, sizes: TV_SIZES, fontScale: screen.fontScale })
       return (
-        Math.max(view === LIBRARY_VIEWS.tiles ? picture : 0, wordsHeight) +
+        Math.max(view === LIBRARY_VIEWS.tiles ? picture : 0, words) +
         TV_SIZES.space3 * 2 +
         TV_SIZES.space2
       )

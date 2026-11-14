@@ -148,3 +148,32 @@ export const formatScore = (rating: Rating): string => {
   if (rating.source === RATING_SOURCES.metacritic) return String(Math.round(rating.value * 10))
   return `${Math.round(rating.value * 10)}%`
 }
+
+/** Every rating source, in the order a ratings panel lists them. */
+const RATING_SOURCE_ORDER = [
+  RATING_SOURCES.rottenTomatoes,
+  RATING_SOURCES.imdb,
+  RATING_SOURCES.metacritic,
+  RATING_SOURCES.tmdb,
+] as const satisfies readonly RatingSource[]
+
+/** The scores a title has, in a ratings panel's order; a source with none is left out. */
+export const inSourceOrder = (ratings: readonly Rating[]): Rating[] =>
+  RATING_SOURCE_ORDER.flatMap((source) => ratings.find((each) => each.source === source) ?? [])
+
+const percentFigure = (rating: Rating): string => String(Math.round(rating.value * 10))
+const outOfTenFigure = (rating: Rating): string => rating.value.toFixed(1)
+
+const SCORE_FIGURES = {
+  [RATING_SOURCES.rottenTomatoes]: percentFigure,
+  [RATING_SOURCES.imdb]: outOfTenFigure,
+  [RATING_SOURCES.metacritic]: percentFigure,
+  [RATING_SOURCES.tmdb]: outOfTenFigure,
+} as const satisfies Record<RatingSource, (rating: Rating) => string>
+
+/** A score's number as a ratings panel shows it, before its scale: "72" for "72%" or "72/100", "6.4" for "6.4/10". */
+export const scoreFigure = (rating: Rating): string => SCORE_FIGURES[rating.source](rating)
+
+/** How far along its bar a score reaches, from 0 to 100. */
+export const scoreBarPercent = (rating: Rating): number =>
+  Math.min(100, Math.max(0, rating.value * 10))

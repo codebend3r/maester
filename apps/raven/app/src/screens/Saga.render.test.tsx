@@ -41,7 +41,7 @@ describe('Saga on a phone or tablet', () => {
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
 
-  it("lists the saga's movies as posters, with how many and the years they span", async () => {
+  it("lists the saga's movies as rows, with how many and the years they span", async () => {
     await renderScreen({ ui: <Saga /> })
 
     expect(await screen.findByRole('header', { name: NIGHT_SAGA.name })).toBeTruthy()

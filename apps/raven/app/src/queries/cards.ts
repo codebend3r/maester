@@ -23,6 +23,7 @@ import {
   showYears,
   sortFact,
   watchedStateOf,
+  type Rating,
 } from '@raven/core'
 
 import type { EpisodeWords } from '@/queries/episodeMark'
@@ -63,6 +64,8 @@ export type ShelfCard = {
   episode?: EpisodeWords | null
   /** The picture's chips drawn under `line`: an episode's `DV5`. */
   chips?: readonly FactPart[]
+  /** A movie's scores, in a small ratings panel under a row's words: a saga's movies. */
+  ratings?: readonly Rating[]
   /** Set on a card that resumes a video: it is drawn as a resume card, with what is left to watch. */
   resume?: { timeLeft: string | null } | null
   /** A library's icon, drawn before a row's words, as the side menu's row wears it. */

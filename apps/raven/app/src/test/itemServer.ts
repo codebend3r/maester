@@ -9,6 +9,8 @@ import {
   type ItemDetails,
   type ItemSummary,
   MATCH_STATES,
+  RATING_KINDS,
+  RATING_SOURCES,
   type MediaTracks,
   type SeasonSummary,
   createApiClient,
@@ -77,6 +79,10 @@ export const BUSBOYS = detailsFor({
     tagline: 'Every table has a story.',
     summary: 'Two busboys at a downtown steakhouse plan one last perfect shift.',
     contentRating: 'R',
+    ratings: [
+      { source: RATING_SOURCES.rottenTomatoes, kind: RATING_KINDS.critic, value: 7.2, votes: null },
+      { source: RATING_SOURCES.imdb, kind: RATING_KINDS.audience, value: 6.4, votes: 1200 },
+    ],
     genres: ['Comedy', 'Drama'],
     credits: [
       {

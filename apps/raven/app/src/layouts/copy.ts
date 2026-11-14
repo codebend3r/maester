@@ -1,4 +1,4 @@
-import { REPEAT_MODES, type RepeatMode } from '@raven/core'
+import { RATING_SOURCES, REPEAT_MODES, type RepeatMode } from '@raven/core'
 
 import type { PersonCard } from '@/queries/itemPage'
 
@@ -22,6 +22,46 @@ export const FIELD_COPY = { showPassword: 'Show password' } as const
 
 /** A TV picker's option chosen now, marked with a tick. */
 export const PICKER_LIST_COPY = { chosen: (label: string) => `✓ ${label}` } as const
+
+type RatingSaidProps = { site: string; score: string; spoken: string; meaning: string }
+
+/** The ratings panel's words, the web's: each source's full name, the label under its score, what the number means and its scale. */
+export const RATING_PANEL_COPY = {
+  ratings: 'Ratings',
+  sources: {
+    [RATING_SOURCES.rottenTomatoes]: {
+      site: 'Rotten Tomatoes',
+      label: 'Tomatometer',
+      meaning: 'Critics who reviewed it positively',
+      shown: '%',
+      spoken: '%',
+    },
+    [RATING_SOURCES.imdb]: {
+      site: 'IMDb',
+      label: 'IMDb',
+      meaning: 'Average user rating',
+      shown: '/10',
+      spoken: ' out of 10',
+    },
+    [RATING_SOURCES.metacritic]: {
+      site: 'Metacritic',
+      label: 'Metascore',
+      meaning: 'Weighted critic score',
+      shown: '/100',
+      spoken: ' out of 100',
+    },
+    [RATING_SOURCES.tmdb]: {
+      site: 'TMDB',
+      label: 'TMDB',
+      meaning: 'Average user rating',
+      shown: '/10',
+      spoken: ' out of 10',
+    },
+  },
+  /** One score as it is read out: "Rotten Tomatoes: 72%. Critics who reviewed it positively." */
+  itemLabel: ({ site, score, spoken, meaning }: RatingSaidProps) =>
+    `${site}: ${score}${spoken}. ${meaning}.`,
+} as const
 
 type PersonLabelProps = Pick<PersonCard, 'name' | 'role'>
 
