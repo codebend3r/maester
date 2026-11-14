@@ -4,6 +4,7 @@ import {
   type ItemDetails,
   type MediaItem,
   type MediaTracks,
+  type Rating,
   FACT_PART_KINDS,
   type FactPart,
   type FileFact,
@@ -78,6 +79,8 @@ export type ItemHero = {
   byline: string | null
   /** The content rating, "R". */
   rating: string | null
+  /** Every score it has, one per source, as the web's ratings panel shows them; none for a season. */
+  ratings: readonly Rating[]
   facts: string[]
   progress: Progress | null
   /** A movie's, show's or season's poster, or an episode's still. */
@@ -222,6 +225,7 @@ const movieHero = ({ details, shown, primary, ...pictures }: MovieHeroProps): It
   title: details.title,
   byline: directedBy(details),
   rating: details.contentRating,
+  ratings: details.ratings,
   facts: movieFacts({ details: shown, primary }),
   logo: logoOf({ details, place: ART_PLACES.title, ...pictures }),
   progress: timeLeft(primary),
@@ -274,6 +278,7 @@ const episodeHero = ({
     title: details.title,
     byline: null,
     rating: null,
+    ratings: details.ratings,
     facts: episodeFacts({ details: shown, primary }),
     progress: timeLeft(primary),
     poster: { shape: CARD_SHAPES.wide, picture: still },
@@ -373,6 +378,7 @@ export const showPage = ({ details, ...pictures }: ShowPageProps): ItemPage =>
       title: details.title,
       byline: createdBy(details),
       rating: details.contentRating,
+      ratings: details.ratings,
       facts: showFacts(details),
       progress: null,
       poster: posterOf({ details, ...pictures }),
@@ -416,6 +422,7 @@ export const seasonPage = ({ season, show, ...pictures }: SeasonPageProps): Item
       title: season.title,
       byline: null,
       rating: show?.contentRating ?? null,
+      ratings: [],
       facts: seasonFacts(season),
       progress:
         total === 0

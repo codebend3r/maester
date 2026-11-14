@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Icon } from '@raven/native'
 import { TouchFactChips } from '@/layouts/FactChips'
+import { RatingPanel } from '@/layouts/RatingPanel'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
@@ -224,6 +225,7 @@ const Hero = ({ hero, actions, links, onOpen }: HeroProps) => {
           {isWide && <Synopsis hero={hero} isBeside />}
         </View>
       </View>
+      <RatingPanel ratings={hero.ratings} sizes={SIZES} />
       <View style={styles.actionRow}>
         <View style={styles.actions}>
           {actions.map((action) => (
