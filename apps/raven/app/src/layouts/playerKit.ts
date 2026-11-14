@@ -1,7 +1,10 @@
 import {
   type CaptionStyle,
   type Chapter,
+  FACT_PART_KINDS,
+  type FactPart,
   type Marker,
+  PLAYBACK_MODES,
   type PlaybackMode,
   formatDuration,
 } from '@raven/core'
@@ -9,6 +12,7 @@ import type { ComponentProps, ReactNode } from 'react'
 import type { AccessibilityActionEvent, AccessibilityActionInfo } from 'react-native'
 import type Video from 'react-native-video'
 
+import { PLAYBACK_MODE_NAMES } from '@raven/ui/headless'
 import type { IconName } from '@raven/ui/iconDrawings'
 
 import type { PickerProps } from '@/layouts/gridKit'
@@ -215,3 +219,32 @@ export const scrubberAccessibilityOf = ({
     if (nativeEvent.actionName === SEEK_ACTIONS.decrement) onSeek(position - SKIP_SECONDS)
   },
 })
+
+type PictureChipsOfProps = Pick<PlayerChromeProps, 'mode' | 'heading'>
+
+/** The picture's chips: its size, then, while it reaches the screen as the file has it, its codec and range. */
+const pictureChipsOf = ({ mode, heading }: PictureChipsOfProps): FactPart[] =>
+  [
+    { kind: FACT_PART_KINDS.resolution, text: heading.quality },
+    ...(mode === PLAYBACK_MODES.transcode
+      ? []
+      : [
+          { kind: FACT_PART_KINDS.codec, text: heading.codec },
+          { kind: FACT_PART_KINDS.range, text: heading.range },
+        ]),
+  ].flatMap(({ kind, text }) => (text === null ? [] : [{ kind, text }]))
+
+type CornerFactsOfProps = PictureChipsOfProps & { clock: string }
+
+/** What a player's top right corner shows, one under another, and the words it is read out in. */
+type CornerFacts = { clock: string; chips: FactPart[]; way: string | null; label: string }
+
+/** The top right corner both chromes draw: the time of day, the picture's chips, then how the video plays. */
+export const cornerFactsOf = ({ mode, heading, clock }: CornerFactsOfProps): CornerFacts => {
+  const chips = pictureChipsOf({ mode, heading })
+  const way = mode === null ? null : PLAYBACK_MODE_NAMES[mode]
+  const label = [clock, ...chips.map(({ text }) => text), way]
+    .filter((part): part is string => part !== null)
+    .join(', ')
+  return { clock, chips, way, label }
+}

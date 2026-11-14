@@ -1,6 +1,6 @@
 import { type SkipStep, formatDuration } from '@raven/core'
 import { Icon } from '@raven/native'
-import { usePlayerPrefs } from '@raven/ui/headless'
+import { useClock, usePlayerPrefs } from '@raven/ui/headless'
 import type { IconName } from '@raven/ui/iconDrawings'
 import { type ComponentRef, useRef, useState } from 'react'
 import {
@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Video from 'react-native-video'
 
+import { TouchFactChips } from '@/layouts/FactChips'
 import { pickerLabelOf } from '@/layouts/gridKit'
 import { LoadingMark } from '@/layouts/LoadingMark'
 import { openPickerSheet } from '@/layouts/Picker.touch'
@@ -32,8 +33,9 @@ import {
   type SkipDirection,
   type TrackPicker,
   type Transport,
+  cornerFactsOf,
 } from '@/layouts/playerKit'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
 import { useScrub } from '@/layouts/useScrub'
@@ -378,9 +380,34 @@ const PlayerLogo = ({ heading, title }: PlayerLogoProps) => {
   )
 }
 
+type CornerProps = Pick<PlayerChromeProps, 'mode' | 'heading'>
+
+/**
+ * The top right corner, as the TV player's: the time of day, the picture's chips, then how the
+ * video plays on a line of its own, read out together.
+ */
+const Corner = ({ mode, heading }: CornerProps) => {
+  const styles = useStyles()
+  const { clock, chips, way, label } = cornerFactsOf({ mode, heading, clock: useClock() })
+  return (
+    <View accessibilityLabel={label} accessible style={styles.corner}>
+      <Text variant={TEXT_VARIANTS.display} numberOfLines={1} style={styles.clock}>
+        {clock}
+      </Text>
+      {chips.length > 0 && <TouchFactChips parts={chips} />}
+      {way !== null && (
+        <View style={styles.wayChip}>
+          <Text style={styles.wayText}>{way}</Text>
+        </View>
+      )}
+    </View>
+  )
+}
+
 /**
  * Raven's controls over the video under the thumb, the web player's, in icons: Back at the top
- * left with what is playing beside it, and along the bottom the time and the line to drag along, then the transport and the
+ * left with what is playing beside it, the time of day, the picture's chips and how the video plays
+ * at the top right as the TV's, and along the bottom the time and the line to drag along, then the transport and the
  * glass icons for subtitles, audio, quality and Picture in Picture, all inside the safe area
  * while the video fills the screen. They fade once the video has played untouched for the
  * viewer's linger, and a tap brings them back; what is playing fades with them. A double tap on
@@ -405,6 +432,7 @@ const PlayerChrome = ({
   quality,
   next,
   previous,
+  mode,
   onBack,
 }: PlayerChromeProps) => {
   const insets = useSafeAreaInsets()
@@ -498,6 +526,9 @@ const PlayerChrome = ({
             <View pointerEvents="none" style={styles.logoSlot}>
               <PlayerLogo heading={heading} title={title} />
             </View>
+            <View pointerEvents="none" style={styles.cornerSlot}>
+              <Corner heading={heading} mode={mode} />
+            </View>
           </View>
           {gestures.transport !== null && (
             <TransportControls
@@ -546,6 +577,25 @@ const useStyles = pictureStyles((colours) =>
     // Beside Back, its art centred on the button's height until the art stands taller.
     logoSlot: { flexShrink: 1, minHeight: SIZES.controlLarge, justifyContent: 'center' },
     logo: { gap: SIZES.space1 },
+    // Pushed to the right edge, never squeezed by the title, which shrinks instead.
+    cornerSlot: { flex: 1, alignItems: 'flex-end' },
+    corner: { flexShrink: 0, alignItems: 'flex-end', gap: SIZES.space1 },
+    // The time of day over any picture, so a shadow keeps it readable unfaded.
+    clock: {
+      color: colours.text,
+      fontSize: SIZES.textXl,
+      fontVariant: ['tabular-nums'],
+      textShadowColor: colours.ground,
+      textShadowRadius: SIZES.space2,
+    },
+    // Direct play, Remux or Transcode, on the player's glass.
+    wayChip: {
+      paddingHorizontal: SIZES.space2,
+      paddingVertical: SIZES.space0,
+      borderRadius: SIZES.radiusSm,
+      backgroundColor: colours.quiet,
+    },
+    wayText: { color: colours.text, fontSize: SIZES.textXs, fontWeight: 'bold' },
     // The name where there is no art, over any picture, so a shadow keeps it readable unfaded.
     title: {
       color: colours.text,

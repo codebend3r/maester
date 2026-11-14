@@ -1,5 +1,6 @@
 import {
   type AudioTrack,
+  DOLBY_VISION_PROFILES,
   type DolbyVisionConfig,
   ENCODER_KINDS,
   HLS_COPY_AUDIO_CODECS,
@@ -153,21 +154,55 @@ type CopyVideoProps = {
 
 type DolbyVisionCopy = CopyVideoProps & { dolbyVision: DolbyVisionConfig }
 
+/**
+ * The ways HEVC is copied: plain under `hvc1`, Dolby Vision under `dvh1` with its box, or profile
+ * 7's HDR10 base layer alone under `hvc1`, since AVPlayer and a browser decode no profile 7, as
+ * Android TV's player plays it.
+ */
+const HEVC_COPIES = { plain: 'plain', dolbyVision: 'dolbyVision', baseLayer: 'baseLayer' } as const
+
+type HevcCopy = (typeof HEVC_COPIES)[keyof typeof HEVC_COPIES]
+
+const hevcCopyOf = (dolbyVision: DolbyVisionConfig | null): HevcCopy => {
+  if (dolbyVision === null) return HEVC_COPIES.plain
+  if (dolbyVision.profile === DOLBY_VISION_PROFILES.dualLayer) return HEVC_COPIES.baseLayer
+  return HEVC_COPIES.dolbyVision
+}
+
 /** Whether a copy of the picture is Dolby Vision HEVC, which MP4 carries under `dvh1` with its box. */
 export const isDolbyVisionCopy = (props: CopyVideoProps): props is DolbyVisionCopy =>
-  props.videoCodec === VIDEO_CODECS.hevc && props.dolbyVision !== null
+  props.videoCodec === VIDEO_CODECS.hevc &&
+  props.dolbyVision !== null &&
+  hevcCopyOf(props.dolbyVision) === HEVC_COPIES.dolbyVision
 
-const hevcTagArgs = ({ videoCodec, dolbyVision }: CopyVideoProps): string[] => {
-  if (videoCodec !== VIDEO_CODECS.hevc) return []
-  if (dolbyVision === null) return ['-tag:v', HEVC_TAGS.plain]
-  return ['-tag:v', HEVC_TAGS.dolbyVision, ...STRICT_UNOFFICIAL]
-}
+/**
+ * The HEVC NAL unit types profile 7 carries its Dolby Vision in, which the HEVC spec leaves
+ * unspecified: 62 the RPU, 63 the enhancement layer.
+ */
+const DOLBY_VISION_NAL_TYPES = [62, 63] as const
+
+/**
+ * Takes profile 7's RPU and enhancement layer out of the copy, leaving a plain HDR10 stream.
+ * `filter_units` only splits the stream into its NAL units, so it costs next to nothing, and
+ * Debian 12's ffmpeg 5.1 has it (its `dovi_rpu` filter came in 6.1).
+ */
+const BASE_LAYER_FILTER = `filter_units=remove_types=${DOLBY_VISION_NAL_TYPES.join('|')}`
+
+const HEVC_COPY_ARGS = {
+  [HEVC_COPIES.plain]: ['-tag:v', HEVC_TAGS.plain],
+  [HEVC_COPIES.dolbyVision]: ['-tag:v', HEVC_TAGS.dolbyVision, ...STRICT_UNOFFICIAL],
+  [HEVC_COPIES.baseLayer]: ['-tag:v', HEVC_TAGS.plain, '-bsf:v', BASE_LAYER_FILTER],
+} as const satisfies Record<HevcCopy, readonly string[]>
+
+const hevcTagArgs = ({ videoCodec, dolbyVision }: CopyVideoProps): readonly string[] =>
+  videoCodec === VIDEO_CODECS.hevc ? HEVC_COPY_ARGS[hevcCopyOf(dolbyVision)] : []
 
 /**
  * A remux's video, copied. Safari and AVPlayer only play HEVC in MP4 under
  * the hvc1 tag, and AVPlayer renders Dolby Vision itself (profile 5, which
  * is purple and green as plain HEVC) only under `dvh1` with the `dvcC` box,
- * which ffmpeg writes off the stream's own record under `-strict unofficial`.
+ * which ffmpeg writes off the stream's own record under `-strict unofficial`. Profile 7 is
+ * copied as its HDR10 base layer under hvc1, since no Apple device or browser decodes it.
  */
 export const copyVideo = (props: CopyVideoProps): VideoArgs => ({
   input: [],
