@@ -93,14 +93,16 @@ export const {
 
 /**
  * The music pages: an album's, a playlist's and Now Playing, rows and plates the remote moves
- * through on a TV, one page scrolled under the thumb everywhere else; the strip under the screens
- * while a track plays, which the remote reaches below a screen on a TV; New playlist, which only
- * the touch screens offer, and the favourite mark a toolbar wears.
+ * through on a TV, one page scrolled under the thumb everywhere else; the strip beside the
+ * screens while a track plays, under them by the thumb and across the top of a TV, where the
+ * remote reaches it going up or left, and the edge it keeps to; New playlist, which only the
+ * touch screens offer, and the favourite mark a toolbar wears.
  */
 export const {
   AlbumLayout,
   NowPlayingLayout,
   NowPlayingStrip,
+  stripEdge,
   PlaylistLayout,
   NewPlaylistButton,
   FavouriteButton,

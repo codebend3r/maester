@@ -11,9 +11,26 @@ const useTestScreen = create<{ isFocused: boolean }>()(() => ({ isFocused: true 
 /** The route a render test's screen sits on. */
 const TEST_ROUTE = { key: 'test-route-key', name: 'test-route' } as const
 
+/** The navigator's events a screen hears, by whether each says the screen is now in front. */
+const TEST_SCREEN_EVENTS: Readonly<Record<string, boolean>> = { focus: true, blur: false }
+
+type TestScreenListener = () => void
+
+/** The test screen's navigation: its events follow the test screen's store, as a push or a pop would. */
+const testNavigation = {
+  isFocused: (): boolean => useTestScreen.getState().isFocused,
+  addListener: (event: string, listener: TestScreenListener): (() => void) =>
+    useTestScreen.subscribe((now, was) => {
+      if (now.isFocused !== was.isFocused && now.isFocused === TEST_SCREEN_EVENTS[event]) {
+        listener()
+      }
+    }),
+}
+
 /** expo-router's focus hooks, answered for the test's one screen. */
 export const navigationFocusMocks = {
   useIsFocused: (): boolean => useTestScreen((state) => state.isFocused),
+  useNavigation: (): typeof testNavigation => testNavigation,
   useRoute: (): typeof TEST_ROUTE => TEST_ROUTE,
 }
 

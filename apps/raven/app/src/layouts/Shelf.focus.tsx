@@ -1,8 +1,10 @@
+import { isSameDrawing } from '@/layouts/sameDrawing'
 import { useRoute } from 'expo-router'
 import {
   Children,
   type ComponentRef,
   type ComponentType,
+  memo,
   useLayoutEffect,
   useRef,
   useState,
@@ -321,7 +323,7 @@ const SHELF_ROWS = {
  * band the width of the screen, so the remote coming down or up into it from anywhere lands on
  * a card: the first, or the one it last left there.
  */
-const Shelf = (props: ShelfProps) => {
+const ShelfBody = (props: ShelfProps) => {
   const styles = useStyles()
   const band = useShelfBand(props.shelf.key)
   const Row = SHELF_ROWS[shelfStateOf(props.shelf)]
@@ -342,6 +344,8 @@ const Shelf = (props: ShelfProps) => {
   )
 }
 
+const Shelf = memo(ShelfBody, isSameDrawing<ShelfProps>)
+
 /**
  * The shows the viewer binges, first on Home, right under its title and with no heading of its
  * own, as the web's: one show is a single 32:9 card across the width, two stack, and a third
@@ -349,7 +353,7 @@ const Shelf = (props: ShelfProps) => {
  * synopsis, which only the first row's card has the room for. One band the remote comes into on
  * the first card; nothing is drawn while there are none.
  */
-const BingeShelf = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
+const BingeShelfBody = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
   const { isOpening } = useOpeningFocus()
   const { width, onLayout } = useMeasuredWidth()
   const band = useShelfBand(HOME_BANDS.binge)
@@ -382,6 +386,8 @@ const BingeShelf = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
     )
   )
 }
+
+const BingeShelf = memo(BingeShelfBody, isSameDrawing<BingeShelfProps>)
 
 /**
  * A page of shelves on a TV other than Home: the Home plate and the page's name at the top,

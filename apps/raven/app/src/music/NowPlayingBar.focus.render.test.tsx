@@ -49,7 +49,7 @@ describe('NowPlayingBar on a TV', () => {
     useAudioQueue.getState().clear()
   })
 
-  it('shows the playing track under the screens, with Play or Pause and Next', async () => {
+  it('shows the playing track across the top, with Play or Pause and Next', async () => {
     useAudioQueue.getState().playTracks({ tracks: [AIRBAG] })
     await renderBar()
     expect(screen.getByText('Airbag')).toBeTruthy()

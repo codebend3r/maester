@@ -1,5 +1,5 @@
 import { AlbumLayout } from '@/layouts/AlbumLayout.touch'
-import type { MusicKit } from '@/layouts/musicKit'
+import { type MusicKit, STRIP_EDGES } from '@/layouts/musicKit'
 import { FavouriteButton } from '@/layouts/MusicParts.touch'
 import { NowPlayingLayout } from '@/layouts/NowPlayingLayout.touch'
 import { NowPlayingStrip } from '@/layouts/NowPlayingStrip.touch'
@@ -10,6 +10,7 @@ export const touchMusic: MusicKit = {
   AlbumLayout,
   NowPlayingLayout,
   NowPlayingStrip,
+  stripEdge: STRIP_EDGES.bottom,
   PlaylistLayout,
   NewPlaylistButton,
   FavouriteButton,

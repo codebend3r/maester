@@ -41,8 +41,9 @@ const useCountMusicStarts = (): void => {
 }
 
 /**
- * The strip under the screens while a track plays, each platform's own: its cover, title and
- * artists, play or pause and next; pressed, it opens Now Playing.
+ * The strip while a track plays, each platform's own, under the screens by the thumb and across
+ * the top of a TV: its cover, title and artists, play or pause and next; pressed, it opens Now
+ * Playing.
  */
 export const NowPlayingBar = ({ session: { server, api } }: NowPlayingBarProps) => {
   const router = useRouter()
