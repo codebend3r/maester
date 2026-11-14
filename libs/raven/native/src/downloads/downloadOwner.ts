@@ -8,7 +8,7 @@ export const OWNER_DECISIONS = {
   replace: 'replace',
 } as const
 
-export type OwnerDecision = (typeof OWNER_DECISIONS)[keyof typeof OWNER_DECISIONS]
+type OwnerDecision = (typeof OWNER_DECISIONS)[keyof typeof OWNER_DECISIONS]
 
 type OwnerDecisionOfProps = {
   /** The account the downloads belong to; null for none yet. */
@@ -25,6 +25,31 @@ type OwnerDecisionOfProps = {
 export const ownerDecisionOf = ({ ownerId, accountId }: OwnerDecisionOfProps): OwnerDecision => {
   if (accountId === null || ownerId === accountId) return OWNER_DECISIONS.keep
   return ownerId === null ? OWNER_DECISIONS.claim : OWNER_DECISIONS.replace
+}
+
+type KeepForOwnerProps = OwnerDecisionOfProps & {
+  /** Removes every download, files too. */
+  removeAll: () => Promise<void>
+  /** Writes the downloads' new owner. */
+  own: (ownerId: string | null) => void
+}
+
+/**
+ * Carries out `ownerDecisionOf` on a downloads store: claims them for `accountId` when they have
+ * no owner, removes them all and hands them to it when another account owns them, and keeps
+ * them otherwise. Answers whether they were removed.
+ */
+export const keepForOwner = async ({
+  ownerId,
+  accountId,
+  removeAll,
+  own,
+}: KeepForOwnerProps): Promise<boolean> => {
+  const decision = ownerDecisionOf({ ownerId, accountId })
+  if (decision === OWNER_DECISIONS.keep) return false
+  if (decision === OWNER_DECISIONS.replace) await removeAll()
+  own(accountId)
+  return decision === OWNER_DECISIONS.replace
 }
 
 /** The owner a persisted value names: a string, or null for none, as an older version kept none. */

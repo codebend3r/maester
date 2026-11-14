@@ -5,6 +5,7 @@ import {
   type PipeTransform,
   createParamDecorator,
 } from '@nestjs/common'
+import { isRecord } from '@raven/core'
 import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ViewingAccounts } from '@/media/viewingAccounts'
 
@@ -18,7 +19,7 @@ class ViewingAccountOf implements PipeTransform<unknown, AccountKey> {
   constructor(@Inject(ViewingAccounts) private readonly accounts: ViewingAccounts) {}
 
   transform(request: unknown): AccountKey {
-    if (typeof request !== 'object' || request === null) {
+    if (!isRecord(request)) {
       throw new Error('The viewing account was asked for outside a request')
     }
     return this.accounts.keyOf({ request })

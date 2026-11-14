@@ -1,10 +1,9 @@
 import {
   IGNORED,
-  OWNER_DECISIONS,
   UNCONFIGURED_DISK,
+  keepForOwner,
   keepReconciled,
   loadPersisted,
-  ownerDecisionOf,
   savedOwnerOf,
 } from '@raven/native/headless'
 import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
@@ -371,13 +370,13 @@ export const useDownloads = create<DownloadsState>()(
           set({ entries: {} })
           await get().device.disk.removeAll()
         },
-        keepFor: async ({ accountId }) => {
-          const decision = ownerDecisionOf({ ownerId: get().ownerId, accountId })
-          if (decision === OWNER_DECISIONS.keep) return false
-          if (decision === OWNER_DECISIONS.replace) await get().removeAll()
-          set({ ownerId: accountId })
-          return decision === OWNER_DECISIONS.replace
-        },
+        keepFor: ({ accountId }) =>
+          keepForOwner({
+            ownerId: get().ownerId,
+            accountId,
+            removeAll: get().removeAll,
+            own: (ownerId) => set({ ownerId }),
+          }),
       }
     },
     {

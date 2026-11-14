@@ -48,7 +48,7 @@ type SagaLinkProps = { itemId: number; libraryId: number }
  */
 export const SagaLink = ({ itemId, libraryId }: SagaLinkProps) => {
   const sagas = useQuery(sagasQuery(libraryId))
-  const saga = sagas.data?.find((entry) =>
+  const saga = (sagas.data ?? []).find((entry) =>
     entry.media.some((media) => (media.item?.id ?? null) === itemId),
   )
   return saga !== undefined && <SagaCard itemId={itemId} libraryId={libraryId} saga={saga} />

@@ -126,13 +126,13 @@ type TaggedOf<D extends string, V extends Variants> = {
   [K in keyof V & string]: Flatten<{ [P in D]: K } & ObjectOf<V[K]>>
 }[keyof V & string]
 
+type TaggedProps<D extends string, V extends Variants> = { tag: D; variants: V }
+
 /**
  * A discriminated union written as a map from each tag to its variant's fields:
  * `tagged({ tag: 'type', variants: { [KINDS.a]: { id: isNumber }, [KINDS.b]: {} } })`. A value
  * passes when its `tag` names a variant and it has that variant's fields.
  */
-type TaggedProps<D extends string, V extends Variants> = { tag: D; variants: V }
-
 export const tagged =
   <const D extends string, const V extends Variants>({
     tag,

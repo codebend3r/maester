@@ -24,6 +24,7 @@ import {
   videoEncodingOf,
 } from '@/playback/conversion'
 import { TracksService } from '@/playback/tracksService'
+import { QUERY_PARAMS, queryText } from '@/queryValues'
 import type { ClientRequest } from '@/remoteAccess/clientNetwork'
 import { streamSizeFor } from '@/remoteAccess/remoteCap'
 import { SettingsRepository } from '@/settings/settingsRepository'
@@ -35,6 +36,17 @@ type ConversionAsk = {
   quality: string | undefined
   burn: string | undefined
 }
+
+/** The same asks as the route took them off the query, not yet checked. */
+type ConversionQuery = Record<keyof ConversionAsk, unknown>
+
+/** Reads each of the query's asks as text given once, or a 400. */
+const askOf = (query: ConversionQuery): ConversionAsk => ({
+  mode: queryText({ value: query.mode, name: QUERY_PARAMS.mode }),
+  audio: queryText({ value: query.audio, name: QUERY_PARAMS.audio }),
+  quality: queryText({ value: query.quality, name: QUERY_PARAMS.quality }),
+  burn: queryText({ value: query.burn, name: QUERY_PARAMS.burn }),
+})
 
 /** A converted stream asked for and checked: the file, its tracks, its size and how its picture is made. */
 export type Conversion = {
@@ -58,12 +70,14 @@ export type Conversion = {
 
 type ConversionRequestsOpenProps = {
   id: number
-  ask: ConversionAsk
+  query: ConversionQuery
   request: ClientRequest
 }
 
-type PictureOfProps = Pick<Conversion, 'mode' | 'file' | 'maxHeight' | 'bitrate' | 'playback'> & {
-  probe: Conversion['probe']
+type PictureOfProps = Pick<
+  Conversion,
+  'mode' | 'file' | 'maxHeight' | 'bitrate' | 'playback' | 'probe'
+> & {
   burn: Awaited<ReturnType<typeof burnSubtitleOf>>
   encoding: VideoEncoding
 }
@@ -124,7 +138,8 @@ export class ConversionRequests {
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
   ) {}
 
-  async open({ id, ask, request }: ConversionRequestsOpenProps): Promise<Conversion> {
+  async open({ id, query, request }: ConversionRequestsOpenProps): Promise<Conversion> {
+    const ask = askOf(query)
     const mode = streamModeOf(ask.mode)
     const playback = this.settings.playback()
     refuseWhatSettingsTurnOff({ playback, mode })

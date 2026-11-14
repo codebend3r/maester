@@ -1,6 +1,6 @@
 import { type SkipStep, formatDuration } from '@raven/core'
 import { Icon } from '@raven/native'
-import { usePlayerPrefs } from '@raven/ui/headless'
+import { useClock, usePlayerPrefs } from '@raven/ui/headless'
 import type { IconName } from '@raven/ui/iconDrawings'
 import { type ComponentRef, useRef, useState } from 'react'
 import {
@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native'
 
+import { TouchFactChips } from '@/layouts/FactChips'
 import { pickerLabelOf } from '@/layouts/gridKit'
 import { openPickerSheet } from '@/layouts/Picker.touch'
 import {
@@ -23,8 +24,9 @@ import {
   type SkipDirection,
   type TrackPicker,
   type Transport,
+  cornerFactsOf,
 } from '@/layouts/playerKit'
-import { Text } from '@/layouts/Text'
+import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { useScrub } from '@/layouts/useScrub'
 import { VOLUME_ACTION_LIST, volumeAfterAction, volumeAtY, volumeIconOf } from '@/layouts/volumeKit'
@@ -38,7 +40,7 @@ import {
   useTouchChromeStyles,
 } from '@/layouts/PlayerChromeStyles.touch'
 
-// The touch chrome's parts: the line, its buttons and skips, the volume, the track pickers and the title art.
+// The touch chrome's parts: the line, its buttons and skips, the volume, the track pickers, the title art and the corner.
 
 /** The screen reader's actions a control may offer; the hint says what each does here. */
 const ACCESSIBILITY_ACTIONS = { longPress: 'longpress' } as const
@@ -366,5 +368,29 @@ export const PlayerLogo = ({ heading, title }: PlayerLogoProps) => {
         {heading.place !== null && <Text style={styles.place}>{heading.place}</Text>}
       </View>
     )
+  )
+}
+
+type CornerProps = Pick<PlayerChromeProps, 'mode' | 'heading'>
+
+/**
+ * The top right corner, as the TV player's: the time of day, the picture's chips, then how the
+ * video plays on a line of its own, read out together.
+ */
+export const Corner = ({ mode, heading }: CornerProps) => {
+  const styles = useTouchChromeStyles()
+  const { clock, chips, way, label } = cornerFactsOf({ mode, heading, clock: useClock() })
+  return (
+    <View accessibilityLabel={label} accessible style={styles.corner}>
+      <Text variant={TEXT_VARIANTS.display} numberOfLines={1} style={styles.clock}>
+        {clock}
+      </Text>
+      {chips.length > 0 && <TouchFactChips parts={chips} />}
+      {way !== null && (
+        <View style={styles.wayChip}>
+          <Text style={styles.wayText}>{way}</Text>
+        </View>
+      )}
+    </View>
   )
 }

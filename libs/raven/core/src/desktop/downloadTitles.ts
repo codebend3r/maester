@@ -17,7 +17,7 @@ import {
   type DownloadLibrary,
   DOWNLOAD_GROUP_PREFIXES,
   downloadGroupKey,
-} from '@/desktop/protocol'
+} from '@/desktop/downloads'
 import { artItemIdOf, episodeCode, itemLabel, mediaLabel, pickScore } from '@/items'
 
 /*

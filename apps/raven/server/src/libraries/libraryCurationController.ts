@@ -34,6 +34,7 @@ import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ViewingAccount } from '@/media/viewingAccountParam'
 import { parseBody } from '@/parseBody'
 import { ROUTE_PARAMS } from '@/requestParts'
+import { LIBRARY_ROUTES } from '@/libraries/libraryRoutes'
 
 /** The route parameter naming a saga by its TMDB id. */
 const SAGA_PARAM = 'sagaId'
@@ -46,7 +47,7 @@ const requireMovies = (library: LibraryRecord): void => {
 }
 
 /** Tidying a library: its sagas' backdrops, its Dolby Vision only files, and its duplicate movies. */
-@Controller('api/libraries')
+@Controller(LIBRARY_ROUTES)
 @PrivateBy(PRIVACIES.library)
 export class LibraryCurationController {
   constructor(

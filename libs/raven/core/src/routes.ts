@@ -94,9 +94,10 @@ import {
 } from '@/contract'
 import { fillPath } from '@/query'
 import { type Guard, nullable } from '@/schema'
+import { type HttpMethod } from '@shared/http'
 
 /** An HTTP method a raven route answers. */
-export type RouteMethod = (typeof HTTP_METHODS)[keyof typeof HTTP_METHODS]
+export type RouteMethod = HttpMethod
 
 /**
  * One route of the server's API: its method, its path with the server's
