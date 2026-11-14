@@ -2,7 +2,7 @@ import { DEFAULT_THEME, THEMES, type ThemeId, type ThemeTone, themeOf } from '@r
 import { nativeTokens } from '@raven/native/headless'
 import { designTokens, themeTokens } from '@raven/ui/designTokens'
 
-import { CHIP_TOKENS, OVER_PICTURE_TOKENS, PALETTE_TOKENS } from '@/theme/tokenNames'
+import { CHIP_TOKENS, OVER_PICTURE_TOKENS, PALETTE_TOKENS, RATING_TOKENS } from '@/theme/tokenNames'
 
 const { numbers, colours: rootColours } = nativeTokens(
   Object.fromEntries(designTokens.map(({ name, value }) => [name, value])),
@@ -41,6 +41,14 @@ export const CHIP_COLOURS = {
   dolbyVisionOnly: fixed(CHIP_TOKENS.dolbyVisionOnly),
   dolbyVisionDualLayer: fixed(CHIP_TOKENS.dolbyVisionDualLayer),
 } as const satisfies Record<keyof typeof CHIP_TOKENS, string>
+
+/** Each rating source's bar, the same in every theme. */
+export const RATING_COLOURS = {
+  rottenTomatoes: fixed(RATING_TOKENS.rottenTomatoes),
+  imdb: fixed(RATING_TOKENS.imdb),
+  metacritic: fixed(RATING_TOKENS.metacritic),
+  tmdb: fixed(RATING_TOKENS.tmdb),
+} as const satisfies Record<keyof typeof RATING_TOKENS, string>
 
 /**
  * A theme as the app wears it: its colours, the ones it wears over the video, and whether its

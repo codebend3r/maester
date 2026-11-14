@@ -33,6 +33,7 @@ import {
   titleLookOf,
 } from '@/layouts/itemKit'
 import { LINE_RATIO } from '@/layouts/textHeights'
+import { RatingPanel } from '@/layouts/RatingPanel'
 import { OPACITIES } from '@/theme/appTheme'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { translucent } from '@/theme/translucent'
@@ -310,6 +311,7 @@ const Hero = ({ hero, actions, links, file, onOpen }: HeroProps) => {
         {hero.byline !== null && <Text style={styles.byline}>{hero.byline}</Text>}
         {facts !== '' && <Text style={styles.line}>{facts}</Text>}
         {hero.progress !== null && <ProgressLine progress={hero.progress} />}
+        <RatingPanel ratings={hero.ratings} sizes={TV_SIZES} />
         {(hero.tagline !== null || hero.summary !== null) && (
           <View style={styles.synopsis}>
             {hero.tagline !== null && <Text style={styles.tagline}>{hero.tagline}</Text>}
