@@ -113,15 +113,11 @@ const PlayableItem = ({
     api: session.api,
     headersFor: context.headersFor,
   })
+  // Play alone is its icon; Resume shows the spot.
+  const resume =
+    primary.position > 0 ? ITEM_COPY.resumeFrom({ at: formatDuration(primary.position) }) : null
   const actions = [
-    playOf({
-      media: primary,
-      label:
-        primary.position > 0
-          ? ITEM_COPY.resumeFrom({ at: formatDuration(primary.position) })
-          : ITEM_COPY.play,
-      context,
-    }),
+    playOf({ media: primary, label: resume ?? ITEM_COPY.play, text: resume, context }),
     ...fromStartOf({ media: primary, context }),
     ...(nextFile === null ? [] : [nextOf({ media: nextFile, context })]),
     ...(marks.favourite === null ? [] : [favouriteOf(marks.favourite)]),

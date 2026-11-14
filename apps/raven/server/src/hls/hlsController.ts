@@ -55,7 +55,7 @@ import { MEDIA_ROUTES, routeOf } from '@/media/mediaRoutes'
 import { ConversionRequests } from '@/playback/conversionRequests'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
-import { QUERY_PARAMS, queryText } from '@/queryValues'
+import { QUERY_PARAMS } from '@/queryValues'
 import { StreamSessions } from '@/streams/streamSessions'
 import { RESPONSE_EVENTS, trackStream } from '@/streams/trackStream'
 
@@ -157,12 +157,7 @@ export class HlsController {
     const ticket = ticketIn(query)
     const conversion = await this.conversions.open({
       id,
-      ask: {
-        mode: queryText({ value: mode, name: QUERY_PARAMS.mode }),
-        audio: queryText({ value: audio, name: QUERY_PARAMS.audio }),
-        quality: queryText({ value: quality, name: QUERY_PARAMS.quality }),
-        burn: queryText({ value: burn, name: QUERY_PARAMS.burn }),
-      },
+      query: { mode, audio, quality, burn },
       request,
     })
     const { mode: streamMode, file, video } = conversion

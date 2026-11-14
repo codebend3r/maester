@@ -1,4 +1,4 @@
-import { AUTH_REFUSALS, DOWNLOAD_STATUS_KINDS } from '@raven/core'
+import { DOWNLOAD_STATUS_KINDS } from '@raven/core'
 import { unlessStopped } from '@/main/bounded'
 import { SERVER_GONE, SERVER_NAME } from '@/main/desktopConfig'
 import {
@@ -205,8 +205,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     }
     // The sign-in this ticket was read for has ended since: the file waits for the next one.
     if (accessEnds !== ends) {
-      failures.failRuns({ downloadIds: [entry.downloadId], refusal: AUTH_REFUSALS.signedOut })
-      failures.told(entry.downloadId)
+      failures.failSignedOut([entry.downloadId])
       return null
     }
     job.onAccess()
@@ -493,8 +492,7 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
       return run.hasAccess && entry !== null && isUnderWay(entry)
     })
     if (ended.length === 0) return
-    failures.failRuns({ downloadIds: ended, refusal: AUTH_REFUSALS.signedOut })
-    ended.forEach(failures.told)
+    failures.failSignedOut(ended)
     deps.warn(`Raven stopped downloading from ${SERVER_NAME}: its sign-in ended`)
   }
 

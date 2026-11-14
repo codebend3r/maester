@@ -1,6 +1,14 @@
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, devtools, persist } from 'zustand/middleware'
-import { type CaseTurn, ROUTES, type Turn, decide, forget, streamTurn } from '@/lib/api'
+import {
+  type CaseTurn,
+  type Decision,
+  ROUTES,
+  type Turn,
+  decide,
+  forget,
+  streamTurn,
+} from '@/lib/api'
 import { CHAT_COPY } from '@/lib/copy'
 import {
   ENTRY_KINDS,
@@ -65,13 +73,16 @@ type ChatState = {
   adopt: (owner: string) => void
 }
 
-type WithNoteProps = { entries: Entry[]; text: string }
+type WithDecisionProps = { entries: Entry[]; decision: Decision }
 
-/** `entries` with a decision appended that sent nothing: the page's own word on a press. */
-const withNote = ({ entries, text }: WithNoteProps): Entry[] => [
+/** `entries` with a press's answer appended, or the page's own word when nothing answered. */
+const withDecision = ({ entries, decision }: WithDecisionProps): Entry[] => [
   ...entries,
-  { kind: ENTRY_KINDS.decision, id: entries.length, text, events: [] },
+  { kind: ENTRY_KINDS.decision, id: entries.length, text: decision.text, events: decision.events },
 ]
+
+/** The page's own answer to a press or a start over sparrow didn't take: it sent nothing. */
+const pageNote = (text: string): Decision => ({ text, isSettled: false, events: [] })
 
 /**
  * The conversation on this page, kept across reloads. Entry ids are their indexes:
@@ -154,28 +165,14 @@ export const useChat = create<ChatState>()(
             }),
           press: async ({ pendingId, approve }) => {
             set({ isBusy: true })
-            const decision = await decide({ pendingId, approve }).catch(() => null)
-            set(({ entries, settled }) => {
-              if (!decision) {
-                return {
-                  isBusy: false,
-                  entries: withNote({ entries, text: CHAT_COPY.unreachable }),
-                }
-              }
-              return {
-                isBusy: false,
-                settled: decision.isSettled ? [...settled, pendingId] : settled,
-                entries: [
-                  ...entries,
-                  {
-                    kind: ENTRY_KINDS.decision,
-                    id: entries.length,
-                    text: decision.text,
-                    events: decision.events,
-                  },
-                ],
-              }
-            })
+            const decision = await decide({ pendingId, approve }).catch(() =>
+              pageNote(CHAT_COPY.unreachable),
+            )
+            set(({ entries, settled }) => ({
+              isBusy: false,
+              settled: decision.isSettled ? [...settled, pendingId] : settled,
+              entries: withDecision({ entries, decision }),
+            }))
           },
           startOver: async () => {
             set({ isBusy: true })
@@ -189,7 +186,7 @@ export const useChat = create<ChatState>()(
             }
             set(({ entries }) => ({
               isBusy: false,
-              entries: withNote({ entries, text: CHAT_COPY.notForgotten }),
+              entries: withDecision({ entries, decision: pageNote(CHAT_COPY.notForgotten) }),
             }))
           },
           adopt: (owner) => {

@@ -135,8 +135,9 @@ export class HttpPlexTv implements PlexTv {
     })
     // An expired PIN is gone from plex.tv; to the friend that is the same as not approving it.
     if (status === HTTP_STATUSES.notFound) return null
-    if (!isSuccessStatus(status) || !isRecord(body))
+    if (!isSuccessStatus(status) || !isRecord(body)) {
       throw new PlexUnavailable(`plex.tv PIN check (${status})`)
+    }
     return text(body.authToken)
   }
 

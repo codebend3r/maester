@@ -159,9 +159,8 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
     const response = await fetch(href, {
       method: isApi ? props.method : HTTP_METHODS.get,
       headers: {
-        ...(body === undefined
-          ? { [HEADERS.accept]: accept }
-          : { [HEADERS.accept]: accept, [HEADERS.contentType]: ACCEPTS.json }),
+        [HEADERS.accept]: accept,
+        ...(body === undefined ? {} : { [HEADERS.contentType]: ACCEPTS.json }),
         ...(token === null ? {} : { [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${token}` }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -218,38 +217,30 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
     route: { method: RouteMethod; path: P; reply: Guard<T> }
   }
 
-  /** Calls `route` and answers what it replied, once its guard says it is what the route sends. */
-  const ask = <T, P extends string>({
-    route,
-    params,
-    query = {},
-    body,
-  }: AskProps<T, P>): Promise<T> =>
-    expect({
-      request: send({
-        path: pathWithQuery({ path: fillPath({ path: route.path, params: params ?? {} }), query }),
-        method: route.method,
-        body,
-      }),
-      guard: route.reply,
-    })
-
-  type TellProps<P extends string> = RouteCallProps<P> & {
+  type SendRouteProps<P extends string> = RouteCallProps<P> & {
     route: { method: RouteMethod; path: P }
   }
 
-  /** Calls `route` for what it does, not what it answers. */
-  const tell = async <P extends string>({
+  /** Calls `route` with its placeholders filled and `query` after them. */
+  const sendRoute = <P extends string>({
     route,
     params,
     query = {},
     body,
-  }: TellProps<P>): Promise<void> => {
-    await send({
+  }: SendRouteProps<P>): Promise<unknown> =>
+    send({
       path: pathWithQuery({ path: fillPath({ path: route.path, params: params ?? {} }), query }),
       method: route.method,
       body,
     })
+
+  /** Calls `route` and answers what it replied, once its guard says it is what the route sends. */
+  const ask = <T, P extends string>(props: AskProps<T, P>): Promise<T> =>
+    expect({ request: sendRoute(props), guard: props.route.reply })
+
+  /** Calls `route` for what it does, not what it answers. */
+  const tell = async <P extends string>(props: SendRouteProps<P>): Promise<void> => {
+    await sendRoute(props)
   }
 
   return { url, mediaUrl, sendForText, ask, tell }

@@ -26,7 +26,7 @@ import { errorText } from '@/main/log/errorText'
 import { quietly } from '@/main/log/quietly'
 import { ERROR_CODES, errorCodeOf } from '@/main/stateStore'
 import type { Timers } from '@/main/timers'
-import { HEADERS, HTTP_STATUSES, CONTENT_TYPES } from '@shared/http'
+import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, HTTP_STATUSES } from '@shared/http'
 
 /** The log line the packaged smoke waits for: the page has somewhere to load from. */
 export const WEB_HOST_READY = 'web host ready'
@@ -43,13 +43,6 @@ const CONNECT_TIMEOUT_MS = 10_000
 
 /** `localhost` reaches either, so the web host holds both and no other app can take the other. */
 export const LOOPBACK_ADDRESSES = ['127.0.0.1', '::1'] as const
-
-/** Vite names every file under `assets/` by its hash, so it never changes. */
-const CACHE_POLICIES = {
-  immutable: 'public, max-age=31536000, immutable',
-  revalidate: 'no-cache',
-  never: 'no-store',
-} as const
 
 /** The content type of each file extension the build serves. */
 const TYPES_BY_EXTENSION = new Map(
@@ -321,8 +314,9 @@ export const createWebHostHandler = ({
         ...guarded(inlineHashes),
         [HEADERS.contentType]: type,
         [HEADERS.contentLength]: `${file.bytes.byteLength}`,
+        // Vite names every file under `assets/` by its hash, so it never changes.
         [HEADERS.cacheControl]:
-          isAsset && found !== null ? CACHE_POLICIES.immutable : CACHE_POLICIES.revalidate,
+          isAsset && found !== null ? CACHE_POLICIES.immutable : CACHE_POLICIES.noCache,
       },
       body: request.method === HTTP_METHODS.head ? undefined : file.bytes,
     })
@@ -340,7 +334,7 @@ export const createWebHostHandler = ({
       status: HTTP_STATUSES.badGateway,
       headers: {
         [HEADERS.contentType]: CONTENT_TYPES.json,
-        [HEADERS.cacheControl]: CACHE_POLICIES.never,
+        [HEADERS.cacheControl]: CACHE_POLICIES.noStore,
       },
       body: JSON.stringify({ error: WEB_HOST_ERRORS.serverUnreachable }),
     })

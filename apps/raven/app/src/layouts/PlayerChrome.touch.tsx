@@ -1,21 +1,15 @@
 import { type SkipStep } from '@raven/core'
-import { useClock, usePlayerPrefs } from '@raven/ui/headless'
+import { usePlayerPrefs } from '@raven/ui/headless'
 import { useState } from 'react'
 import { Animated, Pressable, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Video from 'react-native-video'
 
-import { TouchFactChips } from '@/layouts/FactChips'
 import { LoadingMark } from '@/layouts/LoadingMark'
 import { CaptionText } from '@/layouts/PlayerCaption'
 import { HoldMark, SkipMark } from '@/layouts/PlayerMark.touch'
-import {
-  PLAYER_COPY,
-  type PlayerChromeKit,
-  type PlayerChromeProps,
-  cornerFactsOf,
-} from '@/layouts/playerKit'
-import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { PLAYER_COPY, type PlayerChromeKit, type PlayerChromeProps } from '@/layouts/playerKit'
+import { Text } from '@/layouts/Text'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
 import { useSkipLadder } from '@/layouts/useSkipLadder'
 import { heldPlaybackOf, useSurfaceGestures } from '@/layouts/useSurfaceGestures'
@@ -23,31 +17,7 @@ import { usePlayerKeys } from '@/player/usePlayerKeys'
 import { SIZES } from '@/theme/appTheme'
 import { APP_ICONS } from '@/theme/icons'
 import { ICON_SIZES, useTouchChromeStyles } from '@/layouts/PlayerChromeStyles.touch'
-import { IconButton, TransportControls, PlayerLogo } from '@/layouts/PlayerParts.touch'
-
-type CornerProps = Pick<PlayerChromeProps, 'mode' | 'heading'>
-
-/**
- * The top right corner, as the TV player's: the time of day, the picture's chips, then how the
- * video plays on a line of its own, read out together.
- */
-const Corner = ({ mode, heading }: CornerProps) => {
-  const styles = useTouchChromeStyles()
-  const { clock, chips, way, label } = cornerFactsOf({ mode, heading, clock: useClock() })
-  return (
-    <View accessibilityLabel={label} accessible style={styles.corner}>
-      <Text variant={TEXT_VARIANTS.display} numberOfLines={1} style={styles.clock}>
-        {clock}
-      </Text>
-      {chips.length > 0 && <TouchFactChips parts={chips} />}
-      {way !== null && (
-        <View style={styles.wayChip}>
-          <Text style={styles.wayText}>{way}</Text>
-        </View>
-      )}
-    </View>
-  )
-}
+import { Corner, IconButton, TransportControls, PlayerLogo } from '@/layouts/PlayerParts.touch'
 
 /**
  * Raven's controls over the video under the thumb, the web player's, in icons: Back at the top

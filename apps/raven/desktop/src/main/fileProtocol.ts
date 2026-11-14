@@ -1,7 +1,7 @@
 import { extensionOf, HTTP_METHODS } from '@raven/core'
 import { ALLOWED_METHODS } from '@/main/webHost'
 import type { Grants } from '@/main/grants'
-import { HEADERS, HTTP_STATUSES } from '@shared/http'
+import { CACHE_POLICIES, HEADERS, HTTP_STATUSES } from '@shared/http'
 
 const BYTE_RANGE_KINDS = {
   all: 'all',
@@ -114,7 +114,7 @@ export const createFileHandler = ({
     const common = {
       [HEADERS.acceptRanges]: 'bytes',
       [HEADERS.contentType]: contentTypeFor(file.name),
-      [HEADERS.cacheControl]: 'no-store',
+      [HEADERS.cacheControl]: CACHE_POLICIES.noStore,
     }
 
     if (size === 0) {

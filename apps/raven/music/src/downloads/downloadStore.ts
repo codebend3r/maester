@@ -22,15 +22,15 @@ import {
   type DownloadDisk,
   IGNORED,
   type MediaSources,
-  OWNER_DECISIONS,
   UNCONFIGURED_DISK,
   folderOf,
   folderOfPath,
   inFolder,
+  keepForOwner,
   keepReconciled,
   loadPersisted,
-  ownerDecisionOf,
   reconcileDownloads,
+  savedOwnerOf,
 } from '@raven/native/headless'
 import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
 import { create } from 'zustand'
@@ -258,7 +258,7 @@ const downloadsOf = (saved: unknown): DownloadsValues => {
   const entries = isRecord(kept.entries) ? Object.values(kept.entries) : []
   const playlists = isRecord(kept.playlists) ? Object.values(kept.playlists) : []
   return {
-    ownerId: isString(kept.ownerId) ? kept.ownerId : null,
+    ownerId: savedOwnerOf(kept),
     entries: Object.fromEntries(
       entries
         .filter(isDownloadEntry)
@@ -515,14 +515,13 @@ export const useDownloads = create<Downloads>()(
           set({ entries: {}, playlists: {} })
           await get().device.disk.removeAll()
         },
-        keepFor: async ({ accountId }) => {
-          const { ownerId, removeAll } = get()
-          const decision = ownerDecisionOf({ ownerId, accountId })
-          if (decision === OWNER_DECISIONS.keep) return false
-          if (decision === OWNER_DECISIONS.replace) await removeAll()
-          set({ ownerId: accountId })
-          return decision === OWNER_DECISIONS.replace
-        },
+        keepFor: ({ accountId }) =>
+          keepForOwner({
+            ownerId: get().ownerId,
+            accountId,
+            removeAll: get().removeAll,
+            own: (ownerId) => set({ ownerId }),
+          }),
       }
     },
     {

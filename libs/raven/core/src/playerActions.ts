@@ -43,7 +43,8 @@ export type PlayerActionState = {
 /** The answer to an action, null for one there is nothing to do for, and the skip it made. */
 export type ResolvedAction = { answer: PlayerAnswer | null; lastSkip: SkipStep | null }
 
-const clampVolume = (value: number): number => Math.min(1, Math.max(0, value))
+/** `value` within 0 and 1, as a player's volume is. */
+export const playerVolumeOf = (value: number): number => Math.min(1, Math.max(0, value))
 
 type ResolvePlayerActionProps = {
   action: PlayerAction
@@ -81,7 +82,7 @@ export const resolvePlayerAction = ({
         to: action.edge === SEEK_EDGES.start ? 0 : (duration ?? position),
       })
     case PLAYER_ACTIONS.volumeBy: {
-      const next = clampVolume((isMuted ? 0 : volume) + action.delta)
+      const next = playerVolumeOf((isMuted ? 0 : volume) + action.delta)
       return answered({ type: PLAYER_ANSWERS.volume, volume: next, isMuted: next === 0 })
     }
     case PLAYER_ACTIONS.toggleMute:
@@ -90,6 +91,3 @@ export const resolvePlayerAction = ({
       return answered({ type: PLAYER_ANSWERS.host, action })
   }
 }
-
-/** `value` within 0 and 1, as a player's volume is. */
-export const playerVolumeOf = clampVolume

@@ -20,12 +20,7 @@ export {
   keepReconciled,
   reconcileDownloads,
 } from '@/downloads/downloadDisk'
-export {
-  OWNER_DECISIONS,
-  type OwnerDecision,
-  ownerDecisionOf,
-  savedOwnerOf,
-} from '@/downloads/downloadOwner'
+export { keepForOwner, savedOwnerOf } from '@/downloads/downloadOwner'
 export {
   DOWNLOADS_FOLDER,
   PART_SUFFIX,

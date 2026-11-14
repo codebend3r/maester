@@ -36,6 +36,7 @@ import { parseBody } from '@/parseBody'
 import { ROUTE_PARAMS } from '@/requestParts'
 import { LibraryWatcher } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
+import { LIBRARY_ROUTES } from '@/libraries/libraryRoutes'
 
 const parseInput = (body: unknown): LibraryInput => {
   const result = validateLibraryInput(body)
@@ -50,7 +51,7 @@ type LibrariesControllerSaveSettingsProps = {
 }
 
 /** The libraries themselves: listing them, and creating, changing, ordering and deleting one. */
-@Controller('api/libraries')
+@Controller(LIBRARY_ROUTES)
 @PrivateBy(PRIVACIES.library)
 export class LibrariesController {
   constructor(
