@@ -22,6 +22,7 @@ import { itemSummary, mediaItem } from '@/test/fixtures'
 import { DEFAULT_PLAYBACK_STATE, renderWithProviders } from '@/test/render'
 import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostPlayer } from '@/stores/playerServices'
+import { NO_TITLE_EXTRAS, NO_HOST_EXTRAS } from '@/components/Player/PlayerServices'
 
 type TestPlayerProps = {
   media: MediaItem
@@ -43,6 +44,7 @@ const TestPlayer = ({
 }: TestPlayerProps) => {
   const isHosting = useHostPlayer({
     title: {
+      ...NO_TITLE_EXTRAS,
       label: media.title,
       logo,
       homeTo,
@@ -53,8 +55,9 @@ const TestPlayer = ({
       markers,
     },
     posterUrl: null,
+    ...NO_HOST_EXTRAS,
     escape: null,
-    progress: { started: () => {}, save: () => {}, left: () => {} },
+    progress: { started: () => {}, save: () => {}, left: () => {}, duration: null },
   })
   return isHosting && <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />
 }

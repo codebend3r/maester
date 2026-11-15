@@ -10,6 +10,7 @@ import {
   object,
   oneOf,
   union,
+  literal,
 } from '@/schema'
 
 /** `off` when not configured, `failing` when the last call went wrong. */
@@ -81,11 +82,11 @@ export const SERVER_EVENT_TYPES = {
  * the account's own streams and name no account.
  */
 export const isServerEvent = union(
-  object({ type: oneOf([SERVER_EVENT_TYPES.library]), libraryId: isNumber }),
-  object({ type: oneOf([SERVER_EVENT_TYPES.viewing]) }),
-  object({ type: oneOf([SERVER_EVENT_TYPES.binge]) }),
-  object({ type: oneOf([SERVER_EVENT_TYPES.captions]) }),
-  object({ type: oneOf([SERVER_EVENT_TYPES.notification]), notification: isNotification }),
+  object({ type: literal(SERVER_EVENT_TYPES.library), libraryId: isNumber }),
+  object({ type: literal(SERVER_EVENT_TYPES.viewing) }),
+  object({ type: literal(SERVER_EVENT_TYPES.binge) }),
+  object({ type: literal(SERVER_EVENT_TYPES.captions) }),
+  object({ type: literal(SERVER_EVENT_TYPES.notification), notification: isNotification }),
 )
 
 export type ServerEvent = Infer<typeof isServerEvent>

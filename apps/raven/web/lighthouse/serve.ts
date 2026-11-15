@@ -1,3 +1,4 @@
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { spawn, spawnSync } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { type Http2ServerRequest, type Http2ServerResponse, createSecureServer } from 'node:http2'
@@ -9,7 +10,6 @@ import {
   AUTH_COOKIE,
   AUTH_PATHS,
   type AuthConfig,
-  FIXTURE_SERVER,
   HTTP_METHODS,
 } from '@raven/core'
 

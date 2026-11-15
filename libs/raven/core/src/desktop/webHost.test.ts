@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test'
 import {
   DEFAULT_LINK_ORIGINS,
   DEFAULT_SERVER_ORIGIN,
-  DESKTOP_ENV,
   isUnreachableAnswer,
   PAGE_ORIGIN,
   WEB_HOST,
@@ -38,10 +37,6 @@ describe('the web host', () => {
   })
 
   it('names the build environment and its fallback server', () => {
-    expect(DESKTOP_ENV).toEqual({
-      serverOrigin: 'RAVEN_DESKTOP_SERVER_ORIGIN',
-      linkOrigins: 'RAVEN_DESKTOP_LINK_ORIGINS',
-    })
     expect(DEFAULT_SERVER_ORIGIN).toBe('https://raven-player.synology.me:8443')
   })
 

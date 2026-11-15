@@ -22,6 +22,7 @@ import {
   type MpvEvent,
   type MpvProperty,
   type MpvTrack,
+  MPV_OPTIONS,
 } from '@raven/mpv'
 import { SPEED_RANGE, clamp, numbersOf } from '@/main/player/commandNumbers'
 import { displayOptions } from '@/main/player/displayOptions'
@@ -39,12 +40,7 @@ import {
   withoutTarget,
 } from '@/main/player/loadTarget'
 import { ENGINE_GONE, OK, type PlayerOutcome, refuse } from '@/main/player/outcomes'
-import {
-  type ApplyOutputProps,
-  isVolumeFixedFor,
-  MPV_OPTIONS,
-  outputOptions,
-} from '@/main/player/outputOptions'
+import { type ApplyOutputProps, isVolumeFixedFor, outputOptions } from '@/main/player/outputOptions'
 import { type Phase, PLAYER_PHASES, type ShowingPhase } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import { createQuietMpv } from '@/main/player/quietMpv'

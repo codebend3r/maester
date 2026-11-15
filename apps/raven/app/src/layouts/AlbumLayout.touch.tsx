@@ -1,4 +1,4 @@
-import type { AlbumTrack } from '@raven/ui/headless'
+import { type AlbumTrack } from '@raven/core'
 import { type AccessibilityActionEvent, Pressable, StyleSheet, View } from 'react-native'
 
 import { MUSIC_COPY } from '@/layouts/copy'

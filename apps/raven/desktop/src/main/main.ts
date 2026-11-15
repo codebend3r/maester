@@ -1,3 +1,4 @@
+import { SYSTEM_NAMES, desktopPlatformFor } from '@/shared/platform'
 import { spawn } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { mkdir, readdir, realpath, rename, stat, statfs, writeFile } from 'node:fs/promises'
@@ -10,8 +11,6 @@ import {
   DESKTOP_PLATFORMS,
   type DesktopEvent,
   type DesktopReply,
-  desktopPlatformFor,
-  SYSTEM_NAMES,
   FILE_SCHEME,
   PICTURE_SCHEME,
   VIDEO_EXTENSIONS,

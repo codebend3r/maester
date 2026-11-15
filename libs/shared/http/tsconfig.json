@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  // No DOM and no Node types: browsers, Node, Bun, Deno and React Native all import this, so a slip fails the typecheck.
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "types": []
+  },
+  "include": ["src"]
+}

@@ -15,6 +15,8 @@ import {
   type DownloadFacts,
   type DownloadGroup,
   type DownloadLibrary,
+  DOWNLOAD_GROUP_PREFIXES,
+  downloadGroupKey,
 } from '@/desktop/protocol'
 import { artItemIdOf, episodeCode, itemLabel, mediaLabel, pickScore } from '@/items'
 
@@ -58,12 +60,16 @@ type ShowGroupKeyProps = Pick<ItemSummary, 'id' | 'type' | 'show'>
 
 /** An episode, its season and its show share one group, whichever of them was asked for. */
 const showGroupKey = ({ id, type, show }: ShowGroupKeyProps): string => {
-  if (type === ITEM_TYPES.show) return `show:${id}`
+  if (type === ITEM_TYPES.show)
+    return downloadGroupKey({ prefix: DOWNLOAD_GROUP_PREFIXES.show, ids: [id] })
   // The server names no show only for a season or episode it cannot place under one.
-  return show === null ? `item:${id}` : `show:${show.id}`
+  return show === null
+    ? downloadGroupKey({ prefix: DOWNLOAD_GROUP_PREFIXES.item, ids: [id] })
+    : downloadGroupKey({ prefix: DOWNLOAD_GROUP_PREFIXES.show, ids: [show.id] })
 }
 
-const movieGroupKey = (media: MediaItem): string => `movie:${media.id}`
+const movieGroupKey = (media: MediaItem): string =>
+  downloadGroupKey({ prefix: DOWNLOAD_GROUP_PREFIXES.movie, ids: [media.id] })
 
 type PosterOfProps = Pick<ItemSummary, 'id' | 'posterVersion'>
 
@@ -210,7 +216,11 @@ type DraftOfSagaProps = { saga: Saga; libraryId: number }
 /** A saga's films, in the saga's order, each wearing its own poster. */
 export const draftOfSaga = ({ saga, libraryId }: DraftOfSagaProps): TitleDraft => ({
   title: saga.name,
-  group: { kind: DOWNLOAD_KINDS.saga, key: `saga:${libraryId}:${saga.tmdbId}`, title: saga.name },
+  group: {
+    kind: DOWNLOAD_KINDS.saga,
+    key: downloadGroupKey({ prefix: DOWNLOAD_GROUP_PREFIXES.saga, ids: [libraryId, saga.tmdbId] }),
+    title: saga.name,
+  },
   artwork: null,
   entries: saga.media.map((media, order) => ({ media, label: mediaLabel(media), order })),
 })

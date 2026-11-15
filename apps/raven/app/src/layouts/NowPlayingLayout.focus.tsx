@@ -1,6 +1,5 @@
-import { REPEAT_MODES } from '@raven/core'
+import { REPEAT_MODES, type QueueRow } from '@raven/core'
 import { usePlayerPrefs } from '@raven/ui/headless'
-import type { QueueRow } from '@raven/ui/headless'
 import { type ComponentRef, type ComponentType, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 

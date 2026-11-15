@@ -1,5 +1,5 @@
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type AlbumSummary,
   type ApiClient,
@@ -93,7 +93,7 @@ export const favouritesApi = ({ read }: FavouritesApiProps): ApiClient => {
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const [path = ''] = url.slice(NAS.origin.length).split('?')
-        return init.method === undefined || init.method === APP_CALL_METHODS.get
+        return init.method === undefined || init.method === HTTP_METHODS.get
           ? responseOf(answerFor(path))
           : responseOf(NOT_FOUND)
       },

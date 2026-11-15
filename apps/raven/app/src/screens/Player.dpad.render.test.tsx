@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import {
   CAPTION_COLOUR_VALUES,
   DEFAULT_CAPTION_STYLE,
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   DEFAULT_THEME,
   DIRECT_PLAYS,
@@ -204,7 +204,7 @@ const progressPath = pathFor({
 
 const savedSpots = (): unknown[] =>
   mockServer.heard
-    .filter(({ method, path }) => method === APP_CALL_METHODS.put && path === progressPath)
+    .filter(({ method, path }) => method === HTTP_METHODS.put && path === progressPath)
     .map(({ body }) => body)
 
 describe('Player on Android TV', () => {

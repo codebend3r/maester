@@ -11,6 +11,7 @@ import {
   oneOf,
   optional,
   union,
+  literal,
 } from '@/schema'
 
 export const THUMBNAIL_STATES = { pending: 'pending', ready: 'ready', failed: 'failed' } as const
@@ -225,7 +226,7 @@ export type Review = Infer<typeof isReview>
 /** A season on its show's page: its card, and how many of its episodes are on disk. */
 export const isSeasonSummary = object({
   ...isItemSummary.shape,
-  type: oneOf([ITEM_TYPES.season]),
+  type: literal(ITEM_TYPES.season),
   /** Its episodes with a file this browser may see. */
   episodeCount: isNumber,
   /** Of `episodeCount`, those watched. */
@@ -242,7 +243,7 @@ export type SeasonSummary = Infer<typeof isSeasonSummary>
 /** An episode on its season's page: what its row shows, and the file Play starts. */
 export const isEpisodeSummary = object({
   ...isItemSummary.shape,
-  type: oneOf([ITEM_TYPES.episode]),
+  type: literal(ITEM_TYPES.episode),
   summary: nullable(isString),
   released: nullable(isString),
   /** Minutes, from TMDB; the row prefers the file's own length. */

@@ -14,12 +14,12 @@ import {
   type Mpv,
   type MpvEvent,
 } from '@/mpv'
+import { MPV_OPTIONS } from '@/options'
 import { MPV_CHOICES, MPV_PROPERTIES, MPV_TRACK_TYPES, propertyGuards } from '@/properties'
 import { isWindows, project } from '@/build/context'
 import { isCleanupMode } from '@/test/cleanupModes'
 
 /** Options this file sets that the wrapper does not name: the audio output, and mpv's silent one. */
-const TEST_OPTIONS = { ao: 'ao' } as const
 const TEST_AUDIO_OUTPUTS = { null: 'null' } as const
 
 const directory = await mkdtemp(resolve(tmpdir(), 'raven-mpv-native-'))
@@ -372,7 +372,7 @@ test('an audio surface plays sound alone: no video track is picked, and nothing 
   try {
     await player.set({ name: MPV_PROPERTIES.pause, value: true })
     // CI runners have no sound card: with video off too, a failed device leaves nothing to play.
-    await player.set({ name: TEST_OPTIONS.ao, value: TEST_AUDIO_OUTPUTS.null })
+    await player.set({ name: MPV_OPTIONS.ao, value: TEST_AUDIO_OUTPUTS.null })
     const logs: string[] = []
     const opened = new Promise<void>((resolveOpen, reject) => {
       const timer = setTimeout(() => {

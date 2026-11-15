@@ -1,4 +1,4 @@
-import { type Infer, isBoolean, isNumber, isString, object, oneOf, union } from '@/schema'
+import { type Infer, isBoolean, isNumber, isString, object, union, literal } from '@/schema'
 
 /**
  * Whether locked libraries can be opened here: `available` once the server
@@ -22,9 +22,9 @@ export const ADMIN_LOCK_STATES = { on: 'on', turningOn: 'turningOn', off: 'off' 
  * answer) before it holds, and until then it goes off again with no password.
  */
 export const isAdminLock = union(
-  object({ state: oneOf([ADMIN_LOCK_STATES.on]), available: isBoolean }),
-  object({ state: oneOf([ADMIN_LOCK_STATES.turningOn]), remainingMs: isNumber }),
-  object({ state: oneOf([ADMIN_LOCK_STATES.off]) }),
+  object({ state: literal(ADMIN_LOCK_STATES.on), available: isBoolean }),
+  object({ state: literal(ADMIN_LOCK_STATES.turningOn), remainingMs: isNumber }),
+  object({ state: literal(ADMIN_LOCK_STATES.off) }),
 )
 
 export type AdminLock = Infer<typeof isAdminLock>

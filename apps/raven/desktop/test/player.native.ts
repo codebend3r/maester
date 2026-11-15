@@ -1,3 +1,4 @@
+import { desktopPlatformFor } from '@/shared/platform'
 import { strict as assert } from 'node:assert'
 import { randomBytes } from 'node:crypto'
 import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
@@ -13,7 +14,6 @@ import {
   AUTH_PATHS,
   CAPTION_COLOURS,
   CAPTION_SIZES,
-  desktopPlatformFor,
   isNumber,
   isRecord,
   isString,

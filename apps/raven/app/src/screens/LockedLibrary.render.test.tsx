@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type ApiClient,
   type LockState,
@@ -51,7 +51,7 @@ const mockLockedServer = (): ApiClient =>
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const path = url.slice(NAS.origin.length)
-        const method = init.method ?? APP_CALL_METHODS.get
+        const method = init.method ?? HTTP_METHODS.get
         mockServer.heard = [...mockServer.heard, { method, path, body: init.body }]
         if (method === unlock.method && path === unlock.path) {
           if (pinOf(init.body) !== PIN) {

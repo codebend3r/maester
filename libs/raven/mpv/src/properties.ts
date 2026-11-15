@@ -18,8 +18,11 @@ const optional =
 
 export const MPV_TRACK_TYPES = { audio: 'audio', sub: 'sub', video: 'video' } as const
 
-/** The word mpv answers beside a flag or a number when it chooses for itself. */
-export const MPV_CHOICES = { auto: 'auto' } as const
+/**
+ * The words mpv takes and answers for a choice: `auto` when it chooses for itself, `yes` and
+ * `no` for a flag set as text, as `sid=no` turns subtitles off.
+ */
+export const MPV_CHOICES = { auto: 'auto', yes: 'yes', no: 'no' } as const
 
 export const isMpvTrack = object({
   id: isNumber,

@@ -1,7 +1,7 @@
 import { type ApiClient, type MediaItem } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { useId, useState } from 'react'
-import { Button } from '@/components/Button/Button'
+import { BUTTON_TONES, Button } from '@/components/Button/Button'
 import { DOLBY_VISION_NOTICE_COPY } from '@/components/Player/copy'
 import styles from '@/components/Player/DolbyVisionNotice.module.scss'
 import { playerQueriesFor } from '@/lib/playerQueries'
@@ -31,7 +31,11 @@ export const DolbyVisionNotice = ({ api, media }: DolbyVisionNoticeProps) => {
             <p>{DOLBY_VISION_NOTICE_COPY.advice}</p>
             {media.versions > 1 && <p>{DOLBY_VISION_NOTICE_COPY.otherVersions}</p>}
           </div>
-          <Button tone="ghost" className={styles.dismiss} onClick={() => setDismissed(true)}>
+          <Button
+            tone={BUTTON_TONES.ghost}
+            className={styles.dismiss}
+            onClick={() => setDismissed(true)}
+          >
             {DOLBY_VISION_NOTICE_COPY.dismiss}
           </Button>
         </aside>

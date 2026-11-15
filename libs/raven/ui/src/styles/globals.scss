@@ -70,6 +70,8 @@
    */
   --color-on-picture: #f1ece2;
   --color-on-picture-soft: rgb(246 242 234 / 85%);
+  // A hairline on a picture: the edge of a menu, a dialog or a key cap over the video.
+  --color-on-picture-hairline: color-mix(in srgb, var(--color-on-picture) 12%, transparent);
   --color-picture-scrim: rgb(10 14 13 / 60%);
   --color-picture-glass: rgb(10 14 13 / 72%);
   // A requested title's check over its poster: green in every theme, under --color-on-picture at 4.5:1.
@@ -164,6 +166,17 @@
   --space-8: 5rem;
   // Between the sections of a long page: home's, the design page's.
   --space-9: 7rem;
+  // The gap between rows that read as one block: a menu's options.
+  --space-hair: 2px;
+  // Inline padding that grows with the text it wraps: a key cap, a caption's box.
+  --space-text-y: 0.1em;
+  --space-text-x: 0.45em;
+  // A field's padding beside its text.
+  --space-field-x: 0.875rem;
+  // The finest gap there is: between the stacked lines of a score or a badge.
+  --space-px: 1px;
+  // A popover's inset from its edge, and between a theme's preview and its name.
+  --space-popover: 0.875rem;
   // The page's own inset from the frame: 20px on a phone up to 56px.
   --gutter: clamp(1.25rem, 4vw, 3.5rem);
   // Between a page's sections: 48px on a phone up to 72px.
@@ -171,6 +184,9 @@
   // A desktop host sets this so the player header clears the window's traffic lights.
   --titlebar-inset: 0px;
 
+  // The corners of a drawing's parts: a theme preview's lines and its poster.
+  --radius-2xs: 2px;
+  --radius-xs: 3px;
   // Rating boxes and keys.
   --radius-sm: 4px;
   // Buttons and thumbnails.
@@ -239,6 +255,12 @@
   --measure: 38rem;
   // A small dialog's width: a pad of keys, not prose.
   --measure-narrow: 24rem;
+  // A short question's dialog: a download to confirm, a link to open.
+  --measure-question: 28rem;
+  // A form's dialog, wider than prose: a library's settings, a search to pick a match from.
+  --measure-form: 40rem;
+  // The widest dialog: a match's search with its candidates' posters beside them.
+  --measure-form-wide: 44rem;
   // An album's cover on its own page and on Now Playing.
   --cover-size: 15rem;
   // A line that has to be seen from across the room: the dashed edge of a drop target.
@@ -268,7 +290,7 @@ body {
 
   // A new theme washes in rather than snapping.
   @media (prefers-reduced-motion: no-preference) {
-    transition: background-color 400ms ease;
+    transition: background-color 400ms var(--ease-out);
   }
 }
 

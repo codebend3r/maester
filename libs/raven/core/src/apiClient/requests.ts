@@ -1,55 +1,34 @@
 import type { Transport } from '@/apiClient/transport'
 import {
-  isTitleHolding,
-  REQUEST_HOLDING_PATH,
   type TitleHolding,
   type TitleRequest,
   type TitleRequestAsk,
   type TitleRequests,
-  isTitleRequest,
-  isTitleRequests,
-  isUpcomingDetails,
-  REQUEST_PATHS,
-  type UpcomingDetails,
   UPCOMING_TITLE_PARAMS,
-  UPCOMING_TITLE_PATH,
+  type UpcomingDetails,
 } from '@/contract'
-import { fillPath } from '@/query'
+import { ROUTES } from '@/routes'
 
 /** Coming soon's titles of their own, and the requests to download them. */
-export const requestCalls = ({ send, expect }: Transport) => ({
+export const requestCalls = ({ ask }: Transport) => ({
   /** One upcoming movie or show, as TMDB describes it. */
   getUpcomingDetails: ({ type, tmdbId }: TitleRequestAsk): Promise<UpcomingDetails> =>
-    expect({
-      request: send({
-        path: fillPath({
-          path: UPCOMING_TITLE_PATH,
-          params: { [UPCOMING_TITLE_PARAMS.type]: type, [UPCOMING_TITLE_PARAMS.tmdbId]: tmdbId },
-        }),
-      }),
-      guard: isUpcomingDetails,
+    ask({
+      route: ROUTES.getUpcomingDetails,
+      params: { [UPCOMING_TITLE_PARAMS.type]: type, [UPCOMING_TITLE_PARAMS.tmdbId]: tmdbId },
     }),
 
   /** Every request with where it stands, and how many the caller has left. */
-  listRequests: (): Promise<TitleRequests> =>
-    expect({ request: send({ path: REQUEST_PATHS.requests }), guard: isTitleRequests }),
+  listRequests: (): Promise<TitleRequests> => ask({ route: ROUTES.listRequests }),
 
   /** Whether the title's Sonarr or Radarr holds it already, and where it stands there. */
   getRequestHolding: ({ type, tmdbId }: TitleRequestAsk): Promise<TitleHolding> =>
-    expect({
-      request: send({
-        path: fillPath({
-          path: REQUEST_HOLDING_PATH,
-          params: { [UPCOMING_TITLE_PARAMS.type]: type, [UPCOMING_TITLE_PARAMS.tmdbId]: tmdbId },
-        }),
-      }),
-      guard: isTitleHolding,
+    ask({
+      route: ROUTES.getRequestHolding,
+      params: { [UPCOMING_TITLE_PARAMS.type]: type, [UPCOMING_TITLE_PARAMS.tmdbId]: tmdbId },
     }),
 
   /** Asks for a movie or show to be downloaded for everyone; spends one of the caller's requests. */
-  requestDownload: (ask: TitleRequestAsk): Promise<TitleRequest> =>
-    expect({
-      request: send({ path: REQUEST_PATHS.requests, method: 'POST', body: ask }),
-      guard: isTitleRequest,
-    }),
+  requestDownload: (titleAsk: TitleRequestAsk): Promise<TitleRequest> =>
+    ask({ route: ROUTES.requestDownload, body: titleAsk }),
 })

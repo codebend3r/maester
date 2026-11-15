@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ApiClient, MediaTracks, SubtitleTrack } from '@raven/core'
 import { useState } from 'react'
-import { preferredAudio, preferredSubtitle } from '@/components/Player/selection'
+import { preferredAudio, preferredSubtitle } from '@raven/core'
 import { playerQueriesFor } from '@/lib/playerQueries'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
@@ -21,7 +21,7 @@ export type TrackSelection = {
    */
   isWaitingForTracks: boolean
   /** The engine switches tracks itself, so the menu shows the pick even when nothing is converted. */
-  playsPickedAudio?: boolean
+  shouldPlayPickedAudio: boolean
   pickAudio: (index: number | null) => void
   pickSubtitle: (id: string | null) => void
 }
@@ -49,7 +49,7 @@ export const useTrackSelection = ({ mediaId, api }: UseTrackSelectionProps): Tra
   const audio = audioPick ?? preferredAudio({ tracks, language: audioLanguage })
   const subtitleId = subtitlePick
     ? subtitlePick.id
-    : preferredSubtitle({ tracks, subtitles: subtitlePrefs })
+    : preferredSubtitle({ tracks, isOn: subtitlePrefs.on, language: subtitlePrefs.language })
   const subtitle = tracks?.subtitles.find((track) => track.id === subtitleId) ?? null
 
   const pickSubtitle = (id: string | null) => {
@@ -69,6 +69,7 @@ export const useTrackSelection = ({ mediaId, api }: UseTrackSelectionProps): Tra
     isDefaultAudio: audio == null || audio === (tracks?.defaultAudio ?? null),
     subtitle,
     isWaitingForTracks: audioLanguage != null && trackList.isPending && audioPick == null,
+    shouldPlayPickedAudio: false,
     pickAudio: (index) => {
       setAudioPick(index)
       setAudioLanguage(tracks?.audio.find((track) => track.index === index)?.language ?? null)

@@ -14,13 +14,13 @@ import {
   resumeAtFor,
   SESSION_KINDS,
   episodeTag,
+  preferredAudio,
+  preferredSubtitle,
 } from '@raven/core'
 import { watchAppHide } from '@raven/native'
 import {
   VIDEO_EVENTS,
   initialVideoState,
-  preferredAudio,
-  preferredSubtitle,
   useCaptionStyle,
   useProgressReport,
   useTrackCues,
@@ -222,7 +222,7 @@ export const Playing = ({
   const [resumeAt] = useState(() => (isFromStart ? 0 : resumeAtFor({ at, media })))
   const heading = usePlayerHeading({ media, session })
   const [subtitle, setSubtitle] = useState(() =>
-    preferredSubtitle({ tracks, subtitles: subtitlePrefs }),
+    preferredSubtitle({ tracks, isOn: subtitlePrefs.on, language: subtitlePrefs.language }),
   )
   // The same query the policy is read from, already answered: its height caps the sizes offered.
   const settings = useQuery(session.queries.playbackSettingsQuery)

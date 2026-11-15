@@ -5,7 +5,7 @@ import { Controller, Get, Module } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@/http'
+import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@shared/http'
 import { serveWebApp } from '@/serveWebApp'
 
 @Controller('api')

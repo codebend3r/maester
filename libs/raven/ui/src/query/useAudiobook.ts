@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ApiClient, AudioBitrate, Chapter, Track } from '@raven/core'
 import { useMemo } from 'react'
-import { isAudiobookTrack } from '@/lib/chapters'
+import { isAudiobookTrack } from '@raven/core'
 import { ravenQueriesFor } from '@/query/ravenQueries'
 import { MUSIC_QUALITIES, usePlayerPrefs } from '@/stores/playerPrefs'
 

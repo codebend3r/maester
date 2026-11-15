@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
   DESKTOP_PLATFORMS,
-  desktopPlatformFor,
   isRavenDesktopBridge,
   WINDOW_CHROMES,
   windowChromeFor,
@@ -33,13 +32,6 @@ describe('isRavenDesktopBridge', () => {
     expect(isRavenDesktopBridge({ request: noop, dropFiles: noop, subscribe: noop })).toBe(false)
     expect(isRavenDesktopBridge({ ...bridge, platform: 'linux' })).toBe(false)
     expect(isRavenDesktopBridge({ ...bridge, platform: 'win32' })).toBe(false)
-  })
-})
-
-describe('desktopPlatformFor', () => {
-  it("reads Node's win32 as Windows and anything else as macOS", () => {
-    expect(desktopPlatformFor({ platform: 'win32' })).toBe(DESKTOP_PLATFORMS.windows)
-    expect(desktopPlatformFor({ platform: 'darwin' })).toBe(DESKTOP_PLATFORMS.mac)
   })
 })
 

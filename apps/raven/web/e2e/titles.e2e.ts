@@ -1,5 +1,5 @@
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { expect, test } from '@playwright/test'
-import { FIXTURE_SERVER } from '@raven/core'
 import { SEASON_GRID_COPY } from '@/components/SeasonGrid/copy'
 import { PLAYABLE_ITEM_VIEW_COPY } from '@/components/PlayableItemView/copy'
 import { COMMON_COPY } from '@/lib/copy'

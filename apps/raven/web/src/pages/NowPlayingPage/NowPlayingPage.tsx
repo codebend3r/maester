@@ -1,11 +1,17 @@
-import { type Chapter, REPEAT_MODES, type Track, formatDuration, orderedOf } from '@raven/core'
+import {
+  type Chapter,
+  REPEAT_MODES,
+  type Track,
+  formatDuration,
+  orderedOf,
+  nextChapterStart,
+  previousChapterStart,
+} from '@raven/core'
 import { Button } from '@raven/ui'
 import {
   AUDIOBOOK_SPEEDS,
   AUDIO_STATES,
-  nextChapterStart,
   playingTrackOf,
-  previousChapterStart,
   useAudioQueue,
   useAudiobookChapters,
   usePlayerPrefs,

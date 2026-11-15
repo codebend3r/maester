@@ -10,8 +10,8 @@ import {
   matching,
   nullable,
   object,
-  oneOf,
   union,
+  literal,
 } from '@/schema'
 
 /** The fields Edit metadata can write over: what a page shows for a movie or show. */
@@ -86,8 +86,8 @@ export const MATCH_SUBJECT_KINDS = { media: 'media', item: 'item' } as const
 
 /** What a Fix match search is for: a file (and the show folder it is in), or a matched show. */
 export const isMatchSubject = union(
-  object({ kind: oneOf([MATCH_SUBJECT_KINDS.media]), id: isNumber }),
-  object({ kind: oneOf([MATCH_SUBJECT_KINDS.item]), id: isNumber }),
+  object({ kind: literal(MATCH_SUBJECT_KINDS.media), id: isNumber }),
+  object({ kind: literal(MATCH_SUBJECT_KINDS.item), id: isNumber }),
 )
 
 export type MatchSubject = Infer<typeof isMatchSubject>

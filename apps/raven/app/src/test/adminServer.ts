@@ -1,6 +1,6 @@
 import {
   type Account,
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type ApiClient,
   DEFAULT_DISPLAY_SETTINGS,
@@ -57,7 +57,7 @@ const REMOTE_ACCESS: RemoteAccessState = {
   status: { state: REMOTE_ACCESS_STATES.disabled },
 }
 
-const { get, put, post } = APP_CALL_METHODS
+const { get, put, post } = HTTP_METHODS
 
 /** What the test server holds, read at each request, so a test can change it as it goes. */
 export type AdminServerState = {

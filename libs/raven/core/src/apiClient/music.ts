@@ -1,4 +1,5 @@
 import type { Transport } from '@/apiClient/transport'
+import { ROUTES } from '@/routes'
 import {
   type AlbumDetails,
   type AlbumMatchCandidate,
@@ -9,16 +10,8 @@ import {
   type FavouriteChange,
   type Lyrics,
   type TrackPage,
-  isAlbumDetails,
-  isAlbumList,
-  isAlbumMatchCandidateList,
-  isArtistDetails,
-  isArtistList,
-  isLyrics,
-  isTrackPage,
 } from '@/contract'
 import { type MusicListOptions, musicListQuery } from '@/musicListQuery'
-import { pathWithQuery } from '@/query'
 
 type ListMusicProps = { libraryId: number } & MusicListOptions
 
@@ -35,99 +28,79 @@ type SetAlbumFavouriteProps = { albumId: number } & FavouriteChange
 type SetArtistFavouriteProps = { artistId: number } & FavouriteChange
 
 /** A music library's artists, albums and tracks, and the pages of one album or artist. */
-export const musicCalls = ({ send, expect }: Transport) => ({
+export const musicCalls = ({ ask }: Transport) => ({
   /** The artists credited in a music library, by name; `sort` other than title sorts by name too. */
   listArtists: ({ libraryId, ...options }: ListMusicProps): Promise<Artist[]> =>
-    expect({
-      request: send({
-        path: `/api/libraries/${libraryId}/artists?${musicListQuery.encode(options)}`,
-      }),
-      guard: isArtistList,
+    ask({
+      route: ROUTES.listArtists,
+      params: { id: libraryId },
+      query: musicListQuery.params(options),
     }),
 
   /** A music library's albums in `sort` order; search matches the album's title and its artists. */
   listAlbums: ({ libraryId, ...options }: ListMusicProps): Promise<AlbumSummary[]> =>
-    expect({
-      request: send({
-        path: `/api/libraries/${libraryId}/albums?${musicListQuery.encode(options)}`,
-      }),
-      guard: isAlbumList,
+    ask({
+      route: ROUTES.listAlbums,
+      params: { id: libraryId },
+      query: musicListQuery.params(options),
     }),
 
   /** One page of a music library's tracks, `limit` long from `offset`, with the whole count. */
   listTracks: ({ libraryId, ...options }: ListMusicProps): Promise<TrackPage> =>
-    expect({
-      request: send({
-        path: `/api/libraries/${libraryId}/tracks?${musicListQuery.encode(options)}`,
-      }),
-      guard: isTrackPage,
+    ask({
+      route: ROUTES.listTracks,
+      params: { id: libraryId },
+      query: musicListQuery.params(options),
     }),
 
   /** An album with its tracks in disc and number order. */
-  getAlbum: (id: number): Promise<AlbumDetails> =>
-    expect({ request: send({ path: `/api/albums/${id}` }), guard: isAlbumDetails }),
+  getAlbum: (id: number): Promise<AlbumDetails> => ask({ route: ROUTES.getAlbum, params: { id } }),
 
   /** An artist with their albums, and the albums of others they appear on. */
   getArtist: (id: number): Promise<ArtistDetails> =>
-    expect({ request: send({ path: `/api/artists/${id}` }), guard: isArtistDetails }),
+    ask({ route: ROUTES.getArtist, params: { id } }),
 
   /** MusicBrainz's releases for an album's Fix match, each with how sure raven is of it, best first. */
   searchAlbumMatches: ({
     albumId,
     query,
   }: SearchAlbumMatchesProps): Promise<AlbumMatchCandidate[]> =>
-    expect({
-      request: send({
-        path: pathWithQuery({
-          path: `/api/albums/${albumId}/match/search`,
-          query: query === undefined ? {} : { query },
-        }),
-      }),
-      guard: isAlbumMatchCandidateList,
+    ask({
+      route: ROUTES.searchAlbumMatches,
+      params: { id: albumId },
+      query: query === undefined ? {} : { query },
     }),
 
   /** Points an album at a MusicBrainz release, or at none, and answers with its page. */
   setAlbumMatch: ({ albumId, mbid }: SetAlbumMatchProps): Promise<AlbumDetails> =>
-    expect({
-      request: send({
-        path: `/api/albums/${albumId}/match`,
-        method: 'PUT',
-        body: { mbid } satisfies AlbumMatchChoice,
-      }),
-      guard: isAlbumDetails,
+    ask({
+      route: ROUTES.setAlbumMatch,
+      params: { id: albumId },
+      body: { mbid } satisfies AlbumMatchChoice,
     }),
 
   /** Marks an album the account's favourite, or not, and answers with its page. */
   setAlbumFavourite: ({ albumId, favourite }: SetAlbumFavouriteProps): Promise<AlbumDetails> =>
-    expect({
-      request: send({
-        path: `/api/albums/${albumId}/favourite`,
-        method: 'PUT',
-        body: { favourite } satisfies FavouriteChange,
-      }),
-      guard: isAlbumDetails,
+    ask({
+      route: ROUTES.setAlbumFavourite,
+      params: { id: albumId },
+      body: { favourite } satisfies FavouriteChange,
     }),
 
   /** Marks an artist the account's favourite, or not, and answers with their page. */
   setArtistFavourite: ({ artistId, favourite }: SetArtistFavouriteProps): Promise<ArtistDetails> =>
-    expect({
-      request: send({
-        path: `/api/artists/${artistId}/favourite`,
-        method: 'PUT',
-        body: { favourite } satisfies FavouriteChange,
-      }),
-      guard: isArtistDetails,
+    ask({
+      route: ROUTES.setArtistFavourite,
+      params: { id: artistId },
+      body: { favourite } satisfies FavouriteChange,
     }),
 
   /** The account's favourite albums across every library it may see, most recently marked first. */
-  listFavouriteAlbums: (): Promise<AlbumSummary[]> =>
-    expect({ request: send({ path: '/api/favourites/albums' }), guard: isAlbumList }),
+  listFavouriteAlbums: (): Promise<AlbumSummary[]> => ask({ route: ROUTES.listFavouriteAlbums }),
 
   /** The account's favourite artists, most recently marked first. */
-  listFavouriteArtists: (): Promise<Artist[]> =>
-    expect({ request: send({ path: '/api/favourites/artists' }), guard: isArtistList }),
+  listFavouriteArtists: (): Promise<Artist[]> => ask({ route: ROUTES.listFavouriteArtists }),
 
   /** A track's lyrics: synced lines, plain text, or none, from its tags, a sidecar `.lrc` or LRCLIB. */
-  getLyrics: (id: number): Promise<Lyrics> =>
-    expect({ request: send({ path: `/api/tracks/${id}/lyrics` }), guard: isLyrics }),
+  getLyrics: (id: number): Promise<Lyrics> => ask({ route: ROUTES.getLyrics, params: { id } }),
 })

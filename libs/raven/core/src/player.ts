@@ -9,6 +9,7 @@ import {
   object,
   oneOf,
   union,
+  literal,
 } from '@/schema'
 
 export const PLAYER_SOURCE_KINDS = { server: 'server', file: 'file' } as const
@@ -18,8 +19,8 @@ export const PLAYER_SOURCE_KINDS = { server: 'server', file: 'file' } as const
  * main process granted it, never a path or a URL.
  */
 export const isPlayerSource = union(
-  object({ kind: oneOf([PLAYER_SOURCE_KINDS.server]), serverId: isString, mediaId: isNumber }),
-  object({ kind: oneOf([PLAYER_SOURCE_KINDS.file]), fileId: isString }),
+  object({ kind: literal(PLAYER_SOURCE_KINDS.server), serverId: isString, mediaId: isNumber }),
+  object({ kind: literal(PLAYER_SOURCE_KINDS.file), fileId: isString }),
 )
 
 export type PlayerSource = Infer<typeof isPlayerSource>
@@ -40,23 +41,23 @@ export const PLAYER_COMMANDS = {
 
 export const isPlayerCommand = union(
   object({
-    type: oneOf([PLAYER_COMMANDS.load]),
+    type: literal(PLAYER_COMMANDS.load),
     source: isPlayerSource,
     start: isNumber,
     audio: nullable(isNumber),
     subtitle: nullable(isString),
   }),
-  object({ type: oneOf([PLAYER_COMMANDS.play]) }),
-  object({ type: oneOf([PLAYER_COMMANDS.pause]) }),
-  object({ type: oneOf([PLAYER_COMMANDS.seek]), time: isNumber }),
-  object({ type: oneOf([PLAYER_COMMANDS.audio]), index: nullable(isNumber) }),
-  object({ type: oneOf([PLAYER_COMMANDS.subtitle]), id: nullable(isString) }),
-  object({ type: oneOf([PLAYER_COMMANDS.volume]), volume: isNumber, muted: isBoolean }),
-  object({ type: oneOf([PLAYER_COMMANDS.speed]), rate: isNumber }),
+  object({ type: literal(PLAYER_COMMANDS.play) }),
+  object({ type: literal(PLAYER_COMMANDS.pause) }),
+  object({ type: literal(PLAYER_COMMANDS.seek), time: isNumber }),
+  object({ type: literal(PLAYER_COMMANDS.audio), index: nullable(isNumber) }),
+  object({ type: literal(PLAYER_COMMANDS.subtitle), id: nullable(isString) }),
+  object({ type: literal(PLAYER_COMMANDS.volume), volume: isNumber, muted: isBoolean }),
+  object({ type: literal(PLAYER_COMMANDS.speed), rate: isNumber }),
   /** How the player draws its subtitles: the account's look, which the player maps to its own. */
-  object({ type: oneOf([PLAYER_COMMANDS.subtitleStyle]), style: isCaptionStyle }),
-  object({ type: oneOf([PLAYER_COMMANDS.stats]) }),
-  object({ type: oneOf([PLAYER_COMMANDS.stop]) }),
+  object({ type: literal(PLAYER_COMMANDS.subtitleStyle), style: isCaptionStyle }),
+  object({ type: literal(PLAYER_COMMANDS.stats) }),
+  object({ type: literal(PLAYER_COMMANDS.stop) }),
 )
 
 export type PlayerCommand = Infer<typeof isPlayerCommand>
@@ -89,16 +90,16 @@ export const PLAYER_EVENTS = {
 } as const
 
 export const isPlayerEvent = union(
-  object({ type: oneOf([PLAYER_EVENTS.time]), time: isNumber }),
-  object({ type: oneOf([PLAYER_EVENTS.buffered]), ranges: listOf(isTimeRange) }),
-  object({ type: oneOf([PLAYER_EVENTS.paused]), paused: isBoolean }),
-  object({ type: oneOf([PLAYER_EVENTS.waiting]), waiting: isBoolean }),
-  object({ type: oneOf([PLAYER_EVENTS.duration]), duration: nullable(isNumber) }),
-  object({ type: oneOf([PLAYER_EVENTS.rate]), rate: isNumber }),
-  object({ type: oneOf([PLAYER_EVENTS.tracks]), tracks: isMediaTracks }),
-  object({ type: oneOf([PLAYER_EVENTS.ended]) }),
+  object({ type: literal(PLAYER_EVENTS.time), time: isNumber }),
+  object({ type: literal(PLAYER_EVENTS.buffered), ranges: listOf(isTimeRange) }),
+  object({ type: literal(PLAYER_EVENTS.paused), paused: isBoolean }),
+  object({ type: literal(PLAYER_EVENTS.waiting), waiting: isBoolean }),
+  object({ type: literal(PLAYER_EVENTS.duration), duration: nullable(isNumber) }),
+  object({ type: literal(PLAYER_EVENTS.rate), rate: isNumber }),
+  object({ type: literal(PLAYER_EVENTS.tracks), tracks: isMediaTracks }),
+  object({ type: literal(PLAYER_EVENTS.ended) }),
   object({
-    type: oneOf([PLAYER_EVENTS.error]),
+    type: literal(PLAYER_EVENTS.error),
     reason: isPlayerErrorReason,
     message: isString,
   }),

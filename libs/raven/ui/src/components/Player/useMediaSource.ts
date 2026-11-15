@@ -9,6 +9,7 @@ import {
 } from '@raven/core'
 import { type RefObject, useEffect, useEffectEvent, useRef } from 'react'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
+import { MEDIA_FAILURE_COPY } from '@/components/Player/copy'
 import type { HtmlSource } from '@/components/Player/engine'
 import type { Rendition } from '@/components/Player/rendition'
 import { type Delivery, browserEnvironment, createStreamSession } from '@/lib/streamSource'
@@ -56,12 +57,49 @@ export const sourceFor = ({
 
 /** What a media element's error means to the viewer. */
 export const failureMessage = (error: MediaError | null): string => {
-  if (error?.code === MediaError.MEDIA_ERR_NETWORK) return 'The connection to the server dropped.'
-  if (error?.code === MediaError.MEDIA_ERR_DECODE) return "The browser couldn't decode this file."
-  if (error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-    return "The browser couldn't open this file."
+  if (error?.code === MediaError.MEDIA_ERR_NETWORK) return MEDIA_FAILURE_COPY.network
+  if (error?.code === MediaError.MEDIA_ERR_DECODE) return MEDIA_FAILURE_COPY.decode
+  if (error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) return MEDIA_FAILURE_COPY.unsupported
+  return MEDIA_FAILURE_COPY.stopped
+}
+
+/**
+ * What the video plays from: who it is (the key a new source re-attaches by), how long the
+ * server says it is, and how to build the source once the effect runs.
+ */
+type SourcePlan = {
+  id: string | number
+  knownDuration: number | null
+  videoSource: (access: () => MediaAccess | null) => VideoSource
+}
+
+type PlanOfProps = { source: HtmlSource; rendition: Rendition; audio: number | null }
+
+/** A library file plays its file or a converted stream; a local file plays itself. */
+const planOf = ({ source, rendition, audio }: PlanOfProps): SourcePlan => {
+  switch (source.kind) {
+    case PLAYER_SOURCE_KINDS.server: {
+      const { mode, quality, burn } = rendition
+      const { media, api } = source
+      const mime = mode === PLAYBACK_MODES.direct ? null : streamMimeType({ media, mode })
+      return {
+        id: media.id,
+        knownDuration: media.duration,
+        videoSource: (access) =>
+          sourceFor({ api, id: media.id, mode, audio, quality, burn, mime, access }),
+      }
+    }
+    case PLAYER_SOURCE_KINDS.file:
+      return {
+        id: source.url,
+        knownDuration: null,
+        videoSource: () => ({ kind: VIDEO_SOURCE_KINDS.file, url: source.url }),
+      }
+    default: {
+      const unknown: never = source
+      return unknown
+    }
   }
-  return 'Playback stopped unexpectedly.'
 }
 
 type UseMediaSourceProps = {
@@ -74,7 +112,8 @@ type UseMediaSourceProps = {
   /** The browser would not start playing. */
   onRefused: () => void
   onFailure: (message: string) => void
-  onSlow?: (delivery: Delivery) => void
+  /** Null where nothing listens for a stream the connection cannot keep up with. */
+  onSlow: ((delivery: Delivery) => void) | null
 }
 
 /**
@@ -96,15 +135,11 @@ export const useMediaSource = ({
   onSlow,
 }: UseMediaSourceProps): void => {
   const { mode, quality, burn } = rendition
-  const mime =
-    mode === PLAYBACK_MODES.direct || htmlSource.kind === PLAYER_SOURCE_KINDS.file
-      ? null
-      : streamMimeType({ media: htmlSource.media, mode })
-  const id = htmlSource.kind === PLAYER_SOURCE_KINDS.server ? htmlSource.media.id : htmlSource.url
-  const api = htmlSource.kind === PLAYER_SOURCE_KINDS.server ? htmlSource.api : null
-  const knownDuration =
-    htmlSource.kind === PLAYER_SOURCE_KINDS.server ? htmlSource.media.duration : null
-  const plane = htmlSource.kind === PLAYER_SOURCE_KINDS.server ? htmlSource.mediaPlane : undefined
+  const plan = planOf({ source: htmlSource, rendition, audio })
+  const { id, knownDuration } = plan
+  // A library file's media plane: the origin and ticket it plays from; a local file has none.
+  const plane =
+    htmlSource.kind === PLAYER_SOURCE_KINDS.server ? (htmlSource.mediaPlane ?? null) : null
   const access = plane?.access ?? null
   // With an origin named, the video waits for its ticket rather than start through the web host.
   const isAwaitingTicket = !!plane?.isAwaitingTicket
@@ -135,9 +170,8 @@ export const useMediaSource = ({
   const slow = useEffectEvent((delivery: Delivery) => {
     if (attached.current === wanted) onSlow?.(delivery)
   })
-  const unreachable = useEffectEvent(() => {
-    if (htmlSource.kind === PLAYER_SOURCE_KINDS.server) htmlSource.mediaPlane?.reportUnreachable()
-  })
+  const unreachable = useEffectEvent(() => plane?.reportUnreachable())
+  const videoSourceNow = useEffectEvent(() => plan.videoSource(() => accessRef.current))
 
   useVideoEvents({
     videoRef,
@@ -196,37 +230,11 @@ export const useMediaSource = ({
     const element = videoRef.current
     if (!element || isAwaitingTicket) return undefined
     attached.current = wanted
-    const videoSource: VideoSource =
-      api != null && typeof id === 'number'
-        ? sourceFor({
-            api,
-            id,
-            mode,
-            audio,
-            quality,
-            burn,
-            mime,
-            access: () => accessRef.current,
-          })
-        : { kind: 'file', url: String(id) }
     return attach({
       element,
-      source: videoSource,
+      source: videoSourceNow(),
       duration: knownDuration,
-      isRemote: originUrl != null,
+      isRemote: originUrl !== null,
     })
-  }, [
-    videoRef,
-    id,
-    knownDuration,
-    api,
-    mode,
-    audio,
-    quality,
-    burn,
-    mime,
-    wanted,
-    originUrl,
-    isAwaitingTicket,
-  ])
+  }, [videoRef, knownDuration, wanted, originUrl, isAwaitingTicket])
 }

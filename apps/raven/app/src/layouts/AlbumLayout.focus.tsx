@@ -1,4 +1,4 @@
-import type { AlbumTrack } from '@raven/ui/headless'
+import { type AlbumTrack } from '@raven/core'
 import { type ComponentRef, useRef } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 

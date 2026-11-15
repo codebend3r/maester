@@ -64,12 +64,16 @@ export default {
       paths: { '@/alert': ['functions/signup-alert/alert.ts'] },
       ignoreDependencies: ['nodemailer'],
     },
+    'libs/raven/core': {
+      // The package's two entries: the library, and the fixture server's facts its e2e suites share.
+      entry: ['src/index.ts', 'src/fixtureServer.ts'],
+    },
     'libs/raven/native': {
       /*
-       * The package's three entries. Its exports name them in dist, and knip's default finds
-       * only src/index.ts.
+       * The package's four entries, the apps' test fixtures among them. Its exports name them in
+       * dist, and knip's default finds only src/index.ts.
        */
-      entry: ['src/index.ts', 'src/headless.ts', 'src/polyfills.ts'],
+      entry: ['src/index.ts', 'src/headless.ts', 'src/polyfills.ts', 'src/testing.ts'],
     },
     'libs/raven/mpv': {
       /*

@@ -1,5 +1,5 @@
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type ApiClient,
   CREDIT_JOBS,
@@ -276,7 +276,7 @@ type BingeAfterProps = {
 /** The binge list once a write adds Severance to it or takes it off; null for any other call. */
 const bingeAfter = ({ method, path, body, ids }: BingeAfterProps): readonly number[] | null => {
   const isSevering =
-    method === APP_CALL_METHODS.put && path === pathFor({ path: setBinge.path, id: SEVERANCE.id })
+    method === HTTP_METHODS.put && path === pathFor({ path: setBinge.path, id: SEVERANCE.id })
   if (!isSevering) return null
   const others = ids.filter((id) => id !== SEVERANCE.id)
   return isRecord(body) && body.binge === true ? [SEVERANCE.id, ...others] : others
@@ -286,8 +286,8 @@ type IsBingeCallProps = { method: string; path: string }
 
 /** Whether a call reads or writes the binge list, which the server answers with the list. */
 const isBingeCall = ({ method, path }: IsBingeCallProps): boolean =>
-  (method === APP_CALL_METHODS.get && path === getBinge.path) ||
-  (method === APP_CALL_METHODS.put && path === pathFor({ path: setBinge.path, id: SEVERANCE.id }))
+  (method === HTTP_METHODS.get && path === getBinge.path) ||
+  (method === HTTP_METHODS.put && path === pathFor({ path: setBinge.path, id: SEVERANCE.id }))
 
 type AnswerForProps = {
   method: string
@@ -297,7 +297,7 @@ type AnswerForProps = {
 
 /** What the server answers `method` at `path` with, sent `body`. */
 const answerFor = ({ method, path, body }: AnswerForProps): Answer => {
-  if (method !== APP_CALL_METHODS.get) return WRITES[path]?.(body) ?? NOT_FOUND
+  if (method !== HTTP_METHODS.get) return WRITES[path]?.(body) ?? NOT_FOUND
   const read = READS[path]
   return read === undefined ? NOT_FOUND : { status: STATUSES.ok, body: read }
 }
@@ -347,10 +347,10 @@ export const itemApi = ({
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const path = pathOnly(url.slice(NAS.origin.length))
-        const method = init.method ?? APP_CALL_METHODS.get
+        const method = init.method ?? HTTP_METHODS.get
         const sent = bodyOf(init.body)
         hear({ method, path, body: sent })
-        await (method === APP_CALL_METHODS.get ? reads(path) : writes())
+        await (method === HTTP_METHODS.get ? reads(path) : writes())
         binge.write(bingeAfter({ method, path, body: sent, ids: binge.read() }) ?? binge.read())
         return responseOf(
           isBingeCall({ method, path })

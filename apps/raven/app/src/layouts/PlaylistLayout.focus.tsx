@@ -1,4 +1,4 @@
-import type { PlaylistTrack } from '@raven/ui/headless'
+import { type PlaylistTrack } from '@raven/core'
 import type { ComponentType } from 'react'
 import { StyleSheet, View } from 'react-native'
 

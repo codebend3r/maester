@@ -25,6 +25,27 @@ export const PAGE_PATHS = {
 /** The page that plays a video. */
 export const watchPageOf = (mediaId: number): AppPath => `${PAGE_PATHS.watch}/${mediaId}`
 
+/** A library's page, on its opening tab. */
+export const libraryPath = (libraryId: number): AppPath => `/libraries/${libraryId}`
+
+type LibraryTabPathProps = { libraryId: number; tab: string }
+
+/** One of a library's other tabs, each its own address beneath the library's. */
+export const libraryTabPath = ({ libraryId, tab }: LibraryTabPathProps): AppPath =>
+  `${libraryPath(libraryId)}/${tab}`
+
+/** A person's page. */
+export const personPath = (personId: number): AppPath => `/people/${personId}`
+
+/** An album's page. */
+export const albumPath = (albumId: number): AppPath => `/albums/${albumId}`
+
+/** An artist's page. */
+export const artistPath = (artistId: number): AppPath => `/artists/${artistId}`
+
+/** A playlist's page. */
+export const playlistPath = (playlistId: number): AppPath => `/playlists/${playlistId}`
+
 /** A movie's page. */
 export const moviePath = (itemId: number): AppPath => `/movies/${itemId}`
 
@@ -92,6 +113,13 @@ const shownCard = ({ everyCard, chosen }: ShownCardProps): string | null => {
   return primaryVersion(everyCard)?.card ?? null
 }
 
+/** What a movie's or an episode's page shows of its files. */
+type LibraryFiles = {
+  versions: MediaItem[]
+  everyCard: MediaItem[]
+  primary: MediaItem
+}
+
 type LibraryFilesProps = {
   versions: readonly MediaItem[]
   library: number | null
@@ -113,11 +141,7 @@ export const libraryFiles = ({
   versions,
   library,
   file,
-}: LibraryFilesProps): {
-  versions: MediaItem[]
-  everyCard: MediaItem[]
-  primary: MediaItem
-} | null => {
+}: LibraryFilesProps): LibraryFiles | null => {
   const named = versions.some((version) => version.libraryId === library) ? library : null
   const libraryId =
     named ??
@@ -137,8 +161,8 @@ type EpisodeBackPathProps = {
 }
 
 /** Where an episode's page leads back to: its season, else its show, else its library. */
-export const episodeBackPath = ({ item, libraryId }: EpisodeBackPathProps): string => {
-  if (!item.show) return `/libraries/${libraryId}`
+export const episodeBackPath = ({ item, libraryId }: EpisodeBackPathProps): AppPath => {
+  if (!item.show) return libraryPath(libraryId)
   return item.season == null
     ? showPath(item.show.id)
     : seasonPath({ showId: item.show.id, season: item.season })
@@ -161,6 +185,12 @@ const isWatchState = object({ media: isMediaItem, session: isViewingSession, upN
 
 export type WatchState = Infer<typeof isWatchState>
 
+/** A link within the app: the address, and for the player the video handed over in router state. */
+export type AppLink = { to: AppPath; state?: WatchState }
+
+/** A link to the player, which always hands the video over. */
+export type WatchLink = Required<AppLink>
+
 type WatchLinkProps = {
   media: MediaItem
   session?: ViewingSession
@@ -177,7 +207,7 @@ export const watchLink = ({
   media,
   session = sessionOf(media),
   upNext = [],
-}: WatchLinkProps): { to: AppPath; state: WatchState } => ({
+}: WatchLinkProps): WatchLink => ({
   to: watchPageOf(media.id),
   state: { media, session, upNext },
 })
@@ -187,7 +217,7 @@ type QueueLinkProps = {
 }
 
 /** The link to play the first of a shuffled `queue`, with the rest after it; null for an empty queue. */
-export const queueLink = ({ queue }: QueueLinkProps): { to: AppPath; state: WatchState } | null => {
+export const queueLink = ({ queue }: QueueLinkProps): WatchLink | null => {
   const [media, ...upNext] = queue
   return media ? watchLink({ media, session: { kind: SESSION_KINDS.queue }, upNext }) : null
 }
@@ -247,10 +277,7 @@ type CardLinkProps = {
 }
 
 /** A card's destination as a link: the page's address in its library, or the player's with the video handed over. */
-export const cardLink = ({
-  media,
-  hasPages,
-}: CardLinkProps): { to: AppPath; state?: WatchState } => {
+export const cardLink = ({ media, hasPages }: CardLinkProps): AppLink => {
   const destination = cardDestination({ media, hasPages })
   switch (destination.kind) {
     case CARD_DESTINATIONS.page:

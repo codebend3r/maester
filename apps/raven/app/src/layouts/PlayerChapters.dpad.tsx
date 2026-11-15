@@ -1,5 +1,4 @@
-import { type Chapter, formatDuration } from '@raven/core'
-import { chapterAt } from '@raven/ui/headless'
+import { type Chapter, formatDuration, chapterAt } from '@raven/core'
 import { type ComponentRef, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
 

@@ -1,7 +1,6 @@
 import { type StateStorage, createJSONStorage } from 'zustand/middleware'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
-import { usePlayerServices } from '@/stores/playerServices'
 
 type ConfigureStorageProps = { storage: StateStorage }
 
@@ -13,10 +12,5 @@ type ConfigureStorageProps = { storage: StateStorage }
 export const configureStorage = async ({ storage }: ConfigureStorageProps): Promise<void> => {
   usePlayerPrefs.persist.setOptions({ storage: createJSONStorage(() => storage) })
   usePageBackdrop.persist.setOptions({ storage: createJSONStorage(() => storage) })
-  usePlayerServices.persist.setOptions({ storage: createJSONStorage(() => storage) })
-  await Promise.all([
-    usePlayerPrefs.persist.rehydrate(),
-    usePageBackdrop.persist.rehydrate(),
-    usePlayerServices.persist.rehydrate(),
-  ])
+  await Promise.all([usePlayerPrefs.persist.rehydrate(), usePageBackdrop.persist.rehydrate()])
 }

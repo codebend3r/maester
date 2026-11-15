@@ -1,6 +1,6 @@
 import {
   ALBUM_TYPES,
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type AlbumDetails,
   type AlbumSummary,
@@ -233,7 +233,7 @@ const mixtapeWith = (body: unknown): Answer => {
   return ok({ playlist: { ...MIXTAPE, trackCount: tracks.length }, tracks })
 }
 
-const { put, post, delete: remove } = APP_CALL_METHODS
+const { put, post, delete: remove } = HTTP_METHODS
 
 const WRITES: Record<string, (body: unknown) => Answer> = {
   [writeKeyOf({
@@ -306,8 +306,7 @@ type AnswerForProps = { method: string; path: string; body: unknown }
 
 /** What the server answers `method` at `path` with, sent `body`. */
 const answerFor = ({ method, path, body }: AnswerForProps): Answer => {
-  if (method !== APP_CALL_METHODS.get)
-    return WRITES[writeKeyOf({ method, path })]?.(body) ?? NOT_FOUND
+  if (method !== HTTP_METHODS.get) return WRITES[writeKeyOf({ method, path })]?.(body) ?? NOT_FOUND
   const read = ANSWERS[path]
   return read === undefined ? NOT_FOUND : ok(read)
 }
@@ -336,10 +335,10 @@ export const musicApi = ({
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const [path = ''] = url.slice(NAS.origin.length).split('?')
-        const method = init.method ?? APP_CALL_METHODS.get
+        const method = init.method ?? HTTP_METHODS.get
         const body = bodyOf(init.body)
         hear({ method, path, body })
-        if (method !== APP_CALL_METHODS.get) await writes()
+        if (method !== HTTP_METHODS.get) await writes()
         return responseOf(answerFor({ method, path, body }))
       },
     }),

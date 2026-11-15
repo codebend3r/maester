@@ -1,5 +1,5 @@
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   APP_OWNER_CALLS,
   type AppClientCall,
@@ -83,7 +83,7 @@ const recordingFetch = (heard: (AppClientCall | null)[]): FetchLike => {
   type AnswerProps = { method?: string }
 
   const answer = async (url: string, init: AnswerProps = {}) => {
-    const name = appClientCallOf({ method: init.method ?? APP_CALL_METHODS.get, url })
+    const name = appClientCallOf({ method: init.method ?? HTTP_METHODS.get, url })
     heard.push(name === null ? null : APP_CLIENT_CALLS[name])
     return {
       ok: true,
@@ -128,11 +128,11 @@ describe('the calls raven’s app may make', () => {
   })
 
   it('writes only what the spec lets it write', () => {
+    expect(calls.flatMap(([, call]) => (call.method === HTTP_METHODS.get ? [] : [call]))).toEqual(
+      expect.arrayContaining(WRITES),
+    )
     expect(
-      calls.flatMap(([, call]) => (call.method === APP_CALL_METHODS.get ? [] : [call])),
-    ).toEqual(expect.arrayContaining(WRITES))
-    expect(
-      calls.filter(([, call]) => call.method !== APP_CALL_METHODS.get).map(([, call]) => call),
+      calls.filter(([, call]) => call.method !== HTTP_METHODS.get).map(([, call]) => call),
     ).toHaveLength(WRITES.length)
   })
 

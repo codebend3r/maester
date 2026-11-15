@@ -18,10 +18,12 @@ export const REQUEST_PATHS = { requests: '/api/requests' } as const
 export const UPCOMING_TITLE_PARAMS = { type: 'type', tmdbId: 'tmdbId' } as const
 
 /** Where the server answers whether a title's Sonarr or Radarr holds it already, and where it stands there. */
-export const REQUEST_HOLDING_PATH = `${REQUEST_PATHS.requests}/:${UPCOMING_TITLE_PARAMS.type}/:${UPCOMING_TITLE_PARAMS.tmdbId}`
+export const REQUEST_HOLDING_PATH =
+  `${REQUEST_PATHS.requests}/:${UPCOMING_TITLE_PARAMS.type}/:${UPCOMING_TITLE_PARAMS.tmdbId}` as const
 
 /** Where the server answers with one upcoming title's details from TMDB. */
-export const UPCOMING_TITLE_PATH = `/api/upcoming/:${UPCOMING_TITLE_PARAMS.type}/:${UPCOMING_TITLE_PARAMS.tmdbId}`
+export const UPCOMING_TITLE_PATH =
+  `/api/upcoming/:${UPCOMING_TITLE_PARAMS.type}/:${UPCOMING_TITLE_PARAMS.tmdbId}` as const
 
 /** Where a request stands, as its Sonarr or Radarr last told the server. */
 export const REQUEST_STATUSES = {

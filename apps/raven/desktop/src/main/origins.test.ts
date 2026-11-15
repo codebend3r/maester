@@ -1,10 +1,6 @@
+import { DESKTOP_ENV } from '@/shared/platform'
 import { describe, expect, it } from 'bun:test'
-import {
-  DEFAULT_LINK_ORIGINS,
-  DEFAULT_SERVER_ORIGIN,
-  DESKTOP_ENV,
-  isServerOrigin,
-} from '@raven/core'
+import { DEFAULT_LINK_ORIGINS, DEFAULT_SERVER_ORIGIN, isServerOrigin } from '@raven/core'
 import { namesServer } from '@/main/desktopConfig'
 import {
   AUTH_ORIGIN_HOOK,

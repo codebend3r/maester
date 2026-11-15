@@ -8,6 +8,7 @@ import {
   object,
   oneOf,
   union,
+  literal,
 } from '@/schema'
 
 /** A logo is the title drawn as art, on a clear ground, for a movie's or show's page. */
@@ -96,8 +97,8 @@ export type ChoosableImageKind = keyof ItemImageOptions
 
 /** What Edit images picks: one of TMDB's pictures, or the one beside the media. */
 export const isImageChoice = union(
-  object({ source: oneOf([IMAGE_SOURCES.tmdb]), ref: isString }),
-  object({ source: oneOf([IMAGE_SOURCES.local]) }),
+  object({ source: literal(IMAGE_SOURCES.tmdb), ref: isString }),
+  object({ source: literal(IMAGE_SOURCES.local) }),
 )
 
 export type ImageChoice = Infer<typeof isImageChoice>
@@ -113,7 +114,12 @@ export type LibraryImageChoice = Infer<typeof isLibraryImageChoice>
 /** The query Edit images is asked with: the library whose cards' pictures it chooses. */
 export const ITEM_QUERY_PARAMS = { library: 'library' } as const
 
-/** The parameters a capability picture address names. */
+/** Where the server serves TMDB's pictures from its own cache: `${IMAGE_CACHE_PATH}/poster/<tmdb path>`. */
+export const IMAGE_CACHE_PATH = '/api/images'
+
+/** The query parameter a thumbnail's or an avatar's version rides in, so a new one is a new address. */
+export const PICTURE_VERSION_PARAM = 'v'
+
 export const PICTURE_PARAMS = { id: 'id', kind: 'kind', version: 'version' } as const
 
 /**

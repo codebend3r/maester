@@ -1,5 +1,4 @@
-import { type Chapter, LYRICS_KINDS, type Lyrics, formatDuration } from '@raven/core'
-import { activeLineAt } from '@raven/ui/headless'
+import { type Chapter, LYRICS_KINDS, type Lyrics, formatDuration, activeLineAt } from '@raven/core'
 
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type BookControls, NOW_PLAYING_ASIDES, type NowPlayingAside } from '@/layouts/musicKit'

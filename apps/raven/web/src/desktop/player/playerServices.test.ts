@@ -1,3 +1,4 @@
+import { NO_TITLE_EXTRAS } from '@raven/ui/headless'
 import {
   DESKTOP_PATHS,
   DESKTOP_REQUESTS,
@@ -67,6 +68,7 @@ describe('playerActionFor', () => {
 describe('fileServicesFor', () => {
   it('describes a local file, going back to On this Mac', () => {
     expect(setup().services.title).toEqual({
+      ...NO_TITLE_EXTRAS,
       label: 'Clip 01',
       context: null,
       duration: null,

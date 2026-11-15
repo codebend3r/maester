@@ -1,6 +1,6 @@
-import { artistNames } from '@raven/core'
+import { artistNames, playlistFactsOf } from '@raven/core'
 import { BROWSE_KINDS, type BrowseTarget, browseIdOf, queueSourceOf } from '@raven/native/headless'
-import { playlistFactsOf, useAudioQueue } from '@raven/ui/headless'
+import { useAudioQueue } from '@raven/ui/headless'
 import type { ReactElement } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 

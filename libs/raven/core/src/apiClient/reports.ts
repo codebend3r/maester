@@ -1,15 +1,12 @@
 import type { Transport } from '@/apiClient/transport'
+import { ROUTES } from '@/routes'
 import {
   BUG_REPORT_PARAMS,
-  BUG_REPORT_PATHS,
   type BugReport,
   type BugReportStatus,
   type BugReportStatusChange,
-  isBugReport,
-  isBugReportList,
   type PlaybackDiagnostics,
 } from '@/contract'
-import { fillPath } from '@/query'
 
 type SetBugReportStatusProps = {
   id: number
@@ -17,26 +14,19 @@ type SetBugReportStatusProps = {
 }
 
 /** Bug reports: what a player sends when a video will not play, and how the admin works through them. */
-export const reportCalls = ({ send, expect }: Transport) => ({
+export const reportCalls = ({ ask }: Transport) => ({
   /** Sends what the player gathered about a video that would not play, for the admin to read later. */
   reportPlaybackError: (diagnostics: PlaybackDiagnostics): Promise<BugReport> =>
-    expect({
-      request: send({ path: BUG_REPORT_PATHS.reports, method: 'POST', body: diagnostics }),
-      guard: isBugReport,
-    }),
+    ask({ route: ROUTES.reportPlaybackError, body: diagnostics }),
 
   /** Every bug report, newest first. Admin only. */
-  listBugReports: (): Promise<BugReport[]> =>
-    expect({ request: send({ path: BUG_REPORT_PATHS.reports }), guard: isBugReportList }),
+  listBugReports: (): Promise<BugReport[]> => ask({ route: ROUTES.listBugReports }),
 
   /** Moves a report on, as the admin works through it. Admin only. */
   setBugReportStatus: ({ id, status }: SetBugReportStatusProps): Promise<BugReport> =>
-    expect({
-      request: send({
-        path: fillPath({ path: BUG_REPORT_PATHS.status, params: { [BUG_REPORT_PARAMS.id]: id } }),
-        method: 'PUT',
-        body: { status } satisfies BugReportStatusChange,
-      }),
-      guard: isBugReport,
+    ask({
+      route: ROUTES.setBugReportStatus,
+      params: { [BUG_REPORT_PARAMS.id]: id },
+      body: { status } satisfies BugReportStatusChange,
     }),
 })

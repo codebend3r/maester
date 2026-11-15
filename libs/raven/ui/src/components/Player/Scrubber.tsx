@@ -2,6 +2,7 @@ import { formatDuration } from '@raven/core'
 import { type CSSProperties, type PointerEvent, useRef, useState } from 'react'
 import { SCRUBBER_COPY } from '@/components/Player/copy'
 import styles from '@/components/Player/Scrubber.module.scss'
+import { classNames } from '@/lib/classNames'
 
 type ShareProps = { time: number; duration: number }
 
@@ -136,9 +137,7 @@ export const Scrubber = ({
      */
     <div
       ref={track}
-      className={[styles.scrubber, dragging != null ? styles.dragging : '']
-        .filter(Boolean)
-        .join(' ')}
+      className={classNames([styles.scrubber, dragging != null ? styles.dragging : ''])}
       // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
       role="slider"
       tabIndex={0}

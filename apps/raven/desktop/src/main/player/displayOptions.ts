@@ -1,5 +1,4 @@
-import { MPV_PROPERTIES } from '@raven/mpv'
-import type { MpvOption } from '@/main/player/outputOptions'
+import { MPV_PROPERTIES, type MpvOption } from '@raven/mpv'
 
 type DisplayOptionsProps = {
   refreshRate: number

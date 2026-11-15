@@ -5,13 +5,16 @@ import {
   isNumber,
   isString,
   keyOf,
+  literal,
   listOf,
   matching,
   nullable,
   object,
   oneOf,
   optional,
+  tagged,
   union,
+  wholeNumberIn,
 } from '@/schema'
 
 describe('matching', () => {
@@ -108,5 +111,49 @@ describe('keyOf and exactPartial', () => {
     expect(isChange({ title: 'Heat', colour: 'red' })).toBe(false)
     expect(isChange({ toString: 'x' })).toBe(false)
     expect(isChange('Heat')).toBe(false)
+  })
+})
+
+describe('literal', () => {
+  it('takes exactly its value and keeps it for a menu', () => {
+    const isDone = literal('done')
+    expect(isDone('done')).toBeTrue()
+    expect(isDone('Done')).toBeFalse()
+    expect(isDone.values).toEqual(['done'])
+  })
+})
+
+describe('wholeNumberIn', () => {
+  it('takes a whole number between its bounds, both included', () => {
+    const isPercent = wholeNumberIn({ min: 1, max: 100 })
+    expect([1, 50, 100].every(isPercent)).toBeTrue()
+    expect([0, 101, 1.5, Number.NaN, '7'].some(isPercent)).toBeFalse()
+  })
+
+  it('stops at the largest whole number a double holds exactly when no top is named', () => {
+    const isId = wholeNumberIn({ min: 1 })
+    expect(isId(Number.MAX_SAFE_INTEGER)).toBeTrue()
+    expect(isId(Number.MAX_SAFE_INTEGER + 1)).toBeFalse()
+  })
+})
+
+describe('tagged', () => {
+  const SHAPES = { circle: 'circle', square: 'square' } as const
+  const isShape = tagged({
+    tag: 'kind',
+    variants: { [SHAPES.circle]: { radius: isNumber }, [SHAPES.square]: { side: isNumber } },
+  })
+
+  it('checks the fields of the variant its tag names', () => {
+    expect(isShape({ kind: SHAPES.circle, radius: 2 })).toBeTrue()
+    expect(isShape({ kind: SHAPES.square, side: 3 })).toBeTrue()
+    expect(isShape({ kind: SHAPES.circle, side: 3 })).toBeFalse()
+  })
+
+  it('refuses an unknown tag, a missing tag and a tag inherited from the prototype', () => {
+    expect(isShape({ kind: 'triangle' })).toBeFalse() // a tag no variant names
+    expect(isShape({ radius: 2 })).toBeFalse()
+    expect(isShape({ kind: 'toString' })).toBeFalse() // a key every object inherits
+    expect(isShape(SHAPES.circle)).toBeFalse()
   })
 })

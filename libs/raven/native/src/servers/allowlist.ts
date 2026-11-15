@@ -1,4 +1,4 @@
-import { APP_CALL_METHODS, type FetchLike, appClientCallOf } from '@raven/core'
+import { HTTP_METHODS, type FetchLike, appClientCallOf } from '@raven/core'
 
 type CheckAppCallProps = { method: string; url: string }
 
@@ -18,6 +18,6 @@ type AllowlistedFetchProps = { fetch: FetchLike }
 export const allowlistedFetch =
   ({ fetch }: AllowlistedFetchProps): FetchLike =>
   async (url, init = {}) => {
-    checkAppCall({ method: init.method ?? APP_CALL_METHODS.get, url })
+    checkAppCall({ method: init.method ?? HTTP_METHODS.get, url })
     return fetch(url, init)
   }

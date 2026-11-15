@@ -123,6 +123,7 @@ const Harness = ({ mode, mediaPlane, onCommit = ignore, onFailure = ignore }: Ha
     playing,
     onRefused: () => {},
     onFailure: (message) => onFailure(`${mode}: ${message}`),
+    onSlow: null,
   })
   /*
    * After the commit and before the effect that swaps the source: where

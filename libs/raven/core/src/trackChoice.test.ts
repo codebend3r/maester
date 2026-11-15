@@ -1,0 +1,109 @@
+import { describe, expect, it } from 'bun:test'
+import { type MediaTracks, PLAYBACK_MODES, type SubtitleTrack } from '@/contract'
+import { playingAudio, preferredAudio, preferredSubtitle } from '@/trackChoice'
+
+const subtitle = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({
+  id: 'embedded-0',
+  source: 'embedded',
+  codec: 'subrip',
+  language: 'en',
+  title: null,
+  default: false,
+  forced: false,
+  hearingImpaired: false,
+  supported: true,
+  ...overrides,
+})
+
+const tracks: MediaTracks = {
+  audio: [
+    { index: 0, codec: 'eac3', channels: 6, language: 'en', title: null, default: true },
+    { index: 1, codec: 'aac', channels: 2, language: 'ja', title: null, default: false },
+  ],
+  subtitles: [
+    subtitle({ id: 'embedded-0', forced: true }),
+    subtitle({ id: 'embedded-1' }),
+    subtitle({ id: 'embedded-2', language: 'ja', supported: false }),
+    subtitle({ id: 'external-0', source: 'external', language: 'ja' }),
+  ],
+  defaultAudio: 0,
+  frameRate: 24,
+}
+
+describe('preferredAudio', () => {
+  it('keeps the default unless another language was picked and is here', () => {
+    expect(preferredAudio({ tracks, language: null })).toBeNull()
+    expect(preferredAudio({ tracks, language: 'en' })).toBeNull()
+    expect(preferredAudio({ tracks, language: 'ja' })).toBe(1)
+    expect(preferredAudio({ tracks, language: 'fr' })).toBeNull()
+    expect(preferredAudio({ tracks: null, language: 'ja' })).toBeNull()
+  })
+})
+
+describe('preferredSubtitle', () => {
+  it('stays off when subtitles were off', () => {
+    expect(preferredSubtitle({ tracks, isOn: false, language: 'en' })).toBeNull()
+  })
+
+  it('prefers a full track in the remembered language over a forced one', () => {
+    expect(preferredSubtitle({ tracks, isOn: true, language: 'en' })).toBe('embedded-1')
+  })
+
+  it('skips picture tracks, and takes any showable one without a language', () => {
+    expect(preferredSubtitle({ tracks, isOn: true, language: 'ja' })).toBe('external-0')
+    expect(preferredSubtitle({ tracks, isOn: true, language: null })).toBe('embedded-1')
+    expect(preferredSubtitle({ tracks, isOn: true, language: 'fr' })).toBeNull()
+  })
+})
+
+describe('playingAudio', () => {
+  it('plays the picked track on a converted stream, else the default', () => {
+    expect(
+      playingAudio({ mode: PLAYBACK_MODES.remux, tracks, audio: 1, shouldPlayPickedAudio: false }),
+    ).toBe(1)
+    expect(
+      playingAudio({
+        mode: PLAYBACK_MODES.transcode,
+        tracks,
+        audio: null,
+        shouldPlayPickedAudio: false,
+      }),
+    ).toBe(0)
+    expect(
+      playingAudio({
+        mode: PLAYBACK_MODES.remux,
+        tracks: null,
+        audio: null,
+        shouldPlayPickedAudio: false,
+      }),
+    ).toBeNull()
+  })
+
+  it("plays the file's own default in direct play, whichever was picked", () => {
+    expect(
+      playingAudio({ mode: PLAYBACK_MODES.direct, tracks, audio: 1, shouldPlayPickedAudio: false }),
+    ).toBe(0)
+    expect(
+      playingAudio({
+        mode: PLAYBACK_MODES.direct,
+        tracks: null,
+        audio: 1,
+        shouldPlayPickedAudio: false,
+      }),
+    ).toBeNull()
+  })
+
+  it('plays the picked track in direct play when the engine switches tracks itself', () => {
+    expect(
+      playingAudio({ mode: PLAYBACK_MODES.direct, tracks, audio: 1, shouldPlayPickedAudio: true }),
+    ).toBe(1)
+    expect(
+      playingAudio({
+        mode: PLAYBACK_MODES.direct,
+        tracks,
+        audio: null,
+        shouldPlayPickedAudio: true,
+      }),
+    ).toBe(0)
+  })
+})

@@ -68,7 +68,7 @@ describe('the headless entry', () => {
     expect(entry.useSearch).toBeFunction()
     expect(entry.useProgressReport).toBeFunction()
     expect(entry.useTrackCues).toBeFunction()
-    expect(entry.preferredAudio({ tracks: null, language: null })).toBeNull()
+    expect(entry.useCaptionStyle).toBeFunction()
     expect(entry.createSelectionStore().getState().selecting).toBeFalse()
     expect(entry.usePageBackdrop.getState().current).toBeNull()
   })

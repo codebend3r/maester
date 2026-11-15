@@ -1,3 +1,4 @@
+import { NO_HOST_EXTRAS } from '@raven/ui/headless'
 import {
   AUTH_CONFIG_STATES,
   type MediaItem,
@@ -268,9 +269,11 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
   const isDesktop = useIsDesktop()
   const logo = useTitleLogo({ media })
   const services: PlayerServices = {
+    ...NO_HOST_EXTRAS,
     title: {
       label: mediaLabel(media),
       logo,
+      context: null,
       homeTo: media.item == null ? null : titleHomePath(media.item),
       duration: media.duration,
       resumeAt: resumeAtFor({ at: 0, media }),
@@ -299,9 +302,10 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
           .then(() => afterWatching({ queryClient, libraryId: media.libraryId }))
           .catch(() => undefined)
       },
+      duration: null,
     },
     posterUrl: api.thumbnailUrl(media),
-    escape: { label: WATCH_PAGE_COPY.copyFileLink, run: copyLink },
+    escape: { label: WATCH_PAGE_COPY.copyFileLink, run: copyLink, icon: 'copy' },
     escapeFeedback: copied,
     report: {
       appVersion: ravenVersion,

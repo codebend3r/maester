@@ -26,15 +26,13 @@ type UseUpNextProps = {
  */
 export const useUpNext = ({ ended, time, duration, credits, seek }: UseUpNextProps) => {
   const navigate = useNavigate()
-  const {
-    title: { next },
-  } = useHostServices()
+  const next = useHostServices((services) => services.title.next)
   const wasEnded = useRef(false)
   const hasLeft = useRef(false)
   const playNext = () => {
     if (!next || hasLeft.current) return
     hasLeft.current = true
-    void navigate(next.to, { replace: true, state: next.state })
+    Promise.resolve(navigate(next.to, { replace: true, state: next.state })).catch(() => undefined)
   }
   const {
     isOffered,
@@ -50,7 +48,7 @@ export const useUpNext = ({ ended, time, duration, credits, seek }: UseUpNextPro
     duration,
     credits,
     hasNext: next != null,
-    canPlayItself: next != null && next.isNextSeason !== true,
+    canPlayItself: next !== null && !next.isNextSeason,
     onDue: playNext,
   })
   const onEnded = useEffectEvent(playNext)
